@@ -1,0 +1,230 @@
+{
+  "current_summary": {
+    "as_of": "2026-10-19",
+    "scope": "documentation usability and cross-file consistency; no engine/GPU execution",
+    "counts": {
+      "protection_purposes": 28,
+      "assessment_rows": 77,
+      "questions": 28,
+      "scenario_groups": 24,
+      "scenarios": 83,
+      "threat_candidates": 74,
+      "failure_misconfiguration": 9,
+      "question_scenario_links": 136,
+      "scenario_test_focuses": 83,
+      "runtime_executions": 0
+    },
+    "surface_counts": {
+      "scenario_scope_mapped": 26,
+      "partial": 7,
+      "backend_unselected": 1,
+      "pending": 3
+    },
+    "implementation_status": "Q-level selector implemented; environment collection,77-row/SC selection and engine execution pending",
+    "validation_status": "passed_after_document_checks_and_two_subagent_reviews",
+    "historical_counts_note": "Nested earlier review counts are retained as dated snapshots; not current totals",
+    "selector_regression_tests": 12,
+    "subagent_reviews": 2,
+    "remaining": "실제 환경·정책값·시험 입력/계측/실행과 통제 효과는 미확인",
+    "team_bundle": "packaged and relocation/link/hash checked; engine execution not run"
+  },
+  "date": "2026-10-18",
+  "checks": [
+    "28 IDs and evidence/control fields",
+    "Markdown/JSON criteria equality",
+    "local source links",
+    "selector active/unknown/absence evidence",
+    "contradictory inputs remain unknown",
+    "other engines retain questions with mapping needed",
+    "R10/R14 absent evidence warnings",
+    "no execution verdict fabricated"
+  ],
+  "result": "passed",
+  "engine_runtime_tests": "not_run",
+  "review_rounds": 2,
+  "review_findings_resolved": true,
+  "scenario_review": {
+    "result": "passed_after_corrections_and_recheck",
+    "counts": {
+      "groups": 24,
+      "scenarios": 83,
+      "threat_candidates": 74,
+      "failure_misconfiguration": 9,
+      "questions": 28,
+      "unique_subtest_designs": 83,
+      "question_links": 132,
+      "runtime_executions": 0,
+      "unique_subtest_designs_note": "historical field name; denotes83 scenario test focuses, not83 executable tests"
+    },
+    "checks": [
+      "unique scenario IDs",
+      "all questions mapped",
+      "Markdown/JSON scenario correspondence",
+      "primary/shared subtest reverse links",
+      "33 surfaces mapped; 4 pending",
+      "selector executes with existing environment template"
+    ],
+    "subagent_review_passes": 2,
+    "remaining": "Installed-version reachability, policy adoption, executable fixtures and runtime validation pending",
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "checklist_team_review": {
+    "date": "2026-10-18",
+    "result": "passed_after_review_corrections",
+    "scope": "document/source-link and MD/JSON consistency; no engine execution",
+    "counts": {
+      "legacy_questions": 28,
+      "parent_questions": 28,
+      "assessment_rows": 77,
+      "scenarios": 83
+    },
+    "independent_reviews": [
+      "canonical source/scope review",
+      "framework mapping/status review",
+      "collection cross-document review"
+    ],
+    "corrections": [
+      "template selection sources broadened",
+      "historical R10 exclusion dated explicitly",
+      "collection30/legacy28/parent28 explained"
+    ],
+    "r10": "media partial static review; Q-C14 not in selector; jobs/client region pending",
+    "engine_runtime_tests": "not_run",
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "supply_policy_adoption_review": {
+    "date": "2026-10-18",
+    "reference_policy_status": "adopted",
+    "enterprise_values": "pending",
+    "implementation": "pending",
+    "runtime_tests": "not_run",
+    "subagent_review": "completed; three status wording corrections applied",
+    "local_checks": "16 rows MD/JSON equal;28Q83SC unchanged;selector executes",
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "request_policy_adoption_review": {
+    "date": "2026-10-18",
+    "reference_policy_status": "adopted",
+    "enterprise_values": "pending",
+    "implementation": "pending",
+    "runtime_tests": "not_run",
+    "subagent_reviewers": 2,
+    "parity_with_supply": "same five-column policy/value/criteria/remaining-work structure; comparable specificity; no material conflict found",
+    "corrections": [
+      "clarify team-block vs enterprise-allow for reused token IDs",
+      "clarify prompt/token option block is not a ban on generated text quoting own input",
+      "remove adopted policy from remaining-work wording"
+    ],
+    "local_checks": "5 policies/21 rows MD-JSON match; supply7/16 unchanged;28Q83SC77rows unchanged;selector runs without test verdicts",
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "remaining_policy_adoption_review": {
+    "date": "2026-10-18",
+    "domains": [
+      "platform",
+      "lifecycle",
+      "observability"
+    ],
+    "policy_purposes": 16,
+    "assessment_rows": 40,
+    "reference_policy_status": "adopted",
+    "enterprise_values": "pending",
+    "numeric_values": "pending",
+    "runtime_tests": "not_run",
+    "subagent_reviewers": 2,
+    "result": "reviewed_and_recommendations_applied",
+    "corrections": [
+      "separate resource baselines from protection/business deadlines",
+      "require actual local transport enforcement evidence",
+      "decide collection-outage operation response before deployment"
+    ],
+    "checks": [
+      "first two domains unchanged",
+      "77 assessment rows and new policy MD/JSON match",
+      "28Q83SC unchanged",
+      "selector returns28 unverified items"
+    ],
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "external_v2_priority_corrections": {
+    "status": "passed_scoped_static_review_and_selector_tests",
+    "scope": "12 SC and associated Q/assessment records; not all40 findings",
+    "questions": 28,
+    "scenarios": 83,
+    "assessment_rows": 77,
+    "question_scenario_links": 133,
+    "shared_test_focus_ids": 83,
+    "selector_unit_tests": 12,
+    "independent_reviewer_rechecks": 2,
+    "runtime_tests": "not_run",
+    "remaining": "F40 runtime impact; external advisory ledger; full77 test readiness; remaining F findings",
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "remaining_review_pass": {
+    "findings_with_code_or_design_detail": 27,
+    "questions": 28,
+    "scenarios": 83,
+    "assessment_rows": 77,
+    "question_scenario_links": 135,
+    "selector_regression_tests": 12,
+    "runtime_tests": "not_run",
+    "subagent_reviewers": 3,
+    "status": "three_subagent_reviews_and_rechecks_completed; corrections_applied; structural_checks_passed",
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "f22_f02_f04_f27_f30": {
+    "status": "three_subagent_reviews_and_rechecks_passed_in_scope",
+    "questions": 28,
+    "scenarios": 83,
+    "assessment_rows": 77,
+    "question_scenario_links": 135,
+    "rows_with_specific_criteria": 77,
+    "all_scenarios_linked_to_rows_or_row_variants": 83,
+    "surface_counts": {
+      "scenario_scope_mapped": 26,
+      "partial": 7,
+      "backend_unselected": 1,
+      "pending": 3
+    },
+    "official_advisories_rechecked": 7,
+    "runtime_tests": "not_run",
+    "remaining": "실제 fixture·계측·복구 구현, 기업별 기준값, GPU·네트워크·CRIU 실행; 공지 경계의 모호함 및 미선정 backend·대기표면",
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "r11_followup": {
+    "date": "2026-10-18",
+    "questions": 28,
+    "scenarios": 83,
+    "assessment_rows": 77,
+    "question_scenario_links": 136,
+    "structural_validation": "passed",
+    "selector_regression_tests": 12,
+    "runtime_tests": "not_run",
+    "subagent_correction": "Q-C08/SC-05-02 recovery-only test fields; original UUID/LoRA test retained in Q-C03/04",
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "risk_context_review": {
+    "date": "2026-10-18",
+    "assessment_rows": 77,
+    "legacy_questions": 28,
+    "scenarios": 83,
+    "question_scenario_links": 135,
+    "risk_categories": {
+      "security": 51,
+      "security_and_reliability": 17,
+      "reliability_recovery": 6,
+      "evidence_verdict": 3
+    },
+    "subagent_reviewers": 3,
+    "followup_review": "passed_after_corrections",
+    "md_json_matches": true,
+    "original_json_fields_unchanged": true,
+    "runtime_tests": "not_run",
+    "record_scope": "historical_snapshot_at_review_time; use current_summary for current counts"
+  },
+  "team_bundle_validation": {
+    "date": "2026-10-19",
+    "source_manifest": "team_bundle validation and inventory",
+    "scope": "bundle file links, original-copy hashes and selector relocation; no engine/GPU execution"
+  }
+}

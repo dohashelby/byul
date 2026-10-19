@@ -1,0 +1,24 @@
+# REQ-01 구조화 (원본 checklist.json은 산문). import_checklist.py가 덧씌운다.
+applies_when:
+  all:
+    - { fact: gateway, eq: true }
+policy_params:
+  - { key: allowed_callers, type: "list[str]", required: true }
+required_observations:
+  - { key: direct_route_status, type: int }
+  - { key: gateway_route_status, type: int }
+executor: direct_route
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: gateway_route_status, op: eq, value: 200 }
+      - { obs: direct_route_status, op: in, value: [401, 403] }
+    fail_when_any:
+      - { obs: direct_route_status, op: eq, value: 200 }
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: gateway_route_status, op: eq, value: 200 }
+        fail_when_any:
+          - { obs: gateway_route_status, op: in, value: [401, 403] }

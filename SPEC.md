@@ -1,0 +1,567 @@
+# 서빙엔진 보안 검증 솔루션 — 설계 초안 (SPEC v0.1)
+
+> 작성 2026-10-19 · 상태: **초안**. 팀 확인 전. 구현·실측 완료를 뜻하지 않는다.
+>
+> **근거:** `serving-security-framework`(점검 77행·시나리오 83개·환경/결과 템플릿)를 "무엇을 점검하나"의 정본으로, `BoBProject/개발계획`(A1 불변식·A3 파이프라인·A17 콘텐츠 팩/확장 지점)을 "어떻게 만드나"의 구조 기준으로 삼았다. BoBProject의 승인 서명·감사 outbox·객체 20여 종은 의도적으로 뺐다(§9).
+>
+> **이 문서의 독자:** 코드를 작성하는 AI 에이전트와 팀원. AI에게는 이 문서 전체를 컨텍스트로 주고, 원본 문서는 "필요할 때 찾아보는 참고"로만 연결한다.
+
+---
+
+## 0. 한 줄 정의와 범위
+
+**환경 정보와 기업 정책을 받아, 서빙엔진에 적용되는 보안 점검을 고르고, 시험을 실행해 증거를 모으고, 규칙 기반으로 판정해 보고서를 낸다.** 엔진 업데이트 시에는 두 버전에서 같은 점검을 돌려 비교한다.
+
+| 포함 (v1) | 제외 (v1) |
+| --- | --- |
+| vLLM 어댑터 1개 (인터페이스는 엔진 중립) | SGLang·TensorRT-LLM 어댑터 구현 |
+| CLI + JSON/HTML 보고서 | 웹 UI, 역할별 로그인 |
+| 로컬 Docker 단일 노드 실행 | K8s·다중 노드·다중 테넌트 |
+| 우선 점검 5~10행 자동화 (§8) | 77행 전부 자동화 |
+| 승인 기록(누가·언제) | 전자서명·registry·철회 절차 |
+| 변경 분석은 **선택 단계** | LLM 판단 보조 |
+
+**두 가지 실행 모드**
+
+| 모드 | 입력 | 질문 |
+| --- | --- | --- |
+| `audit` | 환경 1개 | 지금 이 구성이 정책을 충족하는가? |
+| `update` | 환경 2개(기준/후보) + 선택적 변경 분석 | 버전을 올리면 충족 여부가 달라지는가? |
+
+---
+
+## 1. 파이프라인
+
+```
+ [CheckDef 팩] ─┐
+ [Environment] ─┼─► select ─► Plan ─► run ─► Evidence ─► judge ─► Result ─► report ─► Report
+ [Policy]      ─┤                      ▲                    ▲
+ [Change]*     ─┘                      │                    │
+                              (실행기·센서 플러그인)   (판정 플러그인, 순수 함수)
+ * update 모드에서만, 선택
+```
+
+| 단계 | 하는 일 | 하지 않는 일 |
+| --- | --- | --- |
+| `select` | 환경·정책·변경으로 점검별 적용 여부를 계산하고 시험을 고른다 | 시험 실행 |
+| `run` | 엔진을 띄우고, 정상 대조와 챌린지를 실행하고, 관측·증거 파일을 모은다 | **판정하지 않는다** |
+| `judge` | 증거를 검증한 뒤 판정 플러그인으로 Result를 만든다 | 엔진 접속, 새 요청 |
+| `report` | Result를 영역·보호 목적으로 집계하고, update 모드면 버전을 비교한다 | 새 판정 |
+
+`run`과 `judge`의 분리가 핵심이다. 저장된 Evidence만으로 언제든 다시 `judge`할 수 있어야 한다(재판정).
+
+---
+
+## 2. 공통 규칙
+
+### 2.1 ID
+
+| 대상 | 형식 | 예 |
+| --- | --- | --- |
+| 점검 행 (CheckDef) | `<영역>-<2자리>` | `REQ-01` |
+| 객체 | `<종류>-<ULID>` | `ENV-01JA...` |
+| 팩 | `PACK-<이름>` | `PACK-BASELINE` |
+| 시나리오·Q | 프레임워크 원래 ID 유지 | `SC-01-01`, `Q-C01` |
+
+**영역 코드 5종** (프레임워크 `checklist.json`의 5개 draft 배열과 1:1, 행 수는 현재 기준):
+
+| 코드 | 영역 | 행 수 | 원본 키 |
+| --- | --- | --- | --- |
+| `SUP` | 모델·코드·실행 공급물 | 16 | `supply_assessment_draft` |
+| `REQ` | 추론 요청·자료·공유 상태 | 21 | `request_state_assessment_draft` |
+| `PLT` | 실행 기반·자격·통신 | 12 | `platform_assessment_draft` |
+| `LIF` | 배포·변경 상태와 실행 자원 | 16 | `lifecycle_assessment_draft` |
+| `OBS` | 관측·진단·감사 자료 | 12 | `observability_assessment_draft` |
+
+> **결정 필요:** 프레임워크 77행에는 지금 고유 ID가 없다(논리 검토 L1). 위 코드를 붙이는 변환 스크립트를 첫 작업으로 만든다. **한 번 붙인 ID는 문구가 바뀌어도 바꾸지 않는다.** 행을 없애면 `retired: true`로 남긴다.
+
+### 2.2 모든 객체의 공통 필드
+
+```yaml
+kind: ENV | POL | CHG | PLAN | EVD | RES | RPT
+id: string            # §2.1
+revision: int         # 1부터. 같은 id의 새 내용은 revision+1, 이전 revision은 수정 금지
+created_at: RFC3339   # UTC
+data_origin: MEASURED | DECLARED | EXAMPLE
+content_sha256: hex   # §2.3
+refs: [Ref]           # 이 객체가 근거로 쓴 다른 객체
+```
+
+```yaml
+Ref: { kind: str, id: str, revision: int, sha256: hex }   # 항상 정확한 revision까지 고정
+```
+
+- `MEASURED`: 실제 환경에서 수집하거나 실행해 얻은 값
+- `DECLARED`: 사람이 입력한 값(설정 파일 신고 등). 실제 효과를 관측한 것은 아님
+- `EXAMPLE`: 합성·데모 자료. **공식 판정 근거가 될 수 없다**
+
+### 2.3 해시
+
+`content_sha256` = `content_sha256` 필드를 뺀 객체를 **정렬된 키·UTF-8·공백 없는 JSON**으로 직렬화한 bytes의 SHA-256. 증거 파일은 파일 bytes 자체의 SHA-256.
+
+### 2.4 공통 enum
+
+```yaml
+Applicability: APPLICABLE | NOT_APPLICABLE | UNDETERMINED | CONFLICT
+Verdict:       PASS | FAIL | UNKNOWN | NOT_APPLICABLE      # 문서상 충족/미충족/미확인/해당 없음
+ExecStatus:    PENDING | RUNNING | COMPLETED | ABORTED | NOT_RUN
+Comparison:    NO_CHANGE | REGRESSED | FIXED | STILL_FAILING | UNKNOWN | NOT_COMPARABLE
+Gap:           NO_EXECUTOR | NO_POLICY_VALUE | NO_FIXTURE | NO_ENV_FACT | ADAPTER_UNSUPPORTED
+```
+
+한국어 표시는 보고서 렌더링에서만 바꾼다. 데이터에는 영문 enum만 쓴다.
+
+---
+
+## 3. 카탈로그 입력: CheckDef (객체 7종에 포함하지 않음)
+
+CheckDef는 실행 중 생기는 객체가 아니라 **팩에 담긴 정의**다. 프레임워크 `checklist.json`의 77행을 변환해 만든다.
+
+```yaml
+# packs/PACK-BASELINE/checks/REQ-01.yaml
+id: REQ-01
+revision: 1
+area: REQ
+purpose: "요청·대상 접근 권한"             # ← parent_purpose
+question: "Gateway를 우회한 직통 요청으로 비허용 작업을 수행할 수 없는가?"   # ← question
+risk_summary: "..."                       # ← risk_summary
+review_order: reference_baseline_first    # ← review_order (심각도 아님, 준비 순서)
+impact: null                              # 결정 필요: HIGH|MEDIUM|LOW (논리 검토 L4)
+applies_when:                             # ← applies_when (지금은 산문 → 구조화 필요)
+  all: [{ fact: gateway, eq: true }]
+  prose: "사용자→Gateway 경유와 엔진 직통 제한"   # 원문 보존
+policy_params:                            # ← policy_to_decide / enterprise_decisions
+  - { key: allowed_callers, type: "list[str]", required: true }
+normal_control: "허용 키로 같은 route 호출 시 추론 성공"         # ← normal_control
+challenge_steps: ["...", "..."]           # ← challenge_steps
+required_observations:                    # ← required_observations (구조화)
+  - { key: direct_route_status, type: int }
+  - { key: gateway_route_status, type: int }
+satisfied_if: "..."                       # ← satisfied_if (원문)
+fail_criteria: "..."                      # ← fail_criteria
+unknown_criteria: "..."                   # ← unknown_criteria
+remediation: "..."                        # ← remediation
+executor: null                            # 실행기 플러그인 이름. null이면 자동 실행 불가 → Gap NO_EXECUTOR
+judge: { plugin: rule_table, params: {...} }  # null이면 수동 판정만
+legacy: { q_ids: [Q-C01], scenario_ids: [SC-01-01] }   # 근거 링크. 판정 단위 아님
+```
+
+**변환 시 유의**
+- `applies_when`, `required_observations`는 원문이 산문이다. 자동화할 행만 구조화하고, 나머지는 `prose`만 두고 `executor: null`로 둔다.
+- `satisfied_if`가 얇다(중앙값 41자, 논리 검토 §3). 자동화하는 행은 판정 규칙을 `judge.params`에 체크 가능한 조건으로 다시 쓴다(§6 INV-11).
+- `legacy.q_ids`·`scenario_ids`는 추적용이다. **평가·집계 단위는 CheckDef ID 하나다**(논리 검토 L2).
+
+**팩 매니페스트** (`packs/<id>/pack.yaml`)
+
+```yaml
+pack_id: PACK-BASELINE
+revision: 1
+engines: [vllm]
+checks: [SUP-01, ..., OBS-12]
+files_sha256: [{ path: checks/REQ-01.yaml, sha256: ... }]   # pack.yaml 제외 전 파일, 경로순
+review: { status: DRAFT | REVIEWED, reviewer: str|null, reviewed_at: RFC3339|null }
+```
+
+`REVIEWED`가 아닌 팩으로 만든 Result는 `data_origin`과 관계없이 보고서에 "검토 전 팩"으로 표시한다.
+
+---
+
+## 4. 객체 스키마 7종
+
+Pydantic v2 모델로 구현한다. 아래는 공통 필드(§2.2)를 생략한 고유 필드다.
+
+### 4.1 ENV — Environment (환경 프로필)
+
+프레임워크 `environment_template.json`을 그대로 확장한다.
+
+```yaml
+kind: ENV
+engine: { name: vllm, version: "0.31.0", source_commit: hex|null, image_digest: "sha256:..."|null }
+adapter: { name: vllm, version: "0.1.0" }          # 사용한 엔진 어댑터 (§7.1)
+runtime: { nodes: int, tp_groups: int, gpu_count: int|null, gpu_model: str|null, driver: str|null }
+model: { id: str|null, revision: str|null, inventory_sha256: hex|null }
+facts:                                             # 적용 판단에 쓰는 사실. 키는 등록된 것만
+  gateway:                       { value: true, origin: DECLARED, source: "env.yaml#gateway" }
+  prefix_cache:                  { value: true, origin: MEASURED, source: "..." }
+  shared_or_remote_weights:      { value: false, origin: DECLARED, source: "...", absence_evidence: "EVD-...#..." }
+  dynamic_import:                { value: null }
+  # ... 프레임워크 템플릿의 키 전체
+```
+
+- `facts`의 각 값은 `value`·`origin`·`source`를 반드시 가진다. 값을 모르면 `value: null`.
+- 기능을 `false`로 신고하려면 `absence_evidence`(비사용·비노출 근거)가 있어야 한다. 없으면 적용 판단에서 `null`로 취급한다(프레임워크 selector 규칙, INV-06).
+- 출처끼리 값이 충돌하면 임의로 고르지 않고 `value: null, conflict: [..]`로 둔다.
+
+### 4.2 POL — Policy (기업 정책 값)
+
+```yaml
+kind: POL
+status: DRAFT | CONFIRMED
+pack: Ref                                          # 어떤 팩 기준의 정책인가
+values:                                            # CheckDef.policy_params 채우기
+  REQ-01: { allowed_callers: ["gateway-sa"] }
+scope: { include: [REQ-*, SUP-01], exclude: [] }   # 기업이 고른 점검 범위
+exceptions:
+  - check_id: OBS-04
+    reason: str
+    approved_by: str
+    approved_at: RFC3339
+    expires_at: RFC3339
+confirmed_by: str|null
+confirmed_at: RFC3339|null
+```
+
+- v1 승인은 **"누가·언제" 기록만** 남긴다. 서명은 하지 않는다(§9).
+- 예외는 판정을 바꾸지 않는다. 보고서에 "예외 승인됨"을 따로 표시할 뿐이다(INV-08).
+
+### 4.3 CHG — Change (버전 변경 사실, update 모드 선택)
+
+```yaml
+kind: CHG
+baseline:  { version: str, source_commit: hex, image_digest: str|null }
+candidate: { version: str, source_commit: hex, image_digest: str|null }
+extractor: { name: git_diff_ast | advisory | manual, version: str }
+facts:
+  - id: str
+    category: API_ROUTE | CLI_OPTION | ENV_VAR | DEFAULT_VALUE | DEPENDENCY | ADVISORY | AUTH | OTHER
+    target: str                    # 예: "/v1/completions", "--trust-remote-code"
+    before: any|null
+    after: any|null
+    certainty: CONFIRMED | PARTIAL | UNKNOWN
+    evidence: [{ path: str, line: int|null, sha256: hex }]
+    related_checks: [CheckId]      # 팩의 분석 규칙이 매핑. 비어 있으면 미분류
+reviewed_by: str|null              # 사람 검토 전이면 certainty는 최대 PARTIAL
+```
+
+- 변경 분석은 **시험을 추가로 고르는 근거**일 뿐이다. 변경이 없다고 기본 점검을 빼지 않는다(INV-05).
+
+### 4.4 PLAN — Plan (적용 판단 + 시험 선정)
+
+```yaml
+kind: PLAN
+mode: audit | update
+inputs: { pack: Ref, environments: [Ref], policy: Ref, change: Ref|null }
+items:
+  - check_id: REQ-01
+    applicability: APPLICABLE
+    conditions:                        # 판단 근거를 조건별로 보존
+      - { fact: gateway, expected: true, actual: true, origin: DECLARED, result: TRUE }
+    reason: str
+    triggered_by_change: [CHG.fact.id] # update 모드에서 이 점검을 끌어올린 변경
+    selected: true
+    gaps: []                           # 선정됐지만 자동 실행이 막힌 이유 (Gap enum)
+    priority: reference_baseline_first
+inventory_complete:                    # 보호 목적별 점검 목록 완결 여부 (INV-13)
+  "요청·대상 접근 권한": true
+```
+
+**적용 판단 규칙** (BoBProject `planner/impact.py` 규칙을 계승)
+
+1. 조건 중 근거 있는 `FALSE`가 하나라도 있으면 → `NOT_APPLICABLE` (다른 미확인 조건은 `conditions`에 그대로 남긴다)
+2. 아니고, 모든 필수 조건이 근거 있는 `TRUE`면 → `APPLICABLE`
+3. 아니고, 같은 사실에 값이 상충하면 → `CONFLICT`
+4. 그 밖(근거 없음·null) → `UNDETERMINED`
+5. 빈 조건 목록은 "항상 참"이 아니다. CheckDef에 `applies_when: { always: true }`를 명시한 경우만 무조건 `APPLICABLE`
+
+**선정 규칙**
+- `APPLICABLE` → 선정
+- `UNDETERMINED`·`CONFLICT` → **선정**하고, 보고서에 "적용 미정 상태로 시험함"을 표시한다. 빼지 않는다
+- `NOT_APPLICABLE` → 미선정. 사유를 남긴다
+- 정책 `scope.exclude`로 뺀 점검 → 미선정. 사유 `POLICY_SCOPE`
+- 선정됐지만 `executor`가 없으면 `gaps: [NO_EXECUTOR]` → 수동 시험 대상으로 보고서에 나열
+
+### 4.5 EVD — Evidence (실행 기록 + 관측 + 증거 파일)
+
+`run` 단계의 유일한 산출물이다. **판정 필드가 없다.**
+
+```yaml
+kind: EVD
+plan: Ref
+check_id: REQ-01
+side: baseline | candidate | single           # audit 모드는 single
+environment: Ref
+execution:
+  status: ExecStatus
+  executor: { name: str, version: str, config_sha256: hex }
+  adapter:  { name: str, version: str }
+  started_at: RFC3339|null
+  finished_at: RFC3339|null
+  abort_reason: str|null
+normal_control: { attempted: bool, succeeded: bool|null, detail: str }
+challenges:
+  - step: str                                  # CheckDef.challenge_steps 중 하나
+    attempted: bool                            # 실제로 요청·시도를 보냈는가
+    observations: { direct_route_status: 401 }
+observations:                                  # CheckDef.required_observations 키만
+  direct_route_status:  { value: 401, collected: true }
+  gateway_route_status: { value: 200, collected: true }
+artifacts:
+  - { name: request_log.jsonl, path: "artifacts/<sha>.jsonl", sha256: hex, bytes: int,
+      collected_at: RFC3339, collector: str }
+comparability:                                 # update 모드 비교 조건 (INV-09)
+  model_inventory_sha256: hex|null
+  fixture_sha256: hex|null
+  config_sha256: hex|null
+  gpu: str|null
+  driver: str|null
+```
+
+- 수집 실패는 `collected: false`로 남긴다. 값을 비우거나 추정하지 않는다.
+- 증거 파일은 `artifacts/<sha256>` 이름으로 저장한다(내용 주소). 같은 파일은 한 번만 저장된다.
+
+### 4.6 RES — Result (점검 판정)
+
+```yaml
+kind: RES
+evidence: Ref
+check_id: REQ-01
+side: baseline | candidate | single
+judge: { plugin: str, version: str, params_sha256: hex }
+verdicts:                                      # 세 축은 따로 판정 (프레임워크 05 규칙)
+  security:    Verdict
+  functional:  Verdict
+  performance: Verdict
+reasons: [str]                                 # 판정 규칙의 어떤 조건이 맞았는가
+missing_observations: [str]                    # UNKNOWN의 원인
+exception: { check_id: str, expires_at: RFC3339 } | null   # 정책 예외 표시만. 판정에 영향 없음
+verification_level: MEASURED | DECLARED | EXAMPLE | null   # 근거 중 가장 약한 것. 하나라도 null이면 null
+```
+
+### 4.7 RPT — Report (집계·비교·보고)
+
+```yaml
+kind: RPT
+mode: audit | update
+inputs_manifest: [Ref]                         # 이 보고서가 쓴 모든 객체 (해시 포함)
+pack_review_status: DRAFT | REVIEWED
+by_check:
+  - check_id: REQ-01
+    applicability: APPLICABLE
+    selected: true
+    baseline:  { result: Ref|null, security: Verdict }
+    candidate: { result: Ref|null, security: Verdict }
+    comparison: Comparison                     # update 모드만
+    gaps: [Gap]
+by_purpose:  { "요청·대상 접근 권한": { security: Verdict, inventory_complete: bool } }
+by_area:     { REQ: { security: Verdict } }
+not_selected: [{ check_id: str, reason: str }]
+manual_required: [CheckId]                     # 선정됐지만 자동 실행 불가
+limitations: [str]                             # 미검증 범위, EXAMPLE 사용, 검토 전 팩 등
+approval: { approved_by: str, approved_at: RFC3339, decision: ACCEPT | REJECT, note: str } | null
+```
+
+- JSON이 원본이고 HTML은 JSON에서만 렌더링한다. HTML에 JSON에 없는 내용을 넣지 않는다.
+- `approval`은 보고서를 받아들인 기록이다. 자동 권고가 아니다(INV-07).
+
+**버전 비교 규칙** (`security` 축 기준, 다른 축도 같은 표)
+
+| 기준 \ 후보 | PASS | FAIL | UNKNOWN |
+| --- | --- | --- | --- |
+| **PASS** | NO_CHANGE | REGRESSED | UNKNOWN |
+| **FAIL** | FIXED | STILL_FAILING | UNKNOWN |
+| **UNKNOWN** | UNKNOWN | UNKNOWN | UNKNOWN |
+
+비교 조건(INV-09)이 맞지 않으면 표와 관계없이 `NOT_COMPARABLE`.
+
+**집계 규칙** (점검 → 보호 목적 → 영역)
+
+1. 적용 점검 중 `FAIL`이 하나라도 있으면 → `FAIL`
+2. 아니고 `UNKNOWN`이 있거나 `inventory_complete: false`면 → `UNKNOWN`
+3. 아니고 `PASS`가 하나 이상이면 → `PASS`
+4. 전부 `NOT_APPLICABLE`이면 → `NOT_APPLICABLE`
+
+미충족은 보고서에서 `impact`(정해지면) → `review_order` 순으로 정렬한다. 집계 규칙 자체는 바꾸지 않는다.
+
+---
+
+## 5. 객체 관계
+
+```
+CheckDef(팩) ──┐
+ENV ───────────┼──► PLAN ──► EVD (점검×side마다 1개) ──► RES (EVD마다 1개) ──► RPT
+POL ───────────┤                                                              ▲
+CHG* ──────────┘                                                              │
+                                                               (RES 전부 + PLAN)
+```
+
+- 모든 화살표는 `refs`의 정확한 `Ref`(id+revision+sha256)로 표현한다. "최신 revision"으로 바꿔 읽지 않는다.
+- 재판정: 같은 EVD로 새 RES를 만든다(판정 플러그인 버전이 바뀐 경우 등). 기존 RES는 지우지 않는다.
+
+---
+
+## 6. 불변식 (위반은 버그)
+
+각 항목은 **테스트 1개 이상**으로 고정한다. 출처: A = BoBProject A1 §5, F = 프레임워크, N = 이 SPEC에서 새로 정함.
+
+| ID | 불변식 | 출처 |
+| --- | --- | --- |
+| **INV-01** | `UNKNOWN`을 `PASS`로 올리지 않는다. 확인 부족과 위반 확인을 구별한다. | A1-1 |
+| **INV-02** | `EXAMPLE` 자료, 기대값, 실행하지 않은 시험을 `MEASURED`로 표시하지 않는다. | A1-2 |
+| **INV-03** | 시도가 없으면 차단 성공이 아니다. `challenges[].attempted: false`인데 "거부됨"으로 `PASS`를 낼 수 없다. 응답 미수신만으로 `PASS`가 되지 않는다. | A1-3,4 |
+| **INV-04** | 위반 증거가 없는 것과 준수 증거가 있는 것은 다르다. 센서 장애·수집 실패는 `UNKNOWN`이다. 이미 확인된 `FAIL`은 다른 누락 때문에 지우지 않는다. | A1-10 |
+| **INV-05** | 기본 점검(`review_order: reference_baseline_first`이고 적용되는 것)은 변경 분석 결과가 "영향 없음"이어도 빼지 않는다. 변경 분석은 시험을 **추가**할 뿐 **제거**하지 않는다. | A(planner) |
+| **INV-06** | 환경 사실을 `false`로 쓰려면 비사용·비노출 근거가 필요하다. 근거 없는 `false`는 `null`로 취급한다. 빈 조건 목록은 "항상 참"이 아니다. | F(selector) |
+| **INV-07** | 자동 판정·권고는 승인이 아니다. 보고서의 `approval`은 사람만 쓴다. 코드가 `approval`을 채우지 않는다. | A1-7 |
+| **INV-08** | 정책 예외는 판정을 바꾸지 않는다. 예외가 승인된 `FAIL`도 `FAIL`이다. 만료·미승인 예외는 표시하지 않고 사유를 남긴다. | A1-5,11 |
+| **INV-09** | 버전 비교의 단위는 엔진 이미지다. 모델 inventory, 시험 자료, 설정, GPU·드라이버가 두 EVD에서 같아야 비교한다. 하나라도 다르거나 null이면 `NOT_COMPARABLE`. | A1-9 |
+| **INV-10** | 선정되지 않은 점검은 EVD·RES를 만들지 않는다. 선정됐지만 실행하지 못한 점검은 EVD(`status: NOT_RUN` 또는 `ABORTED`)와 RES(`UNKNOWN`)를 만든다. 둘을 같은 상태로 합치지 않는다. | A1-12 |
+| **INV-11** | `PASS`는 다음이 **모두** 관측될 때만 낸다: ① 정상 대조 성공 ② 모든 챌린지가 시도되고 기대대로 거부·무효 ③ `required_observations` 전부 `collected: true`. 하나라도 빠지면 `UNKNOWN`. 과차단(정상 대조 실패)은 `PASS`가 아니다. | F(05, L3) |
+| **INV-12** | 여러 근거를 집계한 `verification_level`·`data_origin`은 필수 근거 중 하나라도 null이면 null이다. null을 빼고 나머지로 대표값을 정하지 않는다. | A1-14 |
+| **INV-13** | 보호 목적의 `inventory_complete`는 **그 목적에 속한 모든 CheckDef가 PLAN에서 적용 여부를 판단받았고(UNDETERMINED 제외), 팩이 REVIEWED일 때만** `true`다. `false`면 집계는 `PASS`가 될 수 없다. | N(L3 해소) |
+| **INV-14** | `run`은 판정하지 않고 `judge`는 엔진에 접속하지 않는다. 판정 플러그인은 순수 함수다(같은 입력 → 같은 출력, 네트워크·파일 쓰기·시계 접근 금지). | A3, A17 X4 |
+| **INV-15** | 플러그인(실행기·센서·어댑터) 실패는 근거 미확보로 전파한다. 예외를 삼켜 `PASS`·`NOT_APPLICABLE`로 바꾸지 않는다. | A17 §3 |
+| **INV-16** | 객체는 append-only다. 같은 `id`의 기존 revision을 수정·삭제하지 않는다. 모든 참조는 정확한 revision과 해시로 고정한다. | A1 §2 |
+| **INV-17** | `DRAFT` 정책으로 만든 보고서는 "공식 아님"으로 표시한다. 검토 전 팩도 마찬가지다. | A1-6 |
+| **INV-18** | 보안·기능·성능 판정은 따로 기록한다. 한 축의 결과로 다른 축을 채우지 않는다. | F(05) |
+
+---
+
+## 7. 플러그인 인터페이스
+
+모든 플러그인은 `name`과 `version`을 가지며, 그 값을 산출물에 남긴다. 구현체 선택은 `guard.toml`로 한다.
+
+### 7.1 엔진 어댑터 (X8 — v1에 포함, 구현은 vLLM 1개)
+
+엔진마다 다른 부분을 이 한 곳에 모은다. 코어 코드에 `if engine == "vllm"`이 나오면 버그다.
+
+```python
+class EngineAdapter(Protocol):
+    name: str
+    version: str
+    def start_command(self, spec: LaunchSpec) -> list[str]: ...          # 모델·포트·옵션 → 실행 인자
+    def public_routes(self, env: Environment) -> list[Route]: ...        # 노출되는 HTTP 경로
+    def detect_version(self, handle: ContainerHandle) -> EngineIdentity: ...  # 실제로 뜬 엔진·버전
+    def read_option(self, name: CommonOption, env: Environment) -> FactValue: ...  # 공통 옵션 질문
+    def parse_log(self, line: str) -> EngineEvent | None: ...            # 로그 → 공통 이벤트
+    def ready(self, handle: ContainerHandle) -> bool: ...                # 기동 완료 확인
+```
+
+`CommonOption`은 엔진 중립 이름(예: `REMOTE_CODE_EXECUTION`, `API_KEY_REQUIRED`)이고, 어댑터가 엔진 고유 옵션(`--trust-remote-code` 등)으로 번역한다.
+
+### 7.2 나머지
+
+```python
+class EnvCollector(Protocol):      # X2: 환경 사실 수집
+    def collect(self, target: TargetSpec) -> dict[str, FactValue]: ...
+
+class ChangeExtractor(Protocol):   # X3: 변경 사실 추출 (update 모드 선택)
+    def extract(self, repo: Path, base: str, cand: str) -> list[ChangeFact]: ...
+
+class Executor(Protocol):          # 점검 실행기. CheckDef.executor로 지정
+    def run(self, check: CheckDef, env: Environment, policy_values: dict,
+            adapter: EngineAdapter, workdir: Path) -> EvidenceDraft: ...
+
+class Judge(Protocol):             # X4: 순수 함수 (INV-14)
+    def judge(self, check: CheckDef, evidence: Evidence, params: dict,
+              policy_values: dict) -> JudgeOutput: ...
+```
+
+**`rule_table` 판정기**: 관측 키·연산자·기대값의 표로 판정한다. 자동화하는 대부분의 행은 코드 없이 이 표로 판정하는 것을 목표로 한다.
+
+```yaml
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: gateway_route_status, op: eq, value: 200 }   # 정상 대조
+      - { obs: direct_route_status, op: in, value: [401, 403] }
+    fail_when_any:
+      - { obs: direct_route_status, op: eq, value: 200 }
+    # 어느 쪽도 아니면 UNKNOWN (INV-11)
+```
+
+---
+
+## 8. 첫 번째 수직 슬라이스
+
+**목표:** 점검 1행을 처음부터 끝까지 실제로 통과시킨다. 그다음에 행을 늘린다.
+
+**후보:** `REQ-01` Gateway 우회 직통 요청 (`checklist.json` 요청 영역 1번 행, `Q-C01` / `SC-01-01`, `review_order: reference_baseline_first`). 프레임워크 사용성 검토가 end-to-end 예시로 권한 항목이고, 로컬 Docker로 재현할 수 있다.
+
+| 순서 | 만들 것 | 완료 기준 |
+| --- | --- | --- |
+| 1 | `tools/import_checklist.py`: `checklist.json` 77행 → `packs/PACK-BASELINE/checks/*.yaml` (ID 부여) | 77개 파일 생성, 재실행해도 ID 불변 |
+| 2 | `models/`: 객체 7종 + CheckDef Pydantic 모델, 해시 함수 | 예시 YAML 왕복 직렬화, 해시 고정 테스트 |
+| 3 | `store/`: SQLite append-only + 증거 파일 내용 주소 저장 | INV-16 테스트 |
+| 4 | `guard select`: ENV+POL+팩 → PLAN | 적용 판단 규칙 5개, INV-05·06·13 테스트 |
+| 5 | `adapters/vllm.py` + `executors/direct_route.py` | 로컬 vLLM(작은 모델)을 띄워 EVD 생성 |
+| 6 | `judges/rule_table.py` | INV-01·03·04·11·14·15 테스트 |
+| 7 | `guard report`: RES → RPT(JSON) → HTML | 집계·비교 규칙 표 전체 테스트 |
+| 8 | `guard update`: 두 이미지로 같은 점검 실행 → 비교 | INV-09 테스트, NOT_COMPARABLE 케이스 |
+
+그다음 확장 순서: `review_order: reference_baseline_first`이면서 로컬에서 재현 가능한 행부터 5~10개.
+
+---
+
+## 9. 일부러 만들지 않는 것 (BoBProject 대비)
+
+| BoBProject에 있던 것 | v1 처리 | 이유 |
+| --- | --- | --- |
+| Ed25519 서명 승인·registry·철회 | 승인자·시각 기록만 | 구현량 대비 초기 가치가 낮음 |
+| 감사 outbox·2단계 확정·CAS 경합 처리 | 단일 SQLite 트랜잭션 + append-only | 성능 문제의 근원, 단일 사용자 CLI에는 불필요 |
+| 읽을 때마다 해시·감사 전체 재검증 | 쓸 때 검증 + `guard verify` 명령으로 일괄 검증 | 이력에 비례해 느려지는 구조를 피함 |
+| 객체 20여 종(RUN/OBS/EVD 분리, CMP/REC 분리, RTP/RTE/ENS 등) | 7종 | 필요해지면 그때 분리 |
+| 웹 UI·역할 4종·토큰/세션 | CLI만 | 파이프라인이 먼저 |
+| 게이트웨이 구현·런타임 통제 | 없음 | 점검 대상이지 우리가 만들 것이 아님 |
+| LLM 판단 보조(A23) | 없음 | 선택 기능, 나중에 |
+| 54단계 프롬프트 플랜·D번호 결정 체계 | 이 SPEC + `DECISIONS.md` 한 장 | 개발 관리 비용 축소 |
+
+---
+
+## 10. 저장소 구조와 CLI
+
+```
+guard/
+├─ SPEC.md                 # 이 문서
+├─ DECISIONS.md            # 결정 기록 (날짜·결정·이유, 한 줄씩)
+├─ pyproject.toml          # Python 3.11, pydantic, typer, pyyaml, httpx, pytest
+├─ src/guard/
+│  ├─ models/              # §4 객체 7종 + CheckDef + enum
+│  ├─ core/                # select, run, judge, report, compare, aggregate
+│  ├─ store/               # SQLite + artifacts/
+│  ├─ adapters/            # vllm.py (EngineAdapter)
+│  ├─ executors/           # 점검 실행기
+│  ├─ judges/              # rule_table.py + 개별 판정기
+│  ├─ collectors/          # 환경 수집기 (file.py 먼저)
+│  └─ cli.py
+├─ packs/PACK-BASELINE/    # §3
+├─ tools/import_checklist.py
+└─ tests/
+   ├─ invariants/          # INV-01 ~ INV-18 각각
+   └─ ...
+```
+
+```bash
+guard select  --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml   # → PLAN
+guard run     --plan PLAN-...                                                  # → EVD들
+guard judge   --plan PLAN-...                                                  # → RES들 (재실행 = 재판정)
+guard report  --plan PLAN-... --html out.html                                  # → RPT
+guard update  --pack ... --baseline env-a.yaml --candidate env-b.yaml --policy ...  # 위 전체를 두 버전으로
+guard verify                                                                   # 저장소 해시 일괄 검증
+```
+
+---
+
+## 11. AI 코딩 에이전트에게 주는 작업 규칙
+
+1. **이 SPEC이 정본이다.** 원본 프레임워크·BoBProject 문서와 충돌하면 이 SPEC을 따르고, 충돌 사실을 `DECISIONS.md`에 적는다.
+2. **§8 순서대로 한 단계씩 만든다.** 단계마다 테스트가 통과한 뒤 다음으로 간다.
+3. **불변식마다 `tests/invariants/test_inv_XX.py`를 먼저 쓴다.** 구현이 불변식을 어기면 구현을 고친다. 불변식을 고치지 않는다.
+4. **§9 목록에 있는 것을 만들지 않는다.** 필요해 보이면 멈추고 사람에게 묻는다.
+5. **실제 결과를 꾸며 넣지 않는다.** 실행하지 않은 시험의 EVD를 만들거나 예시 값을 `MEASURED`로 표시하지 않는다(INV-02).
+6. **코어에 엔진 이름을 쓰지 않는다.** 엔진별 코드는 `adapters/`에만 둔다.
+7. 테스트 전체가 **1분 안에** 끝나게 유지한다. 실제 엔진이 필요한 테스트는 `@pytest.mark.engine`으로 분리해 기본 실행에서 뺀다.
+
+---
+
+## 12. 남은 결정 (팀 확인 필요)
+
+| # | 항목 | 제안 |
+| --- | --- | --- |
+| D1 | 점검 행 ID 체계 | §2.1 영역코드-순번 |
+| D2 | CheckDef에 `impact`(상/중/하) 추가 여부 | 추가. 보고서 정렬에만 사용 |
+| D3 | 수치 미정 40행의 기준값 도출 방법 | 기준선 측정 후 한도 규칙. 05 문서에 방법 추가 |
+| D4 | `UNDETERMINED` 점검을 선정할지 | 선정 (§4.4). 빼면 미검증 범위가 숨겨짐 |
+| D5 | 첫 슬라이스 점검 | `REQ-01` Gateway 우회 직통 (§8) |
+| D6 | 버전 비교에서 기능·성능 축도 같은 표를 쓸지 | 같은 표. 성능은 수치가 정해진 뒤 |
+| D7 | 두 번째 엔진 어댑터 시점 | 우선 점검 10행이 vLLM에서 돈 뒤 |

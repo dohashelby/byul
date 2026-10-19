@@ -1,0 +1,10 @@
+# 예시 정책 (EXAMPLE, DRAFT). 보고서는 "공식 아님"으로 표시된다.
+data_origin: EXAMPLE
+status: DRAFT
+pack: { id: PACK-BASELINE, revision: 1 }
+values:
+  REQ-01: { allowed_callers: [gateway-sa] }
+scope: { include: [], exclude: [] }   # include가 비면 팩 전체
+exceptions: []
+confirmed_by: null
+confirmed_at: null

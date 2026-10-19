@@ -1,0 +1,15 @@
+# 플러그인 구현 선택 (SPEC §7)
+store = ".guard"
+
+[adapter]
+name = "fake"            # 5단계에서 vllm 어댑터로 바꾼다
+
+[executors]
+# CheckDef.executor 이름 → 구현
+direct_route = "fake"    # 5단계 전까지 FakeExecutor
+
+[fake]
+scenario = "pass"        # pass | direct_200 | not_attempted | missing_obs
+
+[judges]
+rule_table = "rule_table"

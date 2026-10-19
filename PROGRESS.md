@@ -412,3 +412,15 @@ git status
 - 7: models/checkdef.py — `build_pack`, `Pack.path` 선택·`Pack.source` (Step 4)
 - 8: core/report.py — 팩 보존본 사용 한계 문장 (Step 4)
 - 합계 **8건**(models 3, core 3, judges 2), 점검 전용 분기 0건. store/는 집계 밖(팩 보존본 모듈 추가).
+
+
+## 재평가 및 업데이트 제품 경로 구현 (2026-10-19)
+- 시작 커밋 main/ec4f91b. 별도 codex/gua-update-mvp 작업 트리에서 기존 로컬 변경·out/5b 증거를 보존했다.
+- 한 일: 부분 /proc·마운트 수집의 거짓 PASS 방지, 팩 폴더 부재/손상 시 보존본 재판정, UTF-8/LF 팩 생성, 사용자 승인 CPU 프로파일(보안/기능만 비교), 의미 있는 설정 해시, side별 실행 설정·제품 guard update(managed/external), JSON/HTML 기능 비교/비교 불가 필드, 실행 정리 실패 전파, 판정표 사전 검사.
+- 실행 경계: application.py가 runtime과 core를 연결한다. lab은 호환 래퍼로 유지하고 샌드박스 자산은 설치 패키지에 포함했다. 기존 객체 7종·append-only·judge 순수 함수 경계는 유지했다.
+- 점검: PLT-04(환경변수 이름/마운트 경로), REQ-09(token-array ID/길이 두 경계) 실행기·판정표 추가. 연결된 정의 5개, 신규 2개는 모의 계약 검증이며 실제 엔진 자동화 완료 5/77을 뜻하지 않는다. 팩 revision 10, DRAFT.
+- 테스트: 최종 기본 테스트 451 passed, 4 skipped(Windows 네트워크 3·symlink 1), 13 deselected, 159.44s. 최초 수집/팩 회귀 6건은 수정 전 실패를 확인했다. 추가 generic run의 동일 target 재사용도 실패 재현 후 수정했다. Windows 전체 지원 주장은 하지 않는다.
+- 배포 확인: uv build --wheel 성공, frozen 의존성으로 새 가상환경에 wheel 설치 후 guard CLI help와 update 명령 확인. Linux PR/main CI 정의 추가; 원격 실행 결과는 별도 확인한다.
+- 과거 증거: 복사본 Store.verify에서 exposed·isolated의 참조 artifact 각 1개 누락, inv15 0문제. HEAD/6d9ad83/13bb4d3에서 누락 원본을 찾지 못했다. 기존 증거·해시는 수정하지 않았다.
+- 막힌 것: Docker daemon 미실행·모델 캐시 부재로 실제 엔진·두 실제 이미지 실증 미수행. 정책/팩 확정자 미정. AWS 자원은 생성하지 않았다.
+- 다음 단계: Linux/macOS에서 실제 두 이미지 update와 신규 2개 점검 실증, 누락 증거 원본 복구 또는 별도 재실증, 정책·팩 검토. 상세 계획/완료 기준은 docs/REVIEW_AND_DEVELOPMENT_PLAN.md, 실행 절차는 docs/RUNBOOK.md.

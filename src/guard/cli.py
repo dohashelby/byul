@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+import yaml
 
 from guard.collectors.file import load_environment, load_policy
 from guard.core.judge import judge_plan
@@ -19,6 +20,9 @@ from guard.models import Pack, Plan, load_pack, utcnow
 from guard.report.html import render_html
 from guard.store import Store
 from guard.store.packs import PackNotStoredError, get_pack, put_pack
+from guard.application import execute_update, run_config
+from guard.core.preflight import validate_pack
+from guard.models import new_id
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="서빙엔진 보안 검증")
 pack_app = typer.Typer(add_completion=False, no_args_is_help=True, help="팩 보존본")
@@ -43,7 +47,12 @@ def _plan_and_pack(st: Store, plan_id: str, pack_dir: Optional[Path], allow_snap
     plan = st.get(pid, int(rev)) if rev else st.latest(pid)
     if plan.kind != "PLAN":
         raise typer.BadParameter(f"{plan_id} is not a PLAN")
-    pack = load_pack(pack_dir or Path("packs") / plan.inputs.pack.id)
+    try:
+        pack = load_pack(pack_dir or Path("packs") / plan.inputs.pack.id)
+    except (OSError, ValueError, yaml.YAMLError):
+        if allow_snapshot:
+            return plan, get_pack(st, plan.inputs.pack)
+        raise
     if pack.ref() == plan.inputs.pack:
         return plan, pack
     msg = f"pack on disk differs from the one the plan used ({plan.inputs.pack.id} rev {plan.inputs.pack.revision})"
@@ -74,6 +83,7 @@ def select(
     cfg = _config(config)
     st = _store(store, cfg)
     p = load_pack(pack)
+    validate_pack(p)
     put_pack(st, pack)  # select 시점 팩 보존본(judge·report가 나중에 이 revision을 읽을 수 있게)
     e, pol = load_environment(env), load_policy(policy, p)
     st.put(e)
@@ -100,7 +110,7 @@ def run(
         cfg.setdefault("fake", {})["scenario"] = fake_scenario
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack)
-    rc = RunConfig(executors=cfg.get("executors", {}), adapter=(cfg.get("adapter") or {}).get("name"), raw=cfg)
+    rc = run_config(cfg)
     evds = run_plan(st, pk, pl, rc)
     counts: dict[str, int] = {}
     for e in evds:
@@ -156,6 +166,31 @@ def report(
     if html_out:
         html_out.write_text(render_html(json.loads(json_out.read_text(encoding="utf-8"))), encoding="utf-8")
         typer.echo(f"  html → {html_out}")
+
+
+@app.command()
+def update(
+    pack: Path = typer.Option(..., "--pack"),
+    baseline: Path = typer.Option(..., "--baseline"),
+    candidate: Path = typer.Option(..., "--candidate"),
+    policy: Path = typer.Option(..., "--policy"),
+    output: Path = typer.Option(Path("out/updates"), "--output"),
+    config: Path = ConfigOpt,
+    store: Optional[Path] = StoreOpt,
+) -> None:
+    """Two environments → side-specific execution → JSON/HTML comparison."""
+    cfg = _config(config)
+    pk = load_pack(pack)
+    validate_pack(pk)
+    envs = [load_environment(baseline), load_environment(candidate)]
+    pol = load_policy(policy, pk)
+    folder = output / new_id("UPDATE")
+    rpt, failed = execute_update(_store(store, cfg), pk, envs, pol, cfg, folder, utcnow())
+    data = rpt.to_dict()
+    (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    (folder / "report.html").write_text(render_html(data), encoding="utf-8")
+    typer.echo(f"{rpt.id} official={rpt.official} → {folder}")
+    raise typer.Exit(1 if failed else 0)
 
 
 @pack_app.command("import")

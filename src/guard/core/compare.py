@@ -15,9 +15,18 @@ _COMPARABLE_VERDICTS = {Verdict.PASS, Verdict.FAIL, Verdict.UNKNOWN}
 
 
 def comparable(a: Comparability, b: Comparability) -> bool:
-    """모든 비교 조건이 양쪽에서 null이 아니고 같아야 한다."""
-    da, db = a.model_dump(), b.model_dump()
-    return all(da[k] is not None and da[k] == db[k] for k in da)
+    """Explicit CPU profiles compare security/function; unknown hardware never matches."""
+    return not comparison_differences(a, b)
+
+
+def comparison_differences(a: Comparability, b: Comparability) -> list[str]:
+    fields = ["model_inventory_sha256", "fixture_sha256", "config_sha256"]
+    if a.cpu is not None or b.cpu is not None:
+        fields.append("cpu")
+    else:
+        fields.extend(["gpu", "driver"])
+    return [key for key in fields if getattr(a, key) is None or getattr(b, key) is None
+            or getattr(a, key) != getattr(b, key)]
 
 
 def compare(baseline: Verdict, candidate: Verdict, comparable: bool) -> Comparison:

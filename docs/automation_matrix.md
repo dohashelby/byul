@@ -1,5 +1,9 @@
 # 77행 자동화 분류표 (요약)
 
+> 최신 구현 상태: [재평가·구현 보고서](REVIEW_AND_DEVELOPMENT_PLAN.md).
+> 이 표의 A/B/C는 가능성 분류다. 현재 연결된 정의는 REQ-01·REQ-03·PLT-01·PLT-04·REQ-09이며,
+> 신규 PLT-04·REQ-09는 모의 계약 검증 상태다. 이 표의 과거 추천 순서·불확실성 기록과 실제 실측 완료 수를 구분한다.
+
 > 작성 2026-10-19. 판정·코드 변경 없음. 원본: `packs/PACK-BASELINE/checks/*.yaml`(checklist.json 원문 보존 필드) — 행별 표는 [`automation_matrix.csv`](automation_matrix.csv).
 
 **등급 정의**  A: 맥 Docker + CPU vLLM(+ 로컬 컨테이너·fixture)만으로 실행기·판정을 실험실 위상에서 끝까지 재현 가능 · B: 추가 인프라 필요(GPU/TP≥2, 다중 노드, Ray, 부하 도구, 외부 서비스, 추가 모델 등) · C: 기업 실제 환경(승인·배포 시스템, IdP, 기록 저장소 등)이 있어야 의미 있는 판정 · M: 수동 판단만.

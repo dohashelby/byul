@@ -1,0 +1,24 @@
+# 실험실 Gateway — role_open(위반 구성): 유효한 키(일반·관리)면 역할과 무관하게 모든 경로를 엔진으로 넘긴다.
+# GUARD_GENERAL_KEY·GUARD_ADMIN_KEY: 실행 시 환경변수로만 주입. GUARD_ENGINE_UPSTREAM: 엔진 IP:포트.
+map $http_authorization $guard_role {
+    default "";
+    "Bearer ${GUARD_ADMIN_KEY}" admin;
+    "Bearer ${GUARD_GENERAL_KEY}" general;
+}
+
+log_format guard_lab '$remote_addr "$request" $status';   # Authorization 헤더는 기록하지 않는다
+
+server {
+    listen 8080;
+    access_log /dev/stdout guard_lab;
+
+    location / {
+        if ($guard_role = "") {
+            return 401;
+        }
+        proxy_set_header Authorization "";
+        proxy_pass http://${GUARD_ENGINE_UPSTREAM};
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 60s;
+    }
+}

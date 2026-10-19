@@ -24,6 +24,7 @@ from typing import Any, Callable
 from guard.adapters.base import EngineAdapter, ProbeRequest, Route
 from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.docker import Docker, DockerError, Mount
+from guard.runtime.comparison import execution_conditions
 
 from . import http_probe
 from .base import DraftArtifact, EvidenceDraft
@@ -229,7 +230,8 @@ class HttpCheckExecutor:
             wait_engine(target, cprobe, alive)
             return self._finish(make_ctx(cprobe))
         finally:
-            docker.cleanup(timeout=60)
+            if docker.cleanup(timeout=60):
+                raise RuntimeError("probe resource cleanup incomplete")
 
     def validate_policy(self, check: CheckDef, policy_values: dict) -> None:
         """시험 시작 전 정책 값과 실행기 설정의 일치 확인. 불일치면 예외(→ ABORTED). 기본은 확인 없음."""
@@ -249,8 +251,9 @@ class HttpCheckExecutor:
         log_path.write_text("".join(json.dumps(x, ensure_ascii=False, default=str) + "\n" for x in [*ctx.log, summary]),
                             encoding="utf-8")
         fixture = summary.get("fixture", {})
-        config = mask({"target": {k: v for k, v in ctx.target.items() if k != "images"}, "request_timeout": ctx.timeout,
-                       "allow_mutating_routes": ctx.allow_mutating, "roles": sorted(self.roles())}, ctx.secrets)
+        config = mask(execution_conditions(ctx.target, {
+            **self.cfg, "request_timeout": ctx.timeout, "allow_mutating_routes": ctx.allow_mutating,
+        }, list(self.roles())), ctx.secrets)
         return EvidenceDraft(
             status=ExecStatus.COMPLETED,
             # 실험실(stub) 대상은 EXAMPLE. 실제 엔진 대상만 MEASURED (DECISIONS 5a/5b)
@@ -259,9 +262,10 @@ class HttpCheckExecutor:
             challenges=challenges,
             observations=observations,
             artifacts=[DraftArtifact(name="probe_log.jsonl", path=log_path, collector=f"{self.name}/{self.version}")],
-            comparability={"fixture_sha256": sha256_hex(canonical_json(fixture)), "config_sha256": sha256_hex(canonical_json(config)),
+            comparability={"fixture_sha256": sha256_hex(canonical_json(fixture)),
+                           "config_sha256": sha256_hex(canonical_json(config)) if ctx.target.get("comparison_config") else None,
                            "model_inventory_sha256": ctx.env.model.inventory_sha256, "gpu": ctx.env.runtime.gpu_model,
-                           "driver": ctx.env.runtime.driver},
+                           "driver": ctx.env.runtime.driver, "cpu": ctx.env.runtime.cpu},
             config=config,
             started_at=ctx.started,
             finished_at=utcnow(),

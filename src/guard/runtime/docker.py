@@ -235,5 +235,11 @@ class Docker:
     def __enter__(self) -> "Docker":
         return self
 
-    def __exit__(self, *exc) -> None:
-        self.cleanup(timeout=60)
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        problems = self.cleanup(timeout=60)
+        if problems:
+            message = f"cleanup incomplete for {self.label}; inspect labelled containers/networks"
+            if exc is not None:
+                exc.add_note(message)
+            else:
+                raise DockerError(message)

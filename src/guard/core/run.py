@@ -39,6 +39,8 @@ class RunConfig:
     executors: dict[str, str] = field(default_factory=dict)  # CheckDef.executor → 구현 이름
     adapter: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)  # guard.toml 전체 (플러그인 설정)
+    side_configs: dict[str, RunConfig] = field(default_factory=dict)
+    abort_reason: str | None = None
 
 
 def _not_run_origin(plan: Plan) -> DataOrigin:
@@ -86,13 +88,20 @@ def _normalize(check: CheckDef, draft: EvidenceDraft) -> dict[str, Any]:
     return parts
 
 
-def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig) -> list[Evidence]:
+def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     envs = [store.resolve(r) for r in plan.inputs.environments]
     policy = store.resolve(plan.inputs.policy)
-    adapter = registry.ADAPTERS[cfg.adapter]() if cfg.adapter in registry.ADAPTERS else None
-    adapter_info = PluginInfo(name=adapter.name, version=adapter.version) if adapter else None
+    if plan.mode == Mode.update and "real" in cfg.executors.values() and set(cfg.side_configs) != {"baseline", "candidate"}:
+        raise ValueError("real update runs require baseline and candidate side configurations")
+    if plan.mode == Mode.update:
+        for name, impl in cfg.executors.items():
+            if impl != "real":
+                continue
+            paths = [c.raw.get(name, {}).get("target") for c in cfg.side_configs.values()]
+            if len(paths) != 2 or not all(paths) or Path(paths[0]).resolve() == Path(paths[1]).resolve():
+                raise ValueError(f"{name}: update sides need different target files")
 
     plan_ref = plan.ref()
     existing = {
@@ -105,6 +114,11 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig) -> list[Evide
             continue  # INV-10
         check = pack.checks[item.check_id]
         for side, env in _sides(plan, envs):
+            if only_side is not None and side != only_side:
+                continue
+            side_cfg = cfg.side_configs.get(side.value, cfg)
+            adapter = registry.ADAPTERS[side_cfg.adapter]() if side_cfg.adapter in registry.ADAPTERS else None
+            adapter_info = PluginInfo(name=adapter.name, version=adapter.version) if adapter else None
             prev = existing.get((check.id, side))
             ident = {"id": prev.id, "revision": prev.revision + 1} if prev else {"id": new_id("EVD"), "revision": 1}
             common = dict(
@@ -115,7 +129,7 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig) -> list[Evide
                 environment=env.ref(),
                 refs=[plan_ref, env.ref()],
             )
-            evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), cfg, adapter, adapter_info, plan, common)
+            evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common)
             store.put(evd)
             out.append(evd)
     return out
@@ -133,6 +147,8 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
     reason = _blocked_reason(item, cfg)
     if reason:
         return stopped(ExecStatus.NOT_RUN, reason)
+    if cfg.abort_reason:
+        return stopped(ExecStatus.ABORTED, cfg.abort_reason)
 
     impl_name = cfg.executors[item.executor]
     started = utcnow()

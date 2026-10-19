@@ -86,17 +86,32 @@ class AdapterInfo(Strict):
     version: str
 
 
+class CpuProfile(Strict):
+    architecture: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    system: str = Field(min_length=1)
+    kernel: str = Field(min_length=1)
+    threads: int = Field(gt=0)
+
+
 class RuntimeInfo(Strict):
     nodes: int = 1
     tp_groups: int = 1
     gpu_count: int | None = None
     gpu_model: str | None = None
     driver: str | None = None
+    cpu: CpuProfile | None = None
     platform: str | None = None  # 실행 환경 설명. 예: "CPU, arm64, Docker Desktop on macOS"
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("platform",))
+        return _drop_none(handler(self), ("platform", "cpu"))
+
+    @model_validator(mode="after")
+    def _cpu_needs_zero_gpus(self):
+        if self.cpu is not None and self.gpu_count != 0:
+            raise ValueError("an explicit CPU profile needs gpu_count=0")
+        return self
 
 
 class FilesReadByEngine(Strict):
@@ -326,6 +341,17 @@ class Comparability(Strict):
     config_sha256: str | None = None
     gpu: str | None = None
     driver: str | None = None
+    cpu: CpuProfile | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("cpu",))
+
+    @model_validator(mode="after")
+    def _one_backend(self):
+        if self.cpu is not None and (self.gpu is not None or self.driver is not None):
+            raise ValueError("CPU and GPU comparison profiles cannot be mixed")
+        return self
 
 
 class Evidence(GuardObject):
@@ -419,13 +445,15 @@ class CheckRow(Strict):
     baseline: SideResult | None = None
     candidate: SideResult | None = None
     comparison: Comparison | None = None
+    functional_comparison: Comparison | None = None
+    comparison_reasons: list[str] | None = None
     gaps: list[Gap] = Field(default_factory=list)
     exception: ExceptionDisplay | None = None
     functional_scope: FunctionalScope | None = None  # "기능 확인 범위: N / 등록 경로 M (표본)"
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("functional_scope",))
+        return _drop_none(handler(self), ("functional_scope", "functional_comparison", "comparison_reasons"))
 
 
 class AxisSummary(Strict):

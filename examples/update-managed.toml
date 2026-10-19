@@ -1,0 +1,31 @@
+# Fill env-a.yaml/env-b.yaml with real pinned images, versions, model inventory and hardware.
+# Use a DRAFT policy scoped to checks that have the required values.
+store = ".guard-update"
+[adapter]
+name = "vllm"
+[executors]
+direct_route = "real"
+role_route = "real"
+container_config = "real"
+# Enable only after configuring matching policy values and engine validation:
+# credential_exposure = "real"
+# input_validation = "real"
+[update]
+mode = "managed"
+topology = "isolated"
+gateway_profile = "role_enforced"
+engine_profile = "hardened"
+[vllm]
+models_dir = "~/guard-models"
+cpu_kv_cache_gib = 1
+ready_timeout = 600
+[direct_route]
+roles = { allowed = "GUARD_UPDATE_GENERAL" }
+[role_route]
+roles = { general = "GUARD_UPDATE_GENERAL", admin = "GUARD_UPDATE_ADMIN" }
+admin_role = "admin"
+[container_config]
+sentinel_paths = ["/models", "/"]
+[input_validation]
+max_probe_tokens = 4096
+# Set vocab_size and vocab_source from the pinned model before enabling REQ-09.

@@ -151,3 +151,16 @@
 - ~~BoBProject 보고서의 opt-125m 파일 수 37과 이번 12의 차이~~ → 따지지 않음. inventory 정의는 위 "비교용 = snapshot 전체, 참고용 = 엔진이 읽은 파일".
 - 실측 정책 확정자, 팩 검토자 — 계속 미지정(정책·팩 DRAFT, official=false).
 - D2 `impact` 값(HIGH/MEDIUM/LOW) — 지금은 전부 null.
+
+
+## 2026-10-19 — 최신 코드 검토 및 업데이트 경로 구현
+- 사용자 결정: 명시적 CPU 프로파일로 보안·기능 비교를 지원하고 CPU 성능은 미검증으로 둔다. GPU·driver null을 CPU라고 추정하지 않는다. 선택 필드 cpu는 비어 있으면 직렬화에서 빼 과거 해시를 유지한다.
+- 제품 합성 지점은 application.py로 둔다. CLI/core가 Docker를 직접 제어하지 않고 application만 runtime과 코어 파이프라인을 연결한다. 기존 runtime 경계 테스트는 이 명시적 합성 지점만 추가로 허용한다.
+- PLT-01은 불완전 /proc 기록을 버리지 않는다. process_scan_complete=false이면 PASS 불가이며, 이미 확인한 UID 0·capability 위반은 보존한다.
+- judge/report는 디스크 팩이 없거나 손상돼도 정확한 보존본으로 재판정한다. run의 팩 불일치 거부는 유지한다.
+- 비교 해시는 실행 ID/IP/리소스 이름을 제외하고 위상·네트워크 관계·launch/보조 이미지·역할·실행 설정을 포함한다. launch 비교 정보가 없는 외부 target은 설정 미확인으로 비교 불가다.
+- update는 side별 설정과 서로 다른 target 경로를 요구한다. external 실제 대상은 관측 버전·이미지 메타데이터가 ENV와 일치해야 한다. managed는 pinned 이미지/모델 inventory 사전 검사 후 순차 기동·실행·정리한다.
+- PLT-04 신규 범위는 환경변수 이름·마운트 경로, REQ-09 신규 범위는 정상 token-array 대조와 ID/길이 경계 두 건이다. 실제 엔진 실증 전에는 전체 점검 실측 완료로 집계하지 않는다. 기업 기준은 POL, vocab_size/출처/요청 예산은 실행 설정으로 구분한다.
+- 팩 생성 bytes는 UTF-8/LF로 고정한다. 기존 증거의 누락·해시를 재작성해 숨기지 않는다. 과거 exposed/isolated store의 참조 artifact 각 1개 누락은 별도 원본 복구/재실증 과제다.
+- 실제 엔진/두 이미지 실증은 Docker daemon·모델 캐시·비교 이미지가 없는 현재 Windows 환경에서는 미수행이다. 신규 코드 검증과 과거 macOS 실행 기록을 구분한다.
+- 2026-10-19 · 사용자 작업 방식 변경: 이후 구현은 묶음 완료 후 테스트 → 실패 수정 → 필요한 재검증 순서로 진행한다. 중간의 반복 테스트와 테스트 선행 방식은 사용하지 않는다. 불변식과 완료 전 검증 요구 자체는 유지한다. CLAUDE.md·SPEC §11의 작업 순서를 함께 갱신했다.

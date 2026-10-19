@@ -38,7 +38,7 @@ from guard.models.objects import (
 from guard.store import Store
 
 from .aggregate import aggregate
-from .compare import compare_results
+from .compare import compare_results, comparison_differences
 
 _IMPACT_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, None: 3}
 _REVIEW_ORDER_RANK = {"reference_baseline_first": 0, "implementation_path_first": 1, "conditional_when_selected": 2}
@@ -147,6 +147,9 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
                 rb, rc = row["baseline"], row["candidate"]
                 if b and c:
                     row["comparison"] = compare_results(rb.security, b.comparability, rc.security, c.comparability)
+                    row["functional_comparison"] = compare_results(rb.functional or Verdict.UNKNOWN, b.comparability,
+                                                                   rc.functional or Verdict.UNKNOWN, c.comparability)
+                    row["comparison_reasons"] = comparison_differences(b.comparability, c.comparability)
             exc, notes = _exception_display(check.id, policy, as_of)
             row["exception"] = exc
             limitations.extend(notes)

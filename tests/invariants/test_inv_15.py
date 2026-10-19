@@ -54,3 +54,12 @@ def test_invalid_draft_becomes_aborted(tmp_path):
     *_, evd = _run(tmp_path, LiesMeasured())
     assert evd.execution.status == ExecStatus.ABORTED
     assert evd.data_origin != DataOrigin.MEASURED
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.engine
+@pytest.mark.skip(reason="실제 엔진 어댑터(vLLM)의 기동 실패·ready 시간 초과를 ABORTED로 전파하는 시험은 5단계(실제 엔진 필요).")
+def test_real_adapter_start_failure_is_aborted():
+    raise AssertionError

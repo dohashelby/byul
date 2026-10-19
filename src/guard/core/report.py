@@ -1,0 +1,197 @@
+"""report: PLAN + RES → RPT. 새 판정을 하지 않는다. approval은 채우지 않는다(INV-07)."""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from datetime import datetime
+
+from guard.models import (
+    Applicability,
+    DataOrigin,
+    Evidence,
+    ExceptionStatus,
+    ExecStatus,
+    Gap,
+    Mode,
+    NotSelectedReason,
+    Pack,
+    Plan,
+    PolicyStatus,
+    Ref,
+    Result,
+    ReviewStatus,
+    Side,
+    Verdict,
+    new_id,
+    weakest_origin,
+)
+from guard.models.objects import AxisSummary, CheckRow, ExceptionDisplay, NotSelected, Policy, Report, SideResult
+from guard.store import Store
+
+from .aggregate import aggregate
+from .compare import compare_results
+
+_IMPACT_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, None: 3}
+_REVIEW_ORDER_RANK = {"reference_baseline_first": 0, "implementation_path_first": 1, "conditional_when_selected": 2}
+
+
+def _exception_display(check_id: str, policy: Policy, as_of: datetime) -> tuple[ExceptionDisplay | None, list[str]]:
+    shown, notes = None, []
+    for exc in policy.exceptions:
+        if exc.check_id != check_id:
+            continue
+        if not (exc.approved_by and exc.approved_at):
+            notes.append(f"{check_id}: 정책 예외 미승인 — 표시하지 않음 ({exc.reason})")
+        elif exc.expires_at is None or exc.expires_at <= as_of:
+            notes.append(f"{check_id}: 정책 예외 만료 — 표시하지 않음 ({exc.reason})")
+        else:
+            shown = ExceptionDisplay(status=ExceptionStatus.APPROVED, reason=exc.reason, expires_at=exc.expires_at)
+    return shown, notes
+
+
+def _side(res: Result | None) -> SideResult:
+    if res is None:
+        return SideResult(result=None, security=Verdict.UNKNOWN)
+    return SideResult(
+        result=res.ref(),
+        security=res.verdicts.security,
+        functional=res.verdicts.functional,
+        performance=res.verdicts.performance,
+        verification_level=res.verification_level,
+    )
+
+
+def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Report:
+    if plan.inputs.pack != pack.ref():
+        raise ValueError("plan was made with a different pack revision")
+    policy: Policy = store.resolve(plan.inputs.policy)
+    envs = [store.resolve(r) for r in plan.inputs.environments]
+    plan_ref = plan.ref()
+
+    evds: dict[tuple[str, Side], Evidence] = {
+        (e.check_id, e.side): e for e in store.find_latest("EVD", lambda e: e.plan == plan_ref)
+    }
+    evd_keys = {(e.id, e.revision, e.content_sha256) for e in evds.values()}
+    results: dict[tuple[str, Side], Result] = {}
+    for r in store.find_latest("RES", lambda r: (r.evidence.id, r.evidence.revision, r.evidence.sha256) in evd_keys):
+        results[(r.check_id, r.side)] = r  # 최신 EVD revision을 가리키는 최신 RES
+
+    sides = [Side.single] if plan.mode == Mode.audit else [Side.baseline, Side.candidate]
+    limitations: list[str] = []
+    rows: list[CheckRow] = []
+    not_selected: list[NotSelected] = []
+    manual: list[str] = []
+    by_purpose: dict[str, list[Verdict]] = defaultdict(list)
+    by_area: dict[str, list[Verdict]] = defaultdict(list)
+    area_purposes: dict[str, set[str]] = defaultdict(set)
+
+    for item in plan.items:
+        if item.not_selected_reason == NotSelectedReason.RETIRED:
+            continue
+        check = pack.checks[item.check_id]
+        row = dict(
+            check_id=check.id, purpose=check.purpose, area=check.area, question=check.question,
+            review_order=check.review_order, impact=check.impact, applicability=item.applicability,
+            selected=item.selected, gaps=item.gaps,
+        )
+        if not item.selected:
+            not_selected.append(NotSelected(check_id=check.id, reason=item.not_selected_reason.value))
+            rows.append(CheckRow(**row))
+            if item.not_selected_reason == NotSelectedReason.NOT_APPLICABLE:
+                verdict = Verdict.NOT_APPLICABLE
+            else:
+                continue  # 정책 범위 밖: 집계하지 않는다
+        else:
+            row["tested_while_undetermined"] = item.applicability in (Applicability.UNDETERMINED, Applicability.CONFLICT)
+            side_results = {s: results.get((check.id, s)) for s in sides}
+            for s, res in side_results.items():
+                row[s.value] = _side(res)
+            if plan.mode == Mode.update:
+                b, c = evds.get((check.id, Side.baseline)), evds.get((check.id, Side.candidate))
+                rb, rc = row["baseline"], row["candidate"]
+                if b and c:
+                    row["comparison"] = compare_results(rb.security, b.comparability, rc.security, c.comparability)
+            exc, notes = _exception_display(check.id, policy, as_of)
+            row["exception"] = exc
+            limitations.extend(notes)
+            not_run = any(e.execution.status == ExecStatus.NOT_RUN for (cid, _), e in evds.items() if cid == check.id)
+            if Gap.NO_EXECUTOR in item.gaps or not_run:
+                manual.append(check.id)
+            rows.append(CheckRow(**row))
+            # update 모드의 목적·영역 집계는 후보(candidate) 기준
+            verdict = row[sides[-1].value].security
+        for p in [check.purpose, *check.secondary_purposes]:
+            by_purpose[p].append(verdict)
+            area_purposes[check.area].add(p)
+        by_area[check.area].append(verdict)
+
+    inv = plan.inventory_complete
+    purpose_summary = {
+        p: AxisSummary(security=aggregate(vs, inv.get(p, False)), inventory_complete=inv.get(p, False))
+        for p, vs in sorted(by_purpose.items())
+    }
+    area_summary = {}
+    for a, vs in sorted(by_area.items()):
+        complete = all(inv.get(p, False) for p in area_purposes[a])
+        area_summary[a] = AxisSummary(security=aggregate(vs, complete), inventory_complete=complete)
+
+    # 미충족 먼저: impact → review_order → id. 나머지는 PLAN 순서
+    def is_fail(r: CheckRow) -> bool:
+        return any(getattr(r, s.value) and getattr(r, s.value).security == Verdict.FAIL for s in sides)
+
+    fails = sorted((r for r in rows if is_fail(r)),
+                   key=lambda r: (_IMPACT_RANK.get(r.impact, 3), _REVIEW_ORDER_RANK.get(r.review_order, 9), r.check_id))
+    rows = fails + [r for r in rows if not is_fail(r)]
+
+    inputs: list[Ref] = [pack.ref(), *(e.ref() for e in envs), policy.ref(), plan_ref]
+    if plan.inputs.change:
+        inputs.append(plan.inputs.change)
+    inputs += sorted((e.ref() for e in evds.values()), key=lambda r: r.id)
+    inputs += sorted((r.ref() for r in results.values()), key=lambda r: r.id)
+
+    origins = [e.data_origin for e in envs] + [policy.data_origin, plan.data_origin]
+    origins += [e.data_origin for e in evds.values()] + [r.data_origin for r in results.values()]
+    data_origin = weakest_origin(origins) or DataOrigin.EXAMPLE
+
+    # INV-17 및 한계
+    if policy.status != PolicyStatus.CONFIRMED:
+        limitations.insert(0, "정책 DRAFT: 공식 아님")
+    if not pack.reviewed:
+        limitations.insert(0, "검토 전 팩(DRAFT): 공식 아님")
+    if DataOrigin.EXAMPLE in origins:
+        limitations.append("EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음")
+    undetermined = [r.check_id for r in rows if r.tested_while_undetermined]
+    if undetermined:
+        limitations.append(f"적용 미정 상태로 시험함: {len(undetermined)}개 점검")
+    if manual:
+        limitations.append(f"자동 실행 불가(수동 시험 필요): {len(manual)}개 점검")
+    no_level = [k[0] for k, r in results.items() if r.verification_level is None]
+    if no_level:
+        limitations.append(f"검증 수준 없음(근거 누락): {len(set(no_level))}개 점검")
+    incomplete = [p for p, s in purpose_summary.items() if not s.inventory_complete]
+    if incomplete:
+        limitations.append(f"점검 목록 미완결 보호 목적: {len(incomplete)}개 — 집계 PASS 불가")
+    scope_out = [n for n in not_selected if n.reason == NotSelectedReason.POLICY_SCOPE.value]
+    if scope_out:
+        limitations.append(f"정책 범위 밖으로 제외: {len(scope_out)}개 점검")
+
+    official = (
+        policy.status == PolicyStatus.CONFIRMED and pack.reviewed and DataOrigin.EXAMPLE not in origins
+    )
+    return Report(
+        id=new_id("RPT"),
+        data_origin=data_origin,
+        refs=[r for r in inputs if r.kind != "PACK"] + [pack.ref()],
+        mode=plan.mode,
+        official=official,
+        inputs_manifest=inputs,
+        pack_review_status=ReviewStatus.REVIEWED if pack.reviewed else ReviewStatus.DRAFT,
+        policy_status=policy.status,
+        by_check=rows,
+        by_purpose=purpose_summary,
+        by_area=area_summary,
+        not_selected=not_selected,
+        manual_required=manual,
+        limitations=limitations,
+        approval=None,
+    ).seal()

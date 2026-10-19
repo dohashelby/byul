@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "serving-runtime"
+version = "0.0.0.dev0"
+description = "Development skeleton for serving-engine runtime controls"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+serving-runtime = "serving_runtime.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["serving_runtime*"]
+namespaces = false

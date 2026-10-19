@@ -1,0 +1,48 @@
+id: PLT-09
+revision: 1
+retired: false
+area: PLT
+purpose: 상대 확인·전송 보호
+secondary_purposes: []
+question: 엔진부터 collector와 최종 sink까지 필요한 전송 보호가 이어지는가?
+scope: 조건부; 외부 수집·저장 경로
+risk_category: 보안 위협 점검
+risk_summary: 전송 구간을 관찰·변경할 수 있는 주체가 평문·검증 없는 연결을 이용해 관측 자료를 읽거나 collector를 사칭해 기록을 바꿀 수 있음.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: 조건부; 외부 수집·저장 경로
+policy_params: []
+policy_prose:
+  policy_to_decide: 수집·저장 대상과 구간별 보호
+  enterprise_decisions: 구간별 배치·자료·위협 주체, TLS/상대 확인·자격 방식, 내부 IPC 보호 전제와 예외. 다중 노드는 선택 시 별도 검토한다.
+normal_control: 엔진→collector→sink의 승인 기록이 지정 종단으로 전달된다.
+challenge_steps:
+- 각 구간의 실제 SDK·protocol 확인
+- 시험 인증서·수신지 불일치 적용
+- 연결 거부와 정상 복구 비교
+required_observations: []
+required_observations_prose:
+- OTLP SDK 판본·env
+- 실제 protocol·TLS peer
+- collector→sink 설정
+satisfied_if: 어느 구간도 필요한 보호에서 누락되지 않는다.
+fail_criteria: TLS·상대 확인을 요구한 구간에서 비보호 전송 또는 다른 수신지가 허용된다.
+unknown_criteria: URL scheme만 보고 SDK 동작·후속 구간을 확인하지 못했다.
+remediation: 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다
+method_and_evidence: '구간별 종단·상대 확인·자격·전송 보호와 수신 기록을 확인한다. 【F37】선정 protocol/endpoint scheme/exporter SDK 버전/인증서/프록시 전체 수집. SDK가 https를 TLS로 강제하는지 코드 확인 후 실제 handshake 시험. 승인 TLS endpoint, 인증서 불일치 endpoint, 비허용 endpoint를 격리 환경에서 대조하고 실제 handshake·peer·수신 기록을 확인한다. 정상 대조: 승인 collector로 연결·수집 성공하고 실제 TLS peer 검증 또는 채택한 보호 채널 확인.'
+remaining_setup: 사용 SDK와 collector 설정·시험 인증서; 자격 원문 미수집
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C07
+  - Q-C11
+  scenario_ids:
+  - SC-24-01
+  - SC-24-02
+  subtest_ids:
+  - Q-C07/SC-24-01
+  - Q-C07/SC-24-02
+source:
+  array: platform_assessment_draft

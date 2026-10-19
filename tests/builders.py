@@ -23,6 +23,27 @@ T0 = datetime(2026, 10, 19, 0, 0, 0, tzinfo=timezone.utc)
 REQ01_STEPS = ["실제 route 목록 확보", "키 없음·오류·허용키로 Gateway와 직통 경로 비교", "handler 실행과 정책 거부를 대조"]
 
 
+ROUTES = ["/v1/models", "/v1/completions", "/invocations"]
+
+
+def req01_obs(direct=None, gateway=None, registered=None, tested=None, trusted=True, missing=()) -> dict:
+    """REQ-01 관측(경로별). 기본값은 정상 통과 형태(직통 401, Gateway 200, 전 경로 시험)."""
+    registered = ROUTES if registered is None else registered
+    tested = registered if tested is None else tested
+    direct = {r: 401 for r in tested} if direct is None else direct
+    gateway = {r: 200 for r in tested} if gateway is None else gateway
+    obs = {
+        "routes_registered": {"value": registered, "collected": True},
+        "routes_tested": {"value": tested, "collected": True},
+        "direct_outcomes": {"value": direct, "collected": True},
+        "gateway_outcomes": {"value": gateway, "collected": True},
+        "trusted_origin_reachable": {"value": trusted, "collected": True},
+    }
+    for k in missing:
+        obs[k] = {"value": None, "collected": False}
+    return obs
+
+
 def dummy_ref(kind: str, id_: str | None = None) -> Ref:
     return Ref(kind=kind, id=id_ or f"{kind}-TEST", revision=1, sha256="0" * 64)
 
@@ -78,9 +99,6 @@ def evidence(
         challenges=[{"step": s, "attempted": a} for s, a in zip(REQ01_STEPS, att)],
         observations=observations
         if observations is not None
-        else {
-            "direct_route_status": {"value": 401, "collected": True},
-            "gateway_route_status": {"value": 200, "collected": True},
-        },
+        else req01_obs(),
         **kw,
     ).seal()

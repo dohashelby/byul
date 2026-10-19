@@ -36,7 +36,7 @@ def _run(tmp_path, impl):
         env, pol = environment({"gateway": {"value": True, **D}}), policy(pack.ref(), scope={"include": ["REQ-01"], "exclude": []})
         store.put(env); store.put(pol)
         plan = select(pack, [env], pol); store.put(plan)
-        (evd,) = run_plan(store, pack, plan, RunConfig(executors={"direct_route": "test-impl"}))
+        (evd,) = run_plan(store, pack, plan, RunConfig(executors={"direct_route": "test-impl"}, adapter="vllm"))
         return store, pack, plan, evd
     finally:
         del registry.EXECUTORS["test-impl"]
@@ -56,10 +56,33 @@ def test_invalid_draft_becomes_aborted(tmp_path):
     assert evd.data_origin != DataOrigin.MEASURED
 
 
-import pytest  # noqa: E402
+
+def test_docker_probe_failure_becomes_aborted_evidence(tmp_path):
+    """실행 계층(Docker) 실패: probe 컨테이너가 비정상 종료하면 ABORTED → UNKNOWN. 가짜 Docker 실행기 사용."""
+    import json
+
+    from guard.core.judge import judge_plan
+    from guard.executors.direct_route import DirectRouteExecutor, docker_container_probe
+    from guard.models import Verdict
+    from guard.runtime.docker import CmdResult, Docker
+    from tests.builders import T0
+
+    def failing_runner(argv, *, input, timeout, env_extra):
+        return CmdResult(125, "", "docker: Error response from daemon: network not found")
+
+    target = tmp_path / "target.json"
+    target.write_text(json.dumps({
+        "lab": True, "probe_image": "x", "origins": {"external": {"network": "n1"}, "trusted": {"network": "n2"}},
+        "gateway": {"url": "http://g:8080"}, "engine": {"trusted_url": "http://e:8000"},
+        "direct_targets": [{"origin": "external", "url": "http://e:8000"}], "gateway_known_routes": [],
+    }), encoding="utf-8")
+    probe = docker_container_probe(Docker("t1abc", runner=failing_runner), "x")
+    impl = DirectRouteExecutor({"target": str(target), "allowed_key_env": "K"}, container_probe=probe, environ={"K": "k1"})
+    store, pack, plan, evd = _run(tmp_path, impl)
+    assert evd.execution.status == ExecStatus.ABORTED
+    assert "network not found" in evd.execution.abort_reason
+    (res,) = judge_plan(store, pack, plan, as_of=T0)
+    assert res.verdicts.security == Verdict.UNKNOWN
 
 
-@pytest.mark.engine
-@pytest.mark.skip(reason="실제 엔진 어댑터(vLLM)의 기동 실패·ready 시간 초과를 ABORTED로 전파하는 시험은 5단계(실제 엔진 필요).")
-def test_real_adapter_start_failure_is_aborted():
-    raise AssertionError
+# 실제 vLLM 기동 실패 전파는 tests/test_vllm_engine.py::test_inv15_real_engine_start_failure_is_aborted_unknown (-m engine)

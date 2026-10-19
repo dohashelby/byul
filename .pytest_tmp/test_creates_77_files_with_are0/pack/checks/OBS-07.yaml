@@ -1,0 +1,46 @@
+id: OBS-07
+revision: 1
+retired: false
+area: OBS
+purpose: 자료 이용 권한
+secondary_purposes: []
+question: 진단 자료 읽기권만으로 재실행할 수 없는가?
+scope: 조건부; replay 지원 구현
+risk_category: 보안 위협 점검
+risk_summary: 진단 자료의 읽기권만 가진 주체가 외부 replay 도구의 실행 권한까지 얻어 고권한 작업을 수행할 수 있음. 실제 도구 존재·권한 확인 필요.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: 조건부; replay 지원 구현
+policy_params: []
+policy_prose:
+  policy_to_decide: 조회와 실행 역할
+  enterprise_decisions: 자료별 독자·반출 목적·범위·승인, 진단 실행 역할·격리 환경과 parser/입력 신뢰 범위.
+normal_control: 외부 replay를 쓰는 환경에서 승인 실행 역할만 합성 자료를 재실행한다.
+challenge_steps:
+- replay consumer 존재 확인
+- reader 계정과 실행 역할로 같은 무해 자료 실행 요청
+- 실행표식·권한 검사 비교
+required_observations: []
+required_observations_prose:
+- consumer·실행 계정
+- reader·executor 역할
+- 실제 실행 및 거부 기록
+satisfied_if: 팀 참조의 replay 비사용·미도달을 확인한다. 정책을 변경해 지원하는 환경에서도 읽기 권한이 실행 권한으로 자동 확대되지 않는다.
+fail_criteria: 조회만 허용한 계정이 재실행 권한을 얻는다.
+unknown_criteria: consumer 존재·실행 경로를 모른다. 비사용 근거가 있으면 해당 분기만 비적용 후보다.
+remediation: 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다 소비 경로별 허용 목록과 실행 권한을 제한하고 필요 없는 확장을 비활성화한다
+method_and_evidence: '동일 합성 자료에 대해 reader와 실행 역할의 replay 호출·실행표식을 비교한다. 【F24】진단 파일을 외부 도구가 읽어 재실행/역직렬화하는 consumer가 실제 배치될 때. 참조구성은 비사용. 외부 replay 도구 존재·실행계정·입력형식·reader를 먼저 확인. 있으면 읽기권만 가진 계정의 실행 시도, 변조한 무해 진단 fixture 소비를 확인. 정상 대조: 승인된 reader/실행 역할이 정상 자료를 제한 권한으로 처리.'
+remaining_setup: 기본 비사용; 외부 replay 구현·실행 역할 확정 후 시험
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C11
+  - Q-R05-05
+  scenario_ids:
+  - SC-21-03
+  subtest_ids:
+  - Q-C11/SC-21-03
+source:
+  array: observability_assessment_draft

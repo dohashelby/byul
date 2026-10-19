@@ -1,0 +1,46 @@
+id: LIF-08
+revision: 1
+retired: false
+area: LIF
+purpose: 실패 감지·전파
+secondary_purposes: []
+question: rank의 예외·사망·지연·통신 정지를 각각 감지하고 전달하는가?
+scope: 기본 TP; 선정 executor
+risk_category: 일반 장애·복구 점검
+risk_summary: TP rank의 예외·사망·지연을 감지하지 못하면 요청이 멈춘 채 자원을 점유하거나 부분 처리를 성공으로 알릴 수 있음. 공격 입력으로 유발 가능한지는 별도 확인.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 기본 TP; 선정 executor
+policy_params: []
+policy_prose:
+  policy_to_decide: 실패 유형별 기한·격리·전체 중단 방침
+  enterprise_decisions: 실패 유형별 감지·전달·중단·복구 절차와 책임자, 영향 요청 오류 처리·알림 경로.
+normal_control: 정상 TP 요청이 모든 rank 응답으로 완료된다.
+challenge_steps:
+- 격리 rank에 예외·사망·지연·통신 정지를 각각 단독 주입
+- 감지·상위 전달·요청 결과 기록
+- 복구
+required_observations: []
+required_observations_prose:
+- fault 종류·rank
+- 감지 시각·상태
+- 요청 오류·잔존 작업
+satisfied_if: 정한 기한 안에 실패가 전달되고 불완전 작업을 성공으로 처리하지 않는다.
+fail_criteria: 정한 감지·전달 기한을 넘기거나 실패를 성공으로 반환한다.
+unknown_criteria: 네 장애를 하나로 대신했거나 감지 기한·상위 전달을 못 본다.
+remediation: 취소 전파·그룹 장애 처리·retry예산과 실제 종료 관측을 연결한다 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다
+method_and_evidence: rank별 무해 예외·프로세스 종료·제한 지연을 나눠 FAILURE·sentinel·timeout·Core 상태를 기록한다.
+remaining_setup: 장애별 안전 주입기·종료 상한·복구 절차
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C08
+  - Q-C07
+  scenario_ids:
+  - SC-18-02
+  subtest_ids:
+  - Q-C08/SC-18-02
+source:
+  array: lifecycle_assessment_draft

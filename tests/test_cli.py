@@ -29,7 +29,10 @@ def _ok(args):
 
 
 @pytest.mark.parametrize("scenario, expected", [("pass", "PASS"), ("direct_200", "FAIL"),
-                                                ("not_attempted", "UNKNOWN"), ("missing_obs", "UNKNOWN")])
+                                                ("not_attempted", "UNKNOWN"), ("missing_obs", "UNKNOWN"),
+                                                ("refused_with_positive_control", "PASS"),
+                                                ("refused_without_positive_control", "UNKNOWN"),
+                                                ("partial_routes", "UNKNOWN"), ("direct_200_on_invocations", "FAIL")])
 def test_end_to_end(workdir, scenario, expected):
     out = _ok(["select", "--pack", "packs/PACK-BASELINE", "--env", "examples/env.yaml", "--policy", "examples/policy.yaml"])
     plan_id = out.strip().splitlines()[-1]

@@ -1,0 +1,1 @@
+{"lab": true, "probe_image": "x", "origins": {"external": {"network": "n1"}, "trusted": {"network": "n2"}}, "gateway": {"url": "http://g:8080"}, "engine": {"trusted_url": "http://e:8000"}, "direct_targets": [{"origin": "external", "url": "http://e:8000"}], "gateway_known_routes": []}

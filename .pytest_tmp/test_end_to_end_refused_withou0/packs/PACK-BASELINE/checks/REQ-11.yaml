@@ -1,0 +1,45 @@
+id: REQ-11
+revision: 1
+retired: false
+area: REQ
+purpose: 요청·상태·결과 귀속
+secondary_purposes: []
+question: 동시 요청과 스트리밍 결과가 올바른 원 요청으로 반환되는가?
+scope: 기본
+risk_category: 보안 위협 점검
+risk_summary: 호출자가 요청 ID 충돌·동시 실행 조건을 유발할 수 있을 때 다른 사용자의 출력이 자기 연결로 전달되어 정보가 유출될 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 일반·스트리밍 요청; 외부 ID/child는 활성 시 추가
+policy_params: []
+policy_prose:
+  policy_to_decide: 신원·ID 신뢰·결과 독자
+  enterprise_decisions: 결과 독자·공유 관계·허용 응답/오류 필드, 입력 사본 반환 필요성, 취소 확정 시점·늦은 출력 처리, Gateway/SDK/엔진별 재시도, 저장 결과 기능. 결과 수신 권한과 반환 필드 권한을 각각 정한다.
+normal_control: 고유 표식이 있는 A·B 일반·스트리밍 요청이 각각 올바른 연결로 반환된다.
+challenge_steps:
+- 동시 두 요청 실행
+- 한 요청의 응답 속도만 지연
+- 연결·request ID·chunk·종료 대응 비교
+required_observations: []
+required_observations_prose:
+- 서버 생성 ID·클라이언트 ID
+- chunk 순서·연결
+- 각 요청 결과
+satisfied_if: 결과가 다른 사용자·요청에 전달되지 않는다.
+fail_criteria: 다른 요청의 결과·종료 신호가 잘못된 호출자에게 반환된다.
+unknown_criteria: 응답 표식 또는 연결별 ID 대응을 확보하지 못했다.
+remediation: 내부 요청 식별과 반환 대상을 신뢰 신원에 연결한다.
+method_and_evidence: '두 합성 주체의 요청을 겹쳐 principal→외부/내부 ID→worker 상태→collector→응답을 연결한다. ID·child 기능별 변형은 별도 기록한다. 【F17】기본 internal ID는 무작위 접미사. 외부 ID 기반 abort는 별도 통제 필요; token-only/dev router 실제 등록 조건 확인. 동일 외부 ID 동시 요청, randomization on/off, 등록된 abort 경로의 타 사용자/빈 ID 요청을 확인한다. 정상 대조: 자기 요청만 취소, 다른 요청은 정상 완료'
+remaining_setup: 작은 동시성·고유 무해 표식·응답 수집기
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C02
+  scenario_ids:
+  - SC-02-02
+  subtest_ids:
+  - Q-C02/SC-02-02
+source:
+  array: request_state_assessment_draft

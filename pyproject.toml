@@ -26,5 +26,8 @@ packages = ["src/guard"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
-markers = ["engine: 실제 엔진이 필요한 테스트 (기본 실행에서 제외)"]
-addopts = "-m 'not engine'"
+markers = [
+    "engine: 실제 엔진(vLLM)이 필요한 테스트 (기본 실행에서 제외, 5b)",
+    "docker: 로컬 Docker 실험실이 필요한 테스트 (기본 실행에서 제외, `-m docker`)",
+]
+addopts = "-m 'not engine and not docker' --basetemp=.pytest_tmp -p no:cacheprovider"

@@ -1,0 +1,23 @@
+# 실험실 Gateway (nginx 공식 이미지의 templates 기능으로 실행 시 치환).
+# GUARD_ALLOWED_KEY: 실행 시 환경변수로만 주입(파일·명령 인자에 없음). GUARD_ENGINE_UPSTREAM: 엔진 IP:포트.
+map $http_authorization $guard_key_ok {
+    default 0;
+    "Bearer ${GUARD_ALLOWED_KEY}" 1;
+}
+
+log_format guard_lab '$remote_addr "$request" $status';   # Authorization 헤더는 기록하지 않는다
+
+server {
+    listen 8080;
+    access_log /dev/stdout guard_lab;
+
+    location / {
+        if ($guard_key_ok = 0) {
+            return 401;
+        }
+        proxy_set_header Authorization "";   # 키를 엔진으로 넘기지 않는다
+        proxy_pass http://${GUARD_ENGINE_UPSTREAM};
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 10s;
+    }
+}

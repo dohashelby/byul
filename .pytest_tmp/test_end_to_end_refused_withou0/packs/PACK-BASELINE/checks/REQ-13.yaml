@@ -1,0 +1,47 @@
+id: REQ-13
+revision: 1
+retired: false
+area: REQ
+purpose: 요청·상태·결과 귀속
+secondary_purposes:
+- 요청·대상 접근 권한
+question: 응답 옵션과 오류가 독자에게 허용한 정보만 반환하는가?
+scope: 기본+지원 옵션
+risk_category: 보안 위협 점검
+risk_summary: 호출자가 반환 옵션·오류 경로를 이용해 볼 권한이 없는 서버 측 문맥·내부 정보까지 응답으로 받을 수 있음. 자신의 허용 입력 반환과 구분.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 일반/stream/오류; prompt/token 반환 옵션은 수용 시
+policy_params: []
+policy_prose:
+  policy_to_decide: 응답 독자·필드·비공개 문맥 범위
+  enterprise_decisions: 결과 독자·공유 관계·허용 응답/오류 필드, 입력 사본 반환 필요성, 취소 확정 시점·늦은 출력 처리, Gateway/SDK/엔진별 재시도, 저장 결과 기능. 결과 수신 권한과 반환 필드 권한을 각각 정한다.
+normal_control: 일반 응답과 안전한 오류가 허용된 필드만 반환한다.
+challenge_steps:
+- 무해 비공개 표식 포함
+- return_prompt_text·return_token_ids 등 옵션 및 오류 분기 시험
+- Gateway와 직통 응답 비교
+required_observations: []
+required_observations_prose:
+- 실제 요청 옵션
+- Gateway 제거·거부
+- 원응답·오류·독자 권한
+satisfied_if: 비허용 문맥·내부 자료가 반환되지 않는다. 팀 참조 구성에서는 prompt 원문·token ID 추가 반환 옵션을 차단한다. 기업에서 자기 입력 사본 반환을 허용하려면 정책을 변경하고 독자·필드별 권한을 확인한다. 정상 생성 결과가 자기 입력을 인용하는 것과 추가 반환 옵션은 구별한다.
+fail_criteria: 금지 옵션이 살아남거나 비허용 내부·system·자격 표식이 응답에 나타난다.
+unknown_criteria: 특정 옵션이나 오류 경로를 실행하지 못했거나 직통 접근 결과를 모른다.
+remediation: 반환 필드와 오류 정보를 제한한다. 로그 사본은 관측 영역에서 별도 확인한다.
+method_and_evidence: 합성 비공개 표식으로 정상·오류·반환 옵션별 출력과 독자 정책을 비교한다. 반환 가능한 모든 표식을 실제 소비 경로에 배치한다. 올바른 수신자에게 반환됐는지와 반환 필드가 그 수신자에게 허용되는지를 각각 판정한다. 앱이 넣은 합성 비공개 system 표식으로 return_prompt_text·return_token_ids를 요청해 Gateway/직통 및 등록 alias에서 비교한다. 선택 코드의 반환 분기에는 별도 운영자 차단 gate가 없으므로 Gateway 거부/제거와 직통 제한을 집행점으로 확인한다. echo·prompt_logprobs·logprobs는 해당 API의 필드·허용 정보별로 따로 판정한다. 오류에는 /workspace/x·s3://bucket/key·가짜 자격 표식을 사용한다.
+remaining_setup: 합성 민감 표식과 허용 반환 필드 목록
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C02
+  - Q-C11
+  scenario_ids:
+  - SC-21-01
+  subtest_ids:
+  - Q-C11/SC-21-01
+source:
+  array: request_state_assessment_draft

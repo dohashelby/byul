@@ -4,9 +4,10 @@ from datetime import timedelta
 
 from guard.models import Verdict
 from tests.builders import T0, evidence, policy
-from tests.judging import OK, PACK, judge
+from tests.builders import req01_obs
+from tests.judging import OK, PACK, direct, judge
 
-FAIL_EVD = evidence(observations={**OK, "direct_route_status": {"value": 200, "collected": True}})
+FAIL_EVD = evidence(observations=req01_obs(direct=direct(completions=200)))
 
 
 def _pol(**exc):

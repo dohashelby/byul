@@ -1,5 +1,5 @@
 id: REQ-01
-revision: 1
+revision: 2
 retired: false
 area: REQ
 purpose: 요청·대상 접근 권한
@@ -28,10 +28,16 @@ challenge_steps:
 - 키 없음·오류·허용키로 Gateway와 직통 경로 비교
 - handler 실행과 정책 거부를 대조
 required_observations:
-- key: direct_route_status
-  type: int
-- key: gateway_route_status
-  type: int
+- key: routes_registered
+  type: list[str]
+- key: routes_tested
+  type: list[str]
+- key: direct_outcomes
+  type: dict[str, int|outcome]
+- key: gateway_outcomes
+  type: dict[str, int]
+- key: trusted_origin_reachable
+  type: bool
 required_observations_prose:
 - 호출 출발점·경로
 - route·인증 범위
@@ -47,27 +53,51 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: gateway_route_status
-      op: eq
-      value: 200
-    - obs: direct_route_status
-      op: in
+    - obs: routes_registered
+      op: nonempty
+    - obs: routes_tested
+      op: superset_of
+      value_obs: routes_registered
+    - obs: direct_outcomes
+      op: superset_of
+      value_obs: routes_registered
+    - obs: direct_outcomes
+      op: all_in
       value:
       - 401
       - 403
-    fail_when_any:
-    - obs: direct_route_status
+      - refused
+      - timeout
+      - unreachable
+    - obs: trusted_origin_reachable
       op: eq
-      value: 200
+      value: true
+      when:
+        obs: direct_outcomes
+        op: any_in
+        value:
+        - refused
+        - timeout
+        - unreachable
+    fail_when_any:
+    - obs: direct_outcomes
+      op: any_between
+      value:
+      - 200
+      - 299
     axes:
       functional:
         pass_when_all:
-        - obs: gateway_route_status
-          op: eq
-          value: 200
+        - obs: gateway_outcomes
+          op: superset_of
+          value_obs: routes_registered
+        - obs: gateway_outcomes
+          op: all_in
+          value:
+          - 200
         fail_when_any:
-        - obs: gateway_route_status
-          op: in
+        - obs: gateway_outcomes
+          op: any_in
           value:
           - 401
           - 403

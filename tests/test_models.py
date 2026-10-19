@@ -141,7 +141,7 @@ def test_evidence_has_no_verdict_field():
 
 def test_uncollected_observation_has_no_value():
     with pytest.raises(ValidationError):
-        evidence(observations={"direct_route_status": {"value": 401, "collected": False}})
+        evidence(observations={"direct_outcomes": {"value": {"/v1/models": 401}, "collected": False}})
 
 
 def test_confirmed_policy_needs_confirmer():
@@ -171,7 +171,8 @@ def test_all_pack_checks_load_as_checkdef():
     assert len(pack.checks) == 77
     assert all(isinstance(c, CheckDef) for c in pack.checks.values())
     req = pack.checks["REQ-01"]
-    assert [o.key for o in req.required_observations] == ["direct_route_status", "gateway_route_status"]
+    assert [o.key for o in req.required_observations] == [
+        "routes_registered", "routes_tested", "direct_outcomes", "gateway_outcomes", "trusted_origin_reachable"]
 
 
 def test_checkdef_yaml_round_trip():
@@ -183,3 +184,16 @@ def test_checkdef_yaml_round_trip():
     dumped = check.model_dump(mode="json")
     assert all(dumped[k] == v for k, v in raw.items() if k != "applies_when")
     assert dumped["applies_when"]["all"] == raw["applies_when"]["all"]
+
+
+def test_optional_env_fields_do_not_change_old_hashes():
+    """5b에서 추가한 runtime.platform·engine.source_commit_status는 비어 있으면 해시에 들어가지 않는다."""
+    env = environment()
+    assert env.content_sha256 == PINNED_ENV_SHA
+    assert "platform" not in env.to_dict()["runtime"] and "source_commit_status" not in env.to_dict()["engine"]
+    env2 = Environment(id="ENV-X", created_at=T0, data_origin="DECLARED",
+                       engine={"name": "vllm", "source_commit": "db9527a46", "source_commit_status": "ABBREVIATED_MATCH",
+                               "expected_source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6"},
+                       runtime={"platform": "CPU, arm64, Docker Desktop on macOS"}).seal()
+    back = object_from_dict(env2.to_dict())
+    assert back == env2 and back.hash_ok()

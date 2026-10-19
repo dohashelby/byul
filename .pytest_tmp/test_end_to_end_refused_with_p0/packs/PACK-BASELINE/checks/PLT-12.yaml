@@ -1,0 +1,46 @@
+id: PLT-12
+revision: 1
+retired: false
+area: PLT
+purpose: 권한·자격 철회
+secondary_purposes: []
+question: 폐기된 자격 사본을 재사용할 수 없는가?
+scope: 자격 전달·저장·교체 시
+risk_category: 보안 위협 점검
+risk_summary: 폐기된 secret·이미지·설정 사본에 접근한 주체가 남은 자격을 재사용해 서비스에 다시 접근할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 자격 전달·저장·교체 시
+policy_params: []
+policy_prose:
+  policy_to_decide: 자격 수명·사본 정리·교체 절차
+  enterprise_decisions: 철회 대상·issuer·정책 캐시, 진행 요청과 기존 세션 처리, 자격 교체·사본 정리 담당과 근거.
+normal_control: 활성 자격 사본만 허용 위치에서 사용된다.
+challenge_steps:
+- 시험 자격 교체·폐기
+- env·mount·backup 등 승인된 조사 위치 확인
+- 옛 자격으로 무해 신규 접근
+required_observations: []
+required_observations_prose:
+- 사본 위치·owner
+- 교체·삭제 기록
+- 옛 자격 접근 결과
+satisfied_if: 폐기 대상 자격으로 비허용 접근이 성립하지 않는다.
+fail_criteria: 폐기 자격이 허용 범위 밖 사본으로 남아 재사용되거나 철회 기한 후 접근한다.
+unknown_criteria: 사본 위치·폐기 기한이 불명확하거나 외부 자격 검증 결과를 모른다.
+remediation: 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다 복원 묶음 재승인·사본 목록·자산 소유자별 삭제/철회와 재개 검증을 둔다
+method_and_evidence: 시험 자격을 교체·철회하고 worker·임시 파일·배포 secret의 이전 사본으로 접근을 대조한다. snapshot·로그 등에 복사된 시험 자격도 포함한다. issuer 철회/만료와 사본의 실제 삭제는 별도 증거로 확인한다.
+remaining_setup: 사본 조사 범위·보존 예외·철회 기한; 비밀값 출력 금지
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C10
+  - Q-C12
+  scenario_ids:
+  - SC-19-03
+  subtest_ids:
+  - Q-C12/SC-19-03
+source:
+  array: platform_assessment_draft

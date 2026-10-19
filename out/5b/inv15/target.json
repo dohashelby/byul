@@ -1,0 +1,51 @@
+{
+  "lab": false,
+  "engine_kind": "vllm",
+  "run_id": "fa718caa7",
+  "topology": "isolated",
+  "probe_image": "python:3.11-slim",
+  "origins": {
+    "external": {
+      "network": "guard-fa718caa7-outside"
+    },
+    "trusted": {
+      "network": "guard-fa718caa7-engine"
+    }
+  },
+  "gateway": {
+    "url": "http://172.19.0.2:8080",
+    "origin": "external",
+    "host_url": "http://127.0.0.1:49853"
+  },
+  "engine": {
+    "trusted_url": "http://172.18.0.2:8000",
+    "container": "guard-fa718caa7-engine",
+    "ready_timeout": 300.0,
+    "ready_seconds": null
+  },
+  "direct_targets": [
+    {
+      "origin": "external",
+      "url": "http://172.18.0.2:8000"
+    }
+  ],
+  "gateway_known_routes": [
+    {
+      "method": "GET",
+      "path": "/v1/models"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/completions"
+    },
+    {
+      "method": "POST",
+      "path": "/invocations"
+    }
+  ],
+  "images": {
+    "nginx:1.27-alpine": "nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+    "python:3.11-slim": "python@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce",
+    "vllm/vllm-openai-cpu@sha256:495c84fe30f3572b83a78100a1e8ba423dbb77fc532ecefebe114e6b77327bd9": "vllm/vllm-openai-cpu@sha256:495c84fe30f3572b83a78100a1e8ba423dbb77fc532ecefebe114e6b77327bd9"
+  }
+}

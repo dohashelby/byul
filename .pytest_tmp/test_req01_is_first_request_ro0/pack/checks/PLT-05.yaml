@@ -1,0 +1,46 @@
+id: PLT-05
+revision: 1
+retired: false
+area: PLT
+purpose: 자격 전달·사용 제한
+secondary_purposes: []
+question: 자격 만료·누락 시 비승인 대체 접근으로 이어지지 않는가?
+scope: 조건부; 선정 SDK의 실제 fallback 조사
+risk_category: 일반 장애·복구 점검
+risk_summary: 자격 만료·누락 뒤 익명·다른 계정으로 전환되면 승인하지 않은 공급물을 가져오거나 접근 제한이 달라질 수 있음. 공격자의 유발 능력은 별도 조건.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: 조건부; 선정 SDK의 실제 fallback 조사
+policy_params: []
+policy_prose:
+  policy_to_decide: 자격 오류 시 거부·보류·허용 대체 조건
+  enterprise_decisions: 역할별 저장소·객체 범위, 자격 공급·갱신 방식과 실제 필요한 worker 자격, 허용 대체 경로. 비밀 원문 대신 참조·수신자·범위를 기록한다.
+normal_control: 유효 자격으로 승인 객체를 정상 취득한다.
+challenge_steps:
+- 시험 자격 만료·누락 각각 적용
+- 동일 취득 재시도
+- anonymous·다른 provider·cache fallback 여부 확인
+required_observations: []
+required_observations_prose:
+- 자격 선택 순서
+- 최종 접근 identity
+- 취득 대상·실패·fallback
+satisfied_if: 허용하지 않은 자격·공급원으로 접근을 지속하지 않는다.
+fail_criteria: 실패 후 승인되지 않은 identity·경로로 취득을 계속한다.
+unknown_criteria: provider chain 또는 실제 fallback identity를 관측하지 못했다.
+remediation: 저장소·객체별 권한과 송신 허용표를 제한하고 취득/서빙 자격을 분리한다 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다
+method_and_evidence: 없음·만료 상태에서 최종 자격 출처·대상·오류를 관측한다. 익명 fallback 존재를 미리 가정하지 않는다.
+remaining_setup: 격리 자격 사본·만료 주입·정당한 cache 사용 정책
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-R05-09
+  - Q-C10
+  scenario_ids:
+  - SC-14-02
+  subtest_ids:
+  - Q-C10/SC-14-02
+source:
+  array: platform_assessment_draft

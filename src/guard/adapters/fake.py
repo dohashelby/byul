@@ -5,7 +5,7 @@ from __future__ import annotations
 from guard.models import Environment
 from guard.models.objects import FactValue
 
-from .base import CommonOption, ContainerHandle, EngineEvent, EngineIdentity, LaunchSpec, Route
+from .base import CommonOption, ContainerHandle, EngineEvent, EngineIdentity, LaunchSpec, ProbeRequest, Route
 
 
 class FakeAdapter:
@@ -17,6 +17,12 @@ class FakeAdapter:
 
     def public_routes(self, env: Environment) -> list[Route]:
         return []
+
+    def routes_from_openapi(self, doc: dict) -> list[Route]:
+        return []
+
+    def probe_request(self, route: Route, model: str | None) -> ProbeRequest | None:
+        return None
 
     def detect_version(self, handle: ContainerHandle) -> EngineIdentity:
         raise NotImplementedError("fake adapter has no engine")

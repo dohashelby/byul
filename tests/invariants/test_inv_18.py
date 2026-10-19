@@ -14,11 +14,11 @@ def test_all_three_axes_required_separately():
 
 
 def test_axes_judged_independently():
-    from tests.builders import evidence
-    from tests.judging import OK, judge
+    from tests.builders import evidence, req01_obs
+    from tests.judging import OK, direct, judge
 
     # 보안 FAIL(직통 200)이어도 기능은 Gateway 관측으로 따로 PASS, 성능은 규칙이 없어 UNKNOWN
-    res = judge(evidence(observations={**OK, "direct_route_status": {"value": 200, "collected": True}}))
+    res = judge(evidence(observations=req01_obs(direct=direct(completions=200))))
     assert (res.verdicts.security, res.verdicts.functional, res.verdicts.performance) == ("FAIL", "PASS", "UNKNOWN")
     res = judge(evidence(observations=OK))
     assert res.verdicts.performance == "UNKNOWN"  # 보안 PASS를 성능에 복사하지 않는다

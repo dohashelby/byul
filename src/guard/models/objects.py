@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_serializer, model_validator
 
 from .base import GuardObject, Ref, Strict
 from .enums import (
@@ -59,11 +59,26 @@ class FactValue(Strict):
         return self
 
 
+def _drop_none(data: dict, keys: tuple[str, ...]) -> dict:
+    """선택 필드가 비어 있으면 직렬화에서 뺀다(그 필드가 없던 기존 객체의 해시를 유지)."""
+    for k in keys:
+        if data.get(k) is None:
+            data.pop(k, None)
+    return data
+
+
 class EngineInfo(Strict):
     name: str
     version: str | None = None
     source_commit: str | None = None
     image_digest: str | None = None
+    # 고정 소스 commit과의 일치 확인 결과: MATCH | ABBREVIATED_MATCH | MISMATCH | UNVERIFIED
+    source_commit_status: Literal["MATCH", "ABBREVIATED_MATCH", "MISMATCH", "UNVERIFIED"] | None = None
+    expected_source_commit: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("source_commit_status", "expected_source_commit"))
 
 
 class AdapterInfo(Strict):
@@ -77,6 +92,11 @@ class RuntimeInfo(Strict):
     gpu_count: int | None = None
     gpu_model: str | None = None
     driver: str | None = None
+    platform: str | None = None  # 실행 환경 설명. 예: "CPU, arm64, Docker Desktop on macOS"
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("platform",))
 
 
 class ModelInfo(Strict):

@@ -158,6 +158,16 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
         limitations.insert(0, "정책 DRAFT: 공식 아님")
     if not pack.reviewed:
         limitations.insert(0, "검토 전 팩(DRAFT): 공식 아님")
+    for e in envs:
+        if e.runtime.platform:
+            limitations.append(f"실행 환경({e.id}): {e.runtime.platform}")
+        status = e.engine.source_commit_status
+        if status and status != "MATCH":
+            label = {"ABBREVIATED_MATCH": "축약 hash만 일치, 전체 commit 미확인", "MISMATCH": "불일치",
+                     "UNVERIFIED": "일치 미확인"}[status]
+            limitations.append(
+                f"엔진 소스 commit({e.id}): {label} — 관측 {e.engine.source_commit or '없음'}, "
+                f"고정 {e.engine.expected_source_commit or '미지정'}")
     if DataOrigin.EXAMPLE in origins:
         limitations.append("EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음")
     undetermined = [r.check_id for r in rows if r.tested_while_undetermined]

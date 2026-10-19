@@ -1,24 +1,34 @@
-# REQ-01 구조화 (원본 checklist.json은 산문). import_checklist.py가 덧씌운다.
+# REQ-01 구조화 (원본 checklist.json은 산문). import_checklist.py가 덧씌운다. SPEC §3·§7.2와 일치해야 한다.
 applies_when:
   all:
     - { fact: gateway, eq: true }
 policy_params:
   - { key: allowed_callers, type: "list[str]", required: true }
 required_observations:
-  - { key: direct_route_status, type: int }
-  - { key: gateway_route_status, type: int }
+  - { key: routes_registered, type: "list[str]" }
+  - { key: routes_tested, type: "list[str]" }
+  - { key: direct_outcomes, type: "dict[str, int|outcome]" }
+  - { key: gateway_outcomes, type: "dict[str, int]" }
+  - { key: trusted_origin_reachable, type: bool }
 executor: direct_route
 judge:
   plugin: rule_table
   params:
     pass_when_all:
-      - { obs: gateway_route_status, op: eq, value: 200 }
-      - { obs: direct_route_status, op: in, value: [401, 403] }
+      - { obs: routes_registered, op: nonempty }
+      - { obs: routes_tested, op: superset_of, value_obs: routes_registered }
+      - { obs: direct_outcomes, op: superset_of, value_obs: routes_registered }
+      - { obs: direct_outcomes, op: all_in, value: [401, 403, refused, timeout, unreachable] }
+      - obs: trusted_origin_reachable
+        op: eq
+        value: true
+        when: { obs: direct_outcomes, op: any_in, value: [refused, timeout, unreachable] }
     fail_when_any:
-      - { obs: direct_route_status, op: eq, value: 200 }
+      - { obs: direct_outcomes, op: any_between, value: [200, 299] }
     axes:
       functional:
         pass_when_all:
-          - { obs: gateway_route_status, op: eq, value: 200 }
+          - { obs: gateway_outcomes, op: superset_of, value_obs: routes_registered }
+          - { obs: gateway_outcomes, op: all_in, value: [200] }
         fail_when_any:
-          - { obs: gateway_route_status, op: in, value: [401, 403] }
+          - { obs: gateway_outcomes, op: any_in, value: [401, 403] }

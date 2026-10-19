@@ -1,0 +1,46 @@
+id: LIF-06
+revision: 1
+retired: false
+area: LIF
+purpose: 변경 중 일관성
+secondary_purposes: []
+question: live 변경이나 rolling 중에도 요청의 모델·상태 일관성을 지키는가?
+scope: 조건부; live weights·LoRA·다중 replica
+risk_category: 보안 위협·일반 장애 함께 점검
+risk_summary: 변경 권한자의 부적절한 조작이나 동시성 오류로 live·rolling 중 요청이 서로 다른 weights·KV 세대를 사용해 잘못된 결과가 나올 수 있음.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: 조건부; live weights·LoRA·다중 replica
+policy_params: []
+policy_prose:
+  policy_to_decide: 기능별 원자성·진행 요청·실패 처리
+  enterprise_decisions: 수용 차단점·drain·강제 종료·서비스 중단 계획. live/rolling/canary를 선택하면 허용 세대 혼용·원자성·실패 처리를 별도로 정한다.
+normal_control: live/rolling 미사용 기준에서는 재시작·재배포로 일관성을 유지한다.
+challenge_steps:
+- 기능 비사용 설정 확인
+- 사용하는 별도 환경에서만 변경 중 진행 요청·cache 세대 추적
+- 허용 전이 비교
+required_observations: []
+required_observations_prose:
+- live·rolling 활성 근거
+- weight·cache·요청 세대
+- 변경 실패 상태
+satisfied_if: 요청이 허용하지 않은 부분 갱신·세대 조합을 소비하지 않는다.
+fail_criteria: 사용 환경에서 비호환 weight·cache·요청 상태가 섞인다.
+unknown_criteria: 선택 기능 사용 여부·전이 계약 또는 세대 대응이 미확인이다.
+remediation: 승인 인계·수용 차단·실제 준비 확인을 배포 도구에 구현한다 신뢰할 신원에서 객체 소유권을 연결하고 상태 초기화와 대상 검사를 확인한다
+method_and_evidence: '선정 변경 API마다 적용·부분 실패·진행 요청을 대조한다. 세션 lock을 추론 격리로 간주하지 않는다. LoRA·weight transfer·reload를 공통 chunk 절차로 합치지 않는다. rolling/canary는 승인된 세대 혼용·라우팅 정책과 요청별 일관성을 확인한다. 【F32】기본 재배포는 외부 gateway/LB와 실제 승인 모델 준비 확인. live/keep/collective_rpc는 선택 구성에서만 도달성·상태 보존 확인; snapshot 경로와 일반기동 혼동 금지. 기본 재배포: 정상 로딩 완료·불완전 적재와 외부 요청 gate를 대조한다. 선택 live 변경을 사용하는 경우에만 abort/wait/keep의 요청·weights·cache 세대를 시험한다. 정상 대조: 기본: 정상 로딩 완료 후 요청과 실패 시 외부 gate 확인. 선택 live 활성 시에만 abort/wait/keep 및 모델·cache·요청 세대 추적.'
+remaining_setup: 실제 지원 엔진·변경 방식 선정; 기본 구성에 live 시험 강제하지 않음
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C09
+  - Q-C02
+  scenario_ids:
+  - SC-17-03
+  subtest_ids:
+  - Q-C09/SC-17-03
+source:
+  array: lifecycle_assessment_draft

@@ -1,0 +1,55 @@
+id: PLT-07
+revision: 1
+retired: false
+area: PLT
+purpose: 통신·내부 호출 제한
+secondary_purposes: []
+question: 외부 송신이 허용 목적지와 작업에 한정되는가?
+scope: 기본; 취득·runtime·관측 각각 확인
+risk_category: 보안 위협 점검
+risk_summary: 실행 코드·취득 입력·송신 설정을 조작할 수 있는 주체가 엔진의 통신 권한을 이용해 비허용 목적지로 자료를 보내거나 금지 대상에 접근할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 기본; 취득·runtime·관측 각각 확인
+policy_params: []
+policy_prose:
+  policy_to_decide: 송신 허용 대상·작업·정책 단절 시 동작
+  enterprise_decisions: 허용 프로세스·명령·신뢰 집단, 목적지·포트·프로토콜·작업, 마지막 유효 정책 유지/만료/초기 정책 부재의 처리. 같은 TP worker의 역할별 인가를 실제 지원하지 않으면 있다고 가정하지 않고 경계 제한과 잔여 위험을 기록한다.
+normal_control: 필요한 저장소·관측 목적지에 승인된 연결만 발생한다.
+challenge_steps:
+- 실제 목적지·작업 기준선 수집
+- 금지 시험 목적지로 무해 연결 시도
+- Gateway 밖 엔진 송신 제한 확인
+required_observations: []
+required_observations_prose:
+- process·목적지·port·protocol
+- 정책 적용 위치
+- 허용·차단·DNS/redirect 결과
+satisfied_if: 금지 송신은 차단되고 필요한 취득·서비스·관측은 동작한다.
+fail_criteria: 금지 목적지·작업의 송신이 실제 성공한다.
+unknown_criteria: 센서 미관측·정책 적용 실패·DNS 결과를 차단 성공으로만 해석했다.
+remediation: 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다 저장소·객체별 권한과 송신 허용표를 제한하고 취득/서빙 자격을 분리한다
+method_and_evidence: '프로세스별 DNS/연결·목적지·포트·정책 유효 상태와 허용/금지 무해 송신을 대조한다. rank0 worker의 env와 import 당시 config root를 기록한다. VLLM_NO_USAGE_STATS==1 또는 (VLLM_DO_NOT_TRACK or DO_NOT_TRACK or 0)==1 또는 do_not_track 파일 존재 여부를 대조한다. 문자열은 정확히 1일 때 참이며 VLLM_DO_NOT_TRACK=0은 DO_NOT_TRACK=1을 가린다. 새 프로세스별 초기/주기 파일 생성·통제된 수신처 송신을 관측하고 실행 중 env 변경만으로 중지됐다고 판정하지 않는다. 【F37】선정 protocol/endpoint scheme/exporter SDK 버전/인증서/프록시 전체 수집. SDK가 https를 TLS로 강제하는지 코드 확인 후 실제 handshake 시험. 승인 TLS endpoint, 인증서 불일치 endpoint, 비허용 endpoint를 격리 환경에서 대조하고 실제 handshake·peer·수신 기록을 확인한다. 정상 대조: 승인 collector로 연결·수집 성공하고 실제 TLS peer 검증 또는 채택한 보호 채널 확인.'
+remaining_setup: 시험 endpoint와 실제 egress 집행점; timeout만으로 차단 확정 금지
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C07
+  - Q-C10
+  - Q-R05-09
+  scenario_ids:
+  - SC-14-01
+  - SC-14-04
+  - SC-22-01
+  - SC-22-02
+  - SC-24-01
+  subtest_ids:
+  - Q-R05-09/SC-14-01
+  - Q-C10/SC-14-04
+  - Q-C11/SC-22-01
+  - Q-C11/SC-22-02
+  - Q-C07/SC-24-01
+source:
+  array: platform_assessment_draft

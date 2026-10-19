@@ -1,0 +1,47 @@
+id: LIF-12
+revision: 1
+retired: false
+area: LIF
+purpose: 종결·자원 회수
+secondary_purposes: []
+question: 재시도 전후 이전 작업의 잔존과 중복 비용이 통제되는가?
+scope: 조건부; 자동 retry
+risk_category: 보안 위협·일반 장애 함께 점검
+risk_summary: 실패·timeout을 유발할 수 있는 호출자가 재시도를 겹치게 하거나 일반 장애 후 중복 실행이 남아 비용을 증폭시키고 결과를 중복 전달할 수 있음.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: 조건부; 자동 retry
+policy_params: []
+policy_prose:
+  policy_to_decide: retry 허용·중복 처리·기한
+  enterprise_decisions: 요청별/그룹별 회수 대상·잔존 참조·강제 종료·중복 비용 처리. 공유 weights/profiler/retry는 기능 선택 후 별도 수명·종료 계약을 확인한다.
+normal_control: 참조구성에서는 자동 retry 없이 한 호출이 한 attempt로 기록된다.
+challenge_steps:
+- 정상 시도 기준선
+- timeout·연결 종료 후 사용자가 명시 재호출
+- 이전 잔존·새 attempt·중복 비용 확인
+required_observations: []
+required_observations_prose:
+- Gateway·client retry 설정
+- attempt ID
+- 이전 작업·청구·누적 비용
+satisfied_if: 팀 참조에서는 추론 자동 retry 비사용을 실제 설정·경로로 확인한다. 정책을 변경해 사용하는 경우에만 금지 중복 실행·반환·비용 누적이 없는지 판정한다.
+fail_criteria: 금지 자동 재시도나 채택한 중복 비용·잔존 한도 위반이 발생한다.
+unknown_criteria: 상위 앱의 retry 또는 내부 attempt·비용을 확인하지 못했다.
+remediation: 취소 전파·그룹 장애 처리·retry예산과 실제 종료 관측을 연결한다 입력/동시성·queue·출력 대기에 실제 제한을 두고 불필요 debug를 끈다 신뢰할 신원에서 객체 소유권을 연결하고 상태 초기화와 대상 검사를 확인한다
+method_and_evidence: 원/새 attempt·실행·출력·누적 비용·종결을 연결한다.
+remaining_setup: 실제 caller retry 설정; 자동 retry 사용 환경은 별도 정책
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C08
+  - Q-C05
+  - Q-C02
+  scenario_ids:
+  - SC-18-03
+  subtest_ids:
+  - Q-C08/SC-18-03
+source:
+  array: lifecycle_assessment_draft

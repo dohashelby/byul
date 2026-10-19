@@ -14,7 +14,16 @@ D = {"origin": "DECLARED", "source": "env.yaml"}
 
 @pytest.mark.parametrize(
     "scenario, expected",
-    [("pass", Verdict.PASS), ("direct_200", Verdict.FAIL), ("not_attempted", Verdict.UNKNOWN), ("missing_obs", Verdict.UNKNOWN)],
+    [
+        ("pass", Verdict.PASS),
+        ("direct_200", Verdict.FAIL),
+        ("not_attempted", Verdict.UNKNOWN),
+        ("missing_obs", Verdict.UNKNOWN),
+        ("refused_with_positive_control", Verdict.PASS),
+        ("refused_without_positive_control", Verdict.UNKNOWN),
+        ("partial_routes", Verdict.UNKNOWN),
+        ("direct_200_on_invocations", Verdict.FAIL),
+    ],
 )
 def test_req01_fake_scenarios(tmp_path, scenario, expected):
     store = Store(tmp_path / ".guard")

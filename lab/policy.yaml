@@ -1,0 +1,10 @@
+# 실험실 정책. DRAFT 유지, confirmed_by 비움 — 실측 때 사람이 정한다.
+data_origin: DECLARED
+status: DRAFT
+pack: { id: PACK-BASELINE, revision: 2 }
+values:
+  REQ-01: { allowed_callers: [lab-allowed-key-holder] }
+scope: { include: [REQ-01], exclude: [] }
+exceptions: []
+confirmed_by: null
+confirmed_at: null

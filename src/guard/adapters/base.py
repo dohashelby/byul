@@ -33,6 +33,17 @@ class Route:
     method: str
     path: str
     inference: bool = False
+    kind: str = "inference"  # inference | admin | info (info는 REQ-01 등 접근 권한 점검 대상에서 제외)
+    mutating: bool = False  # 엔진 상태를 바꾸는 관리 경로(/sleep 등). 기본적으로 직통 요청을 보내지 않는다
+
+
+@dataclass(frozen=True)
+class ProbeRequest:
+    """무해한 시험 요청 1개(키 없음). 키는 실행기가 붙인다."""
+
+    method: str
+    path: str
+    body: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +74,10 @@ class EngineAdapter(Protocol):
     def start_command(self, spec: LaunchSpec) -> list[str]: ...
 
     def public_routes(self, env: Environment) -> list[Route]: ...
+
+    def routes_from_openapi(self, doc: dict) -> list[Route]: ...  # public_routes의 파싱 부분(실행기가 출발점별로 받아온 문서용)
+
+    def probe_request(self, route: Route, model: str | None) -> ProbeRequest | None: ...  # None = 보내지 않음(상태 변경 경로)
 
     def detect_version(self, handle: ContainerHandle) -> EngineIdentity: ...
 

@@ -1,0 +1,11 @@
+store = "/Users/doha/Desktop/serving-guard/out/5b/inv15/.guard"
+[adapter]
+name = "vllm"
+[executors]
+direct_route = "real"
+[direct_route]
+target = "/Users/doha/Desktop/serving-guard/out/5b/inv15/target.json"
+allowed_key_env = "GUARD_LAB_ALLOWED_KEY"
+denied_key_env = "GUARD_LAB_DENIED_KEY"
+request_timeout = 3.0
+allow_mutating_routes = false

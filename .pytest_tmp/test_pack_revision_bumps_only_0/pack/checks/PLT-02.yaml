@@ -1,0 +1,46 @@
+id: PLT-02
+revision: 1
+retired: false
+area: PLT
+purpose: 실행 권한 제한
+secondary_purposes: []
+question: 로컬 IPC 접점에 허용한 프로세스만 접근하는가?
+scope: 기본; 실제 namespace·UID·소켓·SHM
+risk_category: 보안 위협 점검
+risk_summary: 로컬 socket·SHM에 접근 가능한 비허용 프로세스가 제어 메시지나 자료를 주입·열람해 요청·모델 상태를 바꿀 수 있음. 채널별 실제 권한 확인 필요.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 기본; 실제 namespace·UID·소켓·SHM
+policy_params: []
+policy_prose:
+  policy_to_decide: 허용 프로세스·IPC 경계
+  enterprise_decisions: 계정·컨테이너·namespace·mount·device·socket/SHM 권한과 실제 필요 권한 예외. 초기 설치/장치 준비 권한과 지속 실행 권한을 분리한다.
+normal_control: 승인 core·worker가 IPC를 통해 정상 요청을 수행한다.
+challenge_steps:
+- 실제 socket·shared memory·TCP IPC 목록 확보
+- 비허용 시험 UID에서 연결·열기 시도
+- 허용 주체와 비교
+required_observations: []
+required_observations_prose:
+- IPC 주소·소유자·mode
+- 실제 process UID
+- 연결·열기·작업 영향
+satisfied_if: 비허용 프로세스의 제어 메시지가 소비되지 않는다.
+fail_criteria: 비허용 주체가 보호해야 할 IPC 자료나 명령 접점에 접근한다.
+unknown_criteria: 파일 mode만 확인하고 namespace·상위 디렉터리·실제 접속을 확인하지 못했다.
+remediation: 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다
+method_and_evidence: '허용/비허용 시험 프로세스로 연결·메시지 수용을 대조하고 소켓·SHM 권한을 확보한다. 【F21】실제 RPC_BASE_PATH, socket/SHM 소유자·mode·mount namespace·접근 가능한 PID/UID를 수집; 현재 접근 가능성과 임의 명령 실행 효과를 분리. 허용 프로세스·동일 UID 비허용 프로세스·다른 UID 비허용 프로세스에서 채널별 연결과 무해 메시지 수용을 대조한다. OS 권한·namespace와 실제 소비 여부를 기록한다. 정상 대조: 허용 프로세스의 TP 요청 정상 처리와 채널별 연결/소비 기록 확보.'
+remaining_setup: IPC 종류별 무해 연결 fixture; 임의 역직렬화 payload 없음
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C07
+  - Q-C10
+  scenario_ids:
+  - SC-08-01
+  subtest_ids:
+  - Q-C07/SC-08-01
+source:
+  array: platform_assessment_draft

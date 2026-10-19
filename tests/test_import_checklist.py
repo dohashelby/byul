@@ -134,8 +134,11 @@ def test_pack_revision_bumps_only_on_change(tmp_path):
 
 
 def test_committed_pack_matches_importer(tmp_path):
-    """저장소에 커밋된 팩이 변환기 출력과 같다(손으로 고친 흔적 없음)."""
-    pack = tmp_path / "pack"
-    import_checklist(SOURCE, pack, OVERRIDES)
+    """커밋된 팩에 변환기를 다시 돌려도 바뀌는 것이 없다(손으로 고친 흔적·미반영 override 없음)."""
+    import shutil
+
     committed = ROOT / "packs/PACK-BASELINE"
+    pack = tmp_path / "pack"
+    shutil.copytree(committed, pack)
+    import_checklist(SOURCE, pack, OVERRIDES)
     assert _snapshot(pack) == _snapshot(committed)

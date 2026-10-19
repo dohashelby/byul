@@ -134,15 +134,18 @@ policy_params:                            # ← policy_to_decide / enterprise_de
   - { key: allowed_callers, type: "list[str]", required: true }
 normal_control: "허용 키로 같은 route 호출 시 추론 성공"         # ← normal_control
 challenge_steps: ["...", "..."]           # ← challenge_steps
-required_observations:                    # ← required_observations (구조화)
-  - { key: direct_route_status, type: int }
-  - { key: gateway_route_status, type: int }
+required_observations:                    # ← required_observations (구조화, 경로별)
+  - { key: routes_registered, type: "list[str]" }        # 엔진 /openapi.json(+Gateway 설정의 알려진 경로), 정보성 경로 제외
+  - { key: routes_tested, type: "list[str]" }
+  - { key: direct_outcomes, type: "dict[str, int|outcome]" }   # 무키·오키 대표값. outcome = refused|timeout|unreachable|dns_error|error
+  - { key: gateway_outcomes, type: "dict[str, int]" }          # 허용 키로 Gateway 경유
+  - { key: trusted_origin_reachable, type: bool }              # 같은 시각 신뢰 출발점 → 엔진 도달 (양성 대조)
 satisfied_if: "..."                       # ← satisfied_if (원문)
 fail_criteria: "..."                      # ← fail_criteria
 unknown_criteria: "..."                   # ← unknown_criteria
 remediation: "..."                        # ← remediation
 executor: null                            # 실행기 플러그인 이름. null이면 자동 실행 불가 → Gap NO_EXECUTOR
-judge: { plugin: rule_table, params: {...} }  # null이면 수동 판정만
+judge: { plugin: rule_table, params: {...} }  # null이면 수동 판정만 (REQ-01 판정표는 §7.2)
 legacy: { q_ids: [Q-C01], scenario_ids: [SC-01-01] }   # 근거 링크. 판정 단위 아님
 ```
 
@@ -293,8 +296,11 @@ challenges:
     attempted: bool                            # 실제로 요청·시도를 보냈는가
     observations: { direct_route_status: 401 }
 observations:                                  # CheckDef.required_observations 키만
-  direct_route_status:  { value: 401, collected: true }
-  gateway_route_status: { value: 200, collected: true }
+  routes_registered:  { value: ["/v1/completions", "/invocations"], collected: true }
+  routes_tested:      { value: ["/v1/completions", "/invocations"], collected: true }
+  direct_outcomes:    { value: { "/v1/completions": "timeout", "/invocations": "timeout" }, collected: true }
+  gateway_outcomes:   { value: { "/v1/completions": 200, "/invocations": 200 }, collected: true }
+  trusted_origin_reachable: { value: true, collected: true }
 artifacts:
   - { name: request_log.jsonl, path: "artifacts/<sha>.jsonl", sha256: hex, bytes: int,
       collected_at: RFC3339, collector: str }
@@ -307,6 +313,8 @@ comparability:                                 # update 모드 비교 조건 (IN
 ```
 
 - 수집 실패는 `collected: false`로 남긴다. 값을 비우거나 추정하지 않는다.
+- 직통 결과 값은 HTTP 상태코드(int) 또는 `refused`(연결 거부) · `timeout` · `unreachable`(ENETUNREACH/EHOSTUNREACH) · `dns_error` · `error`. 응답 미수신 종류를 서로 구별한다.
+- 판정에 쓰지 않는 보조 관측(예: REQ-01 `direct_allowed_outcomes`)은 증거 파일에 남긴다.
 - 증거 파일은 `artifacts/<sha256>` 이름으로 저장한다(내용 주소). 같은 파일은 한 번만 저장된다.
 
 ### 4.6 RES — Result (점검 판정)
@@ -397,7 +405,7 @@ CHG* ──────────┘                                          
 | --- | --- | --- |
 | **INV-01** | `UNKNOWN`을 `PASS`로 올리지 않는다. 확인 부족과 위반 확인을 구별한다. | A1-1 |
 | **INV-02** | `EXAMPLE` 자료, 기대값, 실행하지 않은 시험을 `MEASURED`로 표시하지 않는다. | A1-2 |
-| **INV-03** | 시도가 없으면 차단 성공이 아니다. `challenges[].attempted: false`인데 "거부됨"으로 `PASS`를 낼 수 없다. 응답 미수신만으로 `PASS`가 되지 않는다. | A1-3,4 |
+| **INV-03** | 시도가 없으면 차단 성공이 아니다. `challenges[].attempted: false`인데 "거부됨"으로 `PASS`를 낼 수 없다. 응답 미수신만으로 `PASS`가 되지 않는다. (주: `refused`·`timeout`·`unreachable`은 **같은 시각 신뢰 출발점에서 대상에 도달함(양성 대조)이 관측된 경우에만** 차단 근거가 된다. `dns_error`·`error`는 차단 근거가 아니다.) | A1-3,4 |
 | **INV-04** | 위반 증거가 없는 것과 준수 증거가 있는 것은 다르다. 센서 장애·수집 실패는 `UNKNOWN`이다. 이미 확인된 `FAIL`은 다른 누락 때문에 지우지 않는다. | A1-10 |
 | **INV-05** | 기본 점검(`review_order: reference_baseline_first`이고 적용되는 것)은 변경 분석 결과가 "영향 없음"이어도 빼지 않는다. 변경 분석은 시험을 **추가**할 뿐 **제거**하지 않는다. | A(planner) |
 | **INV-06** | 환경 사실을 `false`로 쓰려면 비사용·비노출 근거가 필요하다. 근거 없는 `false`는 `null`로 취급한다. 빈 조건 목록은 "항상 참"이 아니다. | F(selector) |
@@ -430,6 +438,8 @@ class EngineAdapter(Protocol):
     version: str
     def start_command(self, spec: LaunchSpec) -> list[str]: ...          # 모델·포트·옵션 → 실행 인자
     def public_routes(self, env: Environment) -> list[Route]: ...        # 노출되는 HTTP 경로
+    def routes_from_openapi(self, doc: dict) -> list[Route]: ...         # public_routes의 파싱 부분 (5a 추가)
+    def probe_request(self, route: Route, model: str|None) -> ProbeRequest|None: ...  # 무해한 시험 요청, None=보내지 않음 (5a 추가)
     def detect_version(self, handle: ContainerHandle) -> EngineIdentity: ...  # 실제로 뜬 엔진·버전
     def read_option(self, name: CommonOption, env: Environment) -> FactValue: ...  # 공통 옵션 질문
     def parse_log(self, line: str) -> EngineEvent | None: ...            # 로그 → 공통 이벤트
@@ -458,16 +468,30 @@ class Judge(Protocol):             # X4: 순수 함수 (INV-14)
 
 **`rule_table` 판정기**: 관측 키·연산자·기대값의 표로 판정한다. 자동화하는 대부분의 행은 코드 없이 이 표로 판정하는 것을 목표로 한다.
 
+연산자: 스칼라 `eq ne in not_in lt le gt ge`, 모음 `nonempty`, `all_in`·`any_in`(리스트 원소 또는 dict 값), `any_between`·`all_between`(숫자 원소, `value: [lo, hi]`), `superset_of`(`value_obs`로 다른 관측과 비교, dict는 키 집합). 규칙에 `when: {obs, op, value}`를 달면 전제가 성립할 때만 그 규칙을 요구한다. `value_obs`·`when`이 가리키는 관측도 수집돼야 한다.
+
 ```yaml
+# REQ-01
 judge:
   plugin: rule_table
   params:
     pass_when_all:
-      - { obs: gateway_route_status, op: eq, value: 200 }   # 정상 대조
-      - { obs: direct_route_status, op: in, value: [401, 403] }
+      - { obs: routes_registered, op: nonempty }
+      - { obs: routes_tested, op: superset_of, value_obs: routes_registered }   # 등록 경로 전부 시험
+      - { obs: direct_outcomes, op: superset_of, value_obs: routes_registered } # 경로마다 직통 결과
+      - { obs: direct_outcomes, op: all_in, value: [401, 403, refused, timeout, unreachable] }
+      - { obs: trusted_origin_reachable, op: eq, value: true,                   # 무응답을 근거로 쓰면 양성 대조 필수
+          when: { obs: direct_outcomes, op: any_in, value: [refused, timeout, unreachable] } }
     fail_when_any:
-      - { obs: direct_route_status, op: eq, value: 200 }
-    # 어느 쪽도 아니면 UNKNOWN (INV-11)
+      - { obs: direct_outcomes, op: any_between, value: [200, 299] }           # 비허용 호출자의 직통 요청이 처리됨
+    axes:
+      functional:                                                             # 정상 대조: 허용 키 Gateway 경유
+        pass_when_all:
+          - { obs: gateway_outcomes, op: superset_of, value_obs: routes_registered }
+          - { obs: gateway_outcomes, op: all_in, value: [200] }
+        fail_when_any:
+          - { obs: gateway_outcomes, op: any_in, value: [401, 403] }
+    # 어느 쪽도 아니면 UNKNOWN (INV-11): 일부 경로만 시험, 양성 대조 실패, 직통 404·5xx·dns_error·error, 관측 누락
 ```
 
 ---
@@ -523,9 +547,11 @@ guard/
 │  ├─ executors/           # 점검 실행기
 │  ├─ judges/              # rule_table.py + 개별 판정기
 │  ├─ collectors/          # 환경 수집기 (file.py 먼저)
+│  ├─ runtime/             # docker CLI 래퍼. adapters/·executors/에서만 사용 (코어는 모름)
 │  └─ cli.py
 ├─ packs/PACK-BASELINE/    # §3
 ├─ tools/import_checklist.py
+├─ lab/                    # 로컬 전용 컨테이너 실험실 (stub 엔진·nginx Gateway, 증거는 EXAMPLE)
 └─ tests/
    ├─ invariants/          # INV-01 ~ INV-18 각각
    └─ ...

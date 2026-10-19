@@ -1,0 +1,6 @@
+{"example": true, "scenario": "refused_without_positive_control", "observation": "routes_registered", "value": ["/v1/models", "/v1/completions", "/invocations"], "collected": true}
+{"example": true, "scenario": "refused_without_positive_control", "observation": "routes_tested", "value": ["/v1/models", "/v1/completions", "/invocations"], "collected": true}
+{"example": true, "scenario": "refused_without_positive_control", "observation": "direct_outcomes", "value": {"/v1/models": "refused", "/v1/completions": "refused", "/invocations": "refused"}, "collected": true}
+{"example": true, "scenario": "refused_without_positive_control", "observation": "gateway_outcomes", "value": {"/v1/models": 200, "/v1/completions": 200, "/invocations": 200}, "collected": true}
+{"example": true, "scenario": "refused_without_positive_control", "observation": "trusted_origin_reachable", "value": false, "collected": true}
+{"example": true, "scenario": "refused_without_positive_control", "direct_allowed_outcomes": {"/v1/models": 401, "/v1/completions": 401, "/invocations": 401}}

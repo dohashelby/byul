@@ -1,0 +1,47 @@
+id: LIF-03
+revision: 1
+retired: false
+area: LIF
+purpose: 자원 사용 제한
+secondary_purposes: []
+question: 요청 비용과 동시 부하를 제한하며 정상 요청의 처리 기회를 유지하는가?
+scope: 기본; metadata·child는 수용 기능만
+risk_category: 보안 위협 점검
+risk_summary: 일반 호출자가 비싼 요청·많은 child·우선순위·동시 요청을 이용해 GPU·KV·대기열을 독점하고 다른 사용자의 처리를 막을 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 기본; metadata·child는 수용 기능만
+policy_params: []
+policy_prose:
+  policy_to_decide: 요청 예산·동시성·공정성·성능 기준
+  enterprise_decisions: 모델·GPU·부하·공정성·정상 기능/성능 요구, 초과 시 거부/중단/정리 방식, 취득 retry 허용과 부분 자료 처리.
+normal_control: 정상 소량 요청이 정한 지연·처리율을 만족한다.
+challenge_steps:
+- 한 종류 비용만 올린 작은 부하
+- 정상 대조 요청 병행
+- admission·queue·생성 한도와 회복 확인
+required_observations: []
+required_observations_prose:
+- 요청 비용·동시성·n
+- queue·거부·완료
+- 정상 대조 지연
+satisfied_if: 요청별/전체 예산과 정상 서비스 기준을 만족한다.
+fail_criteria: 정한 자원·대기·공정성 기준을 넘거나 한 요청 오류가 허용 범위 밖 서비스 장애를 만든다.
+unknown_criteria: 부하 상한·정상 성능 기준 미정 또는 queue·다른 요청 영향을 못 본다.
+remediation: 입력/동시성·queue·출력 대기에 실제 제한을 두고 불필요 debug를 끈다
+method_and_evidence: '합성 고비용 요청과 정상 workload를 섞어 queue·KV·지연·처리량·거부를 측정한다. 【F19】queue None 기본은 한도 미설정. n의 16384는 기업 안전예산이 아님. priority header가 body보다 우선. 실제 대기열·토큰·n 유효값을 수집하고 경계 부하를 가한다. body와 X-Vllm-Priority를 각각 조작하여 허용 우선순위만 집행되는지 확인한다. 정상 대조: 정한 정상 부하·허용 priority가 기능/성능 기준 충족'
+remaining_setup: 부하·시간 중단값; 기본 무한 queue를 제한으로 가정하지 않음
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C05
+  scenario_ids:
+  - SC-07-01
+  - SC-07-02
+  subtest_ids:
+  - Q-C05/SC-07-01
+  - Q-C05/SC-07-02
+source:
+  array: lifecycle_assessment_draft

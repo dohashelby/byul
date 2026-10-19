@@ -1,0 +1,41 @@
+# 플러그인 구현 선택 (SPEC §7)
+store = ".guard"
+
+[adapter]
+name = "fake"            # 5단계에서 vllm 어댑터로 바꾼다
+
+[executors]
+# CheckDef.executor 이름 → 구현
+direct_route = "fake"    # "fake" | "real" (real은 [direct_route]의 target 위상에 실제 요청)
+
+[fake]
+# pass | direct_200 | not_attempted | missing_obs | refused_with_positive_control
+# | refused_without_positive_control | partial_routes | direct_200_on_invocations
+scenario = "pass"
+
+[direct_route]
+# real 실행기 설정. target.json은 lab/lab.py up()이 만든다(키 없음). 키는 환경변수 이름만 적는다.
+target = ".guard/lab/target.json"
+allowed_key_env = "GUARD_LAB_ALLOWED_KEY"
+denied_key_env = "GUARD_LAB_DENIED_KEY"
+request_timeout = 3.0
+allow_mutating_routes = false
+
+[judges]
+rule_table = "rule_table"
+
+[vllm]
+# 실제 vLLM 위상(5b). lab/lab.py와 engine 테스트가 읽는다. 엔진 인자는 adapters/vllm.py launch_plan()이 만든다.
+image = "vllm/vllm-openai-cpu@sha256:495c84fe30f3572b83a78100a1e8ba423dbb77fc532ecefebe114e6b77327bd9"  # v0.31.0, arm64 CPU
+expected_version = "0.31.0"
+expected_source_commit = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
+source_commit_observed = "db9527a46"          # 이미지 안 vllm._version.commit_id = "gdb9527a46"
+source_commit_status = "ABBREVIATED_MATCH"    # 9자리 축약 hash만 일치, 40자리 전체는 이미지에서 확인 불가
+model = "facebook/opt-125m"
+revision = "27dcfa74d334bc871f3234de431e71c6eeba5dd6"
+models_dir = "~/guard-models"                 # HF cache. 읽기 전용 마운트
+inventory_sha256 = "d677f3999b13aab7bf9a7d203568ca63bc2d3fdc6a102b5efc2c719fd816ae6e"  # tools/model_inventory.py, 12 files
+gpu = false
+cpu_kv_cache_gib = 1
+platform = "CPU, arm64, Docker Desktop on macOS"
+ready_timeout = 600                           # 엔진 로딩 상한(초)

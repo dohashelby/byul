@@ -1,0 +1,4447 @@
+{
+  "kind": "RPT",
+  "id": "RPT-01M59F5APK83N8G0MSVDEXR0TW",
+  "revision": 1,
+  "created_at": "2026-10-19T06:56:37Z",
+  "data_origin": "EXAMPLE",
+  "content_sha256": "6a45a87640f82d0e2a7361eafe6ea3ff253ef72461d252098272fc8dec917f3f",
+  "refs": [
+    {
+      "kind": "ENV",
+      "id": "ENV-01M59F5AC1S6V7J2MPEEM7NRFM",
+      "revision": 1,
+      "sha256": "0bda06ea68b6bfd5e464197834ce991b0115beb4bfa88a90f5eb41bc1d81e4ef"
+    },
+    {
+      "kind": "POL",
+      "id": "POL-01M59F5AC1HFS08QWXX2YKCAAJ",
+      "revision": 1,
+      "sha256": "dea7adee860d1c17c1eb178386ab864817fafa11980094c19c4209c69741d5a1"
+    },
+    {
+      "kind": "PLAN",
+      "id": "PLAN-01M59F5AC3BZ12C17M88J9BK0A",
+      "revision": 1,
+      "sha256": "a3127b4afcdac3eb5419a30ea643e73d092ae75e8f988ae6adc0c0d0d41e1af1"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEH0GF9ZFVASDXYR1QP",
+      "revision": 1,
+      "sha256": "1603949b1a3d9630b26db3fdfa4c98a2b3c11bd8666f2c8603ae43d8c5d6bb26"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEHE6PXH165PG7D1KR6",
+      "revision": 1,
+      "sha256": "69687a8d65acc1e30dcbd368d1759682ef3d82da979ad0a32a70bdb0135975d3"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEJS75YPS38RBE0KZBF",
+      "revision": 1,
+      "sha256": "4a14ec9ef8f509f82bcd9b8a794bd59c548fc5271f87e1cb22e4988ea508baf2"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEJTF5G8Z3A8002ASQC",
+      "revision": 1,
+      "sha256": "4e6dae7bb802058776d6d00fae0e1aa45eac9724a6826b9d64a88a6fafd0b933"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEKR295PVXG79BXRJNS",
+      "revision": 1,
+      "sha256": "53d9ef94a9be23a72f9300becb829818633c4069aa78075e8077c51af6898e35"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEM6NC91FXPX0B8C7YE",
+      "revision": 1,
+      "sha256": "c68fc24d87f105ef2100da7b7945d19c8383efc4c31784f352399c37e78285a3"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEMPXNF81KWYDRZZXC4",
+      "revision": 1,
+      "sha256": "d044561a89374ee1ead49a1a744ec82d5733cdd7efd40c9b606ab14836c6fdc0"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEND3JPBJ5HZSTZAR59",
+      "revision": 1,
+      "sha256": "a5037c66e629ac1189324157a9b89ec643e980a86ddfb54f144d3c284d7be7d1"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AENR6V9Y5VXVZHC7TKC",
+      "revision": 1,
+      "sha256": "bdd21d62b63a180a68868ccae28d017855403e0790fc20881ee1649ea194dca1"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEPTCBZJGW8ZGE1HKSV",
+      "revision": 1,
+      "sha256": "8e8ee6ebe33fd5c31e73bbb06ce9cea709bf31c49135603c945bc49606077f5a"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEPWGAC4S9YZS18QDJM",
+      "revision": 1,
+      "sha256": "b7e261862b5f7c27a840bbc60dca45abe0d92ebb0921780620e698d81c91b124"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEQNS4XB5K2CBN6NEXE",
+      "revision": 1,
+      "sha256": "2c08fe2f5f7fca22b95365f177dc5b8fa4ff95cddb5fcd93d907208e55257b3e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEQZYZA2HM593KWCVCB",
+      "revision": 1,
+      "sha256": "17b60e318952d1a50daf2335e61ab669aedcfd51a67808ab11936dc2a0549b0e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AERBA0F9R1TEGGSA2CQ",
+      "revision": 1,
+      "sha256": "d90fb42e34ed1d3b577db72ff75385e2f4f9aa81af1cccfe9423713ae107946e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AERQ98CBTJPPN5P3G3H",
+      "revision": 1,
+      "sha256": "a3b80517cc7b6c0447175d561951b71da3600f4f7756646fe32a1e41ddad2fdb"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AESAJTBEDCRMGWX5N3N",
+      "revision": 1,
+      "sha256": "5de811beeceb3827c01e1a88efa495b2f75ce49130bada0e8cc074b18bf21195"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AETX7172ER937EEPQYW",
+      "revision": 1,
+      "sha256": "7fc4c7b6476d9c0bfc284975fc352945d854dd4c103096ef56831b9ca315b0be"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEV20NS8T0ADP7G8WBE",
+      "revision": 1,
+      "sha256": "c79584454ea84b35d8f9ee31e6276789b7ecbbbc974201c066f7b76fb9025e1f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEVK60XQ8GQX704DYD9",
+      "revision": 1,
+      "sha256": "217568601848080ea5390fe87aa04aa32c01bba499f7641dd28e3f62ffdc62b1"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEW8A2DRBHM47MC8XWJ",
+      "revision": 1,
+      "sha256": "e77a3b75896991c4e6215bde8dbd152cb17a71f32590e83fa61d8644c8c2d952"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEW8QJJ87C8W33BJYKF",
+      "revision": 1,
+      "sha256": "5538a6196d2e7480719298c4b2c70fe35c5bd92dfe8b32cbfd29b91ece79aecc"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEX19DAQD8FXZKDTBJG",
+      "revision": 1,
+      "sha256": "548ca031ca7ae4df706e55217ec70e7628229f863556cab620928b5047278293"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEXGH0WX0VK6TFCYSTK",
+      "revision": 1,
+      "sha256": "170db77f1f7eb4f1650b56e0320788bd2412fd0d1a37d61e591f87e2265fc036"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEY2S3G9053YNQTY8J6",
+      "revision": 1,
+      "sha256": "f23dba88cafb17636f51ed4b8cf0ba061fb29a45db4c4fe121517147eff04d7b"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEY4GHNNKGKGX04Q2WV",
+      "revision": 1,
+      "sha256": "216ff5823f4e1d6e563f04d5d4d48052378f9543e53ed276cdfe2cbf902a55e0"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEZCFVJZZG5AG3K4029",
+      "revision": 1,
+      "sha256": "8320b1d092c92d6052e402c45dd58700905bc4f3dc124a77b8ec0cfa618e46ca"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEZKM8NKNTAENM91QBT",
+      "revision": 1,
+      "sha256": "e177679653320484e28033dd986d08f14b2b52ec6b0050ee99c1e87ae3c15bdf"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF01559FQXBSB0JGBZP",
+      "revision": 1,
+      "sha256": "32ec936cd835d1d83f2d24b959fe018fb0788cfbf4f5812c9abf50da3cb8b188"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF037G0GJ7AH18PJPCN",
+      "revision": 1,
+      "sha256": "c1a7774d14e2a5ab5a2d88165338b039531287ed244d8c789db1df500903196d"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF1NABXVPSZ2FRS7STY",
+      "revision": 1,
+      "sha256": "76ec074c2129fc3aa896ed2f1f6a3225ee4df043e1d050c00b161ef79eabd2ad"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF20AW1BP85ABEPZMGX",
+      "revision": 1,
+      "sha256": "346b27facfb61e9fcf97f40fd782c550c7ad2cb7ccfcf61f1d23a77f3ae6bb53"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF242SA74ZPPPSJ9YWM",
+      "revision": 1,
+      "sha256": "3e79a03cdee64ae0a535741d5b203b310d9baad7a5abc779e07e1a687371acb6"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF39DN15Y4FM42P7W25",
+      "revision": 1,
+      "sha256": "80e795b05c16f544f8a9e0e56e94b9437fc974d619394dca1ca48a544ddede65"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF3KHB6GCCZCAYGBQAA",
+      "revision": 1,
+      "sha256": "44a3a0d4b1ed4e4f999d45d1063bb05dcc29d9feefed88453a91a4b5aac4f41b"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF4EPZ4JPV7DSWQ25TZ",
+      "revision": 1,
+      "sha256": "4e248a6aff9b2b84a517e68dd28ee65d1d086d7f29cf503ea1a29b17b84a062d"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF4XYMP956WGKW5P62P",
+      "revision": 1,
+      "sha256": "6c327b3772e020aa8087f40c236d87abc81f8ba40be75b61de8d8a6c2289e064"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF5BTFMVY7GT5X8S9C6",
+      "revision": 1,
+      "sha256": "5ae4bff8a547e8642aeb6595f19f0c4b5222832937774ba71dd442e5b7454eac"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF5EYWADJD2B8KSEG8V",
+      "revision": 1,
+      "sha256": "c4db35ae916e09619f18a1bb2e54f62e61c510e2dbaa7f0bd2d368c6cf1874b2"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF63WADYQ7S50VXM7E7",
+      "revision": 1,
+      "sha256": "c04ebbf794672bded4495f6cb17067f4220bf8423221c461bd40f097774897ab"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF6WDBCPJFXJDCVVYBT",
+      "revision": 1,
+      "sha256": "498d1eb02cb448929c239e39f8ac6c5bb81c73b80adc5a4f20c2bed80c69e987"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF76P72ZRS1X0RQKYSJ",
+      "revision": 1,
+      "sha256": "4c45434f815e9b8fcc89c1d861b9e5202ecd427a4ff43f76cedad96c9ca51b16"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF8FHVH763985NBHH27",
+      "revision": 1,
+      "sha256": "0b0d858da8c133d6727985e29a962369f76416bf3544ee28be5f1ac9a8e107a9"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF8J5YV3AC7BWG809QB",
+      "revision": 1,
+      "sha256": "3e443db81f47d48f6140a3116a9d051f966a4a97167be97fc0fcb41f4b2adc1e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF9DX41HGPJZKXF2907",
+      "revision": 1,
+      "sha256": "84d0b39db188070195eb41314840ec032869141c075ffbcb24126c5abad364c9"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF9XPH4METXHCCTHZRN",
+      "revision": 1,
+      "sha256": "ddb765a98dc506b3f07b9bf5df9cd0e1f6f9f41d1c42dafea033d6969497d29f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFAP02AE1KKJGWD4Z9C",
+      "revision": 1,
+      "sha256": "f9d58d3f5d6ad0c88052a3b9933393e1857393fdb35343b035f21336667069c7"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFAWDS4BJD10CVA4NT1",
+      "revision": 1,
+      "sha256": "e4784ed549136da61681022873a044a72d410fe6cd191e97d56305180b0dd34c"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFBWVEPS068PMA0NAFC",
+      "revision": 1,
+      "sha256": "182315854757dee26c3ba0cfd92f6bc1f5d347c2ddcc3b16629b048a1d174fba"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFC2YMHMCRB5RJB0VZ9",
+      "revision": 1,
+      "sha256": "cf71ced26c0704f7cb675abfa0513c71f128215b754e0b0dc8d2939e8fadb8c7"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFCV171GT5P88B3P4JW",
+      "revision": 1,
+      "sha256": "88412c1b3680ef5f7b19664338866f6547bd07b2e936d8e004ebd49ab451f753"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFDM0BQ7214GV1FP4E2",
+      "revision": 1,
+      "sha256": "e1692e0631bbef83ed69a1961e782cc5d72f910b22ddf581b17a94e34cc8595e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFDNE2CVRCQMEYZ5E5Y",
+      "revision": 1,
+      "sha256": "7573fb63d9a12b167e269a59a18bfdc7f2385d4c51325bb113dc8e9c66fc5f4b"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFEVDSCV3CDSXY6W96Y",
+      "revision": 1,
+      "sha256": "c283e3d945edf970eabfa9bd3760e1e8c7d32f18f68c53e7f7ce2974c050eb25"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFEZ03549WJRM25CF06",
+      "revision": 1,
+      "sha256": "9ce68ea0d8a987b1892cad2fe734da15edcb99a7004130347107b2aa10ffe43f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFF64JTX2Y8K76VJ32G",
+      "revision": 1,
+      "sha256": "19edadc14af47f789ea443334589c31d84dfeafb9c076b79b4c08f4afde3bb13"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFGA10C5GZXXNA6VSKM",
+      "revision": 1,
+      "sha256": "cc4b74cd95fb443bbc2962f2c512e85201c42f9a678956b8736eb9bd61eee72a"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFGC37DW665TD793E34",
+      "revision": 1,
+      "sha256": "d7e3bfcf1ad5a280956a553152c2d72230097086bd320f7b2e651f9dda47b75d"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFHB1HM1MT2778F9JEV",
+      "revision": 1,
+      "sha256": "881839353d0f6bacbd7c680a25c316cfca83c48b3741c6ab5053d0314027c58e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFHHTX16Y8PVWH1AG9R",
+      "revision": 1,
+      "sha256": "d1f3849719f34909f7b01d5b0c00def38acdf0d60c43559de3d3140b6c819190"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFJ44RWGSA41MKSAKP4",
+      "revision": 1,
+      "sha256": "8614517093f1565340d222479b587b69bd7e610f1e30f0f3abe2aa88c0955677"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFK3TT8WB4JJ88PNY5H",
+      "revision": 1,
+      "sha256": "15706b950a0dbe2635d964cfc0705ff140c60478bb267b9b2230ecebd3149d51"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFKWADJ2KCC21V6Y69B",
+      "revision": 1,
+      "sha256": "768e4b0bb893bb37eabac7c024f2460251b65c7e9f87f63ffa5a62dee51be475"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFM7M8M0482PHN3TEMB",
+      "revision": 1,
+      "sha256": "ed7e0f07a9310f63446c3366994665e5f493ee4ced700d48cc151cc7f3ecb1ca"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFMNEA41ES4WPG2YMPH",
+      "revision": 1,
+      "sha256": "64bf1e71d542ff91f1aa8bf75fe03d8736fb8b132dce60e92f7be05441d6ad0f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFNWMWCVP6P6BGXCZQ8",
+      "revision": 1,
+      "sha256": "be185da3fcf08e5ec12bbebcaa16404a36a147adbda8003ebca068bda1f10049"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFPR3Q082HTAY72S22J",
+      "revision": 1,
+      "sha256": "3ef22e71ff0876679cc78f19e64c646e19fb9563d96e26e6f4e444410d8c8ea4"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFPXGHN56H5PYXADMQY",
+      "revision": 1,
+      "sha256": "a0e660d67ddda30da749492f12b76b56541dfd56411249a3edd4edb2c921b13f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFQM0Q4M2V9YZC5YM6N",
+      "revision": 1,
+      "sha256": "977d40ded0fe976e10660c4689af5b2b7d1e588bfcd3e76f58cc7225d5f62e3c"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFRQMAE0254KW1ZJ0ZH",
+      "revision": 1,
+      "sha256": "f7e2a4c71145736a9cc932091186fc9aa516ae2314c4f74aaa5afac9ca21e476"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFRXNBP70FF8T695YKR",
+      "revision": 1,
+      "sha256": "0c4b6f4fdc0bdfa9effbcff1e4edb25fbdc3a3edd37a882863c8e72ac9a357d6"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFSV870Y1355YTAWSY9",
+      "revision": 1,
+      "sha256": "d2437f568babfd39e8ac3e77a132b3e7a71d9bbcc29cc33dfee391cfea4ee24e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFTADP9C16BGE1EJACB",
+      "revision": 1,
+      "sha256": "3f257f982a08dd300afee1183ad3c5f46595c72b3359dd1676f33ca3b2a87d71"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFVGBYM41PBY8MG9C4M",
+      "revision": 1,
+      "sha256": "ba7fe92b88e2494f300effd4268ea3b66bb05a0039bbbb6c581b7019db051b45"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFWD965ZH2VXG3S7ZTC",
+      "revision": 1,
+      "sha256": "21d118141b858048cb19fb7eb3b407c1584c6c2256088c6fb7412bdedbaf8a90"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFXFZEM22Y7C4JGYKK3",
+      "revision": 1,
+      "sha256": "5771cf694152ca0053842ad8a3c3af58f1f2971acc44eaf3f891e1e2a7e39ee4"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFYM4E39AP2CED568DF",
+      "revision": 1,
+      "sha256": "67b88d8eaab9413114898b38e966024d2a7827ae4c6fa7d4e498f5b82b45827b"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFYSQMFS6DNFGBCZZ62",
+      "revision": 1,
+      "sha256": "06f9f26c8e7fb493d464c08d76be18e7629f2912159ca0b52fe2f1d17dbb601b"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJFCSSQJDT77Q6WHTMA",
+      "revision": 1,
+      "sha256": "caaf2103f68c23289ca7312b5920c34c9f464f6e87d79f4038649849badf20f1"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJFS5DQF8AV44X21AZ9",
+      "revision": 1,
+      "sha256": "d09998313439c62829b52da664915414bbdd08ccccbc1051cd63f27bad124d75"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJG08QFWKV690C9KKXC",
+      "revision": 1,
+      "sha256": "0334d61e731bb6463bc370827e35d37c7b07e06223d07a227e6dded701be6de8"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJHVWZN7WS97SJJCCB0",
+      "revision": 1,
+      "sha256": "74274f324284f511d1074df4622f0cd8ad7785623d6be5d28129ef16b817aa18"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJHXPEYHDHFRK11GJ58",
+      "revision": 1,
+      "sha256": "49f2773b8614971f9f1a9a1cbf6fa652b19b295b4023fe4a0bc8f2a840071392"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJJ6VG4VD0MJDBH28D4",
+      "revision": 1,
+      "sha256": "ad208bdb7787859e30e581fe9cf9ab6cacface7d41c185d4fce423a3fa0e1186"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJJMQ942APFE0G2PPGW",
+      "revision": 1,
+      "sha256": "985d4db7ad90e035b5adfc91a16d999cf242980dc7f5b3886df5db9bc19e8971"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJKB6QB83FH4TSZT2WM",
+      "revision": 1,
+      "sha256": "526f0471684dc78feda4176193cd691f7a00642d2749de9a8ee2f35acc20428b"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJKX747PXSJTC5T225R",
+      "revision": 1,
+      "sha256": "bd4b30ebbebc7e82bfc7ad0a5669c045223c0ab24dc3220281bda68140d9bd6c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJM8D9TMZEK8TCGJQ6C",
+      "revision": 1,
+      "sha256": "e171fbceec5b3cf935d96ce6a9d01eced1d99d0f78eeeabc0de127b92e7d3622"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJMX95W316TH2ZSXWJR",
+      "revision": 1,
+      "sha256": "acb03d46724d9d6c17e336acbff780aea799239f14f2e305e9b1b7a2d99a7a05"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJN6D6VTFRQ1QZT5RMX",
+      "revision": 1,
+      "sha256": "bfe269bfc149362c06a0a04236a6d1dcb6d2a1717da15e0d944b6710bd749088"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJNK0DMTKDTVZM5W8N5",
+      "revision": 1,
+      "sha256": "6d9b4acaf8a70bd9b639298fc177af62aa91cc7066d76f6924c7140f35a2b6e9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJPNZJCDCFN9SDH6BNN",
+      "revision": 1,
+      "sha256": "abc325a56d3a1b7eda6eb886a97e15c8b8582d21ed4ab14938565bc6875ede9d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJPXAPQDMR5BD8VDV24",
+      "revision": 1,
+      "sha256": "3b439a1770a729a24965a63663ab4a4f0fee1d6dec27104a5102492a573137df"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJQM0FQCCZYZ97WYPX9",
+      "revision": 1,
+      "sha256": "360b82b58c619e2f44f1a8fdafa2df170dc8168c1d6102e585be1156e209c3f7"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJQV6BE1T1J3X36SX5R",
+      "revision": 1,
+      "sha256": "3df912d60c9ae579b1be995c011166632bdd44e7f1a6d83ad0e5b546f5ef1eff"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJRF4W24JHRXZ2JFZNZ",
+      "revision": 1,
+      "sha256": "58612b386b4b02048954119f34799e46913ea8b2f937553868f1b30d6752aedd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJSJFRR24CGP6DTCHQG",
+      "revision": 1,
+      "sha256": "652cdcdf8726daf99afffc6bf4dbfe6f7cfbcd92789559057040dc1e8f5338ca"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJSVK3BEZCP98BGA5KY",
+      "revision": 1,
+      "sha256": "5f51a754f02dfa53bb61ece049cf95e8bed0d0dd6e0e5a7007d9749c0d486eb4"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJTGFRPFCBAEEJ0EJ97",
+      "revision": 1,
+      "sha256": "a822f1db51c9f0dc1db6a3d9669e365c32ce694754844c1e9cf565266896c63f"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJTYQP69K7EYT22ZY6H",
+      "revision": 1,
+      "sha256": "a0b80b1b1c71bbe6e5cdd3be9b151147bbd4c4744f0513b15a6b394b00cb2a9e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJV74W2Z7GFXXQ4ZDM7",
+      "revision": 1,
+      "sha256": "b8ef7cb760a4a4b8fbd5b522a07664bb50365fbebd4d284ad6acd92476fd3359"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJVS2YDJXYJ6DBXA55N",
+      "revision": 1,
+      "sha256": "ad7fb047cff6f48ea7205afff5722b5fc7097165a2f7d73c0cf21ccaf4e5e877"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJWA2P8NDPB417XXMYG",
+      "revision": 1,
+      "sha256": "0537b8414635d088582d77175bdb52b1cc740a94103f818b6069321fd61b41a7"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJWPV4RV67E5CWZN09C",
+      "revision": 1,
+      "sha256": "e4c97911293186daf1120fd12e1e7b4102d68b336ec2a0207974f81d20f77ec7"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJX671BP7TKB7D9VKFG",
+      "revision": 1,
+      "sha256": "43d1f9a5ad17e1ed951126f2fe9071b9d3e239e9614dd6e370c9d7e27dfcf756"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJXHMKB3GKBKP31KS0R",
+      "revision": 1,
+      "sha256": "970d45b5454580521104214f4d212dd1a51d2c4f7aa90b2986fbf101f811830f"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJYCNSTMQRA4H7E0KTY",
+      "revision": 1,
+      "sha256": "65e313267663ad1d3083e8c21854875c7160eed40a94491c092af9d3c593c1bd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJZJZGJNQKKH53XZ1BH",
+      "revision": 1,
+      "sha256": "ea79561c0d4f90ee325759a1c5848965b95cb4d46afdbb7f1ea7f2253260393e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJZP4FPZZKZ3MMW57BK",
+      "revision": 1,
+      "sha256": "de6019ebd3051f44b4293ec1d1d16dae88bb563af291c202bb01944ad6cd9cb0"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK0094FTMCF0CZPCYN2",
+      "revision": 1,
+      "sha256": "83deffcedb9540bed185cce5e118042ba288193a558a7853c56ffbc11ff6705d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK0JXCPG15RVMZFP5PT",
+      "revision": 1,
+      "sha256": "17635c577683b3d397efb28ca97978bf60634deb104873b45d47a225aba1ab41"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK1H9SWGH3SKX1Z1JSA",
+      "revision": 1,
+      "sha256": "3b85397b70483417041af8575a8ef70896d63944d1cc4ae20e95637b5963102a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK1PDG7YYRVW62VT3WP",
+      "revision": 1,
+      "sha256": "b1418cb5760be27c74099b2ad9474f1905b1b595d8348ead9fa4fc37b572bb36"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK27H3P1F6FH3TA71FP",
+      "revision": 1,
+      "sha256": "038617443c2675c5097491042f9f28a365cb69041008117f60d6a7cfea3f3c52"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK2XYD3ZA94W7K1VTC8",
+      "revision": 1,
+      "sha256": "d5e7d47f37ed418d7247d78d259c7e9236a6670ce680b05f7c653a7493e4bcd2"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK3KP4ESQZ9CDV283NA",
+      "revision": 1,
+      "sha256": "7c01ef98752c198f649d5d1a93faa049291ec682a67f5c583c753a389b53c74a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK3KRKA3K9VSM2DX1AC",
+      "revision": 1,
+      "sha256": "61778634bbb0da9a01184fcc8df1d1577de97df47e1ca1511b03499270b8026c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK4AEBP73CRE4PW3Q84",
+      "revision": 1,
+      "sha256": "3cbf9bb3b767f7497b1efe61110aa15e8e70aacb55ec0f16cb59dfc55f1e1646"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK5PCY6XZ9FGAA3DHNH",
+      "revision": 1,
+      "sha256": "c8b9a6c9b372574f3390d3ac33ac19909b058283a0169c2bfd78d49fd302d9a5"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK5ZKP1518N6AEPB91D",
+      "revision": 1,
+      "sha256": "b76956bc69ca88bad5e2108d7c43299b9e4e2fbbd6a7914441938e6d5916ddaa"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK649BF6847DM3RY8W1",
+      "revision": 1,
+      "sha256": "03f4784c53af7e8b1731aa45f0a82eecef59844924aad19737cc55cc80beb0f5"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK6QJ6MW5Q2WN1C1B2K",
+      "revision": 1,
+      "sha256": "41a415266cb4fb2dca98e5ed33d0e005220b0bc23a04759349a839939025150e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK7J6DHBS3YH2YH2E9F",
+      "revision": 1,
+      "sha256": "754ee1d94af22b0d43d5eb9cbe1e8dac0317b049ac2634896c568ef88f3e3a2c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK7MVHK0HP1CVF49XGH",
+      "revision": 1,
+      "sha256": "8e25efff190ab6a7f3cd4c728e72cd5419add6baf1667f623388cfc5e9c89342"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK8FHD6QM01MA33YC91",
+      "revision": 1,
+      "sha256": "c2f304372dc3a29f5ee5a2f11c2ae3bcb5bb9d0704e5f13bc820062986f9d56d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK8S0X910QZS6GYET9E",
+      "revision": 1,
+      "sha256": "61ef080d70167dcb239a8c65d0a929af38897fad8324e70ad3f3741b337f3fa3"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK9HA74RTYKB0ER2KEV",
+      "revision": 1,
+      "sha256": "efa27f0ea0e65e2136930817dce22dd4a488bdfb23ee94d165a06053f98cf4e0"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKA1H5DE1YM8JF5WYJ1",
+      "revision": 1,
+      "sha256": "233c98201e5c43337d8d3cc08b41d6e46b0c5e069f1892ec4fdc5d38d710f533"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKAYTYG2DKZZE9ZQ0VV",
+      "revision": 1,
+      "sha256": "a0a0b5cf0bb029e068939546003410af8b52960f724b1567f0a261fdd94fdcdd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKBFJSZ8ZB1K1NRZJRA",
+      "revision": 1,
+      "sha256": "c7520186443319ad89bdc61dd499d6d828a630c243bc5662c2116ce1aa2c2241"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKBGGW4878HSN00EE1W",
+      "revision": 1,
+      "sha256": "2e9d0ed9d7be438727c21b1779198607f7dd47415c6f124b0ddc866cb2e09d50"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKCW0QSXK142NZXK2SJ",
+      "revision": 1,
+      "sha256": "dd3062a02a058fc4847c830e0799b022da410915f2599fb13ad508b49f27788e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKD8ER2T6SAHEG7ANKK",
+      "revision": 1,
+      "sha256": "9a31fd10d58161c221f321539c3d77799206ad82fa6036620c021a68fa93b751"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKDBTKY2GP00HD2ZK00",
+      "revision": 1,
+      "sha256": "d6755e04763474de592208e5cb303d1322acd40ae8c37727663d1e802bbce0ba"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKE3MJR16A8W21HZTTV",
+      "revision": 1,
+      "sha256": "96fbf46de3743efe2af0151c6ea7866c1009eb51f2891abe36c3153ec24bee99"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKEESWB005HS1K8T8S6",
+      "revision": 1,
+      "sha256": "8f567b001b199c908498da719149cbf7fef68bef0921a37ad23bbb1de5c7f0a3"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKFXJMJTHBDTQ54ZQCQ",
+      "revision": 1,
+      "sha256": "e6a724932943511b1ab14f263a4af8e71247b46c636996a80d054db398ad60b2"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKG4BFKJDW5MQV0K5CZ",
+      "revision": 1,
+      "sha256": "12e81fe6a1715227b2350ef483b298a3ffd753b52f572f382dacae6d736b11bd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKGEHW016W4SW5Q3PKE",
+      "revision": 1,
+      "sha256": "19ba158b1043962cecf91500dfaf718fbed672c05b9e8e9bc51e2c0ca592bba3"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKHFG58EH9K639RX2CJ",
+      "revision": 1,
+      "sha256": "ad4983f877867cd2436b9536d72519690cc04ed0e628d4dac6ab1f7e06e40929"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKHMPCKDE796FBT0056",
+      "revision": 1,
+      "sha256": "c9fd9014834bdb514dbb0b56a70f905222f14d11481e4aca465653bddf37f0f6"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKJ6WMZPQK63N7YAGMG",
+      "revision": 1,
+      "sha256": "9390a974f1ee77bf5d9b8369bba54b77f7ead0f87ff2fe814408e968e5341755"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKJZVDY2DQFGX65NNNE",
+      "revision": 1,
+      "sha256": "f721ba8cd7303127b837cc90d29af0ad3fd519324ec8aadb7392de6ca509c3f9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKKCV9NZ5J4TDS9EXW1",
+      "revision": 1,
+      "sha256": "0c08cdc373e4f8e4ba7791c73a241d4575b9458f457f1ae5b5a02ddbb7d0de75"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKM9YJRC2F4DAG44JAZ",
+      "revision": 1,
+      "sha256": "f4111deead7dda82ffed295d50a5ad7180b03e11824a153f27508e6405fee7ab"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKMGVV9KG7M9E3RK5EP",
+      "revision": 1,
+      "sha256": "80d5b8e1d0c4f6796a5270211f211d371939aa32ca3c42c4dd9b4ceba7c4fcd9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKNEKCEAZ9BWHFNQYE9",
+      "revision": 1,
+      "sha256": "09b92a39689c20f23be7ab85ca6d4d882253b6cddb5d867ec095836bcd6ee690"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKNXMAVNXYAAFVJ3J1W",
+      "revision": 1,
+      "sha256": "07377466cdafef27ce959bc102a94c6058c400dfe0950cee8f826551e6dcef23"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKP6BPR2B3DMA9PW29M",
+      "revision": 1,
+      "sha256": "198c5e9eae1febc39a6a1cc64ffe880a7fc09766a859e63d33da617432582224"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKP8ZAK89MM3QH50RG6",
+      "revision": 1,
+      "sha256": "63e2905b05a0655e6cf525bce5bff6c68603fbfa7d1b6e9aeb22ff1942dc3397"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKQJNZFHRYCYWPWT6M9",
+      "revision": 1,
+      "sha256": "9eea95a1707e21d4e6fa257681404e332c3e64e9a770321e0ba8143aef3b5e6c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKQS7NKH2B6TGABYJ5P",
+      "revision": 1,
+      "sha256": "a2963d4eb8aaca88f4b7c5278d3e33baf5e5a76b2124236f577be031fe060044"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKRA10RSHNKRFYAKHVV",
+      "revision": 1,
+      "sha256": "3f2ec91f44a899e540bcd117f06cf6e0d3ae90df68b2d042fee2539f7f493f5f"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKRC75HRCMVNY0HK1HK",
+      "revision": 1,
+      "sha256": "333076c230dfa1cc15402a33fbd407f587d8508f16f44db05999c4a002978f94"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKS98EEFQ31BQX2MMA2",
+      "revision": 1,
+      "sha256": "fde2afaa5559e4d8d5e0f0ed0af4b97c749ab14999f484e9b3a60ecab7219988"
+    },
+    {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 2,
+      "sha256": "08c1e41df45d52420639de9a91a6cd0e73925f98bd005b030da413d6165a3ac2"
+    }
+  ],
+  "mode": "audit",
+  "official": false,
+  "inputs_manifest": [
+    {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 2,
+      "sha256": "08c1e41df45d52420639de9a91a6cd0e73925f98bd005b030da413d6165a3ac2"
+    },
+    {
+      "kind": "ENV",
+      "id": "ENV-01M59F5AC1S6V7J2MPEEM7NRFM",
+      "revision": 1,
+      "sha256": "0bda06ea68b6bfd5e464197834ce991b0115beb4bfa88a90f5eb41bc1d81e4ef"
+    },
+    {
+      "kind": "POL",
+      "id": "POL-01M59F5AC1HFS08QWXX2YKCAAJ",
+      "revision": 1,
+      "sha256": "dea7adee860d1c17c1eb178386ab864817fafa11980094c19c4209c69741d5a1"
+    },
+    {
+      "kind": "PLAN",
+      "id": "PLAN-01M59F5AC3BZ12C17M88J9BK0A",
+      "revision": 1,
+      "sha256": "a3127b4afcdac3eb5419a30ea643e73d092ae75e8f988ae6adc0c0d0d41e1af1"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEH0GF9ZFVASDXYR1QP",
+      "revision": 1,
+      "sha256": "1603949b1a3d9630b26db3fdfa4c98a2b3c11bd8666f2c8603ae43d8c5d6bb26"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEHE6PXH165PG7D1KR6",
+      "revision": 1,
+      "sha256": "69687a8d65acc1e30dcbd368d1759682ef3d82da979ad0a32a70bdb0135975d3"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEJS75YPS38RBE0KZBF",
+      "revision": 1,
+      "sha256": "4a14ec9ef8f509f82bcd9b8a794bd59c548fc5271f87e1cb22e4988ea508baf2"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEJTF5G8Z3A8002ASQC",
+      "revision": 1,
+      "sha256": "4e6dae7bb802058776d6d00fae0e1aa45eac9724a6826b9d64a88a6fafd0b933"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEKR295PVXG79BXRJNS",
+      "revision": 1,
+      "sha256": "53d9ef94a9be23a72f9300becb829818633c4069aa78075e8077c51af6898e35"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEM6NC91FXPX0B8C7YE",
+      "revision": 1,
+      "sha256": "c68fc24d87f105ef2100da7b7945d19c8383efc4c31784f352399c37e78285a3"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEMPXNF81KWYDRZZXC4",
+      "revision": 1,
+      "sha256": "d044561a89374ee1ead49a1a744ec82d5733cdd7efd40c9b606ab14836c6fdc0"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEND3JPBJ5HZSTZAR59",
+      "revision": 1,
+      "sha256": "a5037c66e629ac1189324157a9b89ec643e980a86ddfb54f144d3c284d7be7d1"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AENR6V9Y5VXVZHC7TKC",
+      "revision": 1,
+      "sha256": "bdd21d62b63a180a68868ccae28d017855403e0790fc20881ee1649ea194dca1"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEPTCBZJGW8ZGE1HKSV",
+      "revision": 1,
+      "sha256": "8e8ee6ebe33fd5c31e73bbb06ce9cea709bf31c49135603c945bc49606077f5a"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEPWGAC4S9YZS18QDJM",
+      "revision": 1,
+      "sha256": "b7e261862b5f7c27a840bbc60dca45abe0d92ebb0921780620e698d81c91b124"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEQNS4XB5K2CBN6NEXE",
+      "revision": 1,
+      "sha256": "2c08fe2f5f7fca22b95365f177dc5b8fa4ff95cddb5fcd93d907208e55257b3e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEQZYZA2HM593KWCVCB",
+      "revision": 1,
+      "sha256": "17b60e318952d1a50daf2335e61ab669aedcfd51a67808ab11936dc2a0549b0e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AERBA0F9R1TEGGSA2CQ",
+      "revision": 1,
+      "sha256": "d90fb42e34ed1d3b577db72ff75385e2f4f9aa81af1cccfe9423713ae107946e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AERQ98CBTJPPN5P3G3H",
+      "revision": 1,
+      "sha256": "a3b80517cc7b6c0447175d561951b71da3600f4f7756646fe32a1e41ddad2fdb"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AESAJTBEDCRMGWX5N3N",
+      "revision": 1,
+      "sha256": "5de811beeceb3827c01e1a88efa495b2f75ce49130bada0e8cc074b18bf21195"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AETX7172ER937EEPQYW",
+      "revision": 1,
+      "sha256": "7fc4c7b6476d9c0bfc284975fc352945d854dd4c103096ef56831b9ca315b0be"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEV20NS8T0ADP7G8WBE",
+      "revision": 1,
+      "sha256": "c79584454ea84b35d8f9ee31e6276789b7ecbbbc974201c066f7b76fb9025e1f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEVK60XQ8GQX704DYD9",
+      "revision": 1,
+      "sha256": "217568601848080ea5390fe87aa04aa32c01bba499f7641dd28e3f62ffdc62b1"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEW8A2DRBHM47MC8XWJ",
+      "revision": 1,
+      "sha256": "e77a3b75896991c4e6215bde8dbd152cb17a71f32590e83fa61d8644c8c2d952"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEW8QJJ87C8W33BJYKF",
+      "revision": 1,
+      "sha256": "5538a6196d2e7480719298c4b2c70fe35c5bd92dfe8b32cbfd29b91ece79aecc"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEX19DAQD8FXZKDTBJG",
+      "revision": 1,
+      "sha256": "548ca031ca7ae4df706e55217ec70e7628229f863556cab620928b5047278293"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEXGH0WX0VK6TFCYSTK",
+      "revision": 1,
+      "sha256": "170db77f1f7eb4f1650b56e0320788bd2412fd0d1a37d61e591f87e2265fc036"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEY2S3G9053YNQTY8J6",
+      "revision": 1,
+      "sha256": "f23dba88cafb17636f51ed4b8cf0ba061fb29a45db4c4fe121517147eff04d7b"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEY4GHNNKGKGX04Q2WV",
+      "revision": 1,
+      "sha256": "216ff5823f4e1d6e563f04d5d4d48052378f9543e53ed276cdfe2cbf902a55e0"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEZCFVJZZG5AG3K4029",
+      "revision": 1,
+      "sha256": "8320b1d092c92d6052e402c45dd58700905bc4f3dc124a77b8ec0cfa618e46ca"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AEZKM8NKNTAENM91QBT",
+      "revision": 1,
+      "sha256": "e177679653320484e28033dd986d08f14b2b52ec6b0050ee99c1e87ae3c15bdf"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF01559FQXBSB0JGBZP",
+      "revision": 1,
+      "sha256": "32ec936cd835d1d83f2d24b959fe018fb0788cfbf4f5812c9abf50da3cb8b188"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF037G0GJ7AH18PJPCN",
+      "revision": 1,
+      "sha256": "c1a7774d14e2a5ab5a2d88165338b039531287ed244d8c789db1df500903196d"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF1NABXVPSZ2FRS7STY",
+      "revision": 1,
+      "sha256": "76ec074c2129fc3aa896ed2f1f6a3225ee4df043e1d050c00b161ef79eabd2ad"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF20AW1BP85ABEPZMGX",
+      "revision": 1,
+      "sha256": "346b27facfb61e9fcf97f40fd782c550c7ad2cb7ccfcf61f1d23a77f3ae6bb53"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF242SA74ZPPPSJ9YWM",
+      "revision": 1,
+      "sha256": "3e79a03cdee64ae0a535741d5b203b310d9baad7a5abc779e07e1a687371acb6"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF39DN15Y4FM42P7W25",
+      "revision": 1,
+      "sha256": "80e795b05c16f544f8a9e0e56e94b9437fc974d619394dca1ca48a544ddede65"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF3KHB6GCCZCAYGBQAA",
+      "revision": 1,
+      "sha256": "44a3a0d4b1ed4e4f999d45d1063bb05dcc29d9feefed88453a91a4b5aac4f41b"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF4EPZ4JPV7DSWQ25TZ",
+      "revision": 1,
+      "sha256": "4e248a6aff9b2b84a517e68dd28ee65d1d086d7f29cf503ea1a29b17b84a062d"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF4XYMP956WGKW5P62P",
+      "revision": 1,
+      "sha256": "6c327b3772e020aa8087f40c236d87abc81f8ba40be75b61de8d8a6c2289e064"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF5BTFMVY7GT5X8S9C6",
+      "revision": 1,
+      "sha256": "5ae4bff8a547e8642aeb6595f19f0c4b5222832937774ba71dd442e5b7454eac"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF5EYWADJD2B8KSEG8V",
+      "revision": 1,
+      "sha256": "c4db35ae916e09619f18a1bb2e54f62e61c510e2dbaa7f0bd2d368c6cf1874b2"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF63WADYQ7S50VXM7E7",
+      "revision": 1,
+      "sha256": "c04ebbf794672bded4495f6cb17067f4220bf8423221c461bd40f097774897ab"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF6WDBCPJFXJDCVVYBT",
+      "revision": 1,
+      "sha256": "498d1eb02cb448929c239e39f8ac6c5bb81c73b80adc5a4f20c2bed80c69e987"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF76P72ZRS1X0RQKYSJ",
+      "revision": 1,
+      "sha256": "4c45434f815e9b8fcc89c1d861b9e5202ecd427a4ff43f76cedad96c9ca51b16"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF8FHVH763985NBHH27",
+      "revision": 1,
+      "sha256": "0b0d858da8c133d6727985e29a962369f76416bf3544ee28be5f1ac9a8e107a9"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF8J5YV3AC7BWG809QB",
+      "revision": 1,
+      "sha256": "3e443db81f47d48f6140a3116a9d051f966a4a97167be97fc0fcb41f4b2adc1e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF9DX41HGPJZKXF2907",
+      "revision": 1,
+      "sha256": "84d0b39db188070195eb41314840ec032869141c075ffbcb24126c5abad364c9"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AF9XPH4METXHCCTHZRN",
+      "revision": 1,
+      "sha256": "ddb765a98dc506b3f07b9bf5df9cd0e1f6f9f41d1c42dafea033d6969497d29f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFAP02AE1KKJGWD4Z9C",
+      "revision": 1,
+      "sha256": "f9d58d3f5d6ad0c88052a3b9933393e1857393fdb35343b035f21336667069c7"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFAWDS4BJD10CVA4NT1",
+      "revision": 1,
+      "sha256": "e4784ed549136da61681022873a044a72d410fe6cd191e97d56305180b0dd34c"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFBWVEPS068PMA0NAFC",
+      "revision": 1,
+      "sha256": "182315854757dee26c3ba0cfd92f6bc1f5d347c2ddcc3b16629b048a1d174fba"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFC2YMHMCRB5RJB0VZ9",
+      "revision": 1,
+      "sha256": "cf71ced26c0704f7cb675abfa0513c71f128215b754e0b0dc8d2939e8fadb8c7"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFCV171GT5P88B3P4JW",
+      "revision": 1,
+      "sha256": "88412c1b3680ef5f7b19664338866f6547bd07b2e936d8e004ebd49ab451f753"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFDM0BQ7214GV1FP4E2",
+      "revision": 1,
+      "sha256": "e1692e0631bbef83ed69a1961e782cc5d72f910b22ddf581b17a94e34cc8595e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFDNE2CVRCQMEYZ5E5Y",
+      "revision": 1,
+      "sha256": "7573fb63d9a12b167e269a59a18bfdc7f2385d4c51325bb113dc8e9c66fc5f4b"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFEVDSCV3CDSXY6W96Y",
+      "revision": 1,
+      "sha256": "c283e3d945edf970eabfa9bd3760e1e8c7d32f18f68c53e7f7ce2974c050eb25"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFEZ03549WJRM25CF06",
+      "revision": 1,
+      "sha256": "9ce68ea0d8a987b1892cad2fe734da15edcb99a7004130347107b2aa10ffe43f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFF64JTX2Y8K76VJ32G",
+      "revision": 1,
+      "sha256": "19edadc14af47f789ea443334589c31d84dfeafb9c076b79b4c08f4afde3bb13"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFGA10C5GZXXNA6VSKM",
+      "revision": 1,
+      "sha256": "cc4b74cd95fb443bbc2962f2c512e85201c42f9a678956b8736eb9bd61eee72a"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFGC37DW665TD793E34",
+      "revision": 1,
+      "sha256": "d7e3bfcf1ad5a280956a553152c2d72230097086bd320f7b2e651f9dda47b75d"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFHB1HM1MT2778F9JEV",
+      "revision": 1,
+      "sha256": "881839353d0f6bacbd7c680a25c316cfca83c48b3741c6ab5053d0314027c58e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFHHTX16Y8PVWH1AG9R",
+      "revision": 1,
+      "sha256": "d1f3849719f34909f7b01d5b0c00def38acdf0d60c43559de3d3140b6c819190"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFJ44RWGSA41MKSAKP4",
+      "revision": 1,
+      "sha256": "8614517093f1565340d222479b587b69bd7e610f1e30f0f3abe2aa88c0955677"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFK3TT8WB4JJ88PNY5H",
+      "revision": 1,
+      "sha256": "15706b950a0dbe2635d964cfc0705ff140c60478bb267b9b2230ecebd3149d51"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFKWADJ2KCC21V6Y69B",
+      "revision": 1,
+      "sha256": "768e4b0bb893bb37eabac7c024f2460251b65c7e9f87f63ffa5a62dee51be475"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFM7M8M0482PHN3TEMB",
+      "revision": 1,
+      "sha256": "ed7e0f07a9310f63446c3366994665e5f493ee4ced700d48cc151cc7f3ecb1ca"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFMNEA41ES4WPG2YMPH",
+      "revision": 1,
+      "sha256": "64bf1e71d542ff91f1aa8bf75fe03d8736fb8b132dce60e92f7be05441d6ad0f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFNWMWCVP6P6BGXCZQ8",
+      "revision": 1,
+      "sha256": "be185da3fcf08e5ec12bbebcaa16404a36a147adbda8003ebca068bda1f10049"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFPR3Q082HTAY72S22J",
+      "revision": 1,
+      "sha256": "3ef22e71ff0876679cc78f19e64c646e19fb9563d96e26e6f4e444410d8c8ea4"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFPXGHN56H5PYXADMQY",
+      "revision": 1,
+      "sha256": "a0e660d67ddda30da749492f12b76b56541dfd56411249a3edd4edb2c921b13f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFQM0Q4M2V9YZC5YM6N",
+      "revision": 1,
+      "sha256": "977d40ded0fe976e10660c4689af5b2b7d1e588bfcd3e76f58cc7225d5f62e3c"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFRQMAE0254KW1ZJ0ZH",
+      "revision": 1,
+      "sha256": "f7e2a4c71145736a9cc932091186fc9aa516ae2314c4f74aaa5afac9ca21e476"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFRXNBP70FF8T695YKR",
+      "revision": 1,
+      "sha256": "0c4b6f4fdc0bdfa9effbcff1e4edb25fbdc3a3edd37a882863c8e72ac9a357d6"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFSV870Y1355YTAWSY9",
+      "revision": 1,
+      "sha256": "d2437f568babfd39e8ac3e77a132b3e7a71d9bbcc29cc33dfee391cfea4ee24e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFTADP9C16BGE1EJACB",
+      "revision": 1,
+      "sha256": "3f257f982a08dd300afee1183ad3c5f46595c72b3359dd1676f33ca3b2a87d71"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFVGBYM41PBY8MG9C4M",
+      "revision": 1,
+      "sha256": "ba7fe92b88e2494f300effd4268ea3b66bb05a0039bbbb6c581b7019db051b45"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFWD965ZH2VXG3S7ZTC",
+      "revision": 1,
+      "sha256": "21d118141b858048cb19fb7eb3b407c1584c6c2256088c6fb7412bdedbaf8a90"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFXFZEM22Y7C4JGYKK3",
+      "revision": 1,
+      "sha256": "5771cf694152ca0053842ad8a3c3af58f1f2971acc44eaf3f891e1e2a7e39ee4"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFYM4E39AP2CED568DF",
+      "revision": 1,
+      "sha256": "67b88d8eaab9413114898b38e966024d2a7827ae4c6fa7d4e498f5b82b45827b"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59F5AFYSQMFS6DNFGBCZZ62",
+      "revision": 1,
+      "sha256": "06f9f26c8e7fb493d464c08d76be18e7629f2912159ca0b52fe2f1d17dbb601b"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJFCSSQJDT77Q6WHTMA",
+      "revision": 1,
+      "sha256": "caaf2103f68c23289ca7312b5920c34c9f464f6e87d79f4038649849badf20f1"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJFS5DQF8AV44X21AZ9",
+      "revision": 1,
+      "sha256": "d09998313439c62829b52da664915414bbdd08ccccbc1051cd63f27bad124d75"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJG08QFWKV690C9KKXC",
+      "revision": 1,
+      "sha256": "0334d61e731bb6463bc370827e35d37c7b07e06223d07a227e6dded701be6de8"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJHVWZN7WS97SJJCCB0",
+      "revision": 1,
+      "sha256": "74274f324284f511d1074df4622f0cd8ad7785623d6be5d28129ef16b817aa18"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJHXPEYHDHFRK11GJ58",
+      "revision": 1,
+      "sha256": "49f2773b8614971f9f1a9a1cbf6fa652b19b295b4023fe4a0bc8f2a840071392"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJJ6VG4VD0MJDBH28D4",
+      "revision": 1,
+      "sha256": "ad208bdb7787859e30e581fe9cf9ab6cacface7d41c185d4fce423a3fa0e1186"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJJMQ942APFE0G2PPGW",
+      "revision": 1,
+      "sha256": "985d4db7ad90e035b5adfc91a16d999cf242980dc7f5b3886df5db9bc19e8971"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJKB6QB83FH4TSZT2WM",
+      "revision": 1,
+      "sha256": "526f0471684dc78feda4176193cd691f7a00642d2749de9a8ee2f35acc20428b"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJKX747PXSJTC5T225R",
+      "revision": 1,
+      "sha256": "bd4b30ebbebc7e82bfc7ad0a5669c045223c0ab24dc3220281bda68140d9bd6c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJM8D9TMZEK8TCGJQ6C",
+      "revision": 1,
+      "sha256": "e171fbceec5b3cf935d96ce6a9d01eced1d99d0f78eeeabc0de127b92e7d3622"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJMX95W316TH2ZSXWJR",
+      "revision": 1,
+      "sha256": "acb03d46724d9d6c17e336acbff780aea799239f14f2e305e9b1b7a2d99a7a05"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJN6D6VTFRQ1QZT5RMX",
+      "revision": 1,
+      "sha256": "bfe269bfc149362c06a0a04236a6d1dcb6d2a1717da15e0d944b6710bd749088"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJNK0DMTKDTVZM5W8N5",
+      "revision": 1,
+      "sha256": "6d9b4acaf8a70bd9b639298fc177af62aa91cc7066d76f6924c7140f35a2b6e9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJPNZJCDCFN9SDH6BNN",
+      "revision": 1,
+      "sha256": "abc325a56d3a1b7eda6eb886a97e15c8b8582d21ed4ab14938565bc6875ede9d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJPXAPQDMR5BD8VDV24",
+      "revision": 1,
+      "sha256": "3b439a1770a729a24965a63663ab4a4f0fee1d6dec27104a5102492a573137df"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJQM0FQCCZYZ97WYPX9",
+      "revision": 1,
+      "sha256": "360b82b58c619e2f44f1a8fdafa2df170dc8168c1d6102e585be1156e209c3f7"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJQV6BE1T1J3X36SX5R",
+      "revision": 1,
+      "sha256": "3df912d60c9ae579b1be995c011166632bdd44e7f1a6d83ad0e5b546f5ef1eff"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJRF4W24JHRXZ2JFZNZ",
+      "revision": 1,
+      "sha256": "58612b386b4b02048954119f34799e46913ea8b2f937553868f1b30d6752aedd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJSJFRR24CGP6DTCHQG",
+      "revision": 1,
+      "sha256": "652cdcdf8726daf99afffc6bf4dbfe6f7cfbcd92789559057040dc1e8f5338ca"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJSVK3BEZCP98BGA5KY",
+      "revision": 1,
+      "sha256": "5f51a754f02dfa53bb61ece049cf95e8bed0d0dd6e0e5a7007d9749c0d486eb4"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJTGFRPFCBAEEJ0EJ97",
+      "revision": 1,
+      "sha256": "a822f1db51c9f0dc1db6a3d9669e365c32ce694754844c1e9cf565266896c63f"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJTYQP69K7EYT22ZY6H",
+      "revision": 1,
+      "sha256": "a0b80b1b1c71bbe6e5cdd3be9b151147bbd4c4744f0513b15a6b394b00cb2a9e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJV74W2Z7GFXXQ4ZDM7",
+      "revision": 1,
+      "sha256": "b8ef7cb760a4a4b8fbd5b522a07664bb50365fbebd4d284ad6acd92476fd3359"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJVS2YDJXYJ6DBXA55N",
+      "revision": 1,
+      "sha256": "ad7fb047cff6f48ea7205afff5722b5fc7097165a2f7d73c0cf21ccaf4e5e877"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJWA2P8NDPB417XXMYG",
+      "revision": 1,
+      "sha256": "0537b8414635d088582d77175bdb52b1cc740a94103f818b6069321fd61b41a7"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJWPV4RV67E5CWZN09C",
+      "revision": 1,
+      "sha256": "e4c97911293186daf1120fd12e1e7b4102d68b336ec2a0207974f81d20f77ec7"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJX671BP7TKB7D9VKFG",
+      "revision": 1,
+      "sha256": "43d1f9a5ad17e1ed951126f2fe9071b9d3e239e9614dd6e370c9d7e27dfcf756"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJXHMKB3GKBKP31KS0R",
+      "revision": 1,
+      "sha256": "970d45b5454580521104214f4d212dd1a51d2c4f7aa90b2986fbf101f811830f"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJYCNSTMQRA4H7E0KTY",
+      "revision": 1,
+      "sha256": "65e313267663ad1d3083e8c21854875c7160eed40a94491c092af9d3c593c1bd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJZJZGJNQKKH53XZ1BH",
+      "revision": 1,
+      "sha256": "ea79561c0d4f90ee325759a1c5848965b95cb4d46afdbb7f1ea7f2253260393e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AJZP4FPZZKZ3MMW57BK",
+      "revision": 1,
+      "sha256": "de6019ebd3051f44b4293ec1d1d16dae88bb563af291c202bb01944ad6cd9cb0"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK0094FTMCF0CZPCYN2",
+      "revision": 1,
+      "sha256": "83deffcedb9540bed185cce5e118042ba288193a558a7853c56ffbc11ff6705d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK0JXCPG15RVMZFP5PT",
+      "revision": 1,
+      "sha256": "17635c577683b3d397efb28ca97978bf60634deb104873b45d47a225aba1ab41"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK1H9SWGH3SKX1Z1JSA",
+      "revision": 1,
+      "sha256": "3b85397b70483417041af8575a8ef70896d63944d1cc4ae20e95637b5963102a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK1PDG7YYRVW62VT3WP",
+      "revision": 1,
+      "sha256": "b1418cb5760be27c74099b2ad9474f1905b1b595d8348ead9fa4fc37b572bb36"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK27H3P1F6FH3TA71FP",
+      "revision": 1,
+      "sha256": "038617443c2675c5097491042f9f28a365cb69041008117f60d6a7cfea3f3c52"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK2XYD3ZA94W7K1VTC8",
+      "revision": 1,
+      "sha256": "d5e7d47f37ed418d7247d78d259c7e9236a6670ce680b05f7c653a7493e4bcd2"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK3KP4ESQZ9CDV283NA",
+      "revision": 1,
+      "sha256": "7c01ef98752c198f649d5d1a93faa049291ec682a67f5c583c753a389b53c74a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK3KRKA3K9VSM2DX1AC",
+      "revision": 1,
+      "sha256": "61778634bbb0da9a01184fcc8df1d1577de97df47e1ca1511b03499270b8026c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK4AEBP73CRE4PW3Q84",
+      "revision": 1,
+      "sha256": "3cbf9bb3b767f7497b1efe61110aa15e8e70aacb55ec0f16cb59dfc55f1e1646"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK5PCY6XZ9FGAA3DHNH",
+      "revision": 1,
+      "sha256": "c8b9a6c9b372574f3390d3ac33ac19909b058283a0169c2bfd78d49fd302d9a5"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK5ZKP1518N6AEPB91D",
+      "revision": 1,
+      "sha256": "b76956bc69ca88bad5e2108d7c43299b9e4e2fbbd6a7914441938e6d5916ddaa"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK649BF6847DM3RY8W1",
+      "revision": 1,
+      "sha256": "03f4784c53af7e8b1731aa45f0a82eecef59844924aad19737cc55cc80beb0f5"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK6QJ6MW5Q2WN1C1B2K",
+      "revision": 1,
+      "sha256": "41a415266cb4fb2dca98e5ed33d0e005220b0bc23a04759349a839939025150e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK7J6DHBS3YH2YH2E9F",
+      "revision": 1,
+      "sha256": "754ee1d94af22b0d43d5eb9cbe1e8dac0317b049ac2634896c568ef88f3e3a2c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK7MVHK0HP1CVF49XGH",
+      "revision": 1,
+      "sha256": "8e25efff190ab6a7f3cd4c728e72cd5419add6baf1667f623388cfc5e9c89342"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK8FHD6QM01MA33YC91",
+      "revision": 1,
+      "sha256": "c2f304372dc3a29f5ee5a2f11c2ae3bcb5bb9d0704e5f13bc820062986f9d56d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK8S0X910QZS6GYET9E",
+      "revision": 1,
+      "sha256": "61ef080d70167dcb239a8c65d0a929af38897fad8324e70ad3f3741b337f3fa3"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AK9HA74RTYKB0ER2KEV",
+      "revision": 1,
+      "sha256": "efa27f0ea0e65e2136930817dce22dd4a488bdfb23ee94d165a06053f98cf4e0"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKA1H5DE1YM8JF5WYJ1",
+      "revision": 1,
+      "sha256": "233c98201e5c43337d8d3cc08b41d6e46b0c5e069f1892ec4fdc5d38d710f533"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKAYTYG2DKZZE9ZQ0VV",
+      "revision": 1,
+      "sha256": "a0a0b5cf0bb029e068939546003410af8b52960f724b1567f0a261fdd94fdcdd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKBFJSZ8ZB1K1NRZJRA",
+      "revision": 1,
+      "sha256": "c7520186443319ad89bdc61dd499d6d828a630c243bc5662c2116ce1aa2c2241"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKBGGW4878HSN00EE1W",
+      "revision": 1,
+      "sha256": "2e9d0ed9d7be438727c21b1779198607f7dd47415c6f124b0ddc866cb2e09d50"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKCW0QSXK142NZXK2SJ",
+      "revision": 1,
+      "sha256": "dd3062a02a058fc4847c830e0799b022da410915f2599fb13ad508b49f27788e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKD8ER2T6SAHEG7ANKK",
+      "revision": 1,
+      "sha256": "9a31fd10d58161c221f321539c3d77799206ad82fa6036620c021a68fa93b751"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKDBTKY2GP00HD2ZK00",
+      "revision": 1,
+      "sha256": "d6755e04763474de592208e5cb303d1322acd40ae8c37727663d1e802bbce0ba"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKE3MJR16A8W21HZTTV",
+      "revision": 1,
+      "sha256": "96fbf46de3743efe2af0151c6ea7866c1009eb51f2891abe36c3153ec24bee99"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKEESWB005HS1K8T8S6",
+      "revision": 1,
+      "sha256": "8f567b001b199c908498da719149cbf7fef68bef0921a37ad23bbb1de5c7f0a3"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKFXJMJTHBDTQ54ZQCQ",
+      "revision": 1,
+      "sha256": "e6a724932943511b1ab14f263a4af8e71247b46c636996a80d054db398ad60b2"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKG4BFKJDW5MQV0K5CZ",
+      "revision": 1,
+      "sha256": "12e81fe6a1715227b2350ef483b298a3ffd753b52f572f382dacae6d736b11bd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKGEHW016W4SW5Q3PKE",
+      "revision": 1,
+      "sha256": "19ba158b1043962cecf91500dfaf718fbed672c05b9e8e9bc51e2c0ca592bba3"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKHFG58EH9K639RX2CJ",
+      "revision": 1,
+      "sha256": "ad4983f877867cd2436b9536d72519690cc04ed0e628d4dac6ab1f7e06e40929"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKHMPCKDE796FBT0056",
+      "revision": 1,
+      "sha256": "c9fd9014834bdb514dbb0b56a70f905222f14d11481e4aca465653bddf37f0f6"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKJ6WMZPQK63N7YAGMG",
+      "revision": 1,
+      "sha256": "9390a974f1ee77bf5d9b8369bba54b77f7ead0f87ff2fe814408e968e5341755"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKJZVDY2DQFGX65NNNE",
+      "revision": 1,
+      "sha256": "f721ba8cd7303127b837cc90d29af0ad3fd519324ec8aadb7392de6ca509c3f9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKKCV9NZ5J4TDS9EXW1",
+      "revision": 1,
+      "sha256": "0c08cdc373e4f8e4ba7791c73a241d4575b9458f457f1ae5b5a02ddbb7d0de75"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKM9YJRC2F4DAG44JAZ",
+      "revision": 1,
+      "sha256": "f4111deead7dda82ffed295d50a5ad7180b03e11824a153f27508e6405fee7ab"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKMGVV9KG7M9E3RK5EP",
+      "revision": 1,
+      "sha256": "80d5b8e1d0c4f6796a5270211f211d371939aa32ca3c42c4dd9b4ceba7c4fcd9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKNEKCEAZ9BWHFNQYE9",
+      "revision": 1,
+      "sha256": "09b92a39689c20f23be7ab85ca6d4d882253b6cddb5d867ec095836bcd6ee690"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKNXMAVNXYAAFVJ3J1W",
+      "revision": 1,
+      "sha256": "07377466cdafef27ce959bc102a94c6058c400dfe0950cee8f826551e6dcef23"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKP6BPR2B3DMA9PW29M",
+      "revision": 1,
+      "sha256": "198c5e9eae1febc39a6a1cc64ffe880a7fc09766a859e63d33da617432582224"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKP8ZAK89MM3QH50RG6",
+      "revision": 1,
+      "sha256": "63e2905b05a0655e6cf525bce5bff6c68603fbfa7d1b6e9aeb22ff1942dc3397"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKQJNZFHRYCYWPWT6M9",
+      "revision": 1,
+      "sha256": "9eea95a1707e21d4e6fa257681404e332c3e64e9a770321e0ba8143aef3b5e6c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKQS7NKH2B6TGABYJ5P",
+      "revision": 1,
+      "sha256": "a2963d4eb8aaca88f4b7c5278d3e33baf5e5a76b2124236f577be031fe060044"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKRA10RSHNKRFYAKHVV",
+      "revision": 1,
+      "sha256": "3f2ec91f44a899e540bcd117f06cf6e0d3ae90df68b2d042fee2539f7f493f5f"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKRC75HRCMVNY0HK1HK",
+      "revision": 1,
+      "sha256": "333076c230dfa1cc15402a33fbd407f587d8508f16f44db05999c4a002978f94"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59F5AKS98EEFQ31BQX2MMA2",
+      "revision": 1,
+      "sha256": "fde2afaa5559e4d8d5e0f0ed0af4b97c749ab14999f484e9b3a60ecab7219988"
+    }
+  ],
+  "pack_review_status": "DRAFT",
+  "policy_status": "DRAFT",
+  "by_check": [
+    {
+      "check_id": "SUP-01",
+      "purpose": "생성·변경·승인 권한",
+      "area": "SUP",
+      "question": "제출·저장소 쓰기 권한만으로 승인 기록을 바꿀 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKHFG58EH9K639RX2CJ",
+          "revision": 1,
+          "sha256": "ad4983f877867cd2436b9536d72519690cc04ed0e628d4dac6ab1f7e06e40929"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-02",
+      "purpose": "생성·변경·승인 권한",
+      "area": "SUP",
+      "question": "배포 권한이 허용된 모델과 대상 환경에 한정되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKHMPCKDE796FBT0056",
+          "revision": 1,
+          "sha256": "c9fd9014834bdb514dbb0b56a70f905222f14d11481e4aca465653bddf37f0f6"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-03",
+      "purpose": "승인 범위",
+      "area": "SUP",
+      "question": "실제 소비하는 하위 모델 자료가 승인 목록에 포함되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKJ6WMZPQK63N7YAGMG",
+          "revision": 1,
+          "sha256": "9390a974f1ee77bf5d9b8369bba54b77f7ead0f87ff2fe814408e968e5341755"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-04",
+      "purpose": "승인 범위",
+      "area": "SUP",
+      "question": "실제 실행 이미지·패키지·의존성이 승인 목록에 포함되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKJZVDY2DQFGX65NNNE",
+          "revision": 1,
+          "sha256": "f721ba8cd7303127b837cc90d29af0ad3fd519324ec8aadb7392de6ca509c3f9"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-05",
+      "purpose": "실제 사용의 일치·무결성",
+      "area": "SUP",
+      "question": "승인 뒤 파일·symlink·마운트가 교체되어도 비승인 사용을 막는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKKCV9NZ5J4TDS9EXW1",
+          "revision": 1,
+          "sha256": "0c08cdc373e4f8e4ba7791c73a241d4575b9458f457f1ae5b5a02ddbb7d0de75"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-06",
+      "purpose": "실제 사용의 일치·무결성",
+      "area": "SUP",
+      "question": "각 worker가 자신에게 배정된 승인 모델 부분을 실제 적재하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKMGVV9KG7M9E3RK5EP",
+          "revision": 1,
+          "sha256": "80d5b8e1d0c4f6796a5270211f211d371939aa32ca3c42c4dd9b4ceba7c4fcd9"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-07",
+      "purpose": "실제 사용의 일치·무결성",
+      "area": "SUP",
+      "question": "생성 결과나 공유 컴파일 캐시의 무단 교체를 막는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKM9YJRC2F4DAG44JAZ",
+          "revision": 1,
+          "sha256": "f4111deead7dda82ffed295d50a5ad7180b03e11824a153f27508e6405fee7ab"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-08",
+      "purpose": "코드 실행 제한",
+      "area": "SUP",
+      "question": "요청 입력으로 허용 밖 코드 판본을 선택할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKNEKCEAZ9BWHFNQYE9",
+          "revision": 1,
+          "sha256": "09b92a39689c20f23be7ab85ca6d4d882253b6cddb5d867ec095836bcd6ee690"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-09",
+      "purpose": "코드 실행 제한",
+      "area": "SUP",
+      "question": "모델의 추가 코드는 허용 조건에서만 실행되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKNXMAVNXYAAFVJ3J1W",
+          "revision": 1,
+          "sha256": "07377466cdafef27ce959bc102a94c6058c400dfe0950cee8f826551e6dcef23"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-10",
+      "purpose": "코드 실행 제한",
+      "area": "SUP",
+      "question": "플러그인 허용 제한이 실제 실행 전에 적용되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKP6BPR2B3DMA9PW29M",
+          "revision": 1,
+          "sha256": "198c5e9eae1febc39a6a1cc64ffe880a7fc09766a859e63d33da617432582224"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-11",
+      "purpose": "코드 실행 제한",
+      "area": "SUP",
+      "question": "지원 실행 모드에서도 동적 import 제한이 유지되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKP8ZAK89MM3QH50RG6",
+          "revision": 1,
+          "sha256": "63e2905b05a0655e6cf525bce5bff6c68603fbfa7d1b6e9aeb22ff1942dc3397"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-12",
+      "purpose": "자료 해석 안전성",
+      "area": "SUP",
+      "question": "선정 reader가 허용하지 않은 객체·동작을 거부하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKQS7NKH2B6TGABYJ5P",
+          "revision": 1,
+          "sha256": "a2963d4eb8aaca88f4b7c5278d3e33baf5e5a76b2124236f577be031fe060044"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-13",
+      "purpose": "자료 해석 안전성",
+      "area": "SUP",
+      "question": "공급 template의 해석 동작이 허용 범위 안에 있는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKQJNZFHRYCYWPWT6M9",
+          "revision": 1,
+          "sha256": "9eea95a1707e21d4e6fa257681404e332c3e64e9a770321e0ba8143aef3b5e6c"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-14",
+      "purpose": "검사 결과 반영",
+      "area": "SUP",
+      "question": "검사 실패·오류·미지원·생략을 통과로 처리하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKRC75HRCMVNY0HK1HK",
+          "revision": 1,
+          "sha256": "333076c230dfa1cc15402a33fbd407f587d8508f16f44db05999c4a002978f94"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-15",
+      "purpose": "재사용 적합성",
+      "area": "SUP",
+      "question": "모델·도구·설정 변경 후 부적합한 파생 결과를 재사용하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKRA10RSHNKRFYAKHVV",
+          "revision": 1,
+          "sha256": "3f2ec91f44a899e540bcd117f06cf6e0d3ae90df68b2d042fee2539f7f493f5f"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-16",
+      "purpose": "재사용 적합성",
+      "area": "SUP",
+      "question": "중단·실패한 생성 결과나 부분 파일을 완료된 결과로 사용하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKS98EEFQ31BQX2MMA2",
+          "revision": 1,
+          "sha256": "fde2afaa5559e4d8d5e0f0ed0af4b97c749ab14999f484e9b3a60ecab7219988"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-01",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "Gateway를 우회한 직통 요청으로 비허용 작업을 수행할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK5PCY6XZ9FGAA3DHNH",
+          "revision": 1,
+          "sha256": "c8b9a6c9b372574f3390d3ac33ac19909b058283a0169c2bfd78d49fd302d9a5"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": "EXAMPLE"
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-02",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "인증이 검사한 경로와 실제 실행 handler의 권한 요구가 일치하는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK5ZKP1518N6AEPB91D",
+          "revision": 1,
+          "sha256": "b76956bc69ca88bad5e2108d7c43299b9e4e2fbbd6a7914441938e6d5916ddaa"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-03",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK6QJ6MW5Q2WN1C1B2K",
+          "revision": 1,
+          "sha256": "41a415266cb4fb2dca98e5ed33d0e005220b0bc23a04759349a839939025150e"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-04",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "외부 입력이 인가에 쓰는 신원을 사칭하지 못하는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK649BF6847DM3RY8W1",
+          "revision": 1,
+          "sha256": "03f4784c53af7e8b1731aa45f0a82eecef59844924aad19737cc55cc80beb0f5"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-05",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "호출자의 모델 사용권이 최종 선택 대상에도 적용되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK7J6DHBS3YH2YH2E9F",
+          "revision": 1,
+          "sha256": "754ee1d94af22b0d43d5eb9cbe1e8dac0317b049ac2634896c568ef88f3e3a2c"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-06",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "저장 결과의 조회·취소 권한을 객체별로 확인하는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK7MVHK0HP1CVF49XGH",
+          "revision": 1,
+          "sha256": "8e25efff190ab6a7f3cd4c728e72cd5419add6baf1667f623388cfc5e9c89342"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-07",
+      "purpose": "실제 입력의 검사",
+      "area": "REQ",
+      "question": "template 적용 뒤 입력에도 필요한 제한이 유지되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK8FHD6QM01MA33YC91",
+          "revision": 1,
+          "sha256": "c2f304372dc3a29f5ee5a2f11c2ae3bcb5bb9d0704e5f13bc820062986f9d56d"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-08",
+      "purpose": "실제 입력의 검사",
+      "area": "REQ",
+      "question": "재사용 token ID 입력도 필요한 검사를 거치는가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK8S0X910QZS6GYET9E",
+          "revision": 1,
+          "sha256": "61ef080d70167dcb239a8c65d0a929af38897fad8324e70ad3f3741b337f3fa3"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-09",
+      "purpose": "실제 입력의 검사",
+      "area": "REQ",
+      "question": "token ID와 입력 길이가 실제 모델·소비자의 유효 범위를 지키는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK9HA74RTYKB0ER2KEV",
+          "revision": 1,
+          "sha256": "efa27f0ea0e65e2136930817dce22dd4a488bdfb23ee94d165a06053f98cf4e0"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-10",
+      "purpose": "실제 입력의 검사",
+      "area": "REQ",
+      "question": "sampling 값과 옵션 조합이 실제 실행 조건을 만족하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKAYTYG2DKZZE9ZQ0VV",
+          "revision": 1,
+          "sha256": "a0a0b5cf0bb029e068939546003410af8b52960f724b1567f0a261fdd94fdcdd"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-11",
+      "purpose": "요청·상태·결과 귀속",
+      "area": "REQ",
+      "question": "동시 요청과 스트리밍 결과가 올바른 원 요청으로 반환되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKA1H5DE1YM8JF5WYJ1",
+          "revision": 1,
+          "sha256": "233c98201e5c43337d8d3cc08b41d6e46b0c5e069f1892ec4fdc5d38d710f533"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-12",
+      "purpose": "요청·상태·결과 귀속",
+      "area": "REQ",
+      "question": "취소·연결 종료 뒤 늦은 결과가 다른 요청이나 새 시도에 섞이지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKBGGW4878HSN00EE1W",
+          "revision": 1,
+          "sha256": "2e9d0ed9d7be438727c21b1779198607f7dd47415c6f124b0ddc866cb2e09d50"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-13",
+      "purpose": "요청·상태·결과 귀속",
+      "area": "REQ",
+      "question": "응답 옵션과 오류가 독자에게 허용한 정보만 반환하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKBFJSZ8ZB1K1NRZJRA",
+          "revision": 1,
+          "sha256": "c7520186443319ad89bdc61dd499d6d828a630c243bc5662c2116ce1aa2c2241"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-14",
+      "purpose": "요청·상태·결과 귀속",
+      "area": "REQ",
+      "question": "분산 처리의 중간 자료와 최종 출력이 원 요청에 연결되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKCW0QSXK142NZXK2SJ",
+          "revision": 1,
+          "sha256": "dd3062a02a058fc4847c830e0799b022da410915f2599fb13ad508b49f27788e"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-15",
+      "purpose": "공유 제한",
+      "area": "REQ",
+      "question": "cache 공유 집단을 신뢰할 신원에서 결정하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKD8ER2T6SAHEG7ANKK",
+          "revision": 1,
+          "sha256": "9a31fd10d58161c221f321539c3d77799206ad82fa6036620c021a68fa93b751"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-16",
+      "purpose": "공유 제한",
+      "area": "REQ",
+      "question": "cache key가 실제 재사용에 필요한 문맥을 구분하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKDBTKY2GP00HD2ZK00",
+          "revision": 1,
+          "sha256": "d6755e04763474de592208e5cb303d1322acd40ae8c37727663d1e802bbce0ba"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-17",
+      "purpose": "공유 제한",
+      "area": "REQ",
+      "question": "cache 시간 차로 비공개 정보가 허용 범위를 넘어 드러나지 않는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKEESWB005HS1K8T8S6",
+          "revision": 1,
+          "sha256": "8f567b001b199c908498da719149cbf7fef68bef0921a37ad23bbb1de5c7f0a3"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-18",
+      "purpose": "실행 상태·메모리 안전",
+      "area": "REQ",
+      "question": "배치 자리 이동·재사용 시 이전 요청의 제한 상태가 남지 않는가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKE3MJR16A8W21HZTTV",
+          "revision": 1,
+          "sha256": "96fbf46de3743efe2af0151c6ea7866c1009eb51f2891abe36c3153ec24bee99"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-19",
+      "purpose": "실행 상태·메모리 안전",
+      "area": "REQ",
+      "question": "선정 kernel의 접근 범위와 초기화가 유효 입력·buffer 범위를 지키는가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKFXJMJTHBDTQ54ZQCQ",
+          "revision": 1,
+          "sha256": "e6a724932943511b1ab14f263a4af8e71247b46c636996a80d054db398ad60b2"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-20",
+      "purpose": "실행 상태·메모리 안전",
+      "area": "REQ",
+      "question": "CUDA Graph 재실행에서 현재 입력을 사용하고 출력 소비 전에 buffer를 잘못 덮어쓰지 않는가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKGEHW016W4SW5Q3PKE",
+          "revision": 1,
+          "sha256": "19ba158b1043962cecf91500dfaf718fbed672c05b9e8e9bc51e2c0ca592bba3"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-21",
+      "purpose": "실행 상태·메모리 안전",
+      "area": "REQ",
+      "question": "TP graph 통신 buffer의 참조가 등록·종료·재기동 과정에서 유효한가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AKG4BFKJDW5MQV0K5CZ",
+          "revision": 1,
+          "sha256": "12e81fe6a1715227b2350ef483b298a3ffd753b52f572f382dacae6d736b11bd"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-01",
+      "purpose": "실행 권한 제한",
+      "area": "PLT",
+      "question": "엔진·worker가 불필요한 호스트·파일·장치 권한을 갖지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJYCNSTMQRA4H7E0KTY",
+          "revision": 1,
+          "sha256": "65e313267663ad1d3083e8c21854875c7160eed40a94491c092af9d3c593c1bd"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-02",
+      "purpose": "실행 권한 제한",
+      "area": "PLT",
+      "question": "로컬 IPC 접점에 허용한 프로세스만 접근하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJZP4FPZZKZ3MMW57BK",
+          "revision": 1,
+          "sha256": "de6019ebd3051f44b4293ec1d1d16dae88bb563af291c202bb01944ad6cd9cb0"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-03",
+      "purpose": "자격 전달·사용 제한",
+      "area": "PLT",
+      "question": "취득 주체의 자격이 허용 저장소·객체에 한정되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJZJZGJNQKKH53XZ1BH",
+          "revision": 1,
+          "sha256": "ea79561c0d4f90ee325759a1c5848965b95cb4d46afdbb7f1ea7f2253260393e"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-04",
+      "purpose": "자격 전달·사용 제한",
+      "area": "PLT",
+      "question": "worker에 불필요한 자격이 전달되지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK0JXCPG15RVMZFP5PT",
+          "revision": 1,
+          "sha256": "17635c577683b3d397efb28ca97978bf60634deb104873b45d47a225aba1ab41"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-05",
+      "purpose": "자격 전달·사용 제한",
+      "area": "PLT",
+      "question": "자격 만료·누락 시 비승인 대체 접근으로 이어지지 않는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK0094FTMCF0CZPCYN2",
+          "revision": 1,
+          "sha256": "83deffcedb9540bed185cce5e118042ba288193a558a7853c56ffbc11ff6705d"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-06",
+      "purpose": "통신·내부 호출 제한",
+      "area": "PLT",
+      "question": "core·worker가 공유하는 실제 신뢰 범위와 외부 접근 제한을 확인했는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK1PDG7YYRVW62VT3WP",
+          "revision": 1,
+          "sha256": "b1418cb5760be27c74099b2ad9474f1905b1b595d8348ead9fa4fc37b572bb36"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-07",
+      "purpose": "통신·내부 호출 제한",
+      "area": "PLT",
+      "question": "외부 송신이 허용 목적지와 작업에 한정되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK1H9SWGH3SKX1Z1JSA",
+          "revision": 1,
+          "sha256": "3b85397b70483417041af8575a8ef70896d63944d1cc4ae20e95637b5963102a"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-08",
+      "purpose": "상대 확인·전송 보호",
+      "area": "PLT",
+      "question": "각 내부 통신 구간이 정한 상대 확인·기밀성·무결성을 충족하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK27H3P1F6FH3TA71FP",
+          "revision": 1,
+          "sha256": "038617443c2675c5097491042f9f28a365cb69041008117f60d6a7cfea3f3c52"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-09",
+      "purpose": "상대 확인·전송 보호",
+      "area": "PLT",
+      "question": "엔진부터 collector와 최종 sink까지 필요한 전송 보호가 이어지는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK2XYD3ZA94W7K1VTC8",
+          "revision": 1,
+          "sha256": "d5e7d47f37ed418d7247d78d259c7e9236a6670ce680b05f7c653a7493e4bcd2"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-10",
+      "purpose": "권한·자격 철회",
+      "area": "PLT",
+      "question": "철회 이후 신규 접근이 정한 기한 안에 거부되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK3KP4ESQZ9CDV283NA",
+          "revision": 1,
+          "sha256": "7c01ef98752c198f649d5d1a93faa049291ec682a67f5c583c753a389b53c74a"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-11",
+      "purpose": "권한·자격 철회",
+      "area": "PLT",
+      "question": "기존 session·handle의 접근도 철회 정책에 맞게 제한되는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK3KRKA3K9VSM2DX1AC",
+          "revision": 1,
+          "sha256": "61778634bbb0da9a01184fcc8df1d1577de97df47e1ca1511b03499270b8026c"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-12",
+      "purpose": "권한·자격 철회",
+      "area": "PLT",
+      "question": "폐기된 자격 사본을 재사용할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AK4AEBP73CRE4PW3Q84",
+          "revision": 1,
+          "sha256": "3cbf9bb3b767f7497b1efe61110aa15e8e70aacb55ec0f16cb59dfc55f1e1646"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-01",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "모델 취득·해석·변환·로딩 비용이 단계별·누적 예산을 지키는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJFCSSQJDT77Q6WHTMA",
+          "revision": 1,
+          "sha256": "caaf2103f68c23289ca7312b5920c34c9f464f6e87d79f4038649849badf20f1"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-02",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "실패한 취득의 반복·재시도가 비용을 무한 누적하지 않는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJFS5DQF8AV44X21AZ9",
+          "revision": 1,
+          "sha256": "d09998313439c62829b52da664915414bbdd08ccccbc1051cd63f27bad124d75"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-03",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "요청 비용과 동시 부하를 제한하며 정상 요청의 처리 기회를 유지하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJG08QFWKV690C9KKXC",
+          "revision": 1,
+          "sha256": "0334d61e731bb6463bc370827e35d37c7b07e06223d07a227e6dded701be6de8"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-04",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "느린 수신자와 진단 buffering이 자원을 과도하게 점유하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJHVWZN7WS97SJJCCB0",
+          "revision": 1,
+          "sha256": "74274f324284f511d1074df4622f0cd8ad7785623d6be5d28129ef16b817aa18"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-05",
+      "purpose": "변경 중 일관성",
+      "area": "LIF",
+      "question": "재배포 중 이전 요청과 새 모델·설정이 잘못 섞이지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJHXPEYHDHFRK11GJ58",
+          "revision": 1,
+          "sha256": "49f2773b8614971f9f1a9a1cbf6fa652b19b295b4023fe4a0bc8f2a840071392"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-06",
+      "purpose": "변경 중 일관성",
+      "area": "LIF",
+      "question": "live 변경이나 rolling 중에도 요청의 모델·상태 일관성을 지키는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJJ6VG4VD0MJDBH28D4",
+          "revision": 1,
+          "sha256": "ad208bdb7787859e30e581fe9cf9ab6cacface7d41c185d4fce423a3fa0e1186"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-07",
+      "purpose": "시작·재개 조건",
+      "area": "LIF",
+      "question": "필요한 worker와 실행 준비를 확인한 뒤 요청을 받는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJJMQ942APFE0G2PPGW",
+          "revision": 1,
+          "sha256": "985d4db7ad90e035b5adfc91a16d999cf242980dc7f5b3886df5db9bc19e8971"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-08",
+      "purpose": "실패 감지·전파",
+      "area": "LIF",
+      "question": "rank의 예외·사망·지연·통신 정지를 각각 감지하고 전달하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJKB6QB83FH4TSZT2WM",
+          "revision": 1,
+          "sha256": "526f0471684dc78feda4176193cd691f7a00642d2749de9a8ee2f35acc20428b"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-09",
+      "purpose": "실패 감지·전파",
+      "area": "LIF",
+      "question": "초기화·모델 준비의 부분 실패가 성공으로 처리되지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJKX747PXSJTC5T225R",
+          "revision": 1,
+          "sha256": "bd4b30ebbebc7e82bfc7ad0a5669c045223c0ab24dc3220281bda68140d9bd6c"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-10",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "취소·연결 종료 뒤 실제 작업과 참조가 정한 기한에 종료되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJM8D9TMZEK8TCGJQ6C",
+          "revision": 1,
+          "sha256": "e171fbceec5b3cf935d96ce6a9d01eced1d99d0f78eeeabc0de127b92e7d3622"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-11",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "실패한 worker·통신·분산 자원이 회수되고 다음 기동이 가능한가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJMX95W316TH2ZSXWJR",
+          "revision": 1,
+          "sha256": "acb03d46724d9d6c17e336acbff780aea799239f14f2e305e9b1b7a2d99a7a05"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-12",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "재시도 전후 이전 작업의 잔존과 중복 비용이 통제되는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJNK0DMTKDTVZM5W8N5",
+          "revision": 1,
+          "sha256": "6d9b4acaf8a70bd9b639298fc177af62aa91cc7066d76f6924c7140f35a2b6e9"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-13",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "daemon 전체 release 이후 다른 소비자의 다음 취득·fallback과 기존 참조가 허용한 상태를 지키는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJN6D6VTFRQ1QZT5RMX",
+          "revision": 1,
+          "sha256": "bfe269bfc149362c06a0a04236a6d1dcb6d2a1717da15e0d944b6710bd749088"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-14",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "profiler 종료가 실제 수집·자원 종료와 맞는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJPNZJCDCFN9SDH6BNN",
+          "revision": 1,
+          "sha256": "abc325a56d3a1b7eda6eb886a97e15c8b8582d21ed4ab14938565bc6875ede9d"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-15",
+      "purpose": "복구 상태의 적합성",
+      "area": "LIF",
+      "question": "rollback 대상이 현재 승인 기준을 만족하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJPXAPQDMR5BD8VDV24",
+          "revision": 1,
+          "sha256": "3b439a1770a729a24965a63663ab4a4f0fee1d6dec27104a5102492a573137df"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-16",
+      "purpose": "복구 상태의 적합성",
+      "area": "LIF",
+      "question": "복원 자료의 변조와 잔존 상태가 복구 결과에 섞이지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJQM0FQCCZYZ97WYPX9",
+          "revision": 1,
+          "sha256": "360b82b58c619e2f44f1a8fdafa2df170dc8168c1d6102e585be1156e209c3f7"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-01",
+      "purpose": "필요한 사건의 기록",
+      "area": "OBS",
+      "question": "필수 접근·관리·승인 사건을 주체·대상·실행과 연결할 수 있는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJQV6BE1T1J3X36SX5R",
+          "revision": 1,
+          "sha256": "3df912d60c9ae579b1be995c011166632bdd44e7f1a6d83ad0e5b546f5ef1eff"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-02",
+      "purpose": "필요한 사건의 기록",
+      "area": "OBS",
+      "question": "준비·실패·종료 기록이 실제 상태를 올바르게 나타내는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJRF4W24JHRXZ2JFZNZ",
+          "revision": 1,
+          "sha256": "58612b386b4b02048954119f34799e46913ea8b2f937553868f1b30d6752aedd"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-03",
+      "purpose": "수집 정보 제한",
+      "area": "OBS",
+      "question": "로그·debug·trace·덤프가 허용한 정보만 수집하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJSJFRR24CGP6DTCHQG",
+          "revision": 1,
+          "sha256": "652cdcdf8726daf99afffc6bf4dbfe6f7cfbcd92789559057040dc1e8f5338ca"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-04",
+      "purpose": "수집 정보 제한",
+      "area": "OBS",
+      "question": "금지한 usage 보고가 실제로 비활성 상태를 유지하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJSVK3BEZCP98BGA5KY",
+          "revision": 1,
+          "sha256": "5f51a754f02dfa53bb61ece049cf95e8bed0d0dd6e0e5a7007d9749c0d486eb4"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-05",
+      "purpose": "수집 정보 제한",
+      "area": "OBS",
+      "question": "허용한 usage 보고가 필드·목적지 범위를 지키는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJTGFRPFCBAEEJ0EJ97",
+          "revision": 1,
+          "sha256": "a822f1db51c9f0dc1db6a3d9669e365c32ce694754844c1e9cf565266896c63f"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-06",
+      "purpose": "자료 이용 권한",
+      "area": "OBS",
+      "question": "기록과 진단 사본을 허용된 독자만 조회·반출하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJTYQP69K7EYT22ZY6H",
+          "revision": 1,
+          "sha256": "a0b80b1b1c71bbe6e5cdd3be9b151147bbd4c4744f0513b15a6b394b00cb2a9e"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-07",
+      "purpose": "자료 이용 권한",
+      "area": "OBS",
+      "question": "진단 자료 읽기권만으로 재실행할 수 없는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJV74W2Z7GFXXQ4ZDM7",
+          "revision": 1,
+          "sha256": "b8ef7cb760a4a4b8fbd5b522a07664bb50365fbebd4d284ad6acd92476fd3359"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-08",
+      "purpose": "자료 이용 권한",
+      "area": "OBS",
+      "question": "재실행이 변조한 진단 자료를 비허용 방식으로 소비하지 않는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJVS2YDJXYJ6DBXA55N",
+          "revision": 1,
+          "sha256": "ad7fb047cff6f48ea7205afff5722b5fc7097165a2f7d73c0cf21ccaf4e5e877"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-09",
+      "purpose": "증거의 신뢰성",
+      "area": "OBS",
+      "question": "요청 입력이 로그의 신원·대상·상태를 위조하지 못하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJWA2P8NDPB417XXMYG",
+          "revision": 1,
+          "sha256": "0537b8414635d088582d77175bdb52b1cc740a94103f818b6069321fd61b41a7"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-10",
+      "purpose": "증거의 신뢰성",
+      "area": "OBS",
+      "question": "기록의 무단 변경·삭제를 제한하고 확인할 수 있는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJWPV4RV67E5CWZN09C",
+          "revision": 1,
+          "sha256": "e4c97911293186daf1120fd12e1e7b4102d68b336ec2a0207974f81d20f77ec7"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-11",
+      "purpose": "증거의 신뢰성",
+      "area": "OBS",
+      "question": "수집 중단·누락·시간 불확실성을 정상 결과로 처리하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJX671BP7TKB7D9VKFG",
+          "revision": 1,
+          "sha256": "43d1f9a5ad17e1ed951126f2fe9071b9d3e239e9614dd6e370c9d7e27dfcf756"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-12",
+      "purpose": "보존·삭제 관리",
+      "area": "OBS",
+      "question": "로그·usage·진단의 원본과 사본이 보존·삭제 범위를 지키는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "tested_while_undetermined": true,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59F5AJXHMKB3GKBKP31KS0R",
+          "revision": 1,
+          "sha256": "970d45b5454580521104214f4d212dd1a51d2c4f7aa90b2986fbf101f811830f"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": null
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "exception": null
+    }
+  ],
+  "by_purpose": {
+    "검사 결과 반영": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "공유 제한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "권한·자격 철회": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "변경 중 일관성": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "보존·삭제 관리": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "복구 상태의 적합성": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "상대 확인·전송 보호": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "생성·변경·승인 권한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "수집 정보 제한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "승인 범위": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "시작·재개 조건": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "실제 사용의 일치·무결성": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "실제 입력의 검사": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "실패 감지·전파": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "실행 권한 제한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "실행 상태·메모리 안전": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "요청·대상 접근 권한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "요청·상태·결과 귀속": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "자격 전달·사용 제한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "자료 이용 권한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "자료 해석 안전성": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "자원 사용 제한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "재사용 적합성": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "종결·자원 회수": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "증거의 신뢰성": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "코드 실행 제한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "통신·내부 호출 제한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "필요한 사건의 기록": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    }
+  },
+  "by_area": {
+    "LIF": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "OBS": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "PLT": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "REQ": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    },
+    "SUP": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    }
+  },
+  "not_selected": [],
+  "manual_required": [
+    "SUP-01",
+    "SUP-02",
+    "SUP-03",
+    "SUP-04",
+    "SUP-05",
+    "SUP-06",
+    "SUP-07",
+    "SUP-08",
+    "SUP-09",
+    "SUP-10",
+    "SUP-11",
+    "SUP-12",
+    "SUP-13",
+    "SUP-14",
+    "SUP-15",
+    "SUP-16",
+    "REQ-02",
+    "REQ-03",
+    "REQ-04",
+    "REQ-05",
+    "REQ-06",
+    "REQ-07",
+    "REQ-08",
+    "REQ-09",
+    "REQ-10",
+    "REQ-11",
+    "REQ-12",
+    "REQ-13",
+    "REQ-14",
+    "REQ-15",
+    "REQ-16",
+    "REQ-17",
+    "REQ-18",
+    "REQ-19",
+    "REQ-20",
+    "REQ-21",
+    "PLT-01",
+    "PLT-02",
+    "PLT-03",
+    "PLT-04",
+    "PLT-05",
+    "PLT-06",
+    "PLT-07",
+    "PLT-08",
+    "PLT-09",
+    "PLT-10",
+    "PLT-11",
+    "PLT-12",
+    "LIF-01",
+    "LIF-02",
+    "LIF-03",
+    "LIF-04",
+    "LIF-05",
+    "LIF-06",
+    "LIF-07",
+    "LIF-08",
+    "LIF-09",
+    "LIF-10",
+    "LIF-11",
+    "LIF-12",
+    "LIF-13",
+    "LIF-14",
+    "LIF-15",
+    "LIF-16",
+    "OBS-01",
+    "OBS-02",
+    "OBS-03",
+    "OBS-04",
+    "OBS-05",
+    "OBS-06",
+    "OBS-07",
+    "OBS-08",
+    "OBS-09",
+    "OBS-10",
+    "OBS-11",
+    "OBS-12"
+  ],
+  "limitations": [
+    "검토 전 팩(DRAFT): 공식 아님",
+    "정책 DRAFT: 공식 아님",
+    "EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음",
+    "적용 미정 상태로 시험함: 76개 점검",
+    "자동 실행 불가(수동 시험 필요): 76개 점검",
+    "검증 수준 없음(근거 누락): 76개 점검",
+    "점검 목록 미완결 보호 목적: 28개 — 집계 PASS 불가"
+  ],
+  "approval": null
+}

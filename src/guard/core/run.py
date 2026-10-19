@@ -65,7 +65,7 @@ def _blocked_reason(item: PlanItem, cfg: RunConfig) -> str | None:
         return "NO_EXECUTOR: check has no automated executor (manual test required)"
     if item.executor not in cfg.executors:
         return f"executor {item.executor!r} not configured in guard.toml [executors]"
-    if cfg.executors[item.executor] not in registry.EXECUTORS:
+    if registry.resolve_executor(item.executor, cfg.executors[item.executor]) is None:
         return f"executor implementation {cfg.executors[item.executor]!r} not available"
     if Gap.NO_POLICY_VALUE in item.gaps:
         return "NO_POLICY_VALUE: required policy values missing"
@@ -138,7 +138,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
     started = utcnow()
     info_stub: ExecutorInfo | None = None
     try:
-        executor = registry.EXECUTORS[impl_name](cfg.raw)
+        executor = registry.resolve_executor(item.executor, impl_name)(cfg.raw)
         info_stub = ExecutorInfo(name=executor.name, version=executor.version, config_sha256=sha256_hex(b""))
         workdir = Path(store.root) / "work" / plan.id / check.id / str(common["side"])
         draft = executor.run(check, env, policy_values, adapter, workdir)

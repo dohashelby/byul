@@ -1,0 +1,50 @@
+id: REQ-07
+revision: 1
+retired: false
+area: REQ
+purpose: 실제 입력의 검사
+secondary_purposes: []
+question: template 적용 뒤 입력에도 필요한 제한이 유지되는가?
+scope: 기본+선택 기능
+risk_category: 보안 위협 점검
+risk_summary: 호출자나 template 공급자가 검사 뒤 입력을 바꿔 금지 입력을 모델에 전달하거나 처리 비용 제한을 피할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 기본 chat template 처리; 요청 template/kwargs 변경은 수용 시 추가
+policy_params: []
+policy_prose:
+  policy_to_decide: 허용 template·검사 위치·입력 제한
+  enterprise_decisions: 허용 endpoint·텍스트/직접 token 등 입력 형식, template override 필요성, 옵션·길이·출력 한도·정상 대조 입력. vocab·버퍼 범위·옵션 필수 관계 등 구현상 제약은 기업 정책으로 완화하지 않는다.
+normal_control: 정상 메시지는 승인 template 적용 후 허용 길이·내용 제한을 만족한다.
+challenge_steps:
+- 원 입력과 렌더 결과 기준선
+- 확장되는 무해 입력으로 제한 경계 확인
+- 검사 시점과 실제 tokenized 입력 비교
+required_observations: []
+required_observations_prose:
+- 원 입력·template
+- 렌더 출력·token 수
+- 제한 적용 위치
+satisfied_if: 실제 입력이 채택한 제한을 우회하지 않는다. 공급 template 출처·실행 제한은 공급물 점검을 함께 사용한다.
+fail_criteria: 검사 후 렌더링된 입력이 필요한 제한을 벗어나 소비된다.
+unknown_criteria: 렌더 후 입력·검사 위치 또는 허용 기준을 확인하지 못했다.
+remediation: 변환 후 입력에도 필요한 검사를 적용하고 요청이 바꿀 필드를 제한한다.
+method_and_evidence: 서버 지정·processor/tokenizer 기본값·내장 fallback 중 실제 선택된 template과 요청 override를 나눠 원 messages·변환 token·실제 검사·거부 위치를 대조한다.
+remaining_setup: 정한 입력 예산과 렌더 계측; template 코드 안전성은 공급물 항목 별도
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C04
+  - Q-C02
+  - Q-R05-05
+  - Q-C05
+  scenario_ids:
+  - SC-03-01
+  - SC-11-07
+  subtest_ids:
+  - Q-C04/SC-03-01
+  - Q-R05-05/SC-11-07
+source:
+  array: request_state_assessment_draft

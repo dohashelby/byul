@@ -223,15 +223,21 @@ class HttpCheckExecutor:
             wait_engine(target, self._container_probe, alive=None)
             return self._finish(make_ctx(self._container_probe))
         docker = Docker(f"x{secrets.token_hex(4)}")
+        draft = None
         try:
             cprobe = docker_container_probe(docker, target["probe_image"])
             container = target["engine"].get("container")
             alive = (lambda: docker.is_running(container, timeout=30)) if container else None
             wait_engine(target, cprobe, alive)
-            return self._finish(make_ctx(cprobe))
+            draft = self._finish(make_ctx(cprobe))
         finally:
-            if docker.cleanup(timeout=60):
-                raise RuntimeError("probe resource cleanup incomplete")
+            try:
+                incomplete = bool(docker.cleanup(timeout=60))
+            except Exception:
+                incomplete = True
+            if incomplete and draft is not None:
+                draft.cleanup_errors.append(f"probe cleanup incomplete: guard.run={docker.run_id}")
+        return draft
 
     def validate_policy(self, check: CheckDef, policy_values: dict) -> None:
         """시험 시작 전 정책 값과 실행기 설정의 일치 확인. 불일치면 예외(→ ABORTED). 기본은 확인 없음."""

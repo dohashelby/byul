@@ -20,13 +20,16 @@ from guard.models import Pack, Plan, load_pack, utcnow
 from guard.report.html import render_html
 from guard.store import Store
 from guard.store.packs import PackNotStoredError, get_pack, put_pack
-from guard.application import execute_update, run_config
+from guard.application import execute_update, run_config, update_readiness
+from guard.store.bundle import export_bundle, restore_bundle, DEFAULT_MAX_BYTES
 from guard.core.preflight import validate_pack
 from guard.models import new_id
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="서빙엔진 보안 검증")
 pack_app = typer.Typer(add_completion=False, no_args_is_help=True, help="팩 보존본")
 app.add_typer(pack_app, name="pack")
+evidence_app = typer.Typer(add_completion=False, no_args_is_help=True, help="검증된 증거 저장소 반출·복원")
+app.add_typer(evidence_app, name="evidence")
 
 ConfigOpt = typer.Option(Path("guard.toml"), "--config", help="플러그인 설정 파일")
 StoreOpt = typer.Option(None, "--store", help="저장소 경로 (기본: guard.toml의 store 또는 .guard)")
@@ -119,6 +122,9 @@ def run(
     for e in evds:
         if e.execution.status.value == "COMPLETED" or e.execution.status.value == "ABORTED":
             typer.echo(f"  {e.check_id} {e.id}@{e.revision} {e.execution.status.value} origin={e.data_origin.value}")
+    if any(e.execution.cleanup_errors for e in evds):
+        typer.echo("probe cleanup incomplete; inspect execution.cleanup_errors and labelled resources")
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -207,6 +213,49 @@ def pack_import(
         typer.echo(f"pack import failed: {exc}")
         raise typer.Exit(1)
     typer.echo(f"stored {ref.id} rev {ref.revision} sha256 {ref.sha256[:16]}… in {st.root}")
+
+
+@app.command("prepare-update")
+def prepare_update(
+    pack: Path = typer.Option(..., "--pack"),
+    baseline: Path = typer.Option(..., "--baseline"),
+    candidate: Path = typer.Option(..., "--candidate"),
+    policy: Path = typer.Option(..., "--policy"),
+    config: Path = ConfigOpt,
+) -> None:
+    """입력·Docker·로컬 이미지·모델 사전 검사. 엔진/자원/저장소를 만들지 않는다."""
+    try:
+        pk = load_pack(pack)
+        data = update_readiness(pk, [load_environment(baseline), load_environment(candidate)],
+                                load_policy(policy, pk), _config(config))
+    except Exception as exc:
+        data = {"ready": False, "checks": [{"check": "input-files", "ok": False,
+                "detail": f"input loading failed ({type(exc).__name__}); verify file paths, schema and pack hashes"}]}
+    typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
+    raise typer.Exit(0 if data["ready"] else 1)
+
+
+@evidence_app.command("export")
+def evidence_export(store: Path = typer.Option(..., "--store"), output: Path = typer.Option(..., "--output")) -> None:
+    """원본을 변경하지 않고 DB·artifacts·팩 보존본만 검증해 zip으로 반출."""
+    try:
+        manifest = export_bundle(store, output)
+    except Exception as exc:
+        typer.echo(f"export failed ({type(exc).__name__}): {exc}")
+        raise typer.Exit(1)
+    typer.echo(f"exported {len(manifest['files'])} verified files → {output}")
+
+
+@evidence_app.command("restore")
+def evidence_restore(bundle: Path = typer.Option(..., "--bundle"), destination: Path = typer.Option(..., "--destination"),
+                     max_bytes: int = typer.Option(DEFAULT_MAX_BYTES, "--max-bytes", min=1)) -> None:
+    """새 경로에만 복원. 경로·용량·해시·객체 참조·팩 보존본 검증 후 공개."""
+    try:
+        manifest = restore_bundle(bundle, destination, max_bytes=max_bytes)
+    except Exception as exc:
+        typer.echo(f"restore failed ({type(exc).__name__}): {exc}")
+        raise typer.Exit(1)
+    typer.echo(f"restored {len(manifest['files'])} verified files → {destination}")
 
 
 @app.command()

@@ -121,3 +121,12 @@ judge/report 재실행은 시험 자원 정리를 다시 실행하거나 확인�
 이미지 아키텍처·모델 캐시·CPU/GPU 조건·운영자 권한·엔진 격리·실행 시간 상한·자원 보관 기간을 먼저 정한다.
 시험 종료 후 guard.run 라벨의 컨테이너/네트워크, 인스턴스, 볼륨, 로그/증거 보관 자원을 확인한다.
 정리 실패 시 보고서만 보고 자원 정리까지 완료됐다고 판단하지 않는다.
+
+
+## 실증 준비와 증거 묶음 명령
+
+`guard prepare-update`로 입력과 로컬 Docker/이미지를 먼저 확인한다.
+`guard evidence export/restore`로 검증된 저장소를 새 위치로 반출/복원한다.
+명령·제약·5개 점검의 PASS/FAIL/UNKNOWN 사례 입력은 [실증 안내](VALIDATION.md)를 따른다.
+REQ-09의 `max_probe_tokens`는 실제 경계 초과 요청(max_input_tokens+1)을 포함하는 요청당 상한이다.
+probe 정리 실패는 증거를 보존하고 execution.cleanup_errors와 재판정 보고서에 남으며 명령은 실패한다.

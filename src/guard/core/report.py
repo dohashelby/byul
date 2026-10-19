@@ -194,6 +194,9 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
     data_origin = weakest_origin(origins) or DataOrigin.EXAMPLE
 
     # INV-17 및 한계
+    for e in evds.values():
+        for error in e.execution.cleanup_errors:
+            limitations.append(f"{e.check_id}/{e.side.value}: {error}")
     if policy.status != PolicyStatus.CONFIRMED:
         limitations.insert(0, "정책 DRAFT: 공식 아님")
     if not pack.reviewed:

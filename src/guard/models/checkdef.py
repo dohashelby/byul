@@ -13,6 +13,9 @@ from .base import Ref, Strict
 from .enums import ReviewStatus
 from .hashing import canonical_json, sha256_hex
 
+# Optional libyaml acceleration retains safe construction and per-load byte checks.
+SAFE_YAML_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
 
 class Condition(Strict):
     """적용 조건 하나: 사실 키와 기대값."""
@@ -183,14 +186,14 @@ def build_pack(manifest_data: dict, files: dict[str, bytes], *, path: Path | Non
             raise PackIntegrityError(f"sha256 mismatch: {f.path}")
     checks = {}
     for cid in manifest.checks:
-        checks[cid] = CheckDef.model_validate(yaml.safe_load(files[f"checks/{cid}.yaml"].decode("utf-8")))
+        checks[cid] = CheckDef.model_validate(yaml.load(files[f"checks/{cid}.yaml"].decode("utf-8"), Loader=SAFE_YAML_LOADER))
     return Pack(manifest=manifest, checks=checks, path=path, source=source)
 
 
 def load_pack(path: Path) -> Pack:
     """팩 폴더를 읽고 매니페스트의 파일 해시를 검증한다."""
     path = Path(path)
-    manifest = yaml.safe_load((path / "pack.yaml").read_text(encoding="utf-8"))
+    manifest = yaml.load((path / "pack.yaml").read_text(encoding="utf-8"), Loader=SAFE_YAML_LOADER)
     files = {p.relative_to(path).as_posix(): p.read_bytes()
              for p in path.rglob("*") if p.is_file() and p.name != "pack.yaml"}
     return build_pack(manifest, files, path=path)

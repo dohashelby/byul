@@ -105,6 +105,16 @@ def test_external_distinct_files_cannot_relabel_one_image(workdir):
     assert not Path("updates").exists()
 
 
+@pytest.mark.parametrize("root", [{}, {"direct_route":"fake"}])
+def test_side_only_real_configuration_cannot_bypass_target_separation(root):
+    from guard.core.run import validate_update_run_config
+    cfg = orchestration.run_config({"executors":root, "sides":{
+        s:{"executors":{"direct_route":"real"}, "direct_route":{"target":"same.json"}}
+        for s in ("baseline","candidate")}})
+    with pytest.raises(ValueError, match="different target"):
+        validate_update_run_config(cfg)
+
+
 @pytest.mark.parametrize("fail_baseline, cleanup_failure", [(False, False), (True, False), (False, True)])
 def test_managed_update_uses_distinct_targets_and_cleans_up(workdir, monkeypatch, fail_baseline, cleanup_failure):
     inputs()

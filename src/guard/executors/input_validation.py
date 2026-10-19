@@ -5,7 +5,7 @@ from .http_common import HttpCheckExecutor, functional_requests
 
 class InputValidationExecutor(HttpCheckExecutor):
     name = "input_validation"
-    version = "0.1.0"
+    version = "0.2.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -14,7 +14,10 @@ class InputValidationExecutor(HttpCheckExecutor):
             raise ValueError("execution settings need vocab_size and its model/fixture source")
         if type(values.get("max_input_tokens")) is not int or values["max_input_tokens"] < 1:
             raise ValueError("max_input_tokens must be a positive policy limit")
-        if values["max_input_tokens"] > int(self.cfg.get("max_probe_tokens", 4096)):
+        budget = self.cfg.get("max_probe_tokens", 4096)
+        if type(budget) is not int or budget < 2:
+            raise ValueError("max_probe_tokens must be an integer of at least two tokens")
+        if values["max_input_tokens"] + 1 > budget:
             raise ValueError("input limit exceeds the configured bounded probe budget")
         if not values.get("rejection_codes") or any(s not in {"400", "413", "422"} for s in values["rejection_codes"]):
             raise ValueError("rejection_codes must explicitly name supported input rejection responses")

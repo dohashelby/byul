@@ -54,6 +54,14 @@ def test_input_budget_aborts_before_requests(tmp_path):
     assert result.verdicts.security.value == "UNKNOWN"
 
 
+@pytest.mark.parametrize("budget", [8, 1, "9", True])
+def test_boundary_request_must_fit_strict_token_budget(tmp_path, budget):
+    def probe(*args): raise AssertionError("must reject before any request")
+    evd, _ = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor({**c, "max_probe_tokens":budget}, container_probe=probe),
+                      {"max_input_tokens":8, "rejection_codes":["400"]})
+    assert evd.execution.status.value == "ABORTED"
+
+
 def test_same_response_changes_with_explicit_rejection_policy(tmp_path):
     probe = lambda n,rs,t: [{"outcome":200 if r["body"]["prompt"] == [0] else 400} for r in rs]
     _, result = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor(c, container_probe=probe),

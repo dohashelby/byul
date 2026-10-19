@@ -296,6 +296,7 @@ execution:
   started_at: RFC3339|null
   finished_at: RFC3339|null
   abort_reason: str|null
+  cleanup_errors: [str]                        # 실행 후 정리 실패. 비어 있으면 직렬화 생략(과거 해시 유지)
 normal_control: { attempted: bool, succeeded: bool|null, detail: str }
 challenges:
   - step: str                                  # CheckDef.challenge_steps 중 하나
@@ -580,6 +581,9 @@ guard judge   --plan PLAN-...                                                  #
 guard report  --plan PLAN-... --html out.html                                  # → RPT
 guard update  --pack ... --baseline env-a.yaml --candidate env-b.yaml --policy ...  # 위 전체를 두 버전으로
 guard verify                                                                   # 저장소 해시 일괄 검증
+guard prepare-update --pack ... --baseline ... --candidate ... --policy ... --config ... # 읽기 전용 준비 검사
+guard evidence export --store ... --output evidence.zip                        # 검증한 DB 사본·artifacts·팩 반출
+guard evidence restore --bundle evidence.zip --destination new-store            # 새 경로에 무결성 검증 후 복원
 ```
 
 ---

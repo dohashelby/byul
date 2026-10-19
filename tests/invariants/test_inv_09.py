@@ -57,3 +57,15 @@ def test_update_mode_with_two_real_images(tmp_path):
     report = json.loads(next((tmp_path / "reports").glob("*/report.json")).read_text(encoding="utf-8"))
     rows = [r for r in report["by_check"] if r["selected"] and not r["gaps"]]
     assert rows and all(r["comparison"] not in (None, "NOT_COMPARABLE") for r in rows)
+    from guard.store import Store
+    from guard.store.bundle import export_bundle, restore_bundle
+    store = Store(tmp_path / "store")
+    ids = {r["check_id"] for r in rows}
+    evidence = [e for e in store.iter_kind("EVD") if e.check_id in ids]
+    assert len(evidence) == 2 * len(ids)
+    assert all(e.execution.status.value == "COMPLETED" and e.data_origin.value == "MEASURED"
+               and not e.execution.cleanup_errors for e in evidence)
+    assert {e.side.value for e in evidence} == {"baseline", "candidate"}
+    export_bundle(store.root, tmp_path / "evidence.zip")
+    restore_bundle(tmp_path / "evidence.zip", tmp_path / "restored")
+    assert Store(tmp_path / "restored").verify() == []

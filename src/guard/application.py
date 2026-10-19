@@ -12,7 +12,7 @@ import secrets
 from guard.adapters.model_inventory import inventory
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
-from guard.core.run import RunConfig, run_plan
+from guard.core.run import RunConfig, run_plan, validate_update_run_config
 from guard.core.select import select
 from guard.models import ExecStatus, Mode, Side
 from guard.store.packs import put_pack
@@ -78,8 +78,8 @@ def _credentials(cfg, gateway_profile):
     return cfg, keys
 
 
-def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime):
-    """Return (report, execution_failed). Never publish fake results as measured."""
+def update_inputs(envs, cfg: dict):
+    """Shared input checks; no containers, stores or output directories are created."""
     mode = cfg.get("update", {}).get("mode", "external")
     if mode not in {"external", "managed"}:
         raise ValueError("update.mode must be external or managed")
@@ -88,16 +88,16 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
     for side, env in zip(("baseline", "candidate"), envs):
         c = side_cfgs[side]
         if mode == "managed":
+            options = c.get("update", {})
+            if (options.get("topology", "isolated") not in {"isolated", "exposed"}
+                    or options.get("gateway_profile", "single") not in {"single", "role_open", "role_enforced"}
+                    or options.get("engine_profile", "default") not in sandbox.ENGINE_PROFILES):
+                raise ValueError(f"{side}: unsupported sandbox profile")
             if c.get("adapter", {}).get("name") != "vllm" or not c.get("executors") or any(v != "real" for v in c["executors"].values()):
                 raise ValueError("managed update requires the vllm adapter and real executors")
             managed[side] = _managed_config(env, c)
     if mode == "external" and any("real" in c.get("executors", {}).values() for c in side_cfgs.values()):
-        if set(cfg.get("sides", {})) != {"baseline", "candidate"}:
-            raise ValueError("external real update needs two explicit side configurations")
-        for name in cfg.get("executors", {}):
-            paths = [side_cfgs[s].get(name, {}).get("target") for s in ("baseline", "candidate")]
-            if not all(paths) or Path(paths[0]).resolve() == Path(paths[1]).resolve():
-                raise ValueError(f"{name}: baseline and candidate need different target files")
+        validate_update_run_config(run_config(cfg))
         for side, env in zip(("baseline", "candidate"), envs):
             c = side_cfgs[side]
             targets = {c.get(name, {}).get("target") for name, impl in c.get("executors", {}).items() if impl == "real"}
@@ -108,6 +108,12 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
                         or not actual or actual.split("@")[-1] != (env.engine.image_digest or "").split("@")[-1]):
                     raise ValueError(f"{side}: target identity differs from ENV; regenerate/verify target metadata")
 
+    return mode, side_cfgs, managed
+
+
+def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime):
+    """Return (report, execution_failed). Never publish fake results as measured."""
+    mode, side_cfgs, managed = update_inputs(envs, cfg)
     # No input or historical evidence is overwritten.
     run_dir.mkdir(parents=True, exist_ok=False)
     put_pack(store, pack.path)
@@ -165,7 +171,76 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
     if lifecycle_errors:
         report = report.model_copy(update={"limitations": [*report.limitations, *lifecycle_errors]}).seal()
     store.put(report)
-    failed = any(e.execution.status == ExecStatus.ABORTED
+    failed = any(e.execution.cleanup_errors or e.execution.status == ExecStatus.ABORTED
                  or (e.execution.status == ExecStatus.NOT_RUN and pack.checks[e.check_id].executor is not None)
                  for e in store.find_latest("EVD", lambda e: e.plan == plan.ref()))
     return report, failed or bool(lifecycle_errors)
+
+
+def update_readiness(pack, envs, policy, cfg: dict) -> dict:
+    """Read-only preparation check. It neither pulls images nor starts an engine."""
+    from guard.executors import registry
+    from guard.core.preflight import validate_pack
+
+    checks = []
+    def record(name, ok, detail):
+        checks.append({"check": name, "ok": bool(ok), "detail": detail})
+
+    prepared = None
+    try:
+        validate_pack(pack)
+        prepared = update_inputs(envs, cfg)
+        plan = select(pack, envs, policy, mode=Mode.update)
+        selected = [item for item in plan.items if item.selected]
+        if not selected:
+            raise ValueError("policy selected no checks")
+        for item in selected:
+            if item.gaps:
+                raise ValueError(f"{item.check_id}: unresolved selection gaps {item.gaps}")
+            for side, c in prepared[1].items():
+                factory = registry.resolve_executor(item.executor, c.get("executors", {}).get(item.executor, ""))
+                if factory is None or c.get("executors", {}).get(item.executor) != "real":
+                    raise ValueError(f"{side}/{item.check_id}: real executor is required")
+                if prepared[0] == "managed":
+                    c, _ = _credentials(c, c.get("update", {}).get("gateway_profile", "single"))
+                executor = factory(c)
+                executor.validate_policy(pack.checks[item.check_id], policy.values.get(item.check_id, {}))
+                executor.keys()
+        record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")
+    except Exception as exc:
+        # Validation errors contain field descriptions; daemon output is never copied.
+        record("inputs", False, str(exc) if isinstance(exc, ValueError) else type(exc).__name__)
+
+    docker = Docker("readiness")
+    try:
+        server = docker.daemon_info(timeout=15)
+        record("docker", server["os"] == "linux" and bool(server["architecture"]), "Linux Docker daemon and known architecture required")
+    except Exception as exc:
+        server = None
+        record("docker", False, f"daemon unavailable ({type(exc).__name__}); start local Linux Docker")
+    if prepared and server and prepared[0] == "managed":
+        aliases = {"x86_64": "amd64", "aarch64": "arm64"}
+        normalize = lambda s: aliases.get(s, s)
+        arch = normalize(server["architecture"])
+        images = {sandbox.NGINX_IMAGE, sandbox.PYTHON_IMAGE, *(v["image"] for v in prepared[2].values())}
+        for image in sorted(images):
+            try:
+                info = docker.image_info(image, timeout=15)
+                digest_ok = bool(info["digests"]) and ("@" not in image or image in info["digests"])
+                record(f"image:{image}", info["os"] == "linux" and normalize(info["architecture"]) == arch and digest_ok,
+                       "local image must match daemon architecture and have a repository digest; no automatic pull")
+            except Exception as exc:
+                record(f"image:{image}", False, f"local image unavailable ({type(exc).__name__})")
+        for side, env in zip(("baseline", "candidate"), envs):
+            if env.runtime.gpu_count == 0:
+                cpu = env.runtime.cpu
+                record(f"hardware:{side}", cpu is not None and cpu.system == "Linux" and normalize(cpu.architecture) == arch,
+                       "explicit CPU profile must match daemon architecture; other profile fields remain declared")
+            else:
+                record(f"hardware:{side}", bool(env.runtime.gpu_model and env.runtime.driver),
+                       "GPU and driver must be declared; actual device availability requires engine validation")
+    if envs[0].engine.image_digest == envs[1].engine.image_digest:
+        record("image-pair", False, "use different image digests for an update validation")
+    return {"ready": all(c["ok"] for c in checks), "checks": checks,
+            "limitations": ["Preparation only: no engine, security verdict or performance was measured.",
+                            "CPU model/kernel/threads and GPU availability require verification on the test host."]}

@@ -1,7 +1,7 @@
 name: guard contracts
 on:
   push:
-    branches: [main]
+    branches: [main, codex/gua-update-mvp]
   pull_request:
 permissions:
   contents: read

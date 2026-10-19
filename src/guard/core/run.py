@@ -88,20 +88,26 @@ def _normalize(check: CheckDef, draft: EvidenceDraft) -> dict[str, Any]:
     return parts
 
 
+def validate_update_run_config(cfg: RunConfig) -> None:
+    effective = [cfg.side_configs.get(side, cfg) for side in ("baseline", "candidate")]
+    real_names = {name for c in effective for name, impl in c.executors.items() if impl == "real"}
+    if real_names and set(cfg.side_configs) != {"baseline", "candidate"}:
+        raise ValueError("real update runs require baseline and candidate side configurations")
+    for name in real_names:
+        if any(c.executors.get(name) != "real" for c in effective):
+            raise ValueError(f"{name}: both update sides must use real executors")
+        paths = [c.raw.get(name, {}).get("target") for c in effective]
+        if not all(paths) or Path(paths[0]).resolve() == Path(paths[1]).resolve():
+            raise ValueError(f"{name}: update sides need different target files")
+
+
 def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     envs = [store.resolve(r) for r in plan.inputs.environments]
     policy = store.resolve(plan.inputs.policy)
-    if plan.mode == Mode.update and "real" in cfg.executors.values() and set(cfg.side_configs) != {"baseline", "candidate"}:
-        raise ValueError("real update runs require baseline and candidate side configurations")
     if plan.mode == Mode.update:
-        for name, impl in cfg.executors.items():
-            if impl != "real":
-                continue
-            paths = [c.raw.get(name, {}).get("target") for c in cfg.side_configs.values()]
-            if len(paths) != 2 or not all(paths) or Path(paths[0]).resolve() == Path(paths[1]).resolve():
-                raise ValueError(f"{name}: update sides need different target files")
+        validate_update_run_config(cfg)
 
     plan_ref = plan.ref()
     existing = {
@@ -180,6 +186,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                 started_at=draft.started_at or started,
                 finished_at=draft.finished_at,
                 abort_reason=draft.abort_reason,
+                cleanup_errors=draft.cleanup_errors,
             ),
             artifacts=artifacts,
             comparability=draft.comparability,

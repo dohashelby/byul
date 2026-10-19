@@ -300,6 +300,14 @@ class Execution(Strict):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     abort_reason: str | None = None
+    cleanup_errors: list[str] = Field(default_factory=list)
+
+    @model_serializer(mode="wrap")
+    def _omit_empty_cleanup(self, handler):
+        data = handler(self)
+        if not self.cleanup_errors:
+            data.pop("cleanup_errors", None)
+        return data
 
 
 class NormalControl(Strict):

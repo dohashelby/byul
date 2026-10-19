@@ -33,7 +33,7 @@ from .http_common import (
 
 class RoleRouteExecutor(HttpCheckExecutor):
     name = "role_route"
-    version = "0.2.0"
+    version = "0.3.0"
 
     def collect(self, ctx: Ctx):
         admin_role = self.cfg.get("admin_role", "admin")

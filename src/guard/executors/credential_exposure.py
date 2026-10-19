@@ -11,7 +11,7 @@ ENV_CMD = ('for d in /proc/[0-9]*; do echo "PID ${d#/proc/}"; '
 
 class CredentialExposureExecutor(ContainerConfigExecutor):
     name = "credential_exposure"
-    version = "0.1.0"
+    version = "0.2.0"
 
     def validate_policy(self, check, values):
         from pathlib import PurePosixPath

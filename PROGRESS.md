@@ -424,3 +424,19 @@ git status
 - 과거 증거: 복사본 Store.verify에서 exposed·isolated의 참조 artifact 각 1개 누락, inv15 0문제. HEAD/6d9ad83/13bb4d3에서 누락 원본을 찾지 못했다. 기존 증거·해시는 수정하지 않았다.
 - 막힌 것: Docker daemon 미실행·모델 캐시 부재로 실제 엔진·두 실제 이미지 실증 미수행. 정책/팩 확정자 미정. AWS 자원은 생성하지 않았다.
 - 다음 단계: Linux/macOS에서 실제 두 이미지 update와 신규 2개 점검 실증, 누락 증거 원본 복구 또는 별도 재실증, 정책·팩 검토. 상세 계획/완료 기준은 docs/REVIEW_AND_DEVELOPMENT_PLAN.md, 실행 절차는 docs/RUNBOOK.md.
+
+
+## 실증 준비·증거 반출 후속 구현 (2026-10-19)
+- 시작: codex/gua-update-mvp/4d97dba. 기존 main과 사용자 .assessment 및 out/5b 원본을 보존했다. 구현 묶음 완료 후 테스트를 실행했다.
+- 한 일: 읽기 전용 prepare-update(팩/정책/실행기/모델 inventory/Docker/로컬 이미지 아키텍처 검사), evidence export/restore(DB read-only backup/증거/팩 보존본 검증), 5개 점검의 실제 PASS/FAIL/UNKNOWN opt-in 행렬, 두 이미지 시험의 MEASURED/반출·복원 계약 보강.
+- 수정: REQ-09 경계 초과 요청도 토큰 예산에 포함, side-only real 설정의 대상 분리 우회 차단, probe 정리 실패 후 COMPLETED/확인된 FAIL 보존 및 재판정 보고서 한계/명령 실패 전파. 빈 cleanup_errors는 생략해 과거 해시를 유지했다.
+- 유지: 연결된 점검은 5개, 팩 revision 10/DRAFT. 기존 정의 77개를 추가 자동화하지 않았고, 신규 PLT-04/REQ-09 실증 완료를 주장하지 않는다. Python·의존성 선언은 변경하지 않았다.
+- 전체 기본 테스트: 475 passed, 1 failed, 4 skipped, 18 deselected / 110.82초. 새 증거 묶음 시험의 DB 파일 바이트 동일성 가정이 실패했다.
+- 수정 후 관련 검증: evidence bundle 10 passed / 12.16초. SQLite backup 헤더 차이를 허용하되 원본 DB 불변·객체/참조/증거 바이트 동일성을 검사했다. 동일 재판정은 멱등, 만료로 판정 내용이 바뀌면 새 revision이 추가되고 과거 참조가 보존됨을 확인했다. 첫 집중 실행에서는 멱등성에 대한 잘못된 기대도 발견해 바로잡았다. 제품 코드를 시험 기대에 맞춰 완화하지 않았다.
+- 별도 검증: wheel 빌드 및 frozen 새 환경 설치 성공. -I -X utf8 설치본 CLI로 select/run/judge/report/export/restore/verify/오프라인 재판정/준비 실패 총 10개 명령의 예상 종료 코드와 전체 로그를 확인했다(EXAMPLE). 최초 설치본 로그의 Windows cp949/UTF-8 캡처 차이는 명시적 UTF-8으로 해결했다.
+- 실제 엔진 opt-in 확인: 6 skipped, 12 deselected / 0.59초. GUARD_UPDATE_*와 GUARD_ENGINE_CASES 미제공. Docker daemon/API 및 모델 캐시도 없어 Docker stub/실제 엔진/실제 두 이미지 실증은 미실행이다.
+- 과거 증거 재확인: 복사본 exposed/isolated 참조 artifact 각각 1개 누락, inv15 문제 0. 원본/해시를 수정하거나 누락 파일을 만들지 않았다.
+- 성능: 선택적 기존 libyaml SafeLoader를 사용하되 해시는 매번 검사한다. Windows 기본 검증은 1분 목표를 초과했다. Linux CI 시간은 별도 확인한다. skip 4건은 기존 Windows 네트워크 3·symlink 1이며 새 skip으로 속도를 맞추지 않았다.
+- 산출물: docs/VALIDATION.md, examples/engine-cases.json. 테스트 로그는 별도 out/test-runs/followup-20261019에 두고 Git에는 포함하지 않는다.
+- 원격 CI: 이 기록 작성 시 push 전이므로 미실행. 작업 브랜치 push에서도 CI가 실행되도록 연결했으며 실제 결과는 해당 커밋의 Actions 기록으로 확인한다.
+- 다음/막힌 것: Linux/모델/두 이미지 준비 후 실제 15개 사례와 update 실행. 정책 임계값·금지 목록·담당자·팩 검토·이미지 쌍·AWS 예산은 팀 결정이 필요하다. 기존 CPU 결정은 유지하며 유료 자원은 생성하지 않았다.

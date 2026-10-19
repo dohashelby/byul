@@ -25,7 +25,16 @@ from guard.models import (
     new_id,
     weakest_origin,
 )
-from guard.models.objects import AxisSummary, CheckRow, ExceptionDisplay, NotSelected, Policy, Report, SideResult
+from guard.models.objects import (
+    AxisSummary,
+    CheckRow,
+    ExceptionDisplay,
+    FunctionalScope,
+    NotSelected,
+    Policy,
+    Report,
+    SideResult,
+)
 from guard.store import Store
 
 from .aggregate import aggregate
@@ -59,6 +68,18 @@ def _side(res: Result | None) -> SideResult:
         performance=res.verdicts.performance,
         verification_level=res.verification_level,
     )
+
+
+def _functional_scope(check, evd: Evidence | None) -> FunctionalScope | None:
+    """CheckDef.functional_scope가 가리키는 관측으로 "기능 확인 범위: N / 등록 경로 M (표본)"을 만든다."""
+    spec = getattr(check, "functional_scope", None)
+    if spec is None or evd is None:
+        return None
+    probed = evd.observations.get(spec.probed_obs)
+    of = evd.observations.get(spec.of_obs)
+    n = len(probed.value) if probed and probed.collected and probed.value is not None else 0
+    m = len(of.value) if of and of.collected and of.value is not None else None
+    return FunctionalScope(probed=n, of=m, label=f"기능 확인 범위: {n} / 등록 경로 {m if m is not None else '?'} (표본)")
 
 
 def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Report:
@@ -117,6 +138,7 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
             not_run = any(e.execution.status == ExecStatus.NOT_RUN for (cid, _), e in evds.items() if cid == check.id)
             if Gap.NO_EXECUTOR in item.gaps or not_run:
                 manual.append(check.id)
+            row["functional_scope"] = _functional_scope(check, evds.get((check.id, sides[-1])))
             rows.append(CheckRow(**row))
             # update 모드의 목적·영역 집계는 후보(candidate) 기준
             verdict = row[sides[-1].value].security

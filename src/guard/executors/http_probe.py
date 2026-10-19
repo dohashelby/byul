@@ -40,8 +40,25 @@ def _classify_connect_error(exc: BaseException) -> str:
     return "error"
 
 
+def tcp_probe(req: dict, timeout: float) -> dict:
+    """TCP 연결만 시도하고 바로 닫는다(바이트를 보내지 않음). outcome: connected | refused | timeout | unreachable | dns_error | error."""
+    started = time.monotonic()
+    out: dict = {"id": req.get("id"), "method": "TCP", "url": req["url"]}
+    parts = urlsplit(req["url"])
+    try:
+        sock = socket.create_connection((parts.hostname, parts.port or 80), timeout=timeout)
+        sock.close()
+        out.update(outcome="connected", phase="connect", detail="tcp connected (no bytes sent)")
+    except BaseException as exc:  # noqa: BLE001
+        out.update(outcome=_classify_connect_error(exc), phase="connect", detail=f"{type(exc).__name__}: {exc}")
+    out["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+    return out
+
+
 def probe(req: dict, timeout: float) -> dict:
-    """요청 1개. 반환: {id, outcome, phase, detail, elapsed_ms, body_bytes, body_preview}."""
+    """요청 1개. 반환: {id, outcome, phase, detail, elapsed_ms, body_bytes, body_preview}. mode=tcp면 tcp_probe."""
+    if req.get("mode") == "tcp":
+        return tcp_probe(req, timeout)
     started = time.monotonic()
     out: dict = {"id": req.get("id"), "method": req.get("method", "GET"), "url": req["url"]}
     parts = urlsplit(req["url"])

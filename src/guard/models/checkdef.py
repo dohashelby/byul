@@ -49,6 +49,26 @@ class JudgeSpec(Strict):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class FunctionalProbe(Strict):
+    """기능 축 표본 요청 1개(허용 키, Gateway 경유). 본문 문자열의 "{model}"은 실행 시 ENV 모델 이름으로 바꾼다."""
+
+    method: str
+    path: str
+    body: dict[str, Any] | None = None
+    expect: list[int] = Field(min_length=1)
+
+    @property
+    def id(self) -> str:
+        return f"{self.method.upper()} {self.path}"
+
+
+class FunctionalScopeSpec(Strict):
+    """보고서의 "기능 확인 범위: N / 등록 경로 M (표본)" 표시용: 어느 관측을 셀지."""
+
+    probed_obs: str
+    of_obs: str
+
+
 class Legacy(Strict):
     q_ids: list[str] = Field(default_factory=list)
     scenario_ids: list[str] = Field(default_factory=list)
@@ -80,6 +100,8 @@ class CheckDef(BaseModel):
     remediation: str | None = None
     executor: str | None = None
     judge: JudgeSpec | None = None
+    functional_probes: list[FunctionalProbe] = Field(default_factory=list)
+    functional_scope: FunctionalScopeSpec | None = None
     legacy: Legacy = Field(default_factory=Legacy)
 
     @model_validator(mode="after")

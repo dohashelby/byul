@@ -22,12 +22,17 @@ CONTAINER_PORT = 8000
 MODEL_MOUNT = "/models"
 
 # 접근 권한 점검에서 제외하는 정보성 경로 (DECISIONS 5a)
-INFO_ROUTES = frozenset({"/health", "/ping", "/version", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect", "/metrics"})
+INFO_ROUTES = frozenset({"/health", "/ping", "/version", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect", "/metrics",
+                         "/load", "/kv_event_sources"})  # /load·/kv_event_sources: 5b 실측 후 승인
+# 경로 변수({response_id} 등)를 채우는 존재하지 않는 고정 ID
+PATH_PARAM_PLACEHOLDER = "guard-probe-nonexistent-id"
+_PATH_PARAM = re.compile(r"\{[^/{}]+\}")
 # 엔진 상태를 바꾸는 관리 경로: 직통 요청을 기본으로 보내지 않는다
 MUTATING_ADMIN_ROUTES = frozenset({
     "/sleep", "/wake_up", "/reset_prefix_cache", "/reset_mm_cache", "/load_lora_adapter", "/unload_lora_adapter",
     "/collective_rpc", "/scale_elastic_ep", "/start_profile", "/stop_profile", "/pause", "/resume",
     "/update_weights", "/init_weight_transfer",
+    "/v1/responses/{response_id}/cancel",  # 사용자 객체 상태 변경 (5b 실측 후 승인)
 })
 READONLY_ADMIN_ROUTES = frozenset({"/is_sleeping", "/server_info", "/is_scaling_elastic_ep", "/get_world_size"})
 
@@ -131,7 +136,11 @@ class VllmAdapter:
     def probe_request(self, route: Route, model: str | None) -> ProbeRequest | None:
         if route.mutating:
             return None
-        model = model or DEFAULT_MODEL
+        pr = self._probe_request(route, model or DEFAULT_MODEL)
+        # 경로 변수는 존재하지 않는 고정 ID로 채운다(실제 객체에 닿지 않음)
+        return ProbeRequest(pr.method, _PATH_PARAM.sub(PATH_PARAM_PLACEHOLDER, pr.path), pr.body)
+
+    def _probe_request(self, route: Route, model: str) -> ProbeRequest:
         if route.method == "GET":
             return ProbeRequest("GET", route.path)
         if route.path in ("/v1/completions", "/invocations"):

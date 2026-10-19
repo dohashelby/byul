@@ -3,19 +3,19 @@
   "verdict": {
     "result": {
       "kind": "RES",
-      "id": "RES-01M59ETD6QPGSGJARM6XXSQ3CW",
+      "id": "RES-01M59HSYY9KQSEZCDMKZSF1F2G",
       "revision": 1,
-      "sha256": "bfab69159e322ea722ea58813d34d903819760bcdfeadf9e5cf0cf7b1c510626"
+      "sha256": "c070af508236771d090bac5ceca9a7f153522042bd2fcccb9d8a923386abbb55"
     },
-    "security": "UNKNOWN",
-    "functional": "UNKNOWN",
+    "security": "PASS",
+    "functional": "PASS",
     "performance": "UNKNOWN",
     "verification_level": "DECLARED"
   },
   "expected_security": "PASS",
-  "ready_seconds": 28.768265125108883,
-  "run_seconds": 146.5,
-  "total_seconds": 177.1,
+  "ready_seconds": 28.648775416892022,
+  "run_seconds": 11.4,
+  "total_seconds": 41.7,
   "wildcard_listeners_before": [
     "ControlCe *:5000",
     "ControlCe *:7000",
@@ -27,23 +27,25 @@
     "rapportd *:56365"
   ],
   "distribution": {
-    "direct | external | allowed | timeout": 16,
-    "direct | external | none | timeout": 16,
-    "direct | external | wrong | timeout": 16,
+    "direct | external | allowed | timeout": 15,
+    "direct | external | none | timeout": 15,
+    "direct | external | wrong | timeout": 15,
+    "direct-tcp | external | allowed | timeout": 1,
+    "direct-tcp | external | none | timeout": 1,
+    "direct-tcp | external | wrong | timeout": 1,
     "engine | trusted | none | 200": 2,
-    "gateway | external | allowed | 200": 8,
+    "functional | external | allowed | 200": 1,
+    "gateway | external | allowed | 200": 6,
     "gateway | external | allowed | 400": 6,
-    "gateway | external | allowed | 404": 2,
-    "gateway | external | none | 401": 16,
-    "gateway | external | wrong | 401": 16
+    "gateway | external | allowed | 404": 1,
+    "gateway | external | none | 401": 13,
+    "gateway | external | wrong | 401": 13
   },
   "routes_registered": [
     "/detokenize",
     "/generative_scoring",
     "/invocations",
     "/is_scaling_elastic_ep",
-    "/kv_event_sources",
-    "/load",
     "/scale_elastic_ep",
     "/tokenize",
     "/v1/chat/completions",
@@ -57,15 +59,15 @@
     "/v1/responses/{response_id}/cancel"
   ],
   "skipped_routes": {
-    "/scale_elastic_ep": "mutating admin route not sent (allow_mutating_routes=false)"
+    "/scale_elastic_ep": "mutating admin route not sent (allow_mutating_routes=false)",
+    "/v1/responses/{response_id}/cancel": "mutating admin route not sent (allow_mutating_routes=false)"
   },
   "direct_outcomes": {
     "/detokenize": "timeout",
     "/generative_scoring": "timeout",
     "/invocations": "timeout",
     "/is_scaling_elastic_ep": "timeout",
-    "/kv_event_sources": "timeout",
-    "/load": "timeout",
+    "/scale_elastic_ep": "timeout",
     "/tokenize": "timeout",
     "/v1/chat/completions": "timeout",
     "/v1/chat/completions/batch": "timeout",
@@ -82,8 +84,7 @@
     "/generative_scoring": "timeout",
     "/invocations": "timeout",
     "/is_scaling_elastic_ep": "timeout",
-    "/kv_event_sources": "timeout",
-    "/load": "timeout",
+    "/scale_elastic_ep": "timeout",
     "/tokenize": "timeout",
     "/v1/chat/completions": "timeout",
     "/v1/chat/completions/batch": "timeout",
@@ -100,8 +101,6 @@
     "/generative_scoring": 400,
     "/invocations": 200,
     "/is_scaling_elastic_ep": 200,
-    "/kv_event_sources": 200,
-    "/load": 200,
     "/tokenize": 200,
     "/v1/chat/completions": 400,
     "/v1/chat/completions/batch": 400,
@@ -110,8 +109,7 @@
     "/v1/messages/count_tokens": 400,
     "/v1/models": 200,
     "/v1/responses": 400,
-    "/v1/responses/{response_id}": 404,
-    "/v1/responses/{response_id}/cancel": 404
+    "/v1/responses/{response_id}": 404
   },
   "gateway_denied_outcomes": {
     "/detokenize": {
@@ -127,14 +125,6 @@
       "wrong": 401
     },
     "/is_scaling_elastic_ep": {
-      "none": 401,
-      "wrong": 401
-    },
-    "/kv_event_sources": {
-      "none": 401,
-      "wrong": 401
-    },
-    "/load": {
       "none": 401,
       "wrong": 401
     },
@@ -173,18 +163,14 @@
     "/v1/responses/{response_id}": {
       "none": 401,
       "wrong": 401
-    },
-    "/v1/responses/{response_id}/cancel": {
-      "none": 401,
-      "wrong": 401
     }
   },
   "trusted_origin_reachable": true,
   "limitations": [
     "검토 전 팩(DRAFT): 공식 아님",
     "정책 DRAFT: 공식 아님",
-    "실행 환경(ENV-01M59ENY2EYMC42C5JDG1321XZ): CPU, arm64, Docker Desktop on macOS",
-    "엔진 소스 commit(ENV-01M59ENY2EYMC42C5JDG1321XZ): 축약 hash만 일치, 전체 commit 미확인 — 관측 db9527a46, 고정 db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "실행 환경(ENV-01M59HSKQYTXMF3BR96FC24TNZ): CPU, arm64, Docker Desktop on macOS",
+    "엔진 소스 commit(ENV-01M59HSKQYTXMF3BR96FC24TNZ): 축약 hash만 일치, 전체 commit 미확인 — 관측 db9527a46, 고정 db9527a46873454610df6dbedf79a36d6bf1a7f6",
     "점검 목록 미완결 보호 목적: 1개 — 집계 PASS 불가",
     "정책 범위 밖으로 제외: 76개 점검"
   ]

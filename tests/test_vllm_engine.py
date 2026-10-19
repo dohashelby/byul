@@ -132,6 +132,11 @@ def test_vllm_topology_end_to_end(topology, expected):
     # 실제 엔진 실행 증거(EVD)는 MEASURED. RES 검증 수준은 근거 중 가장 약한 것 = 적용 조건(gateway 사실, DECLARED) → DECLARED (INV-12)
     (evd,) = [e for e in Store(run_dir / ".guard").iter_kind("EVD") if e.check_id == "REQ-01"]
     assert evd.data_origin.value == "MEASURED" and evd.execution.status.value == "COMPLETED"
+    # 비교 조건은 마운트한 snapshot 전체 inventory, 참고 필드는 비교에 쓰지 않음
+    assert evd.comparability.model_inventory_sha256 == vcfg["inventory_sha256"]
+    (env_obj,) = list(Store(run_dir / ".guard").iter_kind("ENV"))
+    assert env_obj.model.inventory_sha256 == vcfg["inventory_sha256"]
+    assert env_obj.model.files_read_by_engine.inventory_sha256 == vcfg["files_read_by_engine_sha256"]
     assert row["single"]["verification_level"] == "DECLARED"
     # 보고서는 공식 아님(정책·팩 DRAFT)
     assert data["official"] is False

@@ -1,11 +1,11 @@
-(APIServer pid=1) INFO 10-19 06:50:49 [api_utils.py:347] 
-(APIServer pid=1) INFO 10-19 06:50:49 [api_utils.py:347]        █     █     █▄   ▄█
-(APIServer pid=1) INFO 10-19 06:50:49 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.31.0
-(APIServer pid=1) INFO 10-19 06:50:49 [api_utils.py:347]   █▄█▀ █     █     █     █  model   facebook/opt-125m
-(APIServer pid=1) INFO 10-19 06:50:49 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
-(APIServer pid=1) INFO 10-19 06:50:49 [api_utils.py:347] 
-(APIServer pid=1) INFO 10-19 06:50:49 [api_utils.py:286] non-default args: {'model_tag': 'facebook/opt-125m', 'host': '0.0.0.0', 'model': 'facebook/opt-125m', 'revision': '27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'served_model_name': ['facebook/opt-125m']}
-W1019 06:50:48.958000 1 torch/_library/triton.py:53] Triton not available, find_triton_kernels = []
+(APIServer pid=1) INFO 10-19 07:43:01 [api_utils.py:347] 
+(APIServer pid=1) INFO 10-19 07:43:01 [api_utils.py:347]        █     █     █▄   ▄█
+(APIServer pid=1) INFO 10-19 07:43:01 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.31.0
+(APIServer pid=1) INFO 10-19 07:43:01 [api_utils.py:347]   █▄█▀ █     █     █     █  model   facebook/opt-125m
+(APIServer pid=1) INFO 10-19 07:43:01 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=1) INFO 10-19 07:43:01 [api_utils.py:347] 
+(APIServer pid=1) INFO 10-19 07:43:01 [api_utils.py:286] non-default args: {'model_tag': 'facebook/opt-125m', 'host': '0.0.0.0', 'model': 'facebook/opt-125m', 'revision': '27dcfa74d334bc871f3234de431e71c6eeba5dd6', 'served_model_name': ['facebook/opt-125m']}
+W1019 07:43:00.941000 1 torch/_library/triton.py:53] Triton not available, find_triton_kernels = []
 With `vllm serve`, you should provide the model as a positional argument or in a config file instead of via the `--model` option. The `--model` option will be removed in a future version.
 Traceback (most recent call last):
   File "/opt/venv/bin/vllm", line 10, in <module>

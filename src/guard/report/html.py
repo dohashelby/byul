@@ -104,6 +104,8 @@ def render_html(report: dict[str, Any]) -> str:
         if row.get("tested_while_undetermined"):
             app += " (적용 미정 상태로 시험함)"
         marks = [escape(GAP_KO.get(g, g)) for g in row["gaps"]]
+        if row.get("functional_scope"):
+            marks.append(escape(row["functional_scope"]["label"]))
         if row.get("exception"):
             e = row["exception"]
             marks.append(f"예외 승인됨 (만료 {escape(e['expires_at'] or '-')}, {escape(e['reason'])})")

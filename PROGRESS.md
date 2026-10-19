@@ -215,3 +215,50 @@ INV-01~18 모두 `tests/invariants/test_inv_XX.py`에 있다. 엔진이 필요�
   | (참고) | `v0.20.0` (~0.82GB) | `v0.31.0` | 중간 폭 |
 - **INV-09 비교 조건을 이 맥에서 맞추는 방법**: 같은 모델 inventory(`~/guard-models`, `d677f399…`, 두 버전 모두 읽기 전용 마운트) · 같은 시험 자료(fixture_sha256: 같은 어댑터·같은 probe 요청이면 동일하나, **버전마다 등록 경로가 달라지면 요청 목록이 달라져 fixture_sha256이 달라질 수 있음** → 비교용 고정 경로 목록을 정할지 결정 필요) · 같은 설정(config_sha256: target.json에서 실행마다 바뀌는 IP·run_id를 비교용 해시에서 제외하도록 정리 필요) · 같은 "GPU·드라이버" = 둘 다 null(CPU)인데 **INV-09는 null이면 NOT_COMPARABLE** → CPU 비교를 하려면 `runtime.gpu_model`/`driver` 대신 CPU 실행 환경 식별값(예: `cpu:arm64 docker-desktop vm=10cpu/7.75GiB kernel=6.12.76`)을 비교 조건에 넣는 규칙이 필요(SPEC 결정 사항, 사람 확인).
 - 구버전(v0.16 등)은 등록 경로·옵션 이름이 다를 수 있다 → 어댑터 버전 분기 필요 여부를 8단계 시작 시 openapi 실측으로 확인.
+
+## 5b 후속 — TCP 연결 단계 추론 (2026-10-19, 사람 승인)
+- 한 일: 직통 (출발점·대상, 키) 조합마다 먼저 TCP 연결만 시도(`http_probe.tcp_probe`, 바이트 미전송). 연결 실패(timeout/refused/unreachable)면 HTTP 없이 모든 등록 경로(상태 변경 포함)를 그 값으로 기록, 증거에 `basis: tcp_connect (inferred)`. 연결되면 비상태변경 경로만 HTTP(`allow_mutating_routes=false` 유지). `routes_tested` = 모든 (대상, 비허용 키) 조합의 직통 결과가 있는 경로. SPEC §4.5·§6(INV-03 주석), REQ-01 override(`observation_notes`), DECISIONS 갱신. 팩 revision 3. **판정표는 변경 없음.** 기능 축은 고치지 않음(열린 질문에 기록).
+- 기본 테스트: `uv run pytest` → **326 passed, 6 deselected, 약 13초**(TCP 추론·부분 차단·tcp_probe 단위 테스트 추가, 상태 변경 경로 기대 1건을 승인된 동작으로 갱신)
+- `uv run pytest -m engine` → **3 passed, 1 skipped(INV-09) in 93s**
+  | 위상 | 변경 전(`out/5b/before_tcp/`) | **변경 후** | 직통 근거 | 소요(ready / run / 합계) |
+  |---|---|---|---|---|
+  | exposed | FAIL | **FAIL** | TCP 6조합 전부 `connected` → HTTP 96건(외부·호스트 각 48: 200 ×8, 400 ×6, 404 ×2 × 키 3). `/scale_elastic_ep`는 보내지 않음(미시험) | 31s / 2.6s / 40s |
+  | isolated | UNKNOWN | **PASS** | TCP 3조합(외부 × 키 3) 전부 `timeout` → 17경로(`/scale_elastic_ep` 포함) × 3 = 51건 `tcp_connect (inferred)`, HTTP 직통 0건 | 28s / 11.4s / 42s |
+  | INV-15 | ABORTED→UNKNOWN | **ABORTED→UNKNOWN** | — | — |
+  - 양성 대조(신뢰 출발점 → `/health` 200) 두 위상 true. EVD `data_origin` MEASURED, RES 검증 수준 DECLARED, `official=false`.
+  - isolated run 시간이 147s → 11.4s로 줄었다(경로별 HTTP 타임아웃 대기 대신 조합당 TCP 1회).
+  - 기능 축은 두 위상 모두 그대로 UNKNOWN(Gateway 허용 키 400 ×6, 404 ×2).
+- 안전: 실행 전후 와일드카드 리스너 동일(macOS 기본 3개만, `out/5b/listeners_{before,after}_tcp_run.txt`), `guard.run` 컨테이너·네트워크 0개, 상태 변경 경로 HTTP 요청 0건.
+
+## 현재 진행도 (2026-10-19)
+- **SPEC §8 수직 슬라이스: 8단계 중 7단계 완료** — 1 import ✅ · 2 models ✅ · 3 store ✅ · 4 select ✅ · 5 vLLM 어댑터 + direct_route (5a 실험실, 5b 실제 vLLM CPU) ✅ · 6 rule_table ✅ · 7 report ✅ · **8 `guard update` 두 이미지 비교 ⏳ 남음**
+- **자동화된 점검: 1 / 77** (REQ-01, 실제 vLLM에서 exposed FAIL / isolated PASS 재현). 나머지 76행은 `executor: null`(수동 시험 대상으로 보고서에 나열).
+- 불변식 INV-01~18 테스트 전부 있음. 남은 skip은 INV-09 실제 두 이미지 비교(8단계) 1개.
+- 공식 보고서 조건 미충족: 정책 DRAFT·확정자 없음, 팩 DRAFT·검토자 없음 → `official=false`.
+- 다음: 8단계(비교 태그 쌍과 CPU 비교 조건 규칙 결정 필요 — "8단계 준비" 절), 그 뒤 `reference_baseline_first`·로컬 재현 가능 행 5~10개 자동화.
+
+## 기능 축 — functional_probes 목록 (2026-10-19, 사람 결정)
+- 한 일: REQ-01 override에 `functional_probes`(`POST /v1/completions`, 본문 `{model: "{model}", prompt: ping, max_tokens: 1}`, expect [200])와 `functional_scope`. 판정표 기능 축 = "목록의 모든 항목이 기대대로"(관측 `functional_probes_planned`, `functional_probe_results`). 실행기·코어에서 경로 하드코딩 제거(정적 테스트), 정상 대조도 같은 표본. 보고서 행 `functional_scope`와 HTML에 "기능 확인 범위: N / 등록 경로 M (표본)". SPEC §3·§4.5·§4.7·§7.2, DECISIONS 갱신. 팩 revision 4.
+- 테스트: `uv run pytest` → **339 passed, 6 deselected, 약 13초**. `uv run pytest -m engine` → **3 passed, 1 skipped(INV-09) in 90s**.
+  | 위상 | security | functional | 보고서 표시 |
+  |---|---|---|---|
+  | exposed | FAIL | **PASS** | 기능 확인 범위: 1 / 등록 경로 17 (표본) |
+  | isolated | PASS | **PASS** | 기능 확인 범위: 1 / 등록 경로 17 (표본) |
+- 안전: `guard.run` 컨테이너·네트워크 0개, 와일드카드 리스너는 macOS 기본 3개만.
+- 진행도 변화 없음: 8단계 중 7단계, 자동화 점검 1/77.
+
+## 경로 분류 4건 + inventory 정의 (2026-10-19, 사람 승인)
+- 한 일: `GET /load`·`GET /kv_event_sources` → INFO, `POST /v1/responses/{response_id}/cancel` → MUTATING, 경로 변수는 `guard-probe-nonexistent-id`로 치환(`adapters/vllm.py`). inventory 정의 "snapshot 중 vLLM이 읽는 파일만"(`tools/model_inventory.py --scope vllm` 기본) → opt-125m **7 files / 251,897,335 bytes / `b11bc2ca…`**(guard.toml·ENV 갱신, 전체 12개 값은 `out/5b/model_inventory_all.json`).
+- 테스트: `uv run pytest` → **343 passed, 6 deselected, 약 13초**. `uv run pytest -m engine` → **3 passed, 1 skipped(INV-09) in 92s**.
+  | 위상 | security | functional | 등록 경로(시험 대상) | 직통 대표 결과 | 미전송(상태 변경) | run / 합계 |
+  |---|---|---|---|---|---|---|
+  | exposed | **FAIL** | **PASS** | 17 → **15** | 200 ×6, 400 ×6, 404 ×1(`/v1/responses/{response_id}` → 고정 ID로 404) | `/scale_elastic_ep`, `/v1/responses/{response_id}/cancel` | 2.7s / 36s |
+  | isolated | **PASS** | **PASS** | 15 | `timeout` ×15 (TCP 추론, cancel·scale 포함) | 같음(HTTP 0건) | 11.5s / 42s |
+  - 보고서 표시: "기능 확인 범위: 1 / 등록 경로 15 (표본)". 엔진 로그에 고정 ID 경로 요청 7건(Gateway 허용 키·직통), 실제 객체 영향 없음(404).
+- 안전: `guard.run` 컨테이너·네트워크 0개, 와일드카드 리스너는 macOS 기본 3개만.
+- 진행도 변화 없음: 8단계 중 7단계, 자동화 점검 1/77. 보류: 8단계 비교 조건(열린 질문 2), 정책 확정자·팩 검토자(5).
+
+## inventory 기준 수정 (2026-10-19, 사람 결정)
+- 비교용(INV-09) `model.inventory_sha256` = 마운트한 snapshot 전체(`tools/model_inventory.py` 기본 `--scope all`): **12 files, `d677f399…`** (`out/5b/model_inventory.json`). 참고용 `model.files_read_by_engine` = 엔진이 읽은 파일(`--scope vllm`): **7 files, `b11bc2ca…`** (`out/5b/model_inventory_engine_read.json`), 판정·비교 조건에 쓰지 않음. guard.toml `[vllm]`, ENV, SPEC §4.1, DECISIONS 갱신.
+- 테스트: `uv run pytest` → **345 passed, 6 deselected, 약 13초**. `uv run pytest -m engine` → **3 passed, 1 skipped(INV-09) in 86s**: exposed security FAIL / functional PASS, isolated PASS / PASS, "기능 확인 범위: 1 / 등록 경로 15 (표본)" — 이전과 같음. 두 위상 ENV `model.inventory_sha256 = d677f399…`, `files_read_by_engine = {7, b11bc2ca…}`, EVD `comparability.model_inventory_sha256 = d677f399…`(engine 테스트에서 단언).
+- 안전: `guard.run` 컨테이너·네트워크 0개, 와일드카드 리스너는 macOS 기본 3개만.

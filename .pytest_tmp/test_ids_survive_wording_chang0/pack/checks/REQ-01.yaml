@@ -38,6 +38,10 @@ required_observations:
   type: dict[str, int]
 - key: trusted_origin_reachable
   type: bool
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, pass|fail|no_response]
 required_observations_prose:
 - 호출 출발점·경로
 - route·인증 범위
@@ -88,19 +92,20 @@ judge:
     axes:
       functional:
         pass_when_all:
-        - obs: gateway_outcomes
+        - obs: functional_probe_results
+          op: nonempty
+        - obs: functional_probe_results
           op: superset_of
-          value_obs: routes_registered
-        - obs: gateway_outcomes
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
           op: all_in
           value:
-          - 200
+          - pass
         fail_when_any:
-        - obs: gateway_outcomes
+        - obs: functional_probe_results
           op: any_in
           value:
-          - 401
-          - 403
+          - fail
 legacy:
   q_ids:
   - Q-C01
@@ -111,3 +116,18 @@ legacy:
   - Q-C01/SC-01-01
 source:
   array: request_state_assessment_draft
+observation_notes:
+  direct_outcomes: '경로별 무키·오키 대표 직통 결과. (출발점·대상, 키) 조합의 TCP 연결 자체가 timeout/refused/unreachable이면 HTTP 없이 모든 등록 경로(상태 변경 포함)를 그 값으로 기록(basis: tcp_connect, 추론). 연결되면 비상태변경 경로만 HTTP.'
+  routes_tested: 모든 (대상, 비허용 키) 조합의 직통 결과가 있는 경로. 연결되는 위상에서 상태 변경 경로는 미시험.
+functional_probes:
+- method: POST
+  path: /v1/completions
+  body:
+    model: '{model}'
+    prompt: ping
+    max_tokens: 1
+  expect:
+  - 200
+functional_scope:
+  probed_obs: functional_probe_results
+  of_obs: routes_registered

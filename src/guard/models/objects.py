@@ -99,10 +99,22 @@ class RuntimeInfo(Strict):
         return _drop_none(handler(self), ("platform",))
 
 
+class FilesReadByEngine(Strict):
+    """참고용: snapshot 중 엔진이 읽는 파일만의 inventory. 판정·비교 조건(INV-09)에는 쓰지 않는다."""
+
+    file_count: int
+    inventory_sha256: str
+
+
 class ModelInfo(Strict):
     id: str | None = None
     revision: str | None = None
-    inventory_sha256: str | None = None
+    inventory_sha256: str | None = None  # 비교용: 마운트한 snapshot 전체 (tools/model_inventory.py --scope all)
+    files_read_by_engine: FilesReadByEngine | None = None  # 참고용 (엔진이 읽는 파일만)
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("files_read_by_engine",))
 
 
 class Environment(GuardObject):
@@ -387,6 +399,12 @@ class ExceptionDisplay(Strict):
     expires_at: datetime | None = None
 
 
+class FunctionalScope(Strict):
+    probed: int
+    of: int | None
+    label: str
+
+
 class CheckRow(Strict):
     check_id: str
     purpose: str
@@ -403,6 +421,11 @@ class CheckRow(Strict):
     comparison: Comparison | None = None
     gaps: list[Gap] = Field(default_factory=list)
     exception: ExceptionDisplay | None = None
+    functional_scope: FunctionalScope | None = None  # "기능 확인 범위: N / 등록 경로 M (표본)"
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("functional_scope",))
 
 
 class AxisSummary(Strict):

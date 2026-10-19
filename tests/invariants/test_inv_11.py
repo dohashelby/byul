@@ -31,9 +31,10 @@ def test_any_missing_condition_is_unknown(kw):
 
 
 def test_over_blocking_is_not_pass():
-    # 정상 대조 실패(허용 키도 Gateway에서 403) → 보안 PASS 아님, 기능 FAIL
+    # 정상 대조 실패(허용 키 기능 표본도 Gateway에서 403 → fail) → 보안 PASS 아님, 기능 FAIL
     evd = evidence(normal={"attempted": True, "succeeded": False},
-                   observations=req01_obs(gateway={"/v1/models": 403, "/v1/completions": 403, "/invocations": 403}))
+                   observations=req01_obs(gateway={"/v1/models": 403, "/v1/completions": 403, "/invocations": 403},
+                                          functional={"POST /v1/completions": "fail"}))
     res = judge(evd)
     assert res.verdicts.security == Verdict.UNKNOWN
     assert res.verdicts.functional == Verdict.FAIL

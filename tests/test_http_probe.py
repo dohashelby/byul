@@ -70,3 +70,21 @@ def test_http_status_and_body():
         assert "headers" not in out  # 요청 헤더(키)는 결과에 남기지 않는다
     finally:
         httpd.shutdown()
+
+
+def test_tcp_probe_refused_and_connected_without_sending_bytes():
+    from guard.executors.http_probe import tcp_probe
+
+    assert probe({"mode": "tcp", "url": f"http://127.0.0.1:{_free_port()}"}, 1.0)["outcome"] == "refused"
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    try:
+        out = tcp_probe({"url": f"http://127.0.0.1:{srv.getsockname()[1]}"}, 1.0)
+        assert out["outcome"] == "connected"
+        conn, _ = srv.accept()
+        conn.settimeout(0.5)
+        assert conn.recv(10) == b""  # 바이트를 보내지 않고 닫았다
+        conn.close()
+    finally:
+        srv.close()

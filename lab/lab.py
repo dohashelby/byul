@@ -197,7 +197,13 @@ def vllm_env_document(topology: str, vllm: dict, images: dict[str, str | None], 
         "adapter": {"name": "vllm", "version": VllmAdapter().version},
         "runtime": {"nodes": 1, "tp_groups": 1, "gpu_count": 1 if vllm.get("gpu") else 0, "gpu_model": vllm.get("gpu_model"),
                     "driver": vllm.get("driver"), "platform": vllm.get("platform")},
-        "model": {"id": vllm["model"], "revision": vllm["revision"], "inventory_sha256": vllm.get("inventory_sha256")},
+        "model": {
+            "id": vllm["model"], "revision": vllm["revision"],
+            "inventory_sha256": vllm.get("inventory_sha256"),  # 비교용: 마운트한 snapshot 전체
+            **({"files_read_by_engine": {"file_count": vllm["files_read_by_engine_count"],
+                                         "inventory_sha256": vllm["files_read_by_engine_sha256"]}}
+               if vllm.get("files_read_by_engine_sha256") else {}),  # 참고용
+        },
         "facts": {
             "gateway": {"value": True, "origin": "DECLARED", "source": f"lab/lab.py topology={topology} engine=vllm"},
         },

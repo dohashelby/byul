@@ -32,6 +32,8 @@ class World:
         self.blocked = blocked
         self.openapi_ok = openapi_ok
         self.engine_hits = []
+        self.tcp_connects = []
+        self.host_open = False
 
     def engine(self, method, path, headers):
         self.engine_hits.append((method, path))
@@ -58,8 +60,11 @@ class World:
             if network == "trusted":
                 if not self.trusted_reachable:
                     return {**base, "outcome": "timeout", "phase": "connect"}
-            elif not self.exposed:
+            elif not (self.exposed or (network == "host" and self.host_open)):
                 return {**base, "outcome": self.blocked, "phase": "connect"}
+            if r.get("mode") == "tcp":
+                self.tcp_connects.append(network)
+                return {**base, "outcome": "connected", "phase": "connect"}
             status, body = self.engine(r["method"], u.path, headers)
             out = {**base, "outcome": status, "phase": "response"}
             if r.get("want_body"):
@@ -163,17 +168,65 @@ def test_extra_registered_route_is_tested(tmp_path):
     assert res.verdicts.security == Verdict.PASS
 
 
-def test_mutating_route_not_sent_and_unknown(tmp_path):
+def test_mutating_route_not_sent_when_connected(tmp_path):
+    """연결되는 위상: 상태 변경 경로에는 요청을 보내지 않고 미시험으로 남긴다."""
     world = World(exposed=True, engine_routes={**ENGINE_ROUTES, "/sleep": "post"})
     store, evd, res = _run(tmp_path, world)
     assert ("POST", "/sleep") not in world.engine_hits  # 상태 변경 요청을 보내지 않았다
     assert "/sleep" in evd.observations["routes_registered"].value
     assert "/sleep" not in evd.observations["routes_tested"].value
     assert res.verdicts.security == Verdict.FAIL  # 다른 경로 직통 200은 그대로 FAIL
-    world2 = World(exposed=False, engine_routes={**ENGINE_ROUTES, "/sleep": "post"})
-    (tmp_path / "b").mkdir()
-    _, _, res2 = _run(tmp_path / "b", world2)
-    assert res2.verdicts.security == Verdict.UNKNOWN  # 미시험 경로가 있으면 PASS 아님
+
+
+def test_tcp_blocked_infers_all_routes_including_mutating(tmp_path):
+    """직통 TCP 연결 자체가 실패하면 HTTP 없이 모든 등록 경로(상태 변경 포함)를 그 값으로 기록(basis: tcp_connect)."""
+    world = World(exposed=False, engine_routes={**ENGINE_ROUTES, "/sleep": "post"})
+    store, evd, res = _run(tmp_path, world)
+    assert res.verdicts.security == Verdict.PASS, res.reasons
+    assert "/sleep" in evd.observations["routes_tested"].value
+    assert evd.observations["direct_outcomes"].value["/sleep"] == "timeout"
+    assert ("POST", "/sleep") not in world.engine_hits  # 상태 변경 경로에 HTTP를 보내지 않았다
+    lines = [json.loads(l) for l in _log(store, evd).splitlines()]
+    direct = [l for l in lines if l.get("via") == "direct"]
+    assert direct and all(l["basis"] == "tcp_connect (inferred)" for l in direct)
+    summary = lines[-1]
+    assert summary["direct_basis"]["/sleep"]["none"] == ["external:tcp_connect"]
+    step = evd.challenges[1].observations
+    assert set(step["tcp_connect"].values()) == {"timeout"}
+
+
+@pytest.mark.parametrize("blocked", ["refused", "timeout", "unreachable"])
+def test_tcp_blocked_kinds_are_inferred(tmp_path, blocked):
+    world = World(exposed=False, blocked=blocked, engine_routes={**ENGINE_ROUTES, "/sleep": "post"})
+    _, evd, res = _run(tmp_path, world)
+    assert set(evd.observations["direct_outcomes"].value.values()) == {blocked}
+    assert res.verdicts.security == Verdict.PASS
+
+
+def test_partial_tcp_block_keeps_mutating_untested(tmp_path):
+    """외부 출발점은 막혔지만 호스트 출발점이 연결되면, 그 조합은 HTTP로 시험하고 상태 변경 경로는 미시험 → PASS 아님."""
+    world = World(exposed=False, engine_routes={**ENGINE_ROUTES, "/sleep": "post"})
+    world.host_open = True
+    target = _target(tmp_path, True)  # 호스트 대상 포함
+    t = json.loads(target.read_text())
+    cfg = {"target": str(target), "allowed_key_env": "K_ALLOWED", "denied_key_env": "K_DENIED"}
+    registry.EXECUTORS["direct_route:sim"] = lambda raw: DirectRouteExecutor(
+        cfg, container_probe=world.container_probe, host_probe=world.host_probe,
+        environ={"K_ALLOWED": ALLOWED, "K_DENIED": DENIED})
+    try:
+        store = Store(tmp_path / ".guard")
+        pack = baseline_pack()
+        env = environment({"gateway": {"value": True, "origin": "DECLARED", "source": "sim"}})
+        pol = policy(pack.ref(), scope={"include": ["REQ-01"], "exclude": []})
+        store.put(env); store.put(pol)
+        plan = select(pack, [env], pol); store.put(plan)
+        (evd,) = run_plan(store, pack, plan, RunConfig(executors={"direct_route": "sim"}, adapter="vllm"))
+        (res,) = judge_plan(store, pack, plan, as_of=env.created_at)
+    finally:
+        del registry.EXECUTORS["direct_route:sim"]
+    assert "/sleep" not in evd.observations["routes_tested"].value
+    assert ("POST", "/sleep") not in world.engine_hits
+    assert res.verdicts.security == Verdict.FAIL  # 호스트 직통이 200 → FAIL
 
 
 def test_allowed_key_direct_result_is_evidence_only(tmp_path):
@@ -224,3 +277,26 @@ def test_engine_never_ready_is_aborted(tmp_path):
                                host_probe=world.host_probe, environ={"K": ALLOWED})
     with pytest.raises(RuntimeError, match="not ready"):
         impl.run(baseline_pack().checks["REQ-01"], environment(), {}, __import__("guard.adapters.vllm", fromlist=["x"]).VllmAdapter(), tmp_path / "w")
+
+
+def test_functional_probes_from_check_definition(tmp_path):
+    """실행기는 CheckDef.functional_probes 목록을 그대로 실행한다(경로 하드코딩 없음)."""
+    from guard.models import CheckDef
+
+    world = World(exposed=False)
+    check_raw = baseline_pack().checks["REQ-01"].model_dump(mode="json")
+    check_raw["functional_probes"] = [
+        {"method": "POST", "path": "/v1/completions", "body": {"model": "{model}", "prompt": "ping", "max_tokens": 1}, "expect": [200]},
+        {"method": "GET", "path": "/v1/models", "expect": [200]},
+        {"method": "GET", "path": "/nope", "expect": [200]},
+    ]
+    check = CheckDef.model_validate(check_raw)
+    target = _target(tmp_path, False)
+    impl = DirectRouteExecutor({"target": str(target), "allowed_key_env": "K"}, container_probe=world.container_probe,
+                               host_probe=world.host_probe, environ={"K": ALLOWED})
+    from guard.adapters.vllm import VllmAdapter
+    draft = impl.run(check, environment(), {}, VllmAdapter(), tmp_path / "w")
+    res = draft.observations["functional_probe_results"].value
+    assert res == {"POST /v1/completions": "pass", "GET /v1/models": "pass", "GET /nope": "fail"}
+    assert draft.observations["functional_probes_planned"].value == list(res)
+    assert draft.normal_control.attempted and draft.normal_control.succeeded is False

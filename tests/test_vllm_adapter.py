@@ -14,7 +14,8 @@ OPENAPI = {"paths": {
     "/health": {"get": {}}, "/version": {"get": {}}, "/metrics": {"get": {}}, "/openapi.json": {"get": {}},
     "/v1/models": {"get": {}}, "/v1/completions": {"post": {}}, "/v1/chat/completions": {"post": {}},
     "/invocations": {"post": {}}, "/tokenize": {"post": {}}, "/sleep": {"post": {}}, "/is_sleeping": {"get": {}},
-    "/reset_prefix_cache": {"post": {}},
+    "/reset_prefix_cache": {"post": {}}, "/load": {"get": {}}, "/kv_event_sources": {"get": {}},
+    "/v1/responses/{response_id}": {"get": {}}, "/v1/responses/{response_id}/cancel": {"post": {}},
 }}
 
 
@@ -64,6 +65,11 @@ def test_routes_from_openapi_classification():
     assert routes[("POST", "/v1/completions")].kind == "inference"
     assert routes[("POST", "/sleep")].kind == "admin" and routes[("POST", "/sleep")].mutating
     assert routes[("GET", "/is_sleeping")].kind == "admin" and not routes[("GET", "/is_sleeping")].mutating
+    # 5b 실측 후 승인된 분류
+    assert routes[("GET", "/load")].kind == "info"
+    assert routes[("GET", "/kv_event_sources")].kind == "info"
+    assert routes[("POST", "/v1/responses/{response_id}/cancel")].mutating
+    assert not routes[("GET", "/v1/responses/{response_id}")].mutating
 
 
 def test_public_routes_reads_openapi():
@@ -74,7 +80,7 @@ def test_public_routes_reads_openapi():
         return 200, json.dumps(OPENAPI)
 
     routes = VllmAdapter(http_get=get, base_url="http://e:8000").public_routes(environment())
-    assert calls == ["http://e:8000/openapi.json"] and len(routes) == 12
+    assert calls == ["http://e:8000/openapi.json"] and len(routes) == 16
     with pytest.raises(RuntimeError):
         VllmAdapter(http_get=lambda u, t: (500, ""), base_url="http://e").public_routes(environment())
 
@@ -86,6 +92,15 @@ def test_probe_requests_are_harmless():
     assert a.probe_request(Route("POST", "/v1/chat/completions"), "m").body["max_tokens"] == 1
     assert a.probe_request(Route("GET", "/v1/models"), None).body is None
     assert a.probe_request(Route("POST", "/sleep", kind="admin", mutating=True), None) is None
+
+
+def test_path_variables_replaced_with_nonexistent_fixed_id():
+    from guard.adapters.vllm import PATH_PARAM_PLACEHOLDER
+
+    r = VllmAdapter().probe_request(Route("GET", "/v1/responses/{response_id}"), None)
+    assert r.path == f"/v1/responses/{PATH_PARAM_PLACEHOLDER}" and "{" not in r.path
+    assert VllmAdapter().probe_request(Route("POST", "/v1/responses/{response_id}/cancel", kind="admin", mutating=True), None) is None
+    assert VllmAdapter().probe_request(Route("POST", "/a/{x}/b/{y}"), None).path == f"/a/{PATH_PARAM_PLACEHOLDER}/b/{PATH_PARAM_PLACEHOLDER}"
 
 
 def test_detect_version_and_ready():

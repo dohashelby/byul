@@ -140,12 +140,17 @@ required_observations:                    # ← required_observations (구조화
   - { key: direct_outcomes, type: "dict[str, int|outcome]" }   # 무키·오키 대표값. outcome = refused|timeout|unreachable|dns_error|error
   - { key: gateway_outcomes, type: "dict[str, int]" }          # 허용 키로 Gateway 경유
   - { key: trusted_origin_reachable, type: bool }              # 같은 시각 신뢰 출발점 → 엔진 도달 (양성 대조)
+  - { key: functional_probes_planned, type: "list[str]" }      # functional_probes의 "METHOD path"
+  - { key: functional_probe_results, type: "dict[str, pass|fail|no_response]" }
 satisfied_if: "..."                       # ← satisfied_if (원문)
 fail_criteria: "..."                      # ← fail_criteria
 unknown_criteria: "..."                   # ← unknown_criteria
 remediation: "..."                        # ← remediation
 executor: null                            # 실행기 플러그인 이름. null이면 자동 실행 불가 → Gap NO_EXECUTOR
 judge: { plugin: rule_table, params: {...} }  # null이면 수동 판정만 (REQ-01 판정표는 §7.2)
+functional_probes:                        # 기능 축 표본(허용 키, Gateway 경유). 경로를 코드에 두지 않는다
+  - { method: POST, path: /v1/completions, body: { model: "{model}", prompt: ping, max_tokens: 1 }, expect: [200] }
+functional_scope: { probed_obs: functional_probe_results, of_obs: routes_registered }   # 보고서 범위 표시
 legacy: { q_ids: [Q-C01], scenario_ids: [SC-01-01] }   # 근거 링크. 판정 단위 아님
 ```
 
@@ -182,7 +187,8 @@ kind: ENV
 engine: { name: vllm, version: "0.31.0", source_commit: hex|null, image_digest: "sha256:..."|null }
 adapter: { name: vllm, version: "0.1.0" }          # 사용한 엔진 어댑터 (§7.1)
 runtime: { nodes: int, tp_groups: int, gpu_count: int|null, gpu_model: str|null, driver: str|null }
-model: { id: str|null, revision: str|null, inventory_sha256: hex|null }
+model: { id: str|null, revision: str|null, inventory_sha256: hex|null,   # 비교용(INV-09): 마운트한 snapshot 전체의 정렬 목록 해시
+         files_read_by_engine: { file_count: int, inventory_sha256: hex }|null }   # 참고용: 엔진이 읽은 파일만. 판정·비교에 쓰지 않음
 facts:                                             # 적용 판단에 쓰는 사실. 키는 등록된 것만
   gateway:                       { value: true, origin: DECLARED, source: "env.yaml#gateway" }
   prefix_cache:                  { value: true, origin: MEASURED, source: "..." }
@@ -301,6 +307,8 @@ observations:                                  # CheckDef.required_observations 
   direct_outcomes:    { value: { "/v1/completions": "timeout", "/invocations": "timeout" }, collected: true }
   gateway_outcomes:   { value: { "/v1/completions": 200, "/invocations": 200 }, collected: true }
   trusted_origin_reachable: { value: true, collected: true }
+  functional_probes_planned: { value: ["POST /v1/completions"], collected: true }
+  functional_probe_results:  { value: { "POST /v1/completions": "pass" }, collected: true }
 artifacts:
   - { name: request_log.jsonl, path: "artifacts/<sha>.jsonl", sha256: hex, bytes: int,
       collected_at: RFC3339, collector: str }
@@ -314,6 +322,7 @@ comparability:                                 # update 모드 비교 조건 (IN
 
 - 수집 실패는 `collected: false`로 남긴다. 값을 비우거나 추정하지 않는다.
 - 직통 결과 값은 HTTP 상태코드(int) 또는 `refused`(연결 거부) · `timeout` · `unreachable`(ENETUNREACH/EHOSTUNREACH) · `dns_error` · `error`. 응답 미수신 종류를 서로 구별한다.
+- **직통 결과의 근거(basis)**: 실행기는 (출발점·대상, 키) 조합마다 먼저 TCP 연결만 시도한다(바이트 미전송). 연결 자체가 `timeout`·`refused`·`unreachable`이면 HTTP를 보내지 않고 그 조합의 **모든 등록 경로(상태 변경 경로 포함)** 결과를 그 값으로 기록하고 증거 파일에 `basis: tcp_connect (inferred)`로 표시한다. 연결되면 비상태변경 경로에만 HTTP를 보내고(`basis: http`) 상태 변경 경로는 보내지 않는다(미시험). `routes_tested`는 모든 (대상, 비허용 키) 조합의 직통 결과가 있는 경로다.
 - 판정에 쓰지 않는 보조 관측(예: REQ-01 `direct_allowed_outcomes`)은 증거 파일에 남긴다.
 - 증거 파일은 `artifacts/<sha256>` 이름으로 저장한다(내용 주소). 같은 파일은 한 번만 저장된다.
 
@@ -350,6 +359,7 @@ by_check:
     candidate: { result: Ref|null, security: Verdict }
     comparison: Comparison                     # update 모드만
     gaps: [Gap]
+    functional_scope: { probed: int, of: int|null, label: "기능 확인 범위: N / 등록 경로 M (표본)" }   # CheckDef.functional_scope가 있을 때만
 by_purpose:  { "요청·대상 접근 권한": { security: Verdict, inventory_complete: bool } }
 by_area:     { REQ: { security: Verdict } }
 not_selected: [{ check_id: str, reason: str }]
@@ -405,7 +415,7 @@ CHG* ──────────┘                                          
 | --- | --- | --- |
 | **INV-01** | `UNKNOWN`을 `PASS`로 올리지 않는다. 확인 부족과 위반 확인을 구별한다. | A1-1 |
 | **INV-02** | `EXAMPLE` 자료, 기대값, 실행하지 않은 시험을 `MEASURED`로 표시하지 않는다. | A1-2 |
-| **INV-03** | 시도가 없으면 차단 성공이 아니다. `challenges[].attempted: false`인데 "거부됨"으로 `PASS`를 낼 수 없다. 응답 미수신만으로 `PASS`가 되지 않는다. (주: `refused`·`timeout`·`unreachable`은 **같은 시각 신뢰 출발점에서 대상에 도달함(양성 대조)이 관측된 경우에만** 차단 근거가 된다. `dns_error`·`error`는 차단 근거가 아니다.) | A1-3,4 |
+| **INV-03** | 시도가 없으면 차단 성공이 아니다. `challenges[].attempted: false`인데 "거부됨"으로 `PASS`를 낼 수 없다. 응답 미수신만으로 `PASS`가 되지 않는다. (주: `refused`·`timeout`·`unreachable`은 **같은 시각 신뢰 출발점에서 대상에 도달함(양성 대조)이 관측된 경우에만** 차단 근거가 된다. `dns_error`·`error`는 차단 근거가 아니다. TCP 연결 실패에서 경로별 결과를 추론한 경우(`basis: tcp_connect`)도 연결 시도는 실제로 했으므로 "시도함"이며, 같은 양성 대조 조건을 따른다. 연결이 된 뒤의 응답 없음은 `error`다.) | A1-3,4 |
 | **INV-04** | 위반 증거가 없는 것과 준수 증거가 있는 것은 다르다. 센서 장애·수집 실패는 `UNKNOWN`이다. 이미 확인된 `FAIL`은 다른 누락 때문에 지우지 않는다. | A1-10 |
 | **INV-05** | 기본 점검(`review_order: reference_baseline_first`이고 적용되는 것)은 변경 분석 결과가 "영향 없음"이어도 빼지 않는다. 변경 분석은 시험을 **추가**할 뿐 **제거**하지 않는다. | A(planner) |
 | **INV-06** | 환경 사실을 `false`로 쓰려면 비사용·비노출 근거가 필요하다. 근거 없는 `false`는 `null`로 취급한다. 빈 조건 목록은 "항상 참"이 아니다. | F(selector) |
@@ -485,12 +495,14 @@ judge:
     fail_when_any:
       - { obs: direct_outcomes, op: any_between, value: [200, 299] }           # 비허용 호출자의 직통 요청이 처리됨
     axes:
-      functional:                                                             # 정상 대조: 허용 키 Gateway 경유
+      functional:     # CheckDef.functional_probes 목록의 모든 항목이 기대대로 통과. 목록이 늘어도 이 표는 그대로
         pass_when_all:
-          - { obs: gateway_outcomes, op: superset_of, value_obs: routes_registered }
-          - { obs: gateway_outcomes, op: all_in, value: [200] }
+          - { obs: functional_probe_results, op: nonempty }
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
         fail_when_any:
-          - { obs: gateway_outcomes, op: any_in, value: [401, 403] }
+          - { obs: functional_probe_results, op: any_in, value: [fail] }   # 기대 코드가 아닌 HTTP 응답
+    # 정상 대조(EVD.normal_control)도 같은 표본: 전부 pass일 때만 succeeded (INV-11 PASS 관문)
     # 어느 쪽도 아니면 UNKNOWN (INV-11): 일부 경로만 시험, 양성 대조 실패, 직통 404·5xx·dns_error·error, 관측 누락
 ```
 

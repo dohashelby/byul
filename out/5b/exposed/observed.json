@@ -3,19 +3,19 @@
   "verdict": {
     "result": {
       "kind": "RES",
-      "id": "RES-01M59EN0C8F67TNDY2QZYRQMGB",
+      "id": "RES-01M59HRP69DYX6MC52A4R1GHWZ",
       "revision": 1,
-      "sha256": "bb246fdc7f7bb3d71bb632d5e2c113c6d5a158d171a92fa110ca37cb04186f12"
+      "sha256": "3681157d9937e9223ed81ba91eff86485bb46f44e604ab92af0ee3060c0f0647"
     },
     "security": "FAIL",
-    "functional": "UNKNOWN",
+    "functional": "PASS",
     "performance": "UNKNOWN",
     "verification_level": "DECLARED"
   },
   "expected_security": "FAIL",
-  "ready_seconds": 28.525075416080654,
-  "run_seconds": 2.2,
-  "total_seconds": 32.3,
+  "ready_seconds": 28.674380583921447,
+  "run_seconds": 2.5,
+  "total_seconds": 32.9,
   "wildcard_listeners_before": [
     "ControlCe *:5000",
     "ControlCe *:7000",
@@ -27,38 +27,43 @@
     "rapportd *:56365"
   ],
   "distribution": {
-    "direct | external | allowed | 200": 8,
+    "direct | external | allowed | 200": 6,
     "direct | external | allowed | 400": 6,
-    "direct | external | allowed | 404": 2,
-    "direct | external | none | 200": 8,
+    "direct | external | allowed | 404": 1,
+    "direct | external | none | 200": 6,
     "direct | external | none | 400": 6,
-    "direct | external | none | 404": 2,
-    "direct | external | wrong | 200": 8,
+    "direct | external | none | 404": 1,
+    "direct | external | wrong | 200": 6,
     "direct | external | wrong | 400": 6,
-    "direct | external | wrong | 404": 2,
-    "direct | host | allowed | 200": 8,
+    "direct | external | wrong | 404": 1,
+    "direct | host | allowed | 200": 6,
     "direct | host | allowed | 400": 6,
-    "direct | host | allowed | 404": 2,
-    "direct | host | none | 200": 8,
+    "direct | host | allowed | 404": 1,
+    "direct | host | none | 200": 6,
     "direct | host | none | 400": 6,
-    "direct | host | none | 404": 2,
-    "direct | host | wrong | 200": 8,
+    "direct | host | none | 404": 1,
+    "direct | host | wrong | 200": 6,
     "direct | host | wrong | 400": 6,
-    "direct | host | wrong | 404": 2,
+    "direct | host | wrong | 404": 1,
+    "direct-tcp | external | allowed | connected": 1,
+    "direct-tcp | external | none | connected": 1,
+    "direct-tcp | external | wrong | connected": 1,
+    "direct-tcp | host | allowed | connected": 1,
+    "direct-tcp | host | none | connected": 1,
+    "direct-tcp | host | wrong | connected": 1,
     "engine | trusted | none | 200": 2,
-    "gateway | external | allowed | 200": 8,
+    "functional | external | allowed | 200": 1,
+    "gateway | external | allowed | 200": 6,
     "gateway | external | allowed | 400": 6,
-    "gateway | external | allowed | 404": 2,
-    "gateway | external | none | 401": 16,
-    "gateway | external | wrong | 401": 16
+    "gateway | external | allowed | 404": 1,
+    "gateway | external | none | 401": 13,
+    "gateway | external | wrong | 401": 13
   },
   "routes_registered": [
     "/detokenize",
     "/generative_scoring",
     "/invocations",
     "/is_scaling_elastic_ep",
-    "/kv_event_sources",
-    "/load",
     "/scale_elastic_ep",
     "/tokenize",
     "/v1/chat/completions",
@@ -72,15 +77,14 @@
     "/v1/responses/{response_id}/cancel"
   ],
   "skipped_routes": {
-    "/scale_elastic_ep": "mutating admin route not sent (allow_mutating_routes=false)"
+    "/scale_elastic_ep": "mutating admin route not sent (allow_mutating_routes=false)",
+    "/v1/responses/{response_id}/cancel": "mutating admin route not sent (allow_mutating_routes=false)"
   },
   "direct_outcomes": {
     "/detokenize": 200,
     "/generative_scoring": 400,
     "/invocations": 200,
     "/is_scaling_elastic_ep": 200,
-    "/kv_event_sources": 200,
-    "/load": 200,
     "/tokenize": 200,
     "/v1/chat/completions": 400,
     "/v1/chat/completions/batch": 400,
@@ -89,16 +93,13 @@
     "/v1/messages/count_tokens": 400,
     "/v1/models": 200,
     "/v1/responses": 400,
-    "/v1/responses/{response_id}": 404,
-    "/v1/responses/{response_id}/cancel": 404
+    "/v1/responses/{response_id}": 404
   },
   "direct_allowed_outcomes": {
     "/detokenize": 200,
     "/generative_scoring": 400,
     "/invocations": 200,
     "/is_scaling_elastic_ep": 200,
-    "/kv_event_sources": 200,
-    "/load": 200,
     "/tokenize": 200,
     "/v1/chat/completions": 400,
     "/v1/chat/completions/batch": 400,
@@ -107,16 +108,13 @@
     "/v1/messages/count_tokens": 400,
     "/v1/models": 200,
     "/v1/responses": 400,
-    "/v1/responses/{response_id}": 404,
-    "/v1/responses/{response_id}/cancel": 404
+    "/v1/responses/{response_id}": 404
   },
   "gateway_outcomes": {
     "/detokenize": 200,
     "/generative_scoring": 400,
     "/invocations": 200,
     "/is_scaling_elastic_ep": 200,
-    "/kv_event_sources": 200,
-    "/load": 200,
     "/tokenize": 200,
     "/v1/chat/completions": 400,
     "/v1/chat/completions/batch": 400,
@@ -125,8 +123,7 @@
     "/v1/messages/count_tokens": 400,
     "/v1/models": 200,
     "/v1/responses": 400,
-    "/v1/responses/{response_id}": 404,
-    "/v1/responses/{response_id}/cancel": 404
+    "/v1/responses/{response_id}": 404
   },
   "gateway_denied_outcomes": {
     "/detokenize": {
@@ -142,14 +139,6 @@
       "wrong": 401
     },
     "/is_scaling_elastic_ep": {
-      "none": 401,
-      "wrong": 401
-    },
-    "/kv_event_sources": {
-      "none": 401,
-      "wrong": 401
-    },
-    "/load": {
       "none": 401,
       "wrong": 401
     },
@@ -188,18 +177,14 @@
     "/v1/responses/{response_id}": {
       "none": 401,
       "wrong": 401
-    },
-    "/v1/responses/{response_id}/cancel": {
-      "none": 401,
-      "wrong": 401
     }
   },
   "trusted_origin_reachable": true,
   "limitations": [
     "검토 전 팩(DRAFT): 공식 아님",
     "정책 DRAFT: 공식 아님",
-    "실행 환경(ENV-01M59EMY56YJ75FSH3Z0A1VHGE): CPU, arm64, Docker Desktop on macOS",
-    "엔진 소스 commit(ENV-01M59EMY56YJ75FSH3Z0A1VHGE): 축약 hash만 일치, 전체 commit 미확인 — 관측 db9527a46, 고정 db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "실행 환경(ENV-01M59HRKKZNQ6H9A305Y7TK6WP): CPU, arm64, Docker Desktop on macOS",
+    "엔진 소스 commit(ENV-01M59HRKKZNQ6H9A305Y7TK6WP): 축약 hash만 일치, 전체 commit 미확인 — 관측 db9527a46, 고정 db9527a46873454610df6dbedf79a36d6bf1a7f6",
     "점검 목록 미완결 보호 목적: 1개 — 집계 PASS 불가",
     "정책 범위 밖으로 제외: 76개 점검"
   ]

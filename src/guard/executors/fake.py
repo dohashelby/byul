@@ -24,6 +24,7 @@ from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, utcnow
 from .base import DraftArtifact, EvidenceDraft
 
 ROUTES = ["/v1/models", "/v1/completions", "/invocations"]
+FUNCTIONAL_PROBE = "POST /v1/completions"  # 가짜 증거의 기능 표본 이름(REQ-01 override와 같은 모양)
 
 
 def _obs(value: Any) -> dict:
@@ -39,6 +40,8 @@ def _scenario(direct: dict, trusted: bool = True, tested: list[str] | None = Non
         "direct_outcomes": _obs({r: direct[r] for r in tested}),
         "gateway_outcomes": _obs({r: 200 for r in tested}),
         "trusted_origin_reachable": _obs(trusted),
+        "functional_probes_planned": _obs([FUNCTIONAL_PROBE]),
+        "functional_probe_results": _obs({FUNCTIONAL_PROBE: "pass"}),
     }
     for key in missing:
         obs[key] = {"value": None, "collected": False}

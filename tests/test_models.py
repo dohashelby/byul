@@ -172,7 +172,8 @@ def test_all_pack_checks_load_as_checkdef():
     assert all(isinstance(c, CheckDef) for c in pack.checks.values())
     req = pack.checks["REQ-01"]
     assert [o.key for o in req.required_observations] == [
-        "routes_registered", "routes_tested", "direct_outcomes", "gateway_outcomes", "trusted_origin_reachable"]
+        "routes_registered", "routes_tested", "direct_outcomes", "gateway_outcomes", "trusted_origin_reachable",
+        "functional_probes_planned", "functional_probe_results"]
 
 
 def test_checkdef_yaml_round_trip():
@@ -197,3 +198,12 @@ def test_optional_env_fields_do_not_change_old_hashes():
                        runtime={"platform": "CPU, arm64, Docker Desktop on macOS"}).seal()
     back = object_from_dict(env2.to_dict())
     assert back == env2 and back.hash_ok()
+
+
+def test_files_read_by_engine_is_optional_reference_field():
+    env = environment()
+    assert "files_read_by_engine" not in env.to_dict()["model"]  # 비어 있으면 해시에 들어가지 않음
+    env2 = Environment(id="ENV-Y", created_at=T0, data_origin="DECLARED", engine={"name": "vllm"},
+                       model={"id": "m", "inventory_sha256": "a" * 64,
+                              "files_read_by_engine": {"file_count": 7, "inventory_sha256": "b" * 64}}).seal()
+    assert object_from_dict(env2.to_dict()) == env2

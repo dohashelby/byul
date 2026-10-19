@@ -40,6 +40,7 @@ ContainerProbe = Callable[[str, list[dict], float], list[dict]]  # network, requ
 HostProbe = Callable[[dict, float], dict]
 
 NO_RESPONSE = ("timeout", "unreachable")
+TCP_BLOCKED = ("timeout", "refused", "unreachable")  # 이 값이면 HTTP를 보내지 않고 모든 등록 경로에 추론 기록
 KEY_VARIANTS = ("none", "wrong", "allowed")
 MASK = "***"
 
@@ -74,6 +75,17 @@ def mask(value: Any, secrets_: list[str]) -> Any:
     if isinstance(value, list):
         return [mask(v, secrets_) for v in value]
     return value
+
+
+def _fill_model(body: Any, model: str | None) -> Any:
+    """본문 문자열의 "{model}"을 ENV 모델 이름으로 바꾼다(없으면 그대로)."""
+    if isinstance(body, str):
+        return body.replace("{model}", model) if model else body
+    if isinstance(body, dict):
+        return {k: _fill_model(v, model) for k, v in body.items()}
+    if isinstance(body, list):
+        return [_fill_model(v, model) for v in body]
+    return body
 
 
 def docker_container_probe(docker: Docker, image: str) -> ContainerProbe:
@@ -177,10 +189,11 @@ class DirectRouteExecutor:
         gateway_url = target["gateway"]["url"]
         model = env.model.id
 
-        def record(origin: str, via: str, route: str, key_label: str, res: dict) -> None:
+        def record(origin: str, via: str, route: str, key_label: str, res: dict, basis: str = "http") -> None:
             entry = {k: res.get(k) for k in ("outcome", "phase", "detail", "elapsed_ms", "body_bytes", "body_preview")}
+            label = "tcp_connect (inferred)" if basis == "tcp_connect" and via == "direct" else basis
             log.append(mask({"origin": origin, "via": via, "route": route, "key": key_label, "method": res.get("method"),
-                             **entry}, secret_values))
+                             "basis": label, **entry}, secret_values))
 
         # 1. 등록 경로 (신뢰 출발점 → 엔진 /openapi.json)
         (doc_res,) = cprobe(trusted_net, [{"id": "openapi", "method": "GET", "url": f"{engine_url}/openapi.json",
@@ -221,29 +234,57 @@ class DirectRouteExecutor:
             pr = templates[path]
             return {"id": rid, "method": pr.method, "url": f"{base}{pr.path}", "headers": self._headers(key), "body": pr.body}
 
-        # 2·3. 외부 호출자: Gateway(키 3종) + 직통(키 3종)
+        # 2·3. 외부 호출자: Gateway(키 3종, 비상태변경 경로만)
+        #      직통: (출발점·대상, 키) 조합마다 먼저 TCP 연결만 시도한다(HTTP 미전송).
+        #      연결 자체가 실패(timeout/refused/unreachable)하면 그 조합의 **모든 등록 경로**(상태 변경 포함) 결과를
+        #      그 값으로 기록한다(basis: tcp_connect, 추론). 연결되면 비상태변경 경로에만 HTTP 요청(basis: http).
+        direct_combos = [(t, label) for t in target["direct_targets"] for label in KEY_VARIANTS]
+
+        def tcp_check(origin: str, t_url: str, label: str) -> dict:
+            return {"id": f"tcp|{origin}|{label}", "mode": "tcp", "method": "TCP", "url": t_url}
+
+        ext_combos = [(t, l) for t, l in direct_combos if t["origin"] == "external"]
+        ext_tcp = cprobe(external_net, [tcp_check("external", t["url"], l) for t, l in ext_combos], timeout) if ext_combos else []
+        tcp_result: dict[tuple[str, str, str], dict] = {}
+        for (t, l), res in zip(ext_combos, ext_tcp):
+            tcp_result[(t["origin"], t["url"], l)] = res
+        for t, l in direct_combos:
+            if t["origin"] == "host":
+                tcp_result[("host", t["url"], l)] = self._host_probe(tcp_check("host", t["url"], l), timeout)
+        for (origin, t_url, l), res in tcp_result.items():
+            record(origin, "direct-tcp", "*", l, res, basis="tcp_connect")
+
         ext_requests, index = [], []
+        # 기능 축 표본(CheckDef.functional_probes): 허용 키, Gateway 경유
+        probes = {fp.id: fp for fp in check.functional_probes}
+        for pid, fp in probes.items():
+            ext_requests.append({"id": f"func|{pid}", "method": fp.method.upper(), "url": f"{gateway_url}{fp.path}",
+                                 "headers": self._headers(keys["allowed"]), "body": _fill_model(fp.body, model)})
+            index.append(("functional", "external", pid, "allowed", "http"))
         for path in templates:
             for label in KEY_VARIANTS:
                 ext_requests.append(req(f"gw|{path}|{label}", gateway_url, path, keys[label]))
-                index.append(("gateway", "external", path, label))
-            for t in target["direct_targets"]:
-                if t["origin"] != "external":
-                    continue
-                for label in KEY_VARIANTS:
-                    ext_requests.append(req(f"direct|{path}|{label}", t["url"], path, keys[label]))
-                    index.append(("direct", "external", path, label))
-        ext_results = cprobe(external_net, ext_requests, timeout) if ext_requests else []
-        results = list(zip(index, ext_results))
-        for t in target["direct_targets"]:
-            if t["origin"] != "host":
+                index.append(("gateway", "external", path, label, "http"))
+        results: list[tuple[tuple[str, str, str, str, str], dict]] = []
+        for t, label in direct_combos:
+            tr = tcp_result[(t["origin"], t["url"], label)]
+            if tr.get("outcome") in TCP_BLOCKED:
+                for path in routes:  # 상태 변경 경로 포함, HTTP 미전송
+                    results.append((("direct", t["origin"], path, label, "tcp_connect"),
+                                    {"outcome": tr["outcome"], "phase": "connect",
+                                     "detail": f"inferred from TCP connect: {tr.get('detail')}", "method": routes[path].method}))
                 continue
-            for path in templates:
-                for label in KEY_VARIANTS:
-                    r = self._host_probe(req(f"host|{path}|{label}", t["url"], path, keys[label]), timeout)
-                    results.append((("direct", "host", path, label), r))
-        for (via, origin, path, label), res in results:
-            record(origin, via, path, label, res)
+            for path in templates:  # 연결됨(또는 dns_error 등): 비상태변경 경로만 HTTP
+                if t["origin"] == "external":
+                    ext_requests.append(req(f"direct|{path}|{label}", t["url"], path, keys[label]))
+                    index.append(("direct", "external", path, label, "http"))
+                else:
+                    results.append((("direct", t["origin"], path, label, "http"),
+                                    self._host_probe(req(f"host|{path}|{label}", t["url"], path, keys[label]), timeout)))
+        ext_results = cprobe(external_net, ext_requests, timeout) if ext_requests else []
+        results = list(zip(index, ext_results)) + results
+        for (via, origin, path, label, basis), res in results:
+            record(origin, via, path, label, res, basis=basis)
 
         # 5. 양성 대조: 신뢰 출발점 → 엔진 (직통 시험 직후)
         (pos,) = cprobe(trusted_net, [{"id": "positive", "method": "GET", "url": f"{engine_url}/health"}], timeout)
@@ -251,29 +292,45 @@ class DirectRouteExecutor:
         trusted_reachable = isinstance(pos.get("outcome"), int) and not isinstance(pos.get("outcome"), bool)
 
         # 집계
-        direct_denied: dict[str, list] = {p: [] for p in templates}
-        direct_allowed: dict[str, list] = {p: [] for p in templates}
+        direct_denied: dict[str, list] = {p: [] for p in routes}
+        direct_allowed: dict[str, list] = {p: [] for p in routes}
+        direct_basis: dict[str, dict[str, list[str]]] = {p: {} for p in routes}
         gateway_allowed: dict[str, Any] = {}
         gateway_denied: dict[str, dict] = {p: {} for p in templates}
-        for (via, origin, path, label), res in results:
+        for (via, origin, path, label, basis), res in results:
             o = res.get("outcome")
+            if via == "functional":
+                continue
             if via == "direct":
                 (direct_allowed if label == "allowed" else direct_denied)[path].append(o)
+                direct_basis[path].setdefault(label, []).append(f"{origin}:{basis}")
             elif label == "allowed":
                 gateway_allowed[path] = o
             else:
                 gateway_denied[path][label] = o
         direct_outcomes = {p: representative(v) for p, v in direct_denied.items() if v}
         direct_allowed_outcomes = {p: representative(v) for p, v in direct_allowed.items() if v}
-        routes_tested = sorted(p for p in templates if direct_denied[p] and p in gateway_allowed)
+        # 직통 시험 범위: 모든 (대상, 비허용 키) 조합의 결과가 있는 경로 (Gateway 정상 대조 범위는 gateway_outcomes가 따로 본다)
+        denied_combos = sum(1 for _, l in direct_combos if l != "allowed")
+        routes_tested = sorted(p for p in routes if denied_combos and len(direct_denied[p]) == denied_combos)
         gateway_outcomes = {p: o for p, o in gateway_allowed.items() if isinstance(o, int)}
 
-        normal_route = "/v1/completions" if "/v1/completions" in templates else (sorted(templates)[0] if templates else None)
-        normal_status = gateway_allowed.get(normal_route) if normal_route else None
+        functional: dict[str, str] = {}
+        functional_status: dict[str, Any] = {}
+        for (via, origin, pid, label, basis), res in results:
+            if via != "functional":
+                continue
+            o = res.get("outcome")
+            functional_status[pid] = o
+            if isinstance(o, int) and not isinstance(o, bool):
+                functional[pid] = "pass" if o in probes[pid].expect else "fail"
+            else:
+                functional[pid] = "no_response"
+        # 정상 대조 = 기능 표본 전부 기대대로 (CheckDef.functional_probes)
         normal = {
-            "attempted": normal_route is not None,
-            "succeeded": (normal_status == 200) if normal_route else None,
-            "detail": f"allowed key via gateway {normal_route} → {normal_status}",
+            "attempted": bool(probes),
+            "succeeded": (all(v == "pass" for v in functional.values()) and len(functional) == len(probes)) if probes else None,
+            "detail": "allowed key via gateway: " + ", ".join(f"{pid} → {functional_status.get(pid)}" for pid in probes),
         }
 
         has_direct_targets = bool(target["direct_targets"])
@@ -283,6 +340,8 @@ class DirectRouteExecutor:
             "direct_outcomes": {"value": direct_outcomes, "collected": has_direct_targets and bool(direct_outcomes)},
             "gateway_outcomes": {"value": gateway_outcomes, "collected": bool(gateway_outcomes)},
             "trusted_origin_reachable": {"value": trusted_reachable, "collected": True},
+            "functional_probes_planned": {"value": list(probes), "collected": True},
+            "functional_probe_results": {"value": functional, "collected": bool(probes)},
         }
         for k, o in observations.items():
             if not o["collected"]:
@@ -292,8 +351,10 @@ class DirectRouteExecutor:
         challenges = [
             {"step": steps[0], "attempted": True,
              "observations": {"openapi_outcome": doc_res.get("outcome"), "routes": registered, "skipped": skipped}},
-            {"step": steps[1], "attempted": bool(ext_requests) and has_direct_targets,
-             "observations": {"direct_outcomes": direct_outcomes, "gateway_denied": gateway_denied}},
+            {"step": steps[1], "attempted": bool(direct_combos),
+             "observations": {"direct_outcomes": direct_outcomes, "direct_basis": direct_basis,
+                              "tcp_connect": {f"{o}|{l}": r.get("outcome") for (o, _, l), r in tcp_result.items()},
+                              "gateway_denied": gateway_denied}},
             {"step": steps[2], "attempted": bool(ext_requests),
              "observations": {"gateway_outcomes": gateway_outcomes, "trusted_origin_reachable": trusted_reachable}},
         ] if len(steps) == 3 else [{"step": s, "attempted": bool(ext_requests)} for s in steps]
@@ -306,6 +367,9 @@ class DirectRouteExecutor:
             "direct_outcomes": direct_outcomes, "direct_allowed_outcomes": direct_allowed_outcomes,
             "gateway_outcomes": gateway_outcomes, "gateway_denied_outcomes": gateway_denied,
             "trusted_origin_reachable": trusted_reachable,
+            "functional_probe_results": functional, "functional_probe_status": functional_status,
+            "direct_basis": direct_basis,  # 경로·키별 출발점:근거 (http | tcp_connect = TCP 연결 실패에서 추론, HTTP 미전송)
+            "tcp_connect": {f"{o}|{l}": r.get("outcome") for (o, _, l), r in tcp_result.items()},
         }, secret_values)
         log_path = workdir / "probe_log.jsonl"
         log_path.write_text("".join(json.dumps(x, ensure_ascii=False, default=str) + "\n" for x in [*log, summary]),

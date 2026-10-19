@@ -26,8 +26,14 @@ REQ01_STEPS = ["실제 route 목록 확보", "키 없음·오류·허용키로 G
 ROUTES = ["/v1/models", "/v1/completions", "/invocations"]
 
 
-def req01_obs(direct=None, gateway=None, registered=None, tested=None, trusted=True, missing=()) -> dict:
-    """REQ-01 관측(경로별). 기본값은 정상 통과 형태(직통 401, Gateway 200, 전 경로 시험)."""
+FUNCTIONAL_PROBE = "POST /v1/completions"
+
+
+def req01_obs(direct=None, gateway=None, registered=None, tested=None, trusted=True, missing=(),
+              functional=None, planned=None) -> dict:
+    """REQ-01 관측(경로별). 기본값은 정상 통과 형태(직통 401, Gateway 200, 전 경로 시험, 기능 표본 통과)."""
+    functional = {FUNCTIONAL_PROBE: "pass"} if functional is None else functional
+    planned = list(functional) if planned is None else planned
     registered = ROUTES if registered is None else registered
     tested = registered if tested is None else tested
     direct = {r: 401 for r in tested} if direct is None else direct
@@ -38,6 +44,8 @@ def req01_obs(direct=None, gateway=None, registered=None, tested=None, trusted=T
         "direct_outcomes": {"value": direct, "collected": True},
         "gateway_outcomes": {"value": gateway, "collected": True},
         "trusted_origin_reachable": {"value": trusted, "collected": True},
+        "functional_probes_planned": {"value": planned, "collected": True},
+        "functional_probe_results": {"value": functional, "collected": True},
     }
     for k in missing:
         obs[k] = {"value": None, "collected": False}

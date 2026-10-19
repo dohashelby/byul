@@ -1,0 +1,8 @@
+{"example": true, "scenario": "pass", "observation": "routes_registered", "value": ["/v1/models", "/v1/completions", "/invocations"], "collected": true}
+{"example": true, "scenario": "pass", "observation": "routes_tested", "value": ["/v1/models", "/v1/completions", "/invocations"], "collected": true}
+{"example": true, "scenario": "pass", "observation": "direct_outcomes", "value": {"/v1/models": 401, "/v1/completions": 401, "/invocations": 401}, "collected": true}
+{"example": true, "scenario": "pass", "observation": "gateway_outcomes", "value": {"/v1/models": 200, "/v1/completions": 200, "/invocations": 200}, "collected": true}
+{"example": true, "scenario": "pass", "observation": "trusted_origin_reachable", "value": true, "collected": true}
+{"example": true, "scenario": "pass", "observation": "functional_probes_planned", "value": ["POST /v1/completions"], "collected": true}
+{"example": true, "scenario": "pass", "observation": "functional_probe_results", "value": {"POST /v1/completions": "pass"}, "collected": true}
+{"example": true, "scenario": "pass", "direct_allowed_outcomes": {"/v1/models": 401, "/v1/completions": 401, "/invocations": 401}}

@@ -121,3 +121,12 @@ AWS는 기존 Linux 절차와 접근·격리·시간/예산·반출·종료 계�
 
 새 관측/시험 절차는 executors/adapters, 정책과 판정표는 overrides/팩, 회귀는 tests에 둔다.
 점검별 분기를 core에 추가하지 않는다. 이 표는 다음 구현 계획이며 신규 자동화 완료 주장이 아니다.
+
+
+## 이번 직접 검증 결과
+
+코드 커밋 `0c8c61b`의 [Linux CI](https://github.com/dohashelby/gua/actions/runs/39257453735)는
+480 passed, 18 deselected / 28.15초 및 wheel 빌드 성공이다.
+Windows 전체 실행과 수정 과정은 [PROGRESS](../PROGRESS.md)의 후속 구현 항목에 기록했다.
+새 가상환경에 설치한 wheel의 독립 CLI로 반출·복원·오프라인 재판정을 포함한 10개 명령을 확인했다(EXAMPLE).
+실제 엔진 opt-in 6건은 설정 부재로 skip했고, 두 실제 이미지나 신규 두 점검의 실증 성공을 의미하지 않는다.

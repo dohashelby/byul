@@ -440,3 +440,11 @@ git status
 - 산출물: docs/VALIDATION.md, examples/engine-cases.json. 테스트 로그는 별도 out/test-runs/followup-20261019에 두고 Git에는 포함하지 않는다.
 - 원격 CI: 이 기록 작성 시 push 전이므로 미실행. 작업 브랜치 push에서도 CI가 실행되도록 연결했으며 실제 결과는 해당 커밋의 Actions 기록으로 확인한다.
 - 다음/막힌 것: Linux/모델/두 이미지 준비 후 실제 15개 사례와 update 실행. 정책 임계값·금지 목록·담당자·팩 검토·이미지 쌍·AWS 예산은 팀 결정이 필요하다. 기존 CPU 결정은 유지하며 유료 자원은 생성하지 않았다.
+
+
+### 원격 Linux CI 확인 (2026-10-19, Asia/Seoul)
+- 코드 커밋 0c8c61b28dbd8ca12ec2202f0ec91715264b132a의 GitHub Actions push 검증 성공.
+- Ubuntu/Python 3.11: `uv run pytest -q` → **480 passed, 18 deselected / 28.15초**. Windows에서 skip된 4건도 Linux에서 통과했다.
+- `uv sync --frozen`, `uv build --wheel` 성공. 기본 테스트 1분 목표는 이 Linux CI 환경에서 충족했다.
+- 실행: https://github.com/dohashelby/gua/actions/runs/39257453735
+- 초안 PR: https://github.com/dohashelby/gua/pull/1 . 실제 엔진·두 실제 이미지 실증은 이 CI에 포함되지 않는다.

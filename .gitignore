@@ -1,0 +1,20 @@
+# 파이썬·도구 생성물
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.pytest_tmp/
+.DS_Store
+
+# 엔진 테스트(-m engine)의 실행별 산출물. 보존할 증거는 사람이 out/5b 등으로 옮긴다
+out/test-runs/
+
+# 덮어써졌던 out/5b 실행본 보관(REQ-03 단계 재실행분). 고정 증거는 커밋본 out/5b
+out/archive/
+
+# 분류안 승인(2026-10-19): 자동 생성물
+.guard/
+out/report.json
+out/report.html
+out/**/.guard/work/
+out/5b/inv15/empty_models/

@@ -17,8 +17,8 @@ def test_unexpected_value_is_unknown_not_pass_or_fail():
 
 
 def test_partial_routes_is_unknown():
-    obs = req01_obs(tested=["/v1/completions"])
-    obs["routes_registered"]["value"] = ["/v1/models", "/v1/completions", "/invocations"]
+    obs = req01_obs(tested=["POST /v1/completions"])
+    obs["routes_registered"]["value"] = ["GET /v1/models", "POST /v1/completions", "POST /invocations"]
     assert sec(evidence(observations=obs)) == Verdict.UNKNOWN
 
 

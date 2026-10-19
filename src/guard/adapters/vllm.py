@@ -22,8 +22,11 @@ CONTAINER_PORT = 8000
 MODEL_MOUNT = "/models"
 
 # 접근 권한 점검에서 제외하는 정보성 경로 (DECISIONS 5a)
-INFO_ROUTES = frozenset({"/health", "/ping", "/version", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect", "/metrics",
-                         "/load", "/kv_event_sources"})  # /load·/kv_event_sources: 5b 실측 후 승인
+# 경로 종류. 점검은 CheckDef.route_scope.include_kinds로 대상 종류를 고른다.
+LIVENESS_ROUTES = frozenset({"/health", "/ping", "/version"})
+DOCS_ROUTES = frozenset({"/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect"})
+DIAGNOSTIC_ROUTES = frozenset({"/metrics", "/load", "/kv_event_sources"})  # /load·/kv_event_sources: 5b 실측 후 승인
+INFO_ROUTES = LIVENESS_ROUTES | DOCS_ROUTES | DIAGNOSTIC_ROUTES  # REQ-01이 제외하던 정보성 경로 전체
 # 경로 변수({response_id} 등)를 채우는 존재하지 않는 고정 ID
 PATH_PARAM_PLACEHOLDER = "guard-probe-nonexistent-id"
 _PATH_PARAM = re.compile(r"\{[^/{}]+\}")
@@ -32,9 +35,52 @@ MUTATING_ADMIN_ROUTES = frozenset({
     "/sleep", "/wake_up", "/reset_prefix_cache", "/reset_mm_cache", "/load_lora_adapter", "/unload_lora_adapter",
     "/collective_rpc", "/scale_elastic_ep", "/start_profile", "/stop_profile", "/pause", "/resume",
     "/update_weights", "/init_weight_transfer",
-    "/v1/responses/{response_id}/cancel",  # 사용자 객체 상태 변경 (5b 실측 후 승인)
 })
+# 상태를 바꾸는 사용자(추론 API) 경로: 종류는 inference, 상태 변경 표시는 유지(보내지 않음)
+MUTATING_USER_ROUTES = frozenset({
+    "/v1/responses/{response_id}/cancel",  # openai/responses/api_router.py — 사용자 응답 객체 취소 (2026-10-19 사람 결정)
+    "/v1/responses",  # 서버 설정(VLLM_ENABLE_RESPONSES_API_STORE)에 따라 저장·background 작업 생성 — ROUTE_REVIEWS 참고
+})
+
+# 상태 변경 여부를 대상 이미지 소스로 확인한 기록: (엔진 버전, 메서드, 경로) → 판단·근거. 분류 자체는 위 집합이 정한다.
+ROUTE_REVIEWS: dict[tuple[str, str, str], dict] = {
+    ("0.31.0", "POST", "/v1/chat/completions/batch"): {
+        "mutating": False,
+        "source": "vllm/vllm-openai-cpu@sha256:495c84fe…(v0.31.0) openai/chat_completion/api_router.py "
+                  "(sha256 77f858fe0079…) L84-108; chat_completion/batch_serving.py (sha256 0daa49681783…) L114-160",
+        "note": "대화 N개를 한 요청 안에서 동기 생성 후 반환. batch_serving.py 전체에 store·save·persist·write·queue·"
+                "background 경로 없음 → 상태 변경 없음(추론과 같음)",
+    },
+    ("0.31.0", "POST", "/v1/responses"): {
+        "mutating": True,
+        "source": "openai/responses/protocol.py (sha256 5fa24e326726…) L210 store 기본 True, L167 background; "
+                  "responses/serving.py (sha256 c70158037… ) L155-193 메모리 저장소·background_tasks, L337-344 "
+                  "VLLM_ENABLE_RESPONSES_API_STORE 꺼짐이면 store 무시, L513-528 저장",
+        "note": "대상 서버 환경변수에 따라 응답·메시지·이벤트를 메모리에 계속 저장하고 background 작업을 만든다. "
+                "실행기는 서버 설정을 알 수 없으므로 상태 변경으로 표시(보내지 않음). 안전 프로브 없음",
+    },
+}
 READONLY_ADMIN_ROUTES = frozenset({"/is_sleeping", "/server_info", "/is_scaling_elastic_ep", "/get_world_size"})
+
+# 검증된 안전 프로브: (엔진 버전, 메서드, 경로) → 요청. 인가 없이 핸들러에 닿으면 expected_handler_reached 응답이 나오고
+# 엔진 상태는 바뀌지 않음을 대상 이미지의 소스로 확인한 것만 둔다(DECISIONS 2026-10-19 REQ-03).
+_JSON = {"Content-Type": "application/json"}
+SAFE_PROBES: dict[tuple[str, str, str], ProbeRequest] = {
+    ("0.31.0", "POST", "/scale_elastic_ep"): ProbeRequest(
+        "POST", "/scale_elastic_ep", body={}, headers=_JSON,
+        expected_handler_reached={"status": 400, "body_contains": "new_data_parallel_size is required"},
+        basis="safe_probe",
+        source="vllm/vllm-openai-cpu@sha256:495c84fe…(v0.31.0) vllm/entrypoints/serve/elastic_ep/api_router.py "
+               "(sha256 2d6805874a86…) L37-49: body {} → new_data_parallel_size None → HTTPException 400, "
+               "client.scale_elastic_ep(L64) 미도달; 선행 Depends(validate_json_request)는 Content-Type만 검사",
+    ),
+    ("0.31.0", "POST", "/is_scaling_elastic_ep"): ProbeRequest(
+        "POST", "/is_scaling_elastic_ep", body={}, headers=_JSON,
+        expected_handler_reached={"status": 200, "body_contains": "is_scaling_elastic_ep"},
+        basis="safe_probe",
+        source="같은 파일 L83-85: 전역 플래그 읽기만(get_scaling_elastic_ep), 상태 변경 없음",
+    ),
+}
 
 # 공통 옵션 → vLLM 고유 옵션
 OPTION_FLAGS = {
@@ -115,14 +161,18 @@ class VllmAdapter:
         routes = []
         for path, methods in sorted((doc.get("paths") or {}).items()):
             for method in sorted(m.upper() for m in (methods or {}) if m.lower() in {"get", "post", "put", "delete", "patch"}):
-                if path in INFO_ROUTES:
-                    kind = "info"
+                if path in LIVENESS_ROUTES:
+                    kind = "liveness"
+                elif path in DOCS_ROUTES:
+                    kind = "docs"
+                elif path in DIAGNOSTIC_ROUTES:
+                    kind = "diagnostic"
                 elif path in MUTATING_ADMIN_ROUTES or path in READONLY_ADMIN_ROUTES:
                     kind = "admin"
                 else:
                     kind = "inference"
                 routes.append(Route(method=method, path=path, inference=kind == "inference", kind=kind,
-                                    mutating=path in MUTATING_ADMIN_ROUTES))
+                                    mutating=path in MUTATING_ADMIN_ROUTES or path in MUTATING_USER_ROUTES))
         return routes
 
     def public_routes(self, env: Environment) -> list[Route]:
@@ -133,9 +183,12 @@ class VllmAdapter:
             raise RuntimeError(f"/openapi.json returned {status}")
         return self.routes_from_openapi(json.loads(body))
 
-    def probe_request(self, route: Route, model: str | None) -> ProbeRequest | None:
+    def probe_request(self, route: Route, model: str | None, engine_version: str | None = None) -> ProbeRequest | None:
+        safe = SAFE_PROBES.get((engine_version, route.method, route.path))
+        if safe is not None:
+            return safe
         if route.mutating:
-            return None
+            return None  # 검증된 안전 프로브가 없는 상태 변경 경로는 보내지 않는다
         pr = self._probe_request(route, model or DEFAULT_MODEL)
         # 경로 변수는 존재하지 않는 고정 ID로 채운다(실제 객체에 닿지 않음)
         return ProbeRequest(pr.method, _PATH_PARAM.sub(PATH_PARAM_PLACEHOLDER, pr.path), pr.body)

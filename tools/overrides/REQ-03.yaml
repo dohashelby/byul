@@ -1,0 +1,49 @@
+# REQ-03 구조화: 일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가? (Gateway 역할 인가)
+applies_when:
+  all:
+    - { fact: gateway, eq: true }
+policy_params:
+  - { key: general_allowed_kinds, type: "list[str]", required: true }   # 일반 호출자에게 허용한 경로 종류(예: [inference])
+required_observations:
+  - { key: routes_registered, type: "list[str]" }      # 관리·진단 등록 경로(정책 허용 종류 제외)
+  - { key: routes_tested, type: "list[str]" }
+  - { key: nonadmin_outcomes, type: "dict[str, int|outcome]" }   # 키 없음·잘못된 키·일반 역할의 경로별 대표 결과
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, pass|fail|no_response]" }
+observation_notes:
+  nonadmin_outcomes: >-
+    Gateway 경유. 상태 변경 경로는 어댑터의 검증된 안전 프로브만 보내고, 기대 응답이 오면 handler_reached
+    (인가 없이 핸들러 도달). 관리 역할 결과(admin_outcomes)는 증거 파일에만.
+executor: role_route
+route_scope: { include_kinds: [admin, diagnostic], exclude_kinds_policy: general_allowed_kinds }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: routes_registered, op: nonempty }
+      - { obs: routes_tested, op: superset_of, value_obs: routes_registered }
+      - { obs: nonadmin_outcomes, op: superset_of, value_obs: routes_registered }
+      - { obs: nonadmin_outcomes, op: all_in, value: [401, 403] }
+    fail_when_any:
+      - { obs: nonadmin_outcomes, op: any_between, value: [200, 299] }
+      - { obs: nonadmin_outcomes, op: any_in, value: [handler_reached] }
+    axes:
+      functional:   # 목록의 모든 항목이 기대대로 통과 (REQ-01과 같은 표)
+        pass_when_all:
+          - { obs: functional_probe_results, op: nonempty }
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+        fail_when_any:
+          - { obs: functional_probe_results, op: any_in, value: [fail] }
+# 정상 대조: 일반 역할은 추론, 관리 역할은 진단 작업을 수행한다
+functional_probes:
+  - method: POST
+    path: /v1/completions
+    body: { model: "{model}", prompt: ping, max_tokens: 1 }
+    expect: [200]
+    as_role: general
+  - method: GET
+    path: /metrics
+    expect: [200]
+    as_role: admin
+functional_scope: { probed_obs: functional_probe_results, of_obs: routes_registered }

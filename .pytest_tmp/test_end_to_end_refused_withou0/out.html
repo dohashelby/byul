@@ -1,6 +1,6 @@
 <!doctype html><html lang='ko'><head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
-<title>점검 보고서 RPT-01M59JAECCGV7DEQVF8MTCYKQW</title><style>
+<title>점검 보고서 RPT-01M59XPPT99D8BX5MKMHYTJFSQ</title><style>
 :root { --bg:#fff; --fg:#1d1d1f; --muted:#666; --line:#ddd; --pass:#1a7f37; --fail:#cf222e; --unk:#9a6700; --na:#57606a; --warn-bg:#fff8c5; }
 @media (prefers-color-scheme: dark) { :root { --bg:#0d1117; --fg:#e6edf3; --muted:#8b949e; --line:#30363d; --pass:#3fb950; --fail:#f85149; --unk:#d29922; --na:#8b949e; --warn-bg:#3b2e00; } }
 body { background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, sans-serif; margin:0 auto; max-width:1100px; padding:16px; }
@@ -11,16 +11,18 @@ table { border-collapse:collapse; width:100%; } th, td { border-bottom:1px solid
 .v-PASS { color:var(--pass); font-weight:600; } .v-FAIL { color:var(--fail); font-weight:600; }
 .v-UNKNOWN { color:var(--unk); } .v-NOT_APPLICABLE { color:var(--na); }
 </style></head><body>
-<h1>서빙엔진 보안 점검 보고서</h1><p class='muted'><code>RPT-01M59JAECCGV7DEQVF8MTCYKQW@1</code> · 2026-10-19T07:51:50Z · 모드 audit · 자료 출처 EXAMPLE · content_sha256 <code>8fad1000d4e31bde…</code></p>
+<h1>서빙엔진 보안 점검 보고서</h1><p class='muted'><code>RPT-01M59XPPT99D8BX5MKMHYTJFSQ@1</code> · 2026-10-19T11:10:47Z · 모드 audit · 자료 출처 EXAMPLE · content_sha256 <code>ae5b2f3965909aad…</code></p>
 <p class='banner'>공식 아님 — 정책 DRAFT, 검토 전 팩, EXAMPLE 자료</p>
 <p class='muted'>승인 기록 없음 (자동 판정은 승인이 아니다)</p>
 <h2>한계</h2><ul>
 <li>검토 전 팩(DRAFT): 공식 아님</li>
 <li>정책 DRAFT: 공식 아님</li>
+<li>PLT-01: 실행 가능한 쓰기 경로 1개가 정책으로 허용됨 [&quot;/guard-cache&quot;] — 엔진 컴파일 캐시(torch inductor .so)를 위해 쓰기·실행이 모두 가능한 영역이 필요하다.</li>
+<li>PLT-01: 이 점검은 컨테이너 설정(docker inspect)과 컨테이너 안 프로세스 권한만 본다. 호스트·VM 쪽 집행(LSM 정책, 호스트 파일 권한)은 보지 않으며, 실험실 결과는 Docker Desktop의 리눅스 VM 기준이다.</li>
 <li>EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음</li>
-<li>적용 미정 상태로 시험함: 76개 점검</li>
-<li>자동 실행 불가(수동 시험 필요): 76개 점검</li>
-<li>검증 수준 없음(근거 누락): 76개 점검</li>
+<li>적용 미정 상태로 시험함: 74개 점검</li>
+<li>자동 실행 불가(수동 시험 필요): 74개 점검</li>
+<li>검증 수준 없음(근거 누락): 74개 점검</li>
 <li>점검 목록 미완결 보호 목적: 28개 — 집계 PASS 불가</li>
 </ul>
 <h2>영역별</h2><div class='wrap'><table><tr><th>영역</th><th>보안</th><th>점검 목록 완결</th></tr>
@@ -64,400 +66,400 @@ table { border-collapse:collapse; width:100%; } th, td { border-bottom:1px solid
 <th>결과</th>
 <th>공백·표시</th></tr>
 <tr><td><code>SUP-01</code><br><span class='muted'>생성·변경·승인 권한</span></td><td>제출·저장소 쓰기 권한만으로 승인 기록을 바꿀 수 없는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9GVEAZRK7KZ0GSP1AZ@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPV8NBPNAY9PXJYB7EQ@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-02</code><br><span class='muted'>생성·변경·승인 권한</span></td><td>배포 권한이 허용된 모델과 대상 환경에 한정되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9GV42JNXHV2DGZ1MEC@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPWD5FQSY9YKHJBEAWV@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-03</code><br><span class='muted'>승인 범위</span></td><td>실제 소비하는 하위 모델 자료가 승인 목록에 포함되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9H5FKQN6NFC7KYHQFG@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPXHN24BKG5SH6G7Q41@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-04</code><br><span class='muted'>승인 범위</span></td><td>실제 실행 이미지·패키지·의존성이 승인 목록에 포함되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9HGP2JBK746WGDZZ65@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPXB9K3BN7P9K525HKM@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-05</code><br><span class='muted'>실제 사용의 일치·무결성</span></td><td>승인 뒤 파일·symlink·마운트가 교체되어도 비승인 사용을 막는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9J4X0V1790Y2020R6J@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQ3SKGVQRWRJK1H7JHV@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-06</code><br><span class='muted'>실제 사용의 일치·무결성</span></td><td>각 worker가 자신에게 배정된 승인 모델 부분을 실제 적재하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9KASATGX3TZZGJF4Z0@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQ4SMSA6MXWE2XRAEMH@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-07</code><br><span class='muted'>실제 사용의 일치·무결성</span></td><td>생성 결과나 공유 컴파일 캐시의 무단 교체를 막는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9KK2M3X9BX2DDQCRBE@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQ4QAG9J8P08QR2E140@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-08</code><br><span class='muted'>코드 실행 제한</span></td><td>요청 입력으로 허용 밖 코드 판본을 선택할 수 없는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9MR4MGNT29GNJC6W02@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQ59X3M5R9GCT4A1W9V@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-09</code><br><span class='muted'>코드 실행 제한</span></td><td>모델의 추가 코드는 허용 조건에서만 실행되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9MVJS3ZADHZ5T4KDGP@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQ6JPCSPG0XTNTCNAR1@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-10</code><br><span class='muted'>코드 실행 제한</span></td><td>플러그인 허용 제한이 실제 실행 전에 적용되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9NW2KT0PSFAYRXYVZ9@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQ6MES0TQ6B82JYVMVX@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-11</code><br><span class='muted'>코드 실행 제한</span></td><td>지원 실행 모드에서도 동적 import 제한이 유지되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9N2QRSSJ0AYD87HJWE@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQ7J3S7TQE5R00BTHZK@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-12</code><br><span class='muted'>자료 해석 안전성</span></td><td>선정 reader가 허용하지 않은 객체·동작을 거부하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9PY7JVH6MFCT0YYY5Z@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQ92DXRRAK6APVHJQ6Y@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-13</code><br><span class='muted'>자료 해석 안전성</span></td><td>공급 template의 해석 동작이 허용 범위 안에 있는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9Q0CS9M2YJXD6SN5A7@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQAT8NGZ0Y66Y34JCS3@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-14</code><br><span class='muted'>검사 결과 반영</span></td><td>검사 실패·오류·미지원·생략을 통과로 처리하지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9QWXWQWNDPVX1XBPQ3@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQBBCWGXG5JNSQ7RSYR@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-15</code><br><span class='muted'>재사용 적합성</span></td><td>모델·도구·설정 변경 후 부적합한 파생 결과를 재사용하지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9RD8GYDG8JB29AJDP8@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQCSJX6SAYV632TAZ2F@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>SUP-16</code><br><span class='muted'>재사용 적합성</span></td><td>중단·실패한 생성 결과나 부분 파일을 완료된 결과로 사용하지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9R83D6NGTJ1HFSNMVK@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPQFJAG4NST3MPQH5K5F@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-01</code><br><span class='muted'>요청·대상 접근 권한</span></td><td>Gateway를 우회한 직통 요청으로 비허용 작업을 수행할 수 없는가?</td><td>적용</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-PASS">충족</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 EXAMPLE</span><br><code class="muted">RES-01M59JAE93YWQ6NV95NQ3DQW60@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-PASS">충족</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 EXAMPLE</span><br><code class="muted">RES-01M59XPPPFZT6MVC5GVJ0PP1ZE@1</code></td>
 <td>기능 확인 범위: 1 / 등록 경로 3 (표본)</td></tr>
 <tr><td><code>REQ-02</code><br><span class='muted'>요청·대상 접근 권한</span></td><td>인증이 검사한 경로와 실제 실행 handler의 권한 요구가 일치하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE940QSJYX5GH9TDR703@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPF6ARJBVFEAZP499ME@1</code></td>
 <td>실행기 없음</td></tr>
-<tr><td><code>REQ-03</code><br><span class='muted'>요청·대상 접근 권한</span></td><td>일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE94JHHSY741ZRE73AE5@1</code></td>
-<td>실행기 없음</td></tr>
+<tr><td><code>REQ-03</code><br><span class='muted'>요청·대상 접근 권한</span></td><td>일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가?</td><td>적용</td>
+<td>보안 <span class="v-PASS">충족</span><br>기능 <span class="v-PASS">충족</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 EXAMPLE</span><br><code class="muted">RES-01M59XPPPGVQJB4A7MX6WTXG4W@1</code></td>
+<td>기능 확인 범위: 2 / 등록 경로 5 (표본)</td></tr>
 <tr><td><code>REQ-04</code><br><span class='muted'>요청·대상 접근 권한</span></td><td>외부 입력이 인가에 쓰는 신원을 사칭하지 못하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE95SCFWZ1CG1SG7X8F2@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPGV6H2YHJMJ3W3QTDE@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-05</code><br><span class='muted'>요청·대상 접근 권한</span></td><td>호출자의 모델 사용권이 최종 선택 대상에도 적용되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9662HCRMFPD9VJD2H5@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPHPYQZDMX1PJQMZ1PB@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-06</code><br><span class='muted'>요청·대상 접근 권한</span></td><td>저장 결과의 조회·취소 권한을 객체별로 확인하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE960CSTFPECXNVAETTK@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPHD9TV4P60ART75XH0@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-07</code><br><span class='muted'>실제 입력의 검사</span></td><td>template 적용 뒤 입력에도 필요한 제한이 유지되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE970QW93TARH8R6ANYC@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPJTH5G4KAS4KF8XB0F@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-08</code><br><span class='muted'>실제 입력의 검사</span></td><td>재사용 token ID 입력도 필요한 검사를 거치는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE97KGCZCBCPEQDS2DE1@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPJZAJXJT7P3X6Z4N7X@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-09</code><br><span class='muted'>실제 입력의 검사</span></td><td>token ID와 입력 길이가 실제 모델·소비자의 유효 범위를 지키는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE98EB657592K16FNSYG@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPKHC66FTGXEQMZ5MJJ@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-10</code><br><span class='muted'>실제 입력의 검사</span></td><td>sampling 값과 옵션 조합이 실제 실행 조건을 만족하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE99SYEPWZQMJDPT3YRR@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPK7TPPK2K2AK6TYSQB@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-11</code><br><span class='muted'>요청·상태·결과 귀속</span></td><td>동시 요청과 스트리밍 결과가 올바른 원 요청으로 반환되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE99NX6DTR7CSAAPPGQF@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPM7TXWNYGG4P7DG8J8@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-12</code><br><span class='muted'>요청·상태·결과 귀속</span></td><td>취소·연결 종료 뒤 늦은 결과가 다른 요청이나 새 시도에 섞이지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9AQ4R1QM5MKN29ZTYS@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPN6EXARVVFZ2KBQF62@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-13</code><br><span class='muted'>요청·상태·결과 귀속</span></td><td>응답 옵션과 오류가 독자에게 허용한 정보만 반환하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9BX0D29KVRA750Z55P@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPN6ZQ5V3WTRYSYB0E8@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-14</code><br><span class='muted'>요청·상태·결과 귀속</span></td><td>분산 처리의 중간 자료와 최종 출력이 원 요청에 연결되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9BY4C7WR1W0TG7V3XY@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPPQ7SMKHCQJKWXCHEQ@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-15</code><br><span class='muted'>공유 제한</span></td><td>cache 공유 집단을 신뢰할 신원에서 결정하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9CAPCQPGM5PFE5DK31@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPP9N4Z3EZVABAS4RQS@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-16</code><br><span class='muted'>공유 제한</span></td><td>cache key가 실제 재사용에 필요한 문맥을 구분하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9CW5S34H2HMY30YCW2@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPQJ1GSMD3GHET5VCN8@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-17</code><br><span class='muted'>공유 제한</span></td><td>cache 시간 차로 비공개 정보가 허용 범위를 넘어 드러나지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9DWHBH8JPW532N7QV3@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPRA6EZZVTC8ZTMQZJX@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-18</code><br><span class='muted'>실행 상태·메모리 안전</span></td><td>배치 자리 이동·재사용 시 이전 요청의 제한 상태가 남지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9DK28BFCFKY8YT2DW8@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPREQJ4KJG8AJ6NMMH9@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-19</code><br><span class='muted'>실행 상태·메모리 안전</span></td><td>선정 kernel의 접근 범위와 초기화가 유효 입력·buffer 범위를 지키는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9EBZ36Q7NZ9WCH83PR@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPSV804J7EQXH3JJK83@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-20</code><br><span class='muted'>실행 상태·메모리 안전</span></td><td>CUDA Graph 재실행에서 현재 입력을 사용하고 출력 소비 전에 buffer를 잘못 덮어쓰지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9F26P5RSPXG5333K9H@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPT0TT5D5HGBRAA2Q03@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>REQ-21</code><br><span class='muted'>실행 상태·메모리 안전</span></td><td>TP graph 통신 buffer의 참조가 등록·종료·재기동 과정에서 유효한가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9F4HE01R7W4XAV5T3B@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPVBN5Q7278SATPK7R5@1</code></td>
 <td>실행기 없음</td></tr>
-<tr><td><code>PLT-01</code><br><span class='muted'>실행 권한 제한</span></td><td>엔진·worker가 불필요한 호스트·파일·장치 권한을 갖지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8WNYGKQN0E7P194Y6W@1</code></td>
-<td>실행기 없음</td></tr>
+<tr><td><code>PLT-01</code><br><span class='muted'>실행 권한 제한</span></td><td>엔진·worker가 불필요한 호스트·파일·장치 권한을 갖지 않는가?</td><td>적용</td>
+<td>보안 <span class="v-PASS">충족</span><br>기능 <span class="v-PASS">충족</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 EXAMPLE</span><br><code class="muted">RES-01M59XPPP8VH1QSR8W1APQ75F2@1</code></td>
+<td>-</td></tr>
 <tr><td><code>PLT-02</code><br><span class='muted'>실행 권한 제한</span></td><td>로컬 IPC 접점에 허용한 프로세스만 접근하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8WQYCMGDX9WZ5KTHSK@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP8JC1GR1SG2WNCB5WJ@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-03</code><br><span class='muted'>자격 전달·사용 제한</span></td><td>취득 주체의 자격이 허용 저장소·객체에 한정되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8X8RBJCSGQ3194FQT3@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP9V3E6RWJ0MNW6VG5Q@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-04</code><br><span class='muted'>자격 전달·사용 제한</span></td><td>worker에 불필요한 자격이 전달되지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8Y46HYEGYY6H5EA1MY@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP9G296HJF0ADQ1YBNH@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-05</code><br><span class='muted'>자격 전달·사용 제한</span></td><td>자격 만료·누락 시 비승인 대체 접근으로 이어지지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8Y7QH8H52V1VTYKGPT@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPA62S94X3P0HSAHCBR@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-06</code><br><span class='muted'>통신·내부 호출 제한</span></td><td>core·worker가 공유하는 실제 신뢰 범위와 외부 접근 제한을 확인했는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8ZPD3X1NCSQQXTGKF5@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPBM42A0BB21APY8C0G@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-07</code><br><span class='muted'>통신·내부 호출 제한</span></td><td>외부 송신이 허용 목적지와 작업에 한정되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8ZBE94Y6BSEVTB64Q2@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPBXWP4WKAHDSJJVFW9@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-08</code><br><span class='muted'>상대 확인·전송 보호</span></td><td>각 내부 통신 구간이 정한 상대 확인·기밀성·무결성을 충족하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE9048GJF9VY2CYEQYPF@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPCH7VS2WNTXMTEH32S@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-09</code><br><span class='muted'>상대 확인·전송 보호</span></td><td>엔진부터 collector와 최종 sink까지 필요한 전송 보호가 이어지는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE91WN0EM7PB9D8KPEZF@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPCNRN1TQ6Y93VT7MQ5@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-10</code><br><span class='muted'>권한·자격 철회</span></td><td>철회 이후 신규 접근이 정한 기한 안에 거부되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE91HK8CRACK1FTCW56S@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPD1C1VF75TWB49GV4Z@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-11</code><br><span class='muted'>권한·자격 철회</span></td><td>기존 session·handle의 접근도 철회 정책에 맞게 제한되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE92J12SE09AFB0T6KZH@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPDGPP0FM7P1HVSVQ48@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>PLT-12</code><br><span class='muted'>권한·자격 철회</span></td><td>폐기된 자격 사본을 재사용할 수 없는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE92VSP5TD9SZY0A32FB@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPPESANXPEC6X6NBA79H@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-01</code><br><span class='muted'>자원 사용 제한</span></td><td>모델 취득·해석·변환·로딩 비용이 단계별·누적 예산을 지키는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE88P2YWWGHC9M5RZ22Y@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNH7QFQDFVPWA006ERW@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-02</code><br><span class='muted'>자원 사용 제한</span></td><td>실패한 취득의 반복·재시도가 비용을 무한 누적하지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE89ZNSMNW04KMQA4XMF@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNJJ0A73AN40Q7K64AF@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-03</code><br><span class='muted'>자원 사용 제한</span></td><td>요청 비용과 동시 부하를 제한하며 정상 요청의 처리 기회를 유지하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8BQGQYP78GB5B6GSES@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNK6S0GYS37430XCMV7@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-04</code><br><span class='muted'>자원 사용 제한</span></td><td>느린 수신자와 진단 buffering이 자원을 과도하게 점유하지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8C4PTHMWMNNTPMXY8M@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNKBXW9F941535CKJJR@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-05</code><br><span class='muted'>변경 중 일관성</span></td><td>재배포 중 이전 요청과 새 모델·설정이 잘못 섞이지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8D0RTB9WR4HC2XBR1Q@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNM87DNXRM43YHQQMXC@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-06</code><br><span class='muted'>변경 중 일관성</span></td><td>live 변경이나 rolling 중에도 요청의 모델·상태 일관성을 지키는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8DW4CM0Q0H5ZW8A7NT@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNT7ECH201XEAN5PB24@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-07</code><br><span class='muted'>시작·재개 조건</span></td><td>필요한 worker와 실행 준비를 확인한 뒤 요청을 받는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8EP8TAKYPX487DN7MC@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNVXWRVSQPK451EWVZA@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-08</code><br><span class='muted'>실패 감지·전파</span></td><td>rank의 예외·사망·지연·통신 정지를 각각 감지하고 전달하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8FMZ0GY0EAX7KA7P64@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNV9A23N2J9Q68036BK@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-09</code><br><span class='muted'>실패 감지·전파</span></td><td>초기화·모델 준비의 부분 실패가 성공으로 처리되지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8FRTQ9KV44AE9A05VZ@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNWDMPVG4GGMA52290A@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-10</code><br><span class='muted'>종결·자원 회수</span></td><td>취소·연결 종료 뒤 실제 작업과 참조가 정한 기한에 종료되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8GH58TW6SY38J5YDME@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNXAHWMPNVCAGH9CJQR@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-11</code><br><span class='muted'>종결·자원 회수</span></td><td>실패한 worker·통신·분산 자원이 회수되고 다음 기동이 가능한가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8HZPWV57MBDYCB3ZH3@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNXA16TATRJ4R8TX5D9@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-12</code><br><span class='muted'>종결·자원 회수</span></td><td>재시도 전후 이전 작업의 잔존과 중복 비용이 통제되는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8HAX7NXWXRJ7QPEKKM@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNY9Y0PP0F156GHKYPQ@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-13</code><br><span class='muted'>종결·자원 회수</span></td><td>daemon 전체 release 이후 다른 소비자의 다음 취득·fallback과 기존 참조가 허용한 상태를 지키는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8JH3BPS3X57FDTK0TW@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNZBEXHVJ29P9GHHEF9@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-14</code><br><span class='muted'>종결·자원 회수</span></td><td>profiler 종료가 실제 수집·자원 종료와 맞는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8K8BR6SJA22MN5RAQ4@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPNZ33661N7RF72H0J4C@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-15</code><br><span class='muted'>복구 상태의 적합성</span></td><td>rollback 대상이 현재 승인 기준을 만족하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8KBAC10HR1XMW2RX49@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP05RYJD8T886H0H0S9@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>LIF-16</code><br><span class='muted'>복구 상태의 적합성</span></td><td>복원 자료의 변조와 잔존 상태가 복구 결과에 섞이지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8MR0A9C9JY3YRQE9BC@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP0Z7HF00YJ7S64F035@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-01</code><br><span class='muted'>필요한 사건의 기록</span></td><td>필수 접근·관리·승인 사건을 주체·대상·실행과 연결할 수 있는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8NRQVH0CHS89HDGYV5@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP1A8FKDRQVW42YRF93@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-02</code><br><span class='muted'>필요한 사건의 기록</span></td><td>준비·실패·종료 기록이 실제 상태를 올바르게 나타내는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8NDMFCSJY3Y6FQ47E3@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP1Y3Q9RP3FPFR4AM98@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-03</code><br><span class='muted'>수집 정보 제한</span></td><td>로그·debug·trace·덤프가 허용한 정보만 수집하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8PB0YDTD18DN8TG7F3@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP2RH496RYT4296EDKY@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-04</code><br><span class='muted'>수집 정보 제한</span></td><td>금지한 usage 보고가 실제로 비활성 상태를 유지하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8PKH7VNFCDCG5KGYB7@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP2EX7Z2KC1HXQ69DZK@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-05</code><br><span class='muted'>수집 정보 제한</span></td><td>허용한 usage 보고가 필드·목적지 범위를 지키는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8QVRSXEVQECR9JV4AZ@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP3TA4G7CRAE8K1T64P@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-06</code><br><span class='muted'>자료 이용 권한</span></td><td>기록과 진단 사본을 허용된 독자만 조회·반출하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8QBY8ME5YA5N292MSF@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP3FNDW3GC012Q989FJ@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-07</code><br><span class='muted'>자료 이용 권한</span></td><td>진단 자료 읽기권만으로 재실행할 수 없는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8RKVASXN2TG3DZ5D90@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP4NFJARM4JQNMZY00Z@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-08</code><br><span class='muted'>자료 이용 권한</span></td><td>재실행이 변조한 진단 자료를 비허용 방식으로 소비하지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8SY2QVGF2EBP2ZN488@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP5BJENQQ8ESA44FK4W@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-09</code><br><span class='muted'>증거의 신뢰성</span></td><td>요청 입력이 로그의 신원·대상·상태를 위조하지 못하는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8SPJA24MZBR5436QV9@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP5H4R0CHJ38X83DDP1@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-10</code><br><span class='muted'>증거의 신뢰성</span></td><td>기록의 무단 변경·삭제를 제한하고 확인할 수 있는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8TEVXT12S618K05CSS@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP6KK4P6670P3N2V9P9@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-11</code><br><span class='muted'>증거의 신뢰성</span></td><td>수집 중단·누락·시간 불확실성을 정상 결과로 처리하지 않는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8T36WHR19H3W6PJ17Q@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP7SFEWM1YMSKRPHEK2@1</code></td>
 <td>실행기 없음</td></tr>
 <tr><td><code>OBS-12</code><br><span class='muted'>보존·삭제 관리</span></td><td>로그·usage·진단의 원본과 사본이 보존·삭제 범위를 지키는가?</td><td>적용 미정 (적용 미정 상태로 시험함)</td>
-<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59JAE8V20ARKDHR0N8KZ79X@1</code></td>
+<td>보안 <span class="v-UNKNOWN">미확인</span><br>기능 <span class="v-UNKNOWN">미확인</span><br>성능 <span class="v-UNKNOWN">미확인</span><br><span class="muted">검증 수준 없음</span><br><code class="muted">RES-01M59XPPP7QE5TCZ8XM8GEH977@1</code></td>
 <td>실행기 없음</td></tr>
 </table></div>
-<h2>수동 시험 필요 (76)</h2><p>
-<code>SUP-01</code>, <code>SUP-02</code>, <code>SUP-03</code>, <code>SUP-04</code>, <code>SUP-05</code>, <code>SUP-06</code>, <code>SUP-07</code>, <code>SUP-08</code>, <code>SUP-09</code>, <code>SUP-10</code>, <code>SUP-11</code>, <code>SUP-12</code>, <code>SUP-13</code>, <code>SUP-14</code>, <code>SUP-15</code>, <code>SUP-16</code>, <code>REQ-02</code>, <code>REQ-03</code>, <code>REQ-04</code>, <code>REQ-05</code>, <code>REQ-06</code>, <code>REQ-07</code>, <code>REQ-08</code>, <code>REQ-09</code>, <code>REQ-10</code>, <code>REQ-11</code>, <code>REQ-12</code>, <code>REQ-13</code>, <code>REQ-14</code>, <code>REQ-15</code>, <code>REQ-16</code>, <code>REQ-17</code>, <code>REQ-18</code>, <code>REQ-19</code>, <code>REQ-20</code>, <code>REQ-21</code>, <code>PLT-01</code>, <code>PLT-02</code>, <code>PLT-03</code>, <code>PLT-04</code>, <code>PLT-05</code>, <code>PLT-06</code>, <code>PLT-07</code>, <code>PLT-08</code>, <code>PLT-09</code>, <code>PLT-10</code>, <code>PLT-11</code>, <code>PLT-12</code>, <code>LIF-01</code>, <code>LIF-02</code>, <code>LIF-03</code>, <code>LIF-04</code>, <code>LIF-05</code>, <code>LIF-06</code>, <code>LIF-07</code>, <code>LIF-08</code>, <code>LIF-09</code>, <code>LIF-10</code>, <code>LIF-11</code>, <code>LIF-12</code>, <code>LIF-13</code>, <code>LIF-14</code>, <code>LIF-15</code>, <code>LIF-16</code>, <code>OBS-01</code>, <code>OBS-02</code>, <code>OBS-03</code>, <code>OBS-04</code>, <code>OBS-05</code>, <code>OBS-06</code>, <code>OBS-07</code>, <code>OBS-08</code>, <code>OBS-09</code>, <code>OBS-10</code>, <code>OBS-11</code>, <code>OBS-12</code>
+<h2>수동 시험 필요 (74)</h2><p>
+<code>SUP-01</code>, <code>SUP-02</code>, <code>SUP-03</code>, <code>SUP-04</code>, <code>SUP-05</code>, <code>SUP-06</code>, <code>SUP-07</code>, <code>SUP-08</code>, <code>SUP-09</code>, <code>SUP-10</code>, <code>SUP-11</code>, <code>SUP-12</code>, <code>SUP-13</code>, <code>SUP-14</code>, <code>SUP-15</code>, <code>SUP-16</code>, <code>REQ-02</code>, <code>REQ-04</code>, <code>REQ-05</code>, <code>REQ-06</code>, <code>REQ-07</code>, <code>REQ-08</code>, <code>REQ-09</code>, <code>REQ-10</code>, <code>REQ-11</code>, <code>REQ-12</code>, <code>REQ-13</code>, <code>REQ-14</code>, <code>REQ-15</code>, <code>REQ-16</code>, <code>REQ-17</code>, <code>REQ-18</code>, <code>REQ-19</code>, <code>REQ-20</code>, <code>REQ-21</code>, <code>PLT-02</code>, <code>PLT-03</code>, <code>PLT-04</code>, <code>PLT-05</code>, <code>PLT-06</code>, <code>PLT-07</code>, <code>PLT-08</code>, <code>PLT-09</code>, <code>PLT-10</code>, <code>PLT-11</code>, <code>PLT-12</code>, <code>LIF-01</code>, <code>LIF-02</code>, <code>LIF-03</code>, <code>LIF-04</code>, <code>LIF-05</code>, <code>LIF-06</code>, <code>LIF-07</code>, <code>LIF-08</code>, <code>LIF-09</code>, <code>LIF-10</code>, <code>LIF-11</code>, <code>LIF-12</code>, <code>LIF-13</code>, <code>LIF-14</code>, <code>LIF-15</code>, <code>LIF-16</code>, <code>OBS-01</code>, <code>OBS-02</code>, <code>OBS-03</code>, <code>OBS-04</code>, <code>OBS-05</code>, <code>OBS-06</code>, <code>OBS-07</code>, <code>OBS-08</code>, <code>OBS-09</code>, <code>OBS-10</code>, <code>OBS-11</code>, <code>OBS-12</code>
 </p>
 <h2>미선정 (0)</h2><p>
 없음
 </p>
 <h2>입력 목록</h2><div class='wrap'><table><tr><th>종류</th><th>ID</th><th>revision</th><th>sha256</th></tr>
-<tr><td>PACK</td><td><code>PACK-BASELINE</code></td><td>4</td><td><code>0eeebd125e509d07…</code></td></tr>
-<tr><td>ENV</td><td><code>ENV-01M59JAE1HYMVDQM1WK0FGN88S</code></td><td>1</td><td><code>c1c8afc45e71bc9a…</code></td></tr>
-<tr><td>POL</td><td><code>POL-01M59JAE1H2WWJ5T79TMTQ68NH</code></td><td>1</td><td><code>6c67574a63943e75…</code></td></tr>
-<tr><td>PLAN</td><td><code>PLAN-01M59JAE1JPFN8XSXBP9ACPS99</code></td><td>1</td><td><code>c4f4810ff0d4a158…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4189294TC23AS0PJT1</code></td><td>1</td><td><code>2f53242862bcfd87…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE43MPR8MXTB81B20QV9</code></td><td>1</td><td><code>7bc5c883817f9aa9…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE44V2122CMFA45ZJHT6</code></td><td>1</td><td><code>d8cd59a4dfe47f76…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4598JGMQQ6YE29E0TJ</code></td><td>1</td><td><code>2e40f0d9d3293c4f…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE45CKJFY8P0M8ZTM5AX</code></td><td>1</td><td><code>76b6922ab9985d71…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4696JB30VRKKG4RXRS</code></td><td>1</td><td><code>54021969ab6e2b4d…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE47484HQ7CP1XDKTHPF</code></td><td>1</td><td><code>7a028359ddbad524…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE47E614PMK9G37CX305</code></td><td>1</td><td><code>9d9e900a24edad06…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE48D02KSN0HED9F5DDV</code></td><td>1</td><td><code>920621c92722d37d…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE49J30BEZ80JBKF7M0Y</code></td><td>1</td><td><code>80141e6da2fb9daa…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4A2CSQPAPR0C328BE4</code></td><td>1</td><td><code>9c0dbae84b9bac35…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4AFAY910WWV6BPS5VF</code></td><td>1</td><td><code>cd3cfd6445f6d950…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4BKVR1S3694HJFWVBJ</code></td><td>1</td><td><code>52fcc8a008584723…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4BV3BP8P44AT3CWSVV</code></td><td>1</td><td><code>4067cf8c4c05a5c7…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4CNNNMC5S9H44D11RW</code></td><td>1</td><td><code>e1c917096cef0269…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4DTQKW1SKTMXK4X46E</code></td><td>1</td><td><code>9a79c32570836b6a…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4E50YKNVKWJY7D7SE2</code></td><td>1</td><td><code>6eab1f319bfc4d0a…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4FVWZG3BBZ6CP6B1VZ</code></td><td>1</td><td><code>ae608ff2fc8019da…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4G6S4SVDXX318RD2NM</code></td><td>1</td><td><code>339852e9f87a2943…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4GWHM6AZECZ77G73J8</code></td><td>1</td><td><code>cf6eff00c3320acf…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4HN6GWQVXECQ474FKT</code></td><td>1</td><td><code>501bd68e3b095c61…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4HTQ1C6FTA0K87HSDB</code></td><td>1</td><td><code>f7c448722d3008af…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4JT1XYRJZ43MKSDW4F</code></td><td>1</td><td><code>e1aaee1208f26ef1…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4KCPZHP3AB7N7DW3G9</code></td><td>1</td><td><code>0f7498d254343224…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4KJKRSC7JAN7S9YV5Z</code></td><td>1</td><td><code>c2376fb49cfe3dba…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4M18Z07B36DY6H194T</code></td><td>1</td><td><code>ede0cd74af41614a…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4MQFWTHWRHXF27BDD5</code></td><td>1</td><td><code>7ed19dbdff6ae6be…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4N3YBGZ4X7MFJ9X93Z</code></td><td>1</td><td><code>cee7e40ca0714429…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4NE20QB1G7DCDATCR7</code></td><td>1</td><td><code>85e32b9554171031…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4P330EE03C51QH7WSV</code></td><td>1</td><td><code>13b06633ebec252a…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4Q7QZ4RQ3H2DCS1M0T</code></td><td>1</td><td><code>64aabb7e45897352…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4QQMNG491GQVSEGJAN</code></td><td>1</td><td><code>1331aa405927983d…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4R3SN8VEH8528R8VQC</code></td><td>1</td><td><code>60a521644d3492f8…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4S39PBRAN2HR2A4G5K</code></td><td>1</td><td><code>ed98c13a3b7b2435…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4SPCVG024YP2T0AWA2</code></td><td>1</td><td><code>5207a78c26f27e82…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4T37F03XS9M1ZD7FAY</code></td><td>1</td><td><code>e7a71ca56cabb01a…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4TRWZV58YETPGDD79N</code></td><td>1</td><td><code>e1e5e140491e8433…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4V9CXBQESKZEDA668P</code></td><td>1</td><td><code>9500269d8612fac4…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4WC0MTEWMFACSSWK77</code></td><td>1</td><td><code>f5c3f94c9d86cc57…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4X1XPTWHVEC08X1NZT</code></td><td>1</td><td><code>ae4fa4889cbbab1a…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4XF81NM4AT7NP414B2</code></td><td>1</td><td><code>14e0cc7a5f078cfd…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4YANBWGGYXKBWEDHPF</code></td><td>1</td><td><code>8bb46cab66831713…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4YZS49SNS6T3WA2G89</code></td><td>1</td><td><code>00a31a84f59467b8…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE4Z30FTAHA7XBRSBPPW</code></td><td>1</td><td><code>5fc8e6f5ea491e87…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE502QS92ZBREFJTBTXP</code></td><td>1</td><td><code>2e644b13b33e49ee…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE50XWMK1NQ0N36Q63XF</code></td><td>1</td><td><code>a9db5f13cb33afee…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE51N6HB3FVH8N0NY32E</code></td><td>1</td><td><code>14ee83499dbc2bad…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE51Y7WMJV77GCW8A144</code></td><td>1</td><td><code>a21056e577800ae3…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5221YHKKSP6RR214F8</code></td><td>1</td><td><code>062078e411fdde68…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE52RFMVPD3XRKX1Z456</code></td><td>1</td><td><code>47c8a2f15b406995…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE53TYAGR0G6FQ788QYS</code></td><td>1</td><td><code>d2fa352db84c5cde…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE54RP2FQXG2HB475EY2</code></td><td>1</td><td><code>2c002f5483d5c992…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE55SKHNDR3N1G5K5D4Y</code></td><td>1</td><td><code>ed8ff3e0adc53efa…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE55TSE23P8D2MT6CK3S</code></td><td>1</td><td><code>0abd165cb8367321…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE568K55M1VEKRA7YYD9</code></td><td>1</td><td><code>46f8ef4c57935335…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE56DA9NCC01E4BEFHNG</code></td><td>1</td><td><code>345b40b81ca2978b…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE57MPFE4PMXE6F6VKEJ</code></td><td>1</td><td><code>d6b651e042d78292…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE58287QV7D9SR53TV6F</code></td><td>1</td><td><code>933a080cebfd6eab…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE58CT4EA1PE4NW32389</code></td><td>1</td><td><code>90e1f851e08f4c05…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE59EX5JM8GY6WCC0SVY</code></td><td>1</td><td><code>446c2907001a6018…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE59NTPWPJJ7JAXK7BWG</code></td><td>1</td><td><code>be3f624273cfe7e0…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5AG5MJ8XAJD4R5ZJ26</code></td><td>1</td><td><code>a7958424516b700c…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5B6HG93XC47XN581K3</code></td><td>1</td><td><code>bca4e6ab5401f740…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5BJ1Z1G63C3JVWT1P0</code></td><td>1</td><td><code>33aa06a655019c66…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5C5CAVP39QD5E8XTC4</code></td><td>1</td><td><code>6f4110b19aa81a57…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5CSMH4R1X6YVTFAJ88</code></td><td>1</td><td><code>4b963dd213cca06a…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5D6FR8Q9FH31NNTJ8G</code></td><td>1</td><td><code>0620c7631814d253…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5DT6T2TAT2TPCAQYH8</code></td><td>1</td><td><code>1f14008209451bf2…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5EVZ4QS4CAWPN7K05V</code></td><td>1</td><td><code>3f2acbaf392fb8be…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5FRJ37F3SY0YXG4R8Y</code></td><td>1</td><td><code>7ed6a711a6a05d4a…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5G9T9EFA9RY8JTWYFJ</code></td><td>1</td><td><code>c97a9a2d846854eb…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5GSQH6GSP8JVC39EHY</code></td><td>1</td><td><code>875b5c0a8148321d…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5H9RHAEDMMAM3YQAGJ</code></td><td>1</td><td><code>34eaa0f1e64c2c4b…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5J8JX5HVD40J3X08K0</code></td><td>1</td><td><code>5fb48cbf95cc0c33…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5JMXK3XQP8VKAN7HNV</code></td><td>1</td><td><code>6e8777a5a161cfd9…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5KJETV2YGFZMN6X9HS</code></td><td>1</td><td><code>9fbc768252a355aa…</code></td></tr>
-<tr><td>EVD</td><td><code>EVD-01M59JAE5KV0BDDX6A8GCGH4QB</code></td><td>1</td><td><code>972401bd5eac48cb…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE88P2YWWGHC9M5RZ22Y</code></td><td>1</td><td><code>ad9e72a9961c8d68…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE89ZNSMNW04KMQA4XMF</code></td><td>1</td><td><code>d233895da9b04721…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8BQGQYP78GB5B6GSES</code></td><td>1</td><td><code>f134d437e039a708…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8C4PTHMWMNNTPMXY8M</code></td><td>1</td><td><code>fc2ffa81f1a78140…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8D0RTB9WR4HC2XBR1Q</code></td><td>1</td><td><code>dce672812cbcd484…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8DW4CM0Q0H5ZW8A7NT</code></td><td>1</td><td><code>03a21e356840e153…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8EP8TAKYPX487DN7MC</code></td><td>1</td><td><code>2f05542b61c7b246…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8FMZ0GY0EAX7KA7P64</code></td><td>1</td><td><code>49eca3a0aec3fe38…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8FRTQ9KV44AE9A05VZ</code></td><td>1</td><td><code>09955c12e9f524ed…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8GH58TW6SY38J5YDME</code></td><td>1</td><td><code>bbe9748f0e42f587…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8HAX7NXWXRJ7QPEKKM</code></td><td>1</td><td><code>cd3953ff2f83f170…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8HZPWV57MBDYCB3ZH3</code></td><td>1</td><td><code>9ebd6da4388da312…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8JH3BPS3X57FDTK0TW</code></td><td>1</td><td><code>23b6492dfdbb2bf5…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8K8BR6SJA22MN5RAQ4</code></td><td>1</td><td><code>a48e585c86724be5…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8KBAC10HR1XMW2RX49</code></td><td>1</td><td><code>8ac0d7bc52cea239…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8MR0A9C9JY3YRQE9BC</code></td><td>1</td><td><code>b50b7fb36e95d14e…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8NDMFCSJY3Y6FQ47E3</code></td><td>1</td><td><code>58614cdf7724ceb7…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8NRQVH0CHS89HDGYV5</code></td><td>1</td><td><code>0d2dec538f5f24de…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8PB0YDTD18DN8TG7F3</code></td><td>1</td><td><code>b83017dc164b7827…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8PKH7VNFCDCG5KGYB7</code></td><td>1</td><td><code>09d518e1256d94d6…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8QBY8ME5YA5N292MSF</code></td><td>1</td><td><code>e97f4a94e016136e…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8QVRSXEVQECR9JV4AZ</code></td><td>1</td><td><code>121814103aabc73c…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8RKVASXN2TG3DZ5D90</code></td><td>1</td><td><code>31918d7a106a1ac3…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8SPJA24MZBR5436QV9</code></td><td>1</td><td><code>d024ff0eed8eb59c…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8SY2QVGF2EBP2ZN488</code></td><td>1</td><td><code>ad1f95d62b5069ba…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8T36WHR19H3W6PJ17Q</code></td><td>1</td><td><code>48eae4c5be271265…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8TEVXT12S618K05CSS</code></td><td>1</td><td><code>79c83c91dba8765b…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8V20ARKDHR0N8KZ79X</code></td><td>1</td><td><code>56d816c35d49a1d2…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8WNYGKQN0E7P194Y6W</code></td><td>1</td><td><code>70d22d66fb4ce57e…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8WQYCMGDX9WZ5KTHSK</code></td><td>1</td><td><code>a944a1894284a2b8…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8X8RBJCSGQ3194FQT3</code></td><td>1</td><td><code>227bf2c828f6eec7…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8Y46HYEGYY6H5EA1MY</code></td><td>1</td><td><code>c4fef9acef2bc05e…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8Y7QH8H52V1VTYKGPT</code></td><td>1</td><td><code>04359363180e6011…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8ZBE94Y6BSEVTB64Q2</code></td><td>1</td><td><code>5684a96b220d1838…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE8ZPD3X1NCSQQXTGKF5</code></td><td>1</td><td><code>7b8d92d95f35282a…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9048GJF9VY2CYEQYPF</code></td><td>1</td><td><code>49bc6e92c12717d2…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE91HK8CRACK1FTCW56S</code></td><td>1</td><td><code>b0401d67a3d868d4…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE91WN0EM7PB9D8KPEZF</code></td><td>1</td><td><code>7298a37dea814d77…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE92J12SE09AFB0T6KZH</code></td><td>1</td><td><code>ef35a9c55ee389cf…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE92VSP5TD9SZY0A32FB</code></td><td>1</td><td><code>442a3d4d23a2cab9…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE93YWQ6NV95NQ3DQW60</code></td><td>1</td><td><code>9cbbc9f30b360d30…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE940QSJYX5GH9TDR703</code></td><td>1</td><td><code>24aa2e357daeb288…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE94JHHSY741ZRE73AE5</code></td><td>1</td><td><code>f952f7d2827e3d4a…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE95SCFWZ1CG1SG7X8F2</code></td><td>1</td><td><code>88eac6c2ca5fa69e…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE960CSTFPECXNVAETTK</code></td><td>1</td><td><code>03d88f378d59de7a…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9662HCRMFPD9VJD2H5</code></td><td>1</td><td><code>8a2bed89d3d547e3…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE970QW93TARH8R6ANYC</code></td><td>1</td><td><code>b75b8eff0b765db6…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE97KGCZCBCPEQDS2DE1</code></td><td>1</td><td><code>38560935c3139973…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE98EB657592K16FNSYG</code></td><td>1</td><td><code>0ef886171f2026f2…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE99NX6DTR7CSAAPPGQF</code></td><td>1</td><td><code>5ead4c2dbe9b67e6…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE99SYEPWZQMJDPT3YRR</code></td><td>1</td><td><code>ac1c2678c4b7b4bc…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9AQ4R1QM5MKN29ZTYS</code></td><td>1</td><td><code>89011f8b66e59602…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9BX0D29KVRA750Z55P</code></td><td>1</td><td><code>20377438bf4153c4…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9BY4C7WR1W0TG7V3XY</code></td><td>1</td><td><code>6cfb817af948debb…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9CAPCQPGM5PFE5DK31</code></td><td>1</td><td><code>f4d8fe76b83c924f…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9CW5S34H2HMY30YCW2</code></td><td>1</td><td><code>76b8596a7e883e5d…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9DK28BFCFKY8YT2DW8</code></td><td>1</td><td><code>6c127e82239c0685…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9DWHBH8JPW532N7QV3</code></td><td>1</td><td><code>f9a68f0730107a4d…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9EBZ36Q7NZ9WCH83PR</code></td><td>1</td><td><code>eea10de16f013b66…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9F26P5RSPXG5333K9H</code></td><td>1</td><td><code>3fa90081abdf24f3…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9F4HE01R7W4XAV5T3B</code></td><td>1</td><td><code>432475a0815d6005…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9GV42JNXHV2DGZ1MEC</code></td><td>1</td><td><code>f9860108b91e2e14…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9GVEAZRK7KZ0GSP1AZ</code></td><td>1</td><td><code>60cc736220a4943c…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9H5FKQN6NFC7KYHQFG</code></td><td>1</td><td><code>679e716979cf8e3b…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9HGP2JBK746WGDZZ65</code></td><td>1</td><td><code>69f27bf4703651b3…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9J4X0V1790Y2020R6J</code></td><td>1</td><td><code>b4004a1c613c1d1e…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9KASATGX3TZZGJF4Z0</code></td><td>1</td><td><code>3d0aad15ba9fc9ab…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9KK2M3X9BX2DDQCRBE</code></td><td>1</td><td><code>e9852a803e1a9206…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9MR4MGNT29GNJC6W02</code></td><td>1</td><td><code>d820f34316ee310b…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9MVJS3ZADHZ5T4KDGP</code></td><td>1</td><td><code>7db2bf014715ff90…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9N2QRSSJ0AYD87HJWE</code></td><td>1</td><td><code>9054b8dc9e3a2930…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9NW2KT0PSFAYRXYVZ9</code></td><td>1</td><td><code>7d1c1943d374031e…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9PY7JVH6MFCT0YYY5Z</code></td><td>1</td><td><code>040c0144a72a24bd…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9Q0CS9M2YJXD6SN5A7</code></td><td>1</td><td><code>74b48228076ebb03…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9QWXWQWNDPVX1XBPQ3</code></td><td>1</td><td><code>44ccaa5b6082563c…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9R83D6NGTJ1HFSNMVK</code></td><td>1</td><td><code>58d80d8d326eb9f6…</code></td></tr>
-<tr><td>RES</td><td><code>RES-01M59JAE9RD8GYDG8JB29AJDP8</code></td><td>1</td><td><code>a01e2196c5455913…</code></td></tr>
+<tr><td>PACK</td><td><code>PACK-BASELINE</code></td><td>7</td><td><code>bbbb25e0eab08038…</code></td></tr>
+<tr><td>ENV</td><td><code>ENV-01M59XPPEZYG6BRHDEQ31ZYBVS</code></td><td>1</td><td><code>92c2506af9bd064f…</code></td></tr>
+<tr><td>POL</td><td><code>POL-01M59XPPF0T1NYQKXFWE1EF95C</code></td><td>1</td><td><code>5d1367d0078ca599…</code></td></tr>
+<tr><td>PLAN</td><td><code>PLAN-01M59XPPF145SHFNF2332SYAZ3</code></td><td>1</td><td><code>92ddc5aeec0e0611…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHJ1F3P77EJQTPCZPW5</code></td><td>1</td><td><code>afa328e2fa2cf938…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHK18779FGDGBH9V3CB</code></td><td>1</td><td><code>8bf67b0046fa28b4…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHM86YCHKZKSJMAMST7</code></td><td>1</td><td><code>5dd9c2d7901d3cb0…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHNC5STSAJSJHR4NGBR</code></td><td>1</td><td><code>e3474e242a4ba699…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHNQBEM7DEGJ7C2ESF0</code></td><td>1</td><td><code>59e1cffec1a5fb2a…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHPTKVKPQ70QKGD3QRJ</code></td><td>1</td><td><code>6a2bbb355d906749…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHPTQZ9DM1F68PANYJW</code></td><td>1</td><td><code>71f3135f168d6b77…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHQ0AN39WNR5H792JCW</code></td><td>1</td><td><code>4b594aabdf12a5c4…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHQZAFZPEKZSK20295K</code></td><td>1</td><td><code>a0f07d8fcebaca2a…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHRHY7HX4YN9D2SBRQJ</code></td><td>1</td><td><code>270358eec3164dbe…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHRXH2A77CNMRY3B54Q</code></td><td>1</td><td><code>ff8556175e31bddd…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHSZ0F7P8GC6F6NCBY6</code></td><td>1</td><td><code>9e75f231585deef5…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHSZEB148GS08CG97VX</code></td><td>1</td><td><code>a422f0306aca5527…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHTJHZPJ2TMJT2EN189</code></td><td>1</td><td><code>42336369795ef69a…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHV9ZDC7XW43JMVFKWN</code></td><td>1</td><td><code>ed8196f20edff27c…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHVDRNY5QYD220G4SPA</code></td><td>1</td><td><code>30157d2c2bd20822…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHW9SEJW4BN29ED0E2M</code></td><td>1</td><td><code>4384e65fd741a5fe…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHX10VVGTVD3XG5TTEM</code></td><td>1</td><td><code>ec166bf4230adbdb…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHYVDMFWP313JGYXQAQ</code></td><td>1</td><td><code>4f711579d3803e47…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHZCN0WTVESZ7PNAPBQ</code></td><td>1</td><td><code>8e928d0bb3c9ae76…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPHZY36E9NY54ZVXX7NW</code></td><td>1</td><td><code>3ce8ae4dfea91c18…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ0JVSEXZ3P1840JM8Y</code></td><td>1</td><td><code>3fd3763781314481…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ0VQGK3Z5W3KX2J336</code></td><td>1</td><td><code>e4d6a279c74c2d96…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ1H8YSAX5DB3Z52AYN</code></td><td>1</td><td><code>c577c25515bffc4f…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ1MYFMX4VCCWA3PSAJ</code></td><td>1</td><td><code>0e1ebe5d183a5fc1…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ29QV426XMR0BMXERE</code></td><td>1</td><td><code>5a8f25de5a3587bf…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ344DE96VHRHS2QJP1</code></td><td>1</td><td><code>86d8cd9d3ac926b3…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ3T58AYBK9F6DB7SX1</code></td><td>1</td><td><code>4c371a9568ea0e09…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ4PPQYS5N5PPZ6A1MJ</code></td><td>1</td><td><code>e8f759f398171382…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ4X0XVEQT10Z90HAPA</code></td><td>1</td><td><code>0bb437bf295d9db1…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ5FGYQ0V5CC4ZDPEJB</code></td><td>1</td><td><code>30e404922072164e…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ5T4FX2744W4BP8W0G</code></td><td>1</td><td><code>90c50b90f7e42774…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ6ZV311A2WGYQNK4RQ</code></td><td>1</td><td><code>7b4104e6c3d680cc…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ74G93QEDETPEM13F4</code></td><td>1</td><td><code>9d414676925d9c5f…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ7ATM4G0KHM5H8C3N2</code></td><td>1</td><td><code>aef175e510d8ccf6…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ843JFHSN6ETHEGK23</code></td><td>1</td><td><code>02d00d74df5eede6…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ8GQMT6G4J2FKJKSKC</code></td><td>1</td><td><code>1ab59faf1014e2e8…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJ94JSRPY7E4M13HC2B</code></td><td>1</td><td><code>9e0b0ffb0abf18cf…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJA98Y4X46CC71Y7T4A</code></td><td>1</td><td><code>315a198996e733de…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJAT26C88N5GZK4JXNV</code></td><td>1</td><td><code>3a79352bcd00c4c2…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJBSWC9E897PH8WGFKD</code></td><td>1</td><td><code>64df7786db9fe9ca…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJC8FBGFJ706XRQ50SC</code></td><td>1</td><td><code>bfe5d506bf9dbd51…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJCH2T564MG4H5JMK2B</code></td><td>1</td><td><code>e10581c9583c51b7…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJD17NFXE8EXY8N1HDH</code></td><td>1</td><td><code>c3139e63e424db4a…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJDADB7B972RHB74V65</code></td><td>1</td><td><code>6b45de340a2b9df9…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJEEW4NF8Z4SPND302M</code></td><td>1</td><td><code>af4efb8b9a55b0ad…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJEKNNW1N0Y7Q01CGQX</code></td><td>1</td><td><code>01814478f4bc32d9…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJFXWSQ3DJZJ9W64RM4</code></td><td>1</td><td><code>d6d72e91f27f8e3c…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJFZ0962QDDAW7YC0EY</code></td><td>1</td><td><code>0b984e00ae603ba1…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJGB1N3958150PFE44E</code></td><td>1</td><td><code>fcb0b82282523ad2…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJGE235MTS1TRG7RKPQ</code></td><td>1</td><td><code>aca19f140e124659…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJHHTRYV5H0D1N52DHF</code></td><td>1</td><td><code>f38c2875e459ecf4…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJJ7FT06TK2D27G2ZDQ</code></td><td>1</td><td><code>6d0dc66c5ff27054…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJJ8P0QN63VP8WM3FK8</code></td><td>1</td><td><code>10a43284cf2318d0…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJK47HM6Q53Z3K9YF99</code></td><td>1</td><td><code>77c8f4405a78a5fa…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJKPK9NP569AJ8GN9MN</code></td><td>1</td><td><code>8119fde5e8989d4a…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJM2WVD9R4RDWVJG0WC</code></td><td>1</td><td><code>144e38caada62501…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJM4JYAMD7CBV91RAAX</code></td><td>1</td><td><code>8dbf529bbb8a15a9…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJN4GV81TQ6SEMM0698</code></td><td>1</td><td><code>50265f52d788b522…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJNVHKM1X5F2RGZF7EH</code></td><td>1</td><td><code>9768777ad21b3fc4…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJPPQFBJK2BKTXZ80AR</code></td><td>1</td><td><code>c72decd2be39390d…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJPRE4DQ5MA2VVHV7RD</code></td><td>1</td><td><code>162c66704522b29c…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJQ7XZREABY5WG8KYK1</code></td><td>1</td><td><code>1b6a3c836e7b1eea…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJQE0NX14AJV1GF652Q</code></td><td>1</td><td><code>3251c3d2b4b380c5…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJR1SWT79BQMG2FDVW5</code></td><td>1</td><td><code>a56325f17b21d266…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJRVHEFPNQM9CBT6845</code></td><td>1</td><td><code>0e5c848b82544018…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJSHBE6QFKT00QT6YZE</code></td><td>1</td><td><code>af81fb9c899fc684…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJSXY6MK6SNEXBE36Q4</code></td><td>1</td><td><code>ab0112daf67586f0…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJTW1MWB2SDT4MVXB6Q</code></td><td>1</td><td><code>e3749f0f4bc0cef7…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJVT1SKVJZ10E97B7E3</code></td><td>1</td><td><code>b35965c187ea213a…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJVYAT194SH94XQ3NK1</code></td><td>1</td><td><code>059163cf7c7c1601…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJW53EKDPT5246V9XY6</code></td><td>1</td><td><code>fdade2089ea6b89e…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJWP26YERDXD6GHFXM0</code></td><td>1</td><td><code>c3dc02ca4b13a532…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJX1MPF8AT9TKKXWB39</code></td><td>1</td><td><code>42391fe3ef2acd84…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJXYZGVNWNQANY42826</code></td><td>1</td><td><code>cf654479ce55790b…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJYH8WE3V88GDNYBQF8</code></td><td>1</td><td><code>26a7bb798dcac21f…</code></td></tr>
+<tr><td>EVD</td><td><code>EVD-01M59XPPJYNWA72QEP7QVG48YS</code></td><td>1</td><td><code>70cf49c8f1453858…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNH7QFQDFVPWA006ERW</code></td><td>1</td><td><code>a41c40ef0e1d18b9…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNJJ0A73AN40Q7K64AF</code></td><td>1</td><td><code>ad70f2f7e3f128c6…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNK6S0GYS37430XCMV7</code></td><td>1</td><td><code>c2c6ce4aa0da68fa…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNKBXW9F941535CKJJR</code></td><td>1</td><td><code>361ace8653e633f0…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNM87DNXRM43YHQQMXC</code></td><td>1</td><td><code>b73ccbfec34e142e…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNT7ECH201XEAN5PB24</code></td><td>1</td><td><code>2a2865dc522a18bb…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNV9A23N2J9Q68036BK</code></td><td>1</td><td><code>85fd629bee3b3ef8…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNVXWRVSQPK451EWVZA</code></td><td>1</td><td><code>762c8a79d4516469…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNWDMPVG4GGMA52290A</code></td><td>1</td><td><code>dcc3c9e76f1883f0…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNXA16TATRJ4R8TX5D9</code></td><td>1</td><td><code>e94092d7dbde673f…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNXAHWMPNVCAGH9CJQR</code></td><td>1</td><td><code>5dd31c62f09cfcd2…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNY9Y0PP0F156GHKYPQ</code></td><td>1</td><td><code>53d8ced37fe54624…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNZ33661N7RF72H0J4C</code></td><td>1</td><td><code>a8e8c5659bbc165c…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPNZBEXHVJ29P9GHHEF9</code></td><td>1</td><td><code>70219448709b216c…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP05RYJD8T886H0H0S9</code></td><td>1</td><td><code>8eb6f50694b27d5a…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP0Z7HF00YJ7S64F035</code></td><td>1</td><td><code>6fb302900b728e56…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP1A8FKDRQVW42YRF93</code></td><td>1</td><td><code>b087129864fd9653…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP1Y3Q9RP3FPFR4AM98</code></td><td>1</td><td><code>239467defb6b0c02…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP2EX7Z2KC1HXQ69DZK</code></td><td>1</td><td><code>92b2c7c088806153…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP2RH496RYT4296EDKY</code></td><td>1</td><td><code>ba9f8e794e9a9d03…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP3FNDW3GC012Q989FJ</code></td><td>1</td><td><code>eafe652b69004803…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP3TA4G7CRAE8K1T64P</code></td><td>1</td><td><code>031ddd3fd1e219cc…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP4NFJARM4JQNMZY00Z</code></td><td>1</td><td><code>caf153e972836f98…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP5BJENQQ8ESA44FK4W</code></td><td>1</td><td><code>0e3f4e9943d09402…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP5H4R0CHJ38X83DDP1</code></td><td>1</td><td><code>d65f3a1c8122eee0…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP6KK4P6670P3N2V9P9</code></td><td>1</td><td><code>98b52c520050f249…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP7QE5TCZ8XM8GEH977</code></td><td>1</td><td><code>406acf812cc22284…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP7SFEWM1YMSKRPHEK2</code></td><td>1</td><td><code>69a1ef3fb464a622…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP8JC1GR1SG2WNCB5WJ</code></td><td>1</td><td><code>e6018d0fc7711360…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP8VH1QSR8W1APQ75F2</code></td><td>1</td><td><code>9c4b3142c9aed91b…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP9G296HJF0ADQ1YBNH</code></td><td>1</td><td><code>fb0b9bef8291d911…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPP9V3E6RWJ0MNW6VG5Q</code></td><td>1</td><td><code>b04c13459800d198…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPA62S94X3P0HSAHCBR</code></td><td>1</td><td><code>ae51d8992fff88e5…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPBM42A0BB21APY8C0G</code></td><td>1</td><td><code>89e5136a1585b41c…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPBXWP4WKAHDSJJVFW9</code></td><td>1</td><td><code>05c2df00fdca969a…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPCH7VS2WNTXMTEH32S</code></td><td>1</td><td><code>df05735ddedf60e8…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPCNRN1TQ6Y93VT7MQ5</code></td><td>1</td><td><code>151639b6f47a866f…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPD1C1VF75TWB49GV4Z</code></td><td>1</td><td><code>a47f2890f77b87df…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPDGPP0FM7P1HVSVQ48</code></td><td>1</td><td><code>f27f192c6320c73c…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPESANXPEC6X6NBA79H</code></td><td>1</td><td><code>6b22619423dc4e92…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPF6ARJBVFEAZP499ME</code></td><td>1</td><td><code>7c047d9c29ab1e65…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPFZT6MVC5GVJ0PP1ZE</code></td><td>1</td><td><code>88435c9ce31592f4…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPGV6H2YHJMJ3W3QTDE</code></td><td>1</td><td><code>88068ed37993023c…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPGVQJB4A7MX6WTXG4W</code></td><td>1</td><td><code>4ec2d5ccae7086b3…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPHD9TV4P60ART75XH0</code></td><td>1</td><td><code>28dbe94a44210554…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPHPYQZDMX1PJQMZ1PB</code></td><td>1</td><td><code>78ac9b916adffbc1…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPJTH5G4KAS4KF8XB0F</code></td><td>1</td><td><code>bc85c39dd5939a9d…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPJZAJXJT7P3X6Z4N7X</code></td><td>1</td><td><code>967a4b197bfe5987…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPK7TPPK2K2AK6TYSQB</code></td><td>1</td><td><code>eff8b3a08a932260…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPKHC66FTGXEQMZ5MJJ</code></td><td>1</td><td><code>d26538faa9b5d7d7…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPM7TXWNYGG4P7DG8J8</code></td><td>1</td><td><code>f0b4b40d62b9382b…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPN6EXARVVFZ2KBQF62</code></td><td>1</td><td><code>bd54c80255fb5a82…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPN6ZQ5V3WTRYSYB0E8</code></td><td>1</td><td><code>7fcc3d558d34d1da…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPP9N4Z3EZVABAS4RQS</code></td><td>1</td><td><code>dccee730b84c3bd9…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPPQ7SMKHCQJKWXCHEQ</code></td><td>1</td><td><code>31a655c709631279…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPQJ1GSMD3GHET5VCN8</code></td><td>1</td><td><code>ae9689cc748b483d…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPRA6EZZVTC8ZTMQZJX</code></td><td>1</td><td><code>e40124767e78c816…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPREQJ4KJG8AJ6NMMH9</code></td><td>1</td><td><code>27e24c7e4495c682…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPSV804J7EQXH3JJK83</code></td><td>1</td><td><code>da606f1628ac7fb9…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPT0TT5D5HGBRAA2Q03</code></td><td>1</td><td><code>9012e181918e5a25…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPV8NBPNAY9PXJYB7EQ</code></td><td>1</td><td><code>cdfba70072a743d2…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPVBN5Q7278SATPK7R5</code></td><td>1</td><td><code>c057073ea4cadeff…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPWD5FQSY9YKHJBEAWV</code></td><td>1</td><td><code>7463d7ec7e1bdb0c…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPXB9K3BN7P9K525HKM</code></td><td>1</td><td><code>236399c07ecf5521…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPPXHN24BKG5SH6G7Q41</code></td><td>1</td><td><code>3c3318cf08f38d03…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQ3SKGVQRWRJK1H7JHV</code></td><td>1</td><td><code>ea005ed7ab8ec843…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQ4QAG9J8P08QR2E140</code></td><td>1</td><td><code>c4fe074a544ff20c…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQ4SMSA6MXWE2XRAEMH</code></td><td>1</td><td><code>7f8dc58a0411ee79…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQ59X3M5R9GCT4A1W9V</code></td><td>1</td><td><code>5151115d1b4cef9b…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQ6JPCSPG0XTNTCNAR1</code></td><td>1</td><td><code>62c253a7e70475b3…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQ6MES0TQ6B82JYVMVX</code></td><td>1</td><td><code>9d72a8045191be40…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQ7J3S7TQE5R00BTHZK</code></td><td>1</td><td><code>16b02c54aa846baa…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQ92DXRRAK6APVHJQ6Y</code></td><td>1</td><td><code>dbfcefb03dcffdf8…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQAT8NGZ0Y66Y34JCS3</code></td><td>1</td><td><code>138e19a56fdec682…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQBBCWGXG5JNSQ7RSYR</code></td><td>1</td><td><code>7611a90adcdb4463…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQCSJX6SAYV632TAZ2F</code></td><td>1</td><td><code>b515df04abb94591…</code></td></tr>
+<tr><td>RES</td><td><code>RES-01M59XPPQFJAG4NST3MPQH5K5F</code></td><td>1</td><td><code>4b83b9480f534826…</code></td></tr>
 </table></div></body></html>

@@ -5,6 +5,7 @@ dns_error·error는 차단 근거가 아니다.
 """
 
 import socket
+import sys
 
 import pytest
 
@@ -54,6 +55,7 @@ def test_dns_and_other_errors_are_never_block_evidence(outcome):
     assert sec(evidence(observations=obs)) == Verdict.UNKNOWN
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)")
 def test_real_connection_refused_is_classified_and_not_pass_alone():
     """루프백에서 실제 연결 거부를 만들어 분류하고, 양성 대조 없이는 PASS가 아님을 확인 (Docker 불필요)."""
     with socket.socket() as s:

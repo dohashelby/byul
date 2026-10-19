@@ -24,6 +24,27 @@ from guard.models.objects import Change, ConditionEval, FactValue, PlanInputs, P
 
 ENV_COUNT = {Mode.audit: 1, Mode.update: 2}
 
+# 정책 값 타입: 지금 팩이 쓰는 것만. 범용 정책 언어는 만들지 않는다(DECISIONS Step 1-C)
+SUPPORTED_POLICY_TYPES = ("str", "int", "bool", "list[str]")
+
+
+class PolicyValueError(ValueError):
+    """정책 값이 CheckDef.policy_params의 타입과 맞지 않음(실행 전에 거부)."""
+
+
+def check_policy_value(check_id: str, key: str, type_: str, value: Any) -> None:
+    if type_ not in SUPPORTED_POLICY_TYPES:
+        raise PolicyValueError(f"{check_id}.{key}: unsupported policy type {type_!r} (supported: {', '.join(SUPPORTED_POLICY_TYPES)})")
+    ok = {
+        "str": lambda v: isinstance(v, str),
+        "int": lambda v: isinstance(v, int) and not isinstance(v, bool),
+        "bool": lambda v: isinstance(v, bool),
+        "list[str]": lambda v: isinstance(v, list) and all(isinstance(x, str) for x in v),
+    }[type_](value)
+    if not ok:
+        got = "null" if value is None else f"{type(value).__name__} {value!r}"
+        raise PolicyValueError(f"{check_id}.{key}: expected {type_}, got {got}")
+
 
 def evaluate_condition(fact: str, expected: Any, env: Environment) -> ConditionEval:
     fv: FactValue | None = env.facts.get(fact)
@@ -153,6 +174,12 @@ def select(
             not_selected = NotSelectedReason.NOT_APPLICABLE
         if trig and not_selected is None and applicability == Applicability.NOT_APPLICABLE:
             reason += f"; selected because change facts {trig} relate to it"
+
+        # 정책 값이 있으면 타입을 실행 전에 확인(없으면 아래 NO_POLICY_VALUE 공백)
+        given = policy.values.get(cid, {})
+        for param in check.policy_params:
+            if param.type not in SUPPORTED_POLICY_TYPES or param.key in given:
+                check_policy_value(cid, param.key, param.type, given.get(param.key))
 
         gaps: list[Gap] = []
         if not_selected is None:

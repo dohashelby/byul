@@ -77,22 +77,79 @@ def _vllm_plan(vllm: dict):
     return VllmAdapter().launch_plan(spec)
 
 
-def _start_engine(docker: Docker, engine: str, networks: list[str], publish: list[int], vllm: dict | None) -> str:
+# 컴파일 캐시 경로 환경변수 → exec 가능한 /guard-cache (실제 기동 오류 메시지로 확인한 것만, DECISIONS Step 3)
+CACHE_ENV = {
+    # 1차 기동 오류가 권한 TORCHINDUCTOR_CACHE_DIR만으로는 부족했다: 실패 경로가 계속
+    # /tmp/.cache/vllm/torch_compile_cache/…/inductor_cache/…main.so → vLLM 자체 캐시 루트(envs.py L706-709,
+    # compilation/backends.py L1064)가 필요
+    "VLLM_CACHE_ROOT": "/guard-cache/vllm",                 # 필요(이것만으로 기동, 실측 3.0M 사용)
+    "TORCHINDUCTOR_CACHE_DIR": "/guard-cache/torchinductor",  # 오류 메시지가 지목한 변수. 실측 사용 0 — /tmp로 가지 않게 유지
+    # TRITON_CACHE_DIR: 근거 없음(CPU 빌드, 디렉토리 생성 안 됨) → 넣지 않음
+}
+
+# 엔진 컨테이너 실행 권한 프로필(PLT-01). 모델 마운트는 모든 프로필에서 읽기 전용이다.
+ENGINE_PROFILES = {
+    "default": {},                                                    # Docker 기본(root, 기본 capability 14개)
+    # 안전: capability 전부 제거·읽기 전용 루트·non-root. /tmp는 noexec, 컴파일 캐시만 별도 exec 가능 tmpfs(/guard-cache)
+    "hardened": {"cap_drop": ["ALL"], "read_only": True,
+                 "tmpfs": ["/tmp:rw,noexec,nosuid,size=2g,mode=1777", "/guard-cache:rw,exec,nosuid,size=2g,mode=1777"],
+                 "user": "1000:1000", "security_opt": ["no-new-privileges:true"],
+                 "env": {"HOME": "/tmp", **CACHE_ENV}},
+    # 위반(반대 방향): hardened와 같되 /tmp 자체에 exec 허용(정책 허용 목록에 없음)
+    "tmp_exec": {"cap_drop": ["ALL"], "read_only": True, "tmpfs": ["/tmp:rw,exec,nosuid,size=2g,mode=1777"],
+                 "user": "1000:1000", "security_opt": ["no-new-privileges:true"], "env": {"HOME": "/tmp"}},
+    "overprivileged": {"cap_add": ["SYS_ADMIN"], "sentinel_mount": True},  # 위반: 추가 capability + 빈 sentinel 디렉토리 rw
+}
+SENTINEL_TARGET = "/guard-sentinel"
+
+
+def _start_engine(docker: Docker, engine: str, networks: list[str], publish: list[int], vllm: dict | None,
+                  profile: str = "default", sentinel_dir: Path | None = None) -> str:
+    if profile not in ENGINE_PROFILES:
+        raise ValueError(profile)
+    prof = ENGINE_PROFILES[profile]
+    extra_mounts = []
+    if prof.get("sentinel_mount"):
+        if sentinel_dir is None or any(sentinel_dir.iterdir()):
+            raise ValueError("overprivileged profile needs an empty sentinel_dir inside the project")
+        extra_mounts.append(Mount(sentinel_dir.resolve(), SENTINEL_TARGET, read_only=False))
+    opts = {k: prof[k] for k in ("cap_add", "cap_drop", "read_only", "tmpfs", "user", "security_opt") if k in prof}
     if engine == "stub":
         return docker.run_detached(PYTHON_IMAGE, "engine", networks=networks, publish=publish,
-                                   mounts=[Mount(LAB / "stub_engine/server.py", "/lab/server.py")],
-                                   command=["python", "-u", "/lab/server.py"], timeout=T)
+                                   mounts=[Mount(LAB / "stub_engine/server.py", "/lab/server.py"), *extra_mounts],
+                                   public_env=prof.get("env", {}), command=["python", "-u", "/lab/server.py"],
+                                   timeout=T, **opts)
     plan = _vllm_plan(vllm)
-    return docker.run_detached(plan.image, "engine", networks=networks, publish=publish, mounts=plan.mounts,
-                               public_env=plan.env, command=plan.argv, gpus=plan.gpus, shm_size=plan.shm_size,
-                               timeout=T)
+    assert all(m.read_only for m in plan.mounts)  # 모델 마운트는 항상 읽기 전용
+    return docker.run_detached(plan.image, "engine", networks=networks, publish=publish,
+                               mounts=[*plan.mounts, *extra_mounts], public_env={**plan.env, **prof.get("env", {})},
+                               command=plan.argv, gpus=plan.gpus, shm_size=plan.shm_size, timeout=T, **opts)
 
 
-def up(docker: Docker, topology: str, run_dir: Path, allowed_key: str, *, engine: str = "stub",
-       vllm: dict | None = None, wait_ready: bool = True) -> dict:
-    """engine: "stub" | "vllm". vllm: guard.toml [vllm] 섹션(image, model, revision, models_dir, gpu, ready_timeout ...)."""
+GATEWAY_PROFILES = {
+    # 프로필 → 필요한 키 환경변수(값은 실행 시에만, 파일에 없음)
+    "single": ("GUARD_ALLOWED_KEY",),                          # REQ-01: 허용 키 1개면 모든 경로
+    "role_open": ("GUARD_GENERAL_KEY", "GUARD_ADMIN_KEY"),     # REQ-03 위반: 역할 무관 전부 통과
+    "role_enforced": ("GUARD_GENERAL_KEY", "GUARD_ADMIN_KEY"), # REQ-03 안전: 일반 키는 추론 경로만
+}
+
+
+def up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = None, *, engine: str = "stub",
+       vllm: dict | None = None, wait_ready: bool = True, gateway_profile: str = "single",
+       gateway_keys: dict[str, str] | None = None, engine_profile: str = "default",
+       sentinel_dir: Path | None = None) -> dict:
+    """engine: "stub" | "vllm". vllm: guard.toml [vllm] 섹션(image, model, revision, models_dir, gpu, ready_timeout ...).
+
+    gateway_profile: single(allowed_key) | role_open | role_enforced(gateway_keys: GUARD_GENERAL_KEY·GUARD_ADMIN_KEY).
+    """
     if topology not in ("exposed", "isolated"):
         raise ValueError(topology)
+    if gateway_profile not in GATEWAY_PROFILES:
+        raise ValueError(gateway_profile)
+    secret_env = {"GUARD_ALLOWED_KEY": allowed_key} if gateway_profile == "single" else dict(gateway_keys or {})
+    missing = [k for k in GATEWAY_PROFILES[gateway_profile] if not secret_env.get(k)]
+    if missing:
+        raise ValueError(f"gateway profile {gateway_profile} needs keys {missing}")
     if engine not in ("stub", "vllm") or (engine == "vllm" and not vllm):
         raise ValueError(f"engine {engine!r} (vllm needs the [vllm] config)")
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -102,22 +159,22 @@ def up(docker: Docker, topology: str, run_dir: Path, allowed_key: str, *, engine
     publish = [ENGINE_PORT] if topology == "exposed" else []
     if topology == "exposed":
         net = docker.network_create("net", timeout=T)
-        engine_name = _start_engine(docker, engine, [net], publish, vllm)
+        engine_name = _start_engine(docker, engine, [net], publish, vllm, engine_profile, sentinel_dir)
         engine_ip = docker.ip(engine_name, net, timeout=T)
         external_net = trusted_net = net
     else:
         engine_net = docker.network_create("engine", internal=True, timeout=T)
         outside = docker.network_create("outside", timeout=T)
-        engine_name = _start_engine(docker, engine, [engine_net], publish, vllm)
+        engine_name = _start_engine(docker, engine, [engine_net], publish, vllm, engine_profile, sentinel_dir)
         engine_ip = docker.ip(engine_name, engine_net, timeout=T)
         external_net, trusted_net = outside, engine_net
 
     gw_networks = [external_net] if topology == "exposed" else [external_net, trusted_net]
     gateway = docker.run_detached(
         NGINX_IMAGE, "gw", networks=gw_networks, publish=[GATEWAY_PORT],
-        mounts=[Mount(LAB / "gateway", "/etc/nginx/templates")],
+        mounts=[Mount(LAB / "gateway" / gateway_profile, "/etc/nginx/templates")],
         public_env={"GUARD_ENGINE_UPSTREAM": f"{engine_ip}:{ENGINE_PORT}"},
-        secret_env={"GUARD_ALLOWED_KEY": allowed_key}, timeout=T,
+        secret_env=secret_env, timeout=T,
     )
     gateway_ip = docker.ip(gateway, external_net, timeout=T)
     gw_host_port = docker.published_port(gateway, GATEWAY_PORT, timeout=T)
@@ -152,6 +209,8 @@ def up(docker: Docker, topology: str, run_dir: Path, allowed_key: str, *, engine
         "engine_kind": engine,
         "run_id": docker.run_id,
         "topology": topology,
+        "gateway_profile": gateway_profile,
+        "engine_profile": engine_profile,
         "probe_image": PYTHON_IMAGE,
         "origins": {"external": {"network": external_net}, "trusted": {"network": trusted_net}},
         "gateway": {"url": f"http://{gateway_ip}:{GATEWAY_PORT}", "origin": "external",

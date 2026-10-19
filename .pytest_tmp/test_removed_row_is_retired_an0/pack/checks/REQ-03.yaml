@@ -11,8 +11,14 @@ risk_summary: 일반 호출자가 관리·진단 API를 실행해 모델 상태�
 review_order: reference_baseline_first
 impact: null
 applies_when:
+  all:
+  - fact: gateway
+    eq: true
   prose: 관리 접점 검토는 기본, 진단 기능별 활성 여부 확인
-policy_params: []
+policy_params:
+- key: general_allowed_kinds
+  type: list[str]
+  required: true
 policy_prose:
   policy_to_decide: 작업별 역할·허용 범위
   enterprise_decisions: 인증 방식·실제 계정, 사용자/조직별 모델·작업 허용표, 직통 허용 주체·목적, 관리 역할, Gateway의 신원 전달·경로 변환과 선택 API. 저장 결과 기능을 쓰면 객체 소유자·조회·취소 권한도 결정한다.
@@ -21,7 +27,17 @@ challenge_steps:
 - 활성 관리·진단 route 목록 확보
 - 일반키와 관리권한으로 같은 무해 조회·진단 작업 호출
 - 부수 효과 확인
-required_observations: []
+required_observations:
+- key: routes_registered
+  type: list[str]
+- key: routes_tested
+  type: list[str]
+- key: nonadmin_outcomes
+  type: dict[str, int|outcome]
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, pass|fail|no_response]
 required_observations_prose:
 - route별 요구 역할
 - 키·신원별 응답
@@ -32,8 +48,51 @@ unknown_criteria: route 미등록·도달불가를 인가 성공으로 오인하
 remediation: 관리·진단 route를 제한하고 작업별 권한을 집행한다.
 method_and_evidence: 무자격·일반·관리 역할로 실제 등록된 각 route를 대조한다. 각 작업별 결과를 따로 남긴다.
 remaining_setup: 무해 관리 호출 선정; 활성 개발·동적 기능 경로 별도 표시
-executor: null
-judge: null
+executor: role_route
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: routes_registered
+      op: nonempty
+    - obs: routes_tested
+      op: superset_of
+      value_obs: routes_registered
+    - obs: nonadmin_outcomes
+      op: superset_of
+      value_obs: routes_registered
+    - obs: nonadmin_outcomes
+      op: all_in
+      value:
+      - 401
+      - 403
+    fail_when_any:
+    - obs: nonadmin_outcomes
+      op: any_between
+      value:
+      - 200
+      - 299
+    - obs: nonadmin_outcomes
+      op: any_in
+      value:
+      - handler_reached
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: nonempty
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        fail_when_any:
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
 legacy:
   q_ids:
   - Q-C01
@@ -43,3 +102,28 @@ legacy:
   - Q-C01/SC-01-03
 source:
   array: request_state_assessment_draft
+observation_notes:
+  nonadmin_outcomes: Gateway 경유. 상태 변경 경로는 어댑터의 검증된 안전 프로브만 보내고, 기대 응답이 오면 handler_reached (인가 없이 핸들러 도달). 관리 역할 결과(admin_outcomes)는 증거 파일에만.
+route_scope:
+  include_kinds:
+  - admin
+  - diagnostic
+  exclude_kinds_policy: general_allowed_kinds
+functional_probes:
+- method: POST
+  path: /v1/completions
+  body:
+    model: '{model}'
+    prompt: ping
+    max_tokens: 1
+  expect:
+  - 200
+  as_role: general
+- method: GET
+  path: /metrics
+  expect:
+  - 200
+  as_role: admin
+functional_scope:
+  probed_obs: functional_probe_results
+  of_obs: routes_registered

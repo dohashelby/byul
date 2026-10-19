@@ -23,7 +23,7 @@ from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, utcnow
 
 from .base import DraftArtifact, EvidenceDraft
 
-ROUTES = ["/v1/models", "/v1/completions", "/invocations"]
+ROUTES = ["GET /v1/models", "POST /v1/completions", "POST /invocations"]  # "METHOD path" 키
 FUNCTIONAL_PROBE = "POST /v1/completions"  # 가짜 증거의 기능 표본 이름(REQ-01 override와 같은 모양)
 
 
@@ -53,36 +53,95 @@ _REFUSED = {r: "refused" for r in ROUTES}
 
 SCENARIOS: dict[str, dict[str, Any]] = {
     "pass": _scenario(_401),
-    "direct_200": _scenario({**_401, "/v1/completions": 200}),
+    "direct_200": _scenario({**_401, "POST /v1/completions": 200}),
     "not_attempted": _scenario(_401, attempted=False),
     "missing_obs": _scenario(_401, missing=("direct_outcomes",)),
     "refused_with_positive_control": _scenario(_REFUSED, trusted=True),
     "refused_without_positive_control": _scenario(_REFUSED, trusted=False),
-    "partial_routes": _scenario(_401, tested=["/v1/completions"]),
-    "direct_200_on_invocations": _scenario({**_REFUSED, "/invocations": 200}, trusted=True),
+    "partial_routes": _scenario(_401, tested=["POST /v1/completions"]),
+    "direct_200_on_invocations": _scenario({**_REFUSED, "POST /invocations": 200}, trusted=True),
 }
-SUPPORTED_CHECKS = {"REQ-01"}
+# REQ-03(역할별 관리·진단 경로): 관리·진단 등록 경로, 비관리 역할 대표 결과
+REQ03_ROUTES = ["POST /is_scaling_elastic_ep", "GET /kv_event_sources", "GET /load", "GET /metrics", "POST /scale_elastic_ep"]
+REQ03_FUNCTIONAL = {"POST /v1/completions": "pass", "GET /metrics": "pass"}
+
+
+def _req03(nonadmin: dict, tested: list[str] | None = None) -> dict:
+    tested = REQ03_ROUTES if tested is None else tested
+    return {"attempted": True, "observations": {
+        "routes_registered": _obs(REQ03_ROUTES),
+        "routes_tested": _obs(tested),
+        "nonadmin_outcomes": _obs({r: nonadmin[r] for r in tested}),
+        "functional_probes_planned": _obs(list(REQ03_FUNCTIONAL)),
+        "functional_probe_results": _obs(dict(REQ03_FUNCTIONAL)),
+    }}
+
+
+_403 = {r: 403 for r in REQ03_ROUTES}
+SCENARIOS_BY_CHECK: dict[str, dict[str, dict[str, Any]]] = {
+    "REQ-01": SCENARIOS,
+    "REQ-03": {
+        "pass": _req03(_403),                                                   # Gateway가 비관리 역할을 전부 거부
+        "role_open": _req03({**_403, "GET /metrics": 200, "GET /load": 200}),           # 일반 키로 진단 작업 실행 → FAIL
+        "scale_handler_reached": _req03({**_403, "POST /scale_elastic_ep": "handler_reached"}),  # 안전 프로브가 핸들러 도달 → FAIL
+        "mutating_untested": _req03(_403, tested=[r for r in REQ03_ROUTES if r != "POST /scale_elastic_ep"]),  # 미시험 → UNKNOWN
+    },
+}
+# PLT-01(컨테이너 실행 권한). 실험실 정책 기준: pass·tmp_exec 외에는 위반
+DEFAULT_CAPS = ["AUDIT_WRITE", "CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID", "KILL", "MKNOD", "NET_BIND_SERVICE",
+                "NET_RAW", "SETFCAP", "SETGID", "SETPCAP", "SETUID", "SYS_CHROOT"]
+
+
+def _plt01(caps=(), mounts=("/models:ro",), root=False, sentinel=None, exec_writable=("/guard-cache",)) -> dict:
+    sentinel = {"/models": "denied", "/guard-sentinel": "absent"} if sentinel is None else sentinel
+    return {"attempted": True, "observations": {
+        "capabilities_effective": _obs(sorted(caps)), "mounts": _obs(sorted(mounts)), "devices": _obs([]),
+        "privileged": _obs(False), "host_namespaces": _obs([]), "root_uid_present": _obs(root),
+        "sentinel_results": _obs(sentinel),
+        "exec_writable_mounts": _obs(sorted(exec_writable)),
+        "functional_probes_planned": _obs(["POST /v1/completions"]),
+        "functional_probe_results": _obs({"POST /v1/completions": "pass"}),
+    }}
+
+
+SCENARIOS_BY_CHECK["PLT-01"] = {
+    "pass": _plt01(),                                                     # hardened
+    "overprivileged": _plt01(caps=DEFAULT_CAPS + ["SYS_ADMIN"], mounts=("/models:ro", "/guard-sentinel:rw"), root=True,
+                             sentinel={"/models": "denied", "/guard-sentinel": "succeeded"},
+                             exec_writable=("/", "/dev", "/guard-sentinel")),
+    "default_caps": _plt01(caps=DEFAULT_CAPS, root=True, exec_writable=("/", "/dev")),
+    "root_user": _plt01(root=True),
+    "tmp_exec": _plt01(exec_writable=("/tmp",)),                          # /tmp 자체에 exec 허용(허용 목록 밖)
+}
+SUPPORTED_CHECKS = set(SCENARIOS_BY_CHECK)
 
 
 class FakeExecutor:
     name = "fake"
     version = "0.2.0"
 
-    def __init__(self, scenario: str = "pass"):
-        if scenario not in SCENARIOS:
-            raise ValueError(f"unknown fake scenario {scenario!r}; choose from {sorted(SCENARIOS)}")
+    def __init__(self, scenario: str = "pass", scenarios: dict[str, str] | None = None):
+        """scenario: 기본 시나리오, scenarios: 점검별 시나리오(없으면 기본)."""
+        if scenario not in SCENARIOS and not any(scenario in t for t in SCENARIOS_BY_CHECK.values()):
+            raise ValueError(f"unknown fake scenario {scenario!r}")
         self.scenario = scenario
+        self.scenarios = dict(scenarios or {})
 
     def run(self, check: CheckDef, env: Environment, policy_values: dict, adapter, workdir: Path) -> EvidenceDraft:
         if check.id not in SUPPORTED_CHECKS:
             raise ValueError(f"FakeExecutor has no scenario for {check.id}")
-        spec = SCENARIOS[self.scenario]
+        name = self.scenarios.get(check.id, self.scenario)
+        table = SCENARIOS_BY_CHECK[check.id]
+        if name not in table:
+            raise ValueError(f"FakeExecutor: no scenario {name!r} for {check.id}; choose from {sorted(table)}")
+        spec = table[name]
         started = utcnow()
         challenges = [{"step": step, "attempted": spec["attempted"]} for step in check.challenge_steps]
         workdir.mkdir(parents=True, exist_ok=True)
         log = workdir / "probe_log.jsonl"
-        lines = [{"example": True, "scenario": self.scenario, "observation": k, **v} for k, v in spec["observations"].items()]
-        lines.append({"example": True, "scenario": self.scenario, "direct_allowed_outcomes": {r: 401 for r in ROUTES}})
+        lines = [{"example": True, "scenario": name, "observation": k, **v} for k, v in spec["observations"].items()]
+        if check.id == "REQ-01":
+            lines.append({"example": True, "scenario": name, "direct_allowed_outcomes": {r: 401 for r in ROUTES}})
         log.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines), encoding="utf-8")
         return EvidenceDraft(
             status=ExecStatus.COMPLETED,
@@ -91,7 +150,7 @@ class FakeExecutor:
             challenges=challenges,
             observations=spec["observations"],
             artifacts=[DraftArtifact(name="probe_log.jsonl", path=log, collector=f"{self.name}/{self.version}")],
-            config={"scenario": self.scenario, "policy_values": policy_values},
+            config={"scenario": name, "policy_values": policy_values},
             started_at=started,
             finished_at=utcnow(),
         )

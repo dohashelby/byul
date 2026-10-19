@@ -10,7 +10,7 @@ OK = req01_obs()
 
 def direct(**per_route):
     """direct_outcomes: 기본 401, 지정한 경로만 바꿈. 키는 경로 이름의 마지막 부분(completions, invocations, models)."""
-    names = {"models": "/v1/models", "completions": "/v1/completions", "invocations": "/invocations"}
+    names = {"models": "GET /v1/models", "completions": "POST /v1/completions", "invocations": "POST /invocations"}
     out = {r: 401 for r in ROUTES}
     out.update({names[k]: v for k, v in per_route.items()})
     return out

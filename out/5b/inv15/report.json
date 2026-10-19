@@ -1,46 +1,46 @@
 {
   "kind": "RPT",
-  "id": "RPT-01M59HTA7SR7A905DF1YJT0G7P",
+  "id": "RPT-01M59KWR3S345CSPA2GT39P1JH",
   "revision": 1,
-  "created_at": "2026-10-19T07:43:02Z",
+  "created_at": "2026-10-19T08:19:19Z",
   "data_origin": "DECLARED",
-  "content_sha256": "c9f3eaef6a9cd29f982870672715710bdc7440f7c8606b8079801b352916e687",
+  "content_sha256": "6aaae5ae3e82ac83d8dfa7607cc5daf31ccb961d35bcdb310221e4ec5e291a52",
   "refs": [
     {
       "kind": "ENV",
-      "id": "ENV-01M59HT09BEQBP8BBHGHRVPHCG",
+      "id": "ENV-01M59KWEFFAH93PVTQVR6C9QPS",
       "revision": 1,
-      "sha256": "06be1de194a448583189c8c29fba1b45ba0f5779dba08c43721373e1a292d44b"
+      "sha256": "e3d5f924c4b321d5ef39d6e09e322f61ec732974294aa6ecccc2ec58d85c129e"
     },
     {
       "kind": "POL",
-      "id": "POL-01M59HT09BAT5E9ZJZSWHTQ95S",
+      "id": "POL-01M59KWEFFBKSW90Y2R10ZA9FA",
       "revision": 1,
-      "sha256": "11c1e7620c00f6f59c8cfaa96d8d6fb1b44c367fa440fd80e8344c1313ce3fe8"
+      "sha256": "d3143a02a5b164d2c11a6e737312a8cbe6136c2138e0216d3195303cd7e0ab80"
     },
     {
       "kind": "PLAN",
-      "id": "PLAN-01M59HT09DNGNJFW0RSG74883F",
+      "id": "PLAN-01M59KWEFGGE2FQ4FK2CCYT0DN",
       "revision": 1,
-      "sha256": "695fc5d74abc4886a63361ddb0433cc15fdb07cea8c2559c1fa3658f1c0e5820"
+      "sha256": "4bf25c5b373dab80dd8ecc0fcf7653424f7efdb16665ac748adbcf3bdc29be39"
     },
     {
       "kind": "EVD",
-      "id": "EVD-01M59HT0C4V4CXPVF47XJB3JAM",
+      "id": "EVD-01M59KWEJBDAY0271FE6E392EB",
       "revision": 1,
-      "sha256": "e22296e8b2c2ca9614d461b82b0cae93aa457f30858690031c8ed2fdf1cfebed"
+      "sha256": "4e9af21dc7f743acf1ab6bc60a5951c3a92f5b82c530df865e3aaf2ac02260b0"
     },
     {
       "kind": "RES",
-      "id": "RES-01M59HTA5ARQ6KX87E2EGE49BC",
+      "id": "RES-01M59KWR1AWAPE402CTND3N9CR",
       "revision": 1,
-      "sha256": "6aecfc77e60ebaa1d0d55d098d5df61b810d193f017613a807276cf1716f2c5a"
+      "sha256": "b8fcc9e2981e4b6516fef490e15e104dd1d29a358b31a38ba0c63d51ba155734"
     },
     {
       "kind": "PACK",
       "id": "PACK-BASELINE",
-      "revision": 4,
-      "sha256": "0eeebd125e509d07da717fa079253c03c85f920d91a20da1449bf6fe1a7c5358"
+      "revision": 5,
+      "sha256": "9b1ebb37f4b09910d924254030d178f9ac26b60c6c0da5f46ec180ee341400b4"
     }
   ],
   "mode": "audit",
@@ -49,38 +49,38 @@
     {
       "kind": "PACK",
       "id": "PACK-BASELINE",
-      "revision": 4,
-      "sha256": "0eeebd125e509d07da717fa079253c03c85f920d91a20da1449bf6fe1a7c5358"
+      "revision": 5,
+      "sha256": "9b1ebb37f4b09910d924254030d178f9ac26b60c6c0da5f46ec180ee341400b4"
     },
     {
       "kind": "ENV",
-      "id": "ENV-01M59HT09BEQBP8BBHGHRVPHCG",
+      "id": "ENV-01M59KWEFFAH93PVTQVR6C9QPS",
       "revision": 1,
-      "sha256": "06be1de194a448583189c8c29fba1b45ba0f5779dba08c43721373e1a292d44b"
+      "sha256": "e3d5f924c4b321d5ef39d6e09e322f61ec732974294aa6ecccc2ec58d85c129e"
     },
     {
       "kind": "POL",
-      "id": "POL-01M59HT09BAT5E9ZJZSWHTQ95S",
+      "id": "POL-01M59KWEFFBKSW90Y2R10ZA9FA",
       "revision": 1,
-      "sha256": "11c1e7620c00f6f59c8cfaa96d8d6fb1b44c367fa440fd80e8344c1313ce3fe8"
+      "sha256": "d3143a02a5b164d2c11a6e737312a8cbe6136c2138e0216d3195303cd7e0ab80"
     },
     {
       "kind": "PLAN",
-      "id": "PLAN-01M59HT09DNGNJFW0RSG74883F",
+      "id": "PLAN-01M59KWEFGGE2FQ4FK2CCYT0DN",
       "revision": 1,
-      "sha256": "695fc5d74abc4886a63361ddb0433cc15fdb07cea8c2559c1fa3658f1c0e5820"
+      "sha256": "4bf25c5b373dab80dd8ecc0fcf7653424f7efdb16665ac748adbcf3bdc29be39"
     },
     {
       "kind": "EVD",
-      "id": "EVD-01M59HT0C4V4CXPVF47XJB3JAM",
+      "id": "EVD-01M59KWEJBDAY0271FE6E392EB",
       "revision": 1,
-      "sha256": "e22296e8b2c2ca9614d461b82b0cae93aa457f30858690031c8ed2fdf1cfebed"
+      "sha256": "4e9af21dc7f743acf1ab6bc60a5951c3a92f5b82c530df865e3aaf2ac02260b0"
     },
     {
       "kind": "RES",
-      "id": "RES-01M59HTA5ARQ6KX87E2EGE49BC",
+      "id": "RES-01M59KWR1AWAPE402CTND3N9CR",
       "revision": 1,
-      "sha256": "6aecfc77e60ebaa1d0d55d098d5df61b810d193f017613a807276cf1716f2c5a"
+      "sha256": "b8fcc9e2981e4b6516fef490e15e104dd1d29a358b31a38ba0c63d51ba155734"
     }
   ],
   "pack_review_status": "DRAFT",
@@ -371,9 +371,9 @@
       "single": {
         "result": {
           "kind": "RES",
-          "id": "RES-01M59HTA5ARQ6KX87E2EGE49BC",
+          "id": "RES-01M59KWR1AWAPE402CTND3N9CR",
           "revision": 1,
-          "sha256": "6aecfc77e60ebaa1d0d55d098d5df61b810d193f017613a807276cf1716f2c5a"
+          "sha256": "b8fcc9e2981e4b6516fef490e15e104dd1d29a358b31a38ba0c63d51ba155734"
         },
         "security": "UNKNOWN",
         "functional": "UNKNOWN",
@@ -415,7 +415,7 @@
       "question": "일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가?",
       "review_order": "reference_baseline_first",
       "impact": null,
-      "applicability": "UNDETERMINED",
+      "applicability": "APPLICABLE",
       "selected": false,
       "tested_while_undetermined": false,
       "single": null,
@@ -1734,8 +1734,8 @@
   "limitations": [
     "검토 전 팩(DRAFT): 공식 아님",
     "정책 DRAFT: 공식 아님",
-    "실행 환경(ENV-01M59HT09BEQBP8BBHGHRVPHCG): CPU, arm64, Docker Desktop on macOS",
-    "엔진 소스 commit(ENV-01M59HT09BEQBP8BBHGHRVPHCG): 축약 hash만 일치, 전체 commit 미확인 — 관측 db9527a46, 고정 db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "실행 환경(ENV-01M59KWEFFAH93PVTQVR6C9QPS): CPU, arm64, Docker Desktop on macOS",
+    "엔진 소스 commit(ENV-01M59KWEFFAH93PVTQVR6C9QPS): 축약 hash만 일치, 전체 commit 미확인 — 관측 db9527a46, 고정 db9527a46873454610df6dbedf79a36d6bf1a7f6",
     "검증 수준 없음(근거 누락): 1개 점검",
     "점검 목록 미완결 보호 목적: 1개 — 집계 PASS 불가",
     "정책 범위 밖으로 제외: 76개 점검"

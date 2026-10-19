@@ -262,3 +262,153 @@ INV-01~18 모두 `tests/invariants/test_inv_XX.py`에 있다. 엔진이 필요�
 - 비교용(INV-09) `model.inventory_sha256` = 마운트한 snapshot 전체(`tools/model_inventory.py` 기본 `--scope all`): **12 files, `d677f399…`** (`out/5b/model_inventory.json`). 참고용 `model.files_read_by_engine` = 엔진이 읽은 파일(`--scope vllm`): **7 files, `b11bc2ca…`** (`out/5b/model_inventory_engine_read.json`), 판정·비교 조건에 쓰지 않음. guard.toml `[vllm]`, ENV, SPEC §4.1, DECISIONS 갱신.
 - 테스트: `uv run pytest` → **345 passed, 6 deselected, 약 13초**. `uv run pytest -m engine` → **3 passed, 1 skipped(INV-09) in 86s**: exposed security FAIL / functional PASS, isolated PASS / PASS, "기능 확인 범위: 1 / 등록 경로 15 (표본)" — 이전과 같음. 두 위상 ENV `model.inventory_sha256 = d677f399…`, `files_read_by_engine = {7, b11bc2ca…}`, EVD `comparability.model_inventory_sha256 = d677f399…`(engine 테스트에서 단언).
 - 안전: `guard.run` 컨테이너·네트워크 0개, 와일드카드 리스너는 macOS 기본 3개만.
+
+## REQ-03 자동화 (진행 중, 2026-10-19) — 막힘: 사람 결정 대기
+- 한 일: 공통 모듈 `executors/http_common.py`, `executors/role_route.py`(REQ-03), `direct_route.py`를 공통 모듈 위로 이전, 어댑터 경로 종류 세분(liveness·docs·diagnostic)과 검증된 안전 프로브 표(`SAFE_PROBES`, 이미지 소스 직접 확인), CheckDef `route_scope`·기능 표본 `as_role`, Gateway 프로필(single·role_open·role_enforced), FakeExecutor 점검별 시나리오, REQ-03 override, 팩 revision 5.
+- 테스트: `uv run pytest` → **357 passed, 8 deselected, 약 14초**. `-m engine`: REQ-01 회귀 3 passed(exposed FAIL / isolated PASS / INV-15), REQ-03 **role_open → FAIL ✅**, **role_enforced → UNKNOWN ❌(기대 PASS)**.
+- 실제로 나온 값(role_enforced): 비관리 역할(키 없음·잘못된 키·일반) 관리·진단 5경로 전부 401/403, 관리 키는 `/metrics`·`/load`·`/kv_event_sources` 200·안전 프로브 2개 handler_reached, 안전 프로브 전후 `/health` 200·추론 200. 미충족은 `/v1/responses/{response_id}/cancel`이 관리 경로로 범위에 들어왔는데 안전 프로브가 없어 미시험인 것 하나.
+- 막힌 것: cancel 경로 종류 결정(DECISIONS 열린 질문). 판정 규칙·기대값은 바꾸지 않았다.
+- 자동화 점검 수: 아직 **1/77**(REQ-03 미완).
+
+## REQ-03 자동화 완료 (2026-10-19) — 자동화 점검 **2/77**
+- 결정 반영: `/v1/responses/{response_id}/cancel` 종류 → inference(상태 변경 표시 유지) → REQ-03 범위에서 빠짐, REQ-01은 15경로 그대로. REQ-01 handler_reached FAIL 조건 유지 + "검증된 안전 프로브가 있는 경로에서만, 일반 4xx는 FAIL 아님" 단위 테스트(`tests/test_handler_reached.py`).
+- 테스트: `uv run pytest` → **359 passed, 8 deselected, 약 14초**. `uv run pytest -m engine` → **5 passed, 1 skipped(INV-09) in 154s**.
+  | 점검 | 구성 | security | functional | 범위 표시 | run |
+  |---|---|---|---|---|---|
+  | REQ-01 | exposed | FAIL | PASS | 기능 확인 범위: 1 / 등록 경로 15 (표본) | 3.8s |
+  | REQ-01 | isolated | PASS | PASS | 1 / 15 | 12.5s |
+  | REQ-03 | isolated + role_open(위반) | **FAIL** | PASS | 기능 확인 범위: 2 / 등록 경로 5 (표본) | 2.9s |
+  | REQ-03 | isolated + role_enforced(안전) | **PASS** | PASS | 2 / 5 | 2.9s |
+  - REQ-03 대상 5경로: `/is_scaling_elastic_ep`, `/kv_event_sources`, `/load`, `/metrics`, `/scale_elastic_ep`. role_open에서 일반 키: 진단 3경로 200, 안전 프로브 2경로 handler_reached. role_enforced에서 비관리 역할 전부 401/403(일반 키 403), 관리 키는 진단 200·안전 프로브 handler_reached(증거만).
+  - 안전 프로브 전후 엔진 `/health` 200·추론 200(두 구성 모두), 엔진 로그에 실제 스케일 실행 없음.
+- 안전: `guard.run` 컨테이너·네트워크 0개, 와일드카드 리스너 macOS 기본 3개만, 키 미기록(테스트 검사).
+
+### 일반화하면서 고친 것 (REQ-01 → REQ-03)
+| # | 바꾼 것 | 위치 | 코어 여부 |
+|---|---|---|---|
+| 1 | 점검별 대상 경로 종류 `route_scope`(include_kinds, exclude_kinds_policy) — 실행기의 `kind != "info"` 고정 제거 | models/checkdef.py, override | **코어(models)** |
+| 2 | 기능 표본 역할 `as_role` — "허용 키" 고정 제거 | models/checkdef.py | **코어(models)**, 1과 같은 파일·같은 변경 묶음 |
+| 3 | 어댑터 경로 종류 세분(info → liveness·docs·diagnostic), 사용자 상태 변경 경로 집합 | adapters/vllm.py | 아님 |
+| 4 | 검증된 안전 프로브 표(`SAFE_PROBES`, 버전·경로·요청·기대 응답·근거 소스) + `ProbeRequest` 필드, `probe_request(engine_version)` | adapters/ | 아님 |
+| 5 | 공통 모듈 `http_common.py`(경로 수집·요청·분류·handler_reached·기록·마스킹·준비 대기·안전 확인), `direct_route.py` 이전, `role_route.py` 신규 | executors/ | 아님 |
+| 6 | 실행기 설정 `roles`(역할→키 환경변수, `allowed_key_env` 호환), `wrong_key_env` | executors/, guard.toml | 아님 |
+| 7 | Gateway 프로필 single·role_open·role_enforced, `lab.up(gateway_profile, gateway_keys)` | lab/ | 아님 |
+| 8 | FakeExecutor 점검별 시나리오(`fake.scenarios`) | executors/fake.py | 아님 |
+| 9 | REQ-01 판정표 FAIL 조건 `handler_reached` 추가(데이터) | tools/overrides/REQ-01.yaml | 아님(판정표 데이터) |
+| 10 | 테스트 도우미(`environment(engine=…)`), 점검별 정책 사본(engine 테스트) | tests/ | 아님 |
+- core/·judges/ 변경 0건, rule_table 연산자 추가 0건.
+
+## Step 0 — 저장소 위생과 증거 보존 (2026-10-19)
+- 한 일: `.gitignore`, `.gitattributes`(해시 보호 파일 `-text`), `httpx` 제거(`uv lock --offline` 성공, httpx·httpcore·idna 제거), engine 테스트 산출물을 `out/test-runs/<실행별>/`로(보존 증거 `out/5b` 보호 단언), 지원 플랫폼 macOS·Linux 명시와 Windows 알려진 제한 4건 `skipif`, `docs/automation_matrix.csv` CRLF → LF.
+- 테스트: `uv run pytest` → **359 passed, 8 deselected, 약 15초**. Windows skip 4건은 macOS에서 그대로 실행됨.
+- 확인: `-m engine -k inv15` 실행 전후 `out/5b` 파일 69개 sha256 동일(`out/test-runs/out5b_before.sha`). 단 이번 실행은 **Docker Desktop이 꺼져 있어** 엔진 기동 전에 실패했다 → 엔진 쪽 확인은 Docker를 켠 뒤.
+- 주의: 작업 트리의 `out/5b/{exposed,isolated,inv15}`는 커밋 `6d9ad83` 이후 REQ-03 단계의 engine 재실행으로 덮어써진 상태다(커밋에는 그 이전 실행본이 있음). `out/5b/req03-*`는 아직 추적되지 않는다. 어느 것을 보존본으로 할지 사람 결정.
+
+### `.guard/`·`out/` 분류안 (결정은 사람)
+| 경로 | 크기 | 현재 추적 | 내용 | 제안 |
+|---|---|---|---|---|
+| `.guard/` (루트) | 412K | 3파일 | CLI 시연 저장소(FakeExecutor, EXAMPLE) | **무시**(자동 생성물) |
+| `out/report.json`, `out/report.html` | 200K | 2 | 1차 세션 가짜 시연 보고서(EXAMPLE) | **무시** 또는 삭제 |
+| `out/5b/model_inventory*.json`, `listeners_*.txt` | 24K | 6 | 모델 inventory(비교용·참고용), 리스너 전후 기록 | **보존** |
+| `out/5b/explore/` | 396K | 4 | 실측 openapi.json(22경로), 첫 기동 env.yaml·로그 | **보존** |
+| `out/5b/before_tcp/` | 136K | 6 | TCP 추론 도입 전 REQ-01 결과(UNKNOWN 근거) | **보존** |
+| `out/5b/<실행>/` report·observed·env·target·policy·guard.toml·engine_log_tail | 실행당 ~100K | 일부 | 실측 보고서·관측 요약·엔진 로그(키 없음) | **보존** |
+| `out/5b/<실행>/.guard/store.sqlite`, `.guard/artifacts/` | 실행당 ~150K | 일부 | 재판정·`guard verify`에 필요한 원본 객체·증거 파일 | **보존** |
+| `out/5b/<실행>/.guard/work/` | 실행당 16~60K | 일부 | 실행기 작업 사본(같은 내용이 artifacts에 해시로 저장됨) | **무시** |
+| `out/5b/inv15/empty_models/` | 0 | 0 | INV-15용 빈 디렉토리 | **무시** |
+| `out/test-runs/` | — | 0 | 이번부터 engine 테스트 실행별 산출물 | **무시**(이미 `.gitignore`) |
+
+### 사람이 실행할 git 명령 (Step 0, 실행하지 않았음)
+```bash
+git rm -r --cached .pytest_tmp
+git ls-files -z -- '*.pyc' | xargs -0 git rm --cached
+git rm --cached .DS_Store reference/.DS_Store
+# (분류안 승인 시) git rm -r --cached .guard out/report.json out/report.html
+# (분류안 승인 시) git ls-files -z -- 'out/**/.guard/work/*' | xargs -0 git rm --cached
+git add .gitignore .gitattributes
+git add --renormalize .          # .gitattributes 기준으로 줄바꿈 재정규화(바뀌는 파일 확인)
+git status
+```
+
+## Step 1 — 정확성 보강 (2026-10-19) — 코드 완료, 엔진 확인 대기
+- 1-A 재현 먼저: `tests/test_method_keys.py` 4건(REQ-01 POST만 위반 → 수정 전 PASS, 두 메서드 등록·시험·관측, TCP 추론 근거 메서드별, REQ-03 Gateway가 GET만 막음 → 수정 전 PASS). 수정 전 4건 실패 확인 → 수정 후 통과.
+- 1-B: 키 `"METHOD path"` 통일(`http_common.route_key`, 실행기·FakeExecutor·테스트 도우미·SPEC §4.5 예시). 판정표·core·judges 변경 없음.
+- 1-C: `select`의 정책 값 타입 검증(`str·int·bool·list[str]`, null·잘못된 타입·미지원 타입 실행 전 거부) — `tests/test_policy_values.py` 19건.
+- 1-D: rule_table `value_policy`·`subset_of`·`not_subset_of`(judges), REQ-01 `allowed_callers` ↔ 실행기 역할 시작 전 확인(executors), 정책 값이 결과를 바꾸는 테스트(REQ-01, REQ-03, value_policy).
+- 테스트: `uv run pytest` → **394 passed, 8 deselected, 약 15초**.
+- **막힌 것: Docker Desktop이 꺼져 있어** `-m engine`(REQ-01·REQ-03 회귀, 경로 개수 변화 확인)과 Step 2(이미지 안 소스 읽기)·Step 3(PLT-01)을 진행하지 못함.
+- 알림: `direct_route.DirectRouteExecutor.collect`가 약 130줄로 커졌다(직통 조합·TCP 추론·Gateway·집계·증거 구성). 이번 범위에서 나누지 않았다.
+
+## Step 1 엔진 확인 + Step 2 (2026-10-19, Docker 재개)
+- Step 1 `-m engine` → **5 passed, 1 skipped in 162s**: REQ-01 exposed FAIL / isolated PASS(등록 15 — 변화 없음), REQ-03 role_open FAIL / role_enforced PASS(등록 5 — 변화 없음, 범위 안에 메서드가 둘인 경로 없음). 키는 이제 `"METHOD path"`.
+- Step 2: `/v1/chat/completions/batch` 상태 변경 아님(소스 확인), `/v1/responses` 상태 변경 표시(서버 설정 따라 저장·background). 어댑터 `ROUTE_REVIEWS`에 근거. REQ-01 재실행 → **exposed FAIL**(등록 15·시험 13: 직통 200 ×5, handler_reached ×2, 400 ×5, 404 ×1, 미전송 2) / **isolated PASS**(15 전부 TCP 추론 timeout).
+- 매 실행 후 `out/5b` 69개 파일 해시 동일, `guard.run` 컨테이너·네트워크 0개.
+
+## Step 3 — PLT-01 (2026-10-19) — 진행 중, 막힘: hardened 엔진 기동 실패
+- 한 일: 실행기 `executors/container_config.py`(docker inspect, 컨테이너 안 모든 프로세스 `/proc/*/status` CapEff 합집합·UID, sentinel 쓰기 시도 후 즉시 삭제, 기능 표본 via engine), PLT-01 override(허용 목록 판정표: `value_policy`·`subset_of`·`not_subset_of`·`when_policy`), 정책 4값, 실험실 엔진 프로필 3종, FakeExecutor PLT-01 시나리오, 보고서 점검별 한계 문장. 팩 revision 6.
+- 테스트: `uv run pytest` → **411 passed, 12 deselected, 약 19초**(PLT-01 단위 15건: hardened PASS·overprivileged FAIL·default FAIL·자식 프로세스 capability 포함·정책 허용 목록에 따라 판정 변화·정책 타입 검증·설정의 컨테이너 이름·Env 미기록·fake 4 시나리오·보고서 한계).
+- `-m engine`(실제 vLLM CPU, isolated):
+  | 프로필 | security | functional | 실측 |
+  |---|---|---|---|
+  | overprivileged(위반) | **FAIL** ✅ | PASS | capability 15개(기본 14 + SYS_ADMIN), 마운트 `/guard-sentinel:rw`·`/models:ro`, UID 0, sentinel `/guard-sentinel` succeeded(즉시 삭제)·`/models` denied |
+  | default(결과만) | **FAIL** | PASS | 기본 capability 14개, `/models:ro`, UID 0, 루트 파일시스템 쓰기 가능(증거만) |
+  | hardened(안전) | **결과 없음 ❌** | — | 엔진 기동 실패: tmpfs noexec로 torch inductor `.so` mmap 실패 (DECISIONS 열린 질문) |
+  - 프로세스 5개(vllm PID 1, python, VLLM::EngineCore, VLLM::Worker, exec한 sh) 전부 같은 capability·UID.
+  - 모델 inventory 엔진 시험 후 `d677f399…` 그대로(engine 테스트 `test_model_inventory_unchanged_after_engine_runs` 통과). `out/5b` 69개 파일 해시 동일. 와일드카드 리스너 macOS 기본 3개만(rapportd 포트는 재부팅으로 52737). `guard.run` 컨테이너·네트워크 0개.
+- 자동화 점검 수: **2/77 유지**(PLT-01은 안전 구성 PASS를 아직 증명하지 못함).
+- 팩 revision 5 → 6: run·judge·report는 PLAN의 팩 Ref와 디스크 팩이 같아야 하므로, **revision 1~5 팩으로 만든 이전 PLAN(out/5b·out/test-runs의 실행 포함)은 지금 팩으로 재판정할 수 없다**(git 이력의 팩 사본이 있어야 함).
+
+## REQ-01 대비 코어 변경 (REQ-03 일반화 ~ Step 3)
+| # | 위치 | 변경 | 때 |
+|---|---|---|---|
+| 1 | models/checkdef.py | `route_scope`, 기능 표본 `as_role` | REQ-03 |
+| 2 | models/checkdef.py | 기능 표본 `via`, CheckDef `limitations` | Step 3 |
+| 3 | core/select.py | 정책 값 타입 검증(`PolicyValueError`) | Step 1-C |
+| 4 | core/report.py | 점검별 한계 문장을 보고서 한계에 | Step 3 |
+| 5 | judges/rule_table.py | `value_policy`, `subset_of`, `not_subset_of` | Step 1-D |
+| 6 | judges/rule_table.py | `when_policy` | Step 3 |
+- 합계 **6건**(models 2, core 2, judges 2). 점검 전용 분기 0건(INV-14). 점검별 차이는 전부 override 데이터·실행기·어댑터에 있다.
+
+## 알려진 제한
+- 지원 플랫폼 macOS·Linux. Windows 알려진 실패 5건(4건 skip 사유, 경로 표기 1건 대상 미확인).
+- 실험실은 Docker Desktop의 리눅스 VM 기준(PLT-01 보고서 한계에 명시), CPU arm64 vLLM.
+- 정책·팩 DRAFT → `official=false`.
+- 등록된 상태 변경 경로(`/v1/responses`, cancel)는 연결되는 위상에서 미시험.
+
+## PLT-01 자동화 완료 (2026-10-19) — 자동화 점검 **3/77**
+- 결정 반영: hardened (c) — `/tmp` noexec 유지, 컴파일 캐시 전용 exec tmpfs `/guard-cache` + `VLLM_CACHE_ROOT`·`TORCHINDUCTOR_CACHE_DIR`(실제 오류로 확인, TRITON 미사용). 정책 `allowed_exec_writable_paths`, 관측 `exec_writable_mounts`. 반대 방향 프로필 `tmp_exec`. 보고서 한계 문장에 정책 값 채우기. 팩 revision 7.
+- 테스트: `uv run pytest` → **415 passed, 12 deselected, 약 18초**. `uv run pytest -m engine` → **10 passed, 1 skipped(INV-09) in 334s**.
+  | 점검 | 구성 | security | functional | 실측 |
+  |---|---|---|---|---|
+  | REQ-01 | exposed / isolated | FAIL / PASS | PASS / PASS | 유지 |
+  | REQ-03 | role_open / role_enforced | FAIL / PASS | PASS / PASS | 유지 |
+  | PLT-01 | hardened(안전) | **PASS** | PASS | capability 0, UID 1000, 마운트 `/models:ro`, exec 쓰기 `/guard-cache`만(허용 목록), 루트 FS 쓰기 거부, ready 45s |
+  | PLT-01 | tmp_exec(반대) | **FAIL** | PASS | hardened와 같되 exec 쓰기 `/tmp`(허용 목록 밖) |
+  | PLT-01 | overprivileged(위반) | **FAIL** | PASS | capability 15(기본 14 + SYS_ADMIN), UID 0, `/guard-sentinel:rw` 쓰기 성공(즉시 삭제), exec 쓰기 `/`·`/dev`·`/guard-sentinel` |
+  | PLT-01 | default(결과만) | FAIL | PASS | 기본 capability 14, UID 0, exec 쓰기 `/`·`/dev` |
+  - 보고서 한계: "실행 가능한 쓰기 경로 1개가 정책으로 허용됨 ["/guard-cache"] …", "이 점검은 컨테이너 설정 … Docker Desktop의 리눅스 VM 기준이다."
+  - 모델 inventory `d677f399…` 그대로, `out/5b` 해시 동일, `guard.run` 자원 0, 와일드카드 리스너 macOS 기본 3개만.
+- 팩 revision 6 → 7: revision 1~6 팩으로 만든 PLAN은 지금 팩으로 재판정할 수 없다(Step 4에서 다룸).
+- out/5b: 작업 트리 실행본을 `out/archive/5b-after-req03/`에 보존(.gitignore). 복원은 사람이 git으로.
+
+### REQ-01 대비 코어 변경 (최종 집계)
+| # | 위치 | 변경 |
+|---|---|---|
+| 1 | models/checkdef.py | `route_scope`, 기능 표본 `as_role` (REQ-03) |
+| 2 | models/checkdef.py | 기능 표본 `via`, CheckDef `limitations` (PLT-01) |
+| 3 | core/select.py | 정책 값 타입 검증 (Step 1-C) |
+| 4 | core/report.py | 점검별 한계 문장 + 정책 값 채우기 (PLT-01) |
+| 5 | judges/rule_table.py | `value_policy`, `subset_of`, `not_subset_of` (Step 1-D) |
+| 6 | judges/rule_table.py | `when_policy` (PLT-01) |
+- 합계 **6건**(models 2, core 2, judges 2), 점검 전용 분기 0건. 3행째(PLT-01)는 HTTP가 아닌 새 종류 실행기였는데도 코어 추가는 4건(#2·#4·#6, #5는 Step 1에서 미리)이었다.
+
+## Step 4 — 팩 보존본 (2026-10-19)
+- 한 일: `store/packs.py`(put_pack·get_pack), `models/checkdef.build_pack`·`Pack.source`, CLI select 보존본 저장·judge/report 보존본 대체(run은 현재 팩만)·`guard pack import`, 보고서 한계 "팩 보존본 사용(revision N)".
+- 테스트: `uv run pytest` → **421 passed, 13 deselected, 약 21초**(`tests/test_pack_snapshot.py` 6건: 왕복·재저장·변조 거부·Ref 불일치 거부·CLI로 팩 revision을 올린 뒤 이전 PLAN judge·report 성공·run 거부·보존본 없으면 중단·pack import 검증).
+- 수동 확인: 커밋본 out/5b(팩 rev 4)를 `out/test-runs/rejudge-5b-20261019T111117Z`에 복사해 rev 4 팩(커밋 6d9ad83) import 후 재판정 → 3실행 모두 판정 동일, 차이는 한계 1줄과 RES 판정 플러그인 버전(0.2.0 → 0.3.0)뿐. 원본 out/5b 불변.
+- 재판정 가능 범위: 커밋본 out/5b(rev 4) 가능, rev 5 실행(archive·req03-*) 불가, 이후 select는 자동 보존.
+
+### REQ-01 대비 코어 변경 (Step 4 반영)
+- 7: models/checkdef.py — `build_pack`, `Pack.path` 선택·`Pack.source` (Step 4)
+- 8: core/report.py — 팩 보존본 사용 한계 문장 (Step 4)
+- 합계 **8건**(models 3, core 3, judges 2), 점검 전용 분기 0건. store/는 집계 밖(팩 보존본 모듈 추가).

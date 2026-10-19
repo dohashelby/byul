@@ -1,0 +1,16 @@
+# 기본: 텍스트는 저장소·작업 트리 모두 LF (Windows 체크아웃에서 CRLF 변환 방지)
+* text=auto eol=lf
+
+# 해시로 보호되는 파일: 바이트 그대로 (줄바꿈 변환 금지)
+packs/** -text
+reference/framework/data/*.json -text
+tools/overrides/*.yaml -text
+out/**/*.json -text
+out/**/*.jsonl -text
+out/**/*.txt -text
+**/.guard/artifacts/** -text
+**/.guard/work/** -text
+
+# 바이너리
+*.sqlite binary
+*.png binary

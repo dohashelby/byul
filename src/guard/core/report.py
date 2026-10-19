@@ -70,6 +70,21 @@ def _side(res: Result | None) -> SideResult:
     )
 
 
+def _fill_policy(note: str, values: dict) -> str:
+    """점검 한계 문장의 {키}·{len:키}를 정책 값으로 채운다(값이 없으면 '정책 값 없음')."""
+    import json as _json
+    import re as _re
+
+    def sub(m):
+        key = m.group(2)
+        if key not in values:
+            return "(정책 값 없음)"
+        v = values[key]
+        return str(len(v)) if m.group(1) else _json.dumps(v, ensure_ascii=False)
+
+    return _re.sub(r"\{(len:)?([A-Za-z_][A-Za-z0-9_]*)\}", sub, note)
+
+
 def _functional_scope(check, evd: Evidence | None) -> FunctionalScope | None:
     """CheckDef.functional_scope가 가리키는 관측으로 "기능 확인 범위: N / 등록 경로 M (표본)"을 만든다."""
     spec = getattr(check, "functional_scope", None)
@@ -180,6 +195,8 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
         limitations.insert(0, "정책 DRAFT: 공식 아님")
     if not pack.reviewed:
         limitations.insert(0, "검토 전 팩(DRAFT): 공식 아님")
+    if getattr(pack, "source", "dir") == "store":
+        limitations.append(f"팩 보존본 사용(revision {pack.manifest.revision}): 현재 팩 폴더와 다른, select 시점의 팩으로 보고서를 만들었다")
     for e in envs:
         if e.runtime.platform:
             limitations.append(f"실행 환경({e.id}): {e.runtime.platform}")
@@ -190,6 +207,10 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
             limitations.append(
                 f"엔진 소스 commit({e.id}): {label} — 관측 {e.engine.source_commit or '없음'}, "
                 f"고정 {e.engine.expected_source_commit or '미지정'}")
+    for r in rows:
+        if r.selected:
+            for note in getattr(pack.checks[r.check_id], "limitations", []) or []:
+                limitations.append(f"{r.check_id}: {_fill_policy(note, policy.values.get(r.check_id, {}))}")
     if DataOrigin.EXAMPLE in origins:
         limitations.append("EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음")
     undetermined = [r.check_id for r in rows if r.tested_while_undetermined]

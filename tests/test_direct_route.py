@@ -123,7 +123,7 @@ def test_exposed_is_fail_and_keys_never_stored(tmp_path):
     store, evd, res = _run(tmp_path, world)
     assert evd.execution.status == ExecStatus.COMPLETED
     assert res.verdicts.security == Verdict.FAIL
-    assert evd.observations["direct_outcomes"].value == {"/invocations": 200, "/v1/completions": 200, "/v1/models": 200}
+    assert evd.observations["direct_outcomes"].value == {"POST /invocations": 200, "POST /v1/completions": 200, "GET /v1/models": 200}
     assert evd.normal_control.succeeded is True
     blob = _log(store, evd) + json.dumps(evd.to_dict()) + json.dumps(res.to_dict())
     for p in store.root.rglob("*"):
@@ -164,7 +164,7 @@ def test_openapi_failure_is_unknown(tmp_path):
 def test_extra_registered_route_is_tested(tmp_path):
     routes = {**ENGINE_ROUTES, "/tokenize": "post"}
     _, evd, res = _run(tmp_path, World(exposed=False, engine_routes=routes))
-    assert "/tokenize" in evd.observations["routes_tested"].value
+    assert "POST /tokenize" in evd.observations["routes_tested"].value
     assert res.verdicts.security == Verdict.PASS
 
 
@@ -173,8 +173,8 @@ def test_mutating_route_not_sent_when_connected(tmp_path):
     world = World(exposed=True, engine_routes={**ENGINE_ROUTES, "/sleep": "post"})
     store, evd, res = _run(tmp_path, world)
     assert ("POST", "/sleep") not in world.engine_hits  # 상태 변경 요청을 보내지 않았다
-    assert "/sleep" in evd.observations["routes_registered"].value
-    assert "/sleep" not in evd.observations["routes_tested"].value
+    assert "POST /sleep" in evd.observations["routes_registered"].value
+    assert "POST /sleep" not in evd.observations["routes_tested"].value
     assert res.verdicts.security == Verdict.FAIL  # 다른 경로 직통 200은 그대로 FAIL
 
 
@@ -183,14 +183,14 @@ def test_tcp_blocked_infers_all_routes_including_mutating(tmp_path):
     world = World(exposed=False, engine_routes={**ENGINE_ROUTES, "/sleep": "post"})
     store, evd, res = _run(tmp_path, world)
     assert res.verdicts.security == Verdict.PASS, res.reasons
-    assert "/sleep" in evd.observations["routes_tested"].value
-    assert evd.observations["direct_outcomes"].value["/sleep"] == "timeout"
+    assert "POST /sleep" in evd.observations["routes_tested"].value
+    assert evd.observations["direct_outcomes"].value["POST /sleep"] == "timeout"
     assert ("POST", "/sleep") not in world.engine_hits  # 상태 변경 경로에 HTTP를 보내지 않았다
     lines = [json.loads(l) for l in _log(store, evd).splitlines()]
     direct = [l for l in lines if l.get("via") == "direct"]
     assert direct and all(l["basis"] == "tcp_connect (inferred)" for l in direct)
     summary = lines[-1]
-    assert summary["direct_basis"]["/sleep"]["none"] == ["external:tcp_connect"]
+    assert summary["direct_basis"]["POST /sleep"]["none"] == ["external:tcp_connect"]
     step = evd.challenges[1].observations
     assert set(step["tcp_connect"].values()) == {"timeout"}
 
@@ -224,7 +224,7 @@ def test_partial_tcp_block_keeps_mutating_untested(tmp_path):
         (res,) = judge_plan(store, pack, plan, as_of=env.created_at)
     finally:
         del registry.EXECUTORS["direct_route:sim"]
-    assert "/sleep" not in evd.observations["routes_tested"].value
+    assert "POST /sleep" not in evd.observations["routes_tested"].value
     assert ("POST", "/sleep") not in world.engine_hits
     assert res.verdicts.security == Verdict.FAIL  # 호스트 직통이 200 → FAIL
 
@@ -276,7 +276,7 @@ def test_engine_never_ready_is_aborted(tmp_path):
     impl = DirectRouteExecutor({"target": str(target), "allowed_key_env": "K"}, container_probe=world.container_probe,
                                host_probe=world.host_probe, environ={"K": ALLOWED})
     with pytest.raises(RuntimeError, match="not ready"):
-        impl.run(baseline_pack().checks["REQ-01"], environment(), {}, __import__("guard.adapters.vllm", fromlist=["x"]).VllmAdapter(), tmp_path / "w")
+        impl.run(baseline_pack().checks["REQ-01"], environment(), {"allowed_callers": ["allowed"]}, __import__("guard.adapters.vllm", fromlist=["x"]).VllmAdapter(), tmp_path / "w")
 
 
 def test_functional_probes_from_check_definition(tmp_path):
@@ -295,8 +295,51 @@ def test_functional_probes_from_check_definition(tmp_path):
     impl = DirectRouteExecutor({"target": str(target), "allowed_key_env": "K"}, container_probe=world.container_probe,
                                host_probe=world.host_probe, environ={"K": ALLOWED})
     from guard.adapters.vllm import VllmAdapter
-    draft = impl.run(check, environment(), {}, VllmAdapter(), tmp_path / "w")
+    draft = impl.run(check, environment(), {"allowed_callers": ["allowed"]}, VllmAdapter(), tmp_path / "w")
     res = draft.observations["functional_probe_results"].value
     assert res == {"POST /v1/completions": "pass", "GET /v1/models": "pass", "GET /nope": "fail"}
     assert draft.observations["functional_probes_planned"].value == list(res)
     assert draft.normal_control.attempted and draft.normal_control.succeeded is False
+
+
+# --- Step 1-D (ii): 정책 allowed_callers ↔ 실행기 역할 표 -----------------------------------
+
+
+def _run_with_policy(tmp_path, world, allowed_callers):
+    target = _target(tmp_path, world.exposed)
+    cfg = {"target": str(target), "roles": {"allowed": "K_ALLOWED"}, "wrong_key_env": "K_DENIED"}
+    registry.EXECUTORS["direct_route:sim"] = lambda raw: DirectRouteExecutor(
+        cfg, container_probe=world.container_probe, host_probe=world.host_probe,
+        environ={"K_ALLOWED": ALLOWED, "K_DENIED": DENIED})
+    try:
+        store = Store(tmp_path / ".guard")
+        pack = baseline_pack()
+        env = environment({"gateway": {"value": True, "origin": "DECLARED", "source": "sim"}})
+        pol = policy(pack.ref(), scope={"include": ["REQ-01"], "exclude": []},
+                     values={"REQ-01": {"allowed_callers": allowed_callers}})
+        store.put(env); store.put(pol)
+        plan = select(pack, [env], pol); store.put(plan)
+        (evd,) = run_plan(store, pack, plan, RunConfig(executors={"direct_route": "sim"}, adapter="vllm"))
+        (res,) = judge_plan(store, pack, plan, as_of=env.created_at)
+        return evd, res
+    finally:
+        del registry.EXECUTORS["direct_route:sim"]
+
+
+def test_roles_must_match_policy_allowed_callers(tmp_path):
+    """정책 값을 바꾸면 결과가 달라진다: 역할이 허용 주체 목록에 없으면 시험을 시작하지 않는다(ABORTED → UNKNOWN)."""
+    world = World(exposed=True)
+    (tmp_path / "a").mkdir()
+    evd, res = _run_with_policy(tmp_path / "a", world, ["allowed"])
+    assert evd.execution.status == ExecStatus.COMPLETED and res.verdicts.security == Verdict.FAIL
+    hits_before = len(world.engine_hits)
+    (tmp_path / "b").mkdir()
+    evd, res = _run_with_policy(tmp_path / "b", world, ["gateway-sa"])
+    assert evd.execution.status == ExecStatus.ABORTED and res.verdicts.security == Verdict.UNKNOWN
+    assert "allowed_callers" in evd.execution.abort_reason and "allowed" in evd.execution.abort_reason
+    assert len(world.engine_hits) == hits_before  # 시험 시작 전에 거부(요청 0건)
+
+
+def test_anonymous_roles_cannot_be_allowed_callers(tmp_path):
+    evd, _ = _run_with_policy(tmp_path, World(exposed=True), ["allowed", "none"])
+    assert evd.execution.status == ExecStatus.ABORTED and "none" in evd.execution.abort_reason

@@ -88,3 +88,48 @@ def test_value_obs_uncollected_is_unknown():
     params = {"pass_when_all": [{"obs": "t", "op": "superset_of", "value_obs": "r"}]}
     out = _judge(params, {"t": ["/a"], "r": ...})
     assert out.verdicts["security"] == "UNKNOWN" and "r" in out.missing_observations
+
+
+# --- Step 1-D: subset_of, value_policy -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "actual, expected, ok",
+    [
+        (["a"], ["a", "b"], True), ([], ["a"], True), (["a", "c"], ["a", "b"], False),
+        ({"a": 1}, ["a", "b"], True),  # dict는 키 집합
+        (None, ["a"], False), (["a"], None, False),
+    ],
+)
+def test_subset_of(actual, expected, ok):
+    assert evaluate_rule({"obs": "x", "op": "subset_of", "value": expected}, actual) is ok
+
+
+def _judge_policy(params, obs, policy_values):
+    from guard.judges.rule_table import RuleTableJudge
+    from tests.judging import REQ01
+
+    return RuleTableJudge().judge(REQ01, _evd(obs), params, policy_values)
+
+
+CAPS = {"pass_when_all": [{"obs": "caps", "op": "subset_of", "value_policy": "allowed_caps"}],
+        "fail_when_any": [{"obs": "caps", "op": "not_subset_of", "value_policy": "allowed_caps"}]}
+
+
+def test_value_policy_reads_expected_from_policy():
+    obs = {"caps": ["CHOWN"]}
+    assert _judge_policy(CAPS, obs, {"allowed_caps": ["CHOWN", "KILL"]}).verdicts["security"] == "PASS"
+    # 같은 증거, 정책 값만 다름 → 판정이 바뀐다
+    assert _judge_policy(CAPS, obs, {"allowed_caps": []}).verdicts["security"] == "FAIL"
+
+
+def test_value_policy_missing_key_is_unknown_not_pass():
+    out = _judge_policy({"pass_when_all": CAPS["pass_when_all"]}, {"caps": []}, {})
+    assert out.verdicts["security"] == "UNKNOWN"
+    assert any("policy value missing: allowed_caps" in r for r in out.reasons)
+
+
+def test_value_and_value_policy_together_is_error():
+    with pytest.raises(ValueError):
+        _judge_policy({"pass_when_all": [{"obs": "caps", "op": "subset_of", "value": [], "value_policy": "k"}]},
+                      {"caps": []}, {"k": []})

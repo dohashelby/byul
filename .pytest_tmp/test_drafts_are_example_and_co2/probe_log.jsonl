@@ -1,8 +1,8 @@
-{"example": true, "scenario": "missing_obs", "observation": "routes_registered", "value": ["/v1/models", "/v1/completions", "/invocations"], "collected": true}
-{"example": true, "scenario": "missing_obs", "observation": "routes_tested", "value": ["/v1/models", "/v1/completions", "/invocations"], "collected": true}
+{"example": true, "scenario": "missing_obs", "observation": "routes_registered", "value": ["GET /v1/models", "POST /v1/completions", "POST /invocations"], "collected": true}
+{"example": true, "scenario": "missing_obs", "observation": "routes_tested", "value": ["GET /v1/models", "POST /v1/completions", "POST /invocations"], "collected": true}
 {"example": true, "scenario": "missing_obs", "observation": "direct_outcomes", "value": null, "collected": false}
-{"example": true, "scenario": "missing_obs", "observation": "gateway_outcomes", "value": {"/v1/models": 200, "/v1/completions": 200, "/invocations": 200}, "collected": true}
+{"example": true, "scenario": "missing_obs", "observation": "gateway_outcomes", "value": {"GET /v1/models": 200, "POST /v1/completions": 200, "POST /invocations": 200}, "collected": true}
 {"example": true, "scenario": "missing_obs", "observation": "trusted_origin_reachable", "value": true, "collected": true}
 {"example": true, "scenario": "missing_obs", "observation": "functional_probes_planned", "value": ["POST /v1/completions"], "collected": true}
 {"example": true, "scenario": "missing_obs", "observation": "functional_probe_results", "value": {"POST /v1/completions": "pass"}, "collected": true}
-{"example": true, "scenario": "missing_obs", "direct_allowed_outcomes": {"/v1/models": 401, "/v1/completions": 401, "/invocations": 401}}
+{"example": true, "scenario": "missing_obs", "direct_allowed_outcomes": {"GET /v1/models": 401, "POST /v1/completions": 401, "POST /invocations": 401}}

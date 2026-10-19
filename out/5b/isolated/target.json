@@ -1,27 +1,28 @@
 {
   "lab": false,
   "engine_kind": "vllm",
-  "run_id": "ve957c655",
+  "run_id": "v498263d7",
   "topology": "isolated",
+  "gateway_profile": "single",
   "probe_image": "python:3.11-slim",
   "origins": {
     "external": {
-      "network": "guard-ve957c655-outside"
+      "network": "guard-v498263d7-outside"
     },
     "trusted": {
-      "network": "guard-ve957c655-engine"
+      "network": "guard-v498263d7-engine"
     }
   },
   "gateway": {
     "url": "http://172.19.0.2:8080",
     "origin": "external",
-    "host_url": "http://127.0.0.1:51139"
+    "host_url": "http://127.0.0.1:51710"
   },
   "engine": {
     "trusted_url": "http://172.18.0.2:8000",
-    "container": "guard-ve957c655-engine",
+    "container": "guard-v498263d7-engine",
     "ready_timeout": 600.0,
-    "ready_seconds": 28.648775416892022
+    "ready_seconds": 28.36632641684264
   },
   "direct_targets": [
     {

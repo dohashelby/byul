@@ -1,5 +1,5 @@
 id: REQ-01
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 요청·대상 접근 권한
@@ -89,6 +89,10 @@ judge:
       value:
       - 200
       - 299
+    - obs: direct_outcomes
+      op: any_in
+      value:
+      - handler_reached
     axes:
       functional:
         pass_when_all:
@@ -128,6 +132,11 @@ functional_probes:
     max_tokens: 1
   expect:
   - 200
+  as_role: allowed
 functional_scope:
   probed_obs: functional_probe_results
   of_obs: routes_registered
+route_scope:
+  include_kinds:
+  - inference
+  - admin

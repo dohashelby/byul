@@ -32,6 +32,7 @@ judge:
         when: { obs: direct_outcomes, op: any_in, value: [refused, timeout, unreachable] }
     fail_when_any:
       - { obs: direct_outcomes, op: any_between, value: [200, 299] }
+      - { obs: direct_outcomes, op: any_in, value: [handler_reached] }   # 검증된 안전 프로브가 인가 없이 핸들러 도달
     axes:
       functional:   # 목록(functional_probes)의 모든 항목이 기대대로 통과. 목록이 늘어도 이 표는 바뀌지 않는다
         pass_when_all:
@@ -46,4 +47,6 @@ functional_probes:
     path: /v1/completions
     body: { model: "{model}", prompt: ping, max_tokens: 1 }
     expect: [200]
+    as_role: allowed
 functional_scope: { probed_obs: functional_probe_results, of_obs: routes_registered }
+route_scope: { include_kinds: [inference, admin] }   # 생존 확인·문서·진단 경로 제외 (5a 결정과 같은 범위)

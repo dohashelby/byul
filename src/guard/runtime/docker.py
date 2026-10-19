@@ -116,7 +116,10 @@ class Docker:
     def run_detached(self, image: str, suffix: str, *, networks: list[str], timeout: float,
                      publish: list[int] | None = None, mounts: list[Mount] | None = None,
                      public_env: dict[str, str] | None = None, secret_env: dict[str, str] | None = None,
-                     command: list[str] | None = None, gpus: bool = False, shm_size: str | None = None) -> str:
+                     command: list[str] | None = None, gpus: bool = False, shm_size: str | None = None,
+                     cap_add: list[str] | None = None, cap_drop: list[str] | None = None, read_only: bool = False,
+                     tmpfs: list[str] | None = None, user: str | None = None,
+                     security_opt: list[str] | None = None) -> str:
         name = self.name(suffix)
         secret_env = secret_env or {}
         args = ["run", "-d", *self._common_run_args(name, networks, mounts or [], public_env or {}, secret_env)]
@@ -124,6 +127,22 @@ class Docker:
             args += ["--gpus", "all"]
         if shm_size:
             args += ["--shm-size", shm_size]
+        for c in cap_add or []:
+            args += ["--cap-add", c]
+        for c in cap_drop or []:
+            args += ["--cap-drop", c]
+        if read_only:
+            args.append("--read-only")
+        for t in tmpfs or []:
+            if not t.startswith("/") or "privileged" in t:
+                raise ValueError(f"tmpfs must be a container path: {t!r}")
+            args += ["--tmpfs", t]
+        if user:
+            args += ["--user", user]
+        for o in security_opt or []:
+            if "unconfined" in o:
+                raise ValueError(f"refusing security option {o!r}")
+            args += ["--security-opt", o]
         for p in publish or []:
             if not isinstance(p, int):
                 raise ValueError(f"publish takes container ports only (bound to 127.0.0.1): {p!r}")
@@ -140,6 +159,15 @@ class Docker:
         name = self.name(suffix)
         args = ["run", "--rm", "-i", *self._common_run_args(name, [network], mounts or [], {}, {}), image, *command]
         return self._docker(args, timeout=timeout, input=input, check=False)
+
+    def exec(self, container: str, argv: list[str], *, timeout: float) -> CmdResult:
+        """`docker exec`(대상 컨테이너 안 명령). 호출자는 읽기 전용 명령만 쓴다. 실패 코드는 호출자가 본다."""
+        return self._docker(["exec", container, *argv], timeout=timeout, check=False)
+
+    def inspect_json(self, container: str, *, timeout: float) -> dict:
+        out = self._docker(["inspect", container], timeout=timeout).stdout
+        data = json.loads(out)
+        return data[0] if isinstance(data, list) else data
 
     def logs(self, container: str, *, timeout: float) -> str:
         res = self._docker(["logs", container], timeout=timeout, check=False)

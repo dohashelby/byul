@@ -60,15 +60,17 @@ def test_launch_plan_device():
 
 def test_routes_from_openapi_classification():
     routes = {(r.method, r.path): r for r in VllmAdapter().routes_from_openapi(OPENAPI)}
-    assert routes[("GET", "/health")].kind == "info"
-    assert routes[("GET", "/metrics")].kind == "info"
+    assert routes[("GET", "/health")].kind == "liveness"
+    assert routes[("GET", "/openapi.json")].kind == "docs"
+    assert routes[("GET", "/metrics")].kind == "diagnostic"
     assert routes[("POST", "/v1/completions")].kind == "inference"
     assert routes[("POST", "/sleep")].kind == "admin" and routes[("POST", "/sleep")].mutating
     assert routes[("GET", "/is_sleeping")].kind == "admin" and not routes[("GET", "/is_sleeping")].mutating
     # 5b 실측 후 승인된 분류
-    assert routes[("GET", "/load")].kind == "info"
-    assert routes[("GET", "/kv_event_sources")].kind == "info"
-    assert routes[("POST", "/v1/responses/{response_id}/cancel")].mutating
+    assert routes[("GET", "/load")].kind == "diagnostic"
+    assert routes[("GET", "/kv_event_sources")].kind == "diagnostic"
+    cancel = routes[("POST", "/v1/responses/{response_id}/cancel")]
+    assert cancel.mutating and cancel.kind == "inference"  # 사용자 API: 추론 종류, 상태 변경 표시 유지
     assert not routes[("GET", "/v1/responses/{response_id}")].mutating
 
 
@@ -147,3 +149,30 @@ def test_read_option():
 def test_parse_log(line, event):
     ev = VllmAdapter().parse_log(line)
     assert (ev.type, ev.attrs) == event if event else ev is None
+
+
+def test_safe_probe_table_is_version_specific():
+    """검증된 안전 프로브는 대상 이미지 소스로 확인한 버전에만. 다른 버전이면 상태 변경 경로는 보내지 않는다."""
+    from guard.adapters.vllm import SAFE_PROBES
+
+    scale = Route("POST", "/scale_elastic_ep", kind="admin", mutating=True)
+    pr = VllmAdapter().probe_request(scale, None, "0.31.0")
+    assert pr.basis == "safe_probe" and pr.body == {} and pr.headers["Content-Type"] == "application/json"
+    assert pr.expected_handler_reached == {"status": 400, "body_contains": "new_data_parallel_size is required"}
+    assert "api_router.py" in pr.source
+    assert VllmAdapter().probe_request(scale, None, "0.30.0") is None
+    assert VllmAdapter().probe_request(scale, None, None) is None
+    assert all(v.source and v.expected_handler_reached for v in SAFE_PROBES.values())
+
+
+def test_route_reviews_match_classification():
+    """소스로 확인한 상태 변경 판단(ROUTE_REVIEWS)과 어댑터 분류가 일치하고 근거가 있다."""
+    from guard.adapters.vllm import ROUTE_REVIEWS
+
+    doc = {"paths": {path: {method.lower(): {}} for (_, method, path) in ROUTE_REVIEWS}}
+    routes = {(r.method, r.path): r for r in VllmAdapter().routes_from_openapi(doc)}
+    for (_, method, path), review in ROUTE_REVIEWS.items():
+        assert routes[(method, path)].mutating is review["mutating"], path
+        assert review["source"] and review["note"]
+    assert routes[("POST", "/v1/responses")].kind == "inference"  # 사용자 API: 종류는 추론, 상태 변경 표시
+    assert VllmAdapter().probe_request(routes[("POST", "/v1/responses")], None, "0.31.0") is None  # 보내지 않음

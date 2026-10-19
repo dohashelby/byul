@@ -11,6 +11,8 @@
 - 그 밖은 UNKNOWN. 규칙이 없는 축은 UNKNOWN(INV-18).
 - `when`: 전제가 성립할 때만 그 규칙을 요구(pass) 또는 적용(fail)한다. 전제 관측이 없으면 미확인.
 - `value_obs`: 기대값 대신 다른 관측 값과 비교. 그 관측이 없으면 미확인.
+- `value_policy`: 기대값을 정책 값(POL.values[점검])의 이 키에서 읽는다. 키가 없으면 미확인(UNKNOWN).
+- `when_policy`: 정책 값(bool)의 이 키가 true일 때만 그 규칙을 요구(pass)·적용(fail). false면 생략, 없으면 미확인.
 PASS 관문(정상 대조·챌린지 시도·필수 관측, INV-11)은 판정 코어가 따로 강제한다.
 """
 
@@ -84,6 +86,9 @@ OPS = {
     "any_between": _safe(lambda a, e, o: a is not None and any(_between(x, e) for x in _elements(a))),
     "all_between": _safe(lambda a, e, o: a is not None and all(_between(x, e) for x in _elements(a))),
     "superset_of": _safe(lambda a, e, o: a is not None and o is not None and _keys(a) >= _keys(o)),
+    # 관측 ⊆ 기대(value 또는 value_policy). dict는 키 집합. 반대는 not_subset_of(허용 밖 원소가 있음)
+    "subset_of": _safe(lambda a, e, o: a is not None and e is not None and _keys(a) <= _keys(e)),
+    "not_subset_of": _safe(lambda a, e, o: a is not None and e is not None and not (_keys(a) <= _keys(e))),
 }
 
 
@@ -95,16 +100,23 @@ def evaluate_rule(rule: dict, actual: Any, other: Any = None) -> bool:
 
 
 def _describe(rule: dict) -> str:
-    rhs = f"<{rule['value_obs']}>" if "value_obs" in rule else repr(rule.get("value"))
+    if "value_obs" in rule:
+        rhs = f"<{rule['value_obs']}>"
+    elif "value_policy" in rule:
+        rhs = f"<policy:{rule['value_policy']}>"
+    else:
+        rhs = repr(rule.get("value"))
     text = f"{rule['obs']} {rule['op']}" + ("" if rule["op"] == "nonempty" else f" {rhs}")
     if rule.get("when"):
         text += f" (when {_describe(rule['when'])})"
+    if rule.get("when_policy"):
+        text += f" (when policy:{rule['when_policy']})"
     return text
 
 
 class RuleTableJudge:
     name = "rule_table"
-    version = "0.2.0"
+    version = "0.3.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         tables = {"security": {k: params[k] for k in ("pass_when_all", "fail_when_any") if k in params}}
@@ -116,6 +128,8 @@ class RuleTableJudge:
         verdicts: dict[str, Verdict] = {}
         reasons: list[str] = []
         missing: set[str] = set()
+        policy_missing: set[str] = set()
+        policy_values = policy_values or {}
 
         def observed(key: str) -> Any:
             obs = evidence.observations.get(key)
@@ -125,7 +139,15 @@ class RuleTableJudge:
             return obs.value
 
         def check_rule(rule: dict) -> bool | None:
-            """True/False, 관측이 없어 판단 못 하면 None."""
+            """True/False, 관측(또는 정책 값)이 없어 판단 못 하면 None."""
+            if "value_policy" in rule:
+                if "value" in rule:
+                    raise ValueError(f"rule has both value and value_policy: {rule}")
+                key = rule["value_policy"]
+                if key not in policy_values:
+                    policy_missing.add(key)
+                    return None
+                rule = {**rule, "value": policy_values[key]}
             v = observed(rule["obs"])
             other = observed(rule["value_obs"]) if "value_obs" in rule else None
             if v is _MISSING or other is _MISSING:
@@ -133,6 +155,13 @@ class RuleTableJudge:
             return evaluate_rule(rule, v, other)
 
         def premise(rule: dict) -> bool | None:
+            if "when_policy" in rule:
+                key = rule["when_policy"]
+                if key not in policy_values:
+                    policy_missing.add(key)
+                    return None
+                if policy_values[key] is not True:
+                    return False
             return check_rule(rule["when"]) if rule.get("when") else True
 
         for axis in AXES:
@@ -176,6 +205,8 @@ class RuleTableJudge:
                 if not pass_rules:
                     detail.append("no pass rules")
                 reasons.append(f"{axis}: UNKNOWN ({'; '.join(detail)})")
+        for key in sorted(policy_missing):
+            reasons.append(f"policy value missing: {key}")
         return JudgeOutput(verdicts=verdicts, reasons=reasons, missing_observations=sorted(missing))
 
 

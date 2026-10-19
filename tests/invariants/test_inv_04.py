@@ -20,8 +20,8 @@ def test_confirmed_fail_survives_other_missing():
 
 
 def test_confirmed_fail_survives_partial_routes():
-    obs = req01_obs(tested=["/invocations"], direct={"/invocations": 200})
-    obs["routes_registered"]["value"] = ["/v1/completions", "/invocations"]
+    obs = req01_obs(tested=["POST /invocations"], direct={"POST /invocations": 200})
+    obs["routes_registered"]["value"] = ["POST /v1/completions", "POST /invocations"]
     assert sec(evidence(observations=obs)) == Verdict.FAIL
 
 

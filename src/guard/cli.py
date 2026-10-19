@@ -18,8 +18,11 @@ from guard.core.select import select as select_plan
 from guard.models import Pack, Plan, load_pack, utcnow
 from guard.report.html import render_html
 from guard.store import Store
+from guard.store.packs import PackNotStoredError, get_pack, put_pack
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="서빙엔진 보안 검증")
+pack_app = typer.Typer(add_completion=False, no_args_is_help=True, help="팩 보존본")
+app.add_typer(pack_app, name="pack")
 
 ConfigOpt = typer.Option(Path("guard.toml"), "--config", help="플러그인 설정 파일")
 StoreOpt = typer.Option(None, "--store", help="저장소 경로 (기본: guard.toml의 store 또는 .guard)")
@@ -33,15 +36,23 @@ def _store(store: Optional[Path], cfg: dict) -> Store:
     return Store(store or Path(cfg.get("store", ".guard")))
 
 
-def _plan_and_pack(st: Store, plan_id: str, pack_dir: Optional[Path]) -> tuple[Plan, Pack]:
+def _plan_and_pack(st: Store, plan_id: str, pack_dir: Optional[Path], allow_snapshot: bool = False) -> tuple[Plan, Pack]:
+    """PLAN과 그 PLAN이 쓴 팩. 디스크의 팩이 PLAN의 팩 Ref와 다르면 run은 중단하고, judge·report는
+    (allow_snapshot) 저장소의 팩 보존본을 읽는다. 보존본도 없으면 중단한다(팩 해시 검증은 양쪽 모두)."""
     pid, _, rev = plan_id.partition("@")
     plan = st.get(pid, int(rev)) if rev else st.latest(pid)
     if plan.kind != "PLAN":
         raise typer.BadParameter(f"{plan_id} is not a PLAN")
     pack = load_pack(pack_dir or Path("packs") / plan.inputs.pack.id)
-    if pack.ref() != plan.inputs.pack:
-        raise typer.BadParameter(f"pack on disk differs from the one the plan used ({plan.inputs.pack.id} rev {plan.inputs.pack.revision})")
-    return plan, pack
+    if pack.ref() == plan.inputs.pack:
+        return plan, pack
+    msg = f"pack on disk differs from the one the plan used ({plan.inputs.pack.id} rev {plan.inputs.pack.revision})"
+    if not allow_snapshot:
+        raise typer.BadParameter(msg)
+    try:
+        return plan, get_pack(st, plan.inputs.pack)
+    except PackNotStoredError as exc:
+        raise typer.BadParameter(f"{msg}; no stored pack snapshot either ({exc})") from exc
 
 
 def _as_of(value: Optional[str]) -> datetime:
@@ -63,6 +74,7 @@ def select(
     cfg = _config(config)
     st = _store(store, cfg)
     p = load_pack(pack)
+    put_pack(st, pack)  # select 시점 팩 보존본(judge·report가 나중에 이 revision을 읽을 수 있게)
     e, pol = load_environment(env), load_policy(policy, p)
     st.put(e)
     st.put(pol)
@@ -110,7 +122,7 @@ def judge(
     """EVD → RES (재실행 = 재판정)"""
     cfg = _config(config)
     st = _store(store, cfg)
-    pl, pk = _plan_and_pack(st, plan, pack)
+    pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
     results = judge_plan(st, pk, pl, _as_of(as_of))
     counts: dict[str, int] = {}
     for r in results:
@@ -135,7 +147,7 @@ def report(
     """RES → RPT(JSON) → HTML"""
     cfg = _config(config)
     st = _store(store, cfg)
-    pl, pk = _plan_and_pack(st, plan, pack)
+    pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
     rpt = build_report(st, pk, pl, _as_of(as_of))
     st.put(rpt)
     data = rpt.to_dict()
@@ -144,6 +156,22 @@ def report(
     if html_out:
         html_out.write_text(render_html(json.loads(json_out.read_text(encoding="utf-8"))), encoding="utf-8")
         typer.echo(f"  html → {html_out}")
+
+
+@pack_app.command("import")
+def pack_import(
+    pack: Path = typer.Option(..., "--pack", help="팩 폴더(예: git archive로 꺼낸 과거 revision)"),
+    config: Path = ConfigOpt,
+    store: Optional[Path] = StoreOpt,
+) -> None:
+    """팩 폴더를 해시 검증한 뒤 저장소에 보존본으로 넣는다(과거 PLAN 재판정용)."""
+    st = _store(store, _config(config))
+    try:
+        ref = put_pack(st, pack)
+    except Exception as exc:  # noqa: BLE001 - 사용자에게 검증 실패를 보여준다
+        typer.echo(f"pack import failed: {exc}")
+        raise typer.Exit(1)
+    typer.echo(f"stored {ref.id} rev {ref.revision} sha256 {ref.sha256[:16]}… in {st.root}")
 
 
 @app.command()

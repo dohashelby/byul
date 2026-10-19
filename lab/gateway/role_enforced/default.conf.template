@@ -1,0 +1,41 @@
+# 실험실 Gateway — role_enforced(안전 구성): 일반 키는 추론 경로만, 관리 키는 전부. 그 밖 401/403.
+# GUARD_GENERAL_KEY·GUARD_ADMIN_KEY: 실행 시 환경변수로만 주입. GUARD_ENGINE_UPSTREAM: 엔진 IP:포트.
+map $http_authorization $guard_role {
+    default "";
+    "Bearer ${GUARD_ADMIN_KEY}" admin;
+    "Bearer ${GUARD_GENERAL_KEY}" general;
+}
+
+# 일반 역할에 허용한 추론 경로(이 Gateway의 정책 설정)
+map $uri $guard_inference_path {
+    default 0;
+    ~^/v1/(completions|chat/completions|chat/completions/batch|models|messages|messages/count_tokens|responses)(/.*)?$ 1;
+    ~^/(invocations|tokenize|detokenize|generative_scoring)$ 1;
+}
+
+map "$guard_role:$guard_inference_path" $guard_allow {
+    default 0;
+    "admin:0" 1;
+    "admin:1" 1;
+    "general:1" 1;
+}
+
+log_format guard_lab '$remote_addr "$request" $status';   # Authorization 헤더는 기록하지 않는다
+
+server {
+    listen 8080;
+    access_log /dev/stdout guard_lab;
+
+    location / {
+        if ($guard_role = "") {
+            return 401;
+        }
+        if ($guard_allow = 0) {
+            return 403;
+        }
+        proxy_set_header Authorization "";
+        proxy_pass http://${GUARD_ENGINE_UPSTREAM};
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 60s;
+    }
+}

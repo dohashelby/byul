@@ -183,7 +183,8 @@ def test_checkdef_yaml_round_trip():
     text = yaml.safe_dump(check.model_dump(mode="json"), allow_unicode=True, sort_keys=False)
     assert CheckDef.model_validate(yaml.safe_load(text)) == check
     dumped = check.model_dump(mode="json")
-    assert all(dumped[k] == v for k, v in raw.items() if k != "applies_when")
+    assert set(raw) <= set(dumped)  # 원문 필드(추가 필드 포함)를 잃지 않는다
+    assert all(dumped[k] == v for k, v in raw.items() if not isinstance(v, (dict, list)))
     assert dumped["applies_when"]["all"] == raw["applies_when"]["all"]
 
 

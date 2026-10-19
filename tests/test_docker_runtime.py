@@ -157,3 +157,20 @@ def test_runtime_used_only_by_adapters_and_executors():
         if any(m.startswith("guard.runtime") for m in _imports(p)) and "runtime" not in p.parts:
             users.add(p.relative_to(SRC).parts[0])
     assert users <= {"adapters", "executors"}
+
+
+def test_hardening_options_and_exec_inspect():
+    r = FakeRunner(responses={"inspect guard-t1abc-e": '[{"HostConfig": {"Privileged": false}}]'})
+    d = Docker("t1abc", runner=r)
+    d.run_detached("img", "e", networks=["n"], cap_drop=["ALL"], cap_add=["SYS_ADMIN"], read_only=True,
+                   tmpfs=["/tmp:rw,size=1g"], user="1000:1000", security_opt=["no-new-privileges:true"], timeout=5)
+    argv = r.calls[0]["argv"]
+    for flag, val in (("--cap-drop", "ALL"), ("--cap-add", "SYS_ADMIN"), ("--tmpfs", "/tmp:rw,size=1g"),
+                      ("--user", "1000:1000"), ("--security-opt", "no-new-privileges:true")):
+        assert argv[argv.index(flag) + 1] == val
+    assert "--read-only" in argv and "--privileged" not in argv
+    with pytest.raises(ValueError):
+        d.run_detached("img", "e", networks=["n"], security_opt=["seccomp=unconfined"], timeout=5)
+    assert d.inspect_json("guard-t1abc-e", timeout=5) == {"HostConfig": {"Privileged": False}}
+    d.exec("guard-t1abc-e", ["cat", "/proc/1/status"], timeout=5)
+    assert r.calls[-1]["argv"] == ["docker", "exec", "guard-t1abc-e", "cat", "/proc/1/status"]

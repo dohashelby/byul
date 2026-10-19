@@ -302,10 +302,10 @@ challenges:
     attempted: bool                            # 실제로 요청·시도를 보냈는가
     observations: { direct_route_status: 401 }
 observations:                                  # CheckDef.required_observations 키만
-  routes_registered:  { value: ["/v1/completions", "/invocations"], collected: true }
-  routes_tested:      { value: ["/v1/completions", "/invocations"], collected: true }
-  direct_outcomes:    { value: { "/v1/completions": "timeout", "/invocations": "timeout" }, collected: true }
-  gateway_outcomes:   { value: { "/v1/completions": 200, "/invocations": 200 }, collected: true }
+  routes_registered:  { value: ["POST /v1/completions", "POST /invocations"], collected: true }   # 키는 "METHOD path"
+  routes_tested:      { value: ["POST /v1/completions", "POST /invocations"], collected: true }
+  direct_outcomes:    { value: { "POST /v1/completions": "timeout", "POST /invocations": "timeout" }, collected: true }
+  gateway_outcomes:   { value: { "POST /v1/completions": 200, "POST /invocations": 200 }, collected: true }
   trusted_origin_reachable: { value: true, collected: true }
   functional_probes_planned: { value: ["POST /v1/completions"], collected: true }
   functional_probe_results:  { value: { "POST /v1/completions": "pass" }, collected: true }
@@ -550,7 +550,7 @@ judge:
 guard/
 ├─ SPEC.md                 # 이 문서
 ├─ DECISIONS.md            # 결정 기록 (날짜·결정·이유, 한 줄씩)
-├─ pyproject.toml          # Python 3.11, pydantic, typer, pyyaml, httpx, pytest
+├─ pyproject.toml          # Python 3.11, pydantic, typer, pyyaml, pytest (httpx는 미사용이라 2026-10-19 제거)
 ├─ src/guard/
 │  ├─ models/              # §4 객체 7종 + CheckDef + enum
 │  ├─ core/                # select, run, judge, report, compare, aggregate

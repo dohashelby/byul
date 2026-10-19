@@ -1,27 +1,28 @@
 {
   "lab": false,
   "engine_kind": "vllm",
-  "run_id": "vc04240e4",
+  "run_id": "vc87c307e",
   "topology": "exposed",
+  "gateway_profile": "single",
   "probe_image": "python:3.11-slim",
   "origins": {
     "external": {
-      "network": "guard-vc04240e4-net"
+      "network": "guard-vc87c307e-net"
     },
     "trusted": {
-      "network": "guard-vc04240e4-net"
+      "network": "guard-vc87c307e-net"
     }
   },
   "gateway": {
     "url": "http://172.18.0.3:8080",
     "origin": "external",
-    "host_url": "http://127.0.0.1:51089"
+    "host_url": "http://127.0.0.1:51654"
   },
   "engine": {
     "trusted_url": "http://172.18.0.2:8000",
-    "container": "guard-vc04240e4-engine",
+    "container": "guard-vc87c307e-engine",
     "ready_timeout": 600.0,
-    "ready_seconds": 28.674380583921447
+    "ready_seconds": 28.353463416919112
   },
   "direct_targets": [
     {
@@ -30,7 +31,7 @@
     },
     {
       "origin": "host",
-      "url": "http://127.0.0.1:51088"
+      "url": "http://127.0.0.1:51653"
     }
   ],
   "gateway_known_routes": [

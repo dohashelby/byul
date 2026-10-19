@@ -23,7 +23,7 @@ T0 = datetime(2026, 10, 19, 0, 0, 0, tzinfo=timezone.utc)
 REQ01_STEPS = ["실제 route 목록 확보", "키 없음·오류·허용키로 Gateway와 직통 경로 비교", "handler 실행과 정책 거부를 대조"]
 
 
-ROUTES = ["/v1/models", "/v1/completions", "/invocations"]
+ROUTES = ["GET /v1/models", "POST /v1/completions", "POST /invocations"]  # "METHOD path" 키
 
 
 FUNCTIONAL_PROBE = "POST /v1/completions"
@@ -65,7 +65,7 @@ def environment(facts: dict[str, dict] | None = None, origin: DataOrigin = DataO
         id=kw.pop("id", "ENV-TEST"),
         created_at=T0,
         data_origin=origin,
-        engine={"name": "engine-x", "version": "1.0.0"},
+        engine=kw.pop("engine", {"name": "engine-x", "version": "1.0.0"}),
         facts=facts or {},
         **kw,
     ).seal()
@@ -78,7 +78,7 @@ def policy(pack_ref: Ref | None = None, **kw) -> Policy:
         data_origin=DataOrigin.EXAMPLE,
         status="DRAFT",
         pack=pack_ref or dummy_ref("PACK", "PACK-BASELINE"),
-        values={"REQ-01": {"allowed_callers": ["gateway-sa"]}},
+        values={"REQ-01": {"allowed_callers": ["allowed"]}},  # 허용 주체 = 실행기 roles 이름
     )
     data.update(kw)
     return Policy(**data).seal()

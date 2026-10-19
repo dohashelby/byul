@@ -56,10 +56,22 @@ class FunctionalProbe(Strict):
     path: str
     body: dict[str, Any] | None = None
     expect: list[int] = Field(min_length=1)
+    as_role: str = "allowed"  # 어느 역할의 키로 보낼지(실행기 설정의 roles 이름)
+    via: Literal["gateway", "engine"] = "gateway"  # gateway: 외부 호출자 → Gateway / engine: 신뢰 출발점 → 엔진 직접
 
     @property
     def id(self) -> str:
         return f"{self.method.upper()} {self.path}"
+
+
+class RouteScope(Strict):
+    """점검이 대상으로 삼는 등록 경로 종류(어댑터 분류: inference·admin·diagnostic·liveness·docs).
+
+    exclude_kinds_policy: 정책 값 중 "이 종류는 대상에서 뺀다"를 담은 키 이름(예: 일반 호출자에게 허용한 종류).
+    """
+
+    include_kinds: list[str] = Field(min_length=1)
+    exclude_kinds_policy: str | None = None
 
 
 class FunctionalScopeSpec(Strict):
@@ -101,6 +113,8 @@ class CheckDef(BaseModel):
     executor: str | None = None
     judge: JudgeSpec | None = None
     functional_probes: list[FunctionalProbe] = Field(default_factory=list)
+    route_scope: RouteScope | None = None
+    limitations: list[str] = Field(default_factory=list)  # 이 점검을 선정하면 보고서 한계에 그대로 적는 문장
     functional_scope: FunctionalScopeSpec | None = None
     legacy: Legacy = Field(default_factory=Legacy)
 
@@ -134,7 +148,8 @@ class PackManifest(Strict):
 class Pack(BaseModel):
     manifest: PackManifest
     checks: dict[str, CheckDef]
-    path: Path
+    path: Path | None = None
+    source: Literal["dir", "store"] = "dir"  # dir: 팩 폴더, store: 저장소의 팩 보존본(Step 4)
 
     def ref(self) -> Ref:
         return Ref(
@@ -156,20 +171,26 @@ class PackIntegrityError(ValueError):
     pass
 
 
-def load_pack(path: Path) -> Pack:
-    """팩을 읽고 매니페스트의 파일 해시를 검증한다."""
-    path = Path(path)
-    manifest = PackManifest.model_validate(yaml.safe_load((path / "pack.yaml").read_text(encoding="utf-8")))
+def build_pack(manifest_data: dict, files: dict[str, bytes], *, path: Path | None = None,
+               source: str = "dir") -> Pack:
+    """매니페스트와 파일 바이트(경로 → bytes)로 팩을 만들고 파일 목록·해시를 검증한다(폴더·보존본 공용)."""
+    manifest = PackManifest.model_validate(manifest_data)
     listed = {f.path for f in manifest.files_sha256}
-    actual = {p.relative_to(path).as_posix() for p in path.rglob("*") if p.is_file() and p.name != "pack.yaml"}
-    if listed != actual:
-        raise PackIntegrityError(f"pack files differ from manifest: {sorted(listed ^ actual)}")
+    if listed != set(files):
+        raise PackIntegrityError(f"pack files differ from manifest: {sorted(listed ^ set(files))}")
     for f in manifest.files_sha256:
-        if sha256_hex((path / f.path).read_bytes()) != f.sha256:
+        if sha256_hex(files[f.path]) != f.sha256:
             raise PackIntegrityError(f"sha256 mismatch: {f.path}")
     checks = {}
     for cid in manifest.checks:
-        checks[cid] = CheckDef.model_validate(
-            yaml.safe_load((path / "checks" / f"{cid}.yaml").read_text(encoding="utf-8"))
-        )
-    return Pack(manifest=manifest, checks=checks, path=path)
+        checks[cid] = CheckDef.model_validate(yaml.safe_load(files[f"checks/{cid}.yaml"].decode("utf-8")))
+    return Pack(manifest=manifest, checks=checks, path=path, source=source)
+
+
+def load_pack(path: Path) -> Pack:
+    """팩 폴더를 읽고 매니페스트의 파일 해시를 검증한다."""
+    path = Path(path)
+    manifest = yaml.safe_load((path / "pack.yaml").read_text(encoding="utf-8"))
+    files = {p.relative_to(path).as_posix(): p.read_bytes()
+             for p in path.rglob("*") if p.is_file() and p.name != "pack.yaml"}
+    return build_pack(manifest, files, path=path)

@@ -2,6 +2,7 @@
 
 import errno
 import socket
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -33,6 +34,7 @@ def _free_port():
         return s.getsockname()[1]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)")
 def test_refused_on_closed_port():
     assert probe({"method": "GET", "url": f"http://127.0.0.1:{_free_port()}/x"}, 1.0)["outcome"] == "refused"
 
@@ -72,6 +74,7 @@ def test_http_status_and_body():
         httpd.shutdown()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)")
 def test_tcp_probe_refused_and_connected_without_sending_bytes():
     from guard.executors.http_probe import tcp_probe
 

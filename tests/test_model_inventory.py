@@ -1,11 +1,15 @@
 """tools/model_inventory.py: 정렬·심볼릭 링크·해시 규칙."""
 
 import hashlib
+import sys
+
+import pytest
 
 from guard.models.hashing import canonical_json
 from tools.model_inventory import inventory
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)")
 def test_inventory_follows_symlinks_and_is_order_independent(tmp_path):
     blobs = tmp_path / "blobs"
     snap = tmp_path / "snap"
@@ -64,6 +68,7 @@ def test_reference_field_not_used_for_comparability():
     """참고용 files_read_by_engine이 달라도 비교 조건(model.inventory_sha256)만 같으면 EVD 비교 조건은 같다."""
     from pathlib import Path as P
 
-    src = (P(__file__).resolve().parents[1] / "src/guard/executors/direct_route.py").read_text(encoding="utf-8")
-    assert "files_read_by_engine" not in src
-    assert '"model_inventory_sha256": env.model.inventory_sha256' in src
+    exe = P(__file__).resolve().parents[1] / "src/guard/executors"
+    for f in exe.glob("*.py"):
+        assert "files_read_by_engine" not in f.read_text(encoding="utf-8"), f
+    assert '"model_inventory_sha256": ctx.env.model.inventory_sha256' in (exe / "http_common.py").read_text(encoding="utf-8")

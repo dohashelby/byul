@@ -31,11 +31,11 @@ def test_drafts_are_example_and_cover_required_keys(scenario, tmp_path):
 
 
 def test_scenario_shapes(tmp_path):
-    assert _draft("direct_200", tmp_path).observations["direct_outcomes"].value["/v1/completions"] == 200
+    assert _draft("direct_200", tmp_path).observations["direct_outcomes"].value["POST /v1/completions"] == 200
     assert not any(c.attempted for c in _draft("not_attempted", tmp_path).challenges)
     assert _draft("missing_obs", tmp_path).observations["direct_outcomes"].collected is False
     assert _draft("refused_without_positive_control", tmp_path).observations["trusted_origin_reachable"].value is False
-    assert _draft("partial_routes", tmp_path).observations["routes_tested"].value == ["/v1/completions"]
+    assert _draft("partial_routes", tmp_path).observations["routes_tested"].value == ["POST /v1/completions"]
 
 
 def test_unknown_check_raises(tmp_path):

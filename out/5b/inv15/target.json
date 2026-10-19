@@ -1,25 +1,26 @@
 {
   "lab": false,
   "engine_kind": "vllm",
-  "run_id": "fe49dc333",
+  "run_id": "fd610ca07",
   "topology": "isolated",
+  "gateway_profile": "single",
   "probe_image": "python:3.11-slim",
   "origins": {
     "external": {
-      "network": "guard-fe49dc333-outside"
+      "network": "guard-fd610ca07-outside"
     },
     "trusted": {
-      "network": "guard-fe49dc333-engine"
+      "network": "guard-fd610ca07-engine"
     }
   },
   "gateway": {
     "url": "http://172.19.0.2:8080",
     "origin": "external",
-    "host_url": "http://127.0.0.1:51145"
+    "host_url": "http://127.0.0.1:51720"
   },
   "engine": {
     "trusted_url": "http://172.18.0.2:8000",
-    "container": "guard-fe49dc333-engine",
+    "container": "guard-fd610ca07-engine",
     "ready_timeout": 300.0,
     "ready_seconds": null
   },

@@ -9,13 +9,17 @@ from guard.adapters.fake import FakeAdapter
 from guard.adapters.vllm import VllmAdapter
 
 from .base import Executor
+from .container_config import ContainerConfigExecutor
 from .direct_route import DirectRouteExecutor
 from .fake import FakeExecutor
+from .role_route import RoleRouteExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
-    "fake": lambda cfg: FakeExecutor(cfg.get("fake", {}).get("scenario", "pass")),
+    "fake": lambda cfg: FakeExecutor(cfg.get("fake", {}).get("scenario", "pass"), cfg.get("fake", {}).get("scenarios", {})),
     "direct_route:real": lambda cfg: DirectRouteExecutor(cfg.get("direct_route", {})),
+    "role_route:real": lambda cfg: RoleRouteExecutor(cfg.get("role_route", {})),
+    "container_config:real": lambda cfg: ContainerConfigExecutor(cfg.get("container_config", {})),
 }
 
 ADAPTERS: dict[str, Callable[[], EngineAdapter]] = {

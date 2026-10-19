@@ -138,7 +138,7 @@ files_sha256:
 - path: checks/OBS-12.yaml
   sha256: cc6589356779110e8d2fd277d63a68d8009b430ff5dc42b80c46ac059cf80e78
 - path: checks/PLT-01.yaml
-  sha256: f200da6b55bbd4ba32636125deae0a41a51b18812fecabdca06d720b8861d7b2
+  sha256: 15b4c2e28e7f67b59314c2d3c06f2b2afbbb664553e27ebc9e3b09e7e193123e
 - path: checks/PLT-02.yaml
   sha256: e9c50fe997ca92a26b6130b36a28522573526c5086dbc5ea79a4015f8d265b7b
 - path: checks/PLT-03.yaml
@@ -162,11 +162,11 @@ files_sha256:
 - path: checks/PLT-12.yaml
   sha256: 3e24d391a7ce9e8e7356cae6f37feaa9d6d989457b1176c46192dc7051f5c318
 - path: checks/REQ-01.yaml
-  sha256: 8b7b79566ddb5cf2ca4563ab8ad5332feb1fe3d382a389b9758ff5316fc1f870
+  sha256: 002276d192fdc94a8711a2161102ed0bc63324c8dff278280691c3ab46b29770
 - path: checks/REQ-02.yaml
   sha256: d4afa2caed309e88b3ed69c932f54c84ed9cd0d626f94cde9fbb5f1e7d2c607a
 - path: checks/REQ-03.yaml
-  sha256: 56a6f5d5af229583b7c4ef171309e693d9e577e2bff7adf28b6b053f39d0e2ca
+  sha256: 96dffff02506b848edc1eb1f92a01f5b987411129b73190e811537295d3719ef
 - path: checks/REQ-04.yaml
   sha256: 3944bd232694107912331400fca96e8606f3d7e76d4938ca15132494224d4582
 - path: checks/REQ-05.yaml

@@ -141,6 +141,14 @@
 - 2026-10-19 · models: 폴더·보존본 공용 검증 `build_pack(매니페스트, 파일 바이트)`, `Pack.path` 선택·`Pack.source`(dir|store).
 - 2026-10-19 · **커밋본 out/5b(팩 revision 4) 재판정 수동 확인**: `git archive HEAD out/5b/…`와 `git archive 6d9ad83 packs/PACK-BASELINE`(매니페스트 sha256 `0eeebd125e50…` = PLAN의 팩 Ref)를 `out/test-runs/rejudge-5b-20261019T111117Z`에 꺼내 복사본 저장소에 import → judge → report. 원본 `out/5b` 해시 불변. 결과: exposed FAIL/PASS, isolated PASS/PASS, inv15 UNKNOWN/UNKNOWN — **기존 보고서와 판정·검증 수준·기능 확인 범위 동일**. 차이는 (1) 한계 "팩 보존본 사용(revision 4)" 추가 (2) RES 새 revision(@2): 판정 플러그인 버전 0.2.0 → 0.3.0(판정표 params_sha256·판정·이유·누락 관측 동일). 팩 revision 5(작업 트리·archive·`out/5b/req03-*`)는 커밋된 적이 없어 재판정 불가(보고서·증거는 읽을 수 있음).
 
+### A — 수동 증거 입력 (2026-10-19, 사람 승인)
+- 2026-10-19 · **사람의 판정 = 신고된 관측, 도구의 판정기가 PASS 관문을 적용해 RES를 만든다.** SPEC §4.5·§7에 명시. 추가 조건: (a) 신고된 PASS는 첨부 증거 1개 이상, 없으면 UNKNOWN (b) 보고서 한계 "수동 입력자는 인증되지 않은 자기 신고". 필수 관측 문장(CheckDef.required_observations_prose)마다 설명이 없어도 PASS → UNKNOWN(양식이 그 칸을 주므로 같은 원칙으로 적용).
+- 2026-10-19 · DECLARED 수동 증거가 있어도 official 인정. 보고서 상단에 영역별 "수동 입력 N건 / 자동 측정 M건"(`RPT.evidence_counts`, 미실행 건수도 JSON에).
+- 2026-10-19 · 자동 실행기가 있는 점검은 `override_reason`일 때만 수동 증거를 받는다. 대체 규칙(SPEC §4.5): 최신 revision이 판정에 쓰이고, 출처가 다른 이전 COMPLETED revision이 있으면 보고서 행에 "대체됨". **`guard run`이 사람이 입력한 최신 증거 위에 새 revision(NOT_RUN 포함)을 말 없이 만들던 경로를 막음** — 기본은 수동 증거 유지, `--replace-manual`(RunConfig.replace_manual)일 때만 대체하고 그때도 "대체됨" 표시.
+- 2026-10-19 · 판정기 선택은 실행기 레지스트리 메타데이터 `EXECUTOR_DEFAULT_JUDGES`(`manual-entry` → `declared`)를 증거 생성 시 `execution.executor.default_judge`로 기록하고, 코어 judge는 그 값만 읽는다(문자열 비교·executors import 없음, INV-14).
+- 2026-10-19 · 명령: `guard evidence template --plan …`(선정된 점검 중 자동 실행기가 없는 것의 빈 YAML 양식: 정상 대조 설명·챌린지 단계 문장·필수 관측 설명·충족/미충족/미확인 기준, `--include-automated`), `guard evidence import 파일.yaml`(첨부 경로는 파일 기준, 전부 검증 후 쓰기). `evidence add`는 만들지 않음(사람 승인 범위). 양식 필드는 `result_template.json` 참고(3축 판정, normal_control_result, evidence, limitations, started_at/finished_at).
+- 2026-10-19 · 모델: `Execution.operator{by,at}`·`override_reason`, `ExecutorInfo.default_judge`, `CheckRow.evidence_source`·`replaced`, `Report.evidence_counts` — 모두 비어 있으면 직렬화에서 빠짐(기존 해시 유지). 사람이 입력한 증거(operator 있음)는 모델이 MEASURED를 거부.
+
 ## 열린 질문
 - ~~(Step 3) PLT-01 hardened 프로필에서 vLLM이 뜨지 않음~~ → 2026-10-19 (c)로 해결(위). 원문: 원인: Docker tmpfs 기본값 `noexec` — torch inductor가 `/tmp/.cache/vllm/torch_compile_cache/…/*.main.so`를 mmap하지 못함("failed to map segment from shared object"). capability·non-root·읽기 전용 루트 때문이 아님. 선택지: (a) `/tmp` tmpfs에 `exec` 허용(`/tmp:rw,exec,size=2g,mode=1777`) — 실행 가능한 쓰기 영역이 생기는 완화 (b) 엔진 컴파일을 끄는 기동 옵션(`--enforce-eager` 또는 컴파일 단계 낮춤, 어댑터 launch_plan 옵션으로) — exec 불필요, 성능 특성이 바뀜 (c) 컴파일 캐시만 별도 tmpfs(exec)로 두고 `/tmp`는 noexec 유지(`TORCHINDUCTOR_CACHE_DIR`·`VLLM_CACHE_ROOT`) — 노출 범위가 가장 좁음. 결정 전까지 hardened 결과 없음.
 - ~~(Step 0) `.guard/`·`out/`의 추적 범위~~ → 분류안 승인.

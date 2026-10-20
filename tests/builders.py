@@ -102,7 +102,7 @@ def evidence(
         check_id=check_id,
         side=kw.pop("side", "single"),
         environment=dummy_ref("ENV"),
-        execution={"status": status},
+        execution=kw.pop("execution", {"status": status}),
         normal_control=normal if normal is not None else {"attempted": True, "succeeded": True, "detail": ""},
         challenges=[{"step": s, "attempted": a} for s, a in zip(REQ01_STEPS, att)],
         observations=observations

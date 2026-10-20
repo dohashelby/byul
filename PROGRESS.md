@@ -412,3 +412,18 @@ git status
 - 7: models/checkdef.py — `build_pack`, `Pack.path` 선택·`Pack.source` (Step 4)
 - 8: core/report.py — 팩 보존본 사용 한계 문장 (Step 4)
 - 합계 **8건**(models 3, core 3, judges 2), 점검 전용 분기 0건. store/는 집계 밖(팩 보존본 모듈 추가).
+
+## A — 수동 증거 입력 (2026-10-19)
+- 한 일: `guard evidence template`·`guard evidence import`(collectors/manual.py), `declared` 판정기, 실행기 메타데이터 기본 판정기(EVD에 기록, 코어는 그 값만 읽음), run이 수동 증거를 말 없이 덮지 않음(--replace-manual), 보고서 "대체됨"·영역별 "수동 입력 N건 / 자동 측정 M건"·한계 "인증되지 않은 자기 신고", 사람이 입력한 증거 MEASURED 거부. SPEC §4.5·§4.7·§7, DECISIONS 갱신.
+- 테스트: `uv run pytest` → **440 passed, 13 deselected, 약 23초**(tests/test_manual_evidence.py 18건 + INV-02 1건).
+- 데모: `out/test-runs/demo-manual-20261019T112829Z` — 양식 74건 중 SUP-01 한 건을 채워 import → SUP-01 PASS(DECLARED, 수동 입력), 보고서 상단 영역별 건수와 한계 표시, guard verify OK.
+- 코어 변경 누계: 이번 A에서 models 1(필드 묶음), core 3(judge 판정기 선택, run 수동 증거 보호, report 출처·대체·건수), judges 1(declared) → 합계 13건, 점검 전용 분기 0건.
+- 다음: B1(input_validation) — 시작 전 멈춤.
+- A 이후 `-m engine` 회귀: 판정은 전부 기대대로(REQ-01 exposed FAIL/isolated PASS, REQ-03 open FAIL/enforced PASS, PLT-01 hardened PASS·tmp_exec/overprivileged/default FAIL, INV-15 ABORTED→UNKNOWN, inventory 불변). 단 REQ-01 engine 테스트 2건이 실패 — 원인은 테스트가 `artifacts/` 폴더 전체를 JSONL로 읽어서(Step 4부터 팩 보존본 파일이 같은 폴더에 있음). 테스트를 EVD가 가리키는 증거 파일만 읽도록 고친 뒤 **2 passed**. 최종: 기본 440 passed, engine 전체 10 passed·1 skipped(INV-09). `out/5b` 불변, `guard.run` 자원 0.
+
+## B1 일부 + 보류 (2026-10-20)
+- 한 일: `DirectRouteExecutor.collect` 분할(130줄 → 26줄: tcp_precheck·build_direct_requests·aggregate_direct·direct_observations), 공용 `RequestBatch`·`add_functional`·`gateway_matrix`·`send_and_record`를 `http_common`으로(role_route도 사용). 분할 전 골든(`tests/golden/http_executors.json`, 14 시나리오)과 분할 후 동일.
+- 테스트: `uv run pytest` → 441 passed. `-m engine` REQ-01·REQ-03 회귀 4 passed(REQ-01 exposed FAIL·isolated PASS, REQ-03 role_open FAIL·role_enforced PASS, 숫자 동일). 코어 변경 0건.
+- **REQ-07, REQ-09, REQ-10: 자동화 보류(수동 증거 경로 사용).**
+- B2(log_analysis)는 이 세션에서 진행하지 않음.
+- 자동화 점검 수: 3/77 유지.

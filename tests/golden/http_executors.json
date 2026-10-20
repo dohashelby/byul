@@ -1,0 +1,8760 @@
+{
+ "direct_exposed": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /v1/models",
+      "POST /invocations",
+      "POST /v1/completions"
+     ],
+     "skipped": {}
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /v1/models": {
+       "allowed": [
+        "external:http",
+        "host:http"
+       ],
+       "none": [
+        "external:http",
+        "host:http"
+       ],
+       "wrong": [
+        "external:http",
+        "host:http"
+       ]
+      },
+      "POST /invocations": {
+       "allowed": [
+        "external:http",
+        "host:http"
+       ],
+       "none": [
+        "external:http",
+        "host:http"
+       ],
+       "wrong": [
+        "external:http",
+        "host:http"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:http",
+        "host:http"
+       ],
+       "none": [
+        "external:http",
+        "host:http"
+       ],
+       "wrong": [
+        "external:http",
+        "host:http"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "gateway_denied": {
+      "GET /v1/models": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /invocations": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "connected",
+      "external|none": "connected",
+      "external|wrong": "connected",
+      "host|allowed": "connected",
+      "host|none": "connected",
+      "host|wrong": "connected"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "fe5761bcaab3ef252a3675528f3c8ddc7b229ac0475f1fa11f5525b70e54bd6e",
+   "driver": null,
+   "fixture_sha256": "3cab199990ba7cc44fd3ab80ce50410c4cd3a69ad7360da6c2c5b618fa886a43",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "EXAMPLE",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "host",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "host",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "host",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "direct_basis": {
+     "GET /v1/models": {
+      "allowed": [
+       "external:http",
+       "host:http"
+      ],
+      "none": [
+       "external:http",
+       "host:http"
+      ],
+      "wrong": [
+       "external:http",
+       "host:http"
+      ]
+     },
+     "POST /invocations": {
+      "allowed": [
+       "external:http",
+       "host:http"
+      ],
+      "none": [
+       "external:http",
+       "host:http"
+      ],
+      "wrong": [
+       "external:http",
+       "host:http"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:http",
+       "host:http"
+      ],
+      "none": [
+       "external:http",
+       "host:http"
+      ],
+      "wrong": [
+       "external:http",
+       "host:http"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "fixture": {
+     "GET /v1/models": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /invocations": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /v1/models": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /invocations": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": true,
+    "openapi_sha256": "6f2652cf8808dcea542bd9c034f333b430518494206ee59bcf235ac72c73e22a",
+    "routes_registered": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "connected",
+     "external|none": "connected",
+     "external|wrong": "connected",
+     "host|allowed": "connected",
+     "host|none": "connected",
+     "host|wrong": "connected"
+    },
+    "topology": "exposed",
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "direct_exposed_engine_key": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /v1/models",
+      "POST /invocations",
+      "POST /v1/completions"
+     ],
+     "skipped": {}
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /v1/models": {
+       "allowed": [
+        "external:http",
+        "host:http"
+       ],
+       "none": [
+        "external:http",
+        "host:http"
+       ],
+       "wrong": [
+        "external:http",
+        "host:http"
+       ]
+      },
+      "POST /invocations": {
+       "allowed": [
+        "external:http",
+        "host:http"
+       ],
+       "none": [
+        "external:http",
+        "host:http"
+       ],
+       "wrong": [
+        "external:http",
+        "host:http"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:http",
+        "host:http"
+       ],
+       "none": [
+        "external:http",
+        "host:http"
+       ],
+       "wrong": [
+        "external:http",
+        "host:http"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /v1/models": 401,
+      "POST /invocations": 401,
+      "POST /v1/completions": 401
+     },
+     "gateway_denied": {
+      "GET /v1/models": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /invocations": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "connected",
+      "external|none": "connected",
+      "external|wrong": "connected",
+      "host|allowed": "connected",
+      "host|none": "connected",
+      "host|wrong": "connected"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "fe5761bcaab3ef252a3675528f3c8ddc7b229ac0475f1fa11f5525b70e54bd6e",
+   "driver": null,
+   "fixture_sha256": "3cab199990ba7cc44fd3ab80ce50410c4cd3a69ad7360da6c2c5b618fa886a43",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "EXAMPLE",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "host",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "host",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "host",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "host",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "host",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "direct_basis": {
+     "GET /v1/models": {
+      "allowed": [
+       "external:http",
+       "host:http"
+      ],
+      "none": [
+       "external:http",
+       "host:http"
+      ],
+      "wrong": [
+       "external:http",
+       "host:http"
+      ]
+     },
+     "POST /invocations": {
+      "allowed": [
+       "external:http",
+       "host:http"
+      ],
+      "none": [
+       "external:http",
+       "host:http"
+      ],
+      "wrong": [
+       "external:http",
+       "host:http"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:http",
+       "host:http"
+      ],
+      "none": [
+       "external:http",
+       "host:http"
+      ],
+      "wrong": [
+       "external:http",
+       "host:http"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /v1/models": 401,
+     "POST /invocations": 401,
+     "POST /v1/completions": 401
+    },
+    "fixture": {
+     "GET /v1/models": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /invocations": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /v1/models": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /invocations": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": true,
+    "openapi_sha256": "6f2652cf8808dcea542bd9c034f333b430518494206ee59bcf235ac72c73e22a",
+    "routes_registered": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "connected",
+     "external|none": "connected",
+     "external|wrong": "connected",
+     "host|allowed": "connected",
+     "host|none": "connected",
+     "host|wrong": "connected"
+    },
+    "topology": "exposed",
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 401,
+     "POST /invocations": 401,
+     "POST /v1/completions": 401
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "direct_exposed_mutating": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /v1/models",
+      "POST /invocations",
+      "POST /sleep",
+      "POST /v1/completions"
+     ],
+     "skipped": {
+      "POST /sleep": "mutating route without a verified safe probe for this engine version: not sent"
+     }
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /v1/models": {
+       "allowed": [
+        "external:http",
+        "host:http"
+       ],
+       "none": [
+        "external:http",
+        "host:http"
+       ],
+       "wrong": [
+        "external:http",
+        "host:http"
+       ]
+      },
+      "POST /invocations": {
+       "allowed": [
+        "external:http",
+        "host:http"
+       ],
+       "none": [
+        "external:http",
+        "host:http"
+       ],
+       "wrong": [
+        "external:http",
+        "host:http"
+       ]
+      },
+      "POST /sleep": {},
+      "POST /v1/completions": {
+       "allowed": [
+        "external:http",
+        "host:http"
+       ],
+       "none": [
+        "external:http",
+        "host:http"
+       ],
+       "wrong": [
+        "external:http",
+        "host:http"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "gateway_denied": {
+      "GET /v1/models": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /invocations": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "connected",
+      "external|none": "connected",
+      "external|wrong": "connected",
+      "host|allowed": "connected",
+      "host|none": "connected",
+      "host|wrong": "connected"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "fe5761bcaab3ef252a3675528f3c8ddc7b229ac0475f1fa11f5525b70e54bd6e",
+   "driver": null,
+   "fixture_sha256": "3cab199990ba7cc44fd3ab80ce50410c4cd3a69ad7360da6c2c5b618fa886a43",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "EXAMPLE",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "host",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "host",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "host",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "host",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "direct_basis": {
+     "GET /v1/models": {
+      "allowed": [
+       "external:http",
+       "host:http"
+      ],
+      "none": [
+       "external:http",
+       "host:http"
+      ],
+      "wrong": [
+       "external:http",
+       "host:http"
+      ]
+     },
+     "POST /invocations": {
+      "allowed": [
+       "external:http",
+       "host:http"
+      ],
+      "none": [
+       "external:http",
+       "host:http"
+      ],
+      "wrong": [
+       "external:http",
+       "host:http"
+      ]
+     },
+     "POST /sleep": {},
+     "POST /v1/completions": {
+      "allowed": [
+       "external:http",
+       "host:http"
+      ],
+      "none": [
+       "external:http",
+       "host:http"
+      ],
+      "wrong": [
+       "external:http",
+       "host:http"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "fixture": {
+     "GET /v1/models": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /invocations": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /v1/models": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /invocations": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": true,
+    "openapi_sha256": "0959e3a7ff7000f21a6d17d2e588e0d5de596d65f33d26c1c14aa693ae0bdebf",
+    "routes_registered": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /sleep",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {
+     "POST /sleep": "mutating route without a verified safe probe for this engine version: not sent"
+    },
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "connected",
+     "external|none": "connected",
+     "external|wrong": "connected",
+     "host|allowed": "connected",
+     "host|none": "connected",
+     "host|wrong": "connected"
+    },
+    "topology": "exposed",
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /sleep",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "direct_extra_route": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /v1/models",
+      "POST /invocations",
+      "POST /tokenize",
+      "POST /v1/completions"
+     ],
+     "skipped": {}
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /v1/models": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /invocations": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /tokenize": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /v1/models": "timeout",
+      "POST /invocations": "timeout",
+      "POST /tokenize": "timeout",
+      "POST /v1/completions": "timeout"
+     },
+     "gateway_denied": {
+      "GET /v1/models": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /invocations": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /tokenize": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "timeout",
+      "external|none": "timeout",
+      "external|wrong": "timeout"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /tokenize": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "bb9ebbb2ecaccd3d7b673af022704165167cac2264645db9726aeb74f1441018",
+   "driver": null,
+   "fixture_sha256": "c3ee8ae901165106f3e1a1ef8dfe40515331b0b10e0449538cf8a32832f9bca5",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "EXAMPLE",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /tokenize",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /tokenize",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /tokenize",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /tokenize",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /tokenize",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /tokenize",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /tokenize": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "direct_basis": {
+     "GET /v1/models": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /invocations": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /tokenize": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /tokenize": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "fixture": {
+     "GET /v1/models": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /invocations": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /tokenize": {
+      "basis": "http",
+      "body": {
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /v1/models": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /invocations": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /tokenize": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /tokenize": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": true,
+    "openapi_sha256": "42df635199cb0f28a81735785abcbd2aaf70b66d22532a4fdf4b915562f9125c",
+    "routes_registered": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /tokenize",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "timeout",
+     "external|none": "timeout",
+     "external|wrong": "timeout"
+    },
+    "topology": "isolated",
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /tokenize": "timeout",
+     "POST /v1/completions": "timeout"
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /tokenize": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /tokenize",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /tokenize",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "direct_isolated_dns_error": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /v1/models",
+      "POST /invocations",
+      "POST /v1/completions"
+     ],
+     "skipped": {}
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /v1/models": {
+       "allowed": [
+        "external:http"
+       ],
+       "none": [
+        "external:http"
+       ],
+       "wrong": [
+        "external:http"
+       ]
+      },
+      "POST /invocations": {
+       "allowed": [
+        "external:http"
+       ],
+       "none": [
+        "external:http"
+       ],
+       "wrong": [
+        "external:http"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:http"
+       ],
+       "none": [
+        "external:http"
+       ],
+       "wrong": [
+        "external:http"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /v1/models": "dns_error",
+      "POST /invocations": "dns_error",
+      "POST /v1/completions": "dns_error"
+     },
+     "gateway_denied": {
+      "GET /v1/models": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /invocations": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "dns_error",
+      "external|none": "dns_error",
+      "external|wrong": "dns_error"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "bb9ebbb2ecaccd3d7b673af022704165167cac2264645db9726aeb74f1441018",
+   "driver": null,
+   "fixture_sha256": "3cab199990ba7cc44fd3ab80ce50410c4cd3a69ad7360da6c2c5b618fa886a43",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "EXAMPLE",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "dns_error",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /v1/models": "dns_error",
+     "POST /invocations": "dns_error",
+     "POST /v1/completions": "dns_error"
+    },
+    "direct_basis": {
+     "GET /v1/models": {
+      "allowed": [
+       "external:http"
+      ],
+      "none": [
+       "external:http"
+      ],
+      "wrong": [
+       "external:http"
+      ]
+     },
+     "POST /invocations": {
+      "allowed": [
+       "external:http"
+      ],
+      "none": [
+       "external:http"
+      ],
+      "wrong": [
+       "external:http"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:http"
+      ],
+      "none": [
+       "external:http"
+      ],
+      "wrong": [
+       "external:http"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /v1/models": "dns_error",
+     "POST /invocations": "dns_error",
+     "POST /v1/completions": "dns_error"
+    },
+    "fixture": {
+     "GET /v1/models": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /invocations": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /v1/models": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /invocations": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": true,
+    "openapi_sha256": "6f2652cf8808dcea542bd9c034f333b430518494206ee59bcf235ac72c73e22a",
+    "routes_registered": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "dns_error",
+     "external|none": "dns_error",
+     "external|wrong": "dns_error"
+    },
+    "topology": "isolated",
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": "dns_error",
+     "POST /invocations": "dns_error",
+     "POST /v1/completions": "dns_error"
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "direct_isolated_mutating": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /v1/models",
+      "POST /invocations",
+      "POST /sleep",
+      "POST /v1/completions"
+     ],
+     "skipped": {
+      "POST /sleep": "mutating route without a verified safe probe for this engine version: not sent"
+     }
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /v1/models": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /invocations": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /sleep": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /v1/models": "timeout",
+      "POST /invocations": "timeout",
+      "POST /sleep": "timeout",
+      "POST /v1/completions": "timeout"
+     },
+     "gateway_denied": {
+      "GET /v1/models": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /invocations": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "timeout",
+      "external|none": "timeout",
+      "external|wrong": "timeout"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "bb9ebbb2ecaccd3d7b673af022704165167cac2264645db9726aeb74f1441018",
+   "driver": null,
+   "fixture_sha256": "3cab199990ba7cc44fd3ab80ce50410c4cd3a69ad7360da6c2c5b618fa886a43",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "EXAMPLE",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /sleep",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /sleep",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /sleep",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /sleep": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "direct_basis": {
+     "GET /v1/models": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /invocations": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /sleep": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /sleep": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "fixture": {
+     "GET /v1/models": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /invocations": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /v1/models": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /invocations": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": true,
+    "openapi_sha256": "0959e3a7ff7000f21a6d17d2e588e0d5de596d65f33d26c1c14aa693ae0bdebf",
+    "routes_registered": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /sleep",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {
+     "POST /sleep": "mutating route without a verified safe probe for this engine version: not sent"
+    },
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "timeout",
+     "external|none": "timeout",
+     "external|wrong": "timeout"
+    },
+    "topology": "isolated",
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /sleep": "timeout",
+     "POST /v1/completions": "timeout"
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /sleep",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /sleep",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "direct_isolated_no_positive_control": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": "timeout",
+     "routes": [
+      "GET /v1/models",
+      "POST /invocations",
+      "POST /v1/completions"
+     ],
+     "skipped": {}
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /v1/models": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /invocations": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /v1/models": "timeout",
+      "POST /invocations": "timeout",
+      "POST /v1/completions": "timeout"
+     },
+     "gateway_denied": {
+      "GET /v1/models": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /invocations": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "timeout",
+      "external|none": "timeout",
+      "external|wrong": "timeout"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": false
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "bb9ebbb2ecaccd3d7b673af022704165167cac2264645db9726aeb74f1441018",
+   "driver": null,
+   "fixture_sha256": "3cab199990ba7cc44fd3ab80ce50410c4cd3a69ad7360da6c2c5b618fa886a43",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "EXAMPLE",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "direct_basis": {
+     "GET /v1/models": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /invocations": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "fixture": {
+     "GET /v1/models": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /invocations": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /v1/models": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /invocations": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": true,
+    "openapi_sha256": null,
+    "routes_registered": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "timeout",
+     "external|none": "timeout",
+     "external|wrong": "timeout"
+    },
+    "topology": "isolated",
+    "trusted_origin_reachable": false
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /v1/completions": "timeout"
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": false,
+    "value": null
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": false
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "direct_isolated_refused": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /v1/models",
+      "POST /invocations",
+      "POST /v1/completions"
+     ],
+     "skipped": {}
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /v1/models": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /invocations": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /v1/models": "refused",
+      "POST /invocations": "refused",
+      "POST /v1/completions": "refused"
+     },
+     "gateway_denied": {
+      "GET /v1/models": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /invocations": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "refused",
+      "external|none": "refused",
+      "external|wrong": "refused"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "bb9ebbb2ecaccd3d7b673af022704165167cac2264645db9726aeb74f1441018",
+   "driver": null,
+   "fixture_sha256": "3cab199990ba7cc44fd3ab80ce50410c4cd3a69ad7360da6c2c5b618fa886a43",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "EXAMPLE",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "refused",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /v1/models": "refused",
+     "POST /invocations": "refused",
+     "POST /v1/completions": "refused"
+    },
+    "direct_basis": {
+     "GET /v1/models": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /invocations": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /v1/models": "refused",
+     "POST /invocations": "refused",
+     "POST /v1/completions": "refused"
+    },
+    "fixture": {
+     "GET /v1/models": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /invocations": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /v1/models": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /invocations": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": true,
+    "openapi_sha256": "6f2652cf8808dcea542bd9c034f333b430518494206ee59bcf235ac72c73e22a",
+    "routes_registered": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "refused",
+     "external|none": "refused",
+     "external|wrong": "refused"
+    },
+    "topology": "isolated",
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": "refused",
+     "POST /invocations": "refused",
+     "POST /v1/completions": "refused"
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "direct_isolated_timeout": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /v1/models",
+      "POST /invocations",
+      "POST /v1/completions"
+     ],
+     "skipped": {}
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /v1/models": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /invocations": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /v1/models": "timeout",
+      "POST /invocations": "timeout",
+      "POST /v1/completions": "timeout"
+     },
+     "gateway_denied": {
+      "GET /v1/models": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /invocations": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "timeout",
+      "external|none": "timeout",
+      "external|wrong": "timeout"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /v1/models": 200,
+      "POST /invocations": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "bb9ebbb2ecaccd3d7b673af022704165167cac2264645db9726aeb74f1441018",
+   "driver": null,
+   "fixture_sha256": "3cab199990ba7cc44fd3ab80ce50410c4cd3a69ad7360da6c2c5b618fa886a43",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "EXAMPLE",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /invocations",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /v1/models",
+    "via": "gateway"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /invocations",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /v1/models",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "direct_basis": {
+     "GET /v1/models": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /invocations": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "fixture": {
+     "GET /v1/models": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /invocations": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /v1/models": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /invocations": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": true,
+    "openapi_sha256": "6f2652cf8808dcea542bd9c034f333b430518494206ee59bcf235ac72c73e22a",
+    "routes_registered": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "timeout",
+     "external|none": "timeout",
+     "external|wrong": "timeout"
+    },
+    "topology": "isolated",
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": "timeout",
+     "POST /invocations": "timeout",
+     "POST /v1/completions": "timeout"
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /v1/models": 200,
+     "POST /invocations": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /v1/models",
+     "POST /invocations",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "multi_exposed": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /multi",
+      "POST /multi",
+      "POST /v1/completions"
+     ],
+     "skipped": {}
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /multi": {
+       "allowed": [
+        "external:http"
+       ],
+       "none": [
+        "external:http"
+       ],
+       "wrong": [
+        "external:http"
+       ]
+      },
+      "POST /multi": {
+       "allowed": [
+        "external:http"
+       ],
+       "none": [
+        "external:http"
+       ],
+       "wrong": [
+        "external:http"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:http"
+       ],
+       "none": [
+        "external:http"
+       ],
+       "wrong": [
+        "external:http"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /multi": 401,
+      "POST /multi": 200,
+      "POST /v1/completions": 401
+     },
+     "gateway_denied": {
+      "GET /multi": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /multi": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "connected",
+      "external|none": "connected",
+      "external|wrong": "connected"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /multi": 401,
+      "POST /multi": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "61a6216a689d66620c667da0c1b1940eda1613ad4e2c6c3fe8d46abdc7a895b7",
+   "driver": null,
+   "fixture_sha256": "20760170efe8a99108ece1ed2bbb9ba905e6a9285868c8515f3aac38b72ecc74",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "MEASURED",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{\"paths\": {\"/multi\": {\"get\": {}, \"post\": {}}, \"/v1/completions\": {\"post\": {}}}}",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "connected",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /multi": 401,
+     "POST /multi": 200,
+     "POST /v1/completions": 200
+    },
+    "direct_basis": {
+     "GET /multi": {
+      "allowed": [
+       "external:http"
+      ],
+      "none": [
+       "external:http"
+      ],
+      "wrong": [
+       "external:http"
+      ]
+     },
+     "POST /multi": {
+      "allowed": [
+       "external:http"
+      ],
+      "none": [
+       "external:http"
+      ],
+      "wrong": [
+       "external:http"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:http"
+      ],
+      "none": [
+       "external:http"
+      ],
+      "wrong": [
+       "external:http"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /multi": 401,
+     "POST /multi": 200,
+     "POST /v1/completions": 401
+    },
+    "fixture": {
+     "GET /multi": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /multi": {
+      "basis": "http",
+      "body": {},
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /multi": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /multi": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /multi": 401,
+     "POST /multi": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": false,
+    "openapi_sha256": "18dd8ea99764724d1bc82bc6e43f821548722b0d87270213605e42d9806a7dc1",
+    "routes_registered": [
+     "GET /multi",
+     "POST /multi",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "connected",
+     "external|none": "connected",
+     "external|wrong": "connected"
+    },
+    "topology": null,
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /multi": 401,
+     "POST /multi": 200,
+     "POST /v1/completions": 401
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /multi": 401,
+     "POST /multi": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /multi",
+     "POST /multi",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /multi",
+     "POST /multi",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "multi_isolated": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /multi",
+      "POST /multi",
+      "POST /v1/completions"
+     ],
+     "skipped": {}
+    },
+    "step": "실제 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "direct_basis": {
+      "GET /multi": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /multi": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      },
+      "POST /v1/completions": {
+       "allowed": [
+        "external:tcp_connect"
+       ],
+       "none": [
+        "external:tcp_connect"
+       ],
+       "wrong": [
+        "external:tcp_connect"
+       ]
+      }
+     },
+     "direct_outcomes": {
+      "GET /multi": "timeout",
+      "POST /multi": "timeout",
+      "POST /v1/completions": "timeout"
+     },
+     "gateway_denied": {
+      "GET /multi": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /multi": {
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /v1/completions": {
+       "none": 401,
+       "wrong": 401
+      }
+     },
+     "tcp_connect": {
+      "external|allowed": "timeout",
+      "external|none": "timeout",
+      "external|wrong": "timeout"
+     }
+    },
+    "step": "키 없음·오류·허용키로 Gateway와 직통 경로 비교"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "gateway_outcomes": {
+      "GET /multi": 401,
+      "POST /multi": 200,
+      "POST /v1/completions": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     },
+     "trusted_origin_reachable": true
+    },
+    "step": "handler 실행과 정책 거부를 대조"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "61a6216a689d66620c667da0c1b1940eda1613ad4e2c6c3fe8d46abdc7a895b7",
+   "driver": null,
+   "fixture_sha256": "20760170efe8a99108ece1ed2bbb9ba905e6a9285868c8515f3aac38b72ecc74",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "MEASURED",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{\"paths\": {\"/multi\": {\"get\": {}, \"post\": {}}, \"/v1/completions\": {\"post\": {}}}}",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "tcp_connect",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "allowed",
+    "method": "TCP",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "*",
+    "via": "direct-tcp"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /multi",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "gateway"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "GET",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "GET /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /multi",
+    "via": "direct"
+   },
+   {
+    "basis": "tcp_connect (inferred)",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": "inferred from TCP connect: None",
+    "key": "allowed",
+    "method": "POST",
+    "origin": "external",
+    "outcome": "timeout",
+    "phase": "connect",
+    "route": "POST /v1/completions",
+    "via": "direct"
+   },
+   {
+    "direct_allowed_outcomes": {
+     "GET /multi": "timeout",
+     "POST /multi": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "direct_basis": {
+     "GET /multi": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /multi": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     },
+     "POST /v1/completions": {
+      "allowed": [
+       "external:tcp_connect"
+      ],
+      "none": [
+       "external:tcp_connect"
+      ],
+      "wrong": [
+       "external:tcp_connect"
+      ]
+     }
+    },
+    "direct_outcomes": {
+     "GET /multi": "timeout",
+     "POST /multi": "timeout",
+     "POST /v1/completions": "timeout"
+    },
+    "fixture": {
+     "GET /multi": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /multi": {
+      "basis": "http",
+      "body": {},
+      "method": "POST"
+     },
+     "POST /v1/completions": {
+      "basis": "http",
+      "body": {
+       "max_tokens": 1,
+       "model": "m",
+       "prompt": "ping"
+      },
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "POST /v1/completions": 200
+    },
+    "gateway_denied_outcomes": {
+     "GET /multi": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /multi": {
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /v1/completions": {
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "gateway_outcomes": {
+     "GET /multi": 401,
+     "POST /multi": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": false,
+    "openapi_sha256": "18dd8ea99764724d1bc82bc6e43f821548722b0d87270213605e42d9806a7dc1",
+    "routes_registered": [
+     "GET /multi",
+     "POST /multi",
+     "POST /v1/completions"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "tcp_connect": {
+     "external|allowed": "timeout",
+     "external|none": "timeout",
+     "external|wrong": "timeout"
+    },
+    "topology": null,
+    "trusted_origin_reachable": true
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "direct_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /multi": "timeout",
+     "POST /multi": "timeout",
+     "POST /v1/completions": "timeout"
+    }
+   },
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions"
+    ]
+   },
+   "gateway_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /multi": 401,
+     "POST /multi": 200,
+     "POST /v1/completions": 200
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /multi",
+     "POST /multi",
+     "POST /v1/completions"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /multi",
+     "POST /multi",
+     "POST /v1/completions"
+    ]
+   },
+   "trusted_origin_reachable": {
+    "collected": true,
+    "value": true
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "role_enforced": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /load",
+      "GET /metrics",
+      "POST /is_scaling_elastic_ep",
+      "POST /scale_elastic_ep"
+     ],
+     "skipped": {}
+    },
+    "step": "활성 관리·진단 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "by_role": {
+      "GET /load": {
+       "admin": 200,
+       "general": 403,
+       "none": 401,
+       "wrong": 401
+      },
+      "GET /metrics": {
+       "admin": 200,
+       "general": 403,
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /is_scaling_elastic_ep": {
+       "admin": 200,
+       "general": 403,
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /scale_elastic_ep": {
+       "admin": "handler_reached",
+       "general": 403,
+       "none": 401,
+       "wrong": 401
+      }
+     }
+    },
+    "step": "일반키와 관리권한으로 같은 무해 조회·진단 작업 호출"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "admin_outcomes": {
+      "GET /load": 200,
+      "GET /metrics": 200,
+      "POST /is_scaling_elastic_ep": 200,
+      "POST /scale_elastic_ep": "handler_reached"
+     },
+     "safety": {
+      "after": {
+       "health": 200,
+       "inference": 200,
+       "inference_ok": true,
+       "ok": true
+      },
+      "before": {
+       "health": 200,
+       "inference": 200,
+       "inference_ok": true,
+       "ok": true
+      }
+     }
+    },
+    "step": "부수 효과 확인"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "a2607831574cfe88e63c07eeb82bf2df32a7ad498ba27acc0cd721e3c98f788a",
+   "driver": null,
+   "fixture_sha256": "454be142dc62630e867a6ee69202e7fe92e72f451b038b28640234a1285adbb7",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "MEASURED",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{\"paths\": {\"/health\": {\"get\": {}}, \"/metrics\": {\"get\": {}}, \"/load\": {\"get\": {}}, \"/v1/models\": {\"get\": {}}, \"/v1/completions\": {\"post\": {}}, \"/is_scaling_elast",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "safety-before"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "safety-before"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "safety-after"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "safety-after"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "functional"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 403,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "general",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 403,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "general",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 403,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /scale_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 403,
+    "phase": "response",
+    "route": "POST /scale_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /scale_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": "{\"error\":{\"message\":\"new_data_parallel_size is required\",\"code\":400}}",
+    "classified": "handler_reached",
+    "detail": null,
+    "key": "admin",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 400,
+    "phase": "response",
+    "route": "POST /scale_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "admin_outcomes": {
+     "GET /load": 200,
+     "GET /metrics": 200,
+     "POST /is_scaling_elastic_ep": 200,
+     "POST /scale_elastic_ep": "handler_reached"
+    },
+    "fixture": {
+     "GET /load": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "GET /metrics": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /is_scaling_elastic_ep": {
+      "basis": "safe_probe",
+      "body": {},
+      "method": "POST"
+     },
+     "POST /scale_elastic_ep": {
+      "basis": "safe_probe",
+      "body": {},
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "GET /metrics": "pass",
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "GET /metrics": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": false,
+    "nonadmin_outcomes": {
+     "GET /load": 401,
+     "GET /metrics": 401,
+     "POST /is_scaling_elastic_ep": 401,
+     "POST /scale_elastic_ep": 401
+    },
+    "openapi_sha256": "b32ba46618d142e4b1052b009ce50ca5ccfa20cd5cb85a9d9c07f308f3ffc917",
+    "outcomes_by_role": {
+     "GET /load": {
+      "admin": 200,
+      "general": 403,
+      "none": 401,
+      "wrong": 401
+     },
+     "GET /metrics": {
+      "admin": 200,
+      "general": 403,
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /is_scaling_elastic_ep": {
+      "admin": 200,
+      "general": 403,
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /scale_elastic_ep": {
+      "admin": "handler_reached",
+      "general": 403,
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "routes_registered": [
+     "GET /load",
+     "GET /metrics",
+     "POST /is_scaling_elastic_ep",
+     "POST /scale_elastic_ep"
+    ],
+    "safe_probes": {
+     "POST /is_scaling_elastic_ep": {
+      "basis": "safe_probe",
+      "expected_handler_reached": {
+       "body_contains": "is_scaling_elastic_ep",
+       "status": 200
+      },
+      "source": "같은 파일 L83-85: 전역 플래그 읽기만(get_scaling_elastic_ep), 상태 변경 없음"
+     },
+     "POST /scale_elastic_ep": {
+      "basis": "safe_probe",
+      "expected_handler_reached": {
+       "body_contains": "new_data_parallel_size is required",
+       "status": 400
+      },
+      "source": "vllm/vllm-openai-cpu@sha256:495c84fe…(v0.31.0) vllm/entrypoints/serve/elastic_ep/api_router.py (sha256 2d6805874a86…) L37-49: body {} → new_data_parallel_size None → HTTPException 400, client.scale_elastic_ep(L64) 미도달; 선행 Depends(validate_json_request)는 Content-Type만 검사"
+     }
+    },
+    "safety": {
+     "after": {
+      "health": 200,
+      "inference": 200,
+      "inference_ok": true,
+      "ok": true
+     },
+     "before": {
+      "health": 200,
+      "inference": 200,
+      "inference_ok": true,
+      "ok": true
+     }
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "topology": null
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [general] → 200, GET /metrics [admin] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "GET /metrics": "pass",
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions",
+     "GET /metrics"
+    ]
+   },
+   "nonadmin_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /load": 401,
+     "GET /metrics": 401,
+     "POST /is_scaling_elastic_ep": 401,
+     "POST /scale_elastic_ep": 401
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /load",
+     "GET /metrics",
+     "POST /is_scaling_elastic_ep",
+     "POST /scale_elastic_ep"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /load",
+     "GET /metrics",
+     "POST /is_scaling_elastic_ep",
+     "POST /scale_elastic_ep"
+    ]
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "role_open": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /load",
+      "GET /metrics",
+      "POST /is_scaling_elastic_ep",
+      "POST /scale_elastic_ep"
+     ],
+     "skipped": {}
+    },
+    "step": "활성 관리·진단 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "by_role": {
+      "GET /load": {
+       "admin": 200,
+       "general": 200,
+       "none": 401,
+       "wrong": 401
+      },
+      "GET /metrics": {
+       "admin": 200,
+       "general": 200,
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /is_scaling_elastic_ep": {
+       "admin": 200,
+       "general": 200,
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /scale_elastic_ep": {
+       "admin": "handler_reached",
+       "general": "handler_reached",
+       "none": 401,
+       "wrong": 401
+      }
+     }
+    },
+    "step": "일반키와 관리권한으로 같은 무해 조회·진단 작업 호출"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "admin_outcomes": {
+      "GET /load": 200,
+      "GET /metrics": 200,
+      "POST /is_scaling_elastic_ep": 200,
+      "POST /scale_elastic_ep": "handler_reached"
+     },
+     "safety": {
+      "after": {
+       "health": 200,
+       "inference": 200,
+       "inference_ok": true,
+       "ok": true
+      },
+      "before": {
+       "health": 200,
+       "inference": 200,
+       "inference_ok": true,
+       "ok": true
+      }
+     }
+    },
+    "step": "부수 효과 확인"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "a2607831574cfe88e63c07eeb82bf2df32a7ad498ba27acc0cd721e3c98f788a",
+   "driver": null,
+   "fixture_sha256": "454be142dc62630e867a6ee69202e7fe92e72f451b038b28640234a1285adbb7",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "MEASURED",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{\"paths\": {\"/health\": {\"get\": {}}, \"/metrics\": {\"get\": {}}, \"/load\": {\"get\": {}}, \"/v1/models\": {\"get\": {}}, \"/v1/completions\": {\"post\": {}}, \"/is_scaling_elast",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "safety-before"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "safety-before"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/health",
+    "via": "safety-after"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "safety-after"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "functional"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /scale_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": "{\"error\":{\"message\":\"new_data_parallel_size is required\",\"code\":400}}",
+    "classified": "handler_reached",
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 400,
+    "phase": "response",
+    "route": "POST /scale_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /scale_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "safe_probe",
+    "body_bytes": null,
+    "body_preview": "{\"error\":{\"message\":\"new_data_parallel_size is required\",\"code\":400}}",
+    "classified": "handler_reached",
+    "detail": null,
+    "key": "admin",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 400,
+    "phase": "response",
+    "route": "POST /scale_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "admin_outcomes": {
+     "GET /load": 200,
+     "GET /metrics": 200,
+     "POST /is_scaling_elastic_ep": 200,
+     "POST /scale_elastic_ep": "handler_reached"
+    },
+    "fixture": {
+     "GET /load": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "GET /metrics": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /is_scaling_elastic_ep": {
+      "basis": "safe_probe",
+      "body": {},
+      "method": "POST"
+     },
+     "POST /scale_elastic_ep": {
+      "basis": "safe_probe",
+      "body": {},
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "GET /metrics": "pass",
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "GET /metrics": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": false,
+    "nonadmin_outcomes": {
+     "GET /load": 200,
+     "GET /metrics": 200,
+     "POST /is_scaling_elastic_ep": 200,
+     "POST /scale_elastic_ep": "handler_reached"
+    },
+    "openapi_sha256": "b32ba46618d142e4b1052b009ce50ca5ccfa20cd5cb85a9d9c07f308f3ffc917",
+    "outcomes_by_role": {
+     "GET /load": {
+      "admin": 200,
+      "general": 200,
+      "none": 401,
+      "wrong": 401
+     },
+     "GET /metrics": {
+      "admin": 200,
+      "general": 200,
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /is_scaling_elastic_ep": {
+      "admin": 200,
+      "general": 200,
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /scale_elastic_ep": {
+      "admin": "handler_reached",
+      "general": "handler_reached",
+      "none": 401,
+      "wrong": 401
+     }
+    },
+    "routes_registered": [
+     "GET /load",
+     "GET /metrics",
+     "POST /is_scaling_elastic_ep",
+     "POST /scale_elastic_ep"
+    ],
+    "safe_probes": {
+     "POST /is_scaling_elastic_ep": {
+      "basis": "safe_probe",
+      "expected_handler_reached": {
+       "body_contains": "is_scaling_elastic_ep",
+       "status": 200
+      },
+      "source": "같은 파일 L83-85: 전역 플래그 읽기만(get_scaling_elastic_ep), 상태 변경 없음"
+     },
+     "POST /scale_elastic_ep": {
+      "basis": "safe_probe",
+      "expected_handler_reached": {
+       "body_contains": "new_data_parallel_size is required",
+       "status": 400
+      },
+      "source": "vllm/vllm-openai-cpu@sha256:495c84fe…(v0.31.0) vllm/entrypoints/serve/elastic_ep/api_router.py (sha256 2d6805874a86…) L37-49: body {} → new_data_parallel_size None → HTTPException 400, client.scale_elastic_ep(L64) 미도달; 선행 Depends(validate_json_request)는 Content-Type만 검사"
+     }
+    },
+    "safety": {
+     "after": {
+      "health": 200,
+      "inference": 200,
+      "inference_ok": true,
+      "ok": true
+     },
+     "before": {
+      "health": 200,
+      "inference": 200,
+      "inference_ok": true,
+      "ok": true
+     }
+    },
+    "skipped_routes": {},
+    "summary": true,
+    "topology": null
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [general] → 200, GET /metrics [admin] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "GET /metrics": "pass",
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions",
+     "GET /metrics"
+    ]
+   },
+   "nonadmin_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /load": 200,
+     "GET /metrics": 200,
+     "POST /is_scaling_elastic_ep": 200,
+     "POST /scale_elastic_ep": "handler_reached"
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /load",
+     "GET /metrics",
+     "POST /is_scaling_elastic_ep",
+     "POST /scale_elastic_ep"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /load",
+     "GET /metrics",
+     "POST /is_scaling_elastic_ep",
+     "POST /scale_elastic_ep"
+    ]
+   }
+  },
+  "status": "COMPLETED"
+ },
+ "role_unverified_version": {
+  "challenges": [
+   {
+    "attempted": true,
+    "observations": {
+     "openapi_outcome": 200,
+     "routes": [
+      "GET /load",
+      "GET /metrics",
+      "POST /is_scaling_elastic_ep",
+      "POST /scale_elastic_ep"
+     ],
+     "skipped": {
+      "POST /scale_elastic_ep": "mutating route without a verified safe probe for this engine version: not sent"
+     }
+    },
+    "step": "활성 관리·진단 route 목록 확보"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "by_role": {
+      "GET /load": {
+       "admin": 200,
+       "general": 403,
+       "none": 401,
+       "wrong": 401
+      },
+      "GET /metrics": {
+       "admin": 200,
+       "general": 403,
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /is_scaling_elastic_ep": {
+       "admin": 200,
+       "general": 403,
+       "none": 401,
+       "wrong": 401
+      },
+      "POST /scale_elastic_ep": {}
+     }
+    },
+    "step": "일반키와 관리권한으로 같은 무해 조회·진단 작업 호출"
+   },
+   {
+    "attempted": true,
+    "observations": {
+     "admin_outcomes": {
+      "GET /load": 200,
+      "GET /metrics": 200,
+      "POST /is_scaling_elastic_ep": 200
+     },
+     "safety": {
+      "after": null,
+      "before": null
+     }
+    },
+    "step": "부수 효과 확인"
+   }
+  ],
+  "comparability": {
+   "config_sha256": "a2607831574cfe88e63c07eeb82bf2df32a7ad498ba27acc0cd721e3c98f788a",
+   "driver": null,
+   "fixture_sha256": "75cc5b8671db0c56e1cb7edcfbbfd484ebb2be56a7e02d00c927666aebb102ce",
+   "gpu": null,
+   "model_inventory_sha256": null
+  },
+  "data_origin": "MEASURED",
+  "log": [
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{\"paths\": {\"/health\": {\"get\": {}}, \"/metrics\": {\"get\": {}}, \"/load\": {\"get\": {}}, \"/v1/models\": {\"get\": {}}, \"/v1/completions\": {\"post\": {}}, \"/is_scaling_elast",
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "trusted",
+    "outcome": 200,
+    "phase": "response",
+    "route": "/openapi.json",
+    "via": "engine"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /v1/completions",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "functional"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "general",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 403,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "POST",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "POST /is_scaling_elastic_ep",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "general",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 403,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /load",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "none",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "general",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 403,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": null,
+    "detail": null,
+    "key": "wrong",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 401,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "basis": "http",
+    "body_bytes": null,
+    "body_preview": "{}",
+    "detail": null,
+    "key": "admin",
+    "method": "GET",
+    "origin": "external",
+    "outcome": 200,
+    "phase": "response",
+    "route": "GET /metrics",
+    "via": "gateway"
+   },
+   {
+    "admin_outcomes": {
+     "GET /load": 200,
+     "GET /metrics": 200,
+     "POST /is_scaling_elastic_ep": 200
+    },
+    "fixture": {
+     "GET /load": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "GET /metrics": {
+      "basis": "http",
+      "body": null,
+      "method": "GET"
+     },
+     "POST /is_scaling_elastic_ep": {
+      "basis": "http",
+      "body": {},
+      "method": "POST"
+     }
+    },
+    "functional_probe_results": {
+     "GET /metrics": "pass",
+     "POST /v1/completions": "pass"
+    },
+    "functional_probe_status": {
+     "GET /metrics": 200,
+     "POST /v1/completions": 200
+    },
+    "lab": false,
+    "nonadmin_outcomes": {
+     "GET /load": 401,
+     "GET /metrics": 401,
+     "POST /is_scaling_elastic_ep": 401
+    },
+    "openapi_sha256": "b32ba46618d142e4b1052b009ce50ca5ccfa20cd5cb85a9d9c07f308f3ffc917",
+    "outcomes_by_role": {
+     "GET /load": {
+      "admin": 200,
+      "general": 403,
+      "none": 401,
+      "wrong": 401
+     },
+     "GET /metrics": {
+      "admin": 200,
+      "general": 403,
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /is_scaling_elastic_ep": {
+      "admin": 200,
+      "general": 403,
+      "none": 401,
+      "wrong": 401
+     },
+     "POST /scale_elastic_ep": {}
+    },
+    "routes_registered": [
+     "GET /load",
+     "GET /metrics",
+     "POST /is_scaling_elastic_ep",
+     "POST /scale_elastic_ep"
+    ],
+    "safe_probes": {},
+    "safety": {
+     "after": null,
+     "before": null
+    },
+    "skipped_routes": {
+     "POST /scale_elastic_ep": "mutating route without a verified safe probe for this engine version: not sent"
+    },
+    "summary": true,
+    "topology": null
+   }
+  ],
+  "normal_control": {
+   "attempted": true,
+   "detail": "gateway functional probes: POST /v1/completions [general] → 200, GET /metrics [admin] → 200",
+   "succeeded": true
+  },
+  "observations": {
+   "functional_probe_results": {
+    "collected": true,
+    "value": {
+     "GET /metrics": "pass",
+     "POST /v1/completions": "pass"
+    }
+   },
+   "functional_probes_planned": {
+    "collected": true,
+    "value": [
+     "POST /v1/completions",
+     "GET /metrics"
+    ]
+   },
+   "nonadmin_outcomes": {
+    "collected": true,
+    "value": {
+     "GET /load": 401,
+     "GET /metrics": 401,
+     "POST /is_scaling_elastic_ep": 401
+    }
+   },
+   "routes_registered": {
+    "collected": true,
+    "value": [
+     "GET /load",
+     "GET /metrics",
+     "POST /is_scaling_elastic_ep",
+     "POST /scale_elastic_ep"
+    ]
+   },
+   "routes_tested": {
+    "collected": true,
+    "value": [
+     "GET /load",
+     "GET /metrics",
+     "POST /is_scaling_elastic_ep"
+    ]
+   }
+  },
+  "status": "COMPLETED"
+ }
+}

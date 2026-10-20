@@ -78,6 +78,13 @@ def render_html(report: dict[str, Any]) -> str:
     else:
         w("<p class='muted'>승인 기록 없음 (자동 판정은 승인이 아니다)</p>")
 
+    counts = r.get("evidence_counts") or {}
+    if counts:
+        w("<h2>증거 출처(영역별)</h2><div class='wrap'><table><tr><th>영역</th><th>수동 입력 / 자동 측정</th><th>미실행</th></tr>")
+        for area, c in counts.items():
+            w(f"<tr><td>{escape(area)}</td><td>수동 입력 {c['manual']}건 / 자동 측정 {c['automated']}건</td><td>{c['not_run']}건</td></tr>")
+        w("</table></div>")
+
     w("<h2>한계</h2><ul>")
     for item in r["limitations"]:
         w(f"<li>{escape(item)}</li>")
@@ -104,6 +111,12 @@ def render_html(report: dict[str, Any]) -> str:
         if row.get("tested_while_undetermined"):
             app += " (적용 미정 상태로 시험함)"
         marks = [escape(GAP_KO.get(g, g)) for g in row["gaps"]]
+        if row.get("evidence_source") == "manual":
+            marks.append("수동 입력(DECLARED, 자기 신고)")
+        if row.get("replaced"):
+            rp = row["replaced"]
+            src = {"automated": "자동", "manual": "수동"}.get(rp["source"], rp["source"])
+            marks.append(f"대체됨: 이전 {src} 증거(rev {rp['revision']}) — {escape(rp.get('reason') or '')}")
         if row.get("functional_scope"):
             marks.append(escape(row["functional_scope"]["label"]))
         if row.get("exception"):

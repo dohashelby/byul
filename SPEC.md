@@ -326,6 +326,13 @@ comparability:                                 # update 모드 비교 조건 (IN
 - 판정에 쓰지 않는 보조 관측(예: REQ-01 `direct_allowed_outcomes`)은 증거 파일에 남긴다.
 - 증거 파일은 `artifacts/<sha256>` 이름으로 저장한다(내용 주소). 같은 파일은 한 번만 저장된다.
 
+**수동 증거(사람이 입력한 시험 결과, `guard evidence template`·`guard evidence import`)**
+- **사람의 판정은 신고된 관측이다.** 도구의 판정이 아니며, 도구의 판정기가 PASS 관문을 적용해 RES를 만든다. 신고 내용은 관측으로 들어간다: `declared_verdicts`(축별 PASS|FAIL|UNKNOWN), `declared_basis`(근거 설명), `declared_observation_notes`(CheckDef 필수 관측 문장별 설명), `declared_limitations`. 구조화 필수 관측(`required_observations`)이 있으면 값도 함께 넣는다.
+- `data_origin`은 항상 `DECLARED`(MEASURED 불가, 모델이 거부 — INV-02). `execution.status: COMPLETED`, `execution.executor.name: manual-entry`, `execution.operator: {by, at}`(입력자·시각 — 인증되지 않은 자기 신고), 첨부 파일은 `artifacts`(내용 주소).
+- 신고된 PASS는 첨부 증거가 1개 이상이고 필수 관측 문장마다 설명이 있어야 하며, 코어 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집)도 통과해야 한다. 아니면 UNKNOWN. 신고된 FAIL은 유지(INV-04).
+- 선정되지 않은 점검은 거부(INV-10). 자동 실행기가 있는 점검은 `override_reason`이 있을 때만 받고 `execution.override_reason`에 남긴다. 양식 검증은 전부 먼저, 하나라도 틀리면 아무것도 쓰지 않는다.
+- **증거 대체 규칙:** 같은 PLAN·점검·side의 EVD는 하나의 id에 revision으로 쌓이고, **판정에는 최신 revision을 쓴다**(이전 revision은 남는다, INV-16). 수동 증거는 새 revision으로 들어간다. `guard run`은 최신 revision이 사람이 입력한 증거면 덮지 않는다(`--replace-manual`일 때만 대체). 최신 증거가 출처가 다른(자동↔수동) 이전 COMPLETED revision을 대체했으면 보고서 행에 `replaced`("대체됨", 이전 revision·사유)를 표시한다. 말 없이 덮어쓰지 않는다.
+
 ### 4.6 RES — Result (점검 판정)
 
 ```yaml
@@ -359,6 +366,8 @@ by_check:
     candidate: { result: Ref|null, security: Verdict }
     comparison: Comparison                     # update 모드만
     gaps: [Gap]
+    evidence_source: automated | manual | null             # 판정에 쓰인 최신 증거의 출처(실행 완료 시)
+    replaced: { source, revision, executor, reason } | null # 출처가 다른 이전 증거를 대체함("대체됨")
     functional_scope: { probed: int, of: int|null, label: "기능 확인 범위: N / 등록 경로 M (표본)" }   # CheckDef.functional_scope가 있을 때만
 by_purpose:  { "요청·대상 접근 권한": { security: Verdict, inventory_complete: bool } }
 by_area:     { REQ: { security: Verdict } }
@@ -366,6 +375,7 @@ not_selected: [{ check_id: str, reason: str }]
 manual_required: [CheckId]                     # 선정됐지만 자동 실행 불가
 limitations: [str]                             # 미검증 범위, EXAMPLE 사용, 검토 전 팩 등
 approval: { approved_by: str, approved_at: RFC3339, decision: ACCEPT | REJECT, note: str } | null
+evidence_counts: { <영역>: { manual: int, automated: int, not_run: int } }   # 보고서 상단 "수동 입력 N건 / 자동 측정 M건"
 ```
 
 - JSON이 원본이고 HTML은 JSON에서만 렌더링한다. HTML에 JSON에 없는 내용을 넣지 않는다.
@@ -475,6 +485,10 @@ class Judge(Protocol):             # X4: 순수 함수 (INV-14)
     def judge(self, check: CheckDef, evidence: Evidence, params: dict,
               policy_values: dict) -> JudgeOutput: ...
 ```
+
+**판정기 선택**: EVD의 `execution.executor.default_judge`가 있으면 그 판정기, 없으면 CheckDef.judge. `default_judge`는 실행기 레지스트리의 메타데이터("이 실행기의 증거를 판정하는 기본 판정기")에서 증거를 만들 때 기록한다. 코어는 실행기 이름을 비교하지 않는다. 지금 메타데이터: `manual-entry` → `declared`.
+
+**`declared` 판정기**: 수동 증거의 `declared_verdicts`를 RES로 옮긴다(순수 함수). 신고된 PASS는 첨부 0개이거나 필수 관측 문장 설명이 비면 UNKNOWN. PASS 관문은 코어가 따로 적용한다.
 
 **`rule_table` 판정기**: 관측 키·연산자·기대값의 표로 판정한다. 자동화하는 대부분의 행은 코드 없이 이 표로 판정하는 것을 목표로 한다.
 

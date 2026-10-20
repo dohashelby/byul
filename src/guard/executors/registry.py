@@ -22,6 +22,12 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "container_config:real": lambda cfg: ContainerConfigExecutor(cfg.get("container_config", {})),
 }
 
+# 실행기 메타데이터: 이 실행기가 만든 증거를 판정하는 기본 판정기(없으면 CheckDef.judge).
+# 증거를 만들 때 EVD.execution.executor.default_judge로 기록하고, 판정 코어는 그 값만 읽는다.
+EXECUTOR_DEFAULT_JUDGES: dict[str, str] = {
+    "manual-entry": "declared",  # 사람이 입력한 증거(guard evidence import)
+}
+
 ADAPTERS: dict[str, Callable[[], EngineAdapter]] = {
     "fake": FakeAdapter,
     "vllm": VllmAdapter,

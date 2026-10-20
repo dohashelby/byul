@@ -20,14 +20,16 @@ from typing import Any
 from .http_common import (
     Ctx,
     HttpCheckExecutor,
-    classify,
+    RequestBatch,
+    add_functional,
     discover_routes,
     fixture_of,
-    functional_requests,
     functional_results,
+    gateway_matrix,
     probe_templates,
     representative,
     safety_check,
+    send_and_record,
 )
 
 
@@ -45,27 +47,24 @@ class RoleRouteExecutor(HttpCheckExecutor):
         safe_sent = any(t.basis == "safe_probe" for t in templates.values())
         safety_before = safety_check(ctx, "before") if safe_sent else None
 
-        func_reqs, probes = functional_requests(ctx)
-        requests: list[dict] = list(func_reqs)
-        index: list[tuple] = [("functional", pid, probes[pid].as_role) for pid in probes]
-        for path, pr in templates.items():
-            for label in [*nonadmin, admin_role]:
-                requests.append(ctx.request(f"gw|{path}|{label}", ctx.gateway_url, pr, ctx.keys[label]))
-                index.append(("gateway", path, label))
-        results = list(zip(index, ctx.cprobe(ctx.external_net, requests, ctx.timeout))) if requests else []
-        safety_after = safety_check(ctx, "after") if safe_sent else None
+        batch = RequestBatch(network=ctx.external_net)
+        probes = add_functional(ctx, batch)
+        gateway_matrix(ctx, batch, templates, [*nonadmin, admin_role])
+        after: dict = {}
+
+        def after_send() -> None:
+            after["safety"] = safety_check(ctx, "after") if safe_sent else None
+
+        results = send_and_record(ctx, batch, templates, between=after_send)
+        safety_after = after["safety"]
 
         by_role: dict[str, dict[str, Any]] = {p: {} for p in rs.routes}
         func_raw: dict[str, dict] = {}
-        for (via, path, label), res in results:
+        for (via, _origin, path, label, _basis), res, o in results:
             if via == "functional":
                 func_raw[path] = res
-                ctx.record("external", "functional", path, label, res)
-                continue
-            pr = templates[path]
-            o = classify(res, pr)
-            ctx.record("external", "gateway", path, label, res, basis=pr.basis, outcome=o)
-            by_role[path][label] = o
+            else:
+                by_role[path][label] = o
         nonadmin_outcomes = {p: representative([r[l] for l in nonadmin if l in r])
                              for p, r in by_role.items() if all(l in r for l in nonadmin)}
         admin_outcomes = {p: r[admin_role] for p, r in by_role.items() if admin_role in r}

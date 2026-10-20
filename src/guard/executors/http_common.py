@@ -401,3 +401,59 @@ def safety_check(ctx: Ctx, label: str) -> dict:
 
 def fixture_of(templates: dict[str, ProbeRequest]) -> dict:
     return {k: {"method": t.method, "path": t.path, "body": t.body, "basis": t.basis} for k, t in sorted(templates.items())}
+
+
+# --- 요청 묶음·송신·기록 (direct_route·role_route·input_validation 공용) ---------------------
+# 메타: (via, origin, route_key, key_label, basis). via: functional | gateway | direct | (점검별 이름)
+
+
+@dataclass
+class RequestBatch:
+    """외부 출발점에서 한 번에 보낼 요청과, 이미 결과가 있는 항목(호스트 출발점·TCP 추론)."""
+
+    network: str
+    metas: list[tuple] = field(default_factory=list)
+    requests: list[dict] = field(default_factory=list)
+    local: list[tuple[tuple, dict]] = field(default_factory=list)
+
+    def add(self, meta: tuple, request: dict) -> None:
+        self.metas.append(meta)
+        self.requests.append(request)
+
+    def add_result(self, meta: tuple, result: dict) -> None:
+        self.local.append((meta, result))
+
+
+def add_functional(ctx: Ctx, batch: RequestBatch) -> dict[str, Any]:
+    """기능 표본(Gateway 경유)을 묶음에 넣고 id→probe를 돌려준다."""
+    reqs, probes = functional_requests(ctx)
+    for (pid, fp), rq in zip(probes.items(), reqs):
+        batch.add(("functional", "external", pid, fp.as_role, "http"), rq)
+    return probes
+
+
+def gateway_matrix(ctx: Ctx, batch: RequestBatch, templates: dict[str, ProbeRequest], labels: list[str],
+                   via: str = "gateway") -> None:
+    """Gateway × 키: 경로마다 키 표식(labels)별로 같은 요청을 외부 출발점에서 Gateway로."""
+    for path, pr in templates.items():
+        for label in labels:
+            batch.add((via, "external", path, label, pr.basis),
+                      ctx.request(f"{'gw' if via == 'gateway' else via}|{path}|{label}", ctx.gateway_url, pr, ctx.keys[label]))
+
+
+def send_and_record(ctx: Ctx, batch: RequestBatch, templates: dict[str, ProbeRequest], between=None
+                    ) -> list[tuple[tuple, dict, Any]]:
+    """묶음을 보내고(외부 출발점), `between`(예: 양성 대조·안전 확인)을 실행한 뒤 결과를 분류·기록한다.
+    반환: [(메타, 원결과, 분류값)] — 분류값은 안전 프로브 기대 응답이면 handler_reached, 그 밖은 결과 그대로."""
+    sent = ctx.cprobe(batch.network, batch.requests, ctx.timeout) if batch.requests else []
+    results = list(zip(batch.metas, sent)) + batch.local
+    if between is not None:
+        between()
+    out = []
+    for meta, res in results:
+        via, origin, path, label, basis = meta
+        o = res.get("outcome") if via == "functional" else classify(res, templates.get(path))
+        ctx.record(origin, via, path, label, res, basis="tcp_connect (inferred)" if basis == "tcp_connect" else basis,
+                   outcome=o)
+        out.append((meta, res, o))
+    return out

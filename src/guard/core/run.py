@@ -39,6 +39,7 @@ class RunConfig:
     executors: dict[str, str] = field(default_factory=dict)  # CheckDef.executor → 구현 이름
     adapter: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)  # guard.toml 전체 (플러그인 설정)
+    replace_manual: bool = False  # 사람이 입력한 최신 증거를 새 실행 기록으로 대체할지(기본: 대체하지 않음)
 
 
 def _not_run_origin(plan: Plan) -> DataOrigin:
@@ -106,6 +107,9 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig) -> list[Evide
         check = pack.checks[item.check_id]
         for side, env in _sides(plan, envs):
             prev = existing.get((check.id, side))
+            if prev is not None and prev.execution.operator is not None and not cfg.replace_manual:
+                out.append(prev)  # 사람이 입력한 증거를 말 없이 덮지 않는다(SPEC §4.5 증거 대체 규칙)
+                continue
             ident = {"id": prev.id, "revision": prev.revision + 1} if prev else {"id": new_id("EVD"), "revision": 1}
             common = dict(
                 **ident,

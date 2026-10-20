@@ -28,7 +28,9 @@ from guard.models import (
 from guard.models.objects import (
     AxisSummary,
     CheckRow,
+    EvidenceCount,
     ExceptionDisplay,
+    Replaced,
     FunctionalScope,
     NotSelected,
     Policy,
@@ -68,6 +70,29 @@ def _side(res: Result | None) -> SideResult:
         performance=res.verdicts.performance,
         verification_level=res.verification_level,
     )
+
+
+def _source(evd: Evidence | None) -> str | None:
+    """증거 출처: 사람이 입력(operator 있음) → manual, 실행 완료 → automated, 그 밖 → None(미실행·중단)."""
+    if evd is None or evd.execution.status != ExecStatus.COMPLETED:
+        return None
+    return "manual" if evd.execution.operator is not None else "automated"
+
+
+def _replaced(store: Store, latest: Evidence | None, src: str | None) -> Replaced | None:
+    """최신 증거가 출처가 다른 이전 COMPLETED revision을 대체했는가(append-only 이력에서 찾는다)."""
+    if latest is None or src is None:
+        return None
+    for rev in sorted(store.revisions(latest.id), reverse=True):
+        if rev >= latest.revision:
+            continue
+        old = store.get(latest.id, rev)
+        old_src = _source(old)
+        if old_src is not None and old_src != src:
+            reason = latest.execution.override_reason if src == "manual" else "자동 실행이 수동 증거를 대체(--replace-manual)"
+            return Replaced(source=old_src, revision=rev,
+                            executor=old.execution.executor.name if old.execution.executor else None, reason=reason)
+    return None
 
 
 def _fill_policy(note: str, values: dict) -> str:
@@ -118,6 +143,7 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
     not_selected: list[NotSelected] = []
     manual: list[str] = []
     by_purpose: dict[str, list[Verdict]] = defaultdict(list)
+    counts: dict[str, dict[str, int]] = defaultdict(lambda: {"manual": 0, "automated": 0, "not_run": 0})
     by_area: dict[str, list[Verdict]] = defaultdict(list)
     area_purposes: dict[str, set[str]] = defaultdict(set)
 
@@ -154,6 +180,11 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
             if Gap.NO_EXECUTOR in item.gaps or not_run:
                 manual.append(check.id)
             row["functional_scope"] = _functional_scope(check, evds.get((check.id, sides[-1])))
+            latest = evds.get((check.id, sides[-1]))
+            src = _source(latest)
+            row["evidence_source"] = src
+            row["replaced"] = _replaced(store, latest, src)
+            counts[check.area][src or "not_run"] += 1
             rows.append(CheckRow(**row))
             # update 모드의 목적·영역 집계는 후보(candidate) 기준
             verdict = row[sides[-1].value].security
@@ -228,6 +259,12 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
     if scope_out:
         limitations.append(f"정책 범위 밖으로 제외: {len(scope_out)}개 점검")
 
+    manual_n = sum(c["manual"] for c in counts.values())
+    if manual_n:
+        limitations.append(f"수동 증거 {manual_n}건(DECLARED): 수동 입력자는 인증되지 않은 자기 신고다(입력자 이름을 확인하지 않음)")
+    replaced_rows = [r.check_id for r in rows if r.replaced is not None]
+    if replaced_rows:
+        limitations.append(f"출처가 다른 이전 증거를 대체한 점검 {len(replaced_rows)}건: {', '.join(replaced_rows)} (행의 '대체됨' 참고)")
     official = (
         policy.status == PolicyStatus.CONFIRMED and pack.reviewed and DataOrigin.EXAMPLE not in origins
     )
@@ -247,4 +284,5 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
         manual_required=manual,
         limitations=limitations,
         approval=None,
+        evidence_counts={a: EvidenceCount(**c) for a, c in sorted(counts.items())},
     ).seal()

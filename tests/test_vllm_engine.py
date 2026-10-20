@@ -121,8 +121,10 @@ def test_vllm_topology_end_to_end(topology, expected):
 
     data = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
     (row,) = [r for r in data["by_check"] if r["check_id"] == "REQ-01"]
-    art_dir = run_dir / ".guard/artifacts"
-    lines = [json.loads(l) for p in art_dir.iterdir() for l in p.read_text(encoding="utf-8").splitlines()]
+    # EVD가 가리키는 증거 파일만 읽는다(artifacts/에는 팩 보존본 파일도 있다, Step 4)
+    _st = Store(run_dir / ".guard")
+    (_evd,) = [e for e in _st.iter_kind("EVD") if e.check_id == "REQ-01"]
+    lines = [json.loads(l) for a in _evd.artifacts for l in (_st.root / a.path).read_text(encoding="utf-8").splitlines()]
     summary = next(l for l in lines if l.get("summary"))
     dist = Counter((l["via"], l["origin"], l["key"], str(l["outcome"])) for l in lines if not l.get("summary"))
     observed = {

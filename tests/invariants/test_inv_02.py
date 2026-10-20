@@ -48,3 +48,10 @@ def test_not_run_evidence_is_not_measured_even_with_measured_inputs(tmp_path):
     plan = select(pack, [env], pol); store.put(plan)
     (evd,) = run_plan(store, pack, plan, RunConfig())
     assert evd.execution.status == ExecStatus.NOT_RUN and evd.data_origin == DataOrigin.DECLARED
+
+
+def test_human_entered_evidence_is_never_measured():
+    """수동 입력(operator 있음) 증거는 실행 완료여도 MEASURED가 될 수 없다."""
+    with pytest.raises(ValidationError):
+        evidence(status=ExecStatus.COMPLETED, data_origin=DataOrigin.MEASURED,
+                 execution={"status": "COMPLETED", "operator": {"by": "x", "at": "2026-10-19T00:00:00Z"}})

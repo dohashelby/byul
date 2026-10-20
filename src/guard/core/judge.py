@@ -91,18 +91,26 @@ def judge_evidence(
     verdicts = {axis: Verdict.UNKNOWN for axis in AXES}
     judge_info = JudgeInfo(name="none", version="0", params_sha256=sha256_hex(canonical_json({})))
 
-    if check.judge is None:
+    # 판정기: 증거에 기록된 실행기의 기본 판정기가 있으면 그것, 없으면 CheckDef.judge
+    executor = evd.execution.executor
+    if executor is not None and executor.default_judge:
+        plugin_name, params = executor.default_judge, {}
+    elif check.judge is not None:
+        plugin_name, params = check.judge.plugin, check.judge.params
+    else:
+        plugin_name, params = None, {}
+
+    if plugin_name is None:
         reasons.append("no judge defined: manual judgment required")
         if evd.execution.status != ExecStatus.COMPLETED:
             reasons.append(f"execution {evd.execution.status.value}: {evd.execution.abort_reason}")
     else:
-        params = check.judge.params
         judge_info = JudgeInfo(
-            name=check.judge.plugin, version="?", params_sha256=sha256_hex(canonical_json(params))
+            name=plugin_name, version="?", params_sha256=sha256_hex(canonical_json(params))
         )
-        plugin = registry.JUDGES.get(check.judge.plugin)
+        plugin = registry.JUDGES.get(plugin_name)
         if plugin is None:
-            reasons.append(f"judge plugin {check.judge.plugin!r} not available")
+            reasons.append(f"judge plugin {plugin_name!r} not available")
         else:
             judge_info = judge_info.model_copy(update={"name": plugin.name, "version": plugin.version})
             try:

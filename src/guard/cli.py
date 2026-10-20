@@ -11,6 +11,7 @@ from typing import Optional
 import typer
 
 from guard.collectors.file import load_environment, load_policy
+from guard.collectors.manual import ManualEvidenceError, build_template, dump_template, import_evidence
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan
@@ -23,6 +24,8 @@ from guard.store.packs import PackNotStoredError, get_pack, put_pack
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="서빙엔진 보안 검증")
 pack_app = typer.Typer(add_completion=False, no_args_is_help=True, help="팩 보존본")
 app.add_typer(pack_app, name="pack")
+evidence_app = typer.Typer(add_completion=False, no_args_is_help=True, help="수동 증거 입력(DECLARED)")
+app.add_typer(evidence_app, name="evidence")
 
 ConfigOpt = typer.Option(Path("guard.toml"), "--config", help="플러그인 설정 파일")
 StoreOpt = typer.Option(None, "--store", help="저장소 경로 (기본: guard.toml의 store 또는 .guard)")
@@ -156,6 +159,46 @@ def report(
     if html_out:
         html_out.write_text(render_html(json.loads(json_out.read_text(encoding="utf-8"))), encoding="utf-8")
         typer.echo(f"  html → {html_out}")
+
+
+@evidence_app.command("template")
+def evidence_template(
+    plan: str = typer.Option(..., "--plan"),
+    out: Path = typer.Option(Path("manual-evidence.yaml"), "--out"),
+    include_automated: bool = typer.Option(False, "--include-automated", help="자동 실행기가 있는 점검도(override_reason 필요)"),
+    pack: Optional[Path] = typer.Option(None, "--pack"),
+    config: Path = ConfigOpt,
+    store: Optional[Path] = StoreOpt,
+) -> None:
+    """수동 입력이 필요한 점검의 빈 YAML 양식을 만든다."""
+    st = _store(store, _config(config))
+    pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
+    doc = build_template(st, pk, pl, include_automated=include_automated)
+    out.write_text(dump_template(doc), encoding="utf-8")
+    typer.echo(f"{len(doc['checks'])} entries → {out}")
+
+
+@evidence_app.command("import")
+def evidence_import(
+    file: Path = typer.Argument(..., help="채운 양식 YAML (첨부 경로는 이 파일 기준)"),
+    pack: Optional[Path] = typer.Option(None, "--pack"),
+    config: Path = ConfigOpt,
+    store: Optional[Path] = StoreOpt,
+) -> None:
+    """채운 양식을 전부 검증한 뒤 DECLARED 증거로 넣는다(하나라도 틀리면 아무것도 넣지 않음)."""
+    import yaml as _yaml
+
+    st = _store(store, _config(config))
+    head = _yaml.safe_load(file.read_text(encoding="utf-8")) or {}
+    p = head.get("plan") or {}
+    pl, pk = _plan_and_pack(st, f"{p.get('id')}@{p.get('revision')}", pack, allow_snapshot=True)
+    try:
+        result = import_evidence(st, pk, file)
+    except ManualEvidenceError as exc:
+        typer.echo(f"evidence import failed (nothing written): {exc}")
+        raise typer.Exit(1)
+    typer.echo(f"imported {len(result['imported'])}: {', '.join(result['imported']) or '-'}; "
+               f"skipped (not filled) {len(result['skipped'])}")
 
 
 @pack_app.command("import")

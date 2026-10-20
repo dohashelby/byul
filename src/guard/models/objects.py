@@ -276,6 +276,19 @@ class PluginInfo(Strict):
 
 class ExecutorInfo(PluginInfo):
     config_sha256: str
+    # 이 실행기의 증거를 판정하는 기본 판정기(실행기 레지스트리 메타데이터에서 증거 생성 시 기록). 없으면 CheckDef.judge
+    default_judge: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("default_judge",))
+
+
+class Operator(Strict):
+    """사람이 입력한 증거의 입력자·시각(인증되지 않은 자기 신고)."""
+
+    by: str = Field(min_length=1)
+    at: datetime
 
 
 class Execution(Strict):
@@ -285,6 +298,12 @@ class Execution(Strict):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     abort_reason: str | None = None
+    operator: Operator | None = None  # 사람이 입력한 증거만(수동 증거)
+    override_reason: str | None = None  # 자동 실행기가 있는 점검에 수동 증거를 넣은 사유
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("operator", "override_reason"))
 
 
 class NormalControl(Strict):
@@ -348,6 +367,8 @@ class Evidence(GuardObject):
         # INV-02: 실행하지 않은 시험을 MEASURED로 표시하지 않는다
         if self.data_origin == DataOrigin.MEASURED and self.execution.status != ExecStatus.COMPLETED:
             raise ValueError("evidence of an unfinished execution cannot be MEASURED")
+        if self.data_origin == DataOrigin.MEASURED and self.execution.operator is not None:
+            raise ValueError("human-entered evidence cannot be MEASURED (DECLARED only)")
         return self
 
 
@@ -405,6 +426,15 @@ class FunctionalScope(Strict):
     label: str
 
 
+class Replaced(Strict):
+    """같은 PLAN·점검·side에서 최신 증거가 출처가 다른 이전 COMPLETED 증거를 대체함."""
+
+    source: Literal["automated", "manual"]
+    revision: int
+    executor: str | None = None
+    reason: str | None = None
+
+
 class CheckRow(Strict):
     check_id: str
     purpose: str
@@ -422,10 +452,18 @@ class CheckRow(Strict):
     gaps: list[Gap] = Field(default_factory=list)
     exception: ExceptionDisplay | None = None
     functional_scope: FunctionalScope | None = None  # "기능 확인 범위: N / 등록 경로 M (표본)"
+    evidence_source: Literal["automated", "manual"] | None = None  # 판정에 쓰인 최신 증거의 출처(실행 완료 시)
+    replaced: Replaced | None = None
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("functional_scope",))
+        return _drop_none(handler(self), ("functional_scope", "evidence_source", "replaced"))
+
+
+class EvidenceCount(Strict):
+    manual: int = 0      # 수동 입력(DECLARED, 실행 완료)
+    automated: int = 0   # 자동 실행 완료
+    not_run: int = 0     # 실행 안 함·중단
 
 
 class AxisSummary(Strict):
@@ -459,6 +497,11 @@ class Report(GuardObject):
     manual_required: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     approval: Approval | None = None
+    evidence_counts: dict[str, EvidenceCount] | None = None  # 영역별 수동 입력·자동 측정 건수
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("evidence_counts",))
 
 
 OBJECT_CLASSES: dict[str, type[GuardObject]] = {

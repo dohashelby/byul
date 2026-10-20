@@ -58,6 +58,10 @@
 - `.venv/bin/python -B -m unittest discover -s tests -v` 결과 60개 중 42개 통과, 소켓 제한으로 HTTP 18개 건너뜀이다. 기본 데이터 위치는 `$XDG_STATE_HOME/serving-runtime/mvp` 또는 `~/.local/state/serving-runtime/mvp`다. 이후 Claude가 소켓 허용 환경에서 60개 전부 통과(건너뜀 0)와 실제 기동 요청(200 중계·403 미전달·프롬프트 미저장)을 확인했다.
 - 2026-10-21 M3를 시작한 Codex 작업이 사용 한도로 중단돼(`query.py` 초안·`app.py` 일부 변경, 시험 2개 실패 상태) 사용자 승인으로 이번 단계만 Claude가 직접 구현했다. 조회 API(`/api/summary`·`/api/requests`·상세·증거 내려받기), 읽기 전용 대시보드(`mvp/static/` 현황·목록·상세, textContent 렌더링, 3초 갱신·연결 끊김 표시), 정책 무효 시 1 MiB 본문 상한, 시작 시 저장 경로 점검, 엔진 수신 기록 저장 상태 표시를 추가했다. 이전 관측 세션 요청은 실시간 조회의 미발견을 미수신 증거로 쓰지 않는다.
 - `.venv/bin/python -B -m unittest discover -s tests` 결과 76개 전부 통과(Claude 실행, 소켓 허용 환경). M3 코드는 Claude가 구현했으므로 Codex 교차 검수가 필요하다. 사용자가 Windows 브라우저에서 대시보드 접속을 확인했다. 사용자 요청으로 M0~M3 코드·시험과 README MVP 실행 안내를 커밋·푸시했다(로컬 전용 MVP 계획서, `scripts/`, `tests/test_claude_review.py`, `.gitignore` 변경, `.vscode/`는 제외). M4는 미완료다.
+- 2026-10-21 Codex가 M3 조회·정적 라우팅·대시보드를 교차 검수했으며 경로 탈출·XSS·증거 판정의 필수 수정 사항은 없었다.
+- M4로 `mvp-demo`와 `mvp-acceptance`, JSON/Markdown 보고서, 인스턴스별 관측 세션, 손상 위치·이전 실행 표시와 README 실행 안내를 구현했다.
+- `.venv/bin/python -B -m unittest discover -s tests -v` 결과 85개 중 60개 통과, 로컬 소켓 제한으로 HTTP·전체 수용 시험 25개 건너뜀이다.
+- Claude가 소켓 허용 환경에서 전체 85개 시험 통과(건너뜀 0), `mvp-acceptance` MVP-01~11 전부 통과(보고서 JSON/Markdown 생성), 실행 중 서버 대상 `mvp-demo` 14개 사례 전부 통과를 확인했다. 필수 지적은 없었다. 사용자 요청으로 M4까지 커밋·푸시했다. 실제 GPU 엔진·인증·네트워크/커널 통제는 MVP 범위 밖이며 미검증이다.
 
 ## 다음 준비 작업
 

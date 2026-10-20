@@ -44,8 +44,9 @@
 - `.venv/bin/python -B -m unittest discover -s tests -v`로 기존 3개와 새 시험 9개, 총 12개가 통과했다. 알려진 SHA-256·빈 파일·큰 바이너리·원문 보존·FIFO·읽기 중 변경·CLI 정상/오류 경로를 확인했다. 추적 파일 `git diff --check`와 새 Python 파일 2개의 구문·공백 검사도 통과했다. 엔진·실제 통제 환경 시험은 미실시다.
 - 이번 기능의 Git 기준점은 점검 시 HEAD인 `26da771`이다. 새 실행 의존성·도구 설치·커밋·푸시는 없으며, `.vscode/`와 계획서 원문은 수정하지 않았다. 2026-10-21 Claude가 이후 변경인 `cli.py`, `file_info.py`, `test_cli.py`, `test_file_info.py`, README 관련 절을 직접 검수했으며 필수 수정과 코드 수정은 없다.
 - Codex 샌드박스에서는 `/tmp` 쓰기 제한으로 기본 시험 20개가 모두 임시 디렉터리 오류였으나, `TMPDIR=/dev/shm`으로 재실행해 20개 전부 통과했다(`test_file_info` 5개, `test_cli` 7개 포함). `file-info` 수동 실행은 README·없는 경로·디렉터리에서 각각 종료 코드 0·1·1로 기대대로 동작했고 `git diff --check`도 통과했다. 엔진·실제 통제 환경 시험은 여전히 미실시다.
-- 이번에 반영하지 않은 선택 사항은 README "실행·시험" 절의 `file-info` 시험 설명, `-`로 시작하는 경로에 필요한 `--`, 문자 장치 등 특수 파일을 거부하기 전에 `open`이 일어나는 점이다.
-- 2026-10-21 협업 문서의 기본 흐름을 사용자 요청 정리(Claude) → 구현·시험(Codex) → 대화형 직접 검수(Claude) → 필요 시 수정·재시험(Codex) → 최종 보고(Claude)로 통일했다. `scripts/claude_review.py`와 해당 시험은 보존하되 자동 실행하지 않는다.
+- 이번에 반영하지 않은 선택 사항은 README "실행·시험" 절의 `file-info` 시험 설명(README 해당 절 삭제로 더 이상 해당하지 않음), `-`로 시작하는 경로에 필요한 `--`, 문자 장치 등 특수 파일을 거부하기 전에 `open`이 일어나는 점이다.
+- 2026-10-21 협업 문서의 기본 흐름을 사용자 요청 정리(Claude) → 구현·시험(Codex) → 대화형 직접 검수(Claude) → 필요 시 수정·재시험(Codex) → 최종 보고(Claude)로 통일했다. `scripts/claude_review.py`와 해당 시험은 로컬 미커밋 상태로 보존하며 자동 실행하지 않는다.
+- 2026-10-21 원격 커밋 `06b7112`("Update README.md", 2026-10-19 사용자 작성)가 README의 "Python 프로젝트 틀" 절을 삭제했고 사용자 결정으로 이를 유지했다. 그래서 README에는 준비·실행·시험·`file-info` 사용법이 없다. 로컬 커밋 2개를 그 위로 rebase해 `b026fe0`(`file-info`), `f65608d`(협업 문서)로 커밋·푸시했다. `scripts/claude_review.py`, `tests/test_claude_review.py`, `.gitignore`의 `.review/`, `.vscode/`는 검수 전 또는 개인 환경 파일이라 커밋하지 않았다.
 
 ## 다음 준비 작업
 

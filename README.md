@@ -8,4 +8,4 @@ BoB serving-engine security runtime solution
 
 사용자 요청을 Claude가 정리하고 Codex가 구현·시험합니다. Codex는 작업을 마치면 변경 범위·새 파일·시험 명령과 결과·남은 제약·Git 기준점·커밋 여부를 인계하고, Claude가 대화형 세션에서 직접 검수합니다. 필요한 수정·재시험은 Codex가 맡고 Claude가 다시 검수해 최종 보고합니다.
 
-`scripts/claude_review.py`는 보존하지만 기본 작업 흐름에서는 자동 실행하지 않습니다.
+자동 검수 스크립트는 기본 작업 흐름에서 사용하지 않습니다.

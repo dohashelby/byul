@@ -110,6 +110,7 @@ function renderSummary(summary) {
 
   const store = summary.record_store;
   const corrupt = summary.corrupt_lines;
+  const corruptDetails = summary.corrupt_details || { gateway: [], engine: [] };
   const corruptTotal = corrupt.gateway + corrupt.engine;
   setDot("store-dot", store.ok && corruptTotal === 0 ? true : store.state === "unknown" ? null : false);
   const rows = [
@@ -119,6 +120,15 @@ function renderSummary(summary) {
     ["전체 요청", summary.total],
   ];
   if (store.last_error) rows.push(["마지막 오류", `${formatTime(store.last_error_at)} ${store.last_error}`, { problem: true }]);
+  for (const [source, label] of [["gateway", "Gateway 손상"], ["engine", "엔진 손상"]]) {
+    if ((corruptDetails[source] || []).length) {
+      rows.push([
+        label,
+        corruptDetails[source].map((item) => `#${item.line}: ${item.reason}`).join(" · "),
+        { problem: true },
+      ]);
+    }
+  }
   fillKv("store-kv", rows);
 }
 
@@ -132,7 +142,10 @@ function renderRequests(items) {
   for (const item of items) {
     const row = el("tr", {}, [
       el("td", { text: formatTime(item.recorded_at) }),
-      el("td", { className: "mono", text: item.request_id.slice(0, 8), title: item.request_id }),
+      el("td", { className: "mono", title: item.request_id }, [
+        el("span", { text: item.request_id.slice(0, 8) }),
+        ...(item.current_session ? [] : [el("span", { className: "badge badge-previous", text: "이전 실행" })]),
+      ]),
       el("td", { text: item.model ?? "–" }),
       el("td", { className: "num", text: item.max_tokens ?? "–" }),
       el("td", {}, [badge(item.result)]),

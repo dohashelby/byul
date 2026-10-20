@@ -27,10 +27,12 @@ class QueryService:
         gateway_store: JsonlStore,
         engine_store: JsonlStore,
         record_store_status: Callable[[], dict[str, Any]],
+        current_session_id: str | None = None,
     ) -> None:
         self._gateway_store = gateway_store
         self._engine_store = engine_store
         self._record_store_status = record_store_status
+        self._current_session_id = current_session_id
 
     @staticmethod
     def _group(records: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
@@ -122,6 +124,10 @@ class QueryService:
                 "gateway": len(gateway_corrupt),
                 "engine": len(engine_corrupt),
             },
+            "corrupt_details": {
+                "gateway": gateway_corrupt[:20],
+                "engine": engine_corrupt[:20],
+            },
             "record_store": self._record_store_status(),
             "generated_at": _utc_now(),
         }
@@ -140,6 +146,11 @@ class QueryService:
             if (view := self._request_view(request_id, records)) is not None
             and (result is None or view["result"] == result)
         ]
+        for view in views:
+            view["current_session"] = (
+                self._current_session_id is not None
+                and view["observation_session_id"] == self._current_session_id
+            )
         views.sort(
             key=lambda view: (
                 view["recorded_at"] if isinstance(view["recorded_at"], str) else "",
@@ -210,4 +221,3 @@ class QueryService:
             "evidence_summary": evidence_summary,
             "generated_at": _utc_now(),
         }
-

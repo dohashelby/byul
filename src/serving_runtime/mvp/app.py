@@ -21,7 +21,6 @@ from .store import JsonlStore
 from .validator import Decision, validate_request
 
 
-_OBSERVATION_SESSION_ID = uuid4().hex
 _INVALID_POLICY_BODY_LIMIT = 1024 * 1024
 _REQUEST_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 _STATIC_DIR = Path(__file__).with_name("static")
@@ -80,7 +79,9 @@ class GatewayApp:
         self.config = config
         self.policy_state = policy_state
         self.engine_address = engine_address
-        self.observation_session_id = _OBSERVATION_SESSION_ID
+        # One ID per GatewayApp instance: a restart in the same Python process
+        # is still a distinct observation session.
+        self.observation_session_id = uuid4().hex
         self._record_store = JsonlStore(Path(config.data_dir) / "gateway_records.jsonl")
         self._engine_store = JsonlStore(Path(config.data_dir) / "engine_receipts.jsonl")
         self._record_state_lock = threading.Lock()
@@ -92,6 +93,7 @@ class GatewayApp:
             self._record_store,
             self._engine_store,
             self._record_store_status,
+            self.observation_session_id,
         )
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None

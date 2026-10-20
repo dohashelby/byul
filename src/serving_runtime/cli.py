@@ -12,7 +12,7 @@ from .file_info import inspect_file
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="serving-runtime",
-        description="Serving Runtime 개발 도구: 도움말·버전 조회와 로컬 파일 정보 확인.",
+        description="Serving Runtime 개발 도구: 로컬 파일 확인과 런타임 통제 MVP 실행·시험.",
     )
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {version('serving-runtime')}"
@@ -26,6 +26,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument("--engine-port", type=int, default=8088, metavar="N")
     mvp_parser.add_argument("--data-dir", metavar="PATH")
     mvp_parser.add_argument("--relay-timeout", type=float, default=5.0, metavar="SECONDS")
+    demo_parser = commands.add_parser("mvp-demo", help="실행 중인 MVP 시연 사례 전송")
+    demo_parser.add_argument("--gateway", default="http://127.0.0.1:8080", metavar="URL")
+    demo_parser.add_argument("--data-dir", metavar="PATH")
+    acceptance_parser = commands.add_parser(
+        "mvp-acceptance", help="격리된 MVP-01~11 수용 시험 실행"
+    )
+    acceptance_parser.add_argument("--report-dir", metavar="PATH")
     args = parser.parse_args(argv)
     if args.command == "file-info":
         try:
@@ -55,5 +62,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"MVP 실행 실패: {error}", file=sys.stderr)
             return 1
         return 0
+    if args.command == "mvp-demo":
+        from .mvp.demo import run_cli
+
+        return run_cli(args.gateway, args.data_dir)
+    if args.command == "mvp-acceptance":
+        from .mvp.acceptance import run_cli
+
+        return run_cli(args.report_dir)
     parser.print_help()
     return 0

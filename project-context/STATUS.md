@@ -4,6 +4,7 @@
 
 ## 현재 단계
 
+- 2026-10-21 개발계획서 v1.4(개정일 2026-10-21, 문서 상태: 개발 기준 설계안)가 전달되어 저장소에 반영됐다. 이는 문서 반영이며 구현·시험·팀 승인을 의미하지 않는다.
 - 2026-10-19 사용자 신가영이 작성한 개발계획서 v1.0 초안이 전달됐다. 저장소 사본은 `project-context/런타임_통제_개발계획서_v1.0.md`다.
 - 사용자 요청으로 직접 개발할 모듈의 언어는 Python으로 선택했다. 실제 환경·연동 계약·정책값 등 남은 결정은 별도 확인이 필요하다.
 - 초안 전달은 기술 스택 확정·팀 승인·구현 완료를 의미하지 않는다.
@@ -16,6 +17,9 @@
 - WSL 저장소 경로: `/home/bobgy/bobproject/serving-runtime`
 - 2026-10-19 Codex에서 `pwd`, `git rev-parse --show-toplevel`, `uname -a`와 WSL 환경 변수를 확인했다. 작업 폴더와 Git 루트가 위 경로로 일치하며, 명령은 WSL2의 Ubuntu 24.04에서 실행된다.
 - 원본 맥락 문서 위치: `/home/bobgy/bobproject/project`
+- 개발계획서 v1.4 원본: `/mnt/c/Users/bobgy/Downloads/런타임_통제_개발계획서_v1.4.md`
+- 개발계획서 v1.4 저장소 사본: `project-context/런타임_통제_개발계획서_v1.4.md`
+- 2026-10-21 `sha256sum` 비교 결과 원본과 저장소 사본의 SHA-256은 모두 `a350b0a1746e09d2cba23ed596fe0cc14e972b2f3b7cc3b1e72f195a908dc0e2`로 일치했다.
 - 개발계획서 v1.0 원본: `/mnt/c/Users/bobgy/Desktop/bob_project/output/런타임_통제_개발계획서_v1.0.md`
 - 2026-10-19 `sha256sum` 재비교 결과 원본과 저장소 사본의 SHA-256은 모두 `c4961b0578e25b016a8eeb491fd8a8776778b6d5ee43a2b22f96fb7911810c9b`로 일치했다.
 - origin: `https://github.com/yeong-yi/serving-runtime.git` (Git 설정으로 확인)

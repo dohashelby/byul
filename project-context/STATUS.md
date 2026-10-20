@@ -51,6 +51,13 @@
 - 이번에 반영하지 않은 선택 사항은 README "실행·시험" 절의 `file-info` 시험 설명(README 해당 절 삭제로 더 이상 해당하지 않음), `-`로 시작하는 경로에 필요한 `--`, 문자 장치 등 특수 파일을 거부하기 전에 `open`이 일어나는 점이다.
 - 2026-10-21 협업 문서의 기본 흐름을 사용자 요청 정리(Claude) → 구현·시험(Codex) → 대화형 직접 검수(Claude) → 필요 시 수정·재시험(Codex) → 최종 보고(Claude)로 통일했다. `scripts/claude_review.py`와 해당 시험은 로컬 미커밋 상태로 보존하며 자동 실행하지 않는다.
 - 2026-10-21 원격 커밋 `06b7112`("Update README.md", 2026-10-19 사용자 작성)가 README의 "Python 프로젝트 틀" 절을 삭제했고 사용자 결정으로 이를 유지했다. 그래서 README에는 준비·실행·시험·`file-info` 사용법이 없다. 로컬 커밋 2개를 그 위로 rebase해 `b026fe0`(`file-info`), `f65608d`(협업 문서)로 커밋·푸시했다. `scripts/claude_review.py`, `tests/test_claude_review.py`, `.gitignore`의 `.review/`, `.vscode/`는 검수 전 또는 개인 환경 파일이라 커밋하지 않았다.
+- 2026-10-21 로컬 전용 MVP 계획서(커밋 대상 제외)를 기준으로 M0+M1을 구현했다. 새 파일은 `src/serving_runtime/mvp/` 6개 모듈, `examples/mvp/policy.json`, `tests/test_mvp_{policy,validator,mock_engine,app}.py`이며 CLI에 `mvp`를 연결했다.
+- Claude가 소켓 허용 환경에서 전체 43개 통과(건너뜀 0)와 serving-runtime mvp 실제 기동·/api/status 200·POST 501을 확인했다. Codex 샌드박스에서는 소켓 제한으로 HTTP 7개가 건너뛰어졌다.
+- 2026-10-21 Claude 필수 지적에 따라 메시지 `role`의 문자열 형식을 집합 조회 전에 검사하고, 요청·정책의 깊은 중첩 JSON `RecursionError`를 `MALFORMED_JSON`으로 처리했다. 지정한 validator·policy 회귀시험 17개가 모두 통과했다.
+- 2026-10-21 M2 Gateway 중계·서버 발급 요청 ID·Gateway/모의 엔진 JSONL 기록·전달 확인·저장/엔진 오류 처리를 구현했다. 새 파일은 `src/serving_runtime/mvp/store.py`, `tests/test_mvp_{gateway,store}.py`이며 config/app/mock_engine/CLI와 기존 MVP app 시험을 갱신했다.
+- `.venv/bin/python -B -m unittest discover -s tests -v` 결과 60개 중 42개 통과, 소켓 제한으로 HTTP 18개 건너뜀이다. 기본 데이터 위치는 `$XDG_STATE_HOME/serving-runtime/mvp` 또는 `~/.local/state/serving-runtime/mvp`다. 이후 Claude가 소켓 허용 환경에서 60개 전부 통과(건너뜀 0)와 실제 기동 요청(200 중계·403 미전달·프롬프트 미저장)을 확인했다.
+- 2026-10-21 M3를 시작한 Codex 작업이 사용 한도로 중단돼(`query.py` 초안·`app.py` 일부 변경, 시험 2개 실패 상태) 사용자 승인으로 이번 단계만 Claude가 직접 구현했다. 조회 API(`/api/summary`·`/api/requests`·상세·증거 내려받기), 읽기 전용 대시보드(`mvp/static/` 현황·목록·상세, textContent 렌더링, 3초 갱신·연결 끊김 표시), 정책 무효 시 1 MiB 본문 상한, 시작 시 저장 경로 점검, 엔진 수신 기록 저장 상태 표시를 추가했다. 이전 관측 세션 요청은 실시간 조회의 미발견을 미수신 증거로 쓰지 않는다.
+- `.venv/bin/python -B -m unittest discover -s tests` 결과 76개 전부 통과(Claude 실행, 소켓 허용 환경). M3 코드는 Claude가 구현했으므로 Codex 교차 검수가 필요하다. 사용자가 Windows 브라우저에서 대시보드 접속을 확인했다. 사용자 요청으로 M0~M3 코드·시험과 README MVP 실행 안내를 커밋·푸시했다(로컬 전용 MVP 계획서, `scripts/`, `tests/test_claude_review.py`, `.gitignore` 변경, `.vscode/`는 제외). M4는 미완료다.
 
 ## 다음 준비 작업
 

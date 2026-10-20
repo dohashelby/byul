@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Serving Runtime · 요청 통제 MVP</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>Serving Runtime</h1>
+          <p class="subtitle">요청 통제 MVP · 읽기 전용 대시보드</p>
+        </div>
+      </div>
+      <div class="topbar-meta">
+        <span class="badge badge-mock">모의 엔진</span>
+        <span id="refresh-state" class="refresh-state" role="status">연결 중…</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="stale-banner" class="stale-banner" role="alert" hidden></div>
+
+  <main class="page">
+    <section aria-labelledby="overview-title">
+      <div class="section-head">
+        <h2 id="overview-title">현황</h2>
+        <span id="session-id" class="muted mono"></span>
+      </div>
+
+      <div class="stat-grid">
+        <button type="button" class="stat stat-allowed" data-filter="ALLOWED">
+          <span class="stat-label">허용</span><span class="stat-value" id="count-ALLOWED">–</span>
+        </button>
+        <button type="button" class="stat stat-denied" data-filter="DENIED">
+          <span class="stat-label">정책 거부</span><span class="stat-value" id="count-DENIED">–</span>
+        </button>
+        <button type="button" class="stat stat-invalid" data-filter="INVALID">
+          <span class="stat-label">입력 오류</span><span class="stat-value" id="count-INVALID">–</span>
+        </button>
+        <button type="button" class="stat stat-error" data-filter="ERROR">
+          <span class="stat-label">처리 오류</span><span class="stat-value" id="count-ERROR">–</span>
+        </button>
+        <button type="button" class="stat stat-incomplete" data-filter="INCOMPLETE">
+          <span class="stat-label">미완료</span><span class="stat-value" id="count-INCOMPLETE">–</span>
+        </button>
+      </div>
+
+      <div class="card-grid">
+        <article class="card">
+          <h3><span id="policy-dot" class="dot"></span>정책</h3>
+          <dl class="kv" id="policy-kv"></dl>
+        </article>
+        <article class="card">
+          <h3><span id="engine-dot" class="dot"></span>모의 엔진</h3>
+          <dl class="kv" id="engine-kv"></dl>
+        </article>
+        <article class="card">
+          <h3><span id="store-dot" class="dot"></span>기록 저장</h3>
+          <dl class="kv" id="store-kv"></dl>
+        </article>
+      </div>
+
+      <div class="chip-row" aria-label="관측 연결 상태">
+        <span class="chip chip-off">네트워크 관측 · 미연결</span>
+        <span class="chip chip-off">프로세스 관측 · 미연결</span>
+        <span class="chip chip-off">파일 관측 · 미연결</span>
+        <span class="chip chip-off">GPU 관측 · 미연결</span>
+      </div>
+    </section>
+
+    <section aria-labelledby="requests-title">
+      <div class="section-head">
+        <h2 id="requests-title">요청 목록</h2>
+        <div class="filters" role="group" aria-label="결과 필터">
+          <button type="button" class="filter is-active" data-filter="">전체</button>
+          <button type="button" class="filter" data-filter="ALLOWED">허용</button>
+          <button type="button" class="filter" data-filter="DENIED">정책 거부</button>
+          <button type="button" class="filter" data-filter="INVALID">입력 오류</button>
+          <button type="button" class="filter" data-filter="ERROR">처리 오류</button>
+          <button type="button" class="filter" data-filter="INCOMPLETE">미완료</button>
+        </div>
+      </div>
+      <div class="card table-card">
+        <table class="requests">
+          <thead>
+            <tr>
+              <th>시각</th><th>요청 ID</th><th>모델</th><th class="num">max_tokens</th>
+              <th>결과</th><th>사유</th>
+            </tr>
+          </thead>
+          <tbody id="request-rows"></tbody>
+        </table>
+        <p id="empty-state" class="empty" hidden>아직 기록된 요청이 없습니다.</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="drawer" class="drawer" aria-labelledby="drawer-title" aria-hidden="true">
+    <div class="drawer-head">
+      <h2 id="drawer-title">요청 상세</h2>
+      <button type="button" id="drawer-close" class="icon-button" aria-label="닫기">×</button>
+    </div>
+    <div id="drawer-body" class="drawer-body"></div>
+  </aside>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

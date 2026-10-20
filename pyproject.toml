@@ -17,3 +17,6 @@ serving-runtime = "serving_runtime.cli:main"
 where = ["src"]
 include = ["serving_runtime*"]
 namespaces = false
+
+[tool.setuptools.package-data]
+serving_runtime = ["mvp/static/*"]

@@ -486,3 +486,11 @@ git status
 - https://github.com/dohashelby/gua/actions/runs/39544304934
 - 도움말 검사는 색상을 강제로 켠 출력에서 ANSI만 제거하고 동일 옵션명을 검사하도록 보정했다. 실제 --replace-manual 실행 계약은 유지한다.
 - 수정 후 집중 검증: 20 passed / 4.37초. 제품 소스는 바꾸지 않았다. 이후 원격 전체 검증 결과를 별도로 확인한다.
+
+
+### 통합 Linux 최종 검증 (2026-10-21)
+- ff1d488c21e1ef96e3762ea09a883bbbe055ffc4: Ubuntu/Python 3.11, `uv run pytest -q` → **519 passed, 18 deselected / 32.03초**.
+- frozen 설치와 `uv build --wheel` 성공. Windows의 기존 플랫폼 skip 4건도 Linux에서는 통과했다.
+- Push CI: https://github.com/dohashelby/gua/actions/runs/39544534499 (성공), PR CI도 성공.
+- 초안 PR: https://github.com/dohashelby/gua/pull/2 . 통합 merge commit cfd7dbe는 main/d9e9729와 update/42a609d를 모두 부모로 가진다. 원래 두 브랜치는 변경하지 않았다.
+- 이 수치는 기본 논리·모의 계약 검증이며 실제 엔진/두 이미지 실증은 포함하지 않는다.

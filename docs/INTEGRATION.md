@@ -70,3 +70,12 @@ REQ-07·REQ-10 추가 자동화, 정책 카탈로그/양식의 실제 작성, �
 - 기본 전체 테스트와 wheel 빌드/설치본 검증. 실제 엔진 시험은 별도 opt-in이며 미실행을 성공으로 세지 않는다.
 
 실행 결과는 PROGRESS.md의 2026-10-21 통합 항목에서 확인한다.
+
+
+## 검증 결과
+
+- 통합 코드 ff1d488의 [Linux CI](https://github.com/dohashelby/gua/actions/runs/39544534499): **519 passed, 18 deselected / 32.03초**, frozen 설치·wheel 빌드 성공.
+- 설치본 독립 CLI 15개 명령과 양쪽 부모의 EXAMPLE 직렬화 fixture 16개를 확인했다.
+- 첫 Windows/원격 실행에서 발견한 골든 해시·ANSI 도움말 기대값 문제와 수정 과정은 PROGRESS.md에 기록했다. 제품 동작을 시험 결과에 맞춰 완화하지 않았다.
+- 실제 엔진 opt-in 6건은 설정 부재로 skip했다. 실제 엔진·서로 다른 두 이미지·신규 두 점검 실증 완료는 아니다.
+- [초안 PR #2](https://github.com/dohashelby/gua/pull/2)에서 통합 변경을 검토한다.

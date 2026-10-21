@@ -565,3 +565,10 @@ git status
 - 정합성: 카탈로그303/연결595·분류a13/b10/c165/d115, 고유 로컬 출처941개(JSON/YAML Pointer·코드 행) 실존 확인. 고정 외부 출처를 다시 수입하거나 바꾸지 않았다. 설명 개발 도구 재실행과 커밋 설명 JSON이 선언/카탈로그에서 재생성한 값과 같음을 확인했다.
 - 보호 해시 대조: core/models/executors/store/reference/기존 out 증거 변경 0, judges는 declared.py 1파일. 팩 변경은 대상 두 CheckDef와 manifest뿐이며 id_map·기존 5개 자동 정의를 보존했다. 예시/실험실 정책은 pack.revision10→11만 바뀌고 values/scope/승인 공란이 동일하다. 기존 기록은 보존하고 M2 기록을 추가했다.
 - PR #3는 아직 미병합이므로 M2는 codex/gua-policy-template-m1을 base로 준비한다. 이 기록 작성 시 push 전이며 Linux CI는 이후 실제 실행으로 확인한다. 테스트/설치본/무결성 보조 로그는 ignored out/test-runs/policy-m2-20261021에 둔다.
+
+### M2 원격 Linux CI 확인
+- 구현 커밋 b510b6baad11cd19eb0f54079af3aeaf9def2503, Ubuntu/Python 3.11: `uv run pytest -q` → **562 passed, 18 deselected / 37.15초(PR), 36.57초(push)**. skip 없음. Windows 네트워크/심볼릭 링크 제약 5건도 Linux에서 통과했으며 기본 1분 목표를 충족했다.
+- frozen 설치·`uv build --wheel`도 양쪽 실행 성공. 공식 GitHub API의 completed/success와 작업 로그의 통과 수·시간을 확인했다.
+- PR CI: https://github.com/dohashelby/gua/actions/runs/39556527667 / push CI: https://github.com/dohashelby/gua/actions/runs/39556505899 .
+- 초안 PR: https://github.com/dohashelby/gua/pull/4 . base codex/gua-policy-template-m1 / head codex/gua-policy-m2, 선행 PR #3 의존. merge-base 1dc82f0이며 실제 원격 변경20파일이 로컬 diff와 일치했다. 선행 보완9602102와 정책/설명/통합회귀b510b6b를 구분했다. 자동 병합하지 않았다.
+- 후속 기록 커밋은 이 결과만 추가한다. 제품 코드·팩·정책·기존 증거는 추가 변경하지 않으며 실제 엔진·두 이미지 실증은 미수행이다.

@@ -1,0 +1,6 @@
+policy_params:
+- key: approval_record_system
+  type: str
+  required: true
+limitations:
+- '승인 기록 체계(신고된 정책 문맥): {approval_record_system}. 값의 등록은 승인 권한·기록 무결성 검증이 아니다. 실제 권한·변경 결과·감사 기록은 별도 증거가 필요하다.'

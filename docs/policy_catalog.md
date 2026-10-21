@@ -1,6 +1,6 @@
 # 기업 정책 카탈로그 — Phase 1 검토 초안
 
-작성일: 2026-10-21 (Asia/Seoul). **확인된 데이터/코드 사실**, **원문 해석**, **후속 설계 제안**을 구별한다. 기업 정책값·담당자·승인 기록은 작성하지 않았다. M2에서 선언 두 개와 수동 정책 입력 전제를 보강했다. Phase 1의 제안/검토 기록과 현재 구현을 구별하며 변경 내용은 §15를 따른다.
+작성일: 2026-10-21 (Asia/Seoul). **확인된 데이터/코드 사실**, **원문 해석**, **후속 설계 제안**을 구별한다. 기업 정책값·담당자·승인 기록은 작성하지 않았다. M2에서 선언 두 개와 수동 정책 입력 전제를 보강했다. Phase 1의 제안/검토 기록과 현재 구현을 구별하며 M2의 당시 변경은 §15, M5의 현재 변경은 §16을 따른다.
 
 ## 1. 검토 기준과 범위
 
@@ -10,8 +10,8 @@
 - origin: `https://github.com/dohashelby/gua.git`; 원격 main: `d9e9729116eeb16299247ecb9e7df8ff16d882ec`.
 - 기존 기본 작업 트리는 main이고 `.assessment/`가 미추적이었다. 기존 통합 작업 트리는 깨끗했으므로 그 경로를 사용했다. fetch 후 통합 브랜치 앞섬/뒤짐 `0/0`; `git pull --ff-only`는 `Already up to date.`. 원격 main만을 기준으로 삼지 않았다. 다른 두 작업 트리는 수정하지 않았다.
 - 사용자 추가 참고: [체크리스트와 보완 가이드](https://github.com/mg-princess/serving-security-framework/blob/cdfea2401007091f8e5452d87d4ff2fbfaf1219f/03_체크리스트와_보완가이드.md)의 고정 커밋 `cdfea2401007091f8e5452d87d4ff2fbfaf1219f`. 팀 참조 기준 28개와 최신 CHK 연결·변경 사항은 §14에 정리했다.
-- 현재 팩: PACK-BASELINE revision 11, DRAFT(M1은 revision 10). [CLAUDE](../CLAUDE.md), [정책 요청](../POLICY_PROMPT.md), [SPEC](../SPEC.md), [결정 기록](../DECISIONS.md), [진행 기록](../PROGRESS.md)을 기준으로 코드·77 CheckDef·원문 JSON을 대조했다.
-- [POLICY_PROMPT](../POLICY_PROMPT.md)의 “3행만 구조화”는 과거 설명이다. M1은 5개 점검·11개 파라미터였고 M2는 **7개 점검·13개 파라미터**다. 자동 실행기 연결은 5개로 유지하며 과거 실측 3개와 신규 모의 검증 2개를 구별해야 한다.
+- 현재 팩: PACK-BASELINE revision 12, DRAFT(M1 10, M2/M4 11). [CLAUDE](../CLAUDE.md), [정책 요청](../POLICY_PROMPT.md), [SPEC](../SPEC.md), [결정 기록](../DECISIONS.md), [진행 기록](../PROGRESS.md)을 기준으로 코드·77 CheckDef·원문 JSON을 대조했다.
+- [POLICY_PROMPT](../POLICY_PROMPT.md)의 “3행만 구조화”는 과거 설명이다. M1은 5개 점검·11개 파라미터였고 M2/M4는 7개 점검·13개 파라미터였고 M5는 **9개 점검·15개 파라미터**다. 자동 실행기 연결은 5개로 유지하며 과거 실측 3개와 신규 모의 검증 2개를 구별해야 한다.
 - Phase 1 당시 변경 범위: 이 문서, [CSV](policy_catalog.csv), DECISIONS의 관련 열린 질문, PROGRESS의 작업 기록. 코드·팩·정책 파일·SPEC·기존 증거·참고 원문은 변경하지 않는다. 커밋·푸시·엔진/운영 시험·유료 자원 생성·새 의존성 설치는 수행하지 않는다.
 
 ## 2. 용어와 CSV 계약
@@ -50,14 +50,14 @@ CheckDef는 무엇을 어떻게 검사하는지의 정의다. POL은 기업이 �
 | 원문 정규화 결정 발생 수(점검별, 중복 통합 전) | 595 |
 | 점검 ↔ 정책 ID 고유 연결 수 | 595 |
 | 중복 정리 후 카탈로그 고유 항목 수 | 303 |
-| a 이미 policy_params로 구조화 | 13 |
-| b 기존 지원 타입으로 구조화 가능한 후보 | 10 |
+| a 이미 policy_params로 구조화 | 14 |
+| b 기존 지원 타입으로 구조화 가능한 후보 | 9 |
 | c 수치 도출 방법/기준선 결정 우선 | 165 |
 | d 복잡한 구조/형태 추가 설계 | 115 |
 | 수치를 포함한 항목 전체 | 166 |
 | 그중 도출 방법 결정이 먼저인 신규 c | 165 |
 | 수치이면서 복잡한 형태 | 164 |
-| 파라미터 선언이 있는 점검 / 파라미터 | 7 / 13 |
+| 파라미터 선언이 있는 점검 / 파라미터 | 9 / 15 |
 | numeric_values_pending 필드가 있는 원문 행 | 40 |
 
 영역별 CheckDef는 SUP 16, REQ 21, PLT 12, LIF 16, OBS 12다. `items=28`, `scenarios=83`은 추적용 원천 목록이며 점검 수가 아니다.
@@ -88,7 +88,7 @@ CheckDef는 무엇을 어떻게 검사하는지의 정의다. POL은 기업이 �
 
 동일성 미정이라 합치지 않은 후보: INPUT-RENDER-LIMIT ↔ REQ-09-MAX-INPUT-TOKENS(측정 위치/입력 형식), EVENT-SCHEMA ↔ AUDIT-REQUIRED-RECORDS(사건/필수 기록 범위), RESULT-RETRY ↔ INFERENCE-RETRY-ALLOW(전달 권한/자원 수명 계약), SUP reader ↔ replay reader(소비자/신뢰 경계). 이 후보는 이름 유사성만으로 통합하지 않았다.
 
-## 6. 파라미터 13개: 기존 11개와 M2 등록 2개
+## 6. 파라미터 소비: 기존 11개·M2 등록 2개·M5 등록 2개
 
 공통 로더는 [collectors/file.load_policy](../src/guard/collectors/file.py)에서 pack id/revision을 대조해 POL을 만들고 팩 Ref 해시를 채운다. `Policy.values`의 Any 저장만으로 타입/의미가 검증되는 것은 아니다. [core/select](../src/guard/core/select.py)가 선언된 파라미터를 확인하고 [core/run](../src/guard/core/run.py)이 점검별 values를 실행기에 전달한다. [rule_table](../src/guard/judges/rule_table.py)은 직접 value_policy/when_policy가 있는 규칙만 POL을 읽는다.
 
@@ -106,12 +106,14 @@ CheckDef는 무엇을 어떻게 검사하는지의 정의다. POL은 기업이 �
 | `values.REQ-09.max_input_tokens` (int) | 실행: input_validation.validate_policy가 양수/초과 시험 예산 검사; collect가 한도+1 token-array 생성 | 판정: REQ-09 표는 이 정수를 직접 참조하지 않음; challenge_outcomes 소비 | EXAMPLE 모의 계약 기록; 실제 엔진 미실증 |
 | `values.REQ-09.rejection_codes` (list[str]) | 실행: input_validation.validate_policy가 비어 있지 않은 400/413/422 문자열 목록 확인 | 판정: rule_table value_policy all_in; 계획한 두 challenge 응답을 비교 | EXAMPLE 모의 계약 기록; 실제 엔진 미실증 |
 
-M2에서 다음 두 개를 추가했다. 두 값은 선정의 타입/누락 검사, 양식 주석과 수동 입력 전제 확인에만 사용한다. 자동 실행·목록 충족 판정은 구현하지 않았으며 NO_EXECUTOR가 유지된다. 위 기존 11개에도 수동 declared 0.2.0의 필수 키 누락 관문을 적용한다.
+M2 당시 다음 두 개를 추가해 타입/누락과 수동 입력 전제를 확인했다. M4/M5는 신고된 항목별 근거를 제한적으로 대조한다([계약](POLICY_TEMPLATE.md)). 자동 실행·실측은 추가하지 않았으며 NO_EXECUTOR가 유지된다. 현재 declared 0.4.0의 필수 키 누락 관문은 기존 11개에도 적용한다.
 
 | 값 경로 | 선언·소비 | 검증 범위 |
 |---|---|---|
-| `values.SUP-14.required_checks` (list[str], 필수) | 기업이 식별하는 필수 검사 목록. select/template/수동 필수 키 존재 검사 | EXAMPLE 입력·선정·수동 판정 계약; 검사 성공 자동 판정·실측 아님 |
-| `values.LIF-07.required_readiness_items` (list[str], 필수) | 기업이 식별하는 필수 준비 항목 목록. select/template/수동 필수 키 존재 검사 | EXAMPLE 입력·선정·수동 판정 계약; worker/model 준비 자동 관측·실측 아님 |
+| `values.SUP-14.required_checks` (list[str], 필수) | 기업이 식별하는 필수 검사 목록. select/template + M4/M5 신고된 원결과·집행·첨부 대조 | EXAMPLE 입력·선정·수동 판정 계약; 검사 성공 자동 판정·실측 아님 |
+| `values.LIF-07.required_readiness_items` (list[str], 필수) | 기업이 식별하는 필수 준비 항목 목록. select/template + M4/M5 신고된 준비·접수·추론·순서·첨부 대조 | EXAMPLE 입력·선정·수동 판정 계약; worker/model 준비 자동 관측·실측 아님 |
+
+M5는 공유 결정 `P-DRAFT-SUP-GOV-TOOL`을 두 독립 required str 경로 `values.SUP-01.approval_record_system`, `values.SUP-02.approval_record_system`에 연결한다. 문맥 식별용이며 권한표·승인 진위·실제 배포 인가는 검증하지 않는다. 상세 범위와 공백 처리·증거 한계는 §16을 따른다.
 
 PLT-01의 목록은 실제 수집값을 판정표가 비교한다. `require_non_root=false`는 UID 0 검사 전제만 생략하며 특권 모드·host namespace의 고정 금지까지 완화하지 않는다. 마운트는 bind/volume 목적지:ro/rw, 장치는 host:container:권한, 실행 가능한 쓰기는 마운트 지점 목록이다. 이 단순 문자열 목록 계약을 새로운 복잡한 역할 허용표의 지원 증거로 확장하지 않는다.
 
@@ -119,7 +121,7 @@ REQ-01은 설정 역할이 allowed_callers 안에 있어야 하며 none/wrong은
 
 PLT-04는 변수 이름 문법 `[A-Za-z_][A-Za-z0-9_]*`와 절대 컨테이너 경로(경로 요소 `..` 금지)를 검사한다. 변수 값은 수집하지 않는다. 파일 내용·동적 provider·전체 자격 사용권을 검증한 것으로 읽으면 안 된다. REQ-09는 정상 token-array 대조와 token ID/길이의 두 경계만 구현했다. 두 신규 점검 모두 전체 원문 보호 요구를 실제 엔진에서 검증했다는 근거는 없다.
 
-정적 확인한 기존 테스트: [test_policy_values](../tests/test_policy_values.py), [test_collectors](../tests/test_collectors.py), [test_direct_route](../tests/test_direct_route.py), [test_role_route](../tests/test_role_route.py), [test_container_config](../tests/test_container_config.py), [test_rule_table](../tests/test_rule_table.py), [test_new_checks](../tests/test_new_checks.py), [test_real_case_matrix](../tests/test_real_case_matrix.py), [test_validation_readiness](../tests/test_validation_readiness.py). 이번에 pytest를 실행하지 않았다. 과거 기본 CI 519 passed는 PROGRESS에 기록된 논리/모의 검증 결과이며 이번 작업의 통과 수가 아니다. 과거 macOS REQ-01/03·PLT-01 실측 기록과 신규 두 점검의 모의 범위를 같은 수준으로 세지 않았다. PROGRESS에는 과거 exposed/isolated 저장소의 참조 artifact 각 1개 누락도 기록돼 있다. 이번에는 증거 체인을 복구·재검증하지 않았고 실측 기록의 한계를 유지한다.
+Phase 1 당시 정적 확인한 기존 테스트: [test_policy_values](../tests/test_policy_values.py), [test_collectors](../tests/test_collectors.py), [test_direct_route](../tests/test_direct_route.py), [test_role_route](../tests/test_role_route.py), [test_container_config](../tests/test_container_config.py), [test_rule_table](../tests/test_rule_table.py), [test_new_checks](../tests/test_new_checks.py), [test_real_case_matrix](../tests/test_real_case_matrix.py), [test_validation_readiness](../tests/test_validation_readiness.py). 이번에 pytest를 실행하지 않았다. 과거 기본 CI 519 passed는 PROGRESS에 기록된 논리/모의 검증 결과이며 이번 작업의 통과 수가 아니다. 과거 macOS REQ-01/03·PLT-01 실측 기록과 신규 두 점검의 모의 범위를 같은 수준으로 세지 않았다. PROGRESS에는 과거 exposed/isolated 저장소의 참조 artifact 각 1개 누락도 기록돼 있다. 이번에는 증거 체인을 복구·재검증하지 않았고 실측 기록의 한계를 유지한다.
 
 ### 입력 계약의 확인된 사실
 
@@ -834,3 +836,11 @@ P-DRAFT-SUP-CHECK-REQUIRED → `values.SUP-14.required_checks`, P-DRAFT-READINES
 수동 declared 0.2.0은 필수 키 누락 상태의 신고 PASS만 UNKNOWN으로 보류하고 FAIL은 보존한다. 이전 수동 PASS도 정책 누락이 있으면 새 판정 revision에서 달라질 수 있으며 과거 RES/EVD를 수정하지 않는다. core/models·새 실행기·기업 실제 값·외부 CHK selector는 바꾸지 않는다.
 
 설명 JSON은 개발 도구 `tools/build_policy_template_metadata.py`로 선언/카탈로그 연결과 타입을 대조해 재생성한다. 런타임은 패키지 JSON만 읽고 정확한 현재 팩 Ref를 요구한다. 이전/외부 팩은 M1의 안전한 미지정 fallback을 유지하며 과거 팩 보존본 재판정과는 별개다. 실제 M2 검증 결과·환경·제약은 PROGRESS의 M2 기록에 남긴다.
+
+## 16. M5 현재 상태 (2026-10-21)
+
+M4 2632c245bafd3628965e22c4d6dc86f0d1d3c046에서 분기했다. P-DRAFT-SUP-GOV-TOOL 한 결정을 SUP-01/SUP-02의 approval_record_system required str 두 경로로 등록했다. 원문·공유 결정 ID·303결정·595연결은 유지한다. 분류는 a14/b9/c165/d115, 선언은 9점검/15경로다. a 개수와 파라미터 개수를 혼용하지 않는다.
+
+팩 11→12/DRAFT, 해당 두 CheckDef 1→2이며 다른 75점검과 자동 실행/판정 연결5는 유지한다. 값은 승인 도구·기록 체계의 문맥이며 계정·허용표·권한 집행·승인 인증의 증거가 아니다. 공백은 대상 수동 PASS를 보류하고 키 누락/타입 계약은 기존대로다. 현재 CSV의 a 항목 소비 버전/경로와 SUP-14/LIF-07 항목별 신고 검증 설명도 갱신한다. 외부 원문·역할 출처·과거 실제 엔진 검증 범위를 덮어쓰지 않는다.
+
+선언 JSON은 정확한 새 팩 Ref로 재생성한다. 이전/외부 팩은 설명 fallback을 유지한다. OBS-11 정책은 등록하지 않으며 [M5 계획](POLICY_M5_PLAN.md)의 OBS-01 관계·독립 발생 증거·시간/기한·누락/경보/종속 판정 계약이 선행한다. 이번 계약 검증 결과는 PROGRESS의 M5 기록과 구분하며 실제 승인 체계/엔진 실증 완료로 해석하지 않는다.

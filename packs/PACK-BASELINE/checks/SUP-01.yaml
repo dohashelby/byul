@@ -1,5 +1,5 @@
 id: SUP-01
-revision: 1
+revision: 2
 retired: false
 area: SUP
 purpose: 생성·변경·승인 권한
@@ -12,7 +12,10 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 승인 저장소 사용
-policy_params: []
+policy_params:
+- key: approval_record_system
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 실제 담당자·계정, 모델×환경×작업 허용표, 역할 겸임·독립 검토 규칙, 승인 도구·긴급 권한의 기간과 기록. 기업에 특정 인원수를 강제하지 않는다.
@@ -43,3 +46,5 @@ legacy:
   - Q-R05-01/SC-09-01
 source:
   array: supply_assessment_draft
+limitations:
+- '승인 기록 체계(신고된 정책 문맥): {approval_record_system}. 값의 등록은 승인 권한·기록 무결성 검증이 아니다. 실제 권한·변경 결과·감사 기록은 별도 증거가 필요하다.'

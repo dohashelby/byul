@@ -145,3 +145,11 @@ probe 정리 실패는 증거를 보존하고 execution.cleanup_errors와 재판
 
 
 수동 입력·대체 옵션과 반출/복원을 함께 사용하는 절차는 [통합 안내](INTEGRATION.md)를 따른다.
+
+## M5 승인 기록 체계 입력
+
+정책 양식의 SUP-01/SUP-02 아래에 각각 기업이 정한 approval_record_system 문자열을 입력한다. 실제 키/암호·계정 허용표를 대신 넣지 않는다. 미입력은 NO_POLICY_VALUE이며 공백은 수동 PASS를 UNKNOWN으로 보류한다. 값만 채워도 승인/배포 권한이 검증되는 것은 아니다.
+
+기존 evidence template → 관측 설명/첨부 입력 → evidence import → judge → report 절차를 사용한다. 두 점검에는 항목별 policy_evidence를 만들지 않는다. JSON/HTML의 승인 체계 문맥·POLICY_CONTEXT·미인증 자기 신고·official 여부를 함께 확인한다. 과거 revision 11 보존 팩의 SUP-01/SUP-02는 신규 전제를 소급하지 않는다. 과거 LIF-07 추론 충돌 때문에 보류된 확인 위반은 declared 0.4.0 재판정에서 FAIL이 될 수 있으며 원본 EVD/RES는 보존된다.
+
+OBS-11의 필수 기록·기한·시계 오차·장애 대응은 [후속 결정표](POLICY_M5_PLAN.md)를 먼저 확정한다. collector 장애 자체를 공격 성공이나 종속 시험 PASS로 처리하지 않는다.

@@ -4,6 +4,7 @@
 - 첨부 증거 파일 1개 이상(EVD.artifacts)
 - CheckDef.required_observations_prose의 각 항목에 대한 관측 설명(declared_observation_notes)
 - CheckDef.policy_params에 선언된 필수 정책 키
+- SUP-01/SUP-02에 선언된 승인 기록 체계의 비공백 문자열(문맥이며 권한 증명이 아님)
 - SUP-14/LIF-07의 선언된 필수 항목별 신고 관측·첨부 연결 및 제한적 충족 조건
 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집, INV-11)은 판정 코어가 따로 적용한다.
 신고된 FAIL은 그대로 둔다(INV-04). 항목별 관측은 DECLARED이며 실측·신원 인증이 아니다.
@@ -21,7 +22,7 @@ ALLOWED = {"PASS", "FAIL", "UNKNOWN"}
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.3.0"
+    version = "0.4.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         obs = evidence.observations.get("declared_verdicts")
@@ -36,6 +37,14 @@ class DeclaredJudge:
                       if not isinstance(answers.get(item), str) or not answers[item].strip()]
         missing_policy = [p.key for p in check.policy_params if p.required and p.key not in policy_values]
         verdicts, reasons = {}, [f"declared by {who} (self-reported, not authenticated)"]
+        approval_context = check.id in ("SUP-01", "SUP-02") and any(
+            p.key == "approval_record_system" and p.type == "str" and p.required for p in check.policy_params)
+        context_missing = False
+        if approval_context:
+            value = policy_values.get("approval_record_system")
+            context_missing = not isinstance(value, str) or not value.strip()
+            code = "APPROVAL_RECORD_SYSTEM_UNRESOLVED" if context_missing else "APPROVAL_RECORD_SYSTEM_DECLARED"
+            reasons.append(f"POLICY_CONTEXT: {code}; context only, approval permissions not automatically verified")
         item_result = evaluate(check, evidence, policy_values)
         if item_result:
             reasons.extend(item_result[1])
@@ -46,6 +55,9 @@ class DeclaredJudge:
                 v = "UNKNOWN"
             if v == "PASS" and missing_policy:
                 reasons.append(f"{axis}: declared PASS withheld: NO_POLICY_VALUE: required policy keys missing {missing_policy}")
+                v = "UNKNOWN"
+            if v == "PASS" and context_missing:
+                reasons.append(f"{axis}: declared PASS withheld: POLICY_CONTEXT: approval_record_system is blank")
                 v = "UNKNOWN"
             if v == "PASS" and not evidence.artifacts:
                 reasons.append(f"{axis}: declared PASS withheld: no attachment (at least one evidence file required)")

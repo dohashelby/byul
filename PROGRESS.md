@@ -600,3 +600,9 @@ git status
 - 최종 수정 소스로 `uv build --wheel --out-dir out/test-runs/policy-m4-20261021/dist` 성공. 별도 `UV_PROJECT_ENVIRONMENT=out/test-runs/policy-m4-20261021/installed-env`에서 `uv sync --frozen --no-install-project`, `uv pip install --python .../installed-env/Scripts/python.exe --no-deps --reinstall .../dist/guard-0.1.0-py3-none-any.whl`로 설치했다. 제품 의존성/lock 변경 없음.
 - `.venv/Scripts/python.exe -X utf8 -B out/test-runs/policy-m4-20261021/installed_smoke.py` → 저장소 밖 새 TEMP·격리 Python(-I)/설치본의 **19명령 PASS**. 실제 보존 M2 wheel/declared0.2.0으로 SUP-14/LIF-07 및 비대상 SUP-01의 수동 PASS를 만들고 M4 wheel로 재판정해 대상 UNKNOWN·비대상 PASS, 기존 EVD/RES 전체 필드/해시 보존을 확인했다. 이어 실제 /2 CLI 생성→import→판정→JSON/HTML에서 SUP 보안 PASS/기능·성능 UNKNOWN, LIF 보안·기능 PASS/성능 UNKNOWN, official=false·항목별 이유·Store.verify·동일 as_of 멱등을 확인했다. 합성 EXAMPLE/DECLARED 입력 계약 검증이며 실제 엔진 증거가 아니다.
 - 정합성 `.venv/Scripts/python.exe -X utf8 -B out/test-runs/policy-m4-20261021/verify.py` → PASS. 허용13파일(기존10+신규3), 비대상 추적331파일 해시 보존, 문서 상대 링크43회·Python 구문·wheel과 현재 제품 소스 바이트 일치·기준 대비 diff 공백 검사 확인. 팩 Ref/77점검/7점검13선언/자동연결5, 카탈로그303/595·a13/b10/c165/d115 및 설명 JSON 일치도 재확인했다. core/report1파일 외 다른 코어·모델·스토어·실행기·팩·정책 예시·참고 원문 변경0이다.
+
+### M4 원격 기본 전체 검증
+
+- 구현 커밋 fa4ec8ae276e67bd1f266f93fc005b6d886d64d1, Ubuntu/Python3.11: `uv run pytest -q` → **627 passed, 18 deselected / 28.78초(PR), 43.72초(push)**. 실패/skip 없음. 기본1분 목표 충족, Windows에서 skip된 기존5건도 Linux에서 통과했다. 추가65개 사례를 포함한 기본 회귀이며 실제 엔진 검증은 아니다.
+- 공식 API의 양쪽 completed/success와 실제 작업 로그를 확인했다. frozen 설치·`uv build --wheel`도 성공. PR CI https://github.com/dohashelby/gua/actions/runs/39563313641 / push CI https://github.com/dohashelby/gua/actions/runs/39563304626 . 앞서 로컬에서 수정한 실패를 남은 미해결 실패로 집계하지 않으며, 로컬 전체 성공으로 바꿔 기록하지 않는다.
+- 초안 PR https://github.com/dohashelby/gua/pull/6 , base codex/gua-policy-m3-design / head codex/gua-policy-evidence-m4. merge-base23a02ab, ahead1/behind0, 원격13파일이 로컬 diff와 일치함을 확인했다. 선행 PR #5 미병합이며 자동 병합하지 않았다. 이 후속 커밋은 실제 CI 결과만 추가하고 제품 코드·팩·기존 증거는 바꾸지 않는다.

@@ -8,7 +8,7 @@
 - 2026-10-19 사용자 신가영이 작성한 개발계획서 v1.0 초안이 전달됐다. 저장소 사본은 `project-context/런타임_통제_개발계획서_v1.0.md`다.
 - 사용자 요청으로 직접 개발할 모듈의 언어는 Python으로 선택했다. 실제 환경·연동 계약·정책값 등 남은 결정은 별도 확인이 필요하다.
 - 초안 전달은 기술 스택 확정·팀 승인·구현 완료를 의미하지 않는다.
-- 현재 요청 범위는 가벼운 로컬 파일 크기·SHA-256 확인 기능 하나의 구현·시험이다. 보안 통제·외부 연동 기능의 구현·집행 검증은 포함하지 않는다.
+- 현재 요청 범위는 MVP 이후 계획(스트리밍·정책/상태·vLLM v0.1, 로컬 전용 `/tmp/serving-runtime-next-plan/`)의 S0~S3A 구현과 모의·가짜 backend 시험이다. 실제 vLLM 환경 시험(S3B)·인증·외부 통제 연동은 포함하지 않는다.
 - 사용자 요청을 Claude가 정리하고 Codex가 구현·수정·시험한 뒤, Claude가 대화형 세션에서 직접 검수하고 최종 보고한다. 필요한 수정·재시험은 Codex가 맡는다.
 
 ## 확인한 환경
@@ -62,10 +62,23 @@
 - M4로 `mvp-demo`와 `mvp-acceptance`, JSON/Markdown 보고서, 인스턴스별 관측 세션, 손상 위치·이전 실행 표시와 README 실행 안내를 구현했다.
 - `.venv/bin/python -B -m unittest discover -s tests -v` 결과 85개 중 60개 통과, 로컬 소켓 제한으로 HTTP·전체 수용 시험 25개 건너뜀이다.
 - Claude가 소켓 허용 환경에서 전체 85개 시험 통과(건너뜀 0), `mvp-acceptance` MVP-01~11 전부 통과(보고서 JSON/Markdown 생성), 실행 중 서버 대상 `mvp-demo` 14개 사례 전부 통과를 확인했다. 필수 지적은 없었다. 사용자 요청으로 M4까지 커밋·푸시했다. 실제 GPU 엔진·인증·네트워크/커널 통제는 MVP 범위 밖이며 미검증이다.
+- S0 기준선은 HEAD `b1d3555`, 기존 미커밋 4종(`.gitignore`, `.vscode/`, `scripts/`, `tests/test_claude_review.py`), Claude 실행 unittest 85개·MVP-01~11 전부 통과다. v1.4 D-09 대비 n=1·출력 128·본문 64KiB는 적용, 동시성 2·stream은 S1 전 미적용, context 2048은 tokenizer 확인 전이라 미적용이었다.
+- S1에서 SSE 증분 중계, 시작/idle/전체 3종 제한, 일반·stream 공통 동시성 2와 429, HTTP 시작/최종 결과·모의 취소 증거 기록, 조회·대시보드·demo·S1-01~06 수용 시험을 구현했다.
+- Codex 샌드박스의 전체 unittest는 96개 중 66개 통과, 소켓 제한으로 HTTP·전체 수용 시험 30개를 건너뛰었다. 이후 Claude가 소켓 허용 환경에서 unittest 96개 전부 통과(건너뜀 0), `mvp-acceptance` MVP-01~11·S1-01~06 전부 통과, 직접 코드 검수 필수 지적 없음을 확인했다. 실제 vLLM 내부 취소와 context 2048은 미검증·미적용이다.
+- S2에서 정책 schema `runtime-mvp/1.1`의 기간·승인 참조와 1.0 엄격 호환, 철회 스냅샷, 요청별 Gateway 유효성 판정, 재시작 보존 정책 이력, baseline/manifest와 모의 엔진 관측 비교, 단일 백그라운드 수집 스레드, 읽기 전용 API·대시보드, 과거 요청 기록 호환을 구현했다. 요청 기록에는 정책 schema 판본을 추가했고 `policy_history.jsonl`은 저장 실패가 Gateway 시작을 막지 않도록 독립 상태로 표시한다.
+- 유효성에서 구현한 항목은 schema/필드·`valid_from`·`valid_until`·철회 스냅샷이다. `approval_ref`는 표시만 하며 서명 검증·승인 서비스 연동·hot reload·외부 집행 확인은 미구현이다. 관측값은 승인 기준으로 저장·승격하지 않고, 모의 응답은 `data_origin: mock`으로 표시한다. 실제 vLLM 수집은 시도하거나 입증하지 않았다.
+- S2-01~06을 기존 `mvp-acceptance`에 추가했다. Codex 샌드박스에서 `.venv/bin/python -B -m unittest discover -s tests -v`는 총 104개 중 72개 통과, 로컬 소켓 제한으로 HTTP·전체 수용 시험 32개 건너뜀이다. Python 구문 검사, 대시보드 JavaScript 구문 검사(사용 가능한 node), `git diff --check`도 통과했다.
+- Claude가 소켓 허용 환경에서 전체 unittest 104개와 `mvp-acceptance` MVP-01~11·S1-01~06·S2-01~06을 모두 통과(건너뜀 0)시키고 직접 검수에서 필수 지적이 없음을 확인했다. 선택 사항으로 `valid_from > valid_until` 정책도 로드되지만 모든 요청이 503으로 안전 측 동작함을 확인했다.
+- S3A는 Codex가 backend 설정(`backend.py`)·고정 목적지 중계·자격정보·수집 어댑터·시험 전용 가짜 backend(`fake_backend.py`)·단위 시험·S3A-01~08 수용 사례까지 구현한 뒤 Codex 사용 한도로 중단됐다. 사용자 지시로 Claude가 이어받아 대시보드 backend 모드 배지·`gateway_only` 증거 표시, README 외부 backend 절, `docs/S3B_실제환경_시험준비.md`, 이 기록을 작성했다. 이 마무리분은 Codex 교차 검수 전이다.
+- Claude가 소켓 허용 환경에서 unittest 115개 전부 통과(건너뜀 0), `mvp-acceptance` 31개 사례(MVP-01~11·S1-01~06·S2-01~06·S3A-01~08) 전부 통과를 확인했다. S3A 사례는 `fake_backend_test`이며 실제 vLLM 연결이 아니다. vLLM 경로·지표 이름은 공식 문서 latest 기준 후보이고 고정 버전 v0.31.0 응답은 미확인이다.
+- S3B는 미실행이다. 2026-10-21 이 WSL에는 GPU(`nvidia-smi` 없음)·nvidia 런타임·vLLM·k8s가 없어 실제 시험을 할 수 없다(CPU 16, RAM 약 7GiB). 필요한 입력과 절차는 `docs/S3B_실제환경_시험준비.md`에 정리했다. 커밋·푸시는 하지 않았다.
+- 2026-10-21 사용자 승인으로 vLLM CPU 이미지 v0.29.0(digest `sha256:66064cf6…`)과 `Qwen/Qwen2.5-0.5B-Instruct`(revision `7ae55760…`)를 받아 CPU 사전 점검을 수행했다. S3-01~06 모두 통과(보고서 `~/.local/state/serving-runtime/s3b-cpu/reports/s3b-cpu-20261021T064056Z.json`, 비밀값 미포함). 선정 환경(GPU·v0.31.0·선정 모델)과 달라 정식 S3B 통과로 세지 않는다. vLLM 기본 로그에 Gateway 요청 ID·abort 기록이 없어 backend 측 요청 단위 증거와 엔진 내부 취소는 미확인이다. 첫 float32 실행은 OOM, bfloat16으로 재실행했다.
+- CPU 점검 후 사용자가 외부 vLLM 모드 대시보드가 열리지 않는다고 보고했다. 원인은 `app.js`가 `/api/status`의 `mock_engine`만 읽어 vLLM 모드(`backend` 키)에서 스크립트 오류로 화면이 연결 끊김 상태에 머문 것이다. Claude가 두 키를 모두 읽도록 고치고 vLLM 모드 엔진 카드에 자격정보·추론 검증 미확인 표시를 추가했으며 정적 회귀 시험 1개를 넣었다. 브라우저 수준의 vLLM 모드 화면 시험은 없다.
+- 사용자 요청으로 README 맨 앞에 "개발 현황 한눈에"(기능별 확인 수준: 모의/가짜 backend/실제 vLLM CPU, 미구현 목록)와 "실제 vLLM(CPU)으로 실행하기"(이미지·모델 revision·실행·상시 실행·종료 명령) 절을 추가했다. 현재 unittest 116개 전부 통과. 커밋·푸시는 하지 않았다.
 
 ## 다음 준비 작업
 
-- 파일 정보 확인 기능의 구현·시험·Claude 대화형 검수는 완료됐다. 다음 작업은 사용자 요청을 기다린다.
+- S3A까지 완료(가짜 backend 기준). 다음은 승인된 GPU LAB 입력이 준비되면 S3B 실제 vLLM 시험이다. 설치·다운로드·운영 환경 변경은 자동으로 시작하지 않는다. Codex 사용량이 복구되면 Claude가 작성한 S3A 마무리분(대시보드·문서)의 교차 검수를 맡길 수 있다.
 
 ## 갱신 방법
 

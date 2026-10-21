@@ -539,3 +539,10 @@ git status
 - `python -I`의 import 위치가 설치 환경 site-packages임을 확인했고 wheel에 policy_template_metadata.json이 포함됐다. 현재 팩 설명과 Ref 일치, 다른 팩 선언/미지정 설명, 빈/부분/null/잘못된 타입, [], false, 0, REQ-09 소비자 계약, 출력 보호·UTF-8/LF 회귀를 확인했다.
 - 보존: 시작 보호 파일 230개 중 기존 변경은 src/guard/cli.py만이다. core/models/judges 각 0건, 팩 revision 10/DRAFT·정책/예시/실험실/참고/기존 증거 불변. 새 모듈/설명 JSON/회귀는 별도로 추가했다. Phase 1 CSV/MD는 시작 바이트와 동일하며 DECISIONS/PROGRESS는 기존 내용을 prefix로 보존하고 M1 기록만 추가했다. 실행 로그/검사 보조 파일은 ignored out/test-runs/policy-m1-20261021에 있다.
 - 원격 Linux CI는 아직 push 전이므로 미확인이다. 로컬 결과와 구분해 push/초안 PR 후 확인한다. 새 정책 자동화·실제 엔진·두 이미지 실증을 M1 완료로 집계하지 않는다.
+
+### M1 원격 Linux CI 확인
+- 구현 커밋 945cc6b16a82f0d007309bf71d8bd5a79e8cb269, Ubuntu/Python 3.11: 기본 `uv run pytest -q` → **539 passed, 18 deselected / 33.00초(PR), 29.24초(push)**. Windows skip 4건도 Linux에서는 통과했다. 이 환경에서 기본 1분 목표를 충족했다.
+- frozen 의존성 설치와 `uv build --wheel`도 두 실행 모두 성공. 실제 엔진/두 이미지 실증은 포함하지 않는다.
+- PR CI: https://github.com/dohashelby/gua/actions/runs/39552555535 / push CI: https://github.com/dohashelby/gua/actions/runs/39552529119 . 공식 GitHub API에서 completed/success와 작업 로그의 통과 수·시간을 확인했다.
+- 초안 PR: https://github.com/dohashelby/gua/pull/3 . base codex/gua-integration-20261021 / head codex/gua-policy-template-m1, 선행 PR #2 의존. Phase 1 보존 커밋 701b12f와 M1 구현 커밋 945cc6b를 구분했다. 자동 병합하지 않았다.
+- 이 후속 커밋은 검증 기록만 추가한다. 제품 코드·팩·정책·증거는 추가 변경하지 않는다.

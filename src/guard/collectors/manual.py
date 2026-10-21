@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 
 from guard.executors import registry
+from guard import manual_audit
 from guard.manual_policy import OBSERVATION, blank_evidence, normalize, parameter
 from guard.models import (
     DataOrigin,
@@ -37,10 +38,12 @@ from guard.models import (
 from guard.models.objects import Artifact, Execution, ExecutorInfo, Operator
 from guard.store import Store
 
-TEMPLATE_VERSION = "guard-manual-evidence/2"
+TEMPLATE_VERSION = "guard-manual-evidence/3"
+V2_TEMPLATE_VERSION = "guard-manual-evidence/2"
 LEGACY_TEMPLATE_VERSION = "guard-manual-evidence/1"
+MODERN_TEMPLATES = (V2_TEMPLATE_VERSION, TEMPLATE_VERSION)
 EXECUTOR_NAME = "manual-entry"
-EXECUTOR_VERSION = "0.3.0"
+EXECUTOR_VERSION = "0.4.0"
 NORMAL_RESULTS = ("succeeded", "failed", "not_attempted")
 VERDICTS = ("PASS", "FAIL", "UNKNOWN")
 AXES = ("security", "functional", "performance")
@@ -52,9 +55,11 @@ HEADER = """\
 #   attachments(이 파일 기준 상대 경로, PASS는 1개 이상 필요), entered_by(입력자).
 # 자동 실행기가 있는 점검(automated: true)은 override_reason(사유)이 있어야 받는다.
 # verdicts를 모두 비워 둔 항목은 건너뛴다. 사람이 입력한 값은 DECLARED(자기 신고)로 기록된다.
-# v2 policy/pack은 PLAN의 정확한 참조다. policy_evidence는 항목·case별 관측과
+# v2/v3 policy/pack은 PLAN의 정확한 참조다. policy_evidence는 항목·case별 관측과
 # evidence: [{{attachment: <현재 attachments의 경로>, locator: <위치>, basis: <근거>}}]를 연결한다.
 # 관측 null/빈 evidence는 미확인이다. 정책 항목·case를 성공 결과로 해석하지 않는다.
+# v3 OBS-11 audit_evidence는 프로파일·시도·독립 발생·시간/조회 창·경보·종속 처리의
+# 주장별 첨부를 연결한다. 각 evidence에 claim이 필요하며 진위/신원 인증은 아니다.
 """
 
 
@@ -106,6 +111,8 @@ def build_template(store: Store, pack: Pack, plan: Plan, include_automated: bool
             })
             if parameter(check):
                 entries[-1]["policy_evidence"] = blank_evidence(check, policy.values.get(check.id, {}))
+            if manual_audit.enabled(check):
+                entries[-1]["audit_evidence"] = manual_audit.blank_evidence(check, policy.values.get(check.id, {}))
     return {"template": TEMPLATE_VERSION,
             "plan": {"id": plan.id, "revision": plan.revision, "sha256": plan.content_sha256},
             "policy": plan.inputs.policy.model_dump(mode="json"),
@@ -144,20 +151,20 @@ def read_document(path: Path) -> dict:
 
 
 def validate_document(doc: Any) -> dict:
-    if not isinstance(doc, dict) or doc.get("template") not in (TEMPLATE_VERSION, LEGACY_TEMPLATE_VERSION):
+    if not isinstance(doc, dict) or doc.get("template") not in (*MODERN_TEMPLATES, LEGACY_TEMPLATE_VERSION):
         raise ManualEvidenceError("unsupported or missing manual evidence template version")
     p = doc.get("plan")
     if (not isinstance(p, dict) or not isinstance(p.get("id"), str)
             or type(p.get("revision")) is not int or p["revision"] < 1 or not isinstance(p.get("sha256"), str)):
         raise ManualEvidenceError("plan must contain id, positive integer revision and sha256")
-    if doc["template"] == TEMPLATE_VERSION:
+    if doc["template"] in MODERN_TEMPLATES:
         for name, kind in (("policy", "POL"), ("pack", "PACK")):
             try:
                 ref = Ref.model_validate(doc.get(name))
                 if ref.kind != kind:
                     raise ValueError("wrong reference kind")
             except (TypeError, ValueError) as exc:
-                raise ManualEvidenceError(f"v2 {name} requires a complete {kind} Ref") from exc
+                raise ManualEvidenceError(f"v2/v3 {name} requires a complete {kind} Ref") from exc
     entries = doc.get("checks")
     if not isinstance(entries, list):
         raise ManualEvidenceError("checks must be a list")
@@ -167,13 +174,17 @@ def validate_document(doc: Any) -> dict:
                 or not isinstance(entry.get("side"), str) or not isinstance(entry.get("verdicts"), dict)):
             raise ManualEvidenceError("each check needs check_id, side and a verdicts mapping")
         key = (entry["check_id"], entry["side"])
+        if "audit_evidence" in entry and doc["template"] != TEMPLATE_VERSION:
+            raise ManualEvidenceError("audit_evidence requires a v3 form")
+        if "policy_evidence" in entry and doc["template"] == LEGACY_TEMPLATE_VERSION:
+            raise ManualEvidenceError("policy_evidence requires a v2/v3 form")
         if key in seen:
             raise ManualEvidenceError(f"duplicate check/side: {key[0]}/{key[1]}")
         seen.add(key)
     return doc
 
 
-def _validate(entry: dict, pack: Pack, plan: Plan, base: Path, *, values: dict, v2: bool) -> dict:
+def _validate(entry: dict, pack: Pack, plan: Plan, base: Path, *, values: dict, v2: bool, v3: bool = False) -> dict:
     cid = entry.get("check_id")
     where = f"{cid}/{entry.get('side')}"
     try:
@@ -185,6 +196,10 @@ def _validate(entry: dict, pack: Pack, plan: Plan, base: Path, *, values: dict, 
     if entry.get("side") not in [s.value for s in _sides(plan)]:
         raise ManualEvidenceError(f"{where}: side must be one of {[s.value for s in _sides(plan)]}")
     check = pack.checks[cid]
+    reserved = {"declared_verdicts", "declared_basis", "declared_observation_notes", "declared_limitations",
+                OBSERVATION, manual_audit.OBSERVATION}
+    if any(o.key in reserved for o in check.required_observations):
+        raise ManualEvidenceError(f"{where}: reserved manual observation cannot be a required observation")
     reason = entry.get("override_reason")
     if reason is not None and not isinstance(reason, str):
         raise ManualEvidenceError(f"{where}: override_reason must be text")
@@ -257,7 +272,11 @@ def _validate(entry: dict, pack: Pack, plan: Plan, base: Path, *, values: dict, 
     try:
         if not v2 and "policy_evidence" in entry:
             raise ValueError("policy_evidence requires a v2 form")
+        if "audit_evidence" in entry and not manual_audit.enabled(check):
+            raise ValueError("audit_evidence is unsupported for this definition")
         normalize(check, values, entry.get("policy_evidence"), dict.fromkeys(attachments))
+        if v3:
+            manual_audit.normalize(check, values, entry.get("audit_evidence"), dict.fromkeys(attachments))
     except ValueError as exc:
         raise ManualEvidenceError(f"{where}: {exc}") from exc
     return {"entry": entry, "check": check, "verdicts": verdicts, "normal": nc, "obs": obs_in, "notes": notes_in,
@@ -276,15 +295,33 @@ def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None =
         raise ManualEvidenceError("form must reference a PLAN")
     if plan.inputs.pack != pack.ref():
         raise ManualEvidenceError("pack does not match the one the plan used")
-    v2 = doc["template"] == TEMPLATE_VERSION
+    v2 = doc["template"] in MODERN_TEMPLATES
+    v3 = doc["template"] == TEMPLATE_VERSION
     if v2 and (Ref.model_validate(doc["policy"]) != plan.inputs.policy
                or Ref.model_validate(doc["pack"]) != plan.inputs.pack):
-        raise ManualEvidenceError("v2 policy/pack Ref does not match the pinned PLAN inputs")
+        raise ManualEvidenceError("v2/v3 policy/pack Ref does not match the pinned PLAN inputs")
     policy = store.resolve(plan.inputs.policy)
     now = now or utcnow()
     entries = doc.get("checks") or []
     skipped = [e.get("check_id") for e in entries if not _filled(e)]
-    valid = [_validate(e, pack, plan, path.parent, values=policy.values.get(e["check_id"], {}), v2=v2)
+    # Even an unfilled draft must not smuggle a new payload for another check,
+    # side, or declaration. Ordinary unfilled manual entries remain skipped.
+    for e in entries:
+        if not _filled(e) and "audit_evidence" in e:
+            try:
+                item = plan.item(e["check_id"])
+                if not item.selected or e["side"] not in [s.value for s in _sides(plan)]:
+                    raise ValueError("audit check/side is not selected")
+                if not manual_audit.enabled(pack.checks[e["check_id"]]):
+                    raise ValueError("audit_evidence is unsupported for this definition")
+                attachments = e.get("attachments") or []
+                if not isinstance(attachments, list) or any(not isinstance(a, str) for a in attachments):
+                    raise ValueError("audit attachments must be a list of paths")
+                manual_audit.normalize(pack.checks[e["check_id"]], policy.values.get(e["check_id"], {}),
+                                       e.get("audit_evidence"), dict.fromkeys(attachments))
+            except (KeyError, ValueError) as exc:
+                raise ManualEvidenceError(str(exc)) from exc
+    valid = [_validate(e, pack, plan, path.parent, values=policy.values.get(e["check_id"], {}), v2=v2, v3=v3)
              for e in entries if _filled(e)]  # 전부 검증 먼저
 
     plan_ref = plan.ref()
@@ -324,10 +361,16 @@ def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None =
             normalized = normalize(check, policy.values.get(check.id, {}), e.get("policy_evidence"), attachment_hashes)
             if normalized is not None:
                 observations[OBSERVATION] = {"value": normalized, "collected": True}
+        if v3:
+            normalized_audit = manual_audit.normalize(check, policy.values.get(check.id, {}), e.get("audit_evidence"), attachment_hashes)
+            if normalized_audit is not None:
+                observations[manual_audit.OBSERVATION] = {"value": normalized_audit, "collected": True}
         config = {k: e.get(k) for k in ("check_id", "side", "verdicts", "basis", "override_reason")}
         config["attachments"] = [a.sha256 for a in artifacts]
         if OBSERVATION in observations:
             config[OBSERVATION] = observations[OBSERVATION]["value"]
+        if manual_audit.OBSERVATION in observations:
+            config[manual_audit.OBSERVATION] = observations[manual_audit.OBSERVATION]["value"]
         prev = existing.get((check.id, side))
         env_ref = env_refs[0] if side in (Side.single, Side.baseline) else env_refs[1]
         attempted_nc = v["normal"] != "not_attempted"

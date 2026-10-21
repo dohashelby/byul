@@ -633,3 +633,16 @@ git status
 - 과거 검증 재확인: 공식 GitHub API/작업 로그에서 M5 최종e353cd0의 PR39567720670·push39567715343 모두 success·659 passed/18 deselected·wheel 성공을 다시 확인했다. 앞선 M5 재검토의32 passed 및 과거22명령 설치본 기록과 함께 과거 결과이며 M6 실행으로 합산하지 않는다.
 - 문서 범위이므로 로컬 기본 pytest/설치·wheel은 반복하지 않았다. 커밋 후 자동 CI는 별도로 확인하고 최종 SHA의 실행 링크/결과를 초안 PR 본문과 종료 보고에 기록한다.
 - 다음 단계/막힌 것: 기술 프로파일·시간/경보 의미·독립 근거/case 범위를 사람이 검토해 채택해야 다음 제품 구현을 진행한다. 실제 기업 목록/수치/권한/승인/SLA·장애 대응은 별도 미결이다. 실제 엔진/두 이미지·collector 주입·운영/유료 자원 시험은 수행하지 않았다.
+
+## 2026-10-21 — 정책 M7 구현
+
+- 기준: M6 b404a6d847f932edda926c0185572ac315ae7ef1 → codex/gua-policy-obs11-m7, base는 미병합M6 PR8. 시작349파일 해시·팩12·기존CSV/정책을 ignored out/test-runs/policy-m7-20261021에 보존했다.
+- 구현: OBS11 required목록+사건별4개map·dict[str,int], 수동/3·구형/1/2 능력 보존, guard-audit-evidence/1의 프로파일/시도/주장별근거·시계/조회/경보/종속처리, 순수상한/확인FAIL·RPT이유 연결. manual-entry0.4.0/declared0.5.0. 계약과 한계는 docs/POLICY_M7.md다.
+- 유지/계수: 팩13/DRAFT·OBS11정의2·10점검20경로·a19/b8/c161/d115·77ID/303결정595연결·자동연결5. 실제기업값/승인·collector/엔진·다른RES자동전파·복구SLA·원본진위는 미검증/미정이다.
+- 검증: Windows/Python3.11.16/uv0.12.11에서 구현·테스트·문서 전체 작성 후 `uv sync --frozen` 성공. `uv run pytest -q --basetemp=.review-tests-policy-m7 --junitxml=out/test-runs/policy-m7-20261021/first.xml --durations=12`: **741 passed / 1 failed / 5 skipped / 18 deselected, 299.84초**. 실패는 기존 test_unknown_type_rejected가 신규지원 dict[str,int]를 미지원으로 기대한 테스트 가정이었다. 실제 미지원 dict[str,str]로 대조를 바꾸고 빈/0/음수 map의 얕은 타입 계약3개를 추가했다(의미 검증/판정 완화 없음).
+- 재검증: `uv run pytest -q tests/test_policy_m7.py tests/test_policy_values.py --basetemp=.review-tests-policy-m7-fix --junitxml=out/test-runs/policy-m7-20261021/fix.xml --durations=5`: **110 passed, 22.59초**. 이후 비대상 audit_evidence:null도 filled/unfilled 모두 명시 거부하도록 보완하고2개 회귀를 추가했다. `uv run pytest -q tests/test_policy_m7.py -k "invalid_batch or v2_still or legacy_payload or pinned_refs or old_formats" --basetemp=.review-tests-policy-m7-null --junitxml=out/test-runs/policy-m7-20261021/null-fix.xml --durations=3`: **21 passed / 69 deselected, 14.68초**. 별도 실행을 합산한 전체 통과 수로 표시하지 않는다.
+- skip/제외·환경: Windows 루프백 거부/timeout 차이3개와 symlink 권한2개는 기존5skip, Docker/engine18개는 기본 제외다. Windows 전체 실행은1분 목표를 넘었으며 지원 Linux의 최종 전체 CI 시간/결과는 별도 확인해 PR 본문에 기록한다. 최종 제품 코드의 새 OBS 테스트90개가 있으며 실제collector를 주입한 결과가 아니다.
+- 설치/호환: `uv build --wheel --out-dir out/test-runs/policy-m7-20261021/dist` 성공. 저장소 밖 TEMP·별도 설치 venv·Python -I, PYTHONPATH/PYTHONHOME 차단과 설치 collector/source 바이트 일치 확인 후 **29명령 통과**. 실제 M5 wheel+팩12가 만든 /2 OBS/SUP 원본 EVD/RES·PASS를 보존해 새0.5.0으로 재판정/멱등/verify 확인. 새 팩13 /3의 정책양식→선정→수동 import→판정→JSON/HTML에서 OBS security PASS/기능·성능UNKNOWN·SUP/LIF 유지·official false, 확인된 정상 처리 위반 FAIL·과거 /3 객체 보존 확인. 최초 설치 검증29명령도 별도 installed-smoke-initial.json에 보존하며 최종 결과와 합산하지 않는다.
+- 무결성/문서: 허용27파일만 변경(기존22/새5), 시작349개 중327개 바이트 동일. 다른76점검/원문/추적 증거·예시/lab의 값/scope/승인 보존. 팩13해시 **7db2fb622c87e5fee4bcf07e82ef0b2112705b81036dd0b103db71eacce2e3ba**, 팩12복사→로컬 재생성 동일·멱등, 메타데이터/CSV/manifest·wheel/source 일치, 새 순수helper의 I/O/현재시각 접근 없음, 문서 상대링크599개/Pointer533개·CSV 출처·diff check 통과. M6의 과거 코드 위치는 기준 b404a6d의 고정 링크로 보존했다. 근거는 ignored out/test-runs/policy-m7-20261021의 XML/installed-smoke.json/integrity-verification.json/source-facts.json이다.
+- 커밋 후 검증: 최종 SHA의 원격HEAD·PR diff·지원 Linux 전체 CI/frozen sync/wheel 결과는 초안PR 본문과 종료 보고에 기록한다.
+- 다음: 실제 정책/근거의 업무 적정성·조건부경보/역할별규칙·운영대응은 별도 결정 후 격리 실증으로 검증한다. 이번 작업에서 실제 자원 생성·collector 주입·운영 요청은 하지 않는다.

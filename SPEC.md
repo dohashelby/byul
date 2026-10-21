@@ -639,3 +639,15 @@ guard evidence import manual.yaml                                              #
 - SUP-01/SUP-02에 선언된 required str approval_record_system은 승인 도구·기록 체계의 정책상 식별 문맥이다. 키 누락은 NO_POLICY_VALUE, null/타입 오류는 기존 select 오류다. 대상 선언이 있고 문자열이 공백이면 declared PASS를 UNKNOWN으로 보류한다. 정상 값은 권한/진위 증명이 아니며 기존 PASS 관문을 우회하지 않는다. 두 점검 값은 독립이며 자동 복사하지 않는다.
 - 신규 공백 전제는 해당 선언이 없는 과거 팩에는 소급하지 않는다. /1 읽기, /2 생성·manual-entry 0.3.0·policy-evidence/1을 유지하고 scalar를 항목별 증거에 넣지 않는다. Report.limitations는 기존 POLICY_ITEMS: 외에 POLICY_CONTEXT: 이유도 전달한다. EVD/기존 RES는 보존한다.
 - PACK-BASELINE revision 12/DRAFT, SUP-01/SUP-02 revision 2. 정책 선언은 9점검/15경로, 자동 실행/판정 연결은 5개다. OBS-11은 미등록·미구현이며 [후속 계획](docs/POLICY_M5_PLAN.md)을 먼저 합의한다.
+
+## M7 OBS-11 수동 검증 계약
+
+- 타입 지원에 dict[str,int]를 추가한다. 문자열 키·정수 값의 얕은 검사이며 bool은 int가 아니다. 기존4타입·누락 키 NO_POLICY_VALUE·null/범위 밖 타입 검사는 유지한다. OBS 전용 의미 검증은 순수 helper에 둔다.
+- OBS-11은 required_records와 사건별 collection_deadline_ms/max_clock_uncertainty_ms/detection_deadline_ms/alert_deadline_ms를 required로 선언한다. 수집C는 발생t0부터, 식별D·경보A는 수집 기한t0+C부터 각각의 예산이다. 실제 값/승인을 만들지 않는다.
+- 새 수동 양식/3·manual-entry0.4.0·declared0.5.0이다. /1 읽기는 기존 계약, /2는 정확 POL/팩 Ref 및 policy_evidence 검증 유지, /3은 추가 audit_evidence를 지원한다. /1·/2의 audit 숨김과 /1의 policy_evidence 숨김은 거부한다. 기존 guard-policy-evidence/1은 보존한다.
+- OBS 전용 guard-audit-evidence/1은 기존 EVD.observations.declared_audit_evidence에 저장한다. normal/collection_fault/clock_uncertain별 프로파일 적용·실제 시도·독립 발생·시계/조회 창·경보/종속/복구 근거를 연결한다. 현재 첨부만 참조하고 배치 사전 검증·추가 전용 저장·의미 있는 config hash를 유지한다.
+- 시간은 명시 timezone·최대 밀리초 정밀도로만 지원한다. 현재 시각을 보충하지 않으며 오차 구간 상한≤예산은 기한 내, 하한>예산은 기한 후, 경계 겹침/허용 오차 초과는 미확인이다. 부재 조회는 시작·종료·완전성·독립 범위와 별도 경보 수신점 근거를 요구한다.
+- 최초 프로파일은 필수 누락 모두에 경보가 필요한 경우다. 적용/독립 근거를 자동 인증하지 않는다. 확정 누락 자체는 관측 미충족이며 OBS11 FAIL은 이를 정상/종속PASS 처리한 직접 근거 또는 필요한 경보의 확정 부재에 한정한다. 근거 부족/모순은 필요한 전제별 UNKNOWN, 독립 확인FAIL·신고FAIL·UNKNOWN 비승격·INV11을 유지한다.
+- 신규 상한은security만이다. 기능/성능 신고PASS는UNKNOWN, 신고FAIL은 유지하며 기존CPU 등의 상위 제약은 그대로다. clock_uncertain은 근거로 확인된 경계 겹침을 대상이 UNKNOWN 처리했는지의 범위만 평가한다. 단순 시각 누락은 이 case의 성공이 아니다. 실제 다른RES를 수정/조회/집계 제외하지 않는다.
+- REPORT는 AUDIT_COLLECTION: 이유를 기존 limitations에 전달한다. 해시/항목/case·미확인/한계만 표시하고 원본 locator/basis·경로를 노출하지 않는다. DECLARED·미인증 자기 신고·DRAFT/official 계약을 유지한다. 정책 선언 없는 과거 정의에 신규 요구를 소급하지 않는다.
+- PACK-BASELINE13/DRAFT·OBS11 정의2·10점검20경로·자동 연결5. 자세한 필드/제약은 docs/POLICY_M7.md다. 실제 엔진/collector·두 이미지·운영 체계 실증은 별도다.

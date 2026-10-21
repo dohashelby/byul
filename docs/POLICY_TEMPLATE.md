@@ -1,4 +1,4 @@
-# 정책 입력 양식 M1/M2와 M4 수동 증거
+# 정책 입력 양식과 수동 증거
 
 `guard policy template`은 팩에 선언된 `policy_params`를 읽어 빈 기업 정책 YAML을 만든다.
 환경·PLAN·Store·Docker·`guard.toml` 없이 사용할 수 있다. 시험 실행이나 기업 정책 승인은 아니다.
@@ -14,9 +14,9 @@ uv run guard policy template --pack packs/PACK-BASELINE --out my-policy.yaml
 
 ## 빈 값과 실제 입력
 
-현재 M5 팩은 9개 점검·15개 선언을 갖는다(M1 5개·11개, M2/M4 7개·13개). 생성기는 이 이름이나 개수에 한정되지 않으며,
+현재 M7 팩은 10개 점검·20개 선언을 갖는다(M1 5개·11개, M2/M4 7개·13개, M5/M6 9개·15개). 생성기는 이 이름이나 개수에 한정되지 않으며,
 다른 팩의 활성 점검 선언도 읽는다. retired 점검과 선언 없는 점검은 값 안내에 넣지 않는다.
-기본 `scope.include`와 `scope.exclude`는 모두 빈 목록이므로 양식에 표시한 9개로 점검 범위를 축소하지 않는다.
+기본 `scope.include`와 `scope.exclude`는 모두 빈 목록이므로 양식에 표시한 10개로 점검 범위를 축소하지 않는다.
 
 양식은 각 점검을 `REQ-01: {}`처럼 비워 두고 파라미터 이름·타입·필수 여부·설명·결정 역할·
 소비 범위·검증 한계를 주석으로 안내한다. 실제 파라미터 키와 기업 값은 생성하지 않는다.
@@ -41,7 +41,7 @@ REQ-09는 여전히 양의 `max_input_tokens`, 한도+1 요청까지 포함하�
 
 ## 설명의 출처와 일치 조건
 
-[정책 카탈로그](policy_catalog.md)의 분류 a 14개 결정(15개 선언 경로)에서 설명·일반적인 원문 역할·
+[정책 카탈로그](policy_catalog.md)의 분류 a 19개 결정(20개 선언 경로)에서 설명·일반적인 원문 역할·
 소비 경로·검증 기록만 추려 패키지 내부 `collectors/policy_template_metadata.json`에 보존했다.
 생성기는 저장소의 `docs/`·`reference/`를 런타임 필수 경로로 읽지 않는다.
 공통 모델·팩에 설명 필드를 추가하지 않았다.
@@ -160,3 +160,9 @@ values.SUP-01.approval_record_system과 values.SUP-02.approval_record_system은 
 수동 증거 /1 입력과 /2 생성은 그대로다. 승인 체계는 항목 목록/case가 아니며 policy_evidence를 만들지 않는다. manual-entry 0.3.0, policy-evidence/1은 유지한다. declared만 0.4.0이다.
 
 M4의 “같은 사건의 모순”은 M5에서 판정 근거별로 구분한다. LIF-07 추론 결과 충돌은 독립적으로 확인된 준비 전 수락 FAIL을 지우지 않는다. 수락/차단 모순은 해당 위반 확정을 보류하고, 순서 미확인은 FAIL을 만들지 않는다. 모순이 있는 사건의 PASS 보류와 별개 사건의 FAIL 보존은 유지한다. 변경 원인·OBS-11 선행 결정은 [M5 계획](POLICY_M5_PLAN.md)을 따른다.
+
+## M7 OBS-11 정책·수동 /3
+
+OBS-11은 required_records:list[str]와 사건별 collection_deadline_ms/max_clock_uncertainty_ms/detection_deadline_ms/alert_deadline_ms:dict[str,int] 네 map을 선언한다. 의미·숫자 범위·case별 관측·조회 창·경보 조건은 [M7 계약](POLICY_M7.md)을 따른다. 실제 기업 숫자나 예외를 기본값으로 채우지 않으며 양식은 OBS-11:{}다. 신규 map 타입은 문자열 키·정수 값만 허용하고 bool은 정수가 아니다. 부분/빈 정책의 의미 부족은 전용 판정에서 UNKNOWN으로 남긴다.
+
+새 수동 양식은 /3, manual-entry0.4.0, declared0.5.0이다. /2는 정확 POL/팩 Ref와 기존 SUP/LIF policy_evidence를 계속 검증하며 /1·/2의 audit_evidence는 거부한다. 기존 M4/M5 절은 당시 도입 계약이며 /3의 OBS 확장은 M7 계약을 따른다. 새 OBS 관측은 guard-audit-evidence/1로 별도 보존하며 기존 guard-policy-evidence/1은 유지한다. 현재 팩13/DRAFT이며 OBS-11은 수동 점검이다. 자동 실행기 연결5개·official 계산·기존 축/실측 범위는 확대하지 않는다.

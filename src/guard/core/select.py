@@ -25,7 +25,7 @@ from guard.models.objects import Change, ConditionEval, FactValue, PlanInputs, P
 ENV_COUNT = {Mode.audit: 1, Mode.update: 2}
 
 # 정책 값 타입: 지금 팩이 쓰는 것만. 범용 정책 언어는 만들지 않는다(DECISIONS Step 1-C)
-SUPPORTED_POLICY_TYPES = ("str", "int", "bool", "list[str]")
+SUPPORTED_POLICY_TYPES = ("str", "int", "bool", "list[str]", "dict[str,int]")
 
 
 class PolicyValueError(ValueError):
@@ -40,6 +40,7 @@ def check_policy_value(check_id: str, key: str, type_: str, value: Any) -> None:
         "int": lambda v: isinstance(v, int) and not isinstance(v, bool),
         "bool": lambda v: isinstance(v, bool),
         "list[str]": lambda v: isinstance(v, list) and all(isinstance(x, str) for x in v),
+        "dict[str,int]": lambda v: isinstance(v, dict) and all(isinstance(k, str) and type(x) is int for k, x in v.items()),
     }[type_](value)
     if not ok:
         got = "null" if value is None else f"{type(value).__name__} {value!r}"

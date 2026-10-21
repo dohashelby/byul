@@ -3,9 +3,10 @@
 사람의 판정은 신고된 관측이다. 이 판정기는 신고된 PASS를 다음이 없으면 UNKNOWN으로 내린다:
 - 첨부 증거 파일 1개 이상(EVD.artifacts)
 - CheckDef.required_observations_prose의 각 항목에 대한 관측 설명(declared_observation_notes)
-- CheckDef.policy_params에 선언된 필수 정책 키 (값의 충족 여부를 자동 판정하지 않음)
+- CheckDef.policy_params에 선언된 필수 정책 키
+- SUP-14/LIF-07의 선언된 필수 항목별 신고 관측·첨부 연결 및 제한적 충족 조건
 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집, INV-11)은 판정 코어가 따로 적용한다.
-신고된 FAIL은 그대로 둔다(INV-04).
+신고된 FAIL은 그대로 둔다(INV-04). 항목별 관측은 DECLARED이며 실측·신원 인증이 아니다.
 """
 
 from __future__ import annotations
@@ -13,13 +14,14 @@ from __future__ import annotations
 from guard.models import CheckDef, Evidence, Verdict
 
 from .base import AXES, JudgeOutput
+from .policy_items import evaluate
 
 ALLOWED = {"PASS", "FAIL", "UNKNOWN"}
 
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.2.0"
+    version = "0.3.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         obs = evidence.observations.get("declared_verdicts")
@@ -30,12 +32,16 @@ class DeclaredJudge:
         who = f"{op.by} at {op.at.isoformat()}" if op else "unknown operator"
         notes = evidence.observations.get("declared_observation_notes")
         answers = notes.value if notes is not None and notes.collected and isinstance(notes.value, dict) else {}
-        unanswered = [item for item in check.required_observations_prose if not (answers.get(item) or "").strip()]
+        unanswered = [item for item in check.required_observations_prose
+                      if not isinstance(answers.get(item), str) or not answers[item].strip()]
         missing_policy = [p.key for p in check.policy_params if p.required and p.key not in policy_values]
         verdicts, reasons = {}, [f"declared by {who} (self-reported, not authenticated)"]
+        item_result = evaluate(check, evidence, policy_values)
+        if item_result:
+            reasons.extend(item_result[1])
         for axis in AXES:
             v = obs.value.get(axis) or "UNKNOWN"
-            if v not in ALLOWED:
+            if not isinstance(v, str) or v not in ALLOWED:
                 reasons.append(f"{axis}: declared value {v!r} is not a verdict; treated as UNKNOWN")
                 v = "UNKNOWN"
             if v == "PASS" and missing_policy:
@@ -47,6 +53,13 @@ class DeclaredJudge:
             if v == "PASS" and unanswered:
                 reasons.append(f"{axis}: declared PASS withheld: observation notes missing for {unanswered}")
                 v = "UNKNOWN"
+            if item_result and v != "FAIL":
+                ceiling = item_result[0][axis]
+                if ceiling == "FAIL":
+                    v = "FAIL"
+                elif v == "PASS" and ceiling != "PASS":
+                    v = "UNKNOWN"
             verdicts[axis] = Verdict(v)
             reasons.append(f"{axis}: declared {obs.value.get(axis) or 'UNKNOWN'} → {v}")
-        return JudgeOutput(verdicts=verdicts, reasons=reasons)
+        return JudgeOutput(verdicts=verdicts, reasons=reasons,
+                           missing_observations=item_result[2] if item_result else [])

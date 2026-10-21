@@ -132,11 +132,15 @@ def test_cli_real_attachment_policy_to_manual_judgment(tmp_path, monkeypatch, mo
     store = Store(tmp_path / ".guard")
     results = list(store.iter_kind("RES"))
     for res in results:
-        expected = declared if declared == "FAIL" or res.check_id not in PARAMS or res.check_id in supplied else "UNKNOWN"
+        # M4 requires linked item evidence, not only the M2 policy key. This
+        # fixture intentionally leaves all new observation cells blank.
+        expected = declared if declared == "FAIL" or res.check_id not in PARAMS else "UNKNOWN"
         assert res.verdicts.security == expected
-        assert res.judge.version == "0.2.0"
-        if expected == "UNKNOWN":
+        assert res.judge.version == "0.3.0"
+        if expected == "UNKNOWN" and res.check_id not in supplied:
             assert any("NO_POLICY_VALUE" in reason and PARAMS[res.check_id] in reason for reason in res.reasons)
+        elif expected == "UNKNOWN":
+            assert any("POLICY_ITEMS:" in reason for reason in res.reasons)
     original = {obj.ref().sha256: obj.to_dict() for obj in [*store.iter_kind("EVD"), *results]}
     _ok(args)  # 동일 입력/판정 시각 재판정은 멱등이며 과거 객체를 덮지 않는다.
     assert {o.ref().sha256: o.to_dict() for o in [*store.iter_kind("EVD"), *store.iter_kind("RES")]} == original

@@ -168,6 +168,9 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
             side_results = {s: results.get((check.id, s)) for s in sides}
             for s, res in side_results.items():
                 row[s.value] = _side(res)
+                if res and res.judge.name == "declared":
+                    limitations.extend(f"{check.id}/{s.value}: {reason}" for reason in res.reasons
+                                       if reason.startswith("POLICY_ITEMS:"))
             if plan.mode == Mode.update:
                 b, c = evds.get((check.id, Side.baseline)), evds.get((check.id, Side.candidate))
                 rb, rc = row["baseline"], row["candidate"]

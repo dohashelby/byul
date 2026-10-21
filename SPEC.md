@@ -334,6 +334,10 @@ comparability:                                 # update 모드 비교 조건 (IN
 - 신고된 PASS는 첨부 증거가 1개 이상이고 필수 관측 문장마다 설명이 있어야 하며, 코어 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집)도 통과해야 한다. 아니면 UNKNOWN. 신고된 FAIL은 유지(INV-04).
 - 선정되지 않은 점검은 거부(INV-10). 자동 실행기가 있는 점검은 `override_reason`이 있을 때만 받고 `execution.override_reason`에 남긴다. 양식 검증은 전부 먼저, 하나라도 틀리면 아무것도 쓰지 않는다.
 - **증거 대체 규칙:** 같은 PLAN·점검·side의 EVD는 하나의 id에 revision으로 쌓이고, **판정에는 최신 revision을 쓴다**(이전 revision은 남는다, INV-16). 수동 증거는 새 revision으로 들어간다. `guard run`은 최신 revision이 사람이 입력한 증거면 덮지 않는다(`--replace-manual`일 때만 대체). 최신 증거가 출처가 다른(자동↔수동) 이전 COMPLETED revision을 대체했으면 보고서 행에 `replaced`("대체됨", 이전 revision·사유)를 표시한다. 말 없이 덮어쓰지 않는다.
+- **M4 수동 양식 v2:** 새 생성 양식은 `guard-manual-evidence/2`이고 PLAN의 POL/팩 전체 Ref를 추가 대조한다. `/1` 입력도 읽지만 신규 `policy_evidence`를 `/1`에 숨겨 전달하지 않는다. manual-entry·declared는 0.3.0이며 과거 객체의 버전/해시는 바꾸지 않는다.
+- SUP-14.required_checks / LIF-07.required_readiness_items가 required list[str]로 선언된 정의에만 항목·case·첨부 연결을 적용한다. `declared_policy_evidence`는 기존 EVD.observations 안의 예약 수동 관측이며 계약 버전 `guard-policy-evidence/1`·parameter·정규화 records를 보존한다. 기존 객체/DB 종류는 늘리지 않는다. 정확한 항목 ID·trial·대상 범위와 현재 entry의 첨부 sha256·locator·근거를 연결하며, 원본 파일 내용을 자동 해석하거나 자기 신고를 인증하지 않는다.
+- 정책 키/빈·모호한 집합/관측 부족은 새 PASS를 UNKNOWN으로 보류한다. UNKNOWN을 PASS로 올리지 않고 신고 FAIL·독립적으로 확인된 위반은 유지한다. SUP-14는 원검사 결과와 승인/배포 전이를 구별하며 security만 검증한다. LIF-07은 접수 시점의 준비 상태와 순서 근거·공통 ready trial/정상 추론을 대조해 security/functional을 구분한다. 두 계약은 performance를 검증하지 않는다. 기존 CPU/타 점검의 계약은 그대로다.
+- 부분·미확인 관측은 저장 가능하나 Ref/side/미등록 항목/중복/타입 오류는 배치 전체를 거부한다. 정책 선언이 있는 대상의 과거 `/1` 증거는 새 판정에서 해당 PASS가 UNKNOWN일 수 있으며 새 RES revision/이유로 남긴다. 선언 없는 과거 팩·비대상 점검에는 요구를 소급하지 않는다. 항목별 이유는 선택된 RES의 `POLICY_ITEMS:` 이유만 기존 Report.limitations로 전달한다. 상세 입력 계약과 미결 기업 결정은 [정책 문서](docs/POLICY_TEMPLATE.md)를 따른다.
 
 ### 4.6 RES — Result (점검 판정)
 

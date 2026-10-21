@@ -572,3 +572,12 @@ git status
 - PR CI: https://github.com/dohashelby/gua/actions/runs/39556527667 / push CI: https://github.com/dohashelby/gua/actions/runs/39556505899 .
 - 초안 PR: https://github.com/dohashelby/gua/pull/4 . base codex/gua-policy-template-m1 / head codex/gua-policy-m2, 선행 PR #3 의존. merge-base 1dc82f0이며 실제 원격 변경20파일이 로컬 diff와 일치했다. 선행 보완9602102와 정책/설명/통합회귀b510b6b를 구분했다. 자동 병합하지 않았다.
 - 후속 기록 커밋은 이 결과만 추가한다. 제품 코드·팩·정책·기존 증거는 추가 변경하지 않으며 실제 엔진·두 이미지 실증은 미수행이다.
+
+## 2026-10-21 — 정책 M3 설계 검토
+
+- 시작: codex/gua-policy-m2 / 572cef91ff1bf48ffa945f4a0a5fee046e4e0b0e. fetch 후 원격 동일·로컬 변경 없음. 공식 GitHub API에서 PR #2/3/4 open/draft·미병합과 새 M3 PR 부재를 확인하고 codex/gua-policy-m3-design으로 분기했다.
+- 산출물: [정책 M3 계획](docs/POLICY_M3_PLAN.md). M2 사실/한계, 실제 함수별 정책→증거→판정/보고 흐름, SUP-14/LIF-07 계약 제안, 미결 결정표, b10 비교/후보2, 설계 시나리오26개와 복사용 M4 구현 프롬프트를 작성했다. POLICY_TEMPLATE에 연결하고 DECISIONS에 제안/미결 상태를 기록했다.
+- M2 확인: 필수 정책 누락 수동 PASS 보류·FAIL 유지, resolve 후 입력 팩 내부 출력 사전 차단, required list[str] 두 개, 팩11/DRAFT·77점검·7점검/13파라미터·자동 연결5. 설명 생성 함수의 메모리 결과와 번들 JSON, 카탈로그303/연결595·a13/b10/c165/d115를 대조했다. 새 M2 회귀 결함은 확인하지 못했으며 목록 내용의 충족 판정/상세 보고는 다음 계약 과제로 구분한다.
+- 기존 결과 재확인: 최종 M2 SHA의 PR run39556751205 completed/success·562 passed/18 deselected/36.58초, push run39556743272 completed/success·562 passed/18 deselected/35.04초, 양쪽 frozen 설치·wheel 성공을 공식 API/실제 작업 로그에서 읽었다. M2 Windows 557/5skip/18제외와 설치본19명령·M1→M2 EXAMPLE 재판정은 과거 기록이며 이번에 재실행하지 않았다.
+- 범위: 이번은 문서만 작성하며 로컬 pytest/새 시험 코드/제품 구현/팩 재생성/실제 엔진/두 이미지/유료 자원/운영 요청은 수행하지 않는다. 제안한 /2·0.3.0·항목별 계약과 M4 프롬프트는 아직 미실행이다. 실제 기업 값·빈 목록 의미·책임/예외/시간 기준은 미결이다.
+- 보존/검증: 시작 추적 파일340개의 해시·원격 상태·집계/CI 로그를 ignored out/test-runs/policy-m3-design-20261021에 분리했다. 문서 작성 완료 후 `.venv/Scripts/python.exe -X utf8 -B out/test-runs/policy-m3-design-20261021/verify_docs.py` → PASS. 새 계획과 관련 절의 상대 링크34회, 실제 함수·결정ID·b후보10개·시나리오26개·변경 파일/해시·`git diff --check`를 확인했다. 기존 문서3개 수정+새 문서1개뿐이며 나머지 추적 파일337개 바이트 해시가 같다. 제품/팩/카탈로그/참고 원문 변경 0, 새 로컬 pytest 실행 0이다. 외부 링크는 원격 PR/CI API와 확인한 실제 코드 커밋에 근거하며 모든 외부 웹 페이지의 본문 검증을 주장하지 않는다.

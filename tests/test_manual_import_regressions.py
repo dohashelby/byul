@@ -1,6 +1,7 @@
 """Manual import rejects ambiguous input before writes and commits EVD batches atomically."""
 from copy import deepcopy
 from pathlib import Path
+import re
 
 import pytest
 from typer.testing import CliRunner
@@ -159,4 +160,7 @@ def test_cli_has_all_evidence_commands_and_replace_flag():
     result = runner.invoke(app, ["evidence", "--help"])
     assert result.exit_code == 0
     for command in ("template", "import", "export", "restore"): assert command in result.output
-    assert "--replace-manual" in runner.invoke(app, ["run", "--help"]).output
+    help_result = runner.invoke(app, ["run", "--help"], color=True, env={"FORCE_COLOR":"1"})
+    assert help_result.exit_code == 0
+    plain_help = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", help_result.output)
+    assert "--replace-manual" in plain_help

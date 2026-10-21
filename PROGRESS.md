@@ -479,3 +479,10 @@ git status
 - 팩 revision 10/DRAFT, 연결 정의 5개를 보존한다. REQ-09 코드는 기본 real 설정에서 비활성으로 유지하며 main의 자동화 보류/실증 미완료를 유지한다. 새 정책 확대나 기업 값 확정은 이번 범위가 아니다.
 - CI는 codex/** push와 PR에서 실행한다. 이 기록은 push 전 로컬 결과이며 원격 결과는 이후 기록/Actions에서 별도 확인한다.
 - 산출물: docs/INTEGRATION.md, 수동 입력/배치/호환성 회귀와 fixture. 원본 증거와 테스트 출력은 Git에 새로 포함하지 않는다. 다음: Linux CI 및 실제 엔진 검증 환경/정책 확정.
+
+
+### 통합 첫 Linux CI 및 도움말 검사 보정
+- cfd7dbe의 첫 Linux CI: 518 passed, 1 failed, 18 deselected / 24.72초. 실패는 --help의 옵션명 중간 ANSI 색상 코드 때문에 생긴 테스트 출력 가정이다. 기능 실행·입력·배치·호환성 검사는 통과했다.
+- https://github.com/dohashelby/gua/actions/runs/39544304934
+- 도움말 검사는 색상을 강제로 켠 출력에서 ANSI만 제거하고 동일 옵션명을 검사하도록 보정했다. 실제 --replace-manual 실행 계약은 유지한다.
+- 수정 후 집중 검증: 20 passed / 4.37초. 제품 소스는 바꾸지 않았다. 이후 원격 전체 검증 결과를 별도로 확인한다.

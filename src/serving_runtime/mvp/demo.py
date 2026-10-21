@@ -23,6 +23,7 @@ class DemoCase:
     expected_evidence_state: str | None = None
     expected_rule_id: str | None = None
     expected_max_tokens: int | None = None
+    expected_done: bool = False
 
     @property
     def expected_text(self) -> str:
@@ -33,6 +34,8 @@ class DemoCase:
             parts.append(f"규칙 {self.expected_rule_id}")
         if self.expected_max_tokens is not None:
             parts.append(f"max_tokens {self.expected_max_tokens}")
+        if self.expected_done:
+            parts.append("SSE [DONE]")
         return ", ".join(parts)
 
 
@@ -49,6 +52,7 @@ class DemoResult:
     evidence_state: str | None
     rule_id: str | None
     max_tokens: int | None
+    saw_done: bool | None = None
 
 
 class DemoConnectionError(ConnectionError):
@@ -87,11 +91,13 @@ def demo_cases() -> list[DemoCase]:
         DemoCase("MVP-05c", "max_tokens -1 거부", 400, "INVALID", _json_body(max_tokens=-1)),
         DemoCase("MVP-05d", "max_tokens 문자열 거부", 400, "INVALID", _json_body(max_tokens="64")),
         DemoCase("MVP-05e", "max_tokens bool 거부", 400, "INVALID", _json_body(max_tokens=True)),
-        DemoCase("MVP-06a", "stream:true 거부", 400, "INVALID", _json_body(stream=True)),
+        DemoCase("MVP-06a", "stream 타입 오류", 400, "INVALID", _json_body(stream="true")),
         DemoCase("MVP-06b", "미지원 필드 거부", 400, "INVALID", _json_body(unsupported="x")),
         DemoCase("MVP-06c", "70,000바이트 본문 거부", 413, "INVALID", b"x" * 70000),
         DemoCase("MVP-06d", "text/plain 거부", 415, "INVALID", _json_body(),
                  content_type="text/plain"),
+        DemoCase("S1-DEMO", "stream 정상 완료", 200, "ALLOWED", _json_body(stream=True),
+                 expected_done=True),
     ]
 
 
@@ -100,6 +106,7 @@ def evaluate_case(
     actual_http: int,
     request_id: str | None,
     detail: dict[str, Any] | None,
+    saw_done: bool | None = None,
 ) -> DemoResult:
     """Judge one case without performing socket I/O."""
 
@@ -140,6 +147,8 @@ def evaluate_case(
         failures.append(
             f"max_tokens {case.expected_max_tokens} 기대, 실제 {max_tokens!r}"
         )
+    if case.expected_done and saw_done is not True:
+        failures.append("SSE [DONE] 종료 표식 없음")
     return DemoResult(
         case.case_id,
         case.description,
@@ -152,6 +161,7 @@ def evaluate_case(
         evidence_state,
         rule_id,
         max_tokens if isinstance(max_tokens, int) and not isinstance(max_tokens, bool) else None,
+        saw_done,
     )
 
 
@@ -163,7 +173,9 @@ def _read_json(response: Any) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _post_case(gateway: str, case: DemoCase, timeout: float) -> tuple[int, str | None]:
+def _post_case(
+    gateway: str, case: DemoCase, timeout: float
+) -> tuple[int, str | None, bool | None]:
     try:
         request = Request(
             f"{gateway}/v1/chat/completions",
@@ -172,12 +184,16 @@ def _post_case(gateway: str, case: DemoCase, timeout: float) -> tuple[int, str |
             method="POST",
         )
         with urlopen(request, timeout=timeout) as response:
-            response.read()
-            return response.status, response.headers.get("X-Request-ID")
+            body = response.read()
+            return (
+                response.status,
+                response.headers.get("X-Request-ID"),
+                b"data: [DONE]\n\n" in body if case.expected_done else None,
+            )
     except HTTPError as error:
         with error:
             error.read()
-            return error.code, error.headers.get("X-Request-ID")
+            return error.code, error.headers.get("X-Request-ID"), None
     except (URLError, TimeoutError, OSError, ValueError) as error:
         raise DemoConnectionError(str(error)) from error
 
@@ -200,9 +216,9 @@ def run_demo_cases(gateway: str, *, timeout: float = 5.0) -> list[DemoResult]:
     base = gateway.rstrip("/")
     results: list[DemoResult] = []
     for case in demo_cases():
-        status, request_id = _post_case(base, case, timeout)
+        status, request_id, saw_done = _post_case(base, case, timeout)
         detail = _get_detail(base, request_id, timeout) if request_id else None
-        results.append(evaluate_case(case, status, request_id, detail))
+        results.append(evaluate_case(case, status, request_id, detail, saw_done))
     return results
 
 

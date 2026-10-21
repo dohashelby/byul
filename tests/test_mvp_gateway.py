@@ -161,7 +161,7 @@ class GatewayRelayTests(unittest.TestCase):
         self.assertNotIn(request_id, [receipt["request_id"] for receipt in self.engine.receipts])
 
     def test_mvp_06_unsupported_inputs_are_not_relayed(self) -> None:
-        stream_status, stream_headers, stream_body = self.post(request_body(stream=True))
+        stream_status, stream_headers, stream_body = self.post(request_body(stream="true"))
         large_status, large_headers, large_body = self.raw_post(
             {"Content-Type": "application/json", "Content-Length": "65537"}
         )
@@ -170,7 +170,7 @@ class GatewayRelayTests(unittest.TestCase):
         )
 
         self.assertEqual(stream_status, 400)
-        self.assertEqual(json.loads(stream_body)["error"]["code"], "STREAM_UNSUPPORTED")
+        self.assertEqual(json.loads(stream_body)["error"]["code"], "INVALID_STREAM")
         self.assertEqual(large_status, 413)
         self.assertEqual(json.loads(large_body)["error"]["code"], "BODY_TOO_LARGE")
         self.assertEqual(large_headers.get("Connection"), "close")

@@ -102,6 +102,14 @@ class MVPCommandTests(unittest.TestCase):
                 "--engine-port", "18088",
                 "--data-dir", "/tmp/runtime-state",
                 "--relay-timeout", "0.25",
+                "--stream-idle-timeout", "1.5",
+                "--request-deadline", "9",
+                "--max-concurrency", "4",
+                "--revocations", "revocations.json",
+                "--baseline", "baseline.json",
+                "--manifest", "manifest.json",
+                "--collector-interval", "0.5",
+                "--collector-stale-after", "2",
             ])
         self.assertEqual(result, 0)
         config = run.call_args.args[0]
@@ -110,6 +118,26 @@ class MVPCommandTests(unittest.TestCase):
         self.assertEqual(config.engine_port, 18088)
         self.assertEqual(config.data_dir, "/tmp/runtime-state")
         self.assertEqual(config.relay_timeout_s, 0.25)
+        self.assertEqual(config.stream_idle_timeout_s, 1.5)
+        self.assertEqual(config.request_deadline_s, 9)
+        self.assertEqual(config.max_concurrent_requests, 4)
+        self.assertEqual(config.revocations_path, "revocations.json")
+        self.assertEqual(config.baseline_path, "baseline.json")
+        self.assertEqual(config.manifest_path, "manifest.json")
+        self.assertEqual(config.collector_interval_s, 0.5)
+        self.assertEqual(config.collector_stale_after_s, 2)
+
+    def test_timeout_and_concurrency_config_values_are_validated(self) -> None:
+        for options in (
+            {"stream_idle_timeout_s": 0},
+            {"request_deadline_s": 0},
+            {"max_concurrent_requests": 0},
+            {"max_concurrent_requests": True},
+            {"collector_interval_s": 0},
+            {"collector_stale_after_s": 0},
+        ):
+            with self.subTest(options=options), self.assertRaises(ValueError):
+                MVPConfig(**options)
 
 
 if __name__ == "__main__":

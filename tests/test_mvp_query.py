@@ -59,6 +59,14 @@ class QueryServiceTests(unittest.TestCase):
         self.assertEqual(summary["incomplete"], 1)
         self.assertEqual(summary["total"], 3)
 
+    def test_older_records_expose_new_stream_fields_as_none(self) -> None:
+        self.gateway.append(record("4" * 32, "final", "ALLOWED", attempted=True))
+        view = self.service.requests()[0]
+        self.assertIsNone(view["stream"])
+        self.assertIsNone(view["http_start_status"])
+        self.assertIsNone(view["final_outcome"])
+        self.assertIsNone(view["backend_cancel"])
+
     def test_filter_limit_and_invalid_filter(self) -> None:
         for index in range(3):
             self.gateway.append(record(f"{index}" * 32, "final", "DENIED", at=f"2026-10-21T00:00:0{index}+00:00"))
@@ -112,6 +120,11 @@ class DashboardAssetTests(unittest.TestCase):
         script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
         for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "eval(", "document.write"):
             self.assertNotIn(forbidden, script)
+
+    def test_engine_card_reads_both_backend_modes(self) -> None:
+        # The external vLLM mode has no `mock_engine` key in /api/status.
+        script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        self.assertIn("status.mock_engine || status.backend", script)
 
     def test_dashboard_has_no_mutating_controls(self) -> None:
         page = (STATIC_DIR / "index.html").read_text(encoding="utf-8")

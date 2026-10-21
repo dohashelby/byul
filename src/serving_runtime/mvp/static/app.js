@@ -72,6 +72,11 @@ async function getJson(url) {
 
 function renderStatus(status) {
   $("session-id").textContent = `관측 세션 ${status.observation_session_id.slice(0, 8)}`;
+  const external = status.backend_kind === "vllm";
+  const backendBadge = $("backend-badge");
+  backendBadge.textContent = external ? "외부 vLLM backend · 실제 연결 검증 전" : "모의 엔진";
+  backendBadge.className = external ? "badge badge-external" : "badge badge-mock";
+  $("engine-title").textContent = external ? "외부 backend" : "모의 엔진";
 
   const policy = status.policy;
   setDot("policy-dot", policy.valid);
@@ -88,15 +93,22 @@ function renderStatus(status) {
   }
   fillKv("policy-kv", policyRows);
 
-  const engine = status.mock_engine;
+  // The mock mode reports `mock_engine`; the external vLLM mode reports `backend`.
+  const engine = status.mock_engine || status.backend || {};
+  const concurrency = status.concurrency || {};
   const receipts = engine.receipts_store || {};
   setDot("engine-dot", engine.healthy);
   const engineRows = [
     ["주소", engine.url, { mono: true }],
     ["연결", engine.healthy ? "정상" : "응답 없음", { problem: !engine.healthy }],
     ["점검", formatTime(engine.checked_at)],
+    ["동시 요청", `${concurrency.in_flight ?? "–"} / ${concurrency.limit ?? "–"}`],
     ["수신 기록", receipts.ok === false ? `저장 오류: ${receipts.last_error}` : receipts.state || "–", { problem: receipts.ok === false }],
   ];
+  if (external) {
+    engineRows.push(["자격정보", engine.credential || "–", { problem: engine.credential !== "configured" }]);
+    engineRows.push(["추론 검증", engine.inference_verified ? "확인됨" : "미확인 (health는 연결 가능 여부만 뜻함)"]);
+  }
   if (engine.error) engineRows.push(["오류", engine.error, { problem: true }]);
   engineRows.push(["의미", "연결 점검이며 추론·관측 동작 검증이 아님"]);
   fillKv("engine-kv", engineRows);
@@ -132,6 +144,80 @@ function renderSummary(summary) {
   fillKv("store-kv", rows);
 }
 
+function stateCell(value) {
+  return el("span", { className: `badge state-${value}`, text: value });
+}
+
+function renderPolicyState(policy) {
+  const badges = $("policy-state-badges");
+  clear(badges);
+  const badgeRows = [
+    ["읽기", policy.loaded, policy.loaded ? "성공" : "실패"],
+    ["Gateway 활성", policy.gateway_active, policy.gateway_active ? "활성" : "비활성"],
+    ["외부 집행", false, "미연결"],
+  ];
+  for (const [label, ok, value] of badgeRows) {
+    badges.appendChild(el("span", { className: `badge badge-state ${ok ? "ok" : "bad"}`, text: `${label}: ${value}` }));
+  }
+  const validity = $("validity-rows");
+  clear(validity);
+  const labels = { period: "기간", revocation: "철회", approval_ref: "승인 근거" };
+  const results = { not_configured: "미설정", not_validated: "검증 안 함" };
+  for (const item of policy.validity || []) {
+    validity.appendChild(el("tr", {}, [
+      el("td", { text: labels[item.item] || item.item }),
+      el("td", { text: item.state }),
+      el("td", { text: results[item.result] || item.result }),
+    ]));
+  }
+  const history = $("history-rows");
+  clear(history);
+  for (const item of policy.history || []) {
+    history.appendChild(el("tr", { className: item.same_version_content_changed ? "changed" : "" }, [
+      el("td", { text: formatTime(item.at) }),
+      el("td", { text: item.event }),
+      el("td", { text: item.policy_id ?? "–" }),
+      el("td", { text: item.policy_version ?? "–" }),
+      el("td", { className: "mono", text: item.sha256 ? `${item.sha256.slice(0, 12)}…` : "–", title: item.sha256 }),
+      el("td", { text: item.previous?.policy_version ?? "–" }),
+      el("td", { text: item.same_version_content_changed ? "같은 판본 내용 변경" : "–" }),
+    ]));
+  }
+  const store = policy.history_storage || {};
+  $("history-store-state").textContent = store.ok ? "저장 정상" : `저장 오류: ${store.last_error || "확인 불가"}`;
+}
+
+function renderBaseline(baseline) {
+  $("model-id-limit").textContent = baseline.model_id_limit;
+  const body = $("baseline-rows");
+  clear(body);
+  for (const item of baseline.rows || []) {
+    body.appendChild(el("tr", {}, [
+      el("td", { className: "mono", text: item.field }),
+      el("td", { text: item.expected }),
+      el("td", { text: item.observed ?? "–" }),
+      el("td", { text: item.source }),
+      el("td", { text: formatTime(item.observed_at) }),
+      el("td", {}, [stateCell(item.state)]),
+    ]));
+  }
+}
+
+function renderCollectors(payload) {
+  const body = $("collector-rows");
+  clear(body);
+  for (const item of payload.collectors || []) {
+    const origin = item.data_origin === "mock" ? "모의" : item.data_origin ?? "–";
+    body.appendChild(el("tr", {}, [
+      el("td", { className: "mono", text: item.source }),
+      el("td", {}, [stateCell(item.state)]),
+      el("td", { text: formatTime(item.last_success_at) }),
+      el("td", { text: item.last_error ?? "–" }),
+      el("td", {}, [el("span", { className: item.data_origin === "mock" ? "badge badge-mock" : "", text: origin })]),
+    ]));
+  }
+}
+
 function renderRequests(items) {
   const body = $("request-rows");
   clear(body);
@@ -151,6 +237,9 @@ function renderRequests(items) {
       el("td", {}, [badge(item.result)]),
       el("td", { className: "mono muted", text: item.reason_code ?? "–" }),
     ]);
+    if (item.stream) {
+      row.children[2].appendChild(el("span", { className: "badge badge-previous", text: "stream" }));
+    }
     if (item.request_id === state.selectedId) row.classList.add("is-selected");
     row.addEventListener("click", () => openDetail(item.request_id));
     body.appendChild(row);
@@ -199,6 +288,9 @@ function renderDetail(detail) {
       kvList([
         ["결과", RESULT_LABELS[final.result] || final.result],
         ["HTTP", decision.http_status],
+        ["HTTP 시작 상태", final.http_start_status],
+        ["최종 결과", final.final_outcome, { mono: true }],
+        ["스트림", final.stream === true ? "예" : final.stream === false ? "아니요" : null],
         ["사유 코드", decision.reason_code, { mono: true }],
         ["설명", decision.message],
         ["적용 규칙", decision.rule_id, { mono: true }],
@@ -222,6 +314,12 @@ function renderDetail(detail) {
         ["기록 시점 수신 확인", delivery.backend_receipt],
         ["응답", delivery.response],
         ["오류 코드", delivery.error_code, { mono: true }],
+        [
+          "backend 취소",
+          final.backend_cancel === "mock_engine_recorded"
+            ? "모의 엔진 기록 (실제 엔진 취소 확인 아님)"
+            : final.backend_cancel,
+        ],
       ]),
     ]),
   );
@@ -230,7 +328,14 @@ function renderDetail(detail) {
   for (const record of detail.gateway_records) {
     timeline.appendChild(
       el("li", {}, [
-        el("div", { className: "phase", text: record.phase === "started" ? "전달 전 시작 기록" : "최종 기록" }),
+        el("div", {
+          className: "phase",
+          text: record.phase === "started"
+            ? "전달 전 시작 기록"
+            : record.phase === "response_started"
+              ? "HTTP 200 응답 시작"
+              : "최종 기록",
+        }),
         el("div", { className: "muted", text: formatTime(record.recorded_at) }),
       ]),
     );
@@ -302,14 +407,20 @@ function setFilter(filter) {
 async function refresh() {
   const query = state.filter ? `?result=${encodeURIComponent(state.filter)}` : "";
   try {
-    const [status, summary, list] = await Promise.all([
+    const [status, summary, list, policy, baseline, collectors] = await Promise.all([
       getJson("/api/status"),
       getJson("/api/summary"),
       getJson(`/api/requests${query}`),
+      getJson("/api/policy"),
+      getJson("/api/baseline"),
+      getJson("/api/collectors"),
     ]);
     renderStatus(status);
     renderSummary(summary);
     renderRequests(list.requests);
+    renderPolicyState(policy);
+    renderBaseline(baseline);
+    renderCollectors(collectors);
     state.lastSuccess = new Date();
     document.body.classList.remove("is-stale");
     $("stale-banner").hidden = true;

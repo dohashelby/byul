@@ -18,6 +18,9 @@ class Policy:
     output_default_tokens: int
     output_max_tokens: int
     max_body_bytes: int
+    valid_from: str | None = None
+    valid_until: str | None = None
+    approval_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -35,7 +38,7 @@ class DuplicateKeyError(ValueError):
     """Raised when a JSON object contains the same member more than once."""
 
 
-_FIELDS = {
+_REQUIRED_FIELDS = {
     "schema_version",
     "policy_id",
     "policy_version",
@@ -45,6 +48,7 @@ _FIELDS = {
     "output_max_tokens",
     "max_body_bytes",
 }
+_V11_FIELDS = _REQUIRED_FIELDS | {"valid_from", "valid_until", "approval_ref"}
 
 
 def _utc_now() -> str:
@@ -70,6 +74,15 @@ def _is_nonempty_string(value: object) -> bool:
 
 def _is_positive_integer(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def parse_policy_time(value: str) -> datetime:
+    """Parse a policy timestamp, requiring an explicit UTC offset."""
+
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("timezone is required")
+    return parsed
 
 
 def _error(
@@ -108,7 +121,7 @@ def load_policy(path: str | Path) -> PolicyState:
     if not isinstance(document, dict):
         return _error(path_text, loaded_at, "INVALID_POLICY", "policy must be a JSON object", digest)
 
-    missing = sorted(_FIELDS - document.keys())
+    missing = sorted(_REQUIRED_FIELDS - document.keys())
     if missing:
         return _error(
             path_text,
@@ -117,7 +130,9 @@ def load_policy(path: str | Path) -> PolicyState:
             f"missing policy field(s): {', '.join(missing)}",
             digest,
         )
-    unknown = sorted(document.keys() - _FIELDS)
+    schema_version = document.get("schema_version")
+    allowed_fields = _V11_FIELDS if schema_version == "runtime-mvp/1.1" else _REQUIRED_FIELDS
+    unknown = sorted(document.keys() - allowed_fields)
     if unknown:
         return _error(
             path_text,
@@ -126,7 +141,7 @@ def load_policy(path: str | Path) -> PolicyState:
             f"unknown policy field(s): {', '.join(unknown)}",
             digest,
         )
-    if document["schema_version"] != "runtime-mvp/1.0":
+    if schema_version not in {"runtime-mvp/1.0", "runtime-mvp/1.1"}:
         return _error(
             path_text, loaded_at, "INVALID_POLICY", "unsupported schema_version", digest
         )
@@ -170,6 +185,39 @@ def load_policy(path: str | Path) -> PolicyState:
             digest,
         )
 
+    if schema_version == "runtime-mvp/1.1":
+        for name in ("valid_from", "valid_until"):
+            value = document.get(name)
+            if value is None:
+                continue
+            if not _is_nonempty_string(value):
+                return _error(
+                    path_text,
+                    loaded_at,
+                    "INVALID_POLICY",
+                    f"{name} must be an ISO8601 string with a timezone",
+                    digest,
+                )
+            try:
+                parse_policy_time(value)
+            except ValueError:
+                return _error(
+                    path_text,
+                    loaded_at,
+                    "INVALID_POLICY",
+                    f"{name} must be an ISO8601 string with a timezone",
+                    digest,
+                )
+        approval_ref = document.get("approval_ref")
+        if approval_ref is not None and not isinstance(approval_ref, str):
+            return _error(
+                path_text,
+                loaded_at,
+                "INVALID_POLICY",
+                "approval_ref must be a string",
+                digest,
+            )
+
     policy = Policy(
         schema_version=document["schema_version"],
         policy_id=document["policy_id"],
@@ -179,5 +227,8 @@ def load_policy(path: str | Path) -> PolicyState:
         output_default_tokens=document["output_default_tokens"],
         output_max_tokens=document["output_max_tokens"],
         max_body_bytes=document["max_body_bytes"],
+        valid_from=document.get("valid_from"),
+        valid_until=document.get("valid_until"),
+        approval_ref=document.get("approval_ref"),
     )
     return PolicyState(True, policy, path_text, digest, loaded_at, None, None)

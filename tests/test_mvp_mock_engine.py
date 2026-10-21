@@ -29,6 +29,15 @@ class MockEngineTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["status"], "ok")
         self.assertEqual(body["receipts_store"]["state"], "disabled")
+        self.assertEqual(body["data_origin"], "mock")
+
+        _, version = self.get_json("/version")
+        _, models = self.get_json("/v1/models")
+        self.assertEqual(version["engine.kind"], "mock")
+        self.assertEqual(version["data_origin"], "mock")
+        self.assertEqual(models["data"][0]["id"], "test-model")
+        self.assertEqual(models["data"][0]["max_model_len"], 2048)
+        self.assertEqual(models["data_origin"], "mock")
 
     def test_chat_response_and_receipt_found_or_missing(self) -> None:
         request = Request(

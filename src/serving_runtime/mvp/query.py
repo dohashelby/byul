@@ -88,6 +88,12 @@ class QueryService:
             "result": result,
             "reason_code": decision.get("reason_code"),
             "http_status": decision.get("http_status"),
+            "stream": source.get("stream"),
+            "http_start_status": source.get("http_start_status"),
+            "final_outcome": source.get("final_outcome"),
+            "response_started": source.get("response_started"),
+            "backend_cancel": source.get("backend_cancel"),
+            "backend_kind": source.get("backend_kind", "mock"),
             "delivery": {
                 "attempted": delivery.get("attempted"),
                 "backend_receipt": delivery.get("backend_receipt"),
@@ -100,7 +106,16 @@ class QueryService:
         self,
     ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
         records, corrupt = self._gateway_store.read_all()
-        return self._group(records), corrupt
+        normalized: list[dict[str, Any]] = []
+        for record in records:
+            item = dict(record)
+            policy = item.get("policy")
+            if isinstance(policy, dict):
+                policy = dict(policy)
+                policy.setdefault("schema_version", None)
+                item["policy"] = policy
+            normalized.append(item)
+        return self._group(normalized), corrupt
 
     def summary(self) -> dict[str, Any]:
         grouped, gateway_corrupt = self._read_gateway()
@@ -171,12 +186,21 @@ class QueryService:
         if not gateway_records:
             raise RequestNotFoundError(request_id)
         engine_records, engine_corrupt = self._engine_store.read_all()
-        matching_receipts = [
-            record for record in engine_records if record.get("request_id") == request_id
-        ]
         final_state = self._request_view(request_id, gateway_records)
-        live = live_lookup(request_id)
-        live_status = live.get("status")
+        backend_kind = (
+            final_state.get("backend_kind", "mock")
+            if final_state is not None
+            else gateway_records[-1].get("backend_kind", "mock")
+        )
+        matching_receipts = (
+            [
+                record
+                for record in engine_records
+                if record.get("request_id") == request_id
+            ]
+            if backend_kind == "mock"
+            else []
+        )
         attempted = (
             final_state.get("delivery", {}).get("attempted")
             if final_state is not None
@@ -188,26 +212,55 @@ class QueryService:
             record.get("observation_session_id") == current_session_id
             for record in gateway_records
         )
-        if matching_receipts or live_status == "confirmed":
-            evidence_state = "received"
-            evidence_summary = "엔진 수신 확인"
-        elif live_status == "not_found" and same_session and not engine_corrupt:
-            evidence_state = "not_received"
-            evidence_summary = (
-                "Gateway 미전달, 엔진 미수신 확인"
-                if attempted is False
-                else "Gateway 전달 시도 후 엔진 미수신 확인"
+        if backend_kind == "vllm":
+            live = {
+                "status": "not_available",
+                "queried_at": None,
+                "error": None,
+                "evidence_kind": "not_connected",
+            }
+            evidence_state = "gateway_only"
+            response = (
+                final_state.get("delivery", {}).get("response")
+                if final_state is not None
+                else None
             )
-        else:
-            evidence_state = "unknown"
-            if live_status == "unknown":
-                evidence_summary = "엔진 조회 실패로 수신 확인 불가"
-            elif not same_session:
-                evidence_summary = "이전 관측 세션 요청이라 실시간 조회로 미수신을 확인할 수 없음"
+            if attempted is False:
+                evidence_summary = (
+                    "Gateway 미전달 확인, backend 미수신은 미확인(증거원 미연결)"
+                )
+            elif attempted is True and response == "completed":
+                evidence_summary = (
+                    "Gateway 전달·응답 수신, backend 측 수신 기록 미연결"
+                )
             else:
-                evidence_summary = "엔진 수신 기록 손상으로 수신 확인 불가"
+                evidence_summary = (
+                    "Gateway 전달 시도, backend 미수신 여부는 미확인(증거원 미연결)"
+                )
+        else:
+            live = live_lookup(request_id)
+            live_status = live.get("status")
+            if matching_receipts or live_status == "confirmed":
+                evidence_state = "received"
+                evidence_summary = "엔진 수신 확인"
+            elif live_status == "not_found" and same_session and not engine_corrupt:
+                evidence_state = "not_received"
+                evidence_summary = (
+                    "Gateway 미전달, 엔진 미수신 확인"
+                    if attempted is False
+                    else "Gateway 전달 시도 후 엔진 미수신 확인"
+                )
+            else:
+                evidence_state = "unknown"
+                if live_status == "unknown":
+                    evidence_summary = "엔진 조회 실패로 수신 확인 불가"
+                elif not same_session:
+                    evidence_summary = "이전 관측 세션 요청이라 실시간 조회로 미수신을 확인할 수 없음"
+                else:
+                    evidence_summary = "엔진 수신 기록 손상으로 수신 확인 불가"
         return {
             "request_id": request_id,
+            "backend_kind": backend_kind,
             "gateway_records": gateway_records,
             "final_state": final_state,
             "engine_receipts": matching_receipts,

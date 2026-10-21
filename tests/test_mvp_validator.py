@@ -61,7 +61,7 @@ class ValidatorTests(unittest.TestCase):
 
     def test_mvp_06_unsupported_inputs_and_transport_limits(self) -> None:
         cases = [
-            (encoded(stream=True), "application/json", 400, "STREAM_UNSUPPORTED"),
+            (encoded(stream_options={}), "application/json", 400, "UNSUPPORTED_FIELD"),
             (encoded(tools=[]), "application/json", 400, "UNSUPPORTED_FIELD"),
             (encoded(max_completion_tokens=10), "application/json", 400, "UNSUPPORTED_ALIAS"),
             (b" " * 65537, "application/json", 413, "BODY_TOO_LARGE"),
@@ -72,6 +72,13 @@ class ValidatorTests(unittest.TestCase):
                 decision = self.decide(body, content_type)
                 self.assertEqual((decision.result, decision.http_status), ("INVALID", status))
                 self.assertEqual(decision.reason_code, reason)
+
+    def test_stream_true_and_false_are_allowed_before_policy_decision(self) -> None:
+        for value in (True, False):
+            with self.subTest(stream=value):
+                self.assertEqual(self.decide(encoded(stream=value)).result, "ALLOWED")
+        denied = self.decide(encoded(stream=True, max_tokens=129))
+        self.assertEqual((denied.http_status, denied.reason_code), (403, "MAX_TOKENS_EXCEEDED"))
 
     def test_content_type_parameters_and_case_are_accepted(self) -> None:
         decision = self.decide(encoded(max_tokens=64), "Application/JSON; charset=utf-8")

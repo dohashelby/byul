@@ -17,7 +17,7 @@
         </div>
       </div>
       <div class="topbar-meta">
-        <span class="badge badge-mock">모의 엔진</span>
+        <span id="backend-badge" class="badge badge-mock">모의 엔진</span>
         <span id="refresh-state" class="refresh-state" role="status">연결 중…</span>
       </div>
     </div>
@@ -56,7 +56,7 @@
           <dl class="kv" id="policy-kv"></dl>
         </article>
         <article class="card">
-          <h3><span id="engine-dot" class="dot"></span>모의 엔진</h3>
+          <h3><span id="engine-dot" class="dot"></span><span id="engine-title">모의 엔진</span></h3>
           <dl class="kv" id="engine-kv"></dl>
         </article>
         <article class="card">
@@ -71,6 +71,32 @@
         <span class="chip chip-off">파일 관측 · 미연결</span>
         <span class="chip chip-off">GPU 관측 · 미연결</span>
       </div>
+    </section>
+
+    <section aria-labelledby="policy-state-title">
+      <div class="section-head">
+        <h2 id="policy-state-title">정책·기준 상태</h2>
+      </div>
+      <div class="state-badges" id="policy-state-badges"></div>
+      <div class="state-grid">
+        <article class="card table-card state-card">
+          <h3>유효성 항목</h3>
+          <table class="status-table"><thead><tr><th>항목</th><th>상태</th><th>결과</th></tr></thead><tbody id="validity-rows"></tbody></table>
+        </article>
+        <article class="card table-card state-card">
+          <h3>수집원</h3>
+          <table class="status-table"><thead><tr><th>수집원</th><th>상태</th><th>최근 성공</th><th>오류</th><th>출처</th></tr></thead><tbody id="collector-rows"></tbody></table>
+        </article>
+      </div>
+      <p id="model-id-limit" class="notice"></p>
+      <article class="card table-card state-card">
+        <h3>기준 비교</h3>
+        <table class="status-table"><thead><tr><th>필드</th><th>기준</th><th>현재</th><th>출처</th><th>관측 시각</th><th>상태</th></tr></thead><tbody id="baseline-rows"></tbody></table>
+      </article>
+      <article class="card table-card state-card">
+        <h3>정책 이력 <span id="history-store-state" class="muted"></span></h3>
+        <table class="status-table"><thead><tr><th>시각</th><th>이벤트</th><th>정책</th><th>판본</th><th>SHA-256</th><th>이전</th><th>표시</th></tr></thead><tbody id="history-rows"></tbody></table>
+      </article>
     </section>
 
     <section aria-labelledby="requests-title">

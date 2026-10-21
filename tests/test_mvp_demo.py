@@ -65,6 +65,13 @@ class DemoJudgementTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertGreaterEqual(len(result.failures), 3)
 
+    def test_s1_demo_requires_done_marker(self) -> None:
+        case = next(case for case in demo_cases() if case.case_id == "S1-DEMO")
+        self.assertTrue(evaluate_case(case, 200, "e" * 32, detail(), True).passed)
+        failed = evaluate_case(case, 200, "e" * 32, detail(), False)
+        self.assertFalse(failed.passed)
+        self.assertIn("[DONE]", failed.failures[0])
+
     def test_report_and_korean_table(self) -> None:
         result = evaluate_case(demo_cases()[0], 200, "d" * 32, detail())
         with tempfile.TemporaryDirectory() as temporary:

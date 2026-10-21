@@ -103,6 +103,11 @@ body {
 .badge-ERROR { background: var(--error-bg); color: var(--error); }
 .badge-INCOMPLETE { background: var(--incomplete-bg); color: var(--incomplete); }
 .badge-previous { margin-left: 7px; background: var(--surface-2); color: var(--muted); font-family: inherit; font-size: 10px; }
+.badge-state { border: 1px solid var(--border); background: var(--surface-2); color: var(--muted); }
+.badge-state.ok, .state-match, .state-ok { background: var(--allowed-bg); color: var(--allowed); }
+.badge-state.bad, .state-drift, .state-error { background: var(--error-bg); color: var(--error); }
+.state-missing, .state-stale { background: var(--denied-bg); color: var(--denied); }
+.state-not_collected, .state-disconnected, .state-never { background: var(--incomplete-bg); color: var(--incomplete); }
 
 .stale-banner {
   background: var(--error-bg);
@@ -174,6 +179,15 @@ section + section { margin-top: 36px; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .chip { padding: 4px 12px; border-radius: 999px; font-size: 12px; }
 .chip-off { background: var(--surface-2); color: var(--muted); border: 1px dashed var(--border); }
+.state-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.state-card { margin-top: 14px; }
+.state-card h3 { padding: 14px 16px 8px; margin: 0; }
+.status-table { width: 100%; border-collapse: collapse; }
+.status-table th, .status-table td { padding: 9px 12px; text-align: left; border-top: 1px solid var(--border); vertical-align: top; }
+.status-table th { color: var(--muted); font-size: 12px; background: var(--surface-2); }
+.status-table .changed { background: var(--denied-bg); }
+.notice { color: var(--muted); margin: 10px 2px 0; }
 
 .filters { display: flex; flex-wrap: wrap; gap: 6px; }
 .filter {
@@ -254,6 +268,8 @@ section + section { margin-top: 36px; }
 .evidence-box.received { background: var(--allowed-bg); border-left-color: var(--allowed); }
 .evidence-box.not_received { background: var(--invalid-bg); border-left-color: var(--invalid); }
 .evidence-box.unknown { background: var(--denied-bg); border-left-color: var(--denied); }
+.evidence-box.gateway_only { background: var(--invalid-bg); border-left-color: var(--incomplete); }
+.badge-external { background: var(--denied-bg); color: var(--denied); border: 1px solid var(--border); }
 
 .timeline { list-style: none; margin: 0; padding: 0 0 0 4px; }
 .timeline li { position: relative; padding: 0 0 12px 20px; border-left: 2px solid var(--border); }
@@ -295,6 +311,7 @@ pre {
 @media (max-width: 960px) {
   .stat-grid { grid-template-columns: repeat(3, 1fr); }
   .card-grid { grid-template-columns: 1fr; }
+  .state-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
   .topbar-inner, .page { padding: 0 16px; }

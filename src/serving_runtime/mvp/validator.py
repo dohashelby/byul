@@ -131,15 +131,6 @@ def validate_request(
                 model=model,
                 max_tokens=max_tokens,
             )
-        if stream:
-            return _decision(
-                "INVALID",
-                400,
-                "STREAM_UNSUPPORTED",
-                "streaming is not supported",
-                model=model,
-                max_tokens=max_tokens,
-            )
 
     if "n" in document:
         n = document["n"]

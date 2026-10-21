@@ -1,21 +1,31 @@
 """Local gateway, request relay, and single-process MVP launcher."""
 
-from http.client import HTTPException
+from http.client import HTTPConnection, HTTPException
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import re
 import socket
 import threading
+import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
+from .backend import BackendConfig, load_backend_config, parse_prometheus_metrics
+from .collectors import (
+    Collector,
+    CollectorManager,
+    MODEL_ID_LIMIT_NOTE,
+    compare_baseline,
+    load_declaration,
+)
 from .config import MVPConfig
 from .mock_engine import MockEngine, _utc_now
 from .policy import PolicyState, load_policy
+from .policy_state import PolicyHistory, evaluate_policy, load_revocations
 from .query import QueryError, QueryService, RequestNotFoundError
 from .store import JsonlStore
 from .validator import Decision, validate_request
@@ -72,16 +82,43 @@ class GatewayApp:
         self,
         config: MVPConfig,
         policy_state: PolicyState,
-        engine_address: tuple[str, int],
+        engine_address: tuple[str, int] | None = None,
+        backend_config: BackendConfig | None = None,
     ) -> None:
         if config.host != "127.0.0.1":
             raise ValueError("the MVP gateway must bind to 127.0.0.1")
         self.config = config
         self.policy_state = policy_state
-        self.engine_address = engine_address
+        if config.backend == "mock":
+            if backend_config is not None:
+                raise ValueError("backend_config must not be supplied in mock mode")
+            if engine_address is None:
+                raise ValueError("engine_address is required in mock mode")
+            self.backend = BackendConfig.mock(engine_address)
+        else:
+            self.backend = backend_config or load_backend_config(
+                str(config.backend_config_path)
+            )
+            if self.backend.kind != "vllm":
+                raise ValueError("vllm mode requires a vllm backend config")
+        self.engine_address = (self.backend.target.host, self.backend.target.port)
+        self.relay_timeout_s = self.backend.timeouts.get(
+            "relay_timeout_s", config.relay_timeout_s
+        )
+        self.stream_idle_timeout_s = self.backend.timeouts.get(
+            "stream_idle_timeout_s", config.stream_idle_timeout_s
+        )
+        self.request_deadline_s = self.backend.timeouts.get(
+            "request_deadline_s", config.request_deadline_s
+        )
         # One ID per GatewayApp instance: a restart in the same Python process
         # is still a distinct observation session.
         self.observation_session_id = uuid4().hex
+        self.revocation_state = load_revocations(config.revocations_path)
+        self._baseline = load_declaration(config.baseline_path, kind="baseline")
+        self._manifest = load_declaration(config.manifest_path, kind="manifest")
+        self._policy_history = PolicyHistory(Path(config.data_dir) / "policy_history.jsonl")
+        self._policy_history.append_startup(policy_state, self.observation_session_id)
         self._record_store = JsonlStore(Path(config.data_dir) / "gateway_records.jsonl")
         self._engine_store = JsonlStore(Path(config.data_dir) / "engine_receipts.jsonl")
         self._record_state_lock = threading.Lock()
@@ -89,6 +126,8 @@ class GatewayApp:
         self._last_record_error: str | None = None
         self._last_record_error_at: str | None = None
         self._check_record_store()
+        self._in_flight_lock = threading.Lock()
+        self._in_flight = 0
         self._queries = QueryService(
             self._record_store,
             self._engine_store,
@@ -97,6 +136,28 @@ class GatewayApp:
         )
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
+        self._collectors = CollectorManager(
+            [
+                Collector(
+                    "engine_health",
+                    self._collect_engine_health,
+                    config.collector_interval_s,
+                    config.collector_stale_after_s,
+                ),
+                Collector(
+                    "engine_info",
+                    self._collect_engine_info,
+                    config.collector_interval_s,
+                    config.collector_stale_after_s,
+                ),
+                Collector(
+                    "metrics",
+                    self._collect_metrics if self.backend.metrics_target is not None else None,
+                    config.collector_interval_s,
+                    config.collector_stale_after_s,
+                ),
+            ]
+        )
 
     @property
     def address(self) -> tuple[str, int]:
@@ -106,28 +167,158 @@ class GatewayApp:
         return str(host), int(port)
 
     def _engine_url(self, path: str) -> str:
-        return f"http://{self.engine_address[0]}:{self.engine_address[1]}{path}"
+        return self.backend.target.url(path)
+
+    @property
+    def backend_kind(self) -> str:
+        return self.backend.kind
+
+    def _backend_label(self) -> str:
+        return "mock engine" if self.backend_kind == "mock" else "backend"
+
+    def _request_backend(
+        self,
+        method: str,
+        path: str,
+        *,
+        body: bytes | None = None,
+        request_id: str | None = None,
+        content_type: str | None = None,
+        metrics: bool = False,
+    ) -> tuple[int, dict[str, str], bytes]:
+        if metrics:
+            connection, request_path = self.backend.metrics_connection(
+                self.relay_timeout_s
+            )
+        else:
+            connection, request_path = self.backend.connection(
+                path, self.relay_timeout_s
+            )
+        headers = self.backend.request_headers(
+            request_id=request_id, content_type=content_type
+        )
+        try:
+            connection.request(method, request_path, body=body, headers=headers)
+            response = connection.getresponse()
+            return response.status, dict(response.getheaders()), response.read()
+        finally:
+            connection.close()
+
+    def _fetch_engine_json(self, path: str) -> dict[str, Any]:
+        status, _, body = self._request_backend("GET", path)
+        if status != 200:
+            raise OSError(f"backend returned HTTP status {status}")
+        payload = json.loads(body.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("backend response must be a JSON object")
+        return payload
+
+    def _collect_engine_health(self) -> tuple[dict[str, Any], str | None]:
+        if self.backend_kind == "mock":
+            payload = self._fetch_engine_json(self.backend.health_path)
+            if payload.get("status") != "ok":
+                raise ValueError("engine health response is not ok")
+            return payload, payload.get("data_origin")
+        status, _, _ = self._request_backend("GET", self.backend.health_path)
+        if status != 200:
+            raise OSError(f"backend returned HTTP status {status}")
+        return (
+            {
+                "reachable": True,
+                "http_status": status,
+                "inference_verified": False,
+                "meaning": "health reachability does not prove successful inference",
+            },
+            "external_backend",
+        )
+
+    def _collect_engine_info(self) -> tuple[dict[str, Any], str | None]:
+        version = self._fetch_engine_json(self.backend.version_path)
+        models = self._fetch_engine_json(self.backend.models_path)
+        entries = models.get("data")
+        model_id = None
+        max_model_len = None
+        if isinstance(entries, list) and entries and isinstance(entries[0], dict):
+            model_id = entries[0].get("id")
+            max_model_len = entries[0].get("max_model_len")
+        if self.backend_kind == "mock":
+            value = {
+                "engine.kind": version.get("engine.kind"),
+                "engine.version": version.get("engine.version"),
+                "model.id": model_id,
+                "option.max_model_len": max_model_len,
+            }
+            value = {key: item for key, item in value.items() if item is not None}
+            origins = {version.get("data_origin"), models.get("data_origin")}
+            origins.discard(None)
+            data_origin = origins.pop() if len(origins) == 1 else ("mixed" if origins else None)
+            return value, data_origin
+
+        available_ids = sorted(
+            {
+                item.get("id")
+                for item in entries
+                if isinstance(item, dict) and isinstance(item.get("id"), str)
+            }
+        ) if isinstance(entries, list) else []
+        mapped_ids = list(dict.fromkeys(self.backend.model_map.values()))
+        mapped_availability = {
+            policy_model: {
+                "id": backend_model,
+                "available": backend_model in available_ids,
+            }
+            for policy_model, backend_model in self.backend.model_map.items()
+        }
+        value = {
+            "engine.kind": "vllm",
+            "engine.version": version.get("version", version.get("engine.version")),
+            "model.ids": available_ids,
+            "model.map": mapped_availability,
+        }
+        if len(mapped_ids) == 1 and mapped_ids[0] in available_ids:
+            value["model.id"] = mapped_ids[0]
+        value = {key: item for key, item in value.items() if item is not None}
+        return value, "external_backend"
+
+    def _collect_metrics(self) -> tuple[dict[str, Any], str | None]:
+        status, _, body = self._request_backend("GET", "", metrics=True)
+        if status != 200:
+            raise OSError(f"metrics endpoint returned HTTP status {status}")
+        return parse_prometheus_metrics(body, self.backend.metrics_map), "external_backend"
 
     def _engine_status(self) -> dict[str, Any]:
         checked_at = _utc_now()
-        url = self._engine_url("/healthz")
+        url = self._engine_url(self.backend.health_path)
         try:
-            with urlopen(url, timeout=self.config.relay_timeout_s) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+            status, _, body = self._request_backend("GET", self.backend.health_path)
+            if self.backend_kind == "mock":
+                payload = json.loads(body.decode("utf-8"))
                 healthy = (
-                    response.status == 200
+                    status == 200
                     and isinstance(payload, dict)
                     and payload.get("status") == "ok"
                 )
+                receipts_store = (
+                    payload.get("receipts_store") if isinstance(payload, dict) else None
+                )
+            else:
+                payload = None
+                healthy = status == 200
+                receipts_store = {
+                    "state": "not_available",
+                    "ok": None,
+                    "last_error": None,
+                }
             return {
                 "url": url,
                 "healthy": healthy,
+                "reachable": healthy,
+                "inference_verified": False,
                 "health": payload,
                 "checked_at": checked_at,
                 "error": None,
-                "receipts_store": (
-                    payload.get("receipts_store") if isinstance(payload, dict) else None
-                ),
+                "receipts_store": receipts_store,
+                "credential": self.backend.credential_status,
             }
         except (
             HTTPError,
@@ -140,14 +331,17 @@ class GatewayApp:
             return {
                 "url": url,
                 "healthy": False,
+                "reachable": False,
+                "inference_verified": False,
                 "health": None,
                 "checked_at": checked_at,
-                "error": str(error),
+                "error": f"{type(error).__name__}: backend health check failed",
                 "receipts_store": {
-                    "state": "unknown",
+                    "state": "unknown" if self.backend_kind == "mock" else "not_available",
                     "ok": None,
                     "last_error": None,
                 },
+                "credential": self.backend.credential_status,
             }
 
     def _check_record_store(self) -> None:
@@ -197,6 +391,11 @@ class GatewayApp:
         backend_receipt: str,
         response: str,
         error_code: str | None,
+        stream: bool = False,
+        http_start_status: int | None = None,
+        final_outcome: str | None = None,
+        response_started: bool = False,
+        backend_cancel: str | None = None,
     ) -> dict[str, Any]:
         policy = self.policy_state.policy
         return {
@@ -207,6 +406,7 @@ class GatewayApp:
             "target_id": policy.target_id if policy else None,
             "recorded_at": _utc_now(),
             "policy": {
+                "schema_version": policy.schema_version if policy else None,
                 "policy_id": policy.policy_id if policy else None,
                 "policy_version": policy.policy_version if policy else None,
                 "sha256": self.policy_state.sha256,
@@ -229,37 +429,76 @@ class GatewayApp:
                 "response": response,
                 "error_code": error_code,
             },
-            "backend_kind": "mock",
-            "data_origin": "actual_test",
+            "stream": stream,
+            "http_start_status": http_start_status,
+            "final_outcome": final_outcome,
+            "response_started": response_started,
+            "backend_cancel": (
+                backend_cancel
+                if backend_cancel is not None
+                else ("not_applicable" if self.backend_kind == "mock" else "not_observed")
+            ),
+            "backend_kind": self.backend_kind,
+            "data_origin": (
+                "actual_test" if self.backend_kind == "mock" else "external_backend"
+            ),
         }
+
+    def _try_acquire_request(self) -> bool:
+        with self._in_flight_lock:
+            if self._in_flight >= self.config.max_concurrent_requests:
+                return False
+            self._in_flight += 1
+            return True
+
+    def _release_request(self) -> None:
+        with self._in_flight_lock:
+            if self._in_flight <= 0:
+                raise RuntimeError("in-flight request counter underflow")
+            self._in_flight -= 1
+
+    def _concurrency_status(self) -> dict[str, int]:
+        with self._in_flight_lock:
+            return {
+                "in_flight": self._in_flight,
+                "limit": self.config.max_concurrent_requests,
+            }
+
+    def _relay_payload(
+        self, document: dict[str, Any], allowed: Decision, *, stream: bool
+    ) -> bytes:
+        relay_document = {
+            "model": self.backend.mapped_model(allowed.model),
+            "messages": document["messages"],
+            "max_tokens": allowed.max_tokens,
+            "stream": stream,
+        }
+        return json.dumps(relay_document, ensure_ascii=False).encode("utf-8")
 
     def _relay(
         self, request_id: str, document: dict[str, Any], allowed: Decision
     ) -> tuple[Decision, bytes | None]:
-        relay_document = {
-            "model": allowed.model,
-            "messages": document["messages"],
-            "max_tokens": allowed.max_tokens,
-        }
-        request = Request(
-            self._engine_url("/v1/chat/completions"),
-            data=json.dumps(relay_document, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "X-Request-ID": request_id,
-            },
-            method="POST",
+        connection, request_path = self.backend.connection(
+            "/v1/chat/completions", self.relay_timeout_s
         )
         try:
-            with urlopen(request, timeout=self.config.relay_timeout_s) as engine_response:
-                status = engine_response.status
-                body = engine_response.read()
+            connection.request(
+                "POST",
+                request_path,
+                body=self._relay_payload(document, allowed, stream=False),
+                headers=self.backend.request_headers(
+                    request_id=request_id, content_type="application/json"
+                ),
+            )
+            engine_response = connection.getresponse()
+            status = engine_response.status
+            body = engine_response.read()
             if status != 200:
                 return (
                     _engine_error(
                         502,
                         "ENGINE_BAD_RESPONSE",
-                        f"mock engine returned HTTP status {status}",
+                        f"{self._backend_label()} returned HTTP status {status}",
                         allowed,
                     ),
                     None,
@@ -271,30 +510,19 @@ class GatewayApp:
                     _engine_error(
                         502,
                         "ENGINE_BAD_RESPONSE",
-                        "mock engine returned invalid JSON",
+                        f"{self._backend_label()} returned invalid JSON",
                         allowed,
                     ),
                     None,
                 )
             return allowed, body
-        except HTTPError as error:
-            error.close()
-            return (
-                _engine_error(
-                    502,
-                    "ENGINE_BAD_RESPONSE",
-                    f"mock engine returned HTTP status {error.code}",
-                    allowed,
-                ),
-                None,
-            )
-        except (URLError, TimeoutError, OSError, HTTPException) as error:
+        except (TimeoutError, OSError, HTTPException) as error:
             if _is_timeout(error):
                 return (
                     _engine_error(
                         504,
                         "ENGINE_TIMEOUT",
-                        "mock engine request timed out",
+                        f"{self._backend_label()} request timed out",
                         allowed,
                     ),
                     None,
@@ -303,19 +531,188 @@ class GatewayApp:
                 _engine_error(
                     502,
                     "ENGINE_UNREACHABLE",
-                    "mock engine is unreachable",
+                    f"{self._backend_label()} is unreachable",
                     allowed,
                 ),
                 None,
             )
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _sse_done(buffer: bytes, chunk: bytes) -> tuple[bytes, bool]:
+        pending = buffer + chunk
+        lines = pending.split(b"\n")
+        remainder = lines.pop()
+        done = any(
+            line.rstrip(b"\r").startswith(b"data:")
+            and line.rstrip(b"\r")[5:].strip() == b"[DONE]"
+            for line in lines
+        )
+        return remainder, done
+
+    def _relay_stream(
+        self,
+        handler: BaseHTTPRequestHandler,
+        request_id: str,
+        document: dict[str, Any],
+        allowed: Decision,
+        started_at: float,
+    ) -> tuple[Decision, str, bool]:
+        connection, request_path = self.backend.connection(
+            "/v1/chat/completions",
+            min(self.relay_timeout_s, self.request_deadline_s),
+        )
+        response_started = False
+        try:
+            connection.request(
+                "POST",
+                request_path,
+                body=self._relay_payload(document, allowed, stream=True),
+                headers=self.backend.request_headers(
+                    request_id=request_id, content_type="application/json"
+                ),
+            )
+            engine_response = connection.getresponse()
+            content_type = engine_response.getheader("Content-Type", "")
+            media_type = content_type.split(";", 1)[0].strip().lower()
+            if engine_response.status != 200 or media_type != "text/event-stream":
+                return (
+                    _engine_error(
+                        502,
+                        "ENGINE_BAD_RESPONSE",
+                        f"{self._backend_label()} returned an invalid streaming response",
+                        allowed,
+                    ),
+                    "ENGINE_BAD_RESPONSE",
+                    False,
+                )
+
+            handler.close_connection = True
+            try:
+                handler.send_response(200)
+                handler.send_header("Content-Type", "text/event-stream")
+                handler.send_header("Cache-Control", "no-cache")
+                handler.send_header("Connection", "close")
+                handler.send_header("X-Request-ID", request_id)
+                handler.end_headers()
+                handler.wfile.flush()
+                response_started = True
+            except (BrokenPipeError, ConnectionResetError):
+                return (
+                    _engine_error(
+                        200,
+                        "CLIENT_DISCONNECTED",
+                        "client disconnected during streaming",
+                        allowed,
+                    ),
+                    "client_disconnected",
+                    response_started,
+                )
+
+            self._append_record(
+                self._record(
+                    "response_started",
+                    request_id,
+                    allowed,
+                    attempted=True,
+                    backend_receipt=self._receipt_not_queried(),
+                    response="streaming",
+                    error_code=None,
+                    stream=True,
+                    http_start_status=200,
+                    response_started=True,
+                )
+            )
+
+            line_buffer = b""
+            saw_done = False
+            last_chunk_at = time.monotonic()
+            response_socket = connection.sock
+            if response_socket is None:
+                response_file = getattr(engine_response, "fp", None)
+                response_raw = getattr(response_file, "raw", None)
+                response_socket = getattr(response_raw, "_sock", None)
+            while True:
+                now = time.monotonic()
+                deadline_remaining = self.request_deadline_s - (now - started_at)
+                idle_remaining = self.stream_idle_timeout_s - (now - last_chunk_at)
+                if deadline_remaining <= 0:
+                    code, outcome = "STREAM_DEADLINE", "deadline_exceeded"
+                    break
+                if idle_remaining <= 0:
+                    code, outcome = "STREAM_IDLE_TIMEOUT", "idle_timeout"
+                    break
+                if response_socket is not None:
+                    response_socket.settimeout(
+                        max(0.001, min(deadline_remaining, idle_remaining))
+                    )
+                try:
+                    chunk = engine_response.read1(1024)
+                except (socket.timeout, TimeoutError):
+                    if time.monotonic() - started_at >= self.request_deadline_s:
+                        code, outcome = "STREAM_DEADLINE", "deadline_exceeded"
+                    else:
+                        code, outcome = "STREAM_IDLE_TIMEOUT", "idle_timeout"
+                    break
+                except (OSError, HTTPException):
+                    code, outcome = "STREAM_RELAY_ERROR", "relay_error"
+                    break
+                if not chunk:
+                    if saw_done:
+                        return allowed, "completed", True
+                    code, outcome = "STREAM_TRUNCATED", "backend_truncated"
+                    break
+                last_chunk_at = time.monotonic()
+                try:
+                    handler.wfile.write(chunk)
+                    handler.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    code, outcome = "CLIENT_DISCONNECTED", "client_disconnected"
+                    break
+                line_buffer, found_done = self._sse_done(line_buffer, chunk)
+                saw_done = saw_done or found_done
+
+            return _engine_error(200, code, outcome.replace("_", " "), allowed), outcome, True
+        except (TimeoutError, OSError, HTTPException) as error:
+            if _is_timeout(error):
+                return (
+                    _engine_error(
+                        504,
+                        "ENGINE_TIMEOUT",
+                        f"{self._backend_label()} request timed out",
+                        allowed,
+                    ),
+                    "ENGINE_TIMEOUT",
+                    False,
+                )
+            return (
+                _engine_error(
+                    502,
+                    "ENGINE_UNREACHABLE",
+                    f"{self._backend_label()} is unreachable",
+                    allowed,
+                ),
+                "ENGINE_UNREACHABLE",
+                False,
+            )
+        finally:
+            connection.close()
 
     def _engine_receipt_lookup(self, request_id: str) -> dict[str, Any]:
-        query = urlencode({"request_id": request_id})
         queried_at = _utc_now()
+        if self.backend_kind != "mock":
+            return {
+                "status": "not_available",
+                "queried_at": queried_at,
+                "error": None,
+                "evidence_kind": "not_connected",
+            }
+        query = urlencode({"request_id": request_id})
         try:
             with urlopen(
                 self._engine_url(f"/_mock/receipts?{query}"),
-                timeout=self.config.relay_timeout_s,
+                timeout=self.relay_timeout_s,
             ) as response:
                 if response.status != 200:
                     return {
@@ -330,6 +727,16 @@ class GatewayApp:
                     "queried_at": queried_at,
                     "error": "mock engine returned an invalid receipt response",
                 }
+            receipts = payload.get("receipts")
+            receipts = receipts if isinstance(receipts, list) else []
+            final_receipt = next(
+                (
+                    item
+                    for item in reversed(receipts)
+                    if isinstance(item, dict) and isinstance(item.get("stream_end"), str)
+                ),
+                {},
+            )
             return {
                 "status": "confirmed" if payload["found"] else "not_found",
                 "queried_at": (
@@ -338,6 +745,8 @@ class GatewayApp:
                     else queried_at
                 ),
                 "error": None,
+                "stream_end": final_receipt.get("stream_end"),
+                "evidence_kind": final_receipt.get("evidence_kind"),
             }
         except (
             HTTPError,
@@ -355,19 +764,104 @@ class GatewayApp:
             }
 
     def _backend_receipt(self, request_id: str) -> str:
+        if self.backend_kind != "mock":
+            return "not_available"
         return str(self._engine_receipt_lookup(request_id)["status"])
+
+    def _receipt_not_queried(self) -> str:
+        return "not_queried" if self.backend_kind == "mock" else "not_available"
+
+    def _mock_cancel_evidence(self, request_id: str, *, wait: bool) -> str:
+        if self.backend_kind != "mock":
+            return "not_observed"
+        stop_at = time.monotonic() + (0.3 if wait else 0)
+        while True:
+            evidence = self._engine_receipt_lookup(request_id)
+            if (
+                evidence.get("stream_end") == "client_disconnected"
+                and evidence.get("evidence_kind") == "mock"
+            ):
+                return "mock_engine_recorded"
+            if time.monotonic() >= stop_at:
+                return "not_observed"
+            time.sleep(0.01)
+
+    def policy_status(self) -> dict[str, Any]:
+        policy = self.policy_state.policy
+        validity = evaluate_policy(self.policy_state, self.revocation_state)
+        history = self._policy_history.latest(50)
+        history_storage = self._policy_history.status()
+        current = {
+            "path": self.policy_state.path,
+            "schema_version": policy.schema_version if policy else None,
+            "policy_id": policy.policy_id if policy else None,
+            "policy_version": policy.policy_version if policy else None,
+            "target_id": policy.target_id if policy else None,
+            "sha256": self.policy_state.sha256,
+            "loaded_at": self.policy_state.loaded_at,
+            "valid_from": policy.valid_from if policy else None,
+            "valid_until": policy.valid_until if policy else None,
+            "approval_ref": policy.approval_ref if policy else None,
+            "error_code": self.policy_state.error_code,
+            "error_message": self.policy_state.error_message,
+        }
+        return {
+            **validity,
+            "current": current,
+            "policy": current,
+            "revocations": {
+                "state": self.revocation_state.state,
+                "path": self.revocation_state.path,
+                "loaded_at": self.revocation_state.loaded_at,
+                "sha256": self.revocation_state.sha256,
+                "error_code": self.revocation_state.error_code,
+                "error_message": self.revocation_state.error_message,
+            },
+            "history_storage": history_storage,
+            "history": history,
+            "implemented_validity_items": [
+                "policy schema and fields",
+                "valid_from",
+                "valid_until",
+                "revocation snapshot",
+            ],
+            "unimplemented_validity_items": [
+                "signature verification",
+                "approval service integration",
+                "hot reload",
+                "external enforcement confirmation",
+            ],
+        }
+
+    def baseline_status(self) -> dict[str, Any]:
+        return compare_baseline(self._baseline, self._manifest, self._collectors)
+
+    def collectors_status(self) -> dict[str, Any]:
+        return {
+            "collectors": self._collectors.snapshots(),
+            "generated_at": _utc_now(),
+        }
 
     def status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         engine = self._engine_status()
         record_store = self._record_store_status()
+        policy_runtime = self.policy_status()
+        baseline = self.baseline_status()
+        collectors = self.collectors_status()
         return {
             "status": (
                 "ok"
-                if self.policy_state.ok and engine["healthy"] and record_store["ok"]
+                if policy_runtime["gateway_active"]
+                and engine["healthy"]
+                and record_store["ok"]
+                and policy_runtime["history_storage"]["ok"]
                 else "degraded"
             ),
-            "mode": "mock_engine",
+            "mode": (
+                "mock_engine" if self.backend_kind == "mock" else "external_vllm_backend"
+            ),
+            "backend_kind": self.backend_kind,
             "observation_session_id": self.observation_session_id,
             "gateway": {"host": self.address[0], "port": self.address[1]},
             "policy": {
@@ -381,9 +875,41 @@ class GatewayApp:
                 "loaded_at": self.policy_state.loaded_at,
                 "error_code": self.policy_state.error_code,
                 "error_message": self.policy_state.error_message,
+                "loaded": policy_runtime["loaded"],
+                "gateway_active": policy_runtime["gateway_active"],
+                "external_enforcement": policy_runtime["external_enforcement"],
+                "reason_code": policy_runtime["reason_code"],
             },
+            "policy_state": {
+                "loaded": policy_runtime["loaded"],
+                "gateway_active": policy_runtime["gateway_active"],
+                "external_enforcement": policy_runtime["external_enforcement"],
+                "reason_code": policy_runtime["reason_code"],
+            },
+            "policy_history_store": policy_runtime["history_storage"],
             "record_store": record_store,
-            "mock_engine": engine,
+            "concurrency": self._concurrency_status(),
+            "backend": {
+                **engine,
+                **self.backend.safe_status(),
+                "timeouts": {
+                    "relay_timeout_s": self.relay_timeout_s,
+                    "stream_idle_timeout_s": self.stream_idle_timeout_s,
+                    "request_deadline_s": self.request_deadline_s,
+                },
+            },
+            **({"mock_engine": engine} if self.backend_kind == "mock" else {}),
+            "baseline": {
+                "configured": baseline["baseline"]["state"] != "not_configured",
+                "states": {
+                    name: sum(1 for row in baseline["rows"] if row["state"] == name)
+                    for name in ("match", "drift", "missing", "stale", "error", "not_collected")
+                },
+                "model_id_limit": MODEL_ID_LIMIT_NOTE,
+            },
+            "collectors": {
+                item["source"]: item["state"] for item in collectors["collectors"]
+            },
         }
 
     def start(self) -> "GatewayApp":
@@ -393,6 +919,7 @@ class GatewayApp:
 
         class Handler(BaseHTTPRequestHandler):
             server_version = "ServingRuntimeGateway/1.0"
+            protocol_version = "HTTP/1.0"
 
             def log_message(self, format: str, *args: object) -> None:
                 return
@@ -405,6 +932,7 @@ class GatewayApp:
                 *,
                 request_id: str | None = None,
                 close_connection: bool = False,
+                extra_headers: dict[str, str] | None = None,
             ) -> None:
                 if close_connection:
                     self.close_connection = True
@@ -415,6 +943,8 @@ class GatewayApp:
                     self.send_header("X-Request-ID", request_id)
                 if close_connection:
                     self.send_header("Connection", "close")
+                for name, value in (extra_headers or {}).items():
+                    self.send_header(name, value)
                 self.end_headers()
                 try:
                     self.wfile.write(body)
@@ -428,6 +958,7 @@ class GatewayApp:
                 *,
                 request_id: str | None = None,
                 close_connection: bool = False,
+                extra_headers: dict[str, str] | None = None,
             ) -> None:
                 self._send(
                     status,
@@ -435,6 +966,7 @@ class GatewayApp:
                     json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                     request_id=request_id,
                     close_connection=close_connection,
+                    extra_headers=extra_headers,
                 )
 
             def _send_error_decision(
@@ -443,6 +975,7 @@ class GatewayApp:
                 request_id: str,
                 *,
                 close_connection: bool = False,
+                extra_headers: dict[str, str] | None = None,
             ) -> None:
                 self._send_json(
                     decision.http_status,
@@ -456,13 +989,22 @@ class GatewayApp:
                     },
                     request_id=request_id,
                     close_connection=close_connection,
+                    extra_headers=extra_headers,
                 )
 
             def _known_path(self) -> bool:
                 path = urlsplit(self.path).path
                 return (
                     path in _STATIC_FILES
-                    or path in {"/api/status", "/api/summary", "/api/requests", "/v1/chat/completions"}
+                    or path in {
+                        "/api/status",
+                        "/api/summary",
+                        "/api/requests",
+                        "/api/policy",
+                        "/api/baseline",
+                        "/api/collectors",
+                        "/v1/chat/completions",
+                    }
                     or path.startswith("/api/requests/")
                 )
 
@@ -550,6 +1092,15 @@ class GatewayApp:
                 if path == "/api/status":
                     self._send_json(200, owner.status())
                     return
+                if path == "/api/policy":
+                    self._send_json(200, owner.policy_status())
+                    return
+                if path == "/api/baseline":
+                    self._send_json(200, owner.baseline_status())
+                    return
+                if path == "/api/collectors":
+                    self._send_json(200, owner.collectors_status())
+                    return
                 if path == "/api/summary":
                     self._send_json(200, owner._queries.summary())
                     return
@@ -570,6 +1121,8 @@ class GatewayApp:
                 decision: Decision,
                 *,
                 close_connection: bool = False,
+                stream: bool = False,
+                extra_headers: dict[str, str] | None = None,
             ) -> None:
                 owner._append_record(
                     owner._record(
@@ -577,18 +1130,26 @@ class GatewayApp:
                         request_id,
                         decision,
                         attempted=False,
-                        backend_receipt="not_queried",
+                        backend_receipt=owner._receipt_not_queried(),
                         response="none",
                         error_code=None,
+                        stream=stream,
+                        http_start_status=decision.http_status,
+                        final_outcome=decision.reason_code,
                     )
                 )
                 self._send_error_decision(
                     decision,
                     request_id,
                     close_connection=close_connection,
+                    extra_headers=extra_headers,
                 )
 
             def _chat(self, request_id: str) -> None:
+                policy_snapshot = owner.policy_state
+                policy_runtime = evaluate_policy(
+                    policy_snapshot, owner.revocation_state
+                )
                 if self.headers.get("Transfer-Encoding") is not None:
                     self._finish_without_relay(
                         request_id,
@@ -647,6 +1208,21 @@ class GatewayApp:
                     )
                     return
 
+                if not policy_runtime["gateway_active"]:
+                    unavailable = Decision(
+                        result="ERROR",
+                        http_status=503,
+                        reason_code=str(policy_runtime["reason_code"]),
+                        rule_id=None,
+                        message=str(policy_runtime["reason_message"]),
+                        model=None,
+                        max_tokens=None,
+                    )
+                    self._finish_without_relay(
+                        request_id, unavailable, close_connection=True
+                    )
+                    return
+
                 body = self.rfile.read(content_length)
                 incomplete = len(body) != content_length
                 if incomplete:
@@ -661,59 +1237,185 @@ class GatewayApp:
                     )
                     return
                 decision = validate_request(
-                    body, self.headers.get("Content-Type"), owner.policy_state
+                    body, self.headers.get("Content-Type"), policy_snapshot
                 )
+                stream = False
+                document: dict[str, Any] | None = None
+                try:
+                    parsed_document = json.loads(body.decode("utf-8"))
+                    if isinstance(parsed_document, dict):
+                        document = parsed_document
+                        stream = parsed_document.get("stream") is True
+                except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
+                    pass
                 if decision.result != "ALLOWED":
                     self._finish_without_relay(
                         request_id,
                         decision,
                         close_connection=incomplete,
+                        stream=stream,
                     )
                     return
-
-                document = json.loads(body.decode("utf-8"))
-                started = owner._record(
-                    "started",
-                    request_id,
-                    decision,
-                    attempted=False,
-                    backend_receipt="not_queried",
-                    response="none",
-                    error_code=None,
-                )
-                if not owner._append_record(started):
-                    unavailable = _engine_error(
-                        503,
-                        "STORE_UNAVAILABLE",
-                        "request record store is unavailable",
-                        decision,
-                    )
-                    self._send_error_decision(unavailable, request_id)
-                    return
-
-                final_decision, engine_body = owner._relay(request_id, document, decision)
-                backend_receipt = owner._backend_receipt(request_id)
-                completed = final_decision.result == "ALLOWED" and engine_body is not None
-                owner._append_record(
-                    owner._record(
-                        "final",
+                if document is None:
+                    self._finish_without_relay(
                         request_id,
-                        final_decision,
-                        attempted=True,
-                        backend_receipt=backend_receipt,
-                        response="completed" if completed else "failed",
-                        error_code=None if completed else final_decision.reason_code,
+                        _transport_decision(400, "MALFORMED_JSON", "invalid JSON"),
                     )
-                )
-                if completed:
-                    self._send(
-                        200,
-                        "application/json; charset=utf-8",
-                        engine_body,
-                        request_id=request_id,
+                    return
+
+                if owner.backend_kind == "vllm":
+                    if owner.backend.credential_status == "missing":
+                        self._finish_without_relay(
+                            request_id,
+                            _engine_error(
+                                503,
+                                "BACKEND_CREDENTIAL_MISSING",
+                                "backend credential is configured but unavailable",
+                                decision,
+                            ),
+                            stream=stream,
+                        )
+                        return
+                    if owner.backend.mapped_model(decision.model) is None:
+                        self._finish_without_relay(
+                            request_id,
+                            _engine_error(
+                                503,
+                                "BACKEND_MODEL_UNMAPPED",
+                                "allowed policy model has no backend mapping",
+                                decision,
+                            ),
+                            stream=stream,
+                        )
+                        return
+
+                if not owner._try_acquire_request():
+                    limited = Decision(
+                        result="DENIED",
+                        http_status=429,
+                        reason_code="CONCURRENCY_LIMIT",
+                        rule_id="max_concurrent_requests",
+                        message="maximum concurrent requests reached",
+                        model=decision.model,
+                        max_tokens=decision.max_tokens,
                     )
-                else:
-                    self._send_error_decision(final_decision, request_id)
+                    self._finish_without_relay(
+                        request_id,
+                        limited,
+                        stream=stream,
+                        extra_headers={"Retry-After": "1"},
+                    )
+                    return
+
+                acquired_at = time.monotonic()
+                try:
+                    started = owner._record(
+                        "started",
+                        request_id,
+                        decision,
+                        attempted=False,
+                        backend_receipt=owner._receipt_not_queried(),
+                        response="none",
+                        error_code=None,
+                        stream=stream,
+                    )
+                    if not owner._append_record(started):
+                        unavailable = _engine_error(
+                            503,
+                            "STORE_UNAVAILABLE",
+                            "request record store is unavailable",
+                            decision,
+                        )
+                        owner._append_record(
+                            owner._record(
+                                "final",
+                                request_id,
+                                unavailable,
+                                attempted=False,
+                                backend_receipt=owner._receipt_not_queried(),
+                                response="failed",
+                                error_code="STORE_UNAVAILABLE",
+                                stream=stream,
+                                http_start_status=503,
+                                final_outcome="STORE_UNAVAILABLE",
+                            )
+                        )
+                        self._send_error_decision(unavailable, request_id)
+                        return
+
+                    if stream:
+                        final_decision, final_outcome, response_started = owner._relay_stream(
+                            self,
+                            request_id,
+                            document,
+                            decision,
+                            acquired_at,
+                        )
+                        backend_receipt = owner._backend_receipt(request_id)
+                        abnormal_started = response_started and final_outcome not in {
+                            "completed",
+                            "backend_truncated",
+                        }
+                        if owner.backend_kind == "vllm":
+                            backend_cancel = "not_observed"
+                        else:
+                            backend_cancel = (
+                                owner._mock_cancel_evidence(
+                                    request_id,
+                                    wait=final_outcome == "client_disconnected",
+                                )
+                                if abnormal_started
+                                else "not_applicable"
+                            )
+                        completed = final_outcome == "completed"
+                        owner._append_record(
+                            owner._record(
+                                "final",
+                                request_id,
+                                final_decision,
+                                attempted=True,
+                                backend_receipt=backend_receipt,
+                                response="completed" if completed else "failed",
+                                error_code=None if completed else final_decision.reason_code,
+                                stream=True,
+                                http_start_status=(200 if response_started else final_decision.http_status),
+                                final_outcome=final_outcome,
+                                response_started=response_started,
+                                backend_cancel=backend_cancel,
+                            )
+                        )
+                        if not response_started:
+                            self._send_error_decision(final_decision, request_id)
+                        return
+
+                    final_decision, engine_body = owner._relay(request_id, document, decision)
+                    backend_receipt = owner._backend_receipt(request_id)
+                    completed = final_decision.result == "ALLOWED" and engine_body is not None
+                    owner._append_record(
+                        owner._record(
+                            "final",
+                            request_id,
+                            final_decision,
+                            attempted=True,
+                            backend_receipt=backend_receipt,
+                            response="completed" if completed else "failed",
+                            error_code=None if completed else final_decision.reason_code,
+                            stream=False,
+                            http_start_status=final_decision.http_status,
+                            final_outcome=("completed" if completed else final_decision.reason_code),
+                        )
+                    )
+                    if completed:
+                        self._send(
+                            200,
+                            "application/json; charset=utf-8",
+                            engine_body,
+                            request_id=request_id,
+                        )
+                    else:
+                        self._send_error_decision(final_decision, request_id)
+                finally:
+                    owner._release_request()
 
             def do_POST(self) -> None:
                 request_id = uuid4().hex
@@ -732,6 +1434,7 @@ class GatewayApp:
             do_TRACE = _unsupported_method
 
         self._server = ThreadingHTTPServer((self.config.host, self.config.gateway_port), Handler)
+        self._collectors.start()
         self._thread = threading.Thread(
             target=self._server.serve_forever, name="mvp-gateway", daemon=True
         )
@@ -742,7 +1445,9 @@ class GatewayApp:
         server = self._server
         thread = self._thread
         if server is None:
+            self._collectors.stop()
             return
+        self._collectors.stop()
         server.shutdown()
         server.server_close()
         if thread is not None:
@@ -758,24 +1463,30 @@ class GatewayApp:
 
 
 def run(config: MVPConfig) -> None:
-    """Run the gateway and mock engine until interrupted."""
+    """Run the gateway and, only in mock mode, its bundled mock engine."""
 
     if config.host != "127.0.0.1":
         raise ValueError("the MVP servers must bind to 127.0.0.1")
     policy_state = load_policy(config.policy_path)
     data_dir = Path(config.data_dir)
-    engine = MockEngine(
-        port=config.engine_port,
-        receipts_path=data_dir / "engine_receipts.jsonl",
-    )
+    engine: MockEngine | None = None
     gateway: GatewayApp | None = None
     try:
-        engine.start()
-        gateway = GatewayApp(config, policy_state, engine.address).start()
+        if config.backend == "mock":
+            engine = MockEngine(
+                port=config.engine_port,
+                receipts_path=data_dir / "engine_receipts.jsonl",
+            ).start()
+            gateway = GatewayApp(config, policy_state, engine.address).start()
+        else:
+            gateway = GatewayApp(config, policy_state).start()
         gateway_url = f"http://{gateway.address[0]}:{gateway.address[1]}"
-        engine_url = f"http://{engine.address[0]}:{engine.address[1]}"
         print(f"Gateway: {gateway_url}", flush=True)
-        print(f"Mock engine: {engine_url}", flush=True)
+        if engine is not None:
+            engine_url = f"http://{engine.address[0]}:{engine.address[1]}"
+            print(f"Mock engine: {engine_url}", flush=True)
+        else:
+            print(f"External vLLM backend: {gateway.backend.base_url}", flush=True)
         print(f"Data directory: {data_dir}", flush=True)
         print(f"Browser: {gateway_url}/", flush=True)
         try:
@@ -785,4 +1496,5 @@ def run(config: MVPConfig) -> None:
     finally:
         if gateway is not None:
             gateway.stop()
-        engine.stop()
+        if engine is not None:
+            engine.stop()

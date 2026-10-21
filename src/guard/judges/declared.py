@@ -7,6 +7,7 @@
 - SUP-01/SUP-02에 선언된 승인 기록 체계의 비공백 문자열(문맥이며 권한 증명이 아님)
 - SUP-14/LIF-07의 선언된 필수 항목별 신고 관측·첨부 연결 및 제한적 충족 조건
 - OBS-11의 프로파일·독립 근거·시간/조회 창·경보/종속 처리에 대한 제한적 충족 조건
+- OBS-04/05·OBS-07/08에 선언된 bool 정책의 해당 검토 분기(실제 활성 상태 증명 아님)
 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집, INV-11)은 판정 코어가 따로 적용한다.
 신고된 FAIL은 그대로 둔다(INV-04). 항목별 관측은 DECLARED이며 실측·신원 인증이 아니다.
 """
@@ -22,9 +23,29 @@ from .audit_collection import evaluate as evaluate_audit
 ALLOWED = {"PASS", "FAIL", "UNKNOWN"}
 
 
+def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
+    """A declared policy opens a review branch; it does not prove actual state."""
+    branch = {"OBS-04": ("usage_allowed", False), "OBS-05": ("usage_allowed", True),
+              "OBS-07": ("replay_allowed", True), "OBS-08": ("replay_allowed", True)}.get(check.id)
+    if branch is None:
+        return False, []
+    key, expected = branch
+    if not any(p.key == key and p.type == "bool" and p.required for p in check.policy_params):
+        return False, []
+    value = values.get(key)
+    valid = type(value) is bool
+    blocked = not valid or value is not expected
+    shown = ("true" if value else "false") if valid else ("missing" if key not in values else "invalid")
+    code = "POLICY_FLAG_UNRESOLVED" if not valid else ("POLICY_BRANCH_INACTIVE" if blocked else "POLICY_BRANCH_ACTIVE")
+    limit = ("USAGE_FIELDS_DESTINATIONS_PERIOD_AND_ACTUAL_STATE_NOT_AUTOMATICALLY_VERIFIED"
+             if key == "usage_allowed" else "REPLAY_CONSUMER_PERMISSIONS_PARSER_AND_ACTUAL_STATE_NOT_AUTOMATICALLY_VERIFIED")
+    return blocked, [f"POLICY_CONTEXT: {check.id}.{key}={shown}; {code}; declared policy only, not proof of actual state",
+                     f"POLICY_CONTEXT: {limit}; per-check scope only, shared-policy consistency not automatically verified"]
+
+
 class DeclaredJudge:
     name = "declared"
-    version = "0.5.0"
+    version = "0.6.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         obs = evidence.observations.get("declared_verdicts")
@@ -47,6 +68,8 @@ class DeclaredJudge:
             context_missing = not isinstance(value, str) or not value.strip()
             code = "APPROVAL_RECORD_SYSTEM_UNRESOLVED" if context_missing else "APPROVAL_RECORD_SYSTEM_DECLARED"
             reasons.append(f"POLICY_CONTEXT: {code}; context only, approval permissions not automatically verified")
+        branch_blocked, branch_reasons = _branch_context(check, policy_values)
+        reasons.extend(branch_reasons)
         item_result = evaluate(check, evidence, policy_values)
         if item_result is None:
             item_result = evaluate_audit(check, evidence, policy_values)
@@ -62,6 +85,9 @@ class DeclaredJudge:
                 v = "UNKNOWN"
             if v == "PASS" and context_missing:
                 reasons.append(f"{axis}: declared PASS withheld: POLICY_CONTEXT: approval_record_system is blank")
+                v = "UNKNOWN"
+            if v == "PASS" and branch_blocked:
+                reasons.append(f"{axis}: declared PASS withheld: POLICY_CONTEXT: policy flag does not establish this review branch")
                 v = "UNKNOWN"
             if v == "PASS" and not evidence.artifacts:
                 reasons.append(f"{axis}: declared PASS withheld: no attachment (at least one evidence file required)")

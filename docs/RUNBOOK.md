@@ -161,3 +161,15 @@ OBS-11의 필수 기록·기한·시계 오차·장애 대응은 [후속 결정�
 부재는 고장 난 collector 로그만으로 확정하지 않는다. 독립 발생과 전체 조회 시작/종료·경보 수신점·시계 오차를 확인한다. 모든 시각은 timezone을 포함해 따옴표로 쓰고 소수초는3자리 이하다. 누락 관측을 OBS11 FAIL과 동일시하지 말고 정상 처리/경보 부재의 추가 근거를 구별한다. 미수신·조회 실패·창 미종료는 부재 확정이 아니다. 실제 collector 주입이나 운영 중단을 이 명령이 수행하지 않는다.
 
 관측의 실제 필드·정책/시간 의미·구형 /1·/2 처리·보고서 제한은 [M7 계약](POLICY_M7.md)을 따른다. JSON/HTML의 AUDIT_COLLECTION 이유·미인증 신고·official 상태를 함께 확인한다. 복구 사실은 기록하지만 복구 SLA·작성자 인증·실제 다른 RES 전파는 검증하지 않는다.
+
+## M8 usage/replay 정책 문맥 확인
+
+현재 팩14에서 정책 템플릿을 생성하면 OBS04/05의 usage_allowed, OBS07/08의 replay_allowed가
+주석으로 안내되고 실제 값은 비어 있다. [정책 입력 안내](POLICY_TEMPLATE.md)를 따라 기업이 정한 bool만 입력한다.
+false는 비활성 관측이 아니며 true는 실제 구현·권한·승인 증명이 아니다. 같은 범위의 공유 값은 업무 검토한다.
+
+기존 select → evidence template(/3) → evidence import → judge → report 흐름을 사용한다.
+새 증거 payload나 실행 명령은 없다. POLICY_CONTEXT의 실제 true/false·분기 사유와 JSON/HTML의
+DRAFT·official·미인증 자기 신고·자동 검증 한계를 함께 확인한다. OBS04 false / 나머지 true 외의 문맥은
+신고 PASS를 UNKNOWN으로 보류하며 FAIL은 보존한다. false를 비적용이나 자동 제외로 해석하지 않는다.
+전체 분기·기업 결정·미검증 범위는 [M8 계약](POLICY_M8.md)에 있다.

@@ -14,9 +14,9 @@ uv run guard policy template --pack packs/PACK-BASELINE --out my-policy.yaml
 
 ## 빈 값과 실제 입력
 
-현재 M7 팩은 10개 점검·20개 선언을 갖는다(M1 5개·11개, M2/M4 7개·13개, M5/M6 9개·15개). 생성기는 이 이름이나 개수에 한정되지 않으며,
+현재 M8 팩은 14개 점검·24개 선언을 갖는다(M1 5개·11개, M2/M4 7개·13개, M5/M6 9개·15개, M7 10개·20개). 생성기는 이 이름이나 개수에 한정되지 않으며,
 다른 팩의 활성 점검 선언도 읽는다. retired 점검과 선언 없는 점검은 값 안내에 넣지 않는다.
-기본 `scope.include`와 `scope.exclude`는 모두 빈 목록이므로 양식에 표시한 10개로 점검 범위를 축소하지 않는다.
+기본 `scope.include`와 `scope.exclude`는 모두 빈 목록이므로 양식에 표시한 14개로 점검 범위를 축소하지 않는다.
 
 양식은 각 점검을 `REQ-01: {}`처럼 비워 두고 파라미터 이름·타입·필수 여부·설명·결정 역할·
 소비 범위·검증 한계를 주석으로 안내한다. 실제 파라미터 키와 기업 값은 생성하지 않는다.
@@ -41,7 +41,7 @@ REQ-09는 여전히 양의 `max_input_tokens`, 한도+1 요청까지 포함하�
 
 ## 설명의 출처와 일치 조건
 
-[정책 카탈로그](policy_catalog.md)의 분류 a 19개 결정(20개 선언 경로)에서 설명·일반적인 원문 역할·
+[정책 카탈로그](policy_catalog.md)의 분류 a 21개 결정(24개 선언 경로)에서 설명·일반적인 원문 역할·
 소비 경로·검증 기록만 추려 패키지 내부 `collectors/policy_template_metadata.json`에 보존했다.
 생성기는 저장소의 `docs/`·`reference/`를 런타임 필수 경로로 읽지 않는다.
 공통 모델·팩에 설명 필드를 추가하지 않았다.
@@ -165,4 +165,16 @@ M4의 “같은 사건의 모순”은 M5에서 판정 근거별로 구분한다
 
 OBS-11은 required_records:list[str]와 사건별 collection_deadline_ms/max_clock_uncertainty_ms/detection_deadline_ms/alert_deadline_ms:dict[str,int] 네 map을 선언한다. 의미·숫자 범위·case별 관측·조회 창·경보 조건은 [M7 계약](POLICY_M7.md)을 따른다. 실제 기업 숫자나 예외를 기본값으로 채우지 않으며 양식은 OBS-11:{}다. 신규 map 타입은 문자열 키·정수 값만 허용하고 bool은 정수가 아니다. 부분/빈 정책의 의미 부족은 전용 판정에서 UNKNOWN으로 남긴다.
 
-새 수동 양식은 /3, manual-entry0.4.0, declared0.5.0이다. /2는 정확 POL/팩 Ref와 기존 SUP/LIF policy_evidence를 계속 검증하며 /1·/2의 audit_evidence는 거부한다. 기존 M4/M5 절은 당시 도입 계약이며 /3의 OBS 확장은 M7 계약을 따른다. 새 OBS 관측은 guard-audit-evidence/1로 별도 보존하며 기존 guard-policy-evidence/1은 유지한다. 현재 팩13/DRAFT이며 OBS-11은 수동 점검이다. 자동 실행기 연결5개·official 계산·기존 축/실측 범위는 확대하지 않는다.
+새 수동 양식은 /3, manual-entry0.4.0, declared0.5.0이다. /2는 정확 POL/팩 Ref와 기존 SUP/LIF policy_evidence를 계속 검증하며 /1·/2의 audit_evidence는 거부한다. 기존 M4/M5 절은 당시 도입 계약이며 /3의 OBS 확장은 M7 계약을 따른다. 새 OBS 관측은 guard-audit-evidence/1로 별도 보존하며 기존 guard-policy-evidence/1은 유지한다. M7 당시 팩13/DRAFT이며 OBS-11은 수동 점검이다. 자동 실행기 연결5개·official 계산·기존 축/실측 범위는 확대하지 않는다.
+
+## M8 usage·replay bool 문맥
+
+현재 팩14/DRAFT의 OBS04/05 usage_allowed와 OBS07/08 replay_allowed는 required bool이다.
+네 양식은 {}이며 기업 기본값은 생성하지 않는다. null/0/1/문자열은 bool로 바꾸지 않고 false는 누락이 아니다.
+OBS04 false, 나머지 true가 검토 문맥이고 다른 값/키 누락은 신고 PASS를 UNKNOWN으로 보류한다.
+활성 문맥에도 기존 수동 관측·첨부·INV11이 필요하며 FAIL·UNKNOWN을 보존한다.
+정책값만으로 실제 비사용·부재·승인·권한·NOT_APPLICABLE을 만들지 않는다.
+
+declared0.6.0, manual-entry0.4.0·수동/3 및 /1·/2 읽기는 유지한다. 새 항목 payload는 없다.
+분기 표·공유 정책의 점검별 범위/일관성 한계·구형 정의 계약은 [M8 문서](POLICY_M8.md)를 따른다.
+기업이 실제 값·승인·사용 범위와 증거를 준비해야 하며 자동 실행기 연결5개는 그대로다.

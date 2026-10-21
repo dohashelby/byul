@@ -651,3 +651,11 @@ guard evidence import manual.yaml                                              #
 - 신규 상한은security만이다. 기능/성능 신고PASS는UNKNOWN, 신고FAIL은 유지하며 기존CPU 등의 상위 제약은 그대로다. clock_uncertain은 근거로 확인된 경계 겹침을 대상이 UNKNOWN 처리했는지의 범위만 평가한다. 단순 시각 누락은 이 case의 성공이 아니다. 실제 다른RES를 수정/조회/집계 제외하지 않는다.
 - REPORT는 AUDIT_COLLECTION: 이유를 기존 limitations에 전달한다. 해시/항목/case·미확인/한계만 표시하고 원본 locator/basis·경로를 노출하지 않는다. DECLARED·미인증 자기 신고·DRAFT/official 계약을 유지한다. 정책 선언 없는 과거 정의에 신규 요구를 소급하지 않는다.
 - PACK-BASELINE13/DRAFT·OBS11 정의2·10점검20경로·자동 연결5. 자세한 필드/제약은 docs/POLICY_M7.md다. 실제 엔진/collector·두 이미지·운영 체계 실증은 별도다.
+
+## M8 usage·replay 수동 정책 문맥
+
+- OBS-04/05의 usage_allowed, OBS-07/08의 replay_allowed를 required bool로 선언한다. POL은 해당 점검 범위의 허용 의사이며 실제 활성·비활성·도달·권한의 ENV/EVD를 대신하지 않는다. 새 ENV 키·실행기·전역 정책 상속은 없다.
+- OBS04는 false, OBS05/07/08은 true가 기존 수동 검토의 문맥이다. 다른 bool 또는 미확인 값이면 각 축의 신고 PASS만 UNKNOWN으로 보류한다. 활성이어도 기존 증거/INV11 관문이 필요하다. 신고 FAIL·기존 독립 확인FAIL·UNKNOWN 비승격을 보존한다. 플래그만으로 새 FAIL·NOT_APPLICABLE·자동 제외를 만들지 않는다.
+- select의 기존 bool 타입/누락 검사를 재사용한다. false는 값이고 null/0/1/문자열은 변환하지 않는다. 이 전제는 네 대상의 정확한 required bool 선언에만 적용하며 과거/optional/다른 타입/비대상 정의에는 소급하지 않는다.
+- declared0.6.0, manual-entry0.4.0·수동/3·기존 증거 계약과 객체7종·코어·저장소는 유지한다. 기존 POLICY_CONTEXT와 팩 한계 표시로 실제 값·분기·자동 검증/공유 정책 일관성 한계를 보고한다. 기업값·승인·실제 usage/replay 검증을 만들지 않는다.
+- PACK-BASELINE14/DRAFT·네 정의2·14점검24경로·a21/b6/c161/d115, 77ID/303결정595연결·자동 연결5다. [M8 계약](docs/POLICY_M8.md)의 분기 표·구형 증거·후속 계획을 따른다.

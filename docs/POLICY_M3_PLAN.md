@@ -354,4 +354,3 @@ select→evidence template/import→judge→report→재판정을 확인하라.
 main 직접 push·강제 push·자동 병합은 금지한다.
 브랜치/커밋/검증 명령·환경·결과/변경 영향/기업 미결 사항/초안 PR을 보고하라.
 ~~~
-

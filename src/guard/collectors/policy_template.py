@@ -83,8 +83,10 @@ def build_policy_template(pack: Pack) -> str:
 
 def write_policy_template(pack: Pack, output: Path) -> None:
     """새 파일에만 쓴다. 기존 파일·symlink는 배타적 생성으로 보호한다."""
-    content = build_policy_template(pack)
     output = Path(output)
+    if pack.path is not None and output.resolve().is_relative_to(pack.path.resolve()):
+        raise ValueError("출력 경로는 입력 팩 밖이어야 합니다 (팩 파일 목록·해시 보존)")
+    content = build_policy_template(pack)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("x", encoding="utf-8", newline="\n") as stream:
         stream.write(content)

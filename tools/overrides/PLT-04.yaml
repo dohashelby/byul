@@ -1,0 +1,37 @@
+applies_when: { always: true }
+policy_params:
+  - { key: forbidden_env_names, type: "list[str]", required: true }
+  - { key: forbidden_mount_paths, type: "list[str]", required: true }
+executor: credential_exposure
+challenge_steps:
+  - "컨테이너 프로세스의 환경변수 이름 수집"
+  - "선언한 자격 경로의 마운트 노출 확인"
+  - "정상 추론 확인"
+required_observations:
+  - { key: process_scan_complete, type: bool }
+  - { key: worker_env_names, type: "list[str]" }
+  - { key: exposed_credential_paths, type: "list[str]" }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, outcome]" }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: process_scan_complete, op: eq, value: true }
+      - { obs: worker_env_names, op: none_in, value_policy: forbidden_env_names }
+      - { obs: exposed_credential_paths, op: eq, value: [] }
+    fail_when_any:
+      - { obs: worker_env_names, op: any_in, value_policy: forbidden_env_names }
+      - { obs: exposed_credential_paths, op: nonempty }
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: nonempty }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+        fail_when_any:
+          - { obs: functional_probe_results, op: any_in, value: [fail] }
+functional_probes:
+  - { method: POST, path: /v1/completions, body: { model: "{model}", prompt: ping, max_tokens: 1 }, expect: [200], via: engine }
+limitations:
+  - "선언한 금지 환경변수 이름과 bind/volume으로 노출된 자격 경로만 확인한다. 파일 내용·동적 자격 취득·호스트 권한·전체 자격 출처는 검증하지 않는다."

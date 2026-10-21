@@ -1,0 +1,34 @@
+applies_when: { always: true }
+policy_params:
+  - { key: max_input_tokens, type: int, required: true }
+  - { key: rejection_codes, type: "list[str]", required: true }
+executor: input_validation
+challenge_steps:
+  - "정상 token-array 대조 후 범위 밖 token ID 시험"
+  - "길이 한도 밖 시험과 후속 정상 대조"
+required_observations:
+  - { key: accepted_challenges, type: "list[str]" }
+  - { key: challenge_outcomes, type: "dict[str, outcome]" }
+  - { key: challenges_planned, type: "list[str]" }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, outcome]" }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: challenge_outcomes, op: nonempty }
+      - { obs: challenge_outcomes, op: superset_of, value_obs: challenges_planned }
+      - { obs: challenge_outcomes, op: all_in, value_policy: rejection_codes }
+    fail_when_any:
+      - { obs: accepted_challenges, op: nonempty }
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+        fail_when_any:
+          - { obs: functional_probe_results, op: any_in, value: [fail] }
+functional_probes:
+  - { method: POST, path: /v1/completions, body: { model: "{model}", prompt: [0], max_tokens: 1 }, expect: [200], via: engine }
+limitations:
+  - "실행 설정에 출처와 함께 선언한 vocab_size 및 정책 max_input_tokens를 사용하는 token-array 경계 두 건만 시험한다. 실제 모델 유효 범위와 설정의 일치는 별도 확인해야 하며, 다른 입력 형식·음수 ID·모든 경계 조합을 검증하지 않는다."

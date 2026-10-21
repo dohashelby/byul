@@ -427,3 +427,55 @@ git status
 - **REQ-07, REQ-09, REQ-10: 자동화 보류(수동 증거 경로 사용).**
 - B2(log_analysis)는 이 세션에서 진행하지 않음.
 - 자동화 점검 수: 3/77 유지.
+
+
+
+## 재평가 및 업데이트 제품 경로 구현 (2026-10-19)
+- 시작 커밋 main/ec4f91b. 별도 codex/gua-update-mvp 작업 트리에서 기존 로컬 변경·out/5b 증거를 보존했다.
+- 한 일: 부분 /proc·마운트 수집의 거짓 PASS 방지, 팩 폴더 부재/손상 시 보존본 재판정, UTF-8/LF 팩 생성, 사용자 승인 CPU 프로파일(보안/기능만 비교), 의미 있는 설정 해시, side별 실행 설정·제품 guard update(managed/external), JSON/HTML 기능 비교/비교 불가 필드, 실행 정리 실패 전파, 판정표 사전 검사.
+- 실행 경계: application.py가 runtime과 core를 연결한다. lab은 호환 래퍼로 유지하고 샌드박스 자산은 설치 패키지에 포함했다. 기존 객체 7종·append-only·judge 순수 함수 경계는 유지했다.
+- 점검: PLT-04(환경변수 이름/마운트 경로), REQ-09(token-array ID/길이 두 경계) 실행기·판정표 추가. 연결된 정의 5개, 신규 2개는 모의 계약 검증이며 실제 엔진 자동화 완료 5/77을 뜻하지 않는다. 팩 revision 10, DRAFT.
+- 테스트: 최종 기본 테스트 451 passed, 4 skipped(Windows 네트워크 3·symlink 1), 13 deselected, 159.44s. 최초 수집/팩 회귀 6건은 수정 전 실패를 확인했다. 추가 generic run의 동일 target 재사용도 실패 재현 후 수정했다. Windows 전체 지원 주장은 하지 않는다.
+- 배포 확인: uv build --wheel 성공, frozen 의존성으로 새 가상환경에 wheel 설치 후 guard CLI help와 update 명령 확인. Linux PR/main CI 정의 추가; 원격 실행 결과는 별도 확인한다.
+- 과거 증거: 복사본 Store.verify에서 exposed·isolated의 참조 artifact 각 1개 누락, inv15 0문제. HEAD/6d9ad83/13bb4d3에서 누락 원본을 찾지 못했다. 기존 증거·해시는 수정하지 않았다.
+- 막힌 것: Docker daemon 미실행·모델 캐시 부재로 실제 엔진·두 실제 이미지 실증 미수행. 정책/팩 확정자 미정. AWS 자원은 생성하지 않았다.
+- 다음 단계: Linux/macOS에서 실제 두 이미지 update와 신규 2개 점검 실증, 누락 증거 원본 복구 또는 별도 재실증, 정책·팩 검토. 상세 계획/완료 기준은 docs/REVIEW_AND_DEVELOPMENT_PLAN.md, 실행 절차는 docs/RUNBOOK.md.
+
+
+## 실증 준비·증거 반출 후속 구현 (2026-10-19)
+- 시작: codex/gua-update-mvp/4d97dba. 기존 main과 사용자 .assessment 및 out/5b 원본을 보존했다. 구현 묶음 완료 후 테스트를 실행했다.
+- 한 일: 읽기 전용 prepare-update(팩/정책/실행기/모델 inventory/Docker/로컬 이미지 아키텍처 검사), evidence export/restore(DB read-only backup/증거/팩 보존본 검증), 5개 점검의 실제 PASS/FAIL/UNKNOWN opt-in 행렬, 두 이미지 시험의 MEASURED/반출·복원 계약 보강.
+- 수정: REQ-09 경계 초과 요청도 토큰 예산에 포함, side-only real 설정의 대상 분리 우회 차단, probe 정리 실패 후 COMPLETED/확인된 FAIL 보존 및 재판정 보고서 한계/명령 실패 전파. 빈 cleanup_errors는 생략해 과거 해시를 유지했다.
+- 유지: 연결된 점검은 5개, 팩 revision 10/DRAFT. 기존 정의 77개를 추가 자동화하지 않았고, 신규 PLT-04/REQ-09 실증 완료를 주장하지 않는다. Python·의존성 선언은 변경하지 않았다.
+- 전체 기본 테스트: 475 passed, 1 failed, 4 skipped, 18 deselected / 110.82초. 새 증거 묶음 시험의 DB 파일 바이트 동일성 가정이 실패했다.
+- 수정 후 관련 검증: evidence bundle 10 passed / 12.16초. SQLite backup 헤더 차이를 허용하되 원본 DB 불변·객체/참조/증거 바이트 동일성을 검사했다. 동일 재판정은 멱등, 만료로 판정 내용이 바뀌면 새 revision이 추가되고 과거 참조가 보존됨을 확인했다. 첫 집중 실행에서는 멱등성에 대한 잘못된 기대도 발견해 바로잡았다. 제품 코드를 시험 기대에 맞춰 완화하지 않았다.
+- 별도 검증: wheel 빌드 및 frozen 새 환경 설치 성공. -I -X utf8 설치본 CLI로 select/run/judge/report/export/restore/verify/오프라인 재판정/준비 실패 총 10개 명령의 예상 종료 코드와 전체 로그를 확인했다(EXAMPLE). 최초 설치본 로그의 Windows cp949/UTF-8 캡처 차이는 명시적 UTF-8으로 해결했다.
+- 실제 엔진 opt-in 확인: 6 skipped, 12 deselected / 0.59초. GUARD_UPDATE_*와 GUARD_ENGINE_CASES 미제공. Docker daemon/API 및 모델 캐시도 없어 Docker stub/실제 엔진/실제 두 이미지 실증은 미실행이다.
+- 과거 증거 재확인: 복사본 exposed/isolated 참조 artifact 각각 1개 누락, inv15 문제 0. 원본/해시를 수정하거나 누락 파일을 만들지 않았다.
+- 성능: 선택적 기존 libyaml SafeLoader를 사용하되 해시는 매번 검사한다. Windows 기본 검증은 1분 목표를 초과했다. Linux CI 시간은 별도 확인한다. skip 4건은 기존 Windows 네트워크 3·symlink 1이며 새 skip으로 속도를 맞추지 않았다.
+- 산출물: docs/VALIDATION.md, examples/engine-cases.json. 테스트 로그는 별도 out/test-runs/followup-20261019에 두고 Git에는 포함하지 않는다.
+- 원격 CI: 이 기록 작성 시 push 전이므로 미실행. 작업 브랜치 push에서도 CI가 실행되도록 연결했으며 실제 결과는 해당 커밋의 Actions 기록으로 확인한다.
+- 다음/막힌 것: Linux/모델/두 이미지 준비 후 실제 15개 사례와 update 실행. 정책 임계값·금지 목록·담당자·팩 검토·이미지 쌍·AWS 예산은 팀 결정이 필요하다. 기존 CPU 결정은 유지하며 유료 자원은 생성하지 않았다.
+
+
+### 원격 Linux CI 확인 (2026-10-19, Asia/Seoul)
+- 코드 커밋 0c8c61b28dbd8ca12ec2202f0ec91715264b132a의 GitHub Actions push 검증 성공.
+- Ubuntu/Python 3.11: `uv run pytest -q` → **480 passed, 18 deselected / 28.15초**. Windows에서 skip된 4건도 Linux에서 통과했다.
+- `uv sync --frozen`, `uv build --wheel` 성공. 기본 테스트 1분 목표는 이 Linux CI 환경에서 충족했다.
+- 실행: https://github.com/dohashelby/gua/actions/runs/39257453735
+- 초안 PR: https://github.com/dohashelby/gua/pull/1 . 실제 엔진·두 실제 이미지 실증은 이 CI에 포함되지 않는다.
+
+
+## 2026-10-21 — 수동 증거와 업데이트 브랜치 통합
+- 부모: main/d9e9729 + codex/gua-update-mvp/42a609d. 별도 통합 브랜치 codex/gua-integration-20261021을 사용해 기존 두 체크아웃을 보존했다.
+- 충돌 4파일(PROGRESS, cli, core/run, models/objects)을 양쪽 기능을 보존해 해결했다. 수동 입력/출처·대체 이력/HTTP 분할과 update/CPU/증거 반출/팩 보존본/정리 실패 기록을 함께 유지했다.
+- 수정: collected의 문자열·숫자 강제 변환 제거, 중복 check/side 및 관측 키·설명 검증, 첨부 전체 읽기·모든 EVD 생성 후 객체 배치 트랜잭션 저장. 뒤 객체 저장 실패 시 앞 객체 새 revision도 롤백한다. 저장 I/O 실패의 새 미참조 blob은 남을 수 있으나 기존 증거를 삭제하지 않는다.
+- CLI: evidence template/import/export/restore를 한 그룹으로 통합. run --replace-manual 연결, 기본 수동 증거 보존과 명시적 대체/보고서 이력 유지. 모델 serializer는 양쪽 부모의 선택 필드를 함께 처리한다.
+- 구현 및 테스트 코드 작성 완료 후 첫 전체 검증: Windows/Python 3.11.16, 513 passed, 1 failed, 4 skipped, 18 deselected / 81.20초. 실패는 기존 main 골든이 설정 미확인 target에도 config_sha256을 기대해서 발생했다.
+- 수정 후 집중 검증: 20 passed / 4.44초. 골든은 14개 config_sha256 기대값만 null로 조정했고 관측·판정·요청 기록은 바꾸지 않았다. 명시적 비교 조건이 있을 때는 정상 hash를 만드는 양성 계약을 추가했다. 수동 입력·DB 롤백·CLI 대체·양쪽 과거 직렬화 계약도 포함한다.
+- 양쪽 부모의 실제 코드로 생성한 EXAMPLE 객체 16개를 fixture로 보존했다(ENV/POL/PLAN/EVD/RES/RPT). 전체 필드·content_sha256을 현재 모델에서 재검증했다. 실제 엔진 결과를 생성한 것이 아니다.
+- 배포 검증: uv build --wheel 성공, frozen 별도 환경 설치 후 -I -X utf8 설치본 CLI 15개 명령 성공. 자동→수동 FAIL→기본 run 보존→명시적 대체→재판정→반출/복원→팩 폴더 없는 오프라인 재판정을 확인했다. 보고서 전체 EXAMPLE/official=false.
+- 실제 엔진 opt-in: 6 skipped, 12 deselected / 0.53초(GUARD_UPDATE_* 및 GUARD_ENGINE_CASES 미제공). 엔진·두 이미지 실증, 신규 두 점검 실증 완료 주장은 하지 않는다. 유료 자원 생성 없음.
+- 팩 revision 10/DRAFT, 연결 정의 5개를 보존한다. REQ-09 코드는 기본 real 설정에서 비활성으로 유지하며 main의 자동화 보류/실증 미완료를 유지한다. 새 정책 확대나 기업 값 확정은 이번 범위가 아니다.
+- CI는 codex/** push와 PR에서 실행한다. 이 기록은 push 전 로컬 결과이며 원격 결과는 이후 기록/Actions에서 별도 확인한다.
+- 산출물: docs/INTEGRATION.md, 수동 입력/배치/호환성 회귀와 fixture. 원본 증거와 테스트 출력은 Git에 새로 포함하지 않는다. 다음: Linux CI 및 실제 엔진 검증 환경/정책 확정.

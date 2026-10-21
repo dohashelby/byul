@@ -108,3 +108,17 @@ def test_http_executor_drafts_match_golden(tmp_path):
     assert sorted(current) == sorted(golden)
     for name in golden:
         assert current[name] == golden[name], name
+
+
+def test_explicit_comparison_conditions_produce_config_hash(tmp_path):
+    from guard.models import canonical_json, sha256_hex
+    target = dr._target(tmp_path, False)
+    data = json.loads(target.read_text(encoding="utf-8"))
+    data["comparison_config"] = {"profile":"synthetic explicit launch conditions"}
+    target.write_text(json.dumps(data), encoding="utf-8")
+    world = dr.World(exposed=False)
+    executor = DirectRouteExecutor({"target":str(target), "roles":{"allowed":"KA"}},
+        container_probe=world.container_probe, host_probe=world.host_probe, environ={"KA":dr.ALLOWED})
+    draft = executor.run(PACK.checks["REQ-01"], environment(model={"id":"m"}),
+                         {"allowed_callers":["allowed"]}, VllmAdapter(), tmp_path / "work")
+    assert draft.comparability.config_sha256 == sha256_hex(canonical_json(draft.config))

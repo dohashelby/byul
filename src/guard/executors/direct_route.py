@@ -163,7 +163,7 @@ def direct_observations(ctx: Ctx, rs: RouteSet, agg: DirectAgg, probes: dict, te
 
 class DirectRouteExecutor(HttpCheckExecutor):
     name = "direct_route"
-    version = "0.3.0"
+    version = "0.5.0"
 
     def validate_policy(self, check, policy_values: dict) -> None:
         """설정의 역할(허용 주체로 취급해 direct_allowed_outcomes에만 남김)은 모두 정책 allowed_callers에 있어야 한다.

@@ -127,7 +127,9 @@ def render_html(report: dict[str, Any]) -> str:
         if update:
             cmp_ = row.get("comparison")
             w(f"<td>{_side_cell(row.get('baseline'))}</td><td>{_side_cell(row.get('candidate'))}</td>"
-              f"<td>{escape(COMPARISON_KO.get(cmp_, cmp_) if cmp_ else '-')}</td>")
+              f"<td>보안: {escape(COMPARISON_KO.get(cmp_, cmp_) if cmp_ else '-')}"
+              f"<br>기능: {escape(COMPARISON_KO.get(row.get('functional_comparison'), '-'))}"
+              f"<br>{escape(', '.join(row.get('comparison_reasons') or []))}</td>")
         else:
             w(f"<td>{_side_cell(row.get('single'))}</td>")
         w(f"<td>{'<br>'.join(marks) or '-'}</td></tr>")

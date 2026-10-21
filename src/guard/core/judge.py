@@ -134,6 +134,10 @@ def judge_evidence(
             elif verdicts[axis] == Verdict.FAIL and blocks:
                 reasons.append(f"{axis}: FAIL kept despite: {'; '.join(blocks)}")
 
+    if evd.comparability.cpu is not None:
+        verdicts["performance"] = Verdict.UNKNOWN
+        reasons.append("performance: explicit CPU comparison covers security/function only; performance unverified")
+
     mark, exc_reasons = _exception(check.id, policy, as_of)
     reasons.extend(exc_reasons)
 

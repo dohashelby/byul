@@ -296,6 +296,7 @@ execution:
   started_at: RFC3339|null
   finished_at: RFC3339|null
   abort_reason: str|null
+  cleanup_errors: [str]                        # 실행 후 정리 실패. 비어 있으면 직렬화 생략(과거 해시 유지)
 normal_control: { attempted: bool, succeeded: bool|null, detail: str }
 challenges:
   - step: str                                  # CheckDef.challenge_steps 중 하나
@@ -318,6 +319,7 @@ comparability:                                 # update 모드 비교 조건 (IN
   config_sha256: hex|null
   gpu: str|null
   driver: str|null
+  cpu: { architecture: str, model: str, system: str, kernel: str, threads: int } | null  # 명시적 CPU 비교만, 없으면 직렬화 생략
 ```
 
 - 수집 실패는 `collected: false`로 남긴다. 값을 비우거나 추정하지 않는다.
@@ -365,6 +367,8 @@ by_check:
     baseline:  { result: Ref|null, security: Verdict }
     candidate: { result: Ref|null, security: Verdict }
     comparison: Comparison                     # update 모드만
+    functional_comparison: Comparison          # update 모드, 값이 있을 때만
+    comparison_reasons: [str]                  # 불일치/미확인 필드, 값이 있을 때만
     gaps: [Gap]
     evidence_source: automated | manual | null             # 판정에 쓰인 최신 증거의 출처(실행 완료 시)
     replaced: { source, revision, executor, reason } | null # 출처가 다른 이전 증거를 대체함("대체됨")
@@ -431,7 +435,7 @@ CHG* ──────────┘                                          
 | **INV-06** | 환경 사실을 `false`로 쓰려면 비사용·비노출 근거가 필요하다. 근거 없는 `false`는 `null`로 취급한다. 빈 조건 목록은 "항상 참"이 아니다. | F(selector) |
 | **INV-07** | 자동 판정·권고는 승인이 아니다. 보고서의 `approval`은 사람만 쓴다. 코드가 `approval`을 채우지 않는다. | A1-7 |
 | **INV-08** | 정책 예외는 판정을 바꾸지 않는다. 예외가 승인된 `FAIL`도 `FAIL`이다. 만료·미승인 예외는 표시하지 않고 사유를 남긴다. | A1-5,11 |
-| **INV-09** | 버전 비교의 단위는 엔진 이미지다. 모델 inventory, 시험 자료, 설정, GPU·드라이버가 두 EVD에서 같아야 비교한다. 하나라도 다르거나 null이면 `NOT_COMPARABLE`. | A1-9 |
+| **INV-09** | 버전 비교의 단위는 엔진 이미지다. 모델 inventory·시험 자료·의미 있는 실행 설정이 같고 확인돼야 한다. GPU는 GPU·driver, 명시적 CPU(gpu_count=0)는 architecture/model/system/kernel/threads가 같아야 한다. CPU 프로파일 없이 GPU·driver가 null인 경우는 여전히 비교 불가다. CPU는 보안·기능만 비교하고 성능은 UNKNOWN이다(2026-10-19 사용자 결정). | A1-9 + CPU 결정 |
 | **INV-10** | 선정되지 않은 점검은 EVD·RES를 만들지 않는다. 선정됐지만 실행하지 못한 점검은 EVD(`status: NOT_RUN` 또는 `ABORTED`)와 RES(`UNKNOWN`)를 만든다. 둘을 같은 상태로 합치지 않는다. | A1-12 |
 | **INV-11** | `PASS`는 다음이 **모두** 관측될 때만 낸다: ① 정상 대조 성공 ② 모든 챌린지가 시도되고 기대대로 거부·무효 ③ `required_observations` 전부 `collected: true`. 하나라도 빠지면 `UNKNOWN`. 과차단(정상 대조 실패)은 `PASS`가 아니다. | F(05, L3) |
 | **INV-12** | 여러 근거를 집계한 `verification_level`·`data_origin`은 필수 근거 중 하나라도 null이면 null이다. null을 빼고 나머지로 대표값을 정하지 않는다. | A1-14 |
@@ -573,7 +577,8 @@ guard/
 │  ├─ executors/           # 점검 실행기
 │  ├─ judges/              # rule_table.py + 개별 판정기
 │  ├─ collectors/          # 환경 수집기 (file.py 먼저)
-│  ├─ runtime/             # docker CLI 래퍼. adapters/·executors/에서만 사용 (코어는 모름)
+│  ├─ application.py       # 제품 실행 합성 지점. side별 엔진 생명주기와 코어 파이프라인 연결
+│  ├─ runtime/             # Docker·sandbox. adapters/·executors/·application만 사용 (CLI·코어는 직접 제어하지 않음)
 │  └─ cli.py
 ├─ packs/PACK-BASELINE/    # §3
 ├─ tools/import_checklist.py
@@ -586,10 +591,16 @@ guard/
 ```bash
 guard select  --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml   # → PLAN
 guard run     --plan PLAN-...                                                  # → EVD들
+guard run     --plan PLAN-... --replace-manual                                 # 수동 증거를 명시적으로 새 실행으로 대체
 guard judge   --plan PLAN-...                                                  # → RES들 (재실행 = 재판정)
 guard report  --plan PLAN-... --html out.html                                  # → RPT
 guard update  --pack ... --baseline env-a.yaml --candidate env-b.yaml --policy ...  # 위 전체를 두 버전으로
 guard verify                                                                   # 저장소 해시 일괄 검증
+guard prepare-update --pack ... --baseline ... --candidate ... --policy ... --config ... # 읽기 전용 준비 검사
+guard evidence export --store ... --output evidence.zip                        # 검증한 DB 사본·artifacts·팩 반출
+guard evidence restore --bundle evidence.zip --destination new-store            # 새 경로에 무결성 검증 후 복원
+guard evidence template --plan PLAN-... --out manual.yaml                       # 수동 입력 양식
+guard evidence import manual.yaml                                              # 검증한 DECLARED 객체 배치 입력
 ```
 
 ---
@@ -597,8 +608,8 @@ guard verify                                                                   #
 ## 11. AI 코딩 에이전트에게 주는 작업 규칙
 
 1. **이 SPEC이 정본이다.** 원본 프레임워크·BoBProject 문서와 충돌하면 이 SPEC을 따르고, 충돌 사실을 `DECISIONS.md`에 적는다.
-2. **§8 순서대로 한 단계씩 만든다.** 단계마다 테스트가 통과한 뒤 다음으로 간다.
-3. **불변식마다 `tests/invariants/test_inv_XX.py`를 먼저 쓴다.** 구현이 불변식을 어기면 구현을 고친다. 불변식을 고치지 않는다.
+2. **§8의 개발 순서를 따른다.** 사용자 지시에 따라 합의한 구현 묶음을 마친 뒤 테스트하며, 묶음 안의 각 단계마다 테스트를 실행하지 않는다.
+3. **사용자 지시(2026-10-19): 구현 묶음을 마친 뒤 테스트 → 실패 수정 → 필요한 재검증 순으로 진행한다.** 불변식마다 `tests/invariants/test_inv_XX.py` 회귀를 유지한다. 구현이 불변식을 어기면 구현을 고치고 불변식을 완화하지 않는다.
 4. **§9 목록에 있는 것을 만들지 않는다.** 필요해 보이면 멈추고 사람에게 묻는다.
 5. **실제 결과를 꾸며 넣지 않는다.** 실행하지 않은 시험의 EVD를 만들거나 예시 값을 `MEASURED`로 표시하지 않는다(INV-02).
 6. **코어에 엔진 이름을 쓰지 않는다.** 엔진별 코드는 `adapters/`에만 둔다.

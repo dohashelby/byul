@@ -40,6 +40,8 @@ class RunConfig:
     adapter: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)  # guard.toml 전체 (플러그인 설정)
     replace_manual: bool = False  # 사람이 입력한 최신 증거를 새 실행 기록으로 대체할지(기본: 대체하지 않음)
+    side_configs: dict[str, RunConfig] = field(default_factory=dict)
+    abort_reason: str | None = None
 
 
 def _not_run_origin(plan: Plan) -> DataOrigin:
@@ -87,13 +89,26 @@ def _normalize(check: CheckDef, draft: EvidenceDraft) -> dict[str, Any]:
     return parts
 
 
-def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig) -> list[Evidence]:
+def validate_update_run_config(cfg: RunConfig) -> None:
+    effective = [cfg.side_configs.get(side, cfg) for side in ("baseline", "candidate")]
+    real_names = {name for c in effective for name, impl in c.executors.items() if impl == "real"}
+    if real_names and set(cfg.side_configs) != {"baseline", "candidate"}:
+        raise ValueError("real update runs require baseline and candidate side configurations")
+    for name in real_names:
+        if any(c.executors.get(name) != "real" for c in effective):
+            raise ValueError(f"{name}: both update sides must use real executors")
+        paths = [c.raw.get(name, {}).get("target") for c in effective]
+        if not all(paths) or Path(paths[0]).resolve() == Path(paths[1]).resolve():
+            raise ValueError(f"{name}: update sides need different target files")
+
+
+def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig, *, only_side: Side | None = None) -> list[Evidence]:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
     envs = [store.resolve(r) for r in plan.inputs.environments]
     policy = store.resolve(plan.inputs.policy)
-    adapter = registry.ADAPTERS[cfg.adapter]() if cfg.adapter in registry.ADAPTERS else None
-    adapter_info = PluginInfo(name=adapter.name, version=adapter.version) if adapter else None
+    if plan.mode == Mode.update:
+        validate_update_run_config(cfg)
 
     plan_ref = plan.ref()
     existing = {
@@ -106,6 +121,11 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig) -> list[Evide
             continue  # INV-10
         check = pack.checks[item.check_id]
         for side, env in _sides(plan, envs):
+            if only_side is not None and side != only_side:
+                continue
+            side_cfg = cfg.side_configs.get(side.value, cfg)
+            adapter = registry.ADAPTERS[side_cfg.adapter]() if side_cfg.adapter in registry.ADAPTERS else None
+            adapter_info = PluginInfo(name=adapter.name, version=adapter.version) if adapter else None
             prev = existing.get((check.id, side))
             if prev is not None and prev.execution.operator is not None and not cfg.replace_manual:
                 out.append(prev)  # 사람이 입력한 증거를 말 없이 덮지 않는다(SPEC §4.5 증거 대체 규칙)
@@ -119,7 +139,7 @@ def run_plan(store: Store, pack: Pack, plan: Plan, cfg: RunConfig) -> list[Evide
                 environment=env.ref(),
                 refs=[plan_ref, env.ref()],
             )
-            evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), cfg, adapter, adapter_info, plan, common)
+            evd = _run_one(store, check, item, env, policy.values.get(check.id, {}), side_cfg, adapter, adapter_info, plan, common)
             store.put(evd)
             out.append(evd)
     return out
@@ -137,6 +157,8 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
     reason = _blocked_reason(item, cfg)
     if reason:
         return stopped(ExecStatus.NOT_RUN, reason)
+    if cfg.abort_reason:
+        return stopped(ExecStatus.ABORTED, cfg.abort_reason)
 
     impl_name = cfg.executors[item.executor]
     started = utcnow()
@@ -168,6 +190,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
                 started_at=draft.started_at or started,
                 finished_at=draft.finished_at,
                 abort_reason=draft.abort_reason,
+                cleanup_errors=draft.cleanup_errors,
             ),
             artifacts=artifacts,
             comparability=draft.comparability,

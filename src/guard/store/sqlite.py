@@ -61,35 +61,44 @@ class Store:
     # --- 객체 ---------------------------------------------------------------
 
     def put(self, obj: GuardObject) -> Ref:
+        return self.put_many([obj])[0]
+
+    def put_many(self, objects: list[GuardObject]) -> list[Ref]:
+        """Append a batch in one transaction; any failure rolls back every object."""
+        if not objects:
+            return []
+        with closing(self._connect()) as con, con:
+            con.execute("BEGIN IMMEDIATE")
+            return [self._put(con, obj) for obj in objects]
+
+    def _put(self, con: sqlite3.Connection, obj: GuardObject) -> Ref:
         if not obj.hash_ok():
             raise IntegrityError(f"{obj.id} rev {obj.revision}: content_sha256 missing or wrong")
         for ref in obj.refs:
-            self._check_ref(ref)
+            self._check_ref(ref, con)
         body = canonical_json(obj.to_dict()).decode("utf-8")
-        with closing(self._connect()) as con, con:
-            row = con.execute(
-                "SELECT content_sha256 FROM objects WHERE id=? AND revision=?", (obj.id, obj.revision)
-            ).fetchone()
-            if row is not None:
-                if row[0] == obj.content_sha256:
-                    return obj.ref()  # 같은 내용의 재저장은 무해
-                raise AppendOnlyError(f"{obj.id} rev {obj.revision} already exists with different content")
-            latest = con.execute("SELECT MAX(revision) FROM objects WHERE id=?", (obj.id,)).fetchone()[0] or 0
-            if obj.revision != latest + 1:
-                raise AppendOnlyError(f"{obj.id}: next revision must be {latest + 1}, got {obj.revision}")
-            con.execute(
-                "INSERT INTO objects (id, revision, kind, content_sha256, created_at, body) VALUES (?,?,?,?,?,?)",
-                (obj.id, obj.revision, str(obj.kind), obj.content_sha256, obj.to_dict()["created_at"], body),
-            )
+        row = con.execute(
+            "SELECT content_sha256 FROM objects WHERE id=? AND revision=?", (obj.id, obj.revision)
+        ).fetchone()
+        if row is not None:
+            if row[0] == obj.content_sha256:
+                return obj.ref()  # 같은 내용의 재저장은 무해
+            raise AppendOnlyError(f"{obj.id} rev {obj.revision} already exists with different content")
+        latest = con.execute("SELECT MAX(revision) FROM objects WHERE id=?", (obj.id,)).fetchone()[0] or 0
+        if obj.revision != latest + 1:
+            raise AppendOnlyError(f"{obj.id}: next revision must be {latest + 1}, got {obj.revision}")
+        con.execute(
+            "INSERT INTO objects (id, revision, kind, content_sha256, created_at, body) VALUES (?,?,?,?,?,?)",
+            (obj.id, obj.revision, str(obj.kind), obj.content_sha256, obj.to_dict()["created_at"], body),
+        )
         return obj.ref()
 
-    def _check_ref(self, ref: Ref) -> None:
+    def _check_ref(self, ref: Ref, con: sqlite3.Connection) -> None:
         if ref.kind == "PACK":
             return  # 팩은 객체 저장소 밖(파일). Ref의 해시는 팩 로더가 검증한다
-        with closing(self._connect()) as con:
-            row = con.execute(
-                "SELECT content_sha256 FROM objects WHERE id=? AND revision=?", (ref.id, ref.revision)
-            ).fetchone()
+        row = con.execute(
+            "SELECT content_sha256 FROM objects WHERE id=? AND revision=?", (ref.id, ref.revision)
+        ).fetchone()
         if row is None:
             raise IntegrityError(f"ref not found: {ref.id} rev {ref.revision}")
         if row[0] != ref.sha256:

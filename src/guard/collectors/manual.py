@@ -4,7 +4,8 @@
 들어가고, 판정기(실행기 메타데이터의 기본 판정기 `declared`)가 PASS 관문을 적용해 RES를 만든다.
 - data_origin은 항상 DECLARED(INV-02). 입력자·시각은 execution.operator(인증되지 않은 자기 신고).
 - 선정되지 않은 점검은 거부(INV-10). 자동 실행기가 있는 점검은 override_reason이 있을 때만 받는다.
-- 검증은 전부 먼저, 쓰기는 전부 통과한 뒤(하나라도 틀리면 아무것도 쓰지 않음).
+- 양식·첨부 읽기·초안 생성은 전부 먼저, EVD 객체는 한 SQLite 트랜잭션으로 저장한다.
+- I/O 실패 시 참조되지 않은 새 내용 주소 blob은 남을 수 있다. 기존 증거는 삭제·재작성하지 않는다.
 양식 필드는 reference/framework/data/result_template.json을 참고했다(verdict 3축, normal_control_result,
 evidence, limitations, started_at/finished_at).
 """
@@ -25,6 +26,7 @@ from guard.models import (
     Mode,
     Pack,
     Plan,
+    Ref,
     Side,
     canonical_json,
     new_id,
@@ -36,7 +38,7 @@ from guard.store import Store
 
 TEMPLATE_VERSION = "guard-manual-evidence/1"
 EXECUTOR_NAME = "manual-entry"
-EXECUTOR_VERSION = "0.1.0"
+EXECUTOR_VERSION = "0.2.0"
 NORMAL_RESULTS = ("succeeded", "failed", "not_attempted")
 VERDICTS = ("PASS", "FAIL", "UNKNOWN")
 AXES = ("security", "functional", "performance")
@@ -120,6 +122,37 @@ def _filled(e: dict) -> bool:
     return any((e.get("verdicts") or {}).get(a) not in (None, "") for a in AXES)
 
 
+def read_document(path: Path) -> dict:
+    """Read one immutable-in-memory form and validate its outer structure."""
+    try:
+        doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ManualEvidenceError(f"cannot read manual evidence form ({type(exc).__name__})") from exc
+    return validate_document(doc)
+
+
+def validate_document(doc: Any) -> dict:
+    if not isinstance(doc, dict) or doc.get("template") != TEMPLATE_VERSION:
+        raise ManualEvidenceError("unsupported or missing manual evidence template version")
+    p = doc.get("plan")
+    if (not isinstance(p, dict) or not isinstance(p.get("id"), str)
+            or type(p.get("revision")) is not int or p["revision"] < 1 or not isinstance(p.get("sha256"), str)):
+        raise ManualEvidenceError("plan must contain id, positive integer revision and sha256")
+    entries = doc.get("checks")
+    if not isinstance(entries, list):
+        raise ManualEvidenceError("checks must be a list")
+    seen = set()
+    for entry in entries:
+        if (not isinstance(entry, dict) or not isinstance(entry.get("check_id"), str)
+                or not isinstance(entry.get("side"), str) or not isinstance(entry.get("verdicts"), dict)):
+            raise ManualEvidenceError("each check needs check_id, side and a verdicts mapping")
+        key = (entry["check_id"], entry["side"])
+        if key in seen:
+            raise ManualEvidenceError(f"duplicate check/side: {key[0]}/{key[1]}")
+        seen.add(key)
+    return doc
+
+
 def _validate(entry: dict, pack: Pack, plan: Plan, base: Path) -> dict:
     cid = entry.get("check_id")
     where = f"{cid}/{entry.get('side')}"
@@ -132,7 +165,10 @@ def _validate(entry: dict, pack: Pack, plan: Plan, base: Path) -> dict:
     if entry.get("side") not in [s.value for s in _sides(plan)]:
         raise ManualEvidenceError(f"{where}: side must be one of {[s.value for s in _sides(plan)]}")
     check = pack.checks[cid]
-    if check.executor is not None and not (entry.get("override_reason") or "").strip():
+    reason = entry.get("override_reason")
+    if reason is not None and not isinstance(reason, str):
+        raise ManualEvidenceError(f"{where}: override_reason must be text")
+    if check.executor is not None and not (reason or "").strip():
         raise ManualEvidenceError(f"{where}: check has an automated executor; override_reason is required")
     by = entry.get("entered_by")
     if not isinstance(by, str) or not by.strip():
@@ -145,23 +181,55 @@ def _validate(entry: dict, pack: Pack, plan: Plan, base: Path) -> dict:
         if v not in VERDICTS:
             raise ManualEvidenceError(f"{where}: verdict {a}={v!r} must be one of {VERDICTS}")
         verdicts[a] = v
-    nc = (entry.get("normal_control") or {}).get("result")
+    if not isinstance(entry.get("normal_control"), dict):
+        raise ManualEvidenceError(f"{where}: normal_control must be a mapping")
+    nc = entry["normal_control"].get("result")
     if nc not in NORMAL_RESULTS:
         raise ManualEvidenceError(f"{where}: normal_control.result must be one of {NORMAL_RESULTS}")
-    steps = entry.get("challenges") or []
+    steps = entry.get("challenges") if entry.get("challenges") is not None else []
+    if not isinstance(steps, list) or any(not isinstance(c, dict) for c in steps):
+        raise ManualEvidenceError(f"{where}: challenges must be a list of mappings")
     if [c.get("step") for c in steps] != list(check.challenge_steps):
         raise ManualEvidenceError(f"{where}: challenge steps must be exactly the CheckDef steps (no additions or removals)")
     for c in steps:
         if not isinstance(c.get("attempted"), bool):
             raise ManualEvidenceError(f"{where}: challenge attempted must be true/false: {c.get('step')!r}")
-    obs_in = {o.get("key"): o for o in entry.get("required_observations") or []}
+    observations = entry.get("required_observations") if entry.get("required_observations") is not None else []
+    if not isinstance(observations, list) or any(not isinstance(o, dict) for o in observations):
+        raise ManualEvidenceError(f"{where}: required_observations must be a list of mappings")
+    if any(not isinstance(o.get("key"), str) for o in observations):
+        raise ManualEvidenceError(f"{where}: observation keys must be text")
+    obs_in = {o.get("key"): o for o in observations}
+    if len(obs_in) != len(observations):
+        raise ManualEvidenceError(f"{where}: duplicate required_observations key")
     if set(obs_in) != {o.key for o in check.required_observations}:
         raise ManualEvidenceError(f"{where}: required_observations keys must match the CheckDef")
-    notes_in = {o.get("item"): o.get("answer") for o in entry.get("observation_notes") or []}
+    for observation in observations:
+        collected = observation.get("collected")
+        if collected is not None and type(collected) is not bool:
+            raise ManualEvidenceError(f"{where}: collected must be true, false or null (not quoted text or a number)")
+    notes = entry.get("observation_notes") if entry.get("observation_notes") is not None else []
+    if not isinstance(notes, list) or any(not isinstance(o, dict) for o in notes):
+        raise ManualEvidenceError(f"{where}: observation_notes must be a list of mappings")
+    if any(not isinstance(o.get("item"), str) for o in notes):
+        raise ManualEvidenceError(f"{where}: observation note items must be text")
+    notes_in = {o.get("item"): o.get("answer") for o in notes}
+    if len(notes_in) != len(notes):
+        raise ManualEvidenceError(f"{where}: duplicate observation_notes item")
+    if any(answer is not None and not isinstance(answer, str) for answer in notes_in.values()):
+        raise ManualEvidenceError(f"{where}: observation note answers must be text or null")
     if set(notes_in) != set(check.required_observations_prose):
         raise ManualEvidenceError(f"{where}: observation_notes items must match the CheckDef")
     files = []
-    for rel in entry.get("attachments") or []:
+    attachments = entry.get("attachments") if entry.get("attachments") is not None else []
+    if not isinstance(attachments, list) or any(not isinstance(s, str) for s in attachments):
+        raise ManualEvidenceError(f"{where}: attachments must be a list of paths")
+    if entry.get("basis") is not None and not isinstance(entry["basis"], str):
+        raise ManualEvidenceError(f"{where}: basis must be text or null")
+    limitations = entry.get("limitations") if entry.get("limitations") is not None else []
+    if not isinstance(limitations, list) or any(not isinstance(s, str) for s in limitations):
+        raise ManualEvidenceError(f"{where}: limitations must be a list of text")
+    for rel in attachments:
         path = (base / str(rel)).resolve()
         if not path.is_file():
             raise ManualEvidenceError(f"{where}: attachment not found: {rel}")
@@ -172,16 +240,14 @@ def _validate(entry: dict, pack: Pack, plan: Plan, base: Path) -> dict:
             "finished": _dt(entry.get("finished_at"), "finished_at", where)}
 
 
-def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None = None) -> dict:
+def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None = None, *, document: dict | None = None) -> dict:
     """채운 양식을 검증하고(전부), 통과하면 점검마다 DECLARED EVD를 새 revision으로 넣는다."""
     path = Path(path)
-    doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if doc.get("template") != TEMPLATE_VERSION:
-        raise ManualEvidenceError(f"unsupported template version {doc.get('template')!r}")
-    p = doc.get("plan") or {}
-    plan: Plan = store.get(p.get("id"), int(p.get("revision", 0)))
-    if plan.content_sha256 != p.get("sha256"):
-        raise ManualEvidenceError("plan sha256 in the form does not match the stored plan")
+    doc = read_document(path) if document is None else validate_document(document)
+    p = doc["plan"]
+    plan: Plan = store.resolve(Ref(kind="PLAN", id=p["id"], revision=p["revision"], sha256=p["sha256"]))
+    if plan.kind != "PLAN":
+        raise ManualEvidenceError("form must reference a PLAN")
     if plan.inputs.pack != pack.ref():
         raise ManualEvidenceError("pack does not match the one the plan used")
     now = now or utcnow()
@@ -194,20 +260,27 @@ def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None =
     existing = {(e.check_id, e.side): e for e in store.find_latest("EVD", lambda e: e.plan == plan_ref)}
     default_judge = registry.EXECUTOR_DEFAULT_JUDGES.get(EXECUTOR_NAME)
     imported = []
+    prepared = []
+    payloads: dict[str, bytes] = {}
     for v in valid:
         e, check = v["entry"], v["check"]
         side = Side(e["side"])
         at = v["at"] or now
         artifacts = []
         for rel, fpath in v["files"]:
-            stored = store.put_artifact(fpath.read_bytes())
-            artifacts.append(Artifact(name=Path(rel).name, path=stored.path, sha256=stored.sha256, bytes=stored.bytes,
+            try:
+                data = fpath.read_bytes()  # Read every attachment before any write.
+            except OSError as exc:
+                raise ManualEvidenceError(f"cannot read attachment ({type(exc).__name__})") from exc
+            digest = sha256_hex(data)
+            payloads[digest] = data
+            artifacts.append(Artifact(name=Path(rel).name, path=f"artifacts/{digest}", sha256=digest, bytes=len(data),
                                       collected_at=at, collector=f"{EXECUTOR_NAME}/{v['by']}"))
         observations: dict[str, dict] = {}
         for o in check.required_observations:
             given = v["obs"][o.key]
             collected = given.get("collected")
-            collected = (given.get("value") is not None) if collected is None else bool(collected)
+            collected = (given.get("value") is not None) if collected is None else collected
             observations[o.key] = {"value": given.get("value") if collected else None, "collected": collected}
         observations["declared_verdicts"] = {"value": v["verdicts"], "collected": True}
         observations["declared_basis"] = {"value": e.get("basis"), "collected": e.get("basis") is not None}
@@ -242,6 +315,14 @@ def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None =
             observations=observations,
             artifacts=artifacts,
         ).seal()
-        store.put(evd)
+        prepared.append(evd)
         imported.append(check.id)
+    try:
+        for data in payloads.values():
+            store.put_artifact(data)
+        store.put_many(prepared)
+    except Exception as exc:
+        # Content-addressed blobs may remain after an I/O failure. No EVD batch
+        # is partially committed, and existing blobs are never deleted/rewritten.
+        raise ManualEvidenceError(f"no evidence objects imported ({type(exc).__name__})") from exc
     return {"imported": imported, "skipped": skipped, "plan": plan.id}

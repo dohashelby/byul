@@ -522,3 +522,20 @@ git status
 - 검증 명령: 기존 가상환경 Python으로 TEMP의 compare_upstream.py, validate_catalog.py, validate_upstream_reference.py를 실행하고 git diff --check/상태를 확인한다. 실제 종료 결과는 완료 후 아래에 기록한다. pytest/엔진 시험·Phase 2·의존성 추가·커밋/푸시는 수행하지 않는다.
 - 완료 검증: 기존 `..\..\.venv\Scripts\python.exe -X utf8`로 TEMP의 compare_upstream.py·validate_catalog.py·validate_upstream_reference.py를 실행해 각각 종료 코드 0을 확인했다. 원문 정책 의미는 수동 검토하고 스크립트는 연결/경로/일치만 확인했다. 77개 CHK 연결(유일 subtest73·수동 대조4), 참조 기준28·분기 설명112, CSV303개 전부의 고정 외부 출처772개를 확인했다. 전체 고유 출처1,736개(로컬/원격 JSON·YAML Pointer1,622·외부 문서 앵커105·코드 행9)가 실존하며 기존11개 파라미터·77개 연결·정규화595·분류a11/b12/c165/d115는 동일하다.
 - 최종 보존: 보호 경로3,932개 파일 해시/집합과 기존 진행·결정 기록 바이트 보존 확인. 변경 파일은 기존 허용된 네 파일뿐이고 UTF-8/LF·제어문자 없음·CSV/MD 집계와 링크·git diff --check 통과. 최신 문서를 gua의 이전 변환기로 곧바로 재수입할 경우 질문 변경+subtest 충돌 네 항목에서 ID 연속성이 보장되지 않는 점도 문서에 명시했다. 원문·팩·코드·기업 값·실행 증거를 변경하지 않았으며 pytest/엔진·Phase 2·커밋/푸시는 미수행이다.
+
+
+## 2026-10-21 — Phase 2 정책 양식 M1
+- 시작: codex/gua-integration-20261021 / 58b1539a170894ec261c14ee0dac02f286c15a62. fetch 후 원격과 동일. 미커밋 Phase 1 네 문서의 사본/해시를 별도 ignored out/test-runs/policy-m1-20261021에 보존하고 codex/gua-policy-template-m1 브랜치를 만들었다.
+- 승인 범위: guard policy template --pack --out, 값 키 생략+주석, 기존 계약 유지. 구현/테스트 코드를 한 묶음으로 마친 뒤 검증한다. core/models/judges/팩/기업 값/엔진/외부 CHK 확대 없음.
+- 구현: CLI 그룹과 collectors/policy_template.py, 팩 Ref 일치 시에만 사용하는 패키지 설명 JSON, 입력 계약 회귀, docs/POLICY_TEMPLATE.md 및 사용 문서. 미입력 기본값·담당자·승인 기록을 만들지 않고 기존 파일을 덮어쓰지 않는다.
+- PR 기준 사전 확인: 기존 통합 PR #2는 main 대상 open/draft이며 미병합. 새 head PR은 없음. M1은 통합 브랜치를 base로 하는 의존 초안 PR로 준비한다. GitHub 연결 도구 404 후 Git Credential Manager의 기존 인증을 메모리에서 사용해 공식 API 상태를 읽었다. 인증값은 파일/로그에 남기지 않았다.
+- 검증 결과는 구현 묶음 완료 후 아래에 기록한다. 과거 CI를 이번 M1 통과로 사용하지 않는다.
+
+### M1 로컬 검증 및 설치본 확인
+- 구현/테스트/문서 묶음 완료 후 첫 기본 실행: `uv run pytest -q --basetemp=.review-tests-policy-m1 --junitxml=out/test-runs/policy-m1-20261021/first.xml --durations=8` → 534 passed, 1 failed, 4 skipped, 18 deselected / 128.94초. 새 UTF-8 검사에서 제목을 '정책 양식'으로 잘못 기대했으나 실제 제목은 '정책 입력 양식'이었다. 테스트 기대 문구만 바로잡았고 판정/입력 계약을 완화하지 않았다. 패키지 설명의 기존 혼합 언어 표현도 한국어로 정리했다.
+- 수정 후 기본 전체 실행: `uv run pytest -q --basetemp=.review-tests-policy-m1-final --junitxml=out/test-runs/policy-m1-20261021/final.xml --durations=8` → **535 passed, 4 skipped, 18 deselected / 117.56초**. Python 3.11.16 / Windows. skip은 기존 닫힌 루프백 포트의 refused/timeout 차이 3건과 symlink 권한 1건이다. docker/engine 18건은 기본 마커 제외다. Linux 통과나 1분 목표 충족으로 대체하지 않는다.
+- `uv build --wheel --out-dir out/test-runs/policy-m1-20261021/dist` 성공. 별도 환경에 `UV_PROJECT_ENVIRONMENT=out/test-runs/policy-m1-20261021/installed-env uv sync --frozen --no-install-project` 후 `uv pip install --python .../installed-env/Scripts/python.exe --no-deps .../guard-0.1.0-py3-none-any.whl`로 설치했다. 설명 정리 후 wheel 재빌드·재설치도 성공했다.
+- 저장소 밖 TEMP 작업 디렉터리에서 설치본 CLI/격리 Python의 8개 명령 성공: 패키지 import 위치 확인→policy template help→실제 11개 양식 생성→기존 파일 보호(예상 종료 1)→빈 정책 select→로더/77개 PLAN·필수 누락 5개 확인→부분 정책 select→누락 4개/Store.verify 확인. ENV는 EXAMPLE 합성 fixture이며 엔진/시험 실행은 하지 않았다. template 자체는 Store·ENV·설정 없이 실행했고 양식 생성 직후 .guard가 없음을 확인했다.
+- `python -I`의 import 위치가 설치 환경 site-packages임을 확인했고 wheel에 policy_template_metadata.json이 포함됐다. 현재 팩 설명과 Ref 일치, 다른 팩 선언/미지정 설명, 빈/부분/null/잘못된 타입, [], false, 0, REQ-09 소비자 계약, 출력 보호·UTF-8/LF 회귀를 확인했다.
+- 보존: 시작 보호 파일 230개 중 기존 변경은 src/guard/cli.py만이다. core/models/judges 각 0건, 팩 revision 10/DRAFT·정책/예시/실험실/참고/기존 증거 불변. 새 모듈/설명 JSON/회귀는 별도로 추가했다. Phase 1 CSV/MD는 시작 바이트와 동일하며 DECISIONS/PROGRESS는 기존 내용을 prefix로 보존하고 M1 기록만 추가했다. 실행 로그/검사 보조 파일은 ignored out/test-runs/policy-m1-20261021에 있다.
+- 원격 Linux CI는 아직 push 전이므로 미확인이다. 로컬 결과와 구분해 push/초안 PR 후 확인한다. 새 정책 자동화·실제 엔진·두 이미지 실증을 M1 완료로 집계하지 않는다.

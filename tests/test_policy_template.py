@@ -62,10 +62,11 @@ def test_current_declarations_metadata_and_empty_values(tmp_path):
     text = build_policy_template(pack)
     data = yaml.safe_load(text)
     declarations = {(c.id, p.key) for c in pack.active_checks() for p in c.policy_params}
-    assert len(declarations) == 11
+    assert len(declarations) == 13
+    assert {cid for cid, key in declarations} == {"REQ-01", "REQ-03", "REQ-09", "PLT-01", "PLT-04", "SUP-14", "LIF-07"}
     assert set(data["values"]) == {cid for cid, key in declarations}
     assert all(value == {} for value in data["values"].values())
-    assert text.count("# 파라미터: ") == 11
+    assert text.count("# 파라미터: ") == len(declarations)
     for cid, key in declarations:
         assert f"# 파라미터: values.{cid}.{key}\n" in text
     # 카탈로그는 런타임 의존성이 아니라 설명의 검토 출처다.

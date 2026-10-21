@@ -5,7 +5,7 @@ reference 폴더랑 CLAUDE.md랑 *_PROMPT.md로 개발 시작했습니다. 업�
 
 - [재평가·구현 결과와 개발 계획](docs/REVIEW_AND_DEVELOPMENT_PLAN.md)
 - [설치·audit·update·실증 안내](docs/RUNBOOK.md)
-- [빈 기업 정책 양식 생성(M1)](docs/POLICY_TEMPLATE.md)
+- [기업 정책 양식·필수 정책 입력 전제(M1/M2)](docs/POLICY_TEMPLATE.md)
 - [Managed 업데이트 설정](examples/update-managed.toml), [외부 대상 설정](examples/update-external.toml)
 
 guard update CLI와 scoped 실행기 5개가 연결돼 있습니다. 신규 PLT-04·REQ-09는 모의 계약 검증 상태이며,

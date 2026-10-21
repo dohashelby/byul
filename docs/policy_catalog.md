@@ -1,18 +1,18 @@
 # 기업 정책 카탈로그 — Phase 1 검토 초안
 
-작성일: 2026-10-21 (Asia/Seoul). **확인된 데이터/코드 사실**, **원문 해석**, **후속 설계 제안**을 구별한다. 기업 정책값·담당자·승인 기록은 작성하지 않았다. Phase 2는 미착수다.
+작성일: 2026-10-21 (Asia/Seoul). **확인된 데이터/코드 사실**, **원문 해석**, **후속 설계 제안**을 구별한다. 기업 정책값·담당자·승인 기록은 작성하지 않았다. M2에서 선언 두 개와 수동 정책 입력 전제를 보강했다. Phase 1의 제안/검토 기록과 현재 구현을 구별하며 변경 내용은 §15를 따른다.
 
 ## 1. 검토 기준과 범위
 
 - 기준 브랜치: `codex/gua-integration-20261021`.
-- 검토 HEAD 및 fetch 후 원격 HEAD: `58b1539a170894ec261c14ee0dac02f286c15a62`.
+- Phase 1 검토 HEAD 및 당시 fetch 후 원격 HEAD: `58b1539a170894ec261c14ee0dac02f286c15a62`.
 - 작업 경로: `C:/Users/dudwh/.codex/.chatgpt-projects/g-p-6ad495c4b4b88191a115b83333cdb9c3/gua/.assessment/integration-20261021`.
 - origin: `https://github.com/dohashelby/gua.git`; 원격 main: `d9e9729116eeb16299247ecb9e7df8ff16d882ec`.
 - 기존 기본 작업 트리는 main이고 `.assessment/`가 미추적이었다. 기존 통합 작업 트리는 깨끗했으므로 그 경로를 사용했다. fetch 후 통합 브랜치 앞섬/뒤짐 `0/0`; `git pull --ff-only`는 `Already up to date.`. 원격 main만을 기준으로 삼지 않았다. 다른 두 작업 트리는 수정하지 않았다.
 - 사용자 추가 참고: [체크리스트와 보완 가이드](https://github.com/mg-princess/serving-security-framework/blob/cdfea2401007091f8e5452d87d4ff2fbfaf1219f/03_체크리스트와_보완가이드.md)의 고정 커밋 `cdfea2401007091f8e5452d87d4ff2fbfaf1219f`. 팀 참조 기준 28개와 최신 CHK 연결·변경 사항은 §14에 정리했다.
-- 확인된 팩: PACK-BASELINE revision 10, DRAFT. [CLAUDE](../CLAUDE.md), [정책 요청](../POLICY_PROMPT.md), [SPEC](../SPEC.md), [결정 기록](../DECISIONS.md), [진행 기록](../PROGRESS.md)을 기준으로 코드·77 CheckDef·원문 JSON을 대조했다.
-- [POLICY_PROMPT](../POLICY_PROMPT.md)의 “3행만 구조화”는 과거 설명이다. 현재는 **5개 점검·11개 파라미터**이며 과거 실측 3개와 신규 모의 검증 2개를 구별해야 한다.
-- 변경 범위: 이 문서, [CSV](policy_catalog.csv), DECISIONS의 관련 열린 질문, PROGRESS의 작업 기록. 코드·팩·정책 파일·SPEC·기존 증거·참고 원문은 변경하지 않는다. 커밋·푸시·엔진/운영 시험·유료 자원 생성·새 의존성 설치는 수행하지 않는다.
+- 현재 팩: PACK-BASELINE revision 11, DRAFT(M1은 revision 10). [CLAUDE](../CLAUDE.md), [정책 요청](../POLICY_PROMPT.md), [SPEC](../SPEC.md), [결정 기록](../DECISIONS.md), [진행 기록](../PROGRESS.md)을 기준으로 코드·77 CheckDef·원문 JSON을 대조했다.
+- [POLICY_PROMPT](../POLICY_PROMPT.md)의 “3행만 구조화”는 과거 설명이다. M1은 5개 점검·11개 파라미터였고 M2는 **7개 점검·13개 파라미터**다. 자동 실행기 연결은 5개로 유지하며 과거 실측 3개와 신규 모의 검증 2개를 구별해야 한다.
+- Phase 1 당시 변경 범위: 이 문서, [CSV](policy_catalog.csv), DECISIONS의 관련 열린 질문, PROGRESS의 작업 기록. 코드·팩·정책 파일·SPEC·기존 증거·참고 원문은 변경하지 않는다. 커밋·푸시·엔진/운영 시험·유료 자원 생성·새 의존성 설치는 수행하지 않는다.
 
 ## 2. 용어와 CSV 계약
 
@@ -50,14 +50,14 @@ CheckDef는 무엇을 어떻게 검사하는지의 정의다. POL은 기업이 �
 | 원문 정규화 결정 발생 수(점검별, 중복 통합 전) | 595 |
 | 점검 ↔ 정책 ID 고유 연결 수 | 595 |
 | 중복 정리 후 카탈로그 고유 항목 수 | 303 |
-| a 이미 policy_params로 구조화 | 11 |
-| b 기존 지원 타입으로 구조화 가능한 후보 | 12 |
+| a 이미 policy_params로 구조화 | 13 |
+| b 기존 지원 타입으로 구조화 가능한 후보 | 10 |
 | c 수치 도출 방법/기준선 결정 우선 | 165 |
 | d 복잡한 구조/형태 추가 설계 | 115 |
 | 수치를 포함한 항목 전체 | 166 |
 | 그중 도출 방법 결정이 먼저인 신규 c | 165 |
 | 수치이면서 복잡한 형태 | 164 |
-| 파라미터 선언이 있는 점검 / 파라미터 | 5 / 11 |
+| 파라미터 선언이 있는 점검 / 파라미터 | 7 / 13 |
 | numeric_values_pending 필드가 있는 원문 행 | 40 |
 
 영역별 CheckDef는 SUP 16, REQ 21, PLT 12, LIF 16, OBS 12다. `items=28`, `scenarios=83`은 추적용 원천 목록이며 점검 수가 아니다.
@@ -88,7 +88,7 @@ CheckDef는 무엇을 어떻게 검사하는지의 정의다. POL은 기업이 �
 
 동일성 미정이라 합치지 않은 후보: INPUT-RENDER-LIMIT ↔ REQ-09-MAX-INPUT-TOKENS(측정 위치/입력 형식), EVENT-SCHEMA ↔ AUDIT-REQUIRED-RECORDS(사건/필수 기록 범위), RESULT-RETRY ↔ INFERENCE-RETRY-ALLOW(전달 권한/자원 수명 계약), SUP reader ↔ replay reader(소비자/신뢰 경계). 이 후보는 이름 유사성만으로 통합하지 않았다.
 
-## 6. 기존 11개 파라미터: 선언·소비·검증 범위
+## 6. 파라미터 13개: 기존 11개와 M2 등록 2개
 
 공통 로더는 [collectors/file.load_policy](../src/guard/collectors/file.py)에서 pack id/revision을 대조해 POL을 만들고 팩 Ref 해시를 채운다. `Policy.values`의 Any 저장만으로 타입/의미가 검증되는 것은 아니다. [core/select](../src/guard/core/select.py)가 선언된 파라미터를 확인하고 [core/run](../src/guard/core/run.py)이 점검별 values를 실행기에 전달한다. [rule_table](../src/guard/judges/rule_table.py)은 직접 value_policy/when_policy가 있는 규칙만 POL을 읽는다.
 
@@ -105,6 +105,13 @@ CheckDef는 무엇을 어떻게 검사하는지의 정의다. POL은 기업이 �
 | `values.PLT-04.forbidden_mount_paths` (list[str]) | 실행: credential_exposure.validate_policy가 절대 경로/.. 검사; 금지 경로와 bind/volume 목적지의 상위·하위 포함 비교 | 판정: exposed_credential_paths 빈 목록/nonempty; 정책을 직접 읽지 않고 실행기가 만든 관측 소비 | EXAMPLE 모의 계약 기록; 실제 엔진 미실증 |
 | `values.REQ-09.max_input_tokens` (int) | 실행: input_validation.validate_policy가 양수/초과 시험 예산 검사; collect가 한도+1 token-array 생성 | 판정: REQ-09 표는 이 정수를 직접 참조하지 않음; challenge_outcomes 소비 | EXAMPLE 모의 계약 기록; 실제 엔진 미실증 |
 | `values.REQ-09.rejection_codes` (list[str]) | 실행: input_validation.validate_policy가 비어 있지 않은 400/413/422 문자열 목록 확인 | 판정: rule_table value_policy all_in; 계획한 두 challenge 응답을 비교 | EXAMPLE 모의 계약 기록; 실제 엔진 미실증 |
+
+M2에서 다음 두 개를 추가했다. 두 값은 선정의 타입/누락 검사, 양식 주석과 수동 입력 전제 확인에만 사용한다. 자동 실행·목록 충족 판정은 구현하지 않았으며 NO_EXECUTOR가 유지된다. 위 기존 11개에도 수동 declared 0.2.0의 필수 키 누락 관문을 적용한다.
+
+| 값 경로 | 선언·소비 | 검증 범위 |
+|---|---|---|
+| `values.SUP-14.required_checks` (list[str], 필수) | 기업이 식별하는 필수 검사 목록. select/template/수동 필수 키 존재 검사 | EXAMPLE 입력·선정·수동 판정 계약; 검사 성공 자동 판정·실측 아님 |
+| `values.LIF-07.required_readiness_items` (list[str], 필수) | 기업이 식별하는 필수 준비 항목 목록. select/template/수동 필수 키 존재 검사 | EXAMPLE 입력·선정·수동 판정 계약; worker/model 준비 자동 관측·실측 아님 |
 
 PLT-01의 목록은 실제 수집값을 판정표가 비교한다. `require_non_root=false`는 UID 0 검사 전제만 생략하며 특권 모드·host namespace의 고정 금지까지 완화하지 않는다. 마운트는 bind/volume 목적지:ro/rw, 장치는 host:container:권한, 실행 가능한 쓰기는 마운트 지점 목록이다. 이 단순 문자열 목록 계약을 새로운 복잡한 역할 허용표의 지원 증거로 확장하지 않는다.
 
@@ -128,7 +135,7 @@ select는 팩의 선언들을 순회하므로 정책 범위 밖 점검에 주어
 
 REQ-09 추가 소비 계약: max_input_tokens는 정확한 int이면서 양수. 실행 설정 vocab_size도 양의 int이고 vocab_source가 있어야 한다. 실제 모델 일치 여부는 별도 입증한다. max_probe_tokens는 bool/문자열이 아닌 int≥2이며 **max_input_tokens+1 ≤ max_probe_tokens**여야 한다(현재 실행기 코드 기본 예산 4096은 시험 설정 기본값이며 기업 정책값 아님). rejection_codes는 비어 있지 않은 문자열 목록이고 지원 값은 `400`, `413`, `422`다. 정상 대조는 engine token-array prompt=[0] 하나와 전후 정상 응답을 요구한다. 시험은 vocab_size ID와 한도+1 길이를 사용하며 음수 ID·모든 형식/조합은 포함하지 않는다. 2xx challenge는 FAIL, timeout/5xx/비채택 거부 응답은 곧바로 PASS가 아니며 관측과 정상 대조에 따라 UNKNOWN이다.
 
-### Phase 2의 null 양식 충돌 — 미결정
+### Phase 2의 null 양식 충돌 — M1에서 선택 1 적용
 
 1. **미입력 키를 생략하거나 설명 주석만 제공**: 현재 계약·NO_POLICY_VALUE·기존 해시/팩 동작을 유지한다. 필수 키 이름·타입·설명·담당 역할은 주석에 보여 주고 실제 values 아래에는 채운 키만 둔다. 기존 11개를 대상으로 template 명령/문서/테스트를 추가하는 것이 최소 변경 권고다. 정책 확정이나 새 소비자 구현은 포함하지 않는다.
 2. **명시적 미입력 값을 지원하는 새 계약**: null/별도 표식의 의미, 잘못 입력한 null과의 구별, 파라미터 검증·선정·로더/직렬화·보고·기존 정책 호환성을 설계해야 한다. 코어 변경 및 불변식 영향 검토가 필요하며 현재 계약이라고 표현할 수 없다.
@@ -162,15 +169,15 @@ REQ-09 추가 소비 계약: max_input_tokens는 정확한 int이면서 양수. 
 | 자격/인증서·정책/철회 | 발급/배포/단절/철회 중 기준 사건은? issuer/provider/캐시/세션/사본별 만료·갱신·전파/회수 기한과 측정 근거는? | IAM·인프라 보안 정책 책임자 |
 | 관측/진단·보존/삭제 | 수집 주기/양/CPU·GPU·디스크, 지연/시계 오차/누락/경보/복구·용량/유실, 자료별 보존/예외 만료/삭제 완료/확인 기한의 의무·근거·사본 범위는? 확인된 필수 사건 누락을 정상으로 만들지 않는가? | 정보보호·개인정보 정책 책임자·관측 운영 책임자 |
 
-## 8. Phase 2 최소 제안과 완료 확인 (미착수)
+## 8. Phase 2 초기 제안과 이행 상태
 
-최소 권고 범위는 **현재 11개 선언의 정책 template와 현재 계약을 유지하는 미입력 표시**다. 기업이 선택한 b 후보를 추가할 경우에는 처음부터 전부 늘리지 않고 [SUP-CHECK-REQUIRED](policy_catalog.csv), READINESS-REQUIRED, INPUT-ENDPOINTS/FORMATS 등 목록의 의미·범위를 먼저 확인한다. CSV의 각 ID에는 P-DRAFT 접두어가 있으며 이 목록 선택은 제안이다. 자동 소비 없는 항목을 선언해도 새 자동화 점검이 완료되는 것은 아니다. 복잡한 표/절차 및 c의 실제 값 도출은 별도 설계/팀 결정으로 남긴다.
+Phase 1의 최소 권고인 **당시 11개 선언의 template와 키 생략 계약**은 M1에서 구현했다. M2는 그 위에 SUP-14/LIF-07 두 선언과 입력 전제/팩 출력 경계를 보강한다. 기업이 선택한 b 후보를 추가할 경우에는 처음부터 전부 늘리지 않고 [SUP-CHECK-REQUIRED](policy_catalog.csv), READINESS-REQUIRED, INPUT-ENDPOINTS/FORMATS 등 목록의 의미·범위를 먼저 확인한다. CSV의 각 ID에는 P-DRAFT 접두어가 있으며 이 목록 선택은 제안이다. 자동 소비 없는 항목을 선언해도 새 자동화 점검이 완료되는 것은 아니다. 복잡한 표/절차 및 c의 실제 값 도출은 별도 설계/팀 결정으로 남긴다.
 
 산출물 제안: `guard policy template --pack ...` 설계와 구현, 현재 계약에 맞춘 설명/타입/권장 역할/소비 범위 주석, 검토자가 선택한 b에 한한 policy_params/override 구조화와 팩 revision/보존본, 사용 문서 및 의미 있는 입력 계약 회귀. 별도 import 명령·새 타입·새 실행기·기업 기본값은 범위를 넓히는 별도 결정이다. core 변경 필요성·팩/SPEC/불변식 영향은 구현 전에 검토한다.
 
 완료 확인 제안: 빈/부분 입력의 누락 키 gap·null/잘못된 타입 거부·int의 bool/숫자 문자열 거부·[], false, 0의 소비자별 동작·REQ-09 양수/초과 예산/거부 코드·신규 항목의 선언/미선언 구분·기존 판정/직렬화/팩 보존·DRAFT/확정자 공란 유지. Phase 2가 승인된 뒤 구현 묶음 완료 시 기본 pytest 및 관련 회귀를 한 번 실행하고 실패만 수정/재확인한다. 지원 Linux의 기본 검증 1분 목표와 실제 소요를 보고한다. 엔진 실측은 별도 승인된 격리 환경/계획일 때만 수행하며 template 완료와 혼동하지 않는다.
 
-### 다음 작업 프롬프트 초안
+### Phase 1 당시 다음 작업 프롬프트 초안 (기록)
 
 > gua의 codex/gua-integration-20261021을 다시 fetch해 원격/로컬 상태와 HEAD·변경 사항을 확인하고 보존하라. docs/policy_catalog.csv/md와 DECISIONS의 POL-P1 질문을 읽어 Phase 1 해석/제안과 실제 구현을 구별하라. 사람이 선택한 미입력 계약 [선택 1 또는 2] 및 승인된 b 정책 ID [목록]만을 범위로 Phase 2 최소 변경 계획·영향·산출물·완료 기준을 먼저 제시하라. 계약 선택/정책 목록이 아직 미정이면 해당 의존 작업은 구현하지 마라. 기본 권고는 기존 11개 선언의 template를 키 생략/주석 방식으로 생성하고 select 계약을 유지하는 것이다. 복잡한 표를 문자열에 숨기지 말고 기업 값·실제 담당자·승인 기록을 만들지 마라. 승인된 구현은 한 묶음으로 마친 뒤 관련 회귀/기본 검증을 실행하고 실제 명령·결과·한계를 기록하라. 정책·팩 revision과 보존본·불변식을 유지하고 새로운 자동화/엔진 시험/유료 자원/커밋·푸시는 별도 지시 없이는 수행하지 마라.
 
@@ -669,7 +676,7 @@ REQ-09 추가 소비 계약: max_input_tokens는 정확한 int이면서 양수. 
 | P-DRAFT-RETENTION-DELETE-DEADLINE | 삭제 완료 기한을 정한다 | s 또는 일(선정 필요) | 이 결정의 적용 대상·경계·승인 역할·변경 시 재검토 조건은 무엇인가? | 제안: 정보보호·개인정보 정책 책임자·관측 운영 책임자 (정책 결정 역할; 실제 지정·승인 아님) |
 | P-DRAFT-RETENTION-VERIFY-DEADLINE | 삭제 완료 확인 기한을 정한다; 삭제 완료 기한과 별도 | s 또는 일(선정 필요) | 이 결정의 적용 대상·경계·승인 역할·변경 시 재검토 조건은 무엇인가? | 제안: 정보보호·개인정보 정책 책임자·관측 운영 책임자 (정책 결정 역할; 실제 지정·승인 아님) |
 
-## 13. 작성 후 검증 범위
+## 13. Phase 1 작성 후 검증 범위 (당시 기록)
 
 검증은 문서/데이터 정합성에 한정한다. CSV 표준 파싱·필수 열/다중값 타입, 정책 ID/점검 연결·77개 유일 원문/id_map 대응, 실제 JSON/YAML Pointer·코드 행, 11개 실제 선언 경로, 분류/수치/MD 집계, UTF-8/줄바꿈·문서 링크, 허용 파일 차이·보호 경로 SHA-256을 검사한다. 실행한 명령·결과는 [PROGRESS 이번 작업 기록](../PROGRESS.md)에 남긴다. 기본 pytest·엔진/운영 시험은 실행하지 않았으며 의미 해석의 완결성·실제 정책값 승인·실측 완료를 자동 검증 통과로 주장하지 않는다.
 
@@ -814,3 +821,16 @@ REQ-09 추가 소비 계약: max_input_tokens는 정확한 int이면서 양수. 
 | REQ-08·LIF-10·OBS-01/02/04/11·PLT-07의 문구/판정 설명 보강 | 우회 경로·실제 상태·수신 timeout/센서 미관측·필수 기록 누락의 한계를 유지 | 로컬 판정 규칙이나 실행 결과를 갱신하지 않음 |
 
 계수는 정책 제안 303개·점검 연결 595개 및 기존 분류를 유지한다. 새 독립 결정의 추가 대신 기존 표/계약의 범위·출처를 보강한 것이며, 기업 값이나 현재 자동 소비 경로는 추가하지 않았다. 기존 77개 연결/포괄 장부의 로컬 출처와 이번 외부 최신 출처를 함께 보존한다. 최신 원문의 CHK/분기 조건을 실제 팩·selector에 반영하는 작업은 Phase 1 범위 밖의 별도 설계 과제다.
+
+
+## 15. M2 반영 범위 (2026-10-21)
+
+출발점은 M1 `codex/gua-policy-template-m1` / `1dc82f0`이며 M2 작업 브랜치는 `codex/gua-policy-m2`다. 사용자 승인은 두 목록의 타입·필수 키 선언과 입력 계약 보완이며 기업 목록·담당자·승인·빈 목록의 업무 유효성을 확정한 것이 아니다.
+
+P-DRAFT-SUP-CHECK-REQUIRED → `values.SUP-14.required_checks`, P-DRAFT-READINESS-REQUIRED → `values.LIF-07.required_readiness_items`를 각각 required list[str]로 등록했다. 원소는 기업이 식별할 검사/준비 항목의 식별자이며 gua 점검 ID라고 가정하거나 역할×대상×조건 표를 문자열에 숨기지 않는다. 기존 ID·77점검·303결정·595연결은 그대로다. a13/b10/c165/d115로 분류만 갱신했다.
+
+팩 revision은 10→11, 대상 두 CheckDef는 1→2다. 자동 실행기/자동 판정 연결은 여전히 5개이며 새 두 점검의 NO_EXECUTOR가 유지된다. 목록을 입력해도 실제 검사/준비 완료는 자동 확인하지 않는다. 필수 키 missing은 NO_POLICY_VALUE, 명시 []는 값이며 내용의 적절성을 자동 승인하지 않는다.
+
+수동 declared 0.2.0은 필수 키 누락 상태의 신고 PASS만 UNKNOWN으로 보류하고 FAIL은 보존한다. 이전 수동 PASS도 정책 누락이 있으면 새 판정 revision에서 달라질 수 있으며 과거 RES/EVD를 수정하지 않는다. core/models·새 실행기·기업 실제 값·외부 CHK selector는 바꾸지 않는다.
+
+설명 JSON은 개발 도구 `tools/build_policy_template_metadata.py`로 선언/카탈로그 연결과 타입을 대조해 재생성한다. 런타임은 패키지 JSON만 읽고 정확한 현재 팩 Ref를 요구한다. 이전/외부 팩은 M1의 안전한 미지정 fallback을 유지하며 과거 팩 보존본 재판정과는 별개다. 실제 M2 검증 결과·환경·제약은 PROGRESS의 M2 기록에 남긴다.

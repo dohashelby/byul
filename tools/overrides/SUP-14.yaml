@@ -1,0 +1,4 @@
+policy_params:
+- key: required_checks
+  type: list[str]
+  required: true

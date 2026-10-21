@@ -20,7 +20,7 @@ uv build --wheel
 
 새 기업 정책 파일은 아래 명령으로 만들고 설명 주석을 따라 실제 결정값을 입력한다.
 빈 양식도 기존 로더/선정에서 읽히지만 선언된 필수 키가 없으면 `NO_POLICY_VALUE`다.
-기존 출력 파일은 덮어쓰지 않는다. [입력 계약·설명 출처](POLICY_TEMPLATE.md)를 함께 확인한다.
+기존 출력 파일은 덮어쓰지 않고 입력 팩 내부 출력도 거부한다. [입력 계약·설명 출처](POLICY_TEMPLATE.md)를 함께 확인한다.
 
 ```sh
 uv run guard policy template --pack packs/PACK-BASELINE --out my-policy.yaml

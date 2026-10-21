@@ -1,5 +1,5 @@
 id: SUP-14
-revision: 1
+revision: 2
 retired: false
 area: SUP
 purpose: 검사 결과 반영
@@ -12,7 +12,10 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 필수 검사 사용
-policy_params: []
+policy_params:
+- key: required_checks
+  type: list[str]
+  required: true
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 필수 검사 목록·대체 방법 충분성 검토자, 예외 대상·사유·보완 통제·승인자·기한·재검사 조건. 기업이 별도 위험 수용을 허용해도 검사 충족과 구별해 기록한다.

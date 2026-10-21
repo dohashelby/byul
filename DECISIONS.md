@@ -150,6 +150,14 @@
 - 2026-10-19 · 모델: `Execution.operator{by,at}`·`override_reason`, `ExecutorInfo.default_judge`, `CheckRow.evidence_source`·`replaced`, `Report.evidence_counts` — 모두 비어 있으면 직렬화에서 빠짐(기존 해시 유지). 사람이 입력한 증거(operator 있음)는 모델이 MEASURED를 거부.
 
 ## 열린 질문
+### POL-P1 (2026-10-21, Phase 1 검토 대기 — 결정 아님)
+- POL-P1-01 — `POLICY_PROMPT.md` Phase 2의 값 칸 null 제안은 현재 select의 null 타입 오류 계약과 충돌한다. 선택 1: 미입력 키 생략 또는 설명 주석만 제공하여 기존 NO_POLICY_VALUE/타입 검증 계약 유지. template/문서/회귀 범위로 끝낼 수 있어 최소 변경으로 권고한다. 선택 2: 명시적 미입력 null/표식의 새 계약을 도입하고 로더·선정·타입/의미 오류·직렬화/해시·보고·과거 정책 호환성을 검토한다. core/SPEC/불변식 영향 검토가 필요하다. 선택/구현은 하지 않았으며 사람이 결정한다. 키가 선언되지 않은 새 카탈로그 항목 전체에 현재 NO_POLICY_VALUE가 적용되는 것은 아니다.
+- POL-P1-02 — P-DRAFT 제안 ID와 결정 단위/공유 표의 범위를 채택할 것인가? `docs/policy_catalog.csv`의 수는 scalar 값 개수가 아니며 표 내부 역할·대상·모델·부하·주기별 셀은 독립이다. 현재 values.<check_id>.<key>는 보존한다. 유사 명칭만으로 기존/신규 경로를 통합하지 않는다. 원문에 유일한 정책 개수가 없어 원문 대비 중복 감소율은 만들지 않았다.
+- POL-P1-03 — 각 수치의 적용 자원·단위·peak/누적·단계/요청/전체 범위·모델/장치/부하·기준선/도출 규칙·시작/완료 사건과 승인 역할은 무엇인가? numeric_values_pending 40행은 수치 정책 40개가 아니며 목록 문장과 자원별 분해 후보를 구별한다. CPU/GPU/디스크·단계/누적·취득/추론 retry·신규/세션/사본 기한을 독립으로 검토한다. 유출·타요청 혼입·메모리 안전 오류는 정상 계산 오차로 수용하지 않는다.
+- POL-P1-04 — 정책 결정자·실행 담당자·검토자와 실제 정책/팩 확정 역할을 누가 지정할 것인가? 77행은 legacy_q_ids→items.policy_owner로 연결되지만 원문은 전부 “적용 조직의 정책 승인 담당”일 뿐 실제 지정이 아니다. CSV의 권장 역할은 제안이다. 미등록 ENV 후보와 실행 설정/고정 model/runtime 사실의 공급 책임도 별도로 정해야 한다.
+- POL-P1-05 — Phase 2 최소 범위를 기존 11개 선언의 template와 미입력 주석으로 할지, 검토된 b 후보 중 어느 ID까지 포함할지 결정해야 한다. 신규 목록의 policy_params 등록은 새 실행기/실측 완료를 뜻하지 않는다. PLT-04/REQ-09는 모의 계약 기록이며 기존 3개 실측과 수준이 다르다. REQ-09 양수 한도·한도+1 시험 예산·400/413/422 거부 코드를 유지하고 실제 vocab/서비스 한도 일치를 별도로 확인해야 한다. 상세 계획·완료 기준·다음 프롬프트는 docs/policy_catalog.md. 이 작업은 Phase 1에서 멈추며 구현·기업 값 확정·커밋·푸시는 수행하지 않는다.
+- POL-P1-06 (2026-10-21 추가 참고) — 사용자 지정 가이드의 팀 참조 기준 28개와 기업 확정값·ENV/관측을 구별한다. 외부 기준은 mg-princess/serving-security-framework / cdfea2401007091f8e5452d87d4ff2fbfaf1219f로 고정하고 카탈로그 §14 및 CSV source_refs에 연결했다. gua 기존 77개 ID와 최신 CHK의 연결은 유일 subtest 73개·의미 수동 대조 4개이며 배열 순서/숫자 변환을 사용하지 않았다. 향후 CHK·112개 분기 설명을 팩/selector에 도입할지와 정책/불변식 영향을 별도 검토해야 한다. 이번에는 원문·팩·코드·기업 값·확정자를 변경하지 않았고 Phase 2를 시작하지 않았다.
+
 - ~~(Step 3) PLT-01 hardened 프로필에서 vLLM이 뜨지 않음~~ → 2026-10-19 (c)로 해결(위). 원문: 원인: Docker tmpfs 기본값 `noexec` — torch inductor가 `/tmp/.cache/vllm/torch_compile_cache/…/*.main.so`를 mmap하지 못함("failed to map segment from shared object"). capability·non-root·읽기 전용 루트 때문이 아님. 선택지: (a) `/tmp` tmpfs에 `exec` 허용(`/tmp:rw,exec,size=2g,mode=1777`) — 실행 가능한 쓰기 영역이 생기는 완화 (b) 엔진 컴파일을 끄는 기동 옵션(`--enforce-eager` 또는 컴파일 단계 낮춤, 어댑터 launch_plan 옵션으로) — exec 불필요, 성능 특성이 바뀜 (c) 컴파일 캐시만 별도 tmpfs(exec)로 두고 `/tmp`는 noexec 유지(`TORCHINDUCTOR_CACHE_DIR`·`VLLM_CACHE_ROOT`) — 노출 범위가 가장 좁음. 결정 전까지 hardened 결과 없음.
 - ~~(Step 0) `.guard/`·`out/`의 추적 범위~~ → 분류안 승인.
 - (Step 0) Windows 경로 표기 실패 1건 — 알려진 제한으로 유지(사람 결정).

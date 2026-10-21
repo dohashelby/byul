@@ -74,7 +74,7 @@ function renderStatus(status) {
   $("session-id").textContent = `관측 세션 ${status.observation_session_id.slice(0, 8)}`;
   const external = status.backend_kind === "vllm";
   const backendBadge = $("backend-badge");
-  backendBadge.textContent = external ? "외부 vLLM backend · 실제 연결 검증 전" : "모의 엔진";
+  backendBadge.textContent = external ? "외부 vLLM 연결 · 정식 GPU 시험(S3B) 전" : "모의 엔진";
   backendBadge.className = external ? "badge badge-external" : "badge badge-mock";
   $("engine-title").textContent = external ? "외부 backend" : "모의 엔진";
 

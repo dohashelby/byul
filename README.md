@@ -173,7 +173,7 @@ setsid nohup .venv/bin/python -u -m serving_runtime mvp --backend vllm --backend
   --gateway-port 18080 --data-dir $D/data > $D/gateway.log 2>&1 < /dev/null &
 ```
 
-브라우저에서 `http://127.0.0.1:18080`을 엽니다. 위쪽에 "외부 vLLM backend · 실제 연결 검증 전" 배지가 보입니다.
+브라우저에서 `http://127.0.0.1:18080`을 엽니다. 위쪽에 "외부 vLLM 연결 · 정식 GPU 시험(S3B) 전" 배지가 보입니다. 실제 vLLM에 연결된 상태이며, 계획서의 정식 GPU 환경 시험은 아직 하지 않았다는 뜻입니다.
 
 4. 끄거나 다시 켜는 명령입니다.
 

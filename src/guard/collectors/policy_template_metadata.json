@@ -162,7 +162,7 @@
       "type": "list[str]",
       "description": "서비스가 허용하는 입력 endpoint 목록을 정한다",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "선정: required list[str] 타입·누락 검사 / 실행: input_validation 0.3.0 요청 전 단일 프로파일 검사 / 판정: rule_table 0.5.0·declared 0.9.0의 관측 대조와 PASS 상한; REQ09 수동 보안/기능은 판정표와 일치할 때만 신고 PASS 유지; 신고 FAIL 보존 / 보고: POLICY_CONTEXT·정책 목록·시험 및 미검증 범위 표시",
+      "consumer": "선정: required list[str] 타입·누락 검사 / 실행: input_validation 0.3.0 요청 전 단일 프로파일 검사 / 판정: rule_table 0.5.0·declared 0.9.1의 관측 대조와 PASS 상한; REQ09 수동 보안/기능은 판정표와 일치할 때만 신고 PASS 유지; 신고 FAIL 보존 / 보고: POLICY_CONTEXT·정책 목록·시험 및 미검증 범위 표시",
       "verification": "제한 프로파일의 합성 계약 검증 대상; 기업값/승인·실제 엔진·parser 소비 미검증",
       "catalog_id": "P-DRAFT-INPUT-ENDPOINTS"
     },
@@ -170,7 +170,7 @@
       "type": "list[str]",
       "description": "텍스트·직접 token 등 허용 입력 형식을 정한다",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "선정: required list[str] 타입·누락 검사 / 실행: input_validation 0.3.0 요청 전 단일 프로파일 검사 / 판정: rule_table 0.5.0·declared 0.9.0의 관측 대조와 PASS 상한; REQ09 수동 보안/기능은 판정표와 일치할 때만 신고 PASS 유지; 신고 FAIL 보존 / 보고: POLICY_CONTEXT·정책 목록·시험 및 미검증 범위 표시",
+      "consumer": "선정: required list[str] 타입·누락 검사 / 실행: input_validation 0.3.0 요청 전 단일 프로파일 검사 / 판정: rule_table 0.5.0·declared 0.9.1의 관측 대조와 PASS 상한; REQ09 수동 보안/기능은 판정표와 일치할 때만 신고 PASS 유지; 신고 FAIL 보존 / 보고: POLICY_CONTEXT·정책 목록·시험 및 미검증 범위 표시",
       "verification": "제한 프로파일의 합성 계약 검증 대상; 기업값/승인·실제 엔진·parser 소비 미검증",
       "catalog_id": "P-DRAFT-INPUT-FORMATS"
     },
@@ -194,7 +194,7 @@
       "type": "list[str]",
       "description": "실제 재사용을 구분하는 데 필요한 cache key 문맥 목록을 정한다",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "REQ-16 declared0.9.0 / manual_cache_context: same_authenticated_group_private의 문맥별3case 신고 PASS 상한; REQ-15/17 미등록; 자동 실행 없음",
+      "consumer": "REQ-16 declared0.9.1 / manual_cache_context: same_authenticated_group_private의 문맥별3case 신고 PASS 상한; REQ-15/17 미등록; 자동 실행 없음",
       "verification": "M12 제한 DECLARED 계약 구현; 검증 결과는 docs/POLICY_M12.md; 실제 엔진·신원·첨부 진위 미검증",
       "catalog_id": "P-DRAFT-CACHE-CONTEXT"
     },

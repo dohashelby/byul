@@ -65,7 +65,10 @@ def _rows(payload, contexts, artifacts):
     rows, events, bundle = {}, set(), set()
     for row in records:
         _require(type(row) is dict and set(row) == ROW_FIELDS, "RECORD_INVALID")
-        _require(all(_text(row[k]) for k in ROW_FIELDS - {"evidence"}), "RECORD_INCOMPLETE")
+        # An enum's unknown is a valid observation state, not a blank identifier.
+        _require(all(_text(row[k]) for k in ROW_FIELDS - {"evidence"} - ENUMS.keys()), "RECORD_INCOMPLETE")
+        _require(all(isinstance(row[k], str) and row[k].strip() and row[k] == row[k].strip()
+                     for k in ENUMS), "RECORD_INCOMPLETE")
         _require(all(row[k] in allowed for k, allowed in ENUMS.items()), "ENUM_INVALID")
         _require(row["context_id"] in contexts, "FOREIGN_CONTEXT")
         key = (row["context_id"], row["case"])
@@ -131,6 +134,8 @@ def evaluate(check, evidence, values) -> JudgeOutput | None:
                             and row["key_relation"] == ("same" if is_same else "different"))
                 secure &= controls and row["cache_effect"] == expected_effect
                 functional &= controls and row["cache_effect"] == expected_effect and row["inference"] == "succeeded"
+                if row["inference"] != "succeeded":
+                    reasons.append("POLICY_CONTEXT: CACHE_CONTEXT_INFERENCE_UNRESOLVED; functional PASS withheld")
                 if row["cache_effect"] == "old_context_reused":
                     reasons.append("POLICY_CONTEXT: CACHE_CONTEXT_CONTRADICTION; old context reuse declared")
         if secure:

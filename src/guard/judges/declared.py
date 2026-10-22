@@ -50,7 +50,7 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.9.0"
+    version = "0.9.1"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         input_context = policy_context(check, policy_values, evidence.observations)

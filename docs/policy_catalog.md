@@ -880,3 +880,7 @@ a로 이동한2개는 문맥 소비 구현을 뜻한다. 기업의 실제 값/�
 P-DRAFT-CACHE-CONTEXT를 a로 옮기고 values.REQ-16.required_cache_contexts 한 경로만 등록했다. 원래 공유 결정의 REQ15/16/17 연결은 유지하지만 REQ15/17은 미등록/미소비다. 분류 a는 일부 실제 경로의 구조화 여부이며 전체 보호 완료/실측 완료가 아니다. PUBLIC-PREFIX와 SUP모드/파생위치는 b로 남는다.
 
 현재 303결정595연결·a24/b3/c161/d115·15점검27경로·팩16/DRAFT·자동실행5다. 입력 두 행의 declared 소비 버전도0.9.0으로 갱신했다. [M12](POLICY_M12.md)의 선언/미검증 한계를 참고한다.
+
+## 22. M13 현재 상태 — REQ16 unknown 보완
+
+신규 정책 등록은 없다. CACHE-CONTEXT와 입력 두 행의 declared0.9.1 소비 설명·metadata만 갱신한다. 팩16/DRAFT·15점검27경로·303결정595연결·a24/b3/c161/d115·자동실행5는 같다. REQ15의 GROUP/SALT/PUBLIC-PREFIX와 M14 제안은 [M13](POLICY_M13.md)의 설계이며 현재 카탈로그 분류/경로에 반영하지 않는다.

@@ -179,3 +179,7 @@ false는 비활성 관측이 아니며 true는 실제 구현·권한·승인 증
 DRAFT·official·미인증 자기 신고·자동 검증 한계를 함께 확인한다. OBS04 false / 나머지 true 외의 문맥은
 신고 PASS를 UNKNOWN으로 보류하며 FAIL은 보존한다. false를 비적용이나 자동 제외로 해석하지 않는다.
 전체 분기·기업 결정·미검증 범위는 [M8 계약](POLICY_M8.md)에 있다.
+
+## M11 수동 관측 상충 처리
+
+REQ-09의 새 입력 범위 계약에서는 신고 PASS와 저장된 보안/기능 관측이 판정표와 일치해야 PASS 후보가 된다. 상충은 UNKNOWN 사유로 JSON/HTML에 표시한다. 원본을 고치지 말고 기존 PLAN/팩으로 재판정해 새 declared0.8.0 RES를 만들면 된다. 같은 as_of 재실행은 멱등이며 수동/3·override_reason·Ref/side 보호는 유지한다. [M11](POLICY_M11.md)에 명령/검증과 미구현 캐시 계약을 구분해 기록한다.

@@ -195,7 +195,7 @@ def test_manual_versions_report_side_history_and_idempotence(tmp_path, pack, ver
         expected = "PASS" if result.check_id in ("OBS-04", "OBS-07") else "UNKNOWN"
         if result.check_id == "OBS-08" and result.side == "candidate": expected = "FAIL"
         assert result.verdicts.security == expected
-        assert result.judge.version == "0.7.0" and result.data_origin == "EXAMPLE"
+        assert result.judge.version == "0.8.0" and result.data_origin == "EXAMPLE"
     report = build_report(st, pack, plan, T0).to_dict()
     text = json.dumps(report, ensure_ascii=False)
     assert not report["official"] and "POLICY_CONTEXT:" in text

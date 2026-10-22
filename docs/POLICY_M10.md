@@ -56,3 +56,7 @@ skip5는 기존 Windows 닫힌 루프백 포트 분류3건·symlink 권한2건�
 ## 한계와 다음 단계
 
 전체 기업 목록이 단일쌍이 아니면 값을 잘라 맞추지 않고 관계표 확장이 선행한다. REQ07/08/10, Gateway/다른 endpoint·형식, 금지 경로 전수, 재사용 ID/renderer/sampling, parser 소비·메모리/상태 영향은 이번 범위 밖이다. 합성 probe는 실제 엔진이나 두 이미지 실증이 아니다. 실제 기업 값·담당자·승인·대상/hop·모델/vocab·시험예산/중단조건의 근거는 팀이 준비해야 한다. 운영/유료 자원/실제 엔진은 실행하지 않는다.
+
+## M11 후속 검토
+
+M10의 성공한 기존 검증과 별개로, 수동 신고 PASS와 accepted_challenges/functional_probe_results가 상충해도 PASS가 유지되는 반례가 확인됐다. [M11](POLICY_M11.md)은 새 M10 계약의 보안/기능에 고정 판정표 PASS를 추가 요구한다. 과거 EVD/RES는 바꾸지 않고 새 declared0.8.0 재판정에서 상충 PASS를 UNKNOWN으로 기록한다. 이 공백이 M10에서 최초 도입됐다고 단정하지 않는다.

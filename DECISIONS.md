@@ -296,3 +296,9 @@
 ## 2026-10-22 M10 REQ-09 입력 범위 구현
 
 사용자 실행 지시로 M9 POL-M9-SCOPE/PAIR/OBS를 채택했다. REQ-09 단일 engine POST/token_ids 프로파일만 지원하며 기업 값·승인·실제 시험 대상은 확정하지 않는다. 과거 정의/부분 선언을 구분하는 순수 helper를 실행·두 판정기에서 공유한다. 판정기에서는 PASS만 제한하여 독립 FAIL을 보존한다. 수동 두 관측만 조건부 config hash에 포함하고 core/report의 rule_table POLICY_CONTEXT 전달만 보강한다. body는 기존 model/{model}·prompt 정수[0]·max_tokens 정수1·expect200을 고정하며 새 요청은 추가하지 않는다. 열린 업무 질문: 전체 승인 목록/관계표 필요성, 대상과 hop, 모델/vocab·예산·중단조건, 실제 담당자와 승인.
+
+## 2026-10-22 M11 — 수동 일관성 채택·캐시 설계 제안
+
+- POL-M11-MANUAL-CEILING 채택: 새 M10 REQ09 계약의 수동 보안/기능 PASS에 고정 rule_table PASS를 요구한다. 자동표 FAIL을 수동 FAIL로 복사하지 않고 상충 UNKNOWN, 신고 FAIL/UNKNOWN은 보존한다. 성능은 이번 보완 대상에서 제외한다. declared0.8.0이며 코어/실행기/저장소/수동 hash는 유지한다.
+- cache 제안/미등록: PUBLIC-PREFIX는 true/false 모두 보호 검토가 필요하고 비공개 공유 허용으로 확대하지 않는다. M12는 REQ16 required_cache_contexts와 같은 인증 집단 내 문맥별3case 수동 계약을 권고한다. /3 generic 관측의 첨부 hash 귀속을 판정 시 검사하며 별도 payload/양식/4·POL타입·코어 변경을 만들지 않는 안이다.
+- M12에서만 채택할 기술 식별자 model_generation/adapter_content/media_identity·schema·PASS상한은 docs/POLICY_M11.md에 있다. 기업 전체 목록/신뢰집단/실제 consumer와 객체/공개분류·담당/승인·대상/권한/예산/중단조건은 미정이다. 기업값을 추정하거나 목록을 지원 범위로 잘라 맞추지 않는다. REQ15신원·REQ17통계·SUP모드/파생위치는 후속이다.

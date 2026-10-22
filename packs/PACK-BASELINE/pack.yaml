@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 14
+revision: 15
 engines:
 - vllm
 checks:
@@ -178,7 +178,7 @@ files_sha256:
 - path: checks/REQ-08.yaml
   sha256: 580aa61d2c5739fe6c9e1fd88158b2b09188818ae7d72590574e6313caeab7ea
 - path: checks/REQ-09.yaml
-  sha256: a5cc9a31db732825c63b92f5edabb9d3a193d6eb496a3982cdf6dc76b3898666
+  sha256: 64d058795a354d16ecf1656b05e8eea1ea8f15c9c8aeff32fda5941dc256113b
 - path: checks/REQ-10.yaml
   sha256: 6c5fe6e88b18e4a4d2572907599bb9b17ee559ba2dc7a1e6b4f84ba4f7b628f7
 - path: checks/REQ-11.yaml

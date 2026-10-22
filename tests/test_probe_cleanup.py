@@ -32,7 +32,9 @@ def test_probe_cleanup_preserves_completed_failure(tmp_path, monkeypatch, cleanu
     monkeypatch.setitem(registry.EXECUTORS, "input_validation:cleanup", lambda c: InputValidationExecutor(c["input_validation"]))
     pack, env = baseline_pack(), environment(model={"id":"test"})
     pol = policy(pack.ref(), scope={"include":["REQ-09"]},
-                 values={"REQ-09":{"max_input_tokens":8,"rejection_codes":["400"]}})
+                 values={"REQ-09":{"max_input_tokens":8,"rejection_codes":["400"],
+                    "allowed_endpoints":[pack.checks["REQ-09"].functional_probes[0].id],
+                    "allowed_input_formats":["token_ids"]}})
     store = Store(tmp_path / "store")
     for obj in (env, pol): store.put(obj)
     plan = select(pack, [env], pol); store.put(plan)

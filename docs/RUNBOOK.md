@@ -16,6 +16,12 @@ uv build --wheel
 기본 테스트는 Docker/engine을 제외한다. 새 실행기는 실제 엔진 검증과 구분한다.
 실증의 store와 output은 기존 out/5b 밖의 새로운 경로를 사용한다.
 
+M10의 REQ-09는 두 required 정책 `allowed_endpoints`·`allowed_input_formats`도 필요하다.
+전체 승인 목록이 정의의 단일 engine POST/token_ids 표본과 일치할 때만 지원하며, 목록을 줄여 맞추지 않는다.
+빈 양식은 값을 채우지 않고 미입력은 NOT_RUN, 미지원 범위는 요청 전 ABORTED다.
+수동 증거는 `evidence template --include-automated`·비공백 override_reason과 두 generic 범위 관측을 사용한다.
+[M10 계약과 검증](POLICY_M10.md)을 확인한다. 실제 엔진/두 이미지 실증은 별도다.
+
 ## 기존 audit
 
 새 기업 정책 파일은 아래 명령으로 만들고 설명 주석을 따라 실제 결정값을 입력한다.

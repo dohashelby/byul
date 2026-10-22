@@ -141,7 +141,7 @@ def test_v2_end_to_end_report_and_rejudge(tmp_path,pack):
     assert outcomes["LIF-07"].verdicts.model_dump()=={"security":"PASS","functional":"PASS","performance":"UNKNOWN"}
     assert outcomes["SUP-03"].verdicts.security=="PASS"
     for evd in st.iter_kind("EVD"):
-        assert evd.data_origin=="DECLARED" and evd.execution.executor.version=="0.4.0"
+        assert evd.data_origin=="DECLARED" and evd.execution.executor.version=="0.5.0"
         if evd.check_id in PARAMETERS:
             payload=evd.observations[OBSERVATION].value
             assert payload["version"]=="guard-policy-evidence/1"

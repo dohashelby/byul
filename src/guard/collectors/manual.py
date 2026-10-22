@@ -20,6 +20,7 @@ import yaml
 
 from guard.executors import registry
 from guard import manual_audit
+from guard.input_policy import OBSERVATIONS as INPUT_OBSERVATIONS, contract_state as input_contract_state
 from guard.manual_policy import OBSERVATION, blank_evidence, normalize, parameter
 from guard.models import (
     DataOrigin,
@@ -43,7 +44,7 @@ V2_TEMPLATE_VERSION = "guard-manual-evidence/2"
 LEGACY_TEMPLATE_VERSION = "guard-manual-evidence/1"
 MODERN_TEMPLATES = (V2_TEMPLATE_VERSION, TEMPLATE_VERSION)
 EXECUTOR_NAME = "manual-entry"
-EXECUTOR_VERSION = "0.4.0"
+EXECUTOR_VERSION = "0.5.0"
 NORMAL_RESULTS = ("succeeded", "failed", "not_attempted")
 VERDICTS = ("PASS", "FAIL", "UNKNOWN")
 AXES = ("security", "functional", "performance")
@@ -366,6 +367,9 @@ def import_evidence(store: Store, pack: Pack, path: Path, now: datetime | None =
             if normalized_audit is not None:
                 observations[manual_audit.OBSERVATION] = {"value": normalized_audit, "collected": True}
         config = {k: e.get(k) for k in ("check_id", "side", "verdicts", "basis", "override_reason")}
+        if input_contract_state(check) != "legacy":
+            config["submitted_input_scope"] = {key: observations.get(key, {"value": None, "collected": False})
+                                               for key in INPUT_OBSERVATIONS}
         config["attachments"] = [a.sha256 for a in artifacts]
         if OBSERVATION in observations:
             config[OBSERVATION] = observations[OBSERVATION]["value"]

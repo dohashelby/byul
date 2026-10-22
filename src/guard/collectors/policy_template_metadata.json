@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 14,
-    "sha256": "c5e35da1b52e4438b1427e8c76b3ad767b415a35936479c841631df165e8dad0"
+    "revision": 15,
+    "sha256": "19fa4f3fd0c2348f8ad5384bb32eac74071c02bb342d6818b1c7205dfe12da63"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -157,6 +157,22 @@
       "consumer": "선정: core/select.py 타입·필수 키 / 실행: http_common.discover_routes; role_route에서 include_kinds에서 정책 종류를 차감 / 판정: REQ-03 표는 이 값을 직접 참조하지 않음; 제외 후 경로 관측으로 판정 / 수동 판정: declared 0.5.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
       "catalog_id": "P-DRAFT-REQ-03-GENERAL-ALLOWED-KINDS"
+    },
+    "values.REQ-09.allowed_endpoints": {
+      "type": "list[str]",
+      "description": "서비스가 허용하는 입력 endpoint 목록을 정한다",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: required list[str] 타입·누락 검사 / 실행: input_validation 0.3.0 요청 전 단일 프로파일 검사 / 판정: rule_table 0.5.0·declared 0.7.0의 관측 대조와 PASS 상한; FAIL 보존 / 보고: POLICY_CONTEXT·정책 목록·시험 및 미검증 범위 표시",
+      "verification": "제한 프로파일의 합성 계약 검증 대상; 기업값/승인·실제 엔진·parser 소비 미검증",
+      "catalog_id": "P-DRAFT-INPUT-ENDPOINTS"
+    },
+    "values.REQ-09.allowed_input_formats": {
+      "type": "list[str]",
+      "description": "텍스트·직접 token 등 허용 입력 형식을 정한다",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: required list[str] 타입·누락 검사 / 실행: input_validation 0.3.0 요청 전 단일 프로파일 검사 / 판정: rule_table 0.5.0·declared 0.7.0의 관측 대조와 PASS 상한; FAIL 보존 / 보고: POLICY_CONTEXT·정책 목록·시험 및 미검증 범위 표시",
+      "verification": "제한 프로파일의 합성 계약 검증 대상; 기업값/승인·실제 엔진·parser 소비 미검증",
+      "catalog_id": "P-DRAFT-INPUT-FORMATS"
     },
     "values.REQ-09.max_input_tokens": {
       "type": "int",

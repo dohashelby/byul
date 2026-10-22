@@ -292,3 +292,7 @@
 - POL-M9-OBS(기술제안): 두 실제 제출범위 관측·기존 fixture·수동 generic 관측/hash를 연결한다. real 선행검사만으로 충분하지 않아 오프라인 rule_table·declared에도 공유 순수 helper의 PASS 상한을 적용한다. 기존 FAIL/연산자/다른 점검은 보존한다. core/report 한 곳에서 rule_table의 안전한 POLICY_CONTEXT도 전달할 필요가 있다. 다른 코어/모델/저장소/비교/어댑터·새 타입/DSL은 변경하지 않는 안이다.
 - 위 제안과 M10의 후보 파일·버전·예상 팩15/14점검26경로/a23b4는 현재 구현/승인 상태가 아니다. 실제 M10 실행 지시에서 기술 범위를 채택한 뒤 구현한다. M9 현재 팩14/DRAFT·14점검24경로·a21/b6/c161/d115·77ID/303결정595연결·자동연결5를 유지한다.
 - 열린 업무 결정: target/hop/호출자 범위의 실제 전체 허용목록과 endpoint×형식 관계, 승인/변경 역할, 모델/vocab/consumer 근거·정상/금지 시험의 권한·예산·중단 조건. 실제 담당자/수치/목록은 만들지 않는다. 질문이 남아도 작성 가능한 설계·질문·다음 프롬프트는 완성한다.
+
+## 2026-10-22 M10 REQ-09 입력 범위 구현
+
+사용자 실행 지시로 M9 POL-M9-SCOPE/PAIR/OBS를 채택했다. REQ-09 단일 engine POST/token_ids 프로파일만 지원하며 기업 값·승인·실제 시험 대상은 확정하지 않는다. 과거 정의/부분 선언을 구분하는 순수 helper를 실행·두 판정기에서 공유한다. 판정기에서는 PASS만 제한하여 독립 FAIL을 보존한다. 수동 두 관측만 조건부 config hash에 포함하고 core/report의 rule_table POLICY_CONTEXT 전달만 보강한다. body는 기존 model/{model}·prompt 정수[0]·max_tokens 정수1·expect200을 고정하며 새 요청은 추가하지 않는다. 열린 업무 질문: 전체 승인 목록/관계표 필요성, 대상과 hop, 모델/vocab·예산·중단조건, 실제 담당자와 승인.

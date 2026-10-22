@@ -36,7 +36,9 @@ def test_readiness_checks_local_images_without_starting_containers(tmp_path, mon
         model={"id":"test", "revision":"rev", "inventory_sha256":inventory(snapshot)["inventory_sha256"]})
         for side, letter in [("a","a"),("b","b")]]
     pol = policy(pack.ref(), scope={"include":["REQ-09"]},
-                 values={"REQ-09":{"max_input_tokens":8, "rejection_codes":["400"]}})
+                 values={"REQ-09":{"max_input_tokens":8, "rejection_codes":["400"],
+                    "allowed_endpoints":[pack.checks["REQ-09"].functional_probes[0].id],
+                    "allowed_input_formats":["token_ids"]}})
     cfg = {"adapter":{"name":"vllm"}, "executors":{"input_validation":"real"},
            "update":{"mode":"managed"}, "vllm":{"models_dir":str(tmp_path)},
            "input_validation":{"vocab_size":100, "vocab_source":"synthetic fixture"}}

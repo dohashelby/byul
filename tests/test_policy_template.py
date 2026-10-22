@@ -62,7 +62,7 @@ def test_current_declarations_metadata_and_empty_values(tmp_path):
     text = build_policy_template(pack)
     data = yaml.safe_load(text)
     declarations = {(c.id, p.key) for c in pack.active_checks() for p in c.policy_params}
-    assert len(declarations) == 24
+    assert len(declarations) == 26
     assert {cid for cid, key in declarations} == {"REQ-01", "REQ-03", "REQ-09", "PLT-01", "PLT-04", "SUP-14", "LIF-07", "SUP-01", "SUP-02", "OBS-11", "OBS-04", "OBS-05", "OBS-07", "OBS-08"}
     assert set(data["values"]) == {cid for cid, key in declarations}
     assert all(value == {} for value in data["values"].values())
@@ -130,6 +130,8 @@ def test_empty_list_false_and_zero_are_values_not_missing(tmp_path):
 ])
 def test_req09_semantic_guards_are_not_relaxed_by_template(tmp_path, values, budget):
     pack = baseline_pack()
+    values = {**values, "allowed_endpoints": [pack.checks["REQ-09"].functional_probes[0].id],
+              "allowed_input_formats": ["token_ids"]}  # EXAMPLE complete scope; test the numeric guard.
     pol = _load(tmp_path, pack, {"REQ-09": values})
     plan = select(pack, [_env()], pol)
     assert "NO_POLICY_VALUE" not in plan.item("REQ-09").gaps
@@ -141,7 +143,9 @@ def test_req09_semantic_guards_are_not_relaxed_by_template(tmp_path, values, bud
 
 def test_req09_boundary_fits_probe_budget(tmp_path):
     pack = baseline_pack()
-    values = {"max_input_tokens": 7, "rejection_codes": ["400", "413", "422"]}
+    values = {"max_input_tokens": 7, "rejection_codes": ["400", "413", "422"],
+              "allowed_endpoints": [pack.checks["REQ-09"].functional_probes[0].id],
+              "allowed_input_formats": ["token_ids"]}
     pol = _load(tmp_path, pack, {"REQ-09": values})
     executor = InputValidationExecutor({"vocab_size": 10, "vocab_source": "EXAMPLE test fixture",
                                         "max_probe_tokens": 8})

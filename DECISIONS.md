@@ -302,3 +302,11 @@
 - POL-M11-MANUAL-CEILING 채택: 새 M10 REQ09 계약의 수동 보안/기능 PASS에 고정 rule_table PASS를 요구한다. 자동표 FAIL을 수동 FAIL로 복사하지 않고 상충 UNKNOWN, 신고 FAIL/UNKNOWN은 보존한다. 성능은 이번 보완 대상에서 제외한다. declared0.8.0이며 코어/실행기/저장소/수동 hash는 유지한다.
 - cache 제안/미등록: PUBLIC-PREFIX는 true/false 모두 보호 검토가 필요하고 비공개 공유 허용으로 확대하지 않는다. M12는 REQ16 required_cache_contexts와 같은 인증 집단 내 문맥별3case 수동 계약을 권고한다. /3 generic 관측의 첨부 hash 귀속을 판정 시 검사하며 별도 payload/양식/4·POL타입·코어 변경을 만들지 않는 안이다.
 - M12에서만 채택할 기술 식별자 model_generation/adapter_content/media_identity·schema·PASS상한은 docs/POLICY_M11.md에 있다. 기업 전체 목록/신뢰집단/실제 consumer와 객체/공개분류·담당/승인·대상/권한/예산/중단조건은 미정이다. 기업값을 추정하거나 목록을 지원 범위로 잘라 맞추지 않는다. REQ15신원·REQ17통계·SUP모드/파생위치는 후속이다.
+
+## 2026-10-22 M12 — 캐시 문맥 수동 계약 채택
+
+- 사용자 지시로 POL-M12-CACHE-CONTEXT 채택: M11 제안의 REQ16 한정 정책·/3 generic 증거·순수 PASS 상한과 관련 judges/팩/SPEC/문서 변경·검증·커밋/푸시/초안 PR을 승인받았다. M11 PR13 미병합이므로 codex/gua-policy-cache-m12의 base는 codex/gua-policy-m11 / 06efef4다.
+- 프로파일·정확 필드/enum·문맥별3case·첨부 귀속은 [M12](docs/POLICY_M12.md)에 따른다. 새 범용 프레임워크/스키마/양식·실행기는 만들지 않는다. 기술 식별자는 기업의 실제 활성 사실이 아니다.
+- 보안의 cache effect 신고와 기능의 inference 신고를 축별로 구분한다. 구조/전제가 유효한 상태의 추론 실패만으로 보안 격리 신고를 자동 반박하지 않는다. 모든 실패/미완결은 새 FAIL 대신 PASS 상한 UNKNOWN이며 기존 신고FAIL/UNKNOWN·CPU를 보존한다.
+- 안전한 코드만 report에 전달하고 전용 helper 의존 예외도 신고 FAIL을 지우지 않는다. 미입력/의미 부족과 NO_EXECUTOR는 구분한다. 관측은 EVD hash에 포함하며 기존 config 입력을 늘리지 않는다.
+- 미결 업무: 기업 전체 문맥·실제 consumer/객체·인증 집단/신원 근거·첨부 수집/검토·공개 분류·승인 담당·시험 대상/권한/예산/중단조건. PUBLIC-PREFIX·REQ15·REQ17·실제 실행·M13은 후속이다.

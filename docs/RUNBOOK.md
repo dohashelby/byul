@@ -183,3 +183,7 @@ DRAFT·official·미인증 자기 신고·자동 검증 한계를 함께 확인�
 ## M11 수동 관측 상충 처리
 
 REQ-09의 새 입력 범위 계약에서는 신고 PASS와 저장된 보안/기능 관측이 판정표와 일치해야 PASS 후보가 된다. 상충은 UNKNOWN 사유로 JSON/HTML에 표시한다. 원본을 고치지 말고 기존 PLAN/팩으로 재판정해 새 declared0.8.0 RES를 만들면 된다. 같은 as_of 재실행은 멱등이며 수동/3·override_reason·Ref/side 보호는 유지한다. [M11](POLICY_M11.md)에 명령/검증과 미구현 캐시 계약을 구분해 기록한다.
+
+## M12 REQ-16 수동 캐시 문맥 검토
+
+[상세 절차](POLICY_M12.md)에 따라 새 팩16과 POL로 select → evidence template → generic 값·첨부 입력 → evidence import → judge → report를 실행한다. NO_EXECUTOR는 수동 계약 등록 후에도 남는다. 기존 /1/2 읽기와 /3, Ref/side·append-only를 보존한다. 같은 as_of 재판정은 멱등이며 과거 PLAN은 정확한 팩15 보존본으로 재판정한다. 새 팩을 과거 PLAN에 강제로 대입하지 않는다. 캐시 probe나 실제 엔진을 띄우는 절차는 이번 범위에 없다.

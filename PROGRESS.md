@@ -621,3 +621,15 @@ git status
 
 - M5 구현 커밋 `3272608a596b185d7496d892c1687c50492e1400`의 Ubuntu/Python3.11/uv0.12.11 전체 CI: [PR 실행 39567425652](https://github.com/dohashelby/gua/actions/runs/39567425652) **659 passed / 18 deselected, 40.30초**, 실패·skip 없음. [push 실행 39567406146](https://github.com/dohashelby/gua/actions/runs/39567406146) **659 passed / 18 deselected, 44.84초**. 양쪽 frozen sync·wheel 빌드 성공이며 Windows skip 5건도 지원 Linux에서는 실행·통과했다. 과거 M4의627통과와 이번659통과는 별도 실행이다.
 - 초안 [PR #7](https://github.com/dohashelby/gua/pull/7), base codex/gua-policy-evidence-m4 / head codex/gua-policy-m5. 최초 merge-base2632c24·ahead1/behind0·원격25파일과 로컬 diff 일치를 확인했다. 이 후속 커밋은 실제 CI 기록만 추가하며 제품 코드/팩/테스트/증거를 바꾸지 않는다. 선행 PR #6 미병합이며 자동 병합하지 않는다.
+
+## 2026-10-21 — 정책 M6 설계 문서
+
+- 기준: M5 e353cd02b2709ab063355d881092ce249fa1b8e9, fetch 후 로컬/원격0/0·clean. PR #7은 open/draft·미병합. codex/gua-policy-obs11-m6-design에서 문서 작업하며 base는M5다.
+- 한 일: [POLICY_M6_PLAN](docs/POLICY_M6_PLAN.md)에 M5 근거/검증 수준, OBS01/11 대응표, OBS11 연결12후보 분해, 소유권·타입 한계, 최소 수동 근거 계약/빈 예시·시간 구간, T01~24 예상 판정/계약 테스트, 실제 호출/변경 후보, 열린 결정/선행 조건, 다음 M7 프롬프트를 작성했다. M5 계획에는 링크만 추가하고 DECISIONS에 제안·미결 상태를 기록했다.
+- 설계 제안/미구현: 사건별 정수map 제한 타입·5개 정책 경로·수동/3·OBS 전용 순수 평가·보고 이유. 문서 작성 승인을 제품 구현·기업 기준 승인으로 간주하지 않는다. M7 프롬프트는 실행하지 않았다.
+- 기존 상태 유지: 팩12/DRAFT·해시 f3cada3bc4d193f8f4e834a11adea8e4387e1e340a79f19705b3fa44d1e0783c, 77점검·9점검15경로·자동 연결5·303결정595연결·a14/b9/c165/d115. OBS11은 여전히 정책/실행기/판정기 미등록이다.
+- 검증: 문서 전부 작성 후 Windows/Python3.11.16에서 `.venv/Scripts/python.exe -X utf8 -B out/test-runs/policy-m6-20261021/verify.py` 실행. 상대 링크34개·JSON Pointer2개·문서 anchor1개·명시 코드 위치13개, 후보12개와 분류 b1/c7/d4·T01~24·열린 결정9개·빈 YAML·오차 구간 계산·정책/메타데이터·팩/계수·git diff --check를 확인했다. 코드 링크 위치4건과 밀리초 초과 정밀도의 비절삭 조건을 보완한 뒤 강화한 참조 검사까지 PASS, 오류0건.
+- 보존: 시작 추적348개 중345개 바이트 동일, 기존 문서3개 변경·새 설계 문서1개뿐이다. 제품/테스트/SPEC/원문/증거/팩/CSV/설명JSON/예시·lab 정책에 변경이 없다. 근거는 ignored out/test-runs/policy-m6-20261021의 before.json/source-facts.json/document-verification.json에 보존했다.
+- 과거 검증 재확인: 공식 GitHub API/작업 로그에서 M5 최종e353cd0의 PR39567720670·push39567715343 모두 success·659 passed/18 deselected·wheel 성공을 다시 확인했다. 앞선 M5 재검토의32 passed 및 과거22명령 설치본 기록과 함께 과거 결과이며 M6 실행으로 합산하지 않는다.
+- 문서 범위이므로 로컬 기본 pytest/설치·wheel은 반복하지 않았다. 커밋 후 자동 CI는 별도로 확인하고 최종 SHA의 실행 링크/결과를 초안 PR 본문과 종료 보고에 기록한다.
+- 다음 단계/막힌 것: 기술 프로파일·시간/경보 의미·독립 근거/case 범위를 사람이 검토해 채택해야 다음 제품 구현을 진행한다. 실제 기업 목록/수치/권한/승인/SLA·장애 대응은 별도 미결이다. 실제 엔진/두 이미지·collector 주입·운영/유료 자원 시험은 수행하지 않았다.

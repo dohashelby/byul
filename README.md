@@ -4,7 +4,7 @@ BoB serving-engine security runtime solution
 - 개발계획서 v1.4(문서 상태: 개발 기준 설계안)가 전달됐으며, 직접 개발할 모듈의 언어는 Python으로 선택했습니다. 연동 규격·실제 환경 등은 미결입니다.
 - Codex는 구현·수정·시험을, Claude는 검수를 담당합니다.
 
-## 개발 현황 한눈에 (2026-10-21)
+## 개발 현황 한눈에 (2026-10-24)
 
 | 구분 | 내용 | 확인 수준 |
 | --- | --- | --- |
@@ -14,7 +14,10 @@ BoB serving-engine security runtime solution
 | 외부 vLLM 연결 (S3A) | 설정 파일로 고정된 목적지·모델 별칭·자격정보, health·모델·버전·지표 수집 | 가짜 backend·실제 vLLM(CPU) |
 | 기록·조회 | 요청별 시작/최종 JSONL 기록(프롬프트 원문 미저장), 조회 API, 증거 JSON 내려받기 | 모의 엔진·실제 vLLM(CPU) |
 | 대시보드 | 현황·요청 목록·상세 증거·정책/기준 상태, 3초 갱신, 읽기 전용 | 브라우저 수동 확인 |
-| 시험 | unittest 116개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`) | 전부 통과 |
+| context 사전 통제 | 정책 `max_context_tokens`(예: 2048): backend `/tokenize`로 입력 토큰을 세어 입력+`max_tokens` 초과 시 403, 셀 수 없으면 503(모두 엔진 미전달) | 모의 엔진·가짜 backend·실제 vLLM(CPU) |
+| 모델 파일 무결성 | 승인 자산 목록(경로·SHA-256·크기)과 디스크 파일 주기 비교, 변경·누락·목록 밖 파일 표시 | 단위·HTTP 시험, 실제 모델 파일 목록 생성 확인 |
+| 통신·행위 통제 준비 (P2 사전 작업) | Cilium 규칙 후보 생성, Tetragon 파일 규칙 후보·이벤트 변환, 관측 API·대시보드 | 합성 fixture 단위 시험만; 클러스터 미적용·미검증 |
+| 시험 | unittest 157개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | Claude 소켓 허용 환경 157개 전부 통과; 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -23,10 +26,11 @@ BoB serving-engine security runtime solution
 
 **아직 하지 않은 것**
 - 정식 S3B 실제 환경 시험
-- 요청 단위 backend 수신 증거: vLLM 기본 로그에 Gateway 요청 ID가 남지 않습니다.
-- 엔진 내부 생성 취소 확인
-- context 2048 사전 통제: tokenizer 확인 전입니다.
-- API 인증, 엔진 포트 직접 접근 차단, Cilium·Tetragon 통합, SGLang
+- 정식 환경의 요청 단위 backend 증거·엔진 내부 취소: CPU 사전 점검에서는 vLLM `--enable-log-requests --enable-request-id-headers`로 확인했으나 GPU 고정 버전에서 재확인이 필요합니다.
+- context 통제의 고정 버전 확인: `/tokenize` 형식은 vLLM v0.29.0 CPU에서만 확인했습니다.
+- 모델 파일 쓰기 차단(읽기 전용 마운트·권한)과 엔진 메모리 로딩 확인: 지금은 디스크 해시 비교만 합니다.
+- Cilium·Tetragon 규칙 생성·이벤트 변환은 준비됨. 클러스터 적용·실효 검증은 미실행
+- API 인증, 엔진 포트 직접 접근 차단, SGLang
 
 ## 런타임 통제 MVP (로컬)
 
@@ -42,6 +46,19 @@ BoB serving-engine security runtime solution
 ```
 
 이 MVP는 요청 통제·기록·조회 경로를 다룹니다. 커널 통제, 네트워크 격리, API 인증은 구현하지 않았으며 이를 입증하지 않습니다. 엔진 포트(8088, 외부 vLLM 포트)로 직접 보내는 요청은 막지 않습니다.
+
+### 코드 구조
+
+- `app.py`: Gateway 구성요소를 생성·연결하고 상태 조합과 시작·종료를 담당합니다.
+- `http_handler.py`: HTTP 응답 도우미, 정적 파일 allowlist, API·POST 경로 분기를 담당합니다.
+- `request_flow.py`: 채팅 요청의 검사·기록·중계 흐름과 동시성 슬롯을 관리합니다.
+- `relay.py`: 일반 응답과 SSE stream을 backend에서 클라이언트로 중계합니다.
+- `engine_client.py`: 토큰 수·상태·정보·지표·모의 수신 증거를 backend에서 조회합니다.
+- `request_records.py`: 요청 기록을 구성하고 JSONL 저장 상태와 요청별 context를 관리합니다.
+- `backend.py`: backend 설정을 검증하고 고정 목적지 연결과 헤더를 생성합니다.
+- `collectors.py`: 상태 수집 주기와 snapshot·baseline 비교를 관리합니다.
+- `policy.py`·`policy_state.py`: 정책 문서 검증과 기간·철회·이력 판정을 담당합니다.
+- `store.py`·`query.py`: JSONL 입출력과 요청 요약·상세 조회를 담당합니다.
 
 ### 준비
 
@@ -117,6 +134,32 @@ baseline과 manifest는 평면 `fields` 객체를 사용합니다. manifest도 �
 
 비교 상태는 `match`(일치), `drift`(차이), `missing`(수집 결과에 필드 없음), `stale`(마지막 성공이 신선도 초과), `error`(수집 실패), `not_collected`(수집원 없음)입니다. 모의 엔진 응답은 `data_origin: mock`으로 표시하며 실제 엔진 관측이라고 주장하지 않습니다. 수집 실패 시 마지막 성공값과 시각을 유지하고 0이나 정상값으로 바꾸지 않습니다. 관측값은 baseline으로 저장하거나 승격하지 않습니다. 특히 **model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않습니다.**
 
+### context 사전 통제
+
+정책 schema `runtime-mvp/1.1`의 선택 필드 `max_context_tokens`를 넣으면 켜집니다(예: `examples/mvp/policy-v1.1-context.json`, 2048). 값은 `output_max_tokens`보다 커야 합니다.
+
+- Gateway는 일반·stream 생성 요청을 보내기 전에 backend의 `POST /tokenize`(`model`, `messages`, `add_generation_prompt: true`)로 입력 토큰 수(`count`)를 받습니다. vLLM 모드에서는 고정 `base_url` 경로 접두와 Authorization을 생성 요청과 동일하게 적용하며, 문자 길이로 추정하지 않습니다.
+- 입력 토큰 + 적용 `max_tokens`가 한도를 넘으면 일반·stream 모두 403 `CONTEXT_LIMIT_EXCEEDED`이며 생성 요청을 보내지 않습니다.
+- 연결 실패·backend 오류뿐 아니라 HTTP 200 응답에 `count`가 없거나 bool·음수이거나 JSON을 해석할 수 없는 모든 경우도 통과시키지 않고 503 `CONTEXT_CHECK_UNAVAILABLE`으로 기록합니다. backend 예외 메시지는 응답·요청 기록에 남기지 않습니다.
+- 기록과 상세 화면에 입력 토큰·한도·판정이 남습니다. 토큰 세기 요청에는 `<요청 ID>-tokenize` 요청 ID를 붙입니다.
+- 모의 엔진과 가짜 backend의 `/tokenize`는 단어 수 기반의 결정적 계산이며 실제 tokenizer가 아닙니다. 실제 vLLM v0.29.0 CPU에서는 짧은 질문 36토큰 허용, 2129토큰 입력 거부(생성 미전달)를 확인했습니다. 선정 GPU 고정 버전의 응답 형식은 다시 확인해야 합니다.
+
+### 모델 파일 무결성 점검
+
+승인한 모델·tokenizer 파일 목록과 디스크 파일을 주기적으로 비교합니다. 해시 비교이며 쓰기를 막거나 엔진이 메모리에 올린 내용을 증명하지 않습니다.
+
+```bash
+# 현재 파일로 목록 초안 만들기 (관측값이므로 사람이 검토한 뒤 승인 목록으로 사용)
+.venv/bin/python -m serving_runtime assets snapshot --root /path/to/model --out assets.json
+# Gateway에 연결 (기본 60초마다 점검)
+.venv/bin/python -m serving_runtime mvp --asset-manifest assets.json [--asset-interval 60]
+```
+
+- 목록 형식 `runtime-asset-manifest/1.0`: `root`(절대경로)와 `files[{path, sha256, size}]`. 경로는 `root` 안 상대경로만 허용하며, `root` 자체가 심볼릭 링크면 목록 로드·생성·검사를 거부합니다. `assets snapshot` 출력은 기존 파일·깨진 링크를 덮어쓰지 않고 0600 모드로 원자적 생성합니다.
+- 결과는 수집원 표의 `asset_integrity` 행에 일치·변경·누락·읽기 불가·링크·목록 밖 파일·목록 밖 링크·순회 오류 수로 표시하며, 하나라도 다르면 `intact: false`입니다. 순회 오류는 상대경로·오류 종류를 최대 50개 남기며, 해당 오류가 있으면 `snapshot`은 부분 목록을 쓰지 않고 실패합니다. 목록을 매번 다시 읽으므로 목록 파일 오류도 수집 오류로 드러납니다.
+- 심볼릭 링크는 따라가지 않습니다. 항목의 `root` 아래 모든 상위 구성 요소를 확인하고 파일을 `O_NOFOLLOW`로 열어, 중간 디렉터리가 `root` 밖을 가리키는 링크인 경우도 읽지 않고 `symlink`로 보고합니다. Hugging Face 캐시의 `snapshots/<revision>` 폴더는 파일이 모두 링크라서 거부되므로, 실제 파일이 있는 폴더(예: `--local-dir`로 받은 모델 폴더)를 지정합니다.
+- 자산 검사는 다른 health·metrics 수집원과 분리된 백그라운드 스레드에서 수행합니다. 검사 결과에 `duration_s`를 남기고, 이전 검사가 끝난 시점부터 `--asset-interval` 후에 다음 검사를 시작합니다.
+
 ### 외부 vLLM backend 모드 (S3A)
 
 기본은 기존 모의 엔진 모드입니다. 외부 backend 모드는 Gateway만 띄우고 모의 엔진을 실행하지 않으며, 실제 엔진의 시작·종료도 관리하지 않습니다.
@@ -129,7 +172,7 @@ baseline과 manifest는 평면 `fields` 객체를 사용합니다. manifest도 �
 
 - `base_url`: backend 주소(http/https, 경로 접두 허용). 요청 본문·헤더(`Host`, `X-Forwarded-*` 등)로 바꿀 수 없고, 클라이언트 헤더는 backend로 전달하지 않습니다. 3xx redirect는 따라가지 않고 502로 처리하며, https 인증서 검증은 끌 수 없습니다.
 - `model_map`: 정책 허용 모델명 → backend 모델 ID. 매핑 없는 허용 모델은 backend를 호출하지 않고 503 `BACKEND_MODEL_UNMAPPED`입니다.
-- `credential`: `{"env": "변수명"}` 또는 `{"file": "경로"}` 중 하나. 키 값은 설정 파일·CLI에 넣지 않습니다. 설정했는데 값이 없으면 503 `BACKEND_CREDENTIAL_MISSING`(backend 미호출), 파일이 다른 사용자에게 읽히면 `insecure_file` 상태로 표시합니다. 키는 기록·API·화면·보고서에 남기지 않습니다.
+- `credential`: `{"env": "변수명"}` 또는 `{"file": "경로"}` 중 하나. 키 값은 설정 파일·CLI에 넣지 않습니다. 설정했는데 값이 없으면 503 `BACKEND_CREDENTIAL_MISSING`, 공백·제어문자나 HTTP 헤더에 쓸 수 없는 문자가 있으면 503 `BACKEND_CREDENTIAL_INVALID`로 backend를 호출하지 않습니다. 파일이 다른 사용자에게 읽히면 `insecure_file` 상태로 표시합니다. 키는 기록·API·화면·보고서에 남기지 않습니다.
 - `health_path`·`models_path`·`version_path`·`metrics_url`·`metrics_map`·`timeouts`: 상태·지표 수집과 시간 제한. health 200은 "연결 가능"이며 추론 정상을 뜻하지 않습니다.
 
 증거 구분: 외부 backend 요청은 기록에 `backend_kind: "vllm"`으로 남고, 모의 엔진 수신 기록을 증거로 쓰지 않습니다. backend 측 수신 기록원이 아직 연결되지 않았으므로 거부 요청은 "Gateway 미전달 확인, backend 미수신은 미확인", 허용 요청은 "Gateway 전달·응답 수신, backend 측 수신 기록 미연결"로 표시합니다. 엔진 내부 생성 취소는 확인하지 않습니다(`backend_cancel: "not_observed"`).
@@ -152,16 +195,19 @@ GPU가 없는 PC에서 실제 vLLM과 연결해 보는 방법입니다. **정식
 
 ```bash
 D=~/.local/state/serving-runtime/s3b-cpu; mkdir -p -m 700 $D/hf-cache
-umask 077; python3 -c "import secrets;print(secrets.token_urlsafe(32))" > $D/vllm-api-key
+umask 077; python3 -c "import secrets,sys;sys.stdout.write(secrets.token_urlsafe(32))" > $D/vllm-api-key
 printf 'VLLM_API_KEY=%s\n' "$(cat $D/vllm-api-key)" > $D/vllm.env
 docker run -d --name s3b-vllm-cpu -p 127.0.0.1:8000:8000 --memory 6g --shm-size 1g \
   --env-file $D/vllm.env -e VLLM_CPU_KVCACHE_SPACE=1 -e HF_HOME=/hf -v $D/hf-cache:/hf \
   public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.29.0 \
   --model Qwen/Qwen2.5-0.5B-Instruct --revision 7ae557604adf67be50417f59c2c2f167def9a775 \
   --served-model-name qwen2.5-0.5b-instruct --dtype bfloat16 --max-model-len 2048 \
-  --max-num-seqs 2 --enforce-eager --host 0.0.0.0 --port 8000
+  --max-num-seqs 2 --enforce-eager --enable-log-requests --enable-request-id-headers \
+  --host 0.0.0.0 --port 8000
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8000/health   # 200이면 준비 완료
 ```
+
+`--enable-log-requests --enable-request-id-headers`는 Gateway 요청 ID의 backend 수신 여부와 취소 요청의 `aborted` 로그를 요청 단위 증거로 남기기 위한 옵션입니다. 2026-10-23 v0.29.0 CPU 재실행에서 이 로그에 프롬프트 원문은 남지 않음을 확인했습니다.
 
 2. `$D/backend.json`을 `examples/mvp/backend-vllm.example.json` 형식으로 만듭니다. `model_map`은 `{"test-model": "qwen2.5-0.5b-instruct"}`로, `credential`은 `{"file": "<$D 절대 경로>/vllm-api-key"}`로 둡니다. CPU는 느리므로 `timeouts.relay_timeout_s`를 120 정도로 늘립니다.
 
@@ -173,7 +219,7 @@ setsid nohup .venv/bin/python -u -m serving_runtime mvp --backend vllm --backend
   --gateway-port 18080 --data-dir $D/data > $D/gateway.log 2>&1 < /dev/null &
 ```
 
-브라우저에서 `http://127.0.0.1:18080`을 엽니다. 위쪽에 "외부 vLLM 연결 · 정식 GPU 시험(S3B) 전" 배지가 보입니다. 실제 vLLM에 연결된 상태이며, 계획서의 정식 GPU 환경 시험은 아직 하지 않았다는 뜻입니다.
+브라우저에서 `http://127.0.0.1:18080`을 엽니다. 위쪽 배지는 health가 정상이면 "외부 vLLM 모드 · 연결됨 · 정식 GPU 시험(S3B) 전", 아니면 문제 색의 "외부 vLLM 모드 · 연결 안 됨 · 정식 GPU 시험(S3B) 전"으로 표시됩니다.
 
 4. 끄거나 다시 켜는 명령입니다.
 
@@ -184,6 +230,10 @@ docker start s3b-vllm-cpu     # vLLM 다시 켜기 (준비 2~3분)
 ```
 
 CPU에서는 예열 뒤 16토큰 응답에 5~7초가 걸립니다. 이 결과를 GPU 성능이나 정식 S3B 통과로 해석하지 않습니다.
+
+CPU 사전 점검 도구의 기본 실행은 `.venv/bin/python tools/s3b_cpu_precheck.py`이며, 엔진 중단·복구까지 허용할 때 `--allow-engine-restart`, S3-01~03에 backend 요청·취소 로그를 필수 증거로 요구할 때 `--require-backend-request-log`를 붙입니다(두 옵션은 함께 쓸 수 있음). 종료 코드는 모든 사례 통과 0, 하나라도 실패 1, 키·실행 대상 사전 확인 실패 2, 미실행 사례가 있는 부분 점검 3입니다. 도구는 공백·개행·제어문자 등이 든 키 파일을 값 노출 없이 거부합니다.
+
+이 실제 vLLM 모드의 요청은 `127.0.0.1:18080`으로 보냅니다. 아래 "요청 보내기" 예시의 `8080`은 모의 엔진 모드입니다.
 
 ### 요청 보내기
 
@@ -220,7 +270,7 @@ curl -N -H 'Content-Type: application/json' \
 | 기록 저장 불가 | 503 | 처리 오류 (모의 엔진 미호출) |
 | 모의 엔진 연결 실패 / 시간 초과 | 502 / 504 | 처리 오류 |
 
-stream은 backend SSE 바이트를 전체 버퍼링하지 않고 즉시 전달합니다. HTTP 200이 시작된 뒤에도 `[DONE]` 없는 종료, 청크 무응답, 전체 제한 초과, client 연결 종료, 중계 오류는 최종 기록에서 성공이 아닌 `ERROR`로 남습니다. Gateway는 이때 backend 연결을 닫지만, 현재 확인 가능한 취소 증거는 모의 엔진의 `evidence_kind: "mock"` 기록뿐이며 실제 vLLM 내부 생성 취소를 입증하지 않습니다. 또한 context 2048 제한은 tokenizer·chat template 확인 전이므로 아직 적용하지 않았고 문자 길이로 대신하지 않습니다.
+stream은 backend SSE 바이트를 전체 버퍼링하지 않고 즉시 전달합니다. HTTP 200이 시작된 뒤에도 `[DONE]` 없는 종료, 청크 무응답, 전체 제한 초과, client 연결 종료, 중계 오류는 최종 기록에서 성공이 아닌 `ERROR`로 남습니다. Gateway는 이때 backend 연결을 닫습니다. vLLM v0.29.0 CPU를 요청 로그 옵션과 함께 실행한 사전 점검에서는 취소 요청의 `aborted` 로그를 확인했지만, 이는 정식 GPU S3B 증거가 아닙니다. context 제한은 아래 "context 사전 통제"를 참고합니다.
 
 ### 시연하기
 
@@ -233,7 +283,8 @@ stream은 backend SSE 바이트를 전체 버퍼링하지 않고 즉시 전달�
 
 ### 대시보드
 
-- **현황**: 결과별 건수, 정책 판본·SHA-256·로딩 시각, 모의 엔진 연결 점검, 기록 저장 상태·손상 줄 수와 위치. 네트워크·프로세스·파일·GPU 관측은 "미연결"로 표시합니다.
+- **현황**: 결과별 건수, 정책 판본·SHA-256·로딩 시각, 모의 엔진 연결 점검, 기록 저장 상태·손상 줄 수와 위치. 네트워크·프로세스·파일 관측은 저장 자료에 따라 "미연결"·"합성 데이터"·"실제 수집"으로, GPU 관측은 "미연결"로 표시합니다.
+- **통신·행위 관측**: Hubble 통신과 Tetragon 프로세스·파일 최신 기록을 각각 표시합니다. 합성 자료는 "합성" 배지가 붙고 허용 목록 밖 실행 파일은 강조됩니다.
 - **정책·기준 상태**: 읽기/Gateway 활성/외부 집행 배지, 기간·철회·승인 근거, 최근 정책 이력 50건, baseline 비교, 수집원별 최근 성공·오류·`data_origin`을 표시합니다.
 - **요청 목록**: 결과별 필터. 행을 누르면 상세가 열리며, 재실행 전 요청에는 "이전 실행" 태그가 붙습니다.
 - **상세**: 판정·적용 규칙, 전달 여부, Gateway 기록(시작→최종), 모의 엔진 수신 증거, 증거 JSON 내려받기.
@@ -248,6 +299,7 @@ stream은 backend SSE 바이트를 전체 버퍼링하지 않고 즉시 전달�
 - `gateway_records.jsonl`: 요청별 시작·최종 판정 기록
 - `engine_receipts.jsonl`: 모의 엔진 수신 기록
 - `policy_history.jsonl`: 시작 시 정책 로딩 성공·실패, 현재·직전 참조와 같은 판본 내용 변경 기록
+- `observations.jsonl`: CLI로 변환한 Hubble·Tetragon 관측 기록(`data_origin` 필수)
 
 프롬프트·응답 원문은 저장하지 않습니다. 실행할 때 이전 기록을 지우지 않으며, 초기화하려면 서버를 끈 뒤 위 폴더를 직접 삭제합니다.
 
@@ -289,9 +341,38 @@ MVP-01~11, S1-01~06, S2-01~06, S3A-01~08을 임시 데이터와 빈 포트에서
 | S1 | SSE 증분 중계·3종 시간 제한·동시성 2·종료 결과 기록 | 완료 (Claude 소켓 허용 환경 unittest 96개·MVP-01~11·S1-01~06 전부 통과, 건너뜀 0, 직접 코드 검수 필수 지적 없음) |
 | S2 | 정책 이력·기간/철회 유효성·기준 비교·수집 상태 | 완료 (Claude 소켓 허용 환경 unittest 104개·MVP-01~11·S1-01~06·S2-01~06 전부 통과, 건너뜀 0, 직접 코드 검수 필수 지적 없음) |
 | S3A | 외부 vLLM backend 모드·고정 목적지·자격정보·수집 어댑터 | 완료 — 가짜 backend 시험만 (unittest 115개·수용 시험 31개 사례 전부 통과). 실제 vLLM 연결 아님 |
-| S3B | 고정 vLLM·모델 실제 환경 시험 | 정식 S3B 미실행(승인 GPU 환경 없음). CPU 사전 점검(vLLM v0.29.0 CPU·0.5B 모델)에서 S3-01~06 통과, 엔진 내부 취소·backend 요청 ID 증거는 미확인 (`docs/S3B_실제환경_시험준비.md` §7) |
+| S3B | 고정 vLLM·모델 실제 환경 시험 | 정식 S3B 미실행(승인 GPU 환경 없음). CPU 사전 점검(vLLM v0.29.0 CPU·0.5B 모델)에서 S3-01~06 통과했고 요청 로그 옵션 재실행으로 요청 ID·취소 로그를 확인함. 정식 GPU 증거 아님 (`docs/S3B_실제환경_시험준비.md` §7) |
 
-실제 vLLM 환경 시험(S3B), 인증, 직통 접근 제한, Cilium·Tetragon 통합, context 2048 사전 통제는 이후 범위입니다.
+실제 vLLM 환경 시험(S3B), 인증, 직통 접근 제한, Cilium·Tetragon 클러스터 적용·실효 검증는 이후 범위입니다.
+
+## 통신·행위 통제 준비 (P2 사전 작업)
+
+이 단계의 산출물은 **Cilium 1.20.3 / Tetragon 1.7.1 문법 기준 후보이며 클러스터 미적용·미검증**입니다. Kubernetes·Cilium·Tetragon을 설치하거나 정책을 적용하지 않으며, 생성 성공은 통신 차단·파일 관측·커널 Override의 실효를 입증하지 않습니다.
+
+엄격한 `runtime-enforcement-intent/1.0` JSON 예시는 `examples/enforcement/intent.example.json`입니다. 알 수 없는 필드, 빈 label, 잘못된 port, 상대경로를 거부합니다. 생성 파일은 지정한 출력 폴더의 고정 파일명만 사용합니다.
+
+```bash
+.venv/bin/python -m serving_runtime enforce render \
+  --intent examples/enforcement/intent.example.json --out /tmp/runtime-enforcement
+```
+
+- Cilium 후보는 engine ingress를 Gateway·metrics collector의 engine TCP port로 한정하고, engine egress를 DNS TCP/UDP 53과 명시한 FQDN/CIDR 목적지로, Gateway egress를 engine TCP port와 DNS로 한정합니다. 선택된 endpoint에 ingress/egress 절이 존재하므로 해당 방향은 그 허용 규칙 외 default deny가 됩니다.
+- Tetragon 후보는 `security_file_permission`의 모델 쓰기(`TG-ASSET-01`), 민감 경로 읽기(`TG-SECRET-01`), cache 쓰기 관측(`TG-CACHE-01`)을 만듭니다. `monitor`에는 Override가 없습니다. `enforce_probe`의 `TG-DENY-01`만 지정 `probe_path` 쓰기에 `Override argError -1` 후보를 만들며, 커널 지원과 실제 거부 효과는 확인하지 않았습니다.
+- `TG-EXEC-01` 정책은 따로 만들지 않습니다. Tetragon 기본 `process_exec` 이벤트의 binary를 intent의 `allowed_engine_binaries`와 비교해 어댑터가 `allowed_binary`를 판정합니다. 목록이 비어 있거나 intent 없이 변환하면 판정은 `null`입니다.
+
+공식 출력 모양을 흉내 낸 fixture는 `tests/fixtures/enforcement/`에 있으며 실제 수집 자료가 아닙니다. 호출자가 `synthetic` 또는 `real`을 반드시 지정해야 하고 Tetragon `arguments`는 저장하지 않습니다.
+
+```bash
+.venv/bin/python -m serving_runtime enforce ingest --kind hubble \
+  --input tests/fixtures/enforcement/hubble_flows.synthetic.jsonl \
+  --origin synthetic --data-dir /tmp/runtime-observations
+.venv/bin/python -m serving_runtime enforce ingest --kind tetragon \
+  --input tests/fixtures/enforcement/tetragon_events.synthetic.jsonl \
+  --origin synthetic --data-dir /tmp/runtime-observations \
+  --intent examples/enforcement/intent.example.json
+```
+
+변환 성공 건은 `<data-dir>/observations.jsonl`에 추가됩니다. 형식 오류·미지원 이벤트는 원문 대신 줄 번호와 사유로 거부 집계합니다. MVP를 같은 `--data-dir`로 실행하면 `GET /api/observations`와 대시보드에서 source·kind·verdict·rule ID·자료 출처별 건수, 최신 50건, 손상 줄을 읽을 수 있습니다.
 
 ## 협업·검수
 

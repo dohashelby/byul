@@ -75,10 +75,23 @@
 - 2026-10-21 사용자 승인으로 vLLM CPU 이미지 v0.29.0(digest `sha256:66064cf6…`)과 `Qwen/Qwen2.5-0.5B-Instruct`(revision `7ae55760…`)를 받아 CPU 사전 점검을 수행했다. S3-01~06 모두 통과(보고서 `~/.local/state/serving-runtime/s3b-cpu/reports/s3b-cpu-20261021T064056Z.json`, 비밀값 미포함). 선정 환경(GPU·v0.31.0·선정 모델)과 달라 정식 S3B 통과로 세지 않는다. vLLM 기본 로그에 Gateway 요청 ID·abort 기록이 없어 backend 측 요청 단위 증거와 엔진 내부 취소는 미확인이다. 첫 float32 실행은 OOM, bfloat16으로 재실행했다.
 - CPU 점검 후 사용자가 외부 vLLM 모드 대시보드가 열리지 않는다고 보고했다. 원인은 `app.js`가 `/api/status`의 `mock_engine`만 읽어 vLLM 모드(`backend` 키)에서 스크립트 오류로 화면이 연결 끊김 상태에 머문 것이다. Claude가 두 키를 모두 읽도록 고치고 vLLM 모드 엔진 카드에 자격정보·추론 검증 미확인 표시를 추가했으며 정적 회귀 시험 1개를 넣었다. 브라우저 수준의 vLLM 모드 화면 시험은 없다.
 - 사용자 요청으로 README 맨 앞에 "개발 현황 한눈에"(기능별 확인 수준: 모의/가짜 backend/실제 vLLM CPU, 미구현 목록)와 "실제 vLLM(CPU)으로 실행하기"(이미지·모델 revision·실행·상시 실행·종료 명령) 절을 추가했다. 현재 unittest 116개 전부 통과. 커밋·푸시는 하지 않았다.
+- 2026-10-23 직전 교차 검수의 필수 6건을 반영했다. health 기반 외부 vLLM 배지, HTTP 헤더 부적합 credential의 `invalid`/503 미전달, CPU 사전 점검의 `overall`·종료 코드 3·포트/프로세스/Docker 복구 정리와 판정 강화를 구현했다.
+- CPU 사전 점검에 backend 요청 로그 필수 옵션과 S3-03 0.5초 timeout, S3-04 모델·지표 기준을 추가하고 README·S3B 준비 문서를 2026-10-23 CPU 로그 재확인 결과에 맞췄다. 정식 GPU S3B 증거는 아니다.
+- `.venv/bin/python -B -m unittest discover -s tests -v`는 124개 중 85개 통과·소켓 제한 39개 건너뜀·실패 0개였고, 변경 Python `py_compile`과 도구 `--help`도 통과했다. 실행 중인 Gateway/vLLM과 컨테이너는 건드리지 않았고 커밋·푸시하지 않았다.
+- 2026-10-24 credential env·파일 값에서 끝의 LF 또는 CRLF 하나만 제거한 뒤 헤더 안전성을 검사하도록 공용화했고, CPU 사전 점검 키 읽기도 같은 규칙을 사용한다. 내부 CR/LF·앞뒤 공백·단독 CR·줄바꿈 2개는 계속 거부한다. `.venv/bin/python -B -m unittest discover -s tests -v` 결과 124개 중 85개 통과·소켓 제한 39개 건너뜀·실패 0개다. 실행 중 서버·Docker는 건드리지 않았고 설치·커밋·푸시하지 않았다.
+- 2026-10-24 S3-06의 backend 종류 판정을 전체 누적 기록이 아니라 이번 사전 점검이 기록한 요청 ID로 한정해, 과거 mock 기록에 의한 재실행 거짓 실패를 제거하고 단위 시험을 추가했다.
+- P2 사전 작업으로 엄격 intent, Cilium 1.20.3·Tetragon 1.7.1 JSON 정책 후보, Hubble·Tetragon 이벤트 변환 CLI와 관측 API·대시보드를 추가했다. 합성 fixture 기준이며 클러스터 적용·실효 검증은 하지 않았다.
+- 표준 라이브러리만 사용했다. 전체 unittest 142개 중 102개 통과·소켓 제한 40개 건너뜀·실패 0개이며, 설치·컨테이너 조작·커밋·푸시는 하지 않았다.
+- 2026-10-24 Codex가 Claude 작성분을 교차 검수해 필수 6건(배지 과장, 비정상 키 노출, 미실행의 통과 집계, 실패 시 정리, 판정 기준, README 포트)을 찾고 수정했다. 수정 중 생긴 끝 줄바꿈 키 회귀와 S3-06 누적 기록 거짓 실패도 Codex가 고쳤다. 이후 vLLM을 `--enable-log-requests --enable-request-id-headers`로 띄워 강화 기준(`--require-backend-request-log --allow-engine-restart`)으로 실행한 CPU 사전 점검이 S3-01~06 전부 통과했다(보고서 `~/.local/state/serving-runtime/s3b-cpu/reports/s3b-cpu-20261023T154404Z.json`). 허용 요청 ID의 vLLM 로그 기록, 거부 요청 ID 부재, 취소 요청 `aborted` 로그를 확인했다.
+- 2026-10-24 Codex 로그인 만료로 Claude가 context 사전 통제(`max_context_tokens`, backend `/tokenize`, 초과 403·확인 불가 503, 생성 미전달)와 모델 파일 무결성 점검(`assets snapshot`, `--asset-manifest`, `asset_integrity` 수집원)을 직접 구현했다. 실제 vLLM v0.29.0 CPU `/tokenize`로 36토큰 허용·2129토큰 거부를 확인했다. unittest 157개 전부 통과(Claude, 소켓 허용). 이 두 기능은 Codex 교차 검수 전이다. 커밋·푸시하지 않았다.
+- 2026-10-24 Codex가 교차 검수 필수 6건을 반영했다: 자산 순회 오류·root/상위 링크·`O_NOFOLLOW` 검증, snapshot 배타 생성, 전용 자산 수집 스레드·소요 시간/종료 기준 간격, context 해석 오류 503, 대시보드 원인 수 표시다.
+- `.venv/bin/python -B -m unittest discover -s tests -v`는 166개 중 116개 통과·로컬 소켓 제한 50개 건너뜀·실패 0개였다. 실행 중인 서버·Docker는 건드리지 않았고 설치·커밋·푸시하지 않았다; 소켓 HTTP 회귀시험은 Claude 환경 재실행이 필요하다.
+- 2026-10-24 `mvp/app.py`의 기록·backend 조회·중계·요청 흐름·HTTP 분기를 `request_records.py`·`engine_client.py`·`relay.py`·`request_flow.py`·`http_handler.py`로 책임별 분리하고 `app.py`에는 구성·상태 조합·수명주기를 남겼다.
+- 분리 모듈 `py_compile`·단독 import·관련 unittest 105개(45개 skip)와 전체 unittest 166개(50개 skip)는 실패 0개다; 소켓 HTTP 전체 실행은 Claude 환경 검수가 필요하며 설치·서버·Docker 조작·커밋·푸시는 하지 않았다.
 
 ## 다음 준비 작업
 
-- S3A까지 완료(가짜 backend 기준). 다음은 승인된 GPU LAB 입력이 준비되면 S3B 실제 vLLM 시험이다. 설치·다운로드·운영 환경 변경은 자동으로 시작하지 않는다. Codex 사용량이 복구되면 Claude가 작성한 S3A 마무리분(대시보드·문서)의 교차 검수를 맡길 수 있다.
+- S3A까지 완료(가짜 backend 기준). 승인된 GPU LAB 입력이 준비되면 S3B 실제 vLLM 시험, 승인된 Kubernetes LAB과 수집 출력이 준비되면 P2 후보의 Cilium·Tetragon 적용·실효 검증을 진행한다. 설치·다운로드·운영 환경 변경은 자동으로 시작하지 않는다.
 
 ## 갱신 방법
 

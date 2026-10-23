@@ -318,3 +318,16 @@
 - POL-M13-UNKNOWN-AXES: 구조/격리 근거가 유효하면 inference failed/not_attempted/unknown은 기능만 UNKNOWN, 독립 보안은 기존 PASS 후보를 유지한다. 격리 관련unknown은 두 축 보류, rawFAIL/UNKNOWN은 보존한다. 판정기0.9.1이며 과거 객체/팩/설정 해시는 그대로다.
 - 설계 제안: REQ15의 PRIVATE-GROUP 최초 프로파일, PUBLIC-PREFIX bool·전체 격리집단 목록·신원정책 Ref의 명시 POL 전제와 /3 generic 증거를 [M13](docs/POLICY_M13.md)에 정리한다. bool false만으로 공유 관계/승인을 추론하지 않는다. 실제 신규키·카탈로그 분류 변경과 M14 실행은 하지 않는다.
 - 미결: 기업 전체집단/분류·신원정책 정본/승인·서비스 자격 뒤 사용자전달·대상경로/신뢰 경계/consumer·담당·시험권한/예산/중단조건. 문서 작성이나 합성 회귀의 차단 조건으로 삼지 않는다.
+
+## 2026-10-23 — 자동화 1차 구현 범위
+
+- 사용자 승인: Windows CPU 제품 기동·기존 5개 보강·REQ10/REQ13/OBS03 자동 실행·구현 완료 후 테스트/수정·문서·커밋/푸시·초안 PR. 과거 POLICY_PROMPT의 양식 전용/커밋 금지와 CLAUDE의 신규 실행기 승인 조건은 이 명시 승인으로 충족한다. 새 의존성은 추가하지 않는다.
+- CPU는 보안/기능만 비교하고 성능 UNKNOWN이라는 기존 결정을 유지한다. 실행 자원/모델 경로/옵션은 실행 설정에, 기업 기준은 POL에 분리한다. 기존 설정·7객체·원문/증거/팩 보존본은 유지한다.
+- 새 실행기는 관측된 분기만 판정한다. HTTP 거부와 메모리 안전, 4xx와 exception dump, 자기 입력 인용과 비공개 문맥 노출을 구분한다. 미검증 분기는 UNKNOWN, 독립 확인 위반은 FAIL을 보존한다.
+- 현재 CPU 기동은 제한된 amd64 snapshot 프로파일이다. Intel GPU 지원·GPU 성능·기업 승인/collector·두 실제 이미지 비교 완료를 뜻하지 않는다. 구체 범위/검증은 docs/AUTOMATION_PHASE1.md에 기록한다.
+
+### 실제 Windows CPU 실행에서 확인한 보완
+
+- cpu-bounded + hardened + vLLM 0.31.0 x86 CPU 실행에서 첫 추론 중 Triton launcher 공유 라이브러리가 `/tmp/.triton/cache`의 noexec 때문에 로드되지 않았다. 캐시 이동 뒤에도 CPU driver의 별도 임시 `.so`가 `/tmp`에서 로드되다 실패했다. 두 실패의 Docker OOMKilled는 false였다. `/tmp` 실행 제한·비root·읽기 전용 루트를 유지하고 이 프로파일의 `TRITON_CACHE_DIR=/guard-cache/triton`, `TMPDIR=/guard-cache`를 이미 존재하는 실행 허용 컴파일 tmpfs로 고정한다. 일반 임시 파일도 이 tmpfs에 올 수 있으며 `/tmp` 자체의 실행 제한을 해제한 것은 아니다. 실제 환경 변수와 권한을 비교 설정에도 함께 기록한다. 다른 프로파일에 이 예외를 전파하지 않는다.
+- 제품은 기동 실패 시와 종료 직전에 자신이 소유한 engine/gateway만 진단한다. `managed-diagnostic.json`과 SHA는 별도 실행 진단이며 EVD 첨부나 증거 bundle 자동 포함물이 아니다. 보고서에는 상대 경로와 SHA만 연결한다. 상태 허용 필드, 로그 tail 80줄·명령별 5초·컨테이너별 저장 32KiB, 알려진 키와 표지된 자격 값 정제를 적용한다. 임의 개인 정보 정제나 거대한 단일 로그 줄의 원시 수신 바이트 상한은 보장하지 않는다. 진단 실패가 원래 실행 실패나 확인된 위반을 덮지 않는다.
+- Windows 통합 worktree의 공유 editable 환경이 기본 checkout을 가리킨 사례가 있었다. 검증에는 별도 `UV_PROJECT_ENVIRONMENT`와 frozen 설치를 사용하고 `guard.__file__`로 실제 검증 소스를 확인한다. 환경 경로 문제와 제품 실패를 구분해 기록하며 공유 환경을 덮어쓰지 않는다.

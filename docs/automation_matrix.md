@@ -1,8 +1,8 @@
 # 77행 자동화 분류표 (요약)
 
-> 최신 구현 상태: [재평가·구현 보고서](REVIEW_AND_DEVELOPMENT_PLAN.md).
-> 이 표의 A/B/C는 가능성 분류다. 현재 연결된 정의는 REQ-01·REQ-03·PLT-01·PLT-04·REQ-09이며,
-> 신규 PLT-04·REQ-09는 모의 계약 검증 상태다. 이 표의 과거 추천 순서·불확실성 기록과 실제 실측 완료 수를 구분한다.
+> 현재 구현: [Windows CPU·자동화 1차](AUTOMATION_PHASE1.md). 실행기 연결은 기존 REQ-01·REQ-03·PLT-01·PLT-04·REQ-09와 신규 REQ-10·REQ-13·OBS-03의 8개다. 신규 3개는 제한 관측 프로파일이며 전체 분기 검증 완료를 뜻하지 않는다.
+> 이번 코드에서 Windows CPU 제품 명령으로 8개를 실제 실행했다. 기존 5개는 위반 구성에서 모두 FAIL·강화 구성에서 모두 PASS였고, 짧은 관측 시간 구성은 4개 UNKNOWN·PLT-01 PASS였다(원래 보안 기대 14/15 일치, 행렬 exit 1 보존). 신규 3개는 보안 REQ-10 UNKNOWN·REQ-13 FAIL·OBS-03 UNKNOWN이다. 근거와 한계는 위 문서를 따른다. CSV에 구현·검증·남은 범위·근거를 구분했다.
+> 아래 A/B/C와 불확실성 표는 2026-10-19 맥 CPU 기준의 가능성 분류 이력이다. Windows 지원 여부·실제 완료 수는 별도이며, 한 실행기 종류로 묶였다는 이유만으로 기존 코드가 모든 행을 실행할 수 있다고 보지 않는다.
 
 > 작성 2026-10-19. 판정·코드 변경 없음. 원본: `packs/PACK-BASELINE/checks/*.yaml`(checklist.json 원문 보존 필드) — 행별 표는 [`automation_matrix.csv`](automation_matrix.csv).
 

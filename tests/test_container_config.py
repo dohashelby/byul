@@ -13,7 +13,7 @@ from guard.executors.fake import DEFAULT_CAPS, SCENARIOS_BY_CHECK
 from guard.models import ExecStatus, Verdict
 from guard.runtime.docker import CmdResult
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import baseline_pack, environment, policy, completion_response
 
 LAB_POLICY = {"allowed_capabilities": [], "allowed_mounts": ["/models:ro"], "allowed_devices": [], "require_non_root": True,
               "allowed_exec_writable_paths": ["/guard-cache"]}
@@ -94,7 +94,7 @@ class FakeDocker:
 
 
 def _probe(network, requests, timeout):
-    return [{"id": r["id"], "method": r["method"], "url": r["url"], "outcome": 200, "phase": "response"} for r in requests]
+    return [{"id": r["id"], "method": r["method"], "url": r["url"], **completion_response(r), "phase": "response"} for r in requests]
 
 
 def _target(tmp_path, container="guard-lab-engine"):

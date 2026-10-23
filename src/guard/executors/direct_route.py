@@ -123,7 +123,7 @@ def aggregate_direct(results: list[tuple[tuple, dict, Any]], routes: dict[str, R
 def direct_observations(ctx: Ctx, rs: RouteSet, agg: DirectAgg, probes: dict, templates: dict[str, ProbeRequest],
                         skipped: dict, tcp: dict[TcpKey, dict], trusted_reachable: bool, combos: list, sent_any: bool,
                         safety: dict):
-    functional, functional_status, normal = functional_results(probes, agg.functional_raw)
+    functional, functional_status, normal = functional_results(probes, agg.functional_raw, ctx.env.model.id)
     has_direct = bool(ctx.target["direct_targets"])
     observations = {
         "routes_registered": {"value": rs.registered if rs.collected else None, "collected": rs.collected},
@@ -163,7 +163,7 @@ def direct_observations(ctx: Ctx, rs: RouteSet, agg: DirectAgg, probes: dict, te
 
 class DirectRouteExecutor(HttpCheckExecutor):
     name = "direct_route"
-    version = "0.5.0"
+    version = "0.6.0"
 
     def validate_policy(self, check, policy_values: dict) -> None:
         """설정의 역할(허용 주체로 취급해 direct_allowed_outcomes에만 남김)은 모두 정책 allowed_callers에 있어야 한다.

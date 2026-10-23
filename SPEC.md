@@ -693,3 +693,7 @@ declared0.9.0의 REQ16 상한은 신고 PASS만 제한한다. 보안은 문맥·
 보안 구조·격리 관측·첨부·기존 INV11 관문이 완결된 신고 PASS에서 inference의 failed/not_attempted/unknown만으로 독립된 보안 근거를 지우지 않는다. 기능은 모든 행 succeeded를 요구한다. 격리 관련 object_change/other_conditions/key_relation/cache_effect의 unknown은 보안/기능 PASS를 보류한다. raw FAIL/UNKNOWN·성능 UNKNOWN·CPU·legacy/부분선언·REQ09/SUP/LIF/OBS는 보존한다. 과거 RES UNKNOWN과 EVD 원본 신고 UNKNOWN을 구분하고 동일 증거의 새 판정 버전으로만 변화시킨다.
 
 declared0.9.1과 기존 캐시 helper만 변경한다. 수동 구조/1·양식/3·/1/2읽기·기존 config hash·팩16/DRAFT/REQ16정의2·77점검·15정책점검27경로·303결정595연결·a24/b3/c161/d115·자동실행5는 그대로다. REQ15 신규 계약과 M14는 [M13](docs/POLICY_M13.md)의 미구현 제안이다.
+
+## 자동화 1차 — Windows CPU와 실제 관측 확대
+
+2026-10-23 사용자 승인 범위는 기존 5개 점검 보강과 REQ-10/REQ-13/OBS-03 자동화다. `guard prepare-validation`/`guard validate`의 단일 managed 실행 경로와 명시적 CPU 자원 프로파일을 추가한다. 기술 설정과 POL을 분리하고, 원본 77개 ID·7객체·보존 증거·기존 판정 동작을 유지한다. 구현·계약·미검증 범위와 실행 후 결과는 [자동화 1차](docs/AUTOMATION_PHASE1.md)를 따른다. 이 범위 승인은 §0의 5~10개 우선 자동화 범위 안이며 향후 A/B/C 확대는 실제 관측과 인프라 조건별로 진행한다.

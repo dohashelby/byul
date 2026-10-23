@@ -14,7 +14,7 @@ from guard.executors.direct_route import DirectRouteExecutor
 from guard.executors.role_route import RoleRouteExecutor
 from guard.models import Verdict
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import baseline_pack, environment, policy, completion_response
 
 ALLOWED, GENERAL, ADMIN, WRONG = "allowed-k1", "general-k2", "admin-k3", "wrong-k4"
 
@@ -62,7 +62,7 @@ class MultiWorld:
         elif network != "trusted" and not self.exposed:
             return {**base, "outcome": "timeout", "phase": "connect"}
         status, body = self.engine(r["method"], u.path, auth, extra)
-        return {**base, "outcome": status, "body": body if r.get("want_body") else None, "body_preview": body[:160]}
+        return {**base, "outcome": status, "body": completion_response(r, status).get("body", body) if r.get("want_body") else None, "body_preview": body[:160]}
 
 
 def _target(tmp_path, exposed):

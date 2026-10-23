@@ -8,8 +8,9 @@ reference 폴더랑 CLAUDE.md랑 *_PROMPT.md로 개발 시작했습니다. 업�
 - [기업 정책 양식·필수 정책 입력 전제(M1/M2)](docs/POLICY_TEMPLATE.md)
 - [Managed 업데이트 설정](examples/update-managed.toml), [외부 대상 설정](examples/update-external.toml)
 
-guard update CLI와 scoped 실행기 5개가 연결돼 있습니다. 신규 PLT-04·REQ-09는 모의 계약 검증 상태이며,
-두 실제 이미지의 업데이트 비교 실증은 아직 완료하지 않았습니다. 기본 guard.toml은 EXAMPLE 시연 설정입니다.
+Windows CPU 단일 관리 기동 `guard prepare-validation`·`guard validate`와 실행기 8개가 연결돼 있습니다. 기존 5개와 신규 REQ-10·REQ-13·OBS-03의 지원 범위·직접 검증·미확인 분기는 [자동화 1차](docs/AUTOMATION_PHASE1.md)를 따릅니다. 두 실제 이미지의 업데이트 비교는 별도 검증이며 기본 guard.toml은 EXAMPLE 시연 설정입니다.
+
+[Windows CPU 설정](examples/windows-cpu.toml)과 [8개 점검 시험 정책](examples/automation-policy.yaml)은 EXAMPLE/DRAFT 예시입니다. 실제 ENV·모델 snapshot 경로·기업 정책을 확인해야 하며 누락한 관측을 PASS로 채우지 않습니다.
 
 
 실증 준비 검사·증거 반출/복원·실제 5개 점검 사례 행렬: [실증 안내](docs/VALIDATION.md).

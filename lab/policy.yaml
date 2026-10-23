@@ -1,7 +1,7 @@
 # 실험실 정책. DRAFT 유지, confirmed_by 비움 — 실측 때 사람이 정한다.
 data_origin: DECLARED
 status: DRAFT
-pack: { id: PACK-BASELINE, revision: 16 }
+pack: { id: PACK-BASELINE, revision: 17 }
 values:
   REQ-01: { allowed_callers: [allowed] }   # 허용 주체 = 실행기 설정 [direct_route].roles의 이름
   REQ-03: { general_allowed_kinds: [inference] }   # 일반 호출자 = 추론만, 관리 호출자 = 관리·진단

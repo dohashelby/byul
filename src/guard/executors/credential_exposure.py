@@ -11,7 +11,7 @@ ENV_CMD = ('for d in /proc/[0-9]*; do echo "PID ${d#/proc/}"; '
 
 class CredentialExposureExecutor(ContainerConfigExecutor):
     name = "credential_exposure"
-    version = "0.2.0"
+    version = "0.3.0"
 
     def validate_policy(self, check, values):
         from pathlib import PurePosixPath
@@ -43,7 +43,7 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
                                                       or d.startswith(p.rstrip("/") + "/") for d in destinations))
         requests, probes = functional_requests(ctx, via="engine")
         responses = ctx.cprobe(ctx.trusted_net, requests, ctx.timeout) if requests else []
-        functional, _, normal = functional_results(probes, dict(zip(probes, responses)))
+        functional, _, normal = functional_results(probes, dict(zip(probes, responses)), ctx.env.model.id)
         obs = {
             "process_scan_complete": {"value": complete, "collected": True},
             "worker_env_names": {"value": names, "collected": bool(lines)},

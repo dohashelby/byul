@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import subprocess
@@ -48,6 +49,38 @@ class Mount:
     source: Path
     target: str
     read_only: bool = True
+
+
+@dataclass(frozen=True)
+class ContainerLimits:
+    """Explicit per-container bounds; units are bytes and CPU equivalents."""
+
+    cpus: float | None = None
+    memory_bytes: int | None = None
+    memory_swap_bytes: int | None = None
+    shm_bytes: int | None = None
+    pids_limit: int | None = None
+
+    def __post_init__(self):
+        if self.cpus is not None and (type(self.cpus) not in (int, float) or not math.isfinite(self.cpus) or self.cpus <= 0):
+            raise ValueError("resources.cpus must be a positive finite number")
+        for key in ("memory_bytes", "memory_swap_bytes", "shm_bytes", "pids_limit"):
+            value = getattr(self, key)
+            if value is not None and (type(value) is not int or value <= 0):
+                raise ValueError(f"resources.{key} must be a positive integer")
+        if self.memory_swap_bytes is not None and (self.memory_bytes is None or self.memory_swap_bytes < self.memory_bytes):
+            raise ValueError("memory_swap_bytes includes RAM and must be at least memory_bytes")
+        if self.shm_bytes is not None and self.memory_bytes is not None and self.shm_bytes > self.memory_bytes:
+            raise ValueError("shm_bytes must not exceed memory_bytes")
+
+    @classmethod
+    def from_mapping(cls, values: dict) -> "ContainerLimits":
+        if type(values) is not dict or set(values) - set(cls.__dataclass_fields__):
+            raise ValueError("unknown or malformed container resources")
+        return cls(**values)
+
+    def to_dict(self) -> dict:
+        return {key: value for key in self.__dataclass_fields__ if (value := getattr(self, key)) is not None}
 
 
 class Docker:
@@ -119,12 +152,26 @@ class Docker:
                      command: list[str] | None = None, gpus: bool = False, shm_size: str | None = None,
                      cap_add: list[str] | None = None, cap_drop: list[str] | None = None, read_only: bool = False,
                      tmpfs: list[str] | None = None, user: str | None = None,
-                     security_opt: list[str] | None = None) -> str:
+                     security_opt: list[str] | None = None, limits: ContainerLimits | None = None,
+                     entrypoint: str | None = None) -> str:
         name = self.name(suffix)
         secret_env = secret_env or {}
         args = ["run", "-d", *self._common_run_args(name, networks, mounts or [], public_env or {}, secret_env)]
         if gpus:
             args += ["--gpus", "all"]
+        if limits is not None:
+            if not isinstance(limits, ContainerLimits):
+                raise ValueError("limits must be ContainerLimits")
+            flags = {"cpus": "--cpus", "memory_bytes": "--memory", "memory_swap_bytes": "--memory-swap",
+                     "shm_bytes": "--shm-size", "pids_limit": "--pids-limit"}
+            for key, value in limits.to_dict().items():
+                if key == "shm_bytes" and shm_size is not None:
+                    raise ValueError("set only one of shm_size and limits.shm_bytes")
+                args += [flags[key], str(value)]
+        if entrypoint is not None:
+            if not isinstance(entrypoint, str) or not re.fullmatch(r"/[A-Za-z0-9_./-]+", entrypoint) or ".." in entrypoint.split("/"):
+                raise ValueError("entrypoint must be one absolute executable path")
+            args += ["--entrypoint", entrypoint]
         if shm_size:
             args += ["--shm-size", shm_size]
         for c in cap_add or []:
@@ -173,6 +220,35 @@ class Docker:
         res = self._docker(["logs", container], timeout=timeout, check=False)
         return res.stdout + res.stderr
 
+    def logs_window(self, container: str, *, since: str, until: str, timeout: float) -> CmdResult:
+        """Preserve log-reader failure, both streams, and Docker timestamps."""
+        if not since or not until:
+            raise ValueError("bounded log collection needs since and until")
+        return self._docker(["logs", "--timestamps", "--since", since, "--until", until, container],
+                            timeout=timeout, check=False)
+
+    def diagnostic_state(self, suffix: str, *, timeout: float) -> dict:
+        """Read only this run's engine/gateway; never expose Config.Env or raw State.Error."""
+        if suffix not in {"engine", "gw"}:
+            raise ValueError("unsupported managed diagnostic role")
+        template = '{"owner":{{json (index .Config.Labels "guard.run")}},"state":{{json .State}}}'
+        raw = json.loads(self._docker(["inspect", "--format", template, self.name(suffix)], timeout=timeout).stdout)
+        if raw.get("owner") != self.run_id:
+            raise DockerError("managed diagnostic ownership mismatch")
+        state = raw.get("state") or {}
+        status = state.get("Status")
+        return {"status": status if status in {"created", "running", "paused", "restarting", "removing", "exited", "dead"} else "unknown",
+                "running": state.get("Running") if type(state.get("Running")) is bool else None,
+                "oom_killed": state.get("OOMKilled") if type(state.get("OOMKilled")) is bool else None,
+                "exit_code": state.get("ExitCode") if type(state.get("ExitCode")) is int else None,
+                "error_present": bool(state.get("Error"))}
+
+    def diagnostic_logs(self, suffix: str, *, timeout: float) -> CmdResult:
+        """Tail line count is bounded; caller must redact and cap saved bytes before writing."""
+        if suffix not in {"engine", "gw"}:
+            raise ValueError("unsupported managed diagnostic role")
+        return self._docker(["logs", "--timestamps", "--tail", "80", self.name(suffix)], timeout=timeout, check=False)
+
     def is_running(self, container: str, *, timeout: float) -> bool:
         res = self._docker(["inspect", "--format", "{{.State.Running}}", container], timeout=timeout, check=False)
         return res.returncode == 0 and res.stdout.strip() == "true"
@@ -200,6 +276,8 @@ class Docker:
         if res.returncode != 0:
             return None
         digests = json.loads(res.stdout or "[]") or []
+        if "@" in image and image in digests:
+            return image
         return digests[0] if digests else None
 
     def container_image(self, container: str, *, timeout: float) -> str:
@@ -212,9 +290,15 @@ class Docker:
         raw = json.loads(self._docker(["info", "--format", "{{json .}}"], timeout=timeout).stdout)
         return {"os": raw.get("OSType"), "architecture": raw.get("Architecture")}
 
+    def daemon_resources(self, *, timeout: float) -> dict:
+        """Capacity only; this does not measure currently available memory."""
+        raw = json.loads(self._docker(["info", "--format", "{{json .}}"], timeout=timeout).stdout)
+        return {"memory_bytes": raw.get("MemTotal"), "cpus": raw.get("NCPU")}
+
     def image_info(self, image: str, *, timeout: float) -> dict:
         raw = json.loads(self._docker(["image", "inspect", "--format", "{{json .}}", image], timeout=timeout).stdout)
-        return {"os": raw.get("Os"), "architecture": raw.get("Architecture"), "digests": raw.get("RepoDigests") or []}
+        return {"os": raw.get("Os"), "architecture": raw.get("Architecture"), "digests": raw.get("RepoDigests") or [],
+                "entrypoint": (raw.get("Config") or {}).get("Entrypoint")}
 
     # --- 정리 --------------------------------------------------------------------
 

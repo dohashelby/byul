@@ -1,0 +1,100 @@
+applies_when:
+  always: true
+policy_params:
+- key: allowed_response_fields
+  type: list[str]
+  required: true
+- key: allowed_error_fields
+  type: list[str]
+  required: true
+- key: forbidden_return_options
+  type: list[str]
+  required: true
+- key: required_targets
+  type: list[str]
+  required: true
+challenge_steps:
+- 선정 대상 정상 응답과 허용 필드 대조
+- 비공개 system 문맥과 금지 반환 옵션 시험
+- 안전한 오류와 후속 정상 대조
+required_observations:
+- key: response_coverage_complete
+  type: bool
+- key: response_coverage_gaps
+  type: list[str]
+- key: response_cases_tested
+  type: list[str]
+- key: response_fields_seen
+  type: list[str]
+- key: error_fields_seen
+  type: list[str]
+- key: response_options_returned
+  type: list[str]
+- key: response_options_tested
+  type: list[str]
+- key: response_targets_tested
+  type: list[str]
+- key: private_markers_returned
+  type: list[str]
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, outcome]
+executor: response_content
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: response_coverage_complete
+      op: eq
+      value: true
+    - obs: response_fields_seen
+      op: subset_of
+      value_policy: allowed_response_fields
+    - obs: error_fields_seen
+      op: subset_of
+      value_policy: allowed_error_fields
+    - obs: response_options_returned
+      op: none_in
+      value_policy: forbidden_return_options
+    - obs: response_options_tested
+      op: eq
+      value_policy: forbidden_return_options
+    - obs: response_targets_tested
+      op: eq
+      value_policy: required_targets
+    - obs: private_markers_returned
+      op: eq
+      value: []
+    fail_when_any:
+    - obs: response_fields_seen
+      op: not_subset_of
+      value_policy: allowed_response_fields
+    - obs: error_fields_seen
+      op: not_subset_of
+      value_policy: allowed_error_fields
+    - obs: response_options_returned
+      op: any_in
+      value_policy: forbidden_return_options
+    - obs: private_markers_returned
+      op: nonempty
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        fail_when_any:
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
+limitations:
+- 정책의 required_targets에 명시한 engine/Gateway 및 단일 completions/chat-completions endpoint만 시험한다. stream·alias·저장 결과·독자 신원 귀속 전체를 검증하지 않는다.
+- 비공개 system 표식은 chat messages에 실제 제출하고 정상 200 응답을 확인하는 범위다. 모델 내부 token 소비 계측은 없고, completions-only 환경은 해당 분기 UNKNOWN이다. 자기 입력·오류 입력의 인용은 비공개 system 누출과 구분한다.
+- 반환 옵션의 200 응답만으로 거부·제거를 증명하지 않는다. 실제 추가 반환은 관측하고, 효과가 없는 200은 accepted/ignored 불명으로 UNKNOWN이다. 안전 4xx 외 서버 오류·인증 실패는 거부 성공으로 세지 않는다.
+- 응답 JSON leaf 경로를 정책과 대조한다. 안전 오류는 max_tokens에 무해 표식을 넣는 검증 오류 한 종류이며 실제 비공개 서버 경로·자격·모든 내부 오류의 부재를 증명하지 않는다.

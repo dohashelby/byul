@@ -2,11 +2,12 @@
 from copy import deepcopy
 from guard.input_policy import contract_state, policy_context
 from .http_common import HttpCheckExecutor, functional_requests
+from .content_common import bounded_probe, control_state, record_content
 
 
 class InputValidationExecutor(HttpCheckExecutor):
     name = "input_validation"
-    version = "0.3.0"
+    version = "0.4.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -35,22 +36,20 @@ class InputValidationExecutor(HttpCheckExecutor):
         cases = {"token_id": [self.cfg["vocab_size"]],
                  "length": [0] * (ctx.policy_values["max_input_tokens"] + 1)}
         def send(req, label):
-            result = ctx.cprobe(ctx.trusted_net, [req], ctx.timeout)
-            r = result[0] if len(result) == 1 else {}
-            ctx.record("trusted", "input-validation", label, fp.as_role, r)
-            return r.get("outcome")
+            r = bounded_probe(ctx, ctx.trusted_net, req)
+            record_content(ctx, "trusted", "input-validation", label, r)
+            return r
 
         def control(label):
-            value = send(deepcopy(template), label)
-            controls[label] = "pass" if type(value) is int and value in fp.expect else (
-                "fail" if type(value) is int else "no_response")
+            response = send(deepcopy(template), label)
+            controls[label] = control_state(response, ctx.env.model.id, "/v1/completions")
 
         control("before")
         if controls["before"] == "pass":
             for name, prompt in cases.items():
                 request = deepcopy(template)
                 request["body"]["prompt"] = prompt
-                value = send(request, name)
+                value = send(request, name).get("outcome")
                 outcomes[name] = str(value) if value is not None else "error"
                 control("after_" + name)
         normal = {"attempted": True, "succeeded": len(controls) == 3 and all(v == "pass" for v in controls.values()),

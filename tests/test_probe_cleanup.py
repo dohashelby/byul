@@ -12,7 +12,7 @@ from guard.core.select import select
 from guard.models import ExecStatus
 from guard.models.objects import Execution
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy, T0
+from tests.builders import baseline_pack, environment, policy, T0, completion_response
 
 
 @pytest.mark.parametrize("cleanup_raises", [False, True])
@@ -25,7 +25,7 @@ def test_probe_cleanup_preserves_completed_failure(tmp_path, monkeypatch, cleanu
         def cleanup(self, **kw):
             if cleanup_raises: raise RuntimeError("secret daemon error")
             return ["secret daemon error"]
-    def probe(net, requests, timeout): return [{"outcome":200} for _ in requests]
+    def probe(net, requests, timeout): return [completion_response(r) for r in requests]
     monkeypatch.setattr(http_common, "Docker", Docker)
     monkeypatch.setattr(http_common, "docker_container_probe", lambda *a: probe)
     cfg = {"input_validation":{"target":str(target), "vocab_size":100, "vocab_source":"synthetic"}}

@@ -13,7 +13,7 @@ from typing import Callable
 
 from guard.models import DataOrigin, Environment
 from guard.models.objects import FactValue
-from guard.runtime.docker import Docker, Mount
+from guard.runtime.docker import ContainerLimits, Docker, Mount
 
 from .base import CommonOption, ContainerHandle, EngineEvent, EngineIdentity, LaunchSpec, ProbeRequest, Route
 
@@ -91,6 +91,59 @@ PROBE_PROMPT = "ping"
 
 HttpGet = Callable[[str, float], tuple[int | str, str]]  # url, timeout → (상태코드 | 분류 문자열, 본문)
 
+CPU_LAUNCH_KEYS = {"dtype", "max_model_len", "max_num_seqs", "max_num_batched_tokens",
+                   "kv_cache_memory_bytes", "enforce_eager", "cpu_threads", "resources"}
+
+
+@dataclass(frozen=True)
+class CpuLaunchOptions:
+    """A bounded CPU diagnostic profile, separate from enterprise POL values."""
+
+    dtype: str = "float32"
+    max_model_len: int = 128
+    max_num_seqs: int = 1
+    max_num_batched_tokens: int = 128
+    kv_cache_memory_bytes: int = 67108864
+    enforce_eager: bool = True
+    cpu_threads: int = 2
+
+    def __post_init__(self):
+        if type(self.dtype) is not str or self.dtype not in {"float32", "float16", "bfloat16"}:
+            raise ValueError("CPU dtype must be float32, float16 or bfloat16")
+        for key in ("max_model_len", "max_num_seqs", "max_num_batched_tokens", "kv_cache_memory_bytes", "cpu_threads"):
+            value = getattr(self, key)
+            if type(value) is not int or value <= 0:
+                raise ValueError(f"CPU {key} must be a positive integer")
+        if type(self.enforce_eager) is not bool:
+            raise ValueError("CPU enforce_eager must be a boolean")
+        if self.max_num_batched_tokens < self.max_model_len:
+            raise ValueError("CPU max_num_batched_tokens must cover max_model_len")
+
+    @classmethod
+    def from_options(cls, options: dict) -> "CpuLaunchOptions":
+        return cls(**{key: options[key] for key in cls.__dataclass_fields__ if key in options})
+
+    def to_dict(self) -> dict:
+        return {key: getattr(self, key) for key in self.__dataclass_fields__}
+
+
+def cpu_launch_limits(options: dict) -> ContainerLimits:
+    values = {"cpus": 2, "memory_bytes": 3221225472, "memory_swap_bytes": 5368709120,
+              "shm_bytes": 536870912, "pids_limit": 256}
+    supplied = options.get("resources", {})
+    if type(supplied) is not dict:
+        raise ValueError("CPU resources must be a table")
+    values.update(supplied)
+    limits = ContainerLimits.from_mapping(values)
+    if any(getattr(limits, key) is None for key in values):
+        raise ValueError("bounded CPU resources cannot be null")
+    cpu = CpuLaunchOptions.from_options(options)
+    if cpu.cpu_threads > limits.cpus:
+        raise ValueError("CPU threads must not exceed the container CPU bound")
+    if cpu.kv_cache_memory_bytes >= limits.memory_bytes:
+        raise ValueError("KV cache must leave memory for model weights and runtime")
+    return limits
+
 
 @dataclass(frozen=True)
 class LaunchPlan:
@@ -102,6 +155,8 @@ class LaunchPlan:
     container_port: int = CONTAINER_PORT
     gpus: bool = False  # True면 docker --gpus all
     shm_size: str | None = None
+    limits: ContainerLimits | None = None
+    entrypoint: str | None = None
 
 
 @dataclass
@@ -111,7 +166,7 @@ class VllmAdapter:
     base_url: str | None = None
     launch_spec: LaunchSpec | None = None
     name: str = field(default="vllm", init=False)
-    version: str = field(default="0.1.0", init=False)
+    version: str = field(default="0.2.0", init=False)
 
     # --- 기동 ------------------------------------------------------------------
 
@@ -119,9 +174,35 @@ class VllmAdapter:
         revision = spec.options.get("revision")
         if not revision:
             raise ValueError("model revision must be pinned (options['revision'])")
-        unknown = set(spec.options) - {"revision", "models_dir", "device", "cpu_kv_cache_gib", *(o.value for o in CommonOption)}
+        unknown = set(spec.options) - {"revision", "models_dir", "device", "cpu_kv_cache_gib", "launch_profile",
+                                      "model_layout", *CPU_LAUNCH_KEYS, *(o.value for o in CommonOption)}
         if unknown:
             raise ValueError(f"unknown launch options: {sorted(unknown)}")
+        profile = spec.options.get("launch_profile", "legacy")
+        if type(profile) is not str or profile not in {"legacy", "cpu-bounded"}:
+            raise ValueError("launch_profile must be legacy or cpu-bounded")
+        layout = spec.options.get("model_layout", "hf-cache")
+        if type(layout) is not str or layout not in {"hf-cache", "snapshot"}:
+            raise ValueError("model_layout must be hf-cache or snapshot")
+        if profile == "legacy" and (layout != "hf-cache" or any(key in spec.options for key in CPU_LAUNCH_KEYS)):
+            raise ValueError("bounded CPU options and snapshot layout require launch_profile=cpu-bounded")
+        if profile == "cpu-bounded":
+            if spec.options.get("device") != "cpu":
+                raise ValueError("cpu-bounded requires explicit device=cpu")
+            if "cpu_kv_cache_gib" in spec.options:
+                raise ValueError("cpu-bounded uses kv_cache_memory_bytes; do not also set cpu_kv_cache_gib")
+            cpu = CpuLaunchOptions.from_options(spec.options)
+            cpu_launch_limits(spec.options)
+            argv = [MODEL_MOUNT if layout == "snapshot" else spec.model, "--revision", str(revision),
+                    "--served-model-name", spec.model, "--host", "0.0.0.0", "--port", str(spec.port),
+                    "--dtype", cpu.dtype, "--max-model-len", str(cpu.max_model_len),
+                    "--max-num-seqs", str(cpu.max_num_seqs), "--max-num-batched-tokens", str(cpu.max_num_batched_tokens),
+                    "--kv-cache-memory-bytes", str(cpu.kv_cache_memory_bytes), "--load-format", "auto"]
+            if cpu.enforce_eager:
+                argv.append("--enforce-eager")
+            if spec.options.get(CommonOption.REMOTE_CODE_EXECUTION.value):
+                argv.append(OPTION_FLAGS[CommonOption.REMOTE_CODE_EXECUTION])
+            return argv
         argv = [
             "--model", spec.model, "--revision", str(revision), "--served-model-name", spec.model,
             "--host", "0.0.0.0", "--port", str(spec.port),
@@ -142,17 +223,31 @@ class VllmAdapter:
             raise ValueError(f"device must be gpu or cpu, got {device!r}")
         secret = ["VLLM_API_KEY"] if spec.options.get(CommonOption.API_KEY_REQUIRED.value) else []
         env = {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "HF_HOME": MODEL_MOUNT}
-        if device == "cpu":
+        argv = self.start_command(spec)
+        bounded = spec.options.get("launch_profile") == "cpu-bounded"
+        if bounded:
+            cpu = CpuLaunchOptions.from_options(spec.options)
+            env.update(VLLM_CPU_OMP_THREADS_BIND="nobind", OMP_NUM_THREADS=str(cpu.cpu_threads),
+                       VLLM_NO_USAGE_STATS="1", DO_NOT_TRACK="1")
+            # The image itself may define the legacy GiB variable. Remove it
+            # in the child before starting, otherwise it overrides byte sizing.
+            argv = ["-u", "VLLM_CPU_KVCACHE_SPACE", "vllm", "serve", *argv]
+        elif device == "cpu":
             # CPU 빌드: KV cache 메모리(GiB). 작은 모델·작은 VM에 맞춘 값
-            env["VLLM_CPU_KVCACHE_SPACE"] = str(spec.options.get("cpu_kv_cache_gib", 1))
+            gib = spec.options.get("cpu_kv_cache_gib", 1)
+            if type(gib) is not int or gib <= 0:
+                raise ValueError("cpu_kv_cache_gib must be a positive integer")
+            env["VLLM_CPU_KVCACHE_SPACE"] = str(gib)
         return LaunchPlan(
             image=spec.image,
-            argv=self.start_command(spec),
+            argv=argv,
             env=env,
             secret_env_names=secret,
             mounts=[Mount(Path(models_dir), MODEL_MOUNT, read_only=True)],
             gpus=device == "gpu",
-            shm_size="1g",
+            shm_size=None if bounded else "1g",
+            limits=cpu_launch_limits(spec.options) if bounded else None,
+            entrypoint="/usr/bin/env" if bounded else None,
         )
 
     # --- 경로 ------------------------------------------------------------------

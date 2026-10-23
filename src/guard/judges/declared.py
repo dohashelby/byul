@@ -15,6 +15,7 @@ PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관�
 from __future__ import annotations
 
 from guard.models import CheckDef, Evidence, Verdict
+from guard.input_policy import policy_context
 
 from .base import AXES, JudgeOutput
 from .policy_items import evaluate
@@ -45,9 +46,10 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.6.0"
+    version = "0.7.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
+        input_context = policy_context(check, policy_values, evidence.observations)
         obs = evidence.observations.get("declared_verdicts")
         if obs is None or not obs.collected or not isinstance(obs.value, dict):
             return JudgeOutput(verdicts={a: Verdict.UNKNOWN for a in AXES}, reasons=["no declared verdicts"],
@@ -70,6 +72,8 @@ class DeclaredJudge:
             reasons.append(f"POLICY_CONTEXT: {code}; context only, approval permissions not automatically verified")
         branch_blocked, branch_reasons = _branch_context(check, policy_values)
         reasons.extend(branch_reasons)
+        if input_context is not None:
+            reasons.extend(input_context.reasons)
         item_result = evaluate(check, evidence, policy_values)
         if item_result is None:
             item_result = evaluate_audit(check, evidence, policy_values)
@@ -89,6 +93,9 @@ class DeclaredJudge:
             if v == "PASS" and branch_blocked:
                 reasons.append(f"{axis}: declared PASS withheld: POLICY_CONTEXT: policy flag does not establish this review branch")
                 v = "UNKNOWN"
+            if v == "PASS" and input_context is not None and input_context.blocked:
+                reasons.append(f"{axis}: declared PASS withheld: POLICY_CONTEXT: submitted input scope unresolved")
+                v = "UNKNOWN"
             if v == "PASS" and not evidence.artifacts:
                 reasons.append(f"{axis}: declared PASS withheld: no attachment (at least one evidence file required)")
                 v = "UNKNOWN"
@@ -104,4 +111,5 @@ class DeclaredJudge:
             verdicts[axis] = Verdict(v)
             reasons.append(f"{axis}: declared {obs.value.get(axis) or 'UNKNOWN'} → {v}")
         return JudgeOutput(verdicts=verdicts, reasons=reasons,
-                           missing_observations=item_result[2] if item_result else [])
+                           missing_observations=sorted(set(item_result[2] if item_result else [])
+                               | set(input_context.missing if input_context is not None else ())))

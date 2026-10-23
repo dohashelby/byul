@@ -1,15 +1,19 @@
 """REQ-09 bounded token-array checks using declared policy limits and a valid control."""
 from copy import deepcopy
+from guard.input_policy import contract_state, policy_context
 from .http_common import HttpCheckExecutor, functional_requests
 
 
 class InputValidationExecutor(HttpCheckExecutor):
     name = "input_validation"
-    version = "0.2.0"
+    version = "0.3.0"
     requires_roles = False
     requires_route_scope = False
 
     def validate_policy(self, check, values):
+        context = policy_context(check, values)
+        if context is not None and context.blocked:
+            raise ValueError("; ".join(context.reasons))
         if type(self.cfg.get("vocab_size")) is not int or self.cfg["vocab_size"] < 1 or not self.cfg.get("vocab_source"):
             raise ValueError("execution settings need vocab_size and its model/fixture source")
         if type(values.get("max_input_tokens")) is not int or values["max_input_tokens"] < 1:
@@ -60,7 +64,15 @@ class InputValidationExecutor(HttpCheckExecutor):
             "functional_probes_planned": {"value": planned, "collected": True},
             "functional_probe_results": {"value": controls, "collected": True},
         }
+        scope = {}
+        if contract_state(ctx.check) != "legacy":
+            # The request was actually attempted above. Derive scope from that
+            # prepared request/probe, never from the policy's expected lists.
+            scope = {"input_endpoints_tested": [f"{template['method']} {fp.path}"],
+                     "input_formats_tested": ["token_ids"] if type(template["body"]["prompt"]) is list
+                     and all(type(v) is int for v in template["body"]["prompt"]) else []}
+            obs.update({key: {"value": value, "collected": True} for key, value in scope.items()})
         return obs, normal, [{"step": s, "attempted": len(outcomes) == len(cases)} for s in ctx.check.challenge_steps], {
             "challenge_outcomes": outcomes, "controls": controls,
             "fixture": {"cases": cases, "control": fp.model_dump(mode="json"), "policy": ctx.policy_values,
-                        "vocab_source": self.cfg["vocab_source"]}}
+                        "vocab_source": self.cfg["vocab_source"], **({"submitted_scope": scope} if scope else {})}}

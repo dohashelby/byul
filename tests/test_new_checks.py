@@ -19,6 +19,9 @@ def pipeline(tmp_path, cid, factory, values):
     path.write_text(json.dumps(target), encoding="utf-8")
     store = Store(tmp_path / "store")
     pack = baseline_pack()
+    if cid == "REQ-09":
+        values = {"allowed_endpoints": [pack.checks[cid].functional_probes[0].id],
+                  "allowed_input_formats": ["token_ids"], **values}  # Explicit EXAMPLE test fixture, not defaults.
     env = environment(model={"id": "test"})
     pol = policy(pack.ref(), scope={"include": [cid]}, values={cid: values})
     store.put(env); store.put(pol)

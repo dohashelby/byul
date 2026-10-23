@@ -85,7 +85,7 @@ def test_inference_conflict_still_prevents_unproved_pass(pack):
 
 
 def test_approval_declarations_are_two_scalar_paths_not_item_evidence(pack):
-    assert pack.manifest.revision == 14 and not pack.reviewed
+    assert pack.manifest.revision == 15 and not pack.reviewed
     for cid in ("SUP-01", "SUP-02"):
         c = pack.checks[cid]
         assert c.revision == 2
@@ -159,7 +159,7 @@ def test_manual_approval_to_report_preserves_history_and_escapes_context(tmp_pat
     assert results["SUP-02"].verdicts.security == "UNKNOWN"
     # The evidence is declared; the result keeps the weaker EXAMPLE ENV/POL
     # provenance rather than promoting this synthetic contract to real data.
-    assert all(r.judge.version == "0.6.0" and r.data_origin == "EXAMPLE" for r in results.values())
+    assert all(r.judge.version == "0.7.0" and r.data_origin == "EXAMPLE" for r in results.values())
     assert all(e.data_origin == "DECLARED" for e in st.iter_kind("EVD"))
     saved = {o.ref().sha256: o.to_dict() for k in ("EVD", "RES") for o in st.iter_kind(k)}
     judge_plan(st, pack, plan, T0)

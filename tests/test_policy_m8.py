@@ -36,10 +36,10 @@ def given(cid, value):
 
 
 def test_declarations_catalog_and_blank_template_are_not_execution(pack):
-    assert pack.manifest.revision == 14 and not pack.reviewed
+    assert pack.manifest.revision == 15 and not pack.reviewed
     assert len(pack.checks) == 77
     assert sum(bool(c.policy_params) for c in pack.active_checks()) == 14
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 24
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 26
     assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09"}
     for cid, (key, _) in FLAGS.items():
         check = pack.checks[cid]
@@ -53,7 +53,7 @@ def test_declarations_catalog_and_blank_template_are_not_execution(pack):
     assert template["scope"] == {"include": [], "exclude": []}
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
     assert len(rows) == 303 and sum(len(json.loads(r["check_ids"])) for r in rows) == 595
-    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=21, b=6, c=161, d=115)
+    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=23, b=4, c=161, d=115)
     for pid, checks in (("P-DRAFT-USAGE-ALLOW", ("OBS-04", "OBS-05")), ("P-DRAFT-REPLAY-ALLOW", ("OBS-07", "OBS-08"))):
         row = next(r for r in rows if r["proposed_policy_id"] == pid)
         assert row["classification"] == "a" and row["proposed_shape"] == "bool"
@@ -184,7 +184,7 @@ def test_manual_versions_report_side_history_and_idempotence(tmp_path, pack, ver
     doc["checks"][0]["entered_by"] = "EXAMPLE <script>operator</script>"
     import_evidence(st, pack, write(tmp_path, doc), now=T0)
     for e in st.iter_kind("EVD"):
-        assert e.execution.executor.version == "0.4.0" and e.data_origin == "DECLARED"
+        assert e.execution.executor.version == "0.5.0" and e.data_origin == "DECLARED"
         assert "declared_audit_evidence" not in e.observations
     judge_plan(st, pack, plan, T0)
     before = snapshot(st)
@@ -195,7 +195,7 @@ def test_manual_versions_report_side_history_and_idempotence(tmp_path, pack, ver
         expected = "PASS" if result.check_id in ("OBS-04", "OBS-07") else "UNKNOWN"
         if result.check_id == "OBS-08" and result.side == "candidate": expected = "FAIL"
         assert result.verdicts.security == expected
-        assert result.judge.version == "0.6.0" and result.data_origin == "EXAMPLE"
+        assert result.judge.version == "0.7.0" and result.data_origin == "EXAMPLE"
     report = build_report(st, pack, plan, T0).to_dict()
     text = json.dumps(report, ensure_ascii=False)
     assert not report["official"] and "POLICY_CONTEXT:" in text

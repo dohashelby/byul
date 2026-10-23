@@ -14,7 +14,7 @@ uv run guard policy template --pack packs/PACK-BASELINE --out my-policy.yaml
 
 ## 빈 값과 실제 입력
 
-현재 M8 팩은 14개 점검·24개 선언을 갖는다(M1 5개·11개, M2/M4 7개·13개, M5/M6 9개·15개, M7 10개·20개). 생성기는 이 이름이나 개수에 한정되지 않으며,
+현재 M10 팩은 14개 점검·26개 선언을 갖는다(M1 5개·11개, M2/M4 7개·13개, M5/M6 9개·15개, M7 10개·20개). 생성기는 이 이름이나 개수에 한정되지 않으며,
 다른 팩의 활성 점검 선언도 읽는다. retired 점검과 선언 없는 점검은 값 안내에 넣지 않는다.
 기본 `scope.include`와 `scope.exclude`는 모두 빈 목록이므로 양식에 표시한 14개로 점검 범위를 축소하지 않는다.
 
@@ -41,7 +41,7 @@ REQ-09는 여전히 양의 `max_input_tokens`, 한도+1 요청까지 포함하�
 
 ## 설명의 출처와 일치 조건
 
-[정책 카탈로그](policy_catalog.md)의 분류 a 21개 결정(24개 선언 경로)에서 설명·일반적인 원문 역할·
+[정책 카탈로그](policy_catalog.md)의 분류 a 23개 결정(26개 선언 경로)에서 설명·일반적인 원문 역할·
 소비 경로·검증 기록만 추려 패키지 내부 `collectors/policy_template_metadata.json`에 보존했다.
 생성기는 저장소의 `docs/`·`reference/`를 런타임 필수 경로로 읽지 않는다.
 공통 모델·팩에 설명 필드를 추가하지 않았다.
@@ -178,3 +178,9 @@ OBS04 false, 나머지 true가 검토 문맥이고 다른 값/키 누락은 신�
 declared0.6.0, manual-entry0.4.0·수동/3 및 /1·/2 읽기는 유지한다. 새 항목 payload는 없다.
 분기 표·공유 정책의 점검별 범위/일관성 한계·구형 정의 계약은 [M8 문서](POLICY_M8.md)를 따른다.
 기업이 실제 값·승인·사용 범위와 증거를 준비해야 하며 자동 실행기 연결5개는 그대로다.
+
+## M10 REQ-09 endpoint·형식
+
+두 required 목록은 실제 대상 인터페이스의 전체 승인 기준이며 각각 단일 원소만 지원한다. endpoint는 CheckDef 정상 engine POST의 METHOD path와 정확히 같고 형식은 token_ids다. 기업 정책을 줄여 맞추지 않는다. 빈 양식 REQ-09:{}는 유지하며 값 누락은 NOT_RUN, 잘못된 타입은 선정 오류, 빈/복수/미지원/표본 불일치는 요청 전 ABORTED다. 기존 수치·거부 코드·vocab 출처·예산도 필요하다.
+
+수동 /3은 `guard evidence template --include-automated`와 비공백 override_reason을 사용한다. input_endpoints_tested·input_formats_tested는 실제 시험 범위의 generic 관측이며 두 목록 전체와 일치해야 PASS 후보가 된다. 수동 신고는 DECLARED다. /1·/2 읽기와 기존 참조/side 보호를 보존한다. [M10](POLICY_M10.md)의 검증과 한계를 따른다.

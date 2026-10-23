@@ -659,3 +659,12 @@ guard evidence import manual.yaml                                              #
 - select의 기존 bool 타입/누락 검사를 재사용한다. false는 값이고 null/0/1/문자열은 변환하지 않는다. 이 전제는 네 대상의 정확한 required bool 선언에만 적용하며 과거/optional/다른 타입/비대상 정의에는 소급하지 않는다.
 - declared0.6.0, manual-entry0.4.0·수동/3·기존 증거 계약과 객체7종·코어·저장소는 유지한다. 기존 POLICY_CONTEXT와 팩 한계 표시로 실제 값·분기·자동 검증/공유 정책 일관성 한계를 보고한다. 기업값·승인·실제 usage/replay 검증을 만들지 않는다.
 - PACK-BASELINE14/DRAFT·네 정의2·14점검24경로·a21/b6/c161/d115, 77ID/303결정595연결·자동 연결5다. [M8 계약](docs/POLICY_M8.md)의 분기 표·구형 증거·후속 계획을 따른다.
+
+## M10 REQ-09 입력 범위 계약
+
+- REQ-09의 required `allowed_endpoints`·`allowed_input_formats`는 list[str]다. 정상 engine POST 표본과 정확히 같은 endpoint 하나·`token_ids` 하나만 지원한다. 기업 전체 허용 목록을 줄이거나 기본값을 채우지 않는다. REQ-07/08/10·복수 관계표·재사용 ID/renderer는 후속이다.
+- 정책2개·관측2개의 정확한 선언 묶음에 적용한다. 모든 새 이름이 없는 과거 정의는 기존 계약, 일부/잘못된 선언은 PASS 보류다. 순수 input_policy가 실행 전·rule_table·declared의 의미를 공유한다. 의미 오류는 target/readiness/Docker/probe 전 ABORTED, 누락은 기존 NOT_RUN, 잘못된 타입은 선정 오류다.
+- 실제 제출에서 input_endpoints_tested·input_formats_tested를 수집하고 기존 정상3·경계2 요청을 보존한다. 두 관측의 전체 정책 일치·지원 프로파일을 보안/기능 PASS 전제로 사용한다. 오프라인 재판정에도 PASS 상한을 적용하고 기존 FAIL/UNKNOWN은 보존한다. 성능 규칙은 추가하지 않는다.
+- /3 generic 수동 관측과 --include-automated·override_reason을 사용한다. 새 계약 REQ-09에 한해 두 관측 값/collected를 config hash에 반영한다. 과거 정의/다른점검 입력과 기존 EVD/RES는 보존하며 /1·/2 읽기도 유지한다.
+- input_validation0.3.0·rule_table0.5.0·declared0.7.0·manual-entry0.5.0. core/report 한 파일에서 rule_table의 POLICY_CONTEXT 전달만 보강한다. official·축·출처·비교 규칙은 유지한다.
+- 팩15/DRAFT·REQ09정의5·14점검26경로·a23/b4/c161/d115·자동연결5다. 실제 parser 소비·전체 원문 요구·기업 승인·실제 엔진은 미검증이다. [M10 구현/검증](docs/POLICY_M10.md)을 따른다.

@@ -184,3 +184,7 @@ declared0.6.0, manual-entry0.4.0·수동/3 및 /1·/2 읽기는 유지한다. �
 두 required 목록은 실제 대상 인터페이스의 전체 승인 기준이며 각각 단일 원소만 지원한다. endpoint는 CheckDef 정상 engine POST의 METHOD path와 정확히 같고 형식은 token_ids다. 기업 정책을 줄여 맞추지 않는다. 빈 양식 REQ-09:{}는 유지하며 값 누락은 NOT_RUN, 잘못된 타입은 선정 오류, 빈/복수/미지원/표본 불일치는 요청 전 ABORTED다. 기존 수치·거부 코드·vocab 출처·예산도 필요하다.
 
 수동 /3은 `guard evidence template --include-automated`와 비공백 override_reason을 사용한다. input_endpoints_tested·input_formats_tested는 실제 시험 범위의 generic 관측이며 두 목록 전체와 일치해야 PASS 후보가 된다. 수동 신고는 DECLARED다. /1·/2 읽기와 기존 참조/side 보호를 보존한다. [M10](POLICY_M10.md)의 검증과 한계를 따른다.
+
+## M11 REQ-09 수동 PASS와 관측의 일관성
+
+새 M10 계약의 REQ-09는 수동 신고 PASS라도 고정된 판정표가 같은 보안/기능 축에서 PASS 후보를 인정해야 유지한다. accepted_challenges에 수락된 경계가 있거나 정상 결과 fail 등 상충이 있으면 해당 신고 PASS를 UNKNOWN으로 보류한다. 관측/규칙 부족·평가 오류도 보류하며 신고 FAIL/UNKNOWN과 성능 처리는 보존한다. /3·/1/2 읽기·자동대체 이유·Ref/side·기존 hash 입력은 그대로다. [M11 계약/검증과 캐시 설계](POLICY_M11.md)를 참고한다. 캐시 정책은 아직 양식에 등록하지 않는다.

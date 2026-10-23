@@ -8,6 +8,7 @@
 - SUP-14/LIF-07의 선언된 필수 항목별 신고 관측·첨부 연결 및 제한적 충족 조건
 - OBS-11의 프로파일·독립 근거·시간/조회 창·경보/종속 처리에 대한 제한적 충족 조건
 - OBS-04/05·OBS-07/08에 선언된 bool 정책의 해당 검토 분기(실제 활성 상태 증명 아님)
+- M10 REQ-09 계약의 보안·기능 관측이 고정된 rule_table에서도 PASS 후보일 것
 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집, INV-11)은 판정 코어가 따로 적용한다.
 신고된 FAIL은 그대로 둔다(INV-04). 항목별 관측은 DECLARED이며 실측·신원 인증이 아니다.
 """
@@ -20,6 +21,7 @@ from guard.input_policy import policy_context
 from .base import AXES, JudgeOutput
 from .policy_items import evaluate
 from .audit_collection import evaluate as evaluate_audit
+from .rule_table import RuleTableJudge
 
 ALLOWED = {"PASS", "FAIL", "UNKNOWN"}
 
@@ -46,7 +48,7 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.7.0"
+    version = "0.8.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         input_context = policy_context(check, policy_values, evidence.observations)
@@ -54,6 +56,17 @@ class DeclaredJudge:
         if obs is None or not obs.collected or not isinstance(obs.value, dict):
             return JudgeOutput(verdicts={a: Verdict.UNKNOWN for a in AXES}, reasons=["no declared verdicts"],
                                missing_observations=["declared_verdicts"])
+        input_rules = None
+        input_rule_issue = "unavailable"
+        if input_context is not None and not input_context.blocked:
+            if check.judge is not None and check.judge.plugin == "rule_table":
+                try:
+                    # Evaluate the pinned CheckDef directly. Calling the core
+                    # would select this EVD's declared default_judge recursively.
+                    input_rules = RuleTableJudge().judge(check, evidence, check.judge.params, policy_values)
+                    input_rule_issue = "evaluated"
+                except Exception:  # INV-04: a dependency error must not erase declared FAIL.
+                    input_rule_issue = "evaluation_error"
         op = evidence.execution.operator
         who = f"{op.by} at {op.at.isoformat()}" if op else "unknown operator"
         notes = evidence.observations.get("declared_observation_notes")
@@ -96,6 +109,13 @@ class DeclaredJudge:
             if v == "PASS" and input_context is not None and input_context.blocked:
                 reasons.append(f"{axis}: declared PASS withheld: POLICY_CONTEXT: submitted input scope unresolved")
                 v = "UNKNOWN"
+            if v == "PASS" and input_context is not None and axis in ("security", "functional"):
+                ceiling = input_rules.verdicts.get(axis, Verdict.UNKNOWN) if input_rules is not None else Verdict.UNKNOWN
+                if ceiling != Verdict.PASS:
+                    code = "OBSERVATION_CONFLICT" if ceiling == Verdict.FAIL else "RULE_UNRESOLVED"
+                    reasons.append(f"POLICY_CONTEXT: REQ09_MANUAL_{code}; axis={axis}; "
+                                   f"rule_table={ceiling.value}; {input_rule_issue}; DECLARED PASS withheld")
+                    v = "UNKNOWN"
             if v == "PASS" and not evidence.artifacts:
                 reasons.append(f"{axis}: declared PASS withheld: no attachment (at least one evidence file required)")
                 v = "UNKNOWN"
@@ -112,4 +132,5 @@ class DeclaredJudge:
             reasons.append(f"{axis}: declared {obs.value.get(axis) or 'UNKNOWN'} → {v}")
         return JudgeOutput(verdicts=verdicts, reasons=reasons,
                            missing_observations=sorted(set(item_result[2] if item_result else [])
-                               | set(input_context.missing if input_context is not None else ())))
+                               | set(input_context.missing if input_context is not None else ())
+                               | set(input_rules.missing_observations if input_rules is not None else ())))

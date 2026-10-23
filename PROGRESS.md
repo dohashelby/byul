@@ -691,3 +691,10 @@ git status
 - 팩15/DRAFT·REQ09정의5·14점검26경로·a23/b4/c161/d115·자동연결5. 기업 값은 미입력, 실제 엔진/두 이미지/운영/유료 자원은 실행하지 않는다.
 - 검증: 구현 묶음 완료 후 Windows 기본전체 최초892통과/52실패/5skip/18제외(112.98초), 테스트 CPU/판정기/보고서 가정 및 기존 필수키 fixture 수정 후 관련143통과(26.36초), 최종전체944통과/실패0/5skip/18제외(206.02초). 새99사례·불변식/기존회귀 포함. skip은 기존 루프백3/symlink2, Windows1분 목표 미충족이다. frozen sync·wheel·저장소밖 실제 M8 wheel/팩14→M10 자동/수동 증거 재판정과 설치본CLI21명령 통과. 기존증거/다른76정의 보존·생성멱등·metadata일치 확인. 직접 명령/환경·실패원인·미검증은 [M10](docs/POLICY_M10.md), XML/설치로그는 out/test-runs/policy-m10-20261022에 남겼다. 최종SHA의 Linux CI·원격/base/diff 확인은 초안PR에 기록한다.
 - 후속: 실제 기업 전체 목록·대상·승인·vocab 근거 확보, 복수 관계표는 별도 설계.
+
+## 2026-10-22 M11 — REQ-09 수동 일관성·캐시 설계
+
+- 기준 M10 5c0db82, codex/gua-policy-m11, PR base=M10(미병합). 수동 신고PASS와 관측상충을 판정표로 대조하여 보안/기능 PASS만 UNKNOWN으로 제한한다. declared0.8.0, 신고FAIL/UNKNOWN·성능·과거정의·기존코어/실행/수동hash/증거는 보존한다.
+- 팩15/DRAFT/REQ09정의5·77/14정책점검26경로·303결정595연결/a23b4c161d115·자동연결5 유지. PUBLIC-PREFIX/CONTEXT는 설계만 했으며 등록하지 않았다. M12 REQ16 제한 수동 계약과 복사 프롬프트는 docs/POLICY_M11.md에 작성했다.
+- 구현·테스트·문서 묶음 완료 후 Windows/CPython3.11.16/uv0.12.11에서 기본전체993통과/실패0/5skip/18제외(210.14초), 신규49사례 포함. 최초전체에서통과했다. skip은기존루프백3/symlink2, Windows1분목표미달이다. frozen sync/export·wheel·별도설치·저장소밖 실제M10 wheel/팩15→M11 정상/상충EVD/RES 재판정29명령통과: 상충축UNKNOWN·정상/원본/hash·멱등·CLI JSON/HTML 확인. 정합성검증은팩전체/기존증거/코어등보존·metadata일치·설계16반례/3예시행·M12미실행을확인했다. 직접명령/환경/느린구간은 [M11](docs/POLICY_M11.md), 로그는 out/test-runs/policy-m11-20261022에보존한다. 과거M10 결과와합산하지않는다. 최종SHA Linux CI/durations·원격/base/diff는초안PR에기록한다.
+- 업무미결: 전체 문맥·공개분류/신뢰집단·실제객체/consumer·승인/담당·시험대상/예산/중단조건. M12·실제엔진/두이미지/운영/유료자원은 실행하지 않는다.

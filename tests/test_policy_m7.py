@@ -351,7 +351,7 @@ def test_v3_cli_report_integrity_idempotence_and_meaningful_hash(tmp_path,pack):
     assert 'AUDIT_COLLECTION:' in (tmp_path/'r.html').read_text(encoding='utf-8')
     assert 'EXAMPLE complete event-correlated query' not in (tmp_path/'r.html').read_text(encoding='utf-8')
     assert all(e.execution.executor.version=='0.5.0' and e.data_origin=='DECLARED' for e in st.iter_kind('EVD'))
-    assert all(r.judge.version=='0.7.0' for r in st.iter_kind('RES'))
+    assert all(r.judge.version=='0.8.0' for r in st.iter_kind('RES'))
     previous=next(e for e in st.iter_kind('EVD') if e.check_id=='OBS-11')
     entry(doc,'OBS-11')['audit_evidence']['records'][0]['observations']['case_detail']='EXAMPLE edited meaningful claim'
     import_evidence(st,pack,write(tmp_path,doc),now=T0)

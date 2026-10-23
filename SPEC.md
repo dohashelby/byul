@@ -668,3 +668,10 @@ guard evidence import manual.yaml                                              #
 - /3 generic 수동 관측과 --include-automated·override_reason을 사용한다. 새 계약 REQ-09에 한해 두 관측 값/collected를 config hash에 반영한다. 과거 정의/다른점검 입력과 기존 EVD/RES는 보존하며 /1·/2 읽기도 유지한다.
 - input_validation0.3.0·rule_table0.5.0·declared0.7.0·manual-entry0.5.0. core/report 한 파일에서 rule_table의 POLICY_CONTEXT 전달만 보강한다. official·축·출처·비교 규칙은 유지한다.
 - 팩15/DRAFT·REQ09정의5·14점검26경로·a23/b4/c161/d115·자동연결5다. 실제 parser 소비·전체 원문 요구·기업 승인·실제 엔진은 미검증이다. [M10 구현/검증](docs/POLICY_M10.md)을 따른다.
+
+## M11 REQ-09 수동 PASS 일관성
+
+- 사용자 실행 지시로 M10 신규 계약 REQ-09의 보안/기능에 고정 CheckDef rule_table의 PASS 상한을 추가한다. 수동 신고 PASS와 판정표 PASS가 일치해야 기존 PASS 후보를 유지한다. 판정표 FAIL은 상충 UNKNOWN, UNKNOWN/규칙부재/미지원/평가오류는 근거부족 UNKNOWN이다. 수동 FAIL·UNKNOWN은 그대로 보존한다.
+- 판정 코어를 재호출하지 않고 순수 판정표를 직접 조합한다. default_judge=declared의 재귀를 피하고 의존 예외로 신고 FAIL을 지우지 않는다. 원문 관측/예외를 노출하지 않는 POLICY_CONTEXT 사유를 기존 JSON/HTML에 전달한다.
+- declared0.8.0이다. 수동 성능·명시 CPU·INV11·첨부/답변/정상/챌린지·M10 범위·과거 정의/부분선언·다른점검을 보존한다. 실행기/코어/모델/Store/양식/Ref/side/config hash 입력은 변경하지 않는다. M10 상충 증거는 그대로 두고 새 RES에서 PASS→UNKNOWN을 기록하며 동일 as_of는 멱등이다.
+- 팩15/REQ09정의5·77점검·14정책점검26경로·a23/b4/c161/d115·자동연결5 유지. 캐시 설계와 M12 프롬프트는 [M11 문서](docs/POLICY_M11.md)의 미구현 제안이며 현재 제품 계약이 아니다.

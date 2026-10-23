@@ -85,7 +85,7 @@ def test_inference_conflict_still_prevents_unproved_pass(pack):
 
 
 def test_approval_declarations_are_two_scalar_paths_not_item_evidence(pack):
-    assert pack.manifest.revision == 18 and not pack.reviewed
+    assert pack.manifest.revision == 19 and not pack.reviewed
     for cid in ("SUP-01", "SUP-02"):
         c = pack.checks[cid]
         assert c.revision == 2
@@ -98,7 +98,7 @@ def test_approval_declarations_are_two_scalar_paths_not_item_evidence(pack):
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
     row = next(r for r in rows if r["proposed_policy_id"] == "P-DRAFT-SUP-GOV-TOOL")
     assert row["classification"] == "a" and len(json.loads(row["current_param_paths"])) == 2
-    assert len(rows) == 317 and sum(len(json.loads(r["check_ids"])) for r in rows) == 609
+    assert len(rows) == 322 and sum(len(json.loads(r["check_ids"])) for r in rows) == 614
 
 
 @pytest.mark.parametrize("cid", ["SUP-01", "SUP-02"])
@@ -159,7 +159,7 @@ def test_manual_approval_to_report_preserves_history_and_escapes_context(tmp_pat
     assert results["SUP-02"].verdicts.security == "UNKNOWN"
     # The evidence is declared; the result keeps the weaker EXAMPLE ENV/POL
     # provenance rather than promoting this synthetic contract to real data.
-    assert all(r.judge.version == "0.11.0" and r.data_origin == "EXAMPLE" for r in results.values())
+    assert all(r.judge.version == "0.12.0" and r.data_origin == "EXAMPLE" for r in results.values())
     assert all(e.data_origin == "DECLARED" for e in st.iter_kind("EVD"))
     saved = {o.ref().sha256: o.to_dict() for k in ("EVD", "RES") for o in st.iter_kind(k)}
     judge_plan(st, pack, plan, T0)

@@ -25,3 +25,20 @@ def validate_template_policy(values: dict) -> None:
         raise ValueError("max_rendered_input_tokens must be a positive integer policy limit")
     if type(values.get("request_template_override_allowed")) is not bool:
         raise ValueError("request_template_override_allowed must be an explicit boolean")
+
+
+def _required_text(values: dict, key: str) -> None:
+    if type(values.get(key)) is not str or not values[key].strip():
+        raise ValueError(f"{key} must be an explicit nonblank string")
+
+
+def validate_request_binding_policy(values: dict) -> None:
+    """Validate policy shape; unsupported business contexts remain distinct."""
+    for key in ("result_binding", "client_request_id_trust"):
+        _required_text(values, key)
+
+
+def validate_log_integrity_policy(values: dict) -> None:
+    for key in ("collector_profile", "client_request_id_trust"):
+        _required_text(values, key)
+    string_list(values, "required_trusted_fields")

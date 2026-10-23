@@ -1,5 +1,5 @@
 id: REQ-11
-revision: 1
+revision: 2
 retired: false
 area: REQ
 purpose: 요청·상태·결과 귀속
@@ -11,17 +11,59 @@ risk_summary: 호출자가 요청 ID 충돌·동시 실행 조건을 유발할 �
 review_order: reference_baseline_first
 impact: null
 applies_when:
+  always: true
   prose: 일반·스트리밍 요청; 외부 ID/child는 활성 시 추가
-policy_params: []
+policy_params:
+- key: result_binding
+  type: str
+  required: true
+- key: client_request_id_trust
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: 신원·ID 신뢰·결과 독자
   enterprise_decisions: 결과 독자·공유 관계·허용 응답/오류 필드, 입력 사본 반환 필요성, 취소 확정 시점·늦은 출력 처리, Gateway/SDK/엔진별 재시도, 저장 결과 기능. 결과 수신 권한과 반환 필드 권한을 각각 정한다.
 normal_control: 고유 표식이 있는 A·B 일반·스트리밍 요청이 각각 올바른 연결로 반환된다.
 challenge_steps:
-- 동시 두 요청 실행
-- 한 요청의 응답 속도만 지연
-- 연결·request ID·chunk·종료 대응 비교
-required_observations: []
+- '일반 JSON 두 연결: 서버 생성 ID와 실제 소비 입력 귀속'
+- '일반 JSON 두 연결: 서로 다른 body request_id와 실제 소비 입력 귀속'
+- '일반 JSON 두 연결: 같은 body request_id 충돌에서도 원 연결 귀속'
+- '일반 JSON 두 연결: 같은 X-Request-Id·다른 body ID와 헤더 우선순위'
+- 'SSE 두 연결: 서버 생성 ID·chunk·종료와 실제 소비 입력 귀속'
+- 'SSE 두 연결: 서로 다른 body request_id·chunk·종료 귀속'
+- 'SSE 두 연결: 같은 body request_id 충돌·한쪽 느린 읽기와 원 연결 귀속'
+- 'SSE 두 연결: 같은 X-Request-Id·다른 body ID·chunk·종료 귀속'
+required_observations:
+- key: profile_supported
+  type: bool
+- key: source_contract_verified
+  type: bool
+- key: template_identity_verified
+  type: bool
+- key: connection_binding_verified
+  type: bool
+- key: connection_overlap_verified
+  type: bool
+- key: tested_result_binding
+  type: str
+- key: tested_client_request_id_trust
+  type: str
+- key: cases_planned
+  type: list[str]
+- key: cases_attempted
+  type: list[str]
+- key: cases_verified
+  type: list[str]
+- key: security_violations
+  type: list[str]
+- key: collection_complete
+  type: bool
+- key: normal_controls
+  type: bool
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, outcome]
 required_observations_prose:
 - 서버 생성 ID·클라이언트 ID
 - chunk 순서·연결
@@ -32,8 +74,77 @@ unknown_criteria: 응답 표식 또는 연결별 ID 대응을 확보하지 못�
 remediation: 내부 요청 식별과 반환 대상을 신뢰 신원에 연결한다.
 method_and_evidence: '두 합성 주체의 요청을 겹쳐 principal→외부/내부 ID→worker 상태→collector→응답을 연결한다. ID·child 기능별 변형은 별도 기록한다. 【F17】기본 internal ID는 무작위 접미사. 외부 ID 기반 abort는 별도 통제 필요; token-only/dev router 실제 등록 조건 확인. 동일 외부 ID 동시 요청, randomization on/off, 등록된 abort 경로의 타 사용자/빈 ID 요청을 확인한다. 정상 대조: 자기 요청만 취소, 다른 요청은 정상 완료'
 remaining_setup: 작은 동시성·고유 무해 표식·응답 수집기
-executor: null
-judge: null
+executor: request_binding
+judge:
+  plugin: rule_table
+  params:
+    fail_when_any:
+    - obs: security_violations
+      op: nonempty
+    pass_when_all:
+    - obs: profile_supported
+      op: eq
+      value: true
+    - obs: source_contract_verified
+      op: eq
+      value: true
+    - obs: template_identity_verified
+      op: eq
+      value: true
+    - obs: connection_binding_verified
+      op: eq
+      value: true
+    - obs: connection_overlap_verified
+      op: eq
+      value: true
+    - obs: tested_result_binding
+      op: eq
+      value_policy: result_binding
+    - obs: tested_client_request_id_trust
+      op: eq
+      value_policy: client_request_id_trust
+    - obs: tested_result_binding
+      op: eq
+      value: originating_connection
+    - obs: tested_client_request_id_trust
+      op: eq
+      value: untrusted_correlation
+    - obs: cases_planned
+      op: eq
+      value:
+      - json:generated
+      - json:distinct_body
+      - json:collision_body
+      - json:collision_header
+      - sse:generated
+      - sse:distinct_body
+      - sse:collision_body
+      - sse:collision_header
+    - obs: cases_attempted
+      op: superset_of
+      value_obs: cases_planned
+    - obs: cases_verified
+      op: superset_of
+      value_obs: cases_planned
+    - obs: collection_complete
+      op: eq
+      value: true
+    - obs: normal_controls
+      op: eq
+      value: true
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        - obs: normal_controls
+          op: eq
+          value: true
 legacy:
   q_ids:
   - Q-C02
@@ -43,3 +154,22 @@ legacy:
   - Q-C02/SC-02-02
 source:
   array: request_state_assessment_draft
+functional_probes:
+- method: POST
+  path: /v1/chat/completions
+  body:
+    model: '{model}'
+    messages:
+    - role: user
+      content: guard request binding control
+    max_tokens: 1
+  expect:
+  - 200
+  via: engine
+limitations:
+- request-connection-binding-v1은 고정 CPU text-chat profile에서 직접 엔진에 연결하는 두 합성 클라이언트의 일반 JSON·SSE 귀속만 확인한다. result_binding=originating_connection과 client_request_id_trust=untrusted_correlation은 기업의 원래 공유·신원 정책을 대체하지 않는 명시적 하위 정책이다. 다른 유효 정책값은 지원하지 않아 UNKNOWN으로 남긴다.
+- 고정 이미지의 소비 측 prompt_token_ids·prompt_text 출처를 확인하고 독립 /tokenize 결과와 고정 template 렌더를 각 연결에서 정확히 대조한다. HTTP 200·usage 개수·클라이언트가 보낸 ID·모델의 임의 생성 문장이나 표식 우연 일치만으로 PASS하지 않는다.
+- 서버 생성 ID·서로 다른 body ID·같은 body ID·같은 X-Request-Id와 다른 body ID의 네 경우를 일반·SSE에서 시험한다. 클라이언트가 제어하는 API ID의 충돌 자체는 FAIL이 아니다. 다른 연결의 정확한 소비 입력 반환·한 스트림 안 ID 변경은 확인된 독립 위반으로 보존한다. 종료 이후 data·중복 종료만으로는 타 요청으로 잘못 귀속됐다고 단정하지 않고 UNKNOWN으로 남긴다.
+- 두 요청의 실제 송신 이후 수집 구간 중첩과 서로 다른 connection_id를 확인한다. 한쪽의 최대250ms 느린 읽기는 클라이언트 연결 수집 조건이다. CPU max_num_seqs=1에서 worker 내부 동시 실행·입력 소비 순서·서버 내부 ID 체인을 확인했다는 뜻이 아니다.
+- 바이트·프레임·시간·요청·출력 상한, UTF-8·JSON/SSE 완전성, 모델·choice·종료·DONE·소비/출력 token 수가 모두 충족돼야 해당 표본을 검증했다고 기록한다. 일반 오류·누락·잘림·비UTF8·timeout은 UNKNOWN이며 앞서 수집한 독립 위반을 지우지 않는다. 새 요청 dispatch는 전체 시간 예산으로 제한하고 별도의 Docker 기동·읽기 전용 inspect·정리 시간은 보고한다.
+- enterprise principal·권한·Gateway·SDK·child·내부 ID randomization on/off·취소/abort·재시도·지연된 저장 결과는 미시험이다. 상태 변경 요청은 보내지 않는다. 고정 소비 입력과 연결 귀속을 확인해도 생성 품질·성능·GPU·여러 실제 이미지의 업데이트 비교·보편적인 다중 사용자 격리를 인증하지 않는다.

@@ -1,0 +1,3317 @@
+{
+  "schema": "guard-automation-phase3-selected/1",
+  "base_commit": "1952533efa0c4cd292fdbaede9f0abda7977fb30",
+  "branch": "codex/gua-automation-phase3",
+  "status": "actual CPU selected evidence; not a full independently restorable bundle",
+  "official": false,
+  "policy_status": "DRAFT",
+  "pack_reviewed": false,
+  "limitations": [
+    "Source commit of inspected engine image is UNVERIFIED; exact image and per-file SHA qualify the contracts.",
+    "Two synthetic direct connections, not enterprise principal/authorization or worker simultaneous execution.",
+    "Native INFO to guard reference collector/display, not enterprise SIEM or raw daemon byte capture.",
+    "Separate display artifact, not automatic detailed events in the main RPT.",
+    "All performance/GPU/two different real image comparisons remain unverified."
+  ],
+  "integration": {
+    "base": "1952533efa0c4cd292fdbaede9f0abda7977fb30",
+    "pack": {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 19,
+      "sha256": "7753f6dc7dcad28985b97d33153f26f07673cc0b41bf28cb0adb65858f172e5a"
+    },
+    "auto_checks": [
+      "OBS-03",
+      "OBS-09",
+      "PLT-01",
+      "PLT-04",
+      "REQ-01",
+      "REQ-03",
+      "REQ-07",
+      "REQ-09",
+      "REQ-10",
+      "REQ-11",
+      "REQ-13"
+    ],
+    "policy_checks": 21,
+    "policy_paths": 46
+  },
+  "attempts": [
+    {
+      "attempt": "real-attempt-01",
+      "execution_success": true,
+      "executed_source_files": {
+        "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "adapters/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "adapters/assets/chat/guard-text-chat-v1.jinja": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+        "adapters/base.py": "6b48806c8a132292fb6fba8e7d0b57559a1e72e9c8c1d7fcfacd0c15ef92cbb1",
+        "adapters/fake.py": "993a554e6de757b7f578cfb5c3a8a7b2b4504475756bc0203639d06b9dc65b89",
+        "adapters/model_inventory.py": "1c3abf9d7516acd83efbeff45fabfc9b09fa743a2a74f75be1e1b643b08d6db4",
+        "adapters/vllm.py": "ef2e137e308c094f1a9508f8750660ff64858308d8fac989f6cbbd9d6c089372",
+        "application.py": "c148a09cd505ecb043e602512b9ffa64850f3355ecd37d3f179a02c5eb3a070e",
+        "automation_policy.py": "5c4a3a939806b917633354b61e51633a8a87f0a911764b93c96aa44f63a0b9f4",
+        "cli.py": "9124fde70c2c453f60c7d500aa83618946df10e859cb746202ec9fcd4bc3f4d8",
+        "collectors/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "collectors/file.py": "af7d915c7d5f9a95a898e184d7e7b7aaa5f3f50087638c6149e252323ab0076f",
+        "collectors/manual.py": "73decf953dae6a72c24dfb9d1dff7faff6f8bd2b5da5751bf63951853d731fb1",
+        "collectors/policy_template.py": "331af03de3a14d031bf27c53044292909669eb0a71bb1b6c45feebb73aa1b7af",
+        "collectors/policy_template_metadata.json": "b904e660e2b7a4eccca7a34c8e359854f33a8d9b826eff92119e53118f498787",
+        "core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "core/aggregate.py": "bda9f20b98a534845370dcedaf51e69eaa158a636887ccaa231ff3be7444999d",
+        "core/compare.py": "37da2a47be6d6205e877fcc5420229c3e46d0fde4b49b2f3a65e1ce465ea2a0e",
+        "core/judge.py": "43ed9ddaeb4f9c5b0fc0a46ae1062b7e5c015ad898e2825f47bf8adadcc51f05",
+        "core/preflight.py": "345d7cbc84d3ce511cdaa5c989ed43960c11d170e8239c7fd239d02a881a92d5",
+        "core/report.py": "9d60215f3ad0499bc090851bf682628fe08036f9dbafd90d163e031917b5a18f",
+        "core/run.py": "b1e1487c710dd29d0f7686a28026eeeb8e402062096511c14ebee8c74eea5f2a",
+        "core/select.py": "1800477749d8a3a5e556039adf6357a2e6c0a91e8b9f9c9292cb0fbf6230efb6",
+        "executors/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "executors/base.py": "0ac2fb9311680e5521e3d6ef5cced0c0361ab874317cab137c093bf53ee93e2f",
+        "executors/container_config.py": "303aaec854740d1b5e96474ab1884f72fa05d60afa03a73fc781fc3c509130f0",
+        "executors/content_common.py": "67185e59bf65cd08674bb6ffc2e25f1b455b68ac4b6698de7b8e92b9c06b505f",
+        "executors/credential_exposure.py": "ce9c83a309dde0d068f5ff7c2152c7e4e02f9bb107a7cb82b7129b31b7663dd3",
+        "executors/direct_route.py": "43c21b5a91ea629418024256b87b587d295d745a04ec08d4d36c61f3649a60bb",
+        "executors/engine_identity.py": "dee76079155c8b2c01ca7ee22455514ec6acb2f71e9d378c0c7fab655986a5af",
+        "executors/fake.py": "989281ac6f705758edcea4e7b28a2f6cc0fab385eaa9b822998f5b339b8fa718",
+        "executors/http_common.py": "d2fcc8c8da947c020cec7844fb62826e80bd2466b5289cbc17f82bbf5935fd47",
+        "executors/http_probe.py": "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d",
+        "executors/input_validation.py": "800a375dcac4e365d92e0f9e6b4b9588fd199798dc82800cc389b48808919f4a",
+        "executors/log_analysis.py": "39e3dfcb6c5cd22fd9a9be917e9699e57c32862d3a769a4dc755538cc9374b59",
+        "executors/log_integrity.py": "b91ae8c24d0e973a708724e8e63ec5b8aeb348bef84d97bb69b70a2684e161cd",
+        "executors/log_integrity_parser.py": "0f7ffefeb9e70e20355926cb91a2da592c4fde5c048755dc5bca1380c1e7b838",
+        "executors/registry.py": "1e4043d2c7de790111cff9c97b1f897e21e729d64a5736085184b30128d15f50",
+        "executors/request_binding.py": "89f8f08367626c881eff81899bab87fd5faea5a4185d49e8dade9955919c6dfe",
+        "executors/response_content.py": "7099c3b74ff0e437f1a77b40e0ea42e6dd0e56949de750b6b448a701640fbedd",
+        "executors/role_route.py": "7249fa958fa8421b9a95d6ce526123ca80f92fbe2c3d1154ba60ffee9c106cd3",
+        "executors/sampling_validation.py": "e905da16eed9b59ed447f3755cc87d0773681cf01157041a57e9a952c6d7e7d7",
+        "executors/stream_probe.py": "76237c70da09e1157f16c3f1c614b578f78bc742149d34a9d972db497d00f8f7",
+        "executors/template_validation.py": "f42add466db19b308a439b4aee0e8172d16f532f9185f80261d68f1a2d2c91ab",
+        "input_policy.py": "130c5d8d3693043eb9b82b33d7dff678de544af22ea3658d0c56b20c80a09db2",
+        "judges/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "judges/audit_collection.py": "73c80b68e355e4714c974e8dc5489c951a968fd638ca8f099c59f7ca91c28b78",
+        "judges/base.py": "8f66f5643ef4e77659726b9ac3dea661374a46ffde3380e8d38c5daa0dadcd1c",
+        "judges/declared.py": "8b4fd1245cb728e46a8f48b62609b07ffbea7f20e03a6821b2051ae9d7400a29",
+        "judges/manual_cache_context.py": "2eaaf1cbd783cfe535fadc92242332d5b7de44a650474d4f47b7a87bfacc385e",
+        "judges/policy_items.py": "e6a9d347d5dd44223c4930735d6229ed6e3e1b0dd8969b555b53d849dff79f06",
+        "judges/registry.py": "ecbbc80e68dfe1b313bd813c1de64f38150d335f2a7c710853d9a17d8048ef9c",
+        "judges/rule_table.py": "975ac1bae78ba5180a2bc4cc288cc17b55770357b465b4df246a45cb1401e680",
+        "manual_audit.py": "bd48943c57e6ba6bf033e8eb31f34c08dd461203cf35b5ec68c5070b3b3110fc",
+        "manual_policy.py": "8368694f955b8a1ce3dce69bae4bda97cb44257a4808913f2e8a8e9082c8862b",
+        "models/__init__.py": "3d59e80f52269fa817d208d252cdf94b4f614d573b1d8355e14f1e0fb08e300f",
+        "models/base.py": "4d7bfc03dc3754c8b97d16f577bd6f9d1d3bebbf19c30bb54bd7ea20cf9bc7db",
+        "models/checkdef.py": "68da2fc053b1e20656c5156f58c318a308db282c41753575f383609e9d6ddb60",
+        "models/enums.py": "c3e53dd3e528071d3fc1bc9131858b086359c42f4c7fc2f2f6bb5d0614a9fd0d",
+        "models/hashing.py": "e90ef64b52fe242028a4e81b16c18fb4a353e0e7d721b302bd7b764fcc4e193a",
+        "models/objects.py": "055abfc50cd3c6c7fdf0bff33236c42edaab2e8bf366bd785d957485fc7bae8b",
+        "models/ulid.py": "8233f5248a5a32855fe7f4b6914259cf3a6974190f31becee16aa77c26ee889d",
+        "report/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "report/html.py": "b25db89a323f030bcf706d35157ee254db3eccb8f9c0617347522f62da21bb6e",
+        "report/log_integrity.py": "6daf41c2b596d866f37bf8e66a242df81d2cfd31e2e0d8b1ecc3607e905974c6",
+        "runtime/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "runtime/assets/gateway/role_enforced/default.conf.template": "bd36fb50e168c4334c1884daa8d0aa91209e06b3bb77f8ef34f0f876c097225b",
+        "runtime/assets/gateway/role_open/default.conf.template": "0ddfd1cb907708213a4e2e2326f4791f0f00b9029bed9b34da8d116de9282e00",
+        "runtime/assets/gateway/single/default.conf.template": "0078a44da3e069b164ac92ee28ecb95a815546b05d935d14991a2d1429136bbc",
+        "runtime/assets/stub_engine/server.py": "f4776423366cdd626e91ad8389e61abee92314a5c354f1f69a53004e71aee628",
+        "runtime/comparison.py": "6dccfc0984a5bb337addbf30eac3aee73c42ef4b96078184b85cf15cad7497a2",
+        "runtime/docker.py": "7ad82112f03b4f3163f7f0ea7c70910eaba594f112a8fba4447fbaa31bd4b127",
+        "runtime/sandbox.py": "983f15c493d2dd8b71ac565da3d845bbbe5bd106dfc45781962e9a77dbc2301f",
+        "store/__init__.py": "c3c68922dec8668bc18d6c13720bad8f7d0178920a3e483dd833b9fda4accb5a",
+        "store/bundle.py": "8c4202b79719b7c8fc4765bb5bfe1a9bfcaf870eead24818395236ff941a35dc",
+        "store/packs.py": "b8ef806f1218d25e436324ad82ce62cf83ba7371e241d544df0060ad35d73de8",
+        "store/sqlite.py": "af867baa88f50ba63d199617e2067b057b4fb3b8c70b9db81edecb282d9751b1"
+      },
+      "manifest": {
+        "schema": "guard-automation-phase3-real/1",
+        "pack": {
+          "kind": "PACK",
+          "id": "PACK-BASELINE",
+          "revision": 19,
+          "sha256": "7753f6dc7dcad28985b97d33153f26f07673cc0b41bf28cb0adb65858f172e5a"
+        },
+        "engine": {
+          "name": "vllm",
+          "version": "0.31.0",
+          "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+          "source_commit_status": "UNVERIFIED"
+        },
+        "adapter": {
+          "name": "vllm",
+          "version": "0.4.0"
+        },
+        "model": {
+          "id": "facebook/opt-125m",
+          "revision": "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+          "inventory_sha256": "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6"
+        },
+        "maximum_engines": 1,
+        "scope": [
+          "REQ-11",
+          "OBS-09",
+          "PLT-01"
+        ],
+        "performance": "UNKNOWN",
+        "official": false,
+        "profile": "pinned CPU security/function diagnostic; no enterprise identity/SIEM/worker concurrency certification"
+      },
+      "checks": [
+        {
+          "check_id": "OBS-09",
+          "execution": {
+            "abort_reason": null,
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.0"
+            },
+            "executor": {
+              "config_sha256": "26d62b0974e692ef38144404f15beacddaced4cec1ef2e494fda0243f76746ca",
+              "name": "log_integrity",
+              "version": "0.1.0"
+            },
+            "finished_at": "2026-10-23T12:07:50Z",
+            "started_at": "2026-10-23T12:07:37Z",
+            "status": "COMPLETED"
+          },
+          "origin": "MEASURED",
+          "normal_control": {
+            "attempted": true,
+            "detail": "normal one-token completion and exact request log event before/after fixed body-ID trials",
+            "succeeded": true
+          },
+          "challenges": [
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "JSON 본문 request_id의 무해 복수행 ID가 실제 native INFO logger와 reference collector에 도달하는지 확인"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "CR·CRLF ID의 실제 수용·원본 사건 경계와 동일 logger 메타데이터를 대조"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "예약 필드·HTML 유사 ID를 비신뢰 메시지로 소비하고 별도 표시 artifact의 사건 대응을 확인"
+            }
+          ],
+          "observations": {
+            "functional_probe_results": {
+              "collected": true,
+              "value": {
+                "after": "pass",
+                "before": "pass"
+              }
+            },
+            "functional_probes_planned": {
+              "collected": true,
+              "value": [
+                "before",
+                "after"
+              ]
+            },
+            "log_boundaries_preserved": {
+              "collected": true,
+              "value": true
+            },
+            "log_client_request_id_trust": {
+              "collected": true,
+              "value": "untrusted_correlation"
+            },
+            "log_collection_complete": {
+              "collected": true,
+              "value": true
+            },
+            "log_collector_profile": {
+              "collected": true,
+              "value": "guard-vllm-native-info-v1"
+            },
+            "log_coverage_gaps": {
+              "collected": true,
+              "value": []
+            },
+            "log_display_verified": {
+              "collected": true,
+              "value": true
+            },
+            "log_identity_verified": {
+              "collected": true,
+              "value": true
+            },
+            "log_required_trusted_fields": {
+              "collected": true,
+              "value": [
+                "process",
+                "level",
+                "source"
+              ]
+            },
+            "log_security_violations": {
+              "collected": true,
+              "value": []
+            },
+            "log_trials_planned": {
+              "collected": true,
+              "value": [
+                "before",
+                "multiline",
+                "cr",
+                "crlf",
+                "reserved",
+                "html",
+                "after"
+              ]
+            },
+            "log_trials_reached": {
+              "collected": true,
+              "value": [
+                "before",
+                "multiline",
+                "cr",
+                "crlf",
+                "reserved",
+                "html",
+                "after"
+              ]
+            },
+            "log_trusted_fields": {
+              "collected": true,
+              "value": [
+                "process",
+                "level",
+                "source"
+              ]
+            },
+            "log_trusted_fields_preserved": {
+              "collected": true,
+              "value": true
+            },
+            "normal_controls": {
+              "collected": true,
+              "value": true
+            }
+          },
+          "verdicts": {
+            "functional": "PASS",
+            "performance": "UNKNOWN",
+            "security": "PASS"
+          },
+          "reasons": [
+            "security: all pass rules met: log_collector_profile eq <policy:collector_profile>; log_client_request_id_trust eq <policy:client_request_id_trust>; log_required_trusted_fields eq <policy:required_trusted_fields>; log_trusted_fields eq ['process', 'level', 'source']; log_identity_verified eq True; log_collection_complete eq True; log_coverage_gaps eq []; log_boundaries_preserved eq True; log_trusted_fields_preserved eq True; log_display_verified eq True; log_trials_planned eq ['before', 'multiline', 'cr', 'crlf', 'reserved', 'html', 'after']; log_trials_reached superset_of <log_trials_planned>; normal_controls eq True",
+            "functional: all pass rules met: functional_probes_planned eq ['before', 'after']; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; normal_controls eq True",
+            "performance: no rule for this axis",
+            "performance: explicit CPU comparison covers security/function only; performance unverified"
+          ],
+          "verification_level": "MEASURED",
+          "evidence_ref": {
+            "kind": "EVD",
+            "id": "EVD-01M5MAHMJ8WEZ9RSXWQFT9XKQS",
+            "revision": 1,
+            "sha256": "898a2d58bf10aec678bb8d916e313dd4b9a5348662c0cf87fb540030b9202f27"
+          },
+          "result_ref": {
+            "kind": "RES",
+            "id": "RES-01M5MAJ7XPA1Q7SSHM89H33RC8",
+            "revision": 1,
+            "sha256": "1975edc2ac5ab0d1d759995300611ed56cebeb48d58fe90c6982fc3aa2a68a6b"
+          },
+          "artifacts": [
+            {
+              "bytes": 3433,
+              "collected_at": "2026-10-23T12:07:50Z",
+              "collector": "log_integrity/0.1.0",
+              "name": "probe_log.jsonl",
+              "path": "artifacts/593d2beebc465fe954556d5cc3a785982a269fc51ea4af640455503b9f9e347b",
+              "sha256": "593d2beebc465fe954556d5cc3a785982a269fc51ea4af640455503b9f9e347b"
+            },
+            {
+              "bytes": 12768,
+              "collected_at": "2026-10-23T12:07:50Z",
+              "collector": "log_integrity/0.1.0",
+              "name": "log_integrity_samples.json",
+              "path": "artifacts/839fe0a7748990806708f53ec1a616f2f8c10b497d182b81d52d837141e221a2",
+              "sha256": "839fe0a7748990806708f53ec1a616f2f8c10b497d182b81d52d837141e221a2"
+            },
+            {
+              "bytes": 15916,
+              "collected_at": "2026-10-23T12:07:50Z",
+              "collector": "log_integrity/0.1.0",
+              "name": "log_integrity_events.json",
+              "path": "artifacts/d783d9530042931d53d57b8df1bc53ca732e53c56b5a0170b299b67e3735b3f0",
+              "sha256": "d783d9530042931d53d57b8df1bc53ca732e53c56b5a0170b299b67e3735b3f0"
+            },
+            {
+              "bytes": 9498,
+              "collected_at": "2026-10-23T12:07:50Z",
+              "collector": "log_integrity/0.1.0",
+              "name": "log_integrity_display.html",
+              "path": "artifacts/4bc2ba9df2f4f9bd611bfaac140c367349e9f8bec7e0951d9807a3ee5d26efef",
+              "sha256": "4bc2ba9df2f4f9bd611bfaac140c367349e9f8bec7e0951d9807a3ee5d26efef"
+            }
+          ]
+        },
+        {
+          "check_id": "PLT-01",
+          "execution": {
+            "abort_reason": null,
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.0"
+            },
+            "executor": {
+              "config_sha256": "1ebb7b1cc3caeed4d2f8fe99e0a3f167c8967a7bbc77ae14ceb44a40654c27d7",
+              "name": "container_config",
+              "version": "0.4.0"
+            },
+            "finished_at": "2026-10-23T12:07:36Z",
+            "started_at": "2026-10-23T12:07:31Z",
+            "status": "COMPLETED"
+          },
+          "origin": "MEASURED",
+          "normal_control": {
+            "attempted": true,
+            "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+            "succeeded": true
+          },
+          "challenges": [
+            {
+              "attempted": true,
+              "observations": {
+                "capabilities": [],
+                "devices": [],
+                "host_namespaces": [],
+                "mounts": [
+                  "/guard-assets/chat/guard-text-chat-v1.jinja:ro",
+                  "/models:ro"
+                ],
+                "privileged": false,
+                "processes": 5,
+                "uids": [
+                  1000
+                ]
+              },
+              "step": "유효 UID·capability·mount·device 수집"
+            },
+            {
+              "attempted": true,
+              "observations": {
+                "exec_write_checks": {
+                  "/dev": "denied",
+                  "/guard-cache": "succeeded",
+                  "/proc/interrupts": "absent",
+                  "/proc/kcore": "absent",
+                  "/proc/keys": "absent",
+                  "/proc/latency_stats": "absent",
+                  "/proc/timer_list": "absent"
+                },
+                "sentinel": {
+                  "/": "denied",
+                  "/models": "denied"
+                }
+              },
+              "step": "필요 없는 시험 파일·장치에 읽기/쓰기 요청"
+            },
+            {
+              "attempted": true,
+              "observations": {
+                "functional": {
+                  "POST /v1/completions": 200
+                }
+              },
+              "step": "정상 추론과 권한 거부 확인"
+            }
+          ],
+          "observations": {
+            "capabilities_effective": {
+              "collected": true,
+              "value": []
+            },
+            "devices": {
+              "collected": true,
+              "value": []
+            },
+            "exec_writable_mounts": {
+              "collected": true,
+              "value": [
+                "/guard-cache"
+              ]
+            },
+            "functional_probe_results": {
+              "collected": true,
+              "value": {
+                "POST /v1/completions": "pass"
+              }
+            },
+            "functional_probes_planned": {
+              "collected": true,
+              "value": [
+                "POST /v1/completions"
+              ]
+            },
+            "host_namespaces": {
+              "collected": true,
+              "value": []
+            },
+            "mounts": {
+              "collected": true,
+              "value": [
+                "/guard-assets/chat/guard-text-chat-v1.jinja:ro",
+                "/models:ro"
+              ]
+            },
+            "privileged": {
+              "collected": true,
+              "value": false
+            },
+            "process_scan_complete": {
+              "collected": true,
+              "value": true
+            },
+            "root_uid_present": {
+              "collected": true,
+              "value": false
+            },
+            "sentinel_results": {
+              "collected": true,
+              "value": {
+                "/models": "denied"
+              }
+            }
+          },
+          "verdicts": {
+            "functional": "PASS",
+            "performance": "UNKNOWN",
+            "security": "PASS"
+          },
+          "reasons": [
+            "security: all pass rules met: process_scan_complete eq True; capabilities_effective subset_of <policy:allowed_capabilities>; mounts subset_of <policy:allowed_mounts>; devices subset_of <policy:allowed_devices>; privileged eq False; host_namespaces subset_of []; root_uid_present eq False (when policy:require_non_root); sentinel_results all_in ['denied', 'absent']; exec_writable_mounts subset_of <policy:allowed_exec_writable_paths>",
+            "functional: all pass rules met: functional_probe_results nonempty; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+            "performance: no rule for this axis",
+            "performance: explicit CPU comparison covers security/function only; performance unverified"
+          ],
+          "verification_level": "MEASURED",
+          "evidence_ref": {
+            "kind": "EVD",
+            "id": "EVD-01M5MAHE09K095J8RH85QJ66VW",
+            "revision": 1,
+            "sha256": "24505e6b0f7ee82f5ba1b913bd8699219018b71b649aebf5de279b9df82c7ef1"
+          },
+          "result_ref": {
+            "kind": "RES",
+            "id": "RES-01M5MAJ7Y7VET14FD0G1T46VM5",
+            "revision": 1,
+            "sha256": "4cbcadd1b83898a4b16599b73241f69a51e8201a00a4b35b195c299ce764bbe5"
+          },
+          "artifacts": [
+            {
+              "bytes": 2933,
+              "collected_at": "2026-10-23T12:07:36Z",
+              "collector": "container_config/0.4.0",
+              "name": "probe_log.jsonl",
+              "path": "artifacts/523b0581177aba39ecf9dc94028e343c90649fd1ef39a7e7cd6d685f4a09b6bd",
+              "sha256": "523b0581177aba39ecf9dc94028e343c90649fd1ef39a7e7cd6d685f4a09b6bd"
+            }
+          ]
+        },
+        {
+          "check_id": "REQ-11",
+          "execution": {
+            "abort_reason": null,
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.0"
+            },
+            "executor": {
+              "config_sha256": "368716a1a8aba9355195686e563c912fc52b287c60082b3f42f79181a2a599cd",
+              "name": "request_binding",
+              "version": "0.1.0"
+            },
+            "finished_at": "2026-10-23T12:07:29Z",
+            "started_at": "2026-10-23T12:06:20Z",
+            "status": "COMPLETED"
+          },
+          "origin": "MEASURED",
+          "normal_control": {
+            "attempted": true,
+            "detail": "before/after fixed chat inference with exact consumer IDs and rendered input",
+            "succeeded": true
+          },
+          "challenges": [
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "일반 JSON 두 연결: 서버 생성 ID와 실제 소비 입력 귀속"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "일반 JSON 두 연결: 서로 다른 body request_id와 실제 소비 입력 귀속"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "일반 JSON 두 연결: 같은 body request_id 충돌에서도 원 연결 귀속"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "일반 JSON 두 연결: 같은 X-Request-Id·다른 body ID와 헤더 우선순위"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "SSE 두 연결: 서버 생성 ID·chunk·종료와 실제 소비 입력 귀속"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "SSE 두 연결: 서로 다른 body request_id·chunk·종료 귀속"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "SSE 두 연결: 같은 body request_id 충돌·한쪽 느린 읽기와 원 연결 귀속"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "SSE 두 연결: 같은 X-Request-Id·다른 body ID·chunk·종료 귀속"
+            }
+          ],
+          "observations": {
+            "cases_attempted": {
+              "collected": true,
+              "value": [
+                "json:generated",
+                "json:distinct_body",
+                "json:collision_body",
+                "json:collision_header",
+                "sse:generated",
+                "sse:distinct_body",
+                "sse:collision_body",
+                "sse:collision_header"
+              ]
+            },
+            "cases_planned": {
+              "collected": true,
+              "value": [
+                "json:generated",
+                "json:distinct_body",
+                "json:collision_body",
+                "json:collision_header",
+                "sse:generated",
+                "sse:distinct_body",
+                "sse:collision_body",
+                "sse:collision_header"
+              ]
+            },
+            "cases_verified": {
+              "collected": true,
+              "value": [
+                "json:generated",
+                "json:distinct_body",
+                "json:collision_body",
+                "json:collision_header",
+                "sse:generated",
+                "sse:distinct_body",
+                "sse:collision_body",
+                "sse:collision_header"
+              ]
+            },
+            "collection_complete": {
+              "collected": true,
+              "value": true
+            },
+            "connection_binding_verified": {
+              "collected": true,
+              "value": true
+            },
+            "connection_overlap_verified": {
+              "collected": true,
+              "value": true
+            },
+            "functional_probe_results": {
+              "collected": true,
+              "value": {
+                "after": "pass",
+                "before": "pass"
+              }
+            },
+            "functional_probes_planned": {
+              "collected": true,
+              "value": [
+                "before",
+                "after"
+              ]
+            },
+            "normal_controls": {
+              "collected": true,
+              "value": true
+            },
+            "profile_supported": {
+              "collected": true,
+              "value": true
+            },
+            "security_violations": {
+              "collected": true,
+              "value": []
+            },
+            "source_contract_verified": {
+              "collected": true,
+              "value": true
+            },
+            "template_identity_verified": {
+              "collected": true,
+              "value": true
+            },
+            "tested_client_request_id_trust": {
+              "collected": true,
+              "value": "untrusted_correlation"
+            },
+            "tested_result_binding": {
+              "collected": true,
+              "value": "originating_connection"
+            }
+          },
+          "verdicts": {
+            "functional": "PASS",
+            "performance": "UNKNOWN",
+            "security": "PASS"
+          },
+          "reasons": [
+            "security: all pass rules met: profile_supported eq True; source_contract_verified eq True; template_identity_verified eq True; connection_binding_verified eq True; connection_overlap_verified eq True; tested_result_binding eq <policy:result_binding>; tested_client_request_id_trust eq <policy:client_request_id_trust>; tested_result_binding eq 'originating_connection'; tested_client_request_id_trust eq 'untrusted_correlation'; cases_planned eq ['json:generated', 'json:distinct_body', 'json:collision_body', 'json:collision_header', 'sse:generated', 'sse:distinct_body', 'sse:collision_body', 'sse:collision_header']; cases_attempted superset_of <cases_planned>; cases_verified superset_of <cases_planned>; collection_complete eq True; normal_controls eq True",
+            "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; normal_controls eq True",
+            "performance: no rule for this axis",
+            "performance: explicit CPU comparison covers security/function only; performance unverified"
+          ],
+          "verification_level": "MEASURED",
+          "evidence_ref": {
+            "kind": "EVD",
+            "id": "EVD-01M5MAF82KRVJRJ44Q71XMFQVN",
+            "revision": 1,
+            "sha256": "6a4c5a949d1d6c7173ff572b894f119e1abc0a9bbdd8b075bef14aab6b0929f4"
+          },
+          "result_ref": {
+            "kind": "RES",
+            "id": "RES-01M5MAJ7YQKACS3SCCB8WRCTE8",
+            "revision": 1,
+            "sha256": "aaaecf4a2db61d60c3666653c550c04fd415877e39527b5dfde99de0784ad091"
+          },
+          "artifacts": [
+            {
+              "bytes": 18374,
+              "collected_at": "2026-10-23T12:07:29Z",
+              "collector": "request_binding/0.1.0",
+              "name": "probe_log.jsonl",
+              "path": "artifacts/1cbd8d55f8a7b59c2837b082f98d84ad85aafee9ae5c59549effb917392d4128",
+              "sha256": "1cbd8d55f8a7b59c2837b082f98d84ad85aafee9ae5c59549effb917392d4128"
+            },
+            {
+              "bytes": 135005,
+              "collected_at": "2026-10-23T12:07:30Z",
+              "collector": "request_binding/0.1.0",
+              "name": "request_binding_samples.json",
+              "path": "artifacts/e20711812cab5940b107db3572c67c3b96783cf653289f34bb6d449bbef41920",
+              "sha256": "e20711812cab5940b107db3572c67c3b96783cf653289f34bb6d449bbef41920"
+            }
+          ]
+        }
+      ],
+      "report_refs": [
+        {
+          "kind": "RPT",
+          "id": "RPT-01M5MAJ7ZRHK7MZRZ2TPSKCAPF",
+          "revision": 1,
+          "sha256": "4e8d39fb58530e646236bda1f6e1c4eff2e676c2292ae2da5dceda6437591160"
+        }
+      ],
+      "attachments": {
+        "REQ-11": {
+          "binding_summary": {
+            "profile": "request-connection-binding-v1",
+            "requests_sent": 20,
+            "settings": {
+              "max_total_requests": 24,
+              "max_output_tokens": 8,
+              "max_duration_seconds": 300,
+              "read_delay_ms": 250
+            },
+            "source_contract": {
+              "profile": "request-connection-binding-v1",
+              "engine_version": "0.31.0",
+              "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "id_prefix": "chatcmpl-",
+              "body_request_id": true,
+              "header_request_id": true,
+              "header_precedence": true,
+              "consumer_prompt_ids": true,
+              "consumer_prompt_text": true,
+              "sources": [
+                {
+                  "path": "vllm/entrypoints/serve/engine/serving.py",
+                  "sha256": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
+                  "lines": "119-129"
+                },
+                {
+                  "path": "vllm/entrypoints/openai/chat_completion/serving.py",
+                  "sha256": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002",
+                  "lines": "291-317,554-565,743-760,1190-1201"
+                },
+                {
+                  "path": "vllm/entrypoints/openai/chat_completion/protocol.py",
+                  "sha256": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1",
+                  "lines": "391-400,416-423,446-452"
+                }
+              ]
+            },
+            "gaps": [],
+            "violations": [],
+            "template_identity_before": {
+              "container_id": "c4ad0465aa869be2c86927fcacb6a9c2d349b220045e676fd45215829800f5e7",
+              "started_at": "2026-10-23T12:03:41.970852489Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "selected_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+              "readonly": true,
+              "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+              "bytes": 347
+            },
+            "template_identity_after": {
+              "container_id": "c4ad0465aa869be2c86927fcacb6a9c2d349b220045e676fd45215829800f5e7",
+              "started_at": "2026-10-23T12:03:41.970852489Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "selected_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+              "readonly": true,
+              "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+              "bytes": 347
+            },
+            "pairs": [
+              {
+                "case": "json:generated",
+                "overlap": true,
+                "distinct_connections": true,
+                "verified": true,
+                "responses": [
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-8fb428ae93976614"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        83,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        37156,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution A 49e2fd2a914a amber\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 0
+                  },
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-a3866714fb640441"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        163,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        43973,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution B 49e2fd2a914a violet\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 0
+                  }
+                ],
+                "timings": [
+                  {
+                    "id": "json-generated-A",
+                    "connection_id": "72e061ea843a33f6653506c8",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 14,
+                    "headers_ms": 908,
+                    "end_ms": 1159
+                  },
+                  {
+                    "id": "json-generated-B",
+                    "connection_id": "24e89d9b3aad8a46d63f6914",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 14,
+                    "headers_ms": 478,
+                    "end_ms": 478
+                  }
+                ]
+              },
+              {
+                "case": "json:distinct_body",
+                "overlap": true,
+                "distinct_connections": true,
+                "verified": true,
+                "responses": [
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-A"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        83,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        37156,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution A 49e2fd2a914a amber\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 0
+                  },
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-B"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        163,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        43973,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution B 49e2fd2a914a violet\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 0
+                  }
+                ],
+                "timings": [
+                  {
+                    "id": "json-distinct_body-A",
+                    "connection_id": "6b3eca6a1199239ac25994d0",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 10,
+                    "headers_ms": 484,
+                    "end_ms": 734
+                  },
+                  {
+                    "id": "json-distinct_body-B",
+                    "connection_id": "b55119c0e60ea8cd8daafaff",
+                    "dispatch_ms": 0,
+                    "request_sent_ms": 10,
+                    "headers_ms": 984,
+                    "end_ms": 984
+                  }
+                ]
+              },
+              {
+                "case": "json:collision_body",
+                "overlap": true,
+                "distinct_connections": true,
+                "verified": true,
+                "responses": [
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-shared-body"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        83,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        37156,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution A 49e2fd2a914a amber\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 0
+                  },
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-shared-body"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        163,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        43973,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution B 49e2fd2a914a violet\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 0
+                  }
+                ],
+                "timings": [
+                  {
+                    "id": "json-collision_body-A",
+                    "connection_id": "88bda59ddae67484b0aef990",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 11,
+                    "headers_ms": 986,
+                    "end_ms": 1236
+                  },
+                  {
+                    "id": "json-collision_body-B",
+                    "connection_id": "b03bb969f117c590671469ff",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 11,
+                    "headers_ms": 527,
+                    "end_ms": 528
+                  }
+                ]
+              },
+              {
+                "case": "json:collision_header",
+                "overlap": true,
+                "distinct_connections": true,
+                "verified": true,
+                "responses": [
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-shared-header"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        83,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        37156,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution A 49e2fd2a914a amber\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 0
+                  },
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-shared-header"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        163,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        43973,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution B 49e2fd2a914a violet\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 0
+                  }
+                ],
+                "timings": [
+                  {
+                    "id": "json-collision_header-A",
+                    "connection_id": "140f993d46f6a1f7c0a871d6",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 19,
+                    "headers_ms": 1011,
+                    "end_ms": 1262
+                  },
+                  {
+                    "id": "json-collision_header-B",
+                    "connection_id": "c68d42c050e80f714de1b95a",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 18,
+                    "headers_ms": 527,
+                    "end_ms": 527
+                  }
+                ]
+              },
+              {
+                "case": "sse:generated",
+                "overlap": true,
+                "distinct_connections": true,
+                "verified": true,
+                "responses": [
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-891dbd74a4472cca"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        83,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        37156,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution A 49e2fd2a914a amber\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 1
+                  },
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-92221d21a7c694be"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        163,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        43973,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution B 49e2fd2a914a violet\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 1
+                  }
+                ],
+                "timings": [
+                  {
+                    "id": "sse-generated-A",
+                    "connection_id": "87eead432c6a1e8908e63620",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 20,
+                    "headers_ms": 248,
+                    "end_ms": 1146
+                  },
+                  {
+                    "id": "sse-generated-B",
+                    "connection_id": "089d5a26dd3aa89d20959f62",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 20,
+                    "headers_ms": 248,
+                    "end_ms": 652
+                  }
+                ]
+              },
+              {
+                "case": "sse:distinct_body",
+                "overlap": true,
+                "distinct_connections": true,
+                "verified": true,
+                "responses": [
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-A"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        83,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        37156,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution A 49e2fd2a914a amber\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 1
+                  },
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-B"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        163,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        43973,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution B 49e2fd2a914a violet\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 1
+                  }
+                ],
+                "timings": [
+                  {
+                    "id": "sse-distinct_body-A",
+                    "connection_id": "2dbef3bc54e1de90eaac3b7e",
+                    "dispatch_ms": 21,
+                    "request_sent_ms": 23,
+                    "headers_ms": 29,
+                    "end_ms": 463
+                  },
+                  {
+                    "id": "sse-distinct_body-B",
+                    "connection_id": "2c4357250048bbf039ae9666",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 24,
+                    "headers_ms": 30,
+                    "end_ms": 951
+                  }
+                ]
+              },
+              {
+                "case": "sse:collision_body",
+                "overlap": true,
+                "distinct_connections": true,
+                "verified": true,
+                "responses": [
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-shared-body"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        83,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        37156,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution A 49e2fd2a914a amber\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 1
+                  },
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-shared-body"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        163,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        43973,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution B 49e2fd2a914a violet\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 1
+                  }
+                ],
+                "timings": [
+                  {
+                    "id": "sse-collision_body-A",
+                    "connection_id": "4f1da0f8099da9288669ebe0",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 18,
+                    "headers_ms": 24,
+                    "end_ms": 878
+                  },
+                  {
+                    "id": "sse-collision_body-B",
+                    "connection_id": "fcee44b3bd36ba3c82692265",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 17,
+                    "headers_ms": 23,
+                    "end_ms": 406
+                  }
+                ]
+              },
+              {
+                "case": "sse:collision_header",
+                "overlap": true,
+                "distinct_connections": true,
+                "verified": true,
+                "responses": [
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-shared-header"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        83,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        37156,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution A 49e2fd2a914a amber\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 1
+                  },
+                  {
+                    "verified": true,
+                    "gaps": [],
+                    "violations": [],
+                    "api_ids": [
+                      "chatcmpl-guard-49e2fd2a914a-shared-header"
+                    ],
+                    "consumer_ids": [
+                      [
+                        12105,
+                        35,
+                        6137,
+                        42066,
+                        163,
+                        2766,
+                        242,
+                        176,
+                        37379,
+                        176,
+                        102,
+                        466,
+                        1570,
+                        102,
+                        43973,
+                        50118,
+                        2401,
+                        33388,
+                        35,
+                        1437
+                      ]
+                    ],
+                    "consumer_texts": [
+                      "user: Guard attribution B 49e2fd2a914a violet\nassistant: "
+                    ],
+                    "output_tokens": 8,
+                    "finish_signals": 1,
+                    "terminal_signals": 1
+                  }
+                ],
+                "timings": [
+                  {
+                    "id": "sse-collision_header-A",
+                    "connection_id": "18c8435cc318da8c556b6cd6",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 12,
+                    "headers_ms": 19,
+                    "end_ms": 832
+                  },
+                  {
+                    "id": "sse-collision_header-B",
+                    "connection_id": "88376342ee1a59f8fb8cb75d",
+                    "dispatch_ms": 1,
+                    "request_sent_ms": 12,
+                    "headers_ms": 18,
+                    "end_ms": 414
+                  }
+                ]
+              }
+            ],
+            "fixtures": {
+              "A": {
+                "text": "user: Guard attribution A 49e2fd2a914a amber\nassistant: ",
+                "tokens": [
+                  12105,
+                  35,
+                  6137,
+                  42066,
+                  83,
+                  2766,
+                  242,
+                  176,
+                  37379,
+                  176,
+                  102,
+                  466,
+                  1570,
+                  102,
+                  37156,
+                  50118,
+                  2401,
+                  33388,
+                  35,
+                  1437
+                ]
+              },
+              "B": {
+                "text": "user: Guard attribution B 49e2fd2a914a violet\nassistant: ",
+                "tokens": [
+                  12105,
+                  35,
+                  6137,
+                  42066,
+                  163,
+                  2766,
+                  242,
+                  176,
+                  37379,
+                  176,
+                  102,
+                  466,
+                  1570,
+                  102,
+                  43973,
+                  50118,
+                  2401,
+                  33388,
+                  35,
+                  1437
+                ]
+              }
+            },
+            "fixture": {
+              "profile": "request-connection-binding-v1",
+              "settings": {
+                "max_total_requests": 24,
+                "max_output_tokens": 8,
+                "max_duration_seconds": 300,
+                "read_delay_ms": 250
+              },
+              "case_order": [
+                "json:generated",
+                "json:distinct_body",
+                "json:collision_body",
+                "json:collision_header",
+                "sse:generated",
+                "sse:distinct_body",
+                "sse:collision_body",
+                "sse:collision_header"
+              ],
+              "body_shape": {
+                "user": "per-run synthetic A/B text",
+                "output": 8
+              }
+            },
+            "elapsed_seconds": 69.03099999995902,
+            "limitations": [
+              "HTTP request/collection intervals overlap; worker-side simultaneous execution is not proved.",
+              "Caller-controlled API IDs may intentionally collide; a collision alone is not a foreign-result finding.",
+              "Only the pinned CPU text fixture and two synthetic direct-engine connections are covered.",
+              "Enterprise principals, gateway authorization, child IDs, randomization modes, cancellation, retries and stored results remain untested.",
+              "Generated prose is never an attribution oracle. Token IDs and rendered prompts are returned consumer-side projections.",
+              "Timeouts bound each dispatch batch and the shared deadline; Docker inspection and cleanup have their own bounds."
+            ]
+          }
+        },
+        "OBS-09": {
+          "log_summary": {
+            "trials": [
+              {
+                "case": "before",
+                "request_id": "G79e7deaa98b2_before",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-G79e7deaa98b2_before",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "multiline",
+                "request_id": "G79e7deaa98b2_multiline\nGUARD_LINE_TWO",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-G79e7deaa98b2_multiline\nGUARD_LINE_TWO",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "cr",
+                "request_id": "G79e7deaa98b2_cr\rGUARD_CR",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-G79e7deaa98b2_cr\rGUARD_CR",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "crlf",
+                "request_id": "G79e7deaa98b2_crlf\r\nGUARD_CRLF",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-G79e7deaa98b2_crlf\r\nGUARD_CRLF",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "reserved",
+                "request_id": "G79e7deaa98b2_reserved|principal=guard-probe|status=probe|level=ERROR|source=guard-probe",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-G79e7deaa98b2_reserved|principal=guard-probe|status=probe|level=ERROR|source=guard-probe",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "html",
+                "request_id": "G79e7deaa98b2_html<script>guard_probe</script><tr data-event-index=\"fake\">guard</tr>",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-G79e7deaa98b2_html<script>guard_probe</script><tr data-event-index=\"fake\">guard</tr>",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "after",
+                "request_id": "G79e7deaa98b2_after",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-G79e7deaa98b2_after",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              }
+            ],
+            "source_identity_before": {
+              "container_id": "c4ad0465aa869be2c86927fcacb6a9c2d349b220045e676fd45215829800f5e7",
+              "started_at": "2026-10-23T12:03:41.970852489Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "image_id": "sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "logging_profile": "request-info-v1",
+              "logging_controls_verified": true
+            },
+            "source_identity_after": {
+              "container_id": "c4ad0465aa869be2c86927fcacb6a9c2d349b220045e676fd45215829800f5e7",
+              "started_at": "2026-10-23T12:03:41.970852489Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "image_id": "sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "logging_profile": "request-info-v1",
+              "logging_controls_verified": true
+            },
+            "native_contract": {
+              "profile": "request-info-v1",
+              "version": "1",
+              "level": "INFO",
+              "color": false,
+              "max_log_len": 512,
+              "external_request_id_trust": "untrusted_correlation",
+              "logger_sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+              "formatter_sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+              "environment": {
+                "VLLM_CONFIGURE_LOGGING": "1",
+                "VLLM_LOGGING_LEVEL": "INFO",
+                "VLLM_LOGGING_COLOR": "0",
+                "VLLM_LOGGING_PREFIX": "",
+                "VLLM_LOGGING_STREAM": "ext://sys.stdout"
+              },
+              "custom_config_allowed": false,
+              "sources": [
+                {
+                  "path": "vllm/logger.py",
+                  "sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+                  "lines": "27-33,64-103"
+                },
+                {
+                  "path": "vllm/logging_utils/formatter.py",
+                  "sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+                  "lines": "60-73"
+                },
+                {
+                  "path": "vllm/entrypoints/serve/utils/request_logger.py",
+                  "sha256": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d",
+                  "lines": "36-66"
+                }
+              ]
+            },
+            "collection_sha256": "958436e0e6ac18fec4c5ea81edf54274712b79d2d89bb67477e1fb4056577bb2",
+            "display_sha256": "ffbfa64908335ab264258f800fd4780cc939195b7f9a5eaf308fafcb4cacbcf5",
+            "display_verified": true,
+            "coverage_gaps": [],
+            "violations": []
+          },
+          "log_capture_provenance": {
+            "returncode": 0,
+            "truncated": false,
+            "decoded_stdout_bytes": 7004,
+            "decoded_stdout_sha256": "005cc073ecb110da878245f4c34ccdc6afc884cd310b1a088410b3660d4fc6a1",
+            "stderr_present": false,
+            "error": null,
+            "encoding": "UTF-8 after Docker CLI decoding; hashes are not raw daemon-file hashes"
+          },
+          "log_collector_projection": {
+            "schema": "guard-native-log-events/1",
+            "collector_profile": "guard-vllm-native-info-v1",
+            "parser_version": "0.1.0",
+            "capture_encoding": "UTF-8 decoded Docker CLI text; not daemon bytes",
+            "decoded_capture_sha256": "005cc073ecb110da878245f4c34ccdc6afc884cd310b1a088410b3660d4fc6a1",
+            "decoded_capture_bytes": 7004,
+            "trusted_fields": [
+              "process",
+              "level",
+              "source"
+            ],
+            "ignored_other_format_lines": 7,
+            "gaps": [],
+            "complete": true,
+            "source_identity": {
+              "container_id": "c4ad0465aa869be2c86927fcacb6a9c2d349b220045e676fd45215829800f5e7",
+              "started_at": "2026-10-23T12:03:41.970852489Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "image_id": "sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "logging_profile": "request-info-v1",
+              "logging_controls_verified": true
+            },
+            "capture_window": {
+              "since": "2026-10-23T12:07:37.989634+00:00",
+              "until": "2026-10-23T12:07:49.390480+00:00"
+            },
+            "redaction": "configured authorization secrets and labelled credential values; source digests precede redaction",
+            "event_count": 15,
+            "events": [
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:07:38",
+                "docker_timestamp": "2026-10-23T12:07:38.946992551Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 0,
+                "end_offset": 625,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "267cea8de39d18a62ce14ed4220c8d3a3de1efcdc4dfb1338388a415f4350cb3",
+                "message_sha256": "eb1bba9b3f56d87fb5ba12461485ecc894610e1ec00e441e63d4048d472f54b8",
+                "event_index": 0
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:07:38",
+                "docker_timestamp": "2026-10-23T12:07:38.947548891Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 625,
+                "end_offset": 765,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "ba139dcee3f9bbfc2b9420c5007c68b09364c9ead1ce63de4804dcdac5937a8b",
+                "message_sha256": "a9a774226d1de0aa80c3dcbff59de8ed293ad48bfc885962303a9491cb3e92a1",
+                "event_index": 1
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:07:40",
+                "docker_timestamp": "2026-10-23T12:07:40.378019486Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 864,
+                "end_offset": 1600,
+                "physical_lines": 2,
+                "raw_decoded_sha256": "997e7a5eb3c8b46a08207d8d0f23fa0328f6f609eada6d35191fdbc661329d0c",
+                "message_sha256": "3fa65421fbb6df49b2a6f321a414325200f02aa1ad403788e227e26b29fbc1e0",
+                "event_index": 2
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:07:40",
+                "docker_timestamp": "2026-10-23T12:07:40.378490277Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 1600,
+                "end_offset": 1847,
+                "physical_lines": 2,
+                "raw_decoded_sha256": "2ba0e38ceccb5bc6c9fa5f564c667d4916f0e782d18d3dd6976f287c2f8d1bd1",
+                "message_sha256": "3458fc432174fe3d140d6eb12b6833cda12c1fa2f491f7159b05f7fd9539cd3b",
+                "event_index": 3
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "loggers.py",
+                "source_line": 320,
+                "native_timestamp": "10-23 12:07:42",
+                "docker_timestamp": "2026-10-23T12:07:42.069222835Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 1946,
+                "end_offset": 2210,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "2290c7d29dfe36387c322757d80cf28b3fbf0b9bde40555f21286d1747ff0ac6",
+                "message_sha256": "40ae15640dfc5880067933d96a7be47be826f1659206383c27e96a8550a6069f",
+                "event_index": 4
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:07:42",
+                "docker_timestamp": "2026-10-23T12:07:42.717573904Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 2210,
+                "end_offset": 2840,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "df1740ac6b877f2dfef5fe20dcc780ebb9a3ec349a4071f88ac26e970e374bd2",
+                "message_sha256": "b51af0e695ed5fe11909a47870c8625c1ad90ab6e23d1ead61cd857024417c23",
+                "event_index": 5
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:07:42",
+                "docker_timestamp": "2026-10-23T12:07:42.718303001Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 2840,
+                "end_offset": 2985,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "c6893838f8d345e9c628cd32a2cd2277946e950f39b5896a2d716e1a9ce29636",
+                "message_sha256": "b60e4601fdea23a1ba125ac34848f1fb3987a0de5d766db5f26c290a7ce57fd7",
+                "event_index": 6
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:07:44",
+                "docker_timestamp": "2026-10-23T12:07:44.255920215Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 3084,
+                "end_offset": 3812,
+                "physical_lines": 2,
+                "raw_decoded_sha256": "4ab93d04eea2af49f5eb4b80ef3812eb11b00e97139297d6d3e15e4756c712ff",
+                "message_sha256": "766572df9e1cf69ce5507fa6160bc78aa5435bc64bc0e8b9237eb90c34cb1a4e",
+                "event_index": 7
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:07:44",
+                "docker_timestamp": "2026-10-23T12:07:44.256329379Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 3812,
+                "end_offset": 4051,
+                "physical_lines": 2,
+                "raw_decoded_sha256": "ac1a106d75d68d25727aa579ea941c41625f3d52a25089159e5e19ba146ece0b",
+                "message_sha256": "008b2c0e4193557654cb4ceaeefdf08c3b91264f04a5723182c6a941523db984",
+                "event_index": 8
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:07:45",
+                "docker_timestamp": "2026-10-23T12:07:45.724020820Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 4150,
+                "end_offset": 4843,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "c81f34f7b93f03e6794323f72c91acf2d216d595a79189a83496b12d59ec313d",
+                "message_sha256": "cb8cc5ab8c18966e5d70aab423116af75e634371b04e0f6a2e7e22135754c059",
+                "event_index": 9
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:07:45",
+                "docker_timestamp": "2026-10-23T12:07:45.725061813Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 4843,
+                "end_offset": 5051,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "ce10f90183ceb6d878f49e12499f3b9dff716a16165a835b6d75f2bef02860ce",
+                "message_sha256": "a69088a1f5aa29f478d4812ecc3b47ee26d12334e10fbc9373bfe527ded6f330",
+                "event_index": 10
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:07:47",
+                "docker_timestamp": "2026-10-23T12:07:47.325716450Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 5150,
+                "end_offset": 5839,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "e5f357a1f4cc807d51fdc2d9247ab90be744a94d09b572c9978b7b121883a2ab",
+                "message_sha256": "651e1a730ef741471c658d0ed7fdca68063002c85226be342ee026612364cd1a",
+                "event_index": 11
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:07:47",
+                "docker_timestamp": "2026-10-23T12:07:47.326240067Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 5839,
+                "end_offset": 6043,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "3839ee7d0f4af9b255782844604979780b91e9ac8994679fb0ebd45031939a80",
+                "message_sha256": "20b00bf603146a984b1b8842af1e7518a3e3a8fcfe780ad3a8af326f9a9b4253",
+                "event_index": 12
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:07:48",
+                "docker_timestamp": "2026-10-23T12:07:48.815636985Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 6142,
+                "end_offset": 6766,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "73c477e7a9c87e6408347ba2deb2f0c8d830baaa9e38bd71ab1eedea9f667933",
+                "message_sha256": "b48ad7919d00452eaebe52c9229f5a4204a16f4a3de386bcf7022bed4117352d",
+                "event_index": 13
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:07:48",
+                "docker_timestamp": "2026-10-23T12:07:48.816283591Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 6766,
+                "end_offset": 6905,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "236c340709f2b80694fdef47262d81d1241c28592cfe8fb9c74c32d49809bb08",
+                "message_sha256": "d12877702c039ffa6e628172503d997cb3e7ac53b33b21a65623218c0c6f2f26",
+                "event_index": 14
+              }
+            ]
+          },
+          "persisted_display_digest_matches_artifact": false
+        }
+      },
+      "launch_conditions": {
+        "model": "facebook/opt-125m",
+        "revision": "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+        "gpu": false,
+        "profile": "cpu-bounded-v1",
+        "model_layout": "snapshot",
+        "dtype": "float32",
+        "max_model_len": 128,
+        "max_num_seqs": 1,
+        "max_num_batched_tokens": 128,
+        "kv_cache_memory_bytes": 67108864,
+        "enforce_eager": true,
+        "cpu_threads": 2,
+        "resources": {
+          "cpus": 2,
+          "memory_bytes": 3221225472,
+          "memory_swap_bytes": 5368709120,
+          "shm_bytes": 536870912,
+          "pids_limit": 256
+        },
+        "entrypoint": "/usr/bin/env",
+        "argv": [
+          "-u",
+          "VLLM_CPU_KVCACHE_SPACE",
+          "vllm",
+          "serve",
+          "/models",
+          "--revision",
+          "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+          "--served-model-name",
+          "facebook/opt-125m",
+          "--host",
+          "0.0.0.0",
+          "--port",
+          "8000",
+          "--dtype",
+          "float32",
+          "--max-model-len",
+          "128",
+          "--max-num-seqs",
+          "1",
+          "--max-num-batched-tokens",
+          "128",
+          "--kv-cache-memory-bytes",
+          "67108864",
+          "--load-format",
+          "auto",
+          "--enforce-eager",
+          "--chat-template",
+          "/guard-assets/chat/guard-text-chat-v1.jinja",
+          "--chat-template-content-format",
+          "string",
+          "--enable-log-requests",
+          "--max-log-len",
+          "512"
+        ],
+        "environment": {
+          "HF_HUB_OFFLINE": "1",
+          "TRANSFORMERS_OFFLINE": "1",
+          "HF_HOME": "/models",
+          "VLLM_CONFIGURE_LOGGING": "1",
+          "VLLM_LOGGING_LEVEL": "INFO",
+          "VLLM_LOGGING_COLOR": "0",
+          "VLLM_LOGGING_PREFIX": "",
+          "VLLM_LOGGING_STREAM": "ext://sys.stdout",
+          "VLLM_CPU_OMP_THREADS_BIND": "nobind",
+          "OMP_NUM_THREADS": "2",
+          "VLLM_NO_USAGE_STATS": "1",
+          "DO_NOT_TRACK": "1",
+          "HOME": "/tmp",
+          "VLLM_CACHE_ROOT": "/guard-cache/vllm",
+          "TORCHINDUCTOR_CACHE_DIR": "/guard-cache/torchinductor",
+          "TRITON_CACHE_DIR": "/guard-cache/triton",
+          "TMPDIR": "/guard-cache"
+        },
+        "engine_permissions": {
+          "cap_drop": [
+            "ALL"
+          ],
+          "read_only": true,
+          "tmpfs": [
+            "/tmp:rw,noexec,nosuid,size=2g,mode=1777",
+            "/guard-cache:rw,exec,nosuid,size=2g,mode=1777"
+          ],
+          "user": "1000:1000",
+          "security_opt": [
+            "no-new-privileges:true"
+          ]
+        },
+        "chat_template": {
+          "profile": "guard-text-chat-v1",
+          "version": "1",
+          "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+          "container_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+          "content_format": "string",
+          "request_overrides": false
+        },
+        "log_profile": {
+          "profile": "request-info-v1",
+          "version": "1",
+          "level": "INFO",
+          "color": false,
+          "max_log_len": 512,
+          "external_request_id_trust": "untrusted_correlation",
+          "logger_sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+          "formatter_sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+          "environment": {
+            "VLLM_CONFIGURE_LOGGING": "1",
+            "VLLM_LOGGING_LEVEL": "INFO",
+            "VLLM_LOGGING_COLOR": "0",
+            "VLLM_LOGGING_PREFIX": "",
+            "VLLM_LOGGING_STREAM": "ext://sys.stdout"
+          },
+          "custom_config_allowed": false,
+          "sources": [
+            {
+              "path": "vllm/logger.py",
+              "sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+              "lines": "27-33,64-103"
+            },
+            {
+              "path": "vllm/logging_utils/formatter.py",
+              "sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+              "lines": "60-73"
+            },
+            {
+              "path": "vllm/entrypoints/serve/utils/request_logger.py",
+              "sha256": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d",
+              "lines": "36-66"
+            }
+          ]
+        }
+      },
+      "preservation": {
+        "model_unchanged": true,
+        "existing_container_identities_states_unchanged": true,
+        "no_additional_containers": true,
+        "inputs_unchanged": true,
+        "source_unchanged_during_execution": true,
+        "pack_unchanged_during_execution": true
+      },
+      "rejudge_proof": {
+        "restored_exact_objects_initially": true,
+        "all_original_objects_preserved": true,
+        "only_RES_RPT_appended": true,
+        "saved_pack_used": true,
+        "as_of": "2026-10-23T12:03:39Z",
+        "as_of_basis": "PLAN.created_at; policy exceptions explicitly empty",
+        "rejudged_semantic_results_equal": true,
+        "original_store_bytes_unchanged": true,
+        "original_reports_unchanged": true,
+        "new_report_json_and_html": true
+      },
+      "commands": [
+        {
+          "returncode": 0,
+          "seconds": 4.015,
+          "name": "01-prepare"
+        },
+        {
+          "returncode": 0,
+          "seconds": 259.266,
+          "name": "02-validate"
+        },
+        {
+          "returncode": 0,
+          "seconds": 1.687,
+          "name": "03-verify"
+        },
+        {
+          "returncode": 0,
+          "seconds": 2.766,
+          "name": "04-export"
+        },
+        {
+          "returncode": 0,
+          "seconds": 2.141,
+          "name": "05-restore"
+        },
+        {
+          "returncode": 0,
+          "seconds": 1.344,
+          "name": "06-verify-restored"
+        },
+        {
+          "returncode": 0,
+          "seconds": 1.328,
+          "name": "07-rejudge-saved-pack"
+        },
+        {
+          "returncode": 0,
+          "seconds": 1.344,
+          "name": "08-report-saved-pack"
+        },
+        {
+          "returncode": 0,
+          "seconds": 1.265,
+          "name": "09-verify-rejudged"
+        }
+      ],
+      "bundle": {
+        "name": "evidence.zip",
+        "sha256": "f740a372817728276544ad8fc193ce2b64c7c9701c5649bb07b5a2f36197de4c",
+        "bytes": 189606
+      }
+    },
+    {
+      "attempt": "real-attempt-02",
+      "execution_success": true,
+      "executed_source_files": {
+        "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "adapters/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "adapters/assets/chat/guard-text-chat-v1.jinja": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+        "adapters/base.py": "6b48806c8a132292fb6fba8e7d0b57559a1e72e9c8c1d7fcfacd0c15ef92cbb1",
+        "adapters/fake.py": "993a554e6de757b7f578cfb5c3a8a7b2b4504475756bc0203639d06b9dc65b89",
+        "adapters/model_inventory.py": "1c3abf9d7516acd83efbeff45fabfc9b09fa743a2a74f75be1e1b643b08d6db4",
+        "adapters/vllm.py": "ef2e137e308c094f1a9508f8750660ff64858308d8fac989f6cbbd9d6c089372",
+        "application.py": "c148a09cd505ecb043e602512b9ffa64850f3355ecd37d3f179a02c5eb3a070e",
+        "automation_policy.py": "5c4a3a939806b917633354b61e51633a8a87f0a911764b93c96aa44f63a0b9f4",
+        "cli.py": "9124fde70c2c453f60c7d500aa83618946df10e859cb746202ec9fcd4bc3f4d8",
+        "collectors/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "collectors/file.py": "af7d915c7d5f9a95a898e184d7e7b7aaa5f3f50087638c6149e252323ab0076f",
+        "collectors/manual.py": "73decf953dae6a72c24dfb9d1dff7faff6f8bd2b5da5751bf63951853d731fb1",
+        "collectors/policy_template.py": "331af03de3a14d031bf27c53044292909669eb0a71bb1b6c45feebb73aa1b7af",
+        "collectors/policy_template_metadata.json": "b904e660e2b7a4eccca7a34c8e359854f33a8d9b826eff92119e53118f498787",
+        "core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "core/aggregate.py": "bda9f20b98a534845370dcedaf51e69eaa158a636887ccaa231ff3be7444999d",
+        "core/compare.py": "37da2a47be6d6205e877fcc5420229c3e46d0fde4b49b2f3a65e1ce465ea2a0e",
+        "core/judge.py": "43ed9ddaeb4f9c5b0fc0a46ae1062b7e5c015ad898e2825f47bf8adadcc51f05",
+        "core/preflight.py": "345d7cbc84d3ce511cdaa5c989ed43960c11d170e8239c7fd239d02a881a92d5",
+        "core/report.py": "9d60215f3ad0499bc090851bf682628fe08036f9dbafd90d163e031917b5a18f",
+        "core/run.py": "b1e1487c710dd29d0f7686a28026eeeb8e402062096511c14ebee8c74eea5f2a",
+        "core/select.py": "1800477749d8a3a5e556039adf6357a2e6c0a91e8b9f9c9292cb0fbf6230efb6",
+        "executors/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "executors/base.py": "0ac2fb9311680e5521e3d6ef5cced0c0361ab874317cab137c093bf53ee93e2f",
+        "executors/container_config.py": "303aaec854740d1b5e96474ab1884f72fa05d60afa03a73fc781fc3c509130f0",
+        "executors/content_common.py": "67185e59bf65cd08674bb6ffc2e25f1b455b68ac4b6698de7b8e92b9c06b505f",
+        "executors/credential_exposure.py": "ce9c83a309dde0d068f5ff7c2152c7e4e02f9bb107a7cb82b7129b31b7663dd3",
+        "executors/direct_route.py": "43c21b5a91ea629418024256b87b587d295d745a04ec08d4d36c61f3649a60bb",
+        "executors/engine_identity.py": "dee76079155c8b2c01ca7ee22455514ec6acb2f71e9d378c0c7fab655986a5af",
+        "executors/fake.py": "989281ac6f705758edcea4e7b28a2f6cc0fab385eaa9b822998f5b339b8fa718",
+        "executors/http_common.py": "d2fcc8c8da947c020cec7844fb62826e80bd2466b5289cbc17f82bbf5935fd47",
+        "executors/http_probe.py": "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d",
+        "executors/input_validation.py": "800a375dcac4e365d92e0f9e6b4b9588fd199798dc82800cc389b48808919f4a",
+        "executors/log_analysis.py": "39e3dfcb6c5cd22fd9a9be917e9699e57c32862d3a769a4dc755538cc9374b59",
+        "executors/log_integrity.py": "b135ac29ecb7d0a523a085f42937b0acd29a2bcb49defc87382a32f6058e2e41",
+        "executors/log_integrity_parser.py": "0f7ffefeb9e70e20355926cb91a2da592c4fde5c048755dc5bca1380c1e7b838",
+        "executors/registry.py": "1e4043d2c7de790111cff9c97b1f897e21e729d64a5736085184b30128d15f50",
+        "executors/request_binding.py": "89f8f08367626c881eff81899bab87fd5faea5a4185d49e8dade9955919c6dfe",
+        "executors/response_content.py": "7099c3b74ff0e437f1a77b40e0ea42e6dd0e56949de750b6b448a701640fbedd",
+        "executors/role_route.py": "7249fa958fa8421b9a95d6ce526123ca80f92fbe2c3d1154ba60ffee9c106cd3",
+        "executors/sampling_validation.py": "e905da16eed9b59ed447f3755cc87d0773681cf01157041a57e9a952c6d7e7d7",
+        "executors/stream_probe.py": "76237c70da09e1157f16c3f1c614b578f78bc742149d34a9d972db497d00f8f7",
+        "executors/template_validation.py": "f42add466db19b308a439b4aee0e8172d16f532f9185f80261d68f1a2d2c91ab",
+        "input_policy.py": "130c5d8d3693043eb9b82b33d7dff678de544af22ea3658d0c56b20c80a09db2",
+        "judges/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "judges/audit_collection.py": "73c80b68e355e4714c974e8dc5489c951a968fd638ca8f099c59f7ca91c28b78",
+        "judges/base.py": "8f66f5643ef4e77659726b9ac3dea661374a46ffde3380e8d38c5daa0dadcd1c",
+        "judges/declared.py": "8b4fd1245cb728e46a8f48b62609b07ffbea7f20e03a6821b2051ae9d7400a29",
+        "judges/manual_cache_context.py": "2eaaf1cbd783cfe535fadc92242332d5b7de44a650474d4f47b7a87bfacc385e",
+        "judges/policy_items.py": "e6a9d347d5dd44223c4930735d6229ed6e3e1b0dd8969b555b53d849dff79f06",
+        "judges/registry.py": "ecbbc80e68dfe1b313bd813c1de64f38150d335f2a7c710853d9a17d8048ef9c",
+        "judges/rule_table.py": "975ac1bae78ba5180a2bc4cc288cc17b55770357b465b4df246a45cb1401e680",
+        "manual_audit.py": "bd48943c57e6ba6bf033e8eb31f34c08dd461203cf35b5ec68c5070b3b3110fc",
+        "manual_policy.py": "8368694f955b8a1ce3dce69bae4bda97cb44257a4808913f2e8a8e9082c8862b",
+        "models/__init__.py": "3d59e80f52269fa817d208d252cdf94b4f614d573b1d8355e14f1e0fb08e300f",
+        "models/base.py": "4d7bfc03dc3754c8b97d16f577bd6f9d1d3bebbf19c30bb54bd7ea20cf9bc7db",
+        "models/checkdef.py": "68da2fc053b1e20656c5156f58c318a308db282c41753575f383609e9d6ddb60",
+        "models/enums.py": "c3e53dd3e528071d3fc1bc9131858b086359c42f4c7fc2f2f6bb5d0614a9fd0d",
+        "models/hashing.py": "e90ef64b52fe242028a4e81b16c18fb4a353e0e7d721b302bd7b764fcc4e193a",
+        "models/objects.py": "055abfc50cd3c6c7fdf0bff33236c42edaab2e8bf366bd785d957485fc7bae8b",
+        "models/ulid.py": "8233f5248a5a32855fe7f4b6914259cf3a6974190f31becee16aa77c26ee889d",
+        "report/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "report/html.py": "b25db89a323f030bcf706d35157ee254db3eccb8f9c0617347522f62da21bb6e",
+        "report/log_integrity.py": "6daf41c2b596d866f37bf8e66a242df81d2cfd31e2e0d8b1ecc3607e905974c6",
+        "runtime/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "runtime/assets/gateway/role_enforced/default.conf.template": "bd36fb50e168c4334c1884daa8d0aa91209e06b3bb77f8ef34f0f876c097225b",
+        "runtime/assets/gateway/role_open/default.conf.template": "0ddfd1cb907708213a4e2e2326f4791f0f00b9029bed9b34da8d116de9282e00",
+        "runtime/assets/gateway/single/default.conf.template": "0078a44da3e069b164ac92ee28ecb95a815546b05d935d14991a2d1429136bbc",
+        "runtime/assets/stub_engine/server.py": "f4776423366cdd626e91ad8389e61abee92314a5c354f1f69a53004e71aee628",
+        "runtime/comparison.py": "6dccfc0984a5bb337addbf30eac3aee73c42ef4b96078184b85cf15cad7497a2",
+        "runtime/docker.py": "7ad82112f03b4f3163f7f0ea7c70910eaba594f112a8fba4447fbaa31bd4b127",
+        "runtime/sandbox.py": "983f15c493d2dd8b71ac565da3d845bbbe5bd106dfc45781962e9a77dbc2301f",
+        "store/__init__.py": "c3c68922dec8668bc18d6c13720bad8f7d0178920a3e483dd833b9fda4accb5a",
+        "store/bundle.py": "8c4202b79719b7c8fc4765bb5bfe1a9bfcaf870eead24818395236ff941a35dc",
+        "store/packs.py": "b8ef806f1218d25e436324ad82ce62cf83ba7371e241d544df0060ad35d73de8",
+        "store/sqlite.py": "af867baa88f50ba63d199617e2067b057b4fb3b8c70b9db81edecb282d9751b1"
+      },
+      "manifest": {
+        "schema": "guard-automation-phase3-real/1",
+        "pack": {
+          "kind": "PACK",
+          "id": "PACK-BASELINE",
+          "revision": 19,
+          "sha256": "7753f6dc7dcad28985b97d33153f26f07673cc0b41bf28cb0adb65858f172e5a"
+        },
+        "engine": {
+          "name": "vllm",
+          "version": "0.31.0",
+          "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+          "source_commit_status": "UNVERIFIED"
+        },
+        "adapter": {
+          "name": "vllm",
+          "version": "0.4.0"
+        },
+        "model": {
+          "id": "facebook/opt-125m",
+          "revision": "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+          "inventory_sha256": "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6"
+        },
+        "maximum_engines": 1,
+        "scope": [
+          "OBS-09"
+        ],
+        "performance": "UNKNOWN",
+        "official": false,
+        "profile": "pinned CPU security/function diagnostic; no enterprise identity/SIEM/worker concurrency certification"
+      },
+      "checks": [
+        {
+          "check_id": "OBS-09",
+          "execution": {
+            "abort_reason": null,
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.0"
+            },
+            "executor": {
+              "config_sha256": "26d62b0974e692ef38144404f15beacddaced4cec1ef2e494fda0243f76746ca",
+              "name": "log_integrity",
+              "version": "0.1.0"
+            },
+            "finished_at": "2026-10-23T12:16:30Z",
+            "started_at": "2026-10-23T12:15:40Z",
+            "status": "COMPLETED"
+          },
+          "origin": "MEASURED",
+          "normal_control": {
+            "attempted": true,
+            "detail": "normal one-token completion and exact request log event before/after fixed body-ID trials",
+            "succeeded": true
+          },
+          "challenges": [
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "JSON 본문 request_id의 무해 복수행 ID가 실제 native INFO logger와 reference collector에 도달하는지 확인"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "CR·CRLF ID의 실제 수용·원본 사건 경계와 동일 logger 메타데이터를 대조"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "예약 필드·HTML 유사 ID를 비신뢰 메시지로 소비하고 별도 표시 artifact의 사건 대응을 확인"
+            }
+          ],
+          "observations": {
+            "functional_probe_results": {
+              "collected": true,
+              "value": {
+                "after": "pass",
+                "before": "pass"
+              }
+            },
+            "functional_probes_planned": {
+              "collected": true,
+              "value": [
+                "before",
+                "after"
+              ]
+            },
+            "log_boundaries_preserved": {
+              "collected": true,
+              "value": true
+            },
+            "log_client_request_id_trust": {
+              "collected": true,
+              "value": "untrusted_correlation"
+            },
+            "log_collection_complete": {
+              "collected": true,
+              "value": true
+            },
+            "log_collector_profile": {
+              "collected": true,
+              "value": "guard-vllm-native-info-v1"
+            },
+            "log_coverage_gaps": {
+              "collected": true,
+              "value": []
+            },
+            "log_display_verified": {
+              "collected": true,
+              "value": true
+            },
+            "log_identity_verified": {
+              "collected": true,
+              "value": true
+            },
+            "log_required_trusted_fields": {
+              "collected": true,
+              "value": [
+                "process",
+                "level",
+                "source"
+              ]
+            },
+            "log_security_violations": {
+              "collected": true,
+              "value": []
+            },
+            "log_trials_planned": {
+              "collected": true,
+              "value": [
+                "before",
+                "multiline",
+                "cr",
+                "crlf",
+                "reserved",
+                "html",
+                "after"
+              ]
+            },
+            "log_trials_reached": {
+              "collected": true,
+              "value": [
+                "before",
+                "multiline",
+                "cr",
+                "crlf",
+                "reserved",
+                "html",
+                "after"
+              ]
+            },
+            "log_trusted_fields": {
+              "collected": true,
+              "value": [
+                "process",
+                "level",
+                "source"
+              ]
+            },
+            "log_trusted_fields_preserved": {
+              "collected": true,
+              "value": true
+            },
+            "normal_controls": {
+              "collected": true,
+              "value": true
+            }
+          },
+          "verdicts": {
+            "functional": "PASS",
+            "performance": "UNKNOWN",
+            "security": "PASS"
+          },
+          "reasons": [
+            "security: all pass rules met: log_collector_profile eq <policy:collector_profile>; log_client_request_id_trust eq <policy:client_request_id_trust>; log_required_trusted_fields eq <policy:required_trusted_fields>; log_trusted_fields eq ['process', 'level', 'source']; log_identity_verified eq True; log_collection_complete eq True; log_coverage_gaps eq []; log_boundaries_preserved eq True; log_trusted_fields_preserved eq True; log_display_verified eq True; log_trials_planned eq ['before', 'multiline', 'cr', 'crlf', 'reserved', 'html', 'after']; log_trials_reached superset_of <log_trials_planned>; normal_controls eq True",
+            "functional: all pass rules met: functional_probes_planned eq ['before', 'after']; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; normal_controls eq True",
+            "performance: no rule for this axis",
+            "performance: explicit CPU comparison covers security/function only; performance unverified"
+          ],
+          "verification_level": "MEASURED",
+          "evidence_ref": {
+            "kind": "EVD",
+            "id": "EVD-01M5MB0BCVZ8NZAYZN3PGWQGX3",
+            "revision": 1,
+            "sha256": "444b51eb5ff1cff924d6e49e5ab829f14b56a4d5140f10ca0dab619b47ea75bc"
+          },
+          "result_ref": {
+            "kind": "RES",
+            "id": "RES-01M5MB235HED8J9WB859F8Y7RC",
+            "revision": 1,
+            "sha256": "cd7da4b34482ec35fd9e43b6b7097df37daf3c215b1adcf303a44d266cdb21ed"
+          },
+          "artifacts": [
+            {
+              "bytes": 3433,
+              "collected_at": "2026-10-23T12:16:31Z",
+              "collector": "log_integrity/0.1.0",
+              "name": "probe_log.jsonl",
+              "path": "artifacts/de26fdeb2f0df6408960ebecbaa747b76bfa644568d2d14245facc1927f916bf",
+              "sha256": "de26fdeb2f0df6408960ebecbaa747b76bfa644568d2d14245facc1927f916bf"
+            },
+            {
+              "bytes": 12768,
+              "collected_at": "2026-10-23T12:16:31Z",
+              "collector": "log_integrity/0.1.0",
+              "name": "log_integrity_samples.json",
+              "path": "artifacts/3ab52fb8de926b46360b620d5b177b4e903bc48c17451529a0d0eb6d2211b60f",
+              "sha256": "3ab52fb8de926b46360b620d5b177b4e903bc48c17451529a0d0eb6d2211b60f"
+            },
+            {
+              "bytes": 15916,
+              "collected_at": "2026-10-23T12:16:31Z",
+              "collector": "log_integrity/0.1.0",
+              "name": "log_integrity_events.json",
+              "path": "artifacts/22cc3e1542a4cc685eff764cf6014ba975c02b13ce921c172569327447374b6b",
+              "sha256": "22cc3e1542a4cc685eff764cf6014ba975c02b13ce921c172569327447374b6b"
+            },
+            {
+              "bytes": 9372,
+              "collected_at": "2026-10-23T12:16:31Z",
+              "collector": "log_integrity/0.1.0",
+              "name": "log_integrity_display.html",
+              "path": "artifacts/845e7464f2bdbec8c30326a5dd1eb3c31426fb2d3267d08e281d11323559dd48",
+              "sha256": "845e7464f2bdbec8c30326a5dd1eb3c31426fb2d3267d08e281d11323559dd48"
+            }
+          ]
+        }
+      ],
+      "report_refs": [
+        {
+          "kind": "RPT",
+          "id": "RPT-01M5MB237K3RRFC5XM7BSPW3K5",
+          "revision": 1,
+          "sha256": "8dd6fd2410440ff0e022370e38d05cc8bcf223d480c3acf54491c74ef1673245"
+        }
+      ],
+      "attachments": {
+        "OBS-09": {
+          "log_summary": {
+            "trials": [
+              {
+                "case": "before",
+                "request_id": "Gaedc943b85ba_before",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-Gaedc943b85ba_before",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "multiline",
+                "request_id": "Gaedc943b85ba_multiline\nGUARD_LINE_TWO",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-Gaedc943b85ba_multiline\nGUARD_LINE_TWO",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "cr",
+                "request_id": "Gaedc943b85ba_cr\rGUARD_CR",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-Gaedc943b85ba_cr\rGUARD_CR",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "crlf",
+                "request_id": "Gaedc943b85ba_crlf\r\nGUARD_CRLF",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-Gaedc943b85ba_crlf\r\nGUARD_CRLF",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "reserved",
+                "request_id": "Gaedc943b85ba_reserved|principal=guard-probe|status=probe|level=ERROR|source=guard-probe",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-Gaedc943b85ba_reserved|principal=guard-probe|status=probe|level=ERROR|source=guard-probe",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "html",
+                "request_id": "Gaedc943b85ba_html<script>guard_probe</script><tr data-event-index=\"fake\">guard</tr>",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-Gaedc943b85ba_html<script>guard_probe</script><tr data-event-index=\"fake\">guard</tr>",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              },
+              {
+                "case": "after",
+                "request_id": "Gaedc943b85ba_after",
+                "request_id_trust": "untrusted_correlation",
+                "http_outcome": 200,
+                "response_id": "cmpl-Gaedc943b85ba_after",
+                "normal_generation": "pass",
+                "response_id_matches_body": true
+              }
+            ],
+            "source_identity_before": {
+              "container_id": "e64176a99a8819dcf8060782da7617d9eb71e94cae3760675ab88cca6559d557",
+              "started_at": "2026-10-23T12:13:30.051491066Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "image_id": "sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "logging_profile": "request-info-v1",
+              "logging_controls_verified": true
+            },
+            "source_identity_after": {
+              "container_id": "e64176a99a8819dcf8060782da7617d9eb71e94cae3760675ab88cca6559d557",
+              "started_at": "2026-10-23T12:13:30.051491066Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "image_id": "sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "logging_profile": "request-info-v1",
+              "logging_controls_verified": true
+            },
+            "native_contract": {
+              "profile": "request-info-v1",
+              "version": "1",
+              "level": "INFO",
+              "color": false,
+              "max_log_len": 512,
+              "external_request_id_trust": "untrusted_correlation",
+              "logger_sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+              "formatter_sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+              "environment": {
+                "VLLM_CONFIGURE_LOGGING": "1",
+                "VLLM_LOGGING_LEVEL": "INFO",
+                "VLLM_LOGGING_COLOR": "0",
+                "VLLM_LOGGING_PREFIX": "",
+                "VLLM_LOGGING_STREAM": "ext://sys.stdout"
+              },
+              "custom_config_allowed": false,
+              "sources": [
+                {
+                  "path": "vllm/logger.py",
+                  "sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+                  "lines": "27-33,64-103"
+                },
+                {
+                  "path": "vllm/logging_utils/formatter.py",
+                  "sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+                  "lines": "60-73"
+                },
+                {
+                  "path": "vllm/entrypoints/serve/utils/request_logger.py",
+                  "sha256": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d",
+                  "lines": "36-66"
+                }
+              ]
+            },
+            "collection_sha256": "be71bf93814a5c9a459c8464ede08bbd14e5a25815c0ea9a460b7b08e4ccf6b6",
+            "display_sha256": "845e7464f2bdbec8c30326a5dd1eb3c31426fb2d3267d08e281d11323559dd48",
+            "display_verified": true,
+            "coverage_gaps": [],
+            "violations": []
+          },
+          "log_capture_provenance": {
+            "returncode": 0,
+            "truncated": false,
+            "decoded_stdout_bytes": 7004,
+            "decoded_stdout_sha256": "48b94be228d79e3ebe92cbf4b7d875a4fba849e52dca7059520a0011993f168e",
+            "stderr_present": false,
+            "error": null,
+            "encoding": "UTF-8 after Docker CLI decoding; hashes are not raw daemon-file hashes"
+          },
+          "log_collector_projection": {
+            "schema": "guard-native-log-events/1",
+            "collector_profile": "guard-vllm-native-info-v1",
+            "parser_version": "0.1.0",
+            "capture_encoding": "UTF-8 decoded Docker CLI text; not daemon bytes",
+            "decoded_capture_sha256": "48b94be228d79e3ebe92cbf4b7d875a4fba849e52dca7059520a0011993f168e",
+            "decoded_capture_bytes": 7004,
+            "trusted_fields": [
+              "process",
+              "level",
+              "source"
+            ],
+            "ignored_other_format_lines": 7,
+            "gaps": [],
+            "complete": true,
+            "source_identity": {
+              "container_id": "e64176a99a8819dcf8060782da7617d9eb71e94cae3760675ab88cca6559d557",
+              "started_at": "2026-10-23T12:13:30.051491066Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "image_id": "sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "logging_profile": "request-info-v1",
+              "logging_controls_verified": true
+            },
+            "capture_window": {
+              "since": "2026-10-23T12:15:40.318441+00:00",
+              "until": "2026-10-23T12:16:30.339094+00:00"
+            },
+            "redaction": "configured authorization secrets and labelled credential values; source digests precede redaction",
+            "event_count": 15,
+            "events": [
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:15:41",
+                "docker_timestamp": "2026-10-23T12:15:41.185869406Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 0,
+                "end_offset": 625,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "39defe95ab08e61a188bb5f80195fafa19d25cb26a6e85c91a64ccc12aef7fa1",
+                "message_sha256": "8c0b2e51e912c1f4190d851ff65f411a5cf14044b43790a9499582de038963f1",
+                "event_index": 0
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:15:41",
+                "docker_timestamp": "2026-10-23T12:15:41.188212134Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 625,
+                "end_offset": 765,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "d935ab65a8a6b27d23475e6e0de55a49eea4dfc04204eba3e0a06d05c4781500",
+                "message_sha256": "ff4ff58034375530bcd3407ec85b37119f54c5e290a2be1ee6175a1bd9741f2f",
+                "event_index": 1
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:16:24",
+                "docker_timestamp": "2026-10-23T12:16:24.005922382Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 864,
+                "end_offset": 1600,
+                "physical_lines": 2,
+                "raw_decoded_sha256": "591249f997ad7c61f5f7ff35768e1ca55d6f64adabffac371a2fa4e193a9c0e2",
+                "message_sha256": "0c308edb72bae2754269875a53cc96dd6c84577f04dc69a9a458c6eb6d9eb22c",
+                "event_index": 2
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:16:24",
+                "docker_timestamp": "2026-10-23T12:16:24.009425308Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 1600,
+                "end_offset": 1847,
+                "physical_lines": 2,
+                "raw_decoded_sha256": "460e9c92123bc60eb51ce3af94f7b5daa57e2fd3dac5eee0e3588db1d575d75a",
+                "message_sha256": "5b8c0515bc93e012e73e83fdc64561daaf796db8e8134821e213660cdae05f16",
+                "event_index": 3
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:16:25",
+                "docker_timestamp": "2026-10-23T12:16:25.164351374Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 1946,
+                "end_offset": 2576,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "9667b246384a4aca6160e89e3113c8093b1918899301bc71b331fb19df77975a",
+                "message_sha256": "cf4b07aab9b5760bab6c41bc0af0454bd4e27470c6d33bd09d36f58d388f8ff6",
+                "event_index": 4
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:16:25",
+                "docker_timestamp": "2026-10-23T12:16:25.166248212Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 2576,
+                "end_offset": 2721,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "055336925e3819c2eb966ec3aa88a5f604081586f61c9be2be21829b0ad3ebf3",
+                "message_sha256": "9215bc0a554009cec858240b8b4b0de092d8f3815864ddcf9870fe1d9f66bda0",
+                "event_index": 5
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:16:26",
+                "docker_timestamp": "2026-10-23T12:16:26.282966052Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 2820,
+                "end_offset": 3548,
+                "physical_lines": 2,
+                "raw_decoded_sha256": "a27e38bed007445c808c838d5230a0a3e4ee39b4c69ef04b4b04b679348bb655",
+                "message_sha256": "ef9a806c056a12b20a96534fe385f3db732e865682a49907dff8e28470fec309",
+                "event_index": 6
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:16:26",
+                "docker_timestamp": "2026-10-23T12:16:26.283336425Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 3548,
+                "end_offset": 3787,
+                "physical_lines": 2,
+                "raw_decoded_sha256": "be1a76fcfcc716531ed3e9b9ef561277f258e75b9f08fe6853270a513b3ead8c",
+                "message_sha256": "15bc6d4a1645ef931d609211fea8e5c160fdf376103352f9fa0fb7c429aa296a",
+                "event_index": 7
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "loggers.py",
+                "source_line": 320,
+                "native_timestamp": "10-23 12:16:26",
+                "docker_timestamp": "2026-10-23T12:16:26.782255422Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 3886,
+                "end_offset": 4150,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "d8999502685a880220730101c62278f34af41f5d4ce8817f2ced2e3debd77a22",
+                "message_sha256": "db0605fbb7ad54b69f27764fea8f8cc6d60eda166a181414dc09dc4fb66453a8",
+                "event_index": 8
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:16:27",
+                "docker_timestamp": "2026-10-23T12:16:27.356120041Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 4150,
+                "end_offset": 4843,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "d343449616ff53ff45de0ce509dafa00c9b218824e94f18170bae4685750ed54",
+                "message_sha256": "28c3fa482fbf14b7d4a515280caeebafb911e92e19592eafbe835ac0b58ac7a3",
+                "event_index": 9
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:16:27",
+                "docker_timestamp": "2026-10-23T12:16:27.356590182Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 4843,
+                "end_offset": 5051,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "735ac847abb9f82fc35a52466a2c44521ec24b1d50823c4979e11f261ab85973",
+                "message_sha256": "afd204062a6461d454e06474515ce7ba3d17e2b9844b97d50c8e282d2e80475e",
+                "event_index": 10
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:16:28",
+                "docker_timestamp": "2026-10-23T12:16:28.798840396Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 5150,
+                "end_offset": 5839,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "3c220432c2743e88e1d594e6493cc18096087d75d1d9b68ffbe7d3c51f7ede3d",
+                "message_sha256": "c9a8cce712881700e6af853e789675c60b484e90bb7ef18098d0fc163735d24a",
+                "event_index": 11
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:16:28",
+                "docker_timestamp": "2026-10-23T12:16:28.799305680Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 5839,
+                "end_offset": 6043,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "645d1a50b47eee1f5024618ca8a97e6d4d197ee4d8d228f525bf1038cb094359",
+                "message_sha256": "4a5d8c90e544fc339740887af902a5fbc681c96fa4c8ef8a27f6af19f956d503",
+                "event_index": 12
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "request_logger.py",
+                "source_line": 65,
+                "native_timestamp": "10-23 12:16:29",
+                "docker_timestamp": "2026-10-23T12:16:29.956134365Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 6142,
+                "end_offset": 6766,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "f4e3b660135866ae37b490fbc0892eeacb64bb04f56d4c451fb7d552b43d2afc",
+                "message_sha256": "a063c287608e9054b60e1941fdeb07e6f2a3b48d0c7adf98857386ab9a64fec1",
+                "event_index": 13
+              },
+              {
+                "process": "APIServer",
+                "pid": 1,
+                "level": "INFO",
+                "source": "async_llm.py",
+                "source_line": 553,
+                "native_timestamp": "10-23 12:16:29",
+                "docker_timestamp": "2026-10-23T12:16:29.956869160Z",
+                "message_trust": "untrusted_opaque",
+                "start_offset": 6766,
+                "end_offset": 6905,
+                "physical_lines": 1,
+                "raw_decoded_sha256": "ef95eadf8a5155fa1463fe98f3458b33446a2635ad8882f12a3243d7837e5982",
+                "message_sha256": "d90acdcbb77328d8a705c53a04f1635bc1bedd16e6716fc4e6141459cda07c67",
+                "event_index": 14
+              }
+            ]
+          },
+          "persisted_display_digest_matches_artifact": true
+        }
+      },
+      "launch_conditions": {
+        "model": "facebook/opt-125m",
+        "revision": "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+        "gpu": false,
+        "profile": "cpu-bounded-v1",
+        "model_layout": "snapshot",
+        "dtype": "float32",
+        "max_model_len": 128,
+        "max_num_seqs": 1,
+        "max_num_batched_tokens": 128,
+        "kv_cache_memory_bytes": 67108864,
+        "enforce_eager": true,
+        "cpu_threads": 2,
+        "resources": {
+          "cpus": 2,
+          "memory_bytes": 3221225472,
+          "memory_swap_bytes": 5368709120,
+          "shm_bytes": 536870912,
+          "pids_limit": 256
+        },
+        "entrypoint": "/usr/bin/env",
+        "argv": [
+          "-u",
+          "VLLM_CPU_KVCACHE_SPACE",
+          "vllm",
+          "serve",
+          "/models",
+          "--revision",
+          "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+          "--served-model-name",
+          "facebook/opt-125m",
+          "--host",
+          "0.0.0.0",
+          "--port",
+          "8000",
+          "--dtype",
+          "float32",
+          "--max-model-len",
+          "128",
+          "--max-num-seqs",
+          "1",
+          "--max-num-batched-tokens",
+          "128",
+          "--kv-cache-memory-bytes",
+          "67108864",
+          "--load-format",
+          "auto",
+          "--enforce-eager",
+          "--chat-template",
+          "/guard-assets/chat/guard-text-chat-v1.jinja",
+          "--chat-template-content-format",
+          "string",
+          "--enable-log-requests",
+          "--max-log-len",
+          "512"
+        ],
+        "environment": {
+          "HF_HUB_OFFLINE": "1",
+          "TRANSFORMERS_OFFLINE": "1",
+          "HF_HOME": "/models",
+          "VLLM_CONFIGURE_LOGGING": "1",
+          "VLLM_LOGGING_LEVEL": "INFO",
+          "VLLM_LOGGING_COLOR": "0",
+          "VLLM_LOGGING_PREFIX": "",
+          "VLLM_LOGGING_STREAM": "ext://sys.stdout",
+          "VLLM_CPU_OMP_THREADS_BIND": "nobind",
+          "OMP_NUM_THREADS": "2",
+          "VLLM_NO_USAGE_STATS": "1",
+          "DO_NOT_TRACK": "1",
+          "HOME": "/tmp",
+          "VLLM_CACHE_ROOT": "/guard-cache/vllm",
+          "TORCHINDUCTOR_CACHE_DIR": "/guard-cache/torchinductor",
+          "TRITON_CACHE_DIR": "/guard-cache/triton",
+          "TMPDIR": "/guard-cache"
+        },
+        "engine_permissions": {
+          "cap_drop": [
+            "ALL"
+          ],
+          "read_only": true,
+          "tmpfs": [
+            "/tmp:rw,noexec,nosuid,size=2g,mode=1777",
+            "/guard-cache:rw,exec,nosuid,size=2g,mode=1777"
+          ],
+          "user": "1000:1000",
+          "security_opt": [
+            "no-new-privileges:true"
+          ]
+        },
+        "chat_template": {
+          "profile": "guard-text-chat-v1",
+          "version": "1",
+          "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+          "container_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+          "content_format": "string",
+          "request_overrides": false
+        },
+        "log_profile": {
+          "profile": "request-info-v1",
+          "version": "1",
+          "level": "INFO",
+          "color": false,
+          "max_log_len": 512,
+          "external_request_id_trust": "untrusted_correlation",
+          "logger_sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+          "formatter_sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+          "environment": {
+            "VLLM_CONFIGURE_LOGGING": "1",
+            "VLLM_LOGGING_LEVEL": "INFO",
+            "VLLM_LOGGING_COLOR": "0",
+            "VLLM_LOGGING_PREFIX": "",
+            "VLLM_LOGGING_STREAM": "ext://sys.stdout"
+          },
+          "custom_config_allowed": false,
+          "sources": [
+            {
+              "path": "vllm/logger.py",
+              "sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+              "lines": "27-33,64-103"
+            },
+            {
+              "path": "vllm/logging_utils/formatter.py",
+              "sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+              "lines": "60-73"
+            },
+            {
+              "path": "vllm/entrypoints/serve/utils/request_logger.py",
+              "sha256": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d",
+              "lines": "36-66"
+            }
+          ]
+        }
+      },
+      "preservation": {
+        "model_unchanged": true,
+        "existing_container_identities_states_unchanged": true,
+        "no_additional_containers": true,
+        "inputs_unchanged": true,
+        "source_unchanged_during_execution": true,
+        "pack_unchanged_during_execution": true
+      },
+      "rejudge_proof": {
+        "restored_exact_objects_initially": true,
+        "all_original_objects_preserved": true,
+        "only_RES_RPT_appended": true,
+        "saved_pack_used": true,
+        "as_of": "2026-10-23T12:13:27Z",
+        "as_of_basis": "PLAN.created_at; policy exceptions explicitly empty",
+        "rejudged_semantic_results_equal": true,
+        "original_store_bytes_unchanged": true,
+        "original_reports_unchanged": true,
+        "new_report_json_and_html": true
+      },
+      "commands": [
+        {
+          "returncode": 0,
+          "seconds": 4.235,
+          "name": "01-prepare"
+        },
+        {
+          "returncode": 0,
+          "seconds": 191.187,
+          "name": "02-validate"
+        },
+        {
+          "returncode": 0,
+          "seconds": 1.844,
+          "name": "03-verify"
+        },
+        {
+          "returncode": 0,
+          "seconds": 2.328,
+          "name": "04-export"
+        },
+        {
+          "returncode": 0,
+          "seconds": 2.734,
+          "name": "05-restore"
+        },
+        {
+          "returncode": 0,
+          "seconds": 1.922,
+          "name": "06-verify-restored"
+        },
+        {
+          "returncode": 0,
+          "seconds": 2.093,
+          "name": "07-rejudge-saved-pack"
+        },
+        {
+          "returncode": 0,
+          "seconds": 2.047,
+          "name": "08-report-saved-pack"
+        },
+        {
+          "returncode": 0,
+          "seconds": 1.953,
+          "name": "09-verify-rejudged"
+        }
+      ],
+      "bundle": {
+        "name": "evidence.zip",
+        "sha256": "79d616fd49c7e997292d1b05ae1168ef8b205209fbccf1117e1694c16978267b",
+        "bytes": 172840
+      }
+    }
+  ],
+  "final_source_files": {
+    "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "adapters/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "adapters/assets/chat/guard-text-chat-v1.jinja": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+    "adapters/base.py": "6b48806c8a132292fb6fba8e7d0b57559a1e72e9c8c1d7fcfacd0c15ef92cbb1",
+    "adapters/fake.py": "993a554e6de757b7f578cfb5c3a8a7b2b4504475756bc0203639d06b9dc65b89",
+    "adapters/model_inventory.py": "1c3abf9d7516acd83efbeff45fabfc9b09fa743a2a74f75be1e1b643b08d6db4",
+    "adapters/vllm.py": "ef2e137e308c094f1a9508f8750660ff64858308d8fac989f6cbbd9d6c089372",
+    "application.py": "c148a09cd505ecb043e602512b9ffa64850f3355ecd37d3f179a02c5eb3a070e",
+    "automation_policy.py": "5c4a3a939806b917633354b61e51633a8a87f0a911764b93c96aa44f63a0b9f4",
+    "cli.py": "9124fde70c2c453f60c7d500aa83618946df10e859cb746202ec9fcd4bc3f4d8",
+    "collectors/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "collectors/file.py": "af7d915c7d5f9a95a898e184d7e7b7aaa5f3f50087638c6149e252323ab0076f",
+    "collectors/manual.py": "73decf953dae6a72c24dfb9d1dff7faff6f8bd2b5da5751bf63951853d731fb1",
+    "collectors/policy_template.py": "331af03de3a14d031bf27c53044292909669eb0a71bb1b6c45feebb73aa1b7af",
+    "collectors/policy_template_metadata.json": "b904e660e2b7a4eccca7a34c8e359854f33a8d9b826eff92119e53118f498787",
+    "core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "core/aggregate.py": "bda9f20b98a534845370dcedaf51e69eaa158a636887ccaa231ff3be7444999d",
+    "core/compare.py": "37da2a47be6d6205e877fcc5420229c3e46d0fde4b49b2f3a65e1ce465ea2a0e",
+    "core/judge.py": "43ed9ddaeb4f9c5b0fc0a46ae1062b7e5c015ad898e2825f47bf8adadcc51f05",
+    "core/preflight.py": "345d7cbc84d3ce511cdaa5c989ed43960c11d170e8239c7fd239d02a881a92d5",
+    "core/report.py": "9d60215f3ad0499bc090851bf682628fe08036f9dbafd90d163e031917b5a18f",
+    "core/run.py": "b1e1487c710dd29d0f7686a28026eeeb8e402062096511c14ebee8c74eea5f2a",
+    "core/select.py": "1800477749d8a3a5e556039adf6357a2e6c0a91e8b9f9c9292cb0fbf6230efb6",
+    "executors/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "executors/base.py": "0ac2fb9311680e5521e3d6ef5cced0c0361ab874317cab137c093bf53ee93e2f",
+    "executors/container_config.py": "303aaec854740d1b5e96474ab1884f72fa05d60afa03a73fc781fc3c509130f0",
+    "executors/content_common.py": "67185e59bf65cd08674bb6ffc2e25f1b455b68ac4b6698de7b8e92b9c06b505f",
+    "executors/credential_exposure.py": "ce9c83a309dde0d068f5ff7c2152c7e4e02f9bb107a7cb82b7129b31b7663dd3",
+    "executors/direct_route.py": "43c21b5a91ea629418024256b87b587d295d745a04ec08d4d36c61f3649a60bb",
+    "executors/engine_identity.py": "dee76079155c8b2c01ca7ee22455514ec6acb2f71e9d378c0c7fab655986a5af",
+    "executors/fake.py": "989281ac6f705758edcea4e7b28a2f6cc0fab385eaa9b822998f5b339b8fa718",
+    "executors/http_common.py": "d2fcc8c8da947c020cec7844fb62826e80bd2466b5289cbc17f82bbf5935fd47",
+    "executors/http_probe.py": "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d",
+    "executors/input_validation.py": "800a375dcac4e365d92e0f9e6b4b9588fd199798dc82800cc389b48808919f4a",
+    "executors/log_analysis.py": "39e3dfcb6c5cd22fd9a9be917e9699e57c32862d3a769a4dc755538cc9374b59",
+    "executors/log_integrity.py": "b135ac29ecb7d0a523a085f42937b0acd29a2bcb49defc87382a32f6058e2e41",
+    "executors/log_integrity_parser.py": "0f7ffefeb9e70e20355926cb91a2da592c4fde5c048755dc5bca1380c1e7b838",
+    "executors/registry.py": "1e4043d2c7de790111cff9c97b1f897e21e729d64a5736085184b30128d15f50",
+    "executors/request_binding.py": "89f8f08367626c881eff81899bab87fd5faea5a4185d49e8dade9955919c6dfe",
+    "executors/response_content.py": "7099c3b74ff0e437f1a77b40e0ea42e6dd0e56949de750b6b448a701640fbedd",
+    "executors/role_route.py": "7249fa958fa8421b9a95d6ce526123ca80f92fbe2c3d1154ba60ffee9c106cd3",
+    "executors/sampling_validation.py": "e905da16eed9b59ed447f3755cc87d0773681cf01157041a57e9a952c6d7e7d7",
+    "executors/stream_probe.py": "76237c70da09e1157f16c3f1c614b578f78bc742149d34a9d972db497d00f8f7",
+    "executors/template_validation.py": "f42add466db19b308a439b4aee0e8172d16f532f9185f80261d68f1a2d2c91ab",
+    "input_policy.py": "130c5d8d3693043eb9b82b33d7dff678de544af22ea3658d0c56b20c80a09db2",
+    "judges/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "judges/audit_collection.py": "73c80b68e355e4714c974e8dc5489c951a968fd638ca8f099c59f7ca91c28b78",
+    "judges/base.py": "8f66f5643ef4e77659726b9ac3dea661374a46ffde3380e8d38c5daa0dadcd1c",
+    "judges/declared.py": "8b4fd1245cb728e46a8f48b62609b07ffbea7f20e03a6821b2051ae9d7400a29",
+    "judges/manual_cache_context.py": "2eaaf1cbd783cfe535fadc92242332d5b7de44a650474d4f47b7a87bfacc385e",
+    "judges/policy_items.py": "e6a9d347d5dd44223c4930735d6229ed6e3e1b0dd8969b555b53d849dff79f06",
+    "judges/registry.py": "ecbbc80e68dfe1b313bd813c1de64f38150d335f2a7c710853d9a17d8048ef9c",
+    "judges/rule_table.py": "975ac1bae78ba5180a2bc4cc288cc17b55770357b465b4df246a45cb1401e680",
+    "manual_audit.py": "bd48943c57e6ba6bf033e8eb31f34c08dd461203cf35b5ec68c5070b3b3110fc",
+    "manual_policy.py": "8368694f955b8a1ce3dce69bae4bda97cb44257a4808913f2e8a8e9082c8862b",
+    "models/__init__.py": "3d59e80f52269fa817d208d252cdf94b4f614d573b1d8355e14f1e0fb08e300f",
+    "models/base.py": "4d7bfc03dc3754c8b97d16f577bd6f9d1d3bebbf19c30bb54bd7ea20cf9bc7db",
+    "models/checkdef.py": "68da2fc053b1e20656c5156f58c318a308db282c41753575f383609e9d6ddb60",
+    "models/enums.py": "c3e53dd3e528071d3fc1bc9131858b086359c42f4c7fc2f2f6bb5d0614a9fd0d",
+    "models/hashing.py": "e90ef64b52fe242028a4e81b16c18fb4a353e0e7d721b302bd7b764fcc4e193a",
+    "models/objects.py": "055abfc50cd3c6c7fdf0bff33236c42edaab2e8bf366bd785d957485fc7bae8b",
+    "models/ulid.py": "8233f5248a5a32855fe7f4b6914259cf3a6974190f31becee16aa77c26ee889d",
+    "report/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "report/html.py": "b25db89a323f030bcf706d35157ee254db3eccb8f9c0617347522f62da21bb6e",
+    "report/log_integrity.py": "6daf41c2b596d866f37bf8e66a242df81d2cfd31e2e0d8b1ecc3607e905974c6",
+    "runtime/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runtime/assets/gateway/role_enforced/default.conf.template": "bd36fb50e168c4334c1884daa8d0aa91209e06b3bb77f8ef34f0f876c097225b",
+    "runtime/assets/gateway/role_open/default.conf.template": "0ddfd1cb907708213a4e2e2326f4791f0f00b9029bed9b34da8d116de9282e00",
+    "runtime/assets/gateway/single/default.conf.template": "0078a44da3e069b164ac92ee28ecb95a815546b05d935d14991a2d1429136bbc",
+    "runtime/assets/stub_engine/server.py": "f4776423366cdd626e91ad8389e61abee92314a5c354f1f69a53004e71aee628",
+    "runtime/comparison.py": "6dccfc0984a5bb337addbf30eac3aee73c42ef4b96078184b85cf15cad7497a2",
+    "runtime/docker.py": "7ad82112f03b4f3163f7f0ea7c70910eaba594f112a8fba4447fbaa31bd4b127",
+    "runtime/sandbox.py": "983f15c493d2dd8b71ac565da3d845bbbe5bd106dfc45781962e9a77dbc2301f",
+    "store/__init__.py": "c3c68922dec8668bc18d6c13720bad8f7d0178920a3e483dd833b9fda4accb5a",
+    "store/bundle.py": "8c4202b79719b7c8fc4765bb5bfe1a9bfcaf870eead24818395236ff941a35dc",
+    "store/packs.py": "b8ef806f1218d25e436324ad82ce62cf83ba7371e241d544df0060ad35d73de8",
+    "store/sqlite.py": "af867baa88f50ba63d199617e2067b057b4fb3b8c70b9db81edecb282d9751b1"
+  }
+}

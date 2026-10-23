@@ -19,7 +19,8 @@ from __future__ import annotations
 
 from guard.models import CheckDef, Evidence, Verdict
 from guard.input_policy import policy_context
-from guard.automation_policy import string_list, validate_template_policy
+from guard.automation_policy import (string_list, validate_template_policy,
+                                     validate_request_binding_policy, validate_log_integrity_policy)
 
 from .base import AXES, JudgeOutput
 from .policy_items import evaluate
@@ -28,7 +29,8 @@ from .rule_table import RuleTableJudge
 from . import manual_cache_context
 
 ALLOWED = {"PASS", "FAIL", "UNKNOWN"}
-AUTOMATION_RULE_CEILING_EXECUTORS = {"sampling_validation", "response_content", "log_analysis", "template_validation"}
+AUTOMATION_RULE_CEILING_EXECUTORS = {"sampling_validation", "response_content", "log_analysis", "template_validation",
+                                     "request_binding", "log_integrity"}
 
 
 def _automation_policy_valid(executor: str, values: dict) -> bool:
@@ -38,6 +40,18 @@ def _automation_policy_valid(executor: str, values: dict) -> bool:
     outside this check. A self-reported coverage flag cannot authorize an empty
     or unsupported required policy scope. Do not coerce or shrink a policy.
     """
+    if executor in {"request_binding", "log_integrity"}:
+        try:
+            if executor == "request_binding":
+                validate_request_binding_policy(values)
+                return (values["result_binding"] == "originating_connection"
+                        and values["client_request_id_trust"] == "untrusted_correlation")
+            validate_log_integrity_policy(values)
+            return (values["collector_profile"] == "guard-vllm-native-info-v1"
+                    and values["client_request_id_trust"] == "untrusted_correlation"
+                    and set(values["required_trusted_fields"]) <= {"process", "level", "source"})
+        except (TypeError, ValueError, KeyError, AttributeError):
+            return False
     if executor == "template_validation":
         try:
             validate_template_policy(values)
@@ -91,7 +105,7 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.11.0"
+    version = "0.12.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         input_context = policy_context(check, policy_values, evidence.observations)

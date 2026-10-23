@@ -42,9 +42,9 @@ def _pol(tmp_path, values):
 def test_new_declarations_do_not_create_automatic_executors():
     pack = baseline_pack()
     assert len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 19
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 41
-    assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07"}
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 21
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 46
+    assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09"}
     for cid, key in PARAMS.items():
         check = pack.checks[cid]
         assert [(p.key, p.type, p.required) for p in check.policy_params] == [(key, "list[str]", True)]
@@ -136,7 +136,7 @@ def test_cli_real_attachment_policy_to_manual_judgment(tmp_path, monkeypatch, mo
         # fixture intentionally leaves all new observation cells blank.
         expected = declared if declared == "FAIL" or res.check_id not in PARAMS else "UNKNOWN"
         assert res.verdicts.security == expected
-        assert res.judge.version == "0.11.0"
+        assert res.judge.version == "0.12.0"
         if expected == "UNKNOWN" and res.check_id not in supplied:
             assert any("NO_POLICY_VALUE" in reason and PARAMS[res.check_id] in reason for reason in res.reasons)
         elif expected == "UNKNOWN":
@@ -178,7 +178,7 @@ def test_template_rejects_symlink_parent_into_input_pack(tmp_path):
 def test_packaged_metadata_matches_catalog_and_pack():
     expected = build_metadata(baseline_pack(), ROOT / "docs/policy_catalog.csv")
     actual = json.loads((ROOT / "src/guard/collectors/policy_template_metadata.json").read_text(encoding="utf-8"))
-    assert expected == actual and len(actual["parameters"]) == 41
+    assert expected == actual and len(actual["parameters"]) == 46
     for cid, key in PARAMS.items():
         assert f"values.{cid}.{key}" in actual["parameters"]
 

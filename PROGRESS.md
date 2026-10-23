@@ -731,3 +731,10 @@ git status
 - 테스트 결과: 기본 전체 1781pass/5skip/18제외(JUnit suite 364.50s), 마지막 adapter 보수 관련 128회귀 통과. 실제 표와 원본 UNKNOWN/FAIL 보존·반출/복원/저장 팩 재판정·wheel71파일/17CLI 검증은 [직접 기록](docs/AUTOMATION_PHASE2.md#검증-기록)·[선별 증거](docs/evidence/automation-phase2-20261023.json)를 따른다. 과거1차14/15 exit1과590파일 보존. 최종SHA Linux CI는 PR에서 별도 확인.
 - 다음 단계: REQ-11의 일반/SSE 소비 귀속·OBS-09의 실제 collector/parser를 독립 계약으로 설계한 뒤 제한 실행기를 확대한다. 기업 정책 확정과 운영 증거 수집은 구분한다. Windows 기본 테스트1분 목표 미달의 I/O도 후속 개선한다.
 - 남은 것: 9연결은77전체 완료 수가 아니다. CPU성능/GPU/서로 다른 두 실제 이미지 비교·임의template·REQ10하위소비·OBS03예외dump·기업승인 전체는 미검증. 비용서버/운영시험/병합은 수행하지 않았다.
+
+## 자동화 3차 — REQ-11 연결 귀속·OBS-09 실제 참조 수집 (2026-10-23)
+- 한 일: [실행 프롬프트](docs/AUTOMATION_PHASE3_PROMPT.md)에 따라 두 실행기·경계 있는 JSON/SSE 수집기·명시적 native INFO 기동·실제 parser/별도 escaped HTML·순수 정책/수동 PASS 상한을 연결했다. PACK19/DRAFT·11자동연결·21정책점검46경로·카탈로그322행614연결·adapter0.4.0/declared0.12.0이다.
+- 테스트: HTML 마지막 보수 전 기본전체 2016pass/5skip/18제외(JUnit455.55s), 마지막 표시바이트 회귀55pass(3.42s). 첫9실패의 FD/시계/기대목록을 고치고 전체 재실행했다. 최종 SHA 전체 Linux CI는 초안 PR에서 별도 확인한다. Windows1분 목표 미달이며 skip/제외를 통과로 세지 않는다.
+- 실측: Windows/WSL2 pinned CPU·실제 OPT로 REQ-11(JSON4쌍/SSE4쌍,20요청)·OBS-09(7사례)·PLT-01 S/F PASS/PUNKNOWN. 첫 OBS 표시내용/첨부Ref는 맞지만 별도 display digest가 Windows 줄바꿈과 달라 원본 보존 후 고정 UTF8저장+새OBS 단독02로 재검증했다. 기업 principal/SIEM/worker 병렬성·GPU/성능/두 실제 이미지 비교는 미검증, official=false다.
+- 보존/배포: 두 시도 verify·반출·새 복원·저장 팩 재판정·JSONHTML, 기존 객체/보고서/store/모델/컨테이너 불변·관리자원정리. 최종wheel77파일/17CLI·frozen/-I·readonly준비,팩재생성2회/metadata/로컬출처·보호167추적파일과다른75정의 보존을 확인했다. [직접 기록](docs/AUTOMATION_PHASE3.md#검증-기록)·[선별 증거](docs/evidence/automation-phase3-20261023.json)를 따른다.
+- 다음 단계: REQ-10 runner 실제 소비·OBS-03 예외 dump를 별도 계약으로 확장하고 기업 신원/로그 필수필드는 팀이 정한다. 현재11연결은77전체 완료가 아니다. 임의template/processor·취소/child/retry·외부 collector는 별도 묶음이다.

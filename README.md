@@ -24,3 +24,7 @@ REQ-09의 endpoint·형식 정책은 단일 engine POST/token_ids 프로파일�
 ### M11 수동 PASS 일관성과 다음 캐시 계약
 
 REQ-09의 수동 보안/기능 PASS는 같은 관측의 판정표와 일치할 때만 유지한다. 상충·평가 불가는 UNKNOWN으로 기록하며 기존 신고FAIL/UNKNOWN·과거증거를 보존한다. [M11 구현·캐시 설계·M12 프롬프트](docs/POLICY_M11.md)를 참고한다. 캐시 정책은 이번에 등록하지 않았다.
+
+### M12 REQ-16 필수 캐시 문맥 수동 계약
+
+required_cache_contexts와 문맥별3case의 수동 증거 검증·판정·JSON/HTML 연결을 추가했다. 제한된 DECLARED 계약이며 실제 캐시/신원 보호 자동화는 아니다. 팩16/DRAFT·자동실행5를 유지하고 [M12 입력 절차와 검증 결과](docs/POLICY_M12.md)를 제공한다.

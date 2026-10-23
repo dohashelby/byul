@@ -675,3 +675,13 @@ guard evidence import manual.yaml                                              #
 - 판정 코어를 재호출하지 않고 순수 판정표를 직접 조합한다. default_judge=declared의 재귀를 피하고 의존 예외로 신고 FAIL을 지우지 않는다. 원문 관측/예외를 노출하지 않는 POLICY_CONTEXT 사유를 기존 JSON/HTML에 전달한다.
 - declared0.8.0이다. 수동 성능·명시 CPU·INV11·첨부/답변/정상/챌린지·M10 범위·과거 정의/부분선언·다른점검을 보존한다. 실행기/코어/모델/Store/양식/Ref/side/config hash 입력은 변경하지 않는다. M10 상충 증거는 그대로 두고 새 RES에서 PASS→UNKNOWN을 기록하며 동일 as_of는 멱등이다.
 - 팩15/REQ09정의5·77점검·14정책점검26경로·a23/b4/c161/d115·자동연결5 유지. 캐시 설계와 M12 프롬프트는 [M11 문서](docs/POLICY_M11.md)의 미구현 제안이며 현재 제품 계약이 아니다.
+
+## M12 REQ-16 필수 캐시 문맥 수동 계약
+
+사용자 실행 지시로 M11 §4의 제한 계약을 채택한다. required list[str] `values.REQ-16.required_cache_contexts`와 dict 관측 `declared_cache_context_evidence`를 등록한다. 비어 있지 않은 고유 model_generation/adapter_content/media_identity 부분집합만 지원하며 전체 기업 목록을 줄이거나 자동 정규화하지 않는다.
+
+`guard-cache-context-evidence/1` / `same_authenticated_group_private`는 수동 /3 generic 값이다. 필수 문맥별 same_context/changed_context/post_control·동일 trial/target/workload·고유 event·전후 쌍·첨부 hash/locator/basis를 순수 검증한다. 사건 순서·신원·실제 소비 객체·hit 귀속·첨부 진위는 사람이 신고하며 자동 인증하지 않는다. 구조·전제 누락/상충은 PASS를 보류하며 미완결 generic 값의 전역 import 계약은 바꾸지 않는다.
+
+declared0.9.0의 REQ16 상한은 신고 PASS만 제한한다. 보안은 문맥·객체·key·cache effect 계약, 기능은 그 계약과 모든 행 추론 성공을 요구한다. 추론 실패만으로 별도 신고된 격리 사실을 자동 부정하지 않는다. old_context_reused는 보안/기능 PASS를 UNKNOWN으로 보류하고 새 자동 FAIL은 만들지 않는다. 신고 FAIL/UNKNOWN을 보존한다. 새 계약 성능 PASS는 UNKNOWN이며 명시 CPU의 기존 성능 UNKNOWN 규칙이 우선한다. INV11·첨부·답변·기존 REQ09/SUP/LIF/OBS를 유지한다.
+
+모든 새 표식이 없는 과거 정의는 legacy, 부분/잘못된 선언은 보류다. collector/양식·core/models/store/adapter/HTTP/실행기·config hash 입력은 변경하지 않는다. 관측 변경은 EVD content hash, 판정 버전 변경은 새 RES에 남기며 원본을 바꾸지 않는다. REQ16정의2·팩16/DRAFT·77점검·15정책점검27경로·a24/b3/c161/d115·303결정595연결·자동실행5다. PUBLIC-PREFIX와 REQ15/17·실제 캐시 자동 실행은 미구현이다. 상세 계약/명령/검증은 [M12](docs/POLICY_M12.md).

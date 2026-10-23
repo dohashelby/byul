@@ -698,3 +698,10 @@ git status
 - 팩15/DRAFT/REQ09정의5·77/14정책점검26경로·303결정595연결/a23b4c161d115·자동연결5 유지. PUBLIC-PREFIX/CONTEXT는 설계만 했으며 등록하지 않았다. M12 REQ16 제한 수동 계약과 복사 프롬프트는 docs/POLICY_M11.md에 작성했다.
 - 구현·테스트·문서 묶음 완료 후 Windows/CPython3.11.16/uv0.12.11에서 기본전체993통과/실패0/5skip/18제외(210.14초), 신규49사례 포함. 최초전체에서통과했다. skip은기존루프백3/symlink2, Windows1분목표미달이다. frozen sync/export·wheel·별도설치·저장소밖 실제M10 wheel/팩15→M11 정상/상충EVD/RES 재판정29명령통과: 상충축UNKNOWN·정상/원본/hash·멱등·CLI JSON/HTML 확인. 정합성검증은팩전체/기존증거/코어등보존·metadata일치·설계16반례/3예시행·M12미실행을확인했다. 직접명령/환경/느린구간은 [M11](docs/POLICY_M11.md), 로그는 out/test-runs/policy-m11-20261022에보존한다. 과거M10 결과와합산하지않는다. 최종SHA Linux CI/durations·원격/base/diff는초안PR에기록한다.
 - 업무미결: 전체 문맥·공개분류/신뢰집단·실제객체/consumer·승인/담당·시험대상/예산/중단조건. M12·실제엔진/두이미지/운영/유료자원은 실행하지 않는다.
+
+## 2026-10-22 M12 — REQ-16 필수 캐시 문맥
+
+- M11 06efef4에서 분기, codex/gua-policy-cache-m12, PR base=M11. required_cache_contexts와 /3 generic 관측에 문맥별3case 수동 계약을 구현했다. declared0.9.0 + 전용 순수 helper, core/models/store/collector/실행기 변경0이다.
+- REQ16정의2·팩16/DRAFT·77점검·15정책점검27경로·a24/b3/c161/d115·303결정595연결·자동실행5. CACHE-CONTEXT 공유 후보의 실제 등록 경로는 REQ16뿐이다. 기업 values/scope/승인과 기존 증거·비대상 팩 정의는 보존한다.
+- 구현·테스트·문서 초안 후 직접 검증: 최초1135통과/4실패(Windows fixture CRLF/LF hash 불일치), 관련 수정188통과/1skip, 최종1139통과/실패0/5skip/18제외(299.01초, 신규146사례). 기존skip은 루프백3/symlink2이며 제외/skip을 늘리지 않았다. frozen sync/export·wheel·별도설치와 저장소 밖 실제CLI 최종38명령, M11 wheel/팩15→M12의 legacy REQ16·SUP/LIF/OBS·REQ09 재판정·원본/hash/멱등·JSON/HTML을 확인했다. 보조검사의 비선정 행 가정도 수정했고 제품 판정은 완화하지 않았다. Windows1분 목표는 미달이다. 직접 결과/명령은 [M12](docs/POLICY_M12.md), 최종 SHA Linux CI는 초안 PR에 기록하며 과거M11 결과와 합산하지 않는다.
+- 남은 일: 기업 실제값/신원/객체/첨부 근거 결정, REQ15/17·실캐시 자동 시험 후속 설계. 실제 엔진/운영/유료 자원과 M13은 진행하지 않는다.

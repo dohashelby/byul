@@ -188,3 +188,9 @@ declared0.6.0, manual-entry0.4.0·수동/3 및 /1·/2 읽기는 유지한다. �
 ## M11 REQ-09 수동 PASS와 관측의 일관성
 
 새 M10 계약의 REQ-09는 수동 신고 PASS라도 고정된 판정표가 같은 보안/기능 축에서 PASS 후보를 인정해야 유지한다. accepted_challenges에 수락된 경계가 있거나 정상 결과 fail 등 상충이 있으면 해당 신고 PASS를 UNKNOWN으로 보류한다. 관측/규칙 부족·평가 오류도 보류하며 신고 FAIL/UNKNOWN과 성능 처리는 보존한다. /3·/1/2 읽기·자동대체 이유·Ref/side·기존 hash 입력은 그대로다. [M11 계약/검증과 캐시 설계](POLICY_M11.md)를 참고한다. 캐시 정책은 아직 양식에 등록하지 않는다.
+
+## M12 REQ-16 정책과 수동 관측
+
+생성 양식의 REQ-16:{}에 기업 전체 required_cache_contexts를 입력한다. model_generation/adapter_content/media_identity의 비어 있지 않은 고유 부분집합만 첫 수동 프로파일을 지원하며 기본값은 없다. []/공백/중복/미지원은 PASS 근거가 아니다. PUBLIC-PREFIX·REQ15/17은 등록하지 않았다.
+
+수동 /3 generic required_observations의 declared_cache_context_evidence 값에 guard-cache-context-evidence/1 구조를 넣고 collected=true로 신고한다. 각 문맥의3case와 실제 entry 첨부 SHA-256/locator/basis를 직접 작성한다. 기존 첨부 경로를 사용하며 새 payload나 /4는 없다. [M12 입력 절차·축별 판정·검증](POLICY_M12.md)을 따른다. 첨부 내용·신원 인증이나 실제 엔진 검증을 뜻하지 않는다.

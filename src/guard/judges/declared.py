@@ -9,6 +9,7 @@
 - OBS-11의 프로파일·독립 근거·시간/조회 창·경보/종속 처리에 대한 제한적 충족 조건
 - OBS-04/05·OBS-07/08에 선언된 bool 정책의 해당 검토 분기(실제 활성 상태 증명 아님)
 - M10 REQ-09 계약의 보안·기능 관측이 고정된 rule_table에서도 PASS 후보일 것
+- M12 REQ-16의 필수 캐시 문맥별 수동 3case 계약이 해당 축에서 완결될 것
 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집, INV-11)은 판정 코어가 따로 적용한다.
 신고된 FAIL은 그대로 둔다(INV-04). 항목별 관측은 DECLARED이며 실측·신원 인증이 아니다.
 """
@@ -22,6 +23,7 @@ from .base import AXES, JudgeOutput
 from .policy_items import evaluate
 from .audit_collection import evaluate as evaluate_audit
 from .rule_table import RuleTableJudge
+from . import manual_cache_context
 
 ALLOWED = {"PASS", "FAIL", "UNKNOWN"}
 
@@ -48,7 +50,7 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.8.0"
+    version = "0.9.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         input_context = policy_context(check, policy_values, evidence.observations)
@@ -92,6 +94,15 @@ class DeclaredJudge:
             item_result = evaluate_audit(check, evidence, policy_values)
         if item_result:
             reasons.extend(item_result[1])
+        cache_result = None
+        if manual_cache_context.contract_state(check) != "legacy":
+            try:
+                cache_result = manual_cache_context.evaluate(check, evidence, policy_values)
+            except Exception:  # INV-04: dependency errors cannot erase a person's FAIL.
+                cache_result = JudgeOutput(verdicts={}, missing_observations=[manual_cache_context.OBSERVATION],
+                    reasons=["POLICY_CONTEXT: CACHE_CONTEXT_EVALUATION_ERROR; DECLARED PASS withheld"])
+            if cache_result is not None:
+                reasons.extend(cache_result.reasons)
         for axis in AXES:
             v = obs.value.get(axis) or "UNKNOWN"
             if not isinstance(v, str) or v not in ALLOWED:
@@ -128,9 +139,13 @@ class DeclaredJudge:
                     v = "FAIL"
                 elif v == "PASS" and ceiling != "PASS":
                     v = "UNKNOWN"
+            if v == "PASS" and cache_result is not None and cache_result.verdicts.get(axis) != Verdict.PASS:
+                reasons.append(f"POLICY_CONTEXT: CACHE_CONTEXT_PASS_WITHHELD; axis={axis}")
+                v = "UNKNOWN"
             verdicts[axis] = Verdict(v)
             reasons.append(f"{axis}: declared {obs.value.get(axis) or 'UNKNOWN'} → {v}")
         return JudgeOutput(verdicts=verdicts, reasons=reasons,
                            missing_observations=sorted(set(item_result[2] if item_result else [])
                                | set(input_context.missing if input_context is not None else ())
-                               | set(input_rules.missing_observations if input_rules is not None else ())))
+                               | set(input_rules.missing_observations if input_rules is not None else ())
+                               | set(cache_result.missing_observations if cache_result is not None else ())))

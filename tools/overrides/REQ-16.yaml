@@ -1,0 +1,8 @@
+policy_params:
+- {key: required_cache_contexts, type: 'list[str]', required: true}
+required_observations:
+- {key: declared_cache_context_evidence, type: dict}
+limitations:
+- 'required_cache_contexts={required_cache_contexts}는 기업이 정하는 전체 필수 문맥 목록이다. same_authenticated_group_private에서 model_generation·adapter_content·media_identity의 비어 있지 않은 고유 부분집합만 지원하며 미지원 항목을 잘라 맞추지 않는다.'
+- '문맥별 same_context/changed_context/post_control의 객체·key·hit·추론·첨부 연결을 DECLARED로 검토한다. 사건 순서·신뢰 신원·consumer·객체 변경·첨부 내용의 진위와 승인은 자동 인증하지 않는다.'
+- 'REQ-15 공개/교차 집단 보호와 REQ-17 통계·정보 유출은 미검증이다. 수동 신고 PASS의 상한만 적용하고 성능 PASS는 기준 부재로 UNKNOWN이다. 실제 캐시 실행기는 없다.'

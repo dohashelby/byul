@@ -208,6 +208,14 @@ class Docker:
     def pull(self, image: str, *, timeout: float) -> None:
         self._docker(["pull", "--quiet", image], timeout=timeout)
 
+    def daemon_info(self, *, timeout: float) -> dict:
+        raw = json.loads(self._docker(["info", "--format", "{{json .}}"], timeout=timeout).stdout)
+        return {"os": raw.get("OSType"), "architecture": raw.get("Architecture")}
+
+    def image_info(self, image: str, *, timeout: float) -> dict:
+        raw = json.loads(self._docker(["image", "inspect", "--format", "{{json .}}", image], timeout=timeout).stdout)
+        return {"os": raw.get("Os"), "architecture": raw.get("Architecture"), "digests": raw.get("RepoDigests") or []}
+
     # --- 정리 --------------------------------------------------------------------
 
     def cleanup(self, *, timeout: float) -> list[str]:
@@ -235,5 +243,11 @@ class Docker:
     def __enter__(self) -> "Docker":
         return self
 
-    def __exit__(self, *exc) -> None:
-        self.cleanup(timeout=60)
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        problems = self.cleanup(timeout=60)
+        if problems:
+            message = f"cleanup incomplete for {self.label}; inspect labelled containers/networks"
+            if exc is not None:
+                exc.add_note(message)
+            else:
+                raise DockerError(message)

@@ -83,6 +83,7 @@ OPS = {
     "nonempty": _safe(lambda a, e, o: isinstance(a, (list, dict, tuple, set, str)) and len(a) > 0),
     "all_in": _safe(lambda a, e, o: a is not None and all(_member(x, e) for x in _elements(a))),
     "any_in": _safe(lambda a, e, o: a is not None and any(_member(x, e) for x in _elements(a))),
+    "none_in": _safe(lambda a, e, o: a is not None and not any(_member(x, e) for x in _elements(a))),
     "any_between": _safe(lambda a, e, o: a is not None and any(_between(x, e) for x in _elements(a))),
     "all_between": _safe(lambda a, e, o: a is not None and all(_between(x, e) for x in _elements(a))),
     "superset_of": _safe(lambda a, e, o: a is not None and o is not None and _keys(a) >= _keys(o)),
@@ -116,7 +117,7 @@ def _describe(rule: dict) -> str:
 
 class RuleTableJudge:
     name = "rule_table"
-    version = "0.3.0"
+    version = "0.4.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         tables = {"security": {k: params[k] for k in ("pass_when_all", "fail_when_any") if k in params}}

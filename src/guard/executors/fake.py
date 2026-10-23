@@ -95,6 +95,7 @@ DEFAULT_CAPS = ["AUDIT_WRITE", "CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID", "KIL
 def _plt01(caps=(), mounts=("/models:ro",), root=False, sentinel=None, exec_writable=("/guard-cache",)) -> dict:
     sentinel = {"/models": "denied", "/guard-sentinel": "absent"} if sentinel is None else sentinel
     return {"attempted": True, "observations": {
+        "process_scan_complete": _obs(True),
         "capabilities_effective": _obs(sorted(caps)), "mounts": _obs(sorted(mounts)), "devices": _obs([]),
         "privileged": _obs(False), "host_namespaces": _obs([]), "root_uid_present": _obs(root),
         "sentinel_results": _obs(sentinel),

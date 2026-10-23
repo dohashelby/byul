@@ -88,9 +88,15 @@ def test_mounts_are_read_only():
     d = Docker("t1abc", runner=r)
     d.run_once("img", "probe", network="n", mounts=[Mount(Path("/a/b.py"), "/probe/b.py")], command=["python"], input=b"{}", timeout=5)
     argv = r.calls[0]["argv"]
-    assert argv[argv.index("-v") + 1] == "/a/b.py:/probe/b.py:ro"
+    assert argv[argv.index("-v") + 1] == f"{Path('/a/b.py')}:/probe/b.py:ro"
     assert "--rm" in argv and "-i" in argv
     assert r.calls[0]["input"] == b"{}"
+
+
+def test_context_manager_reports_cleanup_failure():
+    with pytest.raises(DockerError, match="cleanup incomplete"):
+        with Docker("cleanup-test", runner=FakeRunner(fail_on="network ls")):
+            pass
 
 
 def test_failure_raises_docker_error():
@@ -156,7 +162,8 @@ def test_runtime_used_only_by_adapters_and_executors():
     for p in SRC.rglob("*.py"):
         if any(m.startswith("guard.runtime") for m in _imports(p)) and "runtime" not in p.parts:
             users.add(p.relative_to(SRC).parts[0])
-    assert users <= {"adapters", "executors"}
+    # The application composition root owns update lifecycle; CLI/core remain runtime-free.
+    assert users <= {"adapters", "executors", "application.py"}
 
 
 def test_hardening_options_and_exec_inspect():

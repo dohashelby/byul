@@ -32,6 +32,7 @@ class EvidenceDraft(Strict):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     abort_reason: str | None = None
+    cleanup_errors: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _not_measured_unless_completed(self) -> "EvidenceDraft":

@@ -86,17 +86,32 @@ class AdapterInfo(Strict):
     version: str
 
 
+class CpuProfile(Strict):
+    architecture: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    system: str = Field(min_length=1)
+    kernel: str = Field(min_length=1)
+    threads: int = Field(gt=0)
+
+
 class RuntimeInfo(Strict):
     nodes: int = 1
     tp_groups: int = 1
     gpu_count: int | None = None
     gpu_model: str | None = None
     driver: str | None = None
+    cpu: CpuProfile | None = None
     platform: str | None = None  # 실행 환경 설명. 예: "CPU, arm64, Docker Desktop on macOS"
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("platform",))
+        return _drop_none(handler(self), ("platform", "cpu"))
+
+    @model_validator(mode="after")
+    def _cpu_needs_zero_gpus(self):
+        if self.cpu is not None and self.gpu_count != 0:
+            raise ValueError("an explicit CPU profile needs gpu_count=0")
+        return self
 
 
 class FilesReadByEngine(Strict):
@@ -298,12 +313,16 @@ class Execution(Strict):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     abort_reason: str | None = None
-    operator: Operator | None = None  # 사람이 입력한 증거만(수동 증거)
-    override_reason: str | None = None  # 자동 실행기가 있는 점검에 수동 증거를 넣은 사유
+    operator: Operator | None = None
+    override_reason: str | None = None
+    cleanup_errors: list[str] = Field(default_factory=list)
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("operator", "override_reason"))
+        data = _drop_none(handler(self), ("operator", "override_reason"))
+        if not self.cleanup_errors:
+            data.pop("cleanup_errors", None)
+        return data
 
 
 class NormalControl(Strict):
@@ -345,6 +364,17 @@ class Comparability(Strict):
     config_sha256: str | None = None
     gpu: str | None = None
     driver: str | None = None
+    cpu: CpuProfile | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("cpu",))
+
+    @model_validator(mode="after")
+    def _one_backend(self):
+        if self.cpu is not None and (self.gpu is not None or self.driver is not None):
+            raise ValueError("CPU and GPU comparison profiles cannot be mixed")
+        return self
 
 
 class Evidence(GuardObject):
@@ -449,6 +479,8 @@ class CheckRow(Strict):
     baseline: SideResult | None = None
     candidate: SideResult | None = None
     comparison: Comparison | None = None
+    functional_comparison: Comparison | None = None
+    comparison_reasons: list[str] | None = None
     gaps: list[Gap] = Field(default_factory=list)
     exception: ExceptionDisplay | None = None
     functional_scope: FunctionalScope | None = None  # "기능 확인 범위: N / 등록 경로 M (표본)"
@@ -457,13 +489,14 @@ class CheckRow(Strict):
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("functional_scope", "evidence_source", "replaced"))
+        return _drop_none(handler(self), ("functional_scope", "evidence_source", "replaced",
+                                          "functional_comparison", "comparison_reasons"))
 
 
 class EvidenceCount(Strict):
-    manual: int = 0      # 수동 입력(DECLARED, 실행 완료)
-    automated: int = 0   # 자동 실행 완료
-    not_run: int = 0     # 실행 안 함·중단
+    manual: int = 0
+    automated: int = 0
+    not_run: int = 0
 
 
 class AxisSummary(Strict):

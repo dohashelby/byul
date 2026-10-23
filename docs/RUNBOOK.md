@@ -1,0 +1,135 @@
+# 실행·실증 안내
+
+지원: Python 3.11, Linux/macOS, 로컬 Docker. Windows는 기본 논리 테스트 일부만 확인했다.
+실제 엔진 시험에는 사전에 받은 HF 모델 캐시와 호환 아키텍처의 pinned 이미지가 필요하다.
+정책/팩 DRAFT이면 공식 보고서가 아니다.
+
+## 설치와 기본 검증
+
+```sh
+uv sync --frozen
+uv run guard --help
+uv run pytest -q
+uv build --wheel
+```
+
+기본 테스트는 Docker/engine을 제외한다. 새 실행기는 실제 엔진 검증과 구분한다.
+실증의 store와 output은 기존 out/5b 밖의 새로운 경로를 사용한다.
+
+## 기존 audit
+
+```sh
+uv run guard select --pack packs/PACK-BASELINE --env examples/env.yaml --policy examples/policy.yaml
+uv run guard run --plan PLAN-ID
+uv run guard judge --plan PLAN-ID
+uv run guard report --plan PLAN-ID --json report.json --html report.html
+uv run guard verify
+```
+
+기본 guard.toml은 FakeExecutor 시연이다. 실제 엔진 결과로 해석하지 않는다.
+
+## Managed 업데이트
+
+[managed 설정 예시](../examples/update-managed.toml)를 복사하고 환경/정책을 준비한다.
+
+각 ENV에는 engine.name/version/image_digest(repository@sha256:64hex),
+model.id/revision/inventory_sha256, runtime.gpu_count를 명시한다.
+HF 캐시는 `models_dir/hub/models--ORG--MODEL/snapshots/REVISION`을 사용한다.
+model inventory는 snapshot 전체 파일의 정렬 목록 해시다.
+
+```sh
+uv run python tools/model_inventory.py /cache/hub/models--ORG--MODEL/snapshots/REVISION
+uv run guard update --pack packs/PACK-BASELINE --baseline env-a.yaml --candidate env-b.yaml --policy policy.yaml --config update.toml --store .guard-update --output out/updates
+uv run guard verify --store .guard-update
+```
+
+각 side는 다른 컨테이너/target으로 순서대로 기동·실행·정리된다.
+ENV의 버전/이미지 digest와 실제 준비된 엔진이 다르면 ABORTED로 기록한다.
+기동 실패가 있어도 가능한 다른 side와 보고서를 남긴다.
+종료 코드 0은 파이프라인 실행 성공이며 보안 PASS를 뜻하지 않는다.
+기동/실행/필수 자동화 미실행 실패는 종료 코드 1이다. 수동 전용 점검은 보고서에서 UNKNOWN으로 남는다.
+
+CPU ENV 예시(실제 확인한 환경값으로 작성):
+
+```yaml
+runtime:
+  gpu_count: 0
+  cpu:
+    architecture: x86_64
+    model: REPLACE_WITH_ACTUAL_CPU
+    system: Linux
+    kernel: REPLACE_WITH_ACTUAL_KERNEL
+    threads: 2
+```
+
+이 값은 ENV 신고값이며 자체 하드웨어 계측 증거는 아니다. CPU 성능 축은 UNKNOWN이다.
+GPU 사용 시 cpu 프로파일을 넣지 말고 실제 GPU/driver를 제공한다.
+
+## 외부에서 준비한 두 대상
+
+[external 예시](../examples/update-external.toml)처럼 side별 target 경로를 지정한다.
+같은 target 파일을 두 side에서 재사용하지 않는다. 각 실제 환경과 target을 별도로 확인해야 한다.
+각 target은 lab=false, observed_version, engine.image_digest를 포함하고 해당 ENV와 일치해야 한다.
+target의 `comparison_config`에는 엔진 이미지 자체를 제외한 실제 launch/보안 조건을 기록한다.
+이 정보가 없는 과거 target은 보안 시험은 가능하지만 설정 조건 미확인으로 비교 불가다.
+시험 역할 키는 이름으로만 설정하고 값은 환경변수에 둔다.
+
+## 신규 점검
+
+PLT-04의 executor 이름은 credential_exposure다. 정책은 forbidden_env_names/list[str],
+forbidden_mount_paths/list[str]이며 컨테이너 환경변수 이름/마운트 경로만 확인한다.
+처음에는 실제 자격 대신 GUARD_TEST_CREDENTIAL 같은 무해한 표식을 사용한다.
+자격값은 수집하지 않으며 읽기 실패가 있으면 PASS가 되지 않는다.
+
+REQ-09의 executor 이름은 input_validation이다. 정책은 max_input_tokens/int,
+rejection_codes/list[str]이며 예시는 ["400", "422"]다.
+실행 설정에는 vocab_size/int와 vocab_source/str를 pinned 모델 근거와 함께 넣는다.
+max_probe_tokens는 기본 4096이며 예산보다 큰 시험은 요청 전 ABORTED다.
+정상 token-array [0]가 통과한 뒤 범위 밖 ID와 입력 길이를 시험한다.
+다른 입력 형식/모든 경계 조합/실제 모델 범위 전체를 검증한 것으로 해석하지 않는다.
+두 신규 점검은 이번에 실제 엔진 실증하지 않았다. 활성화 전 정책과 설정을 검토한다.
+
+## 실제 두 이미지 통합 테스트
+
+```sh
+export GUARD_UPDATE_CONFIG=/absolute/update.toml
+export GUARD_UPDATE_BASELINE=/absolute/env-a.yaml
+export GUARD_UPDATE_CANDIDATE=/absolute/env-b.yaml
+export GUARD_UPDATE_POLICY=/absolute/policy.yaml
+uv run pytest -m engine tests/invariants/test_inv_09.py -q
+```
+
+조건이 없으면 해당 테스트는 사유와 함께 skip한다. managed/real 설정 및 서로 다른 이미지 digest를 강제한다.
+기본 테스트의 통과 수를 이 실증의 성공으로 대체하지 않는다.
+
+## 증거 보존·복원
+
+update 출력에는 plan.txt와 JSON/HTML이 있고 store에는 ENV/POL/PLAN/EVD/RES/RPT와 팩 보존본/artifacts가 있다.
+전용 store 전체와 실행 설정을 바이트 그대로 보관한다. 키·불필요한 환경변수 파일은 보관하지 않는다.
+복사본에서 verify를 실행하고 plan.txt의 PLAN으로 judge/report를 실행한다.
+현재 packs 폴더가 없어도 정상 팩 보존본이 있으면 재판정할 수 있다.
+과거 팩이 없는 경우 정확한 git revision에서 꺼낸 팩을 pack import로 먼저 넣는다.
+현재 저장소의 과거 exposed/isolated store에는 참조 증거 파일이 각각 1개 누락돼 있다.
+원본을 확보하기 전에는 해당 저장소의 verify/완전한 재판정 성공을 보장하지 않는다.
+기존 evidence를 새 버전으로 재판정하면 새 RES revision이 생기며 과거 결과는 수정하지 않는다.
+정리 실패 같은 실행 생명주기 한계는 최초 update 보고서도 함께 보관한다.
+judge/report 재실행은 시험 자원 정리를 다시 실행하거나 확인하는 명령이 아니다.
+
+## AWS 실증 준비
+
+위 Linux 절차를 재사용한다. 실제 계정/리전/자원 생성·가격 산정은 이번 작업에서 수행하지 않았다.
+이미지 아키텍처·모델 캐시·CPU/GPU 조건·운영자 권한·엔진 격리·실행 시간 상한·자원 보관 기간을 먼저 정한다.
+시험 종료 후 guard.run 라벨의 컨테이너/네트워크, 인스턴스, 볼륨, 로그/증거 보관 자원을 확인한다.
+정리 실패 시 보고서만 보고 자원 정리까지 완료됐다고 판단하지 않는다.
+
+
+## 실증 준비와 증거 묶음 명령
+
+`guard prepare-update`로 입력과 로컬 Docker/이미지를 먼저 확인한다.
+`guard evidence export/restore`로 검증된 저장소를 새 위치로 반출/복원한다.
+명령·제약·5개 점검의 PASS/FAIL/UNKNOWN 사례 입력은 [실증 안내](VALIDATION.md)를 따른다.
+REQ-09의 `max_probe_tokens`는 실제 경계 초과 요청(max_input_tokens+1)을 포함하는 요청당 상한이다.
+probe 정리 실패는 증거를 보존하고 execution.cleanup_errors와 재판정 보고서에 남으며 명령은 실패한다.
+
+
+수동 입력·대체 옵션과 반출/복원을 함께 사용하는 절차는 [통합 안내](INTEGRATION.md)를 따른다.

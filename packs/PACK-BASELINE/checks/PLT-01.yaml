@@ -1,5 +1,5 @@
 id: PLT-01
-revision: 3
+revision: 4
 retired: false
 area: PLT
 purpose: 실행 권한 제한
@@ -38,6 +38,8 @@ challenge_steps:
 - 필요 없는 시험 파일·장치에 읽기/쓰기 요청
 - 정상 추론과 권한 거부 확인
 required_observations:
+- key: process_scan_complete
+  type: bool
 - key: capabilities_effective
   type: list[str]
 - key: mounts
@@ -73,6 +75,9 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
+    - obs: process_scan_complete
+      op: eq
+      value: true
     - obs: capabilities_effective
       op: subset_of
       value_policy: allowed_capabilities

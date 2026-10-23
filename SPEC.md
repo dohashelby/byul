@@ -632,3 +632,10 @@ guard evidence import manual.yaml                                              #
 | D5 | 첫 슬라이스 점검 | `REQ-01` Gateway 우회 직통 (§8) |
 | D6 | 버전 비교에서 기능·성능 축도 같은 표를 쓸지 | 같은 표. 성능은 수치가 정해진 뒤 |
 | D7 | 두 번째 엔진 어댑터 시점 | 우선 점검 10행이 vLLM에서 돈 뒤 |
+
+## M5 수동 정책 문맥·충돌 판정 보완
+
+- declared 0.4.0은 LIF-07 준비 전 수락의 확인된 보안 FAIL을 추론 결과 충돌로 지우지 않는다. 동일 사건의 수락/차단 모순은 위반 확정을 보류한다. 다른 유효 순서 확인 방법은 보안 위반의 반증이 아니지만 충돌 사건의 PASS는 계속 보류한다. 순서 미확인·첨부 미연결은 위반을 확정하지 않는다. 서로 다른 필수 준비 항목의 상태 차이 자체는 모순이 아니다. 원본·신고 FAIL·UNKNOWN 비승격·기능 정상 묶음·성능 미검증 계약을 유지한다.
+- SUP-01/SUP-02에 선언된 required str approval_record_system은 승인 도구·기록 체계의 정책상 식별 문맥이다. 키 누락은 NO_POLICY_VALUE, null/타입 오류는 기존 select 오류다. 대상 선언이 있고 문자열이 공백이면 declared PASS를 UNKNOWN으로 보류한다. 정상 값은 권한/진위 증명이 아니며 기존 PASS 관문을 우회하지 않는다. 두 점검 값은 독립이며 자동 복사하지 않는다.
+- 신규 공백 전제는 해당 선언이 없는 과거 팩에는 소급하지 않는다. /1 읽기, /2 생성·manual-entry 0.3.0·policy-evidence/1을 유지하고 scalar를 항목별 증거에 넣지 않는다. Report.limitations는 기존 POLICY_ITEMS: 외에 POLICY_CONTEXT: 이유도 전달한다. EVD/기존 RES는 보존한다.
+- PACK-BASELINE revision 12/DRAFT, SUP-01/SUP-02 revision 2. 정책 선언은 9점검/15경로, 자동 실행/판정 연결은 5개다. OBS-11은 미등록·미구현이며 [후속 계획](docs/POLICY_M5_PLAN.md)을 먼저 합의한다.

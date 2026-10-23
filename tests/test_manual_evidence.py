@@ -24,7 +24,10 @@ def _setup(tmp_path, include=("SUP-01", "REQ-01")):
     store = Store(tmp_path / ".guard")
     pack = baseline_pack()
     env = environment({"gateway": {"value": True, **D}})
-    pol = policy(pack.ref(), scope={"include": list(include), "exclude": []})
+    pol = policy(pack.ref(), scope={"include": list(include), "exclude": []},
+                 values={"REQ-01": {"allowed_callers": ["allowed"]},
+                         "SUP-01": {"approval_record_system": "EXAMPLE approval registry"},
+                         "SUP-02": {"approval_record_system": "EXAMPLE approval registry"}})
     store.put(env); store.put(pol)
     plan = select(pack, [env], pol); store.put(plan)
     run_plan(store, pack, plan, RunConfig(executors={"direct_route": "fake"}, adapter="fake"))
@@ -197,6 +200,10 @@ def test_cli_template_and_import(tmp_path, monkeypatch):
         src = ROOT / name
         (shutil.copytree if src.is_dir() else shutil.copy)(src, tmp_path / name)
     shutil.copytree(ROOT / "packs", tmp_path / "packs")
+    policy_path = tmp_path / "examples/policy.yaml"
+    fixture = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+    fixture.setdefault("values", {})["SUP-01"] = {"approval_record_system": "EXAMPLE approval registry"}
+    policy_path.write_text(yaml.safe_dump(fixture), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
     out = runner.invoke(app, ["select", "--pack", "packs/PACK-BASELINE", "--env", "examples/env.yaml",

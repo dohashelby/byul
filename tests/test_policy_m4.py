@@ -38,7 +38,7 @@ def setup(tmp_path, pack, given=None, mode="audit"):
     if mode == "update":
         envs.append(environment(id="ENV-CANDIDATE"))
     pol = policy(pack.ref(), values=values() if given is None else given,
-                 scope={"include": ["SUP-14", "LIF-07", "SUP-01"]})
+                 scope={"include": ["SUP-14", "LIF-07", "SUP-03"]})
     st.put_many([*envs, pol])
     put_pack(st, PACK_DIR)
     plan = select(pack, envs, pol, mode=mode)
@@ -126,7 +126,7 @@ def test_v2_uses_pinned_refs_and_never_populates_observation_results(tmp_path, p
         assert len(e["policy_evidence"]["records"])==2*len(CASES[cid])
         assert all(all(v is None for v in r["observations"].values()) and not r["evidence"]
                    for r in e["policy_evidence"]["records"])
-    assert "policy_evidence" not in entry(doc,"SUP-01")
+    assert "policy_evidence" not in entry(doc,"SUP-03")
     # A new revision with the same ID is not the PLAN's policy.
     original=st.resolve(plan.inputs.policy)
     st.put(original.model_copy(update={"revision":2,"values":values(["EXAMPLE-new"])}).seal())
@@ -139,7 +139,7 @@ def test_v2_end_to_end_report_and_rejudge(tmp_path,pack):
     outcomes=judge(st,pack,plan)
     assert outcomes["SUP-14"].verdicts.model_dump()=={"security":"PASS","functional":"UNKNOWN","performance":"UNKNOWN"}
     assert outcomes["LIF-07"].verdicts.model_dump()=={"security":"PASS","functional":"PASS","performance":"UNKNOWN"}
-    assert outcomes["SUP-01"].verdicts.security=="PASS"
+    assert outcomes["SUP-03"].verdicts.security=="PASS"
     for evd in st.iter_kind("EVD"):
         assert evd.data_origin=="DECLARED" and evd.execution.executor.version=="0.3.0"
         if evd.check_id in PARAMETERS:
@@ -154,7 +154,7 @@ def test_v2_end_to_end_report_and_rejudge(tmp_path,pack):
     assert rpt["official"] is False
     assert any("SUP-14/single: POLICY_ITEMS:" in s and "EXAMPLE-one" in s for s in rpt["limitations"])
     assert any("LIF-07/single: POLICY_ITEMS:" in s for s in rpt["limitations"])
-    assert not any("SUP-01/single: POLICY_ITEMS:" in s for s in rpt["limitations"])
+    assert not any("SUP-03/single: POLICY_ITEMS:" in s for s in rpt["limitations"])
     assert "EXAMPLE synthetic event linkage" not in json.dumps(rpt)  # no raw basis leakage
 
 
@@ -189,7 +189,7 @@ def test_invalid_forms_reject_entire_batch_and_preserve_prior_fail(tmp_path,pack
     elif issue=="bad_limitation": r["limitation"]=[]
     elif issue=="bad_records": e["policy_evidence"]["records"]={}
     elif issue=="legacy_smuggling": bad["template"]="guard-manual-evidence/1"
-    elif issue=="non_target_payload": entry(bad,"SUP-01")["policy_evidence"]=deepcopy(e["policy_evidence"])
+    elif issue=="non_target_payload": entry(bad,"SUP-03")["policy_evidence"]=deepcopy(e["policy_evidence"])
     with pytest.raises((ManualEvidenceError,ValueError,IntegrityError)):
         import_evidence(st,pack,write(tmp_path,bad),now=T0)
     assert snapshot(st)==before and set((st.root/"artifacts").iterdir())==blobs
@@ -326,7 +326,7 @@ def test_v1_import_and_old_definition_compatibility(tmp_path,pack):
     import_evidence(st,pack,write(tmp_path,doc),now=T0)
     out=judge(st,pack,plan)
     assert out["SUP-14"].verdicts.security=="UNKNOWN" and out["LIF-07"].verdicts.security=="UNKNOWN"
-    assert out["SUP-01"].verdicts.security=="PASS"
+    assert out["SUP-03"].verdicts.security=="PASS"
     old=pack.checks["SUP-14"].model_copy(update={"policy_params":[]})
     evd,vals=unit(pack.checks["SUP-14"])
     del evd.observations[OBSERVATION]

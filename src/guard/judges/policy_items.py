@@ -54,9 +54,15 @@ def evaluate(check, evidence, values):
         o = row["observations"]
         if o.get("trial_id") and o.get("target_scope"):
             events[(o["trial_id"], o["target_scope"], row["case"])].append(row)
-    conflicts = set()
+    conflicts, admission_conflicts = set(), set()
     event_fields = ("gate_outcome",) if check.id == "SUP-14" else ("request_outcome", "inference_outcome", "order_basis")
     for group in events.values():
+        # Only contradictory admission facts can invalidate an independently
+        # linked early-admission failure. Inference results and the method used
+        # to establish order are not premises of that security failure.
+        if check.id == "LIF-07" and len({r["observations"].get("request_outcome") for r in group
+                                         if r["observations"].get("request_outcome") not in (None, "unknown")}) > 1:
+            admission_conflicts.update((r["item_id"], r["case"]) for r in group)
         if any(len({r["observations"].get(f) for r in group if r["observations"].get(f) not in (None, "unknown")}) > 1
                for f in event_fields):
             conflicts.update((r["item_id"], r["case"]) for r in group)
@@ -80,17 +86,17 @@ def evaluate(check, evidence, values):
                 all(isinstance(o.get(f), str) and o[f].strip() and o[f] != "unknown" for f in FIELDS[check.id])
                 and linked
             )
-            if (item, case) in conflicts:
-                note("EVENT_CONFLICT", row, gap=True)
-                complete = False
-                continue
-            if (check.id == "LIF-07" and linked
+            if (check.id == "LIF-07" and linked and (item, case) not in admission_conflicts
                     and all((o.get(f) or "").strip() for f in ("trial_id", "target_scope", "order_detail"))
                     and o.get("order_basis") in ("same_clock", "independent_order")
                     and (o.get("order_detail") or "").strip()
                     and o.get("item_state") == "not_ready" and o.get("request_outcome") == "accepted"):
                 failures.add("security")
                 note("LIF_ADMITTED_BEFORE_READY", row)
+            if (item, case) in conflicts:
+                note("EVENT_CONFLICT", row, gap=True)
+                complete = False
+                continue
             if not supported:
                 note("RECORD_INCOMPLETE", row, gap=True)
                 complete = False

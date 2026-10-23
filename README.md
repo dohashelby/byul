@@ -8,9 +8,9 @@ reference 폴더랑 CLAUDE.md랑 *_PROMPT.md로 개발 시작했습니다. 업�
 - [기업 정책 양식·필수 정책 입력 전제(M1/M2)](docs/POLICY_TEMPLATE.md)
 - [Managed 업데이트 설정](examples/update-managed.toml), [외부 대상 설정](examples/update-external.toml)
 
-현행 [자동화 2차](docs/AUTOMATION_PHASE2.md)는 REQ-07의 고정 템플릿 적용 후 입력 점검을 더해 자동 실행기 연결 9개, 정책 19점검·41경로, PACK-BASELINE 18/DRAFT로 구성합니다. REQ-07 정의는 revision 2, 어댑터는 0.3.0, 수동 판정기는 declared/0.11.0입니다. 카탈로그는 317행·609연결이며 원문 정책 결정 전체의 자동화 완료 수는 아닙니다. [작업 프롬프트·완료 계약](docs/AUTOMATION_PHASE2_PROMPT.md)을 함께 확인합니다.
+현행 [자동화 보강](docs/AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
 
-2차 구현·회귀·실제 CPU 검증을 수행했습니다. 기본 전체 1,781통과·5 skip·18제외, 마지막 어댑터 보수 관련 128회귀 통과입니다. 실제 127 경계와 32 반례의 판정, 기존 UNKNOWN/FAIL 보존, 증거 반출·복원·저장 팩 재판정은 [직접 기록](docs/AUTOMATION_PHASE2.md#검증-기록)과 [선별 증거](docs/evidence/automation-phase2-20261023.json)를 따릅니다. [Windows CPU chat 설정](examples/windows-cpu-chat.toml)과 [시험 정책](examples/automation-chat-policy.yaml)은 EXAMPLE/DRAFT입니다. OPT의 지시 학습·system 비공개성을 보장하지 않으며 성능 UNKNOWN·official=false를 유지합니다.
+[3차 실제 CPU 기록](docs/AUTOMATION_PHASE3.md)과 [선별 증거](docs/evidence/automation-phase3-20261023.json)는 당시 팩19의 이력이다. 새 판정 계약을 과거 결과에 소급하지 않는다. [Windows CPU JSON/SSE·native INFO 설정](examples/windows-cpu-binding-logs.toml)과 [11점검 시험 정책](examples/automation-binding-logs-policy.yaml)은 EXAMPLE/DRAFT다. 기본 guard.toml은 fake 시연 설정이며 실제 모델 snapshot·ENV·정책은 별도 준비한다. prepare-*의 ready와 점검별 지원, 실제 실행 결과는 서로 다른 정보다.
 
 Windows CPU 단일 관리 기동 `guard prepare-validation`·`guard validate`와 8개 실행기의 기존 직접 검증은 [자동화 1차](docs/AUTOMATION_PHASE1.md)의 과거 결과로 보존합니다. 기존 5개와 REQ-10·REQ-13·OBS-03의 당시 지원 범위·미확인 분기도 해당 기록을 따릅니다. 두 실제 이미지의 업데이트 비교는 별도 검증이며 기본 guard.toml은 EXAMPLE 시연 설정입니다.
 

@@ -24,13 +24,17 @@ class ResponseContentExecutor(HttpCheckExecutor):
     requires_route_scope = False
 
     def validate_policy(self, check, values):
-        validate_content_settings(self.cfg)
+        self.validate_configuration(check)
         for key in ("allowed_response_fields", "allowed_error_fields", "forbidden_return_options", "required_targets"):
             string_list(values, key, empty=key == "forbidden_return_options")
         if set(values["forbidden_return_options"]) - OPTIONS.keys():
             raise ValueError("unsupported forbidden return option; cannot silently omit it")
         if set(values["required_targets"]) - {"engine", "gateway"}:
             raise ValueError("required_targets supports engine and gateway only")
+
+    def validate_configuration(self, check):
+        """Check execution settings independently of enterprise policy scope."""
+        validate_content_settings(self.cfg)
         if self.cfg.get("endpoint", "/v1/completions") not in ENDPOINTS:
             raise ValueError("response content supports /v1/completions or /v1/chat/completions only")
 

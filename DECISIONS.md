@@ -341,3 +341,14 @@
 - cpu-bounded + hardened + vLLM 0.31.0 x86 CPU 실행에서 첫 추론 중 Triton launcher 공유 라이브러리가 `/tmp/.triton/cache`의 noexec 때문에 로드되지 않았다. 캐시 이동 뒤에도 CPU driver의 별도 임시 `.so`가 `/tmp`에서 로드되다 실패했다. 두 실패의 Docker OOMKilled는 false였다. `/tmp` 실행 제한·비root·읽기 전용 루트를 유지하고 이 프로파일의 `TRITON_CACHE_DIR=/guard-cache/triton`, `TMPDIR=/guard-cache`를 이미 존재하는 실행 허용 컴파일 tmpfs로 고정한다. 일반 임시 파일도 이 tmpfs에 올 수 있으며 `/tmp` 자체의 실행 제한을 해제한 것은 아니다. 실제 환경 변수와 권한을 비교 설정에도 함께 기록한다. 다른 프로파일에 이 예외를 전파하지 않는다.
 - 제품은 기동 실패 시와 종료 직전에 자신이 소유한 engine/gateway만 진단한다. `managed-diagnostic.json`과 SHA는 별도 실행 진단이며 EVD 첨부나 증거 bundle 자동 포함물이 아니다. 보고서에는 상대 경로와 SHA만 연결한다. 상태 허용 필드, 로그 tail 80줄·명령별 5초·컨테이너별 저장 32KiB, 알려진 키와 표지된 자격 값 정제를 적용한다. 임의 개인 정보 정제나 거대한 단일 로그 줄의 원시 수신 바이트 상한은 보장하지 않는다. 진단 실패가 원래 실행 실패나 확인된 위반을 덮지 않는다.
 - Windows 통합 worktree의 공유 editable 환경이 기본 checkout을 가리킨 사례가 있었다. 검증에는 별도 `UV_PROJECT_ENVIRONMENT`와 frozen 설치를 사용하고 `guard.__file__`로 실제 검증 소스를 확인한다. 환경 경로 문제와 제품 실패를 구분해 기록하며 공유 환경을 덮어쓰지 않는다.
+
+## 2026-10-23 — 자동화 신뢰성 보강 계약
+
+- 사용자 명시 승인: REQ11 판정·managed update sentinel·지원 안내의 구현/회귀/문서/커밋/일반push/초안PR. 기존 작업 지침의 관련 judge 변경 승인 조건은 이 지시로 충족된다. 새 정책/실행기·실제 엔진·새 의존성은 추가하지 않는다.
+- REQ11 rev3: 현재 collector에 독립 생성 출력 귀속 근거가 없어 security pass rules를 비운다. 입력 projection/ID의 독립 FAIL과 기능 축은 보존하고 수동 PASS도 저장 정의의 rule_table 상한을 따른다. 과거 rev2 팩/결과는 소급 변경하지 않는다.
+- sentinel은 새 실행 폴더의 side 전용 빈 경로만 사용한다. 호스트 ready와 정적 지원 상태는 별도로 출력하며 부분 미지원이 다른 점검을 제거하지 않는다. 7객체/core/models/store의 재설계 없이 적용한다.
+- 기업 기준/승인·독립 출력 oracle·새 candidate 선정/두 이미지 실제 실증은 후속이며 이번에는 실행하지 않는다. 누적 PR의 main 반영은 원격에서 완료됐음을 별도로 재확인했다.
+
+- 2026-10-24 원격 재확인: PR2~18은 모두 main 병합 완료(최종24f7d90). 코드 동일·.DS_Store만 다른 최신 main으로 fast-forward해 기존 로컬 수정을 보존했다. 이번 초안 PR base는 main이며 GitHub PR 병합/닫기/base변경/rebase/force-push는 수행하지 않는다.
+
+- 최종 검토 보완: OBS03의 유효하지만 미지원인 로그 분기/문맥도 정적 안내에 분리한다. 설정/source inventory·local engine과 required source 연결의 기존 실행 거부를 유지하며 새 dump 수집이나 정책값을 추가하지 않는다.

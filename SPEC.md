@@ -1,6 +1,6 @@
 # 서빙엔진 보안 검증 솔루션 — 설계 초안 (SPEC v0.1)
 
-> 2026-10-23 자동화 2차: 고정 CPU text-chat fixture·REQ-07 변환 후 입력 검사·REQ-13 private 분기·시간창 행렬 계약을 추가한다. [실행 계약](docs/AUTOMATION_PHASE2_PROMPT.md)과 [현재 검증](docs/AUTOMATION_PHASE2.md)을 따른다. 일반 Jinja 실행·기업 승인·전체77 자동화·GPU/두 이미지 실측의 범위 확장은 아니다.
+> 2026-10-23 현행 보강: REQ-11 revision 3은 독립 생성 출력 귀속 오라클 부재로 보안 PASS를 보류하고 입력 projection 하위 검증을 분리한다. managed update side별 sentinel과 읽기 전용 점검 지원 안내를 연결한다. [계약·검증·다음 실증 조건](docs/AUTOMATION_HARDENING.md)을 따른다. 새 정책/실행기·실제 엔진 기동·객체7종 변경은 없다. 과거 1~3차 실측은 해당 당시 팩의 기록이다.
 
 > 작성 2026-10-19 · 상태: **초안**. 팀 확인 전. 구현·실측 완료를 뜻하지 않는다.
 >

@@ -1,3 +1,5 @@
+> 역사적 Phase 1 정책 양식 작업 프롬프트다. 아래의 3행 구조화·코드/커밋 금지와 단계별 수치는 당시 범위이며 현행 개발 지시가 아니다. 현재 팩20·정책21점검46경로·자동11의 계약은 [현행 보강](docs/AUTOMATION_HARDENING.md), 최근 진행은 [PROGRESS](PROGRESS.md)를 읽는다. 실행할 작업 범위와 커밋/푸시는 현재 사용자 지시를 따른다.
+
 이 세션의 목표는 **기업 정책값(POL)을 입력할 수 있는 체계를 정비하는 것**이다. 먼저 `CLAUDE.md`(특히 "진행 방식"), `SPEC.md`(§2.1, §3, §4.2 POL, §4.4), `PROGRESS.md`, `DECISIONS.md`, `examples/policy.yaml`, `lab/policy.yaml`을 읽어라.
 
 ## 용어 구분 (먼저 이해할 것)

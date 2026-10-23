@@ -5,7 +5,7 @@ data_origin: EXAMPLE
 status: DRAFT
 pack:
   id: PACK-BASELINE
-  revision: 19
+  revision: 20
 values:
   REQ-01:
     allowed_callers:

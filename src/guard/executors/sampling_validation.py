@@ -46,12 +46,17 @@ class SamplingValidationExecutor(HttpCheckExecutor):
         codes = _strings(values.get("rejection_codes"), "rejection_codes")
         if set(codes) - {"400", "422"}:
             raise ValueError("rejection_codes must explicitly use 400 and/or 422")
+        self.validate_configuration(check)
+        _integer(self.cfg.get("max_total_requests"), "max_total_requests", 1 + 5 * len(options), 64)
+
+    def validate_configuration(self, check):
+        """Keep local bounds/fixtures valid for a policy outside this profile."""
         for name in ("constraint_source", "constraint_engine_version"):
             value = self.cfg.get(name)
             if type(value) is not str or not value.strip() or value.strip().lower() in {"unknown", "null", "none"}:
                 raise ValueError(f"sampling execution needs explicit {name}; it remains declared context")
         _integer(self.cfg.get("max_output_tokens"), "max_output_tokens", 1, 32)
-        _integer(self.cfg.get("max_total_requests"), "max_total_requests", 1 + 5 * len(options), 64)
+        _integer(self.cfg.get("max_total_requests"), "max_total_requests", 1, 64)
         _integer(self.cfg.get("max_probe_tokens"), "max_probe_tokens", 1, 4096)
         _integer(self.cfg.get("max_duration_seconds"), "max_duration_seconds", 1, 300)
         timeout = self.cfg.get("request_timeout", 3.0)

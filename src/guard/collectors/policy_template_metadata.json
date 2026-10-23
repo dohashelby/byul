@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 19,
-    "sha256": "7753f6dc7dcad28985b97d33153f26f07673cc0b41bf28cb0adb65858f172e5a"
+    "revision": 20,
+    "sha256": "7ec3cb2d1a1f8db8886bbccf605af1d464f95a66f06a74a9d94a7a0ad37180fc"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -296,18 +296,18 @@
     },
     "values.REQ-11.client_request_id_trust": {
       "type": "str",
-      "description": "고정 직접 엔진에서 외부 request ID를 신뢰하지 않는 상관값으로 해석하는 정책. 내부 주체 인증과 구분",
+      "description": "고정 직접 엔진에서 외부 request ID를 신뢰하지 않는 상관값으로 해석하는 정책. 내부 주체 인증과 구분 (입력 projection 하위 관측이며 생성 출력 귀속 미검증·보안 PASS 보류)",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "REQ-11 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
-      "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
+      "consumer": "REQ-11 선언·select 타입 검사 / 제한 프로파일 입력 projection 수집·생성 출력 미검증 / 팩20 rule_table·declared/0.12.0 보안 PASS 상한·JSON/HTML",
+      "verification": "현행 출력 귀속 상한 계약: docs/AUTOMATION_HARDENING.md; 과거 실측은 팩19 기록",
       "catalog_id": "P-AUTO-REQ-11-CLIENT-REQUEST-ID-TRUST"
     },
     "values.REQ-11.result_binding": {
       "type": "str",
-      "description": "고정 직접 엔진 프로파일의 결과 연결 귀속 기준. 기업 신원·공유/독자 권한 전체와 구분",
+      "description": "고정 직접 엔진 프로파일의 결과 연결 귀속 기준. 기업 신원·공유/독자 권한 전체와 구분 (입력 projection 하위 관측이며 생성 출력 귀속 미검증·보안 PASS 보류)",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "REQ-11 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
-      "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
+      "consumer": "REQ-11 선언·select 타입 검사 / 제한 프로파일 입력 projection 수집·생성 출력 미검증 / 팩20 rule_table·declared/0.12.0 보안 PASS 상한·JSON/HTML",
+      "verification": "현행 출력 귀속 상한 계약: docs/AUTOMATION_HARDENING.md; 과거 실측은 팩19 기록",
       "catalog_id": "P-AUTO-REQ-11-RESULT-BINDING"
     },
     "values.REQ-13.allowed_error_fields": {

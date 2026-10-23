@@ -1,12 +1,14 @@
 # 실증 준비와 완료 판정
 
-## 현행 2차 검증 결과
+## 현행 자동화 보강과 지원 범위
 
-[자동화 2차](AUTOMATION_PHASE2.md)·[완료 계약](AUTOMATION_PHASE2_PROMPT.md)을 기준으로 REQ-07 revision 2의 렌더 후 입력 경계·실제 소비 token 대조와 REQ-13 private_system 분기를 검증했다. 현행 등록은 PACK-BASELINE 18/DRAFT·자동 연결 9개·정책 19점검/41경로·카탈로그 317행/609연결·adapter 0.3.0·declared/0.11.0이다. 기본 전체 1,781통과·5 skip·18제외, 마지막 오류 직렬화 보수 후 관련 128회귀 통과. 최종 127 경계 확인과 별도 32 반례, REQ-13 private_system·PLT-01의 실제 관측, 반출·복원·저장 팩 재판정은 [직접 검증 기록](AUTOMATION_PHASE2.md#검증-기록)과 [선별 증거](evidence/automation-phase2-20261023.json)를 따른다. 아래 기록은 과거 단계 이력이다.
+현행 [자동화 보강](AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
 
-[별도 CPU chat 설정](../examples/windows-cpu-chat.toml)과 [EXAMPLE/DRAFT 정책](../examples/automation-chat-policy.yaml)으로 실제 ENV·원본 모델 snapshot·고정 이미지를 준비한다. [RUNBOOK의 새 제품 명령](RUNBOOK.md#현행-자동화-2차-입력과-검증-상태)을 사용해 한 엔진씩 실행하고 JSON/HTML·EVD/RES Ref·반출/새 위치 복원·저장 증거 재판정을 확인한다. 컨테이너 안 고정 template SHA 전후와 `/tokenize`의 IDs/실제 prompt_token_ids가 일치해야 소비 근거가 된다. 단순 개수·200/400만으로 통과시키지 않는다.
+단일 엔진은 prepare-validation → validate, 두 환경은 prepare-update → update를 사용한다. 새 준비 출력의 side별 check_support에서 SUPPORTED/UNSUPPORTED/UNKNOWN·이유·한계를 읽는다. ready는 입력/호스트 준비 상태이며 모든 점검의 지원이나 PASS가 아니다. 유효하지만 미지원인 정책은 지원 안내로 구분하고 다른 점검을 제거하지 않는다. COMPLETED/MEASURED는 전체 챌린지나 생성 출력 귀속의 입증 수가 아니다.
 
-실증은 정상 예산 127과 별도 EXAMPLE 반례 예산 32를 구분하며 REQ-13의 1차 정책값·확인된 FAIL·미확인 분기를 보존한다. CPU 성능 UNKNOWN·official=false이며 임의 템플릿·멀티모달·기업 승인·GPU·두 실제 이미지 업데이트 비교는 이 제한 프로파일의 완료 범위에 포함되지 않는다. 1차의 14/15 기대 일치와 짧은 관측 시간의 실제 PASS는 원본 그대로 보존한다.
+[실제 CPU 3차 기록](AUTOMATION_PHASE3.md)·[선별 증거](evidence/automation-phase3-20261023.json), [명시적 real 설정](../examples/windows-cpu-binding-logs.toml)·[EXAMPLE/DRAFT 정책](../examples/automation-binding-logs-policy.yaml)을 참고한다. 실제 ENV·로컬 snapshot 경로가 필요하며 모델/이미지 수신은 자동으로 하지 않는다. 실행은 새 store/output으로 하나씩 진행하고 기존 컨테이너·모델·증거를 보존한다. 기본 guard.toml은 fake 시연 설정이다. CPU 성능 UNKNOWN·팩/정책 미승인·official=false를 유지한다.
+
+아래는 과거 단계의 명령과 실증 계약이다. 당시 수치·팩 revision·지원 환경 설명을 현행 완료 주장으로 해석하지 않는다. 두 실제 이미지 비교의 다음 수락 기준과 PR 통합 선택지는 [보강 계획](AUTOMATION_HARDENING.md)을 따른다.
 
 ## 기존 검증 계약과 이력
 

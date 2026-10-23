@@ -1,17 +1,14 @@
 # 실행·실증 안내
 
-## 현행 자동화 2차 입력과 검증 상태
+## 현행 자동화 보강과 지원 범위
 
-[자동화 2차](AUTOMATION_PHASE2.md)와 [완료 계약](AUTOMATION_PHASE2_PROMPT.md)은 PACK-BASELINE 18/DRAFT·REQ-07 revision 2·자동 연결 9개·정책 19점검/41경로를 기준으로 한다. 정책 카탈로그는 317행·609연결, adapter는 0.3.0, declared는 0.11.0이다. 기본 전체 1,781통과·5 skip·18제외, 마지막 오류 직렬화 보수 후 관련 128회귀 통과. 최종 127 경계 확인과 별도 32 반례, REQ-13 private_system·PLT-01의 실제 관측, 반출·복원·저장 팩 재판정은 [직접 검증 기록](AUTOMATION_PHASE2.md#검증-기록)과 [선별 증거](evidence/automation-phase2-20261023.json)를 따른다. 아래 과거 단계의 명령·수치와 [1차 Windows CPU 직접 기록](AUTOMATION_PHASE1.md)을 2차 성공 결과로 합산하지 않는다.
+현행 [자동화 보강](AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
 
-기존 CPU 설정의 기본 동작은 유지한다. 새 [Windows CPU chat 설정](../examples/windows-cpu-chat.toml)을 별도 로컬 파일로 복사해 `models_dir`를 실제 snapshot 절대 경로로 바꾸고, 실제 CPU ENV의 이미지 digest·모델 revision/inventory·adapter 버전을 준비한다. [별도 시험 정책](../examples/automation-chat-policy.yaml)은 새 고정 읽기 전용 template 마운트를 PLT-01에 명시한 EXAMPLE/DRAFT이며 REQ-13의 기존 정책값을 보존한다.
+단일 엔진은 prepare-validation → validate, 두 환경은 prepare-update → update를 사용한다. 새 준비 출력의 side별 check_support에서 SUPPORTED/UNSUPPORTED/UNKNOWN·이유·한계를 읽는다. ready는 입력/호스트 준비 상태이며 모든 점검의 지원이나 PASS가 아니다. 유효하지만 미지원인 정책은 지원 안내로 구분하고 다른 점검을 제거하지 않는다. COMPLETED/MEASURED는 전체 챌린지나 생성 출력 귀속의 입증 수가 아니다.
 
-```text
-uv run guard prepare-validation --pack packs/PACK-BASELINE --env env-cpu.yaml --policy examples/automation-chat-policy.yaml --config windows-cpu-chat.local.toml
-uv run guard validate --pack packs/PACK-BASELINE --env env-cpu.yaml --policy examples/automation-chat-policy.yaml --config windows-cpu-chat.local.toml --store out/test-runs/chat-new/store --output out/test-runs/chat-new/run
-```
+[실제 CPU 3차 기록](AUTOMATION_PHASE3.md)·[선별 증거](evidence/automation-phase3-20261023.json), [명시적 real 설정](../examples/windows-cpu-binding-logs.toml)·[EXAMPLE/DRAFT 정책](../examples/automation-binding-logs-policy.yaml)을 참고한다. 실제 ENV·로컬 snapshot 경로가 필요하며 모델/이미지 수신은 자동으로 하지 않는다. 실행은 새 store/output으로 하나씩 진행하고 기존 컨테이너·모델·증거를 보존한다. 기본 guard.toml은 fake 시연 설정이다. CPU 성능 UNKNOWN·팩/정책 미승인·official=false를 유지한다.
 
-실행마다 `chat-new`를 새 경로로 바꾸고 엔진은 하나씩 기동한다. 기존 다른 컨테이너·모델·과거 증거는 보존한다. 준비 검사는 기동/이미지 수신을 하지 않으며 성공 exit0은 보안 PASS를 뜻하지 않는다. 고정 텍스트 메시지 형식의 시험이며 OPT의 지시 학습·system 비공개성 인증은 아니다. Windows CPU 성능은 UNKNOWN이고 예시 보고서는 official=false다.
+아래는 과거 단계의 명령과 실증 계약이다. 당시 수치·팩 revision·지원 환경 설명을 현행 완료 주장으로 해석하지 않는다. 두 실제 이미지 비교의 다음 수락 기준과 PR 통합 선택지는 [보강 계획](AUTOMATION_HARDENING.md)을 따른다.
 
 ## 기존 실행 안내와 이력
 

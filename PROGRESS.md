@@ -667,3 +667,20 @@ git status
 - `uv build --wheel --out-dir out/test-runs/policy-m8-20261021/dist` 성공. 별도 venv에 frozen 의존성과 wheel을 설치하고 저장소 밖 TEMP·Python -I·PYTHONPATH/PYTHONHOME 차단·설치된 declared/source 바이트 일치 확인 후 **24명령 통과**. 실제 보존 M7 wheel/팩13의 /3으로9점검 EVD/RES를 만들고 M8 재판정에서 과거 객체/해시·기존 분기 PASS·OBS/SUP/LIF·멱등·Store.verify를 보존했다. 새 팩14 /3에서는 OBS04/07 PASS·OBS05/08 UNKNOWN·false와 분기/한계의 JSON/HTML·official false·기존 OBS/SUP/LIF를 확인했다. 합성 EXAMPLE/DECLARED 계약이며 실제 usage/replay 실행이 아니다.
 - 정합성 verify.py PASS: 허용26파일(기존20/신규6), 기존354개 중334개 바이트 동일·다른73점검/원문/증거·예시/lab 값 보존. 팩14 해시 **c5e35da1b52e4438b1427e8c76b3ad767b415a35936479c841631df165e8dad0**. 팩13 복사→재생성 동일/멱등·카탈로그303/595/분류·정확Ref 설명24경로·wheel/source·문서598링크/535Pointer·CSV출처·diff check를 확인했다. CSV는 두 소비 행과 기존14행의 이동한 코드 참조만 갱신했다.
 - 커밋 후 최종 SHA의 원격HEAD·초안 PR/base/diff·지원 Linux 전체 CI/frozen sync/wheel 결과는 PR 본문과 종료 보고에 기록한다. 실제 엔진·두 이미지·usage 송신·replay·운영/유료 자원 시험은 하지 않았다.
+
+## 2026-10-22 — 정책 M9 설계 문서
+
+- 기준: M8 c77636cd4ecf5cc7fada8e053c95a10110c453f2, fetch 후0/0·clean, PR10 open/draft·미병합. codex/gua-policy-input-m9-design에서 base를M8로 유지한다. 시작 추적360파일 hash/HEAD/status를 ignored out/test-runs/policy-m9-20261022에 보존했다.
+- 한 일: docs/POLICY_M9_PLAN.md에 M8 검토/검증수준·REQ07~10 원문/구현 대응·두 카탈로그ID/소유권·endpoint/형식/조합·실제호출/증거/hash/비교·T01~22 반례·대안/변경위치·열린업무결정·복사 가능한 M10 프롬프트를 작성했다. M8 문서에는 후속 링크만 추가하고 DECISIONS에는 제안·미결 상태를 기록했다.
+- 기술제안/미구현: REQ09 단일engine token-array 정상표본에 대응하는두목록·두범위관측만 첫프로파일로 권고한다. 복수/부분/미지원은 요청전중단, real/오프라인/수동의 PASS상한·FAIL보존·수동의미hash·rule_table사유의 제한적core/report 전달을 설계했다. 관계표/재사용ID/renderer/sampling·다른3점검 자동화는 후속이며 현재 제품/팩을 바꾸지 않는다.
+- 기존 상태 유지: 팩14/DRAFT·hash c5e35da1b52e4438b1427e8c76b3ad767b415a35936479c841631df165e8dad0·77점검/14정책점검24경로·303결정595연결/a21b6c161d115·자동연결5·declared0.6.0/manual-entry0.4.0/수동3. 두 입력정책은 여전히b·미등록이다.
+- 과거 결과 재확인: M8 최종SHA의 공식API/작업로그에서 PR39586507246·push39586490000 성공,850 passed/18 deselected·33.21/47.19초·frozen sync/wheel 성공을 확인했다. M8의 첫실패는테스트fixture/표시가정수정후관련262/1skip와최종CI로해소됐다. M8설치24명령과앞선A의2026-10-22 재검토98/4.05초는과거기록이며M9실행으로합산하지않는다.
+- 문서 묶음 완료 시점: 네 문서 작성을 마쳤고 이제 링크·코드위치·JSON Pointer·예시·표/프롬프트·전체바이트보존을 검증한다. M9에서는 제품/테스트/팩/CSV/메타데이터/예시·lab 정책·원문/증거 파일을 변경하지 않고 로컬pytest/새wheel·엔진 시험을 반복하지 않는다. 문서검증결과는 아래 추가한다.
+- 다음/막힌 것: M10 기술 프로파일의 채택과 실제 기업 target/허용범위/승인·모델/소비근거·시험조건 결정이 후속이다. 설계문서 작성의 차단 조건으로 묶지 않았으며 운영/엔진/두이미지·usage/replay·유료자원 시험은 하지 않았다. 최종SHA의CI/원격/PR검증은 PR본문과종료보고에기록한다.
+
+### M9 문서 작성 후 검증
+
+- Windows/Python3.11.16에서 `.venv/Scripts/python.exe -X utf8 -B out/test-runs/policy-m9-20261022/verify.py` 실행. 상대링크34·JSON Pointer10·문서anchor1·검토HEAD 고정코드위치18·설계T01~22·EXAMPLE YAML조각1·목록곱집합반례·M10 10단계/버전/예상계수·CSV/팩/설명JSON 정합성·diff check를 확인했다. FakeExecutor 고정링크가 클래스 대신 관측생성행을 가리킨1건을 수정한 뒤 PASS, 오류0건이다.
+- 변경은 기존문서3개에 후속기록 추가·신규설계1개뿐이다. 시작360추적파일중357개바이트동일이며 제품·테스트·SPEC·팩/CSV/메타데이터·examples/lab·원문/기존증거는 변경0이다. 기존3문서의 M8까지 내용도 바이트prefix로 보존했다. 팩14해시·77ID/14정책점검24경로·303결정595연결/a21b6c161d115·자동연결5를 재확인했다.
+- 과거 M8 설치로그24명령 exit0와 앞선 A의98통과XML은 읽어서 대조했으며 다시 시험하지 않았다. 새 로컬 pytest·wheel·실제엔진/두이미지·운영/유료자원 시험은0이다. 문서 검증을 제품 실행 검증으로 표시하지 않는다.
+- 근거는 ignored out/test-runs/policy-m9-20261022의 before.json/source-facts.json/document-verification.json과 과거CI재조회로그다. 커밋후 최종SHA의 자동CI·원격HEAD·초안PR base/diff는 PR본문과종료보고에별도기록한다.

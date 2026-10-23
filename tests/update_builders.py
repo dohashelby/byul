@@ -12,7 +12,7 @@ from guard.core.report import build_report
 from guard.core.select import select
 from guard.executors.fake import SCENARIOS_BY_CHECK
 from guard.models import Evidence, sha256_hex
-from guard.store import Store
+from guard.store import Store, StoredArtifact
 from guard.store.packs import put_pack
 from guard.update_acceptance import CHECKS
 from tests.builders import PACK_DIR, T0, baseline_pack, environment, policy
@@ -51,8 +51,53 @@ def _observations(cid, fail):
     return {key: {"collected": True, "value": value} for key, value in values.items()}
 
 
+class _PureGraph:
+    """Small test data container, not a replacement for Store integration tests.
+
+    Pure acceptance tests need object relationships, not sqlite/pack copies.
+    Disk/bundle/CLI tests keep build_update_case's default real Store path.
+    """
+    def __init__(self):
+        self.objects = {}
+
+    def put(self, obj):
+        assert obj.hash_ok()
+        for ref in obj.refs:
+            if ref.kind != "PACK":
+                self.resolve(ref)
+        key = (obj.id, obj.revision)
+        assert key not in self.objects or self.objects[key] == obj
+        self.objects[key] = deepcopy(obj)
+        return obj.ref()
+
+    def get(self, id_, revision):
+        return deepcopy(self.objects[(id_, revision)])
+
+    def resolve(self, ref):
+        obj = self.get(ref.id, ref.revision)
+        assert obj.hash_ok() and obj.ref() == ref
+        return obj
+
+    def revisions(self, id_):
+        return sorted(rev for name, rev in self.objects if name == id_)
+
+    def iter_kind(self, kind):
+        return iter(deepcopy([obj for obj in self.objects.values() if obj.kind == kind]))
+
+    def find_latest(self, kind, predicate):
+        latest = {}
+        for obj in self.iter_kind(kind):
+            if predicate(obj) and (obj.id not in latest or obj.revision > latest[obj.id].revision):
+                latest[obj.id] = obj
+        return list(latest.values())
+
+    def put_artifact(self, data):
+        digest = sha256_hex(data)
+        return StoredArtifact(f"artifacts/{digest}", digest, len(data))
+
+
 def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, different_config=False,
-                      same_version=False, same_image=False, mutate_evidence=None):
+                      same_version=False, same_image=False, mutate_evidence=None, in_memory=False):
     """Build only synthetic objects with the real pack/rules and product report.
 
     mutate_evidence(cid, side, raw) may modify test input before sealing and
@@ -60,8 +105,9 @@ def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, di
     Returns (sealed_report_dict, all_stored_object_dicts, verified_pack).
     """
     pack = baseline_pack()
-    store = Store(tmp_path / "store")
-    put_pack(store, PACK_DIR)
+    store = _PureGraph() if in_memory else Store(tmp_path / "store")
+    if not in_memory:
+        put_pack(store, PACK_DIR)
     envs = [
         environment(id=f"ENV-SYNTHETIC-{side.upper()}", origin="DECLARED",
                     engine={"name": "vllm", "version": "test-1" if side == "baseline" or same_version else "test-2",
@@ -113,3 +159,8 @@ def build_update_case(tmp_path, *, candidate_fail=False, baseline_fail=False, di
     objects = [obj.to_dict() for kind in ("ENV", "POL", "CHG", "PLAN", "EVD", "RES", "RPT")
                for obj in store.iter_kind(kind)]
     return report.to_dict(), objects, pack
+
+
+def build_pure_update_case(tmp_path=None, **kwargs):
+    """Same real select/judge/report graph without disk, for pure verification."""
+    return build_update_case(tmp_path, in_memory=True, **kwargs)

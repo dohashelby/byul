@@ -1,8 +1,8 @@
 # 기업 정책 카탈로그 — Phase 1 검토 초안
 
-> 현행 [자동화 보강](AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
+> 현행 [REQ-15 M14](POLICY_M14.md)는 PACK-BASELINE 21/DRAFT·REQ-15 revision 2·자동 연결 11개·정책 22점검/49경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.13.0이다. 수동 캐시 증거의 제한 신고 계약이며 새 실제 실행기는 없다. [자동화 보강](AUTOMATION_HARDENING.md)의 REQ-11 입력 projection 하위 검증과 생성 출력 귀속 미검증·전체 보안 PASS 보류를 유지한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
 >
-> 분류 a43/b3/c161/d115는 정책의 현재 소비 상태이며 인프라 가능 등급 A/B/C와 다르다. 아래 단계별 수치는 당시 기록이다.
+> 분류 a46/b2/c161/d113는 정책의 현재 소비 상태이며 인프라 가능 등급 A/B/C와 다르다. GROUP·SALT의 제한 list/정본 참조는 전체 관계표/책임표의 구현 완료가 아니다. 아래 단계별 수치는 당시 기록이다.
 
 > 1차 기록 당시 등록: 자동화 1차 팩17/DRAFT, 정책 18점검·38경로, 자동 실행기 연결 8개(신규3개는 제한 관측 프로파일). CSV의 원문 결정 303행·595연결을 보존하고 제한 프로파일 입력 투영 11행을 추가해 총314행·606연결이다. 이 11개를 기업의 복잡한 원결정 전체가 해결된 것으로 세지 않는다. 아래 Phase/M 단계별 수치는 당시 기록이며 [현재 구현·검증](AUTOMATION_PHASE1.md)을 따른다.
 
@@ -890,3 +890,17 @@ P-DRAFT-CACHE-CONTEXT를 a로 옮기고 values.REQ-16.required_cache_contexts �
 ## 22. M13 현재 상태 — REQ16 unknown 보완
 
 신규 정책 등록은 없다. CACHE-CONTEXT와 입력 두 행의 declared0.9.1 소비 설명·metadata만 갱신한다. 팩16/DRAFT·15점검27경로·303결정595연결·a24/b3/c161/d115·자동실행5는 같다. REQ15의 GROUP/SALT/PUBLIC-PREFIX와 M14 제안은 [M13](POLICY_M13.md)의 설계이며 현재 카탈로그 분류/경로에 반영하지 않는다.
+
+## 23. M14 현재 소비 — REQ-15 제한 수동 계약
+
+기존 PUBLIC-PREFIX/GROUP/SALT를 각각 values.REQ-15.public_prefix_sharing_allowed(bool),
+isolated_cache_groups(list[str]), cache_identity_policy_ref(str)에 연결했다. 기존 세 ID·설명·역할·출처·
+REQ15/16/17 check_ids와 카탈로그322행/614연결은 유지한다. 새 경로는 REQ15에만 있다.
+원래 GROUP의 신원×공유 집단 허용 관계와 SALT 책임표의 형태·미구현 의미는 classification_reason에 보존했다.
+
+팩20→21/DRAFT·REQ15정의1→2·declared0.13.0, 정책22점검49경로·a46/b2/c161/d113·자동연결11이다.
+false·전체 격리 그룹·정본 참조와 한 진입점의 집단별 distinct credential 대표 주체를 요구한다.
+전체 ordered pair/역방향의 여섯 case·실제 key→entry→consumer·첨부 귀속을 DECLARED로 대조한다.
+신고 PASS의 보안/기능 상한과 성능UNKNOWN을 적용하며 rawFAIL/UNKNOWN과 기존 관문을 유지한다.
+실제 캐시 실행·정책/신원/첨부 진위·public true·shared service·안전 거부·REQ17은 미검증이다.
+MULTIUSER 등 다른 원문 결정은 새로 등록하지 않는다. [M14 계약·검증 범위](POLICY_M14.md)를 따른다.

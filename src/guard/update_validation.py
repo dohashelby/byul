@@ -25,6 +25,8 @@ from guard.report.html import render_html
 from guard.update_acceptance import CHECKS, assess_update
 from guard.validation_evidence import (inventory_tree, read_objects,
                                        verify_saved_bundle, verify_store_files)
+from guard.preparation_guidance import (PreparationInputError, annotate, contract_issue,
+                                        input_failure, missing_input, read_inputs)
 
 
 SCHEMA = "guard-update-validation/1"
@@ -378,14 +380,20 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if args.diagnostic:
                 raise ValueError("--diagnostic is available only with --analyze-existing")
-            if not all(getattr(args, name) for name in ("pack", "baseline", "candidate", "policy", "config")):
-                raise ValueError("preparation/execution needs --pack --baseline --candidate --policy --config")
+            missing = [name for name in ("pack", "baseline", "candidate", "policy", "config") if not getattr(args, name)]
+            if missing:
+                raise PreparationInputError(input_failure([missing_input(name) for name in missing])["guidance"])
             inputs = {name: _plain_path(getattr(args, name)) for name in ("pack", "baseline", "candidate", "policy", "config")}
-            pack = load_pack(inputs["pack"])
-            envs = [load_environment(inputs[name]) for name in ("baseline", "candidate")]
-            policy = load_policy(inputs["policy"], pack)
-            cfg = tomllib.loads(inputs["config"].read_text(encoding="utf-8"))
-            declared = validate_inputs(pack, envs, policy, cfg)
+            loaded, issues = read_inputs(inputs, pack_loader=load_pack, environment_loader=load_environment,
+                policy_loader=load_policy, config_loader=lambda path: tomllib.loads(path.read_text(encoding="utf-8")))
+            if issues:
+                raise PreparationInputError(input_failure(issues)["guidance"])
+            pack, policy, cfg = loaded["pack"], loaded["policy"], loaded["config"]
+            envs = [loaded[name] for name in ("baseline", "candidate")]
+            try:
+                declared = validate_inputs(pack, envs, policy, cfg)
+            except Exception as exc:
+                raise PreparationInputError(input_failure([contract_issue(exc)])["guidance"]) from exc
             protected = [inputs["pack"], *(inputs[name].parent for name in ("baseline", "candidate", "policy", "config"))]
             for side in ("baseline", "candidate"):
                 launch = merge_config(cfg, cfg.get("sides", {}).get(side, {})).get("vllm", {})
@@ -396,7 +404,7 @@ def main(argv: list[str] | None = None) -> int:
             pack_files = inventory_tree(inputs["pack"])
             _new_json(output / "inputs.json", {"schema": SCHEMA, "inputs": input_hashes,
                                                "pack": pack.ref().model_dump(mode="json"), "pack_files": pack_files})
-            readiness = update_readiness(pack, envs, policy, cfg)
+            readiness = annotate(update_readiness(pack, envs, policy, cfg))
             ready = _support_ready(readiness)
             if args.execute and ready:
                 summary = execute_run(inputs, output, readiness, declared, timeout=args.command_timeout)
@@ -413,6 +421,7 @@ def main(argv: list[str] | None = None) -> int:
                 summary["accepted"] = False
                 code = 1
             summary["source_inputs_unchanged"] = unchanged
+            summary["guidance"] = summary.get("readiness", readiness).get("guidance", readiness["guidance"])
             _new_json(output / "commands.json", {"schema": SCHEMA, "commands": summary.get("commands", [])})
             _new_json(output / "summary.json", summary)
         print(json.dumps({"status": "ready" if code == 0 and summary["mode"] == "preparation" else
@@ -423,7 +432,10 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         # Do not echo raw config, environment, daemon output or exception text.
         detail = str(exc) if isinstance(exc, ValueError) and type(exc) is ValueError else type(exc).__name__
-        print(json.dumps({"status": "error", "accepted": False, "detail": detail}, ensure_ascii=False), file=sys.stderr)
+        failure = {"status": "error", "accepted": False, "detail": detail}
+        if isinstance(exc, PreparationInputError):
+            failure["guidance"] = exc.guidance
+        print(json.dumps(failure, ensure_ascii=False), file=sys.stderr)
         return 1
 
 

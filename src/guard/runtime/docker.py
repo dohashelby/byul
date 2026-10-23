@@ -28,6 +28,9 @@ class CmdResult:
     returncode: int
     stdout: str
     stderr: str
+    stdout_bytes: bytes | None = None
+    stderr_bytes: bytes | None = None
+    capture: dict | None = None
 
 
 class Runner(Protocol):
@@ -108,6 +111,33 @@ class Docker:
         if check and res.returncode != 0:
             raise DockerError(f"docker {' '.join(args[:2])} failed ({res.returncode}): {res.stderr.strip()[:500]}")
         return res
+
+    def _bounded_read(self, args: list[str], *, timeout: float, max_bytes: int) -> CmdResult:
+        """Log-only capture; injected Runner keeps its historical call contract.
+
+        A custom runner without byte metadata is explicitly an unverified
+        transport. It remains usable for tests, but cannot claim a source cap.
+        """
+        if self._runner is subprocess_runner:
+            from .bounded import capture_pipes
+            result = capture_pipes([self._bin, *args], timeout=timeout, env_extra={},
+                                   max_stdout_bytes=max_bytes, max_stderr_bytes=max_bytes)
+            out, err = result["stdout_bytes"], result["stderr_bytes"]
+            return CmdResult(result["returncode"], out.decode("utf-8", "replace"),
+                             err.decode("utf-8", "replace"), out, err, result["capture"])
+        result = self._docker(args, timeout=timeout, check=False)
+        out, err = result.stdout.encode("utf-8"), result.stderr.encode("utf-8")
+        return CmdResult(result.returncode, out[:max_bytes].decode("utf-8", "replace"),
+                         err[:max_bytes].decode("utf-8", "replace"),
+                         capture={"schema": "guard-pipe-capture/1", "bounded_at_source": False,
+                                  "complete": False, "timed_out": False,
+                                  "truncated": len(out) > max_bytes or len(err) > max_bytes,
+                                  "transport": "injected runner; pipe bound not established"})
+
+    def exec_bounded(self, container: str, argv: list[str], *, timeout: float,
+                     max_bytes: int = 2 * 1024**2) -> CmdResult:
+        """Read-only file capture with an actual local CLI pipe budget."""
+        return self._bounded_read(["exec", container, *argv], timeout=timeout, max_bytes=max_bytes)
 
     @staticmethod
     def _check_secret_env(secret_env: dict[str, str]) -> None:
@@ -220,12 +250,13 @@ class Docker:
         res = self._docker(["logs", container], timeout=timeout, check=False)
         return res.stdout + res.stderr
 
-    def logs_window(self, container: str, *, since: str, until: str, timeout: float) -> CmdResult:
+    def logs_window(self, container: str, *, since: str, until: str, timeout: float,
+                    max_bytes: int = 1_000_000) -> CmdResult:
         """Preserve log-reader failure, both streams, and Docker timestamps."""
         if not since or not until:
             raise ValueError("bounded log collection needs since and until")
-        return self._docker(["logs", "--timestamps", "--since", since, "--until", until, container],
-                            timeout=timeout, check=False)
+        return self._bounded_read(["logs", "--timestamps", "--since", since, "--until", until, container],
+                                  timeout=timeout, max_bytes=max_bytes)
 
     def diagnostic_state(self, suffix: str, *, timeout: float) -> dict:
         """Read only this run's engine/gateway; never expose Config.Env or raw State.Error."""

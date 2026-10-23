@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from copy import deepcopy
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -71,8 +73,18 @@ def dummy_ref(kind: str, id_: str | None = None) -> Ref:
     return Ref(kind=kind, id=id_ or f"{kind}-TEST", revision=1, sha256="0" * 64)
 
 
-def baseline_pack():
+@lru_cache(maxsize=1)
+def _verified_baseline_pack():
+    """Test-only immutable seed; production loaders still verify every read.
+
+    Tests which exercise changed pack bytes call load_pack on their own copied
+    directory. Never return this shared instance to a test that can mutate it.
+    """
     return load_pack(PACK_DIR)
+
+
+def baseline_pack():
+    return deepcopy(_verified_baseline_pack())
 
 
 def environment(facts: dict[str, dict] | None = None, origin: DataOrigin = DataOrigin.EXAMPLE, **kw) -> Environment:

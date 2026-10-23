@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 13
+revision: 14
 engines:
 - vllm
 checks:
@@ -120,15 +120,15 @@ files_sha256:
 - path: checks/OBS-03.yaml
   sha256: 0222ea9d663aa1a83147375cb838f80c77a2d5774a517790c9baf61089f2d8f8
 - path: checks/OBS-04.yaml
-  sha256: 05e8b538352591ac555b7aa675b59249a31951cc0c44107b625379b0fd48a600
+  sha256: a117b509823918501e8e5d6298d340354d34889d6563f5f910af8736253678f2
 - path: checks/OBS-05.yaml
-  sha256: b3dcc17469aa55b43ea07963bcf2fdaf5dca42a9a0bc1b68d628640fcb05ec1f
+  sha256: eff35313ab230234cbcad8e349d7c97c20b25b321593ecedef17744500fb1a7d
 - path: checks/OBS-06.yaml
   sha256: d1cab6db751822ebf02739b22de8756fb746f159975c43b96ea76c595deb4ad1
 - path: checks/OBS-07.yaml
-  sha256: 1c9049e3b71efcef7c5b34811e4a8eefdf66462761826392f180aa71404e844a
+  sha256: 7b58fe00e391745cadea74ef8b8c2c10103e8dd7f1b8221656133af51765a0a4
 - path: checks/OBS-08.yaml
-  sha256: a81d4a87ca78f0b2321bd0444765a67b433c44a24b106b35c8d4e517d20204f0
+  sha256: 1cea73d787c32f6558bd566a48d99398cb67a635facb78aaed89300a7b208fc4
 - path: checks/OBS-09.yaml
   sha256: bc726730e25861cd5e86b69deda87f5b5537e2863932fecc4f9474484a9f1292
 - path: checks/OBS-10.yaml

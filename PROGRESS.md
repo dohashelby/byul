@@ -646,3 +646,24 @@ git status
 - 무결성/문서: 허용27파일만 변경(기존22/새5), 시작349개 중327개 바이트 동일. 다른76점검/원문/추적 증거·예시/lab의 값/scope/승인 보존. 팩13해시 **7db2fb622c87e5fee4bcf07e82ef0b2112705b81036dd0b103db71eacce2e3ba**, 팩12복사→로컬 재생성 동일·멱등, 메타데이터/CSV/manifest·wheel/source 일치, 새 순수helper의 I/O/현재시각 접근 없음, 문서 상대링크599개/Pointer533개·CSV 출처·diff check 통과. M6의 과거 코드 위치는 기준 b404a6d의 고정 링크로 보존했다. 근거는 ignored out/test-runs/policy-m7-20261021의 XML/installed-smoke.json/integrity-verification.json/source-facts.json이다.
 - 커밋 후 검증: 최종 SHA의 원격HEAD·PR diff·지원 Linux 전체 CI/frozen sync/wheel 결과는 초안PR 본문과 종료 보고에 기록한다.
 - 다음: 실제 정책/근거의 업무 적정성·조건부경보/역할별규칙·운영대응은 별도 결정 후 격리 실증으로 검증한다. 이번 작업에서 실제 자원 생성·collector 주입·운영 요청은 하지 않는다.
+
+## 2026-10-21 — 정책 M8 구현
+
+- 기준: M7 3841b268c65cc32fcf31eaa8de69e8f507c27fa5, fetch 후 원격/로컬0/0·clean, PR9 open/draft·미병합. codex/gua-policy-m8의 base는M7이다. 시작354파일 hash·팩13·CSV·examples/lab을 ignored out/test-runs/policy-m8-20261021에 별도 보존했다.
+- M7 검토: OBS11 정책·수동/3·구형/1/2·순수 시간/조회/FAIL 상한·보고 사유가 연결돼 있다. M7 제품 회귀를 확인해 바꾼 것은 없으며 실제 collector/원본 인증/기업 승인/엔진·운영 실증은 여전히 미검증이다. 과거 최종CI752/18 및 설치29명령을 이번 실행 결과로 합산하지 않는다.
+- 구현: usage_allowed(OBS04/05), replay_allowed(OBS07/08) required bool 등록. OBS04 false/나머지 true가 수동 검토 문맥이다. 다른/미확인 문맥은 각 축의 신고 PASS만 UNKNOWN으로 보류하고 FAIL·UNKNOWN 비승격·기존 증거/PASS 관문을 보존한다. 실제 상태·비적용·자동 제외·새 FAIL을 정책값으로 만들지 않는다.
+- 구조: declared0.6.0의 작은 순수 함수, 기존 POLICY_CONTEXT/report·템플릿을 재사용한다. core/models/store·수동 입력 코드·새 실행기·의존성 변경0이다. manual-entry0.4.0·수동/3·/1/2·기존 payload/과거 객체는 유지한다.
+- 정합성: 팩14/DRAFT·네 정의2·14점검24경로·a21/b6/c161/d115·77ID/303결정595연결·자동연결5. 카탈로그 두 결정의 소비와 기존14행 코드 줄 참조를 갱신했다. 다른73점검/원문/기존 증거·examples/lab 값/scope/출처/승인을 보존한다.
+- 문서: docs/POLICY_M8.md의 원문·소유권·분기 표·공유 정책 일관성 한계·호환·후속6후보와 M9 설계 프롬프트, SPEC/입력/실행 안내/카탈로그/결정 기록을 작성했다. 실제 기업값·승인·usage 송신·replay 실행·엔진/운영/유료 자원 시험은 하지 않는다.
+- 구현 묶음 완료 시점: 구현·회귀 테스트·문서 전체를 먼저 작성한 뒤 frozen sync·기본 전체·wheel/격리 설치본·무결성 검증을 시작했다. 실제 결과는 아래와 같다. M7 테스트의 현재 팩/버전 기대만 갱신하고 의미·불변식·skip/제외는 완화하지 않았다.
+
+### M8 로컬 검증 결과
+
+- Windows/Python3.11.16/uv0.12.11, uv sync --frozen 성공. 구현·테스트·문서 작성 후 기본 전체 `uv run pytest -q --basetemp=.review-tests-policy-m8 --junitxml=out/test-runs/policy-m8-20261021/first.xml --durations=12` → **817 passed / 28 failed / 5 skipped / 18 deselected, 290.94초**. 기존 테스트는 통과했고 새 M8 테스트의 입력 구성/표시 가정에 오류가 있었다.
+- 최초 실패:20건은 단위 fixture의 봉인 후 값 변경·미재봉인,4건은 미수집 관측에 값이 남은 잘못된 fixture,4건은 RPT에 RES의 영문 원문 사유가 그대로 나타난다는 잘못된 기대였다. 제품 무결성·판정·표시 규칙을 완화하지 않고 별도 봉인한 음성 fixture·미수집 null·RPT의 기존 한국어 미인증 안내 검증으로 수정했다. 정상 입력의 코어 PASS 대조도 추가했다.
+- 첫 수정 후 M8만 실행한 fix.xml은 **90 passed / 8 failed, 5.51초**였다. 남은 미수집 fixture4건과 EVD 자유 메모가 RPT에 직접 전달된다는 가정4건을 보완했다. 실제 보고서/RES의 사유와 renderer에 전달된 RPT의 escape를 각각 검사한다. 이 과정의 제품 코드 변경은 없다.
+- 최종 영향 범위 `uv run pytest -q tests/test_policy_m8.py tests/test_policy_m2.py tests/test_policy_m5.py tests/test_policy_m7.py tests/test_policy_template.py --basetemp=.review-tests-policy-m8-recheck --junitxml=out/test-runs/policy-m8-20261021/recheck.xml --durations=5` → **262 passed / 1 skipped, 65.00초**. 새 M8 98개와 기존 정책·OBS/SUP/LIF·양식 회귀를 포함한다. 별도 실행을 더해 전체 통과 수로 표시하지 않는다.
+- 전체 skip5는 기존 Windows 루프백 거부/timeout 차이3개·symlink 권한2개, 재검증 skip1은 symlink 권한이다. 기본 제외18개는 Docker/engine 시험이다. Windows 전체1분 목표는 미달이며 지원 Linux 전체 CI는 커밋 후 별도 확인한다.
+- `uv build --wheel --out-dir out/test-runs/policy-m8-20261021/dist` 성공. 별도 venv에 frozen 의존성과 wheel을 설치하고 저장소 밖 TEMP·Python -I·PYTHONPATH/PYTHONHOME 차단·설치된 declared/source 바이트 일치 확인 후 **24명령 통과**. 실제 보존 M7 wheel/팩13의 /3으로9점검 EVD/RES를 만들고 M8 재판정에서 과거 객체/해시·기존 분기 PASS·OBS/SUP/LIF·멱등·Store.verify를 보존했다. 새 팩14 /3에서는 OBS04/07 PASS·OBS05/08 UNKNOWN·false와 분기/한계의 JSON/HTML·official false·기존 OBS/SUP/LIF를 확인했다. 합성 EXAMPLE/DECLARED 계약이며 실제 usage/replay 실행이 아니다.
+- 정합성 verify.py PASS: 허용26파일(기존20/신규6), 기존354개 중334개 바이트 동일·다른73점검/원문/증거·예시/lab 값 보존. 팩14 해시 **c5e35da1b52e4438b1427e8c76b3ad767b415a35936479c841631df165e8dad0**. 팩13 복사→재생성 동일/멱등·카탈로그303/595/분류·정확Ref 설명24경로·wheel/source·문서598링크/535Pointer·CSV출처·diff check를 확인했다. CSV는 두 소비 행과 기존14행의 이동한 코드 참조만 갱신했다.
+- 커밋 후 최종 SHA의 원격HEAD·초안 PR/base/diff·지원 Linux 전체 CI/frozen sync/wheel 결과는 PR 본문과 종료 보고에 기록한다. 실제 엔진·두 이미지·usage 송신·replay·운영/유료 자원 시험은 하지 않았다.

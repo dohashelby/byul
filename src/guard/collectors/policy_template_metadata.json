@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 13,
-    "sha256": "7db2fb622c87e5fee4bcf07e82ef0b2112705b81036dd0b103db71eacce2e3ba"
+    "revision": 14,
+    "sha256": "c5e35da1b52e4438b1427e8c76b3ad767b415a35936479c841631df165e8dad0"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -13,6 +13,38 @@
       "consumer": "선정: core/select.py의 기존 타입·필수 키 검사 / 양식: policy_template의 선언·설명 주석 표시 / 수동 판정: declared 0.5.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님 / 수동 판정: policy_items는 DECLARED 항목별 관측·첨부 연결을 대조; 제한적 위반 FAIL/불충분 UNKNOWN, 완전한 조건만 신고 PASS 유지; 자동 실행·실측 아님",
       "verification": "입력·선정·수동 판정의 EXAMPLE 계약 검증 범위; 자동 실행·실제 엔진 실증 없음",
       "catalog_id": "P-DRAFT-READINESS-REQUIRED"
+    },
+    "values.OBS-04.usage_allowed": {
+      "type": "bool",
+      "description": "usage 보고 생성·전송의 기업 허용 여부를 결정한다; 팀 참조는 비사용이며 변경 승인·재시험 전 기본값 생성 금지",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: select의 required bool 타입/누락 검사, false는 값 / 양식: 정책 기본값 없이 점검별 빈 입력과 설명 생성 / 판정: declared 0.6.0의 대상 선언에 한한 분기별 PASS 보류; FAIL 보존 / 보고: POLICY_CONTEXT 이유와 실제 상태/공유 정책 일관성 미검증 표시",
+      "verification": "수동 정책 문맥의 코드 계약; 기업값/승인·실제 usage/replay·엔진 미검증",
+      "catalog_id": "P-DRAFT-USAGE-ALLOW"
+    },
+    "values.OBS-05.usage_allowed": {
+      "type": "bool",
+      "description": "usage 보고 생성·전송의 기업 허용 여부를 결정한다; 팀 참조는 비사용이며 변경 승인·재시험 전 기본값 생성 금지",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: select의 required bool 타입/누락 검사, false는 값 / 양식: 정책 기본값 없이 점검별 빈 입력과 설명 생성 / 판정: declared 0.6.0의 대상 선언에 한한 분기별 PASS 보류; FAIL 보존 / 보고: POLICY_CONTEXT 이유와 실제 상태/공유 정책 일관성 미검증 표시",
+      "verification": "수동 정책 문맥의 코드 계약; 기업값/승인·실제 usage/replay·엔진 미검증",
+      "catalog_id": "P-DRAFT-USAGE-ALLOW"
+    },
+    "values.OBS-07.replay_allowed": {
+      "type": "bool",
+      "description": "진단 replay 지원 여부를 정한다; 팀 참조는 비사용이며 실제 미도달은 환경/코드 근거 필요",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: select의 required bool 타입/누락 검사, false는 값 / 양식: 정책 기본값 없이 점검별 빈 입력과 설명 생성 / 판정: declared 0.6.0의 대상 선언에 한한 분기별 PASS 보류; FAIL 보존 / 보고: POLICY_CONTEXT 이유와 실제 상태/공유 정책 일관성 미검증 표시",
+      "verification": "수동 정책 문맥의 코드 계약; 기업값/승인·실제 usage/replay·엔진 미검증",
+      "catalog_id": "P-DRAFT-REPLAY-ALLOW"
+    },
+    "values.OBS-08.replay_allowed": {
+      "type": "bool",
+      "description": "진단 replay 지원 여부를 정한다; 팀 참조는 비사용이며 실제 미도달은 환경/코드 근거 필요",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: select의 required bool 타입/누락 검사, false는 값 / 양식: 정책 기본값 없이 점검별 빈 입력과 설명 생성 / 판정: declared 0.6.0의 대상 선언에 한한 분기별 PASS 보류; FAIL 보존 / 보고: POLICY_CONTEXT 이유와 실제 상태/공유 정책 일관성 미검증 표시",
+      "verification": "수동 정책 문맥의 코드 계약; 기업값/승인·실제 usage/replay·엔진 미검증",
+      "catalog_id": "P-DRAFT-REPLAY-ALLOW"
     },
     "values.OBS-11.alert_deadline_ms": {
       "type": "dict[str,int]",

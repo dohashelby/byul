@@ -1,0 +1,5 @@
+policy_params:
+- {key: usage_allowed, type: bool, required: true}
+limitations:
+- 'usage_allowed={usage_allowed}은 이 점검 범위의 기업 정책 신고다. false는 비생성·비전송의 관측이 아니고 true는 금지 정책 분기를 충족하지 않는다. 정책값만으로 비적용·PASS를 만들지 않는다.'
+- 'usage 실제 활성·생성·송신·필드·목적지·주기는 자동 검증하지 않는다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.'

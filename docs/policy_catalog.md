@@ -1,6 +1,6 @@
 # 기업 정책 카탈로그 — Phase 1 검토 초안
 
-작성일: 2026-10-21 (Asia/Seoul). **확인된 데이터/코드 사실**, **원문 해석**, **후속 설계 제안**을 구별한다. 기업 정책값·담당자·승인 기록은 작성하지 않았다. M2에서 선언 두 개와 수동 정책 입력 전제를 보강했다. Phase 1의 제안/검토 기록과 현재 구현을 구별하며 M2의 당시 변경은 §15, M5 당시 변경은 §16, M7의 현재 변경은 §17을 따른다.
+작성일: 2026-10-21 (Asia/Seoul). **확인된 데이터/코드 사실**, **원문 해석**, **후속 설계 제안**을 구별한다. 기업 정책값·담당자·승인 기록은 작성하지 않았다. M2에서 선언 두 개와 수동 정책 입력 전제를 보강했다. Phase 1의 제안/검토 기록과 현재 구현을 구별하며 M2의 당시 변경은 §15, M5 당시 변경은 §16, M7의 당시 변경은 §17, M8의 현재 변경은 §18을 따른다.
 
 ## 1. 검토 기준과 범위
 
@@ -10,8 +10,8 @@
 - origin: `https://github.com/dohashelby/gua.git`; 원격 main: `d9e9729116eeb16299247ecb9e7df8ff16d882ec`.
 - 기존 기본 작업 트리는 main이고 `.assessment/`가 미추적이었다. 기존 통합 작업 트리는 깨끗했으므로 그 경로를 사용했다. fetch 후 통합 브랜치 앞섬/뒤짐 `0/0`; `git pull --ff-only`는 `Already up to date.`. 원격 main만을 기준으로 삼지 않았다. 다른 두 작업 트리는 수정하지 않았다.
 - 사용자 추가 참고: [체크리스트와 보완 가이드](https://github.com/mg-princess/serving-security-framework/blob/cdfea2401007091f8e5452d87d4ff2fbfaf1219f/03_체크리스트와_보완가이드.md)의 고정 커밋 `cdfea2401007091f8e5452d87d4ff2fbfaf1219f`. 팀 참조 기준 28개와 최신 CHK 연결·변경 사항은 §14에 정리했다.
-- 현재 팩: PACK-BASELINE revision 13, DRAFT(M1 10, M2/M4 11, M5/M6 12). [CLAUDE](../CLAUDE.md), [정책 요청](../POLICY_PROMPT.md), [SPEC](../SPEC.md), [결정 기록](../DECISIONS.md), [진행 기록](../PROGRESS.md)을 기준으로 코드·77 CheckDef·원문 JSON을 대조했다.
-- [POLICY_PROMPT](../POLICY_PROMPT.md)의 “3행만 구조화”는 과거 설명이다. M1은 5개 점검·11개 파라미터였고 M2/M4는 7개 점검·13개 파라미터였고 M5/M6는 9개 점검·15개 파라미터였고 M7은 **10개 점검·20개 파라미터**다. 자동 실행기 연결은 5개로 유지하며 과거 실측 3개와 신규 모의 검증 2개를 구별해야 한다.
+- 현재 팩: PACK-BASELINE revision 14, DRAFT(M1 10, M2/M4 11, M5/M6 12, M7 13). [CLAUDE](../CLAUDE.md), [정책 요청](../POLICY_PROMPT.md), [SPEC](../SPEC.md), [결정 기록](../DECISIONS.md), [진행 기록](../PROGRESS.md)을 기준으로 코드·77 CheckDef·원문 JSON을 대조했다.
+- [POLICY_PROMPT](../POLICY_PROMPT.md)의 “3행만 구조화”는 과거 설명이다. M1은 5개 점검·11개 파라미터였고 M2/M4는 7개 점검·13개 파라미터였고 M5/M6는 9개 점검·15개 파라미터였고 M7은 10개 점검·20개 파라미터였고 M8은 **14개 점검·24개 파라미터**다. 자동 실행기 연결은 5개로 유지하며 과거 실측 3개와 신규 모의 검증 2개를 구별해야 한다.
 - Phase 1 당시 변경 범위: 이 문서, [CSV](policy_catalog.csv), DECISIONS의 관련 열린 질문, PROGRESS의 작업 기록. 코드·팩·정책 파일·SPEC·기존 증거·참고 원문은 변경하지 않는다. 커밋·푸시·엔진/운영 시험·유료 자원 생성·새 의존성 설치는 수행하지 않는다.
 
 ## 2. 용어와 CSV 계약
@@ -50,14 +50,14 @@ CheckDef는 무엇을 어떻게 검사하는지의 정의다. POL은 기업이 �
 | 원문 정규화 결정 발생 수(점검별, 중복 통합 전) | 595 |
 | 점검 ↔ 정책 ID 고유 연결 수 | 595 |
 | 중복 정리 후 카탈로그 고유 항목 수 | 303 |
-| a 이미 policy_params로 구조화 | 19 |
-| b 기존 지원 타입으로 구조화 가능한 후보 | 8 |
+| a 이미 policy_params로 구조화 | 21 |
+| b 기존 지원 타입으로 구조화 가능한 후보 | 6 |
 | c 수치 도출 방법/기준선 결정 우선 | 161 |
 | d 복잡한 구조/형태 추가 설계 | 115 |
 | 수치를 포함한 항목 전체 | 166 |
 | 그중 현재 c 분류인 수치 후보 | 161 |
 | 수치이면서 복잡한 형태 | 164 |
-| 파라미터 선언이 있는 점검 / 파라미터 | 10 / 20 |
+| 파라미터 선언이 있는 점검 / 파라미터 | 14 / 24 |
 | numeric_values_pending 필드가 있는 원문 행 | 40 |
 
 영역별 CheckDef는 SUP 16, REQ 21, PLT 12, LIF 16, OBS 12다. `items=28`, `scenarios=83`은 추적용 원천 목록이며 점검 수가 아니다.
@@ -106,7 +106,7 @@ CheckDef는 무엇을 어떻게 검사하는지의 정의다. POL은 기업이 �
 | `values.REQ-09.max_input_tokens` (int) | 실행: input_validation.validate_policy가 양수/초과 시험 예산 검사; collect가 한도+1 token-array 생성 | 판정: REQ-09 표는 이 정수를 직접 참조하지 않음; challenge_outcomes 소비 | EXAMPLE 모의 계약 기록; 실제 엔진 미실증 |
 | `values.REQ-09.rejection_codes` (list[str]) | 실행: input_validation.validate_policy가 비어 있지 않은 400/413/422 문자열 목록 확인 | 판정: rule_table value_policy all_in; 계획한 두 challenge 응답을 비교 | EXAMPLE 모의 계약 기록; 실제 엔진 미실증 |
 
-M2 당시 다음 두 개를 추가해 타입/누락과 수동 입력 전제를 확인했다. M4/M5는 신고된 항목별 근거를 제한적으로 대조한다([계약](POLICY_TEMPLATE.md)). 자동 실행·실측은 추가하지 않았으며 NO_EXECUTOR가 유지된다. 현재 declared 0.4.0의 필수 키 누락 관문은 기존 11개에도 적용한다.
+M2 당시 다음 두 개를 추가해 타입/누락과 수동 입력 전제를 확인했다. M4/M5는 신고된 항목별 근거를 제한적으로 대조한다([계약](POLICY_TEMPLATE.md)). 자동 실행·실측은 추가하지 않았으며 NO_EXECUTOR가 유지된다. 현재 declared 0.6.0의 필수 키 누락 관문은 기존 11개에도 적용한다.
 
 | 값 경로 | 선언·소비 | 검증 범위 |
 |---|---|---|
@@ -485,7 +485,6 @@ Phase 1의 최소 권고인 **당시 11개 선언의 template와 키 생략 계�
 | P-DRAFT-COLLECTION-CPU | 수집·진단의 CPU 처리 예산을 별도로 정한다 | OBS-03, OBS-04, OBS-05 |
 | P-DRAFT-COLLECTION-GPU | 수집·진단의 GPU 처리 예산을 별도로 정한다; 미사용 환경은 적용 여부 결정 | OBS-03, OBS-04, OBS-05 |
 | P-DRAFT-COLLECTION-DISK | 수집·진단 파일/사본 저장 공간 한도를 별도로 정한다 | OBS-03, OBS-04, OBS-05 |
-| P-DRAFT-USAGE-ALLOW | usage 보고 생성·전송의 기업 허용 여부를 결정한다; 팀 참조는 비사용이며 변경 승인·재시험 전 기본값 생성 금지 | OBS-04, OBS-05 |
 | P-DRAFT-USAGE-ACTIVATION | usage 허용/금지 적용 시점과 새 프로세스 확인 범위를 정한다; 실행 중 env 변경만으로 중단 가정 금지 | OBS-04, OBS-05 |
 | P-DRAFT-DIAG-ACCESS-READ-EXPORT | 기록·진단 원본/사본의 독자와 반출 목적·범위·승인을 정한다 | OBS-06, OBS-07, OBS-08 |
 | P-DRAFT-DIAG-ACCESS-EXECUTION | 진단 replay 실행 역할과 격리 환경 요구를 정한다; 읽기 권한과 실행 권한 분리 | OBS-06, OBS-07, OBS-08 |
@@ -493,7 +492,6 @@ Phase 1의 최소 권고인 **당시 11개 선언의 template와 키 생략 계�
 | P-DRAFT-DIAG-ACCESS-EXPORT-TTL | 반출 임시 권한의 유효 기간을 정한다 | OBS-06, OBS-07, OBS-08 |
 | P-DRAFT-DIAG-ACCESS-DIAG-TTL | 진단 실행 임시 권한의 유효 기간을 별도로 정한다 | OBS-06, OBS-07, OBS-08 |
 | P-DRAFT-DIAG-ACCESS-REVOKE | 반출/진단 권한 회수 기한을 정한다 | OBS-06, OBS-07, OBS-08 |
-| P-DRAFT-REPLAY-ALLOW | 진단 replay 지원 여부를 정한다; 팀 참조는 비사용이며 실제 미도달은 환경/코드 근거 필요 | OBS-07, OBS-08 |
 | P-DRAFT-AUDIT-FORMAT | 비신뢰 입력이 사건·신원·대상·상태를 위조하지 못하도록 신뢰 필드와 기록/해석 형식을 정한다 | OBS-09, OBS-10, OBS-11 |
 | P-DRAFT-AUDIT-ROLES | 기록의 작성·조회·관리·독립 검토 권한을 정한다 | OBS-09, OBS-10, OBS-11 |
 | P-DRAFT-AUDIT-INTEGRITY | 무단 변경·삭제 제한과 독립 변조 탐지·확인 수단을 정한다; hash만으로 작성자 인증 아님 | OBS-09, OBS-10, OBS-11 |
@@ -852,3 +850,19 @@ M6 b404a6d847f932edda926c0185572ac315ae7ef1에서 OBS-11 전용5개 경로를 �
 팩13/DRAFT·대상 정의2, 10점검20경로·a19/b8/c161/d115·자동 연결5다. a는 소비 구조가 구현됐다는 분류다. 수치4개가 c에서 a로 이동해도 실제 도출 근거·기업 값/승인이 완료된 것은 아니므로 전체 수치 미결 과제가4개 줄었다고 해석하지 않는다. 현재 c 복잡형160개/나머지1개의 분류와 전체 수치 복잡형164개를 구분한다.
 
 선정은 타입/필수 키, 수동/3은 항목×case의 신고 근거 연결, declared0.5.0/audit_collection은 범위/시간 구간/부재/정상 처리·필요 경보를 제한 검증한다. 실제 collector 제어·운영 대응·전사 RES 전파·원본 진위는 검증하지 않는다. 숫자는 여전히 기업이 제공하며 사례값은 EXAMPLE이다. 다른 수집 정책 후보(복구 SLA·권한/형식/무결성·용량/유실)는 미구현이다. 상세 계약은 [M7](POLICY_M7.md)을 따른다.
+
+## 18. M8 usage/replay 정책 문맥 등록
+
+기존 P-DRAFT-USAGE-ALLOW를 OBS04/05의 usage_allowed, P-DRAFT-REPLAY-ALLOW를 OBS07/08의
+replay_allowed required bool에 연결했다. 두 ID·원문·점검 연결은 유지한다. bool은 기업 정책 문맥이며
+실제 활성/consumer/권한/안전의 관측이 아니다. 공유 값 자동 복사·전역 충돌 해결은 없고 범위/일관성은 업무 검토한다.
+
+OBS04 false / OBS05·07·08 true만 검토 문맥을 채운다. 다른 값/누락은 신고 PASS 보류, FAIL 보존이다.
+실제 승인·관측·기존 PASS 관문이 필요하며 정책값으로 PASS·비적용·자동 제외를 만들지 않는다.
+설명과 POLICY_CONTEXT 이유를 기존 JSON/HTML에 연결했다. 새 payload·실행기는 없다.
+
+현재 팩14/DRAFT·네 정의2·declared0.6.0·manual-entry0.4.0·수동/3이다.
+14점검24경로·a21/b6/c161/d115이며 77ID·303결정595연결·자동 실행/판정 연결5는 그대로다.
+a로 이동한2개는 문맥 소비 구현을 뜻한다. 기업의 실제 값/승인·엔진 자동화 완료가 아니다.
+기존 declared 소비 줄 참조14행은 실제 현재 코드 위치에 맞춰 갱신했다.
+검증·미결·후속 후보 비교와 M9 설계 프롬프트는 [M8 계약](POLICY_M8.md)을 따른다.

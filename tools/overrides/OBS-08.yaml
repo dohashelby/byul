@@ -1,0 +1,5 @@
+policy_params:
+- {key: replay_allowed, type: bool, required: true}
+limitations:
+- 'replay_allowed={replay_allowed}은 이 점검 범위의 기업 정책 신고다. false는 consumer 미배포·미도달의 증거가 아니고 true는 안전한 parser·자료 신뢰·실행 범위의 증명이 아니다. 정책값만으로 비적용·PASS를 만들지 않는다.'
+- '자료 출처·parser/reader·거부·부수 동작의 수동 근거가 별도로 필요하다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.'

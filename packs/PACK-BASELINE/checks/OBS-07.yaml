@@ -1,5 +1,5 @@
 id: OBS-07
-revision: 1
+revision: 2
 retired: false
 area: OBS
 purpose: 자료 이용 권한
@@ -12,7 +12,10 @@ review_order: conditional_when_selected
 impact: null
 applies_when:
   prose: 조건부; replay 지원 구현
-policy_params: []
+policy_params:
+- key: replay_allowed
+  type: bool
+  required: true
 policy_prose:
   policy_to_decide: 조회와 실행 역할
   enterprise_decisions: 자료별 독자·반출 목적·범위·승인, 진단 실행 역할·격리 환경과 parser/입력 신뢰 범위.
@@ -44,3 +47,6 @@ legacy:
   - Q-C11/SC-21-03
 source:
   array: observability_assessment_draft
+limitations:
+- replay_allowed={replay_allowed}은 이 점검 범위의 기업 정책 신고다. false는 consumer 미배포·미도달의 증거가 아니고 true는 구현·실행 권한의 증명이 아니다. 정책값만으로 비적용·PASS를 만들지 않는다.
+- consumer·계정·읽기/실행 권한·실제 실행/거부의 수동 근거가 별도로 필요하다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.

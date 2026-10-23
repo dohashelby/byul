@@ -1,5 +1,5 @@
 id: LIF-07
-revision: 1
+revision: 2
 retired: false
 area: LIF
 purpose: 시작·재개 조건
@@ -12,7 +12,10 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 기본 TP; 선택 graph/backend는 실제 설정
-policy_params: []
+policy_params:
+- key: required_readiness_items
+  type: list[str]
+  required: true
 policy_prose:
   policy_to_decide: 필수 준비 항목·재개 승인·정상 기능 기준
   enterprise_decisions: 필수 준비 항목·성능 수용 기준·정상 시험 입력·준비 증거·재개 승인 역할. 공급물 승인과 운영 준비 판정을 연결한다.

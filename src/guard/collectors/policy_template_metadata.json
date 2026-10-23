@@ -2,71 +2,63 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 10,
-    "sha256": "1fad2f3c9606e4da8f555cd9d5329eb3f13aa0bda177f3daa6a08c6bd153ae05"
+    "revision": 11,
+    "sha256": "33cab1b2a45e6039d53e5b48bedaa5085b0a5bfb39f42521df24194139ff2ab4"
   },
   "parameters": {
-    "values.REQ-01.allowed_callers": {
+    "values.LIF-07.required_readiness_items": {
       "type": "list[str]",
-      "description": "직통 시험에서 허용 주체로 취급할 실행기 역할 이름 목록",
+      "description": "필수 worker/model/선택 graph·backend 준비 항목을 정한다",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "선정: core/select.py 타입·필수 키 / 실행: direct_route.DirectRouteExecutor.validate_policy; 역할이 허용 목록에 속하는지·none/wrong 금지 확인 / 판정: REQ-01 표는 이 값을 직접 참조하지 않음; 직통 관측으로 판정",
-      "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
-      "catalog_id": "P-DRAFT-REQ-01-ALLOWED-CALLERS"
-    },
-    "values.REQ-03.general_allowed_kinds": {
-      "type": "list[str]",
-      "description": "일반 호출자에게 허용하여 관리·진단 시험 대상에서 제외할 경로 종류",
-      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "선정: core/select.py 타입·필수 키 / 실행: http_common.discover_routes; role_route에서 include_kinds에서 정책 종류를 차감 / 판정: REQ-03 표는 이 값을 직접 참조하지 않음; 제외 후 경로 관측으로 판정",
-      "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
-      "catalog_id": "P-DRAFT-REQ-03-GENERAL-ALLOWED-KINDS"
+      "consumer": "선정: core/select.py의 기존 타입·필수 키 검사 / 양식: policy_template의 선언·설명 주석 표시 / 수동 입력 전제만 확인; 목록 충족 자동 판정·자동 실행기 없음 / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
+      "verification": "입력·선정·수동 판정의 EXAMPLE 계약 검증 범위; 자동 실행·실제 엔진 실증 없음",
+      "catalog_id": "P-DRAFT-READINESS-REQUIRED"
     },
     "values.PLT-01.allowed_capabilities": {
       "type": "list[str]",
       "description": "지속 실행 시 허용할 유효 Linux capability 목록",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: container_config가 실제 capability 합집합 수집; 이 목록 직접 비교 없음 / 판정: rule_table value_policy의 subset_of/not_subset_of",
+      "consumer": "실행: container_config가 실제 capability 합집합 수집; 이 목록 직접 비교 없음 / 판정: rule_table value_policy의 subset_of/not_subset_of / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
       "catalog_id": "P-DRAFT-PLT-01-ALLOWED-CAPABILITIES"
-    },
-    "values.PLT-01.allowed_mounts": {
-      "type": "list[str]",
-      "description": "허용할 bind/volume 마운트의 목적지:ro/rw 목록",
-      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: container_config가 bind/volume 목적지:ro/rw 수집; 이 목록 직접 비교 없음 / 판정: rule_table value_policy의 subset_of/not_subset_of",
-      "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
-      "catalog_id": "P-DRAFT-PLT-01-ALLOWED-MOUNTS"
     },
     "values.PLT-01.allowed_devices": {
       "type": "list[str]",
       "description": "허용할 장치의 host:container:권한 목록",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: container_config가 host:container:권한 문자열 수집; 이 목록 직접 비교 없음 / 판정: rule_table value_policy의 subset_of/not_subset_of",
+      "consumer": "실행: container_config가 host:container:권한 문자열 수집; 이 목록 직접 비교 없음 / 판정: rule_table value_policy의 subset_of/not_subset_of / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
       "catalog_id": "P-DRAFT-PLT-01-ALLOWED-DEVICES"
-    },
-    "values.PLT-01.require_non_root": {
-      "type": "bool",
-      "description": "UID 0 프로세스 부재를 요구할지 결정",
-      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: container_config가 root_uid_present 수집; 이 bool 직접 소비 없음 / 판정: rule_table when_policy; true일 때 UID 0 부재 요구, false이면 해당 규칙 생략",
-      "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
-      "catalog_id": "P-DRAFT-PLT-01-REQUIRE-NON-ROOT"
     },
     "values.PLT-01.allowed_exec_writable_paths": {
       "type": "list[str]",
       "description": "쓰기·실행이 모두 가능한 마운트 지점의 허용 목록",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: container_config가 쓰기+실행 가능 mount 지점 수집; 이 목록 직접 비교 없음 / 판정: rule_table value_policy의 subset_of/not_subset_of / 표시: core/report._fill_policy 제한 문장",
+      "consumer": "실행: container_config가 쓰기+실행 가능 mount 지점 수집; 이 목록 직접 비교 없음 / 판정: rule_table value_policy의 subset_of/not_subset_of / 표시: core/report._fill_policy 제한 문장 / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
       "catalog_id": "P-DRAFT-PLT-01-ALLOWED-EXEC-WRITABLE-PATHS"
+    },
+    "values.PLT-01.allowed_mounts": {
+      "type": "list[str]",
+      "description": "허용할 bind/volume 마운트의 목적지:ro/rw 목록",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "실행: container_config가 bind/volume 목적지:ro/rw 수집; 이 목록 직접 비교 없음 / 판정: rule_table value_policy의 subset_of/not_subset_of / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
+      "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
+      "catalog_id": "P-DRAFT-PLT-01-ALLOWED-MOUNTS"
+    },
+    "values.PLT-01.require_non_root": {
+      "type": "bool",
+      "description": "UID 0 프로세스 부재를 요구할지 결정",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "실행: container_config가 root_uid_present 수집; 이 bool 직접 소비 없음 / 판정: rule_table when_policy; true일 때 UID 0 부재 요구, false이면 해당 규칙 생략 / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
+      "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
+      "catalog_id": "P-DRAFT-PLT-01-REQUIRE-NON-ROOT"
     },
     "values.PLT-04.forbidden_env_names": {
       "type": "list[str]",
       "description": "worker에 전달하지 않을 환경변수 이름 목록; 자격 값 제외",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: credential_exposure.validate_policy가 변수명 문법 검사; 이름만 수집 / 판정: rule_table value_policy none_in/any_in",
+      "consumer": "실행: credential_exposure.validate_policy가 변수명 문법 검사; 이름만 수집 / 판정: rule_table value_policy none_in/any_in / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 기존 EXAMPLE 모의 계약 검증 기록; 실제 엔진 미실증",
       "catalog_id": "P-DRAFT-PLT-04-FORBIDDEN-ENV-NAMES"
     },
@@ -74,15 +66,31 @@
       "type": "list[str]",
       "description": "worker에 노출하지 않을 자격 파일/디렉터리 절대 경로 목록",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: credential_exposure.validate_policy가 절대 경로/.. 검사; 금지 경로와 bind/volume 목적지의 상위·하위 포함 비교 / 판정: exposed_credential_paths 빈 목록/nonempty; 정책을 직접 읽지 않고 실행기가 만든 관측 소비",
+      "consumer": "실행: credential_exposure.validate_policy가 절대 경로/.. 검사; 금지 경로와 bind/volume 목적지의 상위·하위 포함 비교 / 판정: exposed_credential_paths 빈 목록/nonempty; 정책을 직접 읽지 않고 실행기가 만든 관측 소비 / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 기존 EXAMPLE 모의 계약 검증 기록; 실제 엔진 미실증",
       "catalog_id": "P-DRAFT-PLT-04-FORBIDDEN-MOUNT-PATHS"
+    },
+    "values.REQ-01.allowed_callers": {
+      "type": "list[str]",
+      "description": "직통 시험에서 허용 주체로 취급할 실행기 역할 이름 목록",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: core/select.py 타입·필수 키 / 실행: direct_route.DirectRouteExecutor.validate_policy; 역할이 허용 목록에 속하는지·none/wrong 금지 확인 / 판정: REQ-01 표는 이 값을 직접 참조하지 않음; 직통 관측으로 판정 / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
+      "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
+      "catalog_id": "P-DRAFT-REQ-01-ALLOWED-CALLERS"
+    },
+    "values.REQ-03.general_allowed_kinds": {
+      "type": "list[str]",
+      "description": "일반 호출자에게 허용하여 관리·진단 시험 대상에서 제외할 경로 종류",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: core/select.py 타입·필수 키 / 실행: http_common.discover_routes; role_route에서 include_kinds에서 정책 종류를 차감 / 판정: REQ-03 표는 이 값을 직접 참조하지 않음; 제외 후 경로 관측으로 판정 / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
+      "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
+      "catalog_id": "P-DRAFT-REQ-03-GENERAL-ALLOWED-KINDS"
     },
     "values.REQ-09.max_input_tokens": {
       "type": "int",
       "description": "token-array 경계 시험의 서비스 입력 token 한도",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: input_validation.validate_policy가 양수/초과 시험 예산 검사; collect가 한도+1 token-array 생성 / 판정: REQ-09 표는 이 정수를 직접 참조하지 않음; challenge_outcomes 소비",
+      "consumer": "실행: input_validation.validate_policy가 양수/초과 시험 예산 검사; collect가 한도+1 token-array 생성 / 판정: REQ-09 표는 이 정수를 직접 참조하지 않음; challenge_outcomes 소비 / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 기존 EXAMPLE 모의 계약 검증 기록; 실제 엔진 미실증",
       "catalog_id": "P-DRAFT-REQ-09-MAX-INPUT-TOKENS"
     },
@@ -90,9 +98,17 @@
       "type": "list[str]",
       "description": "범위 밖 token-array 요청에 허용할 명시적 거부 HTTP 응답 코드",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: input_validation.validate_policy가 비어 있지 않은 400/413/422 문자열 목록 확인 / 판정: rule_table value_policy all_in; 계획한 두 challenge 응답을 비교",
+      "consumer": "실행: input_validation.validate_policy가 비어 있지 않은 400/413/422 문자열 목록 확인 / 판정: rule_table value_policy all_in; 계획한 두 challenge 응답을 비교 / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 기존 EXAMPLE 모의 계약 검증 기록; 실제 엔진 미실증",
       "catalog_id": "P-DRAFT-REQ-09-REJECTION-CODES"
+    },
+    "values.SUP-14.required_checks": {
+      "type": "list[str]",
+      "description": "승인 전에 완료해야 하는 필수 검사 목록을 정한다",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: core/select.py의 기존 타입·필수 키 검사 / 양식: policy_template의 선언·설명 주석 표시 / 수동 입력 전제만 확인; 목록 충족 자동 판정·자동 실행기 없음 / 수동 판정: declared 0.2.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
+      "verification": "입력·선정·수동 판정의 EXAMPLE 계약 검증 범위; 자동 실행·실제 엔진 실증 없음",
+      "catalog_id": "P-DRAFT-SUP-CHECK-REQUIRED"
     }
   }
 }

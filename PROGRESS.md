@@ -546,3 +546,29 @@ git status
 - PR CI: https://github.com/dohashelby/gua/actions/runs/39552555535 / push CI: https://github.com/dohashelby/gua/actions/runs/39552529119 . 공식 GitHub API에서 completed/success와 작업 로그의 통과 수·시간을 확인했다.
 - 초안 PR: https://github.com/dohashelby/gua/pull/3 . base codex/gua-integration-20261021 / head codex/gua-policy-template-m1, 선행 PR #2 의존. Phase 1 보존 커밋 701b12f와 M1 구현 커밋 945cc6b를 구분했다. 자동 병합하지 않았다.
 - 이 후속 커밋은 검증 기록만 추가한다. 제품 코드·팩·정책·증거는 추가 변경하지 않는다.
+
+
+## 2026-10-21 — 정책 M2 구현
+- 시작: codex/gua-policy-template-m1 / 1dc82f0f08e24c5cd396c414089495edf45bc130. fetch 후 원격 동일·로컬 변경 없음. PR #2/3는 open/draft·미병합으로 확인했고 codex/gua-policy-m2 브랜치를 만들었다.
+- 보존: 시작 추적 파일 336개의 해시와 M1 팩/설명 JSON·카탈로그·예시/실험실 정책 사본을 별도 ignored out/test-runs/policy-m2-20261021에 남겼다. 다른 작업 트리와 sources/를 수정하지 않는다.
+- 구현: declared 0.2.0의 필수 키 누락 PASS 보류/FAIL 유지, 입력 팩 내부 출력 사전 거부, SUP-14/LIF-07 필수 목록 등록, 개발용 설명 갱신 도구와 계약 회귀·사용 문서. 구현/테스트를 모두 작성한 뒤 검증한다.
+- 팩: 기존 로컬 원문+overrides로 재생성한 PACK-BASELINE rev11/DRAFT, 대상 CheckDef 각 rev2. 77 ID·자동 연결 5개 유지, 정책 선언은 7점검·13개. 카탈로그303/연결595 유지·분류 a13/b10/c165/d115. 기업 값·담당/승인·새 자동 실행기/실측은 추가하지 않았다.
+- 영향: 정책 누락 수동 PASS는 새 판정에서 UNKNOWN일 수 있다. 과거 EVD/RES를 수정하지 않으며 실제 M1 설치본→M2 재판정 확인과 기본/설치본 검증 결과를 아래에 기록한다. core/models 변경 0건이 목표이며 judges 변경은 declared 1파일로 제한한다.
+
+### M2 구현 후 검증 결과
+- 기본 전체: `uv run pytest -q --basetemp=.review-tests-policy-m2 --junitxml=out/test-runs/policy-m2-20261021/first.xml --durations=12` → **557 passed, 5 skipped, 18 deselected / 81.45초**. Windows/Python 3.11.16. 첫 전체 실행에서 실패 없음. skip은 기존 루프백 네트워크 3·파일 symlink 권한 1과 신규 부모 디렉터리 symlink 권한 1이다. docker/engine 18건은 기본 제외다. 이 결과를 Linux 통과나 1분 목표 충족으로 표현하지 않는다.
+- `uv build --wheel --out-dir out/test-runs/policy-m2-20261021/dist` 성공. 별도 `UV_PROJECT_ENVIRONMENT=out/test-runs/policy-m2-20261021/installed-env`에 `uv sync --frozen --no-install-project` 후 `uv pip install --python .../installed-env/Scripts/python.exe --no-deps .../guard-0.1.0-py3-none-any.whl`로 설치했다. 새 의존성을 선언하지 않았다.
+- 저장소 밖 TEMP에서 설치본/격리 Python(-I)의 **19개 명령이 기대 종료 코드로 통과**했다. 새 13개 양식·기존 파일 보호·팩 내부 거부(예상 종료1)·빈 정책의 77점검/누락7/자동연결5·Store.verify를 확인했다. wheel 설명 JSON 포함 및 site-packages import 위치도 확인했다.
+- 과거 재판정은 실제 M1 wheel/declared0.1.0으로 새 EXAMPLE fixture를 만들어 실행했다. REQ-01 필수 allowed_callers가 없는 POL로 select→수동 template/import(실제 합성 첨부)→judge에서 PASS가 나옴을 확인했다. 실제 엔진 증거가 아니라 입력 계약 재현이다.
+- 이어 M2 wheel/declared0.2.0에서 현재 디스크 팩11을 가리킨 채 같은 PLAN을 재판정했다. 정확한 저장 팩10으로 재판정해 UNKNOWN·RES revision2·NO_POLICY_VALUE/allowed_callers 이유가 나왔고, 기존 RES revision1·EVD의 전체 필드/해시와 참조/증거 무결성을 유지했다. 보고서에는 팩 보존본 rev10·official=false가 나타났다. 같은 시각 재판정은 멱등이며 RES revision을 더 만들지 않았다.
+- 기본 회귀에는 SUP-14/LIF-07의 누락/부분/입력 완료/신고 FAIL을 실제 CLI+임시 첨부로 확인했다. 두 목록이 있어도 NO_EXECUTOR를 유지하고 []/false/0·선택 키와 누락을 구분했다. 출력 사전 거부·설명 경로 누락/중복/타입/미선언·다른 팩 fallback·팩 재생성/보존본 회귀도 포함한다.
+- 정합성: 카탈로그303/연결595·분류a13/b10/c165/d115, 고유 로컬 출처941개(JSON/YAML Pointer·코드 행) 실존 확인. 고정 외부 출처를 다시 수입하거나 바꾸지 않았다. 설명 개발 도구 재실행과 커밋 설명 JSON이 선언/카탈로그에서 재생성한 값과 같음을 확인했다.
+- 보호 해시 대조: core/models/executors/store/reference/기존 out 증거 변경 0, judges는 declared.py 1파일. 팩 변경은 대상 두 CheckDef와 manifest뿐이며 id_map·기존 5개 자동 정의를 보존했다. 예시/실험실 정책은 pack.revision10→11만 바뀌고 values/scope/승인 공란이 동일하다. 기존 기록은 보존하고 M2 기록을 추가했다.
+- PR #3는 아직 미병합이므로 M2는 codex/gua-policy-template-m1을 base로 준비한다. 이 기록 작성 시 push 전이며 Linux CI는 이후 실제 실행으로 확인한다. 테스트/설치본/무결성 보조 로그는 ignored out/test-runs/policy-m2-20261021에 둔다.
+
+### M2 원격 Linux CI 확인
+- 구현 커밋 b510b6baad11cd19eb0f54079af3aeaf9def2503, Ubuntu/Python 3.11: `uv run pytest -q` → **562 passed, 18 deselected / 37.15초(PR), 36.57초(push)**. skip 없음. Windows 네트워크/심볼릭 링크 제약 5건도 Linux에서 통과했으며 기본 1분 목표를 충족했다.
+- frozen 설치·`uv build --wheel`도 양쪽 실행 성공. 공식 GitHub API의 completed/success와 작업 로그의 통과 수·시간을 확인했다.
+- PR CI: https://github.com/dohashelby/gua/actions/runs/39556527667 / push CI: https://github.com/dohashelby/gua/actions/runs/39556505899 .
+- 초안 PR: https://github.com/dohashelby/gua/pull/4 . base codex/gua-policy-template-m1 / head codex/gua-policy-m2, 선행 PR #3 의존. merge-base 1dc82f0이며 실제 원격 변경20파일이 로컬 diff와 일치했다. 선행 보완9602102와 정책/설명/통합회귀b510b6b를 구분했다. 자동 병합하지 않았다.
+- 후속 기록 커밋은 이 결과만 추가한다. 제품 코드·팩·정책·기존 증거는 추가 변경하지 않으며 실제 엔진·두 이미지 실증은 미수행이다.

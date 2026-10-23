@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 10
+revision: 11
 engines:
 - vllm
 checks:
@@ -94,7 +94,7 @@ files_sha256:
 - path: checks/LIF-06.yaml
   sha256: 11ea4a913059bda346e751c9b3aa33d0975565413869901dc3c875a746fbbca9
 - path: checks/LIF-07.yaml
-  sha256: cc57f6da736d1e2a8d4d864d07c1a64aeef6255a60cbe0b9f6bed36bab8897b7
+  sha256: cf3f26db54f06c1fc973be8a6681858703baf03e539d0577b1f5fbec723231fd
 - path: checks/LIF-08.yaml
   sha256: 455ffa79e1e8f0c69ca276115f1cb5f498927bcb1b69ed46db254041d4c25efd
 - path: checks/LIF-09.yaml
@@ -230,7 +230,7 @@ files_sha256:
 - path: checks/SUP-13.yaml
   sha256: 2f63524c9b70cf434ba5f878d0fb8af40fe543a6d93fa95dba1b92961fb8392d
 - path: checks/SUP-14.yaml
-  sha256: eaa83e7908be2e425bd256a0d30e2869c06d122c5119d4e2c2333f61cb46218e
+  sha256: fe20468d5faf5ccff2a2daf22659e312e92b200d09f1e7ac50090de8e4234001
 - path: checks/SUP-15.yaml
   sha256: b5ed806e94159e3404664e89a73b2976bfcc3734e91c77273d57066780e55a20
 - path: checks/SUP-16.yaml

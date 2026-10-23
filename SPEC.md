@@ -685,3 +685,11 @@ guard evidence import manual.yaml                                              #
 declared0.9.0의 REQ16 상한은 신고 PASS만 제한한다. 보안은 문맥·객체·key·cache effect 계약, 기능은 그 계약과 모든 행 추론 성공을 요구한다. 추론 실패만으로 별도 신고된 격리 사실을 자동 부정하지 않는다. old_context_reused는 보안/기능 PASS를 UNKNOWN으로 보류하고 새 자동 FAIL은 만들지 않는다. 신고 FAIL/UNKNOWN을 보존한다. 새 계약 성능 PASS는 UNKNOWN이며 명시 CPU의 기존 성능 UNKNOWN 규칙이 우선한다. INV11·첨부·답변·기존 REQ09/SUP/LIF/OBS를 유지한다.
 
 모든 새 표식이 없는 과거 정의는 legacy, 부분/잘못된 선언은 보류다. collector/양식·core/models/store/adapter/HTTP/실행기·config hash 입력은 변경하지 않는다. 관측 변경은 EVD content hash, 판정 버전 변경은 새 RES에 남기며 원본을 바꾸지 않는다. REQ16정의2·팩16/DRAFT·77점검·15정책점검27경로·a24/b3/c161/d115·303결정595연결·자동실행5다. PUBLIC-PREFIX와 REQ15/17·실제 캐시 자동 실행은 미구현이다. 상세 계약/명령/검증은 [M12](docs/POLICY_M12.md).
+
+## M13 REQ-16 허용 enum과 미확인 상태
+
+사용자 지시로 POL-M13-UNKNOWN-AXES를 채택한다. guard-cache-context-evidence/1의 unknown은 enum에 선언된 경우 유효한 관측 상태이며 형태 오류와 구분한다. 빈/공백·잘못된 타입은 RECORD_INCOMPLETE, 미지원 문자열은 ENUM_INVALID다. 식별자·집단·신원/상세/첨부 근거의 unknown 표식은 계속 근거 부족이다.
+
+보안 구조·격리 관측·첨부·기존 INV11 관문이 완결된 신고 PASS에서 inference의 failed/not_attempted/unknown만으로 독립된 보안 근거를 지우지 않는다. 기능은 모든 행 succeeded를 요구한다. 격리 관련 object_change/other_conditions/key_relation/cache_effect의 unknown은 보안/기능 PASS를 보류한다. raw FAIL/UNKNOWN·성능 UNKNOWN·CPU·legacy/부분선언·REQ09/SUP/LIF/OBS는 보존한다. 과거 RES UNKNOWN과 EVD 원본 신고 UNKNOWN을 구분하고 동일 증거의 새 판정 버전으로만 변화시킨다.
+
+declared0.9.1과 기존 캐시 helper만 변경한다. 수동 구조/1·양식/3·/1/2읽기·기존 config hash·팩16/DRAFT/REQ16정의2·77점검·15정책점검27경로·303결정595연결·a24/b3/c161/d115·자동실행5는 그대로다. REQ15 신규 계약과 M14는 [M13](docs/POLICY_M13.md)의 미구현 제안이다.

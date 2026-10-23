@@ -194,3 +194,7 @@ declared0.6.0, manual-entry0.4.0·수동/3 및 /1·/2 읽기는 유지한다. �
 생성 양식의 REQ-16:{}에 기업 전체 required_cache_contexts를 입력한다. model_generation/adapter_content/media_identity의 비어 있지 않은 고유 부분집합만 첫 수동 프로파일을 지원하며 기본값은 없다. []/공백/중복/미지원은 PASS 근거가 아니다. PUBLIC-PREFIX·REQ15/17은 등록하지 않았다.
 
 수동 /3 generic required_observations의 declared_cache_context_evidence 값에 guard-cache-context-evidence/1 구조를 넣고 collected=true로 신고한다. 각 문맥의3case와 실제 entry 첨부 SHA-256/locator/basis를 직접 작성한다. 기존 첨부 경로를 사용하며 새 payload나 /4는 없다. [M12 입력 절차·축별 판정·검증](POLICY_M12.md)을 따른다. 첨부 내용·신원 인증이나 실제 엔진 검증을 뜻하지 않는다.
+
+## M13 REQ16 미확인 상태
+
+guard-cache-context-evidence/1의 enum unknown은 유효한 미확인 상태다. 식별자·신원/첨부 근거의 unknown은 여전히 근거 부족이다. 추론 unknown만으로 별도 완결된 보안 근거를 지우지 않으며 기능 PASS는 보류한다. 격리 상태의 unknown·미지원 값·형태 오류를 구분하고 raw FAIL/UNKNOWN·성능/CPU·INV11을 유지한다. 구조/양식/팩/기존 해시 입력은 그대로이며 declared0.9.1로 재판정한다. [M13 계약·검증·REQ15 미구현 설계](POLICY_M13.md)를 참고한다.

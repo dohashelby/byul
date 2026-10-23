@@ -159,7 +159,7 @@ def test_manual_approval_to_report_preserves_history_and_escapes_context(tmp_pat
     assert results["SUP-02"].verdicts.security == "UNKNOWN"
     # The evidence is declared; the result keeps the weaker EXAMPLE ENV/POL
     # provenance rather than promoting this synthetic contract to real data.
-    assert all(r.judge.version == "0.9.0" and r.data_origin == "EXAMPLE" for r in results.values())
+    assert all(r.judge.version == "0.9.1" and r.data_origin == "EXAMPLE" for r in results.values())
     assert all(e.data_origin == "DECLARED" for e in st.iter_kind("EVD"))
     saved = {o.ref().sha256: o.to_dict() for k in ("EVD", "RES") for o in st.iter_kind(k)}
     judge_plan(st, pack, plan, T0)

@@ -187,3 +187,7 @@ REQ-09의 새 입력 범위 계약에서는 신고 PASS와 저장된 보안/기�
 ## M12 REQ-16 수동 캐시 문맥 검토
 
 [상세 절차](POLICY_M12.md)에 따라 새 팩16과 POL로 select → evidence template → generic 값·첨부 입력 → evidence import → judge → report를 실행한다. NO_EXECUTOR는 수동 계약 등록 후에도 남는다. 기존 /1/2 읽기와 /3, Ref/side·append-only를 보존한다. 같은 as_of 재판정은 멱등이며 과거 PLAN은 정확한 팩15 보존본으로 재판정한다. 새 팩을 과거 PLAN에 강제로 대입하지 않는다. 캐시 probe나 실제 엔진을 띄우는 절차는 이번 범위에 없다.
+
+## M13 저장 증거 재판정
+
+M12의 inference=unknown이 구조오류로 보류된 증거는 원본을 고치지 않고 정확한 기존 PLAN/팩16과 같은 as_of로 judge한다. 보안 근거/INV11이 충분하면 새 declared0.9.1 RES에서 보안 UNKNOWN→PASS가 가능하나 원본 신고 UNKNOWN은 승격하지 않는다. JSON/HTML에 기능 미확인과 DECLARED 한계를 남긴다. 원본·Ref·side·config hash는 그대로다. [M13](POLICY_M13.md)의 직접 검증과 REQ15 후속 설계를 따른다.

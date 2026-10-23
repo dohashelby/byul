@@ -136,7 +136,7 @@ def test_cli_real_attachment_policy_to_manual_judgment(tmp_path, monkeypatch, mo
         # fixture intentionally leaves all new observation cells blank.
         expected = declared if declared == "FAIL" or res.check_id not in PARAMS else "UNKNOWN"
         assert res.verdicts.security == expected
-        assert res.judge.version == "0.9.0"
+        assert res.judge.version == "0.9.1"
         if expected == "UNKNOWN" and res.check_id not in supplied:
             assert any("NO_POLICY_VALUE" in reason and PARAMS[res.check_id] in reason for reason in res.reasons)
         elif expected == "UNKNOWN":

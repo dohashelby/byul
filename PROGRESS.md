@@ -705,3 +705,10 @@ git status
 - REQ16정의2·팩16/DRAFT·77점검·15정책점검27경로·a24/b3/c161/d115·303결정595연결·자동실행5. CACHE-CONTEXT 공유 후보의 실제 등록 경로는 REQ16뿐이다. 기업 values/scope/승인과 기존 증거·비대상 팩 정의는 보존한다.
 - 구현·테스트·문서 초안 후 직접 검증: 최초1135통과/4실패(Windows fixture CRLF/LF hash 불일치), 관련 수정188통과/1skip, 최종1139통과/실패0/5skip/18제외(299.01초, 신규146사례). 기존skip은 루프백3/symlink2이며 제외/skip을 늘리지 않았다. frozen sync/export·wheel·별도설치와 저장소 밖 실제CLI 최종38명령, M11 wheel/팩15→M12의 legacy REQ16·SUP/LIF/OBS·REQ09 재판정·원본/hash/멱등·JSON/HTML을 확인했다. 보조검사의 비선정 행 가정도 수정했고 제품 판정은 완화하지 않았다. Windows1분 목표는 미달이다. 직접 결과/명령은 [M12](docs/POLICY_M12.md), 최종 SHA Linux CI는 초안 PR에 기록하며 과거M11 결과와 합산하지 않는다.
 - 남은 일: 기업 실제값/신원/객체/첨부 근거 결정, REQ15/17·실캐시 자동 시험 후속 설계. 실제 엔진/운영/유료 자원과 M13은 진행하지 않는다.
+
+## 2026-10-23 M13 — REQ16 unknown과 REQ15 설계
+
+- 기준 M12 55a24b2, codex/gua-policy-cache-m13, PR base=M12. 허용 enum unknown을 문자열 근거표식과 분리하고 추론 상태만 미확인인 경우 기능 축만 보류한다. declared0.9.1과 기존helper 두 파일이며 core/models/store/collector/실행기 변경0이다.
+- 팩16/DRAFT·REQ16정의2·77점검·15정책점검27경로·303결정595연결·a24/b3/c161/d115·자동실행5 보존. 소비 버전 설명3행과 metadata만 갱신한다. REQ15·PUBLIC-PREFIX·새정책은 미등록이다.
+- 구현·테스트·REQ15 설계·M14 초안 완료 후 Windows/CPython3.11.16/uv0.12.11에서 기본전체1279통과/실패0/5skip/18제외(370.58초, 신규140사례). 첫실행통과, skip은기존루프백3/symlink2이며 제외를 늘리지 않았다. frozen sync/export·wheel·저장소밖 설치본38명령·실제M12 wheel/팩16 unknown재현→M13 축별보완·legacy팩15/REQ09/SUP/LIF/OBS/미등록REQ15 보존·JSON/HTML/원본/hash/멱등을 확인했다. 정합성은팩전체/기존out61/M12검증120·코어등바이트보존·metadata/링크/설계20반례/예시2를검증했다. Windows1분목표미달이며 직접명령/시간은 [M13](docs/POLICY_M13.md), 최종SHA Linux CI는초안PR에기록한다. 과거M12 수와 합산하지 않는다.
+- 다음/미정: M14 기술 계약 검토와 기업 집단/신원정책/공개분류·consumer·승인/담당·대상/권한/예산/중단조건. 실제 엔진/운영/유료 자원·M14는 실행하지 않는다.

@@ -310,3 +310,11 @@
 - 보안의 cache effect 신고와 기능의 inference 신고를 축별로 구분한다. 구조/전제가 유효한 상태의 추론 실패만으로 보안 격리 신고를 자동 반박하지 않는다. 모든 실패/미완결은 새 FAIL 대신 PASS 상한 UNKNOWN이며 기존 신고FAIL/UNKNOWN·CPU를 보존한다.
 - 안전한 코드만 report에 전달하고 전용 helper 의존 예외도 신고 FAIL을 지우지 않는다. 미입력/의미 부족과 NO_EXECUTOR는 구분한다. 관측은 EVD hash에 포함하며 기존 config 입력을 늘리지 않는다.
 - 미결 업무: 기업 전체 문맥·실제 consumer/객체·인증 집단/신원 근거·첨부 수집/검토·공개 분류·승인 담당·시험 대상/권한/예산/중단조건. PUBLIC-PREFIX·REQ15·REQ17·실제 실행·M13은 후속이다.
+
+## 2026-10-23 M13 — unknown 축별 일관성과 REQ15 설계
+
+- 사용자 지시로 REQ16의 허용 unknown/형태/enum 의미 구분·축별 상한 보완과 관련 judges/테스트/문서/metadata·커밋/푸시/초안PR을 승인받았다. 기업 실제값·REQ15 신규 등록·실제 엔진 시험은 승인되지 않았다.
+- M12 55a24b2에서 codex/gua-policy-cache-m13으로 분기한다. PR14가 미병합이므로 base는M12다. fetch한 main1778c15는 .DS_Store 변경뿐이며 이번 작업에 섞지 않는다.
+- POL-M13-UNKNOWN-AXES: 구조/격리 근거가 유효하면 inference failed/not_attempted/unknown은 기능만 UNKNOWN, 독립 보안은 기존 PASS 후보를 유지한다. 격리 관련unknown은 두 축 보류, rawFAIL/UNKNOWN은 보존한다. 판정기0.9.1이며 과거 객체/팩/설정 해시는 그대로다.
+- 설계 제안: REQ15의 PRIVATE-GROUP 최초 프로파일, PUBLIC-PREFIX bool·전체 격리집단 목록·신원정책 Ref의 명시 POL 전제와 /3 generic 증거를 [M13](docs/POLICY_M13.md)에 정리한다. bool false만으로 공유 관계/승인을 추론하지 않는다. 실제 신규키·카탈로그 분류 변경과 M14 실행은 하지 않는다.
+- 미결: 기업 전체집단/분류·신원정책 정본/승인·서비스 자격 뒤 사용자전달·대상경로/신뢰 경계/consumer·담당·시험권한/예산/중단조건. 문서 작성이나 합성 회귀의 차단 조건으로 삼지 않는다.

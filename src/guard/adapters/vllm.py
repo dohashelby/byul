@@ -98,7 +98,25 @@ PROBE_PROMPT = "ping"
 HttpGet = Callable[[str, float], tuple[int | str, str]]  # url, timeout → (상태코드 | 분류 문자열, 본문)
 
 CPU_LAUNCH_KEYS = {"dtype", "max_model_len", "max_num_seqs", "max_num_batched_tokens",
-                   "kv_cache_memory_bytes", "enforce_eager", "cpu_threads", "resources", "chat_template_profile"}
+                   "kv_cache_memory_bytes", "enforce_eager", "cpu_threads", "resources", "chat_template_profile", "logging_profile"}
+
+
+def fixed_native_log_profile(profile: str) -> dict:
+    """A fixed native logging fixture; no custom dictConfig or Python imports."""
+    if type(profile) is not str or profile != "request-info-v1":
+        raise ValueError("logging_profile must be request-info-v1")
+    return {"profile": profile, "version": "1", "level": "INFO", "color": False,
+            "max_log_len": 512, "external_request_id_trust": "untrusted_correlation",
+            "logger_sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+            "formatter_sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+            "environment": {"VLLM_CONFIGURE_LOGGING": "1", "VLLM_LOGGING_LEVEL": "INFO",
+                            "VLLM_LOGGING_COLOR": "0", "VLLM_LOGGING_PREFIX": "",
+                            "VLLM_LOGGING_STREAM": "ext://sys.stdout"},
+            "custom_config_allowed": False,
+            "sources": [
+                {"path": "vllm/logger.py", "sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010", "lines": "27-33,64-103"},
+                {"path": "vllm/logging_utils/formatter.py", "sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5", "lines": "60-73"},
+                {"path": "vllm/entrypoints/serve/utils/request_logger.py", "sha256": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d", "lines": "36-66"}]}
 
 
 def fixed_chat_template(profile: str) -> tuple[Mount, dict]:
@@ -184,6 +202,7 @@ class LaunchPlan:
     limits: ContainerLimits | None = None
     entrypoint: str | None = None
     chat_template: dict | None = None
+    log_profile: dict | None = None
 
 
 @dataclass
@@ -193,7 +212,7 @@ class VllmAdapter:
     base_url: str | None = None
     launch_spec: LaunchSpec | None = None
     name: str = field(default="vllm", init=False)
-    version: str = field(default="0.3.0", init=False)
+    version: str = field(default="0.4.0", init=False)
 
     # --- 기동 ------------------------------------------------------------------
 
@@ -232,6 +251,9 @@ class VllmAdapter:
             if "chat_template_profile" in spec.options:
                 _, template = fixed_chat_template(spec.options["chat_template_profile"])
                 argv += ["--chat-template", template["container_path"], "--chat-template-content-format", "string"]
+            if "logging_profile" in spec.options:
+                logging = fixed_native_log_profile(spec.options["logging_profile"])
+                argv += ["--enable-log-requests", "--max-log-len", str(logging["max_log_len"])]
             return argv
         argv = [
             "--model", spec.model, "--revision", str(revision), "--served-model-name", spec.model,
@@ -256,9 +278,13 @@ class VllmAdapter:
         argv = self.start_command(spec)
         mounts = [Mount(Path(models_dir), MODEL_MOUNT, read_only=True)]
         template = None
+        logging = None
         if "chat_template_profile" in spec.options:
             template_mount, template = fixed_chat_template(spec.options["chat_template_profile"])
             mounts.append(template_mount)
+        if "logging_profile" in spec.options:
+            logging = fixed_native_log_profile(spec.options["logging_profile"])
+            env.update(logging["environment"])
         bounded = spec.options.get("launch_profile") == "cpu-bounded"
         if bounded:
             cpu = CpuLaunchOptions.from_options(spec.options)
@@ -284,7 +310,26 @@ class VllmAdapter:
             limits=cpu_launch_limits(spec.options) if bounded else None,
             entrypoint="/usr/bin/env" if bounded else None,
             chat_template=template,
+            log_profile=logging,
         )
+
+    def request_binding_contract(self, image_digest: str, engine_version: str) -> dict | None:
+        """Consumer evidence in the inspected image, not an authenticated principal."""
+        if image_digest != CHAT_REVIEWED_IMAGE or engine_version != "0.31.0":
+            return None
+        return {"profile": "request-connection-binding-v1", "engine_version": engine_version,
+                "image_digest": image_digest, "id_prefix": "chatcmpl-", "body_request_id": True,
+                "header_request_id": True, "header_precedence": True,
+                "consumer_prompt_ids": True, "consumer_prompt_text": True,
+                "sources": [
+                    {"path": "vllm/entrypoints/serve/engine/serving.py", "sha256": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02", "lines": "119-129"},
+                    {"path": "vllm/entrypoints/openai/chat_completion/serving.py", "sha256": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002", "lines": "291-317,554-565,743-760,1190-1201"},
+                    {"path": "vllm/entrypoints/openai/chat_completion/protocol.py", "sha256": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1", "lines": "391-400,416-423,446-452"}]}
+
+    def native_log_contract(self, image_digest: str, engine_version: str) -> dict | None:
+        if image_digest != CHAT_REVIEWED_IMAGE or engine_version != "0.31.0":
+            return None
+        return fixed_native_log_profile("request-info-v1")
 
     def template_rejection_evidence(self, response: dict, *, kind: str,
                                     prompt_tokens: int | None = None, output_tokens: int | None = None,

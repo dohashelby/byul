@@ -27,10 +27,11 @@ from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, canonica
 from guard.runtime.docker import Docker, DockerError, Mount
 from guard.runtime.comparison import execution_conditions
 
-from . import http_probe
+from . import http_probe, stream_probe
 from .base import DraftArtifact, EvidenceDraft
 
 ContainerProbe = Callable[[str, list[dict], float], list[dict]]  # network, requests, timeout → results
+StreamProbe = Callable[[str, list[dict], float], list[dict]]  # bounded connection-local JSON/SSE
 HostProbe = Callable[[dict, float], dict]
 
 NO_RESPONSE = ("timeout", "unreachable")
@@ -121,6 +122,42 @@ def docker_container_probe(docker: Docker, image: str) -> ContainerProbe:
     return run
 
 
+def docker_stream_probe(docker: Docker, image: str) -> StreamProbe:
+    """Use the existing owned Docker lifecycle; no independent cleanup owner.
+
+    This additional protocol never changes the legacy serial request format.
+    Keys stay in stdin, and collector errors never include raw stderr/request
+    data. The parent executor supplies its remaining whole-run budget.
+    """
+    script = Path(stream_probe.__file__).resolve()
+    counter = {"n": 0}
+    counter_lock = Lock()
+
+    def run(network: str, requests: list[dict], timeout: float) -> list[dict]:
+        stream_probe._prepare(requests, timeout)  # validate before creating a container
+        with counter_lock:
+            counter["n"] += 1
+            suffix = f"streamprobe{counter['n']}"
+        result = docker.run_once(
+            image, suffix, network=network, timeout=timeout + 60,
+            mounts=[Mount(script, "/probe/stream_probe.py")], command=["python", "/probe/stream_probe.py"],
+            input=json.dumps({"timeout": timeout, "requests": requests}, ensure_ascii=False).encode("utf-8"),
+        )
+        if result.returncode != 0:
+            raise DockerError(f"stream probe container exited {result.returncode}")
+        try:
+            values = json.loads(result.stdout)
+        except (ValueError, TypeError) as exc:
+            raise DockerError("invalid stream probe response") from exc
+        if (type(values) is not list or len(values) != len(requests)
+                or any(type(value) is not dict for value in values)
+                or [value.get("id") for value in values] != [request["id"] for request in requests]):
+            raise DockerError("invalid stream probe response labels")
+        return values
+
+    return run
+
+
 @dataclass
 class Ctx:
     check: CheckDef
@@ -136,6 +173,7 @@ class Ctx:
     workdir: Path
     started: Any
     log: list[dict] = field(default_factory=list)
+    sprobe: StreamProbe | None = None
 
     @property
     def trusted_net(self) -> str:
@@ -177,10 +215,11 @@ class HttpCheckExecutor:
     functional_via = "gateway"   # 이 실행기가 보내는 기능 표본의 경로
 
     def __init__(self, cfg: dict, container_probe: ContainerProbe | None = None, host_probe: HostProbe = http_probe.probe,
-                 environ: dict[str, str] | None = None):
+                 environ: dict[str, str] | None = None, stream_probe: StreamProbe | None = None):
         self.cfg = cfg
         self._container_probe = container_probe
         self._host_probe = host_probe
+        self._stream_probe = stream_probe
         self._environ = os.environ if environ is None else environ
 
     # --- 키 ----------------------------------------------------------------------
@@ -219,15 +258,15 @@ class HttpCheckExecutor:
         target = json.loads(Path(self.cfg["target"]).read_text(encoding="utf-8"))
         keys = self.keys()
 
-        def make_ctx(cprobe: ContainerProbe) -> Ctx:
+        def make_ctx(cprobe: ContainerProbe, sprobe: StreamProbe | None = None) -> Ctx:
             return Ctx(check=check, env=env, adapter=adapter, target=target, policy_values=policy_values,
                        timeout=float(self.cfg.get("request_timeout", 3.0)),
                        allow_mutating=bool(self.cfg.get("allow_mutating_routes", False)), keys=keys,
-                       secrets=[v for v in keys.values() if v], cprobe=cprobe, workdir=workdir, started=utcnow())
+                       secrets=[v for v in keys.values() if v], cprobe=cprobe, workdir=workdir, started=utcnow(), sprobe=sprobe)
 
         if self._container_probe is not None:
             wait_engine(target, self._container_probe, alive=None)
-            return self._finish(make_ctx(self._container_probe))
+            return self._finish(make_ctx(self._container_probe, self._stream_probe))
         docker = Docker(f"x{secrets.token_hex(4)}")
         draft = None
         try:
@@ -235,7 +274,7 @@ class HttpCheckExecutor:
             container = target["engine"].get("container")
             alive = (lambda: docker.is_running(container, timeout=30)) if container else None
             wait_engine(target, cprobe, alive)
-            draft = self._finish(make_ctx(cprobe))
+            draft = self._finish(make_ctx(cprobe, self._stream_probe or docker_stream_probe(docker, target["probe_image"])))
         finally:
             try:
                 incomplete = bool(docker.cleanup(timeout=60))

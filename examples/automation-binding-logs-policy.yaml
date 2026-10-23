@@ -1,0 +1,147 @@
+# EXAMPLE/DRAFT limited connection and native INFO policy; not enterprise approval.
+data_origin: EXAMPLE
+status: DRAFT
+pack:
+  id: PACK-BASELINE
+  revision: 19
+values:
+  REQ-01:
+    allowed_callers:
+    - allowed
+  REQ-03:
+    general_allowed_kinds:
+    - inference
+  PLT-01:
+    allowed_capabilities: []
+    allowed_mounts:
+    - /models:ro
+    - /guard-assets/chat/guard-text-chat-v1.jinja:ro
+    allowed_devices: []
+    require_non_root: true
+    allowed_exec_writable_paths:
+    - /guard-cache
+  PLT-04:
+    forbidden_env_names:
+    - GUARD_TEST_CREDENTIAL
+    forbidden_mount_paths: []
+  REQ-09:
+    max_input_tokens: 127
+    rejection_codes:
+    - '400'
+    - '413'
+    - '422'
+    allowed_endpoints:
+    - POST /v1/completions
+    allowed_input_formats:
+    - token_ids
+  REQ-10:
+    allowed_sampling_options:
+    - temperature
+    - top_p
+    - min_tokens
+    rejection_codes:
+    - '400'
+    - '422'
+  REQ-13:
+    allowed_response_fields:
+    - id
+    - object
+    - created
+    - model
+    - choices[].index
+    - choices[].text
+    - choices[].logprobs
+    - choices[].finish_reason
+    - choices[].stop_reason
+    - choices[].token_ids
+    - choices[].prompt_logprobs
+    - choices[].prompt_token_ids
+    - choices[].routed_experts
+    - service_tier
+    - system_fingerprint
+    - usage.prompt_tokens
+    - usage.total_tokens
+    - usage.completion_tokens
+    - usage.prompt_tokens_details
+    - usage.completion_tokens_details
+    - kv_transfer_params
+    - ec_transfer_params
+    - metrics
+    allowed_error_fields:
+    - error.message
+    - error.type
+    - error.param
+    - error.code
+    - detail[].loc[]
+    - detail[].msg
+    - detail[].type
+    - detail[].input
+    - detail[].ctx.error
+    - detail[].ctx.expected
+    forbidden_return_options:
+    - echo
+    - return_prompt_text
+    - return_token_ids
+    - logprobs
+    - prompt_logprobs
+    required_targets:
+    - engine
+    - gateway
+  OBS-03:
+    allowed_log_fields:
+    - timestamp
+    - level
+    - message
+    - request_id
+    - event
+    - exception
+    - traceback
+    - exception_dump
+    forbidden_log_fields:
+    - authorization
+    - password
+    - secret
+    - prompt
+    - token_ids
+    forbidden_marker_contexts:
+    - caller_input
+    - private_system
+    - error_input
+    required_sources:
+    - engine
+    required_branches:
+    - normal
+    - error
+    - exception_dump
+  REQ-07:
+    allowed_template_sha256:
+    - e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e
+    max_rendered_input_tokens: 127
+    request_template_override_allowed: false
+  REQ-11:
+    result_binding: originating_connection
+    client_request_id_trust: untrusted_correlation
+  OBS-09:
+    collector_profile: guard-vllm-native-info-v1
+    required_trusted_fields:
+    - process
+    - level
+    - source
+    client_request_id_trust: untrusted_correlation
+scope:
+  include:
+  - REQ-01
+  - REQ-03
+  - PLT-01
+  - PLT-04
+  - REQ-09
+  - REQ-10
+  - REQ-13
+  - OBS-03
+  - REQ-07
+  - REQ-11
+  - OBS-09
+  exclude: []
+exceptions: []
+confirmed_by: null
+confirmed_at: null

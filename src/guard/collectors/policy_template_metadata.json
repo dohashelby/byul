@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 18,
-    "sha256": "4d00aec5587635ab777807c07509dcba57fa23c34705591e1aa35bc110feff54"
+    "revision": 19,
+    "sha256": "7753f6dc7dcad28985b97d33153f26f07673cc0b41bf28cb0adb65858f172e5a"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -85,6 +85,30 @@
       "consumer": "선정: select의 required bool 타입/누락 검사, false는 값 / 양식: 정책 기본값 없이 점검별 빈 입력과 설명 생성 / 판정: declared 0.6.0의 대상 선언에 한한 분기별 PASS 보류; FAIL 보존 / 보고: POLICY_CONTEXT 이유와 실제 상태/공유 정책 일관성 미검증 표시",
       "verification": "수동 정책 문맥의 코드 계약; 기업값/승인·실제 usage/replay·엔진 미검증",
       "catalog_id": "P-DRAFT-REPLAY-ALLOW"
+    },
+    "values.OBS-09.client_request_id_trust": {
+      "type": "str",
+      "description": "실제 로그의 외부 request ID를 신뢰하지 않는 상관값으로 해석하는 정책",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "OBS-09 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
+      "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
+      "catalog_id": "P-AUTO-OBS-09-CLIENT-REQUEST-ID-TRUST"
+    },
+    "values.OBS-09.collector_profile": {
+      "type": "str",
+      "description": "실제 native INFO 로그를 소비할 명시적 참조 수집 프로파일. 기업 SIEM과 구분",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "OBS-09 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
+      "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
+      "catalog_id": "P-AUTO-OBS-09-COLLECTOR-PROFILE"
+    },
+    "values.OBS-09.required_trusted_fields": {
+      "type": "list[str]",
+      "description": "실제 수집 경로에서 요구하는 신뢰 필드. 초기 지원은 process/level/source이며 주체·상태 필드는 자동 생성하지 않음",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "OBS-09 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
+      "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
+      "catalog_id": "P-AUTO-OBS-09-REQUIRED-TRUSTED-FIELDS"
     },
     "values.OBS-11.alert_deadline_ms": {
       "type": "dict[str,int]",
@@ -269,6 +293,22 @@
       "consumer": "REQ-10 선언·select 타입 검사 / guard.executors.sampling_validation 실제 관측 / rule_table 저장 관측 재판정·JSON/HTML",
       "verification": "자동화 1차 제한 프로파일; 실제 실행·미검증 범위는 docs/AUTOMATION_PHASE1.md",
       "catalog_id": "P-AUTO-REQ-10-REJECTION-CODES"
+    },
+    "values.REQ-11.client_request_id_trust": {
+      "type": "str",
+      "description": "고정 직접 엔진에서 외부 request ID를 신뢰하지 않는 상관값으로 해석하는 정책. 내부 주체 인증과 구분",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "REQ-11 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
+      "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
+      "catalog_id": "P-AUTO-REQ-11-CLIENT-REQUEST-ID-TRUST"
+    },
+    "values.REQ-11.result_binding": {
+      "type": "str",
+      "description": "고정 직접 엔진 프로파일의 결과 연결 귀속 기준. 기업 신원·공유/독자 권한 전체와 구분",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "REQ-11 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
+      "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
+      "catalog_id": "P-AUTO-REQ-11-RESULT-BINDING"
     },
     "values.REQ-13.allowed_error_fields": {
       "type": "list[str]",

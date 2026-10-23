@@ -62,8 +62,8 @@ def test_current_declarations_metadata_and_empty_values(tmp_path):
     text = build_policy_template(pack)
     data = yaml.safe_load(text)
     declarations = {(c.id, p.key) for c in pack.active_checks() for p in c.policy_params}
-    assert len(declarations) == 41
-    assert {cid for cid, key in declarations} == {"REQ-01", "REQ-03", "REQ-07", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "PLT-01", "PLT-04", "SUP-14", "LIF-07", "SUP-01", "SUP-02", "OBS-11", "OBS-04", "OBS-05", "OBS-07", "OBS-08", "REQ-16"}
+    assert len(declarations) == 46
+    assert {cid for cid, key in declarations} == {"REQ-01", "REQ-03", "REQ-07", "REQ-09", "REQ-10", "REQ-11", "REQ-13", "OBS-03", "OBS-09", "PLT-01", "PLT-04", "SUP-14", "LIF-07", "SUP-01", "SUP-02", "OBS-11", "OBS-04", "OBS-05", "OBS-07", "OBS-08", "REQ-16"}
     assert set(data["values"]) == {cid for cid, key in declarations}
     assert all(value == {} for value in data["values"].values())
     assert text.count("# 파라미터: ") == len(declarations)

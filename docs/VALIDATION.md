@@ -1,5 +1,15 @@
 # 실증 준비와 완료 판정
 
+## 현행 2차 검증 결과
+
+[자동화 2차](AUTOMATION_PHASE2.md)·[완료 계약](AUTOMATION_PHASE2_PROMPT.md)을 기준으로 REQ-07 revision 2의 렌더 후 입력 경계·실제 소비 token 대조와 REQ-13 private_system 분기를 검증했다. 현행 등록은 PACK-BASELINE 18/DRAFT·자동 연결 9개·정책 19점검/41경로·카탈로그 317행/609연결·adapter 0.3.0·declared/0.11.0이다. 기본 전체 1,781통과·5 skip·18제외, 마지막 오류 직렬화 보수 후 관련 128회귀 통과. 최종 127 경계 확인과 별도 32 반례, REQ-13 private_system·PLT-01의 실제 관측, 반출·복원·저장 팩 재판정은 [직접 검증 기록](AUTOMATION_PHASE2.md#검증-기록)과 [선별 증거](evidence/automation-phase2-20261023.json)를 따른다. 아래 기록은 과거 단계 이력이다.
+
+[별도 CPU chat 설정](../examples/windows-cpu-chat.toml)과 [EXAMPLE/DRAFT 정책](../examples/automation-chat-policy.yaml)으로 실제 ENV·원본 모델 snapshot·고정 이미지를 준비한다. [RUNBOOK의 새 제품 명령](RUNBOOK.md#현행-자동화-2차-입력과-검증-상태)을 사용해 한 엔진씩 실행하고 JSON/HTML·EVD/RES Ref·반출/새 위치 복원·저장 증거 재판정을 확인한다. 컨테이너 안 고정 template SHA 전후와 `/tokenize`의 IDs/실제 prompt_token_ids가 일치해야 소비 근거가 된다. 단순 개수·200/400만으로 통과시키지 않는다.
+
+실증은 정상 예산 127과 별도 EXAMPLE 반례 예산 32를 구분하며 REQ-13의 1차 정책값·확인된 FAIL·미확인 분기를 보존한다. CPU 성능 UNKNOWN·official=false이며 임의 템플릿·멀티모달·기업 승인·GPU·두 실제 이미지 업데이트 비교는 이 제한 프로파일의 완료 범위에 포함되지 않는다. 1차의 14/15 기대 일치와 짧은 관측 시간의 실제 PASS는 원본 그대로 보존한다.
+
+## 기존 검증 계약과 이력
+
 작성: 2026-10-19, Asia/Seoul. 시작 코드: `codex/gua-update-mvp / 4d97dba`.
 이 문서는 이후 준비 도구와 시험 계약을 설명한다. 실제 엔진 실증 완료 기록이 아니다.
 

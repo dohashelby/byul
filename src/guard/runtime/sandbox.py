@@ -311,6 +311,8 @@ def _up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = 
                                  argv=plan.argv, environment=_public_environment(plan.env, prof, credential_canary),
                                  engine_permissions={k: prof[k] for k in
                                      ("cap_add", "cap_drop", "read_only", "tmpfs", "user", "security_opt") if k in prof})
+        if plan.chat_template is not None:
+            launch_conditions["chat_template"] = plan.chat_template
     target = {
         # 실험실 stub 대상만 lab=true(→ EXAMPLE). 실제 vLLM 대상은 실제 실행 → MEASURED (DECISIONS 5a/5b)
         "lab": engine == "stub",

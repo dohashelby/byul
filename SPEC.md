@@ -1,5 +1,7 @@
 # 서빙엔진 보안 검증 솔루션 — 설계 초안 (SPEC v0.1)
 
+> 2026-10-23 자동화 2차: 고정 CPU text-chat fixture·REQ-07 변환 후 입력 검사·REQ-13 private 분기·시간창 행렬 계약을 추가한다. [실행 계약](docs/AUTOMATION_PHASE2_PROMPT.md)과 [현재 검증](docs/AUTOMATION_PHASE2.md)을 따른다. 일반 Jinja 실행·기업 승인·전체77 자동화·GPU/두 이미지 실측의 범위 확장은 아니다.
+
 > 작성 2026-10-19 · 상태: **초안**. 팀 확인 전. 구현·실측 완료를 뜻하지 않는다.
 >
 > **근거:** `serving-security-framework`(점검 77행·시나리오 83개·환경/결과 템플릿)를 "무엇을 점검하나"의 정본으로, `BoBProject/개발계획`(A1 불변식·A3 파이프라인·A17 콘텐츠 팩/확장 지점)을 "어떻게 만드나"의 구조 기준으로 삼았다. BoBProject의 승인 서명·감사 outbox·객체 20여 종은 의도적으로 뺐다(§9).

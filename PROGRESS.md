@@ -725,3 +725,9 @@ git status
 - 배포본: 별도 wheel/새 venv/외부cwd/Python -I·환경경로 차단에서 소스=wheel=설치69파일 일치,CLI16명령 기대일치·정책38경로·새3 합성 판정/JSONHTML/verify0. 최종 Windows wheel SHA `7b3186e946457b47228e7d1c6f53470e6b8b6c947ca85eaa094ad0c252a7dfaa`. 합성 설치 결과는 실제 엔진 결과로 세지 않는다.
 - 보존: 보호176파일·다른74정의·기존원문/증거·7객체 저장계약 유지, 임시팩재생성2회/metadata/카탈로그/CSV정합 확인. 모델7파일 inventory와 기존5컨테이너 ID/상태 전후 동일·기존kind2개 계속실행. 비용/운영시험·GPU·두 실제이미지 비교·기업승인·runner소비·실제예외dump 전체는 미검증이다.
 - 자세한 명령/범위/직접 결과와 후속 조건은 [AUTOMATION_PHASE1](docs/AUTOMATION_PHASE1.md), 선별 실증 요약은 [검증 JSON](docs/evidence/automation-phase1-20261023.json)을 따른다. 전체 모델/DB/로그/개인 경로는 커밋하지 않고 저장소 밖 output의 이번 phase 폴더에 원본을 보존했다. 커밋 후 최종SHA 원격일치·지원Linux CI·wheel 결과는 초안PR 본문과 종료 보고에 기록한다.
+
+## 자동화 2차 — 고정 CPU chat·REQ-07·관측 계약 (2026-10-23)
+- 한 일: [실행 프롬프트](docs/AUTOMATION_PHASE2_PROMPT.md)에 따라 고정 readonly template/안정 비교 설정, REQ-07 POL3·관측13·4챌린지·실제 token 소비/경계·수동 PASS 상한·보고서, REQ-13 private_system 실측, matrix/2·읽기 전용 과거 분석을 연결했다. PACK18/DRAFT·9자동연결·19정책점검/41경로·카탈로그317행/609연결이다.
+- 테스트 결과: 기본 전체 1781pass/5skip/18제외(JUnit suite 364.50s), 마지막 adapter 보수 관련 128회귀 통과. 실제 표와 원본 UNKNOWN/FAIL 보존·반출/복원/저장 팩 재판정·wheel71파일/17CLI 검증은 [직접 기록](docs/AUTOMATION_PHASE2.md#검증-기록)·[선별 증거](docs/evidence/automation-phase2-20261023.json)를 따른다. 과거1차14/15 exit1과590파일 보존. 최종SHA Linux CI는 PR에서 별도 확인.
+- 다음 단계: REQ-11의 일반/SSE 소비 귀속·OBS-09의 실제 collector/parser를 독립 계약으로 설계한 뒤 제한 실행기를 확대한다. 기업 정책 확정과 운영 증거 수집은 구분한다. Windows 기본 테스트1분 목표 미달의 I/O도 후속 개선한다.
+- 남은 것: 9연결은77전체 완료 수가 아니다. CPU성능/GPU/서로 다른 두 실제 이미지 비교·임의template·REQ10하위소비·OBS03예외dump·기업승인 전체는 미검증. 비용서버/운영시험/병합은 수행하지 않았다.

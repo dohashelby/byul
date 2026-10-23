@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,6 +21,11 @@ from .base import CommonOption, ContainerHandle, EngineEvent, EngineIdentity, La
 DEFAULT_MODEL = "facebook/opt-125m"
 CONTAINER_PORT = 8000
 MODEL_MOUNT = "/models"
+CHAT_TEMPLATE_PROFILE = "guard-text-chat-v1"
+CHAT_TEMPLATE_SHA256 = "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e"
+CHAT_TEMPLATE_CONTAINER_PATH = "/guard-assets/chat/guard-text-chat-v1.jinja"
+CHAT_TEMPLATE_ASSET = Path(__file__).resolve().parent / "assets" / "chat" / "guard-text-chat-v1.jinja"
+CHAT_REVIEWED_IMAGE = "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b"
 
 # 접근 권한 점검에서 제외하는 정보성 경로 (DECISIONS 5a)
 # 경로 종류. 점검은 CheckDef.route_scope.include_kinds로 대상 종류를 고른다.
@@ -92,7 +98,27 @@ PROBE_PROMPT = "ping"
 HttpGet = Callable[[str, float], tuple[int | str, str]]  # url, timeout → (상태코드 | 분류 문자열, 본문)
 
 CPU_LAUNCH_KEYS = {"dtype", "max_model_len", "max_num_seqs", "max_num_batched_tokens",
-                   "kv_cache_memory_bytes", "enforce_eager", "cpu_threads", "resources"}
+                   "kv_cache_memory_bytes", "enforce_eager", "cpu_threads", "resources", "chat_template_profile"}
+
+
+def fixed_chat_template(profile: str) -> tuple[Mount, dict]:
+    """Only a shipped, byte-pinned text fixture may enable the chat endpoint.
+
+    This formats messages for bounded API experiments. It does not turn an
+    untrained base model into an instruction or system-isolation model.
+    """
+    if type(profile) is not str or profile != CHAT_TEMPLATE_PROFILE:
+        raise ValueError(f"chat_template_profile must be {CHAT_TEMPLATE_PROFILE}")
+    if not CHAT_TEMPLATE_ASSET.is_file() or CHAT_TEMPLATE_ASSET.is_symlink():
+        raise ValueError("fixed chat template asset is missing or is a symlink")
+    actual = hashlib.sha256(CHAT_TEMPLATE_ASSET.read_bytes()).hexdigest()
+    if actual != CHAT_TEMPLATE_SHA256:
+        raise ValueError("fixed chat template asset integrity differs from the shipped profile")
+    return Mount(CHAT_TEMPLATE_ASSET, CHAT_TEMPLATE_CONTAINER_PATH, read_only=True), {
+        "profile": CHAT_TEMPLATE_PROFILE, "version": "1", "sha256": actual,
+        "container_path": CHAT_TEMPLATE_CONTAINER_PATH, "content_format": "string",
+        "request_overrides": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -157,6 +183,7 @@ class LaunchPlan:
     shm_size: str | None = None
     limits: ContainerLimits | None = None
     entrypoint: str | None = None
+    chat_template: dict | None = None
 
 
 @dataclass
@@ -166,7 +193,7 @@ class VllmAdapter:
     base_url: str | None = None
     launch_spec: LaunchSpec | None = None
     name: str = field(default="vllm", init=False)
-    version: str = field(default="0.2.0", init=False)
+    version: str = field(default="0.3.0", init=False)
 
     # --- 기동 ------------------------------------------------------------------
 
@@ -202,6 +229,9 @@ class VllmAdapter:
                 argv.append("--enforce-eager")
             if spec.options.get(CommonOption.REMOTE_CODE_EXECUTION.value):
                 argv.append(OPTION_FLAGS[CommonOption.REMOTE_CODE_EXECUTION])
+            if "chat_template_profile" in spec.options:
+                _, template = fixed_chat_template(spec.options["chat_template_profile"])
+                argv += ["--chat-template", template["container_path"], "--chat-template-content-format", "string"]
             return argv
         argv = [
             "--model", spec.model, "--revision", str(revision), "--served-model-name", spec.model,
@@ -224,6 +254,11 @@ class VllmAdapter:
         secret = ["VLLM_API_KEY"] if spec.options.get(CommonOption.API_KEY_REQUIRED.value) else []
         env = {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "HF_HOME": MODEL_MOUNT}
         argv = self.start_command(spec)
+        mounts = [Mount(Path(models_dir), MODEL_MOUNT, read_only=True)]
+        template = None
+        if "chat_template_profile" in spec.options:
+            template_mount, template = fixed_chat_template(spec.options["chat_template_profile"])
+            mounts.append(template_mount)
         bounded = spec.options.get("launch_profile") == "cpu-bounded"
         if bounded:
             cpu = CpuLaunchOptions.from_options(spec.options)
@@ -243,12 +278,85 @@ class VllmAdapter:
             argv=argv,
             env=env,
             secret_env_names=secret,
-            mounts=[Mount(Path(models_dir), MODEL_MOUNT, read_only=True)],
+            mounts=mounts,
             gpus=device == "gpu",
             shm_size=None if bounded else "1g",
             limits=cpu_launch_limits(spec.options) if bounded else None,
             entrypoint="/usr/bin/env" if bounded else None,
+            chat_template=template,
         )
+
+    def template_rejection_evidence(self, response: dict, *, kind: str,
+                                    prompt_tokens: int | None = None, output_tokens: int | None = None,
+                                    max_model_len: int | None = None) -> dict | None:
+        """Recognize only the inspected vLLM 0.31.0 pre-generation rejections.
+
+        HTTP 400 by itself is insufficient: auth, a bad model or an unrelated
+        validation failure must never stand in for input-limit enforcement.
+        The caller must independently pin/verify the image and engine version.
+        """
+        if (type(response) is not dict or type(response.get("outcome")) is not int
+                or response["outcome"] != 400 or response.get("body_truncated")
+                or type(response.get("body")) is not str):
+            return None
+        try:
+            value = json.loads(response["body"])
+        except (ValueError, TypeError):
+            return None
+        error = value.get("error") if type(value) is dict else None
+        if (type(error) is not dict or error.get("type") != "BadRequestError"
+                or type(error.get("code")) is not int or error["code"] != 400):
+            return None
+        if kind == "request_override":
+            expected = ("Chat template is passed with request, but --trust-request-chat-template is not set. "
+                        "Refused request with untrusted chat template.")
+            if error.get("message") != expected or error.get("param") is not None:
+                return None
+            return {"engine_version": "0.31.0", "image_digest": CHAT_REVIEWED_IMAGE,
+                    "phase": "pre_generation", "kind": kind,
+                    "source": "vllm/renderers/online_renderer.py:636-660",
+                    "source_sha256": "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e"}
+        if kind == "input_limit":
+            if (any(type(v) is not int or v <= 0 for v in (prompt_tokens, output_tokens, max_model_len))
+                    or output_tokens > max_model_len or prompt_tokens <= max_model_len - output_tokens
+                    or error.get("param") != "input_tokens"):
+                return None
+            # Tokenization may retain only max_input+1 tokens before rejecting.
+            captured = min(prompt_tokens, max_model_len - output_tokens + 1)
+            qualifier = "at least " if captured == max_model_len - output_tokens + 1 else ""
+            expected = (f"This model's maximum context length is {max_model_len} tokens. However, you requested "
+                        f"{output_tokens} output tokens and your prompt contains {qualifier}{captured} input tokens, "
+                        f"for a total of {qualifier}{captured + output_tokens} tokens. Please reduce the length of the "
+                        "input prompt or the number of requested output tokens."
+                        f" (parameter=input_tokens, value={captured})")
+            if error.get("message") != expected:
+                return None
+            return {"engine_version": "0.31.0", "image_digest": CHAT_REVIEWED_IMAGE,
+                    "phase": "pre_generation", "kind": kind,
+                    "source": "vllm/renderers/params.py:483-510",
+                    "source_sha256": "ad38852674ebc5bbe69aa9df91602847d518382cc2ceb0a25aac1d07be66b504",
+                    "formatter_source": "vllm/exceptions.py:49-56",
+                    "formatter_source_sha256": "22fe819c7ef10438f740c251d81af204871a04c3aa3eb1fd0e68604dc4c2146f",
+                    "serialization_source": "vllm/entrypoints/serve/exception_handling/error_response.py:41-44,87-95",
+                    "serialization_source_sha256": "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e",
+                    "sanitizer_source": "vllm/entrypoints/serve/exception_handling/utils.py:7-15",
+                    "sanitizer_source_sha256": "723214aa4c63418f1d5eb7c1ff2116eca474778576ac7198daa1f39217c17a4f",
+                    "observed_input_tokens": captured, "max_model_len": max_model_len,
+                    "requested_output_tokens": output_tokens}
+        return None
+
+    def supports_template_profile(self, metadata: dict) -> bool:
+        """Restrict probes to the shipped text fixture, never arbitrary Jinja.
+
+        This checks the declared profile contract only. The executor must also
+        verify the actual owned container's argv, readonly mount and file bytes.
+        A new supported profile requires its own version and inspected bytes.
+        """
+        return (type(metadata) is dict and metadata == {
+            "profile": CHAT_TEMPLATE_PROFILE, "version": "1", "sha256": CHAT_TEMPLATE_SHA256,
+            "container_path": CHAT_TEMPLATE_CONTAINER_PATH, "content_format": "string",
+            "request_overrides": False,
+        } and type(metadata.get("request_overrides")) is bool)
 
     # --- 경로 ------------------------------------------------------------------
 

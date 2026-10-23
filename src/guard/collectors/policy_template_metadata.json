@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 17,
-    "sha256": "1adbb9e624136a8985e72ca31f6606ebff5d5fdd34ad641c7903a27ec0e0b4d2"
+    "revision": 18,
+    "sha256": "4d00aec5587635ab777807c07509dcba57fa23c34705591e1aa35bc110feff54"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -197,6 +197,30 @@
       "consumer": "선정: core/select.py 타입·필수 키 / 실행: http_common.discover_routes; role_route에서 include_kinds에서 정책 종류를 차감 / 판정: REQ-03 표는 이 값을 직접 참조하지 않음; 제외 후 경로 관측으로 판정 / 수동 판정: declared 0.5.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
       "catalog_id": "P-DRAFT-REQ-03-GENERAL-ALLOWED-KINDS"
+    },
+    "values.REQ-07.allowed_template_sha256": {
+      "type": "list[str]",
+      "description": "선정된 고정 text-chat 시험 프로파일에서 허용할 template 바이트 SHA-256 목록. 기업 승인 진위 인증과 구분",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "REQ-07 선언·select 타입 검사 / 순수 validate_template_policy / template_validation 실제 token/소비 관측 / rule_table·declared/0.11.0·JSON/HTML",
+      "verification": "자동화 2차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE2.md",
+      "catalog_id": "P-AUTO-REQ-07-ALLOWED-TEMPLATE-SHA256"
+    },
+    "values.REQ-07.max_rendered_input_tokens": {
+      "type": "int",
+      "description": "선정 text-chat 프로파일의 실제 template 적용 후 입력 token 한도. 시험 자원 상한이나 기업 기본값이 아님",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "REQ-07 선언·select 타입 검사 / 순수 validate_template_policy / template_validation 실제 token/소비 관측 / rule_table·declared/0.11.0·JSON/HTML",
+      "verification": "자동화 2차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE2.md",
+      "catalog_id": "P-AUTO-REQ-07-MAX-RENDERED-INPUT-TOKENS"
+    },
+    "values.REQ-07.request_template_override_allowed": {
+      "type": "bool",
+      "description": "선정 text-chat 프로파일의 요청 template override 허용 여부. 초기 deny 검증만 지원하며 true는 미검증 문맥",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "REQ-07 선언·select 타입 검사 / 순수 validate_template_policy / template_validation 실제 token/소비 관측 / rule_table·declared/0.11.0·JSON/HTML",
+      "verification": "자동화 2차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE2.md",
+      "catalog_id": "P-AUTO-REQ-07-REQUEST-TEMPLATE-OVERRIDE-ALLOWED"
     },
     "values.REQ-09.allowed_endpoints": {
       "type": "list[str]",

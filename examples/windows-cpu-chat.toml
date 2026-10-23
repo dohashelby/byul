@@ -1,0 +1,127 @@
+# Explicit fixed chat fixture; model snapshot and default CPU configuration are unchanged.
+# Windows + Docker Desktop Linux/WSL2, bounded CPU diagnostic example.
+# This is launch configuration, not enterprise policy. Use real ENV inventory,
+# kernel/architecture/CPU information and a DRAFT policy scoped to these checks.
+# ENV image: official v0.31.0 Linux amd64 CPU repository@sha256 digest.
+# Known diagnostic image: vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b
+# ENV model: facebook/opt-125m, revision 27dcfa74d334bc871f3234de431e71c6eeba5dd6.
+# Compute inventory of the exact snapshot directory; do not copy an old hash.
+# ENV runtime: gpu_count=0 and explicit Linux CPU profile, threads=2.
+# One engine at a time. RAM/swap/shm values are ceilings, not fit guarantees.
+# Existing unrelated containers are preserved. Intel GPU passthrough is unused.
+store = '.guard-windows-cpu-chat'
+
+[adapter]
+name = 'vllm'
+
+[executors]
+direct_route = 'real'
+role_route = 'real'
+container_config = 'real'
+credential_exposure = 'real'
+input_validation = 'real'
+sampling_validation = 'real'
+response_content = 'real'
+log_analysis = 'real'
+template_validation = 'real'
+
+[validation]
+mode = 'managed'
+topology = 'isolated'
+gateway_profile = 'role_enforced'
+engine_profile = 'hardened'
+# DRAFT sandbox counterexample only. true adds the fixed harmless
+# GUARD_TEST_CREDENTIAL=EXAMPLE_NOT_A_SECRET; false does not inject it.
+credential_canary = false
+
+# Used only by prepare-update/update. Each ENV must name a different image
+# digest for actual update validation. Both engines run sequentially.
+[update]
+mode = 'managed'
+topology = 'isolated'
+gateway_profile = 'role_enforced'
+engine_profile = 'hardened'
+credential_canary = false
+
+[vllm]
+chat_template_profile = 'guard-text-chat-v1'
+launch_profile = 'cpu-bounded'
+model_layout = 'snapshot'
+# Literal TOML strings preserve Windows backslashes; replace with your path.
+# Directory contains config.json, tokenizer files and real weights directly.
+models_dir = 'C:\guard-models\opt-125m-snapshot'
+dtype = 'float32'
+max_model_len = 128
+max_num_seqs = 1
+max_num_batched_tokens = 128
+kv_cache_memory_bytes = 67108864
+enforce_eager = true
+cpu_threads = 2
+ready_timeout = 600
+# Do not set cpu_kv_cache_gib with this byte-sized profile.
+
+[vllm.resources]
+cpus = 2
+memory_bytes = 3221225472
+memory_swap_bytes = 5368709120
+shm_bytes = 536870912
+pids_limit = 256
+
+[direct_route]
+roles = { allowed = 'GUARD_CPU_GENERAL' }
+request_timeout = 30.0
+allow_mutating_routes = false
+
+[role_route]
+roles = { general = 'GUARD_CPU_GENERAL', admin = 'GUARD_CPU_ADMIN' }
+admin_role = 'admin'
+request_timeout = 30.0
+allow_mutating_routes = false
+
+[container_config]
+sentinel_paths = ['/models', '/']
+request_timeout = 30.0
+
+[credential_exposure]
+request_timeout = 30.0
+
+[input_validation]
+vocab_size = 50272
+vocab_source = 'pinned facebook/opt-125m config.json; verify the actual mounted file'
+max_probe_tokens = 128
+request_timeout = 30.0
+# The diagnostic input budget belongs in the test policy, not this config.
+# No defaults or approval for enterprise policy are supplied here.
+
+[sampling_validation]
+constraint_source = 'EXAMPLE: vLLM 0.31.0 sampling API validation; actual runner consumption remains unverified'
+constraint_engine_version = '0.31.0'
+max_output_tokens = 2
+max_total_requests = 32
+max_probe_tokens = 64
+max_duration_seconds = 180
+request_timeout = 30.0
+
+[response_content]
+endpoint = '/v1/chat/completions'
+roles = { allowed = 'GUARD_CPU_GENERAL' }
+request_timeout = 30.0
+# Fixed formatting enables a synthetic private system branch; model instruction quality is unverified.
+
+[log_analysis]
+endpoint = '/v1/completions'
+request_timeout = 30.0
+log_sources = [{ id = 'engine', kind = 'docker_logs', container = '@engine', role = 'engine' }]
+# Docker stdout may be plain text. Missing structured fields or exception dumps
+# stay UNKNOWN; synthetic JSON and a safe 4xx do not prove actual dump coverage.
+
+[template_validation]
+endpoint = '/v1/chat/completions'
+tokenize_endpoint = '/tokenize'
+request_timeout = 120.0
+max_output_tokens = 1
+max_total_requests = 48
+max_probe_tokens = 256
+max_total_probe_tokens = 16384
+max_input_bytes = 4096
+max_duration_seconds = 300

@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 12
+revision: 13
 engines:
 - vllm
 checks:
@@ -134,7 +134,7 @@ files_sha256:
 - path: checks/OBS-10.yaml
   sha256: 3d39ce3ba5943bcc5b5fa839de44f472c6c7a414750dda09a1599b34ac9340fd
 - path: checks/OBS-11.yaml
-  sha256: 66775f751ff74dc0e0623d421d7bfcd88d55ca2a7735c97e3d3d85bd0fb350ec
+  sha256: 7d136c7c2952fad7e887da056f88c12f9dbdbc1dda08268b7308cc120a13b62f
 - path: checks/OBS-12.yaml
   sha256: cc6589356779110e8d2fd277d63a68d8009b430ff5dc42b80c46ac059cf80e78
 - path: checks/PLT-01.yaml

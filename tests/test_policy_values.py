@@ -17,6 +17,8 @@ D = {"origin": "DECLARED", "source": "env.yaml"}
         ("bool", True, True), ("bool", 1, False),
         ("list[str]", ["a", "b"], True), ("list[str]", [], True), ("list[str]", "a", False),
         ("list[str]", ["a", 1], False), ("list[str]", None, False),
+        ("dict[str,int]", {}, True), ("dict[str,int]", {"a": 0}, True),
+        ("dict[str,int]", {"a": -1}, True),  # range semantics belong to the consumer
     ],
 )
 def test_check_policy_value(type_, value, ok):
@@ -30,7 +32,7 @@ def test_check_policy_value(type_, value, ok):
 
 def test_unknown_type_rejected():
     with pytest.raises(PolicyValueError, match="unsupported policy type"):
-        check_policy_value("X-01", "k", "dict[str,int]", {})
+        check_policy_value("X-01", "k", "dict[str,str]", {})
 
 
 def _plan(values):

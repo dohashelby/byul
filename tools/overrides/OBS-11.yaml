@@ -1,0 +1,9 @@
+policy_params:
+- {key: required_records, type: 'list[str]', required: true}
+- {key: collection_deadline_ms, type: 'dict[str,int]', required: true}
+- {key: max_clock_uncertainty_ms, type: 'dict[str,int]', required: true}
+- {key: detection_deadline_ms, type: 'dict[str,int]', required: true}
+- {key: alert_deadline_ms, type: 'dict[str,int]', required: true}
+limitations:
+- 'OBS-11은 필수 누락 모두에 경보가 필요한 제한 프로파일의 자기 신고 근거를 대조한다. 실제 collector 제어·원본 진위·운영 대응·모든 종속 RES 전파는 검증하지 않는다.'
+- '사건별 수치와 독립 근거는 기업이 제공해야 하며 프로파일 적용·시각·조회 범위가 불명확하면 UNKNOWN이다. 보안만 제한 판정하고 기능·성능 PASS는 검증하지 않는다.'

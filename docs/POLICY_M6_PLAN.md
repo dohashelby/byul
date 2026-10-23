@@ -24,9 +24,9 @@ POLICY_PROMPT.md의 3점검/Phase 1 커밋 금지·null 양식은 과거 단계�
 
 | 확인된 사실 | 근거 | 해석·한계 |
 |---|---|---|
-| LIF-07은 수락 모순과 추론/순서 방법 차이를 분리해 확인된 준비 전 수락 FAIL을 보존 | [policy_items.evaluate](../src/guard/judges/policy_items.py#L10), [회귀](../tests/test_policy_m5.py#L39) | 같은 사건의 수락/차단 충돌·순서 미확인·첨부 미연결은 확정 위반으로 쓰지 않는다. 모순 PASS는 보류 |
-| SUP-01/02의 required str·공백 보류·버전 0.4.0·과거 정의 호환 | [DeclaredJudge](../src/guard/judges/declared.py#L23), [회귀](../tests/test_policy_m5.py#L87) | 승인 시스템 이름은 문맥이며 권한·승인 진위 증명이 아니다 |
-| 정책 문맥 이유를 RPT 한계에 전달, HTML escape·official false 검증 | [build_report](../src/guard/core/report.py#L125), [회귀](../tests/test_policy_m5.py#L143) | 설명/항목 검증을 실제 엔진·승인 체계 실증으로 세지 않는다 |
+| LIF-07은 수락 모순과 추론/순서 방법 차이를 분리해 확인된 준비 전 수락 FAIL을 보존 | [policy_items.evaluate](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/judges/policy_items.py#L10), [회귀](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/tests/test_policy_m5.py#L39) | 같은 사건의 수락/차단 충돌·순서 미확인·첨부 미연결은 확정 위반으로 쓰지 않는다. 모순 PASS는 보류 |
+| SUP-01/02의 required str·공백 보류·버전 0.4.0·과거 정의 호환 | [DeclaredJudge](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/judges/declared.py#L23), [회귀](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/tests/test_policy_m5.py#L87) | 승인 시스템 이름은 문맥이며 권한·승인 진위 증명이 아니다 |
+| 정책 문맥 이유를 RPT 한계에 전달, HTML escape·official false 검증 | [build_report](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/core/report.py#L125), [회귀](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/tests/test_policy_m5.py#L143) | 설명/항목 검증을 실제 엔진·승인 체계 실증으로 세지 않는다 |
 | 과거 객체 보존·재판정·타입/키/FAIL 계약을 유지하는 범위의 변경 | [M5 계획](POLICY_M5_PLAN.md), [진행 기록](../PROGRESS.md) | 이번 정적 검토에서 M5 완료를 뒤집을 중대한 회귀는 확인하지 못했다. 저장소 전체 무결함을 입증한 것은 아니다 |
 
 | 검증 출처 | 결과 | M6와 구분 |
@@ -90,8 +90,8 @@ numeric_values_pending이다. 현재 12후보 모두 policy_params 미등록이�
 
 ### 4.1 소유권과 타입의 실제 한계
 
-현재 [Policy.values](../src/guard/models/objects.py#L171)는 dict의 Any 값을 보관할 수 있지만
-[check_policy_value](../src/guard/core/select.py#L35)가 지원하는 것은 str/int/bool/list[str]뿐이다.
+현재 [Policy.values](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/models/objects.py#L171)는 dict의 Any 값을 보관할 수 있지만
+[check_policy_value](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/core/select.py#L35)가 지원하는 것은 str/int/bool/list[str]뿐이다.
 보관 가능성과 검증 지원은 다르다. 사건별 수치 표는 현재 타입으로 의미 있게 검증할 수 없다.
 
 | 자료 | 위치·소유자 | 섞으면 안 되는 것 |
@@ -322,11 +322,11 @@ T12와 T13의 위반 전제는 분리한다. T12에 필요 없는 다른 항목�
 
 ## 8. 현재 호출 경로와 최소 변경 후보
 
-현재: [정책 양식](../src/guard/collectors/policy_template.py#L31) → 로더/POL →
-[select](../src/guard/core/select.py) → [build_template/import_evidence](../src/guard/collectors/manual.py#L69)
-→ EVD → [judge_evidence](../src/guard/core/judge.py#L76) →
-[DeclaredJudge.judge](../src/guard/judges/declared.py#L27) → RES →
-[build_report](../src/guard/core/report.py#L125) → JSON → [HTML](../src/guard/report/html.py).
+현재: [정책 양식](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/collectors/policy_template.py#L31) → 로더/POL →
+[select](../src/guard/core/select.py) → [build_template/import_evidence](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/collectors/manual.py#L69)
+→ EVD → [judge_evidence](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/core/judge.py#L76) →
+[DeclaredJudge.judge](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/judges/declared.py#L27) → RES →
+[build_report](https://github.com/dohashelby/gua/blob/b404a6d847f932edda926c0185572ac315ae7ef1/src/guard/core/report.py#L125) → JSON → [HTML](../src/guard/report/html.py).
 
 | 후보 파일/함수 | 다음 구현에서의 최소 책임 | 보존할 경계·검증 |
 |---|---|---|
@@ -461,3 +461,7 @@ frozen sync·wheel을 빌드하고 저장소 밖 설치본에서 정책양식→
 시작 추적348개 중 허용 문서3개를 제외한345개 바이트 보존·변경4파일 허용 범위·git diff --check를 확인한다.
 문서 검증 보조 도구/로그는 ignored out/test-runs/policy-m6-20261021에 두며 제품 테스트를 추가하지 않는다.
 기본 pytest는 로컬에서 반복하지 않고, 최종 문서 커밋의 자동 CI 실행은 별도로 확인한다.
+
+## M7 구현 후속
+
+사용자가 M7 프롬프트의 제품 구현을 지시했다. §9의 최초 기술 권고를 채택한 구현과 조회 시작/종료·경보 수신점·프로파일 적용·case 시도 근거의 구체화는 [M7 계약](POLICY_M7.md)을 따른다. 이 문서의 M6 검증/미결 기록은 당시 상태로 보존하며 실제 기업 수치·근거 진위·운영 대응 승인은 여전히 별도다.

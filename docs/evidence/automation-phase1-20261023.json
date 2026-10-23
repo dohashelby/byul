@@ -1,0 +1,1120 @@
+{
+  "schema": "guard-automation-phase1-selected-summary/1",
+  "created_at": "2026-10-23T10:11:36.095047+00:00",
+  "base_commit": "714b8bd60ebae3f8bde2bd056f7850ab38325209",
+  "pack_ref": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 17,
+    "sha256": "1adbb9e624136a8985e72ca31f6606ebff5d5fdd34ad641c7903a27ec0e0b4d2"
+  },
+  "environment": {
+    "data_origin": "DECLARED",
+    "engine": {
+      "name": "vllm",
+      "version": "0.31.0",
+      "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b"
+    },
+    "source_commit_status": "UNVERIFIED",
+    "runtime": {
+      "gpu_count": 0,
+      "cpu": {
+        "architecture": "x86_64",
+        "model": "Intel(R) Core(TM) Ultra 7 255H",
+        "system": "Linux",
+        "kernel": "6.18.33.2-microsoft-standard-WSL2",
+        "threads": 2
+      },
+      "platform": "Windows host; Docker Desktop Linux amd64 CPU diagnostic"
+    },
+    "model": {
+      "id": "facebook/opt-125m",
+      "revision": "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+      "inventory_sha256": "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6"
+    },
+    "identity_limitation": "ENV is declared fixture identity; metadata is not independent host or enterprise authentication."
+  },
+  "registration": {
+    "check_definitions": 77,
+    "automated_executor_checks": 8,
+    "structured_policy_checks": 18,
+    "policy_parameter_paths": 38
+  },
+  "matrix": {
+    "original_harness_success": false,
+    "original_hypothesis_matches": 14,
+    "original_hypothesis_total": 15,
+    "supplemental_saved_evidence_validation_accepted": true,
+    "cases": [
+      {
+        "case": "exposed-violations",
+        "checks": [
+          {
+            "check_id": "PLT-01",
+            "expected_security": "FAIL",
+            "actual": {
+              "security": "FAIL",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M329S4H378VEVQV33G2B8E",
+              "revision": 1,
+              "sha256": "049559059d7a32f73014a59b79d59baf6abb2f6e27f687be3e348d5550264a4f"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M32K990GZM74PJ17AD5P0J",
+              "revision": 1,
+              "sha256": "89275678709e33755b7927cd3f45a6e91b6fbdc1112c702869917992d07efa38"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "PLT-04",
+            "expected_security": "FAIL",
+            "actual": {
+              "security": "FAIL",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M32EFPV00WSM40NPZEEMEJ",
+              "revision": 1,
+              "sha256": "6a797445182d58dd53bbd7e7212aaca6fceebfe850501f7f97404bd02e8598de"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M32K99P0X71AJDMCCWHBAA",
+              "revision": 1,
+              "sha256": "6254a214c119f5823cae03576b192e1a1ab619255e210006dca45d4603b7675e"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "REQ-01",
+            "expected_security": "FAIL",
+            "actual": {
+              "security": "FAIL",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M30TWWDZX68NJTYG7SA3HR",
+              "revision": 1,
+              "sha256": "6f07ddfdcc37e66ae2b8c6e18b080c0fdcfeb7666c6aadef6117cc12253448e2"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M32K9XKJ3BF5MF4YR2JCXQ",
+              "revision": 1,
+              "sha256": "6fd349f432b8d36e0ae44e47f02660a7df90d248f26531f47c6a8b0b09ab5b72"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "REQ-03",
+            "expected_security": "FAIL",
+            "actual": {
+              "security": "FAIL",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M31ZN9KWACDB1R6NTAXD2A",
+              "revision": 1,
+              "sha256": "028e0fbc9fd6d059ec27dbebf190dd9f714a977cd0069bac2d94593faee4145b"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M32KA32GFWVQGBED9RJ5X8",
+              "revision": 1,
+              "sha256": "97297179e7968340853b000d6f9320e950c04b1880ee15062f29433257e8ea9c"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "REQ-09",
+            "expected_security": "FAIL",
+            "actual": {
+              "security": "FAIL",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M3251ZWRM4YB717HEYWENM",
+              "revision": 1,
+              "sha256": "dbf1044fd03896c5a940f1b6d3ac5d4345ce49b42d9219313edee84d8496c32d"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M32KA99Z4Q9J7174TBQYVB",
+              "revision": 1,
+              "sha256": "a64e9648f2b29e0ce661b6d07dcf17d79c6ac3ca5238fd873e1ce4e03fdc8a4a"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          }
+        ],
+        "verified": true,
+        "exported": true,
+        "restored": true,
+        "original_hypothesis_matched": true,
+        "original_mismatches": [],
+        "rejudged_from_saved_pack": true,
+        "rejudge_idempotent": true,
+        "original_objects_and_refs_preserved": true,
+        "original_store_bytes_preserved": true,
+        "normal_control_and_all_axes_separately_checked": true,
+        "limitations": [
+          "EXAMPLE/DRAFT test policy; a narrow REQ-09 policy violation is not proof of memory corruption.",
+          "The tiny positive timeout induces a real observation constraint, not a forged UNKNOWN."
+        ]
+      },
+      {
+        "case": "isolated-controls",
+        "checks": [
+          {
+            "check_id": "PLT-01",
+            "expected_security": "PASS",
+            "actual": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M38GGCADFA36CRJ0X6AQCQ",
+              "revision": 1,
+              "sha256": "96dccf8e73cb758e0747fcd2db4d300a2212edd2146dc1281b1938ab87775258"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M38SC04B8F16FSTVB6JGDV",
+              "revision": 1,
+              "sha256": "4ef702f478a06a7faa12dcc5dba499ddea9aa40aafe05c490870abd5b3ff58b6"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "PLT-04",
+            "expected_security": "PASS",
+            "actual": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M38MN0DBS6DB3A6HX8F0RD",
+              "revision": 1,
+              "sha256": "612ef4deadfe85e32ba76a13227886bd599dbaef829ffdd1f1b0598a4bd5aef2"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M38SC9TG8KTDSY85T1MFVK",
+              "revision": 1,
+              "sha256": "df59e0b824162d8347933f5a0994801a1897f5117bb41a34fe16bf52bb841b2b"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "REQ-01",
+            "expected_security": "PASS",
+            "actual": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M34SWJC3622PTYMRPMBS9H",
+              "revision": 1,
+              "sha256": "53229f06125f9a07292f442d38694909f63450d1e7a57d389b0ebe4acad065ee"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M38SCGHH0NTJ833WNT5QHW",
+              "revision": 1,
+              "sha256": "e5108c24e9e791ab552556241f0de1b1a1597026af49b060da1bf4ea3bd8db25"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "REQ-03",
+            "expected_security": "PASS",
+            "actual": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M386W63EAN4DYFXNPDV1XN",
+              "revision": 1,
+              "sha256": "458481bad43bbfe4863344ccbf85e124674bdf6f51828bbbb91ec197ab8b12e4"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M38SCQPWCQTF6GRR7V4NGW",
+              "revision": 1,
+              "sha256": "1692f4f405cfa11865f0f4cf51b0181d0e1136795cd75e23ff33e32bc193178a"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "REQ-09",
+            "expected_security": "PASS",
+            "actual": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M38C3DSR31KVDT1TBN9EEQ",
+              "revision": 1,
+              "sha256": "e820608afbe713609b1061eb3a586b5449b4f8911190608e66a0a39d49dbfa3f"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M38SCSQ7NKV60ZDKX5F2GX",
+              "revision": 1,
+              "sha256": "8a8170da05cc16eb9eaa55cb4807e023cbfa919f2473315ee1459aa99f96db20"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          }
+        ],
+        "verified": true,
+        "exported": true,
+        "restored": true,
+        "original_hypothesis_matched": true,
+        "original_mismatches": [],
+        "rejudged_from_saved_pack": true,
+        "rejudge_idempotent": true,
+        "original_objects_and_refs_preserved": true,
+        "original_store_bytes_preserved": true,
+        "normal_control_and_all_axes_separately_checked": true,
+        "limitations": [
+          "EXAMPLE/DRAFT test policy; a narrow REQ-09 policy violation is not proof of memory corruption.",
+          "The tiny positive timeout induces a real observation constraint, not a forged UNKNOWN."
+        ]
+      },
+      {
+        "case": "isolated-insufficient-observation",
+        "checks": [
+          {
+            "check_id": "PLT-01",
+            "expected_security": "UNKNOWN",
+            "actual": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": false,
+            "short_timeout_complete_actual_pass_accepted": true,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": true
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M3BV1VAH66VEDPBCV4910N",
+              "revision": 1,
+              "sha256": "6e9776ff827636b40ae90071a5e8df1ea037de20f12d0db9495f6fa608a5c055"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M3CH6QY7D8883684X0Q3SC",
+              "revision": 1,
+              "sha256": "4c88795cfe12391ddca53f1ea4dcce48a75992b0acbb3a4732a22f0d5a942236"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "PLT-04",
+            "expected_security": "UNKNOWN",
+            "actual": {
+              "security": "UNKNOWN",
+              "functional": "UNKNOWN",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": false
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M3CCHW75VN2GHG368K8V5H",
+              "revision": 1,
+              "sha256": "9fb70f01c62248604b7b2419829a807aaade8f611bc582c98273e48119e4e3fe"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M3CH6X4J5FGRGB5R041Z2N",
+              "revision": 1,
+              "sha256": "e6aa776d6606384c9319900ff2ee8a7bad103c6d2ab39048de7078aac65f6306"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "REQ-01",
+            "expected_security": "UNKNOWN",
+            "actual": {
+              "security": "UNKNOWN",
+              "functional": "UNKNOWN",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": false
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M3BG5HGBQMYYH6PJC6A0VD",
+              "revision": 1,
+              "sha256": "42c16ea9260da4e23f24baa6ed9a31b616a78cac50843d4d82a8ec3a03943ce2"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M3CH7491NF6SCH4GFV9BVT",
+              "revision": 1,
+              "sha256": "de98bcf90e36d10224872448bb5918e6f820e89b92765b8a3ecf5d550b68ab89"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "REQ-03",
+            "expected_security": "UNKNOWN",
+            "actual": {
+              "security": "UNKNOWN",
+              "functional": "UNKNOWN",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": false
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M3BP9Q861DJNJ6DKVJWCJV",
+              "revision": 1,
+              "sha256": "613669473fe7298904c6026f981268e7d17b7647dcd127f1e6142c1d9ea91bfc"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M3CH745S3ENXN4ZAG523MG",
+              "revision": 1,
+              "sha256": "1e40d54213b974947b56fb095ff25e141e0dac12126bf5e96ac0e8e537c6a3c3"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          },
+          {
+            "check_id": "REQ-09",
+            "expected_security": "UNKNOWN",
+            "actual": {
+              "security": "UNKNOWN",
+              "functional": "UNKNOWN",
+              "performance": "UNKNOWN"
+            },
+            "original_hypothesis_matched": true,
+            "short_timeout_complete_actual_pass_accepted": false,
+            "normal_control": {
+              "attempted": true,
+              "succeeded": false
+            },
+            "evidence_ref": {
+              "kind": "EVD",
+              "id": "EVD-01M5M3BS2QDQ86AEWMDT1T3RGF",
+              "revision": 1,
+              "sha256": "179ba2ee95734d0199064b3651c2005a79e65f1bde4bc5bf733c942afdfbdb02"
+            },
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M3CH7FA2E6BJMXTDMSQTWN",
+              "revision": 1,
+              "sha256": "b9f88a4d565c62f5ff81e9676cd31df197ceb6c040a6028169f9437e5959d575"
+            },
+            "execution_status": "COMPLETED",
+            "evidence_origin": "MEASURED"
+          }
+        ],
+        "verified": true,
+        "exported": true,
+        "restored": true,
+        "original_hypothesis_matched": false,
+        "original_mismatches": [
+          "PLT-01: expected security UNKNOWN, observed PASS"
+        ],
+        "rejudged_from_saved_pack": true,
+        "rejudge_idempotent": true,
+        "original_objects_and_refs_preserved": true,
+        "original_store_bytes_preserved": true,
+        "normal_control_and_all_axes_separately_checked": true,
+        "limitations": [
+          "EXAMPLE/DRAFT test policy; a narrow REQ-09 policy violation is not proof of memory corruption.",
+          "The tiny positive timeout induces a real observation constraint, not a forged UNKNOWN."
+        ]
+      }
+    ],
+    "actual_engine_starts": 3,
+    "selected_check_observations": 15,
+    "actual_short_timeout_passes": [
+      "PLT-01"
+    ]
+  },
+  "all_eight": {
+    "official": false,
+    "checks": [
+      {
+        "check_id": "OBS-03",
+        "execution_status": "COMPLETED",
+        "evidence_origin": "MEASURED",
+        "actual": {
+          "security": "UNKNOWN",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "normal_control": {
+          "attempted": true,
+          "succeeded": true
+        },
+        "evidence_ref": {
+          "kind": "EVD",
+          "id": "EVD-01M5M2WYRZJXMVGDD61GDTTFA2",
+          "revision": 1,
+          "sha256": "338a65759a670363aa84b88acce7abd5e72c78a428f4225a03c399403f78d271"
+        },
+        "result_ref": {
+          "kind": "RES",
+          "id": "RES-01M5M2X5BW7NXM8GCQ8ZNFD9TG",
+          "revision": 1,
+          "sha256": "065e1b810d38b2892bd4edd02053682b7cde30752755ddce748a1a912f4dd0bb"
+        },
+        "verification_level": "MEASURED",
+        "reasons": [
+          "security: UNKNOWN (pass rules unmet: log_coverage_complete eq True (observed False); log_required_branches_tested eq <policy:required_branches> (observed []))",
+          "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+          "performance: no rule for this axis",
+          "performance: explicit CPU comparison covers security/function only; performance unverified"
+        ],
+        "remaining_scope": [
+          "private system marker was not consumed by the completions profile",
+          "engine: JSON field inventory unavailable or empty; plain text absence is not PASS",
+          "engine: no trial-linked events for error, exception_dump, normal"
+        ]
+      },
+      {
+        "check_id": "PLT-01",
+        "execution_status": "COMPLETED",
+        "evidence_origin": "MEASURED",
+        "actual": {
+          "security": "PASS",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "normal_control": {
+          "attempted": true,
+          "succeeded": true
+        },
+        "evidence_ref": {
+          "kind": "EVD",
+          "id": "EVD-01M5M2WQX6AD7HHTNF1JYV47MN",
+          "revision": 1,
+          "sha256": "1454641b480cec06d6975dadf0c2d30b6ac22e90b65e453776658d9beb007e42"
+        },
+        "result_ref": {
+          "kind": "RES",
+          "id": "RES-01M5M2X5C3CZAWWYM9KNR59KV0",
+          "revision": 1,
+          "sha256": "83357a16ff1456e46ec9955fe41cc4d9ad2478d173e9406e191d97c4222b3cda"
+        },
+        "verification_level": "MEASURED",
+        "reasons": [
+          "security: all pass rules met: process_scan_complete eq True; capabilities_effective subset_of <policy:allowed_capabilities>; mounts subset_of <policy:allowed_mounts>; devices subset_of <policy:allowed_devices>; privileged eq False; host_namespaces subset_of []; root_uid_present eq False (when policy:require_non_root); sentinel_results all_in ['denied', 'absent']; exec_writable_mounts subset_of <policy:allowed_exec_writable_paths>",
+          "functional: all pass rules met: functional_probe_results nonempty; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+          "performance: no rule for this axis",
+          "performance: explicit CPU comparison covers security/function only; performance unverified"
+        ],
+        "remaining_scope": []
+      },
+      {
+        "check_id": "PLT-04",
+        "execution_status": "COMPLETED",
+        "evidence_origin": "MEASURED",
+        "actual": {
+          "security": "PASS",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "normal_control": {
+          "attempted": true,
+          "succeeded": true
+        },
+        "evidence_ref": {
+          "kind": "EVD",
+          "id": "EVD-01M5M2WWC4WAYSPNNFQ9HZ34F5",
+          "revision": 1,
+          "sha256": "8b8b2883bc906377f5f55c73ff2f773510306a0132fa427d8adf289949809131"
+        },
+        "result_ref": {
+          "kind": "RES",
+          "id": "RES-01M5M2X5CFJWZE67VPN5PQ9GCD",
+          "revision": 1,
+          "sha256": "3e1101be20030ca19420b9e4c79513a833d7bf3479d5e55492e234df20f2c63a"
+        },
+        "verification_level": "MEASURED",
+        "reasons": [
+          "security: all pass rules met: process_scan_complete eq True; worker_env_names none_in <policy:forbidden_env_names>; exposed_credential_paths eq []",
+          "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results nonempty; functional_probe_results all_in ['pass']",
+          "performance: no rule for this axis",
+          "performance: explicit CPU comparison covers security/function only; performance unverified"
+        ],
+        "remaining_scope": []
+      },
+      {
+        "check_id": "REQ-01",
+        "execution_status": "COMPLETED",
+        "evidence_origin": "MEASURED",
+        "actual": {
+          "security": "PASS",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "normal_control": {
+          "attempted": true,
+          "succeeded": true
+        },
+        "evidence_ref": {
+          "kind": "EVD",
+          "id": "EVD-01M5M2R135PR8T4EXFXEQ8EDZ4",
+          "revision": 1,
+          "sha256": "1ec15a9f866e1cd66b8a44014390ffdb5a41d4ca650967a1b4bde18950431b5d"
+        },
+        "result_ref": {
+          "kind": "RES",
+          "id": "RES-01M5M2X5CR1R6TAVKZ0P67SVZJ",
+          "revision": 1,
+          "sha256": "56c27ca4079fe31b896974e3e546dd5a7a31b6bf8fefad5cd98819a6e98f1b8d"
+        },
+        "verification_level": "DECLARED",
+        "reasons": [
+          "security: all pass rules met: routes_registered nonempty; routes_tested superset_of <routes_registered>; direct_outcomes superset_of <routes_registered>; direct_outcomes all_in [401, 403, 'refused', 'timeout', 'unreachable']; trusted_origin_reachable eq True (when direct_outcomes any_in ['refused', 'timeout', 'unreachable'])",
+          "functional: all pass rules met: functional_probe_results nonempty; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+          "performance: no rule for this axis",
+          "performance: explicit CPU comparison covers security/function only; performance unverified"
+        ],
+        "remaining_scope": []
+      },
+      {
+        "check_id": "REQ-03",
+        "execution_status": "COMPLETED",
+        "evidence_origin": "MEASURED",
+        "actual": {
+          "security": "PASS",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "normal_control": {
+          "attempted": true,
+          "succeeded": true
+        },
+        "evidence_ref": {
+          "kind": "EVD",
+          "id": "EVD-01M5M2VGG27HC5VAWZTT1GXQND",
+          "revision": 1,
+          "sha256": "5c8fe38dc56b73a1cdc9097bc186fe88e3a4c34b3dbbd705795495ef2e2139de"
+        },
+        "result_ref": {
+          "kind": "RES",
+          "id": "RES-01M5M2X5DFPJ293SS86ECAPR59",
+          "revision": 1,
+          "sha256": "114cc435326aa7e93483902836e2b8b9cd605c99275c87d730f88a5ea5fbdfcc"
+        },
+        "verification_level": "DECLARED",
+        "reasons": [
+          "security: all pass rules met: routes_registered nonempty; routes_tested superset_of <routes_registered>; nonadmin_outcomes superset_of <routes_registered>; nonadmin_outcomes all_in [401, 403]",
+          "functional: all pass rules met: functional_probe_results nonempty; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+          "performance: no rule for this axis",
+          "performance: explicit CPU comparison covers security/function only; performance unverified"
+        ],
+        "remaining_scope": []
+      },
+      {
+        "check_id": "REQ-09",
+        "execution_status": "COMPLETED",
+        "evidence_origin": "MEASURED",
+        "actual": {
+          "security": "PASS",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "normal_control": {
+          "attempted": true,
+          "succeeded": true
+        },
+        "evidence_ref": {
+          "kind": "EVD",
+          "id": "EVD-01M5M2VP4YZM5TMN1ZQTHYFSX7",
+          "revision": 1,
+          "sha256": "8d8d4a7636771fbb696c1db377b6b5234c76891086a149a36cbf9dcc983d9bec"
+        },
+        "result_ref": {
+          "kind": "RES",
+          "id": "RES-01M5M2X5DSYTPMQV865Z3K3QHG",
+          "revision": 1,
+          "sha256": "342c63495632ca0908b17cbd35ca7e0b695380862571239628d97a6bb0bbe599"
+        },
+        "verification_level": "MEASURED",
+        "reasons": [
+          "security: all pass rules met: challenge_outcomes nonempty; challenge_outcomes superset_of <challenges_planned>; challenge_outcomes all_in <policy:rejection_codes>; input_endpoints_tested eq <policy:allowed_endpoints>; input_formats_tested eq <policy:allowed_input_formats>",
+          "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; input_endpoints_tested eq <policy:allowed_endpoints>; input_formats_tested eq <policy:allowed_input_formats>",
+          "performance: no rule for this axis",
+          "POLICY_CONTEXT: INPUT_SCOPE_ENGINE_DIRECT; submitted token-array profile only; other endpoints/formats, parser consumption and corporate approval are not automatically verified",
+          "POLICY_CONTEXT: INPUT_SCOPE_MATCHED; allowed endpoint and tested profile: POST /v1/completions; format: token_ids",
+          "performance: explicit CPU comparison covers security/function only; performance unverified"
+        ],
+        "remaining_scope": []
+      },
+      {
+        "check_id": "REQ-10",
+        "execution_status": "COMPLETED",
+        "evidence_origin": "MEASURED",
+        "actual": {
+          "security": "UNKNOWN",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "normal_control": {
+          "attempted": true,
+          "succeeded": true
+        },
+        "evidence_ref": {
+          "kind": "EVD",
+          "id": "EVD-01M5M2VTVB96SX5E1JE67YXYM2",
+          "revision": 1,
+          "sha256": "f0070ca3bad973be39a777f69c1a620c9ecd0ee6da793f90d3c0ecf79be9a087"
+        },
+        "result_ref": {
+          "kind": "RES",
+          "id": "RES-01M5M2X5DS797Q0PJHH3YCMW86",
+          "revision": 1,
+          "sha256": "25be585c918e293156c9ed92456e4ae145122b12bd6d2dc35e9827c7ccedac89"
+        },
+        "verification_level": "MEASURED",
+        "reasons": [
+          "security: UNKNOWN (pass rules unmet: runner_consumption_verified eq True (observed False))",
+          "functional: all pass rules met: sampling_options_tested eq <policy:allowed_sampling_options>; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; sampling_health_results superset_of <sampling_options_planned>; sampling_health_results all_in ['200']",
+          "performance: no rule for this axis",
+          "performance: explicit CPU comparison covers security/function only; performance unverified"
+        ],
+        "remaining_scope": [
+          "V2/runner/worker actual consumption and count limits are not measured; security UNKNOWN is expected for this profile."
+        ]
+      },
+      {
+        "check_id": "REQ-13",
+        "execution_status": "COMPLETED",
+        "evidence_origin": "MEASURED",
+        "actual": {
+          "security": "FAIL",
+          "functional": "UNKNOWN",
+          "performance": "UNKNOWN"
+        },
+        "normal_control": {
+          "attempted": true,
+          "succeeded": true
+        },
+        "evidence_ref": {
+          "kind": "EVD",
+          "id": "EVD-01M5M2W635J2TESKNW01NM16GG",
+          "revision": 1,
+          "sha256": "f908cda85f7caf7ef8b0b641dcbec97dd51652b295a99a86b1f62fe935f14541"
+        },
+        "result_ref": {
+          "kind": "RES",
+          "id": "RES-01M5M2X5EDNF8TNZD21EJKRKXN",
+          "revision": 1,
+          "sha256": "75c3ab2efdc7f8fb578d855fc80bc5db30c70968dc68a2424ecd783dfb735528"
+        },
+        "verification_level": "MEASURED",
+        "reasons": [
+          "security: FAIL because response_fields_seen not_subset_of <policy:allowed_response_fields>; response_options_returned any_in <policy:forbidden_return_options> (observed error_fields_seen=['error.code', 'error.message', 'error.param', 'error.type'], private_markers_returned=[], response_fields_seen=['choices[].finish_reason', 'choices[].index', 'choices[].logprobs', 'choices[].logprobs.text_offset[]', 'choices[].logprobs.token_logprobs[]', 'choices[].logprobs.tokens[]', 'choices[].logprobs.top_logprobs[].\\n', 'choices[].prompt_logprobs', 'choices[].prompt_logprobs[]', 'choices[].prompt_logprobs[].100.decoded_token', 'choices[].prompt_logprobs[].100.logprob', 'choices[].prompt_logprobs[].100.r",
+          "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+          "performance: no rule for this axis",
+          "security: FAIL kept despite: challenges not attempted: ['비공개 system 문맥과 금지 반환 옵션 시험']",
+          "functional: PASS withheld: challenges not attempted: ['비공개 system 문맥과 금지 반환 옵션 시험']",
+          "performance: explicit CPU comparison covers security/function only; performance unverified"
+        ],
+        "remaining_scope": [
+          "engine: private system context unsupported by completions profile",
+          "engine:option:return_prompt_text: option accepted or ignored; rejection/stripping not observable",
+          "gateway: private system context unsupported by completions profile",
+          "gateway:option:return_prompt_text: option accepted or ignored; rejection/stripping not observable"
+        ]
+      }
+    ],
+    "verified": true,
+    "exported": true,
+    "restored_and_verified": true,
+    "security_counts": {
+      "UNKNOWN": 2,
+      "PASS": 5,
+      "FAIL": 1
+    }
+  },
+  "tests": {
+    "tests": 1644,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5,
+    "passed": 1639,
+    "seconds": 171.382,
+    "deselected": 18,
+    "skip_cases": [
+      {
+        "class": "tests.invariants.test_inv_03",
+        "name": "test_real_connection_refused_is_classified_and_not_pass_alone",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "class": "tests.test_http_probe",
+        "name": "test_refused_on_closed_port",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "class": "tests.test_http_probe",
+        "name": "test_tcp_probe_refused_and_connected_without_sending_bytes",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "class": "tests.test_model_inventory",
+        "name": "test_inventory_follows_symlinks_and_is_order_independent",
+        "reason": "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "class": "tests.test_policy_m2",
+        "name": "test_template_rejects_symlink_parent_into_input_pack",
+        "reason": "디렉터리 symlink 권한/지원 필요: OSError"
+      }
+    ]
+  },
+  "package": {
+    "isolated_installation_verified": true,
+    "python_version": "3.11.16 (main, Sep  1 2026, 14:15:24) [MSC v.1944 64 bit (AMD64)]",
+    "python_bits": 64,
+    "package_version": "0.1.0",
+    "declared_judge_version": "0.10.0",
+    "cli_commands_matching_expected_exit": 16,
+    "source_wheel_installed_file_matches": 69,
+    "wheel_name": "guard-0.1.0-py3-none-any.whl",
+    "wheel_sha256": "7b3186e946457b47228e7d1c6f53470e6b8b6c947ca85eaa094ad0c252a7dfaa",
+    "synthetic_checks_are_actual_engine_evidence": false
+  },
+  "external_preservation": {
+    "model_inventory_unchanged": true,
+    "unrelated_container_identity_and_states_unchanged": true
+  },
+  "source_artifacts": [
+    {
+      "artifact": "matrix/summary.json",
+      "local_relative_path": "cpu-cases-r4/summary.json",
+      "sha256": "df27a27507aa1d9327b7aeafea21cbd8fa0ce72d8fad13ac524b6d13b1dd006a"
+    },
+    {
+      "artifact": "matrix/manifest.json",
+      "local_relative_path": "cpu-cases-r4/manifest.json",
+      "sha256": "7090626f60c01ebc1f036a6503b536075e595bcc207e9e629c94b872e8a5375a"
+    },
+    {
+      "artifact": "environment/source",
+      "local_relative_path": "seed/env.yaml",
+      "sha256": "8ba9cf9a6a3ef40d4fcbbf6e0079ee0c97e6d3f7f00bba9f2b0e4c213841d485"
+    },
+    {
+      "artifact": "rejudge/summary.json",
+      "local_relative_path": "rejudge-r4/summary.json",
+      "sha256": "e37d239be2dfc2eb8983c5375c9119eac7b551e7b671790506949168d8e5f7ea"
+    },
+    {
+      "artifact": "rejudge/all-fifteen-observations.json",
+      "local_relative_path": "rejudge-r4/all-fifteen-observations.json",
+      "sha256": "3b0f6b006c59bcbdb064f80998fb0dd4da5bb7748c80d1e33431438fc8a0aacc"
+    },
+    {
+      "artifact": "matrix/exposed-violations/expected-actual.json",
+      "local_relative_path": "cpu-cases-r4/exposed-violations/expected-actual.json",
+      "sha256": "2fff1b537067c960ad5c4071c42cf39d7b0ab17b0535baa91abf495073c40662"
+    },
+    {
+      "artifact": "matrix/exposed-violations/proof.json",
+      "local_relative_path": "cpu-cases-r4/exposed-violations/proof.json",
+      "sha256": "9d377004336381ddab3f3a7b3843526576d0412cbb62029394be6466e528f70b"
+    },
+    {
+      "artifact": "matrix/exposed-violations/restored-proof.json",
+      "local_relative_path": "cpu-cases-r4/exposed-violations/restored-proof.json",
+      "sha256": "20c033c5c06e478b911d9199aa736ea852b9caff8ff045ab9f3ec2bf01fea9e5"
+    },
+    {
+      "artifact": "rejudge/exposed-violations/rejudge-proof.json",
+      "local_relative_path": "rejudge-r4/exposed-violations/rejudge-proof.json",
+      "sha256": "a7b1ceedea704a16d6b71dac44dc3ee27d4569488a9efa571108258be1dc5820"
+    },
+    {
+      "artifact": "matrix/exposed-violations/03-verify.json",
+      "local_relative_path": "cpu-cases-r4/exposed-violations/03-verify.json",
+      "sha256": "fe7108b2e38054b5fc6735062f37384a68712bc4ef1d9be73b2df987ad2f8088"
+    },
+    {
+      "artifact": "matrix/exposed-violations/04-export.json",
+      "local_relative_path": "cpu-cases-r4/exposed-violations/04-export.json",
+      "sha256": "a5ba3b063d046aa39ebbe15ea06601f357d293d08960b6e7bf39f9ad01ad40cb"
+    },
+    {
+      "artifact": "matrix/exposed-violations/05-restore.json",
+      "local_relative_path": "cpu-cases-r4/exposed-violations/05-restore.json",
+      "sha256": "4c9b50160b043cdb5314f4f0764549886cda898925711bfacb82af0334ef04ea"
+    },
+    {
+      "artifact": "matrix/exposed-violations/06-verify-restored.json",
+      "local_relative_path": "cpu-cases-r4/exposed-violations/06-verify-restored.json",
+      "sha256": "097397f7af76677bc1580ac0d2335fc4e129b0337ef17c940a0d2a8130fddbc7"
+    },
+    {
+      "artifact": "matrix/isolated-controls/expected-actual.json",
+      "local_relative_path": "cpu-cases-r4/isolated-controls/expected-actual.json",
+      "sha256": "de61fcb0c126c9dfe01c6be12c54ff6c0e7cf908cf35815addfc1a458b44d920"
+    },
+    {
+      "artifact": "matrix/isolated-controls/proof.json",
+      "local_relative_path": "cpu-cases-r4/isolated-controls/proof.json",
+      "sha256": "a92a0b4ef8e9fbd23be9dc187cea848898ef8eb1d62d3421f1d0fb39f8749cf6"
+    },
+    {
+      "artifact": "matrix/isolated-controls/restored-proof.json",
+      "local_relative_path": "cpu-cases-r4/isolated-controls/restored-proof.json",
+      "sha256": "54916cb3ef99e86ef5308c8dc7dfdc291a3c066a823aecd105d4cb54b8d54648"
+    },
+    {
+      "artifact": "rejudge/isolated-controls/rejudge-proof.json",
+      "local_relative_path": "rejudge-r4/isolated-controls/rejudge-proof.json",
+      "sha256": "15886cec95c716f34d72e2edf4558508ff07011e773a8045c4de91ec8f50cd5d"
+    },
+    {
+      "artifact": "matrix/isolated-controls/03-verify.json",
+      "local_relative_path": "cpu-cases-r4/isolated-controls/03-verify.json",
+      "sha256": "3b552b7bbea879f27fcd7b3d8d848f813bdef32a1e7102b7621ef4e422643ff7"
+    },
+    {
+      "artifact": "matrix/isolated-controls/04-export.json",
+      "local_relative_path": "cpu-cases-r4/isolated-controls/04-export.json",
+      "sha256": "9afe70f862d2ac10fc9c35577eeaf19fb674f3d2f13ef54253b9b757575db5cc"
+    },
+    {
+      "artifact": "matrix/isolated-controls/05-restore.json",
+      "local_relative_path": "cpu-cases-r4/isolated-controls/05-restore.json",
+      "sha256": "51cd48d158dde2a58ef9e148e6a2a70a5a32ff0d54e8a4e14db3f9d217b03ac8"
+    },
+    {
+      "artifact": "matrix/isolated-controls/06-verify-restored.json",
+      "local_relative_path": "cpu-cases-r4/isolated-controls/06-verify-restored.json",
+      "sha256": "805ee010c5f725a215c63432304cb2a0f3f02f043954b263368589ba6d3175a7"
+    },
+    {
+      "artifact": "matrix/isolated-insufficient-observation/expected-actual.json",
+      "local_relative_path": "cpu-cases-r4/isolated-insufficient-observation/expected-actual.json",
+      "sha256": "de5706e3dfe7aef1d2a0fd1c11aff67e84043dce76146d01186a3819c65bbf1f"
+    },
+    {
+      "artifact": "matrix/isolated-insufficient-observation/proof.json",
+      "local_relative_path": "cpu-cases-r4/isolated-insufficient-observation/proof.json",
+      "sha256": "186e37bb9c9f4a612738e9b09e1bae09495dbd3cc7843c24f963c26bb98e9006"
+    },
+    {
+      "artifact": "matrix/isolated-insufficient-observation/restored-proof.json",
+      "local_relative_path": "cpu-cases-r4/isolated-insufficient-observation/restored-proof.json",
+      "sha256": "e47b6d983328831bb39279bd057b502b6867d34872267fabeeb83233175b351b"
+    },
+    {
+      "artifact": "rejudge/isolated-insufficient-observation/rejudge-proof.json",
+      "local_relative_path": "rejudge-r4/isolated-insufficient-observation/rejudge-proof.json",
+      "sha256": "9d69d0407442c2b5df19761ca05bc98ccc1d341a9dcf1b7b1d851b47bf35a3ff"
+    },
+    {
+      "artifact": "matrix/isolated-insufficient-observation/03-verify.json",
+      "local_relative_path": "cpu-cases-r4/isolated-insufficient-observation/03-verify.json",
+      "sha256": "d0fe6f1f47356bd12a099a3fcb46aa95db6a5d3a1ed8583a5e9515b618c0c733"
+    },
+    {
+      "artifact": "matrix/isolated-insufficient-observation/04-export.json",
+      "local_relative_path": "cpu-cases-r4/isolated-insufficient-observation/04-export.json",
+      "sha256": "e6a30488192dcb8045d44f0e4f6584cb2dfce5f5b448f6d1a8884488f98fd0ed"
+    },
+    {
+      "artifact": "matrix/isolated-insufficient-observation/05-restore.json",
+      "local_relative_path": "cpu-cases-r4/isolated-insufficient-observation/05-restore.json",
+      "sha256": "7715cd10c03dee1db8fb36207e2648e6a034ed2202bea062a78456134f0dd630"
+    },
+    {
+      "artifact": "matrix/isolated-insufficient-observation/06-verify-restored.json",
+      "local_relative_path": "cpu-cases-r4/isolated-insufficient-observation/06-verify-restored.json",
+      "sha256": "8d1a85a095fd4c074590ae3af474a3677ffff8bc25559c27d5215b03f83a95d7"
+    },
+    {
+      "artifact": "all8/summary.json",
+      "local_relative_path": "all8/summary.json",
+      "sha256": "2de9a7aee520136c3839670fa61964623b7ef2b00d64429882460221b1f20abe"
+    },
+    {
+      "artifact": "all8/01-prepare.json",
+      "local_relative_path": "all8/01-prepare.json",
+      "sha256": "4264954033086feb4856305e81a51378845b74434c652d0cc30807f5fa8e1198"
+    },
+    {
+      "artifact": "all8/02-validate.json",
+      "local_relative_path": "all8/02-validate.json",
+      "sha256": "612c47f1cbfc7be77fc772d342db5575279a9ed9a13498825047d4fc55e8c131"
+    },
+    {
+      "artifact": "all8/03-verify.json",
+      "local_relative_path": "all8/03-verify.json",
+      "sha256": "4fb06f53fa9299028a7119e2956d826e2f76cef1b0a75ff1e874bbf6809440dc"
+    },
+    {
+      "artifact": "all8/04-export.json",
+      "local_relative_path": "all8/04-export.json",
+      "sha256": "bbc92f00a19d7fadce7fa93e271ea5d83e34400a24ea7359da2f79c4a367f9bb"
+    },
+    {
+      "artifact": "all8/05-restore.json",
+      "local_relative_path": "all8/05-restore.json",
+      "sha256": "2e28a8aaa98c8b19e7b7f4fcd3f315c48144072afb0e15025c3d66a00e1a26ae"
+    },
+    {
+      "artifact": "all8/06-restored-verify.json",
+      "local_relative_path": "all8/06-restored-verify.json",
+      "sha256": "348b8f86e2312fca15ba6ef9387f6b1bcc6e41571516ed804fdfb54af73f3a07"
+    },
+    {
+      "artifact": "pytest/final.xml",
+      "local_relative_path": "pytest-final-r3.xml",
+      "sha256": "3a23c7e61378b39f3689bcb42bc90d17541fcb7b9df7f629f6488ac13f3c10c1"
+    },
+    {
+      "artifact": "pytest/final.log",
+      "local_relative_path": "pytest-final-r3.log",
+      "sha256": "809b66525e7d913a57f1b0de76e8545bc9b02d9c916882a9e1cd74b83c95617a"
+    },
+    {
+      "artifact": "package/installed-summary.json",
+      "local_relative_path": "package-validation-r4/installed-summary.json",
+      "sha256": "f6e7510d6ba41e21e64fa1c6e403572b75b652d4e431b5a11915e8815802e9af"
+    },
+    {
+      "artifact": "package/package-source-bytes.json",
+      "local_relative_path": "package-validation-r4/package-source-bytes.json",
+      "sha256": "b68a938a11cf9b52edce7264907bbc0228eae0f87b9fcb7fcc8241adb7a77f55"
+    },
+    {
+      "artifact": "environment/preservation.json",
+      "local_relative_path": "preservation.json",
+      "sha256": "82176f6587f615fb22cb59fb2dc4be3c3fa24444bb6c7516175f9d3ab8b1c2d3"
+    }
+  ],
+  "limitations": [
+    "This committed JSON is a selected summary, not a complete evidence bundle or independently reproducible attestation.",
+    "Full EVD/RES objects, SQLite stores, logs, exact local commands and bundles remain in external local artifacts; paths here are relative to the phase output root and may not exist on another machine.",
+    "Summary input SHA-256 values identify local source files; they do not include or authenticate the omitted contents.",
+    "Reports use EXAMPLE/DRAFT policies and remain nonofficial. MEASURED execution is distinct from enterprise approval and declared hardware identity.",
+    "The matrix and all-eight run use one actual CPU image. Two-image update comparison, GPU, performance, all 77 checks and enterprise system enforcement remain unverified.",
+    "The new three checks provide limited observations; UNKNOWN outcomes are preserved rather than promoted to PASS.",
+    "The original matrix hypothesis may fail: a tiny positive timeout is not guaranteed to lose observations. An actual complete PASS is preserved, and original success=false/mismatches are not relabeled as a successful hypothesis.",
+    "Final pytest excludes opt-in Docker/engine tests; actual engine runs are summarized separately.",
+    "A package rebuilt after a pure helper move may have a different wheel hash without changing the real-engine execution semantics."
+  ]
+}

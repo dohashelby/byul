@@ -17,6 +17,7 @@ import json
 import os
 import secrets
 import time
+from threading import Lock
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -100,11 +101,16 @@ def classify(res: dict, pr: ProbeRequest | None) -> Any:
 def docker_container_probe(docker: Docker, image: str) -> ContainerProbe:
     script = Path(http_probe.__file__).resolve()
     counter = {"n": 0}
+    counter_lock = Lock()
 
     def run(network: str, requests: list[dict], timeout: float) -> list[dict]:
-        counter["n"] += 1
+        # Sampling checks issue a challenge and a valid control concurrently.
+        # Reserve names before launching either subprocess; never share a name.
+        with counter_lock:
+            counter["n"] += 1
+            suffix = f"probe{counter['n']}"
         res = docker.run_once(
-            image, f"probe{counter['n']}", network=network, timeout=timeout * max(len(requests), 1) + 60,
+            image, suffix, network=network, timeout=timeout * max(len(requests), 1) + 60,
             mounts=[Mount(script, "/probe/http_probe.py")], command=["python", "/probe/http_probe.py"],
             input=json.dumps({"timeout": timeout, "requests": requests}).encode(),  # 키는 stdin으로만
         )
@@ -165,7 +171,7 @@ class HttpCheckExecutor:
     """공통 실행 골격. 하위 클래스는 collect(ctx) → (observations, normal_control, challenges, summary)를 구현한다."""
 
     name = "http_check"
-    version = "0.2.0"
+    version = "0.3.0"
     requires_roles = True        # 역할 키가 필요한가(직통·역할 점검). 컨테이너 설정 점검은 아님
     requires_route_scope = True  # CheckDef.route_scope가 필요한가
     functional_via = "gateway"   # 이 실행기가 보내는 기능 표본의 경로
@@ -356,6 +362,19 @@ def probe_templates(ctx: Ctx, routes: dict[str, Route]) -> tuple[dict[str, Probe
     return templates, skipped
 
 
+def inference_control_profile(fp) -> str | None:
+    """Identify a submitted generation fixture, never an administrative GET.
+
+    Unsupported generation forms still require a structured response; status
+    alone must not silently establish inference. Model-list/health/metrics GETs
+    keep the status expectation declared in their CheckDef.
+    """
+    body = fp.body or {}
+    if fp.method.upper() == "POST" and "model" in body and any(key in body for key in ("prompt", "messages", "input")):
+        return "/v1/chat/completions" if "messages" in body else "/v1/completions"
+    return None
+
+
 def functional_requests(ctx: Ctx, via: str = "gateway") -> tuple[list[dict], dict[str, Any]]:
     """CheckDef.functional_probes → (요청 목록, id→probe). gateway: 역할(as_role) 키로 Gateway 경유(외부 출발점),
     engine: 신뢰 출발점에서 엔진으로 직접(키는 역할이 설정돼 있을 때만). 실행기가 다룰 수 없는 경로면 거부."""
@@ -368,20 +387,28 @@ def functional_requests(ctx: Ctx, via: str = "gateway") -> tuple[list[dict], dic
         if via == "gateway":
             if fp.as_role not in ctx.keys:
                 raise RuntimeError(f"functional probe {pid}: role {fp.as_role!r} not configured")
-            reqs.append(ctx.request(f"func|{pid}", ctx.gateway_url, pr, ctx.keys[fp.as_role]))
+            reqs.append(ctx.request(f"func|{pid}", ctx.gateway_url, pr, ctx.keys[fp.as_role], want_body=inference_control_profile(fp) is not None))
         else:
-            reqs.append(ctx.request(f"func|{pid}", ctx.engine_url, pr, ctx.keys.get(fp.as_role)))
+            reqs.append(ctx.request(f"func|{pid}", ctx.engine_url, pr, ctx.keys.get(fp.as_role), want_body=inference_control_profile(fp) is not None))
     return reqs, probes
 
 
-def functional_results(probes: dict[str, Any], results: dict[str, dict]) -> tuple[dict[str, str], dict[str, Any], dict]:
+def functional_results(probes: dict[str, Any], results: dict[str, dict], expected_model: str | None = None) -> tuple[dict[str, str], dict[str, Any], dict]:
     functional: dict[str, str] = {}
     status: dict[str, Any] = {}
     for pid, fp in probes.items():
         o = (results.get(pid) or {}).get("outcome")
         status[pid] = o
         if isinstance(o, int) and not isinstance(o, bool):
-            functional[pid] = "pass" if o in fp.expect else "fail"
+            if o not in fp.expect:
+                functional[pid] = "fail"
+            elif inference_control_profile(fp) is not None:
+                # Local import avoids a module cycle with content_common's
+                # request/masking helpers. No engine operation happens here.
+                from .content_common import control_state
+                functional[pid] = control_state(results[pid], expected_model, inference_control_profile(fp))
+            else:
+                functional[pid] = "pass"
         else:
             functional[pid] = "no_response"
     normal = {

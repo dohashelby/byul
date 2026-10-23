@@ -29,6 +29,21 @@ ROUTES = ["GET /v1/models", "POST /v1/completions", "POST /invocations"]  # "MET
 FUNCTIONAL_PROBE = "POST /v1/completions"
 
 
+def completion_response(request: dict, outcome=200) -> dict:
+    """Explicit EXAMPLE generation success for fake transports, never a default
+    production response. Non-inference and unsuccessful requests keep status only.
+    """
+    import json
+    body = request.get("body") or {}
+    response = {"outcome": outcome}
+    if type(outcome) is int and outcome == 200 and isinstance(body, dict) and "model" in body and any(
+            key in body for key in ("prompt", "messages")):
+        choice = {"message": {"role": "assistant", "content": "EXAMPLE"}} if "messages" in body else {"text": "EXAMPLE"}
+        response["body"] = json.dumps({"model": body["model"], "choices": [{**choice, "finish_reason": "length"}],
+                                      "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}})
+    return response
+
+
 def req01_obs(direct=None, gateway=None, registered=None, tested=None, trusted=True, missing=(),
               functional=None, planned=None) -> dict:
     """REQ-01 관측(경로별). 기본값은 정상 통과 형태(직통 401, Gateway 200, 전 경로 시험, 기능 표본 통과)."""

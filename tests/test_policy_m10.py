@@ -24,7 +24,7 @@ from guard.models.objects import Observation
 from guard.report.html import render_html
 from guard.store import Store
 from guard.store.packs import put_pack
-from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy
+from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy, completion_response
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import fill, snapshot, write
 
@@ -72,7 +72,7 @@ def run(tmp_path, monkeypatch, pack, vals, probe=None, missing_target=False):
         calls.extend(deepcopy(requests))
         if probe:
             return probe(requests)
-        return [{"outcome": 200 if r.get("id") == "ready" or r["body"]["prompt"] == [0] else 400}
+        return [completion_response(r, 200 if r.get("id") == "ready" or r["body"]["prompt"] == [0] else 400)
                 for r in requests]
     monkeypatch.setitem(registry.EXECUTORS, "input_validation:m10-test", lambda cfg: InputValidationExecutor(
         {"target": str(target), "vocab_size": 100, "vocab_source": "EXAMPLE synthetic model fixture"},
@@ -90,24 +90,29 @@ def run(tmp_path, monkeypatch, pack, vals, probe=None, missing_target=False):
 
 def test_registration_is_bounded_and_template_empty(pack):
     check = pack.checks["REQ-09"]
-    assert check.revision == 5 and pack.manifest.revision == 16 and not pack.reviewed
+    assert check.revision == 5 and pack.manifest.revision == 17 and not pack.reviewed
     assert contract_state(check) == "complete" and len(check.required_observations) == 7
     assert len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 15
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 27
-    assert len([c for c in pack.active_checks() if c.executor]) == 5
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 18
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 38
+    assert len([c for c in pack.active_checks() if c.executor]) == 8
     template = yaml.safe_load(build_policy_template(pack))
     assert template["values"]["REQ-09"] == {} and template["status"] == "DRAFT"
     assert template["confirmed_by"] is None and template["confirmed_at"] is None
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
-    assert len(rows) == 303 and sum(len(json.loads(r["check_ids"])) for r in rows) == 595
-    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=24,b=3,c=161,d=115)
+    assert len(rows) == 314 and sum(len(json.loads(r["check_ids"])) for r in rows) == 606
+    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=35,b=3,c=161,d=115)
     for pid, key in zip(("P-DRAFT-INPUT-ENDPOINTS", "P-DRAFT-INPUT-FORMATS"), POLICIES):
         row = next(r for r in rows if r["proposed_policy_id"] == pid)
         assert row["classification"] == "a" and json.loads(row["current_param_paths"]) == [f"values.REQ-09.{key}"]
-    for cid in ("REQ-07", "REQ-08", "REQ-10"):
+    for cid in ("REQ-07", "REQ-08"):
         c = pack.checks[cid]
         assert c.revision == 1 and not c.policy_params and c.executor is None and c.judge is None
+    sampling = pack.checks["REQ-10"]
+    assert sampling.revision == 2 and sampling.executor == "sampling_validation"
+    assert [(p.key, p.type, p.required) for p in sampling.policy_params] == [
+        ("allowed_sampling_options", "list[str]", True), ("rejection_codes", "list[str]", True)]
+    assert sampling.judge.plugin == "rule_table"
 
 
 @pytest.mark.parametrize("key", POLICIES)
@@ -182,7 +187,7 @@ def test_endpoint_comes_from_definition_and_request_not_policy(tmp_path, monkeyp
 @pytest.mark.parametrize("boundary,expected", [(400,"PASS"),(200,"FAIL"),(206,"FAIL"),("timeout","UNKNOWN"),(500,"UNKNOWN"),(401,"UNKNOWN")])
 def test_boundary_results_keep_existing_meaning(tmp_path, monkeypatch, pack, boundary, expected):
     def probe(requests):
-        return [{"outcome": 200 if r.get("id")=="ready" or r["body"]["prompt"]==[0] else boundary} for r in requests]
+        return [completion_response(r, 200 if r.get("id")=="ready" or r["body"]["prompt"]==[0] else boundary) for r in requests]
     _, _, evd, res, _ = run(tmp_path, monkeypatch, pack, values(pack.checks["REQ-09"]), probe)
     assert evd.execution.status == "COMPLETED" and res.verdicts.security == expected
     assert res.verdicts.functional == "PASS" and res.verdicts.performance == "UNKNOWN"
@@ -201,7 +206,7 @@ def test_controls_and_independent_failure(tmp_path, monkeypatch, pack, stage, ou
             count+=1
             is_control=r["body"]["prompt"]==[0]
             code=outcome if is_control and ((stage=="before" and count==1) or (stage=="after" and count>1)) else 200
-            result.append({"outcome":code})
+            result.append(completion_response(r, code))
         return result
     _, _, evd, res, calls = run(tmp_path, monkeypatch, pack, values(pack.checks["REQ-09"]), probe)
     assert res.verdicts.security == security and res.verdicts.functional == functional

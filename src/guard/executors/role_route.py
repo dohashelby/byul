@@ -35,7 +35,7 @@ from .http_common import (
 
 class RoleRouteExecutor(HttpCheckExecutor):
     name = "role_route"
-    version = "0.3.0"
+    version = "0.4.0"
 
     def collect(self, ctx: Ctx):
         admin_role = self.cfg.get("admin_role", "admin")
@@ -69,7 +69,7 @@ class RoleRouteExecutor(HttpCheckExecutor):
                              for p, r in by_role.items() if all(l in r for l in nonadmin)}
         admin_outcomes = {p: r[admin_role] for p, r in by_role.items() if admin_role in r}
         routes_tested = sorted(nonadmin_outcomes)
-        functional, functional_status, normal = functional_results(probes, func_raw)
+        functional, functional_status, normal = functional_results(probes, func_raw, ctx.env.model.id)
 
         observations = {
             "routes_registered": {"value": rs.registered if rs.collected else None, "collected": rs.collected},

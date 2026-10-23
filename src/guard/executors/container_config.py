@@ -102,7 +102,7 @@ def _mount_key(m: dict) -> str:
 
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
-    version = "0.3.0"
+    version = "0.4.0"
     requires_roles = False
     requires_route_scope = False
     functional_via = "engine"
@@ -180,7 +180,7 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         for (pid, fp), r in zip(probes.items(), res):
             func_raw[pid] = r
             ctx.record("trusted", "functional-engine", pid, fp.as_role, r)
-        functional, functional_status, normal = functional_results(probes, func_raw)
+        functional, functional_status, normal = functional_results(probes, func_raw, ctx.env.model.id)
 
         mount_lines = [line.split() for line in mt.stdout.splitlines() if line.strip()]
         mounts_complete = mt.returncode == 0 and bool(mount_lines) and all(len(line) >= 6 for line in mount_lines)

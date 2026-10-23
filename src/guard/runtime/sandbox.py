@@ -12,14 +12,16 @@ vLLM 엔진 인자는 `adapters/vllm.py`의 launch_plan()만 쓴다(여기서 �
 from __future__ import annotations
 
 import json
+import hashlib
 import time
 from pathlib import Path
 
 import yaml
 
 from guard.adapters.base import LaunchSpec
-from guard.adapters.vllm import CONTAINER_PORT, VllmAdapter
+from guard.adapters.vllm import CONTAINER_PORT, CPU_LAUNCH_KEYS, CpuLaunchOptions, VllmAdapter
 from guard.executors import http_probe
+from guard.executors.content_common import redact_value
 from guard.executors.http_probe import probe
 from guard.runtime.docker import Docker, DockerError, Mount
 
@@ -72,6 +74,7 @@ def _vllm_plan(vllm: dict):
         model=vllm["model"], port=ENGINE_PORT, image=vllm["image"],
         options={"revision": vllm["revision"], "models_dir": Path(vllm["models_dir"]).expanduser(),
                  "device": "gpu" if vllm.get("gpu") else "cpu",
+                 **{key: vllm[key] for key in ("launch_profile", "model_layout", *CPU_LAUNCH_KEYS) if key in vllm},
                  **({"cpu_kv_cache_gib": vllm["cpu_kv_cache_gib"]} if "cpu_kv_cache_gib" in vllm else {})},
     )
     return VllmAdapter().launch_plan(spec)
@@ -84,7 +87,7 @@ CACHE_ENV = {
     # compilation/backends.py L1064)가 필요
     "VLLM_CACHE_ROOT": "/guard-cache/vllm",                 # 필요(이것만으로 기동, 실측 3.0M 사용)
     "TORCHINDUCTOR_CACHE_DIR": "/guard-cache/torchinductor",  # 오류 메시지가 지목한 변수. 실측 사용 0 — /tmp로 가지 않게 유지
-    # TRITON_CACHE_DIR: 근거 없음(CPU 빌드, 디렉토리 생성 안 됨) → 넣지 않음
+    # legacy CPU 빌드에는 Triton 캐시 사용 증거가 없었다. cpu-bounded 전용 보완은 _engine_profile()에 있다.
 }
 
 # 엔진 컨테이너 실행 권한 프로필(PLT-01). 모델 마운트는 모든 프로필에서 읽기 전용이다.
@@ -103,11 +106,31 @@ ENGINE_PROFILES = {
 SENTINEL_TARGET = "/guard-sentinel"
 
 
-def _start_engine(docker: Docker, engine: str, networks: list[str], publish: list[int], vllm: dict | None,
-                  profile: str = "default", sentinel_dir: Path | None = None) -> str:
+def _engine_profile(engine: str, vllm: dict | None, profile: str) -> dict:
+    """실행과 비교 조건이 같은 고정 권한·캐시 환경을 사용한다."""
     if profile not in ENGINE_PROFILES:
         raise ValueError(profile)
     prof = ENGINE_PROFILES[profile]
+    if engine == "vllm" and (vllm or {}).get("launch_profile") == "cpu-bounded" and profile == "hardened":
+        # x86 CPU vLLM 0.31.0의 Triton launcher .so가 /tmp/.triton/cache에서 noexec로 실패했다.
+        # /tmp 보호를 풀지 않고, 검증된 실행 가능 컴파일 캐시에만 JIT 출력을 둔다.
+        # Triton CPU load_binary() also dlopens a tempfile outside its persistent
+        # cache. Use an already mounted directory: a missing TMPDIR child would
+        # silently fall back to /tmp. Other CPU temporary files may share it.
+        return {**prof, "env": {**prof.get("env", {}), "TRITON_CACHE_DIR": "/guard-cache/triton", "TMPDIR": "/guard-cache"}}
+    return prof
+
+
+def _public_environment(base: dict, prof: dict, credential_canary: bool) -> dict:
+    return {**base, **prof.get("env", {}),
+            **({"GUARD_TEST_CREDENTIAL": "EXAMPLE_NOT_A_SECRET"} if credential_canary else {})}
+
+
+def _start_engine(docker: Docker, engine: str, networks: list[str], publish: list[int], vllm: dict | None,
+                  profile: str = "default", sentinel_dir: Path | None = None, credential_canary: bool = False) -> str:
+    prof = _engine_profile(engine, vllm, profile)
+    if type(credential_canary) is not bool:
+        raise ValueError("credential_canary must be a boolean")
     extra_mounts = []
     if prof.get("sentinel_mount"):
         if sentinel_dir is None or any(sentinel_dir.iterdir()):
@@ -117,12 +140,16 @@ def _start_engine(docker: Docker, engine: str, networks: list[str], publish: lis
     if engine == "stub":
         return docker.run_detached(PYTHON_IMAGE, "engine", networks=networks, publish=publish,
                                    mounts=[Mount(LAB / "stub_engine/server.py", "/lab/server.py"), *extra_mounts],
-                                   public_env=prof.get("env", {}), command=["python", "-u", "/lab/server.py"],
+                                   public_env=_public_environment({}, prof, credential_canary), command=["python", "-u", "/lab/server.py"],
                                    timeout=T, **opts)
     plan = _vllm_plan(vllm)
     assert all(m.read_only for m in plan.mounts)  # 모델 마운트는 항상 읽기 전용
+    if plan.limits is not None:
+        opts["limits"] = plan.limits
+    if plan.entrypoint is not None:
+        opts["entrypoint"] = plan.entrypoint
     return docker.run_detached(plan.image, "engine", networks=networks, publish=publish,
-                               mounts=[*plan.mounts, *extra_mounts], public_env={**plan.env, **prof.get("env", {})},
+                               mounts=[*plan.mounts, *extra_mounts], public_env=_public_environment(plan.env, prof, credential_canary),
                                command=plan.argv, gpus=plan.gpus, shm_size=plan.shm_size, timeout=T, **opts)
 
 
@@ -134,16 +161,87 @@ GATEWAY_PROFILES = {
 }
 
 
+def capture_diagnostics(docker: Docker, run_dir: Path, *, secret_values: list[str], phase: str) -> dict:
+    """Best-effort separate run diagnostic, captured before labelled resources are removed.
+
+    This is not an EVD attachment or an automatic evidence-bundle member. Never
+    copy raw daemon errors, Config.Env, requests, or unredacted log files.
+    """
+    path = run_dir / "managed-diagnostic.json"
+    try:
+        # A startup-failure capture must survive the application's final capture.
+        if not path.exists():
+            rows = {}
+            for role in ("engine", "gw"):
+                row = {}
+                try:
+                    row["state"] = docker.diagnostic_state(role, timeout=5)
+                except Exception as exc:
+                    row["state_error_type"] = type(exc).__name__
+                else:
+                    try:
+                        result = docker.diagnostic_logs(role, timeout=5)
+                        row["logs_returncode"] = result.returncode
+                        if result.returncode == 0:
+                            text = redact_value(result.stdout + result.stderr, secret_values)
+                            encoded = text.encode("utf-8")
+                            row["logs_truncated"] = len(encoded) > 32768
+                            # Redact before clipping: even a credential crossing the saved boundary is removed.
+                            row["logs"] = encoded[-32768:].decode("utf-8", "ignore")
+                        else:
+                            row["logs_error_type"] = "DockerCommandFailure"
+                    except Exception as exc:
+                        row["logs_error_type"] = type(exc).__name__
+                rows[role] = row
+            doc = {"schema": "guard-managed-diagnostic/1", "phase": phase if phase in {"startup-failure", "run-final"} else "unknown",
+                   "containers": rows,
+                   "scope": "Separate run diagnostic; not an EVD attachment or automatic evidence-bundle member.",
+                   "redaction": "Known gateway credentials and labelled credential values are masked; arbitrary log content or personal data may remain.",
+                   "limits": {"tail_lines_per_container": 80, "saved_log_bytes_per_container": 32768,
+                              "timeout_seconds_per_command": 5,
+                              "raw_single_line_bytes": "not hard-capped by the subprocess reader"}}
+            run_dir.mkdir(parents=True, exist_ok=True)
+            # The run directory is fresh and no existing capture is overwritten.
+            payload = json.dumps(doc, ensure_ascii=False, indent=2).encode("utf-8")
+            with path.open("xb") as out:
+                out.write(payload)
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        hash_path = path.with_suffix(".json.sha256")
+        if not hash_path.exists():
+            hash_path.write_text(digest + "  managed-diagnostic.json\n", encoding="ascii")
+        return {"path": path.name, "sha256": digest}
+    except Exception as exc:
+        # Diagnostic collection must never replace the original execution failure or a completed violation.
+        return {"error_type": type(exc).__name__}
+
+
 def up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = None, *, engine: str = "stub",
        vllm: dict | None = None, wait_ready: bool = True, gateway_profile: str = "single",
        gateway_keys: dict[str, str] | None = None, engine_profile: str = "default",
-       sentinel_dir: Path | None = None) -> dict:
+       sentinel_dir: Path | None = None, credential_canary: bool = False) -> dict:
+    try:
+        return _up(docker, topology, run_dir, allowed_key, engine=engine, vllm=vllm, wait_ready=wait_ready,
+                   gateway_profile=gateway_profile, gateway_keys=gateway_keys, engine_profile=engine_profile,
+                   sentinel_dir=sentinel_dir, credential_canary=credential_canary)
+    except Exception:
+        if run_dir.exists():
+            capture_diagnostics(docker, run_dir, secret_values=[v for v in [allowed_key, *(gateway_keys or {}).values()] if v],
+                                phase="startup-failure")
+        raise
+
+
+def _up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = None, *, engine: str = "stub",
+        vllm: dict | None = None, wait_ready: bool = True, gateway_profile: str = "single",
+        gateway_keys: dict[str, str] | None = None, engine_profile: str = "default",
+        sentinel_dir: Path | None = None, credential_canary: bool = False) -> dict:
     """engine: "stub" | "vllm". vllm: guard.toml [vllm] 섹션(image, model, revision, models_dir, gpu, ready_timeout ...).
 
     gateway_profile: single(allowed_key) | role_open | role_enforced(gateway_keys: GUARD_GENERAL_KEY·GUARD_ADMIN_KEY).
     """
     if topology not in ("exposed", "isolated"):
         raise ValueError(topology)
+    if type(credential_canary) is not bool:
+        raise ValueError("credential_canary must be a boolean")
     if gateway_profile not in GATEWAY_PROFILES:
         raise ValueError(gateway_profile)
     secret_env = {"GUARD_ALLOWED_KEY": allowed_key} if gateway_profile == "single" else dict(gateway_keys or {})
@@ -159,13 +257,13 @@ def up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = N
     publish = [ENGINE_PORT] if topology == "exposed" else []
     if topology == "exposed":
         net = docker.network_create("net", timeout=T)
-        engine_name = _start_engine(docker, engine, [net], publish, vllm, engine_profile, sentinel_dir)
+        engine_name = _start_engine(docker, engine, [net], publish, vllm, engine_profile, sentinel_dir, credential_canary)
         engine_ip = docker.ip(engine_name, net, timeout=T)
         external_net = trusted_net = net
     else:
         engine_net = docker.network_create("engine", internal=True, timeout=T)
         outside = docker.network_create("outside", timeout=T)
-        engine_name = _start_engine(docker, engine, [engine_net], publish, vllm, engine_profile, sentinel_dir)
+        engine_name = _start_engine(docker, engine, [engine_net], publish, vllm, engine_profile, sentinel_dir, credential_canary)
         engine_ip = docker.ip(engine_name, engine_net, timeout=T)
         external_net, trusted_net = outside, engine_net
 
@@ -203,6 +301,16 @@ def up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = N
 
     if engine == "vllm":
         images[vllm["image"]] = docker.image_digest(vllm["image"], timeout=T)
+    launch_conditions = {k: v for k, v in (vllm or {}).items() if k in {"model", "revision", "gpu", "cpu_kv_cache_gib"}}
+    if engine == "vllm" and vllm.get("launch_profile") == "cpu-bounded":
+        plan = _vllm_plan(vllm)
+        prof = _engine_profile(engine, vllm, engine_profile)
+        launch_conditions.update(profile="cpu-bounded-v1", model_layout=vllm.get("model_layout", "hf-cache"),
+                                 **CpuLaunchOptions.from_options(vllm).to_dict(),
+                                 resources=plan.limits.to_dict(), entrypoint=plan.entrypoint,
+                                 argv=plan.argv, environment=_public_environment(plan.env, prof, credential_canary),
+                                 engine_permissions={k: prof[k] for k in
+                                     ("cap_add", "cap_drop", "read_only", "tmpfs", "user", "security_opt") if k in prof})
     target = {
         # 실험실 stub 대상만 lab=true(→ EXAMPLE). 실제 vLLM 대상은 실제 실행 → MEASURED (DECISIONS 5a/5b)
         "lab": engine == "stub",
@@ -211,8 +319,7 @@ def up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = N
         "observed_version": version,
         "comparison_config": {"profile": "sandbox-v1", "topology": topology, "engine_profile": engine_profile,
                               "support_images": {k: v for k, v in images.items() if not vllm or k != vllm["image"]},
-                              "gateway_profile": gateway_profile, "launch": {k: v for k, v in (vllm or {}).items()
-                               if k in {"model", "revision", "gpu", "cpu_kv_cache_gib"}}},
+                              "gateway_profile": gateway_profile, "launch": launch_conditions},
         "topology": topology,
         "gateway_profile": gateway_profile,
         "engine_profile": engine_profile,
@@ -227,6 +334,8 @@ def up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = N
         "gateway_known_routes": KNOWN_GATEWAY_ROUTES,
         "images": images,
     }
+    if credential_canary:
+        target["comparison_config"]["credential_canary"] = True
     (run_dir / "target.json").write_text(json.dumps(target, indent=2), encoding="utf-8")
     doc = env_document(topology, images) if engine == "stub" else vllm_env_document(topology, vllm, images, version)
     (run_dir / "env.yaml").write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False), encoding="utf-8")

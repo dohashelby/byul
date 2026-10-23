@@ -213,7 +213,8 @@ def test_cli_template_and_import(tmp_path, monkeypatch):
     r = runner.invoke(app, ["evidence", "template", "--plan", plan, "--out", "manual.yaml"])
     assert r.exit_code == 0, r.output
     doc = yaml.safe_load((tmp_path / "manual.yaml").read_text(encoding="utf-8"))
-    assert len(doc["checks"]) >= 70
+    assert {entry['check_id'] for entry in doc['checks']} == {
+        check.id for check in baseline_pack().active_checks() if check.executor is None}
     _fill(_entry(doc, "SUP-01"))
     p = _write(tmp_path, doc)
     r = runner.invoke(app, ["evidence", "import", str(p)])

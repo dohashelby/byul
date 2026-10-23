@@ -1,5 +1,5 @@
 id: REQ-10
-revision: 1
+revision: 2
 retired: false
 area: REQ
 purpose: 실제 입력의 검사
@@ -11,8 +11,15 @@ risk_summary: 호출자가 지원 범위를 벗어난 sampling 조합·개수를
 review_order: reference_baseline_first
 impact: null
 applies_when:
+  always: true
   prose: API가 받는 sampling 옵션
-policy_params: []
+policy_params:
+- key: allowed_sampling_options
+  type: list[str]
+  required: true
+- key: rejection_codes
+  type: list[str]
+  required: true
 policy_prose:
   policy_to_decide: 허용 옵션·범위·정상 입력
   enterprise_decisions: 허용 endpoint·텍스트/직접 token 등 입력 형식, template override 필요성, 옵션·길이·출력 한도·정상 대조 입력. vocab·버퍼 범위·옵션 필수 관계 등 구현상 제약은 기업 정책으로 완화하지 않는다.
@@ -21,7 +28,23 @@ challenge_steps:
 - 옵션별 경계 안 요청
 - 한 옵션만 경계 밖으로 변경
 - 해당 요청 오류와 병행·후속 정상 요청 상태 확인
-required_observations: []
+required_observations:
+- key: sampling_options_planned
+  type: list[str]
+- key: sampling_options_tested
+  type: list[str]
+- key: sampling_challenge_outcomes
+  type: dict[str, outcome]
+- key: sampling_accepted_options
+  type: list[str]
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, outcome]
+- key: sampling_health_results
+  type: dict[str, outcome]
+- key: runner_consumption_verified
+  type: bool
 required_observations_prose:
 - sampling 유효값
 - 실제 runner·worker 제한
@@ -32,8 +55,60 @@ unknown_criteria: worker 예외만 확인되고 API 거부·다른 요청·엔�
 remediation: 기본값 적용 후에도 값과 관계 검사를 유지한다.
 method_and_evidence: '유한/비유한 값·min/max 등 관계 조건을 변환·기본값 적용 후 소비값과 비교한다. 옵션별 결과와 오류 뒤 추론을 기록한다. 【F40】V2 해당 processor 도달 시 1024/1024/128 상한에서 ValueError 확인. API는 값 범위를 검사. 엔진 종료 전파는 확인하지 않음. 기존 입력 오류 시나리오의 V2 시험 변형이며 공유 엔진 종료는 미확인이다. V2가 실제 활성인 격리 환경에서 allowed IDs/logit_bias 1023·1024·1025, min_tokens>0에서 실제 all_stop_token_ids 127·128·129를 대조하고 병행 정상 요청과 후속 요청 생존을 확인한다. 모델 vocab/EOS 추가분 기록. 정상 대조: 경계 이내 유효 요청·병행 정상 요청 완료'
 remaining_setup: V2 count 한도는 실제 소비 조건 확인 후 한도+1까지; 부하·중단 상한 사전 설정
-executor: null
-judge: null
+executor: sampling_validation
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: sampling_options_tested
+      op: eq
+      value_policy: allowed_sampling_options
+    - obs: sampling_challenge_outcomes
+      op: nonempty
+    - obs: sampling_challenge_outcomes
+      op: superset_of
+      value_obs: sampling_options_planned
+    - obs: sampling_challenge_outcomes
+      op: all_in
+      value_policy: rejection_codes
+    - obs: runner_consumption_verified
+      op: eq
+      value: true
+    axes:
+      functional:
+        pass_when_all:
+        - obs: sampling_options_tested
+          op: eq
+          value_policy: allowed_sampling_options
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        - obs: sampling_health_results
+          op: superset_of
+          value_obs: sampling_options_planned
+        - obs: sampling_health_results
+          op: all_in
+          value:
+          - '200'
+functional_probes:
+- method: POST
+  path: /v1/completions
+  body:
+    model: '{model}'
+    prompt: guard sampling control
+    max_tokens: 1
+  expect:
+  - 200
+  via: engine
+limitations:
+- sampling-api-v1은 engine POST /v1/completions의 텍스트 표본과 정책 allowed_sampling_options 전체 목록만 시험한다. 지원 옵션은 temperature·top_p·min_tokens이며 다른 옵션·endpoint·token-array·NaN/Infinity를 대신 검증하지 않는다.
+- 실행 fixture의 max_tokens는 기업 출력 한도와 구분되는 작은 시험 예산이다. temperature 음수·top_p 범위·min_tokens와 max_tokens 관계의 제약 출처와 버전은 실행 설정의 DECLARED 참조이며 실제 빌드와 일치한다고 인증하지 않는다.
+- 정상 경계·동시 송신 정상 요청·후속 정상 추론과 health를 관측한다. health만으로 복구를 판정하지 않으며 두 송신의 병행이 worker 내부 실행 겹침이나 모든 worker 생존을 입증하지 않는다.
+- 실제 V2 활성·runner/worker 최종 소비값·allowed IDs/logit_bias/stop 개수 제한은 미계측이다. runner_consumption_verified=false로 보안 PASS를 보류하며 기능 PASS는 한 표본의 관측 범위다. API 수용·5xx·timeout만으로 메모리 손상·타 요청 피해·엔진 취약성을 확정하지 않는다.
 legacy:
   q_ids:
   - Q-C04

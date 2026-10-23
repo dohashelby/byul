@@ -9,6 +9,7 @@
 - OBS-11의 프로파일·독립 근거·시간/조회 창·경보/종속 처리에 대한 제한적 충족 조건
 - OBS-04/05·OBS-07/08에 선언된 bool 정책의 해당 검토 분기(실제 활성 상태 증명 아님)
 - M10 REQ-09 계약의 보안·기능 관측이 고정된 rule_table에서도 PASS 후보일 것
+- 신규 sampling_validation/response_content/log_analysis 정의의 각 축이 고정된 rule_table에서도 PASS 후보일 것
 - M12 REQ-16의 필수 캐시 문맥별 수동 3case 계약이 해당 축에서 완결될 것
 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집, INV-11)은 판정 코어가 따로 적용한다.
 신고된 FAIL은 그대로 둔다(INV-04). 항목별 관측은 DECLARED이며 실측·신원 인증이 아니다.
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 from guard.models import CheckDef, Evidence, Verdict
 from guard.input_policy import policy_context
+from guard.automation_policy import string_list
 
 from .base import AXES, JudgeOutput
 from .policy_items import evaluate
@@ -26,6 +28,37 @@ from .rule_table import RuleTableJudge
 from . import manual_cache_context
 
 ALLOWED = {"PASS", "FAIL", "UNKNOWN"}
+AUTOMATION_RULE_CEILING_EXECUTORS = {"sampling_validation", "response_content", "log_analysis"}
+
+
+def _automation_policy_valid(executor: str, values: dict) -> bool:
+    """Pure POL constraints of the bounded profiles, without executor/I/O setup.
+
+    Runtime sources, credentials, endpoints and actual consumption are still
+    outside this check. A self-reported coverage flag cannot authorize an empty
+    or unsupported required policy scope. Do not coerce or shrink a policy.
+    """
+    keys, may_be_empty = {
+        "sampling_validation": (("allowed_sampling_options", "rejection_codes"), set()),
+        "response_content": (("allowed_response_fields", "allowed_error_fields", "forbidden_return_options", "required_targets"),
+                             {"forbidden_return_options"}),
+        "log_analysis": (("allowed_log_fields", "forbidden_log_fields", "forbidden_marker_contexts", "required_sources", "required_branches"),
+                         {"forbidden_log_fields", "forbidden_marker_contexts"}),
+    }[executor]
+    try:
+        for key in keys:
+            string_list(values, key, empty=key in may_be_empty)
+        if executor == "sampling_validation":
+            return (not set(values["allowed_sampling_options"]) - {"temperature", "top_p", "min_tokens"}
+                    and not set(values["rejection_codes"]) - {"400", "422"})
+        if executor == "response_content":
+            return (not set(values["forbidden_return_options"]) - {"echo", "return_prompt_text", "return_token_ids", "logprobs", "prompt_logprobs"}
+                    and not set(values["required_targets"]) - {"engine", "gateway"})
+        return (not set(values["forbidden_marker_contexts"]) - {"caller_input", "private_system", "error_input"}
+                and {"normal", "error", "exception_dump"} <= set(values["required_branches"])
+                and not set(values["required_branches"]) - {"normal", "error", "exception_dump", "debug", "trace"})
+    except (TypeError, ValueError, KeyError, AttributeError):
+        return False
 
 
 def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
@@ -50,7 +83,7 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.9.1"
+    version = "0.10.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         input_context = policy_context(check, policy_values, evidence.observations)
@@ -69,6 +102,21 @@ class DeclaredJudge:
                     input_rule_issue = "evaluated"
                 except Exception:  # INV-04: a dependency error must not erase declared FAIL.
                     input_rule_issue = "evaluation_error"
+        automation_rules = None
+        automation_rule_issue = "unavailable"
+        automation_ceiling = (check.executor in AUTOMATION_RULE_CEILING_EXECUTORS
+                              and check.judge is not None and check.judge.plugin == "rule_table")
+        automation_policy_valid = not automation_ceiling or _automation_policy_valid(check.executor, policy_values)
+        if automation_ceiling:
+            try:
+                # The declared default_judge must not bypass the pinned
+                # automatic observation contract. Do not call the core here.
+                automation_rules = RuleTableJudge().judge(check, evidence, check.judge.params, policy_values)
+                automation_rule_issue = "evaluated"
+            except Exception:
+                # Never copy exception details or erase a separately declared
+                # FAIL merely because a rule dependency could not be evaluated.
+                automation_rule_issue = "evaluation_error"
         op = evidence.execution.operator
         who = f"{op.by} at {op.at.isoformat()}" if op else "unknown operator"
         notes = evidence.observations.get("declared_observation_notes")
@@ -127,6 +175,17 @@ class DeclaredJudge:
                     reasons.append(f"POLICY_CONTEXT: REQ09_MANUAL_{code}; axis={axis}; "
                                    f"rule_table={ceiling.value}; {input_rule_issue}; DECLARED PASS withheld")
                     v = "UNKNOWN"
+            if v == "PASS" and automation_ceiling:
+                if not automation_policy_valid:
+                    reasons.append(f"POLICY_CONTEXT: AUTOMATION_MANUAL_POLICY_UNRESOLVED; check={check.id}; axis={axis}; "
+                                   "bounded profile policy values invalid; DECLARED PASS withheld")
+                    v = "UNKNOWN"
+                ceiling = automation_rules.verdicts.get(axis, Verdict.UNKNOWN) if automation_rules is not None else Verdict.UNKNOWN
+                if v == "PASS" and ceiling != Verdict.PASS:
+                    code = "OBSERVATION_CONFLICT" if ceiling == Verdict.FAIL else "RULE_UNRESOLVED"
+                    reasons.append(f"POLICY_CONTEXT: AUTOMATION_MANUAL_{code}; check={check.id}; axis={axis}; "
+                                   f"rule_table={ceiling.value}; {automation_rule_issue}; DECLARED PASS withheld")
+                    v = "UNKNOWN"
             if v == "PASS" and not evidence.artifacts:
                 reasons.append(f"{axis}: declared PASS withheld: no attachment (at least one evidence file required)")
                 v = "UNKNOWN"
@@ -148,4 +207,5 @@ class DeclaredJudge:
                            missing_observations=sorted(set(item_result[2] if item_result else [])
                                | set(input_context.missing if input_context is not None else ())
                                | set(input_rules.missing_observations if input_rules is not None else ())
+                               | set(automation_rules.missing_observations if automation_rules is not None else ())
                                | set(cache_result.missing_observations if cache_result is not None else ())))

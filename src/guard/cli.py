@@ -23,7 +23,7 @@ from guard.report.html import render_html
 from guard.store import Store
 from guard.store import IntegrityError
 from guard.store.packs import PackNotStoredError, get_pack, put_pack
-from guard.application import execute_update, run_config, update_readiness
+from guard.application import execute_update, execute_validation, run_config, update_readiness, validation_readiness
 from guard.store.bundle import export_bundle, restore_bundle, DEFAULT_MAX_BYTES
 from guard.core.preflight import validate_pack
 from guard.models import new_id
@@ -273,6 +273,47 @@ def pack_import(
         typer.echo(f"pack import failed: {exc}")
         raise typer.Exit(1)
     typer.echo(f"stored {ref.id} rev {ref.revision} sha256 {ref.sha256[:16]}… in {st.root}")
+
+
+@app.command("validate")
+def validate(
+    pack: Path = typer.Option(..., "--pack"),
+    env: Path = typer.Option(..., "--env"),
+    policy: Path = typer.Option(..., "--policy"),
+    output: Path = typer.Option(Path("out/validations"), "--output"),
+    config: Path = ConfigOpt,
+    store: Optional[Path] = StoreOpt,
+) -> None:
+    """단일 managed 엔진 기동 → 실제 점검 → 보고서·정리. canary는 DRAFT 시험용 무해 표식이다."""
+    cfg = _config(config)
+    pk = load_pack(pack)
+    environment = load_environment(env)
+    pol = load_policy(policy, pk)
+    folder = output / new_id("VALIDATE")
+    rpt, failed = execute_validation(_store(store, cfg), pk, environment, pol, cfg, folder, utcnow())
+    data = rpt.to_dict()
+    (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    (folder / "report.html").write_text(render_html(data), encoding="utf-8")
+    typer.echo(f"{rpt.id} official={rpt.official} → {folder}")
+    raise typer.Exit(1 if failed else 0)
+
+
+@app.command("prepare-validation")
+def prepare_validation(
+    pack: Path = typer.Option(..., "--pack"),
+    env: Path = typer.Option(..., "--env"),
+    policy: Path = typer.Option(..., "--policy"),
+    config: Path = ConfigOpt,
+) -> None:
+    """단일 환경의 읽기 전용 준비 검사. 기동·pull·저장을 하지 않는다."""
+    try:
+        pk = load_pack(pack)
+        data = validation_readiness(pk, load_environment(env), load_policy(policy, pk), _config(config))
+    except Exception as exc:
+        data = {"ready": False, "checks": [{"check": "input-files", "ok": False,
+                "detail": f"input loading failed ({type(exc).__name__}); verify file paths, schema and pack hashes"}]}
+    typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
+    raise typer.Exit(0 if data["ready"] else 1)
 
 
 @app.command("prepare-update")

@@ -130,3 +130,6 @@ AWS는 기존 Linux 절차와 접근·격리·시간/예산·반출·종료 계�
 Windows 전체 실행과 수정 과정은 [PROGRESS](../PROGRESS.md)의 후속 구현 항목에 기록했다.
 새 가상환경에 설치한 wheel의 독립 CLI로 반출·복원·오프라인 재판정을 포함한 10개 명령을 확인했다(EXAMPLE).
 실제 엔진 opt-in 6건은 설정 부재로 skip했고, 두 실제 이미지나 신규 두 점검의 실증 성공을 의미하지 않는다.
+# Windows CPU 제품 실행과 순차 사례
+
+현재 단일 managed 실행은 `guard prepare-validation`·`guard validate`, 기존 5개 실제 사례 도구는 `tools/validate_cpu_cases.py`다. [설정·명령·지원 범위·직접 실행 결과](AUTOMATION_PHASE1.md)를 확인한다. 한 번에 vLLM 하나만 기동하며 기존 다른 컨테이너를 보존한다. 아래 `engine-cases.json`은 이미 준비된 외부 fixture를 입력받는 방식이고, 새 순차 사례 도구와 구분한다.

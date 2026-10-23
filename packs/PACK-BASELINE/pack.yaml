@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 16
+revision: 17
 engines:
 - vllm
 checks:
@@ -118,7 +118,7 @@ files_sha256:
 - path: checks/OBS-02.yaml
   sha256: 1957890ffe8316b80e2d81d0dbadb8fa2824a490899179edee0a064447ab8e97
 - path: checks/OBS-03.yaml
-  sha256: 0222ea9d663aa1a83147375cb838f80c77a2d5774a517790c9baf61089f2d8f8
+  sha256: 163a47941c708cdad06fc8b849e81d670f7de415e9983b89777a7efda3c8cd6d
 - path: checks/OBS-04.yaml
   sha256: a117b509823918501e8e5d6298d340354d34889d6563f5f910af8736253678f2
 - path: checks/OBS-05.yaml
@@ -180,13 +180,13 @@ files_sha256:
 - path: checks/REQ-09.yaml
   sha256: 64d058795a354d16ecf1656b05e8eea1ea8f15c9c8aeff32fda5941dc256113b
 - path: checks/REQ-10.yaml
-  sha256: 6c5fe6e88b18e4a4d2572907599bb9b17ee559ba2dc7a1e6b4f84ba4f7b628f7
+  sha256: d49c9e58b65ef7b3b6fd9449d4d1607c01112e91ce4872780a7b3c0eef3fc74a
 - path: checks/REQ-11.yaml
   sha256: beb41dd862fd25457c0ac02b1da37e56a241aae08ce7d6892366405517a9e1aa
 - path: checks/REQ-12.yaml
   sha256: c389b504f6ad64e76a1afc23d23f6d833d29f97341106eddef7de0adb100ba4f
 - path: checks/REQ-13.yaml
-  sha256: c0b2af0db18fa37f8ec8f05873a38e422661bbb4f740b5a9006848f262eda004
+  sha256: 6d7498eb5242a3c0713f66a54d0aa0c8de6104da3a9e94b8a91bb3b38b06a8bf
 - path: checks/REQ-14.yaml
   sha256: 76a4e0742c7b2cb2048ae4c08ee457cd01dab77fa4d1f9bd937625a65d18d93b
 - path: checks/REQ-15.yaml

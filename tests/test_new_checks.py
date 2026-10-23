@@ -9,7 +9,7 @@ from guard.core.run import run_plan, RunConfig
 from guard.core.judge import judge_plan
 from guard.runtime.docker import CmdResult
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import baseline_pack, environment, policy, completion_response
 
 
 def pipeline(tmp_path, cid, factory, values):
@@ -43,7 +43,7 @@ def pipeline(tmp_path, cid, factory, values):
 @pytest.mark.parametrize("outcome, expected", [(400,"PASS"),(200,"FAIL"),(206,"FAIL"),("timeout","UNKNOWN"),(500,"UNKNOWN")])
 def test_token_boundary_contract(tmp_path, outcome, expected):
     def probe(net, requests, timeout):
-        return [{"outcome": 200 if r["body"]["prompt"] == [0] else outcome} for r in requests]
+        return [completion_response(r, 200 if r["body"]["prompt"] == [0] else outcome) for r in requests]
     _, result = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor(c, container_probe=probe),
                          {"vocab_size": 100, "max_input_tokens": 8, "rejection_codes":["400","422"]})
     assert result.verdicts.security.value == expected
@@ -66,7 +66,7 @@ def test_boundary_request_must_fit_strict_token_budget(tmp_path, budget):
 
 
 def test_same_response_changes_with_explicit_rejection_policy(tmp_path):
-    probe = lambda n,rs,t: [{"outcome":200 if r["body"]["prompt"] == [0] else 400} for r in rs]
+    probe = lambda n,rs,t: [completion_response(r, 200 if r["body"]["prompt"] == [0] else 400) for r in rs]
     _, result = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor(c, container_probe=probe),
                          {"vocab_size":100,"max_input_tokens":8,"rejection_codes":["422"]})
     assert result.verdicts.security.value == "UNKNOWN"
@@ -80,8 +80,36 @@ def test_credential_exposure_contract(tmp_path, leak, unreadable, expected):
             assert argv == ["sh","-c",ENV_CMD]
             return CmdResult(0, "PID 1\nPATH\n" + ("GUARD_TEST_CREDENTIAL\n" if leak else "") +
                              ("GUARD_READ_ERROR\n" if unreadable else "GUARD_READ_OK\n"), "")
-    probe = lambda n,rs,t: [{"outcome":200} for r in rs]
+    probe = lambda n,rs,t: [completion_response(r) for r in rs]
     _, result = pipeline(tmp_path, "PLT-04",
                          lambda c: CredentialExposureExecutor(c, container_probe=probe, docker=Docker()),
                          {"forbidden_env_names":["GUARD_TEST_CREDENTIAL"],"forbidden_mount_paths":["/test-creds"]})
     assert result.verdicts.security.value == expected
+
+
+@pytest.mark.parametrize("raw", ["{}", '{"error":"generation failed"}', "<html>not inference</html>"])
+def test_req09_http_200_error_body_does_not_establish_normal_inference(tmp_path, raw):
+    sent = []
+    def probe(net, requests, timeout):
+        sent.extend(requests)
+        return [{"outcome": 200, "body": raw} for _ in requests]
+    evd, result = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor(c, container_probe=probe),
+                           {"max_input_tokens": 8, "rejection_codes": ["400"]})
+    assert evd.execution.status.value == "COMPLETED" and evd.normal_control.succeeded is False
+    assert result.verdicts.security.value == result.verdicts.functional.value == "UNKNOWN"
+    assert len(sent) == 1
+
+
+def test_req09_confirmed_boundary_acceptance_survives_later_probe_exception(tmp_path):
+    calls = 0
+    def probe(net, requests, timeout):
+        nonlocal calls
+        calls += 1
+        if calls >= 3:
+            raise TimeoutError("private transport details")
+        return [completion_response(request) for request in requests]
+    evd, result = pipeline(tmp_path, "REQ-09", lambda c: InputValidationExecutor(c, container_probe=probe),
+                           {"max_input_tokens": 8, "rejection_codes": ["400"]})
+    assert evd.execution.status.value == "COMPLETED"
+    assert result.verdicts.security.value == "FAIL"
+    assert "private transport details" not in evd.model_dump_json()

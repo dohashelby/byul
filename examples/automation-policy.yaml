@@ -1,0 +1,74 @@
+# EXAMPLE/DRAFT sandbox policy. These are test fixtures, not enterprise defaults.
+# Field lists illustrate the pinned vLLM completion schema; review for your API.
+data_origin: EXAMPLE
+status: DRAFT
+pack: {id: PACK-BASELINE, revision: 17}
+values:
+  REQ-01: {allowed_callers: [allowed]}
+  REQ-03: {general_allowed_kinds: [inference]}
+  PLT-01:
+    allowed_capabilities: []
+    allowed_mounts: ['/models:ro']
+    allowed_devices: []
+    require_non_root: true
+    allowed_exec_writable_paths: ['/guard-cache']
+  PLT-04: {forbidden_env_names: [GUARD_TEST_CREDENTIAL], forbidden_mount_paths: []}
+  REQ-09:
+    max_input_tokens: 127
+    rejection_codes: ['400', '413', '422']
+    allowed_endpoints: ['POST /v1/completions']
+    allowed_input_formats: [token_ids]
+  REQ-10:
+    allowed_sampling_options: [temperature, top_p, min_tokens]
+    rejection_codes: ['400', '422']
+  REQ-13:
+    allowed_response_fields:
+      - id
+      - object
+      - created
+      - model
+      - choices[].index
+      - choices[].text
+      - choices[].logprobs
+      - choices[].finish_reason
+      - choices[].stop_reason
+      - choices[].token_ids
+      - choices[].prompt_logprobs
+      - choices[].prompt_token_ids
+      - choices[].routed_experts
+      - service_tier
+      - system_fingerprint
+      - usage.prompt_tokens
+      - usage.total_tokens
+      - usage.completion_tokens
+      - usage.prompt_tokens_details
+      - usage.completion_tokens_details
+      - kv_transfer_params
+      - ec_transfer_params
+      - metrics
+    allowed_error_fields:
+      - error.message
+      - error.type
+      - error.param
+      - error.code
+      - detail[].loc[]
+      - detail[].msg
+      - detail[].type
+      - detail[].input
+      - detail[].ctx.error
+      - detail[].ctx.expected
+    forbidden_return_options: [echo, return_prompt_text, return_token_ids, logprobs, prompt_logprobs]
+    required_targets: [engine, gateway]
+  OBS-03:
+    # Example structured-log field contract. Plain engine stdout is UNKNOWN.
+    allowed_log_fields: [timestamp, level, message, request_id, event, exception, traceback, exception_dump]
+    forbidden_log_fields: [authorization, password, secret, prompt, token_ids]
+    forbidden_marker_contexts: [caller_input, private_system, error_input]
+    required_sources: [engine]
+    required_branches: [normal, error, exception_dump]
+scope:
+  include: [REQ-01, REQ-03, PLT-01, PLT-04, REQ-09, REQ-10, REQ-13, OBS-03]
+  exclude: []
+exceptions: []
+confirmed_by: null
+confirmed_at: null

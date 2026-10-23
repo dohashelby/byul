@@ -191,3 +191,6 @@ REQ-09의 새 입력 범위 계약에서는 신고 PASS와 저장된 보안/기�
 ## M13 저장 증거 재판정
 
 M12의 inference=unknown이 구조오류로 보류된 증거는 원본을 고치지 않고 정확한 기존 PLAN/팩16과 같은 as_of로 judge한다. 보안 근거/INV11이 충분하면 새 declared0.9.1 RES에서 보안 UNKNOWN→PASS가 가능하나 원본 신고 UNKNOWN은 승격하지 않는다. JSON/HTML에 기능 미확인과 DECLARED 한계를 남긴다. 원본·Ref·side·config hash는 그대로다. [M13](POLICY_M13.md)의 직접 검증과 REQ15 후속 설계를 따른다.
+# Windows CPU 자동화 1차
+
+단일 엔진의 제품 기동은 `guard prepare-validation` → `guard validate`를 사용한다. [Windows CPU·신규 3개 점검·기존 5개 사례 검증](AUTOMATION_PHASE1.md), [실행 설정](../examples/windows-cpu.toml), [EXAMPLE/DRAFT 시험 정책](../examples/automation-policy.yaml)을 참고한다. 아래 과거 단계의 5개 실행기 설명과 당시 실측 범위는 이력이며 현재 구현·검증 상태는 자동화 1차 기록을 따른다.

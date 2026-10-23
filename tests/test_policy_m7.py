@@ -109,7 +109,7 @@ def test_policy_declarations_and_blank_form_are_not_execution(pack, tmp_path):
     check = pack.checks["OBS-11"]
     assert {p.key:p.type for p in check.policy_params if p.required} == POLICY_TYPES
     assert check.executor is None and check.judge is None and check.revision == 2
-    assert pack.manifest.revision == 16 and not pack.reviewed
+    assert pack.manifest.revision == 17 and not pack.reviewed
     pol = yaml.safe_load(build_policy_template(pack))
     assert pol["values"]["OBS-11"] == {} and pol["status"] == "DRAFT"
     st, plan, _ = setup(tmp_path, pack)
@@ -351,7 +351,7 @@ def test_v3_cli_report_integrity_idempotence_and_meaningful_hash(tmp_path,pack):
     assert 'AUDIT_COLLECTION:' in (tmp_path/'r.html').read_text(encoding='utf-8')
     assert 'EXAMPLE complete event-correlated query' not in (tmp_path/'r.html').read_text(encoding='utf-8')
     assert all(e.execution.executor.version=='0.5.0' and e.data_origin=='DECLARED' for e in st.iter_kind('EVD'))
-    assert all(r.judge.version=='0.9.1' for r in st.iter_kind('RES'))
+    assert all(r.judge.version=='0.10.0' for r in st.iter_kind('RES'))
     previous=next(e for e in st.iter_kind('EVD') if e.check_id=='OBS-11')
     entry(doc,'OBS-11')['audit_evidence']['records'][0]['observations']['case_detail']='EXAMPLE edited meaningful claim'
     import_evidence(st,pack,write(tmp_path,doc),now=T0)

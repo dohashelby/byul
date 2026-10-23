@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import tempfile
+import threading
 import time
 import unittest
 from urllib.error import HTTPError
@@ -201,6 +202,34 @@ class CollectorAndBaselineTests(unittest.TestCase):
         self.assertEqual(failed["last_success_at"], success["last_success_at"])
         time.sleep(0.05)
         self.assertEqual(collector.snapshot()["state"], "stale")
+
+    def test_dedicated_collector_starts_in_background_and_waits_after_finish(self) -> None:
+        starts: list[float] = []
+        finishes: list[float] = []
+        second_started = threading.Event()
+
+        def fetch() -> dict[str, bool]:
+            starts.append(time.monotonic())
+            if len(starts) == 2:
+                second_started.set()
+            time.sleep(0.04)
+            finishes.append(time.monotonic())
+            return {"ok": True}
+
+        collector = Collector(
+            "slow",
+            fetch,
+            interval_s=0.05,
+            stale_after_s=1,
+            dedicated_thread=True,
+        )
+        manager = CollectorManager([collector])
+        started = time.monotonic()
+        manager.start()
+        self.addCleanup(manager.stop)
+        self.assertLess(time.monotonic() - started, 0.04)
+        self.assertTrue(second_started.wait(1))
+        self.assertGreaterEqual(starts[1] - finishes[0], 0.04)
 
     def test_baseline_rows_separate_manifest_and_engine_sources(self) -> None:
         with tempfile.TemporaryDirectory() as directory_text:

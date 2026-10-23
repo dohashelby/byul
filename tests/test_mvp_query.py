@@ -126,6 +126,13 @@ class DashboardAssetTests(unittest.TestCase):
         script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
         self.assertIn("status.mock_engine || status.backend", script)
 
+    def test_external_badge_depends_on_health_and_keeps_gpu_warning(self) -> None:
+        script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+        self.assertIn('engine.healthy ? "연결됨" : "연결 안 됨"', script)
+        self.assertIn("외부 vLLM 모드", script)
+        self.assertIn("정식 GPU 시험(S3B) 전", script)
+        self.assertIn('engine.healthy ? "badge-external" : "badge-ERROR"', script)
+
     def test_dashboard_has_no_mutating_controls(self) -> None:
         page = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
         self.assertNotIn("<form", page)

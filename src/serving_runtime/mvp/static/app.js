@@ -73,9 +73,15 @@ async function getJson(url) {
 function renderStatus(status) {
   $("session-id").textContent = `관측 세션 ${status.observation_session_id.slice(0, 8)}`;
   const external = status.backend_kind === "vllm";
+  // The mock mode reports `mock_engine`; the external vLLM mode reports `backend`.
+  const engine = status.mock_engine || status.backend || {};
   const backendBadge = $("backend-badge");
-  backendBadge.textContent = external ? "외부 vLLM 연결 · 정식 GPU 시험(S3B) 전" : "모의 엔진";
-  backendBadge.className = external ? "badge badge-external" : "badge badge-mock";
+  backendBadge.textContent = external
+    ? `외부 vLLM 모드 · ${engine.healthy ? "연결됨" : "연결 안 됨"} · 정식 GPU 시험(S3B) 전`
+    : "모의 엔진";
+  backendBadge.className = external
+    ? `badge ${engine.healthy ? "badge-external" : "badge-ERROR"}`
+    : "badge badge-mock";
   $("engine-title").textContent = external ? "외부 backend" : "모의 엔진";
 
   const policy = status.policy;
@@ -93,8 +99,6 @@ function renderStatus(status) {
   }
   fillKv("policy-kv", policyRows);
 
-  // The mock mode reports `mock_engine`; the external vLLM mode reports `backend`.
-  const engine = status.mock_engine || status.backend || {};
   const concurrency = status.concurrency || {};
   const receipts = engine.receipts_store || {};
   setDot("engine-dot", engine.healthy);
@@ -203,17 +207,105 @@ function renderBaseline(baseline) {
   }
 }
 
+function assetSummary(item) {
+  // asset_integrity: collection can succeed while files differ from the approved list.
+  const value = item.source === "asset_integrity" ? item.last_value : null;
+  if (!value || !value.counts) return [];
+  const c = value.counts;
+  const problem = !value.intact;
+  const text = `일치 ${c.match}/${value.total} · 변경 ${c.changed} · 누락 ${c.missing} · 읽기 불가 ${c.unreadable} · 링크 ${c.symlink} · 목록 밖 파일 ${value.extra_file_count} · 목록 밖 링크 ${value.extra_symlink_count ?? 0} · 순회 오류 ${value.walk_error_count ?? 0}`;
+  return [el("div", { className: problem ? "problem" : "muted", text, title: value.limit })];
+}
+
 function renderCollectors(payload) {
   const body = $("collector-rows");
   clear(body);
   for (const item of payload.collectors || []) {
     const origin = item.data_origin === "mock" ? "모의" : item.data_origin ?? "–";
     body.appendChild(el("tr", {}, [
-      el("td", { className: "mono", text: item.source }),
+      el("td", { className: "mono", text: item.source }, assetSummary(item)),
       el("td", {}, [stateCell(item.state)]),
       el("td", { text: formatTime(item.last_success_at) }),
       el("td", { text: item.last_error ?? "–" }),
       el("td", {}, [el("span", { className: item.data_origin === "mock" ? "badge badge-mock" : "", text: origin })]),
+    ]));
+  }
+}
+
+function observationBadge(origin) {
+  if (origin === "synthetic") return el("span", { className: "badge badge-synthetic", text: "합성" });
+  if (origin === "real") return el("span", { className: "badge badge-ALLOWED", text: "실제" });
+  return el("span", { className: "badge badge-INCOMPLETE", text: "미확인" });
+}
+
+function observationState(origins) {
+  if ((origins?.real || 0) > 0) return ["실제 수집", "chip-real"];
+  if ((origins?.synthetic || 0) > 0) return ["합성 데이터", "chip-synthetic"];
+  return ["미연결", "chip-off"];
+}
+
+function setObservationChip(id, label, stateValue) {
+  const chip = $(id);
+  chip.textContent = `${label} 관측 · ${stateValue[0]}`;
+  chip.className = `chip ${stateValue[1]}`;
+}
+
+function podLabel(pod) {
+  if (!pod) return "–";
+  const name = pod.pod || "–";
+  return pod.namespace ? `${pod.namespace}/${name}` : name;
+}
+
+function renderObservations(payload) {
+  const items = payload.observations || [];
+  const origins = payload.origins_by_kind || {};
+  setObservationChip(
+    "network-observation-chip",
+    "네트워크",
+    observationState(origins.network_flow),
+  );
+  setObservationChip(
+    "process-observation-chip",
+    "프로세스",
+    observationState(origins.process_exec),
+  );
+  setObservationChip(
+    "file-observation-chip",
+    "파일",
+    observationState(origins.file_access),
+  );
+  setObservationChip("gpu-observation-chip", "GPU", ["미연결", "chip-off"]);
+
+  const corrupt = payload.corrupt_lines || 0;
+  $("observation-corrupt").textContent = `손상 줄 ${corrupt}`;
+
+  const hubble = items.filter((item) => item.source === "hubble" && item.kind === "network_flow");
+  const hubbleBody = $("hubble-observation-rows");
+  clear(hubbleBody);
+  $("hubble-observation-empty").hidden = hubble.length > 0;
+  for (const item of hubble) {
+    const destination = `${podLabel(item.dst)} · ${item.dst?.ip || "–"}:${item.dst?.port || "–"}/${item.dst?.protocol || "–"}`;
+    hubbleBody.appendChild(el("tr", {}, [
+      el("td", { text: formatTime(item.observed_at) }),
+      el("td", { text: podLabel(item.src) }),
+      el("td", { className: "mono", text: destination }),
+      el("td", { text: item.verdict || "–", title: item.reason || "" }),
+      el("td", {}, [observationBadge(item.data_origin)]),
+    ]));
+  }
+
+  const tetragon = items.filter((item) => item.source === "tetragon");
+  const tetragonBody = $("tetragon-observation-rows");
+  clear(tetragonBody);
+  $("tetragon-observation-empty").hidden = tetragon.length > 0;
+  for (const item of tetragon) {
+    const outsideAllowlist = item.kind === "process_exec" && item.allowed_binary === false;
+    tetragonBody.appendChild(el("tr", { className: outsideAllowlist ? "exec-outside-allowlist" : "" }, [
+      el("td", { text: formatTime(item.observed_at) }),
+      el("td", { text: item.kind === "process_exec" ? "프로세스" : `파일 ${item.access || "other"}` }),
+      el("td", { className: "mono", text: item.path || item.binary || "–", title: podLabel(item.pod) }),
+      el("td", { className: "mono", text: `${item.rule_id || "–"} · ${item.action || "–"}` }),
+      el("td", {}, [observationBadge(item.data_origin)]),
     ]));
   }
 }
@@ -267,6 +359,13 @@ function kvList(rows) {
   return list;
 }
 
+function contextText(context) {
+  if (!context) return "설정 안 됨";
+  const labels = { within_limit: "한도 이내", exceeded: "한도 초과(미전달)", unavailable: "토큰 수 확인 불가(미전달)" };
+  const tokens = context.input_tokens === null || context.input_tokens === undefined ? "–" : context.input_tokens;
+  return `${labels[context.result] || context.result} · 입력 ${tokens}토큰 / 한도 ${context.limit}`;
+}
+
 function renderDetail(detail) {
   const body = $("drawer-body");
   clear(body);
@@ -296,6 +395,7 @@ function renderDetail(detail) {
         ["적용 규칙", decision.rule_id, { mono: true }],
         ["모델", final.model],
         ["max_tokens", final.max_tokens],
+        ["context 검사", contextText((finalRecord.request || {}).context)],
       ]),
     ]),
   );
@@ -407,13 +507,14 @@ function setFilter(filter) {
 async function refresh() {
   const query = state.filter ? `?result=${encodeURIComponent(state.filter)}` : "";
   try {
-    const [status, summary, list, policy, baseline, collectors] = await Promise.all([
+    const [status, summary, list, policy, baseline, collectors, observations] = await Promise.all([
       getJson("/api/status"),
       getJson("/api/summary"),
       getJson(`/api/requests${query}`),
       getJson("/api/policy"),
       getJson("/api/baseline"),
       getJson("/api/collectors"),
+      getJson("/api/observations"),
     ]);
     renderStatus(status);
     renderSummary(summary);
@@ -421,6 +522,7 @@ async function refresh() {
     renderPolicyState(policy);
     renderBaseline(baseline);
     renderCollectors(collectors);
+    renderObservations(observations);
     state.lastSuccess = new Date();
     document.body.classList.remove("is-stale");
     $("stale-banner").hidden = true;

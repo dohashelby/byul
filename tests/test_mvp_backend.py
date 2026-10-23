@@ -14,7 +14,11 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from serving_runtime.mvp.app import GatewayApp
-from serving_runtime.mvp.backend import load_backend_config, parse_prometheus_metrics
+from serving_runtime.mvp.backend import (
+    is_valid_credential_value,
+    load_backend_config,
+    parse_prometheus_metrics,
+)
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.fake_backend import FakeBackend
 from serving_runtime.mvp.mock_engine import MockEngine
@@ -151,7 +155,7 @@ class BackendConfigTests(unittest.TestCase):
             self.assertNotIn("secret", json.dumps(configured.safe_status()))
 
             credential = directory / "credential"
-            credential.write_text("file-secret\n", encoding="utf-8")
+            credential.write_text("file-secret", encoding="utf-8")
             credential.chmod(0o644)
             file_path = self.write(
                 directory,
@@ -164,6 +168,84 @@ class BackendConfigTests(unittest.TestCase):
             self.assertEqual(insecure.credential_status, "insecure_file")
             credential.write_text("changed-secret", encoding="utf-8")
             self.assertEqual(insecure.authorization, "Bearer file-secret")
+
+    def test_credentials_with_header_unsafe_characters_are_invalid_and_hidden(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            env_path = self.write(
+                directory,
+                backend_document(
+                    "http://example.invalid", credential={"env": "BACKEND_TOKEN"}
+                ),
+            )
+            credential = directory / "credential"
+            file_path = self.write(
+                directory,
+                backend_document(
+                    "http://example.invalid", credential={"file": "credential"}
+                ),
+                "file-invalid.json",
+            )
+            invalid_values = (
+                " leading-space",
+                "trailing-space ",
+                "internal\nnewline",
+                "internal\rreturn",
+                "trailing-return\r",
+                "two-newlines\n\n",
+                "two-crlf\r\n\r\n",
+                "has\x00null",
+                "non-ascii-한",
+            )
+            for secret in invalid_values:
+                with self.subTest(source="env", secret=repr(secret)):
+                    config = load_backend_config(
+                        env_path, environ={"BACKEND_TOKEN": secret}
+                    )
+                    self.assertEqual(config.credential_status, "invalid")
+                    self.assertIsNone(config.authorization)
+                    self.assertNotIn(secret, repr(config))
+                    self.assertNotIn(secret, json.dumps(config.safe_status()))
+                with self.subTest(source="file", secret=repr(secret)):
+                    credential.write_bytes(secret.encode("utf-8"))
+                    credential.chmod(0o600)
+                    config = load_backend_config(file_path)
+                    self.assertEqual(config.credential_status, "invalid")
+                    self.assertIsNone(config.authorization)
+
+            self.assertTrue(is_valid_credential_value("visible-ASCII_123"))
+            self.assertFalse(is_valid_credential_value("not valid"))
+
+    def test_credentials_allow_one_terminal_lf_or_crlf_for_env_and_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            env_path = self.write(
+                directory,
+                backend_document(
+                    "http://example.invalid", credential={"env": "BACKEND_TOKEN"}
+                ),
+            )
+            credential = directory / "credential"
+            file_path = self.write(
+                directory,
+                backend_document(
+                    "http://example.invalid", credential={"file": "credential"}
+                ),
+                "file-newline.json",
+            )
+            for ending in ("\n", "\r\n"):
+                with self.subTest(source="env", ending=repr(ending)):
+                    config = load_backend_config(
+                        env_path, environ={"BACKEND_TOKEN": f"abc123{ending}"}
+                    )
+                    self.assertEqual(config.credential_status, "configured")
+                    self.assertEqual(config.authorization, "Bearer abc123")
+                with self.subTest(source="file", ending=repr(ending)):
+                    credential.write_bytes(f"abc123{ending}".encode("ascii"))
+                    credential.chmod(0o600)
+                    config = load_backend_config(file_path)
+                    self.assertEqual(config.credential_status, "configured")
+                    self.assertEqual(config.authorization, "Bearer abc123")
 
     def test_mvp_config_requires_vllm_config_and_keeps_mock_default(self) -> None:
         self.assertEqual(MVPConfig().backend, "mock")
@@ -313,7 +395,7 @@ class ExternalBackendHttpTests(unittest.TestCase):
         self.assertTrue(first)
         self.assertTrue(payload.endswith(b"data: [DONE]\n\n"))
 
-    def test_policy_denials_unmapped_model_and_missing_credential_never_call_chat(self) -> None:
+    def test_policy_denials_unmapped_model_and_invalid_credentials_never_call_chat(self) -> None:
         gateway = self.start_gateway()
         for body, expected, status in (
             (chat_body(model="other-model"), "MODEL_NOT_ALLOWED", 403),
@@ -342,6 +424,22 @@ class ExternalBackendHttpTests(unittest.TestCase):
         status, _, body = self.request(gateway, chat_body())
         self.assertEqual(status, 503)
         self.assertEqual(json.loads(body)["error"]["code"], "BACKEND_CREDENTIAL_MISSING")
+        self.assertEqual(self.fake.request_count, 0)
+
+        gateway.stop()
+        secret = "MUST-NOT-LEAK\r\nInjected: value"
+        invalid = backend_document(
+            self.fake.base_url, credential={"env": "INVALID_BACKEND_TOKEN"}
+        )
+        gateway = self.start_gateway(
+            document=invalid, environ={"INVALID_BACKEND_TOKEN": secret}
+        )
+        status, headers, body = self.request(gateway, chat_body())
+        self.assertEqual(status, 503)
+        self.assertEqual(json.loads(body)["error"]["code"], "BACKEND_CREDENTIAL_INVALID")
+        self.assertNotIn(secret.encode(), body)
+        detail = self.get_json(gateway, f"/api/requests/{headers['X-Request-ID']}")
+        self.assertEqual(detail["gateway_records"][-1]["delivery"]["attempted"], False)
         self.assertEqual(self.fake.request_count, 0)
 
     def test_backend_failures_are_distinct_and_redirect_is_not_followed(self) -> None:

@@ -15,6 +15,7 @@ from serving_runtime.mvp.app import GatewayApp
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.mock_engine import MockEngine
 from serving_runtime.mvp.policy import load_policy
+from serving_runtime.mvp.relay import sse_done
 from serving_runtime.mvp.store import JsonlStore
 
 
@@ -38,12 +39,12 @@ class SSEParserUnitTests(unittest.TestCase):
         pending = b""
         found = False
         for chunk in (b"data: {\"x\":1}\n", b"\ndata: [DO", b"NE]\r", b"\n\r\n"):
-            pending, current = GatewayApp._sse_done(pending, chunk)
+            pending, current = sse_done(pending, chunk)
             found = found or current
         self.assertTrue(found)
 
     def test_partial_marker_is_not_treated_as_done(self) -> None:
-        pending, found = GatewayApp._sse_done(b"", b"data: [DONE]")
+        pending, found = sse_done(b"", b"data: [DONE]")
         self.assertFalse(found)
         self.assertEqual(pending, b"data: [DONE]")
 

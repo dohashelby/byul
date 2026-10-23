@@ -179,6 +179,12 @@ section + section { margin-top: 36px; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .chip { padding: 4px 12px; border-radius: 999px; font-size: 12px; }
 .chip-off { background: var(--surface-2); color: var(--muted); border: 1px dashed var(--border); }
+.chip-synthetic { background: var(--invalid-bg); color: var(--invalid); border: 1px solid var(--invalid); }
+.chip-real { background: var(--allowed-bg); color: var(--allowed); border: 1px solid var(--allowed); }
+.badge-synthetic { background: var(--invalid-bg); color: var(--invalid); }
+.observation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.observation-grid .card h3 { padding: 14px 16px 8px; margin: 0; }
+.status-table tr.exec-outside-allowlist { background: var(--error-bg); color: var(--error); }
 .state-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .state-card { margin-top: 14px; }
@@ -312,6 +318,7 @@ pre {
   .stat-grid { grid-template-columns: repeat(3, 1fr); }
   .card-grid { grid-template-columns: 1fr; }
   .state-grid { grid-template-columns: 1fr; }
+  .observation-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
   .topbar-inner, .page { padding: 0 16px; }
@@ -319,3 +326,5 @@ pre {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .subtitle { display: none; }
 }
+td .problem { color: var(--error); font-size: 12px; }
+td .muted { font-size: 12px; }

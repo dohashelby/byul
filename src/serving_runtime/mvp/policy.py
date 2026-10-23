@@ -21,6 +21,7 @@ class Policy:
     valid_from: str | None = None
     valid_until: str | None = None
     approval_ref: str | None = None
+    max_context_tokens: int | None = None
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,12 @@ _REQUIRED_FIELDS = {
     "output_max_tokens",
     "max_body_bytes",
 }
-_V11_FIELDS = _REQUIRED_FIELDS | {"valid_from", "valid_until", "approval_ref"}
+_V11_FIELDS = _REQUIRED_FIELDS | {
+    "valid_from",
+    "valid_until",
+    "approval_ref",
+    "max_context_tokens",
+}
 
 
 def _utc_now() -> str:
@@ -217,6 +223,24 @@ def load_policy(path: str | Path) -> PolicyState:
                 "approval_ref must be a string",
                 digest,
             )
+        max_context_tokens = document.get("max_context_tokens")
+        if max_context_tokens is not None:
+            if not _is_positive_integer(max_context_tokens):
+                return _error(
+                    path_text,
+                    loaded_at,
+                    "INVALID_POLICY",
+                    "max_context_tokens must be a positive integer",
+                    digest,
+                )
+            if document["output_max_tokens"] >= max_context_tokens:
+                return _error(
+                    path_text,
+                    loaded_at,
+                    "INVALID_POLICY",
+                    "max_context_tokens must exceed output_max_tokens",
+                    digest,
+                )
 
     policy = Policy(
         schema_version=document["schema_version"],
@@ -230,5 +254,6 @@ def load_policy(path: str | Path) -> PolicyState:
         valid_from=document.get("valid_from"),
         valid_until=document.get("valid_until"),
         approval_ref=document.get("approval_ref"),
+        max_context_tokens=document.get("max_context_tokens"),
     )
     return PolicyState(True, policy, path_text, digest, loaded_at, None, None)

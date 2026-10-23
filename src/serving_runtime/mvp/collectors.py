@@ -26,6 +26,7 @@ class Collector:
         fetch: Callable[[], Any] | None,
         interval_s: float = 5,
         stale_after_s: float = 15,
+        dedicated_thread: bool = False,
     ) -> None:
         if interval_s <= 0 or stale_after_s <= 0:
             raise ValueError("collector intervals must be positive")
@@ -33,6 +34,7 @@ class Collector:
         self.fetch = fetch
         self.interval_s = float(interval_s)
         self.stale_after_s = float(stale_after_s)
+        self.dedicated_thread = dedicated_thread
         self.last_attempt_at: str | None = None
         self.last_success_at: str | None = None
         self.last_error: str | None = None
@@ -60,14 +62,16 @@ class Collector:
                 self._last_attempt_monotonic = attempted_monotonic
                 self.last_error = str(error)
             return
+        completed_at = _utc_now()
+        completed_monotonic = time.monotonic()
         with self._lock:
             self.last_attempt_at = attempted_at
-            self.last_success_at = attempted_at
+            self.last_success_at = completed_at
             self.last_error = None
             self.last_value = value
             self.data_origin = data_origin if isinstance(data_origin, str) else None
             self._last_attempt_monotonic = attempted_monotonic
-            self._last_success_monotonic = attempted_monotonic
+            self._last_success_monotonic = completed_monotonic
 
     def due(self, now: float | None = None) -> bool:
         with self._lock:
@@ -106,30 +110,52 @@ class Collector:
 
 
 class CollectorManager:
-    """Poll all sources from one background thread."""
+    """Poll ordinary sources together and slow sources on dedicated threads."""
 
     def __init__(self, collectors: list[Collector]) -> None:
         self.collectors = collectors
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._dedicated_threads: list[threading.Thread] = []
 
     def start(self) -> None:
         if self._thread is not None:
             return
         self._stop.clear()
         for collector in self.collectors:
+            if collector.dedicated_thread:
+                continue
             collector.collect()
         self._thread = threading.Thread(
             target=self._run, name="mvp-collectors", daemon=True
         )
         self._thread.start()
+        self._dedicated_threads = [
+            threading.Thread(
+                target=self._run_dedicated,
+                args=(collector,),
+                name=f"mvp-collector-{collector.source}",
+                daemon=True,
+            )
+            for collector in self.collectors
+            if collector.dedicated_thread and collector.fetch is not None
+        ]
+        for thread in self._dedicated_threads:
+            thread.start()
 
     def _run(self) -> None:
         while not self._stop.wait(0.05):
             now = time.monotonic()
             for collector in self.collectors:
-                if collector.due(now):
+                if not collector.dedicated_thread and collector.due(now):
                     collector.collect()
+
+    def _run_dedicated(self, collector: Collector) -> None:
+        while not self._stop.is_set():
+            collector.collect()
+            # The interval starts when the preceding collection has finished.
+            if self._stop.wait(collector.interval_s):
+                return
 
     def stop(self) -> None:
         thread = self._thread
@@ -137,7 +163,10 @@ class CollectorManager:
             return
         self._stop.set()
         thread.join(timeout=5)
+        for dedicated in self._dedicated_threads:
+            dedicated.join(timeout=5)
         self._thread = None
+        self._dedicated_threads = []
 
     def snapshots(self) -> list[dict[str, Any]]:
         return [collector.snapshot() for collector in self.collectors]

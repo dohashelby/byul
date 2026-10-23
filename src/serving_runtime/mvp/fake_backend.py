@@ -11,6 +11,8 @@ import time
 from typing import Any
 from urllib.parse import urlsplit
 
+from .mock_engine import simulated_token_count
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -62,6 +64,9 @@ class FakeBackend:
         self.stream_interval_s = stream_interval_s
         self._required_authorization = required_authorization
         self.metrics_failure: str | None = None
+        self.tokenize_failure = False
+        self.tokenize_response_body: bytes | None = None
+        self.tokenize_calls = 0
         self._requests: list[dict[str, Any]] = []
         self._redirect_follow_count = 0
         self._lock = threading.Lock()
@@ -276,8 +281,39 @@ class FakeBackend:
                     return
                 self._send_json(404, {"error": {"code": "FAKE_NOT_FOUND"}})
 
+            def _tokenize(self) -> None:
+                if not self._authorized():
+                    self._send_json(401, {"error": {"code": "FAKE_AUTH_REQUIRED"}})
+                    return
+                with owner._lock:
+                    owner.tokenize_calls += 1
+                if owner.tokenize_failure:
+                    self._send_json(500, {"error": {"code": "FAKE_TOKENIZE_FAILURE"}})
+                    return
+                try:
+                    content_length = int(self.headers.get("Content-Length", "0"))
+                    document = json.loads(self.rfile.read(content_length).decode("utf-8"))
+                    count = simulated_token_count(
+                        document.get("messages") if isinstance(document, dict) else None
+                    )
+                except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                    self._send_json(400, {"error": {"code": "FAKE_MALFORMED"}})
+                    return
+                if owner.tokenize_response_body is not None:
+                    encoded = owner.tokenize_response_body
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(encoded)))
+                    self.end_headers()
+                    self.wfile.write(encoded)
+                    return
+                self._send_json(200, {"count": count})
+
             def do_POST(self) -> None:
                 route = self._route()
+                if route == "/tokenize":
+                    self._tokenize()
+                    return
                 if route != "/v1/chat/completions":
                     self._send_json(404, {"error": {"code": "FAKE_NOT_FOUND"}})
                     return

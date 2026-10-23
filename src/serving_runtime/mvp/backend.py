@@ -46,6 +46,22 @@ _SAMPLE = re.compile(
 )
 
 
+def is_valid_credential_value(value: str) -> bool:
+    """Return whether a secret is safe to place in an HTTP header value."""
+
+    return bool(value) and all(0x21 <= ord(character) <= 0x7E for character in value)
+
+
+def normalize_credential_value(value: str) -> str:
+    """Remove at most one terminal LF or CRLF without trimming other characters."""
+
+    if value.endswith("\r\n"):
+        return value[:-2]
+    if value.endswith("\n"):
+        return value[:-1]
+    return value
+
+
 @dataclass(frozen=True)
 class URLTarget:
     """A validated HTTP(S) origin plus an optional fixed path prefix."""
@@ -235,8 +251,8 @@ def _read_credential(
         if not isinstance(name, str) or _ENV_NAME.fullmatch(name) is None:
             raise ValueError("credential.env must be a valid environment variable name")
         candidate = environ.get(name)
-        if isinstance(candidate, str) and candidate.strip():
-            secret = candidate.strip()
+        if isinstance(candidate, str) and candidate:
+            secret = candidate
     else:
         configured_path = value["file"]
         if not isinstance(configured_path, str) or not configured_path.strip():
@@ -247,13 +263,17 @@ def _read_credential(
         try:
             mode = stat.S_IMODE(path.stat().st_mode)
             insecure = bool(mode & 0o044)
-            candidate = path.read_text(encoding="utf-8").strip()
+            with path.open("r", encoding="utf-8", newline="") as credential_file:
+                candidate = credential_file.read()
         except (OSError, UnicodeError):
             candidate = ""
         if candidate:
             secret = candidate
     if secret is None:
         return True, "missing", None
+    secret = normalize_credential_value(secret)
+    if not is_valid_credential_value(secret):
+        return True, "invalid", None
     return True, "insecure_file" if insecure else "configured", f"Bearer {secret}"
 
 

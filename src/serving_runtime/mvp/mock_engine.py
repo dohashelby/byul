@@ -16,6 +16,24 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def simulated_token_count(messages: object) -> int:
+    """Deterministic stand-in for a tokenizer; NOT a real token count.
+
+    Counts whitespace-separated words plus a fixed overhead per message so the
+    Gateway's context check can be exercised without a real model tokenizer.
+    """
+
+    if not isinstance(messages, list):
+        raise ValueError("messages must be a list")
+    total = 2
+    for message in messages:
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, str):
+            raise ValueError("message content must be a string")
+        total += len(content.split()) + 4
+    return total
+
+
 class MockEngine:
     """A local-only mock engine with a thread-safe receipt journal."""
 
@@ -60,6 +78,7 @@ class MockEngine:
         self.split_writes = split_writes
         self._receipts: list[dict[str, Any]] = []
         self._receipts_lock = threading.Lock()
+        self.tokenize_calls = 0
         self._stream_transmissions: dict[str, bytearray] = {}
         self._receipts_store = JsonlStore(receipts_path) if receipts_path is not None else None
         self._receipts_store_error: str | None = None
@@ -254,6 +273,7 @@ class MockEngine:
                     "/v1/models",
                     "/_mock/receipts",
                     "/v1/chat/completions",
+                    "/tokenize",
                 }
 
             def _unsupported_method(self) -> None:
@@ -330,8 +350,25 @@ class MockEngine:
                     return
                 self._send_json(404, {"error": {"code": "NOT_FOUND"}})
 
+            def _tokenize(self) -> None:
+                try:
+                    content_length = int(self.headers.get("Content-Length", "0"))
+                    document = json.loads(self.rfile.read(content_length).decode("utf-8"))
+                    count = simulated_token_count(
+                        document.get("messages") if isinstance(document, dict) else None
+                    )
+                except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                    self._send_json(400, {"error": {"code": "MALFORMED_REQUEST"}})
+                    return
+                with owner._receipts_lock:
+                    owner.tokenize_calls += 1
+                self._send_json(200, {"count": count, "data_origin": "mock"})
+
             def do_POST(self) -> None:
                 parsed = urlsplit(self.path)
+                if parsed.path == "/tokenize":
+                    self._tokenize()
+                    return
                 if parsed.path != "/v1/chat/completions":
                     self._unsupported_method()
                     return

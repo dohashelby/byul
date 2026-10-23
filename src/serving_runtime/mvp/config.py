@@ -31,6 +31,8 @@ class MVPConfig:
     manifest_path: str | None = None
     collector_interval_s: float = 5.0
     collector_stale_after_s: float = 15.0
+    asset_manifest_path: str | None = None
+    asset_interval_s: float = 60.0
 
     def __post_init__(self) -> None:
         if self.backend not in {"mock", "vllm"}:
@@ -55,7 +57,7 @@ class MVPConfig:
             raise ValueError("max_concurrent_requests must be a positive integer")
         if not str(self.data_dir).strip():
             raise ValueError("data_dir must not be empty")
-        for name in ("revocations_path", "baseline_path", "manifest_path"):
+        for name in ("revocations_path", "baseline_path", "manifest_path", "asset_manifest_path"):
             value = getattr(self, name)
             if value is not None and not str(value).strip():
                 raise ValueError(f"{name} must not be empty when configured")
@@ -63,6 +65,8 @@ class MVPConfig:
             raise ValueError("collector_interval_s must be positive")
         if self.collector_stale_after_s <= 0:
             raise ValueError("collector_stale_after_s must be positive")
+        if self.asset_interval_s <= 0:
+            raise ValueError("asset_interval_s must be positive")
 
 
 # A concise public name for callers that prefer the module-qualified Config.

@@ -46,9 +46,12 @@ def report(expected):
 def test_three_cases_have_exact_five_checks_and_only_real_executors():
     cases = build_cases(config(), "PACK-BASELINE", 17)
     assert len(cases) == 3
-    assert [set(c["expected"].values()) for c in cases] == [{"FAIL"}, {"PASS"}, {"UNKNOWN"}]
+    assert [set(c["expected"].values()) if c["expected"] is not None else None for c in cases] == [{"FAIL"}, {"PASS"}, None]
+    assert cases[2]["name"] == "short-timeout-observation"
+    assert cases[2]["observation_contract"] == "short-timeout"
+    assert cases[2]["legacy_hypothesis"] == dict.fromkeys(CHECKS, "UNKNOWN")
     for case in cases:
-        assert tuple(case["expected"]) == CHECKS
+        assert tuple(case["legacy_hypothesis"]) == CHECKS
         assert case["policy"]["scope"] == {"include": list(CHECKS), "exclude": []}
         assert case["config"]["executors"] == dict.fromkeys(EXECUTORS, "real")
         assert case["config"]["adapter"]["name"] == "vllm"
@@ -153,6 +156,16 @@ def test_seed_identity_validation_does_not_modify_declarations():
     assert (cfg, env) == before
 
 
+@pytest.mark.parametrize("profile", ["guard-chat-fixture-v1", None, ""])
+def test_fixed_completion_matrix_rejects_any_explicit_chat_template_profile(profile):
+    cfg, env = config(), environment()
+    cfg["vllm"]["chat_template_profile"] = profile
+    before = deepcopy((cfg, env))
+    with pytest.raises(ValueError, match="completions-only"):
+        validate_seed_inputs(cfg, env)
+    assert (cfg, env) == before
+
+
 @pytest.mark.parametrize("change", ["example", "unpinned-image", "no-inventory", "gpu", "cpu-host", "no-gateway", "wrong-thread"])
 def test_seed_identity_cannot_be_invented_from_missing_or_inconsistent_fields(change):
     cfg, env = config(), environment()
@@ -177,3 +190,12 @@ def test_seed_identity_cannot_be_invented_from_missing_or_inconsistent_fields(ch
 def test_incomplete_proof_does_not_count_as_fifteen_measured_results():
     assert _proof([])["problems"]
     assert _proof([])["refs"] == []
+
+
+def test_no_fixed_timing_verdict_is_only_scope_comparison_not_the_evidence_contract():
+    actual = report(dict.fromkeys(CHECKS, "UNKNOWN"))
+    actual["by_check"][2]["single"]["security"] = "PASS"
+    comparison = compare_report(actual, None)
+    assert comparison["matched"] is True
+    assert comparison["expected_security"] is None
+    assert "observation_contract" not in comparison

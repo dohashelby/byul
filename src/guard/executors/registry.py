@@ -18,6 +18,7 @@ from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
 from .response_content import ResponseContentExecutor
 from .log_analysis import LogAnalysisExecutor
+from .template_validation import TemplateValidationExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
@@ -30,6 +31,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "sampling_validation:real": lambda cfg: SamplingValidationExecutor(cfg.get("sampling_validation", {})),
     "response_content:real": lambda cfg: ResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ")),
     "log_analysis:real": lambda cfg: LogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ")),
+    "template_validation:real": lambda cfg: TemplateValidationExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ")),
 }
 
 # 실행기 메타데이터: 이 실행기가 만든 증거를 판정하는 기본 판정기(없으면 CheckDef.judge).

@@ -5,6 +5,7 @@
 packs/** -text
 reference/framework/data/*.json -text
 tools/overrides/*.yaml -text
+src/guard/adapters/assets/chat/*.jinja -text
 out/**/*.json -text
 out/**/*.jsonl -text
 out/**/*.txt -text

@@ -9,7 +9,7 @@
 - OBS-11의 프로파일·독립 근거·시간/조회 창·경보/종속 처리에 대한 제한적 충족 조건
 - OBS-04/05·OBS-07/08에 선언된 bool 정책의 해당 검토 분기(실제 활성 상태 증명 아님)
 - M10 REQ-09 계약의 보안·기능 관측이 고정된 rule_table에서도 PASS 후보일 것
-- 신규 sampling_validation/response_content/log_analysis 정의의 각 축이 고정된 rule_table에서도 PASS 후보일 것
+- 신규 sampling_validation/response_content/log_analysis/template_validation 정의의 각 축이 고정된 rule_table에서도 PASS 후보일 것
 - M12 REQ-16의 필수 캐시 문맥별 수동 3case 계약이 해당 축에서 완결될 것
 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집, INV-11)은 판정 코어가 따로 적용한다.
 신고된 FAIL은 그대로 둔다(INV-04). 항목별 관측은 DECLARED이며 실측·신원 인증이 아니다.
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from guard.models import CheckDef, Evidence, Verdict
 from guard.input_policy import policy_context
-from guard.automation_policy import string_list
+from guard.automation_policy import string_list, validate_template_policy
 
 from .base import AXES, JudgeOutput
 from .policy_items import evaluate
@@ -28,7 +28,7 @@ from .rule_table import RuleTableJudge
 from . import manual_cache_context
 
 ALLOWED = {"PASS", "FAIL", "UNKNOWN"}
-AUTOMATION_RULE_CEILING_EXECUTORS = {"sampling_validation", "response_content", "log_analysis"}
+AUTOMATION_RULE_CEILING_EXECUTORS = {"sampling_validation", "response_content", "log_analysis", "template_validation"}
 
 
 def _automation_policy_valid(executor: str, values: dict) -> bool:
@@ -38,6 +38,14 @@ def _automation_policy_valid(executor: str, values: dict) -> bool:
     outside this check. A self-reported coverage flag cannot authorize an empty
     or unsupported required policy scope. Do not coerce or shrink a policy.
     """
+    if executor == "template_validation":
+        try:
+            validate_template_policy(values)
+        except (TypeError, ValueError, KeyError, AttributeError):
+            return False
+        # The shipped profile verifies denial of request template overrides.
+        # A valid policy allowing them still needs a supported evidence profile.
+        return values["request_template_override_allowed"] is False
     keys, may_be_empty = {
         "sampling_validation": (("allowed_sampling_options", "rejection_codes"), set()),
         "response_content": (("allowed_response_fields", "allowed_error_fields", "forbidden_return_options", "required_targets"),
@@ -83,7 +91,7 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.10.0"
+    version = "0.11.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         input_context = policy_context(check, policy_values, evidence.observations)
@@ -178,7 +186,7 @@ class DeclaredJudge:
             if v == "PASS" and automation_ceiling:
                 if not automation_policy_valid:
                     reasons.append(f"POLICY_CONTEXT: AUTOMATION_MANUAL_POLICY_UNRESOLVED; check={check.id}; axis={axis}; "
-                                   "bounded profile policy values invalid; DECLARED PASS withheld")
+                                   "bounded profile policy context invalid or unsupported; DECLARED PASS withheld")
                     v = "UNKNOWN"
                 ceiling = automation_rules.verdicts.get(axis, Verdict.UNKNOWN) if automation_rules is not None else Verdict.UNKNOWN
                 if v == "PASS" and ceiling != Verdict.PASS:

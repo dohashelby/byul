@@ -3,6 +3,11 @@
 날짜 · 결정 · 이유 (한 줄씩). SPEC과 참고 문서가 충돌하면 SPEC을 따르고 여기 적는다.
 
 ## 결정
+- 2026-10-23 · REQ-07 첫 CPU 실증의 30초 cold 생성 timeout은 UNKNOWN으로 보존한다. template 실행기와 별도 chat 예제의 기술 관측 timeout만 상한/설정 120초로 보수하고 300초 새 송신 마감·남은 시간 제한·기업 POL·판정표·자원 상한은 유지한다. 기존 실행 안의 retry나 warmup 대체는 하지 않고 새 시도로 검증한다. · 첫 응답 30.095초 timeout, 후속 79ms 소비 일치의 실제 근거.
+- 2026-10-23 · 자동화 2차는 사용자의 후속 구현·테스트·문서·커밋·푸시·초안 PR 계속 진행 지시에 따라 고정 CPU chat fixture, REQ-07 실행기와 declared 상한, 기존 REQ-13 private_system 분기, CPU 시간 제한 행렬 계약을 한 묶음으로 구현한다. 코어·객체·저장소는 유지하고 새 의존성은 추가하지 않는다. · [범위와 실행 프롬프트](docs/AUTOMATION_PHASE2_PROMPT.md).
+- 2026-10-23 · `guard-text-chat-v1`은 읽기 전용 별도 자산으로만 제공한다. 기존 모델 snapshot·기본 completion 경로는 보존한다. 실제 mount 바이트/이미지/argv와 소비 prompt IDs를 확인하며 요청 임의 Jinja·fallback·멀티모달·기업 template 승인 전체를 입증하지 않는다. · CPU fixture의 정상 요청과 정확한 소비 증거를 분리.
+- 2026-10-23 · REQ-07 정책의 양의 입력 한도에는 임의 기업 상한을 두지 않는다. 실행 자원 한도와 분리하고 정확한 소비 최댓값·실제 시험 경계를 저장하여 다른 POL 재판정의 과거 true 플래그 재사용을 막는다. 허용 override=true는 유효한 입력이나 초기 deny 프로파일에서 UNKNOWN이다. · 수동 신고 PASS에도 같은 순수 검증·판정표 상한 적용.
+- 2026-10-23 · 1차 CPU 행렬의 14/15·exit1은 보존한다. 짧은 HTTP timeout이 별도 Docker inspect/exec 시간 상한까지 보장하지 않으므로 3번째 사례를 강제 다섯 UNKNOWN 대신 관측 계약으로 평가한다. 과거 자료는 읽기 전용 분석 후 새 위치에 별도 결과를 남긴다. · [2차 계약과 검증](docs/AUTOMATION_PHASE2.md).
 - 2026-10-19 · Python 3.11은 uv가 내려받은 인터프리터를 쓴다(사람 승인 "A"). 설치용 네트워크만 사용. · 로컬에 3.14뿐이었음.
 - 2026-10-19 · 점검 행 ID는 첫 변환 때 배열 순서로 붙이고 `packs/PACK-BASELINE/id_map.yaml`에 고정한다. 재변환 시 질문 문구 → `subtest_ids`(유일할 때만) 순으로 기존 ID와 대조하고, 못 찾은 새 행은 영역의 다음 번호, 사라진 행은 `retired: true`. · SPEC §2.1 "한 번 붙인 ID는 바꾸지 않는다".
 - 2026-10-19 · 자동화 행의 구조화 내용은 원본을 고치지 않고 `tools/overrides/<ID>.yaml`로 덧씌운다. · 재변환해도 구조화가 유지되도록.

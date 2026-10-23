@@ -65,19 +65,19 @@ def result(check, evd, vals):
 
 def test_registration_catalog_template_and_no_automation(pack):
     c=pack.checks["REQ-16"]
-    assert (pack.manifest.revision,c.revision)==(17,2) and not pack.reviewed
+    assert (pack.manifest.revision,c.revision)==(18,2) and not pack.reviewed
     assert [(p.key,p.type,p.required) for p in c.policy_params]==[("required_cache_contexts","list[str]",True)]
     assert [(o.key,o.type) for o in c.required_observations]==[("declared_cache_context_evidence","dict")]
     assert c.executor is c.judge is None and len(pack.checks)==77
-    assert sum(bool(c.policy_params) for c in pack.active_checks())== 18
-    assert sum(len(c.policy_params) for c in pack.active_checks())== 38
-    assert {c.id for c in pack.active_checks() if c.executor}=={"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03"}
+    assert sum(bool(c.policy_params) for c in pack.active_checks())== 19
+    assert sum(len(c.policy_params) for c in pack.active_checks())== 41
+    assert {c.id for c in pack.active_checks() if c.executor}=={"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07"}
     text=build_policy_template(pack); doc=yaml.safe_load(text)
     assert doc["values"]["REQ-16"]=={} and "required_cache_contexts" in text
     assert doc["status"]=="DRAFT" and doc["confirmed_by"] is None
     assert all(not pack.checks[cid].policy_params for cid in ("REQ-15","REQ-17"))
     rows=list(csv.DictReader((ROOT/"docs/policy_catalog.csv").open(encoding="utf-8",newline="")))
-    assert len(rows)==314 and sum(len(json.loads(r["check_ids"])) for r in rows)==606
+    assert len(rows)==317 and sum(len(json.loads(r["check_ids"])) for r in rows)==609
     row=next(r for r in rows if r["proposed_policy_id"]=="P-DRAFT-CACHE-CONTEXT")
     assert json.loads(row["check_ids"])==["REQ-15","REQ-16","REQ-17"]
     assert json.loads(row["current_param_paths"])==["values.REQ-16.required_cache_contexts"]

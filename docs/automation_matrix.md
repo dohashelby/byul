@@ -1,6 +1,9 @@
 # 77행 자동화 분류표 (요약)
 
-> 현재 구현: [Windows CPU·자동화 1차](AUTOMATION_PHASE1.md). 실행기 연결은 기존 REQ-01·REQ-03·PLT-01·PLT-04·REQ-09와 신규 REQ-10·REQ-13·OBS-03의 8개다. 신규 3개는 제한 관측 프로파일이며 전체 분기 검증 완료를 뜻하지 않는다.
+> 현행 구현: [자동화 2차](AUTOMATION_PHASE2.md)에서 REQ-07 revision 2의 `template_validation`을 연결해 자동 실행기 9개가 연결됐다. PACK-BASELINE 18/DRAFT·정책 19점검/41경로·adapter 0.3.0·declared/0.11.0 기준이다. 고정 CPU text-chat 프로파일에서 렌더된 실제 token IDs와 소비 prompt_token_ids, 정책 경계와 요청 override를 검증하는 제한 범위다. [별도 설정](../examples/windows-cpu-chat.toml)과 [EXAMPLE/DRAFT 정책](../examples/automation-chat-policy.yaml), [완료 계약](AUTOMATION_PHASE2_PROMPT.md)을 참고한다. 기본 전체 1,781통과·5 skip·18제외, 마지막 오류 직렬화 보수 후 관련 128회귀 통과. 최종 127 경계 확인과 별도 32 반례, REQ-13 private_system·PLT-01의 실제 관측, 반출·복원·저장 팩 재판정은 [직접 검증 기록](AUTOMATION_PHASE2.md#검증-기록)과 [선별 증거](evidence/automation-phase2-20261023.json)를 따른다. 연결 수가 완료 수는 아니다. 성능 UNKNOWN·official=false를 유지한다.
+> 아래 1차 직접 결과와 A/B/C 분류의 역사적 수치는 보존한다. REQ-10 하위 runner 소비·OBS-03 예외 dump 등 남은 분기가 새 REQ-07 등록만으로 검증되지는 않는다.
+
+> 1차 기록 당시 구현: [Windows CPU·자동화 1차](AUTOMATION_PHASE1.md). 실행기 연결은 기존 REQ-01·REQ-03·PLT-01·PLT-04·REQ-09와 신규 REQ-10·REQ-13·OBS-03의 8개다. 신규 3개는 제한 관측 프로파일이며 전체 분기 검증 완료를 뜻하지 않는다.
 > 이번 코드에서 Windows CPU 제품 명령으로 8개를 실제 실행했다. 기존 5개는 위반 구성에서 모두 FAIL·강화 구성에서 모두 PASS였고, 짧은 관측 시간 구성은 4개 UNKNOWN·PLT-01 PASS였다(원래 보안 기대 14/15 일치, 행렬 exit 1 보존). 신규 3개는 보안 REQ-10 UNKNOWN·REQ-13 FAIL·OBS-03 UNKNOWN이다. 근거와 한계는 위 문서를 따른다. CSV에 구현·검증·남은 범위·근거를 구분했다.
 > 아래 A/B/C와 불확실성 표는 2026-10-19 맥 CPU 기준의 가능성 분류 이력이다. Windows 지원 여부·실제 완료 수는 별도이며, 한 실행기 종류로 묶였다는 이유만으로 기존 코드가 모든 행을 실행할 수 있다고 보지 않는다.
 

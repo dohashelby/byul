@@ -1,5 +1,20 @@
 # 실행·실증 안내
 
+## 현행 자동화 2차 입력과 검증 상태
+
+[자동화 2차](AUTOMATION_PHASE2.md)와 [완료 계약](AUTOMATION_PHASE2_PROMPT.md)은 PACK-BASELINE 18/DRAFT·REQ-07 revision 2·자동 연결 9개·정책 19점검/41경로를 기준으로 한다. 정책 카탈로그는 317행·609연결, adapter는 0.3.0, declared는 0.11.0이다. 기본 전체 1,781통과·5 skip·18제외, 마지막 오류 직렬화 보수 후 관련 128회귀 통과. 최종 127 경계 확인과 별도 32 반례, REQ-13 private_system·PLT-01의 실제 관측, 반출·복원·저장 팩 재판정은 [직접 검증 기록](AUTOMATION_PHASE2.md#검증-기록)과 [선별 증거](evidence/automation-phase2-20261023.json)를 따른다. 아래 과거 단계의 명령·수치와 [1차 Windows CPU 직접 기록](AUTOMATION_PHASE1.md)을 2차 성공 결과로 합산하지 않는다.
+
+기존 CPU 설정의 기본 동작은 유지한다. 새 [Windows CPU chat 설정](../examples/windows-cpu-chat.toml)을 별도 로컬 파일로 복사해 `models_dir`를 실제 snapshot 절대 경로로 바꾸고, 실제 CPU ENV의 이미지 digest·모델 revision/inventory·adapter 버전을 준비한다. [별도 시험 정책](../examples/automation-chat-policy.yaml)은 새 고정 읽기 전용 template 마운트를 PLT-01에 명시한 EXAMPLE/DRAFT이며 REQ-13의 기존 정책값을 보존한다.
+
+```text
+uv run guard prepare-validation --pack packs/PACK-BASELINE --env env-cpu.yaml --policy examples/automation-chat-policy.yaml --config windows-cpu-chat.local.toml
+uv run guard validate --pack packs/PACK-BASELINE --env env-cpu.yaml --policy examples/automation-chat-policy.yaml --config windows-cpu-chat.local.toml --store out/test-runs/chat-new/store --output out/test-runs/chat-new/run
+```
+
+실행마다 `chat-new`를 새 경로로 바꾸고 엔진은 하나씩 기동한다. 기존 다른 컨테이너·모델·과거 증거는 보존한다. 준비 검사는 기동/이미지 수신을 하지 않으며 성공 exit0은 보안 PASS를 뜻하지 않는다. 고정 텍스트 메시지 형식의 시험이며 OPT의 지시 학습·system 비공개성 인증은 아니다. Windows CPU 성능은 UNKNOWN이고 예시 보고서는 official=false다.
+
+## 기존 실행 안내와 이력
+
 지원: Python 3.11, Linux/macOS, 로컬 Docker. Windows는 기본 논리 테스트 일부만 확인했다.
 실제 엔진 시험에는 사전에 받은 HF 모델 캐시와 호환 아키텍처의 pinned 이미지가 필요하다.
 정책/팩 DRAFT이면 공식 보고서가 아니다.

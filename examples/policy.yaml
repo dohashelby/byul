@@ -1,7 +1,7 @@
 # 예시 정책 (EXAMPLE, DRAFT). 보고서는 "공식 아님"으로 표시된다.
 data_origin: EXAMPLE
 status: DRAFT
-pack: { id: PACK-BASELINE, revision: 17 }
+pack: { id: PACK-BASELINE, revision: 18 }
 values:
   REQ-01: { allowed_callers: [gateway-sa] }
   REQ-03: { general_allowed_kinds: [inference] }   # 일반 호출자 = 추론만, 관리 호출자 = 관리·진단

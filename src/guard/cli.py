@@ -13,6 +13,7 @@ import yaml
 
 from guard.collectors.file import load_environment, load_policy
 from guard.collectors.manual import ManualEvidenceError, build_template, dump_template, import_evidence, read_document
+from guard.collectors.policy_template import write_policy_template
 from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan
@@ -32,6 +33,8 @@ pack_app = typer.Typer(add_completion=False, no_args_is_help=True, help="팩 보
 app.add_typer(pack_app, name="pack")
 evidence_app = typer.Typer(add_completion=False, no_args_is_help=True, help="수동 증거 입력·저장소 반출·복원")
 app.add_typer(evidence_app, name="evidence")
+policy_app = typer.Typer(add_completion=False, no_args_is_help=True, help="기업 정책 입력 양식")
+app.add_typer(policy_app, name="policy")
 
 ConfigOpt = typer.Option(Path("guard.toml"), "--config", help="플러그인 설정 파일")
 StoreOpt = typer.Option(None, "--store", help="저장소 경로 (기본: guard.toml의 store 또는 .guard)")
@@ -74,6 +77,20 @@ def _as_of(value: Optional[str]) -> datetime:
         return utcnow()
     dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+@policy_app.command("template")
+def policy_template(
+    pack: Path = typer.Option(..., "--pack", help="정책 파라미터를 읽을 팩 경로"),
+    out: Path = typer.Option(..., "--out", help="새 정책 YAML 경로 (기존 파일 덮어쓰기 금지)"),
+) -> None:
+    """팩에 선언된 정책 키의 설명과 빈 values를 생성한다. 시험·저장소 생성 없음."""
+    try:
+        write_policy_template(load_pack(pack), out)
+    except (OSError, ValueError, yaml.YAMLError) as exc:
+        typer.echo(f"정책 양식 생성 실패: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"DRAFT 정책 양식 생성: {out}")
 
 
 @app.command()

@@ -494,3 +494,55 @@ git status
 - Push CI: https://github.com/dohashelby/gua/actions/runs/39544534499 (성공), PR CI도 성공.
 - 초안 PR: https://github.com/dohashelby/gua/pull/2 . 통합 merge commit cfd7dbe는 main/d9e9729와 update/42a609d를 모두 부모로 가진다. 원래 두 브랜치는 변경하지 않았다.
 - 이 수치는 기본 논리·모의 계약 검증이며 실제 엔진/두 이미지 실증은 포함하지 않는다.
+
+## 기업 정책 카탈로그 Phase 1 (2026-10-21, Asia/Seoul)
+- 기준: 기존 깨끗한 통합 작업 트리 `codex/gua-integration-20261021` / `58b1539a170894ec261c14ee0dac02f286c15a62`. origin fetch 및 ls-remote로 통합 원격 HEAD 동일 확인, 앞섬/뒤짐 0/0, `git pull --ff-only` → Already up to date. main 작업 트리의 미추적 .assessment와 다른 두 브랜치/작업 트리는 보존했다.
+- 한 일: 77개 CheckDef의 source.array+question을 원문 draft와 유일 대조하고 id_map의 질문/subtest_ids/retired 및 변환기의 질문→유일 subtest ID 보존 규칙을 확인했다. 원문 모든 정책/수치/범위·충족/실패/미확인 필드, 11개 선언, 로더/select/실행기/판정표/기존 관련 테스트를 정적으로 대조했다. docs/policy_catalog.csv/md를 작성하고 DECISIONS 열린 질문에 POL-P1-01~05를 추가했다. 과거 기록은 보존했다.
+- 산정: SUP 16·REQ 21·PLT 12·LIF 16·OBS 12 = 77개. 이번 정규화의 점검별 결정 발생 595 / 연결 595, 고유 항목 303(a 11, b 12, c 165, d 115). 수치 포함 166(도출 선행 신규 c 165, 수치+복잡 164). 원문 numeric_values_pending 40행과 구별하며 적용성 미정 자원별 후보를 포함한다. 이 수는 scalar 값 개수가 아니고 원문 대비 감소율은 만들지 않았다.
+- 확인된 현재 구현: 5개 점검·11개 파라미터, 팩 revision 10/DRAFT. 기존 REQ-01/03·PLT-01의 과거 macOS 제한 실측 기록과 신규 PLT-04/REQ-09의 EXAMPLE 모의 계약 기록을 구분했다. 이번 코드 시험/엔진 재실측은 수행하지 않았다. 과거 증거 누락 기록도 그대로 유지했다.
+- 다음/미결정: null 미입력 계약, 제안 ID/공유 표·수치 후보의 분해·적용성, 실제 정책 승인/팩 검토 역할, 각 단위/측정·기준선/SLA 및 Phase 2의 b 선택을 사람과 A가 검토한다. 최소 권고는 기존 11개 template에서 키 생략/주석으로 현재 계약을 유지하는 것. Phase 2 미착수; 기업 값·확정자 생성/코드·팩·SPEC·policy/증거 변경·pytest·엔진/운영 시험·유료 자원·의존성 추가·커밋·푸시 없음.
+- 작성 후 문서·데이터 검증 명령과 실제 결과는 아래에 덧붙인다. 자동 검증은 원문 해석이나 정책 승인·실측 완료를 대신하지 않는다.
+
+### Phase 1 문서·데이터 정합성 확인 명령과 결과
+- Git 기준 명령: `git remote -v`, `git branch -vv`, `git rev-parse HEAD`, `git status --porcelain=v1`, `git worktree list`, `git fetch origin`, `git log --oneline --left-right codex/gua-integration-20261021...origin/codex/gua-integration-20261021`, `git rev-list --left-right --count HEAD...origin/codex/gua-integration-20261021`, `git pull --ff-only`, `git ls-remote origin refs/heads/codex/gua-integration-20261021 refs/heads/main`. 결과: 통합 HEAD/원격 58b1539a170894ec261c14ee0dac02f286c15a62, main d9e9729116eeb16299247ecb9e7df8ff16d882ec, 통합 작업 트리 시작 시 변경 없음, 통합 앞섬/뒤짐 0/0, pull은 Already up to date. 기준을 바꾸는 reset/stash/병합/강제 push는 실행하지 않았다.
+- 원문·기준선 준비: 기존 `..\..\.venv\Scripts\python.exe -X utf8 "$env:TEMP\gua-policy-phase1-20261021\inspect.py"` 및 같은 경로 `protect.py`. 기존 PyYAML을 이용해 JSON/YAML을 읽고 추적 파일 330개와 보호 경로 파일 3,932개의 SHA-256 기준선을 저장했다. 같은 경로 read_rows.py/more.py로 정책·수치·범위/충족/실패/미확인 필드와 owner 연결을 읽었고 rg/Get-Content로 실제 로더/소비 코드·기존 테스트를 정적으로 확인했다. 큰 참고 Markdown 전체·pytest·엔진은 실행하지 않았다. 보조 스크립트/기준선은 저장소 밖 TEMP에만 있다.
+- 작성 후 검증 명령: `..\..\.venv\Scripts\python.exe -X utf8 "$env:TEMP\gua-policy-phase1-20261021\validate_catalog.py"`. 최초 실행은 마지막 `git diff --check`에서 PROGRESS.md의 EOF 빈 줄 1건을 발견해 종료 코드 1. 추가한 끝 빈 줄만 제거했고 과거 내용은 바꾸지 않았다. 재실행 종료 코드 0, 아래 항목 통과. 정규식은 경로/ID·문서 일치 확인에만 쓰며 정책의 의미/분류는 작성자가 검토한 제안이다.
+- 원문/연결: SUP16·REQ21·PLT12·LIF16·OBS12=77, 질문+source.array 유일 대응과 id_map ID/질문/subtest/retired·legacy·policy_prose/충족/실패/미확인 일치. items28/scenarios83은 점검 수에 사용하지 않음. numeric_values_pending40행 확인. 모든 legacy Q가 items.policy_owner에 연결되고 원문/경로 보존.
+- 카탈로그: CSV 20열·303개 고유 P-DRAFT ID·595개 유일 점검 연결, 고아/중복/누락 0. a11·b12·c165·d115 및 분류 우선순위 a→c→d→b 확인. 수치166·수치+복잡164. 실제 5개 점검의 필수 파라미터 11개와 values 경로·타입 1:1 연결. 신규 항목에는 현재 경로를 만들지 않음. 이 수는 적용성 미정 분해 후보/복잡한 표를 포함한 이번 정규화 단위이며 원문의 유일 정책 총수나 scalar 개수는 아님.
+- 출처/환경: 고유 source_refs 964개(JSON/YAML Pointer955·코드 행9) 모두 실존. MD 원문 Pointer 링크531개·로컬 링크 대상22개 실존. facts 의존성은 실제 등록 키, fixed는 실제 model/runtime/engine 필드, config는 실제 소비 코드와 대조. 미지원 추가 관측은 candidate로 분리.
+- MD/CSV: 77개 연결표의 정책 ID 집합과 CSV의 연결이 점검별로 동일. 77개 포괄/제외 장부와 수치166개 질문 장부, 집계·기존11개 값 경로 일치. UTF-8/BOM 없음·새 CSV/MD LF·각 파일 마지막 줄바꿈 확인. 추가 기록도 기존 LF를 따른다. 기존 DECISIONS/PROGRESS 기록은 삽입/추가 구간을 제거한 바이트 SHA-256이 시작 기준선과 같음.
+- 변경/보존: `git diff --check` 통과. 추적 파일330개를 시작 해시와 비교해 변경은 DECISIONS/PROGRESS뿐이고, 새 파일은 docs/policy_catalog.csv/md 두 개뿐이다. 보호 경로 src/packs/examples/lab/reference/out/.guard 파일3,932개는 바이트 SHA-256과 파일 집합 동일. 다른 작업 트리·sources/·기존 참고 원문/실행 증거를 쓰는 명령은 실행하지 않았다. 코드·팩/정책·SPEC 변경, pytest/엔진/운영 시험·새 의존성·유료 서버·커밋/푸시 없음.
+- 범위 한계: 이 검증은 문서·데이터 정합성이다. 원문 해석의 유일성·기업 값/담당자 확정·기존 CI 재통과·증거 체인 복구·신규 엔진 실측·Phase 2 완료는 확인하지 않았고 통과로 적지 않는다. 기록 추가 후 같은 검증을 재실행했다. 추가 제어문자 검사에서 검증 명령 경로의 이스케이프 제어문자 1건을 발견해 올바른 경로로 고쳤고, 제어문자 금지 확인도 검증에 포함했다. 최종 재검증은 종료 코드 0이며 모든 파일 UTF-8/LF·제어문자 없음이다. 최종 git diff --check/상태 확인과 원격 ls-remote에서 4파일 범위 및 원격 HEAD 불변을 확인했다.
+
+### 사용자 지정 체크리스트 가이드 추가 대조 (2026-10-21)
+- 사용자 지시: mg-princess/serving-security-framework의 03_체크리스트와_보완가이드.md를 정책 참고로 사용. 외부 main `git ls-remote` 결과 cdfea2401007091f8e5452d87d4ff2fbfaf1219f, 문서/JSON은 이 커밋으로 고정했다. gua 작업 브랜치/HEAD는 codex/gua-integration-20261021 / 58b1539a170894ec261c14ee0dac02f286c15a62 그대로이며 기존 네 파일 변경을 보존했다.
+- 조회: GitHub 연결 도구로 문서 첫 65행과 고정 본문을 취득했다. 1,713,297 byte JSON은 연결 도구에서 본문이 비어 있었고 비인증 raw URL은 404였다. 저장소 밖 TEMP에 `git clone --filter=blob:none --no-checkout --depth 1 --branch main https://github.com/mg-princess/serving-security-framework.git`으로 읽기용 사본을 만들고 `git show cdfea2401007091f8e5452d87d4ff2fbfaf1219f:data/checklist.json` 및 같은 커밋 문서를 읽었다. Git blob SHA(JSON b0215028a52965dd6b39114193b515e18f8d5463, 문서 3f5441400b5717aea5a92b7bcd1184f52e20f39f) 검증. 큰 문서 전체를 모델 입력으로 읽지 않고 정책/해당 항목 부분과 코드로 읽은 JSON만 대조했다.
+- 연결/차이: 질문 77개가 모두 바뀌어 문구 직접 일치로는 연결되지 않았다. 양쪽 유일 subtest_ids 73개와 충돌 4개(REQ-19/20 kernel/Graph, LIF-05/07 배포 전환/준비)를 질문 의미·정할 정책·충족 기준으로 수동 대조했다. 원문 분야별 수는 16/21/12/16/12=77이고 보호 목적별 팀 참조 기준 28개·시험 분기 설명 112개다. 질문 외 차이는 enterprise_decisions3·scope1·satisfied_if8·fail_criteria2·unknown_criteria5이며 비교 스크립트의 문자열 차이 수로 기록한다. 내용 해석은 문서 §14에 따로 남겼다.
+- 보완: 카탈로그 MD에 팀 참조 방향/기업별 결정 구분·28개 요약·77개 CHK 교차표·차이와 구현 한계를 추가했다. CSV 모든 303개 항목에 고정 커밋의 가이드/CHK/정책 필드 출처를 보강하고 SUP 적재/실제 plugin 그룹·LIF release 계약 네 항목을 보완했다. 수치 도출에서 자원/성능 기준선과 보안/업무 기한의 기준 선결정을 구별했다. DECISIONS 열린 질문 POL-P1-06 추가. ID/분류/연결/기존 values 경로·기업 값·실제 담당자와 원본 reference/framework·팩·코드는 보존한다.
+- 검증 명령: 기존 가상환경 Python으로 TEMP의 compare_upstream.py, validate_catalog.py, validate_upstream_reference.py를 실행하고 git diff --check/상태를 확인한다. 실제 종료 결과는 완료 후 아래에 기록한다. pytest/엔진 시험·Phase 2·의존성 추가·커밋/푸시는 수행하지 않는다.
+- 완료 검증: 기존 `..\..\.venv\Scripts\python.exe -X utf8`로 TEMP의 compare_upstream.py·validate_catalog.py·validate_upstream_reference.py를 실행해 각각 종료 코드 0을 확인했다. 원문 정책 의미는 수동 검토하고 스크립트는 연결/경로/일치만 확인했다. 77개 CHK 연결(유일 subtest73·수동 대조4), 참조 기준28·분기 설명112, CSV303개 전부의 고정 외부 출처772개를 확인했다. 전체 고유 출처1,736개(로컬/원격 JSON·YAML Pointer1,622·외부 문서 앵커105·코드 행9)가 실존하며 기존11개 파라미터·77개 연결·정규화595·분류a11/b12/c165/d115는 동일하다.
+- 최종 보존: 보호 경로3,932개 파일 해시/집합과 기존 진행·결정 기록 바이트 보존 확인. 변경 파일은 기존 허용된 네 파일뿐이고 UTF-8/LF·제어문자 없음·CSV/MD 집계와 링크·git diff --check 통과. 최신 문서를 gua의 이전 변환기로 곧바로 재수입할 경우 질문 변경+subtest 충돌 네 항목에서 ID 연속성이 보장되지 않는 점도 문서에 명시했다. 원문·팩·코드·기업 값·실행 증거를 변경하지 않았으며 pytest/엔진·Phase 2·커밋/푸시는 미수행이다.
+
+
+## 2026-10-21 — Phase 2 정책 양식 M1
+- 시작: codex/gua-integration-20261021 / 58b1539a170894ec261c14ee0dac02f286c15a62. fetch 후 원격과 동일. 미커밋 Phase 1 네 문서의 사본/해시를 별도 ignored out/test-runs/policy-m1-20261021에 보존하고 codex/gua-policy-template-m1 브랜치를 만들었다.
+- 승인 범위: guard policy template --pack --out, 값 키 생략+주석, 기존 계약 유지. 구현/테스트 코드를 한 묶음으로 마친 뒤 검증한다. core/models/judges/팩/기업 값/엔진/외부 CHK 확대 없음.
+- 구현: CLI 그룹과 collectors/policy_template.py, 팩 Ref 일치 시에만 사용하는 패키지 설명 JSON, 입력 계약 회귀, docs/POLICY_TEMPLATE.md 및 사용 문서. 미입력 기본값·담당자·승인 기록을 만들지 않고 기존 파일을 덮어쓰지 않는다.
+- PR 기준 사전 확인: 기존 통합 PR #2는 main 대상 open/draft이며 미병합. 새 head PR은 없음. M1은 통합 브랜치를 base로 하는 의존 초안 PR로 준비한다. GitHub 연결 도구 404 후 Git Credential Manager의 기존 인증을 메모리에서 사용해 공식 API 상태를 읽었다. 인증값은 파일/로그에 남기지 않았다.
+- 검증 결과는 구현 묶음 완료 후 아래에 기록한다. 과거 CI를 이번 M1 통과로 사용하지 않는다.
+
+### M1 로컬 검증 및 설치본 확인
+- 구현/테스트/문서 묶음 완료 후 첫 기본 실행: `uv run pytest -q --basetemp=.review-tests-policy-m1 --junitxml=out/test-runs/policy-m1-20261021/first.xml --durations=8` → 534 passed, 1 failed, 4 skipped, 18 deselected / 128.94초. 새 UTF-8 검사에서 제목을 '정책 양식'으로 잘못 기대했으나 실제 제목은 '정책 입력 양식'이었다. 테스트 기대 문구만 바로잡았고 판정/입력 계약을 완화하지 않았다. 패키지 설명의 기존 혼합 언어 표현도 한국어로 정리했다.
+- 수정 후 기본 전체 실행: `uv run pytest -q --basetemp=.review-tests-policy-m1-final --junitxml=out/test-runs/policy-m1-20261021/final.xml --durations=8` → **535 passed, 4 skipped, 18 deselected / 117.56초**. Python 3.11.16 / Windows. skip은 기존 닫힌 루프백 포트의 refused/timeout 차이 3건과 symlink 권한 1건이다. docker/engine 18건은 기본 마커 제외다. Linux 통과나 1분 목표 충족으로 대체하지 않는다.
+- `uv build --wheel --out-dir out/test-runs/policy-m1-20261021/dist` 성공. 별도 환경에 `UV_PROJECT_ENVIRONMENT=out/test-runs/policy-m1-20261021/installed-env uv sync --frozen --no-install-project` 후 `uv pip install --python .../installed-env/Scripts/python.exe --no-deps .../guard-0.1.0-py3-none-any.whl`로 설치했다. 설명 정리 후 wheel 재빌드·재설치도 성공했다.
+- 저장소 밖 TEMP 작업 디렉터리에서 설치본 CLI/격리 Python의 8개 명령 성공: 패키지 import 위치 확인→policy template help→실제 11개 양식 생성→기존 파일 보호(예상 종료 1)→빈 정책 select→로더/77개 PLAN·필수 누락 5개 확인→부분 정책 select→누락 4개/Store.verify 확인. ENV는 EXAMPLE 합성 fixture이며 엔진/시험 실행은 하지 않았다. template 자체는 Store·ENV·설정 없이 실행했고 양식 생성 직후 .guard가 없음을 확인했다.
+- `python -I`의 import 위치가 설치 환경 site-packages임을 확인했고 wheel에 policy_template_metadata.json이 포함됐다. 현재 팩 설명과 Ref 일치, 다른 팩 선언/미지정 설명, 빈/부분/null/잘못된 타입, [], false, 0, REQ-09 소비자 계약, 출력 보호·UTF-8/LF 회귀를 확인했다.
+- 보존: 시작 보호 파일 230개 중 기존 변경은 src/guard/cli.py만이다. core/models/judges 각 0건, 팩 revision 10/DRAFT·정책/예시/실험실/참고/기존 증거 불변. 새 모듈/설명 JSON/회귀는 별도로 추가했다. Phase 1 CSV/MD는 시작 바이트와 동일하며 DECISIONS/PROGRESS는 기존 내용을 prefix로 보존하고 M1 기록만 추가했다. 실행 로그/검사 보조 파일은 ignored out/test-runs/policy-m1-20261021에 있다.
+- 원격 Linux CI는 아직 push 전이므로 미확인이다. 로컬 결과와 구분해 push/초안 PR 후 확인한다. 새 정책 자동화·실제 엔진·두 이미지 실증을 M1 완료로 집계하지 않는다.
+
+### M1 원격 Linux CI 확인
+- 구현 커밋 945cc6b16a82f0d007309bf71d8bd5a79e8cb269, Ubuntu/Python 3.11: 기본 `uv run pytest -q` → **539 passed, 18 deselected / 33.00초(PR), 29.24초(push)**. Windows skip 4건도 Linux에서는 통과했다. 이 환경에서 기본 1분 목표를 충족했다.
+- frozen 의존성 설치와 `uv build --wheel`도 두 실행 모두 성공. 실제 엔진/두 이미지 실증은 포함하지 않는다.
+- PR CI: https://github.com/dohashelby/gua/actions/runs/39552555535 / push CI: https://github.com/dohashelby/gua/actions/runs/39552529119 . 공식 GitHub API에서 completed/success와 작업 로그의 통과 수·시간을 확인했다.
+- 초안 PR: https://github.com/dohashelby/gua/pull/3 . base codex/gua-integration-20261021 / head codex/gua-policy-template-m1, 선행 PR #2 의존. Phase 1 보존 커밋 701b12f와 M1 구현 커밋 945cc6b를 구분했다. 자동 병합하지 않았다.
+- 이 후속 커밋은 검증 기록만 추가한다. 제품 코드·팩·정책·증거는 추가 변경하지 않는다.

@@ -233,3 +233,14 @@
 - 기술 권고(후속 구현 지시 전 미확정): 빈/모호한 집합의 신규 PASS 보류, 신고 FAIL 보존·UNKNOWN 비승격, SUP-14 원결과와 승인/배포 전이 구분, LIF-07 준비/접수/정상 추론 및 시계 불확실성 구분, 축별 범위 제한. 현재 declared 0.2.0의 동작을 이번에 바꾸지 않는다.
 - 다음 후보 제안은 P-DRAFT-SUP-GOV-TOOL과 조건부 P-DRAFT-AUDIT-REQUIRED-RECORDS 두 개다. 전자는 도구 이름만으로 권한 집행을, 후자는 목록만으로 수집 기한/누락을 검증하지 못한다. OBS-01 동일성·실제 사건·기한/시간 기준 결정이 선행한다. 이번과 바로 다음 증거 연결 구현에서 팩에 등록하지 않는다.
 - 설계안의 복사용 M4 프롬프트는 사람이 검토해 실행할 제안이다. judges/core 보고 연결의 구체 범위를 그 프롬프트에 적었으며 이번 문서 작성 승인으로 구현 승인을 간주하지 않는다.
+
+## 2026-10-21 — 정책 M4 구현 (사용자 승인)
+
+- 사용자가 직전 M4 프롬프트대로 /2 양식·SUP-14/LIF-07 항목별 판정·보고 연결, 구현 묶음 완료 후 테스트/수정·문서화·커밋/푸시·초안 PR을 명시적으로 지시했다. collectors/manual·전용 보조 함수·declared·core/report의 제한 변경은 이 승인에 포함하며 별도 승인을 반복 요청하지 않는다. core/select·core/judge·models·store 스키마·팩·카탈로그·예시 정책·실행기·의존성은 보존한다.
+- M3 기준 23a02ab420501f7fc75cc1fa555bc938a4a793a5에서 codex/gua-policy-evidence-m4로 분기했다. 시작 추적 파일341개의 해시/원격 상태를 ignored out/test-runs/policy-m4-20261021에 보존한다. PR #2~5는 open/draft·미병합이며 base는 M3다.
+- 채택한 보수적 기술 계약: 양식 /2·manual-entry/declared0.3.0, 정확 POL/팩 Ref·항목/case·현재 첨부 해시 연결. 빈/모호한 집합의 새 PASS 보류, 신고 FAIL 보존·UNKNOWN 비승격, 항목별 원결과/집행 구분, 동일 정상 묶음 trial/대상 확인, 예외 충분성 자동 수용 없음, SUP security와 LIF security/functional만 제한 검증, 성능 미검증. POL-M3-ID/HISTORY/AXES/COVERAGE의 첫 구현 기술 권고를 이 범위로 채택하며 실제 기업 식별자 체계·대체 방법/역할·운영 승인은 여전히 미결이다.
+- 계약 위치는 guard/manual_policy.py의 두 정책 전용 순수 형태 검증과 judges/policy_items.py의 점검별 의미 검증으로 나눈다. collector와 judge가 같은 어휘/형태를 사용하되 판정기가 파일/저장소에 접근하지 않게 한다. 범용 DSL·객체/플러그인 종류는 추가하지 않는다.
+- LIF item_state는 접수/차단 당시 상태에 대한 자기 신고다. order_basis/detail은 원본 시각 자동 해석이 아니며 미확인이면 보류한다. 알려진 준비 전 접수는 추론 결과 누락과 무관하게 FAIL을 유지한다. 기능 실패는 필수 항목 전부의 동일 정상 ready 묶음이 확인된 경우만 도출한다. 같은 사건의 모순은 해당 사건을 미확인으로 하며 별개 사건의 위반은 유지한다.
+- 현재 RPT 모델에는 RES 상세 이유가 없으므로 선택된 declared RES의 POLICY_ITEMS: 이유만 기존 limitations에 전달한다. item/case·이유·첨부 해시 식별자를 표시하며 원본 경로/locator/basis 본문은 보고하지 않는다. HTML은 기존 escape를 재사용한다. 자기 신고·DRAFT/EXAMPLE·official 조건은 변경하지 않는다.
+- 과거 /1을 읽고 대상 정책 선언이 있는 구형 증거 PASS를 새 판정에서 UNKNOWN으로 보류하되 원본 EVD/RES/해시는 바꾸지 않는다. 비대상/선언 없는 정의에는 요구를 소급하지 않는다. M2 테스트의 완전 정책+빈 관측 PASS 기대는 M4의 UNKNOWN 기대/버전으로 갱신하고 키 누락·FAIL 보존 계약은 유지한다.
+- 실제 기업 목록·담당/승인·빈 목록의 업무 유효성·예외/조건부 정책·수치/성능·OBS-01 동일성 등은 미결이다. 추가 정책 후보 등록·실제 엔진/두 이미지 시험·유료 자원/운영 요청은 하지 않는다.

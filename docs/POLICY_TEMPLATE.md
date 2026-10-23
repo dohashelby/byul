@@ -1,4 +1,4 @@
-# 정책 입력 양식 M1/M2
+# 정책 입력 양식 M1/M2와 M4 수동 증거
 
 `guard policy template`은 팩에 선언된 `policy_params`를 읽어 빈 기업 정책 YAML을 만든다.
 환경·PLAN·Store·Docker·`guard.toml` 없이 사용할 수 있다. 시험 실행이나 기업 정책 승인은 아니다.
@@ -94,6 +94,59 @@ uv run python tools/build_policy_template_metadata.py --pack packs/PACK-BASELINE
 
 ## M3 검토 기록과 다음 구현 프롬프트
 
-아래는 M2 당시의 검토 요청이다. [M3 설계안](POLICY_M3_PLAN.md)에는 코드 흐름·미결 결정·시나리오와 사용자가 검토해 전달할 후속 구현 프롬프트를 보존했다. 제안한 /2 양식·declared 0.3.0·보고 연결은 아직 구현되지 않았다. 현재 제품 계약은 위 M1/M2 설명을 따른다.
+아래는 M2 당시의 검토 요청이다. [M3 설계안](POLICY_M3_PLAN.md)에는 코드 흐름·미결 결정·시나리오와 후속 구현 프롬프트를 보존했다. /2 양식·declared 0.3.0·보고 연결의 현재 M4 구현 계약은 아래를 따른다. M3의 사실/제안은 당시 기록으로 유지한다.
 
 > gua의 M2 최신 브랜치·커밋과 실제 PR 상태를 확인하고 정책 입력 전제와 정책 내용의 충족 판정을 구별하라. SUP-14/LIF-07의 빈 목록 허용 조건·검사/준비 식별자·실제 목록·책임 역할에 필요한 팀 질문을 정리하고, 수동 증거와 정책 항목을 어떻게 대조할지 설계안을 작성하라. 남은 b 10개 중 다음 후보는 최대 2개만 제안하고 실제 소비 경로·선행 결정·최소 변경·의미 있는 실패 검증을 명시하라. 기업 값·담당자·승인·실측을 만들지 말고, 이번에는 새 팩/실행기/판정 규칙을 구현하지 말라. core/models 변경 필요성과 실제 엔진 환경 과제를 구분해 사람이 검토할 계획·질문·다음 구현 프롬프트를 제시하라. M2의 PASS 보류/FAIL 보존·과거 증거·팩 Ref 일치 계약을 유지하라.
+
+## M4: 수동 정책 항목과 증거 연결
+
+M4는 수동 양식 /2·manual-entry 0.3.0·declared 0.3.0을 제공한다. 기업 정책 입력 명령 자체는 기존과 같고 팩은 revision11/DRAFT·77점검·7점검/13정책 선언·자동 실행기 연결5를 유지한다. 두 점검에 실제 엔진 실행기를 추가한 것이 아니다.
+
+```sh
+uv run guard evidence template --plan PLAN-ID --out manual-v2.yaml
+uv run guard evidence import manual-v2.yaml
+uv run guard judge --plan PLAN-ID --as-of 2026-10-21T00:00:00Z
+uv run guard report --plan PLAN-ID --json report.json --html report.html
+```
+
+양식의 plan·policy·pack Ref는 그대로 보존한다. 두 점검의 policy_evidence.records는 PLAN이 고정한 POL의 실제 항목 ID와 case를 사용한다. 관측 칸·verdicts·시험 시도·첨부는 실행/확인한 사실만 사람이 입력한다. null/빈 목록은 성공 결과가 아니다.
+
+아래는 **EXAMPLE 입력 형태 조각**이며 완성 정책/시험 결과가 아니다. 전체 양식은 위 CLI에서 생성한다.
+
+```yaml
+policy_evidence:
+  parameter: required_checks
+  records:
+    - item_id: EXAMPLE-enterprise-check
+      case: failed
+      observations:
+        trial_id: null
+        target_scope: null
+        check_outcome: null
+        gate_outcome: null
+        exception_assessment: null
+        transition_detail: null
+      evidence:
+        - attachment: EXAMPLE-log.txt
+          locator: null
+          basis: null
+      limitation: null
+```
+
+attachment는 같은 entry.attachments에 기재한 실제 경로여야 한다. import는 파일을 읽고 sha256으로 정규화한다. locator는 파일 내 사건 위치, basis는 그 사건과 주장 간 연결의 설명이다. 보고서에는 item/case·이유 코드·첨부 해시 식별자만 전달하고 원본 경로·basis·locator 본문을 복사하지 않는다. 해시는 파일 동일성 근거이며 신고 내용·입력자·승인 진위를 인증하지 않는다.
+
+| 대상 | case와 관측 |
+|---|---|
+| SUP-14 | normal/failed/error/unsupported/skipped. check_outcome: succeeded/failed/error/unsupported/skipped/unknown; gate_outcome: advanced/blocked/unknown; exception_assessment: none/reported/unknown; transition_detail: 근거 설명 |
+| LIF-07 | not_ready/ready. item_state: ready/not_ready/unknown; request_outcome: accepted/blocked/not_attempted/unknown; inference_outcome: succeeded/failed/not_attempted/unknown; order_basis: same_clock/independent_order/unknown; order_detail: 순서 근거 |
+| 공통 | trial_id·target_scope는 실제 시험·범위의 신고 식별자. 관측 enum은 결과 분류 어휘로 기업 기본값이 아님. 각 필드는 null/생략이면 미확인, 제공한 잘못된 타입/enum은 오류 |
+
+SUP-14는 각 항목×case의 실제 원결과와 관문을 연결한다. 실패 주입을 차단했으면 원검사 실패를 SUP-14 FAIL로 복사하지 않는다. 필수 미완료를 실제 통과시켰고 해당 예외 없음이 근거와 함께 신고됐으면 security FAIL이다. 예외 신고만으로 원검사 성공/PASS로 바꾸지 않는다. 정상 성공 묶음은 동일 trial/대상이어야 한다. functional/performance PASS는 이 계약에서 UNKNOWN이다.
+
+LIF-07의 item_state는 **요청 접수/차단 당시**의 준비 상태를 뜻한다. order_basis와 order_detail은 그 순서를 뒷받침한 자기 신고이며 원본 시각을 자동 파싱한 결과가 아니다. health/listener만으로 필수 rank/model 준비·실제 접수를 입증하지 못한다. 정상 ready 대조는 필수 항목 모두 동일 trial/대상에서 준비 후 접수·추론 성공을 보여야 한다. 미준비 접수가 확인되면 보안 FAIL이며, 추론 관측이 없더라도 그 위반을 지우지 않는다. 기능 FAIL은 같은 정상 ready 묶음의 접수/준비가 확인된 기능 실패에 한정한다. 시계 순서가 unknown이면 관련 PASS/위반 확정을 보류한다. performance는 UNKNOWN이다.
+
+**오류/미확인:** 다른 PLAN/POL/팩 revision/hash, 모드에 맞지 않는 side, 비선정 check, 미등록 item, 중복 item/case, 잘못된 타입·필드·첨부 소속은 배치 전체 오류다. 누락 case·빈 evidence·관측 null/unknown·locator/basis 부족·미확인 한계는 저장하되 PASS를 UNKNOWN으로 보류한다. 선언한 파일의 부재/읽기 실패는 기존처럼 오류다. 같은 사건의 모순은 해당 사건을 미확인으로 처리하고 별개 사건의 위반은 유지한다.
+
+**빈 정책과 호환:** select의 기존 타입 검증은 유지한다. []·공백/중복 식별자가 있는 정책 집합은 신규 항목 PASS를 보류하며 기업 정책 자체의 FAIL/해당 없음으로 바꾸지 않는다. /1 입력은 읽고 과거 EVD/RES/해시는 수정하지 않는다. 해당 정책 선언이 있는 정의의 구형 증거에는 새 항목 근거가 없으므로 재판정 PASS가 UNKNOWN으로 달라질 수 있다. 선언 없는 과거 정의·다른 점검은 기존 계약이다. 같은 입력/as_of 재판정은 멱등이며 새 관측은 새 실행 config hash에 포함한다.
+
+**한계:** 이 기능은 DECLARED 자료의 연결·충족 조건 검사다. 첨부 진위·승인 인증·조건부/역할별 항목·예외 충분성·기업 실제 목록·빈 목록 유효성·기한/성능 수치는 확정하지 않는다. 실제 엔진/두 이미지 실증과 정책 후보 추가 등록은 별도다. POL/팩 DRAFT·EXAMPLE과 미인증 자기 신고 문구 및 기존 official 계산을 유지한다.

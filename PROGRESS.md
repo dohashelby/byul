@@ -583,3 +583,26 @@ git status
 - 보존/검증: 시작 추적 파일340개의 해시·원격 상태·집계/CI 로그를 ignored out/test-runs/policy-m3-design-20261021에 분리했다. 문서 작성 완료 후 `.venv/Scripts/python.exe -X utf8 -B out/test-runs/policy-m3-design-20261021/verify_docs.py` → PASS. 새 계획과 관련 절의 상대 링크34회, 실제 함수·결정ID·b후보10개·시나리오26개·변경 파일/해시·`git diff --check`를 확인했다. 기존 문서3개 수정+새 문서1개뿐이며 나머지 추적 파일337개 바이트 해시가 같다. 제품/팩/카탈로그/참고 원문 변경 0, 새 로컬 pytest 실행 0이다. 외부 링크는 원격 PR/CI API와 확인한 실제 코드 커밋에 근거하며 모든 외부 웹 페이지의 본문 검증을 주장하지 않는다.
 - 문서 최초 커밋84fb516c1edd50b7e1c028523cd55cf4b82cd733을 codex/gua-policy-m3-design에 push했다. 초안 PR https://github.com/dohashelby/gua/pull/5 , base codex/gua-policy-m2이며 자동 병합하지 않았다. 새 파일의 끝 공백은 후속 문서 정리에서 제거하고 M2 기준 대비 `git diff --check 572cef91ff1bf48ffa945f4a0a5fee046e4e0b0e`를 다시 통과했다.
 - 이번 M3 최초 커밋의 새 원격 push CI https://github.com/dohashelby/gua/actions/runs/39559705153 : Ubuntu/Python3.11, `uv run pytest -q` → **562 passed, 18 deselected / 37.40초**, frozen 설치·wheel 빌드 completed/success. 문서 브랜치의 새 회귀 결과이며 M2 과거 실행과 별도다. 이 결과 기록·끝 공백 정리는 문서만 바꾸고 제품/팩/기존 증거는 바꾸지 않는다. 후속 HEAD/PR CI는 최종 보고에서 실제 상태를 확인한다.
+
+## 2026-10-21 — 정책 M4 구현
+
+- 시작: codex/gua-policy-m3-design / 23a02ab420501f7fc75cc1fa555bc938a4a793a5. fetch 후 원격 동일·로컬 변경 없음, PR #2~5 open/draft·미병합. codex/gua-policy-evidence-m4에서 작업하며 시작 추적 파일341개 해시와 원격 상태를 별도 ignored out/test-runs/policy-m4-20261021에 남겼다.
+- 구현: /2 수동 양식의 정확 POL/팩 Ref·정책 항목/case·첨부 연결, /1 입력 호환, 기존 EVD 예약 관측에 정규화, 순수 SUP-14/LIF-07 의미 검증과 declared0.3.0, 해당 RES 이유를 기존 Report.limitations에 전달한다. 객체/DB/모델/팩/자동 실행기/의존성을 추가하지 않는다.
+- 계약: 원검사 결과와 관문 구분, 준비/접수 당시 상태·동일 ready 묶음·기능 실패 구분, 관측/형식 오류 경계, FAIL 보존·UNKNOWN 비승격·빈/모호 정책의 PASS 보류. 기업 실제 값·빈 목록 업무 유효성·예외 충분성 등은 미결이다. 기존 M2 수동 CLI 테스트는 새 정책값만으로 PASS가 되지 않도록 기대/버전을 갱신했다.
+- 작성: 제품 구현과 회귀 테스트를 한 묶음으로 작성한 뒤 기본 전체·wheel·격리 설치본/과거 M2→M4 재판정을 검증한다. 이번 기록 시점에는 아직 테스트를 실행하지 않았으며 실제 결과를 아래에 추가한다. 실제 엔진·두 이미지·유료 자원·운영 시험은 하지 않는다.
+
+### M4 구현 후 로컬 검증
+
+- Windows/Python3.11.16, `uv run pytest -q --basetemp=.review-tests-policy-m4 --junitxml=out/test-runs/policy-m4-20261021/first.xml --durations=12` → **615 passed, 7 failed, 5 skipped, 18 deselected / 92.69초**. 6건은 안내 HEADER의 중괄호를 format이 치환한 구현 오류, 1건은 PLAN hash 거부의 IntegrityError를 새 테스트가 예상하지 않은 테스트 가정 오류였다. 중괄호를 escape하고 예상 예외를 수정했다.
+- 수정 후 전체 `uv run pytest -q --basetemp=.review-tests-policy-m4-final --junitxml=out/test-runs/policy-m4-20261021/final.xml --durations=12` → **620 passed, 2 failed, 5 skipped, 18 deselected / 95.29초**. 남은 2건은 새 항목 PASS 보류가 기존 NO_POLICY_VALUE 이유를 먼저 가린 설명 회귀였다. 기존 필수키·첨부·관측 관문 이유를 먼저 보존한 뒤 항목별 한계/확인된 FAIL을 적용하도록 구현을 수정했다. 테스트 기대를 없애지 않았다.
+- 영향 범위 재검증: `uv run pytest -q tests/test_policy_m2.py tests/test_policy_m4.py tests/test_manual_evidence.py tests/test_manual_import_regressions.py tests/invariants/test_inv_04.py tests/invariants/test_inv_11.py tests/invariants/test_inv_14.py --basetemp=.review-tests-policy-m4-recheck --junitxml=out/test-runs/policy-m4-20261021/recheck.xml` → **140 passed, 1 skipped / 26.93초**. 남은 로컬 전체 실패 사례와 수동 입력·FAIL/PASS 관문·순수 함수 회귀가 통과했다. 전체 627건의 수정 후 성공은 이후 원격 기본 CI와 구분해 기록한다.
+- 기본 전체 skip5는 기존 Windows 루프백 네트워크3·파일 symlink권한1·부모 디렉터리 symlink권한1, 재검증 skip1은 부모 symlink권한이다. Docker/engine18 기본 제외는 그대로다. Windows 전체1분 목표 달성이나 실제 엔진 검증으로 표현하지 않는다.
+- 최종 수정 소스로 `uv build --wheel --out-dir out/test-runs/policy-m4-20261021/dist` 성공. 별도 `UV_PROJECT_ENVIRONMENT=out/test-runs/policy-m4-20261021/installed-env`에서 `uv sync --frozen --no-install-project`, `uv pip install --python .../installed-env/Scripts/python.exe --no-deps --reinstall .../dist/guard-0.1.0-py3-none-any.whl`로 설치했다. 제품 의존성/lock 변경 없음.
+- `.venv/Scripts/python.exe -X utf8 -B out/test-runs/policy-m4-20261021/installed_smoke.py` → 저장소 밖 새 TEMP·격리 Python(-I)/설치본의 **19명령 PASS**. 실제 보존 M2 wheel/declared0.2.0으로 SUP-14/LIF-07 및 비대상 SUP-01의 수동 PASS를 만들고 M4 wheel로 재판정해 대상 UNKNOWN·비대상 PASS, 기존 EVD/RES 전체 필드/해시 보존을 확인했다. 이어 실제 /2 CLI 생성→import→판정→JSON/HTML에서 SUP 보안 PASS/기능·성능 UNKNOWN, LIF 보안·기능 PASS/성능 UNKNOWN, official=false·항목별 이유·Store.verify·동일 as_of 멱등을 확인했다. 합성 EXAMPLE/DECLARED 입력 계약 검증이며 실제 엔진 증거가 아니다.
+- 정합성 `.venv/Scripts/python.exe -X utf8 -B out/test-runs/policy-m4-20261021/verify.py` → PASS. 허용13파일(기존10+신규3), 비대상 추적331파일 해시 보존, 문서 상대 링크43회·Python 구문·wheel과 현재 제품 소스 바이트 일치·기준 대비 diff 공백 검사 확인. 팩 Ref/77점검/7점검13선언/자동연결5, 카탈로그303/595·a13/b10/c165/d115 및 설명 JSON 일치도 재확인했다. core/report1파일 외 다른 코어·모델·스토어·실행기·팩·정책 예시·참고 원문 변경0이다.
+
+### M4 원격 기본 전체 검증
+
+- 구현 커밋 fa4ec8ae276e67bd1f266f93fc005b6d886d64d1, Ubuntu/Python3.11: `uv run pytest -q` → **627 passed, 18 deselected / 28.78초(PR), 43.72초(push)**. 실패/skip 없음. 기본1분 목표 충족, Windows에서 skip된 기존5건도 Linux에서 통과했다. 추가65개 사례를 포함한 기본 회귀이며 실제 엔진 검증은 아니다.
+- 공식 API의 양쪽 completed/success와 실제 작업 로그를 확인했다. frozen 설치·`uv build --wheel`도 성공. PR CI https://github.com/dohashelby/gua/actions/runs/39563313641 / push CI https://github.com/dohashelby/gua/actions/runs/39563304626 . 앞서 로컬에서 수정한 실패를 남은 미해결 실패로 집계하지 않으며, 로컬 전체 성공으로 바꿔 기록하지 않는다.
+- 초안 PR https://github.com/dohashelby/gua/pull/6 , base codex/gua-policy-m3-design / head codex/gua-policy-evidence-m4. merge-base23a02ab, ahead1/behind0, 원격13파일이 로컬 diff와 일치함을 확인했다. 선행 PR #5 미병합이며 자동 병합하지 않았다. 이 후속 커밋은 실제 CI 결과만 추가하고 제품 코드·팩·기존 증거는 바꾸지 않는다.

@@ -36,6 +36,10 @@ uv run guard verify
 
 기본 guard.toml은 FakeExecutor 시연이다. 실제 엔진 결과로 해석하지 않는다.
 
+수동 증거는 `guard evidence template --plan PLAN-ID --out manual-v2.yaml`로 생성해 입력한다.
+SUP-14/LIF-07은 항목·case·첨부 연결이 필요하며 /1 읽기 호환과 재판정 영향은
+[M4 수동 증거 계약](POLICY_TEMPLATE.md)을 따른다. 필수 목록만 입력했다고 PASS가 되지 않는다.
+
 ## Managed 업데이트
 
 [managed 설정 예시](../examples/update-managed.toml)를 복사하고 환경/정책을 준비한다.

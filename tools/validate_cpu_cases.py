@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 from copy import deepcopy
 from datetime import datetime, timezone
-import hashlib
 import json
 import math
 from pathlib import Path
@@ -21,18 +20,20 @@ import subprocess
 import sys
 import time
 import tomllib
-from types import SimpleNamespace
 import zipfile
 
 import yaml
 
+from guard.validation_evidence import (
+    file_sha256 as _sha,
+    inventory_tree as _inventory_tree,
+    read_objects as _objects,
+    verify_saved_bundle as _verify_saved_bundle,
+    verify_store_files as _verify_store_files,
+)
 
 CHECKS = ("REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09")
 EXECUTORS = ("direct_route", "role_route", "container_config", "credential_exposure", "input_validation")
-
-
-def _sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _new_json(path: Path, data) -> None:
@@ -183,24 +184,6 @@ def compare_report(report: dict, expected: dict | None) -> dict:
     return {"expected_security": expected, "actual": actual, "mismatches": problems, "matched": not problems}
 
 
-def _objects(store: Path) -> list[dict]:
-    db = store / "store.sqlite"
-    if not db.is_file():
-        raise ValueError("product store was not created")
-    if any(p.exists() and p.stat().st_size for p in (db.with_name(db.name + "-wal"), db.with_name(db.name + "-journal"))):
-        raise ValueError("close/checkpoint the source store before read-only analysis")
-    # immutable avoids creating lock, WAL or shared-memory files in past evidence.
-    with sqlite3.connect(db.resolve().as_uri() + "?mode=ro&immutable=1", uri=True) as con:
-        rows = con.execute("SELECT kind,id,revision,content_sha256,body FROM objects ORDER BY kind,id,revision")
-        objects = []
-        for kind, ident, revision, sha, body in rows:
-            obj = json.loads(body)
-            if (obj.get("kind"), obj.get("id"), obj.get("revision"), obj.get("content_sha256")) != (kind, ident, revision, sha):
-                raise ValueError("database index and stored object identity differ")
-            objects.append(obj)
-        return objects
-
-
 def observation_contract(report: dict, objects: list[dict], pack, *, short_timeout: bool = False) -> dict:
     """Pure independent audit of saved objects; never runs or amends a judgment.
 
@@ -326,64 +309,6 @@ def observation_contract(report: dict, objects: list[dict], pack, *, short_timeo
             "checks": checks, "problems": problems,
             "limitations": ["This audits saved evidence; it does not execute an engine or authenticate the operator/host.",
                             "A verdict name alone is insufficient: original object refs, fixed rules and the PASS gate are checked."]}
-
-
-def _verify_store_files(store: Path, objects: list[dict]) -> object:
-    """Verify a snapshot using read-only files, without constructing Store()."""
-    from guard.models import Ref
-    from guard.store.packs import get_pack
-
-    plans = [o for o in objects if o.get("kind") == "PLAN"]
-    if len(plans) != 1:
-        raise ValueError("one original PLAN is required")
-    pack = get_pack(SimpleNamespace(root=store), Ref.model_validate(plans[0]["inputs"]["pack"]))
-    for obj in objects:
-        for artifact in obj.get("artifacts", []):
-            name, digest = artifact.get("path"), artifact.get("sha256")
-            if name != f"artifacts/{digest}" or not re.fullmatch(r"[0-9a-f]{64}", digest or ""):
-                raise ValueError("noncanonical original artifact path")
-            path = store / name
-            if path.is_symlink() or not path.is_file() or path.stat().st_size != artifact["bytes"] or _sha(path) != digest:
-                raise ValueError("original evidence artifact missing or changed")
-    for path in (store / "artifacts").iterdir():
-        if path.is_symlink() or not path.is_file() or not re.fullmatch(r"[0-9a-f]{64}", path.name) or _sha(path) != path.name:
-            raise ValueError("stored content-address file missing or changed")
-    return pack
-
-
-def _inventory_tree(folder: Path) -> dict:
-    if folder.is_symlink() or not folder.is_dir():
-        raise ValueError("source matrix must be a regular directory")
-    result = {}
-    for path in sorted(folder.rglob("*")):
-        if path.is_symlink():
-            raise ValueError("source matrix must not contain symlinks")
-        if path.is_file():
-            result[path.relative_to(folder).as_posix()] = {"sha256": _sha(path), "bytes": path.stat().st_size}
-    return result
-
-
-def _verify_saved_bundle(bundle: Path, restored: Path) -> None:
-    with zipfile.ZipFile(bundle) as archive:
-        infos = archive.infolist()
-        names = [i.filename for i in infos]
-        if (len(names) != len(set(names)) or len(names) > 100000 or "manifest.json" not in names
-                or sum(i.file_size for i in infos) > 2 * 1024**3 or archive.getinfo("manifest.json").file_size > 16 * 1024**2):
-            raise ValueError("invalid original evidence bundle inventory/budget")
-        manifest = json.loads(archive.read("manifest.json"))
-        files = manifest.get("files", {})
-        if manifest.get("format") != "guard-store-bundle/1" or set(files) != set(names) - {"manifest.json"}:
-            raise ValueError("original evidence bundle manifest mismatch")
-        for name, meta in files.items():
-            if name != "store.sqlite" and re.fullmatch(r"artifacts/[0-9a-f]{64}", name) is None:
-                raise ValueError("unexpected original evidence bundle path")
-            info = archive.getinfo(name)
-            with archive.open(info) as stream:
-                digest = hashlib.file_digest(stream, "sha256").hexdigest()
-            path = restored / name
-            if (info.file_size != meta.get("bytes") or digest != meta.get("sha256")
-                    or not path.is_file() or path.stat().st_size != meta["bytes"] or _sha(path) != digest):
-                raise ValueError("original bundle/restored bytes differ")
 
 
 def analyze_existing(source: Path, output: Path) -> dict:

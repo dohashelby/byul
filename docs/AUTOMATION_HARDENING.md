@@ -46,7 +46,7 @@ overprivileged 프로파일은 원래 빈 쓰기 가능 sentinel mount를 요구
 2. 같은 모델 ID/revision/inventory, CPU/커널/threads/메모리 상한, fixture, 정책값과 실행 설정을 고정한다. 이미지 차이 외 설정 차이는 명시하고 비교 가능 조건을 확인한다. CPU 성능은 UNKNOWN으로 둔다. 지원 범위를 맞추려고 기업 정책을 축소하거나 예시 값을 기업 승인으로 승격하지 않는다.
 3. 기존 컨테이너를 삭제·정리 대상으로 삼지 않는다. 필요한 이미지/모델 다운로드, 디스크·WSL2 메모리 여유, 외부 네트워크/시험 대상 권한과 비용 조건을 확인한 뒤 별도 실행 승인을 받는다. 하나씩 순차 실행하고 새 store/output 경로를 사용한다.
 4. 각 side에 실제 MEASURED/COMPLETED EVD, 정상 대조·모든 계획 챌린지·필수 관측·Ref/첨부 해시를 요구한다. 이것만으로 수락하지 않는다. 공통 핵심 행의 양쪽 구체 PASS/FAIL과 의도한 NO_CHANGE/REGRESSED/FIXED/STILL_FAILING을 확인한다. UNKNOWN/NOT_COMPARABLE만 있는 실행은 제품 실증 성공으로 세지 않는다. 새로운 정의의 REQ-11 보안 UNKNOWN은 예상 제한으로 별도 기록한다.
-5. 첫 비교는 보안 hardened→hardened의 구체 NO_CHANGE를, 반례 fixture를 승인한 경우 노출→강화의 FIXED 또는 강화→노출의 REGRESSED를 확인한다. 실제 관측이 예상과 다르면 원본을 보존하고 원인을 분석한다. 정리 실패·부분 수집·독립 FAIL 보존도 별도로 확인한다.
+5. 첫 비교는 같은 hardened 프로파일·모델·자원 조건을 고정하고 이미지 digest/버전만 바꾼다. 실제 양쪽 PASS/FAIL에 따라 NO_CHANGE/REGRESSED/FIXED/STILL_FAILING을 기록한다. 노출→강화처럼 의미 있는 실행 프로파일을 바꾼 진단은 config hash가 달라져 NOT_COMPARABLE인 것이 정상이다. 이를 이미지 업데이트의 FIXED/REGRESSED로 세지 않는다. 실제 관측이 예상과 다르면 원본을 보존하고 원인을 분석한다. 정리 실패·부분 수집·독립 FAIL 보존도 별도로 확인한다. 구현한 수락 도구와 현재 검증 결과는 [두 이미지 CPU 비교](UPDATE_VALIDATION.md)를 따른다.
 6. JSON/HTML의 두 side, 비교 불가 이유·정책/팩 검토 상태·official 여부를 확인한다. 원본 verify→증거 반출→새 위치 복원→저장 팩 재판정에서 의미·원본 해시·멱등을 확인한다. 소유 컨테이너/네트워크만 정리하고 기존 모델/다른 컨테이너/과거 증거를 보존한다.
 
 ## 이번 직접 검증 기록

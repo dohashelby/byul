@@ -1,5 +1,9 @@
 # 실증 준비와 완료 판정
 
+## 두 이미지 비교 수락
+
+현행 도구와 직접 검증 결과는 [두 이미지 CPU 비교](UPDATE_VALIDATION.md)를 따른다. `python -m guard.update_validation`은 기본 준비 검사, 명시적 `--execute`는 기존 update CLI를 통한 순차 실행, `--analyze-existing`은 저장 증거의 읽기 전용 분석이다. UNKNOWN·명령 성공만으로 수락하지 않으며 CPU 성능은 UNKNOWN이다. 프로파일 변경은 NOT_COMPARABLE이 정상이고 실제 후보 이미지가 없는 현재 두 이미지 시험은 미수행이다.
+
 ## 현행 자동화 보강과 지원 범위
 
 현행 [자동화 보강](AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.

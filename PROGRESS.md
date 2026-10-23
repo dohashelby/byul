@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-24 — 두 이미지 CPU 비교 수락 도구
+
+- 한 일: `codex/gua-update-validation`에서 기존 다섯 점검의 준비→명시적 순차 update→원본 수락→반출/복원→저장 팩 재판정을 연결한다. 읽기 전용 증거 검증을 공통화하고 opt-in INV09의 UNKNOWN 허용을 제거한다. update --as-of, 별도 EXAMPLE/DRAFT 정책/Windows 설정, [실행 안내](docs/UPDATE_VALIDATION.md)를 추가한다. 팩20/77점검/자동11/정책21점검46경로와 과거 증거는 보존한다.
+- 테스트 결과: 전체 구현 후 첫 실행의 테스트 자료 오류(8실패/21준비오류)를 수정하고 timeout 우선 거부를 보강했다. 집중 회귀 후 최종 Windows/Python3.11.16 기본 전체 **2199통과/0실패/0오류/7skip/18제외·269.40초**. Windows 루프백3·symlink권한4 skip, engine/docker18 제외, 1분목표미달이다. 새 wheel81파일/-I/설치본 합성 분석·진단 거부, 보호250파일/77정의·팩재생성2회·정책/이력보존을 확인했다. [직접 기록](docs/UPDATE_VALIDATION.md#이번-검증-결과)·[선별 요약](docs/evidence/update-validation-20261024.json)을 따른다. 실제 두 이미지 시험은 미수행이다.
+- 다음 단계: 호환하는 두 번째 로컬 pinned CPU 이미지와 실제 후보 ENV를 팀이 준비한 뒤 새 store/output에서 전체 수락 계약을 실증한다. 입력·보안 프로파일은 고정하며 변경 진단을 업데이트 성공으로 합산하지 않는다.
+- 막힌 것: Docker는 가용하나 vLLM 이미지 한 종류뿐이라 실제 두 이미지 실행은 미수행. 기존 kind 컨테이너2개는 계속 실행 중이며 이미지/모델 수신·기존 리소스 중지/삭제는 하지 않았다. CPU 성능·GPU·기업 승인·새 정책은 이번 완료 범위가 아니다.
+
 ## 0단계 — 프로젝트 골격 (2026-10-19)
 - 한 일: pyproject(uv, Python 3.11), 디렉토리, DECISIONS.md
 - 테스트 결과: -

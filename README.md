@@ -3,6 +3,8 @@ reference 폴더랑 CLAUDE.md랑 *_PROMPT.md로 개발 시작했습니다. 업�
 
 ## 실행과 현재 상태
 
+- [두 이미지 CPU 업데이트 비교 수락 도구와 현재 검증](docs/UPDATE_VALIDATION.md): 준비·명시적 실행·증거 반출/복원·저장 팩 재판정. 두 실제 이미지 실증은 후보 이미지 미준비로 미수행이다.
+
 - [재평가·구현 결과와 개발 계획](docs/REVIEW_AND_DEVELOPMENT_PLAN.md)
 - [설치·audit·update·실증 안내](docs/RUNBOOK.md)
 - [기업 정책 양식·필수 정책 입력 전제(M1/M2)](docs/POLICY_TEMPLATE.md)

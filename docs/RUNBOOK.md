@@ -1,5 +1,9 @@
 # 실행·실증 안내
 
+## 두 이미지 CPU 업데이트 비교
+
+[두 이미지 비교 안내](UPDATE_VALIDATION.md)에 준비 입력·Windows 명령·수락 기준을 정리했다. `python -m guard.update_validation`의 기본은 읽기 전용 준비 검사이며 실제 기동은 `--execute`가 필요하다. 분석은 `--analyze-existing`으로 원본을 보존한다. 최소 다섯 점검의 보안/기능 구체 판정과 반출·복원·저장 팩 재판정을 확인한다. 실제 두 이미지 시험은 아직 미수행이며 준비 성공과 시험 수락을 구분한다.
+
 ## 현행 자동화 보강과 지원 범위
 
 현행 [자동화 보강](AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.

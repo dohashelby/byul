@@ -241,6 +241,7 @@ def update(
     candidate: Path = typer.Option(..., "--candidate"),
     policy: Path = typer.Option(..., "--policy"),
     output: Path = typer.Option(Path("out/updates"), "--output"),
+    as_of: Optional[str] = typer.Option(None, "--as-of", help="예외 만료 판단 시각 (RFC3339, 기본 현재)"),
     config: Path = ConfigOpt,
     store: Optional[Path] = StoreOpt,
 ) -> None:
@@ -251,7 +252,8 @@ def update(
     envs = [load_environment(baseline), load_environment(candidate)]
     pol = load_policy(policy, pk)
     folder = output / new_id("UPDATE")
-    rpt, failed = execute_update(_store(store, cfg), pk, envs, pol, cfg, folder, utcnow())
+    judged_at = _as_of(as_of)
+    rpt, failed = execute_update(_store(store, cfg), pk, envs, pol, cfg, folder, judged_at)
     data = rpt.to_dict()
     (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     (folder / "report.html").write_text(render_html(data), encoding="utf-8")

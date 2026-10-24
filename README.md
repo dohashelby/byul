@@ -217,6 +217,21 @@ vLLM 근거 표기: 경로(`/v1/chat/completions`, `/health`, `/v1/models`, `/ve
 
 S3A 시험은 시험 전용 가짜 backend(`src/serving_runtime/mvp/fake_backend.py`, `data_origin: fake_backend_test`)로 수행했으며 **실제 vLLM 연결 완료가 아닙니다.** 실제 환경 시험(S3B) 준비는 `docs/S3B_실제환경_시험준비.md`를 참고합니다.
 
+### Gateway 성능 비교 실행 묶음
+
+`tools/perf_compare.py`는 개발계획서 v1.4 §9.8의 고정 순서 `B0→B1→B2`, `B1→B2→B0`, `B2→B0→B1`를 실행합니다. 도구가 모드를 바꾸지는 않습니다. 운영자가 세 구성을 미리 준비하고 `runtime-perf-plan/1.0`에 각각의 **Gateway** URL과 실제로 켠 기능을 적어야 합니다. B0도 같은 Gateway를 경유하며 엔진 직접 호출로 대신할 수 없습니다. 입력 예시는 `examples/perf/plan.example.json`이고 URL·모델·입력은 실행 환경 값으로 바꿔야 합니다.
+
+```bash
+.venv/bin/python tools/perf_compare.py examples/perf/plan.example.json \
+  --out-dir /path/to/new-perf-output
+```
+
+기본 실행은 각 mode마다 warmup 20건(계산 제외), 일반 100건, stream 100건과 동시성 2를 사용합니다. 절차 점검 때 `--warmup-count`, `--normal-count`, `--stream-count`, `--blocks`로 줄일 수 있지만 20/100/100/3블록이 아니면 보고서에 **계획 예산 아님**으로 남습니다. JSON 보고서·Markdown 요약·요청별 원시 JSON은 기존 파일을 덮지 않도록 배타 생성하며, 프롬프트·응답 원문은 저장하지 않고 입력 묶음의 SHA-256과 개수만 기록합니다.
+
+내장 표준 라이브러리 측정기는 같은 client 위치에서 monotonic clock으로 E2E와 stream TTFT를 측정합니다. 지연 평균과 nearest-rank p50/p95의 분모는 성공 요청이고, 완료 요청/초는 phase wall time 동안 성공적으로 완료된 요청 수입니다. 오류 수·코드와 usage가 제공한 실제 출력 token 수는 따로 보존합니다. vLLM benchmark는 기본 옵션이 Gateway에서 거부할 확장 필드를 넣을 수 있어 이번 묶음이 설치하거나 호출하지 않으며, 보고서에는 나중에 검토된 외부 결과를 `external` 측정기로 붙일 자리만 둡니다. **실제 수치는 정식 GPU 환경에서 산출하며, 지금 작은 실행 결과는 절차 확인용입니다.**
+
+요청에는 `model`·`messages`·`max_tokens`·`n`·`stream`만 넣습니다. 기본 프로필(D-09)은 `temperature`를 `UNSUPPORTED_FIELD`로 거부하므로, 계획에 `temperature`를 적으면 모든 모드의 정책이 그 필드를 허용해야 합니다(예: 시험 전용 1.2 프로필). 생략하면 엔진 기본값으로 생성되어 출력 길이가 요청마다 달라질 수 있으니 출력 토큰 수를 함께 보세요. 또 MVP Gateway는 최종 기록을 쓴 뒤 연결을 닫으며 동시성 슬롯을 반환하므로, 측정기는 응답 본문(또는 stream `[DONE]`) 시각에 지연을 기록한 뒤 서버가 연결을 닫을 때까지 기다리고 다음 요청을 보냅니다. 이 대기는 측정 시간에 넣지 않습니다.
+
 ### 기록 보존 한도 (D-08)
 
 계획서 v1.4 §6.5·D-08의 LAB 보존 한도(원본 7일 또는 합계 5GiB 중 먼저 도달한 쪽)를 계산합니다. **기본은 보고만 하고 아무것도 지우지 않습니다.** 실제 삭제는 `--retention-enforce`를 줄 때만 합니다.

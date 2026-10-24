@@ -473,7 +473,12 @@ class SlowClientHttpTests(unittest.TestCase):
         rejected = self.raw_response(gateway, b"GET /api/status HTTP/1.0\r\n\r\n")
         self.assertIn(b"503 Service Unavailable", rejected)
         held.close()
-        time.sleep(0.05)
+        # Wait for the server to release the held slot; a fixed short sleep
+        # raced the handler thread when the whole suite ran under load.
+        deadline = time.monotonic() + 3
+        while gateway._server.connection_status()["active"] and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(gateway._server.connection_status()["active"], 0)
 
         for stream in (False, True):
             request = Request(

@@ -1,0 +1,1340 @@
+{
+  "kind": "RPT",
+  "id": "RPT-01M7Q3X8N2K4V9T6B5D1C0HJ8R",
+  "revision": 1,
+  "created_at": "2026-11-30T09:00:00Z",
+  "data_origin": "MEASURED",
+  "content_sha256": "fd4724e97003de393e3446a2b4345f1a4ea0a1e8d806b8368b07af096dc955eb",
+  "refs": [],
+  "mode": "update",
+  "official": true,
+  "pack_review_status": "REVIEWED",
+  "policy_status": "CONFIRMED",
+  "inputs_manifest": [
+    {
+      "kind": "ENV",
+      "id": "ENV-01M7Q2A4F6H8J0K2M4P6R8T0V2",
+      "revision": 1,
+      "sha256": "42af6a60566790b112bc3fb2bd12b686407b94eb5237889d2c98dcdc297d98d9"
+    },
+    {
+      "kind": "ENV",
+      "id": "ENV-01M7Q2B5G7J9K1M3N5Q7S9U1W3",
+      "revision": 1,
+      "sha256": "6a56c6421bd2a8568bdd71de4abfd1bb0d25cf0041a3781250accd433865e532"
+    },
+    {
+      "kind": "POL",
+      "id": "POL-01M7Q2C6H8K0M2N4P6R8T0V2X4",
+      "revision": 1,
+      "sha256": "841c2bd02e2a78077ff52ca61385733d0c736715e988265c8bf1712faf28c1ac"
+    },
+    {
+      "kind": "PLAN",
+      "id": "PLAN-01M7Q2D7J9M1N3P5Q7S9U1W3Y5",
+      "revision": 1,
+      "sha256": "d03f7a301cdb0d6d64677011d8f52ee450608b674d89326b5ee1416d63cb9d9d"
+    },
+    {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 5,
+      "sha256": "414ac8310c3cb151e887136c34eaeded2c3ff7d742ca0a92a2b367861fc4762b"
+    }
+  ],
+  "by_check": [
+    {
+      "check_id": "REQ-01",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "Gateway를 우회한 직통 요청으로 비허용 작업을 수행할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "REGRESSED",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-01-B",
+          "revision": 1,
+          "sha256": "e2f84ef8c957a6d894c9a35167960dae279cd28c9403802be36239bd49d3b676"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-01-C",
+          "revision": 1,
+          "sha256": "7093848220d2c19c2569dbd2c7ab6fcc6470ee3cb474d950b23d07074fb74a8c"
+        },
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": {
+        "probed": 15,
+        "of": 15,
+        "label": "기능 확인 범위: 15 / 등록 경로 15"
+      }
+    },
+    {
+      "check_id": "REQ-02",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "인증이 검사한 경로와 실제 실행 handler의 권한 요구가 일치하는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-02-B",
+          "revision": 1,
+          "sha256": "3bbf85765e879a84cad6ba3075cc0acccc1611e423a0b27954e7dbd30e48f6d5"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-02-C",
+          "revision": 1,
+          "sha256": "bce9fbf0746c504d90f52bf7dbf3bf1c5433ea3c2a3b99931bcac704d4e4b6e2"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "REQ-03",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "FIXED",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-03-B",
+          "revision": 1,
+          "sha256": "3437e487b397663f636afeb53d24284cba8b53a16b4d48f79a0bcad58a663a27"
+        },
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-03-C",
+          "revision": 1,
+          "sha256": "d8c72348df3ffbe155a8b9bfd01b2e8aea622fa2773bf1b5e96adb1bd2a0a290"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "REQ-04",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "외부 입력이 인가에 쓰는 신원을 사칭하지 못하는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-04-B",
+          "revision": 1,
+          "sha256": "63f9a7d13e9b478da24f9b5222afbd94dc7cef7c28b35548c521779f3daf6144"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-04-C",
+          "revision": 1,
+          "sha256": "f7f754b5540507ccddcdc45830adf8f099258ba6881bd4d3a59ca79fc5be9c8f"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "REQ-05",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "호출자의 모델 사용권이 최종 선택 대상에도 적용되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "STILL_FAILING",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-05-B",
+          "revision": 1,
+          "sha256": "52246531c48d8ab975f9263c831982d64ec3ddd05933b9da6c224448efbb1ae9"
+        },
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-05-C",
+          "revision": 1,
+          "sha256": "194948927d729730888c87e2dd65244b19e86687b3b9de0130d0ccafbf441c90"
+        },
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "REQ-06",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "저장 결과의 조회·취소 권한을 객체별로 확인하는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-06-B",
+          "revision": 1,
+          "sha256": "205406d8e1739324f131395acbf692bcab8db842b223d47cff06087a9d090f8d"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "REQ-06-C",
+          "revision": 1,
+          "sha256": "744420e89d319b59fcb21053f31bc859abe69d225d983a906411a286106c288e"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "PLT-01",
+      "purpose": "실행 권한 제한",
+      "area": "PLT",
+      "question": "엔진·worker가 불필요한 호스트·파일·장치 권한을 갖지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-01-B",
+          "revision": 1,
+          "sha256": "4d30185bb3e59d08b363a3ab96e3ec90e328b03662edca28c29b9faf7e0af15f"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-01-C",
+          "revision": 1,
+          "sha256": "960a65c7a6cbe4b95fec84f9f68498640af1c9993b319412b2561a725ed4b267"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "PLT-03",
+      "purpose": "자격 전달·사용 제한",
+      "area": "PLT",
+      "question": "취득 주체의 자격이 허용 저장소·객체에 한정되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-03-B",
+          "revision": 1,
+          "sha256": "444341f52a8ec0a9ffbe308240d64500e1d49b18d96e4755f8e45bcf1eaee920"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-03-C",
+          "revision": 1,
+          "sha256": "ba8384dc6a61d680fbaf918f148c5367cc98e63dfdf0d7d092dc4c16588c98af"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "PLT-04",
+      "purpose": "자격 전달·사용 제한",
+      "area": "PLT",
+      "question": "worker에 불필요한 자격이 전달되지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "REGRESSED",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-04-B",
+          "revision": 1,
+          "sha256": "d434163bb7509dcffbdd14f421b651dd3b69b51bc41838007ebf652cb0fb47d2"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-04-C",
+          "revision": 1,
+          "sha256": "356b1fe2c39e0a08261966a822da9645215b50a9bf59d90945b9aad59204f5cd"
+        },
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "PLT-06",
+      "purpose": "통신·내부 호출 제한",
+      "area": "PLT",
+      "question": "core·worker가 공유하는 실제 신뢰 범위와 외부 접근 제한을 확인했는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "UNKNOWN",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-06-B",
+          "revision": 1,
+          "sha256": "f92642be6b5f251ee19ac5a66ec732aa165ca0b848111770daf43062b27f986d"
+        },
+        "security": "UNKNOWN",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-06-C",
+          "revision": 1,
+          "sha256": "bc7d23acb40ae216f34e6cef3e693c4069ed8a9e15997ec68cbe7f8af4edc062"
+        },
+        "security": "UNKNOWN",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [
+        "NO_ENV_FACT"
+      ],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "PLT-07",
+      "purpose": "통신·내부 호출 제한",
+      "area": "PLT",
+      "question": "외부 송신이 허용 목적지와 작업에 한정되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-07-B",
+          "revision": 1,
+          "sha256": "3d5e6346b371d92e7c1bde25f101369087312cd5c91d6dbd05b5751196f518a0"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-07-C",
+          "revision": 1,
+          "sha256": "c2db932fd828a5d6f0ca56f3d5025404580aa201459c5eb9ee0093bd823b4601"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "PLT-08",
+      "purpose": "상대 확인·전송 보호",
+      "area": "PLT",
+      "question": "각 내부 통신 구간이 정한 상대 확인·기밀성·무결성을 충족하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-08-B",
+          "revision": 1,
+          "sha256": "4121538afa6bfc601499524f641c6c248b150e7625f619824213cac17b9c5701"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "PLT-08-C",
+          "revision": 1,
+          "sha256": "2739639f5a4f418d4ca799f58292b19edc2cb7d3d97045b8429bebeb3b2b9686"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "LIF-01",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "모델 취득·해석·변환·로딩 비용이 단계별·누적 예산을 지키는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-01-B",
+          "revision": 1,
+          "sha256": "1f2da7af555b8e9a42814a9724b4727a0dc13ce2670eb69a6badea85276fb498"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-01-C",
+          "revision": 1,
+          "sha256": "fa3d53fb88c20c12019d00923be10a06af88e1d683f01eb2c80dfdbeec651f6c"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "LIF-03",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "요청 비용과 동시 부하를 제한하며 정상 요청의 처리 기회를 유지하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "STILL_FAILING",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-03-B",
+          "revision": 1,
+          "sha256": "de797b90450d7fb2a4ad07ed6e9faba0824bf9e6fa219bcb6d4afb63a56f09ac"
+        },
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-03-C",
+          "revision": 1,
+          "sha256": "5b7d1e49014bd09b0b123d44b44cdac612bd839178c2ebb64a8d47352f8925ea"
+        },
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": {
+        "status": "APPROVED",
+        "reason": "다음 분기 게이트웨이 도입 전까지 임시 허용",
+        "approved_by": "정보보호팀",
+        "expires_at": "2026-12-31T00:00:00Z"
+      },
+      "functional_scope": null
+    },
+    {
+      "check_id": "LIF-07",
+      "purpose": "시작·재개 조건",
+      "area": "LIF",
+      "question": "필요한 worker와 실행 준비를 확인한 뒤 요청을 받는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-07-B",
+          "revision": 1,
+          "sha256": "597c8b6a7995b2c2b79e5b915c65fa32dfa6f8e527a874349fcd74e2da96aebe"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-07-C",
+          "revision": 1,
+          "sha256": "8deefaaf42de933936865724418c6870bb9cf389211f7ac7763533b37576d022"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "LIF-10",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "취소·연결 종료 뒤 실제 작업과 참조가 정한 기한에 종료되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-10-B",
+          "revision": 1,
+          "sha256": "d9971f8579f3979d29cff519a6924b174810ff15a4103101341f1c9f2d602dfa"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-10-C",
+          "revision": 1,
+          "sha256": "38f8aa2a5a53d0861b4e415e86d357d59f5b89c45b0e248305330d21e4354c19"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "LIF-11",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "실패한 worker·통신·분산 자원이 회수되고 다음 기동이 가능한가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "UNKNOWN",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-11-B",
+          "revision": 1,
+          "sha256": "374588b98d51c256b710b8e90f6d2e183d3b0dfed38ab9484777706096a849e6"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "LIF-11-C",
+          "revision": 1,
+          "sha256": "3c70bfeb21b6846797d5f4d4f6fb53315e1bbe291bcdeb896bdf421a429d2c23"
+        },
+        "security": "UNKNOWN",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [
+        "NO_FIXTURE"
+      ],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "OBS-03",
+      "purpose": "수집 정보 제한",
+      "area": "OBS",
+      "question": "로그·debug·trace·덤프가 허용한 정보만 수집하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-03-B",
+          "revision": 1,
+          "sha256": "45b228ece971c10cbb210153d83378e0c7d75c91b69078286fdf9e3d667d982e"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-03-C",
+          "revision": 1,
+          "sha256": "48f7eb23a78b6cf5431ec31df47e6b5cdee4dd802a58a75d025f7403ef0221c3"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "OBS-04",
+      "purpose": "수집 정보 제한",
+      "area": "OBS",
+      "question": "금지한 usage 보고가 실제로 비활성 상태를 유지하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-04-B",
+          "revision": 1,
+          "sha256": "25363cf8cb31dcf482809a25bb79310494f6a0ab21b711e7c70b10d6d7e8522c"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-04-C",
+          "revision": 1,
+          "sha256": "3116c29cb05dc8158ffea491ac48e8143e49032ea01408289dcca656ac52ad39"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "OBS-05",
+      "purpose": "수집 정보 제한",
+      "area": "OBS",
+      "question": "허용한 usage 보고가 필드·목적지 범위를 지키는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-05-B",
+          "revision": 1,
+          "sha256": "f3a24b1df37a1e46f8d4d6891ac24729a1a43e59062afa2bd1afa2d5e66b8ed8"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-05-C",
+          "revision": 1,
+          "sha256": "7f3be59ac3fd9477e0ef2f2a938189f7e08dfd889c36d4c04bb2761651ff10c8"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "OBS-06",
+      "purpose": "자료 이용 권한",
+      "area": "OBS",
+      "question": "기록과 진단 사본을 허용된 독자만 조회·반출하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "FIXED",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-06-B",
+          "revision": 1,
+          "sha256": "f808bf712d2343799a56b66741dc9bc0db93a00c1acb36c97bd7f247a06a837c"
+        },
+        "security": "FAIL",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-06-C",
+          "revision": 1,
+          "sha256": "31e2c15b91996bee2d7f3b7831674c79b08364efe03afbe048c64e183d524110"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "MEASURED"
+      },
+      "gaps": [],
+      "evidence_source": "automated",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "OBS-09",
+      "purpose": "증거의 신뢰성",
+      "area": "OBS",
+      "question": "요청 입력이 로그의 신원·대상·상태를 위조하지 못하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-09-B",
+          "revision": 1,
+          "sha256": "8f95047ce413668101658c589224878702150e0dab45f7d60bc3fa6df007f5a7"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "DECLARED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-09-C",
+          "revision": 1,
+          "sha256": "531ec2610915db258874ee8f51604492feb6fcc7bbc08dd2ba3a8536c77ed15a"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "DECLARED"
+      },
+      "gaps": [],
+      "evidence_source": "manual",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    },
+    {
+      "check_id": "OBS-12",
+      "purpose": "보존·삭제 관리",
+      "area": "OBS",
+      "question": "로그·usage·진단의 원본과 사본이 보존·삭제 범위를 지키는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": null,
+      "comparison": "NO_CHANGE",
+      "baseline": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-12-B",
+          "revision": 1,
+          "sha256": "bbbebe3e861362080b478604fec7f82fe51026f6280ecb709c2482dd7e21ddda"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "DECLARED"
+      },
+      "candidate": {
+        "result": {
+          "kind": "RES",
+          "id": "OBS-12-C",
+          "revision": 1,
+          "sha256": "ff6005b8bdcf5035a1db13f2b3e4b4fbc1d598e15b60678eec00eac635e89823"
+        },
+        "security": "PASS",
+        "functional": "PASS",
+        "performance": "UNKNOWN",
+        "verification_level": "DECLARED"
+      },
+      "gaps": [],
+      "evidence_source": "manual",
+      "replaced": null,
+      "exception": null,
+      "functional_scope": null
+    }
+  ],
+  "by_purpose": {
+    "요청·대상 접근 권한": {
+      "security": "FAIL",
+      "inventory_complete": true
+    },
+    "실행 권한 제한": {
+      "security": "PASS",
+      "inventory_complete": true
+    },
+    "자격 전달·사용 제한": {
+      "security": "FAIL",
+      "inventory_complete": true
+    },
+    "통신·내부 호출 제한": {
+      "security": "UNKNOWN",
+      "inventory_complete": true
+    },
+    "상대 확인·전송 보호": {
+      "security": "PASS",
+      "inventory_complete": true
+    },
+    "자원 사용 제한": {
+      "security": "FAIL",
+      "inventory_complete": true
+    },
+    "시작·재개 조건": {
+      "security": "PASS",
+      "inventory_complete": true
+    },
+    "종결·자원 회수": {
+      "security": "UNKNOWN",
+      "inventory_complete": true
+    },
+    "수집 정보 제한": {
+      "security": "PASS",
+      "inventory_complete": true
+    },
+    "자료 이용 권한": {
+      "security": "PASS",
+      "inventory_complete": true
+    },
+    "증거의 신뢰성": {
+      "security": "PASS",
+      "inventory_complete": true
+    },
+    "보존·삭제 관리": {
+      "security": "PASS",
+      "inventory_complete": true
+    }
+  },
+  "by_area": {
+    "REQ": {
+      "security": "FAIL",
+      "inventory_complete": false
+    },
+    "PLT": {
+      "security": "FAIL",
+      "inventory_complete": false
+    },
+    "LIF": {
+      "security": "FAIL",
+      "inventory_complete": false
+    },
+    "OBS": {
+      "security": "PASS",
+      "inventory_complete": false
+    }
+  },
+  "not_selected": [
+    {
+      "check_id": "SUP-03",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-04",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-05",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-06",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-07",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-08",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-09",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-10",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-11",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-12",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-13",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-14",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-15",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-16",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-07",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-08",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-09",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-10",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-11",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-12",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-13",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-14",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-15",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-16",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-17",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-18",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-19",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-20",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-21",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-05",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-09",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-10",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-11",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-12",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-02",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-04",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-05",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-06",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-08",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-09",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-12",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-14",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-15",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-16",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-01",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-02",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-07",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-08",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-10",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-11",
+      "reason": "POLICY_SCOPE"
+    }
+  ],
+  "manual_required": [
+    "SUP-01",
+    "SUP-02",
+    "PLT-02",
+    "LIF-13"
+  ],
+  "limitations": [
+    "점검 목록 미완결 영역 4개 — 집계 PASS 불가",
+    "실행 환경: GPU 1장, Linux, Docker 27 (단일 노드). 다중 노드 구성은 시험하지 않음",
+    "수동 입력 증거는 인증되지 않은 자기 신고(DECLARED)"
+  ],
+  "approval": {
+    "approved_by": "김서준(정보보호팀)",
+    "approved_at": "2026-11-30T14:20:00Z",
+    "decision": "ACCEPT",
+    "note": "REQ-01·PLT-04 후퇴 건은 후보 배포 보류"
+  },
+  "evidence_counts": {
+    "REQ": {
+      "manual": 0,
+      "automated": 6,
+      "not_run": 15
+    },
+    "PLT": {
+      "manual": 0,
+      "automated": 6,
+      "not_run": 6
+    },
+    "LIF": {
+      "manual": 0,
+      "automated": 5,
+      "not_run": 11
+    },
+    "OBS": {
+      "manual": 2,
+      "automated": 4,
+      "not_run": 6
+    },
+    "SUP": {
+      "manual": 0,
+      "automated": 0,
+      "not_run": 16
+    }
+  }
+}

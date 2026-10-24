@@ -285,14 +285,16 @@ class PolicyHistory:
         result.setdefault("same_version_content_changed", False)
         return result
 
-    def append_startup(self, policy_state: PolicyState, session_id: str) -> None:
+    def append_startup(
+        self, policy_state: PolicyState, session_id: str
+    ) -> dict[str, Any] | None:
         try:
             existing, _ = self.store.read_all()
         except OSError as error:
             self.state = "error"
             self.last_error = str(error)
             self.last_error_at = _utc_now()
-            return
+            return None
         previous_record = self._normalized(existing[-1]) if existing else None
         policy = policy_state.policy
         previous = {
@@ -329,9 +331,10 @@ class PolicyHistory:
             self.state = "error"
             self.last_error = str(error)
             self.last_error_at = _utc_now()
-            return
+            return None
         self.state = "ok"
         self.last_error = None
+        return record
 
     def latest(self, limit: int = 50) -> list[dict[str, Any]]:
         try:

@@ -49,6 +49,7 @@
           <span class="stat-label">미완료</span><span class="stat-value" id="count-INCOMPLETE">–</span>
         </button>
       </div>
+      <p id="revalidation-warning" class="revalidation-warning" role="alert" hidden></p>
 
       <div class="card-grid">
         <article class="card">
@@ -97,6 +98,20 @@
         <h3>정책 이력 <span id="history-store-state" class="muted"></span></h3>
         <table class="status-table"><thead><tr><th>시각</th><th>이벤트</th><th>정책</th><th>판본</th><th>SHA-256</th><th>이전</th><th>표시</th></tr></thead><tbody id="history-rows"></tbody></table>
       </article>
+    </section>
+
+    <section aria-labelledby="revalidation-title">
+      <div class="section-head">
+        <h2 id="revalidation-title">재검증 요청</h2>
+        <span id="revalidation-state" class="muted"></span>
+      </div>
+      <div class="card table-card">
+        <table class="status-table">
+          <thead><tr><th>트리거</th><th>근거 요약</th><th>열린 시각</th><th>현재 근거</th><th>출처</th></tr></thead>
+          <tbody id="revalidation-rows"></tbody>
+        </table>
+        <p id="revalidation-empty" class="empty">열린 재검증 요청이 없습니다.</p>
+      </div>
     </section>
 
     <section aria-labelledby="observations-title">

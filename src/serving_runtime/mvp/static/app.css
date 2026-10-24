@@ -194,6 +194,15 @@ section + section { margin-top: 36px; }
 .status-table th { color: var(--muted); font-size: 12px; background: var(--surface-2); }
 .status-table .changed { background: var(--denied-bg); }
 .notice { color: var(--muted); margin: 10px 2px 0; }
+.revalidation-warning {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--denied);
+  border-radius: 10px;
+  background: var(--denied-bg);
+  color: var(--denied);
+  font-weight: 600;
+}
 
 .filters { display: flex; flex-wrap: wrap; gap: 6px; }
 .filter {

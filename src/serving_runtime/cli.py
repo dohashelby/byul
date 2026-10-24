@@ -61,6 +61,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     snapshot_parser.add_argument("--root", required=True, metavar="DIR")
     snapshot_parser.add_argument("--out", required=True, metavar="PATH")
+    revalidation_parser = commands.add_parser(
+        "revalidation", help="재검증 요청 조회 연동 도구"
+    )
+    revalidation_commands = revalidation_parser.add_subparsers(
+        dest="revalidation_command"
+    )
+    revalidation_export_parser = revalidation_commands.add_parser(
+        "export", help="열린 재검증 요청을 새 JSON 파일로 내보내기"
+    )
+    revalidation_export_parser.add_argument("--data-dir", required=True, metavar="DIR")
+    revalidation_export_parser.add_argument("--out", required=True, metavar="FILE")
     enforce_parser = commands.add_parser(
         "enforce", help="Cilium·Tetragon 후보 생성과 관측 이벤트 변환"
     )
@@ -206,6 +217,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "assets":
         assets_parser.print_help()
+        return 0
+    if args.command == "revalidation" and args.revalidation_command == "export":
+        from .mvp.revalidation import export_requests
+
+        try:
+            document = export_requests(args.data_dir, args.out)
+        except (OSError, ValueError) as error:
+            print(f"재검증 요청 내보내기 실패: {error}", file=sys.stderr)
+            return 1
+        print(f"열린 재검증 요청 {document['open_count']}건을 {args.out}에 썼습니다.")
+        print(document["format_status"])
+        return 0
+    if args.command == "revalidation":
+        revalidation_parser.print_help()
         return 0
     parser.print_help()
     return 0

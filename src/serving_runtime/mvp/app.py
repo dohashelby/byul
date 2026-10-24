@@ -28,6 +28,7 @@ from .policy import PolicyState, load_policy
 from .policy_state import PolicyHistory, evaluate_policy, load_revocations
 from .query import QueryService
 from .relay import Relay
+from .revalidation import RevalidationRequests
 from .request_flow import ConcurrencyLimiter, RequestFlow
 from .request_records import RequestRecords
 from .store import JsonlStore
@@ -86,9 +87,18 @@ class GatewayApp:
         self._policy_history = PolicyHistory(
             Path(config.data_dir) / "policy_history.jsonl"
         )
-        self._policy_history.append_startup(
+        self._revalidation = RevalidationRequests(config.data_dir)
+        policy_history_record = self._policy_history.append_startup(
             policy_state, self.observation_session_id
         )
+        if policy_history_record is None:
+            self._revalidation.record_evaluation_error(
+                "policy_history", RuntimeError("startup policy history was not stored")
+            )
+        else:
+            self._revalidation.observe_policy_history(
+                policy_history_record, **self._revalidation_context()
+            )
 
         self._records = RequestRecords(
             config.data_dir,
@@ -134,6 +144,7 @@ class GatewayApp:
                     self._engine_client.collect_info,
                     config.collector_interval_s,
                     config.collector_stale_after_s,
+                    on_collected=self._evaluate_baseline_revalidation,
                 ),
                 Collector(
                     "metrics",
@@ -155,8 +166,47 @@ class GatewayApp:
                     config.asset_interval_s,
                     config.asset_interval_s * 3,
                     dedicated_thread=True,
+                    on_collected=self._evaluate_asset_revalidation,
                 ),
             ]
+        )
+
+    def _revalidation_context(self) -> dict[str, Any]:
+        policy = self.policy_state.policy
+        return {
+            "observation_session_id": self.observation_session_id,
+            "target_id": policy.target_id if policy else None,
+            "policy": {
+                "policy_id": policy.policy_id if policy else None,
+                "policy_version": policy.policy_version if policy else None,
+                "sha256": self.policy_state.sha256,
+            },
+        }
+
+    def _evaluate_asset_revalidation(
+        self, result: Any, data_origin: str | None
+    ) -> None:
+        if not isinstance(result, dict):
+            self._revalidation.record_evaluation_error(
+                "asset_integrity", ValueError("asset collector result is not an object")
+            )
+            return
+        self._revalidation.observe_asset(
+            result, data_origin=data_origin, **self._revalidation_context()
+        )
+
+    def _evaluate_baseline_revalidation(
+        self, _result: Any, _data_origin: str | None
+    ) -> None:
+        try:
+            comparison = compare_baseline(
+                self._baseline, self._manifest, self._collectors
+            )
+        except Exception as error:
+            self._revalidation.record_evaluation_error("baseline", error)
+            return
+        self._revalidation.observe_baseline(
+            comparison, **self._revalidation_context()
         )
 
     def _collect_asset_integrity(self) -> tuple[dict[str, Any], str]:
@@ -231,6 +281,9 @@ class GatewayApp:
             "generated_at": _utc_now(),
         }
 
+    def revalidation_status(self) -> dict[str, Any]:
+        return self._revalidation.summary()
+
     def status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         engine = self._engine_client.status()
@@ -238,6 +291,7 @@ class GatewayApp:
         policy_runtime = self.policy_status()
         baseline = self.baseline_status()
         collectors = self.collectors_status()
+        revalidation = self.revalidation_status()
         return {
             "status": (
                 "ok"
@@ -245,6 +299,8 @@ class GatewayApp:
                 and engine["healthy"]
                 and record_store["ok"]
                 and policy_runtime["history_storage"]["ok"]
+                and revalidation["evaluation_status"]["ok"]
+                and revalidation["storage"]["ok"]
                 else "degraded"
             ),
             "mode": (
@@ -311,6 +367,12 @@ class GatewayApp:
                 item["source"]: item["state"]
                 for item in collectors["collectors"]
             },
+            "revalidation": {
+                "open_count": revalidation["open_count"],
+                "current_condition_count": revalidation["current_condition_count"],
+                "evaluation_state": revalidation["evaluation_status"]["state"],
+                "storage_state": revalidation["storage"]["state"],
+            },
         }
 
     def start(self) -> "GatewayApp":
@@ -323,6 +385,7 @@ class GatewayApp:
                 policy_status=self.policy_status,
                 baseline_status=self.baseline_status,
                 collectors_status=self.collectors_status,
+                revalidation_status=self.revalidation_status,
                 queries=self._queries,
                 observations=self._observations,
                 receipt_lookup=self._engine_client.receipt_lookup,

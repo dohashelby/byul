@@ -27,6 +27,7 @@ class Collector:
         interval_s: float = 5,
         stale_after_s: float = 15,
         dedicated_thread: bool = False,
+        on_collected: Callable[[Any, str | None], None] | None = None,
     ) -> None:
         if interval_s <= 0 or stale_after_s <= 0:
             raise ValueError("collector intervals must be positive")
@@ -35,6 +36,7 @@ class Collector:
         self.interval_s = float(interval_s)
         self.stale_after_s = float(stale_after_s)
         self.dedicated_thread = dedicated_thread
+        self.on_collected = on_collected
         self.last_attempt_at: str | None = None
         self.last_success_at: str | None = None
         self.last_error: str | None = None
@@ -72,6 +74,13 @@ class Collector:
             self.data_origin = data_origin if isinstance(data_origin, str) else None
             self._last_attempt_monotonic = attempted_monotonic
             self._last_success_monotonic = completed_monotonic
+        if self.on_collected is not None:
+            try:
+                self.on_collected(value, self.data_origin)
+            except Exception:
+                # Observation consumers must not turn a successful collection
+                # into a collector failure or stop its polling thread.
+                pass
 
     def due(self, now: float | None = None) -> bool:
         with self._lock:

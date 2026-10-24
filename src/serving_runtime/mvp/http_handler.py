@@ -35,6 +35,7 @@ class HandlerDependencies:
     policy_status: Callable[[], dict[str, Any]]
     baseline_status: Callable[[], dict[str, Any]]
     collectors_status: Callable[[], dict[str, Any]]
+    revalidation_status: Callable[[], dict[str, Any]]
     queries: QueryService
     observations: ObservationQuery
     receipt_lookup: Callable[[str], dict[str, Any]]
@@ -176,6 +177,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/policy",
                 "/api/baseline",
                 "/api/collectors",
+                "/api/revalidation",
                 "/api/observations",
                 "/v1/chat/completions",
             }
@@ -296,6 +298,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/collectors":
             self._send_json(200, self.dependencies.collectors_status())
+            return
+        if path == "/api/revalidation":
+            self._send_json(200, self.dependencies.revalidation_status())
             return
         if path == "/api/observations":
             self._observation_list(parsed.query)

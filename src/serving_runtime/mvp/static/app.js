@@ -232,6 +232,46 @@ function renderCollectors(payload) {
   }
 }
 
+function renderRevalidation(payload) {
+  const items = payload.requests || [];
+  const body = $("revalidation-rows");
+  clear(body);
+  $("revalidation-empty").hidden = items.length > 0;
+  const triggerLabels = {
+    asset_changed: "자산 변경",
+    config_drift: "구성 drift",
+    policy_content_changed: "정책 내용 변경",
+  };
+  for (const item of items) {
+    const originLabel = item.data_origin === "mock" ? "모의" : item.data_origin ?? "–";
+    const originClass = item.data_origin === "mock" ? "badge badge-mock" : "badge badge-state";
+    const conditionLabels = {
+      current: "있음",
+      cleared: "해소됨",
+      superseded: "다른 근거로 대체됨, 해소 아님",
+    };
+    const conditionClass = item.condition_state === "superseded"
+      ? "badge-INCOMPLETE"
+      : item.current_evidence_present ? "state-drift" : "state-match";
+    body.appendChild(el("tr", {}, [
+      el("td", { text: triggerLabels[item.trigger] || item.trigger }),
+      el("td", { text: item.evidence_summary }),
+      el("td", { text: formatTime(item.opened_at) }),
+      el("td", {}, [el("span", {
+        className: `badge ${conditionClass}`,
+        text: item.condition_state_label || conditionLabels[item.condition_state] || "–",
+      })]),
+      el("td", {}, [el("span", { className: originClass, text: originLabel })]),
+    ]));
+  }
+  const warning = $("revalidation-warning");
+  warning.textContent = `열린 재검증 요청 ${payload.open_count || 0}건 · 현재 근거 ${payload.current_condition_count || 0}건 — 자동 승인·해제되지 않습니다.`;
+  warning.hidden = (payload.open_count || 0) === 0;
+  const corrupt = (payload.corrupt_lines || []).length;
+  const errors = (payload.evaluation_errors || []).length;
+  $("revalidation-state").textContent = `열림 ${payload.open_count || 0} · 현재 근거 ${payload.current_condition_count || 0} · 손상 줄 ${corrupt} · 평가 오류 ${errors}`;
+}
+
 function observationBadge(origin) {
   if (origin === "synthetic") return el("span", { className: "badge badge-synthetic", text: "합성" });
   if (origin === "real") return el("span", { className: "badge badge-ALLOWED", text: "실제" });
@@ -300,10 +340,18 @@ function renderObservations(payload) {
   $("tetragon-observation-empty").hidden = tetragon.length > 0;
   for (const item of tetragon) {
     const outsideAllowlist = item.kind === "process_exec" && item.allowed_binary === false;
+    const podUnknown = item.pod_attribution === "unavailable";
+    const processUnknown = item.process_attribution === "unavailable"
+      || (item.kind === "file_access" && !item.binary);
+    const kindLabel = item.kind === "process_exec" ? "프로세스" : `파일 ${item.access || "other"}`;
+    const attributionLabels = [];
+    if (podUnknown) attributionLabels.push("pod 미확인");
+    if (processUnknown) attributionLabels.push("프로세스 미확인");
+    const attributionLabel = attributionLabels.join(" · ");
     tetragonBody.appendChild(el("tr", { className: outsideAllowlist ? "exec-outside-allowlist" : "" }, [
       el("td", { text: formatTime(item.observed_at) }),
-      el("td", { text: item.kind === "process_exec" ? "프로세스" : `파일 ${item.access || "other"}` }),
-      el("td", { className: "mono", text: item.path || item.binary || "–", title: podLabel(item.pod) }),
+      el("td", { text: attributionLabel ? `${kindLabel} · ${attributionLabel}` : kindLabel }),
+      el("td", { className: "mono", text: item.path || item.binary || "–", title: attributionLabel || podLabel(item.pod) }),
       el("td", { className: "mono", text: `${item.rule_id || "–"} · ${item.action || "–"}` }),
       el("td", {}, [observationBadge(item.data_origin)]),
     ]));
@@ -507,13 +555,14 @@ function setFilter(filter) {
 async function refresh() {
   const query = state.filter ? `?result=${encodeURIComponent(state.filter)}` : "";
   try {
-    const [status, summary, list, policy, baseline, collectors, observations] = await Promise.all([
+    const [status, summary, list, policy, baseline, collectors, revalidation, observations] = await Promise.all([
       getJson("/api/status"),
       getJson("/api/summary"),
       getJson(`/api/requests${query}`),
       getJson("/api/policy"),
       getJson("/api/baseline"),
       getJson("/api/collectors"),
+      getJson("/api/revalidation"),
       getJson("/api/observations"),
     ]);
     renderStatus(status);
@@ -522,6 +571,7 @@ async function refresh() {
     renderPolicyState(policy);
     renderBaseline(baseline);
     renderCollectors(collectors);
+    renderRevalidation(revalidation);
     renderObservations(observations);
     state.lastSuccess = new Date();
     document.body.classList.remove("is-stale");

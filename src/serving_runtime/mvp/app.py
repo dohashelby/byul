@@ -275,6 +275,27 @@ class GatewayApp:
         host, port = self._server.server_address[:2]
         return str(host), int(port)
 
+    @staticmethod
+    def _profile_status(policy: Any) -> dict[str, Any]:
+        if policy is None:
+            return {
+                "profile": None,
+                "test_only": False,
+                "max_n": None,
+                "extra_fields": [],
+                "passthrough_count": 0,
+                "validate_count": 0,
+            }
+        extra = [{"name": rule.name, "mode": rule.mode} for rule in policy.extra_fields]
+        return {
+            "profile": policy.profile,
+            "test_only": policy.profile == "zeroday-lab",
+            "max_n": policy.max_n,
+            "extra_fields": extra,
+            "passthrough_count": sum(1 for item in extra if item["mode"] == "passthrough"),
+            "validate_count": sum(1 for item in extra if item["mode"] == "validate"),
+        }
+
     def policy_status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         validity = evaluate_policy(self.policy_state, self.revocation_state)
@@ -291,6 +312,7 @@ class GatewayApp:
             "valid_from": policy.valid_from if policy else None,
             "valid_until": policy.valid_until if policy else None,
             "approval_ref": policy.approval_ref if policy else None,
+            **self._profile_status(policy),
             "error_code": self.policy_state.error_code,
             "error_message": self.policy_state.error_message,
         }
@@ -372,6 +394,7 @@ class GatewayApp:
                 "target_id": policy.target_id if policy else None,
                 "sha256": self.policy_state.sha256,
                 "loaded_at": self.policy_state.loaded_at,
+                **self._profile_status(policy),
                 "error_code": self.policy_state.error_code,
                 "error_message": self.policy_state.error_message,
                 "loaded": policy_runtime["loaded"],

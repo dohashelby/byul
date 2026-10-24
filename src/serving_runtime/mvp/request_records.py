@@ -110,6 +110,7 @@ class RequestRecords:
             "recorded_at": _utc_now(),
             "policy": {
                 "schema_version": policy.schema_version if policy else None,
+                "profile": policy.profile if policy else None,
                 "policy_id": policy.policy_id if policy else None,
                 "policy_version": policy.policy_version if policy else None,
                 "sha256": policy_state.sha256,
@@ -125,6 +126,12 @@ class RequestRecords:
             "request": {
                 "model": decision.model,
                 "max_tokens": decision.max_tokens,
+                "n": decision.n,
+                # Test-only extra fields: names and modes only, never values.
+                "extra_fields": [
+                    {"name": name, "mode": mode}
+                    for name, mode in decision.extra_fields
+                ],
                 "context": getattr(self._request_local, "context", None),
             },
             "delivery": {

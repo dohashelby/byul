@@ -172,6 +172,15 @@ class FakeBackend:
                     "model": document.get("model"),
                     "max_tokens": document.get("max_tokens"),
                     "stream": document.get("stream") is True,
+                    "n": document.get("n"),
+                    # Test-only visibility into which request fields reached
+                    # the backend, and the original values of non-Gateway fields.
+                    "field_names": sorted(document),
+                    "extra_values": {
+                        key: value
+                        for key, value in document.items()
+                        if key not in {"model", "messages", "max_tokens", "stream", "n"}
+                    },
                     "host": self.headers.get("Host"),
                     "header_names": sorted(name.lower() for name in self.headers),
                     "authorization_present": self.headers.get("Authorization") is not None,

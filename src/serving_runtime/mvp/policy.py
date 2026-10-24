@@ -1,11 +1,21 @@
 """Load and validate the small, local MVP policy document."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any
+
+
+@dataclass(frozen=True)
+class ExtraFieldRule:
+    """One test-only request field opened by a runtime-mvp/1.2 zeroday-lab policy."""
+
+    name: str
+    mode: str
+    constraints: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -22,6 +32,12 @@ class Policy:
     valid_until: str | None = None
     approval_ref: str | None = None
     max_context_tokens: int | None = None
+    profile: str = "default"
+    extra_fields: tuple[ExtraFieldRule, ...] = ()
+    max_n: int = 1
+
+    def extra_field_rule(self, name: str) -> ExtraFieldRule | None:
+        return next((rule for rule in self.extra_fields if rule.name == name), None)
 
 
 @dataclass(frozen=True)
@@ -55,6 +71,36 @@ _V11_FIELDS = _REQUIRED_FIELDS | {
     "approval_ref",
     "max_context_tokens",
 }
+_V12_FIELDS = _V11_FIELDS | {"profile", "extra_fields", "max_n"}
+_SCHEMA_FIELDS = {
+    "runtime-mvp/1.0": _REQUIRED_FIELDS,
+    "runtime-mvp/1.1": _V11_FIELDS,
+    "runtime-mvp/1.2": _V12_FIELDS,
+}
+_PROFILES = {"default", "zeroday-lab"}
+# Fields the Gateway always validates or normalizes itself; a policy may not
+# reopen them as extra fields.
+RESERVED_REQUEST_FIELDS = frozenset(
+    {"model", "messages", "max_tokens", "stream", "n", "max_completion_tokens"}
+)
+EXTRA_FIELD_TYPES = frozenset(
+    {"integer", "number", "string", "boolean", "array", "object"}
+)
+_ITEM_TYPES = frozenset({"integer", "number", "string", "boolean"})
+_CONSTRAINTS_BY_TYPE = {
+    "integer": {"min", "max"},
+    "number": {"min", "max"},
+    "string": {"max_length"},
+    "boolean": set(),
+    "array": {"max_items", "items", "max_bytes"},
+    "object": {"max_bytes"},
+}
+_ITEM_CONSTRAINTS_BY_TYPE = {
+    "integer": {"min", "max"},
+    "number": {"min", "max"},
+    "string": {"max_length"},
+    "boolean": set(),
+}
 
 
 def _utc_now() -> str:
@@ -80,6 +126,85 @@ def _is_nonempty_string(value: object) -> bool:
 
 def _is_positive_integer(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _is_finite_number(value: object) -> bool:
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, int) or (isinstance(value, float) and math.isfinite(value))
+
+
+def _is_non_negative_integer(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _check_bounds(where: str, kind: str, rule: dict[str, Any]) -> None:
+    for bound in ("min", "max"):
+        if bound in rule:
+            value = rule[bound]
+            if kind == "integer":
+                valid = isinstance(value, int) and not isinstance(value, bool)
+            else:
+                valid = _is_finite_number(value)
+            if not valid:
+                raise ValueError(f"{where}.{bound} must be a finite {kind}")
+    if "min" in rule and "max" in rule and rule["min"] > rule["max"]:
+        raise ValueError(f"{where}.min must not exceed max")
+    if "max_length" in rule and not _is_non_negative_integer(rule["max_length"]):
+        raise ValueError(f"{where}.max_length must be a non-negative integer")
+
+
+def _parse_item_rule(where: str, value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{where} must be an object")
+    kind = value.get("type")
+    if kind not in _ITEM_TYPES:
+        raise ValueError(f"{where}.type must be one of {', '.join(sorted(_ITEM_TYPES))}")
+    unknown = sorted(value.keys() - {"type"} - _ITEM_CONSTRAINTS_BY_TYPE[kind])
+    if unknown:
+        raise ValueError(f"{where} has unknown or unsupported key(s): {', '.join(unknown)}")
+    _check_bounds(where, kind, value)
+    return dict(value)
+
+
+def _parse_extra_fields(value: object) -> tuple[ExtraFieldRule, ...]:
+    if not isinstance(value, dict):
+        raise ValueError("extra_fields must be an object")
+    rules: list[ExtraFieldRule] = []
+    for name in sorted(value):
+        where = f"extra_fields.{name}"
+        if not name or name != name.strip():
+            raise ValueError("extra_fields names must be non-empty without surrounding spaces")
+        if name in RESERVED_REQUEST_FIELDS:
+            raise ValueError(f"{where} is reserved by the Gateway")
+        rule = value[name]
+        if not isinstance(rule, dict):
+            raise ValueError(f"{where} must be an object")
+        mode = rule.get("mode")
+        if mode == "passthrough":
+            unknown = sorted(rule.keys() - {"mode"})
+            if unknown:
+                raise ValueError(f"{where} passthrough allows only mode; unknown key(s): {', '.join(unknown)}")
+            rules.append(ExtraFieldRule(name, "passthrough"))
+            continue
+        if mode != "validate":
+            raise ValueError(f"{where}.mode must be validate or passthrough")
+        kind = rule.get("type")
+        if kind not in EXTRA_FIELD_TYPES:
+            raise ValueError(f"{where}.type must be one of {', '.join(sorted(EXTRA_FIELD_TYPES))}")
+        unknown = sorted(rule.keys() - {"mode", "type"} - _CONSTRAINTS_BY_TYPE[kind])
+        if unknown:
+            raise ValueError(f"{where} has unknown or unsupported key(s) for type {kind}: {', '.join(unknown)}")
+        _check_bounds(where, kind, rule)
+        for size in ("max_items", "max_bytes"):
+            if size in rule and not _is_non_negative_integer(rule[size]):
+                raise ValueError(f"{where}.{size} must be a non-negative integer")
+        constraints = {key: item for key, item in rule.items() if key not in {"mode", "type"}}
+        constraints["type"] = kind
+        if "items" in rule:
+            constraints["items"] = _parse_item_rule(f"{where}.items", rule["items"])
+        rules.append(ExtraFieldRule(name, "validate", constraints))
+    return tuple(rules)
 
 
 def parse_policy_time(value: str) -> datetime:
@@ -137,7 +262,7 @@ def load_policy(path: str | Path) -> PolicyState:
             digest,
         )
     schema_version = document.get("schema_version")
-    allowed_fields = _V11_FIELDS if schema_version == "runtime-mvp/1.1" else _REQUIRED_FIELDS
+    allowed_fields = _SCHEMA_FIELDS.get(schema_version, _REQUIRED_FIELDS)
     unknown = sorted(document.keys() - allowed_fields)
     if unknown:
         return _error(
@@ -147,7 +272,7 @@ def load_policy(path: str | Path) -> PolicyState:
             f"unknown policy field(s): {', '.join(unknown)}",
             digest,
         )
-    if schema_version not in {"runtime-mvp/1.0", "runtime-mvp/1.1"}:
+    if schema_version not in _SCHEMA_FIELDS:
         return _error(
             path_text, loaded_at, "INVALID_POLICY", "unsupported schema_version", digest
         )
@@ -191,7 +316,7 @@ def load_policy(path: str | Path) -> PolicyState:
             digest,
         )
 
-    if schema_version == "runtime-mvp/1.1":
+    if schema_version in {"runtime-mvp/1.1", "runtime-mvp/1.2"}:
         for name in ("valid_from", "valid_until"):
             value = document.get(name)
             if value is None:
@@ -242,6 +367,52 @@ def load_policy(path: str | Path) -> PolicyState:
                     digest,
                 )
 
+    profile = "default"
+    extra_fields: tuple[ExtraFieldRule, ...] = ()
+    max_n = 1
+    if schema_version == "runtime-mvp/1.2":
+        profile = document.get("profile", "default")
+        if profile not in _PROFILES:
+            return _error(
+                path_text,
+                loaded_at,
+                "INVALID_POLICY",
+                "profile must be default or zeroday-lab",
+                digest,
+            )
+        if "extra_fields" in document:
+            if profile != "zeroday-lab":
+                return _error(
+                    path_text,
+                    loaded_at,
+                    "INVALID_POLICY",
+                    "extra_fields require profile zeroday-lab",
+                    digest,
+                )
+            try:
+                extra_fields = _parse_extra_fields(document["extra_fields"])
+            except ValueError as error:
+                return _error(path_text, loaded_at, "INVALID_POLICY", str(error), digest)
+        if "max_n" in document:
+            max_n = document["max_n"]
+            if not _is_positive_integer(max_n):
+                return _error(
+                    path_text,
+                    loaded_at,
+                    "INVALID_POLICY",
+                    "max_n must be a positive integer",
+                    digest,
+                )
+            if max_n > 1 and profile != "zeroday-lab":
+                # The default profile keeps the D-09 LAB value n=1.
+                return _error(
+                    path_text,
+                    loaded_at,
+                    "INVALID_POLICY",
+                    "max_n above 1 requires profile zeroday-lab",
+                    digest,
+                )
+
     policy = Policy(
         schema_version=document["schema_version"],
         policy_id=document["policy_id"],
@@ -255,5 +426,8 @@ def load_policy(path: str | Path) -> PolicyState:
         valid_until=document.get("valid_until"),
         approval_ref=document.get("approval_ref"),
         max_context_tokens=document.get("max_context_tokens"),
+        profile=profile,
+        extra_fields=extra_fields,
+        max_n=max_n,
     )
     return PolicyState(True, policy, path_text, digest, loaded_at, None, None)

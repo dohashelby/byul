@@ -87,6 +87,16 @@ class QueryService:
             "run_id": source.get("run_id"),
             "model": request.get("model"),
             "max_tokens": request.get("max_tokens"),
+            "policy_profile": (
+                source.get("policy", {}).get("profile")
+                if isinstance(source.get("policy"), dict)
+                else None
+            ),
+            "extra_fields": (
+                request.get("extra_fields")
+                if isinstance(request.get("extra_fields"), list)
+                else []
+            ),
             "result": result,
             "reason_code": decision.get("reason_code"),
             "http_status": decision.get("http_status"),

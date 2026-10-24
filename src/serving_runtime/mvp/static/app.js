@@ -104,6 +104,7 @@ function renderStatus(status) {
   const policyRows = [
     ["정책", policy.policy_id],
     ["판본", policy.policy_version],
+    ["프로필", policy.test_only ? `${policy.profile} (시험 전용)` : policy.profile || "default", { problem: policy.test_only }],
     ["대상", policy.target_id],
     ["SHA-256", policy.sha256 ? `${policy.sha256.slice(0, 12)}…` : null, { mono: true, title: policy.sha256 }],
     ["로딩", formatTime(policy.loaded_at)],
@@ -113,6 +114,7 @@ function renderStatus(status) {
     policyRows.push(["사유", `${policy.error_code || ""} ${policy.error_message || ""}`.trim(), { problem: true }]);
   }
   fillKv("policy-kv", policyRows);
+  renderProfileWarning(policy);
 
   const concurrency = status.concurrency || {};
   const connections = status.connections || {};
@@ -579,6 +581,28 @@ function contextText(context) {
   return `${labels[context.result] || context.result} · 입력 ${tokens}토큰 / 한도 ${context.limit}`;
 }
 
+function renderProfileWarning(policy) {
+  const warning = $("profile-warning");
+  if (!policy || !policy.test_only) {
+    warning.hidden = true;
+    return;
+  }
+  const passthrough = (policy.extra_fields || [])
+    .filter((item) => item.mode === "passthrough")
+    .map((item) => item.name);
+  warning.textContent =
+    `시험 전용 프로필(${policy.profile}): 검사하지 않고 엔진에 전달하는 필드 ${policy.passthrough_count ?? passthrough.length}개`
+    + `${passthrough.length ? ` (${passthrough.join(", ")})` : ""}`
+    + ` · 검사 후 전달 ${policy.validate_count ?? 0}개 · 허용 n 최대 ${policy.max_n ?? 1}. 승인된 운영 정책이 아닙니다.`;
+  warning.hidden = false;
+}
+
+function extraFieldsText(items) {
+  if (!Array.isArray(items) || !items.length) return null;
+  const modes = { validate: "검사", passthrough: "미검사 전달" };
+  return items.map((item) => `${item.name}(${modes[item.mode] || item.mode})`).join(", ");
+}
+
 function renderDetail(detail) {
   const body = $("drawer-body");
   clear(body);
@@ -609,6 +633,8 @@ function renderDetail(detail) {
         ["적용 규칙", decision.rule_id, { mono: true }],
         ["모델", final.model],
         ["max_tokens", final.max_tokens],
+        ["n", (finalRecord.request || {}).n],
+        ["추가 필드", extraFieldsText((finalRecord.request || {}).extra_fields)],
         ["context 검사", contextText((finalRecord.request || {}).context)],
       ]),
     ]),
@@ -617,6 +643,7 @@ function renderDetail(detail) {
     section("적용 정책", [
       kvList([
         ["정책", `${policy.policy_id ?? "–"} · 판본 ${policy.policy_version ?? "–"}`],
+        ["프로필", policy.profile === "zeroday-lab" ? "zeroday-lab (시험 전용)" : policy.profile, { problem: policy.profile === "zeroday-lab" }],
         ["SHA-256", policy.sha256, { mono: true }],
       ]),
     ]),

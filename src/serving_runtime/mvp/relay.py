@@ -32,6 +32,9 @@ def engine_error(
         message=message,
         model=allowed.model,
         max_tokens=allowed.max_tokens,
+        # Keep what was (or would have been) relayed so failure records stay accurate.
+        extra_fields=allowed.extra_fields,
+        n=allowed.n,
     )
 
 
@@ -52,12 +55,21 @@ def relay_payload(
     *,
     stream: bool,
 ) -> bytes:
-    relay_document = {
-        "model": backend.mapped_model(allowed.model),
-        "messages": document["messages"],
-        "max_tokens": allowed.max_tokens,
-        "stream": stream,
-    }
+    relay_document: dict[str, Any] = {}
+    # Test-only extra fields keep the client's original value; the Gateway-owned
+    # fields below are written last so they always win.
+    for name, _mode in allowed.extra_fields:
+        relay_document[name] = document[name]
+    relay_document.update(
+        {
+            "model": backend.mapped_model(allowed.model),
+            "messages": document["messages"],
+            "max_tokens": allowed.max_tokens,
+            "stream": stream,
+        }
+    )
+    if allowed.n is not None and allowed.n > 1:
+        relay_document["n"] = allowed.n
     return json.dumps(relay_document, ensure_ascii=False).encode("utf-8")
 
 

@@ -137,6 +137,19 @@ baseline과 manifest는 평면 `fields` 객체를 사용합니다. manifest도 �
 
 비교 상태는 `match`(일치), `drift`(차이), `missing`(수집 결과에 필드 없음), `stale`(마지막 성공이 신선도 초과), `error`(수집 실패), `not_collected`(수집원 없음)입니다. 모의 엔진 응답은 `data_origin: mock`으로 표시하며 실제 엔진 관측이라고 주장하지 않습니다. 수집 실패 시 마지막 성공값과 시각을 유지하고 0이나 정상값으로 바꾸지 않습니다. 관측값은 baseline으로 저장하거나 승격하지 않습니다. 특히 **model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않습니다.**
 
+### 정책 1.2 시험 전용 프로필 (zeroday-lab)
+
+**시험 전용입니다.** 개발계획서 v1.4 D-09 기본 LAB 프로필(텍스트 전용, n=1, 5개 요청 필드)은 바꾸지 않습니다. 제로데이 시험에서 "Gateway가 막아서 엔진에 도달하지 않음"과 "엔진에 도달했을 때 탐지·차단됨"을 구분하려고, 정책으로 추가 요청 필드를 열 수 있게 한 계획서 범위 밖 확장입니다.
+
+- `runtime-mvp/1.2`는 1.1의 모든 필드에 `profile`(`default`·`zeroday-lab`), `extra_fields`, `max_n`(기본 1)을 더합니다. 1.0·1.1 문서에 이 필드를 넣으면 기존처럼 `UNKNOWN_FIELD`입니다.
+- `extra_fields`와 `max_n > 1`은 `zeroday-lab`에서만 허용합니다. `model`·`messages`·`max_tokens`·`stream`·`n`·`max_completion_tokens`는 열 수 없고, `max_completion_tokens` 별칭은 모든 프로필에서 계속 거부합니다.
+- 규칙은 `{"mode": "validate", "type": ..., 제약}` 또는 `{"mode": "passthrough"}`입니다. 제약은 `min`·`max`(integer/number), `max_length`(string), `max_items`·`items`·`max_bytes`(array), `max_bytes`(object)만 받고, 타입에 맞지 않는 제약·알 수 없는 키·`min > max`는 정책 오류입니다. bool은 숫자로 인정하지 않습니다.
+- 제약 위반은 400 `INVALID_EXTRA_FIELD`이며 메시지에는 필드 이름과 위반 제약만 남고 값은 남지 않습니다. 통과한 필드는 원래 값 그대로 backend에 전달하고, model 매핑·`max_tokens`·`stream`은 Gateway 값이 우선합니다. `n > 1`이 허용되면 `n`도 전달합니다.
+- 요청 기록·증거에는 정책 `profile`과 전달한 추가 필드의 **이름과 모드만** 남깁니다. 값은 저장하지 않습니다. `/api/status`·`/api/policy`와 대시보드는 `zeroday-lab`이면 "시험 전용 프로필: 검사하지 않고 전달하는 필드 N개" 경고를 표시합니다.
+- 예시 `examples/mvp/policy-v1.2-zeroday-lab.json`(`approval_ref: LAB-ZERODAY-TEST-ONLY`)의 값은 시험 출발점이며 승인된 정책값이 아닙니다.
+- 주의: Gateway는 열린 필드의 의미를 해석하지 않습니다. `best_of`처럼 엔진 쪽에서 n·출력 상한과 같은 효과를 내는 필드를 passthrough로 열면 Gateway의 n·`max_tokens` 통제를 우회할 수 있으므로, 이런 필드는 시험 목적이 분명할 때만 엽니다.
+- 알려진 한계: messages content는 계속 문자열만 받습니다(멀티모달 미지원). context 사전 통제는 `messages`만 `/tokenize`에 보내므로 `chat_template_kwargs` 등 passthrough 필드가 바꾸는 토큰 수는 반영되지 않습니다. `n > 1`은 각 응답이 같은 prompt를 쓰므로 context 계산은 그대로이고, 총 출력량은 `n × max_tokens`까지 늘 수 있습니다.
+
 ### context 사전 통제
 
 정책 schema `runtime-mvp/1.1`의 선택 필드 `max_context_tokens`를 넣으면 켜집니다(예: `examples/mvp/policy-v1.1-context.json`, 2048). 값은 `output_max_tokens`보다 커야 합니다.

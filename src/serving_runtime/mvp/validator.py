@@ -2,9 +2,16 @@
 
 from dataclasses import dataclass
 import json
+import math
 from typing import Any, Literal
 
-from .policy import DuplicateKeyError, PolicyState, _object_without_duplicates, _reject_json_constant
+from .policy import (
+    DuplicateKeyError,
+    ExtraFieldRule,
+    PolicyState,
+    _object_without_duplicates,
+    _reject_json_constant,
+)
 
 
 @dataclass(frozen=True)
@@ -16,6 +23,67 @@ class Decision:
     message: str
     model: str | None
     max_tokens: int | None
+    # Test-only fields (runtime-mvp/1.2 zeroday-lab) that passed validation, as
+    # (name, mode) pairs. Values are never kept here.
+    extra_fields: tuple[tuple[str, str], ...] = ()
+    n: int | None = None
+
+
+def _type_matches(kind: str, value: object) -> bool:
+    if kind == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if kind == "number":
+        if isinstance(value, bool):
+            return False
+        # Arbitrarily large JSON integers are finite; math.isfinite would overflow.
+        return isinstance(value, int) or (
+            isinstance(value, float) and math.isfinite(value)
+        )
+    if kind == "string":
+        return isinstance(value, str)
+    if kind == "boolean":
+        return isinstance(value, bool)
+    if kind == "array":
+        return isinstance(value, list)
+    if kind == "object":
+        return isinstance(value, dict)
+    return False
+
+
+def _scalar_violation(rule: dict[str, Any], value: object) -> str | None:
+    """Return the violated constraint name for a scalar, or None."""
+
+    if not _type_matches(rule["type"], value):
+        return "type"
+    if "min" in rule and value < rule["min"]:
+        return "min"
+    if "max" in rule and value > rule["max"]:
+        return "max"
+    if "max_length" in rule and len(value) > rule["max_length"]:
+        return "max_length"
+    return None
+
+
+def _extra_field_violation(rule: ExtraFieldRule, value: object) -> str | None:
+    constraints = rule.constraints
+    violation = _scalar_violation(
+        {key: item for key, item in constraints.items() if key in {"type", "min", "max", "max_length"}},
+        value,
+    )
+    if violation is not None:
+        return violation
+    if "max_items" in constraints and len(value) > constraints["max_items"]:
+        return "max_items"
+    if "items" in constraints:
+        for item in value:
+            item_violation = _scalar_violation(constraints["items"], item)
+            if item_violation is not None:
+                return f"items.{item_violation}"
+    if "max_bytes" in constraints:
+        encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        if len(encoded) > constraints["max_bytes"]:
+            return "max_bytes"
+    return None
 
 
 def _decision(
@@ -73,6 +141,8 @@ def validate_request(
             "max_completion_tokens is not supported; use max_tokens",
         )
     allowed_fields = {"model", "messages", "max_tokens", "stream", "n"}
+    extra_rules = {rule.name: rule for rule in policy.extra_fields}
+    allowed_fields |= extra_rules.keys()
     unsupported = sorted(document.keys() - allowed_fields)
     if unsupported:
         return _decision(
@@ -132,17 +202,44 @@ def validate_request(
                 max_tokens=max_tokens,
             )
 
+    n: int | None = None
     if "n" in document:
         n = document["n"]
-        if not isinstance(n, int) or isinstance(n, bool) or n != 1:
+        if (
+            not isinstance(n, int)
+            or isinstance(n, bool)
+            or n < 1
+            or n > policy.max_n
+        ):
             return _decision(
                 "INVALID",
                 400,
                 "N_UNSUPPORTED",
-                "n must be the integer 1",
+                (
+                    "n must be the integer 1"
+                    if policy.max_n == 1
+                    else f"n must be an integer between 1 and {policy.max_n}"
+                ),
                 model=model,
                 max_tokens=max_tokens,
             )
+
+    passed_extras: list[tuple[str, str]] = []
+    for name in sorted(document.keys() & extra_rules.keys()):
+        rule = extra_rules[name]
+        if rule.mode == "validate":
+            violation = _extra_field_violation(rule, document[name])
+            if violation is not None:
+                # Name the field and constraint only; never echo the value.
+                return _decision(
+                    "INVALID",
+                    400,
+                    "INVALID_EXTRA_FIELD",
+                    f"extra field {name} violates {violation}",
+                    model=model,
+                    max_tokens=max_tokens,
+                )
+        passed_extras.append((name, rule.mode))
 
     if model not in policy.allowed_models:
         return _decision(
@@ -164,11 +261,14 @@ def validate_request(
             model=model,
             max_tokens=max_tokens,
         )
-    return _decision(
+    return Decision(
         "ALLOWED",
         200,
         "REQUEST_ALLOWED",
+        None,
         "request is allowed",
-        model=model,
-        max_tokens=max_tokens,
+        model,
+        max_tokens,
+        extra_fields=tuple(passed_extras),
+        n=n,
     )

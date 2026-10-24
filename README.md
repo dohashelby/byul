@@ -27,7 +27,7 @@ BoB serving-engine security runtime solution
 | 대상 등록 프레임 (F1) | `--target`(`runtime-target/1.0`): 정책 대상 대조·엔진/모델 비교, `--target-pod-status`로 Pod 조회·교체 구분 | 단위·HTTP 시험, 로컬 kind에서 Pod 교체 확인 |
 | 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류와 기간 있는 승인 예외 | 단위 시험; SP4 송수신 정책은 로컬 kind에서 수동 확인 |
 | 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 수정 반영 |
-| 시험 | 추적 unittest 339개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 시험 | 추적 unittest 347개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -160,7 +160,7 @@ curl -H "Authorization: Bearer $LAB_TOKEN" -H 'Content-Type: application/json' \
 ```
 
 - 주체마다 `principal_id`, `roles`, `token_sha256`, 선택 `allowed_models`·`disabled`를 둡니다. `route_roles`는 보호 경로별 허용 역할입니다. `POST /v1/chat/completions`는 항상 보호하고(기본 역할 `inference`), 조회 API는 `"GET /api/*": ["viewer"]`처럼 넣었을 때만 보호합니다.
-- 인증 정보 없음은 401 `AUTH_REQUIRED`, 토큰 불일치·비활성 주체·Bearer 외 방식은 401 `AUTH_INVALID`, 역할 불허는 403 `ROLE_NOT_ALLOWED`, 주체에 허용되지 않은 모델은 403 `PRINCIPAL_MODEL_NOT_ALLOWED`입니다. 모두 엔진에 전달하지 않고, 401·역할 거부는 본문을 읽기 전에 끝냅니다.
+- 요청은 정책 유효성, 인증, 대상 등록, 본문 순서로 판정합니다. 인증 정보 없음은 401 `AUTH_REQUIRED`, 토큰 불일치·비활성 주체·Bearer 외 방식은 401 `AUTH_INVALID`, 역할 불허는 403 `ROLE_NOT_ALLOWED`, 주체에 허용되지 않은 모델은 403 `PRINCIPAL_MODEL_NOT_ALLOWED`입니다. 모두 엔진에 전달하지 않고, 401·역할 거부는 대상 상태를 확인하거나 본문을 읽기 전에 끝냅니다.
 - 인증 설정을 읽지 못하거나 형식이 틀리면 추론 요청을 503 `AUTH_UNAVAILABLE`로 막고 `/api/status`를 `degraded`로 둡니다. 이것은 Gateway 오류이며 보안 차단 성공으로 세지 않습니다.
 - 요청 기록에는 인증 상태·방식·주체 ID·역할만 남습니다. 토큰과 토큰 해시는 기록·상태·로그에 남기지 않고, 클라이언트의 `Authorization` 헤더는 backend로 전달하지 않습니다.
 - 조회 API를 보호하면 `/api/*`(상태·요청 목록·상세·증거 내려받기·관측·대상 등) 전체에 토큰 없음·불일치 401, 역할 없음 403을 돌려줍니다. 화면 파일(`/`, `/static/*`)은 데이터가 없어 공개입니다. 대시보드는 401을 받으면 토큰 입력창을 띄우고, 입력한 토큰을 그 탭의 세션 저장소에만 두고 `Authorization` 헤더로 보냅니다. 증거 내려받기도 같은 헤더를 붙여 받습니다. 인증 설정을 읽지 못하면 조회 보호 여부를 알 수 없으므로 조회 API도 503 `AUTH_UNAVAILABLE`로 막습니다.

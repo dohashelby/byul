@@ -7,12 +7,15 @@ metadata:
   namespace: serving-lab
   labels: {app: test-receiver, purpose: task-check}
 spec:
+  automountServiceAccountToken: false
   containers:
     - name: receiver
       image: serving-runtime-lab:dev
       imagePullPolicy: IfNotPresent
       command: ["python", "-m", "http.server", "8080"]
       ports: [{containerPort: 8080}]
+      securityContext:
+        {runAsUser: 10003, runAsGroup: 10003, runAsNonRoot: true, allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
 ---
 apiVersion: v1
 kind: Pod
@@ -21,11 +24,14 @@ metadata:
   namespace: serving-lab
   labels: {app: artifact-acquire, purpose: task-check}
 spec:
+  automountServiceAccountToken: false
   containers:
     - name: acquire
       image: serving-runtime-lab:dev
       imagePullPolicy: IfNotPresent
       command: ["sleep", "3600"]
+      securityContext:
+        {runAsUser: 10002, runAsGroup: 10002, runAsNonRoot: true, allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
 ---
 # SP1: the acquire step (UID 10002) writes the supply; the engine step
 # (UID 10001) mounts the same volume read-only and its own cache generation
@@ -37,6 +43,7 @@ metadata:
   namespace: serving-lab
   labels: {app: supply-check, purpose: task-check}
 spec:
+  automountServiceAccountToken: false
   volumes:
     - name: serving-model
       emptyDir: {}
@@ -46,7 +53,7 @@ spec:
     - name: acquire-step
       image: serving-runtime-lab:dev
       imagePullPolicy: IfNotPresent
-      securityContext: {runAsUser: 10002, runAsGroup: 10002, runAsNonRoot: true, allowPrivilegeEscalation: false}
+      securityContext: {runAsUser: 10002, runAsGroup: 10002, runAsNonRoot: true, allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
       command: ["python", "-c", "from pathlib import Path; Path('/opt/serving/assets/model/approved.txt').write_text('approved supply\\n')"]
       volumeMounts:
         - {name: serving-model, mountPath: /opt/serving/assets/model, readOnly: false}
@@ -55,7 +62,7 @@ spec:
     - name: cache-prep
       image: serving-runtime-lab:dev
       imagePullPolicy: IfNotPresent
-      securityContext: {runAsUser: 10001, runAsGroup: 10001, runAsNonRoot: true, allowPrivilegeEscalation: false}
+      securityContext: {runAsUser: 10001, runAsGroup: 10001, runAsNonRoot: true, allowPrivilegeEscalation: false, capabilities: {drop: ["ALL"]}}
       command: ["python", "-c", "import os; os.makedirs('/cache-root/vllm/lab-image/lab-revision/default', mode=0o755, exist_ok=True)"]
       volumeMounts:
         - {name: serving-cache, mountPath: /cache-root}

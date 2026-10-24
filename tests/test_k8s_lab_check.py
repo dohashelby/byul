@@ -731,16 +731,33 @@ if __name__ == "__main__":
 class TaskCheckRunner:
     """Answer kubectl calls for L-07/L-08 from a small scenario table."""
 
-    def __init__(self, *, connect: dict[tuple[str, str], bool], supply: dict, readonly: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        connect: dict[tuple[str, str], bool],
+        supply: dict,
+        readonly: bool = True,
+        fail_task_pod_delete: bool = False,
+        fail_policy_delete: bool = False,
+    ) -> None:
         self.connect = connect
         self.supply = supply
         self.readonly = readonly
+        self.fail_task_pod_delete = fail_task_pod_delete
+        self.fail_policy_delete = fail_policy_delete
         self.calls: list[tuple[str, ...]] = []
         self.applied_policies = False
 
     def run(self, argv: list[str], *, timeout: float) -> ProcessResult:
         command = tuple(argv)
         self.calls.append(command)
+        if "delete" in command and "task-check-pods.yaml" in " ".join(command):
+            return ProcessResult(command, 1 if self.fail_task_pod_delete else 0, "", "")
+        if "delete" in command and any(
+            name in " ".join(command)
+            for name in ("acquire-egress", "receiver-fixture")
+        ):
+            return ProcessResult(command, 1 if self.fail_policy_delete else 0, "", "")
         if "jsonpath={.status.podIP}" in command:
             return ProcessResult(command, 0, "10.0.0.9", "")
         if "apply" in command and any(name in " ".join(command) for name in ("acquire-egress", "receiver-fixture")):
@@ -756,7 +773,26 @@ class TaskCheckRunner:
             return ProcessResult(command, 0 if ok else 7, json.dumps({"connected": ok}), "")
         if command[-3:] == ("supply-check", "-o", "json") or ("pod" in command and "supply-check" in command and "json" in command):
             mount = {"mountPath": "/opt/serving/assets/model", "readOnly": self.readonly}
-            document = {"spec": {"containers": [{"name": "engine", "volumeMounts": [mount]}]}}
+            document = {
+                "spec": {
+                    "automountServiceAccountToken": False,
+                    "initContainers": [
+                        {"name": "acquire-step", "securityContext": {"runAsUser": 10002}}
+                    ],
+                    "containers": [
+                        {
+                            "name": "engine",
+                            "volumeMounts": [mount],
+                            "securityContext": {
+                                "runAsUser": 10001,
+                                "runAsNonRoot": True,
+                                "allowPrivilegeEscalation": False,
+                                "capabilities": {"drop": ["ALL"]},
+                            },
+                        }
+                    ],
+                }
+            }
             return ProcessResult(command, 0, json.dumps(document), "")
         return ProcessResult(command, 0, "", "")
 
@@ -810,6 +846,48 @@ class TaskCheckTests(unittest.TestCase):
         deletes = [call for call in runner.calls if "delete" in call]
         self.assertTrue(any("cilium-acquire-egress.json" in " ".join(call) for call in deletes))
         self.assertTrue(any("task-check-pods.yaml" in " ".join(call) for call in deletes))
+        self.assertFalse(any("--wait=false" in call for call in deletes))
+
+    def test_cleanup_failures_make_task_checks_fail(self) -> None:
+        runner = TaskCheckRunner(
+            connect=self.good_connect(),
+            supply=self.good_supply(),
+            fail_task_pod_delete=True,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            checker = self.checker(runner, directory)
+            checker.rendered_v11_dir.mkdir(parents=True)
+            for name in ("cilium-acquire-egress.json", "cilium-receiver-fixture-ingress.json"):
+                (checker.rendered_v11_dir / name).write_text("{}", encoding="utf-8")
+            checker._task_cases(cilium_ok=True)
+            self.assertEqual(checker.cases["L-07"]["status"], "failed")
+            self.assertEqual(checker.cases["L-08"]["status"], "failed")
+            self.assertIn("정리 실패", checker.cases["L-08"]["summary"])
+
+    def test_policy_cleanup_failure_fails_l07(self) -> None:
+        runner = TaskCheckRunner(
+            connect=self.good_connect(),
+            supply=self.good_supply(),
+            fail_policy_delete=True,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            checker = self.checker(runner, directory)
+            checker.rendered_v11_dir.mkdir(parents=True)
+            for name in ("cilium-acquire-egress.json", "cilium-receiver-fixture-ingress.json"):
+                (checker.rendered_v11_dir / name).write_text("{}", encoding="utf-8")
+            checker._task_cases(cilium_ok=True)
+            self.assertEqual(checker.cases["L-07"]["status"], "failed")
+            self.assertIn("policy cleanup failed", checker.cases["L-07"]["summary"])
+
+    def test_task_pods_disable_api_tokens_and_run_non_root(self) -> None:
+        manifest = (ROOT / "deploy/lab/task-check-pods.yaml").read_text(encoding="utf-8")
+        self.assertEqual(manifest.count("automountServiceAccountToken: false"), 3)
+        self.assertIn("runAsUser: 10001", manifest)
+        self.assertIn("runAsUser: 10002", manifest)
+        self.assertIn("runAsUser: 10003", manifest)
+        self.assertEqual(manifest.count('capabilities: {drop: ["ALL"]}'), 5)
+        self.assertNotIn("secretKeyRef", manifest)
+        self.assertNotIn("imagePullSecrets", manifest)
 
     def test_engine_reaching_receiver_or_writable_supply_fails(self) -> None:
         connect = self.good_connect()

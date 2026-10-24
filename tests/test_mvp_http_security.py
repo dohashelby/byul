@@ -10,9 +10,11 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import Mock
 from urllib.request import Request, urlopen
 
 from serving_runtime.mvp.app import GatewayApp
+from serving_runtime.mvp.auth import AuthResult, Principal
 from serving_runtime.mvp.backend import BackendConfig
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.enforcement.events import ObservationQuery
@@ -90,7 +92,89 @@ class _Relay:
         raise AssertionError("request must not be relayed")
 
 
+class _AuthState:
+    state = "ok"
+
+    def __init__(self, result: AuthResult) -> None:
+        self.result = result
+
+    def authenticate(self, _authorization: str | None) -> AuthResult:
+        return self.result
+
+    @staticmethod
+    def roles_for(_route: str) -> tuple[str, ...]:
+        return ("inference",)
+
+
 class ResourceOrderingTests(unittest.TestCase):
+    @staticmethod
+    def auth_state(result: AuthResult) -> _AuthState:
+        return _AuthState(result)
+
+    def flow(
+        self, temporary: str, *, auth: AuthResult, target_hold
+    ) -> tuple[RequestFlow, RequestRecords]:
+        records = RequestRecords(
+            temporary,
+            "session",
+            lambda: load_policy(POLICY),
+            "mock",
+        )
+        flow = RequestFlow(
+            BackendConfig.mock(("127.0.0.1", 1)),
+            lambda: load_policy(POLICY),
+            lambda: load_revocations(None),
+            records,
+            _Engine(),
+            _Relay(),
+            ConcurrencyLimiter(1),
+            auth_state=lambda: self.auth_state(auth),
+            target_hold=target_hold,
+        )
+        return flow, records
+
+    def test_authentication_failure_precedes_target_hold_and_body_read(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target_hold = Mock(
+                return_value=("TARGET_MISMATCH", "target registration mismatch")
+            )
+            flow, _records = self.flow(
+                temporary,
+                auth=AuthResult("missing"),
+                target_hold=target_hold,
+            )
+            response = _Response(body())
+            response.read_request_body = lambda _length: (_ for _ in ()).throw(
+                AssertionError("body must not be read after failed authentication")
+            )
+            flow.chat(response, "b" * 32)
+            self.assertEqual(response.sent[0].http_status, 401)
+            self.assertEqual(response.sent[0].reason_code, "AUTH_REQUIRED")
+            target_hold.assert_not_called()
+
+    def test_authenticated_target_hold_precedes_body_and_records_principal(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            principal = Principal("client-a", ("inference",), "")
+            target_hold = Mock(
+                return_value=("TARGET_MISMATCH", "target registration mismatch")
+            )
+            flow, records = self.flow(
+                temporary,
+                auth=AuthResult("authenticated", principal),
+                target_hold=target_hold,
+            )
+            response = _Response(body())
+            response.read_request_body = lambda _length: (_ for _ in ()).throw(
+                AssertionError("body must not be read before target hold")
+            )
+            flow.chat(response, "c" * 32)
+            self.assertEqual(response.sent[0].http_status, 503)
+            self.assertEqual(response.sent[0].reason_code, "TARGET_MISMATCH")
+            target_hold.assert_called_once_with("mock-engine-001")
+            stored, corrupt = records.store.read_all()
+            self.assertEqual(corrupt, [])
+            self.assertEqual(stored[-1]["auth"]["principal_id"], "client-a")
+
     def test_full_concurrency_returns_429_without_tokenize(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             limiter = ConcurrencyLimiter(1)

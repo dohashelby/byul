@@ -264,6 +264,10 @@ class ExecPolicy:
             at: datetime | None = datetime.fromisoformat(observed_at)
         except ValueError:
             at = None
+        if at is not None and at.tzinfo is None:
+            # A timestamp without an offset cannot be placed safely on the
+            # timezone-aware phase timeline. Alert instead of aborting ingest.
+            at = None
         with self._lock:
             timeline = self._timeline.get()
             exceptions = self._exceptions.get()

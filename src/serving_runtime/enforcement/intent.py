@@ -15,6 +15,10 @@ SCHEMA_V11 = "runtime-enforcement-intent/1.1"
 SCHEMAS = frozenset({SCHEMA, SCHEMA_V11})
 PHASES = ("loading", "compiling", "inferring")
 _SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_KUBERNETES_NAME = re.compile(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?")
+_LABEL_NAME = re.compile(
+    r"(?:[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?)?"
+)
 _FQDN = re.compile(
     r"^(?=.{1,253}\.?$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.?$"
@@ -283,6 +287,44 @@ def _binary_list(raw: Any, path: str) -> tuple[str, ...]:
     return values
 
 
+def _selectors_overlap(left: dict[str, str], right: dict[str, str]) -> bool:
+    """Return whether a Pod can satisfy both matchLabels selectors."""
+
+    return all(left[key] == right[key] for key in left.keys() & right.keys())
+
+
+def _validate_distinct_roles(
+    roles: list[tuple[str, dict[str, str]]],
+) -> None:
+    for index, (left_name, left) in enumerate(roles):
+        for right_name, right in roles[index + 1 :]:
+            if _selectors_overlap(left, right):
+                raise IntentError(
+                    f"{left_name} and {right_name} labels can select the same Pod"
+                )
+
+
+def _validate_kubernetes_selector(labels: dict[str, str], path: str) -> None:
+    for key, value in labels.items():
+        prefix, separator, name = key.rpartition("/")
+        if not separator:
+            prefix, name = "", key
+        prefix_ok = (
+            not prefix
+            or (
+                len(prefix) <= 253
+                and all(_KUBERNETES_NAME.fullmatch(part) for part in prefix.split("."))
+            )
+        )
+        if (
+            not name
+            or _LABEL_NAME.fullmatch(name) is None
+            or _LABEL_NAME.fullmatch(value) is None
+            or not prefix_ok
+        ):
+            raise IntentError(f"{path}.labels must contain valid Kubernetes labels")
+
+
 def parse_intent(document: Any) -> EnforcementIntent:
     """Validate and normalize one strict ``runtime-enforcement-intent/1.0`` object."""
 
@@ -409,14 +451,25 @@ def parse_intent(document: Any) -> EnforcementIntent:
                 raise IntentError("$.acquire.labels must differ from $.engine.labels")
             # SP4: the engine must not be allowed the acquisition destinations.
             acquire_targets = {
-                (item.fqdn, item.cidr, item.port, item.protocol)
+                (
+                    item.fqdn.lower().rstrip(".") if item.fqdn else None,
+                    item.cidr,
+                    item.port,
+                    item.protocol,
+                )
                 for item in acquire.egress_allow
                 if item.endpoint is None
             }
             shared = [
                 item.fqdn or item.cidr
                 for item in egress
-                if (item.fqdn, item.cidr, item.port, item.protocol) in acquire_targets
+                if (
+                    item.fqdn.lower().rstrip(".") if item.fqdn else None,
+                    item.cidr,
+                    item.port,
+                    item.protocol,
+                )
+                in acquire_targets
             ]
             if shared:
                 raise IntentError(
@@ -431,6 +484,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
             path = f"$.test_receivers[{index}]"
             item = _object(raw_item, path, {"name", "labels", "port", "protocol", "allowed_from"})
             name = _segment(_required(item, "name", path), f"{path}.name")
+            if _KUBERNETES_NAME.fullmatch(name) is None:
+                raise IntentError(f"{path}.name must be a Kubernetes DNS label")
             if name in names:
                 raise IntentError(f"{path}.name must be unique")
             names.add(name)
@@ -517,6 +572,14 @@ def parse_intent(document: Any) -> EnforcementIntent:
                     assets.cache_root
                 ).is_relative_to(supply):
                     raise IntentError("$.assets.cache_root must be separate from supply paths")
+            manifest = Path(assets.manifest_path)
+            manifest_parent = manifest.parent
+            if manifest.is_relative_to(assets.cache_root) or Path(
+                assets.cache_root
+            ).is_relative_to(manifest_parent):
+                raise IntentError(
+                    "$.assets.cache_root must be separate from the approved manifest mount"
+                )
         if "phase_binaries" in root:
             phases_raw = _object(root["phase_binaries"], "$.phase_binaries", set(PHASES))
             for phase in PHASES:
@@ -530,6 +593,25 @@ def parse_intent(document: Any) -> EnforcementIntent:
             overlap = sorted(allowed_any & set(suspect))
             if overlap:
                 raise IntentError(f"$.suspect_binaries overlaps allowed binaries: {', '.join(overlap)}")
+
+        roles: list[tuple[str, dict[str, str]]] = [
+            ("$.gateway", gateway.labels),
+            ("$.engine", engine.labels),
+            *(
+                (f"$.metrics_collectors[{index}]", collector.labels)
+                for index, collector in enumerate(collectors)
+            ),
+            *([("$.acquire", acquire.labels)] if acquire is not None else []),
+            *(
+                (f"$.test_receivers[{index}]", receiver.labels)
+                for index, receiver in enumerate(receivers)
+            ),
+        ]
+        if _KUBERNETES_NAME.fullmatch(namespace) is None:
+            raise IntentError("$.namespace must be a Kubernetes DNS label for schema 1.1")
+        for path, labels in roles:
+            _validate_kubernetes_selector(labels, path)
+        _validate_distinct_roles(roles)
 
     return EnforcementIntent(
         namespace,

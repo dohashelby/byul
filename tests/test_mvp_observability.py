@@ -553,6 +553,7 @@ class FeedReconnectTests(unittest.TestCase):
         self.argv: list[list[str]] = []
         self.started: list[FakeProcess] = []
         self.start_error: Exception | None = None
+        self.start_returncode: int | None = None
         sink = (self.root / "sink").open("ab")
         self.addCleanup(sink.close)
         self.group = helper._FeedGroup(
@@ -574,6 +575,7 @@ class FeedReconnectTests(unittest.TestCase):
             raise self.start_error
         self.argv.append(list(argv))
         process = FakeProcess()
+        process.returncode = self.start_returncode
         self.started.append(process)
         return process
 
@@ -658,6 +660,22 @@ class FeedReconnectTests(unittest.TestCase):
         self.assertEqual(len(self.argv), 1)
         self.assertEqual(self.group.state, "reconnecting")
         self.assertIn("context", self.group.open_gap["last_error"])
+
+    def test_immediately_exited_child_does_not_close_the_gap(self) -> None:
+        with (
+            patch.object(self.helper, "_start", side_effect=self.fake_start),
+            patch.object(self.helper, "assert_safe_context"),
+        ):
+            self.supervisor.start_group(self.group, since=None)
+            self.started[0].returncode = 0
+            self.supervisor.tick()
+            self.start_returncode = 0
+            self.now = self.group.next_attempt
+            self.supervisor.tick()
+        self.assertEqual(self.group.state, "reconnecting")
+        self.assertIsNotNone(self.group.open_gap)
+        self.assertEqual(self.group.reconnect_count, 0)
+        self.assertIn("child exited during start", self.group.open_gap["last_error"])
 
     def test_gateway_treats_reconnecting_writer_as_unavailable(self) -> None:
         feed_path = self.root / "tetragon.jsonl"

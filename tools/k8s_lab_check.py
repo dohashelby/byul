@@ -1351,6 +1351,7 @@ class LabChecker:
         baseline_acquire = self._connect(case, "artifact-acquire", receiver, 8080)
         baseline_other = self._connect(case, self.pods["other"], receiver, 8080)
         applied: list[Path] = []
+        cleanup_failures: list[str] = []
         try:
             for name in SP4_POLICY_FILES:
                 path = self.rendered_v11_dir / name
@@ -1369,7 +1370,15 @@ class LabChecker:
             )
         finally:
             for path in reversed(applied):
-                self._kubectl(case, "delete", "-f", str(path), "--ignore-not-found=true")
+                deleted = self._kubectl(
+                    case, "delete", "-f", str(path), "--ignore-not-found=true"
+                )
+                if deleted.returncode != 0:
+                    cleanup_failures.append(path.name)
+            if cleanup_failures:
+                raise RuntimeError(
+                    f"task-check policy cleanup failed: {', '.join(cleanup_failures)}"
+                )
         results = {
             "baseline acquire→receiver": baseline_acquire,
             "baseline other→receiver": baseline_other,
@@ -1396,14 +1405,32 @@ class LabChecker:
         if spec.returncode == 0:
             try:
                 document = json.loads(spec.stdout)
+                pod_spec = document.get("spec", {})
+                engine = next(
+                    item
+                    for item in pod_spec.get("containers", [])
+                    if item.get("name") == "engine"
+                )
                 mounts = {
                     item.get("mountPath"): item
-                    for container in document.get("spec", {}).get("containers", [])
-                    if container.get("name") == "engine"
-                    for item in container.get("volumeMounts", [])
+                    for item in engine.get("volumeMounts", [])
                 }
-                configured = mounts.get("/opt/serving/assets/model", {}).get("readOnly") is True
-            except (json.JSONDecodeError, AttributeError):
+                engine_security = engine.get("securityContext", {})
+                acquire = next(
+                    item
+                    for item in pod_spec.get("initContainers", [])
+                    if item.get("name") == "acquire-step"
+                )
+                configured = (
+                    pod_spec.get("automountServiceAccountToken") is False
+                    and mounts.get("/opt/serving/assets/model", {}).get("readOnly") is True
+                    and engine_security.get("runAsUser") == 10001
+                    and engine_security.get("runAsNonRoot") is True
+                    and engine_security.get("allowPrivilegeEscalation") is False
+                    and engine_security.get("capabilities", {}).get("drop") == ["ALL"]
+                    and acquire.get("securityContext", {}).get("runAsUser") == 10002
+                )
+            except (json.JSONDecodeError, AttributeError, StopIteration, TypeError):
                 configured = False
         result = self._exec(case, "supply-check", "python", "-c", SUPPLY_CHECK_SCRIPT)
         try:
@@ -1411,7 +1438,7 @@ class LabChecker:
         except ValueError:
             observed = {}
         evidence = [
-            f"설정: 엔진 모델 mount readOnly={configured}",
+            f"설정: SA 토큰 미장착·비root 계정·권한 제거·모델 readOnly={configured}",
             f"실행 계정 UID={observed.get('uid')}",
             f"모델 읽기={'성공' if observed.get('read_ok') else '실패'}",
             f"모델 쓰기 errno={observed.get('write_errno')}",
@@ -1439,7 +1466,8 @@ class LabChecker:
         except Exception as error:  # report both cases, then clean up
             for case_id in TASK_CASE_TITLES:
                 self._set(self.cases[case_id], "failed", sanitize_text(str(error)))
-            self._delete_task_pods(start)
+            if not self._delete_task_pods(start):
+                self._mark_task_cleanup_failure()
             return
         try:
             if cilium_ok:
@@ -1448,12 +1476,30 @@ class LabChecker:
                 self._set(self.cases["L-07"], "not_run", "L-02 engine egress 정책이 없어 engine 거부를 판정할 수 없음")
             self._run_case("L-08", self._l08)
         finally:
-            self._delete_task_pods(self.cases["L-08"])
+            if not self._delete_task_pods(self.cases["L-08"]):
+                self._mark_task_cleanup_failure()
 
-    def _delete_task_pods(self, case: dict[str, Any]) -> None:
-        self._kubectl(
-            case, "delete", "-f", str(self.task_pods), "--ignore-not-found=true", "--wait=false", timeout=60
-        )
+    def _mark_task_cleanup_failure(self) -> None:
+        for case_id in TASK_CASE_TITLES:
+            case = self.cases[case_id]
+            case["status"] = "failed"
+            case["summary"] = f"{case['summary']} · 시험 Pod 정리 실패"
+            case["evidence"].append("task-check-pods.yaml 삭제 완료를 확인하지 못함")
+
+    def _delete_task_pods(self, case: dict[str, Any]) -> bool:
+        try:
+            result = self._kubectl(
+                case,
+                "delete",
+                "-f",
+                str(self.task_pods),
+                "--ignore-not-found=true",
+                timeout=60,
+            )
+        except Exception as error:
+            case["evidence"].append(f"시험 Pod 정리 명령 오류: {sanitize_text(str(error))}")
+            return False
+        return result.returncode == 0
 
     def _l06(self, case: dict[str, Any]) -> None:
         if not self.cleanup_requested:

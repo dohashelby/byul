@@ -126,7 +126,6 @@ class AuthState:
             "state": self.state,
             "method": METHOD if self.configured else None,
             "path": self.path,
-            "sha256": self.sha256,
             "loaded_at": self.loaded_at,
             "auth_ref": self.auth_ref,
             "principal_count": len(active),

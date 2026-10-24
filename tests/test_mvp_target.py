@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -226,6 +227,26 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
         )
         self.assertEqual(records[1]["previous_instance_id"], instance_id("u1", "c1"))
         self.assertEqual(second.record_context()["instance_id"], instance_id("u2", "c3"))
+
+    def test_snapshot_write_failure_retries_the_same_instance(self) -> None:
+        data_dir = Path(self.temporary.name) / "data"
+        registration = load_target(
+            self.write("t.json", target_document(kubernetes=kubernetes_block()))
+        )
+        registry = TargetRegistry(
+            registration, data_dir=data_dir, observation_session_id="s1"
+        )
+        snapshot = summarize_pods(
+            {"items": [pod("p1", "u1", "containerd://c1")]}, "engine"
+        )
+        with patch.object(registry.store, "append", side_effect=OSError("disk full")):
+            registry.observe_kubernetes(snapshot, "kubernetes_api")
+        self.assertEqual(registry.record_context()["instance_state"], "ok")
+        self.assertEqual(registry._events_this_session, 0)
+        registry.observe_kubernetes(snapshot, "kubernetes_api")
+        records, corrupt = JsonlStore(data_dir / "target_snapshots.jsonl").read_all()
+        self.assertEqual(corrupt, [])
+        self.assertEqual([item["event"] for item in records], ["instance_started"])
 
     def test_status_compares_declared_and_observed_values(self) -> None:
         registration = load_target(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import closing
+from email.message import Message
 import json
 from pathlib import Path
 import tempfile
@@ -20,6 +21,7 @@ from serving_runtime.mvp.auth import (
 from serving_runtime.mvp.backend import load_backend_config
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.fake_backend import FakeBackend
+from serving_runtime.mvp.http_handler import Handler
 from serving_runtime.mvp.mock_engine import MockEngine
 from serving_runtime.mvp.policy import load_policy
 from serving_runtime.mvp.store import JsonlStore
@@ -104,6 +106,7 @@ class AuthConfigTests(TempFiles, unittest.TestCase):
         status = state.status()
         self.assertEqual(status["principal_count"], 2)
         self.assertEqual(status["disabled_principal_count"], 1)
+        self.assertNotIn("sha256", status)
         self.assertNotIn(token_digest(INFERENCE_TOKEN), json.dumps(status))
 
     def test_route_roles_default_to_inference(self) -> None:
@@ -161,6 +164,15 @@ class AuthConfigTests(TempFiles, unittest.TestCase):
         self.assertEqual(not_configured().authenticate(None).state, "not_configured")
         broken = self.load({"schema_version": "x"})
         self.assertEqual(broken.authenticate(f"Bearer {INFERENCE_TOKEN}").state, "unavailable")
+
+    def test_duplicate_authorization_headers_are_ambiguous_and_rejected(self) -> None:
+        handler = object.__new__(Handler)
+        handler.headers = Message()
+        handler.headers.add_header("Authorization", f"Bearer {INFERENCE_TOKEN}")
+        handler.headers.add_header("authorization", f"Bearer {VIEWER_TOKEN}")
+        combined = handler.request_header("Authorization")
+        self.assertEqual(self.load(auth_document()).authenticate(combined).state, "invalid")
+        self.assertNotIn(INFERENCE_TOKEN, combined)
 
     def test_token_digest_rejects_unusable_tokens(self) -> None:
         for token in ("short", "has space in it here", "é" * 20, "x" * 513):

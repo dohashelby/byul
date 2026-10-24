@@ -81,7 +81,7 @@ def check_cache(intent: EnforcementIntent, *, root_override: str | None = None) 
         for child in children:
             path = Path(child.path)
             if child.is_symlink() or not child.is_dir(follow_symlinks=False):
-                if depth < _DEPTH:
+                if depth <= _DEPTH:
                     result["unexpected_entries"].append(
                         {"path": str(path), "kind": "symlink" if child.is_symlink() else "file"}
                     )
@@ -97,7 +97,7 @@ def check_cache(intent: EnforcementIntent, *, root_override: str | None = None) 
     current_entries = [item for item in generations if item["is_current"]]
     if not current_entries:
         result["state"] = "current_generation_missing"
-    elif current_entries[0]["problems"] or result["walk_errors"]:
+    elif any(item["problems"] for item in generations) or result["walk_errors"]:
         result["state"] = "problems"
     elif result["other_generation_count"] or result["unexpected_entries"]:
         result["state"] = "other_generations_present"

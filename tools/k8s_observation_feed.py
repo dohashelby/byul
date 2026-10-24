@@ -385,7 +385,15 @@ class _Supervisor:
                     raise _StopRequested
                 if child.ready is not None:
                     child.ready(child.process)
+            exited = [
+                {"name": child.name, "returncode": child.returncode()}
+                for child in group.children
+                if child.returncode() is not None
+            ]
+            if exited:
+                raise RuntimeError(f"child exited during start: {exited}")
         except _StopRequested:
+            _stop_children(group)
             raise
         except (OSError, RuntimeError, ValueError) as error:
             _stop_children(group)

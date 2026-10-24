@@ -428,23 +428,30 @@ class TargetRegistry:
                 event = "instance_confirmed"
             else:
                 event = "instance_started" if old_id is None else "instance_changed"
+            record = {
+                "schema_version": SNAPSHOT_SCHEMA,
+                "event": event,
+                "recorded_at": now,
+                "observation_session_id": self.observation_session_id,
+                "target_id": self.registration.target_id,
+                "instance": instance,
+                "previous_instance_id": old_id,
+                "reason": (
+                    _change_reason(previous, instance)
+                    if event == "instance_changed"
+                    else None
+                ),
+            }
+            try:
+                self.store.append(record)
+            except OSError as error:
+                # Preserve the last durable cursor so the next observation of
+                # this same instance retries the missing history record.
+                self._store_error = type(error).__name__
+                return
+            self._store_error = None
             self._events_this_session += 1
             self._last_recorded = instance
-        record = {
-            "schema_version": SNAPSHOT_SCHEMA,
-            "event": event,
-            "recorded_at": now,
-            "observation_session_id": self.observation_session_id,
-            "target_id": self.registration.target_id,
-            "instance": instance,
-            "previous_instance_id": old_id,
-            "reason": _change_reason(previous, instance) if event == "instance_changed" else None,
-        }
-        try:
-            self.store.append(record)
-            self._store_error = None
-        except OSError as error:
-            self._store_error = type(error).__name__
 
     def current_instance(self) -> dict[str, Any] | None:
         with self._lock:

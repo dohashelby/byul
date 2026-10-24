@@ -220,6 +220,12 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def request_header(self, name: str) -> str | None:
+        if name.casefold() == "authorization":
+            values = self.headers.get_all(name, [])
+            if len(values) > 1:
+                # Avoid accepting a credential according to one of several
+                # incompatible duplicate-header joining rules.
+                return "duplicate-authorization-header"
         return self.headers.get(name)
 
     def read_request_body(self, length: int) -> bytes:
@@ -464,7 +470,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_static(path)
             return
         if path.startswith("/api/"):
-            refusal = self.dependencies.authorize_read(self.headers.get("Authorization"))
+            refusal = self.dependencies.authorize_read(self.request_header("Authorization"))
             if refusal is not None:
                 status, code, message = refusal
                 self._send_read_refusal(status, code, message)

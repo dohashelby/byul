@@ -88,6 +88,9 @@ class IntentV11ParsingTests(unittest.TestCase):
             "engine-shares-acquire-destination": lambda d: d["engine_egress_allow"].append(
                 {"fqdn": "artifacts.example.invalid", "port": 443, "protocol": "TCP"}
             ),
+            "engine-shares-acquire-destination-case": lambda d: d["engine_egress_allow"].append(
+                {"fqdn": "ARTIFACTS.EXAMPLE.INVALID.", "port": 443, "protocol": "TCP"}
+            ),
             "engine-endpoint-egress": lambda d: d["engine_egress_allow"].append(
                 {"endpoint": {"app": "x"}, "port": 1, "protocol": "TCP"}
             ),
@@ -97,11 +100,21 @@ class IntentV11ParsingTests(unittest.TestCase):
             "receiver-without-acquire": lambda d: d.pop("acquire"),
             "receiver-bad-role": lambda d: d["test_receivers"][0].update(allowed_from=["engine"]),
             "receiver-dup-name": lambda d: d["test_receivers"].append(dict(d["test_receivers"][0])),
+            "receiver-invalid-name": lambda d: d["test_receivers"][0].update(name="Bad_Name"),
+            "acquire-invalid-label": lambda d: d["acquire"].update(labels={"bad key": "value"}),
+            "invalid-namespace": lambda d: d.update(namespace="Serving_Lab"),
             "mgmt-equals-port": lambda d: d["engine"].update(management_port=8000),
             "cache-dir-mismatch": lambda d: d["protected_paths"].update(cache_dir="/var/cache/serving/other"),
             "cache-under-model": lambda d: (
                 d["assets"].update(cache_root="/opt/serving/assets/model/cache"),
                 d["protected_paths"].update(cache_dir="/opt/serving/assets/model/cache/vllm/image-example/revision-example/default"),
+            ),
+            "manifest-mount-contains-cache": lambda d: (
+                d["assets"].update(manifest_path="/var/cache/manifest.json"),
+                d["assets"].update(cache_root="/var/cache/serving"),
+            ),
+            "overlapping-role-selectors": lambda d: d["acquire"].update(
+                labels={"app": "serving-engine", "task": "acquire"}
             ),
             "unsafe-segment": lambda d: d["assets"]["cache_generation"].update(image_id="../escape"),
             "root-uid": lambda d: d["assets"].update(engine_uid=0),
@@ -210,6 +223,16 @@ class CacheCheckTests(unittest.TestCase):
         result = self.check()
         self.assertEqual(result["state"], "other_generations_present")
         self.assertEqual(result["other_generation_count"], 1)
+        os.chmod(other, 0o775)
+        self.assertEqual(self.check()["state"], "problems")
+        os.chmod(other, 0o755)
+        stray_generation_file = self.root / "vllm/image-old/revision-example/not-a-directory"
+        stray_generation_file.write_text("unexpected", encoding="utf-8")
+        self.assertIn(
+            str(stray_generation_file),
+            [item["path"] for item in self.check()["unexpected_entries"]],
+        )
+        stray_generation_file.unlink()
         os.chmod(self.current, 0o775)
         self.assertIn("group_or_other_writable", [p for g in self.check()["generations"] if g["is_current"] for p in g["problems"]])
         self.assertEqual(self.check()["state"], "problems")
@@ -269,6 +292,11 @@ class ExecPolicyTests(unittest.TestCase):
             policy = ExecPolicy(self.intent, timeline_path=timeline)
             result = policy.classify_exec(binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T10:10:00Z")
             self.assertEqual(result["exec_verdict"], "outside_allowlist")
+
+    def test_naive_event_time_alerts_instead_of_aborting_ingest(self) -> None:
+        result = self.classify("/usr/bin/python3", "2026-10-24T09:20:00")
+        self.assertEqual(result["exec_verdict"], "phase_unknown")
+        self.assertEqual(result["phase"], ["unknown"])
 
     def test_parent_condition_requires_parent_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

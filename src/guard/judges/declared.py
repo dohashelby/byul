@@ -24,8 +24,8 @@ from guard.automation_policy import (string_list, validate_template_policy,
                                      validate_request_binding_policy, validate_log_integrity_policy)
 
 from .base import AXES, JudgeOutput
-from .policy_items import evaluate
-from .audit_collection import evaluate as evaluate_audit
+from .policy_items import evaluate, OBSERVATION as POLICY_ITEMS_OBSERVATION
+from .audit_collection import evaluate as evaluate_audit, OBSERVATION as AUDIT_OBSERVATION
 from .rule_table import RuleTableJudge
 from . import manual_cache_context, manual_cache_group
 
@@ -160,9 +160,19 @@ class DeclaredJudge:
         reasons.extend(branch_reasons)
         if input_context is not None:
             reasons.extend(input_context.reasons)
-        item_result = evaluate(check, evidence, policy_values)
+        try:
+            item_result = evaluate(check, evidence, policy_values)
+        except Exception:  # INV-04: dependency errors must not erase declared FAIL.
+            item_result = (dict.fromkeys(AXES, "UNKNOWN"),
+                ["POLICY_CONTEXT: POLICY_ITEMS_EVALUATION_ERROR; DECLARED PASS withheld"],
+                [POLICY_ITEMS_OBSERVATION])
         if item_result is None:
-            item_result = evaluate_audit(check, evidence, policy_values)
+            try:
+                item_result = evaluate_audit(check, evidence, policy_values)
+            except Exception:
+                item_result = (dict.fromkeys(AXES, "UNKNOWN"),
+                    ["POLICY_CONTEXT: AUDIT_COLLECTION_EVALUATION_ERROR; DECLARED PASS withheld"],
+                    [AUDIT_OBSERVATION])
         if item_result:
             reasons.extend(item_result[1])
         cache_result = None

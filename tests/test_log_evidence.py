@@ -16,6 +16,7 @@ from guard.models import DataOrigin, PolicyStatus, ReviewStatus
 from guard.store import Store
 from guard.validation_evidence import inventory_tree
 from tests.builders import PACK_DIR, baseline_pack
+from tests.prepared_fixtures import manual_setup_seed
 
 
 _spec = importlib.util.spec_from_file_location("wheel_log_fixture", Path(__file__).resolve().parents[1] / "tools/wheel_log_fixture.py")
@@ -24,7 +25,16 @@ _spec.loader.exec_module(_fixture)
 
 
 def seed(tmp_path):
-    return _fixture.build(tmp_path / "store", PACK_DIR)
+    def create(folder):
+        source, report = _fixture.build(folder / "store", PACK_DIR)
+        store = Store(source)
+        plan, = list(store.iter_kind("PLAN"))
+        return store, plan, report
+
+    parameters = {"pack": baseline_pack().model_dump(mode="json"),
+                  "fixture_source": hashlib.sha256(Path(_fixture.__file__).read_bytes()).hexdigest()}
+    store, _, report = manual_setup_seed("saved-log-replay", parameters, tmp_path, create)
+    return store.root, report
 
 
 def revised_sample(store_path, change, *, replace_observations=False):

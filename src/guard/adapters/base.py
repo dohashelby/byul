@@ -86,7 +86,8 @@ class EngineAdapter(Protocol):
     def routes_from_openapi(self, doc: dict) -> list[Route]: ...  # public_routes의 파싱 부분(실행기가 출발점별로 받아온 문서용)
 
     def probe_request(self, route: Route, model: str | None,
-                      engine_version: str | None = None) -> ProbeRequest | None: ...  # None = 보내지 않음(검증 안 된 상태 변경 경로)
+                      engine_version: str | None = None,
+                      engine_image_digest: str | None = None) -> ProbeRequest | None: ...  # None = 보내지 않음(검증 안 된 상태 변경 경로)
 
     def detect_version(self, handle: ContainerHandle) -> EngineIdentity: ...
 

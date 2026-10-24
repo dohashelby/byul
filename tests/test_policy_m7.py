@@ -18,8 +18,8 @@ from guard.manual_audit import BUDGETS, CASES, CLAIMS, CONTRACT, OBSERVATION, PO
 from guard.models.objects import Observation
 from guard.report.html import render_html
 from guard.store import Store
-from guard.store.packs import put_pack
 from tests.builders import PACK_DIR, T0, baseline_pack, environment, policy
+from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import entry, fill, snapshot, write
 
@@ -93,16 +93,23 @@ def row(evd, case="collection_fault", item="EXAMPLE-one"):
 
 
 def setup(tmp_path, pack, mode="audit", scope=("OBS-11", "SUP-03"), items=("EXAMPLE-one", "EXAMPLE-two")):
-    st = Store(tmp_path/"store"); envs = [environment()]
+    envs = [environment()]
     if mode == "update": envs.append(environment(id="ENV-CANDIDATE"))
     given = values(items)
     pol = policy(pack.ref(), values={"OBS-11": given}, scope={"include": list(scope)})
-    st.put_many([*envs, pol]); put_pack(st, PACK_DIR)
-    plan = select(pack, envs, pol, mode=mode); st.put(plan)
-    doc = fill(build_template(st, pack, plan))
-    for e in doc["checks"]:
-        if e["check_id"] == "OBS-11": e["audit_evidence"] = payload(given)
-    return st, plan, doc
+    def create(folder):
+        st = Store(folder / "store")
+        st.put_many([*envs, pol]); put_baseline_snapshot(st)
+        plan = select(pack, envs, pol, mode=mode); st.put(plan)
+        doc = fill(build_template(st, pack, plan))
+        for e in doc["checks"]:
+            if e["check_id"] == "OBS-11": e["audit_evidence"] = payload(given)
+        return st, plan, doc
+
+    return manual_setup_seed("m7", {
+        "pack": pack.model_dump(mode="json"), "environments": [e.to_dict() for e in envs],
+        "policy": pol.to_dict(), "mode": mode, "scope": list(scope), "items": list(items),
+    }, tmp_path, create)
 
 
 def test_policy_declarations_and_blank_form_are_not_execution(pack, tmp_path):

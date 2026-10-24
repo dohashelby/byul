@@ -174,6 +174,8 @@ class Ctx:
     started: Any
     log: list[dict] = field(default_factory=list)
     sprobe: StreamProbe | None = None
+    fixed_route_fixture: bool = False
+    route_fixture_inputs: dict | None = None
 
     @property
     def trusted_net(self) -> str:
@@ -210,6 +212,7 @@ class HttpCheckExecutor:
 
     name = "http_check"
     version = "0.3.0"
+    fixed_fixture_version = None
     requires_roles = True        # 역할 키가 필요한가(직통·역할 점검). 컨테이너 설정 점검은 아님
     requires_route_scope = True  # CheckDef.route_scope가 필요한가
     functional_via = "gateway"   # 이 실행기가 보내는 기능 표본의 경로
@@ -217,6 +220,12 @@ class HttpCheckExecutor:
     def __init__(self, cfg: dict, container_probe: ContainerProbe | None = None, host_probe: HostProbe = http_probe.probe,
                  environ: dict[str, str] | None = None, stream_probe: StreamProbe | None = None):
         self.cfg = cfg
+        if "comparison_routes" in cfg:
+            if self.fixed_fixture_version is None:
+                raise ValueError("comparison_routes is not supported by this executor")
+            if cfg["comparison_routes"] is None:
+                raise ValueError("comparison_routes must be an explicit nonempty route list")
+            self.version = self.fixed_fixture_version
         self._container_probe = container_probe
         self._host_probe = host_probe
         self._stream_probe = stream_probe
@@ -299,8 +308,8 @@ class HttpCheckExecutor:
         summary = mask({"summary": True, "topology": ctx.target.get("topology"), "lab": bool(ctx.target.get("lab")),
                         **summary}, ctx.secrets)
         log_path = ctx.workdir / "probe_log.jsonl"
-        log_path.write_text("".join(json.dumps(x, ensure_ascii=False, default=str) + "\n" for x in [*ctx.log, summary]),
-                            encoding="utf-8")
+        with log_path.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write("".join(json.dumps(x, ensure_ascii=False, default=str) + "\n" for x in [*ctx.log, summary]))
         fixture = summary.get("fixture", {})
         config = mask(execution_conditions(ctx.target, {
             **self.cfg, "request_timeout": ctx.timeout, "allow_mutating_routes": ctx.allow_mutating,
@@ -389,9 +398,14 @@ def probe_templates(ctx: Ctx, routes: dict[str, Route]) -> tuple[dict[str, Probe
     skipped: dict[str, str] = {}
     model, version = ctx.env.model.id, ctx.env.engine.version
     for key, route in routes.items():
-        pr = ctx.adapter.probe_request(route, model, version)
+        digest = ctx.env.engine.image_digest
+        # Preserve legacy three-argument adapters when no image was declared.
+        # A pinned safe probe always receives the actual observed ENV identity.
+        args = (route, model, version)
+        pr = ctx.adapter.probe_request(*args, digest) if digest else ctx.adapter.probe_request(*args)
         if pr is None and route.mutating and ctx.allow_mutating:
-            pr = ctx.adapter.probe_request(Route(route.method, route.path, route.inference, route.kind, False), model, version)
+            args = (Route(route.method, route.path, route.inference, route.kind, False), model, version)
+            pr = ctx.adapter.probe_request(*args, digest) if digest else ctx.adapter.probe_request(*args)
         if pr is None:
             skipped[key] = "mutating route without a verified safe probe for this engine version: not sent"
         elif pr.method.upper() != route.method.upper():
@@ -521,7 +535,14 @@ def send_and_record(ctx: Ctx, batch: RequestBatch, templates: dict[str, ProbeReq
                     ) -> list[tuple[tuple, dict, Any]]:
     """묶음을 보내고(외부 출발점), `between`(예: 양성 대조·안전 확인)을 실행한 뒤 결과를 분류·기록한다.
     반환: [(메타, 원결과, 분류값)] — 분류값은 안전 프로브 기대 응답이면 handler_reached, 그 밖은 결과 그대로."""
+    if ctx.fixed_route_fixture:
+        from .route_fixture import verify_requests
+        verify_requests(ctx.route_fixture_inputs, batch.requests)
     sent = ctx.cprobe(batch.network, batch.requests, ctx.timeout) if batch.requests else []
+    if getattr(ctx, "fixed_route_fixture", False) and (
+            len(sent) != len(batch.requests)
+            or [value.get("id") for value in sent] != [request["id"] for request in batch.requests]):
+        raise RuntimeError("fixed route fixture response labels do not match the submitted requests")
     results = list(zip(batch.metas, sent)) + batch.local
     if between is not None:
         between()

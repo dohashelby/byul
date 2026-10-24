@@ -1,6 +1,10 @@
 # 77행 자동화 분류표 (요약)
 
-> 현행: PACK21/DRAFT·REQ-11 정의3·자동연결11·정책22점검49경로다. [REQ-15 M14](POLICY_M14.md)의 수동 신고 계약을 추가했으며 실제 캐시 실행기는 없다. [판정·준비 보강](AUTOMATION_HARDENING.md)의 입력 projection 성공과 생성 출력 귀속 미검증을 구분하는 REQ-11 보안 PASS 보류는 유지한다. 과거 팩19의 실제 CPU PASS를 소급 변경하지 않는다. 새 묶음은 합성·대역 회귀이며 실제 엔진을 기동하지 않았다. 인프라 가능 등급 A/B/C와 정책 소비 분류 a/b/c/d는 별개다.
+> 현행 통합 후보: PACK21/DRAFT·REQ-11 정의3·자동연결11·정책22점검49경로다. [REQ-15 M14](POLICY_M14.md)의 수동 신고 계약을 추가했으며 실제 캐시 실행기는 없다. [판정·준비 보강](AUTOMATION_HARDENING.md)의 입력 projection 성공과 생성 출력 귀속 미검증을 구분하는 REQ-11 보안 PASS 보류는 유지한다. 과거 팩19의 실제 CPU PASS를 소급 변경하지 않는다. 인프라 가능 등급 A/B/C와 정책 소비 분류 a/b/c/d는 별개다. 통합 후보의 검증 결과는 [v1 통합 후보 검증](UPDATE_VALIDATION.md#v1-통합-후보-검증)에 따르며 main 반영·공식 승인을 뜻하지 않는다.
+
+> 두 이미지 실측: [PR #28의 C 후속 결과](UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)는 pinned vLLM CPU 0.31.0/0.32.0·기존 OPT 모델·동일 CPU 프로파일에서 REQ-01·REQ-03·REQ-09·PLT-01·PLT-04를 실제 실행하고 수락·반출/복원·저장 팩 재판정을 통과했다. 5개 점검의 양쪽 보안/기능은 PASS이며 전부 NO_CHANGE다. 실제 차이 탐지와 연결 11개의 모든 분기를 입증한 결과가 아니다. EVD 10개는 MEASURED이지만 REQ-01/03의 RES.verification_level은 조건의 신고 출처 때문에 DECLARED이고 나머지 3개는 MEASURED다. PACK21·예시 정책 DRAFT로 official=false, 성능 UNKNOWN이다. PR #27의 과거 실패와 앞선 미실측 기록은 별도로 보존한다.
+
+> 실측 범위 주의: REQ-01의 실제 등록 목록은 기준15/후보16개이고 고정 합집합 요청 자료는 동일하다. 미검토 상태 변경 경로 `/v1/responses`·`/v1/responses/{response_id}/cancel`에는 HTTP를 보내지 않고 기존 TCP 차단 근거를 사용했다. REQ-03은 양쪽 관리·진단 등록5개/시험5개이며 검토한 버전·digest에 한정한 안전 probe를 사용했다. 미검토 이미지·다른 endpoint/입력 형식·GPU·기업 승인은 별도 범위다. CSV의 해당 5행에서 검증·남은 범위·근거만 갱신했으며 A/B/C 등급과 정책 소비 분류는 바꾸지 않았다.
 
 > 3차 기록 당시 구현: [연결 귀속·로그 수집](AUTOMATION_PHASE3.md)에서 REQ-11 `request_binding`과 OBS-09 `log_integrity`를 제품 registry에 연결했다. PACK19/DRAFT·자동연결11개·정책21점검/46경로·adapter0.4.0·declared0.12.0이다. 아래 2차/1차 결과는 과거 기록이며 이번 직접 검증 결과와 구분한다. 직접 CPU에서 새 두 점검과 PLT-01 S/F PASS·PUNKNOWN, 반출/복원/저장 팩 재판정을 확인했다. HTML 줄바꿈 digest는 새 시도02로 보수·재검증했다. 두 제한 프로파일은 기업 신원·SIEM·worker 내부 병렬성·전체77행 완료를 뜻하지 않는다.
 

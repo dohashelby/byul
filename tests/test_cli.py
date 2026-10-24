@@ -1,23 +1,19 @@
 """guard select → run → judge → report 를 FakeExecutor로 처음부터 끝까지 (CLI)."""
 
 import json
-import shutil
 
 import pytest
 from typer.testing import CliRunner
 
 from guard.cli import app
-from tests.builders import ROOT
+from tests.prepared_fixtures import copy_workdir
 
 runner = CliRunner()
 
 
 @pytest.fixture
 def workdir(tmp_path, monkeypatch):
-    for name in ("guard.toml", "examples"):
-        src = ROOT / name
-        (shutil.copytree if src.is_dir() else shutil.copy)(src, tmp_path / name)
-    shutil.copytree(ROOT / "packs", tmp_path / "packs")
+    copy_workdir(tmp_path)
     monkeypatch.chdir(tmp_path)
     return tmp_path
 

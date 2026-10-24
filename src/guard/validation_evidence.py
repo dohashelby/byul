@@ -15,7 +15,7 @@ import stat
 from types import SimpleNamespace
 import zipfile
 
-from guard.models import Pack, Ref
+from guard.models import Pack, Ref, canonical_json, sha256_hex
 from guard.store.packs import get_pack
 
 _DIGEST = re.compile(r"[0-9a-f]{64}")
@@ -115,7 +115,35 @@ def verify_store_files(store: Path, objects: list[dict]) -> Pack:
             _unlinked(path)
             if not path.is_file() or path.stat().st_size != size or file_sha256(path) != digest:
                 raise ValueError("original evidence artifact missing or changed")
+        _verify_fixed_route_fixture(store, obj)
     return pack
+
+
+def _verify_fixed_route_fixture(store: Path, obj: dict) -> None:
+    """Tie the new opt-in collector's resolved inputs to its sealed EVD hash.
+
+    Legacy evidence keeps its original fixture format and interpretation.
+    This is an input-integrity check, never a verdict or collector attestation.
+    """
+    executor = obj.get("execution", {}).get("executor") or {}
+    versions = {"direct_route": "0.7.0", "role_route": "0.5.0"}
+    if (obj.get("kind") != "EVD" or executor.get("name") not in versions
+            or versions[executor["name"]] != executor.get("version")):
+        return
+    if obj.get("execution", {}).get("status") != "COMPLETED":
+        return
+    logs = [a for a in obj.get("artifacts", []) if a.get("name") == "probe_log.jsonl"]
+    if len(logs) != 1:
+        raise ValueError("fixed route fixture requires one original probe log")
+    try:
+        lines = (store / logs[0]["path"]).read_text(encoding="utf-8").splitlines()
+        summary = json.loads(lines[-1])
+        fixture = summary["fixture"]
+        if (summary.get("summary") is not True or fixture.get("protocol") != "fixed-route-fixture/1"
+                or sha256_hex(canonical_json(fixture)) != obj["comparability"]["fixture_sha256"]):
+            raise ValueError("fixed route fixture and original EVD input hash differ")
+    except (KeyError, IndexError, TypeError, AttributeError) as exc:
+        raise ValueError("fixed route fixture attachment is incomplete") from exc
 
 
 def inventory_tree(folder: Path) -> dict[str, dict]:

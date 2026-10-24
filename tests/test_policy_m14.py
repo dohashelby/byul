@@ -20,8 +20,9 @@ from guard.models.objects import CpuProfile
 from guard.report.html import render_html
 from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle
-from guard.store.packs import get_pack, put_pack
+from guard.store.packs import get_pack
 from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy
+from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 from tests.req15_builders import AXES, ATTACHMENT, GROUPS, payload, policy_values, unit
 from tests.test_policy_m4 import fill, snapshot, write
 
@@ -236,13 +237,21 @@ def test_g20_existing_core_pass_gates_and_cpu_performance_remain(pack, gate):
 
 
 def setup(tmp_path, pack, mode="audit", data=ATTACHMENT):
-    st = Store(tmp_path / "store"); envs = [environment()]
+    envs = [environment()]
     if mode == "update": envs.append(environment(id="ENV-CANDIDATE"))
     pol = policy(pack.ref(), scope={"include": ["REQ-15"]}, values={"REQ-15": policy_values()})
-    st.put_many([*envs, pol]); put_pack(st, PACK_DIR)
-    plan = select(pack, envs, pol, mode=mode); st.put(plan)
+    def create(folder):
+        st = Store(folder / "store")
+        st.put_many([*envs, pol]); put_baseline_snapshot(st)
+        plan = select(pack, envs, pol, mode=mode); st.put(plan)
+        doc = fill(build_template(st, pack, plan))
+        return st, plan, doc
+
+    st, plan, doc = manual_setup_seed("m14", {
+        "pack": pack.model_dump(mode="json"), "environments": [e.to_dict() for e in envs],
+        "policy": pol.to_dict(), "mode": mode, "attachment": data.hex(),
+    }, tmp_path, create)
     assert plan.item("REQ-15").gaps == ["NO_EXECUTOR"]
-    doc = fill(build_template(st, pack, plan))
     digest = hashlib.sha256(data).hexdigest()
     for entry in doc["checks"]:
         assert entry["required_observations"][0]["value"] is None

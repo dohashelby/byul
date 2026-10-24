@@ -25,6 +25,8 @@ from tests import test_role_route as role
 from tests.test_container_config import FakeDocker, LAB_POLICY, _probe
 from tests.builders import PACK_DIR, baseline_pack, environment, policy
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
+from tests.response_semantics_support import materialize_pack21
+from guard.store.packs import put_pack
 
 
 VALUES = {
@@ -95,13 +97,15 @@ def _executor(tmp_path, cid, expected, *, violation_and_missing=False):
 
 
 def _run(tmp_path, monkeypatch, cid, expected, *, violation_and_missing=False):
-    pack = baseline_pack()
+    # Phase 1 is a historical contract: replay its exact stored PACK21 rather
+    # than apply the new response/credential meaning to old status-only EVDs.
+    pack = materialize_pack21(tmp_path / 'historical-pack21')
     env = environment({'gateway': {'value': True, 'origin': 'EXAMPLE', 'source': 'synthetic topology'}},
         engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'test-model'})
     pol = policy(pack.ref(), scope={'include': [cid]}, values={cid: VALUES[cid]})
     def create(folder):
         st = Store(folder / 'store')
-        put_baseline_snapshot(st)
+        put_pack(st, pack.path)
         st.put(env)
         st.put(pol)
         plan = select(pack, [env], pol)

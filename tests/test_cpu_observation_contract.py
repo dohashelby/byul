@@ -19,9 +19,10 @@ from guard.models.objects import object_from_dict
 from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle
 from guard.store.packs import put_pack
-from tests.builders import PACK_DIR, T0, baseline_pack, environment, policy
+from tests.builders import T0, environment, policy
 from tests.test_automation_phase1_contracts import VALUES, _run
-from tests.prepared_fixtures import copy_frozen_tree, put_baseline_snapshot
+from tests.prepared_fixtures import copy_frozen_tree
+from tests.response_semantics_support import materialize_pack21
 from tools.validate_cpu_cases import (CHECKS, _inventory_tree, _objects, _verify_store_files,
                                       analyze_existing, compare_report, main, observation_contract)
 
@@ -36,9 +37,12 @@ def _write(path, data):
 def _case(folder, monkeypatch, expected):
     """Combine the existing five fake-I/O executors under one frozen CPU PLAN."""
     folder.mkdir()
-    pack = baseline_pack()
+    # The child executors below intentionally exercise the historical PACK21
+    # status/mount contract. Freeze that exact pack for replay, rather than
+    # combining historical EVD with the current changed CheckDefs.
+    pack = materialize_pack21(folder / "pack21")
     store = Store(folder / "store")
-    put_baseline_snapshot(store)
+    put_pack(store, pack.path)
     env = environment({"gateway": {"value": True, "origin": "EXAMPLE", "source": "fake-I/O test"}},
                       engine={"name": "vllm", "version": "0.31.0"},
                       model={"id": "test-model"}, runtime={"gpu_count": 0, "cpu": CPU})

@@ -1,0 +1,110 @@
+id: PLT-04
+revision: 2
+retired: false
+area: PLT
+purpose: 자격 전달·사용 제한
+secondary_purposes: []
+question: worker에 불필요한 자격이 전달되지 않는가?
+scope: 기본 환경 전달 확인; Ray 원격 전달은 선택
+risk_category: 보안 위협 점검
+risk_summary: 침해된 worker가 불필요하게 상속받은 secret·자격을 이용해 저장소 등 다른 서비스의 자료에 접근할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  always: true
+  prose: 기본 환경 전달 확인; Ray 원격 전달은 선택
+policy_params:
+- key: forbidden_env_names
+  type: list[str]
+  required: true
+- key: forbidden_mount_paths
+  type: list[str]
+  required: true
+policy_prose:
+  policy_to_decide: worker별 필요한 자격·전달 범위
+  enterprise_decisions: 역할별 저장소·객체 범위, 자격 공급·갱신 방식과 실제 필요한 worker 자격, 허용 대체 경로. 비밀 원문 대신 참조·수신자·범위를 기록한다.
+normal_control: worker가 필요한 최소 자격으로 정상 실행한다.
+challenge_steps:
+- 컨테이너 프로세스의 환경변수 이름 수집
+- 선언한 자격 경로의 마운트 노출 확인
+- 정상 추론 확인
+required_observations:
+- key: process_scan_complete
+  type: bool
+- key: worker_env_names
+  type: list[str]
+- key: exposed_credential_paths
+  type: list[str]
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, outcome]
+required_observations_prose:
+- env·mount·credential provider
+- rank별 유효 자격
+- 정상 기능 결과
+satisfied_if: 필요하지 않은 소비자에게 자격을 노출하지 않는다.
+fail_criteria: 불필요한 자격이 worker에 전달되어 접근에 사용 가능하다.
+unknown_criteria: env만 확인하고 파일·provider·상속 자격 경로를 확인하지 못했다.
+remediation: 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다
+method_and_evidence: driver→worker의 변수 이름·출처·consumer를 대조하고 canary 변수로 추가/제외 및 손상 제외 설정의 처리를 확인한다.
+remaining_setup: 비밀 원문을 남기지 않는 자격 식별 수집기와 최소 목록
+executor: credential_exposure
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: process_scan_complete
+      op: eq
+      value: true
+    - obs: worker_env_names
+      op: none_in
+      value_policy: forbidden_env_names
+    - obs: exposed_credential_paths
+      op: eq
+      value: []
+    fail_when_any:
+    - obs: worker_env_names
+      op: any_in
+      value_policy: forbidden_env_names
+    - obs: exposed_credential_paths
+      op: nonempty
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: nonempty
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        fail_when_any:
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
+legacy:
+  q_ids:
+  - Q-C10
+  - Q-C07
+  scenario_ids:
+  - SC-14-03
+  subtest_ids:
+  - Q-C10/SC-14-03
+source:
+  array: platform_assessment_draft
+functional_probes:
+- method: POST
+  path: /v1/completions
+  body:
+    model: '{model}'
+    prompt: ping
+    max_tokens: 1
+  expect:
+  - 200
+  via: engine
+limitations:
+- 선언한 금지 환경변수 이름과 bind/volume으로 노출된 자격 경로만 확인한다. 파일 내용·동적 자격 취득·호스트 권한·전체 자격 출처는 검증하지 않는다.

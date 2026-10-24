@@ -13,6 +13,7 @@ from guard.models import ExecStatus
 from guard.models.objects import Execution
 from guard.store import Store
 from tests.builders import baseline_pack, environment, policy, T0, completion_response
+from tests.response_semantics_support import with_legacy_check
 
 
 @pytest.mark.parametrize("cleanup_raises", [False, True])
@@ -30,7 +31,8 @@ def test_probe_cleanup_preserves_completed_failure(tmp_path, monkeypatch, cleanu
     monkeypatch.setattr(http_common, "docker_container_probe", lambda *a: probe)
     cfg = {"input_validation":{"target":str(target), "vocab_size":100, "vocab_source":"synthetic"}}
     monkeypatch.setitem(registry.EXECUTORS, "input_validation:cleanup", lambda c: InputValidationExecutor(c["input_validation"]))
-    pack, env = baseline_pack(), environment(model={"id":"test"})
+    # Preserve the old status-only confirmed FAIL while testing cleanup.
+    pack, env = with_legacy_check(baseline_pack(), "REQ-09"), environment(model={"id":"test"})
     pol = policy(pack.ref(), scope={"include":["REQ-09"]},
                  values={"REQ-09":{"max_input_tokens":8,"rejection_codes":["400"],
                     "allowed_endpoints":[pack.checks["REQ-09"].functional_probes[0].id],

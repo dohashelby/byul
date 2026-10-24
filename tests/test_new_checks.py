@@ -10,6 +10,7 @@ from guard.core.judge import judge_plan
 from guard.runtime.docker import CmdResult
 from guard.store import Store
 from tests.builders import baseline_pack, environment, policy, completion_response
+from tests.response_semantics_support import with_legacy_check
 
 
 def pipeline(tmp_path, cid, factory, values):
@@ -18,7 +19,9 @@ def pipeline(tmp_path, cid, factory, values):
     path = tmp_path / "target.json"
     path.write_text(json.dumps(target), encoding="utf-8")
     store = Store(tmp_path / "store")
-    pack = baseline_pack()
+    # Historical status-only PACK21 component contracts; new semantics have
+    # independent regression tests, including challenge-only HTTP200 errors.
+    pack = with_legacy_check(baseline_pack(), cid)
     if cid == "REQ-09":
         values = {"allowed_endpoints": [pack.checks[cid].functional_probes[0].id],
                   "allowed_input_formats": ["token_ids"], **values}  # Explicit EXAMPLE test fixture, not defaults.

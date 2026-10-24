@@ -1,4 +1,6 @@
-> 역사적 Phase 1 정책 양식 작업 프롬프트다. 아래의 3행 구조화·코드/커밋 금지와 단계별 수치는 당시 범위이며 현행 개발 지시가 아니다. 현재 팩20·정책21점검46경로·자동11의 계약은 [현행 보강](docs/AUTOMATION_HARDENING.md), 최근 진행은 [PROGRESS](PROGRESS.md)를 읽는다. 실행할 작업 범위와 커밋/푸시는 현재 사용자 지시를 따른다.
+> 역사적 Phase 1 정책 양식 작업 프롬프트다. 아래의 3행 구조화·코드/커밋 금지·1분 목표와 단계별 수치는 당시 범위이며 현행 개발 지시가 아니다. 현행 상태는 아래 안내를 따른다.
+
+> 2026-10-24 현행 판정 보완 후보: PACK22/DRAFT·REQ-09 revision 6·PLT-04 revision 3·정책 22점검/50경로·자동 연결 11개다. REQ-09의 HTTP 2xx는 실제 소비 증명이 아니며 소비·피해 근거가 없으면 UNKNOWN이다. PLT-04의 기존 `forbidden_mount_paths`는 명시적인 마운트 금지 정책으로 유지하고 실제 자격 접근과 구별한다. 선택 정책 `credential_candidate_paths: list[str]`는 파일 본문을 읽지 않고 동일 worker 주체의 메타데이터·읽기 권한을 따로 관측한다. 기업의 실제 경로·승인값은 만들지 않는다. [현행 카탈로그](docs/policy_catalog.md)·[진행 기록](PROGRESS.md)을 읽고 실행할 작업 범위와 커밋/푸시는 현재 사용자 지시를 따른다. 과거 PR #28/#29의 팩21 실측·재판정은 새 팩22의 검증 결과가 아니다.
 
 이 세션의 목표는 **기업 정책값(POL)을 입력할 수 있는 체계를 정비하는 것**이다. 먼저 `CLAUDE.md`(특히 "진행 방식"), `SPEC.md`(§2.1, §3, §4.2 POL, §4.4), `PROGRESS.md`, `DECISIONS.md`, `examples/policy.yaml`, `lab/policy.yaml`을 읽어라.
 

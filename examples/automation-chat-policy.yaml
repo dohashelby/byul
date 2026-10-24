@@ -5,7 +5,7 @@ data_origin: EXAMPLE
 status: DRAFT
 pack:
   id: PACK-BASELINE
-  revision: 21
+  revision: 22
 values:
   REQ-01:
     allowed_callers:
@@ -26,6 +26,7 @@ values:
     forbidden_env_names:
     - GUARD_TEST_CREDENTIAL
     forbidden_mount_paths: []
+    credential_candidate_paths: []
   REQ-09:
     max_input_tokens: 127
     rejection_codes:

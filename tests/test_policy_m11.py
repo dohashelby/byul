@@ -28,6 +28,7 @@ def change(evd, scenario):
     if scenario == "security_fail":
         evd.observations["accepted_challenges"].value = ["token_id"]
         evd.observations["challenge_outcomes"].value["token_id"] = "200"
+        evd.observations["confirmed_input_violations"].value = ["EXAMPLE-confirmed-token-id-consumption"]
     elif scenario == "functional_fail":
         evd.observations["functional_probe_results"].value["after_token_id"] = "fail"
     elif scenario == "security_unknown":
@@ -125,6 +126,7 @@ def test_real_manual_import_rejudge_history_sides_and_reports(tmp_path, pack, ve
     if scenario == "security_fail":
         obs["accepted_challenges"]["value"] = ["token_id"]
         obs["challenge_outcomes"]["value"]["token_id"] = "200"
+        obs["confirmed_input_violations"]["value"] = ["EXAMPLE-confirmed-token-id-consumption"]
     else: obs["functional_probe_results"]["value"]["after_token_id"] = "fail"
     previous = next(e for e in st.find_latest("EVD", lambda e: e.check_id == "REQ-09" and e.side == side))
     import_evidence(st, pack, write(tmp_path, doc), now=T0)

@@ -22,6 +22,7 @@ from guard.models import CheckDef, Evidence, Verdict
 from guard.input_policy import policy_context
 from guard.automation_policy import (string_list, validate_template_policy,
                                      validate_request_binding_policy, validate_log_integrity_policy)
+from guard.policy_ceilings import manual_pass_ceiling as executor_manual_pass_ceiling
 
 from .base import AXES, JudgeOutput
 from .policy_items import evaluate, OBSERVATION as POLICY_ITEMS_OBSERVATION
@@ -106,7 +107,7 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.13.0"
+    version = "0.14.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         input_context = policy_context(check, policy_values, evidence.observations)
@@ -127,9 +128,11 @@ class DeclaredJudge:
                     input_rule_issue = "evaluation_error"
         automation_rules = None
         automation_rule_issue = "unavailable"
-        automation_ceiling = (check.executor in AUTOMATION_RULE_CEILING_EXECUTORS
-                              and check.judge is not None and check.judge.plugin == "rule_table")
-        automation_policy_valid = not automation_ceiling or _automation_policy_valid(check.executor, policy_values)
+        automation_ceiling = (check.judge is not None and check.judge.plugin == "rule_table"
+                              and (check.executor in AUTOMATION_RULE_CEILING_EXECUTORS
+                                   or check.judge.params.get("declared_pass_ceiling") is True))
+        automation_policy_valid = (check.executor not in AUTOMATION_RULE_CEILING_EXECUTORS
+                                   or _automation_policy_valid(check.executor, policy_values))
         if automation_ceiling:
             try:
                 # The declared default_judge must not bypass the pinned
@@ -140,6 +143,13 @@ class DeclaredJudge:
                 # Never copy exception details or erase a separately declared
                 # FAIL merely because a rule dependency could not be evaluated.
                 automation_rule_issue = "evaluation_error"
+        try:
+            executor_ceiling = executor_manual_pass_ceiling(check, policy_values, evidence)
+            if (type(executor_ceiling) is not dict or any(axis not in AXES or value not in ALLOWED
+                                                        for axis, value in executor_ceiling.items())):
+                executor_ceiling = {"security": "UNKNOWN"}
+        except Exception:
+            executor_ceiling = {"security": "UNKNOWN"}
         op = evidence.execution.operator
         who = f"{op.by} at {op.at.isoformat()}" if op else "unknown operator"
         notes = evidence.observations.get("declared_observation_notes")
@@ -228,6 +238,9 @@ class DeclaredJudge:
                     reasons.append(f"POLICY_CONTEXT: AUTOMATION_MANUAL_{code}; check={check.id}; axis={axis}; "
                                    f"rule_table={ceiling.value}; {automation_rule_issue}; DECLARED PASS withheld")
                     v = "UNKNOWN"
+            if v == "PASS" and executor_ceiling.get(axis, "PASS") != "PASS":
+                reasons.append(f"POLICY_CONTEXT: EXECUTOR_MANUAL_POLICY_UNRESOLVED; axis={axis}; DECLARED PASS withheld")
+                v = "UNKNOWN"
             if v == "PASS" and not evidence.artifacts:
                 reasons.append(f"{axis}: declared PASS withheld: no attachment (at least one evidence file required)")
                 v = "UNKNOWN"

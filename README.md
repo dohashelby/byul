@@ -25,8 +25,9 @@ BoB serving-engine security runtime solution
 | SGLang 연결 준비 | `--backend sglang`, 엔진별 출력 상한 필드(`max_completion_tokens`), backend별 `/tokenize` payload, `sglang:*` 지표 대응 | 시험 전용 가짜 SGLang만, 실제 SGLang 미확인, Codex 교차 검수 수정 반영 |
 | API 인증 프레임 (F2) | `--auth-config`(`runtime-auth/1.0`): bearer 토큰 주체·역할·주체별 허용 모델, 401/403 엔진 미전달, 설정 오류 503 | 단위·HTTP 시험, 로컬 실행 확인. 실제 인증 연동(D-02)은 미정 |
 | 대상 등록 프레임 (F1) | `--target`(`runtime-target/1.0`): 정책 대상 대조·엔진/모델 비교, `--target-pod-status`로 Pod 조회·교체 구분 | 단위·HTTP 시험, 로컬 kind에서 Pod 교체 확인 |
+| 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류와 기간 있는 승인 예외 | 단위 시험; SP4 송수신 정책은 로컬 kind에서 수동 확인 |
 | 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 수정 반영 |
-| 시험 | 추적 unittest 309개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 시험 | 추적 unittest 326개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -570,6 +571,23 @@ L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었습니다. 앞선 기�
 ```
 
 live feed는 완성된 새 줄만 변환하며 파일 회전·잘림을 감지합니다. heartbeat가 정상 갱신되면 이벤트가 없어도 "수집 정상·새 이벤트 없음"이고, writer 종료·heartbeat 만료는 관측 불가입니다. heartbeat 만료 기준은 `--collector-stale-after`와 같습니다. heartbeat를 설정하지 않은 임의 feed는 생존을 입증할 수 없으므로 이전처럼 새 이벤트가 없으면 stale이 되며 화면에 "writer heartbeat 미설정" 이유가 붙습니다. heartbeat의 `started_at`보다 오래된 이벤트는 저장하지 않고 실행 전 이벤트로 별도 집계합니다. 원본 손상 줄은 내용 대신 줄 번호·사유와 누적 건수를 표시합니다. Hubble 화면은 혼합 기록에서도 최근 DROPPED 최대 25건을 우선 표시해 FORWARDED에 묻히지 않게 합니다. Cilium 화면의 "설정됨"은 정책 객체 존재만 뜻하고, 실제 차단은 lab L-02 통과 또는 실제 Hubble `DROPPED` 근거로 별도 표시합니다.
+
+### 통제 의도 1.1: 작업별 통신·모델/캐시 보호·단계별 실행 (SP4·SP1·SP3)
+
+`runtime-enforcement-intent/1.1`은 1.0 문서를 그대로 받으면서(1.0 결과물은 바이트 단위로 같음) 아래 항목을 더합니다. 예시는 `examples/enforcement/intent-v1.1.example.json`, `exec-exceptions.example.json`, `phase-timeline.example.json`이며 모두 승인값이 아닌 LAB 예시입니다.
+
+```bash
+.venv/bin/python -m serving_runtime enforce render --intent examples/enforcement/intent-v1.1.example.json --out /tmp/runtime-enforcement
+.venv/bin/python -m serving_runtime enforce cache-check --intent examples/enforcement/intent-v1.1.example.json --root /path/to/cache-copy
+.venv/bin/python -m serving_runtime enforce ingest --kind tetragon --input events.jsonl --origin real --data-dir DIR \
+  --intent examples/enforcement/intent-v1.1.example.json \
+  --exceptions examples/enforcement/exec-exceptions.example.json --timeline examples/enforcement/phase-timeline.example.json
+```
+
+- **SP4 작업별 통신:** `acquire`(모델 취득 Pod)의 송신 허용 목록, `test_receivers`(팀 소유 시험 목적지)와 수신 허용 역할, `engine.management_port`(observer는 이 포트만), `observer_kube_api`를 받습니다. `cilium-acquire-egress`, `cilium-observer-N-egress`, `cilium-receiver-NAME-ingress`를 추가로 생성합니다. engine 송신 허용에 acquire 목적지가 들어 있으면 형식 오류입니다. 로컬 kind에서 같은 receiver에 acquire는 허용, engine과 다른 client는 거부되는 것을 확인했습니다. TCP 연결 허용은 HTTPS 안의 URL·파일 권한을 입증하지 않습니다.
+- **SP1 모델·캐시:** `assets`에 tokenizer·승인 manifest 경로, `cache_root`, 캐시 세대(engine/image_id/model_revision/compile_profile), engine/acquire/probe UID를 둡니다. `protected_paths.cache_dir`는 세대 경로와 같아야 하고 캐시는 공급물 경로와 겹칠 수 없습니다. `pod-security-candidate.json`(공급물 읽기 전용 mount·비root UID·세대 subPath)과 TG-ASSET-02(tokenizer 쓰기 감시)를 만들고, TG-CACHE-01은 캐시 루트 전체를 감시해 변환 때 현재/다른 세대(CACHE-02)를 나눕니다. `enforce cache-check`는 링크를 따라가지 않고 세대 디렉터리의 소유자·권한·다른 세대를 보고합니다(삭제하지 않음).
+- **SP3 단계별 실행:** `phase_binaries`(loading/compiling/inferring), `suspect_binaries`, 단계 시간표, 승인 예외로 실행 이벤트를 `allowed_in_phase`/`exception`/`outside_allowlist`/`suspect_binary`/`exec_from_cache`/`phase_unknown`으로 분류합니다. 관측·경보만 하며 실행을 막지 않습니다. Python·worker를 통째로 예외 처리하지 않고, maintenance 단계는 승인 예외로만 허용합니다. 부모·이미지 조건이 있는 예외는 이벤트에 그 근거가 있을 때만 적용합니다. 시간표·예외 파일이 바뀌면 다시 읽고, 손상되면 단계 불명·예외 0건으로 처리합니다. Gateway에서는 `--observation-intent`(1.1)와 함께 `--observation-exceptions`·`--observation-timeline`을 줍니다.
+- 한계: 모든 결과물은 클러스터 미적용 후보입니다(SP4 2개 정책만 kind에서 수동 확인 후 삭제). 실제 엔진의 단계별 정상 목록, 단계 신호 자동 수집, 캐시 권한 변경 관측, 실행 거부는 아직 없습니다.
 
 ## 협업·검수
 

@@ -163,6 +163,19 @@ def _process(
     return binary, _pod(process.get("pod"))
 
 
+def _image_digest(process: Any) -> str | None:
+    """Return the sha256 image digest Tetragon reports for the container, if any."""
+
+    pod = process.get("pod") if isinstance(process, dict) else None
+    container = pod.get("container") if isinstance(pod, dict) else None
+    image = container.get("image") if isinstance(container, dict) else None
+    image_id = image.get("id") if isinstance(image, dict) else None
+    if not isinstance(image_id, str):
+        return None
+    match = re.search(r"sha256:[0-9a-f]{64}", image_id)
+    return match.group(0) if match else None
+
+
 def parse_tetragon(
     document: Any,
     *,
@@ -170,6 +183,7 @@ def parse_tetragon(
     allowed_engine_binaries: tuple[str, ...] | list[str] | None = None,
     environment: str | None = None,
     run_id: str | None = None,
+    exec_policy: Any = None,
 ) -> dict[str, Any]:
     root = _object(document, "$")
     observed_at = _event_time(root)
@@ -205,6 +219,21 @@ def parse_tetragon(
                 "allowed_binary": binary in allowlist if allowlist else None,
             }
         )
+        if exec_policy is not None:
+            parent = event.get("parent")
+            parent_binary = (
+                parent.get("binary")
+                if isinstance(parent, dict) and isinstance(parent.get("binary"), str) and parent.get("binary")
+                else None
+            )
+            normalized.update(
+                exec_policy.classify_exec(
+                    binary=binary,
+                    parent=parent_binary,
+                    image=_image_digest(event.get("process")),
+                    observed_at=observed_at,
+                )
+            )
         return normalized
 
     binary, pod = _process(event, "$.process_kprobe", require_binary=False)
@@ -266,6 +295,8 @@ def parse_tetragon(
             "action_mode": action_mode,
         }
     )
+    if exec_policy is not None and normalized["rule_id"] == "TG-CACHE-01":
+        normalized.update(exec_policy.classify_cache_write(file_path))
     return normalized
 
 
@@ -277,6 +308,7 @@ def transform_lines(
     allowed_engine_binaries: tuple[str, ...] | list[str] | None = None,
     environment: str | None = None,
     run_id: str | None = None,
+    exec_policy: Any = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Transform lines while retaining only line numbers and safe error reasons."""
 
@@ -303,6 +335,7 @@ def transform_lines(
                     allowed_engine_binaries=allowed_engine_binaries,
                     environment=environment,
                     run_id=run_id,
+                    exec_policy=exec_policy,
                 )
         except (json.JSONDecodeError, EventError, RecursionError) as error:
             rejected.append({"line": line_number, "reason": str(error)})
@@ -320,6 +353,7 @@ def ingest_file(
     allowed_engine_binaries: tuple[str, ...] | list[str] | None = None,
     environment: str | None = None,
     run_id: str | None = None,
+    exec_policy: Any = None,
 ) -> dict[str, Any]:
     with Path(input_path).open("r", encoding="utf-8") as source:
         accepted, rejected = transform_lines(
@@ -329,6 +363,7 @@ def ingest_file(
             allowed_engine_binaries=allowed_engine_binaries,
             environment=environment,
             run_id=run_id,
+            exec_policy=exec_policy,
         )
     store = JsonlStore(Path(data_dir) / "observations.jsonl")
     for item in accepted:

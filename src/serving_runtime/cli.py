@@ -58,6 +58,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument("--run-id", metavar="ID")
     mvp_parser.add_argument("--revocations", metavar="PATH")
     mvp_parser.add_argument(
+        "--observation-exceptions",
+        metavar="PATH",
+        help="실행 예외(runtime-exec-exceptions/1.0); intent 1.1 필요",
+    )
+    mvp_parser.add_argument(
+        "--observation-timeline",
+        metavar="PATH",
+        help="단계 시간표(runtime-phase-timeline/1.0); intent 1.1 필요",
+    )
+    mvp_parser.add_argument(
         "--target",
         metavar="PATH",
         help="대상 등록 파일(runtime-target/1.0). 없으면 대상 미등록",
@@ -168,6 +178,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     ingest_parser.add_argument("--intent", metavar="PATH")
     ingest_parser.add_argument("--environment", metavar="NAME")
     ingest_parser.add_argument("--run-id", metavar="ID")
+    ingest_parser.add_argument(
+        "--exceptions", metavar="PATH", help="승인 실행 예외(runtime-exec-exceptions/1.0)"
+    )
+    ingest_parser.add_argument(
+        "--timeline", metavar="PATH", help="단계 시간표(runtime-phase-timeline/1.0)"
+    )
+    cache_check_parser = enforce_commands.add_parser(
+        "cache-check", help="캐시 세대 디렉터리의 소유자·권한·다른 세대를 점검(읽기 전용)"
+    )
+    cache_check_parser.add_argument("--intent", required=True, metavar="PATH")
+    cache_check_parser.add_argument(
+        "--root", metavar="DIR", help="cache_root 대신 점검할 디렉터리(사본 점검용)"
+    )
     args = parser.parse_args(argv)
     if args.command == "file-info":
         try:
@@ -221,6 +244,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "cilium_policy_status": args.cilium_policy_status,
                 "auth_config_path": args.auth_config,
                 "target_path": args.target,
+                "observation_exceptions_path": args.observation_exceptions,
+                "observation_timeline_path": args.observation_timeline,
                 "target_pod_status": args.target_pod_status,
             }
             if args.data_dir is not None:
@@ -242,12 +267,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         from .enforcement.cilium import render_manifests as render_cilium
         from .enforcement.cilium import write_manifests
         from .enforcement.intent import IntentError, load_intent
+        from .enforcement.security import render_pod_security
         from .enforcement.tetragon import render_manifests as render_tetragon
 
         try:
             intent = load_intent(args.intent)
             manifests = render_cilium(intent)
             manifests.update(render_tetragon(intent))
+            pod_security = render_pod_security(intent)
+            if pod_security is not None:
+                manifests["pod-security-candidate.json"] = pod_security
             written = write_manifests(manifests, args.out)
         except (OSError, ValueError, IntentError) as error:
             print(f"통제 후보 생성 실패: {error}", file=sys.stderr)
@@ -259,12 +288,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "enforce" and args.enforce_command == "ingest":
         from .enforcement.events import ingest_file
+        from .enforcement.execpolicy import ExecPolicy
         from .enforcement.intent import IntentError, load_intent
 
         try:
             binaries = None
+            exec_policy = None
             if args.intent is not None:
-                binaries = load_intent(args.intent).allowed_engine_binaries
+                intent = load_intent(args.intent)
+                binaries = intent.allowed_engine_binaries
+                if intent.schema != "runtime-enforcement-intent/1.0":
+                    exec_policy = ExecPolicy(
+                        intent,
+                        exceptions_path=args.exceptions,
+                        timeline_path=args.timeline,
+                    )
+            elif args.exceptions or args.timeline:
+                raise ValueError("--exceptions and --timeline need --intent (schema 1.1)")
             result = ingest_file(
                 args.input,
                 args.data_dir,
@@ -273,6 +313,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 allowed_engine_binaries=binaries,
                 environment=args.environment,
                 run_id=args.run_id,
+                exec_policy=exec_policy,
             )
         except (OSError, UnicodeError, ValueError, IntentError) as error:
             print(f"관측 변환 실패: {error}", file=sys.stderr)
@@ -287,6 +328,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 file=sys.stderr,
             )
         return 0
+    if args.command == "enforce" and args.enforce_command == "cache-check":
+        from .enforcement.cache import check_cache
+        from .enforcement.intent import IntentError, load_intent
+
+        try:
+            report = check_cache(load_intent(args.intent), root_override=args.root)
+        except (OSError, ValueError, IntentError) as error:
+            print(f"캐시 점검 실패: {error}", file=sys.stderr)
+            return 1
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0 if report["state"] in {"ok", "other_generations_present"} else 3
     if args.command == "enforce":
         enforce_parser.print_help()
         return 0

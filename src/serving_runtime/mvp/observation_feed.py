@@ -43,7 +43,9 @@ class ObservationFeed:
         allowed_engine_binaries: Iterable[str] | None = None,
         heartbeat_path: str | Path | None = None,
         heartbeat_stale_after_s: float = 15.0,
+        exec_policy: Any = None,
     ) -> None:
+        self.exec_policy = exec_policy
         if kind not in {"hubble", "tetragon"}:
             raise ValueError("observation feed kind must be hubble or tetragon")
         self.kind = kind
@@ -381,6 +383,7 @@ class ObservationFeed:
                 allowed_engine_binaries=self.allowed_engine_binaries,
                 environment=self.environment,
                 run_id=self.run_id,
+                exec_policy=self.exec_policy,
             )
             if line_rejected:
                 rejected.append(

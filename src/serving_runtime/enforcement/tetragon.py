@@ -75,14 +75,22 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
     """Render file policies; TG-EXEC-01 is intentionally adapter-only."""
 
     paths = intent.protected_paths
+    assets = intent.assets
+    # With 1.1 assets the cache policy watches the whole cache root so the
+    # adapter can tell current-generation writes from other generations (CACHE-02).
+    cache_prefix = assets.cache_root if assets is not None else paths.cache_dir
     manifests = {
         "tetragon-tg-asset-01.json": _policy(
             intent, "TG-ASSET-01", [paths.model_dir], 2
         ),
         "tetragon-tg-cache-01.json": _policy(
-            intent, "TG-CACHE-01", [paths.cache_dir], 2
+            intent, "TG-CACHE-01", [cache_prefix], 2
         ),
     }
+    if assets is not None and assets.tokenizer_dir is not None:
+        manifests["tetragon-tg-asset-02.json"] = _policy(
+            intent, "TG-ASSET-02", [assets.tokenizer_dir], 2
+        )
     if paths.secret_paths:
         manifests["tetragon-tg-secret-01.json"] = _policy(
             intent, "TG-SECRET-01", list(paths.secret_paths), 4

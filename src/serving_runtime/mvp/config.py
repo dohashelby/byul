@@ -55,6 +55,8 @@ class MVPConfig:
     auth_config_path: str | None = None
     target_path: str | None = None
     target_pod_status: bool = False
+    observation_exceptions_path: str | None = None
+    observation_timeline_path: str | None = None
     cilium_timeout_s: float = 10.0
 
     def __post_init__(self) -> None:
@@ -101,6 +103,8 @@ class MVPConfig:
             "observation_intent_path",
             "auth_config_path",
             "target_path",
+            "observation_exceptions_path",
+            "observation_timeline_path",
             "environment",
             "run_id",
             "observation_environment",

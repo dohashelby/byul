@@ -39,21 +39,34 @@ def _port_rule(port: int, protocol: str) -> dict[str, Any]:
     return {"ports": [{"port": str(port), "protocol": protocol}]}
 
 
+def _observer_port(intent: EnforcementIntent) -> int:
+    return intent.engine.management_port or intent.engine.port or 8000
+
+
 def engine_ingress(intent: EnforcementIntent) -> dict[str, Any]:
-    sources = [{"matchLabels": dict(intent.gateway.labels)}]
-    sources.extend({"matchLabels": dict(item.labels)} for item in intent.metrics_collectors)
+    gateway = {"matchLabels": dict(intent.gateway.labels)}
+    observers = [{"matchLabels": dict(item.labels)} for item in intent.metrics_collectors]
+    api_port = intent.engine.port or 8000
+    if intent.engine.management_port is None:
+        # 1.0 behaviour: Gateway and observers share the engine API port.
+        rules = [{"fromEndpoints": [gateway, *observers], "toPorts": [_port_rule(api_port, "TCP")]}]
+    else:
+        # SP4: observers reach only the read-only management listener.
+        rules = [{"fromEndpoints": [gateway], "toPorts": [_port_rule(api_port, "TCP")]}]
+        if observers:
+            rules.append(
+                {
+                    "fromEndpoints": observers,
+                    "toPorts": [_port_rule(intent.engine.management_port, "TCP")],
+                }
+            )
     return {
         "apiVersion": "cilium.io/v2",
         "kind": "CiliumNetworkPolicy",
         "metadata": _metadata(intent, "runtime-engine-ingress"),
         "spec": {
             "endpointSelector": {"matchLabels": dict(intent.engine.labels)},
-            "ingress": [
-                {
-                    "fromEndpoints": sources,
-                    "toPorts": [_port_rule(intent.engine.port or 8000, "TCP")],
-                }
-            ],
+            "ingress": rules,
         },
     }
 
@@ -111,14 +124,109 @@ def gateway_egress(intent: EnforcementIntent) -> dict[str, Any]:
     }
 
 
+def _egress_rules(items) -> list[dict[str, Any]]:
+    rules: list[dict[str, Any]] = []
+    for item in items:
+        rule: dict[str, Any] = {"toPorts": [_port_rule(item.port, item.protocol)]}
+        if item.fqdn is not None:
+            rule["toFQDNs"] = [{"matchName": item.fqdn}]
+        elif item.cidr is not None:
+            rule["toCIDR"] = [item.cidr]
+        else:
+            rule["toEndpoints"] = [{"matchLabels": dict(item.endpoint)}]
+        rules.append(rule)
+    return rules
+
+
+def acquire_egress(intent: EnforcementIntent) -> dict[str, Any]:
+    """SP4: only the acquisition task may reach the approved artifact sources."""
+
+    assert intent.acquire is not None
+    has_fqdn = any(item.fqdn is not None for item in intent.acquire.egress_allow)
+    return {
+        "apiVersion": "cilium.io/v2",
+        "kind": "CiliumNetworkPolicy",
+        "metadata": _metadata(intent, "runtime-acquire-egress"),
+        "spec": {
+            "endpointSelector": {"matchLabels": dict(intent.acquire.labels)},
+            "egress": [
+                _dns_egress(intent, inspect_names=has_fqdn),
+                *_egress_rules(intent.acquire.egress_allow),
+            ],
+        },
+    }
+
+
+def observer_egress(intent: EnforcementIntent, collector, index: int) -> dict[str, Any]:
+    """SP4: one observer reaches the engine management listener and nothing else."""
+
+    rules: list[dict[str, Any]] = [
+        {
+            "toEndpoints": [{"matchLabels": dict(intent.engine.labels)}],
+            "toPorts": [_port_rule(_observer_port(intent), "TCP")],
+        },
+        _dns_egress(intent, inspect_names=False),
+    ]
+    if intent.observer_kube_api:
+        rules.append({"toEntities": ["kube-apiserver"]})
+    for receiver in intent.test_receivers:
+        if "observer" in receiver.allowed_from:
+            rules.append(
+                {
+                    "toEndpoints": [{"matchLabels": dict(receiver.labels)}],
+                    "toPorts": [_port_rule(receiver.port, receiver.protocol)],
+                }
+            )
+    return {
+        "apiVersion": "cilium.io/v2",
+        "kind": "CiliumNetworkPolicy",
+        "metadata": _metadata(intent, f"runtime-observer-{index}-egress"),
+        "spec": {
+            "endpointSelector": {"matchLabels": dict(collector.labels)},
+            "egress": rules,
+        },
+    }
+
+
+def receiver_ingress(intent: EnforcementIntent, receiver) -> dict[str, Any]:
+    """A test fixture accepts only the task roles that are meant to reach it."""
+
+    sources: list[dict[str, Any]] = []
+    if "acquire" in receiver.allowed_from and intent.acquire is not None:
+        sources.append({"matchLabels": dict(intent.acquire.labels)})
+    if "observer" in receiver.allowed_from:
+        sources.extend({"matchLabels": dict(item.labels)} for item in intent.metrics_collectors)
+    return {
+        "apiVersion": "cilium.io/v2",
+        "kind": "CiliumNetworkPolicy",
+        "metadata": _metadata(intent, f"runtime-receiver-{receiver.name}-ingress"),
+        "spec": {
+            "endpointSelector": {"matchLabels": dict(receiver.labels)},
+            "ingress": [
+                {"fromEndpoints": sources, "toPorts": [_port_rule(receiver.port, receiver.protocol)]}
+            ],
+        },
+    }
+
+
 def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
     """Build fixed-name JSON manifests without touching the filesystem."""
 
-    return {
+    manifests = {
         "cilium-engine-ingress.json": engine_ingress(intent),
         "cilium-engine-egress.json": engine_egress(intent),
         "cilium-gateway-egress.json": gateway_egress(intent),
     }
+    if intent.acquire is not None:
+        manifests["cilium-acquire-egress.json"] = acquire_egress(intent)
+    if intent.schema != "runtime-enforcement-intent/1.0":
+        for index, collector in enumerate(intent.metrics_collectors):
+            manifests[f"cilium-observer-{index}-egress.json"] = observer_egress(
+                intent, collector, index
+            )
+    for receiver in intent.test_receivers:
+        manifests[f"cilium-receiver-{receiver.name}-ingress.json"] = receiver_ingress(intent, receiver)
+    return manifests
 
 
 def write_manifests(

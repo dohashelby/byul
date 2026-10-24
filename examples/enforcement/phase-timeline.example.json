@@ -1,0 +1,10 @@
+{
+  "schema_version": "runtime-phase-timeline/1.0",
+  "target_ref": "LAB-TARGET-EXAMPLE-ONLY",
+  "entries": [
+    {"phase": "loading", "from": "2026-10-24T09:00:00+00:00", "until": "2026-10-24T09:05:00+00:00", "basis": "declared"},
+    {"phase": "compiling", "from": "2026-10-24T09:03:00+00:00", "until": "2026-10-24T09:10:00+00:00", "basis": "engine_signal"},
+    {"phase": "inferring", "from": "2026-10-24T09:10:00+00:00", "until": null, "basis": "test_controller"},
+    {"phase": "maintenance", "from": "2026-10-24T10:00:00+00:00", "until": "2026-10-24T10:30:00+00:00", "basis": "declared"}
+  ]
+}

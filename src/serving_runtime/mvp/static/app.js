@@ -522,11 +522,28 @@ function renderObservations(payload, collectorsPayload) {
   clear(tetragonBody);
   $("tetragon-observation-empty").hidden = tetragon.length > 0;
   for (const item of tetragon) {
-    const outsideAllowlist = item.kind === "process_exec" && item.allowed_binary === false;
+    const flaggedVerdicts = ["outside_allowlist", "suspect_binary", "exec_from_cache", "phase_unknown"];
+    const outsideAllowlist = item.kind === "process_exec"
+      && (item.exec_verdict ? flaggedVerdicts.includes(item.exec_verdict) : item.allowed_binary === false);
     const podUnknown = item.pod_attribution === "unavailable";
     const processUnknown = item.process_attribution === "unavailable"
       || (item.kind === "file_access" && !item.binary);
-    const kindLabel = item.kind === "process_exec" ? "프로세스" : `파일 ${item.access || "other"}`;
+    const verdictLabels = {
+      allowed_in_phase: "단계 허용",
+      exception: `승인 예외 ${item.exception_id || ""}`.trim(),
+      outside_allowlist: "목록 밖",
+      suspect_binary: "의심 실행",
+      exec_from_cache: "캐시에서 실행",
+      phase_unknown: "단계 불명",
+    };
+    const generationLabels = { current: "현재 캐시 세대", other: "다른 캐시 세대", outside: "캐시 밖" };
+    let kindLabel = item.kind === "process_exec" ? "프로세스" : `파일 ${item.access || "other"}`;
+    if (item.exec_verdict) {
+      kindLabel += ` · ${(item.phase || []).join("+")} · ${verdictLabels[item.exec_verdict] || item.exec_verdict}`;
+    }
+    if (item.cache_generation) {
+      kindLabel += ` · ${generationLabels[item.cache_generation] || item.cache_generation}`;
+    }
     const attributionLabels = [];
     if (podUnknown) attributionLabels.push("pod 미확인");
     if (processUnknown) attributionLabels.push("프로세스 미확인");

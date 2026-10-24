@@ -31,6 +31,8 @@ from .http_handler import (
 from .lab_report import LabReportSource
 from .mock_engine import MockEngine, _utc_now
 from .observation_feed import ObservationFeed
+from serving_runtime.enforcement.execpolicy import ExecPolicy
+
 from .auth import load_auth
 from .target import KubernetesTargetCollector, TargetRegistry, load_target
 from .policy import PolicyState, load_policy
@@ -73,10 +75,18 @@ class GatewayApp:
                     f"{config.backend} mode requires a {config.backend} backend config"
                 )
         allowed_binaries: tuple[str, ...] = ()
+        self._exec_policy: ExecPolicy | None = None
         if config.observation_intent_path is not None:
-            allowed_binaries = load_intent(
-                config.observation_intent_path
-            ).allowed_engine_binaries
+            intent = load_intent(config.observation_intent_path)
+            allowed_binaries = intent.allowed_engine_binaries
+            if intent.schema != "runtime-enforcement-intent/1.0":
+                self._exec_policy = ExecPolicy(
+                    intent,
+                    exceptions_path=config.observation_exceptions_path,
+                    timeline_path=config.observation_timeline_path,
+                )
+        elif config.observation_exceptions_path or config.observation_timeline_path:
+            raise ValueError("observation exceptions/timeline need an observation intent")
 
         self.engine_address = (self.backend.target.host, self.backend.target.port)
         self.relay_timeout_s = self.backend.timeouts.get(
@@ -224,6 +234,7 @@ class GatewayApp:
                 allowed_engine_binaries=allowed_binaries,
                 heartbeat_path=observation_heartbeats.get(kind),
                 heartbeat_stale_after_s=config.collector_stale_after_s,
+                exec_policy=self._exec_policy,
             )
             self._observation_feeds.append(feed)
             collectors.append(

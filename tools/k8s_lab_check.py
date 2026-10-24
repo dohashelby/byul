@@ -17,7 +17,14 @@ import sys
 import time
 from typing import Any, BinaryIO, Callable, Sequence
 
+from serving_runtime.enforcement.cilium import (
+    render_manifests as render_cilium_manifests,
+)
 from serving_runtime.enforcement.events import transform_lines
+from serving_runtime.enforcement.intent import load_intent
+from serving_runtime.enforcement.tetragon import (
+    render_manifests as render_tetragon_manifests,
+)
 
 
 EXPECTED_CONTEXT = "kind-runtime-lab"
@@ -48,6 +55,22 @@ TASK_CASE_TITLES = {
 }
 TASK_POD_NAMES = ("test-receiver", "artifact-acquire", "supply-check")
 SP4_POLICY_FILES = ("cilium-acquire-egress.json", "cilium-receiver-fixture-ingress.json")
+CILIUM_LAB_POLICY_FILES = (
+    "cilium-engine-ingress.json",
+    "cilium-engine-egress.json",
+    "cilium-gateway-egress.json",
+)
+TETRAGON_MONITOR_POLICY_FILES = (
+    "tetragon-tg-asset-01.json",
+    "tetragon-tg-secret-01.json",
+    "tetragon-tg-cache-01.json",
+)
+TETRAGON_DENY_POLICY_FILE = "tetragon-tg-deny-01.json"
+MANAGED_POLICY_FILES = (
+    *CILIUM_LAB_POLICY_FILES,
+    *TETRAGON_MONITOR_POLICY_FILES,
+    TETRAGON_DENY_POLICY_FILE,
+)
 _SENSITIVE_VALUE = re.compile(
     r"(?i)\b(authorization|password|api[_-]?key|access[_-]?token|refresh[_-]?token|secret)"
     r"([\"']?\s*[:=]\s*[\"']?)([^\"'\s,;}]+)"
@@ -621,6 +644,16 @@ class LabChecker:
         self.applied: list[Path] = []
         self.started_at = utc_now()
         self.current_context: str | None = None
+        self.pre_run_cleanup: dict[str, Any] = {
+            "title": "실행 전 정리",
+            "status": "not_run",
+            "summary": "아직 실행하지 않음",
+            "managed_policies": [],
+            "found_policies": [],
+            "deleted_policies": [],
+            "warnings": [],
+            "commands": [],
+        }
 
     def assert_safe_context(self) -> None:
         if self.context != EXPECTED_CONTEXT:
@@ -714,6 +747,117 @@ class LabChecker:
         if result.returncode == 0 and path not in self.applied:
             self.applied.append(path)
         return result
+
+    def _managed_policy_refs(self) -> list[tuple[str, str]]:
+        """Derive the cleanup scope from the manifests this checker applies."""
+
+        intent = load_intent(self.intent)
+        manifests = render_cilium_manifests(intent)
+        manifests.update(render_tetragon_manifests(intent))
+        references: list[tuple[str, str]] = []
+        for filename in MANAGED_POLICY_FILES:
+            document = manifests.get(filename)
+            if not isinstance(document, dict):
+                raise RuntimeError(f"관리 정책 manifest 누락: {filename}")
+            metadata = document.get("metadata")
+            kind = document.get("kind")
+            name = metadata.get("name") if isinstance(metadata, dict) else None
+            namespace = metadata.get("namespace") if isinstance(metadata, dict) else None
+            if not isinstance(kind, str) or not isinstance(name, str):
+                raise RuntimeError(f"관리 정책 식별자 오류: {filename}")
+            if namespace != self.namespace:
+                raise RuntimeError(
+                    f"관리 정책 namespace 불일치: {filename} ({namespace!r})"
+                )
+            reference = (kind, name)
+            if reference not in references:
+                references.append(reference)
+        return references
+
+    @staticmethod
+    def _listed_policy_names(output: str, kind: str, namespace: str) -> list[str]:
+        try:
+            document = json.loads(output)
+        except json.JSONDecodeError as error:
+            raise RuntimeError(f"{kind} 조회 결과가 JSON이 아님") from error
+        items = document.get("items") if isinstance(document, dict) else None
+        if not isinstance(items, list):
+            raise RuntimeError(f"{kind} 조회 결과에 items 배열이 없음")
+        names: list[str] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            metadata = item.get("metadata")
+            if not isinstance(metadata, dict):
+                continue
+            name = metadata.get("name")
+            item_namespace = metadata.get("namespace")
+            if isinstance(name, str) and item_namespace == namespace:
+                names.append(name)
+        return sorted(set(names))
+
+    def _run_pre_run_cleanup(self) -> bool:
+        evidence = self.pre_run_cleanup
+        try:
+            managed = self._managed_policy_refs()
+            evidence["managed_policies"] = [
+                f"{kind}/{name}" for kind, name in managed
+            ]
+            managed_by_kind: dict[str, set[str]] = {}
+            for kind, name in managed:
+                managed_by_kind.setdefault(kind, set()).add(name)
+
+            found: list[tuple[str, str]] = []
+            unmanaged: list[tuple[str, str]] = []
+            for kind, managed_names in managed_by_kind.items():
+                result = self._kubectl(evidence, "get", kind, "-o", "json")
+                if result.returncode != 0:
+                    raise RuntimeError(f"실행 전 {kind} 조회 실패 (rc={result.returncode})")
+                for name in self._listed_policy_names(
+                    result.stdout, kind, self.namespace
+                ):
+                    target = (kind, name)
+                    if name in managed_names:
+                        found.append(target)
+                    else:
+                        unmanaged.append(target)
+
+            evidence["found_policies"] = [
+                f"{kind}/{name}" for kind, name in found
+            ]
+            evidence["warnings"] = [
+                f"관리 대상 외 정책은 삭제하지 않음: {kind}/{name}"
+                for kind, name in unmanaged
+            ]
+            for kind, name in found:
+                result = self._kubectl(
+                    evidence,
+                    "delete",
+                    kind,
+                    name,
+                    "--ignore-not-found=true",
+                    "--wait=true",
+                    "--timeout=60s",
+                    timeout=70,
+                )
+                if result.returncode != 0:
+                    raise RuntimeError(
+                        f"실행 전 정책 삭제 실패: {kind}/{name} "
+                        f"(rc={result.returncode})"
+                    )
+                evidence["deleted_policies"].append(f"{kind}/{name}")
+
+            evidence["status"] = "passed"
+            if found:
+                evidence["summary"] = (
+                    f"이전 실행의 관리 정책 {len(found)}개 삭제 완료"
+                )
+            else:
+                evidence["summary"] = "이전 실행의 관리 정책 잔여 없음"
+        except Exception as error:
+            evidence["status"] = "failed"
+            evidence["summary"] = sanitize_text(str(error))
+        return evidence["status"] == "passed"
 
     def _set(
         self,
@@ -869,11 +1013,7 @@ class LabChecker:
         )
         if render.returncode != 0:
             raise RuntimeError("enforcement manifest rendering failed")
-        for name in (
-            "cilium-engine-ingress.json",
-            "cilium-engine-egress.json",
-            "cilium-gateway-egress.json",
-        ):
+        for name in CILIUM_LAB_POLICY_FILES:
             path = self.rendered_dir / name
             if not path.is_file() or self._apply(case, path).returncode != 0:
                 raise RuntimeError(f"could not apply {name}")
@@ -993,11 +1133,7 @@ class LabChecker:
     def _l04(self, case: dict[str, Any]) -> None:
         if not self._ensure_rendered(case):
             raise RuntimeError("Tetragon manifests are unavailable")
-        for name in (
-            "tetragon-tg-asset-01.json",
-            "tetragon-tg-secret-01.json",
-            "tetragon-tg-cache-01.json",
-        ):
+        for name in TETRAGON_MONITOR_POLICY_FILES:
             path = self.rendered_dir / name
             if not path.is_file() or self._apply(case, path).returncode != 0:
                 raise RuntimeError(f"could not apply {name}")
@@ -1189,7 +1325,7 @@ class LabChecker:
     def _l05(self, case: dict[str, Any]) -> None:
         if not self._ensure_rendered(case):
             raise RuntimeError("Tetragon deny manifest is unavailable")
-        deny_path = self.rendered_dir / "tetragon-tg-deny-01.json"
+        deny_path = self.rendered_dir / TETRAGON_DENY_POLICY_FILE
         if not deny_path.is_file() or self._apply(case, deny_path).returncode != 0:
             raise RuntimeError("could not apply tetragon-tg-deny-01.json")
         self.sleep(3)
@@ -1527,8 +1663,18 @@ class LabChecker:
         self.rendered_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.raw_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        l04_blocked = self._check_tetragon_export_denylist()
-        baseline_ok = self._run_case("L-01", self._l01)
+        cleanup_ok = self._run_pre_run_cleanup()
+        if cleanup_ok:
+            l04_blocked = self._check_tetragon_export_denylist()
+            baseline_ok = self._run_case("L-01", self._l01)
+        else:
+            l04_blocked = False
+            self._set(
+                self.cases["L-01"],
+                "failed",
+                f"실행 전 정리 실패: {self.pre_run_cleanup['summary']}",
+            )
+            baseline_ok = False
         cilium_ok = False
         if baseline_ok:
             cilium_ok = self._run_case("L-02", self._l02)
@@ -1565,6 +1711,7 @@ class LabChecker:
             "context": self.current_context,
             "namespace": self.namespace,
             "cleanup_requested": self.cleanup_requested,
+            "pre_run_cleanup": self.pre_run_cleanup,
             "overall": overall,
             "cases": list(self.cases.values()),
         }
@@ -1582,6 +1729,41 @@ def report_markdown(report: dict[str, Any]) -> str:
         f"- 전체 결과: **{report['overall']}**",
         "",
     ]
+    cleanup = report.get("pre_run_cleanup")
+    if isinstance(cleanup, dict):
+        lines.extend(
+            [
+                f"## {cleanup.get('title', '실행 전 정리')}",
+                "",
+                f"- 상태: **{cleanup.get('status', 'not_run')}**",
+                f"- 요약: {cleanup.get('summary', '')}",
+            ]
+        )
+        if cleanup.get("deleted_policies"):
+            lines.append("- 삭제한 관리 정책:")
+            lines.extend(
+                f"  - `{item}`" for item in cleanup["deleted_policies"]
+            )
+        if cleanup.get("warnings"):
+            lines.append("- 경고:")
+            lines.extend(f"  - {item}" for item in cleanup["warnings"])
+        if cleanup.get("commands"):
+            lines.extend(["", "명령 요약:", ""])
+            for command in cleanup["commands"]:
+                rendered = shlex.join(str(item) for item in command["argv"])
+                lines.append(
+                    f"- `{sanitize_text(rendered, limit=500)}` "
+                    f"→ rc={command['returncode']}"
+                )
+                if command.get("stdout"):
+                    lines.append(
+                        f"  - stdout: `{sanitize_text(str(command['stdout']), limit=300)}`"
+                    )
+                if command.get("stderr"):
+                    lines.append(
+                        f"  - stderr: `{sanitize_text(str(command['stderr']), limit=300)}`"
+                    )
+        lines.append("")
     for case in report["cases"]:
         lines.extend(
             [

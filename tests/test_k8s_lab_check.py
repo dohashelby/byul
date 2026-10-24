@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from serving_runtime.enforcement.cilium import render_manifests as render_cilium
 from serving_runtime.enforcement.cilium import write_manifests
@@ -81,6 +82,42 @@ class TetragonLogRunner:
             self.log_calls.append(command)
             index = min(len(self.log_calls) - 1, len(self.outputs) - 1)
             return ProcessResult(command, 0, self.outputs[index], "")
+        return ProcessResult(command, 0, "", "")
+
+
+class PreRunCleanupRunner:
+    def __init__(
+        self,
+        policies: dict[str, list[str]],
+        *,
+        fail_delete: tuple[str, str] | None = None,
+    ) -> None:
+        self.policies = {kind: list(names) for kind, names in policies.items()}
+        self.fail_delete = fail_delete
+        self.calls: list[tuple[str, ...]] = []
+        self.events: list[str] = []
+
+    def run(self, argv: list[str], *, timeout: float) -> ProcessResult:
+        command = tuple(argv)
+        self.calls.append(command)
+        if command == ("kubectl", "config", "current-context"):
+            return ProcessResult(command, 0, "kind-runtime-lab\n", "")
+        if "get" in command:
+            kind = command[command.index("get") + 1]
+            items = [
+                {"metadata": {"name": name, "namespace": "serving-lab"}}
+                for name in self.policies.get(kind, [])
+            ]
+            return ProcessResult(command, 0, json.dumps({"items": items}), "")
+        if "delete" in command:
+            index = command.index("delete")
+            kind, name = command[index + 1 : index + 3]
+            self.events.append(f"delete:{kind}/{name}")
+            if self.fail_delete == (kind, name):
+                return ProcessResult(command, 9, "", "delete failed")
+            if name in self.policies.get(kind, []):
+                self.policies[kind].remove(name)
+            return ProcessResult(command, 0, f"{name} deleted\n", "")
         return ProcessResult(command, 0, "", "")
 
 
@@ -206,6 +243,148 @@ class CommandConstructionTests(unittest.TestCase):
             [call[0] for call in wrong_current.calls],
             [("kubectl", "config", "current-context")],
         )
+
+
+class PreRunCleanupTests(unittest.TestCase):
+    def checker(self, runner: PreRunCleanupRunner, directory: str) -> LabChecker:
+        return LabChecker(
+            context="kind-runtime-lab",
+            namespace="serving-lab",
+            state_dir=Path(directory),
+            cleanup=False,
+            runner=runner,  # type: ignore[arg-type]
+            repo_root=ROOT,
+            sleeper=lambda _seconds: None,
+        )
+
+    def run_with_stubbed_lab(
+        self, checker: LabChecker, baseline
+    ) -> tuple[dict, tuple[Path, Path]]:
+        def passed(case: dict) -> None:
+            checker._set(case, "passed", "stubbed")
+
+        with (
+            patch.object(
+                checker, "_check_tetragon_export_denylist", return_value=False
+            ),
+            patch.object(checker, "_l01", side_effect=baseline),
+            patch.object(checker, "_l02", side_effect=passed),
+            patch.object(checker, "_l03", side_effect=passed),
+            patch.object(checker, "_l04", side_effect=passed),
+            patch.object(checker, "_l05", side_effect=passed),
+        ):
+            return checker.run()
+
+    def test_leftover_managed_policies_are_deleted_before_baseline(self) -> None:
+        runner = PreRunCleanupRunner(
+            {
+                "CiliumNetworkPolicy": ["runtime-engine-egress"],
+                "TracingPolicyNamespaced": ["runtime-tg-deny-01"],
+            }
+        )
+        baseline_calls: list[str] = []
+        with tempfile.TemporaryDirectory() as directory:
+            checker = self.checker(runner, directory)
+
+            def baseline(case: dict) -> None:
+                self.assertEqual(
+                    runner.events,
+                    [
+                        "delete:CiliumNetworkPolicy/runtime-engine-egress",
+                        "delete:TracingPolicyNamespaced/runtime-tg-deny-01",
+                    ],
+                )
+                baseline_calls.append("called")
+                checker._set(case, "passed", "baseline proceeded")
+
+            report, paths = self.run_with_stubbed_lab(checker, baseline)
+            persisted_cleanup = json.loads(
+                paths[0].read_text(encoding="utf-8")
+            )["pre_run_cleanup"]
+            markdown = paths[1].read_text(encoding="utf-8")
+
+        self.assertEqual(baseline_calls, ["called"])
+        self.assertEqual(report["cases"][0]["status"], "passed")
+        cleanup = report["pre_run_cleanup"]
+        self.assertEqual(cleanup["status"], "passed")
+        self.assertEqual(
+            cleanup["deleted_policies"],
+            [
+                "CiliumNetworkPolicy/runtime-engine-egress",
+                "TracingPolicyNamespaced/runtime-tg-deny-01",
+            ],
+        )
+        delete_commands = [
+            command
+            for command in cleanup["commands"]
+            if "delete" in command["argv"]
+        ]
+        self.assertTrue(delete_commands)
+        self.assertTrue(
+            all("--namespace" in command["argv"] for command in delete_commands)
+        )
+        self.assertTrue(
+            all("--wait=true" in command["argv"] for command in delete_commands)
+        )
+        self.assertTrue(all(command["returncode"] == 0 for command in delete_commands))
+        self.assertEqual(persisted_cleanup["deleted_policies"], cleanup["deleted_policies"])
+        self.assertIn("runtime-engine-egress", markdown)
+        self.assertIn("rc=0", markdown)
+
+    def test_delete_failure_fails_l01_without_running_baseline(self) -> None:
+        target = ("CiliumNetworkPolicy", "runtime-engine-ingress")
+        runner = PreRunCleanupRunner(
+            {target[0]: [target[1]], "TracingPolicyNamespaced": []},
+            fail_delete=target,
+        )
+        baseline_calls: list[str] = []
+        with tempfile.TemporaryDirectory() as directory:
+            checker = self.checker(runner, directory)
+
+            def baseline(_case: dict) -> None:
+                baseline_calls.append("called")
+
+            report, _paths = self.run_with_stubbed_lab(checker, baseline)
+
+        self.assertEqual(baseline_calls, [])
+        self.assertEqual(report["pre_run_cleanup"]["status"], "failed")
+        self.assertEqual(report["cases"][0]["status"], "failed")
+        self.assertIn("실행 전 정책 삭제 실패", report["cases"][0]["summary"])
+        self.assertEqual(report["pre_run_cleanup"]["commands"][-1]["returncode"], 9)
+
+    def test_unmanaged_policies_are_warned_and_never_deleted(self) -> None:
+        runner = PreRunCleanupRunner(
+            {
+                "CiliumNetworkPolicy": [
+                    "runtime-gateway-egress",
+                    "team-owned-egress",
+                ],
+                "TracingPolicyNamespaced": ["security-team-audit"],
+            }
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            checker = self.checker(runner, directory)
+
+            def baseline(case: dict) -> None:
+                checker._set(case, "passed", "baseline proceeded")
+
+            report, paths = self.run_with_stubbed_lab(checker, baseline)
+            markdown = paths[1].read_text(encoding="utf-8")
+
+        deleted_commands = [
+            command
+            for command in runner.calls
+            if "delete" in command
+        ]
+        self.assertEqual(len(deleted_commands), 1)
+        self.assertIn("runtime-gateway-egress", deleted_commands[0])
+        self.assertNotIn("team-owned-egress", " ".join(deleted_commands[0]))
+        self.assertNotIn("security-team-audit", " ".join(deleted_commands[0]))
+        warnings = report["pre_run_cleanup"]["warnings"]
+        self.assertTrue(any("team-owned-egress" in item for item in warnings))
+        self.assertTrue(any("security-team-audit" in item for item in warnings))
+        self.assertIn("실행 전 정리", markdown)
+        self.assertIn("team-owned-egress", markdown)
 
 
 class OutputParsingTests(unittest.TestCase):

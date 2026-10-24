@@ -496,6 +496,8 @@ MVP-01~11, S1-01~06, S2-01~06, S3A-01~08을 임시 데이터와 빈 포트에서
 
 준비된 `runtime-lab` kind 클러스터에서의 lab 실행 순서는 다음과 같습니다. Gateway는 기존 규칙대로 pod 안의 `127.0.0.1:8080`에만 바인딩되며, 점검 도구가 `kubectl exec`로 같은 pod 안에서 요청합니다. 도구는 현재 context도 정확히 `kind-runtime-lab`인지 먼저 확인하고, 기본적으로 적용한 정책을 유지합니다(`--cleanup`을 주면 정책만 정리).
 
+매 실행은 안전 context 확인 뒤 L-01 전에 도구의 렌더·적용 목록에 속한 잔여 정책만 삭제 완료까지 기다리며, 같은 namespace의 다른 정책은 삭제하지 않고 보고서의 `실행 전 정리` 경고로 남깁니다.
+
 ```bash
 docker build -f deploy/lab/Dockerfile -t serving-runtime-lab:dev .
 kind load docker-image --name runtime-lab serving-runtime-lab:dev

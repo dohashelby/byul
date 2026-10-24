@@ -21,12 +21,16 @@ class RequestRecords:
         observation_session_id: str,
         policy_state: Callable[[], PolicyState],
         backend_kind: str,
+        environment: str | None = None,
+        run_id: str | None = None,
     ) -> None:
         self.store = JsonlStore(Path(data_dir) / "gateway_records.jsonl")
         self._data_dir = str(data_dir)
         self._observation_session_id = observation_session_id
         self._policy_state = policy_state
         self._backend_kind = backend_kind
+        self._environment = environment
+        self._run_id = run_id
         self._state_lock = threading.Lock()
         self._store_state = "unknown"
         self._last_error: str | None = None
@@ -100,6 +104,8 @@ class RequestRecords:
             "phase": phase,
             "request_id": request_id,
             "observation_session_id": self._observation_session_id,
+            "environment": self._environment,
+            "run_id": self._run_id,
             "target_id": policy.target_id if policy else None,
             "recorded_at": _utc_now(),
             "policy": {

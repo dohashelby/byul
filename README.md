@@ -18,7 +18,7 @@ BoB serving-engine security runtime solution
 | 모델 파일 무결성 | 승인 자산 목록(경로·SHA-256·크기)과 디스크 파일 주기 비교, 변경·누락·목록 밖 파일 표시 | 단위·HTTP 시험, 실제 모델 파일 목록 생성 확인 |
 | 재검증 요청 | 자산 변경·engine API 구성 drift·같은 판본 정책 내용 변경을 JSONL 요청으로 열고 조회·내보내기 | 단위 시험 완료; 검증 도구 연동 형식 D-03 미합의 |
 | 통신·행위 통제 준비 (P2 사전 작업) | Cilium 규칙 후보 생성, Tetragon 파일 규칙 후보·이벤트 변환, 관측 API·대시보드 | 로컬 kind에서 Cilium 통제·Hubble 실제 관측 통과, Tetragon 감시는 귀속 한계와 함께 확인, 차단은 재시작 후 유지 확인(업그레이드 직후 불일치 사례 원인 확인 중) |
-| 시험 | unittest 157개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | Claude 소켓 허용 환경 157개 전부 통과; 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 시험 | unittest 230개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 이번 Codex 샌드박스에서 174개 통과·소켓 제한 56개 건너뜀·실패 0개. 직전판은 Claude 소켓 허용 환경에서 224개 전부 통과했으며, 이번 deadline·heartbeat 회귀시험은 재실행 필요. 기존 CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -189,6 +189,7 @@ Gateway는 수집 결과에서 승인 상태와 다른 근거를 발견하면 `<
 - `base_url`: backend 주소(http/https, 경로 접두 허용). 요청 본문·헤더(`Host`, `X-Forwarded-*` 등)로 바꿀 수 없고, 클라이언트 헤더는 backend로 전달하지 않습니다. 3xx redirect는 따라가지 않고 502로 처리하며, https 인증서 검증은 끌 수 없습니다.
 - `model_map`: 정책 허용 모델명 → backend 모델 ID. 매핑 없는 허용 모델은 backend를 호출하지 않고 503 `BACKEND_MODEL_UNMAPPED`입니다.
 - `credential`: `{"env": "변수명"}` 또는 `{"file": "경로"}` 중 하나. 키 값은 설정 파일·CLI에 넣지 않습니다. 설정했는데 값이 없으면 503 `BACKEND_CREDENTIAL_MISSING`, 공백·제어문자나 HTTP 헤더에 쓸 수 없는 문자가 있으면 503 `BACKEND_CREDENTIAL_INVALID`로 backend를 호출하지 않습니다. 파일이 다른 사용자에게 읽히면 `insecure_file` 상태로 표시합니다. 키는 기록·API·화면·보고서에 남기지 않습니다.
+- `metrics_credential`: metrics 목적지에 인증이 필요할 때만 `credential`과 같은 env/file 형식으로 별도 설정합니다. 설정하지 않으면 metrics 요청에는 `Authorization`을 보내지 않으며, `metrics_url`이 같은 호스트여도 추론용 `credential`을 재사용하지 않습니다. 누락·부적합한 metrics 키는 metrics 수집만 오류로 만들고 추론 요청에는 영향을 주지 않습니다.
 - `health_path`·`models_path`·`version_path`·`metrics_url`·`metrics_map`·`timeouts`: 상태·지표 수집과 시간 제한. health 200은 "연결 가능"이며 추론 정상을 뜻하지 않습니다.
 
 증거 구분: 외부 backend 요청은 기록에 `backend_kind: "vllm"`으로 남고, 모의 엔진 수신 기록을 증거로 쓰지 않습니다. backend 측 수신 기록원이 아직 연결되지 않았으므로 거부 요청은 "Gateway 미전달 확인, backend 미수신은 미확인", 허용 요청은 "Gateway 전달·응답 수신, backend 측 수신 기록 미연결"로 표시합니다. 엔진 내부 생성 취소는 확인하지 않습니다(`backend_cancel: "not_observed"`).
@@ -288,6 +289,8 @@ curl -N -H 'Content-Type: application/json' \
 
 stream은 backend SSE 바이트를 전체 버퍼링하지 않고 즉시 전달합니다. HTTP 200이 시작된 뒤에도 `[DONE]` 없는 종료, 청크 무응답, 전체 제한 초과, client 연결 종료, 중계 오류는 최종 기록에서 성공이 아닌 `ERROR`로 남습니다. Gateway는 이때 backend 연결을 닫습니다. vLLM v0.29.0 CPU를 요청 로그 옵션과 함께 실행한 사전 점검에서는 취소 요청의 `aborted` 로그를 확인했지만, 이는 정식 GPU S3B 증거가 아닙니다. context 제한은 아래 "context 사전 통제"를 참고합니다.
 
+Gateway는 기본적으로 요청 헤더 전체 5초, 본문 전체 읽기 10초의 절대 deadline과 동시 client 연결 64개 상한을 적용합니다. `--request-header-timeout`, `--request-body-timeout`, `--max-connections`로 조정합니다. deadline은 monotonic 시각의 남은 시간을 매 socket read에 적용하므로 1바이트씩 계속 보내도 연장되지 않습니다. 이 연결 상한은 정책의 동시 추론 2개(`--max-concurrency`)와 별개입니다. 느린 헤더·본문은 408, `Content-Length`보다 짧게 끝난 본문은 400, 연결 상한 초과는 즉시 503으로 기록하며 backend에 전달하지 않습니다. 동시 추론 상한이 찼을 때는 `/tokenize`도 호출하지 않고 429를 반환합니다.
+
 ### 시연하기
 
 터미널 두 개를 사용합니다.
@@ -299,10 +302,10 @@ stream은 backend SSE 바이트를 전체 버퍼링하지 않고 즉시 전달�
 
 ### 대시보드
 
-- **현황**: 결과별 건수, 정책 판본·SHA-256·로딩 시각, 모의 엔진 연결 점검, 기록 저장 상태·손상 줄 수와 위치. 네트워크·프로세스·파일 관측은 저장 자료에 따라 "미연결"·"합성 데이터"·"실제 수집"으로, GPU 관측은 "미연결"로 표시합니다.
-- **통신·행위 관측**: Hubble 통신과 Tetragon 프로세스·파일 최신 기록을 각각 표시합니다. 합성 자료는 "합성" 배지가 붙고 허용 목록 밖 실행 파일은 강조됩니다.
+- **현황**: 결과별 건수, 정책 판본·SHA-256·로딩 시각, 모의 엔진 연결 점검, 기록 저장 상태·손상 줄 수와 위치. 네트워크·프로세스·파일 관측은 저장 자료와 live feed/heartbeat 상태를 함께 보며 "미연결"·"합성 데이터"·"실제 기록·실시간 미연결"·"수집 정상·새 이벤트 없음"·"실제 수집(실시간)"·"관측 불가"를 구분합니다. GPU 관측은 "미연결"입니다.
+- **통신·행위 관측**: Hubble 통신과 Tetragon 프로세스·파일 최신 기록, 환경·실행 배지, Cilium 정책 객체 상태, kind lab L-01~L-06 결과를 표시합니다. Tetragon Override는 "차단 시도 기록(enforce)"이며 실제 EPERM 확인은 lab L-05와 별개입니다. 합성 자료는 "합성" 배지가 붙고 허용 목록 밖 실행 파일은 강조됩니다.
 - **정책·기준 상태**: 읽기/Gateway 활성/외부 집행 배지, 기간·철회·승인 근거, 최근 정책 이력 50건, baseline 비교, 수집원별 최근 성공·오류·`data_origin`을 표시합니다.
-- **요청 목록**: 결과별 필터. 행을 누르면 상세가 열리며, 재실행 전 요청에는 "이전 실행" 태그가 붙습니다.
+- **요청 목록**: 결과별 필터와 Gateway 환경·실행 배지. 행을 누르면 상세가 열리며, 재실행 전 요청에는 "이전 실행" 태그가 붙습니다. 과거 기록에 필드가 없으면 "환경 미기록"·"실행 미기록"으로 표시합니다.
 - **상세**: 판정·적용 규칙, 전달 여부, Gateway 기록(시작→최종), 모의 엔진 수신 증거, 증거 JSON 내려받기.
 - 3초마다 갱신하며, 서버와 연결이 끊기면 경고 배너를 띄우고 이전 값을 흐리게 표시합니다.
 
@@ -315,7 +318,9 @@ stream은 backend SSE 바이트를 전체 버퍼링하지 않고 즉시 전달�
 - `gateway_records.jsonl`: 요청별 시작·최종 판정 기록
 - `engine_receipts.jsonl`: 모의 엔진 수신 기록
 - `policy_history.jsonl`: 시작 시 정책 로딩 성공·실패, 현재·직전 참조와 같은 판본 내용 변경 기록
-- `observations.jsonl`: CLI로 변환한 Hubble·Tetragon 관측 기록(`data_origin` 필수)
+- `observations.jsonl`: CLI 또는 live feed로 변환한 Hubble·Tetragon 관측 기록(`data_origin` 필수, `environment`·`run_id`는 과거 호환을 위해 선택)
+- `observation_feed_{hubble,tetragon}.json`: live feed 파일 identity·byte offset·최근 event key 체크포인트. 회전·잘림 뒤 처음부터 읽되 event key로 재시작 중복을 피합니다.
+- `hubble.heartbeat.json`, `tetragon.heartbeat.json`: 보조 follow 스크립트가 출력 폴더에 원자적으로 갱신하는 writer 시작 시각·최근 생존 시각·자식 프로세스 상태. Gateway data-dir 파일이 아니라 feed 원본 옆에 둡니다.
 
 프롬프트·응답 원문은 저장하지 않습니다. 실행할 때 이전 기록을 지우지 않으며, 초기화하려면 서버를 끈 뒤 위 폴더를 직접 삭제합니다.
 
@@ -395,7 +400,7 @@ L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었습니다. 앞선 기�
 ```
 
 - Cilium 후보는 engine ingress를 Gateway·metrics collector의 engine TCP port로 한정하고, engine egress를 DNS TCP/UDP 53과 명시한 FQDN/CIDR 목적지로, Gateway egress를 engine TCP port와 DNS로 한정합니다. 선택된 endpoint에 ingress/egress 절이 존재하므로 해당 방향은 그 허용 규칙 외 default deny가 됩니다.
-- Tetragon 후보는 `security_file_permission`의 모델 쓰기(`TG-ASSET-01`), 민감 경로 읽기(`TG-SECRET-01`), cache 쓰기 관측(`TG-CACHE-01`)을 만듭니다. `monitor`에는 Override가 없습니다. `enforce_probe`의 `TG-DENY-01`만 지정 `probe_path` 쓰기에 `Override argError -1` 후보를 만듭니다. 최종 WSL+kind 확인에서도 실제 쓰기 차단이 안정적으로 유지되지 않았습니다.
+- Tetragon 후보는 `security_file_permission`의 모델 쓰기(`TG-ASSET-01`), 민감 경로 읽기(`TG-SECRET-01`), cache 쓰기 관측(`TG-CACHE-01`)을 만듭니다. `monitor`에는 Override가 없습니다. `enforce_probe`의 `TG-DENY-01`만 지정 `probe_path` 쓰기에 `Override argError -1` 후보를 만듭니다. WSL+kind에서는 Tetragon 재시작 후 8.5시간 경과·클러스터 범위 추가 시험에서도 EPERM이 유지됐지만, helm upgrade 직후 한 실행에서 불일치가 있었으므로 업그레이드·재시작 직후 재현 확인은 남아 있습니다.
 - `TG-EXEC-01` 정책은 따로 만들지 않습니다. Tetragon 기본 `process_exec` 이벤트의 binary를 intent의 `allowed_engine_binaries`와 비교해 어댑터가 `allowed_binary`를 판정합니다. 목록이 비어 있거나 intent 없이 변환하면 판정은 `null`입니다.
 
 공식 출력 모양을 흉내 낸 fixture는 `tests/fixtures/enforcement/`에 있으며 실제 수집 자료가 아닙니다. 호출자가 `synthetic` 또는 `real`을 반드시 지정해야 하고 Tetragon `arguments`는 저장하지 않습니다.
@@ -403,14 +408,46 @@ L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었습니다. 앞선 기�
 ```bash
 .venv/bin/python -m serving_runtime enforce ingest --kind hubble \
   --input tests/fixtures/enforcement/hubble_flows.synthetic.jsonl \
-  --origin synthetic --data-dir /tmp/runtime-observations
+  --origin synthetic --data-dir /tmp/runtime-observations \
+  --environment fixture-local --run-id fixture-run
 .venv/bin/python -m serving_runtime enforce ingest --kind tetragon \
   --input tests/fixtures/enforcement/tetragon_events.synthetic.jsonl \
   --origin synthetic --data-dir /tmp/runtime-observations \
-  --intent examples/enforcement/intent.example.json
+  --intent examples/enforcement/intent.example.json \
+  --environment fixture-local --run-id fixture-run
 ```
 
-변환 성공 건은 `<data-dir>/observations.jsonl`에 추가됩니다. 형식 오류·미지원 이벤트는 원문 대신 줄 번호와 사유로 거부 집계합니다. MVP를 같은 `--data-dir`로 실행하면 `GET /api/observations`와 대시보드에서 source·kind·verdict·rule ID·자료 출처별 건수, 최신 50건, 손상 줄을 읽을 수 있습니다.
+`--environment`와 `--run-id`는 새 기록의 시험 범위를 구분하는 선택 옵션입니다. 과거 JSONL 호환 때문에 필수로 만들지 않았습니다. 변환 성공 건은 `<data-dir>/observations.jsonl`에 추가됩니다. 형식 오류·미지원 이벤트는 원문 대신 줄 번호와 사유로 거부 집계합니다. MVP를 같은 `--data-dir`로 실행하면 `GET /api/observations`와 대시보드에서 source·kind·verdict·rule ID·환경·실행·자료 출처별 건수, 최신 50건, 손상 줄을 읽을 수 있습니다.
+
+실행 중 Gateway가 계속 추가되는 원본 파일을 자동 수집하게 하려면 먼저 별도 터미널에서 lab 전용 보조 스크립트를 실행합니다. 이 스크립트는 현재 kubectl context와 지정 context가 모두 정확히 `kind-runtime-lab`일 때만 `cilium hubble port-forward`, 로컬 4245에 고정한 `hubble observe --follow -o jsonpb`, Tetragon `export-stdout` 로그 follow를 시작합니다. Hubble은 실행 시각 이후의 `DROPPED`만 기본 수집하고 Tetragon은 `kubectl logs --follow --tail=0`으로 시작 전 로그를 재생하지 않습니다. Hubble FORWARDED까지 필요하면 `--include-forwarded`를 명시합니다. 다음 명령은 사용자가 명시적으로 실행할 때만 클러스터를 조회하며, Gateway나 시험 과정에서 자동 실행하지 않습니다.
+
+```bash
+.venv/bin/python -B tools/k8s_observation_feed.py \
+  --context kind-runtime-lab \
+  --output-dir ~/.local/state/serving-runtime/k8s-lab/live
+```
+
+전경 실행의 Ctrl-C뿐 아니라 SIGTERM/SIGHUP도 같은 정리 경로를 사용해 세 자식 프로세스를 종료하고 heartbeat를 `stopped`로 갱신합니다.
+
+그 뒤 기존 메인 data-dir에 요청 환경과 관측 환경을 각각 지정해 Gateway를 실행할 수 있습니다. `--lab-report`는 JSON 파일 또는 JSON 보고서 디렉터리를 받으며, 디렉터리면 수정 시각이 가장 최근인 JSON을 읽습니다. 보고서 없음·손상은 `/api/lab-report`와 화면에서 별도 상태로 표시합니다. `--cilium-policy-status`는 고정 context `kind-runtime-lab`, namespace `serving-lab`에서만 `CiliumNetworkPolicy` 객체를 10초 timeout으로 주기 조회합니다.
+
+```bash
+.venv/bin/python -m serving_runtime mvp \
+  --backend vllm --backend-config backend.json --gateway-port 18080 \
+  --data-dir ~/.local/state/serving-runtime/s3b-cpu/data \
+  --environment docker-cpu --run-id s3b-cpu-current \
+  --observation-feed hubble=~/.local/state/serving-runtime/k8s-lab/live/hubble.jsonl \
+  --observation-feed tetragon=~/.local/state/serving-runtime/k8s-lab/live/tetragon.jsonl \
+  --observation-heartbeat hubble=~/.local/state/serving-runtime/k8s-lab/live/hubble.heartbeat.json \
+  --observation-heartbeat tetragon=~/.local/state/serving-runtime/k8s-lab/live/tetragon.heartbeat.json \
+  --observation-origin real \
+  --observation-environment kind-lab-wsl --observation-run-id k8s-lab-live \
+  --observation-intent deploy/lab/intent.lab.json \
+  --lab-report ~/.local/state/serving-runtime/k8s-lab/reports \
+  --cilium-policy-status
+```
+
+live feed는 완성된 새 줄만 변환하며 파일 회전·잘림을 감지합니다. heartbeat가 정상 갱신되면 이벤트가 없어도 "수집 정상·새 이벤트 없음"이고, writer 종료·heartbeat 만료는 관측 불가입니다. heartbeat 만료 기준은 `--collector-stale-after`와 같습니다. heartbeat를 설정하지 않은 임의 feed는 생존을 입증할 수 없으므로 이전처럼 새 이벤트가 없으면 stale이 되며 화면에 "writer heartbeat 미설정" 이유가 붙습니다. heartbeat의 `started_at`보다 오래된 이벤트는 저장하지 않고 실행 전 이벤트로 별도 집계합니다. 원본 손상 줄은 내용 대신 줄 번호·사유와 누적 건수를 표시합니다. Hubble 화면은 혼합 기록에서도 최근 DROPPED 최대 25건을 우선 표시해 FORWARDED에 묻히지 않게 합니다. Cilium 화면의 "설정됨"은 정책 객체 존재만 뜻하고, 실제 차단은 lab L-02 통과 또는 실제 Hubble `DROPPED` 근거로 별도 표시합니다.
 
 ## 협업·검수
 

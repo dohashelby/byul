@@ -36,7 +36,7 @@ class EngineClient:
         else:
             connection, request_path = self.backend.connection(path, self.timeout_s)
         headers = self.backend.request_headers(
-            request_id=request_id, content_type=content_type
+            request_id=request_id, content_type=content_type, metrics=metrics
         )
         try:
             connection.request(method, request_path, body=body, headers=headers)
@@ -161,6 +161,10 @@ class EngineClient:
         return value, "external_backend"
 
     def collect_metrics(self) -> tuple[dict[str, Any], str | None]:
+        if self.backend.metrics_credential_status == "missing":
+            raise OSError("metrics credential is configured but unavailable")
+        if self.backend.metrics_credential_status == "invalid":
+            raise OSError("metrics credential is invalid")
         status, _, body = self.request("GET", "", metrics=True)
         if status != 200:
             raise OSError(f"metrics endpoint returned HTTP status {status}")

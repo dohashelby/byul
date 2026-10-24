@@ -44,6 +44,21 @@ function badge(result) {
   return el("span", { className: `badge badge-${result}`, text: RESULT_LABELS[result] || result });
 }
 
+function scopeBadges(environment, runId) {
+  const wrap = el("div", { className: "scope-badges" });
+  wrap.appendChild(el("span", {
+    className: `badge ${environment ? "badge-state" : "badge-INCOMPLETE"}`,
+    text: environment || "환경 미기록",
+    title: environment || "과거 기록 또는 옵션 미설정",
+  }));
+  wrap.appendChild(el("span", {
+    className: `badge ${runId ? "badge-state" : "badge-INCOMPLETE"}`,
+    text: runId || "실행 미기록",
+    title: runId || "과거 기록 또는 옵션 미설정",
+  }));
+  return wrap;
+}
+
 function setDot(id, ok) {
   const dot = $(id);
   dot.className = "dot" + (ok === true ? " ok" : ok === false ? " bad" : "");
@@ -71,7 +86,7 @@ async function getJson(url) {
 }
 
 function renderStatus(status) {
-  $("session-id").textContent = `관측 세션 ${status.observation_session_id.slice(0, 8)}`;
+  $("session-id").textContent = `관측 세션 ${status.observation_session_id.slice(0, 8)} · ${status.environment || "환경 미기록"} · ${status.run_id || "실행 미기록"}`;
   const external = status.backend_kind === "vllm";
   // The mock mode reports `mock_engine`; the external vLLM mode reports `backend`.
   const engine = status.mock_engine || status.backend || {};
@@ -100,6 +115,7 @@ function renderStatus(status) {
   fillKv("policy-kv", policyRows);
 
   const concurrency = status.concurrency || {};
+  const connections = status.connections || {};
   const receipts = engine.receipts_store || {};
   setDot("engine-dot", engine.healthy);
   const engineRows = [
@@ -107,10 +123,13 @@ function renderStatus(status) {
     ["연결", engine.healthy ? "정상" : "응답 없음", { problem: !engine.healthy }],
     ["점검", formatTime(engine.checked_at)],
     ["동시 요청", `${concurrency.in_flight ?? "–"} / ${concurrency.limit ?? "–"}`],
+    ["클라이언트 연결", `${connections.active ?? "–"} / ${connections.limit ?? "–"} · 거절 ${connections.rejected ?? 0}`],
+    ["요청 읽기 timeout", `헤더 ${connections.request_header_timeout_s ?? "–"}초 · 본문 ${connections.request_body_timeout_s ?? "–"}초`],
     ["수신 기록", receipts.ok === false ? `저장 오류: ${receipts.last_error}` : receipts.state || "–", { problem: receipts.ok === false }],
   ];
   if (external) {
     engineRows.push(["자격정보", engine.credential || "–", { problem: engine.credential !== "configured" }]);
+    engineRows.push(["metrics 자격정보", engine.metrics_credential || "미설정", { problem: ["missing", "invalid", "insecure_file"].includes(engine.metrics_credential) }]);
     engineRows.push(["추론 검증", engine.inference_verified ? "확인됨" : "미확인 (health는 연결 가능 여부만 뜻함)"]);
   }
   if (engine.error) engineRows.push(["오류", engine.error, { problem: true }]);
@@ -217,13 +236,45 @@ function assetSummary(item) {
   return [el("div", { className: problem ? "problem" : "muted", text, title: value.limit })];
 }
 
+function collectorSummary(item) {
+  const rows = assetSummary(item);
+  const value = item.last_value;
+  if (item.source.startsWith("observation_feed_") && value) {
+    rows.push(el("div", {
+      className: value.rejected > 0 || value.corrupt_lines_total > 0 || value.out_of_window_total > 0 ? "problem" : "muted",
+      text: `최근 처리 ${value.processed} · 저장 ${value.accepted} · 중복 ${value.duplicates} · 거부 ${value.rejected} · 손상 누적 ${value.corrupt_lines_total} · 실행 전 이벤트 누적 ${value.out_of_window_total || 0}`,
+      title: value.path,
+    }));
+    if ((value.rejected_details || []).length) {
+      rows.push(el("div", {
+        className: "problem",
+        text: value.rejected_details.map((detail) => `#${detail.line}: ${detail.reason}`).join(" · "),
+      }));
+    }
+    const writer = value.writer || {};
+    rows.push(el("div", {
+      className: writer.configured ? "muted" : "problem",
+      text: writer.configured
+        ? `writer ${writer.state} · heartbeat ${formatTime(writer.updated_at)}${value.idle ? " · 새 이벤트 없음" : ""}`
+        : "writer heartbeat 미설정 · 이벤트가 없으면 생존 여부를 확인할 수 없음",
+    }));
+  }
+  if (item.source === "cilium_policy" && value) {
+    rows.push(el("div", {
+      className: "muted",
+      text: `정책 객체 ${value.object_count ?? 0}개 · 객체 존재는 실제 차단 증거가 아님`,
+    }));
+  }
+  return rows;
+}
+
 function renderCollectors(payload) {
   const body = $("collector-rows");
   clear(body);
   for (const item of payload.collectors || []) {
     const origin = item.data_origin === "mock" ? "모의" : item.data_origin ?? "–";
     body.appendChild(el("tr", {}, [
-      el("td", { className: "mono", text: item.source }, assetSummary(item)),
+      el("td", { className: "mono", text: item.source }, collectorSummary(item)),
       el("td", {}, [stateCell(item.state)]),
       el("td", { text: formatTime(item.last_success_at) }),
       el("td", { text: item.last_error ?? "–" }),
@@ -278,8 +329,31 @@ function observationBadge(origin) {
   return el("span", { className: "badge badge-INCOMPLETE", text: "미확인" });
 }
 
-function observationState(origins) {
-  if ((origins?.real || 0) > 0) return ["실제 수집", "chip-real"];
+function observationState(origins, collector) {
+  const value = collector?.last_value || {};
+  const writer = value.writer || {};
+  if (collector && collector.state !== "ok") {
+    if (writer.configured === false) {
+      return [`관측 불가 (writer heartbeat 미설정 · ${collector.state})`, "chip-off"];
+    }
+    if ((collector.last_error || "").includes("heartbeat") || (collector.last_error || "").includes("writer")) {
+      return [`관측 불가 (writer heartbeat 오류)`, "chip-off"];
+    }
+    return [`관측 불가 (${collector.state})`, "chip-off"];
+  }
+  if ((value.rejected || 0) > 0 && value.out_of_window === value.rejected && writer.configured) {
+    return ["수집 정상 · 실행 전 이벤트 제외", "chip-real"];
+  }
+  if ((value.rejected || 0) > 0 && (value.accepted || 0) === 0) {
+    return ["관측 불가 (손상 줄)", "chip-off"];
+  }
+  if ((value.rejected || 0) > 0) return ["실시간 수집 · 일부 제외", "chip-synthetic"];
+  if (collector?.state === "ok" && writer.configured && value.idle) {
+    return ["수집 정상 · 새 이벤트 없음", "chip-real"];
+  }
+  if (collector?.state === "ok" && writer.configured) return ["실제 수집(실시간)", "chip-real"];
+  if (collector?.state === "ok") return ["실시간 기록 · writer 생존 미확인", "chip-off"];
+  if ((origins?.real || 0) > 0) return ["실제 기록 · 실시간 미연결", "chip-off"];
   if ((origins?.synthetic || 0) > 0) return ["합성 데이터", "chip-synthetic"];
   return ["미연결", "chip-off"];
 }
@@ -296,37 +370,40 @@ function podLabel(pod) {
   return pod.namespace ? `${pod.namespace}/${name}` : name;
 }
 
-function renderObservations(payload) {
+function renderObservations(payload, collectorsPayload) {
   const items = payload.observations || [];
   const origins = payload.origins_by_kind || {};
+  const collectorMap = Object.fromEntries((collectorsPayload.collectors || []).map((item) => [item.source, item]));
   setObservationChip(
     "network-observation-chip",
     "네트워크",
-    observationState(origins.network_flow),
+    observationState(origins.network_flow, collectorMap.observation_feed_hubble),
   );
   setObservationChip(
     "process-observation-chip",
     "프로세스",
-    observationState(origins.process_exec),
+    observationState(origins.process_exec, collectorMap.observation_feed_tetragon),
   );
   setObservationChip(
     "file-observation-chip",
     "파일",
-    observationState(origins.file_access),
+    observationState(origins.file_access, collectorMap.observation_feed_tetragon),
   );
   setObservationChip("gpu-observation-chip", "GPU", ["미연결", "chip-off"]);
 
   const corrupt = payload.corrupt_lines || 0;
   $("observation-corrupt").textContent = `손상 줄 ${corrupt}`;
 
-  const hubble = items.filter((item) => item.source === "hubble" && item.kind === "network_flow");
+  const hubble = (payload.hubble_observations || items)
+    .filter((item) => item.source === "hubble" && item.kind === "network_flow");
   const hubbleBody = $("hubble-observation-rows");
   clear(hubbleBody);
   $("hubble-observation-empty").hidden = hubble.length > 0;
   for (const item of hubble) {
     const destination = `${podLabel(item.dst)} · ${item.dst?.ip || "–"}:${item.dst?.port || "–"}/${item.dst?.protocol || "–"}`;
-    hubbleBody.appendChild(el("tr", {}, [
+    hubbleBody.appendChild(el("tr", { className: item.verdict === "dropped" ? "observation-dropped" : "" }, [
       el("td", { text: formatTime(item.observed_at) }),
+      el("td", {}, [scopeBadges(item.environment, item.run_id)]),
       el("td", { text: podLabel(item.src) }),
       el("td", { className: "mono", text: destination }),
       el("td", { text: item.verdict || "–", title: item.reason || "" }),
@@ -335,6 +412,9 @@ function renderObservations(payload) {
   }
 
   const tetragon = items.filter((item) => item.source === "tetragon");
+  const sourceCounts = payload.counts?.source || {};
+  $("observation-summary").textContent =
+    `Hubble ${sourceCounts.hubble || 0}건 · Tetragon ${sourceCounts.tetragon || 0}건`;
   const tetragonBody = $("tetragon-observation-rows");
   clear(tetragonBody);
   $("tetragon-observation-empty").hidden = tetragon.length > 0;
@@ -348,12 +428,96 @@ function renderObservations(payload) {
     if (podUnknown) attributionLabels.push("pod 미확인");
     if (processUnknown) attributionLabels.push("프로세스 미확인");
     const attributionLabel = attributionLabels.join(" · ");
+    const rawAction = String(item.action_raw || item.action || "").toUpperCase();
+    const normalizedActionMode = item.action_mode
+      || (rawAction === "KPROBE_ACTION_OVERRIDE" ? "enforce" : rawAction === "KPROBE_ACTION_POST" || rawAction === "OBSERVED" ? "monitor" : "unknown");
+    const actionMode = normalizedActionMode === "enforce"
+      ? "차단 시도 기록(enforce)"
+      : normalizedActionMode === "monitor"
+        ? "감시만(monitor)"
+        : "알 수 없음";
     tetragonBody.appendChild(el("tr", { className: outsideAllowlist ? "exec-outside-allowlist" : "" }, [
       el("td", { text: formatTime(item.observed_at) }),
+      el("td", {}, [scopeBadges(item.environment, item.run_id)]),
       el("td", { text: attributionLabel ? `${kindLabel} · ${attributionLabel}` : kindLabel }),
       el("td", { className: "mono", text: item.path || item.binary || "–", title: attributionLabel || podLabel(item.pod) }),
-      el("td", { className: "mono", text: `${item.rule_id || "–"} · ${item.action || "–"}` }),
+      el("td", { className: "mono", text: `${item.rule_id || "–"} · ${actionMode}`, title: item.action_raw || item.action || "원본 action 미기록" }),
       el("td", {}, [observationBadge(item.data_origin)]),
+    ]));
+  }
+}
+
+function renderCilium(collectorsPayload, labPayload, observations) {
+  const collector = (collectorsPayload.collectors || []).find((item) => item.source === "cilium_policy");
+  const body = $("cilium-policy-rows");
+  clear(body);
+  const value = collector?.last_value;
+  const policies = value?.policies || [];
+  $("cilium-policy-empty").hidden = policies.length > 0;
+  $("cilium-policy-empty").textContent = collector
+    ? (collector.last_error ? `정책 조회 실패: ${collector.last_error}` : "CiliumNetworkPolicy 객체가 없습니다.")
+    : "Cilium 정책 상태 수집원이 설정되지 않았습니다.";
+  $("cilium-policy-state").textContent = collector
+    ? `${collector.state} · 마지막 조회 ${formatTime(collector.last_attempt_at)} · 최근 성공 ${formatTime(collector.last_success_at)}`
+    : "미설정";
+  if (collector?.last_error) $("cilium-policy-state").textContent += ` · ${collector.last_error}`;
+  for (const policy of policies) {
+    const conditions = (policy.conditions || []).map((condition) =>
+      `${condition.type || "조건"}=${condition.status || "–"}${condition.reason ? ` (${condition.reason})` : ""}`
+    ).join(" · ") || "status/조건 없음";
+    const nodeStatus = policy.node_status || {};
+    const objectState = (nodeStatus.total || 0) > 0
+      ? `node ${nodeStatus.total} · enforcing ${nodeStatus.enforcing || 0} · 오류 ${nodeStatus.errors || 0}`
+      : policy.status_present ? "status 있음 · node 상태 없음" : "객체만 확인";
+    body.appendChild(el("tr", {}, [
+      el("td", { className: "mono", text: policy.name }),
+      el("td", { text: objectState, title: nodeStatus.last_updated || "" }),
+      el("td", { text: conditions }),
+    ]));
+  }
+  const verification = $("cilium-verification");
+  clear(verification);
+  const configured = collector?.state === "ok" && (value?.object_count || 0) > 0;
+  const l02 = labPayload.report?.cases?.find((item) => item.id === "L-02");
+  const realDrops = observations.verification?.real_hubble_dropped || 0;
+  const blocked = l02?.status === "passed" || realDrops > 0;
+  verification.appendChild(el("span", {
+    className: `badge badge-state ${configured ? "ok" : "bad"}`,
+    text: configured ? `설정됨 (정책 객체 ${value.object_count}개)` : "정책 객체 확인 불가",
+  }));
+  verification.appendChild(el("span", {
+    className: `badge badge-state ${blocked ? "ok" : "bad"}`,
+    text: blocked
+      ? `저장된 실제 차단 근거 있음 (${l02?.status === "passed" ? "L-02 통과" : ""}${l02?.status === "passed" && realDrops ? " · " : ""}${realDrops ? `Hubble DROPPED ${realDrops}건` : ""})`
+      : "실제 차단 확인 안 됨",
+  }));
+}
+
+function renderLabReport(payload) {
+  const report = payload.report;
+  $("lab-report-state").textContent = payload.state === "ok"
+    ? `${report.overall} · ${report.run_id}`
+    : `${payload.state}${payload.error ? ` · ${payload.error}` : ""}`;
+  const body = $("lab-report-rows");
+  clear(body);
+  $("lab-report-empty").hidden = Boolean(report);
+  $("lab-report-empty").textContent = payload.state === "not_configured"
+    ? "lab 보고서가 설정되지 않았습니다."
+    : payload.state === "missing"
+      ? "lab 보고서 파일을 찾지 못했습니다."
+      : `lab 보고서를 읽지 못했습니다: ${payload.error || "알 수 없는 오류"}`;
+  fillKv("lab-report-meta", report ? [
+    ["실행", report.run_id, { mono: true }],
+    ["환경", `${report.context} · ${report.namespace}`],
+    ["완료", formatTime(report.finished_at)],
+    ["전체", report.overall],
+  ] : [["상태", payload.state], ["경로", payload.configured_path || "미설정", { mono: true }]]);
+  for (const item of report?.cases || []) {
+    const evidence = (item.evidence || []).join(" · ");
+    body.appendChild(el("tr", {}, [
+      el("td", { className: "mono", text: `${item.id} · ${item.title}` }),
+      el("td", {}, [stateCell(item.status)]),
+      el("td", { text: `${item.summary}${evidence ? ` · 증거: ${evidence}` : ""}`, title: item.limitation || item.note || "" }),
     ]));
   }
 }
@@ -372,13 +536,14 @@ function renderRequests(items) {
         el("span", { text: item.request_id.slice(0, 8) }),
         ...(item.current_session ? [] : [el("span", { className: "badge badge-previous", text: "이전 실행" })]),
       ]),
+      el("td", {}, [scopeBadges(item.environment, item.run_id)]),
       el("td", { text: item.model ?? "–" }),
       el("td", { className: "num", text: item.max_tokens ?? "–" }),
       el("td", {}, [badge(item.result)]),
       el("td", { className: "mono muted", text: item.reason_code ?? "–" }),
     ]);
     if (item.stream) {
-      row.children[2].appendChild(el("span", { className: "badge badge-previous", text: "stream" }));
+      row.children[3].appendChild(el("span", { className: "badge badge-previous", text: "stream" }));
     }
     if (item.request_id === state.selectedId) row.classList.add("is-selected");
     row.addEventListener("click", () => openDetail(item.request_id));
@@ -427,6 +592,7 @@ function renderDetail(detail) {
   const head = el("div", { className: "detail-head" }, [badge(final.result || "INCOMPLETE")]);
   body.appendChild(head);
   body.appendChild(el("p", { className: "mono", text: detail.request_id }));
+  body.appendChild(scopeBadges(final.environment, final.run_id));
 
   body.appendChild(el("div", { className: `evidence-box ${detail.evidence_state}`, text: detail.evidence_summary }));
 
@@ -555,7 +721,7 @@ function setFilter(filter) {
 async function refresh() {
   const query = state.filter ? `?result=${encodeURIComponent(state.filter)}` : "";
   try {
-    const [status, summary, list, policy, baseline, collectors, revalidation, observations] = await Promise.all([
+    const [status, summary, list, policy, baseline, collectors, revalidation, observations, labReport] = await Promise.all([
       getJson("/api/status"),
       getJson("/api/summary"),
       getJson(`/api/requests${query}`),
@@ -564,6 +730,7 @@ async function refresh() {
       getJson("/api/collectors"),
       getJson("/api/revalidation"),
       getJson("/api/observations"),
+      getJson("/api/lab-report"),
     ]);
     renderStatus(status);
     renderSummary(summary);
@@ -572,7 +739,9 @@ async function refresh() {
     renderBaseline(baseline);
     renderCollectors(collectors);
     renderRevalidation(revalidation);
-    renderObservations(observations);
+    renderObservations(observations, collectors);
+    renderLabReport(labReport);
+    renderCilium(collectors, labReport, observations);
     state.lastSuccess = new Date();
     document.body.classList.remove("is-stale");
     $("stale-banner").hidden = true;
@@ -589,6 +758,19 @@ async function refresh() {
 for (const button of document.querySelectorAll("[data-filter]")) {
   button.addEventListener("click", () => setFilter(button.dataset.filter));
 }
+const observationsPanel = $("observations-panel");
+try {
+  observationsPanel.open = localStorage.getItem("observations-panel-open") === "1";
+} catch (_) {
+  // Storage can be unavailable; the panel stays collapsed.
+}
+observationsPanel.addEventListener("toggle", () => {
+  try {
+    localStorage.setItem("observations-panel-open", observationsPanel.open ? "1" : "0");
+  } catch (_) {
+    // Ignore storage failures; the toggle still works for this page view.
+  }
+});
 $("drawer-close").addEventListener("click", closeDetail);
 $("drawer-backdrop").addEventListener("click", closeDetail);
 document.addEventListener("keydown", (event) => {

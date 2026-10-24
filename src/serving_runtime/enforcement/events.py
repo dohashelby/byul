@@ -43,19 +43,53 @@ def _pod(value: Any) -> dict[str, str] | None:
     return {"namespace": namespace, "pod": name}
 
 
-def _base(observed_at: str, source: str, kind: str, origin: str) -> dict[str, Any]:
+def _scope_value(value: str | None, name: str) -> str | None:
+    if value is None:
+        return None
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or len(value) > 128
+        or any(ord(character) < 0x20 for character in value)
+    ):
+        raise ValueError(f"{name} must be a non-empty printable string up to 128 characters")
+    return value
+
+
+def _base(
+    observed_at: str,
+    source: str,
+    kind: str,
+    origin: str,
+    *,
+    environment: str | None = None,
+    run_id: str | None = None,
+) -> dict[str, Any]:
     if origin not in {"synthetic", "real"}:
         raise ValueError("data_origin must be synthetic or real")
-    return {
+    environment = _scope_value(environment, "environment")
+    run_id = _scope_value(run_id, "run_id")
+    record = {
         "schema": SCHEMA,
         "observed_at": observed_at,
         "source": source,
         "kind": kind,
         "data_origin": origin,
     }
+    if environment is not None:
+        record["environment"] = environment
+    if run_id is not None:
+        record["run_id"] = run_id
+    return record
 
 
-def parse_hubble(document: Any, *, data_origin: str) -> dict[str, Any]:
+def parse_hubble(
+    document: Any,
+    *,
+    data_origin: str,
+    environment: str | None = None,
+    run_id: str | None = None,
+) -> dict[str, Any]:
     root = _object(document, "$")
     flow = _object(root.get("flow"), "$.flow")
     observed_at = _string(flow.get("time"), "$.flow.time")
@@ -78,7 +112,14 @@ def parse_hubble(document: Any, *, data_origin: str) -> dict[str, Any]:
     direction = flow.get("traffic_direction")
     if direction is not None and not isinstance(direction, str):
         raise EventError("$.flow.traffic_direction must be a string or null")
-    normalized = _base(observed_at, "hubble", "network_flow", data_origin)
+    normalized = _base(
+        observed_at,
+        "hubble",
+        "network_flow",
+        data_origin,
+        environment=environment,
+        run_id=run_id,
+    )
     normalized.update(
         {
             "verdict": {"FORWARDED": "allowed", "DROPPED": "dropped"}.get(
@@ -127,6 +168,8 @@ def parse_tetragon(
     *,
     data_origin: str,
     allowed_engine_binaries: tuple[str, ...] | list[str] | None = None,
+    environment: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     root = _object(document, "$")
     observed_at = _event_time(root)
@@ -138,7 +181,14 @@ def parse_tetragon(
     if event_name == "process_exec":
         binary, pod = _process(event, "$.process_exec", require_binary=True)
         assert binary is not None
-        normalized = _base(observed_at, "tetragon", "process_exec", data_origin)
+        normalized = _base(
+            observed_at,
+            "tetragon",
+            "process_exec",
+            data_origin,
+            environment=environment,
+            run_id=run_id,
+        )
         allowlist = tuple(allowed_engine_binaries or ())
         normalized.update(
             {
@@ -150,6 +200,8 @@ def parse_tetragon(
                 "access": None,
                 "rule_id": "TG-EXEC-01",
                 "action": "observed",
+                "action_raw": "observed",
+                "action_mode": "monitor",
                 "allowed_binary": binary in allowlist if allowlist else None,
             }
         )
@@ -185,7 +237,18 @@ def parse_tetragon(
         raise EventError("process_kprobe has no int_arg")
     access = "write" if mask & 2 else "read" if mask & 4 else "other"
     action = _string(event.get("action"), "$.process_kprobe.action")
-    normalized = _base(observed_at, "tetragon", "file_access", data_origin)
+    action_mode = {
+        "KPROBE_ACTION_OVERRIDE": "enforce",
+        "KPROBE_ACTION_POST": "monitor",
+    }.get(action.upper(), "unknown")
+    normalized = _base(
+        observed_at,
+        "tetragon",
+        "file_access",
+        data_origin,
+        environment=environment,
+        run_id=run_id,
+    )
     normalized.update(
         {
             "binary": binary,
@@ -199,6 +262,8 @@ def parse_tetragon(
             "policy_name": policy_name,
             "rule_id": match.group(1).upper(),
             "action": action,
+            "action_raw": action,
+            "action_mode": action_mode,
         }
     )
     return normalized
@@ -210,6 +275,8 @@ def transform_lines(
     kind: str,
     data_origin: str,
     allowed_engine_binaries: tuple[str, ...] | list[str] | None = None,
+    environment: str | None = None,
+    run_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Transform lines while retaining only line numbers and safe error reasons."""
 
@@ -223,12 +290,19 @@ def transform_lines(
         try:
             document = json.loads(line)
             if kind == "hubble":
-                item = parse_hubble(document, data_origin=data_origin)
+                item = parse_hubble(
+                    document,
+                    data_origin=data_origin,
+                    environment=environment,
+                    run_id=run_id,
+                )
             else:
                 item = parse_tetragon(
                     document,
                     data_origin=data_origin,
                     allowed_engine_binaries=allowed_engine_binaries,
+                    environment=environment,
+                    run_id=run_id,
                 )
         except (json.JSONDecodeError, EventError, RecursionError) as error:
             rejected.append({"line": line_number, "reason": str(error)})
@@ -244,6 +318,8 @@ def ingest_file(
     kind: str,
     data_origin: str,
     allowed_engine_binaries: tuple[str, ...] | list[str] | None = None,
+    environment: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     with Path(input_path).open("r", encoding="utf-8") as source:
         accepted, rejected = transform_lines(
@@ -251,6 +327,8 @@ def ingest_file(
             kind=kind,
             data_origin=data_origin,
             allowed_engine_binaries=allowed_engine_binaries,
+            environment=environment,
+            run_id=run_id,
         )
     store = JsonlStore(Path(data_dir) / "observations.jsonl")
     for item in accepted:
@@ -265,7 +343,15 @@ def ingest_file(
 class ObservationQuery:
     """Read-only aggregation for normalized observations."""
 
-    FILTERS = {"source", "kind", "verdict", "rule_id", "data_origin"}
+    FILTERS = {
+        "source",
+        "kind",
+        "verdict",
+        "rule_id",
+        "data_origin",
+        "environment",
+        "run_id",
+    }
 
     def __init__(self, path: str | Path) -> None:
         self.store = JsonlStore(path)
@@ -282,7 +368,15 @@ class ObservationQuery:
             if all(item.get(name) == value for name, value in active.items())
         ]
         filtered.sort(key=lambda item: str(item.get("observed_at", "")), reverse=True)
-        dimensions = ("source", "kind", "verdict", "rule_id", "data_origin")
+        dimensions = (
+            "source",
+            "kind",
+            "verdict",
+            "rule_id",
+            "data_origin",
+            "environment",
+            "run_id",
+        )
         counts = {
             name: dict(Counter(str(item[name]) for item in filtered if item.get(name) is not None))
             for name in dimensions
@@ -296,9 +390,28 @@ class ObservationQuery:
                 continue
             origin_counts = origins_by_kind.setdefault(kind, {})
             origin_counts[origin] = origin_counts.get(origin, 0) + 1
+        real_hubble_dropped = sum(
+            1
+            for item in filtered
+            if item.get("source") == "hubble"
+            and item.get("verdict") == "dropped"
+            and item.get("data_origin") == "real"
+        )
+        hubble_items = [item for item in filtered if item.get("source") == "hubble"]
+        hubble_dropped = [
+            item for item in hubble_items if item.get("verdict") == "dropped"
+        ][:25]
+        hubble_other = [
+            item for item in hubble_items if item.get("verdict") != "dropped"
+        ]
+        hubble_observations = (
+            hubble_dropped + hubble_other[: 50 - len(hubble_dropped)]
+        )
         return {
             "counts": counts,
             "origins_by_kind": origins_by_kind,
+            "verification": {"real_hubble_dropped": real_hubble_dropped},
+            "hubble_observations": hubble_observations,
             "observations": filtered[:50],
             "corrupt_lines": len(corrupt),
             "corrupt_details": corrupt[:20],

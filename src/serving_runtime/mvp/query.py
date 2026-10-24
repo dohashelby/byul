@@ -83,6 +83,8 @@ class QueryService:
             "request_id": request_id,
             "recorded_at": source.get("recorded_at"),
             "observation_session_id": source.get("observation_session_id"),
+            "environment": source.get("environment"),
+            "run_id": source.get("run_id"),
             "model": request.get("model"),
             "max_tokens": request.get("max_tokens"),
             "result": result,

@@ -40,6 +40,7 @@
 - `base_url`: 승인된 vLLM 주소. 원격이면 https 사용(인증서 검증은 끌 수 없음)
 - `model_map`: 정책의 허용 모델명 → 실제 backend 모델 ID
 - `credential`: `{"env": "VLLM_API_KEY"}` 또는 `{"file": "/보호된/경로"}` (파일 권한 600)
+- `metrics_credential`: metrics endpoint 인증이 필요할 때만 별도 env/file로 설정. 미설정 시 metrics 요청에 추론용 `credential`을 보내지 않음
 - `metrics_url`, `metrics_map`: 실제 `/metrics` 응답에서 이름·타입·단위를 확인한 뒤 매핑. 확인 전에는 `verified: false` 유지
 
 ## 4. 실행·재현 명령

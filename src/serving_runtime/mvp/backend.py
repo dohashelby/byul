@@ -24,6 +24,7 @@ _TOP_LEVEL_FIELDS = frozenset(
         "base_url",
         "model_map",
         "credential",
+        "metrics_credential",
         "health_path",
         "models_path",
         "version_path",
@@ -106,7 +107,10 @@ class BackendConfig:
     metrics_map: dict[str, dict[str, Any]] = field(default_factory=dict)
     credential_status: str = "configured"
     credential_configured: bool = False
+    metrics_credential_status: str = "not_configured"
+    metrics_credential_configured: bool = False
     _authorization: str | None = field(default=None, repr=False, compare=False)
+    _metrics_authorization: str | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     def mock(cls, address: tuple[str, int]) -> "BackendConfig":
@@ -128,6 +132,10 @@ class BackendConfig:
     def authorization(self) -> str | None:
         return self._authorization
 
+    @property
+    def metrics_authorization(self) -> str | None:
+        return self._metrics_authorization
+
     def mapped_model(self, policy_model: str | None) -> str | None:
         if not isinstance(policy_model, str):
             return None
@@ -136,15 +144,20 @@ class BackendConfig:
         return self.model_map.get(policy_model)
 
     def request_headers(
-        self, *, request_id: str | None = None, content_type: str | None = None
+        self,
+        *,
+        request_id: str | None = None,
+        content_type: str | None = None,
+        metrics: bool = False,
     ) -> dict[str, str]:
         headers: dict[str, str] = {}
         if content_type is not None:
             headers["Content-Type"] = content_type
         if request_id is not None:
             headers["X-Request-ID"] = request_id
-        if self._authorization is not None:
-            headers["Authorization"] = self._authorization
+        authorization = self._metrics_authorization if metrics else self._authorization
+        if authorization is not None:
+            headers["Authorization"] = authorization
         return headers
 
     def connection(self, route: str, timeout_s: float) -> tuple[HTTPConnection, str]:
@@ -163,6 +176,8 @@ class BackendConfig:
             "credential_configured": self.credential_configured,
             "health_path": self.health_path,
             "metrics_configured": self.metrics_target is not None,
+            "metrics_credential": self.metrics_credential_status,
+            "metrics_credential_configured": self.metrics_credential_configured,
         }
 
 
@@ -238,25 +253,26 @@ def _read_credential(
     *,
     config_dir: Path,
     environ: Mapping[str, str],
+    field_name: str = "credential",
 ) -> tuple[bool, str, str | None]:
     if credential is None:
         return False, "configured", None
-    value = _require_object(credential, "credential")
+    value = _require_object(credential, field_name)
     if set(value) not in ({"env"}, {"file"}):
-        raise ValueError("credential must contain exactly one of env or file")
+        raise ValueError(f"{field_name} must contain exactly one of env or file")
     insecure = False
     secret: str | None = None
     if "env" in value:
         name = value["env"]
         if not isinstance(name, str) or _ENV_NAME.fullmatch(name) is None:
-            raise ValueError("credential.env must be a valid environment variable name")
+            raise ValueError(f"{field_name}.env must be a valid environment variable name")
         candidate = environ.get(name)
         if isinstance(candidate, str) and candidate:
             secret = candidate
     else:
         configured_path = value["file"]
         if not isinstance(configured_path, str) or not configured_path.strip():
-            raise ValueError("credential.file must be a non-empty path")
+            raise ValueError(f"{field_name}.file must be a non-empty path")
         path = Path(configured_path).expanduser()
         if not path.is_absolute():
             path = config_dir / path
@@ -371,6 +387,18 @@ def load_backend_config(
         config_dir=config_path.parent,
         environ=os.environ if environ is None else environ,
     )
+    (
+        metrics_credential_configured,
+        metrics_credential_status,
+        metrics_authorization,
+    ) = _read_credential(
+        document.get("metrics_credential"),
+        config_dir=config_path.parent,
+        environ=os.environ if environ is None else environ,
+        field_name="metrics_credential",
+    )
+    if not metrics_credential_configured:
+        metrics_credential_status = "not_configured"
     return BackendConfig(
         schema_version="runtime-backend/1.0",
         kind="vllm",
@@ -385,7 +413,10 @@ def load_backend_config(
         metrics_map=metrics_map,
         credential_status=credential_status,
         credential_configured=configured,
+        metrics_credential_status=metrics_credential_status,
+        metrics_credential_configured=metrics_credential_configured,
         _authorization=authorization,
+        _metrics_authorization=metrics_authorization,
     )
 
 

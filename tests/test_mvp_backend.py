@@ -15,11 +15,13 @@ from urllib.request import Request, urlopen
 
 from serving_runtime.mvp.app import GatewayApp
 from serving_runtime.mvp.backend import (
+    BackendConfig,
     is_valid_credential_value,
     load_backend_config,
     parse_prometheus_metrics,
 )
 from serving_runtime.mvp.config import MVPConfig
+from serving_runtime.mvp.engine_client import EngineClient
 from serving_runtime.mvp.fake_backend import FakeBackend
 from serving_runtime.mvp.mock_engine import MockEngine
 from serving_runtime.mvp.policy import load_policy
@@ -168,6 +170,111 @@ class BackendConfigTests(unittest.TestCase):
             self.assertEqual(insecure.credential_status, "insecure_file")
             credential.write_text("changed-secret", encoding="utf-8")
             self.assertEqual(insecure.authorization, "Bearer file-secret")
+
+    def test_metrics_credential_is_separate_even_on_the_same_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            inference_only = load_backend_config(
+                self.write(
+                    directory,
+                    backend_document(
+                        "http://example.invalid",
+                        credential={"env": "INFERENCE_TOKEN"},
+                    ),
+                ),
+                environ={"INFERENCE_TOKEN": "inference-secret"},
+            )
+            self.assertEqual(
+                inference_only.request_headers()["Authorization"],
+                "Bearer inference-secret",
+            )
+            self.assertNotIn(
+                "Authorization", inference_only.request_headers(metrics=True)
+            )
+            self.assertEqual(
+                inference_only.metrics_credential_status, "not_configured"
+            )
+
+            separate = load_backend_config(
+                self.write(
+                    directory,
+                    backend_document(
+                        "http://example.invalid",
+                        credential={"env": "INFERENCE_TOKEN"},
+                        metrics_credential={"env": "METRICS_TOKEN"},
+                    ),
+                    "separate.json",
+                ),
+                environ={
+                    "INFERENCE_TOKEN": "inference-secret",
+                    "METRICS_TOKEN": "metrics-secret",
+                },
+            )
+            self.assertEqual(
+                separate.request_headers(metrics=True)["Authorization"],
+                "Bearer metrics-secret",
+            )
+            self.assertNotIn("inference-secret", repr(separate))
+            self.assertNotIn("metrics-secret", repr(separate))
+
+    def test_engine_client_metrics_request_never_uses_inference_authorization(self) -> None:
+        class Response:
+            status = 200
+
+            @staticmethod
+            def getheaders() -> list[tuple[str, str]]:
+                return []
+
+            @staticmethod
+            def read() -> bytes:
+                return b"metric 1\n"
+
+        class Connection:
+            def __init__(self) -> None:
+                self.headers = None
+
+            def request(self, _method, _path, *, body, headers) -> None:
+                self.headers = headers
+
+            @staticmethod
+            def getresponse() -> Response:
+                return Response()
+
+            @staticmethod
+            def close() -> None:
+                pass
+
+        class Target:
+            display_url = "http://same-host.invalid"
+            host = "same-host.invalid"
+            port = 80
+
+            def __init__(self, connection: Connection) -> None:
+                self._connection = connection
+
+            def connection(self, _timeout: float) -> Connection:
+                return self._connection
+
+            @staticmethod
+            def path(route: str) -> str:
+                return route
+
+            def url(self, route: str) -> str:
+                return self.display_url + route
+
+        connection = Connection()
+        target = Target(connection)
+        config = BackendConfig(
+            schema_version="runtime-backend/1.0",
+            kind="vllm",
+            target=target,
+            model_map={},
+            metrics_target=target,
+            metrics_path="/metrics",
+            _authorization="Bearer inference-secret",
+        )
+        EngineClient(config, 1).request("GET", "", metrics=True)
+        self.assertNotIn("Authorization", connection.headers)
 
     def test_credentials_with_header_unsafe_characters_are_invalid_and_hidden(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

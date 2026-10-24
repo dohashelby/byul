@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import re
+import threading
+import time
 from typing import Any, Callable, ClassVar
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
@@ -15,7 +18,7 @@ from serving_runtime.enforcement.events import ObservationQuery
 
 from .mock_engine import _utc_now
 from .query import QueryError, QueryService, RequestNotFoundError
-from .request_flow import ChatIO
+from .request_flow import ChatIO, transport_decision
 from .validator import Decision
 
 
@@ -26,6 +29,78 @@ _STATIC_FILES = {
     "/static/app.css": ("app.css", "text/css; charset=utf-8"),
     "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
 }
+
+
+class _DeadlineReader:
+    """Socket reader whose timeout is an absolute monotonic deadline."""
+
+    def __init__(self, connection: Any, *, clock: Callable[[], float] = time.monotonic) -> None:
+        self._connection = connection
+        self._clock = clock
+        self._deadline: float | None = None
+        self._buffer = bytearray()
+        self.closed = False
+
+    def set_deadline(self, timeout_s: float) -> None:
+        self._deadline = self._clock() + timeout_s
+
+    def clear_deadline(self) -> None:
+        self._deadline = None
+
+    def _receive(self) -> bytes:
+        if self._deadline is None:
+            raise RuntimeError("request read deadline is not configured")
+        remaining = self._deadline - self._clock()
+        if remaining <= 0:
+            raise TimeoutError("request read deadline exceeded")
+        self._connection.settimeout(remaining)
+        return self._connection.recv(64 * 1024)
+
+    def readline(self, limit: int = -1) -> bytes:
+        if limit == 0:
+            return b""
+        while True:
+            search_limit = len(self._buffer) if limit < 0 else min(len(self._buffer), limit)
+            newline = self._buffer.find(b"\n", 0, search_limit)
+            if newline >= 0:
+                end = newline + 1
+                result = bytes(self._buffer[:end])
+                del self._buffer[:end]
+                return result
+            if limit >= 0 and len(self._buffer) >= limit:
+                result = bytes(self._buffer[:limit])
+                del self._buffer[:limit]
+                return result
+            chunk = self._receive()
+            if not chunk:
+                result = bytes(self._buffer)
+                self._buffer.clear()
+                return result
+            self._buffer.extend(chunk)
+
+    def read(self, size: int = -1) -> bytes:
+        if size == 0:
+            return b""
+        if size < 0:
+            while True:
+                chunk = self._receive()
+                if not chunk:
+                    result = bytes(self._buffer)
+                    self._buffer.clear()
+                    return result
+                self._buffer.extend(chunk)
+        while len(self._buffer) < size:
+            chunk = self._receive()
+            if not chunk:
+                break
+            self._buffer.extend(chunk)
+        result = bytes(self._buffer[:size])
+        del self._buffer[:size]
+        return result
+
+    def close(self) -> None:
+        self.closed = True
+        self._buffer.clear()
 
 
 @dataclass(frozen=True)
@@ -40,6 +115,10 @@ class HandlerDependencies:
     observations: ObservationQuery
     receipt_lookup: Callable[[str], dict[str, Any]]
     observation_session_id: str
+    lab_report: Callable[[], dict[str, Any]]
+    record_transport_error: Callable[[str, Decision], None]
+    request_header_timeout_s: float
+    request_body_timeout_s: float
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -48,6 +127,13 @@ class Handler(BaseHTTPRequestHandler):
     dependencies: ClassVar[HandlerDependencies]
     server_version = "ServingRuntimeGateway/1.0"
     protocol_version = "HTTP/1.0"
+
+    def setup(self) -> None:
+        super().setup()
+        original_reader = self.rfile
+        self.rfile = _DeadlineReader(self.connection)
+        original_reader.close()
+        self.connection.settimeout(self.dependencies.request_header_timeout_s)
 
     def log_message(self, format: str, *args: object) -> None:
         return
@@ -124,7 +210,82 @@ class Handler(BaseHTTPRequestHandler):
         return self.headers.get(name)
 
     def read_request_body(self, length: int) -> bytes:
-        return self.rfile.read(length)
+        self._reading_request_body = True
+        self.rfile.set_deadline(self.dependencies.request_body_timeout_s)
+        try:
+            return self.rfile.read(length)
+        except TimeoutError:
+            self._body_read_timed_out = True
+            raise
+        except (ConnectionResetError, OSError):
+            # Treat a reset during upload as an incomplete body. The request
+            # flow records INVALID_CONTENT_LENGTH and never relays it.
+            return b""
+        finally:
+            self._reading_request_body = False
+            self.rfile.clear_deadline()
+            try:
+                self.connection.settimeout(self.dependencies.request_header_timeout_s)
+            except OSError:
+                pass
+
+    def handle_one_request(self) -> None:
+        """Bound header/body reads and persist timeout outcomes."""
+
+        self._transport_request_id = uuid4().hex
+        self._request_parsed = False
+        self._body_read_timed_out = False
+        self.requestline = ""
+        self.request_version = "HTTP/1.0"
+        self.command = ""
+        self.rfile.set_deadline(self.dependencies.request_header_timeout_s)
+        try:
+            self.raw_requestline = self.rfile.readline(65537)
+            if len(self.raw_requestline) > 65536:
+                self.requestline = ""
+                self.request_version = ""
+                self.command = ""
+                self.send_error(HTTPStatus.REQUEST_URI_TOO_LONG)
+                return
+            if not self.raw_requestline:
+                self.close_connection = True
+                return
+            if not self.parse_request():
+                return
+            self._request_parsed = True
+            self.rfile.clear_deadline()
+            self.connection.settimeout(self.dependencies.request_header_timeout_s)
+            method_name = "do_" + self.command
+            if not hasattr(self, method_name):
+                self.send_error(
+                    HTTPStatus.NOT_IMPLEMENTED,
+                    "Unsupported method (%r)" % self.command,
+                )
+                return
+            getattr(self, method_name)()
+            self.wfile.flush()
+        except TimeoutError:
+            if self._body_read_timed_out:
+                code = "REQUEST_BODY_TIMEOUT"
+                message = "request body read timed out"
+            elif not self._request_parsed:
+                code = "REQUEST_HEADER_TIMEOUT"
+                message = "request header read timed out"
+            else:
+                code = "CONNECTION_IO_TIMEOUT"
+                message = "connection I/O timed out"
+            request_id = getattr(self, "_post_request_id", self._transport_request_id)
+            decision = transport_decision(408, code, message)
+            self.dependencies.record_transport_error(request_id, decision)
+            self.close_connection = True
+            try:
+                self.rfile.clear_deadline()
+                self.connection.settimeout(self.dependencies.request_header_timeout_s)
+                self._send_error_decision(
+                    decision, request_id, close_connection=True
+                )
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                return
 
     def send_error_decision(
         self,
@@ -179,6 +340,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/collectors",
                 "/api/revalidation",
                 "/api/observations",
+                "/api/lab-report",
                 "/v1/chat/completions",
             }
             or path.startswith("/api/requests/")
@@ -305,6 +467,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/observations":
             self._observation_list(parsed.query)
             return
+        if path == "/api/lab-report":
+            self._send_json(200, self.dependencies.lab_report())
+            return
         if path == "/api/summary":
             self._send_json(200, self.dependencies.queries.summary())
             return
@@ -320,7 +485,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(404, {"error": {"code": "NOT_FOUND"}})
 
     def do_POST(self) -> None:
-        request_id = uuid4().hex
+        request_id = getattr(self, "_transport_request_id", uuid4().hex)
         self._post_request_id = request_id
         if urlsplit(self.path).path == "/v1/chat/completions":
             self.dependencies.chat(self, request_id)
@@ -346,3 +511,90 @@ def create_handler(
 
     ConfiguredHandler.dependencies = dependencies
     return ConfiguredHandler
+
+
+class LimitedThreadingHTTPServer(ThreadingHTTPServer):
+    """Thread-per-connection server with a non-blocking hard connection cap."""
+
+    def __init__(
+        self,
+        server_address: tuple[str, int],
+        handler: type[BaseHTTPRequestHandler],
+        *,
+        max_connections: int,
+        on_connection_rejected: Callable[[str, Decision], None],
+    ) -> None:
+        self._connection_slots = threading.BoundedSemaphore(max_connections)
+        self._connection_lock = threading.Lock()
+        self._active_connections = 0
+        self._rejected_connections = 0
+        self._max_connections = max_connections
+        self._on_connection_rejected = on_connection_rejected
+        super().__init__(server_address, handler)
+
+    def process_request(self, request: Any, client_address: Any) -> None:
+        if not self._connection_slots.acquire(blocking=False):
+            request_id = uuid4().hex
+            decision = Decision(
+                result="ERROR",
+                http_status=503,
+                reason_code="CONNECTION_LIMIT",
+                rule_id="max_connections",
+                message="maximum client connections reached",
+                model=None,
+                max_tokens=None,
+            )
+            with self._connection_lock:
+                self._rejected_connections += 1
+            body = json.dumps(
+                {
+                    "error": {
+                        "code": decision.reason_code,
+                        "message": decision.message,
+                        "result": decision.result,
+                        "request_id": request_id,
+                    }
+                }
+            ).encode("utf-8")
+            response = (
+                b"HTTP/1.0 503 Service Unavailable\r\n"
+                b"Content-Type: application/json; charset=utf-8\r\n"
+                + f"Content-Length: {len(body)}\r\n".encode("ascii")
+                + f"X-Request-ID: {request_id}\r\n".encode("ascii")
+                + b"Connection: close\r\n\r\n"
+                + body
+            )
+            try:
+                request.settimeout(0.5)
+                request.sendall(response)
+            except OSError:
+                pass
+            finally:
+                self.shutdown_request(request)
+            self._on_connection_rejected(request_id, decision)
+            return
+        with self._connection_lock:
+            self._active_connections += 1
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            with self._connection_lock:
+                self._active_connections -= 1
+            self._connection_slots.release()
+            raise
+
+    def process_request_thread(self, request: Any, client_address: Any) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            with self._connection_lock:
+                self._active_connections -= 1
+            self._connection_slots.release()
+
+    def connection_status(self) -> dict[str, int]:
+        with self._connection_lock:
+            return {
+                "active": self._active_connections,
+                "limit": self._max_connections,
+                "rejected": self._rejected_connections,
+            }

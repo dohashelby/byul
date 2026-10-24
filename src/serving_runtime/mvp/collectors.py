@@ -17,6 +17,21 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class NoCollectionUpdate(RuntimeError):
+    """A source is reachable but has no new observation to count as success."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        last_value: Any = None,
+        data_origin: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.last_value = last_value
+        self.data_origin = data_origin
+
+
 class Collector:
     """One polling source that retains its last successful observation."""
 
@@ -58,6 +73,18 @@ class Collector:
             else:
                 value = fetched
                 data_origin = fetched.get("data_origin") if isinstance(fetched, dict) else None
+        except NoCollectionUpdate as idle:
+            # Do not move last_success_at or clear an earlier real error. A
+            # feed without independent writer evidence therefore becomes
+            # stale instead of being refreshed as healthy by an empty read.
+            with self._lock:
+                self.last_attempt_at = attempted_at
+                self._last_attempt_monotonic = attempted_monotonic
+                if idle.last_value is not None:
+                    self.last_value = idle.last_value
+                if idle.data_origin is not None:
+                    self.data_origin = idle.data_origin
+            return
         except Exception as error:  # Polling failures are state, not thread failures.
             with self._lock:
                 self.last_attempt_at = attempted_at

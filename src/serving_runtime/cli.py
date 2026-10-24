@@ -11,6 +11,15 @@ import sys
 from .file_info import inspect_file
 
 
+def _observation_feed(value: str) -> tuple[str, str]:
+    kind, separator, path = value.partition("=")
+    if separator != "=" or kind not in {"hubble", "tetragon"} or not path.strip():
+        raise argparse.ArgumentTypeError(
+            "observation feed must be hubble=PATH or tetragon=PATH"
+        )
+    return kind, path
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="serving-runtime",
@@ -37,12 +46,43 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--request-deadline", type=float, default=300.0, metavar="SECONDS"
     )
     mvp_parser.add_argument("--max-concurrency", type=int, default=2, metavar="N")
+    mvp_parser.add_argument("--max-connections", type=int, default=64, metavar="N")
+    mvp_parser.add_argument(
+        "--request-header-timeout", type=float, default=5.0, metavar="SECONDS"
+    )
+    mvp_parser.add_argument(
+        "--request-body-timeout", type=float, default=10.0, metavar="SECONDS"
+    )
+    mvp_parser.add_argument("--environment", metavar="NAME")
+    mvp_parser.add_argument("--run-id", metavar="ID")
     mvp_parser.add_argument("--revocations", metavar="PATH")
     mvp_parser.add_argument("--baseline", metavar="PATH")
     mvp_parser.add_argument("--manifest", metavar="PATH")
     mvp_parser.add_argument("--collector-interval", type=float, default=5.0, metavar="SECONDS")
     mvp_parser.add_argument("--asset-manifest", metavar="PATH")
     mvp_parser.add_argument("--asset-interval", type=float, default=60.0, metavar="SECONDS")
+    mvp_parser.add_argument("--lab-report", metavar="PATH")
+    mvp_parser.add_argument(
+        "--observation-feed",
+        action="append",
+        default=[],
+        type=_observation_feed,
+        metavar="KIND=PATH",
+    )
+    mvp_parser.add_argument(
+        "--observation-heartbeat",
+        action="append",
+        default=[],
+        type=_observation_feed,
+        metavar="KIND=PATH",
+    )
+    mvp_parser.add_argument(
+        "--observation-origin", choices=("synthetic", "real"), default="real"
+    )
+    mvp_parser.add_argument("--observation-environment", metavar="NAME")
+    mvp_parser.add_argument("--observation-run-id", metavar="ID")
+    mvp_parser.add_argument("--observation-intent", metavar="PATH")
+    mvp_parser.add_argument("--cilium-policy-status", action="store_true")
     mvp_parser.add_argument(
         "--collector-stale-after", type=float, default=15.0, metavar="SECONDS"
     )
@@ -89,6 +129,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     ingest_parser.add_argument("--origin", required=True, choices=("synthetic", "real"))
     ingest_parser.add_argument("--data-dir", required=True, metavar="DIR")
     ingest_parser.add_argument("--intent", metavar="PATH")
+    ingest_parser.add_argument("--environment", metavar="NAME")
+    ingest_parser.add_argument("--run-id", metavar="ID")
     args = parser.parse_args(argv)
     if args.command == "file-info":
         try:
@@ -115,6 +157,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "stream_idle_timeout_s": args.stream_idle_timeout,
                 "request_deadline_s": args.request_deadline,
                 "max_concurrent_requests": args.max_concurrency,
+                "max_connections": args.max_connections,
+                "request_header_timeout_s": args.request_header_timeout,
+                "request_body_timeout_s": args.request_body_timeout,
                 "revocations_path": args.revocations,
                 "baseline_path": args.baseline,
                 "manifest_path": args.manifest,
@@ -122,6 +167,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "collector_stale_after_s": args.collector_stale_after,
                 "asset_manifest_path": args.asset_manifest,
                 "asset_interval_s": args.asset_interval,
+                "environment": args.environment,
+                "run_id": args.run_id,
+                "lab_report_path": args.lab_report,
+                "observation_feeds": tuple(args.observation_feed),
+                "observation_heartbeats": tuple(args.observation_heartbeat),
+                "observation_origin": args.observation_origin,
+                "observation_environment": args.observation_environment,
+                "observation_run_id": args.observation_run_id,
+                "observation_intent_path": args.observation_intent,
+                "cilium_policy_status": args.cilium_policy_status,
             }
             if args.data_dir is not None:
                 options["data_dir"] = args.data_dir
@@ -171,6 +226,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 kind=args.kind,
                 data_origin=args.origin,
                 allowed_engine_binaries=binaries,
+                environment=args.environment,
+                run_id=args.run_id,
             )
         except (OSError, UnicodeError, ValueError, IntentError) as error:
             print(f"관측 변환 실패: {error}", file=sys.stderr)

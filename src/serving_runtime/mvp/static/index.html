@@ -115,22 +115,42 @@
     </section>
 
     <section aria-labelledby="observations-title">
-      <div class="section-head">
+      <details id="observations-panel" class="section-toggle">
+      <summary class="section-head">
         <h2 id="observations-title">통신·행위 관측</h2>
-        <span id="observation-corrupt" class="muted"></span>
-      </div>
+        <span class="toggle-meta">
+          <span id="observation-summary" class="muted"></span>
+          <span id="observation-corrupt" class="muted"></span>
+        </span>
+      </summary>
       <div class="observation-grid">
         <article class="card table-card">
           <h3>Hubble 통신</h3>
-          <table class="status-table"><thead><tr><th>시각</th><th>출발</th><th>도착</th><th>판정</th><th>출처</th></tr></thead><tbody id="hubble-observation-rows"></tbody></table>
+          <table class="status-table"><thead><tr><th>시각</th><th>환경·실행</th><th>출발</th><th>도착</th><th>판정</th><th>출처</th></tr></thead><tbody id="hubble-observation-rows"></tbody></table>
           <p id="hubble-observation-empty" class="empty">아직 Hubble 관측이 없습니다.</p>
         </article>
         <article class="card table-card">
           <h3>Tetragon 프로세스·파일</h3>
-          <table class="status-table"><thead><tr><th>시각</th><th>종류</th><th>실행 파일·경로</th><th>규칙·행위</th><th>출처</th></tr></thead><tbody id="tetragon-observation-rows"></tbody></table>
+          <table class="status-table"><thead><tr><th>시각</th><th>환경·실행</th><th>종류</th><th>실행 파일·경로</th><th>규칙·행위</th><th>출처</th></tr></thead><tbody id="tetragon-observation-rows"></tbody></table>
           <p id="tetragon-observation-empty" class="empty">아직 Tetragon 관측이 없습니다.</p>
         </article>
       </div>
+      <p class="notice">Tetragon Override는 차단 시도가 기록됐다는 뜻입니다. 실제 EPERM 결과는 아래 lab L-05 결과와 별도로 확인합니다.</p>
+      <div class="observation-grid observation-state-grid">
+        <article class="card table-card">
+          <h3>Cilium 정책 적용 상태 <span id="cilium-policy-state" class="muted"></span></h3>
+          <div id="cilium-verification" class="state-badges"></div>
+          <table class="status-table"><thead><tr><th>정책</th><th>객체 상태</th><th>조건</th></tr></thead><tbody id="cilium-policy-rows"></tbody></table>
+          <p id="cilium-policy-empty" class="empty">Cilium 정책 상태 수집원이 설정되지 않았습니다.</p>
+        </article>
+        <article class="card table-card">
+          <h3>kind lab 시험 결과 <span id="lab-report-state" class="muted"></span></h3>
+          <dl class="kv lab-report-meta" id="lab-report-meta"></dl>
+          <table class="status-table"><thead><tr><th>시험</th><th>상태</th><th>요약·증거</th></tr></thead><tbody id="lab-report-rows"></tbody></table>
+          <p id="lab-report-empty" class="empty">lab 보고서가 설정되지 않았습니다.</p>
+        </article>
+      </div>
+      </details>
     </section>
 
     <section aria-labelledby="requests-title">
@@ -149,7 +169,7 @@
         <table class="requests">
           <thead>
             <tr>
-              <th>시각</th><th>요청 ID</th><th>모델</th><th class="num">max_tokens</th>
+              <th>시각</th><th>요청 ID</th><th>환경·실행</th><th>모델</th><th class="num">max_tokens</th>
               <th>결과</th><th>사유</th>
             </tr>
           </thead>

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 import threading
 import time
@@ -10,6 +9,7 @@ from typing import Any
 from uuid import uuid4
 
 from serving_runtime.enforcement.events import ObservationQuery
+from serving_runtime.enforcement.intent import load_intent
 
 from .assets import check as check_assets, load_manifest as load_asset_manifest
 from .backend import BackendConfig, load_backend_config
@@ -20,10 +20,17 @@ from .collectors import (
     compare_baseline,
     load_declaration,
 )
+from .cilium_status import CiliumPolicyCollector
 from .config import MVPConfig
 from .engine_client import EngineClient
-from .http_handler import HandlerDependencies, create_handler
+from .http_handler import (
+    HandlerDependencies,
+    LimitedThreadingHTTPServer,
+    create_handler,
+)
+from .lab_report import LabReportSource
 from .mock_engine import MockEngine, _utc_now
+from .observation_feed import ObservationFeed
 from .policy import PolicyState, load_policy
 from .policy_state import PolicyHistory, evaluate_policy, load_revocations
 from .query import QueryService
@@ -60,6 +67,11 @@ class GatewayApp:
             )
             if self.backend.kind != "vllm":
                 raise ValueError("vllm mode requires a vllm backend config")
+        allowed_binaries: tuple[str, ...] = ()
+        if config.observation_intent_path is not None:
+            allowed_binaries = load_intent(
+                config.observation_intent_path
+            ).allowed_engine_binaries
 
         self.engine_address = (self.backend.target.host, self.backend.target.port)
         self.relay_timeout_s = self.backend.timeouts.get(
@@ -105,6 +117,8 @@ class GatewayApp:
             self.observation_session_id,
             lambda: self.policy_state,
             self.backend.kind,
+            config.environment,
+            config.run_id,
         )
         self._engine_store = JsonlStore(
             Path(config.data_dir) / "engine_receipts.jsonl"
@@ -112,6 +126,7 @@ class GatewayApp:
         self._observations = ObservationQuery(
             Path(config.data_dir) / "observations.jsonl"
         )
+        self._lab_report = LabReportSource(config.lab_report_path)
         self._queries = QueryService(
             self._records.store,
             self._engine_store,
@@ -129,47 +144,82 @@ class GatewayApp:
             self._concurrency,
         )
 
-        self._server: ThreadingHTTPServer | None = None
+        self._server: LimitedThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
-        self._collectors = CollectorManager(
-            [
+        collectors = [
+            Collector(
+                "engine_health",
+                self._engine_client.collect_health,
+                config.collector_interval_s,
+                config.collector_stale_after_s,
+            ),
+            Collector(
+                "engine_info",
+                self._engine_client.collect_info,
+                config.collector_interval_s,
+                config.collector_stale_after_s,
+                on_collected=self._evaluate_baseline_revalidation,
+            ),
+            Collector(
+                "metrics",
+                (
+                    self._engine_client.collect_metrics
+                    if self.backend.metrics_target is not None
+                    else None
+                ),
+                config.collector_interval_s,
+                config.collector_stale_after_s,
+            ),
+            Collector(
+                "asset_integrity",
+                (
+                    self._collect_asset_integrity
+                    if config.asset_manifest_path
+                    else None
+                ),
+                config.asset_interval_s,
+                config.asset_interval_s * 3,
+                dedicated_thread=True,
+                on_collected=self._evaluate_asset_revalidation,
+            ),
+        ]
+        self._observation_feeds: list[ObservationFeed] = []
+        observation_heartbeats = dict(config.observation_heartbeats)
+        for kind, path in config.observation_feeds:
+            feed = ObservationFeed(
+                kind=kind,
+                path=path,
+                data_dir=config.data_dir,
+                data_origin=config.observation_origin,
+                environment=config.observation_environment,
+                run_id=config.observation_run_id,
+                allowed_engine_binaries=allowed_binaries,
+                heartbeat_path=observation_heartbeats.get(kind),
+                heartbeat_stale_after_s=config.collector_stale_after_s,
+            )
+            self._observation_feeds.append(feed)
+            collectors.append(
                 Collector(
-                    "engine_health",
-                    self._engine_client.collect_health,
+                    f"observation_feed_{kind}",
+                    feed.collect,
                     config.collector_interval_s,
                     config.collector_stale_after_s,
-                ),
+                )
+            )
+        self._cilium_policy_collector: CiliumPolicyCollector | None = None
+        if config.cilium_policy_status:
+            self._cilium_policy_collector = CiliumPolicyCollector(
+                timeout_s=config.cilium_timeout_s
+            )
+            collectors.append(
                 Collector(
-                    "engine_info",
-                    self._engine_client.collect_info,
+                    "cilium_policy",
+                    self._cilium_policy_collector.collect,
                     config.collector_interval_s,
                     config.collector_stale_after_s,
-                    on_collected=self._evaluate_baseline_revalidation,
-                ),
-                Collector(
-                    "metrics",
-                    (
-                        self._engine_client.collect_metrics
-                        if self.backend.metrics_target is not None
-                        else None
-                    ),
-                    config.collector_interval_s,
-                    config.collector_stale_after_s,
-                ),
-                Collector(
-                    "asset_integrity",
-                    (
-                        self._collect_asset_integrity
-                        if config.asset_manifest_path
-                        else None
-                    ),
-                    config.asset_interval_s,
-                    config.asset_interval_s * 3,
-                    dedicated_thread=True,
-                    on_collected=self._evaluate_asset_revalidation,
-                ),
-            ]
-        )
+                )
+            )
+        self._collectors = CollectorManager(collectors)
 
     def _revalidation_context(self) -> dict[str, Any]:
         policy = self.policy_state.policy
@@ -310,6 +360,8 @@ class GatewayApp:
             ),
             "backend_kind": self.backend.kind,
             "observation_session_id": self.observation_session_id,
+            "environment": self.config.environment,
+            "run_id": self.config.run_id,
             "gateway": {"host": self.address[0], "port": self.address[1]},
             "policy": {
                 "path": self.policy_state.path,
@@ -336,6 +388,19 @@ class GatewayApp:
             "policy_history_store": policy_runtime["history_storage"],
             "record_store": record_store,
             "concurrency": self._concurrency.status(),
+            "connections": {
+                **(
+                    self._server.connection_status()
+                    if self._server is not None
+                    else {
+                        "active": 0,
+                        "limit": self.config.max_connections,
+                        "rejected": 0,
+                    }
+                ),
+                "request_header_timeout_s": self.config.request_header_timeout_s,
+                "request_body_timeout_s": self.config.request_body_timeout_s,
+            },
             "backend": {
                 **engine,
                 **self.backend.safe_status(),
@@ -390,10 +455,17 @@ class GatewayApp:
                 observations=self._observations,
                 receipt_lookup=self._engine_client.receipt_lookup,
                 observation_session_id=self.observation_session_id,
+                lab_report=self._lab_report.read,
+                record_transport_error=self._request_flow.record_without_relay,
+                request_header_timeout_s=self.config.request_header_timeout_s,
+                request_body_timeout_s=self.config.request_body_timeout_s,
             )
         )
-        self._server = ThreadingHTTPServer(
-            (self.config.host, self.config.gateway_port), handler
+        self._server = LimitedThreadingHTTPServer(
+            (self.config.host, self.config.gateway_port),
+            handler,
+            max_connections=self.config.max_connections,
+            on_connection_rejected=self._request_flow.record_without_relay,
         )
         self._collectors.start()
         self._thread = threading.Thread(

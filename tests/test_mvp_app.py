@@ -105,11 +105,25 @@ class MVPCommandTests(unittest.TestCase):
                 "--stream-idle-timeout", "1.5",
                 "--request-deadline", "9",
                 "--max-concurrency", "4",
+                "--max-connections", "12",
+                "--request-header-timeout", "0.75",
+                "--request-body-timeout", "3",
+                "--environment", "docker-cpu",
+                "--run-id", "gateway-run",
                 "--revocations", "revocations.json",
                 "--baseline", "baseline.json",
                 "--manifest", "manifest.json",
                 "--collector-interval", "0.5",
                 "--collector-stale-after", "2",
+                "--lab-report", "reports",
+                "--observation-feed", "hubble=hubble.jsonl",
+                "--observation-feed", "tetragon=tetragon.jsonl",
+                "--observation-heartbeat", "hubble=hubble.heartbeat.json",
+                "--observation-heartbeat", "tetragon=tetragon.heartbeat.json",
+                "--observation-environment", "kind-lab-wsl",
+                "--observation-run-id", "lab-run",
+                "--observation-intent", "intent.json",
+                "--cilium-policy-status",
             ])
         self.assertEqual(result, 0)
         config = run.call_args.args[0]
@@ -121,11 +135,31 @@ class MVPCommandTests(unittest.TestCase):
         self.assertEqual(config.stream_idle_timeout_s, 1.5)
         self.assertEqual(config.request_deadline_s, 9)
         self.assertEqual(config.max_concurrent_requests, 4)
+        self.assertEqual(config.max_connections, 12)
+        self.assertEqual(config.request_header_timeout_s, 0.75)
+        self.assertEqual(config.request_body_timeout_s, 3)
+        self.assertEqual((config.environment, config.run_id), ("docker-cpu", "gateway-run"))
         self.assertEqual(config.revocations_path, "revocations.json")
         self.assertEqual(config.baseline_path, "baseline.json")
         self.assertEqual(config.manifest_path, "manifest.json")
         self.assertEqual(config.collector_interval_s, 0.5)
         self.assertEqual(config.collector_stale_after_s, 2)
+        self.assertEqual(config.lab_report_path, "reports")
+        self.assertEqual(
+            config.observation_feeds,
+            (("hubble", "hubble.jsonl"), ("tetragon", "tetragon.jsonl")),
+        )
+        self.assertEqual(
+            config.observation_heartbeats,
+            (
+                ("hubble", "hubble.heartbeat.json"),
+                ("tetragon", "tetragon.heartbeat.json"),
+            ),
+        )
+        self.assertEqual(config.observation_environment, "kind-lab-wsl")
+        self.assertEqual(config.observation_run_id, "lab-run")
+        self.assertEqual(config.observation_intent_path, "intent.json")
+        self.assertTrue(config.cilium_policy_status)
 
     def test_timeout_and_concurrency_config_values_are_validated(self) -> None:
         for options in (
@@ -133,8 +167,23 @@ class MVPCommandTests(unittest.TestCase):
             {"request_deadline_s": 0},
             {"max_concurrent_requests": 0},
             {"max_concurrent_requests": True},
+            {"max_connections": 0},
+            {"max_connections": True},
+            {"request_header_timeout_s": 0},
+            {"request_body_timeout_s": 0},
             {"collector_interval_s": 0},
             {"collector_stale_after_s": 0},
+            {"cilium_timeout_s": 0},
+            {"observation_feeds": (("hubble", "one"), ("hubble", "two"))},
+            {"observation_heartbeats": (("hubble", "heartbeat"),)},
+            {
+                "observation_feeds": (("hubble", "feed"),),
+                "observation_heartbeats": (
+                    ("hubble", "one"),
+                    ("hubble", "two"),
+                ),
+            },
+            {"observation_intent_path": "intent.json"},
         ):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 MVPConfig(**options)

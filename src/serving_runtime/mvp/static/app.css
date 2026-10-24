@@ -107,6 +107,9 @@ body {
 .badge-state.ok, .state-match, .state-ok { background: var(--allowed-bg); color: var(--allowed); }
 .badge-state.bad, .state-drift, .state-error { background: var(--error-bg); color: var(--error); }
 .state-missing, .state-stale { background: var(--denied-bg); color: var(--denied); }
+.state-passed { background: var(--allowed-bg); color: var(--allowed); }
+.state-failed, .state-inconsistent { background: var(--error-bg); color: var(--error); }
+.state-not_run, .state-unsupported, .state-blocked_by_environment { background: var(--incomplete-bg); color: var(--incomplete); }
 .state-not_collected, .state-disconnected, .state-never { background: var(--incomplete-bg); color: var(--incomplete); }
 
 .stale-banner {
@@ -182,9 +185,15 @@ section + section { margin-top: 36px; }
 .chip-synthetic { background: var(--invalid-bg); color: var(--invalid); border: 1px solid var(--invalid); }
 .chip-real { background: var(--allowed-bg); color: var(--allowed); border: 1px solid var(--allowed); }
 .badge-synthetic { background: var(--invalid-bg); color: var(--invalid); }
+.scope-badges { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.scope-badges .badge { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
 .observation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .observation-grid .card h3 { padding: 14px 16px 8px; margin: 0; }
+.observation-state-grid { margin-top: 14px; }
+.observation-state-grid .state-badges { padding: 0 16px 8px; margin: 0; }
+.lab-report-meta { padding: 0 16px 12px; }
 .status-table tr.exec-outside-allowlist { background: var(--error-bg); color: var(--error); }
+.status-table tr.observation-dropped { background: var(--denied-bg); color: var(--denied); font-weight: 700; }
 .state-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .state-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .state-card { margin-top: 14px; }
@@ -313,6 +322,19 @@ section + section { margin-top: 36px; }
 }
 details { margin-top: 18px; }
 summary { cursor: pointer; color: var(--muted); }
+.section-toggle { margin-top: 0; }
+.section-toggle > summary { list-style: none; color: inherit; }
+.section-toggle > summary::-webkit-details-marker { display: none; }
+.section-toggle > summary h2::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.section-toggle[open] > summary h2::before { transform: rotate(90deg); }
+.section-toggle:not([open]) > summary { margin-bottom: 0; }
+.toggle-meta { display: inline-flex; gap: 12px; }
 pre {
   margin: 10px 0 0;
   padding: 12px;

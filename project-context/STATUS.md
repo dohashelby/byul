@@ -95,6 +95,17 @@
 - L-01 기준선과 L-02 Cilium(Gateway·DNS 허용, 엔진 직통·외부 연결 차단), L-03 Hubble(실제 `DROPPED`를 `--origin real`로 변환)이 통과했다.
 - L-04 Tetragon 감시는 자산 쓰기·비밀 읽기·허용 목록 밖 실행을 확인했지만 kprobe의 pod·process 귀속이 비어 정책·경로·접근·시각으로 판정했고, exec export는 수 초~수십 초 지연됐다.
 - L-05 차단은 적용 직후 5회 `EPERM`이었다. 앞서 기록한 "약 1분 후 재허용"·"클러스터 범위 미차단"은 2026-10-24 재조사에서 둘 다 05:13 Tetragon 재시작 전(04:56 helm upgrade로 뜬 실행)에만 나온 것으로 확인됐다. 재시작 후에는 8.5시간 경과 TG-DENY-01 3/3, 클러스터 범위 실험 정책 3분간 6/6 차단, 삭제 후 쓰기 성공이다. WSL 제한(`override_return`·`fmodret_syscall` 없음)은 syscall 대상에만 해당한다. 업그레이드 직후 불일치 원인은 미확정이다(근거 `~/.local/state/serving-runtime/k8s-lab/investigation-20261024-tetragon.md`). L-06 정리는 미실행해 전체는 `partial`이며, 이는 가짜 backend를 쓴 로컬 kind 결과로 정식 GPU·Kubernetes 1.36.5 검증이 아니다.
+- 2026-10-24 대시보드 관측을 환경·실행별로 구분하고, Tetragon 원본 action을 보존하면서 차단 시도(enforce)·감시(monitor)·알 수 없음으로 나눴다. 과거 scope 없는 기록은 `환경 미기록`·`실행 미기록`으로 표시한다. Gateway 요청 scope와 관측 feed scope는 Docker vLLM과 kind 관측을 섞지 않도록 별도 옵션으로 뒀다.
+- lab 보고서 읽기 전용 API·카드, Hubble/Tetragon append JSONL feed 수집원(회전·잘림·체크포인트·중복 방지·손상 줄/정체 상태), kind-runtime-lab 전용 CiliumNetworkPolicy 상태 수집원과 보조 follow 스크립트를 추가했다. 현재 보고서 JSON을 읽어 `partial`, L-01~L-05 `passed`, L-06 `not_run`을 확인했지만, feed·Cilium 조회·보조 스크립트는 실행하지 않아 실제 연속 수집과 정책 조회는 미확인이다. 정책 객체 존재와 Hubble/lab의 실제 차단 근거는 별도 표시한다.
+- 보안 수정으로 동시성 슬롯을 tokenizer 호출 전에 획득하고 모든 후속 경로에서 반환하게 했다. HTTP 헤더·본문 읽기 timeout, 연결 상한과 즉시 503, 불완전 본문 기록을 추가했다. backend 추론 자격정보와 선택적 metrics 자격정보를 분리해 metrics 설정이 없으면 같은 호스트에도 Authorization을 보내지 않는다. 비밀값은 상태·로그·보고서에 넣지 않는다.
+- `.venv/bin/python -B -m unittest discover -s tests`는 224개 중 169개 통과·샌드박스 소켓 제한 55개 건너뜀·실패 0개다. Python 구문 검사, `node --check src/serving_runtime/mvp/static/app.js`, `git diff --check`도 통과했다. 실행 중인 서버·Docker·kind와 kubectl은 조작하지 않았고 설치·커밋·푸시하지 않았다. Git 기준점은 `ac05f80`; 소켓 HTTP 전건과 실제 feed/Cilium 동작은 Claude 환경 검수가 필요하다.
+- Claude가 소켓 허용 환경에서 직전판 unittest 224개 전부 통과(skip 0)와 실제 kind의 live feed·Cilium 상태·lab 보고서 동작을 확인했다. 검수에서 느린 1바이트 전송이 recv별 timeout을 연장하는 문제, 조용한 정상 writer와 중단을 구분하지 못하는 문제, Tetragon 시작 시 과거 로그 재생, Hubble FORWARDED 누적·DROPPED 가림을 재현했다.
+- 필수 지적에 따라 헤더·본문을 monotonic 절대 deadline reader로 바꾸고, 보조 follow 스크립트가 feed별 시작 시각·최근 생존 시각·자식 상태 heartbeat를 원자적으로 기록하게 했다. Gateway는 정상 heartbeat가 있으면 무이벤트를 정상으로 유지하고, 종료·만료는 관측 불가로 표시하며, heartbeat 시작 전 이벤트를 저장하지 않고 별도 집계한다. heartbeat 없는 임의 feed는 기존처럼 보수적으로 stale 처리한다.
+- Tetragon follow에 `--tail=0`, Hubble follow에 실행 시각 `--since`와 기본 `--verdict DROPPED`를 적용했다. `--include-forwarded`로 전체 verdict를 선택할 수 있고, 혼합된 기존 저장 기록은 Hubble DROPPED 최대 25건을 화면에서 우선 표시한다. 기존에 저장된 과거/allowed 기록은 자동 삭제하지 않는다.
+- 수정 후 `.venv/bin/python -B -m unittest discover -s tests`는 230개 중 174개 통과·샌드박스 소켓 제한 56개 건너뜀·실패 0개다. 새 1바이트 drip 실제 소켓 시험을 포함한 HTTP 전건과 실제 heartbeat follow는 Claude 환경 재검수가 필요하다. 설치·kubectl·서버·Docker 조작·커밋·푸시는 하지 않았고 Git 기준점은 `ac05f80`이다.
+- 2026-10-24 직접 handler 소켓 시험에서 미수신 drip 바이트 때문에 408 뒤 RST가 날 수 있어, RST이면 `REQUEST_HEADER_TIMEOUT`·`REQUEST_BODY_TIMEOUT` transport 기록으로 deadline을 판정하게 했다. 보조 feed는 SIGTERM/SIGHUP도 안전 지점에서 기존 정리 경로로 전환해 port-forward·Hubble·Tetragon 자식을 종료하고 signal handler를 복원한다.
+- 전체 unittest 231개 중 175개 통과·샌드박스 소켓 제한 56개 건너뜀·실패/ERROR 0개다. drip 단독 10회도 소켓 제한으로 모두 건너뛰어 소켓 허용 환경의 반복 확인이 남았다. 설치·kubectl·서버·Docker 조작·커밋·푸시는 하지 않았고 Git 기준점은 `ac05f80`이다.
+- 2026-10-24 Claude가 소켓 허용 환경에서 전체 unittest 231개를 2회 모두 통과(skip 0), drip 시험 단독 10/10 통과를 확인했다. 실제 kind에서 live feed의 과거 로그 미유입·Hubble DROPPED만 수집·무이벤트 구간 정상 유지·writer 종료 약 20초 뒤 heartbeat 만료 표시, SIGTERM 시 자식 3개 정리, 실제 Gateway 1바이트 drip 약 2초 종료를 확인했다. 시작 직후 Hubble relay EOF로 helper가 스스로 종료된 사례가 1회 있었다(재실행 시 정상).
 
 ## 다음 준비 작업
 

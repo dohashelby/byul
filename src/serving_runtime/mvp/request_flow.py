@@ -135,6 +135,87 @@ class RequestFlow:
             extra_headers=extra_headers,
         )
 
+    def record_without_relay(self, request_id: str, decision: Decision) -> None:
+        """Record a transport rejection produced outside the normal chat path."""
+
+        self._records.append(
+            self._records.build(
+                "final",
+                request_id,
+                decision,
+                attempted=False,
+                backend_receipt=self._engine_client.receipt_not_queried(),
+                response="none",
+                error_code=decision.reason_code,
+                http_start_status=decision.http_status,
+                final_outcome=decision.reason_code,
+            )
+        )
+
+    def _context_decision(
+        self,
+        request_id: str,
+        document: dict[str, object],
+        decision: Decision,
+        policy_snapshot: PolicyState,
+    ) -> Decision | None:
+        context_limit = (
+            policy_snapshot.policy.max_context_tokens
+            if policy_snapshot.policy is not None
+            else None
+        )
+        if context_limit is None:
+            return None
+        try:
+            backend_model_id = self._backend.mapped_model(decision.model)
+            if backend_model_id is None:
+                raise ValueError("backend model is unavailable")
+            messages = document["messages"]
+            if not isinstance(messages, list):
+                raise ValueError("validated messages are unavailable")
+            input_tokens = self._engine_client.count_input_tokens(
+                request_id,
+                messages,
+                backend_model_id,
+            )
+        except Exception as error:
+            # Store only the exception class; backend messages may contain secrets.
+            self._records.set_context(
+                {
+                    "limit": context_limit,
+                    "input_tokens": None,
+                    "result": "unavailable",
+                    "error": type(error).__name__,
+                }
+            )
+            return engine_error(
+                503,
+                "CONTEXT_CHECK_UNAVAILABLE",
+                "input token count is unavailable",
+                decision,
+            )
+        total = input_tokens + (decision.max_tokens or 0)
+        exceeded = total > context_limit
+        self._records.set_context(
+            {
+                "limit": context_limit,
+                "input_tokens": input_tokens,
+                "requested_total": total,
+                "result": "exceeded" if exceeded else "within_limit",
+            }
+        )
+        if not exceeded:
+            return None
+        return Decision(
+            result="DENIED",
+            http_status=403,
+            reason_code="CONTEXT_LIMIT_EXCEEDED",
+            rule_id="max_context_tokens",
+            message="input tokens plus max_tokens exceed the context limit",
+            model=decision.model,
+            max_tokens=decision.max_tokens,
+        )
+
     def chat(self, response: ChatIO, request_id: str) -> None:
         self._records.clear_context()
         policy_snapshot = self._policy_state()
@@ -300,77 +381,6 @@ class RequestFlow:
                 )
                 return
 
-        context_limit = (
-            policy_snapshot.policy.max_context_tokens
-            if policy_snapshot.policy is not None
-            else None
-        )
-        if context_limit is not None:
-            try:
-                backend_model_id = self._backend.mapped_model(decision.model)
-                if backend_model_id is None:
-                    raise ValueError("backend model is unavailable")
-                messages = document["messages"]
-                if not isinstance(messages, list):
-                    raise ValueError("validated messages are unavailable")
-                input_tokens = self._engine_client.count_input_tokens(
-                    request_id,
-                    messages,
-                    backend_model_id,
-                )
-            except Exception as error:
-                # Tokenizer transport and response interpretation both fail
-                # closed. Store only the exception class, never its message,
-                # because backend errors may contain credential-bearing data.
-                self._records.set_context(
-                    {
-                        "limit": context_limit,
-                        "input_tokens": None,
-                        "result": "unavailable",
-                        "error": type(error).__name__,
-                    }
-                )
-                self.finish_without_relay(
-                    response,
-                    request_id,
-                    engine_error(
-                        503,
-                        "CONTEXT_CHECK_UNAVAILABLE",
-                        "input token count is unavailable",
-                        decision,
-                    ),
-                    stream=stream,
-                )
-                return
-            total = input_tokens + (decision.max_tokens or 0)
-            exceeded = total > context_limit
-            self._records.set_context(
-                {
-                    "limit": context_limit,
-                    "input_tokens": input_tokens,
-                    "requested_total": total,
-                    "result": "exceeded" if exceeded else "within_limit",
-                }
-            )
-            if exceeded:
-                self.finish_without_relay(
-                    response,
-                    request_id,
-                    Decision(
-                        result="DENIED",
-                        http_status=403,
-                        reason_code="CONTEXT_LIMIT_EXCEEDED",
-                        rule_id="max_context_tokens",
-                        message=(
-                            "input tokens plus max_tokens exceed the context limit"
-                        ),
-                        model=decision.model,
-                        max_tokens=decision.max_tokens,
-                    ),
-                    stream=stream,
-                )
-                return
-
         if not self._concurrency.try_acquire():
             limited = Decision(
                 result="DENIED",
@@ -392,6 +402,17 @@ class RequestFlow:
 
         acquired_at = time.monotonic()
         try:
+            context_decision = self._context_decision(
+                request_id, document, decision, policy_snapshot
+            )
+            if context_decision is not None:
+                self.finish_without_relay(
+                    response,
+                    request_id,
+                    context_decision,
+                    stream=stream,
+                )
+                return
             started = self._records.build(
                 "started",
                 request_id,

@@ -23,8 +23,8 @@ from guard.models.checkdef import ObsSpec
 from guard.models.objects import Observation
 from guard.report.html import render_html
 from guard.store import Store
-from guard.store.packs import put_pack
 from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy, completion_response
+from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import fill, snapshot, write
 
@@ -77,12 +77,18 @@ def run(tmp_path, monkeypatch, pack, vals, probe=None, missing_target=False):
     monkeypatch.setitem(registry.EXECUTORS, "input_validation:m10-test", lambda cfg: InputValidationExecutor(
         {"target": str(target), "vocab_size": 100, "vocab_source": "EXAMPLE synthetic model fixture"},
         container_probe=cprobe))
-    st = Store(tmp_path / "store")
     env = environment(model={"id": "EXAMPLE-model"}, runtime={"gpu_count": 0, "cpu": CPU})
     pol = policy(pack.ref(), scope={"include": ["REQ-09"]}, values={"REQ-09": vals})
-    st.put_many([env, pol]); put_pack(st, PACK_DIR)
-    # Modified definitions are only used for run-contract tests, not pack loading.
-    plan = select(pack, [env], pol); st.put(plan)
+    def create(folder):
+        st = Store(folder / "store")
+        st.put_many([env, pol]); put_baseline_snapshot(st)
+        # Modified definitions are only used for run-contract tests, not pack loading.
+        plan = select(pack, [env], pol); st.put(plan)
+        return st, plan, None
+
+    st, plan, _ = manual_setup_seed("m10-run-inputs", {
+        "pack": pack.model_dump(mode="json"), "environment": env.to_dict(), "policy": pol.to_dict(),
+    }, tmp_path, create)
     evd, = run_plan(st, pack, plan, RunConfig(executors={"input_validation": "m10-test"}, adapter="vllm"))
     res = judge_evidence(pack.checks["REQ-09"], evd, pol, T0)
     return st, plan, evd, res, calls
@@ -280,18 +286,26 @@ def test_absent_markers_keep_historical_contract_and_other_checks(pack):
 
 
 def manual_setup(tmp_path, pack, mode="audit"):
-    st=Store(tmp_path/"store"); envs=[environment()]
+    envs=[environment()]
     if mode=="update": envs.append(environment(id="ENV-CANDIDATE"))
     pol=policy(pack.ref(),scope={"include":["REQ-09","SUP-03"]},values={"REQ-09":values(pack.checks["REQ-09"])})
-    st.put_many([*envs,pol]); put_pack(st,PACK_DIR)
-    plan=select(pack,envs,pol,mode=mode); st.put(plan)
+    def create(folder):
+        st=Store(folder/"store")
+        st.put_many([*envs,pol]); put_baseline_snapshot(st)
+        plan=select(pack,envs,pol,mode=mode); st.put(plan)
+        doc=fill(build_template(st,pack,plan,include_automated=True))
+        for e in doc["checks"]:
+            if e["check_id"]=="REQ-09":
+                e["override_reason"]="EXAMPLE bounded synthetic manual assessment"
+                for o in e["required_observations"]:
+                    o.update(value=observed(pack.checks["REQ-09"])[o["key"]].value,collected=True)
+        return st,plan,doc
+
+    st,plan,doc=manual_setup_seed("m10-manual", {
+        "pack":pack.model_dump(mode="json"),"environments":[e.to_dict() for e in envs],
+        "policy":pol.to_dict(),"mode":mode,
+    },tmp_path,create)
     assert all(e["check_id"]!="REQ-09" for e in build_template(st,pack,plan)["checks"])
-    doc=fill(build_template(st,pack,plan,include_automated=True))
-    for e in doc["checks"]:
-        if e["check_id"]=="REQ-09":
-            e["override_reason"]="EXAMPLE bounded synthetic manual assessment"
-            for o in e["required_observations"]:
-                o.update(value=observed(pack.checks["REQ-09"])[o["key"]].value,collected=True)
     return st,plan,doc
 
 

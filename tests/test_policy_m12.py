@@ -17,8 +17,8 @@ from guard.judges import manual_cache_context as cache
 from guard.models.objects import CpuProfile, ExecutorInfo, Observation
 from guard.report.html import render_html
 from guard.store import Store
-from guard.store.packs import put_pack
 from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy
+from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import fill, snapshot, write
 
@@ -196,14 +196,23 @@ def test_contract_markers_and_existing_checks(pack,kind):
 
 
 def setup(tmp_path,pack,mode="audit"):
-    st=Store(tmp_path/"store"); envs=[environment()]
+    envs=[environment()]
     if mode=="update": envs.append(environment(id="ENV-CANDIDATE"))
     pol=policy(pack.ref(),scope={"include":["REQ-16"]},values={"REQ-16":{cache.POLICY:list(CONTEXTS)}})
-    st.put_many([*envs,pol]);put_pack(st,PACK_DIR);plan=select(pack,envs,pol,mode=mode);st.put(plan)
+    def create(folder):
+        st=Store(folder/"store")
+        st.put_many([*envs,pol]);put_baseline_snapshot(st)
+        plan=select(pack,envs,pol,mode=mode);st.put(plan)
+        doc=fill(build_template(st,pack,plan))
+        for entry in doc["checks"]:
+            entry["required_observations"][0].update(value=payload(CONTEXTS,hashlib.sha256(ATTACHMENT).hexdigest()),collected=True)
+        return st,plan,doc
+
+    st,plan,doc=manual_setup_seed("m12", {
+        "pack":pack.model_dump(mode="json"),"environments":[e.to_dict() for e in envs],
+        "policy":pol.to_dict(),"mode":mode,"attachment":ATTACHMENT.hex(),
+    },tmp_path,create)
     assert plan.item("REQ-16").gaps==["NO_EXECUTOR"]
-    doc=fill(build_template(st,pack,plan))
-    for entry in doc["checks"]:
-        entry["required_observations"][0].update(value=payload(CONTEXTS,hashlib.sha256(ATTACHMENT).hexdigest()),collected=True)
     return st,plan,doc
 
 

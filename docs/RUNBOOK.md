@@ -1,12 +1,20 @@
 # 실행·실증 안내
 
+## v1 통합 후보와 검증 이력
+
+2026-10-24 기준, 이 브랜치는 PR #24·#25·#28을 합치고 전체 회귀·설치본·새 복원 재판정을 통과한 [v1 기술 완료 후보](UPDATE_VALIDATION.md#v1-통합-후보-검증)다. main 미반영 상태이며 공식 출시 승인은 별도다. 현행 정의는 PACK-BASELINE 21/DRAFT·77개 점검 정의·정책 22점검/49경로·자동 연결 11개·adapter 0.4.1·declared 0.13.0이다. 자동 연결 수와 실제 전체 분기 검증 수를 구분한다.
+
+[PR #28의 두 이미지 실측](UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)은 vLLM API 0.31.0/0.32.0 CPU에서 기존 5개 점검의 양쪽 보안·기능 PASS와 수락·반출/복원·저장 팩 재판정 일치를 확인했다. 이 기록을 통합판에서 새로 실행한 결과로 표시하지 않는다. 비교는 모두 NO_CHANGE여서 실제 차이 탐지는 미증명이며 성능 UNKNOWN·정책/팩 DRAFT·official=false다.
+
+실제 EVD 10개의 출처는 MEASURED지만 REQ-01/REQ-03 Result의 검증 수준은 DECLARED다. REQ-01 일부 상태 변경 경로는 HTTP를 보내지 않고 TCP 차단 근거를 사용한다. 모든 handler 실행·기업 승인·11개 점검 모든 분기의 실증으로 확대하지 않는다.
+
 ## 현행 정책·로그 증거와 설치 검증
 
 [이번 보강](POLICY_RELIABILITY_BATCH.md)은 REQ15 수동 계약·로그 수신 상한/출처·저장 로그 재검증·설치본 CI·준비 안내를 연결한다. [로그 도구](LOG_EVIDENCE.md), [REQ15 입력](POLICY_M14.md), [wheel 검증](INSTALLED_VERIFICATION.md)을 따른다. prepare-* JSON의 guidance는 원인/다음 조치를 추가하며 ready와 점검 지원·실제 판정을 구분한다. 입력 실패 때 의존 검사는 미확인이고 총 메모리가 여유 메모리를 뜻하지 않는다.
 
 ## 두 이미지 CPU 업데이트 비교
 
-[두 이미지 비교 안내](UPDATE_VALIDATION.md)에 준비 입력·Windows 명령·수락 기준을 정리했다. `python -m guard.update_validation`의 기본은 읽기 전용 준비 검사이며 실제 기동은 `--execute`가 필요하다. 분석은 `--analyze-existing`으로 원본을 보존한다. 최소 다섯 점검의 보안/기능 구체 판정과 반출·복원·저장 팩 재판정을 확인한다. 실제 두 이미지 시험은 아직 미수행이며 준비 성공과 시험 수락을 구분한다.
+[두 이미지 비교 안내](UPDATE_VALIDATION.md)에 준비 입력·Windows 명령·수락 기준을 정리했다. `python -m guard.update_validation`의 기본은 읽기 전용 준비 검사이며 실제 기동은 `--execute`가 필요하다. 분석은 `--analyze-existing`으로 원본을 보존한다. 최소 다섯 점검의 보안/기능 구체 판정과 반출·복원·저장 팩 재판정을 확인한다. 후보 미준비로 시험하지 못했던 [도구 구현 당시 기록](UPDATE_VALIDATION.md#이번-검증-결과)과 이후 위 PR #28의 성공 기록을 구분한다. 준비 성공은 시험 수락이 아니다.
 
 ## 현행 자동화 보강과 지원 범위
 
@@ -16,7 +24,7 @@
 
 [실제 CPU 3차 기록](AUTOMATION_PHASE3.md)·[선별 증거](evidence/automation-phase3-20261023.json), [명시적 real 설정](../examples/windows-cpu-binding-logs.toml)·[EXAMPLE/DRAFT 정책](../examples/automation-binding-logs-policy.yaml)을 참고한다. 실제 ENV·로컬 snapshot 경로가 필요하며 모델/이미지 수신은 자동으로 하지 않는다. 실행은 새 store/output으로 하나씩 진행하고 기존 컨테이너·모델·증거를 보존한다. 기본 guard.toml은 fake 시연 설정이다. CPU 성능 UNKNOWN·팩/정책 미승인·official=false를 유지한다.
 
-아래는 과거 단계의 명령과 실증 계약이다. 당시 수치·팩 revision·지원 환경 설명을 현행 완료 주장으로 해석하지 않는다. 두 실제 이미지 비교의 다음 수락 기준과 PR 통합 선택지는 [보강 계획](AUTOMATION_HARDENING.md)을 따른다.
+아래는 과거 단계의 명령과 실증 계약이다. 당시 수치·팩 revision·지원 환경 설명을 현행 완료 주장으로 해석하지 않는다. 당시 PR 통합 선택지는 [보강 계획](AUTOMATION_HARDENING.md)의 이력이며 현행 두 이미지 수락 기준과 실측 결과는 위 UPDATE_VALIDATION 안내를 따른다.
 
 ## 기존 실행 안내와 이력
 
@@ -125,7 +133,7 @@ rejection_codes/list[str]이며 예시는 ["400", "422"]다.
 max_probe_tokens는 기본 4096이며 예산보다 큰 시험은 요청 전 ABORTED다.
 정상 token-array [0]가 통과한 뒤 범위 밖 ID와 입력 길이를 시험한다.
 다른 입력 형식/모든 경계 조합/실제 모델 범위 전체를 검증한 것으로 해석하지 않는다.
-두 신규 점검은 이번에 실제 엔진 실증하지 않았다. 활성화 전 정책과 설정을 검토한다.
+이 신규 점검 절을 작성한 당시에는 PLT-04/REQ-09를 실제 엔진 실증하지 않았다. 이후 두 점검은 위 PR #28의 두 이미지 실측에 포함됐다. 다른 환경에 활성화하기 전에는 해당 정책과 설정을 검토한다.
 
 ## 실제 두 이미지 통합 테스트
 

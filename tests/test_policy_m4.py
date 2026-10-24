@@ -17,8 +17,8 @@ from guard.manual_policy import CASES, OBSERVATION, PARAMETERS, blank_evidence, 
 from guard.models import Evidence
 from guard.report.html import render_html
 from guard.store import IntegrityError, Store
-from guard.store.packs import put_pack
 from tests.builders import PACK_DIR, T0, baseline_pack, environment, evidence, policy
+from tests.prepared_fixtures import dump_fixture_yaml, manual_setup_seed, put_baseline_snapshot
 
 runner = CliRunner()
 
@@ -33,17 +33,23 @@ def values(items=("EXAMPLE-one", "EXAMPLE-two")):
 
 
 def setup(tmp_path, pack, given=None, mode="audit"):
-    st = Store(tmp_path / "store")
     envs = [environment()]
     if mode == "update":
         envs.append(environment(id="ENV-CANDIDATE"))
     pol = policy(pack.ref(), values=values() if given is None else given,
                  scope={"include": ["SUP-14", "LIF-07", "SUP-03"]})
-    st.put_many([*envs, pol])
-    put_pack(st, PACK_DIR)
-    plan = select(pack, envs, pol, mode=mode)
-    st.put(plan)
-    return st, plan, build_template(st, pack, plan)
+    def create(folder):
+        st = Store(folder / "store")
+        st.put_many([*envs, pol])
+        put_baseline_snapshot(st)
+        plan = select(pack, envs, pol, mode=mode)
+        st.put(plan)
+        return st, plan, build_template(st, pack, plan)
+
+    return manual_setup_seed("m4", {
+        "pack": pack.model_dump(mode="json"), "environments": [e.to_dict() for e in envs],
+        "policy": pol.to_dict(), "mode": mode,
+    }, tmp_path, create)
 
 
 def fill(doc):
@@ -85,7 +91,7 @@ def row(doc, cid, case, item="EXAMPLE-one", side="single"):
 def write(tmp_path, doc):
     (tmp_path/"EXAMPLE.txt").write_text("EXAMPLE synthetic source; no engine executed\n",encoding="utf-8")
     path = tmp_path/"manual.yaml"
-    path.write_text(yaml.safe_dump(doc,allow_unicode=True,sort_keys=False),encoding="utf-8")
+    path.write_text(dump_fixture_yaml(doc,allow_unicode=True,sort_keys=False),encoding="utf-8")
     return path
 
 
@@ -113,6 +119,26 @@ def unit(check, supplied=None, verdicts=None):
 
 def result(check, evd, vals):
     return DeclaredJudge().judge(check,evd,{},vals)
+
+
+def prior_fail_setup(tmp_path, pack):
+    """Clone the fixed prior state; each invalid import still runs below."""
+    env = environment()
+    pol = policy(pack.ref(), values=values(), scope={"include": ["SUP-14", "LIF-07", "SUP-03"]})
+
+    def create(folder):
+        st, plan, doc = setup(folder, pack)
+        fill(doc)
+        entry(doc)["verdicts"]["security"] = "FAIL"
+        import_evidence(st, pack, write(folder, doc), now=T0)
+        judge(st, pack, plan)
+        return st, plan, doc
+
+    return manual_setup_seed("m4-prior-fail", {
+        "pack": pack.model_dump(mode="json"), "environment": env.to_dict(), "policy": pol.to_dict(),
+        "mode": "audit", "prior_security": "FAIL",
+        "attachment": b"EXAMPLE synthetic source; no engine executed\n".hex(),
+    }, tmp_path, create)
 
 
 def test_v2_uses_pinned_refs_and_never_populates_observation_results(tmp_path, pack):
@@ -164,11 +190,7 @@ def test_v2_end_to_end_report_and_rejudge(tmp_path,pack):
     "wrong_side","not_selected","foreign_attachment","bad_locator","bad_limitation","bad_records",
     "legacy_smuggling","non_target_payload"])
 def test_invalid_forms_reject_entire_batch_and_preserve_prior_fail(tmp_path,pack,issue):
-    st,plan,doc=setup(tmp_path,pack)
-    fill(doc)
-    entry(doc)["verdicts"]["security"]="FAIL"
-    import_evidence(st,pack,write(tmp_path,doc),now=T0)
-    judge(st,pack,plan)
+    st,plan,doc=prior_fail_setup(tmp_path,pack)
     before,blobs=snapshot(st),set((st.root/"artifacts").iterdir())
     bad=deepcopy(doc); e=entry(bad); r=e["policy_evidence"]["records"][0]
     if issue in ("policy_revision","pack_revision"): bad[issue.split("_")[0]]["revision"]+=1

@@ -21,6 +21,7 @@ from guard.store.bundle import export_bundle, restore_bundle
 from guard.store.packs import put_pack
 from tests.builders import PACK_DIR, T0, baseline_pack, environment, policy
 from tests.test_automation_phase1_contracts import VALUES, _run
+from tests.prepared_fixtures import copy_frozen_tree, put_baseline_snapshot
 from tools.validate_cpu_cases import (CHECKS, _inventory_tree, _objects, _verify_store_files,
                                       analyze_existing, compare_report, main, observation_contract)
 
@@ -37,7 +38,7 @@ def _case(folder, monkeypatch, expected):
     folder.mkdir()
     pack = baseline_pack()
     store = Store(folder / "store")
-    put_pack(store, PACK_DIR)
+    put_baseline_snapshot(store)
     env = environment({"gateway": {"value": True, "origin": "EXAMPLE", "source": "fake-I/O test"}},
                       engine={"name": "vllm", "version": "0.31.0"},
                       model={"id": "test-model"}, runtime={"gpu_count": 0, "cpu": CPU})
@@ -239,7 +240,7 @@ def test_analysis_preserves_legacy_failure_while_verifying_observation_contract(
 def test_readonly_analysis_rejects_corrupt_saved_proof_without_repair(matrix, tmp_path, damage):
     root, _ = matrix
     source = tmp_path / "source"
-    shutil.copytree(root, source)
+    copy_frozen_tree(root, source)
     folder = source / "isolated-insufficient-observation"
     objects = _objects(folder / "store")
     if damage == "artifact":

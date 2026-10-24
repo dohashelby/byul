@@ -1,7 +1,6 @@
 """수동 증거 입력(A): guard evidence template / import. 사람의 판정 = 신고된 관측, 판정기가 PASS 관문을 적용한다."""
 
 import json
-import shutil
 
 import pytest
 import yaml
@@ -15,22 +14,35 @@ from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
 from guard.models import DataOrigin, ExecStatus, Verdict
 from guard.store import Store
-from tests.builders import ROOT, T0, baseline_pack, environment, policy
+from tests.builders import T0, baseline_pack, environment, policy
+from tests.prepared_fixtures import copy_workdir, dump_fixture_yaml, manual_setup_seed
 
 D = {"origin": "DECLARED", "source": "env.yaml"}
 
 
 def _setup(tmp_path, include=("SUP-01", "REQ-01")):
-    store = Store(tmp_path / ".guard")
     pack = baseline_pack()
     env = environment({"gateway": {"value": True, **D}})
     pol = policy(pack.ref(), scope={"include": list(include), "exclude": []},
                  values={"REQ-01": {"allowed_callers": ["allowed"]},
                          "SUP-01": {"approval_record_system": "EXAMPLE approval registry"},
                          "SUP-02": {"approval_record_system": "EXAMPLE approval registry"}})
-    store.put(env); store.put(pol)
-    plan = select(pack, [env], pol); store.put(plan)
-    run_plan(store, pack, plan, RunConfig(executors={"direct_route": "fake"}, adapter="fake"))
+    config = RunConfig(executors={"direct_route": "fake"}, adapter="fake")
+
+    def create(folder):
+        store = Store(folder / ".guard")
+        store.put(env); store.put(pol)
+        plan = select(pack, [env], pol); store.put(plan)
+        run_plan(store, pack, plan, config)
+        return store, plan, {}
+
+    store, plan, _ = manual_setup_seed(
+        family="manual-evidence",
+        parameters={"pack": pack.model_dump(mode="json"),
+                    "environment": env.to_dict(), "policy": pol.to_dict(),
+                    "mode": "audit", "scope": list(include),
+                    "run_config": {"executors": config.executors, "adapter": config.adapter, "raw": config.raw}},
+        folder=tmp_path, create=create, store_directory=".guard")
     return store, pack, plan
 
 
@@ -52,7 +64,7 @@ def _write(tmp_path, doc):
     (tmp_path / "evidence").mkdir(exist_ok=True)
     (tmp_path / "evidence/approval-log.txt").write_text("2026-10-19 submitter write denied\n", encoding="utf-8")
     p = tmp_path / "filled.yaml"
-    p.write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    p.write_text(dump_fixture_yaml(doc, allow_unicode=True, sort_keys=False), encoding="utf-8")
     return p
 
 
@@ -196,10 +208,7 @@ def test_report_counts_and_limitations(tmp_path):
 
 
 def test_cli_template_and_import(tmp_path, monkeypatch):
-    for name in ("guard.toml", "examples"):
-        src = ROOT / name
-        (shutil.copytree if src.is_dir() else shutil.copy)(src, tmp_path / name)
-    shutil.copytree(ROOT / "packs", tmp_path / "packs")
+    copy_workdir(tmp_path)
     policy_path = tmp_path / "examples/policy.yaml"
     fixture = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
     fixture.setdefault("values", {})["SUP-01"] = {"approval_record_system": "EXAMPLE approval registry"}

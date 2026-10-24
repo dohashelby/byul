@@ -16,11 +16,11 @@ from guard.store.packs import put_pack
 from guard.validation_evidence import (
     file_sha256, inventory_tree, read_objects, verify_saved_bundle, verify_store_files,
 )
-from tests.builders import PACK_DIR, T0, environment, evidence, policy
+from tests.builders import PACK_DIR, T0, baseline_pack, environment, evidence, policy
+from tests.prepared_fixtures import manual_setup_seed
 
 
-@pytest.fixture
-def saved(tmp_path):
+def _create_saved(tmp_path):
     store = Store(tmp_path / "source")
     pack_ref = put_pack(store, PACK_DIR)
     env = environment({"gateway": {"value": True, "origin": "EXAMPLE", "source": "unit fixture"}})
@@ -34,7 +34,19 @@ def saved(tmp_path):
     evd = Evidence(**{**raw, "plan": plan.ref(), "environment": env.ref(),
                       "refs": [plan.ref(), env.ref()]}).seal()
     store.put(evd)
-    return store.root, plan, evd
+    return store, plan, evd.ref()
+
+
+@pytest.fixture
+def saved(tmp_path):
+    pack = baseline_pack()
+    env = environment({"gateway": {"value": True, "origin": "EXAMPLE", "source": "unit fixture"}})
+    pol = policy(pack.ref(), scope={"include": ["REQ-01"]})
+    parameters = {"pack": pack.model_dump(mode="json"), "environment": env.model_dump(mode="json"),
+                  "policy": pol.model_dump(mode="json"), "artifact": b"EXAMPLE captured bytes\r\n".hex()}
+    store, plan, ref = manual_setup_seed("validation-evidence", parameters, tmp_path, _create_saved,
+                                        store_directory="source")
+    return store.root, plan, store.resolve(ref)
 
 
 def _state(folder):

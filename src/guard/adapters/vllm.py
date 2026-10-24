@@ -88,6 +88,52 @@ SAFE_PROBES: dict[tuple[str, str, str], ProbeRequest] = {
     ),
 }
 
+# 새 지원은 실제로 검토한 버전·전체 이미지 digest 쌍에만 한정한다.
+# 기존 0.31.0 버전 전용 SAFE_PROBES는 과거 호출과 저장 증거의 계약을 보존한다.
+SAFE_PROBE_REVIEWED_IMAGES = {
+    "0.31.0": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+    "0.32.0": "vllm/vllm-openai-cpu@sha256:827ef38187f9b52f2bb838695ef815ec5b65f4bf3e4c061b002b2b0a19cb0701",
+}
+_ELASTIC_EP_ROUTER_SOURCE = (
+    "vllm/entrypoints/serve/elastic_ep/api_router.py "
+    "(sha256 2d6805874a868eb63747903f5e10331855b7c277d46a4cef3dca7f20a2e631db)"
+)
+
+
+def _reviewed_elastic_ep_probes(version: str, image: str) -> dict[tuple[str, str, str, str], ProbeRequest]:
+    source = f"{image} (v{version}) {_ELASTIC_EP_ROUTER_SOURCE}"
+    return {
+        (version, image, "POST", "/scale_elastic_ep"): ProbeRequest(
+            "POST", "/scale_elastic_ep", body={}, headers=_JSON,
+            expected_handler_reached={"status": 400, "body_contains": "new_data_parallel_size is required"},
+            basis="safe_probe",
+            source=source + " L27-49: body {} → new_data_parallel_size None → HTTPException 400; "
+                   "engine_client(L62)·client.scale_elastic_ep(L64) 미도달. "
+                   "선행 Depends(validate_json_request): vllm/entrypoints/serve/utils/api_utils.py "
+                   "(sha256 ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba) "
+                   "L350-356 Content-Type만 검사. HTTPException 응답: "
+                   "vllm/entrypoints/serve/exception_handling/handlers/http.py "
+                   "(sha256 ae710c07f319f56e105a8d143300b0d1042ab4cdedc437da2c7dd88df21e5a18) "
+                   "L16-31 상태 코드와 오류 문구 유지",
+        ),
+        (version, image, "POST", "/is_scaling_elastic_ep"): ProbeRequest(
+            "POST", "/is_scaling_elastic_ep", body={}, headers=_JSON,
+            expected_handler_reached={"status": 200, "body_contains": "is_scaling_elastic_ep"},
+            basis="safe_probe",
+            source=source + " L83-85: get_scaling_elastic_ep() 조회만. "
+                   "vllm/entrypoints/serve/elastic_ep/middleware.py "
+                   "(sha256 99ff0d6d3767acae73e5daa7d70e1be42e7e373975122e79a41fa761e27cc26c) "
+                   "L13-14 전역 플래그 읽기만, L17-19 setter 미호출",
+        ),
+    }
+
+
+PINNED_SAFE_PROBES: dict[tuple[str, str, str, str], ProbeRequest] = {
+    key: probe
+    for version, image in SAFE_PROBE_REVIEWED_IMAGES.items()
+    for key, probe in _reviewed_elastic_ep_probes(version, image).items()
+}
+
 # 공통 옵션 → vLLM 고유 옵션
 OPTION_FLAGS = {
     CommonOption.REMOTE_CODE_EXECUTION: "--trust-remote-code",
@@ -212,7 +258,7 @@ class VllmAdapter:
     base_url: str | None = None
     launch_spec: LaunchSpec | None = None
     name: str = field(default="vllm", init=False)
-    version: str = field(default="0.4.0", init=False)
+    version: str = field(default="0.4.1", init=False)
 
     # --- 기동 ------------------------------------------------------------------
 
@@ -431,8 +477,11 @@ class VllmAdapter:
             raise RuntimeError(f"/openapi.json returned {status}")
         return self.routes_from_openapi(json.loads(body))
 
-    def probe_request(self, route: Route, model: str | None, engine_version: str | None = None) -> ProbeRequest | None:
-        safe = SAFE_PROBES.get((engine_version, route.method, route.path))
+    def probe_request(self, route: Route, model: str | None, engine_version: str | None = None,
+                      engine_image_digest: str | None = None) -> ProbeRequest | None:
+        safe = PINNED_SAFE_PROBES.get((engine_version, engine_image_digest, route.method, route.path))
+        if safe is None:
+            safe = SAFE_PROBES.get((engine_version, route.method, route.path))
         if safe is not None:
             return safe
         if route.mutating:

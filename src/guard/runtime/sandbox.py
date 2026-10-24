@@ -24,6 +24,7 @@ from guard.executors import http_probe
 from guard.executors.content_common import redact_value
 from guard.executors.http_probe import probe
 from guard.runtime.docker import Docker, DockerError, Mount
+from guard.runtime import generation_readiness
 
 LAB = Path(__file__).resolve().parent / "assets"
 NGINX_IMAGE = "nginx:1.27-alpine"
@@ -250,6 +251,9 @@ def _up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = 
         raise ValueError(f"gateway profile {gateway_profile} needs keys {missing}")
     if engine not in ("stub", "vllm") or (engine == "vllm" and not vllm):
         raise ValueError(f"engine {engine!r} (vllm needs the [vllm] config)")
+    generation_profile = generation_readiness.profile(vllm or {})
+    if generation_profile is not None and (engine != "vllm" or not wait_ready):
+        raise ValueError("generation readiness requires a managed engine with wait_ready enabled")
     run_dir.mkdir(parents=True, exist_ok=True)
     images = pull_images(docker)
     ready_timeout = float(vllm.get("ready_timeout", 600)) if engine == "vllm" else 30.0
@@ -293,6 +297,10 @@ def _up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = 
                                                     "want_body": True}], 5, "version")
             if v.get("outcome") == 200:
                 version = json.loads(v.get("body") or "{}").get("version")
+            if generation_profile is not None:
+                generation_readiness.run(run_dir, generation_profile, engine_url, trusted_net,
+                    lambda network, requests, timeout: _probe_in(docker, network, requests, timeout, "generation-ready"),
+                    secret_values=[value for value in secret_env.values() if value])
 
     direct_targets = [{"origin": "external", "url": engine_url}]
     if topology == "exposed":
@@ -340,6 +348,9 @@ def _up(docker: Docker, topology: str, run_dir: Path, allowed_key: str | None = 
     }
     if credential_canary:
         target["comparison_config"]["credential_canary"] = True
+    if generation_profile is not None:
+        target["comparison_config"]["generation_readiness"] = generation_profile
+        target["generation_readiness"] = generation_readiness.reference(run_dir)
     (run_dir / "target.json").write_text(json.dumps(target, indent=2), encoding="utf-8")
     doc = env_document(topology, images) if engine == "stub" else vllm_env_document(topology, vllm, images, version)
     (run_dir / "env.yaml").write_text(yaml.safe_dump(doc, allow_unicode=True, sort_keys=False), encoding="utf-8")

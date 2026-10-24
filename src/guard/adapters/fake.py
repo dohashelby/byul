@@ -21,7 +21,8 @@ class FakeAdapter:
     def routes_from_openapi(self, doc: dict) -> list[Route]:
         return []
 
-    def probe_request(self, route: Route, model: str | None, engine_version: str | None = None) -> ProbeRequest | None:
+    def probe_request(self, route: Route, model: str | None, engine_version: str | None = None,
+                      engine_image_digest: str | None = None) -> ProbeRequest | None:
         return None
 
     def detect_version(self, handle: ContainerHandle) -> EngineIdentity:

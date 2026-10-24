@@ -18,7 +18,19 @@ jobs:
           python-version: "3.11"
       - run: python -m pip install uv==0.12.11
       - run: uv sync --frozen
-      - run: uv run pytest -q --durations=20
+      - name: Measure default suite parent wall clock
+        run: |
+          uv run python - <<'PY'
+          import subprocess
+          import sys
+          import time
+
+          start = time.perf_counter()
+          result = subprocess.run([sys.executable, "-m", "pytest", "-q", "--durations=50"])
+          elapsed = time.perf_counter() - start
+          print(f"Default suite parent wall clock: {elapsed:.3f}s", flush=True)
+          raise SystemExit(result.returncode)
+          PY
       - run: uv build --wheel
       - name: Verify installed wheel outside checkout
         run: uv run python tools/verify_installed.py --wheel dist/guard-0.1.0-py3-none-any.whl --output "${{ runner.temp }}/guard-installed-verification"

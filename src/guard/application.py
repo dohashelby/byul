@@ -17,7 +17,7 @@ from guard.core.select import select
 from guard.models import ExecStatus, Mode, Side
 from guard.store.packs import put_pack
 from guard.runtime.docker import Docker
-from guard.runtime import sandbox
+from guard.runtime import generation_readiness, sandbox
 
 
 def merge_config(base: dict, override: dict) -> dict:
@@ -65,12 +65,14 @@ def _managed_config(env, cfg):
         base["cpu"] = env.runtime.cpu.model_dump(mode="json")
     if env.runtime.platform:
         base["platform"] = env.runtime.platform
+    generation_readiness.profile(base)  # Explicit startup generation is opt-in and CPU-only.
     launch = sandbox._vllm_plan(base)  # Pure option validation before any engine resources are created.
     if base.get("launch_profile") == "cpu-bounded":
         from guard.adapters.vllm import CPU_LAUNCH_KEYS, CpuLaunchOptions
         allowed = {"models_dir", "model_layout", "launch_profile", "ready_timeout", "image", "model", "revision",
                    "expected_version", "inventory_sha256", "gpu", "cpu_kv_cache_gib", "cpu", "gpu_model", "driver",
                    "platform", "expected_source_commit", "source_commit_observed", "source_commit_status",
+                   "generation_readiness_timeout",
                    "files_read_by_engine_sha256", "files_read_by_engine_count", *CPU_LAUNCH_KEYS}
         if set(base) - allowed:
             raise ValueError(f"unknown bounded CPU settings: {sorted(set(base) - allowed)}")
@@ -244,10 +246,18 @@ def _managed_diagnostic_reference(docker, folder: Path, keys: dict, side: str) -
     try:
         saved = sandbox.capture_diagnostics(docker, folder, secret_values=list(keys.values()), phase="run-final")
         if saved.get("path") == "managed-diagnostic.json" and re.fullmatch(r"[0-9a-f]{64}", saved.get("sha256", "")):
-            return f"{side}: separate run diagnostic (not EVD): {side}/managed-diagnostic.json sha256={saved['sha256']}"
-        return f"{side}: separate run diagnostic unavailable ({saved.get('error_type', 'UnknownError')})"
+            detail = f"{side}: separate run diagnostic (not EVD): {side}/managed-diagnostic.json sha256={saved['sha256']}"
+        else:
+            detail = f"{side}: separate run diagnostic unavailable ({saved.get('error_type', 'UnknownError')})"
     except Exception as exc:
-        return f"{side}: separate run diagnostic unavailable ({type(exc).__name__})"
+        detail = f"{side}: separate run diagnostic unavailable ({type(exc).__name__})"
+    try:
+        saved = generation_readiness.reference(folder)
+        if saved is not None:
+            detail += f"; separate startup generation (not EVD): {side}/{saved['path']} sha256={saved['sha256']}"
+    except Exception as exc:
+        detail += f"; separate startup generation unavailable ({type(exc).__name__})"
+    return detail
 
 
 def _validation_inputs(env, cfg: dict):

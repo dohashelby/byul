@@ -20,11 +20,11 @@ from guard.models import canonical_json
 from guard.runtime.docker import CmdResult
 from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle
-from guard.store.packs import put_pack
 from tests import test_direct_route as direct
 from tests import test_role_route as role
 from tests.test_container_config import FakeDocker, LAB_POLICY, _probe
 from tests.builders import PACK_DIR, baseline_pack, environment, policy
+from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 
 
 VALUES = {
@@ -96,15 +96,21 @@ def _executor(tmp_path, cid, expected, *, violation_and_missing=False):
 
 def _run(tmp_path, monkeypatch, cid, expected, *, violation_and_missing=False):
     pack = baseline_pack()
-    st = Store(tmp_path / 'store')
-    put_pack(st, PACK_DIR)
     env = environment({'gateway': {'value': True, 'origin': 'EXAMPLE', 'source': 'synthetic topology'}},
         engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'test-model'})
     pol = policy(pack.ref(), scope={'include': [cid]}, values={cid: VALUES[cid]})
-    st.put(env)
-    st.put(pol)
-    plan = select(pack, [env], pol)
-    st.put(plan)
+    def create(folder):
+        st = Store(folder / 'store')
+        put_baseline_snapshot(st)
+        st.put(env)
+        st.put(pol)
+        plan = select(pack, [env], pol)
+        st.put(plan)
+        return st, plan, None
+
+    st, plan, _ = manual_setup_seed('automation-phase1-inputs', {
+        'pack': pack.model_dump(mode='json'), 'environment': env.to_dict(), 'policy': pol.to_dict(),
+    }, tmp_path, create)
     executor = _executor(tmp_path, cid, expected, violation_and_missing=violation_and_missing)
     name = pack.checks[cid].executor
     monkeypatch.setitem(registry.EXECUTORS, f'{name}:contract', lambda raw: executor)

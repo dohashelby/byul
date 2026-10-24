@@ -5,12 +5,33 @@ import json
 from pathlib import Path
 
 import yaml
+import pytest
 
 from tools.import_checklist import AREAS, import_checklist
+from tests.prepared_fixtures import copy_frozen_tree
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "reference/framework/data/checklist.json"
 OVERRIDES = ROOT / "tools/overrides"
+
+
+@pytest.fixture(scope="session")
+def pristine_imported_pack(tmp_path_factory):
+    """Share only the unchanged first import, never a test's mutable output.
+
+    Tests of initial creation still import directly. Rerun and changed-input
+    tests copy this initial state and invoke the real importer afterwards.
+    """
+    pack = tmp_path_factory.mktemp("importer-pristine") / "pack"
+    import_checklist(SOURCE, pack, OVERRIDES)
+    return pack
+
+
+@pytest.fixture
+def imported_pack(tmp_path, pristine_imported_pack):
+    pack = tmp_path / "pack"
+    copy_frozen_tree(pristine_imported_pack, pack)
+    return pack
 
 
 def _snapshot(pack: Path) -> dict[str, bytes]:
@@ -34,9 +55,8 @@ def test_creates_77_files_with_area_ids(tmp_path):
     assert set(AREAS.values()) == set(expected)
 
 
-def test_req01_is_first_request_row(tmp_path):
-    pack = tmp_path / "pack"
-    import_checklist(SOURCE, pack, OVERRIDES)
+def test_req01_is_first_request_row(imported_pack):
+    pack = imported_pack
     data = yaml.safe_load((pack / "checks/REQ-01.yaml").read_text(encoding="utf-8"))
     src = json.loads(SOURCE.read_text(encoding="utf-8"))["request_state_assessment_draft"][0]
     assert data["question"] == src["question"]
@@ -50,9 +70,8 @@ def test_req01_is_first_request_row(tmp_path):
     assert data["judge"]["plugin"] == "rule_table"
 
 
-def test_unstructured_rows_keep_prose_and_null_executor(tmp_path):
-    pack = tmp_path / "pack"
-    import_checklist(SOURCE, pack, OVERRIDES)
+def test_unstructured_rows_keep_prose_and_null_executor(imported_pack):
+    pack = imported_pack
     data = yaml.safe_load((pack / "checks/SUP-01.yaml").read_text(encoding="utf-8"))
     assert data["executor"] is None
     assert data["judge"] is None
@@ -61,17 +80,15 @@ def test_unstructured_rows_keep_prose_and_null_executor(tmp_path):
     assert data["required_observations_prose"]
 
 
-def test_rerun_is_byte_identical(tmp_path):
-    pack = tmp_path / "pack"
-    import_checklist(SOURCE, pack, OVERRIDES)
+def test_rerun_is_byte_identical(imported_pack):
+    pack = imported_pack
     first = _snapshot(pack)
     import_checklist(SOURCE, pack, OVERRIDES)
     assert _snapshot(pack) == first
 
 
-def test_ids_survive_wording_change_and_reorder(tmp_path):
-    pack = tmp_path / "pack"
-    import_checklist(SOURCE, pack, OVERRIDES)
+def test_ids_survive_wording_change_and_reorder(tmp_path, imported_pack):
+    pack = imported_pack
     data = json.loads(SOURCE.read_text(encoding="utf-8"))
     changed = copy.deepcopy(data)
     rows = changed["request_state_assessment_draft"]
@@ -87,9 +104,8 @@ def test_ids_survive_wording_change_and_reorder(tmp_path):
     assert req21["question"] == data["request_state_assessment_draft"][20]["question"]
 
 
-def test_removed_row_is_retired_and_new_row_gets_next_number(tmp_path):
-    pack = tmp_path / "pack"
-    import_checklist(SOURCE, pack, OVERRIDES)
+def test_removed_row_is_retired_and_new_row_gets_next_number(tmp_path, imported_pack):
+    pack = imported_pack
     data = json.loads(SOURCE.read_text(encoding="utf-8"))
     changed = copy.deepcopy(data)
     removed = changed["platform_assessment_draft"].pop(2)
@@ -106,11 +122,10 @@ def test_removed_row_is_retired_and_new_row_gets_next_number(tmp_path):
     assert plt13["retired"] is False
 
 
-def test_pack_manifest_hashes_all_files(tmp_path):
+def test_pack_manifest_hashes_all_files(imported_pack):
     import hashlib
 
-    pack = tmp_path / "pack"
-    import_checklist(SOURCE, pack, OVERRIDES)
+    pack = imported_pack
     manifest = yaml.safe_load((pack / "pack.yaml").read_text(encoding="utf-8"))
     assert manifest["pack_id"] == "PACK-BASELINE"
     assert manifest["review"]["status"] == "DRAFT"
@@ -122,9 +137,8 @@ def test_pack_manifest_hashes_all_files(tmp_path):
         assert hashlib.sha256((pack / f["path"]).read_bytes()).hexdigest() == f["sha256"]
 
 
-def test_pack_revision_bumps_only_on_change(tmp_path):
-    pack = tmp_path / "pack"
-    import_checklist(SOURCE, pack, OVERRIDES)
+def test_pack_revision_bumps_only_on_change(tmp_path, imported_pack):
+    pack = imported_pack
     import_checklist(SOURCE, pack, OVERRIDES)
     assert yaml.safe_load((pack / "pack.yaml").read_text(encoding="utf-8"))["revision"] == 1
     data = json.loads(SOURCE.read_text(encoding="utf-8"))

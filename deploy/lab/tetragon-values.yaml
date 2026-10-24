@@ -1,0 +1,10 @@
+tetragon:
+  # 호스트 프로세스 이벤트 폭증을 막되, pod_info 실패로 namespace가 비는 lab kprobe는
+  # 정책 이름으로 통과시킨다. 아래 필터 필드는 Tetragon 1.7.1 공식 문서 기준 후보이다.
+  exportAllowList: |-
+    {"event_set":["PROCESS_EXEC","PROCESS_EXIT"],"namespace":["serving-lab"]}
+    {"event_set":["PROCESS_KPROBE"],"policy_names":["runtime-tg-asset-01","runtime-tg-secret-01","runtime-tg-cache-01","runtime-tg-deny-01"]}
+  # 빈 namespace를 deny하지 않아 위 policy_names kprobe 규칙을 유지한다.
+  exportDenyList: |-
+    {"health_check":true}
+    {"namespace":["cilium","kube-system"]}

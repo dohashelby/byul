@@ -13,6 +13,7 @@ from serving_runtime.cli import main
 from serving_runtime.enforcement.cilium import render_manifests as render_cilium
 from serving_runtime.enforcement.cilium import write_manifests
 from serving_runtime.enforcement.events import (
+    EventError,
     ObservationQuery,
     parse_hubble,
     parse_tetragon,
@@ -249,6 +250,65 @@ class EventAdapterTests(unittest.TestCase):
         self.assertEqual([item["line"] for item in rejected], [1, 2])
         self.assertNotIn("not-json", json.dumps(rejected))
 
+    def test_kprobe_without_binary_or_pod_marks_attribution_unavailable(self) -> None:
+        event = json.loads(
+            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()[2]
+        )
+        event["process_kprobe"]["process"].pop("binary")
+        event["process_kprobe"]["process"].pop("pod")
+        observation = parse_tetragon(event, data_origin="real")
+        self.assertIsNone(observation["binary"])
+        self.assertEqual(observation["process_attribution"], "unavailable")
+        self.assertIsNone(observation["pod"])
+        self.assertEqual(observation["pod_attribution"], "unavailable")
+        self.assertEqual(observation["policy_name"], "runtime-tg-asset-01")
+
+    def test_kprobe_empty_binary_is_null_but_required_fields_stay_strict(self) -> None:
+        event = json.loads(
+            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()[2]
+        )
+        event["process_kprobe"]["process"]["binary"] = ""
+        observation = parse_tetragon(event, data_origin="real")
+        self.assertIsNone(observation["binary"])
+        self.assertEqual(observation["process_attribution"], "unavailable")
+        self.assertEqual(observation["pod_attribution"], "available")
+
+        malformed = []
+        for key in ("function_name", "policy_name", "action"):
+            document = json.loads(json.dumps(event))
+            document["process_kprobe"].pop(key)
+            malformed.append(document)
+        no_path = json.loads(json.dumps(event))
+        no_path["process_kprobe"]["args"].pop(0)
+        malformed.append(no_path)
+        no_mask = json.loads(json.dumps(event))
+        no_mask["process_kprobe"]["args"].pop(1)
+        malformed.append(no_mask)
+        for document in malformed:
+            with self.subTest(document=document), self.assertRaises(EventError):
+                parse_tetragon(document, data_origin="real")
+
+    def test_process_exec_still_requires_non_empty_binary(self) -> None:
+        original = json.loads(
+            (FIXTURE_DIR / "tetragon_events.synthetic.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()[0]
+        )
+        for binary in (None, ""):
+            event = json.loads(json.dumps(original))
+            if binary is None:
+                event["process_exec"]["process"].pop("binary")
+            else:
+                event["process_exec"]["process"]["binary"] = binary
+            with self.subTest(binary=binary), self.assertRaisesRegex(
+                EventError, "process.binary must be a non-empty string"
+            ):
+                parse_tetragon(event, data_origin="real")
+
     def test_origin_is_required_and_validated(self) -> None:
         flow = json.loads(
             (FIXTURE_DIR / "hubble_flows.synthetic.jsonl").read_text(
@@ -323,6 +383,8 @@ class DashboardStaticTests(unittest.TestCase):
         self.assertIn("실제 수집", script)
         self.assertIn("exec-outside-allowlist", script)
         self.assertIn("origins_by_kind", script)
+        self.assertIn("pod 미확인", script)
+        self.assertIn("프로세스 미확인", script)
         for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "eval("):
             self.assertNotIn(forbidden, script)
 

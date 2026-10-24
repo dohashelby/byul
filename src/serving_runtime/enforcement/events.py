@@ -32,14 +32,15 @@ def _string(value: Any, path: str) -> str:
     return value
 
 
-def _pod(value: Any) -> dict[str, str | None]:
+def _pod(value: Any) -> dict[str, str] | None:
     pod = value if isinstance(value, dict) else {}
     namespace = pod.get("namespace")
     name = pod.get("pod_name", pod.get("name"))
-    return {
-        "namespace": namespace if isinstance(namespace, str) else None,
-        "pod": name if isinstance(name, str) else None,
-    }
+    if not isinstance(namespace, str) or not namespace:
+        return None
+    if not isinstance(name, str) or not name:
+        return None
+    return {"namespace": namespace, "pod": name}
 
 
 def _base(observed_at: str, source: str, kind: str, origin: str) -> dict[str, Any]:
@@ -105,9 +106,19 @@ def _event_time(root: dict[str, Any]) -> str:
     return _string(root.get("time"), "$.time")
 
 
-def _binary_and_pod(event: dict[str, Any], path: str) -> tuple[str, dict[str, Any]]:
+def _process(
+    event: dict[str, Any], path: str, *, require_binary: bool
+) -> tuple[str | None, dict[str, str] | None]:
     process = _object(event.get("process"), f"{path}.process")
-    binary = _string(process.get("binary"), f"{path}.process.binary")
+    raw_binary = process.get("binary")
+    if require_binary:
+        binary = _string(raw_binary, f"{path}.process.binary")
+    elif raw_binary is None or raw_binary == "":
+        binary = None
+    elif isinstance(raw_binary, str):
+        binary = raw_binary
+    else:
+        raise EventError(f"{path}.process.binary must be a string or null")
     return binary, _pod(process.get("pod"))
 
 
@@ -124,14 +135,17 @@ def parse_tetragon(
         raise EventError("event must contain exactly one supported Tetragon event")
     event_name = event_names[0]
     event = _object(root[event_name], f"$.{event_name}")
-    binary, pod = _binary_and_pod(event, f"$.{event_name}")
     if event_name == "process_exec":
+        binary, pod = _process(event, "$.process_exec", require_binary=True)
+        assert binary is not None
         normalized = _base(observed_at, "tetragon", "process_exec", data_origin)
         allowlist = tuple(allowed_engine_binaries or ())
         normalized.update(
             {
                 "binary": binary,
+                "process_attribution": "available",
                 "pod": pod,
+                "pod_attribution": "available" if pod is not None else "unavailable",
                 "path": None,
                 "access": None,
                 "rule_id": "TG-EXEC-01",
@@ -141,6 +155,7 @@ def parse_tetragon(
         )
         return normalized
 
+    binary, pod = _process(event, "$.process_kprobe", require_binary=False)
     function_name = _string(event.get("function_name"), "$.process_kprobe.function_name")
     if function_name != "security_file_permission":
         raise EventError(f"unsupported kprobe function: {function_name}")
@@ -174,9 +189,14 @@ def parse_tetragon(
     normalized.update(
         {
             "binary": binary,
+            "process_attribution": (
+                "available" if binary is not None else "unavailable"
+            ),
             "pod": pod,
+            "pod_attribution": "available" if pod is not None else "unavailable",
             "path": file_path,
             "access": access,
+            "policy_name": policy_name,
             "rule_id": match.group(1).upper(),
             "action": action,
         }

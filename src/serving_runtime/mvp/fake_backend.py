@@ -37,6 +37,7 @@ class FakeBackend:
         self,
         port: int = 0,
         *,
+        host: str = "127.0.0.1",
         mode: str = "normal",
         model_id: str = "backend-test-model",
         version: str = "fake-vllm-test-0",
@@ -47,6 +48,8 @@ class FakeBackend:
     ) -> None:
         if not isinstance(port, int) or isinstance(port, bool) or not 0 <= port <= 65535:
             raise ValueError("port must be an integer from 0 through 65535")
+        if not isinstance(host, str) or not host:
+            raise ValueError("host must be a non-empty string")
         if mode not in self._MODES:
             raise ValueError("invalid fake backend mode")
         if not isinstance(model_id, str) or not model_id:
@@ -56,6 +59,7 @@ class FakeBackend:
         if header_delay_s < 0 or stream_interval_s < 0:
             raise ValueError("delays must not be negative")
         self.port = port
+        self.host = host
         self.mode = mode
         self.model_id = model_id
         self.version = version
@@ -374,7 +378,7 @@ class FakeBackend:
                     },
                 )
 
-        self._server = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        self._server = ThreadingHTTPServer((self.host, self.port), Handler)
         self._thread = threading.Thread(
             target=self._server.serve_forever,
             name="mvp-fake-backend-test",

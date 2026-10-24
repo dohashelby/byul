@@ -1,0 +1,26 @@
+# EXAMPLE/DRAFT five-check CPU update fixture, not an enterprise approval.
+# Values are the unchanged five-check subset of automation-policy.yaml.
+data_origin: EXAMPLE
+status: DRAFT
+pack: {id: PACK-BASELINE, revision: 21}
+values:
+  REQ-01: {allowed_callers: [allowed]}
+  REQ-03: {general_allowed_kinds: [inference]}
+  PLT-01:
+    allowed_capabilities: []
+    allowed_mounts: ['/models:ro']
+    allowed_devices: []
+    require_non_root: true
+    allowed_exec_writable_paths: ['/guard-cache']
+  PLT-04: {forbidden_env_names: [GUARD_TEST_CREDENTIAL], forbidden_mount_paths: []}
+  REQ-09:
+    max_input_tokens: 127
+    rejection_codes: ['400', '413', '422']
+    allowed_endpoints: ['POST /v1/completions']
+    allowed_input_formats: [token_ids]
+scope:
+  include: [REQ-01, REQ-03, PLT-01, PLT-04, REQ-09]
+  exclude: []
+exceptions: []
+confirmed_by: null
+confirmed_at: null

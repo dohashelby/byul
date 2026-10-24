@@ -14,9 +14,9 @@ uv run guard policy template --pack packs/PACK-BASELINE --out my-policy.yaml
 
 ## 빈 값과 실제 입력
 
-현재 팩20/DRAFT는 21개 점검·46개 선언을 갖는다. 자동 연결은 11개이며 이 개수는 정책 전체의 자동화 완료 수가 아니다. [현행 계약](AUTOMATION_HARDENING.md)을 따른다. 아래 M 단계별 설명은 과거 기록이다. 생성기는 이 이름이나 개수에 한정되지 않으며,
+현재 팩21/DRAFT는 22개 점검·49개 선언을 갖는다. 자동 연결은 11개이며 이 개수는 정책 전체의 자동화 완료 수가 아니다. [REQ-15 수동 계약](POLICY_M14.md)과 [기존 자동화 계약](AUTOMATION_HARDENING.md)을 따른다. 아래 M 단계별 설명은 과거 기록이다. 생성기는 이 이름이나 개수에 한정되지 않으며,
 다른 팩의 활성 점검 선언도 읽는다. retired 점검과 선언 없는 점검은 값 안내에 넣지 않는다.
-기본 `scope.include`와 `scope.exclude`는 모두 빈 목록이므로 양식에 표시한 21개로 점검 범위를 축소하지 않는다.
+기본 `scope.include`와 `scope.exclude`는 모두 빈 목록이므로 양식에 표시한 22개로 점검 범위를 축소하지 않는다.
 
 양식은 각 점검을 `REQ-01: {}`처럼 비워 두고 파라미터 이름·타입·필수 여부·설명·결정 역할·
 소비 범위·검증 한계를 주석으로 안내한다. 실제 파라미터 키와 기업 값은 생성하지 않는다.
@@ -41,7 +41,7 @@ REQ-09는 여전히 양의 `max_input_tokens`, 한도+1 요청까지 포함하�
 
 ## 설명의 출처와 일치 조건
 
-[정책 카탈로그](policy_catalog.md)의 분류 a 43개 결정(46개 선언 경로)에서 설명·일반적인 원문 역할·
+[정책 카탈로그](policy_catalog.md)의 분류 a 46개 결정(49개 선언 경로)에서 설명·일반적인 원문 역할·
 소비 경로·검증 기록만 추려 패키지 내부 `collectors/policy_template_metadata.json`에 보존했다.
 생성기는 저장소의 `docs/`·`reference/`를 런타임 필수 경로로 읽지 않는다.
 공통 모델·팩에 설명 필드를 추가하지 않았다.
@@ -198,3 +198,16 @@ declared0.6.0, manual-entry0.4.0·수동/3 및 /1·/2 읽기는 유지한다. �
 ## M13 REQ16 미확인 상태
 
 guard-cache-context-evidence/1의 enum unknown은 유효한 미확인 상태다. 식별자·신원/첨부 근거의 unknown은 여전히 근거 부족이다. 추론 unknown만으로 별도 완결된 보안 근거를 지우지 않으며 기능 PASS는 보류한다. 격리 상태의 unknown·미지원 값·형태 오류를 구분하고 raw FAIL/UNKNOWN·성능/CPU·INV11을 유지한다. 구조/양식/팩/기존 해시 입력은 그대로이며 declared0.9.1로 재판정한다. [M13 계약·검증·REQ15 미구현 설계](POLICY_M13.md)를 참고한다.
+
+## M14 REQ-15 전체 격리 그룹의 제한 수동 계약
+
+현재 양식은 `REQ-15: {}`와 세 required 키의 설명만 생성한다. public_prefix_sharing_allowed는
+bool이며 첫 프로파일은 false만, isolated_cache_groups는 기업 전체 격리 그룹의 최소 두 고유 문자열,
+cache_identity_policy_ref는 신원·주입/덮어쓰기 책임 정본의 정확한 비공백 참조다. 실제 값·승인·대표 신원은
+생성하지 않는다. bool에서 관계를 추론하거나 목록을 줄이지 않는다.
+
+기존 /3 generic `declared_cache_group_evidence`에 `guard-cache-group-evidence/1`을 입력하고
+전체 ordered pair의 역방향까지 여섯 case·대표 신원·실제 소비 entry·현재 entry 첨부 SHA/locator/basis를
+연결한다. declared0.13.0은 완결된 신고 PASS의 상한만 적용하며 FAIL/UNKNOWN·정상 관문·CPU를 보존한다.
+공개 true·공유 서비스 자격·안전 거부는 지원 밖 UNKNOWN이다. 첨부·신원·정책 승인 진위와 실제 캐시 동작은
+자동 인증하지 않는다. [M14 입력 절차·범위·축별 계약](POLICY_M14.md)을 따른다.

@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 20,
-    "sha256": "7ec3cb2d1a1f8db8886bbccf605af1d464f95a66f06a74a9d94a7a0ad37180fc"
+    "revision": 21,
+    "sha256": "14b3288136b37c8221d4e72d021a6cf353e8996b98e8da08f92ba7c73cbcbeb6"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -90,7 +90,7 @@
       "type": "str",
       "description": "실제 로그의 외부 request ID를 신뢰하지 않는 상관값으로 해석하는 정책",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "OBS-09 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
+      "consumer": "OBS-09 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.13.0·JSON/HTML",
       "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
       "catalog_id": "P-AUTO-OBS-09-CLIENT-REQUEST-ID-TRUST"
     },
@@ -98,7 +98,7 @@
       "type": "str",
       "description": "실제 native INFO 로그를 소비할 명시적 참조 수집 프로파일. 기업 SIEM과 구분",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "OBS-09 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
+      "consumer": "OBS-09 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.13.0·JSON/HTML",
       "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
       "catalog_id": "P-AUTO-OBS-09-COLLECTOR-PROFILE"
     },
@@ -106,7 +106,7 @@
       "type": "list[str]",
       "description": "실제 수집 경로에서 요구하는 신뢰 필드. 초기 지원은 process/level/source이며 주체·상태 필드는 자동 생성하지 않음",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "OBS-09 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.12.0·JSON/HTML",
+      "consumer": "OBS-09 선언·select 타입 검사 / 순수 정책 검증·실제 제한 프로파일 수집 / rule_table·declared/0.13.0·JSON/HTML",
       "verification": "자동화 3차 제한 프로파일; 직접 실행과 미확인 범위는 docs/AUTOMATION_PHASE3.md",
       "catalog_id": "P-AUTO-OBS-09-REQUIRED-TRUSTED-FIELDS"
     },
@@ -298,7 +298,7 @@
       "type": "str",
       "description": "고정 직접 엔진에서 외부 request ID를 신뢰하지 않는 상관값으로 해석하는 정책. 내부 주체 인증과 구분 (입력 projection 하위 관측이며 생성 출력 귀속 미검증·보안 PASS 보류)",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "REQ-11 선언·select 타입 검사 / 제한 프로파일 입력 projection 수집·생성 출력 미검증 / 팩20 rule_table·declared/0.12.0 보안 PASS 상한·JSON/HTML",
+      "consumer": "REQ-11 선언·select 타입 검사 / 제한 프로파일 입력 projection 수집·생성 출력 미검증 / 팩20 rule_table·declared/0.13.0 보안 PASS 상한·JSON/HTML",
       "verification": "현행 출력 귀속 상한 계약: docs/AUTOMATION_HARDENING.md; 과거 실측은 팩19 기록",
       "catalog_id": "P-AUTO-REQ-11-CLIENT-REQUEST-ID-TRUST"
     },
@@ -306,7 +306,7 @@
       "type": "str",
       "description": "고정 직접 엔진 프로파일의 결과 연결 귀속 기준. 기업 신원·공유/독자 권한 전체와 구분 (입력 projection 하위 관측이며 생성 출력 귀속 미검증·보안 PASS 보류)",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "REQ-11 선언·select 타입 검사 / 제한 프로파일 입력 projection 수집·생성 출력 미검증 / 팩20 rule_table·declared/0.12.0 보안 PASS 상한·JSON/HTML",
+      "consumer": "REQ-11 선언·select 타입 검사 / 제한 프로파일 입력 projection 수집·생성 출력 미검증 / 팩20 rule_table·declared/0.13.0 보안 PASS 상한·JSON/HTML",
       "verification": "현행 출력 귀속 상한 계약: docs/AUTOMATION_HARDENING.md; 과거 실측은 팩19 기록",
       "catalog_id": "P-AUTO-REQ-11-RESULT-BINDING"
     },
@@ -341,6 +341,30 @@
       "consumer": "REQ-13 선언·select 타입 검사 / guard.executors.response_content 실제 관측 / rule_table 저장 관측 재판정·JSON/HTML",
       "verification": "자동화 1차 제한 프로파일; 실제 실행·미검증 범위는 docs/AUTOMATION_PHASE1.md",
       "catalog_id": "P-AUTO-REQ-13-REQUIRED-TARGETS"
+    },
+    "values.REQ-15.cache_identity_policy_ref": {
+      "type": "str",
+      "description": "신뢰 salt 주입 주체와 클라이언트 조작 방지 계약을 정한다",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "REQ-15 선언·select 타입 검사 / 수동 /3 generic·guard-cache-group-evidence/1 신고 귀속 대조 / manual_cache_group·declared/0.13.0 PASS 상한·JSON/HTML; 실제 캐시 실행기 없음",
+      "verification": "M14 제한 DECLARED 수동 계약; 합성 검증은 docs/POLICY_M14.md, 실제 엔진·정책 승인·첨부 진위 미검증",
+      "catalog_id": "P-DRAFT-CACHE-SALT"
+    },
+    "values.REQ-15.isolated_cache_groups": {
+      "type": "list[str]",
+      "description": "사용자·서비스 계정·tenant별 cache 공유 단위와 허용 관계를 정한다",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "REQ-15 선언·select 타입 검사 / 수동 /3 generic·guard-cache-group-evidence/1 신고 귀속 대조 / manual_cache_group·declared/0.13.0 PASS 상한·JSON/HTML; 실제 캐시 실행기 없음",
+      "verification": "M14 제한 DECLARED 수동 계약; 합성 검증은 docs/POLICY_M14.md, 실제 엔진·정책 승인·첨부 진위 미검증",
+      "catalog_id": "P-DRAFT-CACHE-GROUP"
+    },
+    "values.REQ-15.public_prefix_sharing_allowed": {
+      "type": "bool",
+      "description": "공개 prefix의 집단 간 공유를 허용할지 정한다; 비공개 자료 혼입은 허용하지 않음",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "REQ-15 선언·select 타입 검사 / 수동 /3 generic·guard-cache-group-evidence/1 신고 귀속 대조 / manual_cache_group·declared/0.13.0 PASS 상한·JSON/HTML; 실제 캐시 실행기 없음",
+      "verification": "M14 제한 DECLARED 수동 계약; 합성 검증은 docs/POLICY_M14.md, 실제 엔진·정책 승인·첨부 진위 미검증",
+      "catalog_id": "P-DRAFT-CACHE-PUBLIC-PREFIX"
     },
     "values.REQ-16.required_cache_contexts": {
       "type": "list[str]",

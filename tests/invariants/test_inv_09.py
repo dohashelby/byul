@@ -55,17 +55,23 @@ def test_update_mode_with_two_real_images(tmp_path):
         "--store", str(tmp_path / "store"), "--output", str(tmp_path / "reports")])
     assert result.exit_code == 0, result.output + repr(result.exception)
     report = json.loads(next((tmp_path / "reports").glob("*/report.json")).read_text(encoding="utf-8"))
-    rows = [r for r in report["by_check"] if r["selected"] and not r["gaps"]]
-    assert rows and all(r["comparison"] not in (None, "NOT_COMPARABLE") for r in rows)
-    from guard.store import Store
+    from guard.update_acceptance import assess_update
+    from guard.validation_evidence import read_objects, verify_store_files, verify_saved_bundle, inventory_tree
+    store_path = tmp_path / "store"
+    before = inventory_tree(store_path)
+    objects = read_objects(store_path)
+    saved_pack = verify_store_files(store_path, objects)
+    acceptance = assess_update(report, objects, saved_pack)
+    assert acceptance["accepted"] is True, acceptance
+    assert acceptance["evidence_contract_valid"] is True
+    # UNKNOWN or omitted rows cannot count as a completed two-image trial.
+    # Pure contract tests use explicitly synthetic fixtures; this opt-in path
+    # alone requires actual engines and original saved MEASURED evidence.
     from guard.store.bundle import export_bundle, restore_bundle
-    store = Store(tmp_path / "store")
-    ids = {r["check_id"] for r in rows}
-    evidence = [e for e in store.iter_kind("EVD") if e.check_id in ids]
-    assert len(evidence) == 2 * len(ids)
-    assert all(e.execution.status.value == "COMPLETED" and e.data_origin.value == "MEASURED"
-               and not e.execution.cleanup_errors for e in evidence)
-    assert {e.side.value for e in evidence} == {"baseline", "candidate"}
-    export_bundle(store.root, tmp_path / "evidence.zip")
+    export_bundle(store_path, tmp_path / "evidence.zip")
     restore_bundle(tmp_path / "evidence.zip", tmp_path / "restored")
-    assert Store(tmp_path / "restored").verify() == []
+    verify_saved_bundle(tmp_path / "evidence.zip", tmp_path / "restored")
+    restored = read_objects(tmp_path / "restored")
+    restored_pack = verify_store_files(tmp_path / "restored", restored)
+    assert assess_update(report, restored, restored_pack)["accepted"] is True
+    assert inventory_tree(store_path) == before

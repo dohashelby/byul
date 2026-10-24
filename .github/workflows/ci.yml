@@ -20,3 +20,5 @@ jobs:
       - run: uv sync --frozen
       - run: uv run pytest -q --durations=20
       - run: uv build --wheel
+      - name: Verify installed wheel outside checkout
+        run: uv run python tools/verify_installed.py --wheel dist/guard-0.1.0-py3-none-any.whl --output "${{ runner.temp }}/guard-installed-verification"

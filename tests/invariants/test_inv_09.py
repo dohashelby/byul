@@ -1,4 +1,4 @@
-"""INV-09: 비교 단위는 엔진 이미지. 모델 inventory·시험 자료·설정·GPU·드라이버가 같아야 비교. 다르거나 null이면 NOT_COMPARABLE."""
+"""INV-09: fixed model/fixture/config + known GPU/driver or explicit CPU profile."""
 
 import pytest
 
@@ -32,6 +32,46 @@ def test_compare_results_uses_comparability():
 
 
 @pytest.mark.engine
-@pytest.mark.skip(reason="두 엔진 이미지로 같은 점검을 실제 실행하는 guard update는 8단계(실제 엔진 필요). 비교 함수는 위에서 검증.")
-def test_update_mode_with_two_real_images():
-    raise AssertionError
+def test_update_mode_with_two_real_images(tmp_path):
+    """Opt-in actual update, never a synthetic substitute for two engines."""
+    import os
+    import json
+    from pathlib import Path
+    import tomllib
+    from typer.testing import CliRunner
+    from guard.cli import app
+    from guard.collectors.file import load_environment
+    required = ["GUARD_UPDATE_CONFIG", "GUARD_UPDATE_BASELINE", "GUARD_UPDATE_CANDIDATE", "GUARD_UPDATE_POLICY"]
+    if not all(os.environ.get(key) for key in required):
+        pytest.skip("requires Docker/models and explicit GUARD_UPDATE_CONFIG/BASELINE/CANDIDATE/POLICY")
+    config, baseline, candidate, policy = [Path(os.environ[key]).resolve() for key in required]
+    cfg = tomllib.loads(config.read_text(encoding="utf-8"))
+    assert cfg.get("update", {}).get("mode") == "managed"
+    assert cfg.get("executors") and all(v == "real" for v in cfg["executors"].values())
+    assert load_environment(baseline).engine.image_digest != load_environment(candidate).engine.image_digest
+    from tests.builders import PACK_DIR
+    result = CliRunner().invoke(app, ["update", "--pack", str(PACK_DIR), "--baseline", str(baseline),
+        "--candidate", str(candidate), "--policy", str(policy), "--config", str(config),
+        "--store", str(tmp_path / "store"), "--output", str(tmp_path / "reports")])
+    assert result.exit_code == 0, result.output + repr(result.exception)
+    report = json.loads(next((tmp_path / "reports").glob("*/report.json")).read_text(encoding="utf-8"))
+    from guard.update_acceptance import assess_update
+    from guard.validation_evidence import read_objects, verify_store_files, verify_saved_bundle, inventory_tree
+    store_path = tmp_path / "store"
+    before = inventory_tree(store_path)
+    objects = read_objects(store_path)
+    saved_pack = verify_store_files(store_path, objects)
+    acceptance = assess_update(report, objects, saved_pack)
+    assert acceptance["accepted"] is True, acceptance
+    assert acceptance["evidence_contract_valid"] is True
+    # UNKNOWN or omitted rows cannot count as a completed two-image trial.
+    # Pure contract tests use explicitly synthetic fixtures; this opt-in path
+    # alone requires actual engines and original saved MEASURED evidence.
+    from guard.store.bundle import export_bundle, restore_bundle
+    export_bundle(store_path, tmp_path / "evidence.zip")
+    restore_bundle(tmp_path / "evidence.zip", tmp_path / "restored")
+    verify_saved_bundle(tmp_path / "evidence.zip", tmp_path / "restored")
+    restored = read_objects(tmp_path / "restored")
+    restored_pack = verify_store_files(tmp_path / "restored", restored)
+    assert assess_update(report, restored, restored_pack)["accepted"] is True
+    assert inventory_tree(store_path) == before

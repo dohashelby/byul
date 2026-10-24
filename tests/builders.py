@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from copy import deepcopy
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,21 @@ ROUTES = ["GET /v1/models", "POST /v1/completions", "POST /invocations"]  # "MET
 
 
 FUNCTIONAL_PROBE = "POST /v1/completions"
+
+
+def completion_response(request: dict, outcome=200) -> dict:
+    """Explicit EXAMPLE generation success for fake transports, never a default
+    production response. Non-inference and unsuccessful requests keep status only.
+    """
+    import json
+    body = request.get("body") or {}
+    response = {"outcome": outcome}
+    if type(outcome) is int and outcome == 200 and isinstance(body, dict) and "model" in body and any(
+            key in body for key in ("prompt", "messages")):
+        choice = {"message": {"role": "assistant", "content": "EXAMPLE"}} if "messages" in body else {"text": "EXAMPLE"}
+        response["body"] = json.dumps({"model": body["model"], "choices": [{**choice, "finish_reason": "length"}],
+                                      "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}})
+    return response
 
 
 def req01_obs(direct=None, gateway=None, registered=None, tested=None, trusted=True, missing=(),
@@ -56,8 +73,18 @@ def dummy_ref(kind: str, id_: str | None = None) -> Ref:
     return Ref(kind=kind, id=id_ or f"{kind}-TEST", revision=1, sha256="0" * 64)
 
 
-def baseline_pack():
+@lru_cache(maxsize=1)
+def _verified_baseline_pack():
+    """Test-only immutable seed; production loaders still verify every read.
+
+    Tests which exercise changed pack bytes call load_pack on their own copied
+    directory. Never return this shared instance to a test that can mutate it.
+    """
     return load_pack(PACK_DIR)
+
+
+def baseline_pack():
+    return deepcopy(_verified_baseline_pack())
 
 
 def environment(facts: dict[str, dict] | None = None, origin: DataOrigin = DataOrigin.EXAMPLE, **kw) -> Environment:

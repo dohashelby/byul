@@ -1,5 +1,13 @@
 # 서빙엔진 보안 검증 솔루션 — 설계 초안 (SPEC v0.1)
 
+> 2026-10-24 현행 안내: 이 브랜치는 PR #24·#25·#28을 합치고 전체 회귀·설치본·새 복원 재판정을 통과한 [v1 기술 완료 후보](docs/UPDATE_VALIDATION.md#v1-통합-후보-검증)이며 main 반영·공식 출시 승인은 별도다. PACK-BASELINE 21/DRAFT·77개 점검 정의·정책 22점검/49경로·자동 연결 11개·adapter 0.4.1·declared 0.13.0을 사용한다. PR #28에서 두 실제 vLLM CPU 이미지(API 0.31.0/0.32.0)의 기존 5개 점검은 양쪽 보안·기능 PASS였고 수락·반출/복원·저장 팩 재판정이 일치했다. [실측 결과](docs/UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)는 해당 실행 코드의 기록이며 통합판의 새 실증으로 간주하지 않는다. 전부 NO_CHANGE라 실제 변화 탐지는 미증명이고 성능 UNKNOWN·DRAFT·official=false를 유지한다. EVD의 MEASURED 출처와 REQ-01/REQ-03 Result의 DECLARED 검증 수준은 다르며, REQ-01 일부 경로는 HTTP 대신 TCP 차단 근거로 검증했다. 기업 승인이나 전체 handler 실행을 뜻하지 않는다.
+
+> 2026-10-24 앞선 정책·로그 증거 보강 당시 기록: REQ-15 M14의 제한 수동 계약, OBS03/09 수집 경계·저장 로그 재검증, 설치 wheel CI·준비 guidance를 [구현/검증 기록](docs/POLICY_RELIABILITY_BATCH.md)에 정리했다. 객체 7종·원본/Ref·판정/비교 불변식을 유지하며 실제 캐시 자동 실행기를 포함하지 않았다. 해당 단계는 실제 엔진/두 이미지 실행을 하지 않았다.
+
+> 2026-10-24 앞선 검증 도구 구현 당시 기록: 기존 다섯 점검의 두 이미지 CPU 비교를 prepare/update·원본 증거 수락·반출/복원·저장 팩 재판정으로 연결했다. 당시 객체/판정/비교 계약과 팩20을 유지했고 update의 선택적 `--as-of`로 예외 만료 판단 시각을 고정했다. 당시 실제 두 이미지 시험은 미수행이었다. 이후 결과와 [당시 기록](docs/UPDATE_VALIDATION.md#이번-검증-결과)을 구분한다.
+
+> 2026-10-23 현행 보강: REQ-11 revision 3은 독립 생성 출력 귀속 오라클 부재로 보안 PASS를 보류하고 입력 projection 하위 검증을 분리한다. managed update side별 sentinel과 읽기 전용 점검 지원 안내를 연결한다. [계약·검증·다음 실증 조건](docs/AUTOMATION_HARDENING.md)을 따른다. 새 정책/실행기·실제 엔진 기동·객체7종 변경은 없다. 과거 1~3차 실측은 해당 당시 팩의 기록이다.
+
 > 작성 2026-10-19 · 상태: **초안**. 팀 확인 전. 구현·실측 완료를 뜻하지 않는다.
 >
 > **근거:** `serving-security-framework`(점검 77행·시나리오 83개·환경/결과 템플릿)를 "무엇을 점검하나"의 정본으로, `BoBProject/개발계획`(A1 불변식·A3 파이프라인·A17 콘텐츠 팩/확장 지점)을 "어떻게 만드나"의 구조 기준으로 삼았다. BoBProject의 승인 서명·감사 outbox·객체 20여 종은 의도적으로 뺐다(§9).
@@ -296,6 +304,7 @@ execution:
   started_at: RFC3339|null
   finished_at: RFC3339|null
   abort_reason: str|null
+  cleanup_errors: [str]                        # 실행 후 정리 실패. 비어 있으면 직렬화 생략(과거 해시 유지)
 normal_control: { attempted: bool, succeeded: bool|null, detail: str }
 challenges:
   - step: str                                  # CheckDef.challenge_steps 중 하나
@@ -318,6 +327,7 @@ comparability:                                 # update 모드 비교 조건 (IN
   config_sha256: hex|null
   gpu: str|null
   driver: str|null
+  cpu: { architecture: str, model: str, system: str, kernel: str, threads: int } | null  # 명시적 CPU 비교만, 없으면 직렬화 생략
 ```
 
 - 수집 실패는 `collected: false`로 남긴다. 값을 비우거나 추정하지 않는다.
@@ -332,6 +342,10 @@ comparability:                                 # update 모드 비교 조건 (IN
 - 신고된 PASS는 첨부 증거가 1개 이상이고 필수 관측 문장마다 설명이 있어야 하며, 코어 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집)도 통과해야 한다. 아니면 UNKNOWN. 신고된 FAIL은 유지(INV-04).
 - 선정되지 않은 점검은 거부(INV-10). 자동 실행기가 있는 점검은 `override_reason`이 있을 때만 받고 `execution.override_reason`에 남긴다. 양식 검증은 전부 먼저, 하나라도 틀리면 아무것도 쓰지 않는다.
 - **증거 대체 규칙:** 같은 PLAN·점검·side의 EVD는 하나의 id에 revision으로 쌓이고, **판정에는 최신 revision을 쓴다**(이전 revision은 남는다, INV-16). 수동 증거는 새 revision으로 들어간다. `guard run`은 최신 revision이 사람이 입력한 증거면 덮지 않는다(`--replace-manual`일 때만 대체). 최신 증거가 출처가 다른(자동↔수동) 이전 COMPLETED revision을 대체했으면 보고서 행에 `replaced`("대체됨", 이전 revision·사유)를 표시한다. 말 없이 덮어쓰지 않는다.
+- **M4 수동 양식 v2:** 새 생성 양식은 `guard-manual-evidence/2`이고 PLAN의 POL/팩 전체 Ref를 추가 대조한다. `/1` 입력도 읽지만 신규 `policy_evidence`를 `/1`에 숨겨 전달하지 않는다. manual-entry·declared는 0.3.0이며 과거 객체의 버전/해시는 바꾸지 않는다.
+- SUP-14.required_checks / LIF-07.required_readiness_items가 required list[str]로 선언된 정의에만 항목·case·첨부 연결을 적용한다. `declared_policy_evidence`는 기존 EVD.observations 안의 예약 수동 관측이며 계약 버전 `guard-policy-evidence/1`·parameter·정규화 records를 보존한다. 기존 객체/DB 종류는 늘리지 않는다. 정확한 항목 ID·trial·대상 범위와 현재 entry의 첨부 sha256·locator·근거를 연결하며, 원본 파일 내용을 자동 해석하거나 자기 신고를 인증하지 않는다.
+- 정책 키/빈·모호한 집합/관측 부족은 새 PASS를 UNKNOWN으로 보류한다. UNKNOWN을 PASS로 올리지 않고 신고 FAIL·독립적으로 확인된 위반은 유지한다. SUP-14는 원검사 결과와 승인/배포 전이를 구별하며 security만 검증한다. LIF-07은 접수 시점의 준비 상태와 순서 근거·공통 ready trial/정상 추론을 대조해 security/functional을 구분한다. 두 계약은 performance를 검증하지 않는다. 기존 CPU/타 점검의 계약은 그대로다.
+- 부분·미확인 관측은 저장 가능하나 Ref/side/미등록 항목/중복/타입 오류는 배치 전체를 거부한다. 정책 선언이 있는 대상의 과거 `/1` 증거는 새 판정에서 해당 PASS가 UNKNOWN일 수 있으며 새 RES revision/이유로 남긴다. 선언 없는 과거 팩·비대상 점검에는 요구를 소급하지 않는다. 항목별 이유는 선택된 RES의 `POLICY_ITEMS:` 이유만 기존 Report.limitations로 전달한다. 상세 입력 계약과 미결 기업 결정은 [정책 문서](docs/POLICY_TEMPLATE.md)를 따른다.
 
 ### 4.6 RES — Result (점검 판정)
 
@@ -365,6 +379,8 @@ by_check:
     baseline:  { result: Ref|null, security: Verdict }
     candidate: { result: Ref|null, security: Verdict }
     comparison: Comparison                     # update 모드만
+    functional_comparison: Comparison          # update 모드, 값이 있을 때만
+    comparison_reasons: [str]                  # 불일치/미확인 필드, 값이 있을 때만
     gaps: [Gap]
     evidence_source: automated | manual | null             # 판정에 쓰인 최신 증거의 출처(실행 완료 시)
     replaced: { source, revision, executor, reason } | null # 출처가 다른 이전 증거를 대체함("대체됨")
@@ -431,7 +447,7 @@ CHG* ──────────┘                                          
 | **INV-06** | 환경 사실을 `false`로 쓰려면 비사용·비노출 근거가 필요하다. 근거 없는 `false`는 `null`로 취급한다. 빈 조건 목록은 "항상 참"이 아니다. | F(selector) |
 | **INV-07** | 자동 판정·권고는 승인이 아니다. 보고서의 `approval`은 사람만 쓴다. 코드가 `approval`을 채우지 않는다. | A1-7 |
 | **INV-08** | 정책 예외는 판정을 바꾸지 않는다. 예외가 승인된 `FAIL`도 `FAIL`이다. 만료·미승인 예외는 표시하지 않고 사유를 남긴다. | A1-5,11 |
-| **INV-09** | 버전 비교의 단위는 엔진 이미지다. 모델 inventory, 시험 자료, 설정, GPU·드라이버가 두 EVD에서 같아야 비교한다. 하나라도 다르거나 null이면 `NOT_COMPARABLE`. | A1-9 |
+| **INV-09** | 버전 비교의 단위는 엔진 이미지다. 모델 inventory·시험 자료·의미 있는 실행 설정이 같고 확인돼야 한다. GPU는 GPU·driver, 명시적 CPU(gpu_count=0)는 architecture/model/system/kernel/threads가 같아야 한다. CPU 프로파일 없이 GPU·driver가 null인 경우는 여전히 비교 불가다. CPU는 보안·기능만 비교하고 성능은 UNKNOWN이다(2026-10-19 사용자 결정). | A1-9 + CPU 결정 |
 | **INV-10** | 선정되지 않은 점검은 EVD·RES를 만들지 않는다. 선정됐지만 실행하지 못한 점검은 EVD(`status: NOT_RUN` 또는 `ABORTED`)와 RES(`UNKNOWN`)를 만든다. 둘을 같은 상태로 합치지 않는다. | A1-12 |
 | **INV-11** | `PASS`는 다음이 **모두** 관측될 때만 낸다: ① 정상 대조 성공 ② 모든 챌린지가 시도되고 기대대로 거부·무효 ③ `required_observations` 전부 `collected: true`. 하나라도 빠지면 `UNKNOWN`. 과차단(정상 대조 실패)은 `PASS`가 아니다. | F(05, L3) |
 | **INV-12** | 여러 근거를 집계한 `verification_level`·`data_origin`은 필수 근거 중 하나라도 null이면 null이다. null을 빼고 나머지로 대표값을 정하지 않는다. | A1-14 |
@@ -573,7 +589,8 @@ guard/
 │  ├─ executors/           # 점검 실행기
 │  ├─ judges/              # rule_table.py + 개별 판정기
 │  ├─ collectors/          # 환경 수집기 (file.py 먼저)
-│  ├─ runtime/             # docker CLI 래퍼. adapters/·executors/에서만 사용 (코어는 모름)
+│  ├─ application.py       # 제품 실행 합성 지점. side별 엔진 생명주기와 코어 파이프라인 연결
+│  ├─ runtime/             # Docker·sandbox. adapters/·executors/·application만 사용 (CLI·코어는 직접 제어하지 않음)
 │  └─ cli.py
 ├─ packs/PACK-BASELINE/    # §3
 ├─ tools/import_checklist.py
@@ -586,10 +603,16 @@ guard/
 ```bash
 guard select  --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml   # → PLAN
 guard run     --plan PLAN-...                                                  # → EVD들
+guard run     --plan PLAN-... --replace-manual                                 # 수동 증거를 명시적으로 새 실행으로 대체
 guard judge   --plan PLAN-...                                                  # → RES들 (재실행 = 재판정)
 guard report  --plan PLAN-... --html out.html                                  # → RPT
 guard update  --pack ... --baseline env-a.yaml --candidate env-b.yaml --policy ...  # 위 전체를 두 버전으로
 guard verify                                                                   # 저장소 해시 일괄 검증
+guard prepare-update --pack ... --baseline ... --candidate ... --policy ... --config ... # 읽기 전용 준비 검사
+guard evidence export --store ... --output evidence.zip                        # 검증한 DB 사본·artifacts·팩 반출
+guard evidence restore --bundle evidence.zip --destination new-store            # 새 경로에 무결성 검증 후 복원
+guard evidence template --plan PLAN-... --out manual.yaml                       # 수동 입력 양식
+guard evidence import manual.yaml                                              # 검증한 DECLARED 객체 배치 입력
 ```
 
 ---
@@ -597,12 +620,12 @@ guard verify                                                                   #
 ## 11. AI 코딩 에이전트에게 주는 작업 규칙
 
 1. **이 SPEC이 정본이다.** 원본 프레임워크·BoBProject 문서와 충돌하면 이 SPEC을 따르고, 충돌 사실을 `DECISIONS.md`에 적는다.
-2. **§8 순서대로 한 단계씩 만든다.** 단계마다 테스트가 통과한 뒤 다음으로 간다.
-3. **불변식마다 `tests/invariants/test_inv_XX.py`를 먼저 쓴다.** 구현이 불변식을 어기면 구현을 고친다. 불변식을 고치지 않는다.
+2. **§8의 개발 순서를 따른다.** 사용자 지시에 따라 합의한 구현 묶음을 마친 뒤 테스트하며, 묶음 안의 각 단계마다 테스트를 실행하지 않는다.
+3. **사용자 지시(2026-10-19): 구현 묶음을 마친 뒤 테스트 → 실패 수정 → 필요한 재검증 순으로 진행한다.** 불변식마다 `tests/invariants/test_inv_XX.py` 회귀를 유지한다. 구현이 불변식을 어기면 구현을 고치고 불변식을 완화하지 않는다.
 4. **§9 목록에 있는 것을 만들지 않는다.** 필요해 보이면 멈추고 사람에게 묻는다.
 5. **실제 결과를 꾸며 넣지 않는다.** 실행하지 않은 시험의 EVD를 만들거나 예시 값을 `MEASURED`로 표시하지 않는다(INV-02).
 6. **코어에 엔진 이름을 쓰지 않는다.** 엔진별 코드는 `adapters/`에만 둔다.
-7. 테스트 전체가 **1분 안에** 끝나게 유지한다. 실제 엔진이 필요한 테스트는 `@pytest.mark.engine`으로 분리해 기본 실행에서 뺀다.
+7. **사용자 지시(2026-10-24): 60초를 넘겨도 중단하지 않으며 시간 초과 실패 gate를 추가하지 않는다.** 전체 suite의 pytest 시간과 부모 프로세스 벽시계를 각각 기록한다. 중복 준비 비용은 줄이되 기존 사례·assert·기대값·불변식을 완화하거나 새 skip/제외로 통과시키지 않는다. 실제 엔진이 필요한 테스트를 `@pytest.mark.engine`으로 분리하는 기존 기본 제외 조건은 유지한다.
 
 ---
 
@@ -617,3 +640,68 @@ guard verify                                                                   #
 | D5 | 첫 슬라이스 점검 | `REQ-01` Gateway 우회 직통 (§8) |
 | D6 | 버전 비교에서 기능·성능 축도 같은 표를 쓸지 | 같은 표. 성능은 수치가 정해진 뒤 |
 | D7 | 두 번째 엔진 어댑터 시점 | 우선 점검 10행이 vLLM에서 돈 뒤 |
+
+## M5 수동 정책 문맥·충돌 판정 보완
+
+- declared 0.4.0은 LIF-07 준비 전 수락의 확인된 보안 FAIL을 추론 결과 충돌로 지우지 않는다. 동일 사건의 수락/차단 모순은 위반 확정을 보류한다. 다른 유효 순서 확인 방법은 보안 위반의 반증이 아니지만 충돌 사건의 PASS는 계속 보류한다. 순서 미확인·첨부 미연결은 위반을 확정하지 않는다. 서로 다른 필수 준비 항목의 상태 차이 자체는 모순이 아니다. 원본·신고 FAIL·UNKNOWN 비승격·기능 정상 묶음·성능 미검증 계약을 유지한다.
+- SUP-01/SUP-02에 선언된 required str approval_record_system은 승인 도구·기록 체계의 정책상 식별 문맥이다. 키 누락은 NO_POLICY_VALUE, null/타입 오류는 기존 select 오류다. 대상 선언이 있고 문자열이 공백이면 declared PASS를 UNKNOWN으로 보류한다. 정상 값은 권한/진위 증명이 아니며 기존 PASS 관문을 우회하지 않는다. 두 점검 값은 독립이며 자동 복사하지 않는다.
+- 신규 공백 전제는 해당 선언이 없는 과거 팩에는 소급하지 않는다. /1 읽기, /2 생성·manual-entry 0.3.0·policy-evidence/1을 유지하고 scalar를 항목별 증거에 넣지 않는다. Report.limitations는 기존 POLICY_ITEMS: 외에 POLICY_CONTEXT: 이유도 전달한다. EVD/기존 RES는 보존한다.
+- PACK-BASELINE revision 12/DRAFT, SUP-01/SUP-02 revision 2. 정책 선언은 9점검/15경로, 자동 실행/판정 연결은 5개다. OBS-11은 미등록·미구현이며 [후속 계획](docs/POLICY_M5_PLAN.md)을 먼저 합의한다.
+
+## M7 OBS-11 수동 검증 계약
+
+- 타입 지원에 dict[str,int]를 추가한다. 문자열 키·정수 값의 얕은 검사이며 bool은 int가 아니다. 기존4타입·누락 키 NO_POLICY_VALUE·null/범위 밖 타입 검사는 유지한다. OBS 전용 의미 검증은 순수 helper에 둔다.
+- OBS-11은 required_records와 사건별 collection_deadline_ms/max_clock_uncertainty_ms/detection_deadline_ms/alert_deadline_ms를 required로 선언한다. 수집C는 발생t0부터, 식별D·경보A는 수집 기한t0+C부터 각각의 예산이다. 실제 값/승인을 만들지 않는다.
+- 새 수동 양식/3·manual-entry0.4.0·declared0.5.0이다. /1 읽기는 기존 계약, /2는 정확 POL/팩 Ref 및 policy_evidence 검증 유지, /3은 추가 audit_evidence를 지원한다. /1·/2의 audit 숨김과 /1의 policy_evidence 숨김은 거부한다. 기존 guard-policy-evidence/1은 보존한다.
+- OBS 전용 guard-audit-evidence/1은 기존 EVD.observations.declared_audit_evidence에 저장한다. normal/collection_fault/clock_uncertain별 프로파일 적용·실제 시도·독립 발생·시계/조회 창·경보/종속/복구 근거를 연결한다. 현재 첨부만 참조하고 배치 사전 검증·추가 전용 저장·의미 있는 config hash를 유지한다.
+- 시간은 명시 timezone·최대 밀리초 정밀도로만 지원한다. 현재 시각을 보충하지 않으며 오차 구간 상한≤예산은 기한 내, 하한>예산은 기한 후, 경계 겹침/허용 오차 초과는 미확인이다. 부재 조회는 시작·종료·완전성·독립 범위와 별도 경보 수신점 근거를 요구한다.
+- 최초 프로파일은 필수 누락 모두에 경보가 필요한 경우다. 적용/독립 근거를 자동 인증하지 않는다. 확정 누락 자체는 관측 미충족이며 OBS11 FAIL은 이를 정상/종속PASS 처리한 직접 근거 또는 필요한 경보의 확정 부재에 한정한다. 근거 부족/모순은 필요한 전제별 UNKNOWN, 독립 확인FAIL·신고FAIL·UNKNOWN 비승격·INV11을 유지한다.
+- 신규 상한은security만이다. 기능/성능 신고PASS는UNKNOWN, 신고FAIL은 유지하며 기존CPU 등의 상위 제약은 그대로다. clock_uncertain은 근거로 확인된 경계 겹침을 대상이 UNKNOWN 처리했는지의 범위만 평가한다. 단순 시각 누락은 이 case의 성공이 아니다. 실제 다른RES를 수정/조회/집계 제외하지 않는다.
+- REPORT는 AUDIT_COLLECTION: 이유를 기존 limitations에 전달한다. 해시/항목/case·미확인/한계만 표시하고 원본 locator/basis·경로를 노출하지 않는다. DECLARED·미인증 자기 신고·DRAFT/official 계약을 유지한다. 정책 선언 없는 과거 정의에 신규 요구를 소급하지 않는다.
+- PACK-BASELINE13/DRAFT·OBS11 정의2·10점검20경로·자동 연결5. 자세한 필드/제약은 docs/POLICY_M7.md다. 실제 엔진/collector·두 이미지·운영 체계 실증은 별도다.
+
+## M8 usage·replay 수동 정책 문맥
+
+- OBS-04/05의 usage_allowed, OBS-07/08의 replay_allowed를 required bool로 선언한다. POL은 해당 점검 범위의 허용 의사이며 실제 활성·비활성·도달·권한의 ENV/EVD를 대신하지 않는다. 새 ENV 키·실행기·전역 정책 상속은 없다.
+- OBS04는 false, OBS05/07/08은 true가 기존 수동 검토의 문맥이다. 다른 bool 또는 미확인 값이면 각 축의 신고 PASS만 UNKNOWN으로 보류한다. 활성이어도 기존 증거/INV11 관문이 필요하다. 신고 FAIL·기존 독립 확인FAIL·UNKNOWN 비승격을 보존한다. 플래그만으로 새 FAIL·NOT_APPLICABLE·자동 제외를 만들지 않는다.
+- select의 기존 bool 타입/누락 검사를 재사용한다. false는 값이고 null/0/1/문자열은 변환하지 않는다. 이 전제는 네 대상의 정확한 required bool 선언에만 적용하며 과거/optional/다른 타입/비대상 정의에는 소급하지 않는다.
+- declared0.6.0, manual-entry0.4.0·수동/3·기존 증거 계약과 객체7종·코어·저장소는 유지한다. 기존 POLICY_CONTEXT와 팩 한계 표시로 실제 값·분기·자동 검증/공유 정책 일관성 한계를 보고한다. 기업값·승인·실제 usage/replay 검증을 만들지 않는다.
+- PACK-BASELINE14/DRAFT·네 정의2·14점검24경로·a21/b6/c161/d115, 77ID/303결정595연결·자동 연결5다. [M8 계약](docs/POLICY_M8.md)의 분기 표·구형 증거·후속 계획을 따른다.
+
+## M10 REQ-09 입력 범위 계약
+
+- REQ-09의 required `allowed_endpoints`·`allowed_input_formats`는 list[str]다. 정상 engine POST 표본과 정확히 같은 endpoint 하나·`token_ids` 하나만 지원한다. 기업 전체 허용 목록을 줄이거나 기본값을 채우지 않는다. REQ-07/08/10·복수 관계표·재사용 ID/renderer는 후속이다.
+- 정책2개·관측2개의 정확한 선언 묶음에 적용한다. 모든 새 이름이 없는 과거 정의는 기존 계약, 일부/잘못된 선언은 PASS 보류다. 순수 input_policy가 실행 전·rule_table·declared의 의미를 공유한다. 의미 오류는 target/readiness/Docker/probe 전 ABORTED, 누락은 기존 NOT_RUN, 잘못된 타입은 선정 오류다.
+- 실제 제출에서 input_endpoints_tested·input_formats_tested를 수집하고 기존 정상3·경계2 요청을 보존한다. 두 관측의 전체 정책 일치·지원 프로파일을 보안/기능 PASS 전제로 사용한다. 오프라인 재판정에도 PASS 상한을 적용하고 기존 FAIL/UNKNOWN은 보존한다. 성능 규칙은 추가하지 않는다.
+- /3 generic 수동 관측과 --include-automated·override_reason을 사용한다. 새 계약 REQ-09에 한해 두 관측 값/collected를 config hash에 반영한다. 과거 정의/다른점검 입력과 기존 EVD/RES는 보존하며 /1·/2 읽기도 유지한다.
+- input_validation0.3.0·rule_table0.5.0·declared0.7.0·manual-entry0.5.0. core/report 한 파일에서 rule_table의 POLICY_CONTEXT 전달만 보강한다. official·축·출처·비교 규칙은 유지한다.
+- 팩15/DRAFT·REQ09정의5·14점검26경로·a23/b4/c161/d115·자동연결5다. 실제 parser 소비·전체 원문 요구·기업 승인·실제 엔진은 미검증이다. [M10 구현/검증](docs/POLICY_M10.md)을 따른다.
+
+## M11 REQ-09 수동 PASS 일관성
+
+- 사용자 실행 지시로 M10 신규 계약 REQ-09의 보안/기능에 고정 CheckDef rule_table의 PASS 상한을 추가한다. 수동 신고 PASS와 판정표 PASS가 일치해야 기존 PASS 후보를 유지한다. 판정표 FAIL은 상충 UNKNOWN, UNKNOWN/규칙부재/미지원/평가오류는 근거부족 UNKNOWN이다. 수동 FAIL·UNKNOWN은 그대로 보존한다.
+- 판정 코어를 재호출하지 않고 순수 판정표를 직접 조합한다. default_judge=declared의 재귀를 피하고 의존 예외로 신고 FAIL을 지우지 않는다. 원문 관측/예외를 노출하지 않는 POLICY_CONTEXT 사유를 기존 JSON/HTML에 전달한다.
+- declared0.8.0이다. 수동 성능·명시 CPU·INV11·첨부/답변/정상/챌린지·M10 범위·과거 정의/부분선언·다른점검을 보존한다. 실행기/코어/모델/Store/양식/Ref/side/config hash 입력은 변경하지 않는다. M10 상충 증거는 그대로 두고 새 RES에서 PASS→UNKNOWN을 기록하며 동일 as_of는 멱등이다.
+- 팩15/REQ09정의5·77점검·14정책점검26경로·a23/b4/c161/d115·자동연결5 유지. 캐시 설계와 M12 프롬프트는 [M11 문서](docs/POLICY_M11.md)의 미구현 제안이며 현재 제품 계약이 아니다.
+
+## M12 REQ-16 필수 캐시 문맥 수동 계약
+
+사용자 실행 지시로 M11 §4의 제한 계약을 채택한다. required list[str] `values.REQ-16.required_cache_contexts`와 dict 관측 `declared_cache_context_evidence`를 등록한다. 비어 있지 않은 고유 model_generation/adapter_content/media_identity 부분집합만 지원하며 전체 기업 목록을 줄이거나 자동 정규화하지 않는다.
+
+`guard-cache-context-evidence/1` / `same_authenticated_group_private`는 수동 /3 generic 값이다. 필수 문맥별 same_context/changed_context/post_control·동일 trial/target/workload·고유 event·전후 쌍·첨부 hash/locator/basis를 순수 검증한다. 사건 순서·신원·실제 소비 객체·hit 귀속·첨부 진위는 사람이 신고하며 자동 인증하지 않는다. 구조·전제 누락/상충은 PASS를 보류하며 미완결 generic 값의 전역 import 계약은 바꾸지 않는다.
+
+declared0.9.0의 REQ16 상한은 신고 PASS만 제한한다. 보안은 문맥·객체·key·cache effect 계약, 기능은 그 계약과 모든 행 추론 성공을 요구한다. 추론 실패만으로 별도 신고된 격리 사실을 자동 부정하지 않는다. old_context_reused는 보안/기능 PASS를 UNKNOWN으로 보류하고 새 자동 FAIL은 만들지 않는다. 신고 FAIL/UNKNOWN을 보존한다. 새 계약 성능 PASS는 UNKNOWN이며 명시 CPU의 기존 성능 UNKNOWN 규칙이 우선한다. INV11·첨부·답변·기존 REQ09/SUP/LIF/OBS를 유지한다.
+
+모든 새 표식이 없는 과거 정의는 legacy, 부분/잘못된 선언은 보류다. collector/양식·core/models/store/adapter/HTTP/실행기·config hash 입력은 변경하지 않는다. 관측 변경은 EVD content hash, 판정 버전 변경은 새 RES에 남기며 원본을 바꾸지 않는다. REQ16정의2·팩16/DRAFT·77점검·15정책점검27경로·a24/b3/c161/d115·303결정595연결·자동실행5다. PUBLIC-PREFIX와 REQ15/17·실제 캐시 자동 실행은 미구현이다. 상세 계약/명령/검증은 [M12](docs/POLICY_M12.md).
+
+## M13 REQ-16 허용 enum과 미확인 상태
+
+사용자 지시로 POL-M13-UNKNOWN-AXES를 채택한다. guard-cache-context-evidence/1의 unknown은 enum에 선언된 경우 유효한 관측 상태이며 형태 오류와 구분한다. 빈/공백·잘못된 타입은 RECORD_INCOMPLETE, 미지원 문자열은 ENUM_INVALID다. 식별자·집단·신원/상세/첨부 근거의 unknown 표식은 계속 근거 부족이다.
+
+보안 구조·격리 관측·첨부·기존 INV11 관문이 완결된 신고 PASS에서 inference의 failed/not_attempted/unknown만으로 독립된 보안 근거를 지우지 않는다. 기능은 모든 행 succeeded를 요구한다. 격리 관련 object_change/other_conditions/key_relation/cache_effect의 unknown은 보안/기능 PASS를 보류한다. raw FAIL/UNKNOWN·성능 UNKNOWN·CPU·legacy/부분선언·REQ09/SUP/LIF/OBS는 보존한다. 과거 RES UNKNOWN과 EVD 원본 신고 UNKNOWN을 구분하고 동일 증거의 새 판정 버전으로만 변화시킨다.
+
+declared0.9.1과 기존 캐시 helper만 변경한다. 수동 구조/1·양식/3·/1/2읽기·기존 config hash·팩16/DRAFT/REQ16정의2·77점검·15정책점검27경로·303결정595연결·a24/b3/c161/d115·자동실행5는 그대로다. REQ15 신규 계약과 M14는 [M13](docs/POLICY_M13.md)의 미구현 제안이다.
+
+## 자동화 1차 — Windows CPU와 실제 관측 확대
+
+2026-10-23 사용자 승인 범위는 기존 5개 점검 보강과 REQ-10/REQ-13/OBS-03 자동화다. `guard prepare-validation`/`guard validate`의 단일 managed 실행 경로와 명시적 CPU 자원 프로파일을 추가한다. 기술 설정과 POL을 분리하고, 원본 77개 ID·7객체·보존 증거·기존 판정 동작을 유지한다. 구현·계약·미검증 범위와 실행 후 결과는 [자동화 1차](docs/AUTOMATION_PHASE1.md)를 따른다. 이 범위 승인은 §0의 5~10개 우선 자동화 범위 안이며 향후 A/B/C 확대는 실제 관측과 인프라 조건별로 진행한다.

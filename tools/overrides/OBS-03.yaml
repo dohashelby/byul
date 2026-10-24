@@ -1,0 +1,95 @@
+applies_when:
+  always: true
+policy_params:
+- key: allowed_log_fields
+  type: list[str]
+  required: true
+- key: forbidden_log_fields
+  type: list[str]
+  required: true
+- key: forbidden_marker_contexts
+  type: list[str]
+  required: true
+- key: required_sources
+  type: list[str]
+  required: true
+- key: required_branches
+  type: list[str]
+  required: true
+challenge_steps:
+- 정상·안전한 오류 요청에 고유 무해 표식과 요청 ID 포함
+- 원본·설정한 collector 사본·dump 파일 수집
+- 시험 요청과 연결된 기본 exception dump·선택 debug/trace 분기 확인
+required_observations:
+- key: log_coverage_complete
+  type: bool
+- key: log_coverage_gaps
+  type: list[str]
+- key: log_sources_tested
+  type: dict[str, list[str]]
+- key: log_fields_seen
+  type: list[str]
+- key: log_marker_contexts_seen
+  type: list[str]
+- key: log_source_ids_tested
+  type: list[str]
+- key: log_required_branches_tested
+  type: list[str]
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, outcome]
+executor: log_analysis
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: log_coverage_complete
+      op: eq
+      value: true
+    - obs: log_fields_seen
+      op: subset_of
+      value_policy: allowed_log_fields
+    - obs: log_fields_seen
+      op: none_in
+      value_policy: forbidden_log_fields
+    - obs: log_marker_contexts_seen
+      op: none_in
+      value_policy: forbidden_marker_contexts
+    - obs: log_source_ids_tested
+      op: eq
+      value_policy: required_sources
+    - obs: log_required_branches_tested
+      op: eq
+      value_policy: required_branches
+    fail_when_any:
+    - obs: log_fields_seen
+      op: not_subset_of
+      value_policy: allowed_log_fields
+    - obs: log_fields_seen
+      op: any_in
+      value_policy: forbidden_log_fields
+    - obs: log_marker_contexts_seen
+      op: any_in
+      value_policy: forbidden_marker_contexts
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        fail_when_any:
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
+limitations:
+- required_sources에 명시한 Docker 원본·collector 사본·컨테이너 내 일반 파일만 읽는다. 전체 sink·회전 파일·trace/profiler 자동 발견, 독자별 읽기·반출 권한 시험은 구현 범위 밖이다. 정책 source 목록의 완전성과 실제 활성 설정은 별도 검토해야 한다.
+- Docker 로그는 실제 since/until과 컨테이너 ID·시작 시각·로그 driver로 출처를 기록한다. 수집 실패·정체성 변경·상한 도달·JSON 필드 미식별·시험 요청과 사건 연결 누락은 UNKNOWN이다. 필드 정책은 JSON leaf 경로 기준이다.
+- 정상 요청과 안전 검증 오류 요청을 보낸다. HTTP 4xx는 exception dump 증거가 아니다. 같은 고유 요청 ID 또는 오류 표식과 exception/traceback/dump 필드를 포함한 실제 사건이 있어야 기본 예외 분기를 확인한다. 없는 dump를 비활성으로 추정하지 않는다.
+- completions-only에서는 private system 표식이 소비되지 않는다. 해당 문맥이 금지 표식 정책에 포함되면 UNKNOWN이다. 실제 위반 표식·비허용 필드는 다른 수집 부족이 있어도 FAIL을 유지한다.
+- 원문 캡처의 해시와 출처를 기록하고 저장 전 설정한 인증키·표지된 자격 값을 마스킹한다. 저장 파일은 마스킹된 bytes의 별도 증거 해시로 검증하며 모든 비밀을 자동 식별한다고 주장하지 않는다.

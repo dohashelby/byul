@@ -12,7 +12,7 @@ from guard.executors import registry
 from guard.executors.direct_route import DirectRouteExecutor, mask, outcome_rank, representative
 from guard.models import DataOrigin, ExecStatus, Verdict
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import baseline_pack, environment, policy, completion_response
 
 ALLOWED, DENIED = "allowed-test-key-123", "denied-test-key-456"
 ENGINE_ROUTES = {"/health": "get", "/v1/models": "get", "/v1/completions": "post", "/invocations": "post"}
@@ -55,7 +55,7 @@ class World:
             # Gateway는 클라이언트 키를 지우고, 엔진 자체 키가 있으면 그것을 붙여 전달한다
             fwd = {"Authorization": f"Bearer {self.engine_key}"} if self.engine_key else {}
             status, body = self.engine(r["method"], u.path, fwd)
-            return {**base, "outcome": status, "phase": "response"}
+            return {**base, **completion_response(r, status), "phase": "response"}
         if u.hostname in ("e", "127.0.0.1"):
             if network == "trusted":
                 if not self.trusted_reachable:
@@ -68,7 +68,7 @@ class World:
             status, body = self.engine(r["method"], u.path, headers)
             out = {**base, "outcome": status, "phase": "response"}
             if r.get("want_body"):
-                out["body"] = body
+                out["body"] = completion_response(r, status).get("body", body)
             return out
         return {**base, "outcome": "dns_error", "phase": "connect"}
 

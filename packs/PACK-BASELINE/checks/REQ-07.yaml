@@ -1,5 +1,5 @@
 id: REQ-07
-revision: 1
+revision: 2
 retired: false
 area: REQ
 purpose: 실제 입력의 검사
@@ -11,17 +11,54 @@ risk_summary: 호출자나 template 공급자가 검사 뒤 입력을 바꿔 금
 review_order: reference_baseline_first
 impact: null
 applies_when:
+  always: true
   prose: 기본 chat template 처리; 요청 template/kwargs 변경은 수용 시 추가
-policy_params: []
+policy_params:
+- key: allowed_template_sha256
+  type: list[str]
+  required: true
+- key: max_rendered_input_tokens
+  type: int
+  required: true
+- key: request_template_override_allowed
+  type: bool
+  required: true
 policy_prose:
   policy_to_decide: 허용 template·검사 위치·입력 제한
   enterprise_decisions: 허용 endpoint·텍스트/직접 token 등 입력 형식, template override 필요성, 옵션·길이·출력 한도·정상 대조 입력. vocab·버퍼 범위·옵션 필수 관계 등 구현상 제약은 기업 정책으로 완화하지 않는다.
 normal_control: 정상 메시지는 승인 template 적용 후 허용 길이·내용 제한을 만족한다.
 challenge_steps:
-- 원 입력과 렌더 결과 기준선
-- 확장되는 무해 입력으로 제한 경계 확인
-- 검사 시점과 실제 tokenized 입력 비교
-required_observations: []
+- 고정 template의 정상 렌더 token과 실제 추론 소비 token을 대조
+- 렌더 후 정책 경계 안 입력의 실제 소비와 정상 결과 확인
+- 원 입력은 정책 안이지만 렌더 후 경계+1인 입력의 실제 소비 또는 사전 거부 위치 확인
+- 두 안전한 고정 요청 template override의 거부 또는 실제 소비 영향 확인
+required_observations:
+- key: selected_template_sha256
+  type: str
+- key: template_identity_verified
+  type: bool
+- key: rendered_prompt_tokens_exact_match
+  type: bool
+- key: rendered_input_token_counts
+  type: dict[str, int]
+- key: max_consumed_prompt_tokens
+  type: int
+- key: tested_rendered_input_limit
+  type: int
+- key: enforcement_observed
+  type: bool
+- key: request_override_rejected
+  type: bool
+- key: security_violations
+  type: list[str]
+- key: collection_complete
+  type: bool
+- key: normal_controls
+  type: bool
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, outcome]
 required_observations_prose:
 - 원 입력·template
 - 렌더 출력·token 수
@@ -32,8 +69,60 @@ unknown_criteria: 렌더 후 입력·검사 위치 또는 허용 기준을 확�
 remediation: 변환 후 입력에도 필요한 검사를 적용하고 요청이 바꿀 필드를 제한한다.
 method_and_evidence: 서버 지정·processor/tokenizer 기본값·내장 fallback 중 실제 선택된 template과 요청 override를 나눠 원 messages·변환 token·실제 검사·거부 위치를 대조한다.
 remaining_setup: 정한 입력 예산과 렌더 계측; template 코드 안전성은 공급물 항목 별도
-executor: null
-judge: null
+executor: template_validation
+judge:
+  plugin: rule_table
+  params:
+    fail_when_any:
+    - obs: security_violations
+      op: nonempty
+    - obs: max_consumed_prompt_tokens
+      op: gt
+      value_policy: max_rendered_input_tokens
+    pass_when_all:
+    - obs: selected_template_sha256
+      op: in
+      value_policy: allowed_template_sha256
+    - obs: template_identity_verified
+      op: eq
+      value: true
+    - obs: rendered_prompt_tokens_exact_match
+      op: eq
+      value: true
+    - obs: enforcement_observed
+      op: eq
+      value: true
+    - obs: request_override_rejected
+      op: eq
+      value: true
+    - obs: collection_complete
+      op: eq
+      value: true
+    - obs: normal_controls
+      op: eq
+      value: true
+    - obs: max_consumed_prompt_tokens
+      op: ge
+      value: 1
+    - obs: max_consumed_prompt_tokens
+      op: le
+      value_policy: max_rendered_input_tokens
+    - obs: tested_rendered_input_limit
+      op: eq
+      value_policy: max_rendered_input_tokens
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        - obs: normal_controls
+          op: eq
+          value: true
 legacy:
   q_ids:
   - Q-C04
@@ -48,3 +137,21 @@ legacy:
   - Q-R05-05/SC-11-07
 source:
   array: request_state_assessment_draft
+functional_probes:
+- method: POST
+  path: /v1/chat/completions
+  body:
+    model: '{model}'
+    messages:
+    - role: user
+      content: guard template control
+    max_tokens: 1
+  expect:
+  - 200
+  via: engine
+limitations:
+- fixed-template-input-v1은 선정된 고정 text-chat template를 읽기 전용 마운트한 단일 CPU 프로파일과 작은 시험 표본만 지원한다. 실제 template 바이트·기동 argv·선정 이미지의 전후 일치와 실제 /tokenize 및 추론 반환 prompt_token_ids의 정확한 일치를 확인한다. token 개수·usage·HTTP 200만으로 실제 소비를 확인하지 않는다.
+- 요청 template override 허용 정책, 임의 Jinja·processor·기본값·내장 fallback·멀티모달 분기는 지원하지 않는다. 원 정책을 축소하거나 다른 template로 대체하지 않고 미검증 범위를 UNKNOWN으로 남긴다.
+- 렌더 후 정책 경계와 경계+1의 정확한 표본을 bounded 탐색한다. 원 입력의 실제 token 수가 정책 안인지 별도 확인하고, 사전 거부는 어댑터의 선정 판본·소스 해시·입력 길이 검증 위치·정확한 오류 내용을 대조한다. 무관한 400·인증 오류·미지원 오류·5xx·timeout을 입력 제한 성공으로 보지 않는다.
+- request_override_rejected는 명시적인 신뢰 금지 거부 또는 실제 소비 token이 서버 template의 렌더와 같아 요청 template가 적용되지 않았음을 확인한 경우다. HTTP 2xx 자체를 적용·무시의 증거로 삼지 않는다. 두 고정 무해 literal 표본 외의 요청 template를 보내지 않는다.
+- normal_controls와 기능 PASS는 before·정확한 경계 안·after의 구조화된 chat 응답과 실제 소비 token 대조가 모두 성공했다는 뜻이다. 모델의 답변 품질·지시 준수·기업 승인이나 보편적인 template 안전성을 인증하지 않는다. 성능은 미검증이다.

@@ -1,0 +1,14 @@
+# Targets must be produced/verified separately for each ENV. No shared mutable target.
+store = ".guard-update"
+[adapter]
+name = "vllm"
+[executors]
+direct_route = "real"
+[update]
+mode = "external"
+[direct_route]
+roles = { allowed = "GUARD_ALLOWED_KEY" }
+[sides.baseline.direct_route]
+target = "baseline-target.json"
+[sides.candidate.direct_route]
+target = "candidate-target.json"

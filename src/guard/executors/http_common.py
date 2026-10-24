@@ -17,6 +17,7 @@ import json
 import os
 import secrets
 import time
+from threading import Lock
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -24,11 +25,13 @@ from typing import Any, Callable
 from guard.adapters.base import EngineAdapter, ProbeRequest, Route
 from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.docker import Docker, DockerError, Mount
+from guard.runtime.comparison import execution_conditions
 
-from . import http_probe
+from . import http_probe, stream_probe
 from .base import DraftArtifact, EvidenceDraft
 
 ContainerProbe = Callable[[str, list[dict], float], list[dict]]  # network, requests, timeout → results
+StreamProbe = Callable[[str, list[dict], float], list[dict]]  # bounded connection-local JSON/SSE
 HostProbe = Callable[[dict, float], dict]
 
 NO_RESPONSE = ("timeout", "unreachable")
@@ -99,17 +102,58 @@ def classify(res: dict, pr: ProbeRequest | None) -> Any:
 def docker_container_probe(docker: Docker, image: str) -> ContainerProbe:
     script = Path(http_probe.__file__).resolve()
     counter = {"n": 0}
+    counter_lock = Lock()
 
     def run(network: str, requests: list[dict], timeout: float) -> list[dict]:
-        counter["n"] += 1
+        # Sampling checks issue a challenge and a valid control concurrently.
+        # Reserve names before launching either subprocess; never share a name.
+        with counter_lock:
+            counter["n"] += 1
+            suffix = f"probe{counter['n']}"
         res = docker.run_once(
-            image, f"probe{counter['n']}", network=network, timeout=timeout * max(len(requests), 1) + 60,
+            image, suffix, network=network, timeout=timeout * max(len(requests), 1) + 60,
             mounts=[Mount(script, "/probe/http_probe.py")], command=["python", "/probe/http_probe.py"],
             input=json.dumps({"timeout": timeout, "requests": requests}).encode(),  # 키는 stdin으로만
         )
         if res.returncode != 0:
             raise DockerError(f"probe container exited {res.returncode}: {res.stderr.strip()[:300]}")
         return json.loads(res.stdout)
+
+    return run
+
+
+def docker_stream_probe(docker: Docker, image: str) -> StreamProbe:
+    """Use the existing owned Docker lifecycle; no independent cleanup owner.
+
+    This additional protocol never changes the legacy serial request format.
+    Keys stay in stdin, and collector errors never include raw stderr/request
+    data. The parent executor supplies its remaining whole-run budget.
+    """
+    script = Path(stream_probe.__file__).resolve()
+    counter = {"n": 0}
+    counter_lock = Lock()
+
+    def run(network: str, requests: list[dict], timeout: float) -> list[dict]:
+        stream_probe._prepare(requests, timeout)  # validate before creating a container
+        with counter_lock:
+            counter["n"] += 1
+            suffix = f"streamprobe{counter['n']}"
+        result = docker.run_once(
+            image, suffix, network=network, timeout=timeout + 60,
+            mounts=[Mount(script, "/probe/stream_probe.py")], command=["python", "/probe/stream_probe.py"],
+            input=json.dumps({"timeout": timeout, "requests": requests}, ensure_ascii=False).encode("utf-8"),
+        )
+        if result.returncode != 0:
+            raise DockerError(f"stream probe container exited {result.returncode}")
+        try:
+            values = json.loads(result.stdout)
+        except (ValueError, TypeError) as exc:
+            raise DockerError("invalid stream probe response") from exc
+        if (type(values) is not list or len(values) != len(requests)
+                or any(type(value) is not dict for value in values)
+                or [value.get("id") for value in values] != [request["id"] for request in requests]):
+            raise DockerError("invalid stream probe response labels")
+        return values
 
     return run
 
@@ -129,6 +173,9 @@ class Ctx:
     workdir: Path
     started: Any
     log: list[dict] = field(default_factory=list)
+    sprobe: StreamProbe | None = None
+    fixed_route_fixture: bool = False
+    route_fixture_inputs: dict | None = None
 
     @property
     def trusted_net(self) -> str:
@@ -164,16 +211,24 @@ class HttpCheckExecutor:
     """공통 실행 골격. 하위 클래스는 collect(ctx) → (observations, normal_control, challenges, summary)를 구현한다."""
 
     name = "http_check"
-    version = "0.2.0"
+    version = "0.3.0"
+    fixed_fixture_version = None
     requires_roles = True        # 역할 키가 필요한가(직통·역할 점검). 컨테이너 설정 점검은 아님
     requires_route_scope = True  # CheckDef.route_scope가 필요한가
     functional_via = "gateway"   # 이 실행기가 보내는 기능 표본의 경로
 
     def __init__(self, cfg: dict, container_probe: ContainerProbe | None = None, host_probe: HostProbe = http_probe.probe,
-                 environ: dict[str, str] | None = None):
+                 environ: dict[str, str] | None = None, stream_probe: StreamProbe | None = None):
         self.cfg = cfg
+        if "comparison_routes" in cfg:
+            if self.fixed_fixture_version is None:
+                raise ValueError("comparison_routes is not supported by this executor")
+            if cfg["comparison_routes"] is None:
+                raise ValueError("comparison_routes must be an explicit nonempty route list")
+            self.version = self.fixed_fixture_version
         self._container_probe = container_probe
         self._host_probe = host_probe
+        self._stream_probe = stream_probe
         self._environ = os.environ if environ is None else environ
 
     # --- 키 ----------------------------------------------------------------------
@@ -212,24 +267,31 @@ class HttpCheckExecutor:
         target = json.loads(Path(self.cfg["target"]).read_text(encoding="utf-8"))
         keys = self.keys()
 
-        def make_ctx(cprobe: ContainerProbe) -> Ctx:
+        def make_ctx(cprobe: ContainerProbe, sprobe: StreamProbe | None = None) -> Ctx:
             return Ctx(check=check, env=env, adapter=adapter, target=target, policy_values=policy_values,
                        timeout=float(self.cfg.get("request_timeout", 3.0)),
                        allow_mutating=bool(self.cfg.get("allow_mutating_routes", False)), keys=keys,
-                       secrets=[v for v in keys.values() if v], cprobe=cprobe, workdir=workdir, started=utcnow())
+                       secrets=[v for v in keys.values() if v], cprobe=cprobe, workdir=workdir, started=utcnow(), sprobe=sprobe)
 
         if self._container_probe is not None:
             wait_engine(target, self._container_probe, alive=None)
-            return self._finish(make_ctx(self._container_probe))
+            return self._finish(make_ctx(self._container_probe, self._stream_probe))
         docker = Docker(f"x{secrets.token_hex(4)}")
+        draft = None
         try:
             cprobe = docker_container_probe(docker, target["probe_image"])
             container = target["engine"].get("container")
             alive = (lambda: docker.is_running(container, timeout=30)) if container else None
             wait_engine(target, cprobe, alive)
-            return self._finish(make_ctx(cprobe))
+            draft = self._finish(make_ctx(cprobe, self._stream_probe or docker_stream_probe(docker, target["probe_image"])))
         finally:
-            docker.cleanup(timeout=60)
+            try:
+                incomplete = bool(docker.cleanup(timeout=60))
+            except Exception:
+                incomplete = True
+            if incomplete and draft is not None:
+                draft.cleanup_errors.append(f"probe cleanup incomplete: guard.run={docker.run_id}")
+        return draft
 
     def validate_policy(self, check: CheckDef, policy_values: dict) -> None:
         """시험 시작 전 정책 값과 실행기 설정의 일치 확인. 불일치면 예외(→ ABORTED). 기본은 확인 없음."""
@@ -246,11 +308,12 @@ class HttpCheckExecutor:
         summary = mask({"summary": True, "topology": ctx.target.get("topology"), "lab": bool(ctx.target.get("lab")),
                         **summary}, ctx.secrets)
         log_path = ctx.workdir / "probe_log.jsonl"
-        log_path.write_text("".join(json.dumps(x, ensure_ascii=False, default=str) + "\n" for x in [*ctx.log, summary]),
-                            encoding="utf-8")
+        with log_path.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write("".join(json.dumps(x, ensure_ascii=False, default=str) + "\n" for x in [*ctx.log, summary]))
         fixture = summary.get("fixture", {})
-        config = mask({"target": {k: v for k, v in ctx.target.items() if k != "images"}, "request_timeout": ctx.timeout,
-                       "allow_mutating_routes": ctx.allow_mutating, "roles": sorted(self.roles())}, ctx.secrets)
+        config = mask(execution_conditions(ctx.target, {
+            **self.cfg, "request_timeout": ctx.timeout, "allow_mutating_routes": ctx.allow_mutating,
+        }, list(self.roles())), ctx.secrets)
         return EvidenceDraft(
             status=ExecStatus.COMPLETED,
             # 실험실(stub) 대상은 EXAMPLE. 실제 엔진 대상만 MEASURED (DECISIONS 5a/5b)
@@ -259,9 +322,10 @@ class HttpCheckExecutor:
             challenges=challenges,
             observations=observations,
             artifacts=[DraftArtifact(name="probe_log.jsonl", path=log_path, collector=f"{self.name}/{self.version}")],
-            comparability={"fixture_sha256": sha256_hex(canonical_json(fixture)), "config_sha256": sha256_hex(canonical_json(config)),
+            comparability={"fixture_sha256": sha256_hex(canonical_json(fixture)),
+                           "config_sha256": sha256_hex(canonical_json(config)) if ctx.target.get("comparison_config") else None,
                            "model_inventory_sha256": ctx.env.model.inventory_sha256, "gpu": ctx.env.runtime.gpu_model,
-                           "driver": ctx.env.runtime.driver},
+                           "driver": ctx.env.runtime.driver, "cpu": ctx.env.runtime.cpu},
             config=config,
             started_at=ctx.started,
             finished_at=utcnow(),
@@ -334,9 +398,14 @@ def probe_templates(ctx: Ctx, routes: dict[str, Route]) -> tuple[dict[str, Probe
     skipped: dict[str, str] = {}
     model, version = ctx.env.model.id, ctx.env.engine.version
     for key, route in routes.items():
-        pr = ctx.adapter.probe_request(route, model, version)
+        digest = ctx.env.engine.image_digest
+        # Preserve legacy three-argument adapters when no image was declared.
+        # A pinned safe probe always receives the actual observed ENV identity.
+        args = (route, model, version)
+        pr = ctx.adapter.probe_request(*args, digest) if digest else ctx.adapter.probe_request(*args)
         if pr is None and route.mutating and ctx.allow_mutating:
-            pr = ctx.adapter.probe_request(Route(route.method, route.path, route.inference, route.kind, False), model, version)
+            args = (Route(route.method, route.path, route.inference, route.kind, False), model, version)
+            pr = ctx.adapter.probe_request(*args, digest) if digest else ctx.adapter.probe_request(*args)
         if pr is None:
             skipped[key] = "mutating route without a verified safe probe for this engine version: not sent"
         elif pr.method.upper() != route.method.upper():
@@ -344,6 +413,19 @@ def probe_templates(ctx: Ctx, routes: dict[str, Route]) -> tuple[dict[str, Probe
         else:
             templates[key] = pr
     return templates, skipped
+
+
+def inference_control_profile(fp) -> str | None:
+    """Identify a submitted generation fixture, never an administrative GET.
+
+    Unsupported generation forms still require a structured response; status
+    alone must not silently establish inference. Model-list/health/metrics GETs
+    keep the status expectation declared in their CheckDef.
+    """
+    body = fp.body or {}
+    if fp.method.upper() == "POST" and "model" in body and any(key in body for key in ("prompt", "messages", "input")):
+        return "/v1/chat/completions" if "messages" in body else "/v1/completions"
+    return None
 
 
 def functional_requests(ctx: Ctx, via: str = "gateway") -> tuple[list[dict], dict[str, Any]]:
@@ -358,20 +440,28 @@ def functional_requests(ctx: Ctx, via: str = "gateway") -> tuple[list[dict], dic
         if via == "gateway":
             if fp.as_role not in ctx.keys:
                 raise RuntimeError(f"functional probe {pid}: role {fp.as_role!r} not configured")
-            reqs.append(ctx.request(f"func|{pid}", ctx.gateway_url, pr, ctx.keys[fp.as_role]))
+            reqs.append(ctx.request(f"func|{pid}", ctx.gateway_url, pr, ctx.keys[fp.as_role], want_body=inference_control_profile(fp) is not None))
         else:
-            reqs.append(ctx.request(f"func|{pid}", ctx.engine_url, pr, ctx.keys.get(fp.as_role)))
+            reqs.append(ctx.request(f"func|{pid}", ctx.engine_url, pr, ctx.keys.get(fp.as_role), want_body=inference_control_profile(fp) is not None))
     return reqs, probes
 
 
-def functional_results(probes: dict[str, Any], results: dict[str, dict]) -> tuple[dict[str, str], dict[str, Any], dict]:
+def functional_results(probes: dict[str, Any], results: dict[str, dict], expected_model: str | None = None) -> tuple[dict[str, str], dict[str, Any], dict]:
     functional: dict[str, str] = {}
     status: dict[str, Any] = {}
     for pid, fp in probes.items():
         o = (results.get(pid) or {}).get("outcome")
         status[pid] = o
         if isinstance(o, int) and not isinstance(o, bool):
-            functional[pid] = "pass" if o in fp.expect else "fail"
+            if o not in fp.expect:
+                functional[pid] = "fail"
+            elif inference_control_profile(fp) is not None:
+                # Local import avoids a module cycle with content_common's
+                # request/masking helpers. No engine operation happens here.
+                from .content_common import control_state
+                functional[pid] = control_state(results[pid], expected_model, inference_control_profile(fp))
+            else:
+                functional[pid] = "pass"
         else:
             functional[pid] = "no_response"
     normal = {
@@ -445,7 +535,14 @@ def send_and_record(ctx: Ctx, batch: RequestBatch, templates: dict[str, ProbeReq
                     ) -> list[tuple[tuple, dict, Any]]:
     """묶음을 보내고(외부 출발점), `between`(예: 양성 대조·안전 확인)을 실행한 뒤 결과를 분류·기록한다.
     반환: [(메타, 원결과, 분류값)] — 분류값은 안전 프로브 기대 응답이면 handler_reached, 그 밖은 결과 그대로."""
+    if ctx.fixed_route_fixture:
+        from .route_fixture import verify_requests
+        verify_requests(ctx.route_fixture_inputs, batch.requests)
     sent = ctx.cprobe(batch.network, batch.requests, ctx.timeout) if batch.requests else []
+    if getattr(ctx, "fixed_route_fixture", False) and (
+            len(sent) != len(batch.requests)
+            or [value.get("id") for value in sent] != [request["id"] for request in batch.requests]):
+        raise RuntimeError("fixed route fixture response labels do not match the submitted requests")
     results = list(zip(batch.metas, sent)) + batch.local
     if between is not None:
         between()

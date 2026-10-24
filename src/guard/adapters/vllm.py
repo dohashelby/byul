@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,13 +14,18 @@ from typing import Callable
 
 from guard.models import DataOrigin, Environment
 from guard.models.objects import FactValue
-from guard.runtime.docker import Docker, Mount
+from guard.runtime.docker import ContainerLimits, Docker, Mount
 
 from .base import CommonOption, ContainerHandle, EngineEvent, EngineIdentity, LaunchSpec, ProbeRequest, Route
 
 DEFAULT_MODEL = "facebook/opt-125m"
 CONTAINER_PORT = 8000
 MODEL_MOUNT = "/models"
+CHAT_TEMPLATE_PROFILE = "guard-text-chat-v1"
+CHAT_TEMPLATE_SHA256 = "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e"
+CHAT_TEMPLATE_CONTAINER_PATH = "/guard-assets/chat/guard-text-chat-v1.jinja"
+CHAT_TEMPLATE_ASSET = Path(__file__).resolve().parent / "assets" / "chat" / "guard-text-chat-v1.jinja"
+CHAT_REVIEWED_IMAGE = "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b"
 
 # 접근 권한 점검에서 제외하는 정보성 경로 (DECISIONS 5a)
 # 경로 종류. 점검은 CheckDef.route_scope.include_kinds로 대상 종류를 고른다.
@@ -82,6 +88,52 @@ SAFE_PROBES: dict[tuple[str, str, str], ProbeRequest] = {
     ),
 }
 
+# 새 지원은 실제로 검토한 버전·전체 이미지 digest 쌍에만 한정한다.
+# 기존 0.31.0 버전 전용 SAFE_PROBES는 과거 호출과 저장 증거의 계약을 보존한다.
+SAFE_PROBE_REVIEWED_IMAGES = {
+    "0.31.0": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+    "0.32.0": "vllm/vllm-openai-cpu@sha256:827ef38187f9b52f2bb838695ef815ec5b65f4bf3e4c061b002b2b0a19cb0701",
+}
+_ELASTIC_EP_ROUTER_SOURCE = (
+    "vllm/entrypoints/serve/elastic_ep/api_router.py "
+    "(sha256 2d6805874a868eb63747903f5e10331855b7c277d46a4cef3dca7f20a2e631db)"
+)
+
+
+def _reviewed_elastic_ep_probes(version: str, image: str) -> dict[tuple[str, str, str, str], ProbeRequest]:
+    source = f"{image} (v{version}) {_ELASTIC_EP_ROUTER_SOURCE}"
+    return {
+        (version, image, "POST", "/scale_elastic_ep"): ProbeRequest(
+            "POST", "/scale_elastic_ep", body={}, headers=_JSON,
+            expected_handler_reached={"status": 400, "body_contains": "new_data_parallel_size is required"},
+            basis="safe_probe",
+            source=source + " L27-49: body {} → new_data_parallel_size None → HTTPException 400; "
+                   "engine_client(L62)·client.scale_elastic_ep(L64) 미도달. "
+                   "선행 Depends(validate_json_request): vllm/entrypoints/serve/utils/api_utils.py "
+                   "(sha256 ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba) "
+                   "L350-356 Content-Type만 검사. HTTPException 응답: "
+                   "vllm/entrypoints/serve/exception_handling/handlers/http.py "
+                   "(sha256 ae710c07f319f56e105a8d143300b0d1042ab4cdedc437da2c7dd88df21e5a18) "
+                   "L16-31 상태 코드와 오류 문구 유지",
+        ),
+        (version, image, "POST", "/is_scaling_elastic_ep"): ProbeRequest(
+            "POST", "/is_scaling_elastic_ep", body={}, headers=_JSON,
+            expected_handler_reached={"status": 200, "body_contains": "is_scaling_elastic_ep"},
+            basis="safe_probe",
+            source=source + " L83-85: get_scaling_elastic_ep() 조회만. "
+                   "vllm/entrypoints/serve/elastic_ep/middleware.py "
+                   "(sha256 99ff0d6d3767acae73e5daa7d70e1be42e7e373975122e79a41fa761e27cc26c) "
+                   "L13-14 전역 플래그 읽기만, L17-19 setter 미호출",
+        ),
+    }
+
+
+PINNED_SAFE_PROBES: dict[tuple[str, str, str, str], ProbeRequest] = {
+    key: probe
+    for version, image in SAFE_PROBE_REVIEWED_IMAGES.items()
+    for key, probe in _reviewed_elastic_ep_probes(version, image).items()
+}
+
 # 공통 옵션 → vLLM 고유 옵션
 OPTION_FLAGS = {
     CommonOption.REMOTE_CODE_EXECUTION: "--trust-remote-code",
@@ -90,6 +142,97 @@ OPTION_FLAGS = {
 PROBE_PROMPT = "ping"
 
 HttpGet = Callable[[str, float], tuple[int | str, str]]  # url, timeout → (상태코드 | 분류 문자열, 본문)
+
+CPU_LAUNCH_KEYS = {"dtype", "max_model_len", "max_num_seqs", "max_num_batched_tokens",
+                   "kv_cache_memory_bytes", "enforce_eager", "cpu_threads", "resources", "chat_template_profile", "logging_profile"}
+
+
+def fixed_native_log_profile(profile: str) -> dict:
+    """A fixed native logging fixture; no custom dictConfig or Python imports."""
+    if type(profile) is not str or profile != "request-info-v1":
+        raise ValueError("logging_profile must be request-info-v1")
+    return {"profile": profile, "version": "1", "level": "INFO", "color": False,
+            "max_log_len": 512, "external_request_id_trust": "untrusted_correlation",
+            "logger_sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010",
+            "formatter_sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+            "environment": {"VLLM_CONFIGURE_LOGGING": "1", "VLLM_LOGGING_LEVEL": "INFO",
+                            "VLLM_LOGGING_COLOR": "0", "VLLM_LOGGING_PREFIX": "",
+                            "VLLM_LOGGING_STREAM": "ext://sys.stdout"},
+            "custom_config_allowed": False,
+            "sources": [
+                {"path": "vllm/logger.py", "sha256": "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010", "lines": "27-33,64-103"},
+                {"path": "vllm/logging_utils/formatter.py", "sha256": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5", "lines": "60-73"},
+                {"path": "vllm/entrypoints/serve/utils/request_logger.py", "sha256": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d", "lines": "36-66"}]}
+
+
+def fixed_chat_template(profile: str) -> tuple[Mount, dict]:
+    """Only a shipped, byte-pinned text fixture may enable the chat endpoint.
+
+    This formats messages for bounded API experiments. It does not turn an
+    untrained base model into an instruction or system-isolation model.
+    """
+    if type(profile) is not str or profile != CHAT_TEMPLATE_PROFILE:
+        raise ValueError(f"chat_template_profile must be {CHAT_TEMPLATE_PROFILE}")
+    if not CHAT_TEMPLATE_ASSET.is_file() or CHAT_TEMPLATE_ASSET.is_symlink():
+        raise ValueError("fixed chat template asset is missing or is a symlink")
+    actual = hashlib.sha256(CHAT_TEMPLATE_ASSET.read_bytes()).hexdigest()
+    if actual != CHAT_TEMPLATE_SHA256:
+        raise ValueError("fixed chat template asset integrity differs from the shipped profile")
+    return Mount(CHAT_TEMPLATE_ASSET, CHAT_TEMPLATE_CONTAINER_PATH, read_only=True), {
+        "profile": CHAT_TEMPLATE_PROFILE, "version": "1", "sha256": actual,
+        "container_path": CHAT_TEMPLATE_CONTAINER_PATH, "content_format": "string",
+        "request_overrides": False,
+    }
+
+
+@dataclass(frozen=True)
+class CpuLaunchOptions:
+    """A bounded CPU diagnostic profile, separate from enterprise POL values."""
+
+    dtype: str = "float32"
+    max_model_len: int = 128
+    max_num_seqs: int = 1
+    max_num_batched_tokens: int = 128
+    kv_cache_memory_bytes: int = 67108864
+    enforce_eager: bool = True
+    cpu_threads: int = 2
+
+    def __post_init__(self):
+        if type(self.dtype) is not str or self.dtype not in {"float32", "float16", "bfloat16"}:
+            raise ValueError("CPU dtype must be float32, float16 or bfloat16")
+        for key in ("max_model_len", "max_num_seqs", "max_num_batched_tokens", "kv_cache_memory_bytes", "cpu_threads"):
+            value = getattr(self, key)
+            if type(value) is not int or value <= 0:
+                raise ValueError(f"CPU {key} must be a positive integer")
+        if type(self.enforce_eager) is not bool:
+            raise ValueError("CPU enforce_eager must be a boolean")
+        if self.max_num_batched_tokens < self.max_model_len:
+            raise ValueError("CPU max_num_batched_tokens must cover max_model_len")
+
+    @classmethod
+    def from_options(cls, options: dict) -> "CpuLaunchOptions":
+        return cls(**{key: options[key] for key in cls.__dataclass_fields__ if key in options})
+
+    def to_dict(self) -> dict:
+        return {key: getattr(self, key) for key in self.__dataclass_fields__}
+
+
+def cpu_launch_limits(options: dict) -> ContainerLimits:
+    values = {"cpus": 2, "memory_bytes": 3221225472, "memory_swap_bytes": 5368709120,
+              "shm_bytes": 536870912, "pids_limit": 256}
+    supplied = options.get("resources", {})
+    if type(supplied) is not dict:
+        raise ValueError("CPU resources must be a table")
+    values.update(supplied)
+    limits = ContainerLimits.from_mapping(values)
+    if any(getattr(limits, key) is None for key in values):
+        raise ValueError("bounded CPU resources cannot be null")
+    cpu = CpuLaunchOptions.from_options(options)
+    if cpu.cpu_threads > limits.cpus:
+        raise ValueError("CPU threads must not exceed the container CPU bound")
+    if cpu.kv_cache_memory_bytes >= limits.memory_bytes:
+        raise ValueError("KV cache must leave memory for model weights and runtime")
+    return limits
 
 
 @dataclass(frozen=True)
@@ -102,6 +245,10 @@ class LaunchPlan:
     container_port: int = CONTAINER_PORT
     gpus: bool = False  # True면 docker --gpus all
     shm_size: str | None = None
+    limits: ContainerLimits | None = None
+    entrypoint: str | None = None
+    chat_template: dict | None = None
+    log_profile: dict | None = None
 
 
 @dataclass
@@ -111,7 +258,7 @@ class VllmAdapter:
     base_url: str | None = None
     launch_spec: LaunchSpec | None = None
     name: str = field(default="vllm", init=False)
-    version: str = field(default="0.1.0", init=False)
+    version: str = field(default="0.4.1", init=False)
 
     # --- 기동 ------------------------------------------------------------------
 
@@ -119,9 +266,41 @@ class VllmAdapter:
         revision = spec.options.get("revision")
         if not revision:
             raise ValueError("model revision must be pinned (options['revision'])")
-        unknown = set(spec.options) - {"revision", "models_dir", "device", "cpu_kv_cache_gib", *(o.value for o in CommonOption)}
+        unknown = set(spec.options) - {"revision", "models_dir", "device", "cpu_kv_cache_gib", "launch_profile",
+                                      "model_layout", *CPU_LAUNCH_KEYS, *(o.value for o in CommonOption)}
         if unknown:
             raise ValueError(f"unknown launch options: {sorted(unknown)}")
+        profile = spec.options.get("launch_profile", "legacy")
+        if type(profile) is not str or profile not in {"legacy", "cpu-bounded"}:
+            raise ValueError("launch_profile must be legacy or cpu-bounded")
+        layout = spec.options.get("model_layout", "hf-cache")
+        if type(layout) is not str or layout not in {"hf-cache", "snapshot"}:
+            raise ValueError("model_layout must be hf-cache or snapshot")
+        if profile == "legacy" and (layout != "hf-cache" or any(key in spec.options for key in CPU_LAUNCH_KEYS)):
+            raise ValueError("bounded CPU options and snapshot layout require launch_profile=cpu-bounded")
+        if profile == "cpu-bounded":
+            if spec.options.get("device") != "cpu":
+                raise ValueError("cpu-bounded requires explicit device=cpu")
+            if "cpu_kv_cache_gib" in spec.options:
+                raise ValueError("cpu-bounded uses kv_cache_memory_bytes; do not also set cpu_kv_cache_gib")
+            cpu = CpuLaunchOptions.from_options(spec.options)
+            cpu_launch_limits(spec.options)
+            argv = [MODEL_MOUNT if layout == "snapshot" else spec.model, "--revision", str(revision),
+                    "--served-model-name", spec.model, "--host", "0.0.0.0", "--port", str(spec.port),
+                    "--dtype", cpu.dtype, "--max-model-len", str(cpu.max_model_len),
+                    "--max-num-seqs", str(cpu.max_num_seqs), "--max-num-batched-tokens", str(cpu.max_num_batched_tokens),
+                    "--kv-cache-memory-bytes", str(cpu.kv_cache_memory_bytes), "--load-format", "auto"]
+            if cpu.enforce_eager:
+                argv.append("--enforce-eager")
+            if spec.options.get(CommonOption.REMOTE_CODE_EXECUTION.value):
+                argv.append(OPTION_FLAGS[CommonOption.REMOTE_CODE_EXECUTION])
+            if "chat_template_profile" in spec.options:
+                _, template = fixed_chat_template(spec.options["chat_template_profile"])
+                argv += ["--chat-template", template["container_path"], "--chat-template-content-format", "string"]
+            if "logging_profile" in spec.options:
+                logging = fixed_native_log_profile(spec.options["logging_profile"])
+                argv += ["--enable-log-requests", "--max-log-len", str(logging["max_log_len"])]
+            return argv
         argv = [
             "--model", spec.model, "--revision", str(revision), "--served-model-name", spec.model,
             "--host", "0.0.0.0", "--port", str(spec.port),
@@ -142,18 +321,133 @@ class VllmAdapter:
             raise ValueError(f"device must be gpu or cpu, got {device!r}")
         secret = ["VLLM_API_KEY"] if spec.options.get(CommonOption.API_KEY_REQUIRED.value) else []
         env = {"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "HF_HOME": MODEL_MOUNT}
-        if device == "cpu":
+        argv = self.start_command(spec)
+        mounts = [Mount(Path(models_dir), MODEL_MOUNT, read_only=True)]
+        template = None
+        logging = None
+        if "chat_template_profile" in spec.options:
+            template_mount, template = fixed_chat_template(spec.options["chat_template_profile"])
+            mounts.append(template_mount)
+        if "logging_profile" in spec.options:
+            logging = fixed_native_log_profile(spec.options["logging_profile"])
+            env.update(logging["environment"])
+        bounded = spec.options.get("launch_profile") == "cpu-bounded"
+        if bounded:
+            cpu = CpuLaunchOptions.from_options(spec.options)
+            env.update(VLLM_CPU_OMP_THREADS_BIND="nobind", OMP_NUM_THREADS=str(cpu.cpu_threads),
+                       VLLM_NO_USAGE_STATS="1", DO_NOT_TRACK="1")
+            # The image itself may define the legacy GiB variable. Remove it
+            # in the child before starting, otherwise it overrides byte sizing.
+            argv = ["-u", "VLLM_CPU_KVCACHE_SPACE", "vllm", "serve", *argv]
+        elif device == "cpu":
             # CPU 빌드: KV cache 메모리(GiB). 작은 모델·작은 VM에 맞춘 값
-            env["VLLM_CPU_KVCACHE_SPACE"] = str(spec.options.get("cpu_kv_cache_gib", 1))
+            gib = spec.options.get("cpu_kv_cache_gib", 1)
+            if type(gib) is not int or gib <= 0:
+                raise ValueError("cpu_kv_cache_gib must be a positive integer")
+            env["VLLM_CPU_KVCACHE_SPACE"] = str(gib)
         return LaunchPlan(
             image=spec.image,
-            argv=self.start_command(spec),
+            argv=argv,
             env=env,
             secret_env_names=secret,
-            mounts=[Mount(Path(models_dir), MODEL_MOUNT, read_only=True)],
+            mounts=mounts,
             gpus=device == "gpu",
-            shm_size="1g",
+            shm_size=None if bounded else "1g",
+            limits=cpu_launch_limits(spec.options) if bounded else None,
+            entrypoint="/usr/bin/env" if bounded else None,
+            chat_template=template,
+            log_profile=logging,
         )
+
+    def request_binding_contract(self, image_digest: str, engine_version: str) -> dict | None:
+        """Consumer evidence in the inspected image, not an authenticated principal."""
+        if image_digest != CHAT_REVIEWED_IMAGE or engine_version != "0.31.0":
+            return None
+        return {"profile": "request-connection-binding-v1", "engine_version": engine_version,
+                "image_digest": image_digest, "id_prefix": "chatcmpl-", "body_request_id": True,
+                "header_request_id": True, "header_precedence": True,
+                "consumer_prompt_ids": True, "consumer_prompt_text": True,
+                "sources": [
+                    {"path": "vllm/entrypoints/serve/engine/serving.py", "sha256": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02", "lines": "119-129"},
+                    {"path": "vllm/entrypoints/openai/chat_completion/serving.py", "sha256": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002", "lines": "291-317,554-565,743-760,1190-1201"},
+                    {"path": "vllm/entrypoints/openai/chat_completion/protocol.py", "sha256": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1", "lines": "391-400,416-423,446-452"}]}
+
+    def native_log_contract(self, image_digest: str, engine_version: str) -> dict | None:
+        if image_digest != CHAT_REVIEWED_IMAGE or engine_version != "0.31.0":
+            return None
+        return fixed_native_log_profile("request-info-v1")
+
+    def template_rejection_evidence(self, response: dict, *, kind: str,
+                                    prompt_tokens: int | None = None, output_tokens: int | None = None,
+                                    max_model_len: int | None = None) -> dict | None:
+        """Recognize only the inspected vLLM 0.31.0 pre-generation rejections.
+
+        HTTP 400 by itself is insufficient: auth, a bad model or an unrelated
+        validation failure must never stand in for input-limit enforcement.
+        The caller must independently pin/verify the image and engine version.
+        """
+        if (type(response) is not dict or type(response.get("outcome")) is not int
+                or response["outcome"] != 400 or response.get("body_truncated")
+                or type(response.get("body")) is not str):
+            return None
+        try:
+            value = json.loads(response["body"])
+        except (ValueError, TypeError):
+            return None
+        error = value.get("error") if type(value) is dict else None
+        if (type(error) is not dict or error.get("type") != "BadRequestError"
+                or type(error.get("code")) is not int or error["code"] != 400):
+            return None
+        if kind == "request_override":
+            expected = ("Chat template is passed with request, but --trust-request-chat-template is not set. "
+                        "Refused request with untrusted chat template.")
+            if error.get("message") != expected or error.get("param") is not None:
+                return None
+            return {"engine_version": "0.31.0", "image_digest": CHAT_REVIEWED_IMAGE,
+                    "phase": "pre_generation", "kind": kind,
+                    "source": "vllm/renderers/online_renderer.py:636-660",
+                    "source_sha256": "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e"}
+        if kind == "input_limit":
+            if (any(type(v) is not int or v <= 0 for v in (prompt_tokens, output_tokens, max_model_len))
+                    or output_tokens > max_model_len or prompt_tokens <= max_model_len - output_tokens
+                    or error.get("param") != "input_tokens"):
+                return None
+            # Tokenization may retain only max_input+1 tokens before rejecting.
+            captured = min(prompt_tokens, max_model_len - output_tokens + 1)
+            qualifier = "at least " if captured == max_model_len - output_tokens + 1 else ""
+            expected = (f"This model's maximum context length is {max_model_len} tokens. However, you requested "
+                        f"{output_tokens} output tokens and your prompt contains {qualifier}{captured} input tokens, "
+                        f"for a total of {qualifier}{captured + output_tokens} tokens. Please reduce the length of the "
+                        "input prompt or the number of requested output tokens."
+                        f" (parameter=input_tokens, value={captured})")
+            if error.get("message") != expected:
+                return None
+            return {"engine_version": "0.31.0", "image_digest": CHAT_REVIEWED_IMAGE,
+                    "phase": "pre_generation", "kind": kind,
+                    "source": "vllm/renderers/params.py:483-510",
+                    "source_sha256": "ad38852674ebc5bbe69aa9df91602847d518382cc2ceb0a25aac1d07be66b504",
+                    "formatter_source": "vllm/exceptions.py:49-56",
+                    "formatter_source_sha256": "22fe819c7ef10438f740c251d81af204871a04c3aa3eb1fd0e68604dc4c2146f",
+                    "serialization_source": "vllm/entrypoints/serve/exception_handling/error_response.py:41-44,87-95",
+                    "serialization_source_sha256": "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e",
+                    "sanitizer_source": "vllm/entrypoints/serve/exception_handling/utils.py:7-15",
+                    "sanitizer_source_sha256": "723214aa4c63418f1d5eb7c1ff2116eca474778576ac7198daa1f39217c17a4f",
+                    "observed_input_tokens": captured, "max_model_len": max_model_len,
+                    "requested_output_tokens": output_tokens}
+        return None
+
+    def supports_template_profile(self, metadata: dict) -> bool:
+        """Restrict probes to the shipped text fixture, never arbitrary Jinja.
+
+        This checks the declared profile contract only. The executor must also
+        verify the actual owned container's argv, readonly mount and file bytes.
+        A new supported profile requires its own version and inspected bytes.
+        """
+        return (type(metadata) is dict and metadata == {
+            "profile": CHAT_TEMPLATE_PROFILE, "version": "1", "sha256": CHAT_TEMPLATE_SHA256,
+            "container_path": CHAT_TEMPLATE_CONTAINER_PATH, "content_format": "string",
+            "request_overrides": False,
+        } and type(metadata.get("request_overrides")) is bool)
 
     # --- 경로 ------------------------------------------------------------------
 
@@ -183,8 +477,11 @@ class VllmAdapter:
             raise RuntimeError(f"/openapi.json returned {status}")
         return self.routes_from_openapi(json.loads(body))
 
-    def probe_request(self, route: Route, model: str | None, engine_version: str | None = None) -> ProbeRequest | None:
-        safe = SAFE_PROBES.get((engine_version, route.method, route.path))
+    def probe_request(self, route: Route, model: str | None, engine_version: str | None = None,
+                      engine_image_digest: str | None = None) -> ProbeRequest | None:
+        safe = PINNED_SAFE_PROBES.get((engine_version, engine_image_digest, route.method, route.path))
+        if safe is None:
+            safe = SAFE_PROBES.get((engine_version, route.method, route.path))
         if safe is not None:
             return safe
         if route.mutating:

@@ -127,7 +127,7 @@ def test_undetermined_is_still_selected(pack):
 
 def test_prose_only_rows_selected_as_manual(pack):
     plan = _plan(pack, {"gateway": fact(True)})
-    sup = plan.item("SUP-01")
+    sup = plan.item("SUP-03")  # No policy declaration; SUP-01 now requires approval context.
     assert sup.applicability == A.UNDETERMINED
     assert sup.selected and sup.gaps == [Gap.NO_EXECUTOR]
     assert len(plan.items) == 77

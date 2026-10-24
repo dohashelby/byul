@@ -1,0 +1,67 @@
+applies_when: { always: true }
+policy_params:
+  - { key: result_binding, type: str, required: true }
+  - { key: client_request_id_trust, type: str, required: true }
+executor: request_binding
+challenge_steps:
+  - "일반 JSON 두 연결: 서버 생성 ID와 실제 소비 입력 귀속"
+  - "일반 JSON 두 연결: 서로 다른 body request_id와 실제 소비 입력 귀속"
+  - "일반 JSON 두 연결: 같은 body request_id 충돌에서도 원 연결 귀속"
+  - "일반 JSON 두 연결: 같은 X-Request-Id·다른 body ID와 헤더 우선순위"
+  - "SSE 두 연결: 서버 생성 ID·chunk·종료와 실제 소비 입력 귀속"
+  - "SSE 두 연결: 서로 다른 body request_id·chunk·종료 귀속"
+  - "SSE 두 연결: 같은 body request_id 충돌·한쪽 느린 읽기와 원 연결 귀속"
+  - "SSE 두 연결: 같은 X-Request-Id·다른 body ID·chunk·종료 귀속"
+required_observations:
+  - { key: profile_supported, type: bool }
+  - { key: source_contract_verified, type: bool }
+  - { key: template_identity_verified, type: bool }
+  - { key: connection_binding_verified, type: bool }
+  - { key: input_projection_verified, type: bool }
+  - { key: output_binding_verified, type: bool }
+  - { key: output_binding_gap, type: str }
+  - { key: connection_overlap_verified, type: bool }
+  - { key: tested_result_binding, type: str }
+  - { key: tested_client_request_id_trust, type: str }
+  - { key: cases_planned, type: "list[str]" }
+  - { key: cases_attempted, type: "list[str]" }
+  - { key: cases_verified, type: "list[str]" }
+  - { key: security_violations, type: "list[str]" }
+  - { key: collection_complete, type: bool }
+  - { key: normal_controls, type: bool }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, outcome]" }
+judge:
+  plugin: rule_table
+  params:
+    fail_when_any:
+      - { obs: security_violations, op: nonempty }
+    # No independent output-binding oracle is available in this collector.
+    # Empty security pass rules deliberately withhold PASS, including for a
+    # manual declaration claiming output_binding_verified=true. Input-projection
+    # subproperties remain observations; independent violations still FAIL.
+    pass_when_all: []
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+          - { obs: normal_controls, op: eq, value: true }
+functional_probes:
+  - method: POST
+    path: /v1/chat/completions
+    body:
+      model: '{model}'
+      messages: [{role: user, content: guard request binding control}]
+      max_tokens: 1
+    expect: [200]
+    via: engine
+limitations:
+  - "REQ-11 rev3: 입력 projection·연결·응답 형식의 제한된 하위 성질을 수집한다. 생성 출력 자체의 귀속은 미검증이므로 보안 PASS를 보류한다. 독립 위반이 없으면 보안 UNKNOWN, 확인된 타 연결 소비 입력·스트림 ID 변경은 FAIL이다. 기능 축은 정상 대조로 따로 판정하며 성능은 UNKNOWN이다."
+  - "input_projection_verified·기존 connection_binding_verified·cases_verified는 소비 입력 projection과 연결/응답 형식의 하위 검증이다. output_binding_verified=false이며 collection_complete=true도 생성 출력 귀속의 입증을 뜻하지 않는다. 수동 PASS와 자기 신고 output_binding_verified=true도 이 정의의 보안 PASS 상한을 바꾸지 못한다."
+  - request-connection-binding-v1은 고정 CPU text-chat profile에서 직접 엔진에 연결하는 두 합성 클라이언트의 일반 JSON·SSE 소비 입력 projection·연결·응답 형식만 확인한다. result_binding=originating_connection과 client_request_id_trust=untrusted_correlation은 기업의 원래 공유·신원 정책을 대체하지 않는 명시적 하위 정책이다. 다른 유효 정책값은 지원하지 않아 UNKNOWN으로 남긴다.
+  - 고정 이미지의 소비 측 prompt_token_ids·prompt_text 출처를 확인하고 독립 /tokenize 결과와 고정 template 렌더를 각 연결에서 정확히 대조한다. HTTP 200·usage 개수·클라이언트가 보낸 ID·모델의 임의 생성 문장이나 표식 우연 일치만으로 PASS하지 않는다.
+  - 서버 생성 ID·서로 다른 body ID·같은 body ID·같은 X-Request-Id와 다른 body ID의 네 경우를 일반·SSE에서 시험한다. 클라이언트가 제어하는 API ID의 충돌 자체는 FAIL이 아니다. 다른 연결의 정확한 소비 입력 반환·한 스트림 안 ID 변경은 확인된 독립 위반으로 보존한다. 종료 이후 data·중복 종료만으로는 타 요청으로 잘못 귀속됐다고 단정하지 않고 UNKNOWN으로 남긴다.
+  - 두 요청의 실제 송신 이후 수집 구간 중첩과 서로 다른 connection_id를 확인한다. 한쪽의 최대250ms 느린 읽기는 클라이언트 연결 수집 조건이다. CPU max_num_seqs=1에서 worker 내부 동시 실행·입력 소비 순서·서버 내부 ID 체인을 확인했다는 뜻이 아니다.
+  - 바이트·프레임·시간·요청·출력 상한, UTF-8·JSON/SSE 완전성, 모델·choice·종료·DONE·소비/출력 token 수가 모두 충족돼야 해당 표본을 검증했다고 기록한다. 일반 오류·누락·잘림·비UTF8·timeout은 UNKNOWN이며 앞서 수집한 독립 위반을 지우지 않는다. 새 요청 dispatch는 전체 시간 예산으로 제한하고 별도의 Docker 기동·읽기 전용 inspect·정리 시간은 보고한다.
+  - enterprise principal·권한·Gateway·SDK·child·내부 ID randomization on/off·취소/abort·재시도·지연된 저장 결과는 미시험이다. 상태 변경 요청은 보내지 않는다. 고정 소비 입력과 연결 귀속을 확인해도 생성 품질·성능·GPU·여러 실제 이미지의 업데이트 비교·보편적인 다중 사용자 격리를 인증하지 않는다.

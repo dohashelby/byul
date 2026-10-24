@@ -40,7 +40,7 @@ from guard.models.objects import (
 from guard.store import Store
 
 from .aggregate import aggregate
-from .compare import compare_results
+from .compare import compare_results, comparison_differences
 
 _IMPACT_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, None: 3}
 _REVIEW_ORDER_RANK = {"reference_baseline_first": 0, "implementation_path_first": 1, "conditional_when_selected": 2}
@@ -168,11 +168,20 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
             side_results = {s: results.get((check.id, s)) for s in sides}
             for s, res in side_results.items():
                 row[s.value] = _side(res)
+                if res and res.judge.name == "declared":
+                    limitations.extend(f"{check.id}/{s.value}: {reason}" for reason in res.reasons
+                                       if reason.startswith(("POLICY_ITEMS:", "POLICY_CONTEXT:", "AUDIT_COLLECTION:")))
+                elif res and res.judge.name == "rule_table":
+                    limitations.extend(f"{check.id}/{s.value}: {reason}" for reason in res.reasons
+                                       if reason.startswith("POLICY_CONTEXT:"))
             if plan.mode == Mode.update:
                 b, c = evds.get((check.id, Side.baseline)), evds.get((check.id, Side.candidate))
                 rb, rc = row["baseline"], row["candidate"]
                 if b and c:
                     row["comparison"] = compare_results(rb.security, b.comparability, rc.security, c.comparability)
+                    row["functional_comparison"] = compare_results(rb.functional or Verdict.UNKNOWN, b.comparability,
+                                                                   rc.functional or Verdict.UNKNOWN, c.comparability)
+                    row["comparison_reasons"] = comparison_differences(b.comparability, c.comparability)
             exc, notes = _exception_display(check.id, policy, as_of)
             row["exception"] = exc
             limitations.extend(notes)
@@ -222,6 +231,9 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
     data_origin = weakest_origin(origins) or DataOrigin.EXAMPLE
 
     # INV-17 및 한계
+    for e in evds.values():
+        for error in e.execution.cleanup_errors:
+            limitations.append(f"{e.check_id}/{e.side.value}: {error}")
     if policy.status != PolicyStatus.CONFIRMED:
         limitations.insert(0, "정책 DRAFT: 공식 아님")
     if not pack.reviewed:

@@ -8,6 +8,7 @@ policy_params:
   - { key: require_non_root, type: bool, required: true }              # 컨테이너 안 프로세스가 UID 0이면 안 되는가
   - { key: allowed_exec_writable_paths, type: "list[str]", required: true }   # 쓰기+실행 가능 마운트 허용 목록(예: ["/guard-cache"])
 required_observations:
+  - { key: process_scan_complete, type: bool }
   - { key: capabilities_effective, type: "list[str]" }   # 컨테이너 안 모든 프로세스 CapEff 합집합
   - { key: mounts, type: "list[str]" }                   # bind·volume 마운트 "목적지:ro|rw" (tmpfs 제외, 증거에만)
   - { key: devices, type: "list[str]" }
@@ -23,6 +24,7 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
+      - { obs: process_scan_complete, op: eq, value: true }
       - { obs: capabilities_effective, op: subset_of, value_policy: allowed_capabilities }
       - { obs: mounts, op: subset_of, value_policy: allowed_mounts }
       - { obs: devices, op: subset_of, value_policy: allowed_devices }

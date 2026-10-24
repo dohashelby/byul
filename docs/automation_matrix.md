@@ -1,5 +1,20 @@
 # 77행 자동화 분류표 (요약)
 
+> 현행 통합 후보: PACK21/DRAFT·REQ-11 정의3·자동연결11·정책22점검49경로다. [REQ-15 M14](POLICY_M14.md)의 수동 신고 계약을 추가했으며 실제 캐시 실행기는 없다. [판정·준비 보강](AUTOMATION_HARDENING.md)의 입력 projection 성공과 생성 출력 귀속 미검증을 구분하는 REQ-11 보안 PASS 보류는 유지한다. 과거 팩19의 실제 CPU PASS를 소급 변경하지 않는다. 인프라 가능 등급 A/B/C와 정책 소비 분류 a/b/c/d는 별개다. 통합 후보의 검증 결과는 [v1 통합 후보 검증](UPDATE_VALIDATION.md#v1-통합-후보-검증)에 따르며 main 반영·공식 승인을 뜻하지 않는다.
+
+> 두 이미지 실측: [PR #28의 C 후속 결과](UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)는 pinned vLLM CPU 0.31.0/0.32.0·기존 OPT 모델·동일 CPU 프로파일에서 REQ-01·REQ-03·REQ-09·PLT-01·PLT-04를 실제 실행하고 수락·반출/복원·저장 팩 재판정을 통과했다. 5개 점검의 양쪽 보안/기능은 PASS이며 전부 NO_CHANGE다. 실제 차이 탐지와 연결 11개의 모든 분기를 입증한 결과가 아니다. EVD 10개는 MEASURED이지만 REQ-01/03의 RES.verification_level은 조건의 신고 출처 때문에 DECLARED이고 나머지 3개는 MEASURED다. PACK21·예시 정책 DRAFT로 official=false, 성능 UNKNOWN이다. PR #27의 과거 실패와 앞선 미실측 기록은 별도로 보존한다.
+
+> 실측 범위 주의: REQ-01의 실제 등록 목록은 기준15/후보16개이고 고정 합집합 요청 자료는 동일하다. 미검토 상태 변경 경로 `/v1/responses`·`/v1/responses/{response_id}/cancel`에는 HTTP를 보내지 않고 기존 TCP 차단 근거를 사용했다. REQ-03은 양쪽 관리·진단 등록5개/시험5개이며 검토한 버전·digest에 한정한 안전 probe를 사용했다. 미검토 이미지·다른 endpoint/입력 형식·GPU·기업 승인은 별도 범위다. CSV의 해당 5행에서 검증·남은 범위·근거만 갱신했으며 A/B/C 등급과 정책 소비 분류는 바꾸지 않았다.
+
+> 3차 기록 당시 구현: [연결 귀속·로그 수집](AUTOMATION_PHASE3.md)에서 REQ-11 `request_binding`과 OBS-09 `log_integrity`를 제품 registry에 연결했다. PACK19/DRAFT·자동연결11개·정책21점검/46경로·adapter0.4.0·declared0.12.0이다. 아래 2차/1차 결과는 과거 기록이며 이번 직접 검증 결과와 구분한다. 직접 CPU에서 새 두 점검과 PLT-01 S/F PASS·PUNKNOWN, 반출/복원/저장 팩 재판정을 확인했다. HTML 줄바꿈 digest는 새 시도02로 보수·재검증했다. 두 제한 프로파일은 기업 신원·SIEM·worker 내부 병렬성·전체77행 완료를 뜻하지 않는다.
+
+> 2차 기록 당시 구현: [자동화 2차](AUTOMATION_PHASE2.md)에서 REQ-07 revision 2의 `template_validation`을 연결해 자동 실행기 9개가 연결됐다. PACK-BASELINE 18/DRAFT·정책 19점검/41경로·adapter 0.3.0·declared/0.11.0 기준이다. 고정 CPU text-chat 프로파일에서 렌더된 실제 token IDs와 소비 prompt_token_ids, 정책 경계와 요청 override를 검증하는 제한 범위다. [별도 설정](../examples/windows-cpu-chat.toml)과 [EXAMPLE/DRAFT 정책](../examples/automation-chat-policy.yaml), [완료 계약](AUTOMATION_PHASE2_PROMPT.md)을 참고한다. 기본 전체 1,781통과·5 skip·18제외, 마지막 오류 직렬화 보수 후 관련 128회귀 통과. 최종 127 경계 확인과 별도 32 반례, REQ-13 private_system·PLT-01의 실제 관측, 반출·복원·저장 팩 재판정은 [직접 검증 기록](AUTOMATION_PHASE2.md#검증-기록)과 [선별 증거](evidence/automation-phase2-20261023.json)를 따른다. 연결 수가 완료 수는 아니다. 성능 UNKNOWN·official=false를 유지한다.
+> 아래 1차 직접 결과와 A/B/C 분류의 역사적 수치는 보존한다. REQ-10 하위 runner 소비·OBS-03 예외 dump 등 남은 분기가 새 REQ-07 등록만으로 검증되지는 않는다.
+
+> 1차 기록 당시 구현: [Windows CPU·자동화 1차](AUTOMATION_PHASE1.md). 실행기 연결은 기존 REQ-01·REQ-03·PLT-01·PLT-04·REQ-09와 신규 REQ-10·REQ-13·OBS-03의 8개다. 신규 3개는 제한 관측 프로파일이며 전체 분기 검증 완료를 뜻하지 않는다.
+> 이번 코드에서 Windows CPU 제품 명령으로 8개를 실제 실행했다. 기존 5개는 위반 구성에서 모두 FAIL·강화 구성에서 모두 PASS였고, 짧은 관측 시간 구성은 4개 UNKNOWN·PLT-01 PASS였다(원래 보안 기대 14/15 일치, 행렬 exit 1 보존). 신규 3개는 보안 REQ-10 UNKNOWN·REQ-13 FAIL·OBS-03 UNKNOWN이다. 근거와 한계는 위 문서를 따른다. CSV에 구현·검증·남은 범위·근거를 구분했다.
+> 아래 A/B/C와 불확실성 표는 2026-10-19 맥 CPU 기준의 가능성 분류 이력이다. Windows 지원 여부·실제 완료 수는 별도이며, 한 실행기 종류로 묶였다는 이유만으로 기존 코드가 모든 행을 실행할 수 있다고 보지 않는다.
+
 > 작성 2026-10-19. 판정·코드 변경 없음. 원본: `packs/PACK-BASELINE/checks/*.yaml`(checklist.json 원문 보존 필드) — 행별 표는 [`automation_matrix.csv`](automation_matrix.csv).
 
 **등급 정의**  A: 맥 Docker + CPU vLLM(+ 로컬 컨테이너·fixture)만으로 실행기·판정을 실험실 위상에서 끝까지 재현 가능 · B: 추가 인프라 필요(GPU/TP≥2, 다중 노드, Ray, 부하 도구, 외부 서비스, 추가 모델 등) · C: 기업 실제 환경(승인·배포 시스템, IdP, 기록 저장소 등)이 있어야 의미 있는 판정 · M: 수동 판단만.

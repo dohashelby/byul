@@ -13,7 +13,7 @@ from guard.executors.fake import SCENARIOS_BY_CHECK
 from guard.executors.role_route import RoleRouteExecutor
 from guard.models import ExecStatus, Verdict
 from guard.store import Store
-from tests.builders import baseline_pack, environment, policy
+from tests.builders import baseline_pack, environment, policy, completion_response
 
 GENERAL, ADMIN, WRONG = "general-key-111", "admin-key-222", "wrong-key-333"
 ENGINE_ROUTES = {"/health": "get", "/metrics": "get", "/load": "get", "/v1/models": "get", "/v1/completions": "post",
@@ -55,7 +55,7 @@ class RoleWorld:
             if self.enforced and role == "general" and u.path not in INFERENCE | self.general_also:
                 return {**base, "outcome": 403}
         status, body = self.engine(r["method"], u.path, r.get("body"))
-        return {**base, "outcome": status, "body": body if r.get("want_body") else None, "body_preview": body[:160]}
+        return {**base, "outcome": status, "body": completion_response(r, status).get("body", body) if r.get("want_body") else None, "body_preview": body[:160]}
 
     def container_probe(self, network, requests, timeout):
         return [self.handle(network, r) for r in requests]

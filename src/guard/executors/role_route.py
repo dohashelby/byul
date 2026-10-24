@@ -31,19 +31,25 @@ from .http_common import (
     safety_check,
     send_and_record,
 )
+from .route_fixture import manifest, resolve_routes
 
 
 class RoleRouteExecutor(HttpCheckExecutor):
     name = "role_route"
-    version = "0.1.0"
+    version = "0.4.0"
+    fixed_fixture_version = "0.5.0"
 
     def collect(self, ctx: Ctx):
         admin_role = self.cfg.get("admin_role", "admin")
         if admin_role not in ctx.keys:
             raise RuntimeError(f"admin role {admin_role!r} not configured in roles")
         nonadmin = [label for label in ctx.keys if label != admin_role]  # none, wrong, 비관리 역할들
-        rs = discover_routes(ctx)
+        configured = self.cfg.get("comparison_routes")
+        rs = resolve_routes(ctx, discover_routes(ctx), configured)
+        ctx.fixed_route_fixture = configured is not None
         templates, skipped = probe_templates(ctx, rs.routes)
+        if ctx.fixed_route_fixture:
+            ctx.route_fixture_inputs = manifest(ctx, rs, templates, skipped, roles=[*nonadmin, admin_role], mode="role")
         safe_sent = any(t.basis == "safe_probe" for t in templates.values())
         safety_before = safety_check(ctx, "before") if safe_sent else None
 
@@ -68,8 +74,8 @@ class RoleRouteExecutor(HttpCheckExecutor):
         nonadmin_outcomes = {p: representative([r[l] for l in nonadmin if l in r])
                              for p, r in by_role.items() if all(l in r for l in nonadmin)}
         admin_outcomes = {p: r[admin_role] for p, r in by_role.items() if admin_role in r}
-        routes_tested = sorted(nonadmin_outcomes)
-        functional, functional_status, normal = functional_results(probes, func_raw)
+        routes_tested = sorted(p for p in nonadmin_outcomes if not ctx.fixed_route_fixture or p in rs.registered)
+        functional, functional_status, normal = functional_results(probes, func_raw, ctx.env.model.id)
 
         observations = {
             "routes_registered": {"value": rs.registered if rs.collected else None, "collected": rs.collected},
@@ -96,4 +102,6 @@ class RoleRouteExecutor(HttpCheckExecutor):
             "safety": {"before": safety_before, "after": safety_after},
             "fixture": fixture_of(templates),
         }
+        if ctx.fixed_route_fixture:
+            summary["fixture"] = ctx.route_fixture_inputs
         return observations, normal, challenges, summary

@@ -21,6 +21,7 @@ from __future__ import annotations
 from typing import Any
 
 from guard.models import CheckDef, Evidence, Verdict
+from guard.input_policy import policy_context
 
 from .base import AXES, JudgeOutput
 
@@ -83,6 +84,7 @@ OPS = {
     "nonempty": _safe(lambda a, e, o: isinstance(a, (list, dict, tuple, set, str)) and len(a) > 0),
     "all_in": _safe(lambda a, e, o: a is not None and all(_member(x, e) for x in _elements(a))),
     "any_in": _safe(lambda a, e, o: a is not None and any(_member(x, e) for x in _elements(a))),
+    "none_in": _safe(lambda a, e, o: a is not None and not any(_member(x, e) for x in _elements(a))),
     "any_between": _safe(lambda a, e, o: a is not None and any(_between(x, e) for x in _elements(a))),
     "all_between": _safe(lambda a, e, o: a is not None and all(_between(x, e) for x in _elements(a))),
     "superset_of": _safe(lambda a, e, o: a is not None and o is not None and _keys(a) >= _keys(o)),
@@ -116,7 +118,7 @@ def _describe(rule: dict) -> str:
 
 class RuleTableJudge:
     name = "rule_table"
-    version = "0.3.0"
+    version = "0.5.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         tables = {"security": {k: params[k] for k in ("pass_when_all", "fail_when_any") if k in params}}
@@ -207,6 +209,13 @@ class RuleTableJudge:
                 reasons.append(f"{axis}: UNKNOWN ({'; '.join(detail)})")
         for key in sorted(policy_missing):
             reasons.append(f"policy value missing: {key}")
+        context = policy_context(check, policy_values, evidence.observations)
+        if context is not None:
+            reasons.extend(context.reasons)
+            missing.update(context.missing)
+            if context.blocked:
+                verdicts = {axis: Verdict.UNKNOWN if verdict == Verdict.PASS else verdict
+                            for axis, verdict in verdicts.items()}
         return JudgeOutput(verdicts=verdicts, reasons=reasons, missing_observations=sorted(missing))
 
 

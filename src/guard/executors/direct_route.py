@@ -40,6 +40,7 @@ from .http_common import (
     send_and_record,
 )
 from .http_common import docker_container_probe, mask, outcome_rank  # noqa: F401  (기존 import 경로 호환)
+from .route_fixture import manifest, resolve_routes
 
 DENIED = ("none", "wrong")
 TcpKey = tuple[str, str, str]  # (origin, url, key_label)
@@ -48,8 +49,12 @@ TcpKey = tuple[str, str, str]  # (origin, url, key_label)
 def tcp_precheck(ctx: Ctx, combos: list[tuple[dict, str]], host_probe) -> dict[TcpKey, dict]:
     """직통 (대상, 키) 조합마다 TCP 연결만 시도(바이트 미전송)하고 기록한다."""
     ext = [(t, l) for t, l in combos if t["origin"] == "external"]
-    tcp = ctx.cprobe(ctx.external_net, [{"id": f"tcp|external|{l}", "mode": "tcp", "method": "TCP", "url": t["url"]}
-                                        for t, l in ext], ctx.timeout) if ext else []
+    requests = [{"id": f"tcp|external|{i}|{l}" if ctx.fixed_route_fixture else f"tcp|external|{l}",
+                 "mode": "tcp", "method": "TCP", "url": t["url"]} for i, (t, l) in enumerate(ext)]
+    tcp = ctx.cprobe(ctx.external_net, requests, ctx.timeout) if ext else []
+    if ctx.fixed_route_fixture and (len(tcp) != len(requests)
+            or [r.get("id") for r in tcp] != [r["id"] for r in requests]):
+        raise RuntimeError("fixed route fixture TCP response labels do not match the submitted requests")
     result: dict[TcpKey, dict] = {(t["origin"], t["url"], l): r for (t, l), r in zip(ext, tcp)}
     for t, l in combos:
         if t["origin"] == "host":
@@ -123,7 +128,7 @@ def aggregate_direct(results: list[tuple[tuple, dict, Any]], routes: dict[str, R
 def direct_observations(ctx: Ctx, rs: RouteSet, agg: DirectAgg, probes: dict, templates: dict[str, ProbeRequest],
                         skipped: dict, tcp: dict[TcpKey, dict], trusted_reachable: bool, combos: list, sent_any: bool,
                         safety: dict):
-    functional, functional_status, normal = functional_results(probes, agg.functional_raw)
+    functional, functional_status, normal = functional_results(probes, agg.functional_raw, ctx.env.model.id)
     has_direct = bool(ctx.target["direct_targets"])
     observations = {
         "routes_registered": {"value": rs.registered if rs.collected else None, "collected": rs.collected},
@@ -163,7 +168,8 @@ def direct_observations(ctx: Ctx, rs: RouteSet, agg: DirectAgg, probes: dict, te
 
 class DirectRouteExecutor(HttpCheckExecutor):
     name = "direct_route"
-    version = "0.3.0"
+    version = "0.6.0"
+    fixed_fixture_version = "0.7.0"
 
     def validate_policy(self, check, policy_values: dict) -> None:
         """설정의 역할(허용 주체로 취급해 direct_allowed_outcomes에만 남김)은 모두 정책 allowed_callers에 있어야 한다.
@@ -181,9 +187,13 @@ class DirectRouteExecutor(HttpCheckExecutor):
                                "refusing to treat them as allowed principals")
 
     def collect(self, ctx: Ctx):
-        rs = discover_routes(ctx)
+        configured = self.cfg.get("comparison_routes")
+        rs = resolve_routes(ctx, discover_routes(ctx), configured)
+        ctx.fixed_route_fixture = configured is not None
         templates, skipped = probe_templates(ctx, rs.routes)
         labels = [*DENIED, *[r for r in ctx.keys if r not in DENIED]]
+        if ctx.fixed_route_fixture:
+            ctx.route_fixture_inputs = manifest(ctx, rs, templates, skipped, roles=labels, mode="direct")
         safe_sent = any(t.basis == "safe_probe" for t in templates.values())
         safety = {"before": safety_check(ctx, "before") if safe_sent else None, "after": None}
 
@@ -205,5 +215,11 @@ class DirectRouteExecutor(HttpCheckExecutor):
 
         results = send_and_record(ctx, batch, templates, between=positive_control)
         agg = aggregate_direct(results, rs.routes, templates, combos)
-        return direct_observations(ctx, rs, agg, probes, templates, skipped, tcp, positive["reachable"], combos,
-                                   bool(batch.requests), safety)
+        observations, normal, challenges, summary = direct_observations(
+            ctx, rs, agg, probes, templates, skipped, tcp, positive["reachable"], combos, bool(batch.requests), safety)
+        if ctx.fixed_route_fixture:
+            # Supplementary requests stay in the full trace, never invent an
+            # OpenAPI registration on the side where that route is absent.
+            observations["routes_tested"]["value"] = [p for p in agg.routes_tested if p in rs.registered]
+            summary["fixture"] = ctx.route_fixture_inputs
+        return observations, normal, challenges, summary

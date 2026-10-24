@@ -37,8 +37,8 @@ HOST_NAMESPACE_KEYS = (("pid", "PidMode"), ("ipc", "IpcMode"), ("net", "NetworkM
 DEFAULT_SENTINELS = ["/models", "/", "/guard-sentinel"]
 
 # 읽기 전용: 모든 프로세스의 status에서 Name·Uid·CapEff만
-PROC_CMD = ('for d in /proc/[0-9]*; do [ -r "$d/status" ] || continue; echo "PID ${d#/proc/}"; '
-            'grep -E "^(Name|Uid|CapEff):" "$d/status"; done')
+PROC_CMD = ('for d in /proc/[0-9]*; do echo "PID ${d#/proc/}"; '
+            'grep -E "^(Name|Uid|CapEff):" "$d/status" 2>/dev/null || echo GUARD_READ_ERROR; done')
 # 마운트 표(읽기 전용). 쓰기 가능(rw)이고 noexec가 아닌 마운트를 후보로, 실제 쓰기 시도로 확인한다
 MOUNTS_CMD = "cat /proc/1/mounts"
 PSEUDO_FS = frozenset({"proc", "sysfs", "cgroup", "cgroup2", "devpts", "mqueue", "securityfs", "debugfs", "tracefs",
@@ -67,10 +67,18 @@ def parse_proc_status(text: str) -> list[dict]:
             if key == "Name":
                 cur["name"] = val
             elif key == "Uid":
-                cur["uid_effective"] = int(val.split()[1])
+                try:
+                    cur["uid_effective"] = int(val.split()[1])
+                except (ValueError, IndexError):
+                    cur["read_error"] = True
             elif key == "CapEff":
-                cur["caps"] = decode_caps(val)
-    return [p for p in procs if "caps" in p and "uid_effective" in p]
+                try:
+                    cur["caps"] = decode_caps(val)
+                except ValueError:
+                    cur["read_error"] = True
+        elif cur is not None and line == "GUARD_READ_ERROR":
+            cur["read_error"] = True
+    return procs
 
 
 def exec_candidates(mounts_text: str) -> list[dict]:
@@ -94,7 +102,7 @@ def _mount_key(m: dict) -> str:
 
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
-    version = "0.1.0"
+    version = "0.4.0"
     requires_roles = False
     requires_route_scope = False
     functional_via = "engine"
@@ -141,8 +149,9 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         # 2. 모든 프로세스의 유효 capability·UID
         proc = docker.exec(container, ["sh", "-c", PROC_CMD], timeout=30)
         procs = parse_proc_status(proc.stdout) if proc.returncode == 0 else []
-        caps = sorted(set().union(*[set(p["caps"]) for p in procs])) if procs else []
-        uids = sorted({p["uid_effective"] for p in procs})
+        caps = sorted({cap for p in procs for cap in p.get("caps", [])})
+        uids = sorted({p["uid_effective"] for p in procs if "uid_effective" in p})
+        complete = bool(procs) and all("caps" in p and "uid_effective" in p and not p.get("read_error") for p in procs)
 
         # 3. sentinel 쓰기 시도
         mount_dests = {m.get("Destination") for m in host_mounts}
@@ -160,7 +169,8 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         exec_checks: dict[str, str] = {}
         for c in candidates:
             r = docker.exec(container, ["sh", "-c", SENTINEL_CMD, "_", c["target"], secrets.token_hex(4)], timeout=30)
-            exec_checks[c["target"]] = r.stdout.strip() if r.returncode == 0 else "error"
+            value = r.stdout.strip()
+            exec_checks[c["target"]] = value if r.returncode == 0 and value in {"succeeded", "denied", "absent"} else "error"
         exec_writable = sorted(t for t, o in exec_checks.items() if o == "succeeded")
 
         # 4. 정상 대조(신뢰 출발점 → 엔진)
@@ -170,19 +180,21 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         for (pid, fp), r in zip(probes.items(), res):
             func_raw[pid] = r
             ctx.record("trusted", "functional-engine", pid, fp.as_role, r)
-        functional, functional_status, normal = functional_results(probes, func_raw)
+        functional, functional_status, normal = functional_results(probes, func_raw, ctx.env.model.id)
 
-        collected = bool(procs)
+        mount_lines = [line.split() for line in mt.stdout.splitlines() if line.strip()]
+        mounts_complete = mt.returncode == 0 and bool(mount_lines) and all(len(line) >= 6 for line in mount_lines)
         observations = {
-            "capabilities_effective": {"value": caps, "collected": collected},
+            "process_scan_complete": {"value": complete, "collected": True},
+            "capabilities_effective": {"value": caps, "collected": any("caps" in p for p in procs)},
             "mounts": {"value": mounts, "collected": True},
             "devices": {"value": devices, "collected": True},
             "privileged": {"value": privileged, "collected": True},
             "host_namespaces": {"value": host_ns, "collected": True},
-            "root_uid_present": {"value": 0 in uids, "collected": collected},
+            "root_uid_present": {"value": 0 in uids, "collected": 0 in uids or (bool(procs) and all("uid_effective" in p for p in procs))},
             "sentinel_results": {"value": sentinel_results, "collected": all(v != "error" for v in sentinel_results.values())},
             "exec_writable_mounts": {"value": exec_writable,
-                                     "collected": mt.returncode == 0 and all(v != "error" for v in exec_checks.values())},
+                                     "collected": mounts_complete and all(v != "error" for v in exec_checks.values())},
             "functional_probes_planned": {"value": list(probes), "collected": True},
             "functional_probe_results": {"value": functional, "collected": bool(probes)},
         }

@@ -1,5 +1,5 @@
 id: OBS-04
-revision: 1
+revision: 2
 retired: false
 area: OBS
 purpose: 수집 정보 제한
@@ -12,7 +12,10 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 내장 usage 경로·금지 정책 시
-policy_params: []
+policy_params:
+- key: usage_allowed
+  type: bool
+  required: true
 policy_prose:
   policy_to_decide: usage 허용 여부·적용 시점
   enterprise_decisions: 민감정보·수집 목적·허용 필드·목적지·주기, 진단 필요성/승인자. usage 허용은 정책 변경·필드/목적지/사본 검토·재시험 후에만 적용한다.
@@ -44,3 +47,6 @@ legacy:
   - Q-C11/SC-22-01
 source:
   array: observability_assessment_draft
+limitations:
+- usage_allowed={usage_allowed}은 이 점검 범위의 기업 정책 신고다. false는 비생성·비전송의 관측이 아니고 true는 금지 정책 분기를 충족하지 않는다. 정책값만으로 비적용·PASS를 만들지 않는다.
+- usage 실제 활성·생성·송신·필드·목적지·주기는 자동 검증하지 않는다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.

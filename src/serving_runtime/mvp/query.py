@@ -224,7 +224,7 @@ class QueryService:
             record.get("observation_session_id") == current_session_id
             for record in gateway_records
         )
-        if backend_kind == "vllm":
+        if backend_kind != "mock":
             live = {
                 "status": "not_available",
                 "queried_at": None,

@@ -340,7 +340,7 @@ class RequestFlow:
             )
             return
 
-        if self._backend.kind == "vllm":
+        if self._backend.external:
             if self._backend.credential_status == "missing":
                 self.finish_without_relay(
                     response,
@@ -481,7 +481,7 @@ class RequestFlow:
                     "completed",
                     "backend_truncated",
                 }
-                if self._backend.kind == "vllm":
+                if self._backend.external:
                     backend_cancel = "not_observed"
                 else:
                     backend_cancel = (

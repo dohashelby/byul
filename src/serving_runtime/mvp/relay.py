@@ -64,7 +64,9 @@ def relay_payload(
         {
             "model": backend.mapped_model(allowed.model),
             "messages": document["messages"],
-            "max_tokens": allowed.max_tokens,
+            # Each engine gets its own name for the output limit (SP2: the vLLM
+            # schema is not applied to SGLang as-is).
+            backend.output_tokens_field: allowed.max_tokens,
             "stream": stream,
         }
     )

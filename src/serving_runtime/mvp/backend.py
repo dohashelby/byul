@@ -33,6 +33,9 @@ _TOP_LEVEL_FIELDS = frozenset(
         "metrics_map",
     }
 )
+# External serving engines this Gateway can relay to. Each keeps its own
+# request field names; see BackendConfig.output_tokens_field.
+EXTERNAL_BACKEND_KINDS = frozenset({"vllm", "sglang"})
 _TIMEOUT_FIELDS = frozenset(
     {"relay_timeout_s", "stream_idle_timeout_s", "request_deadline_s"}
 )
@@ -100,7 +103,7 @@ class BackendConfig:
     model_map: dict[str, str]
     health_path: str = "/health"
     models_path: str = "/v1/models"
-    version_path: str = "/version"
+    version_path: str | None = "/version"
     metrics_target: URLTarget | None = None
     metrics_path: str | None = None
     timeouts: dict[str, float] = field(default_factory=dict)
@@ -127,6 +130,20 @@ class BackendConfig:
     @property
     def base_url(self) -> str:
         return self.target.display_url
+
+    @property
+    def external(self) -> bool:
+        return self.kind != "mock"
+
+    @property
+    def output_tokens_field(self) -> str:
+        """The engine's own name for the output-token limit.
+
+        SGLang v0.5.21 marks ``max_tokens`` deprecated in favour of
+        ``max_completion_tokens``; vLLM and the mock engine take ``max_tokens``.
+        """
+
+        return "max_completion_tokens" if self.kind == "sglang" else "max_tokens"
 
     @property
     def authorization(self) -> str | None:
@@ -321,8 +338,9 @@ def load_backend_config(
         raise ValueError(f"missing backend config field(s): {', '.join(missing)}")
     if document["schema_version"] != "runtime-backend/1.0":
         raise ValueError("unsupported backend schema_version")
-    if document["kind"] != "vllm":
-        raise ValueError("backend kind must be vllm")
+    kind = document["kind"]
+    if kind not in EXTERNAL_BACKEND_KINDS:
+        raise ValueError("backend kind must be vllm or sglang")
 
     target = _parse_origin(document["base_url"], field_name="base_url")
     raw_model_map = _require_object(document["model_map"], "model_map")
@@ -339,7 +357,15 @@ def load_backend_config(
 
     health_path = _route(document.get("health_path", "/health"), "health_path")
     models_path = _route(document.get("models_path", "/v1/models"), "models_path")
-    version_path = _route(document.get("version_path", "/version"), "version_path")
+    # SGLang v0.5.21 has no /version route; its version is only inside
+    # /server_info, which also returns the resolved server arguments. The
+    # default therefore skips version collection for sglang (null = disabled).
+    raw_version_path = document.get(
+        "version_path", "/version" if kind == "vllm" else None
+    )
+    version_path = (
+        None if raw_version_path is None else _route(raw_version_path, "version_path")
+    )
 
     raw_timeouts = document.get("timeouts", {})
     timeouts_document = _require_object(raw_timeouts, "timeouts")
@@ -401,7 +427,7 @@ def load_backend_config(
         metrics_credential_status = "not_configured"
     return BackendConfig(
         schema_version="runtime-backend/1.0",
-        kind="vllm",
+        kind=kind,
         target=target,
         model_map=model_map,
         health_path=health_path,

@@ -35,7 +35,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument("--policy", default="examples/mvp/policy.json", metavar="PATH")
     mvp_parser.add_argument("--gateway-port", type=int, default=8080, metavar="N")
     mvp_parser.add_argument("--engine-port", type=int, default=8088, metavar="N")
-    mvp_parser.add_argument("--backend", choices=("mock", "vllm"), default="mock")
+    mvp_parser.add_argument("--backend", choices=("mock", "vllm", "sglang"), default="mock")
     mvp_parser.add_argument("--backend-config", metavar="PATH")
     mvp_parser.add_argument("--data-dir", metavar="PATH")
     mvp_parser.add_argument("--relay-timeout", type=float, default=5.0, metavar="SECONDS")

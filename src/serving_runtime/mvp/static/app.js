@@ -87,12 +87,13 @@ async function getJson(url) {
 
 function renderStatus(status) {
   $("session-id").textContent = `관측 세션 ${status.observation_session_id.slice(0, 8)} · ${status.environment || "환경 미기록"} · ${status.run_id || "실행 미기록"}`;
-  const external = status.backend_kind === "vllm";
+  const external = Boolean(status.backend_kind) && status.backend_kind !== "mock";
+  const engineName = { vllm: "vLLM", sglang: "SGLang" }[status.backend_kind] || status.backend_kind;
   // The mock mode reports `mock_engine`; the external vLLM mode reports `backend`.
   const engine = status.mock_engine || status.backend || {};
   const backendBadge = $("backend-badge");
   backendBadge.textContent = external
-    ? `외부 vLLM 모드 · ${engine.healthy ? "연결됨" : "연결 안 됨"} · 정식 GPU 시험(S3B) 전`
+    ? `외부 ${engineName} 모드 · ${engine.healthy ? "연결됨" : "연결 안 됨"} · 정식 GPU 시험(S3B) 전`
     : "모의 엔진";
   backendBadge.className = external
     ? `badge ${engine.healthy ? "badge-external" : "badge-ERROR"}`

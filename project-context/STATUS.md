@@ -107,6 +107,9 @@
 - 전체 unittest 231개 중 175개 통과·샌드박스 소켓 제한 56개 건너뜀·실패/ERROR 0개다. drip 단독 10회도 소켓 제한으로 모두 건너뛰어 소켓 허용 환경의 반복 확인이 남았다. 설치·kubectl·서버·Docker 조작·커밋·푸시는 하지 않았고 Git 기준점은 `ac05f80`이다.
 - 2026-10-24 Claude가 소켓 허용 환경에서 전체 unittest 231개를 2회 모두 통과(skip 0), drip 시험 단독 10/10 통과를 확인했다. 실제 kind에서 live feed의 과거 로그 미유입·Hubble DROPPED만 수집·무이벤트 구간 정상 유지·writer 종료 약 20초 뒤 heartbeat 만료 표시, SIGTERM 시 자식 3개 정리, 실제 Gateway 1바이트 drip 약 2초 종료를 확인했다. 시작 직후 Hubble relay EOF로 helper가 스스로 종료된 사례가 1회 있었다(재실행 시 정상).
 - 2026-10-24 Codex 사용 한도(작업 착수 직후, 변경 없음)로 Claude가 제로데이 시험용 정책 `runtime-mvp/1.2`(`profile` default/zeroday-lab, `extra_fields` validate/passthrough, `max_n`)를 직접 구현했다. 1.0·1.1은 그대로이고, 추가 필드는 이름·모드만 기록·증거·대시보드에 남는다. 예시 `examples/mvp/policy-v1.2-zeroday-lab.json`은 승인값이 아닌 시험 출발점이다. Claude 자체 검수에서 backend 전달 후 오류 기록이 추가 필드 이름을 잃는 문제를 찾아 `engine_error`에서 보존하게 고쳤다. 전체 unittest 252개 통과(skip 0, 새 시험 21개 포함, 가짜 backend 본문 도달 HTTP 시험 포함), 기존 `mvp-acceptance` 31개 전부 통과. ZD 수용 사례는 추가하지 않았다. passthrough 필드의 context 반영, 실제 vLLM에서의 필드별 동작은 미확인이다. **Claude 구현분이라 Codex 교차 검수 전**이다. 커밋·푸시하지 않았다.
+- 2026-10-24 계획서 §10.3 필수 산출물로 `docs/지원_미지원_목록.md`(기능·엔진별 확인 수준: 정식/CPU vLLM/로컬 kind/모의·가짜/합성/미구현)와 `docs/외부기능_활용목록.md`(직접 개발 모듈, 외부 도구 실측 판본·digest·출처)를 작성하고 README 현황 표의 오래된 줄을 고쳤다. 라이선스는 공개 저장소 기준 값이며 LICENSE 파일과 직접 대조하지 않아 재확인 필요로 표시했다.
+- 2026-10-24 SGLang 연결 준비(§9.4·D-07): `--backend sglang`, backend `kind: sglang`, 출력 상한을 SGLang 이름 `max_completion_tokens`로 전달, `/tokenize` context 통제, `sglang:*` 지표 대응, 버전은 기본 미수집(`/server_info`가 해석된 서버 인자 전체를 돌려주므로), 대시보드 엔진 이름 표시, 예시 `examples/mvp/backend-sglang.example.json`을 추가했다. 경로·필드·지표 이름은 SGLang v0.5.21 소스에서 확인했고 실제 SGLang은 실행하지 않았다. 시험 전용 가짜 SGLang(`FakeBackend(flavor="sglang")`)으로만 시험했다.
+- 위 두 작업은 Codex 사용 한도(18:14까지)로 **Claude가 구현했고 Codex 교차 검수 전**이다. 전체 unittest 264개 통과(skip 0, SGLang 시험 12개 추가), `mvp-acceptance` 31개 통과. 커밋·푸시하지 않았다.
 
 ## 다음 준비 작업
 

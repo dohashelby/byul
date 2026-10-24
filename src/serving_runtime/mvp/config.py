@@ -49,14 +49,16 @@ class MVPConfig:
     cilium_timeout_s: float = 10.0
 
     def __post_init__(self) -> None:
-        if self.backend not in {"mock", "vllm"}:
-            raise ValueError("backend must be mock or vllm")
-        if self.backend == "vllm" and (
+        if self.backend not in {"mock", "vllm", "sglang"}:
+            raise ValueError("backend must be mock, vllm, or sglang")
+        if self.backend != "mock" and (
             self.backend_config_path is None or not str(self.backend_config_path).strip()
         ):
-            raise ValueError("backend_config_path is required for the vllm backend")
+            raise ValueError(
+                f"backend_config_path is required for the {self.backend} backend"
+            )
         if self.backend == "mock" and self.backend_config_path is not None:
-            raise ValueError("backend_config_path is only valid for the vllm backend")
+            raise ValueError("backend_config_path is only valid for an external backend")
         if self.relay_timeout_s <= 0:
             raise ValueError("relay_timeout_s must be positive")
         if self.stream_idle_timeout_s <= 0:

@@ -105,7 +105,11 @@ class EngineClient:
         )
 
     def collect_info(self) -> tuple[dict[str, Any], str | None]:
-        version = self.fetch_json(self.backend.version_path)
+        version = (
+            self.fetch_json(self.backend.version_path)
+            if self.backend.version_path is not None
+            else {}
+        )
         models = self.fetch_json(self.backend.models_path)
         entries = models.get("data")
         model_id = None
@@ -150,8 +154,12 @@ class EngineClient:
             for policy_model, backend_model in self.backend.model_map.items()
         }
         value = {
-            "engine.kind": "vllm",
-            "engine.version": version.get("version", version.get("engine.version")),
+            "engine.kind": self.backend.kind,
+            "engine.version": (
+                version.get("version", version.get("engine.version"))
+                if self.backend.version_path is not None
+                else "not_collected"
+            ),
             "model.ids": available_ids,
             "model.map": mapped_availability,
         }

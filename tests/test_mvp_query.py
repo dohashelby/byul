@@ -129,7 +129,8 @@ class DashboardAssetTests(unittest.TestCase):
     def test_external_badge_depends_on_health_and_keeps_gpu_warning(self) -> None:
         script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
         self.assertIn('engine.healthy ? "연결됨" : "연결 안 됨"', script)
-        self.assertIn("외부 vLLM 모드", script)
+        self.assertIn("외부 ${engineName} 모드", script)
+        self.assertIn('{ vllm: "vLLM", sglang: "SGLang" }', script)
         self.assertIn("정식 GPU 시험(S3B) 전", script)
         self.assertIn('engine.healthy ? "badge-external" : "badge-ERROR"', script)
 

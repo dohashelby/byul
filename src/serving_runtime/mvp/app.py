@@ -65,8 +65,10 @@ class GatewayApp:
             self.backend = backend_config or load_backend_config(
                 str(config.backend_config_path)
             )
-            if self.backend.kind != "vllm":
-                raise ValueError("vllm mode requires a vllm backend config")
+            if self.backend.kind != config.backend:
+                raise ValueError(
+                    f"{config.backend} mode requires a {config.backend} backend config"
+                )
         allowed_binaries: tuple[str, ...] = ()
         if config.observation_intent_path is not None:
             allowed_binaries = load_intent(
@@ -378,7 +380,7 @@ class GatewayApp:
             "mode": (
                 "mock_engine"
                 if self.backend.kind == "mock"
-                else "external_vllm_backend"
+                else f"external_{self.backend.kind}_backend"
             ),
             "backend_kind": self.backend.kind,
             "observation_session_id": self.observation_session_id,

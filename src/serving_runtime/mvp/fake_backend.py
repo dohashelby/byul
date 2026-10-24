@@ -45,6 +45,7 @@ class FakeBackend:
         path_prefix: str = "",
         header_delay_s: float = 0.2,
         stream_interval_s: float = 0.01,
+        flavor: str = "vllm",
     ) -> None:
         if not isinstance(port, int) or isinstance(port, bool) or not 0 <= port <= 65535:
             raise ValueError("port must be an integer from 0 through 65535")
@@ -58,6 +59,8 @@ class FakeBackend:
             raise ValueError("path_prefix must be empty or start with / without a trailing /")
         if header_delay_s < 0 or stream_interval_s < 0:
             raise ValueError("delays must not be negative")
+        if flavor not in {"vllm", "sglang"}:
+            raise ValueError("flavor must be vllm or sglang")
         self.port = port
         self.host = host
         self.mode = mode
@@ -66,6 +69,9 @@ class FakeBackend:
         self.path_prefix = path_prefix
         self.header_delay_s = header_delay_s
         self.stream_interval_s = stream_interval_s
+        # Test-only imitation of each engine's routes and metric names; it is not
+        # the real engine and proves nothing about a real deployment.
+        self.flavor = flavor
         self._required_authorization = required_authorization
         self.metrics_failure: str | None = None
         self.tokenize_failure = False
@@ -171,6 +177,7 @@ class FakeBackend:
                     "received_at": _utc_now(),
                     "model": document.get("model"),
                     "max_tokens": document.get("max_tokens"),
+                    "max_completion_tokens": document.get("max_completion_tokens"),
                     "stream": document.get("stream") is True,
                     "n": document.get("n"),
                     # Test-only visibility into which request fields reached
@@ -179,7 +186,15 @@ class FakeBackend:
                     "extra_values": {
                         key: value
                         for key, value in document.items()
-                        if key not in {"model", "messages", "max_tokens", "stream", "n"}
+                        if key
+                        not in {
+                            "model",
+                            "messages",
+                            "max_tokens",
+                            "max_completion_tokens",
+                            "stream",
+                            "n",
+                        }
                     },
                     "host": self.headers.get("Host"),
                     "header_names": sorted(name.lower() for name in self.headers),
@@ -257,7 +272,8 @@ class FakeBackend:
                         {"object": "list", "data": [{"id": owner.model_id}]},
                     )
                     return
-                if route == "/version":
+                if route == "/version" and owner.flavor == "vllm":
+                    # SGLang v0.5.21 has no /version route.
                     self._send_json(200, {"version": owner.version})
                     return
                 if route == "/metrics":
@@ -267,13 +283,29 @@ class FakeBackend:
                     if owner.metrics_failure == "http_500":
                         self._send_json(500, {"error": {"code": "FAKE_METRICS_FAILURE"}})
                         return
+                    if owner.flavor == "sglang":
+                        # Names from SGLang v0.5.21 metrics_collector.py.
+                        families = (
+                            "# TYPE sglang:num_running_reqs gauge\n"
+                            "sglang:num_running_reqs{model_name=\"m\"} 1\n"
+                            "# TYPE sglang:num_queue_reqs gauge\n"
+                            "sglang:num_queue_reqs{model_name=\"m\"} 0\n"
+                            "# TYPE sglang:token_usage gauge\n"
+                            "sglang:token_usage{model_name=\"m\"} 0.25\n"
+                            "# TYPE sglang:generation_tokens_total counter\n"
+                            "sglang:generation_tokens_total{model_name=\"m\"} 42\n"
+                        )
+                    else:
+                        families = (
+                            "# TYPE vllm:num_requests_running gauge\n"
+                            "vllm:num_requests_running 1\n"
+                            "# TYPE vllm:num_requests_waiting gauge\n"
+                            "vllm:num_requests_waiting 0\n"
+                        )
                     encoded = (
                         "# test-only fake backend metrics; data_origin=fake_backend_test\n"
-                        "# TYPE vllm:num_requests_running gauge\n"
-                        "vllm:num_requests_running 1\n"
-                        "# TYPE vllm:num_requests_waiting gauge\n"
-                        "vllm:num_requests_waiting 0\n"
-                        "# TYPE unrelated_metric counter\n"
+                        + families
+                        + "# TYPE unrelated_metric counter\n"
                         "unrelated_metric 99\n"
                     ).encode("utf-8")
                     self.send_response(200)
@@ -324,7 +356,9 @@ class FakeBackend:
 
             def do_POST(self) -> None:
                 route = self._route()
-                if route == "/tokenize":
+                if route == "/tokenize" or (
+                    owner.flavor == "sglang" and route == "/v1/tokenize"
+                ):
                     self._tokenize()
                     return
                 if route != "/v1/chat/completions":

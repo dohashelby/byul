@@ -24,6 +24,13 @@
   </header>
 
   <div id="stale-banner" class="stale-banner" role="alert" hidden></div>
+  <div id="auth-form" class="auth-form" role="group" aria-label="조회 토큰" hidden>
+    <span id="auth-message">조회 API에 인증이 필요합니다.</span>
+    <label for="auth-token">조회 토큰</label>
+    <input id="auth-token" type="password" autocomplete="off" spellcheck="false">
+    <button type="button" id="auth-apply">적용</button>
+    <button type="button" id="auth-clear">지우기</button>
+  </div>
 
   <main class="page">
     <section aria-labelledby="overview-title">

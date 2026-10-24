@@ -79,10 +79,59 @@ function fillKv(id, rows) {
   }
 }
 
+const TOKEN_KEY = "serving-runtime-read-token";
+
+class AuthError extends Error {
+  constructor(status, code) {
+    super(`HTTP ${status} ${code}`);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+function readToken() {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function authHeaders() {
+  // The token lives only in this tab's session storage and is sent as a header.
+  const token = readToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function authFetch(url) {
+  const response = await fetch(url, { cache: "no-store", headers: authHeaders() });
+  if (response.status === 401 || response.status === 403 || response.status === 503) {
+    let code = "";
+    try {
+      code = ((await response.clone().json()).error || {}).code || "";
+    } catch (_) {
+      code = "";
+    }
+    if (response.status !== 503 || code === "AUTH_UNAVAILABLE") throw new AuthError(response.status, code);
+  }
+  return response;
+}
+
 async function getJson(url) {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await authFetch(url);
   if (!response.ok) throw new Error(`${url} → HTTP ${response.status}`);
   return response.json();
+}
+
+function showAuthForm(error) {
+  const messages = {
+    AUTH_REQUIRED: "조회 API에 인증이 필요합니다. 조회 역할 토큰을 입력하세요.",
+    AUTH_INVALID: "토큰이 맞지 않습니다. 다시 입력하세요.",
+    ROLE_NOT_ALLOWED: "이 토큰은 조회 역할이 없습니다.",
+    AUTH_UNAVAILABLE: "Gateway 인증 설정 오류(503) — 설정 파일을 확인하세요. 조회도 막혀 있습니다.",
+  };
+  $("auth-message").textContent = messages[error.code] || `조회 거부 (${error.message})`;
+  $("auth-form").hidden = false;
 }
 
 function renderStatus(status) {
@@ -839,6 +888,23 @@ function renderDetail(detail) {
   const download = el("a", { className: "download", text: "증거 JSON 내려받기" });
   download.href = `/api/requests/${encodeURIComponent(detail.request_id)}/evidence`;
   download.setAttribute("download", `evidence-${detail.request_id}.json`);
+  download.addEventListener("click", async (event) => {
+    // A plain link cannot carry the Authorization header, so fetch the file.
+    if (!readToken()) return;
+    event.preventDefault();
+    try {
+      const response = await authFetch(download.href);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const url = URL.createObjectURL(await response.blob());
+      const link = el("a", {});
+      link.href = url;
+      link.setAttribute("download", `evidence-${detail.request_id}.json`);
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      if (error instanceof AuthError) showAuthForm(error);
+    }
+  });
   body.appendChild(download);
 
   const raw = el("details", {}, [
@@ -914,10 +980,12 @@ async function refresh() {
     renderLabReport(labReport);
     renderCilium(collectors, labReport, observations);
     state.lastSuccess = new Date();
+    $("auth-form").hidden = true;
     document.body.classList.remove("is-stale");
     $("stale-banner").hidden = true;
     $("refresh-state").textContent = `3초마다 갱신 · 마지막 ${clockTime(state.lastSuccess)}`;
   } catch (error) {
+    if (error instanceof AuthError) showAuthForm(error);
     document.body.classList.add("is-stale");
     const since = state.lastSuccess ? `마지막 성공 ${clockTime(state.lastSuccess)} 기준 데이터` : "아직 받은 데이터 없음";
     $("stale-banner").textContent = `연결 끊김 — ${since}`;
@@ -941,6 +1009,27 @@ observationsPanel.addEventListener("toggle", () => {
   } catch (_) {
     // Ignore storage failures; the toggle still works for this page view.
   }
+});
+function applyToken() {
+  try {
+    sessionStorage.setItem(TOKEN_KEY, $("auth-token").value.trim());
+  } catch (_) {
+    // Without session storage the token cannot be kept; requests stay unauthenticated.
+  }
+  $("auth-token").value = "";
+  refresh();
+}
+$("auth-apply").addEventListener("click", applyToken);
+$("auth-token").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") applyToken();
+});
+$("auth-clear").addEventListener("click", () => {
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
+  } catch (_) {
+    // Nothing stored.
+  }
+  refresh();
 });
 $("drawer-close").addEventListener("click", closeDetail);
 $("drawer-backdrop").addEventListener("click", closeDetail);

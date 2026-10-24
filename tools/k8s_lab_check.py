@@ -40,6 +40,14 @@ CASE_TITLES = {
     "L-05": "Tetragon probe 차단",
     "L-06": "적용 정책 정리",
 }
+# Opt-in cases (--task-checks). They create and always delete their own Pods
+# and policies, so they do not depend on --cleanup.
+TASK_CASE_TITLES = {
+    "L-07": "SP4 작업별 통신(acquire 허용·engine 거부)",
+    "L-08": "SP1 공급물 읽기 전용 mount·비root 계정",
+}
+TASK_POD_NAMES = ("test-receiver", "artifact-acquire", "supply-check")
+SP4_POLICY_FILES = ("cilium-acquire-egress.json", "cilium-receiver-fixture-ingress.json")
 _SENSITIVE_VALUE = re.compile(
     r"(?i)\b(authorization|password|api[_-]?key|access[_-]?token|refresh[_-]?token|secret)"
     r"([\"']?\s*[:=]\s*[\"']?)([^\"'\s,;}]+)"
@@ -128,6 +136,42 @@ except OSError as error:
     print(type(error).__name__)
     raise SystemExit(9)
 print("WRITE_SUCCEEDED")
+"""
+TCP_CONNECT_SCRIPT = """\
+import json, socket, sys
+try:
+    connection = socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=4)
+    connection.close()
+    print(json.dumps({"connected": True}))
+    raise SystemExit(0)
+except OSError as error:
+    print(json.dumps({"connected": False, "error": type(error).__name__}))
+    raise SystemExit(7)
+"""
+SUPPLY_CHECK_SCRIPT = """\
+import errno, json, os
+from pathlib import Path
+result = {"uid": os.getuid()}
+model = Path("/opt/serving/assets/model/approved.txt")
+try:
+    result["read_ok"] = model.read_text(encoding="utf-8").startswith("approved")
+except OSError as error:
+    result["read_ok"] = False
+    result["read_error"] = type(error).__name__
+try:
+    model.write_text("tamper", encoding="utf-8")
+    result["write_errno"] = None
+except OSError as error:
+    result["write_errno"] = error.errno
+    result["write_erofs"] = error.errno == errno.EROFS
+cache = Path("/var/cache/serving/vllm/lab-image/lab-revision/default/probe.bin")
+try:
+    cache.write_bytes(b"cache")
+    result["cache_write_ok"] = True
+except OSError as error:
+    result["cache_write_ok"] = False
+    result["cache_error"] = type(error).__name__
+print(json.dumps(result))
 """
 NORMAL_WRITE_SCRIPT = """\
 from pathlib import Path
@@ -518,10 +562,10 @@ def wait_for_local_port(
     return False
 
 
-def _new_case(case_id: str) -> dict[str, Any]:
+def _new_case(case_id: str, titles: dict[str, str] | None = None) -> dict[str, Any]:
     return {
         "id": case_id,
-        "title": CASE_TITLES[case_id],
+        "title": (titles or CASE_TITLES)[case_id],
         "status": "not_run",
         "summary": "아직 실행하지 않음",
         "commands": [],
@@ -541,6 +585,7 @@ class LabChecker:
         state_dir: Path,
         cleanup: bool,
         tetragon_wait: float = DEFAULT_TETRAGON_WAIT,
+        task_checks: bool = False,
         runner: SubprocessRunner | None = None,
         repo_root: Path | None = None,
         sleeper: Callable[[float], None] = time.sleep,
@@ -564,7 +609,14 @@ class LabChecker:
         self.raw_dir = self.state_dir / "raw" / self.run_id
         self.data_dir = self.state_dir / "data" / self.run_id
         self.observations_path = self.data_dir / "observations.jsonl"
-        self.cases = {case_id: _new_case(case_id) for case_id in CASE_TITLES}
+        self.task_checks = task_checks
+        self.intent_v11 = self.repo_root / "deploy/lab/intent.lab-v1.1.json"
+        self.task_pods = self.repo_root / "deploy/lab/task-check-pods.yaml"
+        self.rendered_v11_dir = self.state_dir / "rendered-v1.1"
+        titles = dict(CASE_TITLES)
+        if task_checks:
+            titles.update(TASK_CASE_TITLES)
+        self.cases = {case_id: _new_case(case_id, titles) for case_id in titles}
         self.pods: dict[str, str] = {}
         self.applied: list[Path] = []
         self.started_at = utc_now()
@@ -1264,6 +1316,145 @@ class LabChecker:
         except ValueError:
             return None
 
+    def _pod_ip(self, case: dict[str, Any], name: str) -> str:
+        result = self._kubectl(case, "get", "pod", name, "-o", "jsonpath={.status.podIP}")
+        address = result.stdout.strip()
+        if result.returncode != 0 or not address:
+            raise RuntimeError(f"could not read pod IP for {name}")
+        return address
+
+    def _connect(self, case: dict[str, Any], pod: str, host: str, port: int) -> bool:
+        result = self._exec(case, pod, "python", "-c", TCP_CONNECT_SCRIPT, host, str(port))
+        return result.returncode == 0
+
+    def _start_task_pods(self, case: dict[str, Any]) -> None:
+        if self._kubectl(case, "apply", "-f", str(self.task_pods), timeout=30).returncode != 0:
+            raise RuntimeError("could not create task-check pods")
+        wait = self._kubectl(
+            case,
+            "wait",
+            "--for=condition=Ready",
+            *(f"pod/{name}" for name in TASK_POD_NAMES),
+            "--timeout=120s",
+            timeout=130,
+        )
+        if wait.returncode != 0:
+            raise RuntimeError("task-check pods did not become Ready")
+
+    def _l07(self, case: dict[str, Any]) -> None:
+        render = self._runtime(
+            case, "enforce", "render", "--intent", str(self.intent_v11), "--out", str(self.rendered_v11_dir)
+        )
+        if render.returncode != 0:
+            raise RuntimeError("intent 1.1 rendering failed")
+        receiver = self._pod_ip(case, "test-receiver")
+        baseline_acquire = self._connect(case, "artifact-acquire", receiver, 8080)
+        baseline_other = self._connect(case, self.pods["other"], receiver, 8080)
+        applied: list[Path] = []
+        try:
+            for name in SP4_POLICY_FILES:
+                path = self.rendered_v11_dir / name
+                if not path.is_file() or self._kubectl(case, "apply", "-f", str(path)).returncode != 0:
+                    raise RuntimeError(f"could not apply {name}")
+                applied.append(path)
+            self.sleep(3)
+            acquire = self._retry(
+                lambda: self._exec(case, "artifact-acquire", "python", "-c", TCP_CONNECT_SCRIPT, receiver, "8080"),
+                lambda result: result.returncode == 0,
+            ).returncode == 0
+            engine = self._connect(case, self.pods["engine"], receiver, 8080)
+            other = self._connect(case, self.pods["other"], receiver, 8080)
+            to_engine = self._connect(
+                case, "artifact-acquire", "serving-engine.serving-lab.svc.cluster.local", 8000
+            )
+        finally:
+            for path in reversed(applied):
+                self._kubectl(case, "delete", "-f", str(path), "--ignore-not-found=true")
+        results = {
+            "baseline acquire→receiver": baseline_acquire,
+            "baseline other→receiver": baseline_other,
+            "acquire→receiver": acquire,
+            "engine→receiver": engine,
+            "other-client→receiver": other,
+            "acquire→engine API": to_engine,
+        }
+        evidence = [f"{name}: {'연결' if ok else '차단'}" for name, ok in results.items()]
+        case["limitation"] = (
+            "TCP 연결 결과만 확인; HTTPS 안의 URL·파일 권한은 입증하지 않음. "
+            "engine→receiver 차단은 L-02의 engine egress 정책 결과"
+        )
+        if not (baseline_acquire and baseline_other):
+            self._set(case, "failed", "정책 적용 전 receiver 기준선 연결 실패", evidence)
+        elif acquire and not engine and not other and not to_engine:
+            self._set(case, "passed", "같은 receiver에 acquire만 연결, engine·other-client·acquire→engine API는 차단", evidence)
+        else:
+            self._set(case, "failed", "SP4 허용/차단 결과가 기대와 다름", evidence)
+
+    def _l08(self, case: dict[str, Any]) -> None:
+        spec = self._kubectl(case, "get", "pod", "supply-check", "-o", "json")
+        configured = False
+        if spec.returncode == 0:
+            try:
+                document = json.loads(spec.stdout)
+                mounts = {
+                    item.get("mountPath"): item
+                    for container in document.get("spec", {}).get("containers", [])
+                    if container.get("name") == "engine"
+                    for item in container.get("volumeMounts", [])
+                }
+                configured = mounts.get("/opt/serving/assets/model", {}).get("readOnly") is True
+            except (json.JSONDecodeError, AttributeError):
+                configured = False
+        result = self._exec(case, "supply-check", "python", "-c", SUPPLY_CHECK_SCRIPT)
+        try:
+            observed = parse_last_json(result.stdout)
+        except ValueError:
+            observed = {}
+        evidence = [
+            f"설정: 엔진 모델 mount readOnly={configured}",
+            f"실행 계정 UID={observed.get('uid')}",
+            f"모델 읽기={'성공' if observed.get('read_ok') else '실패'}",
+            f"모델 쓰기 errno={observed.get('write_errno')}",
+            f"캐시 세대 쓰기={'성공' if observed.get('cache_write_ok') else '실패'}",
+        ]
+        case["limitation"] = (
+            "읽기 전용 mount의 커널 거부(EROFS)이며 Tetragon 효과가 아님. emptyDir 시험 볼륨이고 "
+            "실제 엔진 image·모델 경로가 아님. 같은 UID의 자기 캐시 쓰기는 막지 않음"
+        )
+        if (
+            configured
+            and observed.get("uid") == 10001
+            and observed.get("read_ok") is True
+            and observed.get("write_erofs") is True
+            and observed.get("cache_write_ok") is True
+        ):
+            self._set(case, "passed", "엔진 계정(10001)이 공급물을 읽고, 쓰기는 EROFS로 거부, 캐시 세대 쓰기는 성공", evidence)
+        else:
+            self._set(case, "failed", "SP1 읽기 전용·계정·캐시 결과가 기대와 다름", evidence)
+
+    def _task_cases(self, cilium_ok: bool) -> None:
+        start = self.cases["L-07"]
+        try:
+            self._start_task_pods(start)
+        except Exception as error:  # report both cases, then clean up
+            for case_id in TASK_CASE_TITLES:
+                self._set(self.cases[case_id], "failed", sanitize_text(str(error)))
+            self._delete_task_pods(start)
+            return
+        try:
+            if cilium_ok:
+                self._run_case("L-07", self._l07)
+            else:
+                self._set(self.cases["L-07"], "not_run", "L-02 engine egress 정책이 없어 engine 거부를 판정할 수 없음")
+            self._run_case("L-08", self._l08)
+        finally:
+            self._delete_task_pods(self.cases["L-08"])
+
+    def _delete_task_pods(self, case: dict[str, Any]) -> None:
+        self._kubectl(
+            case, "delete", "-f", str(self.task_pods), "--ignore-not-found=true", "--wait=false", timeout=60
+        )
+
     def _l06(self, case: dict[str, Any]) -> None:
         if not self.cleanup_requested:
             self._set(case, "not_run", "--cleanup 미지정: 적용한 정책을 클러스터에 유지")
@@ -1292,6 +1483,7 @@ class LabChecker:
         self.data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         l04_blocked = self._check_tetragon_export_denylist()
         baseline_ok = self._run_case("L-01", self._l01)
+        cilium_ok = False
         if baseline_ok:
             cilium_ok = self._run_case("L-02", self._l02)
             if cilium_ok:
@@ -1310,6 +1502,12 @@ class LabChecker:
                     "not_run",
                     "L-01 기준선 실패로 후속 정책 적용 생략",
                 )
+        if self.task_checks:
+            if baseline_ok:
+                self._task_cases(cilium_ok)
+            else:
+                for case_id in TASK_CASE_TITLES:
+                    self._set(self.cases[case_id], "not_run", "L-01 기준선 실패로 생략")
         self._run_case("L-06", self._l06)
         statuses = [item["status"] for item in self.cases.values()]
         overall = calculate_overall(statuses)
@@ -1421,6 +1619,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="이번 실행에서 적용한 Cilium/Tetragon 정책을 보고서 작성 전에 삭제",
     )
+    parser.add_argument(
+        "--task-checks",
+        action="store_true",
+        help="L-07(SP4 작업별 통신)·L-08(SP1 읽기 전용 공급물)을 추가 실행. 시험 Pod·정책은 매번 삭제",
+    )
     return parser
 
 
@@ -1432,6 +1635,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         state_dir=args.state_dir,
         cleanup=args.cleanup,
         tetragon_wait=args.tetragon_wait,
+        task_checks=args.task_checks,
     )
     try:
         report, paths = checker.run()

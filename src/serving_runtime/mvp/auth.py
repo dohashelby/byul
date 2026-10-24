@@ -22,9 +22,12 @@ from .policy import DuplicateKeyError, _object_without_duplicates, _reject_json_
 
 SCHEMA_VERSION = "runtime-auth/1.0"
 CHAT_ROUTE = "POST /v1/chat/completions"
-# Routes the frame can protect today. Read-only dashboard APIs are not covered
-# yet; adding them needs a browser login path (left for a later step).
-PROTECTED_ROUTES = frozenset({CHAT_ROUTE})
+# All read-only query APIs (status, requests, evidence, observations, ...).
+READ_API_ROUTE = "GET /api/*"
+PROTECTED_ROUTES = frozenset({CHAT_ROUTE, READ_API_ROUTE})
+# The chat route must always be covered; read APIs are protected only when the
+# config lists them, so existing configs keep their behaviour.
+REQUIRED_ROUTES = frozenset({CHAT_ROUTE})
 DEFAULT_ROUTE_ROLES = {CHAT_ROUTE: ("inference",)}
 METHOD = "bearer_sha256"
 
@@ -94,6 +97,29 @@ class AuthState:
     def roles_for(self, route: str) -> tuple[str, ...]:
         return dict(self.route_roles).get(route, ())
 
+    @property
+    def read_api_protected(self) -> bool:
+        return self.state == "ok" and READ_API_ROUTE in dict(self.route_roles)
+
+    def authorize_read(self, authorization: str | None) -> tuple[int, str, str] | None:
+        """Return (status, code, message) when a read API request must be refused."""
+
+        if self.state == "not_configured":
+            return None
+        if self.state != "ok":
+            # The config is unreadable, so whether reads were protected is unknown.
+            return (503, "AUTH_UNAVAILABLE", "authentication configuration is unavailable")
+        if not self.read_api_protected:
+            return None
+        result = self.authenticate(authorization)
+        if result.state == "missing":
+            return (401, "AUTH_REQUIRED", "authentication is required")
+        if result.state != "authenticated" or result.principal is None:
+            return (401, "AUTH_INVALID", "authentication failed")
+        if not set(self.roles_for(READ_API_ROUTE)) & set(result.principal.roles):
+            return (403, "ROLE_NOT_ALLOWED", "principal role is not allowed for this route")
+        return None
+
     def status(self) -> dict[str, Any]:
         active = [principal for principal in self.principals if not principal.disabled]
         return {
@@ -107,7 +133,11 @@ class AuthState:
             "disabled_principal_count": len(self.principals) - len(active),
             "route_roles": {route: list(roles) for route, roles in self.route_roles},
             "protected_routes": sorted(route for route, _ in self.route_roles),
-            "unprotected": ["GET /api/*", "GET /static/*", "GET /"],
+            "unprotected": (
+                ["GET /static/*", "GET /"]
+                if self.read_api_protected
+                else ["GET /api/*", "GET /static/*", "GET /"]
+            ),
             "error_code": self.error_code,
             "error_message": self.error_message,
         }
@@ -215,8 +245,8 @@ def _parse(document: object) -> tuple[str | None, tuple[Principal, ...], tuple[t
             if route not in PROTECTED_ROUTES:
                 raise ValueError(f"route_roles key {route!r} is not a protectable route")
             route_roles[route] = _string_list(roles, _ROLE, f"route_roles.{route}")
-    # Every protectable route must be covered so nothing is left open silently.
-    missing = sorted(PROTECTED_ROUTES - route_roles.keys())
+    # The inference route must be covered so it is never left open silently.
+    missing = sorted(REQUIRED_ROUTES - route_roles.keys())
     if missing:
         raise ValueError(f"route_roles must cover: {', '.join(missing)}")
     return auth_ref, tuple(principals), tuple(sorted(route_roles.items()))

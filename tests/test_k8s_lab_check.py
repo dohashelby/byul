@@ -25,6 +25,8 @@ from tools.k8s_lab_check import (
     ProcessResult,
     PROBE_WRITE_SCRIPT,
     SECRET_READ_SCRIPT,
+    SUPPLY_CHECK_SCRIPT,
+    TCP_CONNECT_SCRIPT,
     build_parser,
     calculate_overall,
     classify_probe_results,
@@ -126,6 +128,8 @@ class CommandConstructionTests(unittest.TestCase):
             EXEC_PREP_SCRIPT,
             PROBE_WRITE_SCRIPT,
             NORMAL_WRITE_SCRIPT,
+            TCP_CONNECT_SCRIPT,
+            SUPPLY_CHECK_SCRIPT,
         ):
             with self.subTest(script=script.splitlines()[0]):
                 compile(script, "<lab-script>", "exec")
@@ -722,3 +726,118 @@ class LabIntentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TaskCheckRunner:
+    """Answer kubectl calls for L-07/L-08 from a small scenario table."""
+
+    def __init__(self, *, connect: dict[tuple[str, str], bool], supply: dict, readonly: bool = True) -> None:
+        self.connect = connect
+        self.supply = supply
+        self.readonly = readonly
+        self.calls: list[tuple[str, ...]] = []
+        self.applied_policies = False
+
+    def run(self, argv: list[str], *, timeout: float) -> ProcessResult:
+        command = tuple(argv)
+        self.calls.append(command)
+        if "jsonpath={.status.podIP}" in command:
+            return ProcessResult(command, 0, "10.0.0.9", "")
+        if "apply" in command and any(name in " ".join(command) for name in ("acquire-egress", "receiver-fixture")):
+            self.applied_policies = True
+        if "exec" in command and "-c" in command:
+            pod = command[command.index("exec") + 1]
+            script_index = command.index("-c") + 1
+            if command[script_index].startswith("import errno"):
+                return ProcessResult(command, 0, json.dumps(self.supply), "")
+            host = command[script_index + 1]
+            stage = "after" if self.applied_policies else "before"
+            ok = self.connect.get((stage, pod, host), self.connect.get((stage, pod), False))
+            return ProcessResult(command, 0 if ok else 7, json.dumps({"connected": ok}), "")
+        if command[-3:] == ("supply-check", "-o", "json") or ("pod" in command and "supply-check" in command and "json" in command):
+            mount = {"mountPath": "/opt/serving/assets/model", "readOnly": self.readonly}
+            document = {"spec": {"containers": [{"name": "engine", "volumeMounts": [mount]}]}}
+            return ProcessResult(command, 0, json.dumps(document), "")
+        return ProcessResult(command, 0, "", "")
+
+
+class TaskCheckTests(unittest.TestCase):
+    def checker(self, runner, directory: str) -> LabChecker:
+        checker = LabChecker(
+            context="kind-runtime-lab",
+            namespace="serving-lab",
+            state_dir=Path(directory),
+            cleanup=False,
+            task_checks=True,
+            runner=runner,
+            sleeper=lambda _seconds: None,
+        )
+        checker.pods = {"engine": "engine-pod", "other": "other-pod", "gateway": "gateway-pod"}
+        return checker
+
+    def good_connect(self) -> dict:
+        return {
+            ("before", "artifact-acquire"): True,
+            ("before", "other-pod"): True,
+            ("after", "artifact-acquire", "10.0.0.9"): True,
+            ("after", "engine-pod"): False,
+            ("after", "other-pod"): False,
+            ("after", "artifact-acquire", "serving-engine.serving-lab.svc.cluster.local"): False,
+        }
+
+    def good_supply(self) -> dict:
+        return {"uid": 10001, "read_ok": True, "write_errno": 30, "write_erofs": True, "cache_write_ok": True}
+
+    def test_task_cases_are_opt_in(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            default = LabChecker(context="kind-runtime-lab", namespace="serving-lab", state_dir=Path(directory), cleanup=False, runner=FakeRunner())
+            self.assertNotIn("L-07", default.cases)
+            self.assertIn("L-08", self.checker(FakeRunner(), directory).cases)
+        self.assertTrue(build_parser().parse_args(["--state-dir", "x", "--task-checks"]).task_checks)
+        self.assertFalse(build_parser().parse_args(["--state-dir", "x"]).task_checks)
+
+    def test_task_cases_pass_and_always_clean_up(self) -> None:
+        runner = TaskCheckRunner(connect=self.good_connect(), supply=self.good_supply())
+        with tempfile.TemporaryDirectory() as directory:
+            checker = self.checker(runner, directory)
+            rendered = checker.rendered_v11_dir
+            rendered.mkdir(parents=True)
+            for name in ("cilium-acquire-egress.json", "cilium-receiver-fixture-ingress.json"):
+                (rendered / name).write_text("{}", encoding="utf-8")
+            checker._task_cases(cilium_ok=True)
+            self.assertEqual(checker.cases["L-07"]["status"], "passed", checker.cases["L-07"])
+            self.assertEqual(checker.cases["L-08"]["status"], "passed", checker.cases["L-08"])
+        deletes = [call for call in runner.calls if "delete" in call]
+        self.assertTrue(any("cilium-acquire-egress.json" in " ".join(call) for call in deletes))
+        self.assertTrue(any("task-check-pods.yaml" in " ".join(call) for call in deletes))
+
+    def test_engine_reaching_receiver_or_writable_supply_fails(self) -> None:
+        connect = self.good_connect()
+        connect[("after", "engine-pod")] = True
+        supply = dict(self.good_supply(), write_errno=None, write_erofs=False)
+        runner = TaskCheckRunner(connect=connect, supply=supply)
+        with tempfile.TemporaryDirectory() as directory:
+            checker = self.checker(runner, directory)
+            checker.rendered_v11_dir.mkdir(parents=True)
+            for name in ("cilium-acquire-egress.json", "cilium-receiver-fixture-ingress.json"):
+                (checker.rendered_v11_dir / name).write_text("{}", encoding="utf-8")
+            checker._task_cases(cilium_ok=True)
+            self.assertEqual(checker.cases["L-07"]["status"], "failed")
+            self.assertEqual(checker.cases["L-08"]["status"], "failed")
+
+    def test_l07_needs_engine_egress_policy(self) -> None:
+        runner = TaskCheckRunner(connect=self.good_connect(), supply=self.good_supply())
+        with tempfile.TemporaryDirectory() as directory:
+            checker = self.checker(runner, directory)
+            checker._task_cases(cilium_ok=False)
+            self.assertEqual(checker.cases["L-07"]["status"], "not_run")
+            self.assertEqual(checker.cases["L-08"]["status"], "passed")
+
+    def test_lab_v11_intent_renders_sp4_policies(self) -> None:
+        intent = load_intent(ROOT / "deploy/lab/intent.lab-v1.1.json")
+        manifests = render_cilium(intent)
+        self.assertIn("cilium-acquire-egress.json", manifests)
+        self.assertIn("cilium-receiver-fixture-ingress.json", manifests)
+        legacy = render_cilium(load_intent(LAB_INTENT))
+        for name in ("cilium-engine-ingress.json", "cilium-engine-egress.json", "cilium-gateway-egress.json"):
+            self.assertEqual(manifests[name]["spec"], legacy[name]["spec"])

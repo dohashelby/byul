@@ -120,6 +120,7 @@ class HandlerDependencies:
     request_header_timeout_s: float
     request_body_timeout_s: float
     target_status: Callable[[], dict[str, Any]] = lambda: {"registration": {"state": "not_configured"}}
+    authorize_read: Callable[[str | None], tuple[int, str, str] | None] = lambda _header: None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -165,6 +166,17 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
             return
+
+    def _send_read_refusal(self, status: int, code: str, message: str) -> None:
+        body = json.dumps({"error": {"code": code, "message": message}}).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        if status == 401:
+            self.send_header("WWW-Authenticate", 'Bearer realm="serving-runtime"')
+        self.end_headers()
+        self.wfile.write(body)
 
     def _send_json(
         self,
@@ -451,6 +463,12 @@ class Handler(BaseHTTPRequestHandler):
         if path in _STATIC_FILES:
             self._send_static(path)
             return
+        if path.startswith("/api/"):
+            refusal = self.dependencies.authorize_read(self.headers.get("Authorization"))
+            if refusal is not None:
+                status, code, message = refusal
+                self._send_read_refusal(status, code, message)
+                return
         if path == "/api/status":
             self._send_json(200, self.dependencies.status())
             return

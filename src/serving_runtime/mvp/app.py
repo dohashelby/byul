@@ -562,6 +562,7 @@ class GatewayApp:
                 request_header_timeout_s=self.config.request_header_timeout_s,
                 request_body_timeout_s=self.config.request_body_timeout_s,
                 target_status=self.target_status,
+                authorize_read=lambda header: self.auth_state.authorize_read(header),
             )
         )
         self._server = LimitedThreadingHTTPServer(

@@ -27,7 +27,7 @@ BoB serving-engine security runtime solution
 | 대상 등록 프레임 (F1) | `--target`(`runtime-target/1.0`): 정책 대상 대조·엔진/모델 비교, `--target-pod-status`로 Pod 조회·교체 구분 | 단위·HTTP 시험, 로컬 kind에서 Pod 교체 확인 |
 | 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류와 기간 있는 승인 예외 | 단위 시험; SP4 송수신 정책은 로컬 kind에서 수동 확인 |
 | 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 수정 반영 |
-| 시험 | 추적 unittest 331개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 시험 | 추적 unittest 339개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -159,11 +159,12 @@ curl -H "Authorization: Bearer $LAB_TOKEN" -H 'Content-Type: application/json' \
   http://127.0.0.1:8080/v1/chat/completions
 ```
 
-- 주체마다 `principal_id`, `roles`, `token_sha256`, 선택 `allowed_models`·`disabled`를 둡니다. `route_roles`는 보호 경로별 허용 역할이며 지금 보호할 수 있는 경로는 `POST /v1/chat/completions`뿐입니다(기본 역할 `inference`).
+- 주체마다 `principal_id`, `roles`, `token_sha256`, 선택 `allowed_models`·`disabled`를 둡니다. `route_roles`는 보호 경로별 허용 역할입니다. `POST /v1/chat/completions`는 항상 보호하고(기본 역할 `inference`), 조회 API는 `"GET /api/*": ["viewer"]`처럼 넣었을 때만 보호합니다.
 - 인증 정보 없음은 401 `AUTH_REQUIRED`, 토큰 불일치·비활성 주체·Bearer 외 방식은 401 `AUTH_INVALID`, 역할 불허는 403 `ROLE_NOT_ALLOWED`, 주체에 허용되지 않은 모델은 403 `PRINCIPAL_MODEL_NOT_ALLOWED`입니다. 모두 엔진에 전달하지 않고, 401·역할 거부는 본문을 읽기 전에 끝냅니다.
 - 인증 설정을 읽지 못하거나 형식이 틀리면 추론 요청을 503 `AUTH_UNAVAILABLE`로 막고 `/api/status`를 `degraded`로 둡니다. 이것은 Gateway 오류이며 보안 차단 성공으로 세지 않습니다.
 - 요청 기록에는 인증 상태·방식·주체 ID·역할만 남습니다. 토큰과 토큰 해시는 기록·상태·로그에 남기지 않고, 클라이언트의 `Authorization` 헤더는 backend로 전달하지 않습니다.
-- 한계: 조회 API(`/api/*`)와 대시보드는 아직 인증하지 않습니다. 토큰 회전·만료·외부 인증 서버 연동은 없습니다. `examples/mvp/auth.example.json`의 토큰은 공개된 예시값이므로 시험 외에 쓰지 않습니다.
+- 조회 API를 보호하면 `/api/*`(상태·요청 목록·상세·증거 내려받기·관측·대상 등) 전체에 토큰 없음·불일치 401, 역할 없음 403을 돌려줍니다. 화면 파일(`/`, `/static/*`)은 데이터가 없어 공개입니다. 대시보드는 401을 받으면 토큰 입력창을 띄우고, 입력한 토큰을 그 탭의 세션 저장소에만 두고 `Authorization` 헤더로 보냅니다. 증거 내려받기도 같은 헤더를 붙여 받습니다. 인증 설정을 읽지 못하면 조회 보호 여부를 알 수 없으므로 조회 API도 503 `AUTH_UNAVAILABLE`로 막습니다.
+- 한계: 로그인·세션 만료·토큰 회전·외부 인증 서버 연동은 없습니다. 인증 방식 결정 기록은 `docs/결정기록_D-02_인증연동.md`에 있습니다. `examples/mvp/auth.example.json`의 토큰은 공개된 예시값이므로 시험 외에 쓰지 않습니다.
 
 ### 대상 등록 프레임 (F1)
 
@@ -503,7 +504,12 @@ helm upgrade tetragon cilium/tetragon --version 1.7.1 -n kube-system --reuse-val
 .venv/bin/python -B tools/k8s_lab_check.py \
   --context kind-runtime-lab --namespace serving-lab \
   --state-dir ~/.local/state/serving-runtime/k8s-lab
+# SP4·SP1 작업별 점검(L-07·L-08)까지: 시험 Pod·정책은 실행마다 만들고 지웁니다.
+.venv/bin/python -B tools/k8s_lab_check.py --context kind-runtime-lab --namespace serving-lab \
+  --state-dir ~/.local/state/serving-runtime/k8s-lab --task-checks
 ```
+
+`--task-checks`는 `deploy/lab/task-check-pods.yaml`(test-receiver, artifact-acquire, supply-check)과 `deploy/lab/intent.lab-v1.1.json`을 씁니다. L-07은 acquire 송신·receiver 수신 정책을 적용해 같은 receiver에 acquire만 연결되고 engine·other-client·acquire→engine API는 막히는지 판정합니다(L-02의 engine egress가 있어야 하며, 없으면 `not_run`). L-08은 취득 단계(UID 10002)가 쓴 공급물을 엔진 단계(UID 10001)가 읽기 전용으로 붙였을 때 읽기 성공·쓰기 EROFS·캐시 세대 쓰기 성공인지 봅니다. L-08의 거부는 mount 결과이며 Tetragon 효과가 아니고, 시험용 emptyDir이라 실제 엔진 image·모델 경로 검증이 아닙니다. 메인 실시간 수집 helper와 Hubble port-forward(4245) 포트가 겹치므로 점검 중에는 helper를 멈춥니다.
 
 위 `helm upgrade` 단계의 `tetragon-values.yaml`은 export를 `serving-lab`의 `PROCESS_EXEC`·`PROCESS_EXIT`와 네 lab 정책의 `PROCESS_KPROBE`로 한정해 호스트 이벤트 폭증을 막습니다. WSL+kind에서는 kprobe의 pod namespace가 비므로 kprobe allowlist는 namespace 대신 policy name을 사용하고, denylist는 health check와 `cilium`·`kube-system` namespace만 제외해 빈 namespace를 버리지 않습니다. 필터 필드는 Tetragon 1.7.1 공식 문서 기준 후보입니다.
 

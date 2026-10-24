@@ -132,7 +132,7 @@ class AuthConfigTests(TempFiles, unittest.TestCase):
             "empty-models": auth_document(principals=[dict(good, allowed_models=[])]),
             "dup-id": auth_document(principals=[good, dict(good, token_sha256="0" * 64)]),
             "dup-digest": auth_document(principals=[good, dict(good, principal_id="other")]),
-            "unprotectable-route": auth_document(route_roles={"GET /api/status": ["viewer"]}),
+            "unprotectable-route": auth_document(route_roles={CHAT_ROUTE: ["inference"], "GET /api/status": ["viewer"]}),
             "empty-route-roles": auth_document(route_roles={}),
             "not-object": [],
         }
@@ -169,7 +169,7 @@ class AuthConfigTests(TempFiles, unittest.TestCase):
                     token_digest(token)
 
 
-class AuthGatewayHttpTests(TempFiles, unittest.TestCase):
+class AuthHttpBase(TempFiles, unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -227,6 +227,8 @@ class AuthGatewayHttpTests(TempFiles, unittest.TestCase):
         records, _ = JsonlStore(self.data_dir / "engine_receipts.jsonl").read_all()
         return len(records)
 
+
+class AuthGatewayHttpTests(AuthHttpBase):
     def test_without_auth_config_requests_work_as_before(self) -> None:
         self.start(None)
         status, headers, _ = self.post(chat())
@@ -286,9 +288,62 @@ class AuthGatewayHttpTests(TempFiles, unittest.TestCase):
         record = self.final_record(headers["X-Request-ID"])
         self.assertEqual(record["decision"]["result"], "ERROR")
         self.assertEqual(self.receipts(), 0)
-        overall = self.status()
+        # Whether reads were protected is unknown, so read APIs fail closed too.
+        with self.assertRaises(HTTPError) as refused:
+            self.status()
+        with closing(refused.exception):
+            self.assertEqual(refused.exception.code, 503)
+            self.assertEqual(json.loads(refused.exception.read())["error"]["code"], "AUTH_UNAVAILABLE")
+        overall = self.gateway.status()
         self.assertEqual(overall["status"], "degraded")
         self.assertEqual(overall["auth"]["state"], "error")
+
+
+class ReadApiAuthTests(AuthHttpBase):
+    def get(self, path: str, token: str | None = None):
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        request = Request(self.url(path), headers=headers)
+        try:
+            with urlopen(request, timeout=3) as response:
+                return response.status, dict(response.headers), response.read()
+        except HTTPError as error:
+            with closing(error):
+                return error.code, dict(error.headers), error.read()
+
+    def test_read_apis_open_unless_configured(self) -> None:
+        self.start(self.write_json("auth.json", auth_document()))
+        status, _, body = self.get("/api/status")
+        self.assertEqual(status, 200)
+        self.assertIn("GET /api/*", json.loads(body)["auth"]["unprotected"])
+
+    def test_configured_read_protection(self) -> None:
+        document = auth_document(route_roles={CHAT_ROUTE: ["inference"], "GET /api/*": ["viewer"]})
+        self.start(self.write_json("auth.json", document))
+        status, inference_headers, _ = self.post(chat(), INFERENCE_TOKEN)
+        self.assertEqual(status, 200)
+        request_id = inference_headers["X-Request-ID"]
+        paths = ["/api/status", "/api/requests", f"/api/requests/{request_id}", f"/api/requests/{request_id}/evidence", "/api/observations", "/api/target"]
+        for path in paths:
+            with self.subTest(path=path):
+                code, headers, body = self.get(path)
+                self.assertEqual(code, 401)
+                self.assertTrue(headers.get("WWW-Authenticate", "").startswith("Bearer"))
+                self.assertEqual(json.loads(body)["error"]["code"], "AUTH_REQUIRED")
+                self.assertEqual(self.get(path, "wrong-token-but-long-enough")[0], 401)
+                self.assertEqual(self.get(path, INFERENCE_TOKEN)[0], 403)
+                self.assertEqual(self.get(path, VIEWER_TOKEN)[0], 200)
+        # Static dashboard files carry no data and stay public.
+        for path in ("/", "/static/app.js"):
+            self.assertEqual(self.get(path)[0], 200)
+        status_body = json.loads(self.get("/api/status", VIEWER_TOKEN)[2])
+        self.assertNotIn("GET /api/*", status_body["auth"]["unprotected"])
+        self.assertIn("GET /api/*", status_body["auth"]["protected_routes"])
+
+    def test_unprotectable_route_still_rejected(self) -> None:
+        state = load_auth(self.write_json("bad.json", auth_document(route_roles={CHAT_ROUTE: ["inference"], "GET /static/*": ["viewer"]})))
+        self.assertEqual(state.state, "error")
+        missing_chat = load_auth(self.write_json("bad2.json", auth_document(route_roles={"GET /api/*": ["viewer"]})))
+        self.assertEqual(missing_chat.state, "error")
 
 
 class AuthHeaderNotForwardedTests(TempFiles, unittest.TestCase):

@@ -122,6 +122,21 @@ body {
   padding: 10px 16px;
   font-weight: 600;
 }
+.auth-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--denied-bg);
+  color: var(--denied);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+.auth-form[hidden] { display: none; }
+.auth-form input { min-width: 0; width: min(320px, 100%); padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.auth-form button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
 body.is-stale main { opacity: 0.45; filter: grayscale(0.6); transition: opacity 0.2s; }
 
 .page { padding-top: 28px; padding-bottom: 48px; }

@@ -339,7 +339,7 @@ def load_backend_config(
     if document["schema_version"] != "runtime-backend/1.0":
         raise ValueError("unsupported backend schema_version")
     kind = document["kind"]
-    if kind not in EXTERNAL_BACKEND_KINDS:
+    if not isinstance(kind, str) or kind not in EXTERNAL_BACKEND_KINDS:
         raise ValueError("backend kind must be vllm or sglang")
 
     target = _parse_origin(document["base_url"], field_name="base_url")

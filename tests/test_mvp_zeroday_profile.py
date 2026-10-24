@@ -147,6 +147,42 @@ class ZerodayPolicyTests(PolicyFileMixin, unittest.TestCase):
             with self.subTest(max_n=value):
                 self.assertFalse(self.load(v12_document(max_n=value)).ok)
 
+    def test_unhashable_profile_and_rule_types_are_invalid_policy(self) -> None:
+        cases = {
+            "profile_list": v12_document(profile=[]),
+            "profile_object": v12_document(profile={}),
+            "field_type_list": v12_document(
+                extra_fields={"field_x": {"mode": "validate", "type": []}}
+            ),
+            "field_type_object": v12_document(
+                extra_fields={"field_x": {"mode": "validate", "type": {}}}
+            ),
+            "item_type_list": v12_document(
+                extra_fields={
+                    "field_x": {
+                        "mode": "validate",
+                        "type": "array",
+                        "items": {"type": []},
+                    }
+                }
+            ),
+            "item_type_object": v12_document(
+                extra_fields={
+                    "field_x": {
+                        "mode": "validate",
+                        "type": "array",
+                        "items": {"type": {}},
+                    }
+                }
+            ),
+            "schema_version_list": v12_document(schema_version=[]),
+        }
+        for name, document in cases.items():
+            with self.subTest(name=name):
+                state = self.load(document)
+                self.assertFalse(state.ok)
+                self.assertEqual(state.error_code, "INVALID_POLICY")
+
     def test_reserved_field_names_are_rejected(self) -> None:
         for name in ("model", "messages", "max_tokens", "stream", "n", "max_completion_tokens"):
             with self.subTest(name=name):

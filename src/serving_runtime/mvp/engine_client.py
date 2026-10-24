@@ -56,14 +56,15 @@ class EngineClient:
     ) -> int:
         """Ask the backend tokenizer for the prompt length; never estimate it."""
 
-        payload = json.dumps(
-            {
-                "model": backend_model_id,
-                "messages": messages,
-                "add_generation_prompt": True,
-            },
-            ensure_ascii=False,
-        ).encode("utf-8")
+        tokenize_request = {
+            "model": backend_model_id,
+            "messages": messages,
+        }
+        # vLLM's tokenize API accepts this template option. SGLang v0.5.21's
+        # TokenizeRequest has model/messages but no add_generation_prompt field.
+        if self.backend.kind == "vllm":
+            tokenize_request["add_generation_prompt"] = True
+        payload = json.dumps(tokenize_request, ensure_ascii=False).encode("utf-8")
         status, _, body = self.request(
             "POST",
             "/tokenize",

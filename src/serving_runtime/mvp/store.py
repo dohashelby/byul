@@ -23,6 +23,16 @@ def _lock_for(path: Path) -> threading.Lock:
         return lock
 
 
+class RewriteCommittedError(OSError):
+    """A rewrite replaced the target, but its directory sync did not finish."""
+
+    def __init__(self, *, kept: int, removed: int, cause: OSError) -> None:
+        super().__init__("rewrite committed but directory durability is uncertain")
+        self.kept = kept
+        self.removed = removed
+        self.cause_type = type(cause).__name__
+
+
 class JsonlStore:
     """Append dictionaries as durable UTF-8 JSON Lines records."""
 
@@ -79,6 +89,7 @@ class JsonlStore:
             descriptor = os.open(
                 temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
             )
+            replaced = False
             try:
                 with os.fdopen(descriptor, "wb") as output, self.path.open("rb") as source:
                     descriptor = -1
@@ -91,16 +102,25 @@ class JsonlStore:
                     output.flush()
                     os.fsync(output.fileno())
                 os.replace(temporary, self.path)
-                directory = os.open(self.path.parent, os.O_RDONLY)
+                replaced = True
                 try:
-                    os.fsync(directory)
-                finally:
-                    os.close(directory)
+                    directory = os.open(self.path.parent, os.O_RDONLY)
+                    try:
+                        os.fsync(directory)
+                    finally:
+                        os.close(directory)
+                except OSError as error:
+                    # The visible file has already changed. Preserve the actual
+                    # counts so callers do not report this as a zero-row delete.
+                    raise RewriteCommittedError(
+                        kept=kept, removed=removed, cause=error
+                    ) from error
             finally:
                 if descriptor >= 0:
                     os.close(descriptor)
-                try:
-                    temporary.unlink()
-                except FileNotFoundError:
-                    pass
+                if not replaced:
+                    try:
+                        temporary.unlink()
+                    except FileNotFoundError:
+                        pass
             return kept, removed

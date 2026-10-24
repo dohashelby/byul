@@ -20,11 +20,11 @@ BoB serving-engine security runtime solution
 | 모델 파일 무결성 | 승인 자산 목록(경로·SHA-256·크기)과 디스크 파일 주기 비교, 변경·누락·목록 밖 파일 표시 | 단위·HTTP 시험, 실제 모델 파일 목록 생성 확인 |
 | 재검증 요청 | 자산 변경·engine API 구성 drift·같은 판본 정책 내용 변경을 JSONL 요청으로 열고 조회·내보내기 | 단위 시험 완료; 검증 도구 연동 형식 D-03 미합의 |
 | 통신·행위 통제 준비 (P2 사전 작업) | Cilium 규칙 후보 생성, Tetragon 파일 규칙 후보·이벤트 변환, 관측 API·대시보드 | 로컬 kind에서 Cilium 통제·Hubble 실제 관측 통과, Tetragon 감시는 귀속 한계와 함께 확인, 차단은 재시작 후 유지 확인(업그레이드 직후 불일치 사례 원인 확인 중) |
-| 기록 보존 한도 (D-08) | 7일/5GiB 계산, 기본 보고만·`--retention-enforce`로 삭제, 시험 증거 보존 목록, 정리 구간 기록·표시 | 단위 시험·실행 확인, Codex 교차 검수 전 |
-| 지표 대응표 대조 | 선언 형식(TYPE)·HELP·label 대조, counter 초기화 감지, `metrics-check` | 단위 시험, Codex 교차 검수 전 |
-| SGLang 연결 준비 | `--backend sglang`, 엔진별 출력 상한 필드(`max_completion_tokens`), `/tokenize` context 통제, `sglang:*` 지표 대응 | 시험 전용 가짜 SGLang만, 실제 SGLang 미확인, Codex 교차 검수 전 |
-| 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 전 |
-| 시험 | unittest 252개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 2026-10-24 Claude 소켓 허용 환경에서 252개 전부 통과(건너뜀 0), 수용 31개 통과. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 기록 보존 한도 (D-08) | 7일/5GiB 계산, 기본 보고만·`--retention-enforce`로 삭제, 시험 증거 보존 목록, 요청별 파일 간 묶음 정리, 정리 구간·오류 표시 | 단위 시험·실행 확인, Codex 교차 검수 수정 반영 |
+| 지표 대응표 대조 | 선언 형식(TYPE)·HELP·label 대조, counter 초기화 감지, `metrics-check` | 단위 시험, Codex 교차 검수 완료 |
+| SGLang 연결 준비 | `--backend sglang`, 엔진별 출력 상한 필드(`max_completion_tokens`), backend별 `/tokenize` payload, `sglang:*` 지표 대응 | 시험 전용 가짜 SGLang만, 실제 SGLang 미확인, Codex 교차 검수 수정 반영 |
+| 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 수정 반영 |
+| 시험 | 추적 unittest 282개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -160,7 +160,7 @@ baseline과 manifest는 평면 `fields` 객체를 사용합니다. manifest도 �
 
 정책 schema `runtime-mvp/1.1`의 선택 필드 `max_context_tokens`를 넣으면 켜집니다(예: `examples/mvp/policy-v1.1-context.json`, 2048). 값은 `output_max_tokens`보다 커야 합니다.
 
-- Gateway는 일반·stream 생성 요청을 보내기 전에 backend의 `POST /tokenize`(`model`, `messages`, `add_generation_prompt: true`)로 입력 토큰 수(`count`)를 받습니다. vLLM 모드에서는 고정 `base_url` 경로 접두와 Authorization을 생성 요청과 동일하게 적용하며, 문자 길이로 추정하지 않습니다.
+- Gateway는 일반·stream 생성 요청을 보내기 전에 backend의 `POST /tokenize`로 입력 토큰 수(`count`)를 받습니다. payload는 backend별로 구성합니다. vLLM에는 `model`·`messages`·`add_generation_prompt: true`, SGLang v0.5.21에는 `TokenizeRequest`에 정의된 `model`·`messages`만 보냅니다. vLLM 모드에서는 고정 `base_url` 경로 접두와 Authorization을 생성 요청과 동일하게 적용하며, 문자 길이로 추정하지 않습니다.
 - 입력 토큰 + 적용 `max_tokens`가 한도를 넘으면 일반·stream 모두 403 `CONTEXT_LIMIT_EXCEEDED`이며 생성 요청을 보내지 않습니다.
 - 연결 실패·backend 오류뿐 아니라 HTTP 200 응답에 `count`가 없거나 bool·음수이거나 JSON을 해석할 수 없는 모든 경우도 통과시키지 않고 503 `CONTEXT_CHECK_UNAVAILABLE`으로 기록합니다. backend 예외 메시지는 응답·요청 기록에 남기지 않습니다.
 - 기록과 상세 화면에 입력 토큰·한도·판정이 남습니다. 토큰 세기 요청에는 `<요청 ID>-tokenize` 요청 ID를 붙입니다.
@@ -227,10 +227,10 @@ S3A 시험은 시험 전용 가짜 backend(`src/serving_runtime/mvp/fake_backend
 ```
 
 - 대상은 원본 기록 3종(`gateway_records.jsonl`, `engine_receipts.jsonl`, `observations.jsonl`)입니다. 정책 이력과 재검증 요청은 재시작 때 상태를 되살리는 데 쓰므로 정리하지 않습니다.
-- 요청 하나의 시작·최종 기록은 함께 남기거나 함께 지웁니다. 날짜를 읽을 수 없는 줄(손상 줄 등)은 지우지 않습니다.
-- 크기 한도를 넘으면 오래된 기록부터 지웁니다.
+- 같은 `request_id`의 Gateway 시작·최종 기록과 엔진 receipt는 파일을 가로질러 함께 남기거나 함께 지웁니다. 묶음의 최신 시각으로 나이를 판정하며, Gateway 기록 없이 receipt만 있는 요청도 같은 규칙을 적용합니다. 날짜를 읽을 수 없는 줄(손상 줄 등)과 그 줄이 속한 요청 묶음은 지우지 않습니다.
+- 크기 한도를 넘으면 요청 묶음을 쪼개지 않고 묶음의 최신 시각이 오래된 것부터 지웁니다.
 - 시험 증거 보존: `{"schema": "runtime-retention-hold/1.0", "run_ids": [...], "request_ids": [...]}` 파일에 적은 실행·요청은 지우지 않으며, 보존한 요청의 엔진 수신 기록도 함께 남깁니다. 보존 파일을 읽을 수 없으면 삭제를 하지 않습니다.
-- 지운 내용은 `retention_log.jsonl`에 파일별 건수와 기간으로 남고, 대시보드 수집원 `record_retention`에 "최근 정리 … 이 구간 기록은 조회되지 않음"으로 표시합니다.
+- 지운 내용은 `retention_log.jsonl`에 파일별 건수와 기간으로 남고, 대시보드 수집원 `record_retention`에 "최근 정리 … 이 구간 기록은 조회되지 않음"으로 표시합니다. 파일 교체 뒤 디렉터리 `fsync`가 실패하면 실제 삭제 건수와 내구성 불확실 상태를 남기며, 정리 로그 자체의 기록 실패도 수집 요약과 화면에 오류로 표시합니다.
 - 한계: 같은 Gateway 프로세스 안의 기록 쓰기와는 잠금으로 겹치지 않지만, 실행 중에 별도 프로세스(`enforce ingest` 등)가 같은 파일에 쓰면 보호하지 않습니다. 정리할 때는 그런 명령을 함께 돌리지 마세요.
 
 ### 지표 대응표 대조
@@ -263,7 +263,7 @@ vLLM과 다른 점(SGLang v0.5.21 소스 `entrypoints/http_server.py`·`openai/p
 | 기본 포트(예시) | 8000 | 30000 |
 | 출력 상한 전달 필드 | `max_tokens` | `max_completion_tokens` (SGLang은 `max_tokens`를 deprecated로 표시). 클라이언트는 두 모드 모두 `max_tokens`로 보냅니다 |
 | 버전 조회 | `/version` | 기본 수집 안 함(`version_path: null`, 화면 `not_collected`). SGLang에는 `/version`이 없고 버전은 `/server_info`에만 있는데, 이 응답은 해석된 서버 실행 인자 전체를 돌려주므로 기본으로 호출하지 않습니다 |
-| context 사전 통제 | `/tokenize` | `/tokenize`(같은 요청·응답 형식, `count` 사용) |
+| context 사전 통제 | `/tokenize`: `model`·`messages`·`add_generation_prompt: true`, 응답 `count` | `/tokenize`: v0.5.21 `TokenizeRequest`의 `model`·`messages`, 응답 `count` |
 | 지표 이름 | `vllm:*` | `sglang:num_running_reqs`, `sglang:num_queue_reqs`, `sglang:token_usage`, `sglang:generation_tokens_total` 등. 서버를 `--enable-metrics`로 띄워야 `/metrics`가 생깁니다 |
 
 남은 것: 실제 SGLang 이미지(계획서 선정 `lmsysorg/sglang:v0.5.21`, CUDA 13 이미지) 실행, SGLang 고유 요청 필드(`regex`, `ebnf`, `custom_logit_processor`, `lora_path` 등)의 실제 거부 확인 — Gateway는 기본 프로필에서 이 필드들을 이미 `UNSUPPORTED_FIELD`로 거부합니다 —, `/server_info` 대체 버전 수집, KV/토큰 pool 지표 의미 대조(§4.6)입니다.

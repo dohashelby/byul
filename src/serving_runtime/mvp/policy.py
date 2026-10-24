@@ -158,7 +158,7 @@ def _parse_item_rule(where: str, value: object) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{where} must be an object")
     kind = value.get("type")
-    if kind not in _ITEM_TYPES:
+    if not isinstance(kind, str) or kind not in _ITEM_TYPES:
         raise ValueError(f"{where}.type must be one of {', '.join(sorted(_ITEM_TYPES))}")
     unknown = sorted(value.keys() - {"type"} - _ITEM_CONSTRAINTS_BY_TYPE[kind])
     if unknown:
@@ -190,7 +190,7 @@ def _parse_extra_fields(value: object) -> tuple[ExtraFieldRule, ...]:
         if mode != "validate":
             raise ValueError(f"{where}.mode must be validate or passthrough")
         kind = rule.get("type")
-        if kind not in EXTRA_FIELD_TYPES:
+        if not isinstance(kind, str) or kind not in EXTRA_FIELD_TYPES:
             raise ValueError(f"{where}.type must be one of {', '.join(sorted(EXTRA_FIELD_TYPES))}")
         unknown = sorted(rule.keys() - {"mode", "type"} - _CONSTRAINTS_BY_TYPE[kind])
         if unknown:
@@ -262,7 +262,11 @@ def load_policy(path: str | Path) -> PolicyState:
             digest,
         )
     schema_version = document.get("schema_version")
-    allowed_fields = _SCHEMA_FIELDS.get(schema_version, _REQUIRED_FIELDS)
+    if not isinstance(schema_version, str) or schema_version not in _SCHEMA_FIELDS:
+        return _error(
+            path_text, loaded_at, "INVALID_POLICY", "unsupported schema_version", digest
+        )
+    allowed_fields = _SCHEMA_FIELDS[schema_version]
     unknown = sorted(document.keys() - allowed_fields)
     if unknown:
         return _error(
@@ -271,10 +275,6 @@ def load_policy(path: str | Path) -> PolicyState:
             "UNKNOWN_FIELD",
             f"unknown policy field(s): {', '.join(unknown)}",
             digest,
-        )
-    if schema_version not in _SCHEMA_FIELDS:
-        return _error(
-            path_text, loaded_at, "INVALID_POLICY", "unsupported schema_version", digest
         )
     for name in ("policy_id", "policy_version", "target_id"):
         if not _is_nonempty_string(document[name]):
@@ -372,7 +372,7 @@ def load_policy(path: str | Path) -> PolicyState:
     max_n = 1
     if schema_version == "runtime-mvp/1.2":
         profile = document.get("profile", "default")
-        if profile not in _PROFILES:
+        if not isinstance(profile, str) or profile not in _PROFILES:
             return _error(
                 path_text,
                 loaded_at,

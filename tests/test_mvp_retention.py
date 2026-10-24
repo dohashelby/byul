@@ -8,8 +8,10 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 from serving_runtime.mvp.retention import HOLD_SCHEMA, RecordRetention, load_holds
+from serving_runtime.mvp import store as store_module
 from serving_runtime.mvp.store import JsonlStore
 
 
@@ -96,6 +98,98 @@ class RetentionTests(unittest.TestCase):
         self.assertNotIn("kept", self.request_ids())
         self.assertIn("new", self.request_ids())
 
+    def test_cutoff_uses_latest_time_across_gateway_and_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary)
+            gateway = JsonlStore(data / "gateway_records.jsonl")
+            receipts = JsonlStore(data / "engine_receipts.jsonl")
+            gateway.append({"request_id": "joined", "recorded_at": iso(10)})
+            receipts.append({"request_id": "joined", "received_at": iso(1)})
+            receipts.append({"request_id": "receipt-only", "received_at": iso(10)})
+
+            summary = RecordRetention(data, enforce=True).run(now=NOW)
+
+            gateway_records, _ = gateway.read_all()
+            receipt_records, _ = receipts.read_all()
+            self.assertEqual(
+                [item["request_id"] for item in gateway_records], ["joined"]
+            )
+            self.assertEqual(
+                [item["request_id"] for item in receipt_records], ["joined"]
+            )
+            self.assertEqual(
+                summary["files"]["engine_receipts.jsonl"]["removed_lines"], 1
+            )
+
+    def test_size_limit_selects_cross_file_request_as_one_unit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary)
+            gateway = JsonlStore(data / "gateway_records.jsonl")
+            receipts = JsonlStore(data / "engine_receipts.jsonl")
+            gateway.append({"request_id": "joined", "recorded_at": iso(20)})
+            receipts.append({"request_id": "joined", "received_at": iso(1)})
+            gateway.append({"request_id": "old", "recorded_at": iso(10)})
+            receipts.append({"request_id": "old", "received_at": iso(10)})
+            gateway.append({"request_id": "new", "recorded_at": iso(0)})
+
+            total = sum(
+                (data / name).stat().st_size
+                for name in ("gateway_records.jsonl", "engine_receipts.jsonl")
+            )
+            old_size = sum(
+                len(line) + 1
+                for name in ("gateway_records.jsonl", "engine_receipts.jsonl")
+                for line in (data / name).read_bytes().splitlines()
+                if json.loads(line)["request_id"] == "old"
+            )
+            RecordRetention(
+                data,
+                max_age_days=365,
+                max_bytes=total - old_size,
+                enforce=True,
+            ).run(now=NOW)
+
+            gateway_ids = [item["request_id"] for item in gateway.read_all()[0]]
+            receipt_ids = [item["request_id"] for item in receipts.read_all()[0]]
+            self.assertEqual(gateway_ids, ["joined", "new"])
+            self.assertEqual(receipt_ids, ["joined"])
+
+    def test_undated_gateway_run_hold_propagates_to_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary)
+            gateway = JsonlStore(data / "gateway_records.jsonl")
+            receipts = JsonlStore(data / "engine_receipts.jsonl")
+            gateway.append({"request_id": "held-undated", "run_id": "evidence"})
+            receipts.append(
+                {"request_id": "held-undated", "received_at": iso(20)}
+            )
+            receipts.append({"request_id": "remove", "received_at": iso(20)})
+            hold = data / "hold.json"
+            hold.write_text(
+                json.dumps({"schema": HOLD_SCHEMA, "run_ids": ["evidence"]}),
+                encoding="utf-8",
+            )
+
+            summary = RecordRetention(
+                data, enforce=True, hold_path=hold
+            ).run(now=NOW)
+
+            self.assertEqual(
+                [item["request_id"] for item in gateway.read_all()[0]],
+                ["held-undated"],
+            )
+            self.assertEqual(
+                [item["request_id"] for item in receipts.read_all()[0]],
+                ["held-undated"],
+            )
+            self.assertEqual(
+                summary["files"]["gateway_records.jsonl"]["unclassified_lines"],
+                1,
+            )
+            self.assertEqual(
+                summary["files"]["engine_receipts.jsonl"]["held_units"], 1
+            )
+
     def test_broken_hold_file_blocks_deletion(self) -> None:
         before = (self.data / "gateway_records.jsonl").read_bytes()
         hold = self.hold({"schema": "wrong"})
@@ -144,6 +238,66 @@ class RetentionTests(unittest.TestCase):
         self.assertTrue(done.is_set())
         ids = self.request_ids()
         self.assertEqual(sum(1 for item in ids if item.startswith("w")), 200)
+
+    def test_directory_fsync_failure_reports_committed_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary)
+            gateway = JsonlStore(data / "gateway_records.jsonl")
+            gateway.append({"request_id": "old", "recorded_at": iso(10)})
+            original_open = store_module.os.open
+
+            def fail_directory_open(path, flags, *args, **kwargs):
+                if Path(path) == data and flags == store_module.os.O_RDONLY:
+                    raise OSError("injected directory open failure")
+                return original_open(path, flags, *args, **kwargs)
+
+            with patch(
+                "serving_runtime.mvp.store.os.open",
+                side_effect=fail_directory_open,
+            ):
+                summary = RecordRetention(data, enforce=True).run(now=NOW)
+
+            entry = summary["files"]["gateway_records.jsonl"]
+            self.assertTrue(summary["deleted"])
+            self.assertEqual(entry["removed_lines"], 1)
+            self.assertEqual(entry["durability"], "uncertain")
+            self.assertIn("gateway_records.jsonl", summary["errors"])
+            self.assertEqual(gateway.read_all()[0], [])
+            logged = JsonlStore(data / "retention_log.jsonl").read_all()[0][0]
+            self.assertEqual(
+                logged["files"]["gateway_records.jsonl"]["removed_lines"], 1
+            )
+            self.assertEqual(
+                logged["files"]["gateway_records.jsonl"]["durability"],
+                "uncertain",
+            )
+            self.assertEqual(
+                summary["last_deletion"]["files"]["gateway_records.jsonl"][
+                    "durability"
+                ],
+                "uncertain",
+            )
+
+    def test_retention_log_append_failure_stays_in_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary)
+            gateway = JsonlStore(data / "gateway_records.jsonl")
+            gateway.append({"request_id": "old", "recorded_at": iso(10)})
+            retention = RecordRetention(data, enforce=True)
+
+            with patch.object(
+                retention.log,
+                "append",
+                side_effect=OSError("injected log failure"),
+            ):
+                summary = retention.run(now=NOW)
+
+            self.assertTrue(summary["deleted"])
+            self.assertEqual(summary["retention_log"]["state"], "error")
+            self.assertEqual(summary["retention_log"]["error"], "OSError")
+            self.assertIn("retention_log.jsonl", summary["errors"])
+            self.assertIsNotNone(summary["last_deletion"])
+            self.assertFalse((data / "retention_log.jsonl").exists())
 
 
 if __name__ == "__main__":

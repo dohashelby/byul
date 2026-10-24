@@ -7,18 +7,24 @@ shows the adapter is ready to connect; it does not prove a real SGLang works.
 from __future__ import annotations
 
 from contextlib import closing
+from contextlib import redirect_stderr, redirect_stdout
+import io
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from serving_runtime.mvp.app import GatewayApp
+from serving_runtime.cli import main
+from serving_runtime.mvp.app import GatewayApp, run
 from serving_runtime.mvp.backend import BackendConfig, load_backend_config
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.fake_backend import FakeBackend
+from serving_runtime.mvp.engine_client import EngineClient
 from serving_runtime.mvp.policy import load_policy
 from serving_runtime.mvp.relay import relay_payload
 from serving_runtime.mvp.store import JsonlStore
@@ -120,13 +126,51 @@ class SglangConfigTests(unittest.TestCase):
             )
 
     def test_unknown_kind_is_rejected(self) -> None:
-        for kind in ("tensorrt", "mock", "SGLang", ""):
+        for kind in ("tensorrt", "mock", "SGLang", "", [], {}):
             with self.subTest(kind=kind):
-                with self.assertRaises(ValueError):
+                with self.assertRaisesRegex(
+                    ValueError, "backend kind must be vllm or sglang"
+                ):
                     load_backend_config(
                         self.write(sglang_document("http://127.0.0.1:1", kind=kind)),
                         environ={},
                     )
+
+    def test_unhashable_kind_is_a_clean_cli_failure(self) -> None:
+        backend_path = self.write(
+            sglang_document("http://127.0.0.1:1", kind=[])
+        )
+        metrics_path = backend_path.with_name("metrics.txt")
+        metrics_path.write_text("", encoding="utf-8")
+        commands = (
+            [
+                "mvp",
+                "--backend",
+                "sglang",
+                "--backend-config",
+                str(backend_path),
+                "--policy",
+                str(POLICY),
+                "--data-dir",
+                str(backend_path.parent / "data"),
+            ],
+            [
+                "metrics-check",
+                "--backend-config",
+                str(backend_path),
+                "--input",
+                str(metrics_path),
+            ],
+        )
+        for command in commands:
+            with self.subTest(command=command[0]):
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    code = main(command)
+                self.assertEqual(code, 1)
+                self.assertEqual(stdout.getvalue(), "")
+                self.assertIn("backend kind must be vllm or sglang", stderr.getvalue())
 
     def test_mode_and_backend_kind_must_match(self) -> None:
         with self.assertRaises(ValueError):
@@ -165,6 +209,66 @@ class SglangRelayPayloadTests(unittest.TestCase):
                 )
                 self.assertEqual(relayed["max_tokens"], 64)
                 self.assertNotIn("max_completion_tokens", relayed)
+
+    def test_tokenize_payload_is_backend_specific(self) -> None:
+        class CapturingClient(EngineClient):
+            def __init__(self, backend: BackendConfig) -> None:
+                super().__init__(backend, 1.0)
+                self.payload = None
+
+            def request(self, method, path, **kwargs):
+                self.payload = json.loads(kwargs["body"])
+                return 200, {}, b'{"count": 3}'
+
+        messages = [{"role": "user", "content": "hello"}]
+        for path, expected_generation_prompt in (
+            (VLLM_EXAMPLE, True),
+            (SGLANG_EXAMPLE, False),
+        ):
+            backend = load_backend_config(path, environ={})
+            client = CapturingClient(backend)
+            self.assertEqual(
+                client.count_input_tokens("request", messages, "backend-model"), 3
+            )
+            self.assertEqual(client.payload["model"], "backend-model")
+            self.assertEqual(client.payload["messages"], messages)
+            self.assertEqual(
+                "add_generation_prompt" in client.payload,
+                expected_generation_prompt,
+            )
+
+        mock_client = CapturingClient(BackendConfig.mock(("127.0.0.1", 1)))
+        mock_client.count_input_tokens("request", messages, "test-model")
+        self.assertNotIn("add_generation_prompt", mock_client.payload)
+
+    def test_launcher_names_the_sglang_backend(self) -> None:
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        config = MVPConfig(
+            gateway_port=0,
+            backend="sglang",
+            backend_config_path=str(SGLANG_EXAMPLE),
+            policy_path=str(POLICY),
+            data_dir=directory.name,
+        )
+        gateway = SimpleNamespace(
+            address=("127.0.0.1", 18080),
+            backend=SimpleNamespace(base_url="http://127.0.0.1:30000", kind="sglang"),
+        )
+        gateway.stop = lambda: None
+        output = io.StringIO()
+        with (
+            patch("serving_runtime.mvp.app.GatewayApp") as gateway_class,
+            patch("serving_runtime.mvp.app.threading.Event") as event_class,
+            redirect_stdout(output),
+        ):
+            gateway_class.return_value.start.return_value = gateway
+            event_class.return_value.wait.return_value = None
+            run(config)
+        self.assertIn(
+            "External SGLang backend: http://127.0.0.1:30000",
+            output.getvalue(),
+        )
 
 
 class SglangGatewayHttpTests(unittest.TestCase):

@@ -273,11 +273,18 @@ function collectorSummary(item) {
     if (value.holds?.state === "error") {
       rows.push(el("div", { className: "problem", text: `보존 목록 오류: ${value.holds.error} — 삭제하지 않음` }));
     }
+    if ((value.errors || []).length) {
+      rows.push(el("div", {
+        className: "problem",
+        text: `정리 오류: ${value.errors.join(" · ")}${value.retention_log?.state === "error" ? ` (정리 로그 기록 실패: ${value.retention_log.error})` : ""}`,
+      }));
+    }
     const last = value.last_deletion;
     if (last) {
       const ranges = Object.entries(last.files || {}).map(([name, file]) => {
         const range = file.removable_range || {};
-        return `${name} ${file.removed_lines}줄 (${formatTime(range.from)}~${formatTime(range.to)})`;
+        const durability = file.durability === "uncertain" ? " · 교체됨, 디렉터리 fsync 실패로 내구성 불확실" : "";
+        return `${name} ${file.removed_lines}줄 (${formatTime(range.from)}~${formatTime(range.to)})${durability}`;
       });
       rows.push(el("div", {
         className: "problem",

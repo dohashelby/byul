@@ -561,7 +561,8 @@ def run(config: MVPConfig) -> None:
             engine_url = f"http://{engine.address[0]}:{engine.address[1]}"
             print(f"Mock engine: {engine_url}", flush=True)
         else:
-            print(f"External vLLM backend: {gateway.backend.base_url}", flush=True)
+            backend_name = "vLLM" if gateway.backend.kind == "vllm" else "SGLang"
+            print(f"External {backend_name} backend: {gateway.backend.base_url}", flush=True)
         print(f"Data directory: {data_dir}", flush=True)
         print(f"Browser: {gateway_url}/", flush=True)
         try:

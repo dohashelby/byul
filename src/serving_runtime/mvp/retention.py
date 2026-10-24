@@ -15,7 +15,7 @@ from pathlib import Path
 import threading
 from typing import Any
 
-from .store import JsonlStore
+from .store import JsonlStore, RewriteCommittedError
 
 
 HOLD_SCHEMA = "runtime-retention-hold/1.0"
@@ -93,9 +93,10 @@ def load_holds(path: str | Path | None) -> tuple[set[str], set[str], dict[str, A
 @dataclass
 class _Unit:
     newest: datetime | None
-    lines: list[int]
+    lines: dict[str, list[int]]
     size: int
     held: bool
+    classified: bool
 
 
 class RecordRetention:
@@ -121,22 +122,24 @@ class RecordRetention:
         self.hold_path = hold_path
         self.log = JsonlStore(self.data_dir / "retention_log.jsonl")
         self._run_lock = threading.Lock()
+        self._last_deletion_cache: dict[str, Any] | None = None
 
-    def _scan(
+    def _scan_file(
         self,
         managed: ManagedFile,
         hold_runs: set[str],
         hold_requests: set[str],
-    ) -> tuple[dict[str, _Unit], int, int]:
-        """Return (units, unclassified_lines, file_bytes) without changing the file."""
+        units: dict[str, _Unit],
+    ) -> tuple[int, int, set[str]]:
+        """Add one file to shared units and return its unclassified/size/unit keys."""
 
-        units: dict[str, _Unit] = {}
         unclassified = 0
+        file_units: set[str] = set()
         path = self.data_dir / managed.name
         try:
             source = path.open("rb")
         except FileNotFoundError:
-            return units, 0, 0
+            return 0, 0, file_units
         with source:
             for line_number, raw_line in enumerate(source, start=1):
                 try:
@@ -144,23 +147,47 @@ class RecordRetention:
                 except (UnicodeDecodeError, ValueError, RecursionError):
                     record = None
                 timestamp = _parse_time(record.get(managed.time_field)) if isinstance(record, dict) else None
+                request_id = record.get("request_id") if isinstance(record, dict) else None
+                run_id = record.get("run_id") if isinstance(record, dict) else None
+                group = record.get(managed.group_field) if managed.group_field and isinstance(record, dict) else None
+                if isinstance(group, str) and group:
+                    # Gateway records and engine receipts with the same request
+                    # ID form one unit even though they live in different files.
+                    key = f"request:{group}"
+                else:
+                    key = f"{managed.name}:line:{line_number}"
+                held = (
+                    isinstance(run_id, str) and run_id in hold_runs
+                ) or (
+                    isinstance(request_id, str) and request_id in hold_requests
+                )
                 if timestamp is None:
-                    # Lines we cannot date are never removed by age or size.
+                    # An undated request line still joins its cross-file unit:
+                    # it prevents deletion and can propagate a run hold to the
+                    # request's receipts. Other undated lines remain untouched.
                     unclassified += 1
-                    continue
-                group = record.get(managed.group_field) if managed.group_field else None
-                key = f"g:{group}" if isinstance(group, str) and group else f"l:{line_number}"
-                held = record.get("run_id") in hold_runs or record.get("request_id") in hold_requests
+                    if not (managed.group_field and isinstance(group, str) and group):
+                        continue
                 unit = units.get(key)
                 if unit is None:
-                    units[key] = _Unit(timestamp, [line_number], len(raw_line), held)
+                    units[key] = _Unit(
+                        timestamp,
+                        {managed.name: [line_number]},
+                        len(raw_line),
+                        held,
+                        timestamp is not None,
+                    )
                 else:
-                    unit.lines.append(line_number)
+                    unit.lines.setdefault(managed.name, []).append(line_number)
                     unit.size += len(raw_line)
                     unit.held = unit.held or held
-                    if unit.newest is None or timestamp > unit.newest:
+                    unit.classified = unit.classified and timestamp is not None
+                    if timestamp is not None and (
+                        unit.newest is None or timestamp > unit.newest
+                    ):
                         unit.newest = timestamp
-        return units, unclassified, path.stat().st_size
+                file_units.add(key)
+        return unclassified, path.stat().st_size, file_units
 
     def run(self, *, now: datetime | None = None) -> dict[str, Any]:
         with self._run_lock:
@@ -169,53 +196,62 @@ class RecordRetention:
     def _run(self, now: datetime) -> dict[str, Any]:
         hold_runs, hold_requests, hold_state = load_holds(self.hold_path)
         cutoff = now - self.max_age
-        scanned: dict[str, tuple[dict[str, _Unit], int, int]] = {}
+        units: dict[str, _Unit] = {}
+        scanned: dict[str, tuple[int, int, set[str]]] = {}
         for managed in MANAGED_FILES:
-            units, unclassified, size = self._scan(managed, hold_runs, hold_requests)
-            if managed.name == "gateway_records.jsonl":
-                # A held run also holds the engine receipts of its requests.
-                hold_requests = hold_requests | {
-                    key[2:] for key, unit in units.items() if unit.held and key.startswith("g:")
-                }
-            scanned[managed.name] = (units, unclassified, size)
+            scanned[managed.name] = self._scan_file(
+                managed, hold_runs, hold_requests, units
+            )
 
-        removal: dict[str, dict[str, str]] = {name: {} for name in scanned}
-        for name, (units, _unclassified, _size) in scanned.items():
-            for key, unit in units.items():
-                if not unit.held and unit.newest is not None and unit.newest < cutoff:
-                    removal[name][key] = "age"
+        removal: dict[str, str] = {}
+        for key, unit in units.items():
+            if (
+                not unit.held
+                and unit.classified
+                and unit.newest is not None
+                and unit.newest < cutoff
+            ):
+                removal[key] = "age"
 
-        total_bytes = sum(size for _units, _unclassified, size in scanned.values())
-        remaining = total_bytes - sum(
-            scanned[name][0][key].size for name, keys in removal.items() for key in keys
-        )
+        total_bytes = sum(size for _unclassified, size, _keys in scanned.values())
+        remaining = total_bytes - sum(units[key].size for key in removal)
         if remaining > self.max_bytes:
             candidates = sorted(
                 (
-                    (unit.newest, name, key)
-                    for name, (units, _u, _s) in scanned.items()
+                    (unit.newest, key)
                     for key, unit in units.items()
-                    if not unit.held and key not in removal[name]
+                    if not unit.held
+                    and unit.classified
+                    and unit.newest is not None
+                    and key not in removal
                 ),
                 key=lambda item: item[0],
             )
-            for _newest, name, key in candidates:
+            for _newest, key in candidates:
                 if remaining <= self.max_bytes:
                     break
-                removal[name][key] = "size"
-                remaining -= scanned[name][0][key].size
+                removal[key] = "size"
+                remaining -= units[key].size
 
         # A broken hold file must not lead to deleting what it meant to protect.
         can_delete = self.enforce and hold_state["state"] != "error"
         files: dict[str, Any] = {}
-        for name, (units, unclassified, size) in scanned.items():
-            chosen = removal[name]
-            removed_times = [units[key].newest for key in chosen if units[key].newest is not None]
-            lines = sorted(line for key in chosen for line in units[key].lines)
+        for name, (unclassified, size, file_units) in scanned.items():
+            chosen = {key: removal[key] for key in file_units if key in removal}
+            removed_times = [
+                units[key].newest
+                for key in chosen
+                if units[key].newest is not None
+            ]
+            lines = sorted(
+                line
+                for key in chosen
+                for line in units[key].lines.get(name, [])
+            )
             entry: dict[str, Any] = {
                 "bytes": size,
-                "units": len(units),
-                "held_units": sum(1 for unit in units.values() if unit.held),
+                "units": len(file_units),
+                "held_units": sum(1 for key in file_units if units[key].held),
                 "unclassified_lines": unclassified,
                 "removable_by_age": sum(1 for reason in chosen.values() if reason == "age"),
                 "removable_by_size": sum(1 for reason in chosen.values() if reason == "size"),
@@ -226,11 +262,17 @@ class RecordRetention:
                     else None
                 ),
                 "removed_lines": 0,
+                "durability": "not_applicable",
             }
             if can_delete and lines:
                 try:
                     _kept, removed = JsonlStore(self.data_dir / name).remove_lines(lines)
                     entry["removed_lines"] = removed
+                    entry["durability"] = "confirmed"
+                except RewriteCommittedError as error:
+                    entry["removed_lines"] = error.removed
+                    entry["durability"] = "uncertain"
+                    entry["error"] = f"durability_uncertain:{error.cause_type}"
                 except OSError as error:
                     entry["error"] = type(error).__name__
             files[name] = entry
@@ -249,31 +291,53 @@ class RecordRetention:
             "holds": hold_state,
             "files": files,
             "errors": [name for name, entry in files.items() if "error" in entry],
+            "retention_log": {"state": "not_written"},
         }
         if self.enforce and hold_state["state"] == "error":
             summary["blocked_reason"] = "hold file unreadable; nothing deleted"
+        if removed_total:
+            self._last_deletion_cache = self._deletion_view(summary)
         if removed_total or summary["errors"]:
-            self.log.append(summary)
+            try:
+                summary["retention_log"] = {"state": "ok"}
+                self.log.append(summary)
+            except OSError as error:
+                summary["retention_log"] = {
+                    "state": "error",
+                    "error": type(error).__name__,
+                }
+                summary["errors"].append("retention_log.jsonl")
         summary["last_deletion"] = self.last_deletion()
         return summary
+
+    @staticmethod
+    def _deletion_view(record: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "ran_at": record.get("ran_at"),
+            "files": {
+                name: {
+                    "removed_lines": entry.get("removed_lines"),
+                    "removable_range": entry.get("removable_range"),
+                    "durability": entry.get("durability"),
+                    "error": entry.get("error"),
+                }
+                for name, entry in (record.get("files") or {}).items()
+                if isinstance(entry, dict) and entry.get("removed_lines")
+            },
+        }
 
     def last_deletion(self) -> dict[str, Any] | None:
         """The newest logged deletion, so the removed range stays visible."""
 
-        records, _corrupt = self.log.read_all()
+        if self._last_deletion_cache is not None:
+            return self._last_deletion_cache
+        try:
+            records, _corrupt = self.log.read_all()
+        except OSError:
+            return None
         for record in reversed(records):
             if record.get("deleted"):
-                return {
-                    "ran_at": record.get("ran_at"),
-                    "files": {
-                        name: {
-                            "removed_lines": entry.get("removed_lines"),
-                            "removable_range": entry.get("removable_range"),
-                        }
-                        for name, entry in (record.get("files") or {}).items()
-                        if isinstance(entry, dict) and entry.get("removed_lines")
-                    },
-                }
+                return self._deletion_view(record)
         return None
 
     def collect(self) -> tuple[dict[str, Any], str]:

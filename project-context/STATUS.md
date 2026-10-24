@@ -110,6 +110,7 @@
 - 2026-10-24 계획서 §10.3 필수 산출물로 `docs/지원_미지원_목록.md`(기능·엔진별 확인 수준: 정식/CPU vLLM/로컬 kind/모의·가짜/합성/미구현)와 `docs/외부기능_활용목록.md`(직접 개발 모듈, 외부 도구 실측 판본·digest·출처)를 작성하고 README 현황 표의 오래된 줄을 고쳤다. 라이선스는 공개 저장소 기준 값이며 LICENSE 파일과 직접 대조하지 않아 재확인 필요로 표시했다.
 - 2026-10-24 SGLang 연결 준비(§9.4·D-07): `--backend sglang`, backend `kind: sglang`, 출력 상한을 SGLang 이름 `max_completion_tokens`로 전달, `/tokenize` context 통제, `sglang:*` 지표 대응, 버전은 기본 미수집(`/server_info`가 해석된 서버 인자 전체를 돌려주므로), 대시보드 엔진 이름 표시, 예시 `examples/mvp/backend-sglang.example.json`을 추가했다. 경로·필드·지표 이름은 SGLang v0.5.21 소스에서 확인했고 실제 SGLang은 실행하지 않았다. 시험 전용 가짜 SGLang(`FakeBackend(flavor="sglang")`)으로만 시험했다.
 - 위 두 작업은 Codex 사용 한도(18:14까지)로 **Claude가 구현했고 Codex 교차 검수 전**이다. 전체 unittest 264개 통과(skip 0, SGLang 시험 12개 추가), `mvp-acceptance` 31개 통과. 커밋·푸시하지 않았다.
+- 2026-10-24 D-08 기록 보존(`mvp/retention.py`: 원본 3종 7일/5GiB, 기본 보고만·`--retention-enforce` 시 삭제, 보존 목록 run/request ID, 요청 단위 정리, 날짜 불명 줄 보존, `retention_log.jsonl`·대시보드 정리 구간 표시, 같은 경로 JsonlStore 공유 잠금)과 §4.6 지표 대응표 보강(선언 TYPE·HELP·label 대조, `type_mismatch`, counter 감소 감지, `metrics-check` 명령)을 Claude가 구현했다. 전체 unittest 281개 통과(skip 0), `mvp-acceptance` 31개 통과, 시험 Gateway에서 `record_retention` 수집원 동작을 확인했다. 별도 프로세스의 동시 쓰기는 보호하지 않는다. **Codex 교차 검수 전**이며 커밋·푸시하지 않았다.
 
 ## 다음 준비 작업
 

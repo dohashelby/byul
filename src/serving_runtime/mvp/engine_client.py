@@ -20,6 +20,9 @@ class EngineClient:
     def __init__(self, backend: BackendConfig, timeout_s: float) -> None:
         self.backend = backend
         self.timeout_s = timeout_s
+        # Last seen value of each counter sample, to detect engine restarts.
+        self._counter_last: dict[tuple[str, str, str], float] = {}
+        self._counter_last_reset: dict[str, dict[str, Any]] = {}
 
     def request(
         self,
@@ -176,10 +179,47 @@ class EngineClient:
         status, _, body = self.request("GET", "", metrics=True)
         if status != 200:
             raise OSError(f"metrics endpoint returned HTTP status {status}")
-        return (
-            parse_prometheus_metrics(body, self.backend.metrics_map),
-            "external_backend",
-        )
+        parsed = parse_prometheus_metrics(body, self.backend.metrics_map)
+        self._mark_counter_resets(parsed)
+        return parsed, "external_backend"
+
+    def _mark_counter_resets(self, parsed: dict[str, Any]) -> None:
+        """Flag counters whose value went down since the previous poll.
+
+        A decrease means the engine restarted (or the counter was reset), so a
+        difference across that point must not be read as usage in the period.
+        """
+
+        checked_at = _utc_now()
+        for field_name, item in parsed.items():
+            if item.get("type") != "counter":
+                continue
+            decreased: list[dict[str, Any]] = []
+            for sample in item.get("samples", []):
+                value = sample.get("value")
+                if not isinstance(value, float):
+                    continue
+                key = (field_name, str(sample.get("sample")), str(sample.get("labels")))
+                previous = self._counter_last.get(key)
+                if previous is not None and value < previous:
+                    decreased.append(
+                        {
+                            "sample": sample.get("sample"),
+                            "labels": sample.get("labels"),
+                            "previous": previous,
+                            "current": value,
+                        }
+                    )
+                self._counter_last[key] = value
+            if decreased:
+                self._counter_last_reset[field_name] = {
+                    "detected_at": checked_at,
+                    "samples": decreased[:10],
+                }
+            item["counter_reset"] = {
+                "detected_this_poll": bool(decreased),
+                "last_detected": self._counter_last_reset.get(field_name),
+            }
 
     def status(self) -> dict[str, Any]:
         checked_at = _utc_now()

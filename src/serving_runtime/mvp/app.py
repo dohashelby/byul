@@ -35,6 +35,7 @@ from .policy import PolicyState, load_policy
 from .policy_state import PolicyHistory, evaluate_policy, load_revocations
 from .query import QueryService
 from .relay import Relay
+from .retention import RecordRetention
 from .revalidation import RevalidationRequests
 from .request_flow import ConcurrencyLimiter, RequestFlow
 from .request_records import RequestRecords
@@ -148,6 +149,13 @@ class GatewayApp:
 
         self._server: LimitedThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
+        self._retention = RecordRetention(
+            config.data_dir,
+            max_age_days=config.retention_max_age_days,
+            max_bytes=config.retention_max_bytes,
+            enforce=config.retention_enforce,
+            hold_path=config.retention_hold_path,
+        )
         collectors = [
             Collector(
                 "engine_health",
@@ -171,6 +179,13 @@ class GatewayApp:
                 ),
                 config.collector_interval_s,
                 config.collector_stale_after_s,
+            ),
+            Collector(
+                "record_retention",
+                self._retention.collect,
+                config.retention_interval_s,
+                config.retention_interval_s * 3,
+                dedicated_thread=True,
             ),
             Collector(
                 "asset_integrity",

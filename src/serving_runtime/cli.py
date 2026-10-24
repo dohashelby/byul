@@ -3,6 +3,7 @@
 import argparse
 from collections.abc import Sequence
 from importlib.metadata import version
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -61,6 +62,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument("--collector-interval", type=float, default=5.0, metavar="SECONDS")
     mvp_parser.add_argument("--asset-manifest", metavar="PATH")
     mvp_parser.add_argument("--asset-interval", type=float, default=60.0, metavar="SECONDS")
+    mvp_parser.add_argument("--retention-max-age-days", type=float, default=7.0, metavar="DAYS")
+    mvp_parser.add_argument("--retention-max-bytes", type=int, default=5 * 1024**3, metavar="BYTES")
+    mvp_parser.add_argument("--retention-interval", type=float, default=3600.0, metavar="SECONDS")
+    mvp_parser.add_argument(
+        "--retention-enforce",
+        action="store_true",
+        help="보존 한도를 넘은 기록을 실제로 삭제(기본은 보고만)",
+    )
+    mvp_parser.add_argument("--retention-hold", metavar="PATH", help="삭제하지 않을 실행·요청 ID 목록")
     mvp_parser.add_argument("--lab-report", metavar="PATH")
     mvp_parser.add_argument(
         "--observation-feed",
@@ -112,6 +122,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     revalidation_export_parser.add_argument("--data-dir", required=True, metavar="DIR")
     revalidation_export_parser.add_argument("--out", required=True, metavar="FILE")
+    metrics_parser = commands.add_parser(
+        "metrics-check", help="저장한 /metrics 응답과 backend 지표 대응표 대조"
+    )
+    metrics_parser.add_argument("--backend-config", required=True, metavar="PATH")
+    metrics_parser.add_argument("--input", required=True, metavar="FILE")
+    metrics_parser.add_argument("--json", action="store_true", help="JSON으로 출력")
     enforce_parser = commands.add_parser(
         "enforce", help="Cilium·Tetragon 후보 생성과 관측 이벤트 변환"
     )
@@ -167,6 +183,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "collector_stale_after_s": args.collector_stale_after,
                 "asset_manifest_path": args.asset_manifest,
                 "asset_interval_s": args.asset_interval,
+                "retention_max_age_days": args.retention_max_age_days,
+                "retention_max_bytes": args.retention_max_bytes,
+                "retention_interval_s": args.retention_interval,
+                "retention_enforce": args.retention_enforce,
+                "retention_hold_path": args.retention_hold,
                 "environment": args.environment,
                 "run_id": args.run_id,
                 "lab_report_path": args.lab_report,
@@ -289,5 +310,57 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "revalidation":
         revalidation_parser.print_help()
         return 0
+    if args.command == "metrics-check":
+        from .mvp.backend import (
+            load_backend_config,
+            parse_prometheus_metrics,
+            unmapped_metric_families,
+        )
+
+        try:
+            backend = load_backend_config(args.backend_config, environ={})
+            payload = Path(args.input).read_bytes()
+            fields = parse_prometheus_metrics(payload, backend.metrics_map)
+        except (OSError, ValueError) as error:
+            print(f"지표 대응표 대조 실패: {error}", file=sys.stderr)
+            return 1
+        unmapped = unmapped_metric_families(payload, backend.metrics_map)
+        report = {
+            "schema": "runtime-metric-map-check/1.0",
+            "backend_kind": backend.kind,
+            "input": str(args.input),
+            "input_sha256": hashlib.sha256(payload).hexdigest(),
+            "fields": {
+                name: {
+                    key: item[key]
+                    for key in (
+                        "metric",
+                        "type",
+                        "unit",
+                        "state",
+                        "declared_type",
+                        "type_check",
+                        "help",
+                        "label_keys",
+                    )
+                }
+                | {"sample_count": len(item["samples"])}
+                for name, item in fields.items()
+            },
+            "unmapped_families": unmapped,
+            "note": "verified stays false in the backend config; this report is review evidence only",
+        }
+        if args.json:
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            print(f"backend: {backend.kind} · 입력 SHA-256 {report['input_sha256'][:12]}…")
+            for name, item in report["fields"].items():
+                print(
+                    f"- {name}: {item['metric']} · {item['state']} · 선언 형식 "
+                    f"{item['declared_type'] or '없음'}({item['type_check']}) · 표본 {item['sample_count']}"
+                )
+            print(f"대응표에 없는 지표 {len(unmapped)}개")
+        ok = all(item["state"] == "ok" for item in report["fields"].values())
+        return 0 if ok else 3
     parser.print_help()
     return 0

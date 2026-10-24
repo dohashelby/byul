@@ -446,10 +446,42 @@ def load_backend_config(
     )
 
 
+_COMMENT = re.compile(r"^#\s+(?P<kind>HELP|TYPE)\s+(?P<name>[A-Za-z_:][A-Za-z0-9_:]*)(?:\s+(?P<rest>.*))?$")
+_HELP_LIMIT = 200
+
+
+def _clean_help(text: str) -> str:
+    # HELP text comes from the engine; keep it short and printable.
+    cleaned = "".join(character if character.isprintable() else " " for character in text)
+    return cleaned[:_HELP_LIMIT]
+
+
+def _label_keys(labels: str) -> list[str]:
+    return sorted(set(re.findall(r'([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"', labels)))
+
+
+def _declared(table: dict[str, str], metric: str, metric_type: str) -> str | None:
+    """Find the TYPE/HELP entry for a mapped metric name.
+
+    The Prometheus text format declares counters under the sample name
+    (``x_total``) while OpenMetrics declares the family (``x``); accept both.
+    """
+
+    if metric in table:
+        return table[metric]
+    if metric_type == "counter" and metric.endswith("_total"):
+        return table.get(metric[: -len("_total")])
+    return None
+
+
 def parse_prometheus_metrics(
     payload: bytes, metrics_map: Mapping[str, Mapping[str, Any]]
 ) -> dict[str, Any]:
-    """Extract only explicitly mapped metric families from Prometheus text."""
+    """Extract only explicitly mapped metric families from Prometheus text.
+
+    Each mapped field also reports the engine's own TYPE declaration and HELP
+    text so a mapping whose declared type differs is not reported as ok.
+    """
 
     try:
         text = payload.decode("utf-8")
@@ -463,9 +495,20 @@ def parse_prometheus_metrics(
             names.update({f"{metric}_bucket", f"{metric}_sum", f"{metric}_count"})
         wanted[metric] = names
     extracted: dict[str, list[dict[str, Any]]] = {name: [] for name in wanted}
+    declared_types: dict[str, str] = {}
+    help_texts: dict[str, str] = {}
     for raw_line in text.splitlines():
         line = raw_line.strip()
-        if not line or line.startswith("#"):
+        if not line:
+            continue
+        if line.startswith("#"):
+            comment = _COMMENT.fullmatch(line)
+            if comment is not None:
+                rest = (comment.group("rest") or "").strip()
+                if comment.group("kind") == "TYPE":
+                    declared_types[comment.group("name")] = rest
+                else:
+                    help_texts[comment.group("name")] = _clean_help(rest)
             continue
         match = _SAMPLE.fullmatch(line)
         if match is None:
@@ -490,10 +533,42 @@ def parse_prometheus_metrics(
     result: dict[str, Any] = {}
     for field_name, mapping in metrics_map.items():
         metric = str(mapping["metric"])
+        expected_type = str(mapping["type"])
         samples = extracted[metric]
+        declared_type = _declared(declared_types, metric, expected_type)
+        if declared_type is None:
+            type_check = "not_declared"
+        elif declared_type == expected_type:
+            type_check = "match"
+        else:
+            type_check = "mismatch"
+        if not samples:
+            state = "unsupported_or_absent"
+        elif type_check == "mismatch":
+            state = "type_mismatch"
+        else:
+            state = "ok"
         result[field_name] = {
             **dict(mapping),
-            "state": "ok" if samples else "unsupported_or_absent",
+            "state": state,
+            "declared_type": declared_type,
+            "type_check": type_check,
+            "help": _declared(help_texts, metric, expected_type),
+            "label_keys": sorted({key for sample in samples for key in _label_keys(sample["labels"])}),
             "samples": samples,
         }
     return result
+
+
+def unmapped_metric_families(payload: bytes, metrics_map: Mapping[str, Mapping[str, Any]]) -> list[str]:
+    """Return declared metric families that no mapping covers (for map review)."""
+
+    text = payload.decode("utf-8", errors="replace")
+    mapped = {str(mapping["metric"]) for mapping in metrics_map.values()}
+    mapped |= {name[: -len("_total")] for name in mapped if name.endswith("_total")}
+    families = set()
+    for raw_line in text.splitlines():
+        comment = _COMMENT.fullmatch(raw_line.strip())
+        if comment is not None and comment.group("kind") == "TYPE":
+            families.add(comment.group("name"))
+    return sorted(families - mapped)

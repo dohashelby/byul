@@ -20,6 +20,8 @@ BoB serving-engine security runtime solution
 | 모델 파일 무결성 | 승인 자산 목록(경로·SHA-256·크기)과 디스크 파일 주기 비교, 변경·누락·목록 밖 파일 표시 | 단위·HTTP 시험, 실제 모델 파일 목록 생성 확인 |
 | 재검증 요청 | 자산 변경·engine API 구성 drift·같은 판본 정책 내용 변경을 JSONL 요청으로 열고 조회·내보내기 | 단위 시험 완료; 검증 도구 연동 형식 D-03 미합의 |
 | 통신·행위 통제 준비 (P2 사전 작업) | Cilium 규칙 후보 생성, Tetragon 파일 규칙 후보·이벤트 변환, 관측 API·대시보드 | 로컬 kind에서 Cilium 통제·Hubble 실제 관측 통과, Tetragon 감시는 귀속 한계와 함께 확인, 차단은 재시작 후 유지 확인(업그레이드 직후 불일치 사례 원인 확인 중) |
+| 기록 보존 한도 (D-08) | 7일/5GiB 계산, 기본 보고만·`--retention-enforce`로 삭제, 시험 증거 보존 목록, 정리 구간 기록·표시 | 단위 시험·실행 확인, Codex 교차 검수 전 |
+| 지표 대응표 대조 | 선언 형식(TYPE)·HELP·label 대조, counter 초기화 감지, `metrics-check` | 단위 시험, Codex 교차 검수 전 |
 | SGLang 연결 준비 | `--backend sglang`, 엔진별 출력 상한 필드(`max_completion_tokens`), `/tokenize` context 통제, `sglang:*` 지표 대응 | 시험 전용 가짜 SGLang만, 실제 SGLang 미확인, Codex 교차 검수 전 |
 | 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 전 |
 | 시험 | unittest 252개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 2026-10-24 Claude 소켓 허용 환경에서 252개 전부 통과(건너뜀 0), 수용 31개 통과. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
@@ -214,6 +216,35 @@ Gateway는 수집 결과에서 승인 상태와 다른 근거를 발견하면 `<
 vLLM 근거 표기: 경로(`/v1/chat/completions`, `/health`, `/v1/models`, `/version`, `/metrics`), SSE 종료 `data: [DONE]`, 지표 이름 후보(`vllm:num_requests_running`, `vllm:num_requests_waiting`, `vllm:kv_cache_usage_perc` — 구버전 `vllm:gpu_cache_usage_perc`, `vllm:time_to_first_token_seconds`, `vllm:e2e_request_latency_seconds`, `vllm:prompt_tokens_total`, `vllm:generation_tokens_total`)는 공식 문서 latest(https://docs.vllm.ai/en/latest/usage/metrics/) 기준 **후보**이며, v1.4 선정 고정 버전(v0.31.0)의 실제 응답으로 확인하지 않았습니다. 그래서 `metrics_map`의 `verified`는 항상 `false`입니다. 응답에 없는 지표는 `unsupported_or_absent`로 표시합니다.
 
 S3A 시험은 시험 전용 가짜 backend(`src/serving_runtime/mvp/fake_backend.py`, `data_origin: fake_backend_test`)로 수행했으며 **실제 vLLM 연결 완료가 아닙니다.** 실제 환경 시험(S3B) 준비는 `docs/S3B_실제환경_시험준비.md`를 참고합니다.
+
+### 기록 보존 한도 (D-08)
+
+계획서 v1.4 §6.5·D-08의 LAB 보존 한도(원본 7일 또는 합계 5GiB 중 먼저 도달한 쪽)를 계산합니다. **기본은 보고만 하고 아무것도 지우지 않습니다.** 실제 삭제는 `--retention-enforce`를 줄 때만 합니다.
+
+```bash
+.venv/bin/python -m serving_runtime mvp ... \
+  --retention-enforce --retention-hold hold.json   # 선택: 기본값 7일·5GiB·1시간 주기
+```
+
+- 대상은 원본 기록 3종(`gateway_records.jsonl`, `engine_receipts.jsonl`, `observations.jsonl`)입니다. 정책 이력과 재검증 요청은 재시작 때 상태를 되살리는 데 쓰므로 정리하지 않습니다.
+- 요청 하나의 시작·최종 기록은 함께 남기거나 함께 지웁니다. 날짜를 읽을 수 없는 줄(손상 줄 등)은 지우지 않습니다.
+- 크기 한도를 넘으면 오래된 기록부터 지웁니다.
+- 시험 증거 보존: `{"schema": "runtime-retention-hold/1.0", "run_ids": [...], "request_ids": [...]}` 파일에 적은 실행·요청은 지우지 않으며, 보존한 요청의 엔진 수신 기록도 함께 남깁니다. 보존 파일을 읽을 수 없으면 삭제를 하지 않습니다.
+- 지운 내용은 `retention_log.jsonl`에 파일별 건수와 기간으로 남고, 대시보드 수집원 `record_retention`에 "최근 정리 … 이 구간 기록은 조회되지 않음"으로 표시합니다.
+- 한계: 같은 Gateway 프로세스 안의 기록 쓰기와는 잠금으로 겹치지 않지만, 실행 중에 별도 프로세스(`enforce ingest` 등)가 같은 파일에 쓰면 보호하지 않습니다. 정리할 때는 그런 명령을 함께 돌리지 마세요.
+
+### 지표 대응표 대조
+
+엔진 `/metrics`를 수집할 때 대응표 항목마다 엔진이 선언한 형식(`# TYPE`)과 설명(`# HELP`), label 이름을 함께 남깁니다. 선언 형식이 대응표와 다르면 `type_mismatch`로 표시하고 정상으로 세지 않습니다. counter 값이 이전 수집보다 줄면 엔진 재시작 등으로 초기화된 것으로 보고 `counter_reset`에 표시하며, 그 구간의 차이를 사용량으로 해석하지 않습니다.
+
+반입한 엔진의 `/metrics` 응답을 저장해 두고 대응표를 대조할 수 있습니다(네트워크 접속 없음).
+
+```bash
+curl -s http://127.0.0.1:8000/metrics > metrics.txt
+.venv/bin/python -m serving_runtime metrics-check --backend-config backend.json --input metrics.txt [--json]
+```
+
+모든 항목이 `ok`면 종료 코드 0, 하나라도 미제공·형식 불일치면 3입니다. 대응표에 없는 지표 이름도 함께 보여 줍니다. 대응표의 `verified`는 이 명령 결과와 관계없이 계속 `false`입니다.
 
 ### 외부 SGLang backend 모드 (연결 준비)
 

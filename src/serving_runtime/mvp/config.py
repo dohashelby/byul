@@ -38,6 +38,12 @@ class MVPConfig:
     collector_stale_after_s: float = 15.0
     asset_manifest_path: str | None = None
     asset_interval_s: float = 60.0
+    # D-08 LAB retention: 7 days or 5 GiB. Report-only unless enforced.
+    retention_max_age_days: float = 7.0
+    retention_max_bytes: int = 5 * 1024**3
+    retention_interval_s: float = 3600.0
+    retention_enforce: bool = False
+    retention_hold_path: str | None = None
     lab_report_path: str | None = None
     observation_feeds: tuple[tuple[str, str], ...] = ()
     observation_heartbeats: tuple[tuple[str, str], ...] = ()
@@ -115,6 +121,16 @@ class MVPConfig:
             raise ValueError("collector_stale_after_s must be positive")
         if self.asset_interval_s <= 0:
             raise ValueError("asset_interval_s must be positive")
+        if self.retention_max_age_days <= 0:
+            raise ValueError("retention_max_age_days must be positive")
+        if (
+            not isinstance(self.retention_max_bytes, int)
+            or isinstance(self.retention_max_bytes, bool)
+            or self.retention_max_bytes <= 0
+        ):
+            raise ValueError("retention_max_bytes must be a positive integer")
+        if self.retention_interval_s <= 0:
+            raise ValueError("retention_interval_s must be positive")
         if self.observation_origin not in {"synthetic", "real"}:
             raise ValueError("observation_origin must be synthetic or real")
         kinds = [kind for kind, _path in self.observation_feeds]

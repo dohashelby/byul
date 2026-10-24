@@ -262,6 +262,47 @@ function collectorSummary(item) {
         : "writer heartbeat 미설정 · 이벤트가 없으면 생존 여부를 확인할 수 없음",
     }));
   }
+  if (item.source === "record_retention" && value) {
+    const files = Object.values(value.files || {});
+    const removable = files.reduce((sum, file) => sum + (file.removable_lines || 0), 0);
+    const gib = (bytes) => `${((bytes || 0) / 1024 ** 3).toFixed(2)}GiB`;
+    rows.push(el("div", {
+      className: value.over_size_limit || removable > 0 ? "problem" : "muted",
+      text: `${value.mode === "enforce" ? "삭제 적용" : "보고만(삭제 안 함)"} · ${value.limits?.max_age_days}일/${gib(value.limits?.max_bytes)} · 현재 ${gib(value.total_bytes)} · 한도 초과 대상 ${removable}줄`,
+    }));
+    if (value.holds?.state === "error") {
+      rows.push(el("div", { className: "problem", text: `보존 목록 오류: ${value.holds.error} — 삭제하지 않음` }));
+    }
+    const last = value.last_deletion;
+    if (last) {
+      const ranges = Object.entries(last.files || {}).map(([name, file]) => {
+        const range = file.removable_range || {};
+        return `${name} ${file.removed_lines}줄 (${formatTime(range.from)}~${formatTime(range.to)})`;
+      });
+      rows.push(el("div", {
+        className: "problem",
+        text: `최근 정리 ${formatTime(last.ran_at)}: ${ranges.join(" · ")} — 이 구간 기록은 조회되지 않음`,
+      }));
+    }
+  }
+  if (item.source === "metrics" && value) {
+    const stateLabels = { ok: "정상", type_mismatch: "형식 불일치", unsupported_or_absent: "미제공" };
+    for (const [name, field] of Object.entries(value)) {
+      if (!field || typeof field !== "object" || !field.state) continue;
+      const reset = field.counter_reset || {};
+      const parts = [
+        `${name}: ${stateLabels[field.state] || field.state}`,
+        `선언 형식 ${field.declared_type || "없음"}`,
+      ];
+      if (reset.detected_this_poll) parts.push("counter 감소 감지(엔진 재시작 가능성)");
+      else if (reset.last_detected) parts.push(`최근 counter 감소 ${formatTime(reset.last_detected.detected_at)}`);
+      rows.push(el("div", {
+        className: field.state === "ok" && !reset.detected_this_poll ? "muted" : "problem",
+        text: parts.join(" · "),
+        title: field.help || field.metric || "",
+      }));
+    }
+  }
   if (item.source === "cilium_policy" && value) {
     rows.push(el("div", {
       className: "muted",

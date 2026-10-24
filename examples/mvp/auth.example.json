@@ -1,0 +1,20 @@
+{
+  "schema_version": "runtime-auth/1.0",
+  "auth_ref": "LAB-AUTH-EXAMPLE-ONLY",
+  "principals": [
+    {
+      "principal_id": "lab-inference-client",
+      "roles": ["inference"],
+      "token_sha256": "6538f6e79f333997ae533838f3f0780a320d7d7cc6fb3c6d24146b280ff7ecb7",
+      "allowed_models": ["test-model"]
+    },
+    {
+      "principal_id": "lab-viewer",
+      "roles": ["viewer"],
+      "token_sha256": "80fb1ec8734de7d0b2f13f22267f122d86c96d2443cfa69e0591bb74a9a60ee2"
+    }
+  ],
+  "route_roles": {
+    "POST /v1/chat/completions": ["inference"]
+  }
+}

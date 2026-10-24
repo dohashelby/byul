@@ -31,6 +31,8 @@ from .http_handler import (
 from .lab_report import LabReportSource
 from .mock_engine import MockEngine, _utc_now
 from .observation_feed import ObservationFeed
+from .auth import load_auth
+from .target import KubernetesTargetCollector, TargetRegistry, load_target
 from .policy import PolicyState, load_policy
 from .policy_state import PolicyHistory, evaluate_policy, load_revocations
 from .query import QueryService
@@ -97,6 +99,7 @@ class GatewayApp:
         # A restart in the same Python process is a distinct observation session.
         self.observation_session_id = uuid4().hex
         self.revocation_state = load_revocations(config.revocations_path)
+        self.auth_state = load_auth(config.auth_config_path)
         self._baseline = load_declaration(config.baseline_path, kind="baseline")
         self._manifest = load_declaration(config.manifest_path, kind="manifest")
         self._policy_history = PolicyHistory(
@@ -115,6 +118,11 @@ class GatewayApp:
                 policy_history_record, **self._revalidation_context()
             )
 
+        self._target = TargetRegistry(
+            load_target(config.target_path),
+            data_dir=config.data_dir,
+            observation_session_id=self.observation_session_id,
+        )
         self._records = RequestRecords(
             config.data_dir,
             self.observation_session_id,
@@ -122,6 +130,7 @@ class GatewayApp:
             self.backend.kind,
             config.environment,
             config.run_id,
+            target_context=self._target.record_context,
         )
         self._engine_store = JsonlStore(
             Path(config.data_dir) / "engine_receipts.jsonl"
@@ -145,6 +154,8 @@ class GatewayApp:
             self._engine_client,
             self._relay,
             self._concurrency,
+            lambda: self.auth_state,
+            self._target.gateway_decision,
         )
 
         self._server: LimitedThreadingHTTPServer | None = None
@@ -236,6 +247,19 @@ class GatewayApp:
                     config.collector_stale_after_s,
                 )
             )
+        registration = self._target.registration
+        if config.target_pod_status and registration.kubernetes is not None:
+            collectors.append(
+                Collector(
+                    "target_pods",
+                    KubernetesTargetCollector(
+                        registration.kubernetes, timeout_s=config.cilium_timeout_s
+                    ).collect,
+                    config.collector_interval_s,
+                    config.collector_stale_after_s,
+                    on_collected=self._target.observe_kubernetes,
+                )
+            )
         self._collectors = CollectorManager(collectors)
 
     def _revalidation_context(self) -> dict[str, Any]:
@@ -313,6 +337,20 @@ class GatewayApp:
             "validate_count": sum(1 for item in extra if item["mode"] == "validate"),
         }
 
+    def target_status(self) -> dict[str, Any]:
+        collectors = self.collectors_status()
+        by_source = {item["source"]: item for item in collectors.get("collectors", [])}
+        pods = by_source.get("target_pods")
+        policy = self.policy_state.policy
+        return self._target.status(
+            policy_target_id=policy.target_id if policy else None,
+            backend_kind=self.backend.kind,
+            engine_info=by_source.get("engine_info"),
+            kubernetes=(pods.get("last_value") if pods and pods.get("state") == "ok" else (
+                {"state": pods.get("state"), "error": pods.get("last_error")} if pods else None
+            )),
+        )
+
     def policy_status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         validity = evaluate_policy(self.policy_state, self.revocation_state)
@@ -381,6 +419,7 @@ class GatewayApp:
         baseline = self.baseline_status()
         collectors = self.collectors_status()
         revalidation = self.revalidation_status()
+        target = self.target_status()
         return {
             "status": (
                 "ok"
@@ -390,8 +429,20 @@ class GatewayApp:
                 and policy_runtime["history_storage"]["ok"]
                 and revalidation["evaluation_status"]["ok"]
                 and revalidation["storage"]["ok"]
+                and self.auth_state.state != "error"
+                and target["gateway_hold"] is None
                 else "degraded"
             ),
+            "auth": self.auth_state.status(),
+            "target": {
+                "registration": target["registration"]["state"],
+                "target_id": target["registration"]["target_id"],
+                "target_ref": target["registration"]["target_ref"],
+                "error_code": target["registration"]["error_code"],
+                "gateway_hold": target["gateway_hold"],
+                "counts": target["counts"],
+                "instance": target["instance"],
+            },
             "mode": (
                 "mock_engine"
                 if self.backend.kind == "mock"
@@ -499,6 +550,7 @@ class GatewayApp:
                 record_transport_error=self._request_flow.record_without_relay,
                 request_header_timeout_s=self.config.request_header_timeout_s,
                 request_body_timeout_s=self.config.request_body_timeout_s,
+                target_status=self.target_status,
             )
         )
         self._server = LimitedThreadingHTTPServer(

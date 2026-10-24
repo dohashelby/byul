@@ -7,6 +7,7 @@ import threading
 import time
 from typing import Callable, Protocol
 
+from .auth import CHAT_ROUTE, AuthState, not_configured
 from .backend import BackendConfig
 from .engine_client import EngineClient
 from .policy import PolicyState
@@ -95,7 +96,11 @@ class RequestFlow:
         engine_client: EngineClient,
         relay: Relay,
         concurrency: ConcurrencyLimiter,
+        auth_state: Callable[[], AuthState] | None = None,
+        target_hold: Callable[[str | None], tuple[str, str] | None] | None = None,
     ) -> None:
+        self._auth_state = auth_state or not_configured
+        self._target_hold = target_hold or (lambda _policy_target: None)
         self._backend = backend
         self._policy_state = policy_state
         self._revocation_state = revocation_state
@@ -216,6 +221,63 @@ class RequestFlow:
             max_tokens=decision.max_tokens,
         )
 
+    @staticmethod
+    def _auth_rejection(
+        auth_state: AuthState, auth
+    ) -> tuple[Decision, dict[str, str] | None] | None:
+        """Map an authentication outcome to a pre-body rejection, if any."""
+
+        if auth.state == "not_configured":
+            return None
+        if auth.state == "unavailable":
+            # A broken auth config is a Gateway error, not a successful block.
+            return (
+                Decision(
+                    result="ERROR",
+                    http_status=503,
+                    reason_code="AUTH_UNAVAILABLE",
+                    rule_id=None,
+                    message="authentication configuration is unavailable",
+                    model=None,
+                    max_tokens=None,
+                ),
+                None,
+            )
+        if auth.state in {"missing", "invalid"}:
+            code = "AUTH_REQUIRED" if auth.state == "missing" else "AUTH_INVALID"
+            message = (
+                "authentication is required"
+                if auth.state == "missing"
+                else "authentication failed"
+            )
+            return (
+                Decision(
+                    result="DENIED",
+                    http_status=401,
+                    reason_code=code,
+                    rule_id="authentication",
+                    message=message,
+                    model=None,
+                    max_tokens=None,
+                ),
+                {"WWW-Authenticate": 'Bearer realm="serving-runtime"'},
+            )
+        required = set(auth_state.roles_for(CHAT_ROUTE))
+        if auth.principal is None or not required & set(auth.principal.roles):
+            return (
+                Decision(
+                    result="DENIED",
+                    http_status=403,
+                    reason_code="ROLE_NOT_ALLOWED",
+                    rule_id="route_roles",
+                    message="principal role is not allowed for this route",
+                    model=None,
+                    max_tokens=None,
+                ),
+                None,
+            )
+        return None
+
     def chat(self, response: ChatIO, request_id: str) -> None:
         self._records.clear_context()
         policy_snapshot = self._policy_state()
@@ -297,6 +359,40 @@ class RequestFlow:
             )
             return
 
+        auth_state = self._auth_state()
+        auth = auth_state.authenticate(response.request_header("Authorization"))
+        self._records.set_auth(auth.record())
+        auth_rejection = self._auth_rejection(auth_state, auth)
+        if auth_rejection is not None:
+            decision, headers = auth_rejection
+            self.finish_without_relay(
+                response,
+                request_id,
+                decision,
+                close_connection=True,
+                extra_headers=headers,
+            )
+            return
+
+        hold = self._target_hold(policy.target_id if policy is not None else None)
+        if hold is not None:
+            # Declared target conflicts hold the request; this is not a block result.
+            self.finish_without_relay(
+                response,
+                request_id,
+                Decision(
+                    result="ERROR",
+                    http_status=503,
+                    reason_code=hold[0],
+                    rule_id="target_registration",
+                    message=hold[1],
+                    model=None,
+                    max_tokens=None,
+                ),
+                close_connection=True,
+            )
+            return
+
         body = response.read_request_body(content_length)
         incomplete = len(body) != content_length
         if incomplete:
@@ -337,6 +433,27 @@ class RequestFlow:
                 response,
                 request_id,
                 transport_decision(400, "MALFORMED_JSON", "invalid JSON"),
+            )
+            return
+        principal = auth.principal
+        if (
+            principal is not None
+            and principal.allowed_models is not None
+            and decision.model not in principal.allowed_models
+        ):
+            self.finish_without_relay(
+                response,
+                request_id,
+                Decision(
+                    result="DENIED",
+                    http_status=403,
+                    reason_code="PRINCIPAL_MODEL_NOT_ALLOWED",
+                    rule_id="principal_allowed_models",
+                    message="model is not allowed for this principal",
+                    model=decision.model,
+                    max_tokens=decision.max_tokens,
+                ),
+                stream=stream,
             )
             return
 

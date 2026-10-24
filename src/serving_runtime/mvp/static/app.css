@@ -107,6 +107,8 @@ body {
 .badge-state.ok, .state-match, .state-ok { background: var(--allowed-bg); color: var(--allowed); }
 .badge-state.bad, .state-drift, .state-error { background: var(--error-bg); color: var(--error); }
 .state-missing, .state-stale { background: var(--denied-bg); color: var(--denied); }
+.state-mismatch, .state-multiple_targets, .state-container_missing { background: var(--error-bg); color: var(--error); }
+.state-unknown, .state-not_declared, .state-not_found, .state-not_running, .state-not_configured { background: var(--incomplete-bg); color: var(--incomplete); }
 .state-passed { background: var(--allowed-bg); color: var(--allowed); }
 .state-failed, .state-inconsistent { background: var(--error-bg); color: var(--error); }
 .state-not_run, .state-unsupported, .state-blocked_by_environment { background: var(--incomplete-bg); color: var(--incomplete); }

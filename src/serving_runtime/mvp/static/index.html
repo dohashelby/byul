@@ -96,6 +96,12 @@
         <table class="status-table"><thead><tr><th>필드</th><th>기준</th><th>현재</th><th>출처</th><th>관측 시각</th><th>상태</th></tr></thead><tbody id="baseline-rows"></tbody></table>
       </article>
       <article class="card table-card state-card">
+        <h3>대상 등록 <span id="target-state" class="muted"></span></h3>
+        <p id="target-hold" class="revalidation-warning" role="alert" hidden></p>
+        <table class="status-table"><thead><tr><th>필드</th><th>등록값</th><th>현재</th><th>출처</th><th>상태</th></tr></thead><tbody id="target-rows"></tbody></table>
+        <p id="target-instance" class="notice"></p>
+      </article>
+      <article class="card table-card state-card">
         <h3>정책 이력 <span id="history-store-state" class="muted"></span></h3>
         <table class="status-table"><thead><tr><th>시각</th><th>이벤트</th><th>정책</th><th>판본</th><th>SHA-256</th><th>이전</th><th>표시</th></tr></thead><tbody id="history-rows"></tbody></table>
       </article>

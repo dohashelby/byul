@@ -52,6 +52,9 @@ class MVPConfig:
     observation_run_id: str | None = None
     observation_intent_path: str | None = None
     cilium_policy_status: bool = False
+    auth_config_path: str | None = None
+    target_path: str | None = None
+    target_pod_status: bool = False
     cilium_timeout_s: float = 10.0
 
     def __post_init__(self) -> None:
@@ -96,6 +99,8 @@ class MVPConfig:
             "asset_manifest_path",
             "lab_report_path",
             "observation_intent_path",
+            "auth_config_path",
+            "target_path",
             "environment",
             "run_id",
             "observation_environment",

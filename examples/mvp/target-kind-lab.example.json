@@ -1,0 +1,19 @@
+{
+  "schema_version": "runtime-target/1.0",
+  "target_id": "kind-lab-engine-001",
+  "target_ref": "LAB-TARGET-KIND-EXAMPLE-ONLY",
+  "engine": {
+    "kind": "vllm",
+    "version": null
+  },
+  "model": {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": null
+  },
+  "kubernetes": {
+    "context": "kind-runtime-lab",
+    "namespace": "serving-lab",
+    "selector": {"app": "serving-engine"},
+    "container": "engine"
+  }
+}

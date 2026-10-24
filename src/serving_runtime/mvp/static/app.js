@@ -114,6 +114,17 @@ function renderStatus(status) {
   if (!policy.valid) {
     policyRows.push(["사유", `${policy.error_code || ""} ${policy.error_message || ""}`.trim(), { problem: true }]);
   }
+  const auth = status.auth || {};
+  const authLabels = {
+    not_configured: "미적용 (누구나 추론 요청 가능)",
+    ok: `적용 · 주체 ${auth.principal_count ?? 0}명 · 보호 경로 ${(auth.protected_routes || []).length}개`,
+    error: `설정 오류 — 추론 요청은 503 (${auth.error_code || "unknown"})`,
+  };
+  policyRows.push([
+    "API 인증",
+    authLabels[auth.state] || auth.state || "–",
+    { problem: auth.state === "error" || auth.state === "not_configured" },
+  ]);
   fillKv("policy-kv", policyRows);
   renderProfileWarning(policy);
 
@@ -227,6 +238,47 @@ function renderBaseline(baseline) {
       el("td", {}, [stateCell(item.state)]),
     ]));
   }
+}
+
+function renderTarget(target) {
+  const registration = (target && target.registration) || { state: "unavailable" };
+  const labels = {
+    not_configured: "미등록 — 대상 확인 없이 동작",
+    ok: `등록됨 · ${registration.target_id}${registration.target_ref ? ` · ${registration.target_ref}` : ""}`,
+    error: `등록 파일 오류 (${registration.error_code || "unknown"}) — 추론 요청 보류`,
+    unavailable: "이 Gateway는 대상 등록을 지원하지 않음",
+  };
+  $("target-state").textContent = labels[registration.state] || registration.state;
+  const hold = target && target.gateway_hold;
+  $("target-hold").hidden = !hold;
+  $("target-hold").textContent = hold ? `신규 추론 요청 보류(503): ${hold.reason_code} — ${hold.message}` : "";
+  const body = $("target-rows");
+  clear(body);
+  for (const row of (target && target.comparison) || []) {
+    body.appendChild(el("tr", {}, [
+      el("td", { className: "mono", text: row.field }),
+      el("td", { text: row.expected ?? "–" }),
+      el("td", { text: row.observed ?? "–", title: row.note || "" }),
+      el("td", { text: row.source }),
+      el("td", {}, [stateCell(row.state)]),
+    ]));
+  }
+  const instance = (target && target.instance) || {};
+  const current = instance.current;
+  let text = "";
+  if (instance.state === "not_configured" || !target) {
+    text = "Pod 조회 미설정 — 관측 인스턴스를 구분하지 않음";
+  } else if (current) {
+    text = `현재 인스턴스 ${current.instance_id} · ${current.pod} · 재시작 ${current.restart_count ?? "–"}회 · 조회 ${formatTime(instance.observed_at)}`;
+  } else {
+    text = `인스턴스 확인 불가: ${instance.state} — 추정하지 않음`;
+  }
+  const history = (target && target.history) || [];
+  if (history.length) {
+    const last = history[0];
+    text += ` · 최근 이력 ${last.event}${last.reason ? `(${last.reason})` : ""} ${formatTime(last.recorded_at)}`;
+  }
+  $("target-instance").textContent = text;
 }
 
 function assetSummary(item) {
@@ -646,6 +698,21 @@ function renderProfileWarning(policy) {
   warning.hidden = false;
 }
 
+function authText(auth) {
+  if (!auth) return null;
+  const labels = {
+    not_configured: "인증 미적용",
+    not_evaluated: "인증 확인 전 종료",
+    authenticated: "인증됨",
+    missing: "인증 정보 없음",
+    invalid: "인증 실패",
+    unavailable: "인증 설정 오류",
+  };
+  const label = labels[auth.state] || auth.state;
+  if (!auth.principal_id) return label;
+  return `${label} · ${auth.principal_id} (${(auth.roles || []).join(", ") || "역할 없음"})`;
+}
+
 function extraFieldsText(items) {
   if (!Array.isArray(items) || !items.length) return null;
   const modes = { validate: "검사", passthrough: "미검사 전달" };
@@ -684,6 +751,7 @@ function renderDetail(detail) {
         ["max_tokens", final.max_tokens],
         ["n", (finalRecord.request || {}).n],
         ["추가 필드", extraFieldsText((finalRecord.request || {}).extra_fields)],
+        ["요청 주체", authText(finalRecord.auth)],
         ["context 검사", contextText((finalRecord.request || {}).context)],
       ]),
     ]),
@@ -808,11 +876,14 @@ async function refresh() {
       getJson("/api/observations"),
       getJson("/api/lab-report"),
     ]);
+    // Optional: a gateway started before target support has no /api/target.
+    const target = await getJson("/api/target").catch(() => null);
     renderStatus(status);
     renderSummary(summary);
     renderRequests(list.requests);
     renderPolicyState(policy);
     renderBaseline(baseline);
+    renderTarget(target);
     renderCollectors(collectors);
     renderRevalidation(revalidation);
     renderObservations(observations, collectors);

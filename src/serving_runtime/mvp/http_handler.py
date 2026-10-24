@@ -119,6 +119,7 @@ class HandlerDependencies:
     record_transport_error: Callable[[str, Decision], None]
     request_header_timeout_s: float
     request_body_timeout_s: float
+    target_status: Callable[[], dict[str, Any]] = lambda: {"registration": {"state": "not_configured"}}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -341,6 +342,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/revalidation",
                 "/api/observations",
                 "/api/lab-report",
+                "/api/target",
                 "/v1/chat/completions",
             }
             or path.startswith("/api/requests/")
@@ -469,6 +471,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/lab-report":
             self._send_json(200, self.dependencies.lab_report())
+            return
+        if path == "/api/target":
+            self._send_json(200, self.dependencies.target_status())
             return
         if path == "/api/summary":
             self._send_json(200, self.dependencies.queries.summary())

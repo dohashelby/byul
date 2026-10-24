@@ -57,6 +57,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument("--environment", metavar="NAME")
     mvp_parser.add_argument("--run-id", metavar="ID")
     mvp_parser.add_argument("--revocations", metavar="PATH")
+    mvp_parser.add_argument(
+        "--target",
+        metavar="PATH",
+        help="대상 등록 파일(runtime-target/1.0). 없으면 대상 미등록",
+    )
+    mvp_parser.add_argument(
+        "--target-pod-status",
+        action="store_true",
+        help="대상 등록의 kubernetes selector로 Pod를 읽기 전용 조회(kind-runtime-lab 전용)",
+    )
+    mvp_parser.add_argument(
+        "--auth-config",
+        metavar="PATH",
+        help="시험용 인증 설정(runtime-auth/1.0). 없으면 인증 미적용",
+    )
     mvp_parser.add_argument("--baseline", metavar="PATH")
     mvp_parser.add_argument("--manifest", metavar="PATH")
     mvp_parser.add_argument("--collector-interval", type=float, default=5.0, metavar="SECONDS")
@@ -122,6 +137,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     revalidation_export_parser.add_argument("--data-dir", required=True, metavar="DIR")
     revalidation_export_parser.add_argument("--out", required=True, metavar="FILE")
+    auth_parser = commands.add_parser("auth", help="시험용 인증 설정 도구")
+    auth_commands = auth_parser.add_subparsers(dest="auth_command")
+    auth_commands.add_parser(
+        "hash-token",
+        help="표준 입력의 토큰을 인증 설정용 SHA-256으로 변환(토큰은 출력하지 않음)",
+    )
     metrics_parser = commands.add_parser(
         "metrics-check", help="저장한 /metrics 응답과 backend 지표 대응표 대조"
     )
@@ -198,6 +219,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "observation_run_id": args.observation_run_id,
                 "observation_intent_path": args.observation_intent,
                 "cilium_policy_status": args.cilium_policy_status,
+                "auth_config_path": args.auth_config,
+                "target_path": args.target,
+                "target_pod_status": args.target_pod_status,
             }
             if args.data_dir is not None:
                 options["data_dir"] = args.data_dir
@@ -309,6 +333,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "revalidation":
         revalidation_parser.print_help()
+        return 0
+    if args.command == "auth" and args.auth_command == "hash-token":
+        from getpass import getpass
+
+        from .mvp.auth import token_digest
+
+        try:
+            token = getpass("token: ") if sys.stdin.isatty() else sys.stdin.readline()
+            print(token_digest(token.rstrip("\r\n")))
+        except (EOFError, ValueError) as error:
+            print(f"토큰 변환 실패: {error}", file=sys.stderr)
+            return 1
+        return 0
+    if args.command == "auth":
+        auth_parser.print_help()
         return 0
     if args.command == "metrics-check":
         from .mvp.backend import (

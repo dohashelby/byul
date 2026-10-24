@@ -23,7 +23,9 @@ class RequestRecords:
         backend_kind: str,
         environment: str | None = None,
         run_id: str | None = None,
+        target_context: Callable[[], dict[str, Any]] | None = None,
     ) -> None:
+        self._target_context = target_context
         self.store = JsonlStore(Path(data_dir) / "gateway_records.jsonl")
         self._data_dir = str(data_dir)
         self._observation_session_id = observation_session_id
@@ -40,6 +42,12 @@ class RequestRecords:
 
     def clear_context(self) -> None:
         self._request_local.context = None
+        self._request_local.auth = None
+
+    def set_auth(self, auth: dict[str, Any]) -> None:
+        """Attach the authentication outcome (never the credential) to this request."""
+
+        self._request_local.auth = auth
 
     def set_context(self, context: dict[str, Any]) -> None:
         self._request_local.context = context
@@ -107,6 +115,11 @@ class RequestRecords:
             "environment": self._environment,
             "run_id": self._run_id,
             "target_id": policy.target_id if policy else None,
+            "target": (
+                self._target_context()
+                if self._target_context is not None
+                else {"registration": "not_configured", "target_id": None, "instance_id": None, "instance_state": "not_configured"}
+            ),
             "recorded_at": _utc_now(),
             "policy": {
                 "schema_version": policy.schema_version if policy else None,
@@ -116,6 +129,8 @@ class RequestRecords:
                 "sha256": policy_state.sha256,
                 "path": policy_state.path,
             },
+            "auth": getattr(self._request_local, "auth", None)
+            or {"state": "not_evaluated", "method": None, "principal_id": None, "roles": []},
             "decision": {
                 "result": decision.result,
                 "reason_code": decision.reason_code,

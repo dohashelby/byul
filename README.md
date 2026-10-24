@@ -23,8 +23,10 @@ BoB serving-engine security runtime solution
 | 기록 보존 한도 (D-08) | 7일/5GiB 계산, 기본 보고만·`--retention-enforce`로 삭제, 시험 증거 보존 목록, 요청별 파일 간 묶음 정리, 정리 구간·오류 표시 | 단위 시험·실행 확인, Codex 교차 검수 수정 반영 |
 | 지표 대응표 대조 | 선언 형식(TYPE)·HELP·label 대조, counter 초기화 감지, `metrics-check` | 단위 시험, Codex 교차 검수 완료 |
 | SGLang 연결 준비 | `--backend sglang`, 엔진별 출력 상한 필드(`max_completion_tokens`), backend별 `/tokenize` payload, `sglang:*` 지표 대응 | 시험 전용 가짜 SGLang만, 실제 SGLang 미확인, Codex 교차 검수 수정 반영 |
+| API 인증 프레임 (F2) | `--auth-config`(`runtime-auth/1.0`): bearer 토큰 주체·역할·주체별 허용 모델, 401/403 엔진 미전달, 설정 오류 503 | 단위·HTTP 시험, 로컬 실행 확인. 실제 인증 연동(D-02)은 미정 |
+| 대상 등록 프레임 (F1) | `--target`(`runtime-target/1.0`): 정책 대상 대조·엔진/모델 비교, `--target-pod-status`로 Pod 조회·교체 구분 | 단위·HTTP 시험, 로컬 kind에서 Pod 교체 확인 |
 | 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 수정 반영 |
-| 시험 | 추적 unittest 282개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 시험 | 추적 unittest 309개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -38,7 +40,7 @@ BoB serving-engine security runtime solution
 - 모델 파일 쓰기 차단(읽기 전용 마운트·권한)과 엔진 메모리 로딩 확인: 지금은 디스크 해시 비교만 합니다.
 - 정식 GPU·Kubernetes 1.36.5 환경의 Cilium·Hubble·Tetragon 검증: 현재 결과는 WSL2의 kind v1.37.0과 시험 전용 가짜 backend 기준입니다.
 - Tetragon 초기 차단 불일치(첫 helm upgrade 직후)의 원인 확정과 pod·process 귀속 재확인. 재시작·업그레이드 재현 시험에서는 재현되지 않았습니다.
-- API 인증, 실제 SGLang 실행(어댑터는 가짜 SGLang으로만 시험)
+- 실제 인증 연동 방식(D-02)과 계정·역할(D-03), 조회 API·대시보드 인증, 실제 SGLang 실행(어댑터는 가짜 SGLang으로만 시험)
 
 ## 런타임 통제 MVP (로컬)
 
@@ -142,6 +144,41 @@ baseline과 manifest는 평면 `fields` 객체를 사용합니다. manifest도 �
 ```
 
 비교 상태는 `match`(일치), `drift`(차이), `missing`(수집 결과에 필드 없음), `stale`(마지막 성공이 신선도 초과), `error`(수집 실패), `not_collected`(수집원 없음)입니다. 모의 엔진 응답은 `data_origin: mock`으로 표시하며 실제 엔진 관측이라고 주장하지 않습니다. 수집 실패 시 마지막 성공값과 시각을 유지하고 0이나 정상값으로 바꾸지 않습니다. 관측값은 baseline으로 저장하거나 승격하지 않습니다. 특히 **model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않습니다.**
+
+### API 인증 프레임 (F2)
+
+계획서 D-02(인증 연동 방식)와 D-03(계정·역할)이 정해지지 않아 **교체 가능한 LAB 프레임**으로 만들었습니다. `--auth-config`를 주지 않으면 지금처럼 인증 없이 동작하고 대시보드에 "API 인증: 미적용"으로 표시합니다.
+
+```bash
+# 토큰을 해시로 바꿔 인증 설정에 넣습니다(토큰 원문은 파일에 두지 않습니다).
+printf '%s\n' "$LAB_TOKEN" | .venv/bin/python -m serving_runtime auth hash-token
+.venv/bin/python -m serving_runtime mvp --auth-config examples/mvp/auth.example.json
+curl -H "Authorization: Bearer $LAB_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"model":"test-model","messages":[{"role":"user","content":"hi"}]}' \
+  http://127.0.0.1:8080/v1/chat/completions
+```
+
+- 주체마다 `principal_id`, `roles`, `token_sha256`, 선택 `allowed_models`·`disabled`를 둡니다. `route_roles`는 보호 경로별 허용 역할이며 지금 보호할 수 있는 경로는 `POST /v1/chat/completions`뿐입니다(기본 역할 `inference`).
+- 인증 정보 없음은 401 `AUTH_REQUIRED`, 토큰 불일치·비활성 주체·Bearer 외 방식은 401 `AUTH_INVALID`, 역할 불허는 403 `ROLE_NOT_ALLOWED`, 주체에 허용되지 않은 모델은 403 `PRINCIPAL_MODEL_NOT_ALLOWED`입니다. 모두 엔진에 전달하지 않고, 401·역할 거부는 본문을 읽기 전에 끝냅니다.
+- 인증 설정을 읽지 못하거나 형식이 틀리면 추론 요청을 503 `AUTH_UNAVAILABLE`로 막고 `/api/status`를 `degraded`로 둡니다. 이것은 Gateway 오류이며 보안 차단 성공으로 세지 않습니다.
+- 요청 기록에는 인증 상태·방식·주체 ID·역할만 남습니다. 토큰과 토큰 해시는 기록·상태·로그에 남기지 않고, 클라이언트의 `Authorization` 헤더는 backend로 전달하지 않습니다.
+- 한계: 조회 API(`/api/*`)와 대시보드는 아직 인증하지 않습니다. 토큰 회전·만료·외부 인증 서버 연동은 없습니다. `examples/mvp/auth.example.json`의 토큰은 공개된 예시값이므로 시험 외에 쓰지 않습니다.
+
+### 대상 등록 프레임 (F1)
+
+`--target`으로 이 Gateway가 맡는 승인 대상을 등록합니다. 주지 않으면 지금처럼 대상 확인 없이 동작합니다.
+
+```bash
+.venv/bin/python -m serving_runtime mvp --target examples/mvp/target.example.json
+# kind 시험 환경에서 엔진 Pod까지 확인할 때(읽기 전용 kubectl get pods)
+.venv/bin/python -m serving_runtime mvp --target my-target.json --target-pod-status
+```
+
+- 정책의 `target_id`가 등록과 다르면 신규 추론 요청을 503 `TARGET_MISMATCH`로, 등록 파일을 읽지 못하면 503 `TARGET_UNAVAILABLE`로 보류합니다(엔진 미전달, 차단 성공이 아닌 판정 보류).
+- 엔진 종류(backend 설정), 엔진 버전·모델 ID(engine_info 수집값), 이미지 digest(Pod 조회값)를 등록값과 비교해 `match`/`mismatch`/`unknown`/`not_declared`로 표시합니다. **관측값 불일치는 표시만 하고 요청을 막지 않습니다.**
+- `--target-pod-status`는 등록의 `kubernetes` selector로 `kind-runtime-lab` context에서만 Pod를 조회합니다. Pod UID와 container ID로 인스턴스 ID를 만들고, Pod 교체·컨테이너 재시작은 `<data-dir>/target_snapshots.jsonl`에 새 인스턴스로 남깁니다. Pod가 없거나 여러 개면 하나를 고르지 않고 상태로만 표시합니다.
+- 모든 요청 기록에 `target`(등록 상태·target_id·당시 instance_id)을 남겨, 이전 Pod의 기록이 새 Pod의 근거로 보이지 않게 합니다. `/api/target`과 대시보드 "대상 등록" 표에서 확인합니다.
+- 한계: model ID 일치는 weight·revision·실제 로딩 증명이 아닙니다. 정식 cluster의 context·권한은 D-03 이후입니다.
 
 ### 정책 1.2 시험 전용 프로필 (zeroday-lab)
 

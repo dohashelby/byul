@@ -94,11 +94,11 @@
 - 2026-10-24 Claude가 WSL2 커널 6.18.33.2의 kind v0.33.0 단일 노드(kindest/node v1.37.0), Cilium 1.20.3+Hubble, Tetragon 1.7.1에서 최종 확인했다. 보고서는 저장소 밖 `~/.local/state/serving-runtime/k8s-lab/reports/k8s-lab-20261023T202226Z-162136.{json,md}`다.
 - L-01 기준선과 L-02 Cilium(Gateway·DNS 허용, 엔진 직통·외부 연결 차단), L-03 Hubble(실제 `DROPPED`를 `--origin real`로 변환)이 통과했다.
 - L-04 Tetragon 감시는 자산 쓰기·비밀 읽기·허용 목록 밖 실행을 확인했지만 kprobe의 pod·process 귀속이 비어 정책·경로·접근·시각으로 판정했고, exec export는 수 초~수십 초 지연됐다.
-- L-05 차단은 직후 5회 `EPERM` 뒤 약 1분 후 재허용됐고 클러스터 범위 정책도 차단하지 못해 실효를 신뢰할 수 없다(원인 미확정, WSL modify-return 제한 의심). L-06 정리는 미실행해 전체는 `partial`이며, 이는 가짜 backend를 쓴 로컬 kind 결과로 정식 GPU·Kubernetes 1.36.5 검증이 아니다.
+- L-05 차단은 적용 직후 5회 `EPERM`이었다. 앞서 기록한 "약 1분 후 재허용"·"클러스터 범위 미차단"은 2026-10-24 재조사에서 둘 다 05:13 Tetragon 재시작 전(04:56 helm upgrade로 뜬 실행)에만 나온 것으로 확인됐다. 재시작 후에는 8.5시간 경과 TG-DENY-01 3/3, 클러스터 범위 실험 정책 3분간 6/6 차단, 삭제 후 쓰기 성공이다. WSL 제한(`override_return`·`fmodret_syscall` 없음)은 syscall 대상에만 해당한다. 업그레이드 직후 불일치 원인은 미확정이다(근거 `~/.local/state/serving-runtime/k8s-lab/investigation-20261024-tetragon.md`). L-06 정리는 미실행해 전체는 `partial`이며, 이는 가짜 backend를 쓴 로컬 kind 결과로 정식 GPU·Kubernetes 1.36.5 검증이 아니다.
 
 ## 다음 준비 작업
 
-- 정식 GPU·Kubernetes 1.36.5 환경 검증, Tetragon 차단 불안정 원인 조사, 앞 단계(체크리스트·검증 도구) 담당자에게 받을 입력(실제 정책값·승인 구성·허용 통신 목적지·보호 경로·공통 결과 형식)이 필요하다. 설치·다운로드·운영 환경 변경은 자동으로 시작하지 않는다.
+- 정식 GPU·Kubernetes 1.36.5 환경 검증, 정책 로드 상태의 Tetragon 재시작·업그레이드 재현 시험, 앞 단계(체크리스트·검증 도구) 담당자에게 받을 입력(실제 정책값·승인 구성·허용 통신 목적지·보호 경로·공통 결과 형식)이 필요하다. 설치·다운로드·운영 환경 변경은 자동으로 시작하지 않는다.
 
 ## 갱신 방법
 

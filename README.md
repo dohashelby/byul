@@ -17,7 +17,7 @@ BoB serving-engine security runtime solution
 | context 사전 통제 | 정책 `max_context_tokens`(예: 2048): backend `/tokenize`로 입력 토큰을 세어 입력+`max_tokens` 초과 시 403, 셀 수 없으면 503(모두 엔진 미전달) | 모의 엔진·가짜 backend·실제 vLLM(CPU) |
 | 모델 파일 무결성 | 승인 자산 목록(경로·SHA-256·크기)과 디스크 파일 주기 비교, 변경·누락·목록 밖 파일 표시 | 단위·HTTP 시험, 실제 모델 파일 목록 생성 확인 |
 | 재검증 요청 | 자산 변경·engine API 구성 drift·같은 판본 정책 내용 변경을 JSONL 요청으로 열고 조회·내보내기 | 단위 시험 완료; 검증 도구 연동 형식 D-03 미합의 |
-| 통신·행위 통제 준비 (P2 사전 작업) | Cilium 규칙 후보 생성, Tetragon 파일 규칙 후보·이벤트 변환, 관측 API·대시보드 | 로컬 kind에서 Cilium 통제·Hubble 실제 관측 통과, Tetragon 감시는 귀속 한계와 함께 확인, 차단은 불안정 |
+| 통신·행위 통제 준비 (P2 사전 작업) | Cilium 규칙 후보 생성, Tetragon 파일 규칙 후보·이벤트 변환, 관측 API·대시보드 | 로컬 kind에서 Cilium 통제·Hubble 실제 관측 통과, Tetragon 감시는 귀속 한계와 함께 확인, 차단은 재시작 후 유지 확인(업그레이드 직후 불일치 사례 원인 확인 중) |
 | 시험 | unittest 157개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | Claude 소켓 허용 환경 157개 전부 통과; 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
@@ -31,7 +31,7 @@ BoB serving-engine security runtime solution
 - context 통제의 고정 버전 확인: `/tokenize` 형식은 vLLM v0.29.0 CPU에서만 확인했습니다.
 - 모델 파일 쓰기 차단(읽기 전용 마운트·권한)과 엔진 메모리 로딩 확인: 지금은 디스크 해시 비교만 합니다.
 - 정식 GPU·Kubernetes 1.36.5 환경의 Cilium·Hubble·Tetragon 검증: 현재 결과는 WSL2의 kind v1.37.0과 시험 전용 가짜 backend 기준입니다.
-- Tetragon 차단의 불안정 원인 규명과 pod·process 귀속 재확인
+- 정책이 걸린 상태의 Tetragon 재시작·업그레이드 뒤 차단 유지 여부 재현과 pod·process 귀속 재확인
 - API 인증, SGLang
 
 ## 런타임 통제 MVP (로컬)
@@ -383,7 +383,7 @@ helm upgrade tetragon cilium/tetragon --version 1.7.1 -n kube-system --reuse-val
 
 L-04 Tetragon 감시에서는 TG-ASSET-01 쓰기, TG-SECRET-01 읽기, 허용 목록 밖 실행을 실제 로그에서 확인했습니다. 다만 이 환경에서는 kprobe 이벤트의 pod·process 귀속이 비어 있었고(`pod_info` 조회 실패), 정책 이름·경로·접근 종류·시각으로 판정했습니다. exec 이벤트는 pod 정보 재시도로 수 초~수십 초 늦게 export됐습니다.
 
-L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었지만, 별도 관측에서는 적용 약 1분 뒤 쓰기가 다시 성공했고 podSelector 없는 클러스터 범위 정책은 처음부터 차단하지 못했습니다. WSL 커널의 modify-return 제한 경고가 의심되지만 원인은 확정하지 못했으므로, 이 환경의 Tetragon 차단 실효는 신뢰할 수 없습니다. L-06 정리는 옵션을 지정하지 않아 실행하지 않았고 전체 결과는 `partial`입니다.
+L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었습니다. 앞선 기록에는 "적용 약 1분 뒤 쓰기가 다시 성공"과 "podSelector 없는 클러스터 범위 정책 미차단"이 있었으나, 2026-10-24 재조사 결과 두 사례 모두 Tetragon을 05:13(KST)에 재시작하기 **전**, 04:56 helm upgrade로 뜬 Tetragon 실행에서만 나왔습니다. 재시작 후에는 적용 약 8.5시간이 지난 TG-DENY-01이 3회 모두 `EPERM`이었고, 새로 적용한 클러스터 범위 정책도 3분 동안 engine·gateway pod에서 6회 모두 차단했으며 삭제하자 쓰기가 다시 성공했습니다. 처음 의심한 WSL 커널 제한은 시스템 호출 대상 Override(`override_return: false`, `fmodret_syscall: false`)에만 해당하고, 이 정책이 쓰는 `security_file_permission`은 지원되는 fmod_ret 경로로 동작합니다. 업그레이드 직후 불일치의 원인은 재현 전이라 미확정이므로, 차단 결과는 "재시작 후 유지 확인, 업그레이드·재시작 직후 재확인 필요"로 표시합니다. 재조사 근거는 저장소 밖 `~/.local/state/serving-runtime/k8s-lab/investigation-20261024-tetragon.md`에 있습니다. L-06 정리는 옵션을 지정하지 않아 실행하지 않았고 전체 결과는 `partial`입니다.
 
 보고서는 저장소 밖 `~/.local/state/serving-runtime/k8s-lab/reports/k8s-lab-20261023T202226Z-162136.{json,md}`에 있습니다. 이는 로컬 kind/WSL 결과로 정식 GPU·Kubernetes 1.36.5 환경 검증이 아니며, 엔진도 시험 전용 가짜 backend입니다.
 

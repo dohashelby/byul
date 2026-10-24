@@ -171,7 +171,7 @@ _LENGTH_ERROR_032 = re.compile(
 
 
 def _input_rejection_proof(*, engine_version, engine_image_digest, case, method, path,
-                           request_body, response_status, response_body) -> dict:
+                           request_body, response_status, response_body, context=None) -> dict:
     proof = {"state": "unverified", "reason": "REJECTION_CAUSE_UNVERIFIED", "sources": []}
     review = _INPUT_REJECTION_REVIEWS.get(engine_version)
     if review is None or engine_image_digest != review["image"]:
@@ -212,6 +212,13 @@ def _input_rejection_proof(*, engine_version, engine_image_digest, case, method,
     if not matched:
         # In particular, max_tokens=0 can have other clamping causes. Its
         # error alone is not a verified input-length rejection.
+        if (engine_version == "0.32.0" and case == "length" and all(token == 0 for token in prompt)
+                and error["param"] == "max_tokens"):
+            from .vllm_length_cause import ZERO_ERROR, reviewed_zero_budget
+            if error["message"] == ZERO_ERROR:
+                reviewed = reviewed_zero_budget(context, request_body)
+                if reviewed is not None:
+                    return reviewed
         return proof
     sources = [*review["token" if case == "token_id" else "length"], review["error"], review["exception"]]
     return {"state": "verified", "reason": "REVIEWED_INPUT_REJECTION",
@@ -345,6 +352,11 @@ class VllmAdapter:
 
     def input_rejection_proof(self, **kwargs) -> dict:
         return _input_rejection_proof(**kwargs)
+
+    def input_length_cause_collector(self, ctx):
+        """Optional source-correlated CPU evidence; ordinary requests unchanged."""
+        from .vllm_length_cause import VllmLengthCause
+        return VllmLengthCause(ctx)
 
     # --- 기동 ------------------------------------------------------------------
 

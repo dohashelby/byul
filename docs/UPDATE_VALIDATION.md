@@ -1,8 +1,63 @@
 # 두 이미지 CPU 업데이트 비교 수락 도구
 
+## 후보 길이 거부 원인·자격 후보 후속
+
+**이번 후속의 두 실제 이미지 update 실증은 수락 성공이다.** 기준은 미병합 PR #30의 `d6b42ec1ec8c2c2da9b624dcaa7fcc40104bd39f`다. 먼저 후보 단독 다섯 사례로 REQ-09의 길이 거부 원인과 비어 있지 않은 PLT-04 후보를 확인한 뒤, 같은 최종 제품으로 별도의 두 이미지 업데이트·반출·복원·저장 팩 재판정을 통과했다. 아래 PR #30 당시 팩22 수락 실패와 원본 증거는 과거 기록으로 보존한다. 판정표·기업 정책·수락 기준은 완화하지 않았다.
+
+REQ-09는 선택적 `length_cause_evidence` 수집으로 모호한 HTTP400에 원인 근거를 더한다. 단순 상태 코드·`max_tokens=0` 오류 문장이나 구성 신고만으로 verified를 만들지 않는다. 검토한 source pin과 실제 대상의 이미지/버전·모델 신원, 실제 모델 길이128 조건, 제출 요청과 제한 계산·정상 전후 대조의 연결을 확인하지 못하면 UNKNOWN을 유지한다. 이는 위험한 소비나 피해를 계측하는 새 센서가 아니며 원인 첨부의 출처·무결성과 본시험 결과를 구분한다. 옵션이 없는 과거 실행과 저장된 EVD를 고치거나 새 보장을 소급하지 않는다.
+
+```toml
+[input_validation]
+# 기존 vocab_size/vocab_source/max_probe_tokens/request_timeout 설정과 함께 사용한다.
+length_cause_evidence = true
+```
+
+기본 실행기는 0.5.0, 명시적으로 옵션을 켠 실행기는 0.6.0이며 어댑터 0.4.2·팩22·판정표는 유지한다. 새 `vllm-cpu-length-cause/1`은 위 후보 digest의 0.32.0·기존 OPT-125m revision/inventory·CPU bounded 문맥128만 검토했다. 판정 기준인 `max_input_tokens=127`을 바꾸지 않고, 제출128·출력요청1·모델한도128·플랫폼 cap과 정상 대조를 연결해 출력 여유0의 원인을 확인한다. 같은 소유 컨테이너의 실제 trusted network ID/IP:8000과 HTTP 대상, 이미지·Cmd·마운트·기동 신원을 전후 대조한다. 플랫폼 관측은 별도 Python이며 API 서버 메모리의 직접 측정이 아니다.
+
+추가 Python 관측은 호출당 30초·16KiB로 제한한다. 해당 이미지의 기본 native preload도 일반 허용하지 않고 `reviewed-cpu-native-libraries/1`의 정확한 설정과 두 라이브러리 바이트 SHA를 검증한다. 다른 preload·값이 있는 다른 `LD_*`·Python 경로 주입은 관측 Python 기동 전에 거부한다. 소스/플랫폼/cap 불일치·대상 변경·정상 대조 부족도 UNKNOWN을 유지한다. 원인 첨부에는 허용 필드·고정 코드·해시만 남기며 원본 Env·호스트 마운트 경로·예외 문자열은 저장하지 않는다. 현재 수집 설정과 다른 버전/모델에 이 근거를 확대하지 않는다.
+
+PLT-04는 소유한 hardened 컨테이너의 `/guard-cache` tmpfs에 무해한 EXAMPLE 파일을 준비해 `[absent, denied]` 묶음·읽기 권한이 있는 파일·symlink·directory를 각각 시험했다. 기존 모델·마운트·컨테이너를 바꾸지 않았다. 컨테이너의 관측 프로세스 4개(수집 프로브 제외)의 주체·전후 안정된 메타데이터를 확인했으며 실행기는 후보 본문을 열지 않았다. 이 수를 모델 worker나 TP 그룹 수로 해석하지 않는다. 단순 마운트·mode bits만으로 접근을 추정하지 않고 지원하지 않는 경로 형태는 UNKNOWN으로 보존했다. readable은 후보 파일의 유효 읽기 권한이지 실제 자격 내용·유효성·서비스에서의 사용 인증은 아니다. 기존 명시적 마운트 금지 위반과 후보 관측은 계속 분리한다.
+
+후보 단독 harness는 종료0·364.875초(부모365.753초), 기록한 170개 명령은 모두 종료0·timeout0이다. 각 사례는 원본6=복원6→재판정7객체이며 RES 전체·보고 행이 같고 원본 바이트를 보존했다. 다섯 EVD는 실제 MEASURED, 정책 EXAMPLE/DRAFT·팩 DRAFT·official=false, 성능 UNKNOWN이다. 상세 근거는 `<output>/run/<case>/report.json/html`, `evidence.zip`, `evidence-readable/`, `summary.json`에 있다.
+
+| 사례 | 보안/기능 | 실제 근거 | EVD ID |
+|---|---|---|---|
+| REQ-09 길이 원인 | PASS/PASS | 입력128·요청출력1·모델한도128·CPU cap·정상 전후 대조·동일 대상·13개 소스 SHA로 `REVIEWED_CPU_CONTEXT_EXHAUSTION` | EVD-01M5PYDYSWKRP9CSEX0MC2G8R6 |
+| PLT-04 absent·denied | PASS/PASS | `PATH_ABSENT` / `EFFECTIVE_READ_PERMISSION`·worker 주체/목록 안정 | EVD-01M5PYG3SN5YD3W9TK3H8GVF8W |
+| PLT-04 readable | FAIL/PASS | EXAMPLE 파일의 `candidate_readable` 확인 | EVD-01M5PYH0BFSVSTVD3WW7ASWB9E |
+| PLT-04 symlink | UNKNOWN/PASS | `SYMLINK_NOT_FOLLOWED`·지원 범위 한계 | EVD-01M5PYHW48GRVFYQZCHDDF02MA |
+| PLT-04 directory | UNKNOWN/PASS | `NONREGULAR_SCOPE_UNVERIFIED`·지원 범위 한계 | EVD-01M5PYJQWWKGVZ3XGEC83NBXGP |
+
+길이 HTTP400 본문은 이전과 같지만 새 원인 증거가 추가됐다. 정책127·실제 입력128·요청출력1을 그대로 유지하며 `min(128-128, 1, None, sys.maxsize)=0`으로 출력 여유가 소진되어 generate 호출 전에 거부되는 소스 경로를 확인했다. 소비·피해 센서는 계속 없어 `challenge_consumption`은 unknown, `confirmed_input_violations=[]`다. PLT-04의 위 FAIL은 도구 실패가 아닌 읽기 가능한 후보의 보안 판정이고 두 UNKNOWN도 수집 실패와 구분한다.
+
+### 추가 두 이미지 update 수락
+
+Windows 11·Docker Desktop Linux/WSL2·Intel Core Ultra 7 255H에서 기존 OPT-125m revision `27dcfa74d334bc871f3234de431e71c6eeba5dd6`·inventory `b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6`을 재사용했다. CPU2/threads2·메모리4GiB·문맥128·hardened 조건과 기존 정책값을 유지하고 실행 설정에 `length_cause_evidence=true`만 추가했다. 이미지·모델을 새로 다운로드하지 않았다.
+
+- 기준 0.31.0: `vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b`
+- 후보 0.32.0: `vllm/vllm-openai-cpu@sha256:827ef38187f9b52f2bb838695ef815ec5b65f4bf3e4c061b002b2b0a19cb0701`
+
+| 점검 | 기준 보안/기능 | 후보 보안/기능 | 보안 / 기능 비교 | 기준 / 후보 EVD ID |
+|---|---|---|---|---|
+| REQ-01 | PASS/PASS | PASS/PASS | NO_CHANGE / NO_CHANGE | EVD-01M5PYYE1705R2Z2T0TP9S03X0 / EVD-01M5PZ9QPTFT6DW73DTK9QG7JK |
+| REQ-03 | PASS/PASS | PASS/PASS | NO_CHANGE / NO_CHANGE | EVD-01M5PZ20NCKCA98A8EQK40AYM6 / EVD-01M5PZD447Y3JVJMN34KSGD9G4 |
+| REQ-09 | PASS/PASS | PASS/PASS | NO_CHANGE / NO_CHANGE | EVD-01M5PZ2CA1ZQWNP3E0HNP7Q7A2 / EVD-01M5PZDF7G0M4SDMK46C2YCAP2 |
+| PLT-01 | PASS/PASS | PASS/PASS | NO_CHANGE / NO_CHANGE | EVD-01M5PZ2PYDJGMDHR0QAJWTBBE2 / EVD-01M5PZES2GSS9TH8CTYHZ0HAGN |
+| PLT-04 | PASS/PASS | PASS/PASS | NO_CHANGE / NO_CHANGE | EVD-01M5PZ2YCA6ZCPD9PDRJ8XE2FJ / EVD-01M5PZEZWQ1WXG4C0H9M2FN5JK |
+
+`guard update`는 종료0·828.407초, `python -m guard.update_validation`의 부모 프로세스는 종료0·856.331초다. 원본·복원 후 모두 `accepted=true`·`evidence_contract_valid=true`·`version_upgrade_verified=true`, 문제0개다. verify·반출·두 복원·저장 팩 재판정·보고는 모두 종료0, 원본25=복원25→재판정26객체, RES 전체와 비교 동일·원본 저장소·입력 불변을 확인했다.
+
+실측 원본 보고서는 `<output>/update-run/updates/UPDATE-01M5PYP133CXCJCJ8RXVBE1N2B/report.json/html`의 `RPT-01M5PZF7MSSK4S0TTHNF5VWXBD`이고, 증거 반출본은 `<output>/update-run/evidence.zip`이다. 복원은 `restored/`·`replay-store/`, 저장 팩 재판정 보고서는 `replay-report.json/html`의 `RPT-01M5PZFQMG40D97QHMM011KK4C`다. `<output>/update-run/summary.json`에 수락·원본/재판정 참조와 파일 SHA가, `commands.json`에 명령·종료 코드가 있다. 제품 출처는 `<output>/source-release.zip`과 아래 최종 wheel이며 기존 실패 실증의 원본과 분리한다.
+
+10개 EVD는 MEASURED, REQ-01/03의 RES는 DECLARED이며 나머지 RES는 MEASURED다. 정책은 EXAMPLE/DRAFT·팩22는 DRAFT이므로 official=false·배포 승인은 아니다. 양쪽 보안/기능 FAIL·UNKNOWN은 0개이나 성능은 모두 UNKNOWN이다. 비교는 전부 NO_CHANGE여서 실제 변화의 REGRESSED/FIXED 탐지는 이번 실증으로 입증되지 않았다. 이 update의 PLT-04는 `credential_candidate_paths=[]`인 환경변수/마운트 금지의 부분 범위이며, 비어 있지 않은 후보 네 사례는 위 후보 단독 시험이다. 실제 자격 내용·유효성·사용과 위험한 입력의 실제 소비·피해 센서는 미검증이다. REQ-01의 일부 관리 경로는 HTTP를 보내지 않고 TCP 차단을 근거로 삼는 기존 한계도 유지한다.
+
+구현·테스트 코드·문서 초안 완료 뒤 frozen Python3.11.16으로 검증했다. 최종 Linux 기본 **2905통과·실패/오류/skip0·기존18제외·pytest226.54초(부모228.489초)**, Windows 집중151통과·3.18초(부모4.885초), wheel 제품94파일 소스/설치본 일치·설치 검증21.255초다. 최종 wheel SHA는 `9b2a29f3edd38979998007412dbd483cd43ef6ccb9c9d8da7e4d8e8f9c9eae73`다. 기존2845사례 삭제0·신규60·신규skip0, 기존 테스트 원문·판정기/팩/정책 등 보호129파일을 보존했다. 추가 native/loader 관측 조건 보강 전 측정은 최종 측정과 별도 보존한다. PACK21 원본과 PACK22의 후보 UNKNOWN은 각각 새 복원본에서 재판정해 RES10개/보고 의미를 보존했으며 이후 보강은 optional reader에만 적용됐다. `<output>/preservation-after.json`에서 기존5컨테이너·이미지·모델·입력·제품·팩·과거18557파일의 바이트/상태 보존과 세 소유 실행의 자원 잔여0을 확인했다. 이는 시작/종료 대조이며 완전한 중간 감사 추적이나 호스트 인증은 아니다.
+
+새 이미지/모델 다운로드·기존 서비스 변경·운영 자격 내용/실사용·GPU/성능·다른 모델·전체77개 자동화·기업 승인은 이번 범위에 포함하지 않는다.
+
 ## REQ-09·PLT-04 판정 의미 보완 후보
 
-**새 판정 계약의 두 이미지 실증은 수락 실패다.** 두 실제 이미지 실행·반출/복원·저장 팩 재판정은 완료했지만 후보 REQ-09의 보안 UNKNOWN으로 `accepted=false`다. `guard update`는 종료0·531.687초, 수락 harness는 종료1·558.134초다. 다섯 점검의 양쪽 보안/기능에 구체 PASS/FAIL을 요구하는 기존 기준을 충족하지 못했으며 판정·정책을 완화하지 않았다. PR #29는 main `641f12f`에 병합됐고 이번 계약은 PACK22/DRAFT·REQ-09 정의6·PLT-04 정의3이다.
+**PR #30 당시 기록: 새 판정 계약의 두 이미지 실증은 수락 실패였다.** 두 실제 이미지 실행·반출/복원·저장 팩 재판정은 완료했지만 후보 REQ-09의 보안 UNKNOWN으로 `accepted=false`였다. `guard update`는 종료0·531.687초, 수락 harness는 종료1·558.134초다. 다섯 점검의 양쪽 보안/기능에 구체 PASS/FAIL을 요구하는 기존 기준을 충족하지 못했으며 판정·정책을 완화하지 않았다. PR #29는 main `641f12f`에 병합됐고 당시 계약은 PACK22/DRAFT·REQ-09 정의6·PLT-04 정의3이다. 이 절의 원본·미검증 범위는 당시 기록이며 위 후속의 새 원인 증거·수락 성공과 구분한다.
 
 환경은 Windows 11·Docker Desktop Linux/WSL2 `6.18.33.2-microsoft-standard-WSL2`, Intel Core Ultra 7 255H·x86_64다. 양쪽 CPU2/threads2·memory4GiB/swap 포함5GiB·shm512MiB·float32·max_model_len128·KV64MiB·hardened/isolated 조건을 사용했다. 기존 OPT-125m revision `27dcfa74d334bc871f3234de431e71c6eeba5dd6`·inventory `b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6`을 재사용했다. 이미지·모델을 새로 다운로드하지 않았다.
 

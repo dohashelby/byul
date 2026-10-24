@@ -1,12 +1,14 @@
 # 실증 준비와 완료 판정
 
+[현행 정책·로그 증거 보강](POLICY_RELIABILITY_BATCH.md)의 저장 캡처 분석과 설치본 시험은 새 실제 엔진 실행이 아니다. 준비 명령의 guidance에서 입력·side/check·원인/조치를 확인하고 원래 정책과 미지원 범위를 보존한다. 기존 두 이미지 수락 기준은 그대로다.
+
 ## 두 이미지 비교 수락
 
 현행 도구와 직접 검증 결과는 [두 이미지 CPU 비교](UPDATE_VALIDATION.md)를 따른다. `python -m guard.update_validation`은 기본 준비 검사, 명시적 `--execute`는 기존 update CLI를 통한 순차 실행, `--analyze-existing`은 저장 증거의 읽기 전용 분석이다. UNKNOWN·명령 성공만으로 수락하지 않으며 CPU 성능은 UNKNOWN이다. 프로파일 변경은 NOT_COMPARABLE이 정상이고 실제 후보 이미지가 없는 현재 두 이미지 시험은 미수행이다.
 
 ## 현행 자동화 보강과 지원 범위
 
-현행 [자동화 보강](AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
+직전 [자동화 보강](AUTOMATION_HARDENING.md)의 기록은 팩20/DRAFT·REQ-11 revision 3·정책21점검/46경로·declared/0.12.0 기준이다. 현재는 [이번 묶음](POLICY_RELIABILITY_BATCH.md)의 팩21/DRAFT·정책22점검/49경로·declared/0.13.0을 따른다. 자동 연결11개와 REQ-11의 생성 출력 귀속 미검증·전체 보안 PASS 보류는 유지한다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
 
 단일 엔진은 prepare-validation → validate, 두 환경은 prepare-update → update를 사용한다. 새 준비 출력의 side별 check_support에서 SUPPORTED/UNSUPPORTED/UNKNOWN·이유·한계를 읽는다. ready는 입력/호스트 준비 상태이며 모든 점검의 지원이나 PASS가 아니다. 유효하지만 미지원인 정책은 지원 안내로 구분하고 다른 점검을 제거하지 않는다. COMPLETED/MEASURED는 전체 챌린지나 생성 출력 귀속의 입증 수가 아니다.
 

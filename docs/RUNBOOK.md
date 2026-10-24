@@ -1,12 +1,16 @@
 # 실행·실증 안내
 
+## 현행 정책·로그 증거와 설치 검증
+
+[이번 보강](POLICY_RELIABILITY_BATCH.md)은 REQ15 수동 계약·로그 수신 상한/출처·저장 로그 재검증·설치본 CI·준비 안내를 연결한다. [로그 도구](LOG_EVIDENCE.md), [REQ15 입력](POLICY_M14.md), [wheel 검증](INSTALLED_VERIFICATION.md)을 따른다. prepare-* JSON의 guidance는 원인/다음 조치를 추가하며 ready와 점검 지원·실제 판정을 구분한다. 입력 실패 때 의존 검사는 미확인이고 총 메모리가 여유 메모리를 뜻하지 않는다.
+
 ## 두 이미지 CPU 업데이트 비교
 
 [두 이미지 비교 안내](UPDATE_VALIDATION.md)에 준비 입력·Windows 명령·수락 기준을 정리했다. `python -m guard.update_validation`의 기본은 읽기 전용 준비 검사이며 실제 기동은 `--execute`가 필요하다. 분석은 `--analyze-existing`으로 원본을 보존한다. 최소 다섯 점검의 보안/기능 구체 판정과 반출·복원·저장 팩 재판정을 확인한다. 실제 두 이미지 시험은 아직 미수행이며 준비 성공과 시험 수락을 구분한다.
 
 ## 현행 자동화 보강과 지원 범위
 
-현행 [자동화 보강](AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
+직전 [자동화 보강](AUTOMATION_HARDENING.md)의 기록은 팩20/DRAFT·REQ-11 revision 3·정책21점검/46경로·declared/0.12.0 기준이다. 현재는 [이번 묶음](POLICY_RELIABILITY_BATCH.md)의 팩21/DRAFT·정책22점검/49경로·declared/0.13.0을 따른다. 자동 연결11개와 REQ-11의 생성 출력 귀속 미검증·전체 보안 PASS 보류는 유지한다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
 
 단일 엔진은 prepare-validation → validate, 두 환경은 prepare-update → update를 사용한다. 새 준비 출력의 side별 check_support에서 SUPPORTED/UNSUPPORTED/UNKNOWN·이유·한계를 읽는다. ready는 입력/호스트 준비 상태이며 모든 점검의 지원이나 PASS가 아니다. 유효하지만 미지원인 정책은 지원 안내로 구분하고 다른 점검을 제거하지 않는다. COMPLETED/MEASURED는 전체 챌린지나 생성 출력 귀속의 입증 수가 아니다.
 
@@ -16,7 +20,7 @@
 
 ## 기존 실행 안내와 이력
 
-지원: Python 3.11, Linux/macOS, 로컬 Docker. Windows는 기본 논리 테스트 일부만 확인했다.
+Python 3.11과 로컬 Docker를 사용한다. Windows Desktop/WSL2의 제한 CPU 제품 실행은 과거 1~3차 기록에서 확인했다. 현재 변경의 직접 검증은 위 보강 문서에 별도로 기록하며 macOS·임의 하드웨어·GPU 전체의 실증 완료로 확대하지 않는다.
 실제 엔진 시험에는 사전에 받은 HF 모델 캐시와 호환 아키텍처의 pinned 이미지가 필요하다.
 정책/팩 DRAFT이면 공식 보고서가 아니다.
 

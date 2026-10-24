@@ -3,6 +3,8 @@ reference 폴더랑 CLAUDE.md랑 *_PROMPT.md로 개발 시작했습니다. 업�
 
 ## 실행과 현재 상태
 
+- [정책·로그 증거·설치 재현성 보강](docs/POLICY_RELIABILITY_BATCH.md): 현재 팩21/DRAFT·REQ-15 revision 2·정책22점검/49경로·자동 연결11개. 로그 수집/저장 증거 재검증, REQ-15 수동 계약, 설치본 CI와 준비 안내를 연결한다. 실제 캐시 격리 실행기·두 이미지 실증과 구분한다.
+
 - [두 이미지 CPU 업데이트 비교 수락 도구와 현재 검증](docs/UPDATE_VALIDATION.md): 준비·명시적 실행·증거 반출/복원·저장 팩 재판정. 두 실제 이미지 실증은 후보 이미지 미준비로 미수행이다.
 
 - [재평가·구현 결과와 개발 계획](docs/REVIEW_AND_DEVELOPMENT_PLAN.md)
@@ -10,7 +12,7 @@ reference 폴더랑 CLAUDE.md랑 *_PROMPT.md로 개발 시작했습니다. 업�
 - [기업 정책 양식·필수 정책 입력 전제(M1/M2)](docs/POLICY_TEMPLATE.md)
 - [Managed 업데이트 설정](examples/update-managed.toml), [외부 대상 설정](examples/update-external.toml)
 
-현행 [자동화 보강](docs/AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
+직전 [자동화 보강](docs/AUTOMATION_HARDENING.md)의 당시 기준은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결·adapter 0.4.0·declared/0.12.0이다. 현재 declared는 0.13.0이며 REQ-11의 입력 projection 하위 검증과 생성 출력 귀속 미검증 구분·전체 보안 PASS 보류를 유지한다. 이번 묶음도 실제 엔진을 기동하지 않는다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
 
 [3차 실제 CPU 기록](docs/AUTOMATION_PHASE3.md)과 [선별 증거](docs/evidence/automation-phase3-20261023.json)는 당시 팩19의 이력이다. 새 판정 계약을 과거 결과에 소급하지 않는다. [Windows CPU JSON/SSE·native INFO 설정](examples/windows-cpu-binding-logs.toml)과 [11점검 시험 정책](examples/automation-binding-logs-policy.yaml)은 EXAMPLE/DRAFT다. 기본 guard.toml은 fake 시연 설정이며 실제 모델 snapshot·ENV·정책은 별도 준비한다. prepare-*의 ready와 점검별 지원, 실제 실행 결과는 서로 다른 정보다.
 

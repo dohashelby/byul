@@ -11,6 +11,7 @@
 - M10 REQ-09 계약의 보안·기능 관측이 고정된 rule_table에서도 PASS 후보일 것
 - 신규 sampling_validation/response_content/log_analysis/template_validation 정의의 각 축이 고정된 rule_table에서도 PASS 후보일 것
 - M12 REQ-16의 필수 캐시 문맥별 수동 3case 계약이 해당 축에서 완결될 것
+- M14 REQ-15의 전체 격리 집단 ordered pair별 수동 6case 계약이 해당 축에서 완결될 것
 PASS 관문(정상 대조 성공·모든 챌린지 시도·구조화 필수 관측 수집, INV-11)은 판정 코어가 따로 적용한다.
 신고된 FAIL은 그대로 둔다(INV-04). 항목별 관측은 DECLARED이며 실측·신원 인증이 아니다.
 """
@@ -26,7 +27,7 @@ from .base import AXES, JudgeOutput
 from .policy_items import evaluate
 from .audit_collection import evaluate as evaluate_audit
 from .rule_table import RuleTableJudge
-from . import manual_cache_context
+from . import manual_cache_context, manual_cache_group
 
 ALLOWED = {"PASS", "FAIL", "UNKNOWN"}
 AUTOMATION_RULE_CEILING_EXECUTORS = {"sampling_validation", "response_content", "log_analysis", "template_validation",
@@ -105,7 +106,7 @@ def _branch_context(check: CheckDef, values: dict) -> tuple[bool, list[str]]:
 
 class DeclaredJudge:
     name = "declared"
-    version = "0.12.0"
+    version = "0.13.0"
 
     def judge(self, check: CheckDef, evidence: Evidence, params: dict, policy_values: dict) -> JudgeOutput:
         input_context = policy_context(check, policy_values, evidence.observations)
@@ -173,6 +174,15 @@ class DeclaredJudge:
                     reasons=["POLICY_CONTEXT: CACHE_CONTEXT_EVALUATION_ERROR; DECLARED PASS withheld"])
             if cache_result is not None:
                 reasons.extend(cache_result.reasons)
+        group_result = None
+        if manual_cache_group.contract_state(check) != "legacy":
+            try:
+                group_result = manual_cache_group.evaluate(check, evidence, policy_values)
+            except Exception:  # INV-04: retain independent FAIL and never echo a dependency exception.
+                group_result = JudgeOutput(verdicts={}, missing_observations=[manual_cache_group.OBSERVATION],
+                    reasons=["POLICY_CONTEXT: CACHE_GROUP_EVALUATION_ERROR; DECLARED PASS withheld"])
+            if group_result is not None:
+                reasons.extend(group_result.reasons)
         for axis in AXES:
             v = obs.value.get(axis) or "UNKNOWN"
             if not isinstance(v, str) or v not in ALLOWED:
@@ -223,6 +233,9 @@ class DeclaredJudge:
             if v == "PASS" and cache_result is not None and cache_result.verdicts.get(axis) != Verdict.PASS:
                 reasons.append(f"POLICY_CONTEXT: CACHE_CONTEXT_PASS_WITHHELD; axis={axis}")
                 v = "UNKNOWN"
+            if v == "PASS" and group_result is not None and group_result.verdicts.get(axis) != Verdict.PASS:
+                reasons.append(f"POLICY_CONTEXT: CACHE_GROUP_PASS_WITHHELD; axis={axis}")
+                v = "UNKNOWN"
             verdicts[axis] = Verdict(v)
             reasons.append(f"{axis}: declared {obs.value.get(axis) or 'UNKNOWN'} → {v}")
         return JudgeOutput(verdicts=verdicts, reasons=reasons,
@@ -230,4 +243,5 @@ class DeclaredJudge:
                                | set(input_context.missing if input_context is not None else ())
                                | set(input_rules.missing_observations if input_rules is not None else ())
                                | set(automation_rules.missing_observations if automation_rules is not None else ())
-                               | set(cache_result.missing_observations if cache_result is not None else ())))
+                               | set(cache_result.missing_observations if cache_result is not None else ())
+                               | set(group_result.missing_observations if group_result is not None else ())))

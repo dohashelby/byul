@@ -27,6 +27,7 @@ from guard.application import execute_update, execute_validation, run_config, up
 from guard.store.bundle import export_bundle, restore_bundle, DEFAULT_MAX_BYTES
 from guard.core.preflight import validate_pack
 from guard.models import new_id
+from guard.preparation_guidance import annotate, input_failure, read_inputs
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="서빙엔진 보안 검증")
 pack_app = typer.Typer(add_completion=False, no_args_is_help=True, help="팩 보존본")
@@ -308,12 +309,14 @@ def prepare_validation(
     config: Path = ConfigOpt,
 ) -> None:
     """단일 환경의 읽기 전용 준비 검사. 기동·pull·저장을 하지 않는다."""
+    loaded, issues = read_inputs({"pack": pack, "single": env, "policy": policy, "config": config},
+        pack_loader=load_pack, environment_loader=load_environment, policy_loader=load_policy, config_loader=_config)
     try:
-        pk = load_pack(pack)
-        data = validation_readiness(pk, load_environment(env), load_policy(policy, pk), _config(config))
+        data = input_failure(issues) if issues else annotate(validation_readiness(
+            loaded["pack"], loaded["single"], loaded["policy"], loaded["config"]))
     except Exception as exc:
-        data = {"ready": False, "checks": [{"check": "input-files", "ok": False,
-                "detail": f"input loading failed ({type(exc).__name__}); verify file paths, schema and pack hashes"}]}
+        data = annotate({"ready": False, "checks": [{"check": "input-files", "ok": False,
+                "detail": "preparation failed; verify file paths, schema and pack hashes"}]})
     typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
     raise typer.Exit(0 if data["ready"] else 1)
 
@@ -327,13 +330,15 @@ def prepare_update(
     config: Path = ConfigOpt,
 ) -> None:
     """입력·Docker·로컬 이미지·모델 사전 검사. 엔진/자원/저장소를 만들지 않는다."""
+    loaded, issues = read_inputs({"pack": pack, "baseline": baseline, "candidate": candidate,
+        "policy": policy, "config": config}, pack_loader=load_pack, environment_loader=load_environment,
+        policy_loader=load_policy, config_loader=_config)
     try:
-        pk = load_pack(pack)
-        data = update_readiness(pk, [load_environment(baseline), load_environment(candidate)],
-                                load_policy(policy, pk), _config(config))
+        data = input_failure(issues) if issues else annotate(update_readiness(loaded["pack"],
+            [loaded["baseline"], loaded["candidate"]], loaded["policy"], loaded["config"]))
     except Exception as exc:
-        data = {"ready": False, "checks": [{"check": "input-files", "ok": False,
-                "detail": f"input loading failed ({type(exc).__name__}); verify file paths, schema and pack hashes"}]}
+        data = annotate({"ready": False, "checks": [{"check": "input-files", "ok": False,
+                "detail": "preparation failed; verify file paths, schema and pack hashes"}]})
     typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
     raise typer.Exit(0 if data["ready"] else 1)
 

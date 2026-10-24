@@ -2,6 +2,7 @@
 from copy import deepcopy
 import hashlib
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -96,6 +97,9 @@ class World:
         if self.changes.get("capture_raises"):
             raise RuntimeError("API_KEY=EXAMPLE-capture-secret")
         text = "".join(self.lines)
+        # Synthetic native timestamps belong to this synthetic capture window;
+        # they are never measurements of the fixed historical engine profile.
+        text = re.sub(r"(?m)^2026-10-23T03:00:00\.123456789Z ", since.replace("+00:00", "Z") + " ", text)
         if self.changes.get("replacement"):
             text += "\ufffd\n"
         if self.changes.get("oversize"):

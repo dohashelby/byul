@@ -7,55 +7,73 @@ trial-linked exception/traceback/dump object. A 4xx response is not that object.
 from __future__ import annotations
 
 import json
+import base64
 import hashlib
 import re
 import secrets
+import time
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
 from guard.runtime.docker import Docker
+from .log_analysis_contract import analyze_log_captures, events
 from .content_common import (MAX_SAMPLE_BYTES, append_artifact, content_request, control_state, leaves,
-                             markers, sample_artifact, string_list, validate_content_settings, record_content, bounded_probe)
+                             markers, sample_artifact, string_list, validate_content_settings, record_content, bounded_probe, redact_value)
 from .http_common import HttpCheckExecutor
 
 REQUIRED_BRANCHES = frozenset({"normal", "error", "exception_dump"})
 SUPPORTED_BRANCHES = REQUIRED_BRANCHES | {"debug", "trace"}
 SUPPORTED_MARKER_CONTEXTS = frozenset({"caller_input", "private_system", "error_input"})
 
-_FILE_READER = """import json,pathlib,sys
-p=pathlib.Path(sys.argv[1]); limit=int(sys.argv[2]); stat=p.stat()
-if not p.is_file(): raise ValueError('source is not a regular file')
-with p.open('rb') as f: raw=f.read(limit+1)
-print(json.dumps({'text':raw[:limit].decode('utf-8','replace'),'truncated':len(raw)>limit,
- 'size':stat.st_size,'mtime_ns':stat.st_mtime_ns,'resolved_path':str(p.resolve())}))
+_FILE_READER = """import base64,hashlib,json,os,stat,sys
+path=sys.argv[1]; limit=int(sys.argv[2]); handles=[]
+def open_source():
+    parts=path.split('/')
+    if not path.startswith('/') or any(p in ('.','..') for p in parts): raise ValueError('invalid path')
+    parent=os.open('/',os.O_RDONLY|os.O_DIRECTORY); handles.append(parent)
+    for part in parts[1:-1]:
+        if not part: continue
+        parent=os.open(part,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parent); handles.append(parent)
+    fd=os.open(parts[-1],os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent); handles.append(fd)
+    return fd
+def identity(s):
+    return {'device':s.st_dev,'inode':s.st_ino,'size':s.st_size,'mtime_ns':s.st_mtime_ns,'ctime_ns':s.st_ctime_ns}
+try:
+    fd=open_source(); before=os.fstat(fd)
+    if not stat.S_ISREG(before.st_mode): raise ValueError('source is not a regular file')
+    chunks=[]; remaining=limit+1
+    while remaining:
+        chunk=os.read(fd,min(4096,remaining))
+        if not chunk: break
+        chunks.append(chunk); remaining-=len(chunk)
+    raw=b''.join(chunks); after=os.fstat(fd)
+    current=os.fstat(open_source()); stable=identity(before)==identity(after)==identity(current)
+    kept=raw[:limit]
+    print(json.dumps({'schema':'guard-container-file/2','raw_base64':base64.b64encode(kept).decode('ascii'),
+      'raw_retained_sha256':hashlib.sha256(kept).hexdigest(),'raw_retained_bytes':len(kept),
+      'truncated':len(raw)>limit,'size':before.st_size,'mtime_ns':before.st_mtime_ns,
+      'file_before':identity(before),'file_after':identity(after),'path_after':identity(current),
+      'file_identity_stable':stable,'source_complete':stable and len(raw)<=limit,
+      'nofollow_components':True,'regular_file':True,'window_basis':'exact fresh trial IDs, not file mtime'}))
+except Exception as exc:
+    print(json.dumps({'schema':'guard-container-file/2','error':type(exc).__name__,
+      'file_identity_stable':False,'source_complete':False,'raw_base64':''}))
+finally:
+    for fd in reversed(handles):
+        try: os.close(fd)
+        except OSError: pass
 """
 
 
-def _events(text: str) -> tuple[list[dict], bool]:
-    """Support JSON objects and timestamp-prefixed Docker JSON lines only."""
-    events, complete = [], True
-    for line in text.splitlines():
-        if not line.strip():
-            continue
-        raw = line
-        prefix = re.match(r"^\d{4}-\d{2}-\d{2}T[^\s]+\s+(\{.*)$", raw)
-        if prefix:
-            raw = prefix.group(1)
-        try:
-            event = json.loads(raw)
-        except ValueError:
-            complete = False
-            continue
-        if isinstance(event, dict):
-            events.append(event)
-        else:
-            complete = False
-    return events, complete
+# Historical parser import remains available to callers.
+def _events(text):
+    rows, complete = events(text)
+    return [row["event"] for row in rows], complete
 
 
 class LogAnalysisExecutor(HttpCheckExecutor):
     name = "log_analysis"
-    version = "0.1.0"
+    version = "0.2.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -80,6 +98,9 @@ class LogAnalysisExecutor(HttpCheckExecutor):
     def validate_configuration(self, check):
         """Check bounded execution/source inventory without reducing policy scope."""
         validate_content_settings(self.cfg)
+        duration = self.cfg.get("max_duration_seconds", 180)
+        if type(duration) is not int or not 1 <= duration <= 300:
+            raise ValueError("max_duration_seconds must be a positive integer at most 300")
         if self.cfg.get("endpoint", "/v1/completions") not in {"/v1/completions", "/v1/chat/completions"}:
             raise ValueError("log analysis supports completions/chat completions only")
         sources = self.cfg.get("log_sources")
@@ -109,30 +130,63 @@ class LogAnalysisExecutor(HttpCheckExecutor):
     def _finish(self, ctx):
         return append_artifact(super()._finish(ctx), ctx, "log_samples.json", f"{self.name}/{self.version}")
 
-    def _capture(self, source, since, until):
+    def _capture(self, source, since, until, deadline=None):
+        def budget():
+            remaining = 30 if deadline is None else min(30, deadline - time.monotonic())
+            if remaining <= 0:
+                raise TimeoutError("bounded log capture deadline exhausted")
+            return remaining
         container = source["container"]
-        before = self.docker.inspect_json(container, timeout=30)
+        before = self.docker.inspect_json(container, timeout=budget())
         config = before.get("HostConfig", {}).get("LogConfig", {})
+        raw = None
         if source["kind"] == "docker_logs":
-            result = self.docker.logs_window(container, since=since, until=until, timeout=30)
-            # Preserve partial stdout on a failed read; an observed sensitive
-            # marker may remain valid evidence despite incomplete collection.
-            text = result.stdout + (result.stderr if result.returncode == 0 else "")
-            metadata = {"truncated": len(text.encode("utf-8")) >= MAX_SAMPLE_BYTES}
+            result = self.docker.logs_window(container, since=since, until=until, timeout=budget())
+            text = result.stdout
+            # Successful Docker logs maps container stdout/stderr to separate
+            # CLI pipes. Never join their partial lines or invent a chronology.
+            stderr_text = result.stderr if result.returncode == 0 else ""
+            raw = getattr(result, "stdout_bytes", None)
+            metadata = {"truncated": max(len(text.encode("utf-8")), len(stderr_text.encode("utf-8"))) >= MAX_SAMPLE_BYTES,
+                        "stderr_text": stderr_text.encode("utf-8")[:MAX_SAMPLE_BYTES].decode("utf-8", "replace"),
+                        "stderr_present": bool(result.stderr),
+                        "stderr_role": "container log stream" if result.returncode == 0 else "failed CLI diagnostic; text not retained",
+                        "stream_order": "each pipe keeps its own order; no order across stdout/stderr"}
             if config.get("Type") == "none":
-                raise ValueError("Docker logging driver is none")
+                metadata["source_complete"] = False
+                metadata["driver_disabled"] = True
         else:
-            result = self.docker.exec(container, ["python3", "-c", _FILE_READER, source["path"], str(MAX_SAMPLE_BYTES)], timeout=30)
+            call = getattr(self.docker, "exec_bounded", self.docker.exec)
+            result = call(container, ["python3", "-c", _FILE_READER, source["path"], str(MAX_SAMPLE_BYTES)], timeout=budget())
             captured = json.loads(result.stdout) if result.returncode == 0 else {}
-            text = captured.pop("text", "")
+            if captured.get("schema") == "guard-container-file/2":
+                raw = base64.b64decode(captured.pop("raw_base64", ""), validate=True)
+                if (captured.get("raw_retained_bytes") != len(raw)
+                        or captured.get("raw_retained_sha256") != hashlib.sha256(raw).hexdigest()):
+                    captured["source_complete"] = False
+                    captured["file_identity_stable"] = False
+                text = raw.decode("utf-8", "replace")
+            else:
+                # Old injected fixtures remain readable; they cannot establish
+                # the new nofollow/descriptor-stability guarantee.
+                text = captured.pop("text", "")
+                captured["source_complete"] = False
+                captured["file_identity_stable"] = False
+                captured["legacy_file_metadata"] = True
             metadata = captured
-        after = self.docker.inspect_json(container, timeout=30)
-        same = bool(before.get("Id")) and before.get("Id") == after.get("Id")
+        after = self.docker.inspect_json(container, timeout=budget())
+        same = (bool(before.get("Id")) and before.get("Id") == after.get("Id")
+                and bool(before.get("State", {}).get("StartedAt"))
+                and before.get("Image") == after.get("Image"))
         if before.get("State", {}).get("StartedAt") != after.get("State", {}).get("StartedAt"):
             same = False
+        pipe = getattr(result, "capture", None)
+        if pipe is not None:
+            metadata["pipe_capture"] = pipe
+            metadata["source_complete"] = metadata.get("source_complete", True) and pipe.get("complete") is True
+            metadata["truncated"] = metadata.get("truncated", False) or pipe.get("truncated", False)
+            metadata["timed_out"] = pipe.get("timed_out", False)
         captured_bytes = text.encode("utf-8")
-        # Driver plugins may accept credentials in arbitrary option names.
-        # Keep retention/mode facts and a digest, never arbitrary option values.
         public_options = {"max-size", "max-file", "mode", "max-buffer-size", "compress", "cache-disabled",
                           "cache-max-size", "cache-max-file", "cache-compress"}
         logging_metadata = {"Type": config.get("Type"),
@@ -144,10 +198,13 @@ class LogAnalysisExecutor(HttpCheckExecutor):
                 "window": {"since": since, "until": until}, "returncode": result.returncode,
                 "error": "source reader failed" if result.returncode else None, "identity_stable": same,
                 "unredacted_source_capture_sha256": hashlib.sha256(captured_bytes).hexdigest(),
-                "capture_encoding": "UTF-8 after CLI decoding; digest is not a raw daemon-file digest",
+                "raw_retained_sha256": hashlib.sha256(raw).hexdigest() if raw is not None else None,
+                "raw_retained_bytes": len(raw) if raw is not None else None,
+                "capture_encoding": "retained CLI/file bytes decoded as UTF-8; decoded and raw hashes are separate; not daemon-file digest",
                 "text": captured_bytes[:MAX_SAMPLE_BYTES].decode("utf-8", "replace"), **metadata}
 
     def collect(self, ctx):
+        deadline = time.monotonic() + self.cfg.get("max_duration_seconds", 180)
         endpoint = self.cfg.get("endpoint", "/v1/completions")
         marks = markers()
         token = secrets.token_hex(6)
@@ -169,6 +226,10 @@ class LogAnalysisExecutor(HttpCheckExecutor):
                 gaps.append("private system marker was not consumed by the completions profile")
 
         def send(label, body, branch):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return {"outcome": "probe_error", "phase": "collection", "detail": "deadline exhausted"}
+            ctx.timeout = min(ctx.timeout, remaining)
             request = content_request(ctx, "engine", label, endpoint, body)
             request["headers"]["X-Request-Id"] = correlation[branch]
             response = bounded_probe(ctx, ctx.trusted_net, request)
@@ -205,69 +266,34 @@ class LogAnalysisExecutor(HttpCheckExecutor):
                 gaps.append(f"{source_id}: engine source differs from actual target container")
                 continue
             try:
-                capture = self._capture(source, since, until)
+                capture = self._capture(source, since, until, deadline)
             except Exception as exc:
                 gaps.append(f"{source_id}: log collection failed: {type(exc).__name__}")
                 continue
             captures.append(capture)
-            if capture["returncode"] or not capture["identity_stable"] or capture.get("truncated"):
-                gaps.append(f"{source_id}: failed, truncated or changed source identity")
-            if not capture["identity_stable"]:
-                # A replaced source cannot establish a violation by the engine
-                # used for this trial. Keep its bytes for diagnosis only.
-                continue
-            text = capture["text"]
-            for context in values["forbidden_marker_contexts"]:
-                if marks[context] in text:
-                    violations.append(f"{source_id}: forbidden {context} marker present")
-            for context, marker in marks.items():
-                if marker in text:
-                    marker_contexts_seen.add(context)
-            events, structured = _events(text)
-            if not structured or not events:
-                gaps.append(f"{source_id}: JSON field inventory unavailable or empty; plain text absence is not PASS")
-            branches = set()
-            for event in events:
-                event_fields = leaves(event)
-                fields_seen.update(event_fields)
-                for field in sorted(event_fields):
-                    if field in values["forbidden_log_fields"] or field not in values["allowed_log_fields"]:
-                        violations.append(f"{source_id}: nonpermitted log field {field}")
-                serialized = json.dumps(event, ensure_ascii=False)
-                if correlation["normal"] in serialized:
-                    branches.add("normal")
-                linked_error = correlation["error"] in serialized or marks["error_input"] in serialized
-                if linked_error:
-                    branches.add("error")
-                    for field, items in event_fields.items():
-                        if '["' in field:  # Literal punctuation cannot manufacture a dump/trace parent.
-                            continue
-                        names = {part.lower() for part in field.replace("[]", "").split(".")}
-                        has_content = any(isinstance(v, str) and v.strip() for v in items)
-                        if names & {"exception", "traceback", "exception_dump", "dump"} and has_content:
-                            branches.add("exception_dump")
-                        for name in names & {"debug", "trace"}:
-                            if has_content:
-                                branches.add(name)
-            coverage[source_id] = sorted(branches)
-            missing = set(values["required_branches"]) - branches
-            if missing:
-                gaps.append(f"{source_id}: no trial-linked events for {', '.join(sorted(missing))}")
         # An unlisted collector/dump is not silently assessed. This profile
         # reports exactly the policy's source inventory, not every process sink.
-        obs = {"log_violations": {"value": sorted(set(violations)), "collected": True},
-               "log_coverage_complete": {"value": not gaps, "collected": True},
-               "log_coverage_gaps": {"value": gaps, "collected": True},
-               "log_sources_tested": {"value": coverage, "collected": True},
-               "log_fields_seen": {"value": sorted(fields_seen), "collected": True},
-               "log_marker_contexts_seen": {"value": sorted(marker_contexts_seen), "collected": True},
-               "log_source_ids_tested": {"value": [s for s in values["required_sources"] if s in coverage], "collected": True},
-               "log_required_branches_tested": {"value": [branch for branch in values["required_branches"]
-                  if coverage and all(branch in branches for branches in coverage.values())], "collected": True},
-               "functional_probes_planned": {"value": ["before", "after"], "collected": True},
-               "functional_probe_results": {"value": controls, "collected": True}}
-        sample_artifact(ctx, "log_samples.json", {"captures": captures, "requests": requests, "markers": marks,
-                        "correlation": correlation, "coverage_gaps": gaps})
+        gaps_before_analysis = list(gaps)
+        analysis = analyze_log_captures(captures, values, marks, correlation, initial_gaps=gaps)
+        gaps, violations, coverage = analysis["log_coverage_gaps"], analysis["log_violations"], analysis["log_sources_tested"]
+        obs = {key: {"value": value, "collected": True} for key, value in analysis.items()}
+        obs.update({"functional_probes_planned": {"value": ["before", "after"], "collected": True},
+                    "functional_probe_results": {"value": controls, "collected": True}})
+        saved_captures = redact_value(captures, ctx.secrets)
+        for capture in saved_captures:
+            persisted = capture["text"].encode("utf-8")
+            capture["persisted_decoded_sha256"] = hashlib.sha256(persisted).hexdigest()
+            capture["persisted_decoded_bytes"] = len(persisted)
+            if "stderr_text" in capture:
+                stderr = capture["stderr_text"].encode("utf-8")
+                capture["persisted_stderr_sha256"] = hashlib.sha256(stderr).hexdigest()
+                capture["persisted_stderr_bytes"] = len(stderr)
+        sample_artifact(ctx, "log_samples.json", {"schema": "guard-log-analysis-capture/2",
+                        "captures": saved_captures, "requests": requests, "markers": marks,
+                        "correlation": correlation, "initial_gaps": list(gaps_before_analysis),
+                        "coverage_gaps": gaps, "analysis": analysis, "controls": controls,
+                        "policy_values": values, "source_target": ctx.target["engine"].get("container"),
+                        "window": {"since": since, "until": until}})
         normal = {"attempted": True, "succeeded": len(controls) == 2 and all(v == "pass" for v in controls.values()),
                   "detail": "normal inference before/after a bounded validation-error request; HTTP 4xx is not a dump"}
         return obs, normal, [{"step": step, "attempted": bool(requests)} for step in ctx.check.challenge_steps], {

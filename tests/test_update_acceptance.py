@@ -5,7 +5,7 @@ import pytest
 
 from guard.models.objects import object_from_dict
 from guard.update_acceptance import CHECKS, assess_update
-from tests.update_builders import build_update_case
+from tests.update_builders import build_pure_update_case as build_update_case
 
 
 def patch_case(case, kind, change, choose=lambda obj: True):

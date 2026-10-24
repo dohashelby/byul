@@ -1,5 +1,7 @@
 """OBS-03 source/coverage contracts. All subjects here are explicitly fake."""
 import json
+import base64
+import hashlib
 
 import pytest
 
@@ -56,8 +58,11 @@ class Source:
         return CmdResult(0, "\n".join(lines), "")
 
     def exec(self, container, argv, *, timeout):
-        return CmdResult(0, json.dumps({"text": "\n".join(json.dumps(e) for e in self.events),
-                        "truncated": False, "size": 100, "mtime_ns": 1000, "resolved_path": "/logs/dump.json"}), "")
+        raw = "\n".join(json.dumps(e) for e in self.events).encode()
+        return CmdResult(0, json.dumps({"schema": "guard-container-file/2", "raw_base64": base64.b64encode(raw).decode(),
+                        "raw_retained_bytes": len(raw), "raw_retained_sha256": hashlib.sha256(raw).hexdigest(),
+                        "file_identity_stable": True, "source_complete": True, "nofollow_components": True,
+                        "regular_file": True, "truncated": False, "size": len(raw), "mtime_ns": 1000}), "")
 
 
 def run_log(tmp_path, monkeypatch, source, values=None, source_cfg=None):

@@ -19,7 +19,8 @@ from guard.runtime.docker import Docker
 from .content_common import (append_artifact, content_request, control_state, json_body,
                              record_content, redact_value, sample_artifact)
 from .http_common import HttpCheckExecutor
-from .log_integrity_parser import (MAX_CAPTURE_BYTES, PROFILE, TRUSTED_FIELDS, parse_native_info)
+from .log_integrity_parser import (MAX_CAPTURE_BYTES, PROFILE, TRUSTED_FIELDS)
+from .log_integrity_contract import analyze_integrity_capture
 
 
 STEPS = ("multiline", "control-delimiters", "reserved-display")
@@ -31,7 +32,7 @@ _FORMATTER_SHA = "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20e
 
 class LogIntegrityExecutor(HttpCheckExecutor):
     name = "log_integrity"
-    version = "0.1.0"
+    version = "0.2.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -114,19 +115,30 @@ class LogIntegrityExecutor(HttpCheckExecutor):
             return {"text": "", "returncode": None, "truncated": False, "error": "capture deadline exhausted"}
         try:
             call = self._capture or self.docker.logs_window
-            result = call(ctx.target["engine"]["container"], since=since, until=until, timeout=min(30, remaining))
-            # stderr is not concatenated into stdout: it may be daemon diagnostics,
-            # and joining streams would invent event order across independent pipes.
+            kwargs = {"since": since, "until": until, "timeout": min(30, remaining)}
+            if self._capture is None and isinstance(self.docker, Docker):
+                kwargs["max_bytes"] = MAX_CAPTURE_BYTES
+            result = call(ctx.target["engine"]["container"], **kwargs)
+            # stderr never becomes engine events or an invented stream order.
             text = result.stdout
             if type(text) is not str or type(result.stderr) is not str:
                 raise ValueError("invalid decoded CLI response")
-            raw = text.encode("utf-8")
-            return {"text": raw[:MAX_CAPTURE_BYTES].decode("utf-8", "replace"),
-                    "returncode": result.returncode, "truncated": len(raw) >= MAX_CAPTURE_BYTES,
-                    "decoded_stdout_bytes": len(raw), "decoded_stdout_sha256": hashlib.sha256(raw).hexdigest(),
-                    "stderr_present": bool(result.stderr.strip()),
+            decoded = text.encode("utf-8")
+            raw = getattr(result, "stdout_bytes", None)
+            pipe = getattr(result, "capture", None)
+            return {"text": decoded[:MAX_CAPTURE_BYTES].decode("utf-8", "replace"),
+                    "stderr_text": result.stderr.encode("utf-8")[:MAX_CAPTURE_BYTES].decode("utf-8", "replace") if result.returncode == 0 else "",
+                    "returncode": result.returncode,
+                    "truncated": len(decoded) >= MAX_CAPTURE_BYTES or bool(pipe and pipe.get("truncated")),
+                    "timed_out": bool(pipe and pipe.get("timed_out")),
+                    "source_complete": pipe.get("complete") is True if pipe is not None else True,
+                    "pipe_capture": pipe,
+                    "decoded_stdout_bytes": len(decoded), "decoded_stdout_sha256": hashlib.sha256(decoded).hexdigest(),
+                    "raw_retained_bytes": len(raw) if raw is not None else None,
+                    "raw_retained_sha256": hashlib.sha256(raw).hexdigest() if raw is not None else None,
+                    "stderr_present": bool(result.stderr.strip()), "window": {"since": since, "until": until},
                     "error": "Docker CLI source read failed" if result.returncode else None,
-                    "encoding": "UTF-8 after Docker CLI decoding; hashes are not raw daemon-file hashes"}
+                    "encoding": "retained CLI pipe bytes decoded as UTF-8; raw and decoded hashes are separate, not daemon-file hashes"}
         except Exception as exc:
             return {"text": "", "returncode": None, "truncated": False, "error": type(exc).__name__}
 
@@ -204,48 +216,16 @@ class LogIntegrityExecutor(HttpCheckExecutor):
                            "normal_generation": state, "response_id_matches_body": response_matches})
         until = datetime.now(timezone.utc).isoformat(timespec="microseconds")
         capture = self._read(ctx, since, until, deadline) if verified else {"text": "", "returncode": None, "error": "identity unverified"}
+        capture["window"] = {"since": since, "until": until}
         after_identity = self._snapshot(ctx, launch, deadline) if verified else None
-        stable = bool(verified and before_identity == after_identity)
-        if not stable:
-            gaps.append("engine identity or logging controls changed or could not be rechecked")
-        if capture.get("returncode") != 0 or capture.get("truncated") or capture.get("stderr_present"):
-            gaps.append("native source read failed, reached its bound or included a separate stderr stream")
-        collection = parse_native_info(capture["text"], markers=(nonce,), max_events=self.cfg.get("max_events", 128))
-        gaps.extend(collection["gaps"])
-        anchors = {}
-        for trial in trials:
-            label = trial["case"]
-            expected = "Received request cmpl-" + trial["request_id"] + "-0: params: "
-            matches = [event for event in collection["events"] if event["message"].startswith(expected)
-                       and event["message"].endswith(", lora_request: None.")]
-            matching_source = [event for event in matches if event["level"] == "INFO"
-                               and event["source"] == "request_logger.py" and event["source_line"] == 65]
-            if stable and collection["complete"] and len(matches) > 1:
-                violations.append(f"{label}: duplicate trial-linked request events in the reference collector")
-            baseline = anchors.get("before")
-            if stable and collection["complete"] and baseline and len(matches) == 1:
-                if any(matches[0][key] != baseline[key] for key in ("process", "pid", "level", "source", "source_line")):
-                    violations.append(f"{label}: exact request event overwrites the selected native logger metadata")
-            if len(matching_source) != 1 or not trial["response_id_matches_body"]:
-                gaps.append(f"{label}: one exact body-ID request event and successful linked response are unconfirmed")
-                continue
-            anchors[label] = matching_source[0]
-            reached.append(label)
-        baseline = anchors.get("before")
-        fields_preserved = bool(baseline and len(reached) == len(planned))
-        if baseline and stable and collection["complete"]:
-            for label, event in anchors.items():
-                if any(event[key] != baseline[key] for key in ("process", "pid", "level", "source", "source_line")):
-                    violations.append(f"{label}: selected native logger metadata differs from the normal source")
-                    fields_preserved = False
-        normal_logs = bool("before" in anchors and "after" in anchors)
-        normal_inference = bool(len(controls) == 2 and all(value == "pass" for value in controls.values()))
-        if not normal_logs:
-            gaps.append("normal before/after request events did not reach the reference collector")
-        boundaries = bool(stable and collection["complete"] and len(reached) == len(planned))
-        collection["gaps"] = sorted(set(gaps))
-        collection["complete"] = not gaps
-        collection["source_identity"] = before_identity
+        gaps_before_analysis = list(gaps)
+        analysis = analyze_integrity_capture(capture, trials, before_identity, after_identity,
+                                             initial_gaps=gaps, max_events=self.cfg.get("max_events", 128))
+        collection, stable = analysis["collection"], analysis["stable"]
+        violations, gaps, reached = analysis["violations"], analysis["gaps"], analysis["reached"]
+        fields_preserved, boundaries = analysis["fields_preserved"], analysis["boundaries"]
+        normal_logs, normal_inference = analysis["normal_logs"], analysis["normal_inference"]
+        controls = analysis["controls"]
         collection["capture_window"] = {"since": since, "until": until}
         collection["redaction"] = "configured authorization secrets and labelled credential values; source digests precede redaction"
         displayed = redact_value(collection, ctx.secrets)
@@ -258,7 +238,17 @@ class LogIntegrityExecutor(HttpCheckExecutor):
         # translation would otherwise make the recorded display digest differ.
         (ctx.workdir / "log_integrity_display.html").write_bytes(html.encode("utf-8"))
         sample_artifact(ctx, "log_integrity_events.json", collection)
-        sample_artifact(ctx, "log_integrity_samples.json", {"capture": capture, "trials": trials,
+        saved_capture = redact_value(capture, ctx.secrets)
+        saved_raw = saved_capture["text"].encode("utf-8")
+        saved_capture["persisted_decoded_sha256"] = hashlib.sha256(saved_raw).hexdigest()
+        saved_capture["persisted_decoded_bytes"] = len(saved_raw)
+        if "stderr_text" in saved_capture:
+            stderr_raw = saved_capture["stderr_text"].encode("utf-8")
+            saved_capture["persisted_stderr_sha256"] = hashlib.sha256(stderr_raw).hexdigest()
+            saved_capture["persisted_stderr_bytes"] = len(stderr_raw)
+        sample_artifact(ctx, "log_integrity_samples.json", {"schema": "guard-log-integrity-capture/2",
+                        "capture": saved_capture, "trials": trials, "initial_gaps": gaps_before_analysis,
+                        "max_events": self.cfg.get("max_events", 128), "policy_values": values,
                         "source_identity_before": before_identity, "source_identity_after": after_identity,
                         "native_contract": contract, "collection_sha256": hashlib.sha256(json.dumps(displayed, sort_keys=True, ensure_ascii=False).encode()).hexdigest(),
                         "display_sha256": hashlib.sha256(html.encode()).hexdigest(), "display_verified": display_verified,

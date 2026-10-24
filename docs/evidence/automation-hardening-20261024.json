@@ -1,0 +1,247 @@
+{
+  "kind": "OFFLINE_VERIFICATION_SUMMARY",
+  "data_origin": "EXAMPLE",
+  "actual_engine_started": false,
+  "recorded_at": "2026-10-24T03:07:11.335262+09:00",
+  "implementation_start": "5a352512bbc24589845438438b0146a0d7653b6e",
+  "git_base": "24f7d90a2745c108d7d395e5082a3721a3198f0c",
+  "environment": "Windows x64; CPython 3.11.16; uv 0.12.11; uv.lock frozen",
+  "pack": {
+    "kind": "PACK",
+    "id": "PACK-BASELINE",
+    "revision": 20,
+    "sha256": "7ec3cb2d1a1f8db8886bbccf605af1d464f95a66f06a74a9d94a7a0ad37180fc"
+  },
+  "first_suite": {
+    "passed": 2040,
+    "failed": 26,
+    "errors": 0,
+    "skipped": 5,
+    "deselected": 18,
+    "seconds": 223.73,
+    "junit_sha256": "8133b6e13643273efe0d7b52c0e85aac298199241a46045453fc0071f27412cb",
+    "log_sha256": "e7c61d56dcdc469e8da6e46a3e25b5ae04fa1ea4d756c0c41c3c6cf646717c68",
+    "skip_reasons": [
+      {
+        "test": "tests.invariants.test_inv_03.test_real_connection_refused_is_classified_and_not_pass_alone",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_http_probe.test_refused_on_closed_port",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_http_probe.test_tcp_probe_refused_and_connected_without_sending_bytes",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_model_inventory.test_inventory_follows_symlinks_and_is_order_independent",
+        "reason": "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_policy_m2.test_template_rejects_symlink_parent_into_input_pack",
+        "reason": "디렉터리 symlink 권한/지원 필요: OSError"
+      }
+    ]
+  },
+  "after_test_fixture_repairs": {
+    "passed": 2066,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 5,
+    "deselected": 18,
+    "seconds": 217.46,
+    "junit_sha256": "5b10323005565210a230933ef0052f687c501cbeba6020f22ea8dd18000f5dc4",
+    "log_sha256": "f59f3d2e0c7093dae6f8e9f4fc52bacc08ca4cbcd1547db16e8646e6735fe3aa",
+    "skip_reasons": [
+      {
+        "test": "tests.invariants.test_inv_03.test_real_connection_refused_is_classified_and_not_pass_alone",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_http_probe.test_refused_on_closed_port",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_http_probe.test_tcp_probe_refused_and_connected_without_sending_bytes",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_model_inventory.test_inventory_follows_symlinks_and_is_order_independent",
+        "reason": "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_policy_m2.test_template_rejects_symlink_parent_into_input_pack",
+        "reason": "디렉터리 symlink 권한/지원 필요: OSError"
+      }
+    ]
+  },
+  "after_obs03_review_fix": {
+    "passed": 2084,
+    "failed": 3,
+    "errors": 0,
+    "skipped": 5,
+    "deselected": 18,
+    "seconds": 224.47,
+    "junit_sha256": "e14cd5981a505a58400501b6621a48c74546e5020f33f68d43df422522800e9f",
+    "log_sha256": "f3e3f17973e4b236b35810d5335d3641aa02182b9e86ef37f2fac0220fac912a",
+    "skip_reasons": [
+      {
+        "test": "tests.invariants.test_inv_03.test_real_connection_refused_is_classified_and_not_pass_alone",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_http_probe.test_refused_on_closed_port",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_http_probe.test_tcp_probe_refused_and_connected_without_sending_bytes",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_model_inventory.test_inventory_follows_symlinks_and_is_order_independent",
+        "reason": "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_policy_m2.test_template_rejects_symlink_parent_into_input_pack",
+        "reason": "디렉터리 symlink 권한/지원 필요: OSError"
+      }
+    ]
+  },
+  "final_suite": {
+    "passed": 2087,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 5,
+    "deselected": 18,
+    "seconds": 221.7,
+    "junit_sha256": "f2c0d1ba3003a77a79282e3aac73b32e9409de068c6e1bddacbed7f071ee69b5",
+    "log_sha256": "c4704229391781f6d48caff9f56b7ead4ec9408067651bdab811b7c79e5cf154",
+    "skip_reasons": [
+      {
+        "test": "tests.invariants.test_inv_03.test_real_connection_refused_is_classified_and_not_pass_alone",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_http_probe.test_refused_on_closed_port",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_http_probe.test_tcp_probe_refused_and_connected_without_sending_bytes",
+        "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_model_inventory.test_inventory_follows_symlinks_and_is_order_independent",
+        "reason": "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+      },
+      {
+        "test": "tests.test_policy_m2.test_template_rejects_symlink_parent_into_input_pack",
+        "reason": "디렉터리 symlink 권한/지원 필요: OSError"
+      }
+    ]
+  },
+  "first_failures": {
+    "count": 26,
+    "classification": "test assumptions",
+    "details": [
+      "19: SimpleNamespace lacked real bound validate_configuration method",
+      "3: target run ID was searched in side/event-only fixture list",
+      "4: Evidence builder did not accept PLAN/ENV keyword overrides"
+    ],
+    "product_rules_weakened": false
+  },
+  "last_review_fix": "OBS-03 valid unsupported log branches/marker contexts now separated from malformed values; configuration/source checks remain enforced. Its new preparation fixtures now reseal modified policy values before selection and check specific failure reasons.",
+  "installed_wheel": {
+    "ok": true,
+    "isolated": 1,
+    "files_matched": 78,
+    "commands": 30,
+    "wheel_sha256": "38930ba1b057d8a43df02b479ad0fb9f510defbf781c1b3726ab74f0693f66c8",
+    "checks": [
+      {
+        "name": "normal",
+        "origin": "EXAMPLE",
+        "execution": "COMPLETED",
+        "verdicts": {
+          "security": "UNKNOWN",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "official": false,
+        "swapped_outputs": 0,
+        "input_projection_verified": true,
+        "output_binding_verified": false,
+        "store_verify": []
+      },
+      {
+        "name": "output-swapped",
+        "origin": "EXAMPLE",
+        "execution": "COMPLETED",
+        "verdicts": {
+          "security": "UNKNOWN",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "official": false,
+        "swapped_outputs": 16,
+        "input_projection_verified": true,
+        "output_binding_verified": false,
+        "store_verify": []
+      },
+      {
+        "name": "foreign-input",
+        "origin": "EXAMPLE",
+        "execution": "COMPLETED",
+        "verdicts": {
+          "security": "FAIL",
+          "functional": "PASS",
+          "performance": "UNKNOWN"
+        },
+        "official": false,
+        "swapped_outputs": 0,
+        "input_projection_verified": false,
+        "output_binding_verified": false,
+        "store_verify": []
+      }
+    ],
+    "legacy_verdicts": {
+      "security": "PASS",
+      "functional": "PASS",
+      "performance": "UNKNOWN"
+    }
+  },
+  "integrity": {
+    "base": "5a352512bbc24589845438438b0146a0d7653b6e",
+    "pack": {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 20,
+      "sha256": "7ec3cb2d1a1f8db8886bbccf605af1d464f95a66f06a74a9d94a7a0ad37180fc"
+    },
+    "protected_tracked_files": 175,
+    "protected_bytes_unchanged": true,
+    "other_checkdefs_unchanged": 76,
+    "legacy_req11_fixture_exact": true,
+    "regeneration_twice_bytes_equal": true,
+    "catalog_rows": 322,
+    "catalog_links": 614,
+    "changed_catalog_rows": [
+      "P-AUTO-REQ-11-RESULT-BINDING",
+      "P-AUTO-REQ-11-CLIENT-REQUEST-ID-TRUST"
+    ],
+    "historical_external_refs_preserved_not_refetched": 772,
+    "local_refs_and_pointers_resolved": true,
+    "metadata_exact": true,
+    "policy_values_and_scope_unchanged": true,
+    "auto_checks": 11,
+    "policy_checks": 21,
+    "policy_paths": 46
+  },
+  "tested_source_tree_sha256": "3404992b23ad8293374be7e1d8f1dab87f4bc88afcf473b3a26e92e3f0e8309f",
+  "limitations": [
+    "No engine/stub/GPU/production/paid-resource trial was executed; engine/docker tests remain explicitly excluded.",
+    "Five Windows skips are preserved and not counted as passes; the one-minute target is not met.",
+    "Independent generated-output attribution remains unverified, with REQ-11 rev3 security UNKNOWN unless an independent violation FAIL is observed.",
+    "Official policy/pack review, enterprise identity/SIEM, performance and two actual-image comparison are not established."
+  ]
+}

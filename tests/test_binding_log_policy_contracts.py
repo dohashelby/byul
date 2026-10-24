@@ -38,6 +38,8 @@ def sample(check_id, raw="PASS"):
     if check_id == "REQ-11":
         observations = {"profile_supported": True, "source_contract_verified": True,
             "template_identity_verified": True, "connection_binding_verified": True, "connection_overlap_verified": True,
+            "input_projection_verified": True, "output_binding_verified": False,
+            "output_binding_gap": "EXAMPLE generated output attribution not independently verified",
             "tested_result_binding": "originating_connection", "tested_client_request_id_trust": "untrusted_correlation",
             "cases_planned": list(CASES), "cases_attempted": list(CASES), "cases_verified": list(CASES),
             "security_violations": [], "collection_complete": True}
@@ -110,7 +112,8 @@ def test_policy_requires_every_explicit_field_and_has_no_implicit_defaults(check
 def test_complete_pinned_evidence_contract_is_required_and_performance_remains_unknown(check_id):
     check, evd = sample(check_id)
     assert DeclaredJudge().judge(check, evd, {}, values(check_id)).verdicts == {
-        "security": Verdict.PASS, "functional": Verdict.PASS, "performance": Verdict.UNKNOWN}
+        "security": Verdict.UNKNOWN if check_id == "REQ-11" else Verdict.PASS,
+        "functional": Verdict.PASS, "performance": Verdict.UNKNOWN}
     assert evd.data_origin.value == "EXAMPLE"
 
 

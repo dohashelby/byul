@@ -11,17 +11,22 @@ class InputValidationExecutor(HttpCheckExecutor):
     requires_roles = False
     requires_route_scope = False
 
+    def validate_configuration(self, check):
+        """Validate execution bounds even when policy scope is unsupported."""
+        if type(self.cfg.get("vocab_size")) is not int or self.cfg["vocab_size"] < 1 or not self.cfg.get("vocab_source"):
+            raise ValueError("execution settings need vocab_size and its model/fixture source")
+        budget = self.cfg.get("max_probe_tokens", 4096)
+        if type(budget) is not int or budget < 2:
+            raise ValueError("max_probe_tokens must be an integer of at least two tokens")
+
     def validate_policy(self, check, values):
         context = policy_context(check, values)
         if context is not None and context.blocked:
             raise ValueError("; ".join(context.reasons))
-        if type(self.cfg.get("vocab_size")) is not int or self.cfg["vocab_size"] < 1 or not self.cfg.get("vocab_source"):
-            raise ValueError("execution settings need vocab_size and its model/fixture source")
+        self.validate_configuration(check)
         if type(values.get("max_input_tokens")) is not int or values["max_input_tokens"] < 1:
             raise ValueError("max_input_tokens must be a positive policy limit")
         budget = self.cfg.get("max_probe_tokens", 4096)
-        if type(budget) is not int or budget < 2:
-            raise ValueError("max_probe_tokens must be an integer of at least two tokens")
         if values["max_input_tokens"] + 1 > budget:
             raise ValueError("input limit exceeds the configured bounded probe budget")
         if not values.get("rejection_codes") or any(s not in {"400", "413", "422"} for s in values["rejection_codes"]):

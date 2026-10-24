@@ -1,6 +1,8 @@
 # 기업 정책 카탈로그 — Phase 1 검토 초안
 
-> 현행 2차 등록은 PACK-BASELINE 18/DRAFT, 정책 **19점검·41경로**, 자동 실행기 연결 **9개**다. REQ-07 revision 2에 허용 template SHA 목록·렌더 후 입력 token 한도·요청 override 허용 여부의 3경로를 추가해 CSV는 **317행·609연결**이다. 원문 303행·595연결과 1차의 제한 입력 투영 11행은 보존하고 2차 투영 3행을 더한 수치다. 기업 승인 진위나 모든 템플릿/processor의 자동화를 뜻하지 않는다. adapter 0.3.0·declared/0.11.0의 지원 계약은 [자동화 2차](AUTOMATION_PHASE2.md), [예시 정책](../examples/automation-chat-policy.yaml), [작업 프롬프트](AUTOMATION_PHASE2_PROMPT.md)를 따른다. 기본 전체 1,781통과·5 skip·18제외, 마지막 오류 직렬화 보수 후 관련 128회귀 통과. 최종 127 경계 확인과 별도 32 반례, REQ-13 private_system·PLT-01의 실제 관측, 반출·복원·저장 팩 재판정은 [직접 검증 기록](AUTOMATION_PHASE2.md#검증-기록)과 [선별 증거](evidence/automation-phase2-20261023.json)를 따른다. 연결 수가 완료 수는 아니며 성능 UNKNOWN·EXAMPLE/DRAFT·official=false다. 아래 단계별 수치는 당시 기록이다.
+> 현행 [자동화 보강](AUTOMATION_HARDENING.md)은 PACK-BASELINE 20/DRAFT·REQ-11 revision 3·자동 연결 11개·정책 21점검/46경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.12.0이다. REQ-11은 입력 projection 하위 검증과 생성 출력 귀속 미검증을 구분하며 전체 보안 PASS를 보류한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
+>
+> 분류 a43/b3/c161/d115는 정책의 현재 소비 상태이며 인프라 가능 등급 A/B/C와 다르다. 아래 단계별 수치는 당시 기록이다.
 
 > 1차 기록 당시 등록: 자동화 1차 팩17/DRAFT, 정책 18점검·38경로, 자동 실행기 연결 8개(신규3개는 제한 관측 프로파일). CSV의 원문 결정 303행·595연결을 보존하고 제한 프로파일 입력 투영 11행을 추가해 총314행·606연결이다. 이 11개를 기업의 복잡한 원결정 전체가 해결된 것으로 세지 않는다. 아래 Phase/M 단계별 수치는 당시 기록이며 [현재 구현·검증](AUTOMATION_PHASE1.md)을 따른다.
 

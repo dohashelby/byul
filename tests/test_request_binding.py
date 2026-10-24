@@ -164,9 +164,15 @@ def test_two_consumer_fixtures_cover_all_json_sse_id_cases_without_generated_ech
     draft, world = run(tmp_path)
     result = judge(draft)
     assert draft.data_origin.value == "EXAMPLE"
-    assert result.verdicts["security"] == result.verdicts["functional"] == Verdict.PASS
+    assert result.verdicts["security"] == Verdict.UNKNOWN
+    assert result.verdicts["functional"] == Verdict.PASS
     assert result.verdicts["performance"] == Verdict.UNKNOWN
     assert draft.observations["cases_verified"].value == list(CASES)
+    assert draft.observations["input_projection_verified"].value is True
+    assert draft.observations["output_binding_verified"].value is False
+    assert "not independently verified" in draft.observations["output_binding_gap"].value
+    assert draft.observations["collection_complete"].value is True
+    assert summary(draft)["verification_scope"]["output_binding_verified"] is False
     assert len(world.calls) == 20 and all(0 < timeout <= 120 for timeout in world.timeouts)
     assert all(challenge.attempted for challenge in draft.challenges)
     assert "EXAMPLE-private-host-path" not in json.dumps(summary(draft))
@@ -209,7 +215,8 @@ def test_missing_overlapping_independent_connections_cannot_pass(tmp_path, chang
 
 def test_collector_output_order_does_not_replace_explicit_request_labels(tmp_path):
     draft, _ = run(tmp_path, World(reorder_results=True))
-    assert judge(draft).verdicts["security"] == Verdict.PASS
+    assert draft.observations["input_projection_verified"].value is True
+    assert judge(draft).verdicts["security"] == Verdict.UNKNOWN
 
 
 @pytest.mark.parametrize("key,value", [("result_binding", "tenant_principal"),

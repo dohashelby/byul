@@ -738,3 +738,11 @@ git status
 - 실측: Windows/WSL2 pinned CPU·실제 OPT로 REQ-11(JSON4쌍/SSE4쌍,20요청)·OBS-09(7사례)·PLT-01 S/F PASS/PUNKNOWN. 첫 OBS 표시내용/첨부Ref는 맞지만 별도 display digest가 Windows 줄바꿈과 달라 원본 보존 후 고정 UTF8저장+새OBS 단독02로 재검증했다. 기업 principal/SIEM/worker 병렬성·GPU/성능/두 실제 이미지 비교는 미검증, official=false다.
 - 보존/배포: 두 시도 verify·반출·새 복원·저장 팩 재판정·JSONHTML, 기존 객체/보고서/store/모델/컨테이너 불변·관리자원정리. 최종wheel77파일/17CLI·frozen/-I·readonly준비,팩재생성2회/metadata/로컬출처·보호167추적파일과다른75정의 보존을 확인했다. [직접 기록](docs/AUTOMATION_PHASE3.md#검증-기록)·[선별 증거](docs/evidence/automation-phase3-20261023.json)를 따른다.
 - 다음 단계: REQ-10 runner 실제 소비·OBS-03 예외 dump를 별도 계약으로 확장하고 기업 신원/로그 필수필드는 팀이 정한다. 현재11연결은77전체 완료가 아니다. 임의template/processor·취소/child/retry·외부 collector는 별도 묶음이다.
+
+## 2026-10-23 — 기존 자동화 판정·준비 경로 보강
+
+- 기준 phase3 5a35251에서 codex/gua-automation-hardening으로 분기했다. REQ11 생성 출력 미검증의 보안 PASS 상한, update side별 sentinel, prepare의 점검별 정적 지원 안내를 보강한다. 새 정책/실행기와 실제 엔진 기동은 없다.
+- 팩20/DRAFT·REQ11정의3·77개·자동11·정책21점검46경로·322행614연결을 유지한다. 과거 팩/증거/정책값·기본fake설정을 보존한다.
+- 전체 구현·테스트코드·문서 초안 후 검증/실패수정 완료. 최초26개 보조 코드 가정 실패수정후2066통과, OBS03안내 보수21회귀추가 후 최종2087통과/0실패/5skip/18제외(221.7초). 1분목표미달·실제엔진미기동. wheel78파일/-I/CLI30·팩재생성2회·175파일/다른76정의·정책값/이력보존을 확인했다. [직접 기록](docs/AUTOMATION_HARDENING.md)과 [요약](docs/evidence/automation-hardening-20261024.json)을 따른다. 다음 두 실제 이미지 실증은 계획만 작성했다.
+
+- 2026-10-24 원격 재확인: PR2~18은 모두 main 병합 완료(최종24f7d90). 코드 동일·.DS_Store만 다른 최신 main으로 fast-forward해 기존 로컬 수정을 보존했다. 이번 초안 PR base는 main이며 GitHub PR 병합/닫기/base변경/rebase/force-push는 수행하지 않는다.

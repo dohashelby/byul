@@ -18,6 +18,10 @@ from .content_common import (MAX_SAMPLE_BYTES, append_artifact, content_request,
                              markers, sample_artifact, string_list, validate_content_settings, record_content, bounded_probe)
 from .http_common import HttpCheckExecutor
 
+REQUIRED_BRANCHES = frozenset({"normal", "error", "exception_dump"})
+SUPPORTED_BRANCHES = REQUIRED_BRANCHES | {"debug", "trace"}
+SUPPORTED_MARKER_CONTEXTS = frozenset({"caller_input", "private_system", "error_input"})
+
 _FILE_READER = """import json,pathlib,sys
 p=pathlib.Path(sys.argv[1]); limit=int(sys.argv[2]); stat=p.stat()
 if not p.is_file(): raise ValueError('source is not a regular file')
@@ -60,15 +64,22 @@ class LogAnalysisExecutor(HttpCheckExecutor):
         self.docker = docker or Docker("log" + secrets.token_hex(4))
 
     def validate_policy(self, check, values):
-        validate_content_settings(self.cfg)
+        self.validate_configuration(check)
         for key in ("allowed_log_fields", "forbidden_log_fields", "forbidden_marker_contexts", "required_sources", "required_branches"):
             string_list(values, key, empty=key in {"forbidden_log_fields", "forbidden_marker_contexts"})
-        if set(values["forbidden_marker_contexts"]) - {"caller_input", "private_system", "error_input"}:
+        if set(values["forbidden_marker_contexts"]) - SUPPORTED_MARKER_CONTEXTS:
             raise ValueError("unknown forbidden marker context")
-        if not {"normal", "error", "exception_dump"} <= set(values["required_branches"]):
+        if not REQUIRED_BRANCHES <= set(values["required_branches"]):
             raise ValueError("OBS-03 requires normal, error and basic exception_dump branches")
-        if set(values["required_branches"]) - {"normal", "error", "exception_dump", "debug", "trace"}:
+        if set(values["required_branches"]) - SUPPORTED_BRANCHES:
             raise ValueError("unsupported required log branch")
+        if not any(source["id"] in values["required_sources"] and source.get("role", "engine") == "engine"
+                   for source in self.cfg["log_sources"]):
+            raise ValueError("OBS-03 must include a local engine source; collector-only evidence is insufficient")
+
+    def validate_configuration(self, check):
+        """Check bounded execution/source inventory without reducing policy scope."""
+        validate_content_settings(self.cfg)
         if self.cfg.get("endpoint", "/v1/completions") not in {"/v1/completions", "/v1/chat/completions"}:
             raise ValueError("log analysis supports completions/chat completions only")
         sources = self.cfg.get("log_sources")
@@ -92,8 +103,7 @@ class LogAnalysisExecutor(HttpCheckExecutor):
             ids.append(source["id"])
         if len(ids) != len(set(ids)):
             raise ValueError("log source IDs must be unique")
-        if not any(source["id"] in values["required_sources"] and source.get("role", "engine") == "engine"
-                   for source in sources):
+        if not any(source.get("role", "engine") == "engine" for source in sources):
             raise ValueError("OBS-03 must include a local engine source; collector-only evidence is insufficient")
 
     def _finish(self, ctx):

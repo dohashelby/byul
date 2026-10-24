@@ -1,7 +1,9 @@
-"""REQ-11: bounded JSON/SSE attribution to the originating HTTP connection.
+"""REQ-11: bounded JSON/SSE input projection and connection checks.
 
 The fixture uses consumer-side prompt IDs and rendered text. Generated words,
 an HTTP status, and an echoed caller-controlled request ID prove no ownership.
+There is no independent oracle for the generated output's originating request.
+The current collector can therefore establish subproperties, never security PASS.
 No abort, stored-result, retry, child-request or tenant authorization is tested.
 """
 from __future__ import annotations
@@ -190,7 +192,7 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
 
 class RequestBindingExecutor(HttpCheckExecutor):
     name = "request_binding"
-    version = "0.1.0"
+    version = "0.2.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -386,9 +388,18 @@ class RequestBindingExecutor(HttpCheckExecutor):
             gaps.append("owned engine and fixed template identity were not stable across collection")
         complete = bool(profile_supported and identity_verified and not gaps and not violations
                         and cases_verified == list(CASES) and normal_ok)
+        # This verifies returned consumer-input projections and response framing,
+        # not which request produced the generated content/token IDs. In
+        # particular, an output-only swap can preserve every checked projection.
+        input_projection_verified = complete
+        output_binding_gap = ("Generated output attribution is not independently verified: "
+            "matching prompt projections, API IDs and token counts are insufficient.")
         obs_values = {"profile_supported": profile_supported, "source_contract_verified": source_verified,
             "template_identity_verified": identity_verified,
-            "connection_binding_verified": cases_verified == list(CASES),
+            "connection_binding_verified": cases_verified == list(CASES),  # legacy case-coverage observation
+            "input_projection_verified": input_projection_verified,
+            "output_binding_verified": False,
+            "output_binding_gap": output_binding_gap,
             "connection_overlap_verified": len(pair_observations) == len(CASES) and all(item["overlap"] for item in pair_observations),
             "tested_result_binding": ctx.policy_values["result_binding"],
             "tested_client_request_id_trust": ctx.policy_values["client_request_id_trust"],
@@ -398,6 +409,10 @@ class RequestBindingExecutor(HttpCheckExecutor):
             "functional_probe_results": controls}
         observations = {key: {"value": value, "collected": True} for key, value in obs_values.items()}
         summary = {"profile": PROFILE, "requests_sent": sent, "settings": settings,
+            "verification_scope": {"input_projection_verified": input_projection_verified,
+                "output_binding_verified": False, "output_binding_gap": output_binding_gap,
+                "cases_verified_meaning": "input projection, connection overlap and response framing only",
+                "collection_complete_meaning": "bounded collector protocol complete; not generated-output ownership proof"},
             "source_contract": contract, "gaps": sorted(set(gaps)), "violations": sorted(set(violations)),
             "template_identity_before": before, "template_identity_after": after,
             "pairs": pair_observations, "fixtures": expected,
@@ -405,6 +420,8 @@ class RequestBindingExecutor(HttpCheckExecutor):
                         "body_shape": {"user": "per-run synthetic A/B text", "output": settings["max_output_tokens"]}},
             "elapsed_seconds": time.monotonic() - started,
             "limitations": ["HTTP request/collection intervals overlap; worker-side simultaneous execution is not proved.",
+                output_binding_gap,
+                "connection_binding_verified and cases_verified describe input-projection subproperties only; CheckDef rev3 withholds security PASS.",
                 "Caller-controlled API IDs may intentionally collide; a collision alone is not a foreign-result finding.",
                 "Only the pinned CPU text fixture and two synthetic direct-engine connections are covered.",
                 "Enterprise principals, gateway authorization, child IDs, randomization modes, cancellation, retries and stored results remain untested.",

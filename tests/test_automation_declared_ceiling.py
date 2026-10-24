@@ -192,8 +192,7 @@ def update_scope_observations(cid, evd, policy_key, value):
 
 
 def automatic_validate_policy(check, values):
-    """Call the existing pure preflight method without constructing an executor."""
-    from types import SimpleNamespace
+    """Use real method binding without running executor initialization or I/O."""
     from guard.executors.sampling_validation import SamplingValidationExecutor
     from guard.executors.response_content import ResponseContentExecutor
     from guard.executors.log_analysis import LogAnalysisExecutor
@@ -204,7 +203,9 @@ def automatic_validate_policy(check, values):
         "REQ-13": (ResponseContentExecutor, {}),
         "OBS-03": (LogAnalysisExecutor, {"log_sources": [{"id": "engine", "container": "engine", "kind": "docker_logs"}]}),
     }[check.id]
-    cls.validate_policy(SimpleNamespace(cfg=settings), check, values)
+    executor = object.__new__(cls)
+    executor.cfg = settings
+    executor.validate_policy(check, values)
 
 
 INVALID_POLICY_CASES = [

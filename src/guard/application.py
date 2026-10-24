@@ -179,10 +179,12 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
             with Docker(run_id) as docker:
                 side_dir = run_dir / side.value
                 try:
+                    sentinel_dir = _managed_sentinel_dir(run_dir, options.get("engine_profile", "default"), side.value)
                     target = sandbox.up(docker, options.get("topology", "isolated"), side_dir,
                                         keys.get("GUARD_ALLOWED_KEY"), engine="vllm", vllm=managed[side.value],
                                         gateway_profile=profile, gateway_keys=keys,
                                         engine_profile=options.get("engine_profile", "default"),
+                                        sentinel_dir=sentinel_dir,
                                         credential_canary=options.get("credential_canary", False))
                     if target.get("observed_version") != env.engine.version:
                         raise ValueError("observed engine version differs from ENV")
@@ -216,6 +218,19 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
                  or (e.execution.status == ExecStatus.NOT_RUN and pack.checks[e.check_id].executor is not None)
                  for e in store.find_latest("EVD", lambda e: e.plan == plan.ref()))
     return report, failed or bool(lifecycle_errors)
+
+
+def _managed_sentinel_dir(run_dir: Path, engine_profile: str, side: str = "single") -> Path | None:
+    """Create a fresh, run-owned writable probe directory; never reuse old data."""
+    if not sandbox.ENGINE_PROFILES[engine_profile].get("sentinel_mount"):
+        return None
+    # The run root was created exclusively by this invocation. Keeping each
+    # directory directly below it avoids sharing baseline/candidate writes and
+    # preserves validation's existing run/sentinel location.
+    name = "sentinel" if side == "single" else f"{side}-sentinel"
+    folder = run_dir / name
+    folder.mkdir(exist_ok=False)
+    return folder
 
 
 def _has_cleanup_note(exc: Exception, run_id: str) -> bool:
@@ -274,10 +289,7 @@ def execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of
     store.put(plan)
     (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
     target_dir = run_dir / "single"
-    sentinel_dir = None
-    if options.get("engine_profile") == "overprivileged":
-        sentinel_dir = run_dir / "sentinel"
-        sentinel_dir.mkdir(exist_ok=False)
+    sentinel_dir = _managed_sentinel_dir(run_dir, options.get("engine_profile", "default"))
     for name in effective["executors"]:
         effective.setdefault(name, {})["target"] = str(target_dir / "target.json")
     rc = RunConfig(executors=effective["executors"], adapter="vllm", raw=effective)
@@ -325,12 +337,14 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False) -> 
     """Read-only preparation check. It neither pulls images nor starts an engine."""
     from guard.executors import registry
     from guard.core.preflight import validate_pack
+    from guard.readiness_support import assess_check_support
 
     checks = []
     def record(name, ok, detail):
         checks.append({"check": name, "ok": bool(ok), "detail": detail})
 
     prepared = None
+    check_support = []
     try:
         validate_pack(pack)
         if single:
@@ -345,6 +359,11 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False) -> 
         selected = [item for item in plan.items if item.selected]
         if not selected:
             raise ValueError("policy selected no checks")
+        for (side, c), env in zip(prepared[1].items(), envs):
+            check_support.extend({"side": side, **row} for row in assess_check_support(
+                pack, env, policy, c, selected_check_ids=[item.check_id for item in selected],
+                managed=prepared[0] == "managed"))
+        support_by_key = {(row["side"], row["check_id"]): row for row in check_support}
         for item in selected:
             if item.gaps:
                 raise ValueError(f"{item.check_id}: unresolved selection gaps {item.gaps}")
@@ -355,7 +374,15 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False) -> 
                 if prepared[0] == "managed":
                     c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
                 executor = factory(c)
-                executor.validate_policy(pack.checks[item.check_id], policy.values.get(item.check_id, {}))
+                support = support_by_key[side, item.check_id]
+                # These collectors distinguish a valid policy outside their
+                # bounded profile from malformed input. Still validate launch
+                # settings, budgets and fixtures; never shrink the policy.
+                if (support.get("policy_valid") is True and support.get("policy_supported") is False
+                        and hasattr(executor, "validate_configuration")):
+                    executor.validate_configuration(pack.checks[item.check_id])
+                else:
+                    executor.validate_policy(pack.checks[item.check_id], policy.values.get(item.check_id, {}))
                 executor.keys()
         record("inputs", True, "pack, selection, real executors, policy settings and model inventory checked")
     except Exception as exc:
@@ -410,8 +437,9 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False) -> 
                 record("resources", False, f"Linux Docker capacity unavailable ({type(exc).__name__}); check Docker Desktop/WSL2 memory allocation")
     if not single and envs[0].engine.image_digest == envs[1].engine.image_digest:
         record("image-pair", False, "use different image digests for an update validation")
-    return {"ready": all(c["ok"] for c in checks), "checks": checks,
+    return {"ready": all(c["ok"] for c in checks), "checks": checks, "check_support": check_support,
             "limitations": ["Preparation only: no engine, security verdict or performance was measured.",
+                            "ready describes input/host preparation; per-check static support is separate and does not remove checks or prove challenge completion.",
                             "CPU model/kernel/threads and GPU availability require verification on the test host.",
                             "On Windows, use Docker Desktop Linux containers and WSL2 integration; readiness does not start or reconfigure them.",
                             "Container RAM/shm/swap bounds are ceilings, not reservations or a guarantee that the model fits; preserve unrelated containers."]}

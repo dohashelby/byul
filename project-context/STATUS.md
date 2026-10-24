@@ -1,6 +1,6 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-10-21
+최종 갱신: 2026-10-24
 
 ## 현재 단계
 
@@ -88,10 +88,17 @@
 - `.venv/bin/python -B -m unittest discover -s tests -v`는 166개 중 116개 통과·로컬 소켓 제한 50개 건너뜀·실패 0개였다. 실행 중인 서버·Docker는 건드리지 않았고 설치·커밋·푸시하지 않았다; 소켓 HTTP 회귀시험은 Claude 환경 재실행이 필요하다.
 - 2026-10-24 `mvp/app.py`의 기록·backend 조회·중계·요청 흐름·HTTP 분기를 `request_records.py`·`engine_client.py`·`relay.py`·`request_flow.py`·`http_handler.py`로 책임별 분리하고 `app.py`에는 구성·상태 조합·수명주기를 남겼다.
 - 분리 모듈 `py_compile`·단독 import·관련 unittest 105개(45개 skip)와 전체 unittest 166개(50개 skip)는 실패 0개다; 소켓 HTTP 전체 실행은 Claude 환경 검수가 필요하며 설치·서버·Docker 조작·커밋·푸시는 하지 않았다.
+- 2026-10-24 자산 변경·engine API 구성 drift·같은 판본 정책 내용 변경에서 `runtime-revalidation-request/1.0` 요청을 자동 기록하고, 중복/해소/재발 이벤트·조회 API/읽기 전용 대시보드/O_EXCL 내보내기를 추가했다. 자동 승인·해제·외부 전송은 없고 D-03 연동 형식은 미합의다.
+- `.venv/bin/python -B -m unittest discover -s tests -v`는 177개 중 126개 통과·샌드박스 소켓 제한 51개 건너뜀·실패 0개다. 표준 라이브러리만 사용했고 서버·Docker·Kubernetes·금지 포트는 조작하지 않았으며 설치·커밋·푸시는 하지 않았다; HTTP 전건은 Claude 환경 재실행이 필요하다.
+- 2026-10-24 같은 scope의 재검증 근거 변경을 해소가 아닌 `superseded`로 기록하고 현재 근거 수를 분리했으며, 전체 unittest 205개 중 154개 통과·소켓 제한 51개 건너뜀·실패 0개를 확인했다.
+- 2026-10-24 Claude가 WSL2 커널 6.18.33.2의 kind v0.33.0 단일 노드(kindest/node v1.37.0), Cilium 1.20.3+Hubble, Tetragon 1.7.1에서 최종 확인했다. 보고서는 저장소 밖 `~/.local/state/serving-runtime/k8s-lab/reports/k8s-lab-20261023T202226Z-162136.{json,md}`다.
+- L-01 기준선과 L-02 Cilium(Gateway·DNS 허용, 엔진 직통·외부 연결 차단), L-03 Hubble(실제 `DROPPED`를 `--origin real`로 변환)이 통과했다.
+- L-04 Tetragon 감시는 자산 쓰기·비밀 읽기·허용 목록 밖 실행을 확인했지만 kprobe의 pod·process 귀속이 비어 정책·경로·접근·시각으로 판정했고, exec export는 수 초~수십 초 지연됐다.
+- L-05 차단은 직후 5회 `EPERM` 뒤 약 1분 후 재허용됐고 클러스터 범위 정책도 차단하지 못해 실효를 신뢰할 수 없다(원인 미확정, WSL modify-return 제한 의심). L-06 정리는 미실행해 전체는 `partial`이며, 이는 가짜 backend를 쓴 로컬 kind 결과로 정식 GPU·Kubernetes 1.36.5 검증이 아니다.
 
 ## 다음 준비 작업
 
-- S3A까지 완료(가짜 backend 기준). 승인된 GPU LAB 입력이 준비되면 S3B 실제 vLLM 시험, 승인된 Kubernetes LAB과 수집 출력이 준비되면 P2 후보의 Cilium·Tetragon 적용·실효 검증을 진행한다. 설치·다운로드·운영 환경 변경은 자동으로 시작하지 않는다.
+- 정식 GPU·Kubernetes 1.36.5 환경 검증, Tetragon 차단 불안정 원인 조사, 앞 단계(체크리스트·검증 도구) 담당자에게 받을 입력(실제 정책값·승인 구성·허용 통신 목적지·보호 경로·공통 결과 형식)이 필요하다. 설치·다운로드·운영 환경 변경은 자동으로 시작하지 않는다.
 
 ## 갱신 방법
 

@@ -16,7 +16,8 @@ BoB serving-engine security runtime solution
 | 대시보드 | 현황·요청 목록·상세 증거·정책/기준 상태, 3초 갱신, 읽기 전용 | 브라우저 수동 확인 |
 | context 사전 통제 | 정책 `max_context_tokens`(예: 2048): backend `/tokenize`로 입력 토큰을 세어 입력+`max_tokens` 초과 시 403, 셀 수 없으면 503(모두 엔진 미전달) | 모의 엔진·가짜 backend·실제 vLLM(CPU) |
 | 모델 파일 무결성 | 승인 자산 목록(경로·SHA-256·크기)과 디스크 파일 주기 비교, 변경·누락·목록 밖 파일 표시 | 단위·HTTP 시험, 실제 모델 파일 목록 생성 확인 |
-| 통신·행위 통제 준비 (P2 사전 작업) | Cilium 규칙 후보 생성, Tetragon 파일 규칙 후보·이벤트 변환, 관측 API·대시보드 | 합성 fixture 단위 시험만; 클러스터 미적용·미검증 |
+| 재검증 요청 | 자산 변경·engine API 구성 drift·같은 판본 정책 내용 변경을 JSONL 요청으로 열고 조회·내보내기 | 단위 시험 완료; 검증 도구 연동 형식 D-03 미합의 |
+| 통신·행위 통제 준비 (P2 사전 작업) | Cilium 규칙 후보 생성, Tetragon 파일 규칙 후보·이벤트 변환, 관측 API·대시보드 | 로컬 kind에서 Cilium 통제·Hubble 실제 관측 통과, Tetragon 감시는 귀속 한계와 함께 확인, 차단은 불안정 |
 | 시험 | unittest 157개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | Claude 소켓 허용 환경 157개 전부 통과; 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
@@ -29,8 +30,9 @@ BoB serving-engine security runtime solution
 - 정식 환경의 요청 단위 backend 증거·엔진 내부 취소: CPU 사전 점검에서는 vLLM `--enable-log-requests --enable-request-id-headers`로 확인했으나 GPU 고정 버전에서 재확인이 필요합니다.
 - context 통제의 고정 버전 확인: `/tokenize` 형식은 vLLM v0.29.0 CPU에서만 확인했습니다.
 - 모델 파일 쓰기 차단(읽기 전용 마운트·권한)과 엔진 메모리 로딩 확인: 지금은 디스크 해시 비교만 합니다.
-- Cilium·Tetragon 규칙 생성·이벤트 변환은 준비됨. 클러스터 적용·실효 검증은 미실행
-- API 인증, 엔진 포트 직접 접근 차단, SGLang
+- 정식 GPU·Kubernetes 1.36.5 환경의 Cilium·Hubble·Tetragon 검증: 현재 결과는 WSL2의 kind v1.37.0과 시험 전용 가짜 backend 기준입니다.
+- Tetragon 차단의 불안정 원인 규명과 pod·process 귀속 재확인
+- API 인증, SGLang
 
 ## 런타임 통제 MVP (로컬)
 
@@ -57,6 +59,7 @@ BoB serving-engine security runtime solution
 - `request_records.py`: 요청 기록을 구성하고 JSONL 저장 상태와 요청별 context를 관리합니다.
 - `backend.py`: backend 설정을 검증하고 고정 목적지 연결과 헤더를 생성합니다.
 - `collectors.py`: 상태 수집 주기와 snapshot·baseline 비교를 관리합니다.
+- `revalidation.py`: 재검증 조건 판정, JSONL 이벤트 상태·조회 요약·배타적 내보내기를 담당합니다.
 - `policy.py`·`policy_state.py`: 정책 문서 검증과 기간·철회·이력 판정을 담당합니다.
 - `store.py`·`query.py`: JSONL 입출력과 요청 요약·상세 조회를 담당합니다.
 
@@ -159,6 +162,19 @@ baseline과 manifest는 평면 `fields` 객체를 사용합니다. manifest도 �
 - 결과는 수집원 표의 `asset_integrity` 행에 일치·변경·누락·읽기 불가·링크·목록 밖 파일·목록 밖 링크·순회 오류 수로 표시하며, 하나라도 다르면 `intact: false`입니다. 순회 오류는 상대경로·오류 종류를 최대 50개 남기며, 해당 오류가 있으면 `snapshot`은 부분 목록을 쓰지 않고 실패합니다. 목록을 매번 다시 읽으므로 목록 파일 오류도 수집 오류로 드러납니다.
 - 심볼릭 링크는 따라가지 않습니다. 항목의 `root` 아래 모든 상위 구성 요소를 확인하고 파일을 `O_NOFOLLOW`로 열어, 중간 디렉터리가 `root` 밖을 가리키는 링크인 경우도 읽지 않고 `symlink`로 보고합니다. Hugging Face 캐시의 `snapshots/<revision>` 폴더는 파일이 모두 링크라서 거부되므로, 실제 파일이 있는 폴더(예: `--local-dir`로 받은 모델 폴더)를 지정합니다.
 - 자산 검사는 다른 health·metrics 수집원과 분리된 백그라운드 스레드에서 수행합니다. 검사 결과에 `duration_s`를 남기고, 이전 검사가 끝난 시점부터 `--asset-interval` 후에 다음 검사를 시작합니다.
+
+### 재검증 요청
+
+Gateway는 수집 결과에서 승인 상태와 다른 근거를 발견하면 `<data-dir>/revalidation_requests.jsonl`에 `runtime-revalidation-request/1.0` 이벤트를 추가합니다. 초기 트리거는 자산 무결성 실패, baseline의 `engine_api` 출처 drift, 시작 시 정책 이력의 같은 ID·판본 내용 변경입니다. 같은 근거는 SHA-256 fingerprint로 중복을 막습니다. 관측된 scope에서 근거가 완전히 사라졌을 때만 같은 요청 ID에 `condition_cleared`를 기록하고, 같은 scope의 근거가 달라지면 기존 요청에 `superseded`와 새 요청 ID를 남깁니다. 해소되거나 대체된 근거가 다시 나타나면 `condition_reappeared`를 기록합니다. `superseded`는 다른 근거로 대체된 상태이지 해소가 아닙니다. 요청 `status`는 계속 `open`이며 이 기능은 승인·요청 종료·검증 실행·외부 전송을 하지 않습니다.
+
+`GET /api/revalidation`과 읽기 전용 대시보드에서 요청별 최신 이벤트·현재 근거 존재 여부·출처, 대체 상태("다른 근거로 대체됨, 해소 아님"), 손상 줄과 평가 오류를 확인할 수 있습니다. 열린 요청 수는 과거 요청을 포함해 유지하고, 현재 근거가 존재하는 요청 수는 `current_condition_count`로 따로 제공합니다. `/api/status`와 내보내기 문서에도 두 집계를 함께 표시하며, 검증 도구 전달 파일은 기존 파일을 덮어쓰지 않습니다.
+
+```bash
+.venv/bin/python -m serving_runtime revalidation export \
+  --data-dir ~/.local/state/serving-runtime/mvp --out revalidation-export.json
+```
+
+내보내기 형식은 문서 안에 **검증 도구 연동 형식 초안(D-03 미합의)**으로 명시합니다. 수집·판정·저장 실패는 재검증 상태에 오류로 남지만 Gateway 추론 경로를 중단하지 않습니다.
 
 ### 외부 vLLM backend 모드 (S3A)
 
@@ -343,11 +359,33 @@ MVP-01~11, S1-01~06, S2-01~06, S3A-01~08을 임시 데이터와 빈 포트에서
 | S3A | 외부 vLLM backend 모드·고정 목적지·자격정보·수집 어댑터 | 완료 — 가짜 backend 시험만 (unittest 115개·수용 시험 31개 사례 전부 통과). 실제 vLLM 연결 아님 |
 | S3B | 고정 vLLM·모델 실제 환경 시험 | 정식 S3B 미실행(승인 GPU 환경 없음). CPU 사전 점검(vLLM v0.29.0 CPU·0.5B 모델)에서 S3-01~06 통과했고 요청 로그 옵션 재실행으로 요청 ID·취소 로그를 확인함. 정식 GPU 증거 아님 (`docs/S3B_실제환경_시험준비.md` §7) |
 
-실제 vLLM 환경 시험(S3B), 인증, 직통 접근 제한, Cilium·Tetragon 클러스터 적용·실효 검증는 이후 범위입니다.
+실제 vLLM 환경 시험(S3B), 인증과 정식 환경의 직통 접근 제한은 이후 범위입니다. Cilium·Hubble·Tetragon의 kind 최종 실행 결과와 남은 제약은 아래에 구분해 적습니다.
 
 ## 통신·행위 통제 준비 (P2 사전 작업)
 
-이 단계의 산출물은 **Cilium 1.20.3 / Tetragon 1.7.1 문법 기준 후보이며 클러스터 미적용·미검증**입니다. Kubernetes·Cilium·Tetragon을 설치하거나 정책을 적용하지 않으며, 생성 성공은 통신 차단·파일 관측·커널 Override의 실효를 입증하지 않습니다.
+이 단계의 산출물은 **Cilium 1.20.3 / Tetragon 1.7.1 문법 기준 후보**로 시작했습니다. 최종 확인 환경은 WSL2(커널 6.18.33.2-microsoft-standard-WSL2)의 kind v0.33.0 단일 노드(kindest/node v1.37.0), Cilium 1.20.3+Hubble, Tetragon 1.7.1입니다. Tetragon에는 `deploy/lab/tetragon-values.yaml`을 적용했습니다. kind 노드 버전은 개발계획서 v1.4에서 선정한 Kubernetes 1.36.5와 다릅니다.
+
+준비된 `runtime-lab` kind 클러스터에서의 lab 실행 순서는 다음과 같습니다. Gateway는 기존 규칙대로 pod 안의 `127.0.0.1:8080`에만 바인딩되며, 점검 도구가 `kubectl exec`로 같은 pod 안에서 요청합니다. 도구는 현재 context도 정확히 `kind-runtime-lab`인지 먼저 확인하고, 기본적으로 적용한 정책을 유지합니다(`--cleanup`을 주면 정책만 정리).
+
+```bash
+docker build -f deploy/lab/Dockerfile -t serving-runtime-lab:dev .
+kind load docker-image --name runtime-lab serving-runtime-lab:dev
+kubectl --context kind-runtime-lab apply -f deploy/lab/manifests/
+helm upgrade tetragon cilium/tetragon --version 1.7.1 -n kube-system --reuse-values -f deploy/lab/tetragon-values.yaml
+.venv/bin/python -B tools/k8s_lab_check.py \
+  --context kind-runtime-lab --namespace serving-lab \
+  --state-dir ~/.local/state/serving-runtime/k8s-lab
+```
+
+위 `helm upgrade` 단계의 `tetragon-values.yaml`은 export를 `serving-lab`의 `PROCESS_EXEC`·`PROCESS_EXIT`와 네 lab 정책의 `PROCESS_KPROBE`로 한정해 호스트 이벤트 폭증을 막습니다. WSL+kind에서는 kprobe의 pod namespace가 비므로 kprobe allowlist는 namespace 대신 policy name을 사용하고, denylist는 health check와 `cilium`·`kube-system` namespace만 제외해 빈 namespace를 버리지 않습니다. 필터 필드는 Tetragon 1.7.1 공식 문서 기준 후보입니다.
+
+최종 실행에서 L-01 기준선이 통과했습니다. L-02는 Gateway 경유 요청과 DNS를 허용하면서 other-client의 엔진 직통 연결과 엔진의 외부 연결을 실제로 차단했습니다. L-03은 Hubble의 실제 `DROPPED` 흐름을 `enforce ingest --origin real`로 변환해 통과했습니다.
+
+L-04 Tetragon 감시에서는 TG-ASSET-01 쓰기, TG-SECRET-01 읽기, 허용 목록 밖 실행을 실제 로그에서 확인했습니다. 다만 이 환경에서는 kprobe 이벤트의 pod·process 귀속이 비어 있었고(`pod_info` 조회 실패), 정책 이름·경로·접근 종류·시각으로 판정했습니다. exec 이벤트는 pod 정보 재시도로 수 초~수십 초 늦게 export됐습니다.
+
+L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었지만, 별도 관측에서는 적용 약 1분 뒤 쓰기가 다시 성공했고 podSelector 없는 클러스터 범위 정책은 처음부터 차단하지 못했습니다. WSL 커널의 modify-return 제한 경고가 의심되지만 원인은 확정하지 못했으므로, 이 환경의 Tetragon 차단 실효는 신뢰할 수 없습니다. L-06 정리는 옵션을 지정하지 않아 실행하지 않았고 전체 결과는 `partial`입니다.
+
+보고서는 저장소 밖 `~/.local/state/serving-runtime/k8s-lab/reports/k8s-lab-20261023T202226Z-162136.{json,md}`에 있습니다. 이는 로컬 kind/WSL 결과로 정식 GPU·Kubernetes 1.36.5 환경 검증이 아니며, 엔진도 시험 전용 가짜 backend입니다.
 
 엄격한 `runtime-enforcement-intent/1.0` JSON 예시는 `examples/enforcement/intent.example.json`입니다. 알 수 없는 필드, 빈 label, 잘못된 port, 상대경로를 거부합니다. 생성 파일은 지정한 출력 폴더의 고정 파일명만 사용합니다.
 
@@ -357,7 +395,7 @@ MVP-01~11, S1-01~06, S2-01~06, S3A-01~08을 임시 데이터와 빈 포트에서
 ```
 
 - Cilium 후보는 engine ingress를 Gateway·metrics collector의 engine TCP port로 한정하고, engine egress를 DNS TCP/UDP 53과 명시한 FQDN/CIDR 목적지로, Gateway egress를 engine TCP port와 DNS로 한정합니다. 선택된 endpoint에 ingress/egress 절이 존재하므로 해당 방향은 그 허용 규칙 외 default deny가 됩니다.
-- Tetragon 후보는 `security_file_permission`의 모델 쓰기(`TG-ASSET-01`), 민감 경로 읽기(`TG-SECRET-01`), cache 쓰기 관측(`TG-CACHE-01`)을 만듭니다. `monitor`에는 Override가 없습니다. `enforce_probe`의 `TG-DENY-01`만 지정 `probe_path` 쓰기에 `Override argError -1` 후보를 만들며, 커널 지원과 실제 거부 효과는 확인하지 않았습니다.
+- Tetragon 후보는 `security_file_permission`의 모델 쓰기(`TG-ASSET-01`), 민감 경로 읽기(`TG-SECRET-01`), cache 쓰기 관측(`TG-CACHE-01`)을 만듭니다. `monitor`에는 Override가 없습니다. `enforce_probe`의 `TG-DENY-01`만 지정 `probe_path` 쓰기에 `Override argError -1` 후보를 만듭니다. 최종 WSL+kind 확인에서도 실제 쓰기 차단이 안정적으로 유지되지 않았습니다.
 - `TG-EXEC-01` 정책은 따로 만들지 않습니다. Tetragon 기본 `process_exec` 이벤트의 binary를 intent의 `allowed_engine_binaries`와 비교해 어댑터가 `allowed_binary`를 판정합니다. 목록이 비어 있거나 intent 없이 변환하면 판정은 `null`입니다.
 
 공식 출력 모양을 흉내 낸 fixture는 `tests/fixtures/enforcement/`에 있으며 실제 수집 자료가 아닙니다. 호출자가 `synthetic` 또는 `real`을 반드시 지정해야 하고 Tetragon `arguments`는 저장하지 않습니다.

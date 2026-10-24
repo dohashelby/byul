@@ -313,6 +313,13 @@ function collectorSummary(item) {
         ? `writer ${writer.state} · heartbeat ${formatTime(writer.updated_at)}${value.idle ? " · 새 이벤트 없음" : ""}`
         : "writer heartbeat 미설정 · 이벤트가 없으면 생존 여부를 확인할 수 없음",
     }));
+    if (writer.last_gap) {
+      const gap = writer.last_gap;
+      rows.push(el("div", {
+        className: "problem",
+        text: `재연결 ${writer.reconnect_count ?? 0}회 · 최근 끊긴 구간 ${formatTime(gap.opened_at)} ~ ${formatTime(gap.closed_at)} · 그 사이 이벤트 복구 요청함(완전성 미확인)`,
+      }));
+    }
   }
   if (item.source === "record_retention" && value) {
     const files = Object.values(value.files || {});

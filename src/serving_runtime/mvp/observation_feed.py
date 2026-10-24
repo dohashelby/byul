@@ -256,8 +256,17 @@ class ObservationFeed:
             processes.append(
                 {"name": name, "running": running, "returncode": returncode}
             )
+        open_gap = document.get("open_gap") if isinstance(document.get("open_gap"), dict) else None
+        if state == "reconnecting":
+            since = open_gap.get("opened_at") if open_gap else None
+            # The writer is alive but its source is down: observation is unavailable.
+            raise OSError(
+                f"observation writer is reconnecting (gap open since {since or 'unknown'})"
+            )
         if state != "running" or not all(item["running"] for item in processes):
             raise OSError(f"observation writer is not running (state={state})")
+        reconnect_count = document.get("reconnect_count")
+        last_gap = document.get("last_gap") if isinstance(document.get("last_gap"), dict) else None
         return (
             {
                 "configured": True,
@@ -266,6 +275,19 @@ class ObservationFeed:
                 "started_at": document["started_at"],
                 "age_s": max(0.0, round(age_s, 3)),
                 "processes": processes,
+                "reconnect_count": (
+                    reconnect_count
+                    if isinstance(reconnect_count, int) and not isinstance(reconnect_count, bool)
+                    else None
+                ),
+                "last_gap": (
+                    {
+                        key: last_gap.get(key)
+                        for key in ("gap_id", "opened_at", "closed_at", "backfill", "attempts")
+                    }
+                    if last_gap
+                    else None
+                ),
             },
             started_at,
         )

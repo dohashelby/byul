@@ -27,7 +27,7 @@ BoB serving-engine security runtime solution
 | 대상 등록 프레임 (F1) | `--target`(`runtime-target/1.0`): 정책 대상 대조·엔진/모델 비교, `--target-pod-status`로 Pod 조회·교체 구분 | 단위·HTTP 시험, 로컬 kind에서 Pod 교체 확인 |
 | 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류와 기간 있는 승인 예외 | 단위 시험; SP4 송수신 정책은 로컬 kind에서 수동 확인 |
 | 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 수정 반영 |
-| 시험 | 추적 unittest 326개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 시험 | 추적 unittest 331개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -569,6 +569,8 @@ L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었습니다. 앞선 기�
   --lab-report ~/.local/state/serving-runtime/k8s-lab/reports \
   --cilium-policy-status
 ```
+
+보조 수집 프로그램(`tools/k8s_observation_feed.py`)은 하위 프로세스(port-forward, `hubble observe`, `kubectl logs --follow`)가 끝나도 멈추지 않습니다. 해당 묶음만 정리하고 끊긴 구간을 `{kind}.gaps.jsonl`과 heartbeat에 남긴 뒤 1초부터 최대 30초 간격으로 다시 연결하며, 다시 연결하기 전에 kubectl context를 재확인합니다. 다시 붙을 때는 마지막 정상 확인 1초 전부터 이벤트를 다시 요청하고(Hubble `--since`, Tetragon `--since-time`), 중복은 Gateway가 거릅니다. 재연결 중에는 heartbeat 상태가 `reconnecting`이라 대시보드에 관측 불가로 표시되고, 다시 붙은 뒤에는 재연결 횟수와 최근 끊긴 구간을 보여 줍니다. 복구가 완전한지는 확인할 수 없어 `requested_unverified`로 남깁니다.
 
 live feed는 완성된 새 줄만 변환하며 파일 회전·잘림을 감지합니다. heartbeat가 정상 갱신되면 이벤트가 없어도 "수집 정상·새 이벤트 없음"이고, writer 종료·heartbeat 만료는 관측 불가입니다. heartbeat 만료 기준은 `--collector-stale-after`와 같습니다. heartbeat를 설정하지 않은 임의 feed는 생존을 입증할 수 없으므로 이전처럼 새 이벤트가 없으면 stale이 되며 화면에 "writer heartbeat 미설정" 이유가 붙습니다. heartbeat의 `started_at`보다 오래된 이벤트는 저장하지 않고 실행 전 이벤트로 별도 집계합니다. 원본 손상 줄은 내용 대신 줄 번호·사유와 누적 건수를 표시합니다. Hubble 화면은 혼합 기록에서도 최근 DROPPED 최대 25건을 우선 표시해 FORWARDED에 묻히지 않게 합니다. Cilium 화면의 "설정됨"은 정책 객체 존재만 뜻하고, 실제 차단은 lab L-02 통과 또는 실제 Hubble `DROPPED` 근거로 별도 표시합니다.
 

@@ -483,66 +483,210 @@ class FeedHelperTests(unittest.TestCase):
         for stop_signal in (signal.SIGTERM, signal.SIGHUP):
             with self.subTest(signal=stop_signal):
                 handlers: dict[int, object] = {}
-                signal_sent = False
-
-                class Process:
-                    def __init__(self) -> None:
-                        self.returncode: int | None = None
-                        self.terminated = False
-
-                    def poll(self) -> int | None:
-                        return self.returncode
-
-                    def wait(self, timeout: float) -> int | None:
-                        nonlocal signal_sent
-                        if timeout == 1 and not signal_sent:
-                            signal_sent = True
-                            handler = handlers[stop_signal]
-                            assert callable(handler)
-                            handler(stop_signal, None)
-                        return self.returncode
-
-                    def terminate(self) -> None:
-                        self.terminated = True
-                        self.returncode = -stop_signal
-
-                    def kill(self) -> None:
-                        self.returncode = -signal.SIGKILL
-
-                processes = [Process(), Process(), Process()]
+                processes = [FakeProcess(), FakeProcess(), FakeProcess()]
 
                 def fake_signal(signum: int, handler: object) -> object:
                     previous = handlers.get(signum, signal.SIG_DFL)
                     handlers[signum] = handler
                     return previous
 
+                def tick_then_signal(_supervisor) -> None:
+                    handler = handlers[stop_signal]
+                    assert callable(handler)
+                    handler(stop_signal, None)
+
                 with (
                     tempfile.TemporaryDirectory() as temporary,
-                    patch(
-                        "tools.k8s_observation_feed.assert_safe_context"
-                    ),
-                    patch(
-                        "tools.k8s_observation_feed._wait_for_hubble"
-                    ),
-                    patch(
-                        "tools.k8s_observation_feed._start",
-                        side_effect=processes,
-                    ),
-                    patch(
-                        "tools.k8s_observation_feed.signal.signal",
-                        side_effect=fake_signal,
-                    ),
+                    patch("tools.k8s_observation_feed.assert_safe_context"),
+                    patch("tools.k8s_observation_feed._wait_for_hubble"),
+                    patch("tools.k8s_observation_feed._start", side_effect=processes),
+                    patch("tools.k8s_observation_feed.signal.signal", side_effect=fake_signal),
+                    patch("tools.k8s_observation_feed._Supervisor.tick", tick_then_signal),
                 ):
-                    result = run_observation_feed(
-                        Path(temporary), EXPECTED_CONTEXT
-                    )
+                    result = run_observation_feed(Path(temporary), EXPECTED_CONTEXT, max_ticks=3)
+                    heartbeat = json.loads((Path(temporary) / "tetragon.heartbeat.json").read_text())
 
                 self.assertEqual(result, 0)
-                self.assertTrue(signal_sent)
                 self.assertTrue(all(process.terminated for process in processes))
+                self.assertEqual(heartbeat["state"], "stopped")
                 self.assertEqual(handlers[signal.SIGTERM], signal.SIG_DFL)
                 self.assertEqual(handlers[signal.SIGHUP], signal.SIG_DFL)
 
+    def test_tetragon_backfill_uses_since_time_on_reconnect(self) -> None:
+        self.assertIn("--tail=0", tetragon_command())
+        command = tetragon_command(since_time="2026-10-24T13:07:36Z")
+        self.assertIn("--since-time=2026-10-24T13:07:36Z", command)
+        self.assertNotIn("--tail=0", command)
+
+
+class FakeProcess:
+    def __init__(self) -> None:
+        self.returncode: int | None = None
+        self.terminated = False
+
+    def poll(self) -> int | None:
+        return self.returncode
+
+    def wait(self, timeout: float | None = None) -> int | None:
+        return self.returncode
+
+    def terminate(self) -> None:
+        self.terminated = True
+        if self.returncode is None:
+            self.returncode = -signal.SIGTERM
+
+    def kill(self) -> None:
+        self.returncode = -signal.SIGKILL
+
+
+class FeedReconnectTests(unittest.TestCase):
+    def setUp(self) -> None:
+        import threading
+
+        from tools import k8s_observation_feed as helper
+
+        self.helper = helper
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.now = 1000.0
+        self.argv: list[list[str]] = []
+        self.started: list[FakeProcess] = []
+        self.start_error: Exception | None = None
+        sink = (self.root / "sink").open("ab")
+        self.addCleanup(sink.close)
+        self.group = helper._FeedGroup(
+            "tetragon",
+            feed_path=self.root / "tetragon.jsonl",
+            heartbeat_path=self.root / "tetragon.heartbeat.json",
+            gap_path=self.root / "tetragon.gaps.jsonl",
+            children=[helper._Child("tetragon", lambda since: helper.tetragon_command(since_time=since), sink, sink)],
+        )
+        self.supervisor = helper._Supervisor(
+            [self.group],
+            context=helper.EXPECTED_CONTEXT,
+            stop_requested=threading.Event(),
+            clock=lambda: self.now,
+        )
+
+    def fake_start(self, argv, _output, _error):
+        if self.start_error is not None:
+            raise self.start_error
+        self.argv.append(list(argv))
+        process = FakeProcess()
+        self.started.append(process)
+        return process
+
+    def heartbeat(self) -> dict:
+        self.supervisor.write()
+        return json.loads(self.group.heartbeat_path.read_text(encoding="utf-8"))
+
+    def gaps(self) -> list[dict]:
+        return [json.loads(line) for line in self.group.gap_path.read_text(encoding="utf-8").splitlines()]
+
+    def test_exit_opens_gap_then_reconnects_with_backfill(self) -> None:
+        with (
+            patch.object(self.helper, "_start", side_effect=self.fake_start),
+            patch.object(self.helper, "assert_safe_context") as context_check,
+        ):
+            self.supervisor.start_group(self.group, since=None)
+            self.assertIn("--tail=0", self.argv[0])
+            context_check.assert_not_called()
+            self.assertEqual(self.heartbeat()["state"], "running")
+
+            self.supervisor.tick()  # healthy check records last_healthy_at
+            healthy = self.group.last_healthy_at
+            self.started[0].returncode = 0  # kubectl logs --follow ended by itself
+            self.supervisor.tick()
+            heartbeat = self.heartbeat()
+            # Backfill starts before the last healthy check, not at detection.
+            from datetime import datetime as _dt
+            backfill = _dt.strptime(heartbeat["open_gap"]["backfill_since"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            self.assertLess(backfill, healthy)
+            self.assertEqual(heartbeat["open_gap"]["last_healthy_at"], healthy.isoformat())
+            self.assertEqual(heartbeat["state"], "reconnecting")
+            self.assertEqual(heartbeat["open_gap"]["cause"], [{"name": "tetragon", "returncode": 0}])
+            self.assertEqual(self.gaps()[0]["event"], "gap_opened")
+
+            self.supervisor.tick()  # backoff not elapsed yet
+            self.assertEqual(len(self.argv), 1)
+            self.now += 1.0
+            self.supervisor.tick()
+            self.assertEqual(len(self.argv), 2)
+            since = self.gaps()[0]["backfill_since"]
+            self.assertIn(f"--since-time={since}", self.argv[1])
+            context_check.assert_called_once_with(self.helper.EXPECTED_CONTEXT)
+
+        heartbeat = self.heartbeat()
+        self.assertEqual(heartbeat["state"], "running")
+        self.assertEqual(heartbeat["reconnect_count"], 1)
+        self.assertIsNone(heartbeat["open_gap"])
+        self.assertEqual(heartbeat["last_gap"]["backfill"], "requested_unverified")
+        self.assertEqual([gap["event"] for gap in self.gaps()], ["gap_opened", "gap_closed"])
+        self.assertEqual(heartbeat["started_at"], self.group.started_at)
+
+    def test_failed_reconnects_back_off_and_record_the_error(self) -> None:
+        with patch.object(self.helper, "_start", side_effect=self.fake_start), patch.object(self.helper, "assert_safe_context"):
+            self.supervisor.start_group(self.group, since=None)
+            self.started[0].returncode = 1
+            self.supervisor.tick()
+            self.start_error = OSError("kubectl missing")
+            waits = []
+            for _ in range(7):
+                self.now = self.group.next_attempt
+                self.supervisor.tick()
+                waits.append(self.group.backoff_s)
+            self.assertEqual(waits, [2.0, 4.0, 8.0, 16.0, 30.0, 30.0, 30.0])
+            self.assertEqual(self.group.open_gap["attempts"], 7)
+            self.assertIn("kubectl missing", self.group.open_gap["last_error"])
+            self.assertEqual(self.heartbeat()["state"], "reconnecting")
+            self.start_error = None
+            self.now = self.group.next_attempt
+            self.supervisor.tick()
+            self.assertEqual(self.group.state, "running")
+            self.assertEqual(self.group.backoff_s, 1.0)
+
+    def test_context_change_blocks_reconnect(self) -> None:
+        with patch.object(self.helper, "_start", side_effect=self.fake_start):
+            with patch.object(self.helper, "assert_safe_context"):
+                self.supervisor.start_group(self.group, since=None)
+            self.started[0].returncode = 0
+            self.supervisor.tick()
+            self.now += 1.0
+            with patch.object(self.helper, "assert_safe_context", side_effect=RuntimeError("context must be kind-runtime-lab")):
+                self.supervisor.tick()
+        self.assertEqual(len(self.argv), 1)
+        self.assertEqual(self.group.state, "reconnecting")
+        self.assertIn("context", self.group.open_gap["last_error"])
+
+    def test_gateway_treats_reconnecting_writer_as_unavailable(self) -> None:
+        feed_path = self.root / "tetragon.jsonl"
+        feed_path.write_text("", encoding="utf-8")
+        feed = ObservationFeed(
+            kind="tetragon",
+            path=feed_path,
+            data_dir=self.root / "data",
+            data_origin="real",
+            environment=None,
+            run_id=None,
+            heartbeat_path=self.group.heartbeat_path,
+        )
+        with patch.object(self.helper, "_start", side_effect=self.fake_start), patch.object(self.helper, "assert_safe_context"):
+            self.supervisor.start_group(self.group, since=None)
+            self.supervisor.write()
+            value, _origin = feed.collect()
+            self.assertEqual(value["writer"]["reconnect_count"], 0)
+            self.started[0].returncode = 0
+            self.supervisor.tick()
+            self.supervisor.write()
+            with self.assertRaisesRegex(OSError, "reconnecting"):
+                feed.collect()
+            self.now += 1.0
+            self.supervisor.tick()
+            self.supervisor.write()
+        value, _origin = feed.collect()
+        self.assertEqual(value["writer"]["reconnect_count"], 1)
+        self.assertEqual(value["writer"]["last_gap"]["backfill"], "requested_unverified")
 
 if __name__ == "__main__":
     unittest.main()

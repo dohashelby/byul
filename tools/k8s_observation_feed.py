@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
@@ -75,7 +75,11 @@ def hubble_port_forward_command() -> list[str]:
     return ["cilium", "hubble", "port-forward"]
 
 
-def tetragon_command() -> list[str]:
+def tetragon_command(*, since_time: str | None = None) -> list[str]:
+    # First start skips old log lines; a reconnect asks for lines since the gap
+    # opened so events during the gap can be recovered (duplicates are dropped
+    # by the Gateway's event key).
+    window = ["--tail=0"] if since_time is None else [f"--since-time={since_time}"]
     return [
         "kubectl",
         "--context",
@@ -84,7 +88,7 @@ def tetragon_command() -> list[str]:
         "kube-system",
         "logs",
         "--follow",
-        "--tail=0",
+        *window,
         "daemonset/tetragon",
         "--container",
         "export-stdout",
@@ -179,6 +183,18 @@ def _write_json_atomic(path: Path, document: dict[str, object]) -> None:
             pass
 
 
+GAP_SCHEMA = "runtime-observation-feed-gap/1.0"
+BACKOFF_INITIAL_S = 1.0
+BACKOFF_MAX_S = 30.0
+BACKFILL_MARGIN = timedelta(seconds=1)
+
+
+def _rfc3339_seconds(value: datetime) -> str:
+    """Whole-second UTC timestamp accepted by both kubectl and hubble."""
+
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def write_heartbeats(
     specifications: dict[
         str,
@@ -186,6 +202,7 @@ def write_heartbeats(
     ],
     *,
     state: str,
+    extra: dict[str, dict[str, object]] | None = None,
 ) -> None:
     updated_at = _utc_now()
     for kind, (heartbeat_path, feed_path, started_at, processes) in specifications.items():
@@ -204,130 +221,318 @@ def write_heartbeats(
             item["running"] for item in process_status
         ):
             actual_state = "error"
-        _write_json_atomic(
-            heartbeat_path,
-            {
-                "schema": HEARTBEAT_SCHEMA,
-                "kind": kind,
-                "feed_path": str(feed_path),
-                "started_at": started_at,
-                "updated_at": updated_at,
-                "state": actual_state,
-                "processes": process_status,
-            },
-        )
+        document: dict[str, object] = {
+            "schema": HEARTBEAT_SCHEMA,
+            "kind": kind,
+            "feed_path": str(feed_path),
+            "started_at": started_at,
+            "updated_at": updated_at,
+            "state": actual_state,
+            "processes": process_status,
+        }
+        document.update((extra or {}).get(kind, {}))
+        _write_json_atomic(heartbeat_path, document)
 
 
-def run(output_dir: Path, context: str, *, include_forwarded: bool = False) -> int:
+class _Child:
+    """One follow process. ``argv`` receives the backfill start, if any."""
+
+    def __init__(
+        self,
+        name: str,
+        argv: Callable[[str | None], list[str]],
+        output: BinaryIO,
+        error: BinaryIO,
+        ready: Callable[[subprocess.Popen[bytes]], None] | None = None,
+    ) -> None:
+        self.name = name
+        self.argv = argv
+        self.output = output
+        self.error = error
+        self.ready = ready
+        self.process: subprocess.Popen[bytes] | None = None
+
+    def returncode(self) -> int | None:
+        return None if self.process is None else self.process.poll()
+
+
+class _FeedGroup:
+    """Children that feed one JSONL file, restarted together after a gap."""
+
+    def __init__(
+        self,
+        kind: str,
+        *,
+        feed_path: Path,
+        heartbeat_path: Path,
+        gap_path: Path,
+        children: list[_Child],
+    ) -> None:
+        self.kind = kind
+        self.feed_path = feed_path
+        self.heartbeat_path = heartbeat_path
+        self.gap_path = gap_path
+        self.children = children
+        # The writer start time stays fixed so backfilled events remain in window.
+        self.started_at = _utc_now()
+        self.state = "starting"
+        self.open_gap: dict[str, object] | None = None
+        self.last_gap: dict[str, object] | None = None
+        self.reconnect_count = 0
+        self.backoff_s = BACKOFF_INITIAL_S
+        self.next_attempt = 0.0
+        # Last moment every child was seen running; a gap's backfill starts
+        # before it because an exit is only noticed on the next tick.
+        self.last_healthy_at: datetime | None = None
+
+    def processes(self) -> list[tuple[str, object]]:
+        return [
+            (child.name, child.process if child.process is not None else _NotStarted())
+            for child in self.children
+        ]
+
+    def heartbeat_extra(self) -> dict[str, object]:
+        return {
+            "reconnect_count": self.reconnect_count,
+            "open_gap": self.open_gap,
+            "last_gap": self.last_gap,
+        }
+
+
+class _NotStarted:
+    @staticmethod
+    def poll() -> int:
+        return -1
+
+
+def _append_gap(path: Path, record: dict[str, object]) -> None:
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "ab") as output:
+        output.write((json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"))
+        output.flush()
+        os.fsync(output.fileno())
+
+
+def _stop_children(group: _FeedGroup) -> None:
+    for child in group.children:
+        if child.process is not None and child.process.poll() is None:
+            child.process.terminate()
+    for child in group.children:
+        if child.process is None:
+            continue
+        try:
+            child.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            child.process.kill()
+            child.process.wait(timeout=5)
+
+
+class _Supervisor:
+    def __init__(
+        self,
+        groups: list[_FeedGroup],
+        *,
+        context: str,
+        stop_requested: threading.Event,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.groups = groups
+        self.context = context
+        self.stop_requested = stop_requested
+        self.clock = clock
+
+    def _open_gap(self, group: _FeedGroup, cause: list[dict[str, object]]) -> None:
+        detected = datetime.now(timezone.utc)
+        healthy = group.last_healthy_at
+        # Start the backfill a margin before the last healthy check (or the
+        # writer start), not at detection time, so nothing in between is lost.
+        since = (healthy or datetime.fromisoformat(group.started_at)) - BACKFILL_MARGIN
+        group.open_gap = {
+            "gap_id": uuid4().hex,
+            "opened_at": detected.isoformat(),
+            "last_healthy_at": healthy.isoformat() if healthy else None,
+            "backfill_since": _rfc3339_seconds(since),
+            "cause": cause,
+            "attempts": 0,
+            "last_error": None,
+        }
+        group.state = "reconnecting"
+        group.next_attempt = self.clock() + group.backoff_s
+        _append_gap(group.gap_path, {"schema": GAP_SCHEMA, "event": "gap_opened", "kind": group.kind, **group.open_gap})
+
+    def _close_gap(self, group: _FeedGroup) -> None:
+        assert group.open_gap is not None
+        closed = dict(group.open_gap)
+        closed["closed_at"] = _utc_now()
+        # Backfill was requested; whether every event came back is not knowable
+        # (logs may have rotated or the pod may have restarted).
+        closed["backfill"] = "requested_unverified"
+        _append_gap(group.gap_path, {"schema": GAP_SCHEMA, "event": "gap_closed", "kind": group.kind, **closed})
+        group.last_gap = closed
+        group.open_gap = None
+        group.reconnect_count += 1
+
+    def start_group(self, group: _FeedGroup, *, since: str | None) -> None:
+        started: list[_Child] = []
+        try:
+            if since is not None:
+                # Re-check the context before talking to a cluster again.
+                assert_safe_context(self.context)
+            for child in group.children:
+                child.process = _start(child.argv(since), child.output, child.error)
+                started.append(child)
+                if self.stop_requested.is_set():
+                    raise _StopRequested
+                if child.ready is not None:
+                    child.ready(child.process)
+        except _StopRequested:
+            raise
+        except (OSError, RuntimeError, ValueError) as error:
+            _stop_children(group)
+            raise RuntimeError(f"{group.kind} start failed: {error}") from error
+        group.state = "running"
+        group.backoff_s = BACKOFF_INITIAL_S
+        group.last_healthy_at = datetime.now(timezone.utc)
+
+    def tick(self) -> None:
+        for group in self.groups:
+            if self.stop_requested.is_set():
+                raise _StopRequested
+            if group.state == "running":
+                exited = [
+                    {"name": child.name, "returncode": child.returncode()}
+                    for child in group.children
+                    if child.returncode() is not None
+                ]
+                if exited:
+                    _stop_children(group)
+                    self._open_gap(group, exited)
+                else:
+                    group.last_healthy_at = datetime.now(timezone.utc)
+                continue
+            if group.state == "reconnecting" and self.clock() >= group.next_attempt:
+                assert group.open_gap is not None
+                group.open_gap["attempts"] = int(group.open_gap["attempts"]) + 1
+                try:
+                    self.start_group(group, since=str(group.open_gap["backfill_since"]))
+                except RuntimeError as error:
+                    group.open_gap["last_error"] = str(error)
+                    group.backoff_s = min(group.backoff_s * 2, BACKOFF_MAX_S)
+                    group.next_attempt = self.clock() + group.backoff_s
+                    continue
+                self._close_gap(group)
+
+    def write(self, *, final_state: str | None = None) -> None:
+        for group in self.groups:
+            state = final_state or ("running" if group.state == "running" else group.state)
+            write_heartbeats(
+                {group.kind: (group.heartbeat_path, group.feed_path, group.started_at, group.processes())},
+                state=state,
+                extra={group.kind: group.heartbeat_extra()},
+            )
+
+
+def run(
+    output_dir: Path,
+    context: str,
+    *,
+    include_forwarded: bool = False,
+    max_ticks: int | None = None,
+) -> int:
     assert_safe_context(context)
     output_dir = output_dir.absolute()
     output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     hubble_path = output_dir / "hubble.jsonl"
     tetragon_path = output_dir / "tetragon.jsonl"
-    hubble_error_path = output_dir / "hubble.stderr.log"
-    tetragon_error_path = output_dir / "tetragon.stderr.log"
-    port_forward_log_path = output_dir / "cilium-hubble-port-forward.log"
-    processes: list[tuple[str, subprocess.Popen[bytes]]] = []
-    heartbeat_specs: dict[
-        str,
-        tuple[Path, Path, str, list[tuple[str, subprocess.Popen[bytes]]]],
-    ] = {}
-    final_state = "error"
     stop_requested = threading.Event()
+    final_state = "error"
     with (
         hubble_path.open("ab") as hubble_output,
         tetragon_path.open("ab") as tetragon_output,
-        hubble_error_path.open("ab") as hubble_error,
-        tetragon_error_path.open("ab") as tetragon_error,
-        port_forward_log_path.open("ab") as port_forward_log,
+        (output_dir / "hubble.stderr.log").open("ab") as hubble_error,
+        (output_dir / "tetragon.stderr.log").open("ab") as tetragon_error,
+        (output_dir / "cilium-hubble-port-forward.log").open("ab") as port_forward_log,
     ):
-        previous_signal_handlers = _install_stop_signal_handlers(stop_requested)
-        try:
-            try:
-                port_forward = _start(
-                    hubble_port_forward_command(), port_forward_log, port_forward_log
-                )
-                processes.append(("cilium hubble port-forward", port_forward))
-                if stop_requested.is_set():
-                    raise _StopRequested
-                _wait_for_hubble(
-                    port_forward, stop_requested=stop_requested.is_set
-                )
-                hubble_started_at = _utc_now()
-                hubble_process = _start(
-                    hubble_command(
-                        since=hubble_started_at,
+        hubble_group = _FeedGroup(
+            "hubble",
+            feed_path=hubble_path,
+            heartbeat_path=output_dir / "hubble.heartbeat.json",
+            gap_path=output_dir / "hubble.gaps.jsonl",
+            children=[
+                _Child(
+                    "cilium-hubble-port-forward",
+                    lambda _since: hubble_port_forward_command(),
+                    port_forward_log,
+                    port_forward_log,
+                    ready=lambda process: _wait_for_hubble(
+                        process, stop_requested=stop_requested.is_set
+                    ),
+                ),
+                _Child(
+                    "hubble",
+                    lambda since: hubble_command(
+                        since=since or hubble_group.started_at,
                         include_forwarded=include_forwarded,
                     ),
                     hubble_output,
                     hubble_error,
+                ),
+            ],
+        )
+        tetragon_group = _FeedGroup(
+            "tetragon",
+            feed_path=tetragon_path,
+            heartbeat_path=output_dir / "tetragon.heartbeat.json",
+            gap_path=output_dir / "tetragon.gaps.jsonl",
+            children=[
+                _Child(
+                    "tetragon",
+                    lambda since: tetragon_command(since_time=since),
+                    tetragon_output,
+                    tetragon_error,
                 )
-                processes.append(("hubble", hubble_process))
-                if stop_requested.is_set():
-                    raise _StopRequested
-                heartbeat_specs["hubble"] = (
-                    output_dir / "hubble.heartbeat.json",
-                    hubble_path,
-                    hubble_started_at,
-                    [
-                        ("cilium-hubble-port-forward", port_forward),
-                        ("hubble", hubble_process),
-                    ],
-                )
-                tetragon_started_at = _utc_now()
-                tetragon_process = _start(
-                    tetragon_command(), tetragon_output, tetragon_error
-                )
-                processes.append(("tetragon", tetragon_process))
-                if stop_requested.is_set():
-                    raise _StopRequested
-                heartbeat_specs["tetragon"] = (
-                    output_dir / "tetragon.heartbeat.json",
-                    tetragon_path,
-                    tetragon_started_at,
-                    [("tetragon", tetragon_process)],
-                )
-                write_heartbeats(heartbeat_specs, state="running")
+            ],
+        )
+        groups = [hubble_group, tetragon_group]
+        supervisor = _Supervisor(groups, context=context, stop_requested=stop_requested)
+        previous_signal_handlers = _install_stop_signal_handlers(stop_requested)
+        try:
+            try:
+                for group in groups:
+                    try:
+                        supervisor.start_group(group, since=None)
+                    except RuntimeError as error:
+                        # A failed first start is a gap from the beginning; keep retrying.
+                        supervisor._open_gap(group, [{"name": "initial_start", "returncode": None, "error": str(error)}])
+                supervisor.write()
                 print(f"Hubble feed: {hubble_path}", flush=True)
                 print(f"Tetragon feed: {tetragon_path}", flush=True)
                 print(
-                    f"Heartbeat: {heartbeat_specs['hubble'][0]}, "
-                    f"{heartbeat_specs['tetragon'][0]}",
+                    f"Heartbeat: {hubble_group.heartbeat_path}, {tetragon_group.heartbeat_path}",
                     flush=True,
                 )
                 print(
+                    "끊기면 끊긴 구간을 *.gaps.jsonl에 남기고 자동으로 다시 연결합니다. "
                     "Ctrl-C 또는 SIGTERM/SIGHUP으로 follow 프로세스를 함께 종료합니다.",
                     flush=True,
                 )
-                while True:
+                ticks = 0
+                while max_ticks is None or ticks < max_ticks:
                     if stop_requested.is_set():
                         raise _StopRequested
-                    write_heartbeats(heartbeat_specs, state="running")
-                    for name, process in processes:
-                        returncode = process.poll()
-                        if returncode is not None:
-                            raise RuntimeError(
-                                f"{name} follow exited with status {returncode}"
-                            )
-                    try:
-                        processes[0][1].wait(timeout=1)
-                    except subprocess.TimeoutExpired:
-                        continue
+                    supervisor.tick()
+                    supervisor.write()
+                    ticks += 1
+                    stop_requested.wait(1)
+                final_state = "stopped"
+                return 0
             except (KeyboardInterrupt, _StopRequested):
                 final_state = "stopped"
                 return 0
         finally:
-            for _name, process in processes:
-                if process.poll() is None:
-                    process.terminate()
-            for _name, process in processes:
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=5)
-            if heartbeat_specs:
-                write_heartbeats(heartbeat_specs, state=final_state)
+            for group in groups:
+                _stop_children(group)
+            supervisor.write(final_state=final_state)
             _restore_signal_handlers(previous_signal_handlers)
 
 

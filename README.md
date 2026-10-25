@@ -4,7 +4,7 @@ BoB serving-engine security runtime solution
 - 개발계획서 v1.4(문서 상태: 개발 기준 설계안)가 전달됐으며, 직접 개발할 모듈의 언어는 Python으로 선택했습니다. 연동 규격·실제 환경 등은 미결입니다.
 - Codex는 구현·수정·시험을, Claude는 검수를 담당합니다.
 
-## 개발 현황 한눈에 (2026-10-24)
+## 개발 현황 한눈에 (2026-10-25)
 
 기능별·엔진별 상세 확인 수준은 `docs/지원_미지원_목록.md`, 직접 개발과 외부 도구(판본·출처·라이선스)는 `docs/외부기능_활용목록.md`에 있습니다.
 
@@ -25,9 +25,10 @@ BoB serving-engine security runtime solution
 | SGLang 연결 준비 | `--backend sglang`, 엔진별 출력 상한 필드(`max_completion_tokens`), backend별 `/tokenize` payload, `sglang:*` 지표 대응 | 시험 전용 가짜 SGLang만, 실제 SGLang 미확인, Codex 교차 검수 수정 반영 |
 | API 인증 프레임 (F2) | `--auth-config`(`runtime-auth/1.0`): bearer 토큰 주체·역할·주체별 허용 모델, 401/403 엔진 미전달, 설정 오류 503 | 단위·HTTP 시험, 로컬 실행 확인. 실제 인증 연동(D-02)은 미정 |
 | 대상 등록 프레임 (F1) | `--target`(`runtime-target/1.0`): 정책 대상 대조·엔진/모델 비교, `--target-pod-status`로 Pod 조회·교체 구분 | 단위·HTTP 시험, 로컬 kind에서 Pod 교체 확인 |
-| 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류와 기간 있는 승인 예외 | 단위 시험; SP4 송수신 정책은 로컬 kind에서 수동 확인 |
-| 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 수정 반영 |
-| 시험 | 추적 unittest 347개, 수용 시험 37개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류와 기간 있는 승인 예외 | 단위 시험; L-07·L-08 자동 점검을 로컬 kind에서 실행 확인 |
+| read-only 관리 listener (SP4) | observer용 GET/HEAD 경로 허용 목록, 요청 헤더 격리, timeout·응답 크기 제한, 최소 접근 JSONL | 구현·모의 엔진 HTTP 시험 추가; 현재 Codex에서는 소켓 제한으로 HTTP 시험 skip, 실제 kind 사이드카 미확인 |
+| 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 + CPU vLLM 일부 확인; `logprobs`는 엔진 정지/무응답으로 미확인 |
+| 시험 | 저장소 unittest 364개, 수용 시험 37개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 개인 파일 `tests/test_claude_review.py` 8개를 제외. 이번 Codex 실행은 364개 중 279개 통과·소켓 제한 85개 skip. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -41,7 +42,7 @@ BoB serving-engine security runtime solution
 - 모델 파일 쓰기 차단(읽기 전용 마운트·권한)과 엔진 메모리 로딩 확인: 지금은 디스크 해시 비교만 합니다.
 - 정식 GPU·Kubernetes 1.36.5 환경의 Cilium·Hubble·Tetragon 검증: 현재 결과는 WSL2의 kind v1.37.0과 시험 전용 가짜 backend 기준입니다.
 - Tetragon 초기 차단 불일치(첫 helm upgrade 직후)의 원인 확정과 pod·process 귀속 재확인. 재시작·업그레이드 재현 시험에서는 재현되지 않았습니다.
-- 실제 인증 연동 방식(D-02)과 계정·역할(D-03), 조회 API·대시보드 인증, 실제 SGLang 실행(어댑터는 가짜 SGLang으로만 시험)
+- 실제 인증 연동 방식(D-02)과 계정·역할(D-03), 실제 SGLang 실행(조회 API·대시보드의 LAB bearer 인증 프레임은 구현됨)
 
 ## 런타임 통제 MVP (로컬)
 
@@ -588,6 +589,20 @@ L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었습니다. 앞선 기�
 보조 수집 프로그램(`tools/k8s_observation_feed.py`)은 하위 프로세스(port-forward, `hubble observe`, `kubectl logs --follow`)가 끝나도 멈추지 않습니다. 해당 묶음만 정리하고 끊긴 구간을 `{kind}.gaps.jsonl`과 heartbeat에 남긴 뒤 1초부터 최대 30초 간격으로 다시 연결하며, 다시 연결하기 전에 kubectl context를 재확인합니다. 다시 붙을 때는 마지막 정상 확인 1초 전부터 이벤트를 다시 요청하고(Hubble `--since`, Tetragon `--since-time`), 중복은 Gateway가 거릅니다. 재연결 중에는 heartbeat 상태가 `reconnecting`이라 대시보드에 관측 불가로 표시되고, 다시 붙은 뒤에는 재연결 횟수와 최근 끊긴 구간을 보여 줍니다. 복구가 완전한지는 확인할 수 없어 `requested_unverified`로 남깁니다.
 
 live feed는 완성된 새 줄만 변환하며 파일 회전·잘림을 감지합니다. heartbeat가 정상 갱신되면 이벤트가 없어도 "수집 정상·새 이벤트 없음"이고, writer 종료·heartbeat 만료는 관측 불가입니다. heartbeat 만료 기준은 `--collector-stale-after`와 같습니다. heartbeat를 설정하지 않은 임의 feed는 생존을 입증할 수 없으므로 이전처럼 새 이벤트가 없으면 stale이 되며 화면에 "writer heartbeat 미설정" 이유가 붙습니다. heartbeat의 `started_at`보다 오래된 이벤트는 저장하지 않고 실행 전 이벤트로 별도 집계합니다. 원본 손상 줄은 내용 대신 줄 번호·사유와 누적 건수를 표시합니다. Hubble 화면은 혼합 기록에서도 최근 DROPPED 최대 25건을 우선 표시해 FORWARDED에 묻히지 않게 합니다. Cilium 화면의 "설정됨"은 정책 객체 존재만 뜻하고, 실제 차단은 lab L-02 통과 또는 실제 Hubble `DROPPED` 근거로 별도 표시합니다.
+
+### observer용 read-only 관리 listener (SP4)
+
+계획서 §4.12의 HTTP 경로 제한을 담당하는 별도 관리 어댑터입니다. 기본 bind는 `127.0.0.1`이고, 기본 허용 경로는 `/metrics`, `/health`, `/v1/models`, `/version`입니다. 엔진별 차이는 `--allow-path`를 반복해 정확한 경로 목록으로 바꿉니다.
+
+```bash
+.venv/bin/python -m serving_runtime management-listener \
+  --listen-host 127.0.0.1 --listen-port 18081 \
+  --engine-url http://127.0.0.1:8000
+```
+
+GET/HEAD와 목록에 정확히 일치하는 경로만 엔진에 중계합니다. 쿼리 문자열, 대소문자·percent encoding·중복 slash·끝 slash·`.`/`..` 변형은 허용 경로로 정규화하지 않고 거부하며, 요청 본문과 그 밖의 메서드도 거부합니다. 클라이언트 헤더는 엔진에 전달하지 않습니다. 엔진 키가 필요하면 `--credential-file`에 기존 backend `credential.file`과 같은 형식의 bearer token 파일을 지정할 수 있습니다. 접근 기록은 본문·헤더 없이 누적 허용/거부 건수·경로·상태 코드만 stdout JSONL로 내고, `--record-file`을 주면 같은 내용을 파일에도 추가합니다.
+
+intent 1.1의 `engine.management_port`는 observer가 접근할 이 listener의 포트와 맞춰야 합니다. Cilium의 포트 제한은 HTTP 경로 권한을 대신하지 않으며, listener를 실제 kind sidecar로 배치한 시험은 아직 하지 않았습니다. `0.0.0.0` bind는 `--listen-host 0.0.0.0`을 명시한 경우에만 사용합니다.
 
 ### 통제 의도 1.1: 작업별 통신·모델/캐시 보호·단계별 실행 (SP4·SP1·SP3)
 

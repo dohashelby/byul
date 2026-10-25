@@ -1,6 +1,6 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-10-24
+최종 갱신: 2026-10-25
 
 ## 현재 단계
 
@@ -126,6 +126,11 @@
 - 2026-10-25 `k8s_lab_check.py`가 안전 context 확인 뒤 L-01 전에 자체 렌더·적용 대상의 잔여 Cilium/Tetragon 정책만 삭제 완료까지 기다리고, 삭제 명령·결과와 관리 대상 외 정책 경고를 JSON/Markdown `실행 전 정리` 근거로 남기도록 보강했다.
 - 2026-10-25 `mvp-acceptance`에 S4-01~06(인증·인증 오류·조회 보호·대상 판정 순서·가짜 자식 feed 재연결·정책 1.2)을 추가해 37개 사례로 늘리고 README·지원 목록을 맞췄다. 전체 unittest 359개 중 280개 통과·소켓 제한 79개 skip·실패 0개였고, 수용 시험 자체는 같은 소켓 제한(`Operation not permitted`)으로 시작하지 못했다. 커밋·푸시하지 않았다.
 - 2026-10-25 관측 feed 재연결의 context 조회 `TimeoutExpired`를 gap 유지·1~30초 backoff 대상으로 처리하고 실제 context 불일치는 즉시 중단하도록 수정했다. 최초 조회 timeout도 traceback 없이 오류 종료하며, 전체 unittest 361개 중 282개 통과·소켓 제한 79개 skip·실패 0개다. 실제 helper·kubectl은 조작하지 않았고 Git 기준점은 `0ed00ff`, 커밋·푸시하지 않았다.
+- 2026-10-24 21:30~22:10Z Claude가 18080 Gateway 새 코드·정책 1.2·등록 target에서 Docker vLLM CPU v0.29.0/Qwen2.5-0.5B-Instruct를 시험했다. 대상은 4개 match·`model.revision` unknown이었다. validate 정상 4필드와 passthrough `stop_token_ids`·`logit_bias`는 200, 범위 밖 `temperature`·문자열 `seed`는 400 `INVALID_EXTRA_FIELD`, `n=2`·`best_of`는 Gateway 400으로 엔진 미전달, 잘못된 `response_format`의 엔진 400은 Gateway 502 `ENGINE_BAD_RESPONSE`였다. `logprobs` 3회는 EngineCore timeout/엔진 정지 2회와 무응답 1회로 미완료이며 CPU 결함과 메모리 부족 중 원인은 미확정이다. 첫 시도는 RAM 7GB 중 6GB+·swap 2GB 소진 상태에서 기본 요청도 120초 504였고, kind pause 재시험 뒤 unpause했으며 그 사이 Tetragon이 OOM kill로 1회 재시작했다. 시험 뒤 18080은 기본 정책+target으로 재시작하고 vLLM 컨테이너는 정지했다.
+- 2026-10-25 SP4 read-only 관리 listener를 구현했다. 기본 loopback bind, GET/HEAD·정확한 허용 경로, 본문/경로 변형/그 밖의 메서드 거부, 클라이언트 헤더 격리, 선택 엔진 credential 파일, timeout 504·연결/응답 오류 502, 응답 크기 상한, 내용·헤더 없는 최소 JSONL을 제공한다. CLI·단위/모의 HTTP 시험과 README의 intent 1.1 `engine.management_port` 연결을 추가했으며 실제 kind 사이드카는 미확인이다.
+- 남은 결정: 엔진이 입력 오류로 반환한 400을 Gateway가 502 `ENGINE_BAD_RESPONSE`로 바꾸는 동작이 계획서 §4.2의 "실제 엔진이 반환한 입력 오류는 출처를 보존" 기준과 맞는지 확인해야 한다.
+- 2026-10-25 Claude 소켓 검수의 두 실패를 수정했다. 관리 listener는 Python 3.12가 `//`를 접기 전 `requestline`의 원본 request-target으로 허용 판정·엔진 경로·최소 기록을 처리하고 절대 URI도 거부한다. S4-05는 초기 collector `ok`를 최대 10초 기다려 확인한 뒤에만 장애 전환하며, 전체-suite 스케줄 지연이 정상 snapshot을 `stale`로 만들지 않도록 시험 신선도 구간을 30초로 분리했다(요구하는 `ok`→`error`→`ok` 판정은 유지).
+- 전체 unittest는 개인 시험 8개 포함 372개 중 287개 통과·소켓 제한 85개 skip·실패 0개(개인 시험 제외 364개 중 279개 통과·85개 skip)다. `mvp-acceptance` 37개는 소켓 생성 제한(`Operation not permitted`)으로 시작하지 못했다. `git diff --check`는 통과했다. Git 기준점은 HEAD `ce2edd5`이며 설치·kubectl·Docker·kind·실행 중 서버/helper 조작·커밋·푸시는 하지 않았다.
 
 ## 다음 준비 작업
 

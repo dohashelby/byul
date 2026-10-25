@@ -2170,7 +2170,10 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
             runner.start(
                 data_dir=data_dir,
                 collector_interval_s=0.04,
-                collector_stale_after_s=1.0,
+                # This case drives explicit ok -> error -> ok transitions.
+                # Keep the success snapshot fresh during a loaded full-suite
+                # run instead of letting scheduler delay turn it into stale.
+                collector_stale_after_s=30.0,
                 observation_feeds=(("tetragon", str(feed_path)),),
                 observation_heartbeats=(("tetragon", str(heartbeat_path)),),
                 observation_origin="synthetic",
@@ -2178,15 +2181,21 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
             running = _wait_for(
                 lambda: _collector_source(
                     runner, "observation_feed_tetragon", "ok"
-                )
+                ),
+                timeout=10.0,
             )
+            if running is None:
+                raise RuntimeError(
+                    "S4-05 initial observation collector did not reach ok"
+                )
             started[0].returncode = 0
             supervisor.tick()
             supervisor.write()
             reconnecting = _wait_for(
                 lambda: _collector_source(
                     runner, "observation_feed_tetragon", "error"
-                )
+                ),
+                timeout=10.0,
             )
             status_http, status_body = runner.get_json("/api/status")
             now[0] += 1.0
@@ -2195,7 +2204,8 @@ def _run_s4_05(runner: _Runner) -> AcceptanceResult:
             recovered = _wait_for(
                 lambda: _collector_source(
                     runner, "observation_feed_tetragon", "ok"
-                )
+                ),
+                timeout=10.0,
             )
             context_calls = context_check.call_count
         helper._stop_children(group)

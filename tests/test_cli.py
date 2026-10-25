@@ -73,6 +73,21 @@ class InstalledCommandTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertEqual(result.stdout, "")
 
+    def test_management_listener_help_documents_required_boundary_options(self) -> None:
+        result = self.run_command(
+            sys.executable,
+            "-I",
+            "-m",
+            "serving_runtime",
+            "management-listener",
+            "--help",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--engine-url URL", result.stdout)
+        self.assertIn("--allow-path PATH", result.stdout)
+        self.assertIn("--max-response-bytes BYTES", result.stdout)
+        self.assertEqual(result.stderr, "")
+
 
 if __name__ == "__main__":
     unittest.main()

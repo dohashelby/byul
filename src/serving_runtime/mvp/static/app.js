@@ -217,6 +217,12 @@ function renderSummary(summary) {
     $(`count-${key}`).textContent = summary.counts[key];
   }
   $("count-INCOMPLETE").textContent = summary.incomplete;
+  $("ov-request-total").textContent = String(summary.total);
+  const largest = Math.max(1, ...["ALLOWED", "DENIED", "INVALID", "ENGINE_REJECTED", "ERROR"].map((key) => summary.counts[key] || 0), summary.incomplete || 0);
+  for (const key of ["ALLOWED", "DENIED", "INVALID", "ENGINE_REJECTED", "ERROR", "INCOMPLETE"]) {
+    const value = key === "INCOMPLETE" ? summary.incomplete || 0 : summary.counts[key] || 0;
+    $(`bar-${key}`).style.width = `${(value / largest) * 100}%`;
+  }
 
   const store = summary.record_store;
   const corrupt = summary.corrupt_lines;
@@ -957,7 +963,18 @@ function closeDetail() {
   for (const row of $("request-rows").children) row.classList.remove("is-selected");
 }
 
-const VIEWS = ["overview", "requests", "policy", "target", "observe", "enforce"];
+const VIEWS = ["overview", "requests", "policy", "target", "observe", "enforce", "update", "settings", "user"];
+const VIEW_TITLES = {
+  overview: "현황",
+  requests: "요청",
+  policy: "정책",
+  target: "대상·구성",
+  observe: "관측",
+  enforce: "통제 적용",
+  update: "업데이트 검증",
+  settings: "설정",
+  user: "사용자",
+};
 // Areas split further into one panel per tool; the first entry is the default.
 const SUBVIEWS = { observe: ["collectors", "hubble", "tetragon"], enforce: ["cilium", "lab"] };
 const lastSubview = {};
@@ -986,11 +1003,12 @@ function showView(target, { updateHash = true } = {}) {
     section.hidden = section.dataset.view !== view;
   }
   for (const button of document.querySelectorAll(".nav-item")) {
-    const active = button.dataset.view === view;
+    const active = button.dataset.view === view && (!button.dataset.subview || button.dataset.subview === sub);
     button.classList.toggle("is-active", active);
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   }
+  $("page-title").textContent = VIEW_TITLES[view];
   const hash = sub ? `${view}/${sub}` : view;
   if (updateHash && location.hash.slice(1) !== hash) {
     history.replaceState(null, "", `#${hash}`);
@@ -1063,23 +1081,275 @@ function renderNav({ status, summary, target, revalidation, collectors, observat
   const report = labReport.report;
   const failedCases = report ? (report.cases || []).filter((item) => item.status === "failed").length : 0;
   const cilium = (collectors.collectors || []).find((item) => item.source === "cilium_policy");
-  const enforceProblems = failedCases + (cilium && cilium.state !== "ok" ? 1 : 0)
-    + (["ok", "not_configured"].includes(labReport.state) ? 0 : 1);
   const ciliumProblem = cilium && cilium.state !== "ok" ? 1 : 0;
   setSubtab("cilium", $("cilium-policy-rows").children.length, ciliumProblem, ciliumProblem ? `Cilium 상태 ${cilium.state}` : "");
   const labProblems = failedCases + (["ok", "not_configured"].includes(labReport.state) ? 0 : 1);
   setSubtab("lab", report ? (report.cases || []).length : 0, labProblems, labProblems ? `lab 실패 ${failedCases}건` : "");
-  setNavBadge("enforce", enforceProblems, `lab 실패 ${failedCases}건${cilium && cilium.state !== "ok" ? " · Cilium 상태 조회 문제" : ""}`);
+  setNavBadge("cilium", ciliumProblem, ciliumProblem ? `Cilium 상태 ${cilium.state}` : "");
+  setNavBadge("enforce", labProblems, `lab 실패 ${failedCases}건`);
 
-  const total = errors + policyProblems + targetProblems + collectorProblems.length + enforceProblems;
+  const total = errors + policyProblems + targetProblems + collectorProblems.length + ciliumProblem + labProblems;
   setNavBadge("overview", total, "모든 영역의 경고 합계");
 
-  const gatewayEnv = status.environment || "환경 미기록";
-  $("nav-env-requests").textContent = `Gateway·엔진 · ${gatewayEnv}`;
-  $("nav-env-target").textContent = `Gateway·엔진 · ${gatewayEnv}`;
+  $("env-gateway").textContent = status.environment || "미기록";
   const observedEnv = mostCommon((observations.observations || []).map((item) => item.environment));
-  $("nav-env-observe").textContent = observedEnv ? `관측 · ${observedEnv}` : "수집원·Hubble·Tetragon";
-  $("nav-env-enforce").textContent = report ? `Cilium·lab · ${report.context}` : "Cilium·lab 시험";
+  $("env-observe").textContent = observedEnv || (report ? report.context : "미연결");
+
+  const auth = status.auth || {};
+  const userState = {
+    not_configured: "인증 미적용",
+    ok: "토큰 인증 적용",
+    error: "인증 설정 오류",
+  }[auth.state] || "확인 불가";
+  $("nav-user-state").textContent = userState;
+  fillKv("user-kv", [
+    ["API 인증", userState, { problem: auth.state !== "ok" }],
+    ["방식", auth.method || "미설정"],
+    ["등록 주체 수", auth.state === "ok" ? `${auth.principal_count ?? 0}명` : "미설정"],
+    ["보호 경로", (auth.protected_routes || []).length ? auth.protected_routes.join(", ") : "없음"],
+    ["이 탭의 조회 토큰", readToken() ? "입력됨(이 탭에만 보관)" : "없음"],
+  ]);
+  fillKv("settings-kv", [
+    ["화면 모드", currentTheme() === "dark" ? "다크" : "라이트"],
+    ["모드 기준", storedTheme() ? "직접 선택(이 브라우저에 저장)" : "운영체제 설정을 따름"],
+    ["자동 갱신", `${REFRESH_MS / 1000}초마다`],
+    ["Gateway 주소", location.host],
+    ["실행 환경", status.environment || "미기록"],
+    ["실행 ID", status.run_id || "미기록", { mono: true }],
+  ]);
+}
+
+// ---- Light / dark theme ----------------------------------------------------
+const THEME_KEY = "serving-runtime-theme";
+
+function storedTheme() {
+  try {
+    const value = localStorage.getItem(THEME_KEY);
+    return value === "light" || value === "dark" ? value : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function currentTheme() {
+  const explicit = document.documentElement.dataset.theme;
+  if (explicit === "light" || explicit === "dark") return explicit;
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme, { remember }) {
+  document.documentElement.dataset.theme = theme;
+  if (remember) {
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch (_) {
+      // Storage unavailable: the choice lasts for this page view only.
+    }
+  }
+  resetCharts();
+}
+
+// ---- Charts (vendored Chart.js) --------------------------------------------
+// Labels come from fixed codes and counts, and Chart.js draws them on a
+// canvas, never as HTML.
+const CHART_RESULTS = ["ALLOWED", "DENIED", "INVALID", "ENGINE_REJECTED", "ERROR"];
+const charts = {};
+const chartMode = { requests: "total", mix: "results" };
+let lastChartInput = null;
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+// One accent hue in steps plus gray; only errors use red.
+function resultColor(result) {
+  return {
+    ALLOWED: cssVar("--accent"),
+    DENIED: cssVar("--accent-2"),
+    INVALID: cssVar("--accent-3"),
+    ENGINE_REJECTED: cssVar("--chart-gray"),
+    ERROR: cssVar("--error"),
+    INCOMPLETE: cssVar("--chart-gray-2"),
+  }[result];
+}
+
+function chartAvailable() {
+  const ok = typeof window.Chart === "function";
+  const note = $("chart-error");
+  note.hidden = ok;
+  if (!ok) note.textContent = "그래프 라이브러리(Chart.js)를 불러오지 못해 그래프를 표시하지 않습니다. 숫자와 표는 그대로 볼 수 있습니다.";
+  return ok;
+}
+
+function resetCharts() {
+  for (const id of Object.keys(charts)) {
+    charts[id].destroy();
+    delete charts[id];
+  }
+  if (lastChartInput) renderCharts(...lastChartInput);
+}
+
+function drawChart(id, config) {
+  if (charts[id]) {
+    charts[id].destroy();
+    delete charts[id];
+  }
+  const Chart = window.Chart;
+  Chart.defaults.color = cssVar("--muted");
+  Chart.defaults.borderColor = cssVar("--grid");
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.font.size = 12;
+  charts[id] = new Chart($(id), {
+    ...config,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      ...config.options,
+      plugins: {
+        legend: { labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "rectRounded" } },
+        tooltip: { backgroundColor: cssVar("--surface-2"), titleColor: cssVar("--text"), bodyColor: cssVar("--text"), borderColor: cssVar("--border"), borderWidth: 1 },
+        ...(config.options && config.options.plugins),
+      },
+    },
+  });
+}
+
+// Bucket by hour when the records span two days or less, otherwise by day.
+function timeBuckets(items) {
+  const times = items.map((item) => Date.parse(item.recorded_at)).filter((value) => !Number.isNaN(value));
+  if (!times.length) return { keys: [], step: "hour", keyOf: () => null };
+  const span = Math.max(...times) - Math.min(...times);
+  const step = span <= 48 * 3600 * 1000 ? "hour" : "day";
+  const pad = (value) => String(value).padStart(2, "0");
+  const keyOf = (iso) => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return null;
+    const day = `${date.getMonth() + 1}/${date.getDate()}`;
+    return step === "hour" ? `${day} ${pad(date.getHours())}시` : day;
+  };
+  const keys = [];
+  const start = new Date(Math.min(...times));
+  if (step === "hour") start.setMinutes(0, 0, 0);
+  else start.setHours(0, 0, 0, 0);
+  const end = Math.max(...times);
+  for (let at = start.getTime(); at <= end; at += step === "hour" ? 3600 * 1000 : 24 * 3600 * 1000) {
+    keys.push(keyOf(new Date(at).toISOString()));
+  }
+  return { keys, step, keyOf };
+}
+
+function fillMiniTable(id, rows, emptyText) {
+  const body = $(id);
+  clear(body);
+  if (!rows.length) {
+    body.appendChild(el("tr", {}, [el("td", { className: "muted", text: emptyText }), el("td", {})]));
+    return;
+  }
+  for (const [label, count] of rows) {
+    body.appendChild(el("tr", {}, [el("td", { className: "mono", text: label }), el("td", { className: "num", text: String(count) })]));
+  }
+}
+
+function observationRules(observations) {
+  const counts = observations.counts || {};
+  const dropped = (counts.verdict || {}).dropped || 0;
+  const rules = Object.entries(counts.rule_id || {}).sort((a, b) => b[1] - a[1]);
+  return (dropped ? [["Hubble DROPPED", dropped]] : []).concat(rules);
+}
+
+function renderCharts(summary, chartItems, observations) {
+  lastChartInput = [summary, chartItems, observations];
+  const counts = summary.counts || {};
+
+  // Summary cards (plain tables; no chart library needed).
+  const reasons = new Map();
+  for (const item of chartItems) {
+    if (item.result === "ALLOWED" || !item.reason_code) continue;
+    reasons.set(item.reason_code, (reasons.get(item.reason_code) || 0) + 1);
+  }
+  const topReasons = [...reasons.entries()].sort((a, b) => b[1] - a[1]);
+  $("ov-reason-total").textContent = String(topReasons.reduce((sum, [, count]) => sum + count, 0));
+  $("ov-reason-caption").textContent = `최근 ${chartItems.length}건 중 거부·오류`;
+  fillMiniTable("ov-reason-rows", topReasons.slice(0, 5), "거부·오류 없음");
+  const ruleRows = observationRules(observations);
+  const sourceCounts = (observations.counts && observations.counts.source) || {};
+  $("ov-observation-total").textContent = String(Object.values(sourceCounts).reduce((sum, value) => sum + value, 0));
+  fillMiniTable("ov-rule-rows", ruleRows.slice(0, 5), "관측 사건 없음");
+
+  if (!chartAvailable()) return;
+
+  const { keys, step, keyOf } = timeBuckets(chartItems);
+  const series = Object.fromEntries(CHART_RESULTS.map((key) => [key, new Map(keys.map((bucket) => [bucket, 0]))]));
+  for (const item of chartItems) {
+    const bucket = keyOf(item.recorded_at);
+    if (bucket && series[item.result]) series[item.result].set(bucket, (series[item.result].get(bucket) || 0) + 1);
+  }
+  $("chart-requests-total").textContent = String(chartItems.length);
+  $("chart-requests-note").textContent = `최근 요청 · ${step === "hour" ? "시간" : "일"} 단위`;
+  const accent = cssVar("--accent");
+  if (chartMode.requests === "total") {
+    drawChart("chart-requests", {
+      type: "line",
+      data: {
+        labels: keys,
+        datasets: [{
+          label: "요청",
+          data: keys.map((bucket) => CHART_RESULTS.reduce((sum, key) => sum + (series[key].get(bucket) || 0), 0)),
+          borderColor: accent,
+          backgroundColor: cssVar("--accent-soft"),
+          fill: true,
+          tension: 0.35,
+          pointRadius: 0,
+          borderWidth: 2,
+        }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0 } } } },
+    });
+  } else {
+    drawChart("chart-requests", {
+      type: "bar",
+      data: {
+        labels: keys,
+        datasets: CHART_RESULTS.map((key) => ({
+          label: RESULT_LABELS[key],
+          data: keys.map((bucket) => series[key].get(bucket) || 0),
+          backgroundColor: resultColor(key),
+          stack: "requests",
+        })),
+      },
+      options: {
+        plugins: { legend: { position: "bottom", align: "start" } },
+        scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  if (chartMode.mix === "results") {
+    const values = CHART_RESULTS.map((key) => counts[key] || 0).concat(summary.incomplete || 0);
+    $("chart-mix-total").textContent = String(values.reduce((sum, value) => sum + value, 0));
+    $("chart-mix-note").textContent = "누적 요청 결과";
+    drawChart("chart-mix", {
+      type: "doughnut",
+      data: {
+        labels: CHART_RESULTS.map((key) => RESULT_LABELS[key]).concat(RESULT_LABELS.INCOMPLETE),
+        datasets: [{ data: values, backgroundColor: CHART_RESULTS.map(resultColor).concat(resultColor("INCOMPLETE")), borderColor: cssVar("--surface"), borderWidth: 2 }],
+      },
+      options: { cutout: "68%", plugins: { legend: { position: "right" } } },
+    });
+  } else {
+    const rows = ruleRows.slice(0, 8);
+    $("chart-mix-total").textContent = String(rows.reduce((sum, [, count]) => sum + count, 0));
+    $("chart-mix-note").textContent = "누적 관측 사건(규칙별)";
+    drawChart("chart-mix", {
+      type: "bar",
+      data: {
+        labels: rows.map(([name]) => name),
+        datasets: [{ data: rows.map(([, count]) => count), backgroundColor: accent, barThickness: 14 }],
+      },
+      options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } } },
+    });
+  }
 }
 
 function setFilter(filter) {
@@ -1093,7 +1363,7 @@ function setFilter(filter) {
 async function refresh() {
   const query = state.filter ? `?result=${encodeURIComponent(state.filter)}` : "";
   try {
-    const [status, summary, list, policy, baseline, collectors, revalidation, observations, labReport] = await Promise.all([
+    const [status, summary, list, policy, baseline, collectors, revalidation, observations, labReport, chartList] = await Promise.all([
       getJson("/api/status"),
       getJson("/api/summary"),
       getJson(`/api/requests${query}`),
@@ -1103,6 +1373,8 @@ async function refresh() {
       getJson("/api/revalidation"),
       getJson("/api/observations"),
       getJson("/api/lab-report"),
+      // Charts ignore the list filter and use the most recent records.
+      getJson("/api/requests?limit=1000"),
     ]);
     // Optional: a gateway started before target support has no /api/target.
     const target = await getJson("/api/target").catch(() => null);
@@ -1118,6 +1390,12 @@ async function refresh() {
     renderLabReport(labReport);
     renderCilium(collectors, labReport, observations);
     renderNav({ status, summary, target, revalidation, collectors, observations, labReport });
+    try {
+      renderCharts(summary, chartList.requests || [], observations);
+    } catch (error) {
+      $("chart-error").hidden = false;
+      $("chart-error").textContent = `그래프를 그리지 못했습니다: ${error.message}`;
+    }
     state.lastSuccess = new Date();
     $("auth-form").hidden = true;
     document.body.classList.remove("is-stale");
@@ -1141,7 +1419,27 @@ for (const button of document.querySelectorAll("[data-filter]")) {
   });
 }
 for (const button of document.querySelectorAll(".nav-item")) {
-  button.addEventListener("click", () => showView(button.dataset.view));
+  button.addEventListener("click", () => showView(
+    button.dataset.subview ? `${button.dataset.view}/${button.dataset.subview}` : button.dataset.view,
+  ));
+}
+for (const button of document.querySelectorAll(".card-tab")) {
+  button.addEventListener("click", () => {
+    chartMode[button.dataset.chart] = button.dataset.mode;
+    for (const sibling of document.querySelectorAll(`.card-tab[data-chart="${button.dataset.chart}"]`)) {
+      sibling.classList.toggle("is-active", sibling === button);
+      sibling.setAttribute("aria-selected", sibling === button ? "true" : "false");
+    }
+    if (lastChartInput) renderCharts(...lastChartInput);
+  });
+}
+$("theme-toggle").addEventListener("click", () => {
+  applyTheme(currentTheme() === "dark" ? "light" : "dark", { remember: true });
+});
+if (window.matchMedia) {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (!storedTheme()) resetCharts();
+  });
 }
 for (const button of document.querySelectorAll(".subtab")) {
   button.addEventListener("click", () => showView(`${button.dataset.view}/${button.dataset.subview}`));

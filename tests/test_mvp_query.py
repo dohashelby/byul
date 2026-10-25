@@ -1,6 +1,7 @@
 """M3 read-only query API, evidence judgement, and dashboard asset tests."""
 
 from contextlib import closing
+import hashlib
 import http.client
 import json
 from pathlib import Path
@@ -135,6 +136,19 @@ class DashboardAssetTests(unittest.TestCase):
         self.assertIn('{ vllm: "vLLM", sglang: "SGLang" }', script)
         self.assertIn("정식 GPU 시험(S3B) 전", script)
         self.assertIn('engine.healthy ? "badge-external" : "badge-ERROR"', script)
+
+    def test_vendored_chart_library_is_pinned_and_local(self) -> None:
+        # The dashboard loads Chart.js from the repository only, never a CDN.
+        page = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        self.assertIn('<script src="/static/vendor/chart.umd.min.js"></script>', page)
+        self.assertNotRegex(page, r"<script[^>]+src=\"https?://")
+        bundle = (STATIC_DIR / "vendor" / "chart.umd.min.js").read_bytes()
+        self.assertEqual(
+            hashlib.sha256(bundle).hexdigest(),
+            "48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a",
+        )
+        self.assertTrue(bundle.startswith(b"/*!\n * Chart.js v4.5.1"))
+        self.assertTrue((STATIC_DIR / "vendor" / "chart.js-LICENSE.md").is_file())
 
     def test_dashboard_has_no_mutating_controls(self) -> None:
         page = (STATIC_DIR / "index.html").read_text(encoding="utf-8")

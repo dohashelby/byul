@@ -1,0 +1,13 @@
+{
+  "schema_version": "runtime-target/1.0",
+  "target_id": "mock-engine-001",
+  "target_ref": "LAB-TARGET-EXAMPLE-ONLY",
+  "engine": {
+    "kind": "mock",
+    "version": "mock-1.0"
+  },
+  "model": {
+    "id": "test-model"
+  },
+  "baseline_ref": null
+}

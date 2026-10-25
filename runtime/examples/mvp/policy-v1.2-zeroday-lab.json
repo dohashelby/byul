@@ -1,0 +1,42 @@
+{
+  "schema_version": "runtime-mvp/1.2",
+  "policy_id": "local-zeroday-lab-001",
+  "policy_version": "1",
+  "target_id": "mock-engine-001",
+  "allowed_models": [
+    "test-model"
+  ],
+  "output_default_tokens": 128,
+  "output_max_tokens": 128,
+  "max_body_bytes": 65536,
+  "valid_from": "2026-01-01T00:00:00+00:00",
+  "valid_until": "2027-01-01T00:00:00+00:00",
+  "approval_ref": "LAB-ZERODAY-TEST-ONLY",
+  "max_context_tokens": 2048,
+  "profile": "zeroday-lab",
+  "max_n": 1,
+  "extra_fields": {
+    "temperature": {"mode": "validate", "type": "number", "min": 0, "max": 2},
+    "top_p": {"mode": "validate", "type": "number", "min": 0, "max": 1},
+    "top_k": {"mode": "validate", "type": "integer", "min": -1, "max": 1000},
+    "seed": {"mode": "validate", "type": "integer"},
+    "min_tokens": {"mode": "validate", "type": "integer", "min": 0, "max": 128},
+    "stop": {
+      "mode": "validate",
+      "type": "array",
+      "max_items": 4,
+      "items": {"type": "string", "max_length": 64}
+    },
+    "logprobs": {"mode": "validate", "type": "boolean"},
+    "top_logprobs": {"mode": "validate", "type": "integer", "min": 0, "max": 20},
+    "stop_token_ids": {"mode": "passthrough"},
+    "allowed_token_ids": {"mode": "passthrough"},
+    "logit_bias": {"mode": "passthrough"},
+    "cache_salt": {"mode": "passthrough"},
+    "response_format": {"mode": "passthrough"},
+    "structured_outputs": {"mode": "passthrough"},
+    "chat_template_kwargs": {"mode": "passthrough"},
+    "prompt_logprobs": {"mode": "passthrough"},
+    "ignore_eos": {"mode": "passthrough"}
+  }
+}

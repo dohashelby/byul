@@ -1,0 +1,30 @@
+{
+  "schema_version": "runtime-exec-exceptions/1.0",
+  "exceptions": [
+    {
+      "exception_id": "EXC-LAB-MAINT-001",
+      "rule_ref": "SP3-EXEC",
+      "kind": "maintenance",
+      "executable": "/bin/sh",
+      "phase": "maintenance",
+      "reason": "LAB example: operator health check during maintenance",
+      "approved_by": "lab-runtime-owner",
+      "approval_ref": "LAB-EXCEPTION-EXAMPLE-ONLY",
+      "valid_from": "2026-10-24T10:00:00+00:00",
+      "valid_until": "2026-10-24T10:30:00+00:00"
+    },
+    {
+      "exception_id": "EXC-LAB-STANDING-001",
+      "rule_ref": "SP3-EXEC",
+      "kind": "standing",
+      "executable": "/usr/bin/ptxas",
+      "phase": "compiling",
+      "image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "reason": "LAB example: JIT assembler observed during cold compile",
+      "approved_by": "lab-runtime-owner",
+      "approval_ref": "LAB-EXCEPTION-EXAMPLE-ONLY",
+      "valid_from": "2026-10-24T00:00:00+00:00",
+      "valid_until": "2026-11-21T00:00:00+00:00"
+    }
+  ]
+}

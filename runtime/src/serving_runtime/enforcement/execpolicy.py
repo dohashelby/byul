@@ -1,0 +1,505 @@
+"""SP3 phase-aware execution classification and SP1 cache-generation tagging.
+
+Classifies observed Tetragon events against the 1.1 intent: which phase was
+active (from a declared phase timeline), whether the binary is approved for
+that phase, whether an approved, time-bounded exception covers it, and whether
+it ran from the cache. This is observation and alerting only; nothing here
+blocks a process, and no binary (Python, workers, compilers) is ignored
+wholesale.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+import json
+import os
+from pathlib import Path
+import re
+import threading
+from typing import Any
+
+from .intent import PHASES, EnforcementIntent, IntentError, _reject_constant, _unique_object
+
+
+EXCEPTIONS_SCHEMA = "runtime-exec-exceptions/1.0"
+TIMELINE_SCHEMA = "runtime-phase-timeline/1.0"
+TIMELINE_PHASES = (*PHASES, "maintenance")
+BASES = frozenset({"declared", "engine_signal", "test_controller"})
+# Phases and exceptions come from a trusted management path (plan §7.4). An
+# engine can write its own logs, so an engine_signal phase alone never widens
+# what counts as allowed; it only marks the event for review.
+TRUSTED_BASES = frozenset({"declared", "test_controller"})
+MAINTENANCE_MAX = timedelta(minutes=30)
+_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+
+
+def _time(value: Any, path: str) -> datetime:
+    if not isinstance(value, str):
+        raise IntentError(f"{path} must be an ISO8601 string with a timezone")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as error:
+        raise IntentError(f"{path} must be an ISO8601 string with a timezone") from error
+    if parsed.tzinfo is None:
+        raise IntentError(f"{path} must include a timezone")
+    return parsed
+
+
+def _text(value: Any, path: str) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > 512:
+        raise IntentError(f"{path} must be a non-empty string")
+    return value
+
+
+def _abs(value: Any, path: str) -> str:
+    text = _text(value, path)
+    if not Path(text).is_absolute() or ".." in Path(text).parts:
+        raise IntentError(f"{path} must be an absolute path without parent traversal")
+    return text
+
+
+def _read(path: str | Path) -> Any:
+    try:
+        return json.loads(
+            Path(path).read_text(encoding="utf-8"),
+            object_pairs_hook=_unique_object,
+            parse_constant=_reject_constant,
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError) as error:
+        raise IntentError(f"could not read {path}: {type(error).__name__}") from error
+
+
+@dataclass(frozen=True)
+class ExecException:
+    exception_id: str
+    rule_ref: str
+    kind: str  # maintenance | standing
+    executable: str
+    parent: str | None
+    phase: str
+    image_digest: str | None
+    valid_from: datetime
+    valid_until: datetime
+    approval_ref: str
+
+    def covers(self, *, binary: str, parent: str | None, image: str | None, phases: set[str], at: datetime | None) -> bool:
+        if binary != self.executable or self.phase not in phases:
+            return False
+        if at is None or not self.valid_from <= at < self.valid_until:
+            return False
+        # Missing evidence never satisfies a condition the exception requires.
+        if self.parent is not None and parent != self.parent:
+            return False
+        if self.image_digest is not None and image != self.image_digest:
+            return False
+        return True
+
+
+@dataclass(frozen=True)
+class PhaseEntry:
+    phase: str
+    start: datetime
+    end: datetime | None
+    basis: str
+
+    def active(self, at: datetime) -> bool:
+        return self.start <= at and (self.end is None or at < self.end)
+
+
+def parse_exceptions(document: Any) -> tuple[ExecException, ...]:
+    if not isinstance(document, dict) or set(document) - {"schema_version", "exceptions"}:
+        raise IntentError("exceptions document must contain only schema_version and exceptions")
+    if document.get("schema_version") != EXCEPTIONS_SCHEMA:
+        raise IntentError(f"schema_version must be {EXCEPTIONS_SCHEMA}")
+    raw = document.get("exceptions")
+    if not isinstance(raw, list):
+        raise IntentError("exceptions must be an array")
+    allowed = {
+        "exception_id", "rule_ref", "kind", "executable", "parent", "phase", "image_digest",
+        "reason", "approved_by", "approval_ref", "valid_from", "valid_until",
+    }
+    result: list[ExecException] = []
+    for index, item in enumerate(raw):
+        path = f"exceptions[{index}]"
+        if not isinstance(item, dict):
+            raise IntentError(f"{path} must be an object")
+        unknown = sorted(set(item) - allowed)
+        if unknown:
+            raise IntentError(f"{path} has unknown fields: {', '.join(unknown)}")
+        exception_id = item.get("exception_id")
+        if not isinstance(exception_id, str) or _ID.fullmatch(exception_id) is None:
+            raise IntentError(f"{path}.exception_id is invalid")
+        kind = item.get("kind")
+        if kind not in {"maintenance", "standing"}:
+            raise IntentError(f"{path}.kind must be maintenance or standing")
+        phase = item.get("phase")
+        if phase not in TIMELINE_PHASES:
+            raise IntentError(f"{path}.phase must be one of {', '.join(TIMELINE_PHASES)}")
+        image = item.get("image_digest")
+        if image is not None and (not isinstance(image, str) or _DIGEST.fullmatch(image) is None):
+            raise IntentError(f"{path}.image_digest must be sha256:<64 hex>")
+        if kind == "standing" and image is None:
+            raise IntentError(f"{path} standing exceptions must be bound to an image_digest")
+        start = _time(item.get("valid_from"), f"{path}.valid_from")
+        end = _time(item.get("valid_until"), f"{path}.valid_until")
+        if end <= start:
+            raise IntentError(f"{path}.valid_until must be after valid_from")
+        if kind == "maintenance" and end - start > MAINTENANCE_MAX:
+            raise IntentError(f"{path} maintenance exceptions may last at most 30 minutes")
+        for name in ("reason", "approved_by", "approval_ref"):
+            _text(item.get(name), f"{path}.{name}")
+        result.append(
+            ExecException(
+                exception_id,
+                _text(item.get("rule_ref"), f"{path}.rule_ref"),
+                kind,
+                _abs(item.get("executable"), f"{path}.executable"),
+                _abs(item["parent"], f"{path}.parent") if item.get("parent") is not None else None,
+                phase,
+                image,
+                start,
+                end,
+                item["approval_ref"],
+            )
+        )
+    ids = [item.exception_id for item in result]
+    if len(ids) != len(set(ids)):
+        raise IntentError("exception_id values must be unique")
+    return tuple(result)
+
+
+def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
+    allowed_root = {"schema_version", "target_ref", "entries", "extraction"}
+    if not isinstance(document, dict) or set(document) - allowed_root:
+        raise IntentError(
+            "timeline must contain only schema_version, target_ref, entries, extraction"
+        )
+    if document.get("schema_version") != TIMELINE_SCHEMA:
+        raise IntentError(f"schema_version must be {TIMELINE_SCHEMA}")
+    extraction = document.get("extraction")
+    if extraction is not None:
+        extraction_fields = {
+            "engine", "pattern_set", "support_level", "year", "timezone",
+            "runs_observed", "lines_read", "unparsed_lines", "last_position", "matched_signals",
+            "omitted_boundaries", "open_phases", "limitations",
+        }
+        optional_extraction_fields = {
+            "follow", "collector_state", "clock_sources", "health_probe",
+        }
+        if (
+            not isinstance(extraction, dict)
+            or not extraction_fields <= set(extraction)
+            or set(extraction) - extraction_fields - optional_extraction_fields
+        ):
+            raise IntentError("timeline.extraction has invalid fields")
+        for name in ("engine", "pattern_set", "support_level", "timezone"):
+            if not isinstance(extraction[name], str) or not extraction[name]:
+                raise IntentError(f"timeline.extraction.{name} must be a non-empty string")
+        for name in ("year", "runs_observed", "lines_read", "unparsed_lines"):
+            value = extraction[name]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise IntentError(f"timeline.extraction.{name} must be a non-negative integer")
+        if not 1 <= extraction["year"] <= 9999:
+            raise IntentError("timeline.extraction.year is out of range")
+        position = extraction["last_position"]
+        if (
+            not isinstance(position, dict)
+            or set(position) != {"line", "byte_offset"}
+            or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in position.values())
+        ):
+            raise IntentError("timeline.extraction.last_position is invalid")
+        signals = extraction["matched_signals"]
+        if (
+            not isinstance(signals, dict)
+            or any(
+                not isinstance(name, str)
+                or not name
+                or isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 1
+                for name, value in signals.items()
+            )
+        ):
+            raise IntentError("timeline.extraction.matched_signals is invalid")
+        omitted = extraction["omitted_boundaries"]
+        if not isinstance(omitted, list):
+            raise IntentError("timeline.extraction.omitted_boundaries must be an array")
+        for index, item in enumerate(omitted):
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"line", "signal", "reason"}
+                or isinstance(item["line"], bool)
+                or not isinstance(item["line"], int)
+                or item["line"] < 1
+                or any(not isinstance(item[name], str) or not item[name] for name in ("signal", "reason"))
+            ):
+                raise IntentError(f"timeline.extraction.omitted_boundaries[{index}] is invalid")
+        for name in ("open_phases", "limitations"):
+            values = extraction[name]
+            if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+                raise IntentError(f"timeline.extraction.{name} must be a string array")
+        follow = extraction.get("follow")
+        if follow is not None:
+            follow_fields = {
+                "mode", "existing", "state", "last_updated_at", "input_identity", "events",
+            }
+            if not isinstance(follow, dict) or set(follow) != follow_fields:
+                raise IntentError("timeline.extraction.follow has invalid fields")
+            if follow["mode"] not in {"file", "stdin"}:
+                raise IntentError("timeline.extraction.follow.mode is invalid")
+            if follow["existing"] not in {"fail", "overwrite", "resume"}:
+                raise IntentError("timeline.extraction.follow.existing is invalid")
+            if follow["state"] not in {"running", "stopped", "read_error", "input_ended"}:
+                raise IntentError("timeline.extraction.follow.state is invalid")
+            _time(follow["last_updated_at"], "timeline.extraction.follow.last_updated_at")
+            identity = follow["input_identity"]
+            if identity is not None and (
+                not isinstance(identity, dict)
+                or set(identity) != {"device", "inode"}
+                or any(
+                    isinstance(value, bool) or not isinstance(value, int) or value < 0
+                    for value in identity.values()
+                )
+            ):
+                raise IntentError("timeline.extraction.follow.input_identity is invalid")
+            events = follow["events"]
+            if not isinstance(events, list):
+                raise IntentError("timeline.extraction.follow.events must be an array")
+            for index, item in enumerate(events):
+                if (
+                    not isinstance(item, dict)
+                    or set(item) - {"kind", "at", "error"}
+                    or not {"kind", "at"} <= set(item)
+                    or not isinstance(item["kind"], str)
+                    or not item["kind"]
+                    or ("error" in item and (not isinstance(item["error"], str) or not item["error"]))
+                ):
+                    raise IntentError(f"timeline.extraction.follow.events[{index}] is invalid")
+                _time(item["at"], f"timeline.extraction.follow.events[{index}].at")
+        collector = extraction.get("collector_state")
+        if collector is not None:
+            if not isinstance(collector, dict) or set(collector) != {
+                "run_active", "run_init_ended", "compile_seen", "inferring_seen", "health_ready_at",
+            }:
+                raise IntentError("timeline.extraction.collector_state has invalid fields")
+            for name in ("run_active", "run_init_ended", "compile_seen", "inferring_seen"):
+                if not isinstance(collector[name], bool):
+                    raise IntentError(f"timeline.extraction.collector_state.{name} must be boolean")
+            if collector["health_ready_at"] is not None:
+                _time(
+                    collector["health_ready_at"],
+                    "timeline.extraction.collector_state.health_ready_at",
+                )
+        clocks = extraction.get("clock_sources")
+        if clocks is not None and (
+            not isinstance(clocks, dict)
+            or set(clocks) != {"log_boundaries", "health_boundaries", "ordering"}
+            or any(not isinstance(value, str) or not value for value in clocks.values())
+        ):
+            raise IntentError("timeline.extraction.clock_sources is invalid")
+        health = extraction.get("health_probe")
+        if health is not None:
+            if not isinstance(health, dict) or set(health) != {
+                "configured", "clock_source", "attempts", "successes", "failures",
+                "last_checked_at", "last_result",
+            }:
+                raise IntentError("timeline.extraction.health_probe has invalid fields")
+            if not isinstance(health["configured"], bool):
+                raise IntentError("timeline.extraction.health_probe.configured must be boolean")
+            for name in ("attempts", "successes", "failures"):
+                value = health[name]
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise IntentError(f"timeline.extraction.health_probe.{name} is invalid")
+            for name in ("clock_source", "last_result"):
+                if not isinstance(health[name], str) or not health[name]:
+                    raise IntentError(f"timeline.extraction.health_probe.{name} is invalid")
+            if health["last_checked_at"] is not None:
+                _time(
+                    health["last_checked_at"],
+                    "timeline.extraction.health_probe.last_checked_at",
+                )
+    raw = document.get("entries")
+    if not isinstance(raw, list):
+        raise IntentError("entries must be an array")
+    entries: list[PhaseEntry] = []
+    for index, item in enumerate(raw):
+        path = f"entries[{index}]"
+        if not isinstance(item, dict) or set(item) - {"phase", "from", "until", "basis"}:
+            raise IntentError(f"{path} must contain only phase, from, until, basis")
+        phase = item.get("phase")
+        if phase not in TIMELINE_PHASES:
+            raise IntentError(f"{path}.phase must be one of {', '.join(TIMELINE_PHASES)}")
+        basis = item.get("basis")
+        if basis not in BASES:
+            raise IntentError(f"{path}.basis must be one of {', '.join(sorted(BASES))}")
+        start = _time(item.get("from"), f"{path}.from")
+        end = _time(item["until"], f"{path}.until") if item.get("until") is not None else None
+        if end is not None and end <= start:
+            raise IntentError(f"{path}.until must be after from")
+        entries.append(PhaseEntry(phase, start, end, basis))
+    return tuple(entries)
+
+
+class _ReloadingFile:
+    """Re-read a small JSON file when its size or mtime changes."""
+
+    def __init__(self, path: str | Path | None, parser) -> None:
+        self.path = Path(path) if path is not None else None
+        self.parser = parser
+        self._signature: tuple[int, int] | None = None
+        self.value: tuple = ()
+        self.error: str | None = None
+
+    def get(self) -> tuple:
+        if self.path is None:
+            return ()
+        try:
+            info = os.stat(self.path)
+            signature = (info.st_mtime_ns, info.st_size)
+        except OSError as error:
+            self.value, self.error, self._signature = (), f"{type(error).__name__}", None
+            return ()
+        if signature != self._signature:
+            try:
+                self.value, self.error = self.parser(_read(self.path)), None
+            except IntentError as error:
+                # A broken file yields no exceptions and no phases: fail toward alerts.
+                self.value, self.error = (), str(error)
+            self._signature = signature
+        return self.value
+
+
+class ExecPolicy:
+    def __init__(
+        self,
+        intent: EnforcementIntent,
+        *,
+        exceptions_path: str | Path | None = None,
+        timeline_path: str | Path | None = None,
+    ) -> None:
+        self.intent = intent
+        self._exceptions = _ReloadingFile(exceptions_path, parse_exceptions)
+        self._timeline = _ReloadingFile(timeline_path, parse_timeline)
+        self._lock = threading.Lock()
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            exceptions = self._exceptions.get()
+            timeline = self._timeline.get()
+            return {
+                "exceptions": {
+                    "path": str(self._exceptions.path) if self._exceptions.path else None,
+                    "count": len(exceptions),
+                    "error": self._exceptions.error,
+                },
+                "timeline": {
+                    "path": str(self._timeline.path) if self._timeline.path else None,
+                    "entries": len(timeline),
+                    "error": self._timeline.error,
+                },
+            }
+
+    def classify_exec(
+        self,
+        *,
+        binary: str,
+        parent: str | None,
+        image: str | None,
+        observed_at: str,
+    ) -> dict[str, Any]:
+        try:
+            at: datetime | None = datetime.fromisoformat(observed_at)
+        except ValueError:
+            at = None
+        if at is not None and at.tzinfo is None:
+            # A timestamp without an offset cannot be placed safely on the
+            # timezone-aware phase timeline. Alert instead of aborting ingest.
+            at = None
+        with self._lock:
+            timeline = self._timeline.get()
+            exceptions = self._exceptions.get()
+            timeline_error = self._timeline.error
+        entries = [entry for entry in timeline if at is not None and entry.active(at)]
+        active = sorted({entry.phase for entry in entries})
+        bases = sorted({entry.basis for entry in entries})
+        trusted = sorted({entry.phase for entry in entries if entry.basis in TRUSTED_BASES})
+        intent = self.intent
+        approved = set(intent.allowed_engine_binaries)
+        for phase in active:
+            approved |= set(intent.binaries_for(phase))
+        # A binary approved in every phase does not depend on which phase is
+        # claimed, so it stays allowed even when only engine signals are active.
+        trusted_approved = set(intent.allowed_engine_binaries) | set.intersection(
+            *(set(intent.binaries_for(phase)) for phase in PHASES)
+        )
+        for phase in trusted:
+            trusted_approved |= set(intent.binaries_for(phase))
+        cache_root = intent.assets.cache_root if intent.assets is not None else None
+        from_cache = cache_root is not None and Path(binary).is_relative_to(cache_root)
+
+        def covering(phases: list[str]) -> ExecException | None:
+            return next(
+                (
+                    item
+                    for item in exceptions
+                    if item.covers(binary=binary, parent=parent, image=image, phases=set(phases), at=at)
+                ),
+                None,
+            )
+
+        matched = covering(trusted)
+        candidate = covering(active) if matched is None else None
+        if matched is not None:
+            verdict = "exception"
+        elif from_cache:
+            verdict = "exec_from_cache"
+        elif binary in intent.suspect_binaries:
+            verdict = "suspect_binary"
+        elif not active:
+            verdict = "phase_unknown"
+        elif candidate is not None:
+            # The exception's phase condition is met only by an engine signal.
+            verdict = "phase_signal_unverified"
+        elif active == ["maintenance"]:
+            # Maintenance work is allowed only through an approved exception.
+            verdict = "outside_allowlist"
+        elif binary in trusted_approved:
+            verdict = "allowed_in_phase"
+        elif binary in approved:
+            verdict = "phase_signal_unverified"
+        else:
+            verdict = "outside_allowlist"
+        rule_refs = ["SP3-EXEC"]
+        if from_cache:
+            rule_refs.append("CACHE-03")
+        return {
+            "phase": active or ["unknown"],
+            "phase_basis": bases,
+            "phase_trusted": trusted,
+            "phase_source_error": timeline_error,
+            "exec_verdict": verdict,
+            "exception_id": matched.exception_id if matched else None,
+            "exception_kind": matched.kind if matched else None,
+            "exception_candidate_id": candidate.exception_id if candidate else None,
+            "binary_location": "cache" if from_cache else "other",
+            "parent_attribution": "available" if parent else "unavailable",
+            "image_digest": image,
+            "rule_refs": rule_refs,
+        }
+
+    def classify_cache_write(self, path: str) -> dict[str, Any]:
+        assets = self.intent.assets
+        if assets is None:
+            return {}
+        if Path(path).is_relative_to(assets.generation_path):
+            generation = "current"
+        elif Path(path).is_relative_to(assets.cache_root):
+            generation = "other"
+        else:
+            generation = "outside"
+        return {
+            "cache_generation": generation,
+            "rule_refs": ["CACHE-01", "CACHE-02"] if generation == "other" else ["CACHE-01"],
+        }

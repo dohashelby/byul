@@ -337,6 +337,8 @@ def compare_baseline(
             observed_state = "not_collected"
         elif not isinstance(value, dict) or field not in value:
             observed_state = "missing"
+        elif observed in {"unknown", "not_collected"}:
+            observed_state = "not_collected"
         else:
             observed_state = "match" if observed == expected else "drift"
         rows.append(

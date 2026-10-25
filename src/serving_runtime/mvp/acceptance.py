@@ -20,6 +20,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .app import GatewayApp
+from .assets import snapshot as snapshot_assets
 from .auth import CHAT_ROUTE, token_digest
 from .backend import load_backend_config
 from .config import MVPConfig
@@ -79,17 +80,29 @@ class _Runner:
             self.fake_backend.stop()
             self.fake_backend = None
 
-    def _vllm_document(self, **updates: Any) -> dict[str, Any]:
+    def _external_document(self, flavor: str, **updates: Any) -> dict[str, Any]:
         if self.fake_backend is None:
             raise RuntimeError("fake backend is not running")
+        if flavor not in {"vllm", "sglang"}:
+            raise ValueError("acceptance backend flavor must be vllm or sglang")
+        metric = (
+            "vllm:num_requests_running"
+            if flavor == "vllm"
+            else "sglang:num_running_reqs"
+        )
+        source_doc = (
+            _VLLM_METRICS_DOC
+            if flavor == "vllm"
+            else "https://github.com/sgl-project/sglang/blob/v0.5.21/python/sglang/srt/observability/metrics_collector.py"
+        )
         document: dict[str, Any] = {
             "schema_version": "runtime-backend/1.0",
-            "kind": "vllm",
+            "kind": flavor,
             "base_url": self.fake_backend.base_url,
             "model_map": {"test-model": "backend-test-model"},
             "health_path": "/health",
-            "models_path": "/v1/models",
-            "version_path": "/version",
+            "models_path": "/v1/models" if flavor == "vllm" else "/get_model_info",
+            "version_path": "/version" if flavor == "vllm" else None,
             "metrics_url": (
                 f"http://{self.fake_backend.address[0]}:"
                 f"{self.fake_backend.address[1]}/metrics"
@@ -101,23 +114,69 @@ class _Runner:
             },
             "metrics_map": {
                 "requests.running": {
-                    "metric": "vllm:num_requests_running",
+                    "metric": metric,
                     "type": "gauge",
                     "unit": "requests",
-                    "source_doc": _VLLM_METRICS_DOC,
+                    "source_doc": source_doc,
                     "verified": False,
                 },
                 "requests.absent": {
-                    "metric": "vllm:not_in_fake_response",
+                    "metric": f"{flavor}:not_in_fake_response",
                     "type": "gauge",
                     "unit": "requests",
-                    "source_doc": _VLLM_METRICS_DOC,
+                    "source_doc": source_doc,
                     "verified": False,
                 },
             },
         }
         document.update(updates)
         return document
+
+    def start_external(
+        self,
+        flavor: str,
+        *,
+        policy_path: Path = _EXAMPLE_POLICY,
+        fake_options: dict[str, Any] | None = None,
+        backend_updates: dict[str, Any] | None = None,
+        credential_environ: dict[str, str] | None = None,
+        data_dir: Path | None = None,
+        collector_interval_s: float = 0.05,
+        collector_stale_after_s: float = 1.0,
+        baseline_path: Path | None = None,
+        manifest_path: Path | None = None,
+        asset_manifest_path: Path | None = None,
+        asset_interval_s: float = 0.05,
+    ) -> None:
+        self.stop()
+        active_data_dir = data_dir or self.data_dir
+        options = dict(fake_options or {})
+        options["flavor"] = flavor
+        self.fake_backend = FakeBackend(port=0, **options).start()
+        document = self._external_document(flavor, **(backend_updates or {}))
+        self._backend_config_index += 1
+        path = active_data_dir / f"backend-{flavor}-{self._backend_config_index}.json"
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        path.write_text(json.dumps(document), encoding="utf-8")
+        config = MVPConfig(
+            gateway_port=0,
+            backend=flavor,
+            backend_config_path=str(path),
+            policy_path=str(policy_path),
+            data_dir=str(active_data_dir),
+            collector_interval_s=collector_interval_s,
+            collector_stale_after_s=collector_stale_after_s,
+            baseline_path=str(baseline_path) if baseline_path else None,
+            manifest_path=str(manifest_path) if manifest_path else None,
+            asset_manifest_path=(str(asset_manifest_path) if asset_manifest_path else None),
+            asset_interval_s=asset_interval_s,
+        )
+        backend = load_backend_config(path, environ=credential_environ or {})
+        self.gateway = GatewayApp(
+            config,
+            load_policy(policy_path),
+            backend_config=backend,
+        ).start()
 
     def start_vllm(
         self,
@@ -130,29 +189,16 @@ class _Runner:
         collector_interval_s: float = 0.05,
         collector_stale_after_s: float = 1.0,
     ) -> None:
-        self.stop()
-        active_data_dir = data_dir or self.data_dir
-        self.fake_backend = FakeBackend(port=0, **(fake_options or {})).start()
-        document = self._vllm_document(**(backend_updates or {}))
-        self._backend_config_index += 1
-        path = active_data_dir / f"backend-s3a-{self._backend_config_index}.json"
-        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        path.write_text(json.dumps(document), encoding="utf-8")
-        config = MVPConfig(
-            gateway_port=0,
-            backend="vllm",
-            backend_config_path=str(path),
-            policy_path=str(policy_path),
-            data_dir=str(active_data_dir),
+        self.start_external(
+            "vllm",
+            policy_path=policy_path,
+            fake_options=fake_options,
+            backend_updates=backend_updates,
+            credential_environ=credential_environ,
+            data_dir=data_dir,
             collector_interval_s=collector_interval_s,
             collector_stale_after_s=collector_stale_after_s,
         )
-        backend = load_backend_config(path, environ=credential_environ or {})
-        self.gateway = GatewayApp(
-            config,
-            load_policy(policy_path),
-            backend_config=backend,
-        ).start()
 
     def start(
         self,
@@ -1713,6 +1759,175 @@ def _run_s3a_08(runner: _Runner) -> AcceptanceResult:
     )
 
 
+def _run_sgl_01(runner: _Runner) -> AcceptanceResult:
+    """F4 common comparison path with a deliberately drifting fake SGLang."""
+
+    baseline = runner.data_dir / "sgl-01-baseline.json"
+    manifest = runner.data_dir / "sgl-01-manifest.json"
+    baseline.write_text(
+        json.dumps(
+            {
+                "schema_version": "runtime-mvp-baseline/1.0",
+                "fields": {
+                    "engine.kind": "vllm",
+                    "option.max_model_len": 2048,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "runtime-mvp-baseline/1.0",
+                "fields": {
+                    "engine.kind": "sglang",
+                    "option.max_model_len": 2048,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    runner.start_external(
+        "sglang",
+        baseline_path=baseline,
+        manifest_path=manifest,
+        collector_interval_s=0.04,
+    )
+    info = _wait_for(lambda: _collector_source(runner, "engine_info", "ok"))
+
+    def current_drift() -> dict[str, Any] | None:
+        _, payload = runner.get_json("/api/revalidation")
+        return next(
+            (
+                item
+                for item in payload.get("requests", [])
+                if item.get("trigger") == "config_drift"
+                and item.get("current_evidence_present") is True
+            ),
+            None,
+        )
+
+    drift = _wait_for(current_drift)
+    _, comparison = runner.get_json("/api/baseline")
+    engine_row = next(
+        (
+            item
+            for item in comparison.get("rows", [])
+            if item.get("source") == "engine_api"
+            and item.get("field") == "engine.kind"
+        ),
+        {},
+    )
+    unknown_row = next(
+        (
+            item
+            for item in comparison.get("rows", [])
+            if item.get("source") == "engine_api"
+            and item.get("field") == "option.max_model_len"
+        ),
+        {},
+    )
+    passed = (
+        info is not None
+        and info.get("last_value", {}).get("engine.kind") == "sglang"
+        and info.get("last_value", {}).get("engine.version") == "not_collected"
+        and engine_row.get("state") == "drift"
+        and engine_row.get("observed") == "sglang"
+        and unknown_row.get("state") == "not_collected"
+        and unknown_row.get("observed") == "unknown"
+        and drift is not None
+        and drift.get("data_origin") == "external_backend"
+    )
+    return AcceptanceResult(
+        "SGL-01",
+        "가짜 SGLang engine_info와 승인 baseline 비교",
+        "engine.kind drift와 재검증 요청; version은 not_collected",
+        {
+            "engine_kind": info.get("last_value", {}).get("engine.kind") if info else None,
+            "engine_version": info.get("last_value", {}).get("engine.version") if info else None,
+            "comparison_state": engine_row.get("state"),
+            "max_model_len_state": unknown_row.get("state"),
+            "revalidation": drift is not None,
+            "verification_level": "fake_sglang_test_only",
+        },
+        passed,
+        [],
+    )
+
+
+def _run_sgl_02(runner: _Runner) -> AcceptanceResult:
+    """SP1 hash collector/revalidation through the same fake SGLang app."""
+
+    model = runner.data_dir / "sgl-02-model"
+    model.mkdir(parents=True, exist_ok=True)
+    asset = model / "weights.bin"
+    asset.write_bytes(b"approved-test-fixture")
+    manifest = runner.data_dir / "sgl-02-assets.json"
+    manifest.write_text(json.dumps(snapshot_assets(model)), encoding="utf-8")
+    runner.start_external(
+        "sglang",
+        asset_manifest_path=manifest,
+        asset_interval_s=0.04,
+        collector_interval_s=0.04,
+    )
+    intact = _wait_for(
+        lambda: (
+            item
+            if (item := _collector_source(runner, "asset_integrity", "ok"))
+            and item.get("last_value", {}).get("intact") is True
+            else None
+        )
+    )
+    asset.write_bytes(b"changed-test-fixture")
+    changed = _wait_for(
+        lambda: (
+            item
+            if (item := _collector_source(runner, "asset_integrity", "ok"))
+            and item.get("last_value", {}).get("counts", {}).get("changed") == 1
+            else None
+        )
+    )
+
+    def asset_request() -> dict[str, Any] | None:
+        _, payload = runner.get_json("/api/revalidation")
+        return next(
+            (
+                item
+                for item in payload.get("requests", [])
+                if item.get("trigger") == "asset_changed"
+                and item.get("current_evidence_present") is True
+            ),
+            None,
+        )
+
+    revalidation = _wait_for(asset_request)
+    passed = (
+        intact is not None
+        and changed is not None
+        and changed.get("data_origin") == "local_file"
+        and revalidation is not None
+        and revalidation.get("data_origin") == "local_file"
+    )
+    return AcceptanceResult(
+        "SGL-02",
+        "가짜 SGLang 실행 중 승인 자산 변경",
+        "공통 해시 비교가 변경을 찾고 재검증 요청",
+        {
+            "initial_intact": intact is not None,
+            "changed_count": (
+                changed.get("last_value", {}).get("counts", {}).get("changed")
+                if changed
+                else None
+            ),
+            "revalidation": revalidation is not None,
+            "verification_level": "fake_sglang_test_only",
+        },
+        passed,
+        [],
+    )
+
+
 _S4_INFERENCE_TOKEN = "s4-inference-token-acceptance-0001"
 _S4_VIEWER_TOKEN = "s4-viewer-token-acceptance-000001"
 _S4_WRONG_TOKEN = "s4-wrong-token-acceptance-0000001"
@@ -2380,7 +2595,7 @@ def _run_s4_06(runner: _Runner) -> AcceptanceResult:
 
 
 def execute_acceptance(data_dir: Path) -> list[AcceptanceResult]:
-    """Run MVP-01~11, S1-01~06, S2-01~06, S3A-01~08, and S4-01~06."""
+    """Run MVP, S1/S2/S3A, fake-SGLang, and S4 acceptance cases."""
 
     runner = _Runner(data_dir)
     results: list[AcceptanceResult] = []
@@ -2415,6 +2630,8 @@ def execute_acceptance(data_dir: Path) -> list[AcceptanceResult]:
         results.append(_run_s3a_06(runner))
         results.append(_run_s3a_07(runner))
         results.append(_run_s3a_08(runner))
+        results.append(_run_sgl_01(runner))
+        results.append(_run_sgl_02(runner))
         results.append(_run_s4_01(runner))
         results.append(_run_s4_02(runner))
         results.append(_run_s4_03(runner))
@@ -2455,6 +2672,9 @@ def write_reports(
         "s4_06_backend_fixture": (
             "fake_backend_test; this report does not contain a real vLLM execution"
         ),
+        "sglang_backend_fixture": (
+            "fake_sglang_test_only; this report does not contain a real SGLang execution"
+        ),
         "passed": all(result.passed for result in results),
         "cases": [asdict(result) for result in results],
     }
@@ -2470,6 +2690,7 @@ def write_reports(
         f"- 임시 data_dir: `{data_dir}`",
         "- S3A backend: `fake_backend_test` (실제 vLLM 실행·검증 아님)",
         "- S4-06 backend: `fake_backend_test` (실제 vLLM 실행·검증 아님)",
+        "- SGL-01~02 backend: `fake_sglang_test_only` (실제 SGLang 실행·검증 아님)",
         f"- 전체 결과: {'통과' if common['passed'] else '실패'}",
         "",
         "| 사례 | 명령 | 기대 | 실제 | 결과 | 증거 요청 ID |",

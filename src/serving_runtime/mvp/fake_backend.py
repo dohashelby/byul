@@ -284,6 +284,16 @@ class FakeBackend:
                         {"object": "list", "data": [{"id": owner.model_id}]},
                     )
                     return
+                if route == "/get_model_info" and owner.flavor == "sglang":
+                    self._send_json(
+                        200,
+                        {
+                            "model_path": owner.model_id,
+                            "served_model_name": owner.model_id,
+                            "is_generation": True,
+                        },
+                    )
+                    return
                 if route == "/version" and owner.flavor == "vllm":
                     # SGLang v0.5.21 has no /version route.
                     self._send_json(200, {"version": owner.version})

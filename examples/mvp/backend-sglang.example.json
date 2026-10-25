@@ -6,7 +6,7 @@
     "test-model": "example-backend-model-id"
   },
   "health_path": "/health",
-  "models_path": "/v1/models",
+  "models_path": "/get_model_info",
   "version_path": null,
   "metrics_url": "http://127.0.0.1:30000/metrics",
   "timeouts": {

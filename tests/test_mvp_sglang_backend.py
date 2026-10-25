@@ -94,6 +94,7 @@ class SglangConfigTests(unittest.TestCase):
         self.assertEqual(config.kind, "sglang")
         self.assertTrue(config.external)
         self.assertIsNone(config.version_path)
+        self.assertEqual(config.models_path, "/get_model_info")
         self.assertEqual(config.output_tokens_field, "max_completion_tokens")
         self.assertEqual(config.target.port, 30000)
         self.assertEqual(
@@ -109,6 +110,7 @@ class SglangConfigTests(unittest.TestCase):
     def test_version_path_default_and_override(self) -> None:
         default = load_backend_config(self.write(sglang_document("http://127.0.0.1:1")), environ={})
         self.assertIsNone(default.version_path)
+        self.assertEqual(default.models_path, "/get_model_info")
         explicit = load_backend_config(
             self.write(sglang_document("http://127.0.0.1:1", version_path="/model_info")),
             environ={},
@@ -189,6 +191,34 @@ class SglangConfigTests(unittest.TestCase):
 
 
 class SglangRelayPayloadTests(unittest.TestCase):
+    def test_info_collection_uses_model_info_without_server_info(self) -> None:
+        class StubClient(EngineClient):
+            def __init__(self, backend: BackendConfig) -> None:
+                super().__init__(backend, 1.0)
+                self.paths: list[str] = []
+
+            def fetch_json(self, path: str) -> dict[str, object]:
+                self.paths.append(path)
+                return {
+                    "model_path": "backend-test-model",
+                    "served_model_name": "backend-test-model",
+                    "is_generation": True,
+                }
+
+        document = sglang_document("http://127.0.0.1:1")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "backend.json"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            client = StubClient(load_backend_config(path, environ={}))
+            info, origin = client.collect_info()
+        self.assertEqual(client.paths, ["/get_model_info"])
+        self.assertNotIn("/server_info", client.paths)
+        self.assertEqual(info["engine.kind"], "sglang")
+        self.assertEqual(info["engine.version"], "not_collected")
+        self.assertEqual(info["model.id"], "backend-test-model")
+        self.assertEqual(info["option.max_model_len"], "unknown")
+        self.assertEqual(origin, "external_backend")
+
     def test_output_limit_uses_sglang_field_name(self) -> None:
         decision = validate_request(chat(max_tokens=64), "application/json", load_policy(POLICY))
         backend = load_backend_config(SGLANG_EXAMPLE, environ={})
@@ -383,6 +413,7 @@ class SglangGatewayHttpTests(unittest.TestCase):
         info = self.wait_collector("engine_info")["last_value"]
         self.assertEqual(info["engine.kind"], "sglang")
         self.assertEqual(info["engine.version"], "not_collected")
+        self.assertEqual(info["option.max_model_len"], "unknown")
         metrics = self.wait_collector("metrics")["last_value"]
         self.assertEqual(metrics["requests.running"]["state"], "ok")
         self.assertEqual(metrics["tokens.generated"]["state"], "ok")

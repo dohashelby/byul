@@ -65,6 +65,7 @@ class FullAcceptanceTests(unittest.TestCase):
                 + [f"S1-{index:02d}" for index in range(1, 7)]
                 + [f"S2-{index:02d}" for index in range(1, 7)]
                 + [f"S3A-{index:02d}" for index in range(1, 9)]
+                + [f"SGL-{index:02d}" for index in range(1, 3)]
                 + [f"S4-{index:02d}" for index in range(1, 7)],
             )
             self.assertTrue(all(result.passed for result in results), [
@@ -74,9 +75,10 @@ class FullAcceptanceTests(unittest.TestCase):
             json_path, md_path = write_reports(report_dir, data_dir, results)
             report = json.loads(json_path.read_text(encoding="utf-8"))
             self.assertTrue(report["passed"])
-            self.assertEqual(len(report["cases"]), 37)
+            self.assertEqual(len(report["cases"]), 39)
             self.assertIn("fake_backend_test", report["s3a_backend_fixture"])
             self.assertIn("fake_backend_test", report["s4_06_backend_fixture"])
+            self.assertIn("fake_sglang_test_only", report["sglang_backend_fixture"])
             self.assertIn("실제 vLLM 실행·검증 아님", md_path.read_text(encoding="utf-8"))
             self.assertTrue(md_path.exists())
 

@@ -158,7 +158,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     demo_parser.add_argument("--data-dir", metavar="PATH")
     acceptance_parser = commands.add_parser(
         "mvp-acceptance",
-        help="격리된 MVP-01~11·S1-01~06·S2-01~06·S3A-01~08 수용 시험 실행",
+        help="격리된 MVP·S1·S2·S3A·가짜 SGLang·S4 수용 시험 실행",
     )
     acceptance_parser.add_argument("--report-dir", metavar="PATH")
     assets_parser = commands.add_parser("assets", help="모델 파일 승인 목록 도구")
@@ -223,6 +223,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     cache_check_parser.add_argument(
         "--root", metavar="DIR", help="cache_root 대신 점검할 디렉터리(사본 점검용)"
     )
+    phase_signals_parser = enforce_commands.add_parser(
+        "phase-signals",
+        help="엔진 로그의 확인된 표지를 단계 시간표로 변환",
+    )
+    phase_signals_parser.add_argument(
+        "--engine", required=True, choices=("vllm", "sglang")
+    )
+    phase_signals_parser.add_argument("--log", required=True, metavar="PATH")
+    phase_signals_parser.add_argument("--year", required=True, type=int, metavar="YYYY")
+    phase_signals_parser.add_argument(
+        "--tz", required=True, metavar="OFFSET", help="명시적 UTC offset(예: +00:00)"
+    )
+    phase_signals_parser.add_argument("--out", required=True, metavar="PATH")
     args = parser.parse_args(argv)
     if args.command == "file-info":
         try:
@@ -392,6 +405,42 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0 if report["state"] in {"ok", "other_generations_present"} else 3
+    if args.command == "enforce" and args.enforce_command == "phase-signals":
+        from .enforcement.phase_signals import extract_phase_timeline
+
+        output = Path(args.out)
+        descriptor = -1
+        try:
+            timeline = extract_phase_timeline(
+                args.log,
+                engine=args.engine,
+                year=args.year,
+                timezone_offset=args.tz,
+            )
+            encoded = (
+                json.dumps(timeline, ensure_ascii=False, indent=2) + "\n"
+            ).encode("utf-8")
+            descriptor = os.open(
+                output,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+            )
+            with os.fdopen(descriptor, "wb") as stream:
+                descriptor = -1
+                stream.write(encoded)
+        except (OSError, UnicodeError, ValueError) as error:
+            if descriptor >= 0:
+                os.close(descriptor)
+            print(f"단계 신호 변환 실패: {error}", file=sys.stderr)
+            return 1
+        extraction = timeline["extraction"]
+        print(
+            f"단계 {len(timeline['entries'])}개 · 처리 {extraction['lines_read']}줄 · "
+            f"해석 안 함 {extraction['unparsed_lines']}줄 · 생략 경계 "
+            f"{len(extraction['omitted_boundaries'])}개"
+        )
+        print(f"마지막 위치: line {extraction['last_position']['line']}, byte {extraction['last_position']['byte_offset']}")
+        return 0
     if args.command == "enforce":
         enforce_parser.print_help()
         return 0

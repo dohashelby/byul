@@ -138,17 +138,26 @@ class EngineClient:
             )
             return value, data_origin
 
-        available_ids = (
-            sorted(
-                {
-                    item.get("id")
-                    for item in entries
-                    if isinstance(item, dict) and isinstance(item.get("id"), str)
-                }
+        if self.backend.kind == "sglang" and not isinstance(entries, list):
+            # v0.5.21 /get_model_info returns an object, unlike /v1/models.
+            # Only the live served name/model path is used.  Missing values
+            # stay absent; /server_info is not called to fill them.
+            candidates = (models.get("served_model_name"), models.get("model_path"))
+            available_ids = list(
+                dict.fromkeys(item for item in candidates if isinstance(item, str) and item)
             )
-            if isinstance(entries, list)
-            else []
-        )
+        else:
+            available_ids = (
+                sorted(
+                    {
+                        item.get("id")
+                        for item in entries
+                        if isinstance(item, dict) and isinstance(item.get("id"), str)
+                    }
+                )
+                if isinstance(entries, list)
+                else []
+            )
         mapped_ids = list(dict.fromkeys(self.backend.model_map.values()))
         mapped_availability = {
             policy_model: {
@@ -167,8 +176,12 @@ class EngineClient:
             "model.ids": available_ids,
             "model.map": mapped_availability,
         }
+        if self.backend.kind == "sglang":
+            value["option.max_model_len"] = "unknown"
         if len(mapped_ids) == 1 and mapped_ids[0] in available_ids:
             value["model.id"] = mapped_ids[0]
+        if self.backend.kind == "vllm" and max_model_len is not None:
+            value["option.max_model_len"] = max_model_len
         value = {key: item for key, item in value.items() if item is not None}
         return value, "external_backend"
 

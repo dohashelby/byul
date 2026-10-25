@@ -194,6 +194,33 @@ class RenderV11Tests(unittest.TestCase):
         self.assertEqual(document["acquire"]["securityContext"]["runAsUser"], 10002)
         self.assertIsNone(render_pod_security(load_intent(INTENT_V10)))
 
+    def test_sglang_cache_generation_uses_common_renderers(self) -> None:
+        document = v11_document()
+        document["assets"]["cache_generation"]["engine"] = "sglang"
+        document["protected_paths"]["cache_dir"] = (
+            "/var/cache/serving/sglang/image-example/revision-example/default"
+        )
+        intent = parse_intent(document)
+        self.assertEqual(
+            intent.assets.generation_path,
+            "/var/cache/serving/sglang/image-example/revision-example/default",
+        )
+        pod = render_pod_security(intent)
+        self.assertEqual(pod["cache_generation"]["engine"], "sglang")
+        self.assertEqual(
+            pod["engine"]["volumeMounts"][-1]["subPath"],
+            "sglang/image-example/revision-example/default",
+        )
+        # There is no source-backed SGLang cache environment mapping yet.
+        self.assertEqual(pod["engine"]["cacheEnvironmentCandidates"], [])
+        cilium_text = json.dumps(cilium.render_manifests(intent), sort_keys=True)
+        tetragon_documents = tetragon.render_manifests(intent)
+        self.assertIn('"app": "serving-engine"', cilium_text)
+        cache_values = tetragon_documents["tetragon-tg-cache-01.json"]["spec"][
+            "kprobes"
+        ][0]["selectors"][0]["matchArgs"][0]["values"]
+        self.assertEqual(cache_values, ["/var/cache/serving"])
+
 
 class CacheCheckTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -207,6 +234,20 @@ class CacheCheckTests(unittest.TestCase):
 
     def check(self):
         return check_cache(self.intent, root_override=str(self.root))
+
+    def test_sglang_current_generation_path(self) -> None:
+        document = v11_document()
+        document["assets"]["cache_generation"]["engine"] = "sglang"
+        document["protected_paths"]["cache_dir"] = (
+            "/var/cache/serving/sglang/image-example/revision-example/default"
+        )
+        intent = parse_intent(document)
+        report = check_cache(intent, root_override=str(self.root))
+        self.assertEqual(report["state"], "cache_root_missing")
+        self.assertEqual(
+            report["current_generation"],
+            str(self.root / "sglang/image-example/revision-example/default"),
+        )
 
     def test_states(self) -> None:
         self.assertEqual(self.check()["state"], "cache_root_missing")

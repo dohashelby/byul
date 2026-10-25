@@ -356,7 +356,13 @@ def load_backend_config(
         model_map[policy_model] = backend_model
 
     health_path = _route(document.get("health_path", "/health"), "health_path")
-    models_path = _route(document.get("models_path", "/v1/models"), "models_path")
+    # SGLang v0.5.21 exposes its live model identity at /get_model_info.
+    # /server_info is deliberately not used because it returns the complete
+    # resolved server arguments.  vLLM keeps the OpenAI-compatible model list.
+    models_path = _route(
+        document.get("models_path", "/v1/models" if kind == "vllm" else "/get_model_info"),
+        "models_path",
+    )
     # SGLang v0.5.21 has no /version route; its version is only inside
     # /server_info, which also returns the resolved server arguments. The
     # default therefore skips version collection for sglang (null = disabled).

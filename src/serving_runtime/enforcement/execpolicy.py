@@ -167,10 +167,68 @@ def parse_exceptions(document: Any) -> tuple[ExecException, ...]:
 
 
 def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
-    if not isinstance(document, dict) or set(document) - {"schema_version", "target_ref", "entries"}:
-        raise IntentError("timeline must contain only schema_version, target_ref, entries")
+    allowed_root = {"schema_version", "target_ref", "entries", "extraction"}
+    if not isinstance(document, dict) or set(document) - allowed_root:
+        raise IntentError(
+            "timeline must contain only schema_version, target_ref, entries, extraction"
+        )
     if document.get("schema_version") != TIMELINE_SCHEMA:
         raise IntentError(f"schema_version must be {TIMELINE_SCHEMA}")
+    extraction = document.get("extraction")
+    if extraction is not None:
+        extraction_fields = {
+            "engine", "pattern_set", "support_level", "year", "timezone",
+            "runs_observed", "lines_read", "unparsed_lines", "last_position", "matched_signals",
+            "omitted_boundaries", "open_phases", "limitations",
+        }
+        if not isinstance(extraction, dict) or set(extraction) != extraction_fields:
+            raise IntentError("timeline.extraction has invalid fields")
+        for name in ("engine", "pattern_set", "support_level", "timezone"):
+            if not isinstance(extraction[name], str) or not extraction[name]:
+                raise IntentError(f"timeline.extraction.{name} must be a non-empty string")
+        for name in ("year", "runs_observed", "lines_read", "unparsed_lines"):
+            value = extraction[name]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise IntentError(f"timeline.extraction.{name} must be a non-negative integer")
+        if not 1 <= extraction["year"] <= 9999:
+            raise IntentError("timeline.extraction.year is out of range")
+        position = extraction["last_position"]
+        if (
+            not isinstance(position, dict)
+            or set(position) != {"line", "byte_offset"}
+            or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in position.values())
+        ):
+            raise IntentError("timeline.extraction.last_position is invalid")
+        signals = extraction["matched_signals"]
+        if (
+            not isinstance(signals, dict)
+            or any(
+                not isinstance(name, str)
+                or not name
+                or isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 1
+                for name, value in signals.items()
+            )
+        ):
+            raise IntentError("timeline.extraction.matched_signals is invalid")
+        omitted = extraction["omitted_boundaries"]
+        if not isinstance(omitted, list):
+            raise IntentError("timeline.extraction.omitted_boundaries must be an array")
+        for index, item in enumerate(omitted):
+            if (
+                not isinstance(item, dict)
+                or set(item) != {"line", "signal", "reason"}
+                or isinstance(item["line"], bool)
+                or not isinstance(item["line"], int)
+                or item["line"] < 1
+                or any(not isinstance(item[name], str) or not item[name] for name in ("signal", "reason"))
+            ):
+                raise IntentError(f"timeline.extraction.omitted_boundaries[{index}] is invalid")
+        for name in ("open_phases", "limitations"):
+            values = extraction[name]
+            if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+                raise IntentError(f"timeline.extraction.{name} must be a string array")
     raw = document.get("entries")
     if not isinstance(raw, list):
         raise IntentError("entries must be an array")

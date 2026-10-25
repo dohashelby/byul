@@ -22,13 +22,13 @@ BoB serving-engine security runtime solution
 | 통신·행위 통제 준비 (P2 사전 작업) | Cilium 규칙 후보 생성, Tetragon 파일 규칙 후보·이벤트 변환, 관측 API·대시보드 | 로컬 kind에서 Cilium 통제·Hubble 실제 관측 통과, Tetragon 감시는 귀속 한계와 함께 확인, 차단은 재시작 후 유지 확인(업그레이드 직후 불일치 사례 원인 확인 중) |
 | 기록 보존 한도 (D-08) | 7일/5GiB 계산, 기본 보고만·`--retention-enforce`로 삭제, 시험 증거 보존 목록, 요청별 파일 간 묶음 정리, 정리 구간·오류 표시 | 단위 시험·실행 확인, Codex 교차 검수 수정 반영 |
 | 지표 대응표 대조 | 선언 형식(TYPE)·HELP·label 대조, counter 초기화 감지, `metrics-check` | 단위 시험, Codex 교차 검수 완료 |
-| SGLang 연결 준비 | `--backend sglang`, 엔진별 출력 상한 필드(`max_completion_tokens`), backend별 `/tokenize` payload, `sglang:*` 지표 대응 | 시험 전용 가짜 SGLang만, 실제 SGLang 미확인, Codex 교차 검수 수정 반영 |
+| SGLang 연결 준비 | `--backend sglang`, `/get_model_info` 모델 관측, 엔진별 출력 상한 필드(`max_completion_tokens`), backend별 `/tokenize` payload, `sglang:*` 지표 대응 | F4·SP1 포함 시험 전용 가짜 SGLang만, 실제 SGLang 미확인 |
 | API 인증 프레임 (F2) | `--auth-config`(`runtime-auth/1.0`): bearer 토큰 주체·역할·주체별 허용 모델, 401/403 엔진 미전달, 설정 오류 503 | 단위·HTTP 시험, 로컬 실행 확인. 실제 인증 연동(D-02)은 미정 |
 | 대상 등록 프레임 (F1) | `--target`(`runtime-target/1.0`): 정책 대상 대조·엔진/모델 비교, `--target-pod-status`로 Pod 조회·교체 구분 | 단위·HTTP 시험, 로컬 kind에서 Pod 교체 확인 |
-| 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류와 기간 있는 승인 예외 | 단위 시험; L-07·L-08 자동 점검을 로컬 kind에서 실행 확인 |
+| 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류·엔진 로그 신호 시간표와 기간 있는 승인 예외 | 단위 시험; L-07·L-08 자동 점검을 로컬 kind에서 실행 확인 |
 | read-only 관리 listener (SP4) | observer용 GET/HEAD 경로 허용 목록, 요청 헤더 격리, timeout·응답 크기 제한, 최소 접근 JSONL | 구현·모의 엔진 HTTP 시험 추가; 현재 Codex에서는 소켓 제한으로 HTTP 시험 skip, 실제 kind 사이드카 미확인 |
 | 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 + CPU vLLM 일부 확인; `logprobs`는 엔진 정지/무응답으로 미확인 |
-| 시험 | 저장소 unittest 364개, 수용 시험 37개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 개인 파일 `tests/test_claude_review.py` 8개를 제외. 이번 Codex 실행은 364개 중 279개 통과·소켓 제한 85개 skip. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 시험 | 추적 unittest 376개, 수용 시험 39개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 추적 시험 수는 개인 파일 `tests/test_claude_review.py` 8개를 제외. 이번 공통 명령은 개인 시험 포함 384개 중 297개 통과·소켓 제한 87개 skip. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -322,6 +322,7 @@ vLLM과 다른 점(SGLang v0.5.21 소스 `entrypoints/http_server.py`·`openai/p
 | --- | --- | --- |
 | 기본 포트(예시) | 8000 | 30000 |
 | 출력 상한 전달 필드 | `max_tokens` | `max_completion_tokens` (SGLang은 `max_tokens`를 deprecated로 표시). 클라이언트는 두 모드 모두 `max_tokens`로 보냅니다 |
+| 모델 관측 | `/v1/models` | `/get_model_info`의 `served_model_name`·`model_path`. 응답에 없는 `option.max_model_len`은 `unknown`이며 정상값으로 채우지 않습니다 |
 | 버전 조회 | `/version` | 기본 수집 안 함(`version_path: null`, 화면 `not_collected`). SGLang에는 `/version`이 없고 버전은 `/server_info`에만 있는데, 이 응답은 해석된 서버 실행 인자 전체를 돌려주므로 기본으로 호출하지 않습니다 |
 | context 사전 통제 | `/tokenize`: `model`·`messages`·`add_generation_prompt: true`, 응답 `count` | `/tokenize`: v0.5.21 `TokenizeRequest`의 `model`·`messages`, 응답 `count` |
 | 지표 이름 | `vllm:*` | `sglang:num_running_reqs`, `sglang:num_queue_reqs`, `sglang:token_usage`, `sglang:generation_tokens_total` 등. 서버를 `--enable-metrics`로 띄워야 `/metrics`가 생깁니다 |
@@ -617,15 +618,25 @@ intent 1.1의 `engine.management_port`는 observer가 접근할 이 listener의 
 ```bash
 .venv/bin/python -m serving_runtime enforce render --intent examples/enforcement/intent-v1.1.example.json --out /tmp/runtime-enforcement
 .venv/bin/python -m serving_runtime enforce cache-check --intent examples/enforcement/intent-v1.1.example.json --root /path/to/cache-copy
+.venv/bin/python -m serving_runtime enforce phase-signals --engine vllm --log engine.log --year 2026 --tz +00:00 --out timeline.json
 .venv/bin/python -m serving_runtime enforce ingest --kind tetragon --input events.jsonl --origin real --data-dir DIR \
   --intent examples/enforcement/intent-v1.1.example.json \
   --exceptions examples/enforcement/exec-exceptions.example.json --timeline examples/enforcement/phase-timeline.example.json
 ```
 
 - **SP4 작업별 통신:** `acquire`(모델 취득 Pod)의 송신 허용 목록, `test_receivers`(팀 소유 시험 목적지)와 수신 허용 역할, `engine.management_port`(observer는 이 포트만), `observer_kube_api`를 받습니다. `cilium-acquire-egress`, `cilium-observer-N-egress`, `cilium-receiver-NAME-ingress`를 추가로 생성합니다. engine 송신 허용에 acquire 목적지가 들어 있으면 형식 오류입니다. 로컬 kind에서 같은 receiver에 acquire는 허용, engine과 다른 client는 거부되는 것을 확인했습니다. TCP 연결 허용은 HTTPS 안의 URL·파일 권한을 입증하지 않습니다.
-- **SP1 모델·캐시:** `assets`에 tokenizer·승인 manifest 경로, `cache_root`, 캐시 세대(engine/image_id/model_revision/compile_profile), engine/acquire/probe UID를 둡니다. `protected_paths.cache_dir`는 세대 경로와 같아야 하고 캐시는 공급물 경로와 겹칠 수 없습니다. `pod-security-candidate.json`(공급물 읽기 전용 mount·비root UID·세대 subPath)과 TG-ASSET-02(tokenizer 쓰기 감시)를 만들고, TG-CACHE-01은 캐시 루트 전체를 감시해 변환 때 현재/다른 세대(CACHE-02)를 나눕니다. `enforce cache-check`는 링크를 따라가지 않고 세대 디렉터리의 소유자·권한·다른 세대를 보고합니다(삭제하지 않음).
-- **SP3 단계별 실행:** `phase_binaries`(loading/compiling/inferring), `suspect_binaries`, 단계 시간표, 승인 예외로 실행 이벤트를 `allowed_in_phase`/`exception`/`outside_allowlist`/`suspect_binary`/`exec_from_cache`/`phase_unknown`으로 분류합니다. 관측·경보만 하며 실행을 막지 않습니다. Python·worker를 통째로 예외 처리하지 않고, maintenance 단계는 승인 예외로만 허용합니다. 부모·이미지 조건이 있는 예외는 이벤트에 그 근거가 있을 때만 적용합니다. 시간표·예외 파일이 바뀌면 다시 읽고, 손상되면 단계 불명·예외 0건으로 처리합니다. Gateway에서는 `--observation-intent`(1.1)와 함께 `--observation-exceptions`·`--observation-timeline`을 줍니다.
-- 한계: 모든 결과물은 클러스터 미적용 후보입니다(SP4 2개 정책만 kind에서 수동 확인 후 삭제). 실제 엔진의 단계별 정상 목록, 단계 신호 자동 수집, 캐시 권한 변경 관측, 실행 거부는 아직 없습니다.
+- **SP1 모델·캐시:** `assets`에 tokenizer·승인 manifest 경로, `cache_root`, 캐시 세대(engine/image_id/model_revision/compile_profile), engine/acquire/probe UID를 둡니다. `protected_paths.cache_dir`는 세대 경로와 같아야 하고 캐시는 공급물 경로와 겹칠 수 없습니다. `pod-security-candidate.json`(공급물 읽기 전용 mount·비root UID·세대 subPath)과 TG-ASSET-02(tokenizer 쓰기 감시)를 만들고, TG-CACHE-01은 캐시 루트 전체를 감시해 변환 때 현재/다른 세대(CACHE-02)를 나눕니다. `enforce cache-check`는 링크를 따라가지 않고 세대 디렉터리의 소유자·권한·다른 세대를 보고합니다(삭제하지 않음). `engine: sglang`도 같은 경로 계산·Cilium/Tetragon 후보를 쓰지만, SGLang 캐시 환경변수 후보와 실제 resolved 경로는 아직 없습니다.
+- **SP3 단계별 실행:** `phase_binaries`(loading/compiling/inferring), `suspect_binaries`, 단계 시간표, 승인 예외로 실행 이벤트를 `allowed_in_phase`/`exception`/`outside_allowlist`/`suspect_binary`/`exec_from_cache`/`phase_unknown`으로 분류합니다. `phase-signals`는 로그에 연도·시간대가 없으므로 두 값을 필수로 받고 vLLM CPU v0.29.0에서 관찰한 표지만 `basis: engine_signal`로 변환합니다. 처리 줄 수·해석하지 않은 줄 수·마지막 line/byte 위치·생략 경계를 `extraction`에 남기며, 시각 없는 표지나 없는 compile 표지는 추정하지 않습니다. 생성한 파일을 ExecPolicy가 그대로 읽습니다. 관측·경보만 하며 실행을 막지 않습니다.
+
+| vLLM CPU v0.29.0 신호 | 처리 |
+| --- | --- |
+| `Loading model from scratch...` → `Model loading took ... seconds` | loading 구간 |
+| `Loading weights took` | loading 진행·재시작 식별 보조(단독이면 시작 시각을 만들지 않음) |
+| `Warming up model for the compilation...` → `Warming up done.` | compiling 구간. 제공 실행은 eager라 torch.compile 자체는 비활성 |
+| `init engine (profile, create kv cache, warmup model) took` | 초기화 완료 표지; 단계 경계를 임의 생성하지 않음 |
+| `Application startup complete.` | 타임스탬프가 있는 경우에만 inferring 시작. 제공 로그 줄은 시각이 없어 생략 기록 |
+
+GPU의 torch.compile·CUDA graph capture 표지는 미확인이고 SGLang은 근거 로그가 없어 패턴 미지원입니다. 모든 결과물은 클러스터 미적용 후보입니다(SP4 2개 정책만 kind에서 수동 확인 후 삭제). 실제 엔진의 단계별 정상 실행 목록, 캐시 권한 변경 관측, 실행 거부는 아직 없습니다.
 
 ## 협업·검수
 

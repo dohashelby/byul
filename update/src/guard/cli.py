@@ -19,7 +19,6 @@ from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select as select_plan
 from guard.models import Pack, Plan, load_pack, utcnow
-from guard.report.html import render_html
 from guard.store import Store
 from guard.store import IntegrityError
 from guard.store.packs import PackNotStoredError, get_pack, put_pack
@@ -177,12 +176,11 @@ def report(
     plan: str = typer.Option(..., "--plan"),
     pack: Optional[Path] = typer.Option(None, "--pack"),
     json_out: Path = typer.Option(Path("report.json"), "--json"),
-    html_out: Optional[Path] = typer.Option(None, "--html"),
     as_of: Optional[str] = typer.Option(None, "--as-of"),
     config: Path = ConfigOpt,
     store: Optional[Path] = StoreOpt,
 ) -> None:
-    """RES → RPT(JSON) → HTML"""
+    """RES → RPT(JSON). 화면은 byul platform이 RPT JSON을 읽어 보여준다."""
     cfg = _config(config)
     st = _store(store, cfg)
     pl, pk = _plan_and_pack(st, plan, pack, allow_snapshot=True)
@@ -191,9 +189,6 @@ def report(
     data = rpt.to_dict()
     json_out.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     typer.echo(f"{rpt.id}@{rpt.revision} official={rpt.official} → {json_out}")
-    if html_out:
-        html_out.write_text(render_html(json.loads(json_out.read_text(encoding="utf-8"))), encoding="utf-8")
-        typer.echo(f"  html → {html_out}")
 
 
 @evidence_app.command("template")
@@ -246,7 +241,7 @@ def update(
     config: Path = ConfigOpt,
     store: Optional[Path] = StoreOpt,
 ) -> None:
-    """Two environments → side-specific execution → JSON/HTML comparison."""
+    """Two environments → side-specific execution → JSON comparison."""
     cfg = _config(config)
     pk = load_pack(pack)
     validate_pack(pk)
@@ -257,7 +252,6 @@ def update(
     rpt, failed = execute_update(_store(store, cfg), pk, envs, pol, cfg, folder, judged_at)
     data = rpt.to_dict()
     (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    (folder / "report.html").write_text(render_html(data), encoding="utf-8")
     typer.echo(f"{rpt.id} official={rpt.official} → {folder}")
     raise typer.Exit(1 if failed else 0)
 
@@ -296,7 +290,6 @@ def validate(
     rpt, failed = execute_validation(_store(store, cfg), pk, environment, pol, cfg, folder, utcnow())
     data = rpt.to_dict()
     (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    (folder / "report.html").write_text(render_html(data), encoding="utf-8")
     typer.echo(f"{rpt.id} official={rpt.official} → {folder}")
     raise typer.Exit(1 if failed else 0)
 

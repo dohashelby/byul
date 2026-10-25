@@ -35,13 +35,11 @@ def test_end_to_end(workdir, scenario, expected):
     assert plan_id.startswith("PLAN-")
     _ok(["run", "--plan", plan_id, "--fake-scenario", scenario])
     _ok(["judge", "--plan", plan_id])
-    _ok(["report", "--plan", plan_id, "--json", "out.json", "--html", "out.html"])
+    _ok(["report", "--plan", plan_id, "--json", "out.json"])
     data = json.loads((workdir / "out.json").read_text(encoding="utf-8"))
     (row,) = [r for r in data["by_check"] if r["check_id"] == "REQ-01"]
     assert row["single"]["security"] == expected
     assert data["official"] is False and data["approval"] is None
-    html = (workdir / "out.html").read_text(encoding="utf-8")
-    assert "REQ-01" in html and "공식 아님" in html
     assert "OK" in _ok(["verify"])
 
 

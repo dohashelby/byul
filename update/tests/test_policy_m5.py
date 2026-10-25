@@ -13,7 +13,6 @@ from guard.core.report import build_report
 from guard.core.select import PolicyValueError, select
 from guard.judges.declared import DeclaredJudge
 from guard.manual_policy import OBSERVATION
-from guard.report.html import render_html
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy
@@ -168,6 +167,4 @@ def test_manual_approval_to_report_preserves_history_and_escapes_context(tmp_pat
     assert report["official"] is False
     assert any("SUP-02/single: POLICY_CONTEXT:" in s for s in report["limitations"])
     assert unsafe in json.dumps(report, ensure_ascii=False)
-    html = render_html(report)
-    assert "<script>alert(1)</script>" not in html and "&lt;script&gt;" in html
-    assert "POLICY_CONTEXT:" in html and not st.verify()
+    assert "POLICY_CONTEXT:" in json.dumps(report, ensure_ascii=False) and not st.verify()

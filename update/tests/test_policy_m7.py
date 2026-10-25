@@ -16,7 +16,6 @@ from guard.core.select import PolicyValueError, select
 from guard.judges.declared import DeclaredJudge
 from guard.manual_audit import BUDGETS, CASES, CLAIMS, CONTRACT, OBSERVATION, POLICY_TYPES, normalize, timestamp
 from guard.models.objects import Observation
-from guard.report.html import render_html
 from guard.store import Store
 from tests.builders import PACK_DIR, T0, baseline_pack, environment, policy
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
@@ -351,12 +350,12 @@ def test_v3_cli_report_integrity_idempotence_and_meaningful_hash(tmp_path,pack):
     ok(['evidence','import',str(p),*common])
     args=['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]
     ok(args);before=snapshot(st);ok(args);assert snapshot(st)==before
-    ok(['report','--plan',plan.id,'--json',str(tmp_path/'r.json'),'--html',str(tmp_path/'r.html'),*common])
+    ok(['report','--plan',plan.id,'--json',str(tmp_path/'r.json'),*common])
     data=json.loads((tmp_path/'r.json').read_text(encoding='utf-8'))
     obs=next(r for r in data['by_check'] if r['check_id']=='OBS-11')
     assert obs['single']['security']=='PASS' and obs['single']['functional']=='UNKNOWN' and not data['official']
-    assert 'AUDIT_COLLECTION:' in (tmp_path/'r.html').read_text(encoding='utf-8')
-    assert 'EXAMPLE complete event-correlated query' not in (tmp_path/'r.html').read_text(encoding='utf-8')
+    assert 'AUDIT_COLLECTION:' in (tmp_path/'r.json').read_text(encoding='utf-8')
+    assert 'EXAMPLE complete event-correlated query' not in (tmp_path/'r.json').read_text(encoding='utf-8')
     assert all(e.execution.executor.version=='0.5.0' and e.data_origin=='DECLARED' for e in st.iter_kind('EVD'))
     assert all(r.judge.version=='0.14.0' for r in st.iter_kind('RES'))
     previous=next(e for e in st.iter_kind('EVD') if e.check_id=='OBS-11')
@@ -384,9 +383,8 @@ def test_html_escapes_record_ids_and_hides_raw_locations(tmp_path,pack):
     import_evidence(st,pack,write(tmp_path,doc),now=T0);judge_plan(st,pack,plan,T0)
     report=build_report(st,pack,plan,T0).to_dict()
     assert unsafe in json.dumps(report,ensure_ascii=False)
-    html=render_html(report)
-    assert '<script>alert(1)</script>' not in html and '&lt;script&gt;' in html
-    assert 'L1-L20' not in html and 'EXAMPLE synthetic clock' not in html
+    text=json.dumps(report,ensure_ascii=False)
+    assert 'L1-L20' not in text and 'EXAMPLE synthetic clock' not in text
 
 
 @pytest.mark.parametrize('normal,fail',[('failed',False),('not_attempted',False),('failed',True)])

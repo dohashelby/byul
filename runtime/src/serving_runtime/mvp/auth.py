@@ -132,11 +132,8 @@ class AuthState:
             "disabled_principal_count": len(self.principals) - len(active),
             "route_roles": {route: list(roles) for route, roles in self.route_roles},
             "protected_routes": sorted(route for route, _ in self.route_roles),
-            "unprotected": (
-                ["GET /static/*", "GET /"]
-                if self.read_api_protected
-                else ["GET /api/*", "GET /static/*", "GET /"]
-            ),
+            # 화면은 byul platform이 맡는다. Gateway는 정적 화면을 서빙하지 않는다.
+            "unprotected": [] if self.read_api_protected else ["GET /api/*"],
             "error_code": self.error_code,
             "error_message": self.error_message,
         }

@@ -21,7 +21,6 @@ from guard.judges.rule_table import RuleTableJudge
 from guard.models import Evidence
 from guard.models.checkdef import ObsSpec
 from guard.models.objects import Observation
-from guard.report.html import render_html
 from guard.store import Store
 from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy, completion_response
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
@@ -335,7 +334,7 @@ def test_manual_versions_hash_history_sides_and_report(tmp_path, pack, version, 
     assert all(e.data_origin=="DECLARED" for e in st.iter_kind("EVD"))
     rpt=build_report(st,pack,plan,T0)
     assert not rpt.official and any("INPUT_SCOPE_MATCHED" in note for note in rpt.limitations)
-    assert "token_ids" in render_html(rpt.to_dict()) and all(r.evidence_source == "manual" for r in rpt.by_check if r.selected)
+    assert "token_ids" in json.dumps(rpt.to_dict(), ensure_ascii=False) and all(r.evidence_source == "manual" for r in rpt.by_check if r.selected)
     previous={ (e.check_id,e.side):e for e in st.find_latest("EVD",lambda e:True)}
     for e in doc["checks"]:
         if e["check_id"]=="REQ-09":
@@ -386,20 +385,17 @@ def test_invalid_policy_keeps_declared_fail_and_unknown(pack):
     assert result.verdicts==dict(security="FAIL",functional="UNKNOWN",performance="UNKNOWN")
 
 
-def test_automatic_report_forwards_only_safe_context_and_escapes(tmp_path,monkeypatch,pack):
+def test_automatic_report_forwards_only_safe_context(tmp_path,monkeypatch,pack):
     st,plan,evd,res,_=run(tmp_path,monkeypatch,pack,values(pack.checks["REQ-09"]))
     st.put(res)
     rpt=build_report(st,pack,plan,T0)
     assert not rpt.official and any("INPUT_SCOPE_MATCHED" in note for note in rpt.limitations)
     raw=rpt.model_dump(mode="json")
-    assert "token_ids" in json.dumps(raw) and "INPUT_SCOPE_MATCHED" in render_html(rpt.to_dict())
+    assert "token_ids" in json.dumps(raw) and "INPUT_SCOPE_MATCHED" in json.dumps(rpt.to_dict(), ensure_ascii=False)
     res.reasons.extend(["POLICY_ITEMS: EXAMPLE must not forward", "AUDIT_COLLECTION: EXAMPLE must not forward"])
     res.revision+=1; st.put(res.seal())
     rpt=build_report(st,pack,plan,T0)
     assert not any("EXAMPLE must not forward" in n for n in rpt.limitations)
-    rpt.limitations.append('<script>EXAMPLE</script>')
-    html=render_html(rpt.to_dict())
-    assert '<script>EXAMPLE</script>' not in html and '&lt;script&gt;EXAMPLE&lt;/script&gt;' in html
 
 
 def test_comparison_keeps_conditions_and_cpu_performance(tmp_path,monkeypatch,pack):

@@ -344,9 +344,9 @@ class ReadApiAuthTests(AuthHttpBase):
                 self.assertEqual(self.get(path, "wrong-token-but-long-enough")[0], 401)
                 self.assertEqual(self.get(path, INFERENCE_TOKEN)[0], 403)
                 self.assertEqual(self.get(path, VIEWER_TOKEN)[0], 200)
-        # Static dashboard files carry no data and stay public.
+        # Gateway는 화면을 서빙하지 않는다(화면은 byul platform).
         for path in ("/", "/static/app.js"):
-            self.assertEqual(self.get(path)[0], 200)
+            self.assertEqual(self.get(path)[0], 404)
         status_body = json.loads(self.get("/api/status", VIEWER_TOKEN)[2])
         self.assertNotIn("GET /api/*", status_body["auth"]["unprotected"])
         self.assertIn("GET /api/*", status_body["auth"]["protected_routes"])

@@ -26,6 +26,21 @@ uv run byul-platform       # http://127.0.0.1:8700
 - `web/dist`가 없으면 `/api/*` 밖의 경로는 503 `WEB_NOT_BUILT`를 돌려준다.
 - 화면 개발: API를 띄운 채 `cd web && npm run dev` (Vite가 `/api`를 8700으로 넘긴다).
 
+### runtime과 함께 실행
+
+runtime Gateway는 자체 화면이 없다(2026-10-25 제거). 화면은 이 platform 하나다.
+
+```sh
+platform/scripts/run-with-runtime.sh               # runtime :8080(모의 엔진) + platform :8700
+RUNTIME_DEMO=1 platform/scripts/run-with-runtime.sh  # runtime 시연 요청과 저장소의 합성 관측 자료도 넣는다
+```
+
+기존 시험 기록은 있으면 자동 연결한다: runtime 기본 기록 폴더(`~/.local/state/serving-runtime/mvp`), kind lab 보고서 폴더(`~/.local/state/serving-runtime/k8s-lab/reports`). 다른 위치면 `RUNTIME_DATA_DIR`·`RUNTIME_LAB_REPORT`, Cilium 상태는 `RUNTIME_CILIUM=1`. runtime 화면은 삭제된 runtime 대시보드와 같은 구성·문구이며 3초마다 갱신한다.
+
+update는 자체 화면(HTML 보고서)이 없다(2026-10-25 제거). 실행 스크립트는 `update/out`의 RPT JSON을 기본으로 읽고(`UPDATE_REPORTS_DIR`로 바꿈), 검증 결과 탭이 update 보고서의 모든 내용(종합 판정·주요 결과·영역/보호 목적·증거 출처·한계·전체 표·수동 시험·미선정·승인/입력 목록)을 보여준다.
+
+runtime 기록은 `platform/.runtime-data`에 쌓인다(git 제외). 조회 보호를 켠 runtime이면 `RUNTIME_VIEWER_TOKEN`을 함께 넘긴다.
+
 ## 환경변수
 
 | 이름 | 뜻 | 없을 때 |

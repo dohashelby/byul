@@ -285,5 +285,5 @@ def run_cli(gateway: str, data_dir: str | None = None) -> int:
         print(f"시연 결과 저장 실패: {error}", file=sys.stderr)
         return 1
     print(f"\n결과 JSON: {report}")
-    print("대시보드에서 확인: http://127.0.0.1:8080")
+    print("화면 확인: byul platform (RUNTIME_BASE_URL=http://127.0.0.1:8080 uv run byul-platform)")
     return 0 if all(result.passed for result in results) else 1

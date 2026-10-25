@@ -1,5 +1,6 @@
 """M13 valid unknown is distinct from malformed shape; all fixtures synthetic."""
 from copy import deepcopy
+import json
 import hashlib
 
 import pytest
@@ -9,7 +10,6 @@ from guard.core.report import build_report
 from guard.judges import manual_cache_context as cache
 from guard.judges.declared import DeclaredJudge
 from guard.models import Verdict
-from guard.report.html import render_html
 from tests.builders import T0, policy
 from tests.test_policy_m4 import snapshot
 from tests.test_policy_m12 import AXES, CONTEXTS, baseline_pack, setup, unit, write_input
@@ -142,7 +142,7 @@ def test_real_import_unknown_state_reports_refs_sides_history_and_bytes(tmp_path
     before=snapshot(st);judge_plan(st,pack,plan,T0)
     assert snapshot(st)==before and not st.verify()
     rpt=build_report(st,pack,plan,T0)
-    assert not rpt.official and "CACHE_CONTEXT_INFERENCE_UNRESOLVED" in render_html(rpt.to_dict())
+    assert not rpt.official and "CACHE_CONTEXT_INFERENCE_UNRESOLVED" in json.dumps(rpt.to_dict(),ensure_ascii=False)
     row=next(r for r in rpt.by_check if r.check_id=="REQ-16")
     assert row.evidence_source=="manual"
     if mode=="update":assert row.functional_comparison=="NOT_COMPARABLE"

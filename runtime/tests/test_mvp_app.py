@@ -58,16 +58,14 @@ class GatewayAppTests(unittest.TestCase):
         self.assertEqual(status["record_store"]["data_dir"], self.temporary.name)
         self.assertEqual(len(status["observation_session_id"]), 32)
 
-    def test_dashboard_page_and_assets_are_served(self) -> None:
-        with closing(urlopen(self.base_url + "/", timeout=2)) as response:
-            page = response.read().decode("utf-8")
-            self.assertTrue(response.headers["Content-Type"].startswith("text/html"))
-        self.assertIn("모의 엔진", page)
-        self.assertIn("/static/app.js", page)
-        for asset, content_type in (("/static/app.css", "text/css"), ("/static/app.js", "text/javascript")):
-            with closing(urlopen(self.base_url + asset, timeout=2)) as response:
-                self.assertTrue(response.headers["Content-Type"].startswith(content_type))
-                self.assertGreater(len(response.read()), 0)
+    def test_gateway_serves_no_dashboard(self) -> None:
+        # 화면은 byul platform이 맡는다. Gateway는 조회 API(JSON)만 낸다.
+        for path in ("/", "/static/app.js", "/static/app.css", "/static/vendor/chart.umd.min.js"):
+            with self.subTest(path=path):
+                with self.assertRaises(HTTPError) as caught:
+                    urlopen(self.base_url + path, timeout=2)
+                self.assertEqual(caught.exception.code, 404)
+                self.assertEqual(json.loads(caught.exception.read())["error"]["code"], "NOT_FOUND")
 
     def test_invalid_chat_post_has_m2_error_and_request_id(self) -> None:
         request = Request(

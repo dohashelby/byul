@@ -46,6 +46,7 @@
 
 ## 4. 패치 릴리스·증분 감사 선정과 이월
 설계 §1·§3.4·§4·§5·§6 그대로. 팩에 `change_selection.yaml`(엔진 변경 종류 → 점검 표, 패치 항상 시험 20개, 모델 변경 종류 → 점검, `fact_triggers`)을 추가하고 매니페스트 해시에 포함한다. `fact_triggers`는 체크리스트 구조화 필드에서 끌어낼 수 있는 것만 넣고, 넣은 수와 연결 없는 사실 수를 보고한다. PLAN에 `previous_plan`, `change_type`, `triggers`, `carried_over`를 기록하고 `NotSelectedReason.CARRIED_OVER`를 추가한다.
+- 판정기 버전이 바뀌면 이월 자격 사전 확인 단계에서 기존 EVD를 현재 판정기로 재판정해 새 RES를 append-only로 저장한다. 이월 단계 자체에서는 EVD·RES를 추가 생성하지 않는다. `carried_over.result`는 사전 재판정했으면 새 재판정 RES의 정확한 Ref, 아니면 기존 유효 RES의 정확한 Ref이며, `evidence`는 그 RES가 판정한 EVD의 정확한 Ref다. 원본 EVD·RES를 보존하고 원래 실행 시각과 재판정 시각을 구분하며, 이를 새 실측으로 표시하지 않는다.
 - 불변식 테스트를 **구현보다 먼저** 쓴다: `tests/invariants/test_inv_05.py`를 개정 문구로 고치고(기존 "변경이 영향 없음이어도 기본 점검 유지" 사례는 update 모드 전체 시험 사례로 옮겨 유지), `tests/invariants/test_inv_19.py`를 새로 만든다.
 - 필수 사례: 정식 릴리스(minor 변경)는 이전 PLAN·CHG가 있어도 전체 선정·이월 없음 / 롤백·rc·버전 확인 불가 → 전체 / 패치 릴리스는 항상 시험 20개 + diff 변경 종류 점검만 선정하고 나머지 이월 / 패치에 미분류 엔진 파일 → 변경 종류 표 전체(56) + 항상 20 / 패치에서 이미지·diff 버전 불일치 → 전체 / 패치 이월은 이전 시험 이미지 = 이번 기준 이미지일 때만 / 패치 선정 점검은 기준·후보 둘 다 실행·비교 / 모델 변경 종류마다 해당 점검과 공통 점검 선정 / 규칙에 없는 모델 파일 → 모든 모델 종류 / POL 값 변경 → 그 점검만 / POL 범위 추가 → 새 점검 / POL 예외·상태만 변경 → 재시험 없음 / 연결된 ENV 사실 변경 → 참조 점검 / 연결 없는 ENV 사실 변경 → 전체 / `--previous-plan` 없음 → 전체 / 이월 조건 하나씩 깨기(이전 FAIL, UNKNOWN, 이미지 digest 다름, 같은 점검의 CheckDef revision 다름, 정의 파일 해시만 다름, 실행기 버전 다름, 실행기 설정 해시 다름, 어댑터 버전 다름, 고정 시험 자료 해시 다름, 실행 중 생성 시험 자료 점검, 판별되지 않은 실행 설정 차이, 변경 트리거에 걸림, EXAMPLE) → 각각 선정 / 팩 전체 revision만 다르고 해당 CheckDef가 같으면 이월 가능 / 판정기 버전만 바뀜 → 엔진 없이 재판정한 결과로 판단(PASS면 이월, 아니면 선정) / 패치에서 소스–이미지 관계 미확인 → 전체 / NOT_APPLICABLE은 미선정 / 증분 감사는 한 쪽만 실행하고 Comparison을 내지 않음.
 
@@ -53,7 +54,7 @@
 - `guard update … --change CHG-… --previous-plan PLAN-…`로 패치 릴리스 선정을 하고, 선정된 점검만 기준·후보로 실행한다. `--previous-plan`이 없으면 기존 동작(전체)과 같아야 한다.
 - `guard select --env … --policy … --previous-plan PLAN-… [--change CHG-…]`로 증분 감사 PLAN을 만들고 기존 `guard run/judge/report --plan`으로 끝까지 돌게 한다.
 - 패치 릴리스 보고서: 변경 유형, 항상 시험·diff 트리거별 선정 사유, 이월 표, "이번 실행 N건 / 이월 M건", 바뀐 영역, 미분류 파일과 "규칙표에 추가할 후보".
-- 보고서(JSON 원본 → HTML): 증분 감사는 변경 유형, 트리거별 선정 사유, 이월 표, "이번 실행 N건 / 이월 M건", 같은 점검의 이전 결과(참고). 이월 PASS는 집계에 포함하되 `carried` 표시(U1-Q5 잠정).
+- 보고서(JSON 원본 → byul platform 화면): 증분 감사는 변경 유형, 트리거별 선정 사유, 이월 표, "이번 실행 N건 / 이월 M건", 같은 점검의 이전 결과(참고). 이월 PASS는 집계에 포함하되 `carried` 표시(U1-Q5 잠정).
 - SPEC 본문은 이미 U1 개정이 반영돼 있다. 구현하면서 SPEC과 다르게 해야 할 곳이 생기면 고치지 말고 멈추고 물어라. `docs/UPDATE_SELECTION.md`에 구현 결과(명령 예, 파일 위치)를 짧게 추가한다.
 
 ## 6. 검증

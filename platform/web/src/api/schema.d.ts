@@ -89,6 +89,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runtime/requests/{request_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Request Evidence
+         * @description runtime의 요청 증거 JSON을 내려받는다. 내용은 runtime이 만든 그대로다(본문·자격정보 없음).
+         */
+        get: operations["request_evidence_api_runtime_requests__request_id__evidence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runtime/summary": {
         parameters: {
             query?: never;
@@ -123,15 +143,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/runtime/comparisons": {
+    "/api/runtime/lab-report": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Runtime Comparisons */
-        get: operations["runtime_comparisons_api_runtime_comparisons_get"];
+        /** Lab Report */
+        get: operations["lab_report_api_runtime_lab_report_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -350,30 +370,14 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /**
-         * ComparisonRow
-         * @description 구성 비교(/api/baseline)·대상 비교(/api/target)의 필드 한 줄.
-         */
-        ComparisonRow: {
-            /** Field */
-            field: string;
-            /** Expected */
-            expected: unknown;
-            /** Observed */
-            observed: unknown;
-            /** State */
-            state: string;
-            /** Source */
-            source?: string | null;
-        };
-        /** ComparisonTable */
-        ComparisonTable: {
-            /** State */
-            state: string | null;
-            /** Rows */
-            rows: components["schemas"]["ComparisonRow"][];
-            /** Notes */
-            notes?: string[];
+        /** AxisRow */
+        AxisRow: {
+            /** Name */
+            name: string;
+            /** Security */
+            security: string | null;
+            /** Inventory Complete */
+            inventory_complete: boolean | null;
         };
         /** DiffEntry */
         DiffEntry: {
@@ -449,6 +453,24 @@ export interface components {
             /** Raw */
             raw: unknown;
         };
+        /** LabReportResponse */
+        LabReportResponse: {
+            /** Item */
+            item: components["schemas"]["RuntimeLabReport"] | null;
+            invalid?: components["schemas"]["InvalidItem"] | null;
+            source: components["schemas"]["SourceInfo"];
+        };
+        /** ManifestRef */
+        ManifestRef: {
+            /** Kind */
+            kind: string | null;
+            /** Id */
+            id: string | null;
+            /** Revision */
+            revision: number | null;
+            /** Sha256 */
+            sha256: string | null;
+        };
         /** Meta */
         Meta: {
             /** Contracts Version */
@@ -462,6 +484,13 @@ export interface components {
              * @enum {string}
              */
             runtime_connection: "example" | "connected" | "disconnected" | "unauthorized";
+        };
+        /** NotSelectedRow */
+        NotSelectedRow: {
+            /** Check Id */
+            check_id: string | null;
+            /** Reason */
+            reason: string | null;
         };
         /** Overview */
         Overview: {
@@ -486,6 +515,165 @@ export interface components {
             /** Warnings */
             warnings: components["schemas"]["FieldIssue"][];
         };
+        /** ReportCheck */
+        ReportCheck: {
+            /** Check Id */
+            check_id: string;
+            /** Area */
+            area: string | null;
+            /** Purpose */
+            purpose: string | null;
+            /** Question */
+            question: string | null;
+            /** Review Order */
+            review_order: string | null;
+            /** Impact */
+            impact: string | null;
+            /** Applicability */
+            applicability: string | null;
+            /** Selected */
+            selected: boolean;
+            /** Headline */
+            headline: string | null;
+            single: components["schemas"]["ReportSide"] | null;
+            baseline: components["schemas"]["ReportSide"] | null;
+            candidate: components["schemas"]["ReportSide"] | null;
+            /** Comparison */
+            comparison: string | null;
+            /** Functional Comparison */
+            functional_comparison: string | null;
+            /** Comparison Reasons */
+            comparison_reasons: string[];
+            /** Evidence Source */
+            evidence_source: string | null;
+            /** Marks */
+            marks: components["schemas"]["ReportMark"][];
+        };
+        /** ReportCounts */
+        ReportCounts: {
+            /** Selected */
+            selected: number;
+            /** Fail */
+            fail: number;
+            /** Unknown */
+            unknown: number;
+            /** Pass */
+            pass: number;
+            /** Not Applicable */
+            not_applicable: number;
+            /** Manual Required */
+            manual_required: number;
+            /** Not Selected */
+            not_selected: number;
+            /** Regressed */
+            regressed: number;
+        };
+        /** ReportFocus */
+        ReportFocus: {
+            /** Regressed */
+            regressed: string[];
+            /** Fail */
+            fail: string[];
+            /** Unknown */
+            unknown: string[];
+        };
+        /**
+         * ReportMark
+         * @description 점검 행의 표시 항목. kind: gap, manual_declared, replaced, functional_scope, exception, tested_while_undetermined.
+         */
+        ReportMark: {
+            /** Kind */
+            kind: string;
+            /** Value */
+            value?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Revision */
+            revision?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Executor */
+            executor?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Probed */
+            probed?: number | null;
+            /** Of */
+            of?: number | null;
+            /** Status */
+            status?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+        };
+        /** ReportSide */
+        ReportSide: {
+            /** Result Id */
+            result_id: string | null;
+            /** Result Revision */
+            result_revision: number | null;
+            /** Security */
+            security: string | null;
+            /** Functional */
+            functional: string | null;
+            /** Performance */
+            performance: string | null;
+            /** Verification Level */
+            verification_level: string | null;
+        };
+        /**
+         * ReportView
+         * @description update 보고서 화면(삭제된 update HTML 보고서의 내용). 값은 계약 verification-result(0.2)에서 꺼낸다.
+         */
+        ReportView: {
+            /** Report Id */
+            report_id: string | null;
+            /** Revision */
+            revision: number | null;
+            /** Content Sha256 */
+            content_sha256: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Mode */
+            mode: string | null;
+            /** Data Origin */
+            data_origin: string | null;
+            /** Official */
+            official: boolean;
+            /** Policy Status */
+            policy_status: string | null;
+            /** Pack Review Status */
+            pack_review_status: string | null;
+            /** Unofficial Reasons */
+            unofficial_reasons: string[];
+            /** Overall */
+            overall: string;
+            counts: components["schemas"]["ReportCounts"];
+            /** Incomplete Areas */
+            incomplete_areas: string[];
+            focus: components["schemas"]["ReportFocus"];
+            /** By Area */
+            by_area: components["schemas"]["AxisRow"][];
+            /** By Purpose */
+            by_purpose: components["schemas"]["AxisRow"][];
+            /** Evidence Counts */
+            evidence_counts: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            /** Limitations */
+            limitations: string[];
+            /** Manual Required */
+            manual_required: string[];
+            /** Not Selected */
+            not_selected: components["schemas"]["NotSelectedRow"][];
+            /** Approval */
+            approval?: unknown;
+            /** Inputs Manifest */
+            inputs_manifest: components["schemas"]["ManifestRef"][];
+            /** Checks */
+            checks: components["schemas"]["ReportCheck"][];
+        };
         /** RequestCounts */
         RequestCounts: {
             /** Allowed */
@@ -507,12 +695,12 @@ export interface components {
             /** Event */
             event: components["schemas"]["RuntimeEvent"] | null;
             event_invalid?: components["schemas"]["InvalidItem"] | null;
-            /** Evidence State */
-            evidence_state: string | null;
-            /** Evidence Summary */
-            evidence_summary: string | null;
-            /** Native Detail */
-            native_detail?: unknown;
+            /**
+             * Detail
+             * @description runtime 요청 상세(계약 runtime-request-detail)
+             */
+            detail?: components["schemas"]["RuntimeRequestDetail"] | null;
+            detail_invalid?: components["schemas"]["InvalidItem"] | null;
             /** Evidence */
             evidence?: components["schemas"]["EvidenceItem"][];
             source: components["schemas"]["SourceInfo"];
@@ -571,6 +759,8 @@ export interface components {
             run_id: string | null;
             /** Target Ref */
             target_ref: string | null;
+            /** Observation Session Id */
+            observation_session_id: string | null;
             /** Data Origin */
             data_origin: string;
             /** Origin Detail */
@@ -631,12 +821,6 @@ export interface components {
             label?: string | null;
             /** Target Ref */
             target_ref?: string | null;
-        };
-        /** RuntimeComparisons */
-        RuntimeComparisons: {
-            baseline: components["schemas"]["ComparisonTable"];
-            target: components["schemas"]["ComparisonTable"];
-            source: components["schemas"]["SourceInfo"];
         };
         /** RuntimeEventList */
         RuntimeEventList: {
@@ -699,6 +883,8 @@ export interface components {
         /** VerificationDetail */
         VerificationDetail: {
             item: components["schemas"]["VerificationResult"];
+            /** @description 계약(verification-result 0.2)에서 만든 보고서 화면 자료. */
+            report: components["schemas"]["ReportView"];
             /**
              * Raw Checks
              * @description RPT 원본의 by_check 행(check_id별). 예시 모드에는 원본이 없어 null.
@@ -959,11 +1145,11 @@ export interface components {
         } & unknown;
         /**
          * 재검증 요청 (runtime → platform → update)
-         * @description runtime-revalidation-request/1.0을 공통 형식으로 감싼 것. runtime이 자산·정책·구성 변화를 보면 연다. 자동으로 시험을 돌리거나 승인하지 않는다. 플랫폼에서 사람이 보고 update의 증분 감사(U1)를 시작한다.
+         * @description runtime-revalidation-request/1.0을 공통 형식으로 감싼 것. runtime이 자산·정책·구성 변화를 보면 연다. 자동으로 시험을 돌리거나 승인하지 않는다. 플랫폼에서 사람이 보고 update의 증분 감사(U1)를 시작한다. 0.2부터 runtime 화면의 재검증 표 항목(처음 열린 시각, 현재 근거 존재)을 담는다.
          */
         RevalidationRequest: {
             /** @constant */
-            schema_version: "byul-revalidation-request/0.1";
+            schema_version: "byul-revalidation-request/0.2";
             revalidation_id: string;
             fingerprint: components["schemas"]["Common_sha256"];
             /** @enum {unknown} */
@@ -987,6 +1173,10 @@ export interface components {
             status: "open" | "closed";
             data_origin: components["schemas"]["Common_data_origin"];
             origin_detail?: components["schemas"]["Common_origin_detail"];
+            /** @description 이 재검증 요청이 처음 열린 시각. created_at은 마지막 사건 시각. */
+            opened_at: components["schemas"]["Common_nullable_timestamp"];
+            /** @description 지금도 근거 조건이 남아 있는지. 해소·대체되면 false(대체는 해소가 아님). */
+            current_evidence_present: boolean | null;
         };
         /**
          * 격리 실험 실행 문맥 (update → runtime)
@@ -1012,11 +1202,11 @@ export interface components {
         };
         /**
          * 런타임 사건 (runtime → platform, events.jsonl 한 줄)
-         * @description runtime 계획서 §5.4의 events.jsonl. runtime 내부 기록(gateway record, observation 등)을 공통 머리 필드로 감싸고 원본은 native에 그대로 둔다. 탐지는 차단이 아니고, 집행 시도는 차단 확인이 아니다.
+         * @description runtime 계획서 §5.4의 events.jsonl. runtime 내부 기록(gateway record, observation 등)을 공통 머리 필드로 감싸고 원본은 native에 그대로 둔다. 탐지는 차단이 아니고, 집행 시도는 차단 확인이 아니다. 0.2부터 관측 사건의 화면 표시 값(출발·도착, 실행 파일, 판정 등)을 observation에 담는다.
          */
         RuntimeEvent: {
             /** @constant */
-            schema_version: "byul-runtime-event/0.1";
+            schema_version: "byul-runtime-event/0.2";
             /** @description gateway는 'req:<request_id>', 연속 feed는 'feed:<event_key>', 그 밖은 'sha:<native 정규 JSON 해시>'. 가짜 request_id를 만들지 않는다. */
             event_id: string;
             /** @description 사건이 일어난 시각(원본 관측 시각). 모르면 null. */
@@ -1059,21 +1249,205 @@ export interface components {
                 schema_version: string | null;
                 record: Record<string, never>;
             };
+            /** @description 관측 사건(Hubble·Tetragon)의 표시 값. native.record에서 옮긴 것이며 Gateway 사건은 null. 전체 프로세스 인자·파일 내용은 없다. */
+            observation: null | {
+                /** @description runtime 관측 종류(network_flow, process_exec, file_access). */
+                kind: string;
+                /** @description Hubble 원본 판정 정규화 값(allowed·dropped). 프로젝트 수준 거부 확인이 아니다. */
+                verdict: string | null;
+                reason: string | null;
+                direction: string | null;
+                src_namespace: string | null;
+                src_pod: string | null;
+                dst_namespace: string | null;
+                dst_pod: string | null;
+                dst_ip: string | null;
+                dst_port: number | null;
+                protocol: string | null;
+                binary: string | null;
+                path: string | null;
+                access: string | null;
+                pod_namespace: string | null;
+                pod_name: string | null;
+                pod_attribution: string | null;
+                process_attribution: string | null;
+                rule_id: string | null;
+                action_raw: string | null;
+                /** @enum {unknown} */
+                action_mode: "monitor" | "enforce" | "unknown" | null;
+                phases: string[];
+                exec_verdict: string | null;
+                exception_id: string | null;
+                cache_generation: string | null;
+                allowed_binary: boolean | null;
+            };
         } & (unknown & unknown);
         /**
+         * 통제 적용 시험 결과 (runtime → platform)
+         * @description runtime /api/lab-report(kind lab L-01~L-08 시험 보고서, runtime 형식 serving-runtime-k8s-lab-report/1.0)를 옮긴 것. 정책이 설정됐다는 것과 실제 차단이 확인됐다는 것은 다르며, 실제 결과는 이 시험 결과로 본다. 로컬 kind·가짜 backend 결과는 정식 환경 검증이 아니다.
+         */
+        RuntimeLabReport: {
+            /** @constant */
+            schema_version: "byul-runtime-lab-report/0.1";
+            generated_at: components["schemas"]["Common_timestamp"];
+            /**
+             * @description not_configured=Gateway에 --lab-report 없음, missing=파일 없음, error=읽기·형식 오류, ok=읽음.
+             * @enum {unknown}
+             */
+            state: "not_configured" | "missing" | "error" | "ok";
+            configured_path: string | null;
+            path: string | null;
+            error: string | null;
+            report: null | {
+                run_id: string;
+                context: string;
+                namespace: string;
+                started_at: string | null;
+                finished_at: string | null;
+                overall: string;
+                cases: {
+                    id: string;
+                    title: string;
+                    /** @description runtime 시험 상태(passed, failed, not_run, blocked_by_environment 등). */
+                    status: string;
+                    summary: string;
+                    evidence: string[];
+                    limitation: string | null;
+                    note: string | null;
+                }[];
+            };
+        };
+        /**
+         * 요청 상세 (runtime → platform)
+         * @description runtime /api/requests/{id}를 화면용으로 옮긴 것. 판정·적용 정책·전달·Gateway 기록 흐름·엔진 수신 증거를 담는다. 프롬프트·응답 본문·자격정보·추가 필드 값은 원래 저장하지 않으므로 없다. 원본은 native에 그대로 둔다.
+         */
+        RuntimeRequestDetail: {
+            /** @constant */
+            schema_version: "byul-runtime-request-detail/0.1";
+            request_id: string;
+            event_id: string;
+            /**
+             * @description runtime-event와 같은 변환 규칙의 결과.
+             * @enum {unknown}
+             */
+            outcome: "allowed" | "denied" | "invalid" | "engine_rejected" | "error" | "unknown";
+            environment: string | null;
+            run_id: string | null;
+            backend_kind: string | null;
+            decision: {
+                result: string | null;
+                reason_code: string | null;
+                message: string | null;
+                rule_id: string | null;
+                http_status: number | null;
+                engine_http_status: number | null;
+            };
+            request: {
+                model: string | null;
+                max_tokens: number | null;
+                n: number | null;
+                /** @description 추가 필드 이름과 처리 방식(값은 저장하지 않음). */
+                extra_fields: {
+                    name: string;
+                    mode: string | null;
+                }[];
+                context: null | {
+                    result: string | null;
+                    input_tokens: number | null;
+                    limit: number | null;
+                };
+            };
+            auth: {
+                state: string | null;
+                principal_id: string | null;
+                roles: string[];
+            };
+            policy: {
+                policy_id: string | null;
+                policy_version: string | null;
+                profile: string | null;
+                sha256: string | null;
+            };
+            delivery: {
+                attempted: boolean | null;
+                backend_receipt: string | null;
+                response: string | null;
+                error_code: string | null;
+            };
+            stream: boolean | null;
+            http_start_status: number | null;
+            final_outcome: string | null;
+            backend_cancel: string | null;
+            /** @description Gateway 기록 순서(started → response_started → final). */
+            timeline: {
+                phase: string | null;
+                recorded_at: components["schemas"]["Common_nullable_timestamp"];
+            }[];
+            /**
+             * @description received=엔진 수신 확인, not_received=미수신 확인, unknown=확인 불가, gateway_only=외부 backend라 backend 증거원 미연결.
+             * @enum {unknown}
+             */
+            evidence_state: "received" | "not_received" | "unknown" | "gateway_only" | null;
+            evidence_summary: string | null;
+            engine_receipts: {
+                count: number;
+                first_received_at: string | null;
+            };
+            engine_live: {
+                status: string | null;
+                queried_at: components["schemas"]["Common_nullable_timestamp"];
+            };
+            same_observation_session: boolean | null;
+            corrupt_lines: {
+                gateway: number | null;
+                engine: number | null;
+            };
+            data_origin: components["schemas"]["Common_data_origin"];
+            origin_detail: components["schemas"]["Common_origin_detail"];
+            /** @description runtime 원본(gateway_records, engine_receipts). 본문·자격정보는 원래 없다. */
+            native: {
+                gateway_records: Record<string, never>[];
+                engine_receipts: Record<string, never>[];
+            };
+        };
+        /**
          * 런타임 상태 스냅샷 (runtime → platform)
-         * @description runtime 계획서 §5.4 runtime-result.json의 상태 부분. /api/status를 읽은 시점의 합성값이다. 적용 설정은 동작 성공이 아니고, 미확인을 정상으로 바꾸지 않는다.
+         * @description runtime 조회 API(/api/status·/api/policy·/api/collectors·/api/target·/api/summary·/api/revalidation·/api/observations)를 읽은 시점의 합성값. 적용 설정은 동작 성공이 아니고, 미확인을 정상으로 바꾸지 않는다. 0.2부터 runtime 자체 대시보드(2026-10-25 삭제)가 보여주던 항목을 모두 담는다. 비밀값(토큰·자격정보 내용)은 없다.
          */
         RuntimeStatus: {
             /** @constant */
-            schema_version: "byul-runtime-status/0.1";
+            schema_version: "byul-runtime-status/0.2";
             generated_at: components["schemas"]["Common_timestamp"];
             observation_session_id: string | null;
+            /** @description Gateway 실행 옵션의 요청 환경. 모르면 null. */
+            environment: string | null;
+            run_id: string | null;
+            /**
+             * @description runtime /api/status.status
+             * @enum {unknown}
+             */
+            overall: "ok" | "degraded";
             target: {
                 target_ref: components["schemas"]["Common_local_id"] | null;
+                target_id: string | null;
                 registration: string;
+                error_code: string | null;
                 instance_id: string | null;
                 instance_state: string;
+                instance_observed_at: components["schemas"]["Common_nullable_timestamp"];
+                instance_pod: string | null;
+                instance_restart_count: number | null;
+                /** @description 대상 불일치로 신규 추론 요청을 보류(503)하는 중이면 그 사유. */
+                gateway_hold: null | {
+                    reason_code: string;
+                    message: string | null;
+                };
+                comparison_counts: components["schemas"]["RuntimeStatus_compare_counts"];
+                last_history: null | {
+                    event: string;
+                    reason: string | null;
+                    recorded_at: components["schemas"]["Common_nullable_timestamp"];
+                };
             };
             policy: {
                 policy_ref: components["schemas"]["Common_nullable_policy_ref"];
@@ -1083,30 +1457,269 @@ export interface components {
                 /** @enum {unknown} */
                 approval_state: "not_configured" | "verified" | "last_verified" | "unverified" | "rejected" | "error";
                 valid_until: components["schemas"]["Common_nullable_timestamp"];
+                /** @description runtime 정책 파일 형식(예: runtime-mvp/1.1). */
+                schema: string | null;
+                profile: string | null;
+                /** @description 시험 전용 프로필(zeroday-lab). 승인된 운영 정책이 아니다. */
+                test_only: boolean;
+                max_n: number | null;
+                /** @description 검사하지 않고 엔진에 전달하는 추가 필드 이름(값은 없다). */
+                passthrough_fields: string[];
+                validate_count: number;
+                loaded_at: components["schemas"]["Common_nullable_timestamp"];
+                /** @description 정책 파일 읽기·검증 성공 여부. */
+                load_valid: boolean;
+                error_code: string | null;
+                error_message: string | null;
+                external_enforcement: string;
+                approval_checked_at: components["schemas"]["Common_nullable_timestamp"];
+                approval_reason_code: string | null;
+                /** @description 유효성 항목(기간·철회·승인 확인). */
+                validity_items: {
+                    item: string;
+                    state: string | null;
+                    result: string | null;
+                }[];
+                /** @description 정책 로딩 이력(최근 순, 최대 50). */
+                history: {
+                    at: components["schemas"]["Common_nullable_timestamp"];
+                    event: string;
+                    policy_id: string | null;
+                    policy_version: string | null;
+                    sha256: components["schemas"]["Common_sha256"] | null;
+                    previous_version: string | null;
+                    same_version_content_changed: boolean;
+                }[];
+                history_store: components["schemas"]["RuntimeStatus_store_state"];
+            };
+            /** @description 엔진(모의 엔진 또는 외부 backend) 연결 점검. 연결 점검이며 추론·관측 동작 검증이 아니다. */
+            backend: {
+                kind: string;
+                mode: string;
+                url: string | null;
+                healthy: boolean | null;
+                reachable: boolean | null;
+                inference_verified: boolean | null;
+                checked_at: components["schemas"]["Common_nullable_timestamp"];
+                error: string | null;
+                /** @description 자격정보 상태(configured·missing·invalid 등). 값은 없다. */
+                credential: string | null;
+                metrics_credential: string | null;
+                receipts_store: components["schemas"]["RuntimeStatus_store_state"];
+            };
+            concurrency: {
+                in_flight: number | null;
+                limit: number | null;
+            };
+            connections: {
+                active: number | null;
+                limit: number | null;
+                rejected: number | null;
+                request_header_timeout_s: number | null;
+                request_body_timeout_s: number | null;
+            };
+            /** @description Gateway API 인증 상태. 주체 이름·토큰은 없다. */
+            auth: {
+                state: string;
+                method: string | null;
+                principal_count: number | null;
+                protected_routes: string[];
+                error_code: string | null;
             };
             collectors: {
                 source: string;
                 /** @enum {unknown} */
                 state: "disconnected" | "never" | "ok" | "stale" | "error";
                 last_success_at: components["schemas"]["Common_nullable_timestamp"];
+                last_attempt_at: components["schemas"]["Common_nullable_timestamp"];
+                last_error: string | null;
+                interval_s: number | null;
+                stale_after_s: number | null;
+                data_origin: components["schemas"]["Common_data_origin"] | null;
+                origin_detail: components["schemas"]["Common_origin_detail"];
+                /** @description 수집원별 요약. 해당 없는 수집원은 null. */
+                detail: null | components["schemas"]["RuntimeStatus_feed_detail"] | components["schemas"]["RuntimeStatus_retention_detail"] | components["schemas"]["RuntimeStatus_metrics_detail"] | components["schemas"]["RuntimeStatus_asset_detail"] | components["schemas"]["RuntimeStatus_cilium_detail"];
             }[];
             store: {
                 /** @enum {unknown} */
                 state: "ok" | "error" | "unknown";
+                data_dir: string | null;
+                last_error: string | null;
+                last_error_at: components["schemas"]["Common_nullable_timestamp"];
+                corrupt_lines: {
+                    gateway: number;
+                    engine: number;
+                };
+                corrupt_details: components["schemas"]["RuntimeStatus_line_issue"][];
             };
+            revalidation: {
+                open_count: number;
+                current_condition_count: number;
+                corrupt_lines: number;
+                evaluation_errors: number;
+            };
+            /** @description 저장된 관측 사건 집계(/api/observations). */
+            observations: {
+                by_source: {
+                    [key: string]: number;
+                };
+                corrupt_lines: number;
+                /** @description 실제(real) Hubble DROPPED 건수. 거부 확인이 아니라 관측이다. */
+                real_hubble_dropped: number;
+                origins_by_kind: {
+                    [key: string]: {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description 구성 비교(/api/baseline)와 대상 비교(/api/target). 관측 불일치는 표시만 하고 요청을 자동 차단하지 않는다. */
+            comparisons: {
+                baseline: components["schemas"]["RuntimeStatus_compare_table"];
+                target: components["schemas"]["RuntimeStatus_compare_table"];
+            };
+        };
+        RuntimeStatus_compare_counts: {
+            match: number;
+            mismatch: number;
+            unknown: number;
+            not_declared: number;
+        };
+        RuntimeStatus_store_state: {
+            state: string | null;
+            last_error: string | null;
+        };
+        RuntimeStatus_line_issue: {
+            source: string;
+            line: number | null;
+            reason: string;
+        };
+        /** @description observation_feed_hubble·observation_feed_tetragon: 실시간 수집기 처리 결과와 writer heartbeat. */
+        RuntimeStatus_feed_detail: {
+            /** @constant */
+            kind: "observation_feed";
+            processed: number;
+            accepted: number;
+            duplicates: number;
+            rejected: number;
+            rejected_details: components["schemas"]["RuntimeStatus_line_issue"][];
+            corrupt_lines_total: number;
+            out_of_window: number;
+            out_of_window_total: number;
+            idle: boolean;
+            writer: {
+                configured: boolean;
+                state: string | null;
+                updated_at: components["schemas"]["Common_nullable_timestamp"];
+                reconnect_count: number | null;
+                last_gap: null | {
+                    opened_at: components["schemas"]["Common_nullable_timestamp"];
+                    closed_at: components["schemas"]["Common_nullable_timestamp"];
+                };
+            };
+        };
+        /** @description record_retention: 기록 보존 정리 결과. */
+        RuntimeStatus_retention_detail: {
+            /** @constant */
+            kind: "record_retention";
+            mode: string;
+            max_age_days: number | null;
+            max_bytes: number | null;
+            total_bytes: number | null;
+            over_size_limit: boolean;
+            removable_lines: number;
+            holds_state: string | null;
+            holds_error: string | null;
+            errors: string[];
+            last_deletion: null | {
+                ran_at: components["schemas"]["Common_nullable_timestamp"];
+                files: {
+                    name: string;
+                    removed_lines: number;
+                    from: components["schemas"]["Common_nullable_timestamp"];
+                    to: components["schemas"]["Common_nullable_timestamp"];
+                    durability: string | null;
+                }[];
+            };
+        };
+        /** @description metrics: 엔진 지표 필드별 상태. */
+        RuntimeStatus_metrics_detail: {
+            /** @constant */
+            kind: "metrics";
+            fields: {
+                name: string;
+                state: string;
+                declared_type: string | null;
+                counter_reset_now: boolean;
+                last_counter_reset_at: components["schemas"]["Common_nullable_timestamp"];
+            }[];
+        };
+        /** @description asset_integrity: 승인 자산 목록과 실제 파일 대조. */
+        RuntimeStatus_asset_detail: {
+            /** @constant */
+            kind: "asset_integrity";
+            intact: boolean | null;
+            total: number | null;
+            match: number;
+            changed: number;
+            missing: number;
+            unreadable: number;
+            symlink: number;
+            extra_files: number;
+            extra_symlinks: number;
+            walk_errors: number;
+            limit: string | null;
+        };
+        /** @description cilium_policy: CiliumNetworkPolicy 객체 상태. 객체 존재는 실제 차단 증거가 아니다. */
+        RuntimeStatus_cilium_detail: {
+            /** @constant */
+            kind: "cilium_policy";
+            object_count: number;
+            policies: {
+                name: string;
+                status_present: boolean;
+                node_total: number;
+                node_enforcing: number;
+                node_errors: number;
+                last_updated: string | null;
+                conditions: {
+                    type: string | null;
+                    status: string | null;
+                    reason: string | null;
+                }[];
+            }[];
+        };
+        RuntimeStatus_compare_table: {
+            state: string | null;
+            rows: {
+                field: string;
+                expected: string | number | boolean | null;
+                observed: string | number | boolean | null;
+                source: string | null;
+                state: string;
+                observed_at: string | null;
+                note: string | null;
+            }[];
+            notes: string[];
         };
         /**
          * 격리 검증 결과 (update → platform)
-         * @description serving-guard RPT 객체를 화면용으로 줄인 투영. 원본은 RPT JSON이고 이 문서는 report_ref로 원본을 가리킨다. RPT에 없는 값을 새로 만들지 않는다.
+         * @description serving-guard RPT 객체를 화면용으로 옮긴 것. 원본은 RPT JSON이고 이 문서는 report_ref로 원본을 가리킨다. RPT에 없는 값을 새로 만들지 않는다. 0.2부터 update HTML 보고서(2026-10-25 삭제)가 보여주던 RPT 필드를 모두 담는다.
          */
         VerificationResult: {
             /** @constant */
-            schema_version: "byul-verification-result/0.1";
+            schema_version: "byul-verification-result/0.2";
             report_ref: components["schemas"]["Common_object_ref"];
             /** @enum {unknown} */
             mode: "audit" | "update";
             created_at: components["schemas"]["Common_timestamp"];
             data_origin: components["schemas"]["Common_data_origin"];
+            /** @description RPT.official. 정책 CONFIRMED·팩 REVIEWED·EXAMPLE 아님 등 공식 조건을 update가 판정한 값. */
+            official: boolean;
+            /**
+             * @description RPT.policy_status. guard POL의 확정 상태.
+             * @enum {unknown}
+             */
+            policy_status: "DRAFT" | "CONFIRMED";
             plan_ref: components["schemas"]["Common_object_ref"];
             environment_refs: components["schemas"]["Common_object_ref"][];
             /** @description guard POL 객체 참조. */
@@ -1120,11 +1733,15 @@ export interface components {
                 review_status: "DRAFT" | "REVIEWED";
             };
             change_ref: components["schemas"]["Common_object_ref"] | null;
+            /** @description RPT.inputs_manifest. 이 보고서가 쓴 모든 객체(팩 포함)의 정확한 판본과 해시. */
+            inputs_manifest: components["schemas"]["VerificationResult_manifest_ref"][];
             summary: {
                 by_area: {
-                    [key: string]: {
-                        security: components["schemas"]["Common_verdict"];
-                    };
+                    [key: string]: components["schemas"]["VerificationResult_axis_summary"];
+                };
+                /** @description RPT.by_purpose. 키는 보호 목적 이름(팩의 CheckDef.purpose). */
+                by_purpose: {
+                    [key: string]: components["schemas"]["VerificationResult_axis_summary"];
                 };
                 evidence_counts: {
                     [key: string]: {
@@ -1137,24 +1754,63 @@ export interface components {
             checks: {
                 check_id: components["schemas"]["Common_check_id"];
                 /** @enum {unknown} */
+                area: "SUP" | "REQ" | "PLT" | "LIF" | "OBS";
+                /** @description 보호 목적(팩 CheckDef.purpose). */
+                purpose: string;
+                /** @description 점검 질문(팩 CheckDef 문구). */
+                question: string;
+                review_order: string;
+                impact: string | null;
+                /** @enum {unknown} */
                 applicability: "APPLICABLE" | "NOT_APPLICABLE" | "UNDETERMINED" | "CONFLICT";
                 selected: boolean;
                 not_selected_reason?: string | null;
+                /** @description 적용 미정 상태로 시험함. */
+                tested_while_undetermined: boolean;
                 /** @description audit 모드는 single, update 모드는 baseline·candidate. */
                 sides: {
                     [key: string]: {
                         result_ref: components["schemas"]["Common_object_ref"] | null;
                         security: components["schemas"]["Common_verdict"];
-                        functional: components["schemas"]["Common_verdict"];
-                        performance: components["schemas"]["Common_verdict"];
+                        /** @description RPT에 기능 축 판정이 없으면 null(0.1은 UNKNOWN으로 채웠다). */
+                        functional: components["schemas"]["Common_verdict"] | null;
+                        performance: components["schemas"]["Common_verdict"] | null;
                         verification_level: components["schemas"]["Common_data_origin"] | null;
                     };
                 };
-                comparison: ("NO_CHANGE" | "REGRESSED" | "FIXED" | "STILL_FAILING" | "UNKNOWN" | "NOT_COMPARABLE" | "CARRIED_OVER") | null;
+                comparison: components["schemas"]["VerificationResult_comparison"] | null;
+                functional_comparison: components["schemas"]["VerificationResult_comparison"] | null;
+                /** @description 비교 불일치·미확인 필드(update 모드). 없으면 빈 배열. */
+                comparison_reasons: string[];
                 gaps: ("NO_EXECUTOR" | "NO_POLICY_VALUE" | "NO_FIXTURE" | "NO_ENV_FACT" | "ADAPTER_UNSUPPORTED")[];
                 /** @enum {unknown} */
                 evidence_source: "automated" | "manual" | null;
-                exception_approved?: boolean;
+                /** @description 정책 예외 표시. 판정을 바꾸지 않는다(0.1의 exception_approved를 대체). */
+                exception: null | {
+                    /** @enum {unknown} */
+                    status: "APPROVED" | "EXPIRED" | "UNAPPROVED";
+                    reason: string;
+                    expires_at: components["schemas"]["Common_nullable_timestamp"];
+                };
+                /** @description 같은 PLAN·점검·side에서 출처가 다른 이전 증거를 대체함. */
+                replaced: null | {
+                    /** @enum {unknown} */
+                    source: "automated" | "manual";
+                    revision: number;
+                    executor: string | null;
+                    reason: string | null;
+                };
+                functional_scope: null | {
+                    probed: number;
+                    of: number | null;
+                    label: string;
+                };
+            }[];
+            /** @description 선정됐지만 자동 실행이 안 되는 점검. */
+            manual_required: components["schemas"]["Common_check_id"][];
+            not_selected: {
+                check_id: components["schemas"]["Common_check_id"];
+                reason: string;
             }[];
             limitations: string[];
             approval: null | {
@@ -1164,6 +1820,21 @@ export interface components {
                 decision: "ACCEPT" | "REJECT";
                 note: string;
             };
+        };
+        /** @enum {unknown} */
+        VerificationResult_comparison: "NO_CHANGE" | "REGRESSED" | "FIXED" | "STILL_FAILING" | "UNKNOWN" | "NOT_COMPARABLE" | "CARRIED_OVER";
+        VerificationResult_axis_summary: {
+            security: components["schemas"]["Common_verdict"];
+            /** @description 점검 목록 완결 여부. 거짓이면 집계 PASS가 될 수 없다(SPEC INV-13). RPT에 없으면 null. */
+            inventory_complete: boolean | null;
+        };
+        /** @description inputs_manifest 항목. object_ref와 같되 팩(PACK)도 담는다. */
+        VerificationResult_manifest_ref: {
+            /** @enum {unknown} */
+            kind: "PACK" | "ENV" | "POL" | "CHG" | "PLAN" | "EVD" | "RES" | "RPT";
+            id: string;
+            revision: number;
+            sha256: components["schemas"]["Common_sha256"];
         };
         EvidenceItem: {
             evidence_id: string;
@@ -1306,6 +1977,37 @@ export interface operations {
             };
         };
     };
+    request_evidence_api_runtime_requests__request_id__evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description runtime 증거 JSON 파일(그대로 전달) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     summary_api_runtime_summary_get: {
         parameters: {
             query?: never;
@@ -1346,7 +2048,7 @@ export interface operations {
             };
         };
     };
-    runtime_comparisons_api_runtime_comparisons_get: {
+    lab_report_api_runtime_lab_report_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1361,7 +2063,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RuntimeComparisons"];
+                    "application/json": components["schemas"]["LabReportResponse"];
                 };
             };
         };

@@ -15,7 +15,6 @@ from guard.core.select import select
 from guard.judges.declared import DeclaredJudge
 from guard.manual_policy import CASES, OBSERVATION, PARAMETERS, blank_evidence, normalize
 from guard.models import Evidence
-from guard.report.html import render_html
 from guard.store import IntegrityError, Store
 from tests.builders import PACK_DIR, T0, baseline_pack, environment, evidence, policy
 from tests.prepared_fixtures import dump_fixture_yaml, manual_setup_seed, put_baseline_snapshot
@@ -380,18 +379,17 @@ def test_update_sides_have_separate_records_and_remain_not_comparable(tmp_path,p
     assert any("LIF-07/candidate:" in s and "LIF_ADMITTED_BEFORE_READY" in s for s in report["limitations"])
 
 
-def test_report_escapes_identifiers_and_omits_raw_source_details(tmp_path,pack):
+def test_report_keeps_identifiers_as_data_and_omits_raw_source_details(tmp_path,pack):
     st,plan,doc=setup(tmp_path,pack,values(["EXAMPLE-<script>alert(1)</script>"])); fill(doc)
     row_id=entry(doc)["policy_evidence"]["records"][0]["item_id"]
     import_evidence(st,pack,write(tmp_path,doc),now=T0)
     judge(st,pack,plan)
-    report=build_report(st,pack,plan,T0).to_dict(); html=render_html(report)
+    report=build_report(st,pack,plan,T0).to_dict(); text=json.dumps(report,ensure_ascii=False)
     assert row_id in json.dumps(report,ensure_ascii=False)
-    assert "<script>alert(1)</script>" not in html and "&lt;script&gt;" in html
-    assert "EXAMPLE synthetic event linkage" not in html and "L1-L4" not in html
+    assert "EXAMPLE synthetic event linkage" not in text and "L1-L4" not in text
 
 
-def test_cli_v2_to_json_html_and_idempotent_rejudge(tmp_path,pack):
+def test_cli_v2_to_json_and_idempotent_rejudge(tmp_path,pack):
     st,plan,doc=setup(tmp_path,pack); fill(doc)
     path=write(tmp_path,doc)
     def ok(args):
@@ -402,9 +400,6 @@ def test_cli_v2_to_json_html_and_idempotent_rejudge(tmp_path,pack):
     ok(["evidence","import",str(path),*common])
     args=["judge","--plan",plan.id,"--as-of",T0.isoformat(),*common]
     ok(args); before=snapshot(st); ok(args); assert snapshot(st)==before
-    ok(["report","--plan",plan.id,"--json",str(tmp_path/"report.json"),
-        "--html",str(tmp_path/"report.html"),*common])
-    for fmt in ("json","html"):
-        out=tmp_path/f"report.{fmt}"
-        assert "POLICY_ITEMS:" in out.read_text(encoding="utf-8")
+    ok(["report","--plan",plan.id,"--json",str(tmp_path/"report.json"),*common])
+    assert "POLICY_ITEMS:" in (tmp_path/"report.json").read_text(encoding="utf-8")
     assert not st.verify()

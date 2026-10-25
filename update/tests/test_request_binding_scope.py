@@ -17,7 +17,6 @@ from guard.core.select import select
 from guard.judges.declared import DeclaredJudge
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import CheckDef, Verdict
-from guard.report.html import render_html
 from guard.store import Store
 from tests.builders import T0, baseline_pack, environment, evidence, policy
 from tests.test_binding_log_policy_contracts import sample
@@ -165,7 +164,5 @@ def test_json_and_html_report_explain_input_only_scope_and_output_gap(tmp_path, 
     assert row["single"]["security"] == "UNKNOWN"
     assert row["single"]["functional"] == "PASS"
     assert data["official"] is False and data["data_origin"] == "EXAMPLE"
-    html = render_html(data)
     for required in ("입력 projection", "생성 출력 자체의 귀속은 미검증", "보안 PASS를 보류"):
         assert any(required in note for note in data["limitations"])
-        assert required in html

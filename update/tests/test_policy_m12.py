@@ -15,7 +15,6 @@ from guard.core.select import PolicyValueError, select
 from guard.judges.declared import DeclaredJudge
 from guard.judges import manual_cache_context as cache
 from guard.models.objects import CpuProfile, ExecutorInfo, Observation
-from guard.report.html import render_html
 from guard.store import Store
 from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
@@ -243,10 +242,10 @@ def test_actual_import_rejudge_history_hash_sides_and_report(tmp_path,pack,versi
     results=judge_plan(st,pack,plan,T0)
     for r in results:
         assert r.verdicts.security==("UNKNOWN" if r.side==side else "PASS")
-    rpt=build_report(st,pack,plan,T0); html=render_html(rpt.to_dict())
-    assert not rpt.official and "CACHE_CONTEXT_CONTRADICTION" in html
+    rpt=build_report(st,pack,plan,T0); text=json.dumps(rpt.to_dict(),ensure_ascii=False)
+    assert not rpt.official and "CACHE_CONTEXT_CONTRADICTION" in text
     assert next(r for r in rpt.by_check if r.check_id=="REQ-16").evidence_source=="manual"
-    assert "REQ15" in html and "REQ17" in html
+    assert "REQ15" in text and "REQ17" in text
     for obj in before.values(): assert st.get(obj["id"],obj["revision"]).to_dict()==obj
     after=snapshot(st);judge_plan(st,pack,plan,T0)
     assert snapshot(st)==after and not st.verify()

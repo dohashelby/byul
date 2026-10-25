@@ -27,9 +27,11 @@ update ── run-context (격리 시험에서 runtime 통제를 켤 때) ┘   
 | `policy` | platform → update, runtime | 기업 정책 한 판본 | `verification` = guard POL, `runtime.gateway` = `runtime-mvp/1.1·1.2`, `runtime.enforcement` = `runtime-enforcement-intent/1.x` 원문 |
 | `policy-bundle` | platform → runtime | 승인된 정책을 runtime 내부 형식 파일로 묶은 것 | §5.4 `approved-policy.json` |
 | `run-context` | update → runtime | 격리 시험 실행 문맥 | §5.4 `run-context.json` |
-| `verification-result` | update → platform | 화면용 검증 결과 | guard RPT의 투영 |
+| `verification-result` | update → platform | 검증 결과·보고서 화면 자료 (0.2) | guard RPT의 투영. 0.2부터 삭제된 update HTML 보고서가 보여주던 RPT 필드를 모두 담는다 |
 | `runtime-event` | runtime → platform | 사건 한 줄(JSONL) | `runtime-mvp-record/1.0`, `runtime-observation/1.0` 등을 `native`에 감쌈 |
-| `runtime-status` | runtime → platform | 상태 스냅샷 | `/api/status` |
+| `runtime-status` | runtime → platform | 상태 스냅샷 (0.2) | `/api/status`·`/policy`·`/collectors`·`/target`·`/baseline`·`/summary`·`/revalidation`·`/observations`의 합성 |
+| `runtime-lab-report` | runtime → platform | kind lab 시험 결과 (0.1, 신규) | `/api/lab-report` |
+| `runtime-request-detail` | runtime → platform | 요청 상세 (0.1, 신규) | `/api/requests/{id}` |
 | `revalidation-request` | runtime → platform → update | 재검증 요청 | `runtime-revalidation-request/1.0` |
 | `evidence-index` | update, runtime → platform | 증거 파일 목록 | §5.4 `evidence/index.json` |
 
@@ -118,5 +120,29 @@ Hubble `DROPPED`는 출발·목적지·정책 귀속과 수신 대조 전에는 
 2. **사건 → 점검 매핑:** Tetragon 규칙 `SP3-EXEC`를 어느 `check_id`와 잇는지. 매핑표를 누가 관리할지.
 3. **운영 사건 보존 기간과 저장소:** 사건 규모에 따라 Postgres로 충분한지, OpenSearch가 필요한지.
 4. **환경 `facts`와 runtime 관측의 충돌:** runtime이 관측한 값(예: prefix cache 사용)이 platform 신고와 다를 때 environment를 어떻게 갱신할지. 지금은 runtime이 environment를 고치지 않는다.
-5. **verification-result 생산 위치:** update가 직접 내보낼지, platform이 RPT를 읽어 변환할지.
+5. **verification-result 생산 위치:** 지금은 platform이 RPT를 읽어 변환한다(`platform/api/.../sources/update.py`). update가 직접 내보낼지는 미정.
 6. **번들 전달 경로:** 같은 호스트의 관리 디렉터리(§5.4)로 시작한다. 원격 배포 채널은 미정.
+7. **보고서 표시 규칙의 소유:** 대표 상태·종합 판정·비공식 사유의 표시 규칙은 update HTML 보고서에서 platform으로 옮겨 왔다. 이 값들을 update가 RPT에 직접 넣을지 정해야 한다.
+
+## 변경 이력
+
+### 2026-10-25 · `verification-result` 0.2 (`byul-verification-result/0.2`)
+
+update의 HTML 보고서를 없애고 화면을 platform으로 옮기면서, 그 보고서가 보여주던 RPT 필드를 계약에 넣었다. 다른 계약은 그대로 0.1이다.
+
+- 추가(최상위): `official`, `policy_status`, `inputs_manifest`(팩 포함, `$defs/manifest_ref`), `summary.by_purpose`, `manual_required`, `not_selected`
+- 추가(점검 행): `area`, `purpose`, `question`, `review_order`, `impact`, `tested_while_undetermined`, `functional_comparison`, `comparison_reasons`, `exception`(상태·사유·만료), `replaced`, `functional_scope`
+- 바꿈: `summary.by_area`·`by_purpose` 항목은 `security`와 `inventory_complete`만(`$defs/axis_summary`). 점검 측 `functional`·`performance`는 RPT에 없으면 `null`(0.1은 `UNKNOWN`으로 채웠다 — 원칙 1 위반을 바로잡음)
+- 없앰: 점검 행 `exception_approved`(→ `exception.status`)
+- 쓰는 곳: platform만(update·runtime은 이 문서를 읽거나 쓰지 않는다). 예시 `examples/verification-result.json`은 `update/out/report.json`에서 다시 만들었고(점검은 SUP-01만 남김) `tools/check_contracts.py` 통과.
+
+### 2026-10-25 · runtime 화면 계약 (`runtime-status`·`runtime-event`·`revalidation-request` 0.2, 신규 `runtime-lab-report`·`runtime-request-detail` 0.1)
+
+runtime 자체 대시보드(삭제)가 보여주던 항목을 platform이 계약 형식으로만 받도록 넣었다. runtime 조회 API 응답에서 옮긴 값이며 비밀값·본문은 없다.
+
+- `runtime-status` 0.2: 실행 환경, 대상 등록·보류·인스턴스, 정책 프로필·로딩 검증·승인·유효성 항목·이력, 엔진 연결, 동시성·연결 수, 인증 상태, 수집원 상세(실시간 수집기·보존 정리·지표·자산 무결성·Cilium), 기록 저장, 재검증·관측 집계, 구성·대상 비교 표
+- `runtime-event` 0.2: `observation`(Hubble 출발·도착·판정, Tetragon 실행 파일·경로·귀속·규칙·action·단계·exec 판정)
+- `revalidation-request` 0.2: `opened_at`, `current_evidence_present`
+- 신규 `runtime-lab-report` 0.1, `runtime-request-detail` 0.1
+- 쓰는 곳: platform만. 예시는 모두 EXAMPLE이며 `tools/check_contracts.py` 통과
+

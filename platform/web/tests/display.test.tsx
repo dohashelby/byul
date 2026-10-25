@@ -115,9 +115,9 @@ describe("환경 사실 경고", () => {
 });
 
 describe("공식 결과 아님 띠", () => {
-  it("팩 DRAFT나 EXAMPLE 자료면 공식 결과가 아니다", () => {
+  it("update가 판정한 official 값을 그대로 쓴다", () => {
+    expect(exampleVR.official).toBe(false);
     expect(isUnofficial(exampleVR)).toBe(true);
-    expect(isUnofficial({ ...exampleVR, data_origin: "MEASURED", pack: { ...exampleVR.pack, review_status: "REVIEWED" } })).toBe(false);
-    expect(isUnofficial({ ...exampleVR, data_origin: "MEASURED" })).toBe(true);
+    expect(isUnofficial({ ...exampleVR, official: true })).toBe(false);
   });
 });

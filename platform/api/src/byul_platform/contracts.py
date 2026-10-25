@@ -27,6 +27,8 @@ COMPONENT_NAMES = {
     "verification-result": "VerificationResult",
     "runtime-event": "RuntimeEvent",
     "runtime-status": "RuntimeStatus",
+    "runtime-lab-report": "RuntimeLabReport",
+    "runtime-request-detail": "RuntimeRequestDetail",
     "revalidation-request": "RevalidationRequest",
     "evidence-index": "EvidenceIndex",
 }

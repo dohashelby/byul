@@ -1,5 +1,6 @@
 """완성 시점의 update 모드 보고서 목업을 만든다. 값은 가상이며 시험 결과가 아니다. 저장소(.guard)에 넣지 않는 문서용 파일이다.
-사용: uv run python tools/make_mockup_report.py  → docs/mockup/report_mockup.{json,html}"""
+사용: uv run python tools/make_mockup_report.py  → docs/mockup/report_mockup.json
+(HTML 보고서는 2026-10-25 byul 통합 때 없앴다. 화면은 byul platform이 이 JSON을 읽어 보여준다.)"""
 import hashlib
 import json
 import sys
@@ -7,7 +8,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
-from guard.report.html import render_html  # noqa: E402
 
 src = json.loads((ROOT / "out/5b/exposed/report.json").read_text(encoding="utf-8"))
 meta = {r["check_id"]: r for r in src["by_check"]}
@@ -100,5 +100,4 @@ doc = {
 out = ROOT / "docs/mockup"
 out.mkdir(parents=True, exist_ok=True)
 (out / "report_mockup.json").write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
-(out / "report_mockup.html").write_text(render_html(doc), encoding="utf-8")
-print(out / "report_mockup.html")
+print(out / "report_mockup.json")

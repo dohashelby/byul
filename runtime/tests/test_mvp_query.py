@@ -19,7 +19,6 @@ from serving_runtime.mvp.store import JsonlStore
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_POLICY = ROOT / "examples/mvp/policy.json"
-STATIC_DIR = ROOT / "src/serving_runtime/mvp/static"
 SESSION = "a" * 32
 
 
@@ -115,32 +114,6 @@ class QueryServiceTests(unittest.TestCase):
         detail = self.service.detail("1" * 32, self.lookup("not_found"), SESSION)
         self.assertEqual(detail["evidence_state"], "received")
         self.assertEqual(len(detail["engine_receipts"]), 1)
-
-
-class DashboardAssetTests(unittest.TestCase):
-    def test_script_never_renders_html_strings(self) -> None:
-        script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-        for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "eval(", "document.write"):
-            self.assertNotIn(forbidden, script)
-
-    def test_engine_card_reads_both_backend_modes(self) -> None:
-        # The external vLLM mode has no `mock_engine` key in /api/status.
-        script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-        self.assertIn("status.mock_engine || status.backend", script)
-
-    def test_external_badge_depends_on_health_and_keeps_gpu_warning(self) -> None:
-        script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-        self.assertIn('engine.healthy ? "연결됨" : "연결 안 됨"', script)
-        self.assertIn("외부 ${engineName} 모드", script)
-        self.assertIn('{ vllm: "vLLM", sglang: "SGLang" }', script)
-        self.assertIn("정식 GPU 시험(S3B) 전", script)
-        self.assertIn('engine.healthy ? "badge-external" : "badge-ERROR"', script)
-
-    def test_dashboard_has_no_mutating_controls(self) -> None:
-        page = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
-        self.assertNotIn("<form", page)
-        script = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-        self.assertNotIn('method: "POST"', script)
 
 
 class QueryHttpTests(unittest.TestCase):

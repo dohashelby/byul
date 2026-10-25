@@ -335,8 +335,8 @@ def analyze_existing(source: Path, output: Path) -> dict:
             if pack.ref().model_dump(mode="json") != manifest.get("pack_ref"):
                 raise ValueError("matrix manifest differs from the source store pack snapshot")
             reports = list((folder / "validation").glob("VALIDATE-*/report.json"))
-            if len(reports) != 1 or not reports[0].with_suffix(".html").is_file():
-                raise ValueError("one original JSON/HTML report pair is required")
+            if len(reports) != 1:
+                raise ValueError("one original JSON report is required")
             report = json.loads(reports[0].read_text(encoding="utf-8"))
             contract = observation_contract(report, objects, pack, short_timeout=index == 2)
             expected = dict.fromkeys(CHECKS, ("FAIL", "PASS")[index]) if index < 2 else None
@@ -484,8 +484,8 @@ def main(argv=None) -> int:
                            folder, "02-validate", args.command_timeout)
         try:
             reports = list((folder / "validation").glob("VALIDATE-*/report.json"))
-            if len(reports) != 1 or not reports[0].with_suffix(".html").is_file():
-                raise ValueError("one JSON and HTML product report pair is required")
+            if len(reports) != 1:
+                raise ValueError("one JSON product report is required")
             report = json.loads(reports[0].read_text(encoding="utf-8"))
             comparison = compare_report(report, case["expected"])
             _new_json(folder / "expected-actual.json", comparison)

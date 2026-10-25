@@ -27,7 +27,7 @@
 | 포함 (v1) | 제외 (v1) |
 | --- | --- |
 | vLLM 어댑터 1개 (인터페이스는 엔진 중립) | SGLang·TensorRT-LLM 어댑터 구현 |
-| CLI + JSON/HTML 보고서 | 웹 UI, 역할별 로그인 |
+| CLI + JSON 보고서 (화면은 byul platform, 2026-10-25부터) | 자체 웹 UI·HTML 보고서, 역할별 로그인 |
 | 로컬 Docker 단일 노드 실행 | K8s·다중 노드·다중 테넌트 |
 | 우선 점검 5~10행 자동화 (§8) | 77행 전부 자동화 |
 | 승인 기록(누가·언제) | 전자서명·registry·철회 절차 |
@@ -402,7 +402,7 @@ approval: { approved_by: str, approved_at: RFC3339, decision: ACCEPT | REJECT, n
 evidence_counts: { <영역>: { manual: int, automated: int, not_run: int } }   # 보고서 상단 "수동 입력 N건 / 자동 측정 M건"
 ```
 
-- JSON이 원본이고 HTML은 JSON에서만 렌더링한다. HTML에 JSON에 없는 내용을 넣지 않는다.
+- JSON이 원본이다. 화면은 byul platform이 이 JSON만 읽어 보여주고, JSON에 없는 내용을 넣지 않는다(2026-10-25 HTML 보고서 `report/html.py` 삭제, 같은 내용은 platform 검증 결과 화면).
 - `approval`은 보고서를 받아들인 기록이다. 자동 권고가 아니다(INV-07).
 
 **버전 비교 규칙** (`security` 축 기준, 다른 축도 같은 표)
@@ -465,7 +465,7 @@ CHG* ──────────┘                                          
 | **INV-16** | 객체는 append-only다. 같은 `id`의 기존 revision을 수정·삭제하지 않는다. 모든 참조는 정확한 revision과 해시로 고정한다. | A1 §2 |
 | **INV-17** | `DRAFT` 정책으로 만든 보고서는 "공식 아님"으로 표시한다. 검토 전 팩도 마찬가지다. | A1-6 |
 | **INV-18** | 보안·기능·성능 판정은 따로 기록한다. 한 축의 결과로 다른 축을 채우지 않는다. | F(05) |
-| **INV-19** | 이월은 새 판정이 아니다. 이월 항목은 EVD·RES를 만들지 않고 이전 RES를 정확한 Ref로 참조하며, 보고서는 이월을 이번 실행 결과와 구분해 표시한다. 엔진 정식 릴리스는 이월하지 않는다. 다음 중 하나라도 해당하면 이월할 수 없다: 이전 보안 판정이 PASS가 아님(판정기 버전이 바뀌었으면 저장된 EVD를 현재 판정기로 재판정한 결과 기준) / 이전 시험의 엔진 이미지가 이번 이미지(증분 감사)·이번 기준 이미지(패치 릴리스)와 다름 / 같은 점검 ID의 CheckDef revision 또는 정의 파일 해시가 다름 / 실행기 이름·버전·설정 해시 또는 어댑터 이름·버전이 다름 / 고정 시험 자료 해시가 다르거나 시험 자료를 실행 전에 확정할 수 없음 / 실행 설정 해시가 이번 변경 유형으로 판별되지 않은 이유로 다름 / 이번 변경 트리거에 걸림 / 이전 증거가 `EXAMPLE` / 패치 릴리스에서 소스–이미지 관계가 불일치 또는 미확인. | N(U1) + F(evidence_reuse_rule) |
+| **INV-19** | 이월은 새 판정이 아니다. 판정기 버전이 바뀌면 **이월 자격 사전 확인 단계**에서 기존 EVD를 현재 판정기로 재판정해 새 RES를 append-only로 저장하고 원본 EVD·RES는 보존한다. **이월 단계 자체**에서는 EVD·RES를 추가 생성하지 않는다. `carried_over.result`는 사전 재판정했으면 그 새 RES의 정확한 Ref, 아니면 기존 유효 RES의 정확한 Ref이며, `carried_over.evidence`는 그 RES가 판정한 EVD의 정확한 Ref다. 보고서는 이월을 이번 실행 결과와 구분하고 원래 실행 시각과 재판정 시각을 분리하며 재판정을 새 실측으로 표시하지 않는다. 엔진 정식 릴리스는 이월하지 않는다. 다음 중 하나라도 해당하면 이월할 수 없다: 이전 보안 판정이 PASS가 아님(판정기 버전이 바뀌었으면 사전 재판정한 RES 기준) / 이전 시험의 엔진 이미지가 이번 이미지(증분 감사)·이번 기준 이미지(패치 릴리스)와 다름 / 같은 점검 ID의 CheckDef revision 또는 정의 파일 해시가 다름 / 실행기 이름·버전·설정 해시 또는 어댑터 이름·버전이 다름 / 고정 시험 자료 해시가 다르거나 시험 자료를 실행 전에 확정할 수 없음 / 실행 설정 해시가 이번 변경 유형으로 판별되지 않은 이유로 다름 / 이번 변경 트리거에 걸림 / 이전 증거가 `EXAMPLE` / 패치 릴리스에서 소스–이미지 관계가 불일치 또는 미확인. | N(U1) + F(evidence_reuse_rule) |
 
 ---
 
@@ -562,7 +562,7 @@ judge:
 | 4 | `guard select`: ENV+POL+팩 → PLAN | 적용 판단 규칙 5개, INV-05·06·13 테스트 |
 | 5 | `adapters/vllm.py` + `executors/direct_route.py` | 로컬 vLLM(작은 모델)을 띄워 EVD 생성 |
 | 6 | `judges/rule_table.py` | INV-01·03·04·11·14·15 테스트 |
-| 7 | `guard report`: RES → RPT(JSON) → HTML | 집계·비교 규칙 표 전체 테스트 |
+| 7 | `guard report`: RES → RPT(JSON) (화면은 byul platform) | 집계·비교 규칙 표 전체 테스트 |
 | 8 | `guard update`: 두 이미지로 같은 점검 실행 → 비교 | INV-09 테스트, NOT_COMPARABLE 케이스 |
 | 9 | U1: 입력 유지·`guard diff`(정식 보고·도달 확인, 패치 선정)·`guard model-diff`·패치 릴리스와 증분 감사 선정·이월 | INV-05 개정·INV-19 테스트, v0.31.0→v0.32.0 diff 재현, 과거 패치 5개 선정 재현, 모델·환경 변경 사례 ([UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md)) |
 
@@ -616,7 +616,7 @@ guard select  --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml   #
 guard run     --plan PLAN-...                                                  # → EVD들
 guard run     --plan PLAN-... --replace-manual                                 # 수동 증거를 명시적으로 새 실행으로 대체
 guard judge   --plan PLAN-...                                                  # → RES들 (재실행 = 재판정)
-guard report  --plan PLAN-... --html out.html                                  # → RPT
+guard report  --plan PLAN-... --json out.json                                  # → RPT (화면: byul platform)
 guard update  --pack ... --baseline env-a.yaml --candidate env-b.yaml --policy ...  # 위 전체를 두 버전으로
 guard verify                                                                   # 저장소 해시 일괄 검증
 guard prepare-update --pack ... --baseline ... --candidate ... --policy ... --config ... # 읽기 전용 준비 검사
@@ -698,7 +698,7 @@ guard select --env ... --policy ... --previous-plan PLAN-... [--change CHG-...] 
 ## M11 REQ-09 수동 PASS 일관성
 
 - 사용자 실행 지시로 M10 신규 계약 REQ-09의 보안/기능에 고정 CheckDef rule_table의 PASS 상한을 추가한다. 수동 신고 PASS와 판정표 PASS가 일치해야 기존 PASS 후보를 유지한다. 판정표 FAIL은 상충 UNKNOWN, UNKNOWN/규칙부재/미지원/평가오류는 근거부족 UNKNOWN이다. 수동 FAIL·UNKNOWN은 그대로 보존한다.
-- 판정 코어를 재호출하지 않고 순수 판정표를 직접 조합한다. default_judge=declared의 재귀를 피하고 의존 예외로 신고 FAIL을 지우지 않는다. 원문 관측/예외를 노출하지 않는 POLICY_CONTEXT 사유를 기존 JSON/HTML에 전달한다.
+- 판정 코어를 재호출하지 않고 순수 판정표를 직접 조합한다. default_judge=declared의 재귀를 피하고 의존 예외로 신고 FAIL을 지우지 않는다. 원문 관측/예외를 노출하지 않는 POLICY_CONTEXT 사유를 기존 JSON 보고서에 전달한다.
 - declared0.8.0이다. 수동 성능·명시 CPU·INV11·첨부/답변/정상/챌린지·M10 범위·과거 정의/부분선언·다른점검을 보존한다. 실행기/코어/모델/Store/양식/Ref/side/config hash 입력은 변경하지 않는다. M10 상충 증거는 그대로 두고 새 RES에서 PASS→UNKNOWN을 기록하며 동일 as_of는 멱등이다.
 - 팩15/REQ09정의5·77점검·14정책점검26경로·a23/b4/c161/d115·자동연결5 유지. 캐시 설계와 M12 프롬프트는 [M11 문서](docs/POLICY_M11.md)의 미구현 제안이며 현재 제품 계약이 아니다.
 

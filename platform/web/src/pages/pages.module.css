@@ -3,6 +3,7 @@
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 12px;
+  align-items: start;
 }
 .three {
   display: grid;
@@ -117,4 +118,27 @@
     position: static;
     max-height: none;
   }
+}
+
+/* 검증 보고서: 주요 결과 카드 */
+.findings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 12px;
+}
+.finding {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+.finding:hover {
+  background: var(--surface-2);
+}
+.question {
+  font-weight: 600;
+  line-height: 1.45;
 }

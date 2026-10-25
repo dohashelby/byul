@@ -1,18 +1,17 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { useRequestDetail, useRequests } from "../api/hooks";
+import { useRequests, useRuntimeStatus } from "../api/hooks";
 import type { RequestRow } from "../api/types";
-import { OriginBadge, OutcomeBadge } from "../components/Badges";
+import { Badge, EnumBadge, OriginBadge } from "../components/Badges";
 import { DataTable, type Column } from "../components/DataTable";
-import { DetailPanel, KeyValue } from "../components/DetailPanel";
-import { JsonView } from "../components/JsonView";
-import { FilterBar, FilterSelect, InvalidRows, PageHead, Query, Segmented, StateView } from "../components/Misc";
-import { Short, Time, Value } from "../components/Value";
-import { DECISION_RESULT, label } from "../lib/labels";
+import { FilterBar, FilterSelect, InvalidRows, PageHead, Query, Segmented } from "../components/Misc";
+import { Time, Value } from "../components/Value";
+import { REQUEST_RESULT, label } from "../lib/labels";
 import { REQUEST_SERIES } from "../components/StackedBars";
+import { RequestDrawer } from "./runtime/RequestDrawer";
+import { ScopeBadges } from "./runtime/parts";
 import { matchesTarget, uniq, useEnvTarget } from "../lib/filters";
 import { inRange } from "../lib/time";
-import { carry, useGlobalFilters, useParams } from "../lib/url";
+import { useGlobalFilters, useParams } from "../lib/url";
 
 const FILTER_KEYS = ["q", "outcome", "model", "reason", "stream", "run"] as const;
 
@@ -26,22 +25,52 @@ function loadSaved(): Saved[] {
   }
 }
 
-const columns: Column<RequestRow>[] = [
-  { id: "recorded_at", header: "기록 시각", cell: (r) => <Time iso={r.recorded_at} />, sort: (r) => r.recorded_at },
-  { id: "outcome", header: "결과", cell: (r) => <OutcomeBadge outcome={r.outcome} />, sort: (r) => r.outcome },
-  { id: "model", header: "모델", cell: (r) => <Value v={r.model} />, sort: (r) => r.model },
-  { id: "max_tokens", header: "max_tokens", cell: (r) => <Value v={r.max_tokens} />, sort: (r) => r.max_tokens },
-  { id: "reason_code", header: "사유 코드", cell: (r) => <Value v={r.reason_code} mono />, sort: (r) => r.reason_code },
-  { id: "http_status", header: "클라이언트 HTTP", cell: (r) => <Value v={r.http_status} />, sort: (r) => r.http_status },
-  { id: "engine_http_status", header: "엔진 HTTP", cell: (r) => <Value v={r.engine_http_status} />, sort: (r) => r.engine_http_status },
-  { id: "stream", header: "스트림", cell: (r) => <Value v={r.stream} />, sort: (r) => r.stream },
-  { id: "delivery_attempted", header: "전달 시도", cell: (r) => <Value v={r.delivery_attempted} />, sort: (r) => r.delivery_attempted },
-  { id: "backend_kind", header: "백엔드", cell: (r) => <Value v={r.backend_kind} />, sort: (r) => r.backend_kind },
-  { id: "environment", header: "환경", cell: (r) => <Value v={r.environment} />, sort: (r) => r.environment },
-  { id: "run_id", header: "run_id", cell: (r) => <Short value={r.run_id} n={14} />, sort: (r) => r.run_id },
-  { id: "data_origin", header: "자료 등급", cell: (r) => <OriginBadge origin={r.data_origin} detail={r.origin_detail} />, sort: (r) => r.data_origin },
-  { id: "request_id", header: "request_id", cell: (r) => <Short value={r.request_id} />, sort: (r) => r.request_id, hidden: true },
-];
+function columns(sessionId: string | null | undefined): Column<RequestRow>[] {
+  return [
+    // runtime 대시보드 요청 목록과 같은 열·순서
+    { id: "recorded_at", header: "시각", cell: (r) => <Time iso={r.recorded_at} />, sort: (r) => r.recorded_at },
+    {
+      id: "request_id",
+      header: "요청 ID",
+      cell: (r) => (
+        <span className="mono" title={r.request_id}>
+          {r.request_id.slice(0, 8)}
+          {sessionId && r.observation_session_id && r.observation_session_id !== sessionId && (
+            <span style={{ marginLeft: 6 }}>
+              <Badge tone="muted">이전 실행</Badge>
+            </span>
+          )}
+        </span>
+      ),
+      sort: (r) => r.request_id,
+    },
+    { id: "scope", header: "환경·실행", cell: (r) => <ScopeBadges environment={r.environment} runId={r.run_id} />, sort: (r) => r.environment },
+    {
+      id: "model",
+      header: "모델",
+      cell: (r) => (
+        <>
+          <Value v={r.model} />
+          {r.stream && (
+            <span style={{ marginLeft: 6 }}>
+              <Badge tone="muted">stream</Badge>
+            </span>
+          )}
+        </>
+      ),
+      sort: (r) => r.model,
+    },
+    { id: "max_tokens", header: "max_tokens", cell: (r) => <Value v={r.max_tokens} />, sort: (r) => r.max_tokens },
+    { id: "outcome", header: "결과", cell: (r) => <EnumBadge table={REQUEST_RESULT} value={r.outcome} />, sort: (r) => r.outcome },
+    { id: "reason_code", header: "사유", cell: (r) => <span className="mono muted">{r.reason_code ?? "–"}</span>, sort: (r) => r.reason_code },
+    // platform 추가 열(기본 숨김)
+    { id: "http_status", header: "클라이언트 HTTP", cell: (r) => <Value v={r.http_status} />, sort: (r) => r.http_status, hidden: true },
+    { id: "engine_http_status", header: "엔진 HTTP", cell: (r) => <Value v={r.engine_http_status} />, sort: (r) => r.engine_http_status, hidden: true },
+    { id: "delivery_attempted", header: "전달 시도", cell: (r) => <Value v={r.delivery_attempted} />, sort: (r) => r.delivery_attempted, hidden: true },
+    { id: "backend_kind", header: "백엔드", cell: (r) => <Value v={r.backend_kind} />, sort: (r) => r.backend_kind, hidden: true },
+    { id: "data_origin", header: "자료 등급", cell: (r) => <OriginBadge origin={r.data_origin} detail={r.origin_detail} />, sort: (r) => r.data_origin, hidden: true },
+  ];
+}
 
 export function filterRequests(rows: RequestRow[], f: Record<string, string | null>): RequestRow[] {
   const q = f.q?.trim().toLowerCase();
@@ -58,6 +87,7 @@ export function filterRequests(rows: RequestRow[], f: Record<string, string | nu
 
 export function RequestsPage() {
   const q = useRequests();
+  const status = useRuntimeStatus();
   const [params, patch] = useParams();
   const { range } = useGlobalFilters();
   const { env, targetRef } = useEnvTarget();
@@ -135,16 +165,16 @@ export function RequestsPage() {
             {data.truncated && <div className="small muted">runtime에서 최근 요청만 가져왔습니다(상한 200건).</div>}
             <div>
               <DataTable
-                columns={columns}
+                columns={columns(status.data?.item?.observation_session_id)}
                 rows={rows}
                 rowKey={(r) => r.request_id}
                 onRowClick={(r) => patch({ sel: r.request_id })}
                 selectedKey={selected}
                 initialSort={{ id: "recorded_at", dir: "desc" }}
                 storageKey="requests"
-                empty={<StateView kind="empty" />}
+                empty={<p className="muted" style={{ margin: 0, padding: "24px 0", textAlign: "center" }}>{filters.outcome ? `${REQUEST_RESULT[filters.outcome]?.label ?? filters.outcome} 요청이 없습니다.` : "아직 기록된 요청이 없습니다."}</p>}
               />
-              {selected && <RequestPanel id={selected} onClose={() => patch({ sel: null })} params={params} />}
+              {selected && <RequestDrawer id={selected} onClose={() => patch({ sel: null })} />}
             </div>
             <InvalidRows items={data.invalid} what="요청 기록" />
             <p className="small muted">지연시간·토큰 수·비용은 runtime이 기록하지 않아 열이 없습니다.</p>
@@ -155,89 +185,3 @@ export function RequestsPage() {
   );
 }
 
-function RequestPanel({ id, onClose, params }: { id: string; onClose: () => void; params: URLSearchParams }) {
-  const q = useRequestDetail(id);
-  return (
-    <Query q={q}>
-      {(d) => {
-        const r = d.row;
-        const e = d.event;
-        const evidence = d.evidence ?? [];
-        return (
-          <DetailPanel
-            title={<span className="mono">{id}</span>}
-            subtitle={r ? label(DECISION_RESULT, r.decision_result) : undefined}
-            onClose={onClose}
-            tabs={[
-              {
-                id: "overview",
-                label: "개요",
-                content: r ? (
-                  <div className="stack">
-                    <KeyValue
-                      items={[
-                        ["결과", <OutcomeBadge outcome={r.outcome} />],
-                        ["runtime 판정", <Value v={r.decision_result} mono />],
-                        ["기록 시각", <Time iso={r.recorded_at} />],
-                        ["모델", <Value v={r.model} />],
-                        ["max_tokens", <Value v={r.max_tokens} />],
-                        ["사유 코드", <Value v={r.reason_code} mono />],
-                        ["규칙", <Value v={r.rule_id} mono />],
-                        ["클라이언트 HTTP", <Value v={r.http_status} />],
-                        ["엔진 HTTP", <Value v={r.engine_http_status} />],
-                        ["스트림", <Value v={r.stream} />],
-                        ["전달 시도", <Value v={r.delivery_attempted} />],
-                        ["백엔드", <Value v={r.backend_kind} />],
-                        ["환경", <Value v={r.environment} />],
-                        ["run_id", <Value v={r.run_id} mono />],
-                        ["대상", <Value v={r.target_ref} mono />],
-                        ["정책", e?.policy_ref ? <span className="mono">{`${e.policy_ref.policy_id} v${e.policy_ref.policy_version}`}</span> : <Value v={null} />],
-                        ["자료 등급", <OriginBadge origin={r.data_origin} detail={r.origin_detail} />],
-                        ["증거 상태", <Value v={d.evidence_state} />],
-                        ["증거 요약", <Value v={d.evidence_summary} />],
-                      ]}
-                    />
-                    <div className="row wrap small">
-                      <Link to={`/runtime/events${carry(params, { sel: `req:${id}` })}`}>사건 로그에서 보기</Link>
-                      {r.run_id && <Link to={`/runtime/events${carry(params, { run: r.run_id })}`}>같은 run_id 사건</Link>}
-                    </div>
-                  </div>
-                ) : (
-                  <StateView kind="invalid" detail={d.event_invalid?.errors.join(" / ")} />
-                ),
-              },
-              {
-                id: "raw",
-                label: "원본",
-                content: <JsonView value={d.native_detail ?? e?.native ?? d.event_invalid?.raw ?? null} />,
-              },
-              {
-                id: "evidence",
-                label: `증거 ${evidence.length}`,
-                content:
-                  evidence.length === 0 ? (
-                    <StateView kind="empty" detail="이 요청을 가리키는 증거 목록 항목이 없습니다." />
-                  ) : (
-                    <div className="stack">
-                      {evidence.map((ev) => (
-                        <KeyValue
-                          key={ev.evidence_id}
-                          items={[
-                            ["증거 ID", <span className="mono">{ev.evidence_id}</span>],
-                            ["경로", <span className="mono">{ev.path}</span>],
-                            ["SHA-256", <Short value={ev.sha256} n={16} />],
-                            ["수집", <Time iso={ev.collected_at} />],
-                            ["자료 등급", <OriginBadge origin={ev.data_origin} />],
-                          ]}
-                        />
-                      ))}
-                    </div>
-                  ),
-              },
-            ]}
-          />
-        );
-      }}
-    </Query>
-  );
-}

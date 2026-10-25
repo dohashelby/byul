@@ -1,0 +1,137 @@
+{
+  "schema_version": "byul-runtime-request-detail/0.1",
+  "request_id": "0123456789abcdef0123456789abcdef",
+  "event_id": "req:0123456789abcdef0123456789abcdef",
+  "outcome": "allowed",
+  "environment": "lab",
+  "run_id": "PLAN-01M598RQGT4DRY9XCVDYRZBRPW",
+  "backend_kind": "mock",
+  "decision": {
+    "result": "ALLOWED",
+    "reason_code": null,
+    "message": null,
+    "rule_id": null,
+    "http_status": 200,
+    "engine_http_status": null
+  },
+  "request": {
+    "model": null,
+    "max_tokens": null,
+    "n": null,
+    "extra_fields": [],
+    "context": null
+  },
+  "auth": {
+    "state": null,
+    "principal_id": null,
+    "roles": []
+  },
+  "policy": {
+    "policy_id": null,
+    "policy_version": null,
+    "profile": null,
+    "sha256": null
+  },
+  "delivery": {
+    "attempted": true,
+    "backend_receipt": "received",
+    "response": "completed",
+    "error_code": null
+  },
+  "stream": null,
+  "http_start_status": null,
+  "final_outcome": null,
+  "backend_cancel": null,
+  "timeline": [
+    {
+      "phase": "started",
+      "recorded_at": "2026-10-25T01:02:02+00:00"
+    },
+    {
+      "phase": "final",
+      "recorded_at": "2026-10-25T01:02:03+00:00"
+    }
+  ],
+  "evidence_state": "received",
+  "evidence_summary": "엔진 수신 확인",
+  "engine_receipts": {
+    "count": 1,
+    "first_received_at": "2026-10-25T01:02:03+00:00"
+  },
+  "engine_live": {
+    "status": "confirmed",
+    "queried_at": "2026-10-25T01:02:04+00:00"
+  },
+  "same_observation_session": true,
+  "corrupt_lines": {
+    "gateway": 0,
+    "engine": 0
+  },
+  "data_origin": "EXAMPLE",
+  "origin_detail": "actual_test",
+  "native": {
+    "gateway_records": [
+      {
+        "schema_version": "runtime-mvp-record/1.0",
+        "phase": "started",
+        "request_id": "0123456789abcdef0123456789abcdef",
+        "observation_session_id": "6f1c2a9e0b7d4c3a8e5f1029384756ab",
+        "environment": "lab",
+        "run_id": "PLAN-01M598RQGT4DRY9XCVDYRZBRPW",
+        "target_id": "mock-engine-001",
+        "recorded_at": "2026-10-25T01:02:02+00:00",
+        "decision": {
+          "result": "ALLOWED",
+          "reason_code": null,
+          "rule_id": null,
+          "http_status": 200,
+          "source": "gateway",
+          "engine_http_status": null
+        },
+        "delivery": {
+          "attempted": false,
+          "backend_receipt": "not_queried",
+          "response": "none",
+          "error_code": null
+        },
+        "backend_kind": "mock",
+        "data_origin": "actual_test"
+      },
+      {
+        "schema_version": "runtime-mvp-record/1.0",
+        "phase": "final",
+        "request_id": "0123456789abcdef0123456789abcdef",
+        "observation_session_id": "6f1c2a9e0b7d4c3a8e5f1029384756ab",
+        "environment": "lab",
+        "run_id": "PLAN-01M598RQGT4DRY9XCVDYRZBRPW",
+        "target_id": "mock-engine-001",
+        "recorded_at": "2026-10-25T01:02:03+00:00",
+        "decision": {
+          "result": "ALLOWED",
+          "reason_code": null,
+          "rule_id": null,
+          "http_status": 200,
+          "source": "gateway",
+          "engine_http_status": null
+        },
+        "delivery": {
+          "attempted": true,
+          "backend_receipt": "received",
+          "response": "completed",
+          "error_code": null
+        },
+        "backend_kind": "mock",
+        "data_origin": "actual_test"
+      }
+    ],
+    "engine_receipts": [
+      {
+        "request_id": "0123456789abcdef0123456789abcdef",
+        "received_at": "2026-10-25T01:02:03+00:00",
+        "model": "test-model",
+        "max_tokens": 64,
+        "stream": false
+      }
+    ]
+  }
+}

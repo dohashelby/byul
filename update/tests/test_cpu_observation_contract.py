@@ -70,7 +70,6 @@ def _case(folder, monkeypatch, expected):
     output = folder / "validation" / "VALIDATE-EXAMPLE"
     output.mkdir(parents=True)
     _write(output / "report.json", rpt.to_dict())
-    (output / "report.html").write_text("<p>EXAMPLE synthetic fixture</p>", encoding="utf-8")
     objects = _objects(store.root)
     _write(folder / "original-objects.json", objects)
     export_bundle(store.root, folder / "evidence.zip")

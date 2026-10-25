@@ -17,8 +17,9 @@ from urllib.parse import urlsplit
 from guard.runtime.docker import Docker
 from .base import LaunchSpec, ProbeRequest
 
-# The reviewed image/model/source profile is data, not code: a new pinned
-# image is reviewed by adding a profile file, never by editing this module.
+# 검토한 이미지·모델·소스 값은 아래 JSON 데이터로 분리했다.
+# 현재는 지정한 프로파일 파일 하나만 고정 로드한다.
+# 다중 프로파일 선택과 새 pinned 이미지 연결은 후속 구현이다.
 _PROFILE_PATH = Path(__file__).resolve().parent / "reviewed_profiles" / "vllm-cpu-length-cause-1.json"
 _REVIEWED = json.loads(_PROFILE_PATH.read_text(encoding="utf-8"))
 PROFILE = _REVIEWED["profile"]

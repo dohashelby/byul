@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
-from pathlib import Path
 import re
 import threading
 import time
@@ -23,12 +22,6 @@ from .validator import Decision
 
 
 _REQUEST_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
-_STATIC_DIR = Path(__file__).with_name("static")
-_STATIC_FILES = {
-    "/": ("index.html", "text/html; charset=utf-8"),
-    "/static/app.css": ("app.css", "text/css; charset=utf-8"),
-    "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
-}
 
 
 class _DeadlineReader:
@@ -349,8 +342,7 @@ class Handler(BaseHTTPRequestHandler):
     def _known_path(self) -> bool:
         path = urlsplit(self.path).path
         return (
-            path in _STATIC_FILES
-            or path
+            path
             in {
                 "/api/status",
                 "/api/summary",
@@ -384,15 +376,6 @@ class Handler(BaseHTTPRequestHandler):
                 request_id=request_id,
                 close_connection=close_connection,
             )
-
-    def _send_static(self, path: str) -> None:
-        name, content_type = _STATIC_FILES[path]
-        try:
-            body = (_STATIC_DIR / name).read_bytes()
-        except OSError:
-            self._send_json(500, {"error": {"code": "STATIC_UNAVAILABLE"}})
-            return
-        self._send(200, content_type, body)
 
     def _send_query_error(self, status: int, code: str, message: str) -> None:
         self._send_json(status, {"error": {"code": code, "message": message}})
@@ -467,9 +450,6 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlsplit(self.path)
         path = parsed.path
-        if path in _STATIC_FILES:
-            self._send_static(path)
-            return
         if path.startswith("/api/"):
             refusal = self.dependencies.authorize_read(self.request_header("Authorization"))
             if refusal is not None:

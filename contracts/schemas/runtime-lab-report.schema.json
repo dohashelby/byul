@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.byul.invalid/0.1/runtime-lab-report.schema.json",
+  "title": "통제 적용 시험 결과 (runtime → platform)",
+  "description": "runtime /api/lab-report(kind lab L-01~L-08 시험 보고서, runtime 형식 serving-runtime-k8s-lab-report/1.0)를 옮긴 것. 정책이 설정됐다는 것과 실제 차단이 확인됐다는 것은 다르며, 실제 결과는 이 시험 결과로 본다. 로컬 kind·가짜 backend 결과는 정식 환경 검증이 아니다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "state", "configured_path", "path", "error", "report"],
+  "properties": {
+    "schema_version": { "const": "byul-runtime-lab-report/0.1" },
+    "generated_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "state": {
+      "description": "not_configured=Gateway에 --lab-report 없음, missing=파일 없음, error=읽기·형식 오류, ok=읽음.",
+      "enum": ["not_configured", "missing", "error", "ok"]
+    },
+    "configured_path": { "type": ["string", "null"] },
+    "path": { "type": ["string", "null"] },
+    "error": { "type": ["string", "null"] },
+    "report": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["run_id", "context", "namespace", "started_at", "finished_at", "overall", "cases"],
+          "properties": {
+            "run_id": { "type": "string" },
+            "context": { "type": "string" },
+            "namespace": { "type": "string" },
+            "started_at": { "type": ["string", "null"] },
+            "finished_at": { "type": ["string", "null"] },
+            "overall": { "type": "string" },
+            "cases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "title", "status", "summary", "evidence", "limitation", "note"],
+                "properties": {
+                  "id": { "type": "string", "pattern": "^L-[0-9]{2}$" },
+                  "title": { "type": "string" },
+                  "status": { "description": "runtime 시험 상태(passed, failed, not_run, blocked_by_environment 등).", "type": "string" },
+                  "summary": { "type": "string" },
+                  "evidence": { "type": "array", "items": { "type": "string" } },
+                  "limitation": { "type": ["string", "null"] },
+                  "note": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

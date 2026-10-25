@@ -1,6 +1,7 @@
 """REQ-09 declared PASS consistency; all inputs are synthetic, not engine proof."""
 from copy import deepcopy
 
+import json
 import pytest
 from guard.collectors.manual import import_evidence
 from guard.core.judge import judge_evidence, judge_plan
@@ -10,7 +11,6 @@ from guard.judges.declared import DeclaredJudge
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import Evidence
 from guard.models.checkdef import JudgeSpec
-from guard.report.html import render_html
 from tests.builders import T0, baseline_pack, policy
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import snapshot, write
@@ -139,7 +139,7 @@ def test_real_manual_import_rejudge_history_sides_and_reports(tmp_path, pack, ve
         assert r.verdicts.model_dump()[axis] == ("UNKNOWN" if r.check_id == "REQ-09" and r.side == side else "PASS")
     rpt = build_report(st, pack, plan, T0)
     assert not rpt.official and any("REQ09_MANUAL_OBSERVATION_CONFLICT" in x for x in rpt.limitations)
-    assert "REQ09_MANUAL_OBSERVATION_CONFLICT" in render_html(rpt.to_dict())
+    assert "REQ09_MANUAL_OBSERVATION_CONFLICT" in json.dumps(rpt.to_dict(), ensure_ascii=False)
     for row in rpt.by_check:
         if row.check_id == "REQ-09":
             assert row.evidence_source == "manual"

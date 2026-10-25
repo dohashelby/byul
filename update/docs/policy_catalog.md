@@ -1,6 +1,6 @@
 # 기업 정책 카탈로그 — Phase 1 검토 초안
 
-> 현행 판정 보완 후보는 PACK-BASELINE 22/DRAFT·REQ-09 revision 6·PLT-04 revision 3·자동 연결 11개·정책 22점검/50경로·카탈로그 323행/615연결이다. adapter 0.4.2·input_validation 0.5.0·credential_exposure 0.4.0·declared 0.14.0을 사용한다. PLT-04의 선택 정책 `credential_candidate_paths: list[str]` 한 경로를 추가한다. REQ-09의 응답 상태와 입력 소비, PLT-04의 명시적 마운트 금지 위반과 자격 후보 접근 가능성을 구분한다. 새 계약의 직접 검증 결과와 미검증 범위는 [판정 의미 보완 절](UPDATE_VALIDATION.md#req-09plt-04-판정-의미-보완-후보)을 따른다. PR #28/#29의 팩21 실측·재판정은 과거 계약의 결과로 보존한다.
+> 현행 판정 보완 후보는 PACK-BASELINE 22/DRAFT·REQ-09 revision 6·PLT-04 revision 3·자동 연결 11개·정책 22점검/50경로·카탈로그 323행/615연결이다. adapter 0.4.2·input_validation 기본 0.5.0 / length_cause_evidence=true인 선택 0.6.0·credential_exposure 0.4.0·declared 0.14.0을 사용한다. PLT-04의 선택 정책 `credential_candidate_paths: list[str]` 한 경로를 추가한다. REQ-09의 응답 상태와 입력 소비, PLT-04의 명시적 마운트 금지 위반과 자격 후보 접근 가능성을 구분한다. 실측은 [PR #30 기본 실행·판정 의미 보완 기록](UPDATE_VALIDATION.md#req-09plt-04-판정-의미-보완-후보)과 [PR #31 opt-in·후속 실측](UPDATE_VALIDATION.md#후보-길이-거부-원인자격-후보-후속)을 구분한다. 검토된 0.32.0 CPU 프로파일의 후속 opt-in 수락 성공을 기본 실행이나 과거 증거에 소급하지 않으며 PLT-04의 비어 있지 않은 후보 단독 시험과 두 이미지 update의 후보 [] 부분 범위도 별개다. PR #28/#29의 팩21 실측·재판정은 과거 계약의 결과로 보존한다.
 >
 > 분류 a47/b2/c161/d113는 정책의 현재 소비 상태이며 인프라 가능 등급 A/B/C와 다르다. GROUP·SALT의 제한 list/정본 참조는 전체 관계표/책임표의 구현 완료가 아니다. [REQ-15 M14](POLICY_M14.md) 당시 팩21/DRAFT·정책 22점검/49경로·카탈로그 322행/614연결은 이력이다. 아래 단계별 수치는 당시 기록이다.
 

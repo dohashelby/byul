@@ -21,7 +21,6 @@ from guard.application import merge_config, update_readiness
 from guard.collectors.file import load_environment, load_policy
 from guard.core.select import select
 from guard.models import Mode, load_pack
-from guard.report.html import render_html
 from guard.update_acceptance import CHECKS, assess_update
 from guard.validation_evidence import (inventory_tree, read_objects,
                                        verify_saved_bundle, verify_store_files)
@@ -165,10 +164,8 @@ def _assess_store(store: Path, report_path: Path, *, diagnostic: bool = False) -
 
 
 def _report_pair(report_path: Path) -> dict:
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    if report_path.with_suffix(".html").read_text(encoding="utf-8") != render_html(report):
-        raise ValueError("saved HTML differs from its JSON report")
-    return report
+    # HTML 보고서는 2026-10-25 byul 통합 때 없앴다(화면은 byul platform). JSON만 원본이다.
+    return json.loads(report_path.read_text(encoding="utf-8"))
 
 
 def _preserved_graph(source: Path) -> dict:
@@ -337,7 +334,7 @@ def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared
                 "--store", str(output / "replay-store"), "--config", str(inputs["config"]), "--as-of", summary["as_of"]])
             reported, _ = invoke("report-restored", ["report", "--plan", plan_id, "--pack", str(absent_pack),
                 "--store", str(output / "replay-store"), "--config", str(inputs["config"]), "--as-of", summary["as_of"],
-                "--json", str(output / "replay-report.json"), "--html", str(output / "replay-report.html")])
+                "--json", str(output / "replay-report.json")])
             replayed = judged and reported
             if replayed:
                 summary["replay_acceptance"] = _assess_store(output / "replay-store", output / "replay-report.json")
@@ -347,9 +344,8 @@ def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared
         summary["accepted"] = all((updated, verified, exported, restored, replayed,
                                     summary["original_store_unchanged"], summary["acceptance"]["accepted"]))
         summary["references"] = {name: {"path": str(path), "sha256": _sha(path)} for name, path in {
-            "report": report_path, "html": report_path.with_suffix(".html"),
-            "bundle": output / "evidence.zip", "replay_report": output / "replay-report.json",
-            "replay_html": output / "replay-report.html"}.items() if path.is_file()}
+            "report": report_path,
+            "bundle": output / "evidence.zip", "replay_report": output / "replay-report.json"}.items() if path.is_file()}
         if not summary["accepted"]:
             summary["problems"].append("one or more execution, evidence, replay or acceptance contracts were not met")
     except Exception as exc:

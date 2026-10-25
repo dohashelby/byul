@@ -2,42 +2,145 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.byul.invalid/0.1/revalidation-request.schema.json",
   "title": "재검증 요청 (runtime → platform → update)",
-  "description": "runtime-revalidation-request/1.0을 공통 형식으로 감싼 것. runtime이 자산·정책·구성 변화를 보면 연다. 자동으로 시험을 돌리거나 승인하지 않는다. 플랫폼에서 사람이 보고 update의 증분 감사(U1)를 시작한다.",
+  "description": "runtime-revalidation-request/1.0을 공통 형식으로 감싼 것. runtime이 자산·정책·구성 변화를 보면 연다. 자동으로 시험을 돌리거나 승인하지 않는다. 플랫폼에서 사람이 보고 update의 증분 감사(U1)를 시작한다. 0.2부터 runtime 화면의 재검증 표 항목(처음 열린 시각, 현재 근거 존재)을 담는다.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "revalidation_id", "fingerprint", "event", "created_at", "trigger", "target_ref", "policy_ref", "changed_fields", "evaluation_refs", "evidence_refs", "superseded_by", "status", "data_origin"],
+  "required": [
+    "schema_version",
+    "revalidation_id",
+    "fingerprint",
+    "event",
+    "created_at",
+    "trigger",
+    "target_ref",
+    "policy_ref",
+    "changed_fields",
+    "evaluation_refs",
+    "evidence_refs",
+    "superseded_by",
+    "status",
+    "data_origin",
+    "opened_at",
+    "current_evidence_present"
+  ],
   "properties": {
-    "schema_version": { "const": "byul-revalidation-request/0.1" },
-    "revalidation_id": { "type": "string", "minLength": 1, "maxLength": 128 },
-    "fingerprint": { "$ref": "common.schema.json#/$defs/sha256" },
-    "event": { "enum": ["opened", "condition_cleared", "condition_reappeared", "superseded"] },
-    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
-    "trigger": { "enum": ["asset_changed", "policy_content_changed", "config_drift"] },
-    "target_ref": { "oneOf": [{ "$ref": "common.schema.json#/$defs/local_id" }, { "type": "null" }] },
-    "policy_ref": { "$ref": "common.schema.json#/$defs/nullable_policy_ref" },
+    "schema_version": {
+      "const": "byul-revalidation-request/0.2"
+    },
+    "revalidation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "fingerprint": {
+      "$ref": "common.schema.json#/$defs/sha256"
+    },
+    "event": {
+      "enum": [
+        "opened",
+        "condition_cleared",
+        "condition_reappeared",
+        "superseded"
+      ]
+    },
+    "created_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "trigger": {
+      "enum": [
+        "asset_changed",
+        "policy_content_changed",
+        "config_drift"
+      ]
+    },
+    "target_ref": {
+      "oneOf": [
+        {
+          "$ref": "common.schema.json#/$defs/local_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "policy_ref": {
+      "$ref": "common.schema.json#/$defs/nullable_policy_ref"
+    },
     "changed_fields": {
       "description": "바뀐 항목. 자산은 경로·해시, drift는 필드와 기대/관측 scalar만 둔다. 파일 내용은 넣지 않는다.",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["field", "expected", "observed"],
+        "required": [
+          "field",
+          "expected",
+          "observed"
+        ],
         "properties": {
-          "field": { "type": "string" },
-          "expected": { "type": ["string", "number", "boolean", "null"] },
-          "observed": { "type": ["string", "number", "boolean", "null"] }
+          "field": {
+            "type": "string"
+          },
+          "expected": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "observed": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
         }
       }
     },
     "evaluation_refs": {
       "description": "다시 시험할 점검 ID 제안. runtime이 모르면 빈 배열이고, 선정은 update가 한다.",
       "type": "array",
-      "items": { "$ref": "common.schema.json#/$defs/check_id" }
+      "items": {
+        "$ref": "common.schema.json#/$defs/check_id"
+      }
     },
-    "evidence_refs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/evidence_ref" } },
-    "superseded_by": { "type": ["string", "null"] },
-    "status": { "enum": ["open", "closed"] },
-    "data_origin": { "$ref": "common.schema.json#/$defs/data_origin" },
-    "origin_detail": { "$ref": "common.schema.json#/$defs/origin_detail" }
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "common.schema.json#/$defs/evidence_ref"
+      }
+    },
+    "superseded_by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "data_origin": {
+      "$ref": "common.schema.json#/$defs/data_origin"
+    },
+    "origin_detail": {
+      "$ref": "common.schema.json#/$defs/origin_detail"
+    },
+    "opened_at": {
+      "description": "이 재검증 요청이 처음 열린 시각. created_at은 마지막 사건 시각.",
+      "$ref": "common.schema.json#/$defs/nullable_timestamp"
+    },
+    "current_evidence_present": {
+      "description": "지금도 근거 조건이 남아 있는지. 해소·대체되면 false(대체는 해소가 아님).",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    }
   }
 }

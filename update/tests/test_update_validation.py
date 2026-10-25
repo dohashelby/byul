@@ -189,7 +189,6 @@ def fake_execution(tmp_path, monkeypatch, *, update_code=0, timeout=False, repla
             folder = output / "updates" / "UPDATE-EXAMPLE"
             folder.mkdir(parents=True)
             (folder / "report.json").write_text(json.dumps(report), encoding="utf-8")
-            (folder / "report.html").write_text("EXAMPLE", encoding="utf-8")
             (output / "store").mkdir()
             (output / "store" / "marker").write_text("EXAMPLE", encoding="utf-8")
         if label == "export":
@@ -198,7 +197,6 @@ def fake_execution(tmp_path, monkeypatch, *, update_code=0, timeout=False, repla
             (output / ("restored" if label == "restore" else "replay-store")).mkdir()
         if label == "report-restored":
             (output / "replay-report.json").write_text(json.dumps(report), encoding="utf-8")
-            (output / "replay-report.html").write_text("EXAMPLE", encoding="utf-8")
         return {"command": label, "returncode": update_code if label == "update" else 0,
                 "timed_out": label == "update" and timeout}, json.dumps(readiness()) if label == "prepare-update" else ""
     monkeypatch.setattr(harness, "_command", command)
@@ -329,18 +327,13 @@ def test_target_proof_rejects_source_identity_mismatch(tmp_path, monkeypatch):
         harness._target_proof(source, report_path)
 
 
-@pytest.mark.parametrize("missing", [False, True])
-def test_json_html_pair_requires_matching_content(tmp_path, monkeypatch, missing):
+def test_report_pair_reads_json_only(tmp_path):
+    # HTML 보고서는 없앴다(화면은 byul platform). JSON 보고서만 읽고, 없으면 실패한다.
     path = tmp_path / "report.json"
-    path.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(harness, "render_html", lambda data: "expected HTML")
-    if missing:
-        with pytest.raises(FileNotFoundError):
-            harness._report_pair(path)
-    else:
-        path.with_suffix(".html").write_text("changed HTML", encoding="utf-8")
-        with pytest.raises(ValueError, match="HTML differs"):
-            harness._report_pair(path)
+    with pytest.raises(FileNotFoundError):
+        harness._report_pair(path)
+    path.write_text('{"kind": "RPT"}', encoding="utf-8")
+    assert harness._report_pair(path) == {"kind": "RPT"}
 
 
 def graph_fixture(monkeypatch, source, *, restored=None, replay=None, replay_rows=None):
@@ -404,7 +397,6 @@ def test_full_synthetic_cli_preservation_replay_and_read_only_analysis(tmp_path,
             folder = output / "updates" / "UPDATE-SYNTHETIC-NO-ENGINE"
             folder.mkdir(parents=True)
             (folder / "report.json").write_text(json.dumps(report), encoding="utf-8")
-            (folder / "report.html").write_text(harness.render_html(report), encoding="utf-8")
             envs = [obj for obj in objects if obj["kind"] == "ENV"]
             for side, env in zip(("baseline", "candidate"), envs):
                 (folder / side).mkdir()

@@ -383,6 +383,29 @@ class LabReportTests(unittest.TestCase):
             self.assertEqual(payload["report"]["run_id"], "second")
             self.assertNotIn("commands", payload["report"]["cases"][0])
 
+    def test_task_check_cases_are_optional_but_unknown_ids_are_rejected(self) -> None:
+        def task_case(case_id: str) -> dict[str, object]:
+            return {"id": case_id, "title": case_id, "status": "passed", "summary": "ok", "evidence": []}
+
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "report.json"
+            # --task-checks adds L-07/L-08; the dashboard must still read it.
+            document = lab_report("task-checks")
+            document["cases"] += [task_case("L-07"), task_case("L-08")]
+            path.write_text(json.dumps(document), encoding="utf-8")
+            payload = LabReportSource(path).read()
+            self.assertEqual(payload["state"], "ok")
+            self.assertEqual([item["id"] for item in payload["report"]["cases"]][-2:], ["L-07", "L-08"])
+            for bad_cases in (
+                lab_report("x")["cases"] + [task_case("L-09")],
+                lab_report("x")["cases"] + [task_case("L-07"), task_case("L-07")],
+                lab_report("x")["cases"][:5] + [task_case("L-07")],
+            ):
+                with self.subTest(ids=[item["id"] for item in bad_cases]):
+                    document["cases"] = bad_cases
+                    path.write_text(json.dumps(document), encoding="utf-8")
+                    self.assertEqual(LabReportSource(path).read()["state"], "error")
+
 
 class CiliumCollectorTests(unittest.TestCase):
     def test_fixed_commands_and_safe_object_view(self) -> None:

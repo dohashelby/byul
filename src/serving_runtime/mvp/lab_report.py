@@ -11,6 +11,8 @@ from .mock_engine import _utc_now
 
 REPORT_SCHEMA = "serving-runtime-k8s-lab-report/1.0"
 CASE_IDS = tuple(f"L-{index:02d}" for index in range(1, 7))
+# Present only when the checker ran with --task-checks (SP4/SP1).
+OPTIONAL_CASE_IDS = ("L-07", "L-08")
 
 
 class LabReportSource:
@@ -91,8 +93,8 @@ class LabReportSource:
             if not isinstance(raw_case, dict):
                 raise ValueError("lab report case must be an object")
             case_id = raw_case.get("id")
-            if case_id not in CASE_IDS or case_id in seen:
-                raise ValueError("lab report case IDs must be unique L-01 through L-06")
+            if case_id not in CASE_IDS + OPTIONAL_CASE_IDS or case_id in seen:
+                raise ValueError("lab report case IDs must be unique L-01 through L-08")
             seen.add(case_id)
             status = raw_case.get("status")
             title = raw_case.get("title")
@@ -121,7 +123,7 @@ class LabReportSource:
                     else None,
                 }
             )
-        if seen != set(CASE_IDS):
+        if not set(CASE_IDS) <= seen:
             raise ValueError("lab report must contain L-01 through L-06")
         cases.sort(key=lambda item: item["id"])
         return {

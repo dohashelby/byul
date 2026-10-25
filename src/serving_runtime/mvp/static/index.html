@@ -32,8 +32,18 @@
     <button type="button" id="auth-clear">지우기</button>
   </div>
 
+  <div class="layout">
+  <nav class="sidebar" aria-label="화면 영역">
+    <button type="button" class="nav-item" data-view="overview"><span class="nav-label">현황</span><span class="nav-badge" id="nav-badge-overview" hidden></span><span class="nav-env" id="nav-env-overview">전체 요약</span></button>
+    <button type="button" class="nav-item" data-view="requests"><span class="nav-label">요청</span><span class="nav-badge" id="nav-badge-requests" hidden></span><span class="nav-env" id="nav-env-requests">Gateway·엔진</span></button>
+    <button type="button" class="nav-item" data-view="policy"><span class="nav-label">정책</span><span class="nav-badge" id="nav-badge-policy" hidden></span><span class="nav-env" id="nav-env-policy">Gateway 요청 규칙</span></button>
+    <button type="button" class="nav-item" data-view="target"><span class="nav-label">대상·구성</span><span class="nav-badge" id="nav-badge-target" hidden></span><span class="nav-env" id="nav-env-target">Gateway·엔진</span></button>
+    <button type="button" class="nav-item" data-view="observe"><span class="nav-label">관측</span><span class="nav-badge" id="nav-badge-observe" hidden></span><span class="nav-env" id="nav-env-observe">수집원·Hubble·Tetragon</span></button>
+    <button type="button" class="nav-item" data-view="enforce"><span class="nav-label">통제 적용</span><span class="nav-badge" id="nav-badge-enforce" hidden></span><span class="nav-env" id="nav-env-enforce">Cilium·lab 시험</span></button>
+  </nav>
+
   <main class="page">
-    <section aria-labelledby="overview-title">
+    <section class="view" data-view="overview" aria-labelledby="overview-title">
       <div class="section-head">
         <h2 id="overview-title">현황</h2>
         <span id="session-id" class="muted mono"></span>
@@ -85,31 +95,15 @@
       </div>
     </section>
 
-    <section aria-labelledby="policy-state-title">
+    <section class="view" data-view="policy" aria-labelledby="policy-state-title">
       <div class="section-head">
         <h2 id="policy-state-title">정책·기준 상태</h2>
       </div>
+      <p class="notice">이 화면의 정책은 Gateway가 추론 요청을 허용·거부하는 규칙입니다. Cilium·Tetragon 정책은 「통제 적용」에서 따로 봅니다.</p>
       <div class="state-badges" id="policy-state-badges"></div>
-      <div class="state-grid">
-        <article class="card table-card state-card">
+      <article class="card table-card state-card">
           <h3>유효성 항목</h3>
           <table class="status-table"><thead><tr><th>항목</th><th>상태</th><th>결과</th></tr></thead><tbody id="validity-rows"></tbody></table>
-        </article>
-        <article class="card table-card state-card">
-          <h3>수집원</h3>
-          <table class="status-table"><thead><tr><th>수집원</th><th>상태</th><th>최근 성공</th><th>오류</th><th>출처</th></tr></thead><tbody id="collector-rows"></tbody></table>
-        </article>
-      </div>
-      <p id="model-id-limit" class="notice"></p>
-      <article class="card table-card state-card">
-        <h3>기준 비교</h3>
-        <table class="status-table"><thead><tr><th>필드</th><th>기준</th><th>현재</th><th>출처</th><th>관측 시각</th><th>상태</th></tr></thead><tbody id="baseline-rows"></tbody></table>
-      </article>
-      <article class="card table-card state-card">
-        <h3>대상 등록 <span id="target-state" class="muted"></span></h3>
-        <p id="target-hold" class="revalidation-warning" role="alert" hidden></p>
-        <table class="status-table"><thead><tr><th>필드</th><th>등록값</th><th>현재</th><th>출처</th><th>상태</th></tr></thead><tbody id="target-rows"></tbody></table>
-        <p id="target-instance" class="notice"></p>
       </article>
       <article class="card table-card state-card">
         <h3>정책 이력 <span id="history-store-state" class="muted"></span></h3>
@@ -117,9 +111,23 @@
       </article>
     </section>
 
-    <section aria-labelledby="revalidation-title">
+    <section class="view" data-view="target" aria-labelledby="target-title">
       <div class="section-head">
-        <h2 id="revalidation-title">재검증 요청</h2>
+        <h2 id="target-title">대상·구성</h2>
+      </div>
+      <p id="model-id-limit" class="notice"></p>
+      <article class="card table-card state-card">
+        <h3>대상 등록 <span id="target-state" class="muted"></span></h3>
+        <p id="target-hold" class="revalidation-warning" role="alert" hidden></p>
+        <table class="status-table"><thead><tr><th>필드</th><th>등록값</th><th>현재</th><th>출처</th><th>상태</th></tr></thead><tbody id="target-rows"></tbody></table>
+        <p id="target-instance" class="notice"></p>
+      </article>
+      <article class="card table-card state-card">
+        <h3>기준 비교</h3>
+        <table class="status-table"><thead><tr><th>필드</th><th>기준</th><th>현재</th><th>출처</th><th>관측 시각</th><th>상태</th></tr></thead><tbody id="baseline-rows"></tbody></table>
+      </article>
+      <div class="section-head">
+        <h3 id="revalidation-title">재검증 요청</h3>
         <span id="revalidation-state" class="muted"></span>
       </div>
       <div class="card table-card">
@@ -131,15 +139,19 @@
       </div>
     </section>
 
-    <section aria-labelledby="observations-title">
-      <details id="observations-panel" class="section-toggle">
-      <summary class="section-head">
+    <section class="view" data-view="observe" aria-labelledby="observations-title">
+      <div class="section-head">
         <h2 id="observations-title">통신·행위 관측</h2>
         <span class="toggle-meta">
           <span id="observation-summary" class="muted"></span>
           <span id="observation-corrupt" class="muted"></span>
         </span>
-      </summary>
+      </div>
+      <p class="notice">관측 자료의 환경(예: kind lab)은 행마다 표시됩니다. 요청 화면의 엔진과 다른 환경일 수 있습니다.</p>
+      <article class="card table-card state-card">
+          <h3>수집원</h3>
+          <table class="status-table"><thead><tr><th>수집원</th><th>상태</th><th>최근 성공</th><th>오류</th><th>출처</th></tr></thead><tbody id="collector-rows"></tbody></table>
+      </article>
       <div class="observation-grid">
         <article class="card table-card">
           <h3>Hubble 통신</h3>
@@ -153,6 +165,13 @@
         </article>
       </div>
       <p class="notice">Tetragon Override는 차단 시도가 기록됐다는 뜻입니다. 실제 EPERM 결과는 아래 lab L-05 결과와 별도로 확인합니다.</p>
+    </section>
+
+    <section class="view" data-view="enforce" aria-labelledby="enforce-title">
+      <div class="section-head">
+        <h2 id="enforce-title">통제 적용</h2>
+      </div>
+      <p class="notice">정책이 설정됐다는 것과 실제 차단이 확인됐다는 것은 다릅니다. 실제 결과는 lab 시험 결과로 확인합니다.</p>
       <div class="observation-grid observation-state-grid">
         <article class="card table-card">
           <h3>Cilium 정책 적용 상태 <span id="cilium-policy-state" class="muted"></span></h3>
@@ -167,10 +186,9 @@
           <p id="lab-report-empty" class="empty">lab 보고서가 설정되지 않았습니다.</p>
         </article>
       </div>
-      </details>
     </section>
 
-    <section aria-labelledby="requests-title">
+    <section class="view" data-view="requests" aria-labelledby="requests-title">
       <div class="section-head">
         <h2 id="requests-title">요청 목록</h2>
         <div class="filters" role="group" aria-label="결과 필터">
@@ -197,6 +215,7 @@
       </div>
     </section>
   </main>
+  </div>
 
   <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
   <aside id="drawer" class="drawer" aria-labelledby="drawer-title" aria-hidden="true">

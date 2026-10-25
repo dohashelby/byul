@@ -957,6 +957,85 @@ function closeDetail() {
   for (const row of $("request-rows").children) row.classList.remove("is-selected");
 }
 
+const VIEWS = ["overview", "requests", "policy", "target", "observe", "enforce"];
+
+function showView(name, { updateHash = true } = {}) {
+  const view = VIEWS.includes(name) ? name : "overview";
+  for (const section of document.querySelectorAll(".view")) {
+    section.hidden = section.dataset.view !== view;
+  }
+  for (const button of document.querySelectorAll(".nav-item")) {
+    const active = button.dataset.view === view;
+    button.classList.toggle("is-active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  }
+  if (updateHash && location.hash.slice(1) !== view) {
+    history.replaceState(null, "", `#${view}`);
+  }
+  window.scrollTo(0, 0);
+}
+
+function setNavBadge(view, count, title) {
+  const node = $(`nav-badge-${view}`);
+  node.hidden = !count;
+  node.textContent = count ? String(count) : "";
+  node.title = count ? title : "";
+}
+
+function mostCommon(values) {
+  const counts = new Map();
+  for (const value of values) {
+    if (value) counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  let best = null;
+  for (const [value, count] of counts) {
+    if (best === null || count > counts.get(best)) best = value;
+  }
+  return best;
+}
+
+// Alert counts per sidebar area so problems stay visible from any view.
+function renderNav({ status, summary, target, revalidation, collectors, observations, labReport }) {
+  const errors = (summary.counts && summary.counts.ERROR) || 0;
+  setNavBadge("requests", errors, `처리 오류 누적 ${errors}건`);
+
+  const policy = status.policy || {};
+  const approvalState = (policy.approval || {}).state || "not_configured";
+  const policyProblems = (policy.gateway_active ? 0 : 1)
+    + (["not_configured", "verified"].includes(approvalState) ? 0 : 1);
+  setNavBadge("policy", policyProblems, policy.gateway_active ? "정책 승인 확인 경고" : "Gateway 비활성 — 추론 요청 503");
+
+  const targetCounts = (target && target.counts) || {};
+  const registrationError = target && target.registration && target.registration.state === "error" ? 1 : 0;
+  const openRevalidation = (revalidation.requests || []).length;
+  const targetProblems = (targetCounts.mismatch || 0) + registrationError + openRevalidation;
+  setNavBadge("target", targetProblems, `대상 불일치 ${targetCounts.mismatch || 0}건 · 재검증 요청 ${openRevalidation}건`);
+
+  const collectorProblems = (collectors.collectors || []).filter(
+    (item) => !["ok", "disconnected"].includes(item.state)
+      || (item.state === "disconnected" && String(item.source).startsWith("observation_feed")),
+  );
+  setNavBadge("observe", collectorProblems.length, collectorProblems.map((item) => `${item.source}: ${item.state}`).join(" · "));
+
+  const report = labReport.report;
+  const failedCases = report ? (report.cases || []).filter((item) => item.status === "failed").length : 0;
+  const cilium = (collectors.collectors || []).find((item) => item.source === "cilium_policy");
+  const enforceProblems = failedCases + (cilium && cilium.state !== "ok" ? 1 : 0)
+    + (["ok", "not_configured"].includes(labReport.state) ? 0 : 1);
+  setNavBadge("enforce", enforceProblems, `lab 실패 ${failedCases}건${cilium && cilium.state !== "ok" ? " · Cilium 상태 조회 문제" : ""}`);
+
+  const total = errors + policyProblems + targetProblems + collectorProblems.length + enforceProblems;
+  setNavBadge("overview", total, "모든 영역의 경고 합계");
+
+  const gatewayEnv = status.environment || "환경 미기록";
+  $("nav-env-requests").textContent = `Gateway·엔진 · ${gatewayEnv}`;
+  $("nav-env-target").textContent = `Gateway·엔진 · ${gatewayEnv}`;
+  const observedEnv = mostCommon((observations.observations || []).map((item) => item.environment));
+  $("nav-env-observe").textContent = observedEnv ? `관측 · ${observedEnv}` : "수집원·Hubble·Tetragon";
+  $("nav-env-enforce").textContent = report ? `Cilium·lab · ${report.context}` : "Cilium·lab 시험";
+}
+
 function setFilter(filter) {
   state.filter = filter;
   for (const button of document.querySelectorAll(".filter")) {
@@ -992,6 +1071,7 @@ async function refresh() {
     renderObservations(observations, collectors);
     renderLabReport(labReport);
     renderCilium(collectors, labReport, observations);
+    renderNav({ status, summary, target, revalidation, collectors, observations, labReport });
     state.lastSuccess = new Date();
     $("auth-form").hidden = true;
     document.body.classList.remove("is-stale");
@@ -1008,21 +1088,17 @@ async function refresh() {
 }
 
 for (const button of document.querySelectorAll("[data-filter]")) {
-  button.addEventListener("click", () => setFilter(button.dataset.filter));
+  button.addEventListener("click", () => {
+    // The overview counters jump to the request list with that filter.
+    if (button.classList.contains("stat")) showView("requests");
+    setFilter(button.dataset.filter);
+  });
 }
-const observationsPanel = $("observations-panel");
-try {
-  observationsPanel.open = localStorage.getItem("observations-panel-open") === "1";
-} catch (_) {
-  // Storage can be unavailable; the panel stays collapsed.
+for (const button of document.querySelectorAll(".nav-item")) {
+  button.addEventListener("click", () => showView(button.dataset.view));
 }
-observationsPanel.addEventListener("toggle", () => {
-  try {
-    localStorage.setItem("observations-panel-open", observationsPanel.open ? "1" : "0");
-  } catch (_) {
-    // Ignore storage failures; the toggle still works for this page view.
-  }
-});
+window.addEventListener("hashchange", () => showView(location.hash.slice(1), { updateHash: false }));
+showView(location.hash.slice(1), { updateHash: false });
 function applyToken() {
   try {
     sessionStorage.setItem(TOKEN_KEY, $("auth-token").value.trim());

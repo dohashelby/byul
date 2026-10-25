@@ -1,0 +1,41 @@
+# 관측 전용 부분 연결. 독립적인 실제 파일 소비 근거가 없어 자동 PASS/FAIL은 만들지 않는다.
+applies_when: { always: true }
+collection_profile: fixed-template-supply-v1
+policy_params:
+  - { key: allowed_template_sha256, type: "list[str]", required: true }
+required_observations:
+  - { key: selected_template_sha256, type: str }
+  - { key: template_identity_verified, type: bool }
+  - { key: selected_template_approved, type: bool }
+  - { key: input_projection_exact_match, type: bool }
+  - { key: template_consumer_verified, type: bool }
+  - { key: supply_scope_complete, type: bool }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, outcome]" }
+executor: template_validation
+judge:
+  plugin: rule_table
+  params:
+    declared_pass_ceiling: true
+    pass_when_all: []
+    fail_when_any: []
+    axes:
+      functional:
+        pass_when_all: []
+        fail_when_any: []
+functional_probes:
+  - method: POST
+    path: /v1/chat/completions
+    body:
+      model: '{model}'
+      messages: [{ role: user, content: guard template control }]
+      max_tokens: 1
+    expect: [200]
+    via: engine
+limitations:
+  - "fixed-template-supply-v1은 관리 고정 template의 현재 bytes·소유권·readonly·기동 argv·전후 instance와 API 입력 projection만 수집하는 관측 전용 부분 연결이다. 전체 공급물 보안·기능 PASS/FAIL 판정 연결 완료가 아니다."
+  - "allowed_template_sha256는 SUP-03에 독립 입력하는 승인 해시 목록이다. 빈 목록은 명시적인 승인 template 없음이며 REQ-07·관측·ENV에서 보충하지 않는다. 승인 일치/불일치는 관측이고 승인 주체 인증이나 실제 소비의 증명이 아니다."
+  - "정확한 /tokenize tokens와 추론 prompt_token_ids 일치는 동일 엔진이 보고한 API 입력 projection이다. worker 파일 open·기동 시 loaded bytes·template cache·전체 하위 공급물 소비를 독립 계측하지 못하므로 비승인 파일이 mount되어도 실제 소비 FAIL을 확정하지 않는다."
+  - "원문의 실제 읽기 inventory·승인 제외 시험 묶음·새 기동 선택/소비/차단 challenge는 미실행이다. 정상 chat 표본 관측이 pass여도 전체 기능 PASS는 만들지 않는다. 독립적인 loader/worker 소비 수집원 연결은 후속 과제다."
+  - "기존 REQ-07 수동 bounded 정책 계약은 SUP-03 수동 PASS를 지원하지 않는다. 수동 PASS는 보류되고 AUTOMATION_MANUAL_POLICY_UNRESOLVED 사유가 남으며 신고 FAIL/UNKNOWN은 보존한다. 불필요한 REQ-07 정책키를 SUP-03에 추가하지 않는다."
+  - "검토된 fixed text-chat profile과 full pinned ENV/target 이미지·일치한 모델만 지원한다. bare SHA ENV나 미지원 template·image/model 충돌·identity 변화·token 개수만 일치·수집 실패는 UNKNOWN이다. 응답·토큰 원문과 host mount 경로는 증거 artifact에 저장하지 않는다."

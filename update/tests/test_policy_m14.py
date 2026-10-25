@@ -37,28 +37,28 @@ def result(check, evd, vals):
 
 def test_registration_catalog_empty_template_and_no_new_executor(pack):
     check = pack.checks["REQ-15"]
-    assert (pack.manifest.revision, check.revision) == (24, 3) and not pack.reviewed
+    assert (pack.manifest.revision, check.revision) == (25, 3) and not pack.reviewed
     assert [(p.key, p.type, p.required) for p in check.policy_params] == [
         (k, t, True) for k, t in cache.POLICIES.items()]
     assert [(o.key, o.type) for o in check.required_observations] == [(cache.OBSERVATION, "dict")]
     assert check.executor is check.judge is None and len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 23
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 51
-    assert sum(bool(c.executor) for c in pack.active_checks()) == 12
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 24
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 52
+    assert sum(bool(c.executor) for c in pack.active_checks()) == 13
     assert not pack.checks["REQ-17"].policy_params
     text = build_policy_template(pack)
     doc = yaml.safe_load(text)
     assert doc["values"]["REQ-15"] == {} and doc["scope"] == {"include": [], "exclude": []}
     assert doc["status"] == "DRAFT" and doc["confirmed_by"] is None
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
-    assert len(rows) == 324 and sum(len(json.loads(r["check_ids"])) for r in rows) == 616
+    assert len(rows) == 325 and sum(len(json.loads(r["check_ids"])) for r in rows) == 617
     for suffix, key in (("PUBLIC-PREFIX", "public_prefix_sharing_allowed"), ("GROUP", "isolated_cache_groups"),
                         ("SALT", "cache_identity_policy_ref")):
         row = next(r for r in rows if r["proposed_policy_id"] == f"P-DRAFT-CACHE-{suffix}")
         assert row["classification"] == "a"
         assert json.loads(row["check_ids"]) == ["REQ-15", "REQ-16", "REQ-17"]
         assert json.loads(row["current_param_paths"]) == [f"values.REQ-15.{key}"]
-    assert {k: sum(r["classification"] == k for r in rows) for k in "abcd"} == dict(a=48, b=2, c=161, d=113)
+    assert {k: sum(r["classification"] == k for r in rows) for k in "abcd"} == dict(a=49, b=2, c=161, d=113)
 
 
 @pytest.mark.parametrize("key,bad", [("public_prefix_sharing_allowed", v) for v in (None, 0, "false", [])]
@@ -66,7 +66,7 @@ def test_registration_catalog_empty_template_and_no_new_executor(pack):
     + [("cache_identity_policy_ref", v) for v in (None, False, [])])
 def test_g01_select_rejects_wrong_type_even_when_outside_scope(pack, key, bad):
     vals = policy_values(); vals[key] = bad
-    pol = policy(pack.ref(), scope={"include": ["SUP-03"]}, values={"REQ-15": vals})
+    pol = policy(pack.ref(), scope={"include": ["SUP-05"]}, values={"REQ-15": vals})
     with pytest.raises(PolicyValueError, match="REQ-15"):
         select(pack, [environment()], pol)
 
@@ -172,7 +172,7 @@ def test_g18_old_definitions_are_legacy_and_partial_markers_are_blocked(pack, ki
     elif kind == "observation_partial": check.required_observations = []
     elif kind == "wrong_type": check.required_observations[0].type = "str"
     elif kind == "optional": check.policy_params[0].required = False
-    else: check = pack.checks["SUP-03"]
+    else: check = pack.checks["SUP-05"]
     evd, vals = unit(check)
     got = result(check, evd, vals)
     assert all(v == ("PASS" if kind in ("legacy", "other") else "UNKNOWN") for v in got.verdicts.values())

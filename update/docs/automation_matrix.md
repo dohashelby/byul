@@ -1,6 +1,6 @@
 # 77행 자동화 분류표 (요약)
 
-> 2026-10-26 후속: 팩24/DRAFT·정책23점검/51경로·자동 연결12점검이다. SUP-04는 기존 container_config의 실행 이미지 승인 부분관측이며 전체 공급물 PASS를 만들지 않는다. 실제 vLLM 실증은 사용자 요청으로 보류한다. 아래 과거 분류·실측 기록은 소급하지 않는다. [계약](SUPPLY_IMAGE_APPROVAL.md)·[77개 추적](CHECKLIST_VALIDATION_STATUS.md)을 따른다.
+> 2026-10-26 후속: 팩25/DRAFT·정책24점검/52경로·실행/보안 판정 규칙 연결12점검·관측 전용1점검이다. SUP-04는 실행 이미지 승인 부분관측, SUP-03은 readonly template 신원·승인 membership·API projection 관측 전용이며 승인 일치/불일치 모두 보안 UNKNOWN이다. 기존 실행기11종을 재사용한다. 실제 vLLM 실증은 사용자 결정으로 보류하며 아래 과거 기록은 소급하지 않는다. [공급물 관측 한계](AUTOMATION_HARDENING.md)·[77개 추적](CHECKLIST_VALIDATION_STATUS.md)을 따른다.
 
 > U1 원문 동기화: PACK-BASELINE 23/DRAFT·REQ-09 revision 7·PLT-04 revision 4이며 자동 연결 11개·정책 22점검/50경로와 A/B/C 분류는 유지한다. 승인한 원본 `729216b1`의 77행 질문·framework_id·mechanism_ids와 변경 선정 데이터를 반영해 CheckDef revision이 각각 1씩 증가했다. CSV는 질문만 동기화하며 기존 실측·남은 범위·근거를 보존한다. 팩23으로 새 실제 엔진 시험을 했다는 뜻이 아니며 U1 구현·검증 범위는 [변경 유형별 시험 선정](UPDATE_SELECTION.md)을 따른다.
 

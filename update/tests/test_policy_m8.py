@@ -35,11 +35,11 @@ def given(cid, value):
 
 
 def test_declarations_catalog_and_blank_template_are_not_execution(pack):
-    assert pack.manifest.revision == 24 and not pack.reviewed
+    assert pack.manifest.revision == 25 and not pack.reviewed
     assert len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 23
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 51
-    assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09", "SUP-04"}
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 24
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 52
+    assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09", "SUP-04", "SUP-03"}
     for cid, (key, _) in FLAGS.items():
         check = pack.checks[cid]
         assert check.revision == 3 and check.executor is None and check.judge is None
@@ -51,8 +51,8 @@ def test_declarations_catalog_and_blank_template_are_not_execution(pack):
     assert template["status"] == "DRAFT" and template["data_origin"] == "DECLARED"
     assert template["scope"] == {"include": [], "exclude": []}
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
-    assert len(rows) == 324 and sum(len(json.loads(r["check_ids"])) for r in rows) == 616
-    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=48, b=2, c=161, d=113)
+    assert len(rows) == 325 and sum(len(json.loads(r["check_ids"])) for r in rows) == 617
+    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=49, b=2, c=161, d=113)
     for pid, checks in (("P-DRAFT-USAGE-ALLOW", ("OBS-04", "OBS-05")), ("P-DRAFT-REPLAY-ALLOW", ("OBS-07", "OBS-08"))):
         row = next(r for r in rows if r["proposed_policy_id"] == pid)
         assert row["classification"] == "a" and row["proposed_shape"] == "bool"
@@ -62,7 +62,7 @@ def test_declarations_catalog_and_blank_template_are_not_execution(pack):
 @pytest.mark.parametrize("cid", FLAGS)
 @pytest.mark.parametrize("bad", [None, 0, 1, "true", "false", [], {}, 1.0])
 def test_flags_reject_coercion_even_outside_scope(pack, cid, bad):
-    pol = policy(pack.ref(), scope={"include": ["SUP-03"]}, values={cid: given(cid, bad)})
+    pol = policy(pack.ref(), scope={"include": ["SUP-05"]}, values={cid: given(cid, bad)})
     with pytest.raises(PolicyValueError, match=cid):
         select(pack, [environment()], pol)
 
@@ -96,7 +96,7 @@ def test_policy_flag_does_not_change_environment_applicability_or_scope(pack, ci
     item = plan.item(cid)
     assert item.selected and item.applicability == "UNDETERMINED"
     assert item.gaps == ["NO_EXECUTOR"] and not item.conditions
-    assert not plan.item("SUP-03").selected
+    assert not plan.item("SUP-05").selected
     assert env.to_dict() == before and not env.facts
     absent = select(pack, [env], policy(pack.ref(), scope={"include": [cid]}, values={}))
     assert "NO_POLICY_VALUE" in absent.item(cid).gaps
@@ -128,7 +128,7 @@ def test_flags_are_independent_and_never_copied_or_used_as_evidence(pack):
     plan = select(pack, [environment()], pol)
     assert "NO_POLICY_VALUE" not in plan.item("OBS-04").gaps
     assert all("NO_POLICY_VALUE" in plan.item(cid).gaps for cid in FLAGS if cid != "OBS-04")
-    check = pack.checks["SUP-03"]
+    check = pack.checks["SUP-05"]
     result = DeclaredJudge().judge(check, _manual_evidence(check, dict.fromkeys(AXES, "PASS")), {}, given("OBS-04", False))
     assert all(v == "PASS" for v in result.verdicts.values())
     assert not any(r.startswith("POLICY_CONTEXT:") for r in result.reasons)

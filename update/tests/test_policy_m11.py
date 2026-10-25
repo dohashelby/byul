@@ -82,7 +82,7 @@ def test_unavailable_rule_table_never_erases_declared_fail(pack, monkeypatch, is
 
 @pytest.mark.parametrize("kind", ["legacy", "partial", "other"])
 def test_no_evaluation_for_legacy_partial_or_other_checks(pack, monkeypatch, kind):
-    c = pack.checks["SUP-03" if kind == "other" else "REQ-09"].model_copy(deep=True)
+    c = pack.checks["SUP-05" if kind == "other" else "REQ-09"].model_copy(deep=True)
     if kind == "legacy":
         c.policy_params = [p for p in c.policy_params if p.key not in POLICIES]
         c.required_observations = [o for o in c.required_observations if o.key not in OBSERVATIONS]

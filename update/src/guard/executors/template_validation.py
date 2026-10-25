@@ -18,6 +18,7 @@ from .content_common import (append_artifact, content_request, control_state, js
                              record_content, sample_artifact)
 from .http_common import HttpCheckExecutor
 from .engine_identity import owned_template_snapshot
+from . import template_supply_approval
 
 
 PROFILE = "fixed-template-input-v1"
@@ -41,7 +42,7 @@ def _token_ids(value, maximum):
 
 class TemplateValidationExecutor(HttpCheckExecutor):
     name = "template_validation"
-    version = "0.1.0"
+    version = "0.2.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -58,6 +59,9 @@ class TemplateValidationExecutor(HttpCheckExecutor):
         return owned_template_snapshot(self.docker, ctx, identity, argv, deadline, monotonic=time.monotonic)
 
     def validate_policy(self, check, values):
+        if getattr(check, "collection_profile", None) == template_supply_approval.PROFILE:
+            template_supply_approval.validate_policy(check, values, self.cfg)
+            return
         validate_template_policy(values)
         limits = {"max_output_tokens": 32, "max_total_requests": 64, "max_probe_tokens": 4096,
                   "max_total_probe_tokens": 65536, "max_input_bytes": 4096, "max_duration_seconds": 300}
@@ -93,6 +97,8 @@ class TemplateValidationExecutor(HttpCheckExecutor):
         return append_artifact(super()._finish(ctx), ctx, "template_samples.json", f"{self.name}/{self.version}")
 
     def collect(self, ctx):
+        if getattr(ctx.check, "collection_profile", None) == template_supply_approval.PROFILE:
+            return template_supply_approval.collect(self, ctx)
         self.validate_policy(ctx.check, ctx.policy_values)
         settings = {key: self.cfg.get(key, value) for key, value in DEFAULTS.items()}
         values = ctx.policy_values

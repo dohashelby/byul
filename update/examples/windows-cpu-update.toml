@@ -1,0 +1,97 @@
+# Windows + Docker Desktop Linux/WSL2, two local prepared CPU images.
+# Replace models_dir with the existing pinned snapshot. Do not download here.
+# Both real ENV inputs must declare their actual versions and distinct digests.
+# No candidate digest/version is fabricated by this example.
+# Keep CPU/model/security/resource/probe profiles identical across both sides.
+# Resource limits are ceilings, not proof of available memory or fit.
+store = '.guard-windows-cpu-update'
+
+[adapter]
+name = 'vllm'
+
+[executors]
+direct_route = 'real'
+role_route = 'real'
+container_config = 'real'
+credential_exposure = 'real'
+input_validation = 'real'
+
+[update]
+mode = 'managed'
+topology = 'isolated'
+gateway_profile = 'role_enforced'
+engine_profile = 'hardened'
+credential_canary = false
+
+[vllm]
+launch_profile = 'cpu-bounded'
+model_layout = 'snapshot'
+models_dir = 'C:\guard-models\opt-125m-snapshot'
+dtype = 'float32'
+max_model_len = 128
+max_num_seqs = 1
+max_num_batched_tokens = 128
+kv_cache_memory_bytes = 67108864
+enforce_eager = true
+cpu_threads = 2
+ready_timeout = 600
+# One startup generation, never a retry of a failed check or its normal control.
+generation_readiness_timeout = 180
+
+[vllm.resources]
+cpus = 2
+memory_bytes = 4294967296
+memory_swap_bytes = 5368709120
+shm_bytes = 536870912
+pids_limit = 256
+
+[direct_route]
+# Reviewed pair's full route union. A newly discovered route outside it aborts.
+# Verify this list against both images; never choose only their intersection.
+comparison_routes = [
+  'GET /v1/models',
+  'GET /v1/responses/{response_id}',
+  'POST /detokenize',
+  'POST /generative_scoring',
+  'POST /invocations',
+  'POST /is_scaling_elastic_ep',
+  'POST /scale_elastic_ep',
+  'POST /tokenize',
+  'POST /v1/chat/completions',
+  'POST /v1/chat/completions/batch',
+  'POST /v1/completions',
+  'POST /v1/messages',
+  'POST /v1/messages/count_tokens',
+  'POST /v1/responses',
+  'POST /v1/responses/{response_id}/cancel',
+  'POST /v1/systemone',
+]
+roles = { allowed = 'GUARD_CPU_GENERAL' }
+request_timeout = 30.0
+allow_mutating_routes = false
+
+[role_route]
+comparison_routes = [
+  'GET /kv_event_sources',
+  'GET /load',
+  'GET /metrics',
+  'POST /is_scaling_elastic_ep',
+  'POST /scale_elastic_ep',
+]
+roles = { general = 'GUARD_CPU_GENERAL', admin = 'GUARD_CPU_ADMIN' }
+admin_role = 'admin'
+request_timeout = 30.0
+allow_mutating_routes = false
+
+[container_config]
+sentinel_paths = ['/models', '/']
+request_timeout = 30.0
+
+[credential_exposure]
+request_timeout = 30.0
+
+[input_validation]
+vocab_size = 50272
+vocab_source = 'pinned facebook/opt-125m config.json; verify the actual mounted file'
+max_probe_tokens = 128
+request_timeout = 30.0

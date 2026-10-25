@@ -1,0 +1,45 @@
+id: REQ-08
+revision: 1
+retired: false
+area: REQ
+purpose: 실제 입력의 검사
+secondary_purposes: []
+question: 재사용 token ID 입력도 필요한 검사를 거치는가?
+scope: 도달 조건 확인
+risk_category: 보안 위협 점검
+risk_summary: 재사용 token ID 입력을 제출할 수 있는 호출자가 렌더링·tokenize 검사를 건너뛰어 허용 밖 입력을 실제 모델에 전달할 수 있음.
+review_order: implementation_path_first
+impact: null
+applies_when:
+  prose: 해당 API의 dict/prompt_token_ids가 renderer로 전달됨
+policy_params: []
+policy_prose:
+  policy_to_decide: 허용 입력 경로·검사 요구
+  enterprise_decisions: 허용 endpoint·텍스트/직접 token 등 입력 형식, template override 필요성, 옵션·길이·출력 한도·정상 대조 입력. vocab·버퍼 범위·옵션 필수 관계 등 구현상 제약은 기업 정책으로 완화하지 않는다.
+normal_control: 일반 메시지와 신뢰된 재사용 ID 요청이 각 경로의 필수 검사를 거친다.
+challenge_steps:
+- 활성 재사용 경로 확인
+- 무해 token ID와 메시지가 다른 요청 제출
+- 실제 렌더 생략·검사·소비 경로 확인
+required_observations: []
+required_observations_prose:
+- kv_transfer_params·prompt_token_ids
+- 호출자 허용
+- renderer 분기·최종 token
+satisfied_if: 팀 참조 구성에서는 외부 재사용 token ID 경로가 실제 모델 입력으로 소비되기 전에 차단돼야 한다. 기업이 정책을 변경해 허용하면 우회 분기에도 유효성·정책 검사가 유지돼야 한다. 미도달은 호출 경로 근거로 확인한다.
+fail_criteria: 비허용 재사용 입력이 필수 검사나 신원·문맥 확인을 우회한다.
+unknown_criteria: renderer 분기만 보고 상위 호출자 제한·실제 endpoint 도달을 확인하지 못했다.
+remediation: 입력 경로별 공통 검사 또는 동등한 제한을 적용한다.
+method_and_evidence: 선정 일반/Harmony 경로에서 수용·거부·최종 token과 검사 위치를 비교한다. PD 비활성만으로 제외하지 않는다.
+remaining_setup: 선정 endpoint·Harmony 등 경로별 도달성; PD만으로 적용 여부 판단하지 않음
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C04
+  scenario_ids:
+  - SC-03-02
+  subtest_ids:
+  - Q-C04/SC-03-02
+source:
+  array: request_state_assessment_draft

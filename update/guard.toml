@@ -1,0 +1,63 @@
+# 플러그인 구현 선택 (SPEC §7)
+store = ".guard"
+
+[adapter]
+name = "fake"            # 5단계에서 vllm 어댑터로 바꾼다
+
+[executors]
+# CheckDef.executor 이름 → 구현
+direct_route = "fake"    # "fake" | "real" (real은 [direct_route]의 target 위상에 실제 요청)
+role_route = "fake"      # "fake" | "real" (REQ-03)
+container_config = "fake"  # "fake" | "real" (PLT-01)
+
+[fake]
+# pass | direct_200 | not_attempted | missing_obs | refused_with_positive_control
+# | refused_without_positive_control | partial_routes | direct_200_on_invocations
+scenario = "pass"
+# 점검별 시나리오(없으면 위 scenario). REQ-03: pass | role_open | scale_handler_reached | mutating_untested
+scenarios = { REQ-03 = "pass", PLT-01 = "pass" }   # PLT-01: pass | overprivileged | default_caps | root_user
+
+[direct_route]
+# real 실행기 설정. target.json은 lab/lab.py up()이 만든다(키 없음). 키는 환경변수 이름만 적는다.
+target = ".guard/lab/target.json"
+roles = { allowed = "GUARD_LAB_ALLOWED_KEY" }
+wrong_key_env = "GUARD_LAB_DENIED_KEY"
+request_timeout = 3.0
+allow_mutating_routes = false
+
+[container_config]
+# PLT-01. 대상 컨테이너 이름(없으면 target.engine.container). 읽기 전용 수집(inspect, /proc/*/status)과 sentinel 쓰기 시도
+target = ".guard/lab/target.json"
+# container = "guard-<run>-engine"
+sentinel_paths = ["/models", "/", "/guard-sentinel"]
+request_timeout = 3.0
+
+[role_route]
+# REQ-03. 역할 이름 → 키 환경변수 이름. admin_role의 결과는 증거에만(판정 미사용)
+target = ".guard/lab/target.json"
+roles = { general = "GUARD_LAB_GENERAL_KEY", admin = "GUARD_LAB_ADMIN_KEY" }
+admin_role = "admin"
+wrong_key_env = "GUARD_LAB_DENIED_KEY"
+request_timeout = 3.0
+allow_mutating_routes = false
+
+[judges]
+rule_table = "rule_table"
+
+[vllm]
+# 실제 vLLM 위상(5b). lab/lab.py와 engine 테스트가 읽는다. 엔진 인자는 adapters/vllm.py launch_plan()이 만든다.
+image = "vllm/vllm-openai-cpu@sha256:495c84fe30f3572b83a78100a1e8ba423dbb77fc532ecefebe114e6b77327bd9"  # v0.31.0, arm64 CPU
+expected_version = "0.31.0"
+expected_source_commit = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
+source_commit_observed = "db9527a46"          # 이미지 안 vllm._version.commit_id = "gdb9527a46"
+source_commit_status = "ABBREVIATED_MATCH"    # 9자리 축약 hash만 일치, 40자리 전체는 이미지에서 확인 불가
+model = "facebook/opt-125m"
+revision = "27dcfa74d334bc871f3234de431e71c6eeba5dd6"
+models_dir = "~/guard-models"                 # HF cache. 읽기 전용 마운트
+inventory_sha256 = "d677f3999b13aab7bf9a7d203568ca63bc2d3fdc6a102b5efc2c719fd816ae6e"  # 비교용(INV-09): 마운트한 snapshot 전체, tools/model_inventory.py --scope all, 12 files
+files_read_by_engine_sha256 = "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6"  # 참고용: --scope vllm, 판정·비교에 쓰지 않음
+files_read_by_engine_count = 7
+gpu = false
+cpu_kv_cache_gib = 1
+platform = "CPU, arm64, Docker Desktop on macOS"
+ready_timeout = 600                           # 엔진 로딩 상한(초)

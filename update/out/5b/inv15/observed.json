@@ -1,0 +1,16 @@
+{
+  "status": "ABORTED",
+  "abort_reason": "executor failure: RuntimeError: engine container exited before ready (last /health: refused)",
+  "verdict": {
+    "result": {
+      "kind": "RES",
+      "id": "RES-01M59KWR1AWAPE402CTND3N9CR",
+      "revision": 1,
+      "sha256": "b8fcc9e2981e4b6516fef490e15e104dd1d29a358b31a38ba0c63d51ba155734"
+    },
+    "security": "UNKNOWN",
+    "functional": "UNKNOWN",
+    "performance": "UNKNOWN",
+    "verification_level": null
+  }
+}

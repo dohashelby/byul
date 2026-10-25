@@ -1,0 +1,225 @@
+"""direct_route 실행기: Gateway 우회 직통 요청 시험 (REQ-01). 판정하지 않는다(INV-14).
+
+순서
+1. 신뢰 출발점에서 엔진 /openapi.json → 등록 경로(CheckDef.route_scope의 종류) ∪ Gateway 설정의 알려진 경로
+2. 외부 호출자 → Gateway, CheckDef.functional_probes(역할 키)로 정상 대조
+3. 직통: (출발점·대상, 키) 조합마다 먼저 TCP 연결만. 연결 실패(timeout/refused/unreachable)면 HTTP 없이 모든 등록 경로를
+   그 값으로 기록(basis: tcp_connect, 추론). 연결되면 경로별 HTTP(검증된 안전 프로브 포함). Gateway도 경로별 키 3종.
+4. 결과 분류: 상태코드 | refused | timeout | unreachable | dns_error | error | handler_reached(안전 프로브 기대 응답)
+5. 신뢰 출발점 → 엔진 도달 (양성 대조), 3번 직후. 안전 프로브를 보냈으면 전후 엔진 생존·추론 1회 확인
+6. 요청/응답 요약을 probe_log.jsonl 증거 파일로. 키 값은 마스킹
+
+등록·시험·관측의 경로 키는 "METHOD path"다(같은 URL의 메서드를 따로 시험).
+경로별 대표 직통 결과(direct_outcomes)는 "키 없음"·"잘못된 키"로만 만든다:
+2xx·handler_reached > 그 밖의 코드·dns_error·error > 401/403 > timeout/unreachable > refused.
+허용 키 직통 결과는 direct_allowed_outcomes로 증거 파일에만 남긴다(판정에 쓰지 않음).
+설정은 http_common 참고. 역할: roles = { allowed = "<키 환경변수>" }.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from guard.adapters.base import ProbeRequest, Route
+
+from .http_common import (
+    TCP_BLOCKED,
+    Ctx,
+    HttpCheckExecutor,
+    RequestBatch,
+    RouteSet,
+    add_functional,
+    discover_routes,
+    fixture_of,
+    functional_results,
+    gateway_matrix,
+    probe_templates,
+    representative,
+    safety_check,
+    send_and_record,
+)
+from .http_common import docker_container_probe, mask, outcome_rank  # noqa: F401  (기존 import 경로 호환)
+from .route_fixture import manifest, resolve_routes
+
+DENIED = ("none", "wrong")
+TcpKey = tuple[str, str, str]  # (origin, url, key_label)
+
+
+def tcp_precheck(ctx: Ctx, combos: list[tuple[dict, str]], host_probe) -> dict[TcpKey, dict]:
+    """직통 (대상, 키) 조합마다 TCP 연결만 시도(바이트 미전송)하고 기록한다."""
+    ext = [(t, l) for t, l in combos if t["origin"] == "external"]
+    requests = [{"id": f"tcp|external|{i}|{l}" if ctx.fixed_route_fixture else f"tcp|external|{l}",
+                 "mode": "tcp", "method": "TCP", "url": t["url"]} for i, (t, l) in enumerate(ext)]
+    tcp = ctx.cprobe(ctx.external_net, requests, ctx.timeout) if ext else []
+    if ctx.fixed_route_fixture and (len(tcp) != len(requests)
+            or [r.get("id") for r in tcp] != [r["id"] for r in requests]):
+        raise RuntimeError("fixed route fixture TCP response labels do not match the submitted requests")
+    result: dict[TcpKey, dict] = {(t["origin"], t["url"], l): r for (t, l), r in zip(ext, tcp)}
+    for t, l in combos:
+        if t["origin"] == "host":
+            result[("host", t["url"], l)] = host_probe(
+                {"id": f"tcp|host|{l}", "mode": "tcp", "method": "TCP", "url": t["url"]}, ctx.timeout)
+    for (origin, _, l), res in result.items():
+        ctx.record(origin, "direct-tcp", "*", l, res, basis="tcp_connect")
+    return result
+
+
+def build_direct_requests(ctx: Ctx, batch: RequestBatch, combos: list[tuple[dict, str]], tcp: dict[TcpKey, dict],
+                          routes: dict[str, Route], templates: dict[str, ProbeRequest], host_probe) -> None:
+    """연결 실패 조합은 모든 등록 경로(상태 변경 포함)를 HTTP 없이 추론 기록, 연결된 조합은 경로별 HTTP."""
+    for t, label in combos:
+        tr = tcp[(t["origin"], t["url"], label)]
+        if tr.get("outcome") in TCP_BLOCKED:
+            for path in routes:
+                batch.add_result(("direct", t["origin"], path, label, "tcp_connect"),
+                                 {"outcome": tr["outcome"], "phase": "connect", "method": routes[path].method,
+                                  "detail": f"inferred from TCP connect: {tr.get('detail')}"})
+            continue
+        for path, pr in templates.items():
+            rq = ctx.request(f"direct|{path}|{label}", t["url"], pr, ctx.keys[label])
+            if t["origin"] == "external":
+                batch.add(("direct", "external", path, label, pr.basis), rq)
+            else:
+                batch.add_result(("direct", t["origin"], path, label, pr.basis), host_probe(rq, ctx.timeout))
+
+
+@dataclass
+class DirectAgg:
+    direct_outcomes: dict[str, Any]
+    direct_allowed_outcomes: dict[str, Any]
+    direct_basis: dict[str, dict[str, list[str]]]
+    routes_tested: list[str]
+    gateway_outcomes: dict[str, Any]
+    gateway_denied: dict[str, dict]
+    functional_raw: dict[str, dict]
+
+
+def aggregate_direct(results: list[tuple[tuple, dict, Any]], routes: dict[str, Route],
+                     templates: dict[str, ProbeRequest], combos: list[tuple[dict, str]]) -> DirectAgg:
+    direct_denied: dict[str, list] = {p: [] for p in routes}
+    direct_allowed: dict[str, list] = {p: [] for p in routes}
+    direct_basis: dict[str, dict[str, list[str]]] = {p: {} for p in routes}
+    gateway_allowed: dict[str, Any] = {}
+    gateway_denied: dict[str, dict] = {p: {} for p in templates}
+    func_raw: dict[str, dict] = {}
+    for (via, origin, path, label, basis), res, o in results:
+        if via == "functional":
+            func_raw[path] = res
+        elif via == "direct":
+            (direct_denied if label in DENIED else direct_allowed)[path].append(o)
+            direct_basis[path].setdefault(label, []).append(f"{origin}:{basis}")
+        elif label in DENIED:
+            gateway_denied[path][label] = o
+        else:
+            gateway_allowed[path] = o
+    denied_combos = sum(1 for _, l in combos if l in DENIED)
+    return DirectAgg(
+        direct_outcomes={p: representative(v) for p, v in direct_denied.items() if v},
+        direct_allowed_outcomes={p: representative(v) for p, v in direct_allowed.items() if v},
+        direct_basis=direct_basis,
+        routes_tested=sorted(p for p in routes if denied_combos and len(direct_denied[p]) == denied_combos),
+        gateway_outcomes={p: o for p, o in gateway_allowed.items() if isinstance(o, int)},
+        gateway_denied=gateway_denied,
+        functional_raw=func_raw,
+    )
+
+
+def direct_observations(ctx: Ctx, rs: RouteSet, agg: DirectAgg, probes: dict, templates: dict[str, ProbeRequest],
+                        skipped: dict, tcp: dict[TcpKey, dict], trusted_reachable: bool, combos: list, sent_any: bool,
+                        safety: dict):
+    functional, functional_status, normal = functional_results(probes, agg.functional_raw, ctx.env.model.id)
+    has_direct = bool(ctx.target["direct_targets"])
+    observations = {
+        "routes_registered": {"value": rs.registered if rs.collected else None, "collected": rs.collected},
+        "routes_tested": {"value": agg.routes_tested, "collected": True},
+        "direct_outcomes": {"value": agg.direct_outcomes, "collected": has_direct and bool(agg.direct_outcomes)},
+        "gateway_outcomes": {"value": agg.gateway_outcomes, "collected": bool(agg.gateway_outcomes)},
+        "trusted_origin_reachable": {"value": trusted_reachable, "collected": True},
+        "functional_probes_planned": {"value": list(probes), "collected": True},
+        "functional_probe_results": {"value": functional, "collected": bool(probes)},
+    }
+    tcp_summary = {f"{o}|{l}": r.get("outcome") for (o, _, l), r in tcp.items()}
+    steps = ctx.check.challenge_steps
+    challenges = [
+        {"step": steps[0], "attempted": True,
+         "observations": {"openapi_outcome": rs.openapi_outcome, "routes": rs.registered, "skipped": skipped}},
+        {"step": steps[1], "attempted": bool(combos),
+         "observations": {"direct_outcomes": agg.direct_outcomes, "direct_basis": agg.direct_basis,
+                          "tcp_connect": tcp_summary, "gateway_denied": agg.gateway_denied}},
+        {"step": steps[2], "attempted": sent_any,
+         "observations": {"gateway_outcomes": agg.gateway_outcomes, "trusted_origin_reachable": trusted_reachable,
+                          "safety": safety}},
+    ] if len(steps) == 3 else [{"step": s, "attempted": sent_any} for s in steps]
+    summary = {
+        "routes_registered": rs.registered, "openapi_sha256": rs.openapi_sha256, "skipped_routes": skipped,
+        "direct_outcomes": agg.direct_outcomes, "direct_allowed_outcomes": agg.direct_allowed_outcomes,
+        "gateway_outcomes": agg.gateway_outcomes, "gateway_denied_outcomes": agg.gateway_denied,
+        "trusted_origin_reachable": trusted_reachable,
+        "functional_probe_results": functional, "functional_probe_status": functional_status,
+        "direct_basis": agg.direct_basis, "tcp_connect": tcp_summary,
+        "safe_probes": {p: {"basis": t.basis, "source": t.source, "expected_handler_reached": t.expected_handler_reached}
+                        for p, t in templates.items() if t.basis == "safe_probe"},
+        "safety": safety,
+        "fixture": fixture_of(templates),
+    }
+    return observations, normal, challenges, summary
+
+
+class DirectRouteExecutor(HttpCheckExecutor):
+    name = "direct_route"
+    version = "0.6.0"
+    fixed_fixture_version = "0.7.0"
+
+    def validate_policy(self, check, policy_values: dict) -> None:
+        """설정의 역할(허용 주체로 취급해 direct_allowed_outcomes에만 남김)은 모두 정책 allowed_callers에 있어야 한다.
+        키 없음·잘못된 키(none·wrong)는 항상 비허용 주체이며 허용 주체 목록에 올 수 없다."""
+        key = self.cfg.get("principals_policy", "allowed_callers")
+        allowed = policy_values.get(key)
+        if not isinstance(allowed, list):
+            raise RuntimeError(f"{check.id}: policy {key} is missing (cannot map executor roles to principals)")
+        anonymous = sorted(set(allowed) & set(DENIED))
+        if anonymous:
+            raise RuntimeError(f"{check.id}: policy {key} lists anonymous roles {anonymous} as allowed principals")
+        unknown = sorted(set(self.roles()) - set(allowed))
+        if unknown:
+            raise RuntimeError(f"{check.id}: executor roles {unknown} are not in policy {key} {sorted(allowed)}; "
+                               "refusing to treat them as allowed principals")
+
+    def collect(self, ctx: Ctx):
+        configured = self.cfg.get("comparison_routes")
+        rs = resolve_routes(ctx, discover_routes(ctx), configured)
+        ctx.fixed_route_fixture = configured is not None
+        templates, skipped = probe_templates(ctx, rs.routes)
+        labels = [*DENIED, *[r for r in ctx.keys if r not in DENIED]]
+        if ctx.fixed_route_fixture:
+            ctx.route_fixture_inputs = manifest(ctx, rs, templates, skipped, roles=labels, mode="direct")
+        safe_sent = any(t.basis == "safe_probe" for t in templates.values())
+        safety = {"before": safety_check(ctx, "before") if safe_sent else None, "after": None}
+
+        combos = [(t, label) for t in ctx.target["direct_targets"] for label in labels]
+        tcp = tcp_precheck(ctx, combos, self._host_probe)
+        batch = RequestBatch(network=ctx.external_net)
+        probes = add_functional(ctx, batch)
+        gateway_matrix(ctx, batch, templates, labels)
+        build_direct_requests(ctx, batch, combos, tcp, rs.routes, templates, self._host_probe)
+
+        positive: dict = {}
+
+        def positive_control() -> None:  # 직통 시험 직후: 신뢰 출발점 → 엔진
+            (pos,) = ctx.cprobe(ctx.trusted_net, [{"id": "positive", "method": "GET", "url": f"{ctx.engine_url}/health"}],
+                                ctx.timeout)
+            ctx.record("trusted", "engine", "/health", "none", pos)
+            positive["reachable"] = isinstance(pos.get("outcome"), int) and not isinstance(pos.get("outcome"), bool)
+            safety["after"] = safety_check(ctx, "after") if safe_sent else None
+
+        results = send_and_record(ctx, batch, templates, between=positive_control)
+        agg = aggregate_direct(results, rs.routes, templates, combos)
+        observations, normal, challenges, summary = direct_observations(
+            ctx, rs, agg, probes, templates, skipped, tcp, positive["reachable"], combos, bool(batch.requests), safety)
+        if ctx.fixed_route_fixture:
+            # Supplementary requests stay in the full trace, never invent an
+            # OpenAPI registration on the side where that route is absent.
+            observations["routes_tested"]["value"] = [p for p in agg.routes_tested if p in rs.registered]
+            summary["fixture"] = ctx.route_fixture_inputs
+        return observations, normal, challenges, summary

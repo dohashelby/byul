@@ -1,0 +1,88 @@
+id: OBS-03
+revision: 2
+retired: false
+area: OBS
+purpose: 수집 정보 제한
+secondary_purposes: []
+question: 로그·debug·trace·덤프가 허용한 정보만 수집하는가?
+scope: 기본 로그·엔진 예외 dump; 선택 debug/trace/profiler는 실제 설정
+risk_category: 보안 위협 점검
+risk_summary: 로그·진단 자료를 읽을 수 있는 주체가 과도하게 수집된 요청 본문·자격·내부 자료를 열람할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  always: true
+  prose: 기본 로그·엔진 예외 dump; 선택 debug/trace/profiler는 실제 설정
+policy_params:
+- {key: allowed_log_fields, type: 'list[str]', required: true}
+- {key: forbidden_log_fields, type: 'list[str]', required: true}
+- {key: forbidden_marker_contexts, type: 'list[str]', required: true}
+- {key: required_sources, type: 'list[str]', required: true}
+- {key: required_branches, type: 'list[str]', required: true}
+policy_prose:
+  policy_to_decide: 수집 목적·필드·민감정보 처리
+  enterprise_decisions: 민감정보·수집 목적·허용 필드·목적지·주기, 진단 필요성/승인자. usage 허용은 정책 변경·필드/목적지/사본 검토·재시험 후에만 적용한다.
+normal_control: 허용 로그 수준에서 고유 무해 표식 요청이 승인한 필드만 남긴다.
+challenge_steps:
+- 정상·안전한 오류 요청에 고유 무해 표식과 요청 ID 포함
+- 원본·설정한 collector 사본·dump 파일 수집
+- 시험 요청과 연결된 기본 exception dump·선택 debug/trace 분기 확인
+required_observations:
+- {key: log_coverage_complete, type: bool}
+- {key: log_coverage_gaps, type: 'list[str]'}
+- {key: log_sources_tested, type: 'dict[str, list[str]]'}
+- {key: log_fields_seen, type: 'list[str]'}
+- {key: log_marker_contexts_seen, type: 'list[str]'}
+- {key: log_source_ids_tested, type: 'list[str]'}
+- {key: log_required_branches_tested, type: 'list[str]'}
+- {key: functional_probes_planned, type: 'list[str]'}
+- {key: functional_probe_results, type: 'dict[str, outcome]'}
+required_observations_prose:
+- 활성 로그·dump 설정
+- 실제 필드·표식
+- 원본과 사본 필터
+satisfied_if: 금지한 필드·문맥을 수집하지 않고 필요한 사건은 남긴다.
+fail_criteria: 금지 민감 필드가 기록되거나 수집 목적 밖 사본에 포함된다.
+unknown_criteria: 오류 분기·선택 로그 수준·원본 파일을 확인하지 못했다.
+remediation: 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다
+method_and_evidence: '합성 민감 표식으로 생성 위치·필드·마스킹·sink를 확인한다. 실제 비밀값은 사용하지 않는다. 기본 엔진 예외 로그와 선택 debug 사본에 대해 허용 독자·비허용 사용자 계정으로 읽기·반출을 비교한다. 로컬 원본과 collector 이후 사본을 모두 확인한다. Tensor shape/anon_repr 정제와 원문 필드를 구분하며 수집기 필터만으로 로컬 원본까지 보호됐다고 판정하지 않는다. 앱이 넣은 합성 비공개 system 표식으로 return_prompt_text·return_token_ids를 요청해 Gateway/직통 및 등록 alias에서 비교한다. 선택 코드의 반환 분기에는 별도 운영자 차단 gate가 없으므로 Gateway 거부/제거와 직통 제한을 집행점으로 확인한다. echo·prompt_logprobs·logprobs는 해당 API의 필드·허용 정보별로 따로 판정한다. 오류에는 /workspace/x·s3://bucket/key·가짜 자격 표식을 사용한다. 기본 예외 dump도 포함하며 shape/anon_repr 정제와 원문 필드를 구분한다. 【F26】예외 dump는 기본 검토, debug response/output 로그는 설정별 확인; dump가 언제나 전체 프롬프트를 노출한다는 주장은 금지. 고유한 무해 시험 표식을 넣은 정상 요청과 안전하게 유도한 오류를 각각 실행하고 활성 로그·진단 사본의 필드를 대조한다. 정상 대조: 고유 시험 표식을 정상 요청·안전한 주입 예외에 넣고 각각 수집본/회전파일에서 허용 필드 확인.'
+remaining_setup: 합성 표식과 허용 필드표; shape/anon_repr를 전체 프롬프트로 단정하지 않음
+executor: log_analysis
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - {obs: log_coverage_complete, op: eq, value: true}
+    - {obs: log_fields_seen, op: subset_of, value_policy: allowed_log_fields}
+    - {obs: log_fields_seen, op: none_in, value_policy: forbidden_log_fields}
+    - {obs: log_marker_contexts_seen, op: none_in, value_policy: forbidden_marker_contexts}
+    - {obs: log_source_ids_tested, op: eq, value_policy: required_sources}
+    - {obs: log_required_branches_tested, op: eq, value_policy: required_branches}
+    fail_when_any:
+    - {obs: log_fields_seen, op: not_subset_of, value_policy: allowed_log_fields}
+    - {obs: log_fields_seen, op: any_in, value_policy: forbidden_log_fields}
+    - {obs: log_marker_contexts_seen, op: any_in, value_policy: forbidden_marker_contexts}
+    axes:
+      functional:
+        pass_when_all:
+        - {obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned}
+        - {obs: functional_probe_results, op: all_in, value: [pass]}
+        fail_when_any:
+        - {obs: functional_probe_results, op: any_in, value: [fail]}
+limitations:
+- required_sources에 명시한 Docker 원본·collector 사본·컨테이너 내 일반 파일만 읽는다. 전체 sink·회전 파일·trace/profiler 자동 발견, 독자별 읽기·반출 권한 시험은 구현 범위 밖이다. 정책 source 목록의 완전성과 실제 활성 설정은 별도 검토해야 한다.
+- Docker 로그는 실제 since/until과 컨테이너 ID·시작 시각·로그 driver로 출처를 기록한다. 수집 실패·정체성 변경·상한 도달·JSON 필드 미식별·시험 요청과 사건 연결 누락은 UNKNOWN이다. 필드 정책은 JSON leaf 경로 기준이다.
+- 정상 요청과 안전 검증 오류 요청을 보낸다. HTTP 4xx는 exception dump 증거가 아니다. 같은 고유 요청 ID 또는 오류 표식과 exception/traceback/dump 필드를 포함한 실제 사건이 있어야 기본 예외 분기를 확인한다. 없는 dump를 비활성으로 추정하지 않는다.
+- completions-only에서는 private system 표식이 소비되지 않는다. 해당 문맥이 금지 표식 정책에 포함되면 UNKNOWN이다. 실제 위반 표식·비허용 필드는 다른 수집 부족이 있어도 FAIL을 유지한다.
+- 원문 캡처의 해시와 출처를 기록하고 저장 전 설정한 인증키·표지된 자격 값을 마스킹한다. 저장 파일은 마스킹된 bytes의 별도 증거 해시로 검증하며 모든 비밀을 자동 식별한다고 주장하지 않는다.
+legacy:
+  q_ids:
+  - Q-C11
+  scenario_ids:
+  - SC-21-02
+  - SC-21-01
+  subtest_ids:
+  - Q-C11/SC-21-02
+  - Q-C11/SC-21-01
+source:
+  array: observability_assessment_draft

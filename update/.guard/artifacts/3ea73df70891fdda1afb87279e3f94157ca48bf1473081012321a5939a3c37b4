@@ -1,0 +1,2 @@
+{"example": true, "scenario": "pass", "route": "gateway", "status": 200}
+{"example": true, "scenario": "pass", "route": "direct", "attempted": true, "status": 401}

@@ -1,0 +1,143 @@
+{
+  "schema": "guard-update-validation-development/1",
+  "date": "2026-10-24",
+  "timezone": "Asia/Seoul",
+  "base_commit": "f4541ecfdc843c474b4c0c2c7ead1399c606a9d6",
+  "scope": [
+    "REQ-01",
+    "REQ-03",
+    "PLT-01",
+    "PLT-04",
+    "REQ-09"
+  ],
+  "data_origin": "EXAMPLE",
+  "official": false,
+  "default_tests": {
+    "passed": 2199,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 7,
+    "deselected": 18,
+    "elapsed_seconds": 269.4,
+    "environment": "Windows x64 / Python 3.11.16 / uv 0.12.11 / isolated frozen source venv",
+    "command": "python -X utf8 -m pytest -q --basetemp=<new-output>/pytest-final --junitxml=<new-output>/pytest-final.xml --durations=15",
+    "one_minute_target_met": false,
+    "skip_reasons": [
+      "Windows loopback restrictions (3)",
+      "Windows symlink permission (4)"
+    ],
+    "excluded_scope": "Docker/engine opt-in (18); not counted as passed"
+  },
+  "first_run": {
+    "tests": 2206,
+    "failures": 8,
+    "errors": 21,
+    "skipped": 6,
+    "time": 268.722
+  },
+  "focused_after_fix": {
+    "harness": {
+      "tests": 38,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "time": 4.269
+    },
+    "evidence_io": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "time": 15.552
+    }
+  },
+  "failure_analysis": [
+    "Test fixture duplicated the builder plan argument (21 setup errors).",
+    "Modified test ENV metadata needed resealing (6 failures).",
+    "Target test fixture missed engine.name (1 failure).",
+    "Timeout test exposed an inconsistent result record; timed_out now always prevents success (1 failure)."
+  ],
+  "installed_wheel": {
+    "isolated": true,
+    "wheel_sha256": "9c74c02cabd8cf310e5790fb08fd11ccf8790c2644f72fb9aeeb3625cee0e546",
+    "source_wheel_installed_files_equal": 81,
+    "new_modules_installed": true,
+    "cli_commands": [
+      {
+        "argv": [
+          "--help"
+        ],
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "update",
+          "--help"
+        ],
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "prepare-update",
+          "--help"
+        ],
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "judge",
+          "--help"
+        ],
+        "exit_code": 0
+      },
+      {
+        "argv": [
+          "report",
+          "--help"
+        ],
+        "exit_code": 0
+      }
+    ],
+    "synthetic_offline_analysis_accepted": true,
+    "diagnostic_rejected": true,
+    "source_unchanged": true,
+    "real_engine_executed": false
+  },
+  "preservation": {
+    "pack": {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 20,
+      "sha256": "7ec3cb2d1a1f8db8886bbccf605af1d464f95a66f06a74a9d94a7a0ad37180fc"
+    },
+    "protected_tracked_files": 250,
+    "protected_bytes_unchanged": true,
+    "checkdefs_unchanged": 77,
+    "regeneration_twice_bytes_equal": true,
+    "catalog_rows": 322,
+    "catalog_links": 614,
+    "metadata_exact": true,
+    "policy_values_unchanged": true,
+    "auto_checks": 11,
+    "policy_checks": 21,
+    "policy_paths": 46
+  },
+  "actual_two_image_trial": {
+    "performed": false,
+    "accepted": false,
+    "reason": "Only one local vLLM image; no prepared compatible candidate image/ENV.",
+    "local_vllm_image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+    "daemon": "Linux/x86_64",
+    "docker_cpu_count": 16,
+    "docker_total_memory_bytes": 8025436160,
+    "running_kind_containers_preserved": 2,
+    "images_or_models_downloaded": false,
+    "existing_resources_stopped_or_deleted": false
+  },
+  "limitations": [
+    "Synthetic tests are not actual engine evidence.",
+    "CPU performance/GPU are unverified.",
+    "DRAFT pack and policy remain unapproved.",
+    "Checksums do not authenticate the collector/host."
+  ]
+}

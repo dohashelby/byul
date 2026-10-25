@@ -1,0 +1,9 @@
+{%- for message in messages -%}
+{%- if message['role'] not in ['system', 'user', 'assistant'] -%}
+{{- raise_exception('guard-text-chat-v1 supports system, user and assistant text only') -}}
+{%- endif -%}
+{{- message['role'] + ': ' + message['content'] + '\n' -}}
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+{{- 'assistant: ' -}}
+{%- endif -%}

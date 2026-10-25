@@ -1,0 +1,80 @@
+applies_when:
+  always: true
+policy_params:
+- key: allowed_sampling_options
+  type: list[str]
+  required: true
+- key: rejection_codes
+  type: list[str]
+  required: true
+required_observations:
+- key: sampling_options_planned
+  type: list[str]
+- key: sampling_options_tested
+  type: list[str]
+- key: sampling_challenge_outcomes
+  type: dict[str, outcome]
+- key: sampling_accepted_options
+  type: list[str]
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, outcome]
+- key: sampling_health_results
+  type: dict[str, outcome]
+- key: runner_consumption_verified
+  type: bool
+executor: sampling_validation
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: sampling_options_tested
+      op: eq
+      value_policy: allowed_sampling_options
+    - obs: sampling_challenge_outcomes
+      op: nonempty
+    - obs: sampling_challenge_outcomes
+      op: superset_of
+      value_obs: sampling_options_planned
+    - obs: sampling_challenge_outcomes
+      op: all_in
+      value_policy: rejection_codes
+    - obs: runner_consumption_verified
+      op: eq
+      value: true
+    axes:
+      functional:
+        pass_when_all:
+        - obs: sampling_options_tested
+          op: eq
+          value_policy: allowed_sampling_options
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        - obs: sampling_health_results
+          op: superset_of
+          value_obs: sampling_options_planned
+        - obs: sampling_health_results
+          op: all_in
+          value:
+          - '200'
+functional_probes:
+- method: POST
+  path: /v1/completions
+  body:
+    model: '{model}'
+    prompt: guard sampling control
+    max_tokens: 1
+  expect:
+  - 200
+  via: engine
+limitations:
+- sampling-api-v1은 engine POST /v1/completions의 텍스트 표본과 정책 allowed_sampling_options 전체 목록만 시험한다. 지원 옵션은 temperature·top_p·min_tokens이며 다른 옵션·endpoint·token-array·NaN/Infinity를 대신 검증하지 않는다.
+- 실행 fixture의 max_tokens는 기업 출력 한도와 구분되는 작은 시험 예산이다. temperature 음수·top_p 범위·min_tokens와 max_tokens 관계의 제약 출처와 버전은 실행 설정의 DECLARED 참조이며 실제 빌드와 일치한다고 인증하지 않는다.
+- 정상 경계·동시 송신 정상 요청·후속 정상 추론과 health를 관측한다. health만으로 복구를 판정하지 않으며 두 송신의 병행이 worker 내부 실행 겹침이나 모든 worker 생존을 입증하지 않는다.
+- 실제 V2 활성·runner/worker 최종 소비값·allowed IDs/logit_bias/stop 개수 제한은 미계측이다. runner_consumption_verified=false로 보안 PASS를 보류하며 기능 PASS는 한 표본의 관측 범위다. API 수용·5xx·timeout만으로 메모리 손상·타 요청 피해·엔진 취약성을 확정하지 않는다.

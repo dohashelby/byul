@@ -1,0 +1,120 @@
+{
+  "isolated_sandbox": true,
+  "checks": {
+    "REQ-01": {
+      "PASS": {
+        "config": "cases/REQ-01/pass/guard.toml",
+        "environment": "cases/REQ-01/pass/env.yaml",
+        "policy": "cases/REQ-01/pass/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "FAIL": {
+        "config": "cases/REQ-01/fail/guard.toml",
+        "environment": "cases/REQ-01/fail/env.yaml",
+        "policy": "cases/REQ-01/fail/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "UNKNOWN": {
+        "config": "cases/REQ-01/unknown/guard.toml",
+        "environment": "cases/REQ-01/unknown/env.yaml",
+        "policy": "cases/REQ-01/unknown/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      }
+    },
+    "REQ-03": {
+      "PASS": {
+        "config": "cases/REQ-03/pass/guard.toml",
+        "environment": "cases/REQ-03/pass/env.yaml",
+        "policy": "cases/REQ-03/pass/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "FAIL": {
+        "config": "cases/REQ-03/fail/guard.toml",
+        "environment": "cases/REQ-03/fail/env.yaml",
+        "policy": "cases/REQ-03/fail/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "UNKNOWN": {
+        "config": "cases/REQ-03/unknown/guard.toml",
+        "environment": "cases/REQ-03/unknown/env.yaml",
+        "policy": "cases/REQ-03/unknown/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      }
+    },
+    "PLT-01": {
+      "PASS": {
+        "config": "cases/PLT-01/pass/guard.toml",
+        "environment": "cases/PLT-01/pass/env.yaml",
+        "policy": "cases/PLT-01/pass/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "FAIL": {
+        "config": "cases/PLT-01/fail/guard.toml",
+        "environment": "cases/PLT-01/fail/env.yaml",
+        "policy": "cases/PLT-01/fail/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "UNKNOWN": {
+        "config": "cases/PLT-01/unknown/guard.toml",
+        "environment": "cases/PLT-01/unknown/env.yaml",
+        "policy": "cases/PLT-01/unknown/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      }
+    },
+    "PLT-04": {
+      "PASS": {
+        "config": "cases/PLT-04/pass/guard.toml",
+        "environment": "cases/PLT-04/pass/env.yaml",
+        "policy": "cases/PLT-04/pass/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "FAIL": {
+        "config": "cases/PLT-04/fail/guard.toml",
+        "environment": "cases/PLT-04/fail/env.yaml",
+        "policy": "cases/PLT-04/fail/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "UNKNOWN": {
+        "config": "cases/PLT-04/unknown/guard.toml",
+        "environment": "cases/PLT-04/unknown/env.yaml",
+        "policy": "cases/PLT-04/unknown/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      }
+    },
+    "REQ-09": {
+      "PASS": {
+        "config": "cases/REQ-09/pass/guard.toml",
+        "environment": "cases/REQ-09/pass/env.yaml",
+        "policy": "cases/REQ-09/pass/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "FAIL": {
+        "config": "cases/REQ-09/fail/guard.toml",
+        "environment": "cases/REQ-09/fail/env.yaml",
+        "policy": "cases/REQ-09/fail/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      },
+      "UNKNOWN": {
+        "config": "cases/REQ-09/unknown/guard.toml",
+        "environment": "cases/REQ-09/unknown/env.yaml",
+        "policy": "cases/REQ-09/unknown/policy.yaml",
+        "functional": "REPLACE_WITH_EXPECTED_PASS_FAIL_OR_UNKNOWN",
+        "status": "COMPLETED"
+      }
+    }
+  }
+}

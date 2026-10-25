@@ -1,0 +1,142 @@
+{
+  "profile": "role_open",
+  "verdict": {
+    "result": {
+      "kind": "RES",
+      "id": "RES-01M59KXRAWXF44KT7CA9A0EKRN",
+      "revision": 1,
+      "sha256": "ab5d5db6103c64f76854928f406f95ce9ce8f2e36192217a7b31a8e8f3ae5a3e"
+    },
+    "security": "FAIL",
+    "functional": "PASS",
+    "performance": "UNKNOWN",
+    "verification_level": "DECLARED"
+  },
+  "expected_security": "FAIL",
+  "status": "COMPLETED",
+  "ready_seconds": 28.415999250020832,
+  "run_seconds": 2.9,
+  "total_seconds": 33.0,
+  "wildcard_listeners_before": [
+    "ControlCe *:5000",
+    "ControlCe *:7000",
+    "rapportd *:56365"
+  ],
+  "wildcard_listeners_during": [
+    "ControlCe *:5000",
+    "ControlCe *:7000",
+    "rapportd *:56365"
+  ],
+  "routes_registered": [
+    "/is_scaling_elastic_ep",
+    "/kv_event_sources",
+    "/load",
+    "/metrics",
+    "/scale_elastic_ep"
+  ],
+  "skipped_routes": {},
+  "outcomes_by_role": {
+    "/is_scaling_elastic_ep": {
+      "none": 401,
+      "general": "handler_reached",
+      "wrong": 401,
+      "admin": "handler_reached"
+    },
+    "/kv_event_sources": {
+      "none": 401,
+      "general": 200,
+      "wrong": 401,
+      "admin": 200
+    },
+    "/load": {
+      "none": 401,
+      "general": 200,
+      "wrong": 401,
+      "admin": 200
+    },
+    "/metrics": {
+      "none": 401,
+      "general": 200,
+      "wrong": 401,
+      "admin": 200
+    },
+    "/scale_elastic_ep": {
+      "none": 401,
+      "general": "handler_reached",
+      "wrong": 401,
+      "admin": "handler_reached"
+    }
+  },
+  "nonadmin_outcomes": {
+    "/is_scaling_elastic_ep": "handler_reached",
+    "/kv_event_sources": 200,
+    "/load": 200,
+    "/metrics": 200,
+    "/scale_elastic_ep": "handler_reached"
+  },
+  "admin_outcomes": {
+    "/is_scaling_elastic_ep": "handler_reached",
+    "/kv_event_sources": 200,
+    "/load": 200,
+    "/metrics": 200,
+    "/scale_elastic_ep": "handler_reached"
+  },
+  "functional_probe_results": {
+    "POST /v1/completions": "pass",
+    "GET /metrics": "pass"
+  },
+  "functional_probe_status": {
+    "POST /v1/completions": 200,
+    "GET /metrics": 200
+  },
+  "safety": {
+    "before": {
+      "health": 200,
+      "inference": 200,
+      "inference_ok": true,
+      "ok": true
+    },
+    "after": {
+      "health": 200,
+      "inference": 200,
+      "inference_ok": true,
+      "ok": true
+    }
+  },
+  "safe_probes": {
+    "/is_scaling_elastic_ep": {
+      "basis": "safe_probe",
+      "source": "같은 파일 L83-85: 전역 플래그 읽기만(get_scaling_elastic_ep), 상태 변경 없음",
+      "expected_handler_reached": {
+        "status": 200,
+        "body_contains": "is_scaling_elastic_ep"
+      }
+    },
+    "/scale_elastic_ep": {
+      "basis": "safe_probe",
+      "source": "vllm/vllm-openai-cpu@sha256:495c84fe…(v0.31.0) vllm/entrypoints/serve/elastic_ep/api_router.py (sha256 2d6805874a86…) L37-49: body {} → new_data_parallel_size None → HTTPException 400, client.scale_elastic_ep(L64) 미도달; 선행 Depends(validate_json_request)는 Content-Type만 검사",
+      "expected_handler_reached": {
+        "status": 400,
+        "body_contains": "new_data_parallel_size is required"
+      }
+    }
+  },
+  "engine_log_scale_lines": [
+    "(APIServer pid=1) INFO 10-19 08:19:46 [launcher.py:69] Route: /scale_elastic_ep, Methods: POST",
+    "INFO:     172.18.0.3:41866 - \"POST /scale_elastic_ep HTTP/1.0\" 400 Bad Request",
+    "INFO:     172.18.0.3:41882 - \"POST /scale_elastic_ep HTTP/1.0\" 400 Bad Request"
+  ],
+  "functional_scope": {
+    "probed": 2,
+    "of": 5,
+    "label": "기능 확인 범위: 2 / 등록 경로 5 (표본)"
+  },
+  "limitations": [
+    "검토 전 팩(DRAFT): 공식 아님",
+    "정책 DRAFT: 공식 아님",
+    "실행 환경(ENV-01M59KXNDS6GXTNW50Q2HT3KVP): CPU, arm64, Docker Desktop on macOS",
+    "엔진 소스 commit(ENV-01M59KXNDS6GXTNW50Q2HT3KVP): 축약 hash만 일치, 전체 commit 미확인 — 관측 db9527a46, 고정 db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "점검 목록 미완결 보호 목적: 1개 — 집계 PASS 불가",
+    "정책 범위 밖으로 제외: 76개 점검"
+  ]
+}

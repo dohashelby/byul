@@ -1,0 +1,265 @@
+{
+  "schema": "guard-policy-reliability-verification/1",
+  "date": "2026-10-24",
+  "timezone": "Asia/Seoul",
+  "base_commit": "49526fb6caa9b3885ac912930ac635d069a48e5a",
+  "branch": "codex/gua-policy-reliability-batch",
+  "verification_target": "frozen working-tree package bytes identified by the verified wheel SHA256",
+  "environment": {
+    "os": "Windows x86_64",
+    "python": "3.11.16",
+    "uv": "0.12.11",
+    "pytest": "9.1.1",
+    "dependencies": "uv sync --frozen; fresh source environment"
+  },
+  "scope": [
+    "bounded OBS-03/09 capture",
+    "read-only saved log replay",
+    "REQ-15 limited manual contract",
+    "installed-wheel CI",
+    "preparation guidance",
+    "test-only I/O improvement"
+  ],
+  "first_full": {
+    "selected": 2561,
+    "passed": 2547,
+    "failed": 1,
+    "errors": 0,
+    "skipped": 13,
+    "deselected": 18,
+    "seconds": 266.37,
+    "skip_reasons": {
+      "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)": 3,
+      "container_file reader is a Linux in-container path contract": 1,
+      "container_file reader requires Linux nofollow/dirfd": 1,
+      "the in-container descriptor reader uses Linux dirfd/nofollow": 3,
+      "this Windows account cannot create symlinks": 1,
+      "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)": 1,
+      "디렉터리 symlink 권한/지원 필요: OSError": 1,
+      "symlink permission unavailable": 1,
+      "creating directory symlinks requires host permission": 1
+    }
+  },
+  "focused_after_fix": {
+    "selected": 133,
+    "passed": 127,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 6,
+    "deselected": 0,
+    "seconds": 24.56,
+    "skip_reasons": {
+      "container_file reader is a Linux in-container path contract": 1,
+      "container_file reader requires Linux nofollow/dirfd": 1,
+      "the in-container descriptor reader uses Linux dirfd/nofollow": 3,
+      "this Windows account cannot create symlinks": 1
+    }
+  },
+  "final_full": {
+    "selected": 2564,
+    "passed": 2551,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 13,
+    "deselected": 18,
+    "seconds": 258.46,
+    "skip_reasons": {
+      "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)": 3,
+      "container_file reader is a Linux in-container path contract": 1,
+      "container_file reader requires Linux nofollow/dirfd": 1,
+      "the in-container descriptor reader uses Linux dirfd/nofollow": 3,
+      "this Windows account cannot create symlinks": 1,
+      "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)": 1,
+      "디렉터리 symlink 권한/지원 필요: OSError": 1,
+      "symlink permission unavailable": 1,
+      "creating directory symlinks requires host permission": 1
+    }
+  },
+  "common_tests": {
+    "common_node_ids": 2206,
+    "new_node_ids": 358,
+    "baseline_seconds": 278.39275239995914,
+    "current_seconds": 235.7695066999877,
+    "saved_seconds": 42.62324569997145,
+    "ratio_current_over_baseline": 0.8468952753528015,
+    "order": [
+      "baseline",
+      "current"
+    ],
+    "sample_count": 1,
+    "limitations": [
+      "One sequential sample; filesystem/OS cache and load may differ. No statistical speed guarantee.",
+      "New tests are intentionally outside this common-ID benchmark; run the current full suite separately.",
+      "Engine and Docker markers retain each checkout's default deselection rules."
+    ],
+    "existing_node_ids_preserved": true,
+    "same_python_environment": true,
+    "actual_target_import_paths_verified": true,
+    "old_skips": 7,
+    "current_common_skips": 7,
+    "default_excluded": 18,
+    "one_minute_goal_met": false
+  },
+  "installed": {
+    "success": true,
+    "isolated": true,
+    "source_wheel_installed_files_equal": 87,
+    "wheel_sha256": "895e96e7e078463d852853ee1751831e0e06b86162ce833cda4bd18eea1042e2",
+    "example_fake_audit": true,
+    "saved_pack_replay": true,
+    "tampering_rejected": true,
+    "source_unchanged": true,
+    "req15": {
+      "contract": "complete",
+      "example_complete_manual_pass": true,
+      "foreign_attachment_withheld": true,
+      "incomplete_pass_withheld": true,
+      "declared_fail_preserved": true,
+      "partial_blocked": true,
+      "legacy_preserved": true,
+      "actual_cache_test": false
+    },
+    "analysis": {
+      "update_read_only": true,
+      "audit_never_claims_two_image_trial": true,
+      "log_read_only": true,
+      "missing_log_evidence_never_accepted": true,
+      "example_log_replay": true,
+      "log_tampering_rejected": true
+    },
+    "real_engine_executed": false,
+    "product_network_and_subprocess_blocked": true
+  },
+  "historical_snapshot_compatibility": {
+    "success": true,
+    "old_declared": "0.12.0",
+    "new_declared": "0.13.0",
+    "as_of": "2026-10-24T00:00:00+00:00",
+    "cases": [
+      {
+        "name": "req15-pass",
+        "verdicts": {
+          "security": "PASS",
+          "functional": "PASS",
+          "performance": "PASS"
+        },
+        "old_objects_preserved": true,
+        "old_evidence_refs_preserved": true,
+        "saved_pack20_replayed": true,
+        "official": false
+      },
+      {
+        "name": "req15-unknown",
+        "verdicts": {
+          "security": "UNKNOWN",
+          "functional": "UNKNOWN",
+          "performance": "UNKNOWN"
+        },
+        "old_objects_preserved": true,
+        "old_evidence_refs_preserved": true,
+        "saved_pack20_replayed": true,
+        "official": false
+      },
+      {
+        "name": "req15-fail",
+        "verdicts": {
+          "security": "FAIL",
+          "functional": "FAIL",
+          "performance": "FAIL"
+        },
+        "old_objects_preserved": true,
+        "old_evidence_refs_preserved": true,
+        "saved_pack20_replayed": true,
+        "official": false
+      },
+      {
+        "name": "req16-axis",
+        "verdicts": {
+          "security": "PASS",
+          "functional": "UNKNOWN",
+          "performance": "UNKNOWN"
+        },
+        "old_objects_preserved": true,
+        "old_evidence_refs_preserved": true,
+        "saved_pack20_replayed": true,
+        "official": false
+      }
+    ],
+    "source_unchanged": true,
+    "real_engine_executed": false,
+    "limitations": [
+      "EXAMPLE/DRAFT policy and DECLARED self-report; no source authentication or real cache trial.",
+      "Only REQ-15 legacy PASS/UNKNOWN/FAIL and REQ-16 axis separation were replayed."
+    ]
+  },
+  "preservation": {
+    "other_checkdefs_unchanged": 76,
+    "protected_files": 217,
+    "old_evidence_summaries": 5,
+    "six_policy_values_scope_approval_preserved": true,
+    "pack": {
+      "ref": {
+        "kind": "PACK",
+        "id": "PACK-BASELINE",
+        "revision": 21,
+        "sha256": "14b3288136b37c8221d4e72d021a6cf353e8996b98e8da08f92ba7c73cbcbeb6"
+      },
+      "review": "DRAFT",
+      "active": 77,
+      "automated": 11,
+      "policy_checks": 22,
+      "policy_paths": 49
+    },
+    "catalog": {
+      "rows": 322,
+      "connections": 614,
+      "classification": {
+        "d": 113,
+        "a": 46,
+        "c": 161,
+        "b": 2
+      },
+      "new_binding_ids": [
+        "P-DRAFT-CACHE-GROUP",
+        "P-DRAFT-CACHE-PUBLIC-PREFIX",
+        "P-DRAFT-CACHE-SALT"
+      ],
+      "original_fields_and_sources_preserved": true
+    },
+    "regeneration": {
+      "starting_pack_revision": 20,
+      "resulting_pack_revision": 21,
+      "pack_files": 79,
+      "passes": 2,
+      "metadata_passes": 2,
+      "matches_checkout_bytes": true,
+      "source_untouched": true
+    }
+  },
+  "raw_outputs": {
+    "location": "separate task output outside the repository; not committed",
+    "sha256": {
+      "pytest-current.log": "2e8eb760483dee542a0b4d69746aa08a9bcca554163d7f28e051ccb336f73fa7",
+      "pytest-current.xml": "34fc47b8866191ba660f53894d7a8176abda6b821a3d7e7c6ae005bba88a24b0",
+      "pytest-focused.log": "1c9b8e9d30d2d9b5b535912981ba11e12f2d0e6f89612b7a82bea757988f8381",
+      "pytest-focused.xml": "fe86119934f76ec2be10b3ee68f9c9937091b5c7295640b27ffe744c41aa10ed",
+      "pytest-final.log": "3b60ae432a78f476a413b05f66fc6fd46c915b0ebe50f84fb35fc52f94de27a1",
+      "pytest-final.xml": "2af970aba070233481eb40741cb217707ea278ee8b7fc66e5a522d8650aea8be",
+      "common-tests/summary.json": "10fe255c0be0c8baf227e543ba73a54596c653153e730805611f7fec75485b3f",
+      "installed-release/summary.json": "5601bdd553dd2ea0eee1017e32116698ed7656e4d3f2bafaebdb200fbb0d3518",
+      "old-snapshot-release/summary.json": "852e8560f123a32f3bc68ca00e79c1784d0959816a54f875512d362d0ee9b8c8",
+      "preservation/summary.json": "e6d6543538f69f0ba8fff184fb7cc5c73b7ebc777ac802cdc8597ca3d13a25c7"
+    }
+  },
+  "new_measured_engine_runs": 0,
+  "actual_two_image_trial": false,
+  "actual_gpu_or_performance_trial": false,
+  "existing_resources_modified": false,
+  "limitations": [
+    "Unit/EXAMPLE/local subprocess and installed package verification; no new engine or Docker stub trial.",
+    "Replay agreement is not security PASS, source authentication or enterprise approval.",
+    "REQ-15 remains manual; automatic executor connections remain eleven.",
+    "REQ-10 runner consumption and REQ-11 output attribution remain UNKNOWN; CPU performance remains UNKNOWN.",
+    "Final Linux CI is linked from the draft PR; local results are Windows results."
+  ]
+}

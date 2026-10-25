@@ -1,0 +1,4 @@
+policy_params:
+- key: required_readiness_items
+  type: list[str]
+  required: true

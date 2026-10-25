@@ -1,0 +1,43 @@
+{
+  "scope": "vllm",
+  "file_count": 7,
+  "total_bytes": 251897335,
+  "files": [
+    {
+      "path": "config.json",
+      "bytes": 651,
+      "sha256": "54162c9cd0377110df1859dfabebb106fc0988c8aadb88207ce1ee0d34985df6"
+    },
+    {
+      "path": "generation_config.json",
+      "bytes": 137,
+      "sha256": "d37de99f9835d7a4d0916257f724504d12c4a668f36a50b2d42e09ba4ebd05d5"
+    },
+    {
+      "path": "merges.txt",
+      "bytes": 456318,
+      "sha256": "1ce1664773c50f3e0cc8842619a93edc4624525b728b188a9e0be33b7726adc5"
+    },
+    {
+      "path": "pytorch_model.bin",
+      "bytes": 250540281,
+      "sha256": "2d74da6615135c58cf3cf9ad4cb11e7c613ff9e55fe658a47ab83b6c8d1174a9"
+    },
+    {
+      "path": "special_tokens_map.json",
+      "bytes": 441,
+      "sha256": "0f3cd5f307a2735cfee31ddf33be88655e8be165ee2cdc26ced966f04258adf0"
+    },
+    {
+      "path": "tokenizer_config.json",
+      "bytes": 685,
+      "sha256": "d1e4185b43a0a06421ab7218d5c1a775350bd13024507b34fbed25dcf6c14c6b"
+    },
+    {
+      "path": "vocab.json",
+      "bytes": 898822,
+      "sha256": "06b4d46c8e752d410213d9548eb27a54db70fda0319b6271fb8d59dead5e1cab"
+    }
+  ],
+  "inventory_sha256": "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6"
+}

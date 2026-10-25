@@ -1,0 +1,53 @@
+applies_when: { always: true }
+policy_params:
+  - { key: max_input_tokens, type: int, required: true }
+  - { key: rejection_codes, type: "list[str]", required: true }
+  - { key: allowed_endpoints, type: "list[str]", required: true }
+  - { key: allowed_input_formats, type: "list[str]", required: true }
+executor: input_validation
+challenge_steps:
+  - "정상 token-array 대조 후 범위 밖 token ID 시험"
+  - "길이 한도 밖 시험과 후속 정상 대조"
+required_observations:
+  - { key: accepted_challenges, type: "list[str]" }
+  - { key: challenge_outcomes, type: "dict[str, outcome]" }
+  - { key: challenges_planned, type: "list[str]" }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, outcome]" }
+  - { key: input_endpoints_tested, type: "list[str]" }
+  - { key: input_formats_tested, type: "list[str]" }
+  - { key: challenge_rejection_results, type: "dict[str, outcome]" }
+  - { key: challenge_consumption, type: "dict[str, outcome]" }
+  - { key: confirmed_input_violations, type: "list[str]" }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: challenge_outcomes, op: nonempty }
+      - { obs: challenges_planned, op: eq, value: [token_id, length] }
+      - { obs: challenge_outcomes, op: superset_of, value_obs: challenges_planned }
+      - { obs: challenge_outcomes, op: all_in, value_policy: rejection_codes }
+      - { obs: challenge_rejection_results, op: superset_of, value_obs: challenges_planned }
+      - { obs: challenge_rejection_results, op: all_in, value: [verified] }
+      - { obs: input_endpoints_tested, op: eq, value_policy: allowed_endpoints }
+      - { obs: input_formats_tested, op: eq, value_policy: allowed_input_formats }
+    fail_when_any:
+      - { obs: confirmed_input_violations, op: nonempty }
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+          - { obs: input_endpoints_tested, op: eq, value_policy: allowed_endpoints }
+          - { obs: input_formats_tested, op: eq, value_policy: allowed_input_formats }
+        fail_when_any:
+          - { obs: functional_probe_results, op: any_in, value: [fail] }
+functional_probes:
+  - { method: POST, path: /v1/completions, body: { model: "{model}", prompt: [0], max_tokens: 1 }, expect: [200], via: engine }
+limitations:
+  - "REQ-09 revision 6은 HTTP 상태·검토된 원인별 거부·실제 소비를 구분한다. accepted_challenges는 구 형식의 HTTP 2xx 목록이며 새 정의의 FAIL 근거가 아니다. 오류 객체·불완전 응답·정상 생성 형태만으로 금지 입력 소비나 피해를 확정하지 않는다."
+  - "자동 실행기는 실제 consumer·메모리 접근·상태 오염을 계측하지 않으므로 challenge_consumption은 unknown이고 confirmed_input_violations는 비어 있다. 확인된 독립 위반 또는 신고 FAIL은 다른 관측 누락으로 지우지 않는다. PASS는 검토된 경계 거부 두 건과 정상 대조의 제한된 프로파일만 뜻한다."
+  - "REQ-09 정책 허용 endpoint={allowed_endpoints}, 입력 형식={allowed_input_formats}. 정책 목록은 실제 등록·승인이나 parser 소비의 증명이 아니다."
+  - "REQ-09는 승인된 전체 allowed_endpoints·allowed_input_formats 목록이 각각 하나이며 정의의 정상 engine POST/token_ids 표본과 정확히 일치하는 프로파일만 지원한다. 복수 목록은 일부만 골라 시험하지 않고 요청 전에 중단한다. 기업 정책을 축소하거나 기본값을 보충하지 않는다."
+  - "input_endpoints_tested·input_formats_tested는 실제 제출 범위이며 engine 직통 한 쌍만 나타낸다. 다른 endpoint·형식·Gateway 경계·재사용 ID·renderer·parser의 실제 소비·원문 보호 전체·기업 승인 진위는 자동 검증하지 않는다. 수동 증거는 DECLARED이고 정책 부족은 PASS 보류 사유다."
+  - "실행 설정에 출처와 함께 선언한 vocab_size 및 정책 max_input_tokens를 사용하는 token-array 경계 두 건만 시험한다. 실제 모델 유효 범위와 설정의 일치는 별도 확인해야 하며, 다른 입력 형식·음수 ID·모든 경계 조합을 검증하지 않는다."

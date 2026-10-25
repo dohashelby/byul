@@ -1,0 +1,52 @@
+id: OBS-04
+revision: 2
+retired: false
+area: OBS
+purpose: 수집 정보 제한
+secondary_purposes: []
+question: 금지한 usage 보고가 실제로 비활성 상태를 유지하는가?
+scope: 내장 usage 경로·금지 정책 시
+risk_category: 보안 위협 점검
+risk_summary: usage 설정 변경권자가 opt-out 우선순위·설정 차이를 이용해 금지된 수집·외부 송신을 다시 활성화할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 내장 usage 경로·금지 정책 시
+policy_params:
+- key: usage_allowed
+  type: bool
+  required: true
+policy_prose:
+  policy_to_decide: usage 허용 여부·적용 시점
+  enterprise_decisions: 민감정보·수집 목적·허용 필드·목적지·주기, 진단 필요성/승인자. usage 허용은 정책 변경·필드/목적지/사본 검토·재시험 후에만 적용한다.
+normal_control: usage 비사용 설정의 새 프로세스에서 정상 추론은 유지된다.
+challenge_steps:
+- 새 config home·rank0 조건 준비
+- do_not_track env/file 조합별 새 프로세스 실행
+- 보고 생성·송신 시도와 이전 사본 대조
+required_observations: []
+required_observations_prose:
+- 실제 env·config path
+- 최초 판단·새 보고
+- 송신 관측·기존 파일 구분
+satisfied_if: 정책이 금지한 생성/전송 단계가 수행되지 않는다. 환경변수 변경만으로 실행 중 중단을 가정하지 않는다.
+fail_criteria: 참조정책에서 금지한 새 usage 보고 생성·송신이 확인된다.
+unknown_criteria: 동일 프로세스 cache 판단을 재사용했거나 송신 센서·보고 생성 계측이 없다.
+remediation: 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다
+method_and_evidence: 기동 시 opt-out·최초 판정 캐시·초기/주기 생성·파일·송신 시도를 확인한다. rank0 worker의 env와 import 당시 config root를 기록한다. VLLM_NO_USAGE_STATS==1 또는 (VLLM_DO_NOT_TRACK or DO_NOT_TRACK or 0)==1 또는 do_not_track 파일 존재 여부를 대조한다. 문자열은 정확히 1일 때 참이며 VLLM_DO_NOT_TRACK=0은 DO_NOT_TRACK=1을 가린다. 새 프로세스별 초기/주기 파일 생성·통제된 수신처 송신을 관측하고 실행 중 env 변경만으로 중지됐다고 판정하지 않는다.
+remaining_setup: 정확한 1 판정·env 우선순위 fixture; timeout만으로 비전송 판정 금지
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C11
+  - Q-C07
+  scenario_ids:
+  - SC-22-01
+  subtest_ids:
+  - Q-C11/SC-22-01
+source:
+  array: observability_assessment_draft
+limitations:
+- usage_allowed={usage_allowed}은 이 점검 범위의 기업 정책 신고다. false는 비생성·비전송의 관측이 아니고 true는 금지 정책 분기를 충족하지 않는다. 정책값만으로 비적용·PASS를 만들지 않는다.
+- usage 실제 활성·생성·송신·필드·목적지·주기는 자동 검증하지 않는다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.

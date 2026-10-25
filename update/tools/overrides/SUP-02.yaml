@@ -1,0 +1,6 @@
+policy_params:
+- key: approval_record_system
+  type: str
+  required: true
+limitations:
+- '승인 기록 체계(신고된 정책 문맥): {approval_record_system}. 값의 등록은 모델×환경×작업 허용표나 배포 권한 검증이 아니다. 실제 인가·배포 결과는 별도 증거가 필요하다.'

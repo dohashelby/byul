@@ -173,11 +173,11 @@ CHG는 사람 검토 전이면 기존 규칙대로 `certainty` 최대 `PARTIAL`�
 
 ## 6. 이월 (패치 릴리스와 증분 감사)
 
-엔진 정식 릴리스는 이월하지 않는다. 패치 릴리스(§3.4)와 증분 감사(모델·환경·정책 변경)에서 선정되지 않은 점검만 이전 결과를 이월한다. 이월은 새 판정이 아니다(INV-19). 새 EVD·RES를 만들지 않고 이전 RES를 참조한다(INV-10 유지).
+엔진 정식 릴리스는 이월하지 않는다. 패치 릴리스(§3.4)와 증분 감사(모델·환경·정책 변경)에서 선정되지 않은 점검만 이전 결과를 이월한다. 이월은 새 판정이 아니다(INV-19). **이월 단계 자체**에서는 EVD·RES를 추가 생성하지 않고, 아래 사전 확인을 거친 유효 RES를 정확한 Ref로 참조한다(INV-10 유지).
 
 이월 조건(전부 만족):
 
-- 이전 PLAN에 같은 점검의 RES가 있고 그 RES의 **보안 판정이 PASS**다. FAIL·UNKNOWN은 다시 시험한다.
+- 이전 PLAN에 같은 점검의 RES가 있고 이월 자격 판단에 쓰는 유효 RES의 **보안 판정이 PASS**다(판정기 버전이 바뀌면 아래 사전 재판정한 RES 기준). FAIL·UNKNOWN은 다시 시험한다.
 - 그 RES가 판정한 EVD의 엔진 이미지 digest가 **이번 ENV의 digest와 같다**(증분 감사). 패치 릴리스는 **이번 기준(baseline) ENV의 digest와 같다**.
 - **같은 점검 정의**: 이전 PLAN 항목의 `check_revision`과 이번 팩 안 **같은 점검 ID**의 CheckDef revision이 같고, 이전 PLAN이 참조한 팩 보존본의 `checks/<ID>.yaml` 해시와 이번 팩 매니페스트(`files_sha256`)의 같은 파일 해시가 같다. 팩 전체 revision(예: 22)은 비교 대상이 아니다.
 - **같은 시험 절차**: 그 EVD의 `execution.executor`(이름·버전·`config_sha256`)와 `execution.adapter`(이름·버전)가 이번 실행에 쓸 값과 같다.
@@ -186,9 +186,9 @@ CHG는 사람 검토 전이면 기존 규칙대로 `certainty` 최대 `PARTIAL`�
 - 이 점검이 이번 변경(패치의 항상 시험·diff 변경 종류, 모델 변경 종류, 입력 변경)에 걸리지 않았다.
 - 이전 EVD의 `data_origin`이 `EXAMPLE`이 아니다.
 
-**판정기 버전만 바뀐 경우**: 엔진을 다시 띄우지 않는다. 저장된 EVD를 현재 판정기로 재판정한 RES(기존 재판정 규칙대로 새로 저장, §5 객체 관계)를 기준으로 위 조건을 본다. 재판정 결과가 보안 PASS가 아니면 이월하지 않고 선정한다. CheckDef의 판정 규칙(`judge.params`)이 바뀐 경우는 점검 정의가 바뀐 것이므로 첫 조건에서 걸린다.
+**판정기 버전만 바뀐 경우 — 이월 자격 사전 확인**: 엔진 기동 없이 저장된 EVD를 현재 판정기로 재판정하고 새 RES를 append-only로 저장한다([SPEC §5 객체 관계](../SPEC.md#5-객체-관계)). 원본 EVD·RES와 정확한 Ref는 보존한다. 이 사전 재판정은 이월 단계와 구분하며, 재판정한 RES를 기준으로 위 조건을 본다. 재판정 결과가 보안 PASS가 아니면 이월하지 않고 선정한다. CheckDef의 판정 규칙(`judge.params`)이 바뀐 경우는 점검 정의가 바뀐 것이므로 같은 점검 정의 조건에서 걸린다.
 
-PLAN 항목에 `carried_over: { result: Ref, evidence: Ref, image_digest, judged_at, reason }`를 남긴다. 보고서는 이월 항목을 별도 표로 보이고 상단에 "이번 실행 N건 / 이월 M건"을 표시한다. 이월 PASS는 집계에 포함하되 `carried` 표시를 단다(U1-Q5).
+PLAN 항목에 `carried_over: { result: Ref, evidence: Ref, image_digest, judged_at, reason }`를 남긴다. `result`는 사전 재판정했으면 새 재판정 RES의 정확한 Ref, 아니면 기존 유효 RES의 정확한 Ref다. `evidence`는 그 RES가 판정한 EVD의 정확한 Ref다. `judged_at`은 참조한 RES의 판정 시각이며, 원래 EVD의 실행 시각과 재판정 시각을 구분해 표시하고 재판정을 새 실측으로 표현하지 않는다. 보고서는 이월 항목을 별도 표로 보이고 상단에 "이번 실행 N건 / 이월 M건"을 표시한다. 이월 PASS는 집계에 포함하되 `carried` 표시를 단다(U1-Q5).
 
 증분 감사는 새 구성 한 쪽만 실행한다. INV-09상 모델·설정이 다른 두 구성은 버전 비교 대상이 아니므로 비교(Comparison)를 내지 않고, 보고서에 같은 점검의 이전 결과를 참고로 나란히 보인다.
 

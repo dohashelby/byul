@@ -1,0 +1,30 @@
+{
+  "schema_version": "byul-run-context/0.1",
+  "run_id": "PLAN-01M598RQGT4DRY9XCVDYRZBRPW",
+  "plan_ref": {
+    "kind": "PLAN",
+    "id": "PLAN-01M598RQGT4DRY9XCVDYRZBRPW",
+    "revision": 1,
+    "sha256": "2b764d277c3b1714228755db49a9feb80961a7034e0f71208534586d54318a88"
+  },
+  "side": "single",
+  "evaluation_refs": [
+    "REQ-01",
+    "REQ-03"
+  ],
+  "environment_ref": {
+    "id": "lab-env-001",
+    "revision": 1,
+    "sha256": "fbfda7b1129aaaf96c81479444d5f114068633681bbf0152837c2da254865839"
+  },
+  "target_ref": "mock-engine-001",
+  "policy_ref": {
+    "policy_id": "local-policy-001",
+    "policy_version": "3",
+    "sha256": "f9a8112ae54cacb0e14330c5d2b36231ddc19a7bb7daff3b7505261c9d35cce3"
+  },
+  "window": {
+    "started_at": "2026-10-25T01:00:00Z",
+    "finished_at": null
+  }
+}

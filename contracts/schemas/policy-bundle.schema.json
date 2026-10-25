@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.byul.invalid/0.1/policy-bundle.schema.json",
+  "title": "정책 번들 (platform → runtime)",
+  "description": "runtime 계획서 §5.4의 approved-policy.json. 플랫폼이 CONFIRMED 정책을 runtime 내부 형식 파일로 변환해 해시와 함께 묶는다. runtime은 내부 형식을 그대로 쓰고, 이 목록으로 파일 bytes를 대조한다. 번들은 서명이 아니다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "bundle_id", "created_at", "policy_ref", "target_ref", "approval", "validity", "files"],
+  "properties": {
+    "schema_version": { "const": "byul-policy-bundle/0.1" },
+    "bundle_id": { "$ref": "common.schema.json#/$defs/local_id" },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "policy_ref": {
+      "description": "원본 byul-policy 문서의 판본. sha256은 그 문서의 정규 JSON 해시다.",
+      "$ref": "common.schema.json#/$defs/policy_ref"
+    },
+    "target_ref": { "$ref": "common.schema.json#/$defs/local_id" },
+    "approval": { "$ref": "common.schema.json#/$defs/approval" },
+    "validity": { "$ref": "common.schema.json#/$defs/validity" },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "path", "schema_version", "sha256", "bytes"],
+        "properties": {
+          "role": { "enum": ["gateway_policy", "policy_approvals", "enforcement_intent", "exec_exceptions", "target"] },
+          "path": {
+            "description": "번들 폴더 기준 상대 경로. 절대 경로·.. ·역슬래시를 쓰지 않는다.",
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"
+          },
+          "schema_version": {
+            "description": "파일 안의 runtime 내부 형식(예: runtime-mvp/1.1).",
+            "type": "string",
+            "pattern": "^runtime-[a-z-]+/[0-9]+\\.[0-9]+$"
+          },
+          "sha256": { "$ref": "common.schema.json#/$defs/sha256" },
+          "bytes": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

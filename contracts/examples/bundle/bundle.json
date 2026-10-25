@@ -1,0 +1,36 @@
+{
+  "schema_version": "byul-policy-bundle/0.1",
+  "bundle_id": "bundle-local-policy-001-3",
+  "created_at": "2026-10-25T00:05:00Z",
+  "policy_ref": {
+    "policy_id": "local-policy-001",
+    "policy_version": "3",
+    "sha256": "f9a8112ae54cacb0e14330c5d2b36231ddc19a7bb7daff3b7505261c9d35cce3"
+  },
+  "target_ref": "mock-engine-001",
+  "approval": {
+    "approved_by": "lab-policy-owner",
+    "approved_at": "2026-10-25T00:00:00Z",
+    "approval_ref": "LAB-EXAMPLE-ONLY-CONTEXT"
+  },
+  "validity": {
+    "valid_from": "2026-01-01T00:00:00+00:00",
+    "valid_until": "2027-01-01T00:00:00+00:00"
+  },
+  "files": [
+    {
+      "role": "gateway_policy",
+      "path": "runtime-policy.json",
+      "schema_version": "runtime-mvp/1.1",
+      "sha256": "55dfcfb1c3cfea1e9b602895535e071d570863f648ee410a7761eafb22573be9",
+      "bytes": 434
+    },
+    {
+      "role": "policy_approvals",
+      "path": "policy-approvals.json",
+      "schema_version": "runtime-policy-approvals/1.0",
+      "sha256": "4a5cd600b86e795fc9f528dd6a12f70a55bcc638fa76acfa044d6a770fd36228",
+      "bytes": 383
+    }
+  ]
+}

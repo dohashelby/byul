@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.byul.invalid/0.1/evidence-index.schema.json",
+  "title": "증거 목록 (update, runtime → platform)",
+  "description": "runtime 계획서 §5.4의 evidence/index.json. 증거 파일은 index 옆 files/ 아래에 둔다. 해시는 내용 일치 확인용이며 저장 관리자까지 포함한 변조 방지가 아니다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "producer", "created_at", "items"],
+  "properties": {
+    "schema_version": { "const": "byul-evidence-index/0.1" },
+    "producer": { "enum": ["update", "runtime"] },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidence_id", "path", "bytes", "sha256", "media_type", "collector", "collected_at", "window", "source", "data_origin"],
+        "properties": {
+          "evidence_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "path": {
+            "description": "files/ 기준 상대 경로. 폴더 밖 경로와 symlink 이탈은 거부한다.",
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"
+          },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "$ref": "common.schema.json#/$defs/sha256" },
+          "media_type": { "type": "string", "pattern": "^[a-z]+/[a-z0-9.+-]+$" },
+          "collector": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "version"],
+            "properties": {
+              "name": { "type": "string" },
+              "version": { "type": ["string", "null"] }
+            }
+          },
+          "collected_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+          "window": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["from", "until"],
+                "properties": {
+                  "from": { "$ref": "common.schema.json#/$defs/nullable_timestamp" },
+                  "until": { "$ref": "common.schema.json#/$defs/nullable_timestamp" }
+                }
+              }
+            ]
+          },
+          "source": { "type": "string" },
+          "data_origin": { "$ref": "common.schema.json#/$defs/data_origin" },
+          "refs": {
+            "description": "이 증거를 쓴 객체·사건. guard EVD 참조나 runtime event_id.",
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

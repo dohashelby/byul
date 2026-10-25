@@ -1,0 +1,25 @@
+{
+  "schema_version": "byul-evidence-index/0.1",
+  "producer": "runtime",
+  "created_at": "2026-10-25T01:06:00Z",
+  "items": [
+    {
+      "evidence_id": "ev-request-0123",
+      "path": "request-0123.json",
+      "bytes": 74,
+      "sha256": "fc02dcf18791b56dff69f5f567f14483469c84ca5f895b6e1efb1a41b252cc7b",
+      "media_type": "application/json",
+      "collector": {
+        "name": "serving-runtime/query",
+        "version": null
+      },
+      "collected_at": "2026-10-25T01:06:00Z",
+      "window": null,
+      "source": "gateway",
+      "data_origin": "EXAMPLE",
+      "refs": [
+        "req:0123456789abcdef0123456789abcdef"
+      ]
+    }
+  ]
+}

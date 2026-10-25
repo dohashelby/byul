@@ -3,6 +3,8 @@
 The MEASURED EVD labels below are constructed test metadata for the verifier's
 source checks. They are not saved in repository evidence or reported as a real
 engine measurement. Probe attachments explicitly identify synthetic test input.
+Confirmed input violations below are independent synthetic fixture assertions,
+never inferred from the raw HTTP status or presented as real consumer sensing.
 """
 from copy import deepcopy
 from datetime import timedelta
@@ -24,7 +26,8 @@ VALUES = {
     "REQ-03": {"general_allowed_kinds": ["inference"]},
     "PLT-01": {"allowed_capabilities": [], "allowed_mounts": ["/models:ro"], "allowed_devices": [],
                "require_non_root": True, "allowed_exec_writable_paths": ["/guard-cache"]},
-    "PLT-04": {"forbidden_env_names": ["GUARD_TEST_CREDENTIAL"], "forbidden_mount_paths": []},
+    "PLT-04": {"forbidden_env_names": ["GUARD_TEST_CREDENTIAL"], "forbidden_mount_paths": [],
+               "credential_candidate_paths": []},
     "REQ-09": {"max_input_tokens": 127, "rejection_codes": ["400", "413", "422"],
                "allowed_endpoints": ["POST /v1/completions"], "allowed_input_formats": ["token_ids"]},
 }
@@ -40,13 +43,18 @@ def _observations(cid, fail):
                  "functional_probe_results": {"POST /v1/completions": "pass"}}
         values = {**probe, "process_scan_complete": True,
                   "worker_env_names": ["GUARD_TEST_CREDENTIAL"] if fail else [],
-                  "exposed_credential_paths": []}
+                  "exposed_credential_paths": [], "forbidden_mount_violations": [],
+                  "credential_candidate_results": {}, "credential_candidates_complete": True,
+                  "credential_candidates_planned": []}
     else:
         probe = {"functional_probes_planned": ["before", "after_token_id", "after_length"],
                  "functional_probe_results": {key: "pass" for key in ("before", "after_token_id", "after_length")}}
         values = {**probe, "challenges_planned": ["token_id", "length"],
                   "challenge_outcomes": {"token_id": "400", "length": "200" if fail else "400"},
                   "accepted_challenges": ["length"] if fail else [],
+                  "challenge_rejection_results": {"token_id": "verified", "length": "verified"},
+                  "challenge_consumption": {"token_id": "unknown", "length": "unknown"},
+                  "confirmed_input_violations": ["SYNTHETIC-confirmed-consumption"] if fail else [],
                   "input_endpoints_tested": ["POST /v1/completions"], "input_formats_tested": ["token_ids"]}
     return {key: {"collected": True, "value": value} for key, value in values.items()}
 

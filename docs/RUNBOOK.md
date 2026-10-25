@@ -2,7 +2,17 @@
 
 ## v1 통합 후보와 검증 이력
 
-2026-10-24 기준, 이 브랜치는 PR #24·#25·#28을 합치고 전체 회귀·설치본·새 복원 재판정을 통과한 [v1 기술 완료 후보](UPDATE_VALIDATION.md#v1-통합-후보-검증)다. main 미반영 상태이며 공식 출시 승인은 별도다. 현행 정의는 PACK-BASELINE 21/DRAFT·77개 점검 정의·정책 22점검/49경로·자동 연결 11개·adapter 0.4.1·declared 0.13.0이다. 자동 연결 수와 실제 전체 분기 검증 수를 구분한다.
+2026-10-24 기준, PR #29의 [v1 통합 검증](UPDATE_VALIDATION.md#v1-통합-후보-검증)은 main `641f12f`에 반영됐다. 현행 후보는 PACK-BASELINE 22/DRAFT·77개 점검 정의·정책 22점검/50경로·자동 연결 11개·REQ-09 revision 6·PLT-04 revision 3·adapter 0.4.2·declared 0.14.0이다. [새 계약 실측](UPDATE_VALIDATION.md#req-09plt-04-판정-의미-보완-후보)은 양쪽 실제 실행·반출/복원·재판정을 완료했지만 후보 REQ-09 보안 UNKNOWN으로 수락 실패다. update 종료0·harness 종료1·558.134초를 구분한다. 나머지 4개는 양쪽 보안/기능 PASS이며 PLT-04는 후보 빈 목록의 부분 범위다. PR #28/#29의 팩21 성공을 소급하지 않는다. 자동 연결 수는 실제 전체 분기 검증 수가 아니며 공식 출시·기업 승인은 별도다.
+
+## REQ-09·PLT-04 판정 보완의 입력과 확인
+
+REQ-09의 `max_input_tokens`·`rejection_codes`·전체 허용 endpoint/입력 형식은 기업 정책대로 입력한다. HTTP 상태·오류 본문·실제 소비 근거는 서로 다른 관측이다. `challenge_rejection_results`가 verified여야 확인된 거부 근거가 되며, HTTP 200 오류 객체는 실제 수용·소비나 FAIL의 근거가 아니다. 원시 2xx의 `accepted_challenges`를 수용 증명으로 해석하지 않는다. 자동 실행에서 소비가 미계측이면 `challenge_consumption=unknown`이며 `confirmed_input_violations`를 꾸며 채우지 않는다. 거부도 위반도 확인하지 못한 사례는 UNKNOWN으로 남긴다.
+
+PLT-04의 기존 `forbidden_env_names`·`forbidden_mount_paths`는 유지한다. 후자는 bind/volume 목적지가 선언한 금지 경로와 상위·하위로 겹치는 것 자체를 금지하는 정책이다. `forbidden_mount_violations`는 그 정책의 위반이며, 실제 자격 전달·파일 읽기 성공을 뜻하지 않는다. 기존 금지 정책을 비워 FAIL을 없애지 않는다.
+
+선택 입력 `credential_candidate_paths: list[str]`는 별도의 절대 경로 목록이다. 생략은 선정의 새 필수 키 오류가 아니지만 후보 관측이 미수집되어 PASS는 UNKNOWN으로 보류된다. 양식의 `null`은 실제 목록이 아니므로 미설정으로 둘 때는 키를 생략한다. 명시적인 `[]`는 요청한 후보가 없다는 뜻이며 기존 환경변수·마운트 정책의 부분 검증만 PASS 후보가 된다. 실제 기업 후보 목록을 줄여 통과시키지 않는다. 마운트 금지 목록에서 자동 복사하지 않는다. 실행기는 후보 파일 본문을 읽지 않고 worker와 수집 주체의 UID/GID/groups·namespace·capability·LSM 및 전후 메타데이터 안정성을 대조한 뒤 `os.access`의 읽기 권한을 확인한다. 후보 경로는 중복 없는 최대 32개·경로당 UTF-8 128바이트의 정규 절대 경로만 지원한다.
+
+`credential_candidate_results`의 absent/denied/candidate_readable/unknown/shadowed와 `credential_candidates_complete`·근거를 함께 확인한다. candidate_readable은 위 주체/메타데이터 계약으로 확인한 읽기 권한이며 실제 본문 읽기·자격 내용·자격 사용의 인증이 아니다. 확인된 금지 환경변수·마운트 위반 또는 candidate_readable은 독립 FAIL이다. 상위 마운트만으로 파일 존재·worker의 접근을 추정하지 않는다. 주체 불일치·권한 메타데이터 미확인·symlink·가려진 중첩 마운트는 불명확한 상태로 보존한다. 운영 비밀 원문은 읽거나 수집하지 않는다. 실험에서는 무해한 canary를 사용할 수 있으나 canary 내용/접근 인증 프로파일은 지원하지 않는다. 이 한정 시험은 실제 자격 전체·동적 provider·issuer의 사용 권한을 입증하지 않는다. 정책 템플릿은 실제 기업값을 자동 채우지 않으며 EXAMPLE/DRAFT·official=false를 유지한다.
 
 [PR #28의 두 이미지 실측](UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)은 vLLM API 0.31.0/0.32.0 CPU에서 기존 5개 점검의 양쪽 보안·기능 PASS와 수락·반출/복원·저장 팩 재판정 일치를 확인했다. 이 기록을 통합판에서 새로 실행한 결과로 표시하지 않는다. 비교는 모두 NO_CHANGE여서 실제 차이 탐지는 미증명이며 성능 UNKNOWN·정책/팩 DRAFT·official=false다.
 
@@ -18,7 +28,7 @@
 
 ## 현행 자동화 보강과 지원 범위
 
-직전 [자동화 보강](AUTOMATION_HARDENING.md)의 기록은 팩20/DRAFT·REQ-11 revision 3·정책21점검/46경로·declared/0.12.0 기준이다. 현재는 [이번 묶음](POLICY_RELIABILITY_BATCH.md)의 팩21/DRAFT·정책22점검/49경로·declared/0.13.0을 따른다. 자동 연결11개와 REQ-11의 생성 출력 귀속 미검증·전체 보안 PASS 보류는 유지한다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
+직전 [자동화 보강](AUTOMATION_HARDENING.md)의 기록은 팩20/DRAFT·REQ-11 revision 3·정책21점검/46경로·declared/0.12.0 기준이다. [정책·로그 보강](POLICY_RELIABILITY_BATCH.md)의 팩21/DRAFT·정책22점검/49경로·declared/0.13.0은 그다음 이력이며 현행은 위 팩22 판정 보완 후보를 따른다. 자동 연결11개와 REQ-11의 생성 출력 귀속 미검증·전체 보안 PASS 보류는 유지한다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
 
 단일 엔진은 prepare-validation → validate, 두 환경은 prepare-update → update를 사용한다. 새 준비 출력의 side별 check_support에서 SUPPORTED/UNSUPPORTED/UNKNOWN·이유·한계를 읽는다. ready는 입력/호스트 준비 상태이며 모든 점검의 지원이나 PASS가 아니다. 유효하지만 미지원인 정책은 지원 안내로 구분하고 다른 점검을 제거하지 않는다. COMPLETED/MEASURED는 전체 챌린지나 생성 출력 귀속의 입증 수가 아니다.
 
@@ -123,7 +133,8 @@ target의 `comparison_config`에는 엔진 이미지 자체를 제외한 실제 
 ## 신규 점검
 
 PLT-04의 executor 이름은 credential_exposure다. 정책은 forbidden_env_names/list[str],
-forbidden_mount_paths/list[str]이며 컨테이너 환경변수 이름/마운트 경로만 확인한다.
+forbidden_mount_paths/list[str]이며 컨테이너 환경변수 이름과 명시적 마운트 금지를 확인한다.
+팩22의 선택 credential_candidate_paths/list[str]는 위 설명대로 별도 접근 관측에 사용한다.
 처음에는 실제 자격 대신 GUARD_TEST_CREDENTIAL 같은 무해한 표식을 사용한다.
 자격값은 수집하지 않으며 읽기 실패가 있으면 PASS가 되지 않는다.
 

@@ -1,12 +1,41 @@
 # 두 이미지 CPU 업데이트 비교 수락 도구
 
-현행: PR #28에서 pinned CPU 이미지 0.31.0/0.32.0의 기존 다섯 점검 실행·수락·반출/복원·저장 팩 재판정을 통과했다. [실측 결과](#실측-결과--c-후속-2026-10-24)는 해당 PR 구현의 실제 실행 기록이고, [v1 통합 후보 검증](#v1-통합-후보-검증)은 PR #24·#25·#28을 합친 후보의 별도 검증 상태다. main 반영·공식 승인과 구분한다.
+## REQ-09·PLT-04 판정 의미 보완 후보
+
+**새 판정 계약의 두 이미지 실증은 수락 실패다.** 두 실제 이미지 실행·반출/복원·저장 팩 재판정은 완료했지만 후보 REQ-09의 보안 UNKNOWN으로 `accepted=false`다. `guard update`는 종료0·531.687초, 수락 harness는 종료1·558.134초다. 다섯 점검의 양쪽 보안/기능에 구체 PASS/FAIL을 요구하는 기존 기준을 충족하지 못했으며 판정·정책을 완화하지 않았다. PR #29는 main `641f12f`에 병합됐고 이번 계약은 PACK22/DRAFT·REQ-09 정의6·PLT-04 정의3이다.
+
+환경은 Windows 11·Docker Desktop Linux/WSL2 `6.18.33.2-microsoft-standard-WSL2`, Intel Core Ultra 7 255H·x86_64다. 양쪽 CPU2/threads2·memory4GiB/swap 포함5GiB·shm512MiB·float32·max_model_len128·KV64MiB·hardened/isolated 조건을 사용했다. 기존 OPT-125m revision `27dcfa74d334bc871f3234de431e71c6eeba5dd6`·inventory `b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6`을 재사용했다. 이미지·모델을 새로 다운로드하지 않았다.
+
+- 기준 API 0.31.0: `vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b`
+- 후보 API 0.32.0: `vllm/vllm-openai-cpu@sha256:827ef38187f9b52f2bb838695ef815ec5b65f4bf3e4c061b002b2b0a19cb0701`
+
+S/F는 보안/기능이다. 10개 EVD는 MEASURED이며 REQ-01/03의 Result 검증 수준은 DECLARED, 나머지는 MEASURED다. 정책은 EXAMPLE/DRAFT·팩은 DRAFT이므로 official=false·approval=null이며 성능은 모두 UNKNOWN이다.
+
+| 점검 | 기준 S/F | 후보 S/F | 보안 / 기능 비교 | 기준 / 후보 EVD ID |
+|---|---|---|---|---|
+| REQ-01 | PASS/PASS | PASS/PASS | NO_CHANGE / NO_CHANGE | EVD-01M5PT0TN9TVZ0HQHCFTN7D0VA / EVD-01M5PT7ZG99N1DC4WMWDVMJJP7 |
+| REQ-03 | PASS/PASS | PASS/PASS | NO_CHANGE / NO_CHANGE | EVD-01M5PT3W3XT4TP9ZTZR3K8Q2AJ / EVD-01M5PTB6B4Q3TX17S9HRV3WYXB |
+| REQ-09 | PASS/PASS | UNKNOWN/PASS | UNKNOWN / NO_CHANGE | EVD-01M5PT41MXXH815JJ549VKM9AX / EVD-01M5PTBCKKX2FZ1HZWA1Y7Q9MJ |
+| PLT-01 | PASS/PASS | PASS/PASS | NO_CHANGE / NO_CHANGE | EVD-01M5PT460N6WZCSQES0B6VS2RE / EVD-01M5PTBHYVZNWFCY655SAPS5SJ |
+| PLT-04 | PASS/PASS | PASS/PASS | NO_CHANGE / NO_CHANGE | EVD-01M5PT4ABGVVBGZRPGN3AYY2X0 / EVD-01M5PTBRBGA60MJKGPHYP0YES4 |
+
+**UNKNOWN의 원인:** 후보 REQ-09(EVD-01M5PTBCKKX2FZ1HZWA1Y7Q9MJ)의 token ID 거부는 verified지만 길이 거부는 `REJECTION_CAUSE_UNVERIFIED`다. 양쪽 길이 요청은 HTTP400이며 후보 본문은 `max_tokens must be at least 1, got 0`이었다. 실제 제출 `max_tokens=1`과 구별하고, 목표 길이 제한의 거부인지 다른 clamp 원인인지 확정하지 못했다. 정상 전후 대조·응답 본문·필수 관측은 모두 수집됐으므로 수집 실패가 아니라 검토한 요청/응답/소스 분기의 범위 한계다. 양쪽 실제 consumer/피해 센서는 없어 `challenge_consumption`의 두 case는 unknown, `confirmed_input_violations=[]`다. 기준의 PASS는 검토된 거부 근거에 의한 제한 판정이며 실제 소비 계측이 아니다. **보안·기능 FAIL은 0개**다. 마스킹 샘플은 정규화될 수 있으므로 원문과 구별하며 capture 메타데이터의 원본 SHA·바이트 수·파싱 상태를 함께 본다.
+
+PLT-04는 새 EXAMPLE 정책의 `credential_candidate_paths: []`로 요청한 후보가 없는 환경변수/마운트 금지의 부분 범위만 시험했다. 양쪽 금지 마운트 위반은 없고 후보 계획은 []·결과는 {}다. 후보 파일의 존재·부재·읽기 권한을 실제 시험한 결과가 아니다. 기존 기업 정책/과거 POL에 빈 목록을 보충하거나 기업의 실제 후보 목록을 줄이지 않는다. 비어 있지 않은 후보의 동일 worker 주체·메타데이터 관측, 실제 자격 내용/유효성/사용·동적 provider는 이번 실측으로 검증하지 않았다.
+
+verify·반출·두 복원·저장 팩 judge/report는 모두 종료0이다. 원본25=복원25객체·재판정26객체, 판정/비교 일치·원본 불변을 확인했다. `evidence_contract_valid=true`지만 후보 REQ-09의 구체 보안 판정이 없어 원본·재판정 수락은 false다. `<output>/run/summary.json`·`run-result-details.json`·원본 JSON/HTML·bundle에 근거가 있다. `preservation-after.json`에서 기존 컨테이너·이미지·모델·입력·과거 실증 보존과 두 실제 대상의 신원·소유 자원 정리를 확인했다. 이는 완전한 중간 감사 추적이나 호스트 인증은 아니다.
+
+실측 소스는 `<output>/source-release.zip`과 `preservation-before-release.json`의 제품93파일 SHA로 식별한다. 이후 `vllm.py`의 소스 인용 좌표 두 문자열만 `89–97→89–96`, `93–101→93–100`으로 정정했다. 함수·요청·판정 동작과 원본 EVD는 그대로이며 `rejection-source-review.json`에 소스10파일의 SHA·행 범위를 대조했다. 최종 코드의 `source-verified.zip`·`full-linux-verified.xml`·`dist-verified` 검증과 이번 원 실측을 구분하며 정정 후 엔진 재실행으로 표시하지 않는다.
+
+좌표 정정 후 최종 Linux/Python3.11.16 기본은 **2845통과·실패/오류/skip0·기존18제외·121.61초(부모122.859초)**다. `python -X utf8 -m pytest -q --basetemp=<output> --junitxml=<output>/full-linux-verified.xml --durations=50`으로 실행했고 기존2737사례 삭제0·신규108사례·신규skip0을 확인했다. wheel 제품93파일의 소스/설치본 일치와 오프라인 검증은 통과·8.038초이며 SHA256은 `60c2a538bf7d5c4d043203188d46290717d2fe1f5651fb379c95705367294872`다. 최종 코드의 과거 PACK21 복원·재판정은 11.453초·수락 통과, 원본4339파일·RES10개·보고 의미를 보존했다. 초기 집중/전체 실패에서 경로 목록 처리·수동 정책 상한·순수성 경계와 버전/카탈로그/과거 팩 fixture를 고쳤으며 기존 사례·불변식과 제외 조건을 완화하지 않았다. 좌표 정정 전 전체 2845통과·137.49초(부모138.293초)와 위 실제 엔진 실행은 별도 기록이다. 실제 변화의 REGRESSED/FIXED 탐지·후보 길이 거부 원인·위험한 소비/피해·비어 있지 않은 PLT-04 후보 접근·GPU/성능·다른 엔진/모델·77개 전체 자동화·기업 승인·호스트 인증은 미검증이다. REQ-01 일부 상태 변경 경로의 HTTP 미실행·TCP 차단 근거 범위도 유지한다.
+
+PR #29 통합 당시 기록: PR #28에서 pinned CPU 이미지 0.31.0/0.32.0의 기존 다섯 점검 실행·수락·반출/복원·저장 팩 재판정을 통과했다. [실측 결과](#실측-결과--c-후속-2026-10-24)는 팩21을 사용한 해당 PR 구현의 실제 실행 기록이고, [v1 통합 후보 검증](#v1-통합-후보-검증)은 PR #24·#25·#28을 합친 당시 후보의 별도 검증 상태다. 이후 main 병합과 팩22의 판정 의미 보완·공식 승인을 구분한다.
 
 도구 구현 당시 기록: 2026-10-24, Asia/Seoul. 출발점은 `codex/gua-automation-hardening`의 `f4541ecfdc843c474b4c0c2c7ead1399c606a9d6`이다. 당시 PR #19는 미병합 초안, 원격 main은 `24f7d90a2745c108d7d395e5082a3721a3198f0c`였다. 아래 구현 검증 절의 미실측·팩20·정책21점검/46경로는 그 시점의 기록이며 후속 성공을 취소하는 현행 안내가 아니다.
 
 ## 범위와 수락의 의미
 
-고정 최소 범위는 REQ-01·REQ-03·PLT-01·PLT-04·REQ-09다. 현행은 팩21/DRAFT, 활성77·자동연결11·정책22점검/49경로·카탈로그322행/614연결이다. 이번 통합은 새 정책·실행기·팩 revision·의존성·객체 종류를 추가하지 않는다. REQ-11 rev3의 보안 UNKNOWN과 독립 FAIL 보존도 그대로다. REQ-15의 제한 수동 계약은 이미 등록됐지만 실제 캐시 실행기는 없다. REQ-10 하위 runner 소비, OBS-03 exception dump, REQ-11 독립 출력 귀속, 실제 캐시 자동화·GPU·성능은 이번 범위 밖이다.
+고정 최소 범위는 REQ-01·REQ-03·PLT-01·PLT-04·REQ-09다. PR #29 통합 당시 범위는 팩21/DRAFT·활성77·자동연결11·정책22점검/49경로·카탈로그322행/614연결이었고 당시 통합은 새 정책·실행기·팩 revision·의존성·객체 종류를 추가하지 않았다. 현행 판정 의미 보완은 위 팩22·정책22점검/50경로·카탈로그323행/615연결을 따른다. REQ-11 rev3의 보안 UNKNOWN과 독립 FAIL 보존은 유지한다. REQ-15의 제한 수동 계약은 이미 등록됐지만 실제 캐시 실행기는 없다. REQ-10 하위 runner 소비, OBS-03 exception dump, REQ-11 독립 출력 귀속, 실제 캐시 자동화·GPU·성능은 이번 범위 밖이다.
 
 `accepted=true`는 다섯 점검의 양쪽 원본 증거·판정·비교·반출/복원·저장 팩 재판정 계약이 충족됐다는 뜻이다. 확인된 FAIL·STILL_FAILING도 유효한 시험 결과다. 배포 허가나 모든 보안 점검 통과를 뜻하지 않는다. 반대로 명령 종료0, MEASURED, COMPLETED만으로 수락하지 않는다. UNKNOWN만 있는 비교도 수락하지 않는다. 예시 정책은 EXAMPLE/DRAFT이므로 보고서 official=false이며 기업 승인값을 만들지 않는다.
 

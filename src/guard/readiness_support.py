@@ -29,7 +29,7 @@ _SCOPES = {
     "direct_route": "registered route access and bounded normal inference controls",
     "role_route": "declared general/admin roles over registered route kinds",
     "container_config": "owned container/process permissions and bounded sentinel writes",
-    "credential_exposure": "declared forbidden environment names and mount paths",
+    "credential_exposure": "explicit environment/mount bans and separate bounded worker credential-candidate metadata",
     "input_validation": "one engine token-array endpoint, token ID and input-length challenges",
     "sampling_validation": "bounded sampling API validation; runner consumption unverified",
     "response_content": "declared JSON fields/return options and synthetic private chat context",
@@ -185,6 +185,13 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             if type(limit) is int and type(budget) is int and limit + 1 > budget:
                 unsupported("valid input limit exceeds the bounded probe budget; policy is not reduced", policy_scope=True)
             row["limitations"].append("submitted endpoint/format is a bounded fixture, not proof of all parser consumption paths")
+            row["limitations"].append("HTTP success is not consumption proof; rejection needs an exact reviewed source/response contract")
+        elif executor == "credential_exposure":
+            row["limitations"].append("mount policy violations do not establish credential contents or use; candidate access needs the same observed worker subject")
+            if "credential_candidate_paths" not in values:
+                row["limitations"].append("candidate scope was not configured; security PASS is withheld by the new observation contract")
+            elif not values["credential_candidate_paths"]:
+                row["limitations"].append("explicit empty candidate scope covers environment/mount policy only; no credential file was tested")
         elif executor == "sampling_validation":
             if set(values.get("allowed_sampling_options", [])) - set(SAMPLING_OPTIONS):
                 unsupported("valid sampling policy contains options outside the bounded API profile", policy_scope=True)

@@ -1,8 +1,16 @@
 # 기업 정책 카탈로그 — Phase 1 검토 초안
 
-> 현행 [REQ-15 M14](POLICY_M14.md)는 PACK-BASELINE 21/DRAFT·REQ-15 revision 2·자동 연결 11개·정책 22점검/49경로·카탈로그 322행/614연결을 기준으로 한다. adapter 0.4.0·declared/0.13.0이다. 수동 캐시 증거의 제한 신고 계약이며 새 실제 실행기는 없다. [자동화 보강](AUTOMATION_HARDENING.md)의 REQ-11 입력 projection 하위 검증과 생성 출력 귀속 미검증·전체 보안 PASS 보류를 유지한다. 이 묶음은 실제 엔진을 기동하지 않았다. 과거 1~3차 CPU 실측과 새 합성 회귀를 합산하지 않는다.
+> 현행 판정 보완 후보는 PACK-BASELINE 22/DRAFT·REQ-09 revision 6·PLT-04 revision 3·자동 연결 11개·정책 22점검/50경로·카탈로그 323행/615연결이다. adapter 0.4.2·input_validation 0.5.0·credential_exposure 0.4.0·declared 0.14.0을 사용한다. PLT-04의 선택 정책 `credential_candidate_paths: list[str]` 한 경로를 추가한다. REQ-09의 응답 상태와 입력 소비, PLT-04의 명시적 마운트 금지 위반과 자격 후보 접근 가능성을 구분한다. 새 계약의 직접 검증 결과와 미검증 범위는 [판정 의미 보완 절](UPDATE_VALIDATION.md#req-09plt-04-판정-의미-보완-후보)을 따른다. PR #28/#29의 팩21 실측·재판정은 과거 계약의 결과로 보존한다.
 >
-> 분류 a46/b2/c161/d113는 정책의 현재 소비 상태이며 인프라 가능 등급 A/B/C와 다르다. GROUP·SALT의 제한 list/정본 참조는 전체 관계표/책임표의 구현 완료가 아니다. 아래 단계별 수치는 당시 기록이다.
+> 분류 a47/b2/c161/d113는 정책의 현재 소비 상태이며 인프라 가능 등급 A/B/C와 다르다. GROUP·SALT의 제한 list/정본 참조는 전체 관계표/책임표의 구현 완료가 아니다. [REQ-15 M14](POLICY_M14.md) 당시 팩21/DRAFT·정책 22점검/49경로·카탈로그 322행/614연결은 이력이다. 아래 단계별 수치는 당시 기록이다.
+
+## 현행 REQ-09·PLT-04 정책 의미
+
+- REQ-09의 `rejection_codes`는 기업이 승인한 거부 상태 코드다. 코드 일치만으로 오류 응답의 의미를 채우지 않는다. 오류 본문이 해당 입력의 명시적 거부임을 뒷받침해야 `challenge_rejection_results`가 verified가 되며, 단순 HTTP 2xx나 200 오류 객체는 실제 수용·소비가 아니다. `accepted_challenges`는 원시 2xx 목록으로 보존하지만 새 FAIL 근거로 사용하지 않는다. 별도의 소비·피해 근거가 없으면 `challenge_consumption`은 unknown, `confirmed_input_violations`는 빈 목록이며 보안 판정은 UNKNOWN으로 남을 수 있다. 실제 사용한 한도·전체 endpoint/형식 정책을 시험에 맞춰 줄이지 않는다.
+- PLT-04의 `forbidden_mount_paths`는 해당 경로나 상위·하위가 bind/volume으로 겹치는 것을 금지하는 명시적인 마운트 정책이다. 위반은 `forbidden_mount_violations`로 남기고 기존 FAIL을 유지하되 실제 자격 파일의 전달·읽기 가능성이 확인됐다는 뜻으로 쓰지 않는다. 기존 `forbidden_env_names`와는 독립 정책이다.
+- 새 `credential_candidate_paths`는 worker에서 접근 여부를 따로 확인할 절대 경로 목록이며 `required: false`다. 생략은 선정의 새 필수 입력 오류가 아니지만 후보 관측이 미수집이므로 PASS를 UNKNOWN으로 보류한다. 명시적인 `[]`는 요청한 후보가 없다는 뜻이며 기존 환경변수·마운트 금지 정책의 부분 검증만 PASS 후보가 될 수 있다. 실제 기업 목록을 줄여 이 상태를 만들지 않는다. 이 목록을 기존 마운트 금지 목록에서 자동 복사하거나 기본값으로 채우지 않는다. `credential_candidate_results`의 absent/denied/candidate_readable/unknown/shadowed와 `credential_candidates_complete`·수집 근거를 확인한다. candidate_readable은 동일한 worker·수집 주체의 UID/GID/groups·namespace·capability·LSM과 안정된 파일 메타데이터를 확인한 뒤 `os.access`로 읽기 권한을 관측한 경우다. 본문 읽기 성공·자격 내용·자격 사용의 인증이 아니다. 확인된 금지 환경변수·마운트 위반 또는 이 제한 계약의 candidate_readable은 독립된 FAIL 근거다. 상위 마운트 존재만으로 이를 만들지 않으며, 주체 불일치·symlink·가려진 중첩 마운트 등은 불명확한 상태로 남긴다. 실제 파일 본문·운영 비밀 원문은 읽거나 증거로 수집하지 않는다. canary는 실험에서 사용할 수 있는 무해한 예시이며 canary 내용/접근을 인증하는 별도 프로파일은 구현하지 않았다.
+
+카탈로그의 새 항목은 `P-DRAFT-PLT-04-CREDENTIAL-CANDIDATE-PATHS` 하나다. 금지 정책과 후보 목록은 의미가 달라 합치지 않았다. CSV는 기존 322행 중 이 두 점검의 현행 소비 설명만 갱신하고 다른 원문 결정을 보존한다. 기업의 값·책임자·승인 기록은 여전히 미정이며 예시는 EXAMPLE/DRAFT다.
 
 > 1차 기록 당시 등록: 자동화 1차 팩17/DRAFT, 정책 18점검·38경로, 자동 실행기 연결 8개(신규3개는 제한 관측 프로파일). CSV의 원문 결정 303행·595연결을 보존하고 제한 프로파일 입력 투영 11행을 추가해 총314행·606연결이다. 이 11개를 기업의 복잡한 원결정 전체가 해결된 것으로 세지 않는다. 아래 Phase/M 단계별 수치는 당시 기록이며 [현재 구현·검증](AUTOMATION_PHASE1.md)을 따른다.
 

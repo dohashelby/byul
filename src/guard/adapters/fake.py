@@ -28,6 +28,9 @@ class FakeAdapter:
     def detect_version(self, handle: ContainerHandle) -> EngineIdentity:
         raise NotImplementedError("fake adapter has no engine")
 
+    def input_rejection_proof(self, **kwargs) -> dict:
+        return {"state": "unverified", "reason": "FAKE_ADAPTER_HAS_NO_REJECTION_PROOF", "sources": []}
+
     def read_option(self, name: CommonOption, env: Environment) -> FactValue:
         return FactValue(value=None)  # 모른다
 

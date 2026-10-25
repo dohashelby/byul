@@ -1,6 +1,10 @@
 # 77행 자동화 분류표 (요약)
 
-> 현행 통합 후보: PACK21/DRAFT·REQ-11 정의3·자동연결11·정책22점검49경로다. [REQ-15 M14](POLICY_M14.md)의 수동 신고 계약을 추가했으며 실제 캐시 실행기는 없다. [판정·준비 보강](AUTOMATION_HARDENING.md)의 입력 projection 성공과 생성 출력 귀속 미검증을 구분하는 REQ-11 보안 PASS 보류는 유지한다. 과거 팩19의 실제 CPU PASS를 소급 변경하지 않는다. 인프라 가능 등급 A/B/C와 정책 소비 분류 a/b/c/d는 별개다. 통합 후보의 검증 결과는 [v1 통합 후보 검증](UPDATE_VALIDATION.md#v1-통합-후보-검증)에 따르며 main 반영·공식 승인을 뜻하지 않는다.
+> 현행 판정 보완 후보: PR #29가 main `641f12f`에 반영된 뒤 PACK22/DRAFT·REQ-09 정의6·PLT-04 정의3·정책22점검50경로로 보완했다. 자동 연결11·77개 ID와 다른75개 정의를 유지한다. [새 계약 실측](UPDATE_VALIDATION.md#req-09plt-04-판정-의미-보완-후보)은 두 실제 CPU 이미지 실행·반출/복원·재판정 동일을 확인했지만 후보 REQ-09 보안 UNKNOWN으로 accepted=false다. 나머지 4개는 양쪽 보안/기능 PASS·PLT-04는 후보 빈 목록의 부분 범위다. 보안/기능 FAIL0·성능 UNKNOWN·official=false를 유지하고 실제 변화 탐지는 미증명이다. [PR #29 통합 검증](UPDATE_VALIDATION.md#v1-통합-후보-검증)과 아래 PR #28 성공은 팩21의 이력이며 팩22로 소급하지 않는다. 인프라 가능 등급 A/B/C와 정책 소비 분류 a/b/c/d는 별개다.
+
+> 판정 의미: REQ-09는 상태 코드와 실제 소비를 구별한다. 원시 2xx 목록인 accepted_challenges는 신규 FAIL 근거가 아니며, 본문을 포함한 명시적 거부는 challenge_rejection_results, 실제 소비는 challenge_consumption, 확인된 위반은 confirmed_input_violations로 구분한다. 소비·피해 근거가 없으면 UNKNOWN이다. PLT-04의 forbidden_mount_paths는 명시적 마운트 금지 정책으로 FAIL을 보존한다. 선택 credential_candidate_paths는 파일 본문을 읽지 않고 동일 worker 주체의 메타데이터·읽기 권한을 관측한다. 누락은 미수집 UNKNOWN·명시[]는 요청한 후보 없음이다. candidate_readable은 메타데이터로 확인한 권한이며 자격 내용/사용 인증이 아니다. 상위 마운트만으로 이를 추정하지 않으며 forbidden_mount_violations·credential_candidate_results·credential_candidates_complete를 구분한다. canary 인증 프로파일은 지원하지 않는다. 기업 실제 목록을 줄이거나 운영 비밀 원문을 읽지 않는다. CSV는 이 두 행의 현행 계약·검증 범위만 바꾸며 다른75행과 A/B/C 등급은 보존한다.
+
+> 기존 제한 계약: [REQ-15 M14](POLICY_M14.md)의 수동 신고 계약은 실제 캐시 실행기가 아니다. [판정·준비 보강](AUTOMATION_HARDENING.md)의 입력 projection 성공과 생성 출력 귀속 미검증을 구분하는 REQ-11 보안 PASS 보류는 유지한다. 과거 팩19의 실제 CPU PASS를 소급 변경하지 않는다.
 
 > 두 이미지 실측: [PR #28의 C 후속 결과](UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)는 pinned vLLM CPU 0.31.0/0.32.0·기존 OPT 모델·동일 CPU 프로파일에서 REQ-01·REQ-03·REQ-09·PLT-01·PLT-04를 실제 실행하고 수락·반출/복원·저장 팩 재판정을 통과했다. 5개 점검의 양쪽 보안/기능은 PASS이며 전부 NO_CHANGE다. 실제 차이 탐지와 연결 11개의 모든 분기를 입증한 결과가 아니다. EVD 10개는 MEASURED이지만 REQ-01/03의 RES.verification_level은 조건의 신고 출처 때문에 DECLARED이고 나머지 3개는 MEASURED다. PACK21·예시 정책 DRAFT로 official=false, 성능 UNKNOWN이다. PR #27의 과거 실패와 앞선 미실측 기록은 별도로 보존한다.
 

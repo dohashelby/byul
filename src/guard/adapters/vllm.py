@@ -134,6 +134,89 @@ PINNED_SAFE_PROBES: dict[tuple[str, str, str, str], ProbeRequest] = {
     for key, probe in _reviewed_elastic_ep_probes(version, image).items()
 }
 
+# REQ-09 response meanings reviewed from the two exact local CPU image sources.
+# These are rejection proofs only; neither a 2xx nor a generation-shaped body
+# establishes that the submitted invalid input was consumed or caused damage.
+_INPUT_REJECTION_REVIEWS = {
+    "0.31.0": {
+        "image": SAFE_PROBE_REVIEWED_IMAGES["0.31.0"],
+        "token": [("vllm/v1/engine/input_processor.py", "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b", "397-400,598-626")],
+        "length": [("vllm/renderers/params.py", "ad38852674ebc5bbe69aa9df91602847d518382cc2ceb0a25aac1d07be66b504", "485-512,527-544"),
+                   ("vllm/renderers/online_renderer.py", "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e", "546-631,674-750")],
+        "error": ("vllm/entrypoints/serve/exception_handling/error_response.py", "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e", "38-48,89-96"),
+        "exception": ("vllm/exceptions.py", "22fe819c7ef10438f740c251d81af204871a04c3aa3eb1fd0e68604dc4c2146f", "28-58"),
+    },
+    "0.32.0": {
+        "image": SAFE_PROBE_REVIEWED_IMAGES["0.32.0"],
+        "token": [("vllm/v1/engine/input_processor.py", "97f66659814177d3f7b72b959f09201cbdd1794de21ec1542fe8970f18a1a2b6", "430-433,646-647"),
+                  ("vllm/renderers/base.py", "ec2fe84538bb30ad7ed1e10833081c8c389e6a2f8fda1dcef50005b9db75a1a7", "420-455")],
+        "length": [("vllm/renderers/params.py", "5113461cd308266727d9ced82900cbe65ae50245a2f3cb16224f6689574570a9", "515-540,555-572")],
+        "error": ("vllm/entrypoints/serve/exception_handling/error_response.py", "f83f3571e84fed1a471d090ed5f3a64702af21a36700c1e703c84478e6286fd5", "38-48,93-100"),
+        "exception": ("vllm/exceptions.py", "1c70ea415fe05a7be2c8312877894b2b30e96228461d83a2394922d06d006342", "28-58"),
+    },
+}
+_LENGTH_ERROR_031 = re.compile(
+    r"This model's maximum context length is (?P<limit>[1-9][0-9]*) tokens\. However, you requested "
+    r"(?P<output>[1-9][0-9]*) output tokens and your prompt contains (?P<qualifier>at least )?"
+    r"(?P<count>[1-9][0-9]*) input tokens, for a total of (?P<total_qualifier>at least )?"
+    r"(?P<total>[1-9][0-9]*) tokens\. Please reduce the length of the input prompt or the "
+    r"number of requested output tokens\. \(parameter=input_tokens, value=(?P<value>[1-9][0-9]*)\)"
+)
+_LENGTH_ERROR_032 = re.compile(
+    r"This model's maximum context length is (?P<limit>[1-9][0-9]*) tokens\. However, your prompt "
+    r"contains (?P<qualifier>at least )?(?P<count>[1-9][0-9]*) input tokens, which exceeds this "
+    r"limit even without any output tokens\. Please reduce the length of the input prompt\. "
+    r"\(parameter=input_tokens, value=(?P<value>[1-9][0-9]*)\)"
+)
+
+
+def _input_rejection_proof(*, engine_version, engine_image_digest, case, method, path,
+                           request_body, response_status, response_body) -> dict:
+    proof = {"state": "unverified", "reason": "REJECTION_CAUSE_UNVERIFIED", "sources": []}
+    review = _INPUT_REJECTION_REVIEWS.get(engine_version)
+    if review is None or engine_image_digest != review["image"]:
+        return {**proof, "reason": "INPUT_REJECTION_IMAGE_UNREVIEWED"}
+    if (method != "POST" or path != "/v1/completions" or type(request_body) is not dict
+            or set(request_body) != {"model", "prompt", "max_tokens"}
+            or type(request_body["model"]) is not str or not request_body["model"]
+            or type(request_body["max_tokens"]) is not int or request_body["max_tokens"] != 1):
+        return {**proof, "reason": "INPUT_REJECTION_REQUEST_UNREVIEWED"}
+    prompt = request_body["prompt"]
+    if type(prompt) is not list or not prompt or any(type(token) is not int or token < 0 for token in prompt):
+        return {**proof, "reason": "INPUT_REJECTION_REQUEST_UNREVIEWED"}
+    if type(response_status) is not int or response_status != 400 or type(response_body) is not dict or set(response_body) != {"error"}:
+        return proof
+    error = response_body["error"]
+    if (type(error) is not dict or set(error) != {"message", "type", "param", "code"}
+            or type(error["code"]) is not int or error["code"] != 400 or error["type"] != "BadRequestError"
+            or type(error["message"]) is not str):
+        return proof
+    matched = False
+    if case == "token_id":
+        matched = (len(prompt) == 1 and error["param"] is None
+                   and error["message"] == f"Token id {prompt[0]} is out of vocabulary")
+    elif case == "length" and all(token == 0 for token in prompt) and error["param"] == "input_tokens":
+        pattern = _LENGTH_ERROR_031 if engine_version == "0.31.0" else _LENGTH_ERROR_032
+        match = pattern.fullmatch(error["message"])
+        if match:
+            values = match.groupdict()
+            limit, count, rejected = (int(values[key]) for key in ("limit", "count", "value"))
+            output = int(values["output"]) if engine_version == "0.31.0" else 0
+            expected_qualifier = "at least " if count == limit - output + 1 else None
+            matched = (count == rejected == len(prompt) and count > limit - output
+                       and values["qualifier"] == expected_qualifier)
+            if engine_version == "0.31.0":
+                matched = (matched and output == request_body["max_tokens"]
+                           and int(values["total"]) == count + output
+                           and values["total_qualifier"] == expected_qualifier)
+    if not matched:
+        # In particular, max_tokens=0 can have other clamping causes. Its
+        # error alone is not a verified input-length rejection.
+        return proof
+    sources = [*review["token" if case == "token_id" else "length"], review["error"], review["exception"]]
+    return {"state": "verified", "reason": "REVIEWED_INPUT_REJECTION",
+            "sources": [{"path": path, "sha256": sha, "lines": lines} for path, sha, lines in sources]}
+
 # 공통 옵션 → vLLM 고유 옵션
 OPTION_FLAGS = {
     CommonOption.REMOTE_CODE_EXECUTION: "--trust-remote-code",
@@ -258,7 +341,10 @@ class VllmAdapter:
     base_url: str | None = None
     launch_spec: LaunchSpec | None = None
     name: str = field(default="vllm", init=False)
-    version: str = field(default="0.4.1", init=False)
+    version: str = field(default="0.4.2", init=False)
+
+    def input_rejection_proof(self, **kwargs) -> dict:
+        return _input_rejection_proof(**kwargs)
 
     # --- 기동 ------------------------------------------------------------------
 

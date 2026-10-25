@@ -1,6 +1,8 @@
 # 서빙엔진 보안 검증 솔루션 — 설계 초안 (SPEC v0.1)
 
-> 2026-10-24 현행 안내: 이 브랜치는 PR #24·#25·#28을 합치고 전체 회귀·설치본·새 복원 재판정을 통과한 [v1 기술 완료 후보](docs/UPDATE_VALIDATION.md#v1-통합-후보-검증)이며 main 반영·공식 출시 승인은 별도다. PACK-BASELINE 21/DRAFT·77개 점검 정의·정책 22점검/49경로·자동 연결 11개·adapter 0.4.1·declared 0.13.0을 사용한다. PR #28에서 두 실제 vLLM CPU 이미지(API 0.31.0/0.32.0)의 기존 5개 점검은 양쪽 보안·기능 PASS였고 수락·반출/복원·저장 팩 재판정이 일치했다. [실측 결과](docs/UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)는 해당 실행 코드의 기록이며 통합판의 새 실증으로 간주하지 않는다. 전부 NO_CHANGE라 실제 변화 탐지는 미증명이고 성능 UNKNOWN·DRAFT·official=false를 유지한다. EVD의 MEASURED 출처와 REQ-01/REQ-03 Result의 DECLARED 검증 수준은 다르며, REQ-01 일부 경로는 HTTP 대신 TCP 차단 근거로 검증했다. 기업 승인이나 전체 handler 실행을 뜻하지 않는다.
+> 2026-10-24 판정 의미 보완 후보: PR #29는 main 641f12f에 병합됐다. 현행 PACK22/DRAFT·REQ-09 정의6·PLT-04 정의3·정책22점검50경로·자동연결11이다. 사용자 결정으로 HTTP 성공을 위험한 소비와 구분하고, 명시 마운트 금지와 자격 후보 접근 관측을 분리한다. 어댑터0.4.2·input_validation0.5.0·credential_exposure0.4.0·declared0.14.0이며 이번 테스트·실증 결과는 아래 이전 팩21의 기록과 별도로 갱신한다. 원본 7객체·불변식·다른75개 정의·저장 팩의 과거 판정은 유지한다.
+
+> 2026-10-24 PR #29 통합 당시 기록: 당시 브랜치는 PR #24·#25·#28을 합치고 전체 회귀·설치본·새 복원 재판정을 통과한 [v1 기술 완료 후보](docs/UPDATE_VALIDATION.md#v1-통합-후보-검증)였으며 main 반영·공식 출시 승인은 별도였다. PACK-BASELINE 21/DRAFT·77개 점검 정의·정책 22점검/49경로·자동 연결 11개·adapter 0.4.1·declared 0.13.0을 사용했다. PR #28에서 두 실제 vLLM CPU 이미지(API 0.31.0/0.32.0)의 기존 5개 점검은 양쪽 보안·기능 PASS였고 수락·반출/복원·저장 팩 재판정이 일치했다. [실측 결과](docs/UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)는 해당 실행 코드의 기록이며 통합판의 새 실증으로 간주하지 않는다. 전부 NO_CHANGE라 실제 변화 탐지는 미증명이고 성능 UNKNOWN·DRAFT·official=false를 유지한다. EVD의 MEASURED 출처와 REQ-01/REQ-03 Result의 DECLARED 검증 수준은 다르며, REQ-01 일부 경로는 HTTP 대신 TCP 차단 근거로 검증했다. 기업 승인이나 전체 handler 실행을 뜻하지 않는다.
 
 > 2026-10-24 앞선 정책·로그 증거 보강 당시 기록: REQ-15 M14의 제한 수동 계약, OBS03/09 수집 경계·저장 로그 재검증, 설치 wheel CI·준비 guidance를 [구현/검증 기록](docs/POLICY_RELIABILITY_BATCH.md)에 정리했다. 객체 7종·원본/Ref·판정/비교 불변식을 유지하며 실제 캐시 자동 실행기를 포함하지 않았다. 해당 단계는 실제 엔진/두 이미지 실행을 하지 않았다.
 

@@ -25,6 +25,8 @@ from guard.report.html import render_html
 from guard.store import Store
 from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy, completion_response
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
+from tests.response_semantics_support import (SyntheticInputAdapter, synthetic_input_response,
+                                               with_legacy_check)
 from tests.test_policy_m2 import _manual_evidence
 from tests.test_policy_m4 import fill, snapshot, write
 
@@ -46,6 +48,9 @@ def values(check, **updates):
 def observed(check):
     return {key: Observation(value=value, collected=True) for key, value in {
         "challenge_outcomes": {"token_id": "400", "length": "400"}, "accepted_challenges": [],
+        "challenge_rejection_results": {"token_id": "verified", "length": "verified"},
+        "challenge_consumption": {"token_id": "unknown", "length": "unknown"},
+        "confirmed_input_violations": [],
         "challenges_planned": ["token_id", "length"],
         "functional_probes_planned": ["before", "after_token_id", "after_length"],
         "functional_probe_results": dict.fromkeys(["before", "after_token_id", "after_length"], "pass"),
@@ -72,8 +77,9 @@ def run(tmp_path, monkeypatch, pack, vals, probe=None, missing_target=False):
         calls.extend(deepcopy(requests))
         if probe:
             return probe(requests)
-        return [completion_response(r, 200 if r.get("id") == "ready" or r["body"]["prompt"] == [0] else 400)
+        return [synthetic_input_response(r, 200 if r.get("id") == "ready" or r["body"]["prompt"] == [0] else 400)
                 for r in requests]
+    monkeypatch.setitem(registry.ADAPTERS, "vllm", SyntheticInputAdapter)
     monkeypatch.setitem(registry.EXECUTORS, "input_validation:m10-test", lambda cfg: InputValidationExecutor(
         {"target": str(target), "vocab_size": 100, "vocab_source": "EXAMPLE synthetic model fixture"},
         container_probe=cprobe))
@@ -96,18 +102,18 @@ def run(tmp_path, monkeypatch, pack, vals, probe=None, missing_target=False):
 
 def test_registration_is_bounded_and_template_empty(pack):
     check = pack.checks["REQ-09"]
-    assert check.revision == 5 and pack.manifest.revision == 21 and not pack.reviewed
-    assert contract_state(check) == "complete" and len(check.required_observations) == 7
+    assert check.revision == 6 and pack.manifest.revision == 22 and not pack.reviewed
+    assert contract_state(check) == "complete" and len(check.required_observations) == 10
     assert len(pack.checks) == 77
     assert sum(bool(c.policy_params) for c in pack.active_checks()) == 22
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 49
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 50
     assert len([c for c in pack.active_checks() if c.executor]) == 11
     template = yaml.safe_load(build_policy_template(pack))
     assert template["values"]["REQ-09"] == {} and template["status"] == "DRAFT"
     assert template["confirmed_by"] is None and template["confirmed_at"] is None
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
-    assert len(rows) == 322 and sum(len(json.loads(r["check_ids"])) for r in rows) == 614
-    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=46, b=2, c=161, d=113)
+    assert len(rows) == 323 and sum(len(json.loads(r["check_ids"])) for r in rows) == 615
+    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=47, b=2, c=161, d=113)
     for pid, key in zip(("P-DRAFT-INPUT-ENDPOINTS", "P-DRAFT-INPUT-FORMATS"), POLICIES):
         row = next(r for r in rows if r["proposed_policy_id"] == pid)
         assert row["classification"] == "a" and json.loads(row["current_param_paths"]) == [f"values.REQ-09.{key}"]
@@ -195,8 +201,12 @@ def test_endpoint_comes_from_definition_and_request_not_policy(tmp_path, monkeyp
 
 @pytest.mark.parametrize("boundary,expected", [(400,"PASS"),(200,"FAIL"),(206,"FAIL"),("timeout","UNKNOWN"),(500,"UNKNOWN"),(401,"UNKNOWN")])
 def test_boundary_results_keep_existing_meaning(tmp_path, monkeypatch, pack, boundary, expected):
+    # These two status-only FAIL cases exercise the immutable historical
+    # definition. New definitions never treat raw 2xx as consumption proof.
+    if boundary in (200, 206):
+        pack = with_legacy_check(pack, "REQ-09")
     def probe(requests):
-        return [completion_response(r, 200 if r.get("id")=="ready" or r["body"]["prompt"]==[0] else boundary) for r in requests]
+        return [synthetic_input_response(r, 200 if r.get("id")=="ready" or r["body"]["prompt"]==[0] else boundary) for r in requests]
     _, _, evd, res, _ = run(tmp_path, monkeypatch, pack, values(pack.checks["REQ-09"]), probe)
     assert evd.execution.status == "COMPLETED" and res.verdicts.security == expected
     assert res.verdicts.functional == "PASS" and res.verdicts.performance == "UNKNOWN"
@@ -206,6 +216,9 @@ def test_boundary_results_keep_existing_meaning(tmp_path, monkeypatch, pack, bou
     ("before", 500, "UNKNOWN", "FAIL"), ("before", "timeout", "UNKNOWN", "UNKNOWN"),
     ("after", 500, "FAIL", "FAIL"), ("after", "timeout", "FAIL", "UNKNOWN")])
 def test_controls_and_independent_failure(tmp_path, monkeypatch, pack, stage, outcome, security, functional):
+    # Independent raw-200 FAIL is a PACK21 contract, retained without changing
+    # any case or expected result. Current verified-violation cases are below.
+    pack = with_legacy_check(pack, "REQ-09")
     count = 0
     def probe(requests):
         nonlocal count
@@ -235,6 +248,7 @@ def test_scope_blocks_both_judges_without_erasing_fail(pack, key, bad):
         assert any(r.startswith("POLICY_CONTEXT:") for r in result.reasons)
     assert evd.to_dict()==before and vals==vbefore
     evd.observations["accepted_challenges"].value=["token_id"]
+    evd.observations["confirmed_input_violations"].value=["EXAMPLE-confirmed-token-id-consumption"]
     evd.observations["functional_probe_results"].value["after_token_id"]="fail"
     evd.observations["declared_verdicts"].value=dict(security="FAIL",functional="FAIL",performance="UNKNOWN")
     for judge,params in [(RuleTableJudge(),c.judge.params),(DeclaredJudge(),{})]:
@@ -250,7 +264,7 @@ def test_partial_declaration_never_falls_back_to_legacy_pass(pack, problem):
     elif problem=="obs_missing": c.required_observations=[o for o in c.required_observations if o.key!=OBSERVATIONS[0]]
     elif problem=="policy_optional": c.policy_params[-1].required=False
     elif problem=="policy_type": c.policy_params[-1].type="str"
-    elif problem=="obs_type": c.required_observations[-1].type="str"
+    elif problem=="obs_type": next(o for o in c.required_observations if o.key==OBSERVATIONS[-1]).type="str"
     elif problem=="duplicate": c.policy_params.append(c.policy_params[-1].model_copy())
     else: c.required_observations.append(ObsSpec(key=POLICIES[0],type="list[str]"))
     assert contract_state(c)=="partial"

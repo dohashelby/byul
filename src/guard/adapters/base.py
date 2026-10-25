@@ -89,6 +89,10 @@ class EngineAdapter(Protocol):
                       engine_version: str | None = None,
                       engine_image_digest: str | None = None) -> ProbeRequest | None: ...  # None = 보내지 않음(검증 안 된 상태 변경 경로)
 
+    def input_rejection_proof(self, *, engine_version: str | None, engine_image_digest: str | None,
+                              case: str, method: str, path: str, request_body: dict,
+                              response_status: int, response_body: dict) -> dict: ...
+
     def detect_version(self, handle: ContainerHandle) -> EngineIdentity: ...
 
     def read_option(self, name: CommonOption, env: Environment) -> FactValue: ...

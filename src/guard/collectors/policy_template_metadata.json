@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 21,
-    "sha256": "14b3288136b37c8221d4e72d021a6cf353e8996b98e8da08f92ba7c73cbcbeb6"
+    "revision": 22,
+    "sha256": "48a9ca0764f4d2ec99df59398bb3a184083718b9a91908d94e62d7b427c75167"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -190,6 +190,14 @@
       "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
       "catalog_id": "P-DRAFT-PLT-01-REQUIRE-NON-ROOT"
     },
+    "values.PLT-04.credential_candidate_paths": {
+      "type": "list[str]",
+      "description": "worker에서 파일 본문을 읽지 않고 별도로 메타데이터·읽기 권한을 관측할 자격 후보 절대 경로 목록",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "선정: 선택 list[str]; 누락을 required 오류로 바꾸지 않음 / 실행: forbidden_mount_paths와 독립 검증; 동일 worker/수집 주체의 UID/GID/groups·namespace·capability·LSM과 안정된 메타데이터를 확인한 뒤 os.access 관측; 파일 본문 읽기 금지 / 관측: credential_candidate_results absent/denied/candidate_readable/unknown/shadowed와 credential_candidates_complete / 판정: 누락은 미수집 UNKNOWN; 명시 []는 후보 없음의 부분 정책 검증; 검증된 candidate_readable과 금지 env/mount 위반은 독립 FAIL / 한계: candidate_readable은 유효 읽기 권한이며 자격 내용/유효성/사용의 인증이 아님; canary 인증 프로파일은 미지원 / 보고: 자격 전체/동적 provider/issuer 권한 미검증; 기업값·승인·공식 여부 구분",
+      "verification": "새 계약의 직접 검증 결과와 미검증 범위는 docs/UPDATE_VALIDATION.md의 REQ-09·PLT-04 판정 의미 보완 절 참고. PR #28/#29의 PACK21 실제 두 이미지·재판정은 과거 이력.",
+      "catalog_id": "P-DRAFT-PLT-04-CREDENTIAL-CANDIDATE-PATHS"
+    },
     "values.PLT-04.forbidden_env_names": {
       "type": "list[str]",
       "description": "worker에 전달하지 않을 환경변수 이름 목록; 자격 값 제외",
@@ -200,10 +208,10 @@
     },
     "values.PLT-04.forbidden_mount_paths": {
       "type": "list[str]",
-      "description": "worker에 노출하지 않을 자격 파일/디렉터리 절대 경로 목록",
+      "description": "worker에서 bind/volume 목적지와 겹치면 금지하는 절대 경로 목록; 실제 자격 접근과 별개",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: credential_exposure.validate_policy가 절대 경로/.. 검사; 금지 경로와 bind/volume 목적지의 상위·하위 포함 비교 / 판정: exposed_credential_paths 빈 목록/nonempty; 정책을 직접 읽지 않고 실행기가 만든 관측 소비 / 수동 판정: declared 0.5.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
-      "verification": "코드·기존 테스트 정적 대조; 기존 EXAMPLE 모의 계약 검증 기록; 실제 엔진 미실증",
+      "consumer": "선정: required list[str] 타입·누락 검사 / 실행: 절대 경로/.. 검증; 선언 금지 경로와 bind/volume 목적지의 상위·하위 겹침을 forbidden_mount_violations로 수집 / 판정: PACK22 PLT04정의3에서 명시적 마운트 금지 위반 FAIL 보존; 실제 자격 전달/읽기 성공과 구분 / 수동 판정: 필수 정책·첨부·정상 대조·신고 PASS 상한 유지; 신고 FAIL/UNKNOWN 보존",
+      "verification": "새 계약의 직접 검증 결과와 미검증 범위는 docs/UPDATE_VALIDATION.md의 REQ-09·PLT-04 판정 의미 보완 절 참고. PR #28/#29의 PACK21 실제 두 이미지·재판정은 과거 이력.",
       "catalog_id": "P-DRAFT-PLT-04-FORBIDDEN-MOUNT-PATHS"
     },
     "values.REQ-01.allowed_callers": {
@@ -250,32 +258,32 @@
       "type": "list[str]",
       "description": "서비스가 허용하는 입력 endpoint 목록을 정한다",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "선정: required list[str] 타입·누락 검사 / 실행: input_validation 0.3.0 요청 전 단일 프로파일 검사 / 판정: rule_table 0.5.0·declared 0.9.1의 관측 대조와 PASS 상한; REQ09 수동 보안/기능은 판정표와 일치할 때만 신고 PASS 유지; 신고 FAIL 보존 / 보고: POLICY_CONTEXT·정책 목록·시험 및 미검증 범위 표시",
-      "verification": "제한 프로파일의 합성 계약 검증 대상; 기업값/승인·실제 엔진·parser 소비 미검증",
+      "consumer": "선정: required 입력 정책의 타입·누락·단일 프로파일 검사 / 실행: input_validation 0.5.0의 정상 token-array 대조·ID/길이 challenge; 원시 HTTP 상태와 본문 거부·소비 관측을 분리 / 판정: PACK22 REQ09정의6의 확인된 거부/위반 계약; 원시2xx accepted_challenges만으로 FAIL하지 않음; 소비·피해 미확인 UNKNOWN / 수동 판정: declared 0.14.0에서 현재 선언된 판정표와 PASS 상한을 대조하고 신고 FAIL/UNKNOWN 보존 / 보고: 실제 전체 endpoint/형식 정책·시험/소비 미검증·출처를 구분",
+      "verification": "새 계약의 직접 검증 결과와 미검증 범위는 docs/UPDATE_VALIDATION.md의 REQ-09·PLT-04 판정 의미 보완 절 참고. PR #28/#29의 PACK21 실제 두 이미지·재판정은 과거 이력.",
       "catalog_id": "P-DRAFT-INPUT-ENDPOINTS"
     },
     "values.REQ-09.allowed_input_formats": {
       "type": "list[str]",
       "description": "텍스트·직접 token 등 허용 입력 형식을 정한다",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "선정: required list[str] 타입·누락 검사 / 실행: input_validation 0.3.0 요청 전 단일 프로파일 검사 / 판정: rule_table 0.5.0·declared 0.9.1의 관측 대조와 PASS 상한; REQ09 수동 보안/기능은 판정표와 일치할 때만 신고 PASS 유지; 신고 FAIL 보존 / 보고: POLICY_CONTEXT·정책 목록·시험 및 미검증 범위 표시",
-      "verification": "제한 프로파일의 합성 계약 검증 대상; 기업값/승인·실제 엔진·parser 소비 미검증",
+      "consumer": "선정: required 입력 정책의 타입·누락·단일 프로파일 검사 / 실행: input_validation 0.5.0의 정상 token-array 대조·ID/길이 challenge; 원시 HTTP 상태와 본문 거부·소비 관측을 분리 / 판정: PACK22 REQ09정의6의 확인된 거부/위반 계약; 원시2xx accepted_challenges만으로 FAIL하지 않음; 소비·피해 미확인 UNKNOWN / 수동 판정: declared 0.14.0에서 현재 선언된 판정표와 PASS 상한을 대조하고 신고 FAIL/UNKNOWN 보존 / 보고: 실제 전체 endpoint/형식 정책·시험/소비 미검증·출처를 구분",
+      "verification": "새 계약의 직접 검증 결과와 미검증 범위는 docs/UPDATE_VALIDATION.md의 REQ-09·PLT-04 판정 의미 보완 절 참고. PR #28/#29의 PACK21 실제 두 이미지·재판정은 과거 이력.",
       "catalog_id": "P-DRAFT-INPUT-FORMATS"
     },
     "values.REQ-09.max_input_tokens": {
       "type": "int",
       "description": "token-array 경계 시험의 서비스 입력 token 한도",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: input_validation.validate_policy가 양수/초과 시험 예산 검사; collect가 한도+1 token-array 생성 / 판정: REQ-09 표는 이 정수를 직접 참조하지 않음; challenge_outcomes 소비 / 수동 판정: declared 0.5.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
-      "verification": "코드·기존 테스트 정적 대조; 기존 EXAMPLE 모의 계약 검증 기록; 실제 엔진 미실증",
+      "consumer": "선정: required 입력 정책의 타입·누락·단일 프로파일 검사 / 실행: input_validation 0.5.0의 정상 token-array 대조·ID/길이 challenge; 원시 HTTP 상태와 본문 거부·소비 관측을 분리 / 판정: PACK22 REQ09정의6의 확인된 거부/위반 계약; 원시2xx accepted_challenges만으로 FAIL하지 않음; 소비·피해 미확인 UNKNOWN / 수동 판정: declared 0.14.0에서 현재 선언된 판정표와 PASS 상한을 대조하고 신고 FAIL/UNKNOWN 보존 / 보고: 실제 전체 endpoint/형식 정책·시험/소비 미검증·출처를 구분",
+      "verification": "새 계약의 직접 검증 결과와 미검증 범위는 docs/UPDATE_VALIDATION.md의 REQ-09·PLT-04 판정 의미 보완 절 참고. PR #28/#29의 PACK21 실제 두 이미지·재판정은 과거 이력.",
       "catalog_id": "P-DRAFT-REQ-09-MAX-INPUT-TOKENS"
     },
     "values.REQ-09.rejection_codes": {
       "type": "list[str]",
       "description": "범위 밖 token-array 요청에 허용할 명시적 거부 HTTP 응답 코드",
       "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
-      "consumer": "실행: input_validation.validate_policy가 비어 있지 않은 400/413/422 문자열 목록 확인 / 판정: rule_table value_policy all_in; 계획한 두 challenge 응답을 비교 / 수동 판정: declared 0.5.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
-      "verification": "코드·기존 테스트 정적 대조; 기존 EXAMPLE 모의 계약 검증 기록; 실제 엔진 미실증",
+      "consumer": "선정: required 입력 정책의 타입·누락·단일 프로파일 검사 / 실행: input_validation 0.5.0의 정상 token-array 대조·ID/길이 challenge; 원시 HTTP 상태와 본문 거부·소비 관측을 분리 / 판정: PACK22 REQ09정의6의 확인된 거부/위반 계약; 원시2xx accepted_challenges만으로 FAIL하지 않음; 소비·피해 미확인 UNKNOWN / 수동 판정: declared 0.14.0에서 현재 선언된 판정표와 PASS 상한을 대조하고 신고 FAIL/UNKNOWN 보존 / 보고: 실제 전체 endpoint/형식 정책·시험/소비 미검증·출처를 구분",
+      "verification": "새 계약의 직접 검증 결과와 미검증 범위는 docs/UPDATE_VALIDATION.md의 REQ-09·PLT-04 판정 의미 보완 절 참고. PR #28/#29의 PACK21 실제 두 이미지·재판정은 과거 이력.",
       "catalog_id": "P-DRAFT-REQ-09-REJECTION-CODES"
     },
     "values.REQ-10.allowed_sampling_options": {

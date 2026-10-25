@@ -1,0 +1,38 @@
+{
+  "schema_version": "byul-runtime-status/0.1",
+  "generated_at": "2026-10-25T01:05:00Z",
+  "observation_session_id": "6f1c2a9e0b7d4c3a8e5f1029384756ab",
+  "target": {
+    "target_ref": "mock-engine-001",
+    "registration": "registered",
+    "instance_id": null,
+    "instance_state": "not_configured"
+  },
+  "policy": {
+    "policy_ref": {
+      "policy_id": "local-policy-001",
+      "policy_version": "3",
+      "sha256": "55dfcfb1c3cfea1e9b602895535e071d570863f648ee410a7761eafb22573be9"
+    },
+    "bundle_id": "bundle-local-policy-001-3",
+    "loaded": true,
+    "gateway_active": true,
+    "approval_state": "verified",
+    "valid_until": "2027-01-01T00:00:00+00:00"
+  },
+  "collectors": [
+    {
+      "source": "hubble",
+      "state": "ok",
+      "last_success_at": "2026-10-25T01:04:58Z"
+    },
+    {
+      "source": "tetragon",
+      "state": "stale",
+      "last_success_at": "2026-10-25T00:50:00Z"
+    }
+  ],
+  "store": {
+    "state": "ok"
+  }
+}

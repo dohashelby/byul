@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.byul.invalid/0.1/runtime-status.schema.json",
+  "title": "런타임 상태 스냅샷 (runtime → platform)",
+  "description": "runtime 계획서 §5.4 runtime-result.json의 상태 부분. /api/status를 읽은 시점의 합성값이다. 적용 설정은 동작 성공이 아니고, 미확인을 정상으로 바꾸지 않는다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "observation_session_id", "target", "policy", "collectors", "store"],
+  "properties": {
+    "schema_version": { "const": "byul-runtime-status/0.1" },
+    "generated_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "observation_session_id": { "type": ["string", "null"] },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target_ref", "registration", "instance_id", "instance_state"],
+      "properties": {
+        "target_ref": { "oneOf": [{ "$ref": "common.schema.json#/$defs/local_id" }, { "type": "null" }] },
+        "registration": { "type": "string" },
+        "instance_id": { "type": ["string", "null"] },
+        "instance_state": { "type": "string" }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_ref", "bundle_id", "loaded", "gateway_active", "approval_state", "valid_until"],
+      "properties": {
+        "policy_ref": { "$ref": "common.schema.json#/$defs/nullable_policy_ref" },
+        "bundle_id": { "type": ["string", "null"] },
+        "loaded": { "type": "boolean" },
+        "gateway_active": { "type": "boolean" },
+        "approval_state": { "enum": ["not_configured", "verified", "last_verified", "unverified", "rejected", "error"] },
+        "valid_until": { "$ref": "common.schema.json#/$defs/nullable_timestamp" }
+      }
+    },
+    "collectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "state", "last_success_at"],
+        "properties": {
+          "source": { "type": "string" },
+          "state": { "enum": ["disconnected", "never", "ok", "stale", "error"] },
+          "last_success_at": { "$ref": "common.schema.json#/$defs/nullable_timestamp" }
+        }
+      }
+    },
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": { "enum": ["ok", "error", "unknown"] }
+      }
+    }
+  }
+}

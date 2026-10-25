@@ -1,0 +1,65 @@
+{
+  "schema_version": "byul-environment/0.1",
+  "environment_id": "lab-env-001",
+  "revision": 1,
+  "created_at": "2026-10-25T00:00:00Z",
+  "data_origin": "EXAMPLE",
+  "target": {
+    "target_ref": "mock-engine-001",
+    "engine": {
+      "name": "vllm",
+      "version": "0.31.0",
+      "image_digest": null,
+      "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6"
+    },
+    "model": {
+      "id": "test-model",
+      "revision": null,
+      "inventory_sha256": null,
+      "tokenizer_revision": null
+    },
+    "runtime": {
+      "nodes": 1,
+      "tp_groups": 1,
+      "gpu_count": null,
+      "gpu_model": null,
+      "driver": null
+    }
+  },
+  "deployment": {
+    "kind": "kubernetes",
+    "kubernetes_context": "kind-runtime-lab",
+    "namespace": "serving-lab",
+    "gateway_labels": {
+      "app": "serving-gateway"
+    },
+    "engine_labels": {
+      "app": "serving-engine"
+    },
+    "engine_port": 8000,
+    "management_port": 8001
+  },
+  "facts": {
+    "gateway": {
+      "value": true,
+      "origin": "EXAMPLE",
+      "source": "platform#environment.facts.gateway"
+    },
+    "prefix_cache": {
+      "value": true,
+      "origin": "EXAMPLE",
+      "source": "platform#environment.facts.prefix_cache"
+    },
+    "shared_or_remote_weights": {
+      "value": false,
+      "origin": "EXAMPLE",
+      "source": "platform#environment.facts.shared_or_remote_weights",
+      "absence_evidence": null
+    },
+    "dynamic_import": {
+      "value": null,
+      "origin": null,
+      "source": null
+    }
+  }
+}

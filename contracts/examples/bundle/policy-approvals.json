@@ -1,0 +1,13 @@
+{
+  "schema_version": "runtime-policy-approvals/1.0",
+  "entries": [
+    {
+      "policy_id": "local-policy-001",
+      "policy_version": "3",
+      "sha256": "55dfcfb1c3cfea1e9b602895535e071d570863f648ee410a7761eafb22573be9",
+      "approval_ref": "LAB-EXAMPLE-ONLY-CONTEXT",
+      "approved_at": "2026-10-25T00:00:00Z",
+      "valid_until": "2027-01-01T00:00:00+00:00"
+    }
+  ]
+}

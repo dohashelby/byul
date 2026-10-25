@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.byul.invalid/0.1/policy.schema.json",
+  "title": "기업 정책 (platform → update, runtime)",
+  "description": "통합 플랫폼에서 입력하는 정책 하나. verification은 update의 POL 객체로, runtime은 정책 번들(policy-bundle)로 변환해 쓴다. 한 문서가 두 프로젝트의 정책을 함께 가져야 '이 정책으로 시험했고 이 정책으로 차단했다'를 같은 policy_ref로 이을 수 있다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "policy_id", "policy_version", "created_at", "data_origin", "status", "target_ref", "environment_ref", "validity", "approval", "verification", "runtime"],
+  "properties": {
+    "schema_version": { "const": "byul-policy/0.1" },
+    "policy_id": { "$ref": "common.schema.json#/$defs/local_id" },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "data_origin": { "$ref": "common.schema.json#/$defs/data_origin" },
+    "status": { "enum": ["DRAFT", "CONFIRMED"] },
+    "target_ref": { "$ref": "common.schema.json#/$defs/local_id" },
+    "environment_ref": {
+      "description": "이 정책을 정할 때 기준으로 삼은 환경 판본.",
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/doc_ref" }, { "type": "null" }]
+    },
+    "validity": { "$ref": "common.schema.json#/$defs/validity" },
+    "approval": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/approval" }, { "type": "null" }]
+    },
+    "verification": {
+      "description": "serving-guard POL 고유 필드와 같다(SPEC §4.2).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pack", "values", "scope", "exceptions"],
+      "properties": {
+        "pack": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "revision"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^PACK-[A-Z0-9-]+$" },
+            "revision": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "values": {
+          "description": "점검별 정책 값. 키는 check_id, 값은 그 점검 CheckDef.policy_params를 채운다.",
+          "type": "object",
+          "propertyNames": { "$ref": "common.schema.json#/$defs/check_id" },
+          "additionalProperties": { "type": "object" }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["include", "exclude"],
+          "properties": {
+            "include": { "type": "array", "items": { "type": "string" } },
+            "exclude": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "exceptions": {
+          "description": "판정을 바꾸지 않는다. 보고서에 '예외 승인됨'을 따로 표시할 뿐이다.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["check_id", "reason", "approved_by", "approved_at", "expires_at"],
+            "properties": {
+              "check_id": { "$ref": "common.schema.json#/$defs/check_id" },
+              "reason": { "type": "string", "minLength": 1 },
+              "approved_by": { "type": ["string", "null"] },
+              "approved_at": { "$ref": "common.schema.json#/$defs/nullable_timestamp" },
+              "expires_at": { "$ref": "common.schema.json#/$defs/nullable_timestamp" }
+            }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gateway", "enforcement", "exec_exceptions"],
+      "properties": {
+        "gateway": {
+          "description": "runtime-mvp/1.1·1.2 정책 본문에서 공통 필드(schema_version, policy_id, policy_version, target_id, valid_from/until, approval_ref)를 뺀 나머지.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowed_models", "output_default_tokens", "output_max_tokens", "max_body_bytes"],
+          "properties": {
+            "allowed_models": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "output_default_tokens": { "type": "integer", "minimum": 1 },
+            "output_max_tokens": { "type": "integer", "minimum": 1 },
+            "max_body_bytes": { "type": "integer", "minimum": 1 },
+            "max_context_tokens": { "type": ["integer", "null"], "minimum": 1 },
+            "profile": { "type": "string" },
+            "max_n": { "type": "integer", "minimum": 1 },
+            "extra_fields": { "type": "object" }
+          }
+        },
+        "enforcement": {
+          "description": "runtime-enforcement-intent 문서를 그대로 담는다. 내부 형식 검증은 runtime이 한다. 쓰지 않으면 null.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["intent_schema", "intent"],
+              "properties": {
+                "intent_schema": { "enum": ["runtime-enforcement-intent/1.0", "runtime-enforcement-intent/1.1"] },
+                "intent": { "type": "object" }
+              }
+            }
+          ]
+        },
+        "exec_exceptions": {
+          "description": "runtime-exec-exceptions/1.0의 exceptions 배열 항목을 그대로 담는다.",
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "CONFIRMED" } } },
+      "then": { "properties": { "approval": { "$ref": "common.schema.json#/$defs/approval" } } }
+    }
+  ]
+}

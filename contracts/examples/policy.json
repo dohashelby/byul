@@ -1,0 +1,59 @@
+{
+  "schema_version": "byul-policy/0.1",
+  "policy_id": "local-policy-001",
+  "policy_version": "3",
+  "created_at": "2026-10-25T00:00:00Z",
+  "data_origin": "EXAMPLE",
+  "status": "CONFIRMED",
+  "target_ref": "mock-engine-001",
+  "environment_ref": {
+    "id": "lab-env-001",
+    "revision": 1,
+    "sha256": "fbfda7b1129aaaf96c81479444d5f114068633681bbf0152837c2da254865839"
+  },
+  "validity": {
+    "valid_from": "2026-01-01T00:00:00+00:00",
+    "valid_until": "2027-01-01T00:00:00+00:00"
+  },
+  "approval": {
+    "approved_by": "lab-policy-owner",
+    "approved_at": "2026-10-25T00:00:00Z",
+    "approval_ref": "LAB-EXAMPLE-ONLY-CONTEXT"
+  },
+  "verification": {
+    "pack": {
+      "id": "PACK-BASELINE",
+      "revision": 22
+    },
+    "values": {
+      "REQ-01": {
+        "allowed_callers": [
+          "gateway-sa"
+        ]
+      },
+      "REQ-03": {
+        "general_allowed_kinds": [
+          "inference"
+        ]
+      }
+    },
+    "scope": {
+      "include": [],
+      "exclude": []
+    },
+    "exceptions": []
+  },
+  "runtime": {
+    "gateway": {
+      "allowed_models": [
+        "test-model"
+      ],
+      "output_default_tokens": 128,
+      "output_max_tokens": 128,
+      "max_body_bytes": 65536,
+      "max_context_tokens": 2048
+    },
+    "enforcement": null,
+    "exec_exceptions": []
+  }
+}

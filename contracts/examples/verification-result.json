@@ -1,0 +1,90 @@
+{
+  "schema_version": "byul-verification-result/0.1",
+  "report_ref": {
+    "kind": "RPT",
+    "id": "RPT-01M598RR3HPSJNHA1MENFA6P74",
+    "revision": 1,
+    "sha256": "627e792c63329951fff14e5254f3d50f89a0200a3a06b1d5344f9f6de30539e7"
+  },
+  "mode": "audit",
+  "created_at": "2026-10-19T05:04:53Z",
+  "data_origin": "EXAMPLE",
+  "plan_ref": {
+    "kind": "PLAN",
+    "id": "PLAN-01M598RQGT4DRY9XCVDYRZBRPW",
+    "revision": 1,
+    "sha256": "2b764d277c3b1714228755db49a9feb80961a7034e0f71208534586d54318a88"
+  },
+  "environment_refs": [
+    {
+      "kind": "ENV",
+      "id": "ENV-01M598RQGR67RF44J5BHFCKQ2D",
+      "revision": 1,
+      "sha256": "409623983eba359a234bf36a79dc673a830d9e444bd67eb9ab97a9a6964ac14a"
+    }
+  ],
+  "policy_ref": {
+    "kind": "POL",
+    "id": "POL-01M598RQGS37HPWGG5HZNZZEC1",
+    "revision": 1,
+    "sha256": "e098b512e99cc093d108bb7ae417e8cc056604d779d1b61349a015af1c5e05eb"
+  },
+  "byul_policy_ref": null,
+  "pack": {
+    "id": "PACK-BASELINE",
+    "revision": 1,
+    "review_status": "DRAFT"
+  },
+  "change_ref": null,
+  "summary": {
+    "by_area": {
+      "SUP": {
+        "security": "UNKNOWN"
+      },
+      "REQ": {
+        "security": "UNKNOWN"
+      },
+      "PLT": {
+        "security": "UNKNOWN"
+      },
+      "LIF": {
+        "security": "UNKNOWN"
+      },
+      "OBS": {
+        "security": "UNKNOWN"
+      }
+    },
+    "evidence_counts": {}
+  },
+  "checks": [
+    {
+      "check_id": "SUP-01",
+      "applicability": "UNDETERMINED",
+      "selected": true,
+      "sides": {
+        "single": {
+          "result_ref": {
+            "kind": "RES",
+            "id": "RES-01M598RQXY78K2P5F8YDVJB902",
+            "revision": 1,
+            "sha256": "7ed7450a47b81622f4f1250a46437d94311b9bae9aa22f8e0ce84728221d287d"
+          },
+          "security": "UNKNOWN",
+          "functional": "UNKNOWN",
+          "performance": "UNKNOWN",
+          "verification_level": null
+        }
+      },
+      "comparison": null,
+      "gaps": [
+        "NO_EXECUTOR"
+      ],
+      "evidence_source": null
+    }
+  ],
+  "limitations": [
+    "검토 전 팩(DRAFT): 공식 아님",
+    "EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음"
+  ],
+  "approval": null
+}

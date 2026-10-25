@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.byul.invalid/0.1/verification-result.schema.json",
+  "title": "격리 검증 결과 (update → platform)",
+  "description": "serving-guard RPT 객체를 화면용으로 줄인 투영. 원본은 RPT JSON이고 이 문서는 report_ref로 원본을 가리킨다. RPT에 없는 값을 새로 만들지 않는다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "report_ref", "mode", "created_at", "data_origin", "plan_ref", "environment_refs", "policy_ref", "pack", "change_ref", "summary", "checks", "limitations", "approval"],
+  "properties": {
+    "schema_version": { "const": "byul-verification-result/0.1" },
+    "report_ref": { "$ref": "common.schema.json#/$defs/object_ref" },
+    "mode": { "enum": ["audit", "update"] },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "data_origin": { "$ref": "common.schema.json#/$defs/data_origin" },
+    "plan_ref": { "$ref": "common.schema.json#/$defs/object_ref" },
+    "environment_refs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/object_ref" } },
+    "policy_ref": {
+      "description": "guard POL 객체 참조.",
+      "$ref": "common.schema.json#/$defs/object_ref"
+    },
+    "byul_policy_ref": {
+      "description": "POL을 만든 원본 byul-policy 판본. 플랫폼에서 입력하지 않은 정책이면 null.",
+      "$ref": "common.schema.json#/$defs/nullable_policy_ref"
+    },
+    "pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision", "review_status"],
+      "properties": {
+        "id": { "type": "string" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "review_status": { "enum": ["DRAFT", "REVIEWED"] }
+      }
+    },
+    "change_ref": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/object_ref" }, { "type": "null" }]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by_area", "evidence_counts"],
+      "properties": {
+        "by_area": {
+          "type": "object",
+          "propertyNames": { "enum": ["SUP", "REQ", "PLT", "LIF", "OBS"] },
+          "additionalProperties": {
+            "type": "object",
+            "required": ["security"],
+            "properties": { "security": { "$ref": "common.schema.json#/$defs/verdict" } }
+          }
+        },
+        "evidence_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["manual", "automated", "not_run"],
+            "properties": {
+              "manual": { "type": "integer", "minimum": 0 },
+              "automated": { "type": "integer", "minimum": 0 },
+              "not_run": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "applicability", "selected", "sides", "comparison", "gaps", "evidence_source"],
+        "properties": {
+          "check_id": { "$ref": "common.schema.json#/$defs/check_id" },
+          "applicability": { "enum": ["APPLICABLE", "NOT_APPLICABLE", "UNDETERMINED", "CONFLICT"] },
+          "selected": { "type": "boolean" },
+          "not_selected_reason": { "type": ["string", "null"] },
+          "sides": {
+            "description": "audit 모드는 single, update 모드는 baseline·candidate.",
+            "type": "object",
+            "propertyNames": { "enum": ["baseline", "candidate", "single"] },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["result_ref", "security", "functional", "performance", "verification_level"],
+              "properties": {
+                "result_ref": { "oneOf": [{ "$ref": "common.schema.json#/$defs/object_ref" }, { "type": "null" }] },
+                "security": { "$ref": "common.schema.json#/$defs/verdict" },
+                "functional": { "$ref": "common.schema.json#/$defs/verdict" },
+                "performance": { "$ref": "common.schema.json#/$defs/verdict" },
+                "verification_level": { "oneOf": [{ "$ref": "common.schema.json#/$defs/data_origin" }, { "type": "null" }] }
+              }
+            }
+          },
+          "comparison": {
+            "oneOf": [
+              { "enum": ["NO_CHANGE", "REGRESSED", "FIXED", "STILL_FAILING", "UNKNOWN", "NOT_COMPARABLE", "CARRIED_OVER"] },
+              { "type": "null" }
+            ]
+          },
+          "gaps": {
+            "type": "array",
+            "items": { "enum": ["NO_EXECUTOR", "NO_POLICY_VALUE", "NO_FIXTURE", "NO_ENV_FACT", "ADAPTER_UNSUPPORTED"] }
+          },
+          "evidence_source": { "enum": ["automated", "manual", null] },
+          "exception_approved": { "type": "boolean" }
+        }
+      }
+    },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "approval": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["approved_by", "approved_at", "decision", "note"],
+          "properties": {
+            "approved_by": { "type": "string" },
+            "approved_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+            "decision": { "enum": ["ACCEPT", "REJECT"] },
+            "note": { "type": "string" }
+          }
+        }
+      ]
+    }
+  }
+}

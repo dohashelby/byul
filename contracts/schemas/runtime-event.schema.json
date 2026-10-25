@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.byul.invalid/0.1/runtime-event.schema.json",
+  "title": "런타임 사건 (runtime → platform, events.jsonl 한 줄)",
+  "description": "runtime 계획서 §5.4의 events.jsonl. runtime 내부 기록(gateway record, observation 등)을 공통 머리 필드로 감싸고 원본은 native에 그대로 둔다. 탐지는 차단이 아니고, 집행 시도는 차단 확인이 아니다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "occurred_at", "recorded_at", "source", "category", "outcome", "enforcer", "rule_ref", "target_ref", "policy_ref", "scope", "data_origin", "origin_detail", "evidence_refs", "native"],
+  "properties": {
+    "schema_version": { "const": "byul-runtime-event/0.1" },
+    "event_id": {
+      "description": "gateway는 'req:<request_id>', 연속 feed는 'feed:<event_key>', 그 밖은 'sha:<native 정규 JSON 해시>'. 가짜 request_id를 만들지 않는다.",
+      "type": "string",
+      "pattern": "^(req:[0-9a-f]{32}|feed:[0-9a-f]{64}|sha:[0-9a-f]{64})$"
+    },
+    "occurred_at": {
+      "description": "사건이 일어난 시각(원본 관측 시각). 모르면 null.",
+      "$ref": "common.schema.json#/$defs/nullable_timestamp"
+    },
+    "recorded_at": {
+      "description": "runtime이 기록한 시각.",
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "source": { "enum": ["gateway", "management_listener", "hubble", "tetragon", "policy_state", "target_monitor", "collector"] },
+    "category": { "enum": ["request", "network", "process", "file", "policy", "target", "collector"] },
+    "outcome": {
+      "description": "allowed=정책 통과 후 전달 시도, denied=정책 거부 확인(전달 안 함), invalid=입력 오류 거부, engine_rejected=엔진이 거부, observed=관측만(판단 없음), detected=규칙 위반 탐지(차단 아님), enforce_attempted=집행 시도(결과 미확정), error=처리 오류, unknown=미완료·미확인.",
+      "enum": ["allowed", "denied", "invalid", "engine_rejected", "observed", "detected", "enforce_attempted", "error", "unknown"]
+    },
+    "enforcer": {
+      "description": "실제로 막을 수 있는 주체. Hubble은 관측원이라 enforcer가 아니다.",
+      "enum": ["gateway", "management_listener", "tetragon", "cilium", null]
+    },
+    "rule_ref": { "type": ["string", "null"], "maxLength": 128 },
+    "phase": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/runtime_phase" }, { "type": "null" }]
+    },
+    "target_ref": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/local_id" }, { "type": "null" }]
+    },
+    "target_instance_id": { "type": ["string", "null"] },
+    "policy_ref": { "$ref": "common.schema.json#/$defs/nullable_policy_ref" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "run_id", "observation_session_id", "request_id"],
+      "properties": {
+        "environment": { "type": ["string", "null"] },
+        "run_id": {
+          "description": "격리 실험일 때만 run-context의 run_id. 운영 사건은 null.",
+          "type": ["string", "null"]
+        },
+        "observation_session_id": { "type": ["string", "null"] },
+        "request_id": { "type": ["string", "null"], "pattern": "^[0-9a-f]{32}$" }
+      }
+    },
+    "related_checks": {
+      "description": "이 사건과 관련된 점검 ID. 매핑 규칙이 정해지기 전에는 빈 배열.",
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/check_id" }
+    },
+    "data_origin": { "$ref": "common.schema.json#/$defs/data_origin" },
+    "origin_detail": { "$ref": "common.schema.json#/$defs/origin_detail" },
+    "evidence_refs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/evidence_ref" } },
+    "native": {
+      "description": "runtime 내부 정규화 기록 원본. 프롬프트·응답·자격정보는 원래 저장하지 않으므로 여기에도 없다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "record"],
+      "properties": {
+        "schema_version": { "type": ["string", "null"] },
+        "record": { "type": "object" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "denied" } } },
+      "then": { "properties": { "enforcer": { "enum": ["gateway", "management_listener", "tetragon", "cilium"] } } }
+    },
+    {
+      "if": { "properties": { "source": { "const": "hubble" } } },
+      "then": { "properties": { "enforcer": { "const": null }, "outcome": { "enum": ["observed", "detected", "unknown"] } } }
+    }
+  ]
+}

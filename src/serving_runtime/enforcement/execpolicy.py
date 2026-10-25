@@ -181,7 +181,14 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
             "runs_observed", "lines_read", "unparsed_lines", "last_position", "matched_signals",
             "omitted_boundaries", "open_phases", "limitations",
         }
-        if not isinstance(extraction, dict) or set(extraction) != extraction_fields:
+        optional_extraction_fields = {
+            "follow", "collector_state", "clock_sources", "health_probe",
+        }
+        if (
+            not isinstance(extraction, dict)
+            or not extraction_fields <= set(extraction)
+            or set(extraction) - extraction_fields - optional_extraction_fields
+        ):
             raise IntentError("timeline.extraction has invalid fields")
         for name in ("engine", "pattern_set", "support_level", "timezone"):
             if not isinstance(extraction[name], str) or not extraction[name]:
@@ -229,6 +236,86 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
             values = extraction[name]
             if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
                 raise IntentError(f"timeline.extraction.{name} must be a string array")
+        follow = extraction.get("follow")
+        if follow is not None:
+            follow_fields = {
+                "mode", "existing", "state", "last_updated_at", "input_identity", "events",
+            }
+            if not isinstance(follow, dict) or set(follow) != follow_fields:
+                raise IntentError("timeline.extraction.follow has invalid fields")
+            if follow["mode"] not in {"file", "stdin"}:
+                raise IntentError("timeline.extraction.follow.mode is invalid")
+            if follow["existing"] not in {"fail", "overwrite", "resume"}:
+                raise IntentError("timeline.extraction.follow.existing is invalid")
+            if follow["state"] not in {"running", "stopped", "read_error", "input_ended"}:
+                raise IntentError("timeline.extraction.follow.state is invalid")
+            _time(follow["last_updated_at"], "timeline.extraction.follow.last_updated_at")
+            identity = follow["input_identity"]
+            if identity is not None and (
+                not isinstance(identity, dict)
+                or set(identity) != {"device", "inode"}
+                or any(
+                    isinstance(value, bool) or not isinstance(value, int) or value < 0
+                    for value in identity.values()
+                )
+            ):
+                raise IntentError("timeline.extraction.follow.input_identity is invalid")
+            events = follow["events"]
+            if not isinstance(events, list):
+                raise IntentError("timeline.extraction.follow.events must be an array")
+            for index, item in enumerate(events):
+                if (
+                    not isinstance(item, dict)
+                    or set(item) - {"kind", "at", "error"}
+                    or not {"kind", "at"} <= set(item)
+                    or not isinstance(item["kind"], str)
+                    or not item["kind"]
+                    or ("error" in item and (not isinstance(item["error"], str) or not item["error"]))
+                ):
+                    raise IntentError(f"timeline.extraction.follow.events[{index}] is invalid")
+                _time(item["at"], f"timeline.extraction.follow.events[{index}].at")
+        collector = extraction.get("collector_state")
+        if collector is not None:
+            if not isinstance(collector, dict) or set(collector) != {
+                "run_active", "run_init_ended", "compile_seen", "inferring_seen", "health_ready_at",
+            }:
+                raise IntentError("timeline.extraction.collector_state has invalid fields")
+            for name in ("run_active", "run_init_ended", "compile_seen", "inferring_seen"):
+                if not isinstance(collector[name], bool):
+                    raise IntentError(f"timeline.extraction.collector_state.{name} must be boolean")
+            if collector["health_ready_at"] is not None:
+                _time(
+                    collector["health_ready_at"],
+                    "timeline.extraction.collector_state.health_ready_at",
+                )
+        clocks = extraction.get("clock_sources")
+        if clocks is not None and (
+            not isinstance(clocks, dict)
+            or set(clocks) != {"log_boundaries", "health_boundaries", "ordering"}
+            or any(not isinstance(value, str) or not value for value in clocks.values())
+        ):
+            raise IntentError("timeline.extraction.clock_sources is invalid")
+        health = extraction.get("health_probe")
+        if health is not None:
+            if not isinstance(health, dict) or set(health) != {
+                "configured", "clock_source", "attempts", "successes", "failures",
+                "last_checked_at", "last_result",
+            }:
+                raise IntentError("timeline.extraction.health_probe has invalid fields")
+            if not isinstance(health["configured"], bool):
+                raise IntentError("timeline.extraction.health_probe.configured must be boolean")
+            for name in ("attempts", "successes", "failures"):
+                value = health[name]
+                if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                    raise IntentError(f"timeline.extraction.health_probe.{name} is invalid")
+            for name in ("clock_source", "last_result"):
+                if not isinstance(health[name], str) or not health[name]:
+                    raise IntentError(f"timeline.extraction.health_probe.{name} is invalid")
+            if health["last_checked_at"] is not None:
+                _time(
+                    health["last_checked_at"],
+                    "timeline.extraction.health_probe.last_checked_at",
+                )
     raw = document.get("entries")
     if not isinstance(raw, list):
         raise IntentError("entries must be an array")

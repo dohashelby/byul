@@ -619,6 +619,10 @@ intent 1.1의 `engine.management_port`는 observer가 접근할 이 listener의 
 .venv/bin/python -m serving_runtime enforce render --intent examples/enforcement/intent-v1.1.example.json --out /tmp/runtime-enforcement
 .venv/bin/python -m serving_runtime enforce cache-check --intent examples/enforcement/intent-v1.1.example.json --root /path/to/cache-copy
 .venv/bin/python -m serving_runtime enforce phase-signals --engine vllm --log engine.log --year 2026 --tz +00:00 --out timeline.json
+.venv/bin/python -m serving_runtime enforce phase-signals --engine vllm --log engine.log --year 2026 --tz +00:00 \
+  --out timeline.json --follow --health-url http://127.0.0.1:8000/health --overwrite
+docker logs -f s3b-vllm-cpu 2>&1 | .venv/bin/python -m serving_runtime enforce phase-signals \
+  --engine vllm --log - --year 2026 --tz +00:00 --out timeline.json --follow --resume
 .venv/bin/python -m serving_runtime enforce ingest --kind tetragon --input events.jsonl --origin real --data-dir DIR \
   --intent examples/enforcement/intent-v1.1.example.json \
   --exceptions examples/enforcement/exec-exceptions.example.json --timeline examples/enforcement/phase-timeline.example.json
@@ -626,15 +630,16 @@ intent 1.1의 `engine.management_port`는 observer가 접근할 이 listener의 
 
 - **SP4 작업별 통신:** `acquire`(모델 취득 Pod)의 송신 허용 목록, `test_receivers`(팀 소유 시험 목적지)와 수신 허용 역할, `engine.management_port`(observer는 이 포트만), `observer_kube_api`를 받습니다. `cilium-acquire-egress`, `cilium-observer-N-egress`, `cilium-receiver-NAME-ingress`를 추가로 생성합니다. engine 송신 허용에 acquire 목적지가 들어 있으면 형식 오류입니다. 로컬 kind에서 같은 receiver에 acquire는 허용, engine과 다른 client는 거부되는 것을 확인했습니다. TCP 연결 허용은 HTTPS 안의 URL·파일 권한을 입증하지 않습니다.
 - **SP1 모델·캐시:** `assets`에 tokenizer·승인 manifest 경로, `cache_root`, 캐시 세대(engine/image_id/model_revision/compile_profile), engine/acquire/probe UID를 둡니다. `protected_paths.cache_dir`는 세대 경로와 같아야 하고 캐시는 공급물 경로와 겹칠 수 없습니다. `pod-security-candidate.json`(공급물 읽기 전용 mount·비root UID·세대 subPath)과 TG-ASSET-02(tokenizer 쓰기 감시)를 만들고, TG-CACHE-01은 캐시 루트 전체를 감시해 변환 때 현재/다른 세대(CACHE-02)를 나눕니다. `enforce cache-check`는 링크를 따라가지 않고 세대 디렉터리의 소유자·권한·다른 세대를 보고합니다(삭제하지 않음). `engine: sglang`도 같은 경로 계산·Cilium/Tetragon 후보를 쓰지만, SGLang 캐시 환경변수 후보와 실제 resolved 경로는 아직 없습니다.
-- **SP3 단계별 실행:** `phase_binaries`(loading/compiling/inferring), `suspect_binaries`, 단계 시간표, 승인 예외로 실행 이벤트를 `allowed_in_phase`/`exception`/`outside_allowlist`/`suspect_binary`/`exec_from_cache`/`phase_unknown`으로 분류합니다. `phase-signals`는 로그에 연도·시간대가 없으므로 두 값을 필수로 받고 vLLM CPU v0.29.0에서 관찰한 표지만 `basis: engine_signal`로 변환합니다. 처리 줄 수·해석하지 않은 줄 수·마지막 line/byte 위치·생략 경계를 `extraction`에 남기며, 시각 없는 표지나 없는 compile 표지는 추정하지 않습니다. 생성한 파일을 ExecPolicy가 그대로 읽습니다. 관측·경보만 하며 실행을 막지 않습니다.
+- **SP3 단계별 실행:** `phase_binaries`(loading/compiling/inferring), `suspect_binaries`, 단계 시간표, 승인 예외로 실행 이벤트를 `allowed_in_phase`/`exception`/`outside_allowlist`/`suspect_binary`/`exec_from_cache`/`phase_unknown`으로 분류합니다. `phase-signals`는 로그에 연도·시간대가 없으므로 두 값을 필수로 받고 vLLM CPU v0.29.0에서 관찰한 표지만 `basis: engine_signal`로 변환합니다. 배치 모드는 기존처럼 파일을 한 번 읽고 health를 쓰지 않습니다. `--follow`는 파일 교체·잘림을 따라가거나 `--log -`의 표준입력을 읽고, 확정 경계와 heartbeat를 임시 파일+`os.replace`로 원자 교체합니다(권한 0600). 출력이 이미 있으면 `--overwrite` 또는 `--resume`을 명시해야 합니다. `--health-url`을 함께 주면 compile/init 완료 뒤 첫 HTTP 200의 Gateway 쪽 수집기 UTC 시각이 마지막 로그 경계보다 뒤일 때만 inferring을 열며, 실패·timeout·시계 역전은 경계를 만들지 않습니다. 처리 줄 수·해석하지 않은 줄 수·마지막 line/byte 위치·수집 상태·시계 출처·생략 경계를 `extraction`에 남기되 URL, 로그 원문, 요청·prompt·`SamplingParams` 줄은 저장하지 않습니다. 생성한 파일은 ExecPolicy가 mtime/size 변경 시 다시 읽습니다. 관측·경보만 하며 실행을 막지 않습니다.
 
 | vLLM CPU v0.29.0 신호 | 처리 |
 | --- | --- |
 | `Loading model from scratch...` → `Model loading took ... seconds` | loading 구간 |
 | `Loading weights took` | loading 진행·재시작 식별 보조(단독이면 시작 시각을 만들지 않음) |
 | `Warming up model for the compilation...` → `Warming up done.` | compiling 구간. 제공 실행은 eager라 torch.compile 자체는 비활성 |
-| `init engine (profile, create kv cache, warmup model) took` | 초기화 완료 표지; 단계 경계를 임의 생성하지 않음 |
+| `init engine (profile, create kv cache, warmup model) took` | 초기화 완료 표지; 배치에서는 단계 경계를 임의 생성하지 않고, follow+health에서는 probe 시작 조건 |
 | `Application startup complete.` | 타임스탬프가 있는 경우에만 inferring 시작. 제공 로그 줄은 시각이 없어 생략 기록 |
+| health HTTP 200 (`--follow --health-url`) | compile/init 뒤 첫 성공을 수집기 UTC 시각의 inferring 시작으로 기록. 로그 시각과 순서가 뒤집히면 생략 |
 
 GPU의 torch.compile·CUDA graph capture 표지는 미확인이고 SGLang은 근거 로그가 없어 패턴 미지원입니다. 모든 결과물은 클러스터 미적용 후보입니다(SP4 2개 정책만 kind에서 수동 확인 후 삭제). 실제 엔진의 단계별 정상 실행 목록, 캐시 권한 변경 관측, 실행 거부는 아직 없습니다.
 

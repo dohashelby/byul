@@ -7,7 +7,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import signal
 import sys
+import threading
 
 from .file_info import inspect_file
 
@@ -236,6 +238,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--tz", required=True, metavar="OFFSET", help="명시적 UTC offset(예: +00:00)"
     )
     phase_signals_parser.add_argument("--out", required=True, metavar="PATH")
+    phase_signals_parser.add_argument(
+        "--follow", action="store_true", help="파일 교체·잘림을 따라가거나 --log - 표준입력을 계속 읽기"
+    )
+    phase_signals_parser.add_argument(
+        "--health-url", metavar="URL", help="follow 중 init/compile 뒤 200을 추론 시작 근거로 사용"
+    )
+    phase_signals_parser.add_argument(
+        "--health-interval", type=float, default=2.0, metavar="SECONDS"
+    )
+    existing_group = phase_signals_parser.add_mutually_exclusive_group()
+    existing_group.add_argument(
+        "--overwrite", action="store_true", help="기존 timeline을 버리고 새 follow 상태로 교체"
+    )
+    existing_group.add_argument(
+        "--resume", action="store_true", help="기존 timeline 상태와 입력 위치에서 이어가기"
+    )
     args = parser.parse_args(argv)
     if args.command == "file-info":
         try:
@@ -406,9 +424,47 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0 if report["state"] in {"ok", "other_generations_present"} else 3
     if args.command == "enforce" and args.enforce_command == "phase-signals":
-        from .enforcement.phase_signals import extract_phase_timeline
+        from .enforcement.phase_signals import extract_phase_timeline, follow_phase_timeline
 
         output = Path(args.out)
+        if not args.follow and (
+            args.log == "-" or args.health_url is not None or args.overwrite or args.resume
+        ):
+            print(
+                "단계 신호 변환 실패: --log -, --health-url, --overwrite, --resume는 --follow와 함께 사용해야 합니다",
+                file=sys.stderr,
+            )
+            return 1
+        if args.follow:
+            stop = threading.Event()
+            previous_handler = None
+            if threading.current_thread() is threading.main_thread():
+                previous_handler = signal.getsignal(signal.SIGTERM)
+                signal.signal(signal.SIGTERM, lambda _signum, _frame: stop.set())
+            try:
+                timeline = follow_phase_timeline(
+                    args.log,
+                    output,
+                    engine=args.engine,
+                    year=args.year,
+                    timezone_offset=args.tz,
+                    existing="overwrite" if args.overwrite else "resume" if args.resume else "fail",
+                    health_url=args.health_url,
+                    health_interval=args.health_interval,
+                    stop_event=stop,
+                )
+            except (OSError, UnicodeError, ValueError) as error:
+                print(f"단계 신호 follow 실패: {error}", file=sys.stderr)
+                return 1
+            finally:
+                if previous_handler is not None:
+                    signal.signal(signal.SIGTERM, previous_handler)
+            extraction = timeline["extraction"]
+            print(
+                f"follow 종료 · 상태 {extraction['follow']['state']} · 단계 {len(timeline['entries'])}개 · "
+                f"처리 {extraction['lines_read']}줄"
+            )
+            return 0
         descriptor = -1
         try:
             timeline = extract_phase_timeline(

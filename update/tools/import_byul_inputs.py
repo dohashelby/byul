@@ -4,6 +4,8 @@ BYUL 루트에서 실행:
     uv run --project platform/api --with ./update python update/tools/import_byul_inputs.py \
         --environment <environment.json> --policy <policy.json> \
         --pack update/packs/PACK-BASELINE --output <새 외부 폴더>
+    uv run --project platform/api --with ./update python update/tools/import_byul_inputs.py \
+        --verify-import <기존 import 폴더> --pack update/packs/PACK-BASELINE
 
 기존 platform의 계약 검증기·정규 해시를 사용한다. guard의 제품 의존성이나
 공용 스키마를 바꾸지 않으며 엔진·네트워크·객체 저장소를 실행하지 않는다.
@@ -15,7 +17,9 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
+import re
 import sys
 from typing import Any
 
@@ -24,6 +28,9 @@ from guard.models import Environment, Policy, load_pack, new_id
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+_BUNDLE_FILES = ("source-environment.json", "source-policy.json", "environment.json", "policy.json")
+_MAPPING_KEYS = frozenset({"format", "checked_at", "target_ref", "environment_ref", "byul_policy_ref",
+                           "guard_environment_ref", "guard_policy_ref", "pack_ref", "validity", "limitations", "files"})
 
 
 class InputBoundaryError(ValueError):
@@ -43,17 +50,31 @@ def _constant(_value):
     raise InputBoundaryError("JSON_NONFINITE_NUMBER")
 
 
-def read_document(path: Path) -> tuple[dict[str, Any], bytes]:
+def _float(value):
+    number = float(value)
+    if not math.isfinite(number):
+        raise InputBoundaryError("JSON_NONFINITE_NUMBER")
+    return number
+
+
+def _parse_document(raw: bytes) -> dict[str, Any]:
     try:
-        raw = Path(path).read_bytes()
-        doc = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs, parse_constant=_constant)
+        doc = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs, parse_constant=_constant, parse_float=_float)
     except InputBoundaryError:
         raise
-    except (OSError, UnicodeError, ValueError) as error:
+    except (UnicodeError, ValueError) as error:
         raise InputBoundaryError("INPUT_JSON_UNREADABLE") from error
     if not isinstance(doc, dict):
         raise InputBoundaryError("INPUT_DOCUMENT_NOT_OBJECT")
-    return doc, raw
+    return doc
+
+
+def read_document(path: Path) -> tuple[dict[str, Any], bytes]:
+    try:
+        raw = Path(path).read_bytes()
+    except OSError as error:
+        raise InputBoundaryError("INPUT_JSON_UNREADABLE") from error
+    return _parse_document(raw), raw
 
 
 def _time(value: str | datetime) -> datetime:
@@ -62,7 +83,7 @@ def _time(value: str | datetime) -> datetime:
         if parsed.tzinfo is None:
             raise ValueError("naive")
         return parsed.astimezone(timezone.utc)
-    except (TypeError, ValueError, AttributeError) as error:
+    except (TypeError, ValueError, AttributeError, OverflowError) as error:
         raise InputBoundaryError("AS_OF_REQUIRES_TIMEZONE") from error
 
 
@@ -187,16 +208,189 @@ def import_inputs(environment_path: Path, policy_path: Path, pack_path: Path, ou
     return mapping
 
 
+def _bundle_file(root: Path, name: str) -> Path:
+    """명시된 import 묶음 밖의 파일이나 링크를 따라가지 않는다."""
+    path = root / name
+    if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
+        raise InputBoundaryError("IMPORT_FILE_PATH_UNSAFE")
+    try:
+        resolved = path.resolve(strict=True)
+    except OSError as error:
+        raise InputBoundaryError("IMPORT_FILE_MISSING") from error
+    if not resolved.is_relative_to(root) or not resolved.is_file():
+        raise InputBoundaryError("IMPORT_FILE_PATH_UNSAFE")
+    return resolved
+
+
+def _file_index(mapping: dict) -> dict:
+    files = mapping.get("files")
+    if type(files) is not list:
+        raise InputBoundaryError("IMPORT_FILE_INDEX_INVALID")
+    index = {}
+    for item in files:
+        if type(item) is not dict or set(item) != {"path", "bytes", "sha256"}:
+            raise InputBoundaryError("IMPORT_FILE_INDEX_INVALID")
+        name = item["path"]
+        if type(name) is not str or name not in _BUNDLE_FILES:
+            raise InputBoundaryError("IMPORT_FILE_PATH_UNSAFE")
+        if (name in index or type(item["bytes"]) is not int or item["bytes"] < 0
+                or type(item["sha256"]) is not str or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None):
+            raise InputBoundaryError("IMPORT_FILE_INDEX_INVALID")
+        index[name] = item
+    if set(index) != set(_BUNDLE_FILES):
+        raise InputBoundaryError("IMPORT_FILE_INDEX_INCOMPLETE")
+    return index
+
+
+def _readiness_reasons(env: Environment, pol: Policy, pack, mapping: dict) -> list[str]:
+    """파일 입력의 미확인 조건 안내다. 호스트·target·엔진 지원 여부를 판정하지 않는다."""
+    reasons = ["READ_ONLY_VERIFICATION_NOT_EXECUTION_AUTHORIZATION", "ENGINE_AND_TARGET_NOT_PROBED",
+               "LOCAL_PROVENANCE_NOT_AUTHENTICATED", "APPROVAL_IS_DECLARATION_NOT_AUTHENTICATION"]
+    if env.adapter is None:
+        reasons.append("ADAPTER_UNDECLARED")
+    digest = env.engine.image_digest
+    if digest is None:
+        reasons.append("ENGINE_IMAGE_DIGEST_UNDECLARED")
+    elif "@" not in digest:
+        reasons.append("REPOSITORY_PIN_REQUIRES_EXPLICIT_TARGET")
+    if env.engine.version is None:
+        reasons.append("ENGINE_VERSION_UNDECLARED")
+    if env.engine.source_commit is None:
+        reasons.append("ENGINE_SOURCE_COMMIT_UNDECLARED")
+    for field, code in (("id", "MODEL_ID_UNDECLARED"), ("revision", "MODEL_REVISION_UNDECLARED"),
+                        ("inventory_sha256", "MODEL_INVENTORY_UNDECLARED")):
+        if getattr(env.model, field) is None:
+            reasons.append(code)
+    if env.runtime.gpu_count is None:
+        reasons.append("RUNTIME_KIND_UNDECLARED")
+    elif env.runtime.gpu_count == 0 and env.runtime.cpu is None:
+        reasons.append("CPU_PROFILE_UNDECLARED")
+    elif env.runtime.gpu_count > 0:
+        if env.runtime.gpu_model is None:
+            reasons.append("GPU_MODEL_UNDECLARED")
+        if env.runtime.driver is None:
+            reasons.append("GPU_DRIVER_UNDECLARED")
+    if pol.status.value == "DRAFT":
+        reasons.append("POLICY_DRAFT")
+    if not pack.reviewed:
+        reasons.append("PACK_DRAFT")
+    if "POLICY_VALIDITY_PARTLY_UNDECLARED" in mapping["limitations"]:
+        reasons.append("POLICY_VALIDITY_PARTLY_UNDECLARED")
+    return reasons
+
+
+def verify_import(bundle: Path, pack_path: Path, *, contracts_dir: Path = REPO_ROOT / "contracts",
+                  as_of: datetime | None = None) -> dict:
+    """import 출력의 일관성을 읽기 전용으로 확인한다. 진위·승인·실행 허가는 아니다.
+
+    로컬 관리자가 원본·출력·provenance를 함께 다시 쓰는 것은 서명 없는 이 묶음으로
+    탐지할 수 없다. 반환 Ref·해시는 이번에 읽은 snapshot의 식별 정보다.
+    """
+    bundle = Path(bundle)
+    if bundle.is_symlink() or getattr(bundle, "is_junction", lambda: False)():
+        raise InputBoundaryError("IMPORT_FILE_PATH_UNSAFE")
+    try:
+        root = bundle.resolve(strict=True)
+        if not root.is_dir():
+            raise InputBoundaryError("IMPORT_BUNDLE_UNAVAILABLE")
+    except OSError as error:
+        raise InputBoundaryError("IMPORT_BUNDLE_UNAVAILABLE") from error
+    provenance_path = _bundle_file(root, "provenance.json")
+    mapping, provenance_raw = read_document(provenance_path)
+    if set(mapping) != _MAPPING_KEYS or mapping.get("format") != "guard-byul-input-import/1":
+        raise InputBoundaryError("IMPORT_MAPPING_FORMAT_INVALID")
+    index = _file_index(mapping)
+    actual_files = {path.name for path in root.iterdir()}
+    required_files = {*_BUNDLE_FILES, "provenance.json"}
+    if required_files - actual_files:
+        raise InputBoundaryError("IMPORT_FILE_MISSING")
+    if actual_files - required_files:
+        raise InputBoundaryError("IMPORT_BUNDLE_FILES_MISMATCH")
+
+    documents, payloads = {}, {}
+    for name in _BUNDLE_FILES:
+        path = _bundle_file(root, name)
+        try:
+            raw = path.read_bytes()
+        except OSError as error:
+            raise InputBoundaryError("IMPORT_FILE_UNAVAILABLE") from error
+        if len(raw) != index[name]["bytes"] or hashlib.sha256(raw).hexdigest() != index[name]["sha256"]:
+            raise InputBoundaryError("IMPORT_FILE_HASH_MISMATCH")
+        documents[name], payloads[name] = _parse_document(raw), raw
+
+    try:
+        env = Environment.model_validate(documents["environment.json"])
+        pol = Policy.model_validate(documents["policy.json"])
+    except ValueError as error:
+        raise InputBoundaryError("GUARD_INPUT_MODEL_INVALID") from error
+    if not env.hash_ok() or not pol.hash_ok():
+        raise InputBoundaryError("GUARD_OBJECT_HASH_INVALID")
+    contracts = Contracts(contracts_dir)
+    id_pattern = contracts.schemas["common"]["$defs"]["object_ref"]["properties"]["id"]["pattern"]
+    if (re.fullmatch(id_pattern, env.id) is None or not env.id.startswith("ENV-")
+            or re.fullmatch(id_pattern, pol.id) is None or not pol.id.startswith("POL-")):
+        raise InputBoundaryError("GUARD_OBJECT_ID_INVALID")
+    if (canonical_json(mapping["guard_environment_ref"]) != canonical_json(env.ref().model_dump(mode="json"))
+            or canonical_json(mapping["guard_policy_ref"]) != canonical_json(pol.ref().model_dump(mode="json"))):
+        raise InputBoundaryError("GUARD_OBJECT_REF_MISMATCH")
+
+    checked_at, verified_at = _time(mapping["checked_at"]), _time(as_of or datetime.now(timezone.utc))
+    if checked_at > verified_at:
+        raise InputBoundaryError("IMPORT_CHECKED_AT_IN_FUTURE")
+    pack = load_pack(pack_path)
+    source_env, source_pol = documents["source-environment.json"], documents["source-policy.json"]
+    expected_env, expected_pol, expected_mapping = convert_documents(source_env, source_pol, pack, contracts,
+                                                                      as_of=checked_at)
+    # 원래 생성 ID는 provenance와 정확히 연결한다. 값·revision·시각·출처는 바꾸지 않는다.
+    expected_env = expected_env.model_copy(update={"id": env.id}).seal()
+    expected_pol = expected_pol.model_copy(update={"id": pol.id}).seal()
+    expected_mapping["guard_environment_ref"] = expected_env.ref().model_dump(mode="json")
+    expected_mapping["guard_policy_ref"] = expected_pol.ref().model_dump(mode="json")
+    if any(canonical_json(mapping[key]) != canonical_json(value) for key, value in expected_mapping.items()
+           if key not in {"guard_environment_ref", "guard_policy_ref"}):
+        raise InputBoundaryError("IMPORT_SOURCE_MAPPING_MISMATCH")
+    if (payloads["environment.json"] != canonical_json(expected_env.to_dict())
+            or payloads["policy.json"] != canonical_json(expected_pol.to_dict())):
+        raise InputBoundaryError("IMPORT_CONVERSION_OUTPUT_MISMATCH")
+    # import 당시의 유효성만으로 충분하지 않다. 이번 명시 시각/현재 UTC에서도 다시 확인한다.
+    convert_documents(source_env, source_pol, pack, contracts, as_of=verified_at)
+    # 검증 중 파일 교체를 성공으로 보고하지 않는다. 검증 후 변경을 막는다는 보장은 아니다.
+    for name, raw in {**payloads, "provenance.json": provenance_raw}.items():
+        if _bundle_file(root, name).read_bytes() != raw:
+            raise InputBoundaryError("IMPORT_BUNDLE_CHANGED_DURING_VERIFICATION")
+    return {
+        "verified": True, "engine_executed": False, "execution_ready": None,
+        "time_basis": "EXPLICIT_AS_OF" if as_of is not None else "CURRENT_UTC",
+        "import_checked_at": checked_at.isoformat(), "verified_at": verified_at.isoformat(),
+        "provenance_sha256": hashlib.sha256(provenance_raw).hexdigest(),
+        "environment_ref": mapping["environment_ref"], "byul_policy_ref": mapping["byul_policy_ref"],
+        "guard_environment_ref": env.ref().model_dump(mode="json"),
+        "guard_policy_ref": pol.ref().model_dump(mode="json"), "pack_ref": pack.ref().model_dump(mode="json"),
+        "readiness_reasons": _readiness_reasons(env, pol, pack, mapping),
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--environment", type=Path, required=True)
-    parser.add_argument("--policy", type=Path, required=True)
+    parser.add_argument("--environment", type=Path)
+    parser.add_argument("--policy", type=Path)
     parser.add_argument("--pack", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--verify-import", type=Path, help="기존 import 묶음을 읽기 전용으로 검증")
     parser.add_argument("--contracts-dir", type=Path, default=REPO_ROOT / "contracts")
-    parser.add_argument("--as-of", help="시간대가 포함된 import 유효 기간 확인 시각")
+    parser.add_argument("--as-of", help="시간대가 포함된 import/verify 유효 기간 확인 시각")
     args = parser.parse_args(argv)
+    if args.verify_import is not None:
+        if any(value is not None for value in (args.environment, args.policy, args.output)):
+            parser.error("--verify-import cannot be combined with import input/output options")
+    elif any(value is None for value in (args.environment, args.policy, args.output)):
+        parser.error("import requires --environment, --policy and --output")
     try:
+        if args.verify_import is not None:
+            verified = verify_import(args.verify_import, args.pack, contracts_dir=args.contracts_dir,
+                                     as_of=_time(args.as_of) if args.as_of else None)
+            print(json.dumps(verified, ensure_ascii=False))
+            return 0
         mapping = import_inputs(args.environment, args.policy, args.pack, args.output,
                                 contracts_dir=args.contracts_dir,
                                 as_of=_time(args.as_of) if args.as_of else None)

@@ -62,7 +62,7 @@ def response_capture_metadata(response: dict) -> dict:
 
 
 def rejection_proof(adapter, env, *, case: str, method: str, path: str,
-                    request_body: dict, response: dict) -> dict:
+                    request_body: dict, response: dict, context=None) -> dict:
     """Only complete captures and a reviewed adapter can establish rejection.
 
     An adapter error is a collection gap, never confirmation of consumption or
@@ -93,9 +93,10 @@ def rejection_proof(adapter, env, *, case: str, method: str, path: str,
     if not callable(reviewer):
         return {**proof, "reason": "ADAPTER_REJECTION_REVIEW_UNAVAILABLE"}
     try:
+        extra = {"context": context} if context is not None else {}
         reviewed = reviewer(engine_version=env.engine.version, engine_image_digest=env.engine.image_digest,
                             case=case, method=method, path=path, request_body=request_body,
-                            response_status=status, response_body=payload)
+                            response_status=status, response_body=payload, **extra)
     except Exception:
         return {**proof, "reason": "ADAPTER_REJECTION_REVIEW_FAILED"}
     if (type(reviewed) is not dict or reviewed.get("state") not in {"verified", "unverified"}

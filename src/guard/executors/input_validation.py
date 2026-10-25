@@ -14,8 +14,15 @@ class InputValidationExecutor(HttpCheckExecutor):
     requires_roles = False
     requires_route_scope = False
 
+    def __init__(self, cfg, *args, **kwargs):
+        super().__init__(cfg, *args, **kwargs)
+        if cfg.get("length_cause_evidence") is True:
+            self.version = "0.6.0"
+
     def validate_configuration(self, check):
         """Validate execution bounds even when policy scope is unsupported."""
+        if "length_cause_evidence" in self.cfg and type(self.cfg["length_cause_evidence"]) is not bool:
+            raise ValueError("length_cause_evidence must be an explicit boolean")
         if type(self.cfg.get("vocab_size")) is not int or self.cfg["vocab_size"] < 1 or not self.cfg.get("vocab_source"):
             raise ValueError("execution settings need vocab_size and its model/fixture source")
         budget = self.cfg.get("max_probe_tokens", 4096)
@@ -50,6 +57,19 @@ class InputValidationExecutor(HttpCheckExecutor):
         template, fp = requests[0], next(iter(probes.values()))
         outcomes, controls, rejections, samples = {}, {}, {}, []
         semantic = response_contract_state(ctx.check) == "current"
+        cause_collector = None
+        cause_context = None
+        if semantic and self.cfg.get("length_cause_evidence") is True:
+            factory = getattr(ctx.adapter, "input_length_cause_collector", None)
+            try:
+                if callable(factory):
+                    cause_collector = factory(ctx)
+                    cause_collector.start()
+                else:
+                    cause_context = {"state": "unverified", "reason": "LENGTH_CAUSE_COLLECTOR_UNAVAILABLE"}
+            except Exception:
+                cause_collector = None
+                cause_context = {"state": "unverified", "reason": "LENGTH_CAUSE_COLLECTION_FAILED"}
         cases = {"token_id": [self.cfg["vocab_size"]],
                  "length": [0] * (ctx.policy_values["max_input_tokens"] + 1)}
         def send(req, label):
@@ -76,6 +96,16 @@ class InputValidationExecutor(HttpCheckExecutor):
                     rejections[name] = rejection_proof(ctx.adapter, ctx.env, case=name,
                         method=template["method"], path=fp.path, request_body=request["body"], response=response)
                 control("after_" + name)
+        if cause_collector is not None:
+            try:
+                cause_context = cause_collector.finish(samples)
+            except Exception:
+                cause_context = {"state": "unverified", "reason": "LENGTH_CAUSE_COLLECTION_FAILED"}
+            length = next((sample for sample in samples if sample["case"] == "length"), None)
+            if length is not None:
+                rejections["length"] = rejection_proof(ctx.adapter, ctx.env, case="length",
+                    method=template["method"], path=fp.path, request_body=length["request"]["body"],
+                    response=length["response"], context=cause_context)
         normal = {"attempted": True, "succeeded": len(controls) == 3 and all(v == "pass" for v in controls.values()),
                   "detail": "bounded token-array control before and after each challenge"}
         planned = ["before", "after_token_id", "after_length"]
@@ -115,5 +145,10 @@ class InputValidationExecutor(HttpCheckExecutor):
                                  "Only exact reviewed image/response/request contracts can verify rejection.",
                                  "Stored response bodies are masked and may be JSON-normalized; capture metadata retains original hashes and parse-state, not unmodified wire bytes."]})
             summary["fixture"]["response_evidence_profile"] = "input-response-evidence/1"
+            if self.cfg.get("length_cause_evidence") is True:
+                summary["length_cause_evidence"] = cause_context
+                summary["fixture"]["length_cause_evidence_profile"] = (
+                    cause_context.get("profile", "adapter-length-cause-unavailable/1")
+                    if isinstance(cause_context, dict) else "adapter-length-cause-unavailable/1")
             sample_artifact(ctx, "input_response_samples.json", {"samples": samples, "summary": summary})
         return obs, normal, [{"step": s, "attempted": len(outcomes) == len(cases)} for s in ctx.check.challenge_steps], summary

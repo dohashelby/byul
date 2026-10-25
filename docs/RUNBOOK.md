@@ -14,6 +14,8 @@ PLT-04의 기존 `forbidden_env_names`·`forbidden_mount_paths`는 유지한다.
 
 `credential_candidate_results`의 absent/denied/candidate_readable/unknown/shadowed와 `credential_candidates_complete`·근거를 함께 확인한다. candidate_readable은 위 주체/메타데이터 계약으로 확인한 읽기 권한이며 실제 본문 읽기·자격 내용·자격 사용의 인증이 아니다. 확인된 금지 환경변수·마운트 위반 또는 candidate_readable은 독립 FAIL이다. 상위 마운트만으로 파일 존재·worker의 접근을 추정하지 않는다. 주체 불일치·권한 메타데이터 미확인·symlink·가려진 중첩 마운트는 불명확한 상태로 보존한다. 운영 비밀 원문은 읽거나 수집하지 않는다. 실험에서는 무해한 canary를 사용할 수 있으나 canary 내용/접근 인증 프로파일은 지원하지 않는다. 이 한정 시험은 실제 자격 전체·동적 provider·issuer의 사용 권한을 입증하지 않는다. 정책 템플릿은 실제 기업값을 자동 채우지 않으며 EXAMPLE/DRAFT·official=false를 유지한다.
 
+**알려진 한계(LSM)**: 후보 관측은 각 프로세스의 `/proc/<pid>/attr/current`(AppArmor·SELinux 등 LSM 보안 컨텍스트)가 비어 있지 않아야 주체를 확인한다. LSM이 없거나 컨텍스트를 읽을 수 없는 호스트에서는 `WORKER_SUBJECT_UNVERIFIED`로 모든 후보가 unknown이 되고 PASS는 UNKNOWN으로 남는다. 설계상 보수적 처리이며 그 호스트에서 PLT-04 후보 관측은 지원하지 않는다.
+
 [PR #28의 두 이미지 실측](UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)은 vLLM API 0.31.0/0.32.0 CPU에서 기존 5개 점검의 양쪽 보안·기능 PASS와 수락·반출/복원·저장 팩 재판정 일치를 확인했다. 이 기록을 통합판에서 새로 실행한 결과로 표시하지 않는다. 비교는 모두 NO_CHANGE여서 실제 차이 탐지는 미증명이며 성능 UNKNOWN·정책/팩 DRAFT·official=false다.
 
 실제 EVD 10개의 출처는 MEASURED지만 REQ-01/REQ-03 Result의 검증 수준은 DECLARED다. REQ-01 일부 상태 변경 경로는 HTTP를 보내지 않고 TCP 차단 근거를 사용한다. 모든 handler 실행·기업 승인·11개 점검 모든 분기의 실증으로 확대하지 않는다.

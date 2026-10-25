@@ -11,41 +11,29 @@ import ipaddress
 import json
 import re
 import secrets
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from guard.runtime.docker import Docker
 from .base import LaunchSpec, ProbeRequest
 
-PROFILE = "vllm-cpu-length-cause/1"
-IMAGE = "vllm/vllm-openai-cpu@sha256:827ef38187f9b52f2bb838695ef815ec5b65f4bf3e4c061b002b2b0a19cb0701"
-MODEL = "facebook/opt-125m"
-MODEL_REVISION = "27dcfa74d334bc871f3234de431e71c6eeba5dd6"
-MODEL_INVENTORY = "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6"
-HARDENED_TMPFS = {"/tmp": "rw,noexec,nosuid,size=2g,mode=1777",
-                  "/guard-cache": "rw,exec,nosuid,size=2g,mode=1777"}
-ZERO_ERROR = "max_tokens must be at least 1, got 0. (parameter=max_tokens, value=0)"
-SOURCE_ROOT = "/opt/venv/lib/python3.12/site-packages/vllm/"
-NATIVE_PRELOAD = "/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4:/opt/venv/lib/libiomp5.so"
-NATIVE_PRELOAD_SHA256 = "1603072e3fe3f3c4dc61e83f8ec1a9ef82792b0c712469a4a385ce389cdc6eab"
-NATIVE_LIBRARIES = {
-    "/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4": "572af05b75e2366a3e8c06c29d3a04c0a538c9635c9957f2808846730ab81da5",
-    "/opt/venv/lib/libiomp5.so": "9c6d353bb4a555cb82bcf6baff47c0a019f994abfafa18e3d6ec073dedc3a606",
-}
-SOURCE_REVIEWS = {
-    "renderers/params.py": ("5113461cd308266727d9ced82900cbe65ae50245a2f3cb16224f6689574570a9", "209-241,515-572"),
-    "renderers/base.py": ("ec2fe84538bb30ad7ed1e10833081c8c389e6a2f8fda1dcef50005b9db75a1a7", "712-736,1008-1021,1260-1285"),
-    "renderers/inputs/preprocess.py": ("7890fa28f8594107fb2ff2c61e07ea045912e423d47111254bbccd381034b813", "129-138"),
-    "entrypoints/openai/completion/serving.py": ("bf3a2167da91e1e70d55b86345e9debdb5bd936837a583c318302457a27a9d88", "80-86,154-175,203-206"),
-    "entrypoints/openai/completion/protocol.py": ("b52f1211a6b9e3fef69653949d3cee2cfabd387a6601d7c81f73569fa81c2987", "289-300,377-395"),
-    "entrypoints/serve/utils/api_utils.py": ("ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba", "169-205"),
-    "entrypoints/serve/engine/serving.py": ("e46693a37e9a8b1087c8cee8a1e2cb9a2ce3d052772e3771755ef59de0885cf4", "102-109"),
-    "sampling_params.py": ("88fb3ac6ac3a456be62f5ac2afa7262cec5e00e82c6b425bdefa121cb525cd8a", "600,688-693"),
-    "platforms/__init__.py": ("1cb18cae8c7ad58f9f8c052d5fad11ab0bec68f2fac01b6912235e9615635de5", "174-228,240-293,303-322"),
-    "platforms/cpu.py": ("e8c3220ce2a277de62f9329eb630940bfc8acdb8fb31d6dfddd1238140c264ee", "103-109; no get_max_output_tokens override"),
-    "platforms/interface.py": ("637e120fcf2a45b02b81174b7ed4653364e9d16ff0063772f1fdfaf4f8dcd2b6", "224-225"),
-    "config/model.py": ("04ca37ea1d50128a7ddede30e7baa4e0a56bccec85091577a2c81c5de1a8fab8", "354-365,1847-1902"),
-    "engine/arg_utils.py": ("c10281277fd9a90dc8b22670db4f1af53708c5caa2aefee7aa861fa579329219", "779-788,1016-1019,2008-2009"),
-}
+# The reviewed image/model/source profile is data, not code: a new pinned
+# image is reviewed by adding a profile file, never by editing this module.
+_PROFILE_PATH = Path(__file__).resolve().parent / "reviewed_profiles" / "vllm-cpu-length-cause-1.json"
+_REVIEWED = json.loads(_PROFILE_PATH.read_text(encoding="utf-8"))
+PROFILE = _REVIEWED["profile"]
+ENGINE_VERSION = _REVIEWED["engine_version"]
+IMAGE = _REVIEWED["image"]
+MODEL = _REVIEWED["model"]
+MODEL_REVISION = _REVIEWED["model_revision"]
+MODEL_INVENTORY = _REVIEWED["model_inventory_sha256"]
+HARDENED_TMPFS = dict(_REVIEWED["hardened_tmpfs"])
+ZERO_ERROR = _REVIEWED["zero_error"]
+SOURCE_ROOT = _REVIEWED["source_root"]
+NATIVE_PRELOAD = _REVIEWED["native_preload"]
+NATIVE_PRELOAD_SHA256 = _REVIEWED["native_preload_sha256"]
+NATIVE_LIBRARIES = dict(_REVIEWED["native_libraries"])
+SOURCE_REVIEWS = {name: (item["sha256"], item["lines"]) for name, item in _REVIEWED["source_reviews"].items()}
 MAX_BYTES = 16384
 TIMEOUT = 30
 
@@ -194,7 +182,7 @@ class VllmLengthCause:
         from .vllm import CPU_LAUNCH_KEYS
         ctx = self.ctx
         launch = ctx.target.get("comparison_config", {}).get("launch", {})
-        if (ctx.env.engine.version != "0.32.0" or ctx.env.engine.image_digest != IMAGE
+        if (ctx.env.engine.version != ENGINE_VERSION or ctx.env.engine.image_digest != IMAGE
                 or ctx.env.model.id != MODEL or ctx.env.model.revision != MODEL_REVISION
                 or ctx.env.model.inventory_sha256 != MODEL_INVENTORY or launch.get("max_model_len") != 128
                 or launch.get("profile") != "cpu-bounded-v1" or launch.get("model_layout") != "snapshot"

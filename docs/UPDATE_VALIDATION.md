@@ -14,6 +14,8 @@ length_cause_evidence = true
 
 기본 실행기는 0.5.0, 명시적으로 옵션을 켠 실행기는 0.6.0이며 어댑터 0.4.2·팩22·판정표는 유지한다. 새 `vllm-cpu-length-cause/1`은 위 후보 digest의 0.32.0·기존 OPT-125m revision/inventory·CPU bounded 문맥128만 검토했다. 판정 기준인 `max_input_tokens=127`을 바꾸지 않고, 제출128·출력요청1·모델한도128·플랫폼 cap과 정상 대조를 연결해 출력 여유0의 원인을 확인한다. 같은 소유 컨테이너의 실제 trusted network ID/IP:8000과 HTTP 대상, 이미지·Cmd·마운트·기동 신원을 전후 대조한다. 플랫폼 관측은 별도 Python이며 API 서버 메모리의 직접 측정이 아니다.
 
+검토된 이미지·모델·소스 해시·네이티브 라이브러리·엔진 버전은 코드가 아니라 `src/guard/adapters/reviewed_profiles/vllm-cpu-length-cause-1.json`에 있다. 새 pinned 이미지(예: 패치 릴리스)를 검토하면 프로파일 파일을 추가하고, 판정 코드는 고치지 않는다. 프로파일이 맞지 않는 이미지에서는 원인 근거를 확인하지 않고 UNKNOWN을 유지한다.
+
 추가 Python 관측은 호출당 30초·16KiB로 제한한다. 해당 이미지의 기본 native preload도 일반 허용하지 않고 `reviewed-cpu-native-libraries/1`의 정확한 설정과 두 라이브러리 바이트 SHA를 검증한다. 다른 preload·값이 있는 다른 `LD_*`·Python 경로 주입은 관측 Python 기동 전에 거부한다. 소스/플랫폼/cap 불일치·대상 변경·정상 대조 부족도 UNKNOWN을 유지한다. 원인 첨부에는 허용 필드·고정 코드·해시만 남기며 원본 Env·호스트 마운트 경로·예외 문자열은 저장하지 않는다. 현재 수집 설정과 다른 버전/모델에 이 근거를 확대하지 않는다.
 
 PLT-04는 소유한 hardened 컨테이너의 `/guard-cache` tmpfs에 무해한 EXAMPLE 파일을 준비해 `[absent, denied]` 묶음·읽기 권한이 있는 파일·symlink·directory를 각각 시험했다. 기존 모델·마운트·컨테이너를 바꾸지 않았다. 컨테이너의 관측 프로세스 4개(수집 프로브 제외)의 주체·전후 안정된 메타데이터를 확인했으며 실행기는 후보 본문을 열지 않았다. 이 수를 모델 worker나 TP 그룹 수로 해석하지 않는다. 단순 마운트·mode bits만으로 접근을 추정하지 않고 지원하지 않는 경로 형태는 UNKNOWN으로 보존했다. readable은 후보 파일의 유효 읽기 권한이지 실제 자격 내용·유효성·서비스에서의 사용 인증은 아니다. 기존 명시적 마운트 금지 위반과 후보 관측은 계속 분리한다.

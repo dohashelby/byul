@@ -1,0 +1,202 @@
+{
+    "status": "ok",
+    "auth": {
+        "state": "not_configured",
+        "method": null,
+        "path": null,
+        "loaded_at": "2026-10-25T07:34:23.039863+00:00",
+        "auth_ref": null,
+        "principal_count": 0,
+        "disabled_principal_count": 0,
+        "route_roles": {},
+        "protected_routes": [],
+        "unprotected": [
+            "GET /api/*",
+            "GET /static/*",
+            "GET /"
+        ],
+        "error_code": null,
+        "error_message": null
+    },
+    "target": {
+        "registration": "not_configured",
+        "target_id": null,
+        "target_ref": null,
+        "error_code": null,
+        "gateway_hold": null,
+        "counts": {
+            "match": 0,
+            "mismatch": 0,
+            "unknown": 0,
+            "not_declared": 0
+        },
+        "instance": {
+            "state": "not_configured",
+            "observed_at": null,
+            "current": null,
+            "events_this_session": 0
+        }
+    },
+    "mode": "mock_engine",
+    "backend_kind": "mock",
+    "observation_session_id": "759cc9ad069e4953981d76f10968ab4c",
+    "environment": null,
+    "run_id": null,
+    "gateway": {
+        "host": "127.0.0.1",
+        "port": 18080
+    },
+    "policy": {
+        "path": "examples/mvp/policy.json",
+        "valid": true,
+        "schema_version": "runtime-mvp/1.0",
+        "policy_id": "local-policy-001",
+        "policy_version": "1",
+        "target_id": "mock-engine-001",
+        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+        "loaded_at": "2026-10-25T07:34:23.033163+00:00",
+        "profile": "default",
+        "test_only": false,
+        "max_n": 1,
+        "extra_fields": [],
+        "passthrough_count": 0,
+        "validate_count": 0,
+        "error_code": null,
+        "error_message": null,
+        "loaded": true,
+        "gateway_active": true,
+        "external_enforcement": "not_connected",
+        "reason_code": null,
+        "approval": {
+            "state": "not_configured",
+            "checked_at": null,
+            "verifier": null,
+            "reason_code": null,
+            "reason_message": null,
+            "evidence": {}
+        }
+    },
+    "policy_state": {
+        "loaded": true,
+        "gateway_active": true,
+        "external_enforcement": "not_connected",
+        "reason_code": null,
+        "approval": {
+            "state": "not_configured",
+            "checked_at": null,
+            "verifier": null,
+            "reason_code": null,
+            "reason_message": null,
+            "evidence": {}
+        }
+    },
+    "policy_history_store": {
+        "path": "/var/lib/serving-runtime/policy_history.jsonl",
+        "state": "ok",
+        "ok": true,
+        "last_error": null,
+        "last_error_at": null,
+        "corrupt_lines": []
+    },
+    "record_store": {
+        "data_dir": "/var/lib/serving-runtime",
+        "state": "ok",
+        "ok": true,
+        "last_error": null,
+        "last_error_at": null
+    },
+    "concurrency": {
+        "in_flight": 0,
+        "limit": 2
+    },
+    "connections": {
+        "active": 1,
+        "limit": 64,
+        "rejected": 0,
+        "request_header_timeout_s": 5.0,
+        "request_body_timeout_s": 10.0
+    },
+    "backend": {
+        "url": "http://127.0.0.1:18088/healthz",
+        "healthy": true,
+        "reachable": true,
+        "inference_verified": false,
+        "health": {
+            "status": "ok",
+            "receipts_store": {
+                "state": "ok",
+                "ok": true,
+                "last_error": null
+            },
+            "data_origin": "mock"
+        },
+        "checked_at": "2026-10-25T07:34:33.143752+00:00",
+        "error": null,
+        "receipts_store": {
+            "state": "ok",
+            "ok": true,
+            "last_error": null
+        },
+        "credential": "configured",
+        "kind": "mock",
+        "base_url": "http://127.0.0.1:18088",
+        "credential_configured": false,
+        "health_path": "/healthz",
+        "metrics_configured": false,
+        "metrics_credential": "not_configured",
+        "metrics_credential_configured": false,
+        "timeouts": {
+            "relay_timeout_s": 5.0,
+            "stream_idle_timeout_s": 30.0,
+            "request_deadline_s": 300.0
+        }
+    },
+    "mock_engine": {
+        "url": "http://127.0.0.1:18088/healthz",
+        "healthy": true,
+        "reachable": true,
+        "inference_verified": false,
+        "health": {
+            "status": "ok",
+            "receipts_store": {
+                "state": "ok",
+                "ok": true,
+                "last_error": null
+            },
+            "data_origin": "mock"
+        },
+        "checked_at": "2026-10-25T07:34:33.143752+00:00",
+        "error": null,
+        "receipts_store": {
+            "state": "ok",
+            "ok": true,
+            "last_error": null
+        },
+        "credential": "configured"
+    },
+    "baseline": {
+        "configured": false,
+        "states": {
+            "match": 0,
+            "drift": 0,
+            "missing": 0,
+            "stale": 0,
+            "error": 0,
+            "not_collected": 0
+        },
+        "model_id_limit": "model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않음"
+    },
+    "collectors": {
+        "engine_health": "ok",
+        "engine_info": "ok",
+        "metrics": "disconnected",
+        "record_retention": "ok",
+        "asset_integrity": "disconnected"
+    },
+    "revalidation": {
+        "open_count": 0,
+        "current_condition_count": 0,
+        "evaluation_state": "ok",
+        "storage_state": "ok"
+    }
+}

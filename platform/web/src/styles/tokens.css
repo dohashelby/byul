@@ -1,0 +1,137 @@
+/* 색·간격 토큰. serving-runtime 대시보드(static/app.css, ea3a78c)의 디자인을 그대로 따른다.
+   보라 강조색 하나 + 회색 단계. 빨강·주황(amber)은 오류·경고에만 쓴다.
+   밝은 테마가 기본이고, OS 설정이 어두우면 어두운 테마. 사용자가 고르면 html[data-theme]가 이긴다. */
+
+:root {
+  --bg: #f6f6f8;
+  --surface: #ffffff;
+  --surface-2: #f2f2f5;
+  --border: #e3e3e9;
+  --grid: #ececf1;
+  --text: #17181d;
+  --text-2: #3c3e48;
+  --muted: #6c6f7b;
+  --accent: #5b4fd6;
+  --accent-2: #8f86e6;
+  --accent-3: #c3bdf2;
+  --accent-soft: rgba(91, 79, 214, 0.1);
+  --accent-ink: #4a3fc0;
+  --chart-gray: #a3a6b1;
+  --chart-gray-2: #d3d5dc;
+  --error: #cf3b34;
+  --error-soft: #fbeceb;
+  --warn: #a8661a;
+  --warn-soft: #f9f0e3;
+  --radius: 6px;
+  --backdrop: rgba(8, 9, 14, 0.4);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0c12;
+    --surface: #111219;
+    --surface-2: #171923;
+    --border: #232633;
+    --grid: #1c1f2a;
+    --text: #e7e8ee;
+    --text-2: #c2c4ce;
+    --muted: #8a8d9b;
+    --accent: #7c70f2;
+    --accent-2: #5a50b8;
+    --accent-3: #3d3780;
+    --accent-soft: rgba(124, 112, 242, 0.16);
+    --accent-ink: #a69ef8;
+    --chart-gray: #5c5f6c;
+    --chart-gray-2: #3a3d48;
+    --error: #ec6a60;
+    --error-soft: rgba(236, 106, 96, 0.14);
+    --warn: #d9a050;
+    --warn-soft: rgba(217, 160, 80, 0.14);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b0c12;
+  --surface: #111219;
+  --surface-2: #171923;
+  --border: #232633;
+  --grid: #1c1f2a;
+  --text: #e7e8ee;
+  --text-2: #c2c4ce;
+  --muted: #8a8d9b;
+  --accent: #7c70f2;
+  --accent-2: #5a50b8;
+  --accent-3: #3d3780;
+  --accent-soft: rgba(124, 112, 242, 0.16);
+  --accent-ink: #a69ef8;
+  --chart-gray: #5c5f6c;
+  --chart-gray-2: #3a3d48;
+  --error: #ec6a60;
+  --error-soft: rgba(236, 106, 96, 0.14);
+  --warn: #d9a050;
+  --warn-soft: rgba(217, 160, 80, 0.14);
+  color-scheme: dark;
+}
+
+/* 아래는 위 팔레트에서 파생한 별칭이다. 색 값은 위에서만 정한다. */
+:root {
+  --font-sans: Inter, "Pretendard", -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-1: 4px;
+  --radius-2: var(--radius);
+  --radius-3: var(--radius);
+  --sidebar-w: 216px;
+  --topbar-h: 52px;
+  --panel-w: 520px;
+
+  --surface-1: var(--surface);
+  --surface-3: var(--surface-2);
+  --text-1: var(--text);
+  --text-3: var(--muted);
+  --border-strong: var(--border);
+  --accent-bg: var(--accent-soft);
+  --focus: var(--accent);
+  --row-hover: var(--surface-2);
+  --row-selected: var(--accent-soft);
+
+  /* 배지 톤: 중립이 기본, 통제 결과·충족은 강조색, 오류만 빨강, 경고·예시는 주황 */
+  --tone-neutral-fg: var(--text-2);
+  --tone-neutral-bg: var(--surface-2);
+  --tone-accent-fg: var(--accent-ink);
+  --tone-accent-bg: var(--accent-soft);
+  --tone-warn-fg: var(--warn);
+  --tone-warn-bg: var(--warn-soft);
+  --tone-error-fg: var(--error);
+  --tone-error-bg: var(--error-soft);
+  --tone-muted-fg: var(--muted);
+  --tone-muted-bg: var(--surface-2);
+  --tone-red-fg: var(--error);
+
+  /* 그래프 계열 — serving-runtime 대시보드와 같은 배정 */
+  --viz-allowed: var(--accent);
+  --viz-denied: var(--accent-2);
+  --viz-invalid: var(--accent-3);
+  --viz-engine-rejected: var(--chart-gray);
+  --viz-error: var(--error);
+  --viz-unknown: var(--chart-gray-2);
+  --viz-detected: var(--warn);
+  --viz-enforce: var(--warn);
+  --viz-other: var(--chart-gray-2);
+  --viz-grid: var(--grid);
+  --viz-axis: var(--muted);
+  --viz-gap: var(--surface);
+
+  --banner-example-bg: var(--warn-soft);
+  --banner-example-fg: var(--warn);
+  --banner-unofficial-bg: var(--error-soft);
+  --banner-unofficial-fg: var(--error);
+}

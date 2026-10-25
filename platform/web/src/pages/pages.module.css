@@ -1,0 +1,120 @@
+/* 화면 배치. serving-runtime 대시보드의 간격·카드 모양을 따른다. */
+.chartRow {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 12px;
+}
+.three {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 440px;
+  gap: 12px;
+  align-items: start;
+}
+.three.noPanel {
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+.three > aside {
+  position: sticky;
+  top: 64px;
+  max-height: calc(100vh - 80px);
+}
+.facets {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 8px;
+}
+.facetTitle {
+  padding: 0 8px 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.facetItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-2);
+  text-align: left;
+  font-size: 13px;
+}
+.facetItem:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.facetOn {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+.count {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 12px;
+}
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px 16px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.field > input,
+.field > select,
+.field > textarea {
+  color: var(--text);
+}
+.fieldError {
+  color: var(--error);
+  font-size: 12px;
+}
+.fieldWarn {
+  color: var(--warn);
+  font-size: 12px;
+}
+.invalidInput {
+  border-color: var(--error) !important;
+}
+.diffAdded {
+  color: var(--accent-ink);
+}
+.diffRemoved {
+  color: var(--error);
+}
+.areaRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 1100px) {
+  .chartRow,
+  .three,
+  .three.noPanel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .three > aside {
+    position: static;
+    max-height: none;
+  }
+}

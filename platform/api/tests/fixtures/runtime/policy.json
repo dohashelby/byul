@@ -1,0 +1,137 @@
+{
+    "loaded": true,
+    "gateway_active": true,
+    "external_enforcement": "not_connected",
+    "evaluated_at": "2026-10-25T07:34:33.152040+00:00",
+    "reason_code": null,
+    "reason_message": null,
+    "validity": [
+        {
+            "item": "period",
+            "state": "not_configured",
+            "result": "unbounded",
+            "valid_from": null,
+            "valid_until": null
+        },
+        {
+            "item": "revocation",
+            "state": "not_configured",
+            "result": "not_configured",
+            "matched": null,
+            "error_code": null,
+            "error_message": null
+        },
+        {
+            "item": "approval",
+            "state": "not_configured",
+            "result": "not_configured",
+            "value": null,
+            "checked_at": null,
+            "verifier": null,
+            "evidence": {}
+        }
+    ],
+    "approval": {
+        "state": "not_configured",
+        "checked_at": null,
+        "verifier": null,
+        "reason_code": null,
+        "reason_message": null,
+        "evidence": {}
+    },
+    "current": {
+        "path": "examples/mvp/policy.json",
+        "schema_version": "runtime-mvp/1.0",
+        "policy_id": "local-policy-001",
+        "policy_version": "1",
+        "target_id": "mock-engine-001",
+        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+        "loaded_at": "2026-10-25T07:34:23.033163+00:00",
+        "valid_from": null,
+        "valid_until": null,
+        "approval_ref": null,
+        "profile": "default",
+        "test_only": false,
+        "max_n": 1,
+        "extra_fields": [],
+        "passthrough_count": 0,
+        "validate_count": 0,
+        "error_code": null,
+        "error_message": null
+    },
+    "policy": {
+        "path": "examples/mvp/policy.json",
+        "schema_version": "runtime-mvp/1.0",
+        "policy_id": "local-policy-001",
+        "policy_version": "1",
+        "target_id": "mock-engine-001",
+        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+        "loaded_at": "2026-10-25T07:34:23.033163+00:00",
+        "valid_from": null,
+        "valid_until": null,
+        "approval_ref": null,
+        "profile": "default",
+        "test_only": false,
+        "max_n": 1,
+        "extra_fields": [],
+        "passthrough_count": 0,
+        "validate_count": 0,
+        "error_code": null,
+        "error_message": null
+    },
+    "revocations": {
+        "state": "not_configured",
+        "path": null,
+        "loaded_at": "2026-10-25T07:34:23.039857+00:00",
+        "sha256": null,
+        "error_code": null,
+        "error_message": null
+    },
+    "history_storage": {
+        "path": "/var/lib/serving-runtime/policy_history.jsonl",
+        "state": "ok",
+        "ok": true,
+        "last_error": null,
+        "last_error_at": null,
+        "corrupt_lines": []
+    },
+    "history": [
+        {
+            "event": "loaded",
+            "at": "2026-10-25T07:34:23.039904+00:00",
+            "observation_session_id": "759cc9ad069e4953981d76f10968ab4c",
+            "path": "examples/mvp/policy.json",
+            "policy_id": "local-policy-001",
+            "policy_version": "1",
+            "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+            "schema_version": "runtime-mvp/1.0",
+            "valid_from": null,
+            "valid_until": null,
+            "approval_ref": null,
+            "approval_state": "not_configured",
+            "approval_reason_code": null,
+            "approval_checked_at": null,
+            "approval_verifier": null,
+            "error_code": null,
+            "previous": {
+                "policy_id": null,
+                "policy_version": null,
+                "sha256": null
+            },
+            "same_version_content_changed": false
+        }
+    ],
+    "implemented_validity_items": [
+        "policy schema and fields",
+        "valid_from",
+        "valid_until",
+        "revocation snapshot",
+        "LAB approval-list SHA-256 comparison"
+    ],
+    "unimplemented_validity_items": [
+        "production signature or bundle verifier integration",
+        "approval service integration",
+        "hot reload",
+        "external enforcement confirmation"
+    ]
+}

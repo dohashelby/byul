@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>byul 통합 플랫폼</title>
+    <script>
+      // 저장된 밝은·어두운 모드를 첫 그림 전에 적용한다. 없으면 OS 설정을 따른다.
+      try {
+        var savedTheme = localStorage.getItem("byul-platform-theme");
+        if (savedTheme === "light" || savedTheme === "dark") document.documentElement.dataset.theme = savedTheme;
+      } catch (_) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

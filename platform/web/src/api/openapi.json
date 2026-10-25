@@ -1,0 +1,3994 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "byul platform API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/meta": {
+      "get": {
+        "tags": [
+          "overview"
+        ],
+        "summary": "Meta",
+        "operationId": "meta_api_meta_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Meta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/overview": {
+      "get": {
+        "tags": [
+          "overview"
+        ],
+        "summary": "Overview",
+        "operationId": "overview_api_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runtime/events": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Events",
+        "operationId": "events_api_runtime_events_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeEventList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runtime/requests": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Requests",
+        "operationId": "requests_api_runtime_requests_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runtime/requests/{request_id}": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Request Detail",
+        "operationId": "request_detail_api_runtime_requests__request_id__get",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runtime/summary": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Summary",
+        "operationId": "summary_api_runtime_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runtime/status": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Status",
+        "operationId": "status_api_runtime_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runtime/comparisons": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Runtime Comparisons",
+        "operationId": "runtime_comparisons_api_runtime_comparisons_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeComparisons"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/update/results": {
+      "get": {
+        "tags": [
+          "update"
+        ],
+        "summary": "Results",
+        "operationId": "results_api_update_results_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/update/results/{report_id}": {
+      "get": {
+        "tags": [
+          "update"
+        ],
+        "summary": "Result",
+        "operationId": "result_api_update_results__report_id__get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerificationDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/update/revalidation": {
+      "get": {
+        "tags": [
+          "update"
+        ],
+        "summary": "Revalidation",
+        "operationId": "revalidation_api_update_revalidation_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevalidationList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/environments": {
+      "get": {
+        "tags": [
+          "documents",
+          "environments"
+        ],
+        "summary": "List Environments",
+        "operationId": "list_environments_api_environments_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "documents",
+          "environments"
+        ],
+        "summary": "Save Environment",
+        "operationId": "save_environment_api_environments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Document"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentSaved"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveRejected"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/environments/{doc_id}/revisions": {
+      "get": {
+        "tags": [
+          "documents",
+          "environments"
+        ],
+        "summary": "Environment Revisions",
+        "operationId": "environment_revisions_api_environments__doc_id__revisions_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/environments/{doc_id}/revisions/{revision}": {
+      "get": {
+        "tags": [
+          "documents",
+          "environments"
+        ],
+        "summary": "Environment Revision",
+        "operationId": "environment_revision_api_environments__doc_id__revisions__revision__get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentRevision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/environments/{doc_id}/diff": {
+      "get": {
+        "tags": [
+          "documents",
+          "environments"
+        ],
+        "summary": "Environment Diff",
+        "operationId": "environment_diff_api_environments__doc_id__diff_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "from_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "From Revision"
+            }
+          },
+          {
+            "name": "to_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "To Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionDiff"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/policies": {
+      "get": {
+        "tags": [
+          "documents",
+          "policies"
+        ],
+        "summary": "List Policies",
+        "operationId": "list_policies_api_policies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "documents",
+          "policies"
+        ],
+        "summary": "Save Policy",
+        "operationId": "save_policy_api_policies_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Document"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicySaved"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveRejected"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/policies/{doc_id}/revisions": {
+      "get": {
+        "tags": [
+          "documents",
+          "policies"
+        ],
+        "summary": "Policy Revisions",
+        "operationId": "policy_revisions_api_policies__doc_id__revisions_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/policies/{doc_id}/revisions/{revision}": {
+      "get": {
+        "tags": [
+          "documents",
+          "policies"
+        ],
+        "summary": "Policy Revision",
+        "operationId": "policy_revision_api_policies__doc_id__revisions__revision__get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyRevision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/policies/{doc_id}/diff": {
+      "get": {
+        "tags": [
+          "documents",
+          "policies"
+        ],
+        "summary": "Policy Diff",
+        "operationId": "policy_diff_api_policies__doc_id__diff_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "from_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "From Revision"
+            }
+          },
+          {
+            "name": "to_revision",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "To Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionDiff"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Evidence",
+        "operationId": "evidence_api_evidence_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceList"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ComparisonRow": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "expected": {
+            "title": "Expected"
+          },
+          "observed": {
+            "title": "Observed"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "expected",
+          "observed",
+          "state"
+        ],
+        "title": "ComparisonRow",
+        "description": "구성 비교(/api/baseline)·대상 비교(/api/target)의 필드 한 줄."
+      },
+      "ComparisonTable": {
+        "properties": {
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ComparisonRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "rows"
+        ],
+        "title": "ComparisonTable"
+      },
+      "DiffEntry": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "added",
+              "removed",
+              "changed"
+            ],
+            "title": "Change"
+          },
+          "before": {
+            "title": "Before"
+          },
+          "after": {
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "change"
+        ],
+        "title": "DiffEntry"
+      },
+      "EnvironmentRevision": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/RevisionMeta"
+          },
+          "document": {
+            "$ref": "#/components/schemas/Environment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meta",
+          "document"
+        ],
+        "title": "EnvironmentRevision"
+      },
+      "EnvironmentSaved": {
+        "properties": {
+          "saved": {
+            "$ref": "#/components/schemas/EnvironmentRevision"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "saved",
+          "warnings"
+        ],
+        "title": "EnvironmentSaved"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody"
+      },
+      "EvidenceEntry": {
+        "properties": {
+          "producer": {
+            "type": "string",
+            "title": "Producer"
+          },
+          "index_created_at": {
+            "type": "string",
+            "title": "Index Created At"
+          },
+          "index_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Path"
+          },
+          "item": {
+            "$ref": "#/components/schemas/EvidenceItem"
+          }
+        },
+        "type": "object",
+        "required": [
+          "producer",
+          "index_created_at",
+          "index_path",
+          "item"
+        ],
+        "title": "EvidenceEntry"
+      },
+      "EvidenceList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceEntry"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "invalid": {
+            "items": {
+              "$ref": "#/components/schemas/InvalidItem"
+            },
+            "type": "array",
+            "title": "Invalid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "invalid",
+          "source"
+        ],
+        "title": "EvidenceList"
+      },
+      "FieldIssue": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "message"
+        ],
+        "title": "FieldIssue"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InvalidItem": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "raw": {
+            "title": "Raw"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "errors",
+          "raw"
+        ],
+        "title": "InvalidItem",
+        "description": "계약 검증에 실패한 항목. 버리지 않고 '형식 오류' 행으로 보여준다."
+      },
+      "Meta": {
+        "properties": {
+          "contracts_version": {
+            "type": "string",
+            "title": "Contracts Version"
+          },
+          "example_mode": {
+            "type": "boolean",
+            "title": "Example Mode"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceInfo"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "runtime_connection": {
+            "type": "string",
+            "enum": [
+              "example",
+              "connected",
+              "disconnected",
+              "unauthorized"
+            ],
+            "title": "Runtime Connection"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contracts_version",
+          "example_mode",
+          "sources",
+          "runtime_connection"
+        ],
+        "title": "Meta"
+      },
+      "Overview": {
+        "properties": {
+          "requests": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requests_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeStatusResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerificationResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Verification"
+          },
+          "open_revalidation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Revalidation"
+          },
+          "revalidation_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "status",
+          "latest_verification",
+          "open_revalidation"
+        ],
+        "title": "Overview"
+      },
+      "PolicyRevision": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/RevisionMeta"
+          },
+          "document": {
+            "$ref": "#/components/schemas/Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meta",
+          "document"
+        ],
+        "title": "PolicyRevision"
+      },
+      "PolicySaved": {
+        "properties": {
+          "saved": {
+            "$ref": "#/components/schemas/PolicyRevision"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "saved",
+          "warnings"
+        ],
+        "title": "PolicySaved"
+      },
+      "RequestCounts": {
+        "properties": {
+          "allowed": {
+            "type": "integer",
+            "title": "Allowed"
+          },
+          "denied": {
+            "type": "integer",
+            "title": "Denied"
+          },
+          "invalid": {
+            "type": "integer",
+            "title": "Invalid"
+          },
+          "engine_rejected": {
+            "type": "integer",
+            "title": "Engine Rejected"
+          },
+          "error": {
+            "type": "integer",
+            "title": "Error"
+          },
+          "unknown": {
+            "type": "integer",
+            "title": "Unknown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "allowed",
+          "denied",
+          "invalid",
+          "engine_rejected",
+          "error",
+          "unknown"
+        ],
+        "title": "RequestCounts"
+      },
+      "RequestDetail": {
+        "properties": {
+          "row": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestRow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeEvent"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event"
+          },
+          "event_invalid": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InvalidItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence State"
+          },
+          "evidence_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Summary"
+          },
+          "native_detail": {
+            "title": "Native Detail"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "event",
+          "evidence_state",
+          "evidence_summary",
+          "source"
+        ],
+        "title": "RequestDetail"
+      },
+      "RequestList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RequestRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "invalid": {
+            "items": {
+              "$ref": "#/components/schemas/InvalidItem"
+            },
+            "type": "array",
+            "title": "Invalid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "invalid",
+          "source"
+        ],
+        "title": "RequestList"
+      },
+      "RequestRow": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "recorded_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded At"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "decision_result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Result"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "engine_http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Http Status"
+          },
+          "stream": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stream"
+          },
+          "delivery_attempted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Attempted"
+          },
+          "backend_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Kind"
+          },
+          "environment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "target_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Ref"
+          },
+          "data_origin": {
+            "type": "string",
+            "title": "Data Origin"
+          },
+          "origin_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "request_id",
+          "recorded_at",
+          "outcome",
+          "decision_result",
+          "model",
+          "max_tokens",
+          "reason_code",
+          "rule_id",
+          "http_status",
+          "engine_http_status",
+          "stream",
+          "delivery_attempted",
+          "backend_kind",
+          "environment",
+          "run_id",
+          "target_ref",
+          "data_origin",
+          "origin_detail"
+        ],
+        "title": "RequestRow",
+        "description": "요청 내역 표 한 행. 값은 전부 runtime-event의 native.record에서 꺼낸 것이다.\n\n지연시간·토큰 수·비용은 runtime이 기록하지 않으므로 필드가 없다."
+      },
+      "RequestSummary": {
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/RequestCounts"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "corrupt_lines": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrupt Lines"
+          },
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "counts",
+          "total",
+          "corrupt_lines",
+          "generated_at",
+          "source"
+        ],
+        "title": "RequestSummary"
+      },
+      "RevalidationList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RevalidationRequest"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "invalid": {
+            "items": {
+              "$ref": "#/components/schemas/InvalidItem"
+            },
+            "type": "array",
+            "title": "Invalid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "invalid",
+          "source"
+        ],
+        "title": "RevalidationList"
+      },
+      "RevisionDiff": {
+        "properties": {
+          "doc_id": {
+            "type": "string",
+            "title": "Doc Id"
+          },
+          "from_revision": {
+            "type": "integer",
+            "title": "From Revision"
+          },
+          "to_revision": {
+            "type": "integer",
+            "title": "To Revision"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DiffEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doc_id",
+          "from_revision",
+          "to_revision",
+          "entries"
+        ],
+        "title": "RevisionDiff"
+      },
+      "RevisionList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RevisionMeta"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "source"
+        ],
+        "title": "RevisionList"
+      },
+      "RevisionMeta": {
+        "properties": {
+          "doc_id": {
+            "type": "string",
+            "title": "Doc Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "saved_at": {
+            "type": "string",
+            "title": "Saved At"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "정책은 policy_version, 환경은 null"
+          },
+          "target_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doc_id",
+          "revision",
+          "saved_at",
+          "sha256",
+          "status"
+        ],
+        "title": "RevisionMeta"
+      },
+      "RuntimeComparisons": {
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/ComparisonTable"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ComparisonTable"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "baseline",
+          "target",
+          "source"
+        ],
+        "title": "RuntimeComparisons"
+      },
+      "RuntimeEventList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RuntimeEvent"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "invalid": {
+            "items": {
+              "$ref": "#/components/schemas/InvalidItem"
+            },
+            "type": "array",
+            "title": "Invalid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "invalid",
+          "source"
+        ],
+        "title": "RuntimeEventList"
+      },
+      "RuntimeStatusResponse": {
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item"
+          },
+          "invalid": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InvalidItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "source"
+        ],
+        "title": "RuntimeStatusResponse"
+      },
+      "SaveRejected": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "SCHEMA_INVALID",
+              "STATUS_NOT_ALLOWED",
+              "BAD_REQUEST"
+            ],
+            "title": "Code"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/FieldIssue"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "errors"
+        ],
+        "title": "SaveRejected"
+      },
+      "SourceInfo": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "example",
+              "live",
+              "file"
+            ],
+            "title": "Mode"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "mode"
+        ],
+        "title": "SourceInfo",
+        "description": "이 응답의 자료를 어디서 읽었는지. example이면 화면에 '예시 데이터' 띠를 띄운다."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VerificationDetail": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/VerificationResult"
+          },
+          "raw_checks": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Checks",
+            "description": "RPT 원본의 by_check 행(check_id별). 예시 모드에는 원본이 없어 null."
+          },
+          "raw_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Path"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "source"
+        ],
+        "title": "VerificationDetail"
+      },
+      "VerificationList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VerificationResult"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "invalid": {
+            "items": {
+              "$ref": "#/components/schemas/InvalidItem"
+            },
+            "type": "array",
+            "title": "Invalid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "invalid",
+          "source"
+        ],
+        "title": "VerificationList"
+      },
+      "Common_sha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "Common_timestamp": {
+        "description": "시간대가 있는 RFC 3339 시각. 모르면 필드를 null로 두고 0이나 빈 문자열을 만들지 않는다.",
+        "type": "string",
+        "format": "date-time",
+        "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+      },
+      "Common_nullable_timestamp": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "Common_local_id": {
+        "description": "사람이 정하는 ID(target_ref, policy_id 등). serving-runtime의 _ID 규칙과 같다.",
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+      },
+      "Common_check_id": {
+        "description": "점검 행 ID. serving-guard 팩의 CheckDef ID.",
+        "type": "string",
+        "pattern": "^(SUP|REQ|PLT|LIF|OBS)-[0-9]{2}$"
+      },
+      "Common_data_origin": {
+        "description": "계약 수준의 자료 등급. MEASURED=실제 환경에서 수집·실행, DECLARED=사람이 입력, EXAMPLE=합성·모의·데모(공식 판정 근거 불가).",
+        "enum": [
+          "MEASURED",
+          "DECLARED",
+          "EXAMPLE"
+        ]
+      },
+      "Common_origin_detail": {
+        "description": "생산자의 원래 출처 값(예: runtime의 mock, synthetic, real, external_backend, kubernetes_api). 등급 변환 전 값을 잃지 않으려고 둔다.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "Common_verdict": {
+        "enum": [
+          "PASS",
+          "FAIL",
+          "UNKNOWN",
+          "NOT_APPLICABLE"
+        ]
+      },
+      "Common_object_ref": {
+        "description": "serving-guard 객체 참조(SPEC §2.2 Ref). 항상 정확한 revision과 해시까지 고정한다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "id",
+          "revision",
+          "sha256"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "ENV",
+              "POL",
+              "CHG",
+              "PLAN",
+              "EVD",
+              "RES",
+              "RPT"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^(ENV|POL|CHG|PLAN|EVD|RES|RPT)-[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Common_sha256"
+          }
+        }
+      },
+      "Common_doc_ref": {
+        "description": "byul 계약 문서(environment, policy 등) 참조. id와 revision, 정규 JSON 해시를 함께 고정한다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "revision",
+          "sha256"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Common_local_id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Common_sha256"
+          }
+        }
+      },
+      "Common_policy_ref": {
+        "description": "정책 판본 식별. runtime의 policy_id + policy_version + sha256 연결 키와 같다. ID·version이 같고 해시가 다르면 다른 판본이다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "policy_id",
+          "policy_version",
+          "sha256"
+        ],
+        "properties": {
+          "policy_id": {
+            "$ref": "#/components/schemas/Common_local_id"
+          },
+          "policy_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Common_sha256"
+          }
+        }
+      },
+      "Common_nullable_policy_ref": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Common_policy_ref"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "Common_evidence_ref": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Common_sha256"
+          }
+        }
+      },
+      "Common_approval": {
+        "description": "누가·언제 승인했는지의 기록. 서명이 아니며 인증된 신원도 아니다(자기 신고).",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "approved_by",
+          "approved_at",
+          "approval_ref"
+        ],
+        "properties": {
+          "approved_by": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "approved_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "approval_ref": {
+            "$ref": "#/components/schemas/Common_local_id"
+          }
+        }
+      },
+      "Common_validity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "valid_from",
+          "valid_until"
+        ],
+        "properties": {
+          "valid_from": {
+            "$ref": "#/components/schemas/Common_nullable_timestamp"
+          },
+          "valid_until": {
+            "$ref": "#/components/schemas/Common_nullable_timestamp"
+          }
+        }
+      },
+      "Common_runtime_phase": {
+        "enum": [
+          "loading",
+          "compiling",
+          "inferring",
+          "maintenance",
+          "unknown"
+        ]
+      },
+      "Environment": {
+        "title": "기업 환경 (platform → update, runtime)",
+        "description": "통합 플랫폼에서 입력하는 서빙 환경. update는 ENV 객체로, runtime은 runtime-target/1.0 등록으로 변환해 쓴다. 값을 모르면 null로 둔다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "environment_id",
+          "revision",
+          "created_at",
+          "data_origin",
+          "target",
+          "facts"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-environment/0.1"
+          },
+          "environment_id": {
+            "$ref": "#/components/schemas/Common_local_id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "data_origin": {
+            "$ref": "#/components/schemas/Common_data_origin"
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target_ref",
+              "engine",
+              "model"
+            ],
+            "properties": {
+              "target_ref": {
+                "description": "논리 대상 ID. runtime 정책의 target_id와 같은 값이어야 한다.",
+                "$ref": "#/components/schemas/Common_local_id"
+              },
+              "engine": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "version",
+                  "image_digest",
+                  "source_commit"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "version": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "image_digest": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "source_commit": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[0-9a-f]{7,40}$"
+                  }
+                }
+              },
+              "model": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "revision",
+                  "inventory_sha256"
+                ],
+                "properties": {
+                  "id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "revision": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "inventory_sha256": {
+                    "description": "마운트한 모델 snapshot 전체 파일 목록의 해시(update 비교 조건).",
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Common_sha256"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "tokenizer_revision": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "runtime": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "nodes": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "tp_groups": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "gpu_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "gpu_model": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "driver": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "deployment": {
+            "description": "실제 배치 정보. runtime의 enforcement intent와 target 조회에 쓴다. 모르면 null.",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "kubernetes",
+                      "docker",
+                      "host"
+                    ]
+                  },
+                  "kubernetes_context": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "namespace": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "gateway_labels": {
+                    "$ref": "#/components/schemas/Environment_labels"
+                  },
+                  "engine_labels": {
+                    "$ref": "#/components/schemas/Environment_labels"
+                  },
+                  "engine_port": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "management_port": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                }
+              }
+            ]
+          },
+          "facts": {
+            "description": "적용 판단에 쓰는 사실. 키는 serving-guard에 등록된 것만 허용한다(REGISTERED_FACTS).",
+            "type": "object",
+            "propertyNames": {
+              "enum": [
+                "gateway",
+                "prefix_cache",
+                "prefix_cache_or_shared_cache",
+                "shared_or_remote_weights",
+                "dynamic_import",
+                "alternate_sources_or_formats_or_derived_cache",
+                "remote_acquisition_or_retry",
+                "managed_or_external_fallback",
+                "r10_features",
+                "request_code_revision_selection"
+              ]
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Environment_fact"
+            }
+          }
+        }
+      },
+      "Environment_labels": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "Environment_fact": {
+        "description": "false로 신고하려면 absence_evidence가 있어야 인정된다. 출처끼리 충돌하면 value는 null, conflict에 후보를 둔다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "origin",
+          "source"
+        ],
+        "properties": {
+          "value": {},
+          "origin": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Common_data_origin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "absence_evidence": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conflict": {
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "if": {
+          "required": [
+            "conflict"
+          ],
+          "properties": {
+            "conflict": {
+              "type": "array",
+              "minItems": 1
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "value": {
+              "type": "null"
+            }
+          }
+        }
+      },
+      "EvidenceIndex": {
+        "title": "증거 목록 (update, runtime → platform)",
+        "description": "runtime 계획서 §5.4의 evidence/index.json. 증거 파일은 index 옆 files/ 아래에 둔다. 해시는 내용 일치 확인용이며 저장 관리자까지 포함한 변조 방지가 아니다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "producer",
+          "created_at",
+          "items"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-evidence-index/0.1"
+          },
+          "producer": {
+            "enum": [
+              "update",
+              "runtime"
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "evidence_id",
+                "path",
+                "bytes",
+                "sha256",
+                "media_type",
+                "collector",
+                "collected_at",
+                "window",
+                "source",
+                "data_origin"
+              ],
+              "properties": {
+                "evidence_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "path": {
+                  "description": "files/ 기준 상대 경로. 폴더 밖 경로와 symlink 이탈은 거부한다.",
+                  "type": "string",
+                  "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sha256": {
+                  "$ref": "#/components/schemas/Common_sha256"
+                },
+                "media_type": {
+                  "type": "string",
+                  "pattern": "^[a-z]+/[a-z0-9.+-]+$"
+                },
+                "collector": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "version"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                },
+                "collected_at": {
+                  "$ref": "#/components/schemas/Common_timestamp"
+                },
+                "window": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "from",
+                        "until"
+                      ],
+                      "properties": {
+                        "from": {
+                          "$ref": "#/components/schemas/Common_nullable_timestamp"
+                        },
+                        "until": {
+                          "$ref": "#/components/schemas/Common_nullable_timestamp"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "source": {
+                  "type": "string"
+                },
+                "data_origin": {
+                  "$ref": "#/components/schemas/Common_data_origin"
+                },
+                "refs": {
+                  "description": "이 증거를 쓴 객체·사건. guard EVD 참조나 runtime event_id.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "PolicyBundle": {
+        "title": "정책 번들 (platform → runtime)",
+        "description": "runtime 계획서 §5.4의 approved-policy.json. 플랫폼이 CONFIRMED 정책을 runtime 내부 형식 파일로 변환해 해시와 함께 묶는다. runtime은 내부 형식을 그대로 쓰고, 이 목록으로 파일 bytes를 대조한다. 번들은 서명이 아니다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "bundle_id",
+          "created_at",
+          "policy_ref",
+          "target_ref",
+          "approval",
+          "validity",
+          "files"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-policy-bundle/0.1"
+          },
+          "bundle_id": {
+            "$ref": "#/components/schemas/Common_local_id"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "policy_ref": {
+            "description": "원본 byul-policy 문서의 판본. sha256은 그 문서의 정규 JSON 해시다.",
+            "$ref": "#/components/schemas/Common_policy_ref"
+          },
+          "target_ref": {
+            "$ref": "#/components/schemas/Common_local_id"
+          },
+          "approval": {
+            "$ref": "#/components/schemas/Common_approval"
+          },
+          "validity": {
+            "$ref": "#/components/schemas/Common_validity"
+          },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "path",
+                "schema_version",
+                "sha256",
+                "bytes"
+              ],
+              "properties": {
+                "role": {
+                  "enum": [
+                    "gateway_policy",
+                    "policy_approvals",
+                    "enforcement_intent",
+                    "exec_exceptions",
+                    "target"
+                  ]
+                },
+                "path": {
+                  "description": "번들 폴더 기준 상대 경로. 절대 경로·.. ·역슬래시를 쓰지 않는다.",
+                  "type": "string",
+                  "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"
+                },
+                "schema_version": {
+                  "description": "파일 안의 runtime 내부 형식(예: runtime-mvp/1.1).",
+                  "type": "string",
+                  "pattern": "^runtime-[a-z-]+/[0-9]+\\.[0-9]+$"
+                },
+                "sha256": {
+                  "$ref": "#/components/schemas/Common_sha256"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "Policy": {
+        "title": "기업 정책 (platform → update, runtime)",
+        "description": "통합 플랫폼에서 입력하는 정책 하나. verification은 update의 POL 객체로, runtime은 정책 번들(policy-bundle)로 변환해 쓴다. 한 문서가 두 프로젝트의 정책을 함께 가져야 '이 정책으로 시험했고 이 정책으로 차단했다'를 같은 policy_ref로 이을 수 있다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "policy_id",
+          "policy_version",
+          "created_at",
+          "data_origin",
+          "status",
+          "target_ref",
+          "environment_ref",
+          "validity",
+          "approval",
+          "verification",
+          "runtime"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-policy/0.1"
+          },
+          "policy_id": {
+            "$ref": "#/components/schemas/Common_local_id"
+          },
+          "policy_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "data_origin": {
+            "$ref": "#/components/schemas/Common_data_origin"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "CONFIRMED"
+            ]
+          },
+          "target_ref": {
+            "$ref": "#/components/schemas/Common_local_id"
+          },
+          "environment_ref": {
+            "description": "이 정책을 정할 때 기준으로 삼은 환경 판본.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Common_doc_ref"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validity": {
+            "$ref": "#/components/schemas/Common_validity"
+          },
+          "approval": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Common_approval"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verification": {
+            "description": "serving-guard POL 고유 필드와 같다(SPEC §4.2).",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pack",
+              "values",
+              "scope",
+              "exceptions"
+            ],
+            "properties": {
+              "pack": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "revision"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^PACK-[A-Z0-9-]+$"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "values": {
+                "description": "점검별 정책 값. 키는 check_id, 값은 그 점검 CheckDef.policy_params를 채운다.",
+                "type": "object",
+                "propertyNames": {
+                  "$ref": "#/components/schemas/Common_check_id"
+                },
+                "additionalProperties": {
+                  "type": "object"
+                }
+              },
+              "scope": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "include",
+                  "exclude"
+                ],
+                "properties": {
+                  "include": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "exceptions": {
+                "description": "판정을 바꾸지 않는다. 보고서에 '예외 승인됨'을 따로 표시할 뿐이다.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "check_id",
+                    "reason",
+                    "approved_by",
+                    "approved_at",
+                    "expires_at"
+                  ],
+                  "properties": {
+                    "check_id": {
+                      "$ref": "#/components/schemas/Common_check_id"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "approved_by": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "approved_at": {
+                      "$ref": "#/components/schemas/Common_nullable_timestamp"
+                    },
+                    "expires_at": {
+                      "$ref": "#/components/schemas/Common_nullable_timestamp"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "runtime": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gateway",
+              "enforcement",
+              "exec_exceptions"
+            ],
+            "properties": {
+              "gateway": {
+                "description": "runtime-mvp/1.1·1.2 정책 본문에서 공통 필드(schema_version, policy_id, policy_version, target_id, valid_from/until, approval_ref)를 뺀 나머지.",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "allowed_models",
+                  "output_default_tokens",
+                  "output_max_tokens",
+                  "max_body_bytes"
+                ],
+                "properties": {
+                  "allowed_models": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "output_default_tokens": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "output_max_tokens": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "max_body_bytes": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "max_context_tokens": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  },
+                  "profile": {
+                    "type": "string"
+                  },
+                  "max_n": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "extra_fields": {
+                    "type": "object"
+                  }
+                }
+              },
+              "enforcement": {
+                "description": "runtime-enforcement-intent 문서를 그대로 담는다. 내부 형식 검증은 runtime이 한다. 쓰지 않으면 null.",
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "intent_schema",
+                      "intent"
+                    ],
+                    "properties": {
+                      "intent_schema": {
+                        "enum": [
+                          "runtime-enforcement-intent/1.0",
+                          "runtime-enforcement-intent/1.1"
+                        ]
+                      },
+                      "intent": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                ]
+              },
+              "exec_exceptions": {
+                "description": "runtime-exec-exceptions/1.0의 exceptions 배열 항목을 그대로 담는다.",
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "CONFIRMED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "approval": {
+                  "$ref": "#/components/schemas/Common_approval"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RevalidationRequest": {
+        "title": "재검증 요청 (runtime → platform → update)",
+        "description": "runtime-revalidation-request/1.0을 공통 형식으로 감싼 것. runtime이 자산·정책·구성 변화를 보면 연다. 자동으로 시험을 돌리거나 승인하지 않는다. 플랫폼에서 사람이 보고 update의 증분 감사(U1)를 시작한다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "revalidation_id",
+          "fingerprint",
+          "event",
+          "created_at",
+          "trigger",
+          "target_ref",
+          "policy_ref",
+          "changed_fields",
+          "evaluation_refs",
+          "evidence_refs",
+          "superseded_by",
+          "status",
+          "data_origin"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-revalidation-request/0.1"
+          },
+          "revalidation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "fingerprint": {
+            "$ref": "#/components/schemas/Common_sha256"
+          },
+          "event": {
+            "enum": [
+              "opened",
+              "condition_cleared",
+              "condition_reappeared",
+              "superseded"
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "trigger": {
+            "enum": [
+              "asset_changed",
+              "policy_content_changed",
+              "config_drift"
+            ]
+          },
+          "target_ref": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Common_local_id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy_ref": {
+            "$ref": "#/components/schemas/Common_nullable_policy_ref"
+          },
+          "changed_fields": {
+            "description": "바뀐 항목. 자산은 경로·해시, drift는 필드와 기대/관측 scalar만 둔다. 파일 내용은 넣지 않는다.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "expected",
+                "observed"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "observed": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "evaluation_refs": {
+            "description": "다시 시험할 점검 ID 제안. runtime이 모르면 빈 배열이고, 선정은 update가 한다.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Common_check_id"
+            }
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Common_evidence_ref"
+            }
+          },
+          "superseded_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "data_origin": {
+            "$ref": "#/components/schemas/Common_data_origin"
+          },
+          "origin_detail": {
+            "$ref": "#/components/schemas/Common_origin_detail"
+          }
+        }
+      },
+      "RunContext": {
+        "title": "격리 실험 실행 문맥 (update → runtime)",
+        "description": "runtime 계획서 §5.4의 run-context.json. update가 runtime 통제를 켠 채 시험할 때 발급한다. runtime은 run_id를 Gateway·관측 기록의 run_id로 그대로 쓴다. 운영 사건에는 run_id를 만들지 않는다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "run_id",
+          "plan_ref",
+          "side",
+          "evaluation_refs",
+          "environment_ref",
+          "target_ref",
+          "policy_ref",
+          "window"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-run-context/0.1"
+          },
+          "run_id": {
+            "description": "serving-guard PLAN ID와 같은 값.",
+            "type": "string",
+            "pattern": "^PLAN-[0-9A-HJKMNP-TV-Z]{26}$"
+          },
+          "plan_ref": {
+            "$ref": "#/components/schemas/Common_object_ref"
+          },
+          "side": {
+            "enum": [
+              "baseline",
+              "candidate",
+              "single"
+            ]
+          },
+          "evaluation_refs": {
+            "description": "이 실행에서 시험하는 점검 ID.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Common_check_id"
+            },
+            "uniqueItems": true
+          },
+          "environment_ref": {
+            "$ref": "#/components/schemas/Common_doc_ref"
+          },
+          "target_ref": {
+            "$ref": "#/components/schemas/Common_local_id"
+          },
+          "policy_ref": {
+            "$ref": "#/components/schemas/Common_nullable_policy_ref"
+          },
+          "window": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "started_at",
+              "finished_at"
+            ],
+            "properties": {
+              "started_at": {
+                "$ref": "#/components/schemas/Common_timestamp"
+              },
+              "finished_at": {
+                "$ref": "#/components/schemas/Common_nullable_timestamp"
+              }
+            }
+          }
+        }
+      },
+      "RuntimeEvent": {
+        "title": "런타임 사건 (runtime → platform, events.jsonl 한 줄)",
+        "description": "runtime 계획서 §5.4의 events.jsonl. runtime 내부 기록(gateway record, observation 등)을 공통 머리 필드로 감싸고 원본은 native에 그대로 둔다. 탐지는 차단이 아니고, 집행 시도는 차단 확인이 아니다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "event_id",
+          "occurred_at",
+          "recorded_at",
+          "source",
+          "category",
+          "outcome",
+          "enforcer",
+          "rule_ref",
+          "target_ref",
+          "policy_ref",
+          "scope",
+          "data_origin",
+          "origin_detail",
+          "evidence_refs",
+          "native"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-runtime-event/0.1"
+          },
+          "event_id": {
+            "description": "gateway는 'req:<request_id>', 연속 feed는 'feed:<event_key>', 그 밖은 'sha:<native 정규 JSON 해시>'. 가짜 request_id를 만들지 않는다.",
+            "type": "string",
+            "pattern": "^(req:[0-9a-f]{32}|feed:[0-9a-f]{64}|sha:[0-9a-f]{64})$"
+          },
+          "occurred_at": {
+            "description": "사건이 일어난 시각(원본 관측 시각). 모르면 null.",
+            "$ref": "#/components/schemas/Common_nullable_timestamp"
+          },
+          "recorded_at": {
+            "description": "runtime이 기록한 시각.",
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "source": {
+            "enum": [
+              "gateway",
+              "management_listener",
+              "hubble",
+              "tetragon",
+              "policy_state",
+              "target_monitor",
+              "collector"
+            ]
+          },
+          "category": {
+            "enum": [
+              "request",
+              "network",
+              "process",
+              "file",
+              "policy",
+              "target",
+              "collector"
+            ]
+          },
+          "outcome": {
+            "description": "allowed=정책 통과 후 전달 시도, denied=정책 거부 확인(전달 안 함), invalid=입력 오류 거부, engine_rejected=엔진이 거부, observed=관측만(판단 없음), detected=규칙 위반 탐지(차단 아님), enforce_attempted=집행 시도(결과 미확정), error=처리 오류, unknown=미완료·미확인.",
+            "enum": [
+              "allowed",
+              "denied",
+              "invalid",
+              "engine_rejected",
+              "observed",
+              "detected",
+              "enforce_attempted",
+              "error",
+              "unknown"
+            ]
+          },
+          "enforcer": {
+            "description": "실제로 막을 수 있는 주체. Hubble은 관측원이라 enforcer가 아니다.",
+            "enum": [
+              "gateway",
+              "management_listener",
+              "tetragon",
+              "cilium",
+              null
+            ]
+          },
+          "rule_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "phase": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Common_runtime_phase"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_ref": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Common_local_id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_instance_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policy_ref": {
+            "$ref": "#/components/schemas/Common_nullable_policy_ref"
+          },
+          "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "environment",
+              "run_id",
+              "observation_session_id",
+              "request_id"
+            ],
+            "properties": {
+              "environment": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "run_id": {
+                "description": "격리 실험일 때만 run-context의 run_id. 운영 사건은 null.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "observation_session_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{32}$"
+              }
+            }
+          },
+          "related_checks": {
+            "description": "이 사건과 관련된 점검 ID. 매핑 규칙이 정해지기 전에는 빈 배열.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Common_check_id"
+            }
+          },
+          "data_origin": {
+            "$ref": "#/components/schemas/Common_data_origin"
+          },
+          "origin_detail": {
+            "$ref": "#/components/schemas/Common_origin_detail"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Common_evidence_ref"
+            }
+          },
+          "native": {
+            "description": "runtime 내부 정규화 기록 원본. 프롬프트·응답·자격정보는 원래 저장하지 않으므로 여기에도 없다.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "schema_version",
+              "record"
+            ],
+            "properties": {
+              "schema_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "record": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "outcome": {
+                  "const": "denied"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "enforcer": {
+                  "enum": [
+                    "gateway",
+                    "management_listener",
+                    "tetragon",
+                    "cilium"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "source": {
+                  "const": "hubble"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "enforcer": {
+                  "const": null
+                },
+                "outcome": {
+                  "enum": [
+                    "observed",
+                    "detected",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RuntimeStatus": {
+        "title": "런타임 상태 스냅샷 (runtime → platform)",
+        "description": "runtime 계획서 §5.4 runtime-result.json의 상태 부분. /api/status를 읽은 시점의 합성값이다. 적용 설정은 동작 성공이 아니고, 미확인을 정상으로 바꾸지 않는다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "generated_at",
+          "observation_session_id",
+          "target",
+          "policy",
+          "collectors",
+          "store"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-runtime-status/0.1"
+          },
+          "generated_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "observation_session_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "target_ref",
+              "registration",
+              "instance_id",
+              "instance_state"
+            ],
+            "properties": {
+              "target_ref": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Common_local_id"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "registration": {
+                "type": "string"
+              },
+              "instance_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "instance_state": {
+                "type": "string"
+              }
+            }
+          },
+          "policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "policy_ref",
+              "bundle_id",
+              "loaded",
+              "gateway_active",
+              "approval_state",
+              "valid_until"
+            ],
+            "properties": {
+              "policy_ref": {
+                "$ref": "#/components/schemas/Common_nullable_policy_ref"
+              },
+              "bundle_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "loaded": {
+                "type": "boolean"
+              },
+              "gateway_active": {
+                "type": "boolean"
+              },
+              "approval_state": {
+                "enum": [
+                  "not_configured",
+                  "verified",
+                  "last_verified",
+                  "unverified",
+                  "rejected",
+                  "error"
+                ]
+              },
+              "valid_until": {
+                "$ref": "#/components/schemas/Common_nullable_timestamp"
+              }
+            }
+          },
+          "collectors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source",
+                "state",
+                "last_success_at"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "state": {
+                  "enum": [
+                    "disconnected",
+                    "never",
+                    "ok",
+                    "stale",
+                    "error"
+                  ]
+                },
+                "last_success_at": {
+                  "$ref": "#/components/schemas/Common_nullable_timestamp"
+                }
+              }
+            }
+          },
+          "store": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "state"
+            ],
+            "properties": {
+              "state": {
+                "enum": [
+                  "ok",
+                  "error",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "VerificationResult": {
+        "title": "격리 검증 결과 (update → platform)",
+        "description": "serving-guard RPT 객체를 화면용으로 줄인 투영. 원본은 RPT JSON이고 이 문서는 report_ref로 원본을 가리킨다. RPT에 없는 값을 새로 만들지 않는다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "report_ref",
+          "mode",
+          "created_at",
+          "data_origin",
+          "plan_ref",
+          "environment_refs",
+          "policy_ref",
+          "pack",
+          "change_ref",
+          "summary",
+          "checks",
+          "limitations",
+          "approval"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-verification-result/0.1"
+          },
+          "report_ref": {
+            "$ref": "#/components/schemas/Common_object_ref"
+          },
+          "mode": {
+            "enum": [
+              "audit",
+              "update"
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "data_origin": {
+            "$ref": "#/components/schemas/Common_data_origin"
+          },
+          "plan_ref": {
+            "$ref": "#/components/schemas/Common_object_ref"
+          },
+          "environment_refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Common_object_ref"
+            }
+          },
+          "policy_ref": {
+            "description": "guard POL 객체 참조.",
+            "$ref": "#/components/schemas/Common_object_ref"
+          },
+          "byul_policy_ref": {
+            "description": "POL을 만든 원본 byul-policy 판본. 플랫폼에서 입력하지 않은 정책이면 null.",
+            "$ref": "#/components/schemas/Common_nullable_policy_ref"
+          },
+          "pack": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "revision",
+              "review_status"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "review_status": {
+                "enum": [
+                  "DRAFT",
+                  "REVIEWED"
+                ]
+              }
+            }
+          },
+          "change_ref": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Common_object_ref"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "by_area",
+              "evidence_counts"
+            ],
+            "properties": {
+              "by_area": {
+                "type": "object",
+                "propertyNames": {
+                  "enum": [
+                    "SUP",
+                    "REQ",
+                    "PLT",
+                    "LIF",
+                    "OBS"
+                  ]
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "required": [
+                    "security"
+                  ],
+                  "properties": {
+                    "security": {
+                      "$ref": "#/components/schemas/Common_verdict"
+                    }
+                  }
+                }
+              },
+              "evidence_counts": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "manual",
+                    "automated",
+                    "not_run"
+                  ],
+                  "properties": {
+                    "manual": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automated": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "not_run": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "check_id",
+                "applicability",
+                "selected",
+                "sides",
+                "comparison",
+                "gaps",
+                "evidence_source"
+              ],
+              "properties": {
+                "check_id": {
+                  "$ref": "#/components/schemas/Common_check_id"
+                },
+                "applicability": {
+                  "enum": [
+                    "APPLICABLE",
+                    "NOT_APPLICABLE",
+                    "UNDETERMINED",
+                    "CONFLICT"
+                  ]
+                },
+                "selected": {
+                  "type": "boolean"
+                },
+                "not_selected_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sides": {
+                  "description": "audit 모드는 single, update 모드는 baseline·candidate.",
+                  "type": "object",
+                  "propertyNames": {
+                    "enum": [
+                      "baseline",
+                      "candidate",
+                      "single"
+                    ]
+                  },
+                  "additionalProperties": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "result_ref",
+                      "security",
+                      "functional",
+                      "performance",
+                      "verification_level"
+                    ],
+                    "properties": {
+                      "result_ref": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Common_object_ref"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "security": {
+                        "$ref": "#/components/schemas/Common_verdict"
+                      },
+                      "functional": {
+                        "$ref": "#/components/schemas/Common_verdict"
+                      },
+                      "performance": {
+                        "$ref": "#/components/schemas/Common_verdict"
+                      },
+                      "verification_level": {
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Common_data_origin"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "comparison": {
+                  "oneOf": [
+                    {
+                      "enum": [
+                        "NO_CHANGE",
+                        "REGRESSED",
+                        "FIXED",
+                        "STILL_FAILING",
+                        "UNKNOWN",
+                        "NOT_COMPARABLE",
+                        "CARRIED_OVER"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gaps": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "NO_EXECUTOR",
+                      "NO_POLICY_VALUE",
+                      "NO_FIXTURE",
+                      "NO_ENV_FACT",
+                      "ADAPTER_UNSUPPORTED"
+                    ]
+                  }
+                },
+                "evidence_source": {
+                  "enum": [
+                    "automated",
+                    "manual",
+                    null
+                  ]
+                },
+                "exception_approved": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approval": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "approved_by",
+                  "approved_at",
+                  "decision",
+                  "note"
+                ],
+                "properties": {
+                  "approved_by": {
+                    "type": "string"
+                  },
+                  "approved_at": {
+                    "$ref": "#/components/schemas/Common_timestamp"
+                  },
+                  "decision": {
+                    "enum": [
+                      "ACCEPT",
+                      "REJECT"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "EvidenceItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "path",
+          "bytes",
+          "sha256",
+          "media_type",
+          "collector",
+          "collected_at",
+          "window",
+          "source",
+          "data_origin"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "path": {
+            "description": "files/ 기준 상대 경로. 폴더 밖 경로와 symlink 이탈은 거부한다.",
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Common_sha256"
+          },
+          "media_type": {
+            "type": "string",
+            "pattern": "^[a-z]+/[a-z0-9.+-]+$"
+          },
+          "collector": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "version"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "collected_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "window": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "from",
+                  "until"
+                ],
+                "properties": {
+                  "from": {
+                    "$ref": "#/components/schemas/Common_nullable_timestamp"
+                  },
+                  "until": {
+                    "$ref": "#/components/schemas/Common_nullable_timestamp"
+                  }
+                }
+              }
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "data_origin": {
+            "$ref": "#/components/schemas/Common_data_origin"
+          },
+          "refs": {
+            "description": "이 증거를 쓴 객체·사건. guard EVD 참조나 runtime event_id.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

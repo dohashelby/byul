@@ -1,0 +1,258 @@
+/* serving-runtime 대시보드의 Shell(.app/.sidebar/.pagebar)을 그대로 옮겼다. */
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+.brandName {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.brandTag {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 8px 16px;
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 12px;
+}
+.groupTitle {
+  padding: 0 8px 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+}
+.link:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+}
+.active {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+}
+.navLabel {
+  flex: 1;
+  min-width: 0;
+}
+.navBadge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+.navBadgeError {
+  background: var(--error-soft);
+  color: var(--error);
+}
+.footer {
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+.footItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: var(--text-2);
+}
+.footText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.navSub {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.main {
+  min-width: 0;
+}
+.pagebar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 24px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 12px;
+}
+.chipKey {
+  padding: 0 8px;
+  color: var(--muted);
+  border-right: 1px solid var(--border);
+}
+.chip select,
+.chip input {
+  height: 24px;
+  padding: 0 4px 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  max-width: 220px;
+}
+.chipActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.chipActive .chipKey {
+  color: var(--accent-ink);
+  border-right-color: var(--accent-2);
+}
+.chipReset {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-size: 12px;
+}
+.chipReset:hover {
+  background: var(--accent-soft);
+}
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.refreshState {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.iconButton:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.iconButton:disabled {
+  opacity: 0.5;
+}
+
+@media (max-width: 800px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 6px 8px;
+  }
+  .group {
+    flex-direction: row;
+    margin-top: 0;
+  }
+  .groupTitle {
+    display: none;
+  }
+  .link {
+    width: auto;
+    white-space: nowrap;
+  }
+  .footer {
+    display: flex;
+    gap: 4px;
+  }
+  .navSub {
+    display: none;
+  }
+  .pagebar {
+    flex-wrap: wrap;
+    padding: 8px 16px;
+  }
+}

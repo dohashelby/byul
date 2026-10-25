@@ -1,0 +1,664 @@
+/* 공용 컴포넌트 스타일. serving-runtime 대시보드(static/app.css)의 모양을 그대로 옮겼다. */
+
+/* ---- 배지: 중립이 기본, 통제 결과는 강조색, 오류만 빨강 ------------------ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.plain {
+}
+.neutral {
+  color: var(--text-2);
+}
+.accent {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+.warn {
+  background: var(--warn-soft);
+  border-color: transparent;
+  color: var(--warn);
+}
+.caution {
+  background: var(--warn-soft);
+  border: 1px dashed var(--warn);
+  color: var(--warn);
+}
+.error {
+  background: var(--error-soft);
+  border-color: transparent;
+  color: var(--error);
+}
+.muted {
+  color: var(--muted);
+}
+.faint {
+  color: var(--muted);
+  background: transparent;
+  border-style: dashed;
+}
+/* 자료 등급 EXAMPLE: serving-runtime의 .chip-synthetic처럼 주황 테두리 */
+.example {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: var(--surface);
+}
+
+.na {
+  color: var(--muted);
+}
+.notCollected {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--chart-gray);
+  flex: none;
+}
+.dotOk {
+  background: var(--accent);
+}
+.dotBad {
+  background: var(--error);
+}
+.dotWarn {
+  background: var(--warn);
+}
+
+/* ---- 카드·요약 카드 ------------------------------------------------------ */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+}
+button.metric:hover {
+  background: var(--surface-2);
+}
+.metricTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.bigNumber {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.bigNumber > span:first-child,
+.metricValue {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.bigCaption {
+  color: var(--muted);
+  font-size: 13px;
+}
+.metricBody {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.barList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.barRow {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.barRow:hover .barLabel {
+  color: var(--text);
+}
+.barLabel {
+  font-size: 12px;
+  text-align: right;
+}
+.barTrack {
+  height: 18px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.barFill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.barRow.isError .barFill {
+  background: var(--error);
+}
+.barCount {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.miniTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.miniTable th,
+.miniTable td {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--grid);
+  text-align: left;
+}
+.miniTable th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 표 ----------------------------------------------------------------- */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th {
+  padding: 9px 16px;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.table th button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+}
+.table td {
+  padding: 9px 16px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--grid);
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.clickable tbody tr {
+  cursor: pointer;
+}
+.table tbody tr:hover {
+  background: var(--surface-2);
+}
+.table tbody tr.selected {
+  background: var(--accent-soft);
+}
+.empty {
+  margin: 0;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+.tableFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.colMenu {
+  position: relative;
+}
+.colMenuList {
+  position: absolute;
+  right: 0;
+  top: 32px;
+  z-index: 6;
+  min-width: 200px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.colMenuList label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.colMenuList label:hover {
+  background: var(--surface-2);
+}
+
+/* ---- 상세: 오른쪽 드로어 / 3단 화면 안의 패널 ----------------------------- */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--backdrop);
+  z-index: 9;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  width: min(520px, 100%);
+  border-radius: 0;
+  border-width: 0 0 0 1px;
+  animation: slideIn 0.18s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer {
+    animation: none;
+  }
+}
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.panelHead > :global(.grow) {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+.panelTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 16px;
+  cursor: pointer;
+}
+.iconButton:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.panelBody {
+  padding: 16px 20px 32px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+/* 하위 탭 (serving-runtime .subtabs / .card-tabs) */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.cardTabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.cardTab {
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+}
+.cardTab:hover {
+  color: var(--text);
+}
+.cardTab[aria-selected="true"] {
+  color: var(--accent-ink);
+  border-bottom-color: var(--accent);
+}
+
+/* 키-값 */
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+.kv dt {
+  color: var(--muted);
+}
+.kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* JSON 보기 (serving-runtime의 pre 모양) */
+.json {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow: auto;
+}
+.jsonBar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.jsonLine {
+  display: flex;
+  white-space: pre;
+  line-height: 1.6;
+}
+.jsonNo {
+  flex: none;
+  width: 44px;
+  padding-right: 10px;
+  text-align: right;
+  color: var(--muted);
+  user-select: none;
+}
+.jsonFold {
+  flex: none;
+  width: 16px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+}
+.jsonKey {
+  color: var(--text);
+}
+.jsonStr {
+  color: var(--accent-ink);
+}
+.jsonNum {
+  color: var(--text-2);
+}
+.jsonLit {
+  color: var(--muted);
+}
+
+/* ---- 띠·상태 화면 ---------------------------------------------------------- */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+.bannerExample {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.bannerUnofficial {
+  background: var(--error-soft);
+  color: var(--error);
+}
+.warningBox {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+.stateTitle {
+  font-weight: 600;
+  color: var(--text-2);
+}
+.stateError .stateTitle {
+  color: var(--error);
+}
+
+/* ---- 필터 (serving-runtime .filter / .scope-chip) -------------------------- */
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.filterField {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--muted);
+}
+.filterKey {
+  padding: 0 8px;
+  border-right: 1px solid var(--border);
+}
+.filterField select {
+  height: 24px;
+  padding: 0 4px 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  max-width: 180px;
+  font-size: 12px;
+}
+.filterActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.filterActive .filterKey {
+  border-right-color: var(--accent-2);
+  color: var(--accent-ink);
+}
+.segment {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+}
+.segment:hover {
+  color: var(--text);
+}
+.segment[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+/* ---- 그래프 ---------------------------------------------------------------- */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.legendSwatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+.tooltip {
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text);
+}
+.tooltip table td {
+  padding: 1px 8px 1px 0;
+}
+.chartCard {
+  padding: 16px;
+}
+.chartHead {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.chartBox {
+  position: relative;
+  height: 240px;
+}
+
+/* 섹션 머리 (serving-runtime .section-head) */
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.sectionHead h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.blockTitle {
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}

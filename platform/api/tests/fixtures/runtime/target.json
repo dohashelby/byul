@@ -1,0 +1,49 @@
+{
+    "registration": {
+        "state": "not_configured",
+        "path": null,
+        "sha256": null,
+        "loaded_at": "2026-10-25T07:34:23.040044+00:00",
+        "target_id": null,
+        "target_ref": null,
+        "engine": {
+            "kind": null,
+            "version": null,
+            "image_digest": null
+        },
+        "model": {
+            "id": null,
+            "revision": null
+        },
+        "baseline_ref": null,
+        "kubernetes": null,
+        "error_code": null,
+        "error_message": null
+    },
+    "gateway_hold": null,
+    "comparison": [],
+    "counts": {
+        "match": 0,
+        "mismatch": 0,
+        "unknown": 0,
+        "not_declared": 0
+    },
+    "kubernetes": null,
+    "instance": {
+        "state": "not_configured",
+        "observed_at": null,
+        "current": null,
+        "events_this_session": 0
+    },
+    "history": [],
+    "history_store": {
+        "path": "/var/lib/serving-runtime/target_snapshots.jsonl",
+        "corrupt_lines": 0,
+        "last_error": null
+    },
+    "limits": [
+        "model.id 일치는 weight 해시·revision·실제 로딩을 증명하지 않음",
+        "Pod 조회는 kind-runtime-lab context의 읽기 전용 조회만 지원",
+        "관측값 불일치는 표시만 하고 요청을 자동 차단하지 않음"
+    ]
+}

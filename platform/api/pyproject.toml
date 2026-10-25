@@ -1,0 +1,25 @@
+[project]
+name = "byul-platform"
+version = "0.1.0"
+description = "byul 통합 플랫폼 API (읽기 전용 결과 조회 + 환경·정책 초안 저장)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "pydantic>=2.7",
+    "httpx>=0.27",
+    "jsonschema>=4.23",
+]
+
+[project.scripts]
+byul-platform = "byul_platform.main:run"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["uv_build>=0.8,<0.12"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

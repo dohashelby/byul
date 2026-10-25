@@ -1,0 +1,21 @@
+{
+    "baseline": {
+        "state": "not_configured",
+        "path": null,
+        "sha256": null,
+        "loaded_at": "2026-10-25T07:34:23.039866+00:00",
+        "error_code": null,
+        "error_message": null
+    },
+    "manifest": {
+        "state": "not_configured",
+        "path": null,
+        "sha256": null,
+        "loaded_at": "2026-10-25T07:34:23.039868+00:00",
+        "error_code": null,
+        "error_message": null
+    },
+    "rows": [],
+    "model_id_limit": "model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않음",
+    "generated_at": "2026-10-25T07:34:33.159181+00:00"
+}

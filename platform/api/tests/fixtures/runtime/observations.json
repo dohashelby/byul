@@ -1,0 +1,21 @@
+{
+    "counts": {
+        "source": {},
+        "kind": {},
+        "verdict": {},
+        "rule_id": {},
+        "data_origin": {},
+        "environment": {},
+        "run_id": {},
+        "total": 0
+    },
+    "origins_by_kind": {},
+    "verification": {
+        "real_hubble_dropped": 0
+    },
+    "hubble_observations": [],
+    "observations": [],
+    "corrupt_lines": 0,
+    "corrupt_details": [],
+    "generated_at": "2026-10-25T07:34:33.178896+00:00"
+}

@@ -69,6 +69,15 @@ def _chips(side: dict | None) -> str:
     return "".join(out)
 
 
+def _side_cell(side: dict | None) -> str:
+    """상세 표의 판정 칸: 칩 + 그 판정을 낸 RES의 정확한 ID@revision(근거 추적용)."""
+    cell = _chips(side)
+    if side and side.get("result"):
+        res = side["result"]
+        cell += f'<br><code class="muted small">{escape(res["id"])}@{res["revision"]}</code>'
+    return cell
+
+
 def _marks(row: dict) -> list[str]:
     marks = [escape(GAP_KO.get(g, g)) for g in row["gaps"]]
     if row.get("evidence_source") == "manual":
@@ -210,12 +219,12 @@ def render_html(report: dict[str, Any]) -> str:
           f"<br><span class='muted small'>{escape(app)}</span></td><td>{escape(row['question'])}</td>")
         if update:
             cmp_ = row.get("comparison")
-            w(f"<td>{_chips(row.get('baseline'))}</td><td>{_chips(row.get('candidate'))}</td>"
+            w(f"<td>{_side_cell(row.get('baseline'))}</td><td>{_side_cell(row.get('candidate'))}</td>"
               f"<td>보안: {escape(COMPARISON_KO.get(cmp_, cmp_) if cmp_ else '-')}"
               f"<br>기능: {escape(COMPARISON_KO.get(row.get('functional_comparison'), '-'))}"
               f"<br>{escape(', '.join(row.get('comparison_reasons') or []))}</td>")
         else:
-            w(f"<td>{_chips(row.get('single'))}</td>")
+            w(f"<td>{_side_cell(row.get('single'))}</td>")
         w(f"<td class='small'>{'<br>'.join(_marks(row)) or '-'}</td></tr>")
     w("</table></div></details>")
 

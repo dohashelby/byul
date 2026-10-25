@@ -17,7 +17,7 @@ def ref(kind, i, rev=1):
     return {"kind": kind, "id": i, "revision": rev, "sha256": hashlib.sha256(f"{kind}{i}".encode()).hexdigest()}
 
 
-def side(sec, fn="PASS", perf="UNKNOWN", lvl="MEASURED", rid=None):
+def side(sec, fn="PASS", perf="UNKNOWN", lvl="EXAMPLE", rid=None):
     return {"result": ref("RES", rid) if rid else None, "security": sec, "functional": fn, "performance": perf,
             "verification_level": lvl}
 
@@ -52,7 +52,7 @@ rows = []
 for cid, (b, c, cmp_, extra) in S.items():
     m = meta[cid]
     manual = extra.get("manual")
-    lvl = "DECLARED" if manual else "MEASURED"
+    lvl = "DECLARED" if manual else "EXAMPLE"  # 목업은 실측이 아니므로 MEASURED를 쓰지 않는다(INV-02)
     row = {
         "check_id": cid, "purpose": m["purpose"], "area": m["area"], "question": m["question"],
         "review_order": m["review_order"], "impact": None, "applicability": "APPLICABLE", "selected": True,
@@ -80,17 +80,19 @@ not_sel = [{"check_id": k, "reason": "POLICY_SCOPE"} for k in meta if k not in s
 manual_req = [k for k in meta if k not in sel][:0] + ["SUP-01", "SUP-02", "PLT-02", "LIF-13"]
 doc = {
     "kind": "RPT", "id": "RPT-01M7Q3X8N2K4V9T6B5D1C0HJ8R", "revision": 1, "created_at": "2026-11-30T09:00:00Z",
-    "data_origin": "MEASURED", "content_sha256": hashlib.sha256(b"mockup").hexdigest(), "refs": [], "mode": "update",
-    "official": True, "pack_review_status": "REVIEWED", "policy_status": "CONFIRMED",
+    "mockup": True,  # 화면 설계용 가상 보고서. 시험 결과·승인 기록이 아니다
+    "data_origin": "EXAMPLE", "content_sha256": hashlib.sha256(b"mockup").hexdigest(), "refs": [], "mode": "update",
+    "official": False, "pack_review_status": "REVIEWED", "policy_status": "CONFIRMED",
     "inputs_manifest": [ref("ENV", "ENV-01M7Q2A4F6H8J0K2M4P6R8T0V2"), ref("ENV", "ENV-01M7Q2B5G7J9K1M3N5Q7S9U1W3"), ref("POL", "POL-01M7Q2C6H8K0M2N4P6R8T0V2X4"),
                         ref("PLAN", "PLAN-01M7Q2D7J9M1N3P5Q7S9U1W3Y5"), ref("PACK", "PACK-BASELINE", 5)],
     "by_check": rows, "by_purpose": by_purpose, "by_area": by_area,
     "not_selected": [n for n in not_sel if n["check_id"] not in manual_req],
     "manual_required": manual_req,
-    "limitations": ["점검 목록 미완결 영역 4개 — 집계 PASS 불가",
+    "limitations": ["목업: 화면 설계용 가상 자료다. 판정·수치·승인자는 실제 시험·승인 기록이 아니다",
+                    "점검 목록 미완결 영역 4개 — 집계 PASS 불가",
                     "실행 환경: GPU 1장, Linux, Docker 27 (단일 노드). 다중 노드 구성은 시험하지 않음",
                     "수동 입력 증거는 인증되지 않은 자기 신고(DECLARED)"],
-    "approval": {"approved_by": "김서준(정보보호팀)", "approved_at": "2026-11-30T14:20:00Z", "decision": "ACCEPT", "note": "REQ-01·PLT-04 후퇴 건은 후보 배포 보류"},
+    "approval": {"approved_by": "(목업 예시 승인자)", "approved_at": "2026-11-30T14:20:00Z", "decision": "ACCEPT", "note": "목업 예시: REQ-01·PLT-04 후퇴 건은 후보 배포 보류"},
     "evidence_counts": {"REQ": {"manual": 0, "automated": 6, "not_run": 15}, "PLT": {"manual": 0, "automated": 6, "not_run": 6},
                         "LIF": {"manual": 0, "automated": 5, "not_run": 11}, "OBS": {"manual": 2, "automated": 4, "not_run": 6},
                         "SUP": {"manual": 0, "automated": 0, "not_run": 16}},

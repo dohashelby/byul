@@ -2,7 +2,9 @@
 
 ## v1 통합 후보와 검증 이력
 
-2026-10-24 기준, PR #29의 [v1 통합 검증](UPDATE_VALIDATION.md#v1-통합-후보-검증)은 main `641f12f`에 반영됐다. 현행 후보는 PACK-BASELINE 22/DRAFT·77개 점검 정의·정책 22점검/50경로·자동 연결 11개·REQ-09 revision 6·PLT-04 revision 3·adapter 0.4.2·declared 0.14.0이다. [새 계약 실측](UPDATE_VALIDATION.md#req-09plt-04-판정-의미-보완-후보)은 양쪽 실제 실행·반출/복원·재판정을 완료했지만 후보 REQ-09 보안 UNKNOWN으로 수락 실패다. update 종료0·harness 종료1·558.134초를 구분한다. 나머지 4개는 양쪽 보안/기능 PASS이며 PLT-04는 후보 빈 목록의 부분 범위다. PR #28/#29의 팩21 성공을 소급하지 않는다. 자동 연결 수는 실제 전체 분기 검증 수가 아니며 공식 출시·기업 승인은 별도다.
+**2026-10-25 현행**: PR #30·#31이 main(`fb0c103`)에 병합됐다. 실측은 실행 조건별로 구분한다. (1) PR #30 기본 실행(`length_cause_evidence` 없음): 후보 REQ-09 보안 UNKNOWN으로 수락 실패. (2) PR #31 후속 실행(`length_cause_evidence = true`, 검토 프로파일과 일치하는 0.32.0 CPU 이미지): 다섯 점검 양쪽 PASS·NO_CHANGE로 수락 성공. (3) PLT-04 후보 단독 시험: 비어 있지 않은 EXAMPLE 후보로 absent·denied PASS / readable FAIL / symlink·directory UNKNOWN. (4) 두 이미지 update의 PLT-04: 후보 `[]`인 부분 범위. 상세는 [후속 실측](UPDATE_VALIDATION.md#후보-길이-거부-원인자격-후보-후속)이다.
+
+2026-10-24 PR #30 당시 기록: PR #29의 [v1 통합 검증](UPDATE_VALIDATION.md#v1-통합-후보-검증)은 main `641f12f`에 반영됐다. 당시 후보는 PACK-BASELINE 22/DRAFT·77개 점검 정의·정책 22점검/50경로·자동 연결 11개·REQ-09 revision 6·PLT-04 revision 3·adapter 0.4.2·declared 0.14.0이다. [새 계약 실측](UPDATE_VALIDATION.md#req-09plt-04-판정-의미-보완-후보)은 양쪽 실제 실행·반출/복원·재판정을 완료했지만 후보 REQ-09 보안 UNKNOWN으로 수락 실패다. update 종료0·harness 종료1·558.134초를 구분한다. 나머지 4개는 양쪽 보안/기능 PASS이며 PLT-04는 후보 빈 목록의 부분 범위다. PR #28/#29의 팩21 성공을 소급하지 않는다. 자동 연결 수는 실제 전체 분기 검증 수가 아니며 공식 출시·기업 승인은 별도다.
 
 ## REQ-09·PLT-04 판정 보완의 입력과 확인
 

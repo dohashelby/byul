@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-25 — main CI 복구와 외부 검토 반영
+
+- 한 일: HTML 보고서 상세 표에 판정 Ref(`RES-…@revision`) 표시를 되살려 main CI 실패를 고쳤다(`report/html.py`, 테스트 변경 없음). U1 이월 조건을 같은 CheckDef 비교·실행기/어댑터/시험 자료/실행 설정 동일성·판정기 버전 처리로 정정하고, 소스–이미지 관계 미확인을 전체 시험으로 정했다(설계 §6·§3.1·§3.4, SPEC INV-19). 공지 9건을 회귀 사례로 바꾸고 독립 평가 사례를 따로 정했다. README·RUNBOOK·automation_matrix·UPDATE_VALIDATION에 실행 조건별 현행 요약을 넣었다. 프로파일 설명 과장을 정정했다. 목업을 EXAMPLE·공식 아님으로 바꿨다. CLAUDE.md에 개발 효율 원칙을 추가했다.
+- 테스트 결과: HTML 수정 후 main 기본 suite 2905 통과·실패/오류/skip 0·기존 18 제외·pytest 43.20초/부모 44초(macOS). 그 뒤 바뀐 것은 문서와 `tools/make_mockup_report.py`(문서용 생성기)뿐이다.
+- 다음 단계: 커밋·push 뒤 main push CI 통과를 확인하고, 새 세션에서 `UPDATE_SELECTION_PROMPT.md`로 U1을 구현한다.
+- 막힌 것: 없음.
+
 ## 2026-10-25 — U1 변경 유형별 시험 선정 설계 확정
 
 - 한 일: 사용자 결정으로 엔진 정식 릴리스는 적용 점검 전체 시험(소스 diff는 보고·도달 확인·공백 보고용), 엔진 패치 릴리스(0.xx.1 …)는 항상 시험 20개와 diff에 걸리는 점검만 기준·후보로 시험, 모델·환경·정책 변경은 증분 감사로 골라서 시험하도록 [설계](docs/UPDATE_SELECTION.md)·[구현 지시](UPDATE_SELECTION_PROMPT.md)·SPEC(U1 절·INV-05 개정·INV-19)·DECISIONS를 갱신했다. 2026-10-24의 "모든 엔진 릴리스에 diff 선정" 안은 폐기했다. scratchpad에서 v0.31.0→v0.32.0 1차 검증 실험(변경 경로 2,801·미분류 10·보안 공지 9건 대조)과 과거 패치 5개 선정 계산(25~38/77)을 했다(설계 §8).

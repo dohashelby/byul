@@ -33,6 +33,12 @@ from .mock_engine import MockEngine, _utc_now
 from .observation_feed import ObservationFeed
 from serving_runtime.enforcement.execpolicy import ExecPolicy
 
+from .approval import (
+    ApprovalResult,
+    ApprovalVerifier,
+    HashListApprovalVerifier,
+    unavailable_policy_result,
+)
 from .auth import load_auth
 from .target import KubernetesTargetCollector, TargetRegistry, load_target
 from .policy import PolicyState, load_policy
@@ -55,6 +61,7 @@ class GatewayApp:
         policy_state: PolicyState,
         engine_address: tuple[str, int] | None = None,
         backend_config: BackendConfig | None = None,
+        approval_verifier: ApprovalVerifier | None = None,
     ) -> None:
         if config.host != "127.0.0.1":
             raise ValueError("the MVP gateway must bind to 127.0.0.1")
@@ -109,6 +116,11 @@ class GatewayApp:
         # A restart in the same Python process is a distinct observation session.
         self.observation_session_id = uuid4().hex
         self.revocation_state = load_revocations(config.revocations_path)
+        self._approval_verifier: ApprovalVerifier | None = approval_verifier
+        if self._approval_verifier is None and config.policy_approvals_path is not None:
+            self._approval_verifier = HashListApprovalVerifier(
+                config.policy_approvals_path
+            )
         self.auth_state = load_auth(config.auth_config_path)
         self._baseline = load_declaration(config.baseline_path, kind="baseline")
         self._manifest = load_declaration(config.manifest_path, kind="manifest")
@@ -116,8 +128,9 @@ class GatewayApp:
             Path(config.data_dir) / "policy_history.jsonl"
         )
         self._revalidation = RevalidationRequests(config.data_dir)
+        startup_approval = self._approval_result()
         policy_history_record = self._policy_history.append_startup(
-            policy_state, self.observation_session_id
+            policy_state, self.observation_session_id, startup_approval
         )
         if policy_history_record is None:
             self._revalidation.record_evaluation_error(
@@ -166,6 +179,7 @@ class GatewayApp:
             self._concurrency,
             lambda: self.auth_state,
             self._target.gateway_decision,
+            approval_result=self._approval_result,
         )
 
         self._server: LimitedThreadingHTTPServer | None = None
@@ -273,6 +287,20 @@ class GatewayApp:
             )
         self._collectors = CollectorManager(collectors)
 
+    def _approval_result(self) -> ApprovalResult | None:
+        if self._approval_verifier is None:
+            return None
+        policy = self.policy_state.policy
+        raw = self.policy_state.raw_bytes
+        if not self.policy_state.ok or policy is None or raw is None:
+            return unavailable_policy_result()
+        return self._approval_verifier.verify(
+            raw,
+            policy.policy_id,
+            policy.policy_version,
+            policy.approval_ref,
+        )
+
     def _revalidation_context(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         return {
@@ -364,7 +392,11 @@ class GatewayApp:
 
     def policy_status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
-        validity = evaluate_policy(self.policy_state, self.revocation_state)
+        validity = evaluate_policy(
+            self.policy_state,
+            self.revocation_state,
+            approval=self._approval_result(),
+        )
         history = self._policy_history.latest(50)
         history_storage = self._policy_history.status()
         current = {
@@ -401,9 +433,10 @@ class GatewayApp:
                 "valid_from",
                 "valid_until",
                 "revocation snapshot",
+                "LAB approval-list SHA-256 comparison",
             ],
             "unimplemented_validity_items": [
-                "signature verification",
+                "production signature or bundle verifier integration",
                 "approval service integration",
                 "hot reload",
                 "external enforcement confirmation",
@@ -480,12 +513,14 @@ class GatewayApp:
                 "gateway_active": policy_runtime["gateway_active"],
                 "external_enforcement": policy_runtime["external_enforcement"],
                 "reason_code": policy_runtime["reason_code"],
+                "approval": policy_runtime["approval"],
             },
             "policy_state": {
                 "loaded": policy_runtime["loaded"],
                 "gateway_active": policy_runtime["gateway_active"],
                 "external_enforcement": policy_runtime["external_enforcement"],
                 "reason_code": policy_runtime["reason_code"],
+                "approval": policy_runtime["approval"],
             },
             "policy_history_store": policy_runtime["history_storage"],
             "record_store": record_store,

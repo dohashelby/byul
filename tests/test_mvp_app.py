@@ -111,6 +111,7 @@ class MVPCommandTests(unittest.TestCase):
                 "--environment", "docker-cpu",
                 "--run-id", "gateway-run",
                 "--revocations", "revocations.json",
+                "--policy-approvals", "policy-approvals.json",
                 "--baseline", "baseline.json",
                 "--manifest", "manifest.json",
                 "--collector-interval", "0.5",
@@ -140,6 +141,7 @@ class MVPCommandTests(unittest.TestCase):
         self.assertEqual(config.request_body_timeout_s, 3)
         self.assertEqual((config.environment, config.run_id), ("docker-cpu", "gateway-run"))
         self.assertEqual(config.revocations_path, "revocations.json")
+        self.assertEqual(config.policy_approvals_path, "policy-approvals.json")
         self.assertEqual(config.baseline_path, "baseline.json")
         self.assertEqual(config.manifest_path, "manifest.json")
         self.assertEqual(config.collector_interval_s, 0.5)

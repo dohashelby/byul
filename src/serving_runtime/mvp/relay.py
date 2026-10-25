@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from http.client import HTTPException
 import json
+import re
 import socket
 import time
 from typing import Any, Callable, Protocol
@@ -22,7 +23,12 @@ class StreamResponse(Protocol):
 
 
 def engine_error(
-    status: int, code: str, message: str, allowed: Decision
+    status: int,
+    code: str,
+    message: str,
+    allowed: Decision,
+    *,
+    source: str = "engine",
 ) -> Decision:
     return Decision(
         result="ERROR",
@@ -35,6 +41,103 @@ def engine_error(
         # Keep what was (or would have been) relayed so failure records stay accurate.
         extra_fields=allowed.extra_fields,
         n=allowed.n,
+        source=source,
+    )
+
+
+_ENGINE_ERROR_BODY_LIMIT = 64 * 1024
+_ENGINE_MESSAGE_LIMIT = 256
+_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f-\x9f]+")
+_RETRY_AFTER_SECONDS = re.compile(r"[0-9]{1,10}")
+
+
+def _engine_message(body: bytes, *, truncated: bool) -> str | None:
+    """Extract one bounded JSON error message without retaining the body."""
+
+    if truncated:
+        return None
+    try:
+        document = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
+        return None
+    candidates: list[object] = []
+    if isinstance(document, dict):
+        error = document.get("error")
+        if isinstance(error, dict):
+            candidates.extend((error.get("message"), error.get("detail")))
+        else:
+            candidates.append(error)
+        candidates.extend((document.get("message"), document.get("detail")))
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        cleaned = " ".join(_CONTROL_CHARACTERS.sub(" ", candidate).split())
+        if cleaned:
+            return cleaned[:_ENGINE_MESSAGE_LIMIT]
+    return None
+
+
+def retry_after_seconds(value: str | None) -> str | None:
+    """Return a canonical bounded delta-seconds value, never an HTTP date."""
+
+    if value is None:
+        return None
+    stripped = value.strip()
+    if _RETRY_AFTER_SECONDS.fullmatch(stripped) is None:
+        return None
+    return str(int(stripped))
+
+
+def engine_rejection(
+    status: int,
+    body: bytes,
+    allowed: Decision,
+    *,
+    truncated: bool,
+    retry_after: str | None = None,
+) -> Decision:
+    if status in {401, 403}:
+        # This is the Gateway's upstream credential/configuration failure, not
+        # a client authentication challenge. Preserve the engine status only in
+        # the record and do not expose its response body to the client.
+        return Decision(
+            result="ERROR",
+            http_status=502,
+            reason_code="ENGINE_AUTHORIZATION_FAILED",
+            rule_id=None,
+            message="engine authorization failed",
+            model=allowed.model,
+            max_tokens=allowed.max_tokens,
+            extra_fields=allowed.extra_fields,
+            n=allowed.n,
+            source="engine",
+            engine_http_status=status,
+        )
+    if status == 429:
+        code = "ENGINE_CAPACITY_REJECTED"
+        classification = "engine capacity rejection"
+        client_retry_after = retry_after_seconds(retry_after)
+    else:
+        code = "ENGINE_REJECTED_REQUEST"
+        classification = "engine request rejection"
+        client_retry_after = None
+    summary = _engine_message(body, truncated=truncated)
+    message = f"{classification} (HTTP {status})"
+    if summary is not None:
+        message = f"{message}: {summary}"
+    return Decision(
+        result="ENGINE_REJECTED",
+        http_status=status,
+        reason_code=code,
+        rule_id=None,
+        message=message,
+        model=allowed.model,
+        max_tokens=allowed.max_tokens,
+        extra_fields=allowed.extra_fields,
+        n=allowed.n,
+        source="engine",
+        engine_http_status=status,
+        retry_after=client_retry_after,
     )
 
 
@@ -122,7 +225,23 @@ class Relay:
             )
             engine_response = connection.getresponse()
             status = engine_response.status
-            body = engine_response.read()
+            if 400 <= status < 500:
+                body = engine_response.read(_ENGINE_ERROR_BODY_LIMIT + 1)
+                return (
+                    engine_rejection(
+                        status,
+                        body[:_ENGINE_ERROR_BODY_LIMIT],
+                        allowed,
+                        truncated=len(body) > _ENGINE_ERROR_BODY_LIMIT,
+                        retry_after=engine_response.getheader("Retry-After"),
+                    ),
+                    None,
+                )
+            body = (
+                engine_response.read()
+                if status == 200
+                else engine_response.read(_ENGINE_ERROR_BODY_LIMIT + 1)
+            )
             if status != 200:
                 return (
                     engine_error(
@@ -195,6 +314,16 @@ class Relay:
             engine_response = connection.getresponse()
             content_type = engine_response.getheader("Content-Type", "")
             media_type = content_type.split(";", 1)[0].strip().lower()
+            if 400 <= engine_response.status < 500:
+                body = engine_response.read(_ENGINE_ERROR_BODY_LIMIT + 1)
+                rejected = engine_rejection(
+                    engine_response.status,
+                    body[:_ENGINE_ERROR_BODY_LIMIT],
+                    allowed,
+                    truncated=len(body) > _ENGINE_ERROR_BODY_LIMIT,
+                    retry_after=engine_response.getheader("Retry-After"),
+                )
+                return rejected, rejected.reason_code, False
             if engine_response.status != 200 or media_type != "text/event-stream":
                 return (
                     engine_error(
@@ -217,6 +346,7 @@ class Relay:
                         "CLIENT_DISCONNECTED",
                         "client disconnected during streaming",
                         allowed,
+                        source="client",
                     ),
                     "client_disconnected",
                     response_started,
@@ -272,7 +402,13 @@ class Relay:
                 saw_done = saw_done or found_done
 
             return (
-                engine_error(200, code, outcome.replace("_", " "), allowed),
+                engine_error(
+                    200,
+                    code,
+                    outcome.replace("_", " "),
+                    allowed,
+                    source=("client" if code == "CLIENT_DISCONNECTED" else "engine"),
+                ),
                 outcome,
                 True,
             )

@@ -49,6 +49,7 @@ class PolicyState:
     loaded_at: str
     error_code: str | None
     error_message: str | None
+    raw_bytes: bytes | None = field(default=None, repr=False)
 
 
 class DuplicateKeyError(ValueError):
@@ -430,4 +431,4 @@ def load_policy(path: str | Path) -> PolicyState:
         extra_fields=extra_fields,
         max_n=max_n,
     )
-    return PolicyState(True, policy, path_text, digest, loaded_at, None, None)
+    return PolicyState(True, policy, path_text, digest, loaded_at, None, None, raw)

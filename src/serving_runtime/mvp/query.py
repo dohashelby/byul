@@ -7,7 +7,7 @@ from .mock_engine import _utc_now
 from .store import JsonlStore
 
 
-_FINAL_RESULTS = ("ALLOWED", "DENIED", "INVALID", "ERROR")
+_FINAL_RESULTS = ("ALLOWED", "DENIED", "INVALID", "ENGINE_REJECTED", "ERROR")
 _FILTER_RESULTS = frozenset((*_FINAL_RESULTS, "INCOMPLETE"))
 
 
@@ -100,6 +100,8 @@ class QueryService:
             "result": result,
             "reason_code": decision.get("reason_code"),
             "http_status": decision.get("http_status"),
+            "source": decision.get("source"),
+            "engine_http_status": decision.get("engine_http_status"),
             "stream": source.get("stream"),
             "http_start_status": source.get("http_start_status"),
             "final_outcome": source.get("final_outcome"),

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .approval import ApprovalResult
 from .policy import (
     DuplicateKeyError,
     PolicyState,
@@ -151,6 +152,7 @@ def evaluate_policy(
     policy_state: PolicyState,
     revocations: RevocationState,
     *,
+    approval: ApprovalResult | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Evaluate the immutable startup snapshot for one new request."""
@@ -209,11 +211,24 @@ def evaluate_policy(
     else:
         revocation_result = "not_revoked"
 
-    approval_result = (
-        "not_configured"
-        if policy is None or policy.approval_ref is None
-        else "not_validated"
-    )
+    if approval is None:
+        approval_status = {
+            "state": "not_configured",
+            "checked_at": None,
+            "verifier": None,
+            "reason_code": None,
+            "reason_message": None,
+            "evidence": {},
+        }
+    else:
+        approval_status = approval.status()
+        if approval.state != "verified" and reason_code is None:
+            reason_code = {
+                "unverified": "POLICY_APPROVAL_UNVERIFIED",
+                "rejected": "POLICY_APPROVAL_REJECTED",
+                "error": "POLICY_APPROVAL_ERROR",
+            }[approval.state]
+            reason_message = approval.reason_message
     return {
         "loaded": loaded,
         "gateway_active": loaded and reason_code is None,
@@ -238,12 +253,16 @@ def evaluate_policy(
                 "error_message": revocations.error_message,
             },
             {
-                "item": "approval_ref",
-                "state": approval_result,
-                "result": approval_result,
+                "item": "approval",
+                "state": approval_status["state"],
+                "result": approval_status["reason_code"] or approval_status["state"],
                 "value": policy.approval_ref if policy else None,
+                "checked_at": approval_status["checked_at"],
+                "verifier": approval_status["verifier"],
+                "evidence": approval_status["evidence"],
             },
         ],
+        "approval": approval_status,
     }
 
 
@@ -271,6 +290,10 @@ class PolicyHistory:
             "valid_from",
             "valid_until",
             "approval_ref",
+            "approval_state",
+            "approval_reason_code",
+            "approval_checked_at",
+            "approval_verifier",
             "error_code",
         ):
             result.setdefault(name, None)
@@ -286,7 +309,10 @@ class PolicyHistory:
         return result
 
     def append_startup(
-        self, policy_state: PolicyState, session_id: str
+        self,
+        policy_state: PolicyState,
+        session_id: str,
+        approval: ApprovalResult | None = None,
     ) -> dict[str, Any] | None:
         try:
             existing, _ = self.store.read_all()
@@ -321,6 +347,10 @@ class PolicyHistory:
             "valid_from": policy.valid_from if policy else None,
             "valid_until": policy.valid_until if policy else None,
             "approval_ref": policy.approval_ref if policy else None,
+            "approval_state": approval.state if approval else "not_configured",
+            "approval_reason_code": approval.reason_code if approval else None,
+            "approval_checked_at": approval.checked_at if approval else None,
+            "approval_verifier": approval.verifier if approval else None,
             "error_code": policy_state.error_code,
             "previous": previous,
             "same_version_content_changed": same_version_changed,

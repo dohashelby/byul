@@ -24,6 +24,10 @@ class FakeBackend:
     _MODES = frozenset(
         {
             "normal",
+            "http_400",
+            "http_401",
+            "http_403",
+            "http_429",
             "http_500",
             "invalid_json",
             "sse_truncated",
@@ -134,7 +138,13 @@ class FakeBackend:
             def log_message(self, format: str, *args: object) -> None:
                 return
 
-            def _send_json(self, status: int, document: dict[str, Any]) -> None:
+            def _send_json(
+                self,
+                status: int,
+                document: dict[str, Any],
+                *,
+                extra_headers: dict[str, str] | None = None,
+            ) -> None:
                 payload = {
                     **document,
                     "data_origin": "fake_backend_test",
@@ -144,6 +154,8 @@ class FakeBackend:
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Content-Length", str(len(encoded)))
+                for name, value in (extra_headers or {}).items():
+                    self.send_header(name, value)
                 self.end_headers()
                 try:
                     self.wfile.write(encoded)
@@ -383,6 +395,23 @@ class FakeBackend:
                     return
                 if owner.mode == "http_500":
                     self._send_json(500, {"error": {"code": "FAKE_CHAT_FAILURE"}})
+                    return
+                rejected = {
+                    "http_400": (400, "bad\u0000 request field"),
+                    "http_401": (401, "backend credential rejected"),
+                    "http_403": (403, "backend credential lacks permission"),
+                    "http_429": (429, "backend queue is full"),
+                }.get(owner.mode)
+                if rejected is not None:
+                    self._send_json(
+                        rejected[0],
+                        {"error": {"message": rejected[1]}},
+                        extra_headers=(
+                            {"Retry-After": "3"}
+                            if owner.mode == "http_429"
+                            else None
+                        ),
+                    )
                     return
                 try:
                     content_length = int(self.headers.get("Content-Length", "0"))

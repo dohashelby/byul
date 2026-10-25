@@ -52,12 +52,14 @@ class QueryServiceTests(unittest.TestCase):
         self.gateway.append(record("1" * 32, "started", "ALLOWED"))
         self.gateway.append(record("1" * 32, "final", "ALLOWED", attempted=True))
         self.gateway.append(record("2" * 32, "final", "DENIED"))
+        self.gateway.append(record("5" * 32, "final", "ENGINE_REJECTED", attempted=True))
         self.gateway.append(record("3" * 32, "started", "ALLOWED"))
         summary = self.service.summary()
         self.assertEqual(summary["counts"]["ALLOWED"], 1)
         self.assertEqual(summary["counts"]["DENIED"], 1)
+        self.assertEqual(summary["counts"]["ENGINE_REJECTED"], 1)
         self.assertEqual(summary["incomplete"], 1)
-        self.assertEqual(summary["total"], 3)
+        self.assertEqual(summary["total"], 4)
 
     def test_older_records_expose_new_stream_fields_as_none(self) -> None:
         self.gateway.append(record("4" * 32, "final", "ALLOWED", attempted=True))

@@ -16,7 +16,7 @@ from .policy import (
 
 @dataclass(frozen=True)
 class Decision:
-    result: Literal["ALLOWED", "DENIED", "INVALID", "ERROR"]
+    result: Literal["ALLOWED", "DENIED", "INVALID", "ENGINE_REJECTED", "ERROR"]
     http_status: int
     reason_code: str
     rule_id: str | None
@@ -27,6 +27,9 @@ class Decision:
     # (name, mode) pairs. Values are never kept here.
     extra_fields: tuple[tuple[str, str], ...] = ()
     n: int | None = None
+    source: str = "gateway"
+    engine_http_status: int | None = None
+    retry_after: str | None = None
 
 
 def _type_matches(kind: str, value: object) -> bool:

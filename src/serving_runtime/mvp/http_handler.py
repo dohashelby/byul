@@ -211,6 +211,7 @@ class Handler(BaseHTTPRequestHandler):
                     "code": decision.reason_code,
                     "message": decision.message,
                     "result": decision.result,
+                    "source": decision.source,
                     "request_id": request_id,
                 }
             },
@@ -581,6 +582,7 @@ class LimitedThreadingHTTPServer(ThreadingHTTPServer):
                         "code": decision.reason_code,
                         "message": decision.message,
                         "result": decision.result,
+                        "source": decision.source,
                         "request_id": request_id,
                     }
                 }

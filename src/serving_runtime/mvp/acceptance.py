@@ -1428,6 +1428,10 @@ def _run_s3a_04(runner: _Runner) -> AcceptanceResult:
         raise RuntimeError("fake backend is not running")
     observed: dict[str, dict[str, Any]] = {}
     expected = {
+        "http_400": (400, "ENGINE_REJECTED_REQUEST", "ENGINE_REJECTED", "engine"),
+        "http_401": (502, "ENGINE_AUTHORIZATION_FAILED", "ERROR", "engine"),
+        "http_403": (502, "ENGINE_AUTHORIZATION_FAILED", "ERROR", "engine"),
+        "http_429": (429, "ENGINE_CAPACITY_REJECTED", "ENGINE_REJECTED", "engine"),
         "http_500": (502, "ENGINE_BAD_RESPONSE"),
         "invalid_json": (502, "ENGINE_BAD_RESPONSE"),
         "disconnect": (502, "ENGINE_UNREACHABLE"),
@@ -1435,7 +1439,8 @@ def _run_s3a_04(runner: _Runner) -> AcceptanceResult:
         "header_timeout": (504, "ENGINE_TIMEOUT"),
     }
     request_ids: list[str] = []
-    for mode, (wanted_status, wanted_code) in expected.items():
+    for mode, wanted in expected.items():
+        wanted_status, wanted_code = wanted[:2]
         runner.fake_backend.set_mode(mode)
         status, request_id, body = runner.post_chat()
         if request_id:
@@ -1443,6 +1448,8 @@ def _run_s3a_04(runner: _Runner) -> AcceptanceResult:
         observed[mode] = {
             "http": status,
             "code": body.get("error", {}).get("code"),
+            "result": body.get("error", {}).get("result"),
+            "source": body.get("error", {}).get("source"),
             "expected": [wanted_status, wanted_code],
         }
     redirect_not_followed = runner.fake_backend.redirect_follow_count == 0
@@ -1457,6 +1464,11 @@ def _run_s3a_04(runner: _Runner) -> AcceptanceResult:
             and item["code"] == item["expected"][1]
             for item in observed.values()
         )
+        and observed["http_400"]["result"] == "ENGINE_REJECTED"
+        and observed["http_400"]["source"] == "engine"
+        and observed["http_401"]["result"] == "ERROR"
+        and observed["http_403"]["result"] == "ERROR"
+        and observed["http_429"]["result"] == "ENGINE_REJECTED"
         and redirect_not_followed
         and truncated_status == 200
         and truncated_final is not None
@@ -1465,8 +1477,8 @@ def _run_s3a_04(runner: _Runner) -> AcceptanceResult:
     )
     return AcceptanceResult(
         "S3A-04",
-        "fake backend 500·invalid JSON·disconnect·302·header timeout·SSE 절단",
-        "502/504와 stream 최종 오류 구분, redirect 미추적",
+        "fake backend 400·401·403·429·500·invalid JSON·disconnect·302·header timeout·SSE 절단",
+        "엔진 일반 4xx/429 출처·상태 보존, 엔진 인증 실패 502 오류 분리, 5xx/비정상 응답 502, timeout 504, redirect 미추적",
         {
             "nonstream": observed,
             "redirect_not_followed": redirect_not_followed,

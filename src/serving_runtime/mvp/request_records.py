@@ -135,8 +135,15 @@ class RequestRecords:
                 "result": decision.result,
                 "reason_code": decision.reason_code,
                 "rule_id": decision.rule_id,
-                "message": decision.message,
+                "message": (
+                    "engine rejected request"
+                    if decision.result == "ENGINE_REJECTED"
+                    and decision.source == "engine"
+                    else decision.message
+                ),
                 "http_status": decision.http_status,
+                "source": decision.source,
+                "engine_http_status": decision.engine_http_status,
             },
             "request": {
                 "model": decision.model,

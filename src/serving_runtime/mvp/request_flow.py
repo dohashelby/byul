@@ -7,6 +7,7 @@ import threading
 import time
 from typing import Callable, Protocol
 
+from .approval import ApprovalResult
 from .auth import CHAT_ROUTE, AuthState, not_configured
 from .backend import BackendConfig
 from .engine_client import EngineClient
@@ -98,12 +99,14 @@ class RequestFlow:
         concurrency: ConcurrencyLimiter,
         auth_state: Callable[[], AuthState] | None = None,
         target_hold: Callable[[str | None], tuple[str, str] | None] | None = None,
+        approval_result: Callable[[], ApprovalResult | None] | None = None,
     ) -> None:
         self._auth_state = auth_state or not_configured
         self._target_hold = target_hold or (lambda _policy_target: None)
         self._backend = backend
         self._policy_state = policy_state
         self._revocation_state = revocation_state
+        self._approval_result = approval_result or (lambda: None)
         self._records = records
         self._engine_client = engine_client
         self._relay = relay
@@ -198,6 +201,7 @@ class RequestFlow:
                 "CONTEXT_CHECK_UNAVAILABLE",
                 "input token count is unavailable",
                 decision,
+                source="gateway",
             )
         total = input_tokens + (decision.max_tokens or 0)
         exceeded = total > context_limit
@@ -281,7 +285,11 @@ class RequestFlow:
     def chat(self, response: ChatIO, request_id: str) -> None:
         self._records.clear_context()
         policy_snapshot = self._policy_state()
-        policy_runtime = evaluate_policy(policy_snapshot, self._revocation_state())
+        policy_runtime = evaluate_policy(
+            policy_snapshot,
+            self._revocation_state(),
+            approval=self._approval_result(),
+        )
         if response.request_header("Transfer-Encoding") is not None:
             self.finish_without_relay(
                 response,
@@ -467,6 +475,7 @@ class RequestFlow:
                         "BACKEND_CREDENTIAL_MISSING",
                         "backend credential is configured but unavailable",
                         decision,
+                        source="gateway",
                     ),
                     stream=stream,
                 )
@@ -480,6 +489,7 @@ class RequestFlow:
                         "BACKEND_CREDENTIAL_INVALID",
                         "backend credential cannot be used as an HTTP header value",
                         decision,
+                        source="gateway",
                     ),
                     stream=stream,
                 )
@@ -493,6 +503,7 @@ class RequestFlow:
                         "BACKEND_MODEL_UNMAPPED",
                         "allowed policy model has no backend mapping",
                         decision,
+                        source="gateway",
                     ),
                     stream=stream,
                 )
@@ -546,6 +557,7 @@ class RequestFlow:
                     "STORE_UNAVAILABLE",
                     "request record store is unavailable",
                     decision,
+                    source="gateway",
                 )
                 self._records.append(
                     self._records.build(
@@ -631,7 +643,15 @@ class RequestFlow:
                     )
                 )
                 if not response_started:
-                    response.send_error_decision(final_decision, request_id)
+                    response.send_error_decision(
+                        final_decision,
+                        request_id,
+                        extra_headers=(
+                            {"Retry-After": final_decision.retry_after}
+                            if final_decision.retry_after is not None
+                            else None
+                        ),
+                    )
                 return
 
             final_decision, engine_body = self._relay.relay(
@@ -665,6 +685,14 @@ class RequestFlow:
                     request_id=request_id,
                 )
             else:
-                response.send_error_decision(final_decision, request_id)
+                response.send_error_decision(
+                    final_decision,
+                    request_id,
+                    extra_headers=(
+                        {"Retry-After": final_decision.retry_after}
+                        if final_decision.retry_after is not None
+                        else None
+                    ),
+                )
         finally:
             self._concurrency.release()

@@ -6,6 +6,7 @@ const RESULT_LABELS = {
   ALLOWED: "허용",
   DENIED: "정책 거부",
   INVALID: "입력 오류",
+  ENGINE_REJECTED: "엔진 거부",
   ERROR: "처리 오류",
   INCOMPLETE: "미완료",
 };
@@ -150,7 +151,15 @@ function renderStatus(status) {
   $("engine-title").textContent = external ? "외부 backend" : "모의 엔진";
 
   const policy = status.policy;
-  setDot("policy-dot", policy.valid);
+  setDot("policy-dot", policy.gateway_active);
+  const approval = policy.approval || { state: "not_configured" };
+  const approvalLabels = {
+    not_configured: "미설정",
+    verified: "확인됨",
+    unverified: "목록에서 확인 못함 — 추론 요청은 503",
+    rejected: "불일치·만료 — 추론 요청은 503",
+    error: "확인 오류 — 추론 요청은 503",
+  };
   const policyRows = [
     ["정책", policy.policy_id],
     ["판본", policy.policy_version],
@@ -158,7 +167,9 @@ function renderStatus(status) {
     ["대상", policy.target_id],
     ["SHA-256", policy.sha256 ? `${policy.sha256.slice(0, 12)}…` : null, { mono: true, title: policy.sha256 }],
     ["로딩", formatTime(policy.loaded_at)],
-    ["유효", policy.valid ? "유효" : "무효 — 추론 요청은 503", { problem: !policy.valid }],
+    ["로딩 검증", policy.valid ? "유효" : "무효 — 추론 요청은 503", { problem: !policy.valid }],
+    ["승인 확인", approvalLabels[approval.state] || approval.state, { problem: !["not_configured", "verified"].includes(approval.state) }],
+    ["Gateway 활성", policy.gateway_active ? "활성" : "비활성 — 추론 요청은 503", { problem: !policy.gateway_active }],
   ];
   if (!policy.valid) {
     policyRows.push(["사유", `${policy.error_code || ""} ${policy.error_message || ""}`.trim(), { problem: true }]);
@@ -201,7 +212,7 @@ function renderStatus(status) {
 }
 
 function renderSummary(summary) {
-  for (const key of ["ALLOWED", "DENIED", "INVALID", "ERROR"]) {
+  for (const key of ["ALLOWED", "DENIED", "INVALID", "ENGINE_REJECTED", "ERROR"]) {
     $(`count-${key}`).textContent = summary.counts[key];
   }
   $("count-INCOMPLETE").textContent = summary.incomplete;
@@ -247,8 +258,8 @@ function renderPolicyState(policy) {
   }
   const validity = $("validity-rows");
   clear(validity);
-  const labels = { period: "기간", revocation: "철회", approval_ref: "승인 근거" };
-  const results = { not_configured: "미설정", not_validated: "검증 안 함" };
+  const labels = { period: "기간", revocation: "철회", approval: "승인 확인" };
+  const results = { not_configured: "미설정", POLICY_APPROVAL_VERIFIED: "확인됨" };
   for (const item of policy.validity || []) {
     validity.appendChild(el("tr", {}, [
       el("td", { text: labels[item.item] || item.item }),

@@ -25,7 +25,9 @@ from serving_runtime.mvp.engine_client import EngineClient
 from serving_runtime.mvp.fake_backend import FakeBackend
 from serving_runtime.mvp.mock_engine import MockEngine
 from serving_runtime.mvp.policy import load_policy
+from serving_runtime.mvp.relay import engine_rejection, retry_after_seconds
 from serving_runtime.mvp.store import JsonlStore
+from serving_runtime.mvp.validator import Decision
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +79,49 @@ def chat_body(**updates: object) -> bytes:
     }
     document.update(updates)
     return json.dumps(document).encode("utf-8")
+
+
+class EngineRejectionDecisionTests(unittest.TestCase):
+    def test_4xx_classification_status_origin_and_message_sanitizing(self) -> None:
+        allowed = Decision(
+            "ALLOWED",
+            200,
+            "REQUEST_ALLOWED",
+            None,
+            "request allowed",
+            "test-model",
+            8,
+        )
+        cases = {
+            400: (400, "ENGINE_REJECTED", "ENGINE_REJECTED_REQUEST"),
+            404: (404, "ENGINE_REJECTED", "ENGINE_REJECTED_REQUEST"),
+            413: (413, "ENGINE_REJECTED", "ENGINE_REJECTED_REQUEST"),
+            422: (422, "ENGINE_REJECTED", "ENGINE_REJECTED_REQUEST"),
+            401: (502, "ERROR", "ENGINE_AUTHORIZATION_FAILED"),
+            403: (502, "ERROR", "ENGINE_AUTHORIZATION_FAILED"),
+            429: (429, "ENGINE_REJECTED", "ENGINE_CAPACITY_REJECTED"),
+        }
+        body = json.dumps({"error": {"message": "bad\u0000value " + "x" * 400}}).encode()
+        for status, (client_status, result, code) in cases.items():
+            with self.subTest(status=status):
+                rejected = engine_rejection(status, body, allowed, truncated=False)
+                self.assertEqual(rejected.http_status, client_status)
+                self.assertEqual(rejected.reason_code, code)
+                self.assertEqual(rejected.result, result)
+                self.assertEqual(rejected.source, "engine")
+                self.assertEqual(rejected.engine_http_status, status)
+                self.assertNotIn("\x00", rejected.message)
+                self.assertLessEqual(len(rejected.message), 320)
+                if status in {401, 403}:
+                    self.assertEqual(rejected.message, "engine authorization failed")
+                    self.assertNotIn("bad value", rejected.message)
+
+        truncated = engine_rejection(400, body, allowed, truncated=True)
+        self.assertNotIn("bad value", truncated.message)
+        self.assertEqual(retry_after_seconds(" 003 "), "3")
+        for invalid in (None, "", "-1", "1.5", "Wed, 21 Oct 2026 07:28:00 GMT", "1" * 11):
+            with self.subTest(retry_after=invalid):
+                self.assertIsNone(retry_after_seconds(invalid))
 
 
 class BackendConfigTests(unittest.TestCase):
@@ -584,6 +629,62 @@ class ExternalBackendHttpTests(unittest.TestCase):
         )
         self.assertEqual(final["final_outcome"], "backend_truncated")
         self.assertEqual(final["decision"]["reason_code"], "STREAM_TRUNCATED")
+
+    def test_engine_4xx_preserves_origin_status_and_is_not_a_gateway_denial(self) -> None:
+        gateway = self.start_gateway()
+        cases = (
+            ("http_400", 400, "ENGINE_REJECTED", "ENGINE_REJECTED_REQUEST", 400),
+            ("http_401", 502, "ERROR", "ENGINE_AUTHORIZATION_FAILED", 401),
+            ("http_403", 502, "ERROR", "ENGINE_AUTHORIZATION_FAILED", 403),
+            ("http_429", 429, "ENGINE_REJECTED", "ENGINE_CAPACITY_REJECTED", 429),
+        )
+        for mode, expected_status, expected_result, expected_code, engine_status in cases:
+            self.fake.set_mode(mode)
+            with self.subTest(mode=mode):
+                status, headers, body = self.request(gateway, chat_body())
+                error = json.loads(body)["error"]
+                self.assertEqual(status, expected_status)
+                self.assertEqual(error["code"], expected_code)
+                self.assertEqual(error["result"], expected_result)
+                self.assertEqual(error["source"], "engine")
+                self.assertNotIn("\x00", error["message"])
+                if mode in {"http_401", "http_403"}:
+                    self.assertEqual(error["message"], "engine authorization failed")
+                    self.assertNotIn("backend credential", error["message"])
+                    self.assertNotIn("WWW-Authenticate", headers)
+                if mode == "http_429":
+                    self.assertEqual(headers.get("Retry-After"), "3")
+                final = next(
+                    record
+                    for record in reversed(self.records())
+                    if record["request_id"] == headers["X-Request-ID"]
+                    and record["phase"] == "final"
+                )
+                self.assertEqual(final["decision"]["result"], expected_result)
+                self.assertEqual(final["decision"]["source"], "engine")
+                self.assertEqual(final["decision"]["engine_http_status"], engine_status)
+                self.assertNotIn("backend credential", final["decision"]["message"])
+
+        summary = self.get_json(gateway, "/api/summary")
+        self.assertEqual(summary["counts"]["ENGINE_REJECTED"], 2)
+        self.assertEqual(summary["counts"]["ERROR"], 2)
+        self.assertEqual(summary["counts"]["DENIED"], 0)
+
+        self.fake.set_mode("http_400")
+        status, _, body = self.request(gateway, chat_body(stream=True))
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["error"]["code"], "ENGINE_REJECTED_REQUEST")
+
+        self.fake.set_mode("http_401")
+        status, _, body = self.request(gateway, chat_body(stream=True))
+        self.assertEqual(status, 502)
+        self.assertEqual(json.loads(body)["error"]["result"], "ERROR")
+
+        self.fake.set_mode("http_429")
+        status, headers, body = self.request(gateway, chat_body(stream=True))
+        self.assertEqual(status, 429)
+        self.assertEqual(headers.get("Retry-After"), "3")
+        self.assertEqual(json.loads(body)["error"]["result"], "ENGINE_REJECTED")
 
     def test_credential_is_forwarded_but_never_exposed(self) -> None:
         secret = "S3A-SECRET-MUST-NOT-LEAK"

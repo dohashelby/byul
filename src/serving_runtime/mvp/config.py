@@ -32,6 +32,7 @@ class MVPConfig:
     environment: str | None = None
     run_id: str | None = None
     revocations_path: str | None = None
+    policy_approvals_path: str | None = None
     baseline_path: str | None = None
     manifest_path: str | None = None
     collector_interval_s: float = 5.0
@@ -96,6 +97,7 @@ class MVPConfig:
             raise ValueError("data_dir must not be empty")
         for name in (
             "revocations_path",
+            "policy_approvals_path",
             "baseline_path",
             "manifest_path",
             "asset_manifest_path",

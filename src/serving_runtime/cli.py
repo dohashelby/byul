@@ -58,6 +58,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument("--run-id", metavar="ID")
     mvp_parser.add_argument("--revocations", metavar="PATH")
     mvp_parser.add_argument(
+        "--policy-approvals",
+        metavar="PATH",
+        help="LAB 정책 승인 목록(runtime-policy-approvals/1.0)",
+    )
+    mvp_parser.add_argument(
         "--observation-exceptions",
         metavar="PATH",
         help="실행 예외(runtime-exec-exceptions/1.0); intent 1.1 필요",
@@ -248,6 +253,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "request_header_timeout_s": args.request_header_timeout,
                 "request_body_timeout_s": args.request_body_timeout,
                 "revocations_path": args.revocations,
+                "policy_approvals_path": args.policy_approvals,
                 "baseline_path": args.baseline,
                 "manifest_path": args.manifest,
                 "collector_interval_s": args.collector_interval,

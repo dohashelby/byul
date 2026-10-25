@@ -103,6 +103,7 @@ python3 -m venv .venv
 | `--request-deadline 초` | `300` | stream 요청 전체 처리 상한 |
 | `--max-concurrency N` | `2` | 일반·stream 공통 동시 처리 상한. 초과 요청은 대기 없이 429 |
 | `--revocations PATH` | 미설정 | 철회 스냅샷. 설정했지만 읽기·검증 실패 시 신규 요청 503 |
+| `--policy-approvals PATH` | 미설정 | LAB 승인 목록. 정책 ID·판본·`approval_ref`·정책 파일 SHA-256을 요청마다 대조하며 확인 실패 시 503 |
 | `--baseline PATH` | 미설정 | 승인 기준 파일(읽기 전용) |
 | `--manifest PATH` | 미설정 | 실행 선언값 파일(읽기 전용, 자동 승격 없음) |
 | `--collector-interval 초` | `5` | 모의 엔진 상태·정보 수집 주기 |
@@ -110,7 +111,7 @@ python3 -m venv .venv
 
 ### 정책 1.1과 상태 판정
 
-기존 `runtime-mvp/1.0` 정책은 그대로 로딩합니다. `runtime-mvp/1.1`은 선택 필드 `valid_from`·`valid_until`(시간대가 포함된 ISO8601), `approval_ref`(표시 전용)를 추가합니다. 기간 필드가 없으면 무기한입니다. 1.0 문서에 이 필드를 넣으면 기존 엄격 검증에 따라 `UNKNOWN_FIELD`로 거부합니다. 예시는 `examples/mvp/policy-v1.1.json`입니다.
+기존 `runtime-mvp/1.0` 정책은 그대로 로딩합니다. `runtime-mvp/1.1`은 선택 필드 `valid_from`·`valid_until`(시간대가 포함된 ISO8601), `approval_ref`를 추가합니다. 기간 필드가 없으면 무기한입니다. 1.0 문서에 이 필드를 넣으면 기존 엄격 검증에 따라 `UNKNOWN_FIELD`로 거부합니다. 예시는 `examples/mvp/policy-v1.1.json`입니다.
 
 철회 파일 형식은 다음과 같습니다. 현재 정책의 ID·판본·파일 SHA-256이 모두 같은 항목만 철회로 판정합니다. 철회 파일을 설정하지 않으면 유효성 판단에서 제외하고 화면에 **철회 확인 미설정**으로 표시합니다. 설정한 파일을 읽거나 검증할 수 없으면 상태를 확인할 수 없으므로 신규 요청을 유효하게 보지 않습니다.
 
@@ -129,7 +130,9 @@ python3 -m venv .venv
 
 정책 상태는 서로 섞지 않습니다. `loaded`는 파일 읽기·schema 검증 성공, `gateway_active`는 신규 요청 시점의 기간·철회 판정 통과, `external_enforcement`는 현재 `not_connected`입니다. 시작 시 정책 관측을 `policy_history.jsonl`에 추가하며 같은 ID·판본의 내용 해시가 바뀌면 별도로 표시합니다. 진행 중인 stream은 시작 때 선택한 정책 스냅샷을 사용하므로 이후 만료 시각이 지나도 일괄 종료하지 않습니다.
 
-기간 전·만료·확인된 철회·철회 확인 불가는 각각 `POLICY_NOT_YET_VALID`, `POLICY_EXPIRED`, `POLICY_REVOKED`, `POLICY_REVOCATION_UNKNOWN` 503이며 엔진을 호출하지 않습니다. `approval_ref`는 표시만 하고 유효성을 검증하지 않습니다. 서명 검증, 승인 서비스 연동, hot reload, 외부 집행 확인은 구현하지 않았습니다.
+기간 전·만료·확인된 철회·철회 확인 불가는 각각 `POLICY_NOT_YET_VALID`, `POLICY_EXPIRED`, `POLICY_REVOKED`, `POLICY_REVOCATION_UNKNOWN` 503이며 엔진을 호출하지 않습니다.
+
+`--policy-approvals`를 설정하면 `runtime-policy-approvals/1.0` 목록을 요청마다 다시 읽어 시작 시 로드한 정책 파일 바이트의 SHA-256과 정책 ID·판본·`approval_ref`를 대조합니다. 일치 항목만 `verified`이며 항목 없음·불일치·만료·파일 손상은 정책 상태 오류 503으로 엔진에 전달하지 않습니다. 미설정은 `not_configured`이고 기존 동작과 같습니다. 예시는 `examples/mvp/policy-approvals.example.json`입니다. 이것은 교체 가능한 LAB 해시 대조 틀이며 키·서명을 만들지 않습니다. 실제 검증 도구 쪽 서명/번들 검증기 연동, 정책 hot reload, 외부 집행 확인은 구현하지 않았습니다.
 
 baseline과 manifest는 평면 `fields` 객체를 사용합니다. manifest도 아래와 같은 `runtime-mvp-baseline/1.0` 형식을 쓰며 출처는 `declared_manifest`로 구분합니다.
 
@@ -252,6 +255,8 @@ Gateway는 수집 결과에서 승인 상태와 다른 근거를 발견하면 `<
 - `health_path`·`models_path`·`version_path`·`metrics_url`·`metrics_map`·`timeouts`: 상태·지표 수집과 시간 제한. health 200은 "연결 가능"이며 추론 정상을 뜻하지 않습니다.
 
 증거 구분: 외부 backend 요청은 기록에 `backend_kind: "vllm"`으로 남고, 모의 엔진 수신 기록을 증거로 쓰지 않습니다. backend 측 수신 기록원이 아직 연결되지 않았으므로 거부 요청은 "Gateway 미전달 확인, backend 미수신은 미확인", 허용 요청은 "Gateway 전달·응답 수신, backend 측 수신 기록 미연결"로 표시합니다. 엔진 내부 생성 취소는 확인하지 않습니다(`backend_cancel: "not_observed"`).
+
+엔진이 응답 시작 전에 반환한 일반 입력 4xx는 계획서 §4.2에 따라 HTTP 상태를 보존하고 `decision.result: ENGINE_REJECTED`, `error.source: engine`으로 Gateway 정책 거부와 분리합니다. 429도 `ENGINE_CAPACITY_REJECTED`로 상태를 보존하며, 엔진의 `Retry-After`가 10자리 이하의 정수 초일 때만 정규화해 클라이언트에 전달합니다(HTTP-date 등은 전달하지 않음). 반면 엔진 401/403은 클라이언트 인증 실패가 아니라 Gateway가 제공한 upstream 자격·권한 문제이므로 클라이언트에는 502 `ENGINE_AUTHORIZATION_FAILED`, `result: ERROR`, `source: engine`으로 반환하고 원래 상태는 기록의 `engine_http_status`에만 보존합니다. 이때 엔진 본문은 클라이언트에도 노출하지 않습니다. 그 밖의 엔진 4xx 오류 본문은 상한 안의 JSON 오류 메시지만 제어문자 제거·길이 제한 후 응답하며 기록에는 원문이나 요약을 남기지 않습니다. 엔진 5xx·잘못된 JSON·redirect는 기존처럼 502 `ENGINE_BAD_RESPONSE`입니다.
 
 vLLM 근거 표기: 경로(`/v1/chat/completions`, `/health`, `/v1/models`, `/version`, `/metrics`), SSE 종료 `data: [DONE]`, 지표 이름 후보(`vllm:num_requests_running`, `vllm:num_requests_waiting`, `vllm:kv_cache_usage_perc` — 구버전 `vllm:gpu_cache_usage_perc`, `vllm:time_to_first_token_seconds`, `vllm:e2e_request_latency_seconds`, `vllm:prompt_tokens_total`, `vllm:generation_tokens_total`)는 공식 문서 latest(https://docs.vllm.ai/en/latest/usage/metrics/) 기준 **후보**이며, v1.4 선정 고정 버전(v0.31.0)의 실제 응답으로 확인하지 않았습니다. 그래서 `metrics_map`의 `verified`는 항상 `false`입니다. 응답에 없는 지표는 `unsupported_or_absent`로 표시합니다.
 
@@ -409,6 +414,7 @@ curl -N -H 'Content-Type: application/json' \
 | 본문 64KiB 초과 / Content-Type 오류 | 413 / 415 | 입력 오류 |
 | 정책 파일 없음·검증 실패 | 503 | 처리 오류 (정책 준비 실패) |
 | 정책 기간 전·만료·철회·철회 확인 불가 | 503 | 처리 오류 (원인별 코드, 모의 엔진 미호출) |
+| 구성한 정책 승인 목록의 항목 없음·불일치·만료·확인 오류 | 503 | 처리 오류 (엔진 미호출) |
 | 기록 저장 불가 | 503 | 처리 오류 (모의 엔진 미호출) |
 | 모의 엔진 연결 실패 / 시간 초과 | 502 / 504 | 처리 오류 |
 

@@ -149,7 +149,7 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
         observations = [o["key"] for o in check.get("required_observations", [])]
         observations += check.get("required_observations_prose", [])
         policy = check.get("policy_prose") or {}
-        remaining = old.get("remaining_scope", "")
+        remaining = " / ".join(filter(None, [old.get("remaining_scope", ""), *check.get("limitations", [])]))
         rows.append({
             "check_id": check_id, "area": check["area"], "question": check["question"],
             "pack_revision": str(pack_revision), "check_revision": str(check["revision"]),

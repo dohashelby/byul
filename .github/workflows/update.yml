@@ -18,6 +18,11 @@ on:
 permissions:
   contents: read
 
+# A push followed by its PR event validates the same head only once.
+concurrency:
+  group: update-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   update-default:
     runs-on: ubuntu-latest
@@ -120,7 +125,7 @@ jobs:
       - run: uv sync --frozen
       - name: Verify platform contracts and read-only RPT projection
         run: |
-          uv run --frozen --with ../../update python - <<'PY'
+          uv run --frozen --with-editable ../../update python - <<'PY'
           import os
           import subprocess
           import sys

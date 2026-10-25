@@ -3,13 +3,17 @@
 ## 2026-10-26 통합 작업 기준
 
 - BYUL `main d119ebe`의 JSON 전용 보고서·플랫폼 표시 결정을 보존하고 GUA `8e23bd2`의 U1·Python 3.12를 선택 이관했다. 이관 후 검증 결과는 PROGRESS의 같은 날짜 항목을 따른다.
-- 현행 정의는 PACK-BASELINE 23/DRAFT·77점검·정책 22점검/50경로·real 연결 11개다. [77개 분기별 추적표](docs/CHECKLIST_VALIDATION_STATUS.md)는 코드·원천 자료에서 재생성한다. 연결 수는 전체 분기 검증 완료 수가 아니다.
+- 현행 정의는 PACK-BASELINE 24/DRAFT·77점검·정책 23점검/51경로·real 연결 12점검이다. 실행기 종류는 기존 11종을 재사용하며 SUP-04는 실행 이미지 승인 부분관측이고 전체 공급물 PASS를 만들지 않는다. [77개 분기별 추적표](docs/CHECKLIST_VALIDATION_STATUS.md)는 코드·원천 자료에서 재생성한다. 연결 수는 전체 분기 검증 완료 수가 아니다.
 - UPDATE는 RPT JSON을 생성하며 `platform/api/src/byul_platform/sources/update.py`가 `verification-result/0.2`로 변환한다. `--html`과 자체 보고서 HTML은 복구하지 않는다. OBS 증거 첨부 HTML은 유지한다.
 - [공용 경계·입력 변환](docs/BYUL_INTEGRATION.md)과 `../contracts/README.md`를 따른다. 공용 스키마·생산자·표시 규칙 소유는 임의로 바꾸지 않는다.
 - U1의 내부 구현과 회귀 사례는 이관했지만 사람 정답 승인·독립 정확성 평가는 미완료다. `triggers`·`carried_over`·`previous_result`·`change_summary`의 공용 상세 표현은 공동 검토 대상이며 원본 RPT를 보존한다.
 - 사용자 요청으로 이번 실제 vLLM 실증은 보류한다. Docker daemon 미기동·가용 RAM 제약을 기록하며 과거 GUA 실증을 이번 코드의 실측으로 표시하지 않는다. 기본 시연 설정의 fake와 실제 CPU 실행을 구분한다.
 
 현재 설치·개발·CI의 Python 지원 범위는 **3.12(`>=3.12,<3.13`)**이며 `uv sync --frozen`을 사용합니다. vLLM 대상 이미지의 내부 Python은 별도 환경입니다. 아래 과거 실험의 3.11 표기·원본 증거·팩은 당시 사실대로 보존하며, 3.11용 제품을 별도로 유지하지 않습니다. 전환 검증 범위와 결과는 [설치본 검증](docs/INSTALLED_VERIFICATION.md#python-312-전환-검증)을 확인합니다.
+
+## SUP-04 실행 이미지 승인 후속
+
+[제한 계약과 설정](docs/SUPPLY_IMAGE_APPROVAL.md)을 따른다. 기존 container_config에 실행 프로파일을 추가했으며 실제 vLLM 실증은 보류한다. 기존 76개 정의와 과거 팩은 보존한다.
 
 ## GUA 팩22 실증 이력과 지원 조건
 

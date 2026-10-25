@@ -76,6 +76,10 @@ def preview_inputs(check, env, values: dict, cfg: dict) -> ExecutionPreview | No
 
 def _http_fixture(executor, check, env, values, adapter, target, keys):
     if executor.name == "container_config":
+        from .running_image_approval import PROFILE
+        if getattr(check, "collection_profile", None) == PROFILE:
+            # Running identity is collected on the target, not the PLT-01 sentinel fixture.
+            return None
         from .container_config import DEFAULT_SENTINELS, PROC_CMD, SENTINEL_CMD
         return {"sentinel_paths": list(dict.fromkeys(executor.cfg.get("sentinel_paths", DEFAULT_SENTINELS))),
                 "proc_cmd": PROC_CMD, "sentinel_cmd": SENTINEL_CMD}

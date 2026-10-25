@@ -252,8 +252,8 @@ def test_legacy_checkdef_omits_new_optional_metadata():
     assert CheckDef.model_validate(check).model_dump(mode="json") == check
 
 
-def test_approved_source_refresh_increments_every_existing_definition_once():
-    """팩22의 실제 정의 revision을 고정해 문구 갱신을 판정 규칙 변경과 구분한다."""
+def test_source_refresh_and_image_profile_revisions_preserve_other_definitions():
+    """팩22→23 원문 갱신과 팩24의 SUP-04 추가를 구분하고 다른76개 bytes를 보호한다."""
     prior = {f"{area}-{number:02d}": 1 for area, count in
              (("SUP", 16), ("REQ", 21), ("PLT", 12), ("LIF", 16), ("OBS", 12))
              for number in range(1, count + 1)}
@@ -263,10 +263,18 @@ def test_approved_source_refresh_increments_every_existing_definition_once():
                   "OBS-03": 2, "OBS-04": 2, "OBS-05": 2, "OBS-07": 2, "OBS-08": 2,
                   "OBS-09": 2, "OBS-11": 2})
     pack = load_pack(ROOT / "packs/PACK-BASELINE")
-    assert pack.manifest.revision == 22 + 1
+    assert pack.manifest.revision == 24
     assert set(pack.checks) == set(prior) and len(prior) == 77
-    assert {cid: check.revision for cid, check in pack.checks.items()} == {
-        cid: revision + 1 for cid, revision in prior.items()}
+    expected = {cid: revision + 1 for cid, revision in prior.items()}
+    expected["SUP-04"] += 1  # Only the new running-image profile changes after source refresh.
+    assert {cid: check.revision for cid, check in pack.checks.items()} == expected
+    frozen = json.loads((ROOT / "tests/fixtures/pack23-check-hashes.json").read_text(encoding="utf-8"))
+    assert frozen["pack_revision"] == 23 and len(frozen["checks"]) == 77
+    from hashlib import sha256
+    for path, digest in frozen["checks"].items():
+        if path != "checks/SUP-04.yaml":
+            assert sha256((ROOT / "packs/PACK-BASELINE" / path).read_bytes()).hexdigest() == digest
+    assert pack.checks["SUP-04"].collection_profile == "running-image-approval-v1"
     assert {check.framework_id for check in pack.checks.values()} == {
         "CHK-" + cid.split("-")[0] + "-" + cid.split("-")[1].zfill(3) for cid in prior}
 

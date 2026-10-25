@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 23
+revision: 24
 engines:
 - vllm
 checks:
@@ -212,7 +212,7 @@ files_sha256:
 - path: checks/SUP-03.yaml
   sha256: 49b6edab8b24cf43ce823edd5a7a53f9863ee36b5606df834549e53adb6d6438
 - path: checks/SUP-04.yaml
-  sha256: c7308f711486109f17c4944123971a7a22578e273f845a27d0442b5f9861adc5
+  sha256: c9822e19818158b3b067dffa9c5021081d38c62a1a8f9e6a4f9dc071a32712e3
 - path: checks/SUP-05.yaml
   sha256: 2ae0ceee031107a5e6f2479c5e2efc826a297f04ab855c83223ccd2b977f8b32
 - path: checks/SUP-06.yaml

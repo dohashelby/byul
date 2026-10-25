@@ -62,8 +62,10 @@ def test_current_declarations_metadata_and_empty_values(tmp_path):
     text = build_policy_template(pack)
     data = yaml.safe_load(text)
     declarations = {(c.id, p.key) for c in pack.active_checks() for p in c.policy_params}
-    assert len(declarations) == 50
-    assert {cid for cid, key in declarations} == {"REQ-01", "REQ-03", "REQ-07", "REQ-09", "REQ-10", "REQ-11", "REQ-13", "OBS-03", "OBS-09", "PLT-01", "PLT-04", "SUP-14", "LIF-07", "SUP-01", "SUP-02", "OBS-11", "OBS-04", "OBS-05", "OBS-07", "OBS-08", "REQ-15", "REQ-16"}
+    # Existing 50 declarations plus exactly the explicit SUP-04 image policy.
+    assert len(declarations) == 51
+    assert {cid for cid, key in declarations} == {"REQ-01", "REQ-03", "REQ-07", "REQ-09", "REQ-10", "REQ-11", "REQ-13", "OBS-03", "OBS-09", "PLT-01", "PLT-04", "SUP-14", "LIF-07", "SUP-01", "SUP-02", "OBS-11", "OBS-04", "OBS-05", "OBS-07", "OBS-08", "REQ-15", "REQ-16", "SUP-04"}
+    assert {(cid, key) for cid, key in declarations if cid == "SUP-04"} == {("SUP-04", "approved_image_digests")}
     assert set(data["values"]) == {cid for cid, key in declarations}
     assert all(value == {} for value in data["values"].values())
     assert text.count("# 파라미터: ") == len(declarations)

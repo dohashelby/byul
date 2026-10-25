@@ -26,6 +26,10 @@ EXCEPTIONS_SCHEMA = "runtime-exec-exceptions/1.0"
 TIMELINE_SCHEMA = "runtime-phase-timeline/1.0"
 TIMELINE_PHASES = (*PHASES, "maintenance")
 BASES = frozenset({"declared", "engine_signal", "test_controller"})
+# Phases and exceptions come from a trusted management path (plan §7.4). An
+# engine can write its own logs, so an engine_signal phase alone never widens
+# what counts as allowed; it only marks the event for review.
+TRUSTED_BASES = frozenset({"declared", "test_controller"})
 MAINTENANCE_MAX = timedelta(minutes=30)
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
@@ -417,22 +421,36 @@ class ExecPolicy:
             timeline = self._timeline.get()
             exceptions = self._exceptions.get()
             timeline_error = self._timeline.error
-        active = sorted({entry.phase for entry in timeline if at is not None and entry.active(at)})
-        bases = sorted({entry.basis for entry in timeline if at is not None and entry.active(at)})
+        entries = [entry for entry in timeline if at is not None and entry.active(at)]
+        active = sorted({entry.phase for entry in entries})
+        bases = sorted({entry.basis for entry in entries})
+        trusted = sorted({entry.phase for entry in entries if entry.basis in TRUSTED_BASES})
         intent = self.intent
         approved = set(intent.allowed_engine_binaries)
         for phase in active:
             approved |= set(intent.binaries_for(phase))
+        # A binary approved in every phase does not depend on which phase is
+        # claimed, so it stays allowed even when only engine signals are active.
+        trusted_approved = set(intent.allowed_engine_binaries) | set.intersection(
+            *(set(intent.binaries_for(phase)) for phase in PHASES)
+        )
+        for phase in trusted:
+            trusted_approved |= set(intent.binaries_for(phase))
         cache_root = intent.assets.cache_root if intent.assets is not None else None
         from_cache = cache_root is not None and Path(binary).is_relative_to(cache_root)
-        matched = next(
-            (
-                item
-                for item in exceptions
-                if item.covers(binary=binary, parent=parent, image=image, phases=set(active), at=at)
-            ),
-            None,
-        )
+
+        def covering(phases: list[str]) -> ExecException | None:
+            return next(
+                (
+                    item
+                    for item in exceptions
+                    if item.covers(binary=binary, parent=parent, image=image, phases=set(phases), at=at)
+                ),
+                None,
+            )
+
+        matched = covering(trusted)
+        candidate = covering(active) if matched is None else None
         if matched is not None:
             verdict = "exception"
         elif from_cache:
@@ -441,11 +459,16 @@ class ExecPolicy:
             verdict = "suspect_binary"
         elif not active:
             verdict = "phase_unknown"
+        elif candidate is not None:
+            # The exception's phase condition is met only by an engine signal.
+            verdict = "phase_signal_unverified"
         elif active == ["maintenance"]:
             # Maintenance work is allowed only through an approved exception.
             verdict = "outside_allowlist"
-        elif binary in approved:
+        elif binary in trusted_approved:
             verdict = "allowed_in_phase"
+        elif binary in approved:
+            verdict = "phase_signal_unverified"
         else:
             verdict = "outside_allowlist"
         rule_refs = ["SP3-EXEC"]
@@ -454,10 +477,12 @@ class ExecPolicy:
         return {
             "phase": active or ["unknown"],
             "phase_basis": bases,
+            "phase_trusted": trusted,
             "phase_source_error": timeline_error,
             "exec_verdict": verdict,
             "exception_id": matched.exception_id if matched else None,
             "exception_kind": matched.kind if matched else None,
+            "exception_candidate_id": candidate.exception_id if candidate else None,
             "binary_location": "cache" if from_cache else "other",
             "parent_attribution": "available" if parent else "unavailable",
             "image_digest": image,

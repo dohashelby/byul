@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import threading
 from typing import Any, Literal, Protocol
 
 from .policy import (
@@ -47,7 +48,7 @@ def _utc_now() -> str:
 class ApprovalResult:
     """One verifier outcome with non-secret, structured evidence."""
 
-    state: Literal["verified", "unverified", "rejected", "error"]
+    state: Literal["verified", "last_verified", "unverified", "rejected", "error"]
     checked_at: str
     verifier: str
     reason_code: str
@@ -80,7 +81,7 @@ class ApprovalVerifier(Protocol):
 
 
 def _result(
-    state: Literal["verified", "unverified", "rejected", "error"],
+    state: Literal["verified", "last_verified", "unverified", "rejected", "error"],
     code: str,
     message: str,
     *,
@@ -163,10 +164,18 @@ def _parse_entries(raw: bytes) -> tuple[dict[str, str], ...]:
 
 
 class HashListApprovalVerifier:
-    """LAB verifier that reloads and strictly validates one approval list."""
+    """LAB verifier that reloads and strictly validates one approval list.
+
+    Plan §7.3: when the approval source cannot be read, the last approval
+    verified for the same policy bytes stays in effect while it is still
+    within its validity period. An explicit miss, mismatch or expiry in a
+    readable list ends that fallback.
+    """
 
     def __init__(self, path: str | Path) -> None:
         self.path = str(path)
+        self._lock = threading.Lock()
+        self._last_verified: dict[str, Any] | None = None
 
     def verify(
         self,
@@ -179,31 +188,72 @@ class HashListApprovalVerifier:
     ) -> ApprovalResult:
         checked = (now or _utc_now_datetime()).astimezone(timezone.utc)
         checked_at = checked.isoformat()
+        selector = (hashlib.sha256(policy_bytes).hexdigest(), policy_id, policy_version, approval_ref)
+        source_error: tuple[str, str] | None = None
+        entries: tuple[dict[str, str], ...] = ()
         try:
             raw = Path(self.path).read_bytes()
         except FileNotFoundError:
-            return _result(
-                "error",
-                "APPROVAL_LIST_NOT_FOUND",
-                "policy approval list was not found",
-                checked_at=checked_at,
-            )
+            source_error = ("APPROVAL_LIST_NOT_FOUND", "policy approval list was not found")
         except (OSError, ValueError):
-            return _result(
-                "error",
-                "APPROVAL_LIST_READ_ERROR",
-                "policy approval list could not be read",
-                checked_at=checked_at,
-            )
-        try:
-            entries = _parse_entries(raw)
-        except ValueError as error:
-            return _result(
-                "error",
-                "INVALID_APPROVAL_LIST",
-                str(error),
-                checked_at=checked_at,
-            )
+            source_error = ("APPROVAL_LIST_READ_ERROR", "policy approval list could not be read")
+        else:
+            try:
+                entries = _parse_entries(raw)
+            except ValueError as error:
+                source_error = ("INVALID_APPROVAL_LIST", str(error))
+        if source_error is not None:
+            return self._fallback(selector, checked, checked_at, *source_error)
+        result = self._verify_entries(
+            entries, policy_bytes, policy_id, policy_version, approval_ref, checked, checked_at
+        )
+        with self._lock:
+            if result.state == "verified":
+                self._last_verified = {
+                    "selector": selector,
+                    "verified_at": checked_at,
+                    "valid_until": result.evidence.get("valid_until"),
+                }
+            else:
+                self._last_verified = None
+        return result
+
+    def _fallback(
+        self,
+        selector: tuple[str, str, str, str | None],
+        checked: datetime,
+        checked_at: str,
+        code: str,
+        message: str,
+    ) -> ApprovalResult:
+        with self._lock:
+            last = self._last_verified
+        if last is not None and last["selector"] == selector:
+            valid_until = last["valid_until"]
+            if valid_until is None or checked < parse_policy_time(valid_until):
+                return _result(
+                    "last_verified",
+                    "POLICY_APPROVAL_LAST_VERIFIED",
+                    f"{message}; keeping the last verified approval",
+                    checked_at=checked_at,
+                    evidence={
+                        "source_error": code,
+                        "last_verified_at": last["verified_at"],
+                        "valid_until": valid_until,
+                    },
+                )
+        return _result("error", code, message, checked_at=checked_at)
+
+    def _verify_entries(
+        self,
+        entries: tuple[dict[str, str], ...],
+        policy_bytes: bytes,
+        policy_id: str,
+        policy_version: str,
+        approval_ref: str | None,
+        checked: datetime,
+        checked_at: str,
+    ) -> ApprovalResult:
 
         base_evidence = {
             "schema_version": SCHEMA_VERSION,

@@ -294,7 +294,8 @@ class ExecPolicyTests(unittest.TestCase):
         cases = [
             ("/usr/bin/python3", "2026-10-24T09:20:00Z", "allowed_in_phase", ["inferring"]),
             ("/usr/local/bin/vllm", "2026-10-24T09:20:00Z", "allowed_in_phase", ["inferring"]),
-            ("/usr/bin/gcc", "2026-10-24T09:04:00Z", "allowed_in_phase", ["compiling", "loading"]),
+            # compiling is only an engine_signal here; gcc is approved only for compiling.
+            ("/usr/bin/gcc", "2026-10-24T09:04:00Z", "phase_signal_unverified", ["compiling", "loading"]),
             ("/usr/bin/gcc", "2026-10-24T09:20:00Z", "outside_allowlist", ["inferring"]),
             ("/usr/bin/python3", "2026-10-24T08:00:00Z", "phase_unknown", ["unknown"]),
             ("/bin/sh", "2026-10-24T09:20:00Z", "suspect_binary", ["inferring"]),
@@ -319,9 +320,42 @@ class ExecPolicyTests(unittest.TestCase):
         no_image = self.classify("/usr/bin/ptxas", "2026-10-24T09:05:00Z")
         self.assertEqual(no_image["exec_verdict"], "outside_allowlist")
         with_image = self.classify("/usr/bin/ptxas", "2026-10-24T09:05:00Z", image=digest)
-        self.assertEqual(with_image["exec_verdict"], "exception")
+        # The compiling phase here comes only from an engine signal.
+        self.assertEqual(with_image["exec_verdict"], "phase_signal_unverified")
+        self.assertEqual(with_image["exception_candidate_id"], "EXC-LAB-STANDING-001")
+        self.assertIsNone(with_image["exception_id"])
         wrong_phase = self.classify("/usr/bin/ptxas", "2026-10-24T09:20:00Z", image=digest)
         self.assertEqual(wrong_phase["exec_verdict"], "outside_allowlist")
+
+    def test_engine_signal_alone_does_not_widen_allowed_set(self) -> None:
+        # Plan §7.4: phases come from a trusted path; an engine can write its
+        # own logs, so an engine_signal phase never turns an alert into "allowed".
+        digest = "sha256:" + "0" * 64
+        with tempfile.TemporaryDirectory() as directory:
+            timeline = Path(directory) / "t.json"
+
+            def classify(basis: str, binary: str, image: str | None = None):
+                timeline.write_text(json.dumps({
+                    "schema_version": "runtime-phase-timeline/1.0",
+                    "entries": [{"phase": "compiling", "from": "2026-10-24T09:00:00+00:00", "until": None, "basis": basis}],
+                }), encoding="utf-8")
+                os.utime(timeline, ns=(time.time_ns(), time.time_ns()))
+                policy = ExecPolicy(self.intent, exceptions_path=EXCEPTIONS, timeline_path=timeline)
+                return policy.classify_exec(binary=binary, parent=None, image=image, observed_at="2026-10-24T09:05:00Z")
+
+            for basis in ("declared", "test_controller"):
+                with self.subTest(basis=basis):
+                    self.assertEqual(classify(basis, "/usr/bin/gcc")["exec_verdict"], "allowed_in_phase")
+                    trusted = classify(basis, "/usr/bin/ptxas", image=digest)
+                    self.assertEqual((trusted["exec_verdict"], trusted["exception_id"]), ("exception", "EXC-LAB-STANDING-001"))
+                    self.assertEqual(trusted["phase_trusted"], ["compiling"])
+            signal = classify("engine_signal", "/usr/bin/gcc")
+            self.assertEqual(signal["exec_verdict"], "phase_signal_unverified")
+            self.assertEqual(signal["phase_trusted"], [])
+            # A binary approved in every phase does not depend on the claimed phase.
+            self.assertEqual(classify("engine_signal", "/usr/bin/python3")["exec_verdict"], "allowed_in_phase")
+            # Never approved anywhere stays outside the allowlist.
+            self.assertEqual(classify("engine_signal", "/usr/bin/nvcc")["exec_verdict"], "outside_allowlist")
 
     def test_maintenance_only_window_needs_an_exception(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -411,7 +445,7 @@ class AdapterIntegrationTests(unittest.TestCase):
             data_origin="synthetic",
             exec_policy=self.policy,
         )
-        self.assertEqual(item["exec_verdict"], "exception")
+        self.assertEqual(item["exec_verdict"], "phase_signal_unverified")
         self.assertEqual(item["image_digest"], digest)
         self.assertEqual(item["rule_id"], "TG-EXEC-01")
         self.assertNotIn("super-secret-argument", json.dumps(item))

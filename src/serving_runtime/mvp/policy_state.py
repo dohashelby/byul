@@ -222,7 +222,7 @@ def evaluate_policy(
         }
     else:
         approval_status = approval.status()
-        if approval.state != "verified" and reason_code is None:
+        if approval.state not in {"verified", "last_verified"} and reason_code is None:
             reason_code = {
                 "unverified": "POLICY_APPROVAL_UNVERIFIED",
                 "rejected": "POLICY_APPROVAL_REJECTED",

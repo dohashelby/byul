@@ -29,7 +29,7 @@ BoB serving-engine security runtime solution
 | 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류·엔진 로그 신호 시간표와 기간 있는 승인 예외 | 단위 시험; L-07·L-08 자동 점검을 로컬 kind에서 실행 확인 |
 | read-only 관리 listener (SP4) | observer용 GET/HEAD 경로 허용 목록, 요청 헤더 격리, timeout·응답 크기 제한, 최소 접근 JSONL | 구현·모의 엔진 HTTP 시험 추가; 현재 Codex에서는 소켓 제한으로 HTTP 시험 skip, 실제 kind 사이드카 미확인 |
 | 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 + CPU vLLM 일부 확인; `logprobs`는 엔진 정지/무응답으로 미확인 |
-| 시험 | 추적 unittest 376개, 수용 시험 39개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 추적 시험 수는 개인 파일 `tests/test_claude_review.py` 8개를 제외. 이번 공통 명령은 개인 시험 포함 384개 중 297개 통과·소켓 제한 87개 skip. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 시험 | 추적 unittest 384개, 수용 시험 39개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 추적 시험 수는 개인 파일 `tests/test_claude_review.py` 8개를 제외. 2026-10-25 소켓 허용 환경에서 추적 384개·수용 39개 전부 통과(skip 0). 소켓 제한 환경에서는 HTTP 시험이 skip된다. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -104,7 +104,7 @@ python3 -m venv .venv
 | `--request-deadline 초` | `300` | stream 요청 전체 처리 상한 |
 | `--max-concurrency N` | `2` | 일반·stream 공통 동시 처리 상한. 초과 요청은 대기 없이 429 |
 | `--revocations PATH` | 미설정 | 철회 스냅샷. 설정했지만 읽기·검증 실패 시 신규 요청 503 |
-| `--policy-approvals PATH` | 미설정 | LAB 승인 목록. 정책 ID·판본·`approval_ref`·정책 파일 SHA-256을 요청마다 대조하며 확인 실패 시 503 |
+| `--policy-approvals PATH` | 미설정 | LAB 승인 목록. 정책 ID·판본·`approval_ref`·정책 파일 SHA-256을 요청마다 대조하며 확인 실패 시 503(실행 중 목록을 읽지 못하면 마지막 확인 승인을 유효 기간 안에서 유지) |
 | `--baseline PATH` | 미설정 | 승인 기준 파일(읽기 전용) |
 | `--manifest PATH` | 미설정 | 실행 선언값 파일(읽기 전용, 자동 승격 없음) |
 | `--collector-interval 초` | `5` | 모의 엔진 상태·정보 수집 주기 |
@@ -133,7 +133,7 @@ python3 -m venv .venv
 
 기간 전·만료·확인된 철회·철회 확인 불가는 각각 `POLICY_NOT_YET_VALID`, `POLICY_EXPIRED`, `POLICY_REVOKED`, `POLICY_REVOCATION_UNKNOWN` 503이며 엔진을 호출하지 않습니다.
 
-`--policy-approvals`를 설정하면 `runtime-policy-approvals/1.0` 목록을 요청마다 다시 읽어 시작 시 로드한 정책 파일 바이트의 SHA-256과 정책 ID·판본·`approval_ref`를 대조합니다. 일치 항목만 `verified`이며 항목 없음·불일치·만료·파일 손상은 정책 상태 오류 503으로 엔진에 전달하지 않습니다. 미설정은 `not_configured`이고 기존 동작과 같습니다. 예시는 `examples/mvp/policy-approvals.example.json`입니다. 이것은 교체 가능한 LAB 해시 대조 틀이며 키·서명을 만들지 않습니다. 실제 검증 도구 쪽 서명/번들 검증기 연동, 정책 hot reload, 외부 집행 확인은 구현하지 않았습니다.
+`--policy-approvals`를 설정하면 `runtime-policy-approvals/1.0` 목록을 요청마다 다시 읽어 시작 시 로드한 정책 파일 바이트의 SHA-256과 정책 ID·판본·`approval_ref`를 대조합니다. 일치 항목만 `verified`이며 항목 없음·불일치·만료는 정책 상태 오류 503으로 엔진에 전달하지 않습니다. 시작할 때 목록이 없거나 손상이면 503입니다. 실행 중 한 번 확인된 뒤 목록을 읽을 수 없게 되면(파일 없음·읽기/형식 오류) 같은 정책 바이트와 승인 유효 기간 안에서만 `last_verified`로 마지막 확인 승인을 유지하고 화면에 경고합니다(계획서 §7.3). 읽을 수 있는 목록에서 항목 없음·불일치·만료가 확인되면 유지를 끝냅니다. 미설정은 `not_configured`이고 기존 동작과 같습니다. 예시는 `examples/mvp/policy-approvals.example.json`입니다. 이것은 교체 가능한 LAB 해시 대조 틀이며 키·서명을 만들지 않습니다. 실제 검증 도구 쪽 서명/번들 검증기 연동, 정책 hot reload, 외부 집행 확인은 구현하지 않았습니다.
 
 baseline과 manifest는 평면 `fields` 객체를 사용합니다. manifest도 아래와 같은 `runtime-mvp-baseline/1.0` 형식을 쓰며 출처는 `declared_manifest`로 구분합니다.
 
@@ -416,7 +416,7 @@ curl -N -H 'Content-Type: application/json' \
 | 본문 64KiB 초과 / Content-Type 오류 | 413 / 415 | 입력 오류 |
 | 정책 파일 없음·검증 실패 | 503 | 처리 오류 (정책 준비 실패) |
 | 정책 기간 전·만료·철회·철회 확인 불가 | 503 | 처리 오류 (원인별 코드, 모의 엔진 미호출) |
-| 구성한 정책 승인 목록의 항목 없음·불일치·만료·확인 오류 | 503 | 처리 오류 (엔진 미호출) |
+| 구성한 정책 승인 목록의 항목 없음·불일치·만료·확인 오류(마지막 확인 승인이 없거나 만료된 경우) | 503 | 처리 오류 (엔진 미호출) |
 | 기록 저장 불가 | 503 | 처리 오류 (모의 엔진 미호출) |
 | 모의 엔진 연결 실패 / 시간 초과 | 502 / 504 | 처리 오류 |
 
@@ -467,7 +467,7 @@ HTTP 시험은 로컬 소켓이 필요합니다. 소켓을 막은 샌드박스�
 
 ### 수용 시험
 
-MVP-01~11, S1-01~06, S2-01~06, S3A-01~08, S4-01~06의 37개 사례를 임시 데이터와 빈 포트에서 자체 실행하고 JSON·Markdown 보고서를 남깁니다. S3A 사례와 S4-06은 시험 전용 가짜 backend를 사용하며 보고서에 그 사실을 표시합니다. S4 사례는 다음 최근 기능을 한 번에 확인합니다.
+MVP-01~11, S1-01~06, S2-01~06, S3A-01~08, SGL-01~02, S4-01~06의 39개 사례를 임시 데이터와 빈 포트에서 자체 실행하고 JSON·Markdown 보고서를 남깁니다. S3A·SGL 사례와 S4-06은 시험 전용 가짜 backend를 사용하며 보고서에 그 사실을 표시합니다. S4 사례는 다음 최근 기능을 한 번에 확인합니다.
 
 - S4-01: 인증 없음·불일치·역할·주체 모델 제한·정상 인증과 기록 비밀값 제외
 - S4-02: 인증 설정 오류의 추론·조회 503과 ERROR 집계
@@ -475,6 +475,7 @@ MVP-01~11, S1-01~06, S2-01~06, S3A-01~08, S4-01~06의 37개 사례를 임시 데
 - S4-04: 인증 우선 판정과 대상 등록 불일치 보류
 - S4-05: 가짜 자식 프로세스를 사용한 관측 feed gap·재연결(실제 `kubectl` 미실행)
 - S4-06: 정책 1.2 `zeroday-lab` 추가 필드·`max_n` 정상/거부
+- SGL-01·SGL-02: 가짜 SGLang의 승인 구성 drift·자산 변경 재검증 요청(실제 SGLang 아님)
 
 ```bash
 .venv/bin/python -B -m serving_runtime mvp-acceptance
@@ -631,7 +632,7 @@ docker logs -f s3b-vllm-cpu 2>&1 | .venv/bin/python -m serving_runtime enforce p
 
 - **SP4 작업별 통신:** `acquire`(모델 취득 Pod)의 송신 허용 목록, `test_receivers`(팀 소유 시험 목적지)와 수신 허용 역할, `engine.management_port`(observer는 이 포트만), `observer_kube_api`를 받습니다. `cilium-acquire-egress`, `cilium-observer-N-egress`, `cilium-receiver-NAME-ingress`를 추가로 생성합니다. engine 송신 허용에 acquire 목적지가 들어 있으면 형식 오류입니다. 로컬 kind에서 같은 receiver에 acquire는 허용, engine과 다른 client는 거부되는 것을 확인했습니다. TCP 연결 허용은 HTTPS 안의 URL·파일 권한을 입증하지 않습니다.
 - **SP1 모델·캐시:** `assets`에 tokenizer·승인 manifest 경로, `cache_root`, 캐시 세대(engine/image_id/model_revision/compile_profile), engine/acquire/probe UID를 둡니다. `protected_paths.cache_dir`는 세대 경로와 같아야 하고 캐시는 공급물 경로와 겹칠 수 없습니다. `pod-security-candidate.json`(공급물 읽기 전용 mount·비root UID·세대 subPath)과 TG-ASSET-02(tokenizer 쓰기 감시)를 만들고, TG-CACHE-01은 캐시 루트 전체를 감시해 변환 때 현재/다른 세대(CACHE-02)를 나눕니다. `enforce cache-check`는 링크를 따라가지 않고 세대 디렉터리의 소유자·권한·다른 세대를 보고합니다(삭제하지 않음). `engine: sglang`도 같은 경로 계산·Cilium/Tetragon 후보를 쓰지만, SGLang 캐시 환경변수 후보와 실제 resolved 경로는 아직 없습니다.
-- **SP3 단계별 실행:** `phase_binaries`(loading/compiling/inferring), `suspect_binaries`, 단계 시간표, 승인 예외로 실행 이벤트를 `allowed_in_phase`/`exception`/`outside_allowlist`/`suspect_binary`/`exec_from_cache`/`phase_unknown`으로 분류합니다. `phase-signals`는 로그에 연도·시간대가 없으므로 두 값을 필수로 받고 vLLM CPU v0.29.0에서 관찰한 표지만 `basis: engine_signal`로 변환합니다. 배치 모드는 기존처럼 파일을 한 번 읽고 health를 쓰지 않습니다. `--follow`는 파일 교체·잘림을 따라가거나 `--log -`의 표준입력을 읽고, 확정 경계와 heartbeat를 임시 파일+`os.replace`로 원자 교체합니다(권한 0600). 출력이 이미 있으면 `--overwrite` 또는 `--resume`을 명시해야 합니다. `--health-url`을 함께 주면 compile/init 완료 뒤 첫 HTTP 200의 Gateway 쪽 수집기 UTC 시각이 마지막 로그 경계보다 뒤일 때만 inferring을 열며, 실패·timeout·시계 역전은 경계를 만들지 않습니다. 처리 줄 수·해석하지 않은 줄 수·마지막 line/byte 위치·수집 상태·시계 출처·생략 경계를 `extraction`에 남기되 URL, 로그 원문, 요청·prompt·`SamplingParams` 줄은 저장하지 않습니다. 생성한 파일은 ExecPolicy가 mtime/size 변경 시 다시 읽습니다. 관측·경보만 하며 실행을 막지 않습니다.
+- **SP3 단계별 실행:** `phase_binaries`(loading/compiling/inferring), `suspect_binaries`, 단계 시간표, 승인 예외로 실행 이벤트를 `allowed_in_phase`/`exception`/`outside_allowlist`/`suspect_binary`/`exec_from_cache`/`phase_unknown`/`phase_signal_unverified`로 분류합니다. 계획서 §7.4에 따라 단계 근거 중 `declared`·`test_controller`만 허용 범위를 넓힙니다. 엔진이 자기 로그를 쓸 수 있으므로 `engine_signal` 단계만으로 허용되는 실행(모든 단계에 공통으로 승인된 실행 파일 제외)이나 그 단계에서만 맞는 승인 예외는 `phase_signal_unverified`(확인 필요 경보)로 남기고, 후보 예외 ID는 `exception_candidate_id`에 둡니다. `phase-signals`는 로그에 연도·시간대가 없으므로 두 값을 필수로 받고 vLLM CPU v0.29.0에서 관찰한 표지만 `basis: engine_signal`로 변환합니다. 배치 모드는 기존처럼 파일을 한 번 읽고 health를 쓰지 않습니다. `--follow`는 파일 교체·잘림을 따라가거나 `--log -`의 표준입력을 읽고, 확정 경계와 heartbeat를 임시 파일+`os.replace`로 원자 교체합니다(권한 0600). 출력이 이미 있으면 `--overwrite` 또는 `--resume`을 명시해야 합니다. `--health-url`을 함께 주면 compile/init 완료 뒤 첫 HTTP 200의 Gateway 쪽 수집기 UTC 시각이 마지막 로그 경계보다 뒤일 때만 inferring을 열며, 실패·timeout·시계 역전은 경계를 만들지 않습니다. 처리 줄 수·해석하지 않은 줄 수·마지막 line/byte 위치·수집 상태·시계 출처·생략 경계를 `extraction`에 남기되 URL, 로그 원문, 요청·prompt·`SamplingParams` 줄은 저장하지 않습니다. 생성한 파일은 ExecPolicy가 mtime/size 변경 시 다시 읽습니다. 관측·경보만 하며 실행을 막지 않습니다.
 
 | vLLM CPU v0.29.0 신호 | 처리 |
 | --- | --- |

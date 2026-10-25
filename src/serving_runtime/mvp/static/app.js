@@ -159,6 +159,7 @@ function renderStatus(status) {
     unverified: "목록에서 확인 못함 — 추론 요청은 503",
     rejected: "불일치·만료 — 추론 요청은 503",
     error: "확인 오류 — 추론 요청은 503",
+    last_verified: "목록 확인 불가 — 마지막 확인 승인 유지",
   };
   const policyRows = [
     ["정책", policy.policy_id],
@@ -589,7 +590,7 @@ function renderObservations(payload, collectorsPayload) {
   clear(tetragonBody);
   $("tetragon-observation-empty").hidden = tetragon.length > 0;
   for (const item of tetragon) {
-    const flaggedVerdicts = ["outside_allowlist", "suspect_binary", "exec_from_cache", "phase_unknown"];
+    const flaggedVerdicts = ["outside_allowlist", "suspect_binary", "exec_from_cache", "phase_unknown", "phase_signal_unverified"];
     const outsideAllowlist = item.kind === "process_exec"
       && (item.exec_verdict ? flaggedVerdicts.includes(item.exec_verdict) : item.allowed_binary === false);
     const podUnknown = item.pod_attribution === "unavailable";
@@ -602,6 +603,7 @@ function renderObservations(payload, collectorsPayload) {
       suspect_binary: "의심 실행",
       exec_from_cache: "캐시에서 실행",
       phase_unknown: "단계 불명",
+      phase_signal_unverified: "엔진 신호만 근거 — 확인 필요",
     };
     const generationLabels = { current: "현재 캐시 세대", other: "다른 캐시 세대", outside: "캐시 밖" };
     let kindLabel = item.kind === "process_exec" ? "프로세스" : `파일 ${item.access || "other"}`;

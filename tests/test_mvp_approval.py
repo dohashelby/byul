@@ -124,6 +124,53 @@ class ApprovalVerifierTests(unittest.TestCase):
                     },
                 )
 
+    def test_unreadable_list_keeps_last_verified_until_it_expires(self) -> None:
+        # Plan §7.3: an unreadable approval source keeps the last verified
+        # approval while it is still valid; it does not invent a new one.
+        verifier = HashListApprovalVerifier(self.approvals_path)
+        policy = self.policy_state.policy
+        raw = self.policy_state.raw_bytes
+        assert policy is not None and raw is not None
+
+        def verify(at: datetime):
+            return verifier.verify(raw, policy.policy_id, policy.policy_version, policy.approval_ref, now=at)
+
+        now = datetime(2026, 10, 25, tzinfo=timezone.utc)
+        self.assertEqual(verify(now).state, "error")  # nothing verified yet
+        self.write(approval_document(self.policy_path, valid_until=(now + timedelta(hours=1)).isoformat()))
+        self.assertEqual(verify(now).state, "verified")
+        for label in ("broken", "missing_file"):
+            with self.subTest(case=label):
+                if label == "broken":
+                    self.approvals_path.write_text("{broken", encoding="utf-8")
+                else:
+                    self.approvals_path.unlink()
+                kept = verify(now + timedelta(minutes=1))
+                self.assertEqual(kept.state, "last_verified")
+                self.assertEqual(kept.reason_code, "POLICY_APPROVAL_LAST_VERIFIED")
+                self.assertIn(kept.evidence["source_error"], {"INVALID_APPROVAL_LIST", "APPROVAL_LIST_NOT_FOUND"})
+                evaluated = evaluate_policy(self.policy_state, load_revocations(None), approval=kept)
+                self.assertTrue(evaluated["gateway_active"])
+        # The fallback never outlives the approval's own validity.
+        self.assertEqual(verify(now + timedelta(hours=1)).state, "error")
+
+    def test_explicit_miss_ends_the_last_verified_fallback(self) -> None:
+        verifier = HashListApprovalVerifier(self.approvals_path)
+        policy = self.policy_state.policy
+        raw = self.policy_state.raw_bytes
+        assert policy is not None and raw is not None
+        now = datetime(2026, 10, 25, tzinfo=timezone.utc)
+
+        def verify():
+            return verifier.verify(raw, policy.policy_id, policy.policy_version, policy.approval_ref, now=now)
+
+        self.write(approval_document(self.policy_path))
+        self.assertEqual(verify().state, "verified")
+        self.write({"schema_version": "runtime-policy-approvals/1.0", "entries": []})
+        self.assertEqual(verify().state, "unverified")
+        self.approvals_path.write_text("{broken", encoding="utf-8")
+        self.assertEqual(verify().state, "error")
+
 
 class ApprovalGatewayTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -217,6 +264,14 @@ class ApprovalGatewayTests(unittest.TestCase):
         self.replace_approvals(approval_document(self.policy_path))
         self.assertEqual(self.post()[0], 200)
         self.assertEqual(len(self.engine.receipts), delivered + 1)
+
+    def test_list_broken_after_verification_keeps_serving(self) -> None:
+        self.assertEqual(self.post()[0], 200)
+        self.replace_approvals("{broken", raw=True)
+        self.assertEqual(self.post()[0], 200)
+        approval = self.get("/api/status")["policy"]["approval"]
+        self.assertEqual(approval["state"], "last_verified")
+        self.assertEqual(approval["evidence"]["source_error"], "INVALID_APPROVAL_LIST")
 
 
 if __name__ == "__main__":

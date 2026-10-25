@@ -28,6 +28,8 @@ CASES = {
     "runtime-status.json": "runtime-status",
     "revalidation-request.json": "revalidation-request",
     "evidence-index.json": "evidence-index",
+    "runtime-lab-report.json": "runtime-lab-report",
+    "runtime-request-detail.json": "runtime-request-detail",
 }
 
 

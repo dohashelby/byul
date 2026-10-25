@@ -24,7 +24,8 @@ from typing import Any
 
 from .config import DEFAULT_CONTRACTS_DIR
 from .contracts import Contracts
-from .sources.runtime import gateway_event, observation_event
+from .sources.runtime import gateway_event, lab_report_doc, observation_event, request_detail_doc, runtime_status
+from .sources.update import rpt_to_verification_result
 
 TARGET = "mock-engine-001"
 SESSION = "d3m0" + "0" * 28
@@ -150,115 +151,223 @@ def gateway_record(g: Gen, at: datetime, kind: str, run_id: str | None) -> dict[
 # --- 관측 기록 ------------------------------------------------------------------
 
 
+# 관측 기록은 runtime enforcement/events.py가 만드는 정규화 형식(runtime-observation/1.0)과 같은 모양으로 만든다.
+_POD_ENGINE = {"namespace": "serving-lab", "pod": "serving-engine-0"}
+
+
 def hubble_record(g: Gen, at: datetime) -> dict[str, Any]:
     dropped = g.r.random() < 0.18
     return {
-        "schema_version": "runtime-observation/1.0",
+        "schema": "runtime-observation/1.0",
         "observed_at": iso(at),
         "source": "hubble",
-        "kind": "flow",
+        "kind": "network_flow",
         "data_origin": "synthetic",
-        "environment": "demo",
-        "verdict": "DROPPED" if dropped else "FORWARDED",
-        "src_pod": "serving-engine-0",
-        "dst_ip": g.r.choice(["10.0.3.17", "172.217.25.14", "10.96.0.10"]),
-        "dst_port": g.r.choice([443, 443, 53, 8080]),
-        "protocol": g.r.choice(["TCP", "UDP"]),
-        "drop_reason": "POLICY_DENIED" if dropped else None,
+        "environment": "kind-runtime-lab",
+        "verdict": "dropped" if dropped else "allowed",
+        "src": dict(_POD_ENGINE) if g.r.random() < 0.7 else {"namespace": "serving-lab", "pod": "other-client"},
+        "dst": {
+            "namespace": None if dropped else "serving-lab",
+            "pod": None if dropped else "serving-gateway-0",
+            "ip": g.r.choice(["10.0.3.17", "172.217.25.14", "10.96.0.10"]),
+            "port": g.r.choice([443, 443, 53, 8080]),
+            "protocol": g.r.choice(["TCP", "UDP"]),
+        },
+        "traffic_direction": "egress",
+        "reason": "Policy denied" if dropped else None,
         "event_key": g.hex(64),
     }
 
 
 def tetragon_record(g: Gen, at: datetime) -> dict[str, Any]:
     r = g.r
-    if r.random() < 0.25:
-        enforce = r.random() < 0.5
-        return {
-            "schema_version": "runtime-observation/1.0",
-            "observed_at": iso(at),
-            "source": "tetragon",
-            "kind": "file_write",
-            "data_origin": "synthetic",
-            "environment": "demo",
-            "path": r.choice(["/root/.cache/vllm/torch_compile/cache.bin", "/models/test-model/config.json", "/tmp/x.so"]),
-            "pod": "serving-engine-0",
-            "action_mode": "enforce" if enforce else "monitor",
-            "action_raw": "KPROBE_ACTION_OVERRIDE" if enforce else "KPROBE_ACTION_POST",
-            "cache_generation": r.choice(["current", "other", "outside"]),
-            "rule_refs": ["TG-CACHE-01"],
-            "event_key": g.hex(64),
-        }
+    base = {"schema": "runtime-observation/1.0", "observed_at": iso(at), "source": "tetragon", "data_origin": "synthetic",
+            "environment": "kind-runtime-lab", "pod": dict(_POD_ENGINE), "pod_attribution": "available", "event_key": g.hex(64)}
+    if r.random() < 0.3:
+        enforce = r.random() < 0.4
+        rule = r.choice(["TG-ASSET-01", "TG-SECRET-01", "TG-DENY-01", "TG-CACHE-01"])
+        return {**base, "kind": "file_access",
+                "binary": r.choice(["/usr/local/bin/vllm", None]),
+                "process_attribution": "available" if r.random() < 0.6 else "unavailable",
+                "path": r.choice(["/models/test-model/config.json", "/run/secrets/token", "/root/.cache/vllm/torch_compile/cache.bin"]),
+                "access": r.choice(["read", "write"]), "rule_id": rule,
+                "action": "override" if enforce else "post",
+                "action_raw": "KPROBE_ACTION_OVERRIDE" if enforce else "KPROBE_ACTION_POST",
+                "action_mode": "enforce" if enforce else "monitor",
+                **({"cache_generation": r.choice(["current", "other", "outside"])} if rule == "TG-CACHE-01" else {})}
     verdict = r.choices(
-        ["allowed_in_phase", "exception", "suspect_binary", "outside_allowlist", "exec_from_cache", "phase_unknown"],
-        [0.55, 0.08, 0.12, 0.12, 0.05, 0.08],
+        ["allowed_in_phase", "exception", "suspect_binary", "outside_allowlist", "exec_from_cache", "phase_unknown", "phase_signal_unverified"],
+        [0.5, 0.08, 0.12, 0.12, 0.05, 0.08, 0.05],
     )[0]
-    enforce = verdict in ("outside_allowlist", "suspect_binary") and r.random() < 0.35
+    return {**base, "kind": "process_exec",
+            "binary": r.choice(["/usr/bin/python3", "/bin/sh", "/usr/bin/curl", "/usr/local/bin/nvidia-smi", "/root/.cache/x/run"]),
+            "process_attribution": "available", "path": None, "access": None, "rule_id": "TG-EXEC-01",
+            "action": "observed", "action_raw": "observed", "action_mode": "monitor", "allowed_binary": verdict == "allowed_in_phase",
+            "phase": r.choice([["loading"], ["compiling"], ["inferring"], ["inferring"], ["loading", "compiling"]]),
+            "exec_verdict": verdict, "exception_id": "EXC-NVSMI-01" if verdict == "exception" else None,
+            "rule_refs": ["SP3-EXEC", "CACHE-03"] if verdict == "exec_from_cache" else ["SP3-EXEC"]}
+
+
+# --- runtime 조회 API 응답(원본 모양) → 계약 변환기로 만든다 ---------------------------
+
+
+def native_payloads(g: Gen, records: list[dict[str, Any]], observations: list[dict[str, Any]]) -> dict[str, Any]:
+    """runtime /api/status·/policy·/collectors·/target·/summary·/revalidation·/observations·/baseline 응답 모양."""
+    finals = [r for r in records if r["phase"] == "final"]
+    counts = {k: sum(1 for r in finals if r["decision"]["result"] == k) for k in ("ALLOWED", "DENIED", "INVALID", "ENGINE_REJECTED", "ERROR")}
+    sha = RUNTIME_POLICY["sha256"]
+    feed = lambda kind, n: {"source": f"observation_feed_{kind}", "state": "ok" if kind == "hubble" else "stale",
+        "interval_s": 2.0, "stale_after_s": 30.0, "last_attempt_at": iso(g.now - timedelta(seconds=2)),
+        "last_success_at": iso(g.now - timedelta(seconds=2 if kind == "hubble" else 1100)),
+        "last_error": None if kind == "hubble" else "observation writer heartbeat is stale (age 1100s)", "data_origin": "synthetic",
+        "last_value": {"processed": n, "accepted": n - 2, "duplicates": 1, "rejected": 1,
+                       "rejected_details": [{"line": 412, "reason": "$.flow.l4 is missing"}], "corrupt_lines_total": 1,
+                       "out_of_window": 0, "out_of_window_total": 3, "idle": False,
+                       "writer": {"configured": True, "state": "running", "updated_at": iso(g.now - timedelta(seconds=3)),
+                                  "reconnect_count": 2 if kind == "hubble" else 0,
+                                  "last_gap": {"opened_at": iso(g.now - timedelta(hours=5)), "closed_at": iso(g.now - timedelta(hours=5) + timedelta(seconds=40))} if kind == "hubble" else None}}}
+    collectors = [
+        {"source": "engine_health", "state": "ok", "interval_s": 5.0, "stale_after_s": 15.0, "last_attempt_at": iso(g.now), "last_success_at": iso(g.now),
+         "last_error": None, "data_origin": "mock", "last_value": {"status": "ok"}},
+        {"source": "engine_info", "state": "ok", "interval_s": 5.0, "stale_after_s": 15.0, "last_attempt_at": iso(g.now), "last_success_at": iso(g.now),
+         "last_error": None, "data_origin": "mock", "last_value": {"engine.kind": "mock", "engine.version": "mock-1.0"}},
+        {"source": "metrics", "state": "ok", "interval_s": 5.0, "stale_after_s": 15.0, "last_attempt_at": iso(g.now), "last_success_at": iso(g.now),
+         "last_error": None, "data_origin": "mock", "last_value": {
+             "requests_running": {"state": "ok", "declared_type": "gauge", "counter_reset": {}},
+             "prompt_tokens_total": {"state": "ok", "declared_type": "counter", "counter_reset": {"detected_this_poll": False, "last_detected": {"detected_at": iso(g.now - timedelta(hours=9))}}},
+             "kv_cache_usage": {"state": "unsupported_or_absent", "declared_type": None, "counter_reset": {}}}},
+        {"source": "record_retention", "state": "ok", "interval_s": 3600.0, "stale_after_s": 10800.0, "last_attempt_at": iso(g.now - timedelta(minutes=20)),
+         "last_success_at": iso(g.now - timedelta(minutes=20)), "last_error": None, "data_origin": "local_file", "last_value": {
+             "mode": "report_only", "limits": {"max_age_days": 7.0, "max_bytes": 5368709120}, "total_bytes": 1843200,
+             "over_size_limit": False, "holds": {"state": "not_configured"}, "errors": [],
+             "files": {"gateway_records.jsonl": {"removable_lines": 0}}, "last_deletion": None}},
+        {"source": "asset_integrity", "state": "ok", "interval_s": 60.0, "stale_after_s": 180.0, "last_attempt_at": iso(g.now), "last_success_at": iso(g.now),
+         "last_error": None, "data_origin": "local_file", "last_value": {
+             "intact": False, "total": 12, "counts": {"match": 10, "changed": 1, "missing": 0, "unreadable": 0, "symlink": 0},
+             "extra_file_count": 1, "extra_symlink_count": 0, "walk_error_count": 0, "limit": "해시 일치는 엔진이 실제로 메모리에 올린 바이트를 증명하지 않음"}},
+        feed("hubble", 162), feed("tetragon", 81),
+        {"source": "cilium_policy", "state": "ok", "interval_s": 30.0, "stale_after_s": 90.0, "last_attempt_at": iso(g.now - timedelta(seconds=8)),
+         "last_success_at": iso(g.now - timedelta(seconds=8)), "last_error": None, "data_origin": "kubernetes_api", "last_value": {
+             "object_count": 3, "policies": [
+                 {"name": "engine-ingress-from-gateway", "status_present": True, "node_status": {"total": 1, "enforcing": 1, "errors": 0, "last_updated": iso(g.now - timedelta(hours=6))},
+                  "conditions": [{"type": "Valid", "status": "True", "reason": None}]},
+                 {"name": "engine-egress-dns-only", "status_present": True, "node_status": {"total": 1, "enforcing": 1, "errors": 0, "last_updated": iso(g.now - timedelta(hours=6))},
+                  "conditions": [{"type": "Valid", "status": "True", "reason": None}]},
+                 {"name": "gateway-egress-engine", "status_present": False, "node_status": {}, "conditions": []}]}},
+    ]
+    real_dropped = 0  # 데모는 합성 자료라 실제 DROPPED는 0
     return {
-        "schema_version": "runtime-observation/1.0",
-        "observed_at": iso(at),
-        "source": "tetragon",
-        "kind": "process_exec",
-        "data_origin": "synthetic",
-        "environment": "demo",
-        "binary": r.choice(["/usr/bin/python3", "/bin/sh", "/usr/bin/curl", "/usr/local/bin/nvidia-smi", "/tmp/.x/run"]),
-        "pod": "serving-engine-0",
-        "action_mode": "enforce" if enforce else "monitor",
-        "phase": r.choice(["loading", "compiling", "inferring", "inferring", "inferring"]),
-        "exec_verdict": verdict,
-        "rule_refs": [r.choice(["SP3-EXEC", "SP3-EXEC", "SP1-SHELL", "SP2-NET-TOOL"])],
-        "event_key": g.hex(64),
+        "status": {"status": "degraded", "observation_session_id": SESSION, "environment": "demo", "run_id": None,
+                   "backend_kind": "mock", "mode": "mock_engine",
+                   "auth": {"state": "ok", "method": "bearer", "principal_count": 3, "protected_routes": ["GET /api/*", "POST /v1/chat/completions"], "error_code": None},
+                   "target": {"registration": "ok", "target_id": TARGET, "target_ref": TARGET, "error_code": None, "gateway_hold": None,
+                              "counts": {"match": 3, "mismatch": 1, "unknown": 1, "not_declared": 1},
+                              "instance": {"state": "ok", "observed_at": iso(g.now - timedelta(seconds=10)),
+                                           "current": {"instance_id": "a1b2c3d4e5f60718", "pod": "serving-engine-0", "restart_count": 1}}},
+                   "policy": {"schema_version": RUNTIME_POLICY["schema_version"], "policy_id": RUNTIME_POLICY["policy_id"],
+                              "policy_version": RUNTIME_POLICY["policy_version"], "sha256": sha, "loaded_at": iso(g.start),
+                              "profile": "default", "test_only": False, "max_n": 1, "extra_fields": [], "validate_count": 0,
+                              "valid": True, "error_code": None, "error_message": None, "loaded": True, "gateway_active": True,
+                              "external_enforcement": "not_connected",
+                              "approval": {"state": "verified", "checked_at": iso(g.now - timedelta(seconds=30)), "reason_code": "POLICY_APPROVAL_VERIFIED"}},
+                   "mock_engine": {"url": "http://127.0.0.1:8088/healthz", "healthy": True, "reachable": True, "inference_verified": False,
+                                   "checked_at": iso(g.now), "error": None, "credential": "configured", "receipts_store": {"state": "ok", "ok": True, "last_error": None}},
+                   "concurrency": {"in_flight": 1, "limit": 2},
+                   "connections": {"active": 3, "limit": 64, "rejected": 2, "request_header_timeout_s": 5.0, "request_body_timeout_s": 10.0},
+                   "record_store": {"data_dir": "/var/lib/serving-runtime/demo", "state": "ok", "ok": True, "last_error": None, "last_error_at": None}},
+        "policy": {"evaluated_at": iso(g.now), "current": {"valid_until": "2027-01-01T00:00:00+00:00"},
+                   "validity": [{"item": "period", "state": "ok", "result": "within"},
+                                {"item": "revocation", "state": "ok", "result": "not_revoked"},
+                                {"item": "approval", "state": "ok", "result": "POLICY_APPROVAL_VERIFIED"}],
+                   "history": [
+                       {"at": iso(g.start), "event": "loaded", "policy_id": "local-policy-001", "policy_version": "3", "sha256": sha,
+                        "previous": {"policy_version": "3"}, "same_version_content_changed": True},
+                       {"at": iso(g.start - timedelta(days=1)), "event": "loaded", "policy_id": "local-policy-001", "policy_version": "3", "sha256": g.hex(64),
+                        "previous": {"policy_version": "2"}, "same_version_content_changed": False},
+                       {"at": iso(g.start - timedelta(days=2)), "event": "load_failed", "policy_id": None, "policy_version": None, "sha256": None,
+                        "previous": None, "same_version_content_changed": False}],
+                   "history_storage": {"state": "ok", "ok": True, "last_error": None}},
+        "collectors": {"generated_at": iso(g.now), "collectors": collectors},
+        "target": {"limits": ["model.id 일치는 weight 해시·revision·실제 로딩을 증명하지 않음", "관측값 불일치는 표시만 하고 요청을 자동 차단하지 않음"],
+                   "registration": {"state": "ok"},
+                   "comparison": [
+                       {"field": "target_id", "expected": TARGET, "observed": TARGET, "source": "policy", "state": "match", "note": None},
+                       {"field": "engine.kind", "expected": "mock", "observed": "mock", "source": "engine_api", "state": "match", "note": None},
+                       {"field": "engine.version", "expected": "mock-1.0", "observed": "mock-1.1", "source": "engine_api", "state": "mismatch", "note": None},
+                       {"field": "model.id", "expected": "test-model", "observed": "test-model", "source": "engine_api", "state": "match", "note": None},
+                       {"field": "engine.image_digest", "expected": "sha256:" + "a" * 64, "observed": None, "source": "kubernetes", "state": "unknown", "note": "Pod 조회 실패"},
+                       {"field": "model.revision", "expected": None, "observed": "main", "source": "engine_api", "state": "not_declared", "note": None}],
+                   "history": [{"event": "instance_changed", "reason": "container_restarted", "recorded_at": iso(g.now - timedelta(hours=2))}]},
+        "baseline": {"baseline": {"state": "ok"}, "model_id_limit": "model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않음",
+                     "rows": [{"field": "engine.version", "expected": "mock-1.0", "observed": "mock-1.1", "source": "engine_api", "state": "drift", "observed_at": iso(g.now)},
+                              {"field": "model.id", "expected": "test-model", "observed": "test-model", "source": "engine_api", "state": "match", "observed_at": iso(g.now)},
+                              {"field": "option.max_model_len", "expected": 2048, "observed": None, "source": "engine_api", "state": "not_collected", "observed_at": None}]},
+        "summary": {"counts": counts, "incomplete": sum(1 for r in records if r["phase"] == "started" and not any(f["request_id"] == r["request_id"] for f in finals)),
+                    "corrupt_lines": {"gateway": 1, "engine": 0}, "corrupt_details": {"gateway": [{"line": 211, "reason": "invalid JSON"}], "engine": []},
+                    "record_store": {"data_dir": "/var/lib/serving-runtime/demo", "state": "ok", "ok": True, "last_error": None, "last_error_at": None}},
+        "revalidation": {"open_count": 3, "current_condition_count": 2, "corrupt_lines": [], "evaluation_errors": []},
+        "observations": {"counts": {"source": {s: sum(1 for o in observations if o["source"] == s) for s in ("hubble", "tetragon")}},
+                         "corrupt_lines": 0, "verification": {"real_hubble_dropped": real_dropped},
+                         "origins_by_kind": {k: {"synthetic": sum(1 for o in observations if o["kind"] == k)} for k in ("network_flow", "process_exec", "file_access")}},
     }
 
 
-# --- 상태·재검증·검증 결과·증거 ---------------------------------------------------
+def lab_report_payload(g: Gen) -> dict[str, Any]:
+    """runtime /api/lab-report 응답 모양. 데모 자료(EXAMPLE)이며 실제 시험 결과가 아니다."""
+    cases = [
+        ("L-01", "정책 적용 전 기준선", "passed", "EXAMPLE 정책 적용 전 통신·파일 기준선 기록"),
+        ("L-02", "Cilium 통신 정책", "passed", "EXAMPLE Gateway 경유·DNS 허용, other-client→engine 직통·engine 외부 연결 차단"),
+        ("L-03", "Hubble DROPPED 증거", "passed", "EXAMPLE DROPPED 흐름을 관측 기록으로 변환"),
+        ("L-04", "Tetragon 파일·실행 관측", "passed", "EXAMPLE TG-ASSET-01 쓰기·TG-SECRET-01 읽기·목록 밖 실행 관측"),
+        ("L-05", "Tetragon probe 차단", "failed", "EXAMPLE 적용 직후 EPERM 5회 중 4회 — 재확인 필요"),
+        ("L-06", "적용 정책 정리", "not_run", "EXAMPLE 정리 옵션을 지정하지 않아 실행하지 않음"),
+    ]
+    return {"state": "ok", "configured_path": "/var/lib/serving-runtime/k8s-lab/reports", "generated_at": iso(g.now),
+            "path": "/var/lib/serving-runtime/k8s-lab/reports/k8s-lab-DEMO.json", "error": None,
+            "report": {"run_id": "k8s-lab-DEMO", "context": "kind-runtime-lab", "namespace": "serving-lab",
+                       "started_at": iso(g.now - timedelta(hours=4)), "finished_at": iso(g.now - timedelta(hours=4) + timedelta(minutes=14)),
+                       "overall": "partial",
+                       "cases": [{"id": i, "title": t, "status": st, "summary": sm, "evidence": [f"raw/{i.lower()}.jsonl"] if st != "not_run" else [],
+                                  "limitation": "데모 자료: 실제 시험 결과가 아님", "note": "적용 직후·재시작 후를 따로 확인" if i == "L-05" else None}
+                                 for i, t, st, sm in cases]}}
 
 
-def runtime_status(g: Gen) -> dict[str, Any]:
-    return {
-        "schema_version": "byul-runtime-status/0.1",
-        "generated_at": iso(g.now),
-        "observation_session_id": SESSION,
-        "target": {"target_ref": TARGET, "registration": "registered", "instance_id": "a1b2c3d4e5f60718", "instance_state": "running"},
-        "policy": {
-            "policy_ref": {k: RUNTIME_POLICY[k] for k in ("policy_id", "policy_version", "sha256")},
-            "bundle_id": "bundle-local-policy-001-3",
-            "loaded": True,
-            "gateway_active": True,
-            "approval_state": "verified",
-            "valid_until": "2027-01-01T00:00:00+00:00",
-        },
-        "collectors": [
-            {"source": "engine_health", "state": "ok", "last_success_at": iso(g.now - timedelta(seconds=3))},
-            {"source": "engine_info", "state": "ok", "last_success_at": iso(g.now - timedelta(seconds=3))},
-            {"source": "hubble", "state": "ok", "last_success_at": iso(g.now - timedelta(seconds=8))},
-            {"source": "tetragon", "state": "stale", "last_success_at": iso(g.now - timedelta(minutes=17))},
-            {"source": "metrics", "state": "disconnected", "last_success_at": None},
-        ],
-        "store": {"state": "ok"},
-    }
+def request_detail_native(g: Gen, records: list[dict[str, Any]]) -> dict[str, Any]:
+    """runtime /api/requests/{id} 응답 모양."""
+    final = records[-1]
+    attempted = final["delivery"]["attempted"]
+    receipts = [{"request_id": final["request_id"], "received_at": final["recorded_at"], "model": final["request"]["model"],
+                 "max_tokens": final["request"]["max_tokens"], "stream": final["stream"]}] if attempted else []
+    state = "received" if attempted else "not_received"
+    return {"request_id": final["request_id"], "backend_kind": "mock", "gateway_records": records, "engine_receipts": receipts,
+            "engine_live": {"status": "confirmed" if attempted else "not_found", "queried_at": iso(g.now)},
+            "corrupt_lines": {"gateway": 0, "engine": 0}, "same_observation_session": True, "evidence_state": state,
+            "evidence_summary": "엔진 수신 확인" if attempted else "Gateway 미전달, 엔진 미수신 확인"}
 
 
 def revalidations(g: Gen) -> list[dict[str, Any]]:
     policy_ref = {k: RUNTIME_POLICY[k] for k in ("policy_id", "policy_version", "sha256")}
-    base = {"schema_version": "byul-revalidation-request/0.1", "target_ref": TARGET, "policy_ref": policy_ref,
+    base = {"schema_version": "byul-revalidation-request/0.2", "target_ref": TARGET, "policy_ref": policy_ref,
             "evaluation_refs": [], "evidence_refs": [], "data_origin": "EXAMPLE", "origin_detail": "synthetic"}
     second = f"reval-{g.hex(8)}"
     return [
         {**base, "revalidation_id": f"reval-{g.hex(8)}", "fingerprint": g.hex(64), "event": "opened",
-         "created_at": iso(g.now - timedelta(hours=2)), "trigger": "config_drift",
-         "changed_fields": [{"field": "engine.version", "expected": "0.31.0", "observed": "0.31.1"}],
+         "created_at": iso(g.now - timedelta(hours=2)), "opened_at": iso(g.now - timedelta(hours=2)), "current_evidence_present": True,
+         "trigger": "config_drift", "changed_fields": [{"field": "engine.version", "expected": "mock-1.0", "observed": "mock-1.1"}],
          "superseded_by": None, "status": "open"},
         {**base, "revalidation_id": second, "fingerprint": g.hex(64), "event": "opened",
-         "created_at": iso(g.now - timedelta(hours=7)), "trigger": "asset_changed",
+         "created_at": iso(g.now - timedelta(hours=7)), "opened_at": iso(g.now - timedelta(hours=7)), "current_evidence_present": True,
+         "trigger": "asset_changed",
          "changed_fields": [{"field": "asset:model/test-model/tokenizer.json", "expected": None, "observed": "changed"},
                             {"field": "asset:model/test-model/extra.safetensors", "expected": None, "observed": "unlisted_file"}],
          "superseded_by": None, "status": "open"},
         {**base, "revalidation_id": f"reval-{g.hex(8)}", "fingerprint": g.hex(64), "event": "superseded",
-         "created_at": iso(g.now - timedelta(hours=9)), "trigger": "asset_changed",
-         "changed_fields": [{"field": "asset:model/test-model/tokenizer.json", "expected": None, "observed": "changed"}],
+         "created_at": iso(g.now - timedelta(hours=7)), "opened_at": iso(g.now - timedelta(hours=9)), "current_evidence_present": False,
+         "trigger": "asset_changed", "changed_fields": [{"field": "asset:model/test-model/tokenizer.json", "expected": None, "observed": "changed"}],
          "superseded_by": second, "status": "open"},
         {**base, "revalidation_id": f"reval-{g.hex(8)}", "fingerprint": g.hex(64), "event": "condition_cleared",
-         "created_at": iso(g.now - timedelta(hours=20)), "trigger": "policy_content_changed",
+         "created_at": iso(g.now - timedelta(hours=20)), "opened_at": iso(g.now - timedelta(hours=23)), "current_evidence_present": False,
+         "trigger": "policy_content_changed",
          "changed_fields": [{"field": "policy.sha256", "expected": g.hex(64), "observed": RUNTIME_POLICY["sha256"]}],
          "superseded_by": None, "status": "closed"},
     ]
@@ -279,74 +388,96 @@ def _aggregate(verdicts: list[str]) -> str:
 _COMPARE = {("PASS", "PASS"): "NO_CHANGE", ("PASS", "FAIL"): "REGRESSED", ("FAIL", "PASS"): "FIXED", ("FAIL", "FAIL"): "STILL_FAILING"}
 
 
-# 영역별 미충족 비율. 데모에서 충족·미충족·미확인이 고루 보이게 한다.
+# 영역별 미충족·미확인 비율. 데모에서 충족·미충족·미확인이 고루 보이게 한다.
 _FAIL_RATE = {"SUP": 0.0, "REQ": 0.18, "PLT": 0.0, "LIF": 0.06, "OBS": 0.0}
 _UNKNOWN_RATE = {"SUP": 0.0, "REQ": 0.1, "PLT": 0.0, "LIF": 0.1, "OBS": 0.35}
+CATALOG = json.loads((Path(__file__).with_name("demo_checks.json")).read_text(encoding="utf-8"))
 
 
-def verification_result(g: Gen, mode: str, created: datetime) -> dict[str, Any]:
+def rpt_report(g: Gen, mode: str, created: datetime) -> dict[str, Any]:
+    """update RPT 객체 모양의 데모 보고서. 영역·보호 목적 집계는 SPEC §4.7 규칙으로 만든다."""
     r = g.r
-    checks = []
-    per_area: dict[str, list[str]] = {a: [] for a in AREAS}
+    update = mode == "update"
+    rows: list[dict[str, Any]] = []
+    not_selected: list[dict[str, str]] = []
+    manual_required: list[str] = []
     counts = {a: {"manual": 0, "automated": 0, "not_run": 0} for a in AREAS}
-    for area in AREAS:
-        for n in range(1, r.randint(5, 9)):
-            cid = f"{area}-{n:02d}"
-            applicability = r.choices(["APPLICABLE", "NOT_APPLICABLE", "UNDETERMINED"], [0.82, 0.12, 0.06])[0]
-            selected = applicability != "NOT_APPLICABLE"
-            gaps: list[str] = []
-            no_exec = 0.3 if area == "OBS" else 0.0
-            source = r.choices(["automated", "manual", None], [0.6, 0.4 - no_exec, no_exec])[0] if selected else None
-            if source is None and selected:
-                gaps = [r.choice(["NO_EXECUTOR", "NO_FIXTURE", "NO_ENV_FACT"])]
+    for c in CATALOG:
+        area = c["area"]
+        applicability = r.choices(["APPLICABLE", "NOT_APPLICABLE", "UNDETERMINED"], [0.84, 0.1, 0.06])[0]
+        selected = applicability != "NOT_APPLICABLE"
+        if not selected:
+            not_selected.append({"check_id": c["check_id"], "reason": "NOT_APPLICABLE"})
+        no_exec = 0.3 if area == "OBS" else 0.05
+        source = r.choices(["automated", "manual", None], [0.6, 0.4 - no_exec, no_exec])[0] if selected else None
+        gaps = [r.choice(["NO_EXECUTOR", "NO_FIXTURE", "NO_ENV_FACT"])] if selected and source is None else []
+        if selected and source is None:
+            manual_required.append(c["check_id"])
 
-            def verdict() -> str:
-                if not selected:
-                    return "NOT_APPLICABLE"
-                if source is None:
-                    return "UNKNOWN"
-                fail, unknown = _FAIL_RATE[area], _UNKNOWN_RATE[area]
-                return r.choices(["PASS", "FAIL", "UNKNOWN"], [1 - fail - unknown, fail, unknown])[0]
-
-            def side(sec: str) -> dict[str, Any]:
-                return {"result_ref": g.ref("RES") if selected else None, "security": sec,
-                        "functional": sec if sec != "FAIL" else "PASS", "performance": r.choice(["PASS", "UNKNOWN"]) if selected else "NOT_APPLICABLE",
-                        "verification_level": "EXAMPLE" if source else None}
-
-            if mode == "update":
-                b, c = verdict(), verdict()
-                sides = {"baseline": side(b), "candidate": side(c)}
-                comparison = _COMPARE.get((b, c), "UNKNOWN") if selected else None
-                per_area[area].append(c)
-            else:
-                v = verdict()
-                sides = {"single": side(v)}
-                comparison = None
-                per_area[area].append(v)
-            row: dict[str, Any] = {"check_id": cid, "applicability": applicability, "selected": selected, "sides": sides,
-                                   "comparison": comparison, "gaps": gaps, "evidence_source": source}
+        def verdict() -> str:
             if not selected:
-                row["not_selected_reason"] = "환경 사실상 해당 없음"
-            if selected and r.random() < 0.07:
-                row["exception_approved"] = True
-            checks.append(row)
-            counts[area][source or "not_run"] += 1 if selected else 0
+                return "NOT_APPLICABLE"
+            if source is None:
+                return "UNKNOWN"
+            fail, unknown = _FAIL_RATE[area], _UNKNOWN_RATE[area]
+            return r.choices(["PASS", "FAIL", "UNKNOWN"], [1 - fail - unknown, fail, unknown])[0]
+
+        def side(sec: str) -> dict[str, Any]:
+            return {"result": g.ref("RES") if selected else None, "security": sec,
+                    "functional": "PASS" if sec != "UNKNOWN" else "UNKNOWN",
+                    "performance": r.choice(["PASS", "UNKNOWN"]) if selected else "NOT_APPLICABLE",
+                    "verification_level": "EXAMPLE" if source else None}
+
+        row: dict[str, Any] = {**c, "impact": None, "applicability": applicability, "selected": selected,
+                               "tested_while_undetermined": applicability == "UNDETERMINED" and selected,
+                               "single": None, "baseline": None, "candidate": None, "comparison": None,
+                               "gaps": gaps, "exception": None}
+        if update:
+            b, cand = verdict(), verdict()
+            if b == "PASS" and r.random() < 0.06 and selected and source:
+                cand = "FAIL"  # 후퇴 사례가 보이도록
+            row["baseline"], row["candidate"] = side(b), side(cand)
+            row["comparison"] = _COMPARE.get((b, cand), "UNKNOWN") if selected else None
+        else:
+            row["single"] = side(verdict())
+        if source:
+            row["evidence_source"] = source
+            counts[area][source] += 1
+        elif selected:
+            counts[area]["not_run"] += 1
+        if selected and source and r.random() < 0.06:
+            days = r.choice([-3, 30, 90])
+            row["exception"] = {"status": "EXPIRED" if days < 0 else "APPROVED", "reason": "운영 승인 예외(데모)",
+                                "expires_at": iso(g.now + timedelta(days=days))}
+        if selected and source == "automated" and r.random() < 0.08:
+            row["replaced"] = {"source": "manual", "revision": 1, "executor": None, "reason": "자동 측정으로 대체"}
+        if selected and c["area"] == "REQ" and r.random() < 0.15:
+            probed, of = r.randint(2, 6), r.randint(6, 9)
+            row["functional_scope"] = {"probed": probed, "of": of, "label": f"기능 확인 범위: {probed} / 등록 경로 {of} (표본)"}
+        rows.append(row)
+
+    def headline(row: dict[str, Any]) -> str:
+        return ((row["candidate"] if update else row["single"]) or {}).get("security") or "NOT_APPLICABLE"
+
+    def axis(key: str) -> dict[str, Any]:
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            groups.setdefault(row[key], []).append(row)
+        return {name: {"security": _aggregate([headline(x) for x in items]),
+                       "inventory_complete": not any(x["applicability"] == "UNDETERMINED" for x in items)}
+                for name, items in groups.items()}
+
+    refs = [g.ref("ENV"), g.ref("POL"), g.ref("PLAN")] + ([g.ref("ENV"), g.ref("CHG")] if update else [])
     return {
-        "schema_version": "byul-verification-result/0.1",
-        "report_ref": g.ref("RPT"),
-        "mode": mode,
-        "created_at": iso(created),
-        "data_origin": "EXAMPLE",
-        "plan_ref": g.ref("PLAN"),
-        "environment_refs": [g.ref("ENV")] * (2 if mode == "update" else 1),
-        "policy_ref": g.ref("POL"),
-        "byul_policy_ref": None,
-        "pack": {"id": "PACK-BASELINE", "revision": 22, "review_status": "DRAFT"},
-        "change_ref": g.ref("CHG") if mode == "update" else None,
-        "summary": {"by_area": {a: {"security": _aggregate(v)} for a, v in per_area.items()}, "evidence_counts": counts},
-        "checks": checks,
-        "limitations": ["데모 자료: 화면 확인용 가짜 결과", "검토 전 팩(DRAFT): 공식 아님", "EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음"],
-        "approval": None,
+        "kind": "RPT", "id": g.ulid("RPT"), "revision": 1, "created_at": iso(created), "data_origin": "EXAMPLE",
+        "content_sha256": g.hex(64), "refs": refs, "mode": mode, "official": False,
+        "inputs_manifest": [{"kind": "PACK", "id": "PACK-BASELINE", "revision": 22, "sha256": g.hex(64)}] + refs,
+        "pack_review_status": "DRAFT", "policy_status": "DRAFT",
+        "by_check": rows, "by_purpose": axis("purpose"), "by_area": axis("area"),
+        "not_selected": not_selected, "manual_required": manual_required,
+        "limitations": ["데모 자료: 화면 확인용 가짜 결과", "검토 전 팩(DRAFT): 공식 아님", "정책 DRAFT: 공식 아님",
+                        "EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음"],
+        "approval": None, "evidence_counts": counts,
     }
 
 
@@ -383,26 +514,37 @@ def build(out: Path, *, seed: int = 7, hours: int = 24, requests: int = 600, now
     weights = [0.70, 0.09, 0.12, 0.03, 0.035, 0.025]
     run_id = g.ulid("PLAN")
     events: list[dict[str, Any]] = []
+    all_records: list[dict[str, Any]] = []
+    details: list[dict[str, Any]] = []
     for at in g.times(requests, spikes=[(0.62, 0.015)]):
         kind = g.r.choices(kinds, weights)[0]
         # 몰림 구간에는 정책 거부가 많다(그래프에서 보이도록)
         if abs((at - g.start).total_seconds() / (g.now - g.start).total_seconds() - 0.62) < 0.03 and g.r.random() < 0.6:
             kind = "DENIED"
         in_run = abs((at - g.start).total_seconds() / (g.now - g.start).total_seconds() - 0.3) < 0.02
-        events.append(gateway_event(gateway_record(g, at, kind, run_id if in_run else None)))
-    for at in g.times(requests // 4, spikes=[(0.8, 0.02)]):
-        events.append(observation_event(hubble_record(g, at)))
-    for at in g.times(requests // 8, spikes=[(0.45, 0.02)]):
-        events.append(observation_event(tetragon_record(g, at)))
+        record = gateway_record(g, at, kind, run_id if in_run else None)
+        # runtime처럼 정책 판정을 통과한 요청은 started 기록을 먼저 남긴다(정책 거부·입력 오류는 final 하나)
+        records = [record]
+        if kind in ("ALLOWED", "ENGINE_REJECTED", "ERROR") and record["phase"] == "final":
+            started = {**record, "phase": "started", "recorded_at": iso(at - timedelta(milliseconds=g.r.randint(5, 900))),
+                       "delivery": {"attempted": False, "backend_receipt": "not_queried", "response": "none", "error_code": None}}
+            records = [started, record]
+        all_records += records
+        events.append(gateway_event(record))
+        details.append(request_detail_doc(request_detail_native(g, records)))
+    observations = [hubble_record(g, at) for at in g.times(requests // 4, spikes=[(0.8, 0.02)])]
+    observations += [tetragon_record(g, at) for at in g.times(requests // 8, spikes=[(0.45, 0.02)])]
+    events += [observation_event(o) for o in observations]
     events.sort(key=lambda e: e["recorded_at"])
+    native = native_payloads(g, all_records, observations)
 
     docs: dict[str, Any] = {
-        "runtime-status.json": runtime_status(g),
+        "runtime-status.json": runtime_status(native["status"], native["policy"], native["collectors"], target=native["target"],
+                                              summary=native["summary"], revalidation=native["revalidation"],
+                                              observations=native["observations"], baseline=native["baseline"]),
         "revalidation-request.json": revalidations(g),
-        "verification-result.json": [
-            verification_result(g, "update", g.now - timedelta(hours=3)),
-            verification_result(g, "audit", g.now - timedelta(hours=30)),
-        ],
+        "runtime-lab-report.json": lab_report_doc(lab_report_payload(g)),
+        "runtime-request-detail.json": details,
         "evidence-index.json": evidence(g, out, events),
     }
     # 환경·정책은 계약 예시를 그대로 쓴다(서로의 해시 참조가 맞아야 한다).
@@ -410,8 +552,13 @@ def build(out: Path, *, seed: int = 7, hours: int = 24, requests: int = 600, now
         shutil.copy(contracts_dir / "examples" / name, out / name)
 
     schema_of = {"runtime-status.json": "runtime-status", "revalidation-request.json": "revalidation-request",
-                 "verification-result.json": "verification-result", "evidence-index.json": "evidence-index"}
+                 "evidence-index.json": "evidence-index", "runtime-lab-report.json": "runtime-lab-report",
+                 "runtime-request-detail.json": "runtime-request-detail"}
     errors: list[str] = []
+    # update 보고서는 RPT 원본으로 만든다(platform이 보고서 화면과 계약 투영을 둘 다 만든다).
+    reports = [rpt_report(g, "update", g.now - timedelta(hours=3)), rpt_report(g, "audit", g.now - timedelta(hours=30))]
+    for rpt in reports:
+        errors += [f"{rpt['id']} {e.path}: {e.message}" for e in contracts.errors("verification-result", rpt_to_verification_result(rpt))]
     for name, doc in docs.items():
         for i, item in enumerate(doc if isinstance(doc, list) else [doc]):
             errors += [f"{name}[{i}] {e.path}: {e.message}" for e in contracts.errors(schema_of[name], item)]
@@ -425,6 +572,9 @@ def build(out: Path, *, seed: int = 7, hours: int = 24, requests: int = 600, now
             f.write(json.dumps(e, ensure_ascii=False, separators=(",", ":")) + "\n")
     for name, doc in docs.items():
         (out / name).write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / "update-reports").mkdir()
+    for rpt in reports:
+        (out / "update-reports" / f"{rpt['id']}.json").write_text(json.dumps(rpt, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     (out / "README.txt").write_text("byul-platform 데모 자료. 화면 확인용 가짜 기록이며 공식 근거가 아니다. byul_platform.demo로 다시 만든다.\n", encoding="utf-8")
 
     by_source: dict[str, int] = {}

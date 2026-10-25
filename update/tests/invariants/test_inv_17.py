@@ -3,7 +3,6 @@
 from guard.core.report import build_report
 from guard.models.checkdef import PackReview
 from guard.models import DataOrigin
-from guard.report.html import render_html
 from tests.builders import T0, baseline_pack
 from tests.report_setup import pipeline
 
@@ -19,7 +18,6 @@ def test_draft_policy_not_official(tmp_path):
     rpt = build_report(store, pack, plan, as_of=T0)
     assert rpt.official is False and rpt.policy_status == "DRAFT"
     assert any("DRAFT" in l for l in rpt.limitations)
-    assert "공식 아님" in render_html(rpt.to_dict())
 
 
 def test_unreviewed_pack_not_official(tmp_path):
@@ -27,7 +25,6 @@ def test_unreviewed_pack_not_official(tmp_path):
     rpt = build_report(store, pack, plan, as_of=T0)
     assert rpt.official is False and rpt.pack_review_status == "DRAFT"
     assert any("검토 전 팩" in l for l in rpt.limitations)
-    assert "검토 전 팩" in render_html(rpt.to_dict())
 
 
 def test_example_data_never_official(tmp_path):

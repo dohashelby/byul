@@ -2,16 +2,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.byul.invalid/0.1/verification-result.schema.json",
   "title": "격리 검증 결과 (update → platform)",
-  "description": "serving-guard RPT 객체를 화면용으로 줄인 투영. 원본은 RPT JSON이고 이 문서는 report_ref로 원본을 가리킨다. RPT에 없는 값을 새로 만들지 않는다.",
+  "description": "serving-guard RPT 객체를 화면용으로 옮긴 것. 원본은 RPT JSON이고 이 문서는 report_ref로 원본을 가리킨다. RPT에 없는 값을 새로 만들지 않는다. 0.2부터 update HTML 보고서(2026-10-25 삭제)가 보여주던 RPT 필드를 모두 담는다.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "report_ref", "mode", "created_at", "data_origin", "plan_ref", "environment_refs", "policy_ref", "pack", "change_ref", "summary", "checks", "limitations", "approval"],
+  "required": ["schema_version", "report_ref", "mode", "created_at", "data_origin", "official", "policy_status", "plan_ref", "environment_refs", "policy_ref", "pack", "change_ref", "inputs_manifest", "summary", "checks", "manual_required", "not_selected", "limitations", "approval"],
   "properties": {
-    "schema_version": { "const": "byul-verification-result/0.1" },
+    "schema_version": { "const": "byul-verification-result/0.2" },
     "report_ref": { "$ref": "common.schema.json#/$defs/object_ref" },
     "mode": { "enum": ["audit", "update"] },
     "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
     "data_origin": { "$ref": "common.schema.json#/$defs/data_origin" },
+    "official": {
+      "description": "RPT.official. 정책 CONFIRMED·팩 REVIEWED·EXAMPLE 아님 등 공식 조건을 update가 판정한 값.",
+      "type": "boolean"
+    },
+    "policy_status": {
+      "description": "RPT.policy_status. guard POL의 확정 상태.",
+      "enum": ["DRAFT", "CONFIRMED"]
+    },
     "plan_ref": { "$ref": "common.schema.json#/$defs/object_ref" },
     "environment_refs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/object_ref" } },
     "policy_ref": {
@@ -35,19 +43,25 @@
     "change_ref": {
       "oneOf": [{ "$ref": "common.schema.json#/$defs/object_ref" }, { "type": "null" }]
     },
+    "inputs_manifest": {
+      "description": "RPT.inputs_manifest. 이 보고서가 쓴 모든 객체(팩 포함)의 정확한 판본과 해시.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/manifest_ref" }
+    },
     "summary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["by_area", "evidence_counts"],
+      "required": ["by_area", "by_purpose", "evidence_counts"],
       "properties": {
         "by_area": {
           "type": "object",
           "propertyNames": { "enum": ["SUP", "REQ", "PLT", "LIF", "OBS"] },
-          "additionalProperties": {
-            "type": "object",
-            "required": ["security"],
-            "properties": { "security": { "$ref": "common.schema.json#/$defs/verdict" } }
-          }
+          "additionalProperties": { "$ref": "#/$defs/axis_summary" }
+        },
+        "by_purpose": {
+          "description": "RPT.by_purpose. 키는 보호 목적 이름(팩의 CheckDef.purpose).",
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/axis_summary" }
         },
         "evidence_counts": {
           "type": "object",
@@ -69,12 +83,21 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["check_id", "applicability", "selected", "sides", "comparison", "gaps", "evidence_source"],
+        "required": ["check_id", "area", "purpose", "question", "review_order", "impact", "applicability", "selected", "tested_while_undetermined", "sides", "comparison", "functional_comparison", "comparison_reasons", "gaps", "evidence_source", "exception", "replaced", "functional_scope"],
         "properties": {
           "check_id": { "$ref": "common.schema.json#/$defs/check_id" },
+          "area": { "enum": ["SUP", "REQ", "PLT", "LIF", "OBS"] },
+          "purpose": { "description": "보호 목적(팩 CheckDef.purpose).", "type": "string" },
+          "question": { "description": "점검 질문(팩 CheckDef 문구).", "type": "string" },
+          "review_order": { "type": "string" },
+          "impact": { "type": ["string", "null"] },
           "applicability": { "enum": ["APPLICABLE", "NOT_APPLICABLE", "UNDETERMINED", "CONFLICT"] },
           "selected": { "type": "boolean" },
           "not_selected_reason": { "type": ["string", "null"] },
+          "tested_while_undetermined": {
+            "description": "적용 미정 상태로 시험함.",
+            "type": "boolean"
+          },
           "sides": {
             "description": "audit 모드는 single, update 모드는 baseline·candidate.",
             "type": "object",
@@ -86,24 +109,92 @@
               "properties": {
                 "result_ref": { "oneOf": [{ "$ref": "common.schema.json#/$defs/object_ref" }, { "type": "null" }] },
                 "security": { "$ref": "common.schema.json#/$defs/verdict" },
-                "functional": { "$ref": "common.schema.json#/$defs/verdict" },
-                "performance": { "$ref": "common.schema.json#/$defs/verdict" },
+                "functional": {
+                  "description": "RPT에 기능 축 판정이 없으면 null(0.1은 UNKNOWN으로 채웠다).",
+                  "oneOf": [{ "$ref": "common.schema.json#/$defs/verdict" }, { "type": "null" }]
+                },
+                "performance": { "oneOf": [{ "$ref": "common.schema.json#/$defs/verdict" }, { "type": "null" }] },
                 "verification_level": { "oneOf": [{ "$ref": "common.schema.json#/$defs/data_origin" }, { "type": "null" }] }
               }
             }
           },
-          "comparison": {
-            "oneOf": [
-              { "enum": ["NO_CHANGE", "REGRESSED", "FIXED", "STILL_FAILING", "UNKNOWN", "NOT_COMPARABLE", "CARRIED_OVER"] },
-              { "type": "null" }
-            ]
+          "comparison": { "oneOf": [{ "$ref": "#/$defs/comparison" }, { "type": "null" }] },
+          "functional_comparison": { "oneOf": [{ "$ref": "#/$defs/comparison" }, { "type": "null" }] },
+          "comparison_reasons": {
+            "description": "비교 불일치·미확인 필드(update 모드). 없으면 빈 배열.",
+            "type": "array",
+            "items": { "type": "string" }
           },
           "gaps": {
             "type": "array",
             "items": { "enum": ["NO_EXECUTOR", "NO_POLICY_VALUE", "NO_FIXTURE", "NO_ENV_FACT", "ADAPTER_UNSUPPORTED"] }
           },
           "evidence_source": { "enum": ["automated", "manual", null] },
-          "exception_approved": { "type": "boolean" }
+          "exception": {
+            "description": "정책 예외 표시. 판정을 바꾸지 않는다(0.1의 exception_approved를 대체).",
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["status", "reason", "expires_at"],
+                "properties": {
+                  "status": { "enum": ["APPROVED", "EXPIRED", "UNAPPROVED"] },
+                  "reason": { "type": "string" },
+                  "expires_at": { "$ref": "common.schema.json#/$defs/nullable_timestamp" }
+                }
+              }
+            ]
+          },
+          "replaced": {
+            "description": "같은 PLAN·점검·side에서 출처가 다른 이전 증거를 대체함.",
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["source", "revision", "executor", "reason"],
+                "properties": {
+                  "source": { "enum": ["automated", "manual"] },
+                  "revision": { "type": "integer", "minimum": 1 },
+                  "executor": { "type": ["string", "null"] },
+                  "reason": { "type": ["string", "null"] }
+                }
+              }
+            ]
+          },
+          "functional_scope": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["probed", "of", "label"],
+                "properties": {
+                  "probed": { "type": "integer", "minimum": 0 },
+                  "of": { "type": ["integer", "null"], "minimum": 0 },
+                  "label": { "type": "string" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "manual_required": {
+      "description": "선정됐지만 자동 실행이 안 되는 점검.",
+      "type": "array",
+      "items": { "$ref": "common.schema.json#/$defs/check_id" }
+    },
+    "not_selected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check_id", "reason"],
+        "properties": {
+          "check_id": { "$ref": "common.schema.json#/$defs/check_id" },
+          "reason": { "type": "string" }
         }
       }
     },
@@ -123,6 +214,33 @@
           }
         }
       ]
+    }
+  },
+  "$defs": {
+    "comparison": { "enum": ["NO_CHANGE", "REGRESSED", "FIXED", "STILL_FAILING", "UNKNOWN", "NOT_COMPARABLE", "CARRIED_OVER"] },
+    "axis_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["security", "inventory_complete"],
+      "properties": {
+        "security": { "$ref": "common.schema.json#/$defs/verdict" },
+        "inventory_complete": {
+          "description": "점검 목록 완결 여부. 거짓이면 집계 PASS가 될 수 없다(SPEC INV-13). RPT에 없으면 null.",
+          "type": ["boolean", "null"]
+        }
+      }
+    },
+    "manifest_ref": {
+      "description": "inputs_manifest 항목. object_ref와 같되 팩(PACK)도 담는다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "revision", "sha256"],
+      "properties": {
+        "kind": { "enum": ["PACK", "ENV", "POL", "CHG", "PLAN", "EVD", "RES", "RPT"] },
+        "id": { "type": "string", "minLength": 1 },
+        "revision": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "common.schema.json#/$defs/sha256" }
+      }
     }
   }
 }

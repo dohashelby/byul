@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-25 — byul 통합: HTML 보고서 삭제(화면은 byul platform)
+
+- 한 일: byul 저장소에서 사용자 결정으로 `report/html.py`·`--html`·`report.html` 생성·HTML 목업과 `out/**/report.html`을 지웠다. 같은 내용은 byul `platform/` 검증 결과 화면이 RPT JSON으로 보여준다(DECISIONS 2026-10-25). `update_validation`·`tools/validate_cpu_cases.py`·`tools/verify_installed.py`는 JSON 보고서만 요구한다. 증거 첨부 `log_integrity_display.html`은 그대로다.
+- 테스트 결과: 기본 suite 2903 통과·실패/오류 0·기존 18 제외(macOS, 42.6초). 변경 전 2905에서 렌더러 자체 시험 1개와 HTML/JSON 짝 확인 1사례를 지웠다. engine·docker 표시 시험은 실행하지 않았다(인자에서 `--html`만 뺐다).
+- 다음 단계: Codex 교차 검수. gua 원본 저장소에도 같은 삭제를 반영할지 담당자가 정한다.
+- 막힌 것: 없음.
+
 ## 2026-10-25 — 개발 지침·이월 Ref 문구 정합성 정리
 
 - 한 일: main `1e01b2f`의 기존 합의를 기준으로 사전 재판정 RES와 이월 단계·Ref를 구분하고, CLAUDE의 승인·정책값·소스 확정·검증 범위 문구, CSV 두 행·카탈로그 링크·프로파일 주석을 정리했다. U1은 설계 확정·구현 전이며 제품 로직·판정·팩·테스트는 바꾸지 않았다.

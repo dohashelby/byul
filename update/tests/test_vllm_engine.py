@@ -76,7 +76,7 @@ def _pipeline(run_dir: Path, env_vars: dict, cfg_toml: Path, check_id: str = "RE
     print(_ok(["run", "--plan", plan, *pk, *c], env_vars))
     run_s = time.monotonic() - t0
     print(_ok(["judge", "--plan", plan, *pk, *c], env_vars))
-    _ok(["report", "--plan", plan, *pk, *c, "--json", str(run_dir / "report.json"), "--html", str(run_dir / "report.html")],
+    _ok(["report", "--plan", plan, *pk, *c, "--json", str(run_dir / "report.json")],
         env_vars)
     return {"plan": plan, "run_seconds": round(run_s, 1)}
 

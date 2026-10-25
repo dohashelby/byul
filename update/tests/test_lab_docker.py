@@ -63,8 +63,7 @@ def test_lab_topology_end_to_end(tmp_path, topology, expected):
         pack = ["--pack", str(ROOT / "packs/PACK-BASELINE")]
         print(_ok(["run", "--plan", plan, *pack, *c], env))
         print(_ok(["judge", "--plan", plan, *pack, *c], env))
-        _ok(["report", "--plan", plan, *pack, *c, "--json", str(run_dir / "report.json"),
-             "--html", str(run_dir / "report.html")], env)
+        _ok(["report", "--plan", plan, *pack, *c, "--json", str(run_dir / "report.json")], env)
         gw_logs = docker.logs(docker.name("gw"), timeout=30)
         engine_logs = docker.logs(docker.name("engine"), timeout=30)
 

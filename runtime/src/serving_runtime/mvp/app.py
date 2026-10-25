@@ -663,7 +663,7 @@ def run(config: MVPConfig) -> None:
             backend_name = "vLLM" if gateway.backend.kind == "vllm" else "SGLang"
             print(f"External {backend_name} backend: {gateway.backend.base_url}", flush=True)
         print(f"Data directory: {data_dir}", flush=True)
-        print(f"Browser: {gateway_url}/", flush=True)
+        print(f"Query API: {gateway_url}/api/ (화면: byul platform, RUNTIME_BASE_URL={gateway_url})", flush=True)
         try:
             threading.Event().wait()
         except KeyboardInterrupt:

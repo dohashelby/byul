@@ -16,7 +16,7 @@ BoB serving-engine security runtime solution
 | 정책·상태 (S2) | 정책 schema 1.1(기간·승인 근거), 철회 파일, 정책 이력, 기준/현재 비교, 수집원 상태 | 모의 엔진·fixture |
 | 외부 vLLM 연결 (S3A) | 설정 파일로 고정된 목적지·모델 별칭·자격정보, health·모델·버전·지표 수집 | 가짜 backend·실제 vLLM(CPU) |
 | 기록·조회 | 요청별 시작/최종 JSONL 기록(프롬프트 원문 미저장), 조회 API, 증거 JSON 내려받기 | 모의 엔진·실제 vLLM(CPU) |
-| 대시보드 | 한 화면(왼쪽 메뉴 6개 영역, 관측·통제 적용은 도구별 탭)에 요청·정책/기준 상태·통신·행위 관측(실시간 feed)·Cilium 정책 상태·kind 시험 결과, 현황 그래프(결과 비율·거부/오류 사유·관측 규칙별 사건·시간별 요청, 저장소에 고정한 Chart.js 4.5.1), 환경·실행 구분, 3초 갱신, 읽기 전용 | 브라우저 수동 확인, 실시간 feed는 로컬 kind |
+| 화면 | Gateway 자체 대시보드는 제거했다(2026-10-25, byul). 화면은 byul `platform/`이 runtime 조회 API(`GET /api/*`)를 읽어 보여준다 | byul platform 시험(`platform/api`, `platform/web`) |
 | context 사전 통제 | 정책 `max_context_tokens`(예: 2048): backend `/tokenize`로 입력 토큰을 세어 입력+`max_tokens` 초과 시 403, 셀 수 없으면 503(모두 엔진 미전달) | 모의 엔진·가짜 backend·실제 vLLM(CPU) |
 | 모델 파일 무결성 | 승인 자산 목록(경로·SHA-256·크기)과 디스크 파일 주기 비교, 변경·누락·목록 밖 파일 표시 | 단위·HTTP 시험, 실제 모델 파일 목록 생성 확인 |
 | 재검증 요청 | 자산 변경·engine API 구성 drift·같은 판본 정책 내용 변경을 JSONL 요청으로 열고 조회·내보내기 | 단위 시험 완료; 검증 도구 연동 형식 D-03 미합의 |
@@ -47,7 +47,7 @@ BoB serving-engine security runtime solution
 
 ## 런타임 통제 MVP (로컬)
 
-로컬 PC에서 정책 파일을 읽고, 추론 요청을 허용하거나 거부하고, 그 결과와 증거를 브라우저 대시보드에서 조회합니다. backend는 기본값인 **모의 엔진**과, 설정 파일로 지정하는 **외부 vLLM** 중 하나를 사용합니다.
+로컬 PC에서 정책 파일을 읽고, 추론 요청을 허용하거나 거부하고, 그 결과와 증거를 조회 API로 내보냅니다. 화면은 byul `platform/`이 맡습니다. backend는 기본값인 **모의 엔진**과, 설정 파일로 지정하는 **외부 vLLM** 중 하나를 사용합니다.
 
 ```text
 시험 클라이언트 → Gateway :8080 → 모의 엔진 :8088  (기본, --backend mock)
@@ -55,7 +55,7 @@ BoB serving-engine security runtime solution
                      ↓
           요청 결과 기록 · 수신 증거 · 상태/지표 수집
                      ↓
-          조회 API → 브라우저 대시보드 (읽기 전용)
+          조회 API (읽기 전용) → byul platform 화면
 ```
 
 이 MVP는 요청 통제·기록·조회 경로를 다룹니다. 커널 통제, 네트워크 격리, API 인증은 구현하지 않았으며 이를 입증하지 않습니다. 엔진 포트(8088, 외부 vLLM 포트)로 직접 보내는 요청은 막지 않습니다.
@@ -91,12 +91,12 @@ python3 -m venv .venv
 .venv/bin/python -m serving_runtime mvp
 ```
 
-`Browser: http://127.0.0.1:8080/`이 출력되면 터미널을 열어 둔 채 Windows 브라우저에서 그 주소를 엽니다. 종료는 `Ctrl+C`입니다. 서버는 `127.0.0.1`에만 열립니다.
+터미널을 열어 둔 채 사용합니다. 종료는 `Ctrl+C`입니다. 서버는 `127.0.0.1`에만 열립니다. Gateway는 화면을 서빙하지 않습니다(`/`는 404). 화면은 byul 저장소의 `platform/`을 `RUNTIME_BASE_URL=http://127.0.0.1:8080`으로 실행해 봅니다(`platform/README.md`).
 
 | 옵션 | 기본값 | 설명 |
 | --- | --- | --- |
 | `--policy PATH` | `examples/mvp/policy.json` | 정책 파일. 변경은 재실행으로 적용 |
-| `--gateway-port N` | `8080` | Gateway·대시보드 포트 |
+| `--gateway-port N` | `8080` | Gateway·조회 API 포트 |
 | `--engine-port N` | `8088` | 모의 엔진 포트 |
 | `--data-dir PATH` | `~/.local/state/serving-runtime/mvp` | 기록 저장 위치 |
 | `--relay-timeout 초` | `5` | 엔진 연결·응답 헤더 시작 대기 상한. 일반 요청에서는 기존과 같이 소켓 작업별 대기 상한 |
@@ -168,7 +168,7 @@ curl -H "Authorization: Bearer $LAB_TOKEN" -H 'Content-Type: application/json' \
 - 요청은 정책 유효성, 인증, 대상 등록, 본문 순서로 판정합니다. 인증 정보 없음은 401 `AUTH_REQUIRED`, 토큰 불일치·비활성 주체·Bearer 외 방식은 401 `AUTH_INVALID`, 역할 불허는 403 `ROLE_NOT_ALLOWED`, 주체에 허용되지 않은 모델은 403 `PRINCIPAL_MODEL_NOT_ALLOWED`입니다. 모두 엔진에 전달하지 않고, 401·역할 거부는 대상 상태를 확인하거나 본문을 읽기 전에 끝냅니다.
 - 인증 설정을 읽지 못하거나 형식이 틀리면 추론 요청을 503 `AUTH_UNAVAILABLE`로 막고 `/api/status`를 `degraded`로 둡니다. 이것은 Gateway 오류이며 보안 차단 성공으로 세지 않습니다.
 - 요청 기록에는 인증 상태·방식·주체 ID·역할만 남습니다. 토큰과 토큰 해시는 기록·상태·로그에 남기지 않고, 클라이언트의 `Authorization` 헤더는 backend로 전달하지 않습니다.
-- 조회 API를 보호하면 `/api/*`(상태·요청 목록·상세·증거 내려받기·관측·대상 등) 전체에 토큰 없음·불일치 401, 역할 없음 403을 돌려줍니다. 화면 파일(`/`, `/static/*`)은 데이터가 없어 공개입니다. 대시보드는 401을 받으면 토큰 입력창을 띄우고, 입력한 토큰을 그 탭의 세션 저장소에만 두고 `Authorization` 헤더로 보냅니다. 증거 내려받기도 같은 헤더를 붙여 받습니다. 인증 설정을 읽지 못하면 조회 보호 여부를 알 수 없으므로 조회 API도 503 `AUTH_UNAVAILABLE`로 막습니다.
+- 조회 API를 보호하면 `/api/*`(상태·요청 목록·상세·증거 내려받기·관측·대상 등) 전체에 토큰 없음·불일치 401, 역할 없음 403을 돌려줍니다. Gateway는 화면 파일을 서빙하지 않습니다. byul platform은 조회 토큰을 환경변수 `RUNTIME_VIEWER_TOKEN`으로 받아 서버 쪽에서 `Authorization` 헤더로 보냅니다(브라우저에 토큰을 두지 않음). 인증 설정을 읽지 못하면 조회 보호 여부를 알 수 없으므로 조회 API도 503 `AUTH_UNAVAILABLE`로 막습니다.
 - 한계: 로그인·세션 만료·토큰 회전·외부 인증 서버 연동은 없습니다. 인증 방식 결정 기록은 `docs/결정기록_D-02_인증연동.md`에 있습니다. `examples/mvp/auth.example.json`의 토큰은 공개된 예시값이므로 시험 외에 쓰지 않습니다.
 
 ### 대상 등록 프레임 (F1)
@@ -368,7 +368,7 @@ setsid nohup .venv/bin/python -u -m serving_runtime mvp --backend vllm --backend
   --gateway-port 18080 --data-dir $D/data > $D/gateway.log 2>&1 < /dev/null &
 ```
 
-브라우저에서 `http://127.0.0.1:18080`을 엽니다. 위쪽 배지는 health가 정상이면 "외부 vLLM 모드 · 연결됨 · 정식 GPU 시험(S3B) 전", 아니면 문제 색의 "외부 vLLM 모드 · 연결 안 됨 · 정식 GPU 시험(S3B) 전"으로 표시됩니다.
+상태는 `GET http://127.0.0.1:18080/api/status`의 `backend`(health·reachable)로 확인합니다. 화면은 byul platform을 `RUNTIME_BASE_URL=http://127.0.0.1:18080`으로 실행해 봅니다.
 
 4. 끄거나 다시 켜는 명령입니다.
 
@@ -430,17 +430,12 @@ Gateway는 기본적으로 요청 헤더 전체 5초, 본문 전체 읽기 10초
 
 1. 첫 번째 터미널에서 `.venv/bin/python -m serving_runtime mvp`로 서버를 실행하고 그대로 둡니다.
 2. 두 번째 터미널에서 `.venv/bin/python -m serving_runtime mvp-demo`를 실행합니다. 사례별 기대·실제 결과 표와 저장된 결과 JSON 경로가 출력됩니다. Gateway 주소를 바꿨다면 `--gateway URL`, 기록 위치를 바꿨다면 `--data-dir PATH`를 함께 지정합니다.
-3. 브라우저에서 `http://127.0.0.1:8080`을 열고 **현황 숫자 → 정책 거부 행 클릭 → “Gateway 미전달, 엔진 미수신 확인” → 증거 내려받기** 순서로 확인합니다.
+3. byul `platform/`을 `RUNTIME_BASE_URL=http://127.0.0.1:8080 uv run byul-platform`으로 실행하고 `http://127.0.0.1:8700`에서 **대시보드 숫자 → 요청 내역의 정책 거부 행 → 상세의 증거 상태("Gateway 미전달, 엔진 미수신 확인")** 순서로 확인합니다.
 4. 첫 번째 터미널에서 `Ctrl+C`로 서버를 종료한 뒤 같은 명령으로 재실행합니다. 이전 기록이 유지되고 요청 목록에 **이전 실행** 태그가 나타나는지 확인합니다.
 
-### 대시보드
+### 화면
 
-- **현황**: 결과별 건수, 정책 판본·SHA-256·로딩 시각, 모의 엔진 연결 점검, 기록 저장 상태·손상 줄 수와 위치. 네트워크·프로세스·파일 관측은 저장 자료와 live feed/heartbeat 상태를 함께 보며 "미연결"·"합성 데이터"·"실제 기록·실시간 미연결"·"수집 정상·새 이벤트 없음"·"실제 수집(실시간)"·"관측 불가"를 구분합니다. GPU 관측은 "미연결"입니다.
-- **통신·행위 관측**: Hubble 통신과 Tetragon 프로세스·파일 최신 기록, 환경·실행 배지, Cilium 정책 객체 상태, kind lab L-01~L-06 결과를 표시합니다. Tetragon Override는 "차단 시도 기록(enforce)"이며 실제 EPERM 확인은 lab L-05와 별개입니다. 합성 자료는 "합성" 배지가 붙고 허용 목록 밖 실행 파일은 강조됩니다.
-- **정책·기준 상태**: 읽기/Gateway 활성/외부 집행 배지, 기간·철회·승인 근거, 최근 정책 이력 50건, baseline 비교, 수집원별 최근 성공·오류·`data_origin`을 표시합니다.
-- **요청 목록**: 결과별 필터와 Gateway 환경·실행 배지. 행을 누르면 상세가 열리며, 재실행 전 요청에는 "이전 실행" 태그가 붙습니다. 과거 기록에 필드가 없으면 "환경 미기록"·"실행 미기록"으로 표시합니다.
-- **상세**: 판정·적용 규칙, 전달 여부, Gateway 기록(시작→최종), 모의 엔진 수신 증거, 증거 JSON 내려받기.
-- 3초마다 갱신하며, 서버와 연결이 끊기면 경고 배너를 띄우고 이전 값을 흐리게 표시합니다.
+Gateway 자체 대시보드(`mvp/static/`)는 2026-10-25 byul 통합 때 제거했습니다. 화면은 byul `platform/`이 맡고, 이 Gateway의 조회 API(`/api/summary`·`/api/requests`·상세·`/evidence`·`/api/status`·`/api/policy`·`/api/collectors`·`/api/baseline`·`/api/target`·`/api/revalidation`·`/api/observations`)를 GET으로만 읽습니다. 조회 API의 형식과 의미는 그대로입니다.
 
 거부 요청의 "미수신 확인"은 Gateway가 중계하지 않았다는 기록과, 같은 실행 중인 모의 엔진의 수신 기록 조회를 함께 대조한 결과입니다. 엔진 조회 실패나 이전 실행의 요청은 "확인 불가"로 표시합니다.
 

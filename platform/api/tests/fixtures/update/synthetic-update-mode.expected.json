@@ -1,0 +1,406 @@
+{
+ "overall": "FAIL",
+ "counts": {
+  "selected": 77,
+  "fail": 31,
+  "unknown": 15,
+  "pass": 31,
+  "not_applicable": 0,
+  "manual_required": 76,
+  "not_selected": 0,
+  "regressed": 16
+ },
+ "focus": {
+  "regressed": [
+   "SUP-01",
+   "SUP-06",
+   "SUP-11",
+   "SUP-16",
+   "REQ-05",
+   "REQ-10",
+   "REQ-15",
+   "REQ-20",
+   "PLT-04",
+   "PLT-09",
+   "LIF-02",
+   "LIF-07",
+   "LIF-12",
+   "OBS-01",
+   "OBS-06",
+   "OBS-11"
+  ],
+  "fail": [
+   "SUP-04",
+   "SUP-09",
+   "SUP-14",
+   "REQ-03",
+   "REQ-08",
+   "REQ-13",
+   "REQ-18",
+   "PLT-02",
+   "PLT-07",
+   "PLT-12",
+   "LIF-05",
+   "LIF-10",
+   "LIF-15",
+   "OBS-04",
+   "OBS-09"
+  ],
+  "unknown": [
+   "SUP-05",
+   "SUP-10",
+   "SUP-15",
+   "REQ-04",
+   "REQ-09",
+   "REQ-14",
+   "REQ-19",
+   "PLT-03",
+   "PLT-08",
+   "LIF-01",
+   "LIF-06",
+   "LIF-11",
+   "LIF-16",
+   "OBS-05",
+   "OBS-10"
+  ]
+ },
+ "unofficial_reasons": [
+  "POLICY_DRAFT",
+  "PACK_DRAFT",
+  "EXAMPLE_DATA"
+ ],
+ "incomplete_areas": [
+  "OBS"
+ ],
+ "marks": {
+  "SUP-01": [
+   "gap",
+   "manual_declared",
+   "replaced",
+   "exception",
+   "tested_while_undetermined"
+  ],
+  "SUP-02": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-03": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-04": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-05": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-06": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-07": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-08": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "SUP-09": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-10": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-11": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-12": [
+   "gap",
+   "exception",
+   "tested_while_undetermined"
+  ],
+  "SUP-13": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "SUP-14": [
+   "gap",
+   "manual_declared",
+   "tested_while_undetermined"
+  ],
+  "SUP-15": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "SUP-16": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-01": [],
+  "REQ-02": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-03": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-04": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-05": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-06": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "REQ-07": [
+   "gap",
+   "exception",
+   "tested_while_undetermined"
+  ],
+  "REQ-08": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-09": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-10": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-11": [
+   "gap",
+   "manual_declared",
+   "tested_while_undetermined"
+  ],
+  "REQ-12": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-13": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "REQ-14": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-15": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-16": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-17": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-18": [
+   "gap",
+   "exception",
+   "tested_while_undetermined"
+  ],
+  "REQ-19": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "REQ-20": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "REQ-21": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "PLT-01": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "PLT-02": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "PLT-03": [
+   "gap",
+   "manual_declared",
+   "tested_while_undetermined"
+  ],
+  "PLT-04": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "PLT-05": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "PLT-06": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "PLT-07": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "PLT-08": [
+   "gap",
+   "exception",
+   "tested_while_undetermined"
+  ],
+  "PLT-09": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "PLT-10": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "PLT-11": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "PLT-12": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-01": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "LIF-02": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-03": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-04": [
+   "gap",
+   "manual_declared",
+   "tested_while_undetermined"
+  ],
+  "LIF-05": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-06": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-07": [
+   "gap",
+   "exception",
+   "tested_while_undetermined"
+  ],
+  "LIF-08": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "LIF-09": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-10": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-11": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-12": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-13": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-14": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "LIF-15": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "LIF-16": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "OBS-01": [
+   "gap",
+   "manual_declared",
+   "tested_while_undetermined"
+  ],
+  "OBS-02": [
+   "gap",
+   "exception",
+   "tested_while_undetermined"
+  ],
+  "OBS-03": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "OBS-04": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "OBS-05": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "OBS-06": [
+   "gap",
+   "replaced",
+   "tested_while_undetermined"
+  ],
+  "OBS-07": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "OBS-08": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "OBS-09": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "OBS-10": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "OBS-11": [
+   "gap",
+   "tested_while_undetermined"
+  ],
+  "OBS-12": [
+   "gap",
+   "tested_while_undetermined"
+  ]
+ }
+}

@@ -372,23 +372,6 @@ class EnforcementCliTests(unittest.TestCase):
             self.assertFalse(records[1]["allowed_binary"])
 
 
-class DashboardStaticTests(unittest.TestCase):
-    def test_dashboard_is_text_only_and_has_observation_states(self) -> None:
-        static = ROOT / "src/serving_runtime/mvp/static"
-        page = (static / "index.html").read_text(encoding="utf-8")
-        script = (static / "app.js").read_text(encoding="utf-8")
-        self.assertIn("통신·행위 관측", page)
-        self.assertIn("network-observation-chip", page)
-        self.assertIn("합성 데이터", script)
-        self.assertIn("실제 수집", script)
-        self.assertIn("exec-outside-allowlist", script)
-        self.assertIn("origins_by_kind", script)
-        self.assertIn("pod 미확인", script)
-        self.assertIn("프로세스 미확인", script)
-        for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "eval("):
-            self.assertNotIn(forbidden, script)
-
-
 class ObservationApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()

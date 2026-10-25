@@ -1,0 +1,4044 @@
+{
+    "endpoints": {
+        "status": {
+            "status": "ok",
+            "auth": {
+                "state": "not_configured",
+                "method": null,
+                "path": null,
+                "loaded_at": "2026-10-25T11:26:52.976902+00:00",
+                "auth_ref": null,
+                "principal_count": 0,
+                "disabled_principal_count": 0,
+                "route_roles": {},
+                "protected_routes": [],
+                "unprotected": [
+                    "GET /api/*"
+                ],
+                "error_code": null,
+                "error_message": null
+            },
+            "target": {
+                "registration": "not_configured",
+                "target_id": null,
+                "target_ref": null,
+                "error_code": null,
+                "gateway_hold": null,
+                "counts": {
+                    "match": 0,
+                    "mismatch": 0,
+                    "unknown": 0,
+                    "not_declared": 0
+                },
+                "instance": {
+                    "state": "not_configured",
+                    "observed_at": null,
+                    "current": null,
+                    "events_this_session": 0
+                }
+            },
+            "mode": "mock_engine",
+            "backend_kind": "mock",
+            "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+            "environment": null,
+            "run_id": null,
+            "gateway": {
+                "host": "127.0.0.1",
+                "port": 18091
+            },
+            "policy": {
+                "path": "examples/mvp/policy.json",
+                "valid": true,
+                "schema_version": "runtime-mvp/1.0",
+                "policy_id": "local-policy-001",
+                "policy_version": "1",
+                "target_id": "mock-engine-001",
+                "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                "loaded_at": "2026-10-25T11:26:52.970771+00:00",
+                "profile": "default",
+                "test_only": false,
+                "max_n": 1,
+                "extra_fields": [],
+                "passthrough_count": 0,
+                "validate_count": 0,
+                "error_code": null,
+                "error_message": null,
+                "loaded": true,
+                "gateway_active": true,
+                "external_enforcement": "not_connected",
+                "reason_code": null,
+                "approval": {
+                    "state": "not_configured",
+                    "checked_at": null,
+                    "verifier": null,
+                    "reason_code": null,
+                    "reason_message": null,
+                    "evidence": {}
+                }
+            },
+            "policy_state": {
+                "loaded": true,
+                "gateway_active": true,
+                "external_enforcement": "not_connected",
+                "reason_code": null,
+                "approval": {
+                    "state": "not_configured",
+                    "checked_at": null,
+                    "verifier": null,
+                    "reason_code": null,
+                    "reason_message": null,
+                    "evidence": {}
+                }
+            },
+            "policy_history_store": {
+                "path": "/var/lib/serving-runtime/policy_history.jsonl",
+                "state": "ok",
+                "ok": true,
+                "last_error": null,
+                "last_error_at": null,
+                "corrupt_lines": []
+            },
+            "record_store": {
+                "data_dir": "/var/lib/serving-runtime",
+                "state": "ok",
+                "ok": true,
+                "last_error": null,
+                "last_error_at": null
+            },
+            "concurrency": {
+                "in_flight": 0,
+                "limit": 2
+            },
+            "connections": {
+                "active": 1,
+                "limit": 64,
+                "rejected": 0,
+                "request_header_timeout_s": 5.0,
+                "request_body_timeout_s": 10.0
+            },
+            "backend": {
+                "url": "http://127.0.0.1:18092/healthz",
+                "healthy": true,
+                "reachable": true,
+                "inference_verified": false,
+                "health": {
+                    "status": "ok",
+                    "receipts_store": {
+                        "state": "ok",
+                        "ok": true,
+                        "last_error": null
+                    },
+                    "data_origin": "mock"
+                },
+                "checked_at": "2026-10-25T11:26:54.292452+00:00",
+                "error": null,
+                "receipts_store": {
+                    "state": "ok",
+                    "ok": true,
+                    "last_error": null
+                },
+                "credential": "configured",
+                "kind": "mock",
+                "base_url": "http://127.0.0.1:18092",
+                "credential_configured": false,
+                "health_path": "/healthz",
+                "metrics_configured": false,
+                "metrics_credential": "not_configured",
+                "metrics_credential_configured": false,
+                "timeouts": {
+                    "relay_timeout_s": 5.0,
+                    "stream_idle_timeout_s": 30.0,
+                    "request_deadline_s": 300.0
+                }
+            },
+            "mock_engine": {
+                "url": "http://127.0.0.1:18092/healthz",
+                "healthy": true,
+                "reachable": true,
+                "inference_verified": false,
+                "health": {
+                    "status": "ok",
+                    "receipts_store": {
+                        "state": "ok",
+                        "ok": true,
+                        "last_error": null
+                    },
+                    "data_origin": "mock"
+                },
+                "checked_at": "2026-10-25T11:26:54.292452+00:00",
+                "error": null,
+                "receipts_store": {
+                    "state": "ok",
+                    "ok": true,
+                    "last_error": null
+                },
+                "credential": "configured"
+            },
+            "baseline": {
+                "configured": false,
+                "states": {
+                    "match": 0,
+                    "drift": 0,
+                    "missing": 0,
+                    "stale": 0,
+                    "error": 0,
+                    "not_collected": 0
+                },
+                "model_id_limit": "model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않음"
+            },
+            "collectors": {
+                "engine_health": "ok",
+                "engine_info": "ok",
+                "metrics": "disconnected",
+                "record_retention": "ok",
+                "asset_integrity": "disconnected"
+            },
+            "revalidation": {
+                "open_count": 0,
+                "current_condition_count": 0,
+                "evaluation_state": "ok",
+                "storage_state": "ok"
+            }
+        },
+        "summary": {
+            "counts": {
+                "ALLOWED": 5,
+                "DENIED": 2,
+                "INVALID": 8,
+                "ENGINE_REJECTED": 0,
+                "ERROR": 0
+            },
+            "incomplete": 0,
+            "total": 15,
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "corrupt_details": {
+                "gateway": [],
+                "engine": []
+            },
+            "record_store": {
+                "data_dir": "/var/lib/serving-runtime",
+                "state": "ok",
+                "ok": true,
+                "last_error": null,
+                "last_error_at": null
+            },
+            "generated_at": "2026-10-25T11:26:54.293528+00:00"
+        },
+        "requests": {
+            "requests": [
+                {
+                    "request_id": "a7f28044c89f4b65b54416173b98341b",
+                    "recorded_at": "2026-10-25T11:26:54.194818+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": 64,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "ALLOWED",
+                    "reason_code": "REQUEST_ALLOWED",
+                    "http_status": 200,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": true,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": true,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "57997836140745149f18ea0408466a46",
+                    "recorded_at": "2026-10-25T11:26:54.030072+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": null,
+                    "max_tokens": null,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "INVALID",
+                    "reason_code": "UNSUPPORTED_MEDIA_TYPE",
+                    "http_status": 415,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 415,
+                    "final_outcome": "UNSUPPORTED_MEDIA_TYPE",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "c85853dbc1314c41bae99b3df4b99858",
+                    "recorded_at": "2026-10-25T11:26:54.029089+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": null,
+                    "max_tokens": null,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "INVALID",
+                    "reason_code": "BODY_TOO_LARGE",
+                    "http_status": 413,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 413,
+                    "final_outcome": "BODY_TOO_LARGE",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "1ec82fb5e0c245d8a09339aea760b586",
+                    "recorded_at": "2026-10-25T11:26:54.028322+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": null,
+                    "max_tokens": null,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "INVALID",
+                    "reason_code": "UNSUPPORTED_FIELD",
+                    "http_status": 400,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "UNSUPPORTED_FIELD",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "645fee3f16624ec89cdfff5f1c7e62dd",
+                    "recorded_at": "2026-10-25T11:26:54.027416+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": 64,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "INVALID",
+                    "reason_code": "INVALID_STREAM",
+                    "http_status": 400,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_STREAM",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "f04359427fb74e1bb670420c801d92a1",
+                    "recorded_at": "2026-10-25T11:26:54.026499+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": null,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "INVALID",
+                    "reason_code": "INVALID_MAX_TOKENS",
+                    "http_status": 400,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_MAX_TOKENS",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "0e95a13ce7fd4896ab9b469cddd484a0",
+                    "recorded_at": "2026-10-25T11:26:54.025478+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": null,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "INVALID",
+                    "reason_code": "INVALID_MAX_TOKENS",
+                    "http_status": 400,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_MAX_TOKENS",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "4ca349c7040541c7a9a3e0036f899ca0",
+                    "recorded_at": "2026-10-25T11:26:54.024554+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": null,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "INVALID",
+                    "reason_code": "INVALID_MAX_TOKENS",
+                    "http_status": 400,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_MAX_TOKENS",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "0ba93fc78c9942f490bbe070207c4456",
+                    "recorded_at": "2026-10-25T11:26:54.023588+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": null,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "INVALID",
+                    "reason_code": "INVALID_MAX_TOKENS",
+                    "http_status": 400,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_MAX_TOKENS",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "74c356363e934e4a892ba1e37886b844",
+                    "recorded_at": "2026-10-25T11:26:54.022572+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": 128,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "ALLOWED",
+                    "reason_code": "REQUEST_ALLOWED",
+                    "http_status": 200,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "cb7159df8f594ac5b73d8c8fa563e457",
+                    "recorded_at": "2026-10-25T11:26:54.020962+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "other-model",
+                    "max_tokens": 64,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "DENIED",
+                    "reason_code": "MODEL_NOT_ALLOWED",
+                    "http_status": 403,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 403,
+                    "final_outcome": "MODEL_NOT_ALLOWED",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "70a183303aba42dfb55b912ac0a16615",
+                    "recorded_at": "2026-10-25T11:26:54.019930+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": 64,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "ALLOWED",
+                    "reason_code": "REQUEST_ALLOWED",
+                    "http_status": 200,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "99f63a73ea5f441ab8b16023c6f4286e",
+                    "recorded_at": "2026-10-25T11:26:54.018165+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": 129,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "DENIED",
+                    "reason_code": "MAX_TOKENS_EXCEEDED",
+                    "http_status": 403,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 403,
+                    "final_outcome": "MAX_TOKENS_EXCEEDED",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "ad9beef64de54d5bac8dff702739cca6",
+                    "recorded_at": "2026-10-25T11:26:54.017034+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": 128,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "ALLOWED",
+                    "reason_code": "REQUEST_ALLOWED",
+                    "http_status": 200,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "current_session": true
+                },
+                {
+                    "request_id": "b44523879ff44ee694981a4af68e042e",
+                    "recorded_at": "2026-10-25T11:26:54.014939+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "model": "test-model",
+                    "max_tokens": 64,
+                    "policy_profile": "default",
+                    "extra_fields": [],
+                    "result": "ALLOWED",
+                    "reason_code": "REQUEST_ALLOWED",
+                    "http_status": 200,
+                    "source": "gateway",
+                    "engine_http_status": null,
+                    "stream": false,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "current_session": true
+                }
+            ],
+            "generated_at": "2026-10-25T11:26:54.293898+00:00"
+        },
+        "policy": {
+            "loaded": true,
+            "gateway_active": true,
+            "external_enforcement": "not_connected",
+            "evaluated_at": "2026-10-25T11:26:54.294180+00:00",
+            "reason_code": null,
+            "reason_message": null,
+            "validity": [
+                {
+                    "item": "period",
+                    "state": "not_configured",
+                    "result": "unbounded",
+                    "valid_from": null,
+                    "valid_until": null
+                },
+                {
+                    "item": "revocation",
+                    "state": "not_configured",
+                    "result": "not_configured",
+                    "matched": null,
+                    "error_code": null,
+                    "error_message": null
+                },
+                {
+                    "item": "approval",
+                    "state": "not_configured",
+                    "result": "not_configured",
+                    "value": null,
+                    "checked_at": null,
+                    "verifier": null,
+                    "evidence": {}
+                }
+            ],
+            "approval": {
+                "state": "not_configured",
+                "checked_at": null,
+                "verifier": null,
+                "reason_code": null,
+                "reason_message": null,
+                "evidence": {}
+            },
+            "current": {
+                "path": "examples/mvp/policy.json",
+                "schema_version": "runtime-mvp/1.0",
+                "policy_id": "local-policy-001",
+                "policy_version": "1",
+                "target_id": "mock-engine-001",
+                "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                "loaded_at": "2026-10-25T11:26:52.970771+00:00",
+                "valid_from": null,
+                "valid_until": null,
+                "approval_ref": null,
+                "profile": "default",
+                "test_only": false,
+                "max_n": 1,
+                "extra_fields": [],
+                "passthrough_count": 0,
+                "validate_count": 0,
+                "error_code": null,
+                "error_message": null
+            },
+            "policy": {
+                "path": "examples/mvp/policy.json",
+                "schema_version": "runtime-mvp/1.0",
+                "policy_id": "local-policy-001",
+                "policy_version": "1",
+                "target_id": "mock-engine-001",
+                "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                "loaded_at": "2026-10-25T11:26:52.970771+00:00",
+                "valid_from": null,
+                "valid_until": null,
+                "approval_ref": null,
+                "profile": "default",
+                "test_only": false,
+                "max_n": 1,
+                "extra_fields": [],
+                "passthrough_count": 0,
+                "validate_count": 0,
+                "error_code": null,
+                "error_message": null
+            },
+            "revocations": {
+                "state": "not_configured",
+                "path": null,
+                "loaded_at": "2026-10-25T11:26:52.976897+00:00",
+                "sha256": null,
+                "error_code": null,
+                "error_message": null
+            },
+            "history_storage": {
+                "path": "/var/lib/serving-runtime/policy_history.jsonl",
+                "state": "ok",
+                "ok": true,
+                "last_error": null,
+                "last_error_at": null,
+                "corrupt_lines": []
+            },
+            "history": [
+                {
+                    "event": "loaded",
+                    "at": "2026-10-25T11:26:52.976954+00:00",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "path": "examples/mvp/policy.json",
+                    "policy_id": "local-policy-001",
+                    "policy_version": "1",
+                    "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                    "schema_version": "runtime-mvp/1.0",
+                    "valid_from": null,
+                    "valid_until": null,
+                    "approval_ref": null,
+                    "approval_state": "not_configured",
+                    "approval_reason_code": null,
+                    "approval_checked_at": null,
+                    "approval_verifier": null,
+                    "error_code": null,
+                    "previous": {
+                        "policy_id": null,
+                        "policy_version": null,
+                        "sha256": null
+                    },
+                    "same_version_content_changed": false
+                }
+            ],
+            "implemented_validity_items": [
+                "policy schema and fields",
+                "valid_from",
+                "valid_until",
+                "revocation snapshot",
+                "LAB approval-list SHA-256 comparison"
+            ],
+            "unimplemented_validity_items": [
+                "production signature or bundle verifier integration",
+                "approval service integration",
+                "hot reload",
+                "external enforcement confirmation"
+            ]
+        },
+        "baseline": {
+            "baseline": {
+                "state": "not_configured",
+                "path": null,
+                "sha256": null,
+                "loaded_at": "2026-10-25T11:26:52.976904+00:00",
+                "error_code": null,
+                "error_message": null
+            },
+            "manifest": {
+                "state": "not_configured",
+                "path": null,
+                "sha256": null,
+                "loaded_at": "2026-10-25T11:26:52.976906+00:00",
+                "error_code": null,
+                "error_message": null
+            },
+            "rows": [],
+            "model_id_limit": "model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않음",
+            "generated_at": "2026-10-25T11:26:54.294563+00:00"
+        },
+        "collectors": {
+            "collectors": [
+                {
+                    "source": "engine_health",
+                    "state": "ok",
+                    "interval_s": 5.0,
+                    "stale_after_s": 15.0,
+                    "last_attempt_at": "2026-10-25T11:26:52.978781+00:00",
+                    "last_success_at": "2026-10-25T11:26:52.979244+00:00",
+                    "last_error": null,
+                    "last_value": {
+                        "status": "ok",
+                        "receipts_store": {
+                            "state": "ok",
+                            "ok": true,
+                            "last_error": null
+                        },
+                        "data_origin": "mock"
+                    },
+                    "data_origin": "mock"
+                },
+                {
+                    "source": "engine_info",
+                    "state": "ok",
+                    "interval_s": 5.0,
+                    "stale_after_s": 15.0,
+                    "last_attempt_at": "2026-10-25T11:26:52.979247+00:00",
+                    "last_success_at": "2026-10-25T11:26:52.979841+00:00",
+                    "last_error": null,
+                    "last_value": {
+                        "engine.kind": "mock",
+                        "engine.version": "mock-1.0",
+                        "model.id": "test-model",
+                        "option.max_model_len": 2048
+                    },
+                    "data_origin": "mock"
+                },
+                {
+                    "source": "metrics",
+                    "state": "disconnected",
+                    "interval_s": 5.0,
+                    "stale_after_s": 15.0,
+                    "last_attempt_at": null,
+                    "last_success_at": null,
+                    "last_error": null,
+                    "last_value": null,
+                    "data_origin": null
+                },
+                {
+                    "source": "record_retention",
+                    "state": "ok",
+                    "interval_s": 3600.0,
+                    "stale_after_s": 10800.0,
+                    "last_attempt_at": "2026-10-25T11:26:52.979969+00:00",
+                    "last_success_at": "2026-10-25T11:26:52.980185+00:00",
+                    "last_error": null,
+                    "last_value": {
+                        "schema": "runtime-retention-run/1.0",
+                        "ran_at": "2026-10-25T11:26:52.979972+00:00",
+                        "mode": "report_only",
+                        "deleted": false,
+                        "limits": {
+                            "max_age_days": 7.0,
+                            "max_bytes": 5368709120
+                        },
+                        "cutoff": "2026-10-18T11:26:52.979972+00:00",
+                        "total_bytes": 3139,
+                        "over_size_limit": false,
+                        "over_size_limit_after": false,
+                        "holds": {
+                            "state": "not_configured",
+                            "path": null
+                        },
+                        "files": {
+                            "gateway_records.jsonl": {
+                                "bytes": 0,
+                                "units": 0,
+                                "held_units": 0,
+                                "unclassified_lines": 0,
+                                "removable_by_age": 0,
+                                "removable_by_size": 0,
+                                "removable_lines": 0,
+                                "removable_range": null,
+                                "removed_lines": 0,
+                                "durability": "not_applicable"
+                            },
+                            "engine_receipts.jsonl": {
+                                "bytes": 0,
+                                "units": 0,
+                                "held_units": 0,
+                                "unclassified_lines": 0,
+                                "removable_by_age": 0,
+                                "removable_by_size": 0,
+                                "removable_lines": 0,
+                                "removable_range": null,
+                                "removed_lines": 0,
+                                "durability": "not_applicable"
+                            },
+                            "observations.jsonl": {
+                                "bytes": 3139,
+                                "units": 5,
+                                "held_units": 0,
+                                "unclassified_lines": 0,
+                                "removable_by_age": 0,
+                                "removable_by_size": 0,
+                                "removable_lines": 0,
+                                "removable_range": null,
+                                "removed_lines": 0,
+                                "durability": "not_applicable"
+                            }
+                        },
+                        "errors": [],
+                        "retention_log": {
+                            "state": "not_written"
+                        },
+                        "last_deletion": null
+                    },
+                    "data_origin": "gateway_local"
+                },
+                {
+                    "source": "asset_integrity",
+                    "state": "disconnected",
+                    "interval_s": 60.0,
+                    "stale_after_s": 180.0,
+                    "last_attempt_at": null,
+                    "last_success_at": null,
+                    "last_error": null,
+                    "last_value": null,
+                    "data_origin": null
+                }
+            ],
+            "generated_at": "2026-10-25T11:26:54.294797+00:00"
+        },
+        "revalidation": {
+            "schema_version": "runtime-revalidation-request/1.0",
+            "requests": [],
+            "open_count": 0,
+            "current_condition_count": 0,
+            "corrupt_lines": [],
+            "evaluation_errors": [],
+            "evaluation_status": {
+                "state": "ok",
+                "ok": true,
+                "sources": {
+                    "policy_history": {
+                        "state": "ok",
+                        "last_evaluated_at": "2026-10-25T11:26:52.977119+00:00",
+                        "last_error": null,
+                        "last_error_at": null
+                    },
+                    "baseline": {
+                        "state": "ok",
+                        "last_evaluated_at": "2026-10-25T11:26:52.979866+00:00",
+                        "last_error": null,
+                        "last_error_at": null
+                    }
+                }
+            },
+            "storage": {
+                "path": "/var/lib/serving-runtime/revalidation_requests.jsonl",
+                "state": "ok",
+                "ok": true,
+                "last_error": null,
+                "last_error_at": null
+            },
+            "generated_at": "2026-10-25T11:26:54.295035+00:00"
+        },
+        "observations": {
+            "counts": {
+                "source": {
+                    "tetragon": 3,
+                    "hubble": 2
+                },
+                "kind": {
+                    "file_access": 1,
+                    "process_exec": 2,
+                    "network_flow": 2
+                },
+                "verdict": {
+                    "dropped": 1,
+                    "allowed": 1
+                },
+                "rule_id": {
+                    "TG-ASSET-01": 1,
+                    "TG-EXEC-01": 2
+                },
+                "data_origin": {
+                    "synthetic": 5
+                },
+                "environment": {
+                    "kind-runtime-lab": 5
+                },
+                "run_id": {},
+                "total": 5
+            },
+            "origins_by_kind": {
+                "file_access": {
+                    "synthetic": 1
+                },
+                "process_exec": {
+                    "synthetic": 2
+                },
+                "network_flow": {
+                    "synthetic": 2
+                }
+            },
+            "verification": {
+                "real_hubble_dropped": 0
+            },
+            "hubble_observations": [
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:02:04.000000000Z",
+                    "source": "hubble",
+                    "kind": "network_flow",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "verdict": "dropped",
+                    "src": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "dst": {
+                        "namespace": "kube-system",
+                        "pod": "coredns-xyz",
+                        "ip": "198.51.100.10",
+                        "port": 53,
+                        "protocol": "UDP"
+                    },
+                    "traffic_direction": "EGRESS",
+                    "reason": "POLICY_DENIED"
+                },
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:02:03.000000000Z",
+                    "source": "hubble",
+                    "kind": "network_flow",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "verdict": "allowed",
+                    "src": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-gateway-abc"
+                    },
+                    "dst": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def",
+                        "ip": "10.0.0.20",
+                        "port": 8000,
+                        "protocol": "TCP"
+                    },
+                    "traffic_direction": "INGRESS",
+                    "reason": ""
+                }
+            ],
+            "observations": [
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:03:03.000000000Z",
+                    "source": "tetragon",
+                    "kind": "file_access",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "binary": "/usr/local/bin/vllm",
+                    "process_attribution": "available",
+                    "pod": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "pod_attribution": "available",
+                    "path": "/opt/serving/assets/model/config.json",
+                    "access": "write",
+                    "policy_name": "runtime-tg-asset-01",
+                    "rule_id": "TG-ASSET-01",
+                    "action": "KPROBE_ACTION_POST",
+                    "action_raw": "KPROBE_ACTION_POST",
+                    "action_mode": "monitor"
+                },
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:03:02.000000000Z",
+                    "source": "tetragon",
+                    "kind": "process_exec",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "binary": "/bin/sh",
+                    "process_attribution": "available",
+                    "pod": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "pod_attribution": "available",
+                    "path": null,
+                    "access": null,
+                    "rule_id": "TG-EXEC-01",
+                    "action": "observed",
+                    "action_raw": "observed",
+                    "action_mode": "monitor",
+                    "allowed_binary": false,
+                    "phase": [
+                        "unknown"
+                    ],
+                    "phase_basis": [],
+                    "phase_trusted": [],
+                    "phase_source_error": null,
+                    "exec_verdict": "phase_unknown",
+                    "exception_id": null,
+                    "exception_kind": null,
+                    "exception_candidate_id": null,
+                    "binary_location": "other",
+                    "parent_attribution": "unavailable",
+                    "image_digest": null,
+                    "rule_refs": [
+                        "SP3-EXEC"
+                    ]
+                },
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:03:01.000000000Z",
+                    "source": "tetragon",
+                    "kind": "process_exec",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "binary": "/usr/local/bin/vllm",
+                    "process_attribution": "available",
+                    "pod": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "pod_attribution": "available",
+                    "path": null,
+                    "access": null,
+                    "rule_id": "TG-EXEC-01",
+                    "action": "observed",
+                    "action_raw": "observed",
+                    "action_mode": "monitor",
+                    "allowed_binary": true,
+                    "phase": [
+                        "unknown"
+                    ],
+                    "phase_basis": [],
+                    "phase_trusted": [],
+                    "phase_source_error": null,
+                    "exec_verdict": "phase_unknown",
+                    "exception_id": null,
+                    "exception_kind": null,
+                    "exception_candidate_id": null,
+                    "binary_location": "other",
+                    "parent_attribution": "unavailable",
+                    "image_digest": null,
+                    "rule_refs": [
+                        "SP3-EXEC"
+                    ]
+                },
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:02:04.000000000Z",
+                    "source": "hubble",
+                    "kind": "network_flow",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "verdict": "dropped",
+                    "src": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "dst": {
+                        "namespace": "kube-system",
+                        "pod": "coredns-xyz",
+                        "ip": "198.51.100.10",
+                        "port": 53,
+                        "protocol": "UDP"
+                    },
+                    "traffic_direction": "EGRESS",
+                    "reason": "POLICY_DENIED"
+                },
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:02:03.000000000Z",
+                    "source": "hubble",
+                    "kind": "network_flow",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "verdict": "allowed",
+                    "src": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-gateway-abc"
+                    },
+                    "dst": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def",
+                        "ip": "10.0.0.20",
+                        "port": 8000,
+                        "protocol": "TCP"
+                    },
+                    "traffic_direction": "INGRESS",
+                    "reason": ""
+                }
+            ],
+            "corrupt_lines": 0,
+            "corrupt_details": [],
+            "generated_at": "2026-10-25T11:26:54.295346+00:00"
+        },
+        "target": {
+            "registration": {
+                "state": "not_configured",
+                "path": null,
+                "sha256": null,
+                "loaded_at": "2026-10-25T11:26:52.977123+00:00",
+                "target_id": null,
+                "target_ref": null,
+                "engine": {
+                    "kind": null,
+                    "version": null,
+                    "image_digest": null
+                },
+                "model": {
+                    "id": null,
+                    "revision": null
+                },
+                "baseline_ref": null,
+                "kubernetes": null,
+                "error_code": null,
+                "error_message": null
+            },
+            "gateway_hold": null,
+            "comparison": [],
+            "counts": {
+                "match": 0,
+                "mismatch": 0,
+                "unknown": 0,
+                "not_declared": 0
+            },
+            "kubernetes": null,
+            "instance": {
+                "state": "not_configured",
+                "observed_at": null,
+                "current": null,
+                "events_this_session": 0
+            },
+            "history": [],
+            "history_store": {
+                "path": "/var/lib/serving-runtime/target_snapshots.jsonl",
+                "corrupt_lines": 0,
+                "last_error": null
+            },
+            "limits": [
+                "model.id 일치는 weight 해시·revision·실제 로딩을 증명하지 않음",
+                "Pod 조회는 kind-runtime-lab context의 읽기 전용 조회만 지원",
+                "관측값 불일치는 표시만 하고 요청을 자동 차단하지 않음"
+            ]
+        },
+        "lab-report": {
+            "state": "not_configured",
+            "configured_path": null,
+            "path": null,
+            "error": null,
+            "report": null,
+            "generated_at": "2026-10-25T11:26:54.295840+00:00"
+        },
+        "observations?source=hubble": {
+            "counts": {
+                "source": {
+                    "hubble": 2
+                },
+                "kind": {
+                    "network_flow": 2
+                },
+                "verdict": {
+                    "dropped": 1,
+                    "allowed": 1
+                },
+                "rule_id": {},
+                "data_origin": {
+                    "synthetic": 2
+                },
+                "environment": {
+                    "kind-runtime-lab": 2
+                },
+                "run_id": {},
+                "total": 2
+            },
+            "origins_by_kind": {
+                "network_flow": {
+                    "synthetic": 2
+                }
+            },
+            "verification": {
+                "real_hubble_dropped": 0
+            },
+            "hubble_observations": [
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:02:04.000000000Z",
+                    "source": "hubble",
+                    "kind": "network_flow",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "verdict": "dropped",
+                    "src": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "dst": {
+                        "namespace": "kube-system",
+                        "pod": "coredns-xyz",
+                        "ip": "198.51.100.10",
+                        "port": 53,
+                        "protocol": "UDP"
+                    },
+                    "traffic_direction": "EGRESS",
+                    "reason": "POLICY_DENIED"
+                },
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:02:03.000000000Z",
+                    "source": "hubble",
+                    "kind": "network_flow",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "verdict": "allowed",
+                    "src": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-gateway-abc"
+                    },
+                    "dst": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def",
+                        "ip": "10.0.0.20",
+                        "port": 8000,
+                        "protocol": "TCP"
+                    },
+                    "traffic_direction": "INGRESS",
+                    "reason": ""
+                }
+            ],
+            "observations": [
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:02:04.000000000Z",
+                    "source": "hubble",
+                    "kind": "network_flow",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "verdict": "dropped",
+                    "src": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "dst": {
+                        "namespace": "kube-system",
+                        "pod": "coredns-xyz",
+                        "ip": "198.51.100.10",
+                        "port": 53,
+                        "protocol": "UDP"
+                    },
+                    "traffic_direction": "EGRESS",
+                    "reason": "POLICY_DENIED"
+                },
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:02:03.000000000Z",
+                    "source": "hubble",
+                    "kind": "network_flow",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "verdict": "allowed",
+                    "src": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-gateway-abc"
+                    },
+                    "dst": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def",
+                        "ip": "10.0.0.20",
+                        "port": 8000,
+                        "protocol": "TCP"
+                    },
+                    "traffic_direction": "INGRESS",
+                    "reason": ""
+                }
+            ],
+            "corrupt_lines": 0,
+            "corrupt_details": [],
+            "generated_at": "2026-10-25T11:26:54.296078+00:00"
+        },
+        "observations?source=tetragon": {
+            "counts": {
+                "source": {
+                    "tetragon": 3
+                },
+                "kind": {
+                    "file_access": 1,
+                    "process_exec": 2
+                },
+                "verdict": {},
+                "rule_id": {
+                    "TG-ASSET-01": 1,
+                    "TG-EXEC-01": 2
+                },
+                "data_origin": {
+                    "synthetic": 3
+                },
+                "environment": {
+                    "kind-runtime-lab": 3
+                },
+                "run_id": {},
+                "total": 3
+            },
+            "origins_by_kind": {
+                "file_access": {
+                    "synthetic": 1
+                },
+                "process_exec": {
+                    "synthetic": 2
+                }
+            },
+            "verification": {
+                "real_hubble_dropped": 0
+            },
+            "hubble_observations": [],
+            "observations": [
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:03:03.000000000Z",
+                    "source": "tetragon",
+                    "kind": "file_access",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "binary": "/usr/local/bin/vllm",
+                    "process_attribution": "available",
+                    "pod": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "pod_attribution": "available",
+                    "path": "/opt/serving/assets/model/config.json",
+                    "access": "write",
+                    "policy_name": "runtime-tg-asset-01",
+                    "rule_id": "TG-ASSET-01",
+                    "action": "KPROBE_ACTION_POST",
+                    "action_raw": "KPROBE_ACTION_POST",
+                    "action_mode": "monitor"
+                },
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:03:02.000000000Z",
+                    "source": "tetragon",
+                    "kind": "process_exec",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "binary": "/bin/sh",
+                    "process_attribution": "available",
+                    "pod": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "pod_attribution": "available",
+                    "path": null,
+                    "access": null,
+                    "rule_id": "TG-EXEC-01",
+                    "action": "observed",
+                    "action_raw": "observed",
+                    "action_mode": "monitor",
+                    "allowed_binary": false,
+                    "phase": [
+                        "unknown"
+                    ],
+                    "phase_basis": [],
+                    "phase_trusted": [],
+                    "phase_source_error": null,
+                    "exec_verdict": "phase_unknown",
+                    "exception_id": null,
+                    "exception_kind": null,
+                    "exception_candidate_id": null,
+                    "binary_location": "other",
+                    "parent_attribution": "unavailable",
+                    "image_digest": null,
+                    "rule_refs": [
+                        "SP3-EXEC"
+                    ]
+                },
+                {
+                    "schema": "runtime-observation/1.0",
+                    "observed_at": "2026-10-24T01:03:01.000000000Z",
+                    "source": "tetragon",
+                    "kind": "process_exec",
+                    "data_origin": "synthetic",
+                    "environment": "kind-runtime-lab",
+                    "binary": "/usr/local/bin/vllm",
+                    "process_attribution": "available",
+                    "pod": {
+                        "namespace": "serving-lab",
+                        "pod": "serving-engine-def"
+                    },
+                    "pod_attribution": "available",
+                    "path": null,
+                    "access": null,
+                    "rule_id": "TG-EXEC-01",
+                    "action": "observed",
+                    "action_raw": "observed",
+                    "action_mode": "monitor",
+                    "allowed_binary": true,
+                    "phase": [
+                        "unknown"
+                    ],
+                    "phase_basis": [],
+                    "phase_trusted": [],
+                    "phase_source_error": null,
+                    "exec_verdict": "phase_unknown",
+                    "exception_id": null,
+                    "exception_kind": null,
+                    "exception_candidate_id": null,
+                    "binary_location": "other",
+                    "parent_attribution": "unavailable",
+                    "image_digest": null,
+                    "rule_refs": [
+                        "SP3-EXEC"
+                    ]
+                }
+            ],
+            "corrupt_lines": 0,
+            "corrupt_details": [],
+            "generated_at": "2026-10-25T11:26:54.296320+00:00"
+        }
+    },
+    "details": {
+        "a7f28044c89f4b65b54416173b98341b": {
+            "request_id": "a7f28044c89f4b65b54416173b98341b",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "started",
+                    "request_id": "a7f28044c89f4b65b54416173b98341b",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.030948+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": true,
+                    "http_start_status": null,
+                    "final_outcome": null,
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                },
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "response_started",
+                    "request_id": "a7f28044c89f4b65b54416173b98341b",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.031254+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "not_queried",
+                        "response": "streaming",
+                        "error_code": null
+                    },
+                    "stream": true,
+                    "http_start_status": 200,
+                    "final_outcome": null,
+                    "response_started": true,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                },
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "a7f28044c89f4b65b54416173b98341b",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.194818+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "stream": true,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": true,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "a7f28044c89f4b65b54416173b98341b",
+                "recorded_at": "2026-10-25T11:26:54.194818+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": 64,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "ALLOWED",
+                "reason_code": "REQUEST_ALLOWED",
+                "http_status": 200,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": true,
+                "http_start_status": 200,
+                "final_outcome": "completed",
+                "response_started": true,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": true,
+                    "backend_receipt": "confirmed",
+                    "response": "completed",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [
+                {
+                    "request_id": "a7f28044c89f4b65b54416173b98341b",
+                    "received_at": "2026-10-25T11:26:54.031173+00:00",
+                    "model": "test-model",
+                    "max_tokens": 64,
+                    "stream": true,
+                    "stream_end": "completed",
+                    "evidence_kind": "mock"
+                }
+            ],
+            "engine_live": {
+                "status": "confirmed",
+                "queried_at": "2026-10-25T11:26:54.296788+00:00",
+                "error": null,
+                "stream_end": "completed",
+                "evidence_kind": "mock"
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "received",
+            "evidence_summary": "엔진 수신 확인",
+            "generated_at": "2026-10-25T11:26:54.296868+00:00"
+        },
+        "57997836140745149f18ea0408466a46": {
+            "request_id": "57997836140745149f18ea0408466a46",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "57997836140745149f18ea0408466a46",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.030072+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "UNSUPPORTED_MEDIA_TYPE",
+                        "rule_id": null,
+                        "message": "Content-Type must be application/json",
+                        "http_status": 415,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": null,
+                        "max_tokens": null,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 415,
+                    "final_outcome": "UNSUPPORTED_MEDIA_TYPE",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "57997836140745149f18ea0408466a46",
+                "recorded_at": "2026-10-25T11:26:54.030072+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": null,
+                "max_tokens": null,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "UNSUPPORTED_MEDIA_TYPE",
+                "http_status": 415,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 415,
+                "final_outcome": "UNSUPPORTED_MEDIA_TYPE",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.297368+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.297434+00:00"
+        },
+        "c85853dbc1314c41bae99b3df4b99858": {
+            "request_id": "c85853dbc1314c41bae99b3df4b99858",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "c85853dbc1314c41bae99b3df4b99858",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.029089+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_evaluated",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "BODY_TOO_LARGE",
+                        "rule_id": null,
+                        "message": "request body exceeds the policy limit",
+                        "http_status": 413,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": null,
+                        "max_tokens": null,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 413,
+                    "final_outcome": "BODY_TOO_LARGE",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "c85853dbc1314c41bae99b3df4b99858",
+                "recorded_at": "2026-10-25T11:26:54.029089+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": null,
+                "max_tokens": null,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "BODY_TOO_LARGE",
+                "http_status": 413,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 413,
+                "final_outcome": "BODY_TOO_LARGE",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.297879+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.297946+00:00"
+        },
+        "1ec82fb5e0c245d8a09339aea760b586": {
+            "request_id": "1ec82fb5e0c245d8a09339aea760b586",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "1ec82fb5e0c245d8a09339aea760b586",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.028322+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "UNSUPPORTED_FIELD",
+                        "rule_id": null,
+                        "message": "unsupported field(s): unsupported",
+                        "http_status": 400,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": null,
+                        "max_tokens": null,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "UNSUPPORTED_FIELD",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "1ec82fb5e0c245d8a09339aea760b586",
+                "recorded_at": "2026-10-25T11:26:54.028322+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": null,
+                "max_tokens": null,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "UNSUPPORTED_FIELD",
+                "http_status": 400,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 400,
+                "final_outcome": "UNSUPPORTED_FIELD",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.298369+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.298423+00:00"
+        },
+        "645fee3f16624ec89cdfff5f1c7e62dd": {
+            "request_id": "645fee3f16624ec89cdfff5f1c7e62dd",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "645fee3f16624ec89cdfff5f1c7e62dd",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.027416+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "INVALID_STREAM",
+                        "rule_id": null,
+                        "message": "stream must be a boolean",
+                        "http_status": 400,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_STREAM",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "645fee3f16624ec89cdfff5f1c7e62dd",
+                "recorded_at": "2026-10-25T11:26:54.027416+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": 64,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "INVALID_STREAM",
+                "http_status": 400,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 400,
+                "final_outcome": "INVALID_STREAM",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.298841+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.298894+00:00"
+        },
+        "f04359427fb74e1bb670420c801d92a1": {
+            "request_id": "f04359427fb74e1bb670420c801d92a1",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "f04359427fb74e1bb670420c801d92a1",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.026499+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "INVALID_MAX_TOKENS",
+                        "rule_id": null,
+                        "message": "max_tokens must be a positive integer",
+                        "http_status": 400,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": null,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_MAX_TOKENS",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "f04359427fb74e1bb670420c801d92a1",
+                "recorded_at": "2026-10-25T11:26:54.026499+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": null,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "INVALID_MAX_TOKENS",
+                "http_status": 400,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 400,
+                "final_outcome": "INVALID_MAX_TOKENS",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.299328+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.299392+00:00"
+        },
+        "0e95a13ce7fd4896ab9b469cddd484a0": {
+            "request_id": "0e95a13ce7fd4896ab9b469cddd484a0",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "0e95a13ce7fd4896ab9b469cddd484a0",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.025478+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "INVALID_MAX_TOKENS",
+                        "rule_id": null,
+                        "message": "max_tokens must be a positive integer",
+                        "http_status": 400,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": null,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_MAX_TOKENS",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "0e95a13ce7fd4896ab9b469cddd484a0",
+                "recorded_at": "2026-10-25T11:26:54.025478+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": null,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "INVALID_MAX_TOKENS",
+                "http_status": 400,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 400,
+                "final_outcome": "INVALID_MAX_TOKENS",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.299879+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.299942+00:00"
+        },
+        "4ca349c7040541c7a9a3e0036f899ca0": {
+            "request_id": "4ca349c7040541c7a9a3e0036f899ca0",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "4ca349c7040541c7a9a3e0036f899ca0",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.024554+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "INVALID_MAX_TOKENS",
+                        "rule_id": null,
+                        "message": "max_tokens must be a positive integer",
+                        "http_status": 400,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": null,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_MAX_TOKENS",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "4ca349c7040541c7a9a3e0036f899ca0",
+                "recorded_at": "2026-10-25T11:26:54.024554+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": null,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "INVALID_MAX_TOKENS",
+                "http_status": 400,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 400,
+                "final_outcome": "INVALID_MAX_TOKENS",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.300388+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.300444+00:00"
+        },
+        "0ba93fc78c9942f490bbe070207c4456": {
+            "request_id": "0ba93fc78c9942f490bbe070207c4456",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "0ba93fc78c9942f490bbe070207c4456",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.023588+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "INVALID_MAX_TOKENS",
+                        "rule_id": null,
+                        "message": "max_tokens must be a positive integer",
+                        "http_status": 400,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": null,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 400,
+                    "final_outcome": "INVALID_MAX_TOKENS",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "0ba93fc78c9942f490bbe070207c4456",
+                "recorded_at": "2026-10-25T11:26:54.023588+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": null,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "INVALID_MAX_TOKENS",
+                "http_status": 400,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 400,
+                "final_outcome": "INVALID_MAX_TOKENS",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.300915+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.300973+00:00"
+        },
+        "74c356363e934e4a892ba1e37886b844": {
+            "request_id": "74c356363e934e4a892ba1e37886b844",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "started",
+                    "request_id": "74c356363e934e4a892ba1e37886b844",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.021954+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 128,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": null,
+                    "final_outcome": null,
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                },
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "74c356363e934e4a892ba1e37886b844",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.022572+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 128,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "74c356363e934e4a892ba1e37886b844",
+                "recorded_at": "2026-10-25T11:26:54.022572+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": 128,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "ALLOWED",
+                "reason_code": "REQUEST_ALLOWED",
+                "http_status": 200,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 200,
+                "final_outcome": "completed",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": true,
+                    "backend_receipt": "confirmed",
+                    "response": "completed",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [
+                {
+                    "request_id": "74c356363e934e4a892ba1e37886b844",
+                    "received_at": "2026-10-25T11:26:54.022185+00:00",
+                    "model": "test-model",
+                    "max_tokens": 128,
+                    "stream": false
+                }
+            ],
+            "engine_live": {
+                "status": "confirmed",
+                "queried_at": "2026-10-25T11:26:54.301467+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "received",
+            "evidence_summary": "엔진 수신 확인",
+            "generated_at": "2026-10-25T11:26:54.301527+00:00"
+        },
+        "cb7159df8f594ac5b73d8c8fa563e457": {
+            "request_id": "cb7159df8f594ac5b73d8c8fa563e457",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "cb7159df8f594ac5b73d8c8fa563e457",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.020962+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "DENIED",
+                        "reason_code": "MODEL_NOT_ALLOWED",
+                        "rule_id": "allowed_models",
+                        "message": "model is not allowed by policy",
+                        "http_status": 403,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "other-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 403,
+                    "final_outcome": "MODEL_NOT_ALLOWED",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "cb7159df8f594ac5b73d8c8fa563e457",
+                "recorded_at": "2026-10-25T11:26:54.020962+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "other-model",
+                "max_tokens": 64,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "DENIED",
+                "reason_code": "MODEL_NOT_ALLOWED",
+                "http_status": 403,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 403,
+                "final_outcome": "MODEL_NOT_ALLOWED",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.301997+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.302052+00:00"
+        },
+        "70a183303aba42dfb55b912ac0a16615": {
+            "request_id": "70a183303aba42dfb55b912ac0a16615",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "started",
+                    "request_id": "70a183303aba42dfb55b912ac0a16615",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.019246+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": null,
+                    "final_outcome": null,
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                },
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "70a183303aba42dfb55b912ac0a16615",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.019930+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "70a183303aba42dfb55b912ac0a16615",
+                "recorded_at": "2026-10-25T11:26:54.019930+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": 64,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "ALLOWED",
+                "reason_code": "REQUEST_ALLOWED",
+                "http_status": 200,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 200,
+                "final_outcome": "completed",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": true,
+                    "backend_receipt": "confirmed",
+                    "response": "completed",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [
+                {
+                    "request_id": "70a183303aba42dfb55b912ac0a16615",
+                    "received_at": "2026-10-25T11:26:54.019526+00:00",
+                    "model": "test-model",
+                    "max_tokens": 64,
+                    "stream": false
+                }
+            ],
+            "engine_live": {
+                "status": "confirmed",
+                "queried_at": "2026-10-25T11:26:54.302485+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "received",
+            "evidence_summary": "엔진 수신 확인",
+            "generated_at": "2026-10-25T11:26:54.302557+00:00"
+        },
+        "99f63a73ea5f441ab8b16023c6f4286e": {
+            "request_id": "99f63a73ea5f441ab8b16023c6f4286e",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "99f63a73ea5f441ab8b16023c6f4286e",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.018165+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "DENIED",
+                        "reason_code": "MAX_TOKENS_EXCEEDED",
+                        "rule_id": "output_max_tokens",
+                        "message": "max_tokens exceeds the policy limit",
+                        "http_status": 403,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 129,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 403,
+                    "final_outcome": "MAX_TOKENS_EXCEEDED",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "99f63a73ea5f441ab8b16023c6f4286e",
+                "recorded_at": "2026-10-25T11:26:54.018165+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": 129,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "DENIED",
+                "reason_code": "MAX_TOKENS_EXCEEDED",
+                "http_status": 403,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 403,
+                "final_outcome": "MAX_TOKENS_EXCEEDED",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.303061+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.303126+00:00"
+        },
+        "ad9beef64de54d5bac8dff702739cca6": {
+            "request_id": "ad9beef64de54d5bac8dff702739cca6",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "started",
+                    "request_id": "ad9beef64de54d5bac8dff702739cca6",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.016298+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 128,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": null,
+                    "final_outcome": null,
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                },
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "ad9beef64de54d5bac8dff702739cca6",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.017034+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 128,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "ad9beef64de54d5bac8dff702739cca6",
+                "recorded_at": "2026-10-25T11:26:54.017034+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": 128,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "ALLOWED",
+                "reason_code": "REQUEST_ALLOWED",
+                "http_status": 200,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 200,
+                "final_outcome": "completed",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": true,
+                    "backend_receipt": "confirmed",
+                    "response": "completed",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [
+                {
+                    "request_id": "ad9beef64de54d5bac8dff702739cca6",
+                    "received_at": "2026-10-25T11:26:54.016603+00:00",
+                    "model": "test-model",
+                    "max_tokens": 128,
+                    "stream": false
+                }
+            ],
+            "engine_live": {
+                "status": "confirmed",
+                "queried_at": "2026-10-25T11:26:54.303742+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "received",
+            "evidence_summary": "엔진 수신 확인",
+            "generated_at": "2026-10-25T11:26:54.303832+00:00"
+        },
+        "b44523879ff44ee694981a4af68e042e": {
+            "request_id": "b44523879ff44ee694981a4af68e042e",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "started",
+                    "request_id": "b44523879ff44ee694981a4af68e042e",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.008665+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": null,
+                    "final_outcome": null,
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                },
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "b44523879ff44ee694981a4af68e042e",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.014939+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "b44523879ff44ee694981a4af68e042e",
+                "recorded_at": "2026-10-25T11:26:54.014939+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": 64,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "ALLOWED",
+                "reason_code": "REQUEST_ALLOWED",
+                "http_status": 200,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 200,
+                "final_outcome": "completed",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": true,
+                    "backend_receipt": "confirmed",
+                    "response": "completed",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [
+                {
+                    "request_id": "b44523879ff44ee694981a4af68e042e",
+                    "received_at": "2026-10-25T11:26:54.009198+00:00",
+                    "model": "test-model",
+                    "max_tokens": 64,
+                    "stream": false
+                }
+            ],
+            "engine_live": {
+                "status": "confirmed",
+                "queried_at": "2026-10-25T11:26:54.304429+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "received",
+            "evidence_summary": "엔진 수신 확인",
+            "generated_at": "2026-10-25T11:26:54.304514+00:00"
+        }
+    },
+    "evidence": {
+        "a7f28044c89f4b65b54416173b98341b": {
+            "request_id": "a7f28044c89f4b65b54416173b98341b",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "started",
+                    "request_id": "a7f28044c89f4b65b54416173b98341b",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.030948+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": true,
+                    "http_start_status": null,
+                    "final_outcome": null,
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                },
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "response_started",
+                    "request_id": "a7f28044c89f4b65b54416173b98341b",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.031254+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "not_queried",
+                        "response": "streaming",
+                        "error_code": null
+                    },
+                    "stream": true,
+                    "http_start_status": 200,
+                    "final_outcome": null,
+                    "response_started": true,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                },
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "a7f28044c89f4b65b54416173b98341b",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.194818+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "ALLOWED",
+                        "reason_code": "REQUEST_ALLOWED",
+                        "rule_id": null,
+                        "message": "request is allowed",
+                        "http_status": 200,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": "test-model",
+                        "max_tokens": 64,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": true,
+                        "backend_receipt": "confirmed",
+                        "response": "completed",
+                        "error_code": null
+                    },
+                    "stream": true,
+                    "http_start_status": 200,
+                    "final_outcome": "completed",
+                    "response_started": true,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "a7f28044c89f4b65b54416173b98341b",
+                "recorded_at": "2026-10-25T11:26:54.194818+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": "test-model",
+                "max_tokens": 64,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "ALLOWED",
+                "reason_code": "REQUEST_ALLOWED",
+                "http_status": 200,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": true,
+                "http_start_status": 200,
+                "final_outcome": "completed",
+                "response_started": true,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": true,
+                    "backend_receipt": "confirmed",
+                    "response": "completed",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [
+                {
+                    "request_id": "a7f28044c89f4b65b54416173b98341b",
+                    "received_at": "2026-10-25T11:26:54.031173+00:00",
+                    "model": "test-model",
+                    "max_tokens": 64,
+                    "stream": true,
+                    "stream_end": "completed",
+                    "evidence_kind": "mock"
+                }
+            ],
+            "engine_live": {
+                "status": "confirmed",
+                "queried_at": "2026-10-25T11:26:54.305248+00:00",
+                "error": null,
+                "stream_end": "completed",
+                "evidence_kind": "mock"
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "received",
+            "evidence_summary": "엔진 수신 확인",
+            "generated_at": "2026-10-25T11:26:54.305323+00:00"
+        },
+        "57997836140745149f18ea0408466a46": {
+            "request_id": "57997836140745149f18ea0408466a46",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "57997836140745149f18ea0408466a46",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.030072+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_configured",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "UNSUPPORTED_MEDIA_TYPE",
+                        "rule_id": null,
+                        "message": "Content-Type must be application/json",
+                        "http_status": 415,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": null,
+                        "max_tokens": null,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 415,
+                    "final_outcome": "UNSUPPORTED_MEDIA_TYPE",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "57997836140745149f18ea0408466a46",
+                "recorded_at": "2026-10-25T11:26:54.030072+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": null,
+                "max_tokens": null,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "UNSUPPORTED_MEDIA_TYPE",
+                "http_status": 415,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 415,
+                "final_outcome": "UNSUPPORTED_MEDIA_TYPE",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.306022+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.306098+00:00"
+        },
+        "c85853dbc1314c41bae99b3df4b99858": {
+            "request_id": "c85853dbc1314c41bae99b3df4b99858",
+            "backend_kind": "mock",
+            "gateway_records": [
+                {
+                    "schema_version": "runtime-mvp-record/1.0",
+                    "phase": "final",
+                    "request_id": "c85853dbc1314c41bae99b3df4b99858",
+                    "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                    "environment": null,
+                    "run_id": null,
+                    "target_id": "mock-engine-001",
+                    "target": {
+                        "registration": "not_configured",
+                        "target_id": null,
+                        "instance_id": null,
+                        "instance_state": "not_configured"
+                    },
+                    "recorded_at": "2026-10-25T11:26:54.029089+00:00",
+                    "policy": {
+                        "schema_version": "runtime-mvp/1.0",
+                        "profile": "default",
+                        "policy_id": "local-policy-001",
+                        "policy_version": "1",
+                        "sha256": "fd2de7f0a73dbec98ae01611d7b16d1de3ba52bd396333d13037b0853385237b",
+                        "path": "examples/mvp/policy.json"
+                    },
+                    "auth": {
+                        "state": "not_evaluated",
+                        "method": null,
+                        "principal_id": null,
+                        "roles": []
+                    },
+                    "decision": {
+                        "result": "INVALID",
+                        "reason_code": "BODY_TOO_LARGE",
+                        "rule_id": null,
+                        "message": "request body exceeds the policy limit",
+                        "http_status": 413,
+                        "source": "gateway",
+                        "engine_http_status": null
+                    },
+                    "request": {
+                        "model": null,
+                        "max_tokens": null,
+                        "n": null,
+                        "extra_fields": [],
+                        "context": null
+                    },
+                    "delivery": {
+                        "attempted": false,
+                        "backend_receipt": "not_queried",
+                        "response": "none",
+                        "error_code": null
+                    },
+                    "stream": false,
+                    "http_start_status": 413,
+                    "final_outcome": "BODY_TOO_LARGE",
+                    "response_started": false,
+                    "backend_cancel": "not_applicable",
+                    "backend_kind": "mock",
+                    "data_origin": "actual_test"
+                }
+            ],
+            "final_state": {
+                "request_id": "c85853dbc1314c41bae99b3df4b99858",
+                "recorded_at": "2026-10-25T11:26:54.029089+00:00",
+                "observation_session_id": "986c114885ca4ff4a28643d8405dd916",
+                "environment": null,
+                "run_id": null,
+                "model": null,
+                "max_tokens": null,
+                "policy_profile": "default",
+                "extra_fields": [],
+                "result": "INVALID",
+                "reason_code": "BODY_TOO_LARGE",
+                "http_status": 413,
+                "source": "gateway",
+                "engine_http_status": null,
+                "stream": false,
+                "http_start_status": 413,
+                "final_outcome": "BODY_TOO_LARGE",
+                "response_started": false,
+                "backend_cancel": "not_applicable",
+                "backend_kind": "mock",
+                "delivery": {
+                    "attempted": false,
+                    "backend_receipt": "not_queried",
+                    "response": "none",
+                    "error_code": null
+                }
+            },
+            "engine_receipts": [],
+            "engine_live": {
+                "status": "not_found",
+                "queried_at": "2026-10-25T11:26:54.306707+00:00",
+                "error": null,
+                "stream_end": null,
+                "evidence_kind": null
+            },
+            "corrupt_lines": {
+                "gateway": 0,
+                "engine": 0
+            },
+            "same_observation_session": true,
+            "evidence_state": "not_received",
+            "evidence_summary": "Gateway 미전달, 엔진 미수신 확인",
+            "generated_at": "2026-10-25T11:26:54.306788+00:00"
+        }
+    }
+}

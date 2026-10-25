@@ -17,7 +17,6 @@ from guard.core.select import PolicyValueError, select
 from guard.judges import manual_cache_group as cache
 from guard.judges.declared import DeclaredJudge
 from guard.models.objects import CpuProfile
-from guard.report.html import render_html
 from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle
 from guard.store.packs import get_pack
@@ -273,8 +272,8 @@ def test_g19_actual_import_sides_exact_bytes_refs_rejudge_and_report(tmp_path, p
     evds = list(st.iter_kind("EVD"))
     assert all(e.artifacts[0].sha256 == hashlib.sha256(data).hexdigest() and e.artifacts[0].bytes == len(data) for e in evds)
     after = snapshot(st); judge_plan(st, pack, plan, T0); assert snapshot(st) == after
-    report = build_report(st, pack, plan, T0); html = render_html(report.to_dict())
-    assert not report.official and "CACHE_GROUP_DECLARED_ONLY" in html and "REQ17" in html
+    report = build_report(st, pack, plan, T0); text = json.dumps(report.to_dict(), ensure_ascii=False)
+    assert not report.official and "CACHE_GROUP_DECLARED_ONLY" in text and "REQ17" in text
     assert next(r for r in report.by_check if r.check_id == "REQ-15").evidence_source == "manual"
     for obj in original.values(): assert st.get(obj["id"], obj["revision"]).to_dict() == obj
     side = "candidate" if mode == "update" else "single"
@@ -306,8 +305,8 @@ def test_cli_saved_pack_bundle_restore_judge_report_and_original_preservation(tm
     assert saved.ref() == pack.ref()
     ok(["judge", "--plan", plan.id, "--store", str(restored.root), "--as-of", T0.isoformat()])
     ok(["report", "--plan", plan.id, "--store", str(restored.root), "--json", str(tmp_path / "report.json"),
-        "--html", str(tmp_path / "report.html"), "--as-of", T0.isoformat()])
+        "--as-of", T0.isoformat()])
     report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
-    assert not report["official"] and "CACHE_GROUP_DECLARED_ONLY" in (tmp_path / "report.html").read_text(encoding="utf-8")
+    assert not report["official"] and "CACHE_GROUP_DECLARED_ONLY" in (tmp_path / "report.json").read_text(encoding="utf-8")
     assert all(r.verdicts.security == r.verdicts.functional == "PASS" for r in restored.iter_kind("RES"))
     assert {p.relative_to(st.root): p.read_bytes() for p in st.root.rglob("*") if p.is_file()} == before

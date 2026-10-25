@@ -1,12 +1,28 @@
 {
-  "schema_version": "byul-runtime-status/0.1",
+  "schema_version": "byul-runtime-status/0.2",
   "generated_at": "2026-10-25T01:05:00Z",
   "observation_session_id": "6f1c2a9e0b7d4c3a8e5f1029384756ab",
+  "environment": "lab",
+  "run_id": "PLAN-01M598RQGT4DRY9XCVDYRZBRPW",
+  "overall": "ok",
   "target": {
     "target_ref": "mock-engine-001",
     "registration": "registered",
     "instance_id": null,
-    "instance_state": "not_configured"
+    "instance_state": "not_configured",
+    "target_id": "mock-engine-001",
+    "error_code": null,
+    "instance_observed_at": null,
+    "instance_pod": null,
+    "instance_restart_count": null,
+    "gateway_hold": null,
+    "comparison_counts": {
+      "match": 0,
+      "mismatch": 0,
+      "unknown": 0,
+      "not_declared": 0
+    },
+    "last_history": null
   },
   "policy": {
     "policy_ref": {
@@ -18,21 +34,186 @@
     "loaded": true,
     "gateway_active": true,
     "approval_state": "verified",
-    "valid_until": "2027-01-01T00:00:00+00:00"
+    "valid_until": "2027-01-01T00:00:00+00:00",
+    "schema": "runtime-mvp/1.1",
+    "profile": "default",
+    "test_only": false,
+    "max_n": 1,
+    "passthrough_fields": [],
+    "validate_count": 0,
+    "loaded_at": "2026-10-25T00:59:00Z",
+    "load_valid": true,
+    "error_code": null,
+    "error_message": null,
+    "external_enforcement": "not_connected",
+    "approval_checked_at": "2026-10-25T01:04:58Z",
+    "approval_reason_code": "POLICY_APPROVAL_VERIFIED",
+    "validity_items": [
+      {
+        "item": "period",
+        "state": "ok",
+        "result": "within"
+      },
+      {
+        "item": "revocation",
+        "state": "not_configured",
+        "result": "not_configured"
+      },
+      {
+        "item": "approval",
+        "state": "ok",
+        "result": "POLICY_APPROVAL_VERIFIED"
+      }
+    ],
+    "history": [
+      {
+        "at": "2026-10-25T00:59:00Z",
+        "event": "loaded",
+        "policy_id": "local-policy-001",
+        "policy_version": "3",
+        "sha256": "55dfcfb1c3cfea1e9b602895535e071d570863f648ee410a7761eafb22573be9",
+        "previous_version": null,
+        "same_version_content_changed": false
+      }
+    ],
+    "history_store": {
+      "state": "ok",
+      "last_error": null
+    }
+  },
+  "backend": {
+    "kind": "mock",
+    "mode": "mock_engine",
+    "url": "http://127.0.0.1:8088/healthz",
+    "healthy": true,
+    "reachable": true,
+    "inference_verified": false,
+    "checked_at": "2026-10-25T01:04:59Z",
+    "error": null,
+    "credential": "configured",
+    "metrics_credential": null,
+    "receipts_store": {
+      "state": "ok",
+      "last_error": null
+    }
+  },
+  "concurrency": {
+    "in_flight": 0,
+    "limit": 2
+  },
+  "connections": {
+    "active": 1,
+    "limit": 64,
+    "rejected": 0,
+    "request_header_timeout_s": 5.0,
+    "request_body_timeout_s": 10.0
+  },
+  "auth": {
+    "state": "not_configured",
+    "method": null,
+    "principal_count": 0,
+    "protected_routes": [],
+    "error_code": null
   },
   "collectors": [
     {
       "source": "hubble",
       "state": "ok",
-      "last_success_at": "2026-10-25T01:04:58Z"
+      "last_success_at": "2026-10-25T01:04:58Z",
+      "last_attempt_at": "2026-10-25T01:04:58Z",
+      "last_error": null,
+      "interval_s": 2.0,
+      "stale_after_s": 30.0,
+      "data_origin": "EXAMPLE",
+      "origin_detail": "synthetic",
+      "detail": {
+        "kind": "observation_feed",
+        "processed": 3,
+        "accepted": 3,
+        "duplicates": 0,
+        "rejected": 0,
+        "rejected_details": [],
+        "corrupt_lines_total": 0,
+        "out_of_window": 0,
+        "out_of_window_total": 0,
+        "idle": false,
+        "writer": {
+          "configured": true,
+          "state": "running",
+          "updated_at": "2026-10-25T01:04:58Z",
+          "reconnect_count": 0,
+          "last_gap": null
+        }
+      }
     },
     {
       "source": "tetragon",
       "state": "stale",
-      "last_success_at": "2026-10-25T00:50:00Z"
+      "last_success_at": "2026-10-25T00:50:00Z",
+      "last_attempt_at": "2026-10-25T01:04:58Z",
+      "last_error": "observation writer heartbeat is stale",
+      "interval_s": 2.0,
+      "stale_after_s": 30.0,
+      "data_origin": "EXAMPLE",
+      "origin_detail": "synthetic",
+      "detail": null
     }
   ],
   "store": {
-    "state": "ok"
+    "state": "ok",
+    "data_dir": "/var/lib/serving-runtime",
+    "last_error": null,
+    "last_error_at": null,
+    "corrupt_lines": {
+      "gateway": 0,
+      "engine": 0
+    },
+    "corrupt_details": []
+  },
+  "revalidation": {
+    "open_count": 1,
+    "current_condition_count": 1,
+    "corrupt_lines": 0,
+    "evaluation_errors": 0
+  },
+  "comparisons": {
+    "baseline": {
+      "state": "not_configured",
+      "rows": [],
+      "notes": [
+        "model.id 일치는 weight 해시·revision·메모리 로딩을 증명하지 않음"
+      ]
+    },
+    "target": {
+      "state": "ok",
+      "rows": [
+        {
+          "field": "engine.version",
+          "expected": "0.31.0",
+          "observed": "0.31.1",
+          "source": "engine_api",
+          "state": "mismatch",
+          "observed_at": "2026-10-25T01:04:59Z",
+          "note": null
+        }
+      ],
+      "notes": []
+    }
+  },
+  "observations": {
+    "by_source": {
+      "hubble": 1,
+      "tetragon": 1
+    },
+    "corrupt_lines": 0,
+    "real_hubble_dropped": 0,
+    "origins_by_kind": {
+      "network_flow": {
+        "synthetic": 1
+      },
+      "process_exec": {
+        "synthetic": 1
+      }
+    }
   }
 }

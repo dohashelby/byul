@@ -4,7 +4,6 @@ import json
 
 from guard.core.report import build_report
 from guard.models import Verdict
-from guard.report.html import render_html
 from tests.builders import T0
 from tests.report_setup import pipeline
 
@@ -58,8 +57,6 @@ def test_approved_exception_displayed_without_changing_verdict(tmp_path):
     rpt = build_report(store, pack, plan, as_of=T0)
     row = rpt.by_check[0]
     assert row.single.security == Verdict.FAIL and row.exception.status == "APPROVED"
-    html = render_html(rpt.to_dict())
-    assert "예외 승인됨" in html
 
 
 def test_report_uses_latest_result_revision_pinned(tmp_path):
@@ -75,22 +72,12 @@ def test_report_uses_latest_result_revision_pinned(tmp_path):
     assert store.resolve(row.single.result).verdicts.security == Verdict.FAIL
 
 
-def test_html_is_rendered_only_from_json(tmp_path):
-    store, pack, plan = pipeline(tmp_path, include=["REQ-01"])
-    data = json.loads(json.dumps(build_report(store, pack, plan, as_of=T0).to_dict()))
-    html = render_html(data)
-    assert html == render_html(data)  # 결정적
-    assert "REQ-01" in html and "충족" in html and "EXAMPLE" in html
-    assert "<script" not in html.lower()
-
-
 def test_functional_scope_is_displayed(tmp_path):
     store, pack, plan = pipeline(tmp_path, include=["REQ-01"])
     rpt = build_report(store, pack, plan, as_of=T0)
     (row,) = [r for r in rpt.by_check if r.check_id == "REQ-01"]
     assert row.functional_scope.probed == 1 and row.functional_scope.of == 3
     assert row.functional_scope.label == "기능 확인 범위: 1 / 등록 경로 3 (표본)"
-    assert "기능 확인 범위: 1 / 등록 경로 3 (표본)" in render_html(rpt.to_dict())
     # 기능 범위 정의가 없는 점검에는 표시하지 않는다
     store2, pack2, plan2 = pipeline(tmp_path / "b", include=["SUP-01"])
     (sup,) = [r for r in build_report(store2, pack2, plan2, as_of=T0).by_check if r.check_id == "SUP-01"]

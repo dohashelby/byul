@@ -40,6 +40,26 @@ def test_rpt_conversion_matches_contract_example(contracts):
     assert set(example["limitations"]) <= set(converted["limitations"])
 
 
+def test_contract_carries_every_report_field(contracts):
+    """0.2 계약은 update HTML 보고서가 보여주던 RPT 필드를 모두 담는다."""
+    rpt = load_json(FIXTURES / "update" / "synthetic-update-mode.rpt.json")
+    vr = rpt_to_verification_result(rpt)
+    assert contracts.errors("verification-result", vr) == []
+    assert vr["official"] is rpt["official"] and vr["policy_status"] == rpt["policy_status"]
+    assert vr["summary"]["by_purpose"] == {k: {"security": v["security"], "inventory_complete": v.get("inventory_complete")} for k, v in rpt["by_purpose"].items()}
+    assert vr["manual_required"] == rpt["manual_required"] and vr["not_selected"] == rpt["not_selected"]
+    assert [m["id"] for m in vr["inputs_manifest"]] == [m["id"] for m in rpt["inputs_manifest"]]
+    for row, check in zip(rpt["by_check"], vr["checks"], strict=True):
+        for key in ("area", "purpose", "question", "review_order", "impact", "comparison"):
+            assert check[key] == row.get(key), key
+        assert check["exception"] == row.get("exception")
+        assert check["replaced"] == row.get("replaced")
+        assert check["tested_while_undetermined"] == bool(row.get("tested_while_undetermined"))
+    # RPT에 없는 기능 축 판정은 null로 둔다(UNKNOWN으로 채우지 않는다)
+    rpt["by_check"][0]["candidate"]["functional"] = None
+    assert rpt_to_verification_result(rpt)["checks"][0]["sides"]["candidate"]["functional"] is None
+
+
 def test_rpt_verdicts_are_not_recomputed():
     rpt = load_json(RPT)
     rpt["by_area"]["REQ"]["security"] = "PASS"  # 원본 값을 바꾸면 그대로 따라가야 한다.
@@ -187,3 +207,54 @@ def test_json_diff():
     ]
     assert json_diff({"x": 1}, {"x": True}) == [{"path": "/x", "change": "changed", "before": 1, "after": True}]
     assert json_diff({"a/b": 1}, {}) == [{"path": "/a~1b", "change": "removed", "before": 1, "after": None}]
+
+
+# --- 보고서 화면 (삭제된 update HTML 보고서의 내용) ------------------------------
+
+
+def contracts_errors(doc):
+    from byul_platform.config import DEFAULT_CONTRACTS_DIR
+    from byul_platform.contracts import Contracts
+
+    return Contracts(DEFAULT_CONTRACTS_DIR).errors("verification-result", doc)
+
+
+def test_report_view_matches_update_html_report_rules():
+    """기대값은 update의 render_html(삭제 전)과 대조해 만든 것이다(합성 update 모드 77개 점검)."""
+    from byul_platform.sources.update import report_view
+
+    rpt = load_json(FIXTURES / "update" / "synthetic-update-mode.rpt.json")
+    expected = load_json(FIXTURES / "update" / "synthetic-update-mode.expected.json")
+    vr = rpt_to_verification_result(rpt)
+    assert contracts_errors(vr) == []
+    view = report_view(vr)  # 화면 자료는 계약만 읽어 만든다
+    for key in ("overall", "counts", "focus", "unofficial_reasons", "incomplete_areas"):
+        assert view[key] == expected[key], key
+    assert {c["check_id"]: [m["kind"] for m in c["marks"]] for c in view["checks"] if c["selected"]} == expected["marks"]
+    # 판정 값은 RPT 그대로다
+    row = next(r for r in rpt["by_check"] if r["check_id"] == "SUP-01")
+    check = next(c for c in view["checks"] if c["check_id"] == "SUP-01")
+    assert check["candidate"]["security"] == row["candidate"]["security"]
+    assert check["question"] == row["question"] and check["purpose"] == row["purpose"]
+
+
+def test_report_view_served_with_detail(tmp_path):
+    reports = tmp_path / "reports"
+    reports.mkdir()
+    shutil.copy(FIXTURES / "update" / "synthetic-update-mode.rpt.json", reports / "RPT-update.json")
+    app = create_app(Settings(update_reports_dir=reports, web_dist=tmp_path / "x"))
+    with TestClient(app) as c:
+        item = c.get("/api/update/results").json()["items"][0]
+        detail = c.get(f"/api/update/results/{item['report_ref']['id']}").json()
+        report = detail["report"]
+        assert report["mode"] == "update"
+        assert report["counts"]["regressed"] == 16 and report["counts"]["pass"] == 31
+        assert len(report["by_purpose"]) > 0
+        assert any(m["kind"] == "exception" and m["status"] == "APPROVED" for ch in report["checks"] for m in ch["marks"])
+    # 계약 예시만 있는 예시 모드에서도 보고서 화면 자료가 나온다(0.2 계약에 필드가 다 있음)
+    app = create_app(Settings(web_dist=tmp_path / "x"))
+    with TestClient(app) as c:
+        rid = c.get("/api/update/results").json()["items"][0]["report_ref"]["id"]
+        report = c.get(f"/api/update/results/{rid}").json()["report"]
+        assert report["overall"] == "UNKNOWN" and report["counts"]["manual_required"] == 76
+        assert report["checks"][0]["question"]

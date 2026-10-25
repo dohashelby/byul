@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.byul.invalid/0.1/runtime-request-detail.schema.json",
+  "title": "요청 상세 (runtime → platform)",
+  "description": "runtime /api/requests/{id}를 화면용으로 옮긴 것. 판정·적용 정책·전달·Gateway 기록 흐름·엔진 수신 증거를 담는다. 프롬프트·응답 본문·자격정보·추가 필드 값은 원래 저장하지 않으므로 없다. 원본은 native에 그대로 둔다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "event_id", "outcome", "environment", "run_id", "backend_kind", "decision", "request", "auth", "policy", "delivery", "stream", "http_start_status", "final_outcome", "backend_cancel", "timeline", "evidence_state", "evidence_summary", "engine_receipts", "engine_live", "same_observation_session", "corrupt_lines", "data_origin", "origin_detail", "native"],
+  "properties": {
+    "schema_version": { "const": "byul-runtime-request-detail/0.1" },
+    "request_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "event_id": { "type": "string", "pattern": "^req:[0-9a-f]{32}$" },
+    "outcome": { "description": "runtime-event와 같은 변환 규칙의 결과.", "enum": ["allowed", "denied", "invalid", "engine_rejected", "error", "unknown"] },
+    "environment": { "type": ["string", "null"] },
+    "run_id": { "type": ["string", "null"] },
+    "backend_kind": { "type": ["string", "null"] },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "reason_code", "message", "rule_id", "http_status", "engine_http_status"],
+      "properties": {
+        "result": { "type": ["string", "null"] },
+        "reason_code": { "type": ["string", "null"] },
+        "message": { "type": ["string", "null"] },
+        "rule_id": { "type": ["string", "null"] },
+        "http_status": { "type": ["integer", "null"] },
+        "engine_http_status": { "type": ["integer", "null"] }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "max_tokens", "n", "extra_fields", "context"],
+      "properties": {
+        "model": { "type": ["string", "null"] },
+        "max_tokens": { "type": ["integer", "null"] },
+        "n": { "type": ["integer", "null"] },
+        "extra_fields": {
+          "description": "추가 필드 이름과 처리 방식(값은 저장하지 않음).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "mode"],
+            "properties": { "name": { "type": "string" }, "mode": { "type": ["string", "null"] } }
+          }
+        },
+        "context": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["result", "input_tokens", "limit"],
+              "properties": {
+                "result": { "type": ["string", "null"] },
+                "input_tokens": { "type": ["integer", "null"] },
+                "limit": { "type": ["integer", "null"] }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "principal_id", "roles"],
+      "properties": {
+        "state": { "type": ["string", "null"] },
+        "principal_id": { "type": ["string", "null"] },
+        "roles": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "policy_version", "profile", "sha256"],
+      "properties": {
+        "policy_id": { "type": ["string", "null"] },
+        "policy_version": { "type": ["string", "null"] },
+        "profile": { "type": ["string", "null"] },
+        "sha256": { "type": ["string", "null"] }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempted", "backend_receipt", "response", "error_code"],
+      "properties": {
+        "attempted": { "type": ["boolean", "null"] },
+        "backend_receipt": { "type": ["string", "null"] },
+        "response": { "type": ["string", "null"] },
+        "error_code": { "type": ["string", "null"] }
+      }
+    },
+    "stream": { "type": ["boolean", "null"] },
+    "http_start_status": { "type": ["integer", "null"] },
+    "final_outcome": { "type": ["string", "null"] },
+    "backend_cancel": { "type": ["string", "null"] },
+    "timeline": {
+      "description": "Gateway 기록 순서(started → response_started → final).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phase", "recorded_at"],
+        "properties": {
+          "phase": { "type": ["string", "null"] },
+          "recorded_at": { "$ref": "common.schema.json#/$defs/nullable_timestamp" }
+        }
+      }
+    },
+    "evidence_state": {
+      "description": "received=엔진 수신 확인, not_received=미수신 확인, unknown=확인 불가, gateway_only=외부 backend라 backend 증거원 미연결.",
+      "enum": ["received", "not_received", "unknown", "gateway_only", null]
+    },
+    "evidence_summary": { "type": ["string", "null"] },
+    "engine_receipts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "first_received_at"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "first_received_at": { "type": ["string", "null"] }
+      }
+    },
+    "engine_live": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "queried_at"],
+      "properties": {
+        "status": { "type": ["string", "null"] },
+        "queried_at": { "$ref": "common.schema.json#/$defs/nullable_timestamp" }
+      }
+    },
+    "same_observation_session": { "type": ["boolean", "null"] },
+    "corrupt_lines": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gateway", "engine"],
+      "properties": { "gateway": { "type": ["integer", "null"] }, "engine": { "type": ["integer", "null"] } }
+    },
+    "data_origin": { "$ref": "common.schema.json#/$defs/data_origin" },
+    "origin_detail": { "$ref": "common.schema.json#/$defs/origin_detail" },
+    "native": {
+      "description": "runtime 원본(gateway_records, engine_receipts). 본문·자격정보는 원래 없다.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gateway_records", "engine_receipts"],
+      "properties": {
+        "gateway_records": { "type": "array", "items": { "type": "object" } },
+        "engine_receipts": { "type": "array", "items": { "type": "object" } }
+      }
+    }
+  }
+}

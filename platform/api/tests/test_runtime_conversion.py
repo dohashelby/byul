@@ -142,16 +142,47 @@ def test_request_row_keeps_null_not_zero():
 
 
 def test_captured_runtime_details_convert_to_valid_events(contracts):
-    details = load_json(FIXTURES / "runtime" / "details.json")
+    from byul_platform.sources.runtime import request_detail_doc
+
+    capture = load_json(FIXTURES / "runtime" / "capture.json")
     seen = set()
-    for key, detail in details.items():
-        if key.endswith("/evidence"):
-            continue
+    for detail in capture["details"].values():
         event = gateway_event(pick_gateway_record(detail["gateway_records"]))
         assert contracts.errors("runtime-event", event) == []
         assert event["data_origin"] == "EXAMPLE"  # actual_test(모의 엔진)는 EXAMPLE로 낮춘다
         seen.add(event["outcome"])
+        doc = request_detail_doc(detail)
+        assert contracts.errors("runtime-request-detail", doc) == []
+        assert doc["outcome"] == event["outcome"]
     assert seen == {"allowed", "denied", "invalid"}
+
+
+def test_captured_real_observation_shapes(contracts):
+    """runtime enforce ingest가 만든 실제 정규화 기록(합성 입력)을 계약으로 바꾼다."""
+    capture = load_json(FIXTURES / "runtime" / "capture.json")
+    records = capture["endpoints"]["observations"]["observations"]
+    for record in records:
+        event = observation_event(record)
+        assert contracts.errors("runtime-event", event) == [], record
+        obs = event["observation"]
+        if record["source"] == "hubble":
+            assert event["outcome"] == "observed" and obs["dst_port"] == record["dst"]["port"]
+            assert obs["verdict"] == record["verdict"]
+        else:
+            assert obs["binary"] == record.get("binary")
+            assert obs["phases"] == (record["phase"] if isinstance(record.get("phase"), list) else [])
+    assert any(r["source"] == "tetragon" and r["kind"] == "file_access" for r in records)
+
+
+def test_tetragon_phase_list_and_action_fallback():
+    record = {"source": "tetragon", "kind": "process_exec", "observed_at": "2026-10-25T01:00:00Z", "data_origin": "real",
+              "phase": ["loading", "compiling"], "exec_verdict": "suspect_binary", "action_raw": "KPROBE_ACTION_OVERRIDE"}
+    event = observation_event(record)
+    assert event["phase"] is None and event["observation"]["phases"] == ["loading", "compiling"]
+    assert event["outcome"] == "enforce_attempted" and event["observation"]["action_mode"] == "enforce"
+    record.update(phase=["inferring"], action_raw="KPROBE_ACTION_POST")
+    event = observation_event(record)
+    assert event["phase"] == "inferring" and event["outcome"] == "detected"
 
 
 def test_revalidation_conversion(contracts):
@@ -162,8 +193,10 @@ def test_revalidation_conversion(contracts):
         "data_origin": "mock", "last_event": "opened", "superseded_by": None,
         "evidence": {"field": "engine.version", "expected": "0.31.0", "observed": "0.31.1", "source": "engine_api"},
     }
+    item.update(current_evidence_present=True)
     doc = revalidation_request(item)
     assert contracts.errors("revalidation-request", doc) == []
+    assert doc["opened_at"] == "2026-10-25T01:00:00+00:00" and doc["current_evidence_present"] is True
     assert doc["changed_fields"] == [{"field": "engine.version", "expected": "0.31.0", "observed": "0.31.1"}]
     assert doc["created_at"] == "2026-10-25T02:00:00+00:00"
 

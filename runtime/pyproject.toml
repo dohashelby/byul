@@ -18,5 +18,3 @@ where = ["src"]
 include = ["serving_runtime*"]
 namespaces = false
 
-[tool.setuptools.package-data]
-serving_runtime = ["mvp/static/*", "mvp/static/vendor/*"]

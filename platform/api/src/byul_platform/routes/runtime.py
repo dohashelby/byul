@@ -6,11 +6,13 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from fastapi.responses import Response
+
 from ..models import (
+    LabReportResponse,
     RequestDetail,
     RequestList,
     RequestSummary,
-    RuntimeComparisons,
     RuntimeEventList,
     RuntimeStatusResponse,
 )
@@ -52,17 +54,38 @@ def request_detail(request_id: str, state: AppState = Depends(get_state)) -> dic
         event_invalid = invalid_one(state.contracts, "runtime-event", event)
         if event_invalid:
             event = None
-    evidence = evidence_for_refs(state, {f"req:{request_id}"})
+    detail, detail_invalid = result.detail, None
+    if detail is not None:
+        detail_invalid = invalid_one(state.contracts, "runtime-request-detail", detail)
+        if detail_invalid:
+            detail = None
     return {
         "row": request_row(event) if event else None,
         "event": event,
         "event_invalid": event_invalid,
-        "evidence_state": result.evidence_state,
-        "evidence_summary": result.evidence_summary,
-        "native_detail": result.native_detail,
-        "evidence": evidence,
+        "detail": detail,
+        "detail_invalid": detail_invalid,
+        "evidence": evidence_for_refs(state, {f"req:{request_id}"}),
         "source": state.source("runtime"),
     }
+
+
+@router.get(
+    "/requests/{request_id}/evidence",
+    response_class=Response,
+    responses={200: {"content": {"application/json": {}}, "description": "runtime 증거 JSON 파일(그대로 전달)"}},
+)
+def request_evidence(request_id: str, state: AppState = Depends(get_state)) -> Response:
+    """runtime의 요청 증거 JSON을 내려받는다. 내용은 runtime이 만든 그대로다(본문·자격정보 없음)."""
+    try:
+        body = state.runtime.request_evidence(request_id)
+    except RuntimeNotFound:
+        raise HTTPException(404, detail={"code": "NOT_FOUND", "message": "증거가 없습니다"}) from None
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="evidence-{request_id}.json"'},
+    )
 
 
 @router.get("/summary", response_model=RequestSummary)
@@ -84,6 +107,8 @@ def status(state: AppState = Depends(get_state)) -> dict[str, Any]:
     return {"item": None if bad else doc, "invalid": bad, "source": state.source("runtime")}
 
 
-@router.get("/comparisons", response_model=RuntimeComparisons)
-def runtime_comparisons(state: AppState = Depends(get_state)) -> dict[str, Any]:
-    return {**state.runtime.comparisons(), "source": state.source("runtime")}
+@router.get("/lab-report", response_model=LabReportResponse)
+def lab_report(state: AppState = Depends(get_state)) -> dict[str, Any]:
+    doc = state.runtime.lab_report()
+    bad = invalid_one(state.contracts, "runtime-lab-report", doc)
+    return {"item": None if bad else doc, "invalid": bad, "source": state.source("runtime")}

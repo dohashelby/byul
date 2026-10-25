@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useSearchParams } from "react-router-dom";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
-import { useDocList, useMeta, useRevalidation } from "../api/hooks";
+import { useDocList, useMeta, useRevalidation, useRuntimeStatus } from "../api/hooks";
+import { useRuntimeProblems, type RuntimeProblems } from "../pages/runtime/problems";
 import { Banner, Dot } from "../components/Misc";
 import { SOURCE_MODE, label } from "../lib/labels";
 import { PERIODS, fromLocalInput, toLocalInput, type PeriodKey } from "../lib/time";
@@ -67,9 +68,16 @@ function Sidebar() {
   const reval = useRevalidation();
   const keep = carry(params);
   const openReval = reval.data?.items.filter((r) => r.status === "open").length ?? 0;
+  const problems = useRuntimeProblems();
   const conn = meta.data?.runtime_connection ?? (meta.isError ? "disconnected" : null);
   const connText: Record<string, string> = { connected: "연결됨", disconnected: "연결 끊김", unauthorized: "인증 거부", example: "예시 데이터" };
-  const badges: Record<string, number> = { "/update/revalidation": openReval };
+  const badgeOf = (key: string | undefined): number => {
+    if (!key) return 0;
+    if (key === "revalidation") return openReval;
+    return problems ? (problems[key as keyof RuntimeProblems] as number) || 0 : 0;
+  };
+  // 오류 성격(처리 오류·Gateway 비활성·실패 등)은 빨강, 나머지 경고는 강조색(runtime 대시보드와 같음)
+  const errorBadges = new Set(["requests", "policy", "cilium", "lab"]);
 
   return (
     <aside className={l.sidebar}>
@@ -84,7 +92,9 @@ function Sidebar() {
             {g.items.map((i) => (
               <NavLink key={i.path} to={`${i.path}${keep}`} className={({ isActive }) => `${l.link} ${isActive ? l.active : ""}`}>
                 <span className={l.navLabel}>{i.label}</span>
-                {badges[i.path] ? <span className={l.navBadge}>{badges[i.path]}</span> : null}
+                {badgeOf(i.badge) ? (
+                  <span className={`${l.navBadge} ${errorBadges.has(i.badge ?? "") ? l.navBadgeError : ""}`}>{badgeOf(i.badge)}</span>
+                ) : null}
               </NavLink>
             ))}
           </div>
@@ -206,8 +216,22 @@ function Pagebar() {
   );
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+/** runtime 대시보드처럼 연결이 끊기면 마지막 성공 시각과 함께 띠를 띄우고 화면을 흐리게 한다. */
+function useRuntimeStale(): string | null {
+  const q = useRuntimeStatus();
+  if (!q.isError) return null;
+  const last = q.dataUpdatedAt ? new Date(q.dataUpdatedAt) : null;
+  const since = last ? `마지막 성공 ${pad2(last.getHours())}시 ${pad2(last.getMinutes())}분 ${pad2(last.getSeconds())}초 기준 데이터` : "아직 받은 데이터 없음";
+  return `runtime 연결 끊김 — ${since}`;
+}
+
 export function Layout() {
   const meta = useMeta();
+  const stale = useRuntimeStale();
   return (
     <div className={l.shell}>
       <Sidebar />
@@ -219,7 +243,8 @@ export function Layout() {
             없습니다.
           </Banner>
         )}
-        <main>
+        {stale && <Banner kind="unofficial">{stale}</Banner>}
+        <main style={stale ? { opacity: 0.5, transition: "opacity 0.2s" } : undefined}>
           <Outlet />
         </main>
       </div>

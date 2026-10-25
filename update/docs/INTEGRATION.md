@@ -41,7 +41,7 @@ uv run guard run --plan PLAN-ID --store /test/store
 uv run guard run --plan PLAN-ID --replace-manual --store /test/store
 # 명시한 경우에만 새 실행 revision을 추가한다. 이전 수동 revision은 남는다.
 uv run guard judge --plan PLAN-ID --store /test/store
-uv run guard report --plan PLAN-ID --store /test/store --json /test/report.json --html /test/report.html
+uv run guard report --plan PLAN-ID --store /test/store --json /test/report.json   # 화면: byul platform (UPDATE_REPORTS_DIR)
 uv run guard evidence export --store /test/store --output /test/evidence.zip
 uv run guard evidence restore --bundle /test/evidence.zip --destination /test/restored
 uv run guard verify --store /test/restored

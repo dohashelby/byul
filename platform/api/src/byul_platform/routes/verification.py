@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..models import RevalidationList, VerificationDetail, VerificationList
+from ..sources.update import report_view
 from ..state import AppState, get_state, partition
 
 router = APIRouter(prefix="/api/update", tags=["update"])
@@ -46,6 +47,7 @@ def result(report_id: str, state: AppState = Depends(get_state)) -> dict[str, An
         "item": item,
         "raw_checks": entry.raw_checks if entry else None,
         "raw_path": entry.path if entry else None,
+        "report": report_view(item),
         "source": state.source("update"),
     }
 

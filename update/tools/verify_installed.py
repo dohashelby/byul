@@ -111,7 +111,7 @@ def installed_worker(root: Path, wheel: Path) -> dict:
         cli(["judge", "--plan", plan_id, "--pack", str(absent), "--as-of", frozen, *common])
         report = root / "report.json"
         cli(["report", "--plan", plan_id, "--pack", str(absent), "--as-of", frozen,
-             "--json", str(report), "--html", str(report.with_suffix(".html")), *common])
+             "--json", str(report), *common])
         data = json.loads(report.read_text(encoding="utf-8"))
         row = next(row for row in data["by_check"] if row["check_id"] == "REQ-01")
         assert row["single"]["security"] == "PASS" and not data["official"] and data["approval"] is None
@@ -129,7 +129,7 @@ def installed_worker(root: Path, wheel: Path) -> dict:
         cli(["judge", "--plan", plan_id, "--pack", str(absent), "--as-of", frozen, *replay])
         replay_report = root / "replay-report.json"
         cli(["report", "--plan", plan_id, "--pack", str(absent), "--as-of", frozen,
-             "--json", str(replay_report), "--html", str(replay_report.with_suffix(".html")), *replay])
+             "--json", str(replay_report), *replay])
         new = json.loads(replay_report.read_text(encoding="utf-8"))
         assert new["by_check"] == data["by_check"] and not new["official"]
         assert inventory_tree(store) == original
@@ -268,7 +268,6 @@ def verify_analysis_modules(root: Path, store: Path, report: Path) -> dict:
     destination = source / "updates" / "UPDATE-EXAMPLE"
     destination.mkdir(parents=True)
     shutil.copyfile(report, destination / "report.json")
-    shutil.copyfile(report.with_suffix(".html"), destination / "report.html")
     before = inventory_tree(source)
     result = update_validation.analyze_run(source, root / "update-analysis")
     assert not result["accepted"] and result["source_unchanged"] and inventory_tree(source) == before

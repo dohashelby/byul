@@ -54,7 +54,7 @@
 - `guard update … --change CHG-… --previous-plan PLAN-…`로 패치 릴리스 선정을 하고, 선정된 점검만 기준·후보로 실행한다. `--previous-plan`이 없으면 기존 동작(전체)과 같아야 한다.
 - `guard select --env … --policy … --previous-plan PLAN-… [--change CHG-…]`로 증분 감사 PLAN을 만들고 기존 `guard run/judge/report --plan`으로 끝까지 돌게 한다.
 - 패치 릴리스 보고서: 변경 유형, 항상 시험·diff 트리거별 선정 사유, 이월 표, "이번 실행 N건 / 이월 M건", 바뀐 영역, 미분류 파일과 "규칙표에 추가할 후보".
-- 보고서(JSON 원본 → HTML): 증분 감사는 변경 유형, 트리거별 선정 사유, 이월 표, "이번 실행 N건 / 이월 M건", 같은 점검의 이전 결과(참고). 이월 PASS는 집계에 포함하되 `carried` 표시(U1-Q5 잠정).
+- 보고서(JSON 원본 → byul platform 화면): 증분 감사는 변경 유형, 트리거별 선정 사유, 이월 표, "이번 실행 N건 / 이월 M건", 같은 점검의 이전 결과(참고). 이월 PASS는 집계에 포함하되 `carried` 표시(U1-Q5 잠정).
 - SPEC 본문은 이미 U1 개정이 반영돼 있다. 구현하면서 SPEC과 다르게 해야 할 곳이 생기면 고치지 말고 멈추고 물어라. `docs/UPDATE_SELECTION.md`에 구현 결과(명령 예, 파일 위치)를 짧게 추가한다.
 
 ## 6. 검증

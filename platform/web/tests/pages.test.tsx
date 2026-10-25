@@ -31,6 +31,7 @@ const row = (over: Partial<RequestRow>): RequestRow => ({
   environment: null,
   run_id: null,
   target_ref: null,
+  observation_session_id: null,
   data_origin: "EXAMPLE",
   origin_detail: "actual_test",
   ...over,
@@ -111,8 +112,9 @@ describe("요청 내역", () => {
     const cellOf = (name: string) => cells[headers.indexOf(name)].textContent;
     expect(cellOf("max_tokens")).toBe("–");
     expect(cellOf("모델")).toBe("–");
-    expect(cellOf("엔진HTTP")).toBe("–");
-    expect(cellOf("클라이언트HTTP")).toBe("415");
+    expect(cellOf("사유")).toBe("UNSUPPORTED_MEDIA_TYPE");
+    expect(cellOf("결과")).toBe("입력 오류");
+    expect(cellOf("환경·실행")).toBe("환경 미기록실행 미기록");
     // 지연시간·토큰 수·비용 열은 없다
     expect(headers.join(" ")).not.toMatch(/지연|토큰 수|비용|latency|cost/);
   });

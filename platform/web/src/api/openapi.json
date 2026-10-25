@@ -131,6 +131,45 @@
         }
       }
     },
+    "/api/runtime/requests/{request_id}/evidence": {
+      "get": {
+        "tags": [
+          "runtime"
+        ],
+        "summary": "Request Evidence",
+        "description": "runtime의 요청 증거 JSON을 내려받는다. 내용은 runtime이 만든 그대로다(본문·자격정보 없음).",
+        "operationId": "request_evidence_api_runtime_requests__request_id__evidence_get",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "runtime 증거 JSON 파일(그대로 전달)",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runtime/summary": {
       "get": {
         "tags": [
@@ -173,20 +212,20 @@
         }
       }
     },
-    "/api/runtime/comparisons": {
+    "/api/runtime/lab-report": {
       "get": {
         "tags": [
           "runtime"
         ],
-        "summary": "Runtime Comparisons",
-        "operationId": "runtime_comparisons_api_runtime_comparisons_get",
+        "summary": "Lab Report",
+        "operationId": "lab_report_api_runtime_lab_report_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RuntimeComparisons"
+                  "$ref": "#/components/schemas/LabReportResponse"
                 }
               }
             }
@@ -742,23 +781,13 @@
   },
   "components": {
     "schemas": {
-      "ComparisonRow": {
+      "AxisRow": {
         "properties": {
-          "field": {
+          "name": {
             "type": "string",
-            "title": "Field"
+            "title": "Name"
           },
-          "expected": {
-            "title": "Expected"
-          },
-          "observed": {
-            "title": "Observed"
-          },
-          "state": {
-            "type": "string",
-            "title": "State"
-          },
-          "source": {
+          "security": {
             "anyOf": [
               {
                 "type": "string"
@@ -767,53 +796,27 @@
                 "type": "null"
               }
             ],
-            "title": "Source"
-          }
-        },
-        "type": "object",
-        "required": [
-          "field",
-          "expected",
-          "observed",
-          "state"
-        ],
-        "title": "ComparisonRow",
-        "description": "구성 비교(/api/baseline)·대상 비교(/api/target)의 필드 한 줄."
-      },
-      "ComparisonTable": {
-        "properties": {
-          "state": {
+            "title": "Security"
+          },
+          "inventory_complete": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "boolean"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "State"
-          },
-          "rows": {
-            "items": {
-              "$ref": "#/components/schemas/ComparisonRow"
-            },
-            "type": "array",
-            "title": "Rows"
-          },
-          "notes": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Notes"
+            "title": "Inventory Complete"
           }
         },
         "type": "object",
         "required": [
-          "state",
-          "rows"
+          "name",
+          "security",
+          "inventory_complete"
         ],
-        "title": "ComparisonTable"
+        "title": "AxisRow"
       },
       "DiffEntry": {
         "properties": {
@@ -1017,6 +1020,96 @@
         "title": "InvalidItem",
         "description": "계약 검증에 실패한 항목. 버리지 않고 '형식 오류' 행으로 보여준다."
       },
+      "LabReportResponse": {
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeLabReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item"
+          },
+          "invalid": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InvalidItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceInfo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "source"
+        ],
+        "title": "LabReportResponse"
+      },
+      "ManifestRef": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "revision",
+          "sha256"
+        ],
+        "title": "ManifestRef"
+      },
       "Meta": {
         "properties": {
           "contracts_version": {
@@ -1053,6 +1146,38 @@
           "runtime_connection"
         ],
         "title": "Meta"
+      },
+      "NotSelectedRow": {
+        "properties": {
+          "check_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Check Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "check_id",
+          "reason"
+        ],
+        "title": "NotSelectedRow"
       },
       "Overview": {
         "properties": {
@@ -1174,6 +1299,686 @@
         ],
         "title": "PolicySaved"
       },
+      "ReportCheck": {
+        "properties": {
+          "check_id": {
+            "type": "string",
+            "title": "Check Id"
+          },
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          },
+          "review_order": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Order"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact"
+          },
+          "applicability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applicability"
+          },
+          "selected": {
+            "type": "boolean",
+            "title": "Selected"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "single": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportSide"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportSide"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportSide"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison"
+          },
+          "functional_comparison": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Functional Comparison"
+          },
+          "comparison_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Comparison Reasons"
+          },
+          "evidence_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Source"
+          },
+          "marks": {
+            "items": {
+              "$ref": "#/components/schemas/ReportMark"
+            },
+            "type": "array",
+            "title": "Marks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "check_id",
+          "area",
+          "purpose",
+          "question",
+          "review_order",
+          "impact",
+          "applicability",
+          "selected",
+          "headline",
+          "single",
+          "baseline",
+          "candidate",
+          "comparison",
+          "functional_comparison",
+          "comparison_reasons",
+          "evidence_source",
+          "marks"
+        ],
+        "title": "ReportCheck"
+      },
+      "ReportCounts": {
+        "properties": {
+          "selected": {
+            "type": "integer",
+            "title": "Selected"
+          },
+          "fail": {
+            "type": "integer",
+            "title": "Fail"
+          },
+          "unknown": {
+            "type": "integer",
+            "title": "Unknown"
+          },
+          "pass": {
+            "type": "integer",
+            "title": "Pass"
+          },
+          "not_applicable": {
+            "type": "integer",
+            "title": "Not Applicable"
+          },
+          "manual_required": {
+            "type": "integer",
+            "title": "Manual Required"
+          },
+          "not_selected": {
+            "type": "integer",
+            "title": "Not Selected"
+          },
+          "regressed": {
+            "type": "integer",
+            "title": "Regressed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "selected",
+          "fail",
+          "unknown",
+          "pass",
+          "not_applicable",
+          "manual_required",
+          "not_selected",
+          "regressed"
+        ],
+        "title": "ReportCounts"
+      },
+      "ReportFocus": {
+        "properties": {
+          "regressed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Regressed"
+          },
+          "fail": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fail"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "regressed",
+          "fail",
+          "unknown"
+        ],
+        "title": "ReportFocus"
+      },
+      "ReportMark": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "executor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executor"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "probed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probed"
+          },
+          "of": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Of"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "ReportMark",
+        "description": "점검 행의 표시 항목. kind: gap, manual_declared, replaced, functional_scope, exception, tested_while_undetermined."
+      },
+      "ReportSide": {
+        "properties": {
+          "result_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Id"
+          },
+          "result_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Revision"
+          },
+          "security": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security"
+          },
+          "functional": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Functional"
+          },
+          "performance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Performance"
+          },
+          "verification_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "result_id",
+          "result_revision",
+          "security",
+          "functional",
+          "performance",
+          "verification_level"
+        ],
+        "title": "ReportSide"
+      },
+      "ReportView": {
+        "properties": {
+          "report_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Id"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "content_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Sha256"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "data_origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Origin"
+          },
+          "official": {
+            "type": "boolean",
+            "title": "Official"
+          },
+          "policy_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Status"
+          },
+          "pack_review_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pack Review Status"
+          },
+          "unofficial_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unofficial Reasons"
+          },
+          "overall": {
+            "type": "string",
+            "title": "Overall"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ReportCounts"
+          },
+          "incomplete_areas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Incomplete Areas"
+          },
+          "focus": {
+            "$ref": "#/components/schemas/ReportFocus"
+          },
+          "by_area": {
+            "items": {
+              "$ref": "#/components/schemas/AxisRow"
+            },
+            "type": "array",
+            "title": "By Area"
+          },
+          "by_purpose": {
+            "items": {
+              "$ref": "#/components/schemas/AxisRow"
+            },
+            "type": "array",
+            "title": "By Purpose"
+          },
+          "evidence_counts": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Evidence Counts"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          },
+          "manual_required": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Manual Required"
+          },
+          "not_selected": {
+            "items": {
+              "$ref": "#/components/schemas/NotSelectedRow"
+            },
+            "type": "array",
+            "title": "Not Selected"
+          },
+          "approval": {
+            "title": "Approval"
+          },
+          "inputs_manifest": {
+            "items": {
+              "$ref": "#/components/schemas/ManifestRef"
+            },
+            "type": "array",
+            "title": "Inputs Manifest"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ReportCheck"
+            },
+            "type": "array",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "revision",
+          "content_sha256",
+          "created_at",
+          "mode",
+          "data_origin",
+          "official",
+          "policy_status",
+          "pack_review_status",
+          "unofficial_reasons",
+          "overall",
+          "counts",
+          "incomplete_areas",
+          "focus",
+          "by_area",
+          "by_purpose",
+          "evidence_counts",
+          "limitations",
+          "manual_required",
+          "not_selected",
+          "inputs_manifest",
+          "checks"
+        ],
+        "title": "ReportView",
+        "description": "update 보고서 화면(삭제된 update HTML 보고서의 내용). 값은 계약 verification-result(0.2)에서 꺼낸다."
+      },
       "RequestCounts": {
         "properties": {
           "allowed": {
@@ -1245,30 +2050,27 @@
               }
             ]
           },
-          "evidence_state": {
+          "detail": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/RuntimeRequestDetail"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Evidence State"
+            "title": "Detail",
+            "description": "runtime 요청 상세(계약 runtime-request-detail)"
           },
-          "evidence_summary": {
+          "detail_invalid": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/InvalidItem"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Evidence Summary"
-          },
-          "native_detail": {
-            "title": "Native Detail"
+            ]
           },
           "evidence": {
             "items": {
@@ -1285,8 +2087,6 @@
         "required": [
           "row",
           "event",
-          "evidence_state",
-          "evidence_summary",
           "source"
         ],
         "title": "RequestDetail"
@@ -1492,6 +2292,17 @@
             ],
             "title": "Target Ref"
           },
+          "observation_session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation Session Id"
+          },
           "data_origin": {
             "type": "string",
             "title": "Data Origin"
@@ -1527,6 +2338,7 @@
           "environment",
           "run_id",
           "target_ref",
+          "observation_session_id",
           "data_origin",
           "origin_detail"
         ],
@@ -1713,26 +2525,6 @@
         ],
         "title": "RevisionMeta"
       },
-      "RuntimeComparisons": {
-        "properties": {
-          "baseline": {
-            "$ref": "#/components/schemas/ComparisonTable"
-          },
-          "target": {
-            "$ref": "#/components/schemas/ComparisonTable"
-          },
-          "source": {
-            "$ref": "#/components/schemas/SourceInfo"
-          }
-        },
-        "type": "object",
-        "required": [
-          "baseline",
-          "target",
-          "source"
-        ],
-        "title": "RuntimeComparisons"
-      },
       "RuntimeEventList": {
         "properties": {
           "items": {
@@ -1906,6 +2698,10 @@
           "item": {
             "$ref": "#/components/schemas/VerificationResult"
           },
+          "report": {
+            "$ref": "#/components/schemas/ReportView",
+            "description": "계약(verification-result 0.2)에서 만든 보고서 화면 자료."
+          },
           "raw_checks": {
             "anyOf": [
               {
@@ -1937,6 +2733,7 @@
         "type": "object",
         "required": [
           "item",
+          "report",
           "source"
         ],
         "title": "VerificationDetail"
@@ -2973,7 +3770,7 @@
       },
       "RevalidationRequest": {
         "title": "재검증 요청 (runtime → platform → update)",
-        "description": "runtime-revalidation-request/1.0을 공통 형식으로 감싼 것. runtime이 자산·정책·구성 변화를 보면 연다. 자동으로 시험을 돌리거나 승인하지 않는다. 플랫폼에서 사람이 보고 update의 증분 감사(U1)를 시작한다.",
+        "description": "runtime-revalidation-request/1.0을 공통 형식으로 감싼 것. runtime이 자산·정책·구성 변화를 보면 연다. 자동으로 시험을 돌리거나 승인하지 않는다. 플랫폼에서 사람이 보고 update의 증분 감사(U1)를 시작한다. 0.2부터 runtime 화면의 재검증 표 항목(처음 열린 시각, 현재 근거 존재)을 담는다.",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -2990,11 +3787,13 @@
           "evidence_refs",
           "superseded_by",
           "status",
-          "data_origin"
+          "data_origin",
+          "opened_at",
+          "current_evidence_present"
         ],
         "properties": {
           "schema_version": {
-            "const": "byul-revalidation-request/0.1"
+            "const": "byul-revalidation-request/0.2"
           },
           "revalidation_id": {
             "type": "string",
@@ -3099,6 +3898,17 @@
           },
           "origin_detail": {
             "$ref": "#/components/schemas/Common_origin_detail"
+          },
+          "opened_at": {
+            "description": "이 재검증 요청이 처음 열린 시각. created_at은 마지막 사건 시각.",
+            "$ref": "#/components/schemas/Common_nullable_timestamp"
+          },
+          "current_evidence_present": {
+            "description": "지금도 근거 조건이 남아 있는지. 해소·대체되면 false(대체는 해소가 아님).",
+            "type": [
+              "boolean",
+              "null"
+            ]
           }
         }
       },
@@ -3174,7 +3984,7 @@
       },
       "RuntimeEvent": {
         "title": "런타임 사건 (runtime → platform, events.jsonl 한 줄)",
-        "description": "runtime 계획서 §5.4의 events.jsonl. runtime 내부 기록(gateway record, observation 등)을 공통 머리 필드로 감싸고 원본은 native에 그대로 둔다. 탐지는 차단이 아니고, 집행 시도는 차단 확인이 아니다.",
+        "description": "runtime 계획서 §5.4의 events.jsonl. runtime 내부 기록(gateway record, observation 등)을 공통 머리 필드로 감싸고 원본은 native에 그대로 둔다. 탐지는 차단이 아니고, 집행 시도는 차단 확인이 아니다. 0.2부터 관측 사건의 화면 표시 값(출발·도착, 실행 파일, 판정 등)을 observation에 담는다.",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -3193,11 +4003,12 @@
           "data_origin",
           "origin_detail",
           "evidence_refs",
-          "native"
+          "native",
+          "observation"
         ],
         "properties": {
           "schema_version": {
-            "const": "byul-runtime-event/0.1"
+            "const": "byul-runtime-event/0.2"
           },
           "event_id": {
             "description": "gateway는 'req:<request_id>', 연속 feed는 'feed:<event_key>', 그 밖은 'sha:<native 정규 JSON 해시>'. 가짜 request_id를 만들지 않는다.",
@@ -3370,6 +4181,205 @@
                 "type": "object"
               }
             }
+          },
+          "observation": {
+            "description": "관측 사건(Hubble·Tetragon)의 표시 값. native.record에서 옮긴 것이며 Gateway 사건은 null. 전체 프로세스 인자·파일 내용은 없다.",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "verdict",
+                  "reason",
+                  "direction",
+                  "src_namespace",
+                  "src_pod",
+                  "dst_namespace",
+                  "dst_pod",
+                  "dst_ip",
+                  "dst_port",
+                  "protocol",
+                  "binary",
+                  "path",
+                  "access",
+                  "pod_namespace",
+                  "pod_name",
+                  "pod_attribution",
+                  "process_attribution",
+                  "rule_id",
+                  "action_raw",
+                  "action_mode",
+                  "phases",
+                  "exec_verdict",
+                  "exception_id",
+                  "cache_generation",
+                  "allowed_binary"
+                ],
+                "properties": {
+                  "kind": {
+                    "description": "runtime 관측 종류(network_flow, process_exec, file_access).",
+                    "type": "string"
+                  },
+                  "verdict": {
+                    "description": "Hubble 원본 판정 정규화 값(allowed·dropped). 프로젝트 수준 거부 확인이 아니다.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "direction": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "src_namespace": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "src_pod": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "dst_namespace": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "dst_pod": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "dst_ip": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "dst_port": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "protocol": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "binary": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "path": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "access": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "pod_namespace": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "pod_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "pod_attribution": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "process_attribution": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "rule_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "action_raw": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "action_mode": {
+                    "enum": [
+                      "monitor",
+                      "enforce",
+                      "unknown",
+                      null
+                    ]
+                  },
+                  "phases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exec_verdict": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "exception_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "cache_generation": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "allowed_binary": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            ]
           }
         },
         "allOf": [
@@ -3419,23 +4429,655 @@
           }
         ]
       },
+      "RuntimeLabReport": {
+        "title": "통제 적용 시험 결과 (runtime → platform)",
+        "description": "runtime /api/lab-report(kind lab L-01~L-08 시험 보고서, runtime 형식 serving-runtime-k8s-lab-report/1.0)를 옮긴 것. 정책이 설정됐다는 것과 실제 차단이 확인됐다는 것은 다르며, 실제 결과는 이 시험 결과로 본다. 로컬 kind·가짜 backend 결과는 정식 환경 검증이 아니다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "generated_at",
+          "state",
+          "configured_path",
+          "path",
+          "error",
+          "report"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-runtime-lab-report/0.1"
+          },
+          "generated_at": {
+            "$ref": "#/components/schemas/Common_timestamp"
+          },
+          "state": {
+            "description": "not_configured=Gateway에 --lab-report 없음, missing=파일 없음, error=읽기·형식 오류, ok=읽음.",
+            "enum": [
+              "not_configured",
+              "missing",
+              "error",
+              "ok"
+            ]
+          },
+          "configured_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "report": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "run_id",
+                  "context",
+                  "namespace",
+                  "started_at",
+                  "finished_at",
+                  "overall",
+                  "cases"
+                ],
+                "properties": {
+                  "run_id": {
+                    "type": "string"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "type": "string"
+                  },
+                  "started_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "finished_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "overall": {
+                    "type": "string"
+                  },
+                  "cases": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "title",
+                        "status",
+                        "summary",
+                        "evidence",
+                        "limitation",
+                        "note"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^L-[0-9]{2}$"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "description": "runtime 시험 상태(passed, failed, not_run, blocked_by_environment 등).",
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "limitation": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "note": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "RuntimeRequestDetail": {
+        "title": "요청 상세 (runtime → platform)",
+        "description": "runtime /api/requests/{id}를 화면용으로 옮긴 것. 판정·적용 정책·전달·Gateway 기록 흐름·엔진 수신 증거를 담는다. 프롬프트·응답 본문·자격정보·추가 필드 값은 원래 저장하지 않으므로 없다. 원본은 native에 그대로 둔다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "request_id",
+          "event_id",
+          "outcome",
+          "environment",
+          "run_id",
+          "backend_kind",
+          "decision",
+          "request",
+          "auth",
+          "policy",
+          "delivery",
+          "stream",
+          "http_start_status",
+          "final_outcome",
+          "backend_cancel",
+          "timeline",
+          "evidence_state",
+          "evidence_summary",
+          "engine_receipts",
+          "engine_live",
+          "same_observation_session",
+          "corrupt_lines",
+          "data_origin",
+          "origin_detail",
+          "native"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "byul-runtime-request-detail/0.1"
+          },
+          "request_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$"
+          },
+          "event_id": {
+            "type": "string",
+            "pattern": "^req:[0-9a-f]{32}$"
+          },
+          "outcome": {
+            "description": "runtime-event와 같은 변환 규칙의 결과.",
+            "enum": [
+              "allowed",
+              "denied",
+              "invalid",
+              "engine_rejected",
+              "error",
+              "unknown"
+            ]
+          },
+          "environment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backend_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "reason_code",
+              "message",
+              "rule_id",
+              "http_status",
+              "engine_http_status"
+            ],
+            "properties": {
+              "result": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rule_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "http_status": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "engine_http_status": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          },
+          "request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model",
+              "max_tokens",
+              "n",
+              "extra_fields",
+              "context"
+            ],
+            "properties": {
+              "model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "max_tokens": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "extra_fields": {
+                "description": "추가 필드 이름과 처리 방식(값은 저장하지 않음).",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "mode"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              "context": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "result",
+                      "input_tokens",
+                      "limit"
+                    ],
+                    "properties": {
+                      "result": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "input_tokens": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "limit": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "auth": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "principal_id",
+              "roles"
+            ],
+            "properties": {
+              "state": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "principal_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "policy_id",
+              "policy_version",
+              "profile",
+              "sha256"
+            ],
+            "properties": {
+              "policy_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "policy_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "profile": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "delivery": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attempted",
+              "backend_receipt",
+              "response",
+              "error_code"
+            ],
+            "properties": {
+              "attempted": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "backend_receipt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "response": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "stream": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "http_start_status": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "final_outcome": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backend_cancel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timeline": {
+            "description": "Gateway 기록 순서(started → response_started → final).",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "phase",
+                "recorded_at"
+              ],
+              "properties": {
+                "phase": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "recorded_at": {
+                  "$ref": "#/components/schemas/Common_nullable_timestamp"
+                }
+              }
+            }
+          },
+          "evidence_state": {
+            "description": "received=엔진 수신 확인, not_received=미수신 확인, unknown=확인 불가, gateway_only=외부 backend라 backend 증거원 미연결.",
+            "enum": [
+              "received",
+              "not_received",
+              "unknown",
+              "gateway_only",
+              null
+            ]
+          },
+          "evidence_summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "engine_receipts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "count",
+              "first_received_at"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "first_received_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "engine_live": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "queried_at"
+            ],
+            "properties": {
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "queried_at": {
+                "$ref": "#/components/schemas/Common_nullable_timestamp"
+              }
+            }
+          },
+          "same_observation_session": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "corrupt_lines": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gateway",
+              "engine"
+            ],
+            "properties": {
+              "gateway": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "engine": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          },
+          "data_origin": {
+            "$ref": "#/components/schemas/Common_data_origin"
+          },
+          "origin_detail": {
+            "$ref": "#/components/schemas/Common_origin_detail"
+          },
+          "native": {
+            "description": "runtime 원본(gateway_records, engine_receipts). 본문·자격정보는 원래 없다.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gateway_records",
+              "engine_receipts"
+            ],
+            "properties": {
+              "gateway_records": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "engine_receipts": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
       "RuntimeStatus": {
         "title": "런타임 상태 스냅샷 (runtime → platform)",
-        "description": "runtime 계획서 §5.4 runtime-result.json의 상태 부분. /api/status를 읽은 시점의 합성값이다. 적용 설정은 동작 성공이 아니고, 미확인을 정상으로 바꾸지 않는다.",
+        "description": "runtime 조회 API(/api/status·/api/policy·/api/collectors·/api/target·/api/summary·/api/revalidation·/api/observations)를 읽은 시점의 합성값. 적용 설정은 동작 성공이 아니고, 미확인을 정상으로 바꾸지 않는다. 0.2부터 runtime 자체 대시보드(2026-10-25 삭제)가 보여주던 항목을 모두 담는다. 비밀값(토큰·자격정보 내용)은 없다.",
         "type": "object",
         "additionalProperties": false,
         "required": [
           "schema_version",
           "generated_at",
           "observation_session_id",
+          "environment",
+          "run_id",
+          "overall",
           "target",
           "policy",
+          "backend",
+          "concurrency",
+          "connections",
+          "auth",
           "collectors",
-          "store"
+          "store",
+          "revalidation",
+          "observations",
+          "comparisons"
         ],
         "properties": {
           "schema_version": {
-            "const": "byul-runtime-status/0.1"
+            "const": "byul-runtime-status/0.2"
           },
           "generated_at": {
             "$ref": "#/components/schemas/Common_timestamp"
@@ -3446,14 +5088,42 @@
               "null"
             ]
           },
+          "environment": {
+            "description": "Gateway 실행 옵션의 요청 환경. 모르면 null.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "run_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overall": {
+            "description": "runtime /api/status.status",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
           "target": {
             "type": "object",
             "additionalProperties": false,
             "required": [
               "target_ref",
+              "target_id",
               "registration",
+              "error_code",
               "instance_id",
-              "instance_state"
+              "instance_state",
+              "instance_observed_at",
+              "instance_pod",
+              "instance_restart_count",
+              "gateway_hold",
+              "comparison_counts",
+              "last_history"
             ],
             "properties": {
               "target_ref": {
@@ -3466,8 +5136,20 @@
                   }
                 ]
               },
+              "target_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "registration": {
                 "type": "string"
+              },
+              "error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "instance_id": {
                 "type": [
@@ -3477,6 +5159,82 @@
               },
               "instance_state": {
                 "type": "string"
+              },
+              "instance_observed_at": {
+                "$ref": "#/components/schemas/Common_nullable_timestamp"
+              },
+              "instance_pod": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "instance_restart_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "gateway_hold": {
+                "description": "대상 불일치로 신규 추론 요청을 보류(503)하는 중이면 그 사유.",
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "reason_code",
+                      "message"
+                    ],
+                    "properties": {
+                      "reason_code": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              "comparison_counts": {
+                "$ref": "#/components/schemas/RuntimeStatus_compare_counts"
+              },
+              "last_history": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "event",
+                      "reason",
+                      "recorded_at"
+                    ],
+                    "properties": {
+                      "event": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "recorded_at": {
+                        "$ref": "#/components/schemas/Common_nullable_timestamp"
+                      }
+                    }
+                  }
+                ]
               }
             }
           },
@@ -3489,7 +5247,23 @@
               "loaded",
               "gateway_active",
               "approval_state",
-              "valid_until"
+              "valid_until",
+              "schema",
+              "profile",
+              "test_only",
+              "max_n",
+              "passthrough_fields",
+              "validate_count",
+              "loaded_at",
+              "load_valid",
+              "error_code",
+              "error_message",
+              "external_enforcement",
+              "approval_checked_at",
+              "approval_reason_code",
+              "validity_items",
+              "history",
+              "history_store"
             ],
             "properties": {
               "policy_ref": {
@@ -3519,6 +5293,341 @@
               },
               "valid_until": {
                 "$ref": "#/components/schemas/Common_nullable_timestamp"
+              },
+              "schema": {
+                "description": "runtime 정책 파일 형식(예: runtime-mvp/1.1).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "profile": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "test_only": {
+                "description": "시험 전용 프로필(zeroday-lab). 승인된 운영 정책이 아니다.",
+                "type": "boolean"
+              },
+              "max_n": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "passthrough_fields": {
+                "description": "검사하지 않고 엔진에 전달하는 추가 필드 이름(값은 없다).",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "validate_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "loaded_at": {
+                "$ref": "#/components/schemas/Common_nullable_timestamp"
+              },
+              "load_valid": {
+                "description": "정책 파일 읽기·검증 성공 여부.",
+                "type": "boolean"
+              },
+              "error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "error_message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "external_enforcement": {
+                "type": "string"
+              },
+              "approval_checked_at": {
+                "$ref": "#/components/schemas/Common_nullable_timestamp"
+              },
+              "approval_reason_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "validity_items": {
+                "description": "유효성 항목(기간·철회·승인 확인).",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "item",
+                    "state",
+                    "result"
+                  ],
+                  "properties": {
+                    "item": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "result": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              "history": {
+                "description": "정책 로딩 이력(최근 순, 최대 50).",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "at",
+                    "event",
+                    "policy_id",
+                    "policy_version",
+                    "sha256",
+                    "previous_version",
+                    "same_version_content_changed"
+                  ],
+                  "properties": {
+                    "at": {
+                      "$ref": "#/components/schemas/Common_nullable_timestamp"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "policy_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "policy_version": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sha256": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/Common_sha256"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "previous_version": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "same_version_content_changed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "history_store": {
+                "$ref": "#/components/schemas/RuntimeStatus_store_state"
+              }
+            }
+          },
+          "backend": {
+            "description": "엔진(모의 엔진 또는 외부 backend) 연결 점검. 연결 점검이며 추론·관측 동작 검증이 아니다.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "mode",
+              "url",
+              "healthy",
+              "reachable",
+              "inference_verified",
+              "checked_at",
+              "error",
+              "credential",
+              "metrics_credential",
+              "receipts_store"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "healthy": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "reachable": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "inference_verified": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "checked_at": {
+                "$ref": "#/components/schemas/Common_nullable_timestamp"
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "credential": {
+                "description": "자격정보 상태(configured·missing·invalid 등). 값은 없다.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "metrics_credential": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "receipts_store": {
+                "$ref": "#/components/schemas/RuntimeStatus_store_state"
+              }
+            }
+          },
+          "concurrency": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "in_flight",
+              "limit"
+            ],
+            "properties": {
+              "in_flight": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "limit": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            }
+          },
+          "connections": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "active",
+              "limit",
+              "rejected",
+              "request_header_timeout_s",
+              "request_body_timeout_s"
+            ],
+            "properties": {
+              "active": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "limit": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "rejected": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "request_header_timeout_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "request_body_timeout_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "auth": {
+            "description": "Gateway API 인증 상태. 주체 이름·토큰은 없다.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "method",
+              "principal_count",
+              "protected_routes",
+              "error_code"
+            ],
+            "properties": {
+              "state": {
+                "type": "string"
+              },
+              "method": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "principal_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "protected_routes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           },
@@ -3530,7 +5639,14 @@
               "required": [
                 "source",
                 "state",
-                "last_success_at"
+                "last_success_at",
+                "last_attempt_at",
+                "last_error",
+                "interval_s",
+                "stale_after_s",
+                "data_origin",
+                "origin_detail",
+                "detail"
               ],
               "properties": {
                 "source": {
@@ -3547,6 +5663,63 @@
                 },
                 "last_success_at": {
                   "$ref": "#/components/schemas/Common_nullable_timestamp"
+                },
+                "last_attempt_at": {
+                  "$ref": "#/components/schemas/Common_nullable_timestamp"
+                },
+                "last_error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "interval_s": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "stale_after_s": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "data_origin": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Common_data_origin"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "origin_detail": {
+                  "$ref": "#/components/schemas/Common_origin_detail"
+                },
+                "detail": {
+                  "description": "수집원별 요약. 해당 없는 수집원은 null.",
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RuntimeStatus_feed_detail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RuntimeStatus_retention_detail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RuntimeStatus_metrics_detail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RuntimeStatus_asset_detail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RuntimeStatus_cilium_detail"
+                    }
+                  ]
                 }
               }
             }
@@ -3555,7 +5728,12 @@
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "state"
+              "state",
+              "data_dir",
+              "last_error",
+              "last_error_at",
+              "corrupt_lines",
+              "corrupt_details"
             ],
             "properties": {
               "state": {
@@ -3564,14 +5742,744 @@
                   "error",
                   "unknown"
                 ]
+              },
+              "data_dir": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last_error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "last_error_at": {
+                "$ref": "#/components/schemas/Common_nullable_timestamp"
+              },
+              "corrupt_lines": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "gateway",
+                  "engine"
+                ],
+                "properties": {
+                  "gateway": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "engine": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "corrupt_details": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RuntimeStatus_line_issue"
+                }
               }
+            }
+          },
+          "revalidation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "open_count",
+              "current_condition_count",
+              "corrupt_lines",
+              "evaluation_errors"
+            ],
+            "properties": {
+              "open_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "current_condition_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "corrupt_lines": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "evaluation_errors": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "observations": {
+            "description": "저장된 관측 사건 집계(/api/observations).",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "by_source",
+              "corrupt_lines",
+              "real_hubble_dropped",
+              "origins_by_kind"
+            ],
+            "properties": {
+              "by_source": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "corrupt_lines": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "real_hubble_dropped": {
+                "description": "실제(real) Hubble DROPPED 건수. 거부 확인이 아니라 관측이다.",
+                "type": "integer",
+                "minimum": 0
+              },
+              "origins_by_kind": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "comparisons": {
+            "description": "구성 비교(/api/baseline)와 대상 비교(/api/target). 관측 불일치는 표시만 하고 요청을 자동 차단하지 않는다.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "baseline",
+              "target"
+            ],
+            "properties": {
+              "baseline": {
+                "$ref": "#/components/schemas/RuntimeStatus_compare_table"
+              },
+              "target": {
+                "$ref": "#/components/schemas/RuntimeStatus_compare_table"
+              }
+            }
+          }
+        }
+      },
+      "RuntimeStatus_compare_counts": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "match",
+          "mismatch",
+          "unknown",
+          "not_declared"
+        ],
+        "properties": {
+          "match": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mismatch": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unknown": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "not_declared": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "RuntimeStatus_store_state": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "last_error"
+        ],
+        "properties": {
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RuntimeStatus_line_issue": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source",
+          "line",
+          "reason"
+        ],
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "RuntimeStatus_feed_detail": {
+        "description": "observation_feed_hubble·observation_feed_tetragon: 실시간 수집기 처리 결과와 writer heartbeat.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "processed",
+          "accepted",
+          "duplicates",
+          "rejected",
+          "rejected_details",
+          "corrupt_lines_total",
+          "out_of_window",
+          "out_of_window_total",
+          "idle",
+          "writer"
+        ],
+        "properties": {
+          "kind": {
+            "const": "observation_feed"
+          },
+          "processed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "accepted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "duplicates": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rejected": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rejected_details": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeStatus_line_issue"
+            }
+          },
+          "corrupt_lines_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "out_of_window": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "out_of_window_total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "idle": {
+            "type": "boolean"
+          },
+          "writer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "configured",
+              "state",
+              "updated_at",
+              "reconnect_count",
+              "last_gap"
+            ],
+            "properties": {
+              "configured": {
+                "type": "boolean"
+              },
+              "state": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "$ref": "#/components/schemas/Common_nullable_timestamp"
+              },
+              "reconnect_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "last_gap": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "opened_at",
+                      "closed_at"
+                    ],
+                    "properties": {
+                      "opened_at": {
+                        "$ref": "#/components/schemas/Common_nullable_timestamp"
+                      },
+                      "closed_at": {
+                        "$ref": "#/components/schemas/Common_nullable_timestamp"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "RuntimeStatus_retention_detail": {
+        "description": "record_retention: 기록 보존 정리 결과.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "mode",
+          "max_age_days",
+          "max_bytes",
+          "total_bytes",
+          "over_size_limit",
+          "removable_lines",
+          "holds_state",
+          "holds_error",
+          "errors",
+          "last_deletion"
+        ],
+        "properties": {
+          "kind": {
+            "const": "record_retention"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "max_age_days": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "max_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "total_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "over_size_limit": {
+            "type": "boolean"
+          },
+          "removable_lines": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "holds_state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "holds_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "last_deletion": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "ran_at",
+                  "files"
+                ],
+                "properties": {
+                  "ran_at": {
+                    "$ref": "#/components/schemas/Common_nullable_timestamp"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "removed_lines",
+                        "from",
+                        "to",
+                        "durability"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "removed_lines": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "from": {
+                          "$ref": "#/components/schemas/Common_nullable_timestamp"
+                        },
+                        "to": {
+                          "$ref": "#/components/schemas/Common_nullable_timestamp"
+                        },
+                        "durability": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "RuntimeStatus_metrics_detail": {
+        "description": "metrics: 엔진 지표 필드별 상태.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "fields"
+        ],
+        "properties": {
+          "kind": {
+            "const": "metrics"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "state",
+                "declared_type",
+                "counter_reset_now",
+                "last_counter_reset_at"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "declared_type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "counter_reset_now": {
+                  "type": "boolean"
+                },
+                "last_counter_reset_at": {
+                  "$ref": "#/components/schemas/Common_nullable_timestamp"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RuntimeStatus_asset_detail": {
+        "description": "asset_integrity: 승인 자산 목록과 실제 파일 대조.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "intact",
+          "total",
+          "match",
+          "changed",
+          "missing",
+          "unreadable",
+          "symlink",
+          "extra_files",
+          "extra_symlinks",
+          "walk_errors",
+          "limit"
+        ],
+        "properties": {
+          "kind": {
+            "const": "asset_integrity"
+          },
+          "intact": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "match": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "changed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missing": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unreadable": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "symlink": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "extra_files": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "extra_symlinks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "walk_errors": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RuntimeStatus_cilium_detail": {
+        "description": "cilium_policy: CiliumNetworkPolicy 객체 상태. 객체 존재는 실제 차단 증거가 아니다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "object_count",
+          "policies"
+        ],
+        "properties": {
+          "kind": {
+            "const": "cilium_policy"
+          },
+          "object_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "policies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "status_present",
+                "node_total",
+                "node_enforcing",
+                "node_errors",
+                "last_updated",
+                "conditions"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "status_present": {
+                  "type": "boolean"
+                },
+                "node_total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "node_enforcing": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "node_errors": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "last_updated": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "conditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "type",
+                      "status",
+                      "reason"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "status": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "reason": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "RuntimeStatus_compare_table": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "rows",
+          "notes"
+        ],
+        "properties": {
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field",
+                "expected",
+                "observed",
+                "source",
+                "state",
+                "observed_at",
+                "note"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "observed": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "type": "string"
+                },
+                "observed_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         }
       },
       "VerificationResult": {
         "title": "격리 검증 결과 (update → platform)",
-        "description": "serving-guard RPT 객체를 화면용으로 줄인 투영. 원본은 RPT JSON이고 이 문서는 report_ref로 원본을 가리킨다. RPT에 없는 값을 새로 만들지 않는다.",
+        "description": "serving-guard RPT 객체를 화면용으로 옮긴 것. 원본은 RPT JSON이고 이 문서는 report_ref로 원본을 가리킨다. RPT에 없는 값을 새로 만들지 않는다. 0.2부터 update HTML 보고서(2026-10-25 삭제)가 보여주던 RPT 필드를 모두 담는다.",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -3580,19 +6488,24 @@
           "mode",
           "created_at",
           "data_origin",
+          "official",
+          "policy_status",
           "plan_ref",
           "environment_refs",
           "policy_ref",
           "pack",
           "change_ref",
+          "inputs_manifest",
           "summary",
           "checks",
+          "manual_required",
+          "not_selected",
           "limitations",
           "approval"
         ],
         "properties": {
           "schema_version": {
-            "const": "byul-verification-result/0.1"
+            "const": "byul-verification-result/0.2"
           },
           "report_ref": {
             "$ref": "#/components/schemas/Common_object_ref"
@@ -3608,6 +6521,17 @@
           },
           "data_origin": {
             "$ref": "#/components/schemas/Common_data_origin"
+          },
+          "official": {
+            "description": "RPT.official. 정책 CONFIRMED·팩 REVIEWED·EXAMPLE 아님 등 공식 조건을 update가 판정한 값.",
+            "type": "boolean"
+          },
+          "policy_status": {
+            "description": "RPT.policy_status. guard POL의 확정 상태.",
+            "enum": [
+              "DRAFT",
+              "CONFIRMED"
+            ]
           },
           "plan_ref": {
             "$ref": "#/components/schemas/Common_object_ref"
@@ -3660,11 +6584,19 @@
               }
             ]
           },
+          "inputs_manifest": {
+            "description": "RPT.inputs_manifest. 이 보고서가 쓴 모든 객체(팩 포함)의 정확한 판본과 해시.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationResult_manifest_ref"
+            }
+          },
           "summary": {
             "type": "object",
             "additionalProperties": false,
             "required": [
               "by_area",
+              "by_purpose",
               "evidence_counts"
             ],
             "properties": {
@@ -3680,15 +6612,14 @@
                   ]
                 },
                 "additionalProperties": {
-                  "type": "object",
-                  "required": [
-                    "security"
-                  ],
-                  "properties": {
-                    "security": {
-                      "$ref": "#/components/schemas/Common_verdict"
-                    }
-                  }
+                  "$ref": "#/components/schemas/VerificationResult_axis_summary"
+                }
+              },
+              "by_purpose": {
+                "description": "RPT.by_purpose. 키는 보호 목적 이름(팩의 CheckDef.purpose).",
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/VerificationResult_axis_summary"
                 }
               },
               "evidence_counts": {
@@ -3726,16 +6657,53 @@
               "additionalProperties": false,
               "required": [
                 "check_id",
+                "area",
+                "purpose",
+                "question",
+                "review_order",
+                "impact",
                 "applicability",
                 "selected",
+                "tested_while_undetermined",
                 "sides",
                 "comparison",
+                "functional_comparison",
+                "comparison_reasons",
                 "gaps",
-                "evidence_source"
+                "evidence_source",
+                "exception",
+                "replaced",
+                "functional_scope"
               ],
               "properties": {
                 "check_id": {
                   "$ref": "#/components/schemas/Common_check_id"
+                },
+                "area": {
+                  "enum": [
+                    "SUP",
+                    "REQ",
+                    "PLT",
+                    "LIF",
+                    "OBS"
+                  ]
+                },
+                "purpose": {
+                  "description": "보호 목적(팩 CheckDef.purpose).",
+                  "type": "string"
+                },
+                "question": {
+                  "description": "점검 질문(팩 CheckDef 문구).",
+                  "type": "string"
+                },
+                "review_order": {
+                  "type": "string"
+                },
+                "impact": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "applicability": {
                   "enum": [
@@ -3753,6 +6721,10 @@
                     "string",
                     "null"
                   ]
+                },
+                "tested_while_undetermined": {
+                  "description": "적용 미정 상태로 시험함.",
+                  "type": "boolean"
                 },
                 "sides": {
                   "description": "audit 모드는 single, update 모드는 baseline·candidate.",
@@ -3789,10 +6761,25 @@
                         "$ref": "#/components/schemas/Common_verdict"
                       },
                       "functional": {
-                        "$ref": "#/components/schemas/Common_verdict"
+                        "description": "RPT에 기능 축 판정이 없으면 null(0.1은 UNKNOWN으로 채웠다).",
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Common_verdict"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "performance": {
-                        "$ref": "#/components/schemas/Common_verdict"
+                        "oneOf": [
+                          {
+                            "$ref": "#/components/schemas/Common_verdict"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "verification_level": {
                         "oneOf": [
@@ -3810,20 +6797,29 @@
                 "comparison": {
                   "oneOf": [
                     {
-                      "enum": [
-                        "NO_CHANGE",
-                        "REGRESSED",
-                        "FIXED",
-                        "STILL_FAILING",
-                        "UNKNOWN",
-                        "NOT_COMPARABLE",
-                        "CARRIED_OVER"
-                      ]
+                      "$ref": "#/components/schemas/VerificationResult_comparison"
                     },
                     {
                       "type": "null"
                     }
                   ]
+                },
+                "functional_comparison": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/VerificationResult_comparison"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "comparison_reasons": {
+                  "description": "비교 불일치·미확인 필드(update 모드). 없으면 빈 배열.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 "gaps": {
                   "type": "array",
@@ -3844,8 +6840,137 @@
                     null
                   ]
                 },
-                "exception_approved": {
-                  "type": "boolean"
+                "exception": {
+                  "description": "정책 예외 표시. 판정을 바꾸지 않는다(0.1의 exception_approved를 대체).",
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status",
+                        "reason",
+                        "expires_at"
+                      ],
+                      "properties": {
+                        "status": {
+                          "enum": [
+                            "APPROVED",
+                            "EXPIRED",
+                            "UNAPPROVED"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "expires_at": {
+                          "$ref": "#/components/schemas/Common_nullable_timestamp"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "replaced": {
+                  "description": "같은 PLAN·점검·side에서 출처가 다른 이전 증거를 대체함.",
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "source",
+                        "revision",
+                        "executor",
+                        "reason"
+                      ],
+                      "properties": {
+                        "source": {
+                          "enum": [
+                            "automated",
+                            "manual"
+                          ]
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "executor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "functional_scope": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "probed",
+                        "of",
+                        "label"
+                      ],
+                      "properties": {
+                        "probed": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "of": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 0
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "manual_required": {
+            "description": "선정됐지만 자동 실행이 안 되는 점검.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Common_check_id"
+            }
+          },
+          "not_selected": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "check_id",
+                "reason"
+              ],
+              "properties": {
+                "check_id": {
+                  "$ref": "#/components/schemas/Common_check_id"
+                },
+                "reason": {
+                  "type": "string"
                 }
               }
             }
@@ -3889,6 +7014,73 @@
                 }
               }
             ]
+          }
+        }
+      },
+      "VerificationResult_comparison": {
+        "enum": [
+          "NO_CHANGE",
+          "REGRESSED",
+          "FIXED",
+          "STILL_FAILING",
+          "UNKNOWN",
+          "NOT_COMPARABLE",
+          "CARRIED_OVER"
+        ]
+      },
+      "VerificationResult_axis_summary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "security",
+          "inventory_complete"
+        ],
+        "properties": {
+          "security": {
+            "$ref": "#/components/schemas/Common_verdict"
+          },
+          "inventory_complete": {
+            "description": "점검 목록 완결 여부. 거짓이면 집계 PASS가 될 수 없다(SPEC INV-13). RPT에 없으면 null.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "VerificationResult_manifest_ref": {
+        "description": "inputs_manifest 항목. object_ref와 같되 팩(PACK)도 담는다.",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "id",
+          "revision",
+          "sha256"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "PACK",
+              "ENV",
+              "POL",
+              "CHG",
+              "PLAN",
+              "EVD",
+              "RES",
+              "RPT"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Common_sha256"
           }
         }
       },

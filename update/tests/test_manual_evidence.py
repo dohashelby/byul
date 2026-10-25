@@ -201,10 +201,6 @@ def test_report_counts_and_limitations(tmp_path):
     rpt = build_report(store, pack, plan, as_of=T0)
     assert rpt.evidence_counts["SUP"].manual == 1 and rpt.evidence_counts["REQ"].automated == 1
     assert any("인증되지 않은 자기 신고" in l for l in rpt.limitations)
-    from guard.report.html import render_html
-
-    html = render_html(rpt.to_dict())
-    assert "수동 입력 1건 / 자동 측정 0건" in html and "수동 입력 0건 / 자동 측정 1건" in html
 
 
 def test_cli_template_and_import(tmp_path, monkeypatch):
@@ -229,7 +225,7 @@ def test_cli_template_and_import(tmp_path, monkeypatch):
     r = runner.invoke(app, ["evidence", "import", str(p)])
     assert r.exit_code == 0, r.output
     assert runner.invoke(app, ["judge", "--plan", plan]).exit_code == 0
-    assert runner.invoke(app, ["report", "--plan", plan, "--json", "r.json", "--html", "r.html"]).exit_code == 0
+    assert runner.invoke(app, ["report", "--plan", plan, "--json", "r.json"]).exit_code == 0
     data = json.loads((tmp_path / "r.json").read_text(encoding="utf-8"))
     (row,) = [x for x in data["by_check"] if x["check_id"] == "SUP-01"]
     assert row["single"]["security"] == "PASS" and row["evidence_source"] == "manual"

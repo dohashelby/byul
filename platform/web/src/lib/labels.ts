@@ -111,13 +111,13 @@ export const APPLICABILITY: Record<string, Entry> = {
   APPLICABLE: { label: "적용", tone: "neutral" },
   NOT_APPLICABLE: { label: "해당 없음", tone: "faint" },
   UNDETERMINED: { label: "적용 미정", tone: "muted" },
-  CONFLICT: { label: "충돌", tone: "warn" },
+  CONFLICT: { label: "값 충돌", tone: "warn" },
 };
 
 export const COMPARISON: Record<string, Entry> = {
   NO_CHANGE: { label: "변화 없음", tone: "neutral" },
-  REGRESSED: { label: "퇴행", tone: "error" },
-  FIXED: { label: "해소", tone: "accent" },
+  REGRESSED: { label: "후퇴", tone: "error" },
+  FIXED: { label: "개선", tone: "accent" },
   STILL_FAILING: { label: "계속 미충족", tone: "error" },
   UNKNOWN: { label: "미확인", tone: "muted" },
   NOT_COMPARABLE: { label: "비교 불가", tone: "muted" },
@@ -214,6 +214,109 @@ export const FACT_LABEL: Record<string, string> = {
   r10_features: "R10 기능",
   request_code_revision_selection: "요청별 코드 판본 선택",
 };
+
+// update 보고서(삭제된 guard/report/html.py)의 문구를 그대로 쓴다.
+export const NOT_SELECTED: Record<string, string> = {
+  NOT_APPLICABLE: "해당 없음",
+  POLICY_SCOPE: "정책 범위 밖",
+  RETIRED: "폐기된 점검",
+};
+
+export const UNOFFICIAL_REASON: Record<string, string> = {
+  POLICY_DRAFT: "정책 DRAFT",
+  PACK_DRAFT: "검토 전 팩",
+  EXAMPLE_DATA: "EXAMPLE 자료",
+  CONDITIONS_UNMET: "조건 미충족",
+};
+
+export const EXCEPTION_STATUS: Record<string, string> = {
+  APPROVED: "예외 승인됨",
+  EXPIRED: "예외 만료",
+  UNAPPROVED: "예외 미승인",
+};
+
+export const POLICY_STATUS: Record<string, Entry> = {
+  DRAFT: { label: "정책 초안", tone: "warn" },
+  CONFIRMED: { label: "정책 확정", tone: "neutral" },
+};
+
+export const MODE_LONG: Record<string, string> = { audit: "단일 점검(audit)", update: "버전 비교(update)" };
+
+// ---- runtime 화면 문구 (삭제된 runtime 대시보드 static/app.js와 같은 문구) ----
+
+// 요청 결과(runtime 판정) 표시. 사건 로그의 outcome 표(OUTCOME)와 달리 runtime 화면 문구를 쓴다.
+export const REQUEST_RESULT: Record<string, Entry> = {
+  allowed: { label: "허용", tone: "neutral" },
+  denied: { label: "정책 거부", tone: "accent" },
+  invalid: { label: "입력 오류", tone: "accent" },
+  engine_rejected: { label: "엔진 거부", tone: "accent" },
+  error: { label: "처리 오류", tone: "error" },
+  unknown: { label: "미완료", tone: "muted" },
+};
+
+export const APPROVAL_DETAIL: Record<string, string> = {
+  not_configured: "미설정",
+  verified: "확인됨",
+  unverified: "목록에서 확인 못함 — 추론 요청은 503",
+  rejected: "불일치·만료 — 추론 요청은 503",
+  error: "확인 오류 — 추론 요청은 503",
+  last_verified: "목록 확인 불가 — 마지막 확인 승인 유지",
+};
+
+export const VALIDITY_ITEM: Record<string, string> = { period: "기간", revocation: "철회", approval: "승인 확인" };
+export const VALIDITY_RESULT: Record<string, string> = { not_configured: "미설정", POLICY_APPROVAL_VERIFIED: "확인됨" };
+
+export const RT_TRIGGER: Record<string, string> = {
+  asset_changed: "자산 변경",
+  config_drift: "구성 drift",
+  policy_content_changed: "정책 내용 변경",
+};
+
+export const EXEC_VERDICT: Record<string, string> = {
+  allowed_in_phase: "단계 허용",
+  exception: "승인 예외",
+  outside_allowlist: "목록 밖",
+  suspect_binary: "의심 실행",
+  exec_from_cache: "캐시에서 실행",
+  phase_unknown: "단계 불명",
+  phase_signal_unverified: "엔진 신호만 근거 — 확인 필요",
+};
+
+export const CACHE_GENERATION: Record<string, string> = { current: "현재 캐시 세대", other: "다른 캐시 세대", outside: "캐시 밖" };
+
+export const TIMELINE_PHASE: Record<string, string> = {
+  started: "전달 전 시작 기록",
+  response_started: "HTTP 200 응답 시작",
+  final: "최종 기록",
+};
+
+export const CONTEXT_RESULT: Record<string, string> = {
+  within_limit: "한도 이내",
+  exceeded: "한도 초과(미전달)",
+  unavailable: "토큰 수 확인 불가(미전달)",
+};
+
+export const AUTH_RESULT: Record<string, string> = {
+  not_configured: "인증 미적용",
+  not_evaluated: "인증 확인 전 종료",
+  authenticated: "인증됨",
+  missing: "인증 정보 없음",
+  invalid: "인증 실패",
+  unavailable: "인증 설정 오류",
+};
+
+export const EXTRA_FIELD_MODE: Record<string, string> = { validate: "검사", passthrough: "미검사 전달" };
+
+export const METRIC_STATE: Record<string, string> = { ok: "정상", type_mismatch: "형식 불일치", unsupported_or_absent: "미제공" };
+
+/** runtime 화면의 상태 배지 색(app.css state-*): 정상·일치·통과는 강조색, 오류·불일치·실패는 빨강, 누락·지연은 주황, 나머지는 회색. */
+export function stateTone(value: string | null | undefined): Tone {
+  if (value == null) return "muted";
+  if (["match", "ok", "passed", "verified", "registered"].includes(value)) return "accent";
+  if (["drift", "error", "mismatch", "multiple_targets", "container_missing", "failed", "inconsistent", "rejected"].includes(value)) return "error";
+  if (["missing", "stale", "partial"].includes(value)) return "warn";
+  return "muted";
+}
 
 export function entry(table: Record<string, Entry>, value: string | null | undefined): Entry {
   if (value == null) return { label: "–", tone: "faint" };

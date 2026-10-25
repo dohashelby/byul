@@ -1,5 +1,5 @@
 {
-  "schema_version": "byul-verification-result/0.1",
+  "schema_version": "byul-verification-result/0.2",
   "report_ref": {
     "kind": "RPT",
     "id": "RPT-01M598RR3HPSJNHA1MENFA6P74",
@@ -9,6 +9,8 @@
   "mode": "audit",
   "created_at": "2026-10-19T05:04:53Z",
   "data_origin": "EXAMPLE",
+  "official": false,
+  "policy_status": "DRAFT",
   "plan_ref": {
     "kind": "PLAN",
     "id": "PLAN-01M598RQGT4DRY9XCVDYRZBRPW",
@@ -36,22 +38,1091 @@
     "review_status": "DRAFT"
   },
   "change_ref": null,
+  "inputs_manifest": [
+    {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 1,
+      "sha256": "6ddb6e8dfbf7d6255184ff75acb3058c6a1d28f3aeaa82a5bb38b895ad3e6b19"
+    },
+    {
+      "kind": "ENV",
+      "id": "ENV-01M598RQGR67RF44J5BHFCKQ2D",
+      "revision": 1,
+      "sha256": "409623983eba359a234bf36a79dc673a830d9e444bd67eb9ab97a9a6964ac14a"
+    },
+    {
+      "kind": "POL",
+      "id": "POL-01M598RQGS37HPWGG5HZNZZEC1",
+      "revision": 1,
+      "sha256": "e098b512e99cc093d108bb7ae417e8cc056604d779d1b61349a015af1c5e05eb"
+    },
+    {
+      "kind": "PLAN",
+      "id": "PLAN-01M598RQGT4DRY9XCVDYRZBRPW",
+      "revision": 1,
+      "sha256": "2b764d277c3b1714228755db49a9feb80961a7034e0f71208534586d54318a88"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQP952EF44KZXKA112Y9",
+      "revision": 1,
+      "sha256": "f965107c6f699f51972fab524e1bee2ffb0b97ec183eee64d5d87271cfc6057d"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPAD9DZH5PSTAHNQ7V8",
+      "revision": 1,
+      "sha256": "7380991612f769c413014d41c02f8f403b5af9edd0f518f7e229369788610a0f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPB6F1KYQ642M7G483S",
+      "revision": 1,
+      "sha256": "f1f4c9d057aa567ac3da092cb73109d3eff17534168b9bb5cff6bb99d81662d3"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPBMGR5JG6WH4NVJ2BJ",
+      "revision": 1,
+      "sha256": "5ec5fe691e96d4a68e6db0a79d45cfd954fcc5833a3bc173f9e0810bbc684cc5"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPC8SM1X6ATEP6XQZJB",
+      "revision": 1,
+      "sha256": "f2250e24417ed193e86d628664f2e1538b1324d0fddcadc5b464782ab60ce066"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPD6K5PAVPV1WASNRQ4",
+      "revision": 1,
+      "sha256": "4efe5e7bae0abf370ae8697f3a212dc3a6ed9e95414fe53c1e6fb91c8815d049"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPDCC778N0KPSP5MTCZ",
+      "revision": 1,
+      "sha256": "55cc0f8c403c53c54167e2acfefaed4081c66caa533fb3460fb5aa5ede213e89"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPEVA1WTKJM4TN4QJYB",
+      "revision": 1,
+      "sha256": "1b740ab0d93d898d20eb9412faa4b552de14537f557413a5386982c5345cfdab"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPEYZG1H6C9ADR2PT7G",
+      "revision": 1,
+      "sha256": "736b4985d7ac74409c9dfe74ae1708940164e17c59b102ad7050e90de627df81"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPFQ3GAXFG4GRT4KDV6",
+      "revision": 1,
+      "sha256": "72358a613570b915286d5bef22b22aa39b0d6fd56a2c0f8725ff9f14ed5fe379"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPGGFTRDES4CM0M5KRP",
+      "revision": 1,
+      "sha256": "5beff135c1366baff96929fcfce123eed838eacd49cf16b9272696e376e71c79"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPGM9PXP4FEG2TXESTR",
+      "revision": 1,
+      "sha256": "9cbc109caa0ae1c7a615bc9752b413bb488aa0f00d0e74ade08d197e5e7c77af"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPHFF9YFW1PFVV4WPW0",
+      "revision": 1,
+      "sha256": "eda6f2ac46d91d5b3db5ab81d4f9419d5758ae8bcd255b4c28d9460391507830"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPJBVVDKW8XY8VMHBJV",
+      "revision": 1,
+      "sha256": "b1c8e2e124627c70d536224c485863e758fdfb73f937c27210703b3c024200f7"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPJDG87Y17NMTNNS10G",
+      "revision": 1,
+      "sha256": "f55b6ec3786008562132944b2d33046b13eecb93aa6a9ceb8027519b298dd5be"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPK2H41BVGTC4K0NZY5",
+      "revision": 1,
+      "sha256": "e22e9c86f4f2e5720b4ab7e181a348ec755a04ed021c3f138400221bae7b1aac"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPKKHJV7SAHJW0Q9JD9",
+      "revision": 1,
+      "sha256": "87eba2f973d3ca1ffaf686f06c8f448dc85ea02dc33ff994bd5a6a4cb74313e7"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPMV52X21PMA2JGJ315",
+      "revision": 1,
+      "sha256": "8168c75bad6ff0500e335fcd7474cee30879f9f7abbc8ee01621842fbd1f3b97"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPNT7MX1MSSBWW3449W",
+      "revision": 1,
+      "sha256": "e5d0bfa900f6c205e61651554d624673256cabbb6fe9464c9cdaeee1a0f289b9"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPPZCVRST85YMHJRM4X",
+      "revision": 1,
+      "sha256": "b8587820cd2fed53237c6ea715df9ce62458776479cd150335242718ea848e84"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPPZG9P9KHTYSS4M91Y",
+      "revision": 1,
+      "sha256": "fcfef7121afd961e7d37f7b3b1c19e9464989b7180ebbf768713a068ad62834d"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPQ2M46HVSW8KGYZTXC",
+      "revision": 1,
+      "sha256": "02efa0509439e5a1a4b35047d972c1d17510d9e1defc4a8dd97269cdb2c3783e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPQ965QRQXFW1Q69CPR",
+      "revision": 1,
+      "sha256": "bf93061759f673f34451a6e58ba0f7a9830996491c838f6f1602075ed6d22f2c"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPRT6NJCNZ6T9RXB2WW",
+      "revision": 1,
+      "sha256": "c98d503fdeae86c9df0082997bd8785ec54c2687d219c7479b226b347e4e2b7f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPRW0F8GRGB6SDF9VRT",
+      "revision": 1,
+      "sha256": "0f2506d56524053eacc83095bb80bb83b40d3fa30a286cc87162643d6b455fc9"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPS16WG4C2DCPRBT5E1",
+      "revision": 1,
+      "sha256": "d83c21af626a099570129eb8d1f06940d0ccc8a5b011389532d0b594736f24dd"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPSGYPM5H55YP090VE1",
+      "revision": 1,
+      "sha256": "dcaf04c75ff07648586f51a28809964e84c52bb412cec1c360a364a728e59bba"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPTJ62GE4D36HZB2S5E",
+      "revision": 1,
+      "sha256": "825bae8c7a131fc6b35b6c61646eebca19bf341a6fe7c16e93e8ab58ab385340"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPV0DV3K4MNM5S9TPJV",
+      "revision": 1,
+      "sha256": "6e0a0c700c64c1f27d7e777a93e028b73ddd8f10331494f3dd652df61146cd97"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPV5DNVR342EV679EAR",
+      "revision": 1,
+      "sha256": "77877c044a314294e88d10581d602863b100f198ab25ae41d6f1cef0c1d79b49"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPVS1MT5D9A50D0PK02",
+      "revision": 1,
+      "sha256": "200011e12fe3338e38f52e69232eeb8ab80d9513252a67f3573fe6accb0f6517"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPW83ANS3ZR9P2ZYASN",
+      "revision": 1,
+      "sha256": "60b8091c4faa6c502078d4ace482175926a04a9e612f4ace3d05c97a3f68fa97"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPWEFG31M55MWKQY3FX",
+      "revision": 1,
+      "sha256": "01e999836058edf2372aff80624f425e99de7a1797357f6d444a0edc6cc67b9f"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPXAM8CMZSS754VE61Z",
+      "revision": 1,
+      "sha256": "ff3f70b2fb77c1d61164274cd1fa1324b184cd7a72a804618e3525ba615777fd"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPY8FJA1RPXM7QDWP57",
+      "revision": 1,
+      "sha256": "05995d17792268fe8d3c846ffa1ace8df800430d19120f4c93cc4acd7f571f78"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPYT6VRKP8069TRMD5B",
+      "revision": 1,
+      "sha256": "6d54f75cdc24f9e2c15db295602d1e375b11975510eaca8e16ce4b66ed289b19"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPZ5TG52E4F2QGTYJJQ",
+      "revision": 1,
+      "sha256": "1771ff3d47f28ae7b21e7033a7cd6aa68e564950aeebb1f0b3737bc27e1b2a6c"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQPZT8ZT28BV3YTSN8Y5",
+      "revision": 1,
+      "sha256": "73f8ce733c4aea55318df343ff44e4c56a1b3f28c86ac26ae7e70f0fe735b3ec"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ03AT4F5RX6MSBH7YQ",
+      "revision": 1,
+      "sha256": "f7b20132fd902db09dc00604339b6f824016999db5dc1c6338f0fdbb6fbc00c6"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ0ZQBWV77AK9KWFBY2",
+      "revision": 1,
+      "sha256": "ec7ce4cb434d147d53313286fbc118f7646bd50f5183afa080343443d40e127e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ140CMQT74FD8KZ0Z1",
+      "revision": 1,
+      "sha256": "b9002165d2193dfd7ad552abc9c9c1a85463008e9b4d04d232faf30deaae04a4"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ1CT3JTMGNCQFVFRC4",
+      "revision": 1,
+      "sha256": "20656052ff4753e57495c9fafce78a2ac45fb1799bac1da5801a6eb96a9ef6e6"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ29HY461AWGN4PGH8W",
+      "revision": 1,
+      "sha256": "5ce96a60da6a09c93a1952fb40e66964ffdc0da95a68d161f1462a406b9c432e"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ2TN7EKDP6NDQ1T0ZC",
+      "revision": 1,
+      "sha256": "3971d4056cc2198ed9e431908e4a5bfc0cfe5054c10d54e092e9bd522f3fffa7"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ3GNF002MYSWXFBBP0",
+      "revision": 1,
+      "sha256": "8a0d1057edfee659cc5d958f1848bd9d35c8763fb454d8611b385c3d51f6c336"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ3VMKP7Y0HZA2RGWJJ",
+      "revision": 1,
+      "sha256": "a404d36df7b8f89e761d259312d574884c3d560a30d5a2bee1e7512f557af005"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ4RAJD2GBTYC0SJM8J",
+      "revision": 1,
+      "sha256": "141738998d7c46427cc7f97e99b89144ab5b315b70c4703321da81037e4d71bb"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ4YS2JN8PK1TAPVK4B",
+      "revision": 1,
+      "sha256": "295b878775bbca5694390ac56a078d31a37c8de894b2b280756bb7225aedba4c"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ5G0MRJ1B93QDNR463",
+      "revision": 1,
+      "sha256": "953e2723f527a0a9254b1147047ee902410cbad8682aea32e8435bdf8c8a1202"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ5T9FRWAXEEGN0P9SP",
+      "revision": 1,
+      "sha256": "4e825ae40db7941552fbc67f529ebd41cf36b749c5ab4c73abeb9e744b52d832"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ6JXVACT79J0TX50Q2",
+      "revision": 1,
+      "sha256": "a5b5a48b6b48584331128ce9e2f7532a8d1acf8cbc17bb854fd81f163217ba97"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ75S2C1EXAVJKG5MEK",
+      "revision": 1,
+      "sha256": "95f1328bcb33276ff312765db49c88c5e994ad24786939d8eb9f456eb3271e71"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ7B66ZG3A3FRBXHMXF",
+      "revision": 1,
+      "sha256": "71950c34339c04b1949916d6102bad07f81f68cf39350b4d6e06eee967c944b1"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ801SYY4SD9KZFCT17",
+      "revision": 1,
+      "sha256": "d5d8c060cc275494d6ba9526b47ddfd5e9bfa86fd7a2b56c2587d4e707becbc6"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ8VW63HASFR9C573N6",
+      "revision": 1,
+      "sha256": "cbfa10cd79f98498ea744fec8dd2f6013a72c8c2d1ddf017688d3560510be457"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ962RD8CC7FGHBEVQ4",
+      "revision": 1,
+      "sha256": "8ecb5ad4dab0fbeade302e141de015f8e7601150c4192a1a4770ef9b935f7c41"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQ9TAY7QWP51W1VEV1P",
+      "revision": 1,
+      "sha256": "f9b2d9fbc012e1f06abe6ecbd528eada4f04f633daebf213cb1b7ead0ae303c3"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQAEBS9MNQ3N8DR1Q9Z",
+      "revision": 1,
+      "sha256": "53b3ec1e7c61bf7207b12c78664d06130a91e2a4b07f316fe394c2ea91a44a65"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQAP3JPYHMD19AZB75N",
+      "revision": 1,
+      "sha256": "f9e5af08305201e9eb9be5bbb11d658fd6f5df5ea72f81295e4f7f54a539fe89"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQB5RC594SQWBNEHECR",
+      "revision": 1,
+      "sha256": "8a0b51a92a8211f8c6e3892d9e7336e930cacc74632cb0e105a6f3c27e2bb341"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQBJDFCXEGDPKWJ59A2",
+      "revision": 1,
+      "sha256": "affb271eeea8898e6d3d4ec2ac1bf2f3ca857b58ceb58d7784dca77dab067acd"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQCW99SW095VVGA23F4",
+      "revision": 1,
+      "sha256": "cafe4073a56710e46af5e65f9cfb4cd63138a025b6ad52c4917ffcde16f58e12"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQDCBHA9N6R7SPRXCAD",
+      "revision": 1,
+      "sha256": "3dd9f34103a80edf96eac4f0c046a68049a2ca1be272e1d3af86d5bfadb927aa"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQDDF37G4EJ6THHKC9E",
+      "revision": 1,
+      "sha256": "22fad86fac1e18e5069af472b3e808b69ead3fce0316a464d33d3f76c2613141"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQEQ8R3GGW89ZCPCAS1",
+      "revision": 1,
+      "sha256": "9b9e8da662c71ef0f0800cdc7aa83f5a7422d0b2616c6f36f05c99c51622a1da"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQEZFCKP9ZJJ0XDK4QM",
+      "revision": 1,
+      "sha256": "1d641b4597c2545e8b46bd2f828563b1500a61c2c9c09760aa9c47892b4d6ff7"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQF11C3KMNSM5CWXQJJ",
+      "revision": 1,
+      "sha256": "487f1b5cf5da8c26540a997ea61976ec67c0fc2b7870764108f06ec05d227a53"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQFP8J4VFXKBNXX9Z18",
+      "revision": 1,
+      "sha256": "e170542fe2ee8e29ae1158e384347baa1a41854202445da07645d8af9f5969e4"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQG5X5YQEPMX6Z00PGS",
+      "revision": 1,
+      "sha256": "4180509ecb1b757f8d3dfe55ca1f11cc9c8dd7e76159bb7860a00b581c72bc8b"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQGEG003MBGFDX4ZYMG",
+      "revision": 1,
+      "sha256": "4175befb3c07797fffd94c72d6747c4cbbd319d7d0b4f6c27dfff1523ee97643"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQHN5SW5DK82JZ2AWQW",
+      "revision": 1,
+      "sha256": "69a9e1ac32139b512b5ea9b1ec62a5e9a1bd75eabdbefc70eaa4cd2187ba00ce"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQHY09NF4N04A73ASPK",
+      "revision": 1,
+      "sha256": "3f8ffd2c42098a166369d497ea333ea7fc794c1c4580fe76cfcb79f59442a433"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQJEEZV7Q7Z52FFZ2SH",
+      "revision": 1,
+      "sha256": "918342676a3ee48b1778c5ddfb6ec8fe40ce832472352e99137322a2e811ceb2"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQJM2PYBA0K8CPMKPXK",
+      "revision": 1,
+      "sha256": "1dce0636301d112c78972971fb48387baccfc242732ef88e493eed0f22d388d2"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQKVE02C5XZCXVAE3SZ",
+      "revision": 1,
+      "sha256": "0dab3e1e6bde358fdda2f954e99cbd96e419af600b8bb4728f9e293d5d2a5579"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQMDKQ8JZE8AEGYFYHV",
+      "revision": 1,
+      "sha256": "d0c8877bdf929a27fa41e74d358d63c3f4fb199e089c86ecac1b10effc6edda4"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M598RQQMHA25Z5DRTZG0B9NC",
+      "revision": 1,
+      "sha256": "d2ec93f5c37c72c3ac4f7e0010c5eb9b9d46b03fd0cb88776f0a80c7247a30ca"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQWY21FZTT7QFNNBGQ45",
+      "revision": 1,
+      "sha256": "d40606fb290f56e111461e05c60294abb4111b6d4424a7a10d238841671b43c0"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQWZ16Y5C9K74MDE73SE",
+      "revision": 1,
+      "sha256": "aafa311bed0dba8310c89de2c559dfaaea9a8573519c01d6eca6b08bc155d51f"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQWZX3G4Y94PP264S68W",
+      "revision": 1,
+      "sha256": "e34a9417633fa7074a3214bb5e94ec9d1b2c4238b929dbf6373b6fa9ce117985"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX00JFG0TS1Y03RQ2GY",
+      "revision": 1,
+      "sha256": "f57e00c8dc40d00300bb64d843cfc0aa3f165a19d62616b78135049d0823f7a6"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX01Z40WAT1KBCKHCT1",
+      "revision": 1,
+      "sha256": "e3c71bdfd02edd9d35b1829ecd0cc65a01c98eaca4d8ad9a51cf75f979be5d2f"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX12SJ0RY1AG48JVGSJ",
+      "revision": 1,
+      "sha256": "372cfa30d28267b8ede60e8e7532a3b231e33d8905d9f0e6d504bd500abb7591"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX1T82DF80Z46RRMBBM",
+      "revision": 1,
+      "sha256": "3bcb953f5bb55d7091670189767c66735780f5cbb93d032e6ed05a488c42c72e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX2T78VPGDMEN44Q9K6",
+      "revision": 1,
+      "sha256": "85f5511647de6c87558195af23f4944cae39bece4679bc9881b0af121581bb8c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX33JZRRN8Z4TPXQWGB",
+      "revision": 1,
+      "sha256": "cf1d08d65466cf0e730a08e1e92e4ea7a859ffe658d0cafb0b9e8bb3776f6c1b"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX3F91S1Z92E48SHRDG",
+      "revision": 1,
+      "sha256": "9842fac5075d1d684500f6d5b19c7e61f56bb1e3c3b6208bbb48446e3966e6b2"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX46HDZ6W5VK9H7Y9GB",
+      "revision": 1,
+      "sha256": "8331331fcd349cf6b3e7080391911bec8eaa6d6a05dc351668d5c0ebbd06d54e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX4Q1WR1R7KJN48TZ4T",
+      "revision": 1,
+      "sha256": "88aeed6993964ae0c532bb02f94b8a94c4c1218bb6ffdda8049629da188abb3d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX4QJPA7J749BKMPRX0",
+      "revision": 1,
+      "sha256": "0e5bdd6666c364a188f9581e20aa7f7cd62344c3edf5b7d806a310957fc1cae1"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX5CZ8XGJXT7R41ZW2K",
+      "revision": 1,
+      "sha256": "49228a19b9cb35d505a61df166ed4542726bc79a5c776fac09b23e8bf805e8be"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX5ZNRGB2Y3433VX6TW",
+      "revision": 1,
+      "sha256": "2edd23c89295239c15b09f130ef21b09aabe59fc306bf1dc4d8f1351aa289d98"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX6EZKTY9DVS4YK2GXT",
+      "revision": 1,
+      "sha256": "d48f8903849fa42f17d4c69b9ff9279f3bf794a0b448650bf64aed4cda500ffb"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX6P8JYNEHAEZ2FPXSS",
+      "revision": 1,
+      "sha256": "4300cd8d6cf5101fb1c83e55f0eb23edad229996c971e42fa4e500554d5ca0c9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX7A1QP9DE3AQEX9PQB",
+      "revision": 1,
+      "sha256": "2ce6684588710434d5226a2410515c6e4810768269336b94ddc838df59b9651a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX8J92NR8QWHYKB1EXX",
+      "revision": 1,
+      "sha256": "ba43c5a6c9b6ec834228e6893c8e85aaeb472817f51ccd2b145f65c2882b96ee"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX8V6DY1S54GBM4NYMV",
+      "revision": 1,
+      "sha256": "febb28f79fcbae0fe865afef8f7521a90cbf4d2e93979a7077f70d8263ca0941"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX9FGHYG8YBTAR13N7F",
+      "revision": 1,
+      "sha256": "3855d4ca903d7a944227254ace670fa493a3895684c90eac3fe2d20d5891e690"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQX9PM3ZECCJBD9DCQT4",
+      "revision": 1,
+      "sha256": "02381ce7e46eeaf4e3329355fb460a8857bf0f26559020041d566f2c0ec4dc69"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXA2WWSY3SS00PXSF52",
+      "revision": 1,
+      "sha256": "23e7c27d9166825dec254790266c6edb948145f090de07fcf18ef480a5ffe914"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXA6N7CF41VRF8Z3NEK",
+      "revision": 1,
+      "sha256": "b33f63233d7807d23e565445a5f9ddebe7e3a81166a606eab1024090878e695c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXA9GT8JJJ97E5Q3PVG",
+      "revision": 1,
+      "sha256": "d6207923c0c40e741d49dd27c432c09449e8f11b4fe473b6e142ca7c88e95805"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXB0EK400NNAQNHPQVW",
+      "revision": 1,
+      "sha256": "87811b757d1f22b9de4568990a515c8c00547b66d978c738d1227aa88babdec9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXBDYCDD9K87QZFS0J3",
+      "revision": 1,
+      "sha256": "728b064ca75f4d951239a4bd1b66528a3d33e1f5d1fa5fffaaabf3c8b9c494ab"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXCNV21TW1VJJCQPGDX",
+      "revision": 1,
+      "sha256": "a1edca0d25add84383140a99c27c362d9519da31e9588f769d5c88c175c33130"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXD3WBPEPM5HC91RSW6",
+      "revision": 1,
+      "sha256": "51c8959d20d3b62ae6fecd0dbd7483df06ca610881ce83696e2e36c9c83ff77f"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXDE5V7YYH6ETYXK3KA",
+      "revision": 1,
+      "sha256": "5ca593cef85854b8d8a0f6c3c8f3fa2243df33145f695bf066e9da14914245a3"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXDZ2RT67TZX6SPWTZ0",
+      "revision": 1,
+      "sha256": "1f51c560dcfbb2c07129ddae38026eff2091d2747b1ccc73beeac19df1cef885"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXEF4C0KRKVNBQDHBB4",
+      "revision": 1,
+      "sha256": "3c4b01cd23c33c39198c711a94f287c75837770845c5e69ed5b964d56b7d7b58"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXEMQDG4BYKYHGZN8Y3",
+      "revision": 1,
+      "sha256": "7d364676d5087326cec72f29ce1a7749897128c43552897fdff918c3b5d71ebe"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXF3SHY9N5HZ0C9MZCV",
+      "revision": 1,
+      "sha256": "389067f78e54a1d43197741cc571ebccf934ac73f6021c05add05747edbbcd27"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXFNZM90ETRAKEWX5CN",
+      "revision": 1,
+      "sha256": "6f934ebc53843fcbda9c5cfcb6a5f1062a7f6f4e9d1abfde0c66b6f3dbc40f63"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXG9J1FEV0QBRXA104X",
+      "revision": 1,
+      "sha256": "a50fd81baa1b2f38a200b39c7324d71df72d81631317fb3d58f8639881e91215"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXGQ2N834BMD3CWD47N",
+      "revision": 1,
+      "sha256": "88732c9f709f108e62dab10a1838a93870da16db35d3e1de5ffeb584c552c611"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXH3AV95CMEY4A8RPSP",
+      "revision": 1,
+      "sha256": "3e11a2b3b79679d8895d876dc7a21e51f779bfe5435b058b6ca31dd7bc760e9c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXH8AVAY5YY71PQQPSQ",
+      "revision": 1,
+      "sha256": "2a77cbf7df267c871b7676932df57fb25d6cdcf6bcb0c82e4b7ae455db55d03e"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXJ7G2F2XDWP4VM5TM6",
+      "revision": 1,
+      "sha256": "dec44d733d60c5f2e70de979dc88c04fed5b7ac8e94254e048adfcf005a57a1c"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXK3ZVH7T363860RHTW",
+      "revision": 1,
+      "sha256": "591bd9a76f39bad8fa00f3d216f198024fa364ebb9b4624bfffa3229bf898785"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXK4N2ZGQZSN7XQ7JRY",
+      "revision": 1,
+      "sha256": "6627db530a22f8380073874ba3821611390ca4ca5f0a246e97e993e83236de1d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXK6JWDM49FB10Z2JVP",
+      "revision": 1,
+      "sha256": "188f94b1c131e3906ddc6741a27337876e15b3ff6d1befc1b09a791e9859964b"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXMTKN4G3P4DM7PVX0Q",
+      "revision": 1,
+      "sha256": "44f88b772859403d9052b5bc08b71d3e90a7b8ad236769fdc83536c7d57ea6f9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXNC3CF9F3A9Y58BZQK",
+      "revision": 1,
+      "sha256": "44edb6b8c66cde2626cb54311963c05c5d440545ed5683d5f68270beccf009a9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXNW3DN1Z7SSYTXJNKJ",
+      "revision": 1,
+      "sha256": "6d71c5669b5a169f8c5022a6d8c171f8016d28e1cb320d1766e7093adb0dd500"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXP93KTKEWZYC4G6X9Q",
+      "revision": 1,
+      "sha256": "0a740f98f2eed67abb56f3cdfb9738810f5843f88d28112e8a987d7e7f9ef277"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXPTX3FHFHKGKGFRM6M",
+      "revision": 1,
+      "sha256": "b0331bb6a5e92b48ab5ff63cab13352724dd821ac3c9323b21e07287f4b46e26"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXQDX32THJAYMKSZ5RE",
+      "revision": 1,
+      "sha256": "4ce61ef71b8cb811256ffaa66dc75fbf303dc94f131518c49ba880718a423d98"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXQN009HM2BAB88WDD3",
+      "revision": 1,
+      "sha256": "237d052db12a8b5318aaa7846dc23109b98d0e82d34e1d0dbbb87e00e1ddb56a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXRS0MV05V6DMS9M594",
+      "revision": 1,
+      "sha256": "f9afd515d8ec702aa1f08a5649af8272c76d2745f06017191e0e1b6d86570d83"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXRZ7H3N7A326ZPGXC5",
+      "revision": 1,
+      "sha256": "f20753dab2cf14c6b5ad9cbbbf86ca86d62eb21cd3c1c7bd39263107fc158d53"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXSXJ3FEDZVFN7RNN3B",
+      "revision": 1,
+      "sha256": "970a7bb2e9b68347aba119f3a92d6588de44b0178db33d4c2311ea8a78ad7a02"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXT3BPFANZ61RFNVD2X",
+      "revision": 1,
+      "sha256": "c35c8799a0cf8ba0931b045f116c29a716e8dc1b7e97a612cc569f02757fdad8"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXTTKQ6DQMFXACDPBB4",
+      "revision": 1,
+      "sha256": "3f67f6a71527b1c6f4671fa85ecf9bf2de1208dadd3489966e40d41237830f84"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXVCHDPQS1FVZBR49KZ",
+      "revision": 1,
+      "sha256": "44e2b91bd544227ad2faad4ec76db6348b0b49431d1185e058b9bd45a84652f7"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXVR4ABEYPPG8X8SAMV",
+      "revision": 1,
+      "sha256": "472b087f37c94ede3e5b06a05ee3e6ef0502d8418fc409fdbd191efb19d84f1a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXWMP46KQY6K3FS923Y",
+      "revision": 1,
+      "sha256": "107f3e71b123ad7a2d04ed6ee7c8c644d9920cb9a309b33af24c58b071dbd45a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXWV963XEQHTSHE5NYX",
+      "revision": 1,
+      "sha256": "4ca469c8063c37572706c43adc4535306243395f8855c488bcede4feabaa2898"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXX8MYE1YR7S2R72Q2G",
+      "revision": 1,
+      "sha256": "cf2f257b3c013d3079b576338485d6d74afd1be8fda121b7df8835356d8df5a0"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXXBXA2DA3DHFYY2M7W",
+      "revision": 1,
+      "sha256": "6ed0dfdab1f8e5b2bf9c7c3bd594cb2c3dbcc2c5542d6afe7ea3af75f42f19d4"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXY78K2P5F8YDVJB902",
+      "revision": 1,
+      "sha256": "7ed7450a47b81622f4f1250a46437d94311b9bae9aa22f8e0ce84728221d287d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXYW2QDND710KBEQ12K",
+      "revision": 1,
+      "sha256": "360206492791ef5f047bf9faf9bafa7d7cc7c45fbc47a4a40707712580c3a6bd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXZBMTY9GF8PD9DZT42",
+      "revision": 1,
+      "sha256": "e20e4e3a5d70f7ad8058a34233b13e2efa7c57cdd282437e54ad2c6c5fe2dcc9"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQXZZPF5MM6VD0SSTZW6",
+      "revision": 1,
+      "sha256": "435e97367c38199edc387350cd99d1b6a306bbeb003f8cc08c22c6c62c65ad09"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY004CFA8W92JCFZAQN",
+      "revision": 1,
+      "sha256": "c45f2935238bc0e8168dad370b88a930502a961d4e94510cdf5ded1feb27e828"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY103D1GAGNF8XH29TY",
+      "revision": 1,
+      "sha256": "5074e9f5d70e30d698a6eb4a7e5f99da7551f1a924ae8b7c67384fd4fc14b43a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY1N3H05KF6NG6E08GE",
+      "revision": 1,
+      "sha256": "2452388495c258f77b940a176ec6208cb1fb2e59619bcd144af277f197336c8a"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY20JY5GEG2PST308GN",
+      "revision": 1,
+      "sha256": "e9bfeb0a311898dd620c24e371960c03ca9fddc3c7400938e037989b7d1a1394"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY2CRRG58YY2GSFZBE1",
+      "revision": 1,
+      "sha256": "41aa905d8ef4cc2844d7c1005af6a6694415bb2210bcb188c9fb6b3145baf951"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY33RJ44WA06CH658J8",
+      "revision": 1,
+      "sha256": "bb8c09ba17de21881bb16ebb3901747c90934f046fe0db135a09f08fd4514bdc"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY3SKZRPZZXV08MMJ0R",
+      "revision": 1,
+      "sha256": "b57fb60223d90acac7047e3be6efb24b531b4d2c7d4cfc81b4b4c0152f026376"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY4Q2KAHFQ1TZ61T73P",
+      "revision": 1,
+      "sha256": "aeecc1455837a6b5cb486d6bd06984abd8192a0f3f040fe8ecabc1009f78d02b"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY4QRDEDBD5KT55Q23W",
+      "revision": 1,
+      "sha256": "bf5680173747e9077c2d6be6320a04ec093825ef06e46e4180b65fd3060c6ccf"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY55MT98GKT5BP07N7P",
+      "revision": 1,
+      "sha256": "70a90d4b15f3228b38c9264426461fa6629f16193b8aa8cb68565e2a5703d243"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY5TKCAC152XXFG5GN8",
+      "revision": 1,
+      "sha256": "e36d754e2e1a9fa9dbe1c8a4109bb1c85df6246bae83135345f5f755545c07e6"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M598RQY60VMPN1XENDRCC55G",
+      "revision": 1,
+      "sha256": "ec7cd7879dd5ac45fd1e2b097af367f6d51344ec889919766a19b1a7d7398e6d"
+    }
+  ],
   "summary": {
     "by_area": {
-      "SUP": {
-        "security": "UNKNOWN"
-      },
-      "REQ": {
-        "security": "UNKNOWN"
-      },
-      "PLT": {
-        "security": "UNKNOWN"
-      },
       "LIF": {
-        "security": "UNKNOWN"
+        "security": "UNKNOWN",
+        "inventory_complete": false
       },
       "OBS": {
-        "security": "UNKNOWN"
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "PLT": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "REQ": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "SUP": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      }
+    },
+    "by_purpose": {
+      "검사 결과 반영": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "공유 제한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "권한·자격 철회": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "변경 중 일관성": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "보존·삭제 관리": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "복구 상태의 적합성": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "상대 확인·전송 보호": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "생성·변경·승인 권한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "수집 정보 제한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "승인 범위": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "시작·재개 조건": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "실제 사용의 일치·무결성": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "실제 입력의 검사": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "실패 감지·전파": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "실행 권한 제한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "실행 상태·메모리 안전": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "요청·대상 접근 권한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "요청·상태·결과 귀속": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "자격 전달·사용 제한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "자료 이용 권한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "자료 해석 안전성": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "자원 사용 제한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "재사용 적합성": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "종결·자원 회수": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "증거의 신뢰성": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "코드 실행 제한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "통신·내부 호출 제한": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
+      },
+      "필요한 사건의 기록": {
+        "security": "UNKNOWN",
+        "inventory_complete": false
       }
     },
     "evidence_counts": {}
@@ -59,8 +1130,14 @@
   "checks": [
     {
       "check_id": "SUP-01",
+      "area": "SUP",
+      "purpose": "생성·변경·승인 권한",
+      "question": "제출·저장소 쓰기 권한만으로 승인 기록을 바꿀 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
       "applicability": "UNDETERMINED",
       "selected": true,
+      "tested_while_undetermined": true,
       "sides": {
         "single": {
           "result_ref": {
@@ -76,15 +1153,104 @@
         }
       },
       "comparison": null,
+      "functional_comparison": null,
+      "comparison_reasons": [],
       "gaps": [
         "NO_EXECUTOR"
       ],
-      "evidence_source": null
+      "evidence_source": null,
+      "exception": null,
+      "replaced": null,
+      "functional_scope": null
     }
   ],
+  "manual_required": [
+    "SUP-01",
+    "SUP-02",
+    "SUP-03",
+    "SUP-04",
+    "SUP-05",
+    "SUP-06",
+    "SUP-07",
+    "SUP-08",
+    "SUP-09",
+    "SUP-10",
+    "SUP-11",
+    "SUP-12",
+    "SUP-13",
+    "SUP-14",
+    "SUP-15",
+    "SUP-16",
+    "REQ-02",
+    "REQ-03",
+    "REQ-04",
+    "REQ-05",
+    "REQ-06",
+    "REQ-07",
+    "REQ-08",
+    "REQ-09",
+    "REQ-10",
+    "REQ-11",
+    "REQ-12",
+    "REQ-13",
+    "REQ-14",
+    "REQ-15",
+    "REQ-16",
+    "REQ-17",
+    "REQ-18",
+    "REQ-19",
+    "REQ-20",
+    "REQ-21",
+    "PLT-01",
+    "PLT-02",
+    "PLT-03",
+    "PLT-04",
+    "PLT-05",
+    "PLT-06",
+    "PLT-07",
+    "PLT-08",
+    "PLT-09",
+    "PLT-10",
+    "PLT-11",
+    "PLT-12",
+    "LIF-01",
+    "LIF-02",
+    "LIF-03",
+    "LIF-04",
+    "LIF-05",
+    "LIF-06",
+    "LIF-07",
+    "LIF-08",
+    "LIF-09",
+    "LIF-10",
+    "LIF-11",
+    "LIF-12",
+    "LIF-13",
+    "LIF-14",
+    "LIF-15",
+    "LIF-16",
+    "OBS-01",
+    "OBS-02",
+    "OBS-03",
+    "OBS-04",
+    "OBS-05",
+    "OBS-06",
+    "OBS-07",
+    "OBS-08",
+    "OBS-09",
+    "OBS-10",
+    "OBS-11",
+    "OBS-12"
+  ],
+  "not_selected": [],
   "limitations": [
     "검토 전 팩(DRAFT): 공식 아님",
-    "EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음"
+    "정책 DRAFT: 공식 아님",
+    "EXAMPLE 자료 사용: 공식 판정 근거가 될 수 없음",
+    "적용 미정 상태로 시험함: 76개 점검",
+    "자동 실행 불가(수동 시험 필요): 76개 점검",
+    "검증 수준 없음(근거 누락): 76개 점검",
+    "점검 목록 미완결 보호 목적: 28개 — 집계 PASS 불가"
   ],
   "approval": null
 }

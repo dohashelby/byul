@@ -7,7 +7,12 @@ import { EvidencePage } from "../pages/EvidencePage";
 import { RequestsPage } from "../pages/RequestsPage";
 import { ResultsPage } from "../pages/ResultsPage";
 import { RevalidationPage } from "../pages/RevalidationPage";
-import { RuntimeStatusPage } from "../pages/RuntimeStatusPage";
+import { RuntimeEnforcePage } from "../pages/runtime/RuntimeEnforcePage";
+import { RuntimeObservePage } from "../pages/runtime/RuntimeObservePage";
+import { RuntimeOverviewPage } from "../pages/runtime/RuntimeOverviewPage";
+import { RuntimePolicyPage } from "../pages/runtime/RuntimePolicyPage";
+import { RuntimeSettingsPage } from "../pages/runtime/RuntimeSettingsPage";
+import { RuntimeTargetPage } from "../pages/runtime/RuntimeTargetPage";
 import { StateView } from "../components/Misc";
 import { Layout } from "./Layout";
 
@@ -26,9 +31,18 @@ export const routes: RouteObject[] = [
       { path: "policies/:id", element: <PolicyEditorPage /> },
       { path: "update/results", element: <ResultsPage /> },
       { path: "update/revalidation", element: <RevalidationPage /> },
+      { path: "runtime/overview", element: <RuntimeOverviewPage /> },
       { path: "runtime/requests", element: <RequestsPage /> },
+      { path: "runtime/policy", element: <RuntimePolicyPage /> },
+      { path: "runtime/target", element: <RuntimeTargetPage /> },
+      { path: "runtime/observe", element: <Navigate to="/runtime/observe/collectors" replace /> },
+      { path: "runtime/observe/:sub", element: <RuntimeObservePage /> },
+      { path: "runtime/enforce", element: <Navigate to="/runtime/enforce/cilium" replace /> },
+      { path: "runtime/enforce/:sub", element: <RuntimeEnforcePage /> },
       { path: "runtime/events", element: <EventsPage /> },
-      { path: "runtime/status", element: <RuntimeStatusPage /> },
+      { path: "runtime/settings", element: <RuntimeSettingsPage /> },
+      // 이전 주소 호환
+      { path: "runtime/status", element: <Navigate to="/runtime/overview" replace /> },
       { path: "evidence", element: <EvidencePage /> },
       { path: "*", element: <StateView kind="not_found" detail="없는 화면입니다." /> },
     ],

@@ -14,7 +14,6 @@ from guard.core.select import PolicyValueError, select
 from guard.judges.declared import DeclaredJudge
 from guard.models import Evidence
 from guard.models.checkdef import JudgeSpec, ObsSpec, PolicyParam
-from guard.report.html import render_html
 from guard.store import Store
 from guard.store.packs import put_pack
 from tests.builders import PACK_DIR, ROOT, T0, baseline_pack, environment, policy
@@ -202,15 +201,8 @@ def test_manual_versions_report_side_history_and_idempotence(tmp_path, pack, ver
     assert "usage_allowed=false" in text and "replay_allowed=false" in text
     assert "POLICY_BRANCH_INACTIVE" in text and "인증되지 않은 자기 신고" in text
     assert all(any("not authenticated" in reason for reason in r.reasons) for r in results)
-    html = render_html(report)
-    assert "POLICY_CONTEXT:" in html and "usage_allowed=false" in html
-    assert "<script>operator</script>" not in html
-    # Rendering takes RPT, not all raw EVD notes or operator identifiers.
-    untrusted = deepcopy(report)
-    untrusted["limitations"].append("POLICY_CONTEXT: EXAMPLE <script>untrusted note</script>")
-    escaped = render_html(untrusted)
-    assert "<script>untrusted note</script>" not in escaped
-    assert "&lt;script&gt;untrusted note&lt;/script&gt;" in escaped
+    # The report (화면 원본) carries RPT context, not raw EVD notes or operator identifiers.
+    assert "<script>operator</script>" not in text
     if mode == "update":
         row = next(r for r in report["by_check"] if r["check_id"] == "OBS-08")
         assert row["baseline"]["security"] == "UNKNOWN" and row["candidate"]["security"] == "FAIL"

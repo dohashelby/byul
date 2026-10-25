@@ -1,5 +1,5 @@
 {
-  "schema_version": "byul-revalidation-request/0.1",
+  "schema_version": "byul-revalidation-request/0.2",
   "revalidation_id": "reval-0001",
   "fingerprint": "bb8a00f878cea408d39f41274597239bc412be2bce96a838b7173de05ad4ebeb",
   "event": "opened",
@@ -23,5 +23,7 @@
   "superseded_by": null,
   "status": "open",
   "data_origin": "EXAMPLE",
-  "origin_detail": "mock"
+  "origin_detail": "mock",
+  "opened_at": "2026-10-25T02:00:00Z",
+  "current_evidence_present": true
 }

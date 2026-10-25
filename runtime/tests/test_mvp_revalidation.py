@@ -26,7 +26,6 @@ from serving_runtime.mvp.revalidation import (
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "examples/mvp/policy.json"
-STATIC = ROOT / "src/serving_runtime/mvp/static"
 
 
 def context(session: str = "a" * 32) -> dict:
@@ -397,16 +396,6 @@ class ExportAndDashboardTests(unittest.TestCase):
                 ),
                 1,
             )
-
-    def test_dashboard_is_read_only_and_uses_text_content(self) -> None:
-        page = (STATIC / "index.html").read_text(encoding="utf-8")
-        script = (STATIC / "app.js").read_text(encoding="utf-8")
-        self.assertIn("재검증 요청", page)
-        self.assertIn("/api/revalidation", script)
-        self.assertIn("current_evidence_present", script)
-        self.assertIn("다른 근거로 대체됨, 해소 아님", script)
-        self.assertIn("current_condition_count", script)
-        self.assertNotIn("innerHTML", script)
 
     def test_api_returns_open_requests_and_status_count(self) -> None:
         try:

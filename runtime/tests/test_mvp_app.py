@@ -64,7 +64,11 @@ class GatewayAppTests(unittest.TestCase):
             self.assertTrue(response.headers["Content-Type"].startswith("text/html"))
         self.assertIn("모의 엔진", page)
         self.assertIn("/static/app.js", page)
-        for asset, content_type in (("/static/app.css", "text/css"), ("/static/app.js", "text/javascript")):
+        for asset, content_type in (
+            ("/static/app.css", "text/css"),
+            ("/static/app.js", "text/javascript"),
+            ("/static/vendor/chart.umd.min.js", "text/javascript"),
+        ):
             with closing(urlopen(self.base_url + asset, timeout=2)) as response:
                 self.assertTrue(response.headers["Content-Type"].startswith(content_type))
                 self.assertGreater(len(response.read()), 0)

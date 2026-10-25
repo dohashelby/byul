@@ -28,6 +28,8 @@ _STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/static/app.css": ("app.css", "text/css; charset=utf-8"),
     "/static/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    # Vendored Chart.js 4.5.1 (MIT); see docs/외부기능_활용목록.md for origin and hash.
+    "/static/vendor/chart.umd.min.js": ("vendor/chart.umd.min.js", "text/javascript; charset=utf-8"),
 }
 
 

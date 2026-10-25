@@ -5,73 +5,140 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Serving Runtime · 요청 통제 MVP</title>
   <link rel="stylesheet" href="/static/app.css">
+  <script>
+    // Apply a saved light/dark choice before first paint; fall back to the OS setting.
+    try {
+      var savedTheme = localStorage.getItem("serving-runtime-theme");
+      if (savedTheme === "light" || savedTheme === "dark") document.documentElement.dataset.theme = savedTheme;
+    } catch (_) {}
+  </script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-inner">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <div>
-          <h1>Serving Runtime</h1>
-          <p class="subtitle">요청 통제 MVP · 읽기 전용 대시보드</p>
-        </div>
-      </div>
-      <div class="topbar-meta">
-        <span id="backend-badge" class="badge badge-mock">모의 엔진</span>
-        <span id="refresh-state" class="refresh-state" role="status">연결 중…</span>
-      </div>
+  <div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-name">Serving Runtime</span>
+      <span class="brand-tag">LAB</span>
     </div>
-  </header>
+    <nav class="nav" aria-label="화면 영역">
+      <div class="nav-group">
+        <span class="nav-group-title">개요</span>
+        <button type="button" class="nav-item" data-view="overview"><span class="nav-label">현황</span><span class="nav-badge" id="nav-badge-overview" hidden></span></button>
+      </div>
+      <div class="nav-group">
+        <span class="nav-group-title">요청 통제</span>
+        <button type="button" class="nav-item" data-view="requests"><span class="nav-label">요청</span><span class="nav-badge" id="nav-badge-requests" hidden></span></button>
+        <button type="button" class="nav-item" data-view="policy"><span class="nav-label">정책</span><span class="nav-badge" id="nav-badge-policy" hidden></span></button>
+        <button type="button" class="nav-item" data-view="target"><span class="nav-label">대상·구성</span><span class="nav-badge" id="nav-badge-target" hidden></span></button>
+      </div>
+      <div class="nav-group">
+        <span class="nav-group-title">관측</span>
+        <button type="button" class="nav-item" data-view="observe" data-subview="collectors"><span class="nav-label">수집원</span><span class="nav-badge" id="nav-badge-observe" hidden></span></button>
+        <button type="button" class="nav-item" data-view="observe" data-subview="hubble"><span class="nav-label">Hubble</span></button>
+        <button type="button" class="nav-item" data-view="observe" data-subview="tetragon"><span class="nav-label">Tetragon</span></button>
+      </div>
+      <div class="nav-group">
+        <span class="nav-group-title">통제 적용</span>
+        <button type="button" class="nav-item" data-view="enforce" data-subview="cilium"><span class="nav-label">Cilium</span><span class="nav-badge" id="nav-badge-cilium" hidden></span></button>
+        <button type="button" class="nav-item" data-view="enforce" data-subview="lab"><span class="nav-label">lab 시험</span><span class="nav-badge" id="nav-badge-enforce" hidden></span></button>
+      </div>
+      <div class="nav-group">
+        <span class="nav-group-title">업데이트 검증</span>
+        <button type="button" class="nav-item" data-view="update"><span class="nav-label">업데이트 검증</span></button>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button type="button" class="nav-item" data-view="settings"><span class="nav-label">설정</span></button>
+      <button type="button" class="nav-item nav-user" data-view="user">
+        <span class="nav-avatar" aria-hidden="true"></span>
+        <span class="nav-user-text"><span class="nav-label">사용자</span><span class="nav-sub" id="nav-user-state">인증 상태 확인 중</span></span>
+      </button>
+    </div>
+  </aside>
 
-  <div id="stale-banner" class="stale-banner" role="alert" hidden></div>
-  <div id="auth-form" class="auth-form" role="group" aria-label="조회 토큰" hidden>
-    <span id="auth-message">조회 API에 인증이 필요합니다.</span>
-    <label for="auth-token">조회 토큰</label>
-    <input id="auth-token" type="password" autocomplete="off" spellcheck="false">
-    <button type="button" id="auth-apply">적용</button>
-    <button type="button" id="auth-clear">지우기</button>
-  </div>
+  <div class="main">
+    <header class="pagebar">
+      <h1 id="page-title" class="page-title">현황</h1>
+      <div class="pagebar-filters" aria-label="표시 범위">
+        <span class="scope-chip"><span class="scope-key">요청 환경</span><span id="env-gateway" class="scope-value">–</span></span>
+        <span class="scope-chip"><span class="scope-key">관측 환경</span><span id="env-observe" class="scope-value">–</span></span>
+        <span id="backend-badge" class="badge badge-mock">모의 엔진</span>
+      </div>
+      <div class="pagebar-right">
+        <span id="refresh-state" class="refresh-state" role="status">연결 중…</span>
+        <button type="button" id="theme-toggle" class="icon-button theme-toggle" aria-label="화면 모드 전환" title="화면 모드 전환">
+          <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
 
-  <div class="layout">
-  <nav class="sidebar" aria-label="화면 영역">
-    <button type="button" class="nav-item" data-view="overview"><span class="nav-label">현황</span><span class="nav-badge" id="nav-badge-overview" hidden></span><span class="nav-env" id="nav-env-overview">전체 요약</span></button>
-    <button type="button" class="nav-item" data-view="requests"><span class="nav-label">요청</span><span class="nav-badge" id="nav-badge-requests" hidden></span><span class="nav-env" id="nav-env-requests">Gateway·엔진</span></button>
-    <button type="button" class="nav-item" data-view="policy"><span class="nav-label">정책</span><span class="nav-badge" id="nav-badge-policy" hidden></span><span class="nav-env" id="nav-env-policy">Gateway 요청 규칙</span></button>
-    <button type="button" class="nav-item" data-view="target"><span class="nav-label">대상·구성</span><span class="nav-badge" id="nav-badge-target" hidden></span><span class="nav-env" id="nav-env-target">Gateway·엔진</span></button>
-    <button type="button" class="nav-item" data-view="observe"><span class="nav-label">관측</span><span class="nav-badge" id="nav-badge-observe" hidden></span><span class="nav-env" id="nav-env-observe">수집원·Hubble·Tetragon</span></button>
-    <button type="button" class="nav-item" data-view="enforce"><span class="nav-label">통제 적용</span><span class="nav-badge" id="nav-badge-enforce" hidden></span><span class="nav-env" id="nav-env-enforce">Cilium·lab 시험</span></button>
-  </nav>
+    <div id="stale-banner" class="stale-banner" role="alert" hidden></div>
+    <div id="auth-form" class="auth-form" role="group" aria-label="조회 토큰" hidden>
+      <span id="auth-message">조회 API에 인증이 필요합니다.</span>
+      <label for="auth-token">조회 토큰</label>
+      <input id="auth-token" type="password" autocomplete="off" spellcheck="false">
+      <button type="button" id="auth-apply">적용</button>
+      <button type="button" id="auth-clear">지우기</button>
+    </div>
 
   <main class="page">
     <section class="view" data-view="overview" aria-labelledby="overview-title">
       <div class="section-head">
-        <h2 id="overview-title">현황</h2>
+        <h2 id="overview-title" class="visually-hidden">현황</h2>
         <span id="session-id" class="muted mono"></span>
       </div>
 
-      <div class="stat-grid">
-        <button type="button" class="stat stat-allowed" data-filter="ALLOWED">
-          <span class="stat-label">허용</span><span class="stat-value" id="count-ALLOWED">–</span>
-        </button>
-        <button type="button" class="stat stat-denied" data-filter="DENIED">
-          <span class="stat-label">정책 거부</span><span class="stat-value" id="count-DENIED">–</span>
-        </button>
-        <button type="button" class="stat stat-invalid" data-filter="INVALID">
-          <span class="stat-label">입력 오류</span><span class="stat-value" id="count-INVALID">–</span>
-        </button>
-        <button type="button" class="stat stat-engine-rejected" data-filter="ENGINE_REJECTED">
-          <span class="stat-label">엔진 거부</span><span class="stat-value" id="count-ENGINE_REJECTED">–</span>
-        </button>
-        <button type="button" class="stat stat-error" data-filter="ERROR">
-          <span class="stat-label">처리 오류</span><span class="stat-value" id="count-ERROR">–</span>
-        </button>
-        <button type="button" class="stat stat-incomplete" data-filter="INCOMPLETE">
-          <span class="stat-label">미완료</span><span class="stat-value" id="count-INCOMPLETE">–</span>
-        </button>
+      <div class="summary-grid">
+        <article class="card summary-card">
+          <h3>요청</h3>
+          <p class="big-number"><span id="ov-request-total">–</span><span class="big-caption">전체 요청 기록</span></p>
+          <div class="bar-list" role="group" aria-label="결과별 요청 수">
+            <button type="button" class="bar-row stat" data-filter="ALLOWED"><span class="bar-label">허용</span><span class="bar-track"><span class="bar-fill" id="bar-ALLOWED"></span></span><span class="bar-count" id="count-ALLOWED">–</span></button>
+            <button type="button" class="bar-row stat" data-filter="DENIED"><span class="bar-label">정책 거부</span><span class="bar-track"><span class="bar-fill" id="bar-DENIED"></span></span><span class="bar-count" id="count-DENIED">–</span></button>
+            <button type="button" class="bar-row stat" data-filter="INVALID"><span class="bar-label">입력 오류</span><span class="bar-track"><span class="bar-fill" id="bar-INVALID"></span></span><span class="bar-count" id="count-INVALID">–</span></button>
+            <button type="button" class="bar-row stat" data-filter="ENGINE_REJECTED"><span class="bar-label">엔진 거부</span><span class="bar-track"><span class="bar-fill" id="bar-ENGINE_REJECTED"></span></span><span class="bar-count" id="count-ENGINE_REJECTED">–</span></button>
+            <button type="button" class="bar-row stat is-error" data-filter="ERROR"><span class="bar-label">처리 오류</span><span class="bar-track"><span class="bar-fill" id="bar-ERROR"></span></span><span class="bar-count" id="count-ERROR">–</span></button>
+            <button type="button" class="bar-row stat" data-filter="INCOMPLETE"><span class="bar-label">미완료</span><span class="bar-track"><span class="bar-fill" id="bar-INCOMPLETE"></span></span><span class="bar-count" id="count-INCOMPLETE">–</span></button>
+          </div>
+        </article>
+        <article class="card summary-card">
+          <h3>거부·오류 사유</h3>
+          <p class="big-number"><span id="ov-reason-total">–</span><span class="big-caption" id="ov-reason-caption">최근 요청 중 거부·오류</span></p>
+          <table class="mini-table"><thead><tr><th>사유</th><th class="num">건수</th></tr></thead><tbody id="ov-reason-rows"></tbody></table>
+        </article>
+        <article class="card summary-card">
+          <h3>관측 사건</h3>
+          <p class="big-number"><span id="ov-observation-total">–</span><span class="big-caption">누적 관측 사건</span></p>
+          <table class="mini-table"><thead><tr><th>규칙·판정</th><th class="num">건수</th></tr></thead><tbody id="ov-rule-rows"></tbody></table>
+        </article>
       </div>
+
+      <div class="chart-row">
+        <article class="card chart-card">
+          <h3>시간별 요청</h3>
+          <div class="card-tabs" role="tablist" aria-label="시간별 요청 보기">
+            <button type="button" class="card-tab is-active" role="tab" data-chart="requests" data-mode="total">전체</button>
+            <button type="button" class="card-tab" role="tab" data-chart="requests" data-mode="results">결과별</button>
+          </div>
+          <p class="big-number"><span id="chart-requests-total">–</span><span class="big-caption" id="chart-requests-note">요청</span></p>
+          <div class="chart-box"><canvas id="chart-requests" role="img" aria-label="시간별 요청"></canvas></div>
+        </article>
+        <article class="card chart-card">
+          <h3>구성 비율</h3>
+          <div class="card-tabs" role="tablist" aria-label="구성 비율 보기">
+            <button type="button" class="card-tab is-active" role="tab" data-chart="mix" data-mode="results">요청 결과</button>
+            <button type="button" class="card-tab" role="tab" data-chart="mix" data-mode="rules">관측 규칙</button>
+          </div>
+          <p class="big-number"><span id="chart-mix-total">–</span><span class="big-caption" id="chart-mix-note">누적</span></p>
+          <div class="chart-box"><canvas id="chart-mix" role="img" aria-label="구성 비율"></canvas></div>
+        </article>
+      </div>
+      <p id="chart-error" class="notice" hidden></p>
       <p id="profile-warning" class="revalidation-warning" role="alert" hidden></p>
       <p id="revalidation-warning" class="revalidation-warning" role="alert" hidden></p>
 
+      <h2 class="block-title">구성요소 상태</h2>
       <div class="card-grid">
         <article class="card">
           <h3><span id="policy-dot" class="dot"></span>정책</h3>
@@ -219,7 +286,43 @@
         <p id="empty-state" class="empty" hidden>아직 기록된 요청이 없습니다.</p>
       </div>
     </section>
+    <section class="view" data-view="update" aria-labelledby="update-title">
+      <div class="section-head">
+        <h2 id="update-title">업데이트 검증</h2>
+      </div>
+      <article class="card placeholder-card">
+        <h3>준비 중</h3>
+        <p class="muted">엔진·모델·이미지를 바꾸기 전과 후의 검증 결과를 이 화면에서 보도록 연결할 예정입니다. 아직 연결된 기능과 데이터가 없습니다.</p>
+        <dl class="kv">
+          <dt>연결 상태</dt><dd>미연결</dd>
+          <dt>검증 결과</dt><dd>없음</dd>
+        </dl>
+      </article>
+    </section>
+
+    <section class="view" data-view="settings" aria-labelledby="settings-title">
+      <div class="section-head">
+        <h2 id="settings-title">설정</h2>
+      </div>
+      <article class="card">
+        <h3>화면</h3>
+        <dl class="kv" id="settings-kv"></dl>
+        <p class="notice">이 대시보드는 읽기 전용입니다. 정책·수집 설정은 Gateway 실행 옵션과 관리 경로의 파일에서 바꿉니다.</p>
+      </article>
+    </section>
+
+    <section class="view" data-view="user" aria-labelledby="user-title">
+      <div class="section-head">
+        <h2 id="user-title">사용자</h2>
+      </div>
+      <article class="card">
+        <h3>인증</h3>
+        <dl class="kv" id="user-kv"></dl>
+        <p class="notice">로그인 기능은 없습니다. 조회 API 보호가 켜져 있으면 조회 토큰을 입력해 이 탭에서만 사용합니다.</p>
+      </article>
+    </section>
   </main>
+  </div>
   </div>
 
   <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
@@ -231,6 +334,7 @@
     <div id="drawer-body" class="drawer-body"></div>
   </aside>
 
+  <script src="/static/vendor/chart.umd.min.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

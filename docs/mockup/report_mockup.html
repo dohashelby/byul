@@ -35,7 +35,8 @@ th { font-size:12px; color:var(--muted); font-weight:600; } .wrap { overflow-x:a
 ul.plain { margin:4px 0; padding-left:18px; }
 @media (max-width:560px) { .hero { flex-direction:column; align-items:flex-start; } }
 </style></head><body>
-<h1>서빙엔진 보안 점검 보고서</h1><p class='muted small'>2026-11-30T09:00:00Z · 버전 비교(update) · 자료 출처 MEASURED</p>
+<h1>서빙엔진 보안 점검 보고서</h1><p class='muted small'>2026-11-30T09:00:00Z · 버전 비교(update) · 자료 출처 EXAMPLE</p>
+<p class='banner'>공식 아님 — EXAMPLE 자료</p>
 <div class='hero s-FAIL'><div class='big v-FAIL'>미충족</div><div><strong>종합 보안 판정</strong><p>선정 23건 중 미충족 4건 · 미확인 2건 · 충족 17건</p>
 <p class='muted small'>점검 목록 미완결: REQ, PLT, LIF, OBS</p>
 </div></div>
@@ -83,6 +84,7 @@ ul.plain { margin:4px 0; padding-left:18px; }
 <tr><td>SUP</td><td>수동 입력 0건 / 자동 측정 0건</td><td>16건</td></tr>
 </table></div>
 <h2>한계</h2><ul class='plain'>
+<li>목업: 화면 설계용 가상 자료다. 판정·수치·승인자는 실제 시험·승인 기록이 아니다</li>
 <li>점검 목록 미완결 영역 4개 — 집계 PASS 불가</li>
 <li>실행 환경: GPU 1장, Linux, Docker 27 (단일 노드). 다중 노드 구성은 시험하지 않음</li>
 <li>수동 입력 증거는 인증되지 않은 자기 신고(DECLARED)</li>
@@ -91,73 +93,73 @@ ul.plain { margin:4px 0; padding-left:18px; }
 <th>기준</th><th>후보</th><th>비교</th>
 <th>표시</th></tr>
 <tr><td><code>REQ-01</code><br><span class='muted small'>요청·대상 접근 권한</span><br><span class='muted small'>적용</span></td><td>Gateway를 우회한 직통 요청으로 비허용 작업을 수행할 수 없는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>후퇴</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-01-B@1</code></td><td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-01-C@1</code></td><td>보안: 후퇴<br>기능: -<br></td>
 <td class='small'>기능 확인 범위: 15 / 등록 경로 15</td></tr>
 <tr><td><code>REQ-02</code><br><span class='muted small'>요청·대상 접근 권한</span><br><span class='muted small'>적용</span></td><td>인증이 검사한 경로와 실제 실행 handler의 권한 요구가 일치하는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-02-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-02-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>REQ-03</code><br><span class='muted small'>요청·대상 접근 권한</span><br><span class='muted small'>적용</span></td><td>일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가?</td>
-<td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>개선</td>
+<td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-03-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-03-C@1</code></td><td>보안: 개선<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>REQ-04</code><br><span class='muted small'>요청·대상 접근 권한</span><br><span class='muted small'>적용</span></td><td>외부 입력이 인가에 쓰는 신원을 사칭하지 못하는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-04-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-04-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>REQ-05</code><br><span class='muted small'>요청·대상 접근 권한</span><br><span class='muted small'>적용</span></td><td>호출자의 모델 사용권이 최종 선택 대상에도 적용되는가?</td>
-<td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>계속 미충족</td>
+<td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-05-B@1</code></td><td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-05-C@1</code></td><td>보안: 계속 미충족<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>REQ-06</code><br><span class='muted small'>요청·대상 접근 권한</span><br><span class='muted small'>적용</span></td><td>저장 결과의 조회·취소 권한을 객체별로 확인하는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-06-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">REQ-06-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>PLT-01</code><br><span class='muted small'>실행 권한 제한</span><br><span class='muted small'>적용</span></td><td>엔진·worker가 불필요한 호스트·파일·장치 권한을 갖지 않는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-01-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-01-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>PLT-03</code><br><span class='muted small'>자격 전달·사용 제한</span><br><span class='muted small'>적용</span></td><td>취득 주체의 자격이 허용 저장소·객체에 한정되는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-03-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-03-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>PLT-04</code><br><span class='muted small'>자격 전달·사용 제한</span><br><span class='muted small'>적용</span></td><td>worker에 불필요한 자격이 전달되지 않는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>후퇴</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-04-B@1</code></td><td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-04-C@1</code></td><td>보안: 후퇴<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>PLT-06</code><br><span class='muted small'>통신·내부 호출 제한</span><br><span class='muted small'>적용</span></td><td>core·worker가 공유하는 실제 신뢰 범위와 외부 접근 제한을 확인했는가?</td>
-<td><span class="chip v-UNKNOWN">보안 미확인</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-UNKNOWN">보안 미확인</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>미확인</td>
+<td><span class="chip v-UNKNOWN">보안 미확인</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-06-B@1</code></td><td><span class="chip v-UNKNOWN">보안 미확인</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-06-C@1</code></td><td>보안: 미확인<br>기능: -<br></td>
 <td class='small'>환경 사실 없음</td></tr>
 <tr><td><code>PLT-07</code><br><span class='muted small'>통신·내부 호출 제한</span><br><span class='muted small'>적용</span></td><td>외부 송신이 허용 목적지와 작업에 한정되는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-07-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-07-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>PLT-08</code><br><span class='muted small'>상대 확인·전송 보호</span><br><span class='muted small'>적용</span></td><td>각 내부 통신 구간이 정한 상대 확인·기밀성·무결성을 충족하는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-08-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">PLT-08-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>LIF-01</code><br><span class='muted small'>자원 사용 제한</span><br><span class='muted small'>적용</span></td><td>모델 취득·해석·변환·로딩 비용이 단계별·누적 예산을 지키는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-01-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-01-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>LIF-03</code><br><span class='muted small'>자원 사용 제한</span><br><span class='muted small'>적용</span></td><td>요청 비용과 동시 부하를 제한하며 정상 요청의 처리 기회를 유지하는가?</td>
-<td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>계속 미충족</td>
+<td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-03-B@1</code></td><td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-03-C@1</code></td><td>보안: 계속 미충족<br>기능: -<br></td>
 <td class='small'>예외 승인됨 (만료 2026-12-31T00:00:00Z, 다음 분기 게이트웨이 도입 전까지 임시 허용)</td></tr>
 <tr><td><code>LIF-07</code><br><span class='muted small'>시작·재개 조건</span><br><span class='muted small'>적용</span></td><td>필요한 worker와 실행 준비를 확인한 뒤 요청을 받는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-07-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-07-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>LIF-10</code><br><span class='muted small'>종결·자원 회수</span><br><span class='muted small'>적용</span></td><td>취소·연결 종료 뒤 실제 작업과 참조가 정한 기한에 종료되는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-10-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-10-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>LIF-11</code><br><span class='muted small'>종결·자원 회수</span><br><span class='muted small'>적용</span></td><td>실패한 worker·통신·분산 자원이 회수되고 다음 기동이 가능한가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-UNKNOWN">보안 미확인</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>미확인</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-11-B@1</code></td><td><span class="chip v-UNKNOWN">보안 미확인</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">LIF-11-C@1</code></td><td>보안: 미확인<br>기능: -<br></td>
 <td class='small'>시험 자료 없음</td></tr>
 <tr><td><code>OBS-03</code><br><span class='muted small'>수집 정보 제한</span><br><span class='muted small'>적용</span></td><td>로그·debug·trace·덤프가 허용한 정보만 수집하는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-03-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-03-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>OBS-04</code><br><span class='muted small'>수집 정보 제한</span><br><span class='muted small'>적용</span></td><td>금지한 usage 보고가 실제로 비활성 상태를 유지하는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-04-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-04-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>OBS-05</code><br><span class='muted small'>수집 정보 제한</span><br><span class='muted small'>적용</span></td><td>허용한 usage 보고가 필드·목적지 범위를 지키는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-05-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-05-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>OBS-06</code><br><span class='muted small'>자료 이용 권한</span><br><span class='muted small'>적용</span></td><td>기록과 진단 사본을 허용된 독자만 조회·반출하는가?</td>
-<td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>개선</td>
+<td><span class="chip v-FAIL">보안 미충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-06-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-06-C@1</code></td><td>보안: 개선<br>기능: -<br></td>
 <td class='small'>-</td></tr>
 <tr><td><code>OBS-09</code><br><span class='muted small'>증거의 신뢰성</span><br><span class='muted small'>적용</span></td><td>요청 입력이 로그의 신원·대상·상태를 위조하지 못하는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-09-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-09-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>수동 입력(DECLARED, 자기 신고)</td></tr>
 <tr><td><code>OBS-12</code><br><span class='muted small'>보존·삭제 관리</span><br><span class='muted small'>적용</span></td><td>로그·usage·진단의 원본과 사본이 보존·삭제 범위를 지키는가?</td>
-<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span></td><td>변화 없음</td>
+<td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-12-B@1</code></td><td><span class="chip v-PASS">보안 충족</span><span class="chip v-PASS">기능 충족</span><span class="chip v-UNKNOWN">성능 미확인</span><br><code class="muted small">OBS-12-C@1</code></td><td>보안: 변화 없음<br>기능: -<br></td>
 <td class='small'>수동 입력(DECLARED, 자기 신고)</td></tr>
 </table></div></details>
 <details><summary>수동 시험 필요 (4건)</summary><p>
@@ -167,7 +169,7 @@ ul.plain { margin:4px 0; padding-left:18px; }
 <p><strong>정책 범위 밖</strong> (50건)<br><code>SUP-03</code>, <code>SUP-04</code>, <code>SUP-05</code>, <code>SUP-06</code>, <code>SUP-07</code>, <code>SUP-08</code>, <code>SUP-09</code>, <code>SUP-10</code>, <code>SUP-11</code>, <code>SUP-12</code>, <code>SUP-13</code>, <code>SUP-14</code>, <code>SUP-15</code>, <code>SUP-16</code>, <code>REQ-07</code>, <code>REQ-08</code>, <code>REQ-09</code>, <code>REQ-10</code>, <code>REQ-11</code>, <code>REQ-12</code>, <code>REQ-13</code>, <code>REQ-14</code>, <code>REQ-15</code>, <code>REQ-16</code>, <code>REQ-17</code>, <code>REQ-18</code>, <code>REQ-19</code>, <code>REQ-20</code>, <code>REQ-21</code>, <code>PLT-05</code>, <code>PLT-09</code>, <code>PLT-10</code>, <code>PLT-11</code>, <code>PLT-12</code>, <code>LIF-02</code>, <code>LIF-04</code>, <code>LIF-05</code>, <code>LIF-06</code>, <code>LIF-08</code>, <code>LIF-09</code>, <code>LIF-12</code>, <code>LIF-14</code>, <code>LIF-15</code>, <code>LIF-16</code>, <code>OBS-01</code>, <code>OBS-02</code>, <code>OBS-07</code>, <code>OBS-08</code>, <code>OBS-10</code>, <code>OBS-11</code></p>
 </details>
 <details><summary>승인·추적 정보</summary>
-<p>승인: 김서준(정보보호팀) · 2026-11-30T14:20:00Z · ACCEPT</p>
+<p>승인: (목업 예시 승인자) · 2026-11-30T14:20:00Z · ACCEPT</p>
 <p class='muted small'><code>RPT-01M7Q3X8N2K4V9T6B5D1C0HJ8R@1</code> · content_sha256 <code>fd4724e97003de39…</code></p>
 <div class='wrap'><table><tr><th>종류</th><th>ID</th><th>revision</th><th>sha256</th></tr>
 <tr><td>ENV</td><td><code>ENV-01M7Q2A4F6H8J0K2M4P6R8T0V2</code></td><td>1</td><td><code>42af6a60566790b1…</code></td></tr>

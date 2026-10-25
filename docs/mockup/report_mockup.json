@@ -3,11 +3,12 @@
   "id": "RPT-01M7Q3X8N2K4V9T6B5D1C0HJ8R",
   "revision": 1,
   "created_at": "2026-11-30T09:00:00Z",
-  "data_origin": "MEASURED",
+  "mockup": true,
+  "data_origin": "EXAMPLE",
   "content_sha256": "fd4724e97003de393e3446a2b4345f1a4ea0a1e8d806b8368b07af096dc955eb",
   "refs": [],
   "mode": "update",
-  "official": true,
+  "official": false,
   "pack_review_status": "REVIEWED",
   "policy_status": "CONFIRMED",
   "inputs_manifest": [
@@ -65,7 +66,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -77,7 +78,7 @@
         "security": "FAIL",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -111,7 +112,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -123,7 +124,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -153,7 +154,7 @@
         "security": "FAIL",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -165,7 +166,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -195,7 +196,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -207,7 +208,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -237,7 +238,7 @@
         "security": "FAIL",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -249,7 +250,7 @@
         "security": "FAIL",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -279,7 +280,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -291,7 +292,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -321,7 +322,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -333,7 +334,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -363,7 +364,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -375,7 +376,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -405,7 +406,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -417,7 +418,7 @@
         "security": "FAIL",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -447,7 +448,7 @@
         "security": "UNKNOWN",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -459,7 +460,7 @@
         "security": "UNKNOWN",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [
         "NO_ENV_FACT"
@@ -491,7 +492,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -503,7 +504,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -533,7 +534,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -545,7 +546,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -575,7 +576,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -587,7 +588,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -617,7 +618,7 @@
         "security": "FAIL",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -629,7 +630,7 @@
         "security": "FAIL",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -664,7 +665,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -676,7 +677,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -706,7 +707,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -718,7 +719,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -748,7 +749,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -760,7 +761,7 @@
         "security": "UNKNOWN",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [
         "NO_FIXTURE"
@@ -792,7 +793,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -804,7 +805,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -834,7 +835,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -846,7 +847,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -876,7 +877,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -888,7 +889,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -918,7 +919,7 @@
         "security": "FAIL",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "candidate": {
         "result": {
@@ -930,7 +931,7 @@
         "security": "PASS",
         "functional": "PASS",
         "performance": "UNKNOWN",
-        "verification_level": "MEASURED"
+        "verification_level": "EXAMPLE"
       },
       "gaps": [],
       "evidence_source": "automated",
@@ -1300,15 +1301,16 @@
     "LIF-13"
   ],
   "limitations": [
+    "목업: 화면 설계용 가상 자료다. 판정·수치·승인자는 실제 시험·승인 기록이 아니다",
     "점검 목록 미완결 영역 4개 — 집계 PASS 불가",
     "실행 환경: GPU 1장, Linux, Docker 27 (단일 노드). 다중 노드 구성은 시험하지 않음",
     "수동 입력 증거는 인증되지 않은 자기 신고(DECLARED)"
   ],
   "approval": {
-    "approved_by": "김서준(정보보호팀)",
+    "approved_by": "(목업 예시 승인자)",
     "approved_at": "2026-11-30T14:20:00Z",
     "decision": "ACCEPT",
-    "note": "REQ-01·PLT-04 후퇴 건은 후보 배포 보류"
+    "note": "목업 예시: REQ-01·PLT-04 후퇴 건은 후보 배포 보류"
   },
   "evidence_counts": {
     "REQ": {

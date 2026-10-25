@@ -192,7 +192,42 @@ body.is-stale main { opacity: 0.45; filter: grayscale(0.6); transition: opacity 
   line-height: 18px;
   text-align: center;
 }
-.view[hidden] { display: none; }
+.view[hidden], .subpanel[hidden] { display: none; }
+.subpanel > h3 { padding: 14px 16px 8px; margin: 0; }
+.subpanel > .state-badges { padding: 0 16px 10px; }
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.subtab:hover { color: var(--text); }
+.subtab.is-active { color: var(--accent); border-bottom-color: var(--accent); }
+.subtab-count { color: var(--muted); font-weight: 400; font-size: 12px; }
+.subtab-badge {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--error);
+  color: #fff;
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+}
 .page > .view { margin-top: 0; }
 section + section { margin-top: 36px; }
 .section-head {
@@ -259,9 +294,6 @@ section + section { margin-top: 36px; }
 .badge-synthetic { background: var(--invalid-bg); color: var(--invalid); }
 .scope-badges { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .scope-badges .badge { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
-/* Wide event tables get the full width now that the sidebar takes space. */
-.observation-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
-.observation-grid .card h3 { padding: 14px 16px 8px; margin: 0; }
 .observation-state-grid { margin-top: 14px; }
 .observation-state-grid .state-badges { padding: 0 16px 8px; margin: 0; }
 .lab-report-meta { padding: 0 16px 12px; }
@@ -410,7 +442,6 @@ pre {
   .stat-grid { grid-template-columns: repeat(3, 1fr); }
   .card-grid { grid-template-columns: 1fr; }
   .state-grid { grid-template-columns: 1fr; }
-  .observation-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 800px) {
   .layout { grid-template-columns: minmax(0, 1fr); }

@@ -958,9 +958,30 @@ function closeDetail() {
 }
 
 const VIEWS = ["overview", "requests", "policy", "target", "observe", "enforce"];
+// Areas split further into one panel per tool; the first entry is the default.
+const SUBVIEWS = { observe: ["collectors", "hubble", "tetragon"], enforce: ["cilium", "lab"] };
+const lastSubview = {};
 
-function showView(name, { updateHash = true } = {}) {
+function showSubview(view, name) {
+  const options = SUBVIEWS[view];
+  if (!options) return null;
+  const sub = options.includes(name) ? name : lastSubview[view] || options[0];
+  lastSubview[view] = sub;
+  for (const panel of document.querySelectorAll(`.subpanel[data-view="${view}"]`)) {
+    panel.hidden = panel.dataset.subpanel !== sub;
+  }
+  for (const button of document.querySelectorAll(`.subtab[data-view="${view}"]`)) {
+    const active = button.dataset.subview === sub;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  }
+  return sub;
+}
+
+function showView(target, { updateHash = true } = {}) {
+  const [name, subName] = String(target || "").split("/");
   const view = VIEWS.includes(name) ? name : "overview";
+  const sub = showSubview(view, subName);
   for (const section of document.querySelectorAll(".view")) {
     section.hidden = section.dataset.view !== view;
   }
@@ -970,8 +991,9 @@ function showView(name, { updateHash = true } = {}) {
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   }
-  if (updateHash && location.hash.slice(1) !== view) {
-    history.replaceState(null, "", `#${view}`);
+  const hash = sub ? `${view}/${sub}` : view;
+  if (updateHash && location.hash.slice(1) !== hash) {
+    history.replaceState(null, "", `#${hash}`);
   }
   window.scrollTo(0, 0);
 }
@@ -981,6 +1003,16 @@ function setNavBadge(view, count, title) {
   node.hidden = !count;
   node.textContent = count ? String(count) : "";
   node.title = count ? title : "";
+}
+
+function setSubtab(name, count, problems, title) {
+  const counter = $(`subtab-count-${name}`);
+  if (counter) counter.textContent = String(count);
+  const badge = $(`subtab-badge-${name}`);
+  if (!badge) return;
+  badge.hidden = !problems;
+  badge.textContent = problems ? String(problems) : "";
+  badge.title = problems ? title : "";
 }
 
 function mostCommon(values) {
@@ -1017,12 +1049,26 @@ function renderNav({ status, summary, target, revalidation, collectors, observat
       || (item.state === "disconnected" && String(item.source).startsWith("observation_feed")),
   );
   setNavBadge("observe", collectorProblems.length, collectorProblems.map((item) => `${item.source}: ${item.state}`).join(" · "));
+  const collectorBadge = $("subtab-badge-collectors");
+  collectorBadge.hidden = collectorProblems.length === 0;
+  collectorBadge.textContent = collectorProblems.length ? String(collectorProblems.length) : "";
+  $("subtab-count-hubble").textContent = String($("hubble-observation-rows").children.length);
+  $("subtab-count-tetragon").textContent = String($("tetragon-observation-rows").children.length);
+  const flagged = $("tetragon-observation-rows").querySelectorAll(".exec-outside-allowlist").length;
+  const tetragonBadge = $("subtab-badge-tetragon");
+  tetragonBadge.hidden = flagged === 0;
+  tetragonBadge.textContent = flagged ? String(flagged) : "";
+  tetragonBadge.title = flagged ? `목록 밖·의심·확인 필요 실행 ${flagged}건` : "";
 
   const report = labReport.report;
   const failedCases = report ? (report.cases || []).filter((item) => item.status === "failed").length : 0;
   const cilium = (collectors.collectors || []).find((item) => item.source === "cilium_policy");
   const enforceProblems = failedCases + (cilium && cilium.state !== "ok" ? 1 : 0)
     + (["ok", "not_configured"].includes(labReport.state) ? 0 : 1);
+  const ciliumProblem = cilium && cilium.state !== "ok" ? 1 : 0;
+  setSubtab("cilium", $("cilium-policy-rows").children.length, ciliumProblem, ciliumProblem ? `Cilium 상태 ${cilium.state}` : "");
+  const labProblems = failedCases + (["ok", "not_configured"].includes(labReport.state) ? 0 : 1);
+  setSubtab("lab", report ? (report.cases || []).length : 0, labProblems, labProblems ? `lab 실패 ${failedCases}건` : "");
   setNavBadge("enforce", enforceProblems, `lab 실패 ${failedCases}건${cilium && cilium.state !== "ok" ? " · Cilium 상태 조회 문제" : ""}`);
 
   const total = errors + policyProblems + targetProblems + collectorProblems.length + enforceProblems;
@@ -1096,6 +1142,9 @@ for (const button of document.querySelectorAll("[data-filter]")) {
 }
 for (const button of document.querySelectorAll(".nav-item")) {
   button.addEventListener("click", () => showView(button.dataset.view));
+}
+for (const button of document.querySelectorAll(".subtab")) {
+  button.addEventListener("click", () => showView(`${button.dataset.view}/${button.dataset.subview}`));
 }
 window.addEventListener("hashchange", () => showView(location.hash.slice(1), { updateHash: false }));
 showView(location.hash.slice(1), { updateHash: false });

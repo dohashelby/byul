@@ -9,6 +9,7 @@
   - 점검 데이터는 `data/checklist.json`을 코드로 읽는다(문서를 파싱하지 않는다).
 - `reference/bob-design/` : 이전 프로젝트(BoBProject)의 설계 문서. **구조 참고용이다.** 여기 있는 서명 승인, 감사 outbox, CAS, 객체 20여 종, 웹 UI를 만들지 않는다(SPEC §9).
 - SPEC과 참고 문서가 충돌하면 SPEC을 따르고 `DECISIONS.md`에 한 줄 적는다.
+- 변경 유형별 시험 범위(엔진 정식 릴리스 전체 시험·소스 diff 보고, 패치 릴리스는 diff 선정·이월, 모델·환경·정책 변경은 증분 감사·이월)는 `docs/UPDATE_SELECTION.md`가 SPEC "U1" 절의 세부 정본이다(2026-10-25 사용자 결정).
 
 ## 기술 기준
 - Python 3.11, `uv` 사용, 패키지명 `guard`, `src/guard/` 레이아웃(SPEC §10).

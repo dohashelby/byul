@@ -1,5 +1,7 @@
 # 서빙엔진 보안 검증 솔루션 — 설계 초안 (SPEC v0.1)
 
+> 2026-10-25 U1 결정(구현 전): 엔진 정식 릴리스는 적용 점검 전체를 기준·후보로 시험하고 소스 diff는 보고(바뀐 영역·도달 확인·체크리스트 공백)에만 쓴다. 엔진 패치 릴리스(0.xx.1 …)는 항상 시험 20개와 소스 diff에 걸리는 점검만 기준·후보로 시험한다. 엔진 이미지가 같은 모델·환경·정책 변경은 증분 감사로 걸리는 점검만 시험한다. 선정되지 않은 점검은 이전 PASS를 이월한다. INV-05를 개정하고 INV-19를 추가했다. 맨 끝 "U1" 절과 [UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md)를 따른다.
+
 > 2026-10-24 판정 의미 보완 후보: PR #29는 main 641f12f에 병합됐다. 현행 PACK22/DRAFT·REQ-09 정의6·PLT-04 정의3·정책22점검50경로·자동연결11이다. 사용자 결정으로 HTTP 성공을 위험한 소비와 구분하고, 명시 마운트 금지와 자격 후보 접근 관측을 분리한다. 어댑터0.4.2·input_validation0.5.0·credential_exposure0.4.0·declared0.14.0이며 이번 테스트·실증 결과는 아래 이전 팩21의 기록과 별도로 갱신한다. 원본 7객체·불변식·다른75개 정의·저장 팩의 과거 판정은 유지한다.
 
 > 2026-10-24 PR #29 통합 당시 기록: 당시 브랜치는 PR #24·#25·#28을 합치고 전체 회귀·설치본·새 복원 재판정을 통과한 [v1 기술 완료 후보](docs/UPDATE_VALIDATION.md#v1-통합-후보-검증)였으며 main 반영·공식 출시 승인은 별도였다. PACK-BASELINE 21/DRAFT·77개 점검 정의·정책 22점검/49경로·자동 연결 11개·adapter 0.4.1·declared 0.13.0을 사용했다. PR #28에서 두 실제 vLLM CPU 이미지(API 0.31.0/0.32.0)의 기존 5개 점검은 양쪽 보안·기능 PASS였고 수락·반출/복원·저장 팩 재판정이 일치했다. [실측 결과](docs/UPDATE_VALIDATION.md#실측-결과--c-후속-2026-10-24)는 해당 실행 코드의 기록이며 통합판의 새 실증으로 간주하지 않는다. 전부 NO_CHANGE라 실제 변화 탐지는 미증명이고 성능 UNKNOWN·DRAFT·official=false를 유지한다. EVD의 MEASURED 출처와 REQ-01/REQ-03 Result의 DECLARED 검증 수준은 다르며, REQ-01 일부 경로는 HTTP 대신 TCP 차단 근거로 검증했다. 기업 승인이나 전체 handler 실행을 뜻하지 않는다.
@@ -29,14 +31,14 @@
 | 로컬 Docker 단일 노드 실행 | K8s·다중 노드·다중 테넌트 |
 | 우선 점검 5~10행 자동화 (§8) | 77행 전부 자동화 |
 | 승인 기록(누가·언제) | 전자서명·registry·철회 절차 |
-| 변경 분석은 **선택 단계** | LLM 판단 보조 |
+| 엔진 정식 릴리스는 전체 시험, 패치 릴리스·모델·환경·정책 변경은 골라서 시험 (U1) | LLM 판단 보조 |
 
 **두 가지 실행 모드**
 
 | 모드 | 입력 | 질문 |
 | --- | --- | --- |
 | `audit` | 환경 1개 | 지금 이 구성이 정책을 충족하는가? |
-| `update` | 환경 2개(기준/후보) + 선택적 변경 분석 | 버전을 올리면 충족 여부가 달라지는가? |
+| `update` | 환경 2개(기준/후보) + 엔진 소스 diff + 이전 결과(패치 릴리스) | 버전을 올리면 충족 여부가 달라지는가? 정식 릴리스는 적용 점검 전체, 패치 릴리스는 필요한 점검만 시험한다(U1) |
 
 ---
 
@@ -48,8 +50,10 @@
  [Policy]      ─┤                      ▲                    ▲
  [Change]*     ─┘                      │                    │
                               (실행기·센서 플러그인)   (판정 플러그인, 순수 함수)
- * update 모드에서만, 선택
+ * update 모드: 엔진 소스 diff(정식은 보고용, 패치는 선정용). audit 증분 감사: 모델 manifest diff(선정용). 둘 다 선택(U1)
 ```
+
+변경 유형별 시험 범위(엔진 정식 릴리스 전체 / 패치 릴리스·모델·환경·정책 변경은 골라서)와 입력 유지·이월은 맨 끝 "U1" 절과 [UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md)를 따른다.
 
 | 단계 | 하는 일 | 하지 않는 일 |
 | --- | --- | --- |
@@ -252,7 +256,8 @@ facts:
 reviewed_by: str|null              # 사람 검토 전이면 certainty는 최대 PARTIAL
 ```
 
-- 변경 분석은 **시험을 추가로 고르는 근거**일 뿐이다. 변경이 없다고 기본 점검을 빼지 않는다(INV-05).
+- 엔진 소스 diff는 정식 릴리스에서 **보고 근거**(바뀐 영역 표시·도달 확인·체크리스트 공백)이고 패치 릴리스에서 **선정 근거**다. 모델 manifest diff는 증분 감사의 **선정 근거**다. 어느 쪽도 판정 근거가 아니다(INV-05 개정, INV-19, U1).
+- U1에서 `category`는 엔진·모델 변경 종류 집합으로 확장하고 `unmapped`(규칙 미분류) 선택 필드를 더한다. `extractor.name`에 `git_diff`·`model_manifest`를 더한다. 세부는 [UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md) §3·§4·§7.
 
 ### 4.4 PLAN — Plan (적용 판단 + 시험 선정)
 
@@ -288,6 +293,7 @@ inventory_complete:                    # 보호 목적별 점검 목록 완결 �
 - `NOT_APPLICABLE` → 미선정. 사유를 남긴다
 - 정책 `scope.exclude`로 뺀 점검 → 미선정. 사유 `POLICY_SCOPE`
 - 선정됐지만 `executor`가 없으면 `gaps: [NO_EXECUTOR]` → 수동 시험 대상으로 보고서에 나열
+- update 모드: 정식 릴리스는 위 규칙 그대로 적용 점검 전체다. 패치 릴리스에 `--change`·`--previous-plan`을 주면 항상 시험 20개·diff 변경 종류·입력 변경에 걸린 점검만 선정하고 나머지는 이월(`CARRIED_OVER`)한다. audit 모드에 `--previous-plan`을 주면 증분 감사다: 엔진 이미지가 같을 때 모델·입력 변경에 걸린 점검만 선정하고 나머지는 이월한다(U1)
 
 ### 4.5 EVD — Evidence (실행 기록 + 관측 + 증거 파일)
 
@@ -445,7 +451,7 @@ CHG* ──────────┘                                          
 | **INV-02** | `EXAMPLE` 자료, 기대값, 실행하지 않은 시험을 `MEASURED`로 표시하지 않는다. | A1-2 |
 | **INV-03** | 시도가 없으면 차단 성공이 아니다. `challenges[].attempted: false`인데 "거부됨"으로 `PASS`를 낼 수 없다. 응답 미수신만으로 `PASS`가 되지 않는다. (주: `refused`·`timeout`·`unreachable`은 **같은 시각 신뢰 출발점에서 대상에 도달함(양성 대조)이 관측된 경우에만** 차단 근거가 된다. `dns_error`·`error`는 차단 근거가 아니다. TCP 연결 실패에서 경로별 결과를 추론한 경우(`basis: tcp_connect`)도 연결 시도는 실제로 했으므로 "시도함"이며, 같은 양성 대조 조건을 따른다. 연결이 된 뒤의 응답 없음은 `error`다.) | A1-3,4 |
 | **INV-04** | 위반 증거가 없는 것과 준수 증거가 있는 것은 다르다. 센서 장애·수집 실패는 `UNKNOWN`이다. 이미 확인된 `FAIL`은 다른 누락 때문에 지우지 않는다. | A1-10 |
-| **INV-05** | 기본 점검(`review_order: reference_baseline_first`이고 적용되는 것)은 변경 분석 결과가 "영향 없음"이어도 빼지 않는다. 변경 분석은 시험을 **추가**할 뿐 **제거**하지 않는다. | A(planner) |
+| **INV-05** | (2026-10-25 U1 개정) 엔진 정식 릴리스(major·minor 변경, 롤백, rc·dev, 버전 확인 불가 포함)는 변경 분석으로 시험을 줄이지 않는다(적용 점검 전체). 시험을 줄이는 것은 엔진 패치 릴리스와 증분 감사에서, 변경 트리거(패치의 항상 시험 20개·diff 변경 종류, 모델 변경 종류, 입력 변경)가 없고 이월 조건(INV-19)을 모두 만족하는 점검의 이월로만 가능하다. 이전 결과가 없거나, 이미지와 diff 버전이 맞지 않거나, 미분류 엔진 파일·연결되지 않은 환경 사실·규칙에 없는 모델 파일 변경이 있으면 해당 범위를 넓게 고른다. (개정 전: 기본 점검은 변경 분석이 "영향 없음"이어도 빼지 않는다) | A(planner) + U1 사용자 결정 |
 | **INV-06** | 환경 사실을 `false`로 쓰려면 비사용·비노출 근거가 필요하다. 근거 없는 `false`는 `null`로 취급한다. 빈 조건 목록은 "항상 참"이 아니다. | F(selector) |
 | **INV-07** | 자동 판정·권고는 승인이 아니다. 보고서의 `approval`은 사람만 쓴다. 코드가 `approval`을 채우지 않는다. | A1-7 |
 | **INV-08** | 정책 예외는 판정을 바꾸지 않는다. 예외가 승인된 `FAIL`도 `FAIL`이다. 만료·미승인 예외는 표시하지 않고 사유를 남긴다. | A1-5,11 |
@@ -459,6 +465,7 @@ CHG* ──────────┘                                          
 | **INV-16** | 객체는 append-only다. 같은 `id`의 기존 revision을 수정·삭제하지 않는다. 모든 참조는 정확한 revision과 해시로 고정한다. | A1 §2 |
 | **INV-17** | `DRAFT` 정책으로 만든 보고서는 "공식 아님"으로 표시한다. 검토 전 팩도 마찬가지다. | A1-6 |
 | **INV-18** | 보안·기능·성능 판정은 따로 기록한다. 한 축의 결과로 다른 축을 채우지 않는다. | F(05) |
+| **INV-19** | 이월은 새 판정이 아니다. 이월 항목은 EVD·RES를 만들지 않고 이전 RES를 정확한 Ref로 참조하며, 보고서는 이월을 이번 실행 결과와 구분해 표시한다. 엔진 정식 릴리스는 이월하지 않는다. 이전 보안 판정이 PASS가 아니거나, 이전 시험의 엔진 이미지가 이번 이미지(증분 감사)·이번 기준 이미지(패치 릴리스)와 다르거나, 점검 revision이 다르거나, 이번 변경 트리거에 걸렸거나, 이전 증거가 `EXAMPLE`이면 이월할 수 없다. | N(U1) + F(evidence_reuse_rule) |
 
 ---
 
@@ -492,8 +499,9 @@ class EngineAdapter(Protocol):
 class EnvCollector(Protocol):      # X2: 환경 사실 수집
     def collect(self, target: TargetSpec) -> dict[str, FactValue]: ...
 
-class ChangeExtractor(Protocol):   # X3: 변경 사실 추출 (update 모드 선택)
+class ChangeExtractor(Protocol):   # X3: 변경 사실 추출 (update 모드, U1). 구현은 adapters/에만
     def extract(self, repo: Path, base: str, cand: str) -> list[ChangeFact]: ...
+    # repo는 엔진 소스 저장소의 로컬 clone. clone/fetch는 호출 전에 끝내고 base·cand는 커밋 SHA로 고정한다
 
 class Executor(Protocol):          # 점검 실행기. CheckDef.executor로 지정
     def run(self, check: CheckDef, env: Environment, policy_values: dict,
@@ -556,6 +564,7 @@ judge:
 | 6 | `judges/rule_table.py` | INV-01·03·04·11·14·15 테스트 |
 | 7 | `guard report`: RES → RPT(JSON) → HTML | 집계·비교 규칙 표 전체 테스트 |
 | 8 | `guard update`: 두 이미지로 같은 점검 실행 → 비교 | INV-09 테스트, NOT_COMPARABLE 케이스 |
+| 9 | U1: 입력 유지·`guard diff`(정식 보고·도달 확인, 패치 선정)·`guard model-diff`·패치 릴리스와 증분 감사 선정·이월 | INV-05 개정·INV-19 테스트, v0.31.0→v0.32.0 diff 재현, 과거 패치 5개 선정 재현, 모델·환경 변경 사례 ([UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md)) |
 
 그다음 확장 순서: `review_order: reference_baseline_first`이면서 로컬에서 재현 가능한 행부터 5~10개.
 
@@ -615,6 +624,13 @@ guard evidence export --store ... --output evidence.zip                        #
 guard evidence restore --bundle evidence.zip --destination new-store            # 새 경로에 무결성 검증 후 복원
 guard evidence template --plan PLAN-... --out manual.yaml                       # 수동 입력 양식
 guard evidence import manual.yaml                                              # 검증한 DECLARED 객체 배치 입력
+# U1 (구현 전, 이름은 UPDATE_SELECTION.md §7 제안)
+guard env update    --base ENV-... --patch patch.yaml                          # 변경분만 입력 → 같은 id 새 revision
+guard policy update --base POL-... --patch patch.yaml
+guard diff --from v0.31.0 --to v0.32.0                                         # 엔진 소스 diff → CHG (정식: 보고, 패치: 선정)
+guard update ... --change CHG-... --previous-plan PLAN-...                      # 엔진 패치 릴리스: 선정 점검만 기준·후보 시험 + 이월
+guard model-diff --from <snapshot|manifest> --to <snapshot|manifest>           # 모델 manifest diff → CHG (선정용)
+guard select --env ... --policy ... --previous-plan PLAN-... [--change CHG-...] # 증분 감사
 ```
 
 ---
@@ -707,3 +723,16 @@ declared0.9.1과 기존 캐시 helper만 변경한다. 수동 구조/1·양식/3
 ## 자동화 1차 — Windows CPU와 실제 관측 확대
 
 2026-10-23 사용자 승인 범위는 기존 5개 점검 보강과 REQ-10/REQ-13/OBS-03 자동화다. `guard prepare-validation`/`guard validate`의 단일 managed 실행 경로와 명시적 CPU 자원 프로파일을 추가한다. 기술 설정과 POL을 분리하고, 원본 77개 ID·7객체·보존 증거·기존 판정 동작을 유지한다. 구현·계약·미검증 범위와 실행 후 결과는 [자동화 1차](docs/AUTOMATION_PHASE1.md)를 따른다. 이 범위 승인은 §0의 5~10개 우선 자동화 범위 안이며 향후 A/B/C 확대는 실제 관측과 인프라 조건별로 진행한다.
+
+## U1 변경 유형별 시험 선정 (2026-10-24·25 사용자 결정, 구현 전)
+
+- 정본 설계는 [UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md), 구현 지시는 [UPDATE_SELECTION_PROMPT.md](UPDATE_SELECTION_PROMPT.md), 결정은 `DECISIONS.md` U1 절이다.
+- **엔진 정식 릴리스**(major·minor가 바뀜, 롤백·rc·버전 확인 불가 포함): 적용 점검 전체를 기준·후보 두 이미지로 시험·비교한다. 줄이지 않고 이월하지 않는다. vLLM 소스 diff는 보고서의 바뀐 영역 표시, 도달 확인(이 배포가 쓰는 진입점은 미도달 0이 목표), 체크리스트 공백 후보에만 쓴다.
+- **엔진 패치 릴리스**(major·minor 같고 패치 자리만 올라감, 예: 0.32.0 → 0.32.1): 항상 시험 20개(경로 규칙으로 추적할 수 없는 흩어진 속성), 소스 diff의 변경 종류가 가리키는 점검, 입력 변경에 걸리는 점검을 기준·후보로 시험한다. 미분류 엔진 파일이 있으면 변경 종류 표의 모든 점검을 고른다. 나머지는 이전 PASS를 이월한다.
+- **모델 변경**(엔진 이미지 같음): 모델 manifest diff의 변경 종류(가중치·추가 코드·template·tokenizer·아키텍처)와 모든 모델 변경 공통 점검을 시험한다. 규칙에 없는 모델 파일 변경은 모든 모델 변경 종류를 적용한다.
+- **환경·정책 변경**(엔진 이미지·모델 같음): 바뀐 정책 값의 점검, 새로 범위에 들어온 점검, 바뀐 ENV 사실을 참조하는 점검을 시험한다. 어느 점검과도 연결되지 않은 사실이 바뀌면 적용 점검 전체를 시험한다.
+- 패치 릴리스와 증분 감사에서 선정되지 않은 점검은 이전 보안 PASS를 이월할 수 있다(INV-19). 증분 감사는 새 구성 한 쪽만 실행하며 버전 비교(Comparison)를 내지 않는다(INV-09).
+- CHG의 근거 파일(변경 목록·원본 해시·적용 규칙 해시·미분류 목록)은 내용 주소 artifact로 저장하고 `guard verify`·반출·복원이 누락·변조를 검사한다. 분석 시각·개인 경로·임의 ID는 시험 조건 해시에 넣지 않는다. 사람이 쓴 CHG와 자동 추출 CHG는 같은 형식·검증 함수를 쓴다(2026-10-25 팀원 개선안 반영).
+- 엔진 경로 규칙·추출기는 `adapters/`, 모델 파일 규칙은 `collectors/`, 변경 종류 → 점검 표·패치 항상 시험 목록·모델 변경 종류 → 점검·`fact_triggers`는 팩(`change_selection.yaml`)에 둔다.
+- CheckDef에 프레임워크 `framework_id`(CHK-…)·`mechanism_ids`를 더하되 내부 ID(`REQ-01` 등)는 바꾸지 않는다. 체크리스트 원본은 mg-princess/serving-security-framework `729216b1`(77행·순서·subtest_ids 동일, 질문 문구 개정) 기준으로 갱신한다.
+- 기존 audit(이전 PLAN 없이), 기존 `guard update`(이전 PLAN 없이)의 시험 범위·`guard.update_validation`, 저장 증거 재판정은 그대로 둔다.

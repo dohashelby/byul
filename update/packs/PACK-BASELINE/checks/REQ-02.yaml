@@ -1,38 +1,39 @@
 id: REQ-02
-revision: 1
+framework_id: CHK-REQ-002
+mechanism_ids:
+- mechanism-01
+revision: 2
 retired: false
 area: REQ
-purpose: 요청·대상 접근 권한
+purpose: 작업·대상 인가
 secondary_purposes: []
-question: 인증이 검사한 경로와 실제 실행 handler의 권한 요구가 일치하는가?
+question: Gateway·서버의 경로 설정에 따라 요청 경로가 바뀌어도 최종 실행 API에 필요한 인증·권한 검사가 적용되는가?
 scope: 조건부
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 경로 재작성·인증 대상 차이를 이용해 필요한 인증·인가를 거치지 않고 실제 handler를 실행할 수 있음.
 review_order: conditional_when_selected
 impact: null
 applies_when:
-  prose: root_path 또는 Gateway 경로 재작성 사용
+  prose: root_path·경로 prefix·Gateway/프록시 재작성이 있을 때 적용한다. 재작성 비사용은 기본 route 인증 점검의 제외 사유가 아니다.
 policy_params: []
 policy_prose:
   policy_to_decide: 허용 경로·프록시 재작성 규칙
   enterprise_decisions: 인증 방식·실제 계정, 사용자/조직별 모델·작업 허용표, 직통 허용 주체·목적, 관리 역할, Gateway의 신원 전달·경로 변환과 선택 API. 저장 결과 기능을 쓰면 객체 소유자·조회·취소 권한도 결정한다.
 normal_control: 기본 경로와 승인된 prefix 설정에서 같은 작업에 같은 권한이 적용된다.
 challenge_steps:
-- root_path·rewrite 설정 수집
+- 실제 서버·프록시의 경로 prefix·재작성 설정 수집
 - 동등 작업의 원경로·변환경로를 각각 호출
-- 인증 입력 경로와 handler 선택을 대조
+- 인증·인가 입력 경로/작업과 최종 처리 함수의 선택·실행을 대조
 required_observations: []
 required_observations_prose:
-- 외부 URL
-- Gateway rewrite
-- ASGI path·root_path
-- 선택 handler
+- 외부 요청 주소·작업, 프록시/Gateway의 변환 설정과 변환 후 경로
+- 인증·인가가 판단한 경로/작업과 최종 처리 함수의 선택·실행 또는 거부
 satisfied_if: 경로 변환을 이용해 비허용 handler가 수행되지 않는다.
 fail_criteria: 경로 변환으로 권한 검사를 벗어난 동일 작업이 실행된다.
 unknown_criteria: 외부 응답만 있고 내부 경로·handler 선택을 확인할 수 없다.
-remediation: 경로 해석 기준을 맞추고 실제 활성 route 전체에 권한을 적용한다.
+remediation: '- Gateway·프록시·인증 계층·router가 해석하는 요청 경로를 대조하고 재작성 규칙을 일치시킨다. root_path·경로 prefix를 포함한 최종 API에 필요한 권한 검사를 적용한다.'
 method_and_evidence: 정상/재작성 경로의 원 요청·인증 입력·최종 handler·허용/거부를 한 실행으로 기록한다.
-remaining_setup: 실제 proxy rewrite·root_path 설정과 경로 추적
+remaining_setup: 선정 서버·프록시의 유효 경로 변환 설정과 인증·최종 작업의 연결을 확인할 수단
 executor: null
 judge: null
 legacy:

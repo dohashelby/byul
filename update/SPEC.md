@@ -1,6 +1,9 @@
 # 서빙엔진 보안 검증 솔루션 — 설계 초안 (SPEC v0.1)
 
-> 2026-10-25 U1 결정(구현 전): 엔진 정식 릴리스는 적용 점검 전체를 기준·후보로 시험하고 소스 diff는 보고(바뀐 영역·도달 확인·체크리스트 공백)에만 쓴다. 엔진 패치 릴리스(0.xx.1 …)는 항상 시험 20개와 소스 diff에 걸리는 점검만 기준·후보로 시험한다. 엔진 이미지가 같은 모델·환경·정책 변경은 증분 감사로 걸리는 점검만 시험한다. 선정되지 않은 점검은 이전 PASS를 이월한다. INV-05를 개정하고 INV-19를 추가했다. 맨 끝 "U1" 절과 [UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md)를 따른다.
+> 2026-10-26 BYUL 이관: GUA `8e23bd2`의 U1 제품 연결·팩23·Python 3.12를 선택 이관했다. 아래의 2026-10-25 설계/과거 팩 실측 문구는 당시 기록이다. 현행 코드 검증은 PROGRESS, 77개 분기 현황은 docs/CHECKLIST_VALIDATION_STATUS.md, 외부 경계는 ../contracts/README.md를 따른다. RPT JSON 원본·플랫폼 표시를 유지하며 자체 HTML 보고서는 복구하지 않는다. 이번 실제 엔진 실증은 사용자 요청으로 보류한다.
+
+
+> 2026-10-25 U1 결정(제품 연결·오프라인 검증 및 분류 한계는 설계 §11 참조): 엔진 정식 릴리스는 적용 점검 전체를 기준·후보로 시험하고 소스 diff는 보고(바뀐 영역·도달 확인·체크리스트 공백)에만 쓴다. 엔진 패치 릴리스(0.xx.1 …)는 항상 시험 20개와 소스 diff에 걸리는 점검만 기준·후보로 시험한다. 엔진 이미지가 같은 모델·환경·정책 변경은 증분 감사로 걸리는 점검만 시험한다. 선정되지 않은 점검은 이전 PASS를 이월한다. INV-05를 개정하고 INV-19를 추가했다. 맨 끝 "U1" 절과 [UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md)를 따른다.
 
 > 2026-10-24 판정 의미 보완 후보: PR #29는 main 641f12f에 병합됐다. 현행 PACK22/DRAFT·REQ-09 정의6·PLT-04 정의3·정책22점검50경로·자동연결11이다. 사용자 결정으로 HTTP 성공을 위험한 소비와 구분하고, 명시 마운트 금지와 자격 후보 접근 관측을 분리한다. 어댑터0.4.2·input_validation0.5.0·credential_exposure0.4.0·declared0.14.0이며 이번 테스트·실증 결과는 아래 이전 팩21의 기록과 별도로 갱신한다. 원본 7객체·불변식·다른75개 정의·저장 팩의 과거 판정은 유지한다.
 
@@ -587,11 +590,13 @@ judge:
 
 ## 10. 저장소 구조와 CLI
 
+현행 기술 기준은 Python 3.12(`>=3.12,<3.13`)와 `uv`다. 개발·guard 제품·CI·gua의 시험 보조 Python을 이 범위로 통일한다. 대상 vLLM 이미지 내부 환경은 독립이며 기존 이미지 계약과 과거 3.11 실행 증거·팩·Ref·해시는 보존한다. 별도 3.11용 소스나 제품은 유지하지 않는다.
+
 ```
 guard/
 ├─ SPEC.md                 # 이 문서
 ├─ DECISIONS.md            # 결정 기록 (날짜·결정·이유, 한 줄씩)
-├─ pyproject.toml          # Python 3.11, pydantic, typer, pyyaml, pytest (httpx는 미사용이라 2026-10-19 제거)
+├─ pyproject.toml          # Python 3.12 (>=3.12,<3.13), pydantic, typer, pyyaml, pytest (httpx는 미사용이라 2026-10-19 제거)
 ├─ src/guard/
 │  ├─ models/              # §4 객체 7종 + CheckDef + enum
 │  ├─ core/                # select, run, judge, report, compare, aggregate
@@ -624,7 +629,7 @@ guard evidence export --store ... --output evidence.zip                        #
 guard evidence restore --bundle evidence.zip --destination new-store            # 새 경로에 무결성 검증 후 복원
 guard evidence template --plan PLAN-... --out manual.yaml                       # 수동 입력 양식
 guard evidence import manual.yaml                                              # 검증한 DECLARED 객체 배치 입력
-# U1 (구현 전, 이름은 UPDATE_SELECTION.md §7 제안)
+# U1 (구현 명령·검증 범위는 UPDATE_SELECTION.md §11)
 guard env update    --base ENV-... --patch patch.yaml                          # 변경분만 입력 → 같은 id 새 revision
 guard policy update --base POL-... --patch patch.yaml
 guard diff --from v0.31.0 --to v0.32.0                                         # 엔진 소스 diff → CHG (정식: 보고, 패치: 선정)
@@ -724,7 +729,7 @@ declared0.9.1과 기존 캐시 helper만 변경한다. 수동 구조/1·양식/3
 
 2026-10-23 사용자 승인 범위는 기존 5개 점검 보강과 REQ-10/REQ-13/OBS-03 자동화다. `guard prepare-validation`/`guard validate`의 단일 managed 실행 경로와 명시적 CPU 자원 프로파일을 추가한다. 기술 설정과 POL을 분리하고, 원본 77개 ID·7객체·보존 증거·기존 판정 동작을 유지한다. 구현·계약·미검증 범위와 실행 후 결과는 [자동화 1차](docs/AUTOMATION_PHASE1.md)를 따른다. 이 범위 승인은 §0의 5~10개 우선 자동화 범위 안이며 향후 A/B/C 확대는 실제 관측과 인프라 조건별로 진행한다.
 
-## U1 변경 유형별 시험 선정 (2026-10-24·25 사용자 결정, 구현 전)
+## U1 변경 유형별 시험 선정 (2026-10-24·25 사용자 결정, 구현·검증 범위는 설계 §11)
 
 - 정본 설계는 [UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md), 구현 지시는 [UPDATE_SELECTION_PROMPT.md](UPDATE_SELECTION_PROMPT.md), 결정은 `DECISIONS.md` U1 절이다.
 - **엔진 정식 릴리스**(major·minor가 바뀜, 롤백·rc·버전 확인 불가 포함): 적용 점검 전체를 기준·후보 두 이미지로 시험·비교한다. 줄이지 않고 이월하지 않는다. vLLM 소스 diff는 보고서의 바뀐 영역 표시, 도달 확인(이 배포가 쓰는 진입점은 미도달 0이 목표), 체크리스트 공백 후보에만 쓴다.

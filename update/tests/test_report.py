@@ -1,17 +1,29 @@
-"""7단계: RES → RPT(JSON) → HTML."""
+"""7단계: RES → RPT(JSON). 보고서 화면은 BYUL platform의 책임이다."""
 
 import json
 
 from guard.core.report import build_report
 from guard.models import Verdict
-from tests.builders import T0
+from tests.builders import T0, baseline_pack
 from tests.report_setup import pipeline
 
 PURPOSE = "요청·대상 접근 권한"
 
 
+def _purpose_fixture():
+    """집계 테스트가 의도한 그룹을 원본 체크리스트의 명칭과 독립적으로 둔다.
+
+    REQ-01의 FAIL·PASS와 같은 목적에 속한 미정 REQ-02를 대조한다.
+    실제 원본의 목적 전달은 importer 계약 테스트가 별도로 검증한다.
+    """
+    pack = baseline_pack()
+    for cid in ("REQ-01", "REQ-02"):
+        pack.checks[cid] = pack.checks[cid].model_copy(update={"purpose": PURPOSE, "secondary_purposes": []})
+    return pack
+
+
 def test_full_pack_report_structure(tmp_path):
-    store, pack, plan = pipeline(tmp_path)
+    store, pack, plan = pipeline(tmp_path, pack=_purpose_fixture())
     rpt = build_report(store, pack, plan, as_of=T0)
     store.put(rpt)
     rows = {r.check_id: r for r in rpt.by_check}
@@ -30,7 +42,7 @@ def test_full_pack_report_structure(tmp_path):
 
 
 def test_fail_propagates_to_purpose_and_area(tmp_path):
-    store, pack, plan = pipeline(tmp_path, scenario="direct_200", include=["REQ-*"])
+    store, pack, plan = pipeline(tmp_path, scenario="direct_200", include=["REQ-*"], pack=_purpose_fixture())
     rpt = build_report(store, pack, plan, as_of=T0)
     assert rpt.by_purpose[PURPOSE].security == Verdict.FAIL
     assert rpt.by_area["REQ"].security == Verdict.FAIL
@@ -39,7 +51,7 @@ def test_fail_propagates_to_purpose_and_area(tmp_path):
 
 
 def test_scope_excluded_checks_not_aggregated(tmp_path):
-    store, pack, plan = pipeline(tmp_path, include=["REQ-01"])
+    store, pack, plan = pipeline(tmp_path, include=["REQ-01"], pack=_purpose_fixture())
     rpt = build_report(store, pack, plan, as_of=T0)
     assert [r.check_id for r in rpt.by_check if r.selected] == ["REQ-01"]
     # 정책 범위 밖만 있는 영역·목적은 집계하지 않는다(빈 집계로 판정을 만들지 않음)

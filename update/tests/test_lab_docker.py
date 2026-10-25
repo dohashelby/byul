@@ -11,12 +11,13 @@ import secrets
 import subprocess
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from guard.cli import app
 from guard.runtime.docker import Docker
 from lab import lab
-from tests.builders import ROOT
+from tests.builders import ROOT, baseline_pack
 
 pytestmark = pytest.mark.docker
 runner = CliRunner()
@@ -48,17 +49,23 @@ def test_lab_topology_end_to_end(tmp_path, topology, expected):
     allowed, denied = secrets.token_urlsafe(24), secrets.token_urlsafe(24)
     run_id = f"lab{secrets.token_hex(4)}"
     run_dir = tmp_path / "run"
+    # Keep the lab's declared values and scope; bind this temporary fixture to
+    # the exact pack used by the test without rewriting its historical input.
+    policy_data = yaml.safe_load((ROOT / "lab/policy.yaml").read_text(encoding="utf-8"))
+    policy_data["pack"] = baseline_pack().ref().model_dump(mode="json")
+    policy_path = tmp_path / "policy.yaml"
+    policy_path.write_text(yaml.safe_dump(policy_data, allow_unicode=True), encoding="utf-8")
     env = {"GUARD_LAB_ALLOWED_KEY": allowed, "GUARD_LAB_DENIED_KEY": denied}
     with Docker(run_id) as docker:  # 실패해도 __exit__에서 cleanup
         lab.up(docker, topology, run_dir, allowed)
         cfg = run_dir / "guard.toml"
         cfg.write_text(
-            f'store = "{run_dir / ".guard"}"\n[adapter]\nname = "vllm"\n[executors]\ndirect_route = "real"\n'
-            f'[direct_route]\ntarget = "{run_dir / "target.json"}"\nallowed_key_env = "GUARD_LAB_ALLOWED_KEY"\n'
+            f'store = "{(run_dir / ".guard").as_posix()}"\n[adapter]\nname = "vllm"\n[executors]\ndirect_route = "real"\n'
+            f'[direct_route]\ntarget = "{(run_dir / "target.json").as_posix()}"\nallowed_key_env = "GUARD_LAB_ALLOWED_KEY"\n'
             f'denied_key_env = "GUARD_LAB_DENIED_KEY"\nrequest_timeout = 3.0\n', encoding="utf-8")
         c = ["--config", str(cfg)]
         out = _ok(["select", "--pack", str(ROOT / "packs/PACK-BASELINE"), "--env", str(run_dir / "env.yaml"),
-                   "--policy", str(ROOT / "lab/policy.yaml"), *c], env)
+                   "--policy", str(policy_path), *c], env)
         plan = out.strip().splitlines()[-1]
         pack = ["--pack", str(ROOT / "packs/PACK-BASELINE")]
         print(_ok(["run", "--plan", plan, *pack, *c], env))

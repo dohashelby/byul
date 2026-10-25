@@ -1,4 +1,7 @@
-"""INV-05: 기본 점검은 변경 분석이 '영향 없음'이어도 빼지 않는다. 변경 분석은 추가만 한다."""
+"""INV-05: 기본 audit·정식 update는 전체 범위, 증분 선정은 승인된 U1 계약으로만 줄인다.
+
+기존 변경 분석의 추가·기본 범위 보존 사례는 update 모드 회귀로 그대로 유지한다.
+"""
 
 from guard.core.select import select
 from guard.models.objects import Change

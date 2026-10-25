@@ -42,11 +42,13 @@ PLT-04의 기존 `forbidden_env_names`·`forbidden_mount_paths`는 유지한다.
 
 ## 기존 실행 안내와 이력
 
-Python 3.11과 로컬 Docker를 사용한다. Windows Desktop/WSL2의 제한 CPU 제품 실행은 과거 1~3차 기록에서 확인했다. 현재 변경의 직접 검증은 위 보강 문서에 별도로 기록하며 macOS·임의 하드웨어·GPU 전체의 실증 완료로 확대하지 않는다.
+당시에는 Python 3.11과 로컬 Docker를 사용했다. Windows Desktop/WSL2의 제한 CPU 제품 실행은 과거 1~3차 기록에서 확인했다. 현재 변경의 직접 검증은 위 보강 문서에 별도로 기록하며 macOS·임의 하드웨어·GPU 전체의 실증 완료로 확대하지 않는다.
 실제 엔진 시험에는 사전에 받은 HF 모델 캐시와 호환 아키텍처의 pinned 이미지가 필요하다.
 정책/팩 DRAFT이면 공식 보고서가 아니다.
 
 ## 설치와 기본 검증
+
+현행 개발·guard 실행·CI는 64비트 Python 3.12(`>=3.12,<3.13`)를 사용한다. 위 3.11 환경은 과거 실증 기록이며, 대상 vLLM 이미지의 내부 Python·digest·검토 프로파일은 호스트 버전 전환과 독립이다. 기존 3.11 가상환경과 원본 증거는 덮어쓰지 않고 새 경로에 3.12 환경을 준비한다. [전환 검증](INSTALLED_VERIFICATION.md#python-312-전환-검증)을 따른다.
 
 ```sh
 uv sync --frozen

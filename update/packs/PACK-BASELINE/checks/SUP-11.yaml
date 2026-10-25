@@ -1,17 +1,20 @@
 id: SUP-11
-revision: 1
+framework_id: CHK-SUP-011
+mechanism_ids:
+- mechanism-09
+revision: 2
 retired: false
 area: SUP
-purpose: 코드 실행 제한
+purpose: 추가 코드 실행 허용
 secondary_purposes: []
-question: 지원 실행 모드에서도 동적 import 제한이 유지되는가?
+question: 지원하는 실행 방식마다 외부 모듈을 불러오는 제한이 유지되는가?
 scope: null
 risk_category: 보안 위협 점검
 risk_summary: 모듈 경로를 지정할 수 있는 주체가 실행 모드별 import 검사 차이를 이용해 비승인 코드를 실행시킬 수 있음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 동적 import 경로
+  prose: 선정 엔진·확장에 동적 import 소비 경로가 있을 때 적용한다. 지원 실행 모드와 외부 설정의 효과를 함께 확인한다.
 policy_params: []
 policy_prose:
   policy_to_decide: null
@@ -23,13 +26,11 @@ challenge_steps:
 - 실제 import 또는 거부 위치 확인
 required_observations: []
 required_observations_prose:
-- mode·entrypoint·module 선택값
-- import 파일
-- 설정 집행 결과
-satisfied_if: 실행 모드 변경으로 필수 검사가 제거되지 않는다.
+- mode·entrypoint·module 선택값/import 파일/설정 집행 결과
+satisfied_if: 지원하는 각 실행 모드에서 허용하지 않은 외부 모듈 로딩을 거부하고 정상 로딩은 가능하다.
 fail_criteria: 지원 mode에서 승인 밖 dynamic import가 허용된다.
 unknown_criteria: 지원 mode 목록 또는 실제 import 대상을 확인하지 못했다.
-remediation: 보안 판단을 제거 가능한 assertion에만 의존하지 않게 통제하고 외부 설정도 제한한다
+remediation: '- 지원하는 각 실행 모드에서 동적 import를 허용하는 모듈·경로·설정값을 제한한다. 보안 검사를 최적화 옵션으로 제거될 수 있는 assertion과 분리하고 실행 전에 유효성을 검사한다.'
 method_and_evidence: 지원 모드마다 허용/비허용 대상을 비교하고 검사·import 기록을 확인한다.
 remaining_setup: 지원 실행 모드 확정과 import 계측
 executor: null

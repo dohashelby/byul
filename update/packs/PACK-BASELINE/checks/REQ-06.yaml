@@ -1,17 +1,20 @@
 id: REQ-06
-revision: 1
+framework_id: CHK-REQ-006
+mechanism_ids:
+- mechanism-01
+revision: 2
 retired: false
 area: REQ
-purpose: 요청·대상 접근 권한
+purpose: 작업·대상 인가
 secondary_purposes: []
-question: 저장 결과의 조회·취소 권한을 객체별로 확인하는가?
+question: 저장된 결과를 조회하거나 취소할 때 해당 객체의 권한을 확인하는가?
 scope: 조건부
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 타인의 response ID를 이용해 결과를 읽거나 취소·덮어쓰기·대화 이어쓰기를 해 타인 정보와 작업을 침해할 수 있음.
 review_order: conditional_when_selected
 impact: null
 applies_when:
-  prose: 저장 Responses/조회/취소 기능 활성, R10 영속 job 제외
+  prose: 조회·취소할 수 있는 저장 Responses/결과 객체를 지원·사용할 때 적용한다. 메모리 저장도 포함하며 일반 요청의 내부 collector와 구분한다.
 policy_params: []
 policy_prose:
   policy_to_decide: 결과 소유자·공유·취소 권한
@@ -23,13 +26,11 @@ challenge_steps:
 - 저장 객체와 실제 작업 영향 확인
 required_observations: []
 required_observations_prose:
-- 객체 owner·ID
-- 요청 신원
-- 저장 내용·체인·취소 결과
+- 객체 owner·ID/요청 신원/저장 내용·체인·취소 결과
 satisfied_if: 타 주체의 비허용 조회·취소가 거부된다. ID를 알고 있다는 사실을 권한으로 취급하지 않는다.
 fail_criteria: B가 A의 결과를 읽거나 변경·취소하거나 허용 밖 이전 결과를 연결한다.
 unknown_criteria: 저장 기능 활성·owner 기준 또는 객체별 실제 효과를 확인하지 못했다.
-remediation: 결과 객체의 소유·허용 관계를 집행한다.
+remediation: '- 저장 결과와 작업 객체에 소유자·허용 행위를 기록하고 조회·변경·취소마다 검사한다. 요청 ID나 객체 ID를 아는 것과 사용 권한을 구분하고 이전 결과를 참조할 때도 같은 검사를 적용한다.'
 method_and_evidence: '두 시험 주체가 서로의 알려진 response ID로 조회·취소를 시도한다. 조회와 취소는 별도 결과로 기록한다. 【F14】Responses store는 VLLM_ENABLE_RESPONSES_API_STORE 활성 및 request.store 필요. 해당 저장소 접근 코드에 소유자 검사 없음. A/B 사용자로 저장한 response ID를 조회·취소·previous_response_id 이어쓰기·request_id 재사용 덮어쓰기한다. Gateway와 직통 경로를 각각 확인. 정상 대조: A가 자신의 결과 조회·이어쓰기 가능, B의 별도 ID 작업 정상'
 remaining_setup: Responses 저장 등 활성 조건; 시험 객체 외에는 접근하지 않음
 executor: null

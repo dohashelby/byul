@@ -101,6 +101,7 @@ class NotSelectedReason(_StrEnum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
     POLICY_SCOPE = "POLICY_SCOPE"
     RETIRED = "RETIRED"
+    CARRIED_OVER = "CARRIED_OVER"
 
 
 class ExceptionStatus(_StrEnum):

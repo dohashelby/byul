@@ -23,6 +23,11 @@ def _read(path: Path) -> dict[str, Any]:
 
 def load_environment(path: Path) -> Environment:
     data = _read(path)
+    if data.get("kind") == "ENV":
+        obj = Environment.model_validate(data)
+        if not obj.hash_ok():
+            raise ValueError("ENV content hash is invalid")
+        return obj
     origin = DataOrigin(data.get("data_origin", "DECLARED"))
     shorthand_origin = DataOrigin.EXAMPLE if origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
     facts: dict[str, dict] = {}
@@ -50,6 +55,11 @@ def load_environment(path: Path) -> Environment:
 
 def load_policy(path: Path, pack: Pack) -> Policy:
     data = _read(path)
+    if data.get("kind") == "POL":
+        obj = Policy.model_validate(data)
+        if not obj.hash_ok() or obj.pack != pack.ref():
+            raise ValueError("POL hash or pack reference is invalid")
+        return obj
     want = data.get("pack") or {}
     ref = pack.ref()
     if want.get("id") != ref.id or int(want.get("revision", -1)) != ref.revision:

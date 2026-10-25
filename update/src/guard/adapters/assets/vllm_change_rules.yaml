@@ -1,0 +1,190 @@
+version: 3
+basis: docs/UPDATE_SELECTION.md §3.1; tests/fixtures/u1_path_rule_basis.json (agent review; human review pending)
+exclude:
+  prefixes: [tests/, docs/, .buildkite/, benchmarks/, examples/, .github/, tools/, vllm/benchmarks/, rust/src/bench/]
+  components: [tests, benches, examples]
+  suffixes: [.md, .rst]
+rules:
+  - {prefix: vllm/entrypoints/, categories: [API_ROUTE]}
+  # A middleware or a weight/video/parser stream is not necessarily authentication
+  # or an HTTP response stream. These are reviewed paths, not behavior proofs.
+  - {path: vllm/entrypoints/serve/middleware/authenticate.py, categories: [AUTH], basis: auth-boundary}
+  - {path: rust/src/server/src/middleware/auth.rs, categories: [AUTH], basis: auth-boundary}
+  - {path: vllm/entrypoints/openai/responses/streaming_events.py, categories: [STREAMING], basis: response-stream}
+  - {path: rust/src/chat/src/stream.rs, categories: [STREAMING, OUTPUT], basis: response-stream}
+  - {path: rust/src/engine-core-client/src/client/stream.rs, categories: [STREAMING], basis: response-stream}
+  - {prefix: vllm/inputs/, categories: [INPUT_PROCESSING]}
+  - {prefix: vllm/multimodal/, categories: [INPUT_PROCESSING]}
+  - {prefix: vllm/transformers_utils/, categories: [MODEL_LOADING, INPUT_PROCESSING]}
+  - {contains: chat_utils, categories: [TEMPLATE]}
+  # Output response_template grammars are not input chat templates.
+  - {prefix: vllm/transformers_utils/chat_templates/, categories: [TEMPLATE], basis: input-template-boundary}
+  - {contains: sampling, categories: [SAMPLING]}
+  - {prefix: vllm/v1/sample/, categories: [SAMPLING]}
+  - {contains: lora, categories: [MODEL_SELECTION]}
+  - {prefix: vllm/model_executor/model_loader/, categories: [MODEL_LOADING]}
+  - {prefix: vllm/model_executor/models/, categories: [MODEL_LOADING, RUNNER_KERNEL]}
+  - {prefix: vllm/models/, categories: [MODEL_LOADING, RUNNER_KERNEL], basis: modern-models}
+  - {prefix: vllm/model_executor/layers/, categories: [RUNNER_KERNEL]}
+  - {prefix: vllm/model_executor/kernels/, categories: [RUNNER_KERNEL], basis: kernel-implementations}
+  - {prefix: vllm/model_executor/determinism/, categories: [RUNNER_KERNEL], basis: kernel-implementations}
+  - {prefix: vllm/model_executor/warmup/, categories: [RUNNER_KERNEL, COMPILE_CACHE], basis: kernel-warmup}
+  - {path: vllm/_custom_ops.py, categories: [RUNNER_KERNEL], basis: kernel-implementations}
+  - {path: vllm/_aiter_ops.py, categories: [RUNNER_KERNEL], basis: kernel-implementations}
+  - {path: vllm/_xpu_ops.py, categories: [RUNNER_KERNEL], basis: kernel-implementations}
+  - {prefix: vllm/cute_utils/, categories: [RUNNER_KERNEL], basis: kernel-implementations}
+  - {prefix: vllm/triton_utils/, categories: [RUNNER_KERNEL], basis: kernel-implementations}
+  - {prefix: vllm/third_party/flash_linear_attention/ops/, categories: [RUNNER_KERNEL], basis: kernel-implementations}
+  - {prefix: vllm/device_allocator/, categories: [RUNNER_KERNEL], basis: device-memory}
+  - {prefix: vllm/kernels/, categories: [RUNNER_KERNEL]}
+  - {prefix: vllm/v1/worker/, categories: [RUNNER_KERNEL]}
+  - {prefix: csrc/, categories: [RUNNER_KERNEL]}
+  # CACHE denotes request/KV/embedding state, not every memoized Python function,
+  # compile artifact or model-weight acquisition cache whose name contains cache.
+  - {path: vllm/config/cache.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/core/block_pool.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/core/kv_cache_manager.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/core/kv_cache_coordinator.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/core/kv_cache_utils.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/core/kv_cache_metrics.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/core/single_type_kv_cache_manager.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/core/encoder_cache_manager.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/kv_cache_interface.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/kv_cache_layout.py, categories: [CACHE], basis: request-cache}
+  - {path: vllm/v1/kv_cache_spec_registry.py, categories: [CACHE], basis: request-cache}
+  - {prefix: vllm/v1/kv_offload/, categories: [CACHE], basis: cache-offload}
+  - {prefix: vllm/v1/kv_offload/tiering/p2p/, categories: [DISTRIBUTED_IPC], basis: cache-offload}
+  - {path: vllm/v1/kv_offload/cpu/shared_offload_region.py, categories: [DISTRIBUTED_IPC], basis: cache-offload}
+  - {prefix: vllm/v1/simple_kv_offload/, categories: [CACHE], basis: cache-offload}
+  - {prefix: vllm/v1/hisparse/, categories: [CACHE, RUNNER_KERNEL], basis: cache-offload}
+  - {prefix: vllm/v1/attention/, categories: [CACHE, RUNNER_KERNEL], basis: attention}
+  - {prefix: vllm/multimodal/cache/, categories: [CACHE], basis: request-cache}
+  - {prefix: vllm/distributed/kv_transfer/, categories: [CACHE], basis: cache-offload}
+  - {path: vllm/distributed/ec_transfer/ec_connector/cpu/scheduler/embedding_cache.py, categories: [CACHE], basis: request-cache}
+  - {prefix: vllm/entrypoints/serve/dev/cache/, categories: [CACHE], basis: request-cache}
+  - {path: rust/src/server/src/routes/cache.rs, categories: [CACHE], basis: request-cache}
+  - {prefix: vllm/compilation/, categories: [COMPILE_CACHE]}
+  - {prefix: vllm/distributed/, categories: [DISTRIBUTED_IPC]}
+  - {prefix: vllm/v1/executor/, categories: [DISTRIBUTED_IPC]}
+  - {prefix: vllm/v1/serial_utils, categories: [DISTRIBUTED_IPC, INPUT_PROCESSING]}
+  - {contains: remote_code, categories: [REMOTE_CODE]}
+  - {prefix: vllm/plugins/, categories: [PLUGIN]}
+  - {path: vllm/utils/import_utils.py, categories: [PLUGIN, DEPENDENCY, ERROR], basis: import-boundary}
+  - {contains: scheduler, categories: [SCHEDULER]}
+  - {prefix: vllm/v1/core/sched/, categories: [SCHEDULER], basis: scheduler-interface}
+  - {prefix: vllm/v1/spec_decode/, categories: [RUNNER_KERNEL, SAMPLING], basis: speculative-decoding}
+  - {prefix: vllm/v1/pool/, categories: [RUNNER_KERNEL, OUTPUT], basis: pooling}
+  - {prefix: vllm/v1/watermarking/, categories: [RUNNER_KERNEL, SAMPLING], basis: sampling-watermark}
+  - {path: vllm/v1/cudagraph_dispatcher.py, categories: [RUNNER_KERNEL, COMPILE_CACHE], basis: cudagraph-dispatch}
+  - {contains: health, categories: [STARTUP_HEALTH]}
+  - {contains: startup, categories: [STARTUP_HEALTH]}
+  - {contains: shutdown, categories: [FAILURE]}
+  - {contains: fault_tolerance, categories: [FAILURE]}
+  - {contains: exception, categories: [ERROR, FAILURE]}
+  - {contains: profiler, categories: [PROFILER]}
+  - {prefix: vllm/entrypoints/serve/profile/, categories: [PROFILER]}
+  - {prefix: vllm/usage/, categories: [USAGE_STATS]}
+  - {contains: replay, categories: [REPLAY]}
+  - {contains: logger, categories: [OBSERVABILITY]}
+  - {contains: logging, categories: [OBSERVABILITY]}
+  - {contains: metrics, categories: [OBSERVABILITY]}
+  - {contains: outputs, categories: [OUTPUT]}
+  - {contains: output_processor, categories: [OUTPUT]}
+  - {prefix: vllm/tool_parsers/, categories: [OUTPUT_PARSING]}
+  - {prefix: vllm/reasoning/, categories: [OUTPUT_PARSING]}
+  - {prefix: vllm/parser/, categories: [OUTPUT_PARSING], basis: output-parser}
+  - {prefix: vllm/v1/structured_output/, categories: [OUTPUT_PARSING, SAMPLING], basis: constrained-output}
+  - {prefix: vllm/tokenizers/, categories: [MODEL_LOADING, INPUT_PROCESSING], basis: tokenizer}
+  - {path: vllm/tokenizers/detokenizer_utils.py, categories: [OUTPUT], basis: tokenizer}
+  - {prefix: vllm/renderers/inputs/, categories: [INPUT_PROCESSING], basis: input-renderer}
+  - {path: vllm/renderers/base.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/hf.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/cohere.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/deepseek_v32.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/deepseek_v4.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/inkling.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/inkling_encoding.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/kimi_k3.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/mistral.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/online_renderer.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/params.py, categories: [INPUT_PROCESSING, TEMPLATE], basis: input-renderer}
+  - {path: vllm/renderers/terratorch.py, categories: [INPUT_PROCESSING], basis: input-renderer}
+  - {path: vllm/renderers/online_derenderer.py, categories: [OUTPUT, OUTPUT_PARSING], basis: output-derenderer}
+  - {prefix: rust/src/chat/src/parser/, categories: [OUTPUT_PARSING]}
+  - {prefix: rust/src/parser/src/, categories: [OUTPUT_PARSING], basis: rust-output-parser}
+  - {prefix: rust/src/parser/python/src/, categories: [OUTPUT_PARSING], basis: rust-output-parser}
+  - {prefix: rust/src/chat/src/renderer/, categories: [INPUT_PROCESSING, TEMPLATE], basis: rust-renderer}
+  - {prefix: rust/src/chat/src/multimodal/, categories: [INPUT_PROCESSING], basis: rust-renderer}
+  - {path: rust/src/chat/src/multimodal.rs, categories: [INPUT_PROCESSING], basis: rust-renderer}
+  - {prefix: rust/src/chat/src/backend/, categories: [MODEL_LOADING, INPUT_PROCESSING, TEMPLATE], basis: rust-renderer}
+  - {prefix: rust/src/chat/src/output/, categories: [OUTPUT, OUTPUT_PARSING], basis: rust-output}
+  - {path: rust/src/chat/src/event.rs, categories: [OUTPUT], basis: rust-output}
+  - {path: rust/src/chat/src/error.rs, categories: [ERROR, FAILURE], basis: rust-output}
+  - {path: rust/src/chat/src/request.rs, categories: [INPUT_PROCESSING, SAMPLING, MODEL_SELECTION], basis: rust-input}
+  - {path: rust/src/chat/src/lib.rs, categories: [INPUT_PROCESSING, OUTPUT], basis: rust-input}
+  - {path: rust/src/text/src/request.rs, categories: [INPUT_PROCESSING, SAMPLING], basis: rust-input}
+  - {path: rust/src/text/src/lower.rs, categories: [INPUT_PROCESSING, SAMPLING], basis: rust-input}
+  - {prefix: rust/src/text/src/lower/, categories: [INPUT_PROCESSING, SAMPLING], basis: rust-input}
+  - {prefix: rust/src/text/src/backend/, categories: [MODEL_LOADING, INPUT_PROCESSING], basis: rust-input}
+  - {prefix: rust/src/text/src/output/, categories: [OUTPUT], basis: rust-output}
+  - {prefix: rust/src/tokenizer/src/, categories: [MODEL_LOADING, INPUT_PROCESSING, OUTPUT], basis: rust-tokenizer}
+  - {prefix: rust/src/server/, categories: [API_ROUTE]}
+  - {prefix: rust/src/engine-core-client/, categories: [DISTRIBUTED_IPC]}
+  - {path: rust/proto/control.proto, categories: [API_ROUTE, INPUT_PROCESSING], basis: rust-protocol}
+  - {path: rust/proto/inference.proto, categories: [API_ROUTE, INPUT_PROCESSING, STREAMING, SAMPLING], basis: rust-protocol}
+  - {prefix: requirements/, categories: [DEPENDENCY]}
+  - {path: pyproject.toml, categories: [DEPENDENCY, IMAGE]}
+  - {path: setup.py, categories: [IMAGE]}
+  - {path: CMakeLists.txt, categories: [IMAGE]}
+  - {prefix: cmake/, categories: [IMAGE]}
+  - {prefix: docker/, categories: [IMAGE]}
+  - {path: rust/Cargo.toml, categories: [DEPENDENCY], basis: rust-dependency}
+  - {path: rust/Cargo.lock, categories: [DEPENDENCY], basis: rust-dependency}
+  - {path: rust/proto/Cargo.toml, categories: [DEPENDENCY], basis: rust-dependency}
+  - {path: rust/src/chat/Cargo.toml, categories: [DEPENDENCY], basis: rust-dependency}
+  - {path: rust/src/parser/Cargo.toml, categories: [DEPENDENCY], basis: rust-dependency}
+  - {path: rust/src/parser/python/Cargo.toml, categories: [DEPENDENCY], basis: rust-dependency}
+  - {prefix: vllm/entrypoints/cli/, categories: [CLI_OPTION]}
+  - {path: rust/src/cmd/src/cli.rs, categories: [CLI_OPTION], basis: rust-cli}
+  - {prefix: rust/src/cmd/src/cli/, categories: [CLI_OPTION], basis: rust-cli}
+  - {path: vllm/envs.py, categories: [ENV_VAR]}
+  # No blanket GENERIC for config/utils/platforms/engine: a display-only label
+  # must not hide a source change whose protected attributes are still unknown.
+  # Reviewed exact files only: new config/utils/engine files remain unmapped.
+  - {path: rust/src/llm/src/lib.rs, categories: [INPUT_PROCESSING, OUTPUT, STREAMING], basis: review69-exact-files}
+  - {path: rust/src/llm/src/output.rs, categories: [OUTPUT, STREAMING], basis: review69-exact-files}
+  - {path: vllm/config/attention.py, categories: [CACHE, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/config/compilation.py, categories: [COMPILE_CACHE, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/config/ec_transfer.py, categories: [CACHE, DISTRIBUTED_IPC, PLUGIN], basis: review69-exact-files}
+  - {path: vllm/config/engram.py, categories: [DISTRIBUTED_IPC, MODEL_LOADING, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/config/kernel.py, categories: [DISTRIBUTED_IPC, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/config/kv_transfer.py, categories: [CACHE, DISTRIBUTED_IPC, PLUGIN], basis: review69-exact-files}
+  - {path: vllm/config/multimodal.py, categories: [CACHE, INPUT_PROCESSING], basis: review69-exact-files}
+  - {path: vllm/config/observability.py, categories: [OBSERVABILITY], basis: review69-exact-files}
+  - {path: vllm/config/parallel.py, categories: [DISTRIBUTED_IPC], basis: review69-exact-files}
+  - {path: vllm/config/pooler.py, categories: [OUTPUT, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/config/quantization.py, categories: [MODEL_LOADING, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/config/speculative.py, categories: [MODEL_LOADING, RUNNER_KERNEL, SAMPLING], basis: review69-exact-files}
+  - {path: vllm/config/watermarking.py, categories: [SAMPLING], basis: review69-exact-files}
+  - {path: vllm/engine/arg_utils.py, categories: [CLI_OPTION], basis: review69-exact-files}
+  - {path: vllm/platforms/cpu.py, categories: [CACHE, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/platforms/cuda.py, categories: [CACHE, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/platforms/interface.py, categories: [CACHE, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/platforms/rocm.py, categories: [CACHE, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/platforms/xpu.py, categories: [CACHE, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/scripts.py, categories: [CLI_OPTION], basis: review69-exact-files}
+  - {path: vllm/utils/argparse_utils.py, categories: [CLI_OPTION], basis: review69-exact-files}
+  - {path: vllm/utils/b12x.py, categories: [RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/utils/deep_gemm.py, categories: [CACHE, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/utils/diffusion.py, categories: [INPUT_PROCESSING, SAMPLING], basis: review69-exact-files}
+  - {path: vllm/utils/flashinfer.py, categories: [COMPILE_CACHE, DEPENDENCY, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/utils/flashinfer_moe_ep.py, categories: [DISTRIBUTED_IPC, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/utils/humming.py, categories: [COMPILE_CACHE, RUNNER_KERNEL], basis: review69-exact-files}
+  - {path: vllm/utils/jit_monitor.py, categories: [COMPILE_CACHE, OBSERVABILITY], basis: review69-exact-files}
+  - {path: vllm/utils/nccl.py, categories: [DEPENDENCY, DISTRIBUTED_IPC], basis: review69-exact-files}
+  - {path: vllm/utils/network_utils.py, categories: [DISTRIBUTED_IPC], basis: review69-exact-files}
+  - {path: vllm/v1/engine/__init__.py, categories: [DISTRIBUTED_IPC, INPUT_PROCESSING, OUTPUT, SAMPLING], basis: review69-exact-files}
+  - {path: vllm/v1/engine/core_client.py, categories: [DISTRIBUTED_IPC, PROFILER], basis: review69-exact-files}
+  - {path: vllm/v1/engine/detokenizer.py, categories: [OUTPUT, SAMPLING], basis: review69-exact-files}
+  - {path: vllm/v1/engine/input_processor.py, categories: [INPUT_PROCESSING, SAMPLING], basis: review69-exact-files}
+  - {path: vllm/v1/engine/utils.py, categories: [DISTRIBUTED_IPC, FAILURE, STARTUP_HEALTH], basis: review69-exact-files}

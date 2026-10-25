@@ -191,7 +191,7 @@ class VersionPoint(Strict):
 
 
 class Extractor(Strict):
-    name: Literal["git_diff_ast", "advisory", "manual"]
+    name: Literal["git_diff_ast", "advisory", "manual", "git_diff", "model_manifest"]
     version: str
 
 
@@ -203,13 +203,28 @@ class ChangeEvidence(Strict):
 
 class ChangeFact(Strict):
     id: str
-    category: Literal["API_ROUTE", "CLI_OPTION", "ENV_VAR", "DEFAULT_VALUE", "DEPENDENCY", "ADVISORY", "AUTH", "OTHER"]
+    category: Literal["API_ROUTE", "CLI_OPTION", "ENV_VAR", "DEFAULT_VALUE", "DEPENDENCY", "ADVISORY", "AUTH", "OTHER", "STREAMING", "INPUT_PROCESSING", "TEMPLATE", "SAMPLING", "MODEL_SELECTION", "CACHE", "RUNNER_KERNEL", "DISTRIBUTED_IPC", "MODEL_LOADING", "REMOTE_CODE", "PLUGIN", "COMPILE_CACHE", "SCHEDULER", "STARTUP_HEALTH", "FAILURE", "PROFILER", "USAGE_STATS", "REPLAY", "OBSERVABILITY", "OUTPUT", "ERROR", "OUTPUT_PARSING", "IMAGE", "GENERIC", "MODEL_WEIGHTS", "MODEL_CODE", "MODEL_TEMPLATE", "MODEL_TOKENIZER", "MODEL_ARCH"]
     target: str
     before: Any = None
     after: Any = None
     certainty: Literal["CONFIRMED", "PARTIAL", "UNKNOWN"]
     evidence: list[ChangeEvidence] = Field(default_factory=list)
     related_checks: list[str] = Field(default_factory=list)
+    unmapped: bool | None = None
+    details: dict[str, Any] | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("unmapped", "details"))
+
+
+class Artifact(Strict):
+    name: str
+    path: str
+    sha256: str
+    bytes: int
+    collected_at: datetime
+    collector: str
 
 
 class Change(GuardObject):
@@ -219,6 +234,12 @@ class Change(GuardObject):
     extractor: Extractor
     facts: list[ChangeFact] = Field(default_factory=list)
     reviewed_by: str | None = None
+    artifacts: list[Artifact] | None = None
+    analysis: dict[str, Any] | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("artifacts", "analysis"))
 
     @model_validator(mode="after")
     def _unreviewed_max_partial(self) -> "Change":
@@ -235,6 +256,11 @@ class PlanInputs(Strict):
     environments: list[Ref]
     policy: Ref
     change: Ref | None = None
+    previous_plan: Ref | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("previous_plan",))
 
 
 class ConditionEval(Strict):
@@ -245,6 +271,25 @@ class ConditionEval(Strict):
     origin: DataOrigin | None = None
     result: CondResult
     note: str | None = None
+
+
+class SelectionTrigger(Strict):
+    type: str
+    refs: list[str] = Field(default_factory=list)
+
+
+class CarriedOver(Strict):
+    result: Ref
+    evidence: Ref
+    image_digest: str
+    judged_at: datetime
+    reason: str
+
+    @model_validator(mode="after")
+    def _exact_kinds(self):
+        if self.result.kind != "RES" or self.evidence.kind != "EVD":
+            raise ValueError("carried_over requires RES and EVD refs")
+        return self
 
 
 class PlanItem(Strict):
@@ -259,11 +304,24 @@ class PlanItem(Strict):
     gaps: list[Gap] = Field(default_factory=list)
     priority: str
     executor: str | None = None
+    triggers: list[SelectionTrigger] = Field(default_factory=list)
+    carried_over: CarriedOver | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        data = _drop_none(handler(self), ("carried_over",))
+        if not self.triggers:
+            data.pop("triggers", None)
+        return data
 
     @model_validator(mode="after")
     def _reason_iff_not_selected(self) -> "PlanItem":
         if self.selected == (self.not_selected_reason is not None):
             raise ValueError("not_selected_reason is required exactly when selected is false")
+        if self.carried_over is not None and (self.selected or self.not_selected_reason != NotSelectedReason.CARRIED_OVER):
+            raise ValueError("carried_over requires an unselected CARRIED_OVER item")
+        if self.not_selected_reason == NotSelectedReason.CARRIED_OVER and self.carried_over is None:
+            raise ValueError("CARRIED_OVER requires exact result/evidence refs")
         return self
 
 
@@ -273,6 +331,11 @@ class Plan(GuardObject):
     inputs: PlanInputs
     items: list[PlanItem]
     inventory_complete: dict[str, bool]
+    change_type: Literal["ENGINE_RELEASE", "ENGINE_PATCH", "MODEL", "INPUT", "INITIAL"] | None = None
+
+    @model_serializer(mode="wrap")
+    def _ser(self, handler):
+        return _drop_none(handler(self), ("change_type",))
 
     def item(self, check_id: str) -> PlanItem:
         for it in self.items:
@@ -347,15 +410,6 @@ class Observation(Strict):
         if not self.collected and self.value is not None:
             raise ValueError("uncollected observation must not carry a value")
         return self
-
-
-class Artifact(Strict):
-    name: str
-    path: str
-    sha256: str
-    bytes: int
-    collected_at: datetime
-    collector: str
 
 
 class Comparability(Strict):
@@ -486,11 +540,17 @@ class CheckRow(Strict):
     functional_scope: FunctionalScope | None = None  # "기능 확인 범위: N / 등록 경로 M (표본)"
     evidence_source: Literal["automated", "manual"] | None = None  # 판정에 쓰인 최신 증거의 출처(실행 완료 시)
     replaced: Replaced | None = None
+    triggers: list[SelectionTrigger] = Field(default_factory=list)
+    carried_over: CarriedOver | None = None
+    previous_result: SideResult | None = None
 
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("functional_scope", "evidence_source", "replaced",
-                                          "functional_comparison", "comparison_reasons"))
+        data = _drop_none(handler(self), ("functional_scope", "evidence_source", "replaced",
+                                          "functional_comparison", "comparison_reasons", "carried_over", "previous_result"))
+        if not self.triggers:
+            data.pop("triggers", None)
+        return data
 
 
 class EvidenceCount(Strict):
@@ -532,9 +592,12 @@ class Report(GuardObject):
     approval: Approval | None = None
     evidence_counts: dict[str, EvidenceCount] | None = None  # 영역별 수동 입력·자동 측정 건수
 
+    change_summary: dict[str, Any] | None = None
+    carry_counts: dict[str, int] | None = None
+
     @model_serializer(mode="wrap")
     def _ser(self, handler):
-        return _drop_none(handler(self), ("evidence_counts",))
+        return _drop_none(handler(self), ("evidence_counts", "change_summary", "carry_counts"))
 
 
 OBJECT_CLASSES: dict[str, type[GuardObject]] = {

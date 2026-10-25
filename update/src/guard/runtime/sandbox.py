@@ -28,7 +28,7 @@ from guard.runtime import generation_readiness
 
 LAB = Path(__file__).resolve().parent / "assets"
 NGINX_IMAGE = "nginx:1.27-alpine"
-PYTHON_IMAGE = "python:3.11-slim"
+PYTHON_IMAGE = "python:3.12-slim"
 ENGINE_PORT = CONTAINER_PORT
 GATEWAY_PORT = 8080
 KNOWN_GATEWAY_ROUTES = [  # Gateway 설정에서 알려진 경로

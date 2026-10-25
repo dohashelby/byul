@@ -1,0 +1,134 @@
+name: UPDATE and shared contracts
+
+on:
+  push:
+    branches: [main, "codex/**", byul_update]
+    paths:
+      - ".github/workflows/update.yml"
+      - "update/**"
+      - "contracts/**"
+      - "platform/api/**"
+  pull_request:
+    paths:
+      - ".github/workflows/update.yml"
+      - "update/**"
+      - "contracts/**"
+      - "platform/api/**"
+
+permissions:
+  contents: read
+
+jobs:
+  update-default:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: update
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install uv==0.12.11
+      - run: uv sync --frozen
+      - name: Measure default suite parent wall clock
+        run: |
+          uv run python - <<'PY'
+          import os
+          import subprocess
+          import sys
+          import time
+
+          start = time.perf_counter()
+          result = subprocess.run([sys.executable, "-m", "pytest", "-q", "--durations=50",
+              "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-update-pytest")])
+          print(f"Default suite parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
+          raise SystemExit(result.returncode)
+          PY
+      - run: uv build --wheel
+      - name: Verify installed wheel outside checkout
+        run: uv run python tools/verify_installed.py --wheel dist/guard-0.1.0-py3-none-any.whl --output "${{ runner.temp }}/byul-update-installed"
+
+  update-docker-stub:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: update
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install uv==0.12.11
+      - run: uv sync --frozen
+      - name: Measure Python 3.12 Docker stub and probe suite
+        run: |
+          uv run python - <<'PY'
+          import os
+          import subprocess
+          import sys
+          import time
+
+          start = time.perf_counter()
+          result = subprocess.run([sys.executable, "-m", "pytest", "-q", "-m", "docker",
+              "tests/test_lab_docker.py", "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-update-docker")])
+          print(f"Docker stub parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
+          raise SystemExit(result.returncode)
+          PY
+      - name: Record Python helper image identity
+        run: |
+          docker image inspect python:3.12-slim --format '{{json .RepoDigests}}'
+          docker run --rm --network none --cpus 1 --memory 128m python:3.12-slim python -c "import sys; print(sys.version); assert sys.version_info[:2] == (3, 12)"
+
+  shared-contracts:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install uv==0.12.11
+      - name: Validate shared schemas, examples and reference hashes
+        run: uv run --no-project --with jsonschema python contracts/tools/check_contracts.py
+
+  platform-update-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: platform/api
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install uv==0.12.11
+      - run: uv sync --frozen
+      - name: Verify platform contracts and read-only RPT projection
+        run: |
+          uv run --frozen --with ../../update python - <<'PY'
+          import os
+          import subprocess
+          import sys
+          import time
+
+          start = time.perf_counter()
+          result = subprocess.run([sys.executable, "-m", "pytest", "-q", "--durations=20",
+              "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-platform-api-pytest")])
+          print(f"Platform API parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
+          raise SystemExit(result.returncode)
+          PY

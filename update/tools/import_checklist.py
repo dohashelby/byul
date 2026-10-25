@@ -31,6 +31,85 @@ DEFAULT_SOURCE = ROOT / "reference/framework/data/checklist.json"
 DEFAULT_PACK = ROOT / "packs" / PACK_ID
 DEFAULT_OVERRIDES = ROOT / "tools/overrides"
 
+# POL-P1-06에서 의미를 대조한 중복 subtest 네 행. 새 원본의 legacy 번호도 대조한다.
+REVIEWED_DUPLICATES = {
+    "CHK-REQ-019": ("REQ-19", "2.5.2"),
+    "CHK-REQ-020": ("REQ-20", "2.5.3"),
+    "CHK-LIF-005": ("LIF-05", "4.2.1"),
+    "CHK-LIF-007": ("LIF-07", "4.3.1"),
+}
+
+# docs/UPDATE_SELECTION.md §3.2·3.4·4.1의 승인된 표. 엔진 경로 규칙과 분리한다.
+ENGINE_CATEGORIES = {
+    "API_ROUTE": ["REQ-01", "REQ-03", "REQ-06"],
+    "AUTH": ["REQ-01", "REQ-02", "REQ-03", "REQ-04", "REQ-06", "REQ-15"],
+    "STREAMING": ["LIF-04"], "INPUT_PROCESSING": ["REQ-08", "REQ-09", "SUP-12"],
+    "TEMPLATE": ["REQ-07", "SUP-13"], "SAMPLING": ["REQ-10"],
+    "MODEL_SELECTION": ["REQ-05", "LIF-06"], "CACHE": ["REQ-15", "REQ-16", "REQ-17"],
+    "RUNNER_KERNEL": ["REQ-18", "REQ-19", "REQ-20", "REQ-21"],
+    "DISTRIBUTED_IPC": ["REQ-14", "PLT-02", "PLT-04", "PLT-06", "PLT-08", "LIF-13", "SUP-12"],
+    "MODEL_LOADING": ["SUP-03", "SUP-06", "SUP-12", "LIF-01", "LIF-02"],
+    "REMOTE_CODE": ["SUP-08", "SUP-09"], "PLUGIN": ["SUP-10", "SUP-11"],
+    "COMPILE_CACHE": ["SUP-07", "SUP-15"], "SCHEDULER": ["LIF-03"],
+    "STARTUP_HEALTH": ["LIF-07", "LIF-09"],
+    "FAILURE": ["LIF-08", "LIF-10", "LIF-11", "LIF-12"], "PROFILER": ["LIF-14"],
+    "USAGE_STATS": ["OBS-04", "OBS-05"], "REPLAY": ["OBS-07", "OBS-08"],
+    "OBSERVABILITY": ["OBS-02", "OBS-03", "OBS-09"], "OUTPUT": ["REQ-11", "REQ-12"],
+    "ERROR": ["REQ-13"], "OUTPUT_PARSING": [], "DEPENDENCY": ["SUP-04"],
+    "IMAGE": ["SUP-04"], "CLI_OPTION": [], "ENV_VAR": [], "GENERIC": [],
+}
+PATCH_ALWAYS = ["SUP-04", "SUP-11", "SUP-16", "REQ-02", "REQ-04", "REQ-11", "REQ-12", "REQ-13",
+                "PLT-07", "LIF-08", "LIF-09", "LIF-10", "LIF-11", "LIF-12", "OBS-02", "OBS-03",
+                "OBS-09", "LIF-03", "REQ-09", "REQ-10"]
+MODEL_CATEGORIES = {
+    "MODEL_WEIGHTS": ["SUP-03", "SUP-05", "SUP-06", "SUP-16", "LIF-01", "LIF-02"],
+    "MODEL_CODE": ["SUP-08", "SUP-09", "SUP-12"], "MODEL_TEMPLATE": ["SUP-13", "REQ-07"],
+    "MODEL_TOKENIZER": ["REQ-08", "REQ-09", "REQ-10"],
+    "MODEL_ARCH": ["REQ-09", "REQ-10", "LIF-03", "REQ-18", "REQ-19", "REQ-20", "REQ-21"],
+}
+MODEL_COMMON = ["REQ-05", "REQ-16", "SUP-15", "LIF-05", "LIF-06"]
+
+# 구조화 필드 안에 실제 명시된 명칭만 연결한다. 질문·위험 문구는 검색하지 않는다.
+FACT_TERMS = {
+    "gateway": ["Gateway"], "prefix_cache": ["prefix cache"],
+    "prefix_cache_or_shared_cache": ["prefix cache", "공유 cache", "공유 캐시"],
+    "shared_or_remote_weights": ["공유·원격 weights", "공유/원격 공급", "weights daemon"],
+    "dynamic_import": ["동적 import"],
+    "alternate_sources_or_formats_or_derived_cache": ["대체 파일", "파생 cache", "파생/compiled/npcache"],
+    "remote_acquisition_or_retry": ["원격 취득", "다운로드"],
+    "managed_or_external_fallback": ["fallback"],
+    "r10_features": ["R10"], "request_code_revision_selection": ["code_revision", "코드 판본 선택"],
+}
+
+
+def _selection_data(data: dict, assigned_rows: list[tuple[str, str, dict]]) -> dict:
+    triggers: dict[str, list[str]] = {}
+    sources: dict[str, list[dict]] = {}
+    for source_key, cid, row in assigned_rows:
+        structured = {"applicability_criteria": row.get("applicability_criteria", {}),
+                      "test_branch_conditions": row.get("test_branch_conditions", [])}
+        for field, value in structured.items():
+            text = json.dumps(value, ensure_ascii=False)
+            for fact, terms in FACT_TERMS.items():
+                matched = [term for term in terms if term in text]
+                if matched:
+                    triggers.setdefault(fact, []).append(cid)
+                    sources.setdefault(fact, []).append({"check": cid, "framework_id": row.get("id"),
+                        "source": f"{source_key}/{row.get('id')}/{field}", "matched_terms": matched})
+        # 축 6과 원문 환경 문서의 현재 JSON 입력 키(nodes·tp_groups·gpu_count)의 명시 대응.
+        if 6 in row.get("applicability_criteria", {}).get("environment_axes", []):
+            for fact in ("runtime.nodes", "runtime.tp_groups", "runtime.gpu_count"):
+                triggers.setdefault(fact, []).append(cid)
+                sources.setdefault(fact, []).append({"check": cid, "framework_id": row.get("id"),
+                    "source": f"{source_key}/{row.get('id')}/applicability_criteria/environment_axes",
+                    "axis": 6, "document": data.get("assessment_registry", {}).get("environment_axes_document"),
+                    "input_mapping": "02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6"})
+    return {"version": 1, "engine_categories": ENGINE_CATEGORIES, "patch_always": PATCH_ALWAYS,
+            "model_categories": MODEL_CATEGORIES, "model_common": MODEL_COMMON,
+            "fact_triggers": {k: sorted(set(v)) for k, v in sorted(triggers.items())},
+            "fact_trigger_sources": {k: v for k, v in sorted(sources.items())},
+            "unlinked_facts": sorted(set(FACT_TERMS) - set(triggers))}
+
 
 def _dump(data: Any) -> str:
     return yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=1000)
@@ -62,6 +141,8 @@ def _row_to_check(check_id: str, area: str, source_key: str, row: dict) -> dict:
     """원문 필드를 보존한 CheckDef. 구조화는 overrides만."""
     return {
         "id": check_id,
+        "framework_id": row.get("id"),
+        "mechanism_ids": list(row.get("mechanism_ids") or []),
         "revision": 1,
         "retired": False,
         "area": area,
@@ -153,6 +234,16 @@ def _assign_ids(area: str, rows: list[dict], existing: list[dict]) -> tuple[list
                 unmatched.discard(cand)
                 assigned[i] = (cand, r)
 
+    # 원천의 안정 ID와 이전 표시 번호를 함께 확인한 네 행만 명시적으로 연결한다.
+    for i, (cid, r) in enumerate(assigned):
+        if cid is not None or r.get("id") not in REVIEWED_DUPLICATES:
+            continue
+        cand, legacy_number = REVIEWED_DUPLICATES[r["id"]]
+        if (cand in unmatched and r.get("legacy_display_number") == legacy_number
+                and entries[cand].get("subtest_ids", []) == r.get("subtest_ids", [])):
+            unmatched.discard(cand)
+            assigned[i] = (cand, r)
+
     next_no = max((int(e["id"].split("-")[1]) for e in existing), default=0) + 1
     result: list[tuple[str, dict]] = []
     for cid, r in assigned:
@@ -181,12 +272,14 @@ def import_checklist(source: Path, pack_dir: Path, overrides_dir: Path) -> dict:
     old_map = _load(id_map_path) if id_map_path.exists() else {}
     new_map: dict[str, list[dict]] = {}
     all_ids: list[str] = []
+    assigned_rows: list[tuple[str, str, dict]] = []
 
     for source_key, area in AREAS.items():
         rows = data[source_key]
         assigned, entries = _assign_ids(area, rows, (old_map or {}).get(area, []))
         new_map[area] = entries
         for cid, row in assigned:
+            assigned_rows.append((source_key, cid, row))
             check = _row_to_check(cid, area, source_key, row)
             ov = Path(overrides_dir) / f"{cid}.yaml"
             if ov.exists():
@@ -202,6 +295,8 @@ def import_checklist(source: Path, pack_dir: Path, overrides_dir: Path) -> dict:
         all_ids.extend(e["id"] for e in entries)
 
     _write_if_changed(id_map_path, _dump(new_map))
+    if data.get("framework_model"):
+        _write_if_changed(pack_dir / "change_selection.yaml", _dump(_selection_data(data, assigned_rows)))
 
     files = sorted(p for p in pack_dir.rglob("*") if p.is_file() and p.name != "pack.yaml")
     files_sha = [

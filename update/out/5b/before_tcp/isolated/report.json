@@ -1,0 +1,1738 @@
+{
+  "kind": "RPT",
+  "id": "RPT-01M59ETD9CY5Q3496E29FT7AKB",
+  "revision": 1,
+  "created_at": "2026-10-19T06:50:39Z",
+  "data_origin": "DECLARED",
+  "content_sha256": "6077c8880e4e14bd9b682f79d75bbbea04572a337b24c261ed96b55f32177c38",
+  "refs": [
+    {
+      "kind": "ENV",
+      "id": "ENV-01M59ENY2EYMC42C5JDG1321XZ",
+      "revision": 1,
+      "sha256": "156244cc649f1b0dccfb271b2d072554423fe61a15a91dc17d97b62f9ff4c0e8"
+    },
+    {
+      "kind": "POL",
+      "id": "POL-01M59ENY2HFN1Y967VJ8WEDV45",
+      "revision": 1,
+      "sha256": "861733098d584cb1a88f292e2097e57801e17b923e7a0a6a9470246e6e757553"
+    },
+    {
+      "kind": "PLAN",
+      "id": "PLAN-01M59ENY2JJFMJ6ZXVBZNW807X",
+      "revision": 1,
+      "sha256": "35ff8640a4a78eb6f004a8f2c2aaf3058dfaf58b86f75c355db38af6a1b5baa9"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59ENY50721E7FYB6QTF6Z52",
+      "revision": 1,
+      "sha256": "5c1bc0a782086a4ff8c58efbbb578e1f0ae55e4de446f998dad589fac2b647dd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59ETD6QPGSGJARM6XXSQ3CW",
+      "revision": 1,
+      "sha256": "bfab69159e322ea722ea58813d34d903819760bcdfeadf9e5cf0cf7b1c510626"
+    },
+    {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 2,
+      "sha256": "08c1e41df45d52420639de9a91a6cd0e73925f98bd005b030da413d6165a3ac2"
+    }
+  ],
+  "mode": "audit",
+  "official": false,
+  "inputs_manifest": [
+    {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 2,
+      "sha256": "08c1e41df45d52420639de9a91a6cd0e73925f98bd005b030da413d6165a3ac2"
+    },
+    {
+      "kind": "ENV",
+      "id": "ENV-01M59ENY2EYMC42C5JDG1321XZ",
+      "revision": 1,
+      "sha256": "156244cc649f1b0dccfb271b2d072554423fe61a15a91dc17d97b62f9ff4c0e8"
+    },
+    {
+      "kind": "POL",
+      "id": "POL-01M59ENY2HFN1Y967VJ8WEDV45",
+      "revision": 1,
+      "sha256": "861733098d584cb1a88f292e2097e57801e17b923e7a0a6a9470246e6e757553"
+    },
+    {
+      "kind": "PLAN",
+      "id": "PLAN-01M59ENY2JJFMJ6ZXVBZNW807X",
+      "revision": 1,
+      "sha256": "35ff8640a4a78eb6f004a8f2c2aaf3058dfaf58b86f75c355db38af6a1b5baa9"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M59ENY50721E7FYB6QTF6Z52",
+      "revision": 1,
+      "sha256": "5c1bc0a782086a4ff8c58efbbb578e1f0ae55e4de446f998dad589fac2b647dd"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M59ETD6QPGSGJARM6XXSQ3CW",
+      "revision": 1,
+      "sha256": "bfab69159e322ea722ea58813d34d903819760bcdfeadf9e5cf0cf7b1c510626"
+    }
+  ],
+  "pack_review_status": "DRAFT",
+  "policy_status": "DRAFT",
+  "by_check": [
+    {
+      "check_id": "SUP-01",
+      "purpose": "생성·변경·승인 권한",
+      "area": "SUP",
+      "question": "제출·저장소 쓰기 권한만으로 승인 기록을 바꿀 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-02",
+      "purpose": "생성·변경·승인 권한",
+      "area": "SUP",
+      "question": "배포 권한이 허용된 모델과 대상 환경에 한정되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-03",
+      "purpose": "승인 범위",
+      "area": "SUP",
+      "question": "실제 소비하는 하위 모델 자료가 승인 목록에 포함되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-04",
+      "purpose": "승인 범위",
+      "area": "SUP",
+      "question": "실제 실행 이미지·패키지·의존성이 승인 목록에 포함되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-05",
+      "purpose": "실제 사용의 일치·무결성",
+      "area": "SUP",
+      "question": "승인 뒤 파일·symlink·마운트가 교체되어도 비승인 사용을 막는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-06",
+      "purpose": "실제 사용의 일치·무결성",
+      "area": "SUP",
+      "question": "각 worker가 자신에게 배정된 승인 모델 부분을 실제 적재하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-07",
+      "purpose": "실제 사용의 일치·무결성",
+      "area": "SUP",
+      "question": "생성 결과나 공유 컴파일 캐시의 무단 교체를 막는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-08",
+      "purpose": "코드 실행 제한",
+      "area": "SUP",
+      "question": "요청 입력으로 허용 밖 코드 판본을 선택할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-09",
+      "purpose": "코드 실행 제한",
+      "area": "SUP",
+      "question": "모델의 추가 코드는 허용 조건에서만 실행되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-10",
+      "purpose": "코드 실행 제한",
+      "area": "SUP",
+      "question": "플러그인 허용 제한이 실제 실행 전에 적용되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-11",
+      "purpose": "코드 실행 제한",
+      "area": "SUP",
+      "question": "지원 실행 모드에서도 동적 import 제한이 유지되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-12",
+      "purpose": "자료 해석 안전성",
+      "area": "SUP",
+      "question": "선정 reader가 허용하지 않은 객체·동작을 거부하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-13",
+      "purpose": "자료 해석 안전성",
+      "area": "SUP",
+      "question": "공급 template의 해석 동작이 허용 범위 안에 있는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-14",
+      "purpose": "검사 결과 반영",
+      "area": "SUP",
+      "question": "검사 실패·오류·미지원·생략을 통과로 처리하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-15",
+      "purpose": "재사용 적합성",
+      "area": "SUP",
+      "question": "모델·도구·설정 변경 후 부적합한 파생 결과를 재사용하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "SUP-16",
+      "purpose": "재사용 적합성",
+      "area": "SUP",
+      "question": "중단·실패한 생성 결과나 부분 파일을 완료된 결과로 사용하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-01",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "Gateway를 우회한 직통 요청으로 비허용 작업을 수행할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "APPLICABLE",
+      "selected": true,
+      "tested_while_undetermined": false,
+      "single": {
+        "result": {
+          "kind": "RES",
+          "id": "RES-01M59ETD6QPGSGJARM6XXSQ3CW",
+          "revision": 1,
+          "sha256": "bfab69159e322ea722ea58813d34d903819760bcdfeadf9e5cf0cf7b1c510626"
+        },
+        "security": "UNKNOWN",
+        "functional": "UNKNOWN",
+        "performance": "UNKNOWN",
+        "verification_level": "DECLARED"
+      },
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-02",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "인증이 검사한 경로와 실제 실행 handler의 권한 요구가 일치하는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-03",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-04",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "외부 입력이 인가에 쓰는 신원을 사칭하지 못하는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-05",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "호출자의 모델 사용권이 최종 선택 대상에도 적용되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-06",
+      "purpose": "요청·대상 접근 권한",
+      "area": "REQ",
+      "question": "저장 결과의 조회·취소 권한을 객체별로 확인하는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-07",
+      "purpose": "실제 입력의 검사",
+      "area": "REQ",
+      "question": "template 적용 뒤 입력에도 필요한 제한이 유지되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-08",
+      "purpose": "실제 입력의 검사",
+      "area": "REQ",
+      "question": "재사용 token ID 입력도 필요한 검사를 거치는가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-09",
+      "purpose": "실제 입력의 검사",
+      "area": "REQ",
+      "question": "token ID와 입력 길이가 실제 모델·소비자의 유효 범위를 지키는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-10",
+      "purpose": "실제 입력의 검사",
+      "area": "REQ",
+      "question": "sampling 값과 옵션 조합이 실제 실행 조건을 만족하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-11",
+      "purpose": "요청·상태·결과 귀속",
+      "area": "REQ",
+      "question": "동시 요청과 스트리밍 결과가 올바른 원 요청으로 반환되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-12",
+      "purpose": "요청·상태·결과 귀속",
+      "area": "REQ",
+      "question": "취소·연결 종료 뒤 늦은 결과가 다른 요청이나 새 시도에 섞이지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-13",
+      "purpose": "요청·상태·결과 귀속",
+      "area": "REQ",
+      "question": "응답 옵션과 오류가 독자에게 허용한 정보만 반환하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-14",
+      "purpose": "요청·상태·결과 귀속",
+      "area": "REQ",
+      "question": "분산 처리의 중간 자료와 최종 출력이 원 요청에 연결되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-15",
+      "purpose": "공유 제한",
+      "area": "REQ",
+      "question": "cache 공유 집단을 신뢰할 신원에서 결정하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-16",
+      "purpose": "공유 제한",
+      "area": "REQ",
+      "question": "cache key가 실제 재사용에 필요한 문맥을 구분하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-17",
+      "purpose": "공유 제한",
+      "area": "REQ",
+      "question": "cache 시간 차로 비공개 정보가 허용 범위를 넘어 드러나지 않는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-18",
+      "purpose": "실행 상태·메모리 안전",
+      "area": "REQ",
+      "question": "배치 자리 이동·재사용 시 이전 요청의 제한 상태가 남지 않는가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-19",
+      "purpose": "실행 상태·메모리 안전",
+      "area": "REQ",
+      "question": "선정 kernel의 접근 범위와 초기화가 유효 입력·buffer 범위를 지키는가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-20",
+      "purpose": "실행 상태·메모리 안전",
+      "area": "REQ",
+      "question": "CUDA Graph 재실행에서 현재 입력을 사용하고 출력 소비 전에 buffer를 잘못 덮어쓰지 않는가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "REQ-21",
+      "purpose": "실행 상태·메모리 안전",
+      "area": "REQ",
+      "question": "TP graph 통신 buffer의 참조가 등록·종료·재기동 과정에서 유효한가?",
+      "review_order": "implementation_path_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-01",
+      "purpose": "실행 권한 제한",
+      "area": "PLT",
+      "question": "엔진·worker가 불필요한 호스트·파일·장치 권한을 갖지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-02",
+      "purpose": "실행 권한 제한",
+      "area": "PLT",
+      "question": "로컬 IPC 접점에 허용한 프로세스만 접근하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-03",
+      "purpose": "자격 전달·사용 제한",
+      "area": "PLT",
+      "question": "취득 주체의 자격이 허용 저장소·객체에 한정되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-04",
+      "purpose": "자격 전달·사용 제한",
+      "area": "PLT",
+      "question": "worker에 불필요한 자격이 전달되지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-05",
+      "purpose": "자격 전달·사용 제한",
+      "area": "PLT",
+      "question": "자격 만료·누락 시 비승인 대체 접근으로 이어지지 않는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-06",
+      "purpose": "통신·내부 호출 제한",
+      "area": "PLT",
+      "question": "core·worker가 공유하는 실제 신뢰 범위와 외부 접근 제한을 확인했는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-07",
+      "purpose": "통신·내부 호출 제한",
+      "area": "PLT",
+      "question": "외부 송신이 허용 목적지와 작업에 한정되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-08",
+      "purpose": "상대 확인·전송 보호",
+      "area": "PLT",
+      "question": "각 내부 통신 구간이 정한 상대 확인·기밀성·무결성을 충족하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-09",
+      "purpose": "상대 확인·전송 보호",
+      "area": "PLT",
+      "question": "엔진부터 collector와 최종 sink까지 필요한 전송 보호가 이어지는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-10",
+      "purpose": "권한·자격 철회",
+      "area": "PLT",
+      "question": "철회 이후 신규 접근이 정한 기한 안에 거부되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-11",
+      "purpose": "권한·자격 철회",
+      "area": "PLT",
+      "question": "기존 session·handle의 접근도 철회 정책에 맞게 제한되는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "PLT-12",
+      "purpose": "권한·자격 철회",
+      "area": "PLT",
+      "question": "폐기된 자격 사본을 재사용할 수 없는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-01",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "모델 취득·해석·변환·로딩 비용이 단계별·누적 예산을 지키는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-02",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "실패한 취득의 반복·재시도가 비용을 무한 누적하지 않는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-03",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "요청 비용과 동시 부하를 제한하며 정상 요청의 처리 기회를 유지하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-04",
+      "purpose": "자원 사용 제한",
+      "area": "LIF",
+      "question": "느린 수신자와 진단 buffering이 자원을 과도하게 점유하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-05",
+      "purpose": "변경 중 일관성",
+      "area": "LIF",
+      "question": "재배포 중 이전 요청과 새 모델·설정이 잘못 섞이지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-06",
+      "purpose": "변경 중 일관성",
+      "area": "LIF",
+      "question": "live 변경이나 rolling 중에도 요청의 모델·상태 일관성을 지키는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-07",
+      "purpose": "시작·재개 조건",
+      "area": "LIF",
+      "question": "필요한 worker와 실행 준비를 확인한 뒤 요청을 받는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-08",
+      "purpose": "실패 감지·전파",
+      "area": "LIF",
+      "question": "rank의 예외·사망·지연·통신 정지를 각각 감지하고 전달하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-09",
+      "purpose": "실패 감지·전파",
+      "area": "LIF",
+      "question": "초기화·모델 준비의 부분 실패가 성공으로 처리되지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-10",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "취소·연결 종료 뒤 실제 작업과 참조가 정한 기한에 종료되는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-11",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "실패한 worker·통신·분산 자원이 회수되고 다음 기동이 가능한가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-12",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "재시도 전후 이전 작업의 잔존과 중복 비용이 통제되는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-13",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "daemon 전체 release 이후 다른 소비자의 다음 취득·fallback과 기존 참조가 허용한 상태를 지키는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-14",
+      "purpose": "종결·자원 회수",
+      "area": "LIF",
+      "question": "profiler 종료가 실제 수집·자원 종료와 맞는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-15",
+      "purpose": "복구 상태의 적합성",
+      "area": "LIF",
+      "question": "rollback 대상이 현재 승인 기준을 만족하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "LIF-16",
+      "purpose": "복구 상태의 적합성",
+      "area": "LIF",
+      "question": "복원 자료의 변조와 잔존 상태가 복구 결과에 섞이지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-01",
+      "purpose": "필요한 사건의 기록",
+      "area": "OBS",
+      "question": "필수 접근·관리·승인 사건을 주체·대상·실행과 연결할 수 있는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-02",
+      "purpose": "필요한 사건의 기록",
+      "area": "OBS",
+      "question": "준비·실패·종료 기록이 실제 상태를 올바르게 나타내는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-03",
+      "purpose": "수집 정보 제한",
+      "area": "OBS",
+      "question": "로그·debug·trace·덤프가 허용한 정보만 수집하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-04",
+      "purpose": "수집 정보 제한",
+      "area": "OBS",
+      "question": "금지한 usage 보고가 실제로 비활성 상태를 유지하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-05",
+      "purpose": "수집 정보 제한",
+      "area": "OBS",
+      "question": "허용한 usage 보고가 필드·목적지 범위를 지키는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-06",
+      "purpose": "자료 이용 권한",
+      "area": "OBS",
+      "question": "기록과 진단 사본을 허용된 독자만 조회·반출하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-07",
+      "purpose": "자료 이용 권한",
+      "area": "OBS",
+      "question": "진단 자료 읽기권만으로 재실행할 수 없는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-08",
+      "purpose": "자료 이용 권한",
+      "area": "OBS",
+      "question": "재실행이 변조한 진단 자료를 비허용 방식으로 소비하지 않는가?",
+      "review_order": "conditional_when_selected",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-09",
+      "purpose": "증거의 신뢰성",
+      "area": "OBS",
+      "question": "요청 입력이 로그의 신원·대상·상태를 위조하지 못하는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-10",
+      "purpose": "증거의 신뢰성",
+      "area": "OBS",
+      "question": "기록의 무단 변경·삭제를 제한하고 확인할 수 있는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-11",
+      "purpose": "증거의 신뢰성",
+      "area": "OBS",
+      "question": "수집 중단·누락·시간 불확실성을 정상 결과로 처리하지 않는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    },
+    {
+      "check_id": "OBS-12",
+      "purpose": "보존·삭제 관리",
+      "area": "OBS",
+      "question": "로그·usage·진단의 원본과 사본이 보존·삭제 범위를 지키는가?",
+      "review_order": "reference_baseline_first",
+      "impact": null,
+      "applicability": "UNDETERMINED",
+      "selected": false,
+      "tested_while_undetermined": false,
+      "single": null,
+      "baseline": null,
+      "candidate": null,
+      "comparison": null,
+      "gaps": [],
+      "exception": null
+    }
+  ],
+  "by_purpose": {
+    "요청·대상 접근 권한": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    }
+  },
+  "by_area": {
+    "REQ": {
+      "security": "UNKNOWN",
+      "inventory_complete": false
+    }
+  },
+  "not_selected": [
+    {
+      "check_id": "SUP-01",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-02",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-03",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-04",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-05",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-06",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-07",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-08",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-09",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-10",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-11",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-12",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-13",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-14",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-15",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "SUP-16",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-02",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-03",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-04",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-05",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-06",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-07",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-08",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-09",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-10",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-11",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-12",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-13",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-14",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-15",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-16",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-17",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-18",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-19",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-20",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "REQ-21",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-01",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-02",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-03",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-04",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-05",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-06",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-07",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-08",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-09",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-10",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-11",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "PLT-12",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-01",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-02",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-03",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-04",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-05",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-06",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-07",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-08",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-09",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-10",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-11",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-12",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-13",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-14",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-15",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "LIF-16",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-01",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-02",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-03",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-04",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-05",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-06",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-07",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-08",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-09",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-10",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-11",
+      "reason": "POLICY_SCOPE"
+    },
+    {
+      "check_id": "OBS-12",
+      "reason": "POLICY_SCOPE"
+    }
+  ],
+  "manual_required": [],
+  "limitations": [
+    "검토 전 팩(DRAFT): 공식 아님",
+    "정책 DRAFT: 공식 아님",
+    "실행 환경(ENV-01M59ENY2EYMC42C5JDG1321XZ): CPU, arm64, Docker Desktop on macOS",
+    "엔진 소스 commit(ENV-01M59ENY2EYMC42C5JDG1321XZ): 축약 hash만 일치, 전체 commit 미확인 — 관측 db9527a46, 고정 db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "점검 목록 미완결 보호 목적: 1개 — 집계 PASS 불가",
+    "정책 범위 밖으로 제외: 76개 점검"
+  ],
+  "approval": null
+}

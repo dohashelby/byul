@@ -1,0 +1,12 @@
+(APIServer pid=1) WARNING 10-23 05:46:54 [vllm.py:1371] Enforce eager set, disabling torch.compile and CUDAGraphs.
+(Worker pid=167) INFO 10-23 05:47:12 [model_runner.py:382] Loading model from scratch...
+(Worker pid=167) INFO 10-23 05:47:22 [default_loader.py:430] Loading weights took 7.53 seconds
+(Worker pid=167) INFO 10-23 05:47:24 [model_runner.py:404] Model loading took 1.29 GiB memory and 10.532441 seconds
+(Worker pid=167) INFO 10-23 05:47:24 [model_runner.py:13] Warming up model for the compilation...
+(Worker pid=167) INFO 10-23 05:47:58 [model_runner.py:16] Warming up done.
+(EngineCore pid=111) INFO 10-23 05:48:00 [core.py:368] init engine (profile, create kv cache, warmup model) took 36.11 s
+(APIServer pid=1) INFO:     Application startup complete.
+(APIServer pid=1) INFO 10-23 05:51:18 [launcher.py:124] [shutdown] API server: shutdown triggered
+(Worker pid=118) INFO 10-23 05:52:10 [default_loader.py:430] Loading weights took 2.85 seconds
+(Worker pid=118) INFO 10-23 05:52:14 [model_runner.py:404] Model loading took 0.78 GiB memory and 8.577282 seconds
+(EngineCore pid=62) INFO 10-23 05:52:27 [core.py:368] init engine (profile, create kv cache, warmup model) took 12.84 s

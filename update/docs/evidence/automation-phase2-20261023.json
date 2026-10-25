@@ -1,0 +1,2015 @@
+{
+  "schema": "guard-automation-phase2-selected-evidence/1",
+  "generated_at": "2026-10-23T11:22:42.276697+00:00",
+  "implementation_base": {
+    "branch": "codex/gua-windows-automation-phase1",
+    "commit": "1d1463274529708ae5fe5e04f42c134ba5a10ec3"
+  },
+  "provenance": {
+    "scope": "Selected actual result and integrity references; not a full portable bundle.",
+    "raw_evidence_location": "Separate local automation-phase2 output; stores/reports/bundles/request logs are preserved outside Git.",
+    "engine": {
+      "name": "vllm",
+      "version": "0.31.0",
+      "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+      "source_commit_status": "UNVERIFIED"
+    },
+    "adapter": {
+      "name": "vllm",
+      "version": "0.3.0"
+    },
+    "pack": {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 18,
+      "sha256": "4d00aec5587635ab777807c07509dcba57fa23c34705591e1aa35bc110feff54"
+    },
+    "source_files_sha256": {
+      "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "adapters/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "adapters/assets/chat/guard-text-chat-v1.jinja": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+      "adapters/base.py": "6b48806c8a132292fb6fba8e7d0b57559a1e72e9c8c1d7fcfacd0c15ef92cbb1",
+      "adapters/fake.py": "993a554e6de757b7f578cfb5c3a8a7b2b4504475756bc0203639d06b9dc65b89",
+      "adapters/model_inventory.py": "1c3abf9d7516acd83efbeff45fabfc9b09fa743a2a74f75be1e1b643b08d6db4",
+      "adapters/vllm.py": "1694bbfe3ef37bdab1562af7599fbcc1d40cb8386b931391ae135d4bb97a51f7",
+      "application.py": "c148a09cd505ecb043e602512b9ffa64850f3355ecd37d3f179a02c5eb3a070e",
+      "automation_policy.py": "3b01fd7140ec411b0c21d4bbc79e5f7351545a1def9663ae50718f6f949e53c5",
+      "cli.py": "9124fde70c2c453f60c7d500aa83618946df10e859cb746202ec9fcd4bc3f4d8",
+      "collectors/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "collectors/file.py": "af7d915c7d5f9a95a898e184d7e7b7aaa5f3f50087638c6149e252323ab0076f",
+      "collectors/manual.py": "73decf953dae6a72c24dfb9d1dff7faff6f8bd2b5da5751bf63951853d731fb1",
+      "collectors/policy_template.py": "331af03de3a14d031bf27c53044292909669eb0a71bb1b6c45feebb73aa1b7af",
+      "collectors/policy_template_metadata.json": "4de1c27a5f3715685a9fbe25e55d81b9c8cc331e9a6c9987365be11da8aa4b9c",
+      "core/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "core/aggregate.py": "bda9f20b98a534845370dcedaf51e69eaa158a636887ccaa231ff3be7444999d",
+      "core/compare.py": "37da2a47be6d6205e877fcc5420229c3e46d0fde4b49b2f3a65e1ce465ea2a0e",
+      "core/judge.py": "43ed9ddaeb4f9c5b0fc0a46ae1062b7e5c015ad898e2825f47bf8adadcc51f05",
+      "core/preflight.py": "345d7cbc84d3ce511cdaa5c989ed43960c11d170e8239c7fd239d02a881a92d5",
+      "core/report.py": "9d60215f3ad0499bc090851bf682628fe08036f9dbafd90d163e031917b5a18f",
+      "core/run.py": "b1e1487c710dd29d0f7686a28026eeeb8e402062096511c14ebee8c74eea5f2a",
+      "core/select.py": "1800477749d8a3a5e556039adf6357a2e6c0a91e8b9f9c9292cb0fbf6230efb6",
+      "executors/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "executors/base.py": "0ac2fb9311680e5521e3d6ef5cced0c0361ab874317cab137c093bf53ee93e2f",
+      "executors/container_config.py": "303aaec854740d1b5e96474ab1884f72fa05d60afa03a73fc781fc3c509130f0",
+      "executors/content_common.py": "67185e59bf65cd08674bb6ffc2e25f1b455b68ac4b6698de7b8e92b9c06b505f",
+      "executors/credential_exposure.py": "ce9c83a309dde0d068f5ff7c2152c7e4e02f9bb107a7cb82b7129b31b7663dd3",
+      "executors/direct_route.py": "43c21b5a91ea629418024256b87b587d295d745a04ec08d4d36c61f3649a60bb",
+      "executors/fake.py": "989281ac6f705758edcea4e7b28a2f6cc0fab385eaa9b822998f5b339b8fa718",
+      "executors/http_common.py": "37a1b8a77ae8b05a4ef52395428869b297984d39011ecfb87e797dab853dbdf6",
+      "executors/http_probe.py": "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d",
+      "executors/input_validation.py": "800a375dcac4e365d92e0f9e6b4b9588fd199798dc82800cc389b48808919f4a",
+      "executors/log_analysis.py": "39e3dfcb6c5cd22fd9a9be917e9699e57c32862d3a769a4dc755538cc9374b59",
+      "executors/registry.py": "1fb77dc69598bc299c8b3aa05fe08d1cb375d50f71e8791dac1d2d74897f5abd",
+      "executors/response_content.py": "7099c3b74ff0e437f1a77b40e0ea42e6dd0e56949de750b6b448a701640fbedd",
+      "executors/role_route.py": "7249fa958fa8421b9a95d6ce526123ca80f92fbe2c3d1154ba60ffee9c106cd3",
+      "executors/sampling_validation.py": "e905da16eed9b59ed447f3755cc87d0773681cf01157041a57e9a952c6d7e7d7",
+      "executors/template_validation.py": "deece8f00fe8bffeba55269a416b19d4a1cd9d009efd58dcad108220ecbec583",
+      "input_policy.py": "130c5d8d3693043eb9b82b33d7dff678de544af22ea3658d0c56b20c80a09db2",
+      "judges/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "judges/audit_collection.py": "73c80b68e355e4714c974e8dc5489c951a968fd638ca8f099c59f7ca91c28b78",
+      "judges/base.py": "8f66f5643ef4e77659726b9ac3dea661374a46ffde3380e8d38c5daa0dadcd1c",
+      "judges/declared.py": "5a1dc5b7dac8b704fe949aa23c077512cd1b1e5061022a4f7ad4db34b1817d08",
+      "judges/manual_cache_context.py": "2eaaf1cbd783cfe535fadc92242332d5b7de44a650474d4f47b7a87bfacc385e",
+      "judges/policy_items.py": "e6a9d347d5dd44223c4930735d6229ed6e3e1b0dd8969b555b53d849dff79f06",
+      "judges/registry.py": "ecbbc80e68dfe1b313bd813c1de64f38150d335f2a7c710853d9a17d8048ef9c",
+      "judges/rule_table.py": "975ac1bae78ba5180a2bc4cc288cc17b55770357b465b4df246a45cb1401e680",
+      "manual_audit.py": "bd48943c57e6ba6bf033e8eb31f34c08dd461203cf35b5ec68c5070b3b3110fc",
+      "manual_policy.py": "8368694f955b8a1ce3dce69bae4bda97cb44257a4808913f2e8a8e9082c8862b",
+      "models/__init__.py": "3d59e80f52269fa817d208d252cdf94b4f614d573b1d8355e14f1e0fb08e300f",
+      "models/base.py": "4d7bfc03dc3754c8b97d16f577bd6f9d1d3bebbf19c30bb54bd7ea20cf9bc7db",
+      "models/checkdef.py": "68da2fc053b1e20656c5156f58c318a308db282c41753575f383609e9d6ddb60",
+      "models/enums.py": "c3e53dd3e528071d3fc1bc9131858b086359c42f4c7fc2f2f6bb5d0614a9fd0d",
+      "models/hashing.py": "e90ef64b52fe242028a4e81b16c18fb4a353e0e7d721b302bd7b764fcc4e193a",
+      "models/objects.py": "055abfc50cd3c6c7fdf0bff33236c42edaab2e8bf366bd785d957485fc7bae8b",
+      "models/ulid.py": "8233f5248a5a32855fe7f4b6914259cf3a6974190f31becee16aa77c26ee889d",
+      "report/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "report/html.py": "b25db89a323f030bcf706d35157ee254db3eccb8f9c0617347522f62da21bb6e",
+      "runtime/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "runtime/assets/gateway/role_enforced/default.conf.template": "bd36fb50e168c4334c1884daa8d0aa91209e06b3bb77f8ef34f0f876c097225b",
+      "runtime/assets/gateway/role_open/default.conf.template": "0ddfd1cb907708213a4e2e2326f4791f0f00b9029bed9b34da8d116de9282e00",
+      "runtime/assets/gateway/single/default.conf.template": "0078a44da3e069b164ac92ee28ecb95a815546b05d935d14991a2d1429136bbc",
+      "runtime/assets/stub_engine/server.py": "f4776423366cdd626e91ad8389e61abee92314a5c354f1f69a53004e71aee628",
+      "runtime/comparison.py": "6dccfc0984a5bb337addbf30eac3aee73c42ef4b96078184b85cf15cad7497a2",
+      "runtime/docker.py": "7ad82112f03b4f3163f7f0ea7c70910eaba594f112a8fba4447fbaa31bd4b127",
+      "runtime/sandbox.py": "7f137cb77d198d8c999ba9763b2f606b341c6c7d5d5974d3066494ba3fd7d051",
+      "store/__init__.py": "c3c68922dec8668bc18d6c13720bad8f7d0178920a3e483dd833b9fda4accb5a",
+      "store/bundle.py": "8c4202b79719b7c8fc4765bb5bfe1a9bfcaf870eead24818395236ff941a35dc",
+      "store/packs.py": "b8ef806f1218d25e436324ad82ce62cf83ba7371e241d544df0060ad35d73de8",
+      "store/sqlite.py": "af867baa88f50ba63d199617e2067b057b4fb3b8c70b9db81edecb282d9751b1"
+    },
+    "inspected_image_source": {
+      "schema": "guard-image-source-review/1",
+      "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+      "engine_execution": "none; stopped source extraction only",
+      "engine_version": "0.31.0",
+      "source_commit": "UNVERIFIED",
+      "files": [
+        {
+          "path": "vllm/entrypoints/launchers/cli_args.py",
+          "sha256": "c26330deb1bffb27b4ddbdc508a02ffd06efd5b201dba7d077d288e3b6ec2a8e"
+        },
+        {
+          "path": "vllm/entrypoints/serve/tokenize/protocol.py",
+          "sha256": "6bfe415ff5f144c7a0e3daaebf7c39f96eeebb817411b32fbb32c63468033585"
+        },
+        {
+          "path": "vllm/entrypoints/serve/tokenize/serving.py",
+          "sha256": "fb9fd00cc71df5c052f420a959e39434ce5fd3c84556275eb9dc25d43ff59750"
+        },
+        {
+          "path": "vllm/entrypoints/serve/tokenize/api_router.py",
+          "sha256": "dac2a4d0cd6076d50b568f3bae65dea0c6a65547fda073217a7dab9a1e2d8ccc"
+        },
+        {
+          "path": "vllm/entrypoints/openai/chat_completion/protocol.py",
+          "sha256": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1"
+        },
+        {
+          "path": "vllm/entrypoints/openai/chat_completion/serving.py",
+          "sha256": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002"
+        },
+        {
+          "path": "vllm/renderers/online_renderer.py",
+          "sha256": "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e"
+        },
+        {
+          "path": "vllm/renderers/params.py",
+          "sha256": "ad38852674ebc5bbe69aa9df91602847d518382cc2ceb0a25aac1d07be66b504"
+        },
+        {
+          "path": "vllm/entrypoints/serve/utils/api_utils.py",
+          "sha256": "ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba"
+        },
+        {
+          "path": "vllm/renderers/base.py",
+          "sha256": "0f440d8fcfe416c8a4665924d0602fd290152a1f2246cf0ad5d6e953b49ff86d"
+        },
+        {
+          "path": "vllm/entrypoints/serve/exception_handling/error_response.py",
+          "sha256": "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e"
+        }
+      ],
+      "contracts": [
+        {
+          "name": "fixed-chat-template",
+          "evidence": "entrypoints/launchers/cli_args.py:83-96",
+          "claim": "--chat-template and --chat-template-content-format string; trust_request_chat_template defaults false"
+        },
+        {
+          "name": "tokenize-chat",
+          "evidence": "entrypoints/serve/tokenize/protocol.py:46-164; serving.py:70-124",
+          "claim": "messages input; add_generation_prompt=true, add_special_tokens=false; tokens/count/max_model_len and optional token_strs; no engine inference"
+        },
+        {
+          "name": "template-override-rejection",
+          "evidence": "renderers/online_renderer.py:636-660; entrypoints/serve/tokenize/serving.py:76-82",
+          "claim": "non-null request.chat_template or chat_template_kwargs.chat_template rejected when trust flag false"
+        },
+        {
+          "name": "chat-consumed-tokens",
+          "evidence": "entrypoints/openai/chat_completion/serving.py:285-378,1145-1199; protocol.py:416-425",
+          "claim": "rendered engine_input goes to engine_client.generate; return_token_ids request returns final RequestOutput.prompt_token_ids at top level"
+        },
+        {
+          "name": "token-length-preconsumption-rejection",
+          "evidence": "entrypoints/openai/chat_completion/protocol.py:600-622; renderers/params.py:483-510",
+          "claim": "max_input_tokens=context minus requested output; too many tokens raises input_tokens VLLMValidationError during renderer before generate; bounded CPU text scope only"
+        },
+        {
+          "name": "tokenize-chat-context-is-not-enforced",
+          "evidence": "entrypoints/serve/tokenize/protocol.py:143-151; renderers/online_renderer.py:746-766; renderers/base.py:1265-1305; renderers/params.py:209-214,318-350,485-489",
+          "claim": "TokenizeChatRequest supplies a non-null TokenizeParams(max_total_tokens=None,max_output_tokens=0). Renderer inserts model-context defaults only if params is None. max_input_tokens therefore remains None; encoding uses truncation=false and text/token length checks return without a context constraint. This source inference is not a runtime measurement; bounded executor limits remain required."
+        }
+      ]
+    },
+    "error_serialization_source": {
+      "schema": "guard-validation-error-source-chain/1",
+      "reviewed_at": "2026-10-23T11:13:44.9847612Z",
+      "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+      "version": "0.31.0",
+      "source_commit": "UNVERIFIED",
+      "extraction": {
+        "method": "read-only docker cp from the already running owned case2 engine; no start, stop, exec, or delete",
+        "container_id_prefix": "f862fb18eb33",
+        "guard_run_label": "ve87ac3f3b67e",
+        "image_and_label_read_before_copy": true,
+        "package_path": "/opt/venv/lib/python3.12/site-packages/vllm",
+        "new_copies": [
+          "exceptions.py",
+          "exception_handling_utils.py"
+        ],
+        "other_files": "Previously extracted same-pinned-image entrypoints and renderers under ../image-source"
+      },
+      "files": [
+        {
+          "path": "vllm/exceptions.py",
+          "local": "exceptions.py",
+          "sha256": "22fe819c7ef10438f740c251d81af204871a04c3aa3eb1fd0e68604dc4c2146f"
+        },
+        {
+          "path": "vllm/entrypoints/serve/exception_handling/utils.py",
+          "local": "exception_handling_utils.py",
+          "sha256": "723214aa4c63418f1d5eb7c1ff2116eca474778576ac7198daa1f39217c17a4f"
+        },
+        {
+          "path": "vllm/renderers/params.py",
+          "sha256": "ad38852674ebc5bbe69aa9df91602847d518382cc2ceb0a25aac1d07be66b504"
+        },
+        {
+          "path": "vllm/entrypoints/serve/exception_handling/error_response.py",
+          "sha256": "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e"
+        },
+        {
+          "path": "vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py",
+          "sha256": "030324c8f530b6b3a7ddee17d33531e8ad50be92bf361d772c6af337516ccede"
+        },
+        {
+          "path": "vllm/entrypoints/serve/exception_handling/handlers/exception.py",
+          "sha256": "20a933aab30e36fd72c03f07915625fceaf76651314a0686c6e23416c389b4f6"
+        },
+        {
+          "path": "vllm/entrypoints/serve/exception_handling/register.py",
+          "sha256": "8a023f5c066a7b1bc291535450c47c62cae9d9747a6f08a48c3431092393af17"
+        },
+        {
+          "path": "vllm/entrypoints/launchers/app.py",
+          "sha256": "1f1ea5b79688cc042d9418435e84a6d04c17a46f6de6a98e560fe2f2ac5eeca4"
+        },
+        {
+          "path": "vllm/entrypoints/openai/chat_completion/serving.py",
+          "sha256": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002"
+        }
+      ],
+      "chain": [
+        {
+          "evidence": "vllm/renderers/params.py:483-510",
+          "claim": "_token_len_check raises VLLMValidationError before returning engine input, with parameter=input_tokens and value=the captured token count."
+        },
+        {
+          "evidence": "vllm/exceptions.py:38-56",
+          "claim": "__init__ stores parameter/value. __str__ appends parameter first and value second, producing exactly a parenthesized comma-space-separated suffix when both are present."
+        },
+        {
+          "evidence": "vllm/entrypoints/launchers/app.py:53; exception_handling/register.py:26-32",
+          "claim": "The app registers the VLLMError handler."
+        },
+        {
+          "evidence": "vllm/entrypoints/serve/exception_handling/handlers/vllm_error.py:18-25; handlers/exception.py:14-24",
+          "claim": "A validation error is dispatched to the generic exception handler, then create_error_response(exc) and JSONResponse with the resulting code."
+        },
+        {
+          "evidence": "vllm/entrypoints/serve/exception_handling/error_response.py:41-44,87-95",
+          "claim": "VLLMValidationError selects BadRequestError, HTTP 400 and param=exc.parameter. The message is str(exc), then sanitize_message, with numeric code serialization."
+        },
+        {
+          "evidence": "vllm/entrypoints/serve/exception_handling/utils.py:7-15",
+          "claim": "Address, traceback and filesystem-path redaction does not remove the parameter=input_tokens/value decimal suffix."
+        },
+        {
+          "evidence": "vllm/entrypoints/openai/chat_completion/serving.py:235-260,285-289,378",
+          "claim": "Rendering/preprocessing occurs before engine_client.generate; renderer errors propagate through the registered exception handler."
+        }
+      ],
+      "supported_signature": {
+        "kind": "input_limit",
+        "status": 400,
+        "error_type": "BadRequestError",
+        "error_param": "input_tokens",
+        "error_code": 400,
+        "message_rule": "Existing exact source-derived context/output/captured-input/total message followed by exactly ' (parameter=input_tokens, value={captured_input_tokens})'.",
+        "reject": [
+          "missing suffix",
+          "wrong parameter",
+          "wrong value",
+          "wrong context/output/input/total",
+          "extra prefix or trailing text",
+          "other status/type/code",
+          "other image/version"
+        ]
+      },
+      "limitations": [
+        "This is static source inspection with byte hashes, not a new engine execution or a verdict.",
+        "Existing attempt01/attempt02 UNKNOWN evidence is preserved; the source review does not amend any EVD or RES.",
+        "A recognized error signature is limited to the exact reviewed image/version and bounded text-input profile; it does not authenticate arbitrary servers or source commits."
+      ]
+    },
+    "model_inventory_sha256": "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6"
+  },
+  "default_tests": {
+    "command": "python -m pytest -q --durations=12 --basetemp <new-output>/pytest-temp-r4 --junitxml <new-output>/pytest-r4.xml",
+    "environment": "Windows 11 x64; dedicated frozen CPython 3.11.16 64bit editable source environment",
+    "deselected": 18,
+    "excluded_markers": [
+      "engine",
+      "docker"
+    ],
+    "first_whole_run": {
+      "artifact_sha256": "3e39b77616ab58b28a0261228cd86e8e56d8101c6c12b16549189c302cb5eb62",
+      "tests": 1770,
+      "passed": 1758,
+      "failed": 7,
+      "errors": 0,
+      "skipped": 5,
+      "seconds": 379.512,
+      "failures": [
+        "tests.test_cpu_observation_contract::test_resealed_incomplete_evidence_cannot_support_timing_pass[normal]",
+        "tests.test_cpu_observation_contract::test_resealed_incomplete_evidence_cannot_support_timing_pass[challenge]",
+        "tests.test_cpu_observation_contract::test_resealed_incomplete_evidence_cannot_support_timing_pass[observation]",
+        "tests.test_cpu_observation_contract::test_resealed_confirmed_fail_cannot_be_hidden_as_unknown",
+        "tests.test_cpu_observation_contract::test_readonly_analysis_rejects_corrupt_saved_proof_without_repair[report]",
+        "tests.test_policy_m10::test_registration_is_bounded_and_template_empty",
+        "tests.test_policy_template::test_current_declarations_metadata_and_empty_values"
+      ],
+      "skip_reasons": [
+        {
+          "test": "test_real_connection_refused_is_classified_and_not_pass_alone",
+          "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_refused_on_closed_port",
+          "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_tcp_probe_refused_and_connected_without_sending_bytes",
+          "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_inventory_follows_symlinks_and_is_order_independent",
+          "reason": "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_template_rejects_symlink_parent_into_input_pack",
+          "reason": "디렉터리 symlink 권한/지원 필요: OSError"
+        }
+      ]
+    },
+    "focused_after_fixture_repairs": {
+      "artifact_sha256": "5712352d1e6a01d240373ee52de4889713ad7c424f58b7160e1a9d7d9c4d0df4",
+      "tests": 169,
+      "passed": 168,
+      "failed": 1,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 119.689,
+      "failures": [
+        "tests.test_policy_m10::test_registration_is_bounded_and_template_empty"
+      ],
+      "skip_reasons": []
+    },
+    "whole_after_fixture_repairs": {
+      "artifact_sha256": "0f3eac6175285e6e706a003832830871b15f75fc03d66588f9444dbaee8e02a8",
+      "tests": 1777,
+      "passed": 1772,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 5,
+      "seconds": 361.167,
+      "failures": [],
+      "skip_reasons": [
+        {
+          "test": "test_real_connection_refused_is_classified_and_not_pass_alone",
+          "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_refused_on_closed_port",
+          "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_tcp_probe_refused_and_connected_without_sending_bytes",
+          "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_inventory_follows_symlinks_and_is_order_independent",
+          "reason": "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_template_rejects_symlink_parent_into_input_pack",
+          "reason": "디렉터리 symlink 권한/지원 필요: OSError"
+        }
+      ]
+    },
+    "whole_before_last_error_serialization_fix": {
+      "artifact_sha256": "16e30e0e0bbd0fc5604e1ea79808c9491838406be8243a03328a2e33c03823d3",
+      "tests": 1786,
+      "passed": 1781,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 5,
+      "seconds": 364.505,
+      "failures": [],
+      "skip_reasons": [
+        {
+          "test": "test_real_connection_refused_is_classified_and_not_pass_alone",
+          "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_refused_on_closed_port",
+          "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_tcp_probe_refused_and_connected_without_sending_bytes",
+          "reason": "Windows 알려진 제한: 닫힌 루프백 포트가 연결 거부 대신 timeout으로 보고됨 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_inventory_follows_symlinks_and_is_order_independent",
+          "reason": "Windows 알려진 제한: 심볼릭 링크 생성에 개발자 모드·관리자 권한 필요 (지원 플랫폼 macOS·Linux, DECISIONS 2026-10-19)"
+        },
+        {
+          "test": "test_template_rejects_symlink_parent_into_input_pack",
+          "reason": "디렉터리 symlink 권한/지원 필요: OSError"
+        }
+      ]
+    },
+    "final_focused_after_error_serialization_fix": {
+      "artifact_sha256": "6f2a2665fc18dbb95f469b611d24f214c3ad38a8fe8198ad485f1c0e404db4b7",
+      "tests": 128,
+      "passed": 128,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 7.195,
+      "failures": [],
+      "skip_reasons": []
+    },
+    "repairs": [
+      "Reseal the complete test-only reference graph so rejection reaches semantic evidence checks.",
+      "Read the test report explicitly as UTF-8 on the Windows cp949 host.",
+      "Update current registration/catalog expectations for REQ-07; leave enterprise criteria and actual verdicts unchanged.",
+      "Keep the first CPU 30-second UNKNOWN, increase only bounded template observation to120 seconds with a300-second new-dispatch deadline.",
+      "Require the inspected exact VLLMValidationError parameter/value suffix and source serialization chain; generic400 remains inconclusive."
+    ],
+    "seconds_basis": "JUnit testsuite elapsed time; pytest console includes small additional reporting overhead."
+  },
+  "preserved_first_actual_attempt": {
+    "request_timeout_seconds": 30,
+    "summary_sha256": "0fc476a2d6e53912cabd6db6adb822dc8d834f984fc4feeb7b5c9c0036f9e3e8",
+    "source_file_map_sha256": "12d65d2d24d26ede626e4a27469cb81cba2626b314ecc66345e5c6da406428f0",
+    "cases": [
+      {
+        "name": "case1-budget127",
+        "completed": true,
+        "checks": [
+          {
+            "check_id": "PLT-01",
+            "verdicts": {
+              "functional": "PASS",
+              "performance": "UNKNOWN",
+              "security": "PASS"
+            },
+            "reasons": [
+              "security: all pass rules met: process_scan_complete eq True; capabilities_effective subset_of <policy:allowed_capabilities>; mounts subset_of <policy:allowed_mounts>; devices subset_of <policy:allowed_devices>; privileged eq False; host_namespaces subset_of []; root_uid_present eq False (when policy:require_non_root); sentinel_results all_in ['denied', 'absent']; exec_writable_mounts subset_of <policy:allowed_exec_writable_paths>",
+              "functional: all pass rules met: functional_probe_results nonempty; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M6QGR67RAZME8DXJ3ECT7T",
+              "revision": 1,
+              "sha256": "42d42ee42c3267c8348e994a9f02c2ea0ed02df535689a326badd5ced8acfeeb"
+            }
+          },
+          {
+            "check_id": "REQ-07",
+            "verdicts": {
+              "functional": "UNKNOWN",
+              "performance": "UNKNOWN",
+              "security": "UNKNOWN"
+            },
+            "reasons": [
+              "security: UNKNOWN (not collected for: tested_rendered_input_limit eq <policy:max_rendered_input_tokens>; pass rules unmet: enforcement_observed eq True (observed False); collection_complete eq True (observed False); normal_controls eq True (observed False))",
+              "functional: UNKNOWN (pass rules unmet: functional_probe_results superset_of <functional_probes_planned> (observed {'after': 'pass', 'before': 'no_response'}); functional_probe_results all_in ['pass'] (observed {'after': 'pass', 'before': 'no_response'}); normal_controls eq True (observed False))",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M6QGRNB6DEXHMEA4EMZT65",
+              "revision": 1,
+              "sha256": "87156ea7ba802e0432ed116957cda063a5870f4889b482e7fd494ed54281df21"
+            }
+          },
+          {
+            "check_id": "REQ-13",
+            "verdicts": {
+              "functional": "PASS",
+              "performance": "UNKNOWN",
+              "security": "FAIL"
+            },
+            "reasons": [
+              "security: FAIL because response_fields_seen not_subset_of <policy:allowed_response_fields>; response_options_returned any_in <policy:forbidden_return_options>; private_markers_returned nonempty (observed error_fields_seen=['error.code', 'error.message', 'error.param', 'error.type'], private_markers_returned=['engine:option:return_prompt_text:prompt_text', 'gateway:option:return_prompt_text:prompt_text'], response_fields_seen=['choices[].finish_reason', 'choices[].index', 'choices[].logprobs', 'choices[].logprobs.content[].bytes[]', 'choices[].logprobs.content[].logprob', 'choices[].logprobs.content[].token', 'choices[].logprobs.content[].top_logprobs', 'choices[].message.annotations', 'choices[].message.audio', 'choices[].message.content', 'choices[].message.function_call', 'choices[].message.reasoning', 'choices[].message.refusal', 'choices[].message.role', 'choices[].routed_experts', 'choices[].stop_reason', 'choices[].token_ids', 'choices[].token_ids[]', 'created', 'ec_transfer_params', 'id', 'kv_transfer_params', 'metrics', 'model', 'object', 'prompt_logprobs', 'prompt_logprobs[]', 'prompt_logprobs[].104.decoded_token', 'prompt_logprobs[].104.logprob', 'prompt_logprobs[].104.rank', 'prompt_logprobs[].12.decoded_token', 'prompt_logprobs[].12.logprob', 'prompt_logprobs[].12.rank', 'prompt_logprobs[].12105.decoded_token', 'prompt_logprobs[].12105.logprob', 'prompt_logprobs[].12105.rank', 'prompt_logprobs[].131.decoded_token', 'prompt_logprobs[].131.logprob', 'prompt_logprobs[].131.rank', 'prompt_logprobs[].134.decoded_token', 'prompt_logprobs[].134.logprob', 'prompt_logprobs[].134.rank', 'prompt_logprobs[].1437.decoded_token', 'prompt_logprobs[].1437.logprob', 'prompt_logprobs[].1437.rank', 'prompt_logprobs[].2001.decoded_token', 'prompt_logprobs[].2001.logprob', 'prompt_logprobs[].2001.rank', 'prompt_logprobs[].2401.decoded_token', 'prompt_logprobs[].2401.logprob', 'prompt_logprobs[].2401.rank', 'prompt_logprobs[].245.decoded_token', 'prompt_logprobs[].245.logprob', 'prompt_logprobs[].245.rank', 'prompt_logprobs[].288.decoded_token', 'prompt_logprobs[].288.logprob', 'prompt_logprobs[].288.rank', 'prompt_logprobs[].33388.decoded_token', 'prompt_logprobs[].33388.logprob', 'prompt_logprobs[].33388.rank', 'prompt_logprobs[].35.decoded_token', 'prompt_logprobs[].35.logprob', 'prompt_logprobs[].35.rank', 'prompt_logprobs[].393.decoded_token', 'prompt_logprobs[].393.logprob', 'prompt_logprobs[].393.rank', 'prompt_logprobs[].4.decoded_token', 'prompt_logprobs[].4.logprob', 'prompt_logprobs[].4.rank', 'prompt_logprobs[].40899.decoded_token', 'prompt_logprobs[].40899.logprob', 'prompt_logprobs[].40899.rank', 'prompt_logprobs[].4177.decoded_token', 'prompt_logprobs[].4177.logprob', 'prompt_logprobs[].4177.rank', 'prompt_logprobs[].428.decoded_token', 'prompt_logprobs[].428.logprob', 'prompt_logprobs[].428.rank', 'prompt_logprobs[].438.decoded_token', 'prompt_logprobs[].438.logprob', 'prompt_logprobs[].438.rank', 'prompt_logprobs[].4917.decoded_token', 'prompt_logprobs[].4917.logprob', 'prompt_logprobs[].4917.rank', 'prompt_logprobs[].5.decoded_token', 'prompt_logprobs[].5.logprob', 'prompt_logprobs[].5.rank', 'prompt_logprobs[].50118.decoded_token', 'prompt_logprobs[].50118.logprob', 'prompt_logprobs[].50118.rank', 'prompt_logprobs[].506.decoded_token', 'prompt_logprobs[].506.logprob', 'prompt_logprobs[].506.rank', 'prompt_logprobs[].594.decoded_token', 'prompt_logprobs[].594.logprob', 'prompt_logprobs[].594.rank', 'prompt_logprobs[].6.decoded_token', 'prompt_logprobs[].6.logprob', 'prompt_logprobs[].6.rank', 'prompt_logprobs[].698.decoded_token', 'prompt_logprobs[].698.logprob', 'prompt_logprobs[].698.rank', 'prompt_logprobs[].7230.decoded_token', 'prompt_logprobs[].7230.logprob', 'prompt_logprobs[].7230.rank', 'prompt_logprobs[].762.decoded_token', 'prompt_logprobs[].762.logprob', 'prompt_logprobs[].762.rank', 'prompt_logprobs[].766.decoded_token', 'prompt_logprobs[].766.logprob', 'prompt_logprobs[].766.rank', 'prompt_logprobs[].791.decoded_token', 'prompt_logprobs[].791.logprob', 'prompt_logprobs[].791.rank', 'prompt_logprobs[].940.decoded_token', 'prompt_logprobs[].940.logprob', 'prompt_logprobs[].940.rank', 'prompt_text', 'prompt_token_ids', 'prompt_token_ids[]', 'service_tier', 'system_fingerprint', 'usage.completion_tokens', 'usage.completion_tokens_details', 'usage.prompt_tokens', 'usage.prompt_tokens_details', 'usage.total_tokens'], response_options_returned=['logprobs', 'prompt_logprobs', 'return_prompt_text', 'return_token_ids'])",
+              "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M6QGS6TH3Z02SB0WJNTX35",
+              "revision": 1,
+              "sha256": "ce826f857267cd8574fcf29bacfc2057da20c7c5880f99f32330aacaf8d3a5d4"
+            }
+          }
+        ]
+      },
+      {
+        "name": "case2-budget32",
+        "completed": true,
+        "checks": [
+          {
+            "check_id": "REQ-07",
+            "verdicts": {
+              "functional": "UNKNOWN",
+              "performance": "UNKNOWN",
+              "security": "UNKNOWN"
+            },
+            "reasons": [
+              "security: UNKNOWN (not collected for: tested_rendered_input_limit eq <policy:max_rendered_input_tokens>; pass rules unmet: enforcement_observed eq True (observed False); collection_complete eq True (observed False); normal_controls eq True (observed False))",
+              "functional: UNKNOWN (pass rules unmet: functional_probe_results superset_of <functional_probes_planned> (observed {'after': 'pass', 'before': 'no_response'}); functional_probe_results all_in ['pass'] (observed {'after': 'pass', 'before': 'no_response'}); normal_controls eq True (observed False))",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M6WT9NXRQY9EBVA938ET9D",
+              "revision": 1,
+              "sha256": "cdcecc2ca617ee8b817ed82b1cbf9dc562db30be5b6ce19afffc11c315913853"
+            }
+          }
+        ]
+      }
+    ],
+    "preservation": {
+      "model_unchanged": true,
+      "all_existing_container_identities_states_unchanged": true,
+      "no_additional_containers": true,
+      "source_inputs_unchanged": true,
+      "source_files_unchanged_during_execution": true,
+      "pack_unchanged_during_execution": true
+    },
+    "REQ07_gap": "The first normal inference exceeded 30 seconds; subsequent normal inference matched exact prompt IDs. Original UNKNOWN/UNKNOWN retained for both budgets."
+  },
+  "actual_cpu_runs": {
+    "request_timeout_seconds": 120,
+    "success_means": "Execution, evidence preservation and saved-pack rejudge completed; it does not mean all security checks PASS.",
+    "success": true,
+    "cases": [
+      {
+        "name": "case1-budget127",
+        "lifecycle_and_preservation_completed": true,
+        "checks": [
+          {
+            "check_id": "PLT-01",
+            "verdicts": {
+              "functional": "PASS",
+              "performance": "UNKNOWN",
+              "security": "PASS"
+            },
+            "reasons": [
+              "security: all pass rules met: process_scan_complete eq True; capabilities_effective subset_of <policy:allowed_capabilities>; mounts subset_of <policy:allowed_mounts>; devices subset_of <policy:allowed_devices>; privileged eq False; host_namespaces subset_of []; root_uid_present eq False (when policy:require_non_root); sentinel_results all_in ['denied', 'absent']; exec_writable_mounts subset_of <policy:allowed_exec_writable_paths>",
+              "functional: all pass rules met: functional_probe_results nonempty; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M7X8RN2YKXRV9F7SZF6GPE",
+              "revision": 1,
+              "sha256": "d73f016f2c9fb0b9edbbb835c6629dd8a82d221159a1114e1d0a82f80534a2d0"
+            }
+          },
+          {
+            "check_id": "REQ-07",
+            "verdicts": {
+              "functional": "PASS",
+              "performance": "UNKNOWN",
+              "security": "PASS"
+            },
+            "reasons": [
+              "security: all pass rules met: selected_template_sha256 in <policy:allowed_template_sha256>; template_identity_verified eq True; rendered_prompt_tokens_exact_match eq True; enforcement_observed eq True; request_override_rejected eq True; collection_complete eq True; normal_controls eq True; max_consumed_prompt_tokens ge 1; max_consumed_prompt_tokens le <policy:max_rendered_input_tokens>; tested_rendered_input_limit eq <policy:max_rendered_input_tokens>",
+              "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; normal_controls eq True",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M7X8S00CP3PEJXVQH4NEGV",
+              "revision": 1,
+              "sha256": "7ba1fc0ecc4624ad45539c83935de971f94317ed7a86bea9a0abede709b5d90d"
+            }
+          },
+          {
+            "check_id": "REQ-13",
+            "verdicts": {
+              "functional": "PASS",
+              "performance": "UNKNOWN",
+              "security": "FAIL"
+            },
+            "reasons": [
+              "security: FAIL because response_fields_seen not_subset_of <policy:allowed_response_fields>; response_options_returned any_in <policy:forbidden_return_options>; private_markers_returned nonempty (observed error_fields_seen=['error.code', 'error.message', 'error.param', 'error.type'], private_markers_returned=['engine:option:return_prompt_text:prompt_text', 'gateway:option:return_prompt_text:prompt_text'], response_fields_seen=['choices[].finish_reason', 'choices[].index', 'choices[].logprobs', 'choices[].logprobs.content[].bytes[]', 'choices[].logprobs.content[].logprob', 'choices[].logprobs.content[].token', 'choices[].logprobs.content[].top_logprobs', 'choices[].message.annotations', 'choices[].message.audio', 'choices[].message.content', 'choices[].message.function_call', 'choices[].message.reasoning', 'choices[].message.refusal', 'choices[].message.role', 'choices[].routed_experts', 'choices[].stop_reason', 'choices[].token_ids', 'choices[].token_ids[]', 'created', 'ec_transfer_params', 'id', 'kv_transfer_params', 'metrics', 'model', 'object', 'prompt_logprobs', 'prompt_logprobs[]', 'prompt_logprobs[].104.decoded_token', 'prompt_logprobs[].104.logprob', 'prompt_logprobs[].104.rank', 'prompt_logprobs[].1088.decoded_token', 'prompt_logprobs[].1088.logprob', 'prompt_logprobs[].1088.rank', 'prompt_logprobs[].12.decoded_token', 'prompt_logprobs[].12.logprob', 'prompt_logprobs[].12.rank', 'prompt_logprobs[].12105.decoded_token', 'prompt_logprobs[].12105.logprob', 'prompt_logprobs[].12105.rank', 'prompt_logprobs[].131.decoded_token', 'prompt_logprobs[].131.logprob', 'prompt_logprobs[].131.rank', 'prompt_logprobs[].1437.decoded_token', 'prompt_logprobs[].1437.logprob', 'prompt_logprobs[].1437.rank', 'prompt_logprobs[].1549.decoded_token', 'prompt_logprobs[].1549.logprob', 'prompt_logprobs[].1549.rank', 'prompt_logprobs[].16134.decoded_token', 'prompt_logprobs[].16134.logprob', 'prompt_logprobs[].16134.rank', 'prompt_logprobs[].1729.decoded_token', 'prompt_logprobs[].1729.logprob', 'prompt_logprobs[].1729.rank', 'prompt_logprobs[].2146.decoded_token', 'prompt_logprobs[].2146.logprob', 'prompt_logprobs[].2146.rank', 'prompt_logprobs[].2401.decoded_token', 'prompt_logprobs[].2401.logprob', 'prompt_logprobs[].2401.rank', 'prompt_logprobs[].272.decoded_token', 'prompt_logprobs[].272.logprob', 'prompt_logprobs[].272.rank', 'prompt_logprobs[].30320.decoded_token', 'prompt_logprobs[].30320.logprob', 'prompt_logprobs[].30320.rank', 'prompt_logprobs[].3079.decoded_token', 'prompt_logprobs[].3079.logprob', 'prompt_logprobs[].3079.rank', 'prompt_logprobs[].33388.decoded_token', 'prompt_logprobs[].33388.logprob', 'prompt_logprobs[].33388.rank', 'prompt_logprobs[].35.decoded_token', 'prompt_logprobs[].35.logprob', 'prompt_logprobs[].35.rank', 'prompt_logprobs[].393.decoded_token', 'prompt_logprobs[].393.logprob', 'prompt_logprobs[].393.rank', 'prompt_logprobs[].398.decoded_token', 'prompt_logprobs[].398.logprob', 'prompt_logprobs[].398.rank', 'prompt_logprobs[].4.decoded_token', 'prompt_logprobs[].4.logprob', 'prompt_logprobs[].4.rank', 'prompt_logprobs[].438.decoded_token', 'prompt_logprobs[].438.logprob', 'prompt_logprobs[].438.rank', 'prompt_logprobs[].5.decoded_token', 'prompt_logprobs[].5.logprob', 'prompt_logprobs[].5.rank', 'prompt_logprobs[].50118.decoded_token', 'prompt_logprobs[].50118.logprob', 'prompt_logprobs[].50118.rank', 'prompt_logprobs[].506.decoded_token', 'prompt_logprobs[].506.logprob', 'prompt_logprobs[].506.rank', 'prompt_logprobs[].594.decoded_token', 'prompt_logprobs[].594.logprob', 'prompt_logprobs[].594.rank', 'prompt_logprobs[].7230.decoded_token', 'prompt_logprobs[].7230.logprob', 'prompt_logprobs[].7230.rank', 'prompt_logprobs[].762.decoded_token', 'prompt_logprobs[].762.logprob', 'prompt_logprobs[].762.rank', 'prompt_logprobs[].766.decoded_token', 'prompt_logprobs[].766.logprob', 'prompt_logprobs[].766.rank', 'prompt_logprobs[].791.decoded_token', 'prompt_logprobs[].791.logprob', 'prompt_logprobs[].791.rank', 'prompt_logprobs[].940.decoded_token', 'prompt_logprobs[].940.logprob', 'prompt_logprobs[].940.rank', 'prompt_text', 'prompt_token_ids', 'prompt_token_ids[]', 'service_tier', 'system_fingerprint', 'usage.completion_tokens', 'usage.completion_tokens_details', 'usage.prompt_tokens', 'usage.prompt_tokens_details', 'usage.total_tokens'], response_options_returned=['logprobs', 'prompt_logprobs', 'return_prompt_text', 'return_token_ids'])",
+              "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M7X8SR6Q2KP3997S1DZ934",
+              "revision": 1,
+              "sha256": "6a27ded562fd471d7d451a56e62ab1d9f9da142cf25653ce2a33eaddaceb7ca2"
+            }
+          }
+        ],
+        "selected_measurements": {
+          "checks": [
+            {
+              "check_id": "PLT-01",
+              "execution": {
+                "abort_reason": null,
+                "adapter": {
+                  "name": "vllm",
+                  "version": "0.3.0"
+                },
+                "executor": {
+                  "config_sha256": "c28a720e144ce181cc66b5738936a04b966f863daef51cc4b9a58e2d5e06c9fa",
+                  "name": "container_config",
+                  "version": "0.4.0"
+                },
+                "finished_at": "2026-10-23T11:21:27Z",
+                "started_at": "2026-10-23T11:21:23Z",
+                "status": "COMPLETED"
+              },
+              "origin": "MEASURED",
+              "normal_control": {
+                "attempted": true,
+                "detail": "gateway functional probes: POST /v1/completions [allowed] → 200",
+                "succeeded": true
+              },
+              "challenges": [
+                {
+                  "attempted": true,
+                  "observations": {
+                    "capabilities": [],
+                    "devices": [],
+                    "host_namespaces": [],
+                    "mounts": [
+                      "/guard-assets/chat/guard-text-chat-v1.jinja:ro",
+                      "/models:ro"
+                    ],
+                    "privileged": false,
+                    "processes": 5,
+                    "uids": [
+                      1000
+                    ]
+                  },
+                  "step": "유효 UID·capability·mount·device 수집"
+                },
+                {
+                  "attempted": true,
+                  "observations": {
+                    "exec_write_checks": {
+                      "/dev": "denied",
+                      "/guard-cache": "succeeded",
+                      "/proc/interrupts": "absent",
+                      "/proc/kcore": "absent",
+                      "/proc/keys": "absent",
+                      "/proc/latency_stats": "absent",
+                      "/proc/timer_list": "absent"
+                    },
+                    "sentinel": {
+                      "/": "denied",
+                      "/models": "denied"
+                    }
+                  },
+                  "step": "필요 없는 시험 파일·장치에 읽기/쓰기 요청"
+                },
+                {
+                  "attempted": true,
+                  "observations": {
+                    "functional": {
+                      "POST /v1/completions": 200
+                    }
+                  },
+                  "step": "정상 추론과 권한 거부 확인"
+                }
+              ],
+              "observations": {
+                "capabilities_effective": {
+                  "collected": true,
+                  "value": []
+                },
+                "devices": {
+                  "collected": true,
+                  "value": []
+                },
+                "exec_writable_mounts": {
+                  "collected": true,
+                  "value": [
+                    "/guard-cache"
+                  ]
+                },
+                "functional_probe_results": {
+                  "collected": true,
+                  "value": {
+                    "POST /v1/completions": "pass"
+                  }
+                },
+                "functional_probes_planned": {
+                  "collected": true,
+                  "value": [
+                    "POST /v1/completions"
+                  ]
+                },
+                "host_namespaces": {
+                  "collected": true,
+                  "value": []
+                },
+                "mounts": {
+                  "collected": true,
+                  "value": [
+                    "/guard-assets/chat/guard-text-chat-v1.jinja:ro",
+                    "/models:ro"
+                  ]
+                },
+                "privileged": {
+                  "collected": true,
+                  "value": false
+                },
+                "process_scan_complete": {
+                  "collected": true,
+                  "value": true
+                },
+                "root_uid_present": {
+                  "collected": true,
+                  "value": false
+                },
+                "sentinel_results": {
+                  "collected": true,
+                  "value": {
+                    "/models": "denied"
+                  }
+                }
+              },
+              "verdicts": {
+                "functional": "PASS",
+                "performance": "UNKNOWN",
+                "security": "PASS"
+              },
+              "reasons": [
+                "security: all pass rules met: process_scan_complete eq True; capabilities_effective subset_of <policy:allowed_capabilities>; mounts subset_of <policy:allowed_mounts>; devices subset_of <policy:allowed_devices>; privileged eq False; host_namespaces subset_of []; root_uid_present eq False (when policy:require_non_root); sentinel_results all_in ['denied', 'absent']; exec_writable_mounts subset_of <policy:allowed_exec_writable_paths>",
+                "functional: all pass rules met: functional_probe_results nonempty; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+                "performance: no rule for this axis",
+                "performance: explicit CPU comparison covers security/function only; performance unverified"
+              ],
+              "verification_level": "MEASURED",
+              "evidence_ref": {
+                "kind": "EVD",
+                "id": "EVD-01M5M7WYSV5T2T7JX907VZF424",
+                "revision": 1,
+                "sha256": "d59da2c4928e945acfb8ad2e050c9c03b63f1fabad21a68996eb5d85e150a3ad"
+              },
+              "result_ref": {
+                "kind": "RES",
+                "id": "RES-01M5M7X8RN2YKXRV9F7SZF6GPE",
+                "revision": 1,
+                "sha256": "d73f016f2c9fb0b9edbbb835c6629dd8a82d221159a1114e1d0a82f80534a2d0"
+              }
+            },
+            {
+              "check_id": "REQ-07",
+              "execution": {
+                "abort_reason": null,
+                "adapter": {
+                  "name": "vllm",
+                  "version": "0.3.0"
+                },
+                "executor": {
+                  "config_sha256": "e058a46a0a9f4571d3b9b4a42e8b0f1349ce4f8aeb0afa7e1850cf08fb4ebe7a",
+                  "name": "template_validation",
+                  "version": "0.1.0"
+                },
+                "finished_at": "2026-10-23T11:20:50Z",
+                "started_at": "2026-10-23T11:19:48Z",
+                "status": "COMPLETED"
+              },
+              "origin": "MEASURED",
+              "normal_control": {
+                "attempted": true,
+                "detail": "before, exact boundary and after chat inference with exact consumed prompt-token correspondence",
+                "succeeded": true
+              },
+              "challenges": [
+                {
+                  "attempted": true,
+                  "observations": {},
+                  "step": "고정 template의 정상 렌더 token과 실제 추론 소비 token을 대조"
+                },
+                {
+                  "attempted": true,
+                  "observations": {},
+                  "step": "렌더 후 정책 경계 안 입력의 실제 소비와 정상 결과 확인"
+                },
+                {
+                  "attempted": true,
+                  "observations": {},
+                  "step": "원 입력은 정책 안이지만 렌더 후 경계+1인 입력의 실제 소비 또는 사전 거부 위치 확인"
+                },
+                {
+                  "attempted": true,
+                  "observations": {},
+                  "step": "두 안전한 고정 요청 template override의 거부 또는 실제 소비 영향 확인"
+                }
+              ],
+              "observations": {
+                "collection_complete": {
+                  "collected": true,
+                  "value": true
+                },
+                "enforcement_observed": {
+                  "collected": true,
+                  "value": true
+                },
+                "functional_probe_results": {
+                  "collected": true,
+                  "value": {
+                    "after": "pass",
+                    "before": "pass",
+                    "boundary": "pass"
+                  }
+                },
+                "functional_probes_planned": {
+                  "collected": true,
+                  "value": [
+                    "before",
+                    "boundary",
+                    "after"
+                  ]
+                },
+                "max_consumed_prompt_tokens": {
+                  "collected": true,
+                  "value": 127
+                },
+                "normal_controls": {
+                  "collected": true,
+                  "value": true
+                },
+                "rendered_input_token_counts": {
+                  "collected": true,
+                  "value": {
+                    "after": 10,
+                    "before": 10,
+                    "boundary": 127,
+                    "overbound": 128,
+                    "overbound-raw": 121,
+                    "search-112": 120,
+                    "search-116": 124,
+                    "search-118": 126,
+                    "search-119": 127,
+                    "search-120": 128,
+                    "search-128": 136,
+                    "search-64": 72,
+                    "search-96": 104
+                  }
+                },
+                "rendered_prompt_tokens_exact_match": {
+                  "collected": true,
+                  "value": true
+                },
+                "request_override_rejected": {
+                  "collected": true,
+                  "value": true
+                },
+                "security_violations": {
+                  "collected": true,
+                  "value": []
+                },
+                "selected_template_sha256": {
+                  "collected": true,
+                  "value": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e"
+                },
+                "template_identity_verified": {
+                  "collected": true,
+                  "value": true
+                },
+                "tested_rendered_input_limit": {
+                  "collected": true,
+                  "value": 127
+                }
+              },
+              "verdicts": {
+                "functional": "PASS",
+                "performance": "UNKNOWN",
+                "security": "PASS"
+              },
+              "reasons": [
+                "security: all pass rules met: selected_template_sha256 in <policy:allowed_template_sha256>; template_identity_verified eq True; rendered_prompt_tokens_exact_match eq True; enforcement_observed eq True; request_override_rejected eq True; collection_complete eq True; normal_controls eq True; max_consumed_prompt_tokens ge 1; max_consumed_prompt_tokens le <policy:max_rendered_input_tokens>; tested_rendered_input_limit eq <policy:max_rendered_input_tokens>",
+                "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; normal_controls eq True",
+                "performance: no rule for this axis",
+                "performance: explicit CPU comparison covers security/function only; performance unverified"
+              ],
+              "verification_level": "MEASURED",
+              "evidence_ref": {
+                "kind": "EVD",
+                "id": "EVD-01M5M7T2GD20TVQ94BFS03HRY3",
+                "revision": 1,
+                "sha256": "0f90e72c4b5c4ef72a5f94ce0fa825e70b51372de7318928543ac3a0be602384"
+              },
+              "result_ref": {
+                "kind": "RES",
+                "id": "RES-01M5M7X8S00CP3PEJXVQH4NEGV",
+                "revision": 1,
+                "sha256": "7ba1fc0ecc4624ad45539c83935de971f94317ed7a86bea9a0abede709b5d90d"
+              }
+            },
+            {
+              "check_id": "REQ-13",
+              "execution": {
+                "abort_reason": null,
+                "adapter": {
+                  "name": "vllm",
+                  "version": "0.3.0"
+                },
+                "executor": {
+                  "config_sha256": "dd74fdae962562208ced8e9dd97dc81a29f042a7e8cf1b059b0ac128f3f807c2",
+                  "name": "response_content",
+                  "version": "0.1.0"
+                },
+                "finished_at": "2026-10-23T11:21:21Z",
+                "started_at": "2026-10-23T11:20:52Z",
+                "status": "COMPLETED"
+              },
+              "origin": "MEASURED",
+              "normal_control": {
+                "attempted": true,
+                "detail": "normal request before and after response challenges for each selected target",
+                "succeeded": true
+              },
+              "challenges": [
+                {
+                  "attempted": true,
+                  "observations": {},
+                  "step": "선정 대상 정상 응답과 허용 필드 대조"
+                },
+                {
+                  "attempted": true,
+                  "observations": {},
+                  "step": "비공개 system 문맥과 금지 반환 옵션 시험"
+                },
+                {
+                  "attempted": true,
+                  "observations": {},
+                  "step": "안전한 오류와 후속 정상 대조"
+                }
+              ],
+              "observations": {
+                "error_fields_seen": {
+                  "collected": true,
+                  "value": [
+                    "error.code",
+                    "error.message",
+                    "error.param",
+                    "error.type"
+                  ]
+                },
+                "functional_probe_results": {
+                  "collected": true,
+                  "value": {
+                    "engine:after": "pass",
+                    "engine:before": "pass",
+                    "gateway:after": "pass",
+                    "gateway:before": "pass"
+                  }
+                },
+                "functional_probes_planned": {
+                  "collected": true,
+                  "value": [
+                    "engine:before",
+                    "engine:after",
+                    "gateway:before",
+                    "gateway:after"
+                  ]
+                },
+                "private_markers_returned": {
+                  "collected": true,
+                  "value": [
+                    "engine:option:return_prompt_text:prompt_text",
+                    "gateway:option:return_prompt_text:prompt_text"
+                  ]
+                },
+                "response_cases_tested": {
+                  "collected": true,
+                  "value": [
+                    "engine:normal",
+                    "engine:private_system",
+                    "engine:option:echo",
+                    "engine:option:return_prompt_text",
+                    "engine:option:return_token_ids",
+                    "engine:option:logprobs",
+                    "engine:option:prompt_logprobs",
+                    "engine:safe_error",
+                    "engine:after",
+                    "gateway:normal",
+                    "gateway:private_system",
+                    "gateway:option:echo",
+                    "gateway:option:return_prompt_text",
+                    "gateway:option:return_token_ids",
+                    "gateway:option:logprobs",
+                    "gateway:option:prompt_logprobs",
+                    "gateway:safe_error",
+                    "gateway:after"
+                  ]
+                },
+                "response_coverage_complete": {
+                  "collected": true,
+                  "value": true
+                },
+                "response_coverage_gaps": {
+                  "collected": true,
+                  "value": []
+                },
+                "response_fields_seen": {
+                  "collected": true,
+                  "value": [
+                    "choices[].finish_reason",
+                    "choices[].index",
+                    "choices[].logprobs",
+                    "choices[].logprobs.content[].bytes[]",
+                    "choices[].logprobs.content[].logprob",
+                    "choices[].logprobs.content[].token",
+                    "choices[].logprobs.content[].top_logprobs",
+                    "choices[].message.annotations",
+                    "choices[].message.audio",
+                    "choices[].message.content",
+                    "choices[].message.function_call",
+                    "choices[].message.reasoning",
+                    "choices[].message.refusal",
+                    "choices[].message.role",
+                    "choices[].routed_experts",
+                    "choices[].stop_reason",
+                    "choices[].token_ids",
+                    "choices[].token_ids[]",
+                    "created",
+                    "ec_transfer_params",
+                    "id",
+                    "kv_transfer_params",
+                    "metrics",
+                    "model",
+                    "object",
+                    "prompt_logprobs",
+                    "prompt_logprobs[]",
+                    "prompt_logprobs[].104.decoded_token",
+                    "prompt_logprobs[].104.logprob",
+                    "prompt_logprobs[].104.rank",
+                    "prompt_logprobs[].1088.decoded_token",
+                    "prompt_logprobs[].1088.logprob",
+                    "prompt_logprobs[].1088.rank",
+                    "prompt_logprobs[].12.decoded_token",
+                    "prompt_logprobs[].12.logprob",
+                    "prompt_logprobs[].12.rank",
+                    "prompt_logprobs[].12105.decoded_token",
+                    "prompt_logprobs[].12105.logprob",
+                    "prompt_logprobs[].12105.rank",
+                    "prompt_logprobs[].131.decoded_token",
+                    "prompt_logprobs[].131.logprob",
+                    "prompt_logprobs[].131.rank",
+                    "prompt_logprobs[].1437.decoded_token",
+                    "prompt_logprobs[].1437.logprob",
+                    "prompt_logprobs[].1437.rank",
+                    "prompt_logprobs[].1549.decoded_token",
+                    "prompt_logprobs[].1549.logprob",
+                    "prompt_logprobs[].1549.rank",
+                    "prompt_logprobs[].16134.decoded_token",
+                    "prompt_logprobs[].16134.logprob",
+                    "prompt_logprobs[].16134.rank",
+                    "prompt_logprobs[].1729.decoded_token",
+                    "prompt_logprobs[].1729.logprob",
+                    "prompt_logprobs[].1729.rank",
+                    "prompt_logprobs[].2146.decoded_token",
+                    "prompt_logprobs[].2146.logprob",
+                    "prompt_logprobs[].2146.rank",
+                    "prompt_logprobs[].2401.decoded_token",
+                    "prompt_logprobs[].2401.logprob",
+                    "prompt_logprobs[].2401.rank",
+                    "prompt_logprobs[].272.decoded_token",
+                    "prompt_logprobs[].272.logprob",
+                    "prompt_logprobs[].272.rank",
+                    "prompt_logprobs[].30320.decoded_token",
+                    "prompt_logprobs[].30320.logprob",
+                    "prompt_logprobs[].30320.rank",
+                    "prompt_logprobs[].3079.decoded_token",
+                    "prompt_logprobs[].3079.logprob",
+                    "prompt_logprobs[].3079.rank",
+                    "prompt_logprobs[].33388.decoded_token",
+                    "prompt_logprobs[].33388.logprob",
+                    "prompt_logprobs[].33388.rank",
+                    "prompt_logprobs[].35.decoded_token",
+                    "prompt_logprobs[].35.logprob",
+                    "prompt_logprobs[].35.rank",
+                    "prompt_logprobs[].393.decoded_token",
+                    "prompt_logprobs[].393.logprob",
+                    "prompt_logprobs[].393.rank",
+                    "prompt_logprobs[].398.decoded_token",
+                    "prompt_logprobs[].398.logprob",
+                    "prompt_logprobs[].398.rank",
+                    "prompt_logprobs[].4.decoded_token",
+                    "prompt_logprobs[].4.logprob",
+                    "prompt_logprobs[].4.rank",
+                    "prompt_logprobs[].438.decoded_token",
+                    "prompt_logprobs[].438.logprob",
+                    "prompt_logprobs[].438.rank",
+                    "prompt_logprobs[].5.decoded_token",
+                    "prompt_logprobs[].5.logprob",
+                    "prompt_logprobs[].5.rank",
+                    "prompt_logprobs[].50118.decoded_token",
+                    "prompt_logprobs[].50118.logprob",
+                    "prompt_logprobs[].50118.rank",
+                    "prompt_logprobs[].506.decoded_token",
+                    "prompt_logprobs[].506.logprob",
+                    "prompt_logprobs[].506.rank",
+                    "prompt_logprobs[].594.decoded_token",
+                    "prompt_logprobs[].594.logprob",
+                    "prompt_logprobs[].594.rank",
+                    "prompt_logprobs[].7230.decoded_token",
+                    "prompt_logprobs[].7230.logprob",
+                    "prompt_logprobs[].7230.rank",
+                    "prompt_logprobs[].762.decoded_token",
+                    "prompt_logprobs[].762.logprob",
+                    "prompt_logprobs[].762.rank",
+                    "prompt_logprobs[].766.decoded_token",
+                    "prompt_logprobs[].766.logprob",
+                    "prompt_logprobs[].766.rank",
+                    "prompt_logprobs[].791.decoded_token",
+                    "prompt_logprobs[].791.logprob",
+                    "prompt_logprobs[].791.rank",
+                    "prompt_logprobs[].940.decoded_token",
+                    "prompt_logprobs[].940.logprob",
+                    "prompt_logprobs[].940.rank",
+                    "prompt_text",
+                    "prompt_token_ids",
+                    "prompt_token_ids[]",
+                    "service_tier",
+                    "system_fingerprint",
+                    "usage.completion_tokens",
+                    "usage.completion_tokens_details",
+                    "usage.prompt_tokens",
+                    "usage.prompt_tokens_details",
+                    "usage.total_tokens"
+                  ]
+                },
+                "response_options_returned": {
+                  "collected": true,
+                  "value": [
+                    "logprobs",
+                    "prompt_logprobs",
+                    "return_prompt_text",
+                    "return_token_ids"
+                  ]
+                },
+                "response_options_tested": {
+                  "collected": true,
+                  "value": [
+                    "echo",
+                    "return_prompt_text",
+                    "return_token_ids",
+                    "logprobs",
+                    "prompt_logprobs"
+                  ]
+                },
+                "response_targets_tested": {
+                  "collected": true,
+                  "value": [
+                    "engine",
+                    "gateway"
+                  ]
+                }
+              },
+              "verdicts": {
+                "functional": "PASS",
+                "performance": "UNKNOWN",
+                "security": "FAIL"
+              },
+              "reasons": [
+                "security: FAIL because response_fields_seen not_subset_of <policy:allowed_response_fields>; response_options_returned any_in <policy:forbidden_return_options>; private_markers_returned nonempty (observed error_fields_seen=['error.code', 'error.message', 'error.param', 'error.type'], private_markers_returned=['engine:option:return_prompt_text:prompt_text', 'gateway:option:return_prompt_text:prompt_text'], response_fields_seen=['choices[].finish_reason', 'choices[].index', 'choices[].logprobs', 'choices[].logprobs.content[].bytes[]', 'choices[].logprobs.content[].logprob', 'choices[].logprobs.content[].token', 'choices[].logprobs.content[].top_logprobs', 'choices[].message.annotations', 'choices[].message.audio', 'choices[].message.content', 'choices[].message.function_call', 'choices[].message.reasoning', 'choices[].message.refusal', 'choices[].message.role', 'choices[].routed_experts', 'choices[].stop_reason', 'choices[].token_ids', 'choices[].token_ids[]', 'created', 'ec_transfer_params', 'id', 'kv_transfer_params', 'metrics', 'model', 'object', 'prompt_logprobs', 'prompt_logprobs[]', 'prompt_logprobs[].104.decoded_token', 'prompt_logprobs[].104.logprob', 'prompt_logprobs[].104.rank', 'prompt_logprobs[].1088.decoded_token', 'prompt_logprobs[].1088.logprob', 'prompt_logprobs[].1088.rank', 'prompt_logprobs[].12.decoded_token', 'prompt_logprobs[].12.logprob', 'prompt_logprobs[].12.rank', 'prompt_logprobs[].12105.decoded_token', 'prompt_logprobs[].12105.logprob', 'prompt_logprobs[].12105.rank', 'prompt_logprobs[].131.decoded_token', 'prompt_logprobs[].131.logprob', 'prompt_logprobs[].131.rank', 'prompt_logprobs[].1437.decoded_token', 'prompt_logprobs[].1437.logprob', 'prompt_logprobs[].1437.rank', 'prompt_logprobs[].1549.decoded_token', 'prompt_logprobs[].1549.logprob', 'prompt_logprobs[].1549.rank', 'prompt_logprobs[].16134.decoded_token', 'prompt_logprobs[].16134.logprob', 'prompt_logprobs[].16134.rank', 'prompt_logprobs[].1729.decoded_token', 'prompt_logprobs[].1729.logprob', 'prompt_logprobs[].1729.rank', 'prompt_logprobs[].2146.decoded_token', 'prompt_logprobs[].2146.logprob', 'prompt_logprobs[].2146.rank', 'prompt_logprobs[].2401.decoded_token', 'prompt_logprobs[].2401.logprob', 'prompt_logprobs[].2401.rank', 'prompt_logprobs[].272.decoded_token', 'prompt_logprobs[].272.logprob', 'prompt_logprobs[].272.rank', 'prompt_logprobs[].30320.decoded_token', 'prompt_logprobs[].30320.logprob', 'prompt_logprobs[].30320.rank', 'prompt_logprobs[].3079.decoded_token', 'prompt_logprobs[].3079.logprob', 'prompt_logprobs[].3079.rank', 'prompt_logprobs[].33388.decoded_token', 'prompt_logprobs[].33388.logprob', 'prompt_logprobs[].33388.rank', 'prompt_logprobs[].35.decoded_token', 'prompt_logprobs[].35.logprob', 'prompt_logprobs[].35.rank', 'prompt_logprobs[].393.decoded_token', 'prompt_logprobs[].393.logprob', 'prompt_logprobs[].393.rank', 'prompt_logprobs[].398.decoded_token', 'prompt_logprobs[].398.logprob', 'prompt_logprobs[].398.rank', 'prompt_logprobs[].4.decoded_token', 'prompt_logprobs[].4.logprob', 'prompt_logprobs[].4.rank', 'prompt_logprobs[].438.decoded_token', 'prompt_logprobs[].438.logprob', 'prompt_logprobs[].438.rank', 'prompt_logprobs[].5.decoded_token', 'prompt_logprobs[].5.logprob', 'prompt_logprobs[].5.rank', 'prompt_logprobs[].50118.decoded_token', 'prompt_logprobs[].50118.logprob', 'prompt_logprobs[].50118.rank', 'prompt_logprobs[].506.decoded_token', 'prompt_logprobs[].506.logprob', 'prompt_logprobs[].506.rank', 'prompt_logprobs[].594.decoded_token', 'prompt_logprobs[].594.logprob', 'prompt_logprobs[].594.rank', 'prompt_logprobs[].7230.decoded_token', 'prompt_logprobs[].7230.logprob', 'prompt_logprobs[].7230.rank', 'prompt_logprobs[].762.decoded_token', 'prompt_logprobs[].762.logprob', 'prompt_logprobs[].762.rank', 'prompt_logprobs[].766.decoded_token', 'prompt_logprobs[].766.logprob', 'prompt_logprobs[].766.rank', 'prompt_logprobs[].791.decoded_token', 'prompt_logprobs[].791.logprob', 'prompt_logprobs[].791.rank', 'prompt_logprobs[].940.decoded_token', 'prompt_logprobs[].940.logprob', 'prompt_logprobs[].940.rank', 'prompt_text', 'prompt_token_ids', 'prompt_token_ids[]', 'service_tier', 'system_fingerprint', 'usage.completion_tokens', 'usage.completion_tokens_details', 'usage.prompt_tokens', 'usage.prompt_tokens_details', 'usage.total_tokens'], response_options_returned=['logprobs', 'prompt_logprobs', 'return_prompt_text', 'return_token_ids'])",
+                "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+                "performance: no rule for this axis",
+                "performance: explicit CPU comparison covers security/function only; performance unverified"
+              ],
+              "verification_level": "MEASURED",
+              "evidence_ref": {
+                "kind": "EVD",
+                "id": "EVD-01M5M7W1443PYBZRVWJC74PF08",
+                "revision": 1,
+                "sha256": "41609d3a8e0e589dd84487e2f02b3b0407c806485a5021c5dca73961b33cc835"
+              },
+              "result_ref": {
+                "kind": "RES",
+                "id": "RES-01M5M7X8SR6Q2KP3997S1DZ934",
+                "revision": 1,
+                "sha256": "6a27ded562fd471d7d451a56e62ab1d9f9da142cf25653ce2a33eaddaceb7ca2"
+              }
+            }
+          ],
+          "template": {
+            "artifact": {
+              "bytes": 35948,
+              "collected_at": "2026-10-23T11:20:51Z",
+              "collector": "template_validation/0.1.0",
+              "name": "template_samples.json",
+              "path": "artifacts/e98dc88c21b253ca3958323007a04a50c2d50e5efe6b1266e71924ea21b2a8c6",
+              "sha256": "e98dc88c21b253ca3958323007a04a50c2d50e5efe6b1266e71924ea21b2a8c6"
+            },
+            "correspondence": [
+              {
+                "case": "before",
+                "http_status": 200,
+                "rendered_count": 10,
+                "consumed_count": 10,
+                "exact_match": true,
+                "rendered_ids_sha256": "a5c8045b5630f63c4291064b2385a669a6ce4767d7139d9ad354d963188e726b",
+                "consumed_ids_sha256": "a5c8045b5630f63c4291064b2385a669a6ce4767d7139d9ad354d963188e726b"
+              },
+              {
+                "case": "boundary",
+                "http_status": 200,
+                "rendered_count": 127,
+                "consumed_count": 127,
+                "exact_match": true,
+                "rendered_ids_sha256": "c9613dd99d8d242e33c68124e4da3995bd0880db7e8b9bc8424a25e922e4bc58",
+                "consumed_ids_sha256": "c9613dd99d8d242e33c68124e4da3995bd0880db7e8b9bc8424a25e922e4bc58"
+              },
+              {
+                "case": "overbound",
+                "http_status": 400,
+                "rendered_count": 128,
+                "consumed_count": null,
+                "exact_match": false,
+                "rendered_ids_sha256": "a41c4610463202c529304a68543ec236363e478e11b69f0cbd28436c7424bfe1",
+                "consumed_ids_sha256": null
+              },
+              {
+                "case": "after",
+                "http_status": 200,
+                "rendered_count": 10,
+                "consumed_count": 10,
+                "exact_match": true,
+                "rendered_ids_sha256": "a5c8045b5630f63c4291064b2385a669a6ce4767d7139d9ad354d963188e726b",
+                "consumed_ids_sha256": "a5c8045b5630f63c4291064b2385a669a6ce4767d7139d9ad354d963188e726b"
+              }
+            ],
+            "identity_before": {
+              "container_id": "913c625ec67848546de753bb1b13aa4d4a41a03fe6321e1916f2e758992d9013",
+              "started_at": "2026-10-23T11:17:46.01052671Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "selected_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+              "readonly": true,
+              "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+              "bytes": 347
+            },
+            "identity_after": {
+              "container_id": "913c625ec67848546de753bb1b13aa4d4a41a03fe6321e1916f2e758992d9013",
+              "started_at": "2026-10-23T11:17:46.01052671Z",
+              "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "selected_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+              "readonly": true,
+              "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+              "bytes": 347
+            },
+            "identity_stable": true,
+            "selected_template": {
+              "profile": "guard-text-chat-v1",
+              "version": "1",
+              "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+              "container_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+              "content_format": "string",
+              "request_overrides": false
+            },
+            "enforcement_proof": {
+              "engine_version": "0.31.0",
+              "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "phase": "pre_generation",
+              "kind": "input_limit",
+              "source": "vllm/renderers/params.py:483-510",
+              "source_sha256": "ad38852674ebc5bbe69aa9df91602847d518382cc2ceb0a25aac1d07be66b504",
+              "formatter_source": "vllm/exceptions.py:49-56",
+              "formatter_source_sha256": "22fe819c7ef10438f740c251d81af204871a04c3aa3eb1fd0e68604dc4c2146f",
+              "serialization_source": "vllm/entrypoints/serve/exception_handling/error_response.py:41-44,87-95",
+              "serialization_source_sha256": "354a0581fbc29e2c3acbebe5e84ff3dbb132ba0af14ceba5363b6cf2fec6d54e",
+              "sanitizer_source": "vllm/entrypoints/serve/exception_handling/utils.py:7-15",
+              "sanitizer_source_sha256": "723214aa4c63418f1d5eb7c1ff2116eca474778576ac7198daa1f39217c17a4f",
+              "observed_input_tokens": 128,
+              "max_model_len": 128,
+              "requested_output_tokens": 1
+            },
+            "override_proofs": [
+              {
+                "case": "template",
+                "dispatched": true,
+                "applied": false,
+                "consumed_server_render": false,
+                "rejection": {
+                  "engine_version": "0.31.0",
+                  "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+                  "phase": "pre_generation",
+                  "kind": "request_override",
+                  "source": "vllm/renderers/online_renderer.py:636-660",
+                  "source_sha256": "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e"
+                }
+              },
+              {
+                "case": "kwargs",
+                "dispatched": true,
+                "applied": false,
+                "consumed_server_render": false,
+                "rejection": {
+                  "engine_version": "0.31.0",
+                  "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+                  "phase": "pre_generation",
+                  "kind": "request_override",
+                  "source": "vllm/renderers/online_renderer.py:636-660",
+                  "source_sha256": "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e"
+                }
+              }
+            ],
+            "requests_sent": 17,
+            "gaps": [],
+            "violations": []
+          },
+          "private_system_trials": [
+            {
+              "target": "engine",
+              "case": "private_system",
+              "outcome": 200,
+              "capture_error": null,
+              "request_included_system_role": true,
+              "artifact_sha256": "6c002b0b99deafc55f4fff069e12364ebda3869d06fb1c124d7fffa68a220e8e"
+            },
+            {
+              "target": "gateway",
+              "case": "private_system",
+              "outcome": 200,
+              "capture_error": null,
+              "request_included_system_role": true,
+              "artifact_sha256": "6c002b0b99deafc55f4fff069e12364ebda3869d06fb1c124d7fffa68a220e8e"
+            }
+          ]
+        },
+        "report": {
+          "official": false,
+          "policy_status": "DRAFT",
+          "json_sha256": "54580aa4b21f59af6765a9dbd815d71a05dd74ec3ea5075d025ea4f80b739bfb",
+          "html_sha256": "7ee7e82842f6b6e979906bb6fce6be18e36d886acd06a4a421b4b037d846b18d",
+          "refs": [
+            {
+              "kind": "RPT",
+              "id": "RPT-01M5M7X8TSAZ45Q5DTFEW81V1H",
+              "revision": 1,
+              "sha256": "add396c17a823815a84fc5b5fc68aa7d1d699a2f857437529c07667abefc9c67"
+            }
+          ]
+        },
+        "object_refs": [
+          {
+            "kind": "ENV",
+            "id": "ENV-01M5M7P8YF4RQV976AQ2FTKHHA",
+            "revision": 1,
+            "sha256": "b1e6403a4b76e7ff1363041ec18307c30c45c6726c4113fd57b4fb2037b0ab58"
+          },
+          {
+            "kind": "EVD",
+            "id": "EVD-01M5M7T2GD20TVQ94BFS03HRY3",
+            "revision": 1,
+            "sha256": "0f90e72c4b5c4ef72a5f94ce0fa825e70b51372de7318928543ac3a0be602384"
+          },
+          {
+            "kind": "EVD",
+            "id": "EVD-01M5M7W1443PYBZRVWJC74PF08",
+            "revision": 1,
+            "sha256": "41609d3a8e0e589dd84487e2f02b3b0407c806485a5021c5dca73961b33cc835"
+          },
+          {
+            "kind": "EVD",
+            "id": "EVD-01M5M7WYSV5T2T7JX907VZF424",
+            "revision": 1,
+            "sha256": "d59da2c4928e945acfb8ad2e050c9c03b63f1fabad21a68996eb5d85e150a3ad"
+          },
+          {
+            "kind": "PLAN",
+            "id": "PLAN-01M5M7P9A8D4KVD6V1J2BBKCSV",
+            "revision": 1,
+            "sha256": "5d86f4cba100f44da38997aa31cea60368c1977329bac31c3c3d10189ee4ab49"
+          },
+          {
+            "kind": "POL",
+            "id": "POL-01M5M7P8YP9RFAJA7ARCDWZTPN",
+            "revision": 1,
+            "sha256": "a164015bc4fcd8cffc6726c7fa9d8df13240cbd19209fcbbab94f869acf00d1d"
+          },
+          {
+            "kind": "RES",
+            "id": "RES-01M5M7X8RN2YKXRV9F7SZF6GPE",
+            "revision": 1,
+            "sha256": "d73f016f2c9fb0b9edbbb835c6629dd8a82d221159a1114e1d0a82f80534a2d0"
+          },
+          {
+            "kind": "RES",
+            "id": "RES-01M5M7X8S00CP3PEJXVQH4NEGV",
+            "revision": 1,
+            "sha256": "7ba1fc0ecc4624ad45539c83935de971f94317ed7a86bea9a0abede709b5d90d"
+          },
+          {
+            "kind": "RES",
+            "id": "RES-01M5M7X8SR6Q2KP3997S1DZ934",
+            "revision": 1,
+            "sha256": "6a27ded562fd471d7d451a56e62ab1d9f9da142cf25653ce2a33eaddaceb7ca2"
+          },
+          {
+            "kind": "RPT",
+            "id": "RPT-01M5M7X8TSAZ45Q5DTFEW81V1H",
+            "revision": 1,
+            "sha256": "add396c17a823815a84fc5b5fc68aa7d1d699a2f857437529c07667abefc9c67"
+          }
+        ],
+        "evidence_bundle_sha256": "7aad1bcf0e2da6b2e56f2b83b483f76f62a70f7e2eee7c5572965331fdae169f",
+        "saved_pack_rejudge": {
+          "restored_exact_objects_initially": true,
+          "all_original_objects_preserved": true,
+          "only_RES_RPT_appended": true,
+          "saved_pack_used": true,
+          "as_of": "2026-10-23T11:17:43Z",
+          "as_of_basis": "PLAN.created_at; policy exceptions explicitly empty",
+          "rejudged_semantic_results_equal": true,
+          "original_store_bytes_unchanged": true,
+          "original_reports_unchanged": true,
+          "new_report_json_and_html": true
+        }
+      }
+    ],
+    "preservation": {
+      "model_unchanged": true,
+      "all_existing_container_identities_states_unchanged": true,
+      "no_additional_containers": true,
+      "source_inputs_unchanged": true,
+      "source_files_unchanged_during_execution": true,
+      "pack_unchanged_during_execution": true
+    },
+    "sequential": true,
+    "same_single_image": true,
+    "performance": "UNKNOWN"
+  },
+  "preserved_second_actual_attempt": {
+    "summary_sha256": "7fbeebd6bbf8130b2368b8ad6419edc18e2b07c56d9d6ab7e566a32e9bf73d21",
+    "source_file_map_sha256": "6351868631cf96242fc50d639db548734b9b875f95b7c0da9810e0243cc87da1",
+    "cases": [
+      {
+        "name": "case1-budget127",
+        "completed": true,
+        "checks": [
+          {
+            "check_id": "PLT-01",
+            "verdicts": {
+              "functional": "PASS",
+              "performance": "UNKNOWN",
+              "security": "PASS"
+            },
+            "reasons": [
+              "security: all pass rules met: process_scan_complete eq True; capabilities_effective subset_of <policy:allowed_capabilities>; mounts subset_of <policy:allowed_mounts>; devices subset_of <policy:allowed_devices>; privileged eq False; host_namespaces subset_of []; root_uid_present eq False (when policy:require_non_root); sentinel_results all_in ['denied', 'absent']; exec_writable_mounts subset_of <policy:allowed_exec_writable_paths>",
+              "functional: all pass rules met: functional_probe_results nonempty; functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M78G7E5FJEJG6Z65469JR1",
+              "revision": 1,
+              "sha256": "bc141217942fa1a46eccf9d3b44eded95fc178fb78ed843b61a73dac9f2373f6"
+            }
+          },
+          {
+            "check_id": "REQ-07",
+            "verdicts": {
+              "functional": "PASS",
+              "performance": "UNKNOWN",
+              "security": "UNKNOWN"
+            },
+            "reasons": [
+              "security: UNKNOWN (pass rules unmet: enforcement_observed eq True (observed False); collection_complete eq True (observed False))",
+              "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; normal_controls eq True",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M78G7QJ5WPGZWCT70XACCS",
+              "revision": 1,
+              "sha256": "5978534f3e0e0f36429e064131ee22155a4b732192f3f968f7cdeaa4fc3d99a3"
+            }
+          },
+          {
+            "check_id": "REQ-13",
+            "verdicts": {
+              "functional": "PASS",
+              "performance": "UNKNOWN",
+              "security": "FAIL"
+            },
+            "reasons": [
+              "security: FAIL because response_fields_seen not_subset_of <policy:allowed_response_fields>; response_options_returned any_in <policy:forbidden_return_options>; private_markers_returned nonempty (observed error_fields_seen=['error.code', 'error.message', 'error.param', 'error.type'], private_markers_returned=['engine:option:return_prompt_text:prompt_text', 'gateway:option:return_prompt_text:prompt_text'], response_fields_seen=['choices[].finish_reason', 'choices[].index', 'choices[].logprobs', 'choices[].logprobs.content[].bytes[]', 'choices[].logprobs.content[].logprob', 'choices[].logprobs.content[].token', 'choices[].logprobs.content[].top_logprobs', 'choices[].message.annotations', 'choices[].message.audio', 'choices[].message.content', 'choices[].message.function_call', 'choices[].message.reasoning', 'choices[].message.refusal', 'choices[].message.role', 'choices[].routed_experts', 'choices[].stop_reason', 'choices[].token_ids', 'choices[].token_ids[]', 'created', 'ec_transfer_params', 'id', 'kv_transfer_params', 'metrics', 'model', 'object', 'prompt_logprobs', 'prompt_logprobs[]', 'prompt_logprobs[].1027.decoded_token', 'prompt_logprobs[].1027.logprob', 'prompt_logprobs[].1027.rank', 'prompt_logprobs[].104.decoded_token', 'prompt_logprobs[].104.logprob', 'prompt_logprobs[].104.rank', 'prompt_logprobs[].1092.decoded_token', 'prompt_logprobs[].1092.logprob', 'prompt_logprobs[].1092.rank', 'prompt_logprobs[].12105.decoded_token', 'prompt_logprobs[].12105.logprob', 'prompt_logprobs[].12105.rank', 'prompt_logprobs[].131.decoded_token', 'prompt_logprobs[].131.logprob', 'prompt_logprobs[].131.rank', 'prompt_logprobs[].1437.decoded_token', 'prompt_logprobs[].1437.logprob', 'prompt_logprobs[].1437.rank', 'prompt_logprobs[].1729.decoded_token', 'prompt_logprobs[].1729.logprob', 'prompt_logprobs[].1729.rank', 'prompt_logprobs[].2001.decoded_token', 'prompt_logprobs[].2001.logprob', 'prompt_logprobs[].2001.rank', 'prompt_logprobs[].2401.decoded_token', 'prompt_logprobs[].2401.logprob', 'prompt_logprobs[].2401.rank', 'prompt_logprobs[].242.decoded_token', 'prompt_logprobs[].242.logprob', 'prompt_logprobs[].242.rank', 'prompt_logprobs[].272.decoded_token', 'prompt_logprobs[].272.logprob', 'prompt_logprobs[].272.rank', 'prompt_logprobs[].288.decoded_token', 'prompt_logprobs[].288.logprob', 'prompt_logprobs[].288.rank', 'prompt_logprobs[].29023.decoded_token', 'prompt_logprobs[].29023.logprob', 'prompt_logprobs[].29023.rank', 'prompt_logprobs[].3272.decoded_token', 'prompt_logprobs[].3272.logprob', 'prompt_logprobs[].3272.rank', 'prompt_logprobs[].33388.decoded_token', 'prompt_logprobs[].33388.logprob', 'prompt_logprobs[].33388.rank', 'prompt_logprobs[].35.decoded_token', 'prompt_logprobs[].35.logprob', 'prompt_logprobs[].35.rank', 'prompt_logprobs[].393.decoded_token', 'prompt_logprobs[].393.logprob', 'prompt_logprobs[].393.rank', 'prompt_logprobs[].4.decoded_token', 'prompt_logprobs[].4.logprob', 'prompt_logprobs[].4.rank', 'prompt_logprobs[].438.decoded_token', 'prompt_logprobs[].438.logprob', 'prompt_logprobs[].438.rank', 'prompt_logprobs[].466.decoded_token', 'prompt_logprobs[].466.logprob', 'prompt_logprobs[].466.rank', 'prompt_logprobs[].4932.decoded_token', 'prompt_logprobs[].4932.logprob', 'prompt_logprobs[].4932.rank', 'prompt_logprobs[].5.decoded_token', 'prompt_logprobs[].5.logprob', 'prompt_logprobs[].5.rank', 'prompt_logprobs[].50118.decoded_token', 'prompt_logprobs[].50118.logprob', 'prompt_logprobs[].50118.rank', 'prompt_logprobs[].6.decoded_token', 'prompt_logprobs[].6.logprob', 'prompt_logprobs[].6.rank', 'prompt_logprobs[].7230.decoded_token', 'prompt_logprobs[].7230.logprob', 'prompt_logprobs[].7230.rank', 'prompt_logprobs[].762.decoded_token', 'prompt_logprobs[].762.logprob', 'prompt_logprobs[].762.rank', 'prompt_logprobs[].766.decoded_token', 'prompt_logprobs[].766.logprob', 'prompt_logprobs[].766.rank', 'prompt_logprobs[].791.decoded_token', 'prompt_logprobs[].791.logprob', 'prompt_logprobs[].791.rank', 'prompt_logprobs[].940.decoded_token', 'prompt_logprobs[].940.logprob', 'prompt_logprobs[].940.rank', 'prompt_text', 'prompt_token_ids', 'prompt_token_ids[]', 'service_tier', 'system_fingerprint', 'usage.completion_tokens', 'usage.completion_tokens_details', 'usage.prompt_tokens', 'usage.prompt_tokens_details', 'usage.total_tokens'], response_options_returned=['logprobs', 'prompt_logprobs', 'return_prompt_text', 'return_token_ids'])",
+              "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M78G87GB47ZBF5PTZAJ3C2",
+              "revision": 1,
+              "sha256": "6a90595d16850b8177bb7ad54808345814dc5ec4cf95cdcce5f8ff3570298085"
+            }
+          }
+        ]
+      },
+      {
+        "name": "case2-budget32",
+        "completed": true,
+        "checks": [
+          {
+            "check_id": "REQ-07",
+            "verdicts": {
+              "functional": "PASS",
+              "performance": "UNKNOWN",
+              "security": "FAIL"
+            },
+            "reasons": [
+              "security: FAIL because security_violations nonempty; max_consumed_prompt_tokens gt <policy:max_rendered_input_tokens> (observed max_consumed_prompt_tokens=33, security_violations=['overbound: rendered input above the policy token limit was actually consumed'])",
+              "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; normal_controls eq True",
+              "performance: no rule for this axis",
+              "performance: explicit CPU comparison covers security/function only; performance unverified"
+            ],
+            "result_ref": {
+              "kind": "RES",
+              "id": "RES-01M5M7EHV3CBWK9AETS6M1K1X7",
+              "revision": 1,
+              "sha256": "1fa68a4f8e5b22f26355e29e1054cac54a1f424bf509e9ed7f82e721d04207bf"
+            }
+          }
+        ]
+      }
+    ],
+    "preservation": {
+      "model_unchanged": true,
+      "all_existing_container_identities_states_unchanged": true,
+      "no_additional_containers": true,
+      "source_inputs_unchanged": true,
+      "source_files_unchanged_during_execution": true,
+      "pack_unchanged_during_execution": true
+    },
+    "negative_case": {
+      "checks": [
+        {
+          "check_id": "REQ-07",
+          "execution": {
+            "abort_reason": null,
+            "adapter": {
+              "name": "vllm",
+              "version": "0.3.0"
+            },
+            "executor": {
+              "config_sha256": "e058a46a0a9f4571d3b9b4a42e8b0f1349ce4f8aeb0afa7e1850cf08fb4ebe7a",
+              "name": "template_validation",
+              "version": "0.1.0"
+            },
+            "finished_at": "2026-10-23T11:13:25Z",
+            "started_at": "2026-10-23T11:12:27Z",
+            "status": "COMPLETED"
+          },
+          "origin": "MEASURED",
+          "normal_control": {
+            "attempted": true,
+            "detail": "before, exact boundary and after chat inference with exact consumed prompt-token correspondence",
+            "succeeded": true
+          },
+          "challenges": [
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "고정 template의 정상 렌더 token과 실제 추론 소비 token을 대조"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "렌더 후 정책 경계 안 입력의 실제 소비와 정상 결과 확인"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "원 입력은 정책 안이지만 렌더 후 경계+1인 입력의 실제 소비 또는 사전 거부 위치 확인"
+            },
+            {
+              "attempted": true,
+              "observations": {},
+              "step": "두 안전한 고정 요청 template override의 거부 또는 실제 소비 영향 확인"
+            }
+          ],
+          "observations": {
+            "collection_complete": {
+              "collected": true,
+              "value": false
+            },
+            "enforcement_observed": {
+              "collected": true,
+              "value": false
+            },
+            "functional_probe_results": {
+              "collected": true,
+              "value": {
+                "after": "pass",
+                "before": "pass",
+                "boundary": "pass"
+              }
+            },
+            "functional_probes_planned": {
+              "collected": true,
+              "value": [
+                "before",
+                "boundary",
+                "after"
+              ]
+            },
+            "max_consumed_prompt_tokens": {
+              "collected": true,
+              "value": 33
+            },
+            "normal_controls": {
+              "collected": true,
+              "value": true
+            },
+            "rendered_input_token_counts": {
+              "collected": true,
+              "value": {
+                "after": 10,
+                "before": 10,
+                "boundary": 32,
+                "overbound": 33,
+                "overbound-raw": 26,
+                "search-128": 136,
+                "search-16": 24,
+                "search-24": 32,
+                "search-25": 33,
+                "search-26": 34,
+                "search-28": 36,
+                "search-32": 40,
+                "search-64": 72
+              }
+            },
+            "rendered_prompt_tokens_exact_match": {
+              "collected": true,
+              "value": true
+            },
+            "request_override_rejected": {
+              "collected": true,
+              "value": true
+            },
+            "security_violations": {
+              "collected": true,
+              "value": [
+                "overbound: rendered input above the policy token limit was actually consumed"
+              ]
+            },
+            "selected_template_sha256": {
+              "collected": true,
+              "value": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e"
+            },
+            "template_identity_verified": {
+              "collected": true,
+              "value": true
+            },
+            "tested_rendered_input_limit": {
+              "collected": true,
+              "value": 32
+            }
+          },
+          "verdicts": {
+            "functional": "PASS",
+            "performance": "UNKNOWN",
+            "security": "FAIL"
+          },
+          "reasons": [
+            "security: FAIL because security_violations nonempty; max_consumed_prompt_tokens gt <policy:max_rendered_input_tokens> (observed max_consumed_prompt_tokens=33, security_violations=['overbound: rendered input above the policy token limit was actually consumed'])",
+            "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']; normal_controls eq True",
+            "performance: no rule for this axis",
+            "performance: explicit CPU comparison covers security/function only; performance unverified"
+          ],
+          "verification_level": "MEASURED",
+          "evidence_ref": {
+            "kind": "EVD",
+            "id": "EVD-01M5M7CKKRSHK4P84QDWN0GAFB",
+            "revision": 1,
+            "sha256": "377b64794cce94f2bd56eef50714c7fa660c727994b383bcff89a128f026f772"
+          },
+          "result_ref": {
+            "kind": "RES",
+            "id": "RES-01M5M7EHV3CBWK9AETS6M1K1X7",
+            "revision": 1,
+            "sha256": "1fa68a4f8e5b22f26355e29e1054cac54a1f424bf509e9ed7f82e721d04207bf"
+          }
+        }
+      ],
+      "template": {
+        "artifact": {
+          "bytes": 29675,
+          "collected_at": "2026-10-23T11:13:26Z",
+          "collector": "template_validation/0.1.0",
+          "name": "template_samples.json",
+          "path": "artifacts/2296acaaa1048f17fd694569a3e93ca87dfc29e184e6743e160da8b68e601a1b",
+          "sha256": "2296acaaa1048f17fd694569a3e93ca87dfc29e184e6743e160da8b68e601a1b"
+        },
+        "correspondence": [
+          {
+            "case": "before",
+            "http_status": 200,
+            "rendered_count": 10,
+            "consumed_count": 10,
+            "exact_match": true,
+            "rendered_ids_sha256": "a5c8045b5630f63c4291064b2385a669a6ce4767d7139d9ad354d963188e726b",
+            "consumed_ids_sha256": "a5c8045b5630f63c4291064b2385a669a6ce4767d7139d9ad354d963188e726b"
+          },
+          {
+            "case": "boundary",
+            "http_status": 200,
+            "rendered_count": 32,
+            "consumed_count": 32,
+            "exact_match": true,
+            "rendered_ids_sha256": "d38314d3a79667281817df3bf2f8cd47b12784e330667106784dcb064a0dd69a",
+            "consumed_ids_sha256": "d38314d3a79667281817df3bf2f8cd47b12784e330667106784dcb064a0dd69a"
+          },
+          {
+            "case": "overbound",
+            "http_status": 200,
+            "rendered_count": 33,
+            "consumed_count": 33,
+            "exact_match": true,
+            "rendered_ids_sha256": "7b319d55207455197045df8c302d27d81b78a5c5ae2476ca9cccbd066f7e8e7e",
+            "consumed_ids_sha256": "7b319d55207455197045df8c302d27d81b78a5c5ae2476ca9cccbd066f7e8e7e"
+          },
+          {
+            "case": "after",
+            "http_status": 200,
+            "rendered_count": 10,
+            "consumed_count": 10,
+            "exact_match": true,
+            "rendered_ids_sha256": "a5c8045b5630f63c4291064b2385a669a6ce4767d7139d9ad354d963188e726b",
+            "consumed_ids_sha256": "a5c8045b5630f63c4291064b2385a669a6ce4767d7139d9ad354d963188e726b"
+          }
+        ],
+        "identity_before": {
+          "container_id": "f862fb18eb331ca49aab18a9675c247ad642b7560a3fdf7fb44ad9cd39492d06",
+          "started_at": "2026-10-23T11:10:32.769668274Z",
+          "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+          "selected_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+          "readonly": true,
+          "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+          "bytes": 347
+        },
+        "identity_after": {
+          "container_id": "f862fb18eb331ca49aab18a9675c247ad642b7560a3fdf7fb44ad9cd39492d06",
+          "started_at": "2026-10-23T11:10:32.769668274Z",
+          "image": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+          "selected_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+          "readonly": true,
+          "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+          "bytes": 347
+        },
+        "identity_stable": true,
+        "selected_template": {
+          "profile": "guard-text-chat-v1",
+          "version": "1",
+          "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+          "container_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+          "content_format": "string",
+          "request_overrides": false
+        },
+        "enforcement_proof": null,
+        "override_proofs": [
+          {
+            "case": "template",
+            "dispatched": true,
+            "applied": false,
+            "consumed_server_render": false,
+            "rejection": {
+              "engine_version": "0.31.0",
+              "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "phase": "pre_generation",
+              "kind": "request_override",
+              "source": "vllm/renderers/online_renderer.py:636-660",
+              "source_sha256": "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e"
+            }
+          },
+          {
+            "case": "kwargs",
+            "dispatched": true,
+            "applied": false,
+            "consumed_server_render": false,
+            "rejection": {
+              "engine_version": "0.31.0",
+              "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+              "phase": "pre_generation",
+              "kind": "request_override",
+              "source": "vllm/renderers/online_renderer.py:636-660",
+              "source_sha256": "1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e"
+            }
+          }
+        ],
+        "requests_sent": 17,
+        "gaps": [],
+        "violations": [
+          "overbound: rendered input above the policy token limit was actually consumed"
+        ]
+      },
+      "private_system_trials": []
+    },
+    "negative_saved_pack_rejudge": {
+      "restored_exact_objects_initially": true,
+      "all_original_objects_preserved": true,
+      "only_RES_RPT_appended": true,
+      "saved_pack_used": true,
+      "as_of": "2026-10-23T11:10:30Z",
+      "as_of_basis": "PLAN.created_at; policy exceptions explicitly empty",
+      "rejudged_semantic_results_equal": true,
+      "original_store_bytes_unchanged": true,
+      "original_reports_unchanged": true,
+      "new_report_json_and_html": true
+    },
+    "scope": "Budget127 function PASS/security UNKNOWN before strict exception serialization support; budget32 actually consumed33 and FAIL. The accepted-input violation path does not call the modified input-rejection parser."
+  },
+  "historical_matrix_readonly_analysis": {
+    "original_success": false,
+    "original_hypothesis_success": false,
+    "original_hypothesis_match_count": "14/15; original exit1 retained",
+    "observation_contract_success": true,
+    "source_bytes_unchanged": true,
+    "files_preserved": 590,
+    "original_summary_sha256": "df27a27507aa1d9327b7aeafea21cbd8fa0ce72d8fad13ac524b6d13b1dd006a",
+    "analysis_sha256": "11e5fe7ebb10d589c411f390219631b166c9a8c2f895e3965e06809973c8493b",
+    "case_summary": [
+      {
+        "name": "exposed-violations",
+        "success": true
+      },
+      {
+        "name": "isolated-controls",
+        "success": true
+      },
+      {
+        "name": "isolated-insufficient-observation",
+        "success": true
+      }
+    ]
+  },
+  "pack_metadata_and_preservation": {
+    "protected_tracked_bytes": {
+      "okay": true,
+      "counts": {
+        "docs/evidence/": 1,
+        "out/": 61,
+        "other_checkdefs": 76,
+        "id_map": 1,
+        "reference/": 21,
+        "src/guard/core/": 8,
+        "src/guard/models/": 7,
+        "src/guard/store/": 4
+      },
+      "checked": 179,
+      "changed": [],
+      "scope": "Files tracked by the immutable phase-1 commit only; ignored historical output and absent sources are not covered by Git comparison."
+    },
+    "temporary_pack_regeneration": {
+      "okay": true,
+      "revision": 18,
+      "review": "DRAFT",
+      "checks": 77,
+      "files": 79,
+      "first_differences": [],
+      "second_differences": [],
+      "pack_ref": {
+        "kind": "PACK",
+        "id": "PACK-BASELINE",
+        "revision": 18,
+        "sha256": "4d00aec5587635ab777807c07509dcba57fa23c34705591e1aa35bc110feff54"
+      }
+    },
+    "metadata": {
+      "okay": true,
+      "parameters": 41,
+      "policy_checks": 19,
+      "generated_sha256": "4de1c27a5f3715685a9fbe25e55d81b9c8cc331e9a6c9987365be11da8aa4b9c",
+      "stored_sha256": "4de1c27a5f3715685a9fbe25e55d81b9c8cc331e9a6c9987365be11da8aa4b9c",
+      "exact_bytes_equal": true
+    },
+    "policy_catalog": {
+      "okay": true,
+      "original_rows": 314,
+      "current_rows": 317,
+      "added_rows": 3,
+      "prefix_byte_preserved": true,
+      "original_sha256": "792cf1468e4dbefe76d34847fc263105ebfe9623b162bd49df902937198bc1fb",
+      "check_links": 609,
+      "classifications": {
+        "d": 115,
+        "a": 38,
+        "c": 161,
+        "b": 3
+      }
+    },
+    "new_catalog_source_refs": {
+      "okay": true,
+      "counts": {
+        "pointer_resolved": 150,
+        "external_not_fetched": 117,
+        "file_exists": 3
+      },
+      "invalid": []
+    },
+    "automation_matrix": {
+      "okay": true,
+      "rows": 77,
+      "grades": {
+        "C": 16,
+        "A": 47,
+        "B": 14
+      },
+      "status_counts": {
+        "NO_AUTOMATED_EXECUTOR": 68,
+        "REAL_EXECUTOR": 5,
+        "REAL_EXECUTOR_PARTIAL_SCOPE": 4
+      },
+      "original_field_changes": [
+        {
+          "id": "REQ-07",
+          "fields": [
+            "implementation_status",
+            "verification_status",
+            "remaining_scope",
+            "evidence_ref"
+          ]
+        },
+        {
+          "id": "REQ-13",
+          "fields": [
+            "verification_status",
+            "remaining_scope",
+            "evidence_ref"
+          ]
+        }
+      ],
+      "new_columns": []
+    },
+    "registration": {
+      "okay": true,
+      "checks": {
+        "REQ-01": "direct_route",
+        "REQ-03": "role_route",
+        "REQ-07": "template_validation",
+        "REQ-09": "input_validation",
+        "REQ-10": "sampling_validation",
+        "REQ-13": "response_content",
+        "PLT-01": "container_config",
+        "PLT-04": "credential_exposure",
+        "OBS-03": "log_analysis"
+      },
+      "real_registry_keys": [
+        "container_config:real",
+        "credential_exposure:real",
+        "direct_route:real",
+        "input_validation:real",
+        "log_analysis:real",
+        "response_content:real",
+        "role_route:real",
+        "sampling_validation:real",
+        "template_validation:real"
+      ]
+    },
+    "documentation_relative_links": {
+      "okay": true,
+      "checked": 73,
+      "invalid": [],
+      "scope": "Markdown local file destinations; remote URLs and heading fragments are not fetched/validated."
+    },
+    "source_pack_not_written": {
+      "okay": true,
+      "exact_snapshot_equal": true
+    }
+  },
+  "installed_wheel": {
+    "source_wheel_installed_byte_equal_files": 71,
+    "wheel_sha256": "b681ea3a4f80ed14af56ae4ea9aae1e6e5cdcd982cf36454db64804f9dfc1ec2",
+    "cli_command_count": 17,
+    "ok": true,
+    "summary_sha256": "027f8371cf984706316b2b8e0bda13b55c7da9ca7ea2214c1aefb81c7df518b5",
+    "scope": "External isolated installed package; synthetic fixtures are EXAMPLE. Chat preparation is read-only and starts no engine."
+  },
+  "limitations": [
+    "REQ-07 covers only the shipped fixed text-chat profile and bounded output1 fixtures, not arbitrary processors, template approval authenticity, multimodal input or all request options.",
+    "OPT-125m is a base model with a formatter, not an instruction-trained model or system-isolation certification.",
+    "Source image files were inspected by bytes; a full engine source commit is UNVERIFIED.",
+    "EXAMPLE/DRAFT policy and DRAFT pack mean official=false; verification level is weaker than measured observations when input facts are declared.",
+    "CPU performance, GPU, two distinct real image update comparison, REQ-10 downstream consumption, OBS-03 exception dumps, REQ-11 and OBS-09 remain separate.",
+    "Three Windows closed-loopback classification tests and two symlink permission/support tests are skipped, not passed.",
+    "The Windows default suite exceeds the repository one-minute target; unit filesystem/subprocess cost remains a follow-up rather than excluding these checks."
+  ]
+}

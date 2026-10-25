@@ -1,0 +1,421 @@
+SUP:
+- id: SUP-01
+  question: 제출·저장소 쓰기 권한만으로 승인 기록을 바꿀 수 없는가?
+  subtest_ids:
+  - Q-R05-01/SC-09-01
+  retired: false
+- id: SUP-02
+  question: 배포 권한이 허용된 모델과 대상 환경에 한정되는가?
+  subtest_ids:
+  - Q-R05-01/SC-09-02
+  retired: false
+- id: SUP-03
+  question: 실제 소비하는 하위 모델 자료가 승인 목록에 포함되는가?
+  subtest_ids:
+  - Q-R05-02/SC-10-02
+  retired: false
+- id: SUP-04
+  question: 실제 실행 이미지·패키지·의존성이 승인 목록에 포함되는가?
+  subtest_ids:
+  - Q-R05-02/SC-10-03
+  retired: false
+- id: SUP-05
+  question: 승인 뒤 파일·symlink·마운트가 교체되어도 비승인 사용을 막는가?
+  subtest_ids:
+  - Q-R05-04/SC-10-01
+  retired: false
+- id: SUP-06
+  question: 각 worker가 자신에게 배정된 승인 모델 부분을 실제 적재하는가?
+  subtest_ids:
+  - Q-R05-14/SC-10-04
+  - Q-C13/SC-16-03
+  retired: false
+- id: SUP-07
+  question: 생성 결과나 공유 컴파일 캐시의 무단 교체를 막는가?
+  subtest_ids:
+  - Q-R05-04/SC-12-01
+  retired: false
+- id: SUP-08
+  question: 요청 입력으로 허용 밖 코드 판본을 선택할 수 없는가?
+  subtest_ids:
+  - Q-R05-03/SC-11-01
+  retired: false
+- id: SUP-09
+  question: 모델의 추가 코드는 허용 조건에서만 실행되는가?
+  subtest_ids:
+  - Q-R05-05/SC-11-02
+  retired: false
+- id: SUP-10
+  question: 플러그인 허용 제한이 실제 실행 전에 적용되는가?
+  subtest_ids:
+  - Q-R05-05/SC-11-03
+  - Q-R05-05/SC-11-04
+  retired: false
+- id: SUP-11
+  question: 지원 실행 모드에서도 동적 import 제한이 유지되는가?
+  subtest_ids:
+  - Q-R05-06/SC-11-05
+  retired: false
+- id: SUP-12
+  question: 선정 reader가 허용하지 않은 객체·동작을 거부하는가?
+  subtest_ids:
+  - Q-R05-07/SC-11-06
+  - Q-R05-11/SC-13-02
+  - Q-R05-11/SC-13-03
+  - Q-C13/SC-16-02
+  retired: false
+- id: SUP-13
+  question: 공급 template의 해석 동작이 허용 범위 안에 있는가?
+  subtest_ids:
+  - Q-R05-05/SC-11-07
+  retired: false
+- id: SUP-14
+  question: 검사 실패·오류·미지원·생략을 통과로 처리하지 않는가?
+  subtest_ids:
+  - Q-R05-08/SC-13-01
+  retired: false
+- id: SUP-15
+  question: 모델·도구·설정 변경 후 부적합한 파생 결과를 재사용하지 않는가?
+  subtest_ids:
+  - Q-R05-02/SC-12-02
+  retired: false
+- id: SUP-16
+  question: 중단·실패한 생성 결과나 부분 파일을 완료된 결과로 사용하지 않는가?
+  subtest_ids:
+  - Q-R05-11/SC-12-03
+  - Q-R05-13/SC-15-03
+  retired: false
+REQ:
+- id: REQ-01
+  question: Gateway를 우회한 직통 요청으로 비허용 작업을 수행할 수 없는가?
+  subtest_ids:
+  - Q-C01/SC-01-01
+  retired: false
+- id: REQ-02
+  question: 인증이 검사한 경로와 실제 실행 handler의 권한 요구가 일치하는가?
+  subtest_ids:
+  - Q-C01/SC-01-02
+  retired: false
+- id: REQ-03
+  question: 일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가?
+  subtest_ids:
+  - Q-C01/SC-01-03
+  retired: false
+- id: REQ-04
+  question: 외부 입력이 인가에 쓰는 신원을 사칭하지 못하는가?
+  subtest_ids:
+  - Q-C01/SC-01-04
+  retired: false
+- id: REQ-05
+  question: 호출자의 모델 사용권이 최종 선택 대상에도 적용되는가?
+  subtest_ids:
+  - Q-C02/SC-02-01
+  - Q-R05-14/SC-02-04
+  - Q-C13/SC-16-01
+  retired: false
+- id: REQ-06
+  question: 저장 결과의 조회·취소 권한을 객체별로 확인하는가?
+  subtest_ids:
+  - Q-C02/SC-02-03
+  retired: false
+- id: REQ-07
+  question: template 적용 뒤 입력에도 필요한 제한이 유지되는가?
+  subtest_ids:
+  - Q-C04/SC-03-01
+  - Q-R05-05/SC-11-07
+  retired: false
+- id: REQ-08
+  question: 재사용 token ID 입력도 필요한 검사를 거치는가?
+  subtest_ids:
+  - Q-C04/SC-03-02
+  retired: false
+- id: REQ-09
+  question: token ID와 입력 길이가 실제 모델·소비자의 유효 범위를 지키는가?
+  subtest_ids:
+  - Q-C04/SC-04-01
+  retired: false
+- id: REQ-10
+  question: sampling 값과 옵션 조합이 실제 실행 조건을 만족하는가?
+  subtest_ids:
+  - Q-C04/SC-04-02
+  retired: false
+- id: REQ-11
+  question: 동시 요청과 스트리밍 결과가 올바른 원 요청으로 반환되는가?
+  subtest_ids:
+  - Q-C02/SC-02-02
+  retired: false
+- id: REQ-12
+  question: 취소·연결 종료 뒤 늦은 결과가 다른 요청이나 새 시도에 섞이지 않는가?
+  subtest_ids:
+  - Q-C08/SC-18-01
+  - Q-C08/SC-18-03
+  retired: false
+- id: REQ-13
+  question: 응답 옵션과 오류가 독자에게 허용한 정보만 반환하는가?
+  subtest_ids:
+  - Q-C11/SC-21-01
+  retired: false
+- id: REQ-14
+  question: 분산 처리의 중간 자료와 최종 출력이 원 요청에 연결되는가?
+  subtest_ids:
+  - Q-C07/SC-08-02
+  - Q-C07/SC-08-03
+  - Q-C02/SC-08-04
+  retired: false
+- id: REQ-15
+  question: cache 공유 집단을 신뢰할 신원에서 결정하는가?
+  subtest_ids:
+  - Q-C03/SC-05-01
+  retired: false
+- id: REQ-16
+  question: cache key가 실제 재사용에 필요한 문맥을 구분하는가?
+  subtest_ids:
+  - Q-C03/SC-05-02
+  retired: false
+- id: REQ-17
+  question: cache 시간 차로 비공개 정보가 허용 범위를 넘어 드러나지 않는가?
+  subtest_ids:
+  - Q-C03/SC-05-03
+  retired: false
+- id: REQ-18
+  question: 배치 자리 이동·재사용 시 이전 요청의 제한 상태가 남지 않는가?
+  subtest_ids:
+  - Q-C02/SC-06-01
+  retired: false
+- id: REQ-19
+  question: 선정 kernel의 접근 범위와 초기화가 유효 입력·buffer 범위를 지키는가?
+  subtest_ids:
+  - Q-C06/SC-06-02
+  retired: false
+- id: REQ-20
+  question: CUDA Graph 재실행에서 현재 입력을 사용하고 출력 소비 전에 buffer를 잘못 덮어쓰지 않는가?
+  subtest_ids:
+  - Q-C06/SC-06-02
+  retired: false
+- id: REQ-21
+  question: TP graph 통신 buffer의 참조가 등록·종료·재기동 과정에서 유효한가?
+  subtest_ids:
+  - Q-C06/SC-06-02
+  - Q-C07/SC-08-03
+  retired: false
+PLT:
+- id: PLT-01
+  question: 엔진·worker가 불필요한 호스트·파일·장치 권한을 갖지 않는가?
+  subtest_ids:
+  - Q-C10/SC-14-04
+  retired: false
+- id: PLT-02
+  question: 로컬 IPC 접점에 허용한 프로세스만 접근하는가?
+  subtest_ids:
+  - Q-C07/SC-08-01
+  retired: false
+- id: PLT-03
+  question: 취득 주체의 자격이 허용 저장소·객체에 한정되는가?
+  subtest_ids:
+  - Q-R05-09/SC-14-01
+  retired: false
+- id: PLT-04
+  question: worker에 불필요한 자격이 전달되지 않는가?
+  subtest_ids:
+  - Q-C10/SC-14-03
+  retired: false
+- id: PLT-05
+  question: 자격 만료·누락 시 비승인 대체 접근으로 이어지지 않는가?
+  subtest_ids:
+  - Q-C10/SC-14-02
+  retired: false
+- id: PLT-06
+  question: core·worker가 공유하는 실제 신뢰 범위와 외부 접근 제한을 확인했는가?
+  subtest_ids:
+  - Q-C07/SC-08-02
+  retired: false
+- id: PLT-07
+  question: 외부 송신이 허용 목적지와 작업에 한정되는가?
+  subtest_ids:
+  - Q-R05-09/SC-14-01
+  - Q-C10/SC-14-04
+  - Q-C11/SC-22-01
+  - Q-C11/SC-22-02
+  - Q-C07/SC-24-01
+  retired: false
+- id: PLT-08
+  question: 각 내부 통신 구간이 정한 상대 확인·기밀성·무결성을 충족하는가?
+  subtest_ids:
+  - Q-C07/SC-08-01
+  - Q-C07/SC-08-03
+  retired: false
+- id: PLT-09
+  question: 엔진부터 collector와 최종 sink까지 필요한 전송 보호가 이어지는가?
+  subtest_ids:
+  - Q-C07/SC-24-01
+  - Q-C07/SC-24-02
+  retired: false
+- id: PLT-10
+  question: 철회 이후 신규 접근이 정한 기한 안에 거부되는가?
+  subtest_ids:
+  - Q-C10/SC-19-01
+  retired: false
+- id: PLT-11
+  question: 기존 session·handle의 접근도 철회 정책에 맞게 제한되는가?
+  subtest_ids:
+  - Q-C10/SC-19-02
+  retired: false
+- id: PLT-12
+  question: 폐기된 자격 사본을 재사용할 수 없는가?
+  subtest_ids:
+  - Q-C12/SC-19-03
+  retired: false
+LIF:
+- id: LIF-01
+  question: 모델 취득·해석·변환·로딩 비용이 단계별·누적 예산을 지키는가?
+  subtest_ids:
+  - Q-R05-10/SC-15-01
+  retired: false
+- id: LIF-02
+  question: 실패한 취득의 반복·재시도가 비용을 무한 누적하지 않는가?
+  subtest_ids:
+  - Q-R05-13/SC-15-02
+  retired: false
+- id: LIF-03
+  question: 요청 비용과 동시 부하를 제한하며 정상 요청의 처리 기회를 유지하는가?
+  subtest_ids:
+  - Q-C05/SC-07-01
+  - Q-C05/SC-07-02
+  retired: false
+- id: LIF-04
+  question: 느린 수신자와 진단 buffering이 자원을 과도하게 점유하지 않는가?
+  subtest_ids:
+  - Q-C05/SC-07-03
+  - Q-C05/SC-07-04
+  retired: false
+- id: LIF-05
+  question: 재배포 중 이전 요청과 새 모델·설정이 잘못 섞이지 않는가?
+  subtest_ids:
+  - Q-R05-12/SC-17-01
+  - Q-C09/SC-17-02
+  retired: false
+- id: LIF-06
+  question: live 변경이나 rolling 중에도 요청의 모델·상태 일관성을 지키는가?
+  subtest_ids:
+  - Q-C09/SC-17-03
+  retired: false
+- id: LIF-07
+  question: 필요한 worker와 실행 준비를 확인한 뒤 요청을 받는가?
+  subtest_ids:
+  - Q-R05-12/SC-17-01
+  - Q-C09/SC-17-02
+  retired: false
+- id: LIF-08
+  question: rank의 예외·사망·지연·통신 정지를 각각 감지하고 전달하는가?
+  subtest_ids:
+  - Q-C08/SC-18-02
+  retired: false
+- id: LIF-09
+  question: 초기화·모델 준비의 부분 실패가 성공으로 처리되지 않는가?
+  subtest_ids:
+  - Q-R05-12/SC-17-01
+  retired: false
+- id: LIF-10
+  question: 취소·연결 종료 뒤 실제 작업과 참조가 정한 기한에 종료되는가?
+  subtest_ids:
+  - Q-C08/SC-18-01
+  retired: false
+- id: LIF-11
+  question: 실패한 worker·통신·분산 자원이 회수되고 다음 기동이 가능한가?
+  subtest_ids:
+  - Q-C08/SC-18-02
+  - Q-R05-12/SC-17-01
+  retired: false
+- id: LIF-12
+  question: 재시도 전후 이전 작업의 잔존과 중복 비용이 통제되는가?
+  subtest_ids:
+  - Q-C08/SC-18-03
+  retired: false
+- id: LIF-13
+  question: daemon 전체 release 이후 다른 소비자의 다음 취득·fallback과 기존 참조가 허용한 상태를 지키는가?
+  subtest_ids:
+  - Q-C13/SC-16-04
+  retired: false
+- id: LIF-14
+  question: profiler 종료가 실제 수집·자원 종료와 맞는가?
+  subtest_ids:
+  - Q-C08/SC-23-05
+  retired: false
+- id: LIF-15
+  question: rollback 대상이 현재 승인 기준을 만족하는가?
+  subtest_ids:
+  - Q-C12/SC-20-01
+  retired: false
+- id: LIF-16
+  question: 복원 자료의 변조와 잔존 상태가 복구 결과에 섞이지 않는가?
+  subtest_ids:
+  - Q-C12/SC-20-02
+  - Q-C12/SC-20-04
+  retired: false
+OBS:
+- id: OBS-01
+  question: 필수 접근·관리·승인 사건을 주체·대상·실행과 연결할 수 있는가?
+  subtest_ids:
+  - Q-R05-15/SC-23-03
+  - Q-C11/SC-23-02
+  retired: false
+- id: OBS-02
+  question: 준비·실패·종료 기록이 실제 상태를 올바르게 나타내는가?
+  subtest_ids:
+  - Q-C11/SC-23-04
+  - Q-C08/SC-23-05
+  - Q-R05-15/SC-23-03
+  retired: false
+- id: OBS-03
+  question: 로그·debug·trace·덤프가 허용한 정보만 수집하는가?
+  subtest_ids:
+  - Q-C11/SC-21-02
+  - Q-C11/SC-21-01
+  retired: false
+- id: OBS-04
+  question: 금지한 usage 보고가 실제로 비활성 상태를 유지하는가?
+  subtest_ids:
+  - Q-C11/SC-22-01
+  retired: false
+- id: OBS-05
+  question: 허용한 usage 보고가 필드·목적지 범위를 지키는가?
+  subtest_ids:
+  - Q-C11/SC-22-02
+  retired: false
+- id: OBS-06
+  question: 기록과 진단 사본을 허용된 독자만 조회·반출하는가?
+  subtest_ids:
+  - Q-C11/SC-21-02
+  - Q-C11/SC-22-03
+  retired: false
+- id: OBS-07
+  question: 진단 자료 읽기권만으로 재실행할 수 없는가?
+  subtest_ids:
+  - Q-C11/SC-21-03
+  retired: false
+- id: OBS-08
+  question: 재실행이 변조한 진단 자료를 비허용 방식으로 소비하지 않는가?
+  subtest_ids:
+  - Q-C11/SC-21-04
+  retired: false
+- id: OBS-09
+  question: 요청 입력이 로그의 신원·대상·상태를 위조하지 못하는가?
+  subtest_ids:
+  - Q-C11/SC-23-01
+  retired: false
+- id: OBS-10
+  question: 기록의 무단 변경·삭제를 제한하고 확인할 수 있는가?
+  subtest_ids:
+  - Q-C11/SC-23-06
+  retired: false
+- id: OBS-11
+  question: 수집 중단·누락·시간 불확실성을 정상 결과로 처리하지 않는가?
+  subtest_ids:
+  - Q-C11/SC-23-02
+  retired: false
+- id: OBS-12
+  question: 로그·usage·진단의 원본과 사본이 보존·삭제 범위를 지키는가?
+  subtest_ids:
+  - Q-C12/SC-20-03
+  - Q-C11/SC-22-03
+  retired: false

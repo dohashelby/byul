@@ -1,0 +1,46 @@
+id: OBS-10
+revision: 1
+retired: false
+area: OBS
+purpose: 증거의 신뢰성
+secondary_purposes: []
+question: 기록의 무단 변경·삭제를 제한하고 확인할 수 있는가?
+scope: 실제 기록 저장소
+risk_category: 보안 위협 점검
+risk_summary: 기록 저장소 변경권자가 무단 행위의 이력을 삭제·변조해 침해 탐지·원인 분석·시험 판정을 방해할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 실제 기록 저장소
+policy_params: []
+policy_prose:
+  policy_to_decide: writer·검토자 권한·무결성 요구
+  enterprise_decisions: 기록 형식·writer/reader/admin 권한·무결성/변조 탐지 수단, 사건 중요도별 수집 장애 때 운영 유지/제한/중단 절차. 운영 적용 전에 사건별 대응을 확정한다. 미정이면 기본 지속이나 즉시 중단 어느 쪽도 가정하지 않는다.
+normal_control: 정상 writer가 기록을 추가하고 검토자는 읽기만 한다.
+challenge_steps:
+- 시험 증거 묶음 사본 준비
+- 비허용 계정의 수정·삭제·다른 실행 자료 대체 시도
+- 원본 보호·독립 감사·조회 결과 확인
+required_observations: []
+required_observations_prose:
+- 원본·사본 권한
+- 실행ID·manifest·digest
+- 독립 변경·삭제 감사
+satisfied_if: 비허용 변경을 막거나 채택한 검출 요구를 충족한다.
+fail_criteria: 금지 변경·삭제가 허용되거나 채택한 변조 탐지 요구가 작동하지 않는다.
+unknown_criteria: hash만 있고 작성 주체·접근통제·독립 감사가 없거나 보호 요구가 미정이다.
+remediation: 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다 공통 식별자와 오류/수집 상태를 연결하고 민감값 대신 참조를 저장한다
+method_and_evidence: 시험 기록에 대한 역할별 변경·삭제와 별도 감사 흔적을 대조한다.
+remaining_setup: 증거 writer·reader·admin 역할과 변조 방지/탐지 수단
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C11
+  - Q-R05-15
+  scenario_ids:
+  - SC-23-06
+  subtest_ids:
+  - Q-C11/SC-23-06
+source:
+  array: observability_assessment_draft

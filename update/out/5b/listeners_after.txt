@@ -1,0 +1,12 @@
+COMMAND     PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+rapportd    967 doha   14u  IPv4 0x5ab717cd11443fe1      0t0  TCP *:56365 (LISTEN)
+rapportd    967 doha   15u  IPv6 0xd714d4df9cfa2b0a      0t0  TCP *:56365 (LISTEN)
+ControlCe  1075 doha    9u  IPv4 0xa8370f3c98854809      0t0  TCP *:7000 (LISTEN)
+ControlCe  1075 doha   10u  IPv6 0x8189dc658a29f19d      0t0  TCP *:7000 (LISTEN)
+ControlCe  1075 doha   11u  IPv4  0x77b38507e1fe0d8      0t0  TCP *:5000 (LISTEN)
+ControlCe  1075 doha   12u  IPv6 0xe89e7b0ad504c274      0t0  TCP *:5000 (LISTEN)
+codex     10620 doha   39u  IPv4 0xd00a5122e1ef8048      0t0  TCP 127.0.0.1:51096 (LISTEN)
+Code\x20H 14212 doha   29u  IPv4  0x32d3aa0cd0fb114      0t0  TCP 127.0.0.1:60433 (LISTEN)
+Discord   34911 doha   35u  IPv4 0xa1c85fae3097d26c      0t0  TCP 127.0.0.1:6463 (LISTEN)
+Notion    46513 doha   36u  IPv4  0x1d3b858779da300      0t0  TCP 127.0.0.1:49675 (LISTEN)
+Code\x20H 97642 doha   33u  IPv4 0xec82b02fcd84d33c      0t0  TCP 127.0.0.1:56810 (LISTEN)

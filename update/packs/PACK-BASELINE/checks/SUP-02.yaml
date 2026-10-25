@@ -1,0 +1,51 @@
+id: SUP-02
+revision: 2
+retired: false
+area: SUP
+purpose: 생성·변경·승인 권한
+secondary_purposes: []
+question: 배포 권한이 허용된 모델과 대상 환경에 한정되는가?
+scope: null
+risk_category: 보안 위협 점검
+risk_summary: 제한된 배포 담당자가 허용 밖 모델·운영 환경에 배포해 비승인 코드 실행이나 서비스 변경을 일으킬 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 배포 접점 사용
+policy_params:
+- key: approval_record_system
+  type: str
+  required: true
+policy_prose:
+  policy_to_decide: null
+  enterprise_decisions: 실제 담당자·계정, 모델×환경×작업 허용표, 역할 겸임·독립 검토 규칙, 승인 도구·긴급 권한의 기간과 기록. 기업에 특정 인원수를 강제하지 않는다.
+normal_control: 승인한 모델을 허용된 시험 환경에 배포한다.
+challenge_steps:
+- 허용 모델×환경 쌍 배포
+- 같은 계정으로 비허용 모델 또는 대상 환경 중 하나만 바꿔 요청
+- 실제 배포 대상 확인
+required_observations: []
+required_observations_prose:
+- 배포 요청 주체·모델·환경
+- 인가 결과
+- 실제 실행 이미지·모델
+satisfied_if: 허용 밖 배포·승격이 거부된다.
+fail_criteria: 역할에 허용되지 않은 모델이나 환경으로 배포가 진행된다.
+unknown_criteria: 허용표가 없거나 실제 배포 결과를 확인하지 못했다.
+remediation: 승인 기록의 쓰기권과 배포 선택권을 분리하고 승인 대상·변경자를 기록한다 Gateway 정책과 엔진 노출 제한을 함께 적용하고 관리/진단 경로를 따로 제한한다
+method_and_evidence: 역할×모델×환경별 배포 허용/거부와 실제 대상 환경을 대조한다.
+remaining_setup: 모델×환경×작업 허용표와 무해 배포 대상 선정
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-R05-01
+  - Q-C01
+  scenario_ids:
+  - SC-09-02
+  subtest_ids:
+  - Q-R05-01/SC-09-02
+source:
+  array: supply_assessment_draft
+limitations:
+- '승인 기록 체계(신고된 정책 문맥): {approval_record_system}. 값의 등록은 모델×환경×작업 허용표나 배포 권한 검증이 아니다. 실제 인가·배포 결과는 별도 증거가 필요하다.'

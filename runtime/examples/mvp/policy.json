@@ -1,0 +1,10 @@
+{
+  "schema_version": "runtime-mvp/1.0",
+  "policy_id": "local-policy-001",
+  "policy_version": "1",
+  "target_id": "mock-engine-001",
+  "allowed_models": ["test-model"],
+  "output_default_tokens": 128,
+  "output_max_tokens": 128,
+  "max_body_bytes": 65536
+}

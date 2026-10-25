@@ -1,0 +1,52 @@
+id: OBS-05
+revision: 2
+retired: false
+area: OBS
+purpose: 수집 정보 제한
+secondary_purposes: []
+question: 허용한 usage 보고가 필드·목적지 범위를 지키는가?
+scope: 조건부; usage 허용
+risk_category: 보안 위협 점검
+risk_summary: 보고 설정·자료에 영향을 줄 수 있는 주체가 허용 밖 필드·목적지로 보고를 확장해 조직이 금지한 정보를 외부에 보낼 수 있음.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: 조건부; usage 허용
+policy_params:
+- key: usage_allowed
+  type: bool
+  required: true
+policy_prose:
+  policy_to_decide: 허용 필드·목적지·주기
+  enterprise_decisions: 민감정보·수집 목적·허용 필드·목적지·주기, 진단 필요성/승인자. usage 허용은 정책 변경·필드/목적지/사본 검토·재시험 후에만 적용한다.
+normal_control: usage를 별도 승인한 환경에서 허용 필드만 지정 목적지로 보낸다.
+challenge_steps:
+- 허용 정책과 보고 schema 확보
+- 시험 목적지·추가 필드 변경을 제한 적용
+- 실제 payload·목적지·차단 비교
+required_observations: []
+required_observations_prose:
+- 승인 fields·sink
+- 새 보고 payload
+- 실제 연결·sink 수신
+satisfied_if: 팀 참조에서는 usage 보고를 비허용으로 둔다. 정책을 변경해 허용하는 환경에서만 허용 필드·목적지·주기를 대조한다. 근거 없이 prompt 송신을 주장하지 않는다.
+fail_criteria: 허용 밖 필드나 목적지로 보고가 생성·전송된다.
+unknown_criteria: usage 허용이 승인되지 않았거나 payload·최종 목적지를 관측하지 못했다.
+remediation: 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다
+method_and_evidence: 초기/추가 runtime 필드와 실제 수신 목적지를 허용표와 대조한다.
+remaining_setup: 기본 비사용; 기업이 별도 허용할 때만 필드·목적지·보존 결정
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C11
+  - Q-C07
+  scenario_ids:
+  - SC-22-02
+  subtest_ids:
+  - Q-C11/SC-22-02
+source:
+  array: observability_assessment_draft
+limitations:
+- usage_allowed={usage_allowed}은 이 점검 범위의 기업 정책 신고다. true는 필드·목적지·주기의 승인 또는 실제 준수 증명이 아니고 false는 허용 환경 검토 분기를 충족하지 않는다. 정책값만으로 비적용·PASS를 만들지 않는다.
+- 허용 범위·승인·payload·실제 수신의 수동 근거가 별도로 필요하다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.

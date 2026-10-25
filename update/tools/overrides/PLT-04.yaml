@@ -1,0 +1,50 @@
+applies_when: { always: true }
+policy_params:
+  - { key: forbidden_env_names, type: "list[str]", required: true }
+  - { key: forbidden_mount_paths, type: "list[str]", required: true }
+  - { key: credential_candidate_paths, type: "list[str]", required: false }
+executor: credential_exposure
+challenge_steps:
+  - "컨테이너 프로세스의 환경변수 이름 수집"
+  - "명시한 금지 마운트 조건과 자격 후보 메타데이터를 구분하여 확인"
+  - "정상 추론 확인"
+required_observations:
+  - { key: process_scan_complete, type: bool }
+  - { key: worker_env_names, type: "list[str]" }
+  - { key: forbidden_mount_violations, type: "list[str]" }
+  - { key: credential_candidate_results, type: "dict[str, outcome]" }
+  - { key: credential_candidates_complete, type: bool }
+  - { key: credential_candidates_planned, type: "list[str]" }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, outcome]" }
+judge:
+  plugin: rule_table
+  params:
+    declared_pass_ceiling: true
+    pass_when_all:
+      - { obs: process_scan_complete, op: eq, value: true }
+      - { obs: worker_env_names, op: none_in, value_policy: forbidden_env_names }
+      - { obs: forbidden_mount_violations, op: eq, value: [] }
+      - { obs: credential_candidates_complete, op: eq, value: true }
+      - { obs: credential_candidates_planned, op: eq, value_policy: credential_candidate_paths }
+      - { obs: credential_candidate_results, op: superset_of, value_obs: credential_candidates_planned }
+      - { obs: credential_candidate_results, op: subset_of, value_policy: credential_candidate_paths }
+      - { obs: credential_candidate_results, op: all_in, value: [absent, denied] }
+    fail_when_any:
+      - { obs: worker_env_names, op: any_in, value_policy: forbidden_env_names }
+      - { obs: forbidden_mount_violations, op: nonempty }
+      - { obs: credential_candidate_results, op: any_in, value: [candidate_readable] }
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: nonempty }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+        fail_when_any:
+          - { obs: functional_probe_results, op: any_in, value: [fail] }
+functional_probes:
+  - { method: POST, path: /v1/completions, body: { model: "{model}", prompt: ping, max_tokens: 1 }, expect: [200], via: engine }
+limitations:
+  - "PLT-04 revision 3의 forbidden_mount_paths는 명시적인 마운트 금지 정책이다. 상·하위 포함 위반은 forbidden_mount_violations로 기록하며 실제 자격 파일 존재·접근의 증명으로 표현하지 않는다."
+  - "credential_candidate_paths는 별도로 신고한 자격 후보 경로다. 누락하면 미수집 UNKNOWN이며 명시적인 빈 목록은 시험할 후보를 지정하지 않은 제한 범위다. 후보 부재·거부는 같은 worker 주체와 안정된 경로 관측이 있을 때만 확인한다."
+  - "candidate_readable은 동일 worker 주체에서 신고한 후보의 읽기 권한을 관측한 것이며 자격 내용·실제 서비스 사용을 인증하지 않는다. 비밀 원문은 읽지 않는다. symlink·중첩 가림·주체 불일치·부분 수집은 UNKNOWN이다. 파일/provider/상속 자격 전체·호스트 권한·기업 승인 진위는 검증하지 않는다."

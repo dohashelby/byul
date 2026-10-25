@@ -1,0 +1,33 @@
+{
+  "schema_version": "runtime-backend/1.0",
+  "kind": "vllm",
+  "base_url": "http://127.0.0.1:8000",
+  "model_map": {
+    "test-model": "example-backend-model-id"
+  },
+  "health_path": "/health",
+  "models_path": "/v1/models",
+  "version_path": "/version",
+  "metrics_url": "http://127.0.0.1:8000/metrics",
+  "timeouts": {
+    "relay_timeout_s": 5,
+    "stream_idle_timeout_s": 30,
+    "request_deadline_s": 300
+  },
+  "metrics_map": {
+    "requests.running": {
+      "metric": "vllm:num_requests_running",
+      "type": "gauge",
+      "unit": "requests",
+      "source_doc": "https://docs.vllm.ai/en/latest/usage/metrics/",
+      "verified": false
+    },
+    "requests.waiting": {
+      "metric": "vllm:num_requests_waiting",
+      "type": "gauge",
+      "unit": "requests",
+      "source_doc": "https://docs.vllm.ai/en/latest/usage/metrics/",
+      "verified": false
+    }
+  }
+}

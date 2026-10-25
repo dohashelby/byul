@@ -1,0 +1,42 @@
+{
+  "schema": "runtime-enforcement-intent/1.0",
+  "namespace": "serving-lab",
+  "gateway": {
+    "labels": {
+      "app": "serving-gateway"
+    }
+  },
+  "engine": {
+    "labels": {
+      "app": "serving-engine"
+    },
+    "port": 8000
+  },
+  "metrics_collectors": [
+    {
+      "labels": {
+        "app": "serving-observer"
+      }
+    }
+  ],
+  "dns": {
+    "namespace": "kube-system",
+    "labels": {
+      "k8s-app": "kube-dns"
+    },
+    "port": 53
+  },
+  "engine_egress_allow": [],
+  "protected_paths": {
+    "model_dir": "/opt/serving/assets/model",
+    "cache_dir": "/opt/serving/cache",
+    "secret_paths": [
+      "/opt/serving/secret"
+    ]
+  },
+  "allowed_engine_binaries": [
+    "/usr/local/bin/vllm"
+  ],
+  "tetragon_mode": "enforce_probe",
+  "probe_path": "/opt/serving/probe/blocked-probe.txt"
+}

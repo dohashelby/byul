@@ -1,0 +1,191 @@
+{
+  "topology": "isolated",
+  "verdict": {
+    "result": {
+      "kind": "RES",
+      "id": "RES-01M59ETD6QPGSGJARM6XXSQ3CW",
+      "revision": 1,
+      "sha256": "bfab69159e322ea722ea58813d34d903819760bcdfeadf9e5cf0cf7b1c510626"
+    },
+    "security": "UNKNOWN",
+    "functional": "UNKNOWN",
+    "performance": "UNKNOWN",
+    "verification_level": "DECLARED"
+  },
+  "expected_security": "PASS",
+  "ready_seconds": 28.768265125108883,
+  "run_seconds": 146.5,
+  "total_seconds": 177.1,
+  "wildcard_listeners_before": [
+    "ControlCe *:5000",
+    "ControlCe *:7000",
+    "rapportd *:56365"
+  ],
+  "wildcard_listeners_during": [
+    "ControlCe *:5000",
+    "ControlCe *:7000",
+    "rapportd *:56365"
+  ],
+  "distribution": {
+    "direct | external | allowed | timeout": 16,
+    "direct | external | none | timeout": 16,
+    "direct | external | wrong | timeout": 16,
+    "engine | trusted | none | 200": 2,
+    "gateway | external | allowed | 200": 8,
+    "gateway | external | allowed | 400": 6,
+    "gateway | external | allowed | 404": 2,
+    "gateway | external | none | 401": 16,
+    "gateway | external | wrong | 401": 16
+  },
+  "routes_registered": [
+    "/detokenize",
+    "/generative_scoring",
+    "/invocations",
+    "/is_scaling_elastic_ep",
+    "/kv_event_sources",
+    "/load",
+    "/scale_elastic_ep",
+    "/tokenize",
+    "/v1/chat/completions",
+    "/v1/chat/completions/batch",
+    "/v1/completions",
+    "/v1/messages",
+    "/v1/messages/count_tokens",
+    "/v1/models",
+    "/v1/responses",
+    "/v1/responses/{response_id}",
+    "/v1/responses/{response_id}/cancel"
+  ],
+  "skipped_routes": {
+    "/scale_elastic_ep": "mutating admin route not sent (allow_mutating_routes=false)"
+  },
+  "direct_outcomes": {
+    "/detokenize": "timeout",
+    "/generative_scoring": "timeout",
+    "/invocations": "timeout",
+    "/is_scaling_elastic_ep": "timeout",
+    "/kv_event_sources": "timeout",
+    "/load": "timeout",
+    "/tokenize": "timeout",
+    "/v1/chat/completions": "timeout",
+    "/v1/chat/completions/batch": "timeout",
+    "/v1/completions": "timeout",
+    "/v1/messages": "timeout",
+    "/v1/messages/count_tokens": "timeout",
+    "/v1/models": "timeout",
+    "/v1/responses": "timeout",
+    "/v1/responses/{response_id}": "timeout",
+    "/v1/responses/{response_id}/cancel": "timeout"
+  },
+  "direct_allowed_outcomes": {
+    "/detokenize": "timeout",
+    "/generative_scoring": "timeout",
+    "/invocations": "timeout",
+    "/is_scaling_elastic_ep": "timeout",
+    "/kv_event_sources": "timeout",
+    "/load": "timeout",
+    "/tokenize": "timeout",
+    "/v1/chat/completions": "timeout",
+    "/v1/chat/completions/batch": "timeout",
+    "/v1/completions": "timeout",
+    "/v1/messages": "timeout",
+    "/v1/messages/count_tokens": "timeout",
+    "/v1/models": "timeout",
+    "/v1/responses": "timeout",
+    "/v1/responses/{response_id}": "timeout",
+    "/v1/responses/{response_id}/cancel": "timeout"
+  },
+  "gateway_outcomes": {
+    "/detokenize": 200,
+    "/generative_scoring": 400,
+    "/invocations": 200,
+    "/is_scaling_elastic_ep": 200,
+    "/kv_event_sources": 200,
+    "/load": 200,
+    "/tokenize": 200,
+    "/v1/chat/completions": 400,
+    "/v1/chat/completions/batch": 400,
+    "/v1/completions": 200,
+    "/v1/messages": 400,
+    "/v1/messages/count_tokens": 400,
+    "/v1/models": 200,
+    "/v1/responses": 400,
+    "/v1/responses/{response_id}": 404,
+    "/v1/responses/{response_id}/cancel": 404
+  },
+  "gateway_denied_outcomes": {
+    "/detokenize": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/generative_scoring": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/invocations": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/is_scaling_elastic_ep": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/kv_event_sources": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/load": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/tokenize": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/v1/chat/completions": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/v1/chat/completions/batch": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/v1/completions": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/v1/messages": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/v1/messages/count_tokens": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/v1/models": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/v1/responses": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/v1/responses/{response_id}": {
+      "none": 401,
+      "wrong": 401
+    },
+    "/v1/responses/{response_id}/cancel": {
+      "none": 401,
+      "wrong": 401
+    }
+  },
+  "trusted_origin_reachable": true,
+  "limitations": [
+    "검토 전 팩(DRAFT): 공식 아님",
+    "정책 DRAFT: 공식 아님",
+    "실행 환경(ENV-01M59ENY2EYMC42C5JDG1321XZ): CPU, arm64, Docker Desktop on macOS",
+    "엔진 소스 commit(ENV-01M59ENY2EYMC42C5JDG1321XZ): 축약 hash만 일치, 전체 commit 미확인 — 관측 db9527a46, 고정 db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "점검 목록 미완결 보호 목적: 1개 — 집계 PASS 불가",
+    "정책 범위 밖으로 제외: 76개 점검"
+  ]
+}

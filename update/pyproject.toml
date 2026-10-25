@@ -1,0 +1,32 @@
+[project]
+name = "guard"
+version = "0.1.0"
+description = "서빙엔진 보안 검증 솔루션"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "pydantic>=2.6",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+guard = "guard.cli:app"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/guard"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+markers = [
+    "engine: 실제 엔진(vLLM)이 필요한 테스트 (기본 실행에서 제외, 5b)",
+    "docker: 로컬 Docker 실험실이 필요한 테스트 (기본 실행에서 제외, `-m docker`)",
+]
+addopts = "-m 'not engine and not docker' --basetemp=.pytest_tmp -p no:cacheprovider"

@@ -1,0 +1,19 @@
+store = "/Users/doha/Desktop/serving-guard/out/5b/isolated/.guard"
+[adapter]
+name = "vllm"
+[executors]
+direct_route = "real"
+role_route = "real"
+[direct_route]
+target = "/Users/doha/Desktop/serving-guard/out/5b/isolated/target.json"
+roles = { allowed = "GUARD_LAB_ALLOWED_KEY" }
+wrong_key_env = "GUARD_LAB_DENIED_KEY"
+request_timeout = 3.0
+allow_mutating_routes = false
+[role_route]
+target = "/Users/doha/Desktop/serving-guard/out/5b/isolated/target.json"
+roles = { general = "GUARD_LAB_GENERAL_KEY", admin = "GUARD_LAB_ADMIN_KEY" }
+admin_role = "admin"
+wrong_key_env = "GUARD_LAB_DENIED_KEY"
+request_timeout = 3.0
+allow_mutating_routes = false

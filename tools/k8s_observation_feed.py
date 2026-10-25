@@ -28,6 +28,10 @@ class _StopRequested(Exception):
     """Leave the follow loop through its normal child-process cleanup path."""
 
 
+class _ContextMismatchError(RuntimeError):
+    """The active kubectl context is not the isolated runtime lab."""
+
+
 def _install_stop_signal_handlers(
     stop_requested: threading.Event,
 ) -> dict[int, object]:
@@ -115,7 +119,7 @@ def assert_safe_context(
         raise RuntimeError("kubectl current context query failed")
     actual = result.stdout.strip()
     if actual != EXPECTED_CONTEXT:
-        raise RuntimeError(
+        raise _ContextMismatchError(
             f"current kubectl context must be {EXPECTED_CONTEXT}; got {actual or 'empty'}"
         )
 
@@ -395,7 +399,10 @@ class _Supervisor:
         except _StopRequested:
             _stop_children(group)
             raise
-        except (OSError, RuntimeError, ValueError) as error:
+        except _ContextMismatchError:
+            _stop_children(group)
+            raise
+        except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as error:
             _stop_children(group)
             raise RuntimeError(f"{group.kind} start failed: {error}") from error
         group.state = "running"
@@ -423,6 +430,9 @@ class _Supervisor:
                 group.open_gap["attempts"] = int(group.open_gap["attempts"]) + 1
                 try:
                     self.start_group(group, since=str(group.open_gap["backfill_since"]))
+                except _ContextMismatchError as error:
+                    group.open_gap["last_error"] = str(error)
+                    raise
                 except RuntimeError as error:
                     group.open_gap["last_error"] = str(error)
                     group.backoff_s = min(group.backoff_s * 2, BACKOFF_MAX_S)
@@ -566,7 +576,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.context,
             include_forwarded=args.include_forwarded,
         )
-    except (OSError, RuntimeError, ValueError) as error:
+    except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as error:
         print(f"관측 feed 실행 실패: {error}", file=sys.stderr)
         return 1
 

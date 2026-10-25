@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 from pathlib import Path
@@ -453,6 +454,19 @@ class FeedHelperTests(unittest.TestCase):
             assert_safe_context("production", runner=runner)
         self.assertFalse(called)
 
+    def test_initial_context_timeout_is_reported_by_cli(self) -> None:
+        from tools import k8s_observation_feed as helper
+
+        timeout = subprocess.TimeoutExpired(helper.context_command(), 10)
+        with (
+            patch.object(helper, "run", side_effect=timeout),
+            patch.object(helper.sys, "stderr", new_callable=io.StringIO) as stderr,
+        ):
+            result = helper.main(["--output-dir", "unused"])
+
+        self.assertEqual(result, 1)
+        self.assertIn("timed out after 10 seconds", stderr.getvalue())
+
     def test_helper_writes_atomic_per_feed_process_heartbeat(self) -> None:
         class Process:
             @staticmethod
@@ -648,18 +662,74 @@ class FeedReconnectTests(unittest.TestCase):
             self.assertEqual(self.group.state, "running")
             self.assertEqual(self.group.backoff_s, 1.0)
 
+    def test_context_timeout_keeps_gap_open_then_reconnects(self) -> None:
+        context_attempts = 0
+        assert_context = self.helper.assert_safe_context
+
+        def runner(argv, **_kwargs):
+            nonlocal context_attempts
+            context_attempts += 1
+            if context_attempts == 1:
+                raise subprocess.TimeoutExpired(argv, 10)
+            return subprocess.CompletedProcess(argv, 0, self.helper.EXPECTED_CONTEXT + "\n", "")
+
+        def check_context(requested):
+            return assert_context(requested, runner=runner)
+
+        with (
+            patch.object(self.helper, "_start", side_effect=self.fake_start),
+            patch.object(self.helper, "assert_safe_context", side_effect=check_context),
+        ):
+            self.supervisor.start_group(self.group, since=None)
+            self.started[0].returncode = 0
+            self.supervisor.tick()
+
+            self.now = self.group.next_attempt
+            self.supervisor.tick()
+            heartbeat = self.heartbeat()
+            self.assertEqual(heartbeat["state"], "reconnecting")
+            self.assertEqual(heartbeat["reconnect_count"], 0)
+            self.assertEqual(heartbeat["open_gap"]["attempts"], 1)
+            self.assertIn("timed out after 10 seconds", heartbeat["open_gap"]["last_error"])
+            self.assertEqual(self.group.backoff_s, 2.0)
+            self.assertEqual([gap["event"] for gap in self.gaps()], ["gap_opened"])
+
+            self.now = self.group.next_attempt
+            self.supervisor.tick()
+
+        heartbeat = self.heartbeat()
+        self.assertEqual(context_attempts, 2)
+        self.assertEqual(heartbeat["state"], "running")
+        self.assertEqual(heartbeat["reconnect_count"], 1)
+        self.assertIsNone(heartbeat["open_gap"])
+        self.assertIn("timed out after 10 seconds", heartbeat["last_gap"]["last_error"])
+        self.assertEqual([gap["event"] for gap in self.gaps()], ["gap_opened", "gap_closed"])
+
     def test_context_change_blocks_reconnect(self) -> None:
+        assert_context = self.helper.assert_safe_context
+
+        def runner(argv, **_kwargs):
+            return subprocess.CompletedProcess(argv, 0, "other-context\n", "")
+
+        def check_context(requested):
+            return assert_context(requested, runner=runner)
+
         with patch.object(self.helper, "_start", side_effect=self.fake_start):
             with patch.object(self.helper, "assert_safe_context"):
                 self.supervisor.start_group(self.group, since=None)
             self.started[0].returncode = 0
             self.supervisor.tick()
             self.now += 1.0
-            with patch.object(self.helper, "assert_safe_context", side_effect=RuntimeError("context must be kind-runtime-lab")):
+            with (
+                patch.object(self.helper, "assert_safe_context", side_effect=check_context),
+                self.assertRaisesRegex(RuntimeError, "other-context"),
+            ):
                 self.supervisor.tick()
         self.assertEqual(len(self.argv), 1)
         self.assertEqual(self.group.state, "reconnecting")
         self.assertIn("context", self.group.open_gap["last_error"])
+        self.assertEqual(self.group.reconnect_count, 0)
+        self.assertEqual([gap["event"] for gap in self.gaps()], ["gap_opened"])
 
     def test_immediately_exited_child_does_not_close_the_gap(self) -> None:
         with (

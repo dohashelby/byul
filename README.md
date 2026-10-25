@@ -27,7 +27,7 @@ BoB serving-engine security runtime solution
 | 대상 등록 프레임 (F1) | `--target`(`runtime-target/1.0`): 정책 대상 대조·엔진/모델 비교, `--target-pod-status`로 Pod 조회·교체 구분 | 단위·HTTP 시험, 로컬 kind에서 Pod 교체 확인 |
 | 통제 의도 1.1 (SP4·SP1·SP3) | acquire·observer·시험 receiver 통신 정책, 캐시 세대·Pod 보안 후보·캐시 점검, 단계별 실행 분류와 기간 있는 승인 예외 | 단위 시험; SP4 송수신 정책은 로컬 kind에서 수동 확인 |
 | 시험 전용 요청 필드 (정책 1.2, 계획서 범위 밖) | `zeroday-lab` 프로필에서만 추가 필드를 검사 후 전달·검사 없이 전달, 기록에는 이름·모드만 | 모의·가짜 backend, Codex 교차 검수 수정 반영 |
-| 시험 | 추적 unittest 347개, 수용 시험 31개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
+| 시험 | 추적 unittest 347개, 수용 시험 37개 사례(`mvp-acceptance`), 시연 명령(`mvp-demo`), CPU 사전 점검 도구 | 시험 수는 Git 추적 `tests/test*.py`만 세며 개인 파일 `tests/test_claude_review.py`는 제외. CPU 사전 점검 S3-01~06 통과(요청 로그 필수·엔진 재시작 포함) |
 
 **확인 수준의 뜻**
 - 모의 엔진·가짜 backend: 저장소 안 시험용 서버로 확인했습니다.
@@ -458,10 +458,17 @@ HTTP 시험은 로컬 소켓이 필요합니다. 소켓을 막은 샌드박스�
 
 ### 수용 시험
 
-MVP-01~11, S1-01~06, S2-01~06, S3A-01~08을 임시 데이터와 빈 포트에서 자체 실행하고 JSON·Markdown 보고서를 남깁니다. S3A 사례는 시험 전용 가짜 backend를 사용하며 보고서에 그 사실을 표시합니다.
+MVP-01~11, S1-01~06, S2-01~06, S3A-01~08, S4-01~06의 37개 사례를 임시 데이터와 빈 포트에서 자체 실행하고 JSON·Markdown 보고서를 남깁니다. S3A 사례와 S4-06은 시험 전용 가짜 backend를 사용하며 보고서에 그 사실을 표시합니다. S4 사례는 다음 최근 기능을 한 번에 확인합니다.
+
+- S4-01: 인증 없음·불일치·역할·주체 모델 제한·정상 인증과 기록 비밀값 제외
+- S4-02: 인증 설정 오류의 추론·조회 503과 ERROR 집계
+- S4-03: 조회 API 보호와 중복 `Authorization` 거부
+- S4-04: 인증 우선 판정과 대상 등록 불일치 보류
+- S4-05: 가짜 자식 프로세스를 사용한 관측 feed gap·재연결(실제 `kubectl` 미실행)
+- S4-06: 정책 1.2 `zeroday-lab` 추가 필드·`max_n` 정상/거부
 
 ```bash
-.venv/bin/python -m serving_runtime mvp-acceptance
+.venv/bin/python -B -m serving_runtime mvp-acceptance
 ```
 
 기본 보고서 위치는 `~/.local/state/serving-runtime/mvp/acceptance/`입니다. 다른 위치는 `--report-dir PATH`로 지정합니다. 사례가 하나라도 실패하면 종료 코드는 1입니다.

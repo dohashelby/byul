@@ -51,7 +51,7 @@ class M4UnitTests(unittest.TestCase):
 
 
 class FullAcceptanceTests(unittest.TestCase):
-    def test_mvp_s1_s2_and_s3a_cases(self) -> None:
+    def test_mvp_s1_s2_s3a_and_s4_cases(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             data_dir = Path(temporary) / "data"
             data_dir.mkdir()
@@ -64,7 +64,8 @@ class FullAcceptanceTests(unittest.TestCase):
                 [f"MVP-{index:02d}" for index in range(1, 12)]
                 + [f"S1-{index:02d}" for index in range(1, 7)]
                 + [f"S2-{index:02d}" for index in range(1, 7)]
-                + [f"S3A-{index:02d}" for index in range(1, 9)],
+                + [f"S3A-{index:02d}" for index in range(1, 9)]
+                + [f"S4-{index:02d}" for index in range(1, 7)],
             )
             self.assertTrue(all(result.passed for result in results), [
                 (result.case_id, result.actual) for result in results if not result.passed
@@ -73,8 +74,9 @@ class FullAcceptanceTests(unittest.TestCase):
             json_path, md_path = write_reports(report_dir, data_dir, results)
             report = json.loads(json_path.read_text(encoding="utf-8"))
             self.assertTrue(report["passed"])
-            self.assertEqual(len(report["cases"]), 31)
+            self.assertEqual(len(report["cases"]), 37)
             self.assertIn("fake_backend_test", report["s3a_backend_fixture"])
+            self.assertIn("fake_backend_test", report["s4_06_backend_fixture"])
             self.assertIn("실제 vLLM 실행·검증 아님", md_path.read_text(encoding="utf-8"))
             self.assertTrue(md_path.exists())
 

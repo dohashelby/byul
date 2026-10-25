@@ -15,10 +15,12 @@ import threading
 import time
 from typing import Any
 from contextlib import redirect_stderr
+from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from .app import GatewayApp
+from .auth import CHAT_ROUTE, token_digest
 from .backend import load_backend_config
 from .config import MVPConfig
 from .demo import DemoConnectionError, DemoResult, run_demo_cases
@@ -120,6 +122,7 @@ class _Runner:
     def start_vllm(
         self,
         *,
+        policy_path: Path = _EXAMPLE_POLICY,
         fake_options: dict[str, Any] | None = None,
         backend_updates: dict[str, Any] | None = None,
         credential_environ: dict[str, str] | None = None,
@@ -139,7 +142,7 @@ class _Runner:
             gateway_port=0,
             backend="vllm",
             backend_config_path=str(path),
-            policy_path=str(_EXAMPLE_POLICY),
+            policy_path=str(policy_path),
             data_dir=str(active_data_dir),
             collector_interval_s=collector_interval_s,
             collector_stale_after_s=collector_stale_after_s,
@@ -147,7 +150,7 @@ class _Runner:
         backend = load_backend_config(path, environ=credential_environ or {})
         self.gateway = GatewayApp(
             config,
-            load_policy(_EXAMPLE_POLICY),
+            load_policy(policy_path),
             backend_config=backend,
         ).start()
 
@@ -167,6 +170,12 @@ class _Runner:
         manifest_path: Path | None = None,
         collector_interval_s: float = 5.0,
         collector_stale_after_s: float = 15.0,
+        request_body_timeout_s: float = 10.0,
+        auth_config_path: Path | None = None,
+        target_path: Path | None = None,
+        observation_feeds: tuple[tuple[str, str], ...] = (),
+        observation_heartbeats: tuple[tuple[str, str], ...] = (),
+        observation_origin: str = "real",
     ) -> None:
         self.stop()
         active_data_dir = data_dir or self.data_dir
@@ -190,6 +199,12 @@ class _Runner:
             manifest_path=str(manifest_path) if manifest_path else None,
             collector_interval_s=collector_interval_s,
             collector_stale_after_s=collector_stale_after_s,
+            request_body_timeout_s=request_body_timeout_s,
+            auth_config_path=str(auth_config_path) if auth_config_path else None,
+            target_path=str(target_path) if target_path else None,
+            observation_feeds=observation_feeds,
+            observation_heartbeats=observation_heartbeats,
+            observation_origin=observation_origin,
         )
         self.gateway = GatewayApp(config, load_policy(policy_path), self.engine.address).start()
 
@@ -207,6 +222,8 @@ class _Runner:
         manifest_path: Path | None = None,
         collector_interval_s: float = 5.0,
         collector_stale_after_s: float = 15.0,
+        auth_config_path: Path | None = None,
+        target_path: Path | None = None,
     ) -> None:
         if self.engine is None:
             raise RuntimeError("mock engine is not running")
@@ -227,6 +244,8 @@ class _Runner:
             manifest_path=str(manifest_path) if manifest_path else None,
             collector_interval_s=collector_interval_s,
             collector_stale_after_s=collector_stale_after_s,
+            auth_config_path=str(auth_config_path) if auth_config_path else None,
+            target_path=str(target_path) if target_path else None,
         )
         self.gateway = GatewayApp(config, load_policy(policy_path), self.engine.address).start()
 
@@ -281,6 +300,7 @@ class _Runner:
         prompt: str = "acceptance",
         stream: bool = False,
         model: str = "test-model",
+        headers: dict[str, str] | None = None,
     ) -> tuple[int, str | None, dict[str, Any]]:
         body = json.dumps(
             {
@@ -292,7 +312,7 @@ class _Runner:
             ensure_ascii=False,
         ).encode("utf-8")
         status, headers, document = self.json_request(
-            "POST", "/v1/chat/completions", body=body
+            "POST", "/v1/chat/completions", body=body, headers=headers
         )
         return status, headers.get("X-Request-ID"), document
 
@@ -1681,8 +1701,664 @@ def _run_s3a_08(runner: _Runner) -> AcceptanceResult:
     )
 
 
+_S4_INFERENCE_TOKEN = "s4-inference-token-acceptance-0001"
+_S4_VIEWER_TOKEN = "s4-viewer-token-acceptance-000001"
+_S4_WRONG_TOKEN = "s4-wrong-token-acceptance-0000001"
+
+
+def _write_s4_auth(path: Path, *, protect_reads: bool = False) -> None:
+    route_roles: dict[str, list[str]] = {CHAT_ROUTE: ["inference"]}
+    if protect_reads:
+        route_roles["GET /api/*"] = ["viewer"]
+    document = {
+        "schema_version": "runtime-auth/1.0",
+        "auth_ref": "S4-ACCEPTANCE",
+        "principals": [
+            {
+                "principal_id": "s4-client",
+                "roles": ["inference"],
+                "token_sha256": token_digest(_S4_INFERENCE_TOKEN),
+                "allowed_models": ["test-model"],
+            },
+            {
+                "principal_id": "s4-viewer",
+                "roles": ["viewer"],
+                "token_sha256": token_digest(_S4_VIEWER_TOKEN),
+            },
+        ],
+        "route_roles": route_roles,
+    }
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+
+def _records_in(data_dir: Path) -> list[dict[str, Any]]:
+    records, corrupt = JsonlStore(data_dir / "gateway_records.jsonl").read_all()
+    if corrupt:
+        return []
+    return records
+
+
+def _finals_in(data_dir: Path) -> list[dict[str, Any]]:
+    return [record for record in _records_in(data_dir) if record.get("phase") == "final"]
+
+
+def _run_s4_01(runner: _Runner) -> AcceptanceResult:
+    data_dir = runner.data_dir / "s4-01"
+    auth_path = runner.data_dir / "s4-01-auth.json"
+    policy_path = runner.data_dir / "s4-01-policy.json"
+    _write_s4_auth(auth_path)
+    policy_document = json.loads(_EXAMPLE_POLICY.read_text(encoding="utf-8"))
+    policy_document["allowed_models"] = ["test-model", "other-model"]
+    policy_path.write_text(json.dumps(policy_document), encoding="utf-8")
+    runner.start(
+        policy_path=policy_path,
+        data_dir=data_dir,
+        auth_config_path=auth_path,
+    )
+    if runner.engine is None:
+        raise RuntimeError("backend fixture is not running")
+
+    cases = [
+        ("missing", None, "test-model", 401, "AUTH_REQUIRED"),
+        ("invalid", _S4_WRONG_TOKEN, "test-model", 401, "AUTH_INVALID"),
+        ("role", _S4_VIEWER_TOKEN, "test-model", 403, "ROLE_NOT_ALLOWED"),
+        (
+            "principal_model",
+            _S4_INFERENCE_TOKEN,
+            "other-model",
+            403,
+            "PRINCIPAL_MODEL_NOT_ALLOWED",
+        ),
+        ("allowed", _S4_INFERENCE_TOKEN, "test-model", 200, None),
+    ]
+    actual: dict[str, Any] = {}
+    request_ids: list[str] = []
+    passed = True
+    expected_auth = {
+        "missing": ("missing", None),
+        "invalid": ("invalid", None),
+        "role": ("authenticated", "s4-viewer"),
+        "principal_model": ("authenticated", "s4-client"),
+        "allowed": ("authenticated", "s4-client"),
+    }
+    for label, token, model, expected_status, expected_code in cases:
+        headers = {"Authorization": f"Bearer {token}"} if token is not None else None
+        request_body = json.dumps(
+            {
+                "model": model,
+                "messages": [{"role": "user", "content": "acceptance"}],
+                "max_tokens": 64,
+                "stream": False,
+            }
+        ).encode("utf-8")
+        status, response_headers, body = runner.json_request(
+            "POST", "/v1/chat/completions", body=request_body, headers=headers
+        )
+        request_id = response_headers.get("X-Request-ID")
+        if request_id:
+            request_ids.append(request_id)
+        code = body.get("error", {}).get("code")
+        final = _final_record(runner, request_id) if request_id else None
+        auth = (final or {}).get("auth", {})
+        delivery_attempted = (final or {}).get("delivery", {}).get("attempted")
+        actual[label] = {
+            "http": status,
+            "code": code,
+            "www_authenticate": response_headers.get(
+                "WWW-Authenticate", ""
+            ).startswith("Bearer"),
+            "auth_state": auth.get("state"),
+            "principal_id": auth.get("principal_id"),
+            "delivery_attempted": delivery_attempted,
+        }
+        passed = passed and status == expected_status and code == expected_code
+        passed = passed and final is not None
+        passed = passed and (auth.get("state"), auth.get("principal_id")) == expected_auth[label]
+        if label != "allowed":
+            passed = passed and delivery_attempted is False
+        else:
+            passed = passed and delivery_attempted is True
+
+    finals = _finals_in(data_dir)
+    allowed = next(
+        (
+            record
+            for record in reversed(finals)
+            if record.get("decision", {}).get("reason_code") == "REQUEST_ALLOWED"
+        ),
+        {},
+    )
+    stored = (data_dir / "gateway_records.jsonl").read_text(encoding="utf-8")
+    status_text = json.dumps(runner.gateway.status()) if runner.gateway else ""
+    sensitive = (
+        _S4_INFERENCE_TOKEN,
+        _S4_VIEWER_TOKEN,
+        _S4_WRONG_TOKEN,
+        token_digest(_S4_INFERENCE_TOKEN),
+        token_digest(_S4_VIEWER_TOKEN),
+        token_digest(_S4_WRONG_TOKEN),
+    )
+    sensitive_found = any(value in stored or value in status_text for value in sensitive)
+    backend_receipts = len(runner.engine.receipts)
+    non_delivery_count = sum(
+        record.get("delivery", {}).get("attempted") is False for record in finals
+    )
+    passed = (
+        passed
+        and actual["missing"]["www_authenticate"]
+        and backend_receipts == 1
+        and non_delivery_count == 4
+        and allowed.get("auth", {}).get("principal_id") == "s4-client"
+        and allowed.get("auth", {}).get("method") == "bearer_sha256"
+        and not sensitive_found
+    )
+    return AcceptanceResult(
+        "S4-01",
+        "인증 없음·불일치·역할 불허·주체 모델 불허·정상 요청과 기록 대조",
+        "401/401/403/403/200, 401 challenge, 거부 요청 backend 미전달, 주체 ID만 기록",
+        {
+            "requests": actual,
+            "backend_receipts": backend_receipts,
+            "non_delivery_records": non_delivery_count,
+            "allowed_principal_id": allowed.get("auth", {}).get("principal_id"),
+            "token_or_token_digest_found": sensitive_found,
+        },
+        passed,
+        request_ids,
+    )
+
+
+def _run_s4_02(runner: _Runner) -> AcceptanceResult:
+    data_dir = runner.data_dir / "s4-02"
+    auth_path = runner.data_dir / "s4-02-broken-auth.json"
+    auth_path.write_text('{"schema_version":"runtime-auth/1.0"}\n', encoding="utf-8")
+    runner.start(data_dir=data_dir, auth_config_path=auth_path)
+    if runner.engine is None:
+        raise RuntimeError("backend fixture is not running")
+    inference_status, request_id, body = runner.post_chat(
+        headers={"Authorization": f"Bearer {_S4_INFERENCE_TOKEN}"}
+    )
+    status_status, _, status_body = runner.json_request("GET", "/api/status")
+    list_status, _, list_body = runner.json_request("GET", "/api/requests")
+    final = next(
+        (
+            record
+            for record in reversed(_finals_in(data_dir))
+            if record.get("request_id") == request_id
+        ),
+        {},
+    )
+    backend_receipts = len(runner.engine.receipts)
+
+    runner.start_gateway(_EXAMPLE_POLICY, data_dir=data_dir)
+    summary_status, summary = runner.get_json("/api/summary")
+    counts = summary.get("counts", {})
+    passed = (
+        inference_status == 503
+        and body.get("error", {}).get("code") == "AUTH_UNAVAILABLE"
+        and status_status == list_status == 503
+        and status_body.get("error", {}).get("code") == "AUTH_UNAVAILABLE"
+        and list_body.get("error", {}).get("code") == "AUTH_UNAVAILABLE"
+        and final.get("decision", {}).get("result") == "ERROR"
+        and final.get("auth", {}).get("state") == "unavailable"
+        and final.get("delivery", {}).get("attempted") is False
+        and backend_receipts == 0
+        and summary_status == 200
+        and counts.get("DENIED") == 0
+        and counts.get("ERROR") == 1
+    )
+    return AcceptanceResult(
+        "S4-02",
+        "깨진 인증 설정으로 추론·상태·목록 조회 후 인증 없이 같은 기록 집계 조회",
+        "추론·조회 503 AUTH_UNAVAILABLE, backend 미전달, DENIED 0·ERROR 1",
+        {
+            "inference": [inference_status, body.get("error", {}).get("code")],
+            "reads": [
+                [status_status, status_body.get("error", {}).get("code")],
+                [list_status, list_body.get("error", {}).get("code")],
+            ],
+            "record": {
+                "result": final.get("decision", {}).get("result"),
+                "auth_state": final.get("auth", {}).get("state"),
+                "delivery_attempted": final.get("delivery", {}).get("attempted"),
+            },
+            "backend_receipts": backend_receipts,
+            "summary_counts": counts,
+        },
+        passed,
+        [request_id] if request_id else [],
+    )
+
+
+def _duplicate_authorization_get(
+    runner: _Runner, path: str, first: str, second: str
+) -> tuple[int, dict[str, str], dict[str, Any]]:
+    if runner.gateway is None:
+        raise RuntimeError("gateway is not running")
+    connection = http.client.HTTPConnection(*runner.gateway.address, timeout=3)
+    try:
+        connection.putrequest("GET", path)
+        connection.putheader("Authorization", f"Bearer {first}")
+        connection.putheader("Authorization", f"Bearer {second}")
+        connection.endheaders()
+        response = connection.getresponse()
+        body = response.read()
+        try:
+            document = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            document = {}
+        return response.status, dict(response.headers), document
+    finally:
+        connection.close()
+
+
+def _run_s4_03(runner: _Runner) -> AcceptanceResult:
+    data_dir = runner.data_dir / "s4-03"
+    auth_path = runner.data_dir / "s4-03-auth.json"
+    _write_s4_auth(auth_path, protect_reads=True)
+    runner.start(data_dir=data_dir, auth_config_path=auth_path)
+    if runner.engine is None:
+        raise RuntimeError("backend fixture is not running")
+    missing_status, missing_headers, missing_body = runner.json_request(
+        "GET", "/api/status"
+    )
+    viewer_status, _, viewer_body = runner.json_request(
+        "GET",
+        "/api/status",
+        headers={"Authorization": f"Bearer {_S4_VIEWER_TOKEN}"},
+    )
+    duplicate_status, duplicate_headers, duplicate_body = _duplicate_authorization_get(
+        runner, "/api/status", _S4_VIEWER_TOKEN, _S4_INFERENCE_TOKEN
+    )
+    backend_receipts = len(runner.engine.receipts)
+    gateway_records = len(_records_in(data_dir))
+    passed = (
+        missing_status == 401
+        and missing_body.get("error", {}).get("code") == "AUTH_REQUIRED"
+        and missing_headers.get("WWW-Authenticate", "").startswith("Bearer")
+        and viewer_status == 200
+        and viewer_body.get("auth", {}).get("state") == "ok"
+        and duplicate_status == 401
+        and duplicate_body.get("error", {}).get("code") == "AUTH_INVALID"
+        and duplicate_headers.get("WWW-Authenticate", "").startswith("Bearer")
+        and backend_receipts == 0
+        and gateway_records == 0
+    )
+    return AcceptanceResult(
+        "S4-03",
+        "GET /api/* 보호 설정에서 무토큰·조회 역할·중복 Authorization으로 상태 조회",
+        "401 AUTH_REQUIRED, 200, 401 AUTH_INVALID; backend·추론 기록 변화 없음",
+        {
+            "missing": [missing_status, missing_body.get("error", {}).get("code")],
+            "viewer_http": viewer_status,
+            "duplicate": [
+                duplicate_status,
+                duplicate_body.get("error", {}).get("code"),
+            ],
+            "backend_receipts": backend_receipts,
+            "gateway_request_records": gateway_records,
+        },
+        passed,
+        [],
+    )
+
+
+def _headers_only_chat(
+    runner: _Runner, *, authorization: str | None
+) -> tuple[int, dict[str, str], dict[str, Any]]:
+    if runner.gateway is None:
+        raise RuntimeError("gateway is not running")
+    connection = http.client.HTTPConnection(*runner.gateway.address, timeout=3)
+    try:
+        connection.putrequest("POST", "/v1/chat/completions")
+        connection.putheader("Content-Type", "application/json")
+        connection.putheader("Content-Length", "4096")
+        if authorization is not None:
+            connection.putheader("Authorization", authorization)
+        connection.endheaders()
+        response = connection.getresponse()
+        payload = response.read()
+        try:
+            document = json.loads(payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            document = {}
+        return response.status, dict(response.headers), document
+    finally:
+        connection.close()
+
+
+def _run_s4_04(runner: _Runner) -> AcceptanceResult:
+    data_dir = runner.data_dir / "s4-04"
+    auth_path = runner.data_dir / "s4-04-auth.json"
+    target_path = runner.data_dir / "s4-04-target.json"
+    _write_s4_auth(auth_path)
+    target_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "runtime-target/1.0",
+                "target_id": "other-target",
+                "engine": {"kind": "mock", "version": "mock-1.0"},
+                "model": {"id": "test-model"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    runner.start(
+        data_dir=data_dir,
+        auth_config_path=auth_path,
+        target_path=target_path,
+        request_body_timeout_s=0.4,
+    )
+    if runner.engine is None:
+        raise RuntimeError("backend fixture is not running")
+    target_status, target_headers, target_body = _headers_only_chat(
+        runner, authorization=f"Bearer {_S4_INFERENCE_TOKEN}"
+    )
+    auth_status, auth_headers, auth_body = _headers_only_chat(
+        runner, authorization=None
+    )
+    target_id = target_headers.get("X-Request-ID")
+    auth_id = auth_headers.get("X-Request-ID")
+    finals = {record.get("request_id"): record for record in _finals_in(data_dir)}
+    target_record = finals.get(target_id, {})
+    auth_record = finals.get(auth_id, {})
+    backend_receipts = len(runner.engine.receipts)
+    passed = (
+        target_status == 503
+        and target_body.get("error", {}).get("code") == "TARGET_MISMATCH"
+        and target_record.get("auth", {}).get("principal_id") == "s4-client"
+        and target_record.get("request", {}).get("model") is None
+        and target_record.get("delivery", {}).get("attempted") is False
+        and auth_status == 401
+        and auth_body.get("error", {}).get("code") == "AUTH_REQUIRED"
+        and auth_record.get("decision", {}).get("reason_code") == "AUTH_REQUIRED"
+        and auth_record.get("target", {}).get("registration") == "ok"
+        and auth_record.get("delivery", {}).get("attempted") is False
+        and backend_receipts == 0
+    )
+    return AcceptanceResult(
+        "S4-04",
+        "대상 불일치에서 본문 0바이트 전송 요청을 인증 토큰 유무로 두 번 실행",
+        "인증 성공은 503 TARGET_MISMATCH·주체 기록, 인증 없음은 먼저 401; backend 미전달",
+        {
+            "authenticated": {
+                "http": target_status,
+                "code": target_body.get("error", {}).get("code"),
+                "principal_id": target_record.get("auth", {}).get("principal_id"),
+                "recorded_model": target_record.get("request", {}).get("model"),
+                "body_bytes_sent": 0,
+                "delivery_attempted": target_record.get("delivery", {}).get("attempted"),
+            },
+            "unauthenticated": {
+                "http": auth_status,
+                "code": auth_body.get("error", {}).get("code"),
+                "body_bytes_sent": 0,
+                "delivery_attempted": auth_record.get("delivery", {}).get("attempted"),
+            },
+            "backend_receipts": backend_receipts,
+        },
+        passed,
+        [item for item in (target_id, auth_id) if item],
+    )
+
+
+class _AcceptanceFakeProcess:
+    def __init__(self) -> None:
+        self.returncode: int | None = None
+
+    def poll(self) -> int | None:
+        return self.returncode
+
+    def wait(self, timeout: float | None = None) -> int | None:
+        return self.returncode
+
+    def terminate(self) -> None:
+        if self.returncode is None:
+            self.returncode = -15
+
+    def kill(self) -> None:
+        self.returncode = -9
+
+
+def _run_s4_05(runner: _Runner) -> AcceptanceResult:
+    from tools import k8s_observation_feed as helper
+
+    data_dir = runner.data_dir / "s4-05"
+    live_dir = data_dir / "live"
+    live_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    feed_path = live_dir / "tetragon.jsonl"
+    heartbeat_path = live_dir / "tetragon.heartbeat.json"
+    gap_path = live_dir / "tetragon.gaps.jsonl"
+    now = [1000.0]
+    started: list[_AcceptanceFakeProcess] = []
+    commands: list[list[str]] = []
+
+    with feed_path.open("ab") as sink:
+        group = helper._FeedGroup(
+            "tetragon",
+            feed_path=feed_path,
+            heartbeat_path=heartbeat_path,
+            gap_path=gap_path,
+            children=[
+                helper._Child(
+                    "tetragon",
+                    lambda since: helper.tetragon_command(since_time=since),
+                    sink,
+                    sink,
+                )
+            ],
+        )
+        supervisor = helper._Supervisor(
+            [group],
+            context=helper.EXPECTED_CONTEXT,
+            stop_requested=threading.Event(),
+            clock=lambda: now[0],
+        )
+
+        def fake_start(argv: Any, _output: Any, _error: Any) -> _AcceptanceFakeProcess:
+            commands.append(list(argv))
+            process = _AcceptanceFakeProcess()
+            started.append(process)
+            return process
+
+        with (
+            patch.object(helper, "_start", side_effect=fake_start),
+            patch.object(helper, "assert_safe_context") as context_check,
+        ):
+            supervisor.start_group(group, since=None)
+            supervisor.write()
+            runner.start(
+                data_dir=data_dir,
+                collector_interval_s=0.04,
+                collector_stale_after_s=1.0,
+                observation_feeds=(("tetragon", str(feed_path)),),
+                observation_heartbeats=(("tetragon", str(heartbeat_path)),),
+                observation_origin="synthetic",
+            )
+            running = _wait_for(
+                lambda: _collector_source(
+                    runner, "observation_feed_tetragon", "ok"
+                )
+            )
+            started[0].returncode = 0
+            supervisor.tick()
+            supervisor.write()
+            reconnecting = _wait_for(
+                lambda: _collector_source(
+                    runner, "observation_feed_tetragon", "error"
+                )
+            )
+            status_http, status_body = runner.get_json("/api/status")
+            now[0] += 1.0
+            supervisor.tick()
+            supervisor.write()
+            recovered = _wait_for(
+                lambda: _collector_source(
+                    runner, "observation_feed_tetragon", "ok"
+                )
+            )
+            context_calls = context_check.call_count
+        helper._stop_children(group)
+
+    gaps = [
+        json.loads(line)
+        for line in gap_path.read_text(encoding="utf-8").splitlines()
+    ]
+    backend_receipts = len(runner.engine.receipts) if runner.engine else -1
+    gateway_records = len(_records_in(data_dir))
+    writer = (recovered or {}).get("last_value", {}).get("writer", {})
+    passed = (
+        running is not None
+        and reconnecting is not None
+        and "reconnecting" in str(reconnecting.get("last_error"))
+        and status_http == 200
+        and status_body.get("collectors", {}).get("observation_feed_tetragon")
+        == "error"
+        and [item.get("schema") for item in gaps]
+        == [helper.GAP_SCHEMA, helper.GAP_SCHEMA]
+        and [item.get("event") for item in gaps] == ["gap_opened", "gap_closed"]
+        and recovered is not None
+        and writer.get("reconnect_count") == 1
+        and writer.get("last_gap", {}).get("backfill") == "requested_unverified"
+        and len(commands) == 2
+        and any(part.startswith("--since-time=") for part in commands[1])
+        and context_calls == 1
+        and backend_receipts == 0
+        and gateway_records == 0
+    )
+    return AcceptanceResult(
+        "S4-05",
+        "가짜 관측 자식 종료 후 heartbeat·gap 기록을 거쳐 재연결",
+        "reconnecting 중 Gateway 수집원 error, gap 열림·닫힘, backfill 인자 재시작",
+        {
+            "initial_collector": (running or {}).get("state"),
+            "reconnecting_collector": (reconnecting or {}).get("state"),
+            "gateway_observation_state": status_body.get("collectors", {}).get(
+                "observation_feed_tetragon"
+            ),
+            "gap_events": [item.get("event") for item in gaps],
+            "gap_schemas": [item.get("schema") for item in gaps],
+            "recovered_collector": (recovered or {}).get("state"),
+            "reconnect_count": writer.get("reconnect_count"),
+            "backfill_requested": any(
+                part.startswith("--since-time=") for part in commands[1]
+            ) if len(commands) > 1 else False,
+            "backend_receipts": backend_receipts,
+            "gateway_request_records": gateway_records,
+            "real_kubectl_executed": False,
+        },
+        passed,
+        [],
+    )
+
+
+def _run_s4_06(runner: _Runner) -> AcceptanceResult:
+    data_dir = runner.data_dir / "s4-06"
+    policy_path = runner.data_dir / "s4-06-policy.json"
+    document = json.loads(
+        (_ROOT / "examples" / "mvp" / "policy-v1.2-zeroday-lab.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    document["max_n"] = 2
+    policy_path.write_text(json.dumps(document), encoding="utf-8")
+    runner.start_vllm(policy_path=policy_path, data_dir=data_dir)
+    if runner.fake_backend is None:
+        raise RuntimeError("fake backend is not running")
+    marker = "s4-value-must-not-be-recorded"
+    normal_body = json.dumps(
+        {
+            "model": "test-model",
+            "messages": [{"role": "user", "content": "zeroday acceptance"}],
+            "max_tokens": 16,
+            "n": 2,
+            "temperature": 0.7,
+            "cache_salt": marker,
+        }
+    ).encode("utf-8")
+    normal_status, normal_headers, _ = runner.json_request(
+        "POST", "/v1/chat/completions", body=normal_body
+    )
+    normal_id = normal_headers.get("X-Request-ID")
+    normal_received = next(
+        (
+            item
+            for item in runner.fake_backend.requests
+            if item.get("request_id") == normal_id
+        ),
+        {},
+    )
+    rejected_body = json.dumps(
+        {
+            "model": "test-model",
+            "messages": [{"role": "user", "content": "zeroday acceptance"}],
+            "max_tokens": 16,
+            "n": 3,
+            "temperature": 0.7,
+            "cache_salt": marker,
+        }
+    ).encode("utf-8")
+    rejected_status, rejected_headers, rejected_document = runner.json_request(
+        "POST", "/v1/chat/completions", body=rejected_body
+    )
+    rejected_id = rejected_headers.get("X-Request-ID")
+    normal_final = _final_record(runner, normal_id) if normal_id else {}
+    rejected_final = _final_record(runner, rejected_id) if rejected_id else {}
+    stored = (data_dir / "gateway_records.jsonl").read_text(encoding="utf-8")
+    backend_count = runner.fake_backend.request_count
+    expected_fields = [
+        {"name": "cache_salt", "mode": "passthrough"},
+        {"name": "temperature", "mode": "validate"},
+    ]
+    values = normal_received.get("extra_values", {})
+    passed = (
+        normal_status == 200
+        and normal_received.get("n") == 2
+        and values.get("temperature") == 0.7
+        and values.get("cache_salt") == marker
+        and normal_final.get("policy", {}).get("profile") == "zeroday-lab"
+        and normal_final.get("request", {}).get("n") == 2
+        and normal_final.get("request", {}).get("extra_fields") == expected_fields
+        and normal_final.get("delivery", {}).get("attempted") is True
+        and marker not in stored
+        and rejected_status == 400
+        and rejected_document.get("error", {}).get("code") == "N_UNSUPPORTED"
+        and rejected_final.get("decision", {}).get("reason_code") == "N_UNSUPPORTED"
+        and rejected_final.get("delivery", {}).get("attempted") is False
+        and backend_count == 1
+    )
+    return AcceptanceResult(
+        "S4-06",
+        "정책 1.2 zeroday-lab에서 validate·passthrough 필드와 n=2 정상, n=3 거부 요청",
+        "정상 요청만 fake backend 1회 전달, 이름·모드·n만 기록, n=3은 400 미전달",
+        {
+            "normal_http": normal_status,
+            "backend_values_match": (
+                values.get("temperature") == 0.7
+                and values.get("cache_salt") == marker
+                and normal_received.get("n") == 2
+            ),
+            "recorded_extra_fields": normal_final.get("request", {}).get(
+                "extra_fields"
+            ),
+            "recorded_n": normal_final.get("request", {}).get("n"),
+            "value_found_in_gateway_records": marker in stored,
+            "rejected": [
+                rejected_status,
+                rejected_document.get("error", {}).get("code"),
+            ],
+            "rejected_delivery_attempted": rejected_final.get("delivery", {}).get(
+                "attempted"
+            ),
+            "backend_chat_count": backend_count,
+        },
+        passed,
+        [item for item in (normal_id, rejected_id) if item],
+    )
+
+
 def execute_acceptance(data_dir: Path) -> list[AcceptanceResult]:
-    """Run MVP-01~11, S1-01~06, S2-01~06, and S3A-01~08."""
+    """Run MVP-01~11, S1-01~06, S2-01~06, S3A-01~08, and S4-01~06."""
 
     runner = _Runner(data_dir)
     results: list[AcceptanceResult] = []
@@ -1717,6 +2393,12 @@ def execute_acceptance(data_dir: Path) -> list[AcceptanceResult]:
         results.append(_run_s3a_06(runner))
         results.append(_run_s3a_07(runner))
         results.append(_run_s3a_08(runner))
+        results.append(_run_s4_01(runner))
+        results.append(_run_s4_02(runner))
+        results.append(_run_s4_03(runner))
+        results.append(_run_s4_04(runner))
+        results.append(_run_s4_05(runner))
+        results.append(_run_s4_06(runner))
         return results
     finally:
         runner.stop()
@@ -1748,6 +2430,9 @@ def write_reports(
         "s3a_backend_fixture": (
             "fake_backend_test; this report does not contain a real vLLM execution"
         ),
+        "s4_06_backend_fixture": (
+            "fake_backend_test; this report does not contain a real vLLM execution"
+        ),
         "passed": all(result.passed for result in results),
         "cases": [asdict(result) for result in results],
     }
@@ -1762,6 +2447,7 @@ def write_reports(
         f"- OS: {platform.platform()}",
         f"- 임시 data_dir: `{data_dir}`",
         "- S3A backend: `fake_backend_test` (실제 vLLM 실행·검증 아님)",
+        "- S4-06 backend: `fake_backend_test` (실제 vLLM 실행·검증 아님)",
         f"- 전체 결과: {'통과' if common['passed'] else '실패'}",
         "",
         "| 사례 | 명령 | 기대 | 실제 | 결과 | 증거 요청 ID |",

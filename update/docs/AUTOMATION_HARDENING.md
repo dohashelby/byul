@@ -1,5 +1,15 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-26 PLT-07 — 명시 금지 TCP 연결 성공만 판정 연결
+
+기존 소유 컨테이너·image ID/RepoDigest·bridge endpoint·bounded 파일 수집을 재사용한다.
+추가 sender/receiver helper는 실제 UID/netns와 socket·일회성 수신 근거를 대조한다.
+사람이 해당 container UID+netns의 모든 프로세스에 명시한 금지 TCP 연결 성공만 기존
+`rule_table`의 독립 FAIL로 연결한다. 11개 필수 primitive 정책에는 기본값이 없고,
+정책 부재·worker-only 범위·시계/신원/수신 근거 부족은 미확인이다. 이 부분 연결은
+전체 PLT-07·worker/SDK/DNS/TLS·정책 만료 집행 완료가 아니며 새 PASS 규칙도 없다.
+[RUNBOOK](RUNBOOK.md)의 제한 프로파일과 실제 미실증 범위를 따른다.
+
 ## 2026-10-26 LIF-04 — 지속 지연 수신과 자원 수집, 판정 미등록
 
 기존 `stream_probe`를 재사용하고 optional `read_profile`이 있을 때만 chunk별 지연·명시 close를

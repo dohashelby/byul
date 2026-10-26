@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-10-26 · PLT-07은 명시 POL의 container UID+netns 모든 프로세스에 금지한 TCP 연결이 양쪽 소유 송수신 근거로 확인된 분기만 FAIL로 연결한다. · helper를 worker/SDK로 승격하거나 정책값·기본 금지·전체 PASS를 만들지 않고 기존 원문의 독립 위반 기준을 구현하기 위함이다.
+
 - 2026-10-26 · LIF-04의 클라이언트 지연/close와 namespace에 묶인 aggregate 자원 관측을 제품 수집으로 제공하되 CheckDef 판정은 등록하지 않는다. · 연결별 buffer 귀속·worker 취소/회수·기업 예산을 수집 총량에서 추정하지 않기 위함이다.
 
 - 2026-10-26 · OBS-03 strict JSON 분석은 새 capture/3·실행기0.2.1에 명시하고 과거 capture/2·0.2.0은 당시 분석 프로파일로 replay한다. · 모호한 사건으로 새 PASS를 만들지 않으며 저장 증거·과거 판정에 새 계약을 소급하지 않기 위함이다.

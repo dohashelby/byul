@@ -3,10 +3,16 @@
     uv run pytest -m docker -s
 
 exposed → REQ-01 FAIL, isolated → PASS. 끝나면 guard.run 라벨의 컨테이너·네트워크가 남지 않아야 한다.
+PLT-07은 별도 소유 Python helper의 실제 송신·수신을 EXAMPLE FAIL로 연결한다.
+실제 엔진·worker 송신 실증으로 집계하지 않는다.
 키는 실행 중 임의 생성해 이 프로세스 환경에만 둔다(파일·로그에 남기지 않음).
 """
 
+from datetime import datetime, timedelta, timezone
+import ipaddress
 import json
+from pathlib import Path
+import re
 import secrets
 import subprocess
 import time
@@ -16,9 +22,11 @@ import yaml
 from typer.testing import CliRunner
 
 from guard.cli import app
+from guard.executors import egress_receiver
 from guard.runtime.docker import Docker
+from guard.store import Store
 from lab import lab
-from tests.builders import ROOT, baseline_pack, environment
+from tests.builders import ROOT, baseline_pack, environment, policy
 
 pytestmark = pytest.mark.docker
 runner = CliRunner()
@@ -91,6 +99,102 @@ def test_lab_topology_end_to_end(tmp_path, topology, expected):
         assert all(row["queue_kind"] == "listen_backlog_connections"
                    and row["tx_queue_bytes"] is row["rx_queue_bytes"] is None
                    and row["listen_pending_connections"] == 0 for row in listeners)
+
+        # The policy explicitly includes this helper itself. It does not stand
+        # in for an engine worker, SDK or usage producer. Both endpoints use the
+        # lab's already-local pinned Python image; no image is pulled here.
+        trusted_network = target["origins"]["trusted"]["network"]
+        receiver_name = docker.name("egress-receiver")
+        receiver_command = ["python3", "-u", "-c",
+            Path(egress_receiver.__file__).read_text(encoding="utf-8"), "18001"]
+        docker._docker(["run", "-d", "--name", receiver_name, "--label", docker.label,
+            "--network", trusted_network, "--cgroupns=private", "--pull=never",
+            pinned, *receiver_command], timeout=30)
+        lab._wait(lambda: egress_receiver.READY in docker.logs(receiver_name, timeout=30),
+                  "owned egress receiver fixture")
+        source_inspect = docker.inspect_json(resource_name, timeout=5)
+        receiver_inspect = docker.inspect_json(receiver_name, timeout=5)
+        source_cid, receiver_cid = source_inspect["Id"], receiver_inspect["Id"]
+        receiver_ip = receiver_inspect["NetworkSettings"]["Networks"][trusted_network]["IPAddress"]
+        assert source_cid != receiver_cid
+        assert str(ipaddress.IPv4Address(receiver_ip)) == receiver_ip
+        source_ns = docker.exec_bounded(resource_name,
+            ["python3", "-c", "import os; print(os.readlink('/proc/self/ns/net'))"],
+            timeout=5, max_bytes=1024)
+        assert source_ns.returncode == 0
+        assert source_ns.capture["complete"] is True and source_ns.capture["bounded_at_source"] is True
+        assert source_ns.capture["truncated"] is False and source_ns.capture["timed_out"] is False
+        namespace = re.fullmatch(r"net:\[([1-9][0-9]*)\]", source_ns.stdout.strip())
+        assert namespace is not None
+        source_netns = int(namespace.group(1))
+
+        egress_dir = run_dir / "egress"
+        egress_dir.mkdir()
+        source_target = {"lab": True, "run_id": run_id,
+            "origins": {"trusted": {"network": trusted_network}},
+            "engine": {"container": resource_name, "image_digest": pinned,
+                       "trusted_url": f"http://{resource_name}:18000"}}
+        receiver_target = {"lab": True, "run_id": run_id,
+            "origins": {"trusted": {"network": trusted_network}},
+            "engine": {"container": receiver_name, "image_digest": pinned,
+                       "trusted_url": f"http://{receiver_ip}:18001"}}
+        source_path, receiver_path = egress_dir / "target.json", egress_dir / "receiver-target.json"
+        source_path.write_text(json.dumps(source_target), encoding="utf-8")
+        receiver_path.write_text(json.dumps(receiver_target), encoding="utf-8")
+        now = datetime.now(timezone.utc)
+        egress_env = environment(id="ENV-EXAMPLE-EGRESS",
+            engine={"name": "EXAMPLE-python-helper", "image_digest": pinned})
+        egress_policy = policy(baseline_pack().ref(), id="POL-EXAMPLE-EGRESS", created_at=now,
+            scope={"include": ["PLT-07"], "exclude": []}, values={"PLT-07": {
+                "subject_scope": "all_processes_in_container_uid_netns",
+                "subject_container_id": source_cid, "subject_uid": 0,
+                "subject_net_namespace_inode": source_netns,
+                "forbidden_receiver_container_id": receiver_cid,
+                "forbidden_receiver_ip": receiver_ip, "forbidden_receiver_port": 18001,
+                "forbidden_protocol": "tcp", "forbidden_operation": "tcp_connect",
+                "validity_start": (now - timedelta(seconds=10)).isoformat(),
+                "validity_end": (now + timedelta(seconds=60)).isoformat(),
+            }})
+        assert egress_env.hash_ok() and egress_policy.hash_ok()
+        egress_env_path, egress_policy_path = egress_dir / "env.yaml", egress_dir / "policy.yaml"
+        egress_env_path.write_text(yaml.safe_dump(egress_env.to_dict(), allow_unicode=True), encoding="utf-8")
+        egress_policy_path.write_text(yaml.safe_dump(egress_policy.to_dict(), allow_unicode=True), encoding="utf-8")
+        egress_store = egress_dir / ".guard"
+        egress_cfg = egress_dir / "guard.toml"
+        egress_cfg.write_text(
+            f'store = "{egress_store.as_posix()}"\n[adapter]\nname = "vllm"\n'
+            '[executors]\nboundary_egress = "real"\n[boundary_egress]\n'
+            f'target = "{source_path.as_posix()}"\nreceiver_target = "{receiver_path.as_posix()}"\n'
+            'connect_timeout = 0.5\nmax_duration_seconds = 30\n', encoding="utf-8")
+        egress_c = ["--config", str(egress_cfg)]
+        egress_pack = ["--pack", str(ROOT / "packs/PACK-BASELINE")]
+        selected = _ok(["select", *egress_pack, "--env", str(egress_env_path),
+                        "--policy", str(egress_policy_path), *egress_c], env)
+        egress_plan = selected.strip().splitlines()[-1]
+        _ok(["run", "--plan", egress_plan, *egress_pack, *egress_c], env)
+        _ok(["judge", "--plan", egress_plan, *egress_pack, *egress_c], env)
+        egress_report = egress_dir / "report.json"
+        _ok(["report", "--plan", egress_plan, *egress_pack, *egress_c,
+             "--json", str(egress_report)], env)
+        egress_data = json.loads(egress_report.read_text(encoding="utf-8"))
+        egress_row, = [r for r in egress_data["by_check"] if r["check_id"] == "PLT-07"]
+        assert egress_row["single"]["security"] == "FAIL"
+        assert egress_row["single"]["functional"] == egress_row["single"]["performance"] == "UNKNOWN"
+        assert egress_row["single"]["verification_level"] == "EXAMPLE" and egress_data["official"] is False
+        egress_evd, = Store(egress_store).find_latest("EVD", lambda e: e.check_id == "PLT-07")
+        assert egress_evd.execution.status.value == "COMPLETED" and egress_evd.data_origin.value == "EXAMPLE"
+        assert egress_evd.artifacts == []  # Canonical typed observations need no duplicate Store artifact.
+        assert egress_evd.observations["forbidden_egress_successes"].collected is True
+        assert len(egress_evd.observations["forbidden_egress_successes"].value) == 1
+        assert egress_evd.observations["egress_scope_complete"].value is False
+        egress_trial, = egress_evd.observations["egress_trials"].value
+        assert egress_trial["verified"] is True and egress_trial["diagnostic_codes"] == []
+        assert egress_trial["sender_identity"]["uid"] == 0
+        assert egress_trial["sender_identity"]["net_namespace_inode"] == source_netns
+        assert egress_trial["receiver_identity"]["net_namespace_inode"] != source_netns
+        assert egress_trial["source_owner"]["container_id"] == source_cid
+        assert egress_trial["receiver_owner"]["container_id"] == receiver_cid
+
         cfg = run_dir / "guard.toml"
         cfg.write_text(
             f'store = "{(run_dir / ".guard").as_posix()}"\n[adapter]\nname = "vllm"\n[executors]\ndirect_route = "real"\n'

@@ -4,7 +4,7 @@ mechanism_ids:
 - mechanism-11
 - mechanism-15
 - mechanism-16
-revision: 2
+revision: 3
 retired: false
 area: PLT
 purpose: 통신 접근·송신 제한
@@ -16,8 +16,42 @@ risk_summary: 실행 코드·취득 입력·송신 설정을 조작할 수 있�
 review_order: reference_baseline_first
 impact: null
 applies_when:
+  always: true
   prose: 취득·엔진 실행·관측의 외부 송신을 기본 확인한다. 외부 연결이 불필요한 구성도 금지 송신의 집행을 확인한다.
-policy_params: []
+policy_params:
+- key: subject_scope
+  type: str
+  required: true
+- key: subject_container_id
+  type: str
+  required: true
+- key: subject_uid
+  type: int
+  required: true
+- key: subject_net_namespace_inode
+  type: int
+  required: true
+- key: forbidden_receiver_container_id
+  type: str
+  required: true
+- key: forbidden_receiver_ip
+  type: str
+  required: true
+- key: forbidden_receiver_port
+  type: int
+  required: true
+- key: forbidden_protocol
+  type: str
+  required: true
+- key: forbidden_operation
+  type: str
+  required: true
+- key: validity_start
+  type: str
+  required: true
+- key: validity_end
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: 송신 허용 대상·작업·정책 단절 시 동작
   enterprise_decisions: 허용 프로세스·명령·신뢰 집단, 목적지·포트·프로토콜·작업, 마지막 유효 정책 유지/만료/초기 정책 부재의 처리. 같은 TP worker의 역할별 인가를 실제 지원하지 않으면 있다고 가정하지 않고 경계 제한과 잔여 위험을 기록한다.
@@ -26,7 +60,13 @@ challenge_steps:
 - 실제 목적지·작업 기준선 수집
 - 금지 시험 목적지로 무해 연결 시도
 - Gateway 밖 엔진 송신 제한 확인
-required_observations: []
+required_observations:
+- key: forbidden_egress_successes
+  type: list[str]
+- key: egress_trials
+  type: list[dict]
+- key: egress_scope_complete
+  type: bool
 required_observations_prose:
 - 송신 프로세스·목적지·포트·프로토콜, 정책 적용 위치, 허용·차단 기록, DNS 조회·redirect 결과
 satisfied_if: 금지 송신은 차단되고 필요한 취득·서비스·관측은 동작한다.
@@ -35,8 +75,22 @@ unknown_criteria: 센서 관측·정책 적용 상태·최종 송신 결과가 �
 remediation: '- 모델 취득·엔진 실행·관측 단계별 허용 목적지·포트·프로토콜·작업을 정해 해당 송신 지점에 적용한다. DNS·redirect 뒤 최종 목적지와 정책 적용 상태를 기록하고 정상 허용 통신도 유지되는지 확인한다.'
 method_and_evidence: '프로세스별 DNS/연결·목적지·포트·정책 유효 상태와 허용/금지 무해 송신을 대조한다. rank0 worker의 env와 import 당시 config root를 기록한다. VLLM_NO_USAGE_STATS==1 또는 (VLLM_DO_NOT_TRACK or DO_NOT_TRACK or 0)==1 또는 do_not_track 파일 존재 여부를 대조한다. 문자열은 정확히 1일 때 참이며 VLLM_DO_NOT_TRACK=0은 DO_NOT_TRACK=1을 가린다. 새 프로세스별 초기/주기 파일 생성·통제된 수신처 송신을 관측하고 실행 중 env 변경만으로 중지됐다고 판정하지 않는다. 【F37】선정 protocol/endpoint scheme/exporter SDK 버전/인증서/프록시 전체 수집. SDK가 https를 TLS로 강제하는지 코드 확인 후 실제 handshake 시험. 승인 TLS endpoint, 인증서 불일치 endpoint, 비허용 endpoint를 격리 환경에서 대조하고 실제 handshake·peer·수신 기록을 확인한다. 정상 대조: 승인 collector로 연결·수집 성공하고 실제 TLS peer 검증 또는 채택한 보호 채널 확인.'
 remaining_setup: 시험 목적지, 송신 제한을 적용할 위치, 실제 차단 여부를 확인할 기록
-executor: null
-judge: null
+executor: boundary_egress
+judge:
+  plugin: rule_table
+  params:
+    declared_pass_ceiling: true
+    pass_when_all: []
+    fail_when_any:
+    - obs: forbidden_egress_successes
+      op: nonempty
+    axes:
+      functional:
+        pass_when_all: []
+        fail_when_any: []
+      performance:
+        pass_when_all: []
+        fail_when_any: []
 legacy:
   q_ids:
   - Q-C07
@@ -56,3 +110,13 @@ legacy:
   - Q-C07/SC-24-01
 source:
   array: platform_assessment_draft
+collection_profile: explicit-forbidden-egress-v1
+functional_probes: []
+limitations:
+- explicit-forbidden-egress-v1은 명시 POL의 all_processes_in_container_uid_netns 범위에 포함된 소유 컨테이너·숫자 UID·network namespace의 실제 TCP 연결을 확인한다. helper 자신이 정책 대상이며 실제 엔진 worker로 해석하지 않는다. worker-only 또는 특정 실행 파일·명령에만 적용되는 정책은 지원하지 않는다.
+- subject_scope·subject_container_id·subject_uid·subject_net_namespace_inode와 금지 receiver·IPv4·포트·프로토콜·작업·유효 구간은 필수 명시 정책이다. 정책값을 관측에서 보충하지 않고 허용 UID·목적지·기간의 기본값이나 목록 밖 자동 금지 기준을 만들지 않는다. 첫 분기는 tcp·tcp_connect만 지원한다.
+- 송신 PID/start·실제 UID·namespace·socket 양끝과 별도 소유 수신처의 신원·실제 peer·일회성 상관 근거가 같은 사건으로 확인된 명시 금지 연결 성공만 독립 보안 FAIL로 판정한다. 연결·수신 근거는 업무 자료의 소비 증거가 아니다.
+- timeout·연결 거부·미수집·수신 근거 누락·소유 신원이나 namespace 또는 endpoint 불일치는 UNKNOWN이며 차단 성공으로 해석하지 않는다. 같은 사건의 검증이 끝난 금지 연결 성공은 다른 사례나 후속 수집의 미수집으로 지우지 않는다.
+- 실제 worker·SDK·usage 송신, 취득·서비스·관측의 전체 경로, DNS·redirect·TLS·proxy와 업무별 송신 제한은 미검증이다. 같은 UID·namespace라는 사실만으로 다른 프로세스의 송신이나 집행 조건을 증명하지 않는다.
+- 정책 관리 연결 단절·정책 만료 시 집행·fallback과 특정 firewall·SDK의 적용 또는 우회 원인은 미검증이다. 명시된 유효 구간 밖 시험을 금지 송신 위반으로 확정하지 않는다.
+- 전체 송신 제한·필요한 정상 취득·서비스·관측 유지의 보안·기능·성능 PASS 규칙은 없다. egress_scope_complete 값이나 정상 연결 표본으로 이 한계를 해제하지 않는다.

@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 27,
-    "sha256": "75a7466fdc80bab027f7dee480a64715a775c1e041cd14f5a2ded1c25a249776"
+    "revision": 28,
+    "sha256": "c91ece16612e3358ff99605797cf2e6dd8270ea0d546c244fc06f59196d1d22d"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -229,6 +229,94 @@
       "consumer": "선정: required list[str] 타입·누락 검사 / 실행: 절대 경로/.. 검증; 선언 금지 경로와 bind/volume 목적지의 상위·하위 겹침을 forbidden_mount_violations로 수집 / 판정: PACK22 PLT04정의3에서 명시적 마운트 금지 위반 FAIL 보존; 실제 자격 전달/읽기 성공과 구분 / 수동 판정: 필수 정책·첨부·정상 대조·신고 PASS 상한 유지; 신고 FAIL/UNKNOWN 보존",
       "verification": "새 계약의 직접 검증 결과와 미검증 범위는 docs/UPDATE_VALIDATION.md의 REQ-09·PLT-04 판정 의미 보완 절 참고. PR #28/#29의 PACK21 실제 두 이미지·재판정은 과거 이력.",
       "catalog_id": "P-DRAFT-PLT-04-FORBIDDEN-MOUNT-PATHS"
+    },
+    "values.PLT-07.forbidden_operation": {
+      "type": "str",
+      "description": "정책이 명시한 금지 작업. 첫 프로파일은 TCP 연결만 지원하고 실제 무해 상관 표식 수신을 독립 확인한다. 다른 작업의 허용 관계를 만들지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-FORBIDDEN-OPERATION"
+    },
+    "values.PLT-07.forbidden_protocol": {
+      "type": "str",
+      "description": "정책이 명시한 금지 protocol. 첫 프로파일은 TCP만 지원하며 다른 protocol의 보호를 추정하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-FORBIDDEN-PROTOCOL"
+    },
+    "values.PLT-07.forbidden_receiver_container_id": {
+      "type": "str",
+      "description": "명시 금지 시험 목적지인 별도 소유 수신처의 정확한 Docker ID. 다른 수신처나 공개 목적지로 대체하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-FORBIDDEN-RECEIVER-CONTAINER-ID"
+    },
+    "values.PLT-07.forbidden_receiver_ip": {
+      "type": "str",
+      "description": "명시 금지 시험 목적지의 숫자 IPv4 주소. 소유 수신처의 실제 endpoint와 일치해야 하며 목록 밖 주소를 자동 금지하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-FORBIDDEN-RECEIVER-IP"
+    },
+    "values.PLT-07.forbidden_receiver_port": {
+      "type": "int",
+      "description": "명시 금지 시험 목적지의 TCP port. 실제 수신 endpoint와 대조하며 기업 기본값을 넣지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-FORBIDDEN-RECEIVER-PORT"
+    },
+    "values.PLT-07.subject_container_id": {
+      "type": "str",
+      "description": "사람이 명시한 송신 대상 컨테이너의 정확한 Docker ID. 실제 소유 신원과 대조하며 관측값으로 자동 보충하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-SUBJECT-CONTAINER-ID"
+    },
+    "values.PLT-07.subject_net_namespace_inode": {
+      "type": "int",
+      "description": "사람이 명시한 대상 network namespace inode. 실제 probe의 UID·namespace와 함께 일치해야 한다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-SUBJECT-NET-NAMESPACE-INODE"
+    },
+    "values.PLT-07.subject_scope": {
+      "type": "str",
+      "description": "정책이 적용되는 프로세스 집합. 이 프로파일은 선정 container UID+netns의 모든 프로세스 범위만 지원한다. worker·SDK 한정 선언은 대체하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-SUBJECT-SCOPE"
+    },
+    "values.PLT-07.subject_uid": {
+      "type": "int",
+      "description": "사람이 명시한 금지 송신 정책 대상의 숫자 UID. 같은 namespace라는 이유로 다른 UID까지 적용하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-SUBJECT-UID"
+    },
+    "values.PLT-07.validity_end": {
+      "type": "str",
+      "description": "사람이 명시한 정책 적용 구간의 끝 aware ISO 시각. 만료·시계 불일치·누락을 임의 유예하거나 다른 fallback으로 대체하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-VALIDITY-END"
+    },
+    "values.PLT-07.validity_start": {
+      "type": "str",
+      "description": "사람이 명시한 정책 적용 구간의 시작 aware ISO 시각. 실행·송수신 관측 구간과 대조하며 정책 수명 기본값을 넣지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/boundary_egress.py",
+      "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
+      "catalog_id": "P-PLT07-VALIDITY-START"
     },
     "values.REQ-01.allowed_callers": {
       "type": "list[str]",

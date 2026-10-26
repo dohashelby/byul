@@ -1,0 +1,44 @@
+# 명시 정책에 포함된 소유 송신자의 금지 TCP 연결 성공만 확인한다.
+# UID·대상·기간을 기본 제공하거나 helper를 실제 worker로 해석하지 않는다.
+applies_when: { always: true }
+collection_profile: explicit-forbidden-egress-v1
+policy_params:
+  - { key: subject_scope, type: str, required: true }
+  - { key: subject_container_id, type: str, required: true }
+  - { key: subject_uid, type: int, required: true }
+  - { key: subject_net_namespace_inode, type: int, required: true }
+  - { key: forbidden_receiver_container_id, type: str, required: true }
+  - { key: forbidden_receiver_ip, type: str, required: true }
+  - { key: forbidden_receiver_port, type: int, required: true }
+  - { key: forbidden_protocol, type: str, required: true }
+  - { key: forbidden_operation, type: str, required: true }
+  - { key: validity_start, type: str, required: true }
+  - { key: validity_end, type: str, required: true }
+required_observations:
+  - { key: forbidden_egress_successes, type: "list[str]" }
+  - { key: egress_trials, type: "list[dict]" }
+  - { key: egress_scope_complete, type: bool }
+executor: boundary_egress
+judge:
+  plugin: rule_table
+  params:
+    declared_pass_ceiling: true
+    pass_when_all: []
+    fail_when_any:
+      - { obs: forbidden_egress_successes, op: nonempty }
+    axes:
+      functional:
+        pass_when_all: []
+        fail_when_any: []
+      performance:
+        pass_when_all: []
+        fail_when_any: []
+functional_probes: []
+limitations:
+  - "explicit-forbidden-egress-v1은 명시 POL의 all_processes_in_container_uid_netns 범위에 포함된 소유 컨테이너·숫자 UID·network namespace의 실제 TCP 연결을 확인한다. helper 자신이 정책 대상이며 실제 엔진 worker로 해석하지 않는다. worker-only 또는 특정 실행 파일·명령에만 적용되는 정책은 지원하지 않는다."
+  - "subject_scope·subject_container_id·subject_uid·subject_net_namespace_inode와 금지 receiver·IPv4·포트·프로토콜·작업·유효 구간은 필수 명시 정책이다. 정책값을 관측에서 보충하지 않고 허용 UID·목적지·기간의 기본값이나 목록 밖 자동 금지 기준을 만들지 않는다. 첫 분기는 tcp·tcp_connect만 지원한다."
+  - "송신 PID/start·실제 UID·namespace·socket 양끝과 별도 소유 수신처의 신원·실제 peer·일회성 상관 근거가 같은 사건으로 확인된 명시 금지 연결 성공만 독립 보안 FAIL로 판정한다. 연결·수신 근거는 업무 자료의 소비 증거가 아니다."
+  - "timeout·연결 거부·미수집·수신 근거 누락·소유 신원이나 namespace 또는 endpoint 불일치는 UNKNOWN이며 차단 성공으로 해석하지 않는다. 같은 사건의 검증이 끝난 금지 연결 성공은 다른 사례나 후속 수집의 미수집으로 지우지 않는다."
+  - "실제 worker·SDK·usage 송신, 취득·서비스·관측의 전체 경로, DNS·redirect·TLS·proxy와 업무별 송신 제한은 미검증이다. 같은 UID·namespace라는 사실만으로 다른 프로세스의 송신이나 집행 조건을 증명하지 않는다."
+  - "정책 관리 연결 단절·정책 만료 시 집행·fallback과 특정 firewall·SDK의 적용 또는 우회 원인은 미검증이다. 명시된 유효 구간 밖 시험을 금지 송신 위반으로 확정하지 않는다."
+  - "전체 송신 제한·필요한 정상 취득·서비스·관측 유지의 보안·기능·성능 PASS 규칙은 없다. egress_scope_complete 값이나 정상 연결 표본으로 이 한계를 해제하지 않는다."

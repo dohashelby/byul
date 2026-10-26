@@ -226,11 +226,15 @@ def test_only_new_definition_changes_and_legacy_76_hashes_are_preserved():
     hashes = json.loads((ROOT / "tests/fixtures/pack25-check-hashes.json").read_text())
     changed = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
                if hashlib.sha256(p.read_bytes()).hexdigest() != hashes[p.stem]}
-    assert changed == {"PLT-01", "PLT-02"} and len(hashes) == 77
+    assert changed == {"PLT-01", "PLT-02", "PLT-07"} and len(hashes) == 77
     previous = json.loads((ROOT / "tests/fixtures/pack26-check-hashes.json").read_text())
     latest_changes = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
                       if hashlib.sha256(p.read_bytes()).hexdigest() != previous[p.stem]}
-    assert latest_changes == {"PLT-01"} and len(previous) == 77
+    assert latest_changes == {"PLT-01", "PLT-07"} and len(previous) == 77
+    predecessor = json.loads((ROOT / "tests/fixtures/pack27-check-hashes.json").read_text())
+    current_changes = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
+                       if hashlib.sha256(p.read_bytes()).hexdigest() != predecessor[p.stem]}
+    assert current_changes == {"PLT-07"} and len(predecessor) == 77
     check = baseline_pack().checks["PLT-02"]
     assert check.revision == 3 and check.judge.params["pass_when_all"] == []
     assert check.fail_criteria == "비허용 주체가 보호해야 할 IPC 자료나 명령 접점에 접근한다."

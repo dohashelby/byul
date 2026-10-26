@@ -1,5 +1,44 @@
 # 실행·실증 안내
 
+## PLT-07 명시 금지 TCP 연결 한 분기
+
+`boundary_egress`는 기존 `guard select/run/judge/report` 경로에 연결한다.
+첫 분기는 이미 준비된 단일 소유 대상의 audit 구간이다. container ID·UID·netns·정책 구간이
+바뀌면 새 명시 정책이 필요하며, 두 이미지/재기동에 같은 식별자를 자동 이월하지 않는다.
+`examples/boundary-egress.toml`은 실행 설정 양식이며 회사 정책값을 제공하지 않는다.
+새 정책 양식은 현재 팩의 `guard policy template`로 만들고 PLT-07의 11개 필수 값을 사람이
+명시해야 한다. subject의 정확한 container ID·UID·netns와 별도 owned receiver ID·IPv4·port,
+금지 protocol/작업, aware ISO 적용 구간을 관측값이나 다른 점검 정책으로 보충하지 않는다.
+
+첫 프로파일 `explicit-forbidden-egress-v1`은 `subject_scope=all_processes_in_container_uid_netns`,
+`forbidden_protocol=tcp`, `forbidden_operation=tcp_connect`만 지원한다. 이는 해당 UID+netns의
+모든 프로세스를 포함하는 정책을 입력한 경우다. worker·SDK·특정 실행 파일만의 정책을
+이 프로파일로 바꾸지 않는다. 목록 밖 자동 금지, 허용 목록·유효 기간·유예의 기본값은 없다.
+
+송신 target과 receiver target은 이번 run의 별도 pinned Linux 컨테이너여야 한다.
+host/다른 컨테이너의 PID·network 공유나 proc/cgroup을 가리는 mount를 거부하며 명시 private
+cgroup namespace 프로파일을 요구한다. 소유 CID/image ID→RepoDigest/start와 bridge endpoint를
+전후 대조한다. 수신처는 패키지의 standalone `egress_receiver.py` source를 정확한
+`python3 -u -c <source> <port>` 명령으로 실행하고 새 `/guard-observations/egress.jsonl`을 만든다.
+실행기가 이 명령·실제 PID/start/UID/netns/listen socket·파일 수집 경계를 대조한다.
+수신처 준비는 승인된 격리 환경에서 수행하며 제품 실행기는 컨테이너·이미지·엔진을 만들지 않는다.
+
+송신 helper는 명시 숫자 UID로 실행해 실제 UID·netns를 검사한 뒤 소유 수신처 한 곳에
+32바이트의 무해 일회성 상관 표식을 보낸다. 표식 원문은 증거에 남기지 않는다.
+부모의 전체 예산과 검증된 Linux time namespace의 보수적 기한을 연결 전·송신 전에 확인한다.
+송신 쪽 실제 socket과 수신 쪽 reverse tuple·상관 해시·실제 수신 기록·정책 적용 구간이
+같은 사건으로 확인된 경우만 `forbidden_egress_successes`에 남긴다. 서로 다른 netns의
+resource tuple hash를 같다고 비교하지 않는다. UTC 시계가 맞지 않으면 허용 오차를 만들지 않는다.
+ACK는 부가 수집이다. TCP 연결·실제 표식 수신의 독립 근거가 완결됐다면 ACK 실패나
+연결 종료 뒤 peer 메타데이터 조회 실패로 과거 관측을 지우지 않는다. 정식 증거는 EVD의
+구조화 관측이며 중복 summary를 필수 Store artifact로 등록하지 않는다.
+
+이 독립 금지 연결 성공은 보안 FAIL이다. 거부·timeout·미수집은 보안 UNKNOWN이며 전체 차단
+성공으로 보지 않는다. 다른 후속 수집 오류로 이미 검증한 위반을 지우지 않는다. 정상 업무·
+전체 송신 제한·worker/SDK/usage·DNS/redirect/TLS·정책 단절·만료 집행·우회 원인은 미검증이다.
+보안 PASS와 기능·성능 PASS 규칙은 없고 전체 `egress_scope_complete=false`를 유지한다.
+EXAMPLE 대역·소유 시험 socket·격리 Docker stub은 실제 vLLM 실증으로 집계하지 않는다.
+
 ## LIF-04 느린 수신과 독립 자원 부분 관측
 
 `guard capture-stream-pressure`는 기존 SSE 수집에 명시적인 `slow-reader-v1`을 연결한다.

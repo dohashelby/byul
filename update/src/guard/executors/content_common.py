@@ -16,7 +16,7 @@ from typing import Any
 
 from guard.executors.base import DraftArtifact
 from guard.automation_policy import string_list
-from .http_common import mask
+from .http_common import incomplete_artifact_capture, mask
 
 MAX_SAMPLE_BYTES = 1_000_000
 _CREDENTIAL_KEY = re.compile(r"(?i)^(authorization|password|secret|api[_-]?key|access[_-]?token|credential)$")
@@ -118,21 +118,36 @@ def json_body(result: dict) -> tuple[Any, str | None]:
 
 
 def sample_artifact(ctx, filename: str, value: Any) -> None:
-    ctx.workdir.mkdir(parents=True, exist_ok=True)
-    # Mask before persistence. The unredacted capture digest is provenance,
-    # not a claim that the persisted redacted file contains those raw bytes.
-    raw = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
-    payload = {"unredacted_capture_sha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
-               "encoding": "UTF-8; source CLI decoding may replace invalid bytes",
-               "redaction": "configured authorization keys and labelled credential values",
-               "capture": redact_value(value, ctx.secrets)}
-    (ctx.workdir / filename).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    ctx._sample_artifacts = {*getattr(ctx, "_sample_artifacts", ()), filename}
+    try:
+        ctx.workdir.mkdir(parents=True, exist_ok=True)
+        # Mask before persistence. The unredacted capture digest is provenance,
+        # not a claim that the persisted redacted file contains those raw bytes.
+        raw = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+        payload = {"unredacted_capture_sha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+                   "encoding": "UTF-8; source CLI decoding may replace invalid bytes",
+                   "redaction": "configured authorization keys and labelled credential values",
+                   "capture": redact_value(value, ctx.secrets)}
+        (ctx.workdir / filename).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        # Keep collecting; common finish/append excludes partial files and
+        # returns the valid observations as ABORTED with a fixed diagnostic.
+        ctx._failed_artifacts = {*getattr(ctx, "_failed_artifacts", ()), filename}
 
 
 def append_artifact(draft, ctx, filename: str, collector: str):
+    if filename in getattr(ctx, "_failed_artifacts", ()):
+        return incomplete_artifact_capture(draft)
     path = Path(ctx.workdir) / filename
-    if path.exists():
-        draft.artifacts.append(DraftArtifact(name=filename, path=path, collector=collector))
+    try:
+        if path.exists():
+            draft.artifacts.append(DraftArtifact(name=filename, path=path, collector=collector))
+        elif filename in getattr(ctx, "_sample_artifacts", ()):
+            ctx._failed_artifacts = {*getattr(ctx, "_failed_artifacts", ()), filename}
+            return incomplete_artifact_capture(draft)
+    except Exception:
+        ctx._failed_artifacts = {*getattr(ctx, "_failed_artifacts", ()), filename}
+        return incomplete_artifact_capture(draft)
     return draft
 
 

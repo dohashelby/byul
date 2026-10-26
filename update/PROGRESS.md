@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-26 — 부분 수집 위반 보존과 REQ-02 제품 수집
+
+- 한 일: PLT-01의 inspect/proc/sentinel/mount/후속 요청 오류에서 독립 위반을 보존하고 permission_scan_complete PASS 관문을 추가했다. 팩27·PLT-01 정의6만 갱신하며 기존 팩은 보존한다. REQ-02 기존 캡처를 설치 CLI에 연결하고 EXAMPLE 출처를 보존하며 PLT-02 outcome 원문을 차단했다.
+- 테스트 결과: 고정 소스의 Windows 영향 시험 1322 통과/새 sentinel 대역 오류1/기존 skip2·제외1(175.05초/부모176.079초) 후 대역만 교정하고 수집 형태 회귀를 보강했다. 직접·같은 계약·불변식 재검증398 통과/실패0/기존 skip1·제외1(130.27초/부모131.161초), 플랫폼157 통과·기존 경고1(11.38초/부모22.055초), 공용 계약12스키마/11예시/오류0, wheel112파일 일치·격리 설치와 새 CLI 기본 무실행 통과다. 최종 SHA의 전체·플랫폼·양 OS 계약·Docker stub은 PR CI로 확인한다.
+- 다음 단계: PR #15를 갱신하고 OBS-09 이미지 ID/manifest 연결과 OBS-03 중복 JSON key의 관측 정확성을 후속 묶음으로 검증한다. REQ-05 최종 모델 생산자·PLT-07 실제 송신자/집행점과 독립 상태 관측 후보를 계속 대조한다.
+- 막힌 것: REQ-02 생산자 인증·probe ledger/handler 소비, REQ-05 worker의 최종 모델 사용·허용 관계, PLT-07 집행 환경은 미확보다. 실제 vLLM·로컬 Docker 기동은 계속 보류하며 수집 성공을 보안 판정이나 실증으로 표시하지 않는다.
+
 ## 2026-10-26 — REQ-05 고정 모델 기록 수집과 PLT-07 시험 조건
 
 - 한 일: 제품 capture-model-authorization과 소유 JSONL 수집 재사용으로 주체·요청 모델·정책·run/session/instance·구간을 결합하고 원문을 제외했다. PLT-07 송신/수신·DNS/redirect·정책 부재/만료 관문을 정리했다. 팩 26·77개 정의·판정·contracts와 다른 파트는 보존한다.

@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 from pathlib import Path
+import tempfile
 from types import SimpleNamespace
 
 import pytest
@@ -11,6 +12,7 @@ import pytest
 from guard.adapters.template_read_sensor import SensorStatus, observe_template_call, read_template
 from guard.executors.native_observations import validate_capture
 from guard.executors.owned_capture import read_owned_json, strict_json
+from guard.models import DataOrigin
 from tests.builders import environment
 from tests.test_template_supply_approval import SupplyWorld, run, judge, summary, CID, IMAGE_ID
 from tests.test_template_validation import IMAGE
@@ -103,15 +105,55 @@ def test_template_capture_rejects_wrong_context_or_unbounded_claims(mutation):
                          run_id="EXAMPLE-run", image=IMAGE)
 
 
-def test_route_capture_is_declared_attachment_not_a_product_verdict():
-    env = environment()
+@pytest.mark.parametrize("origin, expected", [
+    (DataOrigin.EXAMPLE, "EXAMPLE"),
+    (DataOrigin.DECLARED, "DECLARED"),
+    (DataOrigin.MEASURED, "DECLARED"),
+])
+def test_route_capture_preserves_source_ceiling_without_a_product_verdict(origin, expected):
+    env = environment(origin=origin)
     value = native_record(env, kind="route")
     result = capture(CaptureWorld(value), {"run_id": "EXAMPLE-run"}, env,
                      container="EXAMPLE-gateway", image=IMAGE, path="/guard-observations/route.json")
-    assert result["record"] == value and result["data_origin"] == "DECLARED"
+    # The former unconditional DECLARED expectation promoted the EXAMPLE builder input.
+    # File transport can neither upgrade examples nor authenticate a measured producer.
+    assert result["record"] == value and result["data_origin"] == expected
+    assert result["environment_ref"] == env.ref().model_dump(mode="json")
+    assert result["capture"]["capture_sha256"] == hashlib.sha256(json.dumps(value).encode()).hexdigest()
     assert result["product_connected"] is False and result["security"] == "UNKNOWN"
+    assert result["capture"]["producer_authenticated"] is False
     assert result["summary"]["independent_source_verified"] is False
     assert result["summary"]["actual_consumption_verified"] is False
+
+
+@pytest.fixture
+def external_capture_dir():
+    # Successful evidence publication must remain outside every real checkout,
+    # including when pytest's configured basetemp is inside this repository.
+    with tempfile.TemporaryDirectory(prefix="guard-route-capture-") as folder:
+        yield Path(folder)
+
+
+def test_route_cli_execute_keeps_example_origin_in_saved_attachment(external_capture_dir, monkeypatch, capsys):
+    tmp_path = external_capture_dir
+    env = environment(origin=DataOrigin.EXAMPLE)
+    packet = native_record(env, kind="route")
+    source, target, output = (tmp_path / name for name in ("env.json", "target.json", "route.json"))
+    source.write_text(json.dumps(env.to_dict()), encoding="utf-8")
+    target.write_text('{"run_id":"EXAMPLE-run"}', encoding="utf-8")
+    world = CaptureWorld(packet)
+    monkeypatch.setattr("tools.capture_route_observations.Docker", lambda _: world)
+    monkeypatch.setattr("tools.capture_route_observations.REPO", tmp_path / "repo")
+    assert main(["--env", str(source), "--target", str(target), "--container", "EXAMPLE-gateway",
+                 "--image", IMAGE, "--path", "/guard-observations/route.json", "--output", str(output),
+                 "--execute"]) == 0
+    saved = json.loads(output.read_text(encoding="utf-8"))
+    assert saved["data_origin"] == "EXAMPLE" and saved["record"] == packet
+    assert saved["security"] == "UNKNOWN" and saved["product_connected"] is False
+    assert saved["capture"]["producer_authenticated"] is False
+    assert world.calls == ["inspect", "read", "inspect"]
+    assert json.loads(capsys.readouterr().out) == {
+        "captured": True, "engine_started": False, "product_connected": False, "security": "UNKNOWN"}
 
 
 @pytest.mark.parametrize("change", [
@@ -129,7 +171,8 @@ def test_route_native_contract_does_not_accept_raw_or_ambiguous_producer_claims(
                 container="EXAMPLE-gateway", image=IMAGE, path="/guard-observations/route.json")
 
 
-def test_route_cli_default_never_creates_docker_or_output(tmp_path, monkeypatch, capsys):
+def test_route_cli_default_never_creates_docker_or_output(external_capture_dir, monkeypatch, capsys):
+    tmp_path = external_capture_dir
     env = environment()
     source = tmp_path / "env.json"
     source.write_text(json.dumps(env.to_dict()), encoding="utf-8")

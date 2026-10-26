@@ -84,7 +84,7 @@ def test_inference_conflict_still_prevents_unproved_pass(pack):
 
 
 def test_approval_declarations_are_two_scalar_paths_not_item_evidence(pack):
-    assert pack.manifest.revision == 26 and not pack.reviewed
+    assert pack.manifest.revision == 27 and not pack.reviewed
     for cid in ("SUP-01", "SUP-02"):
         c = pack.checks[cid]
         assert c.revision == 3

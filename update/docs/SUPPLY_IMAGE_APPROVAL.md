@@ -1,5 +1,7 @@
 # SUP-04 실행 이미지 승인 부분관측
 
+> 현행 팩27의 공통 container_config 실행기 버전은 0.5.1이다. PLT-01 수집 완전성 보강에 따른 버전 구분이며 SUP-04 이미지 승인 프로파일·정의·판정은 유지한다. 아래 팩24·0.5.0은 최초 구현 당시 기록이다.
+
 팩24의 SUP-04는 기존 `container_config` 실행기의
 `collection_profile: running-image-approval-v1`을 재사용한다.
 새 실행기 종류·core 판정·공용 스키마·플랫폼 변환기를 추가하지 않는다.

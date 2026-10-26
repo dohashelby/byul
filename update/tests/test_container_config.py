@@ -98,7 +98,7 @@ def _probe(network, requests, timeout):
 
 
 def _target(tmp_path, container="guard-lab-engine"):
-    t = {"lab": False, "probe_image": "x", "origins": {"external": {"network": "ext"}, "trusted": {"network": "trusted"}},
+    t = {"lab": True, "probe_image": "x", "origins": {"external": {"network": "ext"}, "trusted": {"network": "trusted"}},
          "gateway": {"url": "http://g:8080"}, "engine": {"trusted_url": "http://e:8000", "container": container},
          "direct_targets": [], "gateway_known_routes": []}
     p = tmp_path / "target.json"
@@ -106,9 +106,9 @@ def _target(tmp_path, container="guard-lab-engine"):
     return p
 
 
-def _run(tmp_path, docker, values=None, cfg_extra=None):
+def _run(tmp_path, docker, values=None, cfg_extra=None, *, probe=_probe):
     cfg = {"target": str(_target(tmp_path)), **(cfg_extra or {})}
-    registry.EXECUTORS["container_config:sim"] = lambda raw: ContainerConfigExecutor(cfg, container_probe=_probe, docker=docker)
+    registry.EXECUTORS["container_config:sim"] = lambda raw: ContainerConfigExecutor(cfg, container_probe=probe, docker=docker)
     try:
         store = Store(tmp_path / ".guard")
         pack = baseline_pack()
@@ -257,3 +257,204 @@ def test_report_shows_check_limitation(tmp_path):
     rpt = build_report(store, pack, plan, as_of=res.created_at)
     assert any(l.startswith("PLT-01: 이 점검은 컨테이너 설정") and "Docker Desktop의 리눅스 VM 기준" in l for l in rpt.limitations)
     assert any(l.startswith('PLT-01: 실행 가능한 쓰기 경로 1개가 정책으로 허용됨 ["/guard-cache"]') for l in rpt.limitations)
+
+
+class PartialDocker(FakeDocker):
+    """EXAMPLE source failures; no Docker daemon or actual engine is used."""
+
+    def __init__(self, profile="hardened", *, fault=None, proc_text=None, inspect_change=None, mount_text=None):
+        super().__init__(profile)
+        self.fault = fault
+        self.proc_text = proc_text
+        self.inspect_change = inspect_change
+        self.mount_text = mount_text
+
+    def inspect_json(self, container, *, timeout):
+        if self.fault in {"inspect", "all"}:
+            raise OSError("NEVER_PERSIST_INSPECT_SECRET")
+        result = super().inspect_json(container, timeout=timeout)
+        if self.inspect_change:
+            self.inspect_change(result)
+        return result
+
+    def exec(self, container, argv, *, timeout):
+        from guard.executors.container_config import MOUNTS_CMD, PROC_CMD, SENTINEL_CMD
+
+        command = argv[2]
+        stage = "proc" if command == PROC_CMD else "mount" if command == MOUNTS_CMD else "sentinel"
+        if self.fault in {stage, "all"} or command == SENTINEL_CMD and self.fault == argv[4]:
+            raise OSError("NEVER_PERSIST_EXEC_SECRET")
+        if command == PROC_CMD and self.proc_text is not None:
+            return CmdResult(0, self.proc_text, "NEVER_PERSIST_PROC_STDERR")
+        if command == MOUNTS_CMD and self.mount_text is not None:
+            return CmdResult(0, self.mount_text, "NEVER_PERSIST_MOUNT_STDERR")
+        return super().exec(container, argv, timeout=timeout)
+
+
+def _failed_probe(*args):
+    raise OSError("NEVER_PERSIST_FUNCTIONAL_SECRET")
+
+
+@pytest.mark.parametrize("violation,later_fault", [
+    ("privileged", "proc"), ("privileged", "sentinel"), ("privileged", "mount"), ("privileged", "functional"),
+    ("root", "sentinel"), ("root", "mount"), ("root", "functional"),
+    ("capability", "sentinel"), ("capability", "mount"), ("capability", "functional"),
+])
+def test_independent_permission_violation_survives_later_source_error(tmp_path, violation, later_fault):
+    proc_text = {"root": "PID 1\nUid:\t0\t0\t0\t0\nCapEff:\t0\n",
+                 "capability": "PID 1\nUid:\t1000\t1000\t1000\t1000\nCapEff:\t00200000\n"}.get(violation)
+    change = (lambda ins: ins["HostConfig"].update(Privileged=True)) if violation == "privileged" else None
+    docker = PartialDocker(fault=None if later_fault == "functional" else later_fault,
+                           proc_text=proc_text, inspect_change=change)
+    store, evd, result = _run(tmp_path, docker, probe=_failed_probe if later_fault == "functional" else _probe)
+    assert evd.execution.status == ExecStatus.COMPLETED
+    assert evd.data_origin.value == "EXAMPLE"
+    assert result.verdicts.security == Verdict.FAIL, result.reasons
+    assert evd.observations["permission_scan_complete"].value is (later_fault == "functional")
+    if later_fault == "functional":
+        assert result.verdicts.functional == Verdict.UNKNOWN
+    summary = _summary(store, evd)
+    assert summary["collection_errors"]
+    assert "NEVER_PERSIST" not in json.dumps(summary)
+    assert store.verify() == []
+
+
+@pytest.mark.parametrize("profile,expected", [("tmp_exec", Verdict.FAIL), ("hardened", Verdict.UNKNOWN)])
+def test_partial_exec_write_keeps_violation_but_cannot_establish_allowed_subset_pass(tmp_path, profile, expected):
+    _, evd, result = _run(tmp_path, PartialDocker(profile, fault="/dev"))
+    assert evd.execution.status == ExecStatus.COMPLETED
+    assert evd.observations["permission_scan_complete"].value is False
+    assert evd.observations["exec_writable_mounts"].collected is True
+    assert evd.observations["exec_writable_mounts"].value == ["/tmp" if profile == "tmp_exec" else "/guard-cache"]
+    assert result.verdicts.security == expected, result.reasons
+
+
+def test_partial_host_sentinel_write_retains_confirmed_success(tmp_path):
+    class WritableHostSentinelDocker(PartialDocker):
+        def exec(self, container, argv, *, timeout):
+            from guard.executors.container_config import SENTINEL_CMD
+
+            if argv[2] == SENTINEL_CMD and argv[4] == "/guard-sentinel":
+                return CmdResult(0, "succeeded\n", "")
+            return super().exec(container, argv, timeout=timeout)
+
+    def add_mounts(ins):
+        ins["Mounts"] += [{"Type": "bind", "Destination": "/guard-sentinel", "RW": True},
+                          {"Type": "bind", "Destination": "/later", "RW": False}]
+    values = {**LAB_POLICY, "allowed_mounts": ["/models:ro", "/guard-sentinel:rw", "/later:ro"]}
+    _, evd, result = _run(tmp_path, WritableHostSentinelDocker(fault="/later", inspect_change=add_mounts), values=values,
+                          cfg_extra={"sentinel_paths": ["/guard-sentinel", "/later"]})
+    assert evd.observations["sentinel_results"].collected is True
+    assert evd.observations["sentinel_results"].value == {"/guard-sentinel": "succeeded", "/later": "error"}
+    assert evd.observations["permission_scan_complete"].value is False
+    assert result.verdicts.security == Verdict.FAIL
+
+
+@pytest.mark.parametrize("field", ["HostConfig", "Mounts"])
+def test_missing_inspect_fields_are_unknown_instead_of_empty_safe_inventory(tmp_path, field):
+    _, evd, result = _run(tmp_path, PartialDocker(inspect_change=lambda ins: ins.pop(field)))
+    assert evd.execution.status == ExecStatus.COMPLETED
+    assert evd.observations["permission_scan_complete"].value is False
+    assert result.verdicts.security == Verdict.UNKNOWN
+    if field == "HostConfig":
+        assert evd.observations["privileged"].collected is False
+        assert evd.observations["privileged"].value is None
+    else:
+        assert evd.observations["mounts"].collected is False
+
+
+@pytest.mark.parametrize("change", [
+    lambda ins: ins["HostConfig"].pop("Privileged"),
+    lambda ins: ins["HostConfig"].update(Privileged="false"),
+    lambda ins: ins["HostConfig"].pop("Devices"),
+    lambda ins: ins["HostConfig"].update(Devices={}),
+    lambda ins: ins["HostConfig"].pop("PidMode"),
+    lambda ins: ins.update(Mounts={}),
+    lambda ins: ins["Mounts"][0].update(Type=""),
+    lambda ins: ins["Mounts"][0].update(Type="unreviewed-kind"),
+])
+def test_malformed_permission_inventory_does_not_claim_completeness(tmp_path, change):
+    _, evd, result = _run(tmp_path, PartialDocker(inspect_change=change))
+    assert evd.observations["permission_scan_complete"].value is False
+    assert result.verdicts.security == Verdict.UNKNOWN
+
+
+def test_valid_mount_violation_survives_another_malformed_mount(tmp_path):
+    def partial(ins):
+        ins["Mounts"] += [{"Type": "bind", "Destination": "/forbidden", "RW": True}, None]
+    _, evd, result = _run(tmp_path, PartialDocker(inspect_change=partial))
+    assert evd.observations["permission_scan_complete"].value is False
+    assert "/forbidden:rw" in evd.observations["mounts"].value
+    assert result.verdicts.security == Verdict.FAIL
+
+
+@pytest.mark.parametrize("field,value", [("Tmpfs", ["unexpected"]), ("CapAdd", {"unexpected": "NEVER_PERSIST_CONFIG_SECRET"}),
+                                        ("SecurityOpt", True)])
+def test_optional_diagnostic_shape_cannot_erase_privileged_violation(tmp_path, field, value):
+    def partial(ins):
+        ins["HostConfig"].update(Privileged=True, **{field: value})
+    store, evd, result = _run(tmp_path, PartialDocker(inspect_change=partial))
+    assert evd.execution.status == ExecStatus.COMPLETED
+    assert result.verdicts.security == Verdict.FAIL
+    assert "NEVER_PERSIST" not in json.dumps(_summary(store, evd))
+
+
+@pytest.mark.parametrize("fault", ["inspect", "proc", "sentinel", "mount", "all"])
+def test_permission_source_failure_without_violation_is_unknown(tmp_path, fault):
+    store, evd, result = _run(tmp_path, PartialDocker(fault=fault))
+    assert evd.execution.status == ExecStatus.COMPLETED
+    assert evd.observations["permission_scan_complete"].value is False
+    assert result.verdicts.security == Verdict.UNKNOWN
+    assert "NEVER_PERSIST" not in json.dumps(_summary(store, evd))
+
+
+@pytest.mark.parametrize("header", ["PID broken", "PID -1", "PID 0", "PID\t9", "PID", "PID " + "9" * 30])
+def test_malformed_pid_does_not_attribute_following_fields_to_previous_process(header):
+    rows = parse_proc_status("PID 1\nUid:\t1000\t1000\t1000\t1000\nCapEff:\t0\n"
+                             + header + "\nUid:\t0\t0\t0\t0\nCapEff:\t00200000\n")
+    assert rows[0]["uid_effective"] == 1000 and rows[0]["caps"] == []
+    assert rows[1] == {"read_error": True}
+
+
+@pytest.mark.parametrize("fields", ["Uid:\t-1\t-1\t-1\t-1\nCapEff:\t0\n",
+                                   "Uid:\t0\t0\nCapEff:\t0\n",
+                                   "Uid:\t1000\t1000\t1000\t1000\nCapEff:\t-1\n",
+                                   "Uid:\t1000\t1000\t1000\t1000\nCapEff:\t10000000000000000\n"])
+def test_invalid_uid_or_caps_cannot_create_phantom_permission_values(tmp_path, fields):
+    _, evd, result = _run(tmp_path, PartialDocker(proc_text="PID 1\n" + fields))
+    assert evd.observations["process_scan_complete"].value is False
+    assert evd.observations["root_uid_present"].collected is False
+    assert result.verdicts.security == Verdict.UNKNOWN
+
+
+def test_known_root_survives_malformed_later_process(tmp_path):
+    _, evd, result = _run(tmp_path, PartialDocker(proc_text=
+        "PID 1\nUid:\t0\t0\t0\t0\nCapEff:\t0\nPID broken\nUid:\t1000\t1000\t1000\t1000\nCapEff:\t0\n"))
+    assert evd.observations["process_scan_complete"].value is False
+    assert evd.observations["root_uid_present"].value is True
+    assert result.verdicts.security == Verdict.FAIL
+
+
+def test_duplicate_process_header_keeps_scan_incomplete(tmp_path):
+    _, evd, result = _run(tmp_path, PartialDocker(proc_text=
+        ("PID 1\nUid:\t1000\t1000\t1000\t1000\nCapEff:\t0\n") * 2))
+    assert evd.observations["process_scan_complete"].value is False
+    assert result.verdicts.security == Verdict.UNKNOWN
+
+
+def test_saved_partial_permission_evidence_remains_verifiable_after_restore(tmp_path):
+    from guard.models import canonical_json
+    from guard.store.bundle import export_bundle, restore_bundle
+    from guard.store.packs import get_pack, put_pack
+
+    store, evd, result = _run(tmp_path, PartialDocker("tmp_exec", fault="/dev"))
+    pack = baseline_pack()
+    put_pack(store, pack.path)
+    original = canonical_json(evd.to_dict())
+    export_bundle(store.root, tmp_path / "partial.zip")
+    restore_bundle(tmp_path / "partial.zip", tmp_path / "restored")
+    restored = Store(tmp_path / "restored")
+    assert restored.verify() == []
+    assert canonical_json(restored.resolve(evd.ref()).to_dict()) == original
+    replayed, = judge_plan(restored, get_pack(restored, pack.ref()), restored.resolve(evd.plan), as_of=evd.created_at)
+    assert replayed.ref() == result.ref() and replayed.verdicts.security == Verdict.FAIL

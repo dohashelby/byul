@@ -10,23 +10,12 @@ import json
 from pathlib import Path
 import yaml
 
-from guard.collectors.file import load_environment
+from guard.collectors.route_observations import capture, load_inputs, validate_output
 from guard.runtime.docker import Docker
-from guard.executors.native_observations import validate_capture
-from guard.executors.owned_capture import read_owned_json
+from guard.executors.owned_capture import SourceCaptureError
 
 
 REPO = Path(__file__).resolve().parents[2]
-
-
-def capture(docker, target, env, *, container, image, path):
-    packet, provenance = read_owned_json(docker, target, container=container, image=image, path=path)
-    summary = validate_capture(packet, kind="route", env_ref=env.ref().model_dump(mode="json"),
-                               run_id=target["run_id"], image=image)
-    return {"schema": "guard-route-native-attachment/1", "capture": provenance, "record": packet,
-            "summary": summary, "product_connected": False, "data_origin": "DECLARED",
-            "origin_detail": "owned file bytes captured; producer assertions not authenticated",
-            "environment_ref": env.ref().model_dump(mode="json"), "security": "UNKNOWN"}
 
 
 def main(argv=None):
@@ -40,12 +29,9 @@ def main(argv=None):
     parser.add_argument("--execute", action="store_true", help="owned read-only capture, never engine startup")
     args = parser.parse_args(argv)
     try:
-        env = load_environment(args.env)
-        target = json.loads(args.target.read_text(encoding="utf-8"))
-        if (type(target) is not dict or type(target.get("run_id")) is not str or not target["run_id"]
-                or args.output.exists() or args.output.is_symlink()
-                or args.output.resolve().is_relative_to(REPO.resolve())):
-            raise ValueError("CAPTURE_INPUT_OR_OUTPUT_UNSUPPORTED")
+        source = {"container": args.container, "image": args.image, "path": args.path}
+        env, target = load_inputs(args.env, args.target, source)
+        validate_output(args.output, REPO)
         if not args.execute:
             print(json.dumps({"engine_started": False, "capture_executed": False, "ready_to_execute": False,
                               "product_connected": False, "security": "UNKNOWN",
@@ -57,7 +43,7 @@ def main(argv=None):
         with args.output.open("x", encoding="utf-8", newline="\n") as stream:
             json.dump(result, stream, ensure_ascii=False, indent=2)
             stream.write("\n")
-    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError):
+    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError, SourceCaptureError):
         print("NATIVE_ROUTE_CAPTURE_FAILED")
         return 2
     print(json.dumps({"captured": True, "engine_started": False, "product_connected": False, "security": "UNKNOWN"}))

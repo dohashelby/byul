@@ -23,8 +23,11 @@ import re
 import sys
 from typing import Any
 
+from pydantic import ValidationError
+import yaml
+
 from byul_platform.contracts import Contracts, canonical_json, canonical_sha256
-from guard.models import Environment, Policy, load_pack, new_id
+from guard.models import Environment, PackIntegrityError, Policy, load_pack, new_id
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -35,6 +38,22 @@ _MAPPING_KEYS = frozenset({"format", "checked_at", "target_ref", "environment_re
 
 class InputBoundaryError(ValueError):
     """값이나 원문을 포함하지 않는 고정 코드 입력 오류."""
+
+
+def _load_input_pack(path: Path):
+    """팩 입력 오류만 정규화한다. 공용 로더의 예상 밖 실패는 숨기지 않는다."""
+    try:
+        return load_pack(path)
+    except (OSError, UnicodeError, yaml.YAMLError, ValidationError, PackIntegrityError) as error:
+        # 기존 팩 읽기/검증 실패의 CLI 코드를 유지한다. 파서 문맥은 출력하지 않는다.
+        raise InputBoundaryError("INPUT_IMPORT_FAILED") from error
+    except KeyError as error:
+        # 매니페스트 checks에는 있으나 files에 없는 정의를 공용 로더가 조회한 경우다.
+        # 다른 KeyError나 RuntimeError 등은 프로그래밍 오류일 수 있으므로 전파한다.
+        missing = error.args[0] if len(error.args) == 1 else None
+        if isinstance(missing, str) and missing.startswith("checks/") and missing.endswith(".yaml"):
+            raise InputBoundaryError("INPUT_IMPORT_FAILED") from error
+        raise
 
 
 def _pairs(items):
@@ -182,7 +201,7 @@ def import_inputs(environment_path: Path, policy_path: Path, pack_path: Path, ou
     """출력 경로는 새 디렉터리여야 한다. 모든 입력 검증 전에는 출력하지 않는다."""
     environment, env_raw = read_document(environment_path)
     policy, pol_raw = read_document(policy_path)
-    pack = load_pack(pack_path)
+    pack = _load_input_pack(pack_path)
     env, pol, mapping = convert_documents(environment, policy, pack, Contracts(contracts_dir),
                                            as_of=as_of or datetime.now(timezone.utc))
     payloads = {
@@ -337,7 +356,7 @@ def verify_import(bundle: Path, pack_path: Path, *, contracts_dir: Path = REPO_R
     checked_at, verified_at = _time(mapping["checked_at"]), _time(as_of or datetime.now(timezone.utc))
     if checked_at > verified_at:
         raise InputBoundaryError("IMPORT_CHECKED_AT_IN_FUTURE")
-    pack = load_pack(pack_path)
+    pack = _load_input_pack(pack_path)
     source_env, source_pol = documents["source-environment.json"], documents["source-policy.json"]
     expected_env, expected_pol, expected_mapping = convert_documents(source_env, source_pol, pack, contracts,
                                                                       as_of=checked_at)

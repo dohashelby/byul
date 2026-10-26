@@ -320,9 +320,18 @@ def verify_analysis_modules(root: Path, store: Path, report: Path) -> dict:
     else:
         assert not corrupted["accepted"]
     assert inventory_tree(damaged) == damaged_before and inventory_tree(log_store) == before
+    projected_store, projected_report = fixture.build(root / "example-projected-log-store", root / "fixture-pack", projection=True)
+    projected_before = inventory_tree(projected_store)
+    projected = log_evidence.analyze_saved_logs(projected_store, projected_report)
+    assert projected["accepted"] and projected["official"] is False, projected
+    assert projected["checks"][0]["status"] == "PROJECTION_REPLAY_MATCH"
+    assert projected["checks"][0]["raw_source_replayed"] is False
+    assert log_evidence.main(["--store", str(projected_store), "--report", projected_report,
+                              "--output", str(root / "projected-log-analysis")]) == 0
+    assert inventory_tree(projected_store) == projected_before
     return {"update_read_only": True, "audit_never_claims_two_image_trial": True,
             "log_read_only": True, "missing_log_evidence_never_accepted": True,
-            "example_log_replay": True, "log_tampering_rejected": True}
+            "example_log_replay": True, "log_tampering_rejected": True, "example_log_projection_replay": True}
 
 
 def supervisor(args) -> None:

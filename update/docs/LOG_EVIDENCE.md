@@ -1,8 +1,23 @@
 # OBS-03·OBS-09 로그 수집과 저장 증거 재검증
 
-이 문서는 로그 실행기 0.2.1의 수집 경계와 읽기 전용 재검증 범위를 설명한다. 엔진 시험·정책의 보안 판정과 **저장한 기록을 다시 읽었을 때 일치하는지**는 다른 확인이다. 새 실행기 종류나 기업 collector를 추가한 작업은 아니다.
+이 문서는 OBS-03 실행기 0.3.0·OBS-09 0.2.1의 수집 경계와 읽기 전용 재검증 범위를 설명한다. 엔진 시험·정책의 보안 판정과 **저장한 기록을 다시 읽었을 때 일치하는지**는 다른 확인이다. 새 실행기 종류나 기업 collector를 추가한 작업은 아니다.
 
-OBS-03의 새 `guard-log-analysis-capture/3`은 `analysis_profile: guard-log-json/2`를
+OBS-03의 `guard-log-analysis-capture/4`는 `guard-log-predicate-projection/1`이다. 요청 본문은
+정규 SHA, 응답·로그 메시지·traceback·token 값은 저장용 고정 표식/null로 투영한다. 원래 표식과
+상관 ID는 hash만 남긴다. 정책 필드의 구성 요소와 판정용 키 이름은 유지하고 그 밖의 키는
+정책 이름과 겹치지 않는 hash 이름으로 바꾸므로 금지·허용 목록 의미를 바꾸지 않는다.
+실제 원문은 메모리에서 먼저 분석하며, 저장 투영에 기존 strict parser/분석기를 다시 적용한
+결과가 같은 판정 입력을 보존하는지 대조한다. 일치하지 않거나 저장에 실패하면 ABORTED로
+PASS를 보류하고 원문 분석의 안전한 관측·독립 FAIL·다른 성공 첨부를 보존한다.
+거부한 JSON 행 수는 파이프별로 유지하며, 재생할 때 저장 표식 행 수와도 대조한다.
+
+저장 투영은 원문 JSON의 복사본이 아니다. `PROJECTION_REPLAY_MATCH`와
+`replay_basis: stored_predicate_projection`, `raw_source_replayed: false`로 구별한다.
+재생은 투영 bytes·문법·판정 입력을 다시 확인하며 원문 복원·실제 로그 출처 인증이나 새 실측을
+주장하지 않는다. 원래 bytes SHA, 투영 UTF-8 SHA와 artifact 파일 SHA도 각각 구별한다.
+원래 fixture SHA·요청·수집·정책·팩은 유지한다. OBS-09 원문 저장 전체의 보수는 별도 범위다.
+
+과거 OBS-03 0.2.1의 `guard-log-analysis-capture/3`은 `analysis_profile: guard-log-json/2`를
 명시한다. 중복 JSON key(중첩·escape 포함)·비유한 수·파싱 불가 사건으로 전체 수집을
 확정하지 않는다. 다른 완전한 사건의 독립 위반은 보존한다. 거부한 행은 저장 전에
 고정 미확인 표식으로 대체해 비밀값 제거 과정의 JSON 정규화가 누락을 지우지 않게 한다.
@@ -40,7 +55,7 @@ OBS-03은 JSON leaf의 `request_id` 또는 중첩된 실제 `.request_id` 값이
 
 `guard-pipe-capture/1`의 retained SHA256는 디코딩·마스킹 전 **실제로 보존한 CLI 파이프 bytes**의 해시다. 컨테이너 파일 reader의 raw 해시는 읽은 파일 prefix bytes다. 둘 다 Docker daemon 원본 파일 전체의 해시나 collector 서명이 아니다. 잘린 UTF-8은 replacement로 구분하고 PASS를 보류한다. 원시 bytes를 먼저 해시하므로 LF/CRLF를 정규화한 값을 원본 해시로 부르지 않는다.
 
-영구 artifact에는 설정한 인증값과 표지된 자격값을 마스킹한다. 저장된 `persisted_decoded_*`는 마스킹된 text의 정확한 UTF-8 bytes에 대한 별도 해시다. artifact 자체의 SHA256는 저장 파일 bytes를 검증한다. 마스킹이 원시 사건을 제거하면 그 내용을 재구성할 수 없으며 새 검사 결과를 원래의 보안 판정으로 덮어쓰지 않는다. 모든 비밀을 자동으로 식별하는 기능은 아니다. 오류 사유에는 임의 stderr·예외 메시지·설정 본문을 복사하지 않는다.
+과거 OBS-03 0.2.x와 OBS-09의 artifact는 설정한 인증값과 표지된 자격값을 마스킹한다. 저장된 `persisted_decoded_*`는 마스킹된 text의 정확한 UTF-8 bytes에 대한 별도 해시다. OBS-03 0.3.0의 `*_projection_*`는 원문 값이 없는 저장 투영의 bytes이고 `*_original_*`는 투영 전 메모리 text의 hash/길이다. artifact 자체의 SHA256는 저장 파일 bytes를 검증한다. 마스킹·투영으로 제외한 원문을 재구성하지 않으며 새 검사 결과를 원래의 보안 판정으로 덮어쓰지 않는다. 모든 비밀을 자동으로 식별하는 기능은 아니다. 오류 사유에는 임의 stderr·예외 메시지·설정 본문을 복사하지 않는다.
 
 원시 파이프 상한과 영구 표현의 읽기 예산은 구분한다. 여러 invalid UTF-8 bytes가 replacement로 바뀌거나 짧은 비밀값을 긴 마스킹 표식으로 바꾸면 저장 text가 커질 수 있다. 재검증은 named artifact 전체의 16 MiB 읽기 예산과 정확한 저장 해시를 적용하며 원시 cap을 decoded 길이에 소급 적용하지 않는다. replacement·잘림으로 인한 UNKNOWN은 그대로다. 누락 파일·읽을 수 없는 SQLite 등 저장 입력 I/O 오류는 비밀 없는 고정 검증 오류로 표시하며 원본을 복구하거나 수정하지 않는다.
 
@@ -60,7 +75,7 @@ python -m guard.log_evidence --store C:\guard-data\original-store --report RPT-.
 2. RPT manifest의 정확한 PLAN·POL·ENV·EVD·RES Ref와 객체 해시·관계·side.
 3. PLAN의 저장 팩과 artifact path·bytes·SHA256. 디스크의 최신 팩을 적용하지 않는다.
 4. official·정책/팩 검토 상태·data origin·검증 수준의 원본 입력과의 일치.
-5. 저장된 캡처·실행기 버전의 분석 프로파일로 순수 재구성하고 관측과 대조. OBS-03 `/2`+0.2.0은 당시 JSON parser, `/3`+0.2.1은 명시 strict parser를 사용하며 미등록 조합은 확정하지 않는다.
+5. 저장된 캡처·실행기 버전의 분석 프로파일로 순수 재구성하고 관측과 대조. OBS-03 `/2`+0.2.0은 당시 JSON parser, `/3`+0.2.1은 명시 strict parser, `/4`+0.3.0은 strict parser로 저장 투영을 재생하며 미등록 조합은 확정하지 않는다. 과거 형식·저장 증거에 새 계약을 소급하지 않는다.
 6. 저장된 동일 버전 rule_table·원래 params·PASS 관문·CPU 성능 제한으로 판정 축 대조.
 7. OBS-09의 캡처→구조화 event→별도 HTML의 정확한 대응.
 

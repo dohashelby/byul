@@ -312,7 +312,9 @@ def test_new_strict_collection_replays_saved_pass_unknown_or_independent_fail(tm
     before = inventory_tree(store.root)
     replay = analyze_saved_logs(store.root)
     assert replay["accepted"] and replay["original_inventory_preserved"], replay
-    assert replay["checks"][0]["status"] == "REPLAY_MATCH"
+    assert replay["checks"][0]["status"] == "PROJECTION_REPLAY_MATCH"
+    assert replay["checks"][0]["replay_basis"] == "stored_predicate_projection"
+    assert replay["checks"][0]["raw_source_replayed"] is False
     assert replay["checks"][0]["analysis_profile"] == STRICT_JSON_PROFILE
     assert replay["checks"][0]["strict_json_profile_applied"] is True
     assert replay["checks"][0]["coverage_complete"] is (kind is None)

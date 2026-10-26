@@ -14,9 +14,10 @@ import stat
 import sqlite3
 
 from guard.core.judge import pass_gate
-from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE, analyze_log_captures
+from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE, analyze_log_captures, strict_json_loads
 from guard.executors.log_integrity_contract import PLANNED_CASES, analyze_integrity_capture
 from guard.executors.log_integrity_parser import PROFILE, TRUSTED_FIELDS
+from guard.executors.log_projection import PROFILE as LOG_PROJECTION_PROFILE, validate_projection
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import canonical_json, sha256_hex, weakest_origin
 from guard.models.objects import object_from_dict
@@ -111,19 +112,26 @@ def _obs09(store, evd, sample, values):
 
 def _obs03(evd, sample, values):
     version = evd.execution.executor.version
+    projected = False
     if (sample.get("schema") == "guard-log-analysis-capture/2" and version == "0.2.0"
             and "analysis_profile" not in sample):
         profile = LEGACY_JSON_PROFILE
     elif (sample.get("schema") == "guard-log-analysis-capture/3" and version == "0.2.1"
             and sample.get("analysis_profile") == STRICT_JSON_PROFILE):
         profile = STRICT_JSON_PROFILE
+    elif (sample.get("schema") == "guard-log-analysis-capture/4" and version == "0.3.0"
+            and sample.get("analysis_profile") == STRICT_JSON_PROFILE
+            and sample.get("projection_profile") == LOG_PROJECTION_PROFILE):
+        validate_projection(sample, values)
+        profile, projected = STRICT_JSON_PROFILE, True
     else:
         raise ValueError("saved log analysis profile differs from executor version")
     captures = sample["captures"]
     if not isinstance(captures, list) or len(captures) > 16:
         raise ValueError("invalid bounded source inventory")
     for capture in captures:
-        _persisted_text(capture)
+        if not projected:
+            _persisted_text(capture)
         if capture["window"] != sample["window"]:
             raise ValueError("source capture window differs from trial window")
         source = capture["source"]
@@ -137,7 +145,16 @@ def _obs03(evd, sample, values):
         raise ValueError("exact normal/error trial correlation is required")
     for request in sample["requests"]:
         branch = "error" if request["case"] == "safe_error" else "normal"
-        if request["request_id"] != correlation[branch]:
+        if projected:
+            if (set(request) != {"case", "request_fixture_sha256", "request_id_sha256", "trial", "outcome"}
+                    or request["case"] not in {"normal", "safe_error", "after"}
+                    or request["trial"] != branch
+                    or request["request_id_sha256"] != sample["correlation_fingerprints"][branch]
+                    or not isinstance(request["request_fixture_sha256"], str)
+                    or len(request["request_fixture_sha256"]) != 64
+                    or any(c not in "0123456789abcdef" for c in request["request_fixture_sha256"])):
+                raise ValueError("saved projection request binding differs")
+        elif request["request_id"] != correlation[branch]:
             raise ValueError("saved request differs from its capture trial identity")
     obs = analyze_log_captures(captures, values, sample["markers"], correlation,
                                initial_gaps=sample["initial_gaps"], profile=profile)
@@ -299,8 +316,19 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                 raise ValueError("report verdicts differ from the pinned result")
             name = "log_samples.json" if check.id == "OBS-03" else "log_integrity_samples.json"
             envelope = _artifact(store, evd, name)
+            if not isinstance(envelope, dict) or not isinstance(envelope.get("capture"), dict):
+                raise ValueError("saved log capture envelope differs")
             sample = envelope.get("capture", {})
-            expected_schemas = ({"guard-log-analysis-capture/2", "guard-log-analysis-capture/3"}
+            if check.id == "OBS-03" and sample.get("schema") == "guard-log-analysis-capture/4":
+                try:
+                    exact = strict_json_loads(_artifact(store, evd, name, json_value=False))
+                except (ValueError, RecursionError):
+                    raise ValueError("saved projection envelope JSON is ambiguous") from None
+                if (set(exact) != {"capture", "encoding", "redaction"}
+                        or exact["redaction"] != LOG_PROJECTION_PROFILE
+                        or exact["encoding"] != "UTF-8 predicate projection; original values omitted"):
+                    raise ValueError("saved projection envelope profile differs")
+            expected_schemas = ({"guard-log-analysis-capture/2", "guard-log-analysis-capture/3", "guard-log-analysis-capture/4"}
                                 if check.id == "OBS-03" else {"guard-log-integrity-capture/2"})
             if sample.get("schema") not in expected_schemas:
                 row["status"] = "LEGACY_UNVERIFIABLE"
@@ -313,6 +341,10 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                 obs, complete, profile = _obs03(evd, sample, values)
                 row["analysis_profile"] = profile
                 row["strict_json_profile_applied"] = profile == STRICT_JSON_PROFILE
+                if sample.get("schema") == "guard-log-analysis-capture/4":
+                    row["replay_basis"] = "stored_predicate_projection"
+                    row["raw_source_replayed"] = False
+                    limitations.append("OBS-03: stored predicate projection was parsed again; original text/values are omitted, and source digests do not reconstruct or authenticate them.")
                 if profile == LEGACY_JSON_PROFILE:
                     limitations.append("OBS-03: historical JSON parser retained; duplicate-key/non-finite rejection is not retroactively claimed")
             else:
@@ -342,7 +374,8 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                 expected["performance"] = "UNKNOWN"
             if expected != res.verdicts.model_dump(mode="json"):
                 raise ValueError("pinned result differs from fixed-rule replay")
-            row.update(status="REPLAY_MATCH", replayed=True, coverage_complete=complete,
+            row.update(status="PROJECTION_REPLAY_MATCH" if row.get("replay_basis") else "REPLAY_MATCH",
+                       replayed=True, coverage_complete=complete,
                        result=res.ref().model_dump(mode="json"), verdicts=res.verdicts.model_dump(mode="json"))
             if not complete:
                 limitations.append(f"{check.id}/{evd.side.value}: capture remains incomplete; saved UNKNOWN/independent FAIL is preserved")

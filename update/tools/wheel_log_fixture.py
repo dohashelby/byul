@@ -12,12 +12,12 @@ import json
 from pathlib import Path
 
 
-def build(root: Path, pack_dir: Path):
+def build(root: Path, pack_dir: Path, *, projection=False):
     from guard.core.judge import judge_plan
     from guard.core.report import build_report
     from guard.core.select import select
     from guard.executors.log_analysis_contract import analyze_log_captures
-    from guard.models import Environment, Evidence, Policy, load_pack
+    from guard.models import Environment, Evidence, Policy, load_pack, canonical_json, sha256_hex
     from guard.store import Store
     from guard.store.packs import put_pack
 
@@ -62,6 +62,22 @@ def build(root: Path, pack_dir: Path):
               "analysis": analysis, "controls": controls, "policy_values": values,
               "source_target": "EXAMPLE-owned", "window": window}
     envelope = {"capture": sample, "redaction": "EXAMPLE has no credentials; no real source bytes", "encoding": "UTF-8"}
+    version = "0.2.0"
+    if projection:
+        from guard.executors.log_projection import PROFILE, fingerprint, project_log_captures, validate_projection
+        converted = project_log_captures(captures, values, marks, correlation)
+        sample = {"schema": "guard-log-analysis-capture/4", "analysis_profile": "guard-log-json/2",
+                  "projection_profile": PROFILE, **converted,
+                  "requests": [{"case": row["case"], "trial": "error" if row["case"] == "safe_error" else "normal",
+                      "request_id_sha256": fingerprint(row["request_id"]),
+                      "request_fixture_sha256": sha256_hex(canonical_json({"EXAMPLE_case": row["case"]})),
+                      "outcome": row["outcome"]} for row in requests],
+                  "initial_gaps": [], "coverage_gaps": converted["analysis"]["log_coverage_gaps"], "controls": controls,
+                  "policy_values": values, "source_target": "EXAMPLE-owned", "window": window}
+        validate_projection(sample, values)
+        analysis = converted["analysis"]
+        envelope = {"capture": sample, "redaction": PROFILE, "encoding": "UTF-8 predicate projection; original values omitted"}
+        version = "0.3.0"
     content = json.dumps(envelope, ensure_ascii=False).encode()
     saved = store.put_artifact(content)
     probe = "".join(json.dumps({"via": "log-analysis", "route": req["case"], "outcome": req["outcome"]}) + "\n" for req in requests)
@@ -70,7 +86,7 @@ def build(root: Path, pack_dir: Path):
     definition = pack.checks["OBS-03"]
     evd = Evidence(id="EVD-EXAMPLE-WHEEL-LOG", created_at=timestamp, data_origin="EXAMPLE",
         plan=plan.ref(), environment=env.ref(), check_id="OBS-03", side="single", refs=[plan.ref(), env.ref()],
-        execution={"status": "COMPLETED", "executor": {"name": "log_analysis", "version": "0.2.0", "config_sha256": "0" * 64}},
+        execution={"status": "COMPLETED", "executor": {"name": "log_analysis", "version": version, "config_sha256": "0" * 64}},
         normal_control={"attempted": True, "succeeded": True, "detail": "EXAMPLE synthetic transport"},
         challenges=[{"step": step, "attempted": True} for step in definition.challenge_steps],
         observations={key: {"value": value, "collected": True} for key, value in observations.items()},

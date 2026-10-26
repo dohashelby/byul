@@ -16,10 +16,13 @@ from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
 from guard.runtime.docker import Docker
-from .log_analysis_contract import (STRICT_JSON_PROFILE, analyze_log_captures, events,
-                                    persistable_log_text)
+from guard.models import canonical_json, sha256_hex
+from .log_analysis_contract import STRICT_JSON_PROFILE, analyze_log_captures, events
+from .log_projection import (PROFILE as PROJECTION_PROFILE, MAX_ARTIFACT_BYTES, fingerprint,
+                            project_log_captures, protect_analysis, validate_projection)
+from .response_projection import log_metadata
 from .content_common import (MAX_SAMPLE_BYTES, append_artifact, content_request, control_state, leaves,
-                             markers, sample_artifact, string_list, validate_content_settings, record_content, bounded_probe, redact_value)
+                             markers, string_list, validate_content_settings, bounded_probe, text_artifact)
 from .http_common import HttpCheckExecutor
 
 REQUIRED_BRANCHES = frozenset({"normal", "error", "exception_dump"})
@@ -72,9 +75,24 @@ def _events(text):
     return [row["event"] for row in rows], complete
 
 
+def _save_projection(ctx, value):
+    """The validated projection bypasses credential redaction of marker codes."""
+    filename = "log_samples.json"
+    ctx._sample_artifacts = {*getattr(ctx, "_sample_artifacts", ()), filename}
+    try:
+        raw = json.dumps({"capture": value, "encoding": "UTF-8 predicate projection; original values omitted",
+                          "redaction": PROJECTION_PROFILE}, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False)
+        if len(raw.encode("utf-8")) > MAX_ARTIFACT_BYTES:
+            raise ValueError("LOG_PROJECTION_CAPTURE_LIMIT")
+    except Exception:
+        ctx._failed_artifacts = {*getattr(ctx, "_failed_artifacts", ()), filename}
+    else:
+        text_artifact(ctx, filename, raw)
+
+
 class LogAnalysisExecutor(HttpCheckExecutor):
     name = "log_analysis"
-    version = "0.2.1"
+    version = "0.3.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -233,10 +251,12 @@ class LogAnalysisExecutor(HttpCheckExecutor):
             ctx.timeout = min(ctx.timeout, remaining)
             request = content_request(ctx, "engine", label, endpoint, body)
             request["headers"]["X-Request-Id"] = correlation[branch]
+            request_sha256 = sha256_hex(canonical_json(body))
             response = bounded_probe(ctx, ctx.trusted_net, request)
-            record_content(ctx, "trusted", "log-analysis", label, response)
-            requests.append({"case": label, "body": body, "request_id": correlation[branch],
-                             "outcome": response.get("outcome")})
+            ctx.record("trusted", "log-analysis", label, "allowed", {**log_metadata(response), "method": request["method"]})
+            requests.append({"case": label, "request_fixture_sha256": request_sha256,
+                             "request_id_sha256": fingerprint(correlation[branch]), "trial": branch,
+                             "outcome": log_metadata(response)["outcome"]})
             return response
 
         before = send("normal", model_body, "normal")
@@ -268,8 +288,8 @@ class LogAnalysisExecutor(HttpCheckExecutor):
                 continue
             try:
                 capture = self._capture(source, since, until, deadline)
-            except Exception as exc:
-                gaps.append(f"{source_id}: log collection failed: {type(exc).__name__}")
+            except Exception:
+                gaps.append(f"{source_id}: LOG_SOURCE_CAPTURE_UNAVAILABLE")
                 continue
             captures.append(capture)
         # An unlisted collector/dump is not silently assessed. This profile
@@ -277,35 +297,28 @@ class LogAnalysisExecutor(HttpCheckExecutor):
         gaps_before_analysis = list(gaps)
         analysis = analyze_log_captures(captures, values, marks, correlation, initial_gaps=gaps,
                                         profile=STRICT_JSON_PROFILE)
+        original_analysis = analysis
+        analysis = protect_analysis(original_analysis, values)
+        try:
+            projection = project_log_captures(captures, values, marks, correlation,
+                initial_gaps=gaps_before_analysis, analysis=original_analysis)
+            sample = {"schema": "guard-log-analysis-capture/4", "analysis_profile": STRICT_JSON_PROFILE,
+                      "projection_profile": PROJECTION_PROFILE, **projection,
+                      "requests": requests, "initial_gaps": list(gaps_before_analysis),
+                      "coverage_gaps": analysis["log_coverage_gaps"], "controls": controls, "policy_values": values,
+                      "source_target": (ctx.target["engine"].get("container") if isinstance(ctx.target["engine"].get("container"), str)
+                          and re.fullmatch(r"[A-Za-z0-9_.:-]{1,256}", ctx.target["engine"]["container"]) else None),
+                      "window": {"since": since, "until": until}}
+            validate_projection(sample, values)
+        except Exception:
+            # A failed projection cannot invent PASS or discard an actual violation.
+            ctx._failed_artifacts = {*getattr(ctx, "_failed_artifacts", ()), "log_samples.json"}
+        else:
+            _save_projection(ctx, sample)
         gaps, violations, coverage = analysis["log_coverage_gaps"], analysis["log_violations"], analysis["log_sources_tested"]
         obs = {key: {"value": value, "collected": True} for key, value in analysis.items()}
         obs.update({"functional_probes_planned": {"value": ["before", "after"], "collected": True},
                     "functional_probe_results": {"value": controls, "collected": True}})
-        replay_captures = []
-        for capture in captures:
-            saved = dict(capture)
-            rejected = {}
-            for field in ("text", "stderr_text"):
-                if field in saved:
-                    saved[field], rejected[field] = persistable_log_text(saved[field])
-            saved["rejected_json_lines"] = rejected
-            replay_captures.append(saved)
-        saved_captures = redact_value(replay_captures, ctx.secrets)
-        for capture in saved_captures:
-            persisted = capture["text"].encode("utf-8")
-            capture["persisted_decoded_sha256"] = hashlib.sha256(persisted).hexdigest()
-            capture["persisted_decoded_bytes"] = len(persisted)
-            if "stderr_text" in capture:
-                stderr = capture["stderr_text"].encode("utf-8")
-                capture["persisted_stderr_sha256"] = hashlib.sha256(stderr).hexdigest()
-                capture["persisted_stderr_bytes"] = len(stderr)
-        sample_artifact(ctx, "log_samples.json", {"schema": "guard-log-analysis-capture/3",
-                        "analysis_profile": STRICT_JSON_PROFILE,
-                        "captures": saved_captures, "requests": requests, "markers": marks,
-                        "correlation": correlation, "initial_gaps": list(gaps_before_analysis),
-                        "coverage_gaps": gaps, "analysis": analysis, "controls": controls,
-                        "policy_values": values, "source_target": ctx.target["engine"].get("container"),
-                        "window": {"since": since, "until": until}})
         normal = {"attempted": True, "succeeded": len(controls) == 2 and all(v == "pass" for v in controls.values()),
                   "detail": "normal inference before/after a bounded validation-error request; HTTP 4xx is not a dump"}
         return obs, normal, [{"step": step, "attempted": bool(requests)} for step in ctx.check.challenge_steps], {

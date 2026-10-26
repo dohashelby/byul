@@ -1,0 +1,64 @@
+{
+  "schema": "guard-template-consumption-example/1",
+  "data_origin": "EXAMPLE",
+  "source_review": {
+    "source_commit": "UNVERIFIED",
+    "image_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "loader_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "renderer_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "handoff_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "collection": {
+    "session_id": "EXAMPLE-session-1", "start_ms": 0, "end_ms": 1000, "closed": true,
+    "sources": [
+      {"id": "EXAMPLE-loader", "role": "loader", "complete": true, "first_seq": 1, "last_seq": 1},
+      {"id": "EXAMPLE-renderer", "role": "renderer", "complete": true, "first_seq": 1, "last_seq": 2},
+      {"id": "EXAMPLE-handoff", "role": "handoff", "complete": true, "first_seq": 1, "last_seq": 1}
+    ]
+  },
+  "instance": {
+    "container_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "image_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "process_id": 101, "process_start": "EXAMPLE-process-start-1",
+    "model_snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "tokenizer_snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "model_generation": "EXAMPLE-model-1", "tokenizer_generation": "EXAMPLE-tokenizer-1",
+    "renderer_generation": "EXAMPLE-renderer-1"
+  },
+  "approval": {
+    "basis": "EXAMPLE-explicit-policy",
+    "allowed_raw_sha256": ["3333333333333333333333333333333333333333333333333333333333333333"]
+  },
+  "requests": [
+    {"nonce": "EXAMPLE-nonce-1", "request_id": "EXAMPLE-request-1", "subrequest_id": "EXAMPLE-subrequest-1", "input_sha256": "4444444444444444444444444444444444444444444444444444444444444444"}
+  ],
+  "events": [
+    {
+      "event_id": "EXAMPLE-read-1", "source_id": "EXAMPLE-loader", "seq": 1, "elapsed_ms": 10, "kind": "template_read",
+      "context": {"container_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "image_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "process_id": 101, "process_start": "EXAMPLE-process-start-1", "model_snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111", "tokenizer_snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "model_generation": "EXAMPLE-model-1", "tokenizer_generation": "EXAMPLE-tokenizer-1", "renderer_generation": "EXAMPLE-renderer-1"},
+      "load_id": "EXAMPLE-load-1", "template_generation": "EXAMPLE-template-1",
+      "raw_sha256": "3333333333333333333333333333333333333333333333333333333333333333", "decoded_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "raw_bytes": 100, "decoded_bytes": 99, "decode": "utf8-universal-newlines", "outcome": "loaded", "source_kind": "managed_file"
+    },
+    {
+      "event_id": "EXAMPLE-selected-1", "source_id": "EXAMPLE-renderer", "seq": 1, "elapsed_ms": 20, "kind": "template_selected",
+      "context": {"container_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "image_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "process_id": 101, "process_start": "EXAMPLE-process-start-1", "model_snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111", "tokenizer_snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "model_generation": "EXAMPLE-model-1", "tokenizer_generation": "EXAMPLE-tokenizer-1", "renderer_generation": "EXAMPLE-renderer-1"},
+      "nonce": "EXAMPLE-nonce-1", "request_id": "EXAMPLE-request-1", "subrequest_id": "EXAMPLE-subrequest-1", "input_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "load_id": "EXAMPLE-load-1", "selection_id": "EXAMPLE-selection-1", "selected_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "cache_status": "miss", "cache_generation": "EXAMPLE-template-1", "source_kind": "managed_file"
+    },
+    {
+      "event_id": "EXAMPLE-applied-1", "source_id": "EXAMPLE-renderer", "seq": 2, "elapsed_ms": 30, "kind": "template_applied",
+      "context": {"container_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "image_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "process_id": 101, "process_start": "EXAMPLE-process-start-1", "model_snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111", "tokenizer_snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "model_generation": "EXAMPLE-model-1", "tokenizer_generation": "EXAMPLE-tokenizer-1", "renderer_generation": "EXAMPLE-renderer-1"},
+      "nonce": "EXAMPLE-nonce-1", "request_id": "EXAMPLE-request-1", "subrequest_id": "EXAMPLE-subrequest-1", "input_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selection_id": "EXAMPLE-selection-1", "applied_sha256": "5555555555555555555555555555555555555555555555555555555555555555", "render_result": "success",
+      "rendered_input_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "event_id": "EXAMPLE-handoff-1", "source_id": "EXAMPLE-handoff", "seq": 1, "elapsed_ms": 40, "kind": "engine_handoff",
+      "context": {"container_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "image_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "process_id": 101, "process_start": "EXAMPLE-process-start-1", "model_snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111", "tokenizer_snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "model_generation": "EXAMPLE-model-1", "tokenizer_generation": "EXAMPLE-tokenizer-1", "renderer_generation": "EXAMPLE-renderer-1"},
+      "nonce": "EXAMPLE-nonce-1", "request_id": "EXAMPLE-request-1", "subrequest_id": "EXAMPLE-subrequest-1", "input_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "selection_id": "EXAMPLE-selection-1", "rendered_input_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ]
+}

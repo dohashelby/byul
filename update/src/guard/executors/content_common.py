@@ -135,6 +135,16 @@ def sample_artifact(ctx, filename: str, value: Any) -> None:
         ctx._failed_artifacts = {*getattr(ctx, "_failed_artifacts", ()), filename}
 
 
+def text_artifact(ctx, filename: str, value: str) -> None:
+    """Capture exact UTF-8 text bytes through the same partial-artifact boundary."""
+    ctx._sample_artifacts = {*getattr(ctx, "_sample_artifacts", ()), filename}
+    try:
+        ctx.workdir.mkdir(parents=True, exist_ok=True)
+        (ctx.workdir / filename).write_bytes(value.encode("utf-8"))
+    except Exception:
+        ctx._failed_artifacts = {*getattr(ctx, "_failed_artifacts", ()), filename}
+
+
 def append_artifact(draft, ctx, filename: str, collector: str):
     if filename in getattr(ctx, "_failed_artifacts", ()):
         return incomplete_artifact_capture(draft)

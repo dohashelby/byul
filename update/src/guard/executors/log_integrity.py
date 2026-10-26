@@ -18,7 +18,7 @@ from guard.automation_policy import validate_log_integrity_policy
 from guard.report.log_integrity import render_log_integrity, verify_log_display
 from guard.runtime.docker import Docker
 from .content_common import (append_artifact, content_request, control_state, json_body,
-                             record_content, redact_value, sample_artifact)
+                             record_content, redact_value, sample_artifact, text_artifact)
 from .http_common import HttpCheckExecutor
 from .log_integrity_parser import (MAX_CAPTURE_BYTES, PROFILE, TRUSTED_FIELDS)
 from .log_integrity_contract import analyze_integrity_capture
@@ -253,10 +253,9 @@ class LogIntegrityExecutor(HttpCheckExecutor):
         display_verified = verify_log_display(html, displayed)
         if not display_verified:
             gaps.append("reference HTML event mapping could not be verified")
-        ctx.workdir.mkdir(parents=True, exist_ok=True)
         # Persist the exact bytes hashed below; Windows text-mode newline
         # translation would otherwise make the recorded display digest differ.
-        (ctx.workdir / "log_integrity_display.html").write_bytes(html.encode("utf-8"))
+        text_artifact(ctx, "log_integrity_display.html", html)
         sample_artifact(ctx, "log_integrity_events.json", collection)
         saved_capture = redact_value(capture, ctx.secrets)
         saved_raw = saved_capture["text"].encode("utf-8")

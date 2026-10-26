@@ -42,7 +42,12 @@ from .approval import (
     unavailable_policy_result,
 )
 from .auth import load_auth
-from .target import KubernetesTargetCollector, TargetRegistry, load_target
+from .target import (
+    KubernetesTargetCollector,
+    TargetPodSnapshotCollector,
+    TargetRegistry,
+    load_target,
+)
 from .policy import PolicyState, load_policy
 from .policy_state import PolicyHistory, evaluate_policy, load_revocations
 from .query import QueryService
@@ -263,6 +268,13 @@ class GatewayApp:
                 )
             )
         registration = self._target.registration
+        if config.target_pod_snapshot is not None and (
+            registration.state != "ok" or registration.kubernetes is None
+        ):
+            raise ValueError(
+                "--target-pod-snapshot requires an available target registration "
+                "with a kubernetes block"
+            )
         registered_context = (
             registration.kubernetes.context if registration.kubernetes is not None else None
         )
@@ -300,6 +312,20 @@ class GatewayApp:
                     KubernetesTargetCollector(
                         registration.kubernetes,
                         timeout_s=config.cilium_timeout_s,
+                    ).collect,
+                    config.collector_interval_s,
+                    config.collector_stale_after_s,
+                    on_collected=self._target.observe_kubernetes,
+                )
+            )
+        if config.target_pod_snapshot is not None and registration.kubernetes is not None:
+            collectors.append(
+                Collector(
+                    "target_pods",
+                    TargetPodSnapshotCollector(
+                        config.target_pod_snapshot,
+                        registration.kubernetes,
+                        stale_after_s=config.collector_stale_after_s,
                     ).collect,
                     config.collector_interval_s,
                     config.collector_stale_after_s,
@@ -382,6 +408,7 @@ class GatewayApp:
             return {
                 "profile": None,
                 "test_only": False,
+                "output_max_tokens": None,
                 "max_n": None,
                 "extra_fields": [],
                 "passthrough_count": None,
@@ -391,6 +418,7 @@ class GatewayApp:
         return {
             "profile": policy.profile,
             "test_only": policy.profile == "zeroday-lab",
+            "output_max_tokens": policy.output_max_tokens,
             "max_n": policy.max_n,
             "extra_fields": extra,
             "passthrough_count": sum(1 for item in extra if item["mode"] == "passthrough"),

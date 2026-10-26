@@ -90,10 +90,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar="PATH",
         help="대상 등록 파일(runtime-target/1.0). 없으면 대상 미등록",
     )
-    mvp_parser.add_argument(
+    target_pod_group = mvp_parser.add_mutually_exclusive_group()
+    target_pod_group.add_argument(
         "--target-pod-status",
         action="store_true",
         help="대상 등록의 kubernetes selector로 Pod를 읽기 전용 조회",
+    )
+    target_pod_group.add_argument(
+        "--target-pod-snapshot",
+        metavar="PATH",
+        help=(
+            "호스트가 쓴 runtime-target-pods-snapshot/1.0 파일로 대상 Pod를 관측"
+        ),
     )
     mvp_parser.add_argument(
         "--kube-context",
@@ -361,6 +369,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "observation_exceptions_path": args.observation_exceptions,
                 "observation_timeline_path": args.observation_timeline,
                 "target_pod_status": args.target_pod_status,
+                "target_pod_snapshot": args.target_pod_snapshot,
                 "kube_context": args.kube_context,
             }
             if args.policy_bundle is not None:

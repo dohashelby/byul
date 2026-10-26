@@ -205,6 +205,56 @@ class PolicyBundleIntegrationTests(unittest.TestCase):
         self.assertEqual(captured["approvals"], expected_approvals)
         self.assertIsInstance(captured["bundle"], dict)
 
+    def test_policy_bundle_target_is_used_with_host_pod_snapshot(self) -> None:
+        captured: dict[str, object] = {}
+
+        def inspect_config(config: MVPConfig) -> None:
+            captured["target"] = json.loads(Path(str(config.target_path)).read_text())
+            captured["snapshot"] = config.target_pod_snapshot
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = _copy_bundle(Path(temporary))
+            target = {
+                "schema_version": "runtime-target/1.0",
+                "target_id": "mock-engine-001",
+                "engine": {"kind": "mock", "version": "mock-1.0"},
+                "model": {"id": "test-model"},
+                "kubernetes": {
+                    "context": "kind-runtime-lab",
+                    "namespace": "serving-lab",
+                    "selector": {"app": "serving-engine"},
+                    "container": "engine",
+                },
+            }
+            target_path = directory / "target.json"
+            target_path.write_text(json.dumps(target), encoding="utf-8")
+            document = _manifest(directory)
+            document["validity"] = {"valid_from": None, "valid_until": None}
+            raw = target_path.read_bytes()
+            document["files"].append(
+                {
+                    "role": "target",
+                    "path": "target.json",
+                    "schema_version": "runtime-target/1.0",
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "bytes": len(raw),
+                }
+            )
+            _write_manifest(directory, document)
+            with patch("serving_runtime.mvp.app.run", side_effect=inspect_config):
+                result = main(
+                    [
+                        "mvp",
+                        "--policy-bundle",
+                        str(directory),
+                        "--target-pod-snapshot",
+                        "/srv/serving/observation/target-pods.json",
+                    ]
+                )
+        self.assertEqual(result, 0)
+        self.assertEqual(captured["target"], target)
+        self.assertEqual(captured["snapshot"], "/srv/serving/observation/target-pods.json")
+
     def test_policy_bundle_conflicts_with_explicit_role_option(self) -> None:
         for option in (
             "--policy",

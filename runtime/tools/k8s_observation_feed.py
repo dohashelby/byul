@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timedelta, timezone
 import json
+import math
 import os
 from pathlib import Path
 import signal
@@ -17,10 +18,21 @@ import time
 from typing import BinaryIO, Callable, Sequence
 from uuid import uuid4
 
-from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
+from serving_runtime.mvp.config import (
+    DEFAULT_COLLECTOR_INTERVAL_S,
+    DEFAULT_COLLECTOR_STALE_AFTER_S,
+)
 from serving_runtime.mvp.kube_context import (
     DEFAULT_KUBE_CONTEXT,
     validate_kube_context,
+)
+from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
+from serving_runtime.mvp.target import (
+    POD_SNAPSHOT_SCHEMA,
+    KubernetesSelector,
+    parse_label_selector,
+    pods_command,
+    validate_kubernetes_name,
 )
 
 
@@ -270,6 +282,49 @@ GAP_SCHEMA = "runtime-observation-feed-gap/1.0"
 BACKOFF_INITIAL_S = 1.0
 BACKOFF_MAX_S = 30.0
 BACKFILL_MARGIN = timedelta(seconds=1)
+# With the Gateway defaults, the worst observed age is bounded by writer
+# interval + kubectl timeout + Gateway poll interval. Keep that sum strictly
+# below the Gateway stale window: 5 + 4 + 5 = 14 < 15 seconds.
+DEFAULT_TARGET_INTERVAL_S = 5.0
+MAX_TARGET_INTERVAL_S = 5.0
+MAX_TARGET_QUERY_TIMEOUT_S = 5.0
+TARGET_QUERY_TIMEOUT_S = 4.0
+
+
+def _validate_target_timing(interval_s: float, timeout_s: float) -> None:
+    if not math.isfinite(interval_s) or interval_s <= 0:
+        raise ValueError("target interval must be a positive finite number")
+    if interval_s > MAX_TARGET_INTERVAL_S:
+        raise ValueError(
+            f"target interval must be at most {MAX_TARGET_INTERVAL_S:g} seconds"
+        )
+    if (
+        not math.isfinite(timeout_s)
+        or timeout_s <= 0
+        or timeout_s > MAX_TARGET_QUERY_TIMEOUT_S
+    ):
+        raise ValueError(
+            "target query timeout must be a positive finite number no greater "
+            f"than {MAX_TARGET_QUERY_TIMEOUT_S:g} seconds"
+        )
+    worst_case_age_s = interval_s + timeout_s + DEFAULT_COLLECTOR_INTERVAL_S
+    if worst_case_age_s >= DEFAULT_COLLECTOR_STALE_AFTER_S:
+        raise ValueError(
+            "target interval + query timeout + Gateway poll interval must be "
+            "below the Gateway stale window"
+        )
+
+
+def _target_interval_argument(value: str) -> float:
+    try:
+        interval_s = float(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be a number") from error
+    try:
+        _validate_target_timing(interval_s, TARGET_QUERY_TIMEOUT_S)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+    return interval_s
 
 
 def _rfc3339_seconds(value: datetime) -> str:
@@ -400,6 +455,169 @@ def _append_gap(path: Path, record: dict[str, object]) -> None:
         output.write((json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"))
         output.flush()
         os.fsync(output.fileno())
+
+
+def _strings(document: object) -> dict[str, str]:
+    if not isinstance(document, dict):
+        return {}
+    return {
+        key: value
+        for key, value in document.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+
+
+def _reduce_pod(item: object) -> dict[str, object] | None:
+    """Keep only the non-secret Pod fields used by ``summarize_pods``."""
+
+    if not isinstance(item, dict):
+        return None
+    source_metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+    metadata: dict[str, object] = {}
+    for name in ("name", "uid", "deletionTimestamp"):
+        value = source_metadata.get(name)
+        if isinstance(value, str):
+            metadata[name] = value
+    labels = _strings(source_metadata.get("labels"))
+    if labels:
+        metadata["labels"] = labels
+
+    source_spec = item.get("spec") if isinstance(item.get("spec"), dict) else {}
+    spec: dict[str, object] = {}
+    if isinstance(source_spec.get("nodeName"), str):
+        spec["nodeName"] = source_spec["nodeName"]
+
+    source_status = item.get("status") if isinstance(item.get("status"), dict) else {}
+    status: dict[str, object] = {}
+    for name in ("phase", "startTime"):
+        value = source_status.get(name)
+        if isinstance(value, str):
+            status[name] = value
+    conditions: list[dict[str, str]] = []
+    raw_conditions = source_status.get("conditions")
+    for condition in raw_conditions if isinstance(raw_conditions, list) else []:
+        reduced = {
+            name: condition[name]
+            for name in ("type", "status")
+            if isinstance(condition, dict) and isinstance(condition.get(name), str)
+        }
+        if reduced:
+            conditions.append(reduced)
+    if conditions:
+        status["conditions"] = conditions
+    container_statuses: list[dict[str, object]] = []
+    raw_container_statuses = source_status.get("containerStatuses")
+    for container in raw_container_statuses if isinstance(raw_container_statuses, list) else []:
+        if not isinstance(container, dict):
+            continue
+        reduced_container: dict[str, object] = {}
+        for name in ("name", "containerID", "imageID", "image"):
+            value = container.get(name)
+            if isinstance(value, str):
+                reduced_container[name] = value
+        if isinstance(container.get("ready"), bool):
+            reduced_container["ready"] = container["ready"]
+        restart_count = container.get("restartCount")
+        if isinstance(restart_count, int) and not isinstance(restart_count, bool):
+            reduced_container["restartCount"] = restart_count
+        source_state = container.get("state")
+        if isinstance(source_state, dict):
+            state = {
+                name: {}
+                for name in ("running", "waiting", "terminated")
+                if name in source_state
+            }
+            if state:
+                reduced_container["state"] = state
+        container_statuses.append(reduced_container)
+    status["containerStatuses"] = container_statuses
+    return {"metadata": metadata, "spec": spec, "status": status}
+
+
+class TargetPodSnapshotWriter:
+    """Periodically materialize a minimal Pod list for a credential-free Gateway."""
+
+    def __init__(
+        self,
+        path: Path,
+        selector: KubernetesSelector,
+        *,
+        interval_s: float,
+        timeout_s: float = TARGET_QUERY_TIMEOUT_S,
+        runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+    ) -> None:
+        _validate_target_timing(interval_s, timeout_s)
+        self.path = path
+        self.selector = selector
+        self.interval_s = float(interval_s)
+        self.timeout_s = float(timeout_s)
+        self.runner = runner
+
+    def _base(self) -> dict[str, object]:
+        return {
+            "schema": POD_SNAPSHOT_SCHEMA,
+            "context": self.selector.context,
+            "namespace": self.selector.namespace,
+            "selector": dict(self.selector.selector),
+        }
+
+    def collect_once(self) -> dict[str, object]:
+        document = self._base()
+        try:
+            result = self.runner(
+                pods_command(self.selector),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_s,
+                check=False,
+                shell=False,
+            )
+            if result.returncode != 0:
+                error = {"class": "KubectlExit", "code": "kubectl_exit"}
+            else:
+                try:
+                    raw = json.loads(result.stdout)
+                except (json.JSONDecodeError, RecursionError):
+                    error = {"class": "JSONDecodeError", "code": "invalid_json"}
+                else:
+                    items = raw.get("items") if isinstance(raw, dict) else None
+                    if not isinstance(items, list):
+                        error = {"class": "ValueError", "code": "invalid_pod_list"}
+                    else:
+                        document.update(
+                            {
+                                "collected_at": _utc_now(),
+                                "state": "ok",
+                                "error": None,
+                                "items": [
+                                    reduced
+                                    for item in items
+                                    if (reduced := _reduce_pod(item)) is not None
+                                ],
+                            }
+                        )
+                        _write_json_atomic(self.path, document)
+                        return document
+        except subprocess.TimeoutExpired:
+            error = {"class": "TimeoutExpired", "code": "kubectl_timeout"}
+        except (OSError, subprocess.SubprocessError) as failure:
+            error = {"class": type(failure).__name__, "code": "kubectl_error"}
+        document.update(
+            {"collected_at": _utc_now(), "state": "error", "error": error}
+        )
+        _write_json_atomic(self.path, document)
+        return document
+
+    def follow(self, stop_requested: threading.Event) -> None:
+        while not stop_requested.is_set():
+            try:
+                self.collect_once()
+            except OSError:
+                # Feed supervision remains independent even if this optional
+                # snapshot cannot be written. The next interval retries it.
+                pass
+            stop_requested.wait(self.interval_s)
 
 
 def _stop_children(group: _FeedGroup) -> None:
@@ -549,6 +767,9 @@ def run(
     include_forwarded: bool = False,
     max_ticks: int | None = None,
     reader_gid: int | None = None,
+    target_selector: tuple[tuple[str, str], ...] | None = None,
+    target_namespace: str = LAB_NAMESPACE,
+    target_interval_s: float = DEFAULT_TARGET_INTERVAL_S,
 ) -> int:
     global _reader_gid
     assert_safe_context(context)
@@ -557,6 +778,14 @@ def run(
     output_dir = output_dir.absolute()
     output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     _share(output_dir, directory=True)
+    target_writer: TargetPodSnapshotWriter | None = None
+    if target_selector is not None:
+        validate_kubernetes_name(target_namespace, "target namespace")
+        target_writer = TargetPodSnapshotWriter(
+            output_dir / "target-pods.json",
+            KubernetesSelector(context, target_namespace, target_selector, ""),
+            interval_s=target_interval_s,
+        )
     hubble_path = output_dir / "hubble.jsonl"
     tetragon_path = output_dir / "tetragon.jsonl"
     for feed_file in (hubble_path, tetragon_path):
@@ -617,6 +846,15 @@ def run(
         groups = [hubble_group, tetragon_group]
         supervisor = _Supervisor(groups, context=context, stop_requested=stop_requested)
         previous_signal_handlers = _install_stop_signal_handlers(stop_requested)
+        target_thread: threading.Thread | None = None
+        if target_writer is not None:
+            target_thread = threading.Thread(
+                target=target_writer.follow,
+                args=(stop_requested,),
+                name="target-pod-snapshot",
+                daemon=True,
+            )
+            target_thread.start()
         try:
             try:
                 for group in groups:
@@ -651,6 +889,9 @@ def run(
                 final_state = "stopped"
                 return 0
         finally:
+            stop_requested.set()
+            if target_thread is not None:
+                target_thread.join(timeout=TARGET_QUERY_TIMEOUT_S + 1)
             for group in groups:
                 _stop_children(group)
             supervisor.write(final_state=final_state)
@@ -684,17 +925,46 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="DROPPED 기본 필터를 해제해 FORWARDED를 포함한 모든 verdict를 저장",
     )
+    parser.add_argument(
+        "--target-selector",
+        metavar="KEY=VALUE[,KEY=VALUE]",
+        help="이 selector의 Pod 최소 스냅샷을 target-pods.json에 주기적으로 기록",
+    )
+    parser.add_argument(
+        "--target-namespace",
+        default=LAB_NAMESPACE,
+        metavar="NAME",
+        help="대상 Pod namespace (기본: serving-lab)",
+    )
+    parser.add_argument(
+        "--target-interval",
+        type=_target_interval_argument,
+        default=DEFAULT_TARGET_INTERVAL_S,
+        metavar="SECONDS",
+        help=(
+            "대상 Pod 조회 간격 (기본: 5, 최대: 5). 조회 제한 4초와 Gateway "
+            "poll 5초를 더한 최악 age를 stale 15초보다 작게 유지"
+        ),
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        target_selector = (
+            parse_label_selector(args.target_selector)
+            if args.target_selector is not None
+            else None
+        )
         return run(
             args.output_dir.expanduser(),
             args.kube_context,
             include_forwarded=args.include_forwarded,
             reader_gid=args.reader_group,
+            target_selector=target_selector,
+            target_namespace=args.target_namespace,
+            target_interval_s=args.target_interval,
         )
     except ReaderGroupError as error:
         # Configuration error: exit 2 so a supervisor does not restart in a loop.

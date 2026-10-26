@@ -386,3 +386,51 @@ def test_sup04_executor_to_rpt_preserves_contract_verdicts_and_exact_refs(
     assert rpt == before and report.hash_ok()
     for obj in (env, pol, plan, evidence, result):
         assert store.resolve(obj.ref()).to_dict() == originals[obj.id]
+
+
+@pytest.mark.parametrize("approved", [True, False])
+def test_sup03_saved_observation_projects_unknown_without_consumption_claim(
+        tmp_path, contracts, current_pack, approved):
+    """수집기는 guard suite에서 검증한다. 여기서는 EXAMPLE 저장 EVD의 경계를 확인한다."""
+    store = Store(tmp_path / "observation-store")
+    env = Environment(id=new_id("ENV"), created_at=T0, data_origin="EXAMPLE",
+                      engine={"name": "vllm", "version": "0.31.0"}, model={"id": "EXAMPLE-model"}).seal()
+    pol = Policy(id=new_id("POL"), created_at=T0, data_origin="EXAMPLE", status="DRAFT",
+                 pack=current_pack.ref(), scope={"include": ["SUP-03"], "exclude": []},
+                 values={"SUP-03": {"allowed_template_sha256": ["a" * 64] if approved else []}}).seal()
+    store.put_many([env, pol])
+    plan = select(current_pack, [env], pol)
+    store.put(plan)
+    check = current_pack.checks["SUP-03"]
+    observations = {
+        "selected_template_sha256": "a" * 64, "template_identity_verified": True,
+        "selected_template_approved": approved, "input_projection_exact_match": True,
+        "template_consumer_verified": False, "supply_scope_complete": False,
+        "functional_probes_planned": ["POST /v1/chat/completions"],
+        "functional_probe_results": {"POST /v1/chat/completions": "pass"},
+    }
+    evidence = Evidence(
+        id=new_id("EVD"), created_at=T0, data_origin="EXAMPLE",
+        refs=[env.ref(), pol.ref(), plan.ref()], plan=plan.ref(), check_id="SUP-03", side="single",
+        environment=env.ref(), execution={"status": "COMPLETED", "executor": {
+            "name": "example-contract-fixture", "version": "1", "config_sha256": "b" * 64}},
+        normal_control={"attempted": True, "succeeded": True},
+        challenges=[{"step": step, "attempted": False} for step in check.challenge_steps],
+        observations={key: {"value": value, "collected": True} for key, value in observations.items()},
+    ).seal()
+    store.put(evidence)
+    (result,) = judge_plan(store, current_pack, plan, as_of=T0)
+    report = build_report(store, current_pack, plan, T0)
+    before = deepcopy(report.to_dict())
+    converted = rpt_to_verification_result(before)
+    assert contracts.errors("verification-result", converted) == []
+    row = next(item for item in converted["checks"] if item["check_id"] == "SUP-03")
+    side = row["sides"]["single"]
+    assert side["security"] == side["functional"] == side["performance"] == "UNKNOWN"
+    assert side["result_ref"] == result.ref().model_dump(mode="json")
+    assert result.evidence == evidence.ref()
+    assert evidence.ref().model_dump(mode="json") in converted["inputs_manifest"]
+    assert converted["official"] is False and converted["data_origin"] == "EXAMPLE"
+    assert any("API" in limitation and "projection" in limitation for limitation in converted["limitations"])
+    assert report.to_dict() == before and report.hash_ok()
+    assert store.resolve(evidence.ref()).observations["selected_template_approved"].value is approved

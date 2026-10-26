@@ -1,5 +1,6 @@
 # DECISIONS
 
+- 2026-10-26 · SUP-03은 readonly template 현재 bytes·소유/전후 신원·승인 목록 membership·엔진 API 입력 projection의 관측 전용으로 연결하고 보안·기능 PASS/FAIL 규칙을 두지 않는다. 과거 팩24 수동 계약은 보존하고 새 수동 PASS는 기존 bounded 지원 밖으로 보류한다. · 기동 시 loaded bytes와 독립 worker 소비가 미확인이므로 비승인 mount를 실제 소비 FAIL로 오인하지 않기 위함이다.
 - 2026-10-26 · BYUL import 묶음은 원본 bytes·정규 해시·guard 봉인·정확 Ref·변환 내용·import 및 재검증 시각의 정책 유효성을 읽기 전용으로 확인하며 execution_ready는 null로 둔다. · 로컬 provenance는 진위 인증이 아니며 반입 일관성 검증을 엔진 기동 승인이나 이후 실행 시 자동 집행으로 오해하지 않기 위함이다.
 
 - 2026-10-26 · SUP-04는 기존 container_config의 실행 이미지 승인 부분관측으로 연결하고 명시 승인 목록·소유 컨테이너·실제 image ID의 RepoDigest·전후 identity를 모두 확인할 때만 비승인 FAIL을 판정한다. 승인 일치의 전체 보안 PASS는 보류하며 정적 버전 0.5.0과 동적 fixture 이월 불가를 적용한다. · manifest와 local image ID의 혼동·수집 오류로 인한 FAIL 소실·과거 증거의 소급 해석을 막기 위함이다.

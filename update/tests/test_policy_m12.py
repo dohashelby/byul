@@ -64,19 +64,19 @@ def result(check, evd, vals):
 
 def test_registration_catalog_template_and_no_automation(pack):
     c=pack.checks["REQ-16"]
-    assert (pack.manifest.revision,c.revision)==(24,3) and not pack.reviewed
+    assert (pack.manifest.revision,c.revision)==(25,3) and not pack.reviewed
     assert [(p.key,p.type,p.required) for p in c.policy_params]==[("required_cache_contexts","list[str]",True)]
     assert [(o.key,o.type) for o in c.required_observations]==[("declared_cache_context_evidence","dict")]
     assert c.executor is c.judge is None and len(pack.checks)==77
-    assert sum(bool(c.policy_params) for c in pack.active_checks())== 23
-    assert sum(len(c.policy_params) for c in pack.active_checks())== 51
-    assert {c.id for c in pack.active_checks() if c.executor}=={"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09", "SUP-04"}
+    assert sum(bool(c.policy_params) for c in pack.active_checks())== 24
+    assert sum(len(c.policy_params) for c in pack.active_checks())== 52
+    assert {c.id for c in pack.active_checks() if c.executor}=={"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09", "SUP-04", "SUP-03"}
     text=build_policy_template(pack); doc=yaml.safe_load(text)
     assert doc["values"]["REQ-16"]=={} and "required_cache_contexts" in text
     assert doc["status"]=="DRAFT" and doc["confirmed_by"] is None
     assert not pack.checks["REQ-17"].policy_params and pack.checks["REQ-15"].executor is None
     rows=list(csv.DictReader((ROOT/"docs/policy_catalog.csv").open(encoding="utf-8",newline="")))
-    assert len(rows)==324 and sum(len(json.loads(r["check_ids"])) for r in rows)==616
+    assert len(rows)==325 and sum(len(json.loads(r["check_ids"])) for r in rows)==617
     row=next(r for r in rows if r["proposed_policy_id"]=="P-DRAFT-CACHE-CONTEXT")
     assert json.loads(row["check_ids"])==["REQ-15","REQ-16","REQ-17"]
     assert json.loads(row["current_param_paths"])==["values.REQ-16.required_cache_contexts"]
@@ -86,7 +86,7 @@ def test_registration_catalog_template_and_no_automation(pack):
 
 @pytest.mark.parametrize("bad", [None,False,"model_generation",[1],{},[True],1.0])
 def test_select_type_error_even_outside_scope(pack,bad):
-    pol=policy(pack.ref(),scope={"include":["SUP-03"]},values={"REQ-16":{cache.POLICY:bad}})
+    pol=policy(pack.ref(),scope={"include":["SUP-05"]},values={"REQ-16":{cache.POLICY:bad}})
     with pytest.raises(PolicyValueError,match="REQ-16"):
         select(pack,[environment()],pol)
 
@@ -188,7 +188,7 @@ def test_contract_markers_and_existing_checks(pack,kind):
     elif kind=="partial_policy": c.required_observations=[]
     elif kind=="partial_observation": c.policy_params=[]
     elif kind=="wrong_type": c.required_observations[0].type="str"
-    else: c=pack.checks["SUP-03"]; evd=_manual_evidence(c,dict.fromkeys(AXES,"PASS")); vals={}
+    else: c=pack.checks["SUP-05"]; evd=_manual_evidence(c,dict.fromkeys(AXES,"PASS")); vals={}
     r=result(c,evd,vals)
     expected="PASS" if kind in ("legacy","other") else "UNKNOWN"
     assert all(v==expected for v in r.verdicts.values())

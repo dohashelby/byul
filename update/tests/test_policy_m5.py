@@ -84,7 +84,7 @@ def test_inference_conflict_still_prevents_unproved_pass(pack):
 
 
 def test_approval_declarations_are_two_scalar_paths_not_item_evidence(pack):
-    assert pack.manifest.revision == 24 and not pack.reviewed
+    assert pack.manifest.revision == 25 and not pack.reviewed
     for cid in ("SUP-01", "SUP-02"):
         c = pack.checks[cid]
         assert c.revision == 3
@@ -97,13 +97,13 @@ def test_approval_declarations_are_two_scalar_paths_not_item_evidence(pack):
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
     row = next(r for r in rows if r["proposed_policy_id"] == "P-DRAFT-SUP-GOV-TOOL")
     assert row["classification"] == "a" and len(json.loads(row["current_param_paths"])) == 2
-    assert len(rows) == 324 and sum(len(json.loads(r["check_ids"])) for r in rows) == 616
+    assert len(rows) == 325 and sum(len(json.loads(r["check_ids"])) for r in rows) == 617
 
 
 @pytest.mark.parametrize("cid", ["SUP-01", "SUP-02"])
 @pytest.mark.parametrize("bad", [None, [], {}, 1, False])
 def test_approval_invalid_type_rejected_even_outside_selected_scope(pack, cid, bad):
-    pol = policy(pack.ref(), scope={"include": ["SUP-03"]}, values={cid: {"approval_record_system": bad}})
+    pol = policy(pack.ref(), scope={"include": ["SUP-05"]}, values={cid: {"approval_record_system": bad}})
     with pytest.raises(PolicyValueError, match=cid):
         select(pack, [environment()], pol)
 

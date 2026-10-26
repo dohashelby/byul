@@ -75,7 +75,7 @@ BYUL_EXAMPLES_DIR=../.demo-data uv run byul-platform
 | 대시보드 | `/dashboard` | 요청 집계(runtime `/api/summary`), 정책·수집기 상태, 최신 검증 결과, 열린 재검증 수, 시간대별 요청·사건 그래프 |
 | 환경 / 정책 | `/environments`, `/policies`, `…/new`, `…/:id` | 플랫폼 저장소. 구역별 폼, 서버 스키마 검증 오류를 필드 옆에 표시, 판본 이력과 diff |
 | 검증 결과 | `/update/results` | update RPT → `verification-result` |
-| 재검증 요청 | `/update/revalidation` | runtime `/api/revalidation` → `revalidation-request` (시작 버튼 없음) |
+| 재검증 요청 | `/runtime/revalidation` (이전 `/update/revalidation`) | runtime `/api/revalidation` → `revalidation-request` (시작 버튼 없음) |
 | 요청 내역 | `/runtime/requests` | runtime 요청 기록 → `runtime-event`(source=gateway) |
 | 사건 로그 | `/runtime/events` | Gateway·Hubble·Tetragon 기록 → `runtime-event`. 왼쪽 탐색·가운데 목록·오른쪽 상세(개요·원본·연결) |
 | 상태 | `/runtime/status` | `runtime-status`, 구성 비교(`/api/baseline`), 대상 비교(`/api/target`) |

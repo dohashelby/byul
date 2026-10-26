@@ -10,7 +10,8 @@ export default defineConfig({
     // 테스트가 ../../contracts/examples를 픽스처로 읽는다.
     fs: { allow: [".", "../../contracts"] },
   },
-  build: { outDir: "dist", sourcemap: false },
+  // 루프백 전용 화면이라 한 묶음(약 900 kB)으로 둔다.
+  build: { outDir: "dist", sourcemap: false, chunkSizeWarningLimit: 1000 },
   test: {
     environment: "jsdom",
     include: ["tests/**/*.test.{ts,tsx}"],

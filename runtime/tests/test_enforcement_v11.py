@@ -527,5 +527,67 @@ class AdapterIntegrationTests(unittest.TestCase):
         self.assertIn("CACHE-02", accepted[1]["rule_refs"])
 
 
+class CacheMountPathTests(unittest.TestCase):
+    """AWS lab layout: only the current generation is mounted at /cache."""
+
+    AWS_INTENT = Path(__file__).resolve().parents[1] / "deploy" / "gpu-lab" / "intent.aws-lab.json"
+
+    def mounted_document(self) -> dict:
+        document = v11_document()
+        document["assets"]["cache_root"] = "/srv/serving/cache"
+        document["assets"]["cache_mount_path"] = "/cache"
+        document["protected_paths"]["cache_dir"] = "/cache"
+        return document
+
+    def test_watch_root_mount_and_candidate_follow_the_mount(self) -> None:
+        intent = parse_intent(self.mounted_document())
+        assets = intent.assets
+        assert assets is not None
+        self.assertEqual(assets.engine_cache_path, "/cache")
+        self.assertEqual(assets.engine_cache_watch_root, "/cache")
+        self.assertEqual(
+            assets.generation_path,
+            "/srv/serving/cache/vllm/image-example/revision-example/default",
+        )
+        documents = tetragon.render_manifests(intent)
+        values = documents["tetragon-tg-cache-01.json"]["spec"]["kprobes"][0]["selectors"][0]["matchArgs"][0]["values"]
+        self.assertEqual(values, ["/cache"])
+        candidate = render_pod_security(intent)
+        mount = next(m for m in candidate["engine"]["volumeMounts"] if m["name"] == "serving-cache")
+        self.assertEqual(mount["mountPath"], "/cache")
+        self.assertEqual(mount["subPath"], "vllm/image-example/revision-example/default")
+
+    def test_writes_and_exec_are_classified_against_the_mount(self) -> None:
+        policy = ExecPolicy(parse_intent(self.mounted_document()))
+        self.assertEqual(policy.classify_cache_write("/cache/vllm/x.bin")["cache_generation"], "current")
+        self.assertEqual(policy.classify_cache_write("/tmp/x.bin")["cache_generation"], "outside")
+        verdict = policy.classify_exec(
+            binary="/cache/evil", parent=None, image=None, observed_at="2026-10-24T09:20:00+00:00"
+        )
+        self.assertEqual(verdict["exec_verdict"], "exec_from_cache")
+
+    def test_cache_dir_must_be_the_mount_and_separate_from_supply(self) -> None:
+        wrong = self.mounted_document()
+        wrong["protected_paths"]["cache_dir"] = "/srv/serving/cache/vllm/image-example/revision-example/default"
+        with self.assertRaisesRegex(IntentError, "engine-side cache path"):
+            parse_intent(wrong)
+        overlapping = self.mounted_document()
+        overlapping["assets"]["cache_mount_path"] = "/opt/serving/assets/model/cache"
+        overlapping["protected_paths"]["cache_dir"] = "/opt/serving/assets/model/cache"
+        with self.assertRaisesRegex(IntentError, "separate from supply"):
+            parse_intent(overlapping)
+
+    def test_without_mount_path_behaviour_is_unchanged(self) -> None:
+        intent = parse_intent(v11_document())
+        self.assertIsNone(intent.assets.cache_mount_path)
+        self.assertEqual(intent.assets.engine_cache_watch_root, intent.assets.cache_root)
+
+    def test_aws_lab_intent_parses_and_watches_cache_mount(self) -> None:
+        intent = load_intent(self.AWS_INTENT)
+        self.assertEqual(intent.assets.engine_uid, 2000)
+        self.assertEqual(intent.assets.engine_cache_watch_root, "/cache")
+        self.assertEqual(intent.protected_paths.model_dir, "/models")
+
+
 if __name__ == "__main__":
     unittest.main()

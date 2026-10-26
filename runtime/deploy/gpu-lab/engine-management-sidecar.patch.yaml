@@ -1,0 +1,52 @@
+# Strategic merge patch for the AWS bundle's serving-engine Deployment. It
+# only adds the read-only management listener sidecar; the bundle's engine
+# container, UID 2000:0, RuntimeClass nvidia and volumes stay unchanged.
+#
+#   kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine \
+#     --type strategic --patch-file deploy/gpu-lab/engine-management-sidecar.patch.yaml
+#
+# Replace REPLACE_GATEWAY_TAG first (same image as the Gateway). The patch
+# changes the Pod template, so the Recreate strategy restarts the engine (GPU
+# released and loaded again, cold start).
+#
+# The bundle's 03-engine-smoke.sh uses client-side `kubectl apply`. `kubectl
+# patch` does not update last-applied-configuration, so a later 03 apply is
+# expected to KEEP this sidecar (unverified on a cluster) and 03 evidence would
+# then include it. Remove the sidecar before re-running 03 and re-apply after:
+#   kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine --type strategic \
+#     -p '{"spec":{"template":{"spec":{"containers":[{"name":"management-listener","$patch":"delete"}]}}}}'
+# The lasting fix is to add the container to engine.yaml.template (README.md).
+#
+# The sidecar requests no GPU. It runs under the Pod's RuntimeClass nvidia, but
+# the device plugin injects GPU devices only into the container that requests
+# nvidia.com/gpu.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving-engine
+spec:
+  template:
+    spec:
+      containers:
+        - name: management-listener
+          image: serving-gateway:REPLACE_GATEWAY_TAG
+          imagePullPolicy: Never
+          args:
+            - management-listener
+            - --listen-host
+            - 0.0.0.0
+            - --listen-port
+            - "8001"
+            - --engine-url
+            - http://127.0.0.1:8000
+          ports:
+            - {name: management, containerPort: 8001}
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: "50m", memory: 64Mi}
+            limits: {cpu: "200m", memory: 128Mi}

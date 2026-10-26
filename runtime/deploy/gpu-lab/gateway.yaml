@@ -1,0 +1,95 @@
+# Gateway: our code (deploy/gateway/Dockerfile), ServiceAccount "gateway"
+# from the AWS bundle foundation.yaml. The MVP Gateway binds 127.0.0.1 only;
+# reach it with an SSH tunnel plus
+#   kubectl --context byul-aws-lab -n serving-lab port-forward deploy/serving-gateway 8080
+#
+# Host directories (prepared by the administrator, README.md):
+#   /srv/serving/runtime/data   Gateway records, owner 10000, 0700
+#   /srv/serving/bundles        platform policy bundles, read-only here
+#   /srv/serving/observation    host collector output, group 10010 read-only
+# The auth config is a Secret with token hashes only:
+#   kubectl -n serving-lab create secret generic serving-gateway-auth --from-file=auth.json
+# The enforcement intent comes in the bundle (role enforcement_intent); it is
+# applied because the Tetragon feed below is configured.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving-gateway
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: serving-gateway}
+  template:
+    metadata:
+      labels: {app: serving-gateway}
+    spec:
+      serviceAccountName: gateway
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        # 10000 is a project choice (appendix I.4 names no Gateway UID).
+        runAsUser: 10000
+        runAsGroup: 10000
+        # 10010 = host group that may read the collector output (README.md).
+        supplementalGroups: [10010]
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: gateway
+          image: serving-gateway
+          imagePullPolicy: Never
+          args:
+            - mvp
+            - --backend
+            - vllm
+            - --backend-config
+            - /etc/serving/backend/backend.json
+            - --policy-bundle
+            - /etc/serving/bundles/current
+            - --auth-config
+            - /etc/serving/auth/auth.json
+            - --gateway-port
+            - "8080"
+            - --data-dir
+            - /srv/serving/runtime/data
+            - --environment
+            - aws-lab
+            - --observation-feed
+            - hubble=/srv/serving/observation/hubble.jsonl
+            - --observation-feed
+            - tetragon=/srv/serving/observation/tetragon.jsonl
+            - --observation-heartbeat
+            - hubble=/srv/serving/observation/hubble.heartbeat.json
+            - --observation-heartbeat
+            - tetragon=/srv/serving/observation/tetragon.heartbeat.json
+            - --observation-origin
+            - real
+            - --observation-environment
+            - aws-lab
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: "500m", memory: 512Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - {name: backend-config, mountPath: /etc/serving/backend, readOnly: true}
+            - {name: bundles, mountPath: /etc/serving/bundles, readOnly: true}
+            - {name: auth, mountPath: /etc/serving/auth, readOnly: true}
+            - {name: runtime-data, mountPath: /srv/serving/runtime/data}
+            - {name: observation, mountPath: /srv/serving/observation, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: backend-config
+          configMap: {name: serving-gateway-backend}
+        - name: bundles
+          hostPath: {path: /srv/serving/bundles, type: Directory}
+        - name: auth
+          secret: {secretName: serving-gateway-auth}
+        - name: runtime-data
+          hostPath: {path: /srv/serving/runtime/data, type: Directory}
+        - name: observation
+          hostPath: {path: /srv/serving/observation, type: Directory}
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}

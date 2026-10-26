@@ -202,6 +202,44 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# Optional read-only sharing with one group (for example the Gateway Pod's
+# supplemental group). Files stay owner-writable only; the group may read.
+_reader_gid: int | None = None
+
+
+def _share(path: Path, *, directory: bool = False) -> None:
+    if _reader_gid is None:
+        return
+    os.chown(path, -1, _reader_gid, follow_symlinks=False)
+    os.chmod(path, 0o750 if directory else 0o640)
+
+
+def _share_fd(descriptor: int) -> None:
+    """Share a file through its open descriptor (no path lookup race)."""
+
+    if _reader_gid is None:
+        return
+    os.fchown(descriptor, -1, _reader_gid)
+    os.fchmod(descriptor, 0o640)
+
+
+class ReaderGroupError(ValueError):
+    """The collector process is not a member of the requested reader group."""
+
+
+def check_reader_group(gid: int | None) -> None:
+    # A non-root process can only chgrp to a group it belongs to. After
+    # `usermod -aG`, an already running systemd user manager keeps the old
+    # group list, so fail clearly instead of crash-looping on EPERM.
+    if gid is None:
+        return
+    if gid != os.getegid() and gid not in os.getgroups():
+        raise ReaderGroupError(
+            f"이 프로세스는 그룹 {gid}에 속하지 않아 --reader-group으로 공유할 수 없습니다. "
+            "그룹 추가 뒤 모든 세션을 끝내거나 사용자 매니저를 다시 시작하고 `id -G`로 확인하세요"
+        )
+
+
 def _write_json_atomic(path: Path, document: dict[str, object]) -> None:
     encoded = (json.dumps(document, ensure_ascii=False) + "\n").encode("utf-8")
     temporary = path.with_name(f".{path.name}.{os.getpid()}.{uuid4().hex}.tmp")
@@ -214,6 +252,7 @@ def _write_json_atomic(path: Path, document: dict[str, object]) -> None:
         )
         with os.fdopen(descriptor, "wb") as output:
             descriptor = -1
+            _share_fd(output.fileno())
             output.write(encoded)
             output.flush()
             os.fsync(output.fileno())
@@ -357,6 +396,7 @@ class _NotStarted:
 def _append_gap(path: Path, record: dict[str, object]) -> None:
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
     with os.fdopen(descriptor, "ab") as output:
+        _share_fd(output.fileno())
         output.write((json.dumps(record, ensure_ascii=False) + "\n").encode("utf-8"))
         output.flush()
         os.fsync(output.fileno())
@@ -508,12 +548,20 @@ def run(
     *,
     include_forwarded: bool = False,
     max_ticks: int | None = None,
+    reader_gid: int | None = None,
 ) -> int:
+    global _reader_gid
     assert_safe_context(context)
+    check_reader_group(reader_gid)
+    _reader_gid = reader_gid
     output_dir = output_dir.absolute()
     output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    _share(output_dir, directory=True)
     hubble_path = output_dir / "hubble.jsonl"
     tetragon_path = output_dir / "tetragon.jsonl"
+    for feed_file in (hubble_path, tetragon_path):
+        feed_file.touch(mode=0o600, exist_ok=True)
+        _share(feed_file)
     stop_requested = threading.Event()
     final_state = "error"
     with (
@@ -623,6 +671,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument(
+        "--reader-group",
+        type=int,
+        metavar="GID",
+        help=(
+            "feed·heartbeat·gap 파일을 이 그룹에 읽기 전용(0640, 폴더 0750)으로 공유 "
+            "(예: Gateway Pod의 supplementalGroups). 생략하면 소유자만 읽음"
+        ),
+    )
+    parser.add_argument(
         "--include-forwarded",
         action="store_true",
         help="DROPPED 기본 필터를 해제해 FORWARDED를 포함한 모든 verdict를 저장",
@@ -637,7 +694,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.output_dir.expanduser(),
             args.kube_context,
             include_forwarded=args.include_forwarded,
+            reader_gid=args.reader_group,
         )
+    except ReaderGroupError as error:
+        # Configuration error: exit 2 so a supervisor does not restart in a loop.
+        print(f"관측 feed 실행 실패: {error}", file=sys.stderr)
+        return 2
     except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as error:
         print(f"관측 feed 실행 실패: {error}", file=sys.stderr)
         return 1

@@ -120,10 +120,26 @@ class AssetsIntent:
     engine_uid: int
     acquire_uid: int | None
     probe_uid: int | None
+    # Where the engine container sees its current generation when it is
+    # mounted alone (for example the AWS lab mounts it at /cache). cache_root
+    # and the generation path then describe the host directory tree.
+    cache_mount_path: str | None = None
 
     @property
     def generation_path(self) -> str:
         return self.cache_generation.path(self.cache_root)
+
+    @property
+    def engine_cache_path(self) -> str:
+        """The current generation as the engine process sees it."""
+
+        return self.cache_mount_path or self.generation_path
+
+    @property
+    def engine_cache_watch_root(self) -> str:
+        """Prefix for engine-side cache events (Tetragon, exec-from-cache)."""
+
+        return self.cache_mount_path or self.cache_root
 
 
 @dataclass(frozen=True)
@@ -537,6 +553,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
                     "engine_uid",
                     "acquire_uid",
                     "probe_uid",
+                    "cache_mount_path",
                 },
             )
             generation_raw = _object(
@@ -569,15 +586,32 @@ def parse_intent(document: Any) -> EnforcementIntent:
                 _uid(_required(assets_raw, "engine_uid", "$.assets"), "$.assets.engine_uid"),
                 uids["acquire_uid"],
                 uids["probe_uid"],
+                (
+                    _absolute_path(assets_raw["cache_mount_path"], "$.assets.cache_mount_path")
+                    if "cache_mount_path" in assets_raw
+                    else None
+                ),
             )
             declared = [assets.engine_uid, *(uid for uid in uids.values() if uid is not None)]
             if len(set(declared)) != len(declared):
                 raise IntentError("$.assets engine/acquire/probe UIDs must be different accounts")
-            if protected.cache_dir != assets.generation_path:
+            if protected.cache_dir != assets.engine_cache_path:
                 raise IntentError(
-                    "$.protected_paths.cache_dir must equal the cache generation path "
-                    f"{assets.generation_path}"
+                    "$.protected_paths.cache_dir must equal the engine-side cache path "
+                    f"{assets.engine_cache_path}"
                 )
+            if assets.cache_mount_path is not None:
+                mount = Path(assets.cache_mount_path)
+                for supply in filter(
+                    None,
+                    (protected.model_dir, assets.tokenizer_dir, str(Path(assets.manifest_path).parent)),
+                ):
+                    if mount.is_relative_to(supply) or Path(supply).is_relative_to(mount):
+                        raise IntentError("$.assets.cache_mount_path must be separate from supply paths")
+            # With cache_mount_path, cache_root is a host path while the supply
+            # paths are container paths, so this host/container comparison no
+            # longer constrains anything; the mount check above guards the
+            # container side instead.
             for supply in filter(None, (protected.model_dir, assets.tokenizer_dir)):
                 if Path(supply).is_relative_to(assets.cache_root) or Path(
                     assets.cache_root

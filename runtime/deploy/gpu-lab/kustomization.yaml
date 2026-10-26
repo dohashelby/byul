@@ -1,0 +1,22 @@
+# runtime layer on top of the AWS install bundle (aws-handoff-20261026).
+# The bundle owns the namespace, RuntimeClass, ServiceAccounts, observer Role,
+# the serving-engine Deployment/Service and the engine-runtime NetworkPolicy;
+# this layer only adds what runtime needs. Render only with:
+#   kubectl kustomize deploy/gpu-lab
+# Replace REPLACE_GATEWAY_TAG after importing the image (README.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: serving-lab
+resources:
+  - backend-config.yaml
+  - gateway.yaml
+  - management-service.yaml
+  - network-policies.yaml
+  - observer.yaml
+  - test-pods.yaml
+images:
+  - name: serving-gateway
+    newTag: REPLACE_GATEWAY_TAG
+  - name: serving-tools
+    newName: python
+    digest: sha256:REPLACE_WITH_PYTHON_3_12_SLIM_DIGEST

@@ -1,9 +1,0 @@
-# One namespace, as the existing tools and intent files assume. Roles are
-# separated by ServiceAccount, labels and UID (appendix I.4).
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: serving-lab
-  labels:
-    pod-security.kubernetes.io/enforce: restricted
-    pod-security.kubernetes.io/enforce-version: latest

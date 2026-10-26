@@ -1,0 +1,46 @@
+{
+  "schema": "runtime-enforcement-intent/1.1",
+  "namespace": "serving-lab",
+  "gateway": {"labels": {"app": "serving-gateway"}},
+  "engine": {"labels": {"app": "serving-engine"}, "port": 8000, "management_port": 8001},
+  "metrics_collectors": [{"labels": {"app": "serving-observer"}}],
+  "dns": {"namespace": "kube-system", "labels": {"k8s-app": "kube-dns"}, "port": 53},
+  "engine_egress_allow": [],
+  "acquire": {
+    "labels": {"app": "artifact-acquire"},
+    "egress_allow": [
+      {"endpoint": {"app": "test-receiver"}, "port": 8080, "protocol": "TCP"}
+    ]
+  },
+  "test_receivers": [
+    {"name": "fixture", "labels": {"app": "test-receiver"}, "port": 8080, "allowed_from": ["acquire"]}
+  ],
+  "observer_kube_api": false,
+  "protected_paths": {
+    "model_dir": "/models",
+    "cache_dir": "/cache",
+    "secret_paths": ["/var/run/secrets/kubernetes.io/serviceaccount"]
+  },
+  "assets": {
+    "manifest_path": "/models/.byul-model-ready.json",
+    "cache_root": "/srv/serving/cache",
+    "cache_mount_path": "/cache",
+    "cache_generation": {
+      "engine": "vllm",
+      "image_id": "REPLACE_IMAGE_DIGEST_HEX",
+      "model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+      "compile_profile": "REPLACE_PROFILE-profile-01"
+    },
+    "engine_uid": 2000,
+    "acquire_uid": 10002,
+    "probe_uid": 10003
+  },
+  "allowed_engine_binaries": ["/usr/local/bin/vllm-nonroot-entrypoint.sh"],
+  "phase_binaries": {
+    "loading": ["/usr/bin/python3"],
+    "compiling": ["/usr/bin/python3"],
+    "inferring": ["/usr/bin/python3"]
+  },
+  "suspect_binaries": ["/bin/sh", "/bin/bash", "/usr/bin/curl", "/usr/bin/wget"],
+  "tetragon_mode": "monitor"
+}

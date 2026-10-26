@@ -126,9 +126,9 @@ python3 -m venv .venv
 
 묶음의 `approval` 블록은 승인으로 신뢰하지 않습니다. `policy_approvals` 역할만 기존 승인 목록 검증에 사용합니다. 검증한 파일 바이트는 프로세스 전용 시작 스냅샷으로 고정하므로 관리 디렉터리의 새 묶음 적용에는 runtime 재시작이 필요합니다. 원격 전달과 hot reload는 아직 없습니다. 상세 결정은 `docs/결정기록_정책묶음_수신.md`에 있습니다.
 
-### 정식 GPU lab 배포 파일과 Gateway 이미지 (초안)
+### AWS GPU lab 배포 층과 Gateway 이미지 (초안)
 
-`deploy/gpu-lab/`은 계획서 §3.5·부록 I.4를 따른 kustomize 묶음(base + `overlays/vllm`·`overlays/sglang`)이고, `deploy/gateway/Dockerfile`은 시험 자산 없이 runtime 코드만 담는 Gateway 이미지 정의입니다(표준 라이브러리만 쓰므로 설치 단계·네트워크 없이 빌드). 서버에서만 알 수 있는 값(노드 이름, 이미지 digest, 모델·캐시 세대 경로, 모델 반입 명령)은 `REPLACE…`로 비워 두었고 클러스터에 적용하지 않았습니다. `kubectl kustomize deploy/gpu-lab/overlays/vllm`으로 렌더링만 확인합니다. 채울 값과 미확인 범위는 `deploy/gpu-lab/README.md`에 있습니다.
+`deploy/gpu-lab/`은 AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`) **위에 얹는** runtime 쪽 파일입니다. 엔진(vLLM, UID 2000:0, RuntimeClass `nvidia`)·namespace·계정·엔진 격리 정책은 AWS 묶음이 만들고, 여기서는 Gateway(정책 묶음·인증·관측 기록 연결), 엔진 Pod에 붙이는 관리 수신부 사이드카 patch, observer 자리, observer→8001 정책, AWS 값으로 만든 intent(`intent.aws-lab.json`), AWS 호스트에서 수집기를 계속 돌리는 systemd 서비스만 더합니다. `deploy/gateway/Dockerfile`은 runtime 코드만 담는 Gateway 이미지 정의입니다(설치 단계·네트워크 없이 빌드, 노드 containerd에 직접 import). 수집기는 `--reader-group GID`로 feed·heartbeat·gap 파일을 한 그룹에만 읽기 전용으로 공유할 수 있습니다. 클러스터에는 적용하지 않았고 `kubectl kustomize deploy/gpu-lab`로 렌더링만 확인합니다. 순서·채울 값·환경 담당에게 요청할 변경(캐시 마운트 경로 등)은 `deploy/gpu-lab/README.md`, 엔진 UID 결정은 `docs/결정기록_엔진UID.md`에 있습니다.
 
 ### 정책 1.1과 상태 판정
 

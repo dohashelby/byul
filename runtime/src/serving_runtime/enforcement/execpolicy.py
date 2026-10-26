@@ -436,7 +436,7 @@ class ExecPolicy:
         )
         for phase in trusted:
             trusted_approved |= set(intent.binaries_for(phase))
-        cache_root = intent.assets.cache_root if intent.assets is not None else None
+        cache_root = intent.assets.engine_cache_watch_root if intent.assets is not None else None
         from_cache = cache_root is not None and Path(binary).is_relative_to(cache_root)
 
         def covering(phases: list[str]) -> ExecException | None:
@@ -493,7 +493,10 @@ class ExecPolicy:
         assets = self.intent.assets
         if assets is None:
             return {}
-        if Path(path).is_relative_to(assets.generation_path):
+        if assets.cache_mount_path is not None:
+            # Only the current generation is mounted; nothing else is visible.
+            generation = "current" if Path(path).is_relative_to(assets.cache_mount_path) else "outside"
+        elif Path(path).is_relative_to(assets.generation_path):
             generation = "current"
         elif Path(path).is_relative_to(assets.cache_root):
             generation = "other"

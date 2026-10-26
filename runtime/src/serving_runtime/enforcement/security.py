@@ -48,7 +48,7 @@ def render_pod_security(intent: EnforcementIntent) -> dict[str, Any] | None:
     engine_mounts.append(
         {
             "name": "serving-cache",
-            "mountPath": generation,
+            "mountPath": assets.engine_cache_path,
             "subPath": str(Path(generation).relative_to(assets.cache_root)),
             "readOnly": False,
         }
@@ -69,7 +69,7 @@ def render_pod_security(intent: EnforcementIntent) -> dict[str, Any] | None:
             "securityContext": _security_context(assets.engine_uid),
             "volumeMounts": engine_mounts,
             "cacheEnvironmentCandidates": (
-                [{"name": "VLLM_CACHE_ROOT", "value": generation}]
+                [{"name": "VLLM_CACHE_ROOT", "value": assets.engine_cache_path}]
                 if assets.cache_generation.engine == "vllm"
                 else []
             ),

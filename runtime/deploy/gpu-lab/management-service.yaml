@@ -1,0 +1,13 @@
+# The AWS bundle's serving-engine Service exposes only 8000. The management
+# listener sidecar (engine-management-sidecar.patch.yaml) listens on 8001; this
+# separate Service gives the observer a name for it without touching the
+# bundle's Service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: serving-engine-management
+spec:
+  type: ClusterIP
+  selector: {app: serving-engine}
+  ports:
+    - {name: management, port: 8001, targetPort: 8001}

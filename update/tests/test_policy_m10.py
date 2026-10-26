@@ -104,15 +104,15 @@ def test_registration_is_bounded_and_template_empty(pack):
     assert check.revision == 7 and pack.manifest.revision == 25 and not pack.reviewed
     assert contract_state(check) == "complete" and len(check.required_observations) == 10
     assert len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 23
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 51
-    assert len([c for c in pack.active_checks() if c.executor]) == 12
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 24
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 52
+    assert len([c for c in pack.active_checks() if c.executor]) == 13
     template = yaml.safe_load(build_policy_template(pack))
     assert template["values"]["REQ-09"] == {} and template["status"] == "DRAFT"
     assert template["confirmed_by"] is None and template["confirmed_at"] is None
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
-    assert len(rows) == 324 and sum(len(json.loads(r["check_ids"])) for r in rows) == 616
-    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=48, b=2, c=161, d=113)
+    assert len(rows) == 325 and sum(len(json.loads(r["check_ids"])) for r in rows) == 617
+    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=49, b=2, c=161, d=113)
     for pid, key in zip(("P-DRAFT-INPUT-ENDPOINTS", "P-DRAFT-INPUT-FORMATS"), POLICIES):
         row = next(r for r in rows if r["proposed_policy_id"] == pid)
         assert row["classification"] == "a" and json.loads(row["current_param_paths"]) == [f"values.REQ-09.{key}"]
@@ -132,7 +132,7 @@ def test_registration_is_bounded_and_template_empty(pack):
 @pytest.mark.parametrize("key", POLICIES)
 @pytest.mark.parametrize("bad", [None, True, "token_ids", 1, [True], [0], ["token_ids", 1], {}])
 def test_types_rejected_even_outside_scope(pack, key, bad):
-    pol = policy(pack.ref(), scope={"include": ["SUP-03"]}, values={"REQ-09": values(pack.checks["REQ-09"], **{key:bad})})
+    pol = policy(pack.ref(), scope={"include": ["SUP-05"]}, values={"REQ-09": values(pack.checks["REQ-09"], **{key:bad})})
     with pytest.raises(PolicyValueError, match="REQ-09"):
         select(pack, [environment()], pol)
 
@@ -295,13 +295,13 @@ def test_absent_markers_keep_historical_contract_and_other_checks(pack):
     assert contract_state(c)=="legacy" and policy_context(c,vals) is None
     assert RuleTableJudge().judge(c,evd,params,vals).verdicts["security"]=="PASS"
     assert DeclaredJudge().judge(c,evd,{},vals).verdicts["security"]=="PASS"
-    assert policy_context(pack.checks["SUP-03"],{}) is None
+    assert policy_context(pack.checks["SUP-05"],{}) is None
 
 
 def manual_setup(tmp_path, pack, mode="audit"):
     envs=[environment()]
     if mode=="update": envs.append(environment(id="ENV-CANDIDATE"))
-    pol=policy(pack.ref(),scope={"include":["REQ-09","SUP-03"]},values={"REQ-09":values(pack.checks["REQ-09"])})
+    pol=policy(pack.ref(),scope={"include":["REQ-09","SUP-05"]},values={"REQ-09":values(pack.checks["REQ-09"])})
     def create(folder):
         st=Store(folder/"store")
         st.put_many([*envs,pol]); put_baseline_snapshot(st)

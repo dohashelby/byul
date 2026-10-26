@@ -253,7 +253,7 @@ def test_legacy_checkdef_omits_new_optional_metadata():
 
 
 def test_source_refresh_and_image_profile_revisions_preserve_other_definitions():
-    """팩22→23 원문 갱신과 팩24의 SUP-04 추가를 구분하고 다른76개 bytes를 보호한다."""
+    """팩23→24의 SUP-04와 팩24→25의 SUP-03을 구분해 다른76개 bytes를 보호한다."""
     prior = {f"{area}-{number:02d}": 1 for area, count in
              (("SUP", 16), ("REQ", 21), ("PLT", 12), ("LIF", 16), ("OBS", 12))
              for number in range(1, count + 1)}
@@ -267,12 +267,18 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
     assert set(pack.checks) == set(prior) and len(prior) == 77
     expected = {cid: revision + 1 for cid, revision in prior.items()}
     expected["SUP-04"] += 1  # Only the new running-image profile changes after source refresh.
+    expected["SUP-03"] += 1  # Observation-only template profile, not independent consumer proof.
     assert {cid: check.revision for cid, check in pack.checks.items()} == expected
     frozen = json.loads((ROOT / "tests/fixtures/pack23-check-hashes.json").read_text(encoding="utf-8"))
+    previous = json.loads((ROOT / "tests/fixtures/pack24-check-hashes.json").read_text(encoding="utf-8"))
     assert frozen["pack_revision"] == 23 and len(frozen["checks"]) == 77
+    assert previous["pack_revision"] == 24 and len(previous["checks"]) == 77
     from hashlib import sha256
     for path, digest in frozen["checks"].items():
         if path != "checks/SUP-04.yaml":
+            assert previous["checks"][path] == digest
+    for path, digest in previous["checks"].items():
+        if path != "checks/SUP-03.yaml":
             assert sha256((ROOT / "packs/PACK-BASELINE" / path).read_bytes()).hexdigest() == digest
     assert pack.checks["SUP-04"].collection_profile == "running-image-approval-v1"
     assert {check.framework_id for check in pack.checks.values()} == {

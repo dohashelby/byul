@@ -91,7 +91,7 @@ def row(evd, case="collection_fault", item="EXAMPLE-one"):
     return next(r for r in evd.observations[OBSERVATION].value["records"] if r["case"]==case and r["record_id"]==item)
 
 
-def setup(tmp_path, pack, mode="audit", scope=("OBS-11", "SUP-03"), items=("EXAMPLE-one", "EXAMPLE-two")):
+def setup(tmp_path, pack, mode="audit", scope=("OBS-11", "SUP-05"), items=("EXAMPLE-one", "EXAMPLE-two")):
     envs = [environment()]
     if mode == "update": envs.append(environment(id="ENV-CANDIDATE"))
     given = values(items)
@@ -124,12 +124,12 @@ def test_policy_declarations_and_blank_form_are_not_execution(pack, tmp_path):
     assert blank["template"] == "guard-manual-evidence/3"
     assert len(e["audit_evidence"]["records"]) == 6
     assert all(all(v is None for v in r["observations"].values()) and not r["evidence"] for r in e["audit_evidence"]["records"])
-    assert "audit_evidence" not in entry(blank,"SUP-03")
+    assert "audit_evidence" not in entry(blank,"SUP-05")
 
 
 @pytest.mark.parametrize("bad", [None, [], {1:2}, {"EXAMPLE-one":True}, {"EXAMPLE-one":"2"}, {"EXAMPLE-one":1.5}])
 def test_integer_maps_reject_bad_types_outside_scope(pack, bad):
-    pol = policy(pack.ref(), scope={"include":["SUP-03"]}, values={"OBS-11":{"alert_deadline_ms":bad}})
+    pol = policy(pack.ref(), scope={"include":["SUP-05"]}, values={"OBS-11":{"alert_deadline_ms":bad}})
     with pytest.raises(PolicyValueError, match="OBS-11"):
         select(pack,[environment()],pol)
 
@@ -316,16 +316,16 @@ def test_legacy_payload_without_audit_under_new_definition_is_unknown(tmp_path,p
     if version.endswith('/1'):doc.pop('policy');doc.pop('pack')
     import_evidence(st,pack,write(tmp_path,doc),now=T0)
     results={r.check_id:r for r in judge_plan(st,pack,plan,T0)}
-    assert results['OBS-11'].verdicts.security=='UNKNOWN' and results['SUP-03'].verdicts.security=='PASS'
+    assert results['OBS-11'].verdicts.security=='UNKNOWN' and results['SUP-05'].verdicts.security=='PASS'
 
 
 @pytest.mark.parametrize("issue",["foreign_check","foreign_null","unfilled_foreign_null","foreign_side","foreign_item","duplicate","foreign_attachment","wrong_enum","wrong_attempt","wrong_time_error","wrong_dependent","reserved_observation"])
 def test_invalid_batch_never_partially_imports(tmp_path,pack,issue):
     st,plan,doc=setup(tmp_path,pack);e=entry(doc,"OBS-11");r=e["audit_evidence"]["records"][0]
-    if issue=="foreign_check":entry(doc,"SUP-03")["audit_evidence"]=deepcopy(e["audit_evidence"])
+    if issue=="foreign_check":entry(doc,"SUP-05")["audit_evidence"]=deepcopy(e["audit_evidence"])
     elif issue in ("foreign_null","unfilled_foreign_null"):
-        entry(doc,"SUP-03")["audit_evidence"]=None
-        if issue=="unfilled_foreign_null":entry(doc,"SUP-03")["verdicts"]={}
+        entry(doc,"SUP-05")["audit_evidence"]=None
+        if issue=="unfilled_foreign_null":entry(doc,"SUP-05")["verdicts"]={}
     elif issue=="foreign_side": e["side"]="candidate"
     elif issue=="foreign_item":r["record_id"]="EXAMPLE-not-required"
     elif issue=="duplicate": e["audit_evidence"]["records"].append(deepcopy(r))

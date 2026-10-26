@@ -1,5 +1,102 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-26 REQ-02 제한 구현 — EXAMPLE 증거 계약, 제품 연결 보류
+
+기존 `role_route`의 HTTP 응답·프록시 설정과 Gateway 접근 로그에는 인가 입력
+path/주체/작업 → rewrite → 최종 handler 실행을 연결하는 신뢰 수집원이 없다.
+따라서 REQ-02의 executor/judge는 null로 유지한다. 팩 25·기존 12개 보안 판정
+연결과 SUP-03 관측 전용 1개·실행기 11종·나머지 64개 집계는 바뀌지 않는다.
+
+[오프라인 도구](../tools/analyze_route_rewrite.py)는 기업 허용 정책과 기술 표본을
+분리한 명시적 EXAMPLE 입력 및 합성 캡처만 읽는다. 단일 외부 origin에서 안전한
+`POST /v1/completions`로 가는 원경로/prefix 대조에 한정한다. 팩·정의·POL/ENV/PLAN의
+정확한 Ref와 입력 해시는 파일끼리의 대응일 뿐 원본·수집원의 진위 인증이 아니다.
+서버가 만든 ingress/private upstream ID, 요청 fingerprint, 인가 주체와 판단 경로,
+rewritten path/작업 및 최종 handler 사건을 대조한다. HTTP 200·클라이언트 ID·설정만으로
+사슬을 채우지 않는다. 완전한 합성 우회는 별개 사례의 미수집이나 정상 대조 실패로 지우지 않는다.
+
+출력의 `BYPASS_OBSERVED`·`COMPLETE_WITHOUT_BYPASS`·`INCONCLUSIVE`는 **가정한 합성
+사슬의 진단**이며 Guard의 PASS/FAIL이 아니다. 제품 상태는 항상 미연결·보안 UNKNOWN이고
+EVD/RES/RPT·승인 정책을 생성하지 않는다. 실제 로그와 MEASURED/DECLARED 자료는 거절한다.
+기존 출력은 덮어쓰지 않으며 입력/파일 오류에 원문·경로를 반사하지 않는다.
+[회귀](../tests/test_route_rewrite_contract.py)는 prefix/명시 차단·가정 우회와
+신뢰 필드 누락·서버 ID/사건 교환·출처 변경·미지원 handler·잘린 JSON을 구분한다.
+
+제품 연결의 선행 조건은 팀이 정한 작업별 권한·경로 의미, 검토된 안전 handler와
+인가/rewrite/final-handler 수집 위치·source 소유권·상관 ID 전달 통로·누락 검출이다.
+이 수집원과 실제 정상/위반 대조가 갖춰진 뒤 기존 CheckDef·challenge 의미를 보존하는
+연결 계획을 따로 검토한다. 이번 구현에 새 프록시·실행기·정책값·팩 revision은 없다.
+
+## 2026-10-26 현행 후속 계획 — 실제 엔진 실증 보류
+
+이 절은 다음 구현·실험의 준비 계획이며 실행 결과가 아니다. 현재 집계는
+[77개 추적표](CHECKLIST_VALIDATION_STATUS.md), SUP-04의 제한 범위는
+[실행 이미지 승인 계약](SUPPLY_IMAGE_APPROVAL.md)을 따른다. 아래 2026-10-23~24의
+테스트·실측·HTML 표기는 당시 기록으로 보존하며 현행 팩의 새 실증으로 합산하지 않는다.
+현재 RPT JSON이 원본이고 화면·`verification-result/0.2` 변환은 platform 담당이다.
+
+| 관측 공백 | 재사용할 기반 | 새로 확인할 것과 완료 조건 |
+|---|---|---|
+| OBS-03 로그 완결성 | 고유 합성 표식·원본/사본 수집·저장 로그 재검증 | 기업의 필수 source/branch와 수집 문맥을 먼저 정한다. 요청과 연결된 실제 exception/traceback/dump 사건·필수 사본이 있어야 해당 분기를 검증한다. 4xx·덤프 부재·파일 없음은 비활성 또는 비누출의 증명이 아니다. 독립 위반은 다른 source 미수집으로 지우지 않는다. |
+| REQ-10 내부 소비 | sampling API 경계·동시/후속 정상 요청·health | 고정 이미지·실제 활성 runner의 신뢰 가능한 최종 소비 관측을 설계한다. API 수용·5xx·timeout과 내부 소비·다른 요청 영향을 분리하고, 소비 미관측은 보안 UNKNOWN으로 유지한다. |
+| REQ-11 출력 귀속 | 두 JSON/SSE 연결·소비 입력 projection·교환 반례 | 원래 요청과 생성 출력을 독립적으로 연결할 오라클·수집 신뢰 경계를 정한다. 클라이언트 ID·usage 개수·임의 생성 문장 일치로 대신하지 않는다. 정상/출력 교환/불완전 수집을 대조하고 오라클 부재 시 기존 보안 PASS 상한을 유지한다. |
+
+새 점검의 재사용 후보는 다음 세 가지다. 이는 구현·지원 완료 선언이 아니다.
+
+- **SUP-03 관측전용·조건부 실증:** 기존 모델 inventory·manifest·파일 해시와 컨테이너 정체성을 재사용할 수 있다. 이번 readonly template bytes·API projection 연결은 독립 worker의 실제 소비 근거가 부족하므로 보안 PASS/FAIL 규칙을 모두 비워 두고 승인 일치·비승인 모두 UNKNOWN으로 남긴다. 단순 비승인 template mount·파일 존재·해시 일치를 소비 위반 FAIL로 해석하지 않는다. config/tokenizer/template 승인 목록·immutable snapshot과 실제 선택/읽기 EVD가 있어야 후속 판정 계약을 검토할 수 있다. 후속 독립 수집 계약은 실제 읽기·파싱·렌더링 소비 프로세스를 먼저 식별하고, loaded bytes digest·컨테이너/프로세스·모델 세대·수집 시각·선정 요청의 연결과 신뢰 출발점을 정해야 한다. 파일 open 목록만으로 성공한 로딩·소비를 확정하지 않는다. 새 독립 소비 센서는 이번 범위 밖이며 관측전용 연결을 자동 보안 판정 완료로 집계하지 않는다.
+- **LIF-09:** sandbox의 기동·readiness·ABORTED·정리 관측을 재사용할 수 있다. 제한된 실패 fixture, 실패 worker/단계와 집계 준비 상태·외부 접수 gate의 대응, 수정 후 정상 재기동 관측과 기업 복구 방침이 필요하다. guard 자체의 기동 실패만으로 대상 엔진의 부분 실패 보호를 확인했다고 하지 않는다.
+- **REQ-05:** 기존 HTTP·역할별 정상/비허용 요청 수집을 재사용할 수 있다. 호출자×최종 모델 허용표, alias 현재 대상·퇴역 시점/기한·진행 요청 처리 방침, 실제 소비 모델 식별을 먼저 확보한다. 요청 body의 모델 이름만으로 최종 모델 인가를 입증하지 않는다. OBS-04는 정책 등록만으로 생성·송신을 관측할 수 없어 실제 sink·생성/전송 센서 준비를 별도로 검토한다.
+
+다음 세 작업의 완료 기준은 다음과 같다.
+
+1. **계약·시험 입력 확정:** 기업 정책 공란·미지원 프로파일·필수 관측을 구분하고, 정상/위반/미수집/지원 밖 표와 정확한 팩·ENV·POL Ref를 연결한다. 현재 구현에 없는 소비 계측이나 팀 결정을 준비 완료로 표시하지 않는다.
+2. **구현 묶음과 오프라인 계약 검증:** 기존 실행기를 재사용해 필요한 관측만 추가하고, 확인된 FAIL 보존·UNKNOWN 상한·예외/상한 도달·정확한 Ref·저장 증거 재판정·플랫폼 투영을 검증한다. 대역의 관측은 EXAMPLE이며 실제 엔진 실증과 구분한다.
+3. **실증 재개용 묶음 확정:** [후속 분기 계획](UPDATE_VALIDATION.md#2026-10-26-현행-후속-실증-계획--미수행)의 입력·자원·상태 독립성·증거 분리를 정리하고 실제 기동은 보류한다. 사용자 재개 지시와 준비 조건이 충족된 뒤 각 분기를 실행·기록한다.
+
+U1의 잔여 32경로(복합 책임15·제외 제안17)와 23개 부분 정답의 사람 검토·독립 평가는 별도 트랙이다. 저장된 oracle의 `human_pending`을 유지하고, 이 준비 작업에서는 분류·선정·이월 규칙이나 제외 목록을 바꾸지 않는다. 후속 릴리스의 독립 평가 가능 여부도 별도 확인 전에는 단정하지 않는다.
+
+## SUP-03 소비 사건 계약과 EXAMPLE 오프라인 분석
+
+이 절과 `tools/analyze_template_consumption.py`는 독립 소비 수집원을 설계하기 위한 준비다. 실제 수집원·서명·attestation은 구현하지 않았고, 엔진·Docker·모델·네트워크를 실행하지 않는다. 입력은 `guard-template-consumption-example/1`의 합성 metadata뿐이며 원문 로그를 받지 않는다. 결과 `guard-template-consumption-analysis/1`의 `data_consistency=consistent`는 선언된 사건 사슬의 자료 일관성이다. 사건이 실제로 일어났거나 생산자가 신뢰됨을 뜻하지 않는다. 승인에 없는 선택도 같은 구조 일관성을 가질 수 있으며 보안 FAIL이 아니다. 결과의 `actual_consumption_measured`·`independent_sensor_verified`·`template_consumer_verified`·`challenge_exercised`는 항상 false이고 보안·기능·성능은 항상 UNKNOWN이다. 제품의 POL/PLAN/EVD/RES/RPT를 생성하거나 판정에 연결하지 않는다. 현행 SUP-03 실행기·팩25/정의3·빈 보안/기능 규칙·수동 PASS 상한·원문 challenge 미시행·기존5개 수락 계약은 유지한다.
+
+### 먼저 확인한 역할과 남은 소스 근거
+
+기존 `output/automation-phase2-20261023-1792750927786/image-source/` 추출본의 정적 흐름은 API 초기화의 loader가 template 문자열을 보관하고 renderer가 이를 선택·해석한 뒤 token 입력을 engine client에 전달하는 구조다. 모델 worker가 template 파일을 직접 읽는다고 전제하지 않는다.
+
+- `entrypoints/launchers/api_server/app_state.py:67,88-104,122-129`: `load_chat_template` 결과를 OnlineRenderer와 tokenize handler에 전달한다.
+- `entrypoints/chat_utils.py:1491-1547`: 실제 `f.read()` 반환과 `lru_cache`가 있다. 현재 파일의 재해시는 기동 시 보관된 문자열의 증거가 아니다.
+- `renderers/hf.py:263-318,778-840,1120-1132`: 명시 template→processor→tokenizer→내장 fallback 선택과 실제 `tokenizer.apply_chat_template` 호출이 있다.
+- `renderers/online_renderer.py:751-772`: 재사용 token 분기는 template 해석을 건너뛴다. `entrypoints/openai/chat_completion/serving.py:378-395`의 `engine_client.generate` 전달은 worker 최종 소비 사건과 구별한다.
+
+이는 과거 추출본의 코드 조사다. [기존 소스 기록](evidence/automation-phase2-20261023.json)의 이미지 digest·파일 hash·`source_commit=UNVERIFIED` 한계를 유지한다. 로컬 추출본의 파일 hash 일치나 이 사건 예시는 현재 활성 이미지·프로세스·모델 또는 후보 이미지의 동일 흐름을 인증하지 않는다. 특히 loader·HF renderer 등 후속 조사 파일의 이미지 출처는 현재 대상에 대해 새로 확인해야 한다. 실수집 구현 전 선정 이미지와 tokenizer/transformers 의존성의 소스·캐시·호출 주체를 다시 고정해야 한다.
+
+### 최소 사건과 신뢰 출발점
+
+첫 오프라인 계약은 위 API 경로의 **단일 컨테이너·API 프로세스·모델/tokenizer/renderer 세대**만 다룬다. loader·renderer·handoff는 논리 역할이며 서로 다른 독립 인증 주체라는 뜻이 아니다. 다중 API 프로세스·별도 render server·worker·새 모델 세대의 관계는 이번 parser가 지원하지 않는다. 사건마다 expected instance와 다르면 일관성 공백이다.
+
+| 연결 | 최소 사건 metadata와 경계 |
+|---|---|
+| 실제 읽기 buffer | `template_read`의 `load_id`·`template_generation`, 성공 반환한 동일 buffer의 `raw_sha256`/`raw_bytes`, 디코딩·개행 처리 후 유효 문자열을 UTF-8로 표현한 `decoded_sha256`/`decoded_bytes`, 명시한 `decode`, 성공/읽기/파싱 오류. 나중에 파일을 다시 열어 계산한 hash·argv·open 성공·API projection으로 대체하지 않는다. 현재 parser는 hash 선언을 대조하며 원시 bytes를 재계산하지 못한다. |
+| 인스턴스·세대 | 모든 사건의 컨테이너/이미지 digest, PID와 재사용을 구별하는 `process_start`, 모델/tokenizer snapshot digest와 각 generation, renderer generation. 하나의 수집 session에서 발생한 재시작·모델 교체는 새 capture로 분리한다. generation 이름이나 hash의 신고 자체는 실제 snapshot·프로세스 인증이 아니다. |
+| 선택·cache | `template_selected`의 `selection_id`, 앞선 성공한 `load_id`, 선택된 문자열 digest, source 분기, cache hit/miss와 보관한 template generation. 선택 digest는 raw 파일 hash와 섞지 않고 decoded digest와 대조한다. cache hit도 같은 session에서 관측된 앞선 load가 필요하며 기동 전부터 있던 cache는 미수집으로 남는다. 현재 지원 source는 관리 파일 한 종류다. |
+| 실제 해석·전달 | `template_applied`의 동일 selection·적용 문자열 digest·성공/parse_error/bypassed와 렌더 입력 digest, `engine_handoff`의 같은 selection·렌더 입력 digest. 단순 open 뒤 실패·선택과 다른 적용·template 우회·다른 입력 전달은 사슬을 완성하지 못한다. handoff는 `generate` 경계이며 worker의 최종 소비·생성 결과 귀속을 입증하지 않는다. |
+| 선정 요청·시간·완결성 | 수집자가 만든 nonce의 별도 계획표→내부 request/subrequest→입력 digest를 세 사건에서 정확히 대조한다. 클라이언트가 지정한 ID만으로 인증하지 않는다. 한 session의 단조 시간 window, source별 연속 seq·완결성·닫힘과 사건 순서를 확인한다. 수집자가 임의 재정렬·부족한 source 생략으로 사슬을 보충하면 안 된다. |
+| 승인 목록 | 독립 입력한 `EXAMPLE-explicit-policy`의 `allowed_raw_sha256`만 membership에 사용한다. []는 명시적으로 승인 없음이다. 현재 관측값·decoded digest·ENV/API 입력에서 목록을 보충하지 않으며 기업 승인이나 정책 유효성을 인증하지 않는다. |
+
+팀은 수집원·계측 코드와 실행 주체를 어느 신뢰 경계에 둘지, 엔진의 자기 신고를 어디까지 믿는지, 수집원 손실·중단·변조를 어떻게 드러낼지 먼저 결정해야 한다. 동일 엔진 로그를 별도 JSON으로 옮겨도 독립 인증이 되지 않는다. 실제 구현에는 선택된 source/의존성 pin, 읽기 buffer와 반환 문자열을 같은 load 사건으로 묶는 계측 위치, 실제 apply 인수·cache 항목의 수명, collector가 만든 요청과 내부 ID의 결합 경로, 별도 수집 통로와 누락 검출을 검토해야 한다. 이 설계에는 신규 서명·host 인증·원격 attestation 보장이 없다.
+
+### 개인정보·반례·오프라인 도구의 수락 경계
+
+수집원은 합성 fixture만 사용하고 template/token/body/kwargs/응답 원문·host 경로를 저장하지 않는 전처리를 수행해야 한다. parser의 키 allowlist·digest·정수 상한·`EXAMPLE-` opaque ID 제약은 이 준비 입력의 형식을 제한할 뿐 원문에 가명을 붙여 넣는 행위를 탐지하는 개인정보 센서는 아니다. digest도 익명화 보장이 없으므로 실제 고객 입력의 digest를 이번 예시에 반입하지 않는다. CLI는 입력을 읽기만 하고 정해진 결과 projection만 stdout에 쓴다. 잘못된 입력의 필드·값·예외 본문·경로를 출력하지 않는다.
+
+최대 64KiB·64사건·4합성 요청·3논리 source·단조 시간300초, 관리 template bytes 8192 상한이다. schema/unknown field/중복 JSON key/NaN·bool 정수/상한 위반은 입력 거절이며 exit2다. 형식이 유효해도 사슬·source·시간·세대 공백은 `inconsistent`/exit1, 모두 일치하면 `consistent`/exit0이다. 어느 종료 코드도 보안 판정이나 실측 완료가 아니다. `requests[].chain_consistent`는 요청 사슬 내부 연결만을 나타내며 전체 source·시간·인스턴스 공백은 상위 `gaps`와 `data_consistency`를 함께 본다.
+
+작은 합성 [fixture](../tests/fixtures/template-consumption-example.json)의 hash는 실물에서 계산한 근거가 아닌 EXAMPLE 자리값이다. [회귀 코드](../tests/test_template_consumption_analysis.py)는 정상·명시 비승인·cache hit/miss의 동일 구조 일관성, open/읽기 후 parse 실패, A 읽기/B 선택, 오래된 cache, render 우회, 요청 일부 교환, 재시작/PID 재사용, 모델/tokenizer/renderer 교체, 중복/역순/부분 사건·시간/source 공백과 원문 필드 거절을 다룬다. 기존 OBS-03 `log_analysis_contract`는 자유 로그의 표식/필드·로그 정책 판정에 결합돼 이 사건 계약에 직접 재사용하지 않았다. 공통 프레임워크·registry·제품 객체나 판정 규칙은 늘리지 않았다.
+
+실행 형식은 `python -m tools.analyze_template_consumption tests/fixtures/template-consumption-example.json`이다. 이는 로컬 합성 파일 분석이며 실제 수집/기동 명령이 아니다. 구현·테스트 코드를 먼저 고정한 뒤 검증 결과를 별도로 기록한다. 이 절 작성 시점에는 새 parser 테스트를 실행하지 않았다.
+
+제품화 전 **팀 결정**은 template 부분 범위의 장래 판정 의미·승인 주체/유효기간·센서 신뢰 경계·개인정보 보관·필수 source와 실패 처리·새 정의 revision이다. **환경 조건**은 현재 선정 이미지/모델/tokenizer 소스와 immutable snapshot, 안전한 계측 권한·별도 통로, 소유 시험 인스턴스·자원·재시작/정리 조건이다. 전자는 합의가 필요하고 후자는 실제 준비 증거가 필요하다. 어느 한쪽도 이번 parser 구현만으로 충족됐다고 하지 않는다. 실제 엔진 실증 재개·새 수집원 구현·장래 판정 규칙 연결은 별도 후속 범위로 남긴다.
+
 작성 시작: 2026-10-23, 검증: 2026-10-24, Asia/Seoul. 구현 출발점은 `codex/gua-automation-phase3`의 `5a352512bbc24589845438438b0146a0d7653b6e`다. 원격 재확인에서 기존 PR들의 main 병합을 확인했고 `24f7d90a2745c108d7d395e5082a3721a3198f0c`로 fast-forward했다. 둘의 파일 차이는 `.DS_Store`뿐이며 이번 변경은 최신 main 위에 놓는다. 이번에는 새 정책·실행기를 추가하거나 실제 엔진을 기동하지 않는다. 전체 구현·테스트 코드·이 문서 초안을 완료한 뒤 검증하고 결과를 아래에 기록한다.
 
 ## 현재 등록과 의미

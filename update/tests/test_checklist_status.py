@@ -95,6 +95,18 @@ def test_historical_pass_never_becomes_current_pack_measured():
     assert row["windows_cpu_status"] == "HISTORICAL_LIMITED_PROFILE_ONLY"
 
 
+def test_empty_security_rules_are_counted_as_observation_only():
+    checks, matrix, kwargs = _inputs()
+    checks[0]["judge"]["params"] = {"pass_when_all": [], "fail_when_any": []}
+    row, = build_rows(checks, matrix, **kwargs)
+    assert row["real_executor_registered"] == row["judge_registered"] == "true"
+    assert row["implementation"] == "OBSERVATION_ONLY_NO_SECURITY_RULES"
+    assert "독립 근거" in row["next_experiment"]
+    text = render_markdown([row])
+    assert "실행·보안 판정 규칙 연결 0개, 관측 전용 1개" in text
+    assert row["current_pack_actual_status"] == "DEFERRED_NOT_MEASURED"
+
+
 def test_selected_history_preserves_refs_and_does_not_import_synthetic_wheel_runs():
     history = historical_evidence(ROOT)
     refs = [item for rows in history.values() for item in rows]

@@ -127,10 +127,20 @@ def test_undetermined_is_still_selected(pack):
 
 def test_prose_only_rows_selected_as_manual(pack):
     plan = _plan(pack, {"gateway": fact(True)})
-    sup = plan.item("SUP-03")  # No policy declaration; SUP-01 now requires approval context.
+    sup = plan.item("SUP-05")  # Unchanged prose-only control; SUP-03 now has an observation profile.
     assert sup.applicability == A.UNDETERMINED
     assert sup.selected and sup.gaps == [Gap.NO_EXECUTOR]
     assert len(plan.items) == 77
+
+
+def test_template_supply_observation_profile_requires_its_explicit_policy(pack):
+    plan = _plan(pack, {"gateway": fact(True)}, values={})
+    sup = plan.item("SUP-03")
+    assert sup.applicability == A.APPLICABLE and sup.selected
+    assert sup.executor == "template_validation" and sup.gaps == [Gap.NO_POLICY_VALUE]
+    assert pack.checks["SUP-03"].collection_profile == "fixed-template-supply-v1"
+    assert pack.checks["SUP-03"].judge.params["pass_when_all"] == []
+    assert pack.checks["SUP-03"].judge.params["fail_when_any"] == []
 
 
 def test_policy_exclude(pack):

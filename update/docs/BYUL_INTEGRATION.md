@@ -43,6 +43,65 @@ BYUL 정책의 `policy_id/policy_version/sha256`과 guard POL의
 - 원본 BYUL 정책 Ref는 import manifest에 보존된다. 현재 플랫폼 변환기의
   `byul_policy_ref=None`을 이 도구가 자동 변경하거나 연결됐다고 주장하지 않는다.
 
+## import 묶음의 읽기 전용 재검증
+
+기존 import 명령은 유지한다. 생성한 묶음을 다시 확인하려면 다음 명시 옵션을 사용한다.
+
+```powershell
+uv run --project platform/api --with ./update --reinstall-package guard python update/tools/import_byul_inputs.py --verify-import <기존 import 폴더> --pack update/packs/PACK-BASELINE
+```
+
+`--verify-import`와 import의 `--environment`·`--policy`·`--output`을 함께 사용하면 오류다.
+검증은 파일·객체 저장소를 만들거나 복구하지 않으며 엔진·Docker·네트워크를 시작하지 않는다.
+동일 버전의 로컬 wheel 캐시를 재사용하지 않도록 교차 시험·도구 검증에서는
+`--reinstall-package guard`를 사용해 검증 대상 소스를 명시적으로 다시 설치한다.
+
+확인 항목:
+
+1. 고정된 원본 2파일·guard 객체 2파일·`provenance.json`만 있는지 확인한다.
+   임의 경로·누락·중복 index·추가 파일·symlink/junction·묶음 밖 경로는 거부한다.
+2. 원본 bytes와 index의 크기·SHA256을 대조하고 동일하게 읽은 bytes를 파싱한다.
+   BYUL 문서의 정규 JSON 해시는 원본 파일 bytes 해시와 별도로 재계산한다.
+3. ENV/POL의 봉인·ID 형태·정확한 Ref를 확인한다.
+4. 원본 스키마·환경 Ref·target·팩을 확인하고 원래 변환 결과와 출력 객체를 대조한다.
+   생성 ID만 원래 출력 ID에 연결하며 revision·생성 시각·정책 값·출처·미확인을 바꾸지 않는다.
+   출력과 자체 해시·index를 함께 바꿔도 원본 의미와 다르면 거부한다.
+5. 기록된 import 확인 시각과 이번 확인 시각 각각에서 정책 유효 기간을 확인한다.
+   미래 import 확인 시각은 거부한다. 이번 `--as-of`가 없으면 현재 UTC를 사용한다.
+   명시 시각은 `time_basis=EXPLICIT_AS_OF`, 현재 시각은 `CURRENT_UTC`로 구분한다.
+   과거 시각의 재현 확인은 현재 정책 유효성이나 실행 허가가 아니다.
+6. 검증 중 파일 내용이 바뀌었으면 성공으로 보고하지 않는다.
+
+성공 결과의 `verified=true`는 이 묶음에서 읽은 입력·출력 snapshot의 내부 일관성이다.
+`execution_ready=null`, `engine_executed=false`를 유지하고 다음과 같은 고정 사유를 제공한다.
+
+| 사유 | 의미 |
+|---|---|
+| `READ_ONLY_VERIFICATION_NOT_EXECUTION_AUTHORIZATION` | 이번 확인은 시험 실행 허가가 아님 |
+| `ENGINE_AND_TARGET_NOT_PROBED` | 호스트·대상·엔진의 실제 준비 상태를 확인하지 않음 |
+| `ADAPTER_UNDECLARED` | 공용 환경 입력에는 adapter가 없어 추정하지 않음 |
+| `REPOSITORY_PIN_REQUIRES_EXPLICIT_TARGET` | bare manifest 해시로부터 repository를 추정하지 않음. 별도 명시 target과 연결 필요 |
+| `RUNTIME_KIND_UNDECLARED`, `CPU_PROFILE_UNDECLARED` | GPU 수 미확인 또는 CPU 상세 조건 누락. CPU/GPU 지원 판정으로 승격하지 않음 |
+| `MODEL_REVISION_UNDECLARED`, `MODEL_INVENTORY_UNDECLARED` | 재현 가능한 모델·비교 조건이 아직 미확인 |
+| `POLICY_DRAFT`, `PACK_DRAFT` | 현행 정책·팩 검토 상태를 그대로 표시 |
+| `LOCAL_PROVENANCE_NOT_AUTHENTICATED` | provenance는 인증되지 않은 로컬 이력 |
+
+실패는 `IMPORT_FILE_HASH_MISMATCH`, `GUARD_OBJECT_REF_MISMATCH`,
+`IMPORT_CONVERSION_OUTPUT_MISMATCH`, `POLICY_EXPIRED` 등 고정 코드와 종료 2로 알린다.
+예외 원문·원본 정책 내용·비밀값을 진단에 복사하지 않는다.
+
+import와 재검증 모두 팩 YAML 문법·구조·인코딩·필수 파일 누락·파일 해시 불일치를
+기존 `INPUT_IMPORT_FAILED`와 종료 2로 알린다. 팩 입력을 읽는 경계에서 알려진
+파서·모델·무결성·파일 읽기 오류와 누락된 점검 정의 조회만 정규화하며,
+파서 문맥·입력 원문·개인 경로를 출력하지 않는다. 예상 밖 프로그래밍 오류를
+일괄 숨기거나 원본·팩·반입 묶음을 자동 수정하지 않는다.
+
+로컬 관리자는 원본·출력·provenance를 함께 다시 작성할 수 있다.
+이 검증은 그런 공동 재작성이나 원본 진위를 인증하지 않으며 서명·승인 체계를 추가하지 않는다.
+반환된 provenance 해시는 이번에 읽은 파일을 식별할 뿐 인증이 아니다.
+검증 후 파일 변경·정책 만료·새 실행 환경의 변화까지 막는 보장도 아니다.
+실제 실행 전에는 명시한 시각으로 다시 검증하고 기존 select/preflight·대상 확인을 수행해야 한다.
+
 ## RPT JSON → 플랫폼
 
 원본은 guard RPT JSON이다. `platform/api/src/byul_platform/sources/update.py`가

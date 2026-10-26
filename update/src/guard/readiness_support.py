@@ -7,6 +7,7 @@ coverage, engine identity and the security/functional result remain unmeasured.
 from __future__ import annotations
 
 from collections.abc import Iterable
+import re
 
 from guard.adapters.vllm import (CHAT_REVIEWED_IMAGE, CHAT_TEMPLATE_CONTAINER_PATH,
                                  CHAT_TEMPLATE_SHA256, VllmAdapter)
@@ -22,6 +23,8 @@ from guard.executors.log_analysis import (REQUIRED_BRANCHES as LOG_REQUIRED_BRAN
                                           SUPPORTED_BRANCHES as LOG_SUPPORTED_BRANCHES,
                                           SUPPORTED_MARKER_CONTEXTS as LOG_MARKER_CONTEXTS)
 from guard.executors.running_image_approval import PROFILE as IMAGE_APPROVAL_PROFILE, validate_image_approval_policy
+from guard.executors.template_supply_approval import (PROFILE as TEMPLATE_SUPPLY_PROFILE,
+                                                      validate_policy as validate_template_supply_policy)
 from guard.input_policy import policy_context
 
 
@@ -53,7 +56,10 @@ def _policy_shape(check, values):
         if param.key in values:
             check_policy_value(check.id, param.key, param.type, values[param.key])
     if check.executor == "template_validation":
-        validate_template_policy(values)
+        if getattr(check, "collection_profile", None) == TEMPLATE_SUPPLY_PROFILE:
+            validate_template_supply_policy(check, values, {})
+        else:
+            validate_template_policy(values)
     elif check.executor == "container_config" and getattr(check, "collection_profile", None) == IMAGE_APPROVAL_PROFILE:
         validate_image_approval_policy(values)
     elif check.executor == "request_binding":
@@ -90,6 +96,11 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
         if check is not None and getattr(check, "collection_profile", None) == IMAGE_APPROVAL_PROFILE:
             row["scope"] = "owned running pinned image approval only; no sentinel writes or full package validation"
             row["limitations"].append("runtime identity and RepoDigest linkage remain unobserved; approved image alone cannot establish full supply PASS")
+        template_supply = check is not None and getattr(check, "collection_profile", None) == TEMPLATE_SUPPLY_PROFILE
+        if template_supply:
+            row["scope"] = "owned readonly fixed-template identity and API input projection only"
+            row["limitations"].append("observation-only profile: no independent worker consumption proof; approved and unapproved selections remain security UNKNOWN")
+            row["limitations"].append("manual PASS is outside the existing bounded manual template contract; declared FAIL and UNKNOWN remain available")
         if check is None or check.retired:
             row["reasons"].append("check is absent from the active pack")
             continue
@@ -160,8 +171,11 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             elif executor == "template_validation":
                 # The adapter's template_rejection_evidence returns only this
                 # image/version's inspected pre-generation rejection proofs.
-                if image != CHAT_REVIEWED_IMAGE or version != "0.31.0":
+                if not template_supply and (image != CHAT_REVIEWED_IMAGE or version != "0.31.0"):
                     unsupported("REQ-07 pre-generation source evidence is inspected only for the exact pinned image/version")
+                if template_supply and (len(image) > 512 or re.fullmatch(
+                        r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}", image) is None):
+                    unsupported("template supply collection requires an explicit repository-pinned image; a bare manifest digest is not a launch reference")
             elif executor == "request_binding":
                 if adapter.request_binding_contract(image, version) is None:
                     unsupported("REQ-11 has no inspected consumer-source contract for the exact image/version")

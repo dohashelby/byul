@@ -19,6 +19,7 @@ from tests.test_log_integrity_parser import native, PREFIX
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE = "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b"
+IMAGE_ID = "sha256:" + "b" * 64
 VALUES = {"collector_profile": "guard-vllm-native-info-v1", "required_trusted_fields": ["process", "level", "source"],
           "client_request_id_trust": "untrusted_correlation"}
 
@@ -42,13 +43,14 @@ class World:
     def __init__(self, **changes):
         self.changes, self.requests, self.lines = changes, [], []
         self.inspections = 0
+        self.image_queries = []
 
     def inspect_json(self, container, *, timeout):
         assert container == "EXAMPLE-log-engine" and 0 < timeout <= 5
         self.inspections += 1
-        result = {"Id": "EXAMPLE-owned-id", "Image": IMAGE.split("@")[-1],
+        result = {"Id": "EXAMPLE-owned-id", "Image": self.changes.get("actual_image_id", IMAGE_ID),
                   "State": {"Running": True, "StartedAt": "EXAMPLE-start"},
-                  "Config": {"Labels": {"guard.run": "EXAMPLE-log-run"}, "Image": IMAGE,
+                  "Config": {"Labels": {"guard.run": "EXAMPLE-log-run"}, "Image": self.changes.get("configured_image", IMAGE),
                              "Cmd": target()["comparison_config"]["launch"]["argv"],
                              "Env": [f"{key}={value}" for key, value in _ENV.items()] + ["API_KEY=EXAMPLE-inspect-secret"]}}
         if self.changes.get("wrong_owner"):
@@ -63,7 +65,19 @@ class World:
             result["Image"] = "sha256:" + "f" * 64
         if self.changes.get("restart") and self.inspections > 1:
             result["State"]["StartedAt"] = "EXAMPLE-new-start"
+        if self.changes.get("image_changed") and self.inspections > 1:
+            result["Image"] = "sha256:" + "c" * 64
         return result
+
+    def image_info(self, image, *, timeout):
+        assert 0 < timeout <= 5
+        self.image_queries.append(image)
+        if self.changes.get("image_query_raises"):
+            raise RuntimeError("API_KEY=EXAMPLE-image-query-secret")
+        if "image_metadata" in self.changes:
+            return deepcopy(self.changes["image_metadata"])
+        return {"digests": [IMAGE] if image == IMAGE_ID else [],
+                "unused_private_metadata": "EXAMPLE-image-metadata-secret"}
 
     def probe(self, network, requests, timeout):
         assert network == "EXAMPLE-trusted" and len(requests) == 1 and 0 < timeout <= 1
@@ -136,8 +150,15 @@ def test_actual_reference_consumer_and_display_contracts_with_synthetic_transpor
     assert judge(draft).verdicts == {"security": Verdict.PASS, "functional": Verdict.PASS, "performance": Verdict.UNKNOWN}
     assert {item.name for item in draft.artifacts} == {"probe_log.jsonl", "log_integrity_samples.json", "log_integrity_events.json", "log_integrity_display.html"}
     assert draft.observations["log_trials_reached"].value == ["before", "multiline", "cr", "crlf", "reserved", "html", "after"]
+    assert IMAGE_ID != IMAGE.partition("@")[2] and world.image_queries == [IMAGE_ID, IMAGE_ID]
     files = "\n".join(item.path.read_text(encoding="utf-8") for item in draft.artifacts)
     assert "EXAMPLE-inspect-secret" not in files and "Config.Env" not in files
+    assert "EXAMPLE-image-metadata-secret" not in files
+    samples = json.loads(next(item.path for item in draft.artifacts if item.name == "log_integrity_samples.json").read_text(encoding="utf-8"))["capture"]
+    for key in ("source_identity_before", "source_identity_after"):
+        assert samples[key]["image"] == IMAGE and samples[key]["image_id"] == IMAGE_ID
+        assert samples[key]["image_repo_digest_verified"] is True
+    assert all(item.collector == "log_integrity/0.2.1" for item in draft.artifacts)
     display = next(item.path for item in draft.artifacts if item.name.endswith(".html")).read_text(encoding="utf-8")
     assert "<script>guard_probe" not in display and display.count('data-event-index="') == 7
 
@@ -218,3 +239,78 @@ def test_invalid_execution_bounds_fail_before_dispatch(tmp_path, cfg):
 def test_unsupported_metadata_prevents_engine_dispatch(tmp_path):
     draft, world = run(tmp_path, mutate_target=lambda data: data["comparison_config"]["launch"]["log_profile"].update(level="DEBUG"))
     assert not world.requests and judge(draft).verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("metadata", [
+    None, [], {}, {"digests": None}, {"digests": []}, {"digests": IMAGE},
+    {"digests": ["sha256:" + "b" * 64]}, {"digests": [IMAGE + ":tag"]},
+    {"digests": [IMAGE, None]}, {"digests": [IMAGE, 1]},
+    {"digests": ["other.invalid/image@sha256:" + "c" * 64]},
+    {"digests": [IMAGE] * 129},
+])
+def test_missing_malformed_or_unlinked_repo_digests_never_dispatch(metadata, tmp_path):
+    draft, world = run(tmp_path, {"image_metadata": metadata})
+    assert world.image_queries == [IMAGE_ID] and not world.requests
+    assert draft.observations["log_identity_verified"].value is False
+    assert judge(draft).verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("image_id", [None, True, "", "latest", "sha256:short", IMAGE,
+    "sha256:" + "B" * 64])
+def test_invalid_config_image_id_is_not_a_digest_lookup_input(tmp_path, image_id):
+    draft, world = run(tmp_path, {"actual_image_id": image_id})
+    assert not world.image_queries and not world.requests
+    assert judge(draft).verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("linked", [False, True])
+def test_equal_digest_text_requires_the_same_independent_repo_digest_proof(tmp_path, linked):
+    image_id = IMAGE.partition("@")[2]
+    draft, world = run(tmp_path, {"actual_image_id": image_id, "image_metadata": {"digests": [IMAGE] if linked else []}})
+    assert world.image_queries == [image_id] * (2 if linked else 1)
+    assert len(world.requests) == (7 if linked else 0)
+    assert judge(draft).verdicts["security"] == (Verdict.PASS if linked else Verdict.UNKNOWN)
+
+
+def test_config_image_id_cannot_replace_the_declared_pinned_image(tmp_path):
+    draft, world = run(tmp_path, {"configured_image": IMAGE_ID})
+    assert not world.image_queries and not world.requests
+    assert judge(draft).verdicts["security"] == Verdict.UNKNOWN
+
+
+def test_metadata_lookup_failure_is_unknown_and_never_persists_raw_error(tmp_path):
+    draft, world = run(tmp_path, {"image_query_raises": True})
+    assert world.image_queries == [IMAGE_ID] and not world.requests
+    assert judge(draft).verdicts["security"] == Verdict.UNKNOWN
+    assert "EXAMPLE-image-query-secret" not in "".join(item.path.read_text(encoding="utf-8") for item in draft.artifacts)
+
+
+def test_image_id_change_is_unknown_even_if_both_ids_link_the_same_pin(tmp_path):
+    draft, world = run(tmp_path, {"image_changed": True, "image_metadata": {"digests": [IMAGE]}})
+    assert world.image_queries == [IMAGE_ID, "sha256:" + "c" * 64]
+    assert len(world.requests) == 7 and draft.observations["log_identity_verified"].value is False
+    assert judge(draft).verdicts["security"] == Verdict.UNKNOWN
+
+
+@pytest.mark.parametrize("expires_after", ["inspect", "image-info"])
+def test_image_identity_lookup_uses_remaining_deadline_and_does_not_overrun(monkeypatch, expires_after):
+    import guard.executors.log_integrity as module
+    clock, calls = {"now": 0}, []
+    monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: clock["now"]))
+    class DeadlineWorld(World):
+        def inspect_json(self, *args, **kwargs):
+            calls.append(("inspect", kwargs["timeout"]))
+            value = super().inspect_json(*args, **kwargs)
+            clock["now"] = 5 if expires_after == "inspect" else 1
+            return value
+        def image_info(self, *args, **kwargs):
+            calls.append(("image-info", kwargs["timeout"]))
+            value = super().image_info(*args, **kwargs)
+            clock["now"] = 5
+            return value
+    world = DeadlineWorld()
+    executor = LogIntegrityExecutor({}, docker=world)
+    data = target()
+    ctx = SimpleNamespace(target=data, env=environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE}))
+    assert executor._snapshot(ctx, data["comparison_config"]["launch"], 4) is None
+    assert calls == ([("inspect", 4)] if expires_after == "inspect" else [("inspect", 4), ("image-info", 3)])

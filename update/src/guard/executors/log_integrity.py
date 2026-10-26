@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import math
+import re
 import secrets
 import time
 
@@ -28,11 +29,17 @@ _ENV = {"VLLM_CONFIGURE_LOGGING": "1", "VLLM_LOGGING_LEVEL": "INFO", "VLLM_LOGGI
         "VLLM_LOGGING_PREFIX": "", "VLLM_LOGGING_STREAM": "ext://sys.stdout"}
 _LOGGER_SHA = "4e26afd9feab3448f2af529867b00e8bed6a22690defd81a54d2df6b5afdd010"
 _FORMATTER_SHA = "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5"
+_PINNED = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}")
+_IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
+
+
+def _pinned_image(value):
+    return type(value) is str and len(value) <= 512 and _PINNED.fullmatch(value) is not None
 
 
 class LogIntegrityExecutor(HttpCheckExecutor):
     name = "log_integrity"
-    version = "0.2.0"
+    version = "0.2.1"
     requires_roles = False
     requires_route_scope = False
 
@@ -84,10 +91,11 @@ class LogIntegrityExecutor(HttpCheckExecutor):
             if len(environ) != len(pairs):
                 return None
             expected_image = ctx.env.engine.image_digest
+            image_id = actual.get("Image")
             argv = launch.get("argv")
-            if (not expected_image or engine.get("image_digest") != expected_image
+            if (not _pinned_image(expected_image) or engine.get("image_digest") != expected_image
                     or config.get("Image") != expected_image or not state.get("Running")
-                    or actual.get("Image") != expected_image.rsplit("@", 1)[-1]
+                    or type(image_id) is not str or not _IMAGE_ID.fullmatch(image_id)
                     or not actual.get("Id") or not state.get("StartedAt")
                     or not ctx.target.get("run_id")
                     or (config.get("Labels") or {}).get("guard.run") != ctx.target["run_id"]
@@ -103,8 +111,20 @@ class LogIntegrityExecutor(HttpCheckExecutor):
                     or any(environ.get(key) != value for key, value in _ENV.items())
                     or environ.get("VLLM_LOGGING_CONFIG_PATH") not in (None, "")):
                 return None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            # Container.Image is a local configuration ID, not a manifest
+            # digest. Resolve that exact immutable ID as in the existing
+            # running-image collector; Config.Image alone is not proof.
+            image = self.docker.image_info(image_id, timeout=min(5, remaining))
+            digests = image.get("digests") if type(image) is dict else None
+            if (type(digests) is not list or not 1 <= len(digests) <= 128
+                    or any(not _pinned_image(value) for value in digests)
+                    or expected_image not in digests or deadline <= time.monotonic()):
+                return None
             return {"container_id": actual["Id"], "started_at": state["StartedAt"],
-                    "image": expected_image, "image_id": actual.get("Image"),
+                    "image": expected_image, "image_id": image_id, "image_repo_digest_verified": True,
                     "logging_profile": "request-info-v1", "logging_controls_verified": True}
         except Exception:
             return None

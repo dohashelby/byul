@@ -1,6 +1,18 @@
 # OBS-03·OBS-09 로그 수집과 저장 증거 재검증
 
-이 문서는 로그 실행기 0.2.0의 수집 경계와 읽기 전용 재검증 범위를 설명한다. 엔진 시험·정책의 보안 판정과 **저장한 기록을 다시 읽었을 때 일치하는지**는 다른 확인이다. 새 실행기 종류나 기업 collector를 추가한 작업은 아니다.
+이 문서는 로그 실행기 0.2.1의 수집 경계와 읽기 전용 재검증 범위를 설명한다. 엔진 시험·정책의 보안 판정과 **저장한 기록을 다시 읽었을 때 일치하는지**는 다른 확인이다. 새 실행기 종류나 기업 collector를 추가한 작업은 아니다.
+
+OBS-03의 새 `guard-log-analysis-capture/3`은 `analysis_profile: guard-log-json/2`를
+명시한다. 중복 JSON key(중첩·escape 포함)·비유한 수·파싱 불가 사건으로 전체 수집을
+확정하지 않는다. 다른 완전한 사건의 독립 위반은 보존한다. 거부한 행은 저장 전에
+고정 미확인 표식으로 대체해 비밀값 제거 과정의 JSON 정규화가 누락을 지우지 않게 한다.
+원래 source bytes 해시와 실제 저장 text 해시는 계속 구분하며 원문을 새로 보존하지 않는다.
+
+OBS-09는 컨테이너의 실제 image ID로 image metadata를 조회하고 명시한 pinned
+RepoDigest 연결을 확인한다. local config ID와 manifest digest가 다른 정상 구성을
+허용하며 단순 문자열 일치로 연결을 생략하지 않는다. 전후 신원·소유·남은 deadline을
+유지하고 metadata 누락·오류·신원 변경은 UNKNOWN이다. 과거 기록의 두 해시가 같았다는
+사실은 그대로 보존한다.
 
 ## 수집 범위
 
@@ -48,7 +60,7 @@ python -m guard.log_evidence --store C:\guard-data\original-store --report RPT-.
 2. RPT manifest의 정확한 PLAN·POL·ENV·EVD·RES Ref와 객체 해시·관계·side.
 3. PLAN의 저장 팩과 artifact path·bytes·SHA256. 디스크의 최신 팩을 적용하지 않는다.
 4. official·정책/팩 검토 상태·data origin·검증 수준의 원본 입력과의 일치.
-5. `/2` 캡처를 공통 순수 분석 함수로 재구성하고 저장 관측과 대조.
+5. 저장된 캡처·실행기 버전의 분석 프로파일로 순수 재구성하고 관측과 대조. OBS-03 `/2`+0.2.0은 당시 JSON parser, `/3`+0.2.1은 명시 strict parser를 사용하며 미등록 조합은 확정하지 않는다.
 6. 저장된 동일 버전 rule_table·원래 params·PASS 관문·CPU 성능 제한으로 판정 축 대조.
 7. OBS-09의 캡처→구조화 event→별도 HTML의 정확한 대응.
 
@@ -61,6 +73,9 @@ python -m guard.log_evidence --store C:\guard-data\original-store --report RPT-.
 ## 과거 자료와 미검증 범위
 
 기존 캡처의 정확한 artifact bytes·Ref는 계속 검증하지만 `/2` 이전에 없던 파이프 상한·nofollow·정확한 사건 연결을 소급 인증하지 않는다. `LEGACY_UNVERIFIABLE`로 원래 결과를 보존한다. 과거와 다른 판정 버전밖에 없으면 대체 판정기를 적용하지 않고 `JUDGE_VERSION_UNAVAILABLE`로 표시한다. 마스킹으로 재구성 불가능하거나 저장 관측과 다르면 진단은 남기고 원래 판정을 덮어쓰지 않는다.
+
+OBS-03 `/2`의 replay 일치는 새 strict JSON 거부 기준을 만족했다는 뜻이 아니다.
+`analysis_profile`·`strict_json_verified`와 한계에 그 구분을 표시하고 원본 EVD/RES/RPT를 바꾸지 않는다.
 
 이번 검증은 순수 로직, 대역 수집, 로컬 자식 프로세스의 파이프와 Linux 파일 계약, 설치 wheel 재현을 구분한다. 실제 엔진·두 이미지 실행·기업 정책값·로그 구성의 실환경 검증 결과는 별도 기록이 없는 한 미수행이다. 실제 두 이미지 CPU 실증이나 PR #20의 다섯 점검 수락 기준을 대체하거나 완화하지 않는다.
 

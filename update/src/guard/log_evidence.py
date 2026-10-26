@@ -14,7 +14,7 @@ import stat
 import sqlite3
 
 from guard.core.judge import pass_gate
-from guard.executors.log_analysis_contract import analyze_log_captures
+from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE, analyze_log_captures
 from guard.executors.log_integrity_contract import PLANNED_CASES, analyze_integrity_capture
 from guard.executors.log_integrity_parser import PROFILE, TRUSTED_FIELDS
 from guard.judges.rule_table import RuleTableJudge
@@ -110,6 +110,15 @@ def _obs09(store, evd, sample, values):
 
 
 def _obs03(evd, sample, values):
+    version = evd.execution.executor.version
+    if (sample.get("schema") == "guard-log-analysis-capture/2" and version == "0.2.0"
+            and "analysis_profile" not in sample):
+        profile = LEGACY_JSON_PROFILE
+    elif (sample.get("schema") == "guard-log-analysis-capture/3" and version == "0.2.1"
+            and sample.get("analysis_profile") == STRICT_JSON_PROFILE):
+        profile = STRICT_JSON_PROFILE
+    else:
+        raise ValueError("saved log analysis profile differs from executor version")
     captures = sample["captures"]
     if not isinstance(captures, list) or len(captures) > 16:
         raise ValueError("invalid bounded source inventory")
@@ -131,12 +140,12 @@ def _obs03(evd, sample, values):
         if request["request_id"] != correlation[branch]:
             raise ValueError("saved request differs from its capture trial identity")
     obs = analyze_log_captures(captures, values, sample["markers"], correlation,
-                               initial_gaps=sample["initial_gaps"])
+                               initial_gaps=sample["initial_gaps"], profile=profile)
     if obs != sample.get("analysis"):
         raise ValueError("recorded log analysis differs from persisted capture replay (redaction may limit reconstruction)")
     obs.update({"functional_probes_planned": ["before", "after"],
                 "functional_probe_results": sample["controls"]})
-    return obs, obs["log_coverage_complete"]
+    return obs, obs["log_coverage_complete"], profile
 
 
 def analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
@@ -291,19 +300,32 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
             name = "log_samples.json" if check.id == "OBS-03" else "log_integrity_samples.json"
             envelope = _artifact(store, evd, name)
             sample = envelope.get("capture", {})
-            expected_schema = "guard-log-analysis-capture/2" if check.id == "OBS-03" else "guard-log-integrity-capture/2"
-            if sample.get("schema") != expected_schema:
+            expected_schemas = ({"guard-log-analysis-capture/2", "guard-log-analysis-capture/3"}
+                                if check.id == "OBS-03" else {"guard-log-integrity-capture/2"})
+            if sample.get("schema") not in expected_schemas:
                 row["status"] = "LEGACY_UNVERIFIABLE"
                 limitations.append(f"{check.id}/{evd.side.value}: legacy capture retained; new pipe/nofollow/correlation guarantees cannot be reconstructed")
                 continue
             values = policy.values.get(check.id, {})
             if sample.get("policy_values") != values:
                 raise ValueError("saved capture policy differs from pinned policy")
-            obs, complete = (_obs03(evd, sample, values) if check.id == "OBS-03"
-                             else _obs09(store, evd, sample, values))
-            for key, value in obs.items():
+            if check.id == "OBS-03":
+                obs, complete, profile = _obs03(evd, sample, values)
+                row["analysis_profile"] = profile
+                row["strict_json_profile_applied"] = profile == STRICT_JSON_PROFILE
+                if profile == LEGACY_JSON_PROFILE:
+                    limitations.append("OBS-03: historical JSON parser retained; duplicate-key/non-finite rejection is not retroactively claimed")
+            else:
+                obs, complete = _obs09(store, evd, sample, values)
+            # run_plan persists only the CheckDef projection. Auxiliary analysis
+            # diagnostics are checked against sample.analysis inside _obs03,
+            # while every required reconstructed/stored observation is mandatory.
+            for required in check.required_observations:
+                key = required.key
+                if key not in obs:
+                    raise ValueError("saved required observation cannot be reconstructed: " + key)
                 observation = evd.observations.get(key)
-                if observation is None or not observation.collected or observation.value != value:
+                if observation is None or not observation.collected or observation.value != obs[key]:
                     raise ValueError("saved observation differs from capture replay: " + key)
             plugin = RuleTableJudge()
             if (check.judge is None or check.judge.plugin != "rule_table" or res.judge.name != plugin.name

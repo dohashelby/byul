@@ -16,7 +16,8 @@ from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
 from guard.runtime.docker import Docker
-from .log_analysis_contract import analyze_log_captures, events
+from .log_analysis_contract import (STRICT_JSON_PROFILE, analyze_log_captures, events,
+                                    persistable_log_text)
 from .content_common import (MAX_SAMPLE_BYTES, append_artifact, content_request, control_state, leaves,
                              markers, sample_artifact, string_list, validate_content_settings, record_content, bounded_probe, redact_value)
 from .http_common import HttpCheckExecutor
@@ -73,7 +74,7 @@ def _events(text):
 
 class LogAnalysisExecutor(HttpCheckExecutor):
     name = "log_analysis"
-    version = "0.2.0"
+    version = "0.2.1"
     requires_roles = False
     requires_route_scope = False
 
@@ -274,12 +275,22 @@ class LogAnalysisExecutor(HttpCheckExecutor):
         # An unlisted collector/dump is not silently assessed. This profile
         # reports exactly the policy's source inventory, not every process sink.
         gaps_before_analysis = list(gaps)
-        analysis = analyze_log_captures(captures, values, marks, correlation, initial_gaps=gaps)
+        analysis = analyze_log_captures(captures, values, marks, correlation, initial_gaps=gaps,
+                                        profile=STRICT_JSON_PROFILE)
         gaps, violations, coverage = analysis["log_coverage_gaps"], analysis["log_violations"], analysis["log_sources_tested"]
         obs = {key: {"value": value, "collected": True} for key, value in analysis.items()}
         obs.update({"functional_probes_planned": {"value": ["before", "after"], "collected": True},
                     "functional_probe_results": {"value": controls, "collected": True}})
-        saved_captures = redact_value(captures, ctx.secrets)
+        replay_captures = []
+        for capture in captures:
+            saved = dict(capture)
+            rejected = {}
+            for field in ("text", "stderr_text"):
+                if field in saved:
+                    saved[field], rejected[field] = persistable_log_text(saved[field])
+            saved["rejected_json_lines"] = rejected
+            replay_captures.append(saved)
+        saved_captures = redact_value(replay_captures, ctx.secrets)
         for capture in saved_captures:
             persisted = capture["text"].encode("utf-8")
             capture["persisted_decoded_sha256"] = hashlib.sha256(persisted).hexdigest()
@@ -288,7 +299,8 @@ class LogAnalysisExecutor(HttpCheckExecutor):
                 stderr = capture["stderr_text"].encode("utf-8")
                 capture["persisted_stderr_sha256"] = hashlib.sha256(stderr).hexdigest()
                 capture["persisted_stderr_bytes"] = len(stderr)
-        sample_artifact(ctx, "log_samples.json", {"schema": "guard-log-analysis-capture/2",
+        sample_artifact(ctx, "log_samples.json", {"schema": "guard-log-analysis-capture/3",
+                        "analysis_profile": STRICT_JSON_PROFILE,
                         "captures": saved_captures, "requests": requests, "markers": marks,
                         "correlation": correlation, "initial_gaps": list(gaps_before_analysis),
                         "coverage_gaps": gaps, "analysis": analysis, "controls": controls,

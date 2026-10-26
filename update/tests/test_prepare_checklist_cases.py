@@ -35,13 +35,13 @@ def test_preparation_preserves_current_definitions_and_does_not_make_results(pac
     assert plan["data_origin"] == "EXAMPLE" and plan["planning_only"] is True
     assert plan["engine_executed"] is plan["execution_authorized"] is False
     assert [item["check_id"] for item in plan["checks"]] == list(ORDER)
-    assert len(payloads) == 14
+    assert len(payloads) == 15
     scopes = {item["check_id"]: item["scope"] for item in plan["checks"]}
     assert scopes["REQ-02"] == "CONTRACT_ONLY"
     assert scopes["SUP-03"] == "OBSERVATION_ONLY"
-    assert sum(value == "COLLECTOR_CONNECTED" for value in scopes.values()) == 12
+    assert sum(value == "COLLECTOR_CONNECTED" for value in scopes.values()) == 13
     cases = plan["cases"]
-    assert len(cases) == len({case["case_id"] for case in cases}) == 85
+    assert len(cases) == len({case["case_id"] for case in cases}) == 93
     assert all(case["ready_to_execute"] is False and case["verdict"] is None
                and case["evidence_refs"] == case["result_refs"] == []
                and "separate_execution_authorization" in case["pending_inputs"] for case in cases)
@@ -98,7 +98,7 @@ def test_writing_external_plan_preserves_pack_and_never_launches_resources(pack,
     plan = prepare_cases(pack, output)
     assert json.loads((output / "case-plan.json").read_text(encoding="utf-8")) == plan
     assert {str(p): (p.read_bytes(), p.stat().st_mtime_ns) for p in paths if p.is_file()} == before
-    assert len(list(output.rglob("*"))) == 29  # 14 dirs, 14 YAML, one diagnostic plan
+    assert len(list(output.rglob("*"))) == 31  # 15 dirs, 15 YAML, one diagnostic plan
     for item in plan["files"]:
         raw = (output / item["path"]).read_bytes()
         assert item["bytes"] == len(raw) and item["sha256"] == hashlib.sha256(raw).hexdigest()

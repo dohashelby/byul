@@ -263,10 +263,11 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
                   "OBS-03": 2, "OBS-04": 2, "OBS-05": 2, "OBS-07": 2, "OBS-08": 2,
                   "OBS-09": 2, "OBS-11": 2})
     pack = load_pack(ROOT / "packs/PACK-BASELINE")
-    assert pack.manifest.revision == 25
+    assert pack.manifest.revision == 26
     assert set(pack.checks) == set(prior) and len(prior) == 77
     expected = {cid: revision + 1 for cid, revision in prior.items()}
     expected["SUP-04"] += 1  # Only the new running-image profile changes after source refresh.
+    expected["PLT-02"] += 1  # Bounded Unix IPC access profile; all previous definitions remain unchanged.
     expected["SUP-03"] += 1  # Observation-only template profile, not independent consumer proof.
     assert {cid: check.revision for cid, check in pack.checks.items()} == expected
     frozen = json.loads((ROOT / "tests/fixtures/pack23-check-hashes.json").read_text(encoding="utf-8"))
@@ -277,9 +278,16 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
     for path, digest in frozen["checks"].items():
         if path != "checks/SUP-04.yaml":
             assert previous["checks"][path] == digest
+    # Keep the old PACK24 -> PACK25 assertion against its immutable stage snapshot.
+    pack25 = json.loads((ROOT / "tests/fixtures/pack25-check-hashes.json").read_text(encoding="utf-8"))
+    assert len(pack25) == 77
     for path, digest in previous["checks"].items():
         if path != "checks/SUP-03.yaml":
-            assert sha256((ROOT / "packs/PACK-BASELINE" / path).read_bytes()).hexdigest() == digest
+            assert pack25[Path(path).stem] == digest
+    # Then check PACK25 -> current: only the newly authorized IPC definition changes.
+    for cid, digest in pack25.items():
+        if cid != "PLT-02":
+            assert sha256((ROOT / "packs/PACK-BASELINE/checks" / f"{cid}.yaml").read_bytes()).hexdigest() == digest
     assert pack.checks["SUP-04"].collection_profile == "running-image-approval-v1"
     assert {check.framework_id for check in pack.checks.values()} == {
         "CHK-" + cid.split("-")[0] + "-" + cid.split("-")[1].zfill(3) for cid in prior}

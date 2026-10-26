@@ -246,6 +246,13 @@ class Docker:
         data = json.loads(out)
         return data[0] if isinstance(data, list) else data
 
+    def exec_as_uid(self, container: str, uid: int, argv: list[str], *, timeout: float) -> CmdResult:
+        """숫자 UID:GID로 관측 프로세스를 실행한다. 실제 보조 그룹은 probe가 검증한다."""
+        if type(uid) is not int or not 0 <= uid <= 2**31 - 1:
+            raise ValueError("invalid numeric probe UID")
+        return self._docker(["exec", "--user", f"{uid}:{uid}", container, *argv],
+                            timeout=timeout, check=False)
+
     def logs(self, container: str, *, timeout: float) -> str:
         res = self._docker(["logs", container], timeout=timeout, check=False)
         return res.stdout + res.stderr

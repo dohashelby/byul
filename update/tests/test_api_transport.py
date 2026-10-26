@@ -220,6 +220,6 @@ def test_predecessor_definition_hashes_and_no_stream_changes():
 def test_invalid_configuration_has_fixed_diagnostic_without_raw_input(case, bad):
     evd, result = case.run({"api_transport": bad})
     assert evd.execution.status == ExecStatus.ABORTED and result.verdicts.security == Verdict.UNKNOWN
-    assert evd.execution.abort_reason == "executor failure: ValueError: API_TRANSPORT_CONFIGURATION_INVALID"
+    assert evd.execution.abort_reason == "EXECUTOR_FAILURE"
     assert "EXAMPLE_PRIVATE_CONFIG_CANARY" not in canonical_json(evd.to_dict()).decode()
     assert case.state.captures == case.state.cleaned == 0

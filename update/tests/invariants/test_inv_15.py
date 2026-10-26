@@ -45,7 +45,8 @@ def _run(tmp_path, impl):
 def test_executor_exception_becomes_aborted_evidence(tmp_path):
     *_, evd = _run(tmp_path, Boom())
     assert evd.execution.status == ExecStatus.ABORTED
-    assert "sensor offline" in evd.execution.abort_reason
+    assert evd.execution.abort_reason == "EXECUTOR_FAILURE"
+    assert "sensor offline" not in str(evd.to_dict())
     assert evd.data_origin != DataOrigin.MEASURED
     assert not any(o.collected for o in evd.observations.values())
 
@@ -80,7 +81,8 @@ def test_docker_probe_failure_becomes_aborted_evidence(tmp_path):
     impl = DirectRouteExecutor({"target": str(target), "allowed_key_env": "K"}, container_probe=probe, environ={"K": "k1"})
     store, pack, plan, evd = _run(tmp_path, impl)
     assert evd.execution.status == ExecStatus.ABORTED
-    assert "network not found" in evd.execution.abort_reason
+    assert evd.execution.abort_reason == "EXECUTOR_FAILURE"
+    assert "network not found" not in str(evd.to_dict())
     (res,) = judge_plan(store, pack, plan, as_of=T0)
     assert res.verdicts.security == Verdict.UNKNOWN
 

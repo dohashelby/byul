@@ -42,6 +42,14 @@ DECLARED이며 EXAMPLE은 그대로다. 부분 사실 보존은 전체 실행·�
 ABORTED 증거는 기존 이월 관문에서 거부하며 과거 저장 EVD/RES·팩에는 새 의미를 소급하지 않는다.
 과거에 이미 빈 관측으로 저장된 EVD는 이 수정이나 재판정만으로 잃은 사실을 복원할 수 없다.
 
+일반 실행기 생성·수집·무효 draft 오류의 기존 빈 ABORTED 경계는 `EXECUTOR_FAILURE`,
+판정 플러그인의 기존 예외 경계는 `JUDGE_PLUGIN_FAILURE`로 진단한다. 이 두 경계에서는
+예외의 클래스 이름·문자열·입력·경로를 저장하거나 문자열화하지 않는다. 뒤쪽 판정 출력의
+오류가 확인되면 앞에서 적용한 PASS도 INV-15에 따라 UNKNOWN으로 보류하고 이미 확보한
+FAIL은 유지한다. 관측 복구·새 기업 기준을 추가하지 않으며 KeyboardInterrupt/SystemExit는
+그대로 전파한다. 과거 EVD/RES는
+고쳐 쓰지 않는다. 실행기 자체의 모든 자유 진단·기존 로그 재생 경계 전체를 바꾼 것은 아니다.
+
 ## PLT-07 명시 금지 TCP 연결 한 분기
 
 `boundary_egress`는 기존 `guard select/run/judge/report` 경로에 연결한다.

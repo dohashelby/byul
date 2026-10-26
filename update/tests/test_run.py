@@ -84,7 +84,8 @@ def test_original_executor_exception_keeps_the_existing_empty_aborted_boundary(c
     case.executor.error = RuntimeError("EXAMPLE original executor failure")
     evd = case.invoke()
     assert_empty_aborted(evd)
-    assert evd.execution.abort_reason == "executor failure: RuntimeError: EXAMPLE original executor failure"
+    assert evd.execution.abort_reason == "EXECUTOR_FAILURE"
+    assert "EXAMPLE original executor failure" not in canonical_json(evd.to_dict()).decode()
     assert evd.execution.executor.name == case.executor.name
     assert evd.execution.executor.version == case.executor.version
 
@@ -111,7 +112,7 @@ def test_malformed_draft_is_not_repaired_or_reclassified_as_artifact_persistence
         case.executor.output = case.draft.model_copy(update={"observations": observations})
     evd = case.invoke()
     assert_empty_aborted(evd)
-    assert evd.execution.abort_reason.startswith("executor failure:")
+    assert evd.execution.abort_reason == "EXECUTOR_FAILURE"
 
 
 def test_artifact_metadata_creation_failure_preserves_valid_draft_and_later_references(case, monkeypatch):

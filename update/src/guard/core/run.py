@@ -212,5 +212,6 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
             comparability=draft.comparability,
             **parts,
         ).seal()
-    except Exception as exc:  # noqa: BLE001 - INV-15: 실패를 삼키지 않고 ABORTED 증거로 남긴다
-        return stopped(ExecStatus.ABORTED, f"executor failure: {type(exc).__name__}: {exc}", info_stub)
+    except Exception:  # noqa: BLE001 - INV-15: 실패를 삼키지 않고 ABORTED 증거로 남긴다
+        # Exception names/text can contain request content, credentials or paths.
+        return stopped(ExecStatus.ABORTED, "EXECUTOR_FAILURE", info_stub)

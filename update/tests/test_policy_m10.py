@@ -159,9 +159,12 @@ def test_unsupported_aborts_before_target_readiness_and_docker(tmp_path, monkeyp
     def forbidden(*args, **kwargs):
         raise AssertionError("readiness/Docker must never be entered")
     monkeypatch.setattr(http, "wait_engine", forbidden); monkeypatch.setattr(http, "Docker", forbidden)
-    _, _, evd, res, calls = run(tmp_path, monkeypatch, pack, values(pack.checks["REQ-09"], **{key: bad}),
-                                missing_target=True)
-    assert evd.execution.status == "ABORTED" and "INPUT_POLICY_UNSUPPORTED" in evd.execution.abort_reason
+    check = pack.checks["REQ-09"]
+    vals = values(check, **{key: bad})
+    with pytest.raises(ValueError, match="INPUT_POLICY_UNSUPPORTED"):
+        InputValidationExecutor({}).validate_policy(check, vals)
+    _, _, evd, res, calls = run(tmp_path, monkeypatch, pack, vals, missing_target=True)
+    assert evd.execution.status == "ABORTED" and evd.execution.abort_reason == "EXECUTOR_FAILURE"
     assert not calls and all(not o.collected for o in evd.observations.values())
     assert res.verdicts.security == res.verdicts.functional == "UNKNOWN"
 

@@ -464,5 +464,78 @@ def verify(config: Path = ConfigOpt, store: Optional[Path] = StoreOpt) -> None:
     raise typer.Exit(1 if problems else 0)
 
 
+@app.command("capture-route-observations")
+def capture_route_observations(
+    env: Path = typer.Option(..., "--env"),
+    target: Path = typer.Option(..., "--target"),
+    container: str = typer.Option(..., "--container"),
+    image: str = typer.Option(..., "--image"),
+    path: str = typer.Option(..., "--path"),
+    output: Path = typer.Option(..., "--output"),
+    execute: bool = typer.Option(False, "--execute", help="소유 파일 읽기만 수행; 엔진 기동·요청·판정 없음"),
+) -> None:
+    """REQ-02 경로 metadata를 읽는다. 생산자·인가·요청 대응 미확인으로 판정은 UNKNOWN."""
+    from guard.collectors.route_observations import capture, load_inputs, validate_output
+    from guard.executors.owned_capture import SourceCaptureError, create_capture_client
+    source = {"container": container, "image": image, "path": path}
+    try:
+        environment, topology = load_inputs(env, target, source)
+        validate_output(output, Path(__file__).resolve().parents[3])
+        if not execute:
+            typer.echo(json.dumps({"capture_executed": False, "engine_started": False,
+                "ready_to_execute": False, "product_connected": False, "security": "UNKNOWN",
+                "pending": ["OWNED_CAPTURE_NOT_EXECUTED", "ROUTE_PRODUCER_TRUST_UNVERIFIED",
+                            "PROBE_LEDGER_NOT_CONNECTED"]}))
+            return
+        result = capture(create_capture_client(topology["run_id"]), topology, environment, **source)
+        raw = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
+        with output.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(raw)
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError, SourceCaptureError):
+        typer.echo("NATIVE_ROUTE_CAPTURE_FAILED")
+        raise typer.Exit(2)
+    typer.echo(json.dumps({"capture_executed": True, "engine_started": False,
+                          "product_connected": False, "security": "UNKNOWN"}))
+
+
+@app.command("capture-model-authorization")
+def capture_model_authorization(
+    pack: Path = typer.Option(..., "--pack"),
+    env: Path = typer.Option(..., "--env"),
+    policy: Path = typer.Option(..., "--policy"),
+    context: Path = typer.Option(..., "--context"),
+    target: Path = typer.Option(..., "--target"),
+    gateway_container: str = typer.Option(..., "--gateway-container"),
+    gateway_image: str = typer.Option(..., "--gateway-image"),
+    gateway_path: str = typer.Option(..., "--gateway-path"),
+    output: Path = typer.Option(..., "--output"),
+    execute: bool = typer.Option(False, "--execute", help="소유 파일 읽기만 수행; 엔진 기동·요청·판정 없음"),
+) -> None:
+    """REQ-05 고정 모델의 Gateway 기록을 수집한다. 최종 모델 생산자 미확인으로 판정은 UNKNOWN."""
+    from guard.collectors.model_authorization import capture, load_inputs
+    from guard.executors.owned_capture import SourceCaptureError, create_capture_client
+    source = {"container": gateway_container, "image": gateway_image, "path": gateway_path}
+    try:
+        environment, pol, ledger, topology = load_inputs(pack, env, policy, context, target, source)
+        repo = Path(__file__).resolve().parents[3]
+        if (output.exists() or output.is_symlink() or not output.parent.is_dir()
+                or output.resolve().is_relative_to(repo)):
+            raise ValueError("MODEL_AUTHORIZATION_OUTPUT_INVALID")
+        if not execute:
+            typer.echo(json.dumps({"capture_executed": False, "engine_started": False,
+                "ready_to_execute": False, "product_connected": False, "security": "UNKNOWN",
+                "pending": ["OWNED_CAPTURE_NOT_EXECUTED", "FINAL_ENGINE_MODEL_PRODUCER_UNAVAILABLE"]}))
+            return
+        result = capture(create_capture_client(topology["run_id"]), environment, pol, ledger, topology, source)
+        raw = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
+        with output.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(raw)
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError, SourceCaptureError):
+        typer.echo("MODEL_AUTHORIZATION_CAPTURE_FAILED")
+        raise typer.Exit(2)
+    typer.echo(json.dumps({"capture_executed": True, "engine_started": False,
+                          "product_connected": False, "security": "UNKNOWN"}))
+
+
 if __name__ == "__main__":
     app()

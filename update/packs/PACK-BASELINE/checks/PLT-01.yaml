@@ -2,7 +2,7 @@ id: PLT-01
 framework_id: CHK-PLT-001
 mechanism_ids:
 - mechanism-11
-revision: 5
+revision: 6
 retired: false
 area: PLT
 purpose: 실행 최소 권한
@@ -41,6 +41,8 @@ challenge_steps:
 - 필요 없는 시험 파일·장치에 읽기/쓰기 요청
 - 정상 추론과 권한 거부 확인
 required_observations:
+- key: permission_scan_complete
+  type: bool
 - key: process_scan_complete
   type: bool
 - key: capabilities_effective
@@ -76,6 +78,9 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
+    - obs: permission_scan_complete
+      op: eq
+      value: true
     - obs: process_scan_complete
       op: eq
       value: true

@@ -7,20 +7,53 @@ from __future__ import annotations
 
 from datetime import datetime
 import json
+import math
 import re
 
 from .content_common import leaves
 
 
-def events(text: str) -> tuple[list[dict], bool]:
+LEGACY_JSON_PROFILE = "guard-log-json/1"
+STRICT_JSON_PROFILE = "guard-log-json/2"
+REJECTED_JSON_LINE = "GUARD_LOG_JSON_UNVERIFIABLE"
+
+
+def strict_json_loads(text: str):
+    """Reject ambiguous JSON locally without importing collection/runtime code."""
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("ambiguous log JSON")
+            result[key] = value
+        return result
+
+    def constant(_value):
+        raise ValueError("ambiguous log JSON")
+
+    def finite_float(value):
+        number = float(value)
+        if not math.isfinite(number):
+            raise ValueError("ambiguous log JSON")
+        return number
+
+    return json.loads(text, object_pairs_hook=pairs, parse_constant=constant, parse_float=finite_float)
+
+
+def events(text: str, *, profile: str = LEGACY_JSON_PROFILE) -> tuple[list[dict], bool]:
+    # The default preserves the historical helper contract. Fresh collections
+    # explicitly choose the strict profile, also recorded for saved replay.
+    if profile not in {LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE}:
+        raise ValueError("unsupported log analysis profile")
+    loads = strict_json_loads if profile == STRICT_JSON_PROFILE else json.loads
     found, complete = [], True
     for line in text.splitlines():
         if not line.strip():
             continue
         prefix = re.match(r"^(\d{4}-\d{2}-\d{2}T[^\s]+)\s+(\{.*)$", line)
         try:
-            value = json.loads(prefix.group(2) if prefix else line)
-        except ValueError:
+            value = loads(prefix.group(2) if prefix else line)
+        except (ValueError, RecursionError):
             complete = False
             continue
         if not isinstance(value, dict):
@@ -28,6 +61,24 @@ def events(text: str) -> tuple[list[dict], bool]:
             continue
         found.append({"event": value, "timestamp": prefix.group(1) if prefix else None})
     return found, complete
+
+
+def persistable_log_text(text: str) -> tuple[str, int]:
+    """Discard rejected raw rows before generic JSON redaction can normalize them.
+
+    A fixed invalid-JSON placeholder preserves the same coverage gap on replay.
+    A decoding-replacement signal is retained without copying source content.
+    The caller keeps original source digests separate from persisted text hashes.
+    """
+    lines, rejected = [], 0
+    for line in text.splitlines(keepends=True):
+        _, valid = events(line, profile=STRICT_JSON_PROFILE)
+        if valid:
+            lines.append(line)
+        else:
+            rejected += 1
+            lines.append(REJECTED_JSON_LINE + ("\ufffd" if "\ufffd" in line else "") + "\n")
+    return "".join(lines), rejected
 
 
 def _inside(timestamp, window):
@@ -42,8 +93,11 @@ def _inside(timestamp, window):
 
 
 def analyze_log_captures(captures: list[dict], values: dict, marks: dict,
-                         correlation: dict, *, initial_gaps: list[str] = ()) -> dict:
+                         correlation: dict, *, initial_gaps: list[str] = (),
+                         profile: str = LEGACY_JSON_PROFILE) -> dict:
     """Reconstruct semantic log observations without I/O or verdict changes."""
+    if profile not in {LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE}:
+        raise ValueError("unsupported log analysis profile")
     gaps, violations, coverage = list(initial_gaps), [], {}
     fields_seen, contexts_seen = set(), set()
     required = values["required_sources"]
@@ -74,7 +128,7 @@ def analyze_log_captures(captures: list[dict], values: dict, marks: dict,
             texts.append(capture.get("stderr_text", ""))
         parsed, structured = [], True
         for text in texts:
-            rows, valid = events(text)
+            rows, valid = events(text, profile=profile)
             parsed.extend(rows)
             structured = structured and valid
         if any("\ufffd" in text for text in texts):

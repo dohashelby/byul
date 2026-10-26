@@ -35,7 +35,7 @@ def given(cid, value):
 
 
 def test_declarations_catalog_and_blank_template_are_not_execution(pack):
-    assert pack.manifest.revision == 26 and not pack.reviewed
+    assert pack.manifest.revision == 27 and not pack.reviewed
     assert len(pack.checks) == 77
     assert sum(bool(c.policy_params) for c in pack.active_checks()) == 25
     assert sum(len(c.policy_params) for c in pack.active_checks()) == 54

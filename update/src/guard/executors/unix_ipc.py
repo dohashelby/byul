@@ -20,7 +20,7 @@ from .http_common import HttpCheckExecutor, functional_requests, functional_resu
 
 
 PROFILE = "unix-ipc-access-v1"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 _PIN = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}")
 _NS = re.compile(r"(mnt|net|pid|user):\[[0-9]+\]")
 _ID = re.compile(r"[0-9a-f]{64}")
@@ -70,6 +70,9 @@ def _parse(result, mode, uid, count):
             return None
         for index, row in enumerate(value["rows"]):
             if type(row) is not dict or type(row.get("index")) is not int or row["index"] != index:
+                return None
+            if mode == "connect" and (type(row.get("outcome")) is not str
+                    or row["outcome"] not in {"connected", "denied", "unknown"}):
                 return None
             if mode == "inspect" and row.get("complete") is True:
                 owners = row.get("owners")

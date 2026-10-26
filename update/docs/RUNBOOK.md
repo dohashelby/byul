@@ -1,6 +1,39 @@
 # 실행·실증 안내
 
-> 2026-10-26 현행 작업 후보: 팩26/DRAFT, 보안 규칙 연결13개·SUP-03 관측 전용1개다.
+## REQ-02 소유 경로 관측 파일 수집
+
+`guard capture-route-observations --help`로 설치 제품에서도 기존 파일 수집을 사용할 수 있다.
+봉인 ENV와 명시한 target/run ID·소유 컨테이너·pinned 이미지를 준비한다.
+
+```text
+guard capture-route-observations --env "<SEALED-ENV.json>" --target "<TARGET.json>" --container "<OWNED-PRODUCER>" --image "<REPOSITORY@sha256:DIGEST>" --path "/guard-observations/route.json" --output "<NEW-EXTERNAL-ATTACHMENT.json>"
+```
+
+기본 실행은 입력 검사만 하며 Docker 생성·수집·출력을 하지 않는다. `--execute`는
+기존 소유 컨테이너의 파일을 읽기만 하고 엔진 기동·HTTP 요청·판정을 하지 않는다.
+출력은 기존 부모 아래 저장소 밖의 새 파일이어야 하며 링크·junction과 덮어쓰기를 거부한다.
+독립 생산자·인가·요청 ledger가 검증되지 않아 항상 UNKNOWN·`product_connected=false`다.
+EXAMPLE ENV는 EXAMPLE로 보존하며 그 외 입력도 생산자 인증 전에는 DECLARED 첨부다.
+기존 `tools/capture_route_observations.py`도 같은 수집 함수를 사용한다.
+
+## REQ-05 Gateway 기록 수집 — 최종 엔진 모델 판정은 미연결
+
+`guard capture-model-authorization --help`로 제품 명령을 확인한다. 기존 collect/import의
+봉인 ENV/POL JSON과 명시 context·target을 사용하며, 기존 봉인 파일을 직접 고쳐 쓰지 않는다.
+POL의 새 판본에 사람이 `values.REQ-05.principal_model_grants`를 입력해야 한다.
+이 전용 수집 입력은 CheckDef의 자동 정책 양식 등록을 뜻하지 않는다.
+
+```powershell
+guard capture-model-authorization --pack packs/PACK-BASELINE --env "<SEALED-ENV.json>" --policy "<SEALED-POL.json>" --context "<CONTEXT.json>" --target "<TARGET.json>" --gateway-container "<OWNED-GATEWAY>" --gateway-image "<REPOSITORY@sha256:DIGEST>" --gateway-path "/logs/gateway_records.jsonl" --output "<NEW-EXTERNAL-ATTACHMENT.json>"
+```
+
+기본 실행은 입력만 검사하고 출력·Docker를 만들지 않는다. 별도 승인된 소유 자료를
+실제로 읽을 때만 `--execute`를 붙인다. 이 옵션도 기동·요청 발생·판정은 하지 않는다.
+최종 엔진 모델 생산자가 없어 수집 성공 후에도 UNKNOWN·비공식이며 실행/인가 검증
+완료가 아니다. 입력 필드·상한·남은 생산자와 PLT-07 시험 조건은
+[관측 보강](AUTOMATION_HARDENING.md)의 REQ-05/PLT-07 절을 따른다.
+
+> 2026-10-26 현행 작업 후보: 팩27/DRAFT, 보안 규칙 연결13개·SUP-03 관측 전용1개다.
 > PLT-02 Unix IPC 부분 연결·선택 native 파일 수집의 범위는
 > [관측 보강](AUTOMATION_HARDENING.md)을 따른다. 기존 점검 실제 재실증은 변경 영향이
 > 있을 때 해당 범위만 수행한다. 아래 팩21·22·GUA PR #28~#31 기록은 과거 이력이다.

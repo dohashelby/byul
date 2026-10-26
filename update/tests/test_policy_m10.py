@@ -101,7 +101,7 @@ def run(tmp_path, monkeypatch, pack, vals, probe=None, missing_target=False):
 
 def test_registration_is_bounded_and_template_empty(pack):
     check = pack.checks["REQ-09"]
-    assert check.revision == 7 and pack.manifest.revision == 26 and not pack.reviewed
+    assert check.revision == 7 and pack.manifest.revision == 27 and not pack.reviewed
     assert contract_state(check) == "complete" and len(check.required_observations) == 10
     assert len(pack.checks) == 77
     assert sum(bool(c.policy_params) for c in pack.active_checks()) == 25

@@ -10,6 +10,7 @@ from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
 from guard.executors import registry
 from guard.executors.log_analysis import LogAnalysisExecutor
+from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JSON_PROFILE, events
 from guard.runtime.docker import CmdResult
 from guard.store import Store
 from tests.builders import baseline_pack, environment, policy
@@ -63,6 +64,28 @@ class Source:
                         "raw_retained_bytes": len(raw), "raw_retained_sha256": hashlib.sha256(raw).hexdigest(),
                         "file_identity_stable": True, "source_complete": True, "nofollow_components": True,
                         "regular_file": True, "truncated": False, "size": len(raw), "mtime_ns": 1000}), "")
+
+
+class AmbiguousSource(Source):
+    """EXAMPLE malformed log rows; independent complete leak events stay intact."""
+
+    def __init__(self, kind, **options):
+        super().__init__(**options)
+        self.kind = kind
+
+    def logs_window(self, container, *, since, until, timeout):
+        result = super().logs_window(container, since=since, until=until, timeout=timeout)
+        linked = json.dumps(self.events[0]["request_id"])
+        rows = {
+            "request": '{"request_id":' + linked + ',"request_id":"EXAMPLE-unrelated","prompt":"EXAMPLE hidden field"}',
+            "nested": '{"context":{"request_id":' + linked + ',"request_id":"EXAMPLE-unrelated"},"event":"normal"}',
+            "same-value": '{"request_id":' + linked + ',"event":"normal","event":"normal"}',
+            "escaped-key": '{"request_id":' + linked + ',"event":"normal","ev\\u0065nt":"normal"}',
+            "nan": '{"request_id":"EXAMPLE-unrelated","event":NaN}',
+            "infinity": '{"request_id":"EXAMPLE-unrelated","event":Infinity}',
+            "overflow": '{"request_id":"EXAMPLE-unrelated","event":1e400}',
+        }
+        return CmdResult(0, result.stdout + "\n" + rows[self.kind], result.stderr)
 
 
 def run_log(tmp_path, monkeypatch, source, values=None, source_cfg=None):
@@ -185,3 +208,62 @@ def test_collector_exception_message_cannot_enter_observations_or_artifacts(tmp_
     assert "arbitrary-daemon-secret-never-save" not in evd.model_dump_json()
     for artifact in evd.artifacts:
         assert "arbitrary-daemon-secret-never-save" not in (store.root / artifact.path).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("kind", ["request", "nested", "same-value", "escaped-key", "nan", "infinity", "overflow"])
+def test_ambiguous_json_cannot_complete_new_log_collection(tmp_path, monkeypatch, kind):
+    store, evd, res = run_log(tmp_path, monkeypatch, AmbiguousSource(kind))
+    assert evd.execution.status.value == "COMPLETED"
+    assert evd.execution.executor.version == "0.2.1"
+    assert evd.observations["log_coverage_complete"].value is False
+    assert res.verdicts.security.value == "UNKNOWN", res.reasons
+    sample_artifact = next(item for item in evd.artifacts if item.name == "log_samples.json")
+    sample = json.loads((store.root / sample_artifact.path).read_bytes())["capture"]
+    assert sample["schema"] == "guard-log-analysis-capture/3"
+    assert sample["analysis_profile"] == STRICT_JSON_PROFILE
+
+
+@pytest.mark.parametrize("kind", ["request", "nested", "nan"])
+def test_independent_complete_leak_remains_fail_when_another_event_is_ambiguous(tmp_path, monkeypatch, kind):
+    store, evd, res = run_log(tmp_path, monkeypatch, AmbiguousSource(kind, leak=True))
+    assert evd.observations["log_coverage_complete"].value is False
+    assert "prompt" in evd.observations["log_fields_seen"].value
+    assert "caller_input" in evd.observations["log_marker_contexts_seen"].value
+    item = next(artifact for artifact in evd.artifacts if artifact.name == "log_samples.json")
+    assert json.loads((store.root / item.path).read_bytes())["capture"]["analysis"]["log_violations"]
+    assert res.verdicts.security.value == "FAIL", res.reasons
+
+
+@pytest.mark.parametrize("text", ['{"event":1,"event":2}', '{"event":{"key":1,"key":2}}',
+                                 '{"event":1,"ev\\u0065nt":2}', '{"event":NaN}',
+                                 '{"event":Infinity}', '{"event":-Infinity}', '{"event":1e400}'])
+def test_strict_event_parser_rejects_ambiguous_rows_without_hiding_complete_neighbors(text):
+    neighboring = '{"request_id":"EXAMPLE-trial","event":"normal"}'
+    found, complete = events(text + "\n" + neighboring, profile=STRICT_JSON_PROFILE)
+    assert complete is False
+    assert found == [{"event": {"request_id": "EXAMPLE-trial", "event": "normal"}, "timestamp": None}]
+    legacy, legacy_complete = events(text, profile=LEGACY_JSON_PROFILE)
+    assert legacy_complete is True and len(legacy) == 1
+
+
+def test_strict_parser_keeps_valid_finite_json_and_timestamped_events():
+    text = '2026-10-26T00:00:00Z {"event":{"value":1.5,"list":[0,false,null,"NaN"]}}'
+    found, complete = events(text, profile=STRICT_JSON_PROFILE)
+    assert complete is True
+    assert found == [{"timestamp": "2026-10-26T00:00:00Z",
+                      "event": {"event": {"value": 1.5, "list": [0, False, None, "NaN"]}}}]
+
+
+def test_unknown_json_profile_is_not_inferred_from_data():
+    with pytest.raises(ValueError, match="unsupported log analysis profile"):
+        events('{"event":"normal"}', profile="guard-log-json/future")
+
+
+def test_rejected_row_persistence_discards_raw_values_and_keeps_decode_gap_signal():
+    from guard.executors.log_analysis_contract import REJECTED_JSON_LINE, persistable_log_text
+
+    raw = '{"secret":"EXAMPLE-never-retain","secret":"safe","event":"\ufffd"}\n'
+    persisted, rejected = persistable_log_text(raw)
+    assert persisted == REJECTED_JSON_LINE + "\ufffd\n" and rejected == 1
+    assert "EXAMPLE-never-retain" not in persisted
+    assert events(persisted, profile=STRICT_JSON_PROFILE) == ([], False)

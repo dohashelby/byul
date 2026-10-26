@@ -23,7 +23,7 @@ import secrets
 from typing import Any
 
 from .http_common import Ctx, HttpCheckExecutor, functional_requests, functional_results
-from .running_image_approval import (PROFILE as SUPPLY_IMAGE_PROFILE, VERSION as SUPPLY_IMAGE_VERSION,
+from .running_image_approval import (PROFILE as SUPPLY_IMAGE_PROFILE,
                                      collect_running_image_approval, validate_image_approval_policy)
 
 # Linux capability 번호 → 이름 (include/uapi/linux/capability.h)
@@ -60,26 +60,45 @@ def parse_proc_status(text: str) -> list[dict]:
     procs: list[dict] = []
     cur: dict | None = None
     for line in text.splitlines():
-        if line.startswith("PID "):
-            cur = {"pid": int(line[4:].strip())}
+        if line.startswith("PID"):
+            # A broken header must end the preceding process record. Its
+            # following fields cannot be attributed to the last valid PID.
+            value = line[4:].strip()
+            cur = {"pid": int(value)} if line.startswith("PID ") and re.fullmatch(r"[1-9][0-9]{0,9}", value) else {"read_error": True}
+            if "pid" in cur and cur["pid"] > 2147483647:
+                cur = {"read_error": True}
+            if any(p.get("pid") == cur.get("pid") for p in procs) and "pid" in cur:
+                cur["read_error"] = True
             procs.append(cur)
         elif cur is not None and ":" in line:
             key, _, val = line.partition(":")
             val = val.strip()
             if key == "Name":
-                cur["name"] = val
+                if "name" in cur:
+                    cur["read_error"] = True
+                if "pid" in cur:
+                    cur["name"] = val
             elif key == "Uid":
-                try:
-                    cur["uid_effective"] = int(val.split()[1])
-                except (ValueError, IndexError):
+                fields = val.split()
+                if "uid_effective" in cur or len(fields) != 4 or any(not re.fullmatch(r"[0-9]{1,10}", v) for v in fields):
                     cur["read_error"] = True
+                elif any(int(v) > 4294967295 for v in fields):
+                    cur["read_error"] = True
+                elif "pid" in cur:
+                    cur["uid_effective"] = int(fields[1])
             elif key == "CapEff":
-                try:
-                    cur["caps"] = decode_caps(val)
-                except ValueError:
+                if "caps" in cur or not re.fullmatch(r"[0-9A-Fa-f]{1,16}", val):
                     cur["read_error"] = True
+                elif "pid" in cur:
+                    cur["caps"] = decode_caps(val)
         elif cur is not None and line == "GUARD_READ_ERROR":
             cur["read_error"] = True
+        elif line.strip():
+            if cur is None:
+                cur = {"read_error": True}
+                procs.append(cur)
+            else:
+                cur["read_error"] = True
     return procs
 
 
@@ -88,7 +107,7 @@ def exec_candidates(mounts_text: str) -> list[dict]:
     out = []
     for line in mounts_text.splitlines():
         parts = line.split()
-        if len(parts) < 4:
+        if len(parts) != 6 or not parts[1].startswith("/"):
             continue
         _, target, fstype, opts = parts[:4]
         flags = set(opts.split(","))
@@ -104,7 +123,7 @@ def _mount_key(m: dict) -> str:
 
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
-    version = SUPPLY_IMAGE_VERSION
+    version = "0.5.1"
     requires_roles = False
     requires_route_scope = False
     functional_via = "engine"
@@ -136,77 +155,160 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             raise RuntimeError(f"container_config: invalid container name {container!r}")
         docker = self._docker_obj()
 
-        # 1. 실행 구성
-        ins = docker.inspect_json(container, timeout=30)
-        hc = ins.get("HostConfig") or {}
-        mounts_all = ins.get("Mounts") or []
-        host_mounts = [m for m in mounts_all if m.get("Type") in ("bind", "volume")]
+        # Each permission source is independent. A later read failure must not
+        # replace an already observed permission with an empty ABORTED record.
+        errors, ins = [], {}
+        try:
+            inspected = docker.inspect_json(container, timeout=30)
+            if type(inspected) is not dict:
+                raise ValueError("invalid inspect envelope")
+            ins = inspected
+        except Exception:
+            errors.append("CONTAINER_INSPECTION_UNAVAILABLE")
+        hc = ins.get("HostConfig") if type(ins.get("HostConfig")) is dict else {}
+        mounts_raw = ins.get("Mounts")
+        mounts_all = [m for m in mounts_raw if type(m) is dict
+                      and type(m.get("Type")) is str and m["Type"] in {"bind", "volume", "tmpfs"}
+                      and type(m.get("Destination")) is str
+                      and m["Destination"].startswith("/") and ".." not in m["Destination"].split("/")
+                      and (m["Type"] not in {"bind", "volume"} or type(m.get("RW")) is bool)] \
+            if type(mounts_raw) is list else []
+        mounts_complete = type(mounts_raw) is list and len(mounts_all) == len(mounts_raw)
+        host_mounts = [m for m in mounts_all if m["Type"] in ("bind", "volume")]
         mounts = sorted(_mount_key(m) for m in host_mounts)
-        devices = sorted(f"{d.get('PathOnHost')}:{d.get('PathInContainer')}:{d.get('CgroupPermissions')}"
-                         for d in hc.get("Devices") or [])
-        privileged = bool(hc.get("Privileged"))
+        devices_raw = hc.get("Devices")
+        device_rows = [d for d in devices_raw if type(d) is dict
+                       and all(type(d.get(key)) is str and d[key].startswith("/")
+                               for key in ("PathOnHost", "PathInContainer"))
+                       and type(d.get("CgroupPermissions")) is str
+                       and re.fullmatch(r"[rwm]+", d["CgroupPermissions"])] \
+            if type(devices_raw) is list else []
+        devices_complete = "Devices" in hc and (devices_raw is None or
+                           type(devices_raw) is list and len(device_rows) == len(devices_raw))
+        devices = sorted(f"{d['PathOnHost']}:{d['PathInContainer']}:{d['CgroupPermissions']}" for d in device_rows)
+        privileged = hc.get("Privileged") if type(hc.get("Privileged")) is bool else None
+        namespaces_complete = all(type(hc.get(key)) is str for _, key in HOST_NAMESPACE_KEYS)
         host_ns = sorted(ns for ns, key in HOST_NAMESPACE_KEYS if hc.get(key) == "host")
+        inspect_complete = mounts_complete and devices_complete and privileged is not None and namespaces_complete
+        if not inspect_complete:
+            errors.append("CONTAINER_PERMISSION_INVENTORY_INCOMPLETE")
+        raw_config = ins.get("Config") if type(ins.get("Config")) is dict else {}
+        def string_list(field):
+            value = hc.get(field)
+            return value or [] if value is None or type(value) is list and all(type(v) is str for v in value) else None
+
+        tmpfs = hc.get("Tmpfs")
         config = {
-            "user": (ins.get("Config") or {}).get("User") or "",
-            "readonly_rootfs": bool(hc.get("ReadonlyRootfs")),
-            "cap_add": hc.get("CapAdd") or [], "cap_drop": hc.get("CapDrop") or [],
-            "security_opt": hc.get("SecurityOpt") or [], "tmpfs": sorted((hc.get("Tmpfs") or {}).keys()),
-            "image": (ins.get("Config") or {}).get("Image"),
+            "user": raw_config.get("User") if type(raw_config.get("User")) is str else None,
+            "readonly_rootfs": hc.get("ReadonlyRootfs") if type(hc.get("ReadonlyRootfs")) is bool else None,
+            "cap_add": string_list("CapAdd"), "cap_drop": string_list("CapDrop"),
+            "security_opt": string_list("SecurityOpt"),
+            "tmpfs": [] if tmpfs is None else sorted(tmpfs) if type(tmpfs) is dict and all(type(k) is str for k in tmpfs) else None,
+            "image": raw_config.get("Image") if type(raw_config.get("Image")) is str else None,
             # Config.Env는 기록하지 않는다(비밀이 들어 있을 수 있음)
         }
 
         # 2. 모든 프로세스의 유효 capability·UID
-        proc = docker.exec(container, ["sh", "-c", PROC_CMD], timeout=30)
-        procs = parse_proc_status(proc.stdout) if proc.returncode == 0 else []
+        procs, proc_rc = [], None
+        try:
+            proc = docker.exec(container, ["sh", "-c", PROC_CMD], timeout=30)
+            proc_rc = proc.returncode
+            if type(proc.stdout) is not str:
+                raise ValueError("invalid process output")
+            procs = parse_proc_status(proc.stdout)
+        except Exception:
+            errors.append("PROCESS_PERMISSION_SCAN_UNAVAILABLE")
         caps = sorted({cap for p in procs for cap in p.get("caps", [])})
         uids = sorted({p["uid_effective"] for p in procs if "uid_effective" in p})
-        complete = bool(procs) and all("caps" in p and "uid_effective" in p and not p.get("read_error") for p in procs)
+        complete = proc_rc == 0 and bool(procs) and all("pid" in p and "caps" in p and "uid_effective" in p
+                                                     and not p.get("read_error") for p in procs)
+        if not complete:
+            errors.append("PROCESS_PERMISSION_SCAN_INCOMPLETE")
+
+        def write_probe(path):
+            try:
+                result = docker.exec(container, ["sh", "-c", SENTINEL_CMD, "_", path, secrets.token_hex(4)], timeout=30)
+                value = result.stdout.strip()
+                if result.returncode == 0 and value in {"absent", "succeeded", "denied"}:
+                    return value
+            except Exception:
+                pass
+            errors.append("PERMISSION_SENTINEL_UNAVAILABLE")
+            return "error"
 
         # 3. sentinel 쓰기 시도
         mount_dests = {m.get("Destination") for m in host_mounts}
         writes: dict[str, str] = {}
-        for path in self.cfg.get("sentinel_paths", DEFAULT_SENTINELS):
-            r = docker.exec(container, ["sh", "-c", SENTINEL_CMD, "_", path, secrets.token_hex(4)], timeout=30)
-            writes[path] = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() in ("absent", "succeeded", "denied") \
-                else "error"
+        for path in dict.fromkeys(self.cfg.get("sentinel_paths", DEFAULT_SENTINELS)):
+            writes[path] = write_probe(path)
         sentinel_results = {p: o for p, o in writes.items() if p in mount_dests or o == "absent"}
         container_fs_writes = {p: o for p, o in writes.items() if p not in sentinel_results}
 
         # 3-b. 쓰기 가능 + 실행 가능 마운트(그 자체가 권한): 마운트 표의 후보마다 실제 쓰기 시도
-        mt = docker.exec(container, ["sh", "-c", MOUNTS_CMD], timeout=30)
-        candidates = exec_candidates(mt.stdout) if mt.returncode == 0 else []
+        mount_text, mount_rc = "", None
+        try:
+            mt = docker.exec(container, ["sh", "-c", MOUNTS_CMD], timeout=30)
+            mount_rc = mt.returncode
+            if type(mt.stdout) is not str:
+                raise ValueError("invalid mount output")
+            mount_text = mt.stdout
+        except Exception:
+            errors.append("PROCESS_MOUNT_SCAN_UNAVAILABLE")
+        mount_lines = [line.split() for line in mount_text.splitlines() if line.strip()]
+        process_mounts_complete = mount_rc == 0 and bool(mount_lines) and all(
+            len(line) == 6 and line[1].startswith("/") for line in mount_lines)
+        if not process_mounts_complete:
+            errors.append("PROCESS_MOUNT_SCAN_INCOMPLETE")
+        candidates = exec_candidates(mount_text)
         exec_checks: dict[str, str] = {}
         for c in candidates:
-            r = docker.exec(container, ["sh", "-c", SENTINEL_CMD, "_", c["target"], secrets.token_hex(4)], timeout=30)
-            value = r.stdout.strip()
-            exec_checks[c["target"]] = value if r.returncode == 0 and value in {"succeeded", "denied", "absent"} else "error"
+            if c["target"] not in exec_checks:
+                exec_checks[c["target"]] = write_probe(c["target"])
         exec_writable = sorted(t for t, o in exec_checks.items() if o == "succeeded")
+        permission_complete = (inspect_complete and complete and process_mounts_complete
+                               and all(value != "error" for value in (*writes.values(), *exec_checks.values())))
+        # Older saved definitions retain their original complete-list contract.
+        # The new definition has an explicit whole-permission PASS gate so known
+        # partial values can remain collected without manufacturing a PASS.
+        completeness_gate = any(obs.key == "permission_scan_complete" for obs in ctx.check.required_observations)
 
         # 4. 정상 대조(신뢰 출발점 → 엔진)
-        reqs, probes = functional_requests(ctx, via="engine")
-        res = ctx.cprobe(ctx.trusted_net, reqs, max(ctx.timeout, 30.0)) if reqs else []
+        probes = {fp.id: fp for fp in ctx.check.functional_probes}
         func_raw = {}
-        for (pid, fp), r in zip(probes.items(), res):
-            func_raw[pid] = r
-            ctx.record("trusted", "functional-engine", pid, fp.as_role, r)
+        functional_attempted = False
+        try:
+            reqs, probes = functional_requests(ctx, via="engine")
+            functional_attempted = bool(reqs)
+            res = ctx.cprobe(ctx.trusted_net, reqs, max(ctx.timeout, 30.0)) if reqs else []
+            if (type(res) is not list or len(res) != len(reqs) or any(type(r) is not dict for r in res)
+                    or [r.get("id") for r in res] != [r["id"] for r in reqs]):
+                raise ValueError("incomplete functional response correlation")
+            for (pid, fp), r in zip(probes.items(), res):
+                func_raw[pid] = r
+                ctx.record("trusted", "functional-engine", pid, fp.as_role, r)
+        except Exception:
+            errors.append("CONTAINER_FUNCTIONAL_PROBE_UNAVAILABLE")
         functional, functional_status, normal = functional_results(probes, func_raw, ctx.env.model.id)
-
-        mount_lines = [line.split() for line in mt.stdout.splitlines() if line.strip()]
-        mounts_complete = mt.returncode == 0 and bool(mount_lines) and all(len(line) >= 6 for line in mount_lines)
+        normal["attempted"] = functional_attempted
         observations = {
             "process_scan_complete": {"value": complete, "collected": True},
             "capabilities_effective": {"value": caps, "collected": any("caps" in p for p in procs)},
-            "mounts": {"value": mounts, "collected": True},
-            "devices": {"value": devices, "collected": True},
-            "privileged": {"value": privileged, "collected": True},
-            "host_namespaces": {"value": host_ns, "collected": True},
-            "root_uid_present": {"value": 0 in uids, "collected": 0 in uids or (bool(procs) and all("uid_effective" in p for p in procs))},
-            "sentinel_results": {"value": sentinel_results, "collected": all(v != "error" for v in sentinel_results.values())},
+            "mounts": {"value": mounts, "collected": mounts_complete or completeness_gate and bool(host_mounts)},
+            "devices": {"value": devices, "collected": devices_complete or completeness_gate and bool(device_rows)},
+            "privileged": {"value": privileged, "collected": privileged is not None},
+            "host_namespaces": {"value": host_ns, "collected": namespaces_complete or completeness_gate and bool(host_ns)},
+            "root_uid_present": {"value": 0 in uids, "collected": 0 in uids or complete},
+            "sentinel_results": {"value": sentinel_results,
+                                 "collected": mounts_complete and all(v != "error" for v in sentinel_results.values())
+                                 or completeness_gate and bool(sentinel_results)},
             "exec_writable_mounts": {"value": exec_writable,
-                                     "collected": mounts_complete and all(v != "error" for v in exec_checks.values())},
+                                     "collected": process_mounts_complete and all(v != "error" for v in exec_checks.values())
+                                     or completeness_gate and bool(exec_writable)},
             "functional_probes_planned": {"value": list(probes), "collected": True},
             "functional_probe_results": {"value": functional, "collected": bool(probes)},
         }
+        if completeness_gate:
+            observations["permission_scan_complete"] = {"value": permission_complete, "collected": True}
         steps = ctx.check.challenge_steps
         challenges = [
             {"step": steps[0], "attempted": True,
@@ -220,10 +322,11 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             "mounts": mounts, "all_mounts": sorted(f"{m.get('Type')}:{_mount_key(m)}" for m in mounts_all),
             "devices": devices, "capabilities_effective": caps, "uids": uids,
             "processes": [{k: p.get(k) for k in ("pid", "name", "uid_effective", "caps")} for p in procs],
-            "proc_read_rc": proc.returncode, "sentinel_results": sentinel_results,
+            "proc_read_rc": proc_rc, "sentinel_results": sentinel_results,
             "container_fs_writes": container_fs_writes,
             "exec_candidates": candidates, "exec_write_checks": exec_checks,
             "functional_probe_results": functional, "functional_probe_status": functional_status,
+            "permission_scan_complete": permission_complete, "collection_errors": sorted(set(errors)),
             "fixture": {"sentinel_paths": list(writes), "proc_cmd": PROC_CMD, "sentinel_cmd": SENTINEL_CMD},
         }
         return observations, normal, challenges, summary

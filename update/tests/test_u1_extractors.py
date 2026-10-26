@@ -253,7 +253,7 @@ def test_legacy_checkdef_omits_new_optional_metadata():
 
 
 def test_source_refresh_and_image_profile_revisions_preserve_other_definitions():
-    """팩23→24의 SUP-04와 팩24→25의 SUP-03을 구분해 다른76개 bytes를 보호한다."""
+    """팩23→27의 독립 변경 단계를 구분해 각 단계의 나머지76개 bytes를 보호한다."""
     prior = {f"{area}-{number:02d}": 1 for area, count in
              (("SUP", 16), ("REQ", 21), ("PLT", 12), ("LIF", 16), ("OBS", 12))
              for number in range(1, count + 1)}
@@ -263,12 +263,13 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
                   "OBS-03": 2, "OBS-04": 2, "OBS-05": 2, "OBS-07": 2, "OBS-08": 2,
                   "OBS-09": 2, "OBS-11": 2})
     pack = load_pack(ROOT / "packs/PACK-BASELINE")
-    assert pack.manifest.revision == 26
+    assert pack.manifest.revision == 27
     assert set(pack.checks) == set(prior) and len(prior) == 77
     expected = {cid: revision + 1 for cid, revision in prior.items()}
     expected["SUP-04"] += 1  # Only the new running-image profile changes after source refresh.
     expected["PLT-02"] += 1  # Bounded Unix IPC access profile; all previous definitions remain unchanged.
     expected["SUP-03"] += 1  # Observation-only template profile, not independent consumer proof.
+    expected["PLT-01"] += 1  # Complete permission collection gates PASS, preserving violation rules.
     assert {cid: check.revision for cid, check in pack.checks.items()} == expected
     frozen = json.loads((ROOT / "tests/fixtures/pack23-check-hashes.json").read_text(encoding="utf-8"))
     previous = json.loads((ROOT / "tests/fixtures/pack24-check-hashes.json").read_text(encoding="utf-8"))
@@ -284,9 +285,16 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
     for path, digest in previous["checks"].items():
         if path != "checks/SUP-03.yaml":
             assert pack25[Path(path).stem] == digest
-    # Then check PACK25 -> current: only the newly authorized IPC definition changes.
+    # PACK26 is fixed from c9c6ab4 git objects, before the permission completeness change.
+    pack26 = json.loads((ROOT / "tests/fixtures/pack26-check-hashes.json").read_text(encoding="utf-8"))
+    assert len(pack26) == 77
+    # Keep PACK25 -> PACK26 against immutable snapshots: only the IPC definition changed.
     for cid, digest in pack25.items():
         if cid != "PLT-02":
+            assert pack26[cid] == digest
+    # PACK26 -> current changes only PLT-01; old snapshots receive no new contract.
+    for cid, digest in pack26.items():
+        if cid != "PLT-01":
             assert sha256((ROOT / "packs/PACK-BASELINE/checks" / f"{cid}.yaml").read_bytes()).hexdigest() == digest
     assert pack.checks["SUP-04"].collection_profile == "running-image-approval-v1"
     assert {check.framework_id for check in pack.checks.values()} == {

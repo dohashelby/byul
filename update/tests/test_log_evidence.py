@@ -37,7 +37,7 @@ def seed(tmp_path):
     return store.root, report
 
 
-def revised_sample(store_path, change, *, replace_observations=False):
+def revised_sample(store_path, change, *, replace_observations=False, observation_change=None):
     """Append new EVD/RES/RPT; original objects and artifacts remain untouched."""
     store = Store(store_path)
     evd, = list(store.iter_kind("EVD"))
@@ -52,6 +52,9 @@ def revised_sample(store_path, change, *, replace_observations=False):
         from guard.models import Observation
         fields["observations"] = {**evd.observations,
             **{key: Observation(value=value, collected=True) for key, value in envelope["capture"]["analysis"].items()}}
+    if observation_change is not None:
+        fields.setdefault("observations", deepcopy(evd.observations))
+        observation_change(fields["observations"])
     newer = evd.model_copy(update=fields).seal()
     store.put(newer)
     plan = store.resolve(evd.plan)
@@ -277,7 +280,7 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
                           "collected_at": env.created_at, "collector": "EXAMPLE-persisted-draft"})
     evd = Evidence(id="EVD-EXAMPLE-NATIVE", data_origin="EXAMPLE", refs=[plan.ref(), env.ref()],
         plan=plan.ref(), environment=env.ref(), check_id="OBS-09", side="single",
-        execution={"status": "COMPLETED", "executor": {"name": "log_integrity", "version": "0.2.0", "config_sha256": "0" * 64}},
+        execution={"status": "COMPLETED", "executor": {"name": "log_integrity", "version": "0.2.1", "config_sha256": "0" * 64}},
         normal_control=draft.normal_control, challenges=draft.challenges, observations=draft.observations,
         artifacts=artifacts).seal()
     store.put(evd)
@@ -287,3 +290,138 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
     result = analyze_saved_logs(store.root)
     assert result["accepted"], result
     assert result["checks"][0]["verdicts"]["security"] == ("FAIL" if changes.get("duplicate") else "UNKNOWN" if changes else "PASS")
+
+
+@pytest.mark.parametrize("kind,leak,expected", [(None, False, "PASS"), ("request", False, "UNKNOWN"),
+                                             ("nested", True, "FAIL"), ("nan", False, "UNKNOWN")])
+def test_new_strict_collection_replays_saved_pass_unknown_or_independent_fail(tmp_path, monkeypatch, kind, leak, expected):
+    from guard.executors.log_analysis_contract import STRICT_JSON_PROFILE
+    from guard.store.packs import put_pack
+    from tests.test_log_analysis import AmbiguousSource, Source, run_log
+
+    source = AmbiguousSource(kind, leak=leak) if kind else Source()
+    store, evd, res = run_log(tmp_path, monkeypatch, source)
+    assert res.verdicts.security.value == expected
+    pack = baseline_pack()
+    assert set(evd.observations) == {item.key for item in pack.checks["OBS-03"].required_observations}
+    assert "log_violations" not in evd.observations
+    put_pack(store, PACK_DIR)
+    plan = store.resolve(evd.plan)
+    report = build_report(store, pack, plan, store.resolve(evd.environment).created_at)
+    store.put(report)
+    before = inventory_tree(store.root)
+    replay = analyze_saved_logs(store.root)
+    assert replay["accepted"] and replay["original_inventory_preserved"], replay
+    assert replay["checks"][0]["status"] == "REPLAY_MATCH"
+    assert replay["checks"][0]["analysis_profile"] == STRICT_JSON_PROFILE
+    assert replay["checks"][0]["strict_json_profile_applied"] is True
+    assert replay["checks"][0]["coverage_complete"] is (kind is None)
+    assert replay["checks"][0]["verdicts"]["security"] == expected
+    assert inventory_tree(store.root) == before
+    if kind:
+        item = next(artifact for artifact in evd.artifacts if artifact.name == "log_samples.json")
+        sample = json.loads((store.root / item.path).read_bytes())["capture"]
+        assert sample["captures"][0]["rejected_json_lines"]["text"] == 1
+        assert "GUARD_LOG_JSON_UNVERIFIABLE" in sample["captures"][0]["text"]
+        assert '"request_id":"EXAMPLE-unrelated"' not in sample["captures"][0]["text"]
+
+
+def test_legacy_duplicate_key_replay_keeps_original_profile_without_new_strict_claim(tmp_path):
+    from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE
+
+    source, original = seed(tmp_path)
+    def append_legacy_row(sample):
+        capture = sample["captures"][0]
+        capture["text"] += ('{"request_id":"EXAMPLE_TRIAL_NORMAL","request_id":"EXAMPLE-unrelated",'
+                            '"prompt":"EXAMPLE untrusted row"}\n')
+        encoded = capture["text"].encode()
+        capture["persisted_decoded_sha256"] = hashlib.sha256(encoded).hexdigest()
+        capture["persisted_decoded_bytes"] = len(encoded)
+    newer = revised_sample(source, append_legacy_row)
+    before = inventory_tree(source)
+    replay = analyze_saved_logs(source, newer)
+    assert replay["accepted"], replay
+    assert replay["checks"][0]["analysis_profile"] == LEGACY_JSON_PROFILE
+    assert replay["checks"][0]["strict_json_profile_applied"] is False
+    assert replay["checks"][0]["verdicts"]["security"] == "PASS"
+    assert any("historical JSON parser" in item for item in replay["limitations"])
+    assert analyze_saved_logs(source, original)["accepted"]
+    assert inventory_tree(source) == before
+
+
+@pytest.mark.parametrize("change", [
+    lambda sample: sample.update(schema="guard-log-analysis-capture/3", analysis_profile="guard-log-json/2"),
+    lambda sample: sample.update(analysis_profile="guard-log-json/future"),
+    lambda sample: sample.update(schema="guard-log-analysis-capture/3", analysis_profile="guard-log-json/future"),
+])
+def test_unknown_or_mismatched_analysis_profile_is_not_substituted_for_saved_executor(tmp_path, change):
+    source, original = seed(tmp_path)
+    newer = revised_sample(source, change)
+    before = inventory_tree(source)
+    replay = analyze_saved_logs(source, newer)
+    assert not replay["accepted"]
+    assert replay["checks"][0]["status"] == "REPLAY_MISMATCH"
+    assert analyze_saved_logs(source, original)["accepted"]
+    assert inventory_tree(source) == before
+
+
+@pytest.mark.parametrize("missing", ["absent", "not-collected"])
+def test_required_stored_observation_is_never_inferred_from_capture(tmp_path, missing):
+    source, original = seed(tmp_path)
+    def omit(observations):
+        if missing == "absent":
+            observations.pop("log_fields_seen")
+        else:
+            observations["log_fields_seen"] = observations["log_fields_seen"].model_copy(update={"value": None, "collected": False})
+    newer = revised_sample(source, lambda sample: None, observation_change=omit)
+    before = inventory_tree(source)
+    replay = analyze_saved_logs(source, newer)
+    assert not replay["accepted"] and replay["checks"][0]["status"] == "REPLAY_MISMATCH"
+    assert any("log_fields_seen" in problem for problem in replay["problems"])
+    assert analyze_saved_logs(source, original)["accepted"]
+    assert inventory_tree(source) == before
+
+
+def test_required_reconstructed_observation_cannot_be_silently_omitted(tmp_path, monkeypatch):
+    import guard.log_evidence as replay_module
+
+    source, original = seed(tmp_path)
+    newer = revised_sample(source, lambda sample: sample["analysis"].pop("log_fields_seen"))
+    original_analyzer = replay_module.analyze_log_captures
+    def incomplete_reconstruction(*args, **kwargs):
+        reconstructed = original_analyzer(*args, **kwargs)
+        reconstructed.pop("log_fields_seen")
+        return reconstructed
+    before = inventory_tree(source)
+    with monkeypatch.context() as context:
+        context.setattr(replay_module, "analyze_log_captures", incomplete_reconstruction)
+        replay = analyze_saved_logs(source, newer)
+    assert not replay["accepted"] and replay["checks"][0]["status"] == "REPLAY_MISMATCH"
+    assert any("cannot be reconstructed: log_fields_seen" in problem for problem in replay["problems"])
+    assert analyze_saved_logs(source, original)["accepted"]
+    assert inventory_tree(source) == before
+
+
+def test_auxiliary_evidence_diagnostic_does_not_change_fixed_verdict_projection(tmp_path):
+    from guard.models import Observation
+
+    source, original = seed(tmp_path)
+    def add_diagnostic(observations):
+        observations["log_violations"] = Observation(value=["EXAMPLE auxiliary diagnostic only"], collected=True)
+    newer = revised_sample(source, lambda sample: None, observation_change=add_diagnostic)
+    before = inventory_tree(source)
+    replay = analyze_saved_logs(source, newer)
+    assert replay["accepted"] and replay["checks"][0]["verdicts"]["security"] == "PASS", replay
+    assert analyze_saved_logs(source, original)["accepted"]
+    assert inventory_tree(source) == before
+
+
+def test_auxiliary_artifact_diagnostic_is_still_compared_against_full_reconstruction(tmp_path):
+    source, original = seed(tmp_path)
+    newer = revised_sample(source, lambda sample: sample["analysis"].update(log_violations=["EXAMPLE invented diagnostic"]))
+    before = inventory_tree(source)
+    replay = analyze_saved_logs(source, newer)
+    assert not replay["accepted"] and replay["checks"][0]["status"] == "REPLAY_MISMATCH"
+    assert any("recorded log analysis differs" in problem for problem in replay["problems"])
+    assert analyze_saved_logs(source, original)["accepted"]
+    assert inventory_tree(source) == before

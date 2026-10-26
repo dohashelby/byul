@@ -128,6 +128,31 @@ def test_source_failure_is_unknown_and_diagnostics_never_echo_raw_errors(tmp_pat
     assert "PRIVATE_" not in (store.root / evd.artifacts[0].path).read_text(encoding="utf-8")
 
 
+@pytest.mark.parametrize("outcome", [None, True, 200, [], {}, "", "PRIVATE_DAEMON_ERROR"])
+def test_untrusted_outcomes_are_rejected_without_retaining_raw_values(tmp_path, monkeypatch, outcome):
+    def malformed(value):
+        if value["mode"] == "connect":
+            value["rows"][0]["outcome"] = outcome
+    store, _, _, evd, result, _ = run(tmp_path, monkeypatch, World(connected=True, mutate=malformed))
+    assert result.verdicts.security == Verdict.UNKNOWN
+    assert evd.observations["unix_ipc_trials"].collected is False
+    assert evd.observations["unix_ipc_violations"].value == []
+    raw = (store.root / evd.artifacts[0].path).read_text(encoding="utf-8")
+    assert "IPC_SOURCE_OR_IDENTITY_UNVERIFIED" in raw
+    assert "PRIVATE_" not in raw
+
+
+def test_earlier_connection_violation_survives_later_untrusted_outcome(tmp_path, monkeypatch):
+    def malformed(value):
+        if value["mode"] == "connect" and value["uid"] == 0:
+            value["rows"][0]["outcome"] = "PRIVATE_DAEMON_ERROR"
+    store, _, _, evd, result, _ = run(tmp_path, monkeypatch,
+        World(connected=True, mutate=malformed), extra={"probe_uids": [1001, 0]})
+    assert result.verdicts.security == Verdict.FAIL
+    assert len(evd.observations["unix_ipc_violations"].value) == 1
+    assert "PRIVATE_" not in (store.root / evd.artifacts[0].path).read_text(encoding="utf-8")
+
+
 def test_independent_first_uid_violation_survives_later_actor_metadata_gap(tmp_path, monkeypatch):
     world = World(connected=True)
     def later_gap(value):
@@ -201,7 +226,11 @@ def test_only_new_definition_changes_and_legacy_76_hashes_are_preserved():
     hashes = json.loads((ROOT / "tests/fixtures/pack25-check-hashes.json").read_text())
     changed = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
                if hashlib.sha256(p.read_bytes()).hexdigest() != hashes[p.stem]}
-    assert changed == {"PLT-02"} and len(hashes) == 77
+    assert changed == {"PLT-01", "PLT-02"} and len(hashes) == 77
+    previous = json.loads((ROOT / "tests/fixtures/pack26-check-hashes.json").read_text())
+    latest_changes = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
+                      if hashlib.sha256(p.read_bytes()).hexdigest() != previous[p.stem]}
+    assert latest_changes == {"PLT-01"} and len(previous) == 77
     check = baseline_pack().checks["PLT-02"]
     assert check.revision == 3 and check.judge.params["pass_when_all"] == []
     assert check.fail_criteria == "비허용 주체가 보호해야 할 IPC 자료나 명령 접점에 접근한다."

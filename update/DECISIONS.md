@@ -1,5 +1,8 @@
 # DECISIONS
 
+- 2026-10-26 · REQ-02는 신뢰 가능한 인가/rewrite/final-handler 수집원이 갖춰질 때까지 제품 연결·팩 변경을 보류하고 EXAMPLE 사슬 분석만 제공하며, SUP-03 소비 분석도 EXAMPLE 자료 일관성에 한정한다. · HTTP 응답·mount/API projection·합성 사건을 실제 소비나 보안 PASS/FAIL로 승격하지 않고 승인된 대체 범위를 구현하기 위함이다.
+- 2026-10-26 · 점검별 실험 준비는 저장소 밖 새 폴더의 빈 DECLARED/DRAFT 정책과 미실행 사례 목록만 만들며 ENV·실행 설정·승인값·EVD/RES/RPT를 생성하지 않는다. · 기존 5개 수락 계약과 기업 입력의 소유권을 보존하고 준비와 실증을 구분하기 위함이다.
+
 - 2026-10-26 · SUP-03은 readonly template 현재 bytes·소유/전후 신원·승인 목록 membership·엔진 API 입력 projection의 관측 전용으로 연결하고 보안·기능 PASS/FAIL 규칙을 두지 않는다. 과거 팩24 수동 계약은 보존하고 새 수동 PASS는 기존 bounded 지원 밖으로 보류한다. · 기동 시 loaded bytes와 독립 worker 소비가 미확인이므로 비승인 mount를 실제 소비 FAIL로 오인하지 않기 위함이다.
 - 2026-10-26 · BYUL import 묶음은 원본 bytes·정규 해시·guard 봉인·정확 Ref·변환 내용·import 및 재검증 시각의 정책 유효성을 읽기 전용으로 확인하며 execution_ready는 null로 둔다. · 로컬 provenance는 진위 인증이 아니며 반입 일관성 검증을 엔진 기동 승인이나 이후 실행 시 자동 집행으로 오해하지 않기 위함이다.
 

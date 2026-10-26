@@ -1,5 +1,30 @@
 # 두 이미지 CPU 업데이트 비교 수락 도구
 
+## 2026-10-26 점검별 실험 입력 준비 도구 — 엔진 미실행
+
+`update/`에서 다음 명령으로 **새 저장소 외부 폴더**에 빈 정책과 사례 목록을 만든다.
+이 도구는 팩 파일과 정적 registry만 읽으며 Docker 확인·네트워크·Store·판정도 호출하지 않는다.
+`--execute`는 없고 기존 폴더는 거절한다. 출력은 EVD/RES/RPT나 실행 승인이 아니다.
+
+```powershell
+uv run python -m tools.prepare_checklist_cases --pack packs/PACK-BASELINE --output "<NEW-EXTERNAL-CASEBOOK>"
+# 일부만 준비할 때: --checks SUP-03 REQ-02
+```
+
+기본 출력은 현재 collector 연결 13개와 REQ-02 계약 전용 1개의 `case-plan.json` 및
+14개 `CHECK-ID/policy-template.yaml`이다. 정상/위반 입력/미수집/지원 밖과 중요 공백을
+나눈 85개 **미실행 사례**이며 완료 실험 수로 세지 않는다. 기업 허용값·ENV·설정·
+이미지·모델은 채우지 않는다. 정책은 DECLARED/DRAFT·빈 values·미승인이고 사례마다
+수정 사본·정책 결정·수집 범위·환경·설정·별도 실행 승인이 필요하다.
+
+REQ-02에는 실행 명령을 만들지 않으며 [합성 사슬 계약](AUTOMATION_HARDENING.md)을
+먼저 검증한다. SUP-03은 승인/비승인 모두 보안 UNKNOWN 관측 전용으로 유지한다.
+REQ-09 기본/opt-in·오류 객체, PLT-04 후보 생략/[]/부재/거부/읽기 가능/주체 불일치,
+REQ-10 내부 runner·REQ-11 출력 오라클·OBS-03 dump/사본 미수집을 별도 분기로 남긴다.
+기존 5개 두 이미지 수락 도구와 체크 목록은 바꾸지 않는다. 나머지 64개 구현·실험의
+우선순위는 [77개 추적표](CHECKLIST_VALIDATION_STATUS.md)를 따른다. 이번 사례집과
+EXAMPLE 분석 결과는 현행 팩 실제 엔진 검증을 대체하지 않는다.
+
 ## 2026-10-26 현행 후속 실증 계획 — 미수행
 
 **사용자 지시로 실제 vLLM 기동·추론·두 이미지 시험은 보류한다.** 아래는 현재 CLI와 점검 정의를 읽고 작성한 준비 계획이며 명령도 실행하지 않았다. 과거 팩21·22의 성공/실패·EVD·보고서 bytes·HTML 경로는 아래 원문대로 보존한다. 현행 팩의 기준은 [77개 추적표](CHECKLIST_VALIDATION_STATUS.md)이고 과거 실측을 현재 팩의 실측으로 승격하지 않는다.

@@ -101,9 +101,11 @@ cd web && npm run gen:types    # api의 OpenAPI → src/api/openapi.json → src
 ## 시험
 
 ```sh
-cd api && uv run pytest        # 57개: 계약 예시 검증, 변환 표, Hubble≠거부 확인, null 보존, 판본 덮어쓰기 금지, GET 전용 클라이언트, 토큰 비노출 …
-cd web && npm test             # 18개: 배지 규칙, null 표시, Hubble 행, 형식 오류 행, 연결 끊김 화면, 화면이 GET만 보냄 …
+cd api && uv run --with ../../update pytest  # 96개: 계약 예시 검증, 변환 표, Hubble≠거부 확인, null 보존, 판본 덮어쓰기 금지, GET 전용 클라이언트, 토큰 비노출 …
+cd web && npm test             # 21개: 배지 규칙, null 표시, Hubble 행, 형식 오류 행, 연결 끊김 화면, 화면이 GET만 보냄 …
 ```
+
+update 통합 시험에는 `guard`를 제공하는 update 패키지 overlay가 필요하다.
 
 `api/tests/fixtures/runtime/`은 runtime을 모의 엔진으로 띄워 runtime 자체 시연 도구(`mvp-demo`)로 기록을 만든 뒤 GET 응답을 저장한 것이다. `fixtures/update/`는 `update/out/report.json` 사본이다.
 

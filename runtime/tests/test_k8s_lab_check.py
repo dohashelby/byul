@@ -214,7 +214,7 @@ class CommandConstructionTests(unittest.TestCase):
         self.assertEqual(default.tetragon_wait, 90.0)
         self.assertEqual(custom.tetragon_wait, 15.0)
 
-    def test_context_mismatch_stops_before_cluster_commands(self) -> None:
+    def test_non_kind_context_requires_explicit_opt_in(self) -> None:
         wrong_requested = FakeRunner()
         checker = LabChecker(
             context="production",
@@ -228,21 +228,19 @@ class CommandConstructionTests(unittest.TestCase):
             checker.assert_safe_context()
         self.assertEqual(wrong_requested.calls, [])
 
-        wrong_current = FakeRunner(context="kind-something-else")
+        opted_in = FakeRunner(context="kind-something-else")
         checker = LabChecker(
-            context="kind-runtime-lab",
+            context="production",
             namespace="serving-lab",
             state_dir=Path("/tmp/not-used"),
             cleanup=False,
-            runner=wrong_current,  # type: ignore[arg-type]
+            runner=opted_in,  # type: ignore[arg-type]
             repo_root=ROOT,
+            allow_non_kind_context=True,
         )
-        with self.assertRaises(ContextSafetyError):
-            checker.assert_safe_context()
-        self.assertEqual(
-            [call[0] for call in wrong_current.calls],
-            [("kubectl", "config", "current-context")],
-        )
+        checker.assert_safe_context()
+        self.assertEqual(checker.current_context, "production")
+        self.assertEqual(opted_in.calls, [])
 
 
 class PreRunCleanupTests(unittest.TestCase):

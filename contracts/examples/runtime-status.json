@@ -137,6 +137,10 @@
         "out_of_window": 0,
         "out_of_window_total": 0,
         "idle": false,
+        "lost_events_total": 0,
+        "lost_events_by_source": {},
+        "last_lost_at": null,
+        "loss_detected": false,
         "writer": {
           "configured": true,
           "state": "running",

@@ -1,0 +1,39 @@
+# Model acquisition (appendix I.4): only this Job (UID 10002) may write the
+# approved model directory and reach the approved artifact source (Cilium
+# acquire policy). The engine later mounts the same volume read-only.
+#
+# The acquisition command and source are not decided (environment proposal
+# §10: Hugging Face direct or an internal store), so the Job is suspended and
+# its command is a placeholder. Replace it, set `suspend: false`, then apply.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: artifact-acquire
+spec:
+  suspend: true
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: {app: artifact-acquire}
+    spec:
+      serviceAccountName: artifact-acquire
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10002
+        runAsGroup: 10002
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: acquire
+          image: serving-tools
+          command: ["sh", "-c", "echo 'REPLACE: approved model acquisition command' >&2; exit 1"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: models, mountPath: /opt/serving/assets}
+      volumes:
+        - name: models
+          persistentVolumeClaim: {claimName: serving-models}

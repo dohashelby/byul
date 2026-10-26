@@ -168,7 +168,13 @@ def observer_egress(intent: EnforcementIntent, collector, index: int) -> dict[st
         _dns_egress(intent, inspect_names=False),
     ]
     if intent.observer_kube_api:
-        rules.append({"toEntities": ["kube-apiserver"]})
+        # Plan §4.3: the registered API port only, not every port of the entity.
+        rules.append(
+            {
+                "toEntities": ["kube-apiserver"],
+                "toPorts": [_port_rule(intent.observer_kube_api_port, "TCP")],
+            }
+        )
     for receiver in intent.test_receivers:
         if "observer" in receiver.allowed_from:
             rules.append(

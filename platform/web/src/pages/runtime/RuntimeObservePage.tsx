@@ -1,9 +1,11 @@
 // 통신·행위 관측. 삭제된 runtime 대시보드 renderCollectors()·collectorSummary()·renderObservations()를 옮겼다.
+import type { ReactNode } from "react";
 import { useParams as useRouteParams } from "react-router-dom";
 import { useRuntimeEvents, useRuntimeStatus } from "../../api/hooks";
 import type { Collector, RuntimeEvent } from "../../api/types";
 import { Badge } from "../../components/Badges";
 import { PageHead, Query, StateView } from "../../components/Misc";
+import { Value } from "../../components/Value";
 import { CACHE_GENERATION, EXEC_VERDICT, METRIC_STATE } from "../../lib/labels";
 import { useRuntimeProblems } from "./problems";
 import { ObservationOriginBadge, ScopeBadges, StateBadge, Subtabs, TableCard, formatTime, rt } from "./parts";
@@ -14,10 +16,12 @@ const gib = (bytes: number | null) => `${((bytes ?? 0) / 1024 ** 3).toFixed(2)}G
 function CollectorSummary({ c }: { c: Collector }) {
   const d = c.detail;
   if (!d) return null;
-  const lines: [string, boolean][] = [];
+  const lines: [ReactNode, boolean][] = [];
   if (d.kind === "asset_integrity") {
     lines.push([
-      `일치 ${d.match}/${d.total ?? "–"} · 변경 ${d.changed} · 누락 ${d.missing} · 읽기 불가 ${d.unreadable} · 링크 ${d.symlink} · 목록 밖 파일 ${d.extra_files} · 목록 밖 링크 ${d.extra_symlinks} · 순회 오류 ${d.walk_errors}`,
+      <>
+        일치 {d.match}/{d.total ?? "–"} · 변경 {d.changed} · 누락 {d.missing} · 읽기 불가 {d.unreadable} · 링크 {d.symlink} · 목록 밖 파일 <Value v={d.extra_files} /> · 목록 밖 링크 <Value v={d.extra_symlinks} /> · 순회 오류 <Value v={d.walk_errors} />
+      </>,
       d.intact === false,
     ]);
   }
@@ -26,6 +30,18 @@ function CollectorSummary({ c }: { c: Collector }) {
       `최근 처리 ${d.processed} · 저장 ${d.accepted} · 중복 ${d.duplicates} · 거부 ${d.rejected} · 손상 누적 ${d.corrupt_lines_total} · 실행 전 이벤트 누적 ${d.out_of_window_total}`,
       d.rejected > 0 || d.corrupt_lines_total > 0 || d.out_of_window_total > 0,
     ]);
+    if (c.source === "observation_feed_hubble") {
+      const bySource = d.lost_events_by_source
+        ? Object.entries(d.lost_events_by_source).map(([source, count]) => `${source} ${count}`).join(" · ")
+        : null;
+      lines.push([
+        <>
+          Hubble 손실 누적 <Value v={d.lost_events_total} /> · source별 <Value v={bySource} /> · 최근 손실 <Value v={d.last_lost_at ? formatTime(d.last_lost_at) : null} />
+          {d.lost_events_total === 0 ? " (처리한 줄에서 loss 레코드 미관측; 무손실 확인 아님)" : ""}
+        </>,
+        d.loss_detected === true,
+      ]);
+    }
     if (d.rejected_details.length) lines.push([d.rejected_details.map((x) => `#${x.line}: ${x.reason}`).join(" · "), true]);
     lines.push([
       d.writer.configured

@@ -35,6 +35,29 @@ def _entry(path: Path, cache_root: Path, current: Path, engine_uid: int) -> dict
     }
 
 
+def _ancestor(path: Path, engine_uid: int) -> dict[str, Any] | None:
+    """Problems of the cache root or an intermediate generation directory.
+
+    Whoever can write here can create, rename or replace the generation below,
+    so these directories need the same protection as the generation leaf.
+    """
+
+    info = os.lstat(path)
+    problems: list[str] = []
+    if info.st_uid not in (0, engine_uid):
+        problems.append("owner_not_engine_or_root")
+    if info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        problems.append("group_or_other_writable")
+    if not problems:
+        return None
+    return {
+        "path": str(path),
+        "owner_uid": info.st_uid,
+        "mode": oct(stat.S_IMODE(info.st_mode)),
+        "problems": problems,
+    }
+
+
 def check_cache(intent: EnforcementIntent, *, root_override: str | None = None) -> dict[str, Any]:
     """Report generation directories, ownership and permissions under the cache root.
 
@@ -57,10 +80,12 @@ def check_cache(intent: EnforcementIntent, *, root_override: str | None = None) 
         "generations": [],
         "other_generation_count": 0,
         "unexpected_entries": [],
+        "ancestor_problems": [],
         "walk_errors": [],
         "limits": [
             "Directory metadata only; cache file contents and provenance are not verified.",
             "Other generations are reported, not deleted.",
+            "Directories above the cache root are not checked.",
         ],
     }
     try:
@@ -71,6 +96,17 @@ def check_cache(intent: EnforcementIntent, *, root_override: str | None = None) 
     if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
         result["state"] = "cache_root_not_directory"
         return result
+
+    def check_ancestor(path: Path) -> None:
+        try:
+            problem = _ancestor(path, assets.engine_uid)
+        except OSError as error:
+            result["walk_errors"].append({"path": str(path), "error": type(error).__name__})
+            return
+        if problem is not None:
+            result["ancestor_problems"].append(problem)
+
+    check_ancestor(cache_root)
 
     def walk(directory: Path, depth: int) -> None:
         try:
@@ -89,6 +125,7 @@ def check_cache(intent: EnforcementIntent, *, root_override: str | None = None) 
             if depth == _DEPTH:
                 result["generations"].append(_entry(path, cache_root, current, assets.engine_uid))
             else:
+                check_ancestor(path)
                 walk(path, depth + 1)
 
     walk(cache_root, 1)
@@ -97,7 +134,11 @@ def check_cache(intent: EnforcementIntent, *, root_override: str | None = None) 
     current_entries = [item for item in generations if item["is_current"]]
     if not current_entries:
         result["state"] = "current_generation_missing"
-    elif any(item["problems"] for item in generations) or result["walk_errors"]:
+    elif (
+        any(item["problems"] for item in generations)
+        or result["ancestor_problems"]
+        or result["walk_errors"]
+    ):
         result["state"] = "problems"
     elif result["other_generation_count"] or result["unexpected_entries"]:
         result["state"] = "other_generations_present"

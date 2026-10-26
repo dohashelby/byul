@@ -1,0 +1,68 @@
+# Gateway: our code (deploy/gateway/Dockerfile). The MVP Gateway binds
+# 127.0.0.1 only, so clients reach it with
+#   kubectl --context <ctx> -n serving-lab port-forward deploy/serving-gateway 8080
+# The policy comes from the platform bundle (runtime/docs/결정기록_정책묶음_수신.md);
+# the auth config is a Secret the administrator creates (token hashes only):
+#   kubectl -n serving-lab create secret generic serving-gateway-auth --from-file=auth.json
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: serving-gateway}
+  template:
+    metadata:
+      labels: {app: serving-gateway}
+    spec:
+      serviceAccountName: serving-gateway
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: gateway
+          image: serving-gateway
+          args:
+            - mvp
+            - --backend
+            - vllm
+            - --backend-config
+            - /etc/serving/backend/backend.json
+            - --policy-bundle
+            - /etc/serving/bundle/current
+            - --auth-config
+            - /etc/serving/auth/auth.json
+            - --gateway-port
+            - "8080"
+            - --data-dir
+            - /srv/serving/runtime/data
+            - --environment
+            - gpu-lab
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: "500m", memory: 512Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - {name: backend-config, mountPath: /etc/serving/backend, readOnly: true}
+            - {name: bundles, mountPath: /etc/serving/bundle, readOnly: true}
+            - {name: auth, mountPath: /etc/serving/auth, readOnly: true}
+            - {name: runtime-data, mountPath: /srv/serving/runtime}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: backend-config
+          configMap: {name: serving-gateway-backend}
+        - name: bundles
+          persistentVolumeClaim: {claimName: serving-bundles, readOnly: true}
+        - name: auth
+          secret: {secretName: serving-gateway-auth}
+        - name: runtime-data
+          persistentVolumeClaim: {claimName: serving-runtime-data}
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}

@@ -11,7 +11,7 @@ import time
 from typing import Any
 from urllib.parse import urlsplit
 
-from .mock_engine import simulated_token_count
+from .mock_engine import simulated_prompt_token_count, simulated_token_count
 
 
 def _utc_now() -> str:
@@ -81,6 +81,8 @@ class FakeBackend:
         self.tokenize_failure = False
         self.tokenize_response_body: bytes | None = None
         self.tokenize_calls = 0
+        # Bodies the Gateway sent to the tokenizer, for test assertions only.
+        self.tokenize_documents: list[dict[str, Any]] = []
         self._requests: list[dict[str, Any]] = []
         self._redirect_follow_count = 0
         self._lock = threading.Lock()
@@ -186,6 +188,7 @@ class FakeBackend:
                 request_id = self.headers.get("X-Request-ID", "")
                 record = {
                     "request_id": request_id,
+                    "route": f"POST {self._route()}",
                     "received_at": _utc_now(),
                     "model": document.get("model"),
                     "max_tokens": document.get("max_tokens"),
@@ -202,6 +205,7 @@ class FakeBackend:
                         not in {
                             "model",
                             "messages",
+                            "prompt",
                             "max_tokens",
                             "max_completion_tokens",
                             "stream",
@@ -219,7 +223,7 @@ class FakeBackend:
                     owner._requests.append(record)
                 return record
 
-            def _send_stream(self, request_id: str) -> None:
+            def _send_stream(self, request_id: str, *, completion: bool = False) -> None:
                 self.close_connection = True
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
@@ -227,17 +231,20 @@ class FakeBackend:
                 self.send_header("Connection", "close")
                 self.end_headers()
                 for index in range(2):
+                    choice = (
+                        {"index": 0, "text": f"fake-{index + 1}", "finish_reason": None}
+                        if completion
+                        else {
+                            "index": 0,
+                            "delta": {"content": f"fake-{index + 1}"},
+                            "finish_reason": None,
+                        }
+                    )
                     event = {
                         "id": f"fake-{request_id}",
-                        "object": "chat.completion.chunk",
+                        "object": "text_completion" if completion else "chat.completion.chunk",
                         "model": owner.model_id,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": {"content": f"fake-{index + 1}"},
-                                "finish_reason": None,
-                            }
-                        ],
+                        "choices": [choice],
                         "data_origin": "fake_backend_test",
                         "test_only": True,
                     }
@@ -360,12 +367,18 @@ class FakeBackend:
                 try:
                     content_length = int(self.headers.get("Content-Length", "0"))
                     document = json.loads(self.rfile.read(content_length).decode("utf-8"))
-                    count = simulated_token_count(
-                        document.get("messages") if isinstance(document, dict) else None
+                    if not isinstance(document, dict):
+                        raise ValueError
+                    count = (
+                        simulated_prompt_token_count(document.get("prompt"))
+                        if "prompt" in document
+                        else simulated_token_count(document.get("messages"))
                     )
                 except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
                     self._send_json(400, {"error": {"code": "FAKE_MALFORMED"}})
                     return
+                with owner._lock:
+                    owner.tokenize_documents.append(document)
                 if owner.tokenize_response_body is not None:
                     encoded = owner.tokenize_response_body
                     self.send_response(200)
@@ -383,7 +396,7 @@ class FakeBackend:
                 ):
                     self._tokenize()
                     return
-                if route != "/v1/chat/completions":
+                if route not in {"/v1/chat/completions", "/v1/completions"}:
                     self._send_json(404, {"error": {"code": "FAKE_NOT_FOUND"}})
                     return
                 if not self._authorized():
@@ -442,7 +455,23 @@ class FakeBackend:
                     self.wfile.write(payload)
                     return
                 if document.get("stream") is True:
-                    self._send_stream(str(record["request_id"]))
+                    self._send_stream(
+                        str(record["request_id"]),
+                        completion=route == "/v1/completions",
+                    )
+                    return
+                if route == "/v1/completions":
+                    self._send_json(
+                        200,
+                        {
+                            "id": f"fake-{record['request_id']}",
+                            "object": "text_completion",
+                            "model": owner.model_id,
+                            "choices": [
+                                {"index": 0, "text": "fake response", "finish_reason": "stop"}
+                            ],
+                        },
+                    )
                     return
                 self._send_json(
                     200,

@@ -1,0 +1,23 @@
+# Formal GPU lab (plan §3.5, appendix I.4/I.7). Render only with:
+#   kubectl kustomize deploy/gpu-lab/overlays/vllm
+# Values marked REPLACE are filled after the server is available (G0~G2);
+# do not apply this tree before they are replaced.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: serving-lab
+resources:
+  - namespace.yaml
+  - storage.yaml
+  - serviceaccounts.yaml
+  - observer-rbac.yaml
+  - gateway.yaml
+  - observer.yaml
+  - acquire-job.yaml
+  - test-pods.yaml
+images:
+  - name: serving-gateway
+    newName: REPLACE-REGISTRY/serving-gateway
+    digest: sha256:REPLACE_WITH_GATEWAY_IMAGE_DIGEST
+  - name: serving-tools
+    newName: python
+    digest: sha256:REPLACE_WITH_PYTHON_3_12_SLIM_DIGEST

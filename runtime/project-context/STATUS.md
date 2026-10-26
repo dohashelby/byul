@@ -1,6 +1,6 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-10-25
+최종 갱신: 2026-10-26
 
 ## 현재 단계
 
@@ -158,3 +158,26 @@
 - byul 저장소에서 사용자 요청으로 `src/serving_runtime/mvp/static/`(index.html·app.css·app.js·vendored Chart.js)을 지우고 Gateway의 `/`·`/static/*` 서빙을 없앴다(이제 404 JSON). 화면은 byul `platform/`이 조회 API를 GET으로 읽어 보여준다. 조회 API·기록 형식은 바꾸지 않았다.
 - 화면 내용만 검사하던 시험 7개를 지우고 `/`가 404인지 보는 시험으로 바꿨다. `unittest discover -s tests` 379개 중 378개 통과, 남은 1개(`test_mvp_http_security` 연결 상한 시험의 Connection reset)는 변경 전에도 같은 환경(macOS)에서 실패했다.
 - 이 변경은 Codex 교차 검수 전이다(byul에서 Claude가 직접 수정).
+
+## 2026-10-26 contracts 대조와 LAB 정책 묶음 수신
+
+- runtime 결정(2026-10-26)으로 자산 root 미순회 3개 개수와 정책 없음 2개 개수를 0 대신 `null`로 보내고, contracts·platform·웹 표시를 해당 필드에만 맞춰 반영했다.
+- **Codex 구현, Claude 검수 완료.** runtime 결정에 따라 Tetragon file_access outcome과 `declared`·`fake_backend_test` 등급을 contracts 표와 platform 변환기에 반영하고 대조 기록을 작성했다. contracts는 DRAFT/0.x 그대로다.
+- `bundle verify --bundle-dir`와 `mvp --policy-bundle`을 추가했다. bundle 구조·중복 JSON 키·경로/링크 탈출·bytes/SHA-256·내부 schema·기간·대상을 시작 시 검증하고 역할별 적용 여부를 `/api/status`·`/api/policy`에 공개한다. bundle 자기신고 승인은 신뢰하지 않고 기존 승인 목록 검증을 사용한다.
+- runtime 전체 unittest는 397개 중 308개 통과·소켓 제한 89개 skip·실패 0개다. 새 bundle 시험 18개와 platform runtime 변환시험 40개는 전부 통과했고 contracts 검사는 `schemas=12 examples=11 errors=0`이다. platform 전체 pytest는 기존 venv에 update의 `guard`와 `yaml`이 없어 수집 단계에서 중단됐다.
+- Claude가 샌드박스 밖에서 재시험: runtime unittest 399개 전부 통과(skip 0), platform `uv run --with ../../update pytest` 96개 통과, web vitest 21개·`tsc -b` 통과, contracts 검사 오류 0. 예시 묶음(`contracts/examples/bundle`)으로 `mvp --policy-bundle` 실행 시 상태에 묶음 표시·요청 200, 정책 파일을 바꾼 묶음은 SHA-256 불일치로 시작 거부를 확인했다.
+- scratch runtime에서 같은 정책 ID·판본의 내용만 바꿔 `policy_content_changed` 재검증 요청 1건과 다음 재시작의 `condition_cleared`를 만들고, platform의 `byul-revalidation-request/0.2` 변환 및 `revalidation-request`·`runtime-status` schema 오류 0건을 확인했다. `asset_changed`·`config_drift` trigger는 이번 실행에서 일으키지 않았다.
+- 미검증: 원격 bundle 전달, hot reload, 실행 중 묶음 유효 기간 재확인. platform은 지정한 4개 미측정 개수만 `null`로 보존하고 나머지 `_nonneg` 처리는 유지한다.
+- platform README의 실제 확인 시험 수를 api 96개·web 21개로 바로잡았다. **Codex 작성, Claude 검수 완료.**
+- contracts 대조 기록에 `policy_content_changed` 재검증 생성·해소와 계약 오류 0건을 반영했다. **Codex 작성, Claude 검수 완료.**
+- update의 사건→`check_id` 매핑 확인용 `docs/runtime_규칙목록.md`를 실제 규칙 코드와 contracts 표에서 작성했다. **Codex 작성, Claude 검수 완료.**
+- 계획서의 RT 46개를 현재 unittest·수용·kind LAB·CPU 근거에 연결한 `docs/인수시험_대응표.md`를 작성했다. **Codex 작성, Claude 검수 완료.**
+- Task 1: kubectl/cilium 호출의 `--kube-context`(기본 `kind-runtime-lab`) 명시와 context 검증, 비-kind lab 변경 작업의 `--allow-non-kind-context` 이중 확인·경고를 구현했다. **Codex 구현, Claude 검수 완료.**
+- Task 2: 공통 요청 파이프라인을 쓰는 `POST /v1/completions`, 단일 문자열 prompt 검증·tokenize·route 기록·모의/가짜 backend를 구현했으며 실제 vLLM v0.31.0·SGLang schema는 미확인이다. **Codex 구현, Claude 검수 완료.**
+- Task 3: Hubble lost-events를 flow와 분리해 누적/source별/최근 시각/freshness `partial` 상태로 표시하고 contracts·platform API·웹까지 전달했다. 실제 Hubble loss 발생 환경은 미확인이다. **Codex 구현, Claude 검수 완료.**
+- Task 4: `exec_verdict` 설명을 실제 ExecPolicy 순서에 맞추고 completions 사유 코드와 Hubble loss 상태 기록을 규칙 목록에 추가했다. **Codex 구현, Claude 검수 완료.**
+- Task 5: 위 Task 1~4의 구현 상태를 2026-10-26 절에 작업별 한 줄로 기록했다. **Codex 구현, Claude 검수 완료.**
+- Codex가 사용 한도로 마지막 시험 단계에서 멈춰 **Claude가 이어받아 마무리했다(Claude 구현분, Codex 교차 검수 전)**: ① `runtime-auth/1.0`에서 chat route는 계속 명시 필수, `/v1/completions`는 생략 시 기본 `inference` 역할로 보호(Codex안은 chat 누락도 기본값으로 채워 기존 fail-closed 검사를 없앴음) ② `--kube-context`는 생략 시 대상 등록의 `kubernetes.context`를 쓰고, 둘이 다르면 시작 거부(교차 검수 지적 5) ③ `docs/내부_기록형식.md`에 `runtime-hubble-loss/1.0` 추가, socketpair 시험 helper에 completions handler 전달. 샌드박스 밖 재시험: runtime 406개 전부 통과(skip 0), platform 97개, web vitest 21개·`tsc -b`, contracts 오류 0.
+- 2026-10-26 Claude 구현분 교차 검수(Codex, 읽기 전용)에서 나온 지적 7건을 계획서·코드로 확인하고 **Claude가 직접 수정했다(Codex 사용 한도 중, Claude 구현분·Codex 교차 검수 전)**: ① 대상 등록 선언값이 관측과 다르면 `TARGET_MISMATCH`, 확인 못 하면 `TARGET_UNVERIFIED`, 등록된 Pod 조회가 정상이 아니면 `TARGET_UNAVAILABLE`로 신규 요청 503 보류(§4.1·§7.3, 이전에는 표시만 함; `model.revision`은 engine API로 확인 불가라 제외) ② 실시간 수집 helper가 Tetragon raw 파일에 쓰기 전에 `process`·`parent`·`ancestors`의 `arguments`를 지우고 JSON 아닌 줄은 버림(§6.5) ③ 승인 목록 동시 확인에서 늦게 끝난 옛 성공이 새 목록의 명시적 miss를 덮어써 철회된 승인이 `last_verified`로 되살아나던 경합을 읽기 순번으로 막음(수정 전 실패하는 재현 시험 추가) ④ context 사전 검사의 `/tokenize`에 엔진으로 보내는 승인 추가 필드를 함께 보내고, tokenizer가 거부하면 `CONTEXT_CHECK_UNAVAILABLE` 503 ⑤ `--kube-context`가 대상 등록 context와 다르면 시작 거부(위 커밋에 반영) ⑥ cache check가 cache root·중간 디렉터리의 소유자·group/other 쓰기를 `ancestor_problems`로 판정 ⑦ observer의 kube-apiserver 송신을 `observer_kube_api_port`(기본 6443) 하나로 제한(§4.3). runtime unittest 417개 전부 통과(skip 0), `mvp-acceptance` 39개 통과, platform 97개 통과. 미확인: 실제 Tetragon export의 인자 필드 전체 목록, 정식 cluster의 API server port, 보류가 실제 GPU 엔진 기동 시간에 주는 영향.
+- 주의: 이번 수정 전에 만든 kind lab raw 파일 `~/.local/state/serving-runtime/k8s-lab/live/tetragon.jsonl`에는 프로세스 인자가 남아 있을 수 있다. 삭제 여부는 사용자 확인 사항이다.
+- 2026-10-26 정식 GPU lab 배포 파일 초안 `deploy/gpu-lab/`(base + vllm·sglang overlay, kustomize)과 Gateway 이미지 정의 `deploy/gateway/Dockerfile`을 작성했다(**Codex 사용 한도 중 Claude 구현, Codex 교차 검수 전**). namespace는 Pod Security restricted라 hostPath 대신 `/srv/serving/…` local PV·PVC를 쓰고, 역할별 SA(observer만 토큰)·UID(I.4의 10001~10003, Gateway 10000·observer 10004는 프로젝트 선택값)·모델 읽기 전용·캐시 세대 subPath·관리 수신부 사이드카·정지 상태의 모델 반입 Job을 둔다. 노드 이름·이미지 digest·모델/캐시 경로·반입 명령은 `REPLACE…`로 비워 두었다. `kubectl kustomize`로 두 overlay 렌더링(각 24개 객체)만 확인했고 클러스터에는 적용하지 않았다. Gateway 이미지는 표준 라이브러리 코드만 복사하고 최소 dist-info를 만들어 `--network none` 로컬 빌드·`--version`·`bundle verify`·읽기 전용 FS 실행·UID 10000을 확인한 뒤 이미지를 지웠다. 미확인: 실제 클러스터 적용과 restricted 통과, 엔진 판본별 실행 인자·읽기 전용 root FS 기동, observer 수집 프로그램, Gateway의 클러스터 노출 방식(현재 127.0.0.1 bind).

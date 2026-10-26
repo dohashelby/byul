@@ -1,0 +1,102 @@
+# Engine (appendix I.4): UID 10001, one GPU, approved model read-only, only
+# its own cache generation writable, no Kubernetes token, no model download
+# at runtime (offline variables; Cilium engine egress has no external rule).
+# The management listener sidecar relays only read paths to the observer.
+#
+# REPLACE values come from G0~G3: the approved model directory under
+# /srv/serving/models, and the cache generation
+# <engine>/<image-id>/<model-revision>/<compile-profile> (plan §4.9).
+# The lmsysorg/sglang v0.5.21 launch command and flags must be confirmed on
+# the server (G2) before applying.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving-engine
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: serving-engine}
+  template:
+    metadata:
+      labels: {app: serving-engine}
+    spec:
+      serviceAccountName: serving-engine
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: engine
+          image: serving-engine-sglang
+          command: ["python3", "-m", "sglang.launch_server"]
+          args:
+            - --model-path
+            - /opt/serving/assets/model/REPLACE_MODEL_DIR
+            - --served-model-name
+            - qwen2.5-0.5b-instruct
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: HOME, value: /tmp}
+            - {name: XDG_CACHE_HOME, value: /var/cache/serving/sglang/REPLACE_IMAGE_ID/REPLACE_MODEL_REVISION/default}
+          ports:
+            - {name: http, containerPort: 8000}
+          resources:
+            limits: {nvidia.com/gpu: 1, memory: 24Gi}
+            requests: {cpu: "4", memory: 16Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: models, mountPath: /opt/serving/assets, readOnly: true}
+            - {name: cache, mountPath: /var/cache/serving/sglang/REPLACE_IMAGE_ID/REPLACE_MODEL_REVISION/default, subPath: sglang/REPLACE_IMAGE_ID/REPLACE_MODEL_REVISION/default}
+            - {name: tmp, mountPath: /tmp}
+            - {name: shm, mountPath: /dev/shm}
+        - name: management-listener
+          image: serving-gateway
+          args:
+            - management-listener
+            - --listen-host
+            - 0.0.0.0
+            - --listen-port
+            - "8001"
+            - --engine-url
+            - http://127.0.0.1:8000
+          ports:
+            - {name: management, containerPort: 8001}
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: "50m", memory: 64Mi}
+            limits: {memory: 128Mi}
+      volumes:
+        - name: models
+          persistentVolumeClaim: {claimName: serving-models, readOnly: true}
+        - name: cache
+          persistentVolumeClaim: {claimName: serving-cache}
+        - name: tmp
+          emptyDir: {sizeLimit: 2Gi}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 2Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: serving-engine
+spec:
+  selector: {app: serving-engine}
+  ports:
+    - {name: http, port: 8000, targetPort: http}
+    - {name: management, port: 8001, targetPort: management}

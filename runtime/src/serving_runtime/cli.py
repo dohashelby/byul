@@ -34,8 +34,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command")
     file_parser = commands.add_parser("file-info", help="파일 크기와 SHA-256 확인")
     file_parser.add_argument("path", type=Path, help="확인할 일반 파일 경로")
+    bundle_parser = commands.add_parser("bundle", help="LAB 정책 묶음 확인")
+    bundle_commands = bundle_parser.add_subparsers(dest="bundle_command")
+    bundle_verify_parser = bundle_commands.add_parser(
+        "verify", help="정책 묶음의 구조·파일·유효성을 확인"
+    )
+    bundle_verify_parser.add_argument("--bundle-dir", required=True, metavar="DIR")
     mvp_parser = commands.add_parser("mvp", help="로컬 Gateway와 선택한 backend 실행")
-    mvp_parser.add_argument("--policy", default="examples/mvp/policy.json", metavar="PATH")
+    mvp_parser.add_argument("--policy", metavar="PATH")
+    mvp_parser.add_argument(
+        "--policy-bundle",
+        metavar="DIR",
+        help="시작할 때 한 번 검증해 적용할 LAB 정책 묶음 디렉터리",
+    )
     mvp_parser.add_argument("--gateway-port", type=int, default=8080, metavar="N")
     mvp_parser.add_argument("--engine-port", type=int, default=8088, metavar="N")
     mvp_parser.add_argument("--backend", choices=("mock", "vllm", "sglang"), default="mock")
@@ -82,7 +93,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument(
         "--target-pod-status",
         action="store_true",
-        help="대상 등록의 kubernetes selector로 Pod를 읽기 전용 조회(kind-runtime-lab 전용)",
+        help="대상 등록의 kubernetes selector로 Pod를 읽기 전용 조회",
+    )
+    mvp_parser.add_argument(
+        "--kube-context",
+        metavar="NAME",
+        help=(
+            "Cilium 정책·대상 Pod 조회에 명시할 Kubernetes context. 생략하면 대상 등록의 "
+            "kubernetes.context, 그것도 없으면 kind-runtime-lab. 대상 등록과 다르면 시작하지 않음"
+        ),
     )
     mvp_parser.add_argument(
         "--auth-config",
@@ -265,13 +284,44 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"크기(bytes): {info.size_bytes}")
         print(f"SHA-256: {info.sha256}")
         return 0
+    if args.command == "bundle" and args.bundle_command == "verify":
+        from .mvp.policy_bundle import verify_policy_bundle
+
+        try:
+            bundle = verify_policy_bundle(args.bundle_dir)
+        except (OSError, ValueError) as error:
+            print(f"정책 묶음 검증 실패: {error}", file=sys.stderr)
+            return 1
+        print(f"정책 묶음 검증 성공: {bundle.bundle_id}")
+        print(f"bundle.json SHA-256: {bundle.sha256}")
+        print(f"파일 수: {len(bundle.files)}")
+        return 0
     if args.command == "mvp":
         from .mvp.app import run
         from .mvp.config import MVPConfig
+        from .mvp.policy_bundle import verify_policy_bundle
+
+        if args.policy_bundle is not None:
+            conflicts = [
+                option
+                for option, value in (
+                    ("--policy", args.policy),
+                    ("--policy-approvals", args.policy_approvals),
+                    ("--target", args.target),
+                    ("--observation-exceptions", args.observation_exceptions),
+                    ("--observation-intent", args.observation_intent),
+                )
+                if value is not None
+            ]
+            if conflicts:
+                parser.error(
+                    "--policy-bundle은 다음 명시 옵션과 함께 쓸 수 없습니다: "
+                    + ", ".join(conflicts)
+                )
 
         try:
             options = {
-                "policy_path": args.policy,
+                "policy_path": args.policy or "examples/mvp/policy.json",
                 "gateway_port": args.gateway_port,
                 "engine_port": args.engine_port,
                 "backend": args.backend,
@@ -311,10 +361,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "observation_exceptions_path": args.observation_exceptions,
                 "observation_timeline_path": args.observation_timeline,
                 "target_pod_status": args.target_pod_status,
+                "kube_context": args.kube_context,
             }
+            if args.policy_bundle is not None:
+                bundle = verify_policy_bundle(args.policy_bundle)
             if args.data_dir is not None:
                 options["data_dir"] = args.data_dir
-            run(MVPConfig(**options))
+            if args.policy_bundle is None:
+                run(MVPConfig(**options))
+            else:
+                with bundle.materialized_files() as role_paths:
+                    bundle_options, bundle_status = bundle.mvp_options(
+                        tuple(args.observation_feed), role_paths=role_paths
+                    )
+                    options.update(bundle_options)
+                    options["policy_bundle"] = bundle_status
+                    run(MVPConfig(**options))
         except (OSError, ValueError) as error:
             print(f"MVP 실행 실패: {error}", file=sys.stderr)
             return 1
@@ -406,6 +468,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"처리 {result['processed']}건 · 저장 {result['accepted']}건 · "
             f"거부 {len(result['rejected'])}건"
         )
+        if args.kind == "hubble":
+            print(
+                "Hubble 손실 레코드 "
+                f"{result['lost_events_records']}건 · 손실 이벤트 "
+                f"{result['lost_events_total']}건 · source별 "
+                f"{json.dumps(result['lost_events_by_source'], ensure_ascii=False, sort_keys=True)} · "
+                f"최근 손실 {result['last_lost_at'] or '–'}"
+            )
         for rejected in result["rejected"]:
             print(
                 f"거부 line {rejected['line']}: {rejected['reason']}",

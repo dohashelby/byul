@@ -21,15 +21,12 @@ import threading
 from typing import Any, Callable
 
 from .policy import DuplicateKeyError, _object_without_duplicates, _reject_json_constant
+from .kube_context import validate_kube_context
 from .store import JsonlStore
 
 
 SCHEMA_VERSION = "runtime-target/1.0"
 SNAPSHOT_SCHEMA = "runtime-target-snapshot/1.0"
-# Read-only Pod queries are limited to the isolated local lab context for now,
-# matching the other kubectl collectors.
-ALLOWED_CONTEXTS = frozenset({"kind-runtime-lab"})
-
 _TOP = {"schema_version", "target_id", "target_ref", "engine", "model", "baseline_ref", "kubernetes"}
 _ENGINE = {"kind", "version", "image_digest"}
 _MODEL = {"id", "revision"}
@@ -148,10 +145,10 @@ def _parse(document: object) -> dict[str, Any]:
     if document.get("kubernetes") is not None:
         k8s = _object(document, "kubernetes", _KUBERNETES)
         context = k8s.get("context")
-        if context not in ALLOWED_CONTEXTS:
-            raise ValueError(
-                f"kubernetes.context must be one of: {', '.join(sorted(ALLOWED_CONTEXTS))}"
-            )
+        try:
+            context = validate_kube_context(context)
+        except ValueError as error:
+            raise ValueError("kubernetes.context is invalid") from error
         namespace = k8s.get("namespace")
         container = k8s.get("container")
         for name, value in (("namespace", namespace), ("container", container)):
@@ -219,11 +216,13 @@ def load_target(path: str | Path | None) -> TargetRegistration:
     return TargetRegistration("ok", path_text, digest, loaded_at, **fields)
 
 
-def pods_command(selector: KubernetesSelector) -> list[str]:
+def pods_command(
+    selector: KubernetesSelector, context: str | None = None
+) -> list[str]:
     return [
         "kubectl",
         "--context",
-        selector.context,
+        validate_kube_context(context or selector.context),
         "--namespace",
         selector.namespace,
         "get",
@@ -332,15 +331,19 @@ class KubernetesTargetCollector:
         selector: KubernetesSelector,
         *,
         timeout_s: float,
+        context: str | None = None,
         runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ) -> None:
         self.selector = selector
+        if context is not None and context != selector.context:
+            raise ValueError("kube context must match the target registration kubernetes.context")
+        self.context = validate_kube_context(selector.context)
         self.timeout_s = timeout_s
         self.runner = runner
 
     def collect(self) -> tuple[dict[str, Any], str]:
         result = self.runner(
-            pods_command(self.selector),
+            pods_command(self.selector, self.context),
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
@@ -355,7 +358,7 @@ class KubernetesTargetCollector:
         except (json.JSONDecodeError, RecursionError) as error:
             raise ValueError("Pod response is not valid JSON") from error
         summary = summarize_pods(document, self.selector.container)
-        summary["context"] = self.selector.context
+        summary["context"] = self.context
         summary["namespace"] = self.selector.namespace
         summary["selector"] = dict(self.selector.selector)
         return summary, "kubernetes_api"
@@ -472,15 +475,39 @@ class TargetRegistry:
             ),
         }
 
-    def status(
+    def hold(
         self,
         *,
         policy_target_id: str | None,
         backend_kind: str,
         engine_info: dict[str, Any] | None,
         kubernetes: dict[str, Any] | None,
-        history_limit: int = 20,
-    ) -> dict[str, Any]:
+    ) -> tuple[str, str] | None:
+        """Full admission check: registration, then observed-value comparison."""
+
+        decision = self.gateway_decision(policy_target_id)
+        if decision is not None or self.registration.state != "ok":
+            return decision
+        rows = self._comparison_rows(
+            policy_target_id=policy_target_id,
+            backend_kind=backend_kind,
+            engine_info=engine_info,
+            kubernetes=kubernetes,
+        )
+        return comparison_hold(
+            rows,
+            kubernetes_declared=self.registration.kubernetes is not None,
+            kubernetes=kubernetes,
+        )
+
+    def _comparison_rows(
+        self,
+        *,
+        policy_target_id: str | None,
+        backend_kind: str,
+        engine_info: dict[str, Any] | None,
+        kubernetes: dict[str, Any] | None,
+    ) -> list[dict[str, Any]]:
         registration = self.registration
         rows: list[dict[str, Any]] = []
         if registration.state == "ok":
@@ -513,6 +540,24 @@ class TargetRegistry:
                     rows.append(_unknown("engine.image_digest", registration.image_digest, "kubernetes_api", f"pod snapshot {k8s_state}"))
                 else:
                     rows.append(_row("engine.image_digest", registration.image_digest, instance.get("image_digest"), "kubernetes_api", True))
+        return rows
+
+    def status(
+        self,
+        *,
+        policy_target_id: str | None,
+        backend_kind: str,
+        engine_info: dict[str, Any] | None,
+        kubernetes: dict[str, Any] | None,
+        history_limit: int = 20,
+    ) -> dict[str, Any]:
+        registration = self.registration
+        rows = self._comparison_rows(
+            policy_target_id=policy_target_id,
+            backend_kind=backend_kind,
+            engine_info=engine_info,
+            kubernetes=kubernetes,
+        )
         try:
             records, corrupt = self.store.read_all()
         except OSError:
@@ -531,6 +576,12 @@ class TargetRegistry:
                 "events_this_session": self._events_this_session,
             }
         hold = self.gateway_decision(policy_target_id)
+        if hold is None and registration.state == "ok":
+            hold = comparison_hold(
+                rows,
+                kubernetes_declared=registration.kubernetes is not None,
+                kubernetes=kubernetes,
+            )
         return {
             "registration": registration.view(),
             "gateway_hold": {"reason_code": hold[0], "message": hold[1]} if hold else None,
@@ -546,10 +597,41 @@ class TargetRegistry:
             },
             "limits": [
                 "model.id 일치는 weight 해시·revision·실제 로딩을 증명하지 않음",
-                "Pod 조회는 kind-runtime-lab context의 읽기 전용 조회만 지원",
-                "관측값 불일치는 표시만 하고 요청을 자동 차단하지 않음",
+                "Pod 조회는 대상 등록의 kubernetes.context에서 읽기 전용으로만 수행",
+                "선언한 값이 다르거나 확인되지 않으면 신규 요청을 503으로 보류(model.revision은 engine API로 확인할 수 없어 보류 조건에서 제외, 자산 manifest로 확인)",
             ],
         }
+
+
+# The engine API cannot expose these by design; they are checked through the
+# asset manifest and do not gate requests on their own.
+_NON_GATING_FIELDS = frozenset({"model.revision"})
+
+
+def comparison_hold(
+    rows: list[dict[str, Any]],
+    *,
+    kubernetes_declared: bool,
+    kubernetes: dict[str, Any] | None,
+) -> tuple[str, str] | None:
+    """Hold new requests when a declared value differs or cannot be confirmed.
+
+    Plan §4.1/§7.3: a confirmed target mismatch, multiple matching targets or
+    missing metadata are not estimated; admission waits (503) until fixed.
+    """
+
+    gating = [row for row in rows if row["field"] not in _NON_GATING_FIELDS]
+    for row in gating:
+        if row["state"] == "mismatch":
+            return ("TARGET_MISMATCH", f"observed {row['field']} differs from the registered target")
+    if kubernetes_declared:
+        state = kubernetes.get("state") if isinstance(kubernetes, dict) else None
+        if state != "ok":
+            return ("TARGET_UNAVAILABLE", f"target pod snapshot is {state or 'not collected'}")
+    for row in gating:
+        if row["state"] == "unknown":
+            return ("TARGET_UNVERIFIED", f"{row['field']} could not be confirmed ({row['note'] or 'not observed'})")
+    return None
 
 
 def _row(name: str, expected: Any, observed: Any, source: str, observed_ok: bool) -> dict[str, Any]:

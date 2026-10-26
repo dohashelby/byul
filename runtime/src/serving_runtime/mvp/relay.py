@@ -11,6 +11,7 @@ from typing import Any, Callable, Protocol
 from urllib.error import URLError
 
 from .backend import BackendConfig
+from .auth import CHAT_ROUTE, COMPLETIONS_ROUTE
 from .validator import Decision
 
 
@@ -157,16 +158,20 @@ def relay_payload(
     allowed: Decision,
     *,
     stream: bool,
+    route: str = CHAT_ROUTE,
 ) -> bytes:
     relay_document: dict[str, Any] = {}
     # Test-only extra fields keep the client's original value; the Gateway-owned
     # fields below are written last so they always win.
     for name, _mode in allowed.extra_fields:
         relay_document[name] = document[name]
+    input_field = "messages" if route == CHAT_ROUTE else "prompt"
+    if route not in {CHAT_ROUTE, COMPLETIONS_ROUTE}:
+        raise ValueError("unsupported relay route")
     relay_document.update(
         {
             "model": backend.mapped_model(allowed.model),
-            "messages": document["messages"],
+            input_field: document[input_field],
             # Each engine gets its own name for the output limit (SP2: the vLLM
             # schema is not applied to SGLang as-is).
             backend.output_tokens_field: allowed.max_tokens,
@@ -209,16 +214,24 @@ class Relay:
         return "mock engine" if self._backend.kind == "mock" else "backend"
 
     def relay(
-        self, request_id: str, document: dict[str, Any], allowed: Decision
+        self,
+        request_id: str,
+        document: dict[str, Any],
+        allowed: Decision,
+        *,
+        route: str = CHAT_ROUTE,
     ) -> tuple[Decision, bytes | None]:
+        path = "/v1/chat/completions" if route == CHAT_ROUTE else "/v1/completions"
         connection, request_path = self._backend.connection(
-            "/v1/chat/completions", self._relay_timeout_s
+            path, self._relay_timeout_s
         )
         try:
             connection.request(
                 "POST",
                 request_path,
-                body=relay_payload(self._backend, document, allowed, stream=False),
+                body=relay_payload(
+                    self._backend, document, allowed, stream=False, route=route
+                ),
                 headers=self._backend.request_headers(
                     request_id=request_id, content_type="application/json"
                 ),
@@ -296,9 +309,12 @@ class Relay:
         allowed: Decision,
         started_at: float,
         on_response_started: Callable[[], None],
+        *,
+        route: str = CHAT_ROUTE,
     ) -> tuple[Decision, str, bool]:
+        path = "/v1/chat/completions" if route == CHAT_ROUTE else "/v1/completions"
         connection, request_path = self._backend.connection(
-            "/v1/chat/completions",
+            path,
             min(self._relay_timeout_s, self._request_deadline_s),
         )
         response_started = False
@@ -306,7 +322,9 @@ class Relay:
             connection.request(
                 "POST",
                 request_path,
-                body=relay_payload(self._backend, document, allowed, stream=True),
+                body=relay_payload(
+                    self._backend, document, allowed, stream=True, route=route
+                ),
                 headers=self._backend.request_headers(
                     request_id=request_id, content_type="application/json"
                 ),

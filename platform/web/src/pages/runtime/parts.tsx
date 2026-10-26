@@ -79,6 +79,7 @@ export function observationState(origins: Record<string, number> | undefined, co
     return [`관측 불가 (${collector.state})`, "off"];
   }
   if (detail) {
+    if (detail.loss_detected === true) return ["실시간 수집 · Hubble 손실 감지", "synthetic"];
     if (detail.rejected > 0 && detail.out_of_window === detail.rejected && writer?.configured) return ["수집 정상 · 실행 전 이벤트 제외", "real"];
     if (detail.rejected > 0 && detail.accepted === 0) return ["관측 불가 (손상 줄)", "off"];
     if (detail.rejected > 0) return ["실시간 수집 · 일부 제외", "synthetic"];

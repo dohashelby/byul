@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 import threading
 import time
@@ -21,6 +22,7 @@ from .collectors import (
     load_declaration,
 )
 from .cilium_status import CiliumPolicyCollector
+from .kube_context import DEFAULT_KUBE_CONTEXT
 from .config import MVPConfig
 from .engine_client import EngineClient
 from .http_handler import (
@@ -67,6 +69,7 @@ class GatewayApp:
             raise ValueError("the MVP gateway must bind to 127.0.0.1")
         self.config = config
         self.policy_state = policy_state
+        self._policy_bundle = copy.deepcopy(config.policy_bundle)
         if config.backend == "mock":
             if backend_config is not None:
                 raise ValueError("backend_config must not be supplied in mock mode")
@@ -178,7 +181,7 @@ class GatewayApp:
             self._relay,
             self._concurrency,
             lambda: self.auth_state,
-            self._target.gateway_decision,
+            self._target_hold,
             approval_result=self._approval_result,
         )
 
@@ -259,10 +262,28 @@ class GatewayApp:
                     config.collector_stale_after_s,
                 )
             )
+        registration = self._target.registration
+        registered_context = (
+            registration.kubernetes.context if registration.kubernetes is not None else None
+        )
+        # The target registration names the cluster it was approved for. An
+        # explicit --kube-context must agree with it instead of silently
+        # pointing the collectors at another cluster.
+        if (
+            config.kube_context is not None
+            and registered_context is not None
+            and config.kube_context != registered_context
+        ):
+            raise ValueError(
+                f"--kube-context {config.kube_context!r}가 대상 등록의 "
+                f"kubernetes.context {registered_context!r}와 다릅니다"
+            )
+        kube_context = config.kube_context or registered_context or DEFAULT_KUBE_CONTEXT
         self._cilium_policy_collector: CiliumPolicyCollector | None = None
         if config.cilium_policy_status:
             self._cilium_policy_collector = CiliumPolicyCollector(
-                timeout_s=config.cilium_timeout_s
+                timeout_s=config.cilium_timeout_s,
+                context=kube_context,
             )
             collectors.append(
                 Collector(
@@ -272,13 +293,13 @@ class GatewayApp:
                     config.collector_stale_after_s,
                 )
             )
-        registration = self._target.registration
         if config.target_pod_status and registration.kubernetes is not None:
             collectors.append(
                 Collector(
                     "target_pods",
                     KubernetesTargetCollector(
-                        registration.kubernetes, timeout_s=config.cilium_timeout_s
+                        registration.kubernetes,
+                        timeout_s=config.cilium_timeout_s,
                     ).collect,
                     config.collector_interval_s,
                     config.collector_stale_after_s,
@@ -363,8 +384,8 @@ class GatewayApp:
                 "test_only": False,
                 "max_n": None,
                 "extra_fields": [],
-                "passthrough_count": 0,
-                "validate_count": 0,
+                "passthrough_count": None,
+                "validate_count": None,
             }
         extra = [{"name": rule.name, "mode": rule.mode} for rule in policy.extra_fields]
         return {
@@ -376,18 +397,29 @@ class GatewayApp:
             "validate_count": sum(1 for item in extra if item["mode"] == "validate"),
         }
 
-    def target_status(self) -> dict[str, Any]:
+    def _target_inputs(self) -> dict[str, Any]:
         collectors = self.collectors_status()
         by_source = {item["source"]: item for item in collectors.get("collectors", [])}
         pods = by_source.get("target_pods")
+        return {
+            "backend_kind": self.backend.kind,
+            "engine_info": by_source.get("engine_info"),
+            "kubernetes": (pods.get("last_value") if pods and pods.get("state") == "ok" else (
+                {"state": pods.get("state"), "error": pods.get("last_error")} if pods else None
+            )),
+        }
+
+    def _target_hold(self, policy_target_id: str | None) -> tuple[str, str] | None:
+        # Without a registration there is nothing to compare; skip collector reads.
+        if self._target.registration.state == "not_configured":
+            return None
+        return self._target.hold(policy_target_id=policy_target_id, **self._target_inputs())
+
+    def target_status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         return self._target.status(
             policy_target_id=policy.target_id if policy else None,
-            backend_kind=self.backend.kind,
-            engine_info=by_source.get("engine_info"),
-            kubernetes=(pods.get("last_value") if pods and pods.get("state") == "ok" else (
-                {"state": pods.get("state"), "error": pods.get("last_error")} if pods else None
-            )),
+            **self._target_inputs(),
         )
 
     def policy_status(self) -> dict[str, Any]:
@@ -416,6 +448,7 @@ class GatewayApp:
         }
         return {
             **validity,
+            "policy_bundle": copy.deepcopy(self._policy_bundle),
             "current": current,
             "policy": current,
             "revocations": {
@@ -436,7 +469,7 @@ class GatewayApp:
                 "LAB approval-list SHA-256 comparison",
             ],
             "unimplemented_validity_items": [
-                "production signature or bundle verifier integration",
+                "production signature verification",
                 "approval service integration",
                 "hot reload",
                 "external enforcement confirmation",
@@ -522,6 +555,7 @@ class GatewayApp:
                 "reason_code": policy_runtime["reason_code"],
                 "approval": policy_runtime["approval"],
             },
+            "policy_bundle": copy.deepcopy(self._policy_bundle),
             "policy_history_store": policy_runtime["history_storage"],
             "record_store": record_store,
             "concurrency": self._concurrency.status(),
@@ -583,6 +617,7 @@ class GatewayApp:
         handler = create_handler(
             HandlerDependencies(
                 chat=self._request_flow.chat,
+                completions=self._request_flow.completions,
                 status=self.status,
                 policy_status=self.policy_status,
                 baseline_status=self.baseline_status,

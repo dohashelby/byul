@@ -123,6 +123,7 @@ class MVPCommandTests(unittest.TestCase):
                 "--observation-run-id", "lab-run",
                 "--observation-intent", "intent.json",
                 "--cilium-policy-status",
+                "--kube-context", "formal-cluster",
             ])
         self.assertEqual(result, 0)
         config = run.call_args.args[0]
@@ -145,6 +146,7 @@ class MVPCommandTests(unittest.TestCase):
         self.assertEqual(config.collector_interval_s, 0.5)
         self.assertEqual(config.collector_stale_after_s, 2)
         self.assertEqual(config.lab_report_path, "reports")
+        self.assertEqual(config.kube_context, "formal-cluster")
         self.assertEqual(
             config.observation_feeds,
             (("hubble", "hubble.jsonl"), ("tetragon", "tetragon.jsonl")),

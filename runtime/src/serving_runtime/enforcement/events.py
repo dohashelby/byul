@@ -13,6 +13,7 @@ from serving_runtime.mvp.store import JsonlStore
 
 
 SCHEMA = "runtime-observation/1.0"
+HUBBLE_LOSS_SCHEMA = "runtime-hubble-loss/1.0"
 _RULE_ID = re.compile(r"(?i)(TG-[A-Z]+-\d+)")
 
 
@@ -141,6 +142,49 @@ def parse_hubble(
         }
     )
     return normalized
+
+
+def parse_hubble_loss(document: Any) -> dict[str, Any] | None:
+    """Parse a Hubble GetFlowsResponse lost-events line, or return ``None``."""
+
+    root = _object(document, "$")
+    if "lost_events" not in root:
+        return None
+    lost = _object(root.get("lost_events"), "$.lost_events")
+    source = _string(lost.get("source"), "$.lost_events.source")
+    raw_count = lost.get("num_events_lost")
+    if isinstance(raw_count, bool):
+        raise EventError("$.lost_events.num_events_lost must be a non-negative integer")
+    try:
+        count = int(raw_count)
+    except (TypeError, ValueError) as error:
+        raise EventError(
+            "$.lost_events.num_events_lost must be a non-negative integer"
+        ) from error
+    if count < 0 or (isinstance(raw_count, str) and str(count) != raw_count):
+        raise EventError("$.lost_events.num_events_lost must be a non-negative integer")
+    observed_at = _string(root.get("time"), "$.time")
+    cpu = lost.get("cpu")
+    if cpu is not None:
+        if isinstance(cpu, bool):
+            raise EventError("$.lost_events.cpu must be an integer or null")
+        try:
+            cpu = int(cpu)
+        except (TypeError, ValueError) as error:
+            raise EventError("$.lost_events.cpu must be an integer or null") from error
+        if cpu < 0:
+            raise EventError("$.lost_events.cpu must be an integer or null")
+    node_name = root.get("node_name")
+    if node_name is not None and not isinstance(node_name, str):
+        raise EventError("$.node_name must be a string or null")
+    return {
+        "schema": HUBBLE_LOSS_SCHEMA,
+        "observed_at": observed_at,
+        "source": source,
+        "num_events_lost": count,
+        "cpu": cpu,
+        "node_name": node_name,
+    }
 
 
 def _event_time(root: dict[str, Any]) -> str:
@@ -310,6 +354,28 @@ def transform_lines(
     run_id: str | None = None,
     exec_policy: Any = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    accepted, rejected, _losses = transform_lines_with_loss(
+        lines,
+        kind=kind,
+        data_origin=data_origin,
+        allowed_engine_binaries=allowed_engine_binaries,
+        environment=environment,
+        run_id=run_id,
+        exec_policy=exec_policy,
+    )
+    return accepted, rejected
+
+
+def transform_lines_with_loss(
+    lines: Iterable[str],
+    *,
+    kind: str,
+    data_origin: str,
+    allowed_engine_binaries: tuple[str, ...] | list[str] | None = None,
+    environment: str | None = None,
+    run_id: str | None = None,
+    exec_policy: Any = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """Transform lines while retaining only line numbers and safe error reasons."""
 
     if kind not in {"hubble", "tetragon"}:
@@ -318,10 +384,15 @@ def transform_lines(
         raise ValueError("data_origin must be synthetic or real")
     accepted: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
+    losses: list[dict[str, Any]] = []
     for line_number, line in enumerate(lines, start=1):
         try:
             document = json.loads(line)
             if kind == "hubble":
+                loss = parse_hubble_loss(document)
+                if loss is not None:
+                    losses.append(loss)
+                    continue
                 item = parse_hubble(
                     document,
                     data_origin=data_origin,
@@ -341,7 +412,7 @@ def transform_lines(
             rejected.append({"line": line_number, "reason": str(error)})
             continue
         accepted.append(item)
-    return accepted, rejected
+    return accepted, rejected, losses
 
 
 def ingest_file(
@@ -356,7 +427,7 @@ def ingest_file(
     exec_policy: Any = None,
 ) -> dict[str, Any]:
     with Path(input_path).open("r", encoding="utf-8") as source:
-        accepted, rejected = transform_lines(
+        accepted, rejected, losses = transform_lines_with_loss(
             source,
             kind=kind,
             data_origin=data_origin,
@@ -368,10 +439,29 @@ def ingest_file(
     store = JsonlStore(Path(data_dir) / "observations.jsonl")
     for item in accepted:
         store.append(item)
+    by_source: Counter[str] = Counter()
+    for loss in losses:
+        by_source[loss["source"]] += loss["num_events_lost"]
     return {
-        "processed": len(accepted) + len(rejected),
+        "processed": len(accepted) + len(rejected) + len(losses),
         "accepted": len(accepted),
         "rejected": rejected,
+        "lost_events_records": len(losses),
+        "lost_events_total": (
+            sum(item["num_events_lost"] for item in losses)
+            if kind == "hubble"
+            else None
+        ),
+        "lost_events_by_source": (
+            dict(by_source)
+            if kind == "hubble"
+            else None
+        ),
+        "last_lost_at": (
+            max((item["observed_at"] for item in losses), default=None)
+            if kind == "hubble"
+            else None
+        ),
     }
 
 

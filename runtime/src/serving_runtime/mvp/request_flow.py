@@ -8,7 +8,7 @@ import time
 from typing import Callable, Protocol
 
 from .approval import ApprovalResult
-from .auth import CHAT_ROUTE, AuthState, not_configured
+from .auth import CHAT_ROUTE, COMPLETIONS_ROUTE, AuthState, not_configured
 from .backend import BackendConfig
 from .engine_client import EngineClient
 from .policy import PolicyState
@@ -166,6 +166,7 @@ class RequestFlow:
         document: dict[str, object],
         decision: Decision,
         policy_snapshot: PolicyState,
+        request_kind: str,
     ) -> Decision | None:
         context_limit = (
             policy_snapshot.policy.max_context_tokens
@@ -178,13 +179,23 @@ class RequestFlow:
             backend_model_id = self._backend.mapped_model(decision.model)
             if backend_model_id is None:
                 raise ValueError("backend model is unavailable")
-            messages = document["messages"]
-            if not isinstance(messages, list):
+            input_field = "messages" if request_kind == "chat" else "prompt"
+            input_value = document[input_field]
+            if request_kind == "chat" and not isinstance(input_value, list):
                 raise ValueError("validated messages are unavailable")
+            if request_kind == "completions" and not isinstance(input_value, str):
+                raise ValueError("validated prompt is unavailable")
+            # The relay forwards approved extra fields to the engine; the token
+            # count must see the same prompt-shaping inputs.
+            extra_fields = {
+                name: document[name] for name, _mode in decision.extra_fields if name in document
+            }
             input_tokens = self._engine_client.count_input_tokens(
                 request_id,
-                messages,
+                input_value,
                 backend_model_id,
+                request_kind=request_kind,
+                extra_fields=extra_fields,
             )
         except Exception as error:
             # Store only the exception class; backend messages may contain secrets.
@@ -227,7 +238,7 @@ class RequestFlow:
 
     @staticmethod
     def _auth_rejection(
-        auth_state: AuthState, auth
+        auth_state: AuthState, auth, route: str
     ) -> tuple[Decision, dict[str, str] | None] | None:
         """Map an authentication outcome to a pre-body rejection, if any."""
 
@@ -266,7 +277,7 @@ class RequestFlow:
                 ),
                 {"WWW-Authenticate": 'Bearer realm="serving-runtime"'},
             )
-        required = set(auth_state.roles_for(CHAT_ROUTE))
+        required = set(auth_state.roles_for(route))
         if auth.principal is None or not required & set(auth.principal.roles):
             return (
                 Decision(
@@ -283,7 +294,25 @@ class RequestFlow:
         return None
 
     def chat(self, response: ChatIO, request_id: str) -> None:
-        self._records.clear_context()
+        self._handle(response, request_id, route=CHAT_ROUTE, request_kind="chat")
+
+    def completions(self, response: ChatIO, request_id: str) -> None:
+        self._handle(
+            response,
+            request_id,
+            route=COMPLETIONS_ROUTE,
+            request_kind="completions",
+        )
+
+    def _handle(
+        self,
+        response: ChatIO,
+        request_id: str,
+        *,
+        route: str,
+        request_kind: str,
+    ) -> None:
+        self._records.clear_context(route)
         policy_snapshot = self._policy_state()
         policy_runtime = evaluate_policy(
             policy_snapshot,
@@ -370,7 +399,7 @@ class RequestFlow:
         auth_state = self._auth_state()
         auth = auth_state.authenticate(response.request_header("Authorization"))
         self._records.set_auth(auth.record())
-        auth_rejection = self._auth_rejection(auth_state, auth)
+        auth_rejection = self._auth_rejection(auth_state, auth, route)
         if auth_rejection is not None:
             decision, headers = auth_rejection
             self.finish_without_relay(
@@ -416,7 +445,10 @@ class RequestFlow:
             )
             return
         decision = validate_request(
-            body, response.request_header("Content-Type"), policy_snapshot
+            body,
+            response.request_header("Content-Type"),
+            policy_snapshot,
+            request_kind=request_kind,
         )
         stream = False
         document: dict[str, object] | None = None
@@ -531,7 +563,11 @@ class RequestFlow:
         acquired_at = time.monotonic()
         try:
             context_decision = self._context_decision(
-                request_id, document, decision, policy_snapshot
+                request_id,
+                document,
+                decision,
+                policy_snapshot,
+                request_kind,
             )
             if context_decision is not None:
                 self.finish_without_relay(
@@ -603,6 +639,7 @@ class RequestFlow:
                         decision,
                         acquired_at,
                         record_response_started,
+                        route=route,
                     )
                 )
                 backend_receipt = self._engine_client.backend_receipt(request_id)
@@ -655,7 +692,7 @@ class RequestFlow:
                 return
 
             final_decision, engine_body = self._relay.relay(
-                request_id, document, decision
+                request_id, document, decision, route=route
             )
             backend_receipt = self._engine_client.backend_receipt(request_id)
             completed = (

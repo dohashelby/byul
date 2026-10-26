@@ -40,9 +40,10 @@ class RequestRecords:
         self._request_local = threading.local()
         self.check_store()
 
-    def clear_context(self) -> None:
+    def clear_context(self, route: str | None = None) -> None:
         self._request_local.context = None
         self._request_local.auth = None
+        self._request_local.route = route
 
     def set_auth(self, auth: dict[str, Any]) -> None:
         """Attach the authentication outcome (never the credential) to this request."""
@@ -111,6 +112,7 @@ class RequestRecords:
             "schema_version": "runtime-mvp-record/1.0",
             "phase": phase,
             "request_id": request_id,
+            "route": getattr(self._request_local, "route", None),
             "observation_session_id": self._observation_session_id,
             "environment": self._environment,
             "run_id": self._run_id,

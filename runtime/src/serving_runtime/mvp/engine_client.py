@@ -51,18 +51,31 @@ class EngineClient:
     def count_input_tokens(
         self,
         request_id: str,
-        messages: list[Any],
+        input_value: list[Any] | str,
         backend_model_id: str,
+        *,
+        request_kind: str = "chat",
+        extra_fields: dict[str, Any] | None = None,
     ) -> int:
-        """Ask the backend tokenizer for the prompt length; never estimate it."""
+        """Ask the backend tokenizer for the prompt length; never estimate it.
 
-        tokenize_request = {
-            "model": backend_model_id,
-            "messages": messages,
-        }
+        Approved passthrough fields are sent too, because some (for example
+        ``chat_template_kwargs``) change the rendered prompt. If the tokenizer
+        rejects them the count is unavailable and the request is held.
+        """
+
+        tokenize_request: dict[str, Any] = dict(extra_fields or {})
+        # Gateway-owned fields are written last so they always win.
+        tokenize_request["model"] = backend_model_id
+        if request_kind == "chat":
+            tokenize_request["messages"] = input_value
+        elif request_kind == "completions":
+            tokenize_request["prompt"] = input_value
+        else:
+            raise ValueError("unsupported request kind")
         # vLLM's tokenize API accepts this template option. SGLang v0.5.21's
         # TokenizeRequest has model/messages but no add_generation_prompt field.
-        if self.backend.kind == "vllm":
+        if request_kind == "chat" and self.backend.kind == "vllm":
             tokenize_request["add_generation_prompt"] = True
         payload = json.dumps(tokenize_request, ensure_ascii=False).encode("utf-8")
         status, _, body = self.request(

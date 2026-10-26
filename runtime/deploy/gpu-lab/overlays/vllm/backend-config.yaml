@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: serving-gateway-backend
+data:
+  # model_map key must be listed in the bundle's gateway policy allowed_models.
+  backend.json: |
+    {
+      "schema_version": "runtime-backend/1.0",
+      "kind": "vllm",
+      "base_url": "http://serving-engine.serving-lab.svc.cluster.local:8000",
+      "model_map": {
+        "qwen2.5-0.5b-instruct": "qwen2.5-0.5b-instruct"
+      },
+      "health_path": "/health",
+      "models_path": "/v1/models",
+      "version_path": "/version",
+      "metrics_url": "http://serving-engine.serving-lab.svc.cluster.local:8000/metrics",
+      "timeouts": {
+        "relay_timeout_s": 5,
+        "stream_idle_timeout_s": 30,
+        "request_deadline_s": 300
+      }
+    }

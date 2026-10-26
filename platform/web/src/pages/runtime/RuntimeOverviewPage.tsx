@@ -6,6 +6,7 @@ import type { RuntimeStatus } from "../../api/types";
 import { KeyValue } from "../../components/DetailPanel";
 import { Dot, Query, StateView, WarningBox, ui } from "../../components/Misc";
 import { ChartCard, Donut, HBars, REQUEST_SERIES, TimeBars, TimeLine, type RequestKey } from "../../components/StackedBars";
+import { Value } from "../../components/Value";
 import { APPROVAL_DETAIL } from "../../lib/labels";
 import { bucketize, inRange } from "../../lib/time";
 import { carry, useGlobalFilters } from "../../lib/url";
@@ -281,7 +282,7 @@ export function RuntimeOverviewPage() {
               {pol.test_only && (
                 <WarningBox>
                   시험 전용 프로필({pol.profile}): 검사하지 않고 엔진에 전달하는 필드 {pol.passthrough_fields.length}개
-                  {pol.passthrough_fields.length ? ` (${pol.passthrough_fields.join(", ")})` : ""} · 검사 후 전달 {pol.validate_count}개 · 허용 n 최대 {pol.max_n ?? 1}. 승인된 운영 정책이
+                  {pol.passthrough_fields.length ? ` (${pol.passthrough_fields.join(", ")})` : ""} · 검사 후 전달 <Value v={pol.validate_count} />개 · 허용 n 최대 {pol.max_n ?? 1}. 승인된 운영 정책이
                   아닙니다.
                 </WarningBox>
               )}

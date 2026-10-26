@@ -1,9 +1,11 @@
 // 통신·행위 관측. 삭제된 runtime 대시보드 renderCollectors()·collectorSummary()·renderObservations()를 옮겼다.
+import type { ReactNode } from "react";
 import { useParams as useRouteParams } from "react-router-dom";
 import { useRuntimeEvents, useRuntimeStatus } from "../../api/hooks";
 import type { Collector, RuntimeEvent } from "../../api/types";
 import { Badge } from "../../components/Badges";
 import { PageHead, Query, StateView } from "../../components/Misc";
+import { Value } from "../../components/Value";
 import { CACHE_GENERATION, EXEC_VERDICT, METRIC_STATE } from "../../lib/labels";
 import { useRuntimeProblems } from "./problems";
 import { ObservationOriginBadge, ScopeBadges, StateBadge, Subtabs, TableCard, formatTime, rt } from "./parts";
@@ -14,10 +16,12 @@ const gib = (bytes: number | null) => `${((bytes ?? 0) / 1024 ** 3).toFixed(2)}G
 function CollectorSummary({ c }: { c: Collector }) {
   const d = c.detail;
   if (!d) return null;
-  const lines: [string, boolean][] = [];
+  const lines: [ReactNode, boolean][] = [];
   if (d.kind === "asset_integrity") {
     lines.push([
-      `일치 ${d.match}/${d.total ?? "–"} · 변경 ${d.changed} · 누락 ${d.missing} · 읽기 불가 ${d.unreadable} · 링크 ${d.symlink} · 목록 밖 파일 ${d.extra_files} · 목록 밖 링크 ${d.extra_symlinks} · 순회 오류 ${d.walk_errors}`,
+      <>
+        일치 {d.match}/{d.total ?? "–"} · 변경 {d.changed} · 누락 {d.missing} · 읽기 불가 {d.unreadable} · 링크 {d.symlink} · 목록 밖 파일 <Value v={d.extra_files} /> · 목록 밖 링크 <Value v={d.extra_symlinks} /> · 순회 오류 <Value v={d.walk_errors} />
+      </>,
       d.intact === false,
     ]);
   }

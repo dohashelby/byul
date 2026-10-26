@@ -92,18 +92,27 @@ update ── run-context (격리 시험에서 runtime 통제를 켤 때) ┘   
 | Tetragon exec | `outside_allowlist`·`suspect_binary`·`exec_from_cache`, `action_mode: monitor` | `detected` | `tetragon` |
 | Tetragon exec·file | `action_mode: enforce` | `enforce_attempted` | `tetragon` |
 | Tetragon exec | `phase_unknown`·`phase_signal_unverified` | `unknown` | `tetragon` |
+| Tetragon file_access | `action_mode: monitor`, `rule_id`: `TG-ASSET-01`·`TG-ASSET-02`·`TG-SECRET-01` | `detected` | `tetragon` |
+| Tetragon file_access | `action_mode: monitor`, `rule_id: TG-CACHE-01`, `cache_generation: current` | `observed` | `tetragon` |
+| Tetragon file_access | `action_mode: monitor`, `rule_id: TG-CACHE-01`, `cache_generation`: `other`·`outside` | `detected` | `tetragon` |
+| Tetragon file_access | `action_mode: monitor`, `rule_id: TG-CACHE-01`, `cache_generation` 없음 | `unknown` | `tetragon` |
+| Tetragon file_access | 그 밖의 알 수 없는 action 또는 rule | `unknown` | `tetragon` |
 
 Hubble `DROPPED`는 출발·목적지·정책 귀속과 수신 대조 전에는 거부 확인이 아니다(runtime 문서 §7).
+비고: runtime 결정(2026-10-26), 근거: `runtime/docs/contracts_대조_2026-10-26.md`.
 
 ### runtime `data_origin` → 등급
 
 | runtime 값 | 등급 |
 | --- | --- |
 | `real`, `external_backend`, `kubernetes_api`, `local_file` | `MEASURED` |
+| `declared`(manifest 선언 필드) | `DECLARED` |
 | `mock`, `synthetic`, `actual_test`(모의 엔진) | `EXAMPLE` |
+| `fake_backend_test` | `EXAMPLE` |
 | 사람이 입력한 정책·예외·승인 | `DECLARED` |
 
 모의 엔진에서 실제로 돌린 시험(`actual_test`)도 실제 엔진 결과가 아니므로 `EXAMPLE`로 낮춘다.
+비고: runtime 결정(2026-10-26), 근거: `runtime/docs/contracts_대조_2026-10-26.md`.
 
 ## 이번 초안에서 보수적으로 정한 것
 
@@ -121,10 +130,14 @@ Hubble `DROPPED`는 출발·목적지·정책 귀속과 수신 대조 전에는 
 3. **운영 사건 보존 기간과 저장소:** 사건 규모에 따라 Postgres로 충분한지, OpenSearch가 필요한지.
 4. **환경 `facts`와 runtime 관측의 충돌:** runtime이 관측한 값(예: prefix cache 사용)이 platform 신고와 다를 때 environment를 어떻게 갱신할지. 지금은 runtime이 environment를 고치지 않는다.
 5. **verification-result 생산 위치:** 지금은 platform이 RPT를 읽어 변환한다(`platform/api/.../sources/update.py`). update가 직접 내보낼지는 미정.
-6. **번들 전달 경로:** 같은 호스트의 관리 디렉터리(§5.4)로 시작한다. 원격 배포 채널은 미정.
+6. **번들 전달 경로:** 같은 호스트의 관리 디렉터리(§5.4)로 시작한다. LAB 수신 방식은 runtime 결정 기록(`runtime/docs/결정기록_정책묶음_수신.md`) 참조. 원격 전달은 미정.
 7. **보고서 표시 규칙의 소유:** 대표 상태·종합 판정·비공식 사유의 표시 규칙은 update HTML 보고서에서 platform으로 옮겨 왔다. 이 값들을 update가 RPT에 직접 넣을지 정해야 한다.
 
 ## 변경 이력
+
+### runtime 결정(2026-10-26) · 미측정 개수 `null` 보존
+
+`runtime-status` 0.2의 판본과 DRAFT 상태는 유지한다. runtime이 자산 root를 순회하지 못했을 때 platform으로 변환되는 `asset_detail.extra_files`·`extra_symlinks`·`walk_errors`, 정책이 없을 때의 `policy.validate_count`에만 `null`을 허용했다. 나머지 개수 필드는 기존 정수 제약을 유지한다.
 
 ### 2026-10-25 · `verification-result` 0.2 (`byul-verification-result/0.2`)
 

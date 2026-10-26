@@ -1465,7 +1465,7 @@ export interface components {
                 max_n: number | null;
                 /** @description 검사하지 않고 엔진에 전달하는 추가 필드 이름(값은 없다). */
                 passthrough_fields: string[];
-                validate_count: number;
+                validate_count: number | null;
                 loaded_at: components["schemas"]["Common_nullable_timestamp"];
                 /** @description 정책 파일 읽기·검증 성공 여부. */
                 load_valid: boolean;
@@ -1664,9 +1664,9 @@ export interface components {
             missing: number;
             unreadable: number;
             symlink: number;
-            extra_files: number;
-            extra_symlinks: number;
-            walk_errors: number;
+            extra_files: number | null;
+            extra_symlinks: number | null;
+            walk_errors: number | null;
             limit: string | null;
         };
         /** @description cilium_policy: CiliumNetworkPolicy 객체 상태. 객체 존재는 실제 차단 증거가 아니다. */

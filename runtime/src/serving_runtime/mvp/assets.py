@@ -301,8 +301,11 @@ def check(manifest: dict[str, Any]) -> dict[str, Any]:
         regular, links, walk_errors, walk_error_count = _walk(root)
         extra = [path for path in regular if path not in expected]
         extra_links = [path for path in links if path not in expected]
+        extra_file_count: int | None = len(extra)
+        extra_symlink_count: int | None = len(extra_links)
     else:
-        extra, extra_links, walk_errors, walk_error_count = [], [], [], 0
+        extra, extra_links, walk_errors = [], [], []
+        extra_file_count = extra_symlink_count = walk_error_count = None
     return {
         "checked_at": _utc_now(),
         "duration_s": time.monotonic() - started,
@@ -311,16 +314,16 @@ def check(manifest: dict[str, Any]) -> dict[str, Any]:
         "total": len(items),
         "counts": counts,
         "extra_files": extra[:50],
-        "extra_file_count": len(extra),
+        "extra_file_count": extra_file_count,
         "extra_symlinks": extra_links[:50],
-        "extra_symlink_count": len(extra_links),
+        "extra_symlink_count": extra_symlink_count,
         "walk_errors": walk_errors,
         "walk_error_count": walk_error_count,
         "intact": (
             counts["match"] == len(items)
             and not extra
             and not extra_links
-            and walk_error_count == 0
+            and not walk_errors
         ),
         "items": items,
         "limit": "디스크 파일 해시 비교이며 쓰기 차단이나 엔진 메모리 로딩 증명이 아님",

@@ -96,6 +96,13 @@ class PolicyFileMixin:
 
 
 class ZerodayPolicyTests(PolicyFileMixin, unittest.TestCase):
+    def test_missing_policy_reports_unknown_profile_counts(self) -> None:
+        status = GatewayApp._profile_status(None)
+        self.assertIsNone(status["profile"])
+        self.assertIsNone(status["max_n"])
+        self.assertIsNone(status["passthrough_count"])
+        self.assertIsNone(status["validate_count"])
+
     def test_example_policy_loads_as_test_only_profile(self) -> None:
         state = load_policy(ZERODAY_POLICY)
         self.assertTrue(state.ok, state.error_message)

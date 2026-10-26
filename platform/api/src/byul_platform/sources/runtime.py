@@ -34,7 +34,8 @@ _PHASES = {"loading", "compiling", "inferring", "maintenance", "unknown"}
 
 # contracts README "runtime data_origin → 등급"
 _MEASURED = {"real", "external_backend", "kubernetes_api", "local_file"}
-_EXAMPLE = {"mock", "synthetic", "actual_test"}
+_DECLARED = {"declared"}
+_EXAMPLE = {"mock", "synthetic", "actual_test", "fake_backend_test"}
 
 # runtime /api/summary 결과 키 → 계약 outcome
 SUMMARY_RESULT_TO_OUTCOME = {
@@ -65,6 +66,8 @@ def grade(origin: object) -> str:
     """runtime data_origin → 계약 등급. 모르는 값은 공식 근거가 될 수 없으므로 EXAMPLE로 둔다."""
     if origin in _MEASURED:
         return "MEASURED"
+    if origin in _DECLARED:
+        return "DECLARED"
     if origin in _EXAMPLE:
         return "EXAMPLE"
     return "EXAMPLE"
@@ -172,6 +175,19 @@ def observation_outcome(record: dict[str, Any]) -> str:
     if source == "tetragon":
         if _action_mode(record) == "enforce":
             return "enforce_attempted"
+        if record.get("kind") == "file_access":
+            if _action_mode(record) != "monitor":
+                return "unknown"
+            rule_id = record.get("rule_id")
+            if rule_id in {"TG-ASSET-01", "TG-ASSET-02", "TG-SECRET-01"}:
+                return "detected"
+            if rule_id == "TG-CACHE-01":
+                generation = record.get("cache_generation")
+                if generation == "current":
+                    return "observed"
+                if generation in {"other", "outside"}:
+                    return "detected"
+            return "unknown"
         verdict = record.get("exec_verdict")
         if verdict in _TETRAGON_OBSERVED:
             return "observed"
@@ -467,9 +483,9 @@ def _collector_detail(item: dict[str, Any]) -> dict[str, Any] | None:
             "intact": _bool(value.get("intact")),
             "total": _int(value.get("total")),
             **{k: _nonneg(counts.get(k)) for k in ("match", "changed", "missing", "unreadable", "symlink")},
-            "extra_files": _nonneg(value.get("extra_file_count")),
-            "extra_symlinks": _nonneg(value.get("extra_symlink_count")),
-            "walk_errors": _nonneg(value.get("walk_error_count")),
+            "extra_files": _int(value.get("extra_file_count")),
+            "extra_symlinks": _int(value.get("extra_symlink_count")),
+            "walk_errors": _int(value.get("walk_error_count")),
             "limit": _str_or_none(value.get("limit")),
         }
     if source == "cilium_policy":
@@ -584,7 +600,7 @@ def runtime_status(
             "test_only": st_policy.get("test_only") is True,
             "max_n": _int(st_policy.get("max_n")),
             "passthrough_fields": [str(x.get("name")) for x in extra if x.get("mode") == "passthrough"],
-            "validate_count": _nonneg(st_policy.get("validate_count")),
+            "validate_count": _int(st_policy.get("validate_count")),
             "loaded_at": _str_or_none(st_policy.get("loaded_at")),
             "load_valid": st_policy.get("valid") is True,
             "error_code": _str_or_none(st_policy.get("error_code")),

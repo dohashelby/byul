@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 import threading
 import time
@@ -67,6 +68,7 @@ class GatewayApp:
             raise ValueError("the MVP gateway must bind to 127.0.0.1")
         self.config = config
         self.policy_state = policy_state
+        self._policy_bundle = copy.deepcopy(config.policy_bundle)
         if config.backend == "mock":
             if backend_config is not None:
                 raise ValueError("backend_config must not be supplied in mock mode")
@@ -363,8 +365,8 @@ class GatewayApp:
                 "test_only": False,
                 "max_n": None,
                 "extra_fields": [],
-                "passthrough_count": 0,
-                "validate_count": 0,
+                "passthrough_count": None,
+                "validate_count": None,
             }
         extra = [{"name": rule.name, "mode": rule.mode} for rule in policy.extra_fields]
         return {
@@ -416,6 +418,7 @@ class GatewayApp:
         }
         return {
             **validity,
+            "policy_bundle": copy.deepcopy(self._policy_bundle),
             "current": current,
             "policy": current,
             "revocations": {
@@ -436,7 +439,7 @@ class GatewayApp:
                 "LAB approval-list SHA-256 comparison",
             ],
             "unimplemented_validity_items": [
-                "production signature or bundle verifier integration",
+                "production signature verification",
                 "approval service integration",
                 "hot reload",
                 "external enforcement confirmation",
@@ -522,6 +525,7 @@ class GatewayApp:
                 "reason_code": policy_runtime["reason_code"],
                 "approval": policy_runtime["approval"],
             },
+            "policy_bundle": copy.deepcopy(self._policy_bundle),
             "policy_history_store": policy_runtime["history_storage"],
             "record_store": record_store,
             "concurrency": self._concurrency.status(),

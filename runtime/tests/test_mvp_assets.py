@@ -53,6 +53,21 @@ class AssetIntegrityTests(unittest.TestCase):
         self.assertEqual(result["counts"]["missing"], 1)
         self.assertEqual(result["extra_files"], ["new.txt"])
 
+    def test_unwalked_root_reports_unknown_walk_counts(self) -> None:
+        document = load_manifest(self.manifest_path)
+        roots = (self.base / "missing", self.base / "not-a-directory")
+        roots[1].write_text("x", encoding="utf-8")
+        for root in roots:
+            with self.subTest(root=root.name):
+                result = check({**document, "root": str(root)})
+                self.assertEqual(result["extra_files"], [])
+                self.assertEqual(result["extra_symlinks"], [])
+                self.assertEqual(result["walk_errors"], [])
+                self.assertIsNone(result["extra_file_count"])
+                self.assertIsNone(result["extra_symlink_count"])
+                self.assertIsNone(result["walk_error_count"])
+                self.assertFalse(result["intact"])
+
     def test_symlink_is_not_followed(self) -> None:
         target = self.base / "outside.bin"
         target.write_bytes(b"\x00\x01" * 1000)

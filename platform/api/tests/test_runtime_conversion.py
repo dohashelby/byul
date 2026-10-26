@@ -14,6 +14,7 @@ from byul_platform.sources.runtime import (
     pick_gateway_record,
     request_row,
     revalidation_request,
+    runtime_status,
 )
 from conftest import FIXTURES, example_events, load_json
 
@@ -115,6 +116,40 @@ def test_tetragon_outcome_table(contracts, exec_verdict, action_mode, outcome):
     assert contracts.errors("runtime-event", event) == []
 
 
+@pytest.mark.parametrize(
+    ("rule_id", "action_mode", "cache_generation", "outcome"),
+    [
+        ("TG-ASSET-01", "monitor", None, "detected"),
+        ("TG-ASSET-02", "monitor", None, "detected"),
+        ("TG-SECRET-01", "monitor", None, "detected"),
+        ("TG-CACHE-01", "monitor", "current", "observed"),
+        ("TG-CACHE-01", "monitor", "other", "detected"),
+        ("TG-CACHE-01", "monitor", "outside", "detected"),
+        ("TG-CACHE-01", "monitor", None, "unknown"),
+        ("TG-FUTURE-01", "monitor", None, "unknown"),
+        ("TG-ASSET-01", "unknown", None, "unknown"),
+        ("TG-ASSET-01", "enforce", None, "enforce_attempted"),
+    ],
+)
+def test_tetragon_file_access_outcome_table(
+    contracts, rule_id, action_mode, cache_generation, outcome
+):
+    record = {
+        "schema_version": "runtime-observation/1.0",
+        "observed_at": "2026-10-25T01:03:00+00:00",
+        "source": "tetragon",
+        "kind": "file_access",
+        "data_origin": "real",
+        "action_mode": action_mode,
+        "rule_id": rule_id,
+        "cache_generation": cache_generation,
+    }
+    event = observation_event(record)
+    assert event["outcome"] == outcome
+    assert event["enforcer"] == "tetragon"
+    assert contracts.errors("runtime-event", event) == []
+
+
 def test_feed_event_key_becomes_event_id():
     record = {"source": "hubble", "kind": "flow", "observed_at": "2026-10-25T01:00:00Z", "data_origin": "real", "event_key": "c" * 64}
     assert observation_event(record)["event_id"] == "feed:" + "c" * 64
@@ -123,7 +158,8 @@ def test_feed_event_key_becomes_event_id():
 def test_data_origin_grades():
     for raw in ("real", "external_backend", "kubernetes_api", "local_file"):
         assert grade(raw) == "MEASURED"
-    for raw in ("mock", "synthetic", "actual_test", None, "something-new"):
+    assert grade("declared") == "DECLARED"
+    for raw in ("mock", "synthetic", "actual_test", "fake_backend_test", None, "something-new"):
         assert grade(raw) == "EXAMPLE"
 
 
@@ -172,6 +208,68 @@ def test_captured_real_observation_shapes(contracts):
             assert obs["binary"] == record.get("binary")
             assert obs["phases"] == (record["phase"] if isinstance(record.get("phase"), list) else [])
     assert any(r["source"] == "tetragon" and r["kind"] == "file_access" for r in records)
+
+
+def test_runtime_status_preserves_unknown_asset_and_policy_counts(contracts):
+    capture = copy.deepcopy(load_json(FIXTURES / "runtime" / "capture.json"))
+    endpoints = capture["endpoints"]
+    endpoints["status"]["policy"]["passthrough_count"] = None
+    endpoints["status"]["policy"]["validate_count"] = None
+    asset_collector = next(
+        item
+        for item in endpoints["collectors"]["collectors"]
+        if item["source"] == "asset_integrity"
+    )
+    asset_collector.update(
+        {
+            "state": "ok",
+            "last_success_at": "2026-10-25T01:04:58Z",
+            "last_attempt_at": "2026-10-25T01:04:58Z",
+            "last_error": None,
+            "interval_s": 2.0,
+            "stale_after_s": 30.0,
+            "data_origin": "local_file",
+            "last_value": {
+                "intact": False,
+                "total": 2,
+                "counts": {
+                    "match": 0,
+                    "changed": 0,
+                    "missing": 2,
+                    "unreadable": 0,
+                    "symlink": 0,
+                },
+                "extra_file_count": None,
+                "extra_symlink_count": None,
+                "walk_error_count": None,
+                "limit": "asset root was not walked",
+            },
+        }
+    )
+    doc = runtime_status(
+        endpoints["status"],
+        endpoints["policy"],
+        endpoints["collectors"],
+        target=endpoints["target"],
+        summary=endpoints["summary"],
+        revalidation=endpoints["revalidation"],
+        observations=endpoints["observations"],
+        baseline=endpoints["baseline"],
+    )
+    asset = next(c["detail"] for c in doc["collectors"] if c["source"] == "asset_integrity")
+    assert doc["policy"]["validate_count"] is None
+    assert asset["extra_files"] is None
+    assert asset["extra_symlinks"] is None
+    assert asset["walk_errors"] is None
+    assert contracts.errors("runtime-status", doc) == []
+
+    other_counter_null = copy.deepcopy(doc)
+    next(
+        c["detail"]
+        for c in other_counter_null["collectors"]
+        if c["source"] == "asset_integrity"
+    )["match"] = None
+    assert contracts.errors("runtime-status", other_counter_null)
 
 
 def test_tetragon_phase_list_and_action_fallback():

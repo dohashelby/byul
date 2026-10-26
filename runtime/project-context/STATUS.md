@@ -1,6 +1,6 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-10-25
+최종 갱신: 2026-10-26
 
 ## 현재 단계
 
@@ -158,3 +158,12 @@
 - byul 저장소에서 사용자 요청으로 `src/serving_runtime/mvp/static/`(index.html·app.css·app.js·vendored Chart.js)을 지우고 Gateway의 `/`·`/static/*` 서빙을 없앴다(이제 404 JSON). 화면은 byul `platform/`이 조회 API를 GET으로 읽어 보여준다. 조회 API·기록 형식은 바꾸지 않았다.
 - 화면 내용만 검사하던 시험 7개를 지우고 `/`가 404인지 보는 시험으로 바꿨다. `unittest discover -s tests` 379개 중 378개 통과, 남은 1개(`test_mvp_http_security` 연결 상한 시험의 Connection reset)는 변경 전에도 같은 환경(macOS)에서 실패했다.
 - 이 변경은 Codex 교차 검수 전이다(byul에서 Claude가 직접 수정).
+
+## 2026-10-26 contracts 대조와 LAB 정책 묶음 수신
+
+- runtime 결정(2026-10-26)으로 자산 root 미순회 3개 개수와 정책 없음 2개 개수를 0 대신 `null`로 보내고, contracts·platform·웹 표시를 해당 필드에만 맞춰 반영했다.
+- **Codex 구현, Claude 검수 완료.** runtime 결정에 따라 Tetragon file_access outcome과 `declared`·`fake_backend_test` 등급을 contracts 표와 platform 변환기에 반영하고 대조 기록을 작성했다. contracts는 DRAFT/0.x 그대로다.
+- `bundle verify --bundle-dir`와 `mvp --policy-bundle`을 추가했다. bundle 구조·중복 JSON 키·경로/링크 탈출·bytes/SHA-256·내부 schema·기간·대상을 시작 시 검증하고 역할별 적용 여부를 `/api/status`·`/api/policy`에 공개한다. bundle 자기신고 승인은 신뢰하지 않고 기존 승인 목록 검증을 사용한다.
+- runtime 전체 unittest는 397개 중 308개 통과·소켓 제한 89개 skip·실패 0개다. 새 bundle 시험 18개와 platform runtime 변환시험 40개는 전부 통과했고 contracts 검사는 `schemas=12 examples=11 errors=0`이다. platform 전체 pytest는 기존 venv에 update의 `guard`와 `yaml`이 없어 수집 단계에서 중단됐다.
+- Claude가 샌드박스 밖에서 재시험: runtime unittest 399개 전부 통과(skip 0), platform `uv run --with ../../update pytest` 96개 통과, web vitest 21개·`tsc -b` 통과, contracts 검사 오류 0. 예시 묶음(`contracts/examples/bundle`)으로 `mvp --policy-bundle` 실행 시 상태에 묶음 표시·요청 200, 정책 파일을 바꾼 묶음은 SHA-256 불일치로 시작 거부를 확인했다.
+- 미검증: 실제 변환에서 `revalidation-request`가 생성되지 않음, 원격 bundle 전달, hot reload, 실행 중 묶음 유효 기간 재확인. platform은 지정한 4개 미측정 개수만 `null`로 보존하고 나머지 `_nonneg` 처리는 유지한다.

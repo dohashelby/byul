@@ -110,6 +110,22 @@ python3 -m venv .venv
 | `--collector-interval 초` | `5` | 모의 엔진 상태·정보 수집 주기 |
 | `--collector-stale-after 초` | `15` | 마지막 성공 관측값을 오래됨으로 표시하는 기준 |
 
+### LAB 정책 묶음 수신
+
+같은 호스트의 관리 디렉터리에 놓인 `byul-policy-bundle/0.1` 묶음을 시작 시 한 번 검증해 적용할 수 있습니다.
+
+```bash
+# 구조·경로·파일 bytes/SHA-256·내부 schema·기간·대상을 확인만 함
+.venv/bin/python -m serving_runtime bundle verify --bundle-dir /path/to/bundle
+
+# 검증한 역할 파일을 기존 MVP 입력에 연결해 실행
+.venv/bin/python -m serving_runtime mvp --policy-bundle /path/to/bundle
+```
+
+`gateway_policy`는 필수이고 `policy_approvals`·`target`은 해당 기존 옵션에 연결합니다. `enforcement_intent`와 `exec_exceptions`는 Tetragon feed 등 기존 CLI 적용 조건을 만족할 때만 적용하며, 적용하지 못한 파일도 `/api/status`와 `/api/policy`의 `policy_bundle.files[].applied: false`로 남깁니다. `--policy-bundle`은 `--policy`, `--policy-approvals`, `--target`, `--observation-exceptions`, `--observation-intent`와 함께 쓸 수 없습니다.
+
+묶음의 `approval` 블록은 승인으로 신뢰하지 않습니다. `policy_approvals` 역할만 기존 승인 목록 검증에 사용합니다. 검증한 파일 바이트는 프로세스 전용 시작 스냅샷으로 고정하므로 관리 디렉터리의 새 묶음 적용에는 runtime 재시작이 필요합니다. 원격 전달과 hot reload는 아직 없습니다. 상세 결정은 `docs/결정기록_정책묶음_수신.md`에 있습니다.
+
 ### 정책 1.1과 상태 판정
 
 기존 `runtime-mvp/1.0` 정책은 그대로 로딩합니다. `runtime-mvp/1.1`은 선택 필드 `valid_from`·`valid_until`(시간대가 포함된 ISO8601), `approval_ref`를 추가합니다. 기간 필드가 없으면 무기한입니다. 1.0 문서에 이 필드를 넣으면 기존 엄격 검증에 따라 `UNKNOWN_FIELD`로 거부합니다. 예시는 `examples/mvp/policy-v1.1.json`입니다.

@@ -2,7 +2,7 @@
 # Field lists illustrate the pinned vLLM completion schema; review for your API.
 data_origin: EXAMPLE
 status: DRAFT
-pack: {id: PACK-BASELINE, revision: 27}
+pack: {id: PACK-BASELINE, revision: 28}
 values:
   REQ-01: {allowed_callers: [allowed]}
   REQ-03: {general_allowed_kinds: [inference]}

@@ -1,5 +1,7 @@
 # 77행 자동화 분류표 (요약)
 
+> 2026-10-26 후속 현행: 팩28/DRAFT·정책26점검/65경로·보안 규칙 연결14개·관측 전용1개다. PLT-07은 명시 all-process UID+netns의 금지 TCP 연결 성공 한 분기만 연결하며 전체 PASS·worker/SDK 송신은 미검증이다. LIF-04는 수집만 연결했다. 실제 vLLM 실증은 보류하며 아래 팩27 이하의 수치는 당시 기록으로 보존한다. 정본은 [77개 추적](CHECKLIST_VALIDATION_STATUS.md)과 [관측 보강](AUTOMATION_HARDENING.md)이다.
+
 > 2026-10-26 작업 후보: 팩27/DRAFT·정책25점검/54경로·보안 규칙 연결13개·관측 전용1개·실행기12종이다. PLT-01은 부분 수집의 독립 위반과 완전성 관문을 분리했다. PLT-02는 Unix IPC 접근 부분 범위이며 실제 엔진 시험은 보류했다. 기존 점검 재실증은 변경 영향이 있을 때만 해당 범위를 수행한다. 아래 팩26 이하·GUA PR의 현행 표기는 당시 기록이다. [관측 보강](AUTOMATION_HARDENING.md)를 따른다.
 
 > 2026-10-26 후속: 팩25/DRAFT·정책24점검/52경로·실행/보안 판정 규칙 연결12점검·관측 전용1점검이다. SUP-04는 실행 이미지 승인 부분관측, SUP-03은 readonly template 신원·승인 membership·API projection 관측 전용이며 승인 일치/불일치 모두 보안 UNKNOWN이다. 기존 실행기11종을 재사용한다. 실제 vLLM 실증은 사용자 결정으로 보류하며 아래 과거 기록은 소급하지 않는다. [공급물 관측 한계](AUTOMATION_HARDENING.md)·[77개 추적](CHECKLIST_VALIDATION_STATUS.md)을 따른다.

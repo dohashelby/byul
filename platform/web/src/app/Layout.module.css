@@ -22,6 +22,50 @@
   padding: 0 16px;
   border-bottom: 1px solid var(--border);
 }
+a.brand {
+  color: inherit;
+}
+a.brand:hover {
+  text-decoration: none;
+  background: var(--surface-2);
+}
+.areaSwitch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  margin: 8px 8px 0;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.areaTab {
+  padding: 4px 2px;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.areaTab:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+.areaTabActive {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.areaTitle {
+  display: block;
+  padding: 4px 8px 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
 .brandName {
   font-size: 14px;
   font-weight: 600;

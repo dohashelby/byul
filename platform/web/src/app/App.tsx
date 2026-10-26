@@ -4,6 +4,7 @@ import { DashboardPage } from "../pages/DashboardPage";
 import { DocListPage, EnvironmentEditorPage, PolicyEditorPage } from "../pages/DocumentsPage";
 import { EventsPage } from "../pages/EventsPage";
 import { EvidencePage } from "../pages/EvidencePage";
+import { LandingPage } from "../pages/LandingPage";
 import { RequestsPage } from "../pages/RequestsPage";
 import { ResultsPage } from "../pages/ResultsPage";
 import { RevalidationPage } from "../pages/RevalidationPage";
@@ -17,11 +18,11 @@ import { StateView } from "../components/Misc";
 import { Layout } from "./Layout";
 
 export const routes: RouteObject[] = [
+  // 첫 화면은 사이드바 없이 따로 띄운다.
+  { path: "/", element: <LandingPage /> },
   {
-    path: "/",
     element: <Layout />,
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
       { path: "environments", element: <DocListPage kind="environments" /> },
       { path: "environments/new", element: <EnvironmentEditorPage key="new" /> },
@@ -30,7 +31,6 @@ export const routes: RouteObject[] = [
       { path: "policies/new", element: <PolicyEditorPage key="new" /> },
       { path: "policies/:id", element: <PolicyEditorPage /> },
       { path: "update/results", element: <ResultsPage /> },
-      { path: "update/revalidation", element: <RevalidationPage /> },
       { path: "runtime/overview", element: <RuntimeOverviewPage /> },
       { path: "runtime/requests", element: <RequestsPage /> },
       { path: "runtime/policy", element: <RuntimePolicyPage /> },
@@ -41,8 +41,10 @@ export const routes: RouteObject[] = [
       { path: "runtime/enforce/:sub", element: <RuntimeEnforcePage /> },
       { path: "runtime/events", element: <EventsPage /> },
       { path: "runtime/settings", element: <RuntimeSettingsPage /> },
+      { path: "runtime/revalidation", element: <RevalidationPage /> },
       // 이전 주소 호환
       { path: "runtime/status", element: <Navigate to="/runtime/overview" replace /> },
+      { path: "update/revalidation", element: <Navigate to="/runtime/revalidation" replace /> },
       { path: "evidence", element: <EvidencePage /> },
       { path: "*", element: <StateView kind="not_found" detail="없는 화면입니다." /> },
     ],

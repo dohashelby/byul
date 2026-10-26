@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation, useSearchParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useSearchParams } from "react-router-dom";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { useDocList, useMeta, useRevalidation, useRuntimeStatus } from "../api/hooks";
 import { useRuntimeProblems, type RuntimeProblems } from "../pages/runtime/problems";
@@ -7,10 +7,33 @@ import { Banner, Dot } from "../components/Misc";
 import { SOURCE_MODE, label } from "../lib/labels";
 import { PERIODS, fromLocalInput, toLocalInput, type PeriodKey } from "../lib/time";
 import { carry, useGlobalFilters, useParams } from "../lib/url";
-import { NAV, titleFor } from "./nav";
+import { AREAS, areaFor, titleFor, type AreaKey } from "./nav";
 import l from "./Layout.module.css";
 
 const THEME_KEY = "byul-platform-theme";
+const AREA_KEY = "byul-platform-area";
+
+/** 마지막으로 있던 영역. 두 영역에 걸친 화면(증거 목록)에서 사이드바를 정하는 데만 쓴다. */
+function useArea(pathname: string): AreaKey {
+  const [last, setLast] = useState<AreaKey | null>(() => {
+    try {
+      return (sessionStorage.getItem(AREA_KEY) as AreaKey | null) ?? null;
+    } catch {
+      return null;
+    }
+  });
+  const area = areaFor(pathname, last);
+  useEffect(() => {
+    if (area === last) return;
+    setLast(area);
+    try {
+      sessionStorage.setItem(AREA_KEY, area);
+    } catch {
+      /* 저장 못 해도 주소로 영역을 정한다 */
+    }
+  }, [area, last]);
+  return area;
+}
 
 function storedTheme(): "light" | "dark" | null {
   try {
@@ -29,7 +52,7 @@ function effectiveDark(): boolean {
 }
 
 /** serving-runtime처럼 OS 설정을 따르고, 누르면 반대 모드를 기억한다. */
-function ThemeToggle() {
+export function ThemeToggle() {
   const [dark, setDark] = useState(false);
   useEffect(() => {
     const t = storedTheme();
@@ -64,6 +87,9 @@ function ThemeToggle() {
 
 function Sidebar() {
   const [params] = useSearchParams();
+  const { pathname } = useLocation();
+  const areaKey = useArea(pathname);
+  const current = AREAS.find((a) => a.key === areaKey)!;
   const meta = useMeta();
   const reval = useRevalidation();
   const keep = carry(params);
@@ -81,12 +107,26 @@ function Sidebar() {
 
   return (
     <aside className={l.sidebar}>
-      <div className={l.brand}>
+      <Link to={`/${keep}`} className={l.brand} title="첫 화면으로">
         <span className={l.brandName}>byul</span>
         <span className={l.brandTag}>PLATFORM</span>
+      </Link>
+      <div className={l.areaSwitch} role="tablist" aria-label="영역">
+        {AREAS.map((a) => (
+          <Link
+            key={a.key}
+            to={`${a.home}${keep}`}
+            role="tab"
+            aria-selected={a.key === current.key}
+            className={`${l.areaTab} ${a.key === current.key ? l.areaTabActive : ""}`}
+          >
+            {a.short}
+          </Link>
+        ))}
       </div>
-      <nav className={l.nav} aria-label="화면 영역">
-        {NAV.map((g) => (
+      <nav className={l.nav} aria-label={`${current.title} 화면`}>
+        <span className={l.areaTitle}>{current.title}</span>
+        {current.groups.map((g) => (
           <div key={g.title} className={l.group}>
             <span className={l.groupTitle}>{g.title}</span>
             {g.items.map((i) => (

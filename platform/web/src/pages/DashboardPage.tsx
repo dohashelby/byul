@@ -264,7 +264,7 @@ export function DashboardPage() {
                   dot={o.open_revalidation ? "warn" : "none"}
                   value={o.open_revalidation ?? "–"}
                   caption="열린 요청"
-                  onClick={() => go("/update/revalidation")}
+                  onClick={() => go("/runtime/revalidation")}
                   label="재검증 요청으로 이동"
                 >
                   {o.revalidation_error && <span style={{ color: "var(--error)" }}>{o.revalidation_error.message}</span>}

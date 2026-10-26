@@ -1,12 +1,11 @@
 id: PLT-10
 framework_id: CHK-PLT-010
+mechanism_ids:
+- mechanism-12
 revision: 2
 retired: false
 area: PLT
-purpose: 권한·자격 철회
-framework_purpose: 권한 철회
-mechanism_ids:
-- mechanism-12
+purpose: 권한 철회
 secondary_purposes: []
 question: 자격을 철회한 뒤 새 접근을 정한 기한 안에 거부하는가?
 scope: 기본; 선정 issuer·정책 캐시

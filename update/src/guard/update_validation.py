@@ -19,6 +19,9 @@ import tomllib
 
 from guard.application import merge_config, update_readiness
 from guard.collectors.file import load_environment, load_policy
+from guard.collectors.change import read_change, resolve_plan
+from guard.core.change_selection import build_context
+from guard.store import Store
 from guard.core.select import select
 from guard.models import Mode, load_pack
 from guard.update_acceptance import CHECKS, assess_update
@@ -269,12 +272,17 @@ def analyze_run(source: Path, output: Path, *, diagnostic: bool = False) -> dict
 
 
 def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared: dict,
-                *, timeout: int) -> dict:
+                *, timeout: int, change: str | None = None, previous_plan: str | None = None,
+                previous_store: Path | None = None) -> dict:
     """Delegate lifecycle and evidence operations to the existing product CLI."""
     summary = {"schema": SCHEMA, "mode": "execute", "accepted": False, "commands": [],
                "readiness": readiness, **declared, "problems": []}
     common = [arg for name in ("pack", "baseline", "candidate", "policy", "config")
               for arg in (f"--{name}", str(inputs[name]))]
+    if change is not None:
+        common += ["--change", str(change)]
+    if previous_plan is not None:
+        common += ["--previous-plan", previous_plan]
     cli = [sys.executable, "-m", "guard.cli"]
 
     def invoke(label, args):
@@ -284,7 +292,8 @@ def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared
         summary["commands"].append(record)
         return record["returncode"] == 0 and not record.get("timed_out", False), stdout
 
-    ok, prepare_output = invoke("prepare-update", ["prepare-update", *common])
+    prepare_store = ["--store", str(previous_store)] if previous_store is not None else []
+    ok, prepare_output = invoke("prepare-update", ["prepare-update", *common, *prepare_store])
     try:
         latest = json.loads(prepare_output)
         support = _support_ready(latest)
@@ -296,6 +305,17 @@ def execute_run(inputs: dict[str, Path], output: Path, readiness: dict, declared
         summary["stage"] = "preparation-insufficient"
         return summary
     store = output / "store"
+    if previous_store is not None:
+        source_before = inventory_tree(previous_store)
+        exported, _ = invoke("export-previous", ["evidence", "export", "--store", str(previous_store),
+                                                "--output", str(output / "previous.zip")])
+        restored, _ = invoke("restore-previous", ["evidence", "restore", "--bundle", str(output / "previous.zip"),
+                                                 "--destination", str(store)]) if exported else (False, "")
+        summary["previous_source_unchanged"] = inventory_tree(previous_store) == source_before
+        if not restored or not summary["previous_source_unchanged"]:
+            summary["problems"].append("previous store could not be copied without modification")
+            summary["stage"] = "preparation-insufficient"
+            return summary
     summary["as_of"] = datetime.now(timezone.utc).isoformat()
     updated, _ = invoke("update", ["update", *common, "--store", str(store), "--output", str(output / "updates"),
                                  "--as-of", summary["as_of"]])
@@ -358,6 +378,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("pack", "baseline", "candidate", "policy", "config"):
         parser.add_argument(f"--{name}", type=Path)
+    parser.add_argument("--change", help="CHG input file or exact stored Ref")
+    parser.add_argument("--previous-plan", help="explicit previous PLAN Ref")
+    parser.add_argument("--previous-store", type=Path, help="read-only source for previous PLAN/CHG; copied before execution")
     parser.add_argument("--output", type=Path, required=True, help="new directory outside all source inputs")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--execute", action="store_true", help="opt in to product CLI sequential local CPU engines")
@@ -369,7 +392,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--command-timeout must be in [1,7200]")
     try:
         if args.analyze_existing:
-            if any(getattr(args, name) for name in ("pack", "baseline", "candidate", "policy", "config")):
+            if any(getattr(args, name) for name in ("pack", "baseline", "candidate", "policy", "config",
+                                                   "change", "previous_plan", "previous_store")):
                 raise ValueError("existing-run analysis uses stored inputs; do not supply fresh input files")
             summary = analyze_run(args.analyze_existing, args.output, diagnostic=args.diagnostic)
             code = 0 if summary["accepted"] else 1
@@ -386,11 +410,30 @@ def main(argv: list[str] | None = None) -> int:
                 raise PreparationInputError(input_failure(issues)["guidance"])
             pack, policy, cfg = loaded["pack"], loaded["policy"], loaded["config"]
             envs = [loaded[name] for name in ("baseline", "candidate")]
+            if args.previous_plan is not None and args.previous_store is None:
+                raise ValueError("--previous-plan requires --previous-store in the acceptance harness")
+            source = Store.read_only(args.previous_store) if args.previous_store is not None else None
+            change_input = read_change(args.change, pack, source)
+            previous = resolve_plan(source, args.previous_plan)
+            extra = {}
+            if change_input is not None or previous is not None:
+                build_context(source, previous, pack, envs, policy, cfg,
+                              change_input.change if change_input else None, mode=Mode.update, read_only=True)
+                extra = {"change": change_input, "previous_plan": previous, "source_store": source}
             try:
                 declared = validate_inputs(pack, envs, policy, cfg)
             except Exception as exc:
                 raise PreparationInputError(input_failure([contract_issue(exc)])["guidance"]) from exc
+            if extra:
+                declared["u1_inputs"] = {"change": change_input.change.ref().model_dump(mode="json") if change_input else None,
+                    "previous_plan": previous.ref().model_dump(mode="json") if previous else None,
+                    "previous_store": str(args.previous_store) if args.previous_store is not None else None}
             protected = [inputs["pack"], *(inputs[name].parent for name in ("baseline", "candidate", "policy", "config"))]
+            if args.previous_store is not None:
+                protected.append(args.previous_store)
+            if args.change is not None and Path(args.change).is_file():
+                inputs["change"] = Path(args.change).resolve()
+                protected.append(inputs["change"].parent)
             for side in ("baseline", "candidate"):
                 launch = merge_config(cfg, cfg.get("sides", {}).get(side, {})).get("vllm", {})
                 if launch.get("models_dir"):
@@ -400,10 +443,12 @@ def main(argv: list[str] | None = None) -> int:
             pack_files = inventory_tree(inputs["pack"])
             _new_json(output / "inputs.json", {"schema": SCHEMA, "inputs": input_hashes,
                                                "pack": pack.ref().model_dump(mode="json"), "pack_files": pack_files})
-            readiness = annotate(update_readiness(pack, envs, policy, cfg))
+            readiness = annotate(update_readiness(pack, envs, policy, cfg, **extra))
             ready = _support_ready(readiness)
             if args.execute and ready:
-                summary = execute_run(inputs, output, readiness, declared, timeout=args.command_timeout)
+                run_extra = {"change": args.change, "previous_plan": args.previous_plan,
+                             "previous_store": args.previous_store} if extra else {}
+                summary = execute_run(inputs, output, readiness, declared, timeout=args.command_timeout, **run_extra)
                 code = 0 if summary["accepted"] else (2 if summary.get("stage") == "preparation-insufficient" else 1)
             else:
                 summary = {"schema": SCHEMA, "mode": "preparation", "stage": "ready" if ready else "preparation-insufficient",

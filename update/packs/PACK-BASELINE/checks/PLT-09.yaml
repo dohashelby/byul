@@ -1,12 +1,11 @@
 id: PLT-09
 framework_id: CHK-PLT-009
+mechanism_ids:
+- mechanism-16
 revision: 2
 retired: false
 area: PLT
-purpose: 상대 확인·전송 보호
-framework_purpose: 통신 상대·전송 보호
-mechanism_ids:
-- mechanism-16
+purpose: 통신 상대·전송 보호
 secondary_purposes: []
 question: 엔진에서 기록 수집기와 최종 저장소까지 필요한 전송 보호가 유지되는가?
 scope: 조건부; 외부 수집·저장 경로

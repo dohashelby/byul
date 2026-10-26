@@ -1,13 +1,12 @@
 id: PLT-08
 framework_id: CHK-PLT-008
-revision: 2
-retired: false
-area: PLT
-purpose: 상대 확인·전송 보호
-framework_purpose: 통신 상대·전송 보호
 mechanism_ids:
 - mechanism-01
 - mechanism-16
+revision: 2
+retired: false
+area: PLT
+purpose: 통신 상대·전송 보호
 secondary_purposes: []
 question: API·내부 통신의 각 구간에서 통신 상대 인증과 기밀성·무결성 기준을 지키는가?
 scope: API·기본 IPC/TP; 다중 노드·PP는 선택

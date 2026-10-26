@@ -1,12 +1,11 @@
 id: OBS-11
 framework_id: CHK-OBS-011
+mechanism_ids:
+- mechanism-17
 revision: 3
 retired: false
 area: OBS
-purpose: 증거의 신뢰성
-framework_purpose: 실행 상태 관측·수집 건전성
-mechanism_ids:
-- mechanism-17
+purpose: 실행 상태 관측·수집 건전성
 secondary_purposes: []
 question: 기록 수집 중단·누락·시각 오류를 표시하고, 증거가 부족한 시험은 미확인으로 처리하는가?
 scope: 필수 관측 경로

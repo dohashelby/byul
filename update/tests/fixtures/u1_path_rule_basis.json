@@ -1,0 +1,3271 @@
+{
+  "schema": "guard.u1-path-rule-basis/1",
+  "dataset_role": "DEVELOPMENT_REGRESSION",
+  "independent_evaluation": false,
+  "human_review_status": "PENDING",
+  "source_repository": "https://github.com/vllm-project/vllm.git",
+  "source_commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+  "source_tag": "v0.32.0",
+  "previous_rules_sha256": "6575db4d5d69d93a7e45415fa38f863cbb694993d9f5a6980c19a0b189d271d0",
+  "limitations": [
+    "대표 소스와 계열 책임을 검토한 부분 정답이다. 모든 파일·보안 영향의 완전한 정답이 아니다.",
+    "분류기 출력을 정답으로 복사하지 않았다. 이미 검토한 릴리스 자료이므로 독립 평가가 아니다.",
+    "기존 제외 규칙은 확대하지 않았다. test.rs·fixture가 남아 있으면 실제 미분류 또는 보수적 계열 분류로 남긴다.",
+    "GENERIC catchall 제거로 새 미분류가 늘 수 있다. 이는 알려지지 않은 변경을 표시 전용 category로 숨기지 않기 위함이다.",
+    "원래 미분류 69개 전수 검토도 개발·회귀 자료이며 human_pending을 유지한다. 광범위 sampling/lora/metrics 이름 규칙은 대표 책임 검토만 했고 전면 정확성을 입증하지 않았다."
+  ],
+  "groups": [
+    {
+      "id": "auth-boundary",
+      "scope": "인증 middleware 두 파일",
+      "reason": "Bearer 토큰 비교·guarded route의 401 거부를 구현한 파일만 AUTH에 연결한다.",
+      "source": [
+        {
+          "path": "vllm/entrypoints/serve/middleware/authenticate.py",
+          "sha256": "ceb576aa3c053a5bcf145cfbe3f81def0f7213480c4aa1531fc4c00e32955225",
+          "anchor": "AuthenticationMiddleware.verify_token"
+        },
+        {
+          "path": "rust/src/server/src/middleware/auth.rs",
+          "sha256": "39c2cc30603291d0c2717f03d72a49e5646aa21068694f2bd232718491096383",
+          "anchor": "authenticate_api_key / verify_token"
+        }
+      ],
+      "counterexample": "vllm/entrypoints/serve/middleware/x_request_id.py는 API_ROUTE만 해당한다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "response-stream",
+      "scope": "응답 이벤트와 요청별 출력 stream",
+      "reason": "SSE 또는 요청별 응답 이벤트 스트림이며 모델 파일·미디어 디코더의 stream과 구분한다.",
+      "source": [
+        {
+          "path": "vllm/entrypoints/openai/responses/streaming_events.py",
+          "sha256": "189b0e281569a5c0d14959cac7f325ca4097d09196f32a80119fb4f3494cd218",
+          "anchor": "StreamingState / emit_text_delta_events"
+        },
+        {
+          "path": "rust/src/chat/src/stream.rs",
+          "sha256": "c5a30b766fe51f4005b0fdea01014dd7cb507f8d1588f34a055551ba66fc1ea9",
+          "anchor": "ChatEventStream"
+        }
+      ],
+      "counterexample": "vllm/model_executor/model_loader/runai_streamer_loader.py는 MODEL_LOADING이며 STREAMING이 아니다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "modern-models",
+      "scope": "vllm/models/ 모델 구현 계열",
+      "reason": "기존 model_executor/models와 같은 모델 가중치 적재 및 forward 연산 계열로 연결한다.",
+      "source": [
+        {
+          "path": "vllm/models/deepseek_v4/nvidia/model.py",
+          "sha256": "c4472e9b8cd6529724fd056b948e0da8675b544ad8d2a3afa98d7a8e1dd985aa",
+          "anchor": "default_weight_loader / DeepseekV4MLP / load_weights"
+        }
+      ],
+      "counterexample": "vllm/models_extra/example.py는 이 접두어에 포함하지 않는다.",
+      "limitation": "모델 계열 전체의 두 category 합집합이므로 __init__·ops마다 적재와 실행을 모두 바꿨다는 주장이 아니다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "kernel-implementations",
+      "scope": "커널·수치 연산·커널 제공 모듈",
+      "reason": "양자화 선형 커널·custom ops·deterministic matmul·Triton/CuTe helper의 실행 관련 범위다.",
+      "source": [
+        {
+          "path": "vllm/model_executor/kernels/linear/base.py",
+          "sha256": "debd97cebac77a33664c3d406e12e68a691bbc674c3f7e347ea5c5e5ea9e7617",
+          "anchor": "MMLinearKernel"
+        },
+        {
+          "path": "vllm/_custom_ops.py",
+          "sha256": "36428c27bad9bf5ffe5debf9e34bccbc888adb68ad3eb972f6c9ff080e7f683e",
+          "anchor": "paged_attention_rocm / rms_norm"
+        },
+        {
+          "path": "vllm/model_executor/determinism/batch_invariant.py",
+          "sha256": "94e2f6453ad61dd085def8c95c64555b91fd8547e695fca3d530ae6a85b712b5",
+          "anchor": "_matmul_launch_metadata"
+        },
+        {
+          "path": "vllm/cute_utils/_tcgen05.py",
+          "sha256": "aff413f9f9d11fe49af7f38ee1ab7651c3d1b8bdbf0217af2570618377b09d8f",
+          "anchor": "mma_f16 / alloc"
+        },
+        {
+          "path": "vllm/triton_utils/importing.py",
+          "sha256": "3c36659b66aaafb06daec6515ed511efb24a4cb76060eaba2ee82b51f24b0836",
+          "anchor": "HAS_TRITON backend availability"
+        }
+      ],
+      "counterexample": "vllm/model_executor/kernels_extra/example.py는 미분류로 남긴다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "kernel-warmup",
+      "scope": "model_executor/warmup/",
+      "reason": "모델 실행 커널의 JIT·autotune 준비를 하므로 실행 및 컴파일 영역을 보수적으로 함께 연결한다.",
+      "source": [
+        {
+          "path": "vllm/model_executor/warmup/kernel_warmup.py",
+          "sha256": "5eb35e459feaa5656d5365abb3b442ae5fd896193b4053b5c7ac8764e91aa829",
+          "anchor": "Warmup kernels used during model execution / JIT"
+        }
+      ],
+      "counterexample": "일반 파일명의 cache를 request CACHE로 연결하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "device-memory",
+      "scope": "device_allocator/",
+      "reason": "sleep mode를 위한 device allocation 관리로 실행기 메모리 경계와 관련된다.",
+      "source": [
+        {
+          "path": "vllm/device_allocator/cumem.py",
+          "sha256": "60a7d50d96eb9f9542d58346f29c4b01f266556efb194257829ba4c241ea8d05",
+          "anchor": "cumem-based pytorch pluggable allocator to implement sleep mode"
+        }
+      ],
+      "counterexample": "device_allocator_extra/는 포함하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "request-cache",
+      "scope": "KV·encoder·multimodal 요청 상태의 명시적 경로",
+      "reason": "일반 memoization·가중치 캐시와 구분해 요청 상태와 블록 수명에 관련된 파일만 연결한다.",
+      "source": [
+        {
+          "path": "vllm/v1/core/block_pool.py",
+          "sha256": "6d1e0d89b43e3b2ae396906b9c2f0551dbe192b60d05f8c1ca2d93a91bbbeea3",
+          "anchor": "BlockHashToBlockMap / BlockPool"
+        },
+        {
+          "path": "vllm/distributed/ec_transfer/ec_connector/cpu/scheduler/embedding_cache.py",
+          "sha256": "a90e991ac30163bd00f6501b1c66389e92fa6a9c556a17070982e8336f350593",
+          "anchor": "EmbeddingCache"
+        }
+      ],
+      "counterexample": "vllm/utils/cache.py, model_loader/weight_cache/, compilation/*cache*는 CACHE가 아니다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "cache-offload",
+      "scope": "KV offload·HiSparse·KV transport",
+      "reason": "KV 상태 보존·이동 경로다. P2P transport와 shared mmap만 IPC를 추가한다.",
+      "source": [
+        {
+          "path": "vllm/v1/kv_offload/base.py",
+          "sha256": "8dea4e6cf774b15aa0fe0f9399f5ae53d32d976489f3251cf8d5620fe9e059dd",
+          "anchor": "Core abstractions for KV cache offloading"
+        },
+        {
+          "path": "vllm/v1/simple_kv_offload/manager.py",
+          "sha256": "3d076547bc16729e1c91238315c384fcfddf9cfd1f1e418d430ae542b7b8e1e5",
+          "anchor": "BlockStoreMeta / TransferMeta"
+        },
+        {
+          "path": "vllm/v1/hisparse/runtime.py",
+          "sha256": "a533d4a28ba9d3bbcdf065201f0a40fd8b45bfc3bec5cfd47c093ebffd5cc541",
+          "anchor": "NVIDIA HiSparse resident, host, and hot-cache data plane"
+        },
+        {
+          "path": "vllm/v1/kv_offload/tiering/p2p/control/zmq.py",
+          "sha256": "f0600d27335493d06ca3b966d5cf6a4c249ed32efd026cd5fdee2a16579117f9",
+          "anchor": "ZMQ-based transport layer for P2P KV cache sharing"
+        },
+        {
+          "path": "vllm/v1/kv_offload/cpu/shared_offload_region.py",
+          "sha256": "7ac04febeb8ff920fb350f7f6cfef366bd12c216a226980a4150c60cc6016cf9",
+          "anchor": "shared mmap / _wait_for_file_size"
+        }
+      ],
+      "counterexample": "기본 offload 파일을 모두 DISTRIBUTED_IPC로 간주하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "attention",
+      "scope": "v1/attention/",
+      "reason": "AttentionBackend와 KVCacheSpec 및 forward 인터페이스가 결합된 attention 실행 영역이다.",
+      "source": [
+        {
+          "path": "vllm/v1/attention/backend.py",
+          "sha256": "981ec1fc4b84d085838d73c209bf058d732804f5112271e12c8e10fe648177ed",
+          "anchor": "AttentionBackend / KVCacheSpec / AttentionImplBase"
+        }
+      ],
+      "counterexample": "vllm/v1/attention_extra/a.py는 포함하지 않는다.",
+      "limitation": "계열의 CACHE·RUNNER_KERNEL 합집합이며 개별 커널마다 cache 정책이 바뀌었다는 주장이 아니다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "scheduler-interface",
+      "scope": "v1/core/sched/",
+      "reason": "SchedulerInterface와 SchedulerOutput의 선정·자원 배정 경계다.",
+      "source": [
+        {
+          "path": "vllm/v1/core/sched/interface.py",
+          "sha256": "ae946f9beb96941498bb1003893615d8b2203e60fa83fb29ce128fb747d84a25",
+          "anchor": "SchedulerInterface / SchedulerOutput"
+        }
+      ],
+      "counterexample": "sched 이름만 포함하는 임의 경로는 연결하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "speculative-decoding",
+      "scope": "v1/spec_decode/",
+      "reason": "모델 proposer 실행과 후보 토큰 샘플링 연산의 영역이다.",
+      "source": [
+        {
+          "path": "vllm/v1/spec_decode/llm_base_proposer.py",
+          "sha256": "8df7969c47e177dd8940303680f65ac8a71f316af5108977316281887b91769b",
+          "anchor": "SpecDecodeBaseProposer / compute_probs_and_sample_next_token"
+        }
+      ],
+      "counterexample": "이 영역은 HTTP STREAMING으로 간주하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "pooling",
+      "scope": "v1/pool/",
+      "reason": "worker 측 late-interaction 수치 실행과 결과 후처리다.",
+      "source": [
+        {
+          "path": "vllm/v1/pool/late_interaction_runner.py",
+          "sha256": "844ead7a112353f4937914ffdcfc8f17be1bc6bc54813f1e229ba5c42ac57594",
+          "anchor": "LateInteractionRunner: Worker-side state and postprocessing"
+        }
+      ],
+      "counterexample": "이름에 pool이 있다는 이유로 CACHE로 연결하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "sampling-watermark",
+      "scope": "v1/watermarking/",
+      "reason": "logits와 sampled token을 받는 GPU watermark sampler 계열이다.",
+      "source": [
+        {
+          "path": "vllm/v1/watermarking/watermarker.py",
+          "sha256": "058d23fc6f5aa4051554960aeff035f79c0bc2cc7d615f75ada282bdc45735fe",
+          "anchor": "WatermarkSample / RandomSampler / Watermarker"
+        }
+      ],
+      "counterexample": "새 정책·watermark 보안 판정이나 지원을 주장하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "cudagraph-dispatch",
+      "scope": "v1/cudagraph_dispatcher.py",
+      "reason": "미리 준비한 cudagraph capture/replay 실행키를 선택하는 경계다.",
+      "source": [
+        {
+          "path": "vllm/v1/cudagraph_dispatcher.py",
+          "sha256": "105c8f6406e7b8626466c773b970d431d698fc0e298c5812c0c4ce51b6d33326",
+          "anchor": "CudagraphDispatcher"
+        }
+      ],
+      "counterexample": "cache라는 임의 이름만으로 이 영역을 확장하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "output-parser",
+      "scope": "vllm/parser/",
+      "reason": "토큰 출력에서 chat·reasoning·tool 구조를 복원하는 parser 영역이다.",
+      "source": [
+        {
+          "path": "vllm/parser/abstract_parser.py",
+          "sha256": "35810e909e8927fa087d5dfbdaa85bb3d2920faa51dae6b6780c8b1a915f4368",
+          "anchor": "Parser / DelegatingParser / structured_outputs_to_format"
+        }
+      ],
+      "counterexample": "vllm/parser_extra/는 포함하지 않는다.",
+      "limitation": "OUTPUT_PARSING은 기존 팩에 대응 점검이 없어 체크리스트 공백으로 남는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "constrained-output",
+      "scope": "v1/structured_output/",
+      "reason": "grammar를 생성하고 샘플링 가능한 토큰을 제한하는 영역이다.",
+      "source": [
+        {
+          "path": "vllm/v1/structured_output/__init__.py",
+          "sha256": "cfd425138e30ad21fef8849edfe1e7d73f2826a1db28fc33a348d6882f0c1b66",
+          "anchor": "StructuredOutputManager"
+        },
+        {
+          "path": "vllm/v1/structured_output/backend_xgrammar.py",
+          "sha256": "1f9a431b38ab980e2a5afd28fcd2eeb5663ce1b147b30ae4e96b3d2eadcc68cf",
+          "anchor": "XgrammarBackend / GrammarMatcher"
+        }
+      ],
+      "counterexample": "일반 요청 validation 전체로 확대하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "tokenizer",
+      "scope": "vllm/tokenizers/",
+      "reason": "tokenizer 선택·적재와 입력 인코딩 인터페이스이며 detokenizer helper는 출력에도 연결한다.",
+      "source": [
+        {
+          "path": "vllm/tokenizers/protocol.py",
+          "sha256": "15ec34808171509114ce97dd1fa903475ce2e4699a862321e3f59c075518573c",
+          "anchor": "TokenizerLike.from_pretrained"
+        },
+        {
+          "path": "vllm/tokenizers/registry.py",
+          "sha256": "98e13b7df7457cdbd6008756faca2ec4e3af2c5410b62c4c73eb2c1134982b6a",
+          "anchor": "get_tokenizer / resolve_tokenizer_args"
+        }
+      ],
+      "counterexample": "모든 tokenizer 변경을 REMOTE_CODE나 PLUGIN으로 확정하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "input-renderer",
+      "scope": "renderers의 확인한 입력·template 파일",
+      "reason": "메시지·입력 구조를 prompt/template로 만드는 확인된 파일만 연결하고 output derenderer는 분리한다.",
+      "source": [
+        {
+          "path": "vllm/renderers/base.py",
+          "sha256": "ec2fe84538bb30ad7ed1e10833081c8c389e6a2f8fda1dcef50005b9db75a1a7",
+          "anchor": "BaseRenderer"
+        },
+        {
+          "path": "vllm/renderers/hf.py",
+          "sha256": "da50b54985ba82cb261db3e1eda304e2e0c8f8fd484baacc35cf94eb2a783043",
+          "anchor": "load_chat_template"
+        },
+        {
+          "path": "vllm/renderers/deepseek_v4.py",
+          "sha256": "f7175f9980550e5ccfcc94fcebfdeee113eee66efc7cd1ec539d5b2af1f0d8cd",
+          "anchor": "render_messages / _apply_chat_template"
+        },
+        {
+          "path": "vllm/renderers/inputs/preprocess.py",
+          "sha256": "7890fa28f8594107fb2ff2c61e07ea045912e423d47111254bbccd381034b813",
+          "anchor": "prompt_to_seq / conversation_to_seq"
+        }
+      ],
+      "counterexample": "renderers/online_derenderer.py는 TEMPLATE가 아니다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "output-derenderer",
+      "scope": "renderers/online_derenderer.py",
+      "reason": "token 출력과 parser 상태를 외부 응답 구조로 변환한다.",
+      "source": [
+        {
+          "path": "vllm/renderers/online_derenderer.py",
+          "sha256": "b69ab786cee22a1928b3a5ae5a02f9dfe0fbe62536574ac80f4f212c170cefc6",
+          "anchor": "OnlineDerenderer / _resolve_logprobs"
+        }
+      ],
+      "counterexample": "renderer라는 부모 이름만으로 INPUT_PROCESSING·TEMPLATE를 부여하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "rust-output-parser",
+      "scope": "Rust parser의 src 및 Python binding src",
+      "reason": "Rust crate는 Streaming parsers for chat completions로 선언하고 tool·reasoning·unified parser를 노출한다.",
+      "source": [
+        {
+          "path": "rust/src/parser/src/lib.rs",
+          "sha256": "98cb38549b3232b28907e1e14c71733b461af3d50dafd33ab64351ff0d231af3",
+          "anchor": "Streaming parsers for chat completions"
+        }
+      ],
+      "counterexample": "rust/src/parser/Cargo.toml은 DEPENDENCY이고 OUTPUT_PARSING은 아니다.",
+      "limitation": "Rust parser의 HTTP 사용·런타임 도달·신규 점검 지원은 확인하지 않았다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "rust-renderer",
+      "scope": "Rust chat renderer·multimodal·HF backend",
+      "reason": "chat 입력 template 렌더링과 모델/tokenizer 파일 사용 경계다.",
+      "source": [
+        {
+          "path": "rust/src/chat/src/backend/hf.rs",
+          "sha256": "c700b5394e00cbc1211589721f12c3db7c248ef5904e38a9393741b5a4b06c22",
+          "anchor": "load_model_config / load_response_template / default_chat_template_kwargs"
+        },
+        {
+          "path": "rust/src/chat/src/lib.rs",
+          "sha256": "40de853f33fc03e16dfc0e9801a58f3ab2aee2b38871220d6d738c09a3825d93",
+          "anchor": "messages -> rendered prompt -> tokenized prompt -> engine request"
+        }
+      ],
+      "counterexample": "rust/src/chat/src/output/는 입력 template로 분류하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "rust-output",
+      "scope": "Rust chat/text output 및 오류 경계",
+      "reason": "토큰 decoding을 event/block으로 조립하는 후처리와 오류 표현을 구분한다.",
+      "source": [
+        {
+          "path": "rust/src/chat/src/output/default/unified.rs",
+          "sha256": "813e0356fe72c01dcc3716c5b2b2405b0c2467d4f891284551987e01e73220c9",
+          "anchor": "between low-level token decoding and final block assembly"
+        },
+        {
+          "path": "rust/src/text/src/output/mod.rs",
+          "sha256": "b8b3a93bbde4cda04fb226dc195d0ac98ef8d2f062bea56ff547916c38b2f0af",
+          "anchor": "decoded_text_event_stream / CollectedTextOutput"
+        }
+      ],
+      "counterexample": "출력 파일만으로 HTTP auth 처리나 사용자를 확인했다고 하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "rust-input",
+      "scope": "Rust chat/text request 및 lowering",
+      "reason": "request prompt·sampling·LoRA 필드를 보유하고 token 범위를 검증해 engine request로 lowering한다.",
+      "source": [
+        {
+          "path": "rust/src/chat/src/request.rs",
+          "sha256": "081f3985656bf56d15addfa0ce432aaabf23c5dcfd36f10e2f7722a7d7e00b86",
+          "anchor": "ChatRequest / LoraRequest / SamplingParams"
+        },
+        {
+          "path": "rust/src/text/src/request.rs",
+          "sha256": "acc5751344fdfcf4ece3856dd599ce3f154b2ef11df37d4ac00c302e4d227f1d",
+          "anchor": "Prompt / SamplingParams / TextRequest"
+        },
+        {
+          "path": "rust/src/text/src/lower.rs",
+          "sha256": "9ab37a652a5e5d58a3b77dc21e7382f29d53829a00e83fa5c1c43596b96b1ecc",
+          "anchor": "lower_text_request / validate_prompt_token_ids"
+        }
+      ],
+      "counterexample": "확인하지 않은 Rust llm crate 전체를 이 category로 덮지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "rust-tokenizer",
+      "scope": "Rust tokenizer src",
+      "reason": "tokenizer 적재·인코딩과 incremental decoding/attribution을 제공한다.",
+      "source": [
+        {
+          "path": "rust/src/tokenizer/src/hf.rs",
+          "sha256": "af66c51a790cfd11a4f66611adf2091d1ad9c2885e05f6156d6c226287ac7b1c",
+          "anchor": "HuggingFaceTokenizer / decoder / load_tokenizer_json_with_extra_tokens"
+        }
+      ],
+      "counterexample": "rust/src/tokenizer/Cargo.toml은 이 접두어에 포함하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "rust-protocol",
+      "scope": "control.proto / inference.proto",
+      "reason": "명시적 RPC 요청·응답 schema다. inference에 GenerateStream과 RandomSampling 필드가 있다.",
+      "source": [
+        {
+          "path": "rust/proto/inference.proto",
+          "sha256": "a3f653aeadd4fd92b0bc5f9ff6dd12cb8c199b73fbb255099294dd1b9b12a717",
+          "anchor": "service Inference / GenerateStream / RandomSampling"
+        }
+      ],
+      "counterexample": "proto 경로 전체를 API 구현의 런타임 도달로 주장하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "rust-dependency",
+      "scope": "확인한 Cargo manifest/lock",
+      "reason": "Rust workspace 의존성 변경이므로 기존 DEPENDENCY→SUP-04를 사용한다.",
+      "source": [
+        {
+          "path": "rust/Cargo.toml",
+          "sha256": "cf593237d4634a5fe43ba61fa2b190b851ed9756496a4c689d9fc05dbd17d7c6",
+          "anchor": "workspace.dependencies"
+        }
+      ],
+      "counterexample": "Cargo manifest를 parser 런타임 구현으로 분류하지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "rust-cli",
+      "scope": "Rust cmd CLI의 확인한 파일",
+      "reason": "vllm-rs argument definitions이며 CLI_OPTION의 기존 표시 전용 계약을 유지한다.",
+      "source": [
+        {
+          "path": "rust/src/cmd/src/cli.rs",
+          "sha256": "bf574cc38e03111ecb62dc4bea498eb676749a4241417a82ae21b378498c9d06",
+          "anchor": "CLI argument definitions for the vllm-rs binary"
+        }
+      ],
+      "counterexample": "cmd crate 전체를 GENERIC으로 덮지 않는다.",
+      "limitation": "경로 기반의 보수적 관련 영역이며 런타임 사용·취약성·도달을 확인하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "import-boundary",
+      "scope": "utils/import_utils.py만",
+      "reason": "동적 import, 선택 의존성 사용 가능성 확인 및 torchcodec import 오류 메시지 처리를 포함한다. 파일 단위의 보수적 책임 합집합이다.",
+      "source": [
+        {
+          "path": "vllm/utils/import_utils.py",
+          "sha256": "81251955f856bed95dc71e62f7bb2cdfaac1bdc3c551494422530758fa972488",
+          "anchor": "import_from_path / resolve_obj_by_qualname / LazyLoader / check_torchcodec_available"
+        }
+      ],
+      "counterexample": "utils/ 전체를 PLUGIN으로 분류하지 않는다. v0.25.1의 변경은 torchcodec 오류 메시지 절단이며 plugin 허용 정책이 바뀌었다는 근거는 아니다.",
+      "limitation": "PLUGIN·DEPENDENCY는 파일 전체 책임의 보수적 추가 연결이다. 바뀐 함수가 이 점검 모두를 반드시 필요로 한다는 정답으로 사용하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "input-template-boundary",
+      "scope": "입력 chat template fallback만의 확인된 경로",
+      "reason": "response_template 출력 grammar와 입력 chat template를 분리한다. Rust 입력 renderer는 기존 prefix 규칙을 유지한다.",
+      "source": [
+        {
+          "path": "vllm/transformers_utils/chat_templates/registry.py",
+          "sha256": "7110db39db402e11acd2bc6ef3324f59f1ea56d10c9113bc2859e6239734b381",
+          "anchor": "get_chat_template_fallback_path"
+        }
+      ],
+      "counterexample": "vllm/parser/response_template.py와 rust/src/parser/src/unified/hf/template.rs는 OUTPUT_PARSING이며 TEMPLATE가 아니다.",
+      "limitation": "이미 검토한 파일의 정밀화다. 임의 이름의 template를 입력 template로 추정하지 않는다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    },
+    {
+      "id": "review69-exact-files",
+      "scope": "original69_review에 근거가 있는 정확한 파일 경로만",
+      "reason": "원래 69개·124면의 원본 바이트와 실제 delta를 대조했다. 각 파일 책임·category·반례는 original69_review.records에 기록한다.",
+      "source": [
+        {
+          "path": "vllm/config/attention.py",
+          "sha256": "b4edcdd256404813e4483b7669b2b946775f7ed12fed44360d1b46a0807286da",
+          "anchor": "AttentionConfig"
+        },
+        {
+          "path": "vllm/utils/network_utils.py",
+          "sha256": "c809593e6b3c297f64675515ce64cdc1b0aaaeab328743f8ccc33b85d55d23a6",
+          "anchor": "ZmqListener"
+        },
+        {
+          "path": "vllm/v1/engine/detokenizer.py",
+          "sha256": "b9e23b5714b80fbccbff3149541f690bc3ff1d41b064f27bfa7fe85b2bc15476",
+          "anchor": "uses_fast_detokenizer"
+        }
+      ],
+      "counterexample": "config/vllm.py·utils/torch_utils.py·snapshot/runtime.py 및 모든 신규 unreviewed.py는 미분류로 유지한다.",
+      "limitation": "파일 책임의 보수적 합집합이며 모든 함수의 영향·호출 전파·런타임 도달·보안 판정의 정답은 아니다.",
+      "review_status": "AGENT_REVIEWED_HUMAN_PENDING"
+    }
+  ],
+  "examples": [
+    {
+      "id": "modern-model",
+      "path": "vllm/models/deepseek_v4/nvidia/model.py",
+      "categories": [
+        "MODEL_LOADING",
+        "RUNNER_KERNEL"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "modern-model-prefix-boundary",
+      "path": "vllm/models_extra/model.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "kernel",
+      "path": "vllm/model_executor/kernels/linear/base.py",
+      "categories": [
+        "RUNNER_KERNEL"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "kernel-prefix-boundary",
+      "path": "vllm/model_executor/kernels_extra/base.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "attention",
+      "path": "vllm/v1/attention/backend.py",
+      "categories": [
+        "CACHE",
+        "RUNNER_KERNEL"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "attention-prefix-boundary",
+      "path": "vllm/v1/attention_extra/backend.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "allocator",
+      "path": "vllm/device_allocator/cumem.py",
+      "categories": [
+        "RUNNER_KERNEL"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "warmup-not-request-cache",
+      "path": "vllm/model_executor/warmup/flashinfer_autotune_cache.py",
+      "categories": [
+        "COMPILE_CACHE",
+        "RUNNER_KERNEL"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "compile-not-request-cache",
+      "path": "vllm/compilation/example_cache.py",
+      "categories": [
+        "COMPILE_CACHE"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "weight-not-request-cache",
+      "path": "vllm/model_executor/model_loader/weight_cache/daemon.py",
+      "categories": [
+        "MODEL_LOADING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "memoization-unresolved",
+      "path": "vllm/utils/cache.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "block-pool",
+      "path": "vllm/v1/core/block_pool.py",
+      "categories": [
+        "CACHE"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "offload",
+      "path": "vllm/v1/kv_offload/base.py",
+      "categories": [
+        "CACHE"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "offload-ipc",
+      "path": "vllm/v1/kv_offload/tiering/p2p/control/zmq.py",
+      "categories": [
+        "CACHE",
+        "DISTRIBUTED_IPC"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "shared-offload-ipc",
+      "path": "vllm/v1/kv_offload/cpu/shared_offload_region.py",
+      "categories": [
+        "CACHE",
+        "DISTRIBUTED_IPC"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "kv-config",
+      "path": "vllm/config/cache.py",
+      "categories": [
+        "CACHE"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "new-config-unknown",
+      "path": "vllm/config/new_security_behavior.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "new-engine-unknown",
+      "path": "vllm/v1/engine/new_security_behavior.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "new-platform-unknown",
+      "path": "vllm/platforms/new_security_behavior.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "python-parser",
+      "path": "vllm/parser/abstract_parser.py",
+      "categories": [
+        "OUTPUT_PARSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "parser-stream-not-transport",
+      "path": "vllm/parser/engine/streaming_parser_engine.py",
+      "categories": [
+        "OUTPUT_PARSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "parser-prefix-boundary",
+      "path": "vllm/parser_extra/tool.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-parser",
+      "path": "rust/src/parser/src/tool/qwen_coder.rs",
+      "categories": [
+        "OUTPUT_PARSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-parser-binding",
+      "path": "rust/src/parser/python/src/lib.rs",
+      "categories": [
+        "OUTPUT_PARSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-parser-cargo",
+      "path": "rust/src/parser/Cargo.toml",
+      "categories": [
+        "DEPENDENCY"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-parser-bench",
+      "path": "rust/src/parser/benches/tool.rs",
+      "categories": [],
+      "excluded": true,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "tokenizer",
+      "path": "vllm/tokenizers/registry.py",
+      "categories": [
+        "INPUT_PROCESSING",
+        "MODEL_LOADING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "tokenizer-not-plugin",
+      "path": "vllm/tokenizers/new.py",
+      "categories": [
+        "INPUT_PROCESSING",
+        "MODEL_LOADING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "derenderer-not-input",
+      "path": "vllm/renderers/online_derenderer.py",
+      "categories": [
+        "OUTPUT",
+        "OUTPUT_PARSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "hf-renderer",
+      "path": "vllm/renderers/hf.py",
+      "categories": [
+        "INPUT_PROCESSING",
+        "TEMPLATE"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "renderer-preprocess",
+      "path": "vllm/renderers/inputs/preprocess.py",
+      "categories": [
+        "INPUT_PROCESSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "new-renderer-unknown",
+      "path": "vllm/renderers/new_security_behavior.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "python-auth",
+      "path": "vllm/entrypoints/serve/middleware/authenticate.py",
+      "categories": [
+        "API_ROUTE",
+        "AUTH"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-auth",
+      "path": "rust/src/server/src/middleware/auth.rs",
+      "categories": [
+        "API_ROUTE",
+        "AUTH"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "request-id-not-auth",
+      "path": "vllm/entrypoints/serve/middleware/x_request_id.py",
+      "categories": [
+        "API_ROUTE"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "cors-not-auth",
+      "path": "rust/src/server/src/middleware/cors.rs",
+      "categories": [
+        "API_ROUTE"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "filename-not-auth",
+      "path": "vllm/utils/author.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "sse-stream",
+      "path": "vllm/entrypoints/openai/responses/streaming_events.py",
+      "categories": [
+        "API_ROUTE",
+        "STREAMING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "weight-stream-not-response",
+      "path": "vllm/model_executor/model_loader/runai_streamer_loader.py",
+      "categories": [
+        "MODEL_LOADING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "video-stream-not-response",
+      "path": "vllm/multimodal/video_decoders/deepstream.py",
+      "categories": [
+        "INPUT_PROCESSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-response-stream",
+      "path": "rust/src/chat/src/stream.rs",
+      "categories": [
+        "OUTPUT",
+        "STREAMING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "scheduler",
+      "path": "vllm/v1/core/sched/interface.py",
+      "categories": [
+        "SCHEDULER"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "speculative",
+      "path": "vllm/v1/spec_decode/llm_base_proposer.py",
+      "categories": [
+        "RUNNER_KERNEL",
+        "SAMPLING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "watermark",
+      "path": "vllm/v1/watermarking/watermarker.py",
+      "categories": [
+        "RUNNER_KERNEL",
+        "SAMPLING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "constrained-output",
+      "path": "vllm/v1/structured_output/backend_xgrammar.py",
+      "categories": [
+        "OUTPUT_PARSING",
+        "SAMPLING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-request",
+      "path": "rust/src/text/src/request.rs",
+      "categories": [
+        "INPUT_PROCESSING",
+        "SAMPLING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-decoding",
+      "path": "rust/src/text/src/output/decoded.rs",
+      "categories": [
+        "OUTPUT"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-tokenizer",
+      "path": "rust/src/tokenizer/src/hf.rs",
+      "categories": [
+        "INPUT_PROCESSING",
+        "MODEL_LOADING",
+        "OUTPUT"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-proto",
+      "path": "rust/proto/inference.proto",
+      "categories": [
+        "API_ROUTE",
+        "INPUT_PROCESSING",
+        "SAMPLING",
+        "STREAMING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-cli",
+      "path": "rust/src/cmd/src/cli.rs",
+      "categories": [
+        "CLI_OPTION"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "doc-stays-excluded",
+      "path": "docs/auth_cache_stream.md",
+      "categories": [],
+      "excluded": true,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "test-stays-excluded",
+      "path": "vllm/parser/tests/tool.py",
+      "categories": [],
+      "excluded": true,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "unknown-stays-unknown",
+      "path": "vllm/new_domain/mystery.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "snapshot-unreviewed",
+      "path": "vllm/snapshot/runtime.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "specific-import-boundary",
+      "path": "vllm/utils/import_utils.py",
+      "categories": [
+        "DEPENDENCY",
+        "ERROR",
+        "PLUGIN"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "output-template-not-input",
+      "path": "vllm/parser/response_template.py",
+      "categories": [
+        "OUTPUT_PARSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "python-grammar-not-input-template",
+      "path": "vllm/parser/chat_parsing/response_templates.py",
+      "categories": [
+        "OUTPUT_PARSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "rust-grammar-not-input-template",
+      "path": "rust/src/parser/src/unified/hf/template.rs",
+      "categories": [
+        "OUTPUT_PARSING"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "kernel-template-not-input",
+      "path": "csrc/quantization/marlin/marlin_template.h",
+      "categories": [
+        "RUNNER_KERNEL"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "input-template-preserved",
+      "path": "vllm/transformers_utils/chat_templates/registry.py",
+      "categories": [
+        "INPUT_PROCESSING",
+        "MODEL_LOADING",
+        "TEMPLATE"
+      ],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "arbitrary-template-remains-unknown",
+      "path": "vllm/new_domain/template.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "config-attention-boundary",
+      "path": "vllm/config/attention_extra.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "network-helper-boundary",
+      "path": "vllm/utils/network_utils_extra.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    },
+    {
+      "id": "engine-client-boundary",
+      "path": "vllm/v1/engine/core_client_extra.py",
+      "categories": [],
+      "excluded": false,
+      "basis": "AGENT_AUTHORED_PARTIAL_ORACLE"
+    }
+  ],
+  "original69_review": {
+    "schema": "guard.u1-original-unmapped-review/1",
+    "source_artifact_sha256": "d17863f89e9704fd6371d221616ffd7cf319f8ef70f1475cd9fdf05c31300452",
+    "previous_rules_sha256": "b5c885d548f3d0b24e5fd8884ead4dca70b4c2c0462e7604666dc136d8768d8d",
+    "baseline": {
+      "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+      "version": "v0.31.0"
+    },
+    "candidate": {
+      "commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "version": "v0.32.0"
+    },
+    "counts": {
+      "records": 69,
+      "unique_paths": 69,
+      "source_sides": 124,
+      "dispositions": {
+        "exclusion_proposed": 17,
+        "mapped": 37,
+        "unmapped": 15,
+        "refined": 0
+      }
+    },
+    "definitions": {
+      "mapped": "기존 category로 근거 있는 정확한 파일 경로 연결",
+      "refined": "원래69개 중 이미 인식했던 규칙 정밀화(이번69개에는 해당 없음)",
+      "unmapped": "불확실성을 유지하고 기존 확대 선정",
+      "exclusion_proposed": "제외 승인 아님; 팀 결정 전에는 미분류·확대 선정 유지"
+    },
+    "records": [
+      {
+        "id": "original69-01",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".agents/skills/check-api-compat/agents/openai.yaml",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".agents/skills/check-api-compat/agents/openai.yaml",
+            "sha256": "82cbb7487c8380d3548ff7c4f645109cccdf4bf93b6f99253d31202db5f84a39"
+          }
+        ],
+        "responsibility": "에이전트 API 호환성 검토 UI 메타데이터",
+        "change_summary": "새 display_name·default_prompt 추가; 실제 endpoint 구현은 아니다.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "API 안내문을 API_ROUTE 구현으로 오인할 수 있다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-02",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".agents/skills/model-recipes/agents/openai.yaml",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".agents/skills/model-recipes/agents/openai.yaml",
+            "sha256": "1622e92bb1d49c16046b159211964e238e283faf31e5a753bc007965b206875e"
+          }
+        ],
+        "responsibility": "모델 recipe 조회 에이전트 UI 메타데이터",
+        "change_summary": "recipe 조회용 display_name·prompt 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "모델 안내문을 모델 적재 동작으로 오인할 수 있다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-03",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".agents/skills/model-recipes/scripts/read_recipe.sh",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".agents/skills/model-recipes/scripts/read_recipe.sh",
+            "sha256": "156e542837f21c06feea32c7979837687b4041b69725bf1e7081dfd24fbb0d2e"
+          }
+        ],
+        "responsibility": "JSON recipe를 jq/awk로 읽는 개발 스크립트",
+        "change_summary": "guide section과 배포 명령 요약 추출 스크립트 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "배포 명령을 출력한다는 사실은 제품 런타임 실행과 다르다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-04",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".agents/skills/transformers-upgrade/agents/openai.yaml",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".agents/skills/transformers-upgrade/agents/openai.yaml",
+            "sha256": "f5e28c316fd11c054126f42fca37d8be65bf917a9b6f9748562ab26430cbc733"
+          }
+        ],
+        "responsibility": "Transformers 업그레이드 검토 에이전트 메타데이터",
+        "change_summary": "의존성 업그레이드 검토 prompt 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "검토 지시와 실제 dependency manifest를 구분해야 한다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-05",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".agents/skills/transformers-upgrade/scripts/diff_dumps.py",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".agents/skills/transformers-upgrade/scripts/diff_dumps.py",
+            "sha256": "ca7518aaf7a16c4ad9b2a18aed1468686001ac146038190f4f84052779e336cf"
+          }
+        ],
+        "responsibility": "두 config/model 덤프를 비교하는 개발 도구",
+        "change_summary": "차이 계산과 ignored key·layer 집계 스크립트 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "이 도구의 비교 규칙은 제품의 요청 판정 계약이 아니다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-06",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".agents/skills/transformers-upgrade/scripts/dump_configs.py",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".agents/skills/transformers-upgrade/scripts/dump_configs.py",
+            "sha256": "26780cb684780bac96d10697a072795a1eb401dd3b6b0e3b6adac6ab16f3bc7d"
+          }
+        ],
+        "responsibility": "체크포인트 config를 덤프하는 개발 도구",
+        "change_summary": "get_config와 trust_remote_code 선택을 쓰는 조사 스크립트 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "개발 도구도 원격 코드를 실행할 수 있어 경로만으로 무해하다고 제외할 수 없다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-07",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".agents/skills/transformers-upgrade/scripts/dump_model.py",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".agents/skills/transformers-upgrade/scripts/dump_model.py",
+            "sha256": "5a1ff3c9826b5644367c78872540e30c158a75708a9449e5508cac36f3946b93"
+          }
+        ],
+        "responsibility": "meta device에서 모델 구조를 조사하는 개발 도구",
+        "change_summary": "모델 생성·분산 초기화·일부 runtime 검사 대체 스크립트 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "실행 가능한 개발 도구이므로 메타데이터 전체 제외와 동일하게 취급할 수 없다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-08",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".agents/skills/transformers-upgrade/scripts/find_upstreamed.py",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".agents/skills/transformers-upgrade/scripts/find_upstreamed.py",
+            "sha256": "ea6a0fbfcbf422c3846d22cc23bc1138e1eef733bef54845acdd2a73ef1fd60a"
+          }
+        ],
+        "responsibility": "vendored Transformers 코드를 대조하는 개발 도구",
+        "change_summary": "로컬 config·processor와 upstream PR 검토 스크립트 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "외부 모듈과 GitHub를 쓰지만 서비스의 실제 dependency 변경은 아니다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-09",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".claude/skills/check-api-compat",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".claude/skills/check-api-compat",
+            "sha256": "2c284dc0c3a8a20372b649bcccbb5f4166c18ec2256fe87b376ebd5bda43b587"
+          }
+        ],
+        "responsibility": "에이전트 skill 링크",
+        "change_summary": "check-api-compat의 상대 링크 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "링크 대상 안내와 서비스 endpoint 구현을 혼용하면 안 된다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-10",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".claude/skills/model-recipes",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".claude/skills/model-recipes",
+            "sha256": "fed807f1bfe0f0dc81fbb7ced911c6b525acc847eb2f67f74890259891c0f393"
+          }
+        ],
+        "responsibility": "에이전트 skill 링크",
+        "change_summary": "model-recipes의 상대 링크 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "링크의 배포 안내가 런타임 적재를 입증하지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-11",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".claude/skills/pr-checklist",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".claude/skills/pr-checklist",
+            "sha256": "a4950d1ac678db8fe3d2ecbca28a90ae8b90d670339241a97f88eafc83876ec4"
+          }
+        ],
+        "responsibility": "에이전트 skill 링크",
+        "change_summary": "pr-checklist의 상대 링크 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "개발 검토 절차는 보안 점검 실행기가 아니다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-12",
+        "status": "A",
+        "before_path": null,
+        "after_path": ".claude/skills/transformers-upgrade",
+        "source_views": [
+          {
+            "side": "candidate",
+            "path": ".claude/skills/transformers-upgrade",
+            "sha256": "1cc224f64ed2651fe33c2450841172d3f37db3ba8cb44cb8cd6c4a3823018cf6"
+          }
+        ],
+        "responsibility": "에이전트 skill 링크",
+        "change_summary": "transformers-upgrade의 상대 링크 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "링크 대상에서 실행하는 개발 도구의 영향은 별도 검토가 필요하다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-13",
+        "status": "M",
+        "before_path": ".gitignore",
+        "after_path": ".gitignore",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": ".gitignore",
+            "sha256": "65505c71fa943e7a46473aadda7f539c89b6fe461ef9ba36b1ea404d0f784a09"
+          },
+          {
+            "side": "candidate",
+            "path": ".gitignore",
+            "sha256": "e4ffe032aec8d08aa511b0e9e050b9ff2b3b447ef4168409b10a4c8a75c5f5fc"
+          }
+        ],
+        "responsibility": "Git 생성물 추적 제외 설정",
+        "change_summary": "생성 marlin_moe kernel ignore 항목 삭제.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "추적 제외가 빌드 포함 여부와 같다고 주장할 수 없다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-14",
+        "status": "M",
+        "before_path": ".pre-commit-config.yaml",
+        "after_path": ".pre-commit-config.yaml",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": ".pre-commit-config.yaml",
+            "sha256": "0dc287c8e3535887b3a3865034e035faba4eb94c8208be309b17bc916b7dc3b0"
+          },
+          {
+            "side": "candidate",
+            "path": ".pre-commit-config.yaml",
+            "sha256": "c1cb0cd3d38208d8abde0a567f1e6f401d36cb0049b3170ee481456c529dc551"
+          }
+        ],
+        "responsibility": "개발 pre-commit 검사와 개발 의존성",
+        "change_summary": "mypy 지원 버전·pydantic pin·agent 검사 hook 변경.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "개발 의존성을 배포 제품 의존성으로 동일 취급하면 과분류한다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-15",
+        "status": "M",
+        "before_path": "mkdocs.yaml",
+        "after_path": "mkdocs.yaml",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "mkdocs.yaml",
+            "sha256": "377b669bf434b6e896bbfd058314660f620ca9ab66d4ebb49a79a1761c51bf4f"
+          },
+          {
+            "side": "candidate",
+            "path": "mkdocs.yaml",
+            "sha256": "5708a2697a85a86f14753e956c65399891a3d4c39ac06776f505e12442699984"
+          }
+        ],
+        "responsibility": "MkDocs 문서 빌드 설정",
+        "change_summary": "minify·외부 inventory 제거와 문서 경로 redirect 추가.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "문서 빌드 plugin은 제품 PLUGIN 실행 경계와 다르다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-16",
+        "status": "M",
+        "before_path": "rust/src/llm/src/lib.rs",
+        "after_path": "rust/src/llm/src/lib.rs",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "rust/src/llm/src/lib.rs",
+            "sha256": "f163481016cfcfc37afe6d12fda70a71f6da189fe636933466a0ff6efc3fdae3"
+          },
+          {
+            "side": "candidate",
+            "path": "rust/src/llm/src/lib.rs",
+            "sha256": "d4a6a6ee1e4cdadcd7169e9c0e25694a40f30005ffe599ac940fee5bb6332d45"
+          }
+        ],
+        "responsibility": "Rust 토큰화된 생성 요청 facade와 응답 stream",
+        "change_summary": "frontend stream_interval 하한을 요청 값에 적용하고 stats flag 전달.",
+        "disposition": "mapped",
+        "categories": [
+          "INPUT_PROCESSING",
+          "OUTPUT",
+          "STREAMING"
+        ],
+        "anchor": "with_stream_interval",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "토큰화된 생성 facade는 문자열 template나 출력 grammar 파서가 아니다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-17",
+        "status": "M",
+        "before_path": "rust/src/llm/src/output.rs",
+        "after_path": "rust/src/llm/src/output.rs",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "rust/src/llm/src/output.rs",
+            "sha256": "a8500277a9835976dc703ef32918de4f86c2a71feef9afb44ae5e78d3cdd358c"
+          },
+          {
+            "side": "candidate",
+            "path": "rust/src/llm/src/output.rs",
+            "sha256": "3a5cdd3d766f6e7c407dcbba3429d216a4691deeb7ccdc31b3c46ace3f377768"
+          }
+        ],
+        "responsibility": "Rust 요청별 출력·stream 집계",
+        "change_summary": "weight version span, 출력 box, stream interval 병합과 메트릭 전달 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "OUTPUT",
+          "STREAMING"
+        ],
+        "anchor": "WeightVersionSpan",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "토큰·logprob 집계가 tool grammar OUTPUT_PARSING을 뜻하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-18",
+        "status": "M",
+        "before_path": "rust/src/mock-engine/src/engine.rs",
+        "after_path": "rust/src/mock-engine/src/engine.rs",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "rust/src/mock-engine/src/engine.rs",
+            "sha256": "e0f5f0473da7f6a211a6897e4c2e7db1a2b121355672213b7c8a4ac2565a7209"
+          },
+          {
+            "side": "candidate",
+            "path": "rust/src/mock-engine/src/engine.rs",
+            "sha256": "a734381ba4ce238ea57b1a9c548fb13ffe626a6ea2ce47687479fd1e4dd47bc6"
+          }
+        ],
+        "responsibility": "Rust mock-engine의 합성 응답",
+        "change_summary": "합성 prefill_stats를 Box로 감쌈.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "mock 관측은 실제 엔진의 도달·출력을 입증하지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-19",
+        "status": "M",
+        "before_path": "rust/src/mock-engine/src/tests.rs",
+        "after_path": "rust/src/mock-engine/src/tests.rs",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "rust/src/mock-engine/src/tests.rs",
+            "sha256": "7d37e593bc286f9fa5521e52ac435ada14de0154821a25476a946644cf66d8fc"
+          },
+          {
+            "side": "candidate",
+            "path": "rust/src/mock-engine/src/tests.rs",
+            "sha256": "4373cb23c20030186476cd8f584648c5d15d156fc9805849347cb90314db6921"
+          }
+        ],
+        "responsibility": "Rust mock-engine 테스트",
+        "change_summary": "stream adapter·합성 통계·Box 기대값을 새 interface에 맞춤.",
+        "disposition": "exclusion_proposed",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "제품 밖 개발 자료로 보이지만 제외 정책의 팀 결정 전까지 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "tests.rs는 현행 제외 components=tests와 일치하지 않으며 임의 제외를 추가하지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "개발/문서/mock 자료를 제외할지와 범위를 팀에서 결정; 이번 규칙은 제외하지 않음."
+      },
+      {
+        "id": "original69-20",
+        "status": "M",
+        "before_path": "vllm/config/attention.py",
+        "after_path": "vllm/config/attention.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/attention.py",
+            "sha256": "114dfbb8651feab627c49ae1ed16c63ae3e6a9cf26d1d1cc799618ee8a06d617"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/attention.py",
+            "sha256": "b4edcdd256404813e4483b7669b2b946775f7ed12fed44360d1b46a0807286da"
+          }
+        ],
+        "responsibility": "attention backend·KV workspace 설정",
+        "change_summary": "TokenSpeed KV split 하한과 sparse MLA workspace 크기 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "AttentionConfig",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "설정 파일의 CACHE·RUNNER_KERNEL 합집합이며 backend가 실제 선택됐다는 뜻은 아니다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-21",
+        "status": "M",
+        "before_path": "vllm/config/compilation.py",
+        "after_path": "vllm/config/compilation.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/compilation.py",
+            "sha256": "9e005aee4e8d74b23636312e9c9be796d8fc3b43ce483937cf3795fcbcaf18e5"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/compilation.py",
+            "sha256": "d8a8086166e3f344b75d98d8350a77592f7b6c145319b3a9f0b9c8cb36bc39cb"
+          }
+        ],
+        "responsibility": "컴파일 pass·CUDA graph 설정",
+        "change_summary": "decoder replay graph·capture size, deterministic benchmarking, SP 옵션 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "COMPILE_CACHE",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "CompilationConfig",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "compile cache와 실행 graph 책임이며 요청 CACHE나 요청 재전송 REPLAY는 아니다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-22",
+        "status": "M",
+        "before_path": "vllm/config/ec_transfer.py",
+        "after_path": "vllm/config/ec_transfer.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/ec_transfer.py",
+            "sha256": "82db886445984dcc52efb685d44dd93b52c369e3d4e7cbf572348ec085f6d6b1"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/ec_transfer.py",
+            "sha256": "1e30f1e86d082ab72fb075362abf16598c0d6d6025701a7e39fd7df0fcbbc27f"
+          }
+        ],
+        "responsibility": "encoder cache 전달과 connector 설정",
+        "change_summary": "EC rank/parallel 필드 제거와 encoder modality width 기록 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "DISTRIBUTED_IPC",
+          "PLUGIN"
+        ],
+        "anchor": "ECTransferConfig",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "connector module_path 적재 경계는 PLUGIN; 전달만으로 인증·tenant 분리는 확인하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-23",
+        "status": "M",
+        "before_path": "vllm/config/engram.py",
+        "after_path": "vllm/config/engram.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/engram.py",
+            "sha256": "00435380fbcbb508c20f47c6bfba3cf81cf729abc1b08c80fcfab5dda66f3085"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/engram.py",
+            "sha256": "53bf5367af69149f7dc6dfe576921f22948cdb5cbd3e903c8bd7b310f80aa202"
+          }
+        ],
+        "responsibility": "Engram embedding 실행·offload·공유 메모리 설정",
+        "change_summary": "CUDA-alike 제한을 없애고 모델 n-gram 적합성 검사 유지.",
+        "disposition": "mapped",
+        "categories": [
+          "DISTRIBUTED_IPC",
+          "MODEL_LOADING",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "EngramConfig",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "공유 메모리·모델 embedding 관련 범위이며 임의 모델 허용이나 host 권한을 입증하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-24",
+        "status": "M",
+        "before_path": "vllm/config/kernel.py",
+        "after_path": "vllm/config/kernel.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/kernel.py",
+            "sha256": "249ead9ca4c207ff8ea49c99c5e5332eb84ed990e93e55c493bab20b9a293739"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/kernel.py",
+            "sha256": "dedb58b73dd702834d16f9183845ab40098c1f43a13ec70e9063d745e54a12fe"
+          }
+        ],
+        "responsibility": "수치 커널 backend 선택과 MoE 통신 결합",
+        "change_summary": "passthrough all2all를 커널 자체 통신 backend에 묶고 지원 backend·autotune 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "DISTRIBUTED_IPC",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "bind_passthrough_all2all_backend",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "커널 config라고 통신 책임을 지우지 않는다; 새 파일 전체 config catchall은 사용하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-25",
+        "status": "M",
+        "before_path": "vllm/config/kv_transfer.py",
+        "after_path": "vllm/config/kv_transfer.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/kv_transfer.py",
+            "sha256": "f8f933b9565994b5a05aa51cbd23ce58827e44ed8c6fceb19aa35a2ef4dfe670"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/kv_transfer.py",
+            "sha256": "6c1aee67cd39507cd52df37725e88ced5baa63037c6912be011c8aa36ca55bfa"
+          }
+        ],
+        "responsibility": "KV cache 전달 connector 설정",
+        "change_summary": "TorchDistributedConnector 전용 buffer/rank/ip/parallel 설정 제거.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "DISTRIBUTED_IPC",
+          "PLUGIN"
+        ],
+        "anchor": "KVTransferConfig",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "KV 전달·동적 connector module_path 영역이며 모델 weight download cache와 다르다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-26",
+        "status": "M",
+        "before_path": "vllm/config/model.py",
+        "after_path": "vllm/config/model.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/model.py",
+            "sha256": "e33d28deab39c42b1c209116296dcb6e98c6da8b4e42ee0dbca0e8bf098c534c"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/model.py",
+            "sha256": "04ca37ea1d50128a7ddede30e7baa4e0a56bccec85091577a2c81c5de1a8fab8"
+          }
+        ],
+        "responsibility": "다수 모델·tokenizer·KV·sleep·실행 설정의 결합",
+        "change_summary": "attention layer 유형·NVFP4·sleep offload·HC parallel 적합성 변경.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "MODEL_LOADING 하나로 모든 입력·cache·device 영향을 흡수하지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-27",
+        "status": "M",
+        "before_path": "vllm/config/multimodal.py",
+        "after_path": "vllm/config/multimodal.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/multimodal.py",
+            "sha256": "f783ec8290a5e40b5b095767510e0912b713725ca3296aafa268d4077066d9a3"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/multimodal.py",
+            "sha256": "c30971531e7d10c276ac9d01b0080833f1aa5218880a43e43243414a139e96a8"
+          }
+        ],
+        "responsibility": "multimodal 입력 processor와 입력 cache 설정",
+        "change_summary": "flat/scoped processor kwargs의 재귀 병합 우선순위 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "INPUT_PROCESSING"
+        ],
+        "anchor": "_merge_mm_processor_kwargs",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "설정 전체의 요청 cache 합집합이며 이번 병합 변경이 cache 격리를 바꿨다는 주장은 아니다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-28",
+        "status": "M",
+        "before_path": "vllm/config/observability.py",
+        "after_path": "vllm/config/observability.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/observability.py",
+            "sha256": "f690999846d0a6d86ad9fa3024bba3aaa37caec509498c8a04130fe91ce3d939"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/observability.py",
+            "sha256": "6ebc5cad34ab04e8a060c482e2f1267d996d909fa045b8cb055c3a7b96cd7657"
+          }
+        ],
+        "responsibility": "Prometheus·tracing 관측 설정",
+        "change_summary": "custom histogram bucket 추가와 bool·순서·유한 양수 검증.",
+        "disposition": "mapped",
+        "categories": [
+          "OBSERVABILITY"
+        ],
+        "anchor": "_validate_custom_histogram_buckets",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "관측값 설정은 로그 변조 방지나 프로파일러 활성화 자체를 입증하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-29",
+        "status": "M",
+        "before_path": "vllm/config/parallel.py",
+        "after_path": "vllm/config/parallel.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/parallel.py",
+            "sha256": "eee9418488deb7945562c3127106109bac632471a2c1a08a58169a48cd15684c"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/parallel.py",
+            "sha256": "e8dcfb67c1ace957dcc7e12569ee62eb0f983aec3901fdef27c13014cea4b760"
+          }
+        ],
+        "responsibility": "parallel worker·process group·공유 메모리 설정",
+        "change_summary": "migration batching·HC SP·shm tensor arena·분산 timeout 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "DISTRIBUTED_IPC"
+        ],
+        "anchor": "ParallelConfig",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "분산 설정 경로 분류는 네트워크 접근 통제 성공이나 커널 수치 의미를 확인하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-30",
+        "status": "M",
+        "before_path": "vllm/config/pooler.py",
+        "after_path": "vllm/config/pooler.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/pooler.py",
+            "sha256": "db8a594dd03f2c587994287632bb207f589d718fc85c950cd6dfada58461d86f"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/pooler.py",
+            "sha256": "28e22946faee4039ecec73115b13bc7bad031510a16fd15a13fa258a3edc346b"
+          }
+        ],
+        "responsibility": "pooling 출력과 late-interaction scorer 설정",
+        "change_summary": "flash late-interaction Triton scorer 사용 옵션 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "OUTPUT",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "PoolerConfig",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "pool이라는 이름으로 KV CACHE를 부여하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-31",
+        "status": "M",
+        "before_path": "vllm/config/quantization.py",
+        "after_path": "vllm/config/quantization.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/quantization.py",
+            "sha256": "acffc52f525b39a88efd656f1ed705ce3a1b758298bb0684fac7694776bc10b4"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/quantization.py",
+            "sha256": "9b9d695a8126b854e6832780eda8e1a42113601e93da4ba0003ae99c790c5583"
+          }
+        ],
+        "responsibility": "적재·실행용 quantization 사양",
+        "change_summary": "NVFP4 token·int4 group32 quant key 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "MODEL_LOADING",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "QuantSpec",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "양자화 schema는 모델별 허용 정책이나 정확한 수치 정확성을 입증하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-32",
+        "status": "M",
+        "before_path": "vllm/config/speculative.py",
+        "after_path": "vllm/config/speculative.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/speculative.py",
+            "sha256": "88cec427b52bb1cb56842f9034a4d49a915d05302b92b0249227feaf4d81f3e1"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/speculative.py",
+            "sha256": "ce135651a7a0343ff526f72e9545932617378161abd03135d67eda6de89c617c"
+          }
+        ],
+        "responsibility": "draft 모델과 speculative sampling 설정",
+        "change_summary": "longcat·GLM draft architecture override·use_ngram helper 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "MODEL_LOADING",
+          "RUNNER_KERNEL",
+          "SAMPLING"
+        ],
+        "anchor": "SpeculativeConfig",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "HTTP streaming이나 scheduler queue admission 전체를 의미하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-33",
+        "status": "M",
+        "before_path": "vllm/config/utils.py",
+        "after_path": "vllm/config/utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/utils.py",
+            "sha256": "55541a60fdbce39941cfec4e193dbd01cf80ed2b5016eac3e0bcb168a76568c4"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/utils.py",
+            "sha256": "eb3f40bb32522dfdd802f9c456184c501d30dc0fcd36d0edebcb04b510e3ec8b"
+          }
+        ],
+        "responsibility": "다목적 dataclass 설정·해시·문서 helper",
+        "change_summary": "get_attr_docs가 상속 MRO를 순회하고 소스 없는 class를 건너뜀.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "현재 변경이 문서 helper여도 파일 전체를 영구 제외하거나 CLI로 단정하지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-34",
+        "status": "M",
+        "before_path": "vllm/config/vllm.py",
+        "after_path": "vllm/config/vllm.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/vllm.py",
+            "sha256": "057b0a7f80db28522ee46b41f9ae5bd7a0c1998a08e111c5a6ddcb8c08f07f8d"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/vllm.py",
+            "sha256": "573692a80364d5c373321754c6213b4792ae292ba6aea7d6573ae013c2c71ae9"
+          }
+        ],
+        "responsibility": "전체 실행 설정을 결합하는 VllmConfig",
+        "change_summary": "graph pool·SP 제거·scheduler·KV·draft·ReplaySSM 적합성 등 다중 변경.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "단일 category 연결은 이질적인 책임을 가린다; 함수 의미 분석은 범위 밖이다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-35",
+        "status": "M",
+        "before_path": "vllm/config/watermarking.py",
+        "after_path": "vllm/config/watermarking.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/config/watermarking.py",
+            "sha256": "30e6620a3cd7529f0736ad55e38bc326a6a78dee4552f0722208400041c94a1f"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/config/watermarking.py",
+            "sha256": "ded04c98473d23eeadfafbe791067f249758972450860140750e7f4420bbd4ca"
+          }
+        ],
+        "responsibility": "watermark token sampling 설정",
+        "change_summary": "Self import를 typing으로 이동; 기존 watermark key·algorithm·강도 검증 유지.",
+        "disposition": "mapped",
+        "categories": [
+          "SAMPLING"
+        ],
+        "anchor": "WatermarkConfig",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "워터마크 경로 관련성이며 새 보안 점검 지원이나 watermark 보증은 아니다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-36",
+        "status": "M",
+        "before_path": "vllm/engine/arg_utils.py",
+        "after_path": "vllm/engine/arg_utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/engine/arg_utils.py",
+            "sha256": "95be1adb96f55933f6a52260c8cb2181d04707401ca21d97c33108c5ab58f3ac"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/engine/arg_utils.py",
+            "sha256": "c10281277fd9a90dc8b22670db4f1af53708c5caa2aefee7aa861fa579329219"
+          }
+        ],
+        "responsibility": "CLI 옵션 생성·타입 변환·EngineArgs 구성",
+        "change_summary": "새 engine 옵션·deprecated cascade·관측 bucket·sleep·shm 전달 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "CLI_OPTION"
+        ],
+        "anchor": "EngineArgs",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "옵션 전달 관련 분류이며 각 실행 설정의 보안 효과가 검증됐다는 뜻은 아니다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-37",
+        "status": "M",
+        "before_path": "vllm/engine/protocol.py",
+        "after_path": "vllm/engine/protocol.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/engine/protocol.py",
+            "sha256": "9c169671c4d61f5699484fb567848e5c88280dfcad6f2a4f9fdef9f9f3b96a6c"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/engine/protocol.py",
+            "sha256": "e89211b8b91fb17fecdeb99296e19e13a2c2ebf0c2e8fbb1b5b4045e99248131"
+          }
+        ],
+        "responsibility": "EngineClient의 복합 추상 계약",
+        "change_summary": "profiler overrides·wake 상태·pause·weight checksum/update teardown interface 변경.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "interface에 있는 profiler 하나로 cache·실패·weight 변경을 숨기지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-38",
+        "status": "M",
+        "before_path": "vllm/platforms/cpu.py",
+        "after_path": "vllm/platforms/cpu.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/platforms/cpu.py",
+            "sha256": "b288de346b92d62f3e57bcc74c6a9299bb853df7984ce47cec889ecb26bc99ad"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/platforms/cpu.py",
+            "sha256": "e8c3220ce2a277de62f9329eb630940bfc8acdb8fb31d6dfddd1238140c264ee"
+          }
+        ],
+        "responsibility": "CPU backend 선택과 KV block 적합성",
+        "change_summary": "MLA prefill backend 선택과 정렬된 KV block 검증 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "CpuPlatform",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "CPU 이름만으로 OCI IMAGE나 dependency manifest 변경이라 주장하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-39",
+        "status": "M",
+        "before_path": "vllm/platforms/cuda.py",
+        "after_path": "vllm/platforms/cuda.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/platforms/cuda.py",
+            "sha256": "27bd20e6fe42dd70b72fe58ce12cb615a2385776f0ac705349646c67ca68bb26"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/platforms/cuda.py",
+            "sha256": "18ae1dfc34848afcade72821892db50fd3a2e3a57b48829521cc263e3f877caa"
+          }
+        ],
+        "responsibility": "CUDA backend 선택·실행·KV layout",
+        "change_summary": "CUDA 전용 indexer block 정렬 구현 삭제.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "CudaPlatformBase",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "device capability나 driver 자체가 변했다는 증거는 아니다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-40",
+        "status": "M",
+        "before_path": "vllm/platforms/interface.py",
+        "after_path": "vllm/platforms/interface.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/platforms/interface.py",
+            "sha256": "6f5f0f7f304a3899c50a3a558eecd07f66675910befbfa251bc9779ee05a7775"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/platforms/interface.py",
+            "sha256": "637e120fcf2a45b02b81174b7ed4653364e9d16ff0063772f1fdfaf4f8dcd2b6"
+          }
+        ],
+        "responsibility": "platform backend 인터페이스와 KV block 적합성",
+        "change_summary": "MLA backend 선택·공통 KV block 정렬/검증을 결합.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "class Platform:",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "file 책임의 실행·KV 합집합이며 임의 platforms 신규 파일까지 연결하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-41",
+        "status": "M",
+        "before_path": "vllm/platforms/rocm.py",
+        "after_path": "vllm/platforms/rocm.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/platforms/rocm.py",
+            "sha256": "2715a421683973fc5b55a3e96299d36100541888c93d8ba671ef5aa27479b8cf"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/platforms/rocm.py",
+            "sha256": "673191c16304fec9c1bdfc76907e902d430f3bd31a5085cdec4590caa196be5f"
+          }
+        ],
+        "responsibility": "ROCm attention backend·KV layout 적합성",
+        "change_summary": "ultraquant layout 공유 검사와 backend fallback 분기 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "_shares_layout_with_ultraquant",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "ROCm 실제 실행·GPU 보안 상태를 확인하지 않았다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-42",
+        "status": "M",
+        "before_path": "vllm/platforms/xpu.py",
+        "after_path": "vllm/platforms/xpu.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/platforms/xpu.py",
+            "sha256": "d13a446c60c0cc3d16902f75170646d87d6e4b5f153725290a2a4830b0b6b5b2"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/platforms/xpu.py",
+            "sha256": "097b700117ae487e9242cb59c89a85aa957cd14caa13427308f7328c65b1f982"
+          }
+        ],
+        "responsibility": "XPU attention backend·KV block 적합성",
+        "change_summary": "FlashAttn MLA 선택/fallback·quant dtype·block 정렬 검증 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "XPUPlatform",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "XPU 실제 실행·driver 변경을 확인하지 않았다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-43",
+        "status": "D",
+        "before_path": "vllm/scripts.py",
+        "after_path": null,
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/scripts.py",
+            "sha256": "776454ddee908bfc58ed0503e38baab1dcfc0dd051fbfcd09c57f8ad8516fe2c"
+          }
+        ],
+        "responsibility": "이전 CLI 진입점 호환 shim",
+        "change_summary": "vllm.scripts.main 경고·새 CLI 위임 shim 삭제.",
+        "disposition": "mapped",
+        "categories": [
+          "CLI_OPTION"
+        ],
+        "anchor": "def main()",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "삭제 경로도 원본 baseline 근거로 CLI_OPTION에 연결한다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-44",
+        "status": "M",
+        "before_path": "vllm/snapshot/manifest.py",
+        "after_path": "vllm/snapshot/manifest.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/snapshot/manifest.py",
+            "sha256": "7cf5b6cb8eaf6b54c24d65731fc83ffeb500afe6472da0d3d3aedd93ebf517a8"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/snapshot/manifest.py",
+            "sha256": "eede61278ec4b18f1f649036fd247a4efed7d084070932596e06f216a14387db"
+          }
+        ],
+        "responsibility": "host snapshot manifest·경로 신뢰·process identity",
+        "change_summary": "Self import를 typing으로 이동; manifest·artifact root 검증은 유지.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "프로세스 snapshot을 요청 REPLAY나 모델 캐시 CACHE로 바꾸지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-45",
+        "status": "M",
+        "before_path": "vllm/snapshot/runtime.py",
+        "after_path": "vllm/snapshot/runtime.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/snapshot/runtime.py",
+            "sha256": "8f3b230809294dd8c8b60df4fa8624a5e2d689e394e2776d3329370f1442922d"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/snapshot/runtime.py",
+            "sha256": "234eedcc2792972e3415b02a0ed7e641529346b1a7e51af6f3c02a7b5db1e3fb"
+          }
+        ],
+        "responsibility": "host CRIU snapshot 생성·복원·process/socket 보존",
+        "change_summary": "RDMA descriptor 거부·NCCL 설정·bounded 진단·link_remap 검사 변경.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "프로세스 snapshot은 요청 replay와 다르고 PLUGIN/IMAGE 하나로 전체 책임을 설명하지 못한다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-46",
+        "status": "M",
+        "before_path": "vllm/utils/argparse_utils.py",
+        "after_path": "vllm/utils/argparse_utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/argparse_utils.py",
+            "sha256": "fe7abd5c4478091935779b9a9a57f929f8f64cdf51ddf024e198ad5b34ee0b59"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/argparse_utils.py",
+            "sha256": "d1330ebc9e8fc4ef0ff03a985b8bbf2551ca10780d427a830465a97253558a78"
+          }
+        ],
+        "responsibility": "CLI argument parser·config file 처리",
+        "change_summary": "deprecated Action set을 class 공유 상태에서 parser instance별 상태로 이동.",
+        "disposition": "mapped",
+        "categories": [
+          "CLI_OPTION"
+        ],
+        "anchor": "FlexibleArgumentParser",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "서빙 요청 body 검증 INPUT_PROCESSING과 CLI parsing을 구분한다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-47",
+        "status": "M",
+        "before_path": "vllm/utils/b12x.py",
+        "after_path": "vllm/utils/b12x.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/b12x.py",
+            "sha256": "99287526edeff891b8434024ad66a671b03b9eb1f89edf2dcd88797800806ec0"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/b12x.py",
+            "sha256": "99bc2e6d3356f3ba88c9e716a618e044ecd0b14ebe68044a1164c7713af6790d"
+          }
+        ],
+        "responsibility": "B12X kernel module·packed weight helper",
+        "change_summary": "codec별 논리 원소/인코딩 byte 상수 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "B12X_BLOCK_CODECS",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "모듈 존재 확인이 실제 커널 실행·수치 보증은 아니다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-48",
+        "status": "M",
+        "before_path": "vllm/utils/collection_utils.py",
+        "after_path": "vllm/utils/collection_utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/collection_utils.py",
+            "sha256": "06692b0b562cb184e15a5f70438b397483c22cff1565815ea83bc19259377660"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/collection_utils.py",
+            "sha256": "baad4cfcd0be396fee1cf23c50cf1183fd2f20dec6a13e3f0436fdd078ce3396"
+          }
+        ],
+        "responsibility": "다목적 collection helper",
+        "change_summary": "typing_extensions의 assert_never/overload를 typing으로 이동.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "일반 자료구조 helper를 이름만으로 scheduler·cache에 연결할 수 없다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-49",
+        "status": "M",
+        "before_path": "vllm/utils/deep_gemm.py",
+        "after_path": "vllm/utils/deep_gemm.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/deep_gemm.py",
+            "sha256": "3c6652c4fcf2a6aa2e8c95d52056c2d86355a057d1234715b2d4b14c052dfc61"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/deep_gemm.py",
+            "sha256": "3fae19d459c220d36eb00f1f4818c07fdfe28c0056c5a48dbee9e907a74b0bc8"
+          }
+        ],
+        "responsibility": "DeepGEMM 실행과 paged MQA KV layout helper",
+        "change_summary": "SM120에서는 KV page64만 허용하는 함수로 상수 교체.",
+        "disposition": "mapped",
+        "categories": [
+          "CACHE",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "get_paged_mqa_page_sizes",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "paged attention KV cache와 수치 실행의 확인된 합집합이며 Python memoization을 CACHE로 오인하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-50",
+        "status": "M",
+        "before_path": "vllm/utils/diffusion.py",
+        "after_path": "vllm/utils/diffusion.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/diffusion.py",
+            "sha256": "06df7e8fdc829f2bcb44bb4a6ab31573641a10e32ce9f4877f4b4522ca57bc57"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/diffusion.py",
+            "sha256": "ee5cb6da79ce52c714149cb886e44d7aec89826b669ae22159a0f6b42f49f215"
+          }
+        ],
+        "responsibility": "diffusion 요청 sampling 옵션 검증",
+        "change_summary": "canvas width 관련 async scheduling gate 삭제.",
+        "disposition": "mapped",
+        "categories": [
+          "INPUT_PROCESSING",
+          "SAMPLING"
+        ],
+        "anchor": "validate_diffusion_sampling_params",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "실제 diff에서 제거된 gate를 별도 SCHEDULER category로 억지 복원하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-51",
+        "status": "M",
+        "before_path": "vllm/utils/flashinfer.py",
+        "after_path": "vllm/utils/flashinfer.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/flashinfer.py",
+            "sha256": "b0e6abff28095c4ebf26e7fa1c85923401fd47240877d53aa74ec72f9402ecf0"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/flashinfer.py",
+            "sha256": "c0db917fb6525ccf616000b976d34028ff38f19f9f31bf445ad4cc4bc07fc5ab"
+          }
+        ],
+        "responsibility": "FlashInfer 커널·JIT cache·설치 가용성 helper",
+        "change_summary": "BF16 autotune 제거와 nvcc·cache wheel·package version 검사 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "COMPILE_CACHE",
+          "DEPENDENCY",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "_flashinfer_nvcc_path",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "커널 artifact cache는 요청 cache가 아니며 dependency 실행 결과도 확인하지 않았다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-52",
+        "status": "D",
+        "before_path": "vllm/utils/flashinfer_moe_ep.py",
+        "after_path": null,
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/flashinfer_moe_ep.py",
+            "sha256": "7e9a2838312846d7d9beb15ee36741abab3f5bdeabbbfa6abeb405386a32a2f1"
+          }
+        ],
+        "responsibility": "FlashInfer MoE kernel·expert 통신 helper",
+        "change_summary": "MoE mega kernel·NVSHMEM bootstrap·weight 준비 helper 파일 삭제.",
+        "disposition": "mapped",
+        "categories": [
+          "DISTRIBUTED_IPC",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "FiMoeEpBackendSpec",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "삭제 전 baseline 책임을 보존하며 존재하지 않는 candidate 구현을 만들지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-53",
+        "status": "M",
+        "before_path": "vllm/utils/humming.py",
+        "after_path": "vllm/utils/humming.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/humming.py",
+            "sha256": "204eff336cb4fb821d58e5e2b284b016f2150de00d9f030d37c3c67c3ba8d49f"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/humming.py",
+            "sha256": "2da206ffd180942a1959a1141cb0cf4b28b0fbd53c825b029734b0336c22e82c"
+          }
+        ],
+        "responsibility": "Humming weight transform·커널 실행·compile 호환 shim",
+        "change_summary": "compute unit locks·통합 transform·Dynamo DeviceInfo trace patch 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "COMPILE_CACHE",
+          "RUNNER_KERNEL"
+        ],
+        "anchor": "_patch_humming",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "memoized DeviceInfo를 요청 CACHE로 분류하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-54",
+        "status": "M",
+        "before_path": "vllm/utils/jit_monitor.py",
+        "after_path": "vllm/utils/jit_monitor.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/jit_monitor.py",
+            "sha256": "84428bc92c5085f9f45d9fb1b3a3086b35de2b0629bf04bb056899957bb81990"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/jit_monitor.py",
+            "sha256": "379595ceb64242274f575a874f7a6126f4ca8bd42c51067e7f7e5367420fd850"
+          }
+        ],
+        "responsibility": "커널 JIT compile 관측 hook",
+        "change_summary": "TileLang __call__ 대신 compile hook으로 cache miss 관측.",
+        "disposition": "mapped",
+        "categories": [
+          "COMPILE_CACHE",
+          "OBSERVABILITY"
+        ],
+        "anchor": "_compile_with_monitor",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "compile artifact cache·관측 영역이며 모델 요청 CACHE가 아니다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-55",
+        "status": "M",
+        "before_path": "vllm/utils/math_utils.py",
+        "after_path": "vllm/utils/math_utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/math_utils.py",
+            "sha256": "65f73de5632a6929e8240f1c79e2e0c1ef57ee29c44d5d6de2ad66b72f26bcb6"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/math_utils.py",
+            "sha256": "4b9f3ecdcfb6ff6fee98746313e3d243e9de8749dea058d8d5411f41cad9a35e"
+          }
+        ],
+        "responsibility": "일반 산술 helper",
+        "change_summary": "정렬된 목록에서 ceil 값을 찾는 round_up_to 추가.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "이 파일의 호출 용도를 추적하지 않고 커널·scheduler 의미를 추정하지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-56",
+        "status": "M",
+        "before_path": "vllm/utils/nccl.py",
+        "after_path": "vllm/utils/nccl.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/nccl.py",
+            "sha256": "29c7ea555b766d7886e2d35c72ac5634ffbe3f861ca30090968981c01a7597ed"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/nccl.py",
+            "sha256": "eb883fe485edd2e1cdec4e141a73f2cbf76acc3a22af063ab6fdf69263d8dc48"
+          }
+        ],
+        "responsibility": "NCCL library 탐색과 communicator 설정",
+        "change_summary": "railed GIN query·process communicator별 env pin/복원 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "DEPENDENCY",
+          "DISTRIBUTED_IPC"
+        ],
+        "anchor": "pin_nccl_env",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "통신 library·IPC 관련 범위이며 보안 포트 노출이나 GPU driver 변경을 확인하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-57",
+        "status": "M",
+        "before_path": "vllm/utils/network_utils.py",
+        "after_path": "vllm/utils/network_utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/network_utils.py",
+            "sha256": "2cca3b95f522ed7435c55133b31e699989366fce4b258372781d56cbca041c4f"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/network_utils.py",
+            "sha256": "c809593e6b3c297f64675515ce64cdc1b0aaaeab328743f8ccc33b85d55d23a6"
+          }
+        ],
+        "responsibility": "ZMQ/TCP/IPC socket 주소·listener 관리",
+        "change_summary": "supervisor listener·socket fd 전달·공통 buffer policy 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "DISTRIBUTED_IPC"
+        ],
+        "anchor": "ZmqListener",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "일반 네트워크 helper를 HTTP API_ROUTE나 AUTH로 분류하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-58",
+        "status": "M",
+        "before_path": "vllm/utils/numa_wrapper.sh",
+        "after_path": "vllm/utils/numa_wrapper.sh",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/numa_wrapper.sh",
+            "sha256": "dd2f1e45fd10334f02d4c0420a7f9933160d56b2f35029a55b10e30229666c97"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/numa_wrapper.sh",
+            "sha256": "0f256fa1a277bf0b12765b7bf09d9ec69ae8bd200db5ee129bf4dc33d9327b3f"
+          }
+        ],
+        "responsibility": "NUMA 실행 wrapper의 내부 환경·명령 검사",
+        "change_summary": "numactl argument 허용 문자 escaping 정정.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "내부 shell 실행 경계는 요청 CLI_OPTION 하나와 같다고 확정할 수 없다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-59",
+        "status": "M",
+        "before_path": "vllm/utils/system_utils.py",
+        "after_path": "vllm/utils/system_utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/system_utils.py",
+            "sha256": "9be361854412a4d58cc9eef6b999346c606ab11d388e2644fc47fb454546255d"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/system_utils.py",
+            "sha256": "09b103712a196e93e708ccc1d8634c29032c260f74df727789ef79bced1df152"
+          }
+        ],
+        "responsibility": "process·환경·stdout·library 운영 helper",
+        "change_summary": "C stdout fd1 처리와 자식 강제종료 경고 추가.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "하나의 logging 관련 변경으로 파일의 다목적 환경·process 책임을 숨기지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-60",
+        "status": "M",
+        "before_path": "vllm/utils/torch_utils.py",
+        "after_path": "vllm/utils/torch_utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/utils/torch_utils.py",
+            "sha256": "31e8a695f7efa52584ce20cc33edfb643b70c28ce83d273feb34326c61ab631c"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/utils/torch_utils.py",
+            "sha256": "3518e60b59b657fda45bb8df09a05f2fcd78e94ae36a46d58953cd180351c00f"
+          }
+        ],
+        "responsibility": "tensor·random seed·thread·memory·device 다목적 helper",
+        "change_summary": "DP별 seed 파생·lazy pin memory·strided XPU tensor 처리 변경.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "SAMPLING이나 RUNNER_KERNEL 하나가 모든 thread·device·메모리 경계를 대표하지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-61",
+        "status": "M",
+        "before_path": "vllm/v1/engine/__init__.py",
+        "after_path": "vllm/v1/engine/__init__.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/v1/engine/__init__.py",
+            "sha256": "e7532e6c9fde4643cf31cd793d4ae4a6d618c71c87208430fb6680105dc1af42"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/v1/engine/__init__.py",
+            "sha256": "5a525d4fc6e9a802be0d211d98b42cd196ac3bfd91906eb98a9dd47a15ecac22"
+          }
+        ],
+        "responsibility": "engine core IPC 요청·출력 message schema",
+        "change_summary": "EngineCoreOutputs에 weight_version 추가.",
+        "disposition": "mapped",
+        "categories": [
+          "DISTRIBUTED_IPC",
+          "INPUT_PROCESSING",
+          "OUTPUT",
+          "SAMPLING"
+        ],
+        "anchor": "EngineCoreRequest",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "통신 schema의 요청·sampling·출력 합집합이며 실제 weight 갱신 성공을 주장하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-62",
+        "status": "M",
+        "before_path": "vllm/v1/engine/async_llm.py",
+        "after_path": "vllm/v1/engine/async_llm.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/v1/engine/async_llm.py",
+            "sha256": "ff933ed78aa3195782cf1c6d18c53897adfa5bf920421bd2bcc330f2adc84d1e"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/v1/engine/async_llm.py",
+            "sha256": "3491dde64ef226b9f65e4341c944615cf6ebd23de3210293dc66767c4c18365c"
+          }
+        ],
+        "responsibility": "async frontend 생성·admission·output·profiler 생명주기",
+        "change_summary": "profiler session guard·admission metric·stream 오류·watermark·weight 출력 변경.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "PROFILER 하나만 붙여 나머지 복합 동작을 미분류 집계에서 숨기지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-63",
+        "status": "M",
+        "before_path": "vllm/v1/engine/core.py",
+        "after_path": "vllm/v1/engine/core.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/v1/engine/core.py",
+            "sha256": "f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/v1/engine/core.py",
+            "sha256": "458fd729771681b124d3a4d5b1c575f689bf789a5e0c8cc9f5c524eb6ec84f87"
+          }
+        ],
+        "responsibility": "engine core scheduler·KV·worker·실패 생명주기",
+        "change_summary": "encoder width·KV alignment·weight version·profiler·초기 signal 종료 처리 변경.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "CACHE 하나로 전체 engine core의 scheduler·실패 동작을 대신하지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-64",
+        "status": "M",
+        "before_path": "vllm/v1/engine/core_client.py",
+        "after_path": "vllm/v1/engine/core_client.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/v1/engine/core_client.py",
+            "sha256": "24eecc78e8fc4849d4eac948c7586ee349ebfd503d07e80f05ec6c859da06fdd"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/v1/engine/core_client.py",
+            "sha256": "386b528a69029507f80a2df4d6df2a4fa6ba2ba811501dc3449ceea58b5cd90a"
+          }
+        ],
+        "responsibility": "engine core inproc/MP/Ray 통신 client·profile 전달",
+        "change_summary": "supervisor socket listener 상속·closed loop teardown·profiler override 전달 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "DISTRIBUTED_IPC",
+          "PROFILER"
+        ],
+        "anchor": "EngineCoreClient",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "IPC client에 profile 전달 책임도 보존하며 실제 프로파일러 실행을 주장하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-65",
+        "status": "M",
+        "before_path": "vllm/v1/engine/detokenizer.py",
+        "after_path": "vllm/v1/engine/detokenizer.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/v1/engine/detokenizer.py",
+            "sha256": "27bf6ae418754de91228d798405058b66d1484f793fd45f9d69396dfca5e9fa4"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/v1/engine/detokenizer.py",
+            "sha256": "b9e23b5714b80fbccbff3149541f690bc3ff1d41b064f27bfa7fe85b2bc15476"
+          }
+        ],
+        "responsibility": "증분 token 출력 decode와 sampling stop 처리",
+        "change_summary": "fast detokenizer 선택 단순화·min_tokens 경계·stop 이후 token 잘라내기 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "OUTPUT",
+          "SAMPLING"
+        ],
+        "anchor": "uses_fast_detokenizer",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "출력 detokenization은 tool grammar OUTPUT_PARSING과 다르다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-66",
+        "status": "M",
+        "before_path": "vllm/v1/engine/input_processor.py",
+        "after_path": "vllm/v1/engine/input_processor.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/v1/engine/input_processor.py",
+            "sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/v1/engine/input_processor.py",
+            "sha256": "97f66659814177d3f7b72b959f09201cbdd1794de21ec1542fe8970f18a1a2b6"
+          }
+        ],
+        "responsibility": "요청 입력·sampling 검증과 요청별 복사",
+        "change_summary": "watermark를 caller 공유 params 대신 요청 복사에 적용·logprob row 검증·token ID 위임.",
+        "disposition": "mapped",
+        "categories": [
+          "INPUT_PROCESSING",
+          "SAMPLING"
+        ],
+        "anchor": "InputProcessor",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "입력/sampling 책임의 관련성만 분류하며 REQ-09 등 보안 판정 성공을 뜻하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-67",
+        "status": "M",
+        "before_path": "vllm/v1/engine/llm_engine.py",
+        "after_path": "vllm/v1/engine/llm_engine.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/v1/engine/llm_engine.py",
+            "sha256": "fd838313336aff1734a435f606bbdc705ee7efac94c479e26c2cc87eee0f82a8"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/v1/engine/llm_engine.py",
+            "sha256": "b3a9df98e2f0f1cd29fcbb7b079c292f680902a9b578d0d1002015a9a7d6cf15"
+          }
+        ],
+        "responsibility": "동기 engine 요청·cache·output·profiler 생명주기",
+        "change_summary": "request watermark·MM cache invalidation·weight version·profile guard·wake 상태 변경.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "단일 PROFILER나 CACHE로 다른 책임을 가리지 않고 미분류 유지한다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      },
+      {
+        "id": "original69-68",
+        "status": "M",
+        "before_path": "vllm/v1/engine/utils.py",
+        "after_path": "vllm/v1/engine/utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/v1/engine/utils.py",
+            "sha256": "2f5b1b802ca31f19545ba00c68afc83cbbec4e55399e311e9102ce7a483254ab"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/v1/engine/utils.py",
+            "sha256": "8740c9af331597573d59941d3d65a58dbfd93c92f0144fd187b44bb25a6e4a2e"
+          }
+        ],
+        "responsibility": "engine process/actor 기동·IPC·정지·liveness 관리",
+        "change_summary": "listener 소유권·Ray 자원 탐색·새 actor 추적·startup IPC 변경.",
+        "disposition": "mapped",
+        "categories": [
+          "DISTRIBUTED_IPC",
+          "FAILURE",
+          "STARTUP_HEALTH"
+        ],
+        "anchor": "EngineZmqListeners",
+        "rule": "review69-exact-files",
+        "reason": "원본 소스의 확인된 파일 책임을 기존 category 합집합으로 연결한다.",
+        "counterexample_or_risk": "기동·IPC·실패 관련 합집합이며 engine generation 커널을 임의로 포함하지 않는다.",
+        "selection_effect": "관련 category의 기존 연결만 추가하며, 남은 다른 미분류의 확대 선정은 유지한다.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "제안한 파일 책임·category 합집합이 적절한지 확인."
+      },
+      {
+        "id": "original69-69",
+        "status": "M",
+        "before_path": "vllm/v1/utils.py",
+        "after_path": "vllm/v1/utils.py",
+        "source_views": [
+          {
+            "side": "baseline",
+            "path": "vllm/v1/utils.py",
+            "sha256": "6d8d703e2918686bfe791936fc0e5e196cb77e4724e05f0da340ae783b12cb73"
+          },
+          {
+            "side": "candidate",
+            "path": "vllm/v1/utils.py",
+            "sha256": "f9f5b3f1d0c5483dc742cba066cf232dfde053970221a52627716d18420ab638"
+          }
+        ],
+        "responsibility": "API process·tensor buffer·usage·일반 자료구조 helper",
+        "change_summary": "ZMQ listener 상속·frontend 부하 배분·시작 실패 cleanup 변경.",
+        "disposition": "unmapped",
+        "categories": [],
+        "anchor": null,
+        "rule": null,
+        "reason": "다목적 또는 기존 category 대응이 불명확해 파일 전체를 흡수하지 않고 미분류·확대 선정을 유지한다.",
+        "counterexample_or_risk": "실제 IPC delta를 확인했어도 파일 전체 일반 helper를 IPC로 영구 흡수하지 않는다.",
+        "selection_effect": "기존 미분류 확대 선정 유지.",
+        "review_status": "AGENT_REVIEWED_HUMAN_PENDING",
+        "human_question": "현행 category로 부분 연결할지, 복합 책임을 어떻게 보수적으로 표현할지 검토 필요."
+      }
+    ]
+  },
+  "limited_name_review": {
+    "status": "AGENT_REVIEWED_HUMAN_PENDING",
+    "template": {
+      "action": "REFINED",
+      "reason": "입력 fallback과 출력 grammar를 분리한다.",
+      "negative_sources": [
+        {
+          "path": "vllm/parser/response_template.py",
+          "sha256": "df141136d3390130887da63d38c384fea5bb6b4589fd1a46f60f25c90b7501a9",
+          "anchor": "ResponseTemplateToolParser"
+        },
+        {
+          "path": "vllm/parser/chat_parsing/response_templates.py",
+          "sha256": "d68f89cbc5ee1ef11a1489acb2071b2374fc2513245c1bbe95d76adac47ae6a4",
+          "anchor": "load_response_template"
+        },
+        {
+          "path": "rust/src/parser/src/unified/hf/template.rs",
+          "sha256": "f3c6f5817caa1a31e7db0f76edb9dfa0e73bb65636f4706d74db739ff2dc295a",
+          "anchor": "ResponseTemplate"
+        }
+      ]
+    },
+    "sampling": {
+      "action": "PRESERVED_PARTIAL_REVIEW",
+      "source": {
+        "path": "vllm/sampling_params.py",
+        "sha256": "88fb3ac6ac3a456be62f5ac2afa7262cec5e00e82c6b425bdefa121cb525cd8a",
+        "anchor": "SamplingParams"
+      },
+      "limitation": "대표 파일의 sampling 검증 책임은 맞지만 모든 유사 이름을 전수 음성 검증하지 않았다."
+    },
+    "lora": {
+      "action": "PRESERVED_PARTIAL_REVIEW",
+      "source": {
+        "path": "vllm/lora/request.py",
+        "sha256": "d66435c6431c9ee7d3b4abee6ca2828302678a2feca5c377f6408ad5781bc642",
+        "anchor": "LoRARequest"
+      },
+      "limitation": "어댑터 선택 request 책임을 확인했으나 이름 규칙의 범용 정확성을 입증하지 않았다."
+    },
+    "metrics": {
+      "action": "PRESERVED_PARTIAL_REVIEW",
+      "source": {
+        "path": "vllm/v1/metrics/buckets.py",
+        "sha256": "32c0eaae832df0bc8044c91ec5f9d4606a0d5b8a199f1bf31013d8b5635e796e",
+        "anchor": "histogram_buckets"
+      },
+      "limitation": "Prometheus bucket 책임을 확인했으나 metrics/Cargo.toml 같은 package metadata의 경로 과분류 위험은 남는다."
+    }
+  }
+}

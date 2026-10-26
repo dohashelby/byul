@@ -1,12 +1,11 @@
 id: SUP-15
 framework_id: CHK-SUP-015
+mechanism_ids:
+- mechanism-04
 revision: 2
 retired: false
 area: SUP
-purpose: 재사용 적합성
-framework_purpose: 재사용 문맥의 호환성
-mechanism_ids:
-- mechanism-04
+purpose: 재사용 문맥의 호환성
 secondary_purposes: []
 question: 모델·도구·설정이 바뀌면 더 이상 맞지 않는 생성물이나 캐시를 재사용하지 않는가?
 scope: null

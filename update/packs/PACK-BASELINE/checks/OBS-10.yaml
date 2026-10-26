@@ -1,12 +1,11 @@
 id: OBS-10
 framework_id: CHK-OBS-010
+mechanism_ids:
+- mechanism-17
 revision: 2
 retired: false
 area: OBS
-purpose: 증거의 신뢰성
-framework_purpose: 기록 위변조 방지
-mechanism_ids:
-- mechanism-17
+purpose: 기록 위변조 방지
 secondary_purposes: []
 question: 기록을 허락 없이 바꾸거나 지우는 일을 제한하고 확인할 수 있는가?
 scope: 실제 기록 저장소

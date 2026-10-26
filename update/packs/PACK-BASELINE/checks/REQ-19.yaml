@@ -1,12 +1,11 @@
 id: REQ-19
 framework_id: CHK-REQ-019
+mechanism_ids:
+- mechanism-05
 revision: 2
 retired: false
 area: REQ
-purpose: 실행 상태·메모리 안전
-framework_purpose: GPU 메모리 안전성
-mechanism_ids:
-- mechanism-05
+purpose: GPU 메모리 안전성
 secondary_purposes: []
 question: 실제 사용하는 GPU 연산 코드가 입력·버퍼 경계를 지키고 필요한 영역을 초기화하는가?
 scope: 선정 구현 조건

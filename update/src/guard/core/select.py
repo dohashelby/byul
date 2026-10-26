@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from fnmatch import fnmatchcase
 from typing import Any
+from typing import TYPE_CHECKING
 
 from guard.models import (
     Applicability,
@@ -21,6 +22,9 @@ from guard.models import (
     weakest_origin,
 )
 from guard.models.objects import Change, ConditionEval, FactValue, PlanInputs, PlanItem
+
+if TYPE_CHECKING:
+    from .change_selection import SelectionContext
 
 ENV_COUNT = {Mode.audit: 1, Mode.update: 2}
 
@@ -132,11 +136,13 @@ def select(
     policy: Policy,
     change: Change | None = None,
     mode: Mode | str = Mode.audit,
+    *,
+    context: SelectionContext | None = None,
 ) -> Plan:
     mode = Mode(mode)
     if len(envs) != ENV_COUNT[mode]:
         raise ValueError(f"{mode.value} mode needs {ENV_COUNT[mode]} environment(s), got {len(envs)}")
-    if change is not None and mode != Mode.update:
+    if change is not None and mode != Mode.update and context is None:
         raise ValueError("change analysis is only used in update mode")
     pack_ref = pack.ref()
     if policy.pack != pack_ref:
@@ -171,7 +177,7 @@ def select(
         not_selected: NotSelectedReason | None = None
         if not _in_scope(cid, policy):
             not_selected = NotSelectedReason.POLICY_SCOPE
-        elif applicability == Applicability.NOT_APPLICABLE and not trig:
+        elif applicability == Applicability.NOT_APPLICABLE and (context is not None or not trig):
             not_selected = NotSelectedReason.NOT_APPLICABLE
         if trig and not_selected is None and applicability == Applicability.NOT_APPLICABLE:
             reason += f"; selected because change facts {trig} relate to it"
@@ -190,6 +196,19 @@ def select(
             if any(p.required and p.key not in values for p in check.policy_params):
                 gaps.append(Gap.NO_POLICY_VALUE)
 
+        carried = None
+        item_triggers = []
+        if context is not None:
+            item_triggers = context.triggers.get(cid, [])
+            if not_selected is None and not context.full_scope and cid not in context.triggers:
+                carried = context.carried_over.get(cid)
+                if carried is not None:
+                    not_selected = NotSelectedReason.CARRIED_OVER
+                    gaps = []
+                    reason += "; prior security PASS carried by exact evidence/result references"
+            if context.full_scope:
+                reason += f"; U1 full scope: {context.reason or context.change_type}"
+
         items.append(
             PlanItem(
                 check_id=cid,
@@ -203,6 +222,8 @@ def select(
                 gaps=gaps,
                 priority=check.review_order,
                 executor=check.executor,
+                triggers=item_triggers,
+                carried_over=carried,
             )
         )
 
@@ -212,6 +233,13 @@ def select(
     refs = [pack_ref, *(e.ref() for e in envs), policy.ref()]
     if change is not None:
         refs.append(change.ref())
+    if context is not None:
+        if context.previous_plan is not None:
+            refs.append(context.previous_plan)
+        for carried in context.carried_over.values():
+            for ref in (carried.result, carried.evidence):
+                if ref not in refs:
+                    refs.append(ref)
     origin = weakest_origin([*(e.data_origin for e in envs), policy.data_origin, *([change.data_origin] if change else [])])
     return Plan(
         id=new_id("PLAN"),
@@ -223,7 +251,9 @@ def select(
             environments=[e.ref() for e in envs],
             policy=policy.ref(),
             change=change.ref() if change else None,
+            previous_plan=context.previous_plan if context is not None else None,
         ),
+        change_type=context.change_type if context is not None else None,
         items=items,
         inventory_complete=inventory,
     ).seal()

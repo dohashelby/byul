@@ -1,12 +1,11 @@
 id: LIF-13
 framework_id: CHK-LIF-013
+mechanism_ids:
+- mechanism-13
 revision: 2
 retired: false
 area: LIF
-purpose: 종결·자원 회수
-framework_purpose: 실행 상태·버퍼 수명
-mechanism_ids:
-- mechanism-13
+purpose: 실행 상태·버퍼 수명
 secondary_purposes: []
 question: 공유 가중치 전체 해제 후 재취득·대체 공급과 기존 참조의 사용이 승인·접근·수명 기준을 지키는가?
 scope: 조건부; 공유 weights copy/zero-copy

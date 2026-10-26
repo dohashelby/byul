@@ -1,12 +1,11 @@
 id: LIF-01
 framework_id: CHK-LIF-001
+mechanism_ids:
+- mechanism-07
 revision: 2
 retired: false
 area: LIF
-purpose: 자원 사용 제한
-framework_purpose: 자원 예산·공정성
-mechanism_ids:
-- mechanism-07
+purpose: 자원 예산·공정성
 secondary_purposes: []
 question: 모델을 가져와 해석·변환·로딩할 때 단계별·전체 자원 예산을 지키는가?
 scope: 기본; compile은 활성 시

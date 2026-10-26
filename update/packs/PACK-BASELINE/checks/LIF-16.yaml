@@ -1,13 +1,12 @@
 id: LIF-16
 framework_id: CHK-LIF-016
-revision: 2
-retired: false
-area: LIF
-purpose: 복구 상태의 적합성
-framework_purpose: 복구 정책·상태 검증
 mechanism_ids:
 - mechanism-08
 - mechanism-10
+revision: 2
+retired: false
+area: LIF
+purpose: 복구 정책·상태 검증
 secondary_purposes: []
 question: 변조된 복원 자료나 남은 상태가 복구 결과에 섞이지 않는가?
 scope: 백업 사용 시; 특수 snapshot은 선택

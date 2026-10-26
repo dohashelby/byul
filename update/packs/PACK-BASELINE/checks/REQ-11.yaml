@@ -1,12 +1,11 @@
 id: REQ-11
 framework_id: CHK-REQ-011
+mechanism_ids:
+- mechanism-04
 revision: 4
 retired: false
 area: REQ
-purpose: 요청·상태·결과 귀속
-framework_purpose: 요청·결과 귀속
-mechanism_ids:
-- mechanism-04
+purpose: 요청·결과 귀속
 secondary_purposes: []
 question: 동시 요청과 스트리밍 응답이 각각 올바른 요청자에게 돌아가는가?
 scope: 기본

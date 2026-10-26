@@ -1,12 +1,11 @@
 id: LIF-04
 framework_id: CHK-LIF-004
+mechanism_ids:
+- mechanism-07
 revision: 2
 retired: false
 area: LIF
-purpose: 자원 사용 제한
-framework_purpose: 자원 예산·공정성
-mechanism_ids:
-- mechanism-07
+purpose: 자원 예산·공정성
 secondary_purposes: []
 question: 응답을 느리게 읽는 연결과 진단용 버퍼가 자원을 과도하게 차지하지 않는가?
 scope: SSE 기본; response debug는 활성 시

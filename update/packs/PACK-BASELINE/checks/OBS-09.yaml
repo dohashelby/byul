@@ -1,12 +1,11 @@
 id: OBS-09
 framework_id: CHK-OBS-009
+mechanism_ids:
+- mechanism-17
 revision: 3
 retired: false
 area: OBS
-purpose: 증거의 신뢰성
-framework_purpose: 기록 위변조 방지
-mechanism_ids:
-- mechanism-17
+purpose: 기록 위변조 방지
 secondary_purposes: []
 question: 요청에 넣은 값으로 로그의 사용자·대상·상태를 위조할 수 없는가?
 scope: 입력값이 기록에 들어가는 경로

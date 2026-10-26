@@ -1,12 +1,11 @@
 id: PLT-12
 framework_id: CHK-PLT-012
+mechanism_ids:
+- mechanism-12
 revision: 2
 retired: false
 area: PLT
-purpose: 권한·자격 철회
-framework_purpose: 권한 철회
-mechanism_ids:
-- mechanism-12
+purpose: 권한 철회
 secondary_purposes: []
 question: 폐기한 자격의 사본으로 다시 접근할 수 없는가?
 scope: 자격 전달·저장·교체 시

@@ -1,12 +1,11 @@
 id: OBS-12
 framework_id: CHK-OBS-012
+mechanism_ids:
+- mechanism-14
 revision: 2
 retired: false
 area: OBS
-purpose: 보존·삭제 관리
-framework_purpose: 보존·삭제
-mechanism_ids:
-- mechanism-14
+purpose: 보존·삭제
 secondary_purposes: []
 question: 로그·사용 통계·진단의 원본과 사본이 정한 보존·삭제 범위를 지키는가?
 scope: 실제 저장·내보내기·백업 경로

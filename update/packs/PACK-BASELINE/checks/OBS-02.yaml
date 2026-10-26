@@ -1,13 +1,12 @@
 id: OBS-02
 framework_id: CHK-OBS-002
-revision: 2
-retired: false
-area: OBS
-purpose: 필요한 사건의 기록
-framework_purpose: 실행 상태 관측·수집 건전성
 mechanism_ids:
 - mechanism-17
 - mechanism-13
+revision: 2
+retired: false
+area: OBS
+purpose: 실행 상태 관측·수집 건전성
 secondary_purposes: []
 question: 준비·실패·종료 기록이 실제 실행 상태와 일치하는가?
 scope: 기본; 선택 profiler 별도

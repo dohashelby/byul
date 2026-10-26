@@ -38,6 +38,7 @@ from guard.models.objects import (
     SideResult,
 )
 from guard.store import Store
+from guard.report.change import summarize_change
 
 from .aggregate import aggregate
 from .compare import compare_results, comparison_differences
@@ -122,6 +123,28 @@ def _functional_scope(check, evd: Evidence | None) -> FunctionalScope | None:
     return FunctionalScope(probed=n, of=m, label=f"기능 확인 범위: {n} / 등록 경로 {m if m is not None else '?'} (표본)")
 
 
+def _previous_results(store: Store, plan: Plan) -> tuple[dict[str, Result], list[Evidence]]:
+    """이전 PLAN의 참고 판정. 현재 실행·Comparison과 섞지 않는다."""
+    previous_ref = getattr(plan.inputs, "previous_plan", None)
+    if previous_ref is None or plan.mode != Mode.audit:
+        return {}, []
+    previous = store.resolve(previous_ref)
+    side = Side.single if previous.mode == Mode.audit else Side.candidate
+    evidence = {e.check_id: e for e in store.find_latest("EVD", lambda e: e.plan == previous_ref and e.side == side)}
+    keys = {(e.id, e.revision, e.content_sha256) for e in evidence.values()}
+    results = {r.check_id: r for r in store.find_latest(
+        "RES", lambda r: (r.evidence.id, r.evidence.revision, r.evidence.sha256) in keys)}
+    for item in previous.items:
+        carried = getattr(item, "carried_over", None)
+        if carried is not None:
+            result = store.resolve(carried.result)
+            evd = store.resolve(carried.evidence)
+            if result.evidence != carried.evidence or result.check_id != item.check_id or evd.check_id != item.check_id:
+                raise ValueError("previous carried-over result/evidence references do not match")
+            results[item.check_id], evidence[item.check_id] = result, evd
+    return results, list(evidence.values())
+
+
 def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Report:
     if plan.inputs.pack != pack.ref():
         raise ValueError("plan was made with a different pack revision")
@@ -138,6 +161,10 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
         results[(r.check_id, r.side)] = r  # 최신 EVD revision을 가리키는 최신 RES
 
     sides = [Side.single] if plan.mode == Mode.audit else [Side.baseline, Side.candidate]
+    previous_results, previous_evidence = _previous_results(store, plan)
+    carried_results: list[Result] = []
+    carried_evidence: list[Evidence] = []
+    carried_times: list[dict] = []
     limitations: list[str] = []
     rows: list[CheckRow] = []
     not_selected: list[NotSelected] = []
@@ -156,10 +183,36 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
             review_order=check.review_order, impact=check.impact, applicability=item.applicability,
             selected=item.selected, gaps=item.gaps,
         )
+        if getattr(item, "triggers", None):
+            row["triggers"] = item.triggers
+        if check.id in previous_results:
+            row["previous_result"] = _side(previous_results[check.id])
+        carried = getattr(item, "carried_over", None)
         if not item.selected:
             not_selected.append(NotSelected(check_id=check.id, reason=item.not_selected_reason.value))
+            if carried is not None:
+                result = store.resolve(carried.result)
+                evidence = store.resolve(carried.evidence)
+                if result.evidence != carried.evidence or result.check_id != check.id or evidence.check_id != check.id:
+                    raise ValueError("carried-over result/evidence references do not match")
+                if result.verdicts.security != Verdict.PASS:
+                    raise ValueError("carried-over security result must be PASS")
+                row["carried_over"] = carried
+                row["single"] = _side(result)
+                carried_results.append(result)
+                carried_evidence.append(evidence)
+                carried_times.append(dict(check_id=check.id, result=carried.result.model_dump(mode="json"),
+                                          evidence=carried.evidence.model_dump(mode="json"),
+                                          executed_at=(evidence.execution.finished_at or evidence.execution.started_at
+                                                       or evidence.created_at).isoformat(),
+                                          judged_at=carried.judged_at.isoformat(),
+                                          data_origin=evidence.data_origin.value,
+                                          verification_level=result.verification_level.value if result.verification_level else None,
+                                          evidence_source=_source(evidence)))
             rows.append(CheckRow(**row))
-            if item.not_selected_reason == NotSelectedReason.NOT_APPLICABLE:
+            if carried is not None:
+                verdict = result.verdicts.security
+            elif item.not_selected_reason == NotSelectedReason.NOT_APPLICABLE:
                 verdict = Verdict.NOT_APPLICABLE
             else:
                 continue  # 정책 범위 밖: 집계하지 않는다
@@ -225,15 +278,28 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
         inputs.append(plan.inputs.change)
     inputs += sorted((e.ref() for e in evds.values()), key=lambda r: r.id)
     inputs += sorted((r.ref() for r in results.values()), key=lambda r: r.id)
+    previous_ref = getattr(plan.inputs, "previous_plan", None)
+    if previous_ref is not None:
+        inputs.append(previous_ref)
+    inputs += [e.ref() for e in [*carried_evidence, *previous_evidence]]
+    inputs += [r.ref() for r in [*carried_results, *previous_results.values()]]
+    # 동일 Ref만 합친다. 같은 ID의 다른 revision은 각각 보존한다.
+    if previous_ref is not None or carried_results:
+        inputs = list({(ref.id, ref.revision, ref.sha256): ref for ref in inputs}.values())
 
     origins = [e.data_origin for e in envs] + [policy.data_origin, plan.data_origin]
     origins += [e.data_origin for e in evds.values()] + [r.data_origin for r in results.values()]
+    origins += [e.data_origin for e in [*carried_evidence, *previous_evidence]]
+    origins += [r.data_origin for r in [*carried_results, *previous_results.values()]]
     data_origin = weakest_origin(origins) or DataOrigin.EXAMPLE
 
     # INV-17 및 한계
     for e in evds.values():
         for error in e.execution.cleanup_errors:
             limitations.append(f"{e.check_id}/{e.side.value}: {error}")
+    for e in carried_evidence:
+        for error in e.execution.cleanup_errors:
+            limitations.append(f"{e.check_id}/carried 원 실행: {error}")
     if policy.status != PolicyStatus.CONFIRMED:
         limitations.insert(0, "정책 DRAFT: 공식 아님")
     if not pack.reviewed:
@@ -251,7 +317,7 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
                 f"엔진 소스 commit({e.id}): {label} — 관측 {e.engine.source_commit or '없음'}, "
                 f"고정 {e.engine.expected_source_commit or '미지정'}")
     for r in rows:
-        if r.selected:
+        if r.selected or r.carried_over is not None:
             for note in getattr(pack.checks[r.check_id], "limitations", []) or []:
                 limitations.append(f"{r.check_id}: {_fill_policy(note, policy.values.get(r.check_id, {}))}")
     if DataOrigin.EXAMPLE in origins:
@@ -277,6 +343,25 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
     replaced_rows = [r.check_id for r in rows if r.replaced is not None]
     if replaced_rows:
         limitations.append(f"출처가 다른 이전 증거를 대체한 점검 {len(replaced_rows)}건: {', '.join(replaced_rows)} (행의 '대체됨' 참고)")
+    change_summary = summarize_change(store, pack, plan, evds)
+    carry_counts = None
+    if change_summary is not None:
+        if carried_times:
+            change_summary["carried_results"] = carried_times
+        carry_counts = {
+            "selected": sum(item.selected for item in plan.items),
+            "executed": sum(c["automated"] + c["manual"] for c in counts.values()),
+            "measured": len({e.check_id for e in evds.values()
+                             if e.data_origin == DataOrigin.MEASURED and e.execution.status == ExecStatus.COMPLETED}),
+            "carried": len(carried_results),
+            "not_run": sum(c["not_run"] for c in counts.values()),
+            "manual_required": len(manual),
+        }
+        if carried_results:
+            limitations.append(f"이월 PASS {len(carried_results)}건은 집계에 포함하며 이번 실행·실측으로 세지 않음")
+        if any(e.execution.operator is not None for e in carried_evidence):
+            limitations.append("이월한 수동 증거는 인증되지 않은 자기 신고(DECLARED)이며 자동 실측이 아님")
+        limitations.extend(change_summary["limitations"])
     official = (
         policy.status == PolicyStatus.CONFIRMED and pack.reviewed and DataOrigin.EXAMPLE not in origins
     )
@@ -297,4 +382,6 @@ def build_report(store: Store, pack: Pack, plan: Plan, as_of: datetime) -> Repor
         limitations=limitations,
         approval=None,
         evidence_counts={a: EvidenceCount(**c) for a, c in sorted(counts.items())},
+        change_summary=change_summary,
+        carry_counts=carry_counts,
     ).seal()

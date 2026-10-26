@@ -1,13 +1,12 @@
 id: REQ-05
 framework_id: CHK-REQ-005
-revision: 2
-retired: false
-area: REQ
-purpose: 요청·대상 접근 권한
-framework_purpose: 작업·대상 인가
 mechanism_ids:
 - mechanism-01
 - mechanism-08
+revision: 2
+retired: false
+area: REQ
+purpose: 작업·대상 인가
 secondary_purposes: []
 question: 최종 선택된 모델에 호출자의 사용 권한이 적용되고, 사용 종료한 모델의 실행이 차단되는가?
 scope: 기본+선택 기능

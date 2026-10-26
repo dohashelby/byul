@@ -1,12 +1,11 @@
 id: LIF-10
 framework_id: CHK-LIF-010
+mechanism_ids:
+- mechanism-13
 revision: 2
 retired: false
 area: LIF
 purpose: 종결·자원 회수
-framework_purpose: 종결·자원 회수
-mechanism_ids:
-- mechanism-13
 secondary_purposes: []
 question: 취소·연결 종료 후 실제 작업이 정한 기한 안에 중단되고, 더 이상 사용하지 않는 상태·자원이 정리되는가?
 scope: 일반·stream 기본

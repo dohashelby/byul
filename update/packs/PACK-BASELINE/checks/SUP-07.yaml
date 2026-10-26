@@ -1,12 +1,11 @@
 id: SUP-07
 framework_id: CHK-SUP-007
+mechanism_ids:
+- mechanism-09
 revision: 2
 retired: false
 area: SUP
-purpose: 실제 사용의 일치·무결성
-framework_purpose: 실제 사용의 무결성
-mechanism_ids:
-- mechanism-09
+purpose: 실제 사용의 무결성
 secondary_purposes: []
 question: 생성된 코드·파일이나 공유 컴파일 캐시를 권한 없이 바꿀 수 없는가?
 scope: null

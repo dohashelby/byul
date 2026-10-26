@@ -121,9 +121,12 @@ def test_rev2_saved_definition_keeps_its_original_rule_contract():
     current, evd = sample("REQ-11")
     for key in ("input_projection_verified", "output_binding_verified", "output_binding_gap"):
         del evd.observations[key]
-    # Legacy judgment uses notes keyed by the frozen legacy definition.
+    # The refreshed checklist combines these prose prompts. A legacy input
+    # must answer the saved definition's separate prompts, not today's text.
     evd.observations["declared_observation_notes"].value = {
-        key: "EXAMPLE supplied legacy observation note" for key in legacy.required_observations_prose}
+        item: "EXAMPLE supplied observation note" for item in legacy.required_observations_prose
+    }
+    evd.normal_control.detail = f"EXAMPLE: {legacy.normal_control}"
     before = (legacy.model_dump(mode="json"), evd.to_dict())
     automatic = RuleTableJudge().judge(legacy, evd, legacy.judge.params, VALUES)
     declared = DeclaredJudge().judge(legacy, evd, {}, VALUES)

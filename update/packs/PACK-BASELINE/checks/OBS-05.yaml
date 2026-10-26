@@ -1,12 +1,11 @@
 id: OBS-05
 framework_id: CHK-OBS-005
+mechanism_ids:
+- mechanism-15
 revision: 3
 retired: false
 area: OBS
-purpose: 수집 정보 제한
-framework_purpose: 부가정보 수집·송신 통제
-mechanism_ids:
-- mechanism-15
+purpose: 부가정보 수집·송신 통제
 secondary_purposes: []
 question: 허용한 사용 통계 보고가 정한 항목과 목적지 범위를 지키는가?
 scope: 조건부; usage 허용

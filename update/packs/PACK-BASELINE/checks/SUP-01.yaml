@@ -1,12 +1,11 @@
 id: SUP-01
 framework_id: CHK-SUP-001
+mechanism_ids:
+- mechanism-01
 revision: 3
 retired: false
 area: SUP
-purpose: 생성·변경·승인 권한
-framework_purpose: 승인 권한 분리
-mechanism_ids:
-- mechanism-01
+purpose: 승인 권한 분리
 secondary_purposes: []
 question: 파일 제출·저장소 수정 권한과 승인 기록 변경 권한이 분리되어 있는가?
 scope: null

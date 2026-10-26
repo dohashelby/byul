@@ -1,12 +1,11 @@
 id: OBS-01
 framework_id: CHK-OBS-001
+mechanism_ids:
+- mechanism-17
 revision: 2
 retired: false
 area: OBS
-purpose: 필요한 사건의 기록
-framework_purpose: 필수 사건 기록
-mechanism_ids:
-- mechanism-17
+purpose: 필수 사건 기록
 secondary_purposes: []
 question: 필수 접근·관리·승인 기록으로 누가 무엇을 어느 실행에서 했는지 확인할 수 있는가?
 scope: 기본 접근·관리·공급물·배포; 필수 사건은 정책으로 선정

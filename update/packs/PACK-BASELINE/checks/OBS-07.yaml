@@ -1,12 +1,11 @@
 id: OBS-07
 framework_id: CHK-OBS-007
+mechanism_ids:
+- mechanism-01
 revision: 3
 retired: false
 area: OBS
-purpose: 자료 이용 권한
-framework_purpose: 작업·대상 인가
-mechanism_ids:
-- mechanism-01
+purpose: 작업·대상 인가
 secondary_purposes: []
 question: 진단 자료를 읽을 수 있다는 이유만으로 재실행까지 할 수 없는가?
 scope: 조건부; replay 지원 구현

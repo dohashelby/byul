@@ -1,12 +1,11 @@
 id: PLT-11
 framework_id: CHK-PLT-011
+mechanism_ids:
+- mechanism-12
 revision: 2
 retired: false
 area: PLT
-purpose: 권한·자격 철회
-framework_purpose: 권한 철회
-mechanism_ids:
-- mechanism-12
+purpose: 권한 철회
 secondary_purposes: []
 question: 이미 열린 연결과 공유 자원 접근권도 정한 철회 정책대로 제한되는가?
 scope: 조건부; 지속 연결·handle 존재

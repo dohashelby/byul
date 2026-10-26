@@ -1,13 +1,12 @@
 id: LIF-11
 framework_id: CHK-LIF-011
+mechanism_ids:
+- mechanism-13
+- mechanism-10
 revision: 2
 retired: false
 area: LIF
 purpose: 종결·자원 회수
-framework_purpose: 종결·자원 회수
-mechanism_ids:
-- mechanism-13
-- mechanism-10
 secondary_purposes: []
 question: 실패한 worker와 내부 통신·공유 자원을 정리해 다음 기동이 가능한가?
 scope: 기본 TP; Ray/PP는 별도 선택

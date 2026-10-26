@@ -1,12 +1,11 @@
 id: LIF-06
 framework_id: CHK-LIF-006
+mechanism_ids:
+- mechanism-04
 revision: 2
 retired: false
 area: LIF
 purpose: 변경 중 일관성
-framework_purpose: 변경 중 일관성
-mechanism_ids:
-- mechanism-04
 secondary_purposes: []
 question: 실행 중 변경이나 순차 교체 중에도 각 요청의 모델·상태가 일관되는가?
 scope: 조건부; live weights·LoRA·다중 replica

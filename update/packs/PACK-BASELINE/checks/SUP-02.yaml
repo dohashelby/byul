@@ -1,12 +1,11 @@
 id: SUP-02
 framework_id: CHK-SUP-002
+mechanism_ids:
+- mechanism-01
 revision: 3
 retired: false
 area: SUP
-purpose: 생성·변경·승인 권한
-framework_purpose: 작업·대상 인가
-mechanism_ids:
-- mechanism-01
+purpose: 작업·대상 인가
 secondary_purposes: []
 question: 배포 담당자가 허용받은 모델을 허용받은 환경에만 배포할 수 있는가?
 scope: null

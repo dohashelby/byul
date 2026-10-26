@@ -1,13 +1,12 @@
 id: REQ-14
 framework_id: CHK-REQ-014
-revision: 2
-retired: false
-area: REQ
-purpose: 요청·상태·결과 귀속
-framework_purpose: 요청·결과 귀속
 mechanism_ids:
 - mechanism-16
 - mechanism-04
+revision: 2
+retired: false
+area: REQ
+purpose: 요청·결과 귀속
 secondary_purposes: []
 question: 여러 실행 프로세스가 주고받는 중간 자료와 최종 출력이 원래 요청에 맞게 처리·반환되는가?
 scope: 기본+선택 기능

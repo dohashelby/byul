@@ -2,7 +2,7 @@
 name = "guard"
 version = "0.1.0"
 description = "서빙엔진 보안 검증 솔루션"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "pydantic>=2.6",
     "typer>=0.12",
@@ -28,5 +28,6 @@ pythonpath = ["src", "."]
 markers = [
     "engine: 실제 엔진(vLLM)이 필요한 테스트 (기본 실행에서 제외, 5b)",
     "docker: 로컬 Docker 실험실이 필요한 테스트 (기본 실행에서 제외, `-m docker`)",
+    "network: 명시적으로 실행하는 공개 소스 저장소 검증 (기본 실행에서 제외, `-m network`)",
 ]
-addopts = "-m 'not engine and not docker' --basetemp=.pytest_tmp -p no:cacheprovider"
+addopts = "-m 'not engine and not docker and not network' --basetemp=.pytest_tmp -p no:cacheprovider"

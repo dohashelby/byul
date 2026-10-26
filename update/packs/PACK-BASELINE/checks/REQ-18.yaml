@@ -1,12 +1,11 @@
 id: REQ-18
 framework_id: CHK-REQ-018
+mechanism_ids:
+- mechanism-04
 revision: 2
 retired: false
 area: REQ
-purpose: 실행 상태·메모리 안전
-framework_purpose: 실행 상태·버퍼 수명
-mechanism_ids:
-- mechanism-04
+purpose: 실행 상태·버퍼 수명
 secondary_purposes: []
 question: batch slot을 옮기거나 재사용할 때 이전 요청의 제한 상태가 남지 않는가?
 scope: 선택한 runner를 먼저 확인. V1 condense CPU mask 할당 분기에만 기존 mask 시험 적용; V2는 별도 입력·상태 경로

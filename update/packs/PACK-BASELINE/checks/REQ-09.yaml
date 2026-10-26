@@ -1,12 +1,11 @@
 id: REQ-09
 framework_id: CHK-REQ-009
+mechanism_ids:
+- mechanism-03
 revision: 7
 retired: false
 area: REQ
-purpose: 실제 입력의 검사
-framework_purpose: 최종 입력 검증
-mechanism_ids:
-- mechanism-03
+purpose: 최종 입력 검증
 secondary_purposes: []
 question: 토큰 번호와 입력 길이가 실제 모델과 처리 단계에서 허용하는 범위 안에 있는가?
 scope: 기본+선정 입력

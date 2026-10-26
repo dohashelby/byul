@@ -1,12 +1,11 @@
 id: REQ-08
 framework_id: CHK-REQ-008
+mechanism_ids:
+- mechanism-02
 revision: 2
 retired: false
 area: REQ
-purpose: 실제 입력의 검사
-framework_purpose: 최종 입력 검증
-mechanism_ids:
-- mechanism-02
+purpose: 최종 입력 검증
 secondary_purposes: []
 question: 미리 만든 토큰 ID를 재사용하는 입력도 필요한 검사를 거치는가?
 scope: 도달 조건 확인

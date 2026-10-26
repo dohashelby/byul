@@ -69,5 +69,6 @@
   ],
   "previous_byul_commit": "d119ebe446144ae707e6f13ad11eb0d786788217",
   "previous_checklist_sha256": "8c24b31ace48a695271766b2adc6360b8570590ee5d4485e451a50c48eaf4671",
-  "id_migration_basis": "Existing question and subtest_ids uniquely identify each internal ID in the old source; old/new subtest_ids and review_order match for all 77 rows. See ID_MAPPING.json."
+  "id_migration_basis": "Existing question and subtest_ids uniquely identify each internal ID in the old source; old/new subtest_ids and review_order match for all 77 rows. See ID_MAPPING.json.",
+  "merged_byul_main": "3b6a5d63ee4be9062a5a58e047789be929611839"
 }

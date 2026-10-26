@@ -1,12 +1,11 @@
 id: OBS-08
 framework_id: CHK-OBS-008
+mechanism_ids:
+- mechanism-09
 revision: 3
 retired: false
 area: OBS
-purpose: 자료 이용 권한
-framework_purpose: 자료 해석 안전성
-mechanism_ids:
-- mechanism-09
+purpose: 자료 해석 안전성
 secondary_purposes: []
 question: 재실행 도구가 변조된 진단 자료를 거부하고, 자료 해석 시 파일·통신·코드 실행 권한을 승인 범위로 제한하는가?
 scope: 조건부; replay parser

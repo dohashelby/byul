@@ -21,6 +21,7 @@ from guard.executors.sampling_validation import SUPPORTED_OPTIONS as SAMPLING_OP
 from guard.executors.log_analysis import (REQUIRED_BRANCHES as LOG_REQUIRED_BRANCHES,
                                           SUPPORTED_BRANCHES as LOG_SUPPORTED_BRANCHES,
                                           SUPPORTED_MARKER_CONTEXTS as LOG_MARKER_CONTEXTS)
+from guard.executors.running_image_approval import PROFILE as IMAGE_APPROVAL_PROFILE, validate_image_approval_policy
 from guard.input_policy import policy_context
 
 
@@ -53,6 +54,8 @@ def _policy_shape(check, values):
             check_policy_value(check.id, param.key, param.type, values[param.key])
     if check.executor == "template_validation":
         validate_template_policy(values)
+    elif check.executor == "container_config" and getattr(check, "collection_profile", None) == IMAGE_APPROVAL_PROFILE:
+        validate_image_approval_policy(values)
     elif check.executor == "request_binding":
         validate_request_binding_policy(values)
     elif check.executor == "log_integrity":
@@ -84,6 +87,9 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                "scope": _SCOPES.get(executor, "manual evidence; no automatic collection profile"),
                "reasons": [], "limitations": [_COMMON_LIMIT]}
         rows.append(row)
+        if check is not None and getattr(check, "collection_profile", None) == IMAGE_APPROVAL_PROFILE:
+            row["scope"] = "owned running pinned image approval only; no sentinel writes or full package validation"
+            row["limitations"].append("runtime identity and RepoDigest linkage remain unobserved; approved image alone cannot establish full supply PASS")
         if check is None or check.retired:
             row["reasons"].append("check is absent from the active pack")
             continue

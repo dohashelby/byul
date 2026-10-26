@@ -1,12 +1,11 @@
 id: REQ-10
 framework_id: CHK-REQ-010
+mechanism_ids:
+- mechanism-03
 revision: 3
 retired: false
 area: REQ
-purpose: 실제 입력의 검사
-framework_purpose: 최종 입력 검증
-mechanism_ids:
-- mechanism-03
+purpose: 최종 입력 검증
 secondary_purposes: []
 question: 답변 생성 옵션의 값·개수·조합이 실제 실행 가능한 범위 안에 있는가?
 scope: 기본+지원 옵션

@@ -1,12 +1,11 @@
 id: REQ-17
 framework_id: CHK-REQ-017
+mechanism_ids:
+- mechanism-06
 revision: 2
 retired: false
 area: REQ
-purpose: 공유 제한
-framework_purpose: 부채널 노출 제한
-mechanism_ids:
-- mechanism-06
+purpose: 부채널 노출 제한
 secondary_purposes: []
 question: 캐시 적중에 따른 시간 차이로 비공개 정보가 허용 범위 밖에 드러나지 않는가?
 scope: 조건부

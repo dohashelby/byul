@@ -1,12 +1,11 @@
 id: LIF-07
 framework_id: CHK-LIF-007
+mechanism_ids:
+- mechanism-10
 revision: 3
 retired: false
 area: LIF
-purpose: 시작·재개 조건
-framework_purpose: 기동 준비 확인
-mechanism_ids:
-- mechanism-10
+purpose: 기동 준비 확인
 secondary_purposes: []
 question: 필요한 worker와 모델 실행 준비가 끝난 뒤 요청을 받는가?
 scope: 기본 TP; 선택 graph/backend는 실제 설정

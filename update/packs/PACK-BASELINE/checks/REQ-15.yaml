@@ -1,12 +1,11 @@
 id: REQ-15
 framework_id: CHK-REQ-015
+mechanism_ids:
+- mechanism-01
 revision: 3
 retired: false
 area: REQ
-purpose: 공유 제한
-framework_purpose: 공유 권한·범위
-mechanism_ids:
-- mechanism-01
+purpose: 공유 권한·범위
 secondary_purposes: []
 question: 캐시를 공유할 사용자 집단을 검증된 신원에 따라 결정하는가?
 scope: 기본+정책 조건

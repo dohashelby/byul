@@ -1,14 +1,13 @@
 id: PLT-07
 framework_id: CHK-PLT-007
-revision: 2
-retired: false
-area: PLT
-purpose: 통신·내부 호출 제한
-framework_purpose: 통신 접근·송신 제한
 mechanism_ids:
 - mechanism-11
 - mechanism-15
 - mechanism-16
+revision: 2
+retired: false
+area: PLT
+purpose: 통신 접근·송신 제한
 secondary_purposes: []
 question: 엔진의 외부 송신이 허용된 목적지와 작업에 한정되는가?
 scope: 기본; 취득·runtime·관측 각각 확인

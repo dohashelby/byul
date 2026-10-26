@@ -1,12 +1,11 @@
 id: PLT-04
 framework_id: CHK-PLT-004
+mechanism_ids:
+- mechanism-11
 revision: 4
 retired: false
 area: PLT
-purpose: 자격 전달·사용 제한
-framework_purpose: 자격 제공·사용 제한
-mechanism_ids:
-- mechanism-11
+purpose: 자격 제공·사용 제한
 secondary_purposes: []
 question: worker에 필요 없는 자격·비밀정보를 넘기지 않는가?
 scope: 기본 환경 전달 확인; Ray 원격 전달은 선택

@@ -1,12 +1,11 @@
 id: PLT-01
 framework_id: CHK-PLT-001
+mechanism_ids:
+- mechanism-11
 revision: 5
 retired: false
 area: PLT
-purpose: 실행 권한 제한
-framework_purpose: 실행 최소 권한
-mechanism_ids:
-- mechanism-11
+purpose: 실행 최소 권한
 secondary_purposes: []
 question: 엔진과 worker의 호스트·파일·장치 권한이 필요한 범위에 한정되는가?
 scope: 기본; 실제 계정·컨테이너·마운트·장치

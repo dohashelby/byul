@@ -1,6 +1,7 @@
 """Explicit EXAMPLE rejection oracle for transport-independent contract tests."""
 import json
 from pathlib import Path
+from zipfile import ZipFile
 import yaml
 
 from guard.adapters.vllm import VllmAdapter
@@ -47,21 +48,24 @@ def with_legacy_check(pack, check_id):
 def materialize_pack21(destination):
     """Reconstruct and verify the exact historical pack, including its hashes.
 
-    All definitions and the ID map are retained from before the framework sync.
-    load_pack verifies the original PACK21 hashes; current prose and identities
-    must never be substituted into a historical replay.
+    U1 refreshes every current definition. Retain the old 75 definitions and
+    ID map as one immutable fixture archive; the two changed semantic contracts
+    and original manifest remain their existing explicit fixtures. Materialize
+    only the original manifest's files, never new current-pack files. load_pack
+    still rejects every missing or changed byte against the historical hashes.
     """
-    from tests.builders import PACK_DIR
     history = Path(__file__).parent / 'fixtures' / 'pack21-checks'
     destination.mkdir(parents=True, exist_ok=False)
-    for source in sorted(PACK_DIR.rglob('*')):
-        if not source.is_file():
-            continue
-        relative = source.relative_to(PACK_DIR)
-        preserved = history / source.name
-        body = preserved.read_bytes() if preserved.is_file() else source.read_bytes()
-        target = destination / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        with target.open('xb') as stream:
-            stream.write(body)
+    manifest_bytes = (history / 'pack.yaml').read_bytes()
+    manifest = yaml.safe_load(manifest_bytes)
+    (destination / 'pack.yaml').write_bytes(manifest_bytes)
+    with ZipFile(history / 'source.zip') as archive:
+        for record in manifest['files_sha256']:
+            relative = Path(record['path'])
+            preserved = history / relative.name
+            body = preserved.read_bytes() if preserved.is_file() else archive.read(relative.as_posix())
+            target = destination / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open('xb') as stream:
+                stream.write(body)
     return load_pack(destination)

@@ -1,12 +1,11 @@
 id: SUP-16
 framework_id: CHK-SUP-016
+mechanism_ids:
+- mechanism-08
 revision: 2
 retired: false
 area: SUP
-purpose: 재사용 적합성
-framework_purpose: 생성물 완전성
-mechanism_ids:
-- mechanism-08
+purpose: 생성물 완전성
 secondary_purposes: []
 question: 중단되거나 실패한 생성물·부분 파일을 완성된 자료로 사용하지 않는가?
 scope: null

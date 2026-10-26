@@ -1,13 +1,12 @@
 id: REQ-07
 framework_id: CHK-REQ-007
-revision: 3
-retired: false
-area: REQ
-purpose: 실제 입력의 검사
-framework_purpose: 최종 입력 검증
 mechanism_ids:
 - mechanism-02
 - mechanism-09
+revision: 3
+retired: false
+area: REQ
+purpose: 최종 입력 검증
 secondary_purposes: []
 question: chat template 적용으로 입력이 바뀐 뒤에도 필요한 제한이 유지되는가?
 scope: 기본+선택 기능

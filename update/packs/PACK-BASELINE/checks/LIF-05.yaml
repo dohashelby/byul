@@ -1,12 +1,11 @@
 id: LIF-05
 framework_id: CHK-LIF-005
+mechanism_ids:
+- mechanism-10
 revision: 2
 retired: false
 area: LIF
 purpose: 변경 중 일관성
-framework_purpose: 변경 중 일관성
-mechanism_ids:
-- mechanism-10
 secondary_purposes: []
 question: 재배포할 때 이전 요청과 새 모델·설정이 잘못 섞이지 않는가?
 scope: 기본; 재시작·재배포

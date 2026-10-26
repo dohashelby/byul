@@ -1,12 +1,11 @@
 id: REQ-02
 framework_id: CHK-REQ-002
+mechanism_ids:
+- mechanism-01
 revision: 2
 retired: false
 area: REQ
-purpose: 요청·대상 접근 권한
-framework_purpose: 작업·대상 인가
-mechanism_ids:
-- mechanism-01
+purpose: 작업·대상 인가
 secondary_purposes: []
 question: Gateway·서버의 경로 설정에 따라 요청 경로가 바뀌어도 최종 실행 API에 필요한 인증·권한 검사가 적용되는가?
 scope: 조건부

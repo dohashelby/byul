@@ -1,4 +1,4 @@
-"""Build-independent installed-wheel contract check (Python 3.11 + uv).
+"""Build-independent installed-wheel contract check (Python 3.12 + uv).
 
 The supervisor installs only uv.lock runtime dependencies and the supplied
 wheel into a new environment. The copied worker runs outside the checkout with
@@ -9,9 +9,11 @@ from __future__ import annotations
 import argparse
 from contextlib import ExitStack
 from datetime import datetime, timezone
+from email.parser import BytesParser
 import hashlib
 import http.client
 import importlib.util
+from importlib.metadata import metadata
 import json
 import os
 from pathlib import Path
@@ -44,6 +46,7 @@ def prohibited(*args, **kwargs):
 
 
 def installed_worker(root: Path, wheel: Path) -> dict:
+    assert sys.version_info[:2] == (3, 12), "installed-wheel verification requires Python 3.12"
     assert sys.flags.isolated == 1, "worker must use Python -I"
     sys.dont_write_bytecode = True
     os.chdir(root / "work")
@@ -55,6 +58,14 @@ def installed_worker(root: Path, wheel: Path) -> dict:
     expected = json.loads((root / "source-manifest.json").read_text(encoding="utf-8"))
     with zipfile.ZipFile(wheel) as archive:
         shipped = {name: archive.read(name) for name in archive.namelist() if name.startswith("guard/")}
+        metadata_files = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
+        assert len(metadata_files) == 1, "wheel must contain exactly one distribution metadata file"
+        wheel_metadata = BytesParser().parsebytes(archive.read(metadata_files[0]))
+    requires_python = wheel_metadata.get("Requires-Python", "")
+    assert {part.strip() for part in requires_python.split(",")} == {">=3.12", "<3.13"}, "wheel Python support range differs"
+    installed_metadata = metadata("guard")
+    assert installed_metadata["Requires-Python"] == requires_python, "wheel/installed Python support range differs"
+    assert installed_metadata["Name"] == wheel_metadata["Name"] == "guard", "wheel/installed distribution name differs"
     assert expected == {name: digest(body) for name, body in shipped.items()}, "source/wheel files differ"
     assert all((installed.parent / name).read_bytes() == body for name, body in shipped.items())
     assert not any(".assessment" in Path(entry).parts or Path(entry).name in {"src", "tools", "tests"}
@@ -152,6 +163,8 @@ def installed_worker(root: Path, wheel: Path) -> dict:
         assert not any(name == "tests" or name.startswith(("tests.", "tools.")) for name in sys.modules)
     summary = {"schema": "guard-installed-verification/1", "success": True,
                "python": sys.version, "isolated": True, "source_wheel_installed_files_equal": len(shipped),
+               "python312_verified": True, "requires_python": requires_python,
+               "wheel_installed_python_metadata_equal": True,
                "wheel_sha256": digest(wheel.read_bytes()), "commands": commands,
                "example_fake_audit": True, "saved_pack_replay": True, "tampering_rejected": True,
                "source_unchanged": True, "req15": req15, "analysis": analysis,
@@ -313,6 +326,7 @@ def verify_analysis_modules(root: Path, store: Path, report: Path) -> dict:
 
 
 def supervisor(args) -> None:
+    assert sys.version_info[:2] == (3, 12), "installed-wheel verification requires Python 3.12"
     repo = Path(__file__).resolve().parents[1]
     wheel = args.wheel.resolve(strict=True)
     output = args.output.absolute() if args.output else Path(tempfile.gettempdir()) / ("guard-wheel-" + uuid4().hex)

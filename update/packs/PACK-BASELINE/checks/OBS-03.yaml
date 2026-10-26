@@ -1,12 +1,11 @@
 id: OBS-03
 framework_id: CHK-OBS-003
+mechanism_ids:
+- mechanism-14
 revision: 3
 retired: false
 area: OBS
-purpose: 수집 정보 제한
-framework_purpose: 수집 정보 최소화
-mechanism_ids:
-- mechanism-14
+purpose: 수집 정보 최소화
 secondary_purposes: []
 question: 로그·진단·추적·덤프 파일에 허용된 정보만 남기는가?
 scope: 기본 로그·엔진 예외 dump; 선택 debug/trace/profiler는 실제 설정

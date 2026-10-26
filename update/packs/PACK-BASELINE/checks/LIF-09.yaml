@@ -1,12 +1,11 @@
 id: LIF-09
 framework_id: CHK-LIF-009
+mechanism_ids:
+- mechanism-10
 revision: 2
 retired: false
 area: LIF
-purpose: 실패 감지·전파
-framework_purpose: 기동 준비 확인
-mechanism_ids:
-- mechanism-10
+purpose: 기동 준비 확인
 secondary_purposes: []
 question: 일부 worker의 초기화나 모델 준비가 실패했을 때 성공으로 처리하지 않는가?
 scope: 기본; Ray actor/DAG 단계는 선택

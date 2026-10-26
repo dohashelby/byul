@@ -1,12 +1,11 @@
 id: LIF-08
 framework_id: CHK-LIF-008
+mechanism_ids:
+- mechanism-13
 revision: 2
 retired: false
 area: LIF
-purpose: 실패 감지·전파
-framework_purpose: 실패 감지·상위 통지
-mechanism_ids:
-- mechanism-13
+purpose: 실패 감지·상위 통지
 secondary_purposes: []
 question: 각 GPU 실행 프로세스의 예외·종료·지연·통신 정지를 감지해 상위 제어 프로세스에 알리는가?
 scope: 기본 TP; 선정 executor

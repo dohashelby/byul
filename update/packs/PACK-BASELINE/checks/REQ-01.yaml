@@ -1,12 +1,11 @@
 id: REQ-01
 framework_id: CHK-REQ-001
+mechanism_ids:
+- mechanism-01
 revision: 6
 retired: false
 area: REQ
-purpose: 요청·대상 접근 권한
-framework_purpose: 작업·대상 인가
-mechanism_ids:
-- mechanism-01
+purpose: 작업·대상 인가
 secondary_purposes: []
 question: Gateway를 거치지 않은 요청으로 허용받지 않은 작업을 할 수 없는가?
 scope: 기본

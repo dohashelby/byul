@@ -1,12 +1,11 @@
 id: PLT-03
 framework_id: CHK-PLT-003
+mechanism_ids:
+- mechanism-11
 revision: 2
 retired: false
 area: PLT
-purpose: 자격 전달·사용 제한
-framework_purpose: 자격 제공·사용 제한
-mechanism_ids:
-- mechanism-11
+purpose: 자격 제공·사용 제한
 secondary_purposes: []
 question: 모델 취득 계정이 허용된 저장소·파일에만 접근할 수 있는가?
 scope: 기본+선정 SDK; 로컬 마운트 자격은 마운트 주체 확인

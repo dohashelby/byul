@@ -1,12 +1,11 @@
 id: OBS-06
 framework_id: CHK-OBS-006
+mechanism_ids:
+- mechanism-14
 revision: 2
 retired: false
 area: OBS
-purpose: 자료 이용 권한
-framework_purpose: 저장 자료 보호
-mechanism_ids:
-- mechanism-14
+purpose: 저장 자료 보호
 secondary_purposes: []
 question: 기록·진단 사본의 조회·반출을 허용된 주체로 제한하고, 필요한 저장 암호화를 적용하는가?
 scope: 기본 저장 기록; 진단 기능별 선택

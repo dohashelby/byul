@@ -1,12 +1,11 @@
 id: LIF-03
 framework_id: CHK-LIF-003
+mechanism_ids:
+- mechanism-07
 revision: 2
 retired: false
 area: LIF
-purpose: 자원 사용 제한
-framework_purpose: 자원 예산·공정성
-mechanism_ids:
-- mechanism-07
+purpose: 자원 예산·공정성
 secondary_purposes: []
 question: 처리 비용이 큰 요청과 동시 부하를 제한하면서 정상 요청도 처리할 수 있는가?
 scope: 기본; metadata·child는 수용 기능만

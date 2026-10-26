@@ -1,12 +1,11 @@
 id: REQ-16
 framework_id: CHK-REQ-016
+mechanism_ids:
+- mechanism-04
 revision: 3
 retired: false
 area: REQ
-purpose: 공유 제한
-framework_purpose: 재사용 문맥의 호환성
-mechanism_ids:
-- mechanism-04
+purpose: 재사용 문맥의 호환성
 secondary_purposes: []
 question: 캐시 식별값이 재사용에 필요한 모델·설정·자료의 차이를 구분하는가?
 scope: 기본+활성 기능

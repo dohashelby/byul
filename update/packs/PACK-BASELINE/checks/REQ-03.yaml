@@ -1,12 +1,11 @@
 id: REQ-03
 framework_id: CHK-REQ-003
+mechanism_ids:
+- mechanism-01
 revision: 3
 retired: false
 area: REQ
-purpose: 요청·대상 접근 권한
-framework_purpose: 작업·대상 인가
-mechanism_ids:
-- mechanism-01
+purpose: 작업·대상 인가
 secondary_purposes: []
 question: 일반 사용자가 허용받지 않은 관리·진단 작업을 할 수 없는가?
 scope: 기본+활성 기능

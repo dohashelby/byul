@@ -1,12 +1,11 @@
 id: REQ-12
 framework_id: CHK-REQ-012
+mechanism_ids:
+- mechanism-13
 revision: 2
 retired: false
 area: REQ
-purpose: 요청·상태·결과 귀속
-framework_purpose: 요청·결과 귀속
-mechanism_ids:
-- mechanism-13
+purpose: 요청·결과 귀속
 secondary_purposes: []
 question: 취소하거나 연결을 끊은 요청의 늦은 결과가 다른 요청이나 새 시도에 섞이지 않는가?
 scope: 기본+선택 기능

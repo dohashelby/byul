@@ -13,7 +13,7 @@
 
 `examples/windows-cpu.toml`은 Linux amd64 Docker와 로컬 snapshot을 사용하는 제한 실행 프로파일이다. 기술 실행 설정은 `[vllm]`과 `[vllm.resources]`, 기업 허용 기준은 POL에 둔다. 경로를 포함한 TOML은 리터럴 문자열 또는 정상적으로 이스케이프한 문자열을 사용한다.
 
-프로젝트의 64비트 Python 3.11과 `uv sync --frozen`을 사용한다. `examples/windows-cpu.toml`을 별도 위치에 복사하고 models_dir를 실제 snapshot 절대 경로로 바꾼다. ENV에는 실제 이미지 repository@sha256, 관측 버전, 모델 revision/inventory, Linux CPU architecture/model/kernel/threads를 기입한다. 준비 검사가 호스트 신원이나 기업 승인을 인증하지는 않는다. 8개 점검의 비공식 합성 기준 예시는 `examples/automation-policy.yaml`이다.
+현행 실행에는 프로젝트의 64비트 Python 3.12와 `uv sync --frozen`을 사용한다. 아래 3.11.16 실측은 당시 기록으로 보존하며 호스트 버전 전환이 해당 엔진 시험의 재실행을 뜻하지 않는다. `examples/windows-cpu.toml`을 별도 위치에 복사하고 models_dir를 실제 snapshot 절대 경로로 바꾼다. ENV에는 실제 이미지 repository@sha256, 관측 버전, 모델 revision/inventory, Linux CPU architecture/model/kernel/threads를 기입한다. 준비 검사가 호스트 신원이나 기업 승인을 인증하지는 않는다. 8개 점검의 비공식 합성 기준 예시는 `examples/automation-policy.yaml`이다.
 
 ```text
 guard prepare-validation --pack packs/PACK-BASELINE --env env.yaml --policy policy.yaml --config windows-cpu.toml

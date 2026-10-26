@@ -1,13 +1,12 @@
 id: REQ-21
 framework_id: CHK-REQ-021
-revision: 2
-retired: false
-area: REQ
-purpose: 실행 상태·메모리 안전
-framework_purpose: 실행 상태·버퍼 수명
 mechanism_ids:
 - mechanism-05
 - mechanism-16
+revision: 2
+retired: false
+area: REQ
+purpose: 실행 상태·버퍼 수명
 secondary_purposes: []
 question: TP의 GPU 작업 재실행에 사용하는 통신 버퍼가 등록·종료·재기동 후에도 현재 실행의 유효한 버퍼를 참조하는가?
 scope: 조건부

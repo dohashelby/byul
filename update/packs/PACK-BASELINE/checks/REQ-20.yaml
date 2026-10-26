@@ -1,12 +1,11 @@
 id: REQ-20
 framework_id: CHK-REQ-020
+mechanism_ids:
+- mechanism-05
 revision: 2
 retired: false
 area: REQ
-purpose: 실행 상태·메모리 안전
-framework_purpose: 실행 상태·버퍼 수명
-mechanism_ids:
-- mechanism-05
+purpose: 실행 상태·버퍼 수명
 secondary_purposes: []
 question: CUDA Graph 재실행이 현재 입력을 쓰고 아직 읽는 출력 버퍼를 덮어쓰지 않는가?
 scope: 조건부

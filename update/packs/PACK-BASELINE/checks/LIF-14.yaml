@@ -1,12 +1,11 @@
 id: LIF-14
 framework_id: CHK-LIF-014
+mechanism_ids:
+- mechanism-13
 revision: 2
 retired: false
 area: LIF
 purpose: 종결·자원 회수
-framework_purpose: 종결·자원 회수
-mechanism_ids:
-- mechanism-13
 secondary_purposes: []
 question: 성능 진단 종료 응답과 실제 수집·자원 사용의 종료가 일치하는가?
 scope: 조건부; 선정 profiler

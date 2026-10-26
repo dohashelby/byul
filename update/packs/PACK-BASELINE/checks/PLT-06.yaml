@@ -1,11 +1,10 @@
 id: PLT-06
 framework_id: CHK-PLT-006
+mechanism_ids: []
 revision: 2
 retired: false
 area: PLT
-purpose: 통신·내부 호출 제한
-framework_purpose: 실행 최소 권한
-mechanism_ids: []
+purpose: 실행 최소 권한
 secondary_purposes: []
 question: Core·worker의 공유 권한과 침해 영향을 확인하고, 해당 프로세스·내부 통신에 대한 외부 접근을 제한하는가?
 scope: 기본 TP; 실제 protocol과 공격자 시작 권한 확인

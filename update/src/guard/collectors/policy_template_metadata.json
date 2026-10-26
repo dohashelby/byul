@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 23,
-    "sha256": "c9780ff0f9fffe84d77c40c2a099ce36674c85bc1c27c4ea63adfd3ddd1feffb"
+    "revision": 25,
+    "sha256": "4edc0d594facf55deff111ab51f34d80fa7bb9c17b40a16115c6fb25b26576d7"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -397,6 +397,14 @@
       "consumer": "선정: select의 required str 타입·키 누락 검사 / 양식: 두 점검별 독립 빈 값과 설명; 실제 승인 시스템 미지정 / 수동 판정: declared 0.5.0은 선언된 승인 체계가 공백이면 PASS를 UNKNOWN으로 보류; 기존 FAIL 보존 / 보고서: 정책 문맥·검증 한계와 POLICY_CONTEXT 이유; 권한·기록 무결성 자동 검증 아님",
       "verification": "EXAMPLE 입력·선정·수동 증거·보고 계약 검증 대상; 실제 승인 시스템·엔진 실증 없음",
       "catalog_id": "P-DRAFT-SUP-GOV-TOOL"
+    },
+    "values.SUP-04.approved_image_digests": {
+      "type": "list[str]",
+      "description": "동일 대상에서 실제 실행된 pinned 이미지의 기업 승인 repository@sha256 참조 목록",
+      "decision_role": "미지정",
+      "consumer": "선정: 필수 list[str]; 미입력 NO_POLICY_VALUE / 실행: container_config의 running-image-approval-v1; sentinel·package 실행 없음 / 관측: 소유 컨테이너 전후 identity와 실제 image ID로 조회한 RepoDigest 연결 / 판정: 확인된 비승인 실행 이미지 FAIL; 승인 일치도 전체 공급물 보안 UNKNOWN / 한계: package/native/entrypoint/mount·배포 gate와 실제 vLLM 실증 미검증",
+      "verification": "합성 Docker/HTTP 회귀로 제한 계약을 확인하며 실제 vLLM 실증은 사용자 요청으로 보류. 기업 승인 인증·전체 공급물 PASS가 아님.",
+      "catalog_id": "P-DRAFT-SUP-04-APPROVED-IMAGE-DIGESTS"
     },
     "values.SUP-14.required_checks": {
       "type": "list[str]",

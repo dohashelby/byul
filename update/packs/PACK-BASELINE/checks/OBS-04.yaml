@@ -1,12 +1,11 @@
 id: OBS-04
 framework_id: CHK-OBS-004
+mechanism_ids:
+- mechanism-15
 revision: 3
 retired: false
 area: OBS
-purpose: 수집 정보 제한
-framework_purpose: 부가정보 수집·송신 통제
-mechanism_ids:
-- mechanism-15
+purpose: 부가정보 수집·송신 통제
 secondary_purposes: []
 question: 금지한 사용 통계 보고가 실제로 꺼진 상태를 유지하는가?
 scope: 내장 usage 경로·금지 정책 시

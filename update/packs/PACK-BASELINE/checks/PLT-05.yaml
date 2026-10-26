@@ -1,12 +1,11 @@
 id: PLT-05
 framework_id: CHK-PLT-005
+mechanism_ids:
+- mechanism-11
 revision: 2
 retired: false
 area: PLT
-purpose: 자격 전달·사용 제한
-framework_purpose: 자격 제공·사용 제한
-mechanism_ids:
-- mechanism-11
+purpose: 자격 제공·사용 제한
 secondary_purposes: []
 question: 자격이 만료되거나 없을 때 승인하지 않은 다른 방식으로 접근하지 않는가?
 scope: 조건부; 선정 SDK의 실제 fallback 조사

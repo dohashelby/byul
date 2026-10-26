@@ -35,11 +35,11 @@ def given(cid, value):
 
 
 def test_declarations_catalog_and_blank_template_are_not_execution(pack):
-    assert pack.manifest.revision == 23 and not pack.reviewed
+    assert pack.manifest.revision == 25 and not pack.reviewed
     assert len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 22
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 50
-    assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09"}
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 23
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 51
+    assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09", "SUP-04"}
     for cid, (key, _) in FLAGS.items():
         check = pack.checks[cid]
         assert check.revision == 3 and check.executor is None and check.judge is None
@@ -51,8 +51,8 @@ def test_declarations_catalog_and_blank_template_are_not_execution(pack):
     assert template["status"] == "DRAFT" and template["data_origin"] == "DECLARED"
     assert template["scope"] == {"include": [], "exclude": []}
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
-    assert len(rows) == 323 and sum(len(json.loads(r["check_ids"])) for r in rows) == 615
-    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=47, b=2, c=161, d=113)
+    assert len(rows) == 324 and sum(len(json.loads(r["check_ids"])) for r in rows) == 616
+    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=48, b=2, c=161, d=113)
     for pid, checks in (("P-DRAFT-USAGE-ALLOW", ("OBS-04", "OBS-05")), ("P-DRAFT-REPLAY-ALLOW", ("OBS-07", "OBS-08"))):
         row = next(r for r in rows if r["proposed_policy_id"] == pid)
         assert row["classification"] == "a" and row["proposed_shape"] == "bool"

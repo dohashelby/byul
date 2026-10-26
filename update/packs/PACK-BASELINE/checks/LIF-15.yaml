@@ -1,12 +1,11 @@
 id: LIF-15
 framework_id: CHK-LIF-015
+mechanism_ids:
+- mechanism-12
 revision: 2
 retired: false
 area: LIF
-purpose: 복구 상태의 적합성
-framework_purpose: 복구 정책·상태 검증
-mechanism_ids:
-- mechanism-12
+purpose: 복구 정책·상태 검증
 secondary_purposes: []
 question: 이전 구성으로 복귀할 때도 현재 승인 기준을 만족하는가?
 scope: 기본 재배포 복원

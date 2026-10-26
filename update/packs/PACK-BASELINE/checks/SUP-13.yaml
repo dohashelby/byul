@@ -1,12 +1,11 @@
 id: SUP-13
 framework_id: CHK-SUP-013
+mechanism_ids:
+- mechanism-09
 revision: 2
 retired: false
 area: SUP
 purpose: 자료 해석 안전성
-framework_purpose: 자료 해석 안전성
-mechanism_ids:
-- mechanism-09
 secondary_purposes: []
 question: 모델이 제공한 chat template을 해석할 때 허용된 동작 범위를 지키는가?
 scope: null

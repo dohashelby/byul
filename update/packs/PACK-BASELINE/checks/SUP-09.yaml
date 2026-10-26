@@ -1,12 +1,11 @@
 id: SUP-09
 framework_id: CHK-SUP-009
+mechanism_ids:
+- mechanism-09
 revision: 2
 retired: false
 area: SUP
-purpose: 코드 실행 제한
-framework_purpose: 추가 코드 실행 허용
-mechanism_ids:
-- mechanism-09
+purpose: 추가 코드 실행 허용
 secondary_purposes: []
 question: 모델에 포함된 추가 코드가 허용된 조건에서만 실행되는가?
 scope: null

@@ -1,12 +1,11 @@
 id: PLT-02
 framework_id: CHK-PLT-002
+mechanism_ids:
+- mechanism-01
 revision: 2
 retired: false
 area: PLT
-purpose: 실행 권한 제한
-framework_purpose: 실행 최소 권한
-mechanism_ids:
-- mechanism-01
+purpose: 실행 최소 권한
 secondary_purposes: []
 question: 같은 호스트의 내부 통신 접점에 허용된 프로세스만 접근하는가?
 scope: 기본; 실제 namespace·UID·소켓·SHM

@@ -60,8 +60,7 @@ def test_req01_is_first_request_row(imported_pack):
     data = yaml.safe_load((pack / "checks/REQ-01.yaml").read_text(encoding="utf-8"))
     src = json.loads(SOURCE.read_text(encoding="utf-8"))["request_state_assessment_draft"][0]
     assert data["question"] == src["question"]
-    assert data["framework_purpose"] == src["parent_purpose"]
-    assert data["purpose"] == "요청·대상 접근 권한"
+    assert data["purpose"] == src["parent_purpose"]
     assert data["applies_when"]["prose"] == src["applies_when"]
     assert data["required_observations_prose"] == src["required_observations"]
     assert data["legacy"]["q_ids"] == src["legacy_q_ids"]
@@ -73,10 +72,15 @@ def test_req01_is_first_request_row(imported_pack):
 
 def test_unstructured_rows_keep_prose_and_null_executor(imported_pack):
     pack = imported_pack
+    # 과거 원문 사례를 유지한다. 현행 원문의 전파는 U1 별도 계약 테스트에서 확인한다.
+    legacy_source = json.loads(SOURCE.read_text(encoding="utf-8"))
+    legacy_source["supply_assessment_draft"][0]["applies_when"] = "승인 저장소 사용"
+    legacy_path = _write_source(pack.parent, legacy_source)
+    import_checklist(legacy_path, pack, OVERRIDES)
     data = yaml.safe_load((pack / "checks/SUP-01.yaml").read_text(encoding="utf-8"))
     assert data["executor"] is None
     assert data["judge"] is None
-    assert data["applies_when"] == {"prose": json.loads(SOURCE.read_text())["supply_assessment_draft"][0]["applies_when"]}
+    assert data["applies_when"] == {"prose": "승인 저장소 사용"}
     assert data["required_observations"] == []
     assert data["required_observations_prose"]
 
@@ -159,7 +163,6 @@ def test_committed_pack_matches_importer(tmp_path):
     import_checklist(SOURCE, pack, OVERRIDES)
     assert _snapshot(pack) == _snapshot(committed)
 
-
 def test_fixed_ids_survive_all_wording_changes_and_duplicate_subtests(tmp_path, imported_pack):
     data = json.loads(SOURCE.read_text())
     before = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
@@ -183,3 +186,19 @@ def test_duplicate_fixed_id_rejected_without_pack_changes(tmp_path, imported_pac
     with pytest.raises(ValueError, match="Duplicate framework ID"):
         import_checklist(_write_source(tmp_path, data), imported_pack, OVERRIDES)
     assert _snapshot(imported_pack) == before
+
+
+def test_legacy_map_migration_preserves_all_internal_ids(tmp_path, imported_pack):
+    import zipfile
+    history = ROOT / "tests/fixtures/pack21-checks/source.zip"
+    with zipfile.ZipFile(history) as archive:
+        name = next(name for name in archive.namelist() if name.endswith("id_map.yaml"))
+        (imported_pack / "id_map.yaml").write_bytes(archive.read(name))
+    before = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
+              for p in (imported_pack / "checks").glob("*.yaml")}
+    import_checklist(SOURCE, imported_pack, OVERRIDES)
+    after = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
+             for p in (imported_pack / "checks").glob("*.yaml")}
+    assert before == after
+    assert all(not yaml.safe_load(p.read_text())["retired"]
+               for p in (imported_pack / "checks").glob("*.yaml"))

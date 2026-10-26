@@ -1,5 +1,49 @@
 # 실행·실증 안내
 
+## LIF-04 느린 수신과 독립 자원 부분 관측
+
+`guard capture-stream-pressure`는 기존 SSE 수집에 명시적인 `slow-reader-v1`을 연결한다.
+기존 `read_delay_ms`는 최초 한 번 지연한다. 새 프로파일은 제한된 chunk를 읽을 때마다
+기다리고 정한 nonempty read 횟수 뒤 클라이언트 연결을 닫는다. 종료는 worker 취소 증명이 아니다.
+
+```text
+guard capture-stream-pressure --env "<SEALED-ENV.json>" --target "<OWNED-LAB-TARGET.json>" --settings examples/stream-pressure-settings.json --output "<NEW-EXTERNAL-ATTACHMENT.json>"
+```
+
+기본 실행은 입력 검사만 하고 Docker·요청·출력을 만들지 않는다. `--execute`는 소유 중인
+격리 대상에 전후 정상 요청과 느린 SSE/병행 정상 요청을 보낸다. 엔진이나 daemon을 기동하지 않는다.
+target은 명시 boolean `lab`(stub이면 true, 기존 managed 실제 엔진이면 false), 정확한 run label·
+pinned 엔진 이미지·명시 port·trusted network가 필요하다. HTTP host는 컨테이너 DNS 이름 또는
+소유 endpoint의 IP다. 실행 시 network의 소유 라벨·ID와 engine CID/endpoint/attachment 주소를
+대조하고 실제 요청은 검증한 IP로 고정한다. `probe_image`도 로컬 pinned Linux 이미지여야 한다.
+이미지를 조회한 뒤 실제 probe 실행은 `--pull=never`로 제한한다. 엔진과 다른 새 probe 실행 ID로
+이번 probe만 정리하며 기존 컨테이너·network는 정리하지 않는다.
+부모의 남은 전체 예산을 Docker 시작부터 적용하고, 시작 전 자원 표본의 Linux 시간 namespace와
+보수적인 절대 기한을 probe의 연결 전·HTTP 전에도 확인한다. 같은 시계를 확인하지 못하거나
+기한이 만료되면 HTTP를 시작하지 않는다. 수집 종료 후 이번 probe 정리는 별도 최대 30초다.
+
+자원 관측은 host/다른 컨테이너의 PID·network 공유를 거부하고 명시 private cgroup namespace와
+source를 가리는 mount 부재를 요구한다.
+읽기 전용 helper가 PID/start·namespace·RSS·cgroup v2 memory.current·port별 TCP queue/inode/owner를
+상한 안에서 수집하고 전후 컨테이너 신원을 대조한다. probe와 표본의 Linux 시간 namespace가
+같고 표본 측정 구간이 실제 요청/close 구간에 맞을 때만 전·중·후 구간 근거로 센다.
+시간 namespace 미지원·요청 전 표본만 존재·누락·세대 변경은 미확인·고정 진단으로 남긴다.
+시간 namespace가 없고 플랫폼 monotonic 시계의 해상도가 낮으면 새 읽기 프로파일의 상대 시간만
+고해상도 `perf_counter`로 기록한다. namespace 연결은 계속 미확인이고 기존 deadline 시계는 유지한다.
+RSS·cgroup은 총량이고 queue는 표본 시점의 socket 관측이다. 연결별 buffer 비용·worker 취소·회수
+완료를 이 값이나 EOF/HTTP/DONE으로 확정하지 않는다. 원문 응답·토큰·headers·예외 원문은 첨부하지 않는다.
+ESTABLISHED의 queue만 TCP sequence 바이트로 표시하고 LISTEN의 수신 queue는 대기 연결 수로
+구분한다. 나머지 상태의 queue 바이트는 null·미완전 진단으로 남긴다. 이 값은 socket 메모리 점유량이 아니다
+([Linux IPv4 구현](https://github.com/torvalds/linux/blob/master/net/ipv4/tcp_ipv4.c),
+[IPv6 구현](https://github.com/torvalds/linux/blob/master/net/ipv6/tcp_ipv6.c)).
+프로세스 RSS에는 공유 페이지가 각 프로세스에 집계될 수 있고 cgroup 총량에는 관측 helper도
+포함된다. 이 관측 비용을 임의로 빼거나 총량 차이를 연결별 비용으로 바꾸지 않는다.
+
+예시 settings는 기술적 시험 상한이며 기업 메모리·회수 예산이 아니다. 출력은 항상 세 축 UNKNOWN,
+`official=false`·`product_connected=false`다. LIF-04 CheckDef의 executor/judge와 팩27은 유지하며
+새 자동 판정·전체 분기 실증으로 집계하지 않는다. 실제 vLLM 실증은 별도 보류 상태다.
+직접 주입한 probe/sampler는 오프라인 시험용 경로이며 출처를 EXAMPLE로 제한한다.
+
 ## REQ-02 소유 경로 관측 파일 수집
 
 `guard capture-route-observations --help`로 설치 제품에서도 기존 파일 수집을 사용할 수 있다.

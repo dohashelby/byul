@@ -25,6 +25,7 @@ AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS �
 | `test-pods.yaml` | 시험 receiver·other-client(SA `probe`, UID 10003) |
 | `intent.aws-lab.json` | AWS 값으로 만든 통제 의도(엔진 UID 2000, `/models`, 포트 8000/8001) |
 | `host/byul-observation-feed.service` | AWS 호스트에서 수집기를 계속 돌리는 systemd 사용자 서비스 |
+| [`ACCEPTANCE.md`](ACCEPTANCE.md) | AWS 첫 완료 기준 8개 사례의 실행·증거·비용 절약 절차 |
 
 UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`runtime/docs/결정기록_엔진UID.md`). Gateway 10000·observer 10004·공유 그룹 10010은 겹치지 않게 고른 프로젝트 선택값이다.
 
@@ -58,7 +59,7 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
    ```
    patch는 엔진 Pod를 다시 만든다(Recreate: GPU 반납 후 재기동·cold start). 시험 시간 계획에 넣는다.
    AWS 묶음의 03은 client-side `kubectl apply`를 쓰고 `kubectl patch`는 last-applied 기록을 바꾸지 않으므로, 03을 다시 돌려도 **사이드카가 남을 것으로 본다**(클러스터 미검증). 그러면 03의 smoke 증거에 runtime 사이드카가 섞이므로, 03을 다시 돌리기 전에 patch 파일 주석의 명령으로 사이드카를 떼고 03이 끝나면 다시 붙인다. 근본 해결은 템플릿 반영(아래 표).
-6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. 수집 결과 확인은 `tools/k8s_lab_check.py --kube-context byul-aws-lab --allow-non-kind-context`(생성·삭제를 하므로 명시 필요).
+6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. AWS 인수 확인은 [`ACCEPTANCE.md`](ACCEPTANCE.md)의 `tools/aws_lab_acceptance.py`를 사용한다. kind 전용 `tools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.
 7. 접속: 서버에서 `kubectl --context byul-aws-lab -n serving-lab port-forward deploy/serving-gateway 8080`, 노트북에서 SSH 터널(`ssh -L 18081:127.0.0.1:8080 ubuntu@<host>`). 노트북의 개발 서버(`byul-dev`)가 8080을 쓰므로 로컬 포트는 다른 번호(예: 18081)를 쓴다.
 
 ## AWS 묶음과 맞춰야 할 것 (환경 담당에게 요청)

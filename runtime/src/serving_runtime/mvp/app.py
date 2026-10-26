@@ -382,6 +382,7 @@ class GatewayApp:
             return {
                 "profile": None,
                 "test_only": False,
+                "output_max_tokens": None,
                 "max_n": None,
                 "extra_fields": [],
                 "passthrough_count": None,
@@ -391,6 +392,7 @@ class GatewayApp:
         return {
             "profile": policy.profile,
             "test_only": policy.profile == "zeroday-lab",
+            "output_max_tokens": policy.output_max_tokens,
             "max_n": policy.max_n,
             "extra_fields": extra,
             "passthrough_count": sum(1 for item in extra if item["mode"] == "passthrough"),

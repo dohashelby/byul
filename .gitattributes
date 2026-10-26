@@ -1,0 +1,3 @@
+# Contract bundle/evidence manifests hash file bytes, including line endings.
+# Preserve committed example bytes on Windows and Linux checkouts.
+contracts/examples/** -text

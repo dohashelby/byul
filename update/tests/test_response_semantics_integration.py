@@ -88,7 +88,7 @@ def test_req09_same_raw_206_is_legacy_fail_but_new_unconfirmed_unknown(pack):
     data["challenge_rejection_results"]["length"] = "unverified"
     legacy = with_legacy_check(pack, "REQ-09").checks["REQ-09"]
     current = pack.checks["REQ-09"]
-    assert legacy.revision == 5 and current.revision == 6
+    assert legacy.revision == 5 and current.revision == 7
     assert len(current.required_observations) == 10
     _evd, old = judge(pack, legacy, data)
     evd, new = judge(pack, current, data)
@@ -184,7 +184,7 @@ def test_mount_policy_fail_does_not_turn_unknown_candidate_into_credential_acces
     supplied["forbidden_mount_paths"] = supplied["credential_candidate_paths"] = ["/EXAMPLE-forbidden/token"]
     old = with_legacy_check(pack, "PLT-04").checks["PLT-04"]
     current = pack.checks["PLT-04"]
-    assert old.revision == 2 and current.revision == 3 and len(current.required_observations) == 8
+    assert old.revision == 2 and current.revision == 4 and len(current.required_observations) == 8
     _old_evd, old_result = judge(pack, old, data, supplied=supplied)
     evd, new_result = judge(pack, current, data, supplied=supplied)
     assert old_result.verdicts.security.value == new_result.verdicts.security.value == "FAIL"

@@ -1,17 +1,20 @@
 id: SUP-03
-revision: 1
+framework_id: CHK-SUP-003
+mechanism_ids:
+- mechanism-08
+revision: 2
 retired: false
 area: SUP
-purpose: 승인 범위
+purpose: 승인 대상·출처 식별
 secondary_purposes: []
-question: 실제 소비하는 하위 모델 자료가 승인 목록에 포함되는가?
+question: 기본 모델과 함께 읽는 설정·tokenizer·chat template, 하위 모델·추가 공급원의 파일도 승인 범위에 포함되는가?
 scope: null
 risk_category: 보안 위협 점검
 risk_summary: 공급자가 승인 목록 밖 하위 모델·tokenizer·설정을 끼워 넣어 실제 처리 내용이나 실행 코드를 바꿀 수 있음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 모델 로딩
+  prose: 모델을 로딩하는 환경. 기본 config·tokenizer·template를 포함하고, secondary source·redirect·adapter는 실제 사용 시 추가한다.
 policy_params: []
 policy_prose:
   policy_to_decide: null
@@ -23,13 +26,11 @@ challenge_steps:
 - 새 기동에서 그 자료의 선택·소비·차단 관측
 required_observations: []
 required_observations_prose:
-- resolved repo·commit·파일
-- redirect·secondary source 설정
-- 승인 목록과 실제 읽기 대응
+- resolved repo·commit·파일/redirect·secondary source 설정/승인 목록과 실제 읽기 대응
 satisfied_if: 모든 필수 소비 대상이 승인 목록과 연결되고 누락 대상은 사용 전에 처리된다.
 fail_criteria: 승인에 필요한 하위 자료가 목록에 없거나 다른 판본인데 실제로 사용된다.
 unknown_criteria: 하위 모델·resolver·redirect 활성 여부 또는 실제 소비 자료를 확인하지 못했다.
-remediation: 공급물 목록과 실제 소비 경로를 연결하고 식별값을 고정한다
+remediation: '- 기본 모델이 함께 읽는 설정·tokenizer·chat template과 선택한 하위 모델·추가 공급원의 파일을 승인 목록에 포함한다. 실제 로딩 시 선택한 경로·버전을 목록과 대조한다.'
 method_and_evidence: 'config·tokenizer·template·generation config·secondary source의 실제 읽기를 승인 목록과 대조한다. 【F10】MM processor 경로: trust_request_mm_kwargs 허용 시; 기본은 비어 있지 않은 request kwargs 거부. LoRA: resolver 설치·활성 및 운영자 repo_list에 일치할 때. 기본에서는 code_revision 포함 kwargs가 processor 소비 전에 거부되는지 확인. opt-in에서는 실제 processor factory 인수·다운로드 객체를 기록. resolver에서는 repo 목록 밖/안, 같은 이름의 원격 변경을 비교해 실제 immutable snapshot 식별과 승인 대응 확인. 정상 대조: 기본 텍스트 요청 및 승인한 모델/adapter 정상 사용. 【F11】Ultravox secondary model 선택 또는 config에 speculators_config가 있을 때. 기본 텍스트 모델은 config 확인 후 적용 여부 판단. 상위와 secondary/verifier 각각 실제 repo·resolved commit·파일을 수집. verifier가 다른 repo인 fixture에서 revision의 실제 적용 결과와 승인 묶음 대조. 누락·해석 실패는 승인 통과로 넘기지 않음. 정상 대조: 명시 승인된 모든 실제 공급원이 동일 묶음으로 해석되고 정상 로딩. 【F34】VLLM_MODEL_REDIRECT_PATH가 설정되고 매핑 파일·대상 키가 존재할 때. 유효 env·redirect 파일 내용/digest·변경권한·resolved model/tokenizer 경로를 승인 묶음에 포함. 같은 표시명에 다른 무해 모델 경로를 넣어 승인 불일치 탐지 확인. 정상 대조: 승인한 redirect 매핑과 실제 파일로 정상 적재.'
 remaining_setup: 선정 모델과 의존성별 실제 읽기 계측; 선택 기능은 별도 fixture
 executor: null

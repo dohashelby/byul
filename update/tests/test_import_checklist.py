@@ -72,6 +72,11 @@ def test_req01_is_first_request_row(imported_pack):
 
 def test_unstructured_rows_keep_prose_and_null_executor(imported_pack):
     pack = imported_pack
+    # 과거 원문 사례를 유지한다. 현행 원문의 전파는 U1 별도 계약 테스트에서 확인한다.
+    legacy_source = json.loads(SOURCE.read_text(encoding="utf-8"))
+    legacy_source["supply_assessment_draft"][0]["applies_when"] = "승인 저장소 사용"
+    legacy_path = _write_source(pack.parent, legacy_source)
+    import_checklist(legacy_path, pack, OVERRIDES)
     data = yaml.safe_load((pack / "checks/SUP-01.yaml").read_text(encoding="utf-8"))
     assert data["executor"] is None
     assert data["judge"] is None

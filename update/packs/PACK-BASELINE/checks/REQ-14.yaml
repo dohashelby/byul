@@ -1,17 +1,21 @@
 id: REQ-14
-revision: 1
+framework_id: CHK-REQ-014
+mechanism_ids:
+- mechanism-16
+- mechanism-04
+revision: 2
 retired: false
 area: REQ
-purpose: 요청·상태·결과 귀속
+purpose: 요청·결과 귀속
 secondary_purposes: []
-question: 분산 처리의 중간 자료와 최종 출력이 원 요청에 연결되는가?
+question: 여러 실행 프로세스가 주고받는 중간 자료와 최종 출력이 원래 요청에 맞게 처리·반환되는가?
 scope: 기본+선택 기능
 risk_category: 보안 위협 점검
 risk_summary: 전송 입력·peer에 영향을 줄 수 있는 주체가 요청·모델·buffer 연결을 바꿔 타 요청의 중간 자료를 읽거나 출력을 오염시킬 수 있음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 기본 단일 노드 TP; 다중 노드·PP·PD는 활성 시 별도
+  prose: 기본 TP 내부 전달을 확인한다. 다중 노드·PP·PD는 실제 구성에 포함될 때 별도 경로로 추가한다.
 policy_params: []
 policy_prose:
   policy_to_decide: 분산 구성·요청/세대 연결 규칙
@@ -23,13 +27,11 @@ challenge_steps:
 - 중간 자료와 최종 결과의 귀속 확인
 required_observations: []
 required_observations_prose:
-- request·model·generation ID
-- rank·buffer 전달
-- 완료·회수·출력 연결
-satisfied_if: 선정 구성에서 다른 요청/세대의 자료가 잘못 소비되지 않는다. TP/PP와 PD의 결과를 별도 기록한다.
+- request·model·generation ID/rank·buffer 전달/완료·회수·출력 연결
+satisfied_if: 실제 사용하는 구성에서 다른 요청/세대의 자료가 잘못 소비되지 않는다. TP/PP와 PD의 결과를 별도 기록한다.
 fail_criteria: 다른 요청·모델 세대의 자료가 결과에 사용되거나 잘못된 요청으로 반환된다.
 unknown_criteria: 분산 중간 자료·세대·buffer 대응을 계측하지 못했다.
-remediation: 각 단계의 식별·유효 범위·출력 소유 관계를 확인한다.
+remediation: '- 분산 단계마다 요청·모델 버전·중간 자료의 식별정보를 대조하고 최종 출력의 수신자를 확인한다. 지연·재전송·장애 때 다른 요청이나 모델 버전의 자료가 사용되지 않도록 전달·폐기 규칙을 적용한다.'
 method_and_evidence: '선정 executor·actor/rank·중간 buffer·최종 출력·finished 배치를 추적한다. legacy Ray TP2PP2의 출력 rank 설명을 다른 executor에 일반화하지 않는다. PD는 별도 connector 근거가 필요하다. 기본 TP의 rank별 요청·중간 상태·출력 귀속을 확인한다. Ray/PD 근거를 기본 TP 구현의 증거로 대신하지 않는다. core↔worker pickle/cloudpickle와 실행 UID·IPC 접근권을 확인한다. 역할별 명령 인가가 없는 실행 그룹을 격리된 역할로 가정하지 않는다. SC-08-01 비허용 peer 차단과 공급 코드/실행 권한 통제로 연결하고 침해 worker 이후 영향은 잔여 위험으로 기록한다. 【F18】일반 API schema에서 kv_transfer_params가 extra_args로 전달되며 NIXL 선택 시 remote peer 메타데이터 소비. 곧바로 성공적 전송/취약점이라는 뜻 아님. PD/NIXL 환경에서 일반 API의 remote_host/port/block_ids 조작이 신뢰된 proxy 값으로 제한되는지, 잘못된 peer/블록이 거절되는지 확인한다. 정상 대조: 허용 peer·요청·블록의 정상 전송'
 remaining_setup: TP 기본 경로 우선; PD 등은 별도 활성 조건과 추적 구현 필요
 executor: null

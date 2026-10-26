@@ -1,17 +1,20 @@
 id: OBS-11
-revision: 2
+framework_id: CHK-OBS-011
+mechanism_ids:
+- mechanism-17
+revision: 3
 retired: false
 area: OBS
-purpose: 증거의 신뢰성
+purpose: 실행 상태 관측·수집 건전성
 secondary_purposes: []
-question: 수집 중단·누락·시간 불확실성을 정상 결과로 처리하지 않는가?
+question: 기록 수집 중단·누락·시각 오류를 표시하고, 증거가 부족한 시험은 미확인으로 처리하는가?
 scope: 필수 관측 경로
 risk_category: 증거·판정 신뢰성 점검
 risk_summary: 수집 장애·시간 불확실성이 숨겨지면 평가자가 증거 없는 상태를 정상으로 판단해 보호 실패를 놓칠 수 있음. 장애 자체를 공격 성공으로 보지 않음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 필수 관측 경로
+  prose: 필수 수집 경로의 중단·누락·시간 불확실성과 종속 판정을 확인한다. 수집 도구 미정은 미확인이다.
 policy_params:
 - key: required_records
   type: list[str]
@@ -34,18 +37,17 @@ policy_prose:
 normal_control: 필수 시험 사건이 정한 수집 기한 안에 도착한다.
 challenge_steps:
 - 합성 사건 발생
-- collector 중단·쓰기 거부 중 하나 주입
-- 누락·경보·종속 판정 확인 후 복구
+- 수집기 중단 또는 기록 저장 거부를 발생시킴
+- 누락 표시·경보와 해당 기록을 사용하는 시험의 판정을 확인한 뒤 복구
 required_observations: []
 required_observations_prose:
-- 사건 발생 독립 증거
-- 수집 상태·시각
-- 누락 경보·평가 상태
-satisfied_if: 누락·장애가 식별되고 관련 판정에 반영된다. 확인된 필수 기록 누락은 관측 미충족, 종속 시험은 미확인이다.
-fail_criteria: 확인된 필수 기록 누락을 정상으로 처리하거나 필요한 경보를 내지 않는다.
-unknown_criteria: 기한·시간오차 기준이 없거나 사건 발생 자체를 확인하지 못했다. 관측 누락 확인 시 관측 미충족·종속 시험 미확인이다.
-remediation: 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다
-method_and_evidence: 합성 사건을 발생시키고 collector·권한·저장 장애를 제한적으로 주입해 누락 표시와 경보를 확인한다. 시각/순서 불확실성도 기록한다.
+- 사건 발생의 독립 증거, 수집·보존 및 탐지·경보 조건과 기한
+- 수집·복구 상태와 시각, 누락 표시·경보, 다른 필수 증거와 의존 시험 판정
+satisfied_if: 채택한 범위·기한에 누락·수집 장애를 식별해 필요한 표시·경보를 남기고 의존 시험의 판정을 증거 상태에 맞게 갱신한다. 수집·보존 조건이나 기한을 위반한 필수 기록 누락은 OBS-001의 미충족으로, 다른 필수 증거로도 판단할 수 없는 의존 시험은 미확인으로 기록한다. 이미 확인한 위반은 미충족으로 유지한다.
+fail_criteria: 확인된 수집 장애·누락을 정상으로 처리하거나, 채택한 범위·기한에 필요한 표시·경보·의존 시험 판정 처리를 하지 않는다.
+unknown_criteria: 수집 기한·시간 오차 기준이 없거나 사건 발생 자체를 확인하지 못해 누락 감지·표시 기능을 평가할 수 없다.
+remediation: '- 사건별 수집·보존·탐지·알림 기한과 수집기 상태 확인 방법을 정한다. 누락·중단·시간 불확실성을 표시·경보하고, 기한 내 복구·최종 확보와 의존 시험의 증거 충분성을 각각 확인한다. 이미 확인한 위반은 미충족으로 유지한다.'
+method_and_evidence: 합성 사건의 독립 발생 증거와 수집·보존 조건·기한을 정하고 collector·권한·저장 장애를 제한적으로 주입한다. 누락·장애 표시와 경보, 복구, 의존 시험의 판정 처리를 각각 확인한다. 확보한 다른 필수 증거와 확인된 위반을 함께 검토한다.
 remaining_setup: 필수 사건·수집 기한·시간 동기화·장애 후 복구
 executor: null
 judge: null

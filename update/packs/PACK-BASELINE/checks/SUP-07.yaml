@@ -1,21 +1,24 @@
 id: SUP-07
-revision: 1
+framework_id: CHK-SUP-007
+mechanism_ids:
+- mechanism-09
+revision: 2
 retired: false
 area: SUP
-purpose: 실제 사용의 일치·무결성
+purpose: 실제 사용의 무결성
 secondary_purposes: []
-question: 생성 결과나 공유 컴파일 캐시의 무단 교체를 막는가?
+question: 생성된 코드·파일이나 공유 컴파일 캐시를 권한 없이 바꿀 수 없는가?
 scope: null
 risk_category: 보안 위협 점검
 risk_summary: 캐시 쓰기 권한자가 파생 코드·파일을 교체해 다른 worker의 비승인 코드 실행이나 잘못된 계산을 유도할 수 있음. 실제 reader·소비 경로 확인 필요.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 컴파일/AOT cache 실제 생성·읽기 경로. cache 비활성 기본값을 가정하지 않으며 유효 compilation 설정·cache writer 확인
+  prose: 실제 compile/AOT·파생 cache의 생성·읽기 경로를 먼저 확인한다. 명시적 활성 옵션이 없다는 이유로 기본 cache를 제외하지 않는다.
 policy_params: []
 policy_prose:
   policy_to_decide: null
-  enterprise_decisions: 변경 허용 주체, 불변 저장소·쓰기 제한·소비 전 검증의 조합, rank별 실제 소비/mapper/변환 증거와 기록 집행점.
+  enterprise_decisions: 변경을 허용할 주체, 불변 저장소·쓰기 제한·읽기 전 검증의 적용 방법, 각 rank가 읽은 파일·담당 shard·변환 결과의 증거와 기록 위치.
 normal_control: 새 묶음의 빈 cache에서 생성하고 동일 묶음으로 정상 재기동한다.
 challenge_steps:
 - vLLM·Inductor·Triton 실제 cache 경로 확인
@@ -23,13 +26,11 @@ challenge_steps:
 - 재기동 시 소비 전 제한과 실제 읽기 확인
 required_observations: []
 required_observations_prose:
-- cache 경로·소유자·writer
-- 묶음 식별·cache key
-- pickle 등 reader 도달과 소비 기록
+- cache 경로·소유자·writer/묶음 식별·cache key/pickle 등 reader 도달과 소비 기록
 satisfied_if: 허용되지 않은 생성·변조 결과를 소비하지 않는다. 생성 결과마다 사람의 별도 승인을 필수로 요구하지 않는다.
 fail_criteria: 비허용 writer가 바꾼 생성물을 요구한 검사 없이 소비한다.
 unknown_criteria: cache 파일 변경은 확인했지만 소비 도달·내용 검증·권한 집행을 확인하지 못했다.
-remediation: 불변 객체·쓰기 제한·소비 전 검증 중 실제 경로에 맞는 조합을 적용한다 필요 형식만 허용하고 reader/의존성을 고정·수정하며 소비 프로세스 권한을 줄인다 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다
+remediation: '- 컴파일 결과·생성 파일·캐시의 작성자와 읽는 프로세스를 구분하고 저장 위치의 쓰기 권한을 제한한다. 생성 입력·도구·설정의 식별정보를 기록하고, 무단 변경된 결과를 읽기 전에 거부하거나 승인한 조건으로 다시 생성한다.'
 method_and_evidence: '생성 도구·입력·옵션·결과·consumer를 연결하고 다른 writer의 무해 교체 표식으로 재사용 여부를 확인한다. npcache는 생성과 재사용의 writer·권한을 따로 확인한다. 컴파일 캐시는 vLLM의 목록 해석과 실제 생성 코드 소비를 나누고 의존성 내부 검사는 조사 범위를 표시한다. cache 생성자·쓰기권·pickle 소비 위치를 기록한다. 승인 cache 정상 재사용과 비승인 writer의 무해 표식/격리 시험 cache 교체를 대조해 소비 전 제한 여부를 확인한다. safetensors 정책만으로 cache reader를 통과시키지 않는다. 【F03】실제 compilation backend·AOT 사용·캐시 활성값·의존성 판본을 기록. 단순 활성 시 선택으로 기본 캐시 조사를 건너뛰지 않음. 유효 VLLM_CACHE_ROOT·compilation_config.cache_dir·TORCHINDUCTOR_CACHE_DIR·TRITON_CACHE_DIR와 각 rank 실제 파일을 수집; 묶음별 빈 디렉터리 최초 생성/동일 묶음 재기동/다른 묶음 재사용 거절을 비교. 타 계정 쓰기 및 엔진 자신의 잔존 writer·오염 지속성도 확인. 정상 대조: 승인한 동일 묶음에서 정상 생성·재기동 후 결과와 필요 성능 유지.'
 remaining_setup: 격리 cache와 안전한 계측; 임의 코드 실행 payload는 사용하지 않음
 executor: null

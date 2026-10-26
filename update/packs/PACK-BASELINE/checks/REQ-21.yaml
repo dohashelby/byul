@@ -1,17 +1,21 @@
 id: REQ-21
-revision: 1
+framework_id: CHK-REQ-021
+mechanism_ids:
+- mechanism-05
+- mechanism-16
+revision: 2
 retired: false
 area: REQ
-purpose: 실행 상태·메모리 안전
+purpose: 실행 상태·버퍼 수명
 secondary_purposes: []
-question: TP graph 통신 buffer의 참조가 등록·종료·재기동 과정에서 유효한가?
+question: TP의 GPU 작업 재실행에 사용하는 통신 버퍼가 등록·종료·재기동 후에도 현재 실행의 유효한 버퍼를 참조하는가?
 scope: 조건부
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 요청·종료·재기동 중 buffer 수명 관리 오류가 있으면 잘못된 참조로 결과 오염·장애가 생길 수 있음. 일반 호출자의 유발 능력과 자료 노출은 별도 확인.
 review_order: implementation_path_first
 impact: null
 applies_when:
-  prose: 단일 노드 TP 기본 중 해당 graph/communicator가 실제 선택
+  prose: TP의 실제 graph/communicator buffer 등록·참조 경로가 선택될 때 적용한다. 일반 TP 통신 점검은 별도로 유지한다.
 policy_params: []
 policy_prose:
   policy_to_decide: 허용 peer·참조 수명·종료 조건
@@ -23,13 +27,11 @@ challenge_steps:
 - 새 세대의 buffer 등록·참조·정리 대조
 required_observations: []
 required_observations_prose:
-- rank·process generation
-- 등록 handle·buffer 범위
-- graph 완료·해제·재등록
-satisfied_if: 유효하지 않거나 다른 실행의 참조가 소비되지 않는다. native 완료 근거가 없으면 미확인이다.
+- rank·process generation/등록 handle·buffer 범위/graph 완료·해제·재등록
+satisfied_if: 등록된 버퍼가 현재 실행·소유자와 일치하고, 다른 실행의 버퍼나 해제된 버퍼를 사용하지 않는다. GPU 작업 완료와 graph·통신기의 참조 해제는 기록·계측으로 확인한다.
 fail_criteria: 종료된 세대의 잘못된 참조 사용이나 미해제로 다음 기동·자료 귀속이 깨진다.
 unknown_criteria: native 통신의 실제 참조 수명·해제 효과를 계측하지 못했다.
-remediation: 참조의 소유·수명과 실행 세대를 맞추고 재사용 전에 완료를 확인한다.
+remediation: '- TP graph 통신 buffer의 등록 정보·소유자·실행 세대를 관리한다. graph·통신기가 더 이상 해당 buffer를 참조하지 않고 관련 GPU 연산이 모두 끝난 뒤 참조를 해제한다. 종료·재기동 때 이전 등록 정보를 정리하고 새 실행에 유효한 참조만 사용한다.'
 method_and_evidence: rank별 buffer/IPC handle 등록·교환·소비·release와 재기동 후 새 참조를 확인한다. 종료 시간·자원 회수 판정은 C08과 공유한다.
 remaining_setup: 선정 통신 backend·native 계측·격리 재기동 fixture
 executor: null

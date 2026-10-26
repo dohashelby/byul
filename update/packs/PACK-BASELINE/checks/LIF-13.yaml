@@ -1,17 +1,20 @@
 id: LIF-13
-revision: 1
+framework_id: CHK-LIF-013
+mechanism_ids:
+- mechanism-13
+revision: 2
 retired: false
 area: LIF
-purpose: 종결·자원 회수
+purpose: 실행 상태·버퍼 수명
 secondary_purposes: []
-question: daemon 전체 release 이후 다른 소비자의 다음 취득·fallback과 기존 참조가 허용한 상태를 지키는가?
+question: 공유 가중치 전체 해제 후 재취득·대체 공급과 기존 참조의 사용이 승인·접근·수명 기준을 지키는가?
 scope: 조건부; 공유 weights copy/zero-copy
 risk_category: 보안 위협 점검
 risk_summary: 해당 daemon에 release를 보낼 수 있는 소비자가 전체 해제를 유발해 다른 소비자의 취득·참조·서비스를 방해할 수 있음. 기존 참조 영향은 시험 필요.
 review_order: conditional_when_selected
 impact: null
 applies_when:
-  prose: 선택 기능 ipc_cache/preload. 같은 UID client의 release와 copy/zero-copy 경로
+  prose: ipc_cache/preload 등 별도 weights daemon을 선택할 때 적용한다. 기본 TP 자체를 daemon 사용으로 간주하지 않는다.
 policy_params: []
 policy_prose:
   policy_to_decide: 소유·release·수명·실패 시 처리
@@ -23,13 +26,11 @@ challenge_steps:
 - 각 소비자의 다음 취득·fallback·기존 참조 관측
 required_observations: []
 required_observations_prose:
-- daemon rank·model 범위
-- release 응답
-- 후속 취득·소비·native 참조
-satisfied_if: 사용 중 참조를 잘못 해제하거나 폐기 참조를 재사용하지 않는다.
-fail_criteria: 채택한 release 범위·후속 접근·일관성 조건을 위반한다.
-unknown_criteria: release 응답만 있고 기존 native 참조 효과·fallback 소비를 확인하지 못했다.
-remediation: 모델별 인가·실물승인·공유수명·fallback정책을 각각 집행한다 취소 전파·그룹 장애 처리·retry예산과 실제 종료 관측을 연결한다 복원 묶음 재승인·사본 목록·자산 소유자별 삭제/철회와 재개 검증을 둔다
+- daemon rank·model 범위/release 응답/후속 취득·소비·native 참조
+satisfied_if: release가 허용된 주체·범위에서 수행되고, 다른 소비자의 후속 취득·fallback이 승인 조건을 지킨다. 사용 중 참조를 잘못 해제하거나 폐기 참조를 재사용하지 않는다.
+fail_criteria: 비허용 전역 release, 정책에 어긋나는 다른 소비자의 후속 취득·접근 실패, 승인 밖 fallback 소비 또는 참조 일관성 위반을 확인한다. native 참조 위반은 해당 효과의 별도 증거로 판정한다.
+unknown_criteria: release 응답만 있고 다른 소비자의 후속 취득·fallback 소비 또는 기존 native 참조 효과를 확인하지 못했다. 확인하지 못한 분기를 다른 분기의 정상 결과로 대신 판정하지 않는다.
+remediation: '- 별도 가중치 daemon을 사용하는 환경에서는 전체 release 권한과 허용 시점을 제한한다. 다른 사용 프로세스의 다음 취득·기존 참조 상태를 확인하고, fallback에는 승인한 공급물·접근 정책을 적용한다.'
 method_and_evidence: '동시 reader·공급자 종료·release·복사 사본/native 참조와 다른 reader 동작을 확인한다. daemon 인스턴스/rank의 model 전체 해제 전후 다른 client get_state·실패·fallback을 확인한다. copy 소비 완료와 이미 열린 CUDA IPC 참조를 분리 계측한다. fallback의 실제 loader/형식·승인도 다시 확인한다. 【F05】R08 daemon 선택환경만. 기본 TP 자체가 대상 아님. 같은 UID·접근 가능한 socket 신뢰와 copy/zero_copy를 기록. 무해 메시지로 다른 UID·동일 UID 별도 process의 socket 접근 통제를 확인; copy 완료/실패 자동 release와 zero_copy 소비 중 release를 나눠 이후 요청·기존 참조·fallback 확인. 정상 대조: 허용 consumer는 승인 weights로 정상 적재하고 release 이후 허용된 종료·fallback 절차 작동.'
 remaining_setup: 선택 daemon 환경과 native 계측; handle 단위 해제 가정 금지
 executor: null

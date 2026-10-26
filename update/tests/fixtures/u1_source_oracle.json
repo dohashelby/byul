@@ -1,0 +1,2299 @@
+{
+  "schema": "guard.source-selection-oracle/1",
+  "basis": "전후 git blob과 CheckDef 질문의 직접 대조. classifier 출력에서 생성하지 않음. §8.1 설계·회귀 자료만 사용.",
+  "independent_evaluation": {
+    "count": 0,
+    "status": "not_performed",
+    "reason": "알려진 여섯 release 쌍은 이미 설계에 사용했음. 사람 미검토 정답 초안이며 독립 정확성 입증 아님."
+  },
+  "label_policy": "required는 소스 변경으로 직접 확인한 필수 관계, optional은 관련 후보, 누락 라벨은 미평가. 목록에 없다고 무관한 것으로 보지 않음.",
+  "cases": [
+    {
+      "id": "video-reader",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.25.0",
+      "candidate_version": "v0.25.1",
+      "baseline_commit": "702f4814fe54fabff350d43cb753ae3e47c0c276",
+      "candidate_commit": "752a3a504485790a2e8491cacbb35c137339ad34",
+      "before_path": "vllm/multimodal/video.py",
+      "before_sha256": "a92ebadbbb853d44c13bd0461601e2c20af29eecfad55dbb7ac2fa6fc246f111",
+      "after_path": "vllm/multimodal/video.py",
+      "after_sha256": "711e12b983dfd3cc89d7ca75888e87ba323e289d24e5edae462cf5be5087e3f5",
+      "source_fact": "VideoBackend가 torchcodec import RuntimeError를 처리하고 실제 decoder 생성 전에 check_torchcodec_available을 호출한다. 미디어 reader 선택과 오류 경로를 직접 바꾼다.",
+      "rationale": "SUP-12의 실제 reader·의존성·fallback 계약에 연결한다. 직접 token ID 재사용(REQ-08)을 실제로 바꾼다고는 확정하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/SUP-12.yaml",
+        "packs/PACK-BASELINE/checks/REQ-09.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "INPUT_PROCESSING"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [],
+        "required_checks": [
+          "SUP-12"
+        ],
+        "optional_checks": [
+          "REQ-09"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/multimodal/video.py",
+            "sha256": "a92ebadbbb853d44c13bd0461601e2c20af29eecfad55dbb7ac2fa6fc246f111",
+            "required_categories": [
+              "INPUT_PROCESSING"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/multimodal/video.py",
+            "sha256": "711e12b983dfd3cc89d7ca75888e87ba323e289d24e5edae462cf5be5087e3f5",
+            "required_categories": [
+              "INPUT_PROCESSING"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "206f4065675350926005722080762def6a2a421222f1d7a4c77c6812b87b15fe",
+        "findings": [
+          "추가된 import 실패 정리와 decoder 진입 전 검사까지 확인. SUP-12 reader/의존성 확인과 관계가 있지만 실제 악성 객체 거부나 reader 취약성 해결은 입증하지 않는다."
+        ],
+        "human_question": "SUP-12 필수 관계와 REQ-09 선택 관계 유지 여부",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "702f4814fe54fabff350d43cb753ae3e47c0c276",
+            "path": "vllm/multimodal/video.py",
+            "sha256": "a92ebadbbb853d44c13bd0461601e2c20af29eecfad55dbb7ac2fa6fc246f111",
+            "line": null,
+            "anchor": "전후 diff 및 파일 책임 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "752a3a504485790a2e8491cacbb35c137339ad34",
+            "path": "vllm/multimodal/video.py",
+            "sha256": "711e12b983dfd3cc89d7ca75888e87ba323e289d24e5edae462cf5be5087e3f5",
+            "line": 959,
+            "anchor": "check_torchcodec_available()"
+          }
+        ]
+      }
+    },
+    {
+      "id": "import-error-trimming",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.25.0",
+      "candidate_version": "v0.25.1",
+      "baseline_commit": "702f4814fe54fabff350d43cb753ae3e47c0c276",
+      "candidate_commit": "752a3a504485790a2e8491cacbb35c137339ad34",
+      "before_path": "vllm/utils/import_utils.py",
+      "before_sha256": "b3a6bda7a95f0cdd7868082f4d701259257608d051e713992007cd865b2da7de",
+      "after_path": "vllm/utils/import_utils.py",
+      "after_sha256": "8a28a040c2ca7d1f742da34bf0233c52c0554b341d7abe6339cc39594a56238e",
+      "source_fact": "check_torchcodec_available이 RuntimeError에서 libtorchcodec 상세 메시지 뒷부분을 제거하고 from None으로 다시 던진다.",
+      "rationale": "REQ-13의 내부 오류 정보 노출 제한에 반드시 관련된다. 포괄 utils 경로만으로 오류 의미를 분류할 수 있다고 요구하지 않으며 raw 연결 누락과 항상 시험 보완을 별도로 평가한다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-13.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [],
+        "optional_categories": [
+          "GENERIC",
+          "ERROR"
+        ],
+        "forbidden_categories": [],
+        "required_checks": [
+          "REQ-13"
+        ],
+        "optional_checks": [],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": null,
+        "sides": {
+          "baseline": {
+            "path": "vllm/utils/import_utils.py",
+            "sha256": "b3a6bda7a95f0cdd7868082f4d701259257608d051e713992007cd865b2da7de",
+            "required_categories": [],
+            "forbidden_categories": [],
+            "excluded": false
+          },
+          "candidate": {
+            "path": "vllm/utils/import_utils.py",
+            "sha256": "8a28a040c2ca7d1f742da34bf0233c52c0554b341d7abe6339cc39594a56238e",
+            "required_categories": [],
+            "forbidden_categories": [],
+            "excluded": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "85eefd053d30d6b0db09a736ef1bfbfe1afa3feb4f08e44083f67d32948b8d83",
+        "findings": [
+          "이번 diff는 기존 함수를 고친 것이 아니라 check_torchcodec_available 함수를 새로 추가한다. 잘린 메시지의 오류 반환 책임은 REQ-13에 직접 관련된다. 같은 파일의 import_from_path/resolve_obj_by_qualname은 기존 동적 로딩 책임이므로 파일 전체 PLUGIN 연결과 이번 수정의 오류 의미를 분리한다. 기존 optional GENERIC 라벨은 역사적 후보를 보존한 것이며 GENERIC 규칙 복구 요구가 아니다."
+        ],
+        "human_question": "REQ-13 필수, PLUGIN 파일 책임과 오류 변경 책임의 구분 승인",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "702f4814fe54fabff350d43cb753ae3e47c0c276",
+            "path": "vllm/utils/import_utils.py",
+            "sha256": "b3a6bda7a95f0cdd7868082f4d701259257608d051e713992007cd865b2da7de",
+            "line": null,
+            "anchor": "전후 diff 및 파일 책임 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "752a3a504485790a2e8491cacbb35c137339ad34",
+            "path": "vllm/utils/import_utils.py",
+            "sha256": "8a28a040c2ca7d1f742da34bf0233c52c0554b341d7abe6339cc39594a56238e",
+            "line": 557,
+            "anchor": "def check_torchcodec_available"
+          }
+        ]
+      }
+    },
+    {
+      "id": "compile-dtype-guard",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.25.0",
+      "candidate_version": "v0.25.1",
+      "baseline_commit": "702f4814fe54fabff350d43cb753ae3e47c0c276",
+      "candidate_commit": "752a3a504485790a2e8491cacbb35c137339ad34",
+      "before_path": "vllm/compilation/passes/fusion/allreduce_rms_fusion.py",
+      "before_sha256": "19eaa4569391b47fa8c9da47da2187f991755939240098f0e3e1d45ac97fc507",
+      "after_path": "vllm/compilation/passes/fusion/allreduce_rms_fusion.py",
+      "after_sha256": "a6072be3ab5f105816b9f1a41e2860895d26cc26991bbb8f5143b69b496d7323",
+      "source_fact": "두 register_replacement 호출에 _norm_input_weight_dtype_match 추가로 컴파일 패턴 적용 조건을 제한한다.",
+      "rationale": "생성·컴파일 결과 호환 문맥의 관련 후보지만 해당 diff만으로 cache writer 무결성이나 cache key 변경이 필수라고 확정하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/SUP-07.yaml",
+        "packs/PACK-BASELINE/checks/SUP-15.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "COMPILE_CACHE"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [],
+        "required_checks": [],
+        "optional_checks": [
+          "SUP-07",
+          "SUP-15"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/compilation/passes/fusion/allreduce_rms_fusion.py",
+            "sha256": "19eaa4569391b47fa8c9da47da2187f991755939240098f0e3e1d45ac97fc507",
+            "required_categories": [
+              "COMPILE_CACHE"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/compilation/passes/fusion/allreduce_rms_fusion.py",
+            "sha256": "a6072be3ab5f105816b9f1a41e2860895d26cc26991bbb8f5143b69b496d7323",
+            "required_categories": [
+              "COMPILE_CACHE"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "9be8b0ceaf0552f0d0c66b78e1668f9a1df3c946b32ff2a4a1db365e31afca17",
+        "findings": [
+          "정적 컴파일 패턴 적용의 dtype 검사 두 지점을 확인. COMPILE_CACHE는 컴파일 하위체계의 경로 책임이며 이 diff에서 writer 권한이나 cache key 변경을 관측한 것은 아니다. SUP-07/15는 선택 관계로 유지한다."
+        ],
+        "human_question": "컴파일 경로 범주와 cache 보안 사실의 구분 승인",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "702f4814fe54fabff350d43cb753ae3e47c0c276",
+            "path": "vllm/compilation/passes/fusion/allreduce_rms_fusion.py",
+            "sha256": "19eaa4569391b47fa8c9da47da2187f991755939240098f0e3e1d45ac97fc507",
+            "line": 468,
+            "anchor": "extra_check=_norm_input_weight_dtype_match"
+          },
+          {
+            "side": "candidate",
+            "commit": "752a3a504485790a2e8491cacbb35c137339ad34",
+            "path": "vllm/compilation/passes/fusion/allreduce_rms_fusion.py",
+            "sha256": "a6072be3ab5f105816b9f1a41e2860895d26cc26991bbb8f5143b69b496d7323",
+            "line": 468,
+            "anchor": "extra_check=_norm_input_weight_dtype_match"
+          }
+        ]
+      }
+    },
+    {
+      "id": "docker-abi-cache",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.27.0",
+      "candidate_version": "v0.27.1",
+      "baseline_commit": "4bdc8a788d2e2ce9165d552b3d4d8b72604626bf",
+      "candidate_commit": "6e448d0ea9bf3d88d898b65449ca6dc2aec170ac",
+      "before_path": "docker/Dockerfile",
+      "before_sha256": "92fbaf7d8f4273c11ffee168cda05695197400a9c4ac2d1a8145032691690e52",
+      "after_path": "docker/Dockerfile",
+      "after_sha256": "9876efaec74111cad4ce074225740fafa9461166973d1837dc0d4cd23c2f2509",
+      "source_fact": "uv cache에 Ubuntu 22.04 ABI를 구별하는 id를 붙이고 suffix_decoding 확장 모듈 import 점검을 추가한다.",
+      "rationale": "SUP-04의 실제 이미지·의존성 승인 식별에 연결한다. 빌드 cache 호환성은 SUP-15와 관련될 수 있으나 모델 파생 cache 계약과 동일하다고 확정하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/SUP-04.yaml",
+        "packs/PACK-BASELINE/checks/SUP-15.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "IMAGE"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [],
+        "required_checks": [
+          "SUP-04"
+        ],
+        "optional_checks": [
+          "SUP-15"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "docker/Dockerfile",
+            "sha256": "92fbaf7d8f4273c11ffee168cda05695197400a9c4ac2d1a8145032691690e52",
+            "required_categories": [
+              "IMAGE"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "docker/Dockerfile",
+            "sha256": "9876efaec74111cad4ce074225740fafa9461166973d1837dc0d4cd23c2f2509",
+            "required_categories": [
+              "IMAGE"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "758e4e592dd4f48d099f7805e4dc77cbd8f1ae96d4247d1d52e01589602cd1e0",
+        "findings": [
+          "Ubuntu 22.04 ABI 구분용 빌드 cache id와 arctic_inference 모듈 import 검증을 확인. SUP-04 구성 승인 대상과 관계가 있지만 승인 완료나 모델 파생 cache 호환성 증거는 아니다."
+        ],
+        "human_question": "SUP-04 필수와 SUP-15 선택 관계의 범위 승인",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "4bdc8a788d2e2ce9165d552b3d4d8b72604626bf",
+            "path": "docker/Dockerfile",
+            "sha256": "92fbaf7d8f4273c11ffee168cda05695197400a9c4ac2d1a8145032691690e52",
+            "line": null,
+            "anchor": "전후 diff 및 파일 책임 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "6e448d0ea9bf3d88d898b65449ca6dc2aec170ac",
+            "path": "docker/Dockerfile",
+            "sha256": "9876efaec74111cad4ce074225740fafa9461166973d1837dc0d4cd23c2f2509",
+            "line": 953,
+            "anchor": "id=uv-v027-ubuntu2204"
+          }
+        ]
+      }
+    },
+    {
+      "id": "quantization-forwarding",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.27.0",
+      "candidate_version": "v0.27.1",
+      "baseline_commit": "4bdc8a788d2e2ce9165d552b3d4d8b72604626bf",
+      "candidate_commit": "6e448d0ea9bf3d88d898b65449ca6dc2aec170ac",
+      "before_path": "vllm/model_executor/models/qwen3_dspark.py",
+      "before_sha256": "2edf9135043b9b4506131638d729ee0e7487b6acf538d17ca6e3625137d0f192",
+      "after_path": "vllm/model_executor/models/qwen3_dspark.py",
+      "after_sha256": "08adb0f0ce49e08f05b380388ec411a4a191d2ed644e48cedde7796571e028a2",
+      "source_fact": "DSparkMarkovHead가 QuantizationConfig를 받아 ParallelLMHead에 넘기며 model이 self.quant_config를 전달한다.",
+      "rationale": "선정 연산·양자화 설정 경로다. 이 변경만으로 GPU 경계·초기화나 승인 모델 파일 교체 문제를 확정하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-19.yaml",
+        "packs/PACK-BASELINE/checks/SUP-03.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "RUNNER_KERNEL"
+        ],
+        "optional_categories": [
+          "MODEL_LOADING"
+        ],
+        "forbidden_categories": [],
+        "required_checks": [],
+        "optional_checks": [
+          "REQ-19",
+          "SUP-03"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/model_executor/models/qwen3_dspark.py",
+            "sha256": "2edf9135043b9b4506131638d729ee0e7487b6acf538d17ca6e3625137d0f192",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/model_executor/models/qwen3_dspark.py",
+            "sha256": "08adb0f0ce49e08f05b380388ec411a4a191d2ed644e48cedde7796571e028a2",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "305ea12ed728caa2bd918428bc03308fdce4e6828c2a6a6a03b71548bbc7205f",
+        "findings": [
+          "DSparkMarkovHead와 ParallelLMHead에 quant_config를 넘기는 두 연결을 확인. 실행 연산 설정 변화이며 GPU buffer 경계 결함이나 공급물 교체를 확정할 수 없다."
+        ],
+        "human_question": "REQ-19/SUP-03를 선택 관계로 유지할지 검토",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "4bdc8a788d2e2ce9165d552b3d4d8b72604626bf",
+            "path": "vllm/model_executor/models/qwen3_dspark.py",
+            "sha256": "2edf9135043b9b4506131638d729ee0e7487b6acf538d17ca6e3625137d0f192",
+            "line": null,
+            "anchor": "전후 diff 및 파일 책임 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "6e448d0ea9bf3d88d898b65449ca6dc2aec170ac",
+            "path": "vllm/model_executor/models/qwen3_dspark.py",
+            "sha256": "08adb0f0ce49e08f05b380388ec411a4a191d2ed644e48cedde7796571e028a2",
+            "line": 103,
+            "anchor": "quant_config=self.quant_config"
+          }
+        ]
+      }
+    },
+    {
+      "id": "topk-cudagraph-reset",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.20.1",
+      "candidate_version": "v0.20.2",
+      "baseline_commit": "132765e3560659ff63ebd236203672e991b70e08",
+      "candidate_commit": "bc150f50299199599673614f80d12a196f377655",
+      "before_path": "csrc/topk.cu",
+      "before_sha256": "68befea013cfde2cdd0615a22fa9704979b2f15d1153761856671e95b6894338",
+      "after_path": "csrc/topk.cu",
+      "after_sha256": "016d76f4616c1f27e63b07e017b984a7a29c661db0ad1da8faf09bac89561859",
+      "source_fact": "workspace radix 상태 cudaMemsetAsync를 조건 없이 호출해 CUDA graph capture에 항상 포함한다. 기존 capture-time guard가 재실행 상태를 남기는 이유가 주석에 명시돼 있다.",
+      "rationale": "REQ-19의 필요한 영역 초기화 및 REQ-20의 CUDA Graph 현재 상태·버퍼 수명에 직접 연결한다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-19.yaml",
+        "packs/PACK-BASELINE/checks/REQ-20.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "RUNNER_KERNEL"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [],
+        "required_checks": [
+          "REQ-19",
+          "REQ-20"
+        ],
+        "optional_checks": [],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "csrc/topk.cu",
+            "sha256": "68befea013cfde2cdd0615a22fa9704979b2f15d1153761856671e95b6894338",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "csrc/topk.cu",
+            "sha256": "016d76f4616c1f27e63b07e017b984a7a29c661db0ad1da8faf09bac89561859",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "8a74c3fa315918c8ce098d75652a165f66b404ee029152c953a5f831b9a01b11",
+        "findings": [
+          "조건부 needs_cooperative guard가 사라져 memset이 graph capture에 포함된다는 코드와 주석을 확인. REQ-19 초기화와 REQ-20 replay 상태에 직접 관련되지만 실제 도달·누출·성능은 시험하지 않았다."
+        ],
+        "human_question": "REQ-19·REQ-20 필수 관계 승인",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "132765e3560659ff63ebd236203672e991b70e08",
+            "path": "csrc/topk.cu",
+            "sha256": "68befea013cfde2cdd0615a22fa9704979b2f15d1153761856671e95b6894338",
+            "line": 173,
+            "anchor": "cudaMemsetAsync(workspace.data_ptr"
+          },
+          {
+            "side": "candidate",
+            "commit": "bc150f50299199599673614f80d12a196f377655",
+            "path": "csrc/topk.cu",
+            "sha256": "016d76f4616c1f27e63b07e017b984a7a29c661db0ad1da8faf09bac89561859",
+            "line": 182,
+            "anchor": "cudaMemsetAsync(workspace.data_ptr"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cache-admission-cap",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.20.1",
+      "candidate_version": "v0.20.2",
+      "baseline_commit": "132765e3560659ff63ebd236203672e991b70e08",
+      "candidate_commit": "bc150f50299199599673614f80d12a196f377655",
+      "before_path": "vllm/v1/core/kv_cache_manager.py",
+      "before_sha256": "7e9998dfad5e5ab90c261bdb8314a38349193b56abeb3edee5bb5948b86dbbb5",
+      "after_path": "vllm/v1/core/kv_cache_manager.py",
+      "after_sha256": "1372e06731f7b06cdee5afe7d42207dc0d3c489076c43e405ebc9ff119e1b137",
+      "source_fact": "전체 sequence의 block 수와 free block 비교 경로에서 apply_admission_cap=True를 넘긴다. 자원 수용량 계산에 영향을 준다.",
+      "rationale": "LIF-03의 요청 자원 예산·공정성과 직접 관련된다. cache 경로 category가 tenant 공유·key 문맥·부채널을 바꾼다는 뜻은 아니다. raw category 연결과 항상 시험 보완을 나눈다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/LIF-03.yaml",
+        "packs/PACK-BASELINE/checks/REQ-15.yaml",
+        "packs/PACK-BASELINE/checks/REQ-16.yaml",
+        "packs/PACK-BASELINE/checks/REQ-17.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "CACHE"
+        ],
+        "optional_categories": [
+          "SCHEDULER"
+        ],
+        "forbidden_categories": [],
+        "required_checks": [
+          "LIF-03"
+        ],
+        "optional_checks": [
+          "REQ-15",
+          "REQ-16",
+          "REQ-17"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/v1/core/kv_cache_manager.py",
+            "sha256": "7e9998dfad5e5ab90c261bdb8314a38349193b56abeb3edee5bb5948b86dbbb5",
+            "required_categories": [
+              "CACHE"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/v1/core/kv_cache_manager.py",
+            "sha256": "1372e06731f7b06cdee5afe7d42207dc0d3c489076c43e405ebc9ff119e1b137",
+            "required_categories": [
+              "CACHE"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "9dfb5e4d4a29388dace8b7711b4946ee05155cd936d31953e4476e9472add709",
+        "findings": [
+          "할당 block 계산에 admission cap을 적용하는 한 줄 변경과 free block 비교를 확인. LIF-03 예산 질문에 직접 관련된다. 현재 원시 CACHE 연결의 LIF-03 부재와 항상 시험 보완은 별도 문제이며 SCHEDULER를 억지로 필수 라벨로 올리지 않는다."
+        ],
+        "human_question": "LIF-03를 항상 시험 책임으로 유지할지 연결표를 별도로 검토할지 팀 결정",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "132765e3560659ff63ebd236203672e991b70e08",
+            "path": "vllm/v1/core/kv_cache_manager.py",
+            "sha256": "7e9998dfad5e5ab90c261bdb8314a38349193b56abeb3edee5bb5948b86dbbb5",
+            "line": null,
+            "anchor": "전후 diff 및 파일 책임 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "bc150f50299199599673614f80d12a196f377655",
+            "path": "vllm/v1/core/kv_cache_manager.py",
+            "sha256": "1372e06731f7b06cdee5afe7d42207dc0d3c489076c43e405ebc9ff119e1b137",
+            "line": 260,
+            "anchor": "apply_admission_cap=True"
+          }
+        ]
+      }
+    },
+    {
+      "id": "zentorch-op-gate",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.22.0",
+      "candidate_version": "v0.22.1",
+      "baseline_commit": "0b3ba88f165976e77ca5e6a7a3f5bba4562b80af",
+      "candidate_commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+      "before_path": null,
+      "before_sha256": null,
+      "after_path": "vllm/model_executor/kernels/linear/zentorch_utils.py",
+      "after_sha256": "2c7631878d93bfc21906c0ac775aae75cf9aa573b76068818714af01fa1a66d1",
+      "source_fact": "새 has_zentorch_op은 비어 있는 op 목록을 거부하고 Zen CPU와 실제 torch.ops.zentorch op 등록 여부를 확인한다.",
+      "rationale": "실제 CPU linear dispatch를 선택한다. GPU 전용 점검을 이 파일의 확정 필수 점검이라고 적지 않으며 등록 검증 정책과는 관련 후보로 남긴다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/SUP-11.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "RUNNER_KERNEL"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [],
+        "required_checks": [],
+        "optional_checks": [
+          "SUP-11"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "candidate": {
+            "path": "vllm/model_executor/kernels/linear/zentorch_utils.py",
+            "sha256": "2c7631878d93bfc21906c0ac775aae75cf9aa573b76068818714af01fa1a66d1",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "a5cb2c82dfedf9efa1f5df39af9cd569103c6acccb4f541cf7eb0f55a2b45ef7",
+        "findings": [
+          "추가 파일이 빈 op 목록을 거부하고 Zen CPU 및 실제 torch.ops.zentorch 등록을 확인함을 직접 읽었다. CPU dispatch와 외부 모듈 import 제한은 동일하지 않아 SUP-11은 선택 관계다."
+        ],
+        "human_question": "GPU 전용 점검을 CPU 사례 필수로 승격하지 않는 범위 승인",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "candidate",
+            "commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+            "path": "vllm/model_executor/kernels/linear/zentorch_utils.py",
+            "sha256": "2c7631878d93bfc21906c0ac775aae75cf9aa573b76068818714af01fa1a66d1",
+            "line": 14,
+            "anchor": "def has_zentorch_op"
+          }
+        ]
+      }
+    },
+    {
+      "id": "deepseek-fp8-op",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.22.0",
+      "candidate_version": "v0.22.1",
+      "baseline_commit": "0b3ba88f165976e77ca5e6a7a3f5bba4562b80af",
+      "candidate_commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+      "before_path": "vllm/models/deepseek_v4/nvidia/ops/sparse_attn_compress_cutedsl.py",
+      "before_sha256": "b8c60c75d70e07c88bd162861dfc7d77689c189f44dee12da0a31aa3120220d8",
+      "after_path": "vllm/models/deepseek_v4/nvidia/ops/sparse_attn_compress_cutedsl.py",
+      "after_sha256": "503d1008476612a2fc5b7fb31ea3be08e4390cab816c4ebd75657baadc90ee02",
+      "source_fact": "네 FP8 clipping 지점에서 cute.arch.fmin을 cutlass.min으로 대체한다. 실제 sparse attention 연산 코드다.",
+      "rationale": "현대 models 경로 안의 연산 책임을 확인한다. 이 diff만으로 모델 파일 로딩 변화나 메모리 범위 위반 사실은 확정하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-19.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "RUNNER_KERNEL"
+        ],
+        "optional_categories": [
+          "MODEL_LOADING"
+        ],
+        "forbidden_categories": [],
+        "required_checks": [],
+        "optional_checks": [
+          "REQ-19"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/models/deepseek_v4/nvidia/ops/sparse_attn_compress_cutedsl.py",
+            "sha256": "b8c60c75d70e07c88bd162861dfc7d77689c189f44dee12da0a31aa3120220d8",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/models/deepseek_v4/nvidia/ops/sparse_attn_compress_cutedsl.py",
+            "sha256": "503d1008476612a2fc5b7fb31ea3be08e4390cab816c4ebd75657baadc90ee02",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "56c5849b47a463f1d98412b4d92ddfc33e998a03bd50d34b3fee52ed81caa63c",
+        "findings": [
+          "네 FP8 clipping 지점의 cute.arch.fmin→cutlass.min 치환을 확인. 실제 kernel 책임이지만 buffer 경계 위반이나 모델 로더 변경은 확인하지 않았다."
+        ],
+        "human_question": "RUNNER_KERNEL 필수·MODEL_LOADING 선택 관계 검토",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "0b3ba88f165976e77ca5e6a7a3f5bba4562b80af",
+            "path": "vllm/models/deepseek_v4/nvidia/ops/sparse_attn_compress_cutedsl.py",
+            "sha256": "b8c60c75d70e07c88bd162861dfc7d77689c189f44dee12da0a31aa3120220d8",
+            "line": null,
+            "anchor": "전후 diff 및 파일 책임 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+            "path": "vllm/models/deepseek_v4/nvidia/ops/sparse_attn_compress_cutedsl.py",
+            "sha256": "503d1008476612a2fc5b7fb31ea3be08e4390cab816c4ebd75657baadc90ee02",
+            "line": 323,
+            "anchor": "y0 = cutlass.min("
+          }
+        ]
+      }
+    },
+    {
+      "id": "model-config-registry",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.22.0",
+      "candidate_version": "v0.22.1",
+      "baseline_commit": "0b3ba88f165976e77ca5e6a7a3f5bba4562b80af",
+      "candidate_commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+      "before_path": "vllm/transformers_utils/config.py",
+      "before_sha256": "931b8a3746fe48346c250aecd2fc7a78864c421507892283377db653a19b2eef",
+      "after_path": "vllm/transformers_utils/config.py",
+      "after_sha256": "f0350704a6d30caf9209ae498424935fef3d2746bfae6f4ea9f83798f93b52c5",
+      "source_fact": "모델 config registry에 hyperclovax·mellum을 추가하고 rope_type 없는 구성의 기존 ValueError를 return으로 바꾼다.",
+      "rationale": "SUP-03의 함께 읽는 설정·모델 공급물 승인 범위에 연결한다. 입력 처리 category는 가능한 추가 관련성으로 두고 특정 token 재사용이나 reader 부작용은 확정하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/SUP-03.yaml",
+        "packs/PACK-BASELINE/checks/LIF-01.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "MODEL_LOADING"
+        ],
+        "optional_categories": [
+          "INPUT_PROCESSING"
+        ],
+        "forbidden_categories": [],
+        "required_checks": [
+          "SUP-03"
+        ],
+        "optional_checks": [
+          "LIF-01"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/transformers_utils/config.py",
+            "sha256": "931b8a3746fe48346c250aecd2fc7a78864c421507892283377db653a19b2eef",
+            "required_categories": [
+              "MODEL_LOADING"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/transformers_utils/config.py",
+            "sha256": "f0350704a6d30caf9209ae498424935fef3d2746bfae6f4ea9f83798f93b52c5",
+            "required_categories": [
+              "MODEL_LOADING"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "8dcdb59875a4d2dcd4682faaad09c700fd1712a198f9ea044872807e02e0e306",
+        "findings": [
+          "config registry의 두 모델 추가와 rope_type 미존재 시 ValueError→return 변경을 확인. 공급 config 승인 대조와 관련되지만 arbitrary code 실행·토큰 우회 등은 확인하지 않았다."
+        ],
+        "human_question": "SUP-03 필수·LIF-01 선택 관계 검토",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "0b3ba88f165976e77ca5e6a7a3f5bba4562b80af",
+            "path": "vllm/transformers_utils/config.py",
+            "sha256": "931b8a3746fe48346c250aecd2fc7a78864c421507892283377db653a19b2eef",
+            "line": null,
+            "anchor": "전후 diff 및 파일 책임 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+            "path": "vllm/transformers_utils/config.py",
+            "sha256": "f0350704a6d30caf9209ae498424935fef3d2746bfae6f4ea9f83798f93b52c5",
+            "line": 104,
+            "anchor": "hyperclovax=\"HyperCLOVAXConfig\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "documentation-exclusion",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.22.0",
+      "candidate_version": "v0.22.1",
+      "baseline_commit": "0b3ba88f165976e77ca5e6a7a3f5bba4562b80af",
+      "candidate_commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+      "before_path": "docs/models/supported_models.md",
+      "before_sha256": "9ac8fd1a3be6538047d849d636a373061159adb4eec9db6cf50d12aed9f76911",
+      "after_path": "docs/models/supported_models.md",
+      "after_sha256": "d923af234bdb4af2fc15beafa5f0c9beb3a44e971c96916ad1f827fe704fa569",
+      "source_fact": "지원 모델 안내 Markdown의 변경이며 실행 제품 코드가 아니다.",
+      "rationale": "docs 제외 규칙의 음성 사례다. 문서만 바뀐 파일에서 필수 실행 점검을 추론하지 않는다.",
+      "check_references": [],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [],
+        "optional_categories": [],
+        "forbidden_categories": [
+          "API_ROUTE",
+          "AUTH",
+          "RUNNER_KERNEL"
+        ],
+        "required_checks": [],
+        "optional_checks": [],
+        "unrelated_checks": [],
+        "excluded": true,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "docs/models/supported_models.md",
+            "sha256": "9ac8fd1a3be6538047d849d636a373061159adb4eec9db6cf50d12aed9f76911",
+            "required_categories": [],
+            "forbidden_categories": [
+              "API_ROUTE",
+              "AUTH",
+              "RUNNER_KERNEL"
+            ],
+            "excluded": true,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "docs/models/supported_models.md",
+            "sha256": "d923af234bdb4af2fc15beafa5f0c9beb3a44e971c96916ad1f827fe704fa569",
+            "required_categories": [],
+            "forbidden_categories": [
+              "API_ROUTE",
+              "AUTH",
+              "RUNNER_KERNEL"
+            ],
+            "excluded": true,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "d11c4560a5eeeb7f106313f8af6bc2520d1776f5d7469ea9c7ec0a14c6b5feb1",
+        "findings": [
+          "지원 모델 Markdown 행 한 줄 추가이며 실행 제품 코드는 바뀌지 않았다. 이 사례만 기존 docs 제외 계약의 음성으로 사용하며 다른 Markdown의 배포 영향까지 일반화하지 않는다."
+        ],
+        "human_question": "기존 docs 제외 범위의 사례별 음성 승인",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "0b3ba88f165976e77ca5e6a7a3f5bba4562b80af",
+            "path": "docs/models/supported_models.md",
+            "sha256": "9ac8fd1a3be6538047d849d636a373061159adb4eec9db6cf50d12aed9f76911",
+            "line": null,
+            "anchor": "전후 diff 및 파일 책임 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "0decac0d96c42b49572498019f0a0e3600f50398",
+            "path": "docs/models/supported_models.md",
+            "sha256": "d923af234bdb4af2fc15beafa5f0c9beb3a44e971c96916ad1f827fe704fa569",
+            "line": 441,
+            "anchor": "`MellumForCausalLM`"
+          }
+        ]
+      }
+    },
+    {
+      "id": "rust-output-grammar",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.31.0",
+      "candidate_version": "v0.32.0",
+      "baseline_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+      "candidate_commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "before_path": null,
+      "before_sha256": null,
+      "after_path": "rust/src/parser/src/output_grammar/arguments.rs",
+      "after_sha256": "5c2151d3a490ffabf862cd0cb43b68c177eb19f862c997961e678dbb7eb83b08",
+      "source_fact": "새 keyed-parameter tool-call grammar 구현은 schema의 type·enum·union을 출력 protocol grammar로 바꾸며 미지원 제약을 주석으로 밝힌다.",
+      "rationale": "모델 출력의 tool-call parser/grammar 책임이며 체크리스트 공백 후보다. 일반 input reader나 인증 기능과 혼동하지 않는다.",
+      "check_references": [],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "OUTPUT_PARSING"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [
+          "API_ROUTE",
+          "AUTH",
+          "INPUT_PROCESSING"
+        ],
+        "required_checks": [],
+        "optional_checks": [],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "candidate": {
+            "path": "rust/src/parser/src/output_grammar/arguments.rs",
+            "sha256": "5c2151d3a490ffabf862cd0cb43b68c177eb19f862c997961e678dbb7eb83b08",
+            "required_categories": [
+              "OUTPUT_PARSING"
+            ],
+            "forbidden_categories": [
+              "API_ROUTE",
+              "AUTH",
+              "INPUT_PROCESSING"
+            ],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "52e592bc8a7147b9a48532d085e05b127c84ca132ca2d85be438c8f49c457f42",
+        "findings": [
+          "keyed tool-call argument의 JSON schema 변환과 미지원 length/format/minProperties 주석을 확인. 모델 출력 grammar 책임이다. 문자열 길이를 검증하지 않는다는 정적 주석은 런타임 취약성 확정이 아니다. OUTPUT_PARSING의 점검 공백은 그대로 남긴다."
+        ],
+        "human_question": "OUTPUT_PARSING 공백 후보 및 INPUT_PROCESSING 음성 라벨 승인",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "candidate",
+            "commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+            "path": "rust/src/parser/src/output_grammar/arguments.rs",
+            "sha256": "5c2151d3a490ffabf862cd0cb43b68c177eb19f862c997961e678dbb7eb83b08",
+            "line": 185,
+            "anchor": "pub fn arguments("
+          }
+        ]
+      }
+    },
+    {
+      "id": "v1-attention-backend",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.31.0",
+      "candidate_version": "v0.32.0",
+      "baseline_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+      "candidate_commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "before_path": "vllm/v1/attention/backends/cpu_attn.py",
+      "before_sha256": "803a096aae093d52857549f5d841ef6d271b217af104109814c66840642767d5",
+      "after_path": "vllm/v1/attention/backends/cpu_attn.py",
+      "after_sha256": "ffcb1e2b03ceb1d913e10457b1a30366bf630138b0e628616d635c55315d8f09",
+      "source_fact": "CPUAttentionBackend에서 항상 False를 반환하던 use_cascade_attention 정적 메서드 override가 삭제된다. 실제 CPU attention backend 변경이며 상위 구현이나 런타임 효과는 이 사례에서 확정하지 않는다.",
+      "rationale": "GPU 전용 세부 질문을 CPU 파일의 필수 점검으로 확정하지 않는다. 실행 경로 분류와 점검별 도달 조건은 별개다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-19.yaml",
+        "packs/PACK-BASELINE/checks/REQ-20.yaml"
+      ],
+      "test_target": "정적 경로 책임·원본 바이트·규칙 후보 대조. 실제 실행/보안 판정은 하지 않음.",
+      "unverified_boundary": "사람 검토 대기. 알려진 변경 내용의 부분 정답이며 전체 category·점검의 무관성·동적 도달은 확정하지 않음.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "RUNNER_KERNEL"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [],
+        "required_checks": [],
+        "optional_checks": [
+          "REQ-19",
+          "REQ-20"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/v1/attention/backends/cpu_attn.py",
+            "sha256": "803a096aae093d52857549f5d841ef6d271b217af104109814c66840642767d5",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/v1/attention/backends/cpu_attn.py",
+            "sha256": "ffcb1e2b03ceb1d913e10457b1a30366bf630138b0e628616d635c55315d8f09",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [],
+            "excluded": false,
+            "unmapped": false
+          }
+        }
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 commit의 전후 git blob과 CheckDef 직접 대조; classifier 출력은 정답 근거로 사용하지 않음",
+        "original_expected_sha256": "9d87e5249ce56c6b1d1bf34e5fd4bebf57c9fbf10f69e28fdaecb28bdc0394f7",
+        "findings": [
+          "항상 False를 반환하던 CPU use_cascade_attention override 삭제를 확인. 실제 상위 메서드와 선택 조건을 시험하지 않았으므로 GPU 시험이나 현재 런타임 효과를 주장하지 않는다."
+        ],
+        "human_question": "CPU backend 책임과 GPU 조건부 점검 범위 분리 승인",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+            "path": "vllm/v1/attention/backends/cpu_attn.py",
+            "sha256": "803a096aae093d52857549f5d841ef6d271b217af104109814c66840642767d5",
+            "line": 49,
+            "anchor": "class CPUAttentionBackend"
+          },
+          {
+            "side": "candidate",
+            "commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+            "path": "vllm/v1/attention/backends/cpu_attn.py",
+            "sha256": "ffcb1e2b03ceb1d913e10457b1a30366bf630138b0e628616d635c55315d8f09",
+            "line": 49,
+            "anchor": "class CPUAttentionBackend"
+          }
+        ]
+      }
+    },
+    {
+      "id": "patch19-compilation-pass-option",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.19.0",
+      "candidate_version": "v0.19.1",
+      "baseline_commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+      "candidate_commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+      "before_path": "vllm/config/compilation.py",
+      "before_sha256": "ac12008b54dcf778db658786502d160a70a6a1120533584da1e4976c9756ce38",
+      "after_path": "vllm/config/compilation.py",
+      "after_sha256": "5f0b2e7a4716693eb587dab08413a81f5ff288436cb0b8bc187a8d6bb4856844",
+      "source_fact": "PassConfig에 fuse_minimax_qk_norm 선택 필드와 설명이 추가된다. CompilationConfig는 컴파일 mode·CUDA graph·cache 설정을 함께 갖는다.",
+      "rationale": "컴파일 하위체계의 설정 책임은 COMPILE_CACHE로 확인한다. 새 옵션 자체가 cache 오염·호환성 문제를 일으킨다는 의미는 아니다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-01.yaml",
+        "packs/PACK-BASELINE/checks/SUP-07.yaml",
+        "packs/PACK-BASELINE/checks/SUP-15.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "COMPILE_CACHE"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [
+          "AUTH",
+          "API_ROUTE"
+        ],
+        "required_checks": [],
+        "optional_checks": [
+          "SUP-07",
+          "SUP-15"
+        ],
+        "unrelated_checks": [
+          "REQ-01"
+        ],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/config/compilation.py",
+            "sha256": "ac12008b54dcf778db658786502d160a70a6a1120533584da1e4976c9756ce38",
+            "required_categories": [
+              "COMPILE_CACHE"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE"
+            ],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/config/compilation.py",
+            "sha256": "5f0b2e7a4716693eb587dab08413a81f5ff288436cb0b8bc187a8d6bb4856844",
+            "required_categories": [
+              "COMPILE_CACHE"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE"
+            ],
+            "excluded": false,
+            "unmapped": false
+          }
+        },
+        "maximum_certainty": "PARTIAL"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "컴파일 하위체계의 설정 책임은 COMPILE_CACHE로 확인한다. 새 옵션 자체가 cache 오염·호환성 문제를 일으킨다는 의미는 아니다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+            "path": "vllm/config/compilation.py",
+            "sha256": "ac12008b54dcf778db658786502d160a70a6a1120533584da1e4976c9756ce38",
+            "line": 105,
+            "anchor": "class PassConfig:"
+          },
+          {
+            "side": "candidate",
+            "commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+            "path": "vllm/config/compilation.py",
+            "sha256": "5f0b2e7a4716693eb587dab08413a81f5ff288436cb0b8bc187a8d6bb4856844",
+            "line": 105,
+            "anchor": "class PassConfig:"
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "고정 원본 바이트와 책임은 직접 검토했지만 변경 영향의 전체성·동적 도달을 관측하지 않았고 사람 검토도 없다. 따라서 이 자동 추출 CHG는 최대 PARTIAL이며 CONFIRMED를 주장할 수 없다.",
+          "human_decision": "pending"
+        }
+      }
+    },
+    {
+      "id": "patch19-speculative-model-support",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.19.0",
+      "candidate_version": "v0.19.1",
+      "baseline_commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+      "candidate_commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+      "before_path": "vllm/config/speculative.py",
+      "before_sha256": "31045ada67a3bdbae7023b3867c2484fa4e0edc74f7a8d487c1fd5ca6da5ecd3",
+      "after_path": "vllm/config/speculative.py",
+      "after_sha256": "1a6945e82a316529fb68184b6fc5a05240da2fd7baef2d997eeee5de0e91a9e6",
+      "source_fact": "eagle3/extract_hidden_states가 허용하는 target_model_config의 model_type에 minimax_m2와 gemma4를 추가한다. 파일은 draft ModelConfig 생성과 모델 registry 확인을 수행한다.",
+      "rationale": "모델 구성 생성·확인 책임은 MODEL_LOADING과 관련된다. 현재 두 모델에서 실행되는 연산과 추론 출력은 관측하지 않았으며 SAMPLING/RUNNER_KERNEL은 선택 관계다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/SUP-03.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "MODEL_LOADING"
+        ],
+        "optional_categories": [
+          "SAMPLING",
+          "RUNNER_KERNEL"
+        ],
+        "forbidden_categories": [
+          "AUTH",
+          "API_ROUTE"
+        ],
+        "required_checks": [],
+        "optional_checks": [
+          "SUP-03"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/config/speculative.py",
+            "sha256": "31045ada67a3bdbae7023b3867c2484fa4e0edc74f7a8d487c1fd5ca6da5ecd3",
+            "required_categories": [
+              "MODEL_LOADING"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE"
+            ],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/config/speculative.py",
+            "sha256": "1a6945e82a316529fb68184b6fc5a05240da2fd7baef2d997eeee5de0e91a9e6",
+            "required_categories": [
+              "MODEL_LOADING"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE"
+            ],
+            "excluded": false,
+            "unmapped": false
+          }
+        },
+        "maximum_certainty": "PARTIAL"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "모델 구성 생성·확인 책임은 MODEL_LOADING과 관련된다. 현재 두 모델에서 실행되는 연산과 추론 출력은 관측하지 않았으며 SAMPLING/RUNNER_KERNEL은 선택 관계다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+            "path": "vllm/config/speculative.py",
+            "sha256": "31045ada67a3bdbae7023b3867c2484fa4e0edc74f7a8d487c1fd5ca6da5ecd3",
+            "line": 65,
+            "anchor": "class SpeculativeConfig:"
+          },
+          {
+            "side": "candidate",
+            "commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+            "path": "vllm/config/speculative.py",
+            "sha256": "1a6945e82a316529fb68184b6fc5a05240da2fd7baef2d997eeee5de0e91a9e6",
+            "line": 65,
+            "anchor": "class SpeculativeConfig:"
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "고정 원본 바이트와 책임은 직접 검토했지만 변경 영향의 전체성·동적 도달을 관측하지 않았고 사람 검토도 없다. 따라서 이 자동 추출 CHG는 최대 PARTIAL이며 CONFIRMED를 주장할 수 없다.",
+          "human_decision": "pending"
+        }
+      }
+    },
+    {
+      "id": "patch19-combined-compile-range",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.19.0",
+      "candidate_version": "v0.19.1",
+      "baseline_commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+      "candidate_commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+      "before_path": "vllm/config/vllm.py",
+      "before_sha256": "58aebc9654b3d62c9707be62df47ac43254b52218d9ea38c43d3026485ff9e01",
+      "after_path": "vllm/config/vllm.py",
+      "after_sha256": "1c1e1ad1fdcb5873bce60464c8dad303ac62e7978b322ccedf1a6d85288d3666",
+      "source_fact": "fuse_minimax_qk_norm이 켜지면 MAX_TOKEN_NUM과 scheduler max_num_batched_tokens의 최소값으로 컴파일 범위 경계를 추가한다.",
+      "rationale": "이번 hunk의 컴파일 책임은 확인했지만 VllmConfig 전체는 모델·scheduler·cache 등 여러 책임을 결합한다. 파일 전체의 단일 필수 category를 강제하지 않고 COMPILE_CACHE를 부분 선택 라벨로 둔다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/SUP-15.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [],
+        "optional_categories": [
+          "COMPILE_CACHE",
+          "SCHEDULER",
+          "MODEL_LOADING"
+        ],
+        "forbidden_categories": [
+          "AUTH",
+          "API_ROUTE"
+        ],
+        "required_checks": [],
+        "optional_checks": [
+          "SUP-15"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": null,
+        "sides": {
+          "baseline": {
+            "path": "vllm/config/vllm.py",
+            "sha256": "58aebc9654b3d62c9707be62df47ac43254b52218d9ea38c43d3026485ff9e01",
+            "required_categories": [],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE"
+            ],
+            "excluded": false
+          },
+          "candidate": {
+            "path": "vllm/config/vllm.py",
+            "sha256": "1c1e1ad1fdcb5873bce60464c8dad303ac62e7978b322ccedf1a6d85288d3666",
+            "required_categories": [],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE"
+            ],
+            "excluded": false
+          }
+        },
+        "maximum_certainty": "PARTIAL"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "이번 hunk의 컴파일 책임은 확인했지만 VllmConfig 전체는 모델·scheduler·cache 등 여러 책임을 결합한다. 파일 전체의 단일 필수 category를 강제하지 않고 COMPILE_CACHE를 부분 선택 라벨로 둔다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+            "path": "vllm/config/vllm.py",
+            "sha256": "58aebc9654b3d62c9707be62df47ac43254b52218d9ea38c43d3026485ff9e01",
+            "line": 251,
+            "anchor": "class VllmConfig:"
+          },
+          {
+            "side": "candidate",
+            "commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+            "path": "vllm/config/vllm.py",
+            "sha256": "1c1e1ad1fdcb5873bce60464c8dad303ac62e7978b322ccedf1a6d85288d3666",
+            "line": 251,
+            "anchor": "class VllmConfig:"
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "고정 원본 바이트와 책임은 직접 검토했지만 변경 영향의 전체성·동적 도달을 관측하지 않았고 사람 검토도 없다. 따라서 이 자동 추출 CHG는 최대 PARTIAL이며 CONFIRMED를 주장할 수 없다.",
+          "human_decision": "pending"
+        }
+      }
+    },
+    {
+      "id": "patch19-custom-op-meta-registration",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.19.0",
+      "candidate_version": "v0.19.1",
+      "baseline_commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+      "candidate_commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+      "before_path": "vllm/_custom_ops.py",
+      "before_sha256": "8990c0c4de5dadbb2d1ff57f02d6a7f9133df29bb9070179ada3363461b40093",
+      "after_path": "vllm/_custom_ops.py",
+      "after_sha256": "9f0cd82a0155f73594f6f68ff077ead3a8193988dfdaf0a6ca0400d237e71833",
+      "source_fact": "존재하는 torch.ops._C minimax_allreduce_rms/minimax_allreduce_rms_qk에 fake/meta 함수를 등록하고 출력 tensor의 shape·dtype·device를 지정한다.",
+      "rationale": "C++ op용 tensor interface·meta 구현 책임이다. fake 등록 코드만으로 실제 kernel 메모리 안전성이나 import 승인 우회는 확정하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-01.yaml",
+        "packs/PACK-BASELINE/checks/REQ-19.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "RUNNER_KERNEL"
+        ],
+        "optional_categories": [
+          "COMPILE_CACHE"
+        ],
+        "forbidden_categories": [
+          "AUTH",
+          "TEMPLATE"
+        ],
+        "required_checks": [],
+        "optional_checks": [
+          "REQ-19"
+        ],
+        "unrelated_checks": [
+          "REQ-01"
+        ],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/_custom_ops.py",
+            "sha256": "8990c0c4de5dadbb2d1ff57f02d6a7f9133df29bb9070179ada3363461b40093",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "TEMPLATE"
+            ],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/_custom_ops.py",
+            "sha256": "9f0cd82a0155f73594f6f68ff077ead3a8193988dfdaf0a6ca0400d237e71833",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "TEMPLATE"
+            ],
+            "excluded": false,
+            "unmapped": false
+          }
+        },
+        "maximum_certainty": "PARTIAL"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "C++ op용 tensor interface·meta 구현 책임이다. fake 등록 코드만으로 실제 kernel 메모리 안전성이나 import 승인 우회는 확정하지 않는다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+            "path": "vllm/_custom_ops.py",
+            "sha256": "8990c0c4de5dadbb2d1ff57f02d6a7f9133df29bb9070179ada3363461b40093",
+            "line": null,
+            "anchor": "전후 파일 내용·diff 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+            "path": "vllm/_custom_ops.py",
+            "sha256": "9f0cd82a0155f73594f6f68ff077ead3a8193988dfdaf0a6ca0400d237e71833",
+            "line": 3405,
+            "anchor": "def _minimax_allreduce_rms_fake("
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "고정 원본 바이트와 책임은 직접 검토했지만 변경 영향의 전체성·동적 도달을 관측하지 않았고 사람 검토도 없다. 따라서 이 자동 추출 CHG는 최대 PARTIAL이며 CONFIRMED를 주장할 수 없다.",
+          "human_decision": "pending"
+        }
+      }
+    },
+    {
+      "id": "patch19-parser-request-adjustment",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.19.0",
+      "candidate_version": "v0.19.1",
+      "baseline_commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+      "candidate_commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+      "before_path": "vllm/parser/abstract_parser.py",
+      "before_sha256": "6e66ac21adb307e59377b1f82705d19aaa8ce1df3ca4e0fd7057a616baf9c19d",
+      "after_path": "vllm/parser/abstract_parser.py",
+      "after_sha256": "3f563c5786495d0e0850a051a7db56c648827c4c187795bc107c3d3ab1fb0d0b",
+      "source_fact": "DelegatingParser.adjust_request가 reasoning parser와 tool parser의 adjust_request를 순서대로 적용한다.",
+      "rationale": "모델 출력 reasoning/tool-call parser 책임에서 요청 조정을 추가한다. 외부 입력 reader와 HTTP 인증 집행을 동일시하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/PLT-04.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "OUTPUT_PARSING"
+        ],
+        "optional_categories": [
+          "INPUT_PROCESSING"
+        ],
+        "forbidden_categories": [
+          "AUTH"
+        ],
+        "required_checks": [],
+        "optional_checks": [],
+        "unrelated_checks": [
+          "PLT-04"
+        ],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/parser/abstract_parser.py",
+            "sha256": "6e66ac21adb307e59377b1f82705d19aaa8ce1df3ca4e0fd7057a616baf9c19d",
+            "required_categories": [
+              "OUTPUT_PARSING"
+            ],
+            "forbidden_categories": [
+              "AUTH"
+            ],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/parser/abstract_parser.py",
+            "sha256": "3f563c5786495d0e0850a051a7db56c648827c4c187795bc107c3d3ab1fb0d0b",
+            "required_categories": [
+              "OUTPUT_PARSING"
+            ],
+            "forbidden_categories": [
+              "AUTH"
+            ],
+            "excluded": false,
+            "unmapped": false
+          }
+        },
+        "maximum_certainty": "PARTIAL"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "모델 출력 reasoning/tool-call parser 책임에서 요청 조정을 추가한다. 외부 입력 reader와 HTTP 인증 집행을 동일시하지 않는다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+            "path": "vllm/parser/abstract_parser.py",
+            "sha256": "6e66ac21adb307e59377b1f82705d19aaa8ce1df3ca4e0fd7057a616baf9c19d",
+            "line": 232,
+            "anchor": "def adjust_request(self, request: ChatCompletionRequest) -> ChatCompletionRequest:"
+          },
+          {
+            "side": "candidate",
+            "commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+            "path": "vllm/parser/abstract_parser.py",
+            "sha256": "3f563c5786495d0e0850a051a7db56c648827c4c187795bc107c3d3ab1fb0d0b",
+            "line": 232,
+            "anchor": "def adjust_request(self, request: ChatCompletionRequest) -> ChatCompletionRequest:"
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "고정 원본 바이트와 책임은 직접 검토했지만 변경 영향의 전체성·동적 도달을 관측하지 않았고 사람 검토도 없다. 따라서 이 자동 추출 CHG는 최대 PARTIAL이며 CONFIRMED를 주장할 수 없다.",
+          "human_decision": "pending"
+        }
+      }
+    },
+    {
+      "id": "patch19-tokenizer-config-registration",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.19.0",
+      "candidate_version": "v0.19.1",
+      "baseline_commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+      "candidate_commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+      "before_path": "vllm/tokenizers/registry.py",
+      "before_sha256": "561cfdef46ef0f77e7512c329ac600d1aa5969988c684091f99c5979761037dd",
+      "after_path": "vllm/tokenizers/registry.py",
+      "after_sha256": "ccbb9516921c99f2f12b5b1c86a430bf0d4090acb4050fcb7282f388f44c5e50",
+      "source_fact": "tokenizer 로딩 전에 모델 get_config를 호출해 config 등록을 보장하고 step3_vl은 TokenizersBackend로 우회한다. revision/trust_remote_code를 get_config에 전달한다.",
+      "rationale": "모델/토크나이저 설정 취득과 실제 입력 변환 준비를 함께 바꾼다. trust_remote_code 인자 존재만으로 원격 코드 실행이나 차단 성공을 주장하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-09.yaml",
+        "packs/PACK-BASELINE/checks/SUP-03.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "MODEL_LOADING",
+          "INPUT_PROCESSING"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [
+          "AUTH",
+          "API_ROUTE"
+        ],
+        "required_checks": [],
+        "optional_checks": [
+          "SUP-03",
+          "REQ-09"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/tokenizers/registry.py",
+            "sha256": "561cfdef46ef0f77e7512c329ac600d1aa5969988c684091f99c5979761037dd",
+            "required_categories": [
+              "MODEL_LOADING",
+              "INPUT_PROCESSING"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE"
+            ],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/tokenizers/registry.py",
+            "sha256": "ccbb9516921c99f2f12b5b1c86a430bf0d4090acb4050fcb7282f388f44c5e50",
+            "required_categories": [
+              "MODEL_LOADING",
+              "INPUT_PROCESSING"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE"
+            ],
+            "excluded": false,
+            "unmapped": false
+          }
+        },
+        "maximum_certainty": "PARTIAL"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "모델/토크나이저 설정 취득과 실제 입력 변환 준비를 함께 바꾼다. trust_remote_code 인자 존재만으로 원격 코드 실행이나 차단 성공을 주장하지 않는다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "2a69949bdadf0e8942b7a1619b229cb475beef20",
+            "path": "vllm/tokenizers/registry.py",
+            "sha256": "561cfdef46ef0f77e7512c329ac600d1aa5969988c684091f99c5979761037dd",
+            "line": null,
+            "anchor": "전후 파일 내용·diff 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "b1388b1fbf5aaef47937fabe98931211684666a6",
+            "path": "vllm/tokenizers/registry.py",
+            "sha256": "ccbb9516921c99f2f12b5b1c86a430bf0d4090acb4050fcb7282f388f44c5e50",
+            "line": 41,
+            "anchor": "_MODEL_TYPES_WITH_INCORRECT_TOKENIZER_CLASS: set[str] = {\"step3_vl\"}"
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "고정 원본 바이트와 책임은 직접 검토했지만 변경 영향의 전체성·동적 도달을 관측하지 않았고 사람 검토도 없다. 따라서 이 자동 추출 CHG는 최대 PARTIAL이며 CONFIRMED를 주장할 수 없다.",
+          "human_decision": "pending"
+        }
+      }
+    },
+    {
+      "id": "attention-workspace-config",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.31.0",
+      "candidate_version": "v0.32.0",
+      "baseline_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+      "candidate_commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "before_path": "vllm/config/attention.py",
+      "before_sha256": "114dfbb8651feab627c49ae1ed16c63ae3e6a9cf26d1d1cc799618ee8a06d617",
+      "after_path": "vllm/config/attention.py",
+      "after_sha256": "b4edcdd256404813e4483b7669b2b946775f7ed12fed44360d1b46a0807286da",
+      "source_fact": "tokenspeed_mla_min_split_kv 및 sparse_mla_prefill_workspace_factor를 추가해 attention backend의 KV split과 workspace 크기 설정을 노출한다.",
+      "rationale": "kernel/backend 실행 설정 책임이다. CACHE는 workspace와 KV 메모리 예산의 선택 관련성이지만 tenant 공유·cache key 변화는 이 diff에서 확인하지 않는다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-19.yaml",
+        "packs/PACK-BASELINE/checks/REQ-20.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "RUNNER_KERNEL"
+        ],
+        "optional_categories": [
+          "CACHE"
+        ],
+        "forbidden_categories": [
+          "AUTH",
+          "API_ROUTE",
+          "PLUGIN"
+        ],
+        "required_checks": [],
+        "optional_checks": [
+          "REQ-19",
+          "REQ-20"
+        ],
+        "unrelated_checks": [],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "vllm/config/attention.py",
+            "sha256": "114dfbb8651feab627c49ae1ed16c63ae3e6a9cf26d1d1cc799618ee8a06d617",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE",
+              "PLUGIN"
+            ],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "vllm/config/attention.py",
+            "sha256": "b4edcdd256404813e4483b7669b2b946775f7ed12fed44360d1b46a0807286da",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [
+              "AUTH",
+              "API_ROUTE",
+              "PLUGIN"
+            ],
+            "excluded": false,
+            "unmapped": false
+          }
+        },
+        "maximum_certainty": "PARTIAL"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "kernel/backend 실행 설정 책임이다. CACHE는 workspace와 KV 메모리 예산의 선택 관련성이지만 tenant 공유·cache key 변화는 이 diff에서 확인하지 않는다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+            "path": "vllm/config/attention.py",
+            "sha256": "114dfbb8651feab627c49ae1ed16c63ae3e6a9cf26d1d1cc799618ee8a06d617",
+            "line": null,
+            "anchor": "전후 파일 내용·diff 직접 검토"
+          },
+          {
+            "side": "candidate",
+            "commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+            "path": "vllm/config/attention.py",
+            "sha256": "b4edcdd256404813e4483b7669b2b946775f7ed12fed44360d1b46a0807286da",
+            "line": 64,
+            "anchor": "tokenspeed_mla_min_split_kv: int = Field(default=1, ge=1, le=256)"
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "고정 원본 바이트와 책임은 직접 검토했지만 변경 영향의 전체성·동적 도달을 관측하지 않았고 사람 검토도 없다. 따라서 이 자동 추출 CHG는 최대 PARTIAL이며 CONFIRMED를 주장할 수 없다.",
+          "human_decision": "pending"
+        }
+      }
+    },
+    {
+      "id": "agent-api-compat-prompt-metadata",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.31.0",
+      "candidate_version": "v0.32.0",
+      "baseline_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+      "candidate_commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "before_path": null,
+      "before_sha256": null,
+      "after_path": ".agents/skills/check-api-compat/agents/openai.yaml",
+      "after_sha256": "82cbb7487c8380d3548ff7c4f645109cccdf4bf93b6f99253d31202db5f84a39",
+      "source_fact": "display_name/short_description/default_prompt 세 문자열로 개발용 API 호환성 검토 skill을 설명하는 신규 YAML이다.",
+      "rationale": "읽은 blob에는 서빙 요청·인증·kernel 실행 구현이 없다. API라는 문자열만으로 API_ROUTE로 흡수하지 않으며 제외 확대는 팀 결정 전까지 보류한다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/PLT-04.yaml",
+        "packs/PACK-BASELINE/checks/REQ-01.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [],
+        "optional_categories": [],
+        "forbidden_categories": [
+          "API_ROUTE",
+          "AUTH",
+          "RUNNER_KERNEL",
+          "PLUGIN"
+        ],
+        "required_checks": [],
+        "optional_checks": [],
+        "unrelated_checks": [
+          "REQ-01",
+          "PLT-04"
+        ],
+        "excluded": false,
+        "unmapped": true,
+        "sides": {
+          "candidate": {
+            "path": ".agents/skills/check-api-compat/agents/openai.yaml",
+            "sha256": "82cbb7487c8380d3548ff7c4f645109cccdf4bf93b6f99253d31202db5f84a39",
+            "required_categories": [],
+            "forbidden_categories": [
+              "API_ROUTE",
+              "AUTH",
+              "RUNNER_KERNEL",
+              "PLUGIN"
+            ],
+            "excluded": false,
+            "unmapped": true
+          }
+        },
+        "maximum_certainty": "UNKNOWN"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "읽은 blob에는 서빙 요청·인증·kernel 실행 구현이 없다. API라는 문자열만으로 API_ROUTE로 흡수하지 않으며 제외 확대는 팀 결정 전까지 보류한다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "candidate",
+            "commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+            "path": ".agents/skills/check-api-compat/agents/openai.yaml",
+            "sha256": "82cbb7487c8380d3548ff7c4f645109cccdf4bf93b6f99253d31202db5f84a39",
+            "line": 4,
+            "anchor": "default_prompt: \"Use the vLLM API compatibility skill to check this endpoint or field against the upstream OpenAI or Anthropic spec.\""
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "읽은 개발 메타데이터/symlink blob은 기존 서빙 category 대응을 확정하지 않았으므로 미분류 OTHER 사실의 상한은 UNKNOWN이다. 새 제외나 사용자 승인으로 해석하지 않는다.",
+          "human_decision": "pending"
+        }
+      }
+    },
+    {
+      "id": "agent-api-compat-symlink",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.31.0",
+      "candidate_version": "v0.32.0",
+      "baseline_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+      "candidate_commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "before_path": null,
+      "before_sha256": null,
+      "after_path": ".claude/skills/check-api-compat",
+      "after_sha256": "2c284dc0c3a8a20372b649bcccbb5f4166c18ec2256fe87b376ebd5bda43b587",
+      "source_fact": "신규 symlink blob은 ../../.agents/skills/check-api-compat라는 개발 skill 경로 참조 문자열이다.",
+      "rationale": "이 blob은 서빙 API 등록이나 인증 구현이 아니다. 심볼릭 링크를 따라 엔진 코드가 실행된다고 가정하지 않고 기존 category 대응 불명확·제외 팀 결정을 보류한다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/PLT-04.yaml",
+        "packs/PACK-BASELINE/checks/REQ-01.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [],
+        "optional_categories": [],
+        "forbidden_categories": [
+          "API_ROUTE",
+          "AUTH",
+          "RUNNER_KERNEL"
+        ],
+        "required_checks": [],
+        "optional_checks": [],
+        "unrelated_checks": [
+          "REQ-01",
+          "PLT-04"
+        ],
+        "excluded": false,
+        "unmapped": true,
+        "sides": {
+          "candidate": {
+            "path": ".claude/skills/check-api-compat",
+            "sha256": "2c284dc0c3a8a20372b649bcccbb5f4166c18ec2256fe87b376ebd5bda43b587",
+            "required_categories": [],
+            "forbidden_categories": [
+              "API_ROUTE",
+              "AUTH",
+              "RUNNER_KERNEL"
+            ],
+            "excluded": false,
+            "unmapped": true
+          }
+        },
+        "maximum_certainty": "UNKNOWN"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "이 blob은 서빙 API 등록이나 인증 구현이 아니다. 심볼릭 링크를 따라 엔진 코드가 실행된다고 가정하지 않고 기존 category 대응 불명확·제외 팀 결정을 보류한다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "candidate",
+            "commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+            "path": ".claude/skills/check-api-compat",
+            "sha256": "2c284dc0c3a8a20372b649bcccbb5f4166c18ec2256fe87b376ebd5bda43b587",
+            "line": 1,
+            "anchor": "../../.agents/skills/check-api-compat"
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "읽은 개발 메타데이터/symlink blob은 기존 서빙 category 대응을 확정하지 않았으므로 미분류 OTHER 사실의 상한은 UNKNOWN이다. 새 제외나 사용자 승인으로 해석하지 않는다.",
+          "human_decision": "pending"
+        }
+      }
+    },
+    {
+      "id": "marlin-cpp-template-rename",
+      "dataset": "regression",
+      "review_status": "human_pending",
+      "truth_author": "source-review agent; not human approved",
+      "baseline_version": "v0.31.0",
+      "candidate_version": "v0.32.0",
+      "baseline_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+      "candidate_commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+      "before_path": "csrc/libtorch_stable/quantization/marlin/marlin_template.h",
+      "before_sha256": "972ffd66fdfb6781dad13daea1167981821a78b86a93d865baa2b3c3ed11cd19",
+      "after_path": "csrc/quantization/marlin/marlin_template.h",
+      "after_sha256": "972ffd66fdfb6781dad13daea1167981821a78b86a93d865baa2b3c3ed11cd19",
+      "source_fact": "git rename 전후 바이트가 같은 C++ header다. template<typename scalar_t>와 __global__ Marlin kernel, CUDA shared/global 메모리 연산을 구현한다.",
+      "rationale": "여기의 template는 C++ 제네릭 연산 구현이며 사용자 chat template와 다르다. 양쪽 면의 RUNNER_KERNEL 책임과 TEMPLATE 음성을 별도로 검증한다.",
+      "check_references": [
+        "packs/PACK-BASELINE/checks/REQ-01.yaml",
+        "packs/PACK-BASELINE/checks/REQ-19.yaml"
+      ],
+      "test_target": "고정 소스 바이트·경로/면 책임·부분 정답·원시 연결 대조. 엔진을 실행하지 않음.",
+      "unverified_boundary": "개발·회귀 자료이며 사람 검토 대기. 라벨 없는 category/점검은 미평가; 전체 영향·동적 도달·독립 정확성 입증 아님.",
+      "expected": {
+        "truth_scope": "partial",
+        "required_categories": [
+          "RUNNER_KERNEL"
+        ],
+        "optional_categories": [],
+        "forbidden_categories": [
+          "TEMPLATE",
+          "INPUT_PROCESSING",
+          "AUTH"
+        ],
+        "required_checks": [],
+        "optional_checks": [
+          "REQ-19"
+        ],
+        "unrelated_checks": [
+          "REQ-01"
+        ],
+        "excluded": false,
+        "unmapped": false,
+        "sides": {
+          "baseline": {
+            "path": "csrc/libtorch_stable/quantization/marlin/marlin_template.h",
+            "sha256": "972ffd66fdfb6781dad13daea1167981821a78b86a93d865baa2b3c3ed11cd19",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [
+              "TEMPLATE",
+              "INPUT_PROCESSING",
+              "AUTH"
+            ],
+            "excluded": false,
+            "unmapped": false
+          },
+          "candidate": {
+            "path": "csrc/quantization/marlin/marlin_template.h",
+            "sha256": "972ffd66fdfb6781dad13daea1167981821a78b86a93d865baa2b3c3ed11cd19",
+            "required_categories": [
+              "RUNNER_KERNEL"
+            ],
+            "forbidden_categories": [
+              "TEMPLATE",
+              "INPUT_PROCESSING",
+              "AUTH"
+            ],
+            "excluded": false,
+            "unmapped": false
+          }
+        },
+        "maximum_certainty": "PARTIAL"
+      },
+      "source_review": {
+        "status": "agent_rechecked_human_pending",
+        "method": "고정 git blob과 CheckDef 직접 대조; 기존 artifact는 commit/path/hash 식별에만 사용",
+        "findings": [
+          "여기의 template는 C++ 제네릭 연산 구현이며 사용자 chat template와 다르다. 양쪽 면의 RUNNER_KERNEL 책임과 TEMPLATE 음성을 별도로 검증한다."
+        ],
+        "human_question": "소스 책임·부분 라벨 범위를 승인 / 수정 요청 / 판단 유보",
+        "human_decision": "pending",
+        "source_anchors": [
+          {
+            "side": "baseline",
+            "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+            "path": "csrc/libtorch_stable/quantization/marlin/marlin_template.h",
+            "sha256": "972ffd66fdfb6781dad13daea1167981821a78b86a93d865baa2b3c3ed11cd19",
+            "line": 41,
+            "anchor": "template <typename scalar_t,  // compute dtype, half or nv_float16"
+          },
+          {
+            "side": "candidate",
+            "commit": "5df63a7203cdb9328d824a27b682e77c7b9928be",
+            "path": "csrc/quantization/marlin/marlin_template.h",
+            "sha256": "972ffd66fdfb6781dad13daea1167981821a78b86a93d865baa2b3c3ed11cd19",
+            "line": 41,
+            "anchor": "template <typename scalar_t,  // compute dtype, half or nv_float16"
+          }
+        ],
+        "certainty_basis": {
+          "references": [
+            "SPEC.md §4.3 CHG: 사람 검토 전 certainty 최대 PARTIAL",
+            "docs/UPDATE_SELECTION.md §12: 미분류는 OTHER/UNKNOWN/unmapped로 보존"
+          ],
+          "scope": "사람 검토가 없는 guard diff 자동 추출 CHG의 소스 분류 사실. 소스–이미지 관계의 CONFIRMED와는 다른 속성이다.",
+          "rationale": "고정 원본 바이트와 책임은 직접 검토했지만 변경 영향의 전체성·동적 도달을 관측하지 않았고 사람 검토도 없다. 따라서 이 자동 추출 CHG는 최대 PARTIAL이며 CONFIRMED를 주장할 수 없다.",
+          "human_decision": "pending"
+        }
+      }
+    }
+  ],
+  "review_protocol": {
+    "status": "human_pending",
+    "reviewed_by": "source-review agent; no human decision received",
+    "review_scope": "고정 전후 blob, CheckDef 질문, 레코드/면의 부분 라벨; 동적 동작이나 전체 보안 영향은 미평가",
+    "existing_case_preservation": "기존 13개 사례의 필드·기대값은 유지하고 source_review와 expected.sides만 추가함",
+    "approval_requirement": "사람의 명시 회신·검토 대상 파일 해시·사례/관계 범위를 함께 기록한 경우에만 해당 범위를 human_reviewed로 변경",
+    "independent_evaluation": "기존 여섯 release 및 원래 69개 경로는 개발·회귀 자료. 새 사례도 독립 평가가 아님."
+  },
+  "check_basis": [
+    {
+      "path": "packs/PACK-BASELINE/checks/LIF-01.yaml",
+      "sha256": "776cad300feffeec50dfbb63bde5dd6ad77db9b8d2df4cab32adaae33d08cb20",
+      "id": "LIF-01",
+      "purpose": "자원 예산·공정성",
+      "question": "모델을 가져와 해석·변환·로딩할 때 단계별·전체 자원 예산을 지키는가?",
+      "scope": "기본; compile은 활성 시"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/LIF-03.yaml",
+      "sha256": "6ebad6e32dced8e569db437b3ee4e7fe8755954dd5260b2d1ae4b2f83eb9c5c7",
+      "id": "LIF-03",
+      "purpose": "자원 예산·공정성",
+      "question": "처리 비용이 큰 요청과 동시 부하를 제한하면서 정상 요청도 처리할 수 있는가?",
+      "scope": "기본; metadata·child는 수용 기능만"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/PLT-04.yaml",
+      "sha256": "774d36bb1b25a3408da19764b35fde4f9f983579f4b1ff697b97f3d33d922e6d",
+      "id": "PLT-04",
+      "purpose": "자격 제공·사용 제한",
+      "question": "worker에 필요 없는 자격·비밀정보를 넘기지 않는가?",
+      "scope": "기본 환경 전달 확인; Ray 원격 전달은 선택"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/REQ-01.yaml",
+      "sha256": "26ffdbbaeb4775a83a4c4ce26d47971d012120f12a0ff46092c1328b5a96cbac",
+      "id": "REQ-01",
+      "purpose": "작업·대상 인가",
+      "question": "Gateway를 거치지 않은 요청으로 허용받지 않은 작업을 할 수 없는가?",
+      "scope": "기본"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/REQ-09.yaml",
+      "sha256": "2370df794d44def03aaf1af441173a2b5c717d5ba195a29b3450f42132556dd8",
+      "id": "REQ-09",
+      "purpose": "최종 입력 검증",
+      "question": "토큰 번호와 입력 길이가 실제 모델과 처리 단계에서 허용하는 범위 안에 있는가?",
+      "scope": "기본+선정 입력"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/REQ-13.yaml",
+      "sha256": "b32c4c482bc14886ef988e157dbf269f9450d56b5575af1e5e7b4aecc2d6fb4f",
+      "id": "REQ-13",
+      "purpose": "반환 정보 최소 공개",
+      "question": "응답 옵션과 오류 메시지가 수신자에게 허용된 정보만 반환하는가?",
+      "scope": "기본+지원 옵션"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/REQ-15.yaml",
+      "sha256": "137639799ad8769b8da1ebc158aec3edea0d12e1c495916237090bd8017900ae",
+      "id": "REQ-15",
+      "purpose": "공유 권한·범위",
+      "question": "캐시를 공유할 사용자 집단을 검증된 신원에 따라 결정하는가?",
+      "scope": "기본+정책 조건"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/REQ-16.yaml",
+      "sha256": "cd26e18ec8f1d633dab28a0c30ec224dac6e2d4d63a93d047752fd67b0fb8d01",
+      "id": "REQ-16",
+      "purpose": "재사용 문맥의 호환성",
+      "question": "캐시 식별값이 재사용에 필요한 모델·설정·자료의 차이를 구분하는가?",
+      "scope": "기본+활성 기능"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/REQ-17.yaml",
+      "sha256": "f72177384c2cf07ce683ad87886f9f8bba5102090d3fec59154479a2031eca1b",
+      "id": "REQ-17",
+      "purpose": "부채널 노출 제한",
+      "question": "캐시 적중에 따른 시간 차이로 비공개 정보가 허용 범위 밖에 드러나지 않는가?",
+      "scope": "조건부"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/REQ-19.yaml",
+      "sha256": "0afdfb2a3a2e9b6b00e24fe789859911a2ba701f4659f0ab3a823ebf46f0701c",
+      "id": "REQ-19",
+      "purpose": "GPU 메모리 안전성",
+      "question": "실제 사용하는 GPU 연산 코드가 입력·버퍼 경계를 지키고 필요한 영역을 초기화하는가?",
+      "scope": "선정 구현 조건"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/REQ-20.yaml",
+      "sha256": "cd50d865458acd74c601df25d27732060b6c9ef7d0524bb65c6b1d34cbfb1e5e",
+      "id": "REQ-20",
+      "purpose": "실행 상태·버퍼 수명",
+      "question": "CUDA Graph 재실행이 현재 입력을 쓰고 아직 읽는 출력 버퍼를 덮어쓰지 않는가?",
+      "scope": "조건부"
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/SUP-03.yaml",
+      "sha256": "49b6edab8b24cf43ce823edd5a7a53f9863ee36b5606df834549e53adb6d6438",
+      "id": "SUP-03",
+      "purpose": "승인 대상·출처 식별",
+      "question": "기본 모델과 함께 읽는 설정·tokenizer·chat template, 하위 모델·추가 공급원의 파일도 승인 범위에 포함되는가?",
+      "scope": null
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/SUP-04.yaml",
+      "sha256": "c7308f711486109f17c4944123971a7a22578e273f845a27d0442b5f9861adc5",
+      "id": "SUP-04",
+      "purpose": "승인 대상·출처 식별",
+      "question": "실제로 실행하는 이미지·패키지와 함께 설치되는 의존성도 모두 승인되어 있는가?",
+      "scope": null
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/SUP-07.yaml",
+      "sha256": "96c926879bf0c16aa3da76a8c8cda214bc5b3eb02bbf2d7aeba5cf9ed26791b7",
+      "id": "SUP-07",
+      "purpose": "실제 사용의 무결성",
+      "question": "생성된 코드·파일이나 공유 컴파일 캐시를 권한 없이 바꿀 수 없는가?",
+      "scope": null
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/SUP-11.yaml",
+      "sha256": "9b49c2d4de1143bc47fc32e9b9e1eb4d6af07e2d2a87cac7b9114e4f42865e77",
+      "id": "SUP-11",
+      "purpose": "추가 코드 실행 허용",
+      "question": "지원하는 실행 방식마다 외부 모듈을 불러오는 제한이 유지되는가?",
+      "scope": null
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/SUP-12.yaml",
+      "sha256": "43f7fba1275e4d0420c14bbd4970a7f73431dd31c310ce8228270a2a8fa36be2",
+      "id": "SUP-12",
+      "purpose": "자료 해석 안전성",
+      "question": "실제로 사용하는 파일·메시지 해석기가 금지된 객체나 동작을 거부하는가?",
+      "scope": null
+    },
+    {
+      "path": "packs/PACK-BASELINE/checks/SUP-15.yaml",
+      "sha256": "a6848b2dbe99de5a2b98f2e6f30634f4c631fc556d8ba3239c2b757d43a2fee9",
+      "id": "SUP-15",
+      "purpose": "재사용 문맥의 호환성",
+      "question": "모델·도구·설정이 바뀌면 더 이상 맞지 않는 생성물이나 캐시를 재사용하지 않는가?",
+      "scope": null
+    }
+  ]
+}

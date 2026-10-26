@@ -101,7 +101,7 @@ def run(tmp_path, monkeypatch, pack, vals, probe=None, missing_target=False):
 
 def test_registration_is_bounded_and_template_empty(pack):
     check = pack.checks["REQ-09"]
-    assert check.revision == 6 and pack.manifest.revision == 22 and not pack.reviewed
+    assert check.revision == 7 and pack.manifest.revision == 23 and not pack.reviewed
     assert contract_state(check) == "complete" and len(check.required_observations) == 10
     assert len(pack.checks) == 77
     assert sum(bool(c.policy_params) for c in pack.active_checks()) == 22
@@ -118,12 +118,12 @@ def test_registration_is_bounded_and_template_empty(pack):
         assert row["classification"] == "a" and json.loads(row["current_param_paths"]) == [f"values.REQ-09.{key}"]
     for cid in ("REQ-08",):
         c = pack.checks[cid]
-        assert c.revision == 1 and not c.policy_params and c.executor is None and c.judge is None
+        assert c.revision == 2 and not c.policy_params and c.executor is None and c.judge is None
     template_check = pack.checks["REQ-07"]
-    assert template_check.revision == 2 and template_check.executor == "template_validation"
+    assert template_check.revision == 3 and template_check.executor == "template_validation"
     assert len(template_check.policy_params) == 3 and len(template_check.required_observations) == 13
     sampling = pack.checks["REQ-10"]
-    assert sampling.revision == 2 and sampling.executor == "sampling_validation"
+    assert sampling.revision == 3 and sampling.executor == "sampling_validation"
     assert [(p.key, p.type, p.required) for p in sampling.policy_params] == [
         ("allowed_sampling_options", "list[str]", True), ("rejection_codes", "list[str]", True)]
     assert sampling.judge.plugin == "rule_table"

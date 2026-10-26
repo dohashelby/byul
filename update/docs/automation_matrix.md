@@ -1,6 +1,8 @@
 # 77행 자동화 분류표 (요약)
 
-> 2026-10-25 현행: PR #30·#31이 main(`fb0c103`)에 병합됐다. 자동 연결 11개·PACK22는 같다. 실측은 조건별로 구분한다: PR #30 기본 실행(`length_cause_evidence` 없음)은 후보 REQ-09 보안 UNKNOWN으로 accepted=false, PR #31 후속 실행(`length_cause_evidence = true`, 검토 프로파일과 일치하는 0.32.0 CPU 이미지)은 다섯 점검 양쪽 PASS·NO_CHANGE로 accepted=true다. PLT-04는 후보 단독 시험(비어 있지 않은 EXAMPLE 후보)과 두 이미지 update(후보 `[]`, 부분 범위)를 구분한다. 아래 인용은 PR #30 당시 기록이다.
+> U1 원문 동기화: PACK-BASELINE 23/DRAFT·REQ-09 revision 7·PLT-04 revision 4이며 자동 연결 11개·정책 22점검/50경로와 A/B/C 분류는 유지한다. 승인한 원본 `729216b1`의 77행 질문·framework_id·mechanism_ids와 변경 선정 데이터를 반영해 CheckDef revision이 각각 1씩 증가했다. CSV는 질문만 동기화하며 기존 실측·남은 범위·근거를 보존한다. 팩23으로 새 실제 엔진 시험을 했다는 뜻이 아니며 U1 구현·검증 범위는 [변경 유형별 시험 선정](UPDATE_SELECTION.md)을 따른다.
+
+> 2026-10-25 PR #30·#31 기준: 두 PR이 main(`fb0c103`)에 병합됐다. 당시 자동 연결 11개·PACK22는 같다. 실측은 조건별로 구분한다: PR #30 기본 실행(`length_cause_evidence` 없음)은 후보 REQ-09 보안 UNKNOWN으로 accepted=false, PR #31 후속 실행(`length_cause_evidence = true`, 검토 프로파일과 일치하는 0.32.0 CPU 이미지)은 다섯 점검 양쪽 PASS·NO_CHANGE로 accepted=true다. PLT-04는 후보 단독 시험(비어 있지 않은 EXAMPLE 후보)과 두 이미지 update(후보 `[]`, 부분 범위)를 구분한다. 아래 인용은 PR #30 당시 기록이다.
 
 > 2026-10-24 PR #30 당시 기록: PR #29가 main `641f12f`에 반영된 뒤 PACK22/DRAFT·REQ-09 정의6·PLT-04 정의3·정책22점검50경로로 보완했다. 자동 연결11·77개 ID와 다른75개 정의를 유지한다. [새 계약 실측](UPDATE_VALIDATION.md#req-09plt-04-판정-의미-보완-후보)은 두 실제 CPU 이미지 실행·반출/복원·재판정 동일을 확인했지만 후보 REQ-09 보안 UNKNOWN으로 accepted=false다. 나머지 4개는 양쪽 보안/기능 PASS·PLT-04는 후보 빈 목록의 부분 범위다. 보안/기능 FAIL0·성능 UNKNOWN·official=false를 유지하고 실제 변화 탐지는 미증명이다. [PR #29 통합 검증](UPDATE_VALIDATION.md#v1-통합-후보-검증)과 아래 PR #28 성공은 팩21의 이력이며 팩22로 소급하지 않는다. 인프라 가능 등급 A/B/C와 정책 소비 분류 a/b/c/d는 별개다.
 

@@ -56,7 +56,20 @@ class Store:
             con.executescript(_SCHEMA)
 
     def _connect(self) -> sqlite3.Connection:
+        if getattr(self, "_read_only", False):
+            return sqlite3.connect(self.db_path.resolve().as_uri() + "?mode=ro", uri=True)
         return sqlite3.connect(self.db_path)
+
+    @classmethod
+    def read_only(cls, root: Path):
+        """기존 보존본만 읽는다. 준비 검사에서는 디렉토리나 DB를 만들지 않는다."""
+        obj = cls.__new__(cls)
+        obj.root = Path(root)
+        obj.db_path = obj.root / "store.sqlite"
+        if not obj.db_path.is_file():
+            raise ValueError("previous inputs require an existing object store")
+        obj._read_only = True
+        return obj
 
     # --- 객체 ---------------------------------------------------------------
 
@@ -74,6 +87,10 @@ class Store:
     def _put(self, con: sqlite3.Connection, obj: GuardObject) -> Ref:
         if not obj.hash_ok():
             raise IntegrityError(f"{obj.id} rev {obj.revision}: content_sha256 missing or wrong")
+        if str(obj.kind) == "CHG":
+            problems = self._change_artifact_problems(obj)
+            if problems:
+                raise IntegrityError("; ".join(problems))
         for ref in obj.refs:
             self._check_ref(ref, con)
         body = canonical_json(obj.to_dict()).decode("utf-8")
@@ -146,6 +163,8 @@ class Store:
     # --- 증거 파일 ------------------------------------------------------------
 
     def put_artifact(self, data: bytes) -> StoredArtifact:
+        if getattr(self, "_read_only", False):
+            raise IntegrityError("read-only object store")
         digest = sha256_hex(data)
         rel = f"artifacts/{digest}"
         path = self.root / rel
@@ -160,6 +179,26 @@ class Store:
 
     # --- 일괄 검증 (guard verify) ---------------------------------------------
 
+    def _change_artifact_problems(self, obj) -> list[str]:
+        # A missing optional field identifies legacy, unverified source links.
+        if getattr(obj, "artifacts", None) is None:
+            return []
+        problems = []
+        addresses = {}
+        for art in obj.artifacts:
+            addresses[(art.path, art.sha256)] = art
+            if art.path != f"artifacts/{art.sha256}":
+                problems.append("CHG artifact is not content-addressed")
+                continue
+            path = self.root / art.path
+            if not path.is_file() or sha256_hex(path.read_bytes()) != art.sha256 or path.stat().st_size != art.bytes:
+                problems.append("CHG artifact missing or changed")
+        for fact in obj.facts:
+            for evidence in fact.evidence:
+                if (evidence.path, evidence.sha256) not in addresses:
+                    problems.append("CHG fact evidence is not preserved by its artifacts")
+        return problems
+
     def verify(self) -> list[str]:
         problems: list[str] = []
         with closing(self._connect()) as con:
@@ -173,6 +212,8 @@ class Store:
                 continue
             if obj.content_sha256 != sha or not obj.hash_ok():
                 problems.append(f"{id_} rev {rev}: content_sha256 mismatch")
+            if str(obj.kind) == "CHG":
+                problems.extend(f"{id_} rev {rev}: {problem}" for problem in self._change_artifact_problems(obj))
             for ref in obj.refs:
                 if ref.kind != "PACK" and known.get((ref.id, ref.revision)) != ref.sha256:
                     problems.append(f"{id_} rev {rev}: broken ref {ref.id} rev {ref.revision}")

@@ -14,6 +14,8 @@ from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan, validate_update_run_config
 from guard.core.select import select
+from guard.collectors.change import read_change, resolve_plan, save_change
+from guard.core.change_selection import build_context
 from guard.models import ExecStatus, Mode, Side
 from guard.store.packs import put_pack
 from guard.runtime.docker import Docker
@@ -144,9 +146,15 @@ def update_inputs(envs, cfg: dict):
     return mode, side_cfgs, managed
 
 
-def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime):
+def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: datetime,
+                   *, change=None, previous_plan=None):
     """Return (report, execution_failed). Never publish fake results as measured."""
     mode, side_cfgs, managed = update_inputs(envs, cfg)
+    change_input = read_change(change, pack, store)
+    previous = resolve_plan(store, previous_plan)
+    if change_input is not None or previous is not None:
+        build_context(store, previous, pack, envs, policy, cfg,
+                      change_input.change if change_input else None, mode=Mode.update, as_of=as_of, read_only=True)
     if any(c.get("update", {}).get("credential_canary", False) for c in side_cfgs.values()) and policy.status.value != "DRAFT":
         raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
     # No input or historical evidence is overwritten.
@@ -155,7 +163,11 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
     for e in envs:
         store.put(e)
     store.put(policy)
-    plan = select(pack, envs, policy, mode=Mode.update)
+    chg = save_change(store, change_input) if change_input is not None else None
+    context = build_context(store, previous, pack, envs, policy, cfg, chg, mode=Mode.update,
+                            as_of=as_of) if chg is not None or previous is not None else None
+    plan = (select(pack, envs, policy, change=chg, mode=Mode.update, context=context)
+            if context is not None else select(pack, envs, policy, mode=Mode.update))
     store.put(plan)
     (run_dir / "plan.txt").write_text(plan.id + "\n", encoding="utf-8")
     rc = RunConfig(executors=cfg.get("executors", {}))
@@ -167,6 +179,8 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
     lifecycle_errors = []
     diagnostic_refs = []
     for side, env in zip((Side.baseline, Side.candidate), envs):
+        if not any(item.selected for item in plan.items):
+            break  # 이월 전용 PLAN은 엔진을 기동하지 않는다.
         side_cfg = rc.side_configs[side.value]
         if mode == "external":
             run_plan(store, pack, plan, rc, only_side=side)
@@ -343,12 +357,19 @@ def execute_validation(store, pack, env, policy, cfg: dict, run_dir: Path, as_of
     return report, failed or bool(lifecycle_errors)
 
 
-def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False) -> dict:
+def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
+                     change=None, previous_plan=None, source_store=None) -> dict:
     """Read-only preparation check. It neither pulls images nor starts an engine."""
     from guard.executors import registry
     from guard.core.preflight import validate_pack
     from guard.readiness_support import assess_check_support
 
+    change_input = read_change(change, pack, source_store)
+    previous = resolve_plan(source_store, previous_plan) if previous_plan is not None else None
+    context = build_context(source_store, previous, pack, envs, policy, cfg,
+                            change_input.change if change_input else None,
+                            mode=Mode.audit if single else Mode.update, read_only=True
+                            ) if change_input is not None or previous is not None else None
     checks = []
     def record(name, ok, detail):
         checks.append({"check": name, "ok": bool(ok), "detail": detail})
@@ -365,7 +386,10 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False) -> 
         option_group = "validation" if single else "update"
         if any(c.get(option_group, {}).get("credential_canary", False) for c in prepared[1].values()) and policy.status.value != "DRAFT":
             raise ValueError("credential_canary is only available with a DRAFT sandbox policy")
-        plan = select(pack, envs, policy, mode=Mode.audit if single else Mode.update)
+        plan_mode = Mode.audit if single else Mode.update
+        plan = (select(pack, envs, policy, change=change_input.change if change_input else None,
+                       mode=plan_mode, context=context) if context is not None
+                else select(pack, envs, policy, mode=plan_mode))
         selected = [item for item in plan.items if item.selected]
         if not selected:
             raise ValueError("policy selected no checks")

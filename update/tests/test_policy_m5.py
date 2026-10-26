@@ -84,10 +84,10 @@ def test_inference_conflict_still_prevents_unproved_pass(pack):
 
 
 def test_approval_declarations_are_two_scalar_paths_not_item_evidence(pack):
-    assert pack.manifest.revision == 22 and not pack.reviewed
+    assert pack.manifest.revision == 23 and not pack.reviewed
     for cid in ("SUP-01", "SUP-02"):
         c = pack.checks[cid]
-        assert c.revision == 2
+        assert c.revision == 3
         assert [(p.key, p.type, p.required) for p in c.policy_params] == [("approval_record_system", "str", True)]
         assert c.executor is None and c.judge is None
     template = build_policy_template(pack)

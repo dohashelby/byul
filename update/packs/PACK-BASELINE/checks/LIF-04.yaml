@@ -1,17 +1,20 @@
 id: LIF-04
-revision: 1
+framework_id: CHK-LIF-004
+mechanism_ids:
+- mechanism-07
+revision: 2
 retired: false
 area: LIF
-purpose: 자원 사용 제한
+purpose: 자원 예산·공정성
 secondary_purposes: []
-question: 느린 수신자와 진단 buffering이 자원을 과도하게 점유하지 않는가?
+question: 응답을 느리게 읽는 연결과 진단용 버퍼가 자원을 과도하게 차지하지 않는가?
 scope: SSE 기본; response debug는 활성 시
 risk_category: 보안 위협 점검
 risk_summary: 느리게 응답을 읽거나 큰 응답을 유도하는 호출자가 연결·buffer를 오래 점유해 메모리와 다른 요청의 처리 기회를 소모할 수 있음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: SSE 기본; response debug는 활성 시
+  prose: 스트리밍 수신 지연·연결 종료를 확인한다. response debug buffering은 실제 활성 route에서 추가한다.
 policy_params: []
 policy_prose:
   policy_to_decide: 출력 대기·buffer 한도·timeout
@@ -23,13 +26,11 @@ challenge_steps:
 - 메모리·backpressure·종결 관측
 required_observations: []
 required_observations_prose:
-- 연결별 전송량
-- host·buffer 비용
-- 연결 종료 후 회수
+- 연결별 전송량/host·buffer 비용/연결 종료 후 회수
 satisfied_if: 대기·buffer 비용이 한도 안에 있고 종료 뒤 정리된다.
 fail_criteria: 느린 연결·진단이 정한 메모리·시간 예산을 넘겨 자원을 유지한다.
 unknown_criteria: buffer별 비용·회수 또는 허용 예산을 알 수 없다.
-remediation: 입력/동시성·queue·출력 대기에 실제 제한을 두고 불필요 debug를 끈다 취소 전파·그룹 장애 처리·retry예산과 실제 종료 관측을 연결한다
+remediation: '- 느린 수신자의 출력 buffer·보존 시간·전송 기한을 제한하고 필요할 때 역압력·취소를 적용한다. 사용하지 않는 진단 buffering을 끄고 활성 기능의 메모리 예산과 정리 시점을 관리한다.'
 method_and_evidence: 느린 스트림 읽기·연결 종료·debug 옵션에서 출력 대기·메모리·후속 정상 요청을 관측한다.
 remaining_setup: 수신 지연 제어기·진단 활성 조건·메모리 상한
 executor: null

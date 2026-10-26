@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 from .base import Ref, Strict
 from .enums import ReviewStatus
@@ -95,6 +95,8 @@ class CheckDef(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     id: str = Field(pattern=r"^(SUP|REQ|PLT|LIF|OBS)-\d{2}$")
+    framework_id: str | None = None
+    mechanism_ids: list[str] | None = None
     revision: int = Field(ge=1)
     retired: bool = False
     area: Literal["SUP", "REQ", "PLT", "LIF", "OBS"]
@@ -120,6 +122,14 @@ class CheckDef(BaseModel):
     limitations: list[str] = Field(default_factory=list)  # 이 점검을 선정하면 보고서 한계에 그대로 적는 문장
     functional_scope: FunctionalScopeSpec | None = None
     legacy: Legacy = Field(default_factory=Legacy)
+
+    @model_serializer(mode="wrap")
+    def _optional_framework_metadata(self, handler):
+        data = handler(self)
+        for key in ("framework_id", "mechanism_ids"):
+            if data.get(key) is None:
+                data.pop(key, None)
+        return data
 
     @model_validator(mode="after")
     def _area_matches_id(self) -> "CheckDef":
@@ -153,6 +163,7 @@ class Pack(BaseModel):
     checks: dict[str, CheckDef]
     path: Path | None = None
     source: Literal["dir", "store"] = "dir"  # dir: 팩 폴더, store: 저장소의 팩 보존본(Step 4)
+    change_selection: dict[str, Any] | None = None
 
     def ref(self) -> Ref:
         return Ref(
@@ -187,7 +198,24 @@ def build_pack(manifest_data: dict, files: dict[str, bytes], *, path: Path | Non
     checks = {}
     for cid in manifest.checks:
         checks[cid] = CheckDef.model_validate(yaml.load(files[f"checks/{cid}.yaml"].decode("utf-8"), Loader=SAFE_YAML_LOADER))
-    return Pack(manifest=manifest, checks=checks, path=path, source=source)
+    selection = None
+    if "change_selection.yaml" in files:
+        selection = yaml.load(files["change_selection.yaml"].decode("utf-8"), Loader=SAFE_YAML_LOADER)
+        if not isinstance(selection, dict):
+            raise PackIntegrityError("change_selection.yaml must be a mapping")
+        related = []
+        for key in ("engine_categories", "model_categories", "fact_triggers"):
+            mapping = selection.get(key, {})
+            if not isinstance(mapping, dict) or any(not isinstance(v, list) for v in mapping.values()):
+                raise PackIntegrityError(f"invalid change selection mapping: {key}")
+            related.extend(cid for values in mapping.values() for cid in values)
+        for key in ("patch_always", "model_common"):
+            if not isinstance(selection.get(key, []), list):
+                raise PackIntegrityError(f"invalid change selection list: {key}")
+            related.extend(selection.get(key, []))
+        if any(not isinstance(cid, str) or cid not in checks for cid in related):
+            raise PackIntegrityError("change selection references an unknown check")
+    return Pack(manifest=manifest, checks=checks, path=path, source=source, change_selection=selection)
 
 
 def load_pack(path: Path) -> Pack:

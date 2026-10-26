@@ -12,6 +12,9 @@ import typer
 import yaml
 
 from guard.collectors.file import load_environment, load_policy
+from guard.collectors.change import read_change, resolve_plan, save_change, extracted_input
+from guard.collectors.updates import update_object
+from guard.core.change_selection import build_context
 from guard.collectors.manual import ManualEvidenceError, build_template, dump_template, import_evidence, read_document
 from guard.collectors.policy_template import write_policy_template
 from guard.core.judge import judge_plan
@@ -35,6 +38,8 @@ evidence_app = typer.Typer(add_completion=False, no_args_is_help=True, help="수
 app.add_typer(evidence_app, name="evidence")
 policy_app = typer.Typer(add_completion=False, no_args_is_help=True, help="기업 정책 입력 양식")
 app.add_typer(policy_app, name="policy")
+env_app = typer.Typer(add_completion=False, no_args_is_help=True, help="환경 입력 갱신")
+app.add_typer(env_app, name="env")
 
 ConfigOpt = typer.Option(Path("guard.toml"), "--config", help="플러그인 설정 파일")
 StoreOpt = typer.Option(None, "--store", help="저장소 경로 (기본: guard.toml의 store 또는 .guard)")
@@ -46,6 +51,14 @@ def _config(path: Path) -> dict:
 
 def _store(store: Optional[Path], cfg: dict) -> Store:
     return Store(store or Path(cfg.get("store", ".guard")))
+
+
+def _change_inputs(value, previous_plan, pack, cfg, store):
+    """검증 실패 시 새 저장소·실행 출력 없이 반환한다."""
+    root = store or Path(cfg.get("store", ".guard"))
+    needs_store = previous_plan is not None or (value is not None and not Path(value).is_file())
+    source = Store.read_only(root) if needs_store else None
+    return read_change(value, pack, source), resolve_plan(source, previous_plan), source
 
 
 def _plan_and_pack(st: Store, plan_id: str, pack_dir: Optional[Path], allow_snapshot: bool = False) -> tuple[Plan, Pack]:
@@ -93,24 +106,91 @@ def policy_template(
     typer.echo(f"DRAFT 정책 양식 생성: {out}")
 
 
+def _update_input(kind, base, patch, config, store, out):
+    if out is not None and (out.exists() or not out.parent.is_dir()):
+        raise typer.BadParameter("--out must be a new file in an existing directory")
+    cfg = _config(config)
+    obj = update_object(_store(store, cfg), base, patch, kind=kind)
+    if out is not None:
+        with out.open("x", encoding="utf-8") as stream:
+            yaml.safe_dump(obj.to_dict(), stream, allow_unicode=True, sort_keys=False)
+    typer.echo(f"{obj.id}@{obj.revision} sha256={obj.content_sha256}")
+
+
+@env_app.command("update")
+def env_update(base: str = typer.Option(..., "--base"), patch: Path = typer.Option(..., "--patch"),
+               out: Optional[Path] = typer.Option(None, "--out"), config: Path = ConfigOpt,
+               store: Optional[Path] = StoreOpt):
+    """최신 ENV에 부분 갱신을 적용해 같은 ID의 새 revision을 저장한다."""
+    _update_input("ENV", base, patch, config, store, out)
+
+
+@policy_app.command("update")
+def policy_update(base: str = typer.Option(..., "--base"), patch: Path = typer.Option(..., "--patch"),
+                  out: Optional[Path] = typer.Option(None, "--out"), config: Path = ConfigOpt,
+                  store: Optional[Path] = StoreOpt):
+    """최신 POL에 부분 갱신을 적용해 같은 ID의 새 revision을 저장한다."""
+    _update_input("POL", base, patch, config, store, out)
+
+
+@app.command("diff")
+def engine_diff(baseline: str = typer.Option(..., "--from"), candidate: str = typer.Option(..., "--to"),
+                repository: Optional[Path] = typer.Option(None, "--repository", help="기존 git 저장소; 지정 시 fetch하지 않음"),
+                pack: Path = typer.Option(Path("packs/PACK-BASELINE"), "--pack"),
+                config: Path = ConfigOpt, store: Optional[Path] = StoreOpt):
+    """엔진 소스의 원본 바이트와 경로 규칙에서 CHG를 만든다. 엔진을 실행하지 않는다."""
+    from guard.adapters.git_diff import extract_git_change, prepare_source_repository
+    cfg = _config(config)
+    pk = load_pack(pack)
+    options = cfg.get("engine_source", {})
+    if repository is None:
+        repository = prepare_source_repository(options)
+    extracted = extract_git_change(repository, baseline, candidate, pack=pk)
+    saved = save_change(_store(store, cfg), extracted_input(extracted, pk))
+    typer.echo(f"{saved.id}@{saved.revision} sha256={saved.content_sha256}")
+    typer.echo(json.dumps(saved.analysis or {}, ensure_ascii=False, sort_keys=True))
+
+
+@app.command("model-diff")
+def model_diff(baseline: Path = typer.Option(..., "--from"), candidate: Path = typer.Option(..., "--to"),
+               baseline_id: Optional[str] = typer.Option(None, "--baseline-id"),
+               candidate_id: Optional[str] = typer.Option(None, "--candidate-id"),
+               pack: Path = typer.Option(Path("packs/PACK-BASELINE"), "--pack"),
+               config: Path = ConfigOpt, store: Optional[Path] = StoreOpt):
+    """로컬 snapshot/manifest의 변경을 CHG로 보존한다. 모델 코드를 실행하지 않는다."""
+    from guard.collectors.model_manifest import extract_model_change
+    cfg, pk = _config(config), load_pack(pack)
+    extracted = extract_model_change(baseline, candidate, baseline_id=baseline_id, candidate_id=candidate_id, pack=pk)
+    saved = save_change(_store(store, cfg), extracted_input(extracted, pk))
+    typer.echo(f"{saved.id}@{saved.revision} sha256={saved.content_sha256}")
+    typer.echo(json.dumps(saved.analysis or {}, ensure_ascii=False, sort_keys=True))
+
+
 @app.command()
 def select(
     pack: Path = typer.Option(..., "--pack"),
     env: Path = typer.Option(..., "--env"),
     policy: Path = typer.Option(..., "--policy"),
+    change: Optional[str] = typer.Option(None, "--change", help="CHG YAML/JSON 또는 저장 CHG Ref"),
+    previous_plan: Optional[str] = typer.Option(None, "--previous-plan"),
     config: Path = ConfigOpt,
     store: Optional[Path] = StoreOpt,
 ) -> None:
     """ENV + POL + 팩 → PLAN"""
     cfg = _config(config)
-    st = _store(store, cfg)
     p = load_pack(pack)
     validate_pack(p)
-    put_pack(st, pack)  # select 시점 팩 보존본(judge·report가 나중에 이 revision을 읽을 수 있게)
     e, pol = load_environment(env), load_policy(policy, p)
+    change_input, previous, source = _change_inputs(change, previous_plan, p, cfg, store)
+    if change_input is not None or previous is not None:
+        build_context(source, previous, p, [e], pol, cfg, change_input.change if change_input else None, read_only=True)
+    st = _store(store, cfg)
+    put_pack(st, pack)  # select 시점 팩 보존본
     st.put(e)
     st.put(pol)
-    plan = select_plan(p, [e], pol)
+    chg = save_change(st, change_input) if change_input is not None else None
+    context = build_context(st, previous, p, [e], pol, cfg, chg) if chg is not None or previous is not None else None
+    plan = select_plan(p, [e], pol, change=chg, context=context) if context is not None else select_plan(p, [e], pol)
     st.put(plan)
     selected = [i for i in plan.items if i.selected]
     auto = [i for i in selected if not i.gaps]
@@ -236,6 +316,8 @@ def update(
     baseline: Path = typer.Option(..., "--baseline"),
     candidate: Path = typer.Option(..., "--candidate"),
     policy: Path = typer.Option(..., "--policy"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    previous_plan: Optional[str] = typer.Option(None, "--previous-plan"),
     output: Path = typer.Option(Path("out/updates"), "--output"),
     as_of: Optional[str] = typer.Option(None, "--as-of", help="예외 만료 판단 시각 (RFC3339, 기본 현재)"),
     config: Path = ConfigOpt,
@@ -247,9 +329,14 @@ def update(
     validate_pack(pk)
     envs = [load_environment(baseline), load_environment(candidate)]
     pol = load_policy(policy, pk)
+    change_input, previous, source = _change_inputs(change, previous_plan, pk, cfg, store)
+    if change_input is not None or previous is not None:
+        build_context(source, previous, pk, envs, pol, cfg, change_input.change if change_input else None,
+                      mode="update", read_only=True)
     folder = output / new_id("UPDATE")
     judged_at = _as_of(as_of)
-    rpt, failed = execute_update(_store(store, cfg), pk, envs, pol, cfg, folder, judged_at)
+    extra = {"change": change_input, "previous_plan": previous} if change_input is not None or previous is not None else {}
+    rpt, failed = execute_update(_store(store, cfg), pk, envs, pol, cfg, folder, judged_at, **extra)
     data = rpt.to_dict()
     (folder / "report.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     typer.echo(f"{rpt.id} official={rpt.official} → {folder}")
@@ -320,6 +407,9 @@ def prepare_update(
     baseline: Path = typer.Option(..., "--baseline"),
     candidate: Path = typer.Option(..., "--candidate"),
     policy: Path = typer.Option(..., "--policy"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    previous_plan: Optional[str] = typer.Option(None, "--previous-plan"),
+    store: Optional[Path] = StoreOpt,
     config: Path = ConfigOpt,
 ) -> None:
     """입력·Docker·로컬 이미지·모델 사전 검사. 엔진/자원/저장소를 만들지 않는다."""
@@ -327,8 +417,12 @@ def prepare_update(
         "policy": policy, "config": config}, pack_loader=load_pack, environment_loader=load_environment,
         policy_loader=load_policy, config_loader=_config)
     try:
+        extra = {}
+        if not issues and (change is not None or previous_plan is not None):
+            ci, previous, source = _change_inputs(change, previous_plan, loaded["pack"], loaded["config"], store)
+            extra = {"change": ci, "previous_plan": previous, "source_store": source}
         data = input_failure(issues) if issues else annotate(update_readiness(loaded["pack"],
-            [loaded["baseline"], loaded["candidate"]], loaded["policy"], loaded["config"]))
+            [loaded["baseline"], loaded["candidate"]], loaded["policy"], loaded["config"], **extra))
     except Exception as exc:
         data = annotate({"ready": False, "checks": [{"check": "input-files", "ok": False,
                 "detail": "preparation failed; verify file paths, schema and pack hashes"}]})

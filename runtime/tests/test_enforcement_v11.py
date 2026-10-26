@@ -167,7 +167,34 @@ class RenderV11Tests(unittest.TestCase):
         document = v11_document()
         document["observer_kube_api"] = True
         manifests = cilium.render_manifests(parse_intent(document))
-        self.assertIn({"toEntities": ["kube-apiserver"]}, manifests["cilium-observer-0-egress.json"]["spec"]["egress"])
+        self.assertIn(
+            {"toEntities": ["kube-apiserver"], "toPorts": [{"ports": [{"port": "6443", "protocol": "TCP"}]}]},
+            manifests["cilium-observer-0-egress.json"]["spec"]["egress"],
+        )
+        # Plan §4.3: never the whole entity without a port.
+        for rule in manifests["cilium-observer-0-egress.json"]["spec"]["egress"]:
+            if "toEntities" in rule:
+                self.assertIn("toPorts", rule)
+
+    def test_kube_api_port_is_configurable_and_needs_the_flag(self) -> None:
+        document = v11_document()
+        document["observer_kube_api"] = True
+        document["observer_kube_api_port"] = 443
+        manifests = cilium.render_manifests(parse_intent(document))
+        self.assertIn(
+            {"toEntities": ["kube-apiserver"], "toPorts": [{"ports": [{"port": "443", "protocol": "TCP"}]}]},
+            manifests["cilium-observer-0-egress.json"]["spec"]["egress"],
+        )
+        without_flag = v11_document()
+        without_flag["observer_kube_api_port"] = 443
+        with self.assertRaisesRegex(IntentError, "requires observer_kube_api"):
+            parse_intent(without_flag)
+        for bad in (0, 70000, "443", True):
+            bad_port = v11_document()
+            bad_port["observer_kube_api"] = True
+            bad_port["observer_kube_api_port"] = bad
+            with self.subTest(port=bad), self.assertRaises(IntentError):
+                parse_intent(bad_port)
 
     def test_tetragon_watches_tokenizer_and_cache_root(self) -> None:
         self.assertIn("tetragon-tg-asset-02.json", self.tetragon)
@@ -280,6 +307,28 @@ class CacheCheckTests(unittest.TestCase):
         os.chmod(self.current, 0o755)
         (self.root / "vllm" / "stray-link").symlink_to(other)
         self.assertEqual(self.check()["unexpected_entries"][0]["kind"], "symlink")
+
+    def test_writable_root_or_parent_is_a_problem(self) -> None:
+        # Anyone who can write a parent can replace the current generation.
+        if os.getuid() == 0:
+            self.skipTest("ownership check needs a non-root test user")
+        self.current.mkdir(parents=True)
+        for path in (self.root, *self.current.parents):
+            if path.is_relative_to(self.root):
+                os.chmod(path, 0o755)
+        os.chmod(self.current, 0o755)
+        self.assertEqual(self.check()["state"], "ok")
+        for parent in (self.root, self.root / "vllm/image-example/revision-example"):
+            with self.subTest(parent=str(parent)):
+                os.chmod(parent, 0o777)
+                report = self.check()
+                self.assertEqual(report["state"], "problems")
+                self.assertEqual(
+                    [(item["path"], item["problems"]) for item in report["ancestor_problems"]],
+                    [(str(parent), ["group_or_other_writable"])],
+                )
+                os.chmod(parent, 0o755)
+        self.assertEqual(self.check()["state"], "ok")
 
 
 class ExecPolicyTests(unittest.TestCase):

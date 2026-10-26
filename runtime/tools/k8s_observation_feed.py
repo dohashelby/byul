@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Append live Hubble and Tetragon JSONL for the isolated runtime kind lab."""
+"""Append live Hubble and Tetragon JSONL (Tetragon without process arguments)."""
 
 from __future__ import annotations
 
@@ -116,7 +116,7 @@ def assert_safe_context(
 
 
 def _start(
-    argv: Sequence[str], output: BinaryIO, error: BinaryIO
+    argv: Sequence[str], output: BinaryIO | int, error: BinaryIO
 ) -> subprocess.Popen[bytes]:
     return subprocess.Popen(
         list(argv),
@@ -125,6 +125,55 @@ def _start(
         stderr=error,
         shell=False,
     )
+
+
+# Plan §6.5: process argument text is excluded from default collection. The
+# raw Tetragon file is persisted, so arguments are removed before it is written.
+_TETRAGON_PROCESS_KEYS = ("process", "parent")
+
+
+def redact_tetragon_line(line: bytes) -> bytes | None:
+    """Return the event line without process arguments, or None to drop it.
+
+    Lines that are not a JSON object are dropped instead of being stored
+    verbatim, because their content cannot be checked for arguments.
+    """
+
+    try:
+        document = json.loads(line)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
+        return None
+    if not isinstance(document, dict):
+        return None
+    for event in document.values():
+        if not isinstance(event, dict):
+            continue
+        for key in _TETRAGON_PROCESS_KEYS:
+            process = event.get(key)
+            if isinstance(process, dict):
+                process.pop("arguments", None)
+        ancestors = event.get("ancestors")
+        if isinstance(ancestors, list):
+            for ancestor in ancestors:
+                if isinstance(ancestor, dict):
+                    ancestor.pop("arguments", None)
+    return (json.dumps(document, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def _pump(
+    source: BinaryIO,
+    output: BinaryIO,
+    transform: Callable[[bytes], bytes | None],
+    dropped: list[int],
+) -> None:
+    for line in iter(source.readline, b""):
+        cleaned = transform(line)
+        if cleaned is None:
+            dropped[0] += 1
+            continue
+        output.write(cleaned)
+        output.flush()
+    source.close()
 
 
 def _wait_for_hubble(
@@ -239,13 +288,18 @@ class _Child:
         output: BinaryIO,
         error: BinaryIO,
         ready: Callable[[subprocess.Popen[bytes]], None] | None = None,
+        transform: Callable[[bytes], bytes | None] | None = None,
     ) -> None:
         self.name = name
         self.argv = argv
         self.output = output
         self.error = error
         self.ready = ready
+        # When set, stdout goes through this filter before reaching ``output``.
+        self.transform = transform
         self.process: subprocess.Popen[bytes] | None = None
+        self.pump: threading.Thread | None = None
+        self.dropped_lines = [0]
 
     def returncode(self) -> int | None:
         return None if self.process is None else self.process.poll()
@@ -320,6 +374,8 @@ def _stop_children(group: _FeedGroup) -> None:
         except subprocess.TimeoutExpired:
             child.process.kill()
             child.process.wait(timeout=5)
+        if child.pump is not None:
+            child.pump.join(timeout=5)
 
 
 class _Supervisor:
@@ -374,7 +430,18 @@ class _Supervisor:
                 # Re-check the context before talking to a cluster again.
                 assert_safe_context(self.context)
             for child in group.children:
-                child.process = _start(child.argv(since), child.output, child.error)
+                if child.transform is None:
+                    child.process = _start(child.argv(since), child.output, child.error)
+                else:
+                    child.process = _start(child.argv(since), subprocess.PIPE, child.error)
+                    assert child.process.stdout is not None
+                    child.pump = threading.Thread(
+                        target=_pump,
+                        args=(child.process.stdout, child.output, child.transform, child.dropped_lines),
+                        name=f"{child.name}-redact",
+                        daemon=True,
+                    )
+                    child.pump.start()
                 started.append(child)
                 if self.stop_requested.is_set():
                     raise _StopRequested
@@ -495,6 +562,7 @@ def run(
                     ),
                     tetragon_output,
                     tetragon_error,
+                    transform=redact_tetragon_line,
                 )
             ],
         )

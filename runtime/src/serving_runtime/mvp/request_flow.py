@@ -185,11 +185,17 @@ class RequestFlow:
                 raise ValueError("validated messages are unavailable")
             if request_kind == "completions" and not isinstance(input_value, str):
                 raise ValueError("validated prompt is unavailable")
+            # The relay forwards approved extra fields to the engine; the token
+            # count must see the same prompt-shaping inputs.
+            extra_fields = {
+                name: document[name] for name, _mode in decision.extra_fields if name in document
+            }
             input_tokens = self._engine_client.count_input_tokens(
                 request_id,
                 input_value,
                 backend_model_id,
                 request_kind=request_kind,
+                extra_fields=extra_fields,
             )
         except Exception as error:
             # Store only the exception class; backend messages may contain secrets.

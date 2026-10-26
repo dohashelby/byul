@@ -176,6 +176,12 @@ class HashListApprovalVerifier:
         self.path = str(path)
         self._lock = threading.Lock()
         self._last_verified: dict[str, Any] | None = None
+        # Each verification takes a ticket before reading the list. Only a
+        # result from a newer read may replace the stored outcome, so a slow
+        # success from an older list cannot revive an approval that a newer
+        # readable list already removed.
+        self._next_ticket = 0
+        self._stored_ticket = -1
 
     def verify(
         self,
@@ -189,6 +195,9 @@ class HashListApprovalVerifier:
         checked = (now or _utc_now_datetime()).astimezone(timezone.utc)
         checked_at = checked.isoformat()
         selector = (hashlib.sha256(policy_bytes).hexdigest(), policy_id, policy_version, approval_ref)
+        with self._lock:
+            ticket = self._next_ticket
+            self._next_ticket += 1
         source_error: tuple[str, str] | None = None
         entries: tuple[dict[str, str], ...] = ()
         try:
@@ -208,6 +217,10 @@ class HashListApprovalVerifier:
             entries, policy_bytes, policy_id, policy_version, approval_ref, checked, checked_at
         )
         with self._lock:
+            if ticket < self._stored_ticket:
+                # A newer read already decided; this older outcome is stale.
+                return result
+            self._stored_ticket = ticket
             if result.state == "verified":
                 self._last_verified = {
                     "selector": selector,

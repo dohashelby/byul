@@ -12,6 +12,7 @@ from typing import Any
 
 SCHEMA = "runtime-enforcement-intent/1.0"
 SCHEMA_V11 = "runtime-enforcement-intent/1.1"
+DEFAULT_KUBE_API_PORT = 6443
 SCHEMAS = frozenset({SCHEMA, SCHEMA_V11})
 PHASES = ("loading", "compiling", "inferring")
 _SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -148,6 +149,9 @@ class EnforcementIntent:
     acquire: AcquireIntent | None = None
     test_receivers: tuple[TestReceiver, ...] = ()
     observer_kube_api: bool = False
+    # Plan §4.3: only the registered API port. 6443 is the kube-apiserver port
+    # in the kind lab; the formal cluster must confirm its actual port.
+    observer_kube_api_port: int = DEFAULT_KUBE_API_PORT
     assets: AssetsIntent | None = None
     phase_binaries: tuple[tuple[str, tuple[str, ...]], ...] = ()
     suspect_binaries: tuple[str, ...] = ()
@@ -347,6 +351,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
             "acquire",
             "test_receivers",
             "observer_kube_api",
+            "observer_kube_api_port",
             "assets",
             "phase_binaries",
             "suspect_binaries",
@@ -360,6 +365,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         "acquire",
         "test_receivers",
         "observer_kube_api",
+        "observer_kube_api_port",
         "assets",
         "phase_binaries",
         "suspect_binaries",
@@ -436,6 +442,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
     phase_binaries: list[tuple[str, tuple[str, ...]]] = []
     suspect: tuple[str, ...] = ()
     kube_api = False
+    kube_api_port = DEFAULT_KUBE_API_PORT
     if v11:
         if "acquire" in root:
             acquire_raw = _object(root["acquire"], "$.acquire", {"labels", "egress_allow"})
@@ -514,6 +521,10 @@ def parse_intent(document: Any) -> EnforcementIntent:
         kube_api = root.get("observer_kube_api", False)
         if not isinstance(kube_api, bool):
             raise IntentError("$.observer_kube_api must be a boolean")
+        if "observer_kube_api_port" in root:
+            if not kube_api:
+                raise IntentError("$.observer_kube_api_port requires observer_kube_api: true")
+            kube_api_port = _port(root["observer_kube_api_port"], "$.observer_kube_api_port")
         if "assets" in root:
             assets_raw = _object(
                 root["assets"],
@@ -628,6 +639,7 @@ def parse_intent(document: Any) -> EnforcementIntent:
         acquire=acquire,
         test_receivers=tuple(receivers),
         observer_kube_api=kube_api,
+        observer_kube_api_port=kube_api_port,
         assets=assets,
         phase_binaries=tuple(phase_binaries),
         suspect_binaries=suspect,

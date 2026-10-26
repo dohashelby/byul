@@ -81,6 +81,8 @@ class FakeBackend:
         self.tokenize_failure = False
         self.tokenize_response_body: bytes | None = None
         self.tokenize_calls = 0
+        # Bodies the Gateway sent to the tokenizer, for test assertions only.
+        self.tokenize_documents: list[dict[str, Any]] = []
         self._requests: list[dict[str, Any]] = []
         self._redirect_follow_count = 0
         self._lock = threading.Lock()
@@ -375,6 +377,8 @@ class FakeBackend:
                 except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
                     self._send_json(400, {"error": {"code": "FAKE_MALFORMED"}})
                     return
+                with owner._lock:
+                    owner.tokenize_documents.append(document)
                 if owner.tokenize_response_body is not None:
                     encoded = owner.tokenize_response_body
                     self.send_response(200)

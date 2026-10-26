@@ -636,6 +636,8 @@ class FakeProcess:
     def __init__(self) -> None:
         self.returncode: int | None = None
         self.terminated = False
+        # Children with a redaction filter read stdout through a pipe.
+        self.stdout = io.BytesIO()
 
     def poll(self) -> int | None:
         return self.returncode

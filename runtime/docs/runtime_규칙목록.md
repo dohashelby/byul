@@ -22,8 +22,9 @@
 | `AUTH_INVALID` | `authentication` | Gateway / `gateway` | bearer 값이 맞지 않거나 Authorization 헤더가 모호하다. | `DENIED`·미전달 → `denied` | §3.4, §4.2 | update 담당 확인 필요 |
 | `ROLE_NOT_ALLOWED` | `route_roles` | Gateway / `gateway` | 주체 역할이 추론 route에 허용되지 않는다. | `DENIED`·미전달 → `denied` | §3.4, §4.2 | update 담당 확인 필요 |
 | `PRINCIPAL_MODEL_NOT_ALLOWED` | `principal_allowed_models` | Gateway / `gateway` | 주체별 모델 허용 목록에 요청 모델이 없다. | `DENIED`·미전달 → `denied` | §4.2 | update 담당 확인 필요 |
-| `TARGET_UNAVAILABLE` | `target_registration` | Gateway / `gateway` | 대상 등록을 유효하게 읽지 못해 판정을 보류한다. | `ERROR` → `error` | §4.1 | update 담당 확인 필요 |
-| `TARGET_MISMATCH` | `target_registration` | Gateway / `gateway` | 정책의 `target_id`와 등록 대상이 다르다. | `ERROR` → `error` | §4.1 | update 담당 확인 필요 |
+| `TARGET_UNAVAILABLE` | `target_registration` | Gateway / `gateway` | 대상 등록을 유효하게 읽지 못했거나, 등록에 `kubernetes`가 있는데 Pod 조회가 정상이 아니어서(조회 안 함·없음·여러 개·실행 안 됨) 판정을 보류한다. | `ERROR` → `error` | §4.1 | update 담당 확인 필요 |
+| `TARGET_MISMATCH` | `target_registration` | Gateway / `gateway` | 정책의 `target_id`와 등록 대상이 다르거나, 관측한 engine kind·version·model ID·image digest가 등록값과 다르다. | `ERROR` → `error` | §4.1, §7.3 | update 담당 확인 필요 |
+| `TARGET_UNVERIFIED` | `target_registration` | Gateway / `gateway` | 등록에 선언한 값을 아직 확인하지 못했다(engine_info 수집 실패·미보고 등). `model.revision`은 제외. | `ERROR` → `error` | §4.1, §7.3 | update 담당 확인 필요 |
 | `MODEL_NOT_ALLOWED` | `allowed_models` | Gateway / `gateway` | 정책의 모델 허용 목록 밖이다. | `DENIED`·미전달 → `denied` | §4.2, §4.10 | update 담당 확인 필요 |
 | `MAX_TOKENS_EXCEEDED` | `output_max_tokens` | Gateway / `gateway` | 요청 출력 토큰 수가 정책 상한을 넘는다. | `DENIED`·미전달 → `denied` | §4.10 | update 담당 확인 필요 |
 | `CONTEXT_LIMIT_EXCEEDED` | `max_context_tokens` | Gateway / `gateway` | 입력 토큰과 출력 요청 합이 context 상한을 넘는다. | `DENIED`·미전달 → `denied` | §4.10 | update 담당 확인 필요 |
@@ -104,7 +105,7 @@
 | `runtime-engine-egress` | Cilium 후보 / 직접 사건 없음 | DNS와 선언된 engine 송신 CIDR/FQDN·port만 연다. FQDN이 있으면 DNS 이름 관측 규칙도 렌더한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.3, §4.12 | update 담당 확인 필요 |
 | `runtime-gateway-egress` | Cilium 후보 / 직접 사건 없음 | Gateway에서 engine API TCP port와 DNS로만 나가게 한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.3, §4.12 | update 담당 확인 필요 |
 | `runtime-acquire-egress` | Cilium 후보 / 직접 사건 없음 | acquire 역할만 승인한 artifact endpoint/CIDR/FQDN·port와 DNS에 나가게 한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.12 | update 담당 확인 필요 |
-| `runtime-observer-{index}-egress` | Cilium 후보 / 직접 사건 없음 | 각 observer가 engine management listener, DNS, 선택 kube-apiserver와 observer 허용 시험 receiver에만 나가게 한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.12 | update 담당 확인 필요 |
+| `runtime-observer-{index}-egress` | Cilium 후보 / 직접 사건 없음 | 각 observer가 engine management listener, DNS, 선택 kube-apiserver(`observer_kube_api_port` 하나, 기본 6443)와 observer 허용 시험 receiver에만 나가게 한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.12 | update 담당 확인 필요 |
 | `runtime-receiver-{name}-ingress` | Cilium 후보 / 직접 사건 없음 | 시험 receiver가 `allowed_from`에 선언된 acquire/observer 역할의 지정 port만 받게 한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.12 | update 담당 확인 필요 |
 
 ## Hubble 관측

@@ -481,6 +481,27 @@ class ZerodayGatewayHttpTests(unittest.TestCase):
         self.assertEqual(json.loads(body)["error"]["code"], "INVALID_EXTRA_FIELD")
         self.assertEqual(self.fake.request_count, before)
 
+    def test_context_check_tokenizes_with_the_relayed_extra_fields(self) -> None:
+        # The engine renders the prompt with passthrough fields such as
+        # chat_template_kwargs; the context count must see the same inputs.
+        kwargs = {"enable_thinking": True, "note": "x" * 64}
+        status, headers, _ = self.post(chat(chat_template_kwargs=kwargs, temperature=0.5))
+        self.assertEqual(status, 200)
+        sent = self.fake.tokenize_documents[-1]
+        self.assertEqual(sent["chat_template_kwargs"], kwargs)
+        self.assertEqual(sent["temperature"], 0.5)
+        self.assertEqual(sent["model"], "backend-test-model")
+        received = [i for i in self.fake.requests if i["request_id"] == headers["X-Request-ID"]]
+        self.assertEqual(received[0]["extra_values"]["chat_template_kwargs"], kwargs)
+
+    def test_tokenizer_rejecting_extra_fields_holds_the_request(self) -> None:
+        before = self.fake.request_count
+        self.fake.tokenize_failure = True
+        status, _, body = self.post(chat(chat_template_kwargs={"enable_thinking": True}))
+        self.assertEqual(status, 503)
+        self.assertEqual(json.loads(body)["error"]["code"], "CONTEXT_CHECK_UNAVAILABLE")
+        self.assertEqual(self.fake.request_count, before)
+
     def test_status_reports_test_only_profile(self) -> None:
         status = json.loads(self.get("/api/status"))
         policy = status["policy"]

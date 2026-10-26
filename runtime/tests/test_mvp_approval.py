@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -168,6 +169,45 @@ class ApprovalVerifierTests(unittest.TestCase):
         self.assertEqual(verify().state, "verified")
         self.write({"schema_version": "runtime-policy-approvals/1.0", "entries": []})
         self.assertEqual(verify().state, "unverified")
+        self.approvals_path.write_text("{broken", encoding="utf-8")
+        self.assertEqual(verify().state, "error")
+
+    def test_stale_success_cannot_revive_a_removed_approval(self) -> None:
+        # Request A reads the old list and stalls; request B reads the new list
+        # (approval removed) and finishes first; A's late success must not be
+        # cached, so a later read error does not fall back to the old approval.
+        verifier = HashListApprovalVerifier(self.approvals_path)
+        policy = self.policy_state.policy
+        raw = self.policy_state.raw_bytes
+        assert policy is not None and raw is not None
+        now = datetime(2026, 10, 25, tzinfo=timezone.utc)
+        release_a = threading.Event()
+        a_inside = threading.Event()
+        original = verifier._verify_entries
+        calls = {"n": 0}
+
+        def staged(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                a_inside.set()
+                release_a.wait(timeout=10)
+            return original(*args, **kwargs)
+
+        verifier._verify_entries = staged  # type: ignore[method-assign]
+
+        def verify():
+            return verifier.verify(raw, policy.policy_id, policy.policy_version, policy.approval_ref, now=now)
+
+        self.write(approval_document(self.policy_path))
+        results: dict[str, object] = {}
+        thread_a = threading.Thread(target=lambda: results.setdefault("a", verify()))
+        thread_a.start()
+        self.assertTrue(a_inside.wait(timeout=10))
+        self.write({"schema_version": "runtime-policy-approvals/1.0", "entries": []})
+        self.assertEqual(verify().state, "unverified")  # B
+        release_a.set()
+        thread_a.join(timeout=10)
+        self.assertEqual(results["a"].state, "verified")  # A saw the old list
         self.approvals_path.write_text("{broken", encoding="utf-8")
         self.assertEqual(verify().state, "error")
 

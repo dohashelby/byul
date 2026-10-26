@@ -55,10 +55,18 @@ class EngineClient:
         backend_model_id: str,
         *,
         request_kind: str = "chat",
+        extra_fields: dict[str, Any] | None = None,
     ) -> int:
-        """Ask the backend tokenizer for the prompt length; never estimate it."""
+        """Ask the backend tokenizer for the prompt length; never estimate it.
 
-        tokenize_request = {"model": backend_model_id}
+        Approved passthrough fields are sent too, because some (for example
+        ``chat_template_kwargs``) change the rendered prompt. If the tokenizer
+        rejects them the count is unavailable and the request is held.
+        """
+
+        tokenize_request: dict[str, Any] = dict(extra_fields or {})
+        # Gateway-owned fields are written last so they always win.
+        tokenize_request["model"] = backend_model_id
         if request_kind == "chat":
             tokenize_request["messages"] = input_value
         elif request_kind == "completions":

@@ -181,7 +181,7 @@ class GatewayApp:
             self._relay,
             self._concurrency,
             lambda: self.auth_state,
-            self._target.gateway_decision,
+            self._target_hold,
             approval_result=self._approval_result,
         )
 
@@ -397,18 +397,29 @@ class GatewayApp:
             "validate_count": sum(1 for item in extra if item["mode"] == "validate"),
         }
 
-    def target_status(self) -> dict[str, Any]:
+    def _target_inputs(self) -> dict[str, Any]:
         collectors = self.collectors_status()
         by_source = {item["source"]: item for item in collectors.get("collectors", [])}
         pods = by_source.get("target_pods")
+        return {
+            "backend_kind": self.backend.kind,
+            "engine_info": by_source.get("engine_info"),
+            "kubernetes": (pods.get("last_value") if pods and pods.get("state") == "ok" else (
+                {"state": pods.get("state"), "error": pods.get("last_error")} if pods else None
+            )),
+        }
+
+    def _target_hold(self, policy_target_id: str | None) -> tuple[str, str] | None:
+        # Without a registration there is nothing to compare; skip collector reads.
+        if self._target.registration.state == "not_configured":
+            return None
+        return self._target.hold(policy_target_id=policy_target_id, **self._target_inputs())
+
+    def target_status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         return self._target.status(
             policy_target_id=policy.target_id if policy else None,
-            backend_kind=self.backend.kind,
-            engine_info=by_source.get("engine_info"),
-            kubernetes=(pods.get("last_value") if pods and pods.get("state") == "ok" else (
-                {"state": pods.get("state"), "error": pods.get("last_error")} if pods else None
-            )),
+            **self._target_inputs(),
         )
 
     def policy_status(self) -> dict[str, Any]:

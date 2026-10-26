@@ -286,7 +286,8 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
         self.assertEqual(rows["model.id"], "match")
         self.assertEqual(rows["model.revision"], "not_declared")
         self.assertEqual(rows["engine.image_digest"], "mismatch")
-        self.assertIsNone(status["gateway_hold"])
+        # A confirmed mismatch holds new requests (plan §7.3), not only displayed.
+        self.assertEqual(status["gateway_hold"]["reason_code"], "TARGET_MISMATCH")
         stale = registry.status(
             policy_target_id="mock-engine-001",
             backend_kind="mock",
@@ -294,6 +295,53 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
             kubernetes=None,
         )
         self.assertEqual({r["field"]: r["state"] for r in stale["comparison"]}["model.id"], "unknown")
+        # The last seen image digest still differs, so the request stays held.
+        self.assertEqual(stale["gateway_hold"]["reason_code"], "TARGET_MISMATCH")
+
+    def test_hold_follows_comparison(self) -> None:
+        digest = "sha256:" + "a" * 64
+        registration = load_target(
+            self.write(
+                "t.json",
+                target_document(engine={"kind": "mock", "version": "mock-1.0", "image_digest": None}),
+            )
+        )
+        registry = TargetRegistry(registration, data_dir=Path(self.temporary.name) / "d", observation_session_id="s")
+        engine_ok = {"state": "ok", "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"}}
+        self.assertIsNone(
+            registry.hold(policy_target_id="mock-engine-001", backend_kind="mock", engine_info=engine_ok, kubernetes=None)
+        )
+        unverified = registry.hold(
+            policy_target_id="mock-engine-001",
+            backend_kind="mock",
+            engine_info={"state": "error", "last_value": None},
+            kubernetes=None,
+        )
+        self.assertEqual(unverified[0], "TARGET_UNVERIFIED")
+        wrong_kind = registry.hold(
+            policy_target_id="mock-engine-001", backend_kind="vllm", engine_info=engine_ok, kubernetes=None
+        )
+        self.assertEqual(wrong_kind[0], "TARGET_MISMATCH")
+        with_pods = load_target(
+            self.write(
+                "k.json",
+                target_document(
+                    engine={"kind": "mock", "version": "mock-1.0", "image_digest": digest},
+                    kubernetes=kubernetes_block(),
+                ),
+            )
+        )
+        pods_registry = TargetRegistry(with_pods, data_dir=Path(self.temporary.name) / "k", observation_session_id="s")
+        pods_registry.observe_kubernetes(
+            summarize_pods({"items": [pod("p1", "u1", "c1"), pod("p2", "u2", "c2")]}, "engine"), None
+        )
+        multiple = pods_registry.hold(
+            policy_target_id="mock-engine-001",
+            backend_kind="mock",
+            engine_info=engine_ok,
+            kubernetes={"state": "multiple_targets"},
+        )
+        self.assertEqual(multiple[0], "TARGET_UNAVAILABLE")
 
 
 class TargetGatewayHttpTests(TempMixin, unittest.TestCase):

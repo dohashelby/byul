@@ -70,11 +70,17 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
 
 엔진 캐시는 묶음 구조(현재 세대 폴더만 컨테이너 `/cache`에 마운트)를 그대로 쓴다. intent에 `assets.cache_mount_path: "/cache"`를 두어 Tetragon 캐시 규칙(TG-CACHE-01)이 `/cache`를 감시하고, 호스트 쪽 `cache_root`(`/srv/serving/cache`)와 세대 경로는 03이 만드는 `/srv/serving/cache/vllm/<digest hex>/<revision>/<profile>-profile-01`과 같게 둔다. 엔진은 다른 세대를 볼 수 없으므로 컨테이너 안 쓰기는 모두 "현재 세대", 그 밖은 "캐시 밖"으로 분류된다. 호스트에서 `serving-runtime enforce cache-check --intent deploy/gpu-lab/intent.aws-lab.json`으로 세대·권한을 점검한다.
 
+**주의 — CACHE-02(다른 세대 쓰기)의 근거가 바뀐다.** 이 구성에서는 runtime 사건으로 다른 세대 쓰기를 탐지하지 않는다. "엔진 Pod에는 현재 세대 폴더만 붙는다"는 배치 사실이 그 근거이며, runtime은 이 사실을 스스로 확인하지 않는다. 만약 `/cache`에 cache root 전체가 붙으면 다른 세대 쓰기도 "현재 세대"로 분류되어 조용히 놓친다. 그래서 배포·03 실행·프로파일 변경 뒤마다 아래를 확인해 증거로 남긴다.
+```bash
+kubectl --context byul-aws-lab -n serving-lab get deploy serving-engine -o jsonpath='{range .spec.template.spec.volumes[?(@.name=="cache")]}{.hostPath.path}{"\n"}{end}{range .spec.template.spec.containers[?(@.name=="engine")].volumeMounts[?(@.name=="cache")]}{.mountPath}{"\n"}{end}'
+# 첫 줄 = intent의 cache_root/<engine>/<image_id>/<model_revision>/<compile_profile>, 둘째 줄 = /cache 여야 한다
+```
+
 ## intent에서 서버 확인 후 채울 값
 
-- `REPLACE_IMAGE_DIGEST_HEX`, `REPLACE_PROFILE`(dev/reference): AWS 묶음 03이 정한 캐시 경로와 같게(`images.lock`과 `LAB_PROFILE`).
+- `REPLACE_IMAGE_DIGEST_HEX`, `REPLACE_PROFILE`(dev/reference): AWS 묶음 03이 정한 캐시 경로와 같게(`images.lock`과 `LAB_PROFILE`). **dev↔reference를 바꾸면 intent의 `compile_profile`도 바꾼다**(안 바꾸면 cache-check가 `current_generation_missing`, 이전 프로파일 세대는 `other_generations_present`로 보임).
 - `allowed_engine_binaries`·`phase_binaries`: 공식 이미지의 실제 실행 파일. 지금 값(`/usr/local/bin/vllm-nonroot-entrypoint.sh`, `/usr/bin/python3`)은 시작안이며 첫 Tetragon 관측으로 확정한다.
-- `enforce render`의 `pod-security-candidate.json`은 엔진 그룹을 UID와 같게(2000) 쓴다. AWS 묶음은 GID 0이므로 이 후보 파일을 그대로 적용하지 않는다(참고용).
+- `enforce render`의 `pod-security-candidate.json`은 엔진 그룹을 UID와 같게(2000) 쓰고 캐시 환경변수도 `VLLM_CACHE_ROOT=/cache` 하나만 둔다. AWS 묶음은 GID 0이고 `VLLM_CACHE_ROOT=/cache/vllm`, `HOME=/cache/home` 등 하위 폴더를 쓰므로 이 후보 파일을 그대로 적용하지 않는다(참고용).
 
 ## 확인 방법과 확인하지 않은 것
 

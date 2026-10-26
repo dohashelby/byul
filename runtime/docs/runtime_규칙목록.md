@@ -80,7 +80,7 @@
 | `TG-DENY-01` | Tetragon file override / `tetragon` | `enforce_probe`의 정확한 시험 경로 쓰기에 `Override(-EPERM)`을 시도한다. | `enforce_attempted` | §4.5, §4.13, §9.2 RT-SYS-03 | update 담당 확인 필요 |
 | `SP3-EXEC` | ExecPolicy rule ref / `tetragon` | 모든 단계 기반 실행 분류에 붙는 내부 규칙 참조다. | 해당 `exec_verdict`의 결과 | §4.11 | update 담당 확인 필요 |
 | `CACHE-01` | ExecPolicy/cache rule ref / `tetragon` | cache root와 현재 세대를 구분하는 공통 참조다. | file/exec 분류 결과를 따름 | §4.9 | update 담당 확인 필요 |
-| `CACHE-02` | cache rule ref / `tetragon` | cache root 안이지만 현재 generation 밖(`other`)인 쓰기에 추가된다. | monitor `detected` | §4.9 | update 담당 확인 필요 |
+| `CACHE-02` | cache rule ref / `tetragon` | cache root 안이지만 현재 generation 밖(`other`)인 쓰기에 추가된다. `assets.cache_mount_path`를 쓰는 구성(AWS lab: 현재 세대만 `/cache`에 마운트)에서는 이 사건이 생기지 않으며, 근거는 마운트 구조 확인(`deploy/gpu-lab/README.md`)과 호스트 `enforce cache-check`다. | monitor `detected` | §4.9 | update 담당 확인 필요 |
 | `CACHE-03` | ExecPolicy rule ref / `tetragon` | cache 아래의 실행 파일에서 실행된 경우 추가된다. | monitor `detected`(`exec_from_cache`) | §4.9, §4.11 | update 담당 확인 필요 |
 
 ### `exec_verdict`

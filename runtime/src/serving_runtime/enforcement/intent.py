@@ -608,6 +608,10 @@ def parse_intent(document: Any) -> EnforcementIntent:
                 ):
                     if mount.is_relative_to(supply) or Path(supply).is_relative_to(mount):
                         raise IntentError("$.assets.cache_mount_path must be separate from supply paths")
+            # With cache_mount_path, cache_root is a host path while the supply
+            # paths are container paths, so this host/container comparison no
+            # longer constrains anything; the mount check above guards the
+            # container side instead.
             for supply in filter(None, (protected.model_dir, assets.tokenizer_dir)):
                 if Path(supply).is_relative_to(assets.cache_root) or Path(
                     assets.cache_root

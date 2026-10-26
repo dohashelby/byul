@@ -280,7 +280,7 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
                           "collected_at": env.created_at, "collector": "EXAMPLE-persisted-draft"})
     evd = Evidence(id="EVD-EXAMPLE-NATIVE", data_origin="EXAMPLE", refs=[plan.ref(), env.ref()],
         plan=plan.ref(), environment=env.ref(), check_id="OBS-09", side="single",
-        execution={"status": "COMPLETED", "executor": {"name": "log_integrity", "version": "0.2.1", "config_sha256": "0" * 64}},
+        execution={"status": "COMPLETED", "executor": {"name": "log_integrity", "version": "0.3.0", "config_sha256": "0" * 64}},
         normal_control=draft.normal_control, challenges=draft.challenges, observations=draft.observations,
         artifacts=artifacts).seal()
     store.put(evd)
@@ -289,6 +289,9 @@ def test_native_integrity_persisted_capture_replays_original_pass_fail_or_unknow
     store.put(report)
     result = analyze_saved_logs(store.root)
     assert result["accepted"], result
+    assert result["checks"][0]["status"] == "PROJECTION_REPLAY_MATCH"
+    assert result["checks"][0]["raw_source_replayed"] is False
+    assert result["checks"][0]["original_native_parser_replayed"] is False
     assert result["checks"][0]["verdicts"]["security"] == ("FAIL" if changes.get("duplicate") else "UNKNOWN" if changes else "PASS")
 
 

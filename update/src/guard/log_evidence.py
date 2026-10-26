@@ -18,6 +18,8 @@ from guard.executors.log_analysis_contract import LEGACY_JSON_PROFILE, STRICT_JS
 from guard.executors.log_integrity_contract import PLANNED_CASES, analyze_integrity_capture
 from guard.executors.log_integrity_parser import PROFILE, TRUSTED_FIELDS
 from guard.executors.log_projection import PROFILE as LOG_PROJECTION_PROFILE, validate_projection
+from guard.executors.native_projection import (SCHEMA as NATIVE_SCHEMA, PROFILE as NATIVE_PROJECTION_PROFILE,
+    ENCODING as NATIVE_ENCODING, replay_native, render_projection)
 from guard.judges.rule_table import RuleTableJudge
 from guard.models import canonical_json, sha256_hex, weakest_origin
 from guard.models.objects import object_from_dict
@@ -67,7 +69,16 @@ def _persisted_text(capture):
 
 def _obs09(store, evd, sample, values):
     capture, trials = sample["capture"], sample["trials"]
-    _persisted_text(capture)
+    projected = sample.get("schema") == NATIVE_SCHEMA
+    version = evd.execution.executor.version
+    if projected:
+        if version != "0.3.0":
+            raise ValueError("saved native projection differs from executor version")
+        analysis = replay_native(sample)
+    elif version == "0.2.1":
+        _persisted_text(capture)
+    else:
+        raise ValueError("saved native profile differs from executor version")
     if (not isinstance(trials, list) or len(trials) > 12
             or len({trial["case"] for trial in trials}) != len(trials)):
         raise ValueError("invalid bounded native trial inventory")
@@ -80,19 +91,28 @@ def _obs09(store, evd, sample, values):
                           and trial.get("response_id") == "cmpl-" + trial["request_id"])
         if trial.get("response_id_matches_body") is not response_match:
             raise ValueError("native response and exact body request ID differ")
-    analysis = analyze_integrity_capture(capture, trials, sample.get("source_identity_before"),
-                                         sample.get("source_identity_after"),
-                                         initial_gaps=sample["initial_gaps"], max_events=sample["max_events"])
+    if not projected:
+        analysis = analyze_integrity_capture(capture, trials, sample.get("source_identity_before"),
+                                             sample.get("source_identity_after"),
+                                             initial_gaps=sample["initial_gaps"], max_events=sample["max_events"])
     collection = analysis["collection"]
     collection["capture_window"] = capture.get("window")
-    collection["redaction"] = "configured authorization secrets and labelled credential values; source digests precede redaction"
-    saved_collection = _artifact(store, evd, "log_integrity_events.json")["capture"]
+    collection["redaction"] = (NATIVE_PROJECTION_PROFILE if projected else
+        "configured authorization secrets and labelled credential values; source digests precede redaction")
+    events_envelope = _artifact(store, evd, "log_integrity_events.json")
+    if projected:
+        events_envelope = strict_json_loads(_artifact(store, evd, "log_integrity_events.json", json_value=False))
+        if (set(events_envelope) != {"capture", "redaction", "encoding"}
+                or events_envelope["redaction"] != NATIVE_PROJECTION_PROFILE
+                or events_envelope["encoding"] != NATIVE_ENCODING):
+            raise ValueError("saved native events envelope differs")
+    saved_collection = events_envelope["capture"]
     if saved_collection != collection:
         raise ValueError("saved native events differ from capture replay (redaction may limit reconstruction)")
     document = _artifact(store, evd, "log_integrity_display.html", json_value=False)
     displayed = verify_log_display(document, collection)
     if (hashlib.sha256(document.encode()).hexdigest() != sample.get("display_sha256")
-            or document != render_log_integrity(collection) or not displayed):
+            or document != (render_projection(collection) if projected else render_log_integrity(collection)) or not displayed):
         raise ValueError("saved reference HTML does not map exactly to native events")
     if (hashlib.sha256(json.dumps(collection, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
             != sample.get("collection_sha256")):
@@ -102,7 +122,7 @@ def _obs09(store, evd, sample, values):
            "log_trusted_fields": list(TRUSTED_FIELDS), "log_identity_verified": analysis["stable"],
            "log_required_trusted_fields": [field for field in values["required_trusted_fields"] if field in TRUSTED_FIELDS],
            "log_collection_complete": not gaps, "log_boundaries_preserved": analysis["boundaries"],
-           "log_trusted_fields_preserved": analysis["fields_preserved"], "log_display_verified": displayed,
+           "log_trusted_fields_preserved": analysis["fields_preserved"], "log_display_verified": sample["display_verified"] if projected else displayed,
            "log_trials_planned": list(PLANNED_CASES), "log_trials_reached": analysis["reached"],
            "log_security_violations": analysis["violations"], "log_coverage_gaps": gaps,
            "normal_controls": analysis["normal_inference"] and analysis["normal_logs"],
@@ -319,17 +339,18 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
             if not isinstance(envelope, dict) or not isinstance(envelope.get("capture"), dict):
                 raise ValueError("saved log capture envelope differs")
             sample = envelope.get("capture", {})
-            if check.id == "OBS-03" and sample.get("schema") == "guard-log-analysis-capture/4":
+            if sample.get("schema") in {"guard-log-analysis-capture/4", NATIVE_SCHEMA}:
                 try:
                     exact = strict_json_loads(_artifact(store, evd, name, json_value=False))
                 except (ValueError, RecursionError):
                     raise ValueError("saved projection envelope JSON is ambiguous") from None
+                native = sample.get("schema") == NATIVE_SCHEMA
                 if (set(exact) != {"capture", "encoding", "redaction"}
-                        or exact["redaction"] != LOG_PROJECTION_PROFILE
-                        or exact["encoding"] != "UTF-8 predicate projection; original values omitted"):
+                        or exact["redaction"] != (NATIVE_PROJECTION_PROFILE if native else LOG_PROJECTION_PROFILE)
+                        or exact["encoding"] != (NATIVE_ENCODING if native else "UTF-8 predicate projection; original values omitted")):
                     raise ValueError("saved projection envelope profile differs")
             expected_schemas = ({"guard-log-analysis-capture/2", "guard-log-analysis-capture/3", "guard-log-analysis-capture/4"}
-                                if check.id == "OBS-03" else {"guard-log-integrity-capture/2"})
+                                if check.id == "OBS-03" else {"guard-log-integrity-capture/2", NATIVE_SCHEMA})
             if sample.get("schema") not in expected_schemas:
                 row["status"] = "LEGACY_UNVERIFIABLE"
                 limitations.append(f"{check.id}/{evd.side.value}: legacy capture retained; new pipe/nofollow/correlation guarantees cannot be reconstructed")
@@ -349,6 +370,11 @@ def _analyze_saved_logs(store: Path, report_id: str | None = None) -> dict:
                     limitations.append("OBS-03: historical JSON parser retained; duplicate-key/non-finite rejection is not retroactively claimed")
             else:
                 obs, complete = _obs09(store, evd, sample, values)
+                if sample.get("schema") == NATIVE_SCHEMA:
+                    row["replay_basis"] = "stored_native_predicate_transcript"
+                    row["raw_source_replayed"] = False
+                    row["original_native_parser_replayed"] = False
+                    limitations.append("OBS-09: only the stored native predicate transcript was parsed again. Original native line boundaries, excluded-event eligibility and source parser gaps are retained predicates, not re-parsed original text or authenticated source facts.")
             # run_plan persists only the CheckDef projection. Auxiliary analysis
             # diagnostics are checked against sample.analysis inside _obs03,
             # while every required reconstructed/stored observation is mandatory.

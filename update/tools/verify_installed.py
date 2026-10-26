@@ -329,9 +329,22 @@ def verify_analysis_modules(root: Path, store: Path, report: Path) -> dict:
     assert log_evidence.main(["--store", str(projected_store), "--report", projected_report,
                               "--output", str(root / "projected-log-analysis")]) == 0
     assert inventory_tree(projected_store) == projected_before
+    for projection in (False, True):
+        native_store, native_report = fixture.build_native(root / ("native-projection" if projection else "native-legacy"),
+            root / "fixture-pack", projection=projection)
+        native_before = inventory_tree(native_store)
+        native = log_evidence.analyze_saved_logs(native_store, native_report)
+        assert native["accepted"] and native["official"] is False, native
+        row = native["checks"][0]
+        assert row["status"] == ("PROJECTION_REPLAY_MATCH" if projection else "REPLAY_MATCH")
+        if projection:
+            assert row["raw_source_replayed"] is False and row["original_native_parser_replayed"] is False
+        assert log_evidence.main(["--store", str(native_store), "--report", native_report,
+            "--output", str(root / ("native-projection-analysis" if projection else "native-legacy-analysis"))]) == 0
+        assert inventory_tree(native_store) == native_before
     return {"update_read_only": True, "audit_never_claims_two_image_trial": True,
             "log_read_only": True, "missing_log_evidence_never_accepted": True,
-            "example_log_replay": True, "log_tampering_rejected": True, "example_log_projection_replay": True}
+            "example_log_replay": True, "log_tampering_rejected": True, "example_log_projection_replay": True, "example_native_legacy_and_projection_replay": True}
 
 
 def supervisor(args) -> None:

@@ -6,6 +6,13 @@
 #   systemctl --user daemon-reload && systemctl --user enable --now byul-observation-feed
 #   sudo loginctl enable-linger ubuntu     # keep it running after SSH logout
 #
+# The service must run with group 10010 in its group list. After
+# `usermod -aG serving-observe ubuntu`, restart the user manager so it picks up
+# the new group (an open SSH/tmux session or linger keeps the old list):
+#   sudo systemctl restart user@$(id -u ubuntu)
+#   systemd-run --user --wait --pipe id -G   # run inside the user manager; 10010 must appear
+# Without it the collector exits 2 with a clear message (no restart loop).
+#
 # Assumes the byul repository at ~/byul (stdlib only, no venv needed), the
 # bundle's kubectl/cilium/hubble in PATH, and /srv/serving/observation owned by
 # ubuntu with group 10010 (README.md). Tetragon process arguments are removed
@@ -21,6 +28,8 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin
 ExecStart=/usr/bin/python3 -B tools/k8s_observation_feed.py --kube-context byul-aws-lab --output-dir /srv/serving/observation --reader-group 10010
 Restart=on-failure
 RestartSec=15
+# Exit 2 = configuration error (for example not a member of group 10010).
+RestartPreventExitStatus=2
 
 [Install]
 WantedBy=default.target

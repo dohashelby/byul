@@ -37,7 +37,9 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
    sudo install -d -o 10000 -g 10000 -m 0700 /srv/serving/runtime/data
    sudo install -d -o root -g 10000 -m 0750 /srv/serving/bundles
    ```
-   `/srv/serving/runtime`이 없으면 먼저 만든다. 정책 묶음은 platform이 `/srv/serving/bundles/<bundle_id>/`에 쓰고 `current`가 그 폴더를 가리키게 한다(`runtime/docs/결정기록_정책묶음_수신.md`). 묶음의 gateway policy는 `allowed_models`에 `test-model`을, `enforcement_intent` 역할에 `intent.aws-lab.json`(값을 채운 것)을 넣는다.
+   `/srv/serving/runtime`이 없으면 먼저 만든다. `usermod` 뒤에는 이미 떠 있는 systemd 사용자 매니저가 예전 그룹 목록을 유지하므로(다른 SSH·tmux 세션이나 linger가 있으면 재로그인만으로 부족) `sudo systemctl restart user@$(id -u ubuntu)` 후 `systemd-run --user --wait --pipe id -G`에 10010이 보이는지 확인한다. 그룹이 없으면 수집기는 명확한 오류와 함께 종료 코드 2로 멈춘다(재시작 반복 없음).
+
+   정책 묶음은 platform이 `/srv/serving/bundles/<bundle_id>/`에 쓰고 `current`가 그 폴더를 가리키게 한다(`runtime/docs/결정기록_정책묶음_수신.md`). Gateway 컨테이너에는 이 폴더가 `/etc/serving/bundles`로 보이므로 **`current`는 상대 링크**(`ln -sfn <bundle_id> current`)여야 한다. 절대 링크(`/srv/serving/bundles/<id>`)는 컨테이너 안에서 풀리지 않아 Gateway가 시작하지 않는다. 묶음 폴더와 파일은 Gateway(UID 10000)가 읽을 수 있어야 한다(예: 그룹 10000, 폴더 0750·파일 0640). 묶음의 gateway policy는 `allowed_models`에 `test-model`을, `enforcement_intent` 역할에 `intent.aws-lab.json`(값을 채운 것)을 넣는다.
 2. **수집기 실행** — byul 저장소를 `~/byul`에 두고 `host/byul-observation-feed.service`의 주석대로 설치한다. `--kube-context byul-aws-lab --reader-group 10010`으로 돌며, Tetragon 프로세스 인자를 지운 뒤 기록한다. 상태는 `/srv/serving/observation/*.heartbeat.json`.
 3. **Gateway 이미지 넣기** — 레지스트리가 없으므로 노드의 containerd에 직접 넣는다.
    ```bash
@@ -47,23 +49,24 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
    docker save serving-gateway:<tag> | ssh ubuntu@<host> 'sudo ctr -n k8s.io images import -'
    ```
    매니페스트는 `serving-gateway:<tag>` + `imagePullPolicy: Never`로 참조한다(레지스트리 digest가 없어 tag 참조). 대신 배포 뒤 `kubectl get pod -o jsonpath='{..imageID}'`가 위 image ID와 같은지 증거로 남긴다. `REPLACE_GATEWAY_TAG`를 `<tag>`로 바꾼다.
-4. **인증 Secret** — `kubectl -n serving-lab create secret generic serving-gateway-auth --from-file=auth.json`(토큰 해시만 든 `runtime-auth/1.0`).
+4. **인증 Secret** — `kubectl --context byul-aws-lab -n serving-lab create secret generic serving-gateway-auth --from-file=auth.json`(토큰 해시만 든 `runtime-auth/1.0`).
 5. **적용**
    ```bash
    kubectl --context byul-aws-lab apply -k deploy/gpu-lab
    kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine \
      --type strategic --patch-file deploy/gpu-lab/engine-management-sidecar.patch.yaml
    ```
-   AWS 묶음의 03을 다시 돌리면 엔진 Deployment가 원래대로 돌아가 사이드카가 빠진다. 그때 patch를 다시 적용한다.
+   patch는 엔진 Pod를 다시 만든다(Recreate: GPU 반납 후 재기동·cold start). 시험 시간 계획에 넣는다.
+   AWS 묶음의 03은 client-side `kubectl apply`를 쓰고 `kubectl patch`는 last-applied 기록을 바꾸지 않으므로, 03을 다시 돌려도 **사이드카가 남을 것으로 본다**(클러스터 미검증). 그러면 03의 smoke 증거에 runtime 사이드카가 섞이므로, 03을 다시 돌리기 전에 patch 파일 주석의 명령으로 사이드카를 떼고 03이 끝나면 다시 붙인다. 근본 해결은 템플릿 반영(아래 표).
 6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. 수집 결과 확인은 `tools/k8s_lab_check.py --kube-context byul-aws-lab --allow-non-kind-context`(생성·삭제를 하므로 명시 필요).
-7. 접속: SSH 터널 + `kubectl port-forward deploy/serving-gateway 8080`.
+7. 접속: 서버에서 `kubectl --context byul-aws-lab -n serving-lab port-forward deploy/serving-gateway 8080`, 노트북에서 SSH 터널(`ssh -L 18081:127.0.0.1:8080 ubuntu@<host>`). 노트북의 개발 서버(`byul-dev`)가 8080을 쓰므로 로컬 포트는 다른 번호(예: 18081)를 쓴다.
 
 ## AWS 묶음과 맞춰야 할 것 (환경 담당에게 요청)
 
 | 항목 | 지금 | 요청 | 이유 |
 | --- | --- | --- | --- |
 | 엔진 캐시 마운트 | 세대 폴더를 컨테이너 `/cache`에 붙임 | 같은 폴더를 `/var/cache/serving/vllm/<image digest hex>/<model revision>/<profile>-profile-01`에 붙이고 캐시 환경변수(`VLLM_CACHE_ROOT` 등)를 그 아래로 | intent의 cache 규칙(TG-CACHE-01, 계획서 §4.9)은 `/var/cache/serving/<engine>/<image>/<revision>/<profile>` 구조를 전제한다. 지금 구조로는 Tetragon 캐시 사건이 잡히지 않는다. 엔진이 다른 세대를 볼 수 없는 지금의 격리는 그대로 유지된다 |
-| 관리 수신부 | 03이 엔진을 다시 적용하면 사라짐 | `engine.yaml.template`에 사이드카 컨테이너 추가 | patch를 매번 다시 적용하지 않도록 |
+| 관리 수신부 | patch로 붙임. 03 재적용 때 남아 smoke 증거에 섞일 수 있음 | `engine.yaml.template`에 사이드카 컨테이너 추가 | 떼고 붙이는 절차 없이 환경 증거와 runtime 구성을 일치시키려고 |
 | 엔진 접근 정책 | observer 8001 경로 없음 | `network-policies.yaml`의 정책을 함께 적용 | 관측 조회 경로 |
 
 ## intent에서 서버 확인 후 채울 값

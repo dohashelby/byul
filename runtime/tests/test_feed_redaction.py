@@ -126,6 +126,19 @@ class ReaderGroupSharingTests(unittest.TestCase):
         feed._write_json_atomic(heartbeat, {"state": "reconnecting"})
         self.assertEqual(self.mode(heartbeat), 0o640)
 
+    def test_group_not_held_fails_clearly_with_exit_2(self) -> None:
+        held = {os.getegid(), *os.getgroups()}
+        missing = next(gid for gid in range(60000, 65000) if gid not in held)
+        with self.assertRaises(feed.ReaderGroupError):
+            feed.check_reader_group(missing)
+        feed.check_reader_group(os.getgid())  # a held group is accepted
+        feed.check_reader_group(None)
+        code = feed.main(
+            ["--output-dir", str(self.directory / "out"), "--reader-group", str(missing)]
+        )
+        self.assertEqual(code, 2)
+        self.assertFalse((self.directory / "out").exists())
+
     def test_cli_accepts_reader_group(self) -> None:
         args = feed.build_parser().parse_args(
             ["--output-dir", str(self.directory), "--reader-group", "10010", "--kube-context", "byul-aws-lab"]

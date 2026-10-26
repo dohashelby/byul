@@ -5,10 +5,17 @@
 #   kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine \
 #     --type strategic --patch-file deploy/gpu-lab/engine-management-sidecar.patch.yaml
 #
-# Replace REPLACE_GATEWAY_TAG first (same image as the Gateway). The bundle's
-# 03-engine-smoke.sh re-applies its engine.yaml and drops this patch; apply it
-# again after each 03 run, or ask the environment owner to add the container to
-# engine.yaml.template (README.md).
+# Replace REPLACE_GATEWAY_TAG first (same image as the Gateway). The patch
+# changes the Pod template, so the Recreate strategy restarts the engine (GPU
+# released and loaded again, cold start).
+#
+# The bundle's 03-engine-smoke.sh uses client-side `kubectl apply`. `kubectl
+# patch` does not update last-applied-configuration, so a later 03 apply is
+# expected to KEEP this sidecar (unverified on a cluster) and 03 evidence would
+# then include it. Remove the sidecar before re-running 03 and re-apply after:
+#   kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine --type strategic \
+#     -p '{"spec":{"template":{"spec":{"containers":[{"name":"management-listener","$patch":"delete"}]}}}}'
+# The lasting fix is to add the container to engine.yaml.template (README.md).
 #
 # The sidecar requests no GPU. It runs under the Pod's RuntimeClass nvidia, but
 # the device plugin injects GPU devices only into the container that requests

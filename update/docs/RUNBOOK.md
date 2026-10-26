@@ -1,5 +1,24 @@
 # 실행·실증 안내
 
+## PLT-08 명시 소유 API 시험 구간의 평문 성공
+
+`api_transport:real`은 기존 `guard select/run/judge/report`에서 사용한다.
+[설정 예제](../examples/api-transport.toml)와 기존 소유 target, 명시 POL을 제공한다.
+`guard policy template`의 PLT-08 필수9개 값은 비어 있으며 관측에서 자동 채우지 않는다.
+`api_hop_scope`는 `guard_probe_to_owned_direct_api`만 지원하고 CID·network/endpoint ID·IP·port,
+`plaintext_forbidden` 및 aware ISO 유효 시작/끝을 실제 수집과 대조한다. 불일치는 HTTP 전 거부한다.
+
+같은 제품 실행에서 기존 LIF-04의 bounded 정상/slow/병행/후속 요청을 수집한다.
+HTTP-only 수집기, 고정 소유 bridge 종단의 전후 안정성, source guard·시간창과 완전 정상
+응답이 결합된 명시 금지 평문 성공만 보안 FAIL이다. URL scheme이나 임의 수집 JSON을
+import해 판정하는 경로는 없다. 부가 자원·후속 스트림 수집 누락과 cleanup 실패는 이미
+확인한 초기 API 위반을 지우지 않는다. 필요한 종단·시간창 결합 자체가 없으면 UNKNOWN이다.
+
+출처는 기존 수집의 DECLARED 상한·EXAMPLE을 유지한다. 평문 허용·거부·timeout·미수집을
+전체 PASS로 해석하지 않는다. 시험 caller의 직접 구간이며 배포 호출 앱/Gateway 경로,
+암호학적 peer 확인·TLS 종료/재암호화·인증서·IPC/TP·무결성 변조와 전체 PASS는 미검증이다.
+실제 엔진·daemon 기동·이미지 pull·모델 다운로드를 이 실행기가 수행하지 않는다.
+
 ## 첨부 읽기·저장 실패와 부분 증거
 
 실행기가 유효한 draft를 반환한 뒤 첨부 파일 읽기·Store 저장이 실패하면, EVD는

@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 28,
-    "sha256": "c91ece16612e3358ff99605797cf2e6dd8270ea0d546c244fc06f59196d1d22d"
+    "revision": 29,
+    "sha256": "519f1ed966a706af5e4226bb85a3eb197ee6baa5df6ac61307819a7b94d28659"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -317,6 +317,78 @@
       "consumer": "src/guard/executors/boundary_egress.py",
       "verification": "구현·오프라인 검증 대상; 실제 엔진·기업 정책값 미확정",
       "catalog_id": "P-PLT07-VALIDITY-START"
+    },
+    "values.PLT-08.api_container_id": {
+      "type": "str",
+      "description": "정책 적용 API 종단의 정확한 소유 Docker CID. 실행 전후 실제 신원과 대조하며 관측에서 보충하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/api_transport.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-PLT08-API-CONTAINER-ID"
+    },
+    "values.PLT-08.api_endpoint_id": {
+      "type": "str",
+      "description": "선정 API의 bridge endpoint ID. CID·IP와 함께 소유 종단을 고정한다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/api_transport.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-PLT08-API-ENDPOINT-ID"
+    },
+    "values.PLT-08.api_hop_scope": {
+      "type": "str",
+      "description": "명시 선정한 구간. 이 프로파일은 guard_probe_to_owned_direct_api만 지원하며 배포 호출 앱/Gateway 경로로 해석하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/api_transport.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-PLT08-API-HOP-SCOPE"
+    },
+    "values.PLT-08.api_ip": {
+      "type": "str",
+      "description": "선정 API hop의 숫자 IP. 실제 소유 endpoint와 일치해야 하며 주소만으로 인증·보호를 추정하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/api_transport.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-PLT08-API-IP"
+    },
+    "values.PLT-08.api_network_id": {
+      "type": "str",
+      "description": "선정 소유 bridge network의 정확한 ID. 공개망·DNS·다른 구간으로 대체하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/api_transport.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-PLT08-API-NETWORK-ID"
+    },
+    "values.PLT-08.api_port": {
+      "type": "int",
+      "description": "선정 API hop의 명시 포트. 실제 수집 요청과 대조하며 기업값을 기본 제공하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/api_transport.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-PLT08-API-PORT"
+    },
+    "values.PLT-08.plaintext_forbidden": {
+      "type": "bool",
+      "description": "선정 direct API hop의 명시 평문 금지 여부. false를 전체 준수 PASS로 해석하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/api_transport.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-PLT08-PLAINTEXT-FORBIDDEN"
+    },
+    "values.PLT-08.validity_end": {
+      "type": "str",
+      "description": "선정 구간 보호 정책의 aware ISO 유효 끝. 만료·누락을 유예하거나 다른 구간으로 보충하지 않는다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/api_transport.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-PLT08-VALIDITY-END"
+    },
+    "values.PLT-08.validity_start": {
+      "type": "str",
+      "description": "선정 구간 보호 정책의 aware ISO 유효 시작. parent와 source 수집 구간을 대조한다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/api_transport.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-PLT08-VALIDITY-START"
     },
     "values.REQ-01.allowed_callers": {
       "type": "list[str]",

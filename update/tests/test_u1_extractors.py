@@ -263,7 +263,7 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
                   "OBS-03": 2, "OBS-04": 2, "OBS-05": 2, "OBS-07": 2, "OBS-08": 2,
                   "OBS-09": 2, "OBS-11": 2})
     pack = load_pack(ROOT / "packs/PACK-BASELINE")
-    assert pack.manifest.revision == 28
+    assert pack.manifest.revision == 29
     assert set(pack.checks) == set(prior) and len(prior) == 77
     expected = {cid: revision + 1 for cid, revision in prior.items()}
     expected["SUP-04"] += 1  # Only the new running-image profile changes after source refresh.
@@ -271,6 +271,7 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
     expected["SUP-03"] += 1  # Observation-only template profile, not independent consumer proof.
     expected["PLT-01"] += 1  # Complete permission collection gates PASS, preserving violation rules.
     expected["PLT-07"] += 1  # Only the explicit forbidden egress profile changes after PACK27.
+    expected["PLT-08"] += 1  # Explicit owned API plaintext profile after PACK28.
     assert {cid: check.revision for cid, check in pack.checks.items()} == expected
     frozen = json.loads((ROOT / "tests/fixtures/pack23-check-hashes.json").read_text(encoding="utf-8"))
     previous = json.loads((ROOT / "tests/fixtures/pack24-check-hashes.json").read_text(encoding="utf-8"))
@@ -299,10 +300,13 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
     for cid, digest in pack26.items():
         if cid != "PLT-01":
             assert pack27[cid] == digest
-    # PACK27 -> current changes only PLT-07; old snapshots receive no new contract.
+    # Preserve PACK27 -> PACK28 against immutable snapshots, then compare the new stage.
+    pack28 = json.loads((ROOT / "tests/fixtures/pack28-check-hashes.json").read_text(encoding="utf-8"))
+    assert len(pack28) == 77
+    assert {cid for cid, digest in pack27.items() if pack28[cid] != digest} == {"PLT-07"}
     current = {cid: sha256((ROOT / "packs/PACK-BASELINE/checks" / f"{cid}.yaml").read_bytes()).hexdigest()
-               for cid in pack27}
-    assert {cid for cid, digest in pack27.items() if current[cid] != digest} == {"PLT-07"}
+               for cid in pack28}
+    assert {cid for cid, digest in pack28.items() if current[cid] != digest} == {"PLT-08"}
     assert pack.checks["SUP-04"].collection_profile == "running-image-approval-v1"
     assert {check.framework_id for check in pack.checks.values()} == {
         "CHK-" + cid.split("-")[0] + "-" + cid.split("-")[1].zfill(3) for cid in prior}

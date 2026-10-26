@@ -51,6 +51,64 @@ def _ok(args, env):
     return res.output
 
 
+def _api_transport_cli(docker, run_id, network, pinned, run_dir, env):
+    """Actual existing owned Python stub → PLT-08 CLI, always EXAMPLE."""
+    name = docker.name("api-transport-source")
+    source = ROOT / "lab/stub_engine/server.py"
+    docker._docker(["run", "-d", "--name", name, "--label", docker.label,
+        "--network", network, "--cgroupns=private", "--pull=never",
+        "--mount", f"type=bind,src={source},dst=/api/server.py,readonly",
+        pinned, "python", "-u", "/api/server.py"], timeout=30)
+    lab._wait(lambda: "lab-stub listening" in docker.logs(name, timeout=5), "owned API transport source")
+    raw = docker.inspect_json(name, timeout=5)
+    endpoint = raw["NetworkSettings"]["Networks"][network]
+    directory = run_dir / "api-transport"
+    directory.mkdir()
+    target = {"lab": True, "run_id": run_id, "probe_image": pinned,
+        "engine": {"container": name, "image_digest": pinned, "trusted_url": f"http://{endpoint['IPAddress']}:8000"},
+        "origins": {"trusted": {"network": network}}}
+    target_path = directory / "target.json"
+    target_path.write_text(json.dumps(target), encoding="utf-8")
+    pack = baseline_pack()
+    inputs = environment(engine={"name": "EXAMPLE-python-api", "image_digest": pinned}, model={"id": "lab-stub"})
+    now = datetime.now(timezone.utc)
+    pol = policy(pack.ref(), scope={"include": ["PLT-08"]}, values={"PLT-08": {
+        "api_hop_scope": "guard_probe_to_owned_direct_api", "api_container_id": raw["Id"],
+        "api_network_id": endpoint["NetworkID"], "api_endpoint_id": endpoint["EndpointID"],
+        "api_ip": endpoint["IPAddress"], "api_port": 8000, "plaintext_forbidden": True,
+        "validity_start": (now - timedelta(seconds=10)).isoformat(),
+        "validity_end": (now + timedelta(seconds=120)).isoformat()}})
+    ep, pp = directory / "env.yaml", directory / "policy.yaml"
+    ep.write_text(yaml.safe_dump(inputs.to_dict()), encoding="utf-8")
+    pp.write_text(yaml.safe_dump(pol.to_dict()), encoding="utf-8")
+    store_path, cfg = directory / ".guard", directory / "guard.toml"
+    cfg.write_text(f'store = "{store_path.as_posix()}"\n[executors]\napi_transport = "real"\n'
+        f'[api_transport]\ntarget = "{target_path.as_posix()}"\n[api_transport.settings]\n'
+        'schema = "guard-stream-pressure-settings/1"\nmax_duration_seconds = 30\n'
+        'request_timeout_seconds = 3\nmax_resource_samples = 3\nresource_interval_ms = 10\n'
+        'post_close_wait_ms = 0\n', encoding="utf-8")
+    common = ["--config", str(cfg), "--pack", str(ROOT / "packs/PACK-BASELINE")]
+    plan = _ok(["select", "--env", str(ep), "--policy", str(pp), *common], env).strip().splitlines()[-1]
+    _ok(["run", "--plan", plan, *common], env)
+    _ok(["judge", "--plan", plan, *common], env)
+    report = directory / "report.json"
+    _ok(["report", "--plan", plan, "--json", str(report), *common], env)
+    data = json.loads(report.read_text(encoding="utf-8"))
+    row, = [r for r in data["by_check"] if r["check_id"] == "PLT-08"]
+    assert row["single"]["security"] == "FAIL"
+    assert row["single"]["functional"] == row["single"]["performance"] == "UNKNOWN"
+    assert row["single"]["verification_level"] == "EXAMPLE" and data["official"] is False
+    store = Store(store_path)
+    evd, = store.find_latest("EVD", lambda e: e.check_id == "PLT-08")
+    assert evd.execution.status.value == "COMPLETED" and evd.data_origin.value == "EXAMPLE"
+    assert evd.observations["forbidden_plaintext_successes"].value == ["owned_direct_api_plaintext"]
+    assert evd.observations["api_transport_scope_complete"].value is False
+    trial, = evd.observations["api_transport_trials"].value
+    assert trial["binding"]["container_id"] == raw["Id"] and trial["normal_response_verified"] is True
+    assert trial["transport"] == "plain_http" and trial["cryptographic_peer_identity_verified"] is False
+    assert store.verify() == []
+
+
 @pytest.mark.parametrize("topology, expected", [("exposed", "FAIL"), ("isolated", "PASS")])
 def test_lab_topology_end_to_end(tmp_path, topology, expected):
     if not _docker_ok():
@@ -194,6 +252,8 @@ def test_lab_topology_end_to_end(tmp_path, topology, expected):
         assert egress_trial["receiver_identity"]["net_namespace_inode"] != source_netns
         assert egress_trial["source_owner"]["container_id"] == source_cid
         assert egress_trial["receiver_owner"]["container_id"] == receiver_cid
+
+        _api_transport_cli(docker, run_id, trusted_network, pinned, run_dir, env)
 
         cfg = run_dir / "guard.toml"
         cfg.write_text(

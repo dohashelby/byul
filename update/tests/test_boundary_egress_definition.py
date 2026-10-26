@@ -68,7 +68,7 @@ def test_definition_registers_only_explicit_policy_and_three_observations():
     pack = baseline_pack()
     check = pack.checks["PLT-07"]
     override = yaml.safe_load((ROOT / "tools/overrides/PLT-07.yaml").read_text(encoding="utf-8"))
-    assert pack.manifest.revision == 28 and check.revision == 3
+    assert pack.manifest.revision == 29 and check.revision == 3
     assert check.executor == "boundary_egress"
     assert check.collection_profile == "explicit-forbidden-egress-v1"
     assert {p.key: p.type for p in check.policy_params} == POLICY_TYPES

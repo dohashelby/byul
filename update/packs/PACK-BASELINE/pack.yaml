@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 28
+revision: 29
 engines:
 - vllm
 checks:
@@ -154,7 +154,7 @@ files_sha256:
 - path: checks/PLT-07.yaml
   sha256: 767b65fd6cbf925707dce493a90bc26e392ba6d6ca3371e79f4007a17c50ea36
 - path: checks/PLT-08.yaml
-  sha256: 3ce4ef001d2aada0204c6943b4dfceb7b114470ea259059cdab99202caacb26b
+  sha256: ede353d9606e3be40ca7b08961d6512d936661d3aecb691a6b206377d6d64861
 - path: checks/PLT-09.yaml
   sha256: 2d282cefa8391f0d2d7fe6a2bd0a8f2dfe112b5bfd148d288c97459f74441c6f
 - path: checks/PLT-10.yaml

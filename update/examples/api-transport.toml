@@ -1,0 +1,11 @@
+# Explicit POL values and the existing owned target must be supplied by the operator.
+[executors]
+api_transport = "real"
+
+[api_transport]
+target = "target.json"
+
+[api_transport.settings]
+schema = "guard-stream-pressure-settings/1"
+max_duration_seconds = 60
+# Reuses bounded normal/slow/parallel/after collection; no engine startup or image pull.

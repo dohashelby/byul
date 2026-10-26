@@ -1,5 +1,13 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-26 PLT-08 — 명시 금지 평문 direct API 한 분기
+
+동일 제품 실행에서 기존 LIF-04의 소유 endpoint 고정·HTTP-only 정상 응답·source guard와
+전후 신원·시간창 수집을 재사용한다. 필수 primitive POL9개가 명시한 시험 direct hop에서
+금지 평문 정상 응답만 독립 보안 FAIL이다. 전체 PASS·배포 호출 앱/Gateway 경로·TLS·IPC/TP는
+미검증이며 출처는 DECLARED 상한/EXAMPLE이다. 기존 stream 측정·판정 코드는 바꾸지 않는다.
+자세한 실행과 제한은 [RUNBOOK](RUNBOOK.md)을 따른다.
+
 ## 2026-10-26 PLT-07 — 명시 금지 TCP 연결 성공만 판정 연결
 
 기존 소유 컨테이너·image ID/RepoDigest·bridge endpoint·bounded 파일 수집을 재사용한다.

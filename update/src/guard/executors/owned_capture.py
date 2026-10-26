@@ -8,10 +8,17 @@ import re
 import time
 from pathlib import PurePosixPath
 
+from guard.runtime.docker import DockerError as SourceCaptureError
 from .log_analysis import _FILE_READER
 
 
 MAX_BYTES = 65536
+
+
+def create_capture_client(run_id):
+    """런타임 의존성은 실행기 수집 경계에 둔다. 생성 자체는 Docker를 조회하지 않는다."""
+    from guard.runtime.docker import Docker
+    return Docker(run_id)
 
 
 def strict_json(raw, *, limit=MAX_BYTES):

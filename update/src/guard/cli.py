@@ -479,7 +479,7 @@ def capture_model_authorization(
 ) -> None:
     """REQ-05 고정 모델의 Gateway 기록을 수집한다. 최종 모델 생산자 미확인으로 판정은 UNKNOWN."""
     from guard.collectors.model_authorization import capture, load_inputs
-    from guard.runtime.docker import Docker, DockerError
+    from guard.executors.owned_capture import SourceCaptureError, create_capture_client
     source = {"container": gateway_container, "image": gateway_image, "path": gateway_path}
     try:
         environment, pol, ledger, topology = load_inputs(pack, env, policy, context, target, source)
@@ -492,11 +492,11 @@ def capture_model_authorization(
                 "ready_to_execute": False, "product_connected": False, "security": "UNKNOWN",
                 "pending": ["OWNED_CAPTURE_NOT_EXECUTED", "FINAL_ENGINE_MODEL_PRODUCER_UNAVAILABLE"]}))
             return
-        result = capture(Docker(topology["run_id"]), environment, pol, ledger, topology, source)
+        result = capture(create_capture_client(topology["run_id"]), environment, pol, ledger, topology, source)
         raw = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
         with output.open("x", encoding="utf-8", newline="\n") as stream:
             stream.write(raw)
-    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError, DockerError):
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError, SourceCaptureError):
         typer.echo("MODEL_AUTHORIZATION_CAPTURE_FAILED")
         raise typer.Exit(2)
     typer.echo(json.dumps({"capture_executed": True, "engine_started": False,

@@ -173,28 +173,44 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
         executor_info = ExecutorInfo(
             name=executor.name, version=executor.version, config_sha256=sha256_hex(canonical_json(draft.config))
         )
+        # Keep invalid executor output in the existing empty-ABORTED boundary.
+        # Validate before artifact I/O, without repairing or replacing the draft.
+        parts = _normalize(check, draft)
+        artifact_inputs = [(a.name, a.path, a.collector) for a in draft.artifacts]
+        EvidenceDraft.model_validate(draft.model_dump())
         artifacts = []
-        for a in draft.artifacts:
-            stored = store.put_artifact(Path(a.path).read_bytes())
-            artifacts.append(
-                Artifact(name=a.name, path=stored.path, sha256=stored.sha256, bytes=stored.bytes,
-                         collected_at=utcnow(), collector=a.collector)
-            )
+        artifact_failed = False
+        for name, path, collector in artifact_inputs:
+            try:
+                stored = store.put_artifact(Path(path).read_bytes())
+                artifact = Artifact(name=name, path=stored.path, sha256=stored.sha256, bytes=stored.bytes,
+                                    collected_at=utcnow(), collector=collector)
+            except Exception:  # File/store/metadata errors must not erase independent collected facts.
+                artifact_failed = True
+            else:
+                artifacts.append(artifact)
+        status, origin, abort_reason = draft.status, draft.data_origin, draft.abort_reason
+        if artifact_failed:
+            status = ExecStatus.ABORTED
+            origin = min(draft.data_origin, DataOrigin.DECLARED, key=lambda o: ORIGIN_STRENGTH[o])
+            # Never retain artifact exception text, filenames, paths or traces.
+            code = "ARTIFACT_PERSISTENCE_INCOMPLETE"
+            abort_reason = f"{abort_reason}; {code}" if abort_reason else code
         return Evidence(
             **common,
-            data_origin=draft.data_origin,
+            data_origin=origin,
             execution=Execution(
-                status=draft.status,
+                status=status,
                 executor=executor_info,
                 adapter=adapter_info,
                 started_at=draft.started_at or started,
                 finished_at=draft.finished_at,
-                abort_reason=draft.abort_reason,
+                abort_reason=abort_reason,
                 cleanup_errors=draft.cleanup_errors,
             ),
             artifacts=artifacts,
             comparability=draft.comparability,
-            **_normalize(check, draft),
+            **parts,
         ).seal()
     except Exception as exc:  # noqa: BLE001 - INV-15: 실패를 삼키지 않고 ABORTED 증거로 남긴다
         return stopped(ExecStatus.ABORTED, f"executor failure: {type(exc).__name__}: {exc}", info_stub)

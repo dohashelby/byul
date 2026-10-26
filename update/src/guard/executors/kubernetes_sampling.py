@@ -2,7 +2,7 @@
 from pathlib import Path
 import json
 
-from guard.models import DataOrigin, canonical_json, sha256_hex
+from guard.models import DataOrigin
 from guard.models.base import utcnow
 from guard.runtime.kubernetes_http import KubernetesHTTP, PROFILE
 from .http_common import Ctx
@@ -10,7 +10,7 @@ from .sampling_validation import SamplingValidationExecutor
 
 
 class KubernetesSamplingExecutor(SamplingValidationExecutor):
-    version = "0.1.1"
+    version = "0.2.1"
 
     def __init__(self, cfg, *, runner=None, environ=None):
         super().__init__(cfg, environ=environ)
@@ -57,8 +57,7 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
         for challenge in challenges:
             challenge["attempted"] = len(tested) == len(ctx.policy_values["allowed_sampling_options"])
         summary["request_dispatch_attempts"] = summary.pop("requests_sent")
-        control = summary["fixture"].pop("control")
-        summary["fixture"].update(control_sha256=sha256_hex(canonical_json(control)), transport_profile=PROFILE,
+        summary["fixture"].update(transport_profile=PROFILE,
                                   probe_source_sha256=report["probe_source_sha256"])
         summary["kubernetes"] = report
         summary["limitations"].append("Kubernetes transport changes no REQ-10 verdict meaning; security consumption remains UNKNOWN.")

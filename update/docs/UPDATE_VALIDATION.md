@@ -1,5 +1,12 @@
 # 두 이미지 CPU 업데이트 비교 수락 도구
 
+## 2026-10-27 REQ-10 저장 투영의 두 전송 경로
+
+REQ-10의 Docker 로그에 응답 preview가, fixture에 원문 control이 남던 경계를 hash/parse 상태/허용 상태·메서드/유한 시간 metadata로 제한한다. REQ-09의 기존 투영 함수를 공용 보조 모듈로 추출하고 입력 검증·원인 수집·관측·판정은 바꾸지 않는다. REQ-10은 잘못된 transport outcome을 기존 고정 수집 오류로 제한하며 앞서 수집한 정상·수용 관측을 지우지 않는다. 응답 본문은 기존 추론 구조 검사에 메모리로만 전달한다.
+
+Kubernetes의 기존 소유·세대·IP 결합과 control SHA를 보존하고 이미 hash였던 control을 다시 pop/hash하지 않는다. 새 실행기는 Docker0.2.0/Kubernetes0.2.1이며 저장 profile은 `sampling-response-projection/1`다. CheckDef·팩·POL·소비 미확인·보안 UNKNOWN·기존 저장 증거는 유지한다. 원래 요청/관측 계산의 정적 대조와 내용 비저장·수집 공백·두 전송·제품 CLI/저장·불변식·wheel/CI 회귀로 검증하며 실제 엔진/GPU 실증으로 집계하지 않는다.
+
+
 ## 2026-10-27 REQ-09 첨부의 원문 비저장
 
 `input_validation` 0.7.0(일반)·0.8.0(길이 원인 계측)은 기존 요청·정상 대조·원문 거부 검증·원인 계측을 메모리에서 유지한다. `input-response-evidence/1`의 판정 계산·CheckDef/POL·팩 revision은 바꾸지 않는다. 기존 저장 EVD와 첨부는 수정하거나 새 계약으로 소급하지 않는다.

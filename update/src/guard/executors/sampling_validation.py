@@ -13,11 +13,15 @@ import math
 import threading
 import time
 
+from guard.models import canonical_json, sha256_hex
 from .http_common import HttpCheckExecutor, functional_requests
+from .response_projection import capture_metadata, log_metadata
 
 
 SUPPORTED_OPTIONS = ("temperature", "top_p", "min_tokens")
 PROFILE = "sampling-api-v1"
+ARTIFACT_PROFILE = "sampling-response-projection/1"
+_TRANSPORT_OUTCOMES = {"refused", "timeout", "unreachable", "dns_error", "error", "probe_error", "probe_unavailable"}
 
 
 def _strings(value, label):
@@ -35,7 +39,7 @@ def _integer(value, label, minimum, maximum):
 
 class SamplingValidationExecutor(HttpCheckExecutor):
     name = "sampling_validation"
-    version = "0.1.0"
+    version = "0.2.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -91,6 +95,7 @@ class SamplingValidationExecutor(HttpCheckExecutor):
         boundaries = {"temperature": (0.0, -1.0), "top_p": (1.0, 0.0),
                       "min_tokens": (0, self.cfg["max_output_tokens"] + 1)}
         controls, outcomes, health, pairs, attempts = {}, {}, {}, {}, []
+        response_projections = []
         started = time.monotonic()
         deadline = started + self.cfg["max_duration_seconds"]
         sent = 0
@@ -109,13 +114,23 @@ class SamplingValidationExecutor(HttpCheckExecutor):
                 result = ctx.cprobe(ctx.trusted_net, [request], min(ctx.timeout, remaining))
                 if len(result) != 1 or not isinstance(result[0], dict) or result[0].get("id") != label:
                     return {"id": label, "outcome": "incomplete_probe_result", "dispatched": True}
+                outcome = result[0].get("outcome")
+                if not (type(outcome) is int and 100 <= outcome <= 599
+                        or type(outcome) is str and outcome in _TRANSPORT_OUTCOMES):
+                    return {"id": label, "outcome": "incomplete_probe_result", "dispatched": True}
                 return {**result[0], "dispatched": True}
             except Exception:
                 # Do not persist dependency exception text or credentials.
                 return {"id": label, "outcome": "probe_error", "dispatched": True}
 
         def record(label, response):
-            ctx.record("trusted", "sampling-validation", label, fp.as_role, response)
+            projected = log_metadata(response)
+            method = response.get("method")
+            if type(method) is str and method in {"GET", "POST"}:
+                projected["method"] = method
+            ctx.record("trusted", "sampling-validation", label, fp.as_role, projected)
+            response_projections.append({"case": label, "outcome": response.get("outcome"),
+                                         "capture": capture_metadata(response)})
 
         def inference(response):
             if response.get("outcome") != 200 or type(response.get("outcome")) is not int:
@@ -197,7 +212,9 @@ class SamplingValidationExecutor(HttpCheckExecutor):
                   "detail": "text completions with structured output before, concurrent with, and after bounded challenges; health alone is insufficient"}
         challenge_log = [{"step": step, "attempted": len(attempts) == len(options)} for step in ctx.check.challenge_steps]
         return obs, normal, challenge_log, {
-            "profile": PROFILE, "requests_sent": sent, "elapsed_seconds": time.monotonic() - started,
+            "profile": PROFILE, "artifact_profile": ARTIFACT_PROFILE,
+            "requests_sent": sent, "elapsed_seconds": time.monotonic() - started,
+            "response_projections": response_projections,
             "concurrent_pairs": pairs, "health": health,
             "limitations": ["Constraint source/version are DECLARED and not independently authenticated.",
                             "Only bounded API option filtering and text completion responses are observed.",
@@ -205,7 +222,7 @@ class SamplingValidationExecutor(HttpCheckExecutor):
                             "Two probes are dispatched concurrently; scheduler/worker execution overlap is not measured.",
                             "NaN/infinity, allowed-token/logit-bias/stop-count boundaries, other endpoints and formats are untested.",
                             "5xx, timeout, malformed replies and incomplete probes do not prove shared-engine damage."],
-            "fixture": {"profile": PROFILE, "control": template["body"], "options": options,
+            "fixture": {"profile": PROFILE, "control_sha256": sha256_hex(canonical_json(template["body"])), "options": options,
                         "boundaries": {o: {"valid": boundaries[o][0], "invalid": boundaries[o][1]} for o in options},
                         "constraint_source": self.cfg["constraint_source"], "constraint_origin": "DECLARED",
                         "constraint_engine_version": self.cfg["constraint_engine_version"],

@@ -1,6 +1,9 @@
 # Kubernetes 대표 연결: REQ-10 API 표본
 
-기존 `sampling_validation`의 정책·16개 요청(옵션3개일 때)·관측·rule_table 판정을 재사용하는 전송 구현이다. `[executors] sampling_validation = "kubernetes"`를 명시해야 선택된다. 기존 `real` Docker 구현·CheckDef·팩·판정 의미·스트림 시간 측정은 바꾸지 않는다. 새 점검의 자동화 완료로 집계하지 않는다.
+2026-10-27 저장 경계 보수: Docker 실행기0.2.0·Kubernetes0.2.1은 `sampling-response-projection/1`의 응답 hash·JSON parse 상태·허용 메타데이터와 고정 진단만 기록한다. REQ-09와 같은 투영 코드를 재사용하되 원문 응답/preview·token·예외·임의 transport outcome은 저장하지 않는다. control은 공통 수집 단계에서 hash로 바꾸며 기존 Kubernetes fixture의 control hash·전송 결합 필드는 유지한다. Docker의 과거 raw control 표현과 같은 fixture hash라고 주장하지 않는다. 잘못된 outcome 형식은 `incomplete_probe_result`이며 PASS/FAIL이나 엔진 손상 증명이 아니다. 실제 요청·정상/거부·세대 확인과 기존 보안 UNKNOWN은 유지한다.
+
+
+기존 `sampling_validation`의 정책·16개 요청(옵션3개일 때)·관측·rule_table 판정을 재사용하는 전송 구현이다. `[executors] sampling_validation = "kubernetes"`를 명시해야 선택된다. 기존 `real` Docker의 시험 절차·CheckDef·팩·판정 의미·스트림 시간 측정은 유지한다. 새 점검의 자동화 완료로 집계하지 않는다.
 
 제품 경로는 기존 `guard select → run → judge → report --json → verify`다. 기존 platform의 RPT 변환 경계를 유지한다. 이 묶음의 회귀는 EXAMPLE이며 실제 Kubernetes·GPU 실증과 구분한다. API 제약 거부와 정상 응답이 모두 확인돼도 runner 소비를 증명하지 않아 보안 UNKNOWN은 유지된다. 기능 PASS는 기존 표본 범위이며, 잘못된 옵션의 API 수용만으로 보안 FAIL을 만들지 않는다.
 

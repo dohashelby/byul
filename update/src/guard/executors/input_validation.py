@@ -1,25 +1,15 @@
 """REQ-09 bounded token-array checks using declared policy limits and a valid control."""
 from copy import deepcopy
-import math
 from guard.models import canonical_json, sha256_hex
 from guard.input_policy import contract_state, policy_context
 from .http_common import HttpCheckExecutor, functional_requests
 from .content_common import (append_artifact, bounded_probe, control_state, record_content,
                              sample_artifact)
-from .input_response_semantics import (contract_state as response_contract_state, rejection_proof,
-                                      response_capture_metadata)
+from .input_response_semantics import contract_state as response_contract_state, rejection_proof
+from .response_projection import capture_metadata as _capture_projection, log_metadata as _log_projection
 
 
 ARTIFACT_PROFILE = "input-response-projection/2"
-
-
-def _capture_projection(response):
-    try:
-        capture = response_capture_metadata(response)
-    except (TypeError, ValueError, UnicodeError, RecursionError):
-        capture = {"stored_body_is_verbatim": False, "original_json_state": "unavailable",
-                   "diagnostic": "INPUT_CAPTURE_METADATA_UNAVAILABLE"}
-    return {**capture, "stored_body_representation": "omitted_hash_and_parse_state_only"}
 
 
 def _sample_projection(sample):
@@ -27,14 +17,6 @@ def _sample_projection(sample):
     return {"case": sample["case"],
             "request_fixture_sha256": sha256_hex(canonical_json(sample["request"]["body"])),
             "outcome": response.get("outcome"), "capture": _capture_projection(response)}
-
-
-def _log_projection(response):
-    value = {"outcome": response.get("outcome"), "detail": "RAW_INPUT_RESPONSE_OMITTED"}
-    elapsed = response.get("elapsed_ms")
-    if type(elapsed) in (int, float) and 0 <= elapsed <= 86_400_000 and math.isfinite(elapsed):
-        value["elapsed_ms"] = elapsed
-    return value
 
 
 class InputValidationExecutor(HttpCheckExecutor):

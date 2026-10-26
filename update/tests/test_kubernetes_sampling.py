@@ -263,7 +263,7 @@ def test_product_cli_stores_exact_binding_judges_reports_and_verifies(tmp_path, 
     stored_result, = store.find_latest("RES", lambda r: True)
     assert row["single"]["result"] == stored_result.ref().model_dump(mode="json")
     evd, = store.find_latest("EVD", lambda e: True)
-    assert evd.data_origin == DataOrigin.EXAMPLE and evd.execution.executor.version == "0.1.1"
+    assert evd.data_origin == DataOrigin.EXAMPLE and evd.execution.executor.version == "0.2.1"
     assert store.verify() == []
 
 

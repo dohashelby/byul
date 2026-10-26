@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — REQ-10 두 전송의 첨부 저장 경계 보수
+
+- 한 일: 기준ec28f63의 REQ-09 투영을 재사용해 REQ-10 로그·control을 hash/허용 metadata로 제한하고 malformed outcome은 고정 수집 공백으로 남긴다. Docker0.2.0/Kubernetes0.2.1로 구별하며 기존 Kube control hash·요청·관측·판정·팩·스트림 시간 측정을 유지한다.
+- 테스트 결과: 830파일 고정 소스의 최초446통과/1실패/기존skip1/제외1(48.46초/부모49.210초) 후 새 hash 회귀의 Pydantic 필드 접근만 수정했다. 신규 EXAMPLE16개 포함 재검증241통과/실패0/기존skip1/제외1(12.09초/부모12.791초), 기존 Kube fixture hash 일치·wheel125파일 소스/격리설치 일치(부모8.627초), 시험 전후830파일 동일이다. REQ-09 class/투영·REQ-10 관측/추론 AST와 native probe/전송/judge 바이트를 대조했다. 원본은 저장소 밖 byul-sampling-artifact-privacy-20261027T004900+0900이며 실제 엔진/GPU 실증은0이다.
+- 다음 단계: 실패 수정·영향 재검증 후 후속 초안 PR과 그 head의 필수 CI5개를 확인한다.
+- 막힌 것: CPU 검증에는 없음. AWS8vCPU 승인·AMI/driver 호환성과 전체 비용 계획·실제 Kubernetes/GPU 실증은 미확인이다.
+
 ## 2026-10-27 — REQ-09 첨부 원문 저장 경계 보수
 
 - 한 일: 기준481e013의 원문 거부 검증·길이 원인 계측은 메모리에 유지하고 REQ-09 첨부·로그·fixture를 hash/허용 메타데이터/고정 진단으로 제한했다. 실행기0.7/0.8로 구별하며 판정·요청·팩·스트림 시간 측정·공용 계약·제품 의존성을 유지한다.

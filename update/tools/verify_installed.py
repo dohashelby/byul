@@ -91,8 +91,20 @@ def installed_worker(root: Path, wheel: Path) -> dict:
         for argv in (["--help"], ["select", "--help"], ["run", "--help"], ["update", "--help"],
                      ["prepare-update", "--help"], ["judge", "--help"], ["report", "--help"],
                      ["policy", "template", "--help"], ["evidence", "export", "--help"],
-                     ["evidence", "restore", "--help"]):
+                     ["evidence", "restore", "--help"], ["prepare-lifecycle-sensor", "--help"],
+                     ["capture-lifecycle-observations", "--help"]):
             cli(argv)
+        lifecycle_assets = root / "lifecycle-assets"
+        prepared = json.loads(cli(["prepare-lifecycle-sensor", "--output", str(lifecycle_assets)]))
+        assert prepared["prepared"] and prepared["engine_started"] is False and prepared["product_connected"] is False
+        from guard.collectors.lifecycle import load_prepared
+        lifecycle_manifest = load_prepared(lifecycle_assets / "manifest.json")
+        assert lifecycle_manifest["image_contents_verified"] is False
+        spec = importlib.util.spec_from_file_location("EXAMPLE_exported_lifecycle_sensor", lifecycle_assets / "guard_lifecycle_sensor.py")
+        exported = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(exported)
+        assert exported.install(path="/EXAMPLE-not-configured") is False
+        assert exported.PROFILE == lifecycle_manifest["profile"]
         pack_dir = root / "fixture-pack"
         pack = load_pack(pack_dir)
         inputs = root / "inputs"

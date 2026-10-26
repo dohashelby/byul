@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-10-27 · LIF-10은 원래 native 정리를 대신하지 않는 source/code 검증 metadata 센서와 소유 파일 수집을 먼저 연결하고 단일 기록의 출처를 EXAMPLE/DECLARED 상한으로 둔다. · API 종료·finished ID·pool 반납·worker row와 생산자 인증을 혼동하지 않으며 기업 기한·전체 회수 판정을 새로 만들지 않기 위함이다.
+
 - 2026-10-27 · OBS-09 새 첨부는 원문 native 파싱의 판정 표식 transcript와 별도 원문 지문만 저장하고 원문 파서 재실행 여부를 false로 명시한다. · 기존 판정·실제 요청·독립 FAIL·과거 HTML 재생을 보존하면서 원문 비저장과 재생 범위를 정확히 구분하기 위함이다.
 
 - 2026-10-27 · OBS-03은 원문/저장 투영을 같은 strict 분석기로 대조하고 capture4/0.3.0의 재생을 PROJECTION_REPLAY_MATCH로 구별한다. · 원문 비저장·기존 판정 입력·과거 재생을 함께 유지하고 hash만으로 원문 재생·출처 인증을 주장하지 않기 위함이다.

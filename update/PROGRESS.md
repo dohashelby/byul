@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — LIF-10 native metadata 생산자·소유 기록 수집
+
+- 한 일: 기준6b81ade의 LIF-04/owned capture를 대조한 뒤 source/loader code를 검증하는 독립 표준 라이브러리 센서와 자산 준비·소유 단일 프로세스 기록 수집 CLI를 구현했다. API/내부ID/Core/KV fence·pool/worker/ASGI를 구분하고 원래 반환·예외·취소·정리 동작과 기존 스트림 시간을 유지한다. 원문 비저장·정확 ENV/세션/asset/PID·namespace·행 chain 및 후속 실패의 안전한 기록 보존을 연결했다. 판정·팩·자동화 등록은 유지한다.
+- 테스트 결과: 소스 고정 뒤 Windows 기본4909통과/3실패/기존skip13/제외19(pytest448.13초·부모449.298초). ASGI send 반환값 덮어쓰기와 block index fixture를 수정하고 관련 수집·CLI·불변식428통과/0실패/기존skip6/제외1(48.39초·49.194초). wheel 소스/설치본130파일 일치(부모12.855초). assert·판정 완화/새skip/제외0. 상세 원본은 저장소 밖 byul-lifecycle-producer-20261027T064500+0900이다.
+- 다음 단계: 후속 초안 PR의 정확 head에서 Linux 기본 suite·wheel·공용/플랫폼 계약·Docker stub CI를 확인한다. 실제 대상의 loaded source·다중 프로세스/요청별 회수 연결은 별도 검증한다.
+- 막힌 것: CPU 구현에는 없음. 실제 GPU/Kubernetes는 quota8과 기동 직전 준비가 남고 기업 종료 기한·회수 대상·전체 LIF-10 판정은 미선정/미완료다. 실제 엔진 실증·자동화 등록 증가0이다.
+
 ## 2026-10-27 — OBS-09 원문 비저장·native 판정 표식 재생
 
 - 한 일: 기준4d8f3fe에서 native 파서/분석기·실제 body-ID 요청/정상 대조·원문 HTML 행 대응은 메모리에 유지하고, OBS-09 0.3.0/capture3의 첨부·로그만 고정 시험 표식/지문/허용 metadata로 저장한다. 원래 분석과 표식 재분석의 모든 판정 입력을 대조하며 원문 줄 경계/파서 누락은 수집 당시 predicate로 구분한다. 개별 첨부 저장 실패는 성공 참조·관측·독립 FAIL을 보존한다. 팩·판정·fixture·스트림 시간은 유지한다.

@@ -464,6 +464,55 @@ def verify(config: Path = ConfigOpt, store: Optional[Path] = StoreOpt) -> None:
     raise typer.Exit(1 if problems else 0)
 
 
+@app.command("prepare-lifecycle-sensor")
+def prepare_lifecycle_sensor(output: Path = typer.Option(..., "--output")) -> None:
+    """소유 대상용 native metadata 센서를 준비한다. 엔진·클라이언트를 만들지 않는다."""
+    from guard.collectors.lifecycle import prepare_assets
+    try:
+        value = prepare_assets(output, Path(__file__).resolve().parents[3])
+    except (OSError, ValueError, TypeError):
+        typer.echo("LIFECYCLE_PREPARATION_FAILED")
+        raise typer.Exit(2)
+    typer.echo(json.dumps({"prepared":True,"engine_started":False,"product_connected":False,
+                          "profile":value["profile"]}))
+
+
+@app.command("capture-lifecycle-observations")
+def capture_lifecycle_observations(
+    env: Path = typer.Option(..., "--env"),
+    target: Path = typer.Option(..., "--target"),
+    prepared: Path = typer.Option(..., "--prepared"),
+    container: str = typer.Option(..., "--container"),
+    image: str = typer.Option(..., "--image"),
+    path: str = typer.Option(..., "--path"),
+    output: Path = typer.Option(..., "--output"),
+    execute: bool = typer.Option(False, "--execute", help="소유 센서 파일과 프로세스 신원만 읽기"),
+) -> None:
+    """LIF-10 native metadata 수집. 요청 종결·전체 회수 판정은 UNKNOWN이다."""
+    from guard.collectors.lifecycle import load_inputs, validate_output, collect
+    from guard.executors.owned_capture import create_capture_client, SourceCaptureError
+    source = {"container":container,"image":image,"path":path}
+    try:
+        environment, topology, assets = load_inputs(env,target,source,prepared)
+        validate_output(output,Path(__file__).resolve().parents[3])
+        if not execute:
+            typer.echo(json.dumps({"capture_executed":False,"engine_started":False,
+                "product_connected":False,"security":"UNKNOWN"}))
+            return
+        value = collect(create_capture_client(topology["run_id"]),environment,topology,source,assets)
+        raw = json.dumps(value,ensure_ascii=False,indent=2)+"\n"
+        if len(raw.encode("utf-8")) > 4*1024**2:
+            raise ValueError("LIFECYCLE_ATTACHMENT_BOUND")
+        validate_output(output,Path(__file__).resolve().parents[3])
+        with output.open("x",encoding="utf-8",newline="\n") as stream:
+            stream.write(raw)
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError, SourceCaptureError):
+        typer.echo("LIFECYCLE_CAPTURE_FAILED")
+        raise typer.Exit(2)
+    typer.echo(json.dumps({"capture_executed":True,"engine_started":False,
+                          "product_connected":False,"security":"UNKNOWN"}))
+
+
 @app.command("capture-stream-pressure")
 def capture_stream_pressure(
     env: Path = typer.Option(..., "--env"),

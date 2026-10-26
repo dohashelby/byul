@@ -1,5 +1,54 @@
 # 실행·실증 안내
 
+## LIF-10 native metadata 센서 준비와 소유 기록 수집
+
+아직 CheckDef executor/judge는 미등록이며 종료 기한·회수 대상은 기업 결정이다.
+이 절은 실제 생산자/파일 수집의 준비 경계다. 단일 파일 일치·HTTP 취소·finished ID·
+batch row 제거를 전체 Core/worker/GPU 회수나 LIF-10 PASS로 해석하지 않는다.
+
+```powershell
+guard prepare-lifecycle-sensor --output C:\guard-data\lifecycle-assets-new
+```
+
+새 저장소 밖 폴더에 `guard_lifecycle_sensor.py`, `sitecustomize.py`, `settings.json`,
+`manifest.json`을 만든다. 기존 출력은 덮어쓰지 않는다. 준비는 엔진/클라이언트/컨테이너를
+만들지 않고 image 내용 검증 완료도 표시하지 않는다. 센서는 표준 라이브러리만 사용하며
+준비와 수집은 같은 bytes의 센서 배포본을 사용한다.
+고정 source 후보 commit과 실제 source/loader code가 맞는 module에만 hook을 넣는다.
+현재 actual 대상의 모든 Core/worker 파일과 GPU 동작 검증은 미완료다.
+
+실제 활성화는 별도로 승인·준비된 **소유 격리 대상**에서만 한다. 고정 자산을 읽기 전용
+`/guard-lifecycle`에 두고, 설정의 `/guard-lifecycle/data/<session>`만 해당 engine UID 소유
+0700의 새 쓰기 공간으로 제공한다. `PYTHONPATH=/guard-lifecycle`과
+`GUARD_LIFECYCLE_CONFIG=/guard-lifecycle/settings.json`, native `--middleware
+guard_lifecycle_sensor:Middleware`가 필요한 새 계측 기동 설정이다. 이 설정은 기존 causal
+프로파일/ENV/fixture와 구분한다. 예전 증거에 소급하거나 기존 요청/스트림 측정을 바꾸지 않는다.
+이 문서는 로컬 Docker/엔진 기동이나 새 image/model 취득 승인이 아니다.
+
+센서는 실제 함수의 반환/예외/취소를 유지하며 원문 body·token·비밀·동적 예외 내용을 쓰지 않는다.
+입력 Iterator를 선소비하지 않고 request/tensor/block 객체를 영구 보유하지 않는다.
+generator close, 강제 GC·CUDA synchronize·fence 진전·참조 삭제를 수행하지 않는다.
+metadata 읽기 구간과 host callback 시각을 기록하며 장치 clock이나 정확한 내부 종결 시각이라고
+표현하지 않는다. 각 파일은 512행/256 KiB 상한이며 초과는 `BOUND_REACHED`다.
+
+관측을 마칠 때 소유 대상에서 `python /guard-lifecycle/guard_lifecycle_sensor.py --seal`로
+해당 **센서 기록만** 닫을 수 있다. 작업·worker는 종료하지 않는다. 프로세스가 종료되거나
+제어/쓰기/상한 문제가 생긴 기록은 별도 이유나 미완성 행으로 구분한다. 그 뒤 실제 프로세스가
+살아 있는 동안 생성된 `pid-<pid>-<start_ticks>.jsonl`을 읽는다.
+
+`capture-lifecycle-observations`에는 정확한 `--env`, `--target`, `--prepared <manifest.json>`,
+`--container`, `--image <고정 digest>`, `--path`, 저장소 밖 새 `--output`이 필요하다.
+target의 `environment_ref`는 해당 ENV의 정확 Ref이고 `engine.container`와 `run_id`는 소유
+대상과 같아야 한다. 파일 경로도 prepared session 및 기록 PID/start와 정확히 일치해야 한다.
+기본 실행은 입력 검증만 하고 `--execute`에서만 파일·프로세스·image metadata를 읽는다.
+
+원시 파일의 bytes SHA와 행 chain, schema·자산·세션, nofollow/fstat·소유 신원 전후 확인,
+실제 image ID→RepoDigest와 PID/start/UID/namespace 대조를 구분한다. 후속 확인 실패나 마지막
+부분 행 때문에 앞서 읽은 안전한 metadata를 지우지 않는다. 원문 tail은 hash/길이만 남긴다.
+`process_context_verified`는 살아 있는 프로세스 문맥의 일치이며 생산자 인증이 아니다.
+단일 supplied file 수집은 전체 프로세스 목록·모든 요청·native 회수 완전성을 확정하지 않는다.
+출처는 EXAMPLE/DECLARED 상한이고 전체 `security`는 UNKNOWN이다.
+
 ## PLT-08 명시 소유 API 시험 구간의 평문 성공
 
 `api_transport:real`은 기존 `guard select/run/judge/report`에서 사용한다.

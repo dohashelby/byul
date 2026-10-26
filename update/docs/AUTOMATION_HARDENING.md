@@ -1,5 +1,30 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-27 LIF-10 — native metadata 생산자·소유 기록 수집, 판정 미등록
+
+`prepare-lifecycle-sensor`는 Python 3.12/Linux 소유 대상에 넣을 표준 라이브러리 센서와
+설정·bootstrap·bytes manifest를 만든다. source 후보는 공식 v0.31.0 commit
+`db9527a46873454610df6dbedf79a36d6bf1a7f6`이며 실제 image 내용 검증 완료를 뜻하지 않는다.
+센서는 고정 source SHA와 실제 loader code의 구조 지문을 대조한 module만 계측한다.
+외부/내부 ID 매핑, API abort, Core scheduler, KV 소유·지연 fence·pool 참조 수치,
+worker cached state/batch row, native host-copy 반환과 ASGI receive/send 반환을 구분한다.
+원래 함수의 반환/예외/취소와 입력 Iterator를 유지하고 generator 종료·CUDA 동기화·GC·
+fence 진전·참조 삭제를 대신하지 않는다. 원문 요청/응답/token/Secret/예외 이름·본문은 쓰지 않는다.
+
+기록은 프로세스별 PID/start·boot/PID/time namespace와 settings/asset SHA·행 해시 체인에 묶는다.
+클록은 host callback/metadata 관측 시각이며 CUDA 장치 시각·정확한 native 완료 시각이 아니다.
+metadata 읽기 구간을 별도로 남긴다. 새 파일은 256 KiB/512행 상한이며 기존 소유 파일 수집의
+기본 64 KiB는 유지한다. 기록 중단은 센서만 닫고 실제 작업을 종료하지 않는다.
+쓰기/상한/후속 프로세스 재확인 실패는 관측 공백이며 먼저 확보한 안전한 기록을 보존한다.
+
+`capture-lifecycle-observations`는 명시 `--execute`에서만 소유 파일·프로세스를 읽는다.
+정확 ENV Ref/세션/경로·자산 bytes·행 schema/sequence/chain·소유 container/image ID/RepoDigest·
+프로세스 시작/namespace를 대조한다. 단일 프로세스 파일 수집이며 전체 실행·모든 worker·GPU
+회수의 완전성을 확정하지 않는다. 동일 UID의 파일 생산자를 인증하지 않으므로 EXAMPLE 또는
+DECLARED 상한/UNKNOWN이며 CheckDef·judge·팩·자동화 등록은 바꾸지 않는다.
+실제 대상 계측과 기업 종료 기한·회수 대상·전체 수집/판정 연결은 미완료다.
+자세한 준비와 활성화 제한은 [RUNBOOK](RUNBOOK.md)의 LIF-10 절을 따른다.
+
 ## 2026-10-26 PLT-08 — 명시 금지 평문 direct API 한 분기
 
 동일 제품 실행에서 기존 LIF-04의 소유 endpoint 고정·HTTP-only 정상 응답·source guard와

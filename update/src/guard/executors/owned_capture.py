@@ -61,9 +61,11 @@ def validate_owned_source(*, container, image, path):
         raise ValueError("CAPTURE_PATH_INVALID")
 
 
-def _read_owned_file(docker, target, *, container, image, path, timeout=5):
+def _read_owned_file(docker, target, *, container, image, path, timeout=5, max_bytes=MAX_BYTES):
     """고정 source bytes·fstat·pipe 상한·전후 소유 신원을 확인하며 생산자를 인증하지 않는다."""
     validate_owned_source(container=container, image=image, path=path)
+    if type(max_bytes) is not int or not MAX_BYTES <= max_bytes <= 262144:
+        raise ValueError("CAPTURE_READ_BUDGET_INVALID")
     deadline = time.monotonic() + timeout
     def remaining():
         value = deadline - time.monotonic()
@@ -71,14 +73,14 @@ def _read_owned_file(docker, target, *, container, image, path, timeout=5):
             raise ValueError("CAPTURE_DEADLINE")
         return value
     before = identity(docker, target, container, image, remaining())
-    result = docker.exec_bounded(container, ["python3", "-c", _FILE_READER, path, str(MAX_BYTES)],
-                                 timeout=remaining(), max_bytes=128 * 1024)
+    result = docker.exec_bounded(container, ["python3", "-c", _FILE_READER, path, str(max_bytes)],
+                                 timeout=remaining(), max_bytes=2 * max_bytes)
     capture = result.capture or {}
     if (result.returncode != 0 or capture.get("complete") is not True
             or capture.get("bounded_at_source") is not True
             or capture.get("timed_out") is not False or capture.get("truncated") is not False):
         raise ValueError("CAPTURE_TRANSPORT_INCOMPLETE")
-    packet = strict_json(result.stdout.encode(), limit=128 * 1024)
+    packet = strict_json(result.stdout.encode(), limit=2 * max_bytes)
     if type(packet) is not dict:
         raise ValueError("CAPTURE_PACKET_INVALID")
     if (packet.get("schema") != "guard-container-file/2" or packet.get("source_complete") is not True
@@ -87,7 +89,7 @@ def _read_owned_file(docker, target, *, container, image, path, timeout=5):
         raise ValueError("CAPTURE_FILE_INCOMPLETE")
     raw = base64.b64decode(packet.get("raw_base64", ""), validate=True)
     if (type(packet.get("raw_retained_bytes")) is not int or packet["raw_retained_bytes"] != len(raw)
-            or not 0 < len(raw) <= MAX_BYTES
+            or not 0 < len(raw) <= max_bytes
             or packet.get("raw_retained_sha256") != hashlib.sha256(raw).hexdigest()):
         raise ValueError("CAPTURE_BYTES_MISMATCH")
     file_identity = packet.get("file_before")

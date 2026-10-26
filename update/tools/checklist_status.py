@@ -131,10 +131,16 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
         judge = (check.get("judge") or {}).get("plugin", "")
         real = bool(executor and f"{executor}:real" in executor_keys)
         judging = bool(judge and judge in judge_keys)
+        params = (check.get("judge") or {}).get("params", {})
+        observation_only = (real and judging and judge == "rule_table"
+                            and "pass_when_all" in params and "fail_when_any" in params
+                            and not params["pass_when_all"] and not params["fail_when_any"])
         policy_keys = [p["key"] for p in check.get("policy_params", [])]
         family = old["executor_kind"].split(" (")[0]
         history = evidence.get(check_id, [])
-        if real and judging:
+        if observation_only:
+            implementation = "OBSERVATION_ONLY_NO_SECURITY_RULES"
+        elif real and judging:
             implementation = "REAL_EXECUTOR_AND_JUDGE_CONNECTED"
         elif executor or judge:
             implementation = "PARTIALLY_CONNECTED"
@@ -166,7 +172,9 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
             "missing_case": check.get("unknown_criteria") or "필수 관측을 누락시키고 미수집·실패 전파를 확인",
             "unsupported_case": str((check.get("applies_when") or {}).get("prose", "")) + " / " + str(check.get("remaining_setup") or "지원 환경·정책 범위를 확인"),
             "reuse_candidate": REUSE.get(family, "기존 수집을 대조한 뒤 부족한 관측·새 시험 절차만 추가"),
-            "next_experiment": ("현행 정의의 정상·위반·미수집을 실제로 재확인: " if real else "지원 범위·필수 관측을 확정하고 실제 정상·위반·미수집 시험 구현: ") + check["question"],
+            "next_experiment": ("관측 전용: 실제 소비의 독립 근거와 보안 판정 계약을 먼저 확정: " if observation_only else
+                                "현행 정의의 정상·위반·미수집을 실제로 재확인: " if real else
+                                "지원 범위·필수 관측을 확정하고 실제 정상·위반·미수집 시험 구현: ") + check["question"],
             "prerequisites": "; ".join(v for v in (old.get("new_infra"), check.get("remaining_setup")) if v),
             "team_decisions": policy.get("enterprise_decisions") or policy.get("policy_to_decide") or "",
             "historical_verification": old.get("verification_status", ""),
@@ -202,18 +210,20 @@ def render_csv(rows: list[dict[str, str]]) -> str:
 
 
 def render_markdown(rows: list[dict[str, str]]) -> str:
-    real = sum(r["real_executor_registered"] == "true" and r["judge_registered"] == "true" for r in rows)
+    real = sum(r["implementation"] == "REAL_EXECUTOR_AND_JUDGE_CONNECTED" for r in rows)
+    observation_only = sum(r["implementation"] == "OBSERVATION_ONLY_NO_SECURITY_RULES" for r in rows)
     policy = sum(bool(r["policy_keys"]) for r in rows)
     paths = sum(len(r["policy_keys"].split("; ")) for r in rows if r["policy_keys"])
     groups = Counter(r["experiment_group"] for r in rows)
     lines = ["# 체크리스트 구현·실험 추적", "", "이 문서와 CSV는 `tools/checklist_status.py`의 생성물이다. 수정할 정본은 팩·registry·기존 자동화표·명시된 선별 실험 기록이다.", "",
-             f"현행 팩 revision {rows[0]['pack_revision'] if rows else '없음'}의 정의 {len(rows)}개, 정책 등록 {policy}점검/{paths}경로, 실제 실행·판정 연결 {real}개, 미연결 {len(rows)-real}개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.", "",
+             f"현행 팩 revision {rows[0]['pack_revision'] if rows else '없음'}의 정의 {len(rows)}개, 정책 등록 {policy}점검/{paths}경로, 실행·보안 판정 규칙 연결 {real}개, 관측 전용 {observation_only}개, 나머지 미연결 {len(rows)-real-observation_only}개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.", "",
              "- [분기별 전체 CSV](checklist_validation_status.csv): 현재 정의·필수 관측·정상/위반/미수집/지원 밖 계획·선행 조건·기업 결정·과거 EVD/RES를 연결한다.",
              "- 이번 구현 묶음은 사용자 지시에 따라 실제 vLLM 실증을 보류한다. `current_pack_actual_status=DEFERRED_NOT_MEASURED`이며, 과거 기록이나 단위 시험을 현행 팩의 새 실측으로 승격하지 않는다.",
              "- `historical_pack_revisions`와 EVD/RES는 구조화된 과거 CPU 선별 기록(팩17·18·19)에서만 읽는다. 팩21·22의 후속 두 이미지 결과는 원래 자동화표의 `historical_verification`·`remaining_scope`와 [실측 문서](UPDATE_VALIDATION.md)를 함께 따른다.",
              "- 이 선별 JSON은 독립 복원 가능한 원본 bundle 전체가 아니다. 추적된 EVD Ref만으로 현행 코드 재현·무결성 검증·기업 승인을 주장하지 않는다.",
              "- A/B/C는 과거 환경 가능성 분류다. Windows 지원 확정·현재 시험 완료·미지원의 비적용 판정으로 사용하지 않는다.",
              "- CSV의 모든 시험 계획은 아직 실행 결과가 아니다. 정상 기대값도 현행 계약의 증거 관문을 통과해야 하며, REQ-11은 출력 귀속 미검증 시 보안 UNKNOWN을 유지한다.", "",
+             "- 보안 PASS·FAIL 규칙이 모두 비어 있는 관측 전용 프로파일은 실행·판정 규칙 연결 수에서 제외한다. 파일 존재·설정·API 입력 대응은 독립 worker 소비 증명이 아니며, 이런 관측만으로 보안 PASS·FAIL을 확정하지 않는다.", "",
              "| 실험 묶음 | 점검 수 |", "|---|---:|"]
     lines.extend(f"| {group} | {count} |" for group, count in sorted(groups.items()))
     lines += ["", "우선순위는 기존 5개 현행 정의 재확인(P0), 다른 자동 연결의 관측 공백(P1), 로컬 가능성 재검토(P2), 추가 인프라(P3), 기업 환경(P4)이다. 어려운 계측 하나가 독립적인 신규 점검을 모두 막지는 않는다.", "",

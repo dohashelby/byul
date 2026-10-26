@@ -3,7 +3,7 @@
 ## 2026-10-26 통합 작업 기준
 
 - BYUL `main d119ebe`의 JSON 전용 보고서·플랫폼 표시 결정을 보존하고 GUA `8e23bd2`의 U1·Python 3.12를 선택 이관했다. 이관 후 검증 결과는 PROGRESS의 같은 날짜 항목을 따른다.
-- 현행 정의는 PACK-BASELINE 24/DRAFT·77점검·정책 23점검/51경로·real 연결 12점검이다. 실행기 종류는 기존 11종을 재사용하며 SUP-04는 실행 이미지 승인 부분관측이고 전체 공급물 PASS를 만들지 않는다. [77개 분기별 추적표](docs/CHECKLIST_VALIDATION_STATUS.md)는 코드·원천 자료에서 재생성한다. 연결 수는 전체 분기 검증 완료 수가 아니다.
+- 현행 정의는 PACK-BASELINE 25/DRAFT·77점검·정책 24점검/52경로다. 실행·보안 판정 규칙 연결 12점검과 SUP-03 관측 전용 1점검을 구분한다. 실행기 종류는 기존 11종을 재사용하며 SUP-04는 실행 이미지 승인 부분관측이고 SUP-03은 readonly template 신원·API 입력 대응만 수집한다. 전체 공급물 PASS나 독립 소비 검증 완료를 만들지 않는다. [77개 분기별 추적표](docs/CHECKLIST_VALIDATION_STATUS.md)는 코드·원천 자료에서 재생성한다. 연결 수는 전체 분기 검증 완료 수가 아니다.
 - UPDATE는 RPT JSON을 생성하며 `platform/api/src/byul_platform/sources/update.py`가 `verification-result/0.2`로 변환한다. `--html`과 자체 보고서 HTML은 복구하지 않는다. OBS 증거 첨부 HTML은 유지한다.
 - [공용 경계·입력 변환](docs/BYUL_INTEGRATION.md)과 `../contracts/README.md`를 따른다. 공용 스키마·생산자·표시 규칙 소유는 임의로 바꾸지 않는다.
 - U1의 내부 구현과 회귀 사례는 이관했지만 사람 정답 승인·독립 정확성 평가는 미완료다. `triggers`·`carried_over`·`previous_result`·`change_summary`의 공용 상세 표현은 공동 검토 대상이며 원본 RPT를 보존한다.

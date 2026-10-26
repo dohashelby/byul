@@ -1,5 +1,74 @@
 # 두 이미지 CPU 업데이트 비교 수락 도구
 
+## 2026-10-26 점검별 실험 입력 준비 도구 — 엔진 미실행
+
+`update/`에서 다음 명령으로 **새 저장소 외부 폴더**에 빈 정책과 사례 목록을 만든다.
+이 도구는 팩 파일과 정적 registry만 읽으며 Docker 확인·네트워크·Store·판정도 호출하지 않는다.
+`--execute`는 없고 기존 폴더는 거절한다. 출력은 EVD/RES/RPT나 실행 승인이 아니다.
+
+```powershell
+uv run python -m tools.prepare_checklist_cases --pack packs/PACK-BASELINE --output "<NEW-EXTERNAL-CASEBOOK>"
+# 일부만 준비할 때: --checks SUP-03 REQ-02
+```
+
+기본 출력은 현재 collector 연결 13개와 REQ-02 계약 전용 1개의 `case-plan.json` 및
+14개 `CHECK-ID/policy-template.yaml`이다. 정상/위반 입력/미수집/지원 밖과 중요 공백을
+나눈 85개 **미실행 사례**이며 완료 실험 수로 세지 않는다. 기업 허용값·ENV·설정·
+이미지·모델은 채우지 않는다. 정책은 DECLARED/DRAFT·빈 values·미승인이고 사례마다
+수정 사본·정책 결정·수집 범위·환경·설정·별도 실행 승인이 필요하다.
+
+REQ-02에는 실행 명령을 만들지 않으며 [합성 사슬 계약](AUTOMATION_HARDENING.md)을
+먼저 검증한다. SUP-03은 승인/비승인 모두 보안 UNKNOWN 관측 전용으로 유지한다.
+REQ-09 기본/opt-in·오류 객체, PLT-04 후보 생략/[]/부재/거부/읽기 가능/주체 불일치,
+REQ-10 내부 runner·REQ-11 출력 오라클·OBS-03 dump/사본 미수집을 별도 분기로 남긴다.
+기존 5개 두 이미지 수락 도구와 체크 목록은 바꾸지 않는다. 나머지 64개 구현·실험의
+우선순위는 [77개 추적표](CHECKLIST_VALIDATION_STATUS.md)를 따른다. 이번 사례집과
+EXAMPLE 분석 결과는 현행 팩 실제 엔진 검증을 대체하지 않는다.
+
+## 2026-10-26 현행 후속 실증 계획 — 미수행
+
+**사용자 지시로 실제 vLLM 기동·추론·두 이미지 시험은 보류한다.** 아래는 현재 CLI와 점검 정의를 읽고 작성한 준비 계획이며 명령도 실행하지 않았다. 과거 팩21·22의 성공/실패·EVD·보고서 bytes·HTML 경로는 아래 원문대로 보존한다. 현행 팩의 기준은 [77개 추적표](CHECKLIST_VALIDATION_STATUS.md)이고 과거 실측을 현재 팩의 실측으로 승격하지 않는다.
+
+최초 재개 묶음은 기존 REQ-01·REQ-03·PLT-01·PLT-04·REQ-09와 SUP-04의 분기별 독립 시험이다. SUP-03은 승인 입력·지원 프로파일·관측전용 collector·계약 검증이 갖춰진 경우에만 실증을 추가한다. 이번 readonly template bytes·API projection은 독립 worker 소비 센서가 아니므로 승인 일치·비승인 모두 보안 UNKNOWN이다. 새 독립 소비 센서 구현은 이번 범위 밖이며, 관측전용 연결을 자동 보안 판정 완료나 실제 소비 검증으로 표시하지 않는다.
+
+| 점검 | 정상 대조·위반 시험 계획 | 미수집·지원 밖에서 보존할 것 |
+|---|---|---|
+| REQ-01 | 같은 무해 요청을 허용 Gateway 경유와 비허용 직통에서 대조하고 등록/시험 경로·출발점·정상 추론을 연결 | 미시험 상태 변경 경로·HTTP 미송신과 TCP 차단 근거를 구분. 도달성/등록/정상 대조 부족은 UNKNOWN |
+| REQ-03 | 검토된 digest·경로의 안전 probe로 허용 관리자와 일반 호출자의 실제 수행/거부 대조 | 미검토 이미지·관리 경로·효과 미확인은 UNKNOWN. 시험 범위를 맞추기 위해 실제 역할 정책을 축소하지 않음 |
+| PLT-01 | 제한 권한과 전용 무해 sentinel을 쓰는 위반 구성의 유효 권한·mount·정상 요청 대조 | 프로세스 스캔·집행·sentinel 누락과 다른 호스트/GPU 범위를 분리. 소유하지 않은 경로나 파일을 사용하지 않음 |
+| PLT-04 | 명시적 마운트 금지와 별도로 무해한 비어 있지 않은 후보의 absent/denied/readable을 확인 | symlink·directory·누락·명시[]를 구분. 파일 본문·실제 자격 유효성/사용을 읽기 권한 관측으로 대신하지 않음 |
+| REQ-09 | 정책상 정상 입력과 현재 지원 token ID·길이·endpoint/형식 경계를 대조. 기본/off와 검토된 opt-in 원인 수집을 별도 case로 기록 | 2xx 오류 객체·400·timeout을 실제 소비나 피해로 바꾸지 않음. 프로파일/정체성/원인 근거 부족은 UNKNOWN |
+| SUP-04 | 같은 소유 엔진의 pinned RepoDigest 승인 일치/불일치를 각각 명시한 EXAMPLE 정책 사본으로 대조 | 승인 일치도 전체 공급물 보안 PASS 아님. tag-only·identity 불일치·수집 실패는 UNKNOWN, 이미 확인한 비승인 실행 FAIL은 후속 오류로 지우지 않음 |
+| SUP-03 관측전용·조건부 실증 | readonly template bytes·API projection을 승인 일치/불일치 사본으로 비교하되 두 경우 모두 보안 UNKNOWN. 독립 실제 소비 EVD가 있어야 후속 판정 계약 검토 가능 | 비승인 template mount·존재/해시/inventory만으로 FAIL을 만들지 않음. config/tokenizer·secondary/resolver/redirect·새 기동 challenge와 공급물 전체는 미검증 |
+
+### 입력·상태·자원 분리
+
+- baseline/candidate의 서로 다른 실제 repository@sha256, 엔진 버전·아키텍처·소스/검토 프로파일, 동일 모델 ID/revision/inventory를 먼저 확인한다. CPU/threads·커널·메모리·문맥·fixture·기동 조건을 고정하고 명시하지 않은 차이는 비교 가능하다고 추정하지 않는다. 성능은 미검증으로 둔다.
+- 정책은 승인 기업 원본과 EXAMPLE 실험 사본을 구분한다. 승인값을 ENV·관측에서 복사하지 않는다. side·case마다 정책/PLAN/EVD/출력 경로를 분리하고 정확한 Ref를 기록한다. baseline/candidate가 같은 POL을 공유할 수 있는 업데이트 비교와, 위반 정책을 다르게 준 개별 진단 시험을 합산하지 않는다.
+- 동일 이미지·모델·기동 조건의 관측은 상태 독립성·사례별 증거 분리가 확인될 때만 기동을 공유한다. 정상 요청·건강/identity 전후 상태와 실패·정리 여부를 기록하고 OOM·재시작·모델/기동 변경·독립성 불확실 시 새 인스턴스를 사용한다. SUP-04의 metadata 수집 전후 identity만으로 그 뒤 정상 추론 구간까지 입증했다고 쓰지 않는다.
+- 기존 컨테이너·kind·모델·과거 output을 건드리지 않는다. 소유 자원만 정리하고 재개 전 자원 여유·필요한 이미지/모델·상한·수집 권한을 확인한다. 값이 미정이면 해당 분기를 준비 대기로 남긴다.
+
+### 현재 CLI에 근거한 미실행 템플릿
+
+아래는 `update/`에서 입력과 신규 외부 경로를 확정한 뒤 사용할 형식이다. 지금 실행하거나 `<...>`를 예시 승인값으로 채우지 않는다. `prepare-*`도 읽기 전용 Docker 확인을 수행하므로 이번 계획 작성에서는 호출하지 않았다.
+
+```powershell
+uv run guard prepare-validation --pack packs/PACK-BASELINE --env "<ENV.yaml>" --policy "<CASE-POL.yaml>" --config "<CFG.toml>"
+uv run guard validate --pack packs/PACK-BASELINE --env "<ENV.yaml>" --policy "<CASE-POL.yaml>" --config "<CFG.toml>" --store "<NEW-CASE-STORE>" --output "<NEW-CASE-OUTPUT>"
+uv run guard prepare-update --pack packs/PACK-BASELINE --baseline "<BASELINE.yaml>" --candidate "<CANDIDATE.yaml>" --policy "<COMMON-POL.yaml>" --config "<CFG.toml>"
+uv run python -m guard.update_validation --pack packs/PACK-BASELINE --baseline "<BASELINE.yaml>" --candidate "<CANDIDATE.yaml>" --policy "<COMMON-POL.yaml>" --config "<CFG.toml>" --output "<NEW-FIVE-CHECK-OUTPUT>" --execute
+```
+
+현재 `update_acceptance.CHECKS`·`validate_cpu_cases.CHECKS`는 기존 5개에 고정돼 있다. SUP-04·조건부 SUP-03을 이 5개 수락 도구의 성공 건수에 끼워 넣지 않는다. 추가 점검은 우선 별도 case의 `validate`와 아래 증거 검증으로 기록하며, 확장 수락 계약이 필요하면 별도 정의·검증한다. `guard update` 종료0과 수락 성공도 구분한다.
+
+### 실증 재개 후 증거와 완료 판단
+
+각 case의 명령·종료 코드·시간·소스 snapshot·팩/정책/설정·PLAN·EVD/RES·자료 출처를 남긴다. 원본 RPT JSON과 비교 결과를 보존하고 `guard verify` → `guard evidence export` → 새로운 위치의 `guard evidence restore` → 복원 검증 → 저장 팩의 `guard judge`·`guard report --json` 순서로 원본 불변과 판정/비교 의미 일치를 확인한다. 재판정 시각과 원래 실행 시각, 사용한 `--as-of`를 구분한다.
+
+BYUL 투영은 기존 platform의 RPT→`verification-result/0.2` 변환기를 사용하고 스키마·정확한 report/RES Ref·manifest·null/UNKNOWN·official·팩/정책 상태를 확인한다. 계약 예시 검사만으로 실제 RPT 연동을 대체하지 않는다. U1 상세의 계약 표현 미결은 원본 RPT와 함께 별도 한계로 남기고 임의 필드·새 생산자를 만들지 않는다. `report.html`·`--html`을 복구하지 않으며 OBS 증거 HTML은 별개다.
+
+완료는 실제 시험한 분기와 증거로만 기록한다. FAIL/UNKNOWN도 결과 그대로 보존하고, 전부 NO_CHANGE라면 실제 악화/개선 탐지는 미입증이다. 부분관측·실험용 정책·수집 실패·공급물 전체·실제 소비·성능·GPU·기업 승인의 미검증 범위를 한 쪽 요약에 명시한다. 본 절의 모든 실험은 현재 미수행이다.
+
 ## 후보 길이 거부 원인·자격 후보 후속
 
 > 2026-10-25: PR #30·#31은 main(`fb0c103`)에 병합됐다. 아래 수락 성공은 `length_cause_evidence = true`(opt-in)로 실행한 결과이며, 옵션 없는 기본 실행은 아래 "PR #30 당시" 기록처럼 후보 REQ-09가 UNKNOWN으로 남아 수락에 실패할 수 있다. PLT-04는 후보 단독 시험(비어 있지 않은 EXAMPLE 후보)과 두 이미지 update(후보 `[]`, 부분 범위)를 구분한다.

@@ -67,6 +67,27 @@ def test_static_support_does_not_run_collectors_or_change_declared_inputs(pack, 
     assert "no independent binding oracle" in " ".join(rows[1]["limitations"])
 
 
+def test_supply_template_support_uses_its_own_policy_and_names_observation_scope(pack, monkeypatch):
+    from guard.runtime.docker import Docker
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("static supply guidance must not inspect a target")
+
+    monkeypatch.setattr(Docker, "__init__", forbidden)
+    env, pol, cfg = declared_inputs(pack)
+    pol.values["SUP-03"] = {"allowed_template_sha256": [CHAT_TEMPLATE_SHA256]}
+    before = deepcopy((env.model_dump(), pol.model_dump(), cfg))
+    row, = assess_check_support(pack, env, pol, cfg, selected_check_ids=["SUP-03"])
+    assert row["policy_valid"] is True and row["status"] == "SUPPORTED"
+    assert row["scope"] == "owned readonly fixed-template identity and API input projection only"
+    assert "no independent worker consumption proof" in " ".join(row["limitations"])
+    assert "manual PASS is outside" in " ".join(row["limitations"])
+    assert (env.model_dump(), pol.model_dump(), cfg) == before
+    pol.values["SUP-03"] = {}
+    missing, = assess_check_support(pack, env, pol, cfg, selected_check_ids=["SUP-03"])
+    assert missing["status"] == "UNKNOWN" and missing["policy_valid"] is False
+
+
 @pytest.mark.parametrize("change", ["other-digest", "other-version"])
 def test_pinned_source_contracts_do_not_trust_version_alone(pack, change):
     def mutate(env, pol, cfg):

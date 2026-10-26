@@ -1,5 +1,32 @@
 # 두 이미지 CPU 업데이트 비교 수락 도구
 
+## 2026-10-26 관측 확대 후보 — 기존 다섯 점검 반복 실증 제외
+
+이번 팩26 후보는 기존 76개 정의와 다섯 점검의 실행·판정·비교 경로를 보존했다.
+따라서 신규 Unix IPC와 선택 template native 수집에 검증을 집중한다. 기존 다섯 점검의
+두 이미지 실증은 해당 실행/정의/설정/자료/환경에 변경 영향이 있을 때만 재개한다.
+기본 suite·회귀·저장 증거 재판정은 실제 엔진 재실증과 별개다.
+
+사례 준비 도구는 기존 85개에 PLT-02 정상/위반/미수집/지원 밖과 네 가지 경계 사례를
+더해 15점검·93개 미실행 사례와 빈 정책15개를 만든다. 기존의 14/85 기록은 PR #9의
+준비 이력이며 실험 완료 수가 아니다. 기업 보호 경로·허용 UID·시험 UID·환경·설정·
+샌드박스 승인 없이 사례를 실행하지 않는다. SHM/TCP·명령 소비·전체 IPC PASS는 지원 밖이다.
+
+외부 새 경로에서의 형식:
+
+```powershell
+uv run python -m tools.prepare_checklist_cases --pack packs/PACK-BASELINE --checks PLT-02 SUP-03 REQ-02 --output "<NEW-EXTERNAL-CASEBOOK>"
+# REQ-02: 기본 입력 검사만. 실제 소유 파일 캡처는 별도 승인 후 --execute 사용.
+uv run python -m tools.capture_route_observations --env "<SEALED-ENV.json>" --target "<TARGET.json>" --container "<OWNED-PRODUCER>" --image "<REPOSITORY@DIGEST>" --path "/guard-observations/route.json" --output "<NEW-EXTERNAL-ATTACHMENT.json>"
+```
+
+PLT-02는 기존 CPU 설정 사본에서 executors.unix_ipc=real과 unix_ipc.probe_uids를
+명시하고, 빈 정책 양식의 protected_unix_paths/allowed_ipc_uids를 기업이 결정해야 한다.
+신규 1 token 정상 대조·최대8경로/4UID·무payload·전체 deadline 범위를 유지한다.
+SUP-03 native 캡처는 reviewed source·별도 계측 이미지에 생산자가 실제로 연결된 뒤
+사용하며, 자료 일관성을 전체 소비·승인·출처 인증·PASS로 해석하지 않는다.
+실제 엔진·AWS 기동은 여전히 보류이고 이번 문서는 이를 실행한 결과가 아니다.
+
 ## 2026-10-26 점검별 실험 입력 준비 도구 — 엔진 미실행
 
 `update/`에서 다음 명령으로 **새 저장소 외부 폴더**에 빈 정책과 사례 목록을 만든다.

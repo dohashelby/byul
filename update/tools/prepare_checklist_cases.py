@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
 ORDER = ("REQ-01", "REQ-03", "REQ-09", "PLT-01", "PLT-04",
          "REQ-07", "REQ-10", "REQ-11", "REQ-13", "OBS-03", "OBS-09",
-         "SUP-04", "SUP-03", "REQ-02")
+         "SUP-04", "SUP-03", "REQ-02", "PLT-02")
 BRANCHES = {
     "normal": "원문 정상 대조와 해당 프로파일의 관측·challenge 범위를 확인한다.",
     "negative": "원문 위반 기준을 확인할 근거를 준비한다. 부정 입력 자체가 FAIL은 아니다.",
@@ -33,6 +33,12 @@ BRANCHES = {
 }
 # 입력·관측의 차이를 구분하는 사례명이다. 기대 판정표나 실행 결과가 아니다.
 SPECIAL = {
+    "PLT-02": {
+        "disallowed-connected": "전후 endpoint/owner/namespace와 SO_PEERCRED가 연결되는 비허용 UID 접근만 위반 근거다.",
+        "namespace-mismatch": "다른 namespace의 연결을 대상 IPC 접근으로 승격하지 않는다.",
+        "source-changed": "PID/start/inode 교체·수집 실패는 UNKNOWN이다.",
+        "unsupported-ipc": "SHM/TCP/동일 UID 비허용 프로세스·명령 소비는 미시험으로 남긴다.",
+    },
     "REQ-09": {
         "default-source": "기본 원인 수집 설정의 지원 범위와 UNKNOWN을 보존한다.",
         "opt-in-source": "검토된 opt-in 원인 수집의 이미지·소스·요청별 연결을 확인한다.",

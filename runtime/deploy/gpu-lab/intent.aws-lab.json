@@ -18,12 +18,13 @@
   "observer_kube_api": false,
   "protected_paths": {
     "model_dir": "/models",
-    "cache_dir": "/var/cache/serving/vllm/REPLACE_IMAGE_DIGEST_HEX/7ae557604adf67be50417f59c2c2f167def9a775/REPLACE_PROFILE-profile-01",
+    "cache_dir": "/cache",
     "secret_paths": ["/var/run/secrets/kubernetes.io/serviceaccount"]
   },
   "assets": {
     "manifest_path": "/models/.byul-model-ready.json",
-    "cache_root": "/var/cache/serving",
+    "cache_root": "/srv/serving/cache",
+    "cache_mount_path": "/cache",
     "cache_generation": {
       "engine": "vllm",
       "image_id": "REPLACE_IMAGE_DIGEST_HEX",

@@ -65,9 +65,10 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
 
 | 항목 | 지금 | 요청 | 이유 |
 | --- | --- | --- | --- |
-| 엔진 캐시 마운트 | 세대 폴더를 컨테이너 `/cache`에 붙임 | 같은 폴더를 `/var/cache/serving/vllm/<image digest hex>/<model revision>/<profile>-profile-01`에 붙이고 캐시 환경변수(`VLLM_CACHE_ROOT` 등)를 그 아래로 | intent의 cache 규칙(TG-CACHE-01, 계획서 §4.9)은 `/var/cache/serving/<engine>/<image>/<revision>/<profile>` 구조를 전제한다. 지금 구조로는 Tetragon 캐시 사건이 잡히지 않는다. 엔진이 다른 세대를 볼 수 없는 지금의 격리는 그대로 유지된다 |
 | 관리 수신부 | patch로 붙임. 03 재적용 때 남아 smoke 증거에 섞일 수 있음 | `engine.yaml.template`에 사이드카 컨테이너 추가 | 떼고 붙이는 절차 없이 환경 증거와 runtime 구성을 일치시키려고 |
 | 엔진 접근 정책 | observer 8001 경로 없음 | `network-policies.yaml`의 정책을 함께 적용 | 관측 조회 경로 |
+
+엔진 캐시는 묶음 구조(현재 세대 폴더만 컨테이너 `/cache`에 마운트)를 그대로 쓴다. intent에 `assets.cache_mount_path: "/cache"`를 두어 Tetragon 캐시 규칙(TG-CACHE-01)이 `/cache`를 감시하고, 호스트 쪽 `cache_root`(`/srv/serving/cache`)와 세대 경로는 03이 만드는 `/srv/serving/cache/vllm/<digest hex>/<revision>/<profile>-profile-01`과 같게 둔다. 엔진은 다른 세대를 볼 수 없으므로 컨테이너 안 쓰기는 모두 "현재 세대", 그 밖은 "캐시 밖"으로 분류된다. 호스트에서 `serving-runtime enforce cache-check --intent deploy/gpu-lab/intent.aws-lab.json`으로 세대·권한을 점검한다.
 
 ## intent에서 서버 확인 후 채울 값
 

@@ -78,7 +78,9 @@ def render_manifests(intent: EnforcementIntent) -> dict[str, dict[str, Any]]:
     assets = intent.assets
     # With 1.1 assets the cache policy watches the whole cache root so the
     # adapter can tell current-generation writes from other generations (CACHE-02).
-    cache_prefix = assets.cache_root if assets is not None else paths.cache_dir
+    # When only the current generation is mounted (cache_mount_path), the engine
+    # cannot see other generations; the policy watches that mount instead.
+    cache_prefix = assets.engine_cache_watch_root if assets is not None else paths.cache_dir
     manifests = {
         "tetragon-tg-asset-01.json": _policy(
             intent, "TG-ASSET-01", [paths.model_dir], 2

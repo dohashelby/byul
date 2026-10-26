@@ -184,6 +184,8 @@
 
 ## 2026-10-26 AWS 설치 묶음에 맞춘 runtime 배포 층
 
+- AWS-08의 credential-free 대상 추적 gap을 host `runtime-target-pods-snapshot/1.0` → Gateway `--target-pod-snapshot` 경로로 연결하고, rollout 인수 판정에 새 instance_id와 `instance_changed`(`pod_replaced`)를 필수화했다. writer 5초·kubectl timeout 4초·Gateway poll 5초의 최악 age 14초가 stale 15초 미만이 되도록 기본값과 CLI 상한을 고정했다. 전용 snapshot 시험 11개가 통과했고, Codex 샌드박스에서는 runtime unittest 460개 중 96개가 소켓 제한으로 건너뛰어졌고, Claude가 샌드박스 밖에서 460개 전부 통과(skip 0)·platform pytest 169개 통과·`kubectl kustomize` 7개 객체를 확인했다. **Codex 구현, Claude 검수 완료(갱신 간격 대비 stale 판정으로 503이 간헐 발생하는 문제 지적 → 수정)**. 실제 AWS 실행은 안 함.
+
 - AWS 첫 완료 기준 인수 도구·시험·런북(AWS-01~AWS-08)을 추가했다. **Codex 구현, Claude 검수 완료(판정 규칙 2건 지적 반영, 샌드박스 밖 runtime 446·platform 169 통과)**.
 - AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 16:28판)과 대조해 `deploy/gpu-lab/`을 그 위에 얹는 층으로 다시 만들었다(**Codex 사용 한도 중 Claude 구현, Claude 다른 세션 검수 예정, Codex 교차 검수 전**). 엔진·namespace·SA·엔진 격리 정책은 묶음 것을 쓰고, Gateway(SA `gateway`, hostPath로 정책 묶음·인증 Secret·관측 기록 읽기 전용·기록 폴더, `--observation-feed`), 엔진 관리 수신부 사이드카 strategic patch(8001), `serving-engine-management` Service, observer→8001 NetworkPolicy, observer 자리, 시험 Pod, `intent.aws-lab.json`, 호스트 수집기 systemd 서비스를 둔다. 이전 base/overlay(엔진 중복·restricted·local PV·UID 10001)는 지웠다.
 - 엔진 UID는 사용자 결정으로 AWS 묶음과 같은 2000:0(vLLM 0.31.0 공식 비root)을 따르고 `docs/결정기록_엔진UID.md`에 계획서 10001과의 차이를 남겼다. 계획서 원문은 고치지 않았다.

@@ -190,7 +190,14 @@ class DecisionTests(unittest.TestCase):
             ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered"), True
         ),
         "AWS-08": dict.fromkeys(
-            ("restart_ok", "pod_changed", "gateway_recovered", "engine_info_recovered"), True
+            (
+                "restart_ok",
+                "pod_changed",
+                "gateway_recovered",
+                "engine_info_recovered",
+                "gateway_instance_changed",
+            ),
+            True,
         ),
     }
 
@@ -246,6 +253,11 @@ class DecisionTests(unittest.TestCase):
         facts = dict(self.PASS_FACTS["AWS-07"])
         self.assertNotIn("gap_recorded", facts)
         self.assertEqual(evaluate_case("AWS-07", facts)[0], "passed")
+
+    def test_aws_08_gateway_instance_change_is_decisive(self) -> None:
+        facts = dict(self.PASS_FACTS["AWS-08"])
+        facts["gateway_instance_changed"] = False
+        self.assertEqual(evaluate_case("AWS-08", facts)[0], "failed")
 
     def test_explicit_not_run_takes_precedence(self) -> None:
         for case_id in CASE_IDS:
@@ -494,6 +506,93 @@ class FakeExecutionTests(unittest.TestCase):
             self.assertIsNone(case["facts"]["supplementary_gap_recorded"])
             self.assertFalse(list(observation.glob("*.gaps.jsonl")))
             self.assertEqual(case["evidence"]["timings"]["stale_after_s"], 2.0)
+
+    def test_aws_08_requires_gateway_instance_change_and_pod_replaced_history(self) -> None:
+        def engine_pod(uid: str, container_id: str) -> str:
+            return json.dumps(
+                {
+                    "items": [
+                        {
+                            "metadata": {"name": f"engine-{uid}", "uid": uid},
+                            "status": {
+                                "containerStatuses": [
+                                    {"name": "engine", "containerID": container_id}
+                                ],
+                                "conditions": [{"type": "Ready", "status": "True"}],
+                            },
+                        }
+                    ]
+                }
+            )
+
+        before_target = {
+            "instance": {"state": "ok", "current": {"instance_id": "old-instance"}},
+            "history": [],
+            "kubernetes": {"state": "stale", "error": "target Pod snapshot is stale"},
+        }
+        after_target = {
+            "instance": {"state": "ok", "current": {"instance_id": "new-instance"}},
+            "history": [
+                {
+                    "event": "instance_changed",
+                    "reason": "pod_replaced",
+                    "previous_instance_id": "old-instance",
+                    "instance": {"instance_id": "new-instance"},
+                }
+            ],
+            "kubernetes": {"state": "ok"},
+        }
+        runner = FakeRunner(
+            [
+                CommandResult(0, engine_pod("old-uid", "containerd://old")),
+                CommandResult(0),
+                CommandResult(0),
+                CommandResult(0, engine_pod("new-uid", "containerd://new")),
+            ]
+        )
+        http = FakeHTTP(
+            [
+                response(200, before_target),
+                response(200, after_target),
+                response(
+                    200,
+                    {"choices": [{"message": {"content": "hello"}}]},
+                    "recovery-request",
+                ),
+                response(200, detail("ALLOWED", attempted=True)),
+                response(
+                    200,
+                    {
+                        "collectors": [
+                            {
+                                "source": "engine_info",
+                                "state": "ok",
+                                "last_success_at": "9999-01-01T00:00:00+00:00",
+                            }
+                        ]
+                    },
+                ),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            checker = AWSAcceptance(
+                arguments(
+                    Path(temporary),
+                    cases=("AWS-08",),
+                    allow_engine_restart=True,
+                ),
+                runner=runner,
+                http=http,
+            )
+            checker._run_case("AWS-08", checker.aws_08)
+            case = checker.cases[0]
+        self.assertEqual(case["result"], "passed")
+        self.assertTrue(case["facts"]["gateway_instance_changed"])
+        self.assertEqual(
+            case["evidence"]["target_after"]["history_event"]["reason"],
+            "pod_replaced",
+        )
+        self.assertIn("stale", case["evidence"]["snapshot_note"])
 
 
 class EvidenceTests(unittest.TestCase):

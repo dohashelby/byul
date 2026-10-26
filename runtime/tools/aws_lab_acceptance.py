@@ -229,6 +229,17 @@ def _extract_policy_limit(document: object) -> int | None:
     return None
 
 
+def _target_snapshot_stale(document: object) -> bool:
+    if not isinstance(document, dict):
+        return False
+    kubernetes = document.get("kubernetes")
+    if not isinstance(kubernetes, dict):
+        return False
+    return "stale" in " ".join(
+        str(kubernetes.get(name, "")) for name in ("state", "error")
+    ).lower()
+
+
 def _overall(cases: Iterable[Mapping[str, Any]]) -> str:
     results = [case.get("result") for case in cases]
     if results and all(result == "passed" for result in results):
@@ -280,8 +291,20 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
             ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered"),
         ),
         "AWS-08": (
-            ("restart_ok", "pod_changed", "gateway_recovered", "engine_info_recovered"),
-            ("restart_ok", "pod_changed", "gateway_recovered", "engine_info_recovered"),
+            (
+                "restart_ok",
+                "pod_changed",
+                "gateway_recovered",
+                "engine_info_recovered",
+                "gateway_instance_changed",
+            ),
+            (
+                "restart_ok",
+                "pod_changed",
+                "gateway_recovered",
+                "engine_info_recovered",
+                "gateway_instance_changed",
+            ),
         ),
     }
     required, decisive = checks[case_id]
@@ -1332,6 +1355,28 @@ class AWSAcceptance:
         if not self.args.allow_engine_restart:
             return {"not_run_reason": "--allow-engine-restart 없음(GPU 반납 및 cold-start 동반)"}, {}
         print("경고: AWS-08은 serving-engine GPU를 반납한 뒤 cold-start합니다.")
+        _target_response, target_before = self._get_json("/api/target")
+        before_tracker = target_before.get("instance") if target_before else None
+        before_current = (
+            before_tracker.get("current") if isinstance(before_tracker, dict) else None
+        )
+        before_instance_id = (
+            before_current.get("instance_id")
+            if isinstance(before_current, dict)
+            else None
+        )
+        if not isinstance(before_instance_id, str) or not before_instance_id:
+            return {"unknown_reason": "교체 전 Gateway target instance_id를 확인하지 못함"}, {
+                "target_before": {
+                    "state": before_tracker.get("state") if isinstance(before_tracker, dict) else None,
+                    "instance_id": before_instance_id,
+                },
+                "snapshot_note": (
+                    "Gateway target Pod snapshot이 stale인 상태를 관측함"
+                    if _target_snapshot_stale(target_before)
+                    else None
+                ),
+            }
         before, _before_result = self._engine_pod()
         if not before or not before.get("uid") or not before.get("container_id") or not before.get("ready"):
             return {"unknown_reason": "교체 전 엔진 Pod UID/containerID를 확인하지 못함"}, {}
@@ -1344,6 +1389,49 @@ class AWSAcceptance:
         response: HTTPResponse | None = None
         request_id: str | None = None
         valid = False
+        gateway_instance_changed = False
+        target_after: dict[str, Any] | None = None
+        matching_history: dict[str, Any] | None = None
+        snapshot_stale_seen = _target_snapshot_stale(target_before)
+        if rollout.returncode == 0:
+            deadline = self.monotonic() + 90.0
+            while True:
+                try:
+                    _target_response, target_after = self._get_json("/api/target")
+                except (OSError, URLError, TimeoutError):
+                    target_after = None
+                if target_after:
+                    snapshot_stale_seen = snapshot_stale_seen or _target_snapshot_stale(
+                        target_after
+                    )
+                    tracker = target_after.get("instance")
+                    current = tracker.get("current") if isinstance(tracker, dict) else None
+                    current_id = current.get("instance_id") if isinstance(current, dict) else None
+                    history = target_after.get("history")
+                    if isinstance(history, list):
+                        matching_history = next(
+                            (
+                                item
+                                for item in history
+                                if isinstance(item, dict)
+                                and item.get("event") == "instance_changed"
+                                and item.get("reason") == "pod_replaced"
+                                and item.get("previous_instance_id") == before_instance_id
+                                and isinstance(item.get("instance"), dict)
+                                and item["instance"].get("instance_id") == current_id
+                            ),
+                            None,
+                        )
+                    gateway_instance_changed = (
+                        isinstance(current_id, str)
+                        and current_id != before_instance_id
+                        and matching_history is not None
+                    )
+                    if gateway_instance_changed:
+                        break
+                if self.monotonic() >= deadline:
+                    break
+                self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
         if rollout.returncode == 0:
             response, request_id, valid = self._completion(
                 token=self.tokens["RUNTIME_INFERENCE_TOKEN"]
@@ -1371,10 +1459,10 @@ class AWSAcceptance:
                 self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
         changed: bool | None = None
         if after and after.get("uid") and after.get("container_id") and after.get("ready"):
-            changed = (
-                before.get("uid") != after.get("uid")
-                or before.get("container_id") != after.get("container_id")
-            )
+            # A rollout replacement must change the Pod identity. A container
+            # restart alone is a different runtime event and does not satisfy
+            # AWS-08's host-side replacement evidence.
+            changed = before.get("uid") != after.get("uid")
         return {
             "restart_ok": restart.returncode == 0 and rollout.returncode == 0,
             "pod_changed": changed,
@@ -1387,6 +1475,7 @@ class AWSAcceptance:
                 and recovery_record["delivery"]["attempted"] is True
             ),
             "engine_info_recovered": engine_info_ok,
+            "gateway_instance_changed": gateway_instance_changed,
         }, {
             "engine_before": before,
             "engine_after": after,
@@ -1396,9 +1485,21 @@ class AWSAcceptance:
                 "last_success_at": engine_info.get("last_success_at") if engine_info else None,
                 "required_after": restarted_at,
             },
-            "known_gap": (
-                "in-cluster Gateway에는 kubectl이 없어 --target-pod-status가 AWS에서 연결되지 않음; "
-                "이 사례의 교체 증거는 호스트 측 kubectl 기록뿐임"
+            "target_before": {"instance_id": before_instance_id},
+            "target_after": {
+                "instance_id": (
+                    target_after["instance"]["current"].get("instance_id")
+                    if isinstance(target_after, dict)
+                    and isinstance(target_after.get("instance"), dict)
+                    and isinstance(target_after["instance"].get("current"), dict)
+                    else None
+                ),
+                "history_event": matching_history,
+            },
+            "snapshot_note": (
+                "Gateway target Pod snapshot이 stale인 상태를 관측함"
+                if snapshot_stale_seen
+                else None
             ),
         }
 
@@ -1433,7 +1534,6 @@ class AWSAcceptance:
                 ),
             ],
             "known_gaps": [
-                "AWS-08 target instance tracking is host-side only; Gateway --target-pod-status is not connected on AWS.",
                 "Hubble DROPPED is an observation verdict, not independent proof that the connection was blocked.",
                 "A read-only mount can reject AWS-06 before the Tetragon file hook observes it.",
             ],

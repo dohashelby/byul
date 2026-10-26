@@ -8,6 +8,10 @@ from typing import Any
 from .kube_context import validate_kube_context
 
 
+DEFAULT_COLLECTOR_INTERVAL_S = 5.0
+DEFAULT_COLLECTOR_STALE_AFTER_S = 15.0
+
+
 def _default_data_dir() -> str:
     state_home = os.environ.get("XDG_STATE_HOME")
     base = Path(state_home).expanduser() if state_home else Path.home() / ".local" / "state"
@@ -38,8 +42,8 @@ class MVPConfig:
     policy_approvals_path: str | None = None
     baseline_path: str | None = None
     manifest_path: str | None = None
-    collector_interval_s: float = 5.0
-    collector_stale_after_s: float = 15.0
+    collector_interval_s: float = DEFAULT_COLLECTOR_INTERVAL_S
+    collector_stale_after_s: float = DEFAULT_COLLECTOR_STALE_AFTER_S
     asset_manifest_path: str | None = None
     asset_interval_s: float = 60.0
     # D-08 LAB retention: 7 days or 5 GiB. Report-only unless enforced.
@@ -59,6 +63,7 @@ class MVPConfig:
     auth_config_path: str | None = None
     target_path: str | None = None
     target_pod_status: bool = False
+    target_pod_snapshot: str | None = None
     # None means: use the target registration context, else DEFAULT_KUBE_CONTEXT.
     kube_context: str | None = None
     observation_exceptions_path: str | None = None
@@ -111,6 +116,7 @@ class MVPConfig:
             "observation_intent_path",
             "auth_config_path",
             "target_path",
+            "target_pod_snapshot",
             "observation_exceptions_path",
             "observation_timeline_path",
             "environment",
@@ -170,6 +176,10 @@ class MVPConfig:
             raise ValueError("observation_intent_path requires a tetragon feed")
         if not isinstance(self.cilium_policy_status, bool):
             raise ValueError("cilium_policy_status must be a boolean")
+        if not isinstance(self.target_pod_status, bool):
+            raise ValueError("target_pod_status must be a boolean")
+        if self.target_pod_status and self.target_pod_snapshot is not None:
+            raise ValueError("target_pod_status and target_pod_snapshot are mutually exclusive")
         if self.kube_context is not None:
             validate_kube_context(self.kube_context)
         if self.policy_bundle is not None and not isinstance(self.policy_bundle, dict):

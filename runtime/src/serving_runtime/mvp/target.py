@@ -14,8 +14,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import threading
 from typing import Any, Callable
@@ -27,6 +29,8 @@ from .store import JsonlStore
 
 SCHEMA_VERSION = "runtime-target/1.0"
 SNAPSHOT_SCHEMA = "runtime-target-snapshot/1.0"
+POD_SNAPSHOT_SCHEMA = "runtime-target-pods-snapshot/1.0"
+POD_SNAPSHOT_MAX_BYTES = 4 * 1024 * 1024
 _TOP = {"schema_version", "target_id", "target_ref", "engine", "model", "baseline_ref", "kubernetes"}
 _ENGINE = {"kind", "version", "image_digest"}
 _MODEL = {"id", "revision"}
@@ -35,6 +39,7 @@ _NAME = re.compile(r"[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?")
 _LABEL_KEY = re.compile(r"([a-z0-9]([-a-z0-9.]*[a-z0-9])?/)?[A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?")
 _LABEL_VALUE = re.compile(r"([A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?)?")
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+_ERROR_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,63}")
 
 
 def _utc_now() -> str:
@@ -50,6 +55,48 @@ class KubernetesSelector:
 
     def label_selector(self) -> str:
         return ",".join(f"{key}={value}" for key, value in self.selector)
+
+
+def validate_kubernetes_name(value: object, field: str = "name") -> str:
+    if not isinstance(value, str) or _NAME.fullmatch(value) is None or len(value) > 63:
+        raise ValueError(f"{field} must be a Kubernetes name")
+    return value
+
+
+def parse_label_selector(value: str) -> tuple[tuple[str, str], ...]:
+    """Parse the equality-only selector form accepted by target registration."""
+
+    if not isinstance(value, str) or not value:
+        raise ValueError("selector must be a non-empty KEY=VALUE list")
+    pairs: dict[str, str] = {}
+    for item in value.split(","):
+        key, separator, label_value = item.partition("=")
+        if (
+            separator != "="
+            or not key
+            or _LABEL_KEY.fullmatch(key) is None
+            or _LABEL_VALUE.fullmatch(label_value) is None
+            or len(label_value) > 63
+            or key in pairs
+        ):
+            raise ValueError("selector must contain unique valid KEY=VALUE labels")
+        pairs[key] = label_value
+    return validate_label_selector(pairs)
+
+
+def validate_label_selector(
+    selector: dict[object, object],
+) -> tuple[tuple[str, str], ...]:
+    for key, value in selector.items():
+        if (
+            not isinstance(key, str)
+            or _LABEL_KEY.fullmatch(key) is None
+            or not isinstance(value, str)
+            or _LABEL_VALUE.fullmatch(value) is None
+            or len(value) > 63
+        ):
+            raise ValueError("selector must contain valid label keys and values")
+    return tuple(sorted(selector.items()))
 
 
 @dataclass(frozen=True)
@@ -152,21 +199,13 @@ def _parse(document: object) -> dict[str, Any]:
         namespace = k8s.get("namespace")
         container = k8s.get("container")
         for name, value in (("namespace", namespace), ("container", container)):
-            if not isinstance(value, str) or _NAME.fullmatch(value) is None or len(value) > 63:
-                raise ValueError(f"kubernetes.{name} must be a Kubernetes name")
+            validate_kubernetes_name(value, f"kubernetes.{name}")
         selector = k8s.get("selector")
         if not isinstance(selector, dict) or not selector:
             raise ValueError("kubernetes.selector must be a non-empty label object")
-        for key, value in selector.items():
-            if (
-                _LABEL_KEY.fullmatch(key) is None
-                or not isinstance(value, str)
-                or _LABEL_VALUE.fullmatch(value) is None
-                or len(value) > 63
-            ):
-                raise ValueError("kubernetes.selector must contain valid label keys and values")
+        normalized_selector = validate_label_selector(selector)
         kubernetes = KubernetesSelector(
-            context, namespace, tuple(sorted(selector.items())), container
+            context, namespace, normalized_selector, container
         )
     return {
         "target_id": target_id,
@@ -361,6 +400,136 @@ class KubernetesTargetCollector:
         summary["context"] = self.context
         summary["namespace"] = self.selector.namespace
         summary["selector"] = dict(self.selector.selector)
+        return summary, "kubernetes_api"
+
+
+class TargetPodSnapshotCollector:
+    """Read a host-produced Kubernetes Pod snapshot without following links."""
+
+    def __init__(
+        self,
+        path: str | Path,
+        selector: KubernetesSelector,
+        *,
+        stale_after_s: float,
+        now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    ) -> None:
+        if stale_after_s <= 0:
+            raise ValueError("target Pod snapshot stale window must be positive")
+        self.path = Path(path).expanduser()
+        self.selector = selector
+        self.stale_after_s = float(stale_after_s)
+        self.now = now
+
+    def _read(self) -> bytes:
+        descriptor = os.open(
+            self.path,
+            os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
+        )
+        try:
+            information = os.fstat(descriptor)
+            if not stat.S_ISREG(information.st_mode):
+                raise OSError("target Pod snapshot is not a regular file")
+            if information.st_size > POD_SNAPSHOT_MAX_BYTES:
+                raise ValueError("target Pod snapshot exceeds 4 MiB")
+            chunks: list[bytes] = []
+            remaining = POD_SNAPSHOT_MAX_BYTES + 1
+            while remaining:
+                chunk = os.read(descriptor, min(remaining, 64 * 1024))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            raw = b"".join(chunks)
+            if len(raw) > POD_SNAPSHOT_MAX_BYTES:
+                raise ValueError("target Pod snapshot exceeds 4 MiB")
+            return raw
+        finally:
+            os.close(descriptor)
+
+    @staticmethod
+    def _timestamp(value: object) -> datetime:
+        if not isinstance(value, str) or not value:
+            raise ValueError("target Pod snapshot collected_at is invalid")
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ValueError("target Pod snapshot collected_at is invalid") from error
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("target Pod snapshot collected_at has no timezone")
+        return parsed.astimezone(timezone.utc)
+
+    def collect(self) -> tuple[dict[str, Any], str]:
+        raw = self._read()
+        try:
+            document = json.loads(
+                raw.decode("utf-8"),
+                object_pairs_hook=_object_without_duplicates,
+                parse_constant=_reject_json_constant,
+            )
+        except DuplicateKeyError as error:
+            raise ValueError("target Pod snapshot has a duplicate JSON key") from error
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError) as error:
+            raise ValueError("target Pod snapshot is not valid strict JSON") from error
+        fields = {
+            "schema",
+            "context",
+            "namespace",
+            "selector",
+            "collected_at",
+            "state",
+            "error",
+            "items",
+        }
+        if not isinstance(document, dict) or set(document) - fields:
+            raise ValueError("target Pod snapshot fields are invalid")
+        if document.get("schema") != POD_SNAPSHOT_SCHEMA:
+            raise ValueError("target Pod snapshot schema is invalid")
+        expected_selector = dict(self.selector.selector)
+        if (
+            document.get("context") != self.selector.context
+            or document.get("namespace") != self.selector.namespace
+            or document.get("selector") != expected_selector
+        ):
+            raise ValueError("target Pod snapshot does not match the target registration")
+        collected_at = self._timestamp(document.get("collected_at"))
+        state = document.get("state")
+        if state not in {"ok", "error"}:
+            raise ValueError("target Pod snapshot state is invalid")
+        if state == "error":
+            error_value = document.get("error")
+            if (
+                not isinstance(error_value, dict)
+                or set(error_value) != {"class", "code"}
+                or not all(
+                    isinstance(error_value.get(name), str)
+                    and _ERROR_TOKEN.fullmatch(error_value[name]) is not None
+                    for name in ("class", "code")
+                )
+                or "items" in document
+            ):
+                raise ValueError("target Pod snapshot error fields are invalid")
+            raise OSError(
+                f"target Pod snapshot writer error ({error_value['code']})"
+            )
+        if document.get("error") is not None or not isinstance(document.get("items"), list):
+            raise ValueError("target Pod snapshot ok fields are invalid")
+        age_s = (self.now().astimezone(timezone.utc) - collected_at).total_seconds()
+        if age_s > self.stale_after_s:
+            raise OSError("target Pod snapshot is stale")
+        summary = summarize_pods({"items": document["items"]}, self.selector.container)
+        summary.update(
+            {
+                "context": self.selector.context,
+                "namespace": self.selector.namespace,
+                "selector": expected_selector,
+                "collected_at": document["collected_at"],
+                "origin_note": "host_snapshot",
+            }
+        )
+        # The host file is only a credential-free transport. The values still
+        # come from a real kubectl API read, so the contracts grade remains
+        # MEASURED through the existing kubernetes_api origin mapping.
         return summary, "kubernetes_api"
 
 
@@ -597,7 +766,7 @@ class TargetRegistry:
             },
             "limits": [
                 "model.id 일치는 weight 해시·revision·실제 로딩을 증명하지 않음",
-                "Pod 조회는 대상 등록의 kubernetes.context에서 읽기 전용으로만 수행",
+                "Pod 관측은 대상 등록의 kubernetes.context에서 직접 읽기 전용 조회하거나 같은 API 조회의 host snapshot을 읽음",
                 "선언한 값이 다르거나 확인되지 않으면 신규 요청을 503으로 보류(model.revision은 engine API로 확인할 수 없어 보류 조건에서 제외, 자산 manifest로 확인)",
             ],
         }

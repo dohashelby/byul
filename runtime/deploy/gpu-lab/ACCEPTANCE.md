@@ -24,7 +24,7 @@ chmod 600 ~/runtime-acceptance.env
 test -d /srv/serving/observation
 ```
 
-엔진 `serving-engine`, Gateway `serving-gateway`, 시험 Pod `other-client`·`test-receiver`, host collector가 준비돼야 한다. Gateway 정책에는 `test-model`과 인증 역할이 반영돼 있어야 한다.
+엔진 `serving-engine`, Gateway `serving-gateway`, 시험 Pod `other-client`·`test-receiver`, host collector가 준비돼야 한다. Gateway 정책에는 `test-model`과 인증 역할이 반영돼 있어야 한다. 정책 묶음의 `target` 역할에는 context `byul-aws-lab`, namespace `serving-lab`, selector `app=serving-engine`, container `engine`인 대상 등록이 들어 있어야 하며 host collector의 `/srv/serving/observation/target-pods.json`이 Gateway에 읽기 전용으로 보여야 한다.
 
 ## 실행
 
@@ -78,13 +78,13 @@ dev 결과와 수정 사항을 확인한 뒤 AWS 묶음 `COST-PLAN.md` 절차로
 | AWS-05 금지 송신 | 비파괴 | engine→`test-receiver` Pod IP:8080 실패, `other-client`→같은 IP:8080 연결 성공 | kubectl로 확인한 receiver Pod IP, 두 connect 결과, engine→receiver Hubble 관측 | RT-NET-02, RT-TASKNET-01 |
 | AWS-06 RO 쓰기 거부 | 비파괴 | `/models` 쓰기 거부, `/cache` 임시 파일 쓰기·자체 삭제 성공 | exec 결과와 TG-ASSET-01/TG-CACHE-01 관측 | RT-SYS-03, RT-ASSET-02, RT-ASSET-05 |
 | AWS-07 수집 중단 | 변경(opt-in) | collector stop 뒤 두 heartbeat `stopped`와 stale window 안의 Gateway non-ok, restart 뒤 ok | heartbeat 파일, `/api/collectors`, 실제 관측 timing; gap 행은 보조 증거 | RT-OBS-01, RT-SYS-06 |
-| AWS-08 Pod 교체 | 변경(opt-in) | rollout 뒤 Pod UID/containerID 변경, Gateway와 `engine_info` 회복 | host kubectl 전후 신원, 요청 record, collector 상태 | RT-NET-04, RT-PHASE-01 |
+| AWS-08 Pod 교체 | 변경(opt-in) | rollout 뒤 Pod UID 변경, Gateway `/api/target`의 새 instance_id와 `instance_changed`(`pod_replaced`) 이력, Gateway와 `engine_info` 회복 | host kubectl 전후 신원, target 이력, 요청 record, collector 상태 | RT-NET-04, RT-PHASE-01 |
 
 AWS-04의 TCP 실패와 AWS-05의 engine→receiver TCP 실패가 각 차단 결과다. AWS-05는 부록 I.4의 팀 소유 시험 Pod `test-receiver`만 대상으로 하며, DNS 영향을 배제하려고 kubectl로 읽은 Pod IP에 직접 연결한다. egress 정책이 없는 `other-client`가 같은 receiver에 연결하지 못하면 `대조 실패: receiver에 닿지 않음`으로 `unknown`이며 절대 통과시키지 않는다. engine→receiver Hubble 행은 필수 연결 증거지만 차단 여부를 결정하지 않는다.
 
 `192.0.2.1`은 비라우팅 TEST-NET-1이고 이 AWS 묶음은 IMDSv2 hop limit 1이므로 external·IMDS connect는 egress 정책이 없어도 실패한다. 두 probe와 해당 Hubble 행은 보고서에 보조 증거로만 남으며, 그 실패만으로는 송신 통제를 아무것도 입증하지 않는다. 운영 대상이나 제3자 대상으로 시험을 확대하지 않는다. Hubble의 `DROPPED`도 관측 verdict일 뿐 독립적인 차단 증명으로 승격하지 않는다. AWS-06에서 read-only mount가 Tetragon hook보다 먼저 거부하면 TG-ASSET-01이 `not_observed`여도 쓰기 거부 자체의 실패는 아니다. 반면 cache 쓰기 관측이 없으면 필요한 연결 근거가 부족하므로 `unknown`이다.
 
-AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. stop 뒤 `--observation-dir`의 `hubble.heartbeat.json`과 `tetragon.heartbeat.json`이 모두 stop 요청 뒤 갱신된 `stopped`인지 확인하고, 최초 `/api/collectors`에서 읽은 `stale_after_s` 안에 두 `observation_feed_*`가 non-ok가 되는지 기다린다. 보고서에는 stale window와 stop·heartbeat·non-ok·start·recovery의 실제 관측 timing을 남긴다. 정상 SIGTERM 종료는 gap 행을 만들지 않으므로 `*.gaps.jsonl` 신규 행은 보조 증거일 뿐 판정 필수가 아니다. AWS-08은 `kubectl rollout restart deployment/serving-engine`과 ready 대기만 수행한다. 도구는 NetworkPolicy, Cilium/Tetragon 정책, 그 밖의 Deployment spec을 바꾸지 않으며 AWS-06에서 자신이 만든 임시 파일 외에는 삭제하지 않는다.
+AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. stop 뒤 `--observation-dir`의 `hubble.heartbeat.json`과 `tetragon.heartbeat.json`이 모두 stop 요청 뒤 갱신된 `stopped`인지 확인하고, 최초 `/api/collectors`에서 읽은 `stale_after_s` 안에 두 `observation_feed_*`가 non-ok가 되는지 기다린다. 보고서에는 stale window와 stop·heartbeat·non-ok·start·recovery의 실제 관측 timing을 남긴다. 정상 SIGTERM 종료는 gap 행을 만들지 않으므로 `*.gaps.jsonl` 신규 행은 보조 증거일 뿐 판정 필수가 아니다. AWS-08은 `kubectl rollout restart deployment/serving-engine`과 ready 대기만 수행한 뒤 `/api/target`에서 교체 전과 다른 instance_id 및 이전 instance_id에 연결된 `instance_changed`·`pod_replaced` 이력을 기다린다. 이때 host snapshot이 stale였으면 보고서의 `snapshot_note`에 남고 통과로 채우지 않는다. 도구는 NetworkPolicy, Cilium/Tetragon 정책, 그 밖의 Deployment spec을 바꾸지 않으며 AWS-06에서 자신이 만든 임시 파일 외에는 삭제하지 않는다.
 
 ## 결과 반출과 비용 절약
 
@@ -94,7 +94,6 @@ AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. s
 
 ## Known gaps
 
-- AWS Gateway Pod에는 kubectl이 없어서 runtime의 `--target-pod-status`가 연결되지 않는다. AWS-08은 교체 신원을 host 측 kubectl로만 기록한다.
 - Hubble `DROPPED`는 차단 확인 그 자체가 아니다. connect 결과와 정상 Gateway 대조를 함께 읽는다.
 - read-only mount 거부가 Tetragon file hook보다 먼저 발생할 수 있어 TG-ASSET-01 미관측과 쓰기 성공을 같은 뜻으로 보지 않는다.
 - vLLM v0.31.0 이미지의 실제 요청 ID 로그가 `Received request chatcmpl-<Gateway id>` 형식인지 첫 AWS-01에서 확인해야 한다. 다르면 엔진 수신을 추정하지 않고 `unknown`으로 남긴다.

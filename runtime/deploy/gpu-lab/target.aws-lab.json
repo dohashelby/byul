@@ -1,0 +1,20 @@
+{
+  "schema_version": "runtime-target/1.0",
+  "target_id": "serving-engine-aws-lab",
+  "engine": {
+    "kind": "vllm",
+    "version": "0.31.0",
+    "image_digest": "sha256:REPLACE_IMAGE_DIGEST_HEX"
+  },
+  "model": {
+    "id": "test-model"
+  },
+  "kubernetes": {
+    "context": "byul-aws-lab",
+    "namespace": "serving-lab",
+    "selector": {
+      "app": "serving-engine"
+    },
+    "container": "engine"
+  }
+}

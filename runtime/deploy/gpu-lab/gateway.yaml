@@ -46,6 +46,8 @@ spec:
             - /etc/serving/backend/backend.json
             - --policy-bundle
             - /etc/serving/bundles/current
+            - --target-pod-snapshot
+            - /srv/serving/observation/target-pods.json
             - --auth-config
             - /etc/serving/auth/auth.json
             - --gateway-port

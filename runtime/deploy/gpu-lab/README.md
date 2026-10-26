@@ -24,6 +24,7 @@ AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS �
 | `observer.yaml` | observer 자리(SA `observer`, UID 10004) |
 | `test-pods.yaml` | 시험 receiver·other-client(SA `probe`, UID 10003) |
 | `intent.aws-lab.json` | AWS 값으로 만든 통제 의도(엔진 UID 2000, `/models`, 포트 8000/8001) |
+| `target.aws-lab.json` | 정책 묶음의 `target` 역할에 넣을 대상 등록 예시. image digest를 실제 값으로 교체해야 함 |
 | `host/byul-observation-feed.service` | AWS 호스트에서 수집기를 계속 돌리는 systemd 사용자 서비스 |
 | [`ACCEPTANCE.md`](ACCEPTANCE.md) | AWS 첫 완료 기준 8개 사례의 실행·증거·비용 절약 절차 |
 
@@ -40,8 +41,10 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
    ```
    `/srv/serving/runtime`이 없으면 먼저 만든다. `usermod` 뒤에는 이미 떠 있는 systemd 사용자 매니저가 예전 그룹 목록을 유지하므로(다른 SSH·tmux 세션이나 linger가 있으면 재로그인만으로 부족) `sudo systemctl restart user@$(id -u ubuntu)` 후 `systemd-run --user --wait --pipe id -G`에 10010이 보이는지 확인한다. 그룹이 없으면 수집기는 명확한 오류와 함께 종료 코드 2로 멈춘다(재시작 반복 없음).
 
-   정책 묶음은 platform이 `/srv/serving/bundles/<bundle_id>/`에 쓰고 `current`가 그 폴더를 가리키게 한다(`runtime/docs/결정기록_정책묶음_수신.md`). Gateway 컨테이너에는 이 폴더가 `/etc/serving/bundles`로 보이므로 **`current`는 상대 링크**(`ln -sfn <bundle_id> current`)여야 한다. 절대 링크(`/srv/serving/bundles/<id>`)는 컨테이너 안에서 풀리지 않아 Gateway가 시작하지 않는다. 묶음 폴더와 파일은 Gateway(UID 10000)가 읽을 수 있어야 한다(예: 그룹 10000, 폴더 0750·파일 0640). 묶음의 gateway policy는 `allowed_models`에 `test-model`을, `enforcement_intent` 역할에 `intent.aws-lab.json`(값을 채운 것)을 넣는다.
-2. **수집기 실행** — byul 저장소를 `~/byul`에 두고 `host/byul-observation-feed.service`의 주석대로 설치한다. `--kube-context byul-aws-lab --reader-group 10010`으로 돌며, Tetragon 프로세스 인자를 지운 뒤 기록한다. 상태는 `/srv/serving/observation/*.heartbeat.json`.
+   정책 묶음은 platform이 `/srv/serving/bundles/<bundle_id>/`에 쓰고 `current`가 그 폴더를 가리키게 한다(`runtime/docs/결정기록_정책묶음_수신.md`). Gateway 컨테이너에는 이 폴더가 `/etc/serving/bundles`로 보이므로 **`current`는 상대 링크**(`ln -sfn <bundle_id> current`)여야 한다. 절대 링크(`/srv/serving/bundles/<id>`)는 컨테이너 안에서 풀리지 않아 Gateway가 시작하지 않는다. 묶음 폴더와 파일은 Gateway(UID 10000)가 읽을 수 있어야 한다(예: 그룹 10000, 폴더 0750·파일 0640). 묶음의 gateway policy는 `allowed_models`에 `test-model`을, `enforcement_intent` 역할에 `intent.aws-lab.json`(값을 채운 것)을 넣는다. `target` 역할에는 `target.aws-lab.json`의 `REPLACE_IMAGE_DIGEST_HEX`를 실제 엔진 image digest hex로 바꾸고 넣는다. gateway policy의 `target_id`, bundle의 `target_ref`, target 등록의 `target_id`는 모두 `serving-engine-aws-lab`로 맞춘다. 대상 등록의 Kubernetes 값은 context `byul-aws-lab`, namespace `serving-lab`, selector `app=serving-engine`, container `engine`이어야 한다. vLLM 판본은 등록 schema가 허용하므로 이 환경의 `0.31.0`을 선언한다.
+2. **수집기 실행** — byul 저장소를 `~/byul`에 두고 `host/byul-observation-feed.service`의 주석대로 설치한다. `--kube-context byul-aws-lab --reader-group 10010 --target-selector app=serving-engine --target-interval 5`로 돌며, Tetragon 프로세스 인자를 지운 뒤 기록한다. Hubble/Tetragon 상태는 `/srv/serving/observation/*.heartbeat.json`, 대상 Pod는 `/srv/serving/observation/target-pods.json`에 원자 교체로 기록한다. Pod 조회 실패나 4초의 kubectl 제한 초과 때 이전 items를 재사용하지 않고 `state: error`로 바꾼다.
+
+   대상 스냅샷의 타이밍은 **writer 간격 + kubectl timeout + Gateway poll 간격 < Gateway stale window**여야 한다. Gateway 기본값은 poll 5초 / stale 15초이고, 이 서비스는 writer 5초 / kubectl timeout 4초이므로 최악 age는 14초로 15초보다 작다. CLI는 이 기본 조합을 지키기 위해 `--target-interval`의 5초 초과 값을 거부한다.
 3. **Gateway 이미지 넣기** — 레지스트리가 없으므로 노드의 containerd에 직접 넣는다.
    ```bash
    # 노트북(runtime/ 폴더). base는 digest로 고정
@@ -91,6 +94,7 @@ serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out
 ```
 
 - 실제 AWS 적용·실행, Gateway의 hostPath 읽기 권한(10010 그룹)·SELinux/AppArmor 영향
+- host가 쓴 `target-pods.json`을 Gateway가 읽고 rollout 뒤 `instance_changed`(`pod_replaced`)를 남기는지
 - 사이드카가 nvidia RuntimeClass Pod 안에서 정상 기동하는지
 - 관리 수신부 우회(같은 Pod의 loopback 공유) 시험 — AWS 묶음 README도 별도 시험 대상으로 둠
 - observer 수집 프로그램, Gateway의 클러스터 노출 방식(현재 127.0.0.1 bind)

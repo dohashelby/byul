@@ -17,6 +17,10 @@
 # bundle's kubectl/cilium/hubble in PATH, and /srv/serving/observation owned by
 # ubuntu with group 10010 (README.md). Tetragon process arguments are removed
 # before the raw file is written.
+#
+# Target timing rule: writer interval + kubectl timeout + Gateway poll interval
+# must stay below the Gateway stale window. These defaults are 5 + 4 + 5 = 14
+# seconds, below 15 seconds; the writer rejects intervals over 5 seconds.
 [Unit]
 Description=byul live Hubble/Tetragon collector (context byul-aws-lab)
 
@@ -25,7 +29,7 @@ Type=simple
 WorkingDirectory=%h/byul/runtime
 Environment=PYTHONPATH=%h/byul/runtime/src
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/python3 -B tools/k8s_observation_feed.py --kube-context byul-aws-lab --output-dir /srv/serving/observation --reader-group 10010
+ExecStart=/usr/bin/python3 -B tools/k8s_observation_feed.py --kube-context byul-aws-lab --output-dir /srv/serving/observation --reader-group 10010 --target-selector app=serving-engine --target-interval 5
 Restart=on-failure
 RestartSec=15
 # Exit 2 = configuration error (for example not a member of group 10010).

@@ -25,9 +25,13 @@ from serving_runtime.enforcement.intent import load_intent
 from serving_runtime.enforcement.tetragon import (
     render_manifests as render_tetragon_manifests,
 )
+from serving_runtime.mvp.kube_context import (
+    DEFAULT_KUBE_CONTEXT,
+    validate_kube_context,
+)
 
 
-EXPECTED_CONTEXT = "kind-runtime-lab"
+EXPECTED_CONTEXT = DEFAULT_KUBE_CONTEXT
 REPORT_SCHEMA = "serving-runtime-k8s-lab-report/1.0"
 PROBE_ATTEMPTS = 5
 DEFAULT_TETRAGON_WAIT = 90.0
@@ -204,7 +208,7 @@ print("WRITE_OK")
 
 
 class ContextSafetyError(RuntimeError):
-    """The requested/current kubectl context is not the dedicated lab context."""
+    """A mutating non-kind context was not explicitly authorized."""
 
 
 @dataclass(frozen=True)
@@ -609,12 +613,14 @@ class LabChecker:
         cleanup: bool,
         tetragon_wait: float = DEFAULT_TETRAGON_WAIT,
         task_checks: bool = False,
+        allow_non_kind_context: bool = False,
         runner: SubprocessRunner | None = None,
         repo_root: Path | None = None,
         sleeper: Callable[[float], None] = time.sleep,
         port_waiter: Callable[[str, int, subprocess.Popen[bytes], float], bool] = wait_for_local_port,
     ) -> None:
-        self.context = context
+        self.context = validate_kube_context(context)
+        self.allow_non_kind_context = allow_non_kind_context
         self.namespace = namespace
         self.state_dir = state_dir.resolve()
         self.cleanup_requested = cleanup
@@ -656,21 +662,12 @@ class LabChecker:
         }
 
     def assert_safe_context(self) -> None:
-        if self.context != EXPECTED_CONTEXT:
+        if self.context != EXPECTED_CONTEXT and not self.allow_non_kind_context:
             raise ContextSafetyError(
-                f"--context must be {EXPECTED_CONTEXT!r}; got {self.context!r}"
+                "kind-runtime-lab 이외 context는 "
+                "--allow-non-kind-context를 함께 지정해야 합니다"
             )
-        result = self.runner.run(
-            ["kubectl", "config", "current-context"], timeout=10
-        )
-        actual = result.stdout.strip()
-        if result.returncode != 0:
-            raise ContextSafetyError("kubectl current-context could not be read")
-        if actual != EXPECTED_CONTEXT:
-            raise ContextSafetyError(
-                f"current kubectl context must be {EXPECTED_CONTEXT!r}; got {actual!r}"
-            )
-        self.current_context = actual
+        self.current_context = self.context
 
     def _record_run(
         self,
@@ -1064,7 +1061,13 @@ class LabChecker:
         self.raw_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         with port_forward_log.open("wb") as output:
             try:
-                command = ["cilium", "hubble", "port-forward"]
+                command = [
+                    "cilium",
+                    "hubble",
+                    "port-forward",
+                    "--context",
+                    self.context,
+                ]
                 process = self.runner.start(command, output)
                 command_record = {
                     "argv": command,
@@ -1831,9 +1834,21 @@ def write_reports(report: dict[str, Any], state_dir: Path) -> tuple[Path, Path]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="kind runtime-lab에서 Cilium·Hubble·Tetragon lab 사례를 점검합니다."
+        description="명시한 Kubernetes context에서 Cilium·Hubble·Tetragon lab 사례를 점검합니다."
     )
-    parser.add_argument("--context", default=EXPECTED_CONTEXT)
+    parser.add_argument(
+        "--kube-context",
+        "--context",
+        dest="kube_context",
+        default=EXPECTED_CONTEXT,
+        metavar="NAME",
+        help="명시적으로 사용할 Kubernetes context (기본: kind-runtime-lab)",
+    )
+    parser.add_argument(
+        "--allow-non-kind-context",
+        action="store_true",
+        help="kind-runtime-lab 이외 context에서 생성·삭제를 허용(명확한 경고 출력)",
+    )
     parser.add_argument("--namespace", default="serving-lab")
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument(
@@ -1858,13 +1873,20 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     checker = LabChecker(
-        context=args.context,
+        context=args.kube_context,
         namespace=args.namespace,
         state_dir=args.state_dir,
         cleanup=args.cleanup,
         tetragon_wait=args.tetragon_wait,
         task_checks=args.task_checks,
+        allow_non_kind_context=args.allow_non_kind_context,
     )
+    if args.kube_context != EXPECTED_CONTEXT and args.allow_non_kind_context:
+        print(
+            "경고: kind-runtime-lab이 아닌 Kubernetes context "
+            f"{args.kube_context!r}에서 시험 리소스를 생성·삭제합니다.",
+            file=sys.stderr,
+        )
     try:
         report, paths = checker.run()
     except ContextSafetyError as error:

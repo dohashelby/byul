@@ -360,7 +360,7 @@ def request_row(event: dict[str, Any]) -> dict[str, Any]:
 # --- 상태 → runtime-status -------------------------------------------------------
 
 _APPROVAL_STATES = {"not_configured", "verified", "last_verified", "unverified", "rejected", "error"}
-_COLLECTOR_STATES = {"disconnected", "never", "ok", "stale", "error"}
+_COLLECTOR_STATES = {"disconnected", "never", "ok", "partial", "stale", "error"}
 
 
 def _d(value: Any) -> dict[str, Any]:
@@ -422,6 +422,21 @@ def _collector_detail(item: dict[str, Any]) -> dict[str, Any] | None:
             "out_of_window": _nonneg(value.get("out_of_window")),
             "out_of_window_total": _nonneg(value.get("out_of_window_total")),
             "idle": value.get("idle") is True,
+            "lost_events_total": _int(value.get("lost_events_total")),
+            "lost_events_by_source": (
+                {
+                    str(name): _nonneg(count)
+                    for name, count in value["lost_events_by_source"].items()
+                }
+                if isinstance(value.get("lost_events_by_source"), dict)
+                else None
+            ),
+            "last_lost_at": _str_or_none(value.get("last_lost_at")),
+            "loss_detected": (
+                value.get("loss_detected")
+                if isinstance(value.get("loss_detected"), bool)
+                else None
+            ),
             "writer": {
                 "configured": writer.get("configured") is True,
                 "state": _str_or_none(writer.get("state")),

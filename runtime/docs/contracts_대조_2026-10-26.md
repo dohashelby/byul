@@ -10,7 +10,7 @@ scratch runtime을 mock engine으로 띄워 ALLOWED·DENIED·INVALID·ERROR(`POL
 - `runtime-status`: schema 오류 0건
 - `runtime-lab-report`: schema 오류 0건
 - `runtime-request-detail`: schema 오류 0건
-- `revalidation-request`: 생성 항목이 없어 미검증
+- `revalidation-request`: 아래 재검증 확인에서 생성·변환·schema 검증
 
 ## 일치 확인
 
@@ -28,3 +28,14 @@ scratch runtime을 mock engine으로 띄워 ALLOWED·DENIED·INVALID·ERROR(`POL
 runtime은 부모 객체가 있으면 개수 필드를 항상 전송한다. 다만 자산 root가 없거나 디렉터리가 아니어 순회하지 못한 경우의 `extra_file_count`·`extra_symlink_count`·`walk_error_count`, 정책이 없는 경우의 `passthrough_count`·`validate_count`는 기존에 미측정을 0으로 보내던 두 곳이었고 runtime 결정(2026-10-26)으로 `null`로 바꿘다.
 
 contracts는 platform이 변환하는 자산 상세의 `extra_files`·`extra_symlinks`·`walk_errors`와 정책의 `validate_count`에만 `null`을 허용한다. platform도 이 네 필드만 `_int`로 전달하고, runtime이 항상 보내는 나머지 개수에는 `_nonneg`를 그대로 유지한다. 계약에는 `passthrough_count` 필드가 없고 `passthrough_fields`만 있다.
+
+## revalidation-request 확인
+
+scratch runtime을 `examples/mvp/policy.json` 복사본으로 시작한 뒤 같은 data dir에서 같은 `policy_id`·`policy_version`을 유지하고 내용만 `output_max_tokens: 64`로 바꿔 재시작했다. runtime은 `policy_content_changed` trigger의 재검증 요청 1건을 만들었다. 같은 내용을 유지한 채 한 번 더 재시작한 뒤에는 그 요청의 `last_event`가 `condition_cleared`, `status`가 `open`, `current_evidence_present`가 `false`였다.
+
+platform `LiveRuntimeSource` 변환 결과는 `byul-revalidation-request/0.2`였고, `changed_fields`는 `policy.sha256`의 이전 값(`expected`)과 현재 값(`observed`)을 담았다. `event`는 `condition_cleared`, `data_origin`은 `MEASURED`, `origin_detail`은 `local_file`이었다.
+
+- `revalidation-request` schema 오류 0건
+- 같은 실행에서 `runtime-status` schema 오류 0건
+
+이번 확인에서 실제로 일으킨 trigger는 `policy_content_changed`뿐이다. `asset_changed`와 `config_drift`는 같은 변환 경로를 쓰지만 이번 scratch 실행에서는 일으키지 않았다.

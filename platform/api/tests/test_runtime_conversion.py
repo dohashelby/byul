@@ -272,6 +272,65 @@ def test_runtime_status_preserves_unknown_asset_and_policy_counts(contracts):
     assert contracts.errors("runtime-status", other_counter_null)
 
 
+def test_hubble_loss_status_passes_through_and_validates(contracts):
+    capture = copy.deepcopy(load_json(FIXTURES / "runtime" / "capture.json"))
+    endpoints = capture["endpoints"]
+    hubble = {
+        "source": "observation_feed_hubble",
+        "state": "partial",
+        "last_success_at": "2026-10-25T01:04:58Z",
+        "last_attempt_at": "2026-10-25T01:04:58Z",
+        "last_error": None,
+        "interval_s": 2.0,
+        "stale_after_s": 30.0,
+        "data_origin": "real",
+        "last_value": {
+            "processed": 1,
+            "accepted": 0,
+            "duplicates": 0,
+            "rejected": 0,
+            "rejected_details": [],
+            "corrupt_lines_total": 0,
+            "out_of_window": 0,
+            "out_of_window_total": 0,
+            "idle": False,
+            "writer": {
+                "configured": True,
+                "state": "running",
+                "updated_at": "2026-10-25T01:04:58Z",
+                "reconnect_count": 0,
+                "last_gap": None,
+            },
+            "lost_events_total": 9,
+            "lost_events_by_source": {
+                "HUBBLE_RING_BUFFER": 7,
+                "OBSERVER_EVENTS_QUEUE": 2,
+            },
+            "last_lost_at": "2026-10-25T01:04:58Z",
+            "loss_detected": True,
+        },
+    }
+    endpoints["collectors"]["collectors"].append(hubble)
+    doc = runtime_status(
+        endpoints["status"],
+        endpoints["policy"],
+        endpoints["collectors"],
+        target=endpoints["target"],
+        summary=endpoints["summary"],
+        revalidation=endpoints["revalidation"],
+        observations=endpoints["observations"],
+        baseline=endpoints["baseline"],
+    )
+    converted = next(
+        item for item in doc["collectors"] if item["source"] == "observation_feed_hubble"
+    )
+    assert converted["state"] == "partial"
+    assert converted["detail"]["lost_events_total"] == 9
+    assert converted["detail"]["lost_events_by_source"]["HUBBLE_RING_BUFFER"] == 7
+    assert converted["detail"]["loss_detected"] is True
+    assert contracts.errors("runtime-status", doc) == []
+
+
 def test_tetragon_phase_list_and_action_fallback():
     record = {"source": "tetragon", "kind": "process_exec", "observed_at": "2026-10-25T01:00:00Z", "data_origin": "real",
               "phase": ["loading", "compiling"], "exec_verdict": "suspect_binary", "action_raw": "KPROBE_ACTION_OVERRIDE"}

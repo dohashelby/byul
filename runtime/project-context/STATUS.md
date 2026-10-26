@@ -166,4 +166,15 @@
 - `bundle verify --bundle-dir`와 `mvp --policy-bundle`을 추가했다. bundle 구조·중복 JSON 키·경로/링크 탈출·bytes/SHA-256·내부 schema·기간·대상을 시작 시 검증하고 역할별 적용 여부를 `/api/status`·`/api/policy`에 공개한다. bundle 자기신고 승인은 신뢰하지 않고 기존 승인 목록 검증을 사용한다.
 - runtime 전체 unittest는 397개 중 308개 통과·소켓 제한 89개 skip·실패 0개다. 새 bundle 시험 18개와 platform runtime 변환시험 40개는 전부 통과했고 contracts 검사는 `schemas=12 examples=11 errors=0`이다. platform 전체 pytest는 기존 venv에 update의 `guard`와 `yaml`이 없어 수집 단계에서 중단됐다.
 - Claude가 샌드박스 밖에서 재시험: runtime unittest 399개 전부 통과(skip 0), platform `uv run --with ../../update pytest` 96개 통과, web vitest 21개·`tsc -b` 통과, contracts 검사 오류 0. 예시 묶음(`contracts/examples/bundle`)으로 `mvp --policy-bundle` 실행 시 상태에 묶음 표시·요청 200, 정책 파일을 바꾼 묶음은 SHA-256 불일치로 시작 거부를 확인했다.
-- 미검증: 실제 변환에서 `revalidation-request`가 생성되지 않음, 원격 bundle 전달, hot reload, 실행 중 묶음 유효 기간 재확인. platform은 지정한 4개 미측정 개수만 `null`로 보존하고 나머지 `_nonneg` 처리는 유지한다.
+- scratch runtime에서 같은 정책 ID·판본의 내용만 바꿔 `policy_content_changed` 재검증 요청 1건과 다음 재시작의 `condition_cleared`를 만들고, platform의 `byul-revalidation-request/0.2` 변환 및 `revalidation-request`·`runtime-status` schema 오류 0건을 확인했다. `asset_changed`·`config_drift` trigger는 이번 실행에서 일으키지 않았다.
+- 미검증: 원격 bundle 전달, hot reload, 실행 중 묶음 유효 기간 재확인. platform은 지정한 4개 미측정 개수만 `null`로 보존하고 나머지 `_nonneg` 처리는 유지한다.
+- platform README의 실제 확인 시험 수를 api 96개·web 21개로 바로잡았다. **Codex 작성, Claude 검수 완료.**
+- contracts 대조 기록에 `policy_content_changed` 재검증 생성·해소와 계약 오류 0건을 반영했다. **Codex 작성, Claude 검수 완료.**
+- update의 사건→`check_id` 매핑 확인용 `docs/runtime_규칙목록.md`를 실제 규칙 코드와 contracts 표에서 작성했다. **Codex 작성, Claude 검수 완료.**
+- 계획서의 RT 46개를 현재 unittest·수용·kind LAB·CPU 근거에 연결한 `docs/인수시험_대응표.md`를 작성했다. **Codex 작성, Claude 검수 완료.**
+- Task 1: kubectl/cilium 호출의 `--kube-context`(기본 `kind-runtime-lab`) 명시와 context 검증, 비-kind lab 변경 작업의 `--allow-non-kind-context` 이중 확인·경고를 구현했다. **Codex 구현, Claude 검수 완료.**
+- Task 2: 공통 요청 파이프라인을 쓰는 `POST /v1/completions`, 단일 문자열 prompt 검증·tokenize·route 기록·모의/가짜 backend를 구현했으며 실제 vLLM v0.31.0·SGLang schema는 미확인이다. **Codex 구현, Claude 검수 완료.**
+- Task 3: Hubble lost-events를 flow와 분리해 누적/source별/최근 시각/freshness `partial` 상태로 표시하고 contracts·platform API·웹까지 전달했다. 실제 Hubble loss 발생 환경은 미확인이다. **Codex 구현, Claude 검수 완료.**
+- Task 4: `exec_verdict` 설명을 실제 ExecPolicy 순서에 맞추고 completions 사유 코드와 Hubble loss 상태 기록을 규칙 목록에 추가했다. **Codex 구현, Claude 검수 완료.**
+- Task 5: 위 Task 1~4의 구현 상태를 2026-10-26 절에 작업별 한 줄로 기록했다. **Codex 구현, Claude 검수 완료.**
+- Codex가 사용 한도로 마지막 시험 단계에서 멈춰 **Claude가 이어받아 마무리했다(Claude 구현분, Codex 교차 검수 전)**: ① `runtime-auth/1.0`에서 chat route는 계속 명시 필수, `/v1/completions`는 생략 시 기본 `inference` 역할로 보호(Codex안은 chat 누락도 기본값으로 채워 기존 fail-closed 검사를 없앴음) ② `--kube-context`는 생략 시 대상 등록의 `kubernetes.context`를 쓰고, 둘이 다르면 시작 거부(교차 검수 지적 5) ③ `docs/내부_기록형식.md`에 `runtime-hubble-loss/1.0` 추가, socketpair 시험 helper에 completions handler 전달. 샌드박스 밖 재시험: runtime 406개 전부 통과(skip 0), platform 97개, web vitest 21개·`tsc -b`, contracts 오류 0.

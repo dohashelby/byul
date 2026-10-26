@@ -34,6 +34,14 @@ def simulated_token_count(messages: object) -> int:
     return total
 
 
+def simulated_prompt_token_count(prompt: object) -> int:
+    """Deterministic test-only count for a single completion prompt string."""
+
+    if not isinstance(prompt, str):
+        raise ValueError("prompt must be a string")
+    return len(prompt.split()) + 2
+
+
 class MockEngine:
     """A local-only mock engine with a thread-safe receipt journal."""
 
@@ -201,6 +209,8 @@ class MockEngine:
                 request_id: str,
                 model: object,
                 receipt: dict[str, Any],
+                *,
+                completion: bool = False,
             ) -> None:
                 if owner.response_delay_s and owner._stop_event.wait(owner.response_delay_s):
                     self._finish_stream(receipt, "truncated")
@@ -231,18 +241,27 @@ class MockEngine:
                     return
                 for index in range(owner.stream_events):
                     content = "한글✓" if owner.split_writes and index == 0 else f"mock-{index + 1}"
+                    choice = (
+                        {
+                            "index": 0,
+                            "text": content,
+                            "finish_reason": None,
+                        }
+                        if completion
+                        else {
+                            "index": 0,
+                            "delta": {"content": content},
+                            "finish_reason": None,
+                        }
+                    )
                     chunk = {
                         "id": f"mock-{request_id}",
-                        "object": "chat.completion.chunk",
+                        "object": (
+                            "text_completion" if completion else "chat.completion.chunk"
+                        ),
                         "created": int(time.time()),
                         "model": model,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": {"content": content},
-                                "finish_reason": None,
-                            }
-                        ],
+                        "choices": [choice],
                     }
                     event = (
                         "data: " + json.dumps(chunk, ensure_ascii=False, separators=(",", ":"))
@@ -273,6 +292,7 @@ class MockEngine:
                     "/v1/models",
                     "/_mock/receipts",
                     "/v1/chat/completions",
+                    "/v1/completions",
                     "/tokenize",
                 }
 
@@ -345,7 +365,7 @@ class MockEngine:
                         },
                     )
                     return
-                if parsed.path == "/v1/chat/completions":
+                if parsed.path in {"/v1/chat/completions", "/v1/completions"}:
                     self._send_json(405, {"error": {"code": "METHOD_NOT_ALLOWED"}})
                     return
                 self._send_json(404, {"error": {"code": "NOT_FOUND"}})
@@ -354,8 +374,12 @@ class MockEngine:
                 try:
                     content_length = int(self.headers.get("Content-Length", "0"))
                     document = json.loads(self.rfile.read(content_length).decode("utf-8"))
-                    count = simulated_token_count(
-                        document.get("messages") if isinstance(document, dict) else None
+                    if not isinstance(document, dict):
+                        raise ValueError
+                    count = (
+                        simulated_prompt_token_count(document.get("prompt"))
+                        if "prompt" in document
+                        else simulated_token_count(document.get("messages"))
                     )
                 except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
                     self._send_json(400, {"error": {"code": "MALFORMED_REQUEST"}})
@@ -369,7 +393,7 @@ class MockEngine:
                 if parsed.path == "/tokenize":
                     self._tokenize()
                     return
-                if parsed.path != "/v1/chat/completions":
+                if parsed.path not in {"/v1/chat/completions", "/v1/completions"}:
                     self._unsupported_method()
                     return
                 request_id = self.headers.get("X-Request-ID", "").strip()
@@ -397,20 +421,39 @@ class MockEngine:
                     "model": model,
                     "max_tokens": max_tokens,
                     "stream": document.get("stream") is True,
+                    "route": f"POST {parsed.path}",
                 }
                 with owner._receipts_lock:
                     owner._receipts.append(receipt)
                 if document.get("stream") is True:
-                    self._send_stream(request_id, model, receipt)
+                    self._send_stream(
+                        request_id,
+                        model,
+                        receipt,
+                        completion=parsed.path == "/v1/completions",
+                    )
                     return
                 self._persist_receipt(receipt)
                 if owner.response_delay_s and owner._stop_event.wait(owner.response_delay_s):
                     return
                 if owner.header_delay_s and owner._stop_event.wait(owner.header_delay_s):
                     return
-                self._send_json(
-                    200,
-                    {
+                if parsed.path == "/v1/completions":
+                    response = {
+                        "id": f"mock-{request_id}",
+                        "object": "text_completion",
+                        "created": int(time.time()),
+                        "model": model,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "text": "mock response",
+                                "finish_reason": "stop",
+                            }
+                        ],
+                    }
+                else:
+                    response = {
                         "id": f"mock-{request_id}",
                         "object": "chat.completion",
                         "created": int(time.time()),
@@ -422,8 +465,8 @@ class MockEngine:
                                 "finish_reason": "stop",
                             }
                         ],
-                    },
-                )
+                    }
+                self._send_json(200, response)
 
             do_DELETE = _unsupported_method
             do_CONNECT = _unsupported_method

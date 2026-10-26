@@ -99,6 +99,7 @@ class _DeadlineReader:
 @dataclass(frozen=True)
 class HandlerDependencies:
     chat: Callable[[ChatIO, str], None]
+    completions: Callable[[ChatIO, str], None]
     status: Callable[[], dict[str, Any]]
     policy_status: Callable[[], dict[str, Any]]
     baseline_status: Callable[[], dict[str, Any]]
@@ -355,6 +356,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/lab-report",
                 "/api/target",
                 "/v1/chat/completions",
+                "/v1/completions",
             }
             or path.startswith("/api/requests/")
         )
@@ -489,7 +491,7 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/requests/"):
             self._request_detail(path[len("/api/requests/") :])
             return
-        if path == "/v1/chat/completions":
+        if path in {"/v1/chat/completions", "/v1/completions"}:
             self._send_json(405, {"error": {"code": "METHOD_NOT_ALLOWED"}})
             return
         self._send_json(404, {"error": {"code": "NOT_FOUND"}})
@@ -499,6 +501,9 @@ class Handler(BaseHTTPRequestHandler):
         self._post_request_id = request_id
         if urlsplit(self.path).path == "/v1/chat/completions":
             self.dependencies.chat(self, request_id)
+            return
+        if urlsplit(self.path).path == "/v1/completions":
+            self.dependencies.completions(self, request_id)
             return
         self._unsupported_method()
 

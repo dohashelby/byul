@@ -1,0 +1,2 @@
+{"lost_events":{"source":"HUBBLE_RING_BUFFER","num_events_lost":"7","cpu":2},"time":"2026-10-26T00:00:00Z","node_name":"runtime-node"}
+{"lost_events":{"source":"OBSERVER_EVENTS_QUEUE","num_events_lost":3},"time":"2026-10-26T00:00:01Z","node_name":"runtime-node"}

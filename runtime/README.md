@@ -180,7 +180,7 @@ curl -H "Authorization: Bearer $LAB_TOKEN" -H 'Content-Type: application/json' \
   http://127.0.0.1:8080/v1/chat/completions
 ```
 
-- 주체마다 `principal_id`, `roles`, `token_sha256`, 선택 `allowed_models`·`disabled`를 둡니다. `route_roles`는 보호 경로별 허용 역할입니다. `POST /v1/chat/completions`는 항상 보호하고(기본 역할 `inference`), 조회 API는 `"GET /api/*": ["viewer"]`처럼 넣었을 때만 보호합니다.
+- 주체마다 `principal_id`, `roles`, `token_sha256`, 선택 `allowed_models`·`disabled`를 둡니다. `route_roles`는 보호 경로별 허용 역할입니다. `POST /v1/chat/completions`와 `POST /v1/completions`는 항상 보호하고(기본 역할 `inference`), route별 역할을 덮어쓸 수 있습니다. 조회 API는 `"GET /api/*": ["viewer"]`처럼 넣었을 때만 보호합니다.
 - 요청은 정책 유효성, 인증, 대상 등록, 본문 순서로 판정합니다. 인증 정보 없음은 401 `AUTH_REQUIRED`, 토큰 불일치·비활성 주체·Bearer 외 방식은 401 `AUTH_INVALID`, 역할 불허는 403 `ROLE_NOT_ALLOWED`, 주체에 허용되지 않은 모델은 403 `PRINCIPAL_MODEL_NOT_ALLOWED`입니다. 모두 엔진에 전달하지 않고, 401·역할 거부는 대상 상태를 확인하거나 본문을 읽기 전에 끝냅니다.
 - 인증 설정을 읽지 못하거나 형식이 틀리면 추론 요청을 503 `AUTH_UNAVAILABLE`로 막고 `/api/status`를 `degraded`로 둡니다. 이것은 Gateway 오류이며 보안 차단 성공으로 세지 않습니다.
 - 요청 기록에는 인증 상태·방식·주체 ID·역할만 남습니다. 토큰과 토큰 해시는 기록·상태·로그에 남기지 않고, 클라이언트의 `Authorization` 헤더는 backend로 전달하지 않습니다.
@@ -199,7 +199,7 @@ curl -H "Authorization: Bearer $LAB_TOKEN" -H 'Content-Type: application/json' \
 
 - 정책의 `target_id`가 등록과 다르면 신규 추론 요청을 503 `TARGET_MISMATCH`로, 등록 파일을 읽지 못하면 503 `TARGET_UNAVAILABLE`로 보류합니다(엔진 미전달, 차단 성공이 아닌 판정 보류).
 - 엔진 종류(backend 설정), 엔진 버전·모델 ID(engine_info 수집값), 이미지 digest(Pod 조회값)를 등록값과 비교해 `match`/`mismatch`/`unknown`/`not_declared`로 표시합니다. **관측값 불일치는 표시만 하고 요청을 막지 않습니다.**
-- `--target-pod-status`는 등록의 `kubernetes` selector로 `kind-runtime-lab` context에서만 Pod를 조회합니다. Pod UID와 container ID로 인스턴스 ID를 만들고, Pod 교체·컨테이너 재시작은 `<data-dir>/target_snapshots.jsonl`에 새 인스턴스로 남깁니다. Pod가 없거나 여러 개면 하나를 고르지 않고 상태로만 표시합니다.
+- `--target-pod-status`는 등록의 `kubernetes` selector로 Pod를 조회합니다. 조회 context는 `--kube-context NAME`으로 argv에 명시하며 기본값은 `kind-runtime-lab`입니다. Pod UID와 container ID로 인스턴스 ID를 만들고, Pod 교체·컨테이너 재시작은 `<data-dir>/target_snapshots.jsonl`에 새 인스턴스로 남깁니다. Pod가 없거나 여러 개면 하나를 고르지 않고 상태로만 표시합니다.
 - 모든 요청 기록에 `target`(등록 상태·target_id·당시 instance_id)을 남겨, 이전 Pod의 기록이 새 Pod의 근거로 보이지 않게 합니다. `/api/target`과 대시보드 "대상 등록" 표에서 확인합니다.
 - 한계: model ID 일치는 weight·revision·실제 로딩 증명이 아닙니다. 정식 cluster의 context·권한은 D-03 이후입니다.
 
@@ -421,7 +421,7 @@ curl -N -H 'Content-Type: application/json' \
   http://127.0.0.1:8080/v1/chat/completions
 ```
 
-지원하는 요청은 `POST /v1/chat/completions` 하나입니다. `model`(허용 목록), `messages`(role은 system/user/assistant, content는 문자열), `max_tokens`(생략 시 128), `stream`(bool, true면 SSE), `n`(1만)을 받습니다. `stream_options`를 포함한 나머지 필드는 허용하지 않습니다.
+지원하는 요청은 `POST /v1/chat/completions`와 `POST /v1/completions`입니다. chat은 `messages`(role은 system/user/assistant, content는 문자열), completions는 단일 문자열 `prompt`만 받습니다(문자열 배열·token-id 배열 거부). 공통으로 `model`(허용 목록), `max_tokens`(생략 시 128), `stream`(bool, true면 SSE), `n`(1만)을 받습니다. completions의 `echo`·`suffix`·`best_of`·`logprobs`를 포함한 나머지 필드는 정책 `extra_fields`로 명시하지 않으면 허용하지 않습니다. 두 route는 같은 정책 유효성→인증→대상→본문→정책 판정→relay 순서를 쓰며 기록의 `route`로 구분하고 prompt 원문은 저장하지 않습니다. completions context 계산은 backend `/tokenize`에 `prompt`를 보냅니다. 실제 vLLM v0.31.0·SGLang completions schema와 활성 동작은 **미확인**이며, 모의 엔진과 시험 전용 가짜 backend로만 자동 시험했습니다.
 
 | 상황 | HTTP | 결과 |
 | --- | --- | --- |
@@ -522,7 +522,7 @@ MVP-01~11, S1-01~06, S2-01~06, S3A-01~08, SGL-01~02, S4-01~06의 39개 사례를
 
 이 단계의 산출물은 **Cilium 1.20.3 / Tetragon 1.7.1 문법 기준 후보**로 시작했습니다. 최종 확인 환경은 WSL2(커널 6.18.33.2-microsoft-standard-WSL2)의 kind v0.33.0 단일 노드(kindest/node v1.37.0), Cilium 1.20.3+Hubble, Tetragon 1.7.1입니다. Tetragon에는 `deploy/lab/tetragon-values.yaml`을 적용했습니다. kind 노드 버전은 개발계획서 v1.4에서 선정한 Kubernetes 1.36.5와 다릅니다.
 
-준비된 `runtime-lab` kind 클러스터에서의 lab 실행 순서는 다음과 같습니다. Gateway는 기존 규칙대로 pod 안의 `127.0.0.1:8080`에만 바인딩되며, 점검 도구가 `kubectl exec`로 같은 pod 안에서 요청합니다. 도구는 현재 context도 정확히 `kind-runtime-lab`인지 먼저 확인하고, 기본적으로 적용한 정책을 유지합니다(`--cleanup`을 주면 정책만 정리).
+준비된 `runtime-lab` kind 클러스터에서의 lab 실행 순서는 다음과 같습니다. Gateway는 기존 규칙대로 pod 안의 `127.0.0.1:8080`에만 바인딩되며, 점검 도구가 `kubectl exec`로 같은 pod 안에서 요청합니다. 도구는 `--kube-context`를 모든 kubectl/cilium 호출에 명시하고 kubeconfig current-context에는 의존하지 않습니다. 기본값은 `kind-runtime-lab`이며 다른 context는 `--allow-non-kind-context`를 함께 주어야 리소스 생성·삭제 경고 뒤 실행합니다. 기본적으로 적용한 정책을 유지합니다(`--cleanup`을 주면 정책만 정리).
 
 매 실행은 안전 context 확인 뒤 L-01 전에 도구의 렌더·적용 목록에 속한 잔여 정책만 삭제 완료까지 기다리며, 같은 namespace의 다른 정책은 삭제하지 않고 보고서의 `실행 전 정리` 경고로 남깁니다.
 
@@ -532,10 +532,10 @@ kind load docker-image --name runtime-lab serving-runtime-lab:dev
 kubectl --context kind-runtime-lab apply -f deploy/lab/manifests/
 helm upgrade tetragon cilium/tetragon --version 1.7.1 -n kube-system --reuse-values -f deploy/lab/tetragon-values.yaml
 .venv/bin/python -B tools/k8s_lab_check.py \
-  --context kind-runtime-lab --namespace serving-lab \
+  --kube-context kind-runtime-lab --namespace serving-lab \
   --state-dir ~/.local/state/serving-runtime/k8s-lab
 # SP4·SP1 작업별 점검(L-07·L-08)까지: 시험 Pod·정책은 실행마다 만들고 지웁니다.
-.venv/bin/python -B tools/k8s_lab_check.py --context kind-runtime-lab --namespace serving-lab \
+.venv/bin/python -B tools/k8s_lab_check.py --kube-context kind-runtime-lab --namespace serving-lab \
   --state-dir ~/.local/state/serving-runtime/k8s-lab --task-checks
 ```
 
@@ -576,19 +576,19 @@ L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었습니다. 앞선 기�
   --environment fixture-local --run-id fixture-run
 ```
 
-`--environment`와 `--run-id`는 새 기록의 시험 범위를 구분하는 선택 옵션입니다. 과거 JSONL 호환 때문에 필수로 만들지 않았습니다. 변환 성공 건은 `<data-dir>/observations.jsonl`에 추가됩니다. 형식 오류·미지원 이벤트는 원문 대신 줄 번호와 사유로 거부 집계합니다. MVP를 같은 `--data-dir`로 실행하면 `GET /api/observations`와 대시보드에서 source·kind·verdict·rule ID·환경·실행·자료 출처별 건수, 최신 50건, 손상 줄을 읽을 수 있습니다.
+`--environment`와 `--run-id`는 새 기록의 시험 범위를 구분하는 선택 옵션입니다. 과거 JSONL 호환 때문에 필수로 만들지 않았습니다. 변환 성공 건은 `<data-dir>/observations.jsonl`에 추가됩니다. 형식 오류·미지원 이벤트는 원문 대신 줄 번호와 사유로 거부 집계합니다. Hubble `lost_events` 줄은 flow 관측으로 저장하지 않고 source별 손실 수·누적·최근 손실 시각으로 따로 집계합니다. Hubble 유효 줄을 아직 처리하지 않았으면 손실 필드는 `null`이고, `0`은 처리한 줄에서 loss 레코드를 보지 못했다는 뜻일 뿐 무손실 확인이 아닙니다. freshness window 안의 손실은 collector 상태를 `partial`로 표시합니다. MVP를 같은 `--data-dir`로 실행하면 `GET /api/observations`와 대시보드에서 source·kind·verdict·rule ID·환경·실행·자료 출처별 건수, 최신 50건, 손상 줄을 읽을 수 있습니다.
 
-실행 중 Gateway가 계속 추가되는 원본 파일을 자동 수집하게 하려면 먼저 별도 터미널에서 lab 전용 보조 스크립트를 실행합니다. 이 스크립트는 현재 kubectl context와 지정 context가 모두 정확히 `kind-runtime-lab`일 때만 `cilium hubble port-forward`, 로컬 4245에 고정한 `hubble observe --follow -o jsonpb`, Tetragon `export-stdout` 로그 follow를 시작합니다. Hubble은 실행 시각 이후의 `DROPPED`만 기본 수집하고 Tetragon은 `kubectl logs --follow --tail=0`으로 시작 전 로그를 재생하지 않습니다. Hubble FORWARDED까지 필요하면 `--include-forwarded`를 명시합니다. 다음 명령은 사용자가 명시적으로 실행할 때만 클러스터를 조회하며, Gateway나 시험 과정에서 자동 실행하지 않습니다.
+실행 중 Gateway가 계속 추가되는 원본 파일을 자동 수집하게 하려면 먼저 별도 터미널에서 lab 전용 보조 스크립트를 실행합니다. 이 스크립트는 검증한 `--kube-context`를 `cilium hubble port-forward`와 Tetragon kubectl 로그 호출에 명시하고, 로컬 4245에 고정한 `hubble observe --follow -o jsonpb`를 시작합니다. kubeconfig current-context는 사용하지 않습니다. Hubble은 실행 시각 이후의 `DROPPED`만 기본 수집하고 Tetragon은 `kubectl logs --follow --tail=0`으로 시작 전 로그를 재생하지 않습니다. Hubble FORWARDED까지 필요하면 `--include-forwarded`를 명시합니다. 다음 명령은 사용자가 명시적으로 실행할 때만 클러스터를 조회하며, Gateway나 시험 과정에서 자동 실행하지 않습니다.
 
 ```bash
 .venv/bin/python -B tools/k8s_observation_feed.py \
-  --context kind-runtime-lab \
+  --kube-context kind-runtime-lab \
   --output-dir ~/.local/state/serving-runtime/k8s-lab/live
 ```
 
 전경 실행의 Ctrl-C뿐 아니라 SIGTERM/SIGHUP도 같은 정리 경로를 사용해 세 자식 프로세스를 종료하고 heartbeat를 `stopped`로 갱신합니다.
 
-그 뒤 기존 메인 data-dir에 요청 환경과 관측 환경을 각각 지정해 Gateway를 실행할 수 있습니다. `--lab-report`는 JSON 파일 또는 JSON 보고서 디렉터리를 받으며, 디렉터리면 수정 시각이 가장 최근인 JSON을 읽습니다. 보고서 없음·손상은 `/api/lab-report`와 화면에서 별도 상태로 표시합니다. `--cilium-policy-status`는 고정 context `kind-runtime-lab`, namespace `serving-lab`에서만 `CiliumNetworkPolicy` 객체를 10초 timeout으로 주기 조회합니다.
+그 뒤 기존 메인 data-dir에 요청 환경과 관측 환경을 각각 지정해 Gateway를 실행할 수 있습니다. `--lab-report`는 JSON 파일 또는 JSON 보고서 디렉터리를 받으며, 디렉터리면 수정 시각이 가장 최근인 JSON을 읽습니다. 보고서 없음·손상은 `/api/lab-report`와 화면에서 별도 상태로 표시합니다. `--cilium-policy-status`는 `--kube-context`(기본 `kind-runtime-lab`)와 namespace `serving-lab`에서 `CiliumNetworkPolicy` 객체를 10초 timeout으로 주기 조회합니다. `--target-pod-status`도 같은 명시 context를 사용합니다.
 
 ```bash
 .venv/bin/python -m serving_runtime mvp \
@@ -603,10 +603,10 @@ L-05 TG-DENY-01은 적용 직후 5회 모두 `EPERM`이었습니다. 앞선 기�
   --observation-environment kind-lab-wsl --observation-run-id k8s-lab-live \
   --observation-intent deploy/lab/intent.lab.json \
   --lab-report ~/.local/state/serving-runtime/k8s-lab/reports \
-  --cilium-policy-status
+  --kube-context kind-runtime-lab --cilium-policy-status
 ```
 
-보조 수집 프로그램(`tools/k8s_observation_feed.py`)은 하위 프로세스(port-forward, `hubble observe`, `kubectl logs --follow`)가 끝나도 멈추지 않습니다. 해당 묶음만 정리하고 끊긴 구간을 `{kind}.gaps.jsonl`과 heartbeat에 남긴 뒤 1초부터 최대 30초 간격으로 다시 연결하며, 다시 연결하기 전에 kubectl context를 재확인합니다. 다시 붙을 때는 마지막 정상 확인 1초 전부터 이벤트를 다시 요청하고(Hubble `--since`, Tetragon `--since-time`), 중복은 Gateway가 거릅니다. 재연결 중에는 heartbeat 상태가 `reconnecting`이라 대시보드에 관측 불가로 표시되고, 다시 붙은 뒤에는 재연결 횟수와 최근 끊긴 구간을 보여 줍니다. 복구가 완전한지는 확인할 수 없어 `requested_unverified`로 남깁니다.
+보조 수집 프로그램(`tools/k8s_observation_feed.py`)은 하위 프로세스(port-forward, `hubble observe`, `kubectl logs --follow`)가 끝나도 멈추지 않습니다. 해당 묶음만 정리하고 끊긴 구간을 `{kind}.gaps.jsonl`과 heartbeat에 남긴 뒤 1초부터 최대 30초 간격으로 다시 연결하며, 다시 연결하기 전에 설정한 context 이름을 재검증합니다. 다시 붙을 때는 마지막 정상 확인 1초 전부터 이벤트를 다시 요청하고(Hubble `--since`, Tetragon `--since-time`), 중복은 Gateway가 거릅니다. 재연결 중에는 heartbeat 상태가 `reconnecting`이라 대시보드에 관측 불가로 표시되고, 다시 붙은 뒤에는 재연결 횟수와 최근 끊긴 구간을 보여 줍니다. 복구가 완전한지는 확인할 수 없어 `requested_unverified`로 남깁니다.
 
 live feed는 완성된 새 줄만 변환하며 파일 회전·잘림을 감지합니다. heartbeat가 정상 갱신되면 이벤트가 없어도 "수집 정상·새 이벤트 없음"이고, writer 종료·heartbeat 만료는 관측 불가입니다. heartbeat 만료 기준은 `--collector-stale-after`와 같습니다. heartbeat를 설정하지 않은 임의 feed는 생존을 입증할 수 없으므로 이전처럼 새 이벤트가 없으면 stale이 되며 화면에 "writer heartbeat 미설정" 이유가 붙습니다. heartbeat의 `started_at`보다 오래된 이벤트는 저장하지 않고 실행 전 이벤트로 별도 집계합니다. 원본 손상 줄은 내용 대신 줄 번호·사유와 누적 건수를 표시합니다. Hubble 화면은 혼합 기록에서도 최근 DROPPED 최대 25건을 우선 표시해 FORWARDED에 묻히지 않게 합니다. Cilium 화면의 "설정됨"은 정책 객체 존재만 뜻하고, 실제 차단은 lab L-02 통과 또는 실제 Hubble `DROPPED` 근거로 별도 표시합니다.
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import deque
+from collections import Counter, deque
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable
 from uuid import uuid4
 
-from serving_runtime.enforcement.events import transform_lines
+from serving_runtime.enforcement.events import transform_lines_with_loss
 
 from .collectors import NoCollectionUpdate
 from .store import JsonlStore
@@ -69,6 +69,10 @@ class ObservationFeed:
         self._line_number = 0
         self._corrupt_lines_total = 0
         self._out_of_window_total = 0
+        self._hubble_lines_seen_total = 0
+        self._lost_events_total = 0
+        self._lost_events_by_source: Counter[str] = Counter()
+        self._last_lost_at: str | None = None
         self._checkpoint_error: str | None = None
         self._seen: deque[str] = deque(maxlen=self._SEEN_LIMIT)
         self._seen_set: set[str] = set()
@@ -113,6 +117,10 @@ class ObservationFeed:
             corrupt = document.get("corrupt_lines_total", 0)
             out_of_window = document.get("out_of_window_total", 0)
             line_number = document.get("line_number", 0)
+            hubble_lines_seen = document.get("hubble_lines_seen_total", 0)
+            lost_total = document.get("lost_events_total", 0)
+            lost_by_source = document.get("lost_events_by_source", {})
+            last_lost_at = document.get("last_lost_at")
             keys = document.get("recent_event_keys", [])
             if (
                 not isinstance(offset, int)
@@ -126,6 +134,20 @@ class ObservationFeed:
                 or out_of_window < 0
                 or not isinstance(line_number, int)
                 or line_number < 0
+                or not isinstance(hubble_lines_seen, int)
+                or hubble_lines_seen < 0
+                or not isinstance(lost_total, int)
+                or lost_total < 0
+                or not isinstance(lost_by_source, dict)
+                or any(
+                    not isinstance(source, str)
+                    or not source
+                    or not isinstance(count, int)
+                    or isinstance(count, bool)
+                    or count < 0
+                    for source, count in lost_by_source.items()
+                )
+                or (last_lost_at is not None and not isinstance(last_lost_at, str))
                 or not isinstance(keys, list)
                 or any(not isinstance(key, str) or not key for key in keys)
             ):
@@ -139,6 +161,10 @@ class ObservationFeed:
         self._corrupt_lines_total = corrupt
         self._out_of_window_total = out_of_window
         self._line_number = line_number
+        self._hubble_lines_seen_total = hubble_lines_seen
+        self._lost_events_total = lost_total
+        self._lost_events_by_source.update(lost_by_source)
+        self._last_lost_at = last_lost_at
         for key in keys[-self._SEEN_LIMIT :]:
             self._remember(key)
 
@@ -153,6 +179,10 @@ class ObservationFeed:
             "line_number": self._line_number,
             "corrupt_lines_total": self._corrupt_lines_total,
             "out_of_window_total": self._out_of_window_total,
+            "hubble_lines_seen_total": self._hubble_lines_seen_total,
+            "lost_events_total": self._lost_events_total,
+            "lost_events_by_source": dict(self._lost_events_by_source),
+            "last_lost_at": self._last_lost_at,
             "recent_event_keys": list(self._seen),
         }
         encoded = (json.dumps(document, ensure_ascii=False) + "\n").encode("utf-8")
@@ -305,6 +335,21 @@ class ObservationFeed:
         heartbeat: dict[str, Any],
         idle: bool,
     ) -> dict[str, Any]:
+        loss_detected: bool | None = None
+        lost_total: int | None = None
+        lost_by_source: dict[str, int] | None = None
+        if self.kind == "hubble" and self._hubble_lines_seen_total > 0:
+            lost_total = self._lost_events_total
+            lost_by_source = dict(sorted(self._lost_events_by_source.items()))
+            loss_detected = False
+            if self._last_lost_at is not None:
+                try:
+                    last_lost = self._parse_time(self._last_lost_at, "last_lost_at")
+                    loss_detected = (
+                        datetime.now(timezone.utc) - last_lost
+                    ).total_seconds() <= self.heartbeat_stale_after_s
+                except ValueError:
+                    loss_detected = None
         return {
             "path": str(self.path),
             "kind": self.kind,
@@ -326,6 +371,10 @@ class ObservationFeed:
             "run_id": self.run_id,
             "idle": idle,
             "writer": heartbeat,
+            "lost_events_total": lost_total,
+            "lost_events_by_source": lost_by_source,
+            "last_lost_at": self._last_lost_at if self.kind == "hubble" else None,
+            "loss_detected": loss_detected,
         }
 
     def collect(self) -> tuple[dict[str, Any], str]:
@@ -378,6 +427,7 @@ class ObservationFeed:
         accepted_count = 0
         duplicate_count = 0
         out_of_window_count = 0
+        valid_hubble_count = 0
         corrupt_count = 0
         rejected: list[dict[str, Any]] = []
         first_line_number = self._line_number + 1
@@ -398,7 +448,7 @@ class ObservationFeed:
                 rejected.append({"line": line_number, "reason": str(error)})
                 corrupt_count += 1
                 continue
-            accepted, line_rejected = transform_lines(
+            accepted, line_rejected, losses = transform_lines_with_loss(
                 [line],
                 kind=self.kind,
                 data_origin=self.data_origin,
@@ -413,7 +463,7 @@ class ObservationFeed:
                 )
                 corrupt_count += 1
                 continue
-            item = accepted[0]
+            item = accepted[0] if accepted else losses[0]
             if writer_started_at is not None:
                 try:
                     observed_at = self._parse_time(
@@ -432,6 +482,8 @@ class ObservationFeed:
                     )
                     out_of_window_count += 1
                     continue
+            if self.kind == "hubble":
+                valid_hubble_count += 1
             event_key = hashlib.sha256(
                 self.kind.encode("ascii")
                 + b"\0"
@@ -446,6 +498,15 @@ class ObservationFeed:
             if event_key in self._seen_set:
                 duplicate_count += 1
                 continue
+            if losses:
+                loss = losses[0]
+                self._lost_events_total += loss["num_events_lost"]
+                self._lost_events_by_source[loss["source"]] += loss[
+                    "num_events_lost"
+                ]
+                self._last_lost_at = loss["observed_at"]
+                self._remember(event_key)
+                continue
             item["event_key"] = event_key
             self.store.append(item)
             self._remember(event_key)
@@ -455,6 +516,7 @@ class ObservationFeed:
         self._line_number += len(raw_lines)
         self._corrupt_lines_total += corrupt_count
         self._out_of_window_total += out_of_window_count
+        self._hubble_lines_seen_total += valid_hubble_count
         checkpoint_error = self._checkpoint_error
         self._write_checkpoint()
         value = self._status(

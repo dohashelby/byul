@@ -21,15 +21,12 @@ import threading
 from typing import Any, Callable
 
 from .policy import DuplicateKeyError, _object_without_duplicates, _reject_json_constant
+from .kube_context import validate_kube_context
 from .store import JsonlStore
 
 
 SCHEMA_VERSION = "runtime-target/1.0"
 SNAPSHOT_SCHEMA = "runtime-target-snapshot/1.0"
-# Read-only Pod queries are limited to the isolated local lab context for now,
-# matching the other kubectl collectors.
-ALLOWED_CONTEXTS = frozenset({"kind-runtime-lab"})
-
 _TOP = {"schema_version", "target_id", "target_ref", "engine", "model", "baseline_ref", "kubernetes"}
 _ENGINE = {"kind", "version", "image_digest"}
 _MODEL = {"id", "revision"}
@@ -148,10 +145,10 @@ def _parse(document: object) -> dict[str, Any]:
     if document.get("kubernetes") is not None:
         k8s = _object(document, "kubernetes", _KUBERNETES)
         context = k8s.get("context")
-        if context not in ALLOWED_CONTEXTS:
-            raise ValueError(
-                f"kubernetes.context must be one of: {', '.join(sorted(ALLOWED_CONTEXTS))}"
-            )
+        try:
+            context = validate_kube_context(context)
+        except ValueError as error:
+            raise ValueError("kubernetes.context is invalid") from error
         namespace = k8s.get("namespace")
         container = k8s.get("container")
         for name, value in (("namespace", namespace), ("container", container)):
@@ -219,11 +216,13 @@ def load_target(path: str | Path | None) -> TargetRegistration:
     return TargetRegistration("ok", path_text, digest, loaded_at, **fields)
 
 
-def pods_command(selector: KubernetesSelector) -> list[str]:
+def pods_command(
+    selector: KubernetesSelector, context: str | None = None
+) -> list[str]:
     return [
         "kubectl",
         "--context",
-        selector.context,
+        validate_kube_context(context or selector.context),
         "--namespace",
         selector.namespace,
         "get",
@@ -332,15 +331,19 @@ class KubernetesTargetCollector:
         selector: KubernetesSelector,
         *,
         timeout_s: float,
+        context: str | None = None,
         runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ) -> None:
         self.selector = selector
+        if context is not None and context != selector.context:
+            raise ValueError("kube context must match the target registration kubernetes.context")
+        self.context = validate_kube_context(selector.context)
         self.timeout_s = timeout_s
         self.runner = runner
 
     def collect(self) -> tuple[dict[str, Any], str]:
         result = self.runner(
-            pods_command(self.selector),
+            pods_command(self.selector, self.context),
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
@@ -355,7 +358,7 @@ class KubernetesTargetCollector:
         except (json.JSONDecodeError, RecursionError) as error:
             raise ValueError("Pod response is not valid JSON") from error
         summary = summarize_pods(document, self.selector.container)
-        summary["context"] = self.selector.context
+        summary["context"] = self.context
         summary["namespace"] = self.selector.namespace
         summary["selector"] = dict(self.selector.selector)
         return summary, "kubernetes_api"

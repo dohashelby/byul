@@ -135,6 +135,10 @@ Hubble `DROPPED`는 출발·목적지·정책 귀속과 수신 대조 전에는 
 
 ## 변경 이력
 
+### runtime 결정(2026-10-26) · Hubble 수집 손실 상태
+
+`runtime-status` 0.2의 판본과 DRAFT 상태를 유지하면서 observation feed detail에 nullable `lost_events_total`, `lost_events_by_source`, `last_lost_at`, `loss_detected`를 추가하고 collector 상태에 `partial`을 추가했다. 해당 없거나 Hubble 유효 줄을 아직 처리하지 않은 경우는 `null`이며, `lost_events_total: 0`은 처리한 줄에서 loss 레코드를 보지 못했다는 뜻이지 무손실 확인이 아니다. lost-events 레코드는 `runtime-event`로 변환하지 않는다.
+
 ### runtime 결정(2026-10-26) · 미측정 개수 `null` 보존
 
 `runtime-status` 0.2의 판본과 DRAFT 상태는 유지한다. runtime이 자산 root를 순회하지 못했을 때 platform으로 변환되는 `asset_detail.extra_files`·`extra_symlinks`·`walk_errors`, 정책이 없을 때의 `policy.validate_count`에만 `null`을 허용했다. 나머지 개수 필드는 기존 정수 제약을 유지한다.

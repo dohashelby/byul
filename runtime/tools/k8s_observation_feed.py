@@ -18,18 +18,18 @@ from typing import BinaryIO, Callable, Sequence
 from uuid import uuid4
 
 from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
+from serving_runtime.mvp.kube_context import (
+    DEFAULT_KUBE_CONTEXT,
+    validate_kube_context,
+)
 
 
-EXPECTED_CONTEXT = "kind-runtime-lab"
+EXPECTED_CONTEXT = DEFAULT_KUBE_CONTEXT
 LAB_NAMESPACE = "serving-lab"
 
 
 class _StopRequested(Exception):
     """Leave the follow loop through its normal child-process cleanup path."""
-
-
-class _ContextMismatchError(RuntimeError):
-    """The active kubectl context is not the isolated runtime lab."""
 
 
 def _install_stop_signal_handlers(
@@ -48,10 +48,6 @@ def _install_stop_signal_handlers(
 def _restore_signal_handlers(previous: dict[int, object]) -> None:
     for signum, handler in previous.items():
         signal.signal(signum, handler)
-
-
-def context_command() -> list[str]:
-    return ["kubectl", "config", "current-context"]
 
 
 def hubble_command(
@@ -75,11 +71,21 @@ def hubble_command(
     return command
 
 
-def hubble_port_forward_command() -> list[str]:
-    return ["cilium", "hubble", "port-forward"]
+def hubble_port_forward_command(
+    context: str = EXPECTED_CONTEXT,
+) -> list[str]:
+    return [
+        "cilium",
+        "hubble",
+        "port-forward",
+        "--context",
+        validate_kube_context(context),
+    ]
 
 
-def tetragon_command(*, since_time: str | None = None) -> list[str]:
+def tetragon_command(
+    *, context: str = EXPECTED_CONTEXT, since_time: str | None = None
+) -> list[str]:
     # First start skips old log lines; a reconnect asks for lines since the gap
     # opened so events during the gap can be recovered (duplicates are dropped
     # by the Gateway's event key).
@@ -87,7 +93,7 @@ def tetragon_command(*, since_time: str | None = None) -> list[str]:
     return [
         "kubectl",
         "--context",
-        EXPECTED_CONTEXT,
+        validate_kube_context(context),
         "--namespace",
         "kube-system",
         "logs",
@@ -104,24 +110,9 @@ def assert_safe_context(
     *,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> None:
-    if requested != EXPECTED_CONTEXT:
-        raise ValueError(f"--context must be {EXPECTED_CONTEXT}")
-    result = runner(
-        context_command(),
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=False,
-        shell=False,
-    )
-    if result.returncode != 0:
-        raise RuntimeError("kubectl current context query failed")
-    actual = result.stdout.strip()
-    if actual != EXPECTED_CONTEXT:
-        raise _ContextMismatchError(
-            f"current kubectl context must be {EXPECTED_CONTEXT}; got {actual or 'empty'}"
-        )
+    # Every cluster command carries this validated context explicitly. The
+    # kubeconfig current-context is intentionally irrelevant.
+    validate_kube_context(requested)
 
 
 def _start(
@@ -399,9 +390,6 @@ class _Supervisor:
         except _StopRequested:
             _stop_children(group)
             raise
-        except _ContextMismatchError:
-            _stop_children(group)
-            raise
         except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as error:
             _stop_children(group)
             raise RuntimeError(f"{group.kind} start failed: {error}") from error
@@ -430,9 +418,6 @@ class _Supervisor:
                 group.open_gap["attempts"] = int(group.open_gap["attempts"]) + 1
                 try:
                     self.start_group(group, since=str(group.open_gap["backfill_since"]))
-                except _ContextMismatchError as error:
-                    group.open_gap["last_error"] = str(error)
-                    raise
                 except RuntimeError as error:
                     group.open_gap["last_error"] = str(error)
                     group.backoff_s = min(group.backoff_s * 2, BACKOFF_MAX_S)
@@ -479,7 +464,7 @@ def run(
             children=[
                 _Child(
                     "cilium-hubble-port-forward",
-                    lambda _since: hubble_port_forward_command(),
+                    lambda _since: hubble_port_forward_command(context),
                     port_forward_log,
                     port_forward_log,
                     ready=lambda process: _wait_for_hubble(
@@ -505,7 +490,9 @@ def run(
             children=[
                 _Child(
                     "tetragon",
-                    lambda since: tetragon_command(since_time=since),
+                    lambda since: tetragon_command(
+                        context=context, since_time=since
+                    ),
                     tetragon_output,
                     tetragon_error,
                 )
@@ -556,9 +543,16 @@ def run(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="kind-runtime-lab의 Hubble·Tetragon JSONL follow 출력을 저장합니다."
+        description="명시한 Kubernetes context의 Hubble·Tetragon JSONL follow 출력을 저장합니다."
     )
-    parser.add_argument("--context", default=EXPECTED_CONTEXT)
+    parser.add_argument(
+        "--kube-context",
+        "--context",
+        dest="kube_context",
+        default=EXPECTED_CONTEXT,
+        metavar="NAME",
+        help="명시적으로 사용할 Kubernetes context (기본: kind-runtime-lab)",
+    )
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument(
         "--include-forwarded",
@@ -573,7 +567,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         return run(
             args.output_dir.expanduser(),
-            args.context,
+            args.kube_context,
             include_forwarded=args.include_forwarded,
         )
     except (OSError, subprocess.SubprocessError, RuntimeError, ValueError) as error:

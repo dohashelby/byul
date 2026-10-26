@@ -30,6 +30,18 @@ function CollectorSummary({ c }: { c: Collector }) {
       `최근 처리 ${d.processed} · 저장 ${d.accepted} · 중복 ${d.duplicates} · 거부 ${d.rejected} · 손상 누적 ${d.corrupt_lines_total} · 실행 전 이벤트 누적 ${d.out_of_window_total}`,
       d.rejected > 0 || d.corrupt_lines_total > 0 || d.out_of_window_total > 0,
     ]);
+    if (c.source === "observation_feed_hubble") {
+      const bySource = d.lost_events_by_source
+        ? Object.entries(d.lost_events_by_source).map(([source, count]) => `${source} ${count}`).join(" · ")
+        : null;
+      lines.push([
+        <>
+          Hubble 손실 누적 <Value v={d.lost_events_total} /> · source별 <Value v={bySource} /> · 최근 손실 <Value v={d.last_lost_at ? formatTime(d.last_lost_at) : null} />
+          {d.lost_events_total === 0 ? " (처리한 줄에서 loss 레코드 미관측; 무손실 확인 아님)" : ""}
+        </>,
+        d.loss_detected === true,
+      ]);
+    }
     if (d.rejected_details.length) lines.push([d.rejected_details.map((x) => `#${x.line}: ${x.reason}`).join(" · "), true]);
     lines.push([
       d.writer.configured

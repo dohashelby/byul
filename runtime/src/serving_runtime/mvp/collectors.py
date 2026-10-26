@@ -132,6 +132,24 @@ class Collector:
             state = "ok"
         else:
             state = "never"
+        if (
+            state == "ok"
+            and self.source == "observation_feed_hubble"
+            and isinstance(last_value, dict)
+            and last_value.get("loss_detected") is True
+        ):
+            last_lost_at = last_value.get("last_lost_at")
+            try:
+                last_lost = datetime.fromisoformat(
+                    str(last_lost_at).replace("Z", "+00:00")
+                ).astimezone(timezone.utc)
+            except (TypeError, ValueError):
+                state = "partial"
+            else:
+                if (
+                    datetime.now(timezone.utc) - last_lost
+                ).total_seconds() <= self.stale_after_s:
+                    state = "partial"
         return {
             "source": self.source,
             "state": state,

@@ -103,7 +103,11 @@ def _decision(
 
 
 def validate_request(
-    body: bytes, content_type: str | None, policy_state: PolicyState
+    body: bytes,
+    content_type: str | None,
+    policy_state: PolicyState,
+    *,
+    request_kind: Literal["chat", "completions"] = "chat",
 ) -> Decision:
     """Validate one request in the specified order and return its disposition."""
 
@@ -143,7 +147,8 @@ def validate_request(
             "UNSUPPORTED_ALIAS",
             "max_completion_tokens is not supported; use max_tokens",
         )
-    allowed_fields = {"model", "messages", "max_tokens", "stream", "n"}
+    input_field = "messages" if request_kind == "chat" else "prompt"
+    allowed_fields = {"model", input_field, "max_tokens", "stream", "n"}
     extra_rules = {rule.name: rule for rule in policy.extra_fields}
     allowed_fields |= extra_rules.keys()
     unsupported = sorted(document.keys() - allowed_fields)
@@ -160,22 +165,35 @@ def validate_request(
         return _decision("INVALID", 400, "INVALID_MODEL", "model must be a non-empty string")
     model = model_value
 
-    messages = document.get("messages")
-    valid_messages = isinstance(messages, list) and bool(messages)
-    if valid_messages:
-        for message in messages:
-            if (
-                not isinstance(message, dict)
-                or set(message) != {"role", "content"}
-                or not isinstance(message.get("role"), str)
-                or message.get("role") not in {"system", "user", "assistant"}
-                or not isinstance(message.get("content"), str)
-            ):
-                valid_messages = False
-                break
-    if not valid_messages:
+    if request_kind == "chat":
+        messages = document.get("messages")
+        valid_messages = isinstance(messages, list) and bool(messages)
+        if valid_messages:
+            for message in messages:
+                if (
+                    not isinstance(message, dict)
+                    or set(message) != {"role", "content"}
+                    or not isinstance(message.get("role"), str)
+                    or message.get("role") not in {"system", "user", "assistant"}
+                    or not isinstance(message.get("content"), str)
+                ):
+                    valid_messages = False
+                    break
+        if not valid_messages:
+            return _decision(
+                "INVALID",
+                400,
+                "INVALID_MESSAGES",
+                "messages do not match the supported format",
+                model=model,
+            )
+    elif not isinstance(document.get("prompt"), str):
         return _decision(
-            "INVALID", 400, "INVALID_MESSAGES", "messages do not match the supported format", model=model
+            "INVALID",
+            400,
+            "INVALID_PROMPT_TYPE",
+            "prompt must be a single string; arrays and token-id arrays are unsupported",
+            model=model,
         )
 
     max_tokens_value = document.get("max_tokens", policy.output_default_tokens)

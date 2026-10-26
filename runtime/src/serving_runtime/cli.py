@@ -93,7 +93,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     mvp_parser.add_argument(
         "--target-pod-status",
         action="store_true",
-        help="대상 등록의 kubernetes selector로 Pod를 읽기 전용 조회(kind-runtime-lab 전용)",
+        help="대상 등록의 kubernetes selector로 Pod를 읽기 전용 조회",
+    )
+    mvp_parser.add_argument(
+        "--kube-context",
+        metavar="NAME",
+        help=(
+            "Cilium 정책·대상 Pod 조회에 명시할 Kubernetes context. 생략하면 대상 등록의 "
+            "kubernetes.context, 그것도 없으면 kind-runtime-lab. 대상 등록과 다르면 시작하지 않음"
+        ),
     )
     mvp_parser.add_argument(
         "--auth-config",
@@ -353,6 +361,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "observation_exceptions_path": args.observation_exceptions,
                 "observation_timeline_path": args.observation_timeline,
                 "target_pod_status": args.target_pod_status,
+                "kube_context": args.kube_context,
             }
             if args.policy_bundle is not None:
                 bundle = verify_policy_bundle(args.policy_bundle)
@@ -459,6 +468,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"처리 {result['processed']}건 · 저장 {result['accepted']}건 · "
             f"거부 {len(result['rejected'])}건"
         )
+        if args.kind == "hubble":
+            print(
+                "Hubble 손실 레코드 "
+                f"{result['lost_events_records']}건 · 손실 이벤트 "
+                f"{result['lost_events_total']}건 · source별 "
+                f"{json.dumps(result['lost_events_by_source'], ensure_ascii=False, sort_keys=True)} · "
+                f"최근 손실 {result['last_lost_at'] or '–'}"
+            )
         for rejected in result["rejected"]:
             print(
                 f"거부 line {rejected['line']}: {rejected['reason']}",

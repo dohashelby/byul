@@ -284,6 +284,7 @@ class HandlerSocketPairTests(unittest.TestCase):
         self.addCleanup(server_socket.close)
         dependencies = HandlerDependencies(
             chat=chat,
+            completions=chat,
             status=lambda: {},
             policy_status=lambda: {},
             baseline_status=lambda: {},
@@ -382,6 +383,7 @@ class HandlerSocketPairTests(unittest.TestCase):
             self.addCleanup(server_socket.close)
             dependencies = HandlerDependencies(
                 chat=chat,
+                completions=chat,
                 status=lambda: {},
                 policy_status=lambda: {},
                 baseline_status=lambda: {},

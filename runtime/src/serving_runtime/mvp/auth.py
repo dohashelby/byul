@@ -22,13 +22,18 @@ from .policy import DuplicateKeyError, _object_without_duplicates, _reject_json_
 
 SCHEMA_VERSION = "runtime-auth/1.0"
 CHAT_ROUTE = "POST /v1/chat/completions"
+COMPLETIONS_ROUTE = "POST /v1/completions"
 # All read-only query APIs (status, requests, evidence, observations, ...).
 READ_API_ROUTE = "GET /api/*"
-PROTECTED_ROUTES = frozenset({CHAT_ROUTE, READ_API_ROUTE})
-# The chat route must always be covered; read APIs are protected only when the
-# config lists them, so existing configs keep their behaviour.
+PROTECTED_ROUTES = frozenset({CHAT_ROUTE, COMPLETIONS_ROUTE, READ_API_ROUTE})
+# The chat route must always be covered; /v1/completions falls back to the
+# inference role when a config does not list it; read APIs are protected only
+# when the config lists them, so existing configs keep their behaviour.
 REQUIRED_ROUTES = frozenset({CHAT_ROUTE})
-DEFAULT_ROUTE_ROLES = {CHAT_ROUTE: ("inference",)}
+DEFAULT_ROUTE_ROLES = {
+    CHAT_ROUTE: ("inference",),
+    COMPLETIONS_ROUTE: ("inference",),
+}
 METHOD = "bearer_sha256"
 
 _TOP_LEVEL = {"schema_version", "auth_ref", "principals", "route_roles"}
@@ -241,10 +246,13 @@ def _parse(document: object) -> tuple[str | None, tuple[Principal, ...], tuple[t
             if route not in PROTECTED_ROUTES:
                 raise ValueError(f"route_roles key {route!r} is not a protectable route")
             route_roles[route] = _string_list(roles, _ROLE, f"route_roles.{route}")
-    # The inference route must be covered so it is never left open silently.
-    missing = sorted(REQUIRED_ROUTES - route_roles.keys())
-    if missing:
-        raise ValueError(f"route_roles must cover: {', '.join(missing)}")
+        # The chat route must be listed so it is never left open silently.
+        missing = sorted(REQUIRED_ROUTES - route_roles.keys())
+        if missing:
+            raise ValueError(f"route_roles must cover: {', '.join(missing)}")
+        # Configs written before /v1/completions existed keep working: that
+        # route stays protected with its default inference role.
+        route_roles.setdefault(COMPLETIONS_ROUTE, DEFAULT_ROUTE_ROLES[COMPLETIONS_ROUTE])
     return auth_ref, tuple(principals), tuple(sorted(route_roles.items()))
 
 

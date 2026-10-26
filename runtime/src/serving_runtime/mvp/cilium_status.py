@@ -1,4 +1,4 @@
-"""Fixed-context Cilium policy object status collector."""
+"""Explicit-context Cilium policy object status collector."""
 
 from __future__ import annotations
 
@@ -6,20 +6,16 @@ import json
 import subprocess
 from typing import Any, Callable
 
+from .kube_context import DEFAULT_KUBE_CONTEXT, validate_kube_context
 
-EXPECTED_CONTEXT = "kind-runtime-lab"
 NAMESPACE = "serving-lab"
 
 
-def current_context_command() -> list[str]:
-    return ["kubectl", "config", "current-context"]
-
-
-def policy_command() -> list[str]:
+def policy_command(context: str = DEFAULT_KUBE_CONTEXT) -> list[str]:
     return [
         "kubectl",
         "--context",
-        EXPECTED_CONTEXT,
+        validate_kube_context(context),
         "--namespace",
         NAMESPACE,
         "get",
@@ -34,9 +30,11 @@ class CiliumPolicyCollector:
         self,
         *,
         timeout_s: float,
+        context: str = DEFAULT_KUBE_CONTEXT,
         runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     ) -> None:
         self.timeout_s = timeout_s
+        self.context = validate_kube_context(context)
         self.runner = runner
 
     def _run(self, argv: list[str]) -> subprocess.CompletedProcess[str]:
@@ -51,15 +49,7 @@ class CiliumPolicyCollector:
         )
 
     def collect(self) -> tuple[dict[str, Any], str]:
-        context = self._run(current_context_command())
-        if context.returncode != 0:
-            raise OSError("kubectl current context query failed")
-        actual = context.stdout.strip()
-        if actual != EXPECTED_CONTEXT:
-            raise RuntimeError(
-                f"kubectl current context must be {EXPECTED_CONTEXT}; got {actual or 'empty'}"
-            )
-        result = self._run(policy_command())
+        result = self._run(policy_command(self.context))
         if result.returncode != 0:
             raise OSError("CiliumNetworkPolicy query failed")
         try:
@@ -140,7 +130,7 @@ class CiliumPolicyCollector:
         policies.sort(key=lambda item: item["name"])
         return (
             {
-                "context": EXPECTED_CONTEXT,
+                "context": self.context,
                 "namespace": NAMESPACE,
                 "object_count": len(policies),
                 "configured": bool(policies),

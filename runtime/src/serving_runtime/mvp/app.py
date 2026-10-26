@@ -22,6 +22,7 @@ from .collectors import (
     load_declaration,
 )
 from .cilium_status import CiliumPolicyCollector
+from .kube_context import DEFAULT_KUBE_CONTEXT
 from .config import MVPConfig
 from .engine_client import EngineClient
 from .http_handler import (
@@ -261,10 +262,28 @@ class GatewayApp:
                     config.collector_stale_after_s,
                 )
             )
+        registration = self._target.registration
+        registered_context = (
+            registration.kubernetes.context if registration.kubernetes is not None else None
+        )
+        # The target registration names the cluster it was approved for. An
+        # explicit --kube-context must agree with it instead of silently
+        # pointing the collectors at another cluster.
+        if (
+            config.kube_context is not None
+            and registered_context is not None
+            and config.kube_context != registered_context
+        ):
+            raise ValueError(
+                f"--kube-context {config.kube_context!r}가 대상 등록의 "
+                f"kubernetes.context {registered_context!r}와 다릅니다"
+            )
+        kube_context = config.kube_context or registered_context or DEFAULT_KUBE_CONTEXT
         self._cilium_policy_collector: CiliumPolicyCollector | None = None
         if config.cilium_policy_status:
             self._cilium_policy_collector = CiliumPolicyCollector(
-                timeout_s=config.cilium_timeout_s
+                timeout_s=config.cilium_timeout_s,
+                context=kube_context,
             )
             collectors.append(
                 Collector(
@@ -274,13 +293,13 @@ class GatewayApp:
                     config.collector_stale_after_s,
                 )
             )
-        registration = self._target.registration
         if config.target_pod_status and registration.kubernetes is not None:
             collectors.append(
                 Collector(
                     "target_pods",
                     KubernetesTargetCollector(
-                        registration.kubernetes, timeout_s=config.cilium_timeout_s
+                        registration.kubernetes,
+                        timeout_s=config.cilium_timeout_s,
                     ).collect,
                     config.collector_interval_s,
                     config.collector_stale_after_s,
@@ -587,6 +606,7 @@ class GatewayApp:
         handler = create_handler(
             HandlerDependencies(
                 chat=self._request_flow.chat,
+                completions=self._request_flow.completions,
                 status=self.status,
                 policy_status=self.policy_status,
                 baseline_status=self.baseline_status,

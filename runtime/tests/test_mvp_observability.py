@@ -17,12 +17,13 @@ from unittest.mock import patch
 from serving_runtime.cli import main
 from serving_runtime.enforcement.events import (
     ObservationQuery,
+    parse_hubble_loss,
     parse_tetragon,
     transform_lines,
+    transform_lines_with_loss,
 )
 from serving_runtime.mvp.cilium_status import (
     CiliumPolicyCollector,
-    current_context_command,
     policy_command,
 )
 from serving_runtime.mvp.collectors import Collector
@@ -78,6 +79,21 @@ def lab_report(run_id: str = "k8s-lab-unit") -> dict[str, object]:
 
 
 class EnvironmentAndActionTests(unittest.TestCase):
+    def test_hubble_lost_events_are_separate_from_flow_observations(self) -> None:
+        lines = (FIXTURES / "hubble_lost_events.synthetic.jsonl").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        accepted, rejected, losses = transform_lines_with_loss(
+            lines, kind="hubble", data_origin="synthetic"
+        )
+        self.assertEqual((accepted, rejected), ([], []))
+        self.assertEqual([item["num_events_lost"] for item in losses], [7, 3])
+        self.assertEqual(losses[0]["source"], "HUBBLE_RING_BUFFER")
+        self.assertEqual(
+            parse_hubble_loss(json.loads(lines[0]))["schema"],
+            "runtime-hubble-loss/1.0",
+        )
+
     def test_environment_and_run_are_optional_and_preserved_when_supplied(self) -> None:
         line = (FIXTURES / "hubble_flows.synthetic.jsonl").read_text(
             encoding="utf-8"
@@ -246,6 +262,61 @@ class ObservationFeedTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+
+    def test_loss_lines_are_counted_not_stored_as_observations(self) -> None:
+        heartbeat = self.root / "hubble.heartbeat.json"
+        now = datetime.now(timezone.utc)
+        loss = {
+            "lost_events": {
+                "source": "PERF_EVENT_RING_BUFFER",
+                "num_events_lost": "5",
+                "cpu": 1,
+            },
+            "time": now.isoformat(),
+            "node_name": "runtime-node",
+        }
+        self.path.write_text(json.dumps(loss) + "\n", encoding="utf-8")
+        self.write_heartbeat(
+            heartbeat,
+            started_at=(now - timedelta(seconds=1)).isoformat(),
+            updated_at=now.isoformat(),
+        )
+        feed = self.feed(heartbeat_path=heartbeat)
+        value, _ = feed.collect()
+        records, corrupt = feed.store.read_all()
+        self.assertEqual((records, corrupt), ([], []))
+        self.assertEqual(value["accepted"], 0)
+        self.assertEqual(value["lost_events_total"], 5)
+        self.assertEqual(
+            value["lost_events_by_source"], {"PERF_EVENT_RING_BUFFER": 5}
+        )
+        self.assertTrue(value["loss_detected"])
+
+        collector = Collector(
+            "observation_feed_hubble",
+            feed.collect,
+            interval_s=1,
+            stale_after_s=15,
+        )
+        collector.collect()
+        # No new line does not erase the fresh loss signal.
+        self.assertEqual(collector.snapshot()["state"], "partial")
+
+    def test_zero_means_processed_without_loss_not_confirmed_loss_free(self) -> None:
+        heartbeat = self.root / "hubble.heartbeat.json"
+        now = datetime.now(timezone.utc)
+        flow = json.loads(self.lines[0])
+        flow["flow"]["time"] = now.isoformat()
+        self.path.write_text(json.dumps(flow) + "\n", encoding="utf-8")
+        self.write_heartbeat(
+            heartbeat,
+            started_at=(now - timedelta(seconds=1)).isoformat(),
+            updated_at=now.isoformat(),
+        )
+        value, _ = self.feed(heartbeat_path=heartbeat).collect()
+        self.assertEqual(value["lost_events_total"], 0)
+        self.assertEqual(value["lost_events_by_source"], {})
+        self.assertFalse(value["loss_detected"])
 
     def records(self) -> list[dict[str, object]]:
         records, corrupt = JsonlStore(self.data_dir / "observations.jsonl").read_all()
@@ -437,33 +508,37 @@ class CiliumCollectorTests(unittest.TestCase):
 
         def runner(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
             calls.append(argv)
-            stdout = EXPECTED_CONTEXT + "\n" if len(calls) == 1 else json.dumps(response)
-            return subprocess.CompletedProcess(argv, 0, stdout, "")
+            return subprocess.CompletedProcess(argv, 0, json.dumps(response), "")
 
         value, origin = CiliumPolicyCollector(timeout_s=1, runner=runner).collect()
-        self.assertEqual(calls, [current_context_command(), policy_command()])
+        self.assertEqual(calls, [policy_command()])
         self.assertEqual(origin, "kubernetes_api")
         self.assertTrue(value["configured"])
         self.assertEqual(value["policies"][0]["name"], "runtime-engine-ingress")
         self.assertEqual(value["policies"][0]["node_status"]["enforcing"], 1)
         self.assertIn("not proof", value["meaning"])
 
-    def test_wrong_context_is_refused_before_policy_query(self) -> None:
+    def test_configured_context_is_used_for_policy_query(self) -> None:
         def runner(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
-            return subprocess.CompletedProcess(argv, 0, "other-context\n", "")
+            return subprocess.CompletedProcess(argv, 0, '{"items": []}', "")
 
-        with self.assertRaisesRegex(RuntimeError, EXPECTED_CONTEXT):
-            CiliumPolicyCollector(timeout_s=1, runner=runner).collect()
+        value, _ = CiliumPolicyCollector(
+            timeout_s=1, context="formal-cluster", runner=runner
+        ).collect()
+        self.assertEqual(value["context"], "formal-cluster")
 
 
 class FeedHelperTests(unittest.TestCase):
-    def test_helper_commands_are_fixed_and_wrong_context_is_rejected(self) -> None:
+    def test_helper_commands_use_explicit_validated_context(self) -> None:
         hubble = hubble_command(since="2026-10-24T00:00:00+00:00")
         self.assertEqual(hubble[:4], ["hubble", "observe", "--follow", "-o"])
         self.assertIn("--since", hubble)
         self.assertEqual(hubble[-2:], ["--verdict", "DROPPED"])
         self.assertNotIn("--verdict", hubble_command(include_forwarded=True))
-        self.assertEqual(hubble_port_forward_command(), ["cilium", "hubble", "port-forward"])
+        self.assertEqual(
+            hubble_port_forward_command(),
+            ["cilium", "hubble", "port-forward", "--context", EXPECTED_CONTEXT],
+        )
         self.assertIn(EXPECTED_CONTEXT, tetragon_command())
         self.assertIn("--tail=0", tetragon_command())
         called = False
@@ -473,14 +548,15 @@ class FeedHelperTests(unittest.TestCase):
             called = True
             return subprocess.CompletedProcess([], 0, EXPECTED_CONTEXT, "")
 
-        with self.assertRaises(ValueError):
-            assert_safe_context("production", runner=runner)
+        assert_safe_context("production", runner=runner)
         self.assertFalse(called)
+        with self.assertRaises(ValueError):
+            assert_safe_context("-unsafe", runner=runner)
 
     def test_initial_context_timeout_is_reported_by_cli(self) -> None:
         from tools import k8s_observation_feed as helper
 
-        timeout = subprocess.TimeoutExpired(helper.context_command(), 10)
+        timeout = subprocess.TimeoutExpired(["kubectl"], 10)
         with (
             patch.object(helper, "run", side_effect=timeout),
             patch.object(helper.sys, "stderr", new_callable=io.StringIO) as stderr,
@@ -684,75 +760,6 @@ class FeedReconnectTests(unittest.TestCase):
             self.supervisor.tick()
             self.assertEqual(self.group.state, "running")
             self.assertEqual(self.group.backoff_s, 1.0)
-
-    def test_context_timeout_keeps_gap_open_then_reconnects(self) -> None:
-        context_attempts = 0
-        assert_context = self.helper.assert_safe_context
-
-        def runner(argv, **_kwargs):
-            nonlocal context_attempts
-            context_attempts += 1
-            if context_attempts == 1:
-                raise subprocess.TimeoutExpired(argv, 10)
-            return subprocess.CompletedProcess(argv, 0, self.helper.EXPECTED_CONTEXT + "\n", "")
-
-        def check_context(requested):
-            return assert_context(requested, runner=runner)
-
-        with (
-            patch.object(self.helper, "_start", side_effect=self.fake_start),
-            patch.object(self.helper, "assert_safe_context", side_effect=check_context),
-        ):
-            self.supervisor.start_group(self.group, since=None)
-            self.started[0].returncode = 0
-            self.supervisor.tick()
-
-            self.now = self.group.next_attempt
-            self.supervisor.tick()
-            heartbeat = self.heartbeat()
-            self.assertEqual(heartbeat["state"], "reconnecting")
-            self.assertEqual(heartbeat["reconnect_count"], 0)
-            self.assertEqual(heartbeat["open_gap"]["attempts"], 1)
-            self.assertIn("timed out after 10 seconds", heartbeat["open_gap"]["last_error"])
-            self.assertEqual(self.group.backoff_s, 2.0)
-            self.assertEqual([gap["event"] for gap in self.gaps()], ["gap_opened"])
-
-            self.now = self.group.next_attempt
-            self.supervisor.tick()
-
-        heartbeat = self.heartbeat()
-        self.assertEqual(context_attempts, 2)
-        self.assertEqual(heartbeat["state"], "running")
-        self.assertEqual(heartbeat["reconnect_count"], 1)
-        self.assertIsNone(heartbeat["open_gap"])
-        self.assertIn("timed out after 10 seconds", heartbeat["last_gap"]["last_error"])
-        self.assertEqual([gap["event"] for gap in self.gaps()], ["gap_opened", "gap_closed"])
-
-    def test_context_change_blocks_reconnect(self) -> None:
-        assert_context = self.helper.assert_safe_context
-
-        def runner(argv, **_kwargs):
-            return subprocess.CompletedProcess(argv, 0, "other-context\n", "")
-
-        def check_context(requested):
-            return assert_context(requested, runner=runner)
-
-        with patch.object(self.helper, "_start", side_effect=self.fake_start):
-            with patch.object(self.helper, "assert_safe_context"):
-                self.supervisor.start_group(self.group, since=None)
-            self.started[0].returncode = 0
-            self.supervisor.tick()
-            self.now += 1.0
-            with (
-                patch.object(self.helper, "assert_safe_context", side_effect=check_context),
-                self.assertRaisesRegex(RuntimeError, "other-context"),
-            ):
-                self.supervisor.tick()
-        self.assertEqual(len(self.argv), 1)
-        self.assertEqual(self.group.state, "reconnecting")
-        self.assertIn("context", self.group.open_gap["last_error"])
-        self.assertEqual(self.group.reconnect_count, 0)
-        self.assertEqual([gap["event"] for gap in self.gaps()], ["gap_opened"])
 
     def test_immediately_exited_child_does_not_close_the_gap(self) -> None:
         with (

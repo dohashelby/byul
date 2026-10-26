@@ -5660,6 +5660,7 @@
                     "disconnected",
                     "never",
                     "ok",
+                    "partial",
                     "stale",
                     "error"
                   ]
@@ -5961,6 +5962,10 @@
           "out_of_window",
           "out_of_window_total",
           "idle",
+          "lost_events_total",
+          "lost_events_by_source",
+          "last_lost_at",
+          "loss_detected",
           "writer"
         ],
         "properties": {
@@ -6003,6 +6008,35 @@
           },
           "idle": {
             "type": "boolean"
+          },
+          "lost_events_total": {
+            "description": "Hubble lost_events의 누적 손실 수. Hubble 유효 줄을 아직 처리하지 않았거나 해당 없는 수집원은 null. 0은 손실 없음이 아니라 처리한 줄에서 loss 레코드를 보지 못했다는 뜻이다.",
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "lost_events_by_source": {
+            "description": "Hubble loss source별 누적 손실 수. 해당 없거나 아직 보고 여부를 판단할 수 없으면 null.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "last_lost_at": {
+            "$ref": "#/components/schemas/Common_nullable_timestamp"
+          },
+          "loss_detected": {
+            "description": "현재 freshness window에 Hubble loss가 관측됐는지. 해당 없거나 Hubble 유효 줄 미처리면 null.",
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "writer": {
             "type": "object",

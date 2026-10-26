@@ -120,6 +120,33 @@ class ValidatorTests(unittest.TestCase):
             ("INVALID", 400, "INVALID_MESSAGES"),
         )
 
+    def test_completion_prompt_and_fields_are_route_specific(self) -> None:
+        def completion(**updates: object):
+            document: dict[str, object] = {
+                "model": "test-model",
+                "prompt": "hello",
+                "max_tokens": 8,
+            }
+            document.update(updates)
+            return validate_request(
+                json.dumps(document).encode("utf-8"),
+                "application/json",
+                self.policy_state,
+                request_kind="completions",
+            )
+
+        self.assertEqual(completion().result, "ALLOWED")
+        for prompt in (["hello"], [1, 2], 3, None):
+            with self.subTest(prompt=prompt):
+                decision = completion(prompt=prompt)
+                self.assertEqual(
+                    (decision.result, decision.reason_code),
+                    ("INVALID", "INVALID_PROMPT_TYPE"),
+                )
+        for field in ("echo", "suffix", "best_of", "logprobs"):
+            decision = completion(**{field: True})
+            self.assertEqual(decision.reason_code, "UNSUPPORTED_FIELD")
+
     def test_deeply_nested_json_is_malformed(self) -> None:
         body = b'{"model":"test-model","messages":' + b"[" * 32000 + b"]" * 32000 + b"}"
         self.assertLessEqual(len(body), 65536)

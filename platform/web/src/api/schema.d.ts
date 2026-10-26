@@ -1529,7 +1529,7 @@ export interface components {
             collectors: {
                 source: string;
                 /** @enum {unknown} */
-                state: "disconnected" | "never" | "ok" | "stale" | "error";
+                state: "disconnected" | "never" | "ok" | "partial" | "stale" | "error";
                 last_success_at: components["schemas"]["Common_nullable_timestamp"];
                 last_attempt_at: components["schemas"]["Common_nullable_timestamp"];
                 last_error: string | null;
@@ -1606,6 +1606,15 @@ export interface components {
             out_of_window: number;
             out_of_window_total: number;
             idle: boolean;
+            /** @description Hubble lost_events의 누적 손실 수. Hubble 유효 줄을 아직 처리하지 않았거나 해당 없는 수집원은 null. 0은 손실 없음이 아니라 처리한 줄에서 loss 레코드를 보지 못했다는 뜻이다. */
+            lost_events_total: number | null;
+            /** @description Hubble loss source별 누적 손실 수. 해당 없거나 아직 보고 여부를 판단할 수 없으면 null. */
+            lost_events_by_source: {
+                [key: string]: number;
+            } | null;
+            last_lost_at: components["schemas"]["Common_nullable_timestamp"];
+            /** @description 현재 freshness window에 Hubble loss가 관측됐는지. 해당 없거나 Hubble 유효 줄 미처리면 null. */
+            loss_detected: boolean | null;
             writer: {
                 configured: boolean;
                 state: string | null;

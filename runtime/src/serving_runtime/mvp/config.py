@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .kube_context import validate_kube_context
+
 
 def _default_data_dir() -> str:
     state_home = os.environ.get("XDG_STATE_HOME")
@@ -57,6 +59,8 @@ class MVPConfig:
     auth_config_path: str | None = None
     target_path: str | None = None
     target_pod_status: bool = False
+    # None means: use the target registration context, else DEFAULT_KUBE_CONTEXT.
+    kube_context: str | None = None
     observation_exceptions_path: str | None = None
     observation_timeline_path: str | None = None
     policy_bundle: dict[str, Any] | None = None
@@ -166,6 +170,8 @@ class MVPConfig:
             raise ValueError("observation_intent_path requires a tetragon feed")
         if not isinstance(self.cilium_policy_status, bool):
             raise ValueError("cilium_policy_status must be a boolean")
+        if self.kube_context is not None:
+            validate_kube_context(self.kube_context)
         if self.policy_bundle is not None and not isinstance(self.policy_bundle, dict):
             raise ValueError("policy_bundle must be an object when configured")
         if self.cilium_timeout_s <= 0:

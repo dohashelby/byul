@@ -109,6 +109,35 @@ def _api_transport_cli(docker, run_id, network, pinned, run_dir, env):
     assert store.verify() == []
 
 
+def _lifecycle_session_inventory(docker, target, pinned):
+    """Real Linux /proc/fd census in the existing EXAMPLE Python source only."""
+    from guard.executors.lifecycle_session import inventory
+    session = "1" * 32
+    seed = r'''
+from pathlib import Path
+raw=Path('/proc/1/stat').read_text();start=int(raw[raw.rfind(')')+2:].split()[19])
+root=Path('/guard-lifecycle/data')/('1'*32)
+root.mkdir(parents=True,mode=0o700)
+with (root/('pid-1-'+str(start)+'.jsonl')).open('xb') as stream:stream.write(b'EXAMPLE seed metadata only\n')
+(root/('pid-1-'+str(start)+'.jsonl')).chmod(0o600)
+with (root/'private.txt').open('xb') as stream:stream.write(b'EXAMPLE_CENSUS_PRIVATE_LIFECYCLE')
+(root/'pid-2-99.jsonl').symlink_to(root/'private.txt')
+with (root/'SEALED').open('xb'):pass
+(root/'SEALED').chmod(0o600)
+'''
+    seeded = docker.exec_bounded(target["engine"]["container"], ["python3", "-c", seed], timeout=5, max_bytes=4096)
+    assert seeded.returncode == 0 and seeded.capture["complete"]
+    value = inventory(docker,target,container=target["engine"]["container"],image=pinned,session=session)
+    assert value["owner_stable"] and value["metadata"]["directory_stable"] and value["metadata"]["sealed"]
+    assert value["metadata"]["unknown_entries"] == 1
+    assert len(value["metadata"]["files"]) == 2
+    assert [f["regular"] for f in value["metadata"]["files"]] == [True,False]
+    assert any(p["pid"] == 1 and p["same_executable"] for p in value["metadata"]["processes"])
+    assert value["metadata"]["unreadable_pids"] == []
+    assert "EXAMPLE_CENSUS_PRIVATE_LIFECYCLE" not in json.dumps(value)
+    assert value["owner"]["started_at_sha256"] and "started_at" not in value["owner"]
+
+
 @pytest.mark.parametrize("topology, expected", [("exposed", "FAIL"), ("isolated", "PASS")])
 def test_lab_topology_end_to_end(tmp_path, topology, expected):
     if not _docker_ok():
@@ -147,6 +176,7 @@ def test_lab_topology_end_to_end(tmp_path, topology, expected):
         lab._wait(lambda: "RESOURCE_READY" in docker.logs(resource_name, timeout=30), "owned resource fixture")
         from guard.executors.pressure_resources import capture_resource_sample
         resource_target = {"run_id": run_id, "engine": {"container": resource_name, "image_digest": pinned}}
+        _lifecycle_session_inventory(docker, resource_target, pinned)
         observed = capture_resource_sample(docker, resource_target, environment(engine={"name": "engine-x", "image_digest": pinned}),
                                            deadline=time.monotonic() + 30, port=18000)
         assert observed["complete"] is True, observed["diagnostic_codes"]

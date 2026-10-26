@@ -513,6 +513,47 @@ def capture_lifecycle_observations(
                           "product_connected":False,"security":"UNKNOWN"}))
 
 
+@app.command("capture-lifecycle-session")
+def capture_lifecycle_session(
+    env: Path = typer.Option(...,"--env"),
+    target: Path = typer.Option(...,"--target"),
+    prepared: Path = typer.Option(...,"--prepared"),
+    container: str = typer.Option(...,"--container"),
+    image: str = typer.Option(...,"--image"),
+    output: Path = typer.Option(...,"--output"),
+    execute: bool = typer.Option(False,"--execute",help="소유 세션의 프로세스·파일 metadata만 읽기"),
+) -> None:
+    """세션의 개별 기록과 누락을 보존한다. 종결·전체 회수 판정은 UNKNOWN이다."""
+    import hashlib
+    from guard.collectors.lifecycle import load_session_inputs,validate_output,collect_session
+    from guard.executors.owned_capture import create_capture_client,SourceCaptureError
+    try:
+        environment,topology,assets=load_session_inputs(env,target,container,image,prepared)
+        validate_output(output,Path(__file__).resolve().parents[3])
+        if not execute:
+            typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}))
+            return
+        value=collect_session(create_capture_client(topology["run_id"]),environment,topology,container,image,assets)
+        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
+        if len(raw.encode("utf-8"))>64*1024**2:
+            raise ValueError("LIFECYCLE_SESSION_ATTACHMENT_BOUND")
+    except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError,SourceCaptureError):
+        typer.echo("LIFECYCLE_SESSION_CAPTURE_FAILED")
+        raise typer.Exit(2)
+    try:
+        validate_output(output,Path(__file__).resolve().parents[3])
+        with output.open("x",encoding="utf-8",newline="\n") as stream:
+            stream.write(raw)
+    except (OSError,UnicodeError,ValueError):
+        # Only validated metadata reaches this fallback; preserve collected facts.
+        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
+            "diagnostic_codes":["LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
+        raise typer.Exit(1)
+    typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
+        "recordings":len(value["recordings"]),"sha256":hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        "bytes":len(raw.encode("utf-8"))}))
+
+
 @app.command("capture-stream-pressure")
 def capture_stream_pressure(
     env: Path = typer.Option(..., "--env"),

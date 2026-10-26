@@ -101,6 +101,11 @@ def validate_binding(env,target,source,prepared):
     prefix = "/guard-lifecycle/data/" + prepared["session"] + "/"
     if re.fullmatch(re.escape(prefix)+r"pid-[1-9][0-9]{0,9}-[1-9][0-9]{0,19}\.jsonl",source["path"]) is None:
         raise ValueError("LIFECYCLE_SOURCE_SESSION_INVALID")
+    validate_session_binding(env,target,source,prepared)
+
+
+def validate_session_binding(env,target,source,prepared):
+    validate_owned_source(**source)
     if (not env.hash_ok() or type(target) is not dict
             or target.get("environment_ref") != env.ref().model_dump(mode="json")
             or type(target.get("run_id")) is not str
@@ -118,3 +123,23 @@ def collect(docker, env, target, source, prepared):
     origin = DataOrigin.EXAMPLE if env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
     return {**value, "data_origin":origin.value, "environment_ref":env.ref().model_dump(mode="json"),
         "origin_detail":"owned file and process context read; native producer assertions remain unauthenticated"}
+
+
+def load_session_inputs(env_path,target_path,container,image,manifest_path):
+    env=load_environment(Path(env_path))
+    with Path(target_path).open("rb") as stream:
+        target=strict_json(stream.read(65537))
+    prepared=load_prepared(manifest_path)
+    source={"container":container,"image":image,"path":"/guard-lifecycle/data/"+prepared["session"]}
+    validate_session_binding(env,target,source,prepared)
+    return env,target,prepared
+
+
+def collect_session(docker,env,target,container,image,prepared):
+    source={"container":container,"image":image,"path":"/guard-lifecycle/data/"+prepared["session"]}
+    validate_session_binding(env,target,source,prepared)
+    from guard.executors.lifecycle_session import capture_session
+    value=capture_session(docker,target,container=container,image=image,prepared=prepared)
+    origin=DataOrigin.EXAMPLE if env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
+    return {**value,"data_origin":origin.value,"environment_ref":env.ref().model_dump(mode="json"),
+        "origin_detail":"owned container census and recording bytes; producer assertions and fingerprint links remain unauthenticated"}

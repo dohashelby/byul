@@ -2,6 +2,13 @@
 
 ## 2026-10-27 LIF-10 — native metadata 생산자·소유 기록 수집, 판정 미등록
 
+같은 생산자의 여러 프로세스 기록은 `capture-lifecycle-session`으로 연결한다. 소유 세대·
+세션 디렉터리·현재 프로세스와 파일 목록을 전후 대조하고, 기존 개별 수집을 재사용한다.
+목록과 실제 읽기 사이의 파일 신원 변화도 별도 표식으로 남긴다. 후속 목록·특정 기록·
+결과 저장 실패가 앞서 수집한 안전한 metadata를 지우지 않는다. 늦은 저장 실패는 해당
+metadata를 표준 출력으로 반환한다. 제한된 두 census와 지문 사건 index는 전체 실행 구간·
+실제 생산자 인증·요청 종결/회수 판정이 아니다. CLI는 기본 입력 검증이며 자동 판정 등록은 유지한다.
+
 `prepare-lifecycle-sensor`는 Python 3.12/Linux 소유 대상에 넣을 표준 라이브러리 센서와
 설정·bootstrap·bytes manifest를 만든다. source 후보는 공식 v0.31.0 commit
 `db9527a46873454610df6dbedf79a36d6bf1a7f6`이며 실제 image 내용 검증 완료를 뜻하지 않는다.

@@ -49,6 +49,29 @@ target의 `environment_ref`는 해당 ENV의 정확 Ref이고 `engine.container`
 단일 supplied file 수집은 전체 프로세스 목록·모든 요청·native 회수 완전성을 확정하지 않는다.
 출처는 EXAMPLE/DECLARED 상한이고 전체 `security`는 UNKNOWN이다.
 
+세션의 여러 기록은 `capture-lifecycle-session --env <ENV> --target <target.json>
+--prepared <manifest.json> --container <소유 이름> --image <고정 digest> --output <새 JSON>`으로
+수집한다. 기본은 입력 검증이며 `--execute`에서만 같은 소유 컨테이너의 세션 디렉터리와
+프로세스를 읽는다. argv/environ·파일 본문은 목록 수집에 쓰지 않고 native 종료 요청도 보내지 않는다.
+기존 개별 기록 수집의 nofollow/fstat·행 chain·image·프로세스 문맥 대조를 그대로 재사용한다.
+
+`live_census_stable`은 전후의 제한된 목록과 소유 세대가 같다는 뜻이다. 두 시점 사이에 생겼다
+사라진 프로세스나 전체 시험 구간을 증명하지 않는다. `recorded_files_covered`도 그 목록에
+있는 파일의 안전한 기록 prefix와 파일 신원이 수집됐다는 뜻이며 native 종결·회수가 아니다.
+같은 Python 실행 파일을 쓰지만 기록이 없는 프로세스는 `python_processes_without_recording`에
+남긴다. 보조 프로세스도 포함할 수 있으므로 worker 누락으로 단정하지 않는다.
+
+요청 index는 `recordings[i].capture.records[seq]`의 정확한 사건 참조와 지문만 연결한다.
+native ID 할당의 RETURN에 있는 외부/내부 지문 쌍을 보존하고, 외부 ID 재사용은 모호한
+다중 연결로 남긴다. 소유 세대와 boot/PID·time namespace/offset 지문이 다른 자료는 분리한다.
+이 index는 인증된 귀속·전역 시각 순서·`abort_to_stop_seconds`나 전체 LIF-10 판정이 아니다.
+
+기술 상한은 파일32·현재 프로세스128·index 지문256·사건 참조4096이다. 초과·누락·개별 실패는
+표식으로 남기며 이미 수집한 다른 기록은 보존한다. 파일 저장은 새 JSON에만 하고, 늦은 저장
+실패는 종료 코드1과 `artifact_saved:false` 및 검증된 metadata 전체를 표준 출력으로 반환한다.
+부분 파일은 성공 참조로 쓰지 않는다. 입력/준비 검증 실패는 종료 코드2다. 결과의 출처 상한·
+생산자 인증 false·전체 범위 false·security UNKNOWN은 단일 파일 수집과 같다.
+
 ## PLT-08 명시 소유 API 시험 구간의 평문 성공
 
 `api_transport:real`은 기존 `guard select/run/judge/report`에서 사용한다.

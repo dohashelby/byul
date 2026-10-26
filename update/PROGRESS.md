@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — LIF-10 세션 프로세스·파일 목록과 요청 사건 연결
+
+- 한 일: 기준f47da3d의 생산자/개별 수집을 재사용하는 세션 CLI를 구현했다. 전후 census·개별 파일/소유 세대 변화와 실패를 구분하고, 지문/정확 사건 참조·모호한 ID 재사용·클록 문맥 분리 및 늦은 저장 실패의 metadata 표준 출력 보존을 연결했다. 실제 엔진 기동·종료나 기존 스트림 측정 변경은 없다.
+- 테스트 결과: 소스848파일 고정 후 직접/인접 수집·CLI·불변식475통과/0실패/기존skip6/제외1(pytest51.46초·부모52.182초), 새EXAMPLE47건 포함. wheel 소스/설치본132파일 일치(부모11.279초). 기존 assert·판정 유지, 새skip/제외0. 실제 Linux helper는 기존 Docker CI 두 사례에 추가했으며 아직 이 head CI는 미실행이다. 상세 원본은 저장소 밖 byul-lifecycle-process-20261027T080550+0900이다.
+- 다음 단계: 같은 LIF-10 경로의 열린 초안 PR28에 추가 커밋을 푸시하고 정확 head의 Linux 기본·wheel·Docker helper·공용/플랫폼 CI를 확인한다. 전체 실행 구간·실제 생산자 인증/회수는 별도 검증한다.
+- 막힌 것: CPU 구현에는 없음. 실제 image loaded source·GPU/Kubernetes 실증은 준비/할당량이 남고 기업 종료 기한·회수 대상·전체 판정은 미선정이다. 자동화 등록 증가0이다.
+
 ## 2026-10-27 — LIF-10 native metadata 생산자·소유 기록 수집
 
 - 한 일: 기준6b81ade의 LIF-04/owned capture를 대조한 뒤 source/loader code를 검증하는 독립 표준 라이브러리 센서와 자산 준비·소유 단일 프로세스 기록 수집 CLI를 구현했다. API/내부ID/Core/KV fence·pool/worker/ASGI를 구분하고 원래 반환·예외·취소·정리 동작과 기존 스트림 시간을 유지한다. 원문 비저장·정확 ENV/세션/asset/PID·namespace·행 chain 및 후속 실패의 안전한 기록 보존을 연결했다. 판정·팩·자동화 등록은 유지한다.

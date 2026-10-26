@@ -32,7 +32,22 @@ def test_container_preview_uses_existing_fixed_fixture_without_docker(tmp_path, 
     assert preview.fixture_sha256 == sha256_hex(canonical_json({
         "sentinel_paths": ["/one", "/two"], "proc_cmd": PROC_CMD, "sentinel_cmd": SENTINEL_CMD}))
     assert preview.executor.name == "container_config"
+    assert preview.executor.version == ContainerConfigExecutor.version == "0.5.0"
     assert preview.config_sha256 == preview.executor.config_sha256
+
+
+def test_supply_image_identity_cannot_borrow_platform_sentinel_fixture(tmp_path, monkeypatch):
+    from guard.executors.container_config import ContainerConfigExecutor
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("preview must not run or collect")
+
+    monkeypatch.setattr(ContainerConfigExecutor, "run", forbidden)
+    monkeypatch.setattr(ContainerConfigExecutor, "collect", forbidden)
+    cfg = _cfg(tmp_path, "container_config")
+    check = baseline_pack().checks["SUP-04"]
+    pin = "example.invalid/image@sha256:" + "a" * 64
+    assert preview_inputs(check, environment(), {"approved_image_digests": [pin]}, cfg) is None
 
 
 def test_dynamic_registration_fixture_cannot_be_inferred(tmp_path):

@@ -21,8 +21,12 @@ from byul_platform.contracts import canonical_sha256
 from byul_platform.main import create_app
 from byul_platform.sources.update import rpt_to_verification_result, report_view
 from guard.collectors.file import load_environment, load_policy
+from guard.core.judge import judge_plan
 from guard.core.report import build_report
+from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
+from guard.executors import registry as executor_registry
+from guard.executors.container_config import ContainerConfigExecutor
 from guard.models import Environment, Evidence, Policy, Result, load_pack, new_id
 from guard.store import Store
 
@@ -288,3 +292,97 @@ def test_platform_reads_current_rpt_and_keeps_u1_raw_detail(tmp_path, current_pa
         assert detail["report"]["counts"]["selected"] == 0
         assert detail["item"]["official"] is False
     assert path.read_bytes() == raw
+
+
+@pytest.mark.parametrize("approved_matches,expected", [
+    pytest.param(False, "FAIL", id="unapproved-running-image"),
+    pytest.param(True, "UNKNOWN", id="approved-image-partial-supply-scope"),
+])
+def test_sup04_executor_to_rpt_preserves_contract_verdicts_and_exact_refs(
+        tmp_path, monkeypatch, contracts, current_pack, approved_matches, expected):
+    """제품 실행·판정·보고 경로를 대역으로 통과시킨다. 실제 Docker/vLLM 실증 아님."""
+    pinned = "example.invalid/cpu-engine@sha256:" + "a" * 64
+    other = "example.invalid/cpu-engine@sha256:" + "c" * 64
+    image_id, container, run_id = "sha256:" + "b" * 64, "guard-contract-example-engine", "example-contract-run"
+    target = {"lab": True, "run_id": run_id, "probe_image": "unused-example-probe",
+              "origins": {"trusted": {"network": "example-trusted"}},
+              "gateway": {"url": "http://gateway:8080"},
+              "engine": {"container": container, "image_digest": pinned,
+                         "trusted_url": "http://engine:8000", "ready_timeout": 1}}
+    target_path = tmp_path / "target.json"
+    target_path.write_text(json.dumps(target), encoding="utf-8")
+
+    class ExampleDocker:
+        def inspect_json(self, name, *, timeout):
+            assert name == container and timeout > 0
+            return {"Id": "d" * 64, "Name": "/" + container, "Image": image_id,
+                    "State": {"Running": True, "StartedAt": "2026-10-26T00:00:00Z"},
+                    "Config": {"Image": pinned, "Labels": {"guard.run": run_id}}}
+
+        def image_info(self, identifier, *, timeout):
+            assert identifier == image_id and timeout > 0
+            return {"digests": [pinned], "os": "linux", "architecture": "amd64"}
+
+        def exec(self, *args, **kwargs):
+            raise AssertionError("running image profile must not execute sentinel or package commands")
+
+    def example_http(network, requests, timeout):
+        assert network == "example-trusted" and timeout > 0
+        responses = []
+        for request in requests:
+            response = {"id": request["id"], "method": request["method"],
+                        "url": request["url"], "outcome": 200}
+            if request["method"] == "POST":
+                response["body"] = json.dumps({
+                    "model": request["body"]["model"],
+                    "choices": [{"text": "EXAMPLE", "finish_reason": "length"}],
+                    "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                })
+            responses.append(response)
+        return responses
+
+    monkeypatch.setitem(executor_registry.EXECUTORS, "container_config:contract-sim", lambda raw:
+                        ContainerConfigExecutor({"target": str(target_path)},
+                                                container_probe=example_http, docker=ExampleDocker()))
+    store = Store(tmp_path / "supply-store")
+    # BYUL environment와 같은 bare manifest 해시를 쓰며 repository는 명시 target에서만 얻는다.
+    env = Environment(id=new_id("ENV"), created_at=T0, data_origin="EXAMPLE",
+                      engine={"name": "vllm", "version": "0.32.0", "image_digest": pinned.partition("@")[2]},
+                      model={"id": "example-model"}).seal()
+    pol = Policy(id=new_id("POL"), created_at=T0, data_origin="EXAMPLE", status="DRAFT",
+                 pack=current_pack.ref(), scope={"include": ["SUP-04"], "exclude": []},
+                 values={"SUP-04": {"approved_image_digests": [pinned if approved_matches else other]}}).seal()
+    store.put_many([env, pol])
+    plan = select(current_pack, [env], pol)
+    store.put(plan)
+    (evidence,) = run_plan(store, current_pack, plan,
+                          RunConfig(executors={"container_config": "contract-sim"}, adapter="vllm"))
+    (result,) = judge_plan(store, current_pack, plan, as_of=T0)
+    assert evidence.execution.status.value == "COMPLETED"
+    assert evidence.normal_control.succeeded is True
+    assert any(not step.attempted for step in evidence.challenges)
+    assert evidence.observations["running_image_identity_verified"].value is True
+    assert evidence.observations["supply_execution_scope_complete"].value is False
+    assert result.verdicts.security.value == expected
+    assert result.verdicts.functional.value == result.verdicts.performance.value == "UNKNOWN"
+    originals = {obj.id: obj.to_dict() for obj in (env, pol, plan, evidence, result)}
+    report = build_report(store, current_pack, plan, T0 + timedelta(days=1))
+    rpt = report.to_dict()
+    before = deepcopy(rpt)
+    converted = rpt_to_verification_result(rpt)
+    assert contracts.errors("verification-result", converted) == []
+    check = next(row for row in converted["checks"] if row["check_id"] == "SUP-04")
+    assert check["selected"] is True and check["sides"]["single"]["security"] == expected
+    assert check["sides"]["single"]["result_ref"] == result.ref().model_dump(mode="json")
+    assert check["sides"]["single"]["verification_level"] == "EXAMPLE"
+    assert check["sides"]["single"]["functional"] == check["sides"]["single"]["performance"] == "UNKNOWN"
+    assert result.evidence == evidence.ref()
+    assert evidence.ref().model_dump(mode="json") in converted["inputs_manifest"]
+    assert result.ref().model_dump(mode="json") in converted["inputs_manifest"]
+    assert converted["report_ref"] == report.ref().model_dump(mode="json")
+    assert converted["data_origin"] == evidence.data_origin.value == result.data_origin.value == "EXAMPLE"
+    assert converted["official"] is False and converted["policy_status"] == "DRAFT"
+    assert any("running-image-approval-v1" in reason for reason in converted["limitations"])
+    assert rpt == before and report.hash_ok()
+    for obj in (env, pol, plan, evidence, result):
+        assert store.resolve(obj.ref()).to_dict() == originals[obj.id]

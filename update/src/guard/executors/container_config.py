@@ -23,6 +23,8 @@ import secrets
 from typing import Any
 
 from .http_common import Ctx, HttpCheckExecutor, functional_requests, functional_results
+from .running_image_approval import (PROFILE as SUPPLY_IMAGE_PROFILE, VERSION as SUPPLY_IMAGE_VERSION,
+                                     collect_running_image_approval, validate_image_approval_policy)
 
 # Linux capability 번호 → 이름 (include/uapi/linux/capability.h)
 CAP_NAMES = [
@@ -102,7 +104,7 @@ def _mount_key(m: dict) -> str:
 
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
-    version = "0.4.0"
+    version = SUPPLY_IMAGE_VERSION
     requires_roles = False
     requires_route_scope = False
     functional_via = "engine"
@@ -112,6 +114,11 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         super().__init__(cfg, container_probe=container_probe, environ=environ, **kw)
         self._docker = docker  # inspect_json(container, timeout=), exec(container, argv, timeout=)
 
+    def validate_policy(self, check, values):
+        profile = getattr(check, "collection_profile", None)
+        if profile == SUPPLY_IMAGE_PROFILE:
+            validate_image_approval_policy(values)
+
     def _docker_obj(self):
         if self._docker is None:
             from guard.runtime.docker import Docker
@@ -120,6 +127,8 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         return self._docker
 
     def collect(self, ctx: Ctx):
+        if getattr(ctx.check, "collection_profile", None) == SUPPLY_IMAGE_PROFILE:
+            return collect_running_image_approval(self._docker_obj(), ctx, self.cfg.get("container"))
         container = self.cfg.get("container") or ctx.target.get("engine", {}).get("container")
         if not container:
             raise RuntimeError("container_config: no target container (set [container_config].container)")

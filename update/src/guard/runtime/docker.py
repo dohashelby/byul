@@ -158,6 +158,13 @@ class Docker:
     def network_connect(self, network: str, container: str, *, timeout: float) -> None:
         self._docker(["network", "connect", network, container], timeout=timeout)
 
+    def network_info(self, network: str, *, timeout: float) -> dict:
+        """Read the explicit network's ownership and endpoint metadata."""
+        raw = json.loads(self._docker(["network", "inspect", network], timeout=timeout).stdout)
+        if type(raw) is not list or len(raw) != 1 or type(raw[0]) is not dict:
+            raise DockerError("invalid network inspection response")
+        return raw[0]
+
     # --- 컨테이너 ----------------------------------------------------------------
 
     def _common_run_args(self, name: str, networks: list[str], mounts: list[Mount], public_env: dict[str, str],
@@ -231,10 +238,14 @@ class Docker:
         return name
 
     def run_once(self, image: str, suffix: str, *, network: str, timeout: float, command: list[str],
-                 input: bytes | None = None, mounts: list[Mount] | None = None) -> CmdResult:
+                 input: bytes | None = None, mounts: list[Mount] | None = None,
+                 pull_never: bool = False) -> CmdResult:
         """`docker run --rm -i`: stdin으로 입력을 주고 stdout을 받는다. 실패 코드는 호출자가 본다."""
         name = self.name(suffix)
-        args = ["run", "--rm", "-i", *self._common_run_args(name, [network], mounts or [], {}, {}), image, *command]
+        if type(pull_never) is not bool:
+            raise ValueError("pull_never must be an explicit boolean")
+        args = ["run", "--rm", "-i", *(["--pull=never"] if pull_never else []),
+                *self._common_run_args(name, [network], mounts or [], {}, {}), image, *command]
         return self._docker(args, timeout=timeout, input=input, check=False)
 
     def exec(self, container: str, argv: list[str], *, timeout: float) -> CmdResult:

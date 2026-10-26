@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import secrets
 import time
@@ -122,26 +123,49 @@ def docker_container_probe(docker: Docker, image: str) -> ContainerProbe:
     return run
 
 
-def docker_stream_probe(docker: Docker, image: str) -> StreamProbe:
+def docker_stream_probe(docker: Docker, image: str, *, pull_never: bool = False,
+                        parent_deadline: float | None = None, deadline_guard: dict | None = None) -> StreamProbe:
     """Use the existing owned Docker lifecycle; no independent cleanup owner.
 
     This additional protocol never changes the legacy serial request format.
     Keys stay in stdin, and collector errors never include raw stderr/request
     data. The parent executor supplies its remaining whole-run budget.
     """
+    if type(pull_never) is not bool:
+        raise ValueError("pull_never must be an explicit boolean")
+    guard = stream_probe._prepare_deadline_guard(deadline_guard)
+    if ((parent_deadline is None) != (guard is None)
+            or parent_deadline is not None and (type(parent_deadline) not in (int, float)
+                                                or not math.isfinite(parent_deadline))):
+        raise ValueError("invalid parent/source deadline pair")
     script = Path(stream_probe.__file__).resolve()
     counter = {"n": 0}
     counter_lock = Lock()
 
+    def parent_remaining():
+        value = parent_deadline - time.monotonic()
+        if value <= 0:
+            raise DockerError("stream probe parent deadline expired")
+        return value
+
     def run(network: str, requests: list[dict], timeout: float) -> list[dict]:
         stream_probe._prepare(requests, timeout)  # validate before creating a container
+        run_timeout = timeout + 60
+        spec = {"timeout": timeout, "requests": requests}
+        if parent_deadline is not None:
+            run_timeout = parent_remaining()
+            spec.update(timeout=min(timeout, run_timeout), deadline_guard=dict(guard))
         with counter_lock:
             counter["n"] += 1
             suffix = f"streamprobe{counter['n']}"
+        payload = json.dumps(spec, ensure_ascii=False).encode("utf-8")
+        if parent_deadline is not None:
+            run_timeout = parent_remaining()  # Serialization/setup consumes the same parent budget.
         result = docker.run_once(
-            image, suffix, network=network, timeout=timeout + 60,
+            image, suffix, network=network, timeout=run_timeout,
             mounts=[Mount(script, "/probe/stream_probe.py")], command=["python", "/probe/stream_probe.py"],
-            input=json.dumps({"timeout": timeout, "requests": requests}, ensure_ascii=False).encode("utf-8"),
+            input=payload,
+            **({"pull_never": True} if pull_never else {}),
         )
         if result.returncode != 0:
             raise DockerError(f"stream probe container exited {result.returncode}")

@@ -9,6 +9,7 @@ exposed → REQ-01 FAIL, isolated → PASS. 끝나면 guard.run 라벨의 컨테
 import json
 import secrets
 import subprocess
+import time
 
 import pytest
 import yaml
@@ -17,7 +18,7 @@ from typer.testing import CliRunner
 from guard.cli import app
 from guard.runtime.docker import Docker
 from lab import lab
-from tests.builders import ROOT, baseline_pack
+from tests.builders import ROOT, baseline_pack, environment
 
 pytestmark = pytest.mark.docker
 runner = CliRunner()
@@ -58,6 +59,38 @@ def test_lab_topology_end_to_end(tmp_path, topology, expected):
     env = {"GUARD_LAB_ALLOWED_KEY": allowed, "GUARD_LAB_DENIED_KEY": denied}
     with Docker(run_id) as docker:  # 실패해도 __exit__에서 cleanup
         lab.up(docker, topology, run_dir, allowed)
+        # This existing isolated CI lab already has the helper image locally.
+        # Exercise the pressure transport's no-pull boundary without vLLM.
+        target = json.loads((run_dir / "target.json").read_text(encoding="utf-8"))
+        no_pull = docker.run_once(lab.PYTHON_IMAGE, "no-pull-control",
+            network=target["origins"]["trusted"]["network"], timeout=30,
+            command=["python", "-c", "print('guard-local-probe')"], pull_never=True)
+        assert no_pull.returncode == 0 and no_pull.stdout.strip() == "guard-local-probe"
+        missing = docker.run_once("example.invalid/guard-never-pull@sha256:" + "0" * 64,
+            "no-pull-missing", network=target["origins"]["trusted"]["network"], timeout=30,
+            command=["python", "-V"], pull_never=True)
+        assert missing.returncode != 0  # Missing local image fails instead of being fetched.
+        # Exercise the actual read-only helper in a pinned owned Python source,
+        # not vLLM. Explicit namespace setup matches its restricted profile.
+        pinned = docker.image_info(lab.PYTHON_IMAGE, timeout=30)["digests"][0]
+        resource_name = docker.name("resource-source")
+        docker._docker(["run", "-d", "--name", resource_name, "--label", docker.label,
+            "--network", target["origins"]["trusted"]["network"], "--cgroupns=private", "--pull=never",
+            pinned, "python", "-c", "import socket,time; s=socket.socket(); s.bind(('0.0.0.0',18000)); "
+            "s.listen(1); print('RESOURCE_READY',flush=True); time.sleep(300)"], timeout=30)
+        lab._wait(lambda: "RESOURCE_READY" in docker.logs(resource_name, timeout=30), "owned resource fixture")
+        from guard.executors.pressure_resources import capture_resource_sample
+        resource_target = {"run_id": run_id, "engine": {"container": resource_name, "image_digest": pinned}}
+        observed = capture_resource_sample(docker, resource_target, environment(engine={"name": "engine-x", "image_digest": pinned}),
+                                           deadline=time.monotonic() + 30, port=18000)
+        assert observed["complete"] is True, observed["diagnostic_codes"]
+        assert observed["owner"]["run_id"] == run_id
+        assert observed["observations"]["clock"]["sample_finished_monotonic_ns"] >= observed["observations"]["clock"]["sample_started_monotonic_ns"]
+        listeners = [row for row in observed["observations"]["tcp_connections"] if row["state"] == 10 and row["owners"]]
+        assert listeners
+        assert all(row["queue_kind"] == "listen_backlog_connections"
+                   and row["tx_queue_bytes"] is row["rx_queue_bytes"] is None
+                   and row["listen_pending_connections"] == 0 for row in listeners)
         cfg = run_dir / "guard.toml"
         cfg.write_text(
             f'store = "{(run_dir / ".guard").as_posix()}"\n[adapter]\nname = "vllm"\n[executors]\ndirect_route = "real"\n'

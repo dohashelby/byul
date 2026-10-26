@@ -9,6 +9,7 @@ import subprocess
 import sys
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -379,3 +380,372 @@ def test_ctx_stream_probe_is_optional_and_legacy_log_position_is_preserved():
     fields = list(Ctx.__dataclass_fields__)
     assert fields.index("sprobe") > fields.index("log")
     assert Ctx.__dataclass_fields__["sprobe"].default is None
+
+
+def _slow_profile(**changes):
+    # Technical test controls, never enterprise memory/time limits or engine evidence.
+    return {"profile": "slow-reader-v1", "chunk_bytes": 1, "interval_ms": 40,
+            "close_after_reads": 3, **changes}
+
+
+def test_slow_reader_pauses_between_each_read_and_closes_peer_while_control_completes():
+    arrived = threading.Barrier(2)
+    peer_eof = threading.Event()
+    body = b"data: " + b"x" * 512 + b"\n\ndata: [DONE]\n\n"
+
+    def handler(conn, request, index, stop):
+        arrived.wait(timeout=1)
+        label = json.loads(request.partition(b"\r\n\r\n")[2])["prompt"]
+        if label == "normal":
+            _response(conn, b'{"ok":true}')
+        else:
+            # Advertise a longer stream but send only the three observed bytes.
+            # No unread payload is queued at close, so peer EOF is deterministic
+            # rather than depending on an OS's reset handling for discarded data.
+            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: "
+                         + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body[:3])
+            if conn.recv(1) == b"":
+                peer_eof.set()
+
+    with _server(handler) as (url, accepted):
+        slow, normal = stream_probe.collect([
+            _request(url, "slow", mode="sse", read_profile=_slow_profile()),
+            _request(url, "normal")], 2)
+        assert peer_eof.wait(0.5), "the test-owned peer did not observe the client's explicit close"
+    assert len(accepted) == 2
+    assert slow["read_count"] == 3 and slow["read_pause_count"] == 2
+    observations = slow["read_observations"]
+    assert [row["seq"] for row in observations] == [0, 1, 2]
+    assert all(set(row) == {"seq", "started_ms", "finished_ms", "bytes"} and row["bytes"] == 1 for row in observations)
+    assert all(row["finished_ms"] >= row["started_ms"] for row in observations)
+    assert all(later["started_ms"] >= earlier["finished_ms"] + 35
+               for earlier, later in zip(observations, observations[1:]))
+    assert slow["body_bytes"] == 3 and slow["body"] == body[:3].decode()
+    assert slow["client_closed"] and slow["stop_reason"] == "client_close"
+    assert not slow["capture_complete"] and not slow["eof"] and not slow["terminal_seen"]
+    assert slow["client_close_ms"] >= observations[-1]["finished_ms"]
+    assert normal["capture_complete"] and normal["eof"] and normal["body"] == '{"ok":true}'
+    assert normal["end_ms"] < slow["client_close_ms"]
+    assert not {"read_count", "read_pause_count", "client_closed", "client_close_ms", "read_observations"} & set(normal)
+    assert slow["timing_basis"] == "batch_monotonic_client_connection_only"
+
+
+def test_slow_reader_retains_the_legacy_one_time_initial_delay_separately():
+    body = b"data: " + b"x" * 64 + b"\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_delay_ms=100,
+            read_profile=_slow_profile(close_after_reads=2))], 2)
+    observations = value["read_observations"]
+    assert observations[0]["started_ms"] >= value["headers_ms"] + 90
+    assert observations[1]["started_ms"] >= observations[0]["finished_ms"] + 35
+    assert value["read_pause_count"] == 1 and value["read_count"] == 2 and value["client_closed"]
+
+
+@pytest.mark.parametrize("body,terminal", [(b"data: [DONE]\n\n", True), (b"data: 1\n\n", False)])
+def test_slow_reader_real_eof_before_close_threshold_keeps_transport_terminal_distinction(body, terminal):
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse",
+            read_profile=_slow_profile(chunk_bytes=4096, close_after_reads=32))], 1)
+    assert value["capture_complete"] and value["eof"] and value["stop_reason"] == "eof"
+    assert value["terminal_seen"] is terminal
+    assert not value["client_closed"] and value["client_close_ms"] is None
+    assert value["read_count"] == 1 and value["read_pause_count"] == 0
+    assert value["read_observations"][0]["bytes"] == len(body)
+
+
+def test_slow_reader_done_at_close_threshold_never_claims_eof_or_complete_capture():
+    terminal = b"data: [DONE]\n\n"
+    body = terminal + b"data: unobserved\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse",
+            read_profile=_slow_profile(chunk_bytes=len(terminal), close_after_reads=1))], 1)
+    assert value["terminal_seen"] and value["events"][0]["data"] == "[DONE]"
+    assert value["client_closed"] and value["stop_reason"] == "client_close"
+    assert not value["capture_complete"] and not value["eof"]
+    assert value["read_count"] == 1 and value["read_pause_count"] == 0
+    assert value["body"] == terminal.decode() and "unobserved" not in json.dumps(value)
+
+
+def test_slow_reader_deadline_interrupts_inter_read_pause_and_is_not_client_close():
+    body = b"data: " + b"x" * 512 + b"\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        started = time.monotonic()
+        value, = stream_probe.collect([_request(url, mode="sse",
+            read_profile=_slow_profile(interval_ms=250, close_after_reads=32))], 0.18)
+        elapsed = time.monotonic() - started
+    assert elapsed < 0.7
+    assert value["read_count"] == 1 and value["read_pause_count"] == 1
+    assert not value["client_closed"] and value["client_close_ms"] is None
+    assert value["stop_reason"] in {"deadline", "timeout"}
+    assert not value["eof"] and not value["capture_complete"]
+    assert len(value["read_observations"]) == 1
+
+
+def test_slow_reader_still_preserves_sse_limits_instead_of_relabelling_them_as_client_close():
+    body = b"data: " + b"x" * stream_probe.MAX_LINE + b"\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse",
+            read_profile=_slow_profile(chunk_bytes=4096, interval_ms=1, close_after_reads=32))], 2)
+    assert value["stop_reason"] == "line_limit" and value["body_truncated"]
+    assert not value["client_closed"] and not value["capture_complete"]
+    assert 1 <= value["read_count"] <= 32
+    assert len(value["read_observations"]) == value["read_count"]
+    assert all(0 < row["bytes"] <= 4096 for row in value["read_observations"])
+
+
+def test_slow_reader_read_observations_and_bytes_are_bounded_at_the_maximum_read_count():
+    body = b":" + b"x" * 128 + b"\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse",
+            read_profile=_slow_profile(interval_ms=1, close_after_reads=32))], 2)
+    assert value["read_count"] == len(value["read_observations"]) == 32
+    assert value["read_pause_count"] == 31 and value["body_bytes"] == 32
+    assert value["client_closed"] and value["stop_reason"] == "client_close"
+
+
+def test_slow_reader_requires_an_actual_sse_response_without_retaining_other_media():
+    with _server(lambda conn, *_: _response(conn, b'{"private":"not-SSE"}')) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_slow_profile())], 1)
+    assert value["stop_reason"] == "unsupported_read_profile_content_type"
+    assert value["read_count"] == value["read_pause_count"] == 0
+    assert not value["client_closed"] and not value["capture_complete"] and not value["eof"]
+    assert "not-SSE" not in json.dumps(value)
+
+
+@pytest.mark.parametrize("profile", [None, False, [], {},
+    {"profile": "slow-reader-v1"}, {**_slow_profile(), "extra": 1},
+    _slow_profile(profile="other"), _slow_profile(profile=1),
+    _slow_profile(chunk_bytes=0), _slow_profile(chunk_bytes=4097), _slow_profile(chunk_bytes=True),
+    _slow_profile(interval_ms=0), _slow_profile(interval_ms=251), _slow_profile(interval_ms=1.0),
+    _slow_profile(close_after_reads=0), _slow_profile(close_after_reads=33),
+    _slow_profile(close_after_reads=True), _slow_profile(close_after_reads="2"),
+])
+def test_invalid_slow_reader_profiles_never_connect(monkeypatch, profile):
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **kw: pytest.fail("invalid slow profile connected"))
+    with pytest.raises(ValueError):
+        stream_probe.collect([_request("http://127.0.0.1:1", mode="sse", read_profile=profile)], 1)
+
+
+def test_slow_reader_profile_is_not_silently_used_for_a_json_request(monkeypatch):
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **kw: pytest.fail("JSON slow profile connected"))
+    with pytest.raises(ValueError):
+        stream_probe.collect([_request("http://127.0.0.1:1", read_profile=_slow_profile())], 1)
+
+
+def test_absent_slow_profile_preserves_legacy_output_keys_and_one_initial_pause():
+    body = b"data: [DONE]\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_delay_ms=80)], 1)
+    assert value["capture_complete"] and value["eof"] and value["terminal_seen"]
+    assert value["first_byte_ms"] >= value["headers_ms"] + 65
+    assert not {"read_count", "read_pause_count", "client_closed", "client_close_ms", "read_observations"} & set(value)
+
+
+def test_standalone_slow_profile_works_without_guard_imports_or_credential_output():
+    body = b"data: [DONE]\n\ndata: unobserved\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        source = {"timeout": 2, "requests": [_request(url, mode="sse",
+            headers={"Authorization": "Bearer hidden-slow-key"},
+            read_profile=_slow_profile(chunk_bytes=3, interval_ms=1, close_after_reads=2))]}
+        process = subprocess.run([sys.executable, "-I", str(Path(stream_probe.__file__))],
+                                 input=json.dumps(source).encode(), capture_output=True, timeout=4, check=False)
+    assert process.returncode == 0 and process.stderr == b""
+    value, = json.loads(process.stdout)
+    assert value["client_closed"] and value["read_count"] == 2 and value["read_pause_count"] == 1
+    assert value["body_bytes"] == 6 and value["stop_reason"] == "client_close"
+    assert not value["capture_complete"] and b"hidden-slow-key" not in process.stdout
+
+
+def test_slow_reader_clock_binds_both_clients_to_the_existing_batch_monotonic_base(monkeypatch):
+    original_readlink, original_clock = stream_probe.os.readlink, stream_probe._clock
+    calls = []
+    def readlink(path, *args, **kwargs):
+        return "time:[4026531843]" if path == "/proc/self/ns/time" else original_readlink(path, *args, **kwargs)
+    def capture_base(base):
+        calls.append(base)
+        return original_clock(base)
+    monkeypatch.setattr(stream_probe.os, "readlink", readlink)
+    monkeypatch.setattr(stream_probe, "_clock", capture_base)
+    body = b"data: " + b"x" * 64 + b"\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        values = stream_probe.collect([_request(url, label, mode="sse", read_profile=_slow_profile(close_after_reads=1))
+                                       for label in ("a", "b")], 1)
+    assert len(calls) == 1
+    expected = {"basis": "linux-monotonic-time-namespace-v1", "time_namespace_inode": 4026531843,
+                "batch_started_monotonic_ns": round(calls[0] * 1_000_000_000)}
+    assert all(row["clock"] == expected and row["client_closed"] for row in values)
+    assert all(row["relative_clock"] == "monotonic" for row in values)
+    assert values[0]["clock"] is not values[1]["clock"]
+    assert all(set(row["clock"]) == set(expected) for row in values)
+
+
+@pytest.mark.parametrize("link", ["time:[0]", "time:[-1]", "net:[123]", "time:[01]",
+                                  "time:[18446744073709551616]", "PRIVATE_INVALID_NAMESPACE"])
+def test_unsupported_time_namespace_metadata_is_not_promoted_to_a_clock(monkeypatch, link):
+    monkeypatch.setattr(stream_probe.os, "readlink", lambda *_: link)
+    assert stream_probe._clock(1.25) is None
+
+
+def test_missing_time_namespace_keeps_the_slow_read_procedure_and_reports_clock_none(monkeypatch):
+    original = stream_probe.os.readlink
+    def unavailable(path, *args, **kwargs):
+        if path == "/proc/self/ns/time":
+            raise FileNotFoundError("PRIVATE_NAMESPACE_ERROR")
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(stream_probe.os, "readlink", unavailable)
+    body = b"data: " + b"x" * 64 + b"\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_slow_profile(close_after_reads=2))], 1)
+    assert value["clock"] is None and value["client_closed"]
+    assert value["relative_clock"] == "perf_counter"
+    assert value["read_count"] == 2 and value["read_pause_count"] == 1
+    assert value["stop_reason"] == "client_close" and "PRIVATE_" not in json.dumps(value)
+
+
+def test_legacy_collection_does_not_read_or_publish_time_namespace_metadata(monkeypatch):
+    monkeypatch.setattr(stream_probe, "_clock", lambda *_: pytest.fail("legacy collector read a new clock"))
+    with _server(lambda conn, *_: _response(conn, b'{"ok":true}')) as (url, _):
+        value, = stream_probe.collect([_request(url)], 1)
+    assert value["capture_complete"] and value["body"] == '{"ok":true}'
+    assert "clock" not in value
+    assert "relative_clock" not in value
+
+
+def test_slow_reader_uses_high_resolution_relative_time_when_monotonic_is_coarse(monkeypatch):
+    real_time = stream_probe.time
+    counter_calls = []
+    def high_resolution():
+        counter_calls.append(True)
+        return real_time.perf_counter()
+    proxy = SimpleNamespace(
+        monotonic=lambda: int(real_time.monotonic() / 0.015625) * 0.015625,
+        perf_counter=high_resolution)
+    monkeypatch.setattr(stream_probe, "time", proxy)
+    monkeypatch.setattr(stream_probe, "_clock", lambda *_: None)
+    body = b"data: " + b"x" * 64 + b"\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse",
+            read_profile=_slow_profile(interval_ms=10, close_after_reads=3))], 1)
+    assert counter_calls and value["relative_clock"] == "perf_counter" and value["clock"] is None
+    assert value["client_closed"] and value["read_count"] == 3 and value["read_pause_count"] == 2
+    rows = value["read_observations"]
+    assert all(later["started_ms"] - earlier["finished_ms"] >= 9
+               for earlier, later in zip(rows, rows[1:]))
+    assert value["client_close_ms"] >= rows[-1]["finished_ms"]
+
+
+def test_valid_linux_clock_never_uses_a_separate_relative_epoch(monkeypatch):
+    real_time = stream_probe.time
+    monkeypatch.setattr(stream_probe, "time", SimpleNamespace(monotonic=real_time.monotonic,
+        perf_counter=lambda: pytest.fail("valid Linux clock used a different epoch")))
+    bases = []
+    def clock(base):
+        bases.append(base)
+        return {"basis": "linux-monotonic-time-namespace-v1", "time_namespace_inode": 123,
+                "batch_started_monotonic_ns": round(base * 1_000_000_000)}
+    monkeypatch.setattr(stream_probe, "_clock", clock)
+    body = b"data: " + b"x" * 64 + b"\n\n"
+    with _server(lambda conn, *_: _response(conn, body, content_type="text/event-stream")) as (url, _):
+        value, = stream_probe.collect([_request(url, mode="sse", read_profile=_slow_profile(close_after_reads=1))], 1)
+    assert len(bases) == 1 and value["relative_clock"] == "monotonic"
+    assert value["clock"]["batch_started_monotonic_ns"] == round(bases[0] * 1_000_000_000)
+    assert value["client_closed"]
+
+
+def test_legacy_collection_never_consults_the_opt_in_high_resolution_counter(monkeypatch):
+    real_time = stream_probe.time
+    monkeypatch.setattr(stream_probe, "time", SimpleNamespace(monotonic=real_time.monotonic,
+        perf_counter=lambda: pytest.fail("legacy collector used a new counter")))
+    with _server(lambda conn, *_: _response(conn, b'{"ok":true}')) as (url, _):
+        value, = stream_probe.collect([_request(url)], 1)
+    assert value["capture_complete"] and value["body"] == '{"ok":true}'
+    assert "clock" not in value and "relative_clock" not in value
+
+
+def _deadline_guard(deadline=None):
+    return {"basis": "linux-monotonic-time-namespace-v1", "time_namespace_inode": 777,
+            "deadline_monotonic_ns": time.monotonic_ns() + 2_000_000_000 if deadline is None else deadline}
+
+
+@pytest.mark.parametrize("change", [
+    lambda value: value.update(extra="PRIVATE_GUARD_INPUT"),
+    lambda value: value.update(basis="PRIVATE_GUARD_INPUT"),
+    lambda value: value.update(time_namespace_inode=True),
+    lambda value: value.update(deadline_monotonic_ns=0),
+    lambda value: value.update(deadline_monotonic_ns=2**63),
+])
+def test_invalid_deadline_guard_is_rejected_before_any_connection(monkeypatch, change):
+    guard = _deadline_guard()
+    change(guard)
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **kw: pytest.fail("invalid guard connected"))
+    with pytest.raises(ValueError, match="source deadline guard"):
+        stream_probe.collect([_request("http://127.0.0.1:1")], 1, deadline_guard=guard)
+
+
+@pytest.mark.parametrize("problem,reason", [("unavailable", "source_clock_unavailable"),
+                                           ("different", "source_clock_mismatch"),
+                                           ("expired", "source_deadline")])
+def test_source_clock_guard_prevents_connecting_after_startup_delay_or_namespace_gap(monkeypatch, problem, reason):
+    guard = _deadline_guard(1 if problem == "expired" else None)
+    monkeypatch.setattr(stream_probe, "_clock", lambda base: None if problem == "unavailable" else {
+        "basis": guard["basis"], "time_namespace_inode": 778 if problem == "different" else 777,
+        "batch_started_monotonic_ns": round(base * 1_000_000_000)})
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **kw: pytest.fail("failed source guard connected"))
+    value, = stream_probe.collect([_request("http://127.0.0.1:1")], 1, deadline_guard=guard)
+    assert value["outcome"] == "probe_error" and value["stop_reason"] == reason
+    assert value["deadline_guard_verified"] is False and value["capture_complete"] is False
+    assert "request_sent_ms" not in value and value["body_bytes"] == 0
+
+
+@pytest.mark.parametrize("problem,reason", [("expired", "source_deadline"), ("namespace", "source_clock_mismatch")])
+def test_source_deadline_is_rechecked_after_connect_before_http_request(monkeypatch, problem, reason):
+    now = {"ns": 10_000_000_000, "namespace": 777}
+    calls = []
+    guard = _deadline_guard(12_000_000_000)
+    monkeypatch.setattr(stream_probe.time, "monotonic_ns", lambda: now["ns"])
+    monkeypatch.setattr(stream_probe, "_clock", lambda base: {
+        "basis": guard["basis"], "time_namespace_inode": now["namespace"],
+        "batch_started_monotonic_ns": round(base * 1_000_000_000)})
+    class Connection:
+        def __init__(self, *args, **kwargs):
+            self.sock = self
+        def connect(self):
+            calls.append("connect")
+            if problem == "expired":
+                now["ns"] = 13_000_000_000
+            else:
+                now["namespace"] = 778
+        def settimeout(self, value):
+            pass
+        def request(self, *args, **kwargs):
+            pytest.fail("HTTP started after its source cutoff")
+        def close(self):
+            calls.append("close")
+    monkeypatch.setattr(stream_probe.http.client, "HTTPConnection", Connection)
+    value, = stream_probe.collect([_request("http://127.0.0.1:1")], 10, deadline_guard=guard)
+    assert "connect" in calls and "close" in calls
+    assert value["stop_reason"] == reason and value["deadline_guard_verified"] is False
+    assert "request_sent_ms" not in value
+
+
+def test_verified_source_guard_allows_owned_http_and_is_acknowledged(monkeypatch):
+    guard = _deadline_guard()
+    monkeypatch.setattr(stream_probe, "_clock", lambda base: {
+        "basis": guard["basis"], "time_namespace_inode": 777,
+        "batch_started_monotonic_ns": round(base * 1_000_000_000)})
+    with _server(lambda conn, *_: _response(conn, b'{"ok":true}')) as (url, _):
+        value, = stream_probe.collect([_request(url)], 1, deadline_guard=guard)
+    assert value["deadline_guard_verified"] is True
+    assert value["capture_complete"] is True and value["body"] == '{"ok":true}'
+
+
+def test_standalone_source_guard_protocol_refuses_http_and_keeps_fixed_safe_metadata():
+    source = {"timeout": 1, "deadline_guard": _deadline_guard(1),
+              "requests": [_request("http://127.0.0.1:1", headers={"Authorization": "Bearer PRIVATE_GUARD_AUTH"})]}
+    process = subprocess.run([sys.executable, "-I", str(Path(stream_probe.__file__))],
+                             input=json.dumps(source).encode(), capture_output=True, timeout=4, check=False)
+    assert process.returncode == 0 and process.stderr == b""
+    value, = json.loads(process.stdout)
+    assert value["stop_reason"] in {"source_deadline", "source_clock_mismatch", "source_clock_unavailable"}
+    assert value["deadline_guard_verified"] is False and "request_sent_ms" not in value
+    assert b"PRIVATE_" not in process.stdout

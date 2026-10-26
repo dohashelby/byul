@@ -464,6 +464,41 @@ def verify(config: Path = ConfigOpt, store: Optional[Path] = StoreOpt) -> None:
     raise typer.Exit(1 if problems else 0)
 
 
+@app.command("capture-stream-pressure")
+def capture_stream_pressure(
+    env: Path = typer.Option(..., "--env"),
+    target: Path = typer.Option(..., "--target"),
+    settings: Path = typer.Option(..., "--settings"),
+    output: Path = typer.Option(..., "--output"),
+    execute: bool = typer.Option(False, "--execute", help="소유 격리 대상에 제한된 정상·느린 SSE 요청을 실행"),
+) -> None:
+    """LIF-04 부분 관측. 클라이언트 종료·자원 총량은 worker 취소/회수 판정이 아니다."""
+    from guard.collectors.stream_pressure import load_inputs, validate_output
+    from guard.executors.owned_capture import SourceCaptureError
+    from guard.executors.stream_pressure import execute_pressure
+    try:
+        environment, topology, config = load_inputs(env, target, settings)
+        validate_output(output, Path(__file__).resolve().parents[3])
+        if not execute:
+            typer.echo(json.dumps({"capture_executed": False, "engine_started": False,
+                "ready_to_execute": False, "product_connected": False, "security": "UNKNOWN",
+                "pending": ["OWNED_PRESSURE_CAPTURE_NOT_EXECUTED", "RESOURCE_ATTRIBUTION_UNVERIFIED",
+                            "ENTERPRISE_RESOURCE_LIMITS_NOT_EVALUATED"]}))
+            return
+        result = execute_pressure(environment, topology, config)
+        raw = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
+        if len(raw.encode("utf-8")) > 4 * 1024**2:
+            raise ValueError("STREAM_PRESSURE_ATTACHMENT_LIMIT")
+        validate_output(output, Path(__file__).resolve().parents[3])
+        with output.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(raw)
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError, SourceCaptureError):
+        typer.echo("STREAM_PRESSURE_CAPTURE_FAILED")
+        raise typer.Exit(2)
+    typer.echo(json.dumps({"capture_executed": True, "engine_started": False,
+                          "product_connected": False, "security": "UNKNOWN"}))
+
+
 @app.command("capture-route-observations")
 def capture_route_observations(
     env: Path = typer.Option(..., "--env"),

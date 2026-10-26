@@ -1,5 +1,17 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-26 LIF-04 — 지속 지연 수신과 자원 수집, 판정 미등록
+
+기존 `stream_probe`를 재사용하고 optional `read_profile`이 있을 때만 chunk별 지연·명시 close를
+수행한다. 전후 정상 요청, 병행 정상 요청, 소유 컨테이너 PID/start·namespace·RSS/cgroup·TCP queue
+표본을 제품 `capture-stream-pressure`에서 수집한다. 기존 초기 지연·REQ-11 계약은 유지한다.
+소유 socket·파일/전송 대역 회귀는 실제 vLLM 실증과 구별한다. 자세한 준비와 기술 상한은
+[RUNBOOK](RUNBOOK.md)의 LIF-04 절과 `examples/stream-pressure-settings.json`을 따른다.
+
+새 관측은 클라이언트 읽기 절차와 aggregate 자원이다. buffer별 귀속·엔진 작업 취소·정리 완료와
+기업 예산이 없어 보안/기능/성능은 UNKNOWN이다. 새 빈 실행기나 판정을 등록하지 않으며
+77개·보안 규칙 연결13개·관측 전용1개·실행기12종을 유지한다. 과거 팩·실증 기록은 바꾸지 않는다.
+
 ## 2026-10-26 수집 실패와 부분 위반 보존
 
 현행 팩27의 PLT-01은 `permission_scan_complete`를 별도 PASS 관문으로 둔다.

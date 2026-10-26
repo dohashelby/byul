@@ -1,5 +1,76 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-26 REQ-05 — 단일 고정 모델의 runtime 기록 수집, 엔진 판정 연결 보류
+
+PR #14의 소유 파일 수집을 재사용해 제품 명령 `guard capture-model-authorization`를
+추가했다. 기본 모드는 입력만 읽고 Docker·출력 파일·Store를 만들지 않는다.
+`--execute`는 이미 소유한 Gateway 컨테이너의 regular JSONL 파일만 읽으며 엔진 기동,
+요청 발생, 이미지/모델 취득, EVD/RES/RPT 생성은 하지 않는다. 출력은 독립된 수집
+첨부이고 REQ-05 자동 실행·판정 등록은 아니다. 팩 26·77개 정의·기존 판정은 유지한다.
+
+### 실제로 수집하고 구분하는 것
+
+- 봉인된 ENV/POL JSON의 내용 해시·팩 Ref와 context의 정확한 ENV/POL Ref를 확인한다.
+- `POL.values.REQ-05.principal_model_grants`는 주체명과 요청 모델명의 UTF-8 SHA-256
+  쌍을 명시한 목록이다. 기업 값을 채우지 않는다. 이 수집 경계 전용 선언 입력이며
+  CheckDef 정책 양식·카탈로그 등록이나 최종 모델 사용 권한 판정 완료를 뜻하지 않는다.
+- context는 `guard-fixed-model-authorization-context/1`이다. `run_id`, `environment_ref`,
+  `policy_ref`, `runtime_policy`, `observation_session_id`, `target_id`, `instance_id`,
+  `window`와 `cases`만 받는다. window는 timezone을 포함한 start/end와 최대 600초,
+  cases는 고유 case_id·서버 request_id(32자리 hex)·principal_sha256·
+  requested_model_sha256의 2~8개다. 선언상 허용·비허용 사례를 모두 명시해야 한다.
+  이 수집용 시간/건수 상한은 기업의 인가 한도를 대신하지 않는다.
+- runtime_policy는 `policy_id`·`policy_version`·정책 파일 bytes의 `sha256`이다.
+  Guard POL의 정규 문서 해시와 별도로 대조한다. 둘의 연결은 context의 선언이며
+  bundle 검증이나 출처 인증을 했다고 표시하지 않는다.
+- 소유 라벨·pinned Gateway 이미지·컨테이너/파일 전후 신원·bounded pipe·raw bytes
+  해시를 확인한다. 최대 64KiB·64개 객체·한 줄 16KiB이며 CRLF를 해시 전에 바꾸지 않는다.
+- 현재 runtime의 `auth.py`·`request_flow.py`·`request_records.py`와 대조했다.
+  `allowed_models`와 `decision.model`은 요청 모델 검사다. final 기록의 주체·요청 모델,
+  정책·run/session/대상 instance·수집 구간·전달 시도만 결합한다. 중복 final·started만
+  존재·주체/세대/정책 교환·누락은 미확인이다. 다른 사례의 누락이 이미 대응된 Gateway
+  선언 충돌 진단을 지우지는 않지만, 그 진단도 실제 엔진 모델 위반 FAIL은 아니다.
+- 원문 JSONL·주체명·모델 표시명·policy.path·message·request context/body·자격은
+  출력에 넣지 않는다. 필요한 metadata와 해시만 보존한다. mock/actual_test 또는
+  EXAMPLE 입력이 섞이면 EXAMPLE이며 그 외도 DECLARED를 넘지 않는다.
+
+Gateway 허용/거부·HTTP 200·응답 model·delivery.attempted는 최종 엔진 모델의 선택/사용
+증명이 아니다. 현재 그 생산자가 없어 결과는 항상 보안·기능·성능 UNKNOWN,
+`producer_authenticated=false`, `final_model_verified=false`,
+`actual_consumption_verified=false`, `product_connected=false`, `official=false`다.
+alias·LoRA·퇴역·대체 endpoint는 미시험으로 남기고 빈 실행기·판정기는 등록하지 않았다.
+
+### 다음 연결에 필요한 생산자와 완료 관문
+
+runtime 담당자는 서버 생성 request_id와 principal·정책 판본·대상 instance의 결합,
+전달 전후의 모델 selector와 upstream ID를 제공해야 한다. 현재 기록을 UPDATE가
+읽는 것만으로 새 생산자나 인증된 신원이 생기지 않는다. UPDATE의 엔진 adapter에는
+검토된 소스/이미지와 고정 모델 세대에서 실제 선택·generate/worker 사용 지점의
+최종 모델 식별과 같은 요청의 대응이 필요하다. 표시명·config snapshot·별도 helper를
+그 소비 사건으로 바꾸지 않는다. 신뢰 경계·기업 허용표·퇴역 기준과 승인된 CPU
+샌드박스를 확보한 뒤 정상/확인된 위반/미수집/지원 밖을 시험하고 제품 판정에 연결한다.
+이번에는 실제 엔진과 runtime·platform·contracts 제품 코드를 변경하지 않았다.
+
+## PLT-07 후속 송신 시험 조건 — 계획, 실행하지 않음
+
+PLT-07 실행기·정책·판정 등록은 하지 않았다. Linux CPU의 소유 샌드박스로 검토할 수
+있고 AWS가 필수인 것은 아니다. 실제 사용 환경·기동·비용은 별도 승인 범위다.
+
+| 사례 | 먼저 정할 입력·관측 | 완료로 볼 근거와 미확인 경계 |
+|---|---|---|
+| 승인 수신처 | 취득/서비스/관측 단계별 실제 송신 PID/start·UID·namespace·정책 집행 위치와 허용 목적지/포트/프로토콜/작업 | 같은 사건의 송신·실제 peer·소유 수신처 수신/종료와 정상 업무 대조. helper의 성공만으로 엔진 송신을 증명하지 않음 |
+| 비허용 수신처 | 격리된 소유 수신처 두 번째 endpoint, 명시적 금지 작업, 실제 송신자·집행 정책 판본 | 실제 금지 작업의 성공은 수신처와 송신자 양쪽 근거로 확인. timeout·로그 부재·Hubble DROPPED만으로 차단 성공을 확정하지 않음 |
+| DNS·redirect | 통제된 이름/redirect와 최초·최종 주소, 연결/handshake·TLS peer, 적용 정책 | 최종 목적지/작업까지 대조. SDK·exporter·proxy·인증서 또는 실제 경로가 미관측이면 UNKNOWN |
+| 초기 정책 부재·만료/단절 | 마지막 유효 정책 유지/만료 시 거부 등 기업이 정한 동작, 유효 시각·실제 적용 판본 | 정한 동작과 실제 집행·허용 정상 업무를 대조. 어떤 fallback이 안전한지 임의로 정책을 선택하지 않음 |
+
+각 사례는 collector 생성 상관 정보·run/정책·실제 송신 프로세스와 소유 수신처의
+독립 관측을 결합해야 한다. 동일 namespace/UID의 별도 probe는 다른 실행 주체이므로
+동일한 엔진 권한/집행 조건이라고 가정하지 않는다. 연결과 자료 수신·업무 소비도 나눈다.
+기술 상한의 첫 제안은 사례당 연결 최대 8개·무해 표식 최대 1KiB·30초이며 기업
+허용 기준이 아니다. 공개/운영 목적지·실제 Secret은 사용하지 않는다. DNS/redirect,
+송신자 신원 또는 수신측 근거를 준비하지 못하면 해당 범위를 미확인으로 남긴다.
+REQ-05 수집기·기존 5개 업데이트 수락 도구의 종료0을 PLT-07 실증 성공으로 세지 않는다.
+
 ## 2026-10-26 PR #14 보완 — 센서 오류 격리와 IPC 경계 검증
 
 센서의 정상 호출 뒤 `emit`가 실패해 원래 반환값을 잃는 문제를 보완했다.

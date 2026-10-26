@@ -46,13 +46,17 @@ def identity(docker, target, container, image, timeout):
             "image": cfg["Image"]}
 
 
-def read_owned_json(docker, target, *, container, image, path, timeout=5):
-    """고정 source bytes·fstat·pipe 상한·전후 소유 신원을 확인하며 생산자를 인증하지 않는다."""
+def validate_owned_source(*, container, image, path):
     parts = PurePosixPath(path).parts if type(path) is str else ()
     if (not parts or not path.startswith("/") or ".." in parts or "\x00" in path or len(path) > 256
             or type(container) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", container)
             or type(image) is not str or not re.fullmatch(r".+@sha256:[0-9a-f]{64}", image)):
         raise ValueError("CAPTURE_PATH_INVALID")
+
+
+def _read_owned_file(docker, target, *, container, image, path, timeout=5):
+    """고정 source bytes·fstat·pipe 상한·전후 소유 신원을 확인하며 생산자를 인증하지 않는다."""
+    validate_owned_source(container=container, image=image, path=path)
     deadline = time.monotonic() + timeout
     def remaining():
         value = deadline - time.monotonic()
@@ -89,7 +93,25 @@ def read_owned_json(docker, target, *, container, image, path, timeout=5):
     after = identity(docker, target, container, image, remaining())
     if before != after:
         raise ValueError("CAPTURE_INSTANCE_CHANGED")
-    # Raw input is parsed before it can be retained as an artifact by callers.
-    return strict_json(raw), {"capture_sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw),
+    return raw, {"capture_sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw),
         "owner": before, "file_identity": packet.get("file_before"),
         "producer_authenticated": False, "record_authenticity_verified": False}
+
+
+def read_owned_json(docker, target, *, container, image, path, timeout=5):
+    raw, provenance = _read_owned_file(docker, target, container=container, image=image, path=path, timeout=timeout)
+    return strict_json(raw), provenance
+
+
+def read_owned_jsonl(docker, target, *, container, image, path, timeout=5):
+    """같은 소유권/전송/파일 경계로 최대 64개 JSON 객체를 읽는다. 원문은 반환하지 않는다."""
+    raw, provenance = _read_owned_file(docker, target, container=container, image=image, path=path, timeout=timeout)
+    lines = raw.split(b"\n")
+    if lines[-1] == b"":
+        lines.pop()
+    if not 1 <= len(lines) <= 64 or any(not line.strip() or len(line) > 16384 for line in lines):
+        raise ValueError("CAPTURE_JSONL_BOUND")
+    records = [strict_json(line, limit=16384) for line in lines]
+    if any(type(record) is not dict for record in records):
+        raise ValueError("CAPTURE_JSONL_OBJECT_REQUIRED")
+    return records, provenance

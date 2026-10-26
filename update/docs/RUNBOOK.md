@@ -1,5 +1,22 @@
 # 실행·실증 안내
 
+## REQ-05 Gateway 기록 수집 — 최종 엔진 모델 판정은 미연결
+
+`guard capture-model-authorization --help`로 제품 명령을 확인한다. 기존 collect/import의
+봉인 ENV/POL JSON과 명시 context·target을 사용하며, 기존 봉인 파일을 직접 고쳐 쓰지 않는다.
+POL의 새 판본에 사람이 `values.REQ-05.principal_model_grants`를 입력해야 한다.
+이 전용 수집 입력은 CheckDef의 자동 정책 양식 등록을 뜻하지 않는다.
+
+```powershell
+guard capture-model-authorization --pack packs/PACK-BASELINE --env "<SEALED-ENV.json>" --policy "<SEALED-POL.json>" --context "<CONTEXT.json>" --target "<TARGET.json>" --gateway-container "<OWNED-GATEWAY>" --gateway-image "<REPOSITORY@sha256:DIGEST>" --gateway-path "/logs/gateway_records.jsonl" --output "<NEW-EXTERNAL-ATTACHMENT.json>"
+```
+
+기본 실행은 입력만 검사하고 출력·Docker를 만들지 않는다. 별도 승인된 소유 자료를
+실제로 읽을 때만 `--execute`를 붙인다. 이 옵션도 기동·요청 발생·판정은 하지 않는다.
+최종 엔진 모델 생산자가 없어 수집 성공 후에도 UNKNOWN·비공식이며 실행/인가 검증
+완료가 아니다. 입력 필드·상한·남은 생산자와 PLT-07 시험 조건은
+[관측 보강](AUTOMATION_HARDENING.md)의 REQ-05/PLT-07 절을 따른다.
+
 > 2026-10-26 현행 작업 후보: 팩26/DRAFT, 보안 규칙 연결13개·SUP-03 관측 전용1개다.
 > PLT-02 Unix IPC 부분 연결·선택 native 파일 수집의 범위는
 > [관측 보강](AUTOMATION_HARDENING.md)을 따른다. 기존 점검 실제 재실증은 변경 영향이

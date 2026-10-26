@@ -11,8 +11,10 @@ import math
 import re
 import time
 
+from guard.models import canonical_json, sha256_hex
 from .content_common import content_request, control_state, json_body, sample_artifact
 from .engine_identity import owned_template_snapshot
+from .http_common import mask
 
 
 PROFILE = "fixed-template-supply-v1"
@@ -247,8 +249,12 @@ def collect(executor, ctx):
         "functional_probes_planned": {"value": list(functional), "collected": True},
         "functional_probe_results": {"value": functional, "collected": attempted},
     }
+    fixture = {"profile": PROFILE, "normal": ctx.check.functional_probes[0].model_dump(mode="json"),
+               "settings": limits, "endpoints": ["/tokenize", "/v1/chat/completions"]}
+    ctx._template_fixture_sha256 = sha256_hex(canonical_json(mask(fixture, ctx.secrets)))
     summary = {
-        "profile": PROFILE, "requests_sent": requests, "accepted_tokens": accepted_tokens,
+        "profile": PROFILE, "artifact_profile": "template-response-projection/1",
+        "requests_sent": requests, "accepted_tokens": accepted_tokens,
         "tokenize_response_token_count": tokenize_response_tokens,
         "identity_before": before, "identity_after": after,
         "collection_errors": sorted(set(errors)), "responses": responses,
@@ -263,8 +269,8 @@ def collect(executor, ctx):
             "Only the reviewed fixed template, full pinned ENV image, matching model and bounded normal chat are supported.",
             "Manual PASS is outside the existing REQ-07 bounded manual policy contract; declared FAIL and UNKNOWN are preserved.",
         ],
-        "fixture": {"profile": PROFILE, "normal": ctx.check.functional_probes[0].model_dump(mode="json"),
-                    "settings": limits, "endpoints": ["/tokenize", "/v1/chat/completions"]},
+        "fixture": {"profile": PROFILE, "normal_sha256": sha256_hex(canonical_json(fixture["normal"])),
+                    "settings": limits, "endpoints": fixture["endpoints"]},
     }
     if executor.cfg.get("native_observation_path") is not None:
         # Optional actual file capture, never an implicit new sensor/trust/verdict claim.

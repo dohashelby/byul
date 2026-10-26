@@ -13,16 +13,19 @@ import secrets
 import time
 
 from guard.automation_policy import validate_template_policy
+from guard.models import canonical_json, sha256_hex
 from guard.runtime.docker import Docker
 from .content_common import (append_artifact, content_request, control_state, json_body,
-                             record_content, sample_artifact)
-from .http_common import HttpCheckExecutor
+                             sample_artifact)
+from .response_projection import capture_metadata, log_metadata
+from .http_common import HttpCheckExecutor, mask
 from .engine_identity import owned_template_snapshot
 from . import template_supply_approval
 from . import template_sandbox
 
 
 PROFILE = "fixed-template-input-v1"
+ARTIFACT_PROFILE = "template-response-projection/1"
 SAFE_OVERRIDE = "GUARD_SAFE_OVERRIDE_ONLY\n"
 STEPS = ("normal", "boundary", "overbound", "override")
 DEFAULTS = {"max_output_tokens": 1, "max_total_requests": 48,
@@ -43,7 +46,7 @@ def _token_ids(value, maximum):
 
 class TemplateValidationExecutor(HttpCheckExecutor):
     name = "template_validation"
-    version = "0.2.0"
+    version = "0.4.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -51,7 +54,7 @@ class TemplateValidationExecutor(HttpCheckExecutor):
         super().__init__(cfg, *args, **kwargs)
         self.docker = docker or Docker("template" + secrets.token_hex(4))
         if cfg.get("native_observation_path") is not None:
-            self.version = "0.3.0"
+            self.version = "0.5.0"
 
     def _identity_snapshot(self, ctx, identity, argv, deadline):
         """Read only the owned running engine and selected readonly template.
@@ -100,7 +103,12 @@ class TemplateValidationExecutor(HttpCheckExecutor):
             raise ValueError("fixed-template-input-v1 needs the four declared challenge steps")
 
     def _finish(self, ctx):
-        draft = append_artifact(super()._finish(ctx), ctx, "template_samples.json", f"{self.name}/{self.version}")
+        draft = super()._finish(ctx)
+        # Hash the original fixture in memory, independently of its stored projection.
+        fixture_sha = getattr(ctx, "_template_fixture_sha256", None)
+        if fixture_sha is not None:
+            draft.comparability.fixture_sha256 = fixture_sha
+        append_artifact(draft, ctx, "template_samples.json", f"{self.name}/{self.version}")
         if getattr(ctx, "_native_artifact_written", False):
             append_artifact(draft, ctx, "template_native_observations.json", f"{self.name}/{self.version}")
         return draft
@@ -175,12 +183,18 @@ class TemplateValidationExecutor(HttpCheckExecutor):
                 if (type(results) is not list or len(results) != 1 or type(results[0]) is not dict
                         or results[0].get("id") != label):
                     raise ValueError("invalid or unrelated probe response")
+                outcome = results[0].get("outcome")
+                if not (type(outcome) is int and 100 <= outcome <= 599
+                        or type(outcome) is str and outcome in {
+                            "refused", "timeout", "unreachable", "dns_error", "error", "probe_error"}):
+                    raise ValueError("invalid probe outcome")
                 result = {**results[0], "dispatched": True}
-            except Exception as exc:
+            except Exception:
                 result = {"outcome": "probe_error", "phase": "collection",
-                          "detail": type(exc).__name__, "dispatched": True}
-            record_content(ctx, "trusted", "template-validation", label, result)
-            samples.append({"case": label, "request": body, "response": result})
+                          "detail": "TEMPLATE_PROBE_UNAVAILABLE", "dispatched": True}
+            ctx.record("trusted", "template-validation", label, "allowed", log_metadata(result))
+            samples.append({"case": label, "request_fixture_sha256": sha256_hex(canonical_json(body)),
+                            "outcome": result["outcome"], "capture": capture_metadata(result)})
             return result
 
         def tokenize(label, messages, extra=None, *, raw=False):
@@ -385,21 +399,27 @@ class TemplateValidationExecutor(HttpCheckExecutor):
             "functional_probes_planned": {"value": planned, "collected": True},
             "functional_probe_results": {"value": controls, "collected": True},
         }
-        summary = {"profile": PROFILE, "requests_sent": sent, "observed_tokens": token_budget_used,
+        fixture = {"profile": PROFILE, "normal": template, "settings": settings,
+                   "override": SAFE_OVERRIDE, "endpoints": ["/tokenize", "/v1/chat/completions"]}
+        ctx._template_fixture_sha256 = sha256_hex(canonical_json(mask(fixture, ctx.secrets)))
+        summary = {"profile": PROFILE, "artifact_profile": ARTIFACT_PROFILE,
+                   "requests_sent": sent, "observed_tokens": token_budget_used,
                    "elapsed_seconds": time.monotonic() - started, "gaps": gaps,
                    "consumed_prompt_token_counts": consumed_counts,
                    "violations": violations, "selected_template": identity,
                    "template_identity_before": identity_before, "template_identity_after": identity_after,
                    "enforcement_proof": enforcement_proof, "override_proofs": override_proofs,
-                   "fixture": {"profile": PROFILE, "normal": template, "settings": settings,
-                               "override": SAFE_OVERRIDE, "endpoints": ["/tokenize", "/v1/chat/completions"]},
+                   "fixture": {"profile": PROFILE, "normal_sha256": sha256_hex(canonical_json(template)),
+                               "settings": settings, "override_sha256": sha256_hex(canonical_json(SAFE_OVERRIDE)),
+                               "endpoints": fixture["endpoints"]},
                    "limitations": ["Only the selected fixed text-chat profile and bounded fixtures were exercised.",
                                    "A token count or 2xx/4xx alone does not prove rendering, consumption or rejection location.",
                                    "Allowlist policy values are supplied decisions, not independently authenticated approval.",
                                    "Pinned image and observed API version do not independently verify an engine source commit.",
                                    "Request overrides allowed by policy and other processors/templates remain unsupported.",
                                    "Observed-token bounds apply after responses; input bytes, request count and time are bounded before dispatch."]}
-        sample_artifact(ctx, "template_samples.json", {"samples": samples, "summary": summary})
+        sample_artifact(ctx, "template_samples.json", {"artifact_profile": ARTIFACT_PROFILE,
+                                                    "samples": samples, "summary": summary})
         return obs, {"attempted": attempted["normal"], "succeeded": normal_ok,
                      "detail": "before, exact boundary and after chat inference with exact consumed prompt-token correspondence"}, [
                          {"step": step, "attempted": attempted[key]} for step, key in zip(ctx.check.challenge_steps, STEPS)], summary

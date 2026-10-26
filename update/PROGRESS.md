@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — REQ-07 template 첨부의 원문 비저장 보수
+
+- 한 일: 기준dd5b4b8의 REQ-09/10 저장 투영을 재사용해 REQ-07 요청·응답·token·자유 진단을 메모리에 한정하고 SUP-03 고정 요청도 hash로 저장한다. 기존 fixture SHA·관측·판정·source Ref·팩·스트림 시간은 유지하며 실행기0.4.0/native0.5.0으로 구별한다.
+- 테스트 결과: 831파일 소스를 고정한 뒤 신규 EXAMPLE18개 포함 영향491통과/실패0/기존Windows skip1/기존제외1(pytest16.06초/부모16.740초), wheel125파일 소스·격리설치 일치(부모8.913초)다. 기존 두 fixture hash와 원문 비저장·제한 범위 PASS·늦은 수집 실패 뒤 독립 FAIL 보존·제품 저장/반출/복원/Ref 재판정을 확인했다. 증명 함수10개 AST 동일이며 원본은 저장소 밖 byul-template-artifact-privacy-20261027T020700+0900에 보존한다. 실제 엔진/GPU 실증은0이다.
+- 다음 단계: 고정 소스의 직접·인접 계약·불변식·설치본 검증 후 기존 초안 PR을 갱신하고 최종 head 필수 CI5개를 확인한다. 실제 엔진/GPU 실증과 구분한다.
+- 막힌 것: 02:06 KST 실제 G/VT quota0·8vCPU 정정 사례 승인 대기. 예상 credit135.66달러지만 누적69/내부60+예비9 한도를 유지하며 Billing 청구서502로 증분 세금 확인은 미완료다. 신규 AWS 자원·비용은0이다.
+
 ## 2026-10-27 — REQ-10 두 전송의 첨부 저장 경계 보수
 
 - 한 일: 기준ec28f63의 REQ-09 투영을 재사용해 REQ-10 로그·control을 hash/허용 metadata로 제한하고 malformed outcome은 고정 수집 공백으로 남긴다. Docker0.2.0/Kubernetes0.2.1로 구별하며 기존 Kube control hash·요청·관측·판정·팩·스트림 시간 측정을 유지한다.

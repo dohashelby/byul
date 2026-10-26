@@ -221,6 +221,11 @@ def test_zero_payload_probe_uses_owned_linux_socket_or_explicit_transport_double
                 listener.bind(path)
                 listener.listen(1)
                 result = ipc_probe.connect_paths([path], 0.5)
+                listener.settimeout(0.5)
+                connection, _ = listener.accept()
+                with connection:
+                    connection.settimeout(0.5)
+                    assert connection.recv(1) == b""  # Actual EOF: the probe sent no payload.
             row = result["rows"][0]
             assert row["outcome"] == "connected" and row["path_stable"] is True
             assert row["peer"]["pid"] == os.getpid()
@@ -295,3 +300,84 @@ def test_budget_expiry_after_verified_violation_does_not_invent_normal_control_a
                                    extra={"probe_uids": [1001, 0], "max_duration_seconds": 60})
     assert result.verdicts.security == Verdict.FAIL
     assert evd.normal_control.attempted is False and evd.normal_control.succeeded is False
+
+
+@pytest.mark.parametrize("invalid", ["label", "image", "container-name", "running", "started-at", "pid-mode", "proc-mount"])
+def test_unverified_target_is_aborted_before_health_request_or_uid_exec(tmp_path, monkeypatch, invalid):
+    class UnownedWorld(World):
+        def inspect_json(self, *args, **kwargs):
+            value = super().inspect_json(*args, **kwargs)
+            if invalid == "label": value["Config"]["Labels"] = {}
+            elif invalid == "image": value["Config"]["Image"] = "example.invalid/other@sha256:" + "d" * 64
+            elif invalid == "container-name": value["Name"] = "/different"
+            elif invalid == "running": value["State"]["Running"] = 1  # bool identity matters.
+            elif invalid == "started-at": value["State"]["StartedAt"] = ""
+            elif invalid == "pid-mode": value["HostConfig"]["PidMode"] = "host"
+            elif invalid == "proc-mount": value["Mounts"] = [{"Destination": "/proc/host"}]
+            return value
+        def exec_as_uid(self, *args, **kwargs):
+            pytest.fail("unverified target must not receive helper commands")
+        def probe(self, *args, **kwargs):
+            pytest.fail("ownership must be established before even /health")
+    _, _, _, evd, result, world = run(tmp_path, monkeypatch, UnownedWorld())
+    assert evd.execution.status == ExecStatus.ABORTED and result.verdicts.security == Verdict.UNKNOWN
+    assert world.calls and all(c[0] == "identity" for c in world.calls)
+
+
+def test_same_pid_with_changed_start_is_not_stable_endpoint_proof(tmp_path, monkeypatch):
+    world = World(connected=True)
+    def reused(value):
+        if value["mode"] == "inspect":
+            count = sum(c[0] == "inspect" for c in world.calls)
+            value["rows"][0]["owners"][0]["start"] = str(12 + count % 2)
+    world.mutate = reused
+    _, _, _, evd, result, _ = run(tmp_path, monkeypatch, world)
+    assert evd.observations["unix_ipc_violations"].value == [] and result.verdicts.security == Verdict.UNKNOWN
+
+
+def test_verified_violation_survives_later_container_restart(tmp_path, monkeypatch):
+    class RestartWorld(World):
+        def inspect_json(self, *args, **kwargs):
+            value = super().inspect_json(*args, **kwargs)
+            if sum(c[0] == "identity" for c in self.calls) >= 4:
+                value["State"]["StartedAt"] = "2026-10-26T00:00:01Z"
+            return value
+    _, _, _, evd, result, _ = run(tmp_path, monkeypatch, RestartWorld(connected=True),
+                                 extra={"probe_uids": [1001, 0]})
+    assert result.verdicts.security == Verdict.FAIL
+    assert len(evd.observations["unix_ipc_violations"].value) == 1
+    assert evd.observations["unix_ipc_violations"].value[0].endswith(":uid=1001")
+    assert evd.normal_control.succeeded is False
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_proc_metadata_parser_uses_only_explicit_owned_fixture_tree(tmp_path, monkeypatch, changed):
+    from guard.executors import ipc_probe
+    proc = tmp_path / "EXAMPLE-proc"
+    (proc / "net").mkdir(parents=True)
+    (proc / "net/unix").write_text("Header\n0000: 2 0 10000 0001 01 55 /EXAMPLE/socket\n")
+    (proc / "9/fd").mkdir(parents=True)
+    descriptor = proc / "9/fd/3"
+    descriptor.write_bytes(b"")
+    (proc / "9/stat").write_text("9 (EXAMPLE worker) S " + "0 " * 18 + "12\n")
+    (proc / "9/status").write_text("Uid:\t0\t0\t0\t0\n")
+    original_path, is_link, read_link = Path, Path.is_symlink, ipc_probe.os.readlink
+    def fixture_path(value):
+        return proc / str(value)[6:] if str(value).startswith("/proc/") else proc if value == "/proc" else original_path(value)
+    monkeypatch.setattr(ipc_probe, "Path", fixture_path)
+    monkeypatch.setattr(Path, "is_symlink", lambda self: True if self == descriptor else is_link(self))
+    monkeypatch.setattr(ipc_probe.os, "readlink", lambda path: "socket:[55]" if Path(path) == descriptor else read_link(path))
+    monkeypatch.setattr(ipc_probe, "_namespaces", lambda: deepcopy(NS))
+    monkeypatch.setattr(ipc_probe.os, "geteuid", lambda: 0, raising=False)
+    reads = []
+    def stat_socket(_):
+        reads.append(True)
+        return {**SOCKET, "inode": 99 if changed and len(reads) > 1 else SOCKET["inode"]}
+    monkeypatch.setattr(ipc_probe, "_stat_socket", stat_socket)
+    value = ipc_probe.inspect_paths(["/EXAMPLE/socket"])
+    row, = value["rows"]
+    if changed:
+        assert row["complete"] is False and row["error"] == "IPC_METADATA_UNAVAILABLE"
+    else:
+        assert row["complete"] is True and row["owners"] == [OWNER] and row["socket_inode"] == "55"
+    assert "/EXAMPLE/socket" not in json.dumps(value)

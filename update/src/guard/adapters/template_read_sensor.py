@@ -8,16 +8,55 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 import stat
 
 
 MAX_TEMPLATE_BYTES = 8192
+_LOG = logging.getLogger(__name__)
+_EMIT_FAILED = "TEMPLATE_SENSOR_EMIT_FAILED"
 
 
-def observe_template_call(function, kwargs, *, stage, reviewed_source_sha256, emit):
+@dataclass
+class SensorStatus:
+    """호출자가 한 수집 구간에 전달하는 상태. 사건 전달만 세며 소비·인증을 증명하지 않는다."""
+    attempted_events: int = 0
+    failed_events: int = 0
+
+    def snapshot(self):
+        return {"schema": "guard-template-sensor-emission/1",
+                "attempted_events": self.attempted_events, "failed_events": self.failed_events,
+                "emission_complete": self.attempted_events > 0 and self.failed_events == 0,
+                "diagnostic_codes": [_EMIT_FAILED] if self.failed_events else []}
+
+
+def _status(value):
+    if value is not None and type(value) is not SensorStatus:
+        raise ValueError("TEMPLATE_SENSOR_STATUS_INVALID")
+    return value if value is not None else SensorStatus()
+
+
+def _emit(event, emit, status):
+    status.attempted_events += 1
+    try:
+        emit(event)
+    except Exception:
+        status.failed_events += 1
+        try:
+            _LOG.warning(_EMIT_FAILED)  # No exception text, paths, template or traceback.
+        except Exception:
+            pass  # The caller's sticky status still records failure if logging also fails.
+    except BaseException:
+        status.failed_events += 1
+        raise  # Record interruption without swallowing process exit or user cancellation.
+
+
+def observe_template_call(function, kwargs, *, stage, reviewed_source_sha256, emit, status=None):
     """검토된 동기 selection/apply 호출의 실제 인수·반환 연결만 기록한다."""
+    status = _status(status)
     if stage not in {"selection", "apply"} or type(kwargs) is not dict:
         raise ValueError("TEMPLATE_SENSOR_CALL_UNSUPPORTED")
     if inspect.iscoroutinefunction(function) or inspect.isgeneratorfunction(function) or inspect.isasyncgenfunction(function):
@@ -33,25 +72,23 @@ def observe_template_call(function, kwargs, *, stage, reviewed_source_sha256, em
     try:
         result = function(**kwargs)
     except Exception:
-        try:
-            emit(event)
-        except Exception:
-            pass  # missing telemetry stays a gap; never replace the native exception
+        _emit(event, emit, status)
         raise  # preserves native exception and does not persist its text
     # Async/generator invocation is not evidence that the native operation ran.
     if inspect.isawaitable(result) or inspect.isgenerator(result) or inspect.isasyncgen(result):
         event["outcome"] = "deferred"
-        emit(event)
+        _emit(event, emit, status)
         return result
     event["outcome"] = "returned"
     if stage == "selection" and type(result) is str and len(result.encode()) <= MAX_TEMPLATE_BYTES:
         event["returned_sha256"] = hashlib.sha256(result.encode()).hexdigest()
-    emit(event)
+    _emit(event, emit, status)
     return result
 
 
-def read_template(path, *, reviewed_loader_path, reviewed_loader_sha256, emit):
+def read_template(path, *, reviewed_loader_path, reviewed_loader_sha256, emit, status=None):
     """UTF-8 고정 파일 프로파일만 지원한다. caller가 반환 문자열을 native 경로에 전달한다."""
+    status = _status(status)
     source = Path(reviewed_loader_path).read_bytes()
     if hashlib.sha256(source).hexdigest() != reviewed_loader_sha256:
         raise ValueError("TEMPLATE_SENSOR_SOURCE_MISMATCH")
@@ -86,5 +123,5 @@ def read_template(path, *, reviewed_loader_path, reviewed_loader_sha256, emit):
              "loader_sha256": reviewed_loader_sha256, "process_id": os.getpid(),
              "buffer_returned": True, "selection_observed": False, "apply_observed": False,
              "generate_handoff_observed": False, "worker_consumption_verified": False}
-    emit(event)  # Metadata only; no raw template, path, request or token values.
+    _emit(event, emit, status)  # Metadata only; no raw template, path, request or token values.
     return text

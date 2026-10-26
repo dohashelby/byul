@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from guard.adapters.template_read_sensor import observe_template_call, read_template
+from guard.adapters.template_read_sensor import SensorStatus, observe_template_call, read_template
 from guard.executors.native_observations import validate_capture
 from guard.executors.owned_capture import read_owned_json, strict_json
 from tests.builders import environment
@@ -279,3 +279,193 @@ def test_handle_and_path_metadata_views_are_each_checked_without_cross_api_time_
     assert read_template(template, reviewed_loader_path=source,
         reviewed_loader_sha256=hashlib.sha256(source.read_bytes()).hexdigest(), emit=events.append) == "EXAMPLE"
     assert len(events) == 1
+
+
+def _return_once(*, chat_template, calls, result):
+    calls.append("native")
+    return result
+
+
+def _raise_once(*, chat_template, calls, error):
+    calls.append("native")
+    raise error
+
+
+def _broken_emitter(_):
+    raise OSError("PRIVATE_EMITTER_ERROR")
+
+
+@pytest.mark.parametrize("stage", ["selection", "apply"])
+def test_successful_native_result_identity_and_single_call_survive_emit_failure(stage, caplog):
+    calls, expected, status = [], object(), SensorStatus()
+    actual = observe_template_call(_return_once, {"chat_template": "EXAMPLE", "calls": calls, "result": expected},
+        stage=stage, reviewed_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        emit=_broken_emitter, status=status)
+    assert actual is expected and calls == ["native"]
+    assert status.snapshot() == {"schema": "guard-template-sensor-emission/1", "attempted_events": 1,
+        "failed_events": 1, "emission_complete": False, "diagnostic_codes": ["TEMPLATE_SENSOR_EMIT_FAILED"]}
+    assert [r.getMessage() for r in caplog.records] == ["TEMPLATE_SENSOR_EMIT_FAILED"]
+    assert all(r.exc_info is None for r in caplog.records)
+    assert "PRIVATE_" not in caplog.text
+
+
+def test_legacy_sensor_caller_gets_fixed_diagnostic_without_status_argument(caplog):
+    actual = observe_template_call(_select, {"chat_template": "EXAMPLE"}, stage="selection",
+        reviewed_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), emit=_broken_emitter)
+    assert actual == "EXAMPLE" and "TEMPLATE_SENSOR_EMIT_FAILED" in caplog.text
+    assert "PRIVATE_" not in caplog.text
+
+
+def test_sensor_read_returns_same_crlf_buffer_when_emitter_fails(tmp_path, caplog):
+    loader, template = tmp_path / "loader.py", tmp_path / "template"
+    loader.write_bytes(b"# EXAMPLE source")
+    raw = b"EXAMPLE\r\n{{ messages }}\r"
+    template.write_bytes(raw)
+    events, status = [], SensorStatus()
+    def partial_emit(event):
+        events.append(event)
+        template.write_bytes(b"EXAMPLE replaced")
+        _broken_emitter(event)
+    actual = read_template(template, reviewed_loader_path=loader,
+        reviewed_loader_sha256=hashlib.sha256(loader.read_bytes()).hexdigest(), emit=partial_emit, status=status)
+    assert actual == "EXAMPLE\n{{ messages }}\n"
+    assert events[0]["raw_sha256"] == hashlib.sha256(raw).hexdigest()
+    assert events[0]["decoded_sha256"] == hashlib.sha256(actual.encode()).hexdigest()
+    assert status.snapshot()["emission_complete"] is False and status.failed_events == 1
+    assert "PRIVATE_" not in caplog.text and str(template) not in caplog.text
+
+
+def test_native_exception_object_is_preserved_when_both_native_and_emitter_fail(caplog):
+    calls, status, error = [], SensorStatus(), RuntimeError("PRIVATE_NATIVE_ERROR")
+    with pytest.raises(RuntimeError) as caught:
+        observe_template_call(_raise_once, {"chat_template": "EXAMPLE", "calls": calls, "error": error},
+            stage="apply", reviewed_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            emit=_broken_emitter, status=status)
+    assert caught.value is error and calls == ["native"]
+    assert status.failed_events == 1 and status.snapshot()["emission_complete"] is False
+    assert "PRIVATE_" not in caplog.text and all(r.exc_info is None for r in caplog.records)
+
+
+def test_deferred_result_is_not_consumed_or_replaced_on_emitter_failure():
+    consumed, calls, status = [], [], SensorStatus()
+    def deferred():
+        consumed.append(True)
+        yield "EXAMPLE"
+    result = deferred()
+    try:
+        actual = observe_template_call(_return_once, {"chat_template": "EXAMPLE", "calls": calls, "result": result},
+            stage="apply", reviewed_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            emit=_broken_emitter, status=status)
+        assert actual is result and calls == ["native"] and consumed == []
+        assert status.snapshot()["emission_complete"] is False
+    finally:
+        result.close()
+
+
+@pytest.mark.parametrize("interrupt", [KeyboardInterrupt, SystemExit])
+def test_emitter_control_flow_interrupts_are_recorded_and_propagated(interrupt):
+    error, status, calls = interrupt(), SensorStatus(), []
+    def stop(_):
+        raise error
+    with pytest.raises(interrupt) as caught:
+        observe_template_call(_return_once, {"chat_template": "EXAMPLE", "calls": calls, "result": "EXAMPLE"},
+            stage="apply", reviewed_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            emit=stop, status=status)
+    assert caught.value is error and calls == ["native"]
+    assert status.failed_events == 1 and status.snapshot()["emission_complete"] is False
+
+
+def test_status_stays_incomplete_after_later_success_even_if_logging_also_fails(monkeypatch):
+    import guard.adapters.template_read_sensor as sensor
+    monkeypatch.setattr(sensor._LOG, "warning", _broken_emitter)
+    status = SensorStatus()
+    args = dict(stage="selection", reviewed_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                status=status)
+    assert observe_template_call(_select, {"chat_template": "EXAMPLE"}, emit=_broken_emitter, **args) == "EXAMPLE"
+    assert observe_template_call(_select, {"chat_template": "EXAMPLE"}, emit=lambda _: None, **args) == "EXAMPLE"
+    assert status.attempted_events == 2 and status.failed_events == 1
+    assert status.snapshot()["emission_complete"] is False
+    assert SensorStatus().snapshot()["emission_complete"] is False
+
+
+@pytest.mark.parametrize("invalid", ["source", "file-changed", "decode"])
+def test_read_precondition_failures_are_not_swallowed_as_telemetry_errors(tmp_path, monkeypatch, invalid):
+    import guard.adapters.template_read_sensor as sensor
+    loader, template = tmp_path / "loader.py", tmp_path / "template"
+    loader.write_bytes(b"# EXAMPLE source")
+    template.write_bytes(b"\xff" if invalid == "decode" else b"EXAMPLE")
+    source_hash, status, events = hashlib.sha256(loader.read_bytes()).hexdigest(), SensorStatus(), []
+    if invalid == "source":
+        source_hash = "0" * 64
+    if invalid == "file-changed":
+        original, calls = sensor.os.fstat, []
+        def changed(fd):
+            actual = original(fd)
+            calls.append(True)
+            return actual if len(calls) == 1 else SimpleNamespace(st_dev=actual.st_dev, st_ino=actual.st_ino,
+                st_size=actual.st_size + 1, st_mtime_ns=actual.st_mtime_ns, st_ctime_ns=actual.st_ctime_ns)
+        monkeypatch.setattr(sensor.os, "fstat", changed)
+    with pytest.raises((ValueError, UnicodeDecodeError)):
+        read_template(template, reviewed_loader_path=loader, reviewed_loader_sha256=source_hash,
+                      emit=events.append, status=status)
+    assert events == [] and status.attempted_events == 0 and not status.snapshot()["emission_complete"]
+
+
+def test_native_source_mismatch_and_unsupported_calls_still_block_before_invocation():
+    calls, status = [], SensorStatus()
+    with pytest.raises(ValueError, match="SOURCE_MISMATCH"):
+        observe_template_call(_return_once, {"chat_template": "EXAMPLE", "calls": calls, "result": "EXAMPLE"},
+            stage="selection", reviewed_source_sha256="0" * 64, emit=_broken_emitter, status=status)
+    with pytest.raises(ValueError, match="CALL_UNSUPPORTED"):
+        observe_template_call(_return_once, {}, stage="generate", reviewed_source_sha256="0" * 64,
+                              emit=_broken_emitter, status=status)
+    assert calls == [] and status.attempted_events == 0
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_sup03_sensor_delivery_status_is_evidence_metadata_not_consumption_or_pass(tmp_path, failed):
+    env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE},
+                      model={"id": "fixture-model"})
+    packet = native_record(env)
+    status = SensorStatus(attempted_events=2 if failed else 1, failed_events=1 if failed else 0)
+    packet["sensor_status"] = status.snapshot()
+    class NativeWorld(SupplyWorld):
+        def exec_bounded(self, *args, **kwargs):
+            return CaptureWorld(packet).exec_bounded(*args, **kwargs)
+    draft, _ = run(tmp_path, world=NativeWorld(), cfg={"native_observation_path": "/guard-observations/template.json"})
+    actual = summary(draft)["native_observations"]
+    assert actual["reported_sensor_status"] == status.snapshot()
+    assert actual["collection_errors"] == (["TEMPLATE_SENSOR_EMIT_FAILED"] if failed else [])
+    assert actual["actual_consumption_verified"] is actual["producer_authenticated"] is False
+    assert judge(draft).verdicts["security"].value == "UNKNOWN"
+    assert draft.observations["template_consumer_verified"].value is False
+    artifact, = [a for a in draft.artifacts if a.name == "template_native_observations.json"]
+    saved = json.loads(artifact.path.read_text(encoding="utf-8"))
+    assert saved["capture"]["record"]["sensor_status"] == status.snapshot()
+
+
+@pytest.mark.parametrize("change", [
+    {"attempted_events": True}, {"attempted_events": 65}, {"failed_events": -1},
+    {"failed_events": 2}, {"emission_complete": True}, {"diagnostic_codes": ["PRIVATE_ERROR"]},
+    {"template": "PRIVATE_TEMPLATE"}, {"attempted_events": 3, "failed_events": 0, "emission_complete": True,
+                                     "diagnostic_codes": []},
+])
+def test_native_capture_refuses_false_completion_or_unbounded_sensor_status(change):
+    env, status = environment(), SensorStatus(attempted_events=1, failed_events=1)
+    packet = native_record(env)
+    packet["sensor_status"] = {**status.snapshot(), **change}
+    with pytest.raises(ValueError):
+        validate_capture(packet, kind="template", env_ref=env.ref().model_dump(mode="json"),
+                         run_id="EXAMPLE-run", image=IMAGE)
+
+
+def test_legacy_capture_does_not_gain_a_delivery_claim_and_empty_capture_stays_invalid():
+    env = environment()
+    packet = native_record(env)
+    result = validate_capture(packet, kind="template", env_ref=env.ref().model_dump(mode="json"),
+                              run_id="EXAMPLE-run", image=IMAGE)
+    assert "reported_sensor_status" not in result and result["actual_consumption_verified"] is False
+    packet.update(events=[], sensor_status=SensorStatus(attempted_events=1, failed_events=1).snapshot())
+    with pytest.raises(ValueError):
+        validate_capture(packet, kind="template", env_ref=env.ref().model_dump(mode="json"),
+                         run_id="EXAMPLE-run", image=IMAGE)

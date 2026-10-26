@@ -28,12 +28,27 @@ def _sha(value):
 
 
 def validate_capture(value, *, kind, env_ref, run_id, image):
-    _keys(value, ("schema", "run_id", "environment_ref", "image", "events"))
+    keys = {"schema", "run_id", "environment_ref", "image", "events"}
+    if kind == "template" and type(value) is dict and "sensor_status" in value:
+        keys.add("sensor_status")
+    _keys(value, keys)
     if (value["schema"] != f"guard-{kind}-native-observations/1"
             or value["run_id"] != run_id or value["environment_ref"] != env_ref or value["image"] != image
             or type(value["events"]) is not list or not 1 <= len(value["events"]) <= 64):
         raise ValueError("NATIVE_OBSERVATION_BINDING_INVALID")
     if kind == "template":
+        if "sensor_status" in value:
+            status = value["sensor_status"]
+            _keys(status, ("schema", "attempted_events", "failed_events", "emission_complete", "diagnostic_codes"))
+            attempts, failures = status["attempted_events"], status["failed_events"]
+            if (status["schema"] != "guard-template-sensor-emission/1"
+                    or type(attempts) is not int or not 1 <= attempts <= 64
+                    or type(failures) is not int or not 0 <= failures <= attempts
+                    or not attempts - failures <= len(value["events"]) <= attempts
+                    or type(status["emission_complete"]) is not bool
+                    or status["emission_complete"] != (failures == 0)
+                    or status["diagnostic_codes"] != (["TEMPLATE_SENSOR_EMIT_FAILED"] if failures else [])):
+                raise ValueError("NATIVE_TEMPLATE_SENSOR_STATUS_INVALID")
         for event in value["events"]:
             stage = event.get("kind") if type(event) is dict else None
             if stage == "template_read":
@@ -82,7 +97,13 @@ def validate_capture(value, *, kind, env_ref, run_id, image):
             seen.add(event["event_id"])
     else:
         raise ValueError("NATIVE_OBSERVATION_KIND_UNSUPPORTED")
-    return {"schema": f"guard-{kind}-capture-summary/1", "events_seen": len(value["events"]),
+    result = {"schema": f"guard-{kind}-capture-summary/1", "events_seen": len(value["events"]),
             "record_sha256": sha256_hex(canonical_json(value)), "producer_authenticated": False,
             "independent_source_verified": False, "security": "UNKNOWN", "functional": "UNKNOWN",
             "actual_consumption_verified": False}
+    if kind == "template" and "sensor_status" in value:
+        # An unauthenticated producer's delivery claim, never evidence of full collection/consumption.
+        status = value["sensor_status"]
+        result["reported_sensor_status"] = {**status, "diagnostic_codes": list(status["diagnostic_codes"])}
+        result["collection_errors"] = list(status["diagnostic_codes"])
+    return result

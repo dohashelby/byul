@@ -49,6 +49,8 @@ class TemplateValidationExecutor(HttpCheckExecutor):
     def __init__(self, cfg, *args, docker=None, **kwargs):
         super().__init__(cfg, *args, **kwargs)
         self.docker = docker or Docker("template" + secrets.token_hex(4))
+        if cfg.get("native_observation_path") is not None:
+            self.version = "0.3.0"
 
     def _identity_snapshot(self, ctx, identity, argv, deadline):
         """Read only the owned running engine and selected readonly template.
@@ -94,7 +96,10 @@ class TemplateValidationExecutor(HttpCheckExecutor):
             raise ValueError("fixed-template-input-v1 needs the four declared challenge steps")
 
     def _finish(self, ctx):
-        return append_artifact(super()._finish(ctx), ctx, "template_samples.json", f"{self.name}/{self.version}")
+        draft = append_artifact(super()._finish(ctx), ctx, "template_samples.json", f"{self.name}/{self.version}")
+        if getattr(ctx, "_native_artifact_written", False):
+            append_artifact(draft, ctx, "template_native_observations.json", f"{self.name}/{self.version}")
+        return draft
 
     def collect(self, ctx):
         if getattr(ctx.check, "collection_profile", None) == template_supply_approval.PROFILE:

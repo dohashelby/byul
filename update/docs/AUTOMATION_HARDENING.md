@@ -1,5 +1,71 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-26 후속 구현 — 변경 영향 검증·Unix IPC 접근·native 자료 수집
+
+이번 작업 기준은 main `3b6a5d6`이 아닌 승인 변경의 통합 브랜치 `0621272`다.
+PR #6~#9는 이미 main에 병합된 PR #5의 head 브랜치에 뒤늦게 병합돼 main에 포함되지
+않았다. 기존 승인 변경은 다시 구현하지 않고 별도 통합 초안으로 인계한다.
+이번 후보는 팩 26/DRAFT·정책 25점검/54경로·보안 판정 규칙 연결 13개·관측 전용 1개·
+미연결 63개·실행기 12종이다. 정의 변경은 PLT-02 하나이며 기존 76개 정의 bytes와
+기존 판정기는 유지한다. 실제 엔진 시험은 보류 중이다.
+
+### PLT-02의 제한 구현
+
+`unix_ipc:real`은 명시된 보호 Unix SOCK_STREAM 경로와 허용 UID 정책을 받는다.
+`probe_uids`에는 허용·비허용 숫자 UID를 명시해야 하며 owner/관측에서 허용값을
+채우지 않는다. 소유 guard.run·pinned 이미지·대상 신원을 확인한 뒤 컨테이너 내부
+UID:GID를 지정해 zero-payload 연결만 한다. host PID namespace는 지원하지 않는다.
+전후 filesystem inode·socket inode·소유 PID/UID/start·namespace와 커널 SO_PEERCRED가
+연결될 때만 비허용 UID 접근을 FAIL 근거로 남긴다. 이후 정상 대조 오류나 다른
+source 미수집이 이미 확인한 연결 위반을 지우지 않는다.
+
+이것은 운영자가 명시한 보호 접점의 커널 연결 관측이다. 전체 core/worker IPC
+발견·SHM/TCP·추상 주소·동일 UID의 비허용 프로세스·무해 명령 소비·TP는 미검증이다.
+연결 거부나 정상 추론 성공만으로 전체 보호를 PASS로 표시하지 않는다. 보안은
+확인된 접근 FAIL 또는 UNKNOWN이며 기능·성능 PASS도 추가하지 않는다.
+원문의 전체 challenge는 시도 완료로 채우지 않고 부분 관측을 따로 기록한다.
+
+OBS-02·LIF-09는 정상 기동 후 수집하는 현재 실행 골격으로 부분 worker 준비 실패를
+독립 계측할 수 없어 이번에는 등록하지 않았다. guard 자신의 컨테이너 관리 결과나
+health를 대상 worker 준비 완료로 대체하지 않는다. 다음 구현에는 대상의 준비/실패
+생산자와 독립 상태·안전한 실패 주입·접수 gate의 대응이 필요하다.
+
+### REQ-02와 SUP-03: 실제 자료 경계와 남은 생산자
+
+`executors/owned_capture.py`는 소유 컨테이너의 명시된 regular file만 nofollow·
+전후 fstat·instance·해시·pipe 상한·전체 deadline으로 수집한다. 이것은 파일 bytes의
+출처·일관성 확인이며 생산자 진위 인증이 아니다. 원문·Secret 필드가 섞인 자료는
+native allowlist를 통과하지 못하며 증거에 저장하지 않는다.
+
+REQ-02의 `tools/capture_route_observations.py`는 기본 모드에서 ENV/입력만 읽고
+Docker·엔진·출력을 만들지 않는다. 명시적 `--execute`도 이미 소유한 컨테이너의
+자료를 읽는 명령이며 기동·pull은 없다. 자료는 DECLARED 첨부이고 EVD/RES·판정·
+자동 등록을 만들지 않는다. runtime `mvp/auth.py`의 권한 판단과
+`mvp/request_records.py`의 요청 기록만으로 rewrite와 최종 handler 실행의 연결은
+보장되지 않는다. 해당 담당자는 원 method/path·주체 digest·인가 입력/결정·변환 후
+method/path·최종 handler/작업/수행·서버 생성 ingress/upstream ID·요청 digest와 누락
+검출을 제공해야 한다. 클라이언트 ID·프록시 설정·HTTP 200으로 대체하지 않는다.
+현재 생산자가 없으므로 REQ-02 executor/judge는 null을 유지한다.
+
+SUP-03의 `adapters/template_read_sensor.py`는 검토 파일 hash를 확인하고 실제 반환하는
+동일 buffer의 raw/UTF-8 universal-newline 문자열 digest를 기록하는 함수와, 검토된 동기
+selection/apply 호출 인수·반환·오류의 metadata wrapper를 제공한다. 자동 monkeypatch나
+선정 이미지 삽입은 하지 않았다. source hash 일치는 이미지 관계나 함수 진위 인증이
+아니다. 현재 이미지와 의존성의 출처 검토·별도 계측 이미지·load/cache generation 및
+collector nonce/요청/재시작 연결·generate handoff는 후속이다. 전체 worker 소비 센서는
+아니며 EXAMPLE 분석기를 MEASURED로 바꾸지 않았다.
+
+SUP-03에 선택 설정 `native_observation_path`를 준 경우에만 실제 파일 캡처를 시도하고
+strict metadata 자료를 별도 EVD artifact로 연결한다. 이 경우 실행기 버전은 0.3.0,
+옵션 없는 기존 경로는 0.2.0이다. 실패는 고정 진단과 미수집으로 남기며 기존 관측을
+지우지 않는다. 자료의 생산자·소비 진위는 미검증이고 SUP-03의 기존 보안/기능 UNKNOWN·
+consumer_verified=false 상한은 그대로다. 선택 자료가 완전해 보여도 자동 PASS는 없다.
+
+이번 변경의 실제 시험 대상은 새로운 IPC 수집과 선택 native 파일 수집이다. 기존
+다섯 점검의 실행·판정·기동/비교 경로는 바꾸지 않아 두 이미지 전체 재실증을 요구하지
+않는다. native 옵션 없는 REQ-07/SUP-03과 registry·팩 연결은 영향 회귀로 검증한다.
+실제 vLLM·AWS 신규 자원·새 모델/이미지는 사용자 보류 결정에 따라 실행하지 않는다.
+
 ## 2026-10-26 REQ-02 제한 구현 — EXAMPLE 증거 계약, 제품 연결 보류
 
 기존 `role_route`의 HTTP 응답·프록시 설정과 Gateway 접근 로그에는 인가 입력

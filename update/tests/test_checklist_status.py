@@ -93,6 +93,7 @@ def test_historical_pass_never_becomes_current_pack_measured():
     assert row["historical_verification"] == "HISTORICAL_PASS"
     assert row["current_pack_actual_status"] == "DEFERRED_NOT_MEASURED"
     assert row["windows_cpu_status"] == "HISTORICAL_LIMITED_PROFILE_ONLY"
+    assert row["priority"] == "P1_OBSERVATION_GAP"  # No blanket P0 rerun of the old five.
 
 
 def test_empty_security_rules_are_counted_as_observation_only():

@@ -149,7 +149,7 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
         else:
             implementation = "NO_REAL_EXECUTOR"
         if real:
-            priority = "P0_CURRENT_DEFINITION_REVALIDATION" if check_id in {"REQ-01", "REQ-03", "REQ-09", "PLT-01", "PLT-04"} else "P1_OBSERVATION_GAP"
+            priority = "P1_OBSERVATION_GAP"
         else:
             priority = {"A": "P2_LOCAL_FEASIBILITY_REVIEW", "B": "P3_ADDITIONAL_INFRA", "C": "P4_ENTERPRISE_ENV"}.get(old["grade"], "ENVIRONMENT_REVIEW_REQUIRED")
         observations = [o["key"] for o in check.get("required_observations", [])]
@@ -226,7 +226,7 @@ def render_markdown(rows: list[dict[str, str]]) -> str:
              "- 보안 PASS·FAIL 규칙이 모두 비어 있는 관측 전용 프로파일은 실행·판정 규칙 연결 수에서 제외한다. 파일 존재·설정·API 입력 대응은 독립 worker 소비 증명이 아니며, 이런 관측만으로 보안 PASS·FAIL을 확정하지 않는다.", "",
              "| 실험 묶음 | 점검 수 |", "|---|---:|"]
     lines.extend(f"| {group} | {count} |" for group, count in sorted(groups.items()))
-    lines += ["", "우선순위는 기존 5개 현행 정의 재확인(P0), 다른 자동 연결의 관측 공백(P1), 로컬 가능성 재검토(P2), 추가 인프라(P3), 기업 환경(P4)이다. 어려운 계측 하나가 독립적인 신규 점검을 모두 막지는 않는다.", "",
+    lines += ["", "우선순위는 연결된 점검의 관측 공백(P1), 로컬 신규 구현(P2), 추가 인프라(P3), 기업 환경(P4)이다. 기존 점검 재실증은 실행기·정의·설정·시험 자료·환경의 변경 영향이 있을 때만 해당 범위를 수행한다. 팩 revision 변경만으로 기존 5개 전체 재실증을 요구하지 않는다. 어려운 계측 하나가 독립적인 신규 점검을 모두 막지는 않는다.", "",
               "REQ-05는 최종 모델·alias·퇴역 방침, LIF-09는 대상의 부분 실패와 외부 접수 gate, OBS-04는 실제 생성·송신 관측을 먼저 확정한다. 기존 실행기 재사용 후보가 곧 해당 점검의 지원이나 실행 완료를 뜻하지 않는다.", "",
               "실험 완료 시 현재 팩·이미지 digest·모델·정책·분기별 EVD/RES·재현 명령·원본 RPT·플랫폼 계약 검증·미검증 범위를 별도 실험 기록으로 남긴 뒤 정본에 연결한다. 본 추적 도구는 엔진·네트워크·테스트를 실행하지 않는다.", "",
               "재생성: `uv run python -m tools.checklist_status`", "",

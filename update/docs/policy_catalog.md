@@ -1,5 +1,9 @@
 # 기업 정책 카탈로그 — Phase 1 검토 초안
 
+> 2026-10-26 작업 후보: 팩26/DRAFT·정책25점검/54경로·보안 규칙 연결13개·관측 전용1개·실행기12종이다. PLT-02는 Unix IPC 접근 부분 범위이며 실제 엔진 시험은 보류했다. 기존 점검 재실증은 변경 영향이 있을 때만 해당 범위를 수행한다. 아래 팩25 이하·GUA PR의 현행 표기는 당시 기록이다. [관측 보강](AUTOMATION_HARDENING.md)를 따른다.
+
+현재 카탈로그는 327행이며 이 중 구조화한 선언은54경로다. PLT-02 보호 경로·허용 UID의 값과 승인은 비워 두고 기존 325행을 보존했다.
+
 > 2026-10-26 후속: 팩25/DRAFT·정책24점검/52경로·실행/보안 판정 규칙 연결12점검·관측 전용1점검이다. SUP-04는 실행 이미지 승인 부분관측, SUP-03은 readonly template 신원·승인 membership·API projection 관측 전용이며 승인 일치/불일치 모두 보안 UNKNOWN이다. 기존 실행기11종을 재사용한다. 실제 vLLM 실증은 사용자 결정으로 보류하며 아래 과거 기록은 소급하지 않는다. [공급물 관측 한계](AUTOMATION_HARDENING.md)·[77개 추적](CHECKLIST_VALIDATION_STATUS.md)을 따른다.
 
 > U1 원문 동기화: PACK-BASELINE 23/DRAFT·REQ-09 revision 7·PLT-04 revision 4로 갱신했다. 승인한 원본 `729216b1`의 질문·framework_id·mechanism_ids 반영으로 CheckDef revision이 각각 1씩 증가했으며 정책 22점검/50경로·카탈로그 323행/615연결·a47/b2/c161/d113·자동 연결 11개와 판정 계약은 유지한다. 패키지 설명 JSON은 새 팩의 정확한 Ref만 동기화한다. 아래 CSV와 단계별 출처·실측은 당시 기록이며 새 팩의 실제 엔진 검증 완료를 뜻하지 않는다. 변경 선정의 현행 연결은 [U1](UPDATE_SELECTION.md)을 따른다.

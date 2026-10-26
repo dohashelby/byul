@@ -149,6 +149,7 @@ def _tokens(value, maximum):
 
 def collect(executor, ctx):
     """최대 세 번의 무해 요청. 원문 challenge와 독립 소비는 미수집이다."""
+    ctx._native_artifact_written = False
     validate_policy(ctx.check, ctx.policy_values, executor.cfg)
     limits = settings(executor.cfg)
     deadline = time.monotonic() + limits["max_duration_seconds"]
@@ -264,6 +265,25 @@ def collect(executor, ctx):
         "fixture": {"profile": PROFILE, "normal": ctx.check.functional_probes[0].model_dump(mode="json"),
                     "settings": limits, "endpoints": ["/tokenize", "/v1/chat/completions"]},
     }
+    if executor.cfg.get("native_observation_path") is not None:
+        # Optional actual file capture, never an implicit new sensor/trust/verdict claim.
+        from .owned_capture import read_owned_json
+        from .native_observations import validate_capture
+        try:
+            if before is None or deadline <= time.monotonic():
+                raise ValueError("NATIVE_CAPTURE_TARGET_UNVERIFIED")
+            packet, provenance = read_owned_json(executor.docker, ctx.target,
+                container=target[0], image=target[1], path=executor.cfg["native_observation_path"],
+                timeout=min(ctx.timeout, 5, deadline - time.monotonic()))
+            result = validate_capture(packet, kind="template", env_ref=ctx.env.ref().model_dump(mode="json"),
+                                      run_id=ctx.target["run_id"], image=target[1])
+            summary["native_observations"] = {**result, "capture": provenance}
+            sample_artifact(ctx, "template_native_observations.json",
+                            {"capture": provenance, "record": packet, "summary": result})
+            ctx._native_artifact_written = True
+        except Exception:
+            summary["native_observations"] = {"captured": False, "error": "NATIVE_TEMPLATE_CAPTURE_UNAVAILABLE",
+                "actual_consumption_verified": False, "security": "UNKNOWN", "functional": "UNKNOWN"}
     sample_artifact(ctx, "template_samples.json", {"summary": summary})
     return observations, {"attempted": attempted, "succeeded": normal_ok,
                           "detail": "bounded normal chat and exact API input projection; independent consumer unverified"}, [

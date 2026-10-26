@@ -1,5 +1,11 @@
 # 실행·실증 안내
 
+> 2026-10-26 현행 작업 후보: 팩26/DRAFT, 보안 규칙 연결13개·SUP-03 관측 전용1개다.
+> PLT-02 Unix IPC 부분 연결·선택 native 파일 수집의 범위는
+> [관측 보강](AUTOMATION_HARDENING.md)을 따른다. 기존 점검 실제 재실증은 변경 영향이
+> 있을 때 해당 범위만 수행한다. 아래 팩21·22·GUA PR #28~#31 기록은 과거 이력이다.
+> BYUL PR #6~#9의 병합 목적지는 #5의 head 브랜치였으며 main 반영은 별도 통합 PR이 필요하다.
+
 ## v1 통합 후보와 검증 이력
 
 **2026-10-25 현행**: PR #30·#31이 main(`fb0c103`)에 병합됐다. 실측은 실행 조건별로 구분한다. (1) PR #30 기본 실행(`length_cause_evidence` 없음): 후보 REQ-09 보안 UNKNOWN으로 수락 실패. (2) PR #31 후속 실행(`length_cause_evidence = true`, 검토 프로파일과 일치하는 0.32.0 CPU 이미지): 다섯 점검 양쪽 PASS·NO_CHANGE로 수락 성공. (3) PLT-04 후보 단독 시험: 비어 있지 않은 EXAMPLE 후보로 absent·denied PASS / readable FAIL / symlink·directory UNKNOWN. (4) 두 이미지 update의 PLT-04: 후보 `[]`인 부분 범위. 상세는 [후속 실측](UPDATE_VALIDATION.md#후보-길이-거부-원인자격-후보-후속)이다.

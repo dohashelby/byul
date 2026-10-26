@@ -30,6 +30,7 @@ from guard.input_policy import policy_context
 
 # Descriptions of the existing collectors, not a second plugin registry.
 _SCOPES = {
+    "unix_ipc": "owned Linux Unix SOCK_STREAM zero-payload UID access only; no full IPC PASS",
     "direct_route": "registered route access and bounded normal inference controls",
     "role_route": "declared general/admin roles over registered route kinds",
     "container_config": "owned container/process permissions and bounded sentinel writes",
@@ -60,6 +61,9 @@ def _policy_shape(check, values):
             validate_template_supply_policy(check, values, {})
         else:
             validate_template_policy(values)
+    elif check.executor == "unix_ipc":
+        from guard.executors.unix_ipc import policy_shape
+        policy_shape(values)
     elif check.executor == "container_config" and getattr(check, "collection_profile", None) == IMAGE_APPROVAL_PROFILE:
         validate_image_approval_policy(values)
     elif check.executor == "request_binding":
@@ -136,6 +140,15 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             if policy_scope:
                 row["policy_supported"] = False
             row["reasons"].append(reason)
+
+        if executor == "unix_ipc":
+            from guard.executors.unix_ipc import UnixIPCExecutor
+            try:
+                UnixIPCExecutor(cfg.get("unix_ipc", {}), docker=object()).validate_policy(check, values)
+            except (ValueError, TypeError):
+                row["status"] = "UNKNOWN"
+                row["reasons"].append("explicit allowed/disallowed probe UID configuration and bounded IPC settings are required")
+            row["limitations"].append("actual endpoint owner, namespaces and SO_PEERCRED require runtime collection; no SHM/TCP/command or full IPC PASS")
 
         if executor in {"template_validation", "request_binding", "log_integrity"}:
             if executor == "template_validation":

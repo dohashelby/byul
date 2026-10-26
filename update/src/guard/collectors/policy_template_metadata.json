@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 25,
-    "sha256": "1303a315cedab0d940331715cf705ceb14bb04393e3040bc97482e9ac9c292a9"
+    "revision": 26,
+    "sha256": "710b80395538ea246f4d5ddc30bc093ff603b19b44f06ba2a4ef1bcb107d7391"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -189,6 +189,22 @@
       "consumer": "실행: container_config가 root_uid_present 수집; 이 bool 직접 소비 없음 / 판정: rule_table when_policy; true일 때 UID 0 부재 요구, false이면 해당 규칙 생략 / 수동 판정: declared 0.5.0은 선언된 필수 키 누락 시 PASS를 UNKNOWN으로 보류; 값 내용의 충족 자동 검증 아님",
       "verification": "코드·기존 테스트 정적 대조; 과거 macOS 엔진 실측 기록 있음 (현재 통합판 재실측 없음)",
       "catalog_id": "P-DRAFT-PLT-01-REQUIRE-NON-ROOT"
+    },
+    "values.PLT-02.allowed_ipc_uids": {
+      "type": "list[str]",
+      "description": "보호 IPC 접근을 허용한 숫자 UID 문자열 목록",
+      "decision_role": "미지정",
+      "consumer": "선정: 필수 명시 list[str] / 수집: unix-ipc-access-v1의 UID/namespace/peer 연결 대조 / 판정: 확인된 비허용 접속 FAIL만, 전체 보안·기능 PASS 없음",
+      "verification": "제한 IPC 접근 계약; 실제 vLLM 실증 보류. 회귀 결과는 PROGRESS·CI를 따른다.",
+      "catalog_id": "P-DRAFT-PLT-02-ALLOWED-IPC-UIDS"
+    },
+    "values.PLT-02.protected_unix_paths": {
+      "type": "list[str]",
+      "description": "기업이 보호 대상으로 정한 실제 Unix socket 경로 목록",
+      "decision_role": "미지정",
+      "consumer": "선정: 필수 명시 list[str] / 수집: unix-ipc-access-v1의 UID/namespace/peer 연결 대조 / 판정: 확인된 비허용 접속 FAIL만, 전체 보안·기능 PASS 없음",
+      "verification": "제한 IPC 접근 계약; 실제 vLLM 실증 보류. 회귀 결과는 PROGRESS·CI를 따른다.",
+      "catalog_id": "P-DRAFT-PLT-02-PROTECTED-UNIX-PATHS"
     },
     "values.PLT-04.credential_candidate_paths": {
       "type": "list[str]",

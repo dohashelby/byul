@@ -871,3 +871,9 @@ git status
 - 테스트 결과: Linux WSL 2564→2569 통과, 실패/skip 0·기존 제외 18, 부모 243.361→195.885초다. ba374d9의 CI 부모는 [58.354초](https://github.com/dohashelby/gua/actions/runs/40074036680)/[86.218초](https://github.com/dohashelby/gua/actions/runs/40074030720), 문서만 변경한 2694e4a는 [86.532초](https://github.com/dohashelby/gua/actions/runs/40074293956)/[61.167초](https://github.com/dohashelby/gua/actions/runs/40074291530)이며 모두 2569 통과·설치본 검증 성공이다. 입력 key 보강 회귀 25개도 통과했다.
 - 다음 단계: B의 기능 검증과 소요시간 기록을 유지하고 PR C의 두 실제 이미지 실증으로 진행한다. 모든 기존 사례와 wheel/설치본 검증을 유지하며 옮기거나 제외한 사례는 없다.
 - 막힌 것: 60초의 안정 달성은 미확인이지만 최신 사용자 승인으로 시간 초과에 따른 gate·중단 요구가 해제됐다. PR C 실제 이미지 실행·새 pull·실측 문서·사람 확인 묶음은 아직 수행 전이다.
+
+## 프레임워크 확정본과 최신 main 통합 — 2026-10-26
+- 한 일: main 3b6a5d6의 U1·SUP-04·Python 3.12와 77개 생성 정의 보존. 참조 15파일 확정본 동기화, 고정 ID 우선 대응, PACK25/DRAFT.
+- 테스트 결과: 기본 전체 **3300 passed / 19 deselected**, pytest **75.86초**, 부모 벽시계 **76.145초**. 별도 Python 3.12 설치본 검증 통과.
+- 다음 단계: PR #10 검토·병합. 실제 엔진 시험·기업 승인 별도.
+- 막힌 것: 없음. [상세 기록](docs/FRAMEWORK_SYNC_20261026.md).

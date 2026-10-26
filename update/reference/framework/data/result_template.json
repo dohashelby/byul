@@ -1,4 +1,17 @@
 {
+  "record_id": null,
+  "assessment_id": "CHK-OBS-004",
+  "protection_requirement_id": "requirement-5-3",
+  "checklist_revision": "sha256:7f857208af8071b9934695f32b8753000f0f7b79aa0d47d1bd42945184875ef0",
+  "test_branch_ref": {
+    "name": "설정 조작으로 금지한 사용통계 보고 재개",
+    "scenario_ids": [
+      "SC-22-01"
+    ],
+    "apply_when": "usage 금지 정책에서 rank0 env/config·새 프로세스 최초 판단·생성/송신을 확인한다."
+  },
+  "test_case_id": null,
+  "test_case_parameters": {},
   "question_id": "Q-C11",
   "subtest": "usage 초기 및 주기 자료",
   "procedure_version": "초안-0.1",

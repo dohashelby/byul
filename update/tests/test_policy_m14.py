@@ -37,7 +37,7 @@ def result(check, evd, vals):
 
 def test_registration_catalog_empty_template_and_no_new_executor(pack):
     check = pack.checks["REQ-15"]
-    assert (pack.manifest.revision, check.revision) == (24, 3) and not pack.reviewed
+    assert (pack.manifest.revision, check.revision) == (25, 3) and not pack.reviewed
     assert [(p.key, p.type, p.required) for p in check.policy_params] == [
         (k, t, True) for k, t in cache.POLICIES.items()]
     assert [(o.key, o.type) for o in check.required_observations] == [(cache.OBSERVATION, "dict")]

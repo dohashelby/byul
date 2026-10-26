@@ -20,7 +20,7 @@
 
 ## 2. 프레임워크 근거
 
-새 `checklist.json`(mg-princess/serving-security-framework `729216b1`)의 `framework_model`이 같은 흐름을 요구한다.
+새 `checklist.json`(mg-princess/serving-security-framework `0ec5fb5fa5633b0817468b27684690a66fc7b4f5`)의 `framework_model`이 같은 흐름을 요구한다.
 
 - `lifecycle`의 `LC-CHANGE`는 "엔진·모델·설정·의존성·배포 방식이나 정책을 변경할 때" 변경 영향을 검토해 대상과 분기를 고르라고 한다. `LC-INTAKE`는 필요한 시험을 격리 환경에서 하라고 한다.
 - `lifecycle_policy.selection_rule`은 각 시점의 점검을 "검토 후보"로 두고 선정·비적용·미정 이유를 기록하라고 한다. `evidence_reuse_rule`은 증거 재사용 시 대상·구성·정책·시험 절차 판본의 유효성 확인과 원 실행 ID·출처·시각·한계·재사용 이유 기록을 요구한다.
@@ -444,3 +444,6 @@ python -m tools.evaluate_source_selection --oracle tests/fixtures/u1_source_orac
 - 직접 테스트 환경은 Windows/Python 3.11.16·별도 `uv sync --frozen` 환경이다. 최종 기본 `pytest -q --durations=50 --basetemp <output>/pytest-default`는 **3,236통과·실패/오류0·기존 skip13·제외19**, pytest **571.11초/부모573.349초**다. 기존 플랫폼·권한 조건 skip을 보존했고 새 skip/제외·기존 판정 기대값 완화는 없다. 신규 정답에 맞춰 메타데이터 테스트는 기존13개 ID의 존재와 전체 pending/partial을 보존한다.
 - 최초 집중 검증은 306통과(pytest64.31초/부모68.413초), 추가 정적 검토의 평가 입력 대응 보완 뒤 직접·같은 계약·불변식은 118통과(15.19/17.186초)다. 보완은 평가 도구/테스트뿐이고 제품 규칙은 같은 snapshot이다. 최종 기본 suite는 그 보완을 포함한다.
 - 명시적 `pytest -q -m network`는 공개 고정 소스 추출의 바이트 재현성을 확인해 1통과·나머지3267제외(pytest52.32초/부모54.354초)였다. 기본 suite 제외 설정은 바꾸지 않았다. `uv build --wheel --out-dir <output>/dist`와 `python tools/verify_installed.py --wheel <output>/dist/guard-0.1.0-py3-none-any.whl --output <output>/wheel-verified`에서 소스·wheel·격리 설치본104파일이 일치하고 fake·저장 팩·변조 거부 검증도 통과했다. 최종 커밋 Linux CI 결과는 이번 초안 PR에 별도로 기록한다.
+
+### 2026-10-26 확정 원문 동기화
+PR #10은 U1 구현이 포함된 최신 main을 유지하고 참조 문서·템플릿을 확정 커밋에 맞췄다. 기존 점검 정의·변경 선정표를 보존하며 생성기의 고정 ID 대응을 보강했다. [통합 기록](FRAMEWORK_SYNC_20261026.md)을 따른다.

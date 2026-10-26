@@ -115,6 +115,7 @@ def test_removed_row_is_retired_and_new_row_gets_next_number(tmp_path, imported_
     changed = copy.deepcopy(data)
     removed = changed["platform_assessment_draft"].pop(2)
     new_row = copy.deepcopy(changed["platform_assessment_draft"][0])
+    new_row["id"] = "CHK-PLT-013"
     new_row["question"] = "새로 추가된 점검인가?"
     new_row["subtest_ids"] = ["Q-NEW/SC-NEW"]
     changed["platform_assessment_draft"].append(new_row)
@@ -161,3 +162,43 @@ def test_committed_pack_matches_importer(tmp_path):
     shutil.copytree(committed, pack)
     import_checklist(SOURCE, pack, OVERRIDES)
     assert _snapshot(pack) == _snapshot(committed)
+
+def test_fixed_ids_survive_all_wording_changes_and_duplicate_subtests(tmp_path, imported_pack):
+    data = json.loads(SOURCE.read_text())
+    before = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
+              for p in (imported_pack / "checks").glob("*.yaml")}
+    for key in AREAS:
+        for row in data[key]:
+            row["question"] += " revised"
+            row["subtest_ids"] = ["shared"]
+        data[key].reverse()
+    import_checklist(_write_source(tmp_path, data), imported_pack, OVERRIDES)
+    after = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
+             for p in (imported_pack / "checks").glob("*.yaml")}
+    assert before == after
+
+
+def test_duplicate_fixed_id_rejected_without_pack_changes(tmp_path, imported_pack):
+    data = json.loads(SOURCE.read_text())
+    rows = data["observability_assessment_draft"]
+    rows[1]["id"] = rows[0]["id"]
+    before = _snapshot(imported_pack)
+    with pytest.raises(ValueError, match="Duplicate framework ID"):
+        import_checklist(_write_source(tmp_path, data), imported_pack, OVERRIDES)
+    assert _snapshot(imported_pack) == before
+
+
+def test_legacy_map_migration_preserves_all_internal_ids(tmp_path, imported_pack):
+    import zipfile
+    history = ROOT / "tests/fixtures/pack21-checks/source.zip"
+    with zipfile.ZipFile(history) as archive:
+        name = next(name for name in archive.namelist() if name.endswith("id_map.yaml"))
+        (imported_pack / "id_map.yaml").write_bytes(archive.read(name))
+    before = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
+              for p in (imported_pack / "checks").glob("*.yaml")}
+    import_checklist(SOURCE, imported_pack, OVERRIDES)
+    after = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
+             for p in (imported_pack / "checks").glob("*.yaml")}
+    assert before == after
+    assert all(not yaml.safe_load(p.read_text())["retired"]
+               for p in (imported_pack / "checks").glob("*.yaml"))

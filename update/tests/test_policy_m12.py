@@ -64,7 +64,7 @@ def result(check, evd, vals):
 
 def test_registration_catalog_template_and_no_automation(pack):
     c=pack.checks["REQ-16"]
-    assert (pack.manifest.revision,c.revision)==(24,3) and not pack.reviewed
+    assert (pack.manifest.revision,c.revision)==(25,3) and not pack.reviewed
     assert [(p.key,p.type,p.required) for p in c.policy_params]==[("required_cache_contexts","list[str]",True)]
     assert [(o.key,o.type) for o in c.required_observations]==[("declared_cache_context_evidence","dict")]
     assert c.executor is c.judge is None and len(pack.checks)==77

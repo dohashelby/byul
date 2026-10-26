@@ -1,62 +1,74 @@
 SUP:
 - id: SUP-01
+  framework_id: CHK-SUP-001
   question: 파일 제출·저장소 수정 권한과 승인 기록 변경 권한이 분리되어 있는가?
   subtest_ids:
   - Q-R05-01/SC-09-01
   retired: false
 - id: SUP-02
+  framework_id: CHK-SUP-002
   question: 배포 담당자가 허용받은 모델을 허용받은 환경에만 배포할 수 있는가?
   subtest_ids:
   - Q-R05-01/SC-09-02
   retired: false
 - id: SUP-03
+  framework_id: CHK-SUP-003
   question: 기본 모델과 함께 읽는 설정·tokenizer·chat template, 하위 모델·추가 공급원의 파일도 승인 범위에 포함되는가?
   subtest_ids:
   - Q-R05-02/SC-10-02
   retired: false
 - id: SUP-04
+  framework_id: CHK-SUP-004
   question: 실제로 실행하는 이미지·패키지와 함께 설치되는 의존성도 모두 승인되어 있는가?
   subtest_ids:
   - Q-R05-02/SC-10-03
   retired: false
 - id: SUP-05
+  framework_id: CHK-SUP-005
   question: 승인 뒤 파일·symlink·마운트가 바뀌어도 승인하지 않은 자료의 사용을 막는가?
   subtest_ids:
   - Q-R05-04/SC-10-01
   retired: false
 - id: SUP-06
+  framework_id: CHK-SUP-006
   question: 각 worker가 배정받은 승인 모델 파일·shard를 실제로 메모리에 올리는가?
   subtest_ids:
   - Q-R05-14/SC-10-04
   - Q-C13/SC-16-03
   retired: false
 - id: SUP-07
+  framework_id: CHK-SUP-007
   question: 생성된 코드·파일이나 공유 컴파일 캐시를 권한 없이 바꿀 수 없는가?
   subtest_ids:
   - Q-R05-04/SC-12-01
   retired: false
 - id: SUP-08
+  framework_id: CHK-SUP-008
   question: 요청에 넣은 값으로 허용받지 않은 코드 버전을 선택할 수 없는가?
   subtest_ids:
   - Q-R05-03/SC-11-01
   retired: false
 - id: SUP-09
+  framework_id: CHK-SUP-009
   question: 모델에 포함된 추가 코드가 허용된 조건에서만 실행되는가?
   subtest_ids:
   - Q-R05-05/SC-11-02
   retired: false
 - id: SUP-10
+  framework_id: CHK-SUP-010
   question: 승인하지 않은 플러그인을 실행하기 전에 허용 여부를 검사하는가?
   subtest_ids:
   - Q-R05-05/SC-11-03
   - Q-R05-05/SC-11-04
   retired: false
 - id: SUP-11
+  framework_id: CHK-SUP-011
   question: 지원하는 실행 방식마다 외부 모듈을 불러오는 제한이 유지되는가?
   subtest_ids:
   - Q-R05-06/SC-11-05
   retired: false
 - id: SUP-12
+  framework_id: CHK-SUP-012
   question: 실제로 사용하는 파일·메시지 해석기가 금지된 객체나 동작을 거부하는가?
   subtest_ids:
   - Q-R05-07/SC-11-06
@@ -65,21 +77,25 @@ SUP:
   - Q-C13/SC-16-02
   retired: false
 - id: SUP-13
+  framework_id: CHK-SUP-013
   question: 모델이 제공한 chat template을 해석할 때 허용된 동작 범위를 지키는가?
   subtest_ids:
   - Q-R05-05/SC-11-07
   retired: false
 - id: SUP-14
+  framework_id: CHK-SUP-014
   question: 필수 검사가 실패하거나 오류·미지원·생략으로 끝나면 통과시키지 않는가?
   subtest_ids:
   - Q-R05-08/SC-13-01
   retired: false
 - id: SUP-15
+  framework_id: CHK-SUP-015
   question: 모델·도구·설정이 바뀌면 더 이상 맞지 않는 생성물이나 캐시를 재사용하지 않는가?
   subtest_ids:
   - Q-R05-02/SC-12-02
   retired: false
 - id: SUP-16
+  framework_id: CHK-SUP-016
   question: 중단되거나 실패한 생성물·부분 파일을 완성된 자료로 사용하지 않는가?
   subtest_ids:
   - Q-R05-11/SC-12-03
@@ -87,26 +103,31 @@ SUP:
   retired: false
 REQ:
 - id: REQ-01
+  framework_id: CHK-REQ-001
   question: Gateway를 거치지 않은 요청으로 허용받지 않은 작업을 할 수 없는가?
   subtest_ids:
   - Q-C01/SC-01-01
   retired: false
 - id: REQ-02
+  framework_id: CHK-REQ-002
   question: Gateway·서버의 경로 설정에 따라 요청 경로가 바뀌어도 최종 실행 API에 필요한 인증·권한 검사가 적용되는가?
   subtest_ids:
   - Q-C01/SC-01-02
   retired: false
 - id: REQ-03
+  framework_id: CHK-REQ-003
   question: 일반 사용자가 허용받지 않은 관리·진단 작업을 할 수 없는가?
   subtest_ids:
   - Q-C01/SC-01-03
   retired: false
 - id: REQ-04
+  framework_id: CHK-REQ-004
   question: 사용자가 보낸 값으로 권한 검사에 쓰는 신원을 사칭할 수 없는가?
   subtest_ids:
   - Q-C01/SC-01-04
   retired: false
 - id: REQ-05
+  framework_id: CHK-REQ-005
   question: 최종 선택된 모델에 호출자의 사용 권한이 적용되고, 사용 종료한 모델의 실행이 차단되는가?
   subtest_ids:
   - Q-C02/SC-02-01
@@ -114,48 +135,57 @@ REQ:
   - Q-C13/SC-16-01
   retired: false
 - id: REQ-06
+  framework_id: CHK-REQ-006
   question: 저장된 결과를 조회하거나 취소할 때 해당 객체의 권한을 확인하는가?
   subtest_ids:
   - Q-C02/SC-02-03
   retired: false
 - id: REQ-07
+  framework_id: CHK-REQ-007
   question: chat template 적용으로 입력이 바뀐 뒤에도 필요한 제한이 유지되는가?
   subtest_ids:
   - Q-C04/SC-03-01
   - Q-R05-05/SC-11-07
   retired: false
 - id: REQ-08
+  framework_id: CHK-REQ-008
   question: 미리 만든 토큰 ID를 재사용하는 입력도 필요한 검사를 거치는가?
   subtest_ids:
   - Q-C04/SC-03-02
   retired: false
 - id: REQ-09
+  framework_id: CHK-REQ-009
   question: 토큰 번호와 입력 길이가 실제 모델과 처리 단계에서 허용하는 범위 안에 있는가?
   subtest_ids:
   - Q-C04/SC-04-01
   retired: false
 - id: REQ-10
+  framework_id: CHK-REQ-010
   question: 답변 생성 옵션의 값·개수·조합이 실제 실행 가능한 범위 안에 있는가?
   subtest_ids:
   - Q-C04/SC-04-02
   retired: false
 - id: REQ-11
+  framework_id: CHK-REQ-011
   question: 동시 요청과 스트리밍 응답이 각각 올바른 요청자에게 돌아가는가?
   subtest_ids:
   - Q-C02/SC-02-02
   retired: false
 - id: REQ-12
+  framework_id: CHK-REQ-012
   question: 취소하거나 연결을 끊은 요청의 늦은 결과가 다른 요청이나 새 시도에 섞이지 않는가?
   subtest_ids:
   - Q-C08/SC-18-01
   - Q-C08/SC-18-03
   retired: false
 - id: REQ-13
+  framework_id: CHK-REQ-013
   question: 응답 옵션과 오류 메시지가 수신자에게 허용된 정보만 반환하는가?
   subtest_ids:
   - Q-C11/SC-21-01
   retired: false
 - id: REQ-14
+  framework_id: CHK-REQ-014
   question: 여러 실행 프로세스가 주고받는 중간 자료와 최종 출력이 원래 요청에 맞게 처리·반환되는가?
   subtest_ids:
   - Q-C07/SC-08-02
@@ -163,36 +193,43 @@ REQ:
   - Q-C02/SC-08-04
   retired: false
 - id: REQ-15
+  framework_id: CHK-REQ-015
   question: 캐시를 공유할 사용자 집단을 검증된 신원에 따라 결정하는가?
   subtest_ids:
   - Q-C03/SC-05-01
   retired: false
 - id: REQ-16
+  framework_id: CHK-REQ-016
   question: 캐시 식별값이 재사용에 필요한 모델·설정·자료의 차이를 구분하는가?
   subtest_ids:
   - Q-C03/SC-05-02
   retired: false
 - id: REQ-17
+  framework_id: CHK-REQ-017
   question: 캐시 적중에 따른 시간 차이로 비공개 정보가 허용 범위 밖에 드러나지 않는가?
   subtest_ids:
   - Q-C03/SC-05-03
   retired: false
 - id: REQ-18
+  framework_id: CHK-REQ-018
   question: batch slot을 옮기거나 재사용할 때 이전 요청의 제한 상태가 남지 않는가?
   subtest_ids:
   - Q-C02/SC-06-01
   retired: false
 - id: REQ-19
+  framework_id: CHK-REQ-019
   question: 실제 사용하는 GPU 연산 코드가 입력·버퍼 경계를 지키고 필요한 영역을 초기화하는가?
   subtest_ids:
   - Q-C06/SC-06-02
   retired: false
 - id: REQ-20
+  framework_id: CHK-REQ-020
   question: CUDA Graph 재실행이 현재 입력을 쓰고 아직 읽는 출력 버퍼를 덮어쓰지 않는가?
   subtest_ids:
   - Q-C06/SC-06-02
   retired: false
 - id: REQ-21
+  framework_id: CHK-REQ-021
   question: TP의 GPU 작업 재실행에 사용하는 통신 버퍼가 등록·종료·재기동 후에도 현재 실행의 유효한 버퍼를 참조하는가?
   subtest_ids:
   - Q-C06/SC-06-02
@@ -200,36 +237,43 @@ REQ:
   retired: false
 PLT:
 - id: PLT-01
+  framework_id: CHK-PLT-001
   question: 엔진과 worker의 호스트·파일·장치 권한이 필요한 범위에 한정되는가?
   subtest_ids:
   - Q-C10/SC-14-04
   retired: false
 - id: PLT-02
+  framework_id: CHK-PLT-002
   question: 같은 호스트의 내부 통신 접점에 허용된 프로세스만 접근하는가?
   subtest_ids:
   - Q-C07/SC-08-01
   retired: false
 - id: PLT-03
+  framework_id: CHK-PLT-003
   question: 모델 취득 계정이 허용된 저장소·파일에만 접근할 수 있는가?
   subtest_ids:
   - Q-R05-09/SC-14-01
   retired: false
 - id: PLT-04
+  framework_id: CHK-PLT-004
   question: worker에 필요 없는 자격·비밀정보를 넘기지 않는가?
   subtest_ids:
   - Q-C10/SC-14-03
   retired: false
 - id: PLT-05
+  framework_id: CHK-PLT-005
   question: 자격이 만료되거나 없을 때 승인하지 않은 다른 방식으로 접근하지 않는가?
   subtest_ids:
   - Q-C10/SC-14-02
   retired: false
 - id: PLT-06
+  framework_id: CHK-PLT-006
   question: Core·worker의 공유 권한과 침해 영향을 확인하고, 해당 프로세스·내부 통신에 대한 외부 접근을 제한하는가?
   subtest_ids:
   - Q-C07/SC-08-02
   retired: false
 - id: PLT-07
+  framework_id: CHK-PLT-007
   question: 엔진의 외부 송신이 허용된 목적지와 작업에 한정되는가?
   subtest_ids:
   - Q-R05-09/SC-14-01
@@ -239,114 +283,135 @@ PLT:
   - Q-C07/SC-24-01
   retired: false
 - id: PLT-08
+  framework_id: CHK-PLT-008
   question: API·내부 통신의 각 구간에서 통신 상대 인증과 기밀성·무결성 기준을 지키는가?
   subtest_ids:
   - Q-C07/SC-08-01
   - Q-C07/SC-08-03
   retired: false
 - id: PLT-09
+  framework_id: CHK-PLT-009
   question: 엔진에서 기록 수집기와 최종 저장소까지 필요한 전송 보호가 유지되는가?
   subtest_ids:
   - Q-C07/SC-24-01
   - Q-C07/SC-24-02
   retired: false
 - id: PLT-10
+  framework_id: CHK-PLT-010
   question: 자격을 철회한 뒤 새 접근을 정한 기한 안에 거부하는가?
   subtest_ids:
   - Q-C10/SC-19-01
   retired: false
 - id: PLT-11
+  framework_id: CHK-PLT-011
   question: 이미 열린 연결과 공유 자원 접근권도 정한 철회 정책대로 제한되는가?
   subtest_ids:
   - Q-C10/SC-19-02
   retired: false
 - id: PLT-12
+  framework_id: CHK-PLT-012
   question: 폐기한 자격의 사본으로 다시 접근할 수 없는가?
   subtest_ids:
   - Q-C12/SC-19-03
   retired: false
 LIF:
 - id: LIF-01
+  framework_id: CHK-LIF-001
   question: 모델을 가져와 해석·변환·로딩할 때 단계별·전체 자원 예산을 지키는가?
   subtest_ids:
   - Q-R05-10/SC-15-01
   retired: false
 - id: LIF-02
+  framework_id: CHK-LIF-002
   question: 모델 취득이 실패해도 반복·재시도로 비용이 끝없이 쌓이지 않는가?
   subtest_ids:
   - Q-R05-13/SC-15-02
   retired: false
 - id: LIF-03
+  framework_id: CHK-LIF-003
   question: 처리 비용이 큰 요청과 동시 부하를 제한하면서 정상 요청도 처리할 수 있는가?
   subtest_ids:
   - Q-C05/SC-07-01
   - Q-C05/SC-07-02
   retired: false
 - id: LIF-04
+  framework_id: CHK-LIF-004
   question: 응답을 느리게 읽는 연결과 진단용 버퍼가 자원을 과도하게 차지하지 않는가?
   subtest_ids:
   - Q-C05/SC-07-03
   - Q-C05/SC-07-04
   retired: false
 - id: LIF-05
+  framework_id: CHK-LIF-005
   question: 재배포할 때 이전 요청과 새 모델·설정이 잘못 섞이지 않는가?
   subtest_ids:
   - Q-R05-12/SC-17-01
   - Q-C09/SC-17-02
   retired: false
 - id: LIF-06
+  framework_id: CHK-LIF-006
   question: 실행 중 변경이나 순차 교체 중에도 각 요청의 모델·상태가 일관되는가?
   subtest_ids:
   - Q-C09/SC-17-03
   retired: false
 - id: LIF-07
+  framework_id: CHK-LIF-007
   question: 필요한 worker와 모델 실행 준비가 끝난 뒤 요청을 받는가?
   subtest_ids:
   - Q-R05-12/SC-17-01
   - Q-C09/SC-17-02
   retired: false
 - id: LIF-08
+  framework_id: CHK-LIF-008
   question: 각 GPU 실행 프로세스의 예외·종료·지연·통신 정지를 감지해 상위 제어 프로세스에 알리는가?
   subtest_ids:
   - Q-C08/SC-18-02
   retired: false
 - id: LIF-09
+  framework_id: CHK-LIF-009
   question: 일부 worker의 초기화나 모델 준비가 실패했을 때 성공으로 처리하지 않는가?
   subtest_ids:
   - Q-R05-12/SC-17-01
   retired: false
 - id: LIF-10
+  framework_id: CHK-LIF-010
   question: 취소·연결 종료 후 실제 작업이 정한 기한 안에 중단되고, 더 이상 사용하지 않는 상태·자원이 정리되는가?
   subtest_ids:
   - Q-C08/SC-18-01
   retired: false
 - id: LIF-11
+  framework_id: CHK-LIF-011
   question: 실패한 worker와 내부 통신·공유 자원을 정리해 다음 기동이 가능한가?
   subtest_ids:
   - Q-C08/SC-18-02
   - Q-R05-12/SC-17-01
   retired: false
 - id: LIF-12
+  framework_id: CHK-LIF-012
   question: 재시도할 때 이전 작업이 남아 있는지 확인하고 중복 실행 비용을 제한하는가?
   subtest_ids:
   - Q-C08/SC-18-03
   retired: false
 - id: LIF-13
+  framework_id: CHK-LIF-013
   question: 공유 가중치 전체 해제 후 재취득·대체 공급과 기존 참조의 사용이 승인·접근·수명 기준을 지키는가?
   subtest_ids:
   - Q-C13/SC-16-04
   retired: false
 - id: LIF-14
+  framework_id: CHK-LIF-014
   question: 성능 진단 종료 응답과 실제 수집·자원 사용의 종료가 일치하는가?
   subtest_ids:
   - Q-C08/SC-23-05
   retired: false
 - id: LIF-15
+  framework_id: CHK-LIF-015
   question: 이전 구성으로 복귀할 때도 현재 승인 기준을 만족하는가?
   subtest_ids:
   - Q-C12/SC-20-01
   retired: false
 - id: LIF-16
+  framework_id: CHK-LIF-016
   question: 변조된 복원 자료나 남은 상태가 복구 결과에 섞이지 않는가?
   subtest_ids:
   - Q-C12/SC-20-02
@@ -354,12 +419,14 @@ LIF:
   retired: false
 OBS:
 - id: OBS-01
+  framework_id: CHK-OBS-001
   question: 필수 접근·관리·승인 기록으로 누가 무엇을 어느 실행에서 했는지 확인할 수 있는가?
   subtest_ids:
   - Q-R05-15/SC-23-03
   - Q-C11/SC-23-02
   retired: false
 - id: OBS-02
+  framework_id: CHK-OBS-002
   question: 준비·실패·종료 기록이 실제 실행 상태와 일치하는가?
   subtest_ids:
   - Q-C11/SC-23-04
@@ -367,53 +434,63 @@ OBS:
   - Q-R05-15/SC-23-03
   retired: false
 - id: OBS-03
+  framework_id: CHK-OBS-003
   question: 로그·진단·추적·덤프 파일에 허용된 정보만 남기는가?
   subtest_ids:
   - Q-C11/SC-21-02
   - Q-C11/SC-21-01
   retired: false
 - id: OBS-04
+  framework_id: CHK-OBS-004
   question: 금지한 사용 통계 보고가 실제로 꺼진 상태를 유지하는가?
   subtest_ids:
   - Q-C11/SC-22-01
   retired: false
 - id: OBS-05
+  framework_id: CHK-OBS-005
   question: 허용한 사용 통계 보고가 정한 항목과 목적지 범위를 지키는가?
   subtest_ids:
   - Q-C11/SC-22-02
   retired: false
 - id: OBS-06
+  framework_id: CHK-OBS-006
   question: 기록·진단 사본의 조회·반출을 허용된 주체로 제한하고, 필요한 저장 암호화를 적용하는가?
   subtest_ids:
   - Q-C11/SC-21-02
   - Q-C11/SC-22-03
   retired: false
 - id: OBS-07
+  framework_id: CHK-OBS-007
   question: 진단 자료를 읽을 수 있다는 이유만으로 재실행까지 할 수 없는가?
   subtest_ids:
   - Q-C11/SC-21-03
   retired: false
 - id: OBS-08
+  framework_id: CHK-OBS-008
   question: 재실행 도구가 변조된 진단 자료를 거부하고, 자료 해석 시 파일·통신·코드 실행 권한을 승인 범위로 제한하는가?
   subtest_ids:
   - Q-C11/SC-21-04
   retired: false
 - id: OBS-09
+  framework_id: CHK-OBS-009
   question: 요청에 넣은 값으로 로그의 사용자·대상·상태를 위조할 수 없는가?
   subtest_ids:
   - Q-C11/SC-23-01
   retired: false
 - id: OBS-10
+  framework_id: CHK-OBS-010
   question: 기록을 허락 없이 바꾸거나 지우는 일을 제한하고 확인할 수 있는가?
   subtest_ids:
   - Q-C11/SC-23-06
   retired: false
 - id: OBS-11
+  framework_id: CHK-OBS-011
   question: 기록 수집 중단·누락·시각 오류를 표시하고, 증거가 부족한 시험은 미확인으로 처리하는가?
   subtest_ids:
   - Q-C11/SC-23-02
   retired: false
 - id: OBS-12
+  framework_id: CHK-OBS-012
   question: 로그·사용 통계·진단의 원본과 사본이 정한 보존·삭제 범위를 지키는가?
   subtest_ids:
   - Q-C12/SC-20-03

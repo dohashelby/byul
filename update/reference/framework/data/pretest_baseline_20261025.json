@@ -1,0 +1,100 @@
+{
+  "baseline": "시험 전 1차 기준선 2026-10-25",
+  "base_git_commit": "283c5fb84dc2148c4e493d1875402320cc7b3241",
+  "scope": "로컬 문서·양식; 실행·조직 승인 상태는 개별 기록 참조",
+  "files": [
+    {
+      "path": "01_프레임워크와_위협통제연결.md",
+      "sha256": "ede17ca28e9a3222097bb7a8a64d6f63cfbb84d58da1c29fd664f39bc3460715"
+    },
+    {
+      "path": "02_환경별_적용기준.md",
+      "sha256": "c2f7d07f01f3c437ee17d837c2a93b48285e2a2126846c28079ed43b16e87422"
+    },
+    {
+      "path": "03_체크리스트와_보완가이드.md",
+      "sha256": "5fd88e26ced7868b11f8a612d0359af07080d6afac01c3551dcbbb2cd2ce427c"
+    },
+    {
+      "path": "04_엔진과_버전별_차이.md",
+      "sha256": "9db04e1e64eff8fefad6ade3bdefc9a2cb91016a8341871373b9ae0767255897"
+    },
+    {
+      "path": "05_평가와_증거관리.md",
+      "sha256": "86d07f5782706b10edf8b7daf6fe4cc815cc67b871d701bb05f591a9325634fc"
+    },
+    {
+      "path": "data/checklist.json",
+      "sha256": "7f857208af8071b9934695f32b8753000f0f7b79aa0d47d1bd42945184875ef0"
+    },
+    {
+      "path": "data/environment_template.json",
+      "sha256": "748cbd7b6ee6909cd70d3f4debf9d759f2ddbbddf0777ebd799b80b2e3af23f3"
+    },
+    {
+      "path": "data/result_template.json",
+      "sha256": "a67996fc2ba3b9177d3253d1b4cc8c1b35b1896f637b9efc7aa871bd3b382eb0"
+    },
+    {
+      "path": "개발전달/업데이트검증_폼명세.md",
+      "sha256": "d11c4a90057df3a890e9b5e4aa51362b944f643e83541892912c9e7c6fe129ce"
+    },
+    {
+      "path": "노션_공유용/01_프로젝트_소개.md",
+      "sha256": "64a20ba65436940c9fe949ecbb51ee497a50b7500a279a33629cc7f97c161f4d"
+    },
+    {
+      "path": "노션_공유용/02_보안_프레임워크.md",
+      "sha256": "c379000e4cca554ec701763a0df1f96f9388348942d2c70fda9b242cca6d9aa0"
+    },
+    {
+      "path": "노션_공유용/03_vLLM_동작과_위협지도.md",
+      "sha256": "b0c2d94432f3840df86bc052567a5c14f286e56cc8799cb713b8e56eb3bcedf6"
+    },
+    {
+      "path": "노션_공유용/04_환경별_적용과_체크리스트.md",
+      "sha256": "7d7f2ae3c0dc299740a49ae03b47bccc7a2a50b6c00422894858ec1757d555db"
+    },
+    {
+      "path": "노션_공유용/05_위협통제_매트릭스.md",
+      "sha256": "5b751e3e84992d13fe252cdd66dd8dfb451388f9fa470f736e4a635f0cd961c0"
+    },
+    {
+      "path": "노션_공유용/06_평가와_솔루션_런타임.md",
+      "sha256": "18771de1f2fdefd403e8cd561f51d425338f95c99509e174c64497dfac8911fa"
+    },
+    {
+      "path": "노션_공유용/07_엔진별_적용가이드.md",
+      "sha256": "8bc10622e86a3566a5a5bf81985e5eb5317826f1f3cc9618e93a1a063c5d12d1"
+    },
+    {
+      "path": "시험전_1차확정_20261025.md",
+      "sha256": "440338ca03f7c88af749764bf675ec0894e9cf51575d5c850f42945c0224c654"
+    }
+  ],
+  "confirmation": {
+    "status": "confirmed_pretest_baseline",
+    "date": "2026-10-25",
+    "decision_source": "사용자가 수정본 재검토 후 현행 프레임워크를 이대로 1차 확정하도록 요청",
+    "scope": "현행 로컬 프레임워크 문서·양식의 개발·평가 기준선",
+    "operational_policy_and_deployment_approval": "적용 조직이 별도 기록",
+    "implementation_and_engine_test_status": "실제 구현·실행 증거별로 확인"
+  },
+  "independent_recheck": {
+    "date": "2026-10-25",
+    "framework_consistency": "passed",
+    "explorer_function_checks": "passed",
+    "selector_regression_tests_passed": 12,
+    "unique_branch_references": 112,
+    "json_examples_and_template_checked": 4,
+    "prior_template_values_preserved": true,
+    "prior_baseline_hash_matches": 17,
+    "engine_execution_performed": false
+  },
+  "distribution_scope": {
+    "canonical": "Git repository documents and templates",
+    "notion": "Existing framework pages; targeted content updates",
+    "excluded": "별도 업데이트검증솔루션팀_참고사항_20261025.md",
+    "checklist_semantics": "Existing IDs, applicability, branches, criteria, and run status preserved"
+  }
+}

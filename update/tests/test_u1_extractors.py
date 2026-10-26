@@ -263,7 +263,7 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
                   "OBS-03": 2, "OBS-04": 2, "OBS-05": 2, "OBS-07": 2, "OBS-08": 2,
                   "OBS-09": 2, "OBS-11": 2})
     pack = load_pack(ROOT / "packs/PACK-BASELINE")
-    assert pack.manifest.revision == 24
+    assert pack.manifest.revision == 25
     assert set(pack.checks) == set(prior) and len(prior) == 77
     expected = {cid: revision + 1 for cid, revision in prior.items()}
     expected["SUP-04"] += 1  # Only the new running-image profile changes after source refresh.

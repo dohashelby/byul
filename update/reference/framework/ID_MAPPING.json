@@ -1,0 +1,649 @@
+[
+  {
+    "internal_id": "SUP-01",
+    "framework_id": "CHK-SUP-001",
+    "subtest_ids": [
+      "Q-R05-01/SC-09-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-02",
+    "framework_id": "CHK-SUP-002",
+    "subtest_ids": [
+      "Q-R05-01/SC-09-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-03",
+    "framework_id": "CHK-SUP-003",
+    "subtest_ids": [
+      "Q-R05-02/SC-10-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-04",
+    "framework_id": "CHK-SUP-004",
+    "subtest_ids": [
+      "Q-R05-02/SC-10-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-05",
+    "framework_id": "CHK-SUP-005",
+    "subtest_ids": [
+      "Q-R05-04/SC-10-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-06",
+    "framework_id": "CHK-SUP-006",
+    "subtest_ids": [
+      "Q-R05-14/SC-10-04",
+      "Q-C13/SC-16-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-07",
+    "framework_id": "CHK-SUP-007",
+    "subtest_ids": [
+      "Q-R05-04/SC-12-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-08",
+    "framework_id": "CHK-SUP-008",
+    "subtest_ids": [
+      "Q-R05-03/SC-11-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-09",
+    "framework_id": "CHK-SUP-009",
+    "subtest_ids": [
+      "Q-R05-05/SC-11-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-10",
+    "framework_id": "CHK-SUP-010",
+    "subtest_ids": [
+      "Q-R05-05/SC-11-03",
+      "Q-R05-05/SC-11-04"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-11",
+    "framework_id": "CHK-SUP-011",
+    "subtest_ids": [
+      "Q-R05-06/SC-11-05"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-12",
+    "framework_id": "CHK-SUP-012",
+    "subtest_ids": [
+      "Q-R05-07/SC-11-06",
+      "Q-R05-11/SC-13-02",
+      "Q-R05-11/SC-13-03",
+      "Q-C13/SC-16-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-13",
+    "framework_id": "CHK-SUP-013",
+    "subtest_ids": [
+      "Q-R05-05/SC-11-07"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-14",
+    "framework_id": "CHK-SUP-014",
+    "subtest_ids": [
+      "Q-R05-08/SC-13-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-15",
+    "framework_id": "CHK-SUP-015",
+    "subtest_ids": [
+      "Q-R05-02/SC-12-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "SUP-16",
+    "framework_id": "CHK-SUP-016",
+    "subtest_ids": [
+      "Q-R05-11/SC-12-03",
+      "Q-R05-13/SC-15-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-01",
+    "framework_id": "CHK-REQ-001",
+    "subtest_ids": [
+      "Q-C01/SC-01-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-02",
+    "framework_id": "CHK-REQ-002",
+    "subtest_ids": [
+      "Q-C01/SC-01-02"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "REQ-03",
+    "framework_id": "CHK-REQ-003",
+    "subtest_ids": [
+      "Q-C01/SC-01-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-04",
+    "framework_id": "CHK-REQ-004",
+    "subtest_ids": [
+      "Q-C01/SC-01-04"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "REQ-05",
+    "framework_id": "CHK-REQ-005",
+    "subtest_ids": [
+      "Q-C02/SC-02-01",
+      "Q-R05-14/SC-02-04",
+      "Q-C13/SC-16-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-06",
+    "framework_id": "CHK-REQ-006",
+    "subtest_ids": [
+      "Q-C02/SC-02-03"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "REQ-07",
+    "framework_id": "CHK-REQ-007",
+    "subtest_ids": [
+      "Q-C04/SC-03-01",
+      "Q-R05-05/SC-11-07"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-08",
+    "framework_id": "CHK-REQ-008",
+    "subtest_ids": [
+      "Q-C04/SC-03-02"
+    ],
+    "review_order": "implementation_path_first"
+  },
+  {
+    "internal_id": "REQ-09",
+    "framework_id": "CHK-REQ-009",
+    "subtest_ids": [
+      "Q-C04/SC-04-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-10",
+    "framework_id": "CHK-REQ-010",
+    "subtest_ids": [
+      "Q-C04/SC-04-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-11",
+    "framework_id": "CHK-REQ-011",
+    "subtest_ids": [
+      "Q-C02/SC-02-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-12",
+    "framework_id": "CHK-REQ-012",
+    "subtest_ids": [
+      "Q-C08/SC-18-01",
+      "Q-C08/SC-18-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-13",
+    "framework_id": "CHK-REQ-013",
+    "subtest_ids": [
+      "Q-C11/SC-21-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-14",
+    "framework_id": "CHK-REQ-014",
+    "subtest_ids": [
+      "Q-C07/SC-08-02",
+      "Q-C07/SC-08-03",
+      "Q-C02/SC-08-04"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-15",
+    "framework_id": "CHK-REQ-015",
+    "subtest_ids": [
+      "Q-C03/SC-05-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-16",
+    "framework_id": "CHK-REQ-016",
+    "subtest_ids": [
+      "Q-C03/SC-05-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "REQ-17",
+    "framework_id": "CHK-REQ-017",
+    "subtest_ids": [
+      "Q-C03/SC-05-03"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "REQ-18",
+    "framework_id": "CHK-REQ-018",
+    "subtest_ids": [
+      "Q-C02/SC-06-01"
+    ],
+    "review_order": "implementation_path_first"
+  },
+  {
+    "internal_id": "REQ-19",
+    "framework_id": "CHK-REQ-019",
+    "subtest_ids": [
+      "Q-C06/SC-06-02"
+    ],
+    "review_order": "implementation_path_first"
+  },
+  {
+    "internal_id": "REQ-20",
+    "framework_id": "CHK-REQ-020",
+    "subtest_ids": [
+      "Q-C06/SC-06-02"
+    ],
+    "review_order": "implementation_path_first"
+  },
+  {
+    "internal_id": "REQ-21",
+    "framework_id": "CHK-REQ-021",
+    "subtest_ids": [
+      "Q-C06/SC-06-02",
+      "Q-C07/SC-08-03"
+    ],
+    "review_order": "implementation_path_first"
+  },
+  {
+    "internal_id": "PLT-01",
+    "framework_id": "CHK-PLT-001",
+    "subtest_ids": [
+      "Q-C10/SC-14-04"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "PLT-02",
+    "framework_id": "CHK-PLT-002",
+    "subtest_ids": [
+      "Q-C07/SC-08-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "PLT-03",
+    "framework_id": "CHK-PLT-003",
+    "subtest_ids": [
+      "Q-R05-09/SC-14-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "PLT-04",
+    "framework_id": "CHK-PLT-004",
+    "subtest_ids": [
+      "Q-C10/SC-14-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "PLT-05",
+    "framework_id": "CHK-PLT-005",
+    "subtest_ids": [
+      "Q-C10/SC-14-02"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "PLT-06",
+    "framework_id": "CHK-PLT-006",
+    "subtest_ids": [
+      "Q-C07/SC-08-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "PLT-07",
+    "framework_id": "CHK-PLT-007",
+    "subtest_ids": [
+      "Q-R05-09/SC-14-01",
+      "Q-C10/SC-14-04",
+      "Q-C11/SC-22-01",
+      "Q-C11/SC-22-02",
+      "Q-C07/SC-24-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "PLT-08",
+    "framework_id": "CHK-PLT-008",
+    "subtest_ids": [
+      "Q-C07/SC-08-01",
+      "Q-C07/SC-08-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "PLT-09",
+    "framework_id": "CHK-PLT-009",
+    "subtest_ids": [
+      "Q-C07/SC-24-01",
+      "Q-C07/SC-24-02"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "PLT-10",
+    "framework_id": "CHK-PLT-010",
+    "subtest_ids": [
+      "Q-C10/SC-19-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "PLT-11",
+    "framework_id": "CHK-PLT-011",
+    "subtest_ids": [
+      "Q-C10/SC-19-02"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "PLT-12",
+    "framework_id": "CHK-PLT-012",
+    "subtest_ids": [
+      "Q-C12/SC-19-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-01",
+    "framework_id": "CHK-LIF-001",
+    "subtest_ids": [
+      "Q-R05-10/SC-15-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-02",
+    "framework_id": "CHK-LIF-002",
+    "subtest_ids": [
+      "Q-R05-13/SC-15-02"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "LIF-03",
+    "framework_id": "CHK-LIF-003",
+    "subtest_ids": [
+      "Q-C05/SC-07-01",
+      "Q-C05/SC-07-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-04",
+    "framework_id": "CHK-LIF-004",
+    "subtest_ids": [
+      "Q-C05/SC-07-03",
+      "Q-C05/SC-07-04"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-05",
+    "framework_id": "CHK-LIF-005",
+    "subtest_ids": [
+      "Q-R05-12/SC-17-01",
+      "Q-C09/SC-17-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-06",
+    "framework_id": "CHK-LIF-006",
+    "subtest_ids": [
+      "Q-C09/SC-17-03"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "LIF-07",
+    "framework_id": "CHK-LIF-007",
+    "subtest_ids": [
+      "Q-R05-12/SC-17-01",
+      "Q-C09/SC-17-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-08",
+    "framework_id": "CHK-LIF-008",
+    "subtest_ids": [
+      "Q-C08/SC-18-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-09",
+    "framework_id": "CHK-LIF-009",
+    "subtest_ids": [
+      "Q-R05-12/SC-17-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-10",
+    "framework_id": "CHK-LIF-010",
+    "subtest_ids": [
+      "Q-C08/SC-18-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-11",
+    "framework_id": "CHK-LIF-011",
+    "subtest_ids": [
+      "Q-C08/SC-18-02",
+      "Q-R05-12/SC-17-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-12",
+    "framework_id": "CHK-LIF-012",
+    "subtest_ids": [
+      "Q-C08/SC-18-03"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "LIF-13",
+    "framework_id": "CHK-LIF-013",
+    "subtest_ids": [
+      "Q-C13/SC-16-04"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "LIF-14",
+    "framework_id": "CHK-LIF-014",
+    "subtest_ids": [
+      "Q-C08/SC-23-05"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "LIF-15",
+    "framework_id": "CHK-LIF-015",
+    "subtest_ids": [
+      "Q-C12/SC-20-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "LIF-16",
+    "framework_id": "CHK-LIF-016",
+    "subtest_ids": [
+      "Q-C12/SC-20-02",
+      "Q-C12/SC-20-04"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "OBS-01",
+    "framework_id": "CHK-OBS-001",
+    "subtest_ids": [
+      "Q-R05-15/SC-23-03",
+      "Q-C11/SC-23-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "OBS-02",
+    "framework_id": "CHK-OBS-002",
+    "subtest_ids": [
+      "Q-C11/SC-23-04",
+      "Q-C08/SC-23-05",
+      "Q-R05-15/SC-23-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "OBS-03",
+    "framework_id": "CHK-OBS-003",
+    "subtest_ids": [
+      "Q-C11/SC-21-02",
+      "Q-C11/SC-21-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "OBS-04",
+    "framework_id": "CHK-OBS-004",
+    "subtest_ids": [
+      "Q-C11/SC-22-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "OBS-05",
+    "framework_id": "CHK-OBS-005",
+    "subtest_ids": [
+      "Q-C11/SC-22-02"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "OBS-06",
+    "framework_id": "CHK-OBS-006",
+    "subtest_ids": [
+      "Q-C11/SC-21-02",
+      "Q-C11/SC-22-03"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "OBS-07",
+    "framework_id": "CHK-OBS-007",
+    "subtest_ids": [
+      "Q-C11/SC-21-03"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "OBS-08",
+    "framework_id": "CHK-OBS-008",
+    "subtest_ids": [
+      "Q-C11/SC-21-04"
+    ],
+    "review_order": "conditional_when_selected"
+  },
+  {
+    "internal_id": "OBS-09",
+    "framework_id": "CHK-OBS-009",
+    "subtest_ids": [
+      "Q-C11/SC-23-01"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "OBS-10",
+    "framework_id": "CHK-OBS-010",
+    "subtest_ids": [
+      "Q-C11/SC-23-06"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "OBS-11",
+    "framework_id": "CHK-OBS-011",
+    "subtest_ids": [
+      "Q-C11/SC-23-02"
+    ],
+    "review_order": "reference_baseline_first"
+  },
+  {
+    "internal_id": "OBS-12",
+    "framework_id": "CHK-OBS-012",
+    "subtest_ids": [
+      "Q-C12/SC-20-03",
+      "Q-C11/SC-22-03"
+    ],
+    "review_order": "reference_baseline_first"
+  }
+]

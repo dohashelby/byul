@@ -1,18 +1,25 @@
 {
   "current_summary": {
-    "as_of": "2026-10-19",
-    "scope": "documentation usability and cross-file consistency; no engine/GPU execution",
+    "as_of": "2026-10-22",
+    "scope": "8-function/36-requirement restructuring; document/JSON/HTML function consistency; no engine/GPU execution",
     "counts": {
-      "protection_purposes": 28,
+      "protection_purposes": 36,
       "assessment_rows": 77,
       "questions": 28,
       "scenario_groups": 24,
       "scenarios": 83,
-      "threat_candidates": 74,
+      "threat_candidates": 73,
       "failure_misconfiguration": 9,
       "question_scenario_links": 136,
       "scenario_test_focuses": 83,
-      "runtime_executions": 0
+      "runtime_executions": 0,
+      "shared_trust_context": 1,
+      "mechanism_types": 17,
+      "environment_items": 12,
+      "condition_bundles": 112,
+      "security_functions": 8,
+      "protection_requirements": 36,
+      "historical_protection_purposes": 28
     },
     "surface_counts": {
       "scenario_scope_mapped": 26,
@@ -21,12 +28,46 @@
       "pending": 3
     },
     "implementation_status": "Q-level selector implemented; environment collection,77-row/SC selection and engine execution pending",
-    "validation_status": "passed_after_document_checks_and_two_subagent_reviews",
+    "validation_status": "passed_structure_criteria_evidence_preservation_links_and_explorer_function_checks",
     "historical_counts_note": "Nested earlier review counts are retained as dated snapshots; not current totals",
     "selector_regression_tests": 12,
-    "subagent_reviews": 2,
-    "remaining": "실제 환경·정책값·시험 입력/계측/실행과 통제 효과는 미확인",
-    "team_bundle": "packaged and relocation/link/hash checked; engine execution not run"
+    "remaining": "실제 정책값·시험 입력·계측·엔진 실행·통제 효과 검증, R10 전체·R14 검토, 브라우저 렌더링 확인",
+    "team_bundle": "packaged and relocation/link/hash checked; engine execution not run",
+    "historical_subagent_reviews": 2,
+    "current_validation": {
+      "framework": "8 security functions,36 requirements,77 unique CHK,112 condition bundles,136 Q-SC relations; passed",
+      "explorer": "8 function filters,36 requirement filters,77 CHK payloads,57 secondary contributions,48 function/STRIDE intersections; passed source/JS function tests",
+      "selector": "12 regression tests passed",
+      "engine_gpu_execution": "not_run",
+      "browser_rendering": "not_verified; local file URL unavailable in browser policy",
+      "evidence_preservation": "original CHK content fields and original Q/SC fields unchanged; classification/reader-number metadata updated",
+      "local_links": "2981 local links checked; missing files/anchors 0 before final copy"
+    },
+    "independent_subagent_reviews": [
+      "KISA/whole-framework roles and lifecycle",
+      "Oracle/DBMS/CHK evidence preservation",
+      "vLLM trust assumptions and cross-document scope"
+    ],
+    "date": "2026-10-23",
+    "lifecycle_guidance": {
+      "stages": 7,
+      "assessment_candidates_covered": 77,
+      "responsibility": "organization_assignment_required",
+      "execution": "not_run",
+      "decision": "organization_policy_and_evidence_required",
+      "independent_review": "passed_after_restart_decision_and_html_link_fixes",
+      "notion_readback": "7_stages_and_record_guidance_verified_2026-10-23"
+    },
+    "notion_sync": {
+      "pages": 6,
+      "fixed_diagram": "v27",
+      "verified_date": "2026-10-23",
+      "lifecycle_detail_pages": [
+        "02",
+        "06"
+      ],
+      "latest_html_page": "03"
+    }
   },
   "date": "2026-10-18",
   "checks": [
@@ -226,5 +267,198 @@
     "date": "2026-10-19",
     "source_manifest": "team_bundle validation and inventory",
     "scope": "bundle file links, original-copy hashes and selector relocation; no engine/GPU execution"
+  },
+  "assessment_identity_and_applicability": {
+    "date": "2026-10-19",
+    "assessment_count": 77,
+    "unique_assessment_ids": 77,
+    "purpose_count": 28,
+    "scenario_count": 83,
+    "test_branch_specification_count": 112,
+    "scope": "ID·참조 정합성과 내용 조건 점검. 자동 선택·엔진 시험·보호 효과 검증은 미수행.",
+    "selector_implementation": "unchanged_legacy_Q_only",
+    "subagent_review": "two_independent_reviews_completed_and_fixes_rechecked",
+    "orphan_scenario_count": 0,
+    "document_link_error_count": 0,
+    "required_observations_array_count": 77,
+    "legacy_selector_self_tests_passed": 12,
+    "engine_tests_run": false,
+    "review_fixes": [
+      "정책 기준값 미정과 적용 여부 미정 구분",
+      "CHK-REQ-008 금지 입력 거부 확인 분기 포함",
+      "required_observations 기존 배열 자료형 유지"
+    ]
+  },
+  "document_json_consistency_20261020": {
+    "status": "passed",
+    "command": "python3 verify_framework.py",
+    "assessment_rows": 77,
+    "test_branch_specifications": 112,
+    "question_scenario_links": 136,
+    "selector_self_tests_passed": 12,
+    "engine_gpu_tests": "not_run",
+    "scope": "CHK·Q·SC 관계, MD/JSON 점검·적용·분기·증거·정상 대조·순서·판정·보완 방법; 엔진 근거의 재감사는 아님"
+  },
+  "threat_classification": {
+    "checked_on": "2026-10-20",
+    "scenario_records": 83,
+    "threat_hypotheses_with_types": 73,
+    "scope_context_scenarios": [
+      "SC-08-02"
+    ],
+    "failure_misconfiguration_without_attack_types": 9,
+    "types": {
+      "S": 2,
+      "T": 34,
+      "R": 2,
+      "I": 19,
+      "D": 12,
+      "E": 22
+    },
+    "external_mappings": 5,
+    "engine_tests_run": false
+  },
+  "threat_map_review": {
+    "date": "2026-10-20",
+    "nodes": 14,
+    "relations": 21,
+    "visual_groups": 6,
+    "individual_scenario_touchpoints": 83,
+    "reference": "참고자료/통합본/통합본.md",
+    "label_layout": {
+      "labels": 41,
+      "line_intersections": 0,
+      "node_intersections": 0
+    },
+    "review_methods": [
+      "통합본 의미 대조",
+      "독립 SVG 이미지 검수",
+      "HTML JavaScript 함수 검사"
+    ],
+    "actual_engine_tests": "미실행"
+  },
+  "kisa_comparison_revision": {
+    "date": "2026-10-21",
+    "checks": 77,
+    "scenarios": 83,
+    "branches": 112,
+    "question_scenario_links": 136,
+    "subresult_checks": [
+      "CHK-REQ-005",
+      "CHK-PLT-008",
+      "CHK-LIF-013",
+      "CHK-OBS-006"
+    ],
+    "evidence_roles": 77,
+    "engine_tests": "not_run",
+    "document_and_json_checks": "passed",
+    "html_source_and_functions": "passed"
+  },
+  "mechanism_reclassification": {
+    "mechanisms": 17,
+    "primary_assignments": 82,
+    "shared_trust_context": 1,
+    "legacy_analysis_groups": 24,
+    "scenarios": 83,
+    "checks": 77,
+    "conditioned_related_scenarios": true,
+    "runtime_test": "not_run"
+  },
+  "historical_current_summaries": [
+    {
+      "as_of": "2026-10-21",
+      "scope": "documentation usability and cross-file consistency; no engine/GPU execution",
+      "counts": {
+        "protection_purposes": 28,
+        "assessment_rows": 77,
+        "questions": 28,
+        "scenario_groups": 24,
+        "scenarios": 83,
+        "threat_candidates": 73,
+        "failure_misconfiguration": 9,
+        "question_scenario_links": 136,
+        "scenario_test_focuses": 83,
+        "runtime_executions": 0,
+        "shared_trust_context": 1,
+        "mechanism_types": 17,
+        "environment_items": 12,
+        "condition_bundles": 112
+      },
+      "surface_counts": {
+        "scenario_scope_mapped": 26,
+        "partial": 7,
+        "backend_unselected": 1,
+        "pending": 3
+      },
+      "implementation_status": "Q-level selector implemented; environment collection,77-row/SC selection and engine execution pending",
+      "validation_status": "passed_static_document_json_and_explorer_checks",
+      "historical_counts_note": "Nested earlier review counts are retained as dated snapshots; not current totals",
+      "selector_regression_tests": 12,
+      "remaining": "실제 환경·정책값·시험 입력/계측/실행과 통제 효과는 미확인",
+      "team_bundle": "packaged and relocation/link/hash checked; engine execution not run",
+      "historical_subagent_reviews": 2,
+      "current_validation": {
+        "framework": "77 CHK, 112 condition bundles, 136 Q-SC relations, 73 threats + 9 failures + 1 scope context; passed",
+        "explorer": "83 scenarios; category filters and detail functions passed; browser rendering not checked",
+        "selector": "12 regression tests passed",
+        "engine_gpu_execution": "not_run"
+      }
+    }
+  ],
+  "framework_reclassification_review": {
+    "date": "2026-10-22",
+    "status": "passed_after_independent_corrections",
+    "security_functions": 8,
+    "protection_requirements": 36,
+    "assessment_rows": 77,
+    "primary_assignment_missing": 0,
+    "primary_assignment_duplicates": 0,
+    "secondary_requirement_contributions": 57,
+    "legacy_questions": 28,
+    "scenarios": 83,
+    "unchanged_original_content": true,
+    "resolved": [
+      "03 상단 구 다섯 영역 선택표와 관계 문구 수정",
+      "기존 정책 앵커를 해당 정책 색인으로 이동",
+      "05 공동 시험표·예시의 구 목적명 갱신",
+      "역할 겸임과 독립 검토 조건 명시",
+      "HTML 위험 관리 활동을 전체 구조에 표시"
+    ],
+    "scope": "구조·문장·식별·근거 보존 및 JS 동작 검수; 실제 엔진 시험 미실행"
+  },
+  "checklist_verdict_alignment_20261023": {
+    "status": "passed_local_and_notion_prose_checks",
+    "checks_changed": [
+      "CHK-SUP-014",
+      "CHK-REQ-009",
+      "CHK-OBS-001",
+      "CHK-OBS-010",
+      "CHK-OBS-011"
+    ],
+    "scope": "existing policy alignment; no new IDs, branches, policies or execution results",
+    "preserved": {
+      "checks": 77,
+      "branches": 112,
+      "scenarios": 83,
+      "question_scenario_pairs": 136
+    },
+    "validation": {
+      "framework": "passed",
+      "explorer": "passed",
+      "selector_regressions": 12,
+      "independent_verdict_review": "passed",
+      "engine_gpu_execution": "not_run"
+    },
+    "notion": {
+      "prose_pages": [
+        "02",
+        "03",
+        "04",
+        "06"
+      ],
+      "criteria_and_remedies": "five CHKs match canonical JSON",
+      "existing_images_checkboxes_ack_attachment": "preserved",
+      "html_attachment": "uploaded; existing embed preserved pending approval after replacement tool failure and full-page replacement auto-review rejection"
+    }
   }
 }

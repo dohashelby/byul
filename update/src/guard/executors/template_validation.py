@@ -19,6 +19,7 @@ from .content_common import (append_artifact, content_request, control_state, js
 from .http_common import HttpCheckExecutor
 from .engine_identity import owned_template_snapshot
 from . import template_supply_approval
+from . import template_sandbox
 
 
 PROFILE = "fixed-template-input-v1"
@@ -61,6 +62,9 @@ class TemplateValidationExecutor(HttpCheckExecutor):
         return owned_template_snapshot(self.docker, ctx, identity, argv, deadline, monotonic=time.monotonic)
 
     def validate_policy(self, check, values):
+        if getattr(check, "collection_profile", None) == template_sandbox.PROFILE:
+            template_sandbox.validate_policy(check, values, self.cfg)
+            return
         if getattr(check, "collection_profile", None) == template_supply_approval.PROFILE:
             template_supply_approval.validate_policy(check, values, self.cfg)
             return
@@ -101,7 +105,14 @@ class TemplateValidationExecutor(HttpCheckExecutor):
             append_artifact(draft, ctx, "template_native_observations.json", f"{self.name}/{self.version}")
         return draft
 
+    def run(self, check, env, policy_values, adapter, workdir):
+        if getattr(check, "collection_profile", None) == template_sandbox.PROFILE:
+            return template_sandbox.run(self, check, env, policy_values, adapter, workdir)
+        return super().run(check, env, policy_values, adapter, workdir)
+
     def collect(self, ctx):
+        if getattr(ctx.check, "collection_profile", None) == template_sandbox.PROFILE:
+            return template_sandbox.collect(self, ctx)
         if getattr(ctx.check, "collection_profile", None) == template_supply_approval.PROFILE:
             return template_supply_approval.collect(self, ctx)
         self.validate_policy(ctx.check, ctx.policy_values)

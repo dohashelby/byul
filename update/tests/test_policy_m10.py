@@ -101,18 +101,18 @@ def run(tmp_path, monkeypatch, pack, vals, probe=None, missing_target=False):
 
 def test_registration_is_bounded_and_template_empty(pack):
     check = pack.checks["REQ-09"]
-    assert check.revision == 7 and pack.manifest.revision == 29 and not pack.reviewed
+    assert check.revision == 7 and pack.manifest.revision == 30 and not pack.reviewed
     assert contract_state(check) == "complete" and len(check.required_observations) == 10
     assert len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 27
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 74
-    assert len([c for c in pack.active_checks() if c.executor]) == 16
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 28
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 75
+    assert len([c for c in pack.active_checks() if c.executor]) == 17
     template = yaml.safe_load(build_policy_template(pack))
     assert template["values"]["REQ-09"] == {} and template["status"] == "DRAFT"
     assert template["confirmed_by"] is None and template["confirmed_at"] is None
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
-    assert len(rows) == 347 and sum(len(json.loads(r["check_ids"])) for r in rows) == 639
-    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=71, b=2, c=161, d=113)
+    assert len(rows) == 348 and sum(len(json.loads(r["check_ids"])) for r in rows) == 640
+    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=72, b=2, c=161, d=113)
     for pid, key in zip(("P-DRAFT-INPUT-ENDPOINTS", "P-DRAFT-INPUT-FORMATS"), POLICIES):
         row = next(r for r in rows if r["proposed_policy_id"] == pid)
         assert row["classification"] == "a" and json.loads(row["current_param_paths"]) == [f"values.REQ-09.{key}"]

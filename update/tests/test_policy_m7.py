@@ -115,7 +115,7 @@ def test_policy_declarations_and_blank_form_are_not_execution(pack, tmp_path):
     check = pack.checks["OBS-11"]
     assert {p.key:p.type for p in check.policy_params if p.required} == POLICY_TYPES
     assert check.executor is None and check.judge is None and check.revision == 3
-    assert pack.manifest.revision == 29 and not pack.reviewed
+    assert pack.manifest.revision == 30 and not pack.reviewed
     pol = yaml.safe_load(build_policy_template(pack))
     assert pol["values"]["OBS-11"] == {} and pol["status"] == "DRAFT"
     st, plan, _ = setup(tmp_path, pack)

@@ -70,7 +70,7 @@ def _timestamp(value):
         return False
 
 
-def _target(ctx):
+def _target(ctx, *, profile_support=None):
     engine = ctx.target.get("engine")
     config = ctx.target.get("comparison_config")
     launch = config.get("launch") if type(config) is dict else None
@@ -99,7 +99,7 @@ def _target(ctx):
         index = argv.index("--served-model-name") + 1
         if argv.count("--served-model-name") != 1 or index >= len(argv) or argv[index] != model:
             return None
-    supported = getattr(ctx.adapter, "supports_template_profile", None)
+    supported = profile_support or getattr(ctx.adapter, "supports_template_profile", None)
     try:
         if not callable(supported) or not supported(selected):
             return None
@@ -108,7 +108,7 @@ def _target(ctx):
     return container, image, launch, selected
 
 
-def _snapshot(executor, ctx, target, deadline):
+def _snapshot(executor, ctx, target, deadline, *, expected_path=None):
     """공유 REQ-07 helper는 유지하고 이 프로파일의 identity 형식을 보강한다."""
     container, image, launch, identity = target
     try:
@@ -132,7 +132,8 @@ def _snapshot(executor, ctx, target, deadline):
             return None
         # 시간 epoch는 helper와 같고, 개별 snapshot의 남은 시간도 요청 timeout 안이다.
         snap = owned_template_snapshot(executor.docker, ctx, identity, launch["argv"],
-                                       min(deadline, time.monotonic() + ctx.timeout), monotonic=time.monotonic)
+                                       min(deadline, time.monotonic() + ctx.timeout), monotonic=time.monotonic,
+                                       **({"expected_path": expected_path} if expected_path is not None else {}))
         if (type(snap) is not dict or snap.get("container_id") != cid
                 or snap.get("started_at") != state["StartedAt"] or snap.get("image") != image
                 or snap.get("sha256") != identity["sha256"] or snap.get("readonly") is not True):

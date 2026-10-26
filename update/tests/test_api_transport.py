@@ -204,11 +204,14 @@ def test_extra_capture_detail_is_not_stored_as_body_secret_or_exception(case):
 def test_predecessor_definition_hashes_and_no_stream_changes():
     from tests.builders import ROOT, PACK_DIR
     old = json.loads((ROOT / "tests/fixtures/pack28-check-hashes.json").read_text())
+    predecessor = json.loads((ROOT / "tests/fixtures/pack29-check-hashes.json").read_text())
     changed = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
-               if hashlib.sha256(p.read_bytes()).hexdigest() != old[p.stem]}
+               if predecessor[p.stem] != old[p.stem]}
     assert changed == {"PLT-08"} and len(old) == 77
+    assert {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
+            if hashlib.sha256(p.read_bytes()).hexdigest() != predecessor[p.stem]} == {"SUP-13"}
     check = baseline_pack().checks["PLT-08"]
-    assert check.revision == 3 and baseline_pack().manifest.revision == 29
+    assert check.revision == 3 and baseline_pack().manifest.revision == 30
     assert {p.key: p.type for p in check.policy_params} == api.POLICY_TYPES
     assert check.judge.params["pass_when_all"] == []
 

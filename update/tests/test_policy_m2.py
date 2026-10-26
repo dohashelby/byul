@@ -42,9 +42,9 @@ def _pol(tmp_path, values):
 def test_new_declarations_do_not_create_automatic_executors():
     pack = baseline_pack()
     assert len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 27
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 74
-    assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-02", "PLT-04", "PLT-07", "PLT-08", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09", "SUP-04", "SUP-03"}
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 28
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 75
+    assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-02", "PLT-04", "PLT-07", "PLT-08", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09", "SUP-04", "SUP-03", "SUP-13"}
     for cid, key in PARAMS.items():
         check = pack.checks[cid]
         assert [(p.key, p.type, p.required) for p in check.policy_params] == [(key, "list[str]", True)]
@@ -178,7 +178,7 @@ def test_template_rejects_symlink_parent_into_input_pack(tmp_path):
 def test_packaged_metadata_matches_catalog_and_pack():
     expected = build_metadata(baseline_pack(), ROOT / "docs/policy_catalog.csv")
     actual = json.loads((ROOT / "src/guard/collectors/policy_template_metadata.json").read_text(encoding="utf-8"))
-    assert expected == actual and len(actual["parameters"]) == 74
+    assert expected == actual and len(actual["parameters"]) == 75
     for cid, key in PARAMS.items():
         assert f"values.{cid}.{key}" in actual["parameters"]
 

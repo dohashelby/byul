@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 29,
-    "sha256": "519f1ed966a706af5e4226bb85a3eb197ee6baa5df6ac61307819a7b94d28659"
+    "revision": 30,
+    "sha256": "4040e9eb2645151a910fa26654c5fd5ed4bc23a3b26442f9e8661beb4eced05c"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {
@@ -589,6 +589,14 @@
       "consumer": "선정: 필수 list[str]; 미입력 NO_POLICY_VALUE / 실행: container_config의 running-image-approval-v1; sentinel·package 실행 없음 / 관측: 소유 컨테이너 전후 identity와 실제 image ID로 조회한 RepoDigest 연결 / 판정: 확인된 비승인 실행 이미지 FAIL; 승인 일치도 전체 공급물 보안 UNKNOWN / 한계: package/native/entrypoint/mount·배포 gate와 실제 vLLM 실증 미검증",
       "verification": "합성 Docker/HTTP 회귀로 제한 계약을 확인하며 실제 vLLM 실증은 사용자 요청으로 보류. 기업 승인 인증·전체 공급물 PASS가 아님.",
       "catalog_id": "P-DRAFT-SUP-04-APPROVED-IMAGE-DIGESTS"
+    },
+    "values.SUP-13.forbidden_template_attributes": {
+      "type": "list[str]",
+      "description": "선정 고정 공급 template에서 금지할 타입 속성 참조 목록. 이 프로파일은 __class__와 명시적인 빈 목록만 지원한다.",
+      "decision_role": "원문 역할: 적용 조직의 정책 승인 담당 (실제 담당자 미지정)",
+      "consumer": "src/guard/executors/template_sandbox.py",
+      "verification": "자동 연결의 오프라인 검증 대상; 실제 엔진 실증 없음",
+      "catalog_id": "P-SUP13-FORBIDDEN-TEMPLATE-ATTRIBUTES"
     },
     "values.SUP-14.required_checks": {
       "type": "list[str]",

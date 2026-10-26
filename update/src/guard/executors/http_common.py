@@ -100,23 +100,37 @@ def classify(res: dict, pr: ProbeRequest | None) -> Any:
     return o
 
 
-def docker_container_probe(docker: Docker, image: str) -> ContainerProbe:
+def docker_container_probe(docker: Docker, image: str, *, pull_never: bool = False,
+                           parent_deadline: float | None = None) -> ContainerProbe:
+    if type(pull_never) is not bool or parent_deadline is not None and (
+            type(parent_deadline) not in (int, float) or not math.isfinite(parent_deadline)):
+        raise ValueError("invalid HTTP probe lifecycle bounds")
     script = Path(http_probe.__file__).resolve()
     counter = {"n": 0}
     counter_lock = Lock()
 
     def run(network: str, requests: list[dict], timeout: float) -> list[dict]:
+        run_timeout = timeout * max(len(requests), 1) + 60
+        if parent_deadline is not None:
+            remaining = parent_deadline - time.monotonic()
+            if remaining <= 0:
+                raise DockerError("HTTP probe parent deadline expired")
+            run_timeout = min(run_timeout, remaining)
+            timeout = min(timeout, remaining)
         # Sampling checks issue a challenge and a valid control concurrently.
         # Reserve names before launching either subprocess; never share a name.
         with counter_lock:
             counter["n"] += 1
             suffix = f"probe{counter['n']}"
         res = docker.run_once(
-            image, suffix, network=network, timeout=timeout * max(len(requests), 1) + 60,
+            image, suffix, network=network, timeout=run_timeout,
             mounts=[Mount(script, "/probe/http_probe.py")], command=["python", "/probe/http_probe.py"],
             input=json.dumps({"timeout": timeout, "requests": requests}).encode(),  # 키는 stdin으로만
+            **({"pull_never": True} if pull_never else {}),
         )
         if res.returncode != 0:
+            if parent_deadline is not None:
+                raise DockerError("bounded HTTP probe unavailable")
             raise DockerError(f"probe container exited {res.returncode}: {res.stderr.strip()[:300]}")
         return json.loads(res.stdout)
 

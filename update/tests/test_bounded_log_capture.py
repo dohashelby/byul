@@ -60,6 +60,28 @@ def test_exact_cap_and_empty_output_are_complete_not_truncated():
     assert capture("pass")["capture"]["complete"]
 
 
+def test_bounded_stdin_roundtrip_does_not_put_payload_in_argv():
+    payload = b"EXAMPLE credential via stdin only\x00\xff" * 1000
+    result = capture_pipes([sys.executable, "-c", "import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())"],
+                           timeout=3, env_extra={}, max_stdout_bytes=len(payload), max_stderr_bytes=4096,
+                           input_bytes=payload)
+    assert result["capture"]["complete"] and result["stdout_bytes"] == payload
+
+
+def test_stdin_writer_cannot_extend_deadline_when_child_never_reads():
+    started = time.monotonic()
+    result = capture_pipes([sys.executable, "-c", "import time; time.sleep(20)"], timeout=0.3,
+                           env_extra={}, max_stdout_bytes=4096, max_stderr_bytes=4096, input_bytes=b"x" * 1024**2)
+    assert time.monotonic() - started < 3
+    assert result["capture"]["timed_out"] and not result["capture"]["complete"]
+
+
+@pytest.mark.parametrize("payload", ["not bytes", b"x" * (1024**2 + 1)], ids=["not_bytes", "over_limit"])
+def test_invalid_stdin_is_rejected_before_child_creation(payload):
+    with pytest.raises(ValueError, match="stdin must be bounded bytes"):
+        capture_pipes(["never-run"], timeout=3, env_extra={}, max_stdout_bytes=4, max_stderr_bytes=4, input_bytes=payload)
+
+
 def test_injected_runner_keeps_old_signature_but_does_not_claim_source_bound():
     calls = []
     def legacy(argv, *, input, timeout, env_extra):

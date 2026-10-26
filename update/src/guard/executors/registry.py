@@ -16,6 +16,7 @@ from .role_route import RoleRouteExecutor
 from .credential_exposure import CredentialExposureExecutor
 from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
+from .kubernetes_sampling import KubernetesSamplingExecutor
 from .response_content import ResponseContentExecutor
 from .log_analysis import LogAnalysisExecutor
 from .template_validation import TemplateValidationExecutor
@@ -34,6 +35,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "credential_exposure:real": lambda cfg: CredentialExposureExecutor(cfg.get("credential_exposure", {})),
     "input_validation:real": lambda cfg: InputValidationExecutor(cfg.get("input_validation", {})),
     "sampling_validation:real": lambda cfg: SamplingValidationExecutor(cfg.get("sampling_validation", {})),
+    "sampling_validation:kubernetes": lambda cfg: KubernetesSamplingExecutor(cfg.get("sampling_validation", {}), environ=cfg.get("_runtime_environ")),
     "response_content:real": lambda cfg: ResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ")),
     "log_analysis:real": lambda cfg: LogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ")),
     "template_validation:real": lambda cfg: TemplateValidationExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ")),

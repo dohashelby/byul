@@ -126,6 +126,10 @@ python3 -m venv .venv
 
 묶음의 `approval` 블록은 승인으로 신뢰하지 않습니다. `policy_approvals` 역할만 기존 승인 목록 검증에 사용합니다. 검증한 파일 바이트는 프로세스 전용 시작 스냅샷으로 고정하므로 관리 디렉터리의 새 묶음 적용에는 runtime 재시작이 필요합니다. 원격 전달과 hot reload는 아직 없습니다. 상세 결정은 `docs/결정기록_정책묶음_수신.md`에 있습니다.
 
+### 정식 GPU lab 배포 파일과 Gateway 이미지 (초안)
+
+`deploy/gpu-lab/`은 계획서 §3.5·부록 I.4를 따른 kustomize 묶음(base + `overlays/vllm`·`overlays/sglang`)이고, `deploy/gateway/Dockerfile`은 시험 자산 없이 runtime 코드만 담는 Gateway 이미지 정의입니다(표준 라이브러리만 쓰므로 설치 단계·네트워크 없이 빌드). 서버에서만 알 수 있는 값(노드 이름, 이미지 digest, 모델·캐시 세대 경로, 모델 반입 명령)은 `REPLACE…`로 비워 두었고 클러스터에 적용하지 않았습니다. `kubectl kustomize deploy/gpu-lab/overlays/vllm`으로 렌더링만 확인합니다. 채울 값과 미확인 범위는 `deploy/gpu-lab/README.md`에 있습니다.
+
 ### 정책 1.1과 상태 판정
 
 기존 `runtime-mvp/1.0` 정책은 그대로 로딩합니다. `runtime-mvp/1.1`은 선택 필드 `valid_from`·`valid_until`(시간대가 포함된 ISO8601), `approval_ref`를 추가합니다. 기간 필드가 없으면 무기한입니다. 1.0 문서에 이 필드를 넣으면 기존 엄격 검증에 따라 `UNKNOWN_FIELD`로 거부합니다. 예시는 `examples/mvp/policy-v1.1.json`입니다.

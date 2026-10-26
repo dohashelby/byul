@@ -1,0 +1,36 @@
+# Observer slot: the Cilium observer policy (intent metrics_collectors,
+# label app=serving-observer) lets this Pod reach only the engine management
+# listener, DNS and, when enabled, the kube-apiserver port. As in deploy/lab,
+# the in-cluster collector program itself is not decided yet; this Pod only
+# holds the identity so the policy and the L-07 style checks can be run.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving-observer
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: serving-observer}
+  template:
+    metadata:
+      labels: {app: serving-observer}
+    spec:
+      serviceAccountName: serving-observer
+      securityContext:
+        runAsNonRoot: true
+        # 10004 is a project choice; appendix I.4 does not name an observer UID
+        # and 10003 belongs to the test probe.
+        runAsUser: 10004
+        runAsGroup: 10004
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: observer
+          image: serving-tools
+          command: ["python", "-c", "import time; time.sleep(10**9)"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: "50m", memory: 64Mi}
+            limits: {memory: 128Mi}

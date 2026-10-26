@@ -1,0 +1,52 @@
+# Team-owned harmless test targets (appendix I.4: probe UID 10003). The
+# receiver is the intent test_receivers "fixture" (app=test-receiver, 8080).
+# Use them only for the registered allow/deny checks, never as real services.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-receiver
+  labels: {app: test-receiver, purpose: task-check}
+spec:
+  serviceAccountName: serving-probe
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10003
+    runAsGroup: 10003
+    seccompProfile: {type: RuntimeDefault}
+  containers:
+    - name: receiver
+      image: serving-tools
+      command: ["python", "-m", "http.server", "8080", "--directory", "/tmp"]
+      ports: [{containerPort: 8080}]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: {drop: ["ALL"]}
+      volumeMounts:
+        - {name: tmp, mountPath: /tmp}
+  volumes:
+    - name: tmp
+      emptyDir: {sizeLimit: 16Mi}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: other-client
+  labels: {app: other-client, purpose: task-check}
+spec:
+  serviceAccountName: serving-probe
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10003
+    runAsGroup: 10003
+    seccompProfile: {type: RuntimeDefault}
+  containers:
+    - name: client
+      image: serving-tools
+      command: ["python", "-c", "import time; time.sleep(10**9)"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: {drop: ["ALL"]}

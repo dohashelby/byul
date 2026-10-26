@@ -277,4 +277,3 @@ def test_attachment_required_policy_judge_does_not_promote_an_unattached_claim(r
         policy_items.OBSERVATION: Observation(value=linked, collected=True)}}).seal()
     confirmed, _, _ = policy_items.evaluate(check, attached, values)
     assert confirmed["security"] == "FAIL"
-

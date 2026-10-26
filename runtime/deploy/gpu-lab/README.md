@@ -1,72 +1,86 @@
-# 정식 GPU lab 배포 파일 (초안)
+# AWS GPU lab — runtime 배포 층 (초안)
 
-계획서 v1.4 §3.5(환경 기준), 부록 I.4(배치·권한), I.7(G0~G7)과 환경·배포 구성안을 따른 Kubernetes manifest 묶음이다. **아직 어떤 클러스터에도 적용하지 않았다.** 서버에서만 알 수 있는 값은 `REPLACE…`로 비워 두었고, 이 값을 지어내지 않았다.
+AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS 묶음") **위에 얹는** runtime 쪽 파일이다. 엔진·namespace·계정·엔진 격리 정책은 AWS 묶음이 만들고, 여기서는 Gateway·관리 수신부·observer 자리·추가 통신 정책·intent·호스트 수집기만 더한다. **아직 어떤 클러스터에도 적용하지 않았다.** 서버에서만 알 수 있는 값은 `REPLACE…`로 비워 두었다.
 
-## 구성
+## AWS 묶음이 이미 만드는 것 (여기서 다시 만들지 않음)
 
-```
-deploy/gpu-lab/
-├─ base/                 엔진과 무관한 공통 자원
-│  ├─ namespace.yaml     serving-lab, Pod Security "restricted"
-│  ├─ storage.yaml       /srv/serving/{models,cache,runtime,bundles} local PV·PVC
-│  ├─ serviceaccounts.yaml  역할별 계정(observer만 토큰 장착)
-│  ├─ observer-rbac.yaml Pod 조회 전용 Role
-│  ├─ gateway.yaml       serving-gateway (정책 묶음·인증 설정으로 시작)
-│  ├─ observer.yaml      observer 자리(정책 대상 식별용)
-│  ├─ acquire-job.yaml   모델 반입 Job(정지 상태, 명령 미정)
-│  └─ test-pods.yaml     시험 receiver·other-client
-└─ overlays/
-   ├─ vllm/              vllm/vllm-openai v0.31.0 + 관리 수신부 사이드카
-   └─ sglang/            lmsysorg/sglang v0.5.21 + 관리 수신부 사이드카
-```
+| 항목 | AWS 묶음 파일 |
+| --- | --- |
+| namespace `serving-lab`, RuntimeClass `nvidia`, SA `engine`·`gateway`·`observer`·`probe`·`artifact-acquire`, observer Pod 조회 Role | `foundation.yaml` |
+| `serving-engine` Deployment(UID 2000:0, 공식 비root wrapper, GPU 1, 모델 `/models` 읽기 전용, 캐시 `/cache`, served model `test-model`)·Service 8000 | `engine.yaml.template` (03이 적용) |
+| 엔진 ingress는 Gateway→8000만, 엔진 egress 없음 | `engine-isolation.yaml` |
+| context 이름 `byul-aws-lab` | `02-cluster.sh` |
 
-두 엔진은 같은 GPU에서 **하나씩만** 올린다. 엔진을 바꿀 때는 이전 overlay를 지운 뒤 다른 overlay를 적용한다.
+## 이 폴더
 
-## 역할과 권한
+| 파일 | 내용 |
+| --- | --- |
+| `kustomization.yaml` | 아래 자원 묶음. `kubectl kustomize deploy/gpu-lab`로 렌더링 |
+| `gateway.yaml` | Gateway(SA `gateway`, UID 10000·보조 그룹 10010). 정책 묶음·인증 Secret·관측 기록(읽기 전용)·기록 폴더를 hostPath로 받음 |
+| `backend-config.yaml` | vLLM backend 설정(`test-model`) |
+| `engine-management-sidecar.patch.yaml` | AWS 엔진 Deployment에 관리 수신부 사이드카(8001)를 더하는 patch |
+| `management-service.yaml` | 관리 수신부용 Service `serving-engine-management`(8001) |
+| `network-policies.yaml` | observer→8001만 추가 허용(8000은 그대로 Gateway만) |
+| `observer.yaml` | observer 자리(SA `observer`, UID 10004) |
+| `test-pods.yaml` | 시험 receiver·other-client(SA `probe`, UID 10003) |
+| `intent.aws-lab.json` | AWS 값으로 만든 통제 의도(엔진 UID 2000, `/models`, 포트 8000/8001) |
+| `host/byul-observation-feed.service` | AWS 호스트에서 수집기를 계속 돌리는 systemd 사용자 서비스 |
 
-| 역할 | 계정 | UID | 볼륨 | 비고 |
-| --- | --- | --- | --- | --- |
-| Gateway | serving-gateway | 10000(프로젝트 선택값) | 기록 쓰기, 정책 묶음 읽기 전용, 인증 Secret | 토큰 미장착, 127.0.0.1 bind라 port-forward로 접근 |
-| 엔진 | serving-engine | 10001(I.4) | 모델 읽기 전용, 자기 캐시 세대만 쓰기 | GPU 1, 오프라인 변수, 토큰 미장착 |
-| 관리 수신부 | 엔진 Pod 사이드카 | 10000 | 없음 | 엔진 127.0.0.1:8000의 읽기 경로만 8001로 중계 |
-| 모델 반입 | artifact-acquire | 10002(I.4) | 모델 쓰기 | 승인 출처만 송신(Cilium acquire 정책) |
-| observer | serving-observer | 10004(프로젝트 선택값) | 없음 | serving-lab Pod 조회만 |
-| 시험 대상 | serving-probe | 10003(I.4) | 없음 | 등록된 허용·거부 시험에만 사용 |
+UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`runtime/docs/결정기록_엔진UID.md`). Gateway 10000·observer 10004·공유 그룹 10010은 겹치지 않게 고른 프로젝트 선택값이다.
 
-계획서 I.4는 10001·10002·10003만 정한다. Gateway 10000과 observer 10004는 겹치지 않게 고른 프로젝트 선택값이다.
+## 순서 (AWS 묶음 01→02→03 성공 뒤)
 
-## 적용 전에 채울 값
+1. **호스트 폴더·그룹 준비** (관리자)
+   ```bash
+   sudo groupadd -g 10010 serving-observe && sudo usermod -aG serving-observe ubuntu   # 재로그인
+   sudo install -d -o ubuntu -g 10010 -m 0750 /srv/serving/observation
+   sudo install -d -o 10000 -g 10000 -m 0700 /srv/serving/runtime/data
+   sudo install -d -o root -g 10000 -m 0750 /srv/serving/bundles
+   ```
+   `/srv/serving/runtime`이 없으면 먼저 만든다. 정책 묶음은 platform이 `/srv/serving/bundles/<bundle_id>/`에 쓰고 `current`가 그 폴더를 가리키게 한다(`runtime/docs/결정기록_정책묶음_수신.md`). 묶음의 gateway policy는 `allowed_models`에 `test-model`을, `enforcement_intent` 역할에 `intent.aws-lab.json`(값을 채운 것)을 넣는다.
+2. **수집기 실행** — byul 저장소를 `~/byul`에 두고 `host/byul-observation-feed.service`의 주석대로 설치한다. `--kube-context byul-aws-lab --reader-group 10010`으로 돌며, Tetragon 프로세스 인자를 지운 뒤 기록한다. 상태는 `/srv/serving/observation/*.heartbeat.json`.
+3. **Gateway 이미지 넣기** — 레지스트리가 없으므로 노드의 containerd에 직접 넣는다.
+   ```bash
+   # 노트북(runtime/ 폴더). base는 digest로 고정
+   docker build -f deploy/gateway/Dockerfile --build-arg PYTHON_IMAGE=python:3.12-slim@sha256:<digest> -t serving-gateway:<tag> .
+   docker inspect --format '{{.Id}}' serving-gateway:<tag>        # 기록해 둘 image ID
+   docker save serving-gateway:<tag> | ssh ubuntu@<host> 'sudo ctr -n k8s.io images import -'
+   ```
+   매니페스트는 `serving-gateway:<tag>` + `imagePullPolicy: Never`로 참조한다(레지스트리 digest가 없어 tag 참조). 대신 배포 뒤 `kubectl get pod -o jsonpath='{..imageID}'`가 위 image ID와 같은지 증거로 남긴다. `REPLACE_GATEWAY_TAG`를 `<tag>`로 바꾼다.
+4. **인증 Secret** — `kubectl -n serving-lab create secret generic serving-gateway-auth --from-file=auth.json`(토큰 해시만 든 `runtime-auth/1.0`).
+5. **적용**
+   ```bash
+   kubectl --context byul-aws-lab apply -k deploy/gpu-lab
+   kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine \
+     --type strategic --patch-file deploy/gpu-lab/engine-management-sidecar.patch.yaml
+   ```
+   AWS 묶음의 03을 다시 돌리면 엔진 Deployment가 원래대로 돌아가 사이드카가 빠진다. 그때 patch를 다시 적용한다.
+6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. 수집 결과 확인은 `tools/k8s_lab_check.py --kube-context byul-aws-lab --allow-non-kind-context`(생성·삭제를 하므로 명시 필요).
+7. 접속: SSH 터널 + `kubectl port-forward deploy/serving-gateway 8080`.
 
-| 자리 | 채우는 시점 | 확인 방법 |
-| --- | --- | --- |
-| `REPLACE_NODE_NAME` | G0 | `kubectl get nodes` |
-| 이미지 digest 4종(`REPLACE_WITH_…_DIGEST`), Gateway 레지스트리 | G2 | 받은 이미지의 digest. `docs/외부기능_활용목록.md`에도 기록 |
-| `REPLACE_MODEL_DIR` | G2~G3 | 반입한 모델·토크나이저 디렉터리(revision 고정) |
-| `REPLACE_IMAGE_ID`·`REPLACE_MODEL_REVISION` | G3 | 캐시 세대 경로(§4.9)와 intent `assets.cache_generation` |
-| 모델 반입 명령(`acquire-job.yaml`) | 반입 경로 결정 후 | Hugging Face 직접 / 내부 보관소 |
-| 엔진 실행 인자 | G2 | 선정 판본 이미지의 실제 entrypoint·옵션 |
+## AWS 묶음과 맞춰야 할 것 (환경 담당에게 요청)
 
-관리자는 적용 전에 `/srv/serving/…` 디렉터리와 소유자를 `storage.yaml` 주석대로 만든다. 정책은 platform이 만든 묶음을 `/srv/serving/bundles/current/`에 두고, 인증 설정은 Secret으로 만든다(토큰 해시만 넣음).
+| 항목 | 지금 | 요청 | 이유 |
+| --- | --- | --- | --- |
+| 엔진 캐시 마운트 | 세대 폴더를 컨테이너 `/cache`에 붙임 | 같은 폴더를 `/var/cache/serving/vllm/<image digest hex>/<model revision>/<profile>-profile-01`에 붙이고 캐시 환경변수(`VLLM_CACHE_ROOT` 등)를 그 아래로 | intent의 cache 규칙(TG-CACHE-01, 계획서 §4.9)은 `/var/cache/serving/<engine>/<image>/<revision>/<profile>` 구조를 전제한다. 지금 구조로는 Tetragon 캐시 사건이 잡히지 않는다. 엔진이 다른 세대를 볼 수 없는 지금의 격리는 그대로 유지된다 |
+| 관리 수신부 | 03이 엔진을 다시 적용하면 사라짐 | `engine.yaml.template`에 사이드카 컨테이너 추가 | patch를 매번 다시 적용하지 않도록 |
+| 엔진 접근 정책 | observer 8001 경로 없음 | `network-policies.yaml`의 정책을 함께 적용 | 관측 조회 경로 |
 
-## 확인 방법
+## intent에서 서버 확인 후 채울 값
+
+- `REPLACE_IMAGE_DIGEST_HEX`, `REPLACE_PROFILE`(dev/reference): AWS 묶음 03이 정한 캐시 경로와 같게(`images.lock`과 `LAB_PROFILE`).
+- `allowed_engine_binaries`·`phase_binaries`: 공식 이미지의 실제 실행 파일. 지금 값(`/usr/local/bin/vllm-nonroot-entrypoint.sh`, `/usr/bin/python3`)은 시작안이며 첫 Tetragon 관측으로 확정한다.
+- `enforce render`의 `pod-security-candidate.json`은 엔진 그룹을 UID와 같게(2000) 쓴다. AWS 묶음은 GID 0이므로 이 후보 파일을 그대로 적용하지 않는다(참고용).
+
+## 확인 방법과 확인하지 않은 것
 
 ```bash
-# 렌더링만 한다(클러스터에 연결하지 않음).
-kubectl kustomize deploy/gpu-lab/overlays/vllm
-kubectl kustomize deploy/gpu-lab/overlays/sglang
-
-# Gateway 이미지(runtime/ 폴더에서). base 이미지는 digest로 고정한다.
-# 설치 단계가 없어 --network none으로도 빌드된다(2026-10-26 로컬 확인 후 이미지 삭제).
-docker build -f deploy/gateway/Dockerfile \
-  --build-arg PYTHON_IMAGE=python:3.12-slim@sha256:<digest> -t serving-gateway:<version> .
+kubectl kustomize deploy/gpu-lab                          # 렌더링만
+serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out /tmp/render
 ```
 
-적용(`kubectl apply -k`)은 G0~G2를 마치고 위 값을 모두 채운 뒤, 대상 context를 `--context`로 명시해서 한다. 통신·행위 정책은 이 묶음이 아니라 `serving-runtime enforce render`로 intent에서 만든다.
-
-## 확인하지 않은 것
-
-- 실제 클러스터 적용, Pod Security "restricted" 통과 여부
-- vLLM·SGLang 판본별 실행 인자, `readOnlyRootFilesystem`에서의 기동(쓰기 경로가 더 필요할 수 있음)
-- local PV의 디렉터리 소유자·권한이 실제로 의도대로인지(G0·G3에서 `enforce cache-check`로 확인)
-- observer 수집 프로그램(현재는 정책 대상 식별용 자리)
-- Gateway를 클러스터 Service로 노출하는 방식(현재 127.0.0.1 bind, port-forward 전제)
+- 실제 AWS 적용·실행, Gateway의 hostPath 읽기 권한(10010 그룹)·SELinux/AppArmor 영향
+- 사이드카가 nvidia RuntimeClass Pod 안에서 정상 기동하는지
+- 관리 수신부 우회(같은 Pod의 loopback 공유) 시험 — AWS 묶음 README도 별도 시험 대상으로 둠
+- observer 수집 프로그램, Gateway의 클러스터 노출 방식(현재 127.0.0.1 bind)
+- SGLang 전환(AWS 묶음 범위는 vLLM만)

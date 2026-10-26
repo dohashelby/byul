@@ -1,0 +1,22 @@
+# Added on top of the AWS bundle's engine-runtime NetworkPolicy (Gateway may
+# reach engine 8000; engine egress denied). Kubernetes NetworkPolicies add up,
+# so this only opens the management port to the observer; 8000 stays
+# Gateway-only. The sidecar reaches the engine over the Pod's loopback, which
+# NetworkPolicy does not filter: the sidecar and the engine are one network
+# boundary, as the bundle README notes.
+#
+# Finer Cilium/Tetragon rules come from `serving-runtime enforce render`
+# with deploy/gpu-lab/intent.aws-lab.json.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: engine-management-observer
+spec:
+  podSelector:
+    matchLabels: {app: serving-engine}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: serving-observer}
+      ports: [{protocol: TCP, port: 8001}]

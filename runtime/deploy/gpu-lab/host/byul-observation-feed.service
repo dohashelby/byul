@@ -1,0 +1,26 @@
+# systemd user service for the live Hubble/Tetragon collector on the AWS host
+# (the bundle README decides that collection runs on the host). Install as the
+# ubuntu user:
+#   mkdir -p ~/.config/systemd/user
+#   cp deploy/gpu-lab/host/byul-observation-feed.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now byul-observation-feed
+#   sudo loginctl enable-linger ubuntu     # keep it running after SSH logout
+#
+# Assumes the byul repository at ~/byul (stdlib only, no venv needed), the
+# bundle's kubectl/cilium/hubble in PATH, and /srv/serving/observation owned by
+# ubuntu with group 10010 (README.md). Tetragon process arguments are removed
+# before the raw file is written.
+[Unit]
+Description=byul live Hubble/Tetragon collector (context byul-aws-lab)
+
+[Service]
+Type=simple
+WorkingDirectory=%h/byul/runtime
+Environment=PYTHONPATH=%h/byul/runtime/src
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 -B tools/k8s_observation_feed.py --kube-context byul-aws-lab --output-dir /srv/serving/observation --reader-group 10010
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=default.target

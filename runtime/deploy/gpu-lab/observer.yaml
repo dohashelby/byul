@@ -1,8 +1,8 @@
-# Observer slot: the Cilium observer policy (intent metrics_collectors,
-# label app=serving-observer) lets this Pod reach only the engine management
-# listener, DNS and, when enabled, the kube-apiserver port. As in deploy/lab,
-# the in-cluster collector program itself is not decided yet; this Pod only
-# holds the identity so the policy and the L-07 style checks can be run.
+# Observer slot with the bundle's "observer" ServiceAccount (Pod read Role).
+# The intent's metrics_collectors label app=serving-observer lets it reach
+# only the management listener. As in deploy/lab, the in-cluster collector
+# program is not decided; this Pod holds the identity for policy checks.
+# Live Hubble/Tetragon collection runs on the AWS host (README.md).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,7 +15,7 @@ spec:
     metadata:
       labels: {app: serving-observer}
     spec:
-      serviceAccountName: serving-observer
+      serviceAccountName: observer
       securityContext:
         runAsNonRoot: true
         # 10004 is a project choice; appendix I.4 does not name an observer UID

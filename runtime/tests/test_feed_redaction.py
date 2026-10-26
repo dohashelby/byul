@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import io
 import json
+import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
+import tempfile
 import unittest
 
 from tools import k8s_observation_feed as feed
@@ -83,6 +86,51 @@ class RedactTetragonLineTests(unittest.TestCase):
         child.process.wait(timeout=10)
         self.assertNotIn(b"do-not-store", output.getvalue())
         self.assertIn(b"/bin/x", output.getvalue())
+
+
+class ReaderGroupSharingTests(unittest.TestCase):
+    """--reader-group lets one group (the Gateway Pod) read feed files only."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.directory = Path(self.temporary.name)
+        self.addCleanup(setattr, feed, "_reader_gid", None)
+
+    def mode(self, path: Path) -> int:
+        return stat.S_IMODE(path.stat().st_mode)
+
+    def test_files_are_owner_only_by_default(self) -> None:
+        feed._reader_gid = None
+        heartbeat = self.directory / "hubble.heartbeat.json"
+        feed._write_json_atomic(heartbeat, {"state": "running"})
+        gaps = self.directory / "hubble.gaps.jsonl"
+        feed._append_gap(gaps, {"event": "gap_opened"})
+        self.assertEqual(self.mode(heartbeat), 0o600)
+        self.assertEqual(self.mode(gaps), 0o600)
+
+    def test_reader_group_gets_read_only_access(self) -> None:
+        gid = os.getgid()
+        feed._reader_gid = gid
+        heartbeat = self.directory / "hubble.heartbeat.json"
+        feed._write_json_atomic(heartbeat, {"state": "running"})
+        gaps = self.directory / "hubble.gaps.jsonl"
+        feed._append_gap(gaps, {"event": "gap_opened"})
+        feed._share(self.directory, directory=True)
+        for path in (heartbeat, gaps):
+            with self.subTest(path=path.name):
+                self.assertEqual(self.mode(path), 0o640)
+                self.assertEqual(path.stat().st_gid, gid)
+        self.assertEqual(self.mode(self.directory), 0o750)
+        # Rewriting the heartbeat keeps the sharing (atomic replace).
+        feed._write_json_atomic(heartbeat, {"state": "reconnecting"})
+        self.assertEqual(self.mode(heartbeat), 0o640)
+
+    def test_cli_accepts_reader_group(self) -> None:
+        args = feed.build_parser().parse_args(
+            ["--output-dir", str(self.directory), "--reader-group", "10010", "--kube-context", "byul-aws-lab"]
+        )
+        self.assertEqual((args.reader_group, args.kube_context), (10010, "byul-aws-lab"))
 
 
 if __name__ == "__main__":

@@ -1,13 +1,14 @@
-# Team-owned harmless test targets (appendix I.4: probe UID 10003). The
-# receiver is the intent test_receivers "fixture" (app=test-receiver, 8080).
-# Use them only for the registered allow/deny checks, never as real services.
+# Team-owned harmless test targets (appendix I.4: probe UID 10003), using the
+# bundle's "probe" ServiceAccount. The receiver is the intent test_receivers
+# "fixture" (app=test-receiver, 8080). The bundle's engine-test-probe role is
+# separate and stays under the bundle's own temporary exception procedure.
 apiVersion: v1
 kind: Pod
 metadata:
   name: test-receiver
   labels: {app: test-receiver, purpose: task-check}
 spec:
-  serviceAccountName: serving-probe
+  serviceAccountName: probe
   automountServiceAccountToken: false
   securityContext:
     runAsNonRoot: true
@@ -35,7 +36,7 @@ metadata:
   name: other-client
   labels: {app: other-client, purpose: task-check}
 spec:
-  serviceAccountName: serving-probe
+  serviceAccountName: probe
   automountServiceAccountToken: false
   securityContext:
     runAsNonRoot: true

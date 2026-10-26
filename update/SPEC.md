@@ -87,7 +87,7 @@
 | `LIF` | 배포·변경 상태와 실행 자원 | 16 | `lifecycle_assessment_draft` |
 | `OBS` | 관측·진단·감사 자료 | 12 | `observability_assessment_draft` |
 
-> **결정 필요:** 프레임워크 77행에는 지금 고유 ID가 없다(논리 검토 L1). 위 코드를 붙이는 변환 스크립트를 첫 작업으로 만든다. **한 번 붙인 ID는 문구가 바뀌어도 바꾸지 않는다.** 행을 없애면 `retired: true`로 남긴다.
+> **2026-10-26 동기화:** 최초 도입 시 부여한 내부 ID를 유지하고, 최신 원문의 고정 CHK ID는 `framework_id`로 연결한다. `ID_MAPPING.json`에 기존 시험 식별자·검토 순서를 대조한 대응을 보존한다. **한 번 붙인 ID는 문구가 바뀌어도 바꾸지 않는다.** 행을 없애면 `retired: true`로 남긴다.
 
 ### 2.2 모든 객체의 공통 필드
 
@@ -734,5 +734,5 @@ declared0.9.1과 기존 캐시 helper만 변경한다. 수동 구조/1·양식/3
 - 패치 릴리스와 증분 감사에서 선정되지 않은 점검은 이전 보안 PASS를 이월할 수 있다(INV-19). 증분 감사는 새 구성 한 쪽만 실행하며 버전 비교(Comparison)를 내지 않는다(INV-09).
 - CHG의 근거 파일(변경 목록·원본 해시·적용 규칙 해시·미분류 목록)은 내용 주소 artifact로 저장하고 `guard verify`·반출·복원이 누락·변조를 검사한다. 분석 시각·개인 경로·임의 ID는 시험 조건 해시에 넣지 않는다. 사람이 쓴 CHG와 자동 추출 CHG는 같은 형식·검증 함수를 쓴다(2026-10-25 팀원 개선안 반영).
 - 엔진 경로 규칙·추출기는 `adapters/`, 모델 파일 규칙은 `collectors/`, 변경 종류 → 점검 표·패치 항상 시험 목록·모델 변경 종류 → 점검·`fact_triggers`는 팩(`change_selection.yaml`)에 둔다.
-- CheckDef에 프레임워크 `framework_id`(CHK-…)·`mechanism_ids`를 더하되 내부 ID(`REQ-01` 등)는 바꾸지 않는다. 체크리스트 원본은 mg-princess/serving-security-framework `729216b1`(77행·순서·subtest_ids 동일, 질문 문구 개정) 기준으로 갱신한다.
+- CheckDef에 프레임워크 `framework_id`(CHK-…)·`mechanism_ids`를 더하되 내부 ID(`REQ-01` 등)는 바꾸지 않는다. 체크리스트 원본은 mg-princess/serving-security-framework `0ec5fb5fa5633b0817468b27684690a66fc7b4f5`(77행·순서·subtest_ids 동일, 질문 문구 개정) 기준으로 갱신한다.
 - 기존 audit(이전 PLAN 없이), 기존 `guard update`(이전 PLAN 없이)의 시험 범위·`guard.update_validation`, 저장 증거 재판정은 그대로 둔다.

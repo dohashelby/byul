@@ -47,9 +47,9 @@ def with_legacy_check(pack, check_id):
 def materialize_pack21(destination):
     """Reconstruct and verify the exact historical pack, including its hashes.
 
-    The other 75 definitions and id map are unchanged by this batch. A future
-    edit to them must retain the relevant historical file too; load_pack must
-    reject any accidental mismatch instead of silently revising old rules.
+    All definitions and the ID map are retained from before the framework sync.
+    load_pack verifies the original PACK21 hashes; current prose and identities
+    must never be substituted into a historical replay.
     """
     from tests.builders import PACK_DIR
     history = Path(__file__).parent / 'fixtures' / 'pack21-checks'

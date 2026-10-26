@@ -1,17 +1,21 @@
 id: LIF-02
-revision: 1
+framework_id: CHK-LIF-002
+revision: 2
 retired: false
 area: LIF
 purpose: 자원 사용 제한
+framework_purpose: 재시도 비용 제한
+mechanism_ids:
+- mechanism-07
 secondary_purposes: []
-question: 실패한 취득의 반복·재시도가 비용을 무한 누적하지 않는가?
+question: 모델 취득이 실패해도 반복·재시도로 비용이 끝없이 쌓이지 않는가?
 scope: 조건부; 원격 취득·retry
 risk_category: 일반 장애·복구 점검
 risk_summary: 공급원 장애 뒤 무제한 재시도·부분 자료가 누적되면 비용·저장공간이 고갈되고 서비스 준비가 지연될 수 있음. 공급자의 악의적 유발은 별도 조건.
 review_order: conditional_when_selected
 impact: null
 applies_when:
-  prose: 조건부; 원격 취득·retry
+  prose: 원격 취득 또는 SDK/도구의 재시도가 사용될 때 적용한다. 추론 retry와 취득 retry를 구분한다.
 policy_params: []
 policy_prose:
   policy_to_decide: retry 횟수·backoff·부분 자료 수명
@@ -23,13 +27,11 @@ challenge_steps:
 - 한도 도달 시 정지와 복구 확인
 required_observations: []
 required_observations_prose:
-- attempt 횟수·시각
-- 다운로드 누적량
-- 최종 정지·임시파일
+- attempt 횟수·시각/다운로드 누적량/최종 정지·임시파일
 satisfied_if: 횟수·시간·비용 한도와 정리 조건을 지킨다.
 fail_criteria: 실패 반복이 채택한 retry·비용 한도를 넘겨 계속된다.
 unknown_criteria: retry 주체·중첩 계층·누적 비용을 알 수 없거나 한도가 미정이다.
-remediation: 원자적 완료 표시·불완전 파일 격리·재시도 예산과 정리를 둔다
+remediation: '- 취득 재시도의 횟수·간격·총 시간·누적 비용을 제한한다. 중단된 실행과 부분 파일을 확인하고 같은 실패가 무한히 반복되지 않도록 중단·정리 조건을 적용한다.'
 method_and_evidence: 중단·재시도 횟수·대기·누적 다운로드·부분 파일을 기록한다.
 remaining_setup: 시험 저장소 장애 응답·재시도 예산
 executor: null

@@ -1,10 +1,14 @@
 id: REQ-03
-revision: 2
+framework_id: CHK-REQ-003
+revision: 3
 retired: false
 area: REQ
 purpose: 요청·대상 접근 권한
+framework_purpose: 작업·대상 인가
+mechanism_ids:
+- mechanism-01
 secondary_purposes: []
-question: 일반 호출자가 비허용 관리·진단 작업을 수행할 수 없는가?
+question: 일반 사용자가 허용받지 않은 관리·진단 작업을 할 수 없는가?
 scope: 기본+활성 기능
 risk_category: 보안 위협 점검
 risk_summary: 일반 호출자가 관리·진단 API를 실행해 모델 상태를 바꾸거나 비공개 자료를 수집·열람할 수 있음.
@@ -14,7 +18,7 @@ applies_when:
   all:
   - fact: gateway
     eq: true
-  prose: 관리 접점 검토는 기본, 진단 기능별 활성 여부 확인
+  prose: 관리 접점의 등록·노출·권한을 기본 확인한다. 진단·profiler 등은 활성 기능별로 추가한다.
 policy_params:
 - key: general_allowed_kinds
   type: list[str]
@@ -39,13 +43,11 @@ required_observations:
 - key: functional_probe_results
   type: dict[str, pass|fail|no_response]
 required_observations_prose:
-- route별 요구 역할
-- 키·신원별 응답
-- 실제 관리·진단 동작
+- route별 요구 역할/키·신원별 응답/실제 관리·진단 동작
 satisfied_if: 역할 범위 밖 작업이 수행되지 않는다. API key 존재만으로 역할 인가를 충족 처리하지 않는다.
 fail_criteria: 일반 호출자가 금지 관리·진단 동작을 실행한다.
 unknown_criteria: route 미등록·도달불가를 인가 성공으로 오인하거나 실제 효과를 확인하지 못했다.
-remediation: 관리·진단 route를 제한하고 작업별 권한을 집행한다.
+remediation: '- 관리·진단 API를 일반 추론 API와 구분해 작업별 허용 역할을 적용한다. 사용하지 않는 경로는 비활성화하거나 접근을 제한하고, profiler 등 선택 기능도 실제 실행 전에 권한을 검사한다.'
 method_and_evidence: 무자격·일반·관리 역할로 실제 등록된 각 route를 대조한다. 각 작업별 결과를 따로 남긴다.
 remaining_setup: 무해 관리 호출 선정; 활성 개발·동적 기능 경로 별도 표시
 executor: role_route

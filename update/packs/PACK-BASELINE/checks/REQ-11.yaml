@@ -1,10 +1,14 @@
 id: REQ-11
-revision: 3
+framework_id: CHK-REQ-011
+revision: 4
 retired: false
 area: REQ
 purpose: 요청·상태·결과 귀속
+framework_purpose: 요청·결과 귀속
+mechanism_ids:
+- mechanism-04
 secondary_purposes: []
-question: 동시 요청과 스트리밍 결과가 올바른 원 요청으로 반환되는가?
+question: 동시 요청과 스트리밍 응답이 각각 올바른 요청자에게 돌아가는가?
 scope: 기본
 risk_category: 보안 위협 점검
 risk_summary: 호출자가 요청 ID 충돌·동시 실행 조건을 유발할 수 있을 때 다른 사용자의 출력이 자기 연결로 전달되어 정보가 유출될 수 있음.
@@ -12,7 +16,7 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   always: true
-  prose: 일반·스트리밍 요청; 외부 ID/child는 활성 시 추가
+  prose: 일반·스트리밍 요청의 결과 귀속을 확인한다. 외부 ID·child·별도 시도는 실제 사용 시 추가한다.
 policy_params:
 - key: result_binding
   type: str
@@ -71,13 +75,11 @@ required_observations:
 - key: functional_probe_results
   type: dict[str, outcome]
 required_observations_prose:
-- 서버 생성 ID·클라이언트 ID
-- chunk 순서·연결
-- 각 요청 결과
+- 서버 생성 ID·클라이언트 ID/chunk 순서·연결/각 요청 결과
 satisfied_if: 결과가 다른 사용자·요청에 전달되지 않는다.
 fail_criteria: 다른 요청의 결과·종료 신호가 잘못된 호출자에게 반환된다.
 unknown_criteria: 응답 표식 또는 연결별 ID 대응을 확보하지 못했다.
-remediation: 내부 요청 식별과 반환 대상을 신뢰 신원에 연결한다.
+remediation: '- 외부 요청·내부 실행·출력 수신 대상을 검증한 사용자와 작업 ID로 구분한다. 동시 요청과 스트리밍에서 응답 조각·종료 신호를 원래 요청에 반환하도록 상태 등록·전달 규칙을 유지한다.'
 method_and_evidence: '두 합성 주체의 요청을 겹쳐 principal→외부/내부 ID→worker 상태→collector→응답을 연결한다. ID·child 기능별 변형은 별도 기록한다. 【F17】기본 internal ID는 무작위 접미사. 외부 ID 기반 abort는 별도 통제 필요; token-only/dev router 실제 등록 조건 확인. 동일 외부 ID 동시 요청, randomization on/off, 등록된 abort 경로의 타 사용자/빈 ID 요청을 확인한다. 정상 대조: 자기 요청만 취소, 다른 요청은 정상 완료'
 remaining_setup: 작은 동시성·고유 무해 표식·응답 수집기
 executor: request_binding

@@ -1,17 +1,20 @@
 id: PLT-06
-revision: 1
+framework_id: CHK-PLT-006
+revision: 2
 retired: false
 area: PLT
 purpose: 통신·내부 호출 제한
+framework_purpose: 실행 최소 권한
+mechanism_ids: []
 secondary_purposes: []
-question: core·worker가 공유하는 실제 신뢰 범위와 외부 접근 제한을 확인했는가?
+question: Core·worker의 공유 권한과 침해 영향을 확인하고, 해당 프로세스·내부 통신에 대한 외부 접근을 제한하는가?
 scope: 기본 TP; 실제 protocol과 공격자 시작 권한 확인
 risk_category: 보안 위협 점검
 risk_summary: worker를 장악한 주체가 공유 신뢰 범위의 내부 명령을 이용해 다른 요청·모델에 영향을 줄 수 있음. 프로세스 분리만으로 인가 경계를 가정하지 않음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 기본 TP; 실제 protocol과 공격자 시작 권한 확인
+  prose: 실제 core·worker protocol·UID·실행 신뢰 범위를 확인한다. 동일 신뢰 그룹 내부를 독립된 사용자 권한 경계로 가정하지 않는다.
 policy_params: []
 policy_prose:
   policy_to_decide: worker 신뢰 범위·허용 명령·보완 경계
@@ -23,13 +26,11 @@ challenge_steps:
 - 정책상 격리 요구와 실제 집행 비교
 required_observations: []
 required_observations_prose:
-- process 권한·namespace
-- 메시지 reader
-- 외부 접근 차단
+- process 권한·namespace/메시지 reader/외부 접근 차단
 satisfied_if: 실제 UID·직렬화·명령 실행 경계와 잔여 위험을 기록하고 비허용 peer 접근을 제한한다. 지원하지 않는 역할별 인가를 시험 통과로 표시하지 않는다.
 fail_criteria: 외부 비신뢰 주체가 해당 신뢰 범위로 진입하거나 요구한 격리가 없다.
 unknown_criteria: 동일 UID만 확인했거나 외부 접근·메시지 전달 전제를 확인하지 못했다.
-remediation: 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다
+remediation: '- Core·worker의 OS 계정·IPC·RPC에서 공유하는 권한과 침해 영향을 기록한다. 그 범위로 진입하는 외부 접점의 권한을 제한하고, 조직이 요구한 격리를 실제 실행 구성에 적용한다.'
 method_and_evidence: 특정 worker의 실제 송신 능력 범위에서 허용/비허용 대상·명령의 무해 메시지를 대조한다. core↔worker pickle/cloudpickle와 실행 UID·IPC 접근권을 확인한다. 역할별 명령 인가가 없는 실행 그룹을 격리된 역할로 가정하지 않는다. SC-08-01 비허용 peer 차단과 공급 코드/실행 권한 통제로 연결하고 침해 worker 이후 영향은 잔여 위험으로 기록한다.
 remaining_setup: 신뢰 단위 확정; 이미 장악한 worker를 독립 저권한 사용자처럼 가정하지 않음
 executor: null

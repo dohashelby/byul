@@ -1,17 +1,21 @@
 id: LIF-10
-revision: 1
+framework_id: CHK-LIF-010
+revision: 2
 retired: false
 area: LIF
 purpose: 종결·자원 회수
+framework_purpose: 종결·자원 회수
+mechanism_ids:
+- mechanism-13
 secondary_purposes: []
-question: 취소·연결 종료 뒤 실제 작업과 참조가 정한 기한에 종료되는가?
+question: 취소·연결 종료 후 실제 작업이 정한 기한 안에 중단되고, 더 이상 사용하지 않는 상태·자원이 정리되는가?
 scope: 일반·stream 기본
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 일반 호출자가 요청 후 취소·연결 종료를 반복했을 때 잔존 계산·참조가 누적되고 한도도 피할 수 있으면 다른 사용자의 서비스가 중단될 수 있음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 일반·stream 기본
+  prose: 일반·스트리밍 요청의 대기·계산·출력 단계에서 취소·연결 종료·timeout 처리를 확인한다.
 policy_params: []
 policy_prose:
   policy_to_decide: 종료 대상·기한·늦은 결과·잔존 자료 처리
@@ -23,13 +27,11 @@ challenge_steps:
 - 다음 요청 확인
 required_observations: []
 required_observations_prose:
-- abort 접수
-- 내부 실행 종료
-- 참조·전송·자원 회수
-satisfied_if: 채택한 종결·회수 조건을 만족한다. 응답 종료만 확인하면 native 회수는 미확인이다.
+- 중단 요청 접수와 내부 실행 종료 시각, 참조·전송·자원 정리 기록
+satisfied_if: 정한 기한 안에 작업이 중단되고 scheduler·worker 상태와 자원이 각 회수 조건에 맞게 정리된다. 내부 실행·자원의 회수 증거가 부족하면 해당 결과는 미확인으로 기록한다.
 fail_criteria: 요구한 종료 기한 뒤에도 해당 작업·참조가 지속된다.
 unknown_criteria: HTTP 취소 응답·집계 GPU 수치만 있고 해당 요청의 실제 종결을 모른다.
-remediation: 취소 전파·그룹 장애 처리·retry예산과 실제 종료 관측을 연결한다 신뢰할 신원에서 객체 소유권을 연결하고 상태 초기화와 대상 검사를 확인한다
+remediation: '- 취소·연결 종료·timeout을 해당 내부 실행의 중단과 scheduler·worker 상태 정리까지 전달한다. stop 문자열로 응답을 끝냈는데 Core 실행이 남아 있으면 중단을 전달한다. 엔진 장애 시에는 오류 전달과 실행 그룹·잔존 자원 정리를 확인한다. 계산·전송·참조별 종료를 관측하고 기한을 넘긴 작업의 추가 정리 절차를 마련한다.'
 method_and_evidence: HTTP 종료·Core abort·finished ID·worker 행·KV 참조·GPU/전송 완료를 나눠 관측한다.
 remaining_setup: 요청별 종결·회수 계측과 기한
 executor: null

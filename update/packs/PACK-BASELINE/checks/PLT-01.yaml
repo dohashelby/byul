@@ -1,10 +1,14 @@
 id: PLT-01
-revision: 4
+framework_id: CHK-PLT-001
+revision: 5
 retired: false
 area: PLT
 purpose: 실행 권한 제한
+framework_purpose: 실행 최소 권한
+mechanism_ids:
+- mechanism-11
 secondary_purposes: []
-question: 엔진·worker가 불필요한 호스트·파일·장치 권한을 갖지 않는가?
+question: 엔진과 worker의 호스트·파일·장치 권한이 필요한 범위에 한정되는가?
 scope: 기본; 실제 계정·컨테이너·마운트·장치
 risk_category: 보안 위협 점검
 risk_summary: 허용 코드가 침해되거나 비승인 코드가 실행됐을 때 과도한 호스트·파일·장치 권한을 이용해 엔진 밖 자료와 서비스까지 침해할 수 있음.
@@ -12,7 +16,7 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   always: true
-  prose: 기본; 실제 계정·컨테이너·마운트·장치
+  prose: 실행 계정·호스트/컨테이너·mount·장치 접근을 기본 확인한다. 컨테이너 비사용도 제외 사유가 아니다.
 policy_params:
 - key: allowed_capabilities
   type: list[str]
@@ -61,13 +65,11 @@ required_observations:
 - key: functional_probe_results
   type: dict[str, pass|fail|no_response]
 required_observations_prose:
-- 실행 계정·권한
-- mount·device allowlist
-- 접근 결과·정상 추론
+- 실행 계정·권한/mount·device allowlist/접근 결과·정상 추론
 satisfied_if: 필요 밖 접근이 제한되고 정상 로딩·TP는 유지된다.
 fail_criteria: 정책상 불필요한 파일·장치·호스트 권한을 사용한다.
 unknown_criteria: 유효 권한·컨테이너 밖 집행 또는 필요한 권한 목록이 미정이다.
-remediation: 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다
+remediation: '- 엔진·worker 계정의 호스트·파일·mount·장치 권한을 실제 업무에 필요한 범위로 제한한다. 컨테이너 사용 여부에 맞춰 호스트 접근과 다른 작업 영역의 접근 권한을 확인한다.'
 method_and_evidence: 계정·capability·mount·device·쓰기 대상 목록과 허용/비허용 무해 접근을 대조한다.
 remaining_setup: 실제 허용 권한표와 무해 sentinel 자원
 executor: container_config

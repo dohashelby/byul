@@ -1,7 +1,7 @@
 """checklist.json의 5개 draft 배열(77행) → packs/<pack>/checks/<ID>.yaml
 
 ID 규칙(SPEC §2.1): <영역>-<2자리>. 한 번 붙인 ID는 id_map.yaml에 고정하고 바꾸지 않는다.
-재실행 시 기존 ID와의 대조: 질문 문구 → subtest_ids(양쪽에서 유일할 때만). 사라진 행은 retired.
+재실행 시 기존 ID와의 대조: 고정 framework_id → 질문 문구 → subtest_ids(미등록 ID에 한함). 사라진 행은 retired.
 
     uv run python tools/import_checklist.py
 """
@@ -60,12 +60,16 @@ def _write_check(path: Path, check: dict) -> None:
 
 def _row_to_check(check_id: str, area: str, source_key: str, row: dict) -> dict:
     """원문 필드를 보존한 CheckDef. 구조화는 overrides만."""
+    compatibility = _load(ROOT / "tools/framework_compatibility.yaml")
     return {
         "id": check_id,
+        **({"framework_id": row["id"]} if row.get("id") else {}),
         "revision": 1,
         "retired": False,
         "area": area,
-        "purpose": row["parent_purpose"],
+        "purpose": compatibility.get(row.get("id"), row["parent_purpose"]),
+        **({"framework_purpose": row["parent_purpose"],
+            "mechanism_ids": row.get("mechanism_ids", [])} if row.get("id") else {}),
         "secondary_purposes": row.get("secondary_parent_purposes") or [],
         "question": row["question"],
         "scope": row.get("scope"),
@@ -117,13 +121,21 @@ def _assign_ids(area: str, rows: list[dict], existing: list[dict]) -> tuple[list
     """
     entries = {e["id"]: dict(e) for e in existing}
     unmatched = {e["id"] for e in existing}
-    by_question = {e["question"]: e["id"] for e in existing}
+    canonical = [r["id"] for r in rows if r.get("id")]
+    mapped = [e["framework_id"] for e in existing if e.get("framework_id")]
+    if len(canonical) != len(set(canonical)) or len(mapped) != len(set(mapped)):
+        raise ValueError(f"Duplicate framework ID in {area}")
+    by_framework = {e["framework_id"]: e["id"] for e in existing if e.get("framework_id")}
+    by_question = {e["question"]: e["id"] for e in existing if not e.get("framework_id")}
+
 
     def _subtest_key(st: list[str]) -> tuple[str, ...] | None:
         return tuple(st) if st else None
 
     existing_st: dict[tuple, list[str]] = {}
     for e in existing:
+        if e.get("framework_id"):
+            continue
         k = _subtest_key(e.get("subtest_ids") or [])
         if k:
             existing_st.setdefault(k, []).append(e["id"])
@@ -135,7 +147,7 @@ def _assign_ids(area: str, rows: list[dict], existing: list[dict]) -> tuple[list
 
     assigned: list[tuple[str | None, dict]] = []
     for r in rows:
-        cid = by_question.get(r["question"])
+        cid = by_framework.get(r.get("id")) or by_question.get(r["question"])
         if cid is not None and cid in unmatched:
             unmatched.discard(cid)
             assigned.append((cid, r))
@@ -161,6 +173,7 @@ def _assign_ids(area: str, rows: list[dict], existing: list[dict]) -> tuple[list
             next_no += 1
         entries[cid] = {
             "id": cid,
+            **({"framework_id": r["id"]} if r.get("id") else {}),
             "question": r["question"],
             "subtest_ids": list(r.get("subtest_ids") or []),
             "retired": False,
@@ -182,9 +195,11 @@ def import_checklist(source: Path, pack_dir: Path, overrides_dir: Path) -> dict:
     new_map: dict[str, list[dict]] = {}
     all_ids: list[str] = []
 
+    # Validate all identities before writing any definitions.
+    assignments = {area: _assign_ids(area, data[key], (old_map or {}).get(area, []))
+                   for key, area in AREAS.items()}
     for source_key, area in AREAS.items():
-        rows = data[source_key]
-        assigned, entries = _assign_ids(area, rows, (old_map or {}).get(area, []))
+        assigned, entries = assignments[area]
         new_map[area] = entries
         for cid, row in assigned:
             check = _row_to_check(cid, area, source_key, row)

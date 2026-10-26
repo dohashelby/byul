@@ -1,17 +1,21 @@
 id: SUP-09
-revision: 1
+framework_id: CHK-SUP-009
+revision: 2
 retired: false
 area: SUP
 purpose: 코드 실행 제한
+framework_purpose: 추가 코드 실행 허용
+mechanism_ids:
+- mechanism-09
 secondary_purposes: []
-question: 모델의 추가 코드는 허용 조건에서만 실행되는가?
+question: 모델에 포함된 추가 코드가 허용된 조건에서만 실행되는가?
 scope: null
 risk_category: 보안 위협 점검
 risk_summary: 모델 공급자가 추가 Python 코드를 포함시켜 로딩·추론 계정의 파일·자격·통신 권한을 악용할 수 있음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: custom code 소비 경로
+  prose: 추가 코드 사용·금지 설정과 실제 소비 경로를 확인한다. 허용 시 승인 코드만 실행되는지, 금지 시 코드 선택이 차단되는지 확인한다.
 policy_params: []
 policy_prose:
   policy_to_decide: null
@@ -23,13 +27,11 @@ challenge_steps:
 - trust 허용/거부 설정에서 실제 import 비교
 required_observations: []
 required_observations_prose:
-- 유효 trust 설정
-- 코드 선택 분기
-- import된 파일·판본·실행 계정
+- 유효 trust 설정/코드 선택 분기/import된 파일·판본·실행 계정
 satisfied_if: 금지한 코드는 실행되지 않고 허용한 모델은 정상 사용된다.
 fail_criteria: 금지된 추가 코드가 실제 import 또는 실행된다.
 unknown_criteria: auto_map 존재만 확인했거나 실제 코드 선택·import를 관측하지 못했다.
-remediation: 소비 경로별 허용 목록과 실행 권한을 제한하고 필요 없는 확장을 비활성화한다
+remediation: '- 추가 코드 사용을 금지한 구성에서는 실제 import·실행 경로까지 차단되는 설정을 적용한다. 허용한 구성에서는 코드 출처·버전·실행 권한을 승인 묶음에 포함하고 승인한 코드만 실행한다.'
 method_and_evidence: auto_map의 존재만으로 실행을 단정하지 않고 실제 선택된 class·코드 출처(로컬/모델 저장소/다른 저장소/동적 캐시)·판본·의존 파일·trust 검사→import 순서를 확인한다. 무해 실행 표식을 허용/금지 조건에서 대조한다.
 remaining_setup: 선정 모델의 custom code 필요성·승인 목록과 무해 모듈 fixture
 executor: null

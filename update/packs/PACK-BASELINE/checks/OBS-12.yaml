@@ -1,17 +1,21 @@
 id: OBS-12
-revision: 1
+framework_id: CHK-OBS-012
+revision: 2
 retired: false
 area: OBS
 purpose: 보존·삭제 관리
+framework_purpose: 보존·삭제
+mechanism_ids:
+- mechanism-14
 secondary_purposes: []
-question: 로그·usage·진단의 원본과 사본이 보존·삭제 범위를 지키는가?
+question: 로그·사용 통계·진단의 원본과 사본이 정한 보존·삭제 범위를 지키는가?
 scope: 실제 저장·내보내기·백업 경로
 risk_category: 보안 위협 점검
 risk_summary: 보존이 끝난 로그·usage·진단 사본에 접근한 주체가 삭제됐다고 여긴 민감정보를 계속 조회·반출할 수 있음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 실제 저장·내보내기·백업 경로
+  prose: 기본 기록과 실제 생성·저장되는 사본의 보존·삭제를 확인한다. usage·backup·원격 sink 사본은 존재할 때 추가한다.
 policy_params: []
 policy_prose:
   policy_to_decide: 보존 기간·법적/업무 예외·삭제 확인 수준
@@ -23,13 +27,11 @@ challenge_steps:
 - 원본·version·backup·원격 sink별 접근 가능 여부 확인
 required_observations: []
 required_observations_prose:
-- 사본 위치·보존 이유
-- 만료·삭제 작업
-- 실제 조회·복구 가능성
+- 사본 위치·보존 이유/만료·삭제 작업/실제 조회·복구 가능성
 satisfied_if: 정한 기간·범위를 지킨다. POST 시도나 파일 unlink만으로 모든 사본 삭제를 확정하지 않는다. 비관측 사본은 사본별로 별도 결과를 남기며 잔존 bytes 자체를 무조건 실패로 보지 않는다.
 fail_criteria: 정한 보존·삭제 요구를 위반해 사본이 노출·잔존하거나 조기 삭제된다.
 unknown_criteria: 원격·backup 사본을 확인하지 못했거나 보존 예외·기한이 미정이다.
-remediation: 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다 복원 묶음 재승인·사본 목록·자산 소유자별 삭제/철회와 재개 검증을 둔다
+remediation: '- 로그·usage·진단의 원본·사본·백업 위치와 보존·삭제 기한·예외를 관리한다. 만료 후 조회·복구 가능 여부를 사본별로 확인하고 삭제 지연·미관측 사본을 별도 상태로 기록한다.'
 method_and_evidence: 사본 위치·소유자·보존 기간·만료/삭제 작업과 접근 가능 여부를 대조한다. 원격 수신·삭제는 별도 증거로 확인한다. 모델·입력·임시 파일·cache·backup 사본도 Q-C12와 연결해 위치·reader/writer·수명·삭제를 확인한다. 합법적으로 보존하는 사본은 보존 이유와 접근 제한을 기록한다.
 remaining_setup: 자료별 기간·예외·삭제 확인 수준; unlink만으로 전체 삭제 판단 금지
 executor: null

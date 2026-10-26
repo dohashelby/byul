@@ -1,17 +1,21 @@
 id: PLT-11
-revision: 1
+framework_id: CHK-PLT-011
+revision: 2
 retired: false
 area: PLT
 purpose: 권한·자격 철회
+framework_purpose: 권한 철회
+mechanism_ids:
+- mechanism-12
 secondary_purposes: []
-question: 기존 session·handle의 접근도 철회 정책에 맞게 제한되는가?
+question: 이미 열린 연결과 공유 자원 접근권도 정한 철회 정책대로 제한되는가?
 scope: 조건부; 지속 연결·handle 존재
 risk_category: 보안 위협 점검
 risk_summary: 권한이 철회된 주체가 이미 열린 session·handle을 이용해 정한 철회 범위를 넘어 자료에 계속 접근할 수 있음.
 review_order: conditional_when_selected
 impact: null
 applies_when:
-  prose: 조건부; 지속 연결·handle 존재
+  prose: 철회 대상 자격으로 생성된 지속 연결·session·handle이 있을 때 적용한다. 신규 요청 차단으로 대신 판정하지 않는다.
 policy_params: []
 policy_prose:
   policy_to_decide: 진행 작업·세션 처리와 기한
@@ -24,13 +28,11 @@ challenge_steps:
 - 허용 잔존·강제 종료 정책 비교
 required_observations: []
 required_observations_prose:
-- session/handle 생성·소유자
-- 철회 시각
-- 기존·신규 접근 결과
+- session/handle 생성·소유자/철회 시각/기존·신규 접근 결과
 satisfied_if: 기존 접근 유지/종료 방침과 기한을 지킨다.
 fail_criteria: 기존 session이 채택한 철회 후 허용 범위·기한을 넘겨 동작한다.
 unknown_criteria: 기존 session과 재연결을 구분하지 못했거나 잔존 정책이 미정이다.
-remediation: 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다 취소 전파·그룹 장애 처리·retry예산과 실제 종료 관측을 연결한다 복원 묶음 재승인·사본 목록·자산 소유자별 삭제/철회와 재개 검증을 둔다
+remediation: '- 이미 열린 session·handle에 철회 후 허용할 작업, 재인증·제한·종료 조건과 기한을 정한다. 채택한 방침에 따라 기존 접근권을 갱신·회수하거나 세션을 종료하고, 신규 접근과 기존 접근의 처리 결과를 각각 확인한다.'
 method_and_evidence: 철회 전 열린 세션의 후속 사용과 종료를 관측한다. 작업 회수는 종결 영역에 연결한다.
 remaining_setup: 기존 연결 처리 정책과 session 식별 계측
 executor: null

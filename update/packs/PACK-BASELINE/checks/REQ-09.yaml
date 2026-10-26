@@ -1,10 +1,14 @@
 id: REQ-09
-revision: 6
+framework_id: CHK-REQ-009
+revision: 7
 retired: false
 area: REQ
 purpose: 실제 입력의 검사
+framework_purpose: 최종 입력 검증
+mechanism_ids:
+- mechanism-03
 secondary_purposes: []
-question: token ID와 입력 길이가 실제 모델·소비자의 유효 범위를 지키는가?
+question: 토큰 번호와 입력 길이가 실제 모델과 처리 단계에서 허용하는 범위 안에 있는가?
 scope: 기본+선정 입력
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 호출자가 범위 밖 token ID·길이를 제출해 예외·잘못된 계산을 유발할 수 있음. 공유 엔진 중단·타 요청 피해는 실제 경로와 영향 확인 필요.
@@ -12,7 +16,7 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   always: true
-  prose: 활성 endpoint가 받는 값·선정 vocab/runner
+  prose: 활성 입력 endpoint의 token·길이·변환 후 값을 선정 모델·runner 기준으로 확인한다.
 policy_params:
 - key: max_input_tokens
   type: int
@@ -55,14 +59,13 @@ required_observations:
 - key: confirmed_input_violations
   type: list[str]
 required_observations_prose:
-- 모델 vocab·길이 한도
-- 실제 token 배열
-- 오류·후속 요청 상태
-satisfied_if: 허용 밖 값이 위험한 소비 전에 제한되고 정상 입력은 처리된다.
-fail_criteria: 범위 밖 입력이 비허용 메모리 접근·상태 오염을 일으키거나 다른 정상 요청을 손상시킨다.
-unknown_criteria: 유효 범위·실제 consumer 또는 후속 상태를 확인하지 못했다.
-remediation: 모델 기준 범위와 최종 소비값을 연결해 검사한다.
-method_and_evidence: 정상·경계·범위 밖 입력의 검사 위치·실제 소비·오류 뒤 정상 요청을 기록한다.
+- 모델 vocab·처리 단계별 유효 범위와 입력 제한·집행 위치, 허용된 절단·변환 조건
+- 제출값·변환값·실제 소비값과 거부 기록, 메모리 오류·상태·후속 정상 요청 결과
+satisfied_if: 채택한 입력 제한과 실제 소비자의 유효 범위를 각 집행 위치에서 지키고 정상 입력은 처리된다. 절단·변환을 허용한 경우에는 채택한 방식과 시점에 맞게 제한한 값만 소비된다.
+fail_criteria: 채택한 입력 제한이나 실제 소비자의 유효 범위를 위반한 값이 해당 제한 지점을 넘어 수용·소비된다. 비허용 메모리 접근·상태 오염·다른 요청의 피해는 발생 여부와 증거를 별도로 기록한다.
+unknown_criteria: 적용할 제한·집행 위치·허용된 절단·변환 조건 또는 실제 소비값을 확인하지 못했다. 이미 확인한 제한 위반은 후속 영향의 증거 부족과 구분해 미충족으로 기록한다.
+remediation: '- 실제 모델·consumer의 유효 범위와 채택한 입력 제한을 해당 집행 위치에서 검사한다. 절단·변환을 허용하면 방식·시점과 변환 뒤 소비값을 명시한다. vocab·버퍼 범위 등 구현상 제약을 유지하고 오류는 요청 단위에서 처리한다.'
+method_and_evidence: 모델·처리 단계별 유효 범위와 채택한 입력 제한·집행 위치를 정하고 정상·경계·범위 밖 입력의 실제 소비값을 대조한다. 허용한 절단·변환은 적용 시점과 변환 뒤 값을 확인한다. 제한 준수 결과와 메모리 접근·상태 오염·다른 요청 영향은 각각 기록한다.
 remaining_setup: 선정 모델 범위와 격리 환경의 작은 경계 fixture
 executor: input_validation
 judge:

@@ -20,7 +20,7 @@
 
 ## 2. 프레임워크 근거
 
-새 `checklist.json`(mg-princess/serving-security-framework `729216b1`)의 `framework_model`이 같은 흐름을 요구한다.
+새 `checklist.json`(mg-princess/serving-security-framework `0ec5fb5fa5633b0817468b27684690a66fc7b4f5`)의 `framework_model`이 같은 흐름을 요구한다.
 
 - `lifecycle`의 `LC-CHANGE`는 "엔진·모델·설정·의존성·배포 방식이나 정책을 변경할 때" 변경 영향을 검토해 대상과 분기를 고르라고 한다. `LC-INTAKE`는 필요한 시험을 격리 환경에서 하라고 한다.
 - `lifecycle_policy.selection_rule`은 각 시점의 점검을 "검토 후보"로 두고 선정·비적용·미정 이유를 기록하라고 한다. `evidence_reuse_rule`은 증거 재사용 시 대상·구성·정책·시험 절차 판본의 유효성 확인과 원 실행 ID·출처·시각·한계·재사용 이유 기록을 요구한다.
@@ -282,3 +282,6 @@ v0.31.0(`db9527a4`, 체크리스트 `implementation_reference`와 같은 커밋)
 - 같은 모델 파일 안의 의미 변화(예: template 문자열 일부 변경)는 파일 단위로만 잡는다.
 - 엔진 릴리스의 도달 확인은 진입점 수준이다. 바뀐 내부 코드가 실험 중 실행됐는지는 확인하지 않는다.
 - 안전 규칙상 보내지 않는 상태 변경 요청, 장애를 일으켜야 실행되는 실패 경로, 실험 환경에 없는 하드웨어 경로는 도달할 수 없다.
+
+### 2026-10-26 참조 기준 동기화
+원문·고정 ID 대응·위협 연결 메타데이터의 동기화는 완료했다. 변경 영향에 따른 시험 선정과 재사용 기능은 이 문서의 후속 구현 범위다. 기존 실행용 목적 분류는 유지하고 최신 원문 목적은 `framework_purpose`에 보존한다. 자세한 범위는 [동기화 기록](FRAMEWORK_SYNC_20261026.md)을 따른다.

@@ -60,7 +60,8 @@ def test_req01_is_first_request_row(imported_pack):
     data = yaml.safe_load((pack / "checks/REQ-01.yaml").read_text(encoding="utf-8"))
     src = json.loads(SOURCE.read_text(encoding="utf-8"))["request_state_assessment_draft"][0]
     assert data["question"] == src["question"]
-    assert data["purpose"] == src["parent_purpose"]
+    assert data["framework_purpose"] == src["parent_purpose"]
+    assert data["purpose"] == "요청·대상 접근 권한"
     assert data["applies_when"]["prose"] == src["applies_when"]
     assert data["required_observations_prose"] == src["required_observations"]
     assert data["legacy"]["q_ids"] == src["legacy_q_ids"]
@@ -75,7 +76,7 @@ def test_unstructured_rows_keep_prose_and_null_executor(imported_pack):
     data = yaml.safe_load((pack / "checks/SUP-01.yaml").read_text(encoding="utf-8"))
     assert data["executor"] is None
     assert data["judge"] is None
-    assert data["applies_when"] == {"prose": "승인 저장소 사용"}
+    assert data["applies_when"] == {"prose": json.loads(SOURCE.read_text())["supply_assessment_draft"][0]["applies_when"]}
     assert data["required_observations"] == []
     assert data["required_observations_prose"]
 
@@ -110,6 +111,7 @@ def test_removed_row_is_retired_and_new_row_gets_next_number(tmp_path, imported_
     changed = copy.deepcopy(data)
     removed = changed["platform_assessment_draft"].pop(2)
     new_row = copy.deepcopy(changed["platform_assessment_draft"][0])
+    new_row["id"] = "CHK-PLT-013"
     new_row["question"] = "새로 추가된 점검인가?"
     new_row["subtest_ids"] = ["Q-NEW/SC-NEW"]
     changed["platform_assessment_draft"].append(new_row)
@@ -156,3 +158,28 @@ def test_committed_pack_matches_importer(tmp_path):
     shutil.copytree(committed, pack)
     import_checklist(SOURCE, pack, OVERRIDES)
     assert _snapshot(pack) == _snapshot(committed)
+
+
+def test_fixed_ids_survive_all_wording_changes_and_duplicate_subtests(tmp_path, imported_pack):
+    data = json.loads(SOURCE.read_text())
+    before = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
+              for p in (imported_pack / "checks").glob("*.yaml")}
+    for key in AREAS:
+        for row in data[key]:
+            row["question"] += " revised"
+            row["subtest_ids"] = ["shared"]
+        data[key].reverse()
+    import_checklist(_write_source(tmp_path, data), imported_pack, OVERRIDES)
+    after = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
+             for p in (imported_pack / "checks").glob("*.yaml")}
+    assert before == after
+
+
+def test_duplicate_fixed_id_rejected_without_pack_changes(tmp_path, imported_pack):
+    data = json.loads(SOURCE.read_text())
+    rows = data["observability_assessment_draft"]
+    rows[1]["id"] = rows[0]["id"]
+    before = _snapshot(imported_pack)
+    with pytest.raises(ValueError, match="Duplicate framework ID"):
+        import_checklist(_write_source(tmp_path, data), imported_pack, OVERRIDES)
+    assert _snapshot(imported_pack) == before

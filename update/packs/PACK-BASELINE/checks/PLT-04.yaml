@@ -1,10 +1,14 @@
 id: PLT-04
-revision: 3
+framework_id: CHK-PLT-004
+revision: 4
 retired: false
 area: PLT
 purpose: 자격 전달·사용 제한
+framework_purpose: 자격 제공·사용 제한
+mechanism_ids:
+- mechanism-11
 secondary_purposes: []
-question: worker에 불필요한 자격이 전달되지 않는가?
+question: worker에 필요 없는 자격·비밀정보를 넘기지 않는가?
 scope: 기본 환경 전달 확인; Ray 원격 전달은 선택
 risk_category: 보안 위협 점검
 risk_summary: 침해된 worker가 불필요하게 상속받은 secret·자격을 이용해 저장소 등 다른 서비스의 자료에 접근할 수 있음.
@@ -12,7 +16,7 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   always: true
-  prose: 기본 환경 전달 확인; Ray 원격 전달은 선택
+  prose: 기본 worker 환경·자격 상속을 확인한다. Ray/원격 worker 전달은 해당 실행기를 사용할 때 추가한다.
 policy_params:
 - key: forbidden_env_names
   type: list[str]
@@ -49,13 +53,11 @@ required_observations:
 - key: functional_probe_results
   type: dict[str, outcome]
 required_observations_prose:
-- env·mount·credential provider
-- rank별 유효 자격
-- 정상 기능 결과
+- env·mount·credential provider/rank별 유효 자격/정상 기능 결과
 satisfied_if: 필요하지 않은 소비자에게 자격을 노출하지 않는다.
 fail_criteria: 불필요한 자격이 worker에 전달되어 접근에 사용 가능하다.
 unknown_criteria: env만 확인하고 파일·provider·상속 자격 경로를 확인하지 못했다.
-remediation: 실행 계정·상속·mount를 최소화하고 실제 issuer와 session 종료를 연결한다 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다
+remediation: '- driver·부모 프로세스의 환경변수·Secret·파일·mount에서 worker로 전달할 자격을 필요한 것만 명시한다. worker가 받은 자격과 실제 접근 가능한 저장소·서비스를 대조하고 불필요한 전달을 제거한다.'
 method_and_evidence: driver→worker의 변수 이름·출처·consumer를 대조하고 canary 변수로 추가/제외 및 손상 제외 설정의 처리를 확인한다.
 remaining_setup: 비밀 원문을 남기지 않는 자격 식별 수집기와 최소 목록
 executor: credential_exposure

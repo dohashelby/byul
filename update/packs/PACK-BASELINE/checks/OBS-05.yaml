@@ -1,17 +1,21 @@
 id: OBS-05
-revision: 2
+framework_id: CHK-OBS-005
+revision: 3
 retired: false
 area: OBS
 purpose: 수집 정보 제한
+framework_purpose: 부가정보 수집·송신 통제
+mechanism_ids:
+- mechanism-15
 secondary_purposes: []
-question: 허용한 usage 보고가 필드·목적지 범위를 지키는가?
+question: 허용한 사용 통계 보고가 정한 항목과 목적지 범위를 지키는가?
 scope: 조건부; usage 허용
 risk_category: 보안 위협 점검
 risk_summary: 보고 설정·자료에 영향을 줄 수 있는 주체가 허용 밖 필드·목적지로 보고를 확장해 조직이 금지한 정보를 외부에 보낼 수 있음.
 review_order: conditional_when_selected
 impact: null
 applies_when:
-  prose: 조건부; usage 허용
+  prose: usage 일부 또는 전체 보고를 허용할 때 적용한다. 금지 정책의 비활성 검증은 별도 점검으로 유지한다.
 policy_params:
 - key: usage_allowed
   type: bool
@@ -26,13 +30,11 @@ challenge_steps:
 - 실제 payload·목적지·차단 비교
 required_observations: []
 required_observations_prose:
-- 승인 fields·sink
-- 새 보고 payload
-- 실제 연결·sink 수신
+- 승인 fields·sink/새 보고 payload/실제 연결·sink 수신
 satisfied_if: 팀 참조에서는 usage 보고를 비허용으로 둔다. 정책을 변경해 허용하는 환경에서만 허용 필드·목적지·주기를 대조한다. 근거 없이 prompt 송신을 주장하지 않는다.
 fail_criteria: 허용 밖 필드나 목적지로 보고가 생성·전송된다.
 unknown_criteria: usage 허용이 승인되지 않았거나 payload·최종 목적지를 관측하지 못했다.
-remediation: 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다 각 실제 hop의 접근권·상대 검증·송신 제한을 적용한다
+remediation: '- usage 보고를 별도로 허용한 환경에서 필드·목적지·주기·공개 범위를 승인하고 실제 payload·송신 대상에 적용한다. 설정 변경과 redirect 뒤에도 승인 범위가 유지되는지 확인한다. 팀 참조 구성은 usage 비허용을 유지한다.'
 method_and_evidence: 초기/추가 runtime 필드와 실제 수신 목적지를 허용표와 대조한다.
 remaining_setup: 기본 비사용; 기업이 별도 허용할 때만 필드·목적지·보존 결정
 executor: null

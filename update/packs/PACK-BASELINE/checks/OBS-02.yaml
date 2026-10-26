@@ -1,17 +1,22 @@
 id: OBS-02
-revision: 1
+framework_id: CHK-OBS-002
+revision: 2
 retired: false
 area: OBS
 purpose: 필요한 사건의 기록
+framework_purpose: 실행 상태 관측·수집 건전성
+mechanism_ids:
+- mechanism-17
+- mechanism-13
 secondary_purposes: []
-question: 준비·실패·종료 기록이 실제 상태를 올바르게 나타내는가?
+question: 준비·실패·종료 기록이 실제 실행 상태와 일치하는가?
 scope: 기본; 선택 profiler 별도
 risk_category: 증거·판정 신뢰성 점검
 risk_summary: 운영자·평가자가 health·HTTP 응답만 믿으면 실제 실패·수집 지속을 놓쳐 잘못된 서비스 재개나 보안 판정을 내릴 수 있음.
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 기본; 선택 profiler 별도
+  prose: 준비·실패·종료 기록과 실제 상태를 기본 대조한다. profiler 종료는 해당 기능이 있을 때 추가한다.
 policy_params: []
 policy_prose:
   policy_to_decide: 상태별 증거·시각·판정 의미
@@ -22,13 +27,11 @@ challenge_steps:
 - API 응답·로그·worker 실제 상태를 시간순 대조
 required_observations: []
 required_observations_prose:
-- 상태전이 시각
-- API·로그 표현
-- worker·작업·수집 실제 상태
-satisfied_if: 중간 READY·HTTP 종료·health 성공을 더 넓은 완료로 보고하지 않는다.
+- 상태전이 시각/API·로그 표현/worker·작업·수집 실제 상태
+satisfied_if: 준비·작업 완료·수집 종료 기록이 각각 해당 구성요소의 실제 상태와 일치한다.
 fail_criteria: 접수·listener·종료 요청을 실제 준비·적용·종결 완료로 잘못 기록한다.
 unknown_criteria: 실제 상태를 별도로 계측하지 못해 로그 문구의 진위를 확인할 수 없다.
-remediation: 필드 최소화·권한/보존·opt-out·송신통제·수집장애 표시를 실제 경로에 적용한다 취소 전파·그룹 장애 처리·retry예산과 실제 종료 관측을 연결한다 공통 식별자와 오류/수집 상태를 연결하고 민감값 대신 참조를 저장한다
+remediation: '- 기동 요청·접속 가능·모델 준비·계산 완료·수집 종료의 의미를 기록에서 구분한다. 완료 상태를 표시할 때 해당 worker·작업·수집기의 실제 상태를 확인해 중간 단계를 전체 완료로 보고하는 경로를 보완한다.'
 method_and_evidence: '같은 실행의 health·정상 추론·worker 준비·종료 상태를 비교하고 기록의 의미를 확인한다. 【F38】profiler 설정이 있어야 route 등록. prefix 밖 경로이므로 실제 Gateway/직통 접근 통제 별도 검증. backend 시작/정지 실패 주입은 격리 시험환경. 격리 환경에서 시작·정지 backend 실패를 각각 주입하고 응답·경고·내부 flag·실제 기록 생성/종료·다음 시작 가능성을 대조한다. 정상 대조: 정상 start·실제 기록 생성·stop·기록 종료·다시 start 가능 상태 확인.'
 remaining_setup: 상태별 의미·기한과 독립 관측 지점
 executor: null

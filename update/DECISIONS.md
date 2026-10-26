@@ -457,3 +457,6 @@
 - `report/log_integrity.py`와 증거 첨부 `log_integrity_display.html`은 보고서 화면이 아니라 OBS 점검의 증거이므로 그대로 둔다.
 - 테스트: HTML 문자열 확인은 같은 값이 RPT JSON에 있는지로 바꾸고(부정 확인도 JSON 기준으로 유지), HTML escape 확인은 platform(텍스트 전용 렌더링)으로 넘겼다. 렌더러 자체를 보던 1개와 HTML/JSON 짝 확인 1사례는 지웠다. 기본 suite 2903 통과.
 
+
+## 2026-10-26 — 확정 원문 동기화와 기존 실행 계약 보존
+확정 원문은 0ec5fb5 커밋으로 고정한다. 내부 ID와 실행용 목적 분류는 유지하고 framework_id·framework_purpose·mechanism_ids로 최신 원문을 연결한다. 최초 대응은 기존 질문·시험 식별자와 최신 시험 식별자·검토 순서를 검증해 등록했다. 이후 고정 ID를 우선하며 중복 ID는 쓰기 전에 거부한다. PACK23은 DRAFT이며 자동 승인하지 않는다. 과거 PACK21 재판정은 원래 파일 바이트와 해시를 유지한다. 상세 차이는 docs/FRAMEWORK_SYNC_20261026.md를 따른다.

@@ -1,10 +1,14 @@
 id: REQ-01
-revision: 5
+framework_id: CHK-REQ-001
+revision: 6
 retired: false
 area: REQ
 purpose: 요청·대상 접근 권한
+framework_purpose: 작업·대상 인가
+mechanism_ids:
+- mechanism-01
 secondary_purposes: []
-question: Gateway를 우회한 직통 요청으로 비허용 작업을 수행할 수 없는가?
+question: Gateway를 거치지 않은 요청으로 허용받지 않은 작업을 할 수 없는가?
 scope: 기본
 risk_category: 보안 위협 점검
 risk_summary: 엔진 주소에 접근 가능한 호출자가 Gateway를 우회해 앞단에서 금지한 추론·관리 작업을 수행할 수 있음.
@@ -14,7 +18,7 @@ applies_when:
   all:
   - fact: gateway
     eq: true
-  prose: 사용자→Gateway 경유와 엔진 직통 제한
+  prose: 엔진의 진입 경로를 항상 확인한다. Gateway 사용 시 경유·직통을 비교하고, 비사용 시 직접 진입점의 인증·인가·노출 제한을 확인한다.
 policy_params:
 - key: allowed_callers
   type: list[str]
@@ -43,13 +47,11 @@ required_observations:
 - key: functional_probe_results
   type: dict[str, pass|fail|no_response]
 required_observations_prose:
-- 호출 출발점·경로
-- route·인증 범위
-- 실제 handler 실행·거부
+- 요청을 보낸 위치, API 경로, 인증 적용 범위, 처리 함수의 실행·거부 기록
 satisfied_if: 비허용 주체의 작업은 수행되지 않고 허용 요청은 정상 처리된다.
 fail_criteria: 비허용 출발점이나 신원이 직통 경로에서 금지 작업을 실행한다.
 unknown_criteria: /v1만 확인했거나 /invocations 등 등록 경로·도달성·집행점을 확인하지 못했다.
-remediation: 직통 노출 제한과 작업 인가를 함께 적용한다.
+remediation: '- Gateway와 허용 호출자만 엔진에 접근하도록 배포망·수신 주소의 노출을 제한한다. 실제 열린 추론·관리 API 전체에서 경유·직통 경로의 작업 권한을 확인하고 우회 가능한 경로를 제한한다.'
 method_and_evidence: '동일한 무해 요청을 허용/비허용 신원으로 Gateway·직통에 전달하고 네트워크 거부와 handler 수행 여부를 구분한다. 등록 route 목록을 만들고 /v1과 보호 prefix 밖 /invocations 등 실제 추론 경로에 무키·오키·허용키 요청을 Gateway/직통으로 대조한다. root_path·재작성 전후 실제 handler 수행을 기록한다. 【F39】host None 일반 TCP launcher는 빈 호스트 bind; UDS/배포망 별도. CORS * 자체가 네트워크 접근·인가 우회 증거는 아님. 실제 bind·UDS·Gateway·방화벽·CORS 유효값을 기록하고 허용/비허용 Origin의 브라우저 및 비브라우저 직통 요청을 검사한다. 정상 대조: 허용 앱 경유 요청 정상'
 remaining_setup: 격리 endpoint와 허용표; OPTIONS 응답과 실제 작업 실행 구분
 executor: direct_route

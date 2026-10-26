@@ -35,14 +35,14 @@ def given(cid, value):
 
 
 def test_declarations_catalog_and_blank_template_are_not_execution(pack):
-    assert pack.manifest.revision == 22 and not pack.reviewed
+    assert pack.manifest.revision == 23 and not pack.reviewed
     assert len(pack.checks) == 77
     assert sum(bool(c.policy_params) for c in pack.active_checks()) == 22
     assert sum(len(c.policy_params) for c in pack.active_checks()) == 50
     assert {c.id for c in pack.active_checks() if c.executor} == {"REQ-01", "REQ-03", "PLT-01", "PLT-04", "REQ-09", "REQ-10", "REQ-13", "OBS-03", "REQ-07", "REQ-11", "OBS-09"}
     for cid, (key, _) in FLAGS.items():
         check = pack.checks[cid]
-        assert check.revision == 2 and check.executor is None and check.judge is None
+        assert check.revision == 3 and check.executor is None and check.judge is None
         assert [(p.key, p.type, p.required) for p in check.policy_params] == [(key, "bool", True)]
     text = build_policy_template(pack)
     template = yaml.safe_load(text)

@@ -90,6 +90,12 @@ uv run --project platform/api --with ./update --reinstall-package guard python u
 `IMPORT_CONVERSION_OUTPUT_MISMATCH`, `POLICY_EXPIRED` 등 고정 코드와 종료 2로 알린다.
 예외 원문·원본 정책 내용·비밀값을 진단에 복사하지 않는다.
 
+import와 재검증 모두 팩 YAML 문법·구조·인코딩·필수 파일 누락·파일 해시 불일치를
+기존 `INPUT_IMPORT_FAILED`와 종료 2로 알린다. 팩 입력을 읽는 경계에서 알려진
+파서·모델·무결성·파일 읽기 오류와 누락된 점검 정의 조회만 정규화하며,
+파서 문맥·입력 원문·개인 경로를 출력하지 않는다. 예상 밖 프로그래밍 오류를
+일괄 숨기거나 원본·팩·반입 묶음을 자동 수정하지 않는다.
+
 로컬 관리자는 원본·출력·provenance를 함께 다시 작성할 수 있다.
 이 검증은 그런 공동 재작성이나 원본 진위를 인증하지 않으며 서명·승인 체계를 추가하지 않는다.
 반환된 provenance 해시는 이번에 읽은 파일을 식별할 뿐 인증이 아니다.

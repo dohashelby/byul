@@ -12,6 +12,7 @@ import socket
 import subprocess
 
 import pytest
+import yaml
 
 from byul_platform.contracts import canonical_json, canonical_sha256
 from guard.models import Environment, Policy, load_pack
@@ -73,6 +74,124 @@ def _refresh_file_record(bundle, name):
 
 def _tree(bundle):
     return {path.name: (path.read_bytes(), path.stat().st_mtime_ns) for path in bundle.iterdir()}
+
+
+def _file_snapshot(root):
+    return {path.relative_to(root).as_posix(): (path.read_bytes(), path.stat().st_mtime_ns)
+            for path in root.rglob("*") if path.is_file()}
+
+
+@pytest.fixture
+def input_pack(tmp_path, current_pack):
+    """오류 지점까지 실제 로더를 통과시키는 한 점검짜리 EXAMPLE 팩 사본."""
+    path = tmp_path / "EXAMPLE-private-pack-context"
+    (path / "checks").mkdir(parents=True)
+    raw = (PACK_PATH / "checks/REQ-01.yaml").read_bytes()
+    (path / "checks/REQ-01.yaml").write_bytes(raw)
+    manifest = current_pack.manifest.model_dump(mode="json")
+    manifest["checks"] = ["REQ-01"]
+    manifest["files_sha256"] = [{"path": "checks/REQ-01.yaml", "sha256": hashlib.sha256(raw).hexdigest()}]
+    (path / "pack.yaml").write_text(yaml.safe_dump(manifest, allow_unicode=True), encoding="utf-8")
+    return path
+
+
+def _damage_input_pack(path, damage):
+    manifest_path = path / "pack.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    if damage == "manifest-yaml":
+        manifest_path.write_bytes(b"EXAMPLE-private-parser-context: [\n")
+        return
+    if damage == "manifest-encoding":
+        manifest_path.write_bytes(b"\xff")
+        return
+    if damage == "manifest-structure":
+        manifest_path.write_bytes(b"- EXAMPLE-private-structure-context\n")
+        return
+    if damage == "manifest-required-field":
+        manifest.pop("checks")
+    elif damage == "manifest-missing":
+        manifest_path.unlink()
+        return
+    elif damage == "check-missing":
+        (path / "checks/REQ-01.yaml").unlink()
+        return
+    elif damage == "check-not-in-file-index":
+        (path / "checks/REQ-01.yaml").unlink()
+        manifest["files_sha256"] = []
+    elif damage == "check-hash":
+        check = path / "checks/REQ-01.yaml"
+        check.write_bytes(check.read_bytes() + b"\n# EXAMPLE-private-hash-context\n")
+        return
+    else:
+        name, raw = {
+            "check-yaml": ("checks/REQ-01.yaml", b"EXAMPLE-private-parser-context: [\n"),
+            "check-encoding": ("checks/REQ-01.yaml", b"\xff"),
+            "check-structure": ("checks/REQ-01.yaml", b"- EXAMPLE-private-structure-context\n"),
+            "selection-yaml": ("change_selection.yaml", b"EXAMPLE-private-parser-context: [\n"),
+            "selection-structure": ("change_selection.yaml", b"- EXAMPLE-private-selection-context\n"),
+        }[damage]
+        (path / name).write_bytes(raw)
+        record = {"path": name, "sha256": hashlib.sha256(raw).hexdigest()}
+        if name.startswith("checks/"):
+            manifest["files_sha256"] = [record]
+        else:
+            manifest["files_sha256"].append(record)
+    manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True), encoding="utf-8")
+
+
+@pytest.mark.parametrize("mode", ["import", "verify"])
+@pytest.mark.parametrize("damage", [
+    "manifest-yaml", "manifest-encoding", "manifest-structure", "manifest-required-field", "manifest-missing",
+    "check-yaml", "check-encoding", "check-structure", "check-missing", "check-not-in-file-index", "check-hash",
+    "selection-yaml", "selection-structure",
+])
+def test_cli_pack_input_errors_are_fixed_and_preserve_all_inputs(
+        tmp_path, current_pack, input_pack, capsys, mode, damage):
+    env, pol = _sources(tmp_path, current_pack)
+    bundle = tmp_path / "valid-import"
+    boundary.import_inputs(env, pol, input_pack, bundle, as_of=T0)
+    _damage_input_pack(input_pack, damage)
+    output = tmp_path / "must-not-be-created"
+    before = _file_snapshot(tmp_path)
+    args = ["--pack", str(input_pack), "--as-of", T0.isoformat()]
+    if mode == "verify":
+        args.extend(["--verify-import", str(bundle)])
+    else:
+        args.extend(["--environment", str(env), "--policy", str(pol), "--output", str(output)])
+
+    assert boundary.main(args) == 2
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == "INPUT_IMPORT_FAILED\n"
+    assert not output.exists()
+    assert _file_snapshot(tmp_path) == before
+
+
+@pytest.mark.parametrize("mode", ["import", "verify"])
+@pytest.mark.parametrize("error", [
+    RuntimeError("unexpected loader state"), AssertionError("unexpected loader invariant"),
+    KeyError("unexpected loader key"),
+])
+def test_cli_does_not_hide_unexpected_pack_loader_errors(
+        tmp_path, current_pack, monkeypatch, mode, error):
+    env, pol = _sources(tmp_path, current_pack)
+    bundle = _bundle(tmp_path, current_pack)
+    output = tmp_path / "must-not-be-created"
+    before = _file_snapshot(tmp_path)
+
+    def broken_loader(path):
+        raise error
+
+    monkeypatch.setattr(boundary, "load_pack", broken_loader)
+    args = ["--pack", str(PACK_PATH), "--as-of", T0.isoformat()]
+    if mode == "verify":
+        args.extend(["--verify-import", str(bundle)])
+    else:
+        args.extend(["--environment", str(env), "--policy", str(pol), "--output", str(output)])
+    with pytest.raises(type(error)) as caught:
+        boundary.main(args)
+    assert caught.value is error
+    assert not output.exists()
+    assert _file_snapshot(tmp_path) == before
 
 
 def test_verify_is_read_only_and_reports_static_gaps_without_authorizing_execution(tmp_path, current_pack, monkeypatch):

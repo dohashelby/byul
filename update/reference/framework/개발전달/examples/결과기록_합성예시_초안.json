@@ -1,0 +1,3326 @@
+{
+  "proposal_status": "DRAFT_NOT_IMPLEMENTED",
+  "schema_proposal": "assessment-scope-design/0.1",
+  "data_origin": "EXAMPLE",
+  "actual_engine_executed": false,
+  "framework_basis": {
+    "repository": "mg-princess/serving-security-framework",
+    "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+    "content_commit": null,
+    "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+    "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+    "schema_version": "0.2",
+    "original_date": "2026-10-18"
+  },
+  "cases": [
+    {
+      "proposal_status": "DRAFT_NOT_IMPLEMENTED",
+      "data_origin": "EXAMPLE",
+      "record_kind": "assessment_scope_design_example",
+      "framework_case_projection": {
+        "record_id": "EXAMPLE-CASE-1",
+        "assessment_id": "CHK-REQ-005",
+        "protection_requirement_id": "requirement-1-2",
+        "checklist_revision": "sha256:cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+        "test_branch_ref": {
+          "assessment_id": "CHK-REQ-005",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "모델 선택값 변경을 통한 비허용 모델 실행",
+          "scenario_ids": [
+            "SC-02-01"
+          ],
+          "apply_when": "모델 selector를 기본 확인하고 adapter/resolver는 지원·활성 조건에서 추가한다. 모델 사용 종료 시 이전 selector의 최종 실행 결과도 확인한다."
+        },
+        "test_case_id": "synthetic-case-1",
+        "test_case_parameters": {
+          "fixture": "bounded-synthetic",
+          "runtime_executed": false
+        },
+        "question_id": "Q-C02",
+        "subtest": "최종 선택된 모델에 호출자의 사용 권한이 적용되고, 사용 종료한 모델의 실행이 차단되는가?",
+        "procedure_version": "draft-0.1",
+        "environment_id": "ENV-00000000000000000000000002",
+        "environment_revision": 1,
+        "policy_revision": 1,
+        "execution_id": "EVD-00000000000000000000000001",
+        "applicability": "적용",
+        "execution_status": "완료",
+        "collection_status": "수집완료",
+        "security_verdict": "충족",
+        "functional_verdict": "미확인",
+        "performance_verdict": "미확인",
+        "policy_values": {
+          "basis": "EXAMPLE; 실제 조직값 미채택"
+        },
+        "evidence": [
+          {
+            "key": "unit-observation",
+            "target": "합성 모델별 사용 권한",
+            "observation": "양성 정상대조와 위반/허용 결과의 원인",
+            "required": true,
+            "collected": true,
+            "value": {
+              "outcome": "PASS",
+              "synthetic": true
+            },
+            "origin": "EXAMPLE",
+            "source_ref": {
+              "name": "모델별 사용 권한.json",
+              "path": "artifacts/7243a6f59643b7f76e52ae93734e924437bf640ba0e140bb5c56783b20824c9e",
+              "sha256": "7243a6f59643b7f76e52ae93734e924437bf640ba0e140bb5c56783b20824c9e",
+              "bytes": 89,
+              "collected_at": "2026-10-26T10:00:00Z",
+              "collector": "synthetic-design-fixture/1"
+            },
+            "at": "2026-10-26T10:00:00Z",
+            "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+          }
+        ],
+        "facts": [
+          {
+            "value": "EXAMPLE",
+            "origin": "EXAMPLE",
+            "source": "synthetic fixture"
+          }
+        ],
+        "limitations": [
+          "합성 채움 예시; 제품 입력/실측 결과 아님"
+        ],
+        "remediation_owner": null,
+        "approval": null,
+        "environment_evidence_source": {
+          "environment_ref": {
+            "kind": "ENV",
+            "id": "ENV-00000000000000000000000002",
+            "revision": 1,
+            "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+          },
+          "source": "synthetic environment descriptor",
+          "checked_at": "2026-10-26T10:00:00Z"
+        },
+        "environment_checked_at": "2026-10-26T10:00:00Z",
+        "policy_source": {
+          "policy_ref": {
+            "kind": "POL",
+            "id": "POL-00000000000000000000000001",
+            "revision": 1,
+            "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+          },
+          "data_origin": "EXAMPLE"
+        },
+        "policy_approved_by": null,
+        "policy_checked_at": "2026-10-26T10:00:00Z",
+        "normal_control_result": {
+          "attempted": true,
+          "succeeded": true,
+          "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+        },
+        "stop_criteria_ref": {
+          "name": "synthetic-stop-budget",
+          "version": "draft-1",
+          "sha256": "d3ba3b1519fa68d8b2ec4c32b19aed790662c705b33e9a79a32aba31784f2209"
+        },
+        "recovery_procedure_ref": {
+          "name": "synthetic-reset",
+          "version": "draft-1",
+          "sha256": "c31cef953725ca3e47149b68dc54e3d5082c9270f85d068bb8d5159b323deee8"
+        },
+        "remediation_due_at": null,
+        "retest_conditions": [
+          "부족 관측 보완 또는 조건/정책 변경 시 재검토"
+        ],
+        "subtest_inventory_complete": false,
+        "engine_adapter_ref": {
+          "name": "fake",
+          "version": "draft-only",
+          "sha256": "d14bac1e72970fb832c90ae8a0b25e39b4e6e915af478e31a2dfff1e3ab61cd0"
+        },
+        "fixture_ref": {
+          "name": "bounded-synthetic-fixture",
+          "version": "draft-1",
+          "sha256": "17c7c50538f0602465eadba66fa125c460033dcbdc8191e71d85ec8d69c89218"
+        },
+        "collection_adapter_ref": {
+          "name": "synthetic-fixture",
+          "version": "draft-1",
+          "sha256": "2571131330e8d62cf786cca70e9ff72cd460a22f85c2bd604ae52b2162e9775d"
+        },
+        "started_at": "2026-10-26T10:00:00Z",
+        "finished_at": "2026-10-26T10:00:01Z",
+        "scenario_ids": [
+          "SC-02-01"
+        ],
+        "subtest_id": "Q-C02/SC-02-01",
+        "shared_question_ids": []
+      },
+      "existing_object_refs": {
+        "source_environment": {
+          "kind": "ENV",
+          "id": "ENV-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "7924d44f27c57c572596b4196e5a7b2bcbb4df262dfa8b98e6aab94fc775d80b"
+        },
+        "target_environment": {
+          "kind": "ENV",
+          "id": "ENV-00000000000000000000000002",
+          "revision": 1,
+          "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+        },
+        "policy": {
+          "kind": "POL",
+          "id": "POL-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+        },
+        "source_plan": {
+          "kind": "PLAN",
+          "id": "PLAN-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "82b97a409f6e2a6e004e5c5d95fe1a9f44a3ecaa942a4cf2cd0e1981b8a68790"
+        },
+        "target_plan": {
+          "kind": "PLAN",
+          "id": "PLAN-00000000000000000000000002",
+          "revision": 1,
+          "sha256": "6a094dc9f0364eea3c734ad4cdb10bf650898c49ee8b6081867fea729695d561"
+        },
+        "source_evidence": {
+          "kind": "EVD",
+          "id": "EVD-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "6ebf98be94d27b4e4249cc752e2f49f07439c2cc76828aec823a8fbf5bffba8a"
+        },
+        "source_result": {
+          "kind": "RES",
+          "id": "RES-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "8623f553e257b35021d5f12eccd0adb4f07d73173e6dd6d1766f80ad1a48292e"
+        }
+      },
+      "proposed_scope_extension": {
+        "placement": "PLAN/EVD/RES/RPT optional versioned extension; no new store",
+        "selection_inventory": {
+          "authority": "PLAN exactRef + pack/scope definition",
+          "plan_ref": {
+            "kind": "PLAN",
+            "id": "PLAN-00000000000000000000000002",
+            "revision": 1,
+            "sha256": "6a094dc9f0364eea3c734ad4cdb10bf650898c49ee8b6081867fea729695d561"
+          },
+          "expected_common": true,
+          "expected_required_subresults": [
+            "모델별 사용 권한",
+            "사용 종료 모델의 실행 중단"
+          ],
+          "branch_refs": [
+            {
+              "assessment_id": "CHK-REQ-005",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "name": "모델 선택값 변경을 통한 비허용 모델 실행",
+              "scenario_ids": [
+                "SC-02-01"
+              ],
+              "apply_when": "모델 selector를 기본 확인하고 adapter/resolver는 지원·활성 조건에서 추가한다. 모델 사용 종료 시 이전 selector의 최종 실행 결과도 확인한다."
+            },
+            {
+              "assessment_id": "CHK-REQ-005",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "name": "모델 별칭 변경을 통한 승인 대상 바꿔치기",
+              "scenario_ids": [
+                "SC-02-04"
+              ],
+              "apply_when": "서비스 이름·alias·worker에 실제 모델을 연결하는 경로가 있다. 단일 모델도 포함한다. 사용 종료·재매핑 후에도 alias의 현재 승인 대상과 실제 실행을 대조한다."
+            },
+            {
+              "assessment_id": "CHK-REQ-005",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "name": "daemon 접속으로 권한 밖 가중치 읽기",
+              "scenario_ids": [
+                "SC-16-01"
+              ],
+              "apply_when": "별도 weights daemon 또는 공유 모델 공급 구현을 사용한다. 기본 TP와 구분한다."
+            }
+          ],
+          "inventory_complete": false,
+          "inventory_reason": "실제 REVIEWED 팩·전체 목적 적용 판단 미실행; 합성 CHK 범위만 기록"
+        },
+        "common_confirmation": {
+          "unit_ref": {
+            "kind": "common_confirmation",
+            "assessment_id": "CHK-REQ-005",
+            "checklist_ref": {
+              "repository": "mg-princess/serving-security-framework",
+              "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+              "content_commit": null,
+              "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+              "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+              "schema_version": "0.2",
+              "original_date": "2026-10-18"
+            },
+            "normal_control": "호출자가 허용된 활성 모델을 정상 사용한다. 사용 종료 시험에서는 다른 활성 모델과 현재 승인된 alias 매핑도 정상 동작한다."
+          },
+          "applicability": {
+            "status": "APPLICABLE",
+            "basis": "합성 대상의 기능/정책/계기 확인",
+            "fact_refs": [
+              {
+                "kind": "ENV",
+                "id": "ENV-00000000000000000000000002",
+                "revision": 1,
+                "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+              }
+            ],
+            "policy_refs": [
+              {
+                "kind": "POL",
+                "id": "POL-00000000000000000000000001",
+                "revision": 1,
+                "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+              }
+            ]
+          },
+          "support": {
+            "status": "SUPPORTED",
+            "procedure_ref": {
+              "name": "synthetic-bounded-procedure",
+              "version": "draft-0.1",
+              "sha256": "e11c9fac72d045552c09d6fad490e0a89eee707af5a958137e3681fdedf27c1c"
+            }
+          },
+          "selection": {
+            "selected": true,
+            "reason": "필수 결과 적용 확인"
+          },
+          "required_observation_keys": [
+            "unit-observation"
+          ],
+          "required_challenge_steps": [
+            "allow-control",
+            "violation-probe"
+          ],
+          "execution": {
+            "challenge_results": [
+              {
+                "step": "allow-control",
+                "attempted": true
+              },
+              {
+                "step": "violation-probe",
+                "attempted": true
+              }
+            ],
+            "method": "ENGINE_TEST",
+            "status": "COMPLETED",
+            "execution_id": "EVD-00000000000000000000000001",
+            "operator": {
+              "by": "example-reviewer",
+              "at": "2026-10-26T10:00:00Z"
+            },
+            "started_at": "2026-10-26T10:00:00Z",
+            "finished_at": "2026-10-26T10:00:00Z",
+            "engine_executed": false
+          },
+          "normal_control_result": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+          },
+          "evidence": [
+            {
+              "key": "unit-observation",
+              "target": "합성 CHK 공통 확인",
+              "observation": "양성 정상대조와 위반/허용 결과의 원인",
+              "required": true,
+              "collected": true,
+              "value": {
+                "outcome": "PASS",
+                "synthetic": true
+              },
+              "origin": "EXAMPLE",
+              "source_ref": {
+                "name": "CHK 공통 확인.json",
+                "path": "artifacts/b05efa464ef287e06203bb156e9fab7e1afbf0dd490c9b42e9c8e7092b55ad1d",
+                "sha256": "b05efa464ef287e06203bb156e9fab7e1afbf0dd490c9b42e9c8e7092b55ad1d",
+                "bytes": 83,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              },
+              "at": "2026-10-26T10:00:00Z",
+              "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+            }
+          ],
+          "verdicts": {
+            "security": "PASS",
+            "functional": "PASS",
+            "performance": "UNKNOWN"
+          },
+          "missing_evidence": [],
+          "limitations": [
+            "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+          ]
+        },
+        "required_subresults": [
+          {
+            "unit_ref": {
+              "kind": "required_subresult",
+              "name": "모델별 사용 권한",
+              "assessment_id": "CHK-REQ-005",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "applies_when": "모델을 선택하는 모든 경로"
+            },
+            "applicability": {
+              "status": "APPLICABLE",
+              "basis": "합성 대상의 기능/정책/계기 확인",
+              "fact_refs": [
+                {
+                  "kind": "ENV",
+                  "id": "ENV-00000000000000000000000002",
+                  "revision": 1,
+                  "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+                }
+              ],
+              "policy_refs": [
+                {
+                  "kind": "POL",
+                  "id": "POL-00000000000000000000000001",
+                  "revision": 1,
+                  "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+                }
+              ]
+            },
+            "support": {
+              "status": "SUPPORTED",
+              "procedure_ref": {
+                "name": "synthetic-bounded-procedure",
+                "version": "draft-0.1",
+                "sha256": "a0d3bb32da6f8bda0632b46cab3116e49de59aa44ec013b99d4812fb44a1873d"
+              }
+            },
+            "selection": {
+              "selected": true,
+              "reason": "필수 결과 적용 확인"
+            },
+            "required_observation_keys": [
+              "unit-observation"
+            ],
+            "required_challenge_steps": [
+              "allow-control",
+              "violation-probe"
+            ],
+            "execution": {
+              "challenge_results": [
+                {
+                  "step": "allow-control",
+                  "attempted": true
+                },
+                {
+                  "step": "violation-probe",
+                  "attempted": true
+                }
+              ],
+              "method": "ENGINE_TEST",
+              "status": "COMPLETED",
+              "execution_id": "EVD-00000000000000000000000001",
+              "operator": {
+                "by": "example-reviewer",
+                "at": "2026-10-26T10:00:00Z"
+              },
+              "started_at": "2026-10-26T10:00:00Z",
+              "finished_at": "2026-10-26T10:00:00Z",
+              "engine_executed": false
+            },
+            "normal_control_result": {
+              "attempted": true,
+              "succeeded": true,
+              "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+            },
+            "evidence": [
+              {
+                "key": "unit-observation",
+                "target": "합성 모델별 사용 권한",
+                "observation": "양성 정상대조와 위반/허용 결과의 원인",
+                "required": true,
+                "collected": true,
+                "value": {
+                  "outcome": "PASS",
+                  "synthetic": true
+                },
+                "origin": "EXAMPLE",
+                "source_ref": {
+                  "name": "모델별 사용 권한.json",
+                  "path": "artifacts/7243a6f59643b7f76e52ae93734e924437bf640ba0e140bb5c56783b20824c9e",
+                  "sha256": "7243a6f59643b7f76e52ae93734e924437bf640ba0e140bb5c56783b20824c9e",
+                  "bytes": 89,
+                  "collected_at": "2026-10-26T10:00:00Z",
+                  "collector": "synthetic-design-fixture/1"
+                },
+                "at": "2026-10-26T10:00:00Z",
+                "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+              }
+            ],
+            "verdicts": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "missing_evidence": [],
+            "limitations": [
+              "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+            ]
+          },
+          {
+            "unit_ref": {
+              "kind": "required_subresult",
+              "name": "사용 종료 모델의 실행 중단",
+              "assessment_id": "CHK-REQ-005",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "applies_when": "모델 사용 종료·alias 변경 시"
+            },
+            "applicability": {
+              "status": "NOT_APPLICABLE",
+              "basis": "합성 대상의 기능/정책/계기 확인",
+              "fact_refs": [
+                {
+                  "kind": "ENV",
+                  "id": "ENV-00000000000000000000000002",
+                  "revision": 1,
+                  "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+                }
+              ],
+              "policy_refs": [
+                {
+                  "kind": "POL",
+                  "id": "POL-00000000000000000000000001",
+                  "revision": 1,
+                  "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+                }
+              ]
+            },
+            "support": {
+              "status": "UNKNOWN",
+              "procedure_ref": {
+                "name": "synthetic-bounded-procedure",
+                "version": "draft-0.1",
+                "sha256": "af08593b6605c333b33368430c104c7673f223eec41374b46fcf222ae2f00a98"
+              }
+            },
+            "selection": {
+              "selected": false,
+              "reason": "합성 기간에 사용 종료/alias 변경 없음; 해당 계기 발생 시 재선정"
+            },
+            "required_observation_keys": [
+              "unit-observation"
+            ],
+            "required_challenge_steps": [
+              "allow-control",
+              "violation-probe"
+            ],
+            "execution": {
+              "challenge_results": [],
+              "method": "ENGINE_TEST",
+              "status": "NOT_RUN",
+              "execution_id": null,
+              "operator": null,
+              "started_at": null,
+              "finished_at": null,
+              "engine_executed": false
+            },
+            "normal_control_result": {
+              "attempted": false,
+              "succeeded": null,
+              "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+            },
+            "evidence": [],
+            "verdicts": {
+              "security": "NOT_APPLICABLE",
+              "functional": "NOT_APPLICABLE",
+              "performance": "UNKNOWN"
+            },
+            "missing_evidence": [],
+            "limitations": [
+              "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+            ]
+          }
+        ],
+        "coverage_complete": true,
+        "aggregate_security": "PASS",
+        "requirement_contributions": [
+          {
+            "requirement_id": "requirement-1-2",
+            "role": "primary",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "모델별 사용 권한",
+                "assessment_id": "CHK-REQ-005",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "모델을 선택하는 모든 경로"
+              },
+              {
+                "kind": "required_subresult",
+                "name": "사용 종료 모델의 실행 중단",
+                "assessment_id": "CHK-REQ-005",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "모델 사용 종료·alias 변경 시"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "모델별 사용 권한.json",
+                "path": "artifacts/7243a6f59643b7f76e52ae93734e924437bf640ba0e140bb5c56783b20824c9e",
+                "sha256": "7243a6f59643b7f76e52ae93734e924437bf640ba0e140bb5c56783b20824c9e",
+                "bytes": 89,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "PASS",
+            "missing_evidence": []
+          }
+        ]
+      }
+    },
+    {
+      "proposal_status": "DRAFT_NOT_IMPLEMENTED",
+      "data_origin": "EXAMPLE",
+      "record_kind": "assessment_scope_design_example",
+      "framework_case_projection": {
+        "record_id": "EXAMPLE-CASE-2",
+        "assessment_id": "CHK-PLT-008",
+        "protection_requirement_id": "requirement-5-5",
+        "checklist_revision": "sha256:cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+        "test_branch_ref": null,
+        "test_case_id": "synthetic-case-2",
+        "test_case_parameters": {
+          "fixture": "bounded-synthetic",
+          "runtime_executed": false
+        },
+        "question_id": null,
+        "subtest": "API·내부 통신의 각 구간에서 통신 상대 인증과 기밀성·무결성 기준을 지키는가?",
+        "procedure_version": "draft-0.1",
+        "environment_id": "ENV-00000000000000000000000002",
+        "environment_revision": 1,
+        "policy_revision": 1,
+        "execution_id": "EVD-00000000000000000000000001",
+        "applicability": "적용",
+        "execution_status": "완료",
+        "collection_status": "부분수집",
+        "security_verdict": "미확인",
+        "functional_verdict": "미확인",
+        "performance_verdict": "미확인",
+        "policy_values": {
+          "basis": "EXAMPLE; 실제 조직값 미채택"
+        },
+        "evidence": [
+          {
+            "key": "unit-observation",
+            "target": "합성 내부 IPC·TP 전송 보호",
+            "observation": "양성 정상대조와 위반/허용 결과의 원인",
+            "required": true,
+            "collected": true,
+            "value": {
+              "outcome": "PASS",
+              "synthetic": true
+            },
+            "origin": "EXAMPLE",
+            "source_ref": {
+              "name": "내부 IPC·TP 전송 보호.json",
+              "path": "artifacts/6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+              "sha256": "6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+              "bytes": 94,
+              "collected_at": "2026-10-26T10:00:00Z",
+              "collector": "synthetic-design-fixture/1"
+            },
+            "at": "2026-10-26T10:00:00Z",
+            "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+          }
+        ],
+        "facts": [
+          {
+            "value": "EXAMPLE",
+            "origin": "EXAMPLE",
+            "source": "synthetic fixture"
+          }
+        ],
+        "limitations": [
+          "합성 채움 예시; 제품 입력/실측 결과 아님"
+        ],
+        "remediation_owner": "example-owner",
+        "approval": null,
+        "environment_evidence_source": {
+          "environment_ref": {
+            "kind": "ENV",
+            "id": "ENV-00000000000000000000000002",
+            "revision": 1,
+            "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+          },
+          "source": "synthetic environment descriptor",
+          "checked_at": "2026-10-26T10:00:00Z"
+        },
+        "environment_checked_at": "2026-10-26T10:00:00Z",
+        "policy_source": {
+          "policy_ref": {
+            "kind": "POL",
+            "id": "POL-00000000000000000000000001",
+            "revision": 1,
+            "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+          },
+          "data_origin": "EXAMPLE"
+        },
+        "policy_approved_by": null,
+        "policy_checked_at": "2026-10-26T10:00:00Z",
+        "normal_control_result": {
+          "attempted": false,
+          "succeeded": null,
+          "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+        },
+        "stop_criteria_ref": {
+          "name": "synthetic-stop-budget",
+          "version": "draft-1",
+          "sha256": "d3ba3b1519fa68d8b2ec4c32b19aed790662c705b33e9a79a32aba31784f2209"
+        },
+        "recovery_procedure_ref": {
+          "name": "synthetic-reset",
+          "version": "draft-1",
+          "sha256": "c31cef953725ca3e47149b68dc54e3d5082c9270f85d068bb8d5159b323deee8"
+        },
+        "remediation_due_at": null,
+        "retest_conditions": [
+          "부족 관측 보완 또는 조건/정책 변경 시 재검토"
+        ],
+        "subtest_inventory_complete": false,
+        "engine_adapter_ref": {
+          "name": "fake",
+          "version": "draft-only",
+          "sha256": "d14bac1e72970fb832c90ae8a0b25e39b4e6e915af478e31a2dfff1e3ab61cd0"
+        },
+        "fixture_ref": {
+          "name": "bounded-synthetic-fixture",
+          "version": "draft-1",
+          "sha256": "17c7c50538f0602465eadba66fa125c460033dcbdc8191e71d85ec8d69c89218"
+        },
+        "collection_adapter_ref": {
+          "name": "synthetic-fixture",
+          "version": "draft-1",
+          "sha256": "2571131330e8d62cf786cca70e9ff72cd460a22f85c2bd604ae52b2162e9775d"
+        },
+        "started_at": "2026-10-26T10:00:00Z",
+        "finished_at": "2026-10-26T10:00:01Z",
+        "scenario_ids": [],
+        "subtest_id": null,
+        "shared_question_ids": []
+      },
+      "existing_object_refs": {
+        "source_environment": {
+          "kind": "ENV",
+          "id": "ENV-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "7924d44f27c57c572596b4196e5a7b2bcbb4df262dfa8b98e6aab94fc775d80b"
+        },
+        "target_environment": {
+          "kind": "ENV",
+          "id": "ENV-00000000000000000000000002",
+          "revision": 1,
+          "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+        },
+        "policy": {
+          "kind": "POL",
+          "id": "POL-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+        },
+        "source_plan": {
+          "kind": "PLAN",
+          "id": "PLAN-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "82b97a409f6e2a6e004e5c5d95fe1a9f44a3ecaa942a4cf2cd0e1981b8a68790"
+        },
+        "target_plan": {
+          "kind": "PLAN",
+          "id": "PLAN-00000000000000000000000002",
+          "revision": 1,
+          "sha256": "6a094dc9f0364eea3c734ad4cdb10bf650898c49ee8b6081867fea729695d561"
+        },
+        "source_evidence": {
+          "kind": "EVD",
+          "id": "EVD-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "6ebf98be94d27b4e4249cc752e2f49f07439c2cc76828aec823a8fbf5bffba8a"
+        },
+        "source_result": {
+          "kind": "RES",
+          "id": "RES-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "8623f553e257b35021d5f12eccd0adb4f07d73173e6dd6d1766f80ad1a48292e"
+        }
+      },
+      "proposed_scope_extension": {
+        "placement": "PLAN/EVD/RES/RPT optional versioned extension; no new store",
+        "selection_inventory": {
+          "authority": "PLAN exactRef + pack/scope definition",
+          "plan_ref": {
+            "kind": "PLAN",
+            "id": "PLAN-00000000000000000000000002",
+            "revision": 1,
+            "sha256": "6a094dc9f0364eea3c734ad4cdb10bf650898c49ee8b6081867fea729695d561"
+          },
+          "expected_common": true,
+          "expected_required_subresults": [
+            "API 전송 보호",
+            "내부 IPC·TP 전송 보호"
+          ],
+          "branch_refs": [
+            {
+              "assessment_id": "CHK-PLT-008",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "name": "로컬 socket 접근을 통한 내부 제어 침입",
+              "scenario_ids": [
+                "SC-08-01"
+              ],
+              "apply_when": "실제 socket·SHM 등 로컬 IPC 경로와 peer 접근권이 있다."
+            },
+            {
+              "assessment_id": "CHK-PLT-008",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "name": "GPU 프로세스 통신의 도청·변조",
+              "scenario_ids": [
+                "SC-08-03"
+              ],
+              "apply_when": "선정 local collective·SHM·CUDA IPC 등 실제 전송이 선택될 때. UID/namespace와 native 접근 경계를 확인한다."
+            },
+            {
+              "assessment_id": "CHK-PLT-008",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "name": "GPU 프로세스 통신의 도청·변조",
+              "scenario_ids": [
+                "SC-08-03"
+              ],
+              "apply_when": "다중 노드·PP 등 별도 transport를 실제 사용하면 추가한다. local TP의 결과를 원격 구간 보호 근거로 쓰지 않는다."
+            }
+          ],
+          "inventory_complete": false,
+          "inventory_reason": "실제 REVIEWED 팩·전체 목적 적용 판단 미실행; 합성 CHK 범위만 기록"
+        },
+        "common_confirmation": {
+          "unit_ref": {
+            "kind": "common_confirmation",
+            "assessment_id": "CHK-PLT-008",
+            "checklist_ref": {
+              "repository": "mg-princess/serving-security-framework",
+              "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+              "content_commit": null,
+              "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+              "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+              "schema_version": "0.2",
+              "original_date": "2026-10-18"
+            },
+            "normal_control": "허용한 호출 주체가 각 API 구간에서 정상 요청·스트리밍 응답을 주고받고, 승인한 rank 사이 TP 처리도 정상 완료된다."
+          },
+          "applicability": {
+            "status": "APPLICABLE",
+            "basis": "합성 대상의 기능/정책/계기 확인",
+            "fact_refs": [
+              {
+                "kind": "ENV",
+                "id": "ENV-00000000000000000000000002",
+                "revision": 1,
+                "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+              }
+            ],
+            "policy_refs": [
+              {
+                "kind": "POL",
+                "id": "POL-00000000000000000000000001",
+                "revision": 1,
+                "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+              }
+            ]
+          },
+          "support": {
+            "status": "UNKNOWN",
+            "procedure_ref": {
+              "name": "synthetic-bounded-procedure",
+              "version": "draft-0.1",
+              "sha256": "e11c9fac72d045552c09d6fad490e0a89eee707af5a958137e3681fdedf27c1c"
+            }
+          },
+          "selection": {
+            "selected": true,
+            "reason": "필수 결과 적용 확인"
+          },
+          "required_observation_keys": [
+            "unit-observation"
+          ],
+          "required_challenge_steps": [
+            "allow-control",
+            "violation-probe"
+          ],
+          "execution": {
+            "challenge_results": [],
+            "method": "ENGINE_TEST",
+            "status": "NOT_RUN",
+            "execution_id": null,
+            "operator": null,
+            "started_at": null,
+            "finished_at": null,
+            "engine_executed": false
+          },
+          "normal_control_result": {
+            "attempted": false,
+            "succeeded": null,
+            "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+          },
+          "evidence": [],
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "missing_evidence": [
+            "해당 세부 결과의 필수 관측을 수집하지 않음"
+          ],
+          "limitations": [
+            "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+          ]
+        },
+        "required_subresults": [
+          {
+            "unit_ref": {
+              "kind": "required_subresult",
+              "name": "API 전송 보호",
+              "assessment_id": "CHK-PLT-008",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "applies_when": "모든 실제 API 호출 구간; Gateway 사용 여부에 따라 구간 구분"
+            },
+            "applicability": {
+              "status": "APPLICABLE",
+              "basis": "합성 대상의 기능/정책/계기 확인",
+              "fact_refs": [
+                {
+                  "kind": "ENV",
+                  "id": "ENV-00000000000000000000000002",
+                  "revision": 1,
+                  "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+                }
+              ],
+              "policy_refs": [
+                {
+                  "kind": "POL",
+                  "id": "POL-00000000000000000000000001",
+                  "revision": 1,
+                  "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+                }
+              ]
+            },
+            "support": {
+              "status": "UNKNOWN",
+              "procedure_ref": {
+                "name": "synthetic-bounded-procedure",
+                "version": "draft-0.1",
+                "sha256": "a010171775b2b0ee9dfab902bc3c598b02c4dc421756c6d4cab0f875d2ed5a79"
+              }
+            },
+            "selection": {
+              "selected": true,
+              "reason": "필수 결과 적용 확인"
+            },
+            "required_observation_keys": [
+              "unit-observation"
+            ],
+            "required_challenge_steps": [
+              "allow-control",
+              "violation-probe"
+            ],
+            "execution": {
+              "challenge_results": [],
+              "method": "ENGINE_TEST",
+              "status": "NOT_RUN",
+              "execution_id": null,
+              "operator": null,
+              "started_at": null,
+              "finished_at": null,
+              "engine_executed": false
+            },
+            "normal_control_result": {
+              "attempted": false,
+              "succeeded": null,
+              "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+            },
+            "evidence": [],
+            "verdicts": {
+              "security": "UNKNOWN",
+              "functional": "UNKNOWN",
+              "performance": "UNKNOWN"
+            },
+            "missing_evidence": [
+              "해당 세부 결과의 필수 관측을 수집하지 않음"
+            ],
+            "limitations": [
+              "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+            ]
+          },
+          {
+            "unit_ref": {
+              "kind": "required_subresult",
+              "name": "내부 IPC·TP 전송 보호",
+              "assessment_id": "CHK-PLT-008",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "applies_when": "기본 IPC·TP와 선택한 분산 통신"
+            },
+            "applicability": {
+              "status": "APPLICABLE",
+              "basis": "합성 대상의 기능/정책/계기 확인",
+              "fact_refs": [
+                {
+                  "kind": "ENV",
+                  "id": "ENV-00000000000000000000000002",
+                  "revision": 1,
+                  "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+                }
+              ],
+              "policy_refs": [
+                {
+                  "kind": "POL",
+                  "id": "POL-00000000000000000000000001",
+                  "revision": 1,
+                  "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+                }
+              ]
+            },
+            "support": {
+              "status": "SUPPORTED",
+              "procedure_ref": {
+                "name": "synthetic-bounded-procedure",
+                "version": "draft-0.1",
+                "sha256": "7ff222fcc131a7e24d71af92c3b35c7aa29aa3a839899b0777853bca4c5bc228"
+              }
+            },
+            "selection": {
+              "selected": true,
+              "reason": "필수 결과 적용 확인"
+            },
+            "required_observation_keys": [
+              "unit-observation"
+            ],
+            "required_challenge_steps": [
+              "allow-control",
+              "violation-probe"
+            ],
+            "execution": {
+              "challenge_results": [
+                {
+                  "step": "allow-control",
+                  "attempted": true
+                },
+                {
+                  "step": "violation-probe",
+                  "attempted": true
+                }
+              ],
+              "method": "ENGINE_TEST",
+              "status": "COMPLETED",
+              "execution_id": "EVD-00000000000000000000000001",
+              "operator": {
+                "by": "example-reviewer",
+                "at": "2026-10-26T10:00:00Z"
+              },
+              "started_at": "2026-10-26T10:00:00Z",
+              "finished_at": "2026-10-26T10:00:00Z",
+              "engine_executed": false
+            },
+            "normal_control_result": {
+              "attempted": true,
+              "succeeded": true,
+              "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+            },
+            "evidence": [
+              {
+                "key": "unit-observation",
+                "target": "합성 내부 IPC·TP 전송 보호",
+                "observation": "양성 정상대조와 위반/허용 결과의 원인",
+                "required": true,
+                "collected": true,
+                "value": {
+                  "outcome": "PASS",
+                  "synthetic": true
+                },
+                "origin": "EXAMPLE",
+                "source_ref": {
+                  "name": "내부 IPC·TP 전송 보호.json",
+                  "path": "artifacts/6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+                  "sha256": "6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+                  "bytes": 94,
+                  "collected_at": "2026-10-26T10:00:00Z",
+                  "collector": "synthetic-design-fixture/1"
+                },
+                "at": "2026-10-26T10:00:00Z",
+                "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+              }
+            ],
+            "verdicts": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "missing_evidence": [],
+            "limitations": [
+              "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+            ]
+          }
+        ],
+        "coverage_complete": false,
+        "aggregate_security": "UNKNOWN",
+        "requirement_contributions": [
+          {
+            "requirement_id": "requirement-5-5",
+            "role": "primary",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "API 전송 보호",
+                "assessment_id": "CHK-PLT-008",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "모든 실제 API 호출 구간; Gateway 사용 여부에 따라 구간 구분"
+              },
+              {
+                "kind": "required_subresult",
+                "name": "내부 IPC·TP 전송 보호",
+                "assessment_id": "CHK-PLT-008",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "기본 IPC·TP와 선택한 분산 통신"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "내부 IPC·TP 전송 보호.json",
+                "path": "artifacts/6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+                "sha256": "6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+                "bytes": 94,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "UNKNOWN",
+            "missing_evidence": [
+              "해당 세부 결과의 필수 관측을 수집하지 않음"
+            ]
+          },
+          {
+            "requirement_id": "requirement-1-1",
+            "role": "supporting",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "내부 IPC·TP 전송 보호",
+                "assessment_id": "CHK-PLT-008",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "기본 IPC·TP와 선택한 분산 통신"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "내부 IPC·TP 전송 보호.json",
+                "path": "artifacts/6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+                "sha256": "6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+                "bytes": 94,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "PASS",
+            "missing_evidence": [],
+            "scope_note": "확인한 해당 단위의 기여; 요구 전체의 다른 CHK 결과와 별도 집계"
+          },
+          {
+            "requirement_id": "requirement-1-2",
+            "role": "supporting",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "내부 IPC·TP 전송 보호",
+                "assessment_id": "CHK-PLT-008",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "기본 IPC·TP와 선택한 분산 통신"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "내부 IPC·TP 전송 보호.json",
+                "path": "artifacts/6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+                "sha256": "6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+                "bytes": 94,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "PASS",
+            "missing_evidence": [],
+            "scope_note": "확인한 해당 단위의 기여; 요구 전체의 다른 CHK 결과와 별도 집계"
+          }
+        ]
+      }
+    },
+    {
+      "proposal_status": "DRAFT_NOT_IMPLEMENTED",
+      "data_origin": "EXAMPLE",
+      "record_kind": "assessment_scope_design_example",
+      "framework_case_projection": {
+        "record_id": "EXAMPLE-CASE-3",
+        "assessment_id": "CHK-LIF-013",
+        "protection_requirement_id": "requirement-4-4",
+        "checklist_revision": "sha256:cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+        "test_branch_ref": {
+          "assessment_id": "CHK-LIF-013",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "전역 cache 해제로 다른 소비자의 참조 손상",
+          "scenario_ids": [
+            "SC-16-04"
+          ],
+          "apply_when": "ipc_cache/preload 등 별도 daemon과 실제 release 경로를 사용한다. copy/zero-copy를 나눈다."
+        },
+        "test_case_id": "synthetic-case-3",
+        "test_case_parameters": {
+          "fixture": "bounded-synthetic",
+          "runtime_executed": false
+        },
+        "question_id": "Q-C13",
+        "subtest": "공유 가중치 전체 해제 후 재취득·대체 공급과 기존 참조의 사용이 승인·접근·수명 기준을 지키는가?",
+        "procedure_version": "draft-0.1",
+        "environment_id": "ENV-00000000000000000000000002",
+        "environment_revision": 1,
+        "policy_revision": 1,
+        "execution_id": "EVD-00000000000000000000000001",
+        "applicability": "적용",
+        "execution_status": "완료",
+        "collection_status": "수집완료",
+        "security_verdict": "미충족",
+        "functional_verdict": "미확인",
+        "performance_verdict": "미확인",
+        "policy_values": {
+          "basis": "EXAMPLE; 실제 조직값 미채택"
+        },
+        "evidence": [
+          {
+            "key": "unit-observation",
+            "target": "합성 전체 release 권한",
+            "observation": "양성 정상대조와 위반/허용 결과의 원인",
+            "required": true,
+            "collected": true,
+            "value": {
+              "outcome": "PASS",
+              "synthetic": true
+            },
+            "origin": "EXAMPLE",
+            "source_ref": {
+              "name": "전체 release 권한.json",
+              "path": "artifacts/67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+              "sha256": "67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+              "bytes": 87,
+              "collected_at": "2026-10-26T10:00:00Z",
+              "collector": "synthetic-design-fixture/1"
+            },
+            "at": "2026-10-26T10:00:00Z",
+            "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+          },
+          {
+            "key": "unit-observation",
+            "target": "합성 재취득·대체 공급",
+            "observation": "양성 정상대조와 위반/허용 결과의 원인",
+            "required": true,
+            "collected": true,
+            "value": {
+              "outcome": "FAIL",
+              "synthetic": true
+            },
+            "origin": "EXAMPLE",
+            "source_ref": {
+              "name": "재취득·대체 공급.json",
+              "path": "artifacts/b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+              "sha256": "b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+              "bytes": 90,
+              "collected_at": "2026-10-26T10:00:00Z",
+              "collector": "synthetic-design-fixture/1"
+            },
+            "at": "2026-10-26T10:00:00Z",
+            "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+          }
+        ],
+        "facts": [
+          {
+            "value": "EXAMPLE",
+            "origin": "EXAMPLE",
+            "source": "synthetic fixture"
+          }
+        ],
+        "limitations": [
+          "합성 채움 예시; 제품 입력/실측 결과 아님"
+        ],
+        "remediation_owner": "example-owner",
+        "approval": null,
+        "environment_evidence_source": {
+          "environment_ref": {
+            "kind": "ENV",
+            "id": "ENV-00000000000000000000000002",
+            "revision": 1,
+            "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+          },
+          "source": "synthetic environment descriptor",
+          "checked_at": "2026-10-26T10:00:00Z"
+        },
+        "environment_checked_at": "2026-10-26T10:00:00Z",
+        "policy_source": {
+          "policy_ref": {
+            "kind": "POL",
+            "id": "POL-00000000000000000000000001",
+            "revision": 1,
+            "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+          },
+          "data_origin": "EXAMPLE"
+        },
+        "policy_approved_by": null,
+        "policy_checked_at": "2026-10-26T10:00:00Z",
+        "normal_control_result": {
+          "attempted": false,
+          "succeeded": null,
+          "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+        },
+        "stop_criteria_ref": {
+          "name": "synthetic-stop-budget",
+          "version": "draft-1",
+          "sha256": "d3ba3b1519fa68d8b2ec4c32b19aed790662c705b33e9a79a32aba31784f2209"
+        },
+        "recovery_procedure_ref": {
+          "name": "synthetic-reset",
+          "version": "draft-1",
+          "sha256": "c31cef953725ca3e47149b68dc54e3d5082c9270f85d068bb8d5159b323deee8"
+        },
+        "remediation_due_at": null,
+        "retest_conditions": [
+          "부족 관측 보완 또는 조건/정책 변경 시 재검토"
+        ],
+        "subtest_inventory_complete": false,
+        "engine_adapter_ref": {
+          "name": "fake",
+          "version": "draft-only",
+          "sha256": "d14bac1e72970fb832c90ae8a0b25e39b4e6e915af478e31a2dfff1e3ab61cd0"
+        },
+        "fixture_ref": {
+          "name": "bounded-synthetic-fixture",
+          "version": "draft-1",
+          "sha256": "17c7c50538f0602465eadba66fa125c460033dcbdc8191e71d85ec8d69c89218"
+        },
+        "collection_adapter_ref": {
+          "name": "synthetic-fixture",
+          "version": "draft-1",
+          "sha256": "2571131330e8d62cf786cca70e9ff72cd460a22f85c2bd604ae52b2162e9775d"
+        },
+        "started_at": "2026-10-26T10:00:00Z",
+        "finished_at": "2026-10-26T10:00:01Z",
+        "scenario_ids": [
+          "SC-16-04"
+        ],
+        "subtest_id": "Q-C13/SC-16-04",
+        "shared_question_ids": [
+          "Q-C12"
+        ]
+      },
+      "existing_object_refs": {
+        "source_environment": {
+          "kind": "ENV",
+          "id": "ENV-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "7924d44f27c57c572596b4196e5a7b2bcbb4df262dfa8b98e6aab94fc775d80b"
+        },
+        "target_environment": {
+          "kind": "ENV",
+          "id": "ENV-00000000000000000000000002",
+          "revision": 1,
+          "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+        },
+        "policy": {
+          "kind": "POL",
+          "id": "POL-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+        },
+        "source_plan": {
+          "kind": "PLAN",
+          "id": "PLAN-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "82b97a409f6e2a6e004e5c5d95fe1a9f44a3ecaa942a4cf2cd0e1981b8a68790"
+        },
+        "target_plan": {
+          "kind": "PLAN",
+          "id": "PLAN-00000000000000000000000002",
+          "revision": 1,
+          "sha256": "6a094dc9f0364eea3c734ad4cdb10bf650898c49ee8b6081867fea729695d561"
+        },
+        "source_evidence": {
+          "kind": "EVD",
+          "id": "EVD-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "6ebf98be94d27b4e4249cc752e2f49f07439c2cc76828aec823a8fbf5bffba8a"
+        },
+        "source_result": {
+          "kind": "RES",
+          "id": "RES-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "8623f553e257b35021d5f12eccd0adb4f07d73173e6dd6d1766f80ad1a48292e"
+        }
+      },
+      "proposed_scope_extension": {
+        "placement": "PLAN/EVD/RES/RPT optional versioned extension; no new store",
+        "selection_inventory": {
+          "authority": "PLAN exactRef + pack/scope definition",
+          "plan_ref": {
+            "kind": "PLAN",
+            "id": "PLAN-00000000000000000000000002",
+            "revision": 1,
+            "sha256": "6a094dc9f0364eea3c734ad4cdb10bf650898c49ee8b6081867fea729695d561"
+          },
+          "expected_common": true,
+          "expected_required_subresults": [
+            "전체 release 권한",
+            "재취득·대체 공급",
+            "기존 참조의 수명"
+          ],
+          "branch_refs": [
+            {
+              "assessment_id": "CHK-LIF-013",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "name": "전역 cache 해제로 다른 소비자의 참조 손상",
+              "scenario_ids": [
+                "SC-16-04"
+              ],
+              "apply_when": "ipc_cache/preload 등 별도 daemon과 실제 release 경로를 사용한다. copy/zero-copy를 나눈다."
+            }
+          ],
+          "inventory_complete": false,
+          "inventory_reason": "실제 REVIEWED 팩·전체 목적 적용 판단 미실행; 합성 CHK 범위만 기록"
+        },
+        "common_confirmation": {
+          "unit_ref": {
+            "kind": "common_confirmation",
+            "assessment_id": "CHK-LIF-013",
+            "checklist_ref": {
+              "repository": "mg-princess/serving-security-framework",
+              "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+              "content_commit": null,
+              "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+              "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+              "schema_version": "0.2",
+              "original_date": "2026-10-18"
+            },
+            "normal_control": "daemon을 사용하지 않는 기본 TP와 별개로 선택 환경의 정상 취득·release를 확인한다."
+          },
+          "applicability": {
+            "status": "APPLICABLE",
+            "basis": "합성 대상의 기능/정책/계기 확인",
+            "fact_refs": [
+              {
+                "kind": "ENV",
+                "id": "ENV-00000000000000000000000002",
+                "revision": 1,
+                "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+              }
+            ],
+            "policy_refs": [
+              {
+                "kind": "POL",
+                "id": "POL-00000000000000000000000001",
+                "revision": 1,
+                "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+              }
+            ]
+          },
+          "support": {
+            "status": "UNKNOWN",
+            "procedure_ref": {
+              "name": "synthetic-bounded-procedure",
+              "version": "draft-0.1",
+              "sha256": "e11c9fac72d045552c09d6fad490e0a89eee707af5a958137e3681fdedf27c1c"
+            }
+          },
+          "selection": {
+            "selected": true,
+            "reason": "필수 결과 적용 확인"
+          },
+          "required_observation_keys": [
+            "unit-observation"
+          ],
+          "required_challenge_steps": [
+            "allow-control",
+            "violation-probe"
+          ],
+          "execution": {
+            "challenge_results": [],
+            "method": "ENGINE_TEST",
+            "status": "NOT_RUN",
+            "execution_id": null,
+            "operator": null,
+            "started_at": null,
+            "finished_at": null,
+            "engine_executed": false
+          },
+          "normal_control_result": {
+            "attempted": false,
+            "succeeded": null,
+            "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+          },
+          "evidence": [],
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "missing_evidence": [
+            "해당 세부 결과의 필수 관측을 수집하지 않음"
+          ],
+          "limitations": [
+            "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+          ]
+        },
+        "required_subresults": [
+          {
+            "unit_ref": {
+              "kind": "required_subresult",
+              "name": "전체 release 권한",
+              "assessment_id": "CHK-LIF-013",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "applies_when": "별도 weights daemon의 release 경로 사용 시"
+            },
+            "applicability": {
+              "status": "APPLICABLE",
+              "basis": "합성 대상의 기능/정책/계기 확인",
+              "fact_refs": [
+                {
+                  "kind": "ENV",
+                  "id": "ENV-00000000000000000000000002",
+                  "revision": 1,
+                  "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+                }
+              ],
+              "policy_refs": [
+                {
+                  "kind": "POL",
+                  "id": "POL-00000000000000000000000001",
+                  "revision": 1,
+                  "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+                }
+              ]
+            },
+            "support": {
+              "status": "SUPPORTED",
+              "procedure_ref": {
+                "name": "synthetic-bounded-procedure",
+                "version": "draft-0.1",
+                "sha256": "ba2061a601b6461ae60494e1e935b64eb3087ae95c67c5320099aee22815126d"
+              }
+            },
+            "selection": {
+              "selected": true,
+              "reason": "필수 결과 적용 확인"
+            },
+            "required_observation_keys": [
+              "unit-observation"
+            ],
+            "required_challenge_steps": [
+              "allow-control",
+              "violation-probe"
+            ],
+            "execution": {
+              "challenge_results": [
+                {
+                  "step": "allow-control",
+                  "attempted": true
+                },
+                {
+                  "step": "violation-probe",
+                  "attempted": true
+                }
+              ],
+              "method": "ENGINE_TEST",
+              "status": "COMPLETED",
+              "execution_id": "EVD-00000000000000000000000001",
+              "operator": {
+                "by": "example-reviewer",
+                "at": "2026-10-26T10:00:00Z"
+              },
+              "started_at": "2026-10-26T10:00:00Z",
+              "finished_at": "2026-10-26T10:00:00Z",
+              "engine_executed": false
+            },
+            "normal_control_result": {
+              "attempted": true,
+              "succeeded": true,
+              "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+            },
+            "evidence": [
+              {
+                "key": "unit-observation",
+                "target": "합성 전체 release 권한",
+                "observation": "양성 정상대조와 위반/허용 결과의 원인",
+                "required": true,
+                "collected": true,
+                "value": {
+                  "outcome": "PASS",
+                  "synthetic": true
+                },
+                "origin": "EXAMPLE",
+                "source_ref": {
+                  "name": "전체 release 권한.json",
+                  "path": "artifacts/67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                  "sha256": "67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                  "bytes": 87,
+                  "collected_at": "2026-10-26T10:00:00Z",
+                  "collector": "synthetic-design-fixture/1"
+                },
+                "at": "2026-10-26T10:00:00Z",
+                "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+              }
+            ],
+            "verdicts": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "missing_evidence": [],
+            "limitations": [
+              "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+            ]
+          },
+          {
+            "unit_ref": {
+              "kind": "required_subresult",
+              "name": "재취득·대체 공급",
+              "assessment_id": "CHK-LIF-013",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "applies_when": "다른 소비자가 다시 취득하거나 fallback할 때"
+            },
+            "applicability": {
+              "status": "APPLICABLE",
+              "basis": "합성 대상의 기능/정책/계기 확인",
+              "fact_refs": [
+                {
+                  "kind": "ENV",
+                  "id": "ENV-00000000000000000000000002",
+                  "revision": 1,
+                  "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+                }
+              ],
+              "policy_refs": [
+                {
+                  "kind": "POL",
+                  "id": "POL-00000000000000000000000001",
+                  "revision": 1,
+                  "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+                }
+              ]
+            },
+            "support": {
+              "status": "SUPPORTED",
+              "procedure_ref": {
+                "name": "synthetic-bounded-procedure",
+                "version": "draft-0.1",
+                "sha256": "696bce82a8041df2e545d433e1b24055a6fbed7a2ebfebc00a70dd5823936d57"
+              }
+            },
+            "selection": {
+              "selected": true,
+              "reason": "필수 결과 적용 확인"
+            },
+            "required_observation_keys": [
+              "unit-observation"
+            ],
+            "required_challenge_steps": [
+              "allow-control",
+              "violation-probe"
+            ],
+            "execution": {
+              "challenge_results": [
+                {
+                  "step": "allow-control",
+                  "attempted": true
+                },
+                {
+                  "step": "violation-probe",
+                  "attempted": true
+                }
+              ],
+              "method": "ENGINE_TEST",
+              "status": "COMPLETED",
+              "execution_id": "EVD-00000000000000000000000001",
+              "operator": {
+                "by": "example-reviewer",
+                "at": "2026-10-26T10:00:00Z"
+              },
+              "started_at": "2026-10-26T10:00:00Z",
+              "finished_at": "2026-10-26T10:00:00Z",
+              "engine_executed": false
+            },
+            "normal_control_result": {
+              "attempted": true,
+              "succeeded": true,
+              "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+            },
+            "evidence": [
+              {
+                "key": "unit-observation",
+                "target": "합성 재취득·대체 공급",
+                "observation": "양성 정상대조와 위반/허용 결과의 원인",
+                "required": true,
+                "collected": true,
+                "value": {
+                  "outcome": "FAIL",
+                  "synthetic": true
+                },
+                "origin": "EXAMPLE",
+                "source_ref": {
+                  "name": "재취득·대체 공급.json",
+                  "path": "artifacts/b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                  "sha256": "b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                  "bytes": 90,
+                  "collected_at": "2026-10-26T10:00:00Z",
+                  "collector": "synthetic-design-fixture/1"
+                },
+                "at": "2026-10-26T10:00:00Z",
+                "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+              }
+            ],
+            "verdicts": {
+              "security": "FAIL",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "missing_evidence": [],
+            "limitations": [
+              "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+            ]
+          },
+          {
+            "unit_ref": {
+              "kind": "required_subresult",
+              "name": "기존 참조의 수명",
+              "assessment_id": "CHK-LIF-013",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "applies_when": "copy/zero-copy 소비 중 참조가 남아 있을 때"
+            },
+            "applicability": {
+              "status": "APPLICABLE",
+              "basis": "합성 대상의 기능/정책/계기 확인",
+              "fact_refs": [
+                {
+                  "kind": "ENV",
+                  "id": "ENV-00000000000000000000000002",
+                  "revision": 1,
+                  "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+                }
+              ],
+              "policy_refs": [
+                {
+                  "kind": "POL",
+                  "id": "POL-00000000000000000000000001",
+                  "revision": 1,
+                  "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+                }
+              ]
+            },
+            "support": {
+              "status": "UNKNOWN",
+              "procedure_ref": {
+                "name": "synthetic-bounded-procedure",
+                "version": "draft-0.1",
+                "sha256": "e97b28a0ec2d5c36902fc9f95fa5ba5c56c6ca72053d8320c117a4b1b0ddcc17"
+              }
+            },
+            "selection": {
+              "selected": true,
+              "reason": "필수 결과 적용 확인"
+            },
+            "required_observation_keys": [
+              "unit-observation"
+            ],
+            "required_challenge_steps": [
+              "allow-control",
+              "violation-probe"
+            ],
+            "execution": {
+              "challenge_results": [],
+              "method": "ENGINE_TEST",
+              "status": "NOT_RUN",
+              "execution_id": null,
+              "operator": null,
+              "started_at": null,
+              "finished_at": null,
+              "engine_executed": false
+            },
+            "normal_control_result": {
+              "attempted": false,
+              "succeeded": null,
+              "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+            },
+            "evidence": [],
+            "verdicts": {
+              "security": "UNKNOWN",
+              "functional": "UNKNOWN",
+              "performance": "UNKNOWN"
+            },
+            "missing_evidence": [
+              "해당 세부 결과의 필수 관측을 수집하지 않음"
+            ],
+            "limitations": [
+              "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+            ]
+          }
+        ],
+        "coverage_complete": false,
+        "aggregate_security": "FAIL",
+        "requirement_contributions": [
+          {
+            "requirement_id": "requirement-4-4",
+            "role": "primary",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "전체 release 권한",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "별도 weights daemon의 release 경로 사용 시"
+              },
+              {
+                "kind": "required_subresult",
+                "name": "재취득·대체 공급",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "다른 소비자가 다시 취득하거나 fallback할 때"
+              },
+              {
+                "kind": "required_subresult",
+                "name": "기존 참조의 수명",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "copy/zero-copy 소비 중 참조가 남아 있을 때"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "전체 release 권한.json",
+                "path": "artifacts/67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                "sha256": "67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                "bytes": 87,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              },
+              {
+                "name": "재취득·대체 공급.json",
+                "path": "artifacts/b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                "sha256": "b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                "bytes": 90,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "FAIL",
+            "missing_evidence": [
+              "해당 세부 결과의 필수 관측을 수집하지 않음"
+            ]
+          },
+          {
+            "requirement_id": "requirement-1-2",
+            "role": "supporting",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "전체 release 권한",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "별도 weights daemon의 release 경로 사용 시"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "전체 release 권한.json",
+                "path": "artifacts/67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                "sha256": "67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                "bytes": 87,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "PASS",
+            "missing_evidence": [],
+            "scope_note": "확인한 해당 단위의 기여; 요구 전체의 다른 CHK 결과와 별도 집계"
+          },
+          {
+            "requirement_id": "requirement-2-2",
+            "role": "supporting",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "재취득·대체 공급",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "다른 소비자가 다시 취득하거나 fallback할 때"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "재취득·대체 공급.json",
+                "path": "artifacts/b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                "sha256": "b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                "bytes": 90,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "FAIL",
+            "missing_evidence": [],
+            "scope_note": "확인한 해당 단위의 기여; 요구 전체의 다른 CHK 결과와 별도 집계"
+          },
+          {
+            "requirement_id": "requirement-6-4",
+            "role": "supporting",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "전체 release 권한",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "별도 weights daemon의 release 경로 사용 시"
+              },
+              {
+                "kind": "required_subresult",
+                "name": "재취득·대체 공급",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "다른 소비자가 다시 취득하거나 fallback할 때"
+              },
+              {
+                "kind": "required_subresult",
+                "name": "기존 참조의 수명",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "copy/zero-copy 소비 중 참조가 남아 있을 때"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "전체 release 권한.json",
+                "path": "artifacts/67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                "sha256": "67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                "bytes": 87,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              },
+              {
+                "name": "재취득·대체 공급.json",
+                "path": "artifacts/b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                "sha256": "b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                "bytes": 90,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "FAIL",
+            "missing_evidence": [
+              "해당 세부 결과의 필수 관측을 수집하지 않음"
+            ],
+            "scope_note": "확인한 해당 단위의 기여; 요구 전체의 다른 CHK 결과와 별도 집계"
+          },
+          {
+            "requirement_id": "requirement-7-4",
+            "role": "supporting",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "전체 release 권한",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "별도 weights daemon의 release 경로 사용 시"
+              },
+              {
+                "kind": "required_subresult",
+                "name": "재취득·대체 공급",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "다른 소비자가 다시 취득하거나 fallback할 때"
+              },
+              {
+                "kind": "required_subresult",
+                "name": "기존 참조의 수명",
+                "assessment_id": "CHK-LIF-013",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "copy/zero-copy 소비 중 참조가 남아 있을 때"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "전체 release 권한.json",
+                "path": "artifacts/67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                "sha256": "67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+                "bytes": 87,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              },
+              {
+                "name": "재취득·대체 공급.json",
+                "path": "artifacts/b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                "sha256": "b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+                "bytes": 90,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "FAIL",
+            "missing_evidence": [
+              "해당 세부 결과의 필수 관측을 수집하지 않음"
+            ],
+            "scope_note": "확인한 해당 단위의 기여; 요구 전체의 다른 CHK 결과와 별도 집계"
+          }
+        ]
+      }
+    },
+    {
+      "proposal_status": "DRAFT_NOT_IMPLEMENTED",
+      "data_origin": "EXAMPLE",
+      "record_kind": "assessment_scope_design_example",
+      "framework_case_projection": {
+        "record_id": "EXAMPLE-CASE-4",
+        "assessment_id": "CHK-OBS-006",
+        "protection_requirement_id": "requirement-5-4",
+        "checklist_revision": "sha256:cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+        "test_branch_ref": {
+          "assessment_id": "CHK-OBS-006",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "로그 읽기 권한으로 비공개 입력 사본 열람",
+          "scenario_ids": [
+            "SC-21-02"
+          ],
+          "apply_when": "기본 로그·예외 dump·저장 기록을 확인하며 debug/진단 사본은 실제 생성 조건으로 추가한다. 해당 저장 위치의 암호화 요구·적용 상태·복호화 권한도 대조한다."
+        },
+        "test_case_id": "synthetic-case-4",
+        "test_case_parameters": {
+          "fixture": "bounded-synthetic",
+          "runtime_executed": false
+        },
+        "question_id": "Q-C11",
+        "subtest": "기록·진단 사본의 조회·반출을 허용된 주체로 제한하고, 필요한 저장 암호화를 적용하는가?",
+        "procedure_version": "draft-0.1",
+        "environment_id": "ENV-00000000000000000000000002",
+        "environment_revision": 1,
+        "policy_revision": 1,
+        "execution_id": "EVD-00000000000000000000000001",
+        "applicability": "적용",
+        "execution_status": "완료",
+        "collection_status": "부분수집",
+        "security_verdict": "미확인",
+        "functional_verdict": "미확인",
+        "performance_verdict": "미확인",
+        "policy_values": {
+          "basis": "EXAMPLE; 실제 조직값 미채택"
+        },
+        "evidence": [
+          {
+            "key": "unit-observation",
+            "target": "합성 조회·반출 권한",
+            "observation": "양성 정상대조와 위반/허용 결과의 원인",
+            "required": true,
+            "collected": true,
+            "value": {
+              "outcome": "PASS",
+              "synthetic": true
+            },
+            "origin": "EXAMPLE",
+            "source_ref": {
+              "name": "조회·반출 권한.json",
+              "path": "artifacts/8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+              "sha256": "8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+              "bytes": 87,
+              "collected_at": "2026-10-26T10:00:00Z",
+              "collector": "synthetic-design-fixture/1"
+            },
+            "at": "2026-10-26T10:00:00Z",
+            "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+          }
+        ],
+        "facts": [
+          {
+            "value": "EXAMPLE",
+            "origin": "EXAMPLE",
+            "source": "synthetic fixture"
+          }
+        ],
+        "limitations": [
+          "합성 채움 예시; 제품 입력/실측 결과 아님"
+        ],
+        "remediation_owner": "example-owner",
+        "approval": null,
+        "environment_evidence_source": {
+          "environment_ref": {
+            "kind": "ENV",
+            "id": "ENV-00000000000000000000000002",
+            "revision": 1,
+            "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+          },
+          "source": "synthetic environment descriptor",
+          "checked_at": "2026-10-26T10:00:00Z"
+        },
+        "environment_checked_at": "2026-10-26T10:00:00Z",
+        "policy_source": {
+          "policy_ref": {
+            "kind": "POL",
+            "id": "POL-00000000000000000000000001",
+            "revision": 1,
+            "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+          },
+          "data_origin": "EXAMPLE"
+        },
+        "policy_approved_by": null,
+        "policy_checked_at": "2026-10-26T10:00:00Z",
+        "normal_control_result": {
+          "attempted": false,
+          "succeeded": null,
+          "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+        },
+        "stop_criteria_ref": {
+          "name": "synthetic-stop-budget",
+          "version": "draft-1",
+          "sha256": "d3ba3b1519fa68d8b2ec4c32b19aed790662c705b33e9a79a32aba31784f2209"
+        },
+        "recovery_procedure_ref": {
+          "name": "synthetic-reset",
+          "version": "draft-1",
+          "sha256": "c31cef953725ca3e47149b68dc54e3d5082c9270f85d068bb8d5159b323deee8"
+        },
+        "remediation_due_at": null,
+        "retest_conditions": [
+          "부족 관측 보완 또는 조건/정책 변경 시 재검토"
+        ],
+        "subtest_inventory_complete": false,
+        "engine_adapter_ref": {
+          "name": "fake",
+          "version": "draft-only",
+          "sha256": "d14bac1e72970fb832c90ae8a0b25e39b4e6e915af478e31a2dfff1e3ab61cd0"
+        },
+        "fixture_ref": {
+          "name": "bounded-synthetic-fixture",
+          "version": "draft-1",
+          "sha256": "17c7c50538f0602465eadba66fa125c460033dcbdc8191e71d85ec8d69c89218"
+        },
+        "collection_adapter_ref": {
+          "name": "synthetic-fixture",
+          "version": "draft-1",
+          "sha256": "2571131330e8d62cf786cca70e9ff72cd460a22f85c2bd604ae52b2162e9775d"
+        },
+        "started_at": "2026-10-26T10:00:00Z",
+        "finished_at": "2026-10-26T10:00:01Z",
+        "scenario_ids": [
+          "SC-21-02"
+        ],
+        "subtest_id": "Q-C11/SC-21-02",
+        "shared_question_ids": []
+      },
+      "existing_object_refs": {
+        "source_environment": {
+          "kind": "ENV",
+          "id": "ENV-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "7924d44f27c57c572596b4196e5a7b2bcbb4df262dfa8b98e6aab94fc775d80b"
+        },
+        "target_environment": {
+          "kind": "ENV",
+          "id": "ENV-00000000000000000000000002",
+          "revision": 1,
+          "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+        },
+        "policy": {
+          "kind": "POL",
+          "id": "POL-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+        },
+        "source_plan": {
+          "kind": "PLAN",
+          "id": "PLAN-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "82b97a409f6e2a6e004e5c5d95fe1a9f44a3ecaa942a4cf2cd0e1981b8a68790"
+        },
+        "target_plan": {
+          "kind": "PLAN",
+          "id": "PLAN-00000000000000000000000002",
+          "revision": 1,
+          "sha256": "6a094dc9f0364eea3c734ad4cdb10bf650898c49ee8b6081867fea729695d561"
+        },
+        "source_evidence": {
+          "kind": "EVD",
+          "id": "EVD-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "6ebf98be94d27b4e4249cc752e2f49f07439c2cc76828aec823a8fbf5bffba8a"
+        },
+        "source_result": {
+          "kind": "RES",
+          "id": "RES-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "8623f553e257b35021d5f12eccd0adb4f07d73173e6dd6d1766f80ad1a48292e"
+        }
+      },
+      "proposed_scope_extension": {
+        "placement": "PLAN/EVD/RES/RPT optional versioned extension; no new store",
+        "selection_inventory": {
+          "authority": "PLAN exactRef + pack/scope definition",
+          "plan_ref": {
+            "kind": "PLAN",
+            "id": "PLAN-00000000000000000000000002",
+            "revision": 1,
+            "sha256": "6a094dc9f0364eea3c734ad4cdb10bf650898c49ee8b6081867fea729695d561"
+          },
+          "expected_common": true,
+          "expected_required_subresults": [
+            "조회·반출 권한",
+            "저장 암호화·복호화 권한"
+          ],
+          "branch_refs": [
+            {
+              "assessment_id": "CHK-OBS-006",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "name": "로그 읽기 권한으로 비공개 입력 사본 열람",
+              "scenario_ids": [
+                "SC-21-02"
+              ],
+              "apply_when": "기본 로그·예외 dump·저장 기록을 확인하며 debug/진단 사본은 실제 생성 조건으로 추가한다. 해당 저장 위치의 암호화 요구·적용 상태·복호화 권한도 대조한다."
+            },
+            {
+              "assessment_id": "CHK-OBS-006",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "name": "보존 기한 뒤 남은 사용통계 사본 노출",
+              "scenario_ids": [
+                "SC-22-03"
+              ],
+              "apply_when": "usage 로컬 파일 또는 실제 원격 수신·보관 사본이 존재한다. 해당 저장 위치의 암호화 요구·적용 상태·복호화 권한도 대조한다."
+            }
+          ],
+          "inventory_complete": false,
+          "inventory_reason": "실제 REVIEWED 팩·전체 목적 적용 판단 미실행; 합성 CHK 범위만 기록"
+        },
+        "common_confirmation": {
+          "unit_ref": {
+            "kind": "common_confirmation",
+            "assessment_id": "CHK-OBS-006",
+            "checklist_ref": {
+              "repository": "mg-princess/serving-security-framework",
+              "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+              "content_commit": null,
+              "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+              "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+              "schema_version": "0.2",
+              "original_date": "2026-10-18"
+            },
+            "normal_control": "허용된 독자는 필요한 로그·진단 사본을 읽고, 저장 암호화가 필요한 자료는 승인된 저장·키 관리 설정으로 정상 기록·조회한다."
+          },
+          "applicability": {
+            "status": "APPLICABLE",
+            "basis": "합성 대상의 기능/정책/계기 확인",
+            "fact_refs": [
+              {
+                "kind": "ENV",
+                "id": "ENV-00000000000000000000000002",
+                "revision": 1,
+                "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+              }
+            ],
+            "policy_refs": [
+              {
+                "kind": "POL",
+                "id": "POL-00000000000000000000000001",
+                "revision": 1,
+                "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+              }
+            ]
+          },
+          "support": {
+            "status": "UNKNOWN",
+            "procedure_ref": {
+              "name": "synthetic-bounded-procedure",
+              "version": "draft-0.1",
+              "sha256": "e11c9fac72d045552c09d6fad490e0a89eee707af5a958137e3681fdedf27c1c"
+            }
+          },
+          "selection": {
+            "selected": true,
+            "reason": "필수 결과 적용 확인"
+          },
+          "required_observation_keys": [
+            "unit-observation"
+          ],
+          "required_challenge_steps": [
+            "allow-control",
+            "violation-probe"
+          ],
+          "execution": {
+            "challenge_results": [],
+            "method": "ENGINE_TEST",
+            "status": "NOT_RUN",
+            "execution_id": null,
+            "operator": null,
+            "started_at": null,
+            "finished_at": null,
+            "engine_executed": false
+          },
+          "normal_control_result": {
+            "attempted": false,
+            "succeeded": null,
+            "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+          },
+          "evidence": [],
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "missing_evidence": [
+            "해당 세부 결과의 필수 관측을 수집하지 않음"
+          ],
+          "limitations": [
+            "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+          ]
+        },
+        "required_subresults": [
+          {
+            "unit_ref": {
+              "kind": "required_subresult",
+              "name": "조회·반출 권한",
+              "assessment_id": "CHK-OBS-006",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "applies_when": "기록·진단 원본과 실제 사본"
+            },
+            "applicability": {
+              "status": "APPLICABLE",
+              "basis": "합성 대상의 기능/정책/계기 확인",
+              "fact_refs": [
+                {
+                  "kind": "ENV",
+                  "id": "ENV-00000000000000000000000002",
+                  "revision": 1,
+                  "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+                }
+              ],
+              "policy_refs": [
+                {
+                  "kind": "POL",
+                  "id": "POL-00000000000000000000000001",
+                  "revision": 1,
+                  "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+                }
+              ]
+            },
+            "support": {
+              "status": "SUPPORTED",
+              "procedure_ref": {
+                "name": "synthetic-bounded-procedure",
+                "version": "draft-0.1",
+                "sha256": "df6f1f291c9fd541db7e32912196847cd5a977b4f0d7ac5d2a811a981d5a5738"
+              }
+            },
+            "selection": {
+              "selected": true,
+              "reason": "필수 결과 적용 확인"
+            },
+            "required_observation_keys": [
+              "unit-observation"
+            ],
+            "required_challenge_steps": [
+              "allow-control",
+              "violation-probe"
+            ],
+            "execution": {
+              "challenge_results": [
+                {
+                  "step": "allow-control",
+                  "attempted": true
+                },
+                {
+                  "step": "violation-probe",
+                  "attempted": true
+                }
+              ],
+              "method": "ENGINE_TEST",
+              "status": "COMPLETED",
+              "execution_id": "EVD-00000000000000000000000001",
+              "operator": {
+                "by": "example-reviewer",
+                "at": "2026-10-26T10:00:00Z"
+              },
+              "started_at": "2026-10-26T10:00:00Z",
+              "finished_at": "2026-10-26T10:00:00Z",
+              "engine_executed": false
+            },
+            "normal_control_result": {
+              "attempted": true,
+              "succeeded": true,
+              "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+            },
+            "evidence": [
+              {
+                "key": "unit-observation",
+                "target": "합성 조회·반출 권한",
+                "observation": "양성 정상대조와 위반/허용 결과의 원인",
+                "required": true,
+                "collected": true,
+                "value": {
+                  "outcome": "PASS",
+                  "synthetic": true
+                },
+                "origin": "EXAMPLE",
+                "source_ref": {
+                  "name": "조회·반출 권한.json",
+                  "path": "artifacts/8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+                  "sha256": "8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+                  "bytes": 87,
+                  "collected_at": "2026-10-26T10:00:00Z",
+                  "collector": "synthetic-design-fixture/1"
+                },
+                "at": "2026-10-26T10:00:00Z",
+                "acceptance_basis": "실행되지 않은 설계 fixture의 논리적 예시"
+              }
+            ],
+            "verdicts": {
+              "security": "PASS",
+              "functional": "PASS",
+              "performance": "UNKNOWN"
+            },
+            "missing_evidence": [],
+            "limitations": [
+              "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+            ]
+          },
+          {
+            "unit_ref": {
+              "kind": "required_subresult",
+              "name": "저장 암호화·복호화 권한",
+              "assessment_id": "CHK-OBS-006",
+              "checklist_ref": {
+                "repository": "mg-princess/serving-security-framework",
+                "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                "content_commit": null,
+                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                "schema_version": "0.2",
+                "original_date": "2026-10-18"
+              },
+              "applies_when": "자료 등급·저장 위치별 정책에서 암호화를 요구할 때; 요구 미정은 미확인"
+            },
+            "applicability": {
+              "status": "APPLICABLE",
+              "basis": "합성 대상의 기능/정책/계기 확인",
+              "fact_refs": [
+                {
+                  "kind": "ENV",
+                  "id": "ENV-00000000000000000000000002",
+                  "revision": 1,
+                  "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+                }
+              ],
+              "policy_refs": [
+                {
+                  "kind": "POL",
+                  "id": "POL-00000000000000000000000001",
+                  "revision": 1,
+                  "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+                }
+              ]
+            },
+            "support": {
+              "status": "UNKNOWN",
+              "procedure_ref": {
+                "name": "synthetic-bounded-procedure",
+                "version": "draft-0.1",
+                "sha256": "8a7debaaee4cb3b6c6fc33f2487a84d873d9f9df070a2f2531168cd2c309daac"
+              }
+            },
+            "selection": {
+              "selected": true,
+              "reason": "필수 결과 적용 확인"
+            },
+            "required_observation_keys": [
+              "unit-observation"
+            ],
+            "required_challenge_steps": [
+              "allow-control",
+              "violation-probe"
+            ],
+            "execution": {
+              "challenge_results": [],
+              "method": "ENGINE_TEST",
+              "status": "NOT_RUN",
+              "execution_id": null,
+              "operator": null,
+              "started_at": null,
+              "finished_at": null,
+              "engine_executed": false
+            },
+            "normal_control_result": {
+              "attempted": false,
+              "succeeded": null,
+              "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+            },
+            "evidence": [],
+            "verdicts": {
+              "security": "UNKNOWN",
+              "functional": "UNKNOWN",
+              "performance": "UNKNOWN"
+            },
+            "missing_evidence": [
+              "해당 세부 결과의 필수 관측을 수집하지 않음"
+            ],
+            "limitations": [
+              "EXAMPLE; 실제 설치/엔진/보안 효과 미확인"
+            ]
+          }
+        ],
+        "coverage_complete": false,
+        "aggregate_security": "UNKNOWN",
+        "requirement_contributions": [
+          {
+            "requirement_id": "requirement-5-4",
+            "role": "primary",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "조회·반출 권한",
+                "assessment_id": "CHK-OBS-006",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "기록·진단 원본과 실제 사본"
+              },
+              {
+                "kind": "required_subresult",
+                "name": "저장 암호화·복호화 권한",
+                "assessment_id": "CHK-OBS-006",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "자료 등급·저장 위치별 정책에서 암호화를 요구할 때; 요구 미정은 미확인"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "조회·반출 권한.json",
+                "path": "artifacts/8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+                "sha256": "8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+                "bytes": 87,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "UNKNOWN",
+            "missing_evidence": [
+              "해당 세부 결과의 필수 관측을 수집하지 않음"
+            ]
+          },
+          {
+            "requirement_id": "requirement-1-2",
+            "role": "supporting",
+            "source_unit_refs": [
+              {
+                "kind": "required_subresult",
+                "name": "조회·반출 권한",
+                "assessment_id": "CHK-OBS-006",
+                "checklist_ref": {
+                  "repository": "mg-princess/serving-security-framework",
+                  "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+                  "content_commit": null,
+                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+                  "schema_version": "0.2",
+                  "original_date": "2026-10-18"
+                },
+                "applies_when": "기록·진단 원본과 실제 사본"
+              }
+            ],
+            "evidence_refs": [
+              {
+                "name": "조회·반출 권한.json",
+                "path": "artifacts/8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+                "sha256": "8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+                "bytes": 87,
+                "collected_at": "2026-10-26T10:00:00Z",
+                "collector": "synthetic-design-fixture/1"
+              }
+            ],
+            "verdict": "PASS",
+            "missing_evidence": [],
+            "scope_note": "확인한 해당 단위의 기여; 요구 전체의 다른 CHK 결과와 별도 집계"
+          }
+        ]
+      }
+    }
+  ],
+  "manual_review_example": {
+    "unit_ref": {
+      "kind": "required_subresult",
+      "name": "설정/문서 검토 완료"
+    },
+    "applicability": {
+      "status": "APPLICABLE",
+      "basis": "합성 대상의 기능/정책/계기 확인",
+      "fact_refs": [
+        {
+          "kind": "ENV",
+          "id": "ENV-00000000000000000000000002",
+          "revision": 1,
+          "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+        }
+      ],
+      "policy_refs": [
+        {
+          "kind": "POL",
+          "id": "POL-00000000000000000000000001",
+          "revision": 1,
+          "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+        }
+      ]
+    },
+    "support": {
+      "status": "UNKNOWN",
+      "procedure_ref": {
+        "name": "synthetic-bounded-procedure",
+        "version": "draft-0.1",
+        "sha256": "0d2f57d542e6e26840f448c4f7c41d36aac4c15552b069b5ba40585a932a8415"
+      }
+    },
+    "selection": {
+      "selected": true,
+      "reason": "필수 결과 적용 확인"
+    },
+    "required_observation_keys": [
+      "unit-observation"
+    ],
+    "required_challenge_steps": [
+      "allow-control",
+      "violation-probe"
+    ],
+    "execution": {
+      "challenge_results": [],
+      "method": "DOCUMENT_REVIEW",
+      "status": "COMPLETED",
+      "execution_id": "EVD-00000000000000000000000001",
+      "operator": {
+        "by": "example-reviewer",
+        "at": "2026-10-26T10:10:00Z"
+      },
+      "started_at": "2026-10-26T10:09:00Z",
+      "finished_at": "2026-10-26T10:10:00Z",
+      "engine_executed": false
+    },
+    "normal_control_result": {
+      "attempted": false,
+      "succeeded": null,
+      "detail": "합성 정상 대조; 실제 엔진 실행 기록 아님"
+    },
+    "evidence": [
+      {
+        "key": "unit-observation",
+        "target": "합성 정책 문서",
+        "observation": "정책 요구와 설정 목록 대조",
+        "required": true,
+        "collected": true,
+        "value": {
+          "reviewed": true,
+          "engine_behavior_verified": false
+        },
+        "origin": "EXAMPLE",
+        "source_ref": {
+          "name": "manual-review.json",
+          "path": "artifacts/d057d884fbb63bf86a9a13fc9dbc864a59527a85e846a85b484008448ee7b7db",
+          "sha256": "d057d884fbb63bf86a9a13fc9dbc864a59527a85e846a85b484008448ee7b7db",
+          "bytes": 50,
+          "collected_at": "2026-10-26T10:00:00Z",
+          "collector": "synthetic-design-fixture/1"
+        },
+        "at": "2026-10-26T10:10:00Z",
+        "acceptance_basis": "문서 검토 수행 사실만 확인"
+      }
+    ],
+    "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "missing_evidence": [
+      "해당 세부 결과의 필수 관측을 수집하지 않음"
+    ],
+    "limitations": [
+      "EXAMPLE; 실제 설치/엔진/보안 효과 미확인",
+      "문서 절차 완료; 필수 실제 접근/엔진 challenge 미실행"
+    ]
+  },
+  "same_name_branch_roundtrip_cases": [
+    {
+      "assessment_id": "CHK-SUP-008",
+      "full_branch_refs": [
+        {
+          "assessment_id": "CHK-SUP-008",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "요청의 코드 버전 변경으로 비승인 모듈 로딩",
+          "scenario_ids": [
+            "SC-11-01"
+          ],
+          "apply_when": "기본 금지 정책의 endpoint에서 code_revision/mm kwargs 필드가 거부·제거되는지 확인한다. MM 비사용 설정만으로 전달 거부를 추정하지 않는다."
+        },
+        {
+          "assessment_id": "CHK-SUP-008",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "요청의 코드 버전 변경으로 비승인 모듈 로딩",
+          "scenario_ids": [
+            "SC-11-01"
+          ],
+          "apply_when": "선정 멀티모달 processor와 trust-request-mm-kwargs 등 해당 opt-in이 실제 활성일 때만 추가한다. 실제 선택 processor·코드 판본·승인 대응을 확인한다."
+        }
+      ]
+    },
+    {
+      "assessment_id": "CHK-REQ-018",
+      "full_branch_refs": [
+        {
+          "assessment_id": "CHK-REQ-018",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "재사용 배치 자리의 토큰 제한 상태 혼입",
+          "scenario_ids": [
+            "SC-06-01"
+          ],
+          "apply_when": "실제로 V1 runner를 사용하고 CPU mask가 할당된 condense 경로에 도달할 때. A 제한 요청 종료/이동 뒤 B의 동일 slot 재사용을 확인한다."
+        },
+        {
+          "assessment_id": "CHK-REQ-018",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "재사용 배치 자리의 토큰 제한 상태 혼입",
+          "scenario_ids": [
+            "SC-06-01"
+          ],
+          "apply_when": "실제로 V2 runner가 선택되고 해당 sampling 옵션이 소비될 때. slot·count/flag·staged write와 B의 무제한 정상 대조를 확인한다. V1 결과를 전용하지 않는다."
+        }
+      ]
+    },
+    {
+      "assessment_id": "CHK-REQ-020",
+      "full_branch_refs": [
+        {
+          "assessment_id": "CHK-REQ-020",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "GPU 메모리 경계 오류로 다른 요청 자료 노출",
+          "scenario_ids": [
+            "SC-06-02"
+          ],
+          "apply_when": "V1 runner의 해당 CUDA Graph mode가 실제 활성일 때. 현재 입력 갱신·출력 소비와 buffer 수명을 확인한다."
+        },
+        {
+          "assessment_id": "CHK-REQ-020",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "GPU 메모리 경계 오류로 다른 요청 자료 노출",
+          "scenario_ids": [
+            "SC-06-02"
+          ],
+          "apply_when": "V2 runner의 해당 CUDA Graph mode가 실제 활성일 때. 선정 caller/graph manager의 갱신·출력 소비 동기화를 확인한다."
+        }
+      ]
+    },
+    {
+      "assessment_id": "CHK-PLT-008",
+      "full_branch_refs": [
+        {
+          "assessment_id": "CHK-PLT-008",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "GPU 프로세스 통신의 도청·변조",
+          "scenario_ids": [
+            "SC-08-03"
+          ],
+          "apply_when": "선정 local collective·SHM·CUDA IPC 등 실제 전송이 선택될 때. UID/namespace와 native 접근 경계를 확인한다."
+        },
+        {
+          "assessment_id": "CHK-PLT-008",
+          "checklist_ref": {
+            "repository": "mg-princess/serving-security-framework",
+            "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
+            "content_commit": null,
+            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
+            "schema_version": "0.2",
+            "original_date": "2026-10-18"
+          },
+          "name": "GPU 프로세스 통신의 도청·변조",
+          "scenario_ids": [
+            "SC-08-03"
+          ],
+          "apply_when": "다중 노드·PP 등 별도 transport를 실제 사용하면 추가한다. local TP의 결과를 원격 구간 보호 근거로 쓰지 않는다."
+        }
+      ]
+    }
+  ],
+  "reused_evidence_example": {
+    "data_origin": "EXAMPLE",
+    "source": {
+      "evidence_ref": {
+        "kind": "EVD",
+        "id": "EVD-00000000000000000000000001",
+        "revision": 1,
+        "sha256": "6ebf98be94d27b4e4249cc752e2f49f07439c2cc76828aec823a8fbf5bffba8a"
+      },
+      "result_ref": {
+        "kind": "RES",
+        "id": "RES-00000000000000000000000001",
+        "revision": 1,
+        "sha256": "8623f553e257b35021d5f12eccd0adb4f07d73173e6dd6d1766f80ad1a48292e"
+      },
+      "plan_ref": {
+        "kind": "PLAN",
+        "id": "PLAN-00000000000000000000000001",
+        "revision": 1,
+        "sha256": "82b97a409f6e2a6e004e5c5d95fe1a9f44a3ecaa942a4cf2cd0e1981b8a68790"
+      },
+      "environment_ref": {
+        "kind": "ENV",
+        "id": "ENV-00000000000000000000000001",
+        "revision": 1,
+        "sha256": "7924d44f27c57c572596b4196e5a7b2bcbb4df262dfa8b98e6aab94fc775d80b"
+      },
+      "executed_at": "2026-10-25T10:00:00Z",
+      "original_origin": "EXAMPLE"
+    },
+    "target_review": {
+      "plan_ref": {
+        "kind": "PLAN",
+        "id": "PLAN-00000000000000000000000002",
+        "revision": 1,
+        "sha256": "6a094dc9f0364eea3c734ad4cdb10bf650898c49ee8b6081867fea729695d561"
+      },
+      "environment_ref": {
+        "kind": "ENV",
+        "id": "ENV-00000000000000000000000002",
+        "revision": 1,
+        "sha256": "fafa8e01488fffb67ff47cd38de0be2480493e54cd1183b677ceec280cdf8b6d"
+      },
+      "policy_ref": {
+        "kind": "POL",
+        "id": "POL-00000000000000000000000001",
+        "revision": 1,
+        "sha256": "6bbac650c3858a95f784f7b0e0e106870f7c0e635b40ab7e9f00fbf56fee55e0"
+      },
+      "reviewed_by": "example-reviewer",
+      "reviewed_at": "2026-10-26T10:00:00Z",
+      "decision": "WITHHELD",
+      "reason": "대상 환경/범위·실행 조건의 동등성 근거 미해소",
+      "source_ref_resolved": false
+    },
+    "new_execution_recorded": false,
+    "comparison_example": {
+      "baseline": "FAIL",
+      "candidate": "UNKNOWN",
+      "comparable": true,
+      "comparison": "UNKNOWN"
+    }
+  },
+  "historical_review_routing_example": {
+    "input_record_kind": "framework_assessment_review",
+    "source_path": "평가기록/20261024_REQ013_반환정보_평가기록.json",
+    "source_file_sha256": "9959f89a01153a6b6583a573c80ca1f876a12adadbdc43681c2bdeb761c0584c",
+    "read_route": "historical_review_dossier",
+    "raw_source_objects_independently_verified": false,
+    "product_import_supported": false,
+    "mapped_without_invention": {
+      "assessment_id": "CHK-REQ-013",
+      "internal_check_id": "REQ-13",
+      "requirement_id": "requirement-5-1",
+      "plan_ref": {
+        "kind": "PLAN",
+        "id": "PLAN-01M5M7P9A8D4KVD6V1J2BBKCSV",
+        "revision": 1,
+        "sha256": "5d86f4cba100f44da38997aa31cea60368c1977329bac31c3c3d10189ee4ab49"
+      },
+      "execution_id": null,
+      "execution_as_reported": {
+        "abort_reason": null,
+        "adapter": {
+          "name": "vllm",
+          "version": "0.3.0"
+        },
+        "executor": {
+          "config_sha256": "dd74fdae962562208ced8e9dd97dc81a29f042a7e8cf1b059b0ac128f3f807c2",
+          "name": "response_content",
+          "version": "0.1.0"
+        },
+        "finished_at": "2026-10-23T11:21:21Z",
+        "started_at": "2026-10-23T11:20:52Z",
+        "status": "COMPLETED"
+      }
+    },
+    "pack_and_source_scope": "당시 PACK18/보고된 코드·환경. 현재 PACK29 실측으로 소급하지 않음",
+    "normalization_status": "PROPOSED_MAPPING_ONLY"
+  },
+  "synthetic_artifacts": [
+    {
+      "name": "모델별 사용 권한.json",
+      "path": "artifacts/7243a6f59643b7f76e52ae93734e924437bf640ba0e140bb5c56783b20824c9e",
+      "sha256": "7243a6f59643b7f76e52ae93734e924437bf640ba0e140bb5c56783b20824c9e",
+      "bytes": 89,
+      "collected_at": "2026-10-26T10:00:00Z",
+      "collector": "synthetic-design-fixture/1",
+      "example_payload": {
+        "data_origin": "EXAMPLE",
+        "unit": "모델별 사용 권한",
+        "observation": "synthetic-PASS"
+      }
+    },
+    {
+      "name": "CHK 공통 확인.json",
+      "path": "artifacts/b05efa464ef287e06203bb156e9fab7e1afbf0dd490c9b42e9c8e7092b55ad1d",
+      "sha256": "b05efa464ef287e06203bb156e9fab7e1afbf0dd490c9b42e9c8e7092b55ad1d",
+      "bytes": 83,
+      "collected_at": "2026-10-26T10:00:00Z",
+      "collector": "synthetic-design-fixture/1",
+      "example_payload": {
+        "data_origin": "EXAMPLE",
+        "unit": "CHK 공통 확인",
+        "observation": "synthetic-PASS"
+      }
+    },
+    {
+      "name": "내부 IPC·TP 전송 보호.json",
+      "path": "artifacts/6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+      "sha256": "6deb1623ac530731b90c4bbfcc4e4cfe2724e220136f6f4c95b6c3a49829e28c",
+      "bytes": 94,
+      "collected_at": "2026-10-26T10:00:00Z",
+      "collector": "synthetic-design-fixture/1",
+      "example_payload": {
+        "data_origin": "EXAMPLE",
+        "unit": "내부 IPC·TP 전송 보호",
+        "observation": "synthetic-PASS"
+      }
+    },
+    {
+      "name": "전체 release 권한.json",
+      "path": "artifacts/67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+      "sha256": "67ba9a135e74d55a59dfc5182ba79e2ac5dd6d85a0459c0c933f6d89ede8c6df",
+      "bytes": 87,
+      "collected_at": "2026-10-26T10:00:00Z",
+      "collector": "synthetic-design-fixture/1",
+      "example_payload": {
+        "data_origin": "EXAMPLE",
+        "unit": "전체 release 권한",
+        "observation": "synthetic-PASS"
+      }
+    },
+    {
+      "name": "재취득·대체 공급.json",
+      "path": "artifacts/b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+      "sha256": "b126ba61eaf3ddc0a48e29c3b7dbbcd7b4706fa8b390a8b05b281b6781644385",
+      "bytes": 90,
+      "collected_at": "2026-10-26T10:00:00Z",
+      "collector": "synthetic-design-fixture/1",
+      "example_payload": {
+        "data_origin": "EXAMPLE",
+        "unit": "재취득·대체 공급",
+        "observation": "synthetic-FAIL"
+      }
+    },
+    {
+      "name": "조회·반출 권한.json",
+      "path": "artifacts/8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+      "sha256": "8bee090c60aee011d4d9f8bdfa59e00d41fe3ab7660a88c35312565973f1c8d1",
+      "bytes": 87,
+      "collected_at": "2026-10-26T10:00:00Z",
+      "collector": "synthetic-design-fixture/1",
+      "example_payload": {
+        "data_origin": "EXAMPLE",
+        "unit": "조회·반출 권한",
+        "observation": "synthetic-PASS"
+      }
+    },
+    {
+      "name": "manual-review.json",
+      "path": "artifacts/d057d884fbb63bf86a9a13fc9dbc864a59527a85e846a85b484008448ee7b7db",
+      "sha256": "d057d884fbb63bf86a9a13fc9dbc864a59527a85e846a85b484008448ee7b7db",
+      "bytes": 50,
+      "collected_at": "2026-10-26T10:00:00Z",
+      "collector": "synthetic-design-fixture/1",
+      "example_payload": {
+        "reviewed": "synthetic-policy",
+        "engine_run": false
+      }
+    }
+  ],
+  "semantic_basis": {
+    "status": "FRAMEWORK_RULES_FINALIZED_20261027",
+    "documents": [
+      "03_체크리스트와_보완가이드.md",
+      "05_평가와_증거관리.md",
+      "개발전달/결과기록_최소명세_초안.md"
+    ],
+    "structure_status": "CHOICE_FOR_DEVELOPER_REVIEW_NOT_PRODUCT_CONTRACT",
+    "note": "공통 기록 의미를 보여 주는 합성 자료다. proposed_scope_extension·unit 구조와 schema_proposal은 제품 저장/API 스키마로 채택되지 않았다."
+  }
+}

@@ -1,0 +1,2444 @@
+{
+  "version": "2026-10-20",
+  "source": "참고자료/통합본/통합본.md",
+  "source_sha256": "3f9545c311317a7f011440781ceeb7ffd6263446ff561c72963afcdabc5da0f9",
+  "scope": "참조 구성의 기능·자료·권한 연결. 실제 서버·프로세스·망 배치는 환경 정보에서 확인.",
+  "nodes": [
+    {
+      "id": "approval",
+      "label": "검사·승인 기록",
+      "x": 310,
+      "y": 45,
+      "width": 180,
+      "height": 132,
+      "icon": "approval",
+      "caption": "조직에서 관리하는 기록"
+    },
+    {
+      "id": "change",
+      "label": "배포·관리 주체",
+      "x": 600,
+      "y": 45,
+      "width": 180,
+      "height": 132,
+      "icon": "change",
+      "caption": "승인 참조·기동 설정·관리 요청"
+    },
+    {
+      "id": "platform",
+      "label": "호스트·자격·장치",
+      "x": 1180,
+      "y": 45,
+      "width": 180,
+      "height": 132,
+      "icon": "platform",
+      "caption": "실행 계정·mount·Secret·GPU"
+    },
+    {
+      "id": "source",
+      "label": "모델·코드 공급원",
+      "x": 20,
+      "y": 265,
+      "width": 180,
+      "height": 132,
+      "icon": "source",
+      "caption": "로컬 파일·저장소·이미지 등"
+    },
+    {
+      "id": "loader",
+      "label": "모델 취득·로딩",
+      "x": 600,
+      "y": 265,
+      "width": 180,
+      "height": 132,
+      "icon": "loader",
+      "caption": "worker 초기화 안에서도 수행"
+    },
+    {
+      "id": "derived",
+      "label": "컴파일·파생 캐시",
+      "x": 1180,
+      "y": 265,
+      "width": 180,
+      "height": 132,
+      "icon": "derived",
+      "caption": "실행 조건에 맞게 생성·재사용"
+    },
+    {
+      "id": "caller",
+      "label": "사용자·호출 앱",
+      "x": 20,
+      "y": 525,
+      "width": 180,
+      "height": 132,
+      "icon": "caller",
+      "caption": "최종 사용자와 서비스 계정 구분"
+    },
+    {
+      "id": "gateway",
+      "label": "Gateway",
+      "x": 310,
+      "y": 525,
+      "width": 180,
+      "height": 132,
+      "icon": "gateway",
+      "caption": "앞단 정책·라우팅"
+    },
+    {
+      "id": "frontend",
+      "label": "API·전처리·출력",
+      "x": 600,
+      "y": 525,
+      "width": 180,
+      "height": 132,
+      "icon": "frontend",
+      "caption": "입력 선택·허용 검사·응답"
+    },
+    {
+      "id": "core",
+      "label": "Core·scheduler",
+      "x": 890,
+      "y": 525,
+      "width": 180,
+      "height": 132,
+      "icon": "core",
+      "caption": "요청 등록·배정·종결"
+    },
+    {
+      "id": "worker",
+      "label": "worker·TP 실행",
+      "x": 1180,
+      "y": 525,
+      "width": 180,
+      "height": 132,
+      "icon": "worker",
+      "caption": "단일 노드 TP rank 간 통신 포함"
+    },
+    {
+      "id": "sink",
+      "label": "기록 저장·조회",
+      "x": 310,
+      "y": 825,
+      "width": 180,
+      "height": 132,
+      "icon": "observe",
+      "caption": "자료별 저장 위치·통계 목적지"
+    },
+    {
+      "id": "observe",
+      "label": "로그·진단 처리",
+      "x": 20,
+      "y": 825,
+      "width": 180,
+      "height": 132,
+      "icon": "observe",
+      "caption": "생성·선택 수집·전달"
+    },
+    {
+      "id": "cache",
+      "label": "요청 상태·KV 캐시",
+      "x": 890,
+      "y": 825,
+      "width": 180,
+      "height": 132,
+      "icon": "core",
+      "caption": "공유 상태 관리·실제 KV 버퍼"
+    }
+  ],
+  "edges": [
+    {
+      "id": "supply",
+      "source": "source",
+      "target": "loader",
+      "label": "파일·설정·코드",
+      "kind": "model",
+      "boundaries": [
+        "TB4",
+        "TB5"
+      ],
+      "points": [
+        [
+          200,
+          331
+        ],
+        [
+          600,
+          331
+        ]
+      ],
+      "condition": "TB5: 지정한 참조를 서버 자격으로 실제 취득·읽기할 때",
+      "note": "선택한 모델 파일·설정·코드를 서버가 취득·해석하는 경로",
+      "label_position": [
+        400,
+        309
+      ]
+    },
+    {
+      "id": "approval-reference",
+      "source": "approval",
+      "target": "change",
+      "label": "승인 대상 참조",
+      "kind": "organization",
+      "boundaries": [],
+      "points": [
+        [
+          490,
+          111
+        ],
+        [
+          600,
+          111
+        ]
+      ],
+      "condition": "",
+      "note": "배포 담당이 조직의 검사·승인 기록에서 사용할 대상을 확인",
+      "label_position": [
+        545,
+        88
+      ]
+    },
+    {
+      "id": "startup",
+      "source": "change",
+      "target": "loader",
+      "label": "모델·기동 설정",
+      "kind": "control",
+      "boundaries": [
+        "TB4"
+      ],
+      "points": [
+        [
+          690,
+          177
+        ],
+        [
+          690,
+          265
+        ]
+      ],
+      "condition": "배포 수단이 모델·설정·공급원 참조를 지정",
+      "note": "배포 수단이 모델·설정·공급원 참조를 기동에 전달",
+      "label_position": [
+        790,
+        216
+      ]
+    },
+    {
+      "id": "load",
+      "source": "loader",
+      "target": "worker",
+      "label": "모델 준비·적재",
+      "kind": "model",
+      "boundaries": [
+        "TB4"
+      ],
+      "points": [
+        [
+          780,
+          331
+        ],
+        [
+          1125,
+          331
+        ],
+        [
+          1125,
+          452
+        ],
+        [
+          1270,
+          452
+        ],
+        [
+          1270,
+          525
+        ]
+      ],
+      "condition": "",
+      "note": "worker 초기화 과정에서 사용할 모델을 준비·적재",
+      "label_position": [
+        950,
+        309
+      ]
+    },
+    {
+      "id": "derived-use",
+      "source": "derived",
+      "target": "worker",
+      "label": "생성·재사용",
+      "kind": "state",
+      "boundaries": [
+        "TB4"
+      ],
+      "points": [
+        [
+          1360,
+          331
+        ],
+        [
+          1420,
+          331
+        ],
+        [
+          1420,
+          591
+        ],
+        [
+          1360,
+          591
+        ]
+      ],
+      "condition": "",
+      "note": "선택한 실행 모드에서 컴파일·파생물을 생성·읽기·재사용",
+      "label_position": [
+        1490,
+        421
+      ]
+    },
+    {
+      "id": "request1",
+      "source": "caller",
+      "target": "gateway",
+      "label": "요청·응답",
+      "kind": "request",
+      "boundaries": [
+        "TB1"
+      ],
+      "points": [
+        [
+          200,
+          591
+        ],
+        [
+          310,
+          591
+        ]
+      ],
+      "condition": "",
+      "note": "",
+      "label_position": [
+        255,
+        566
+      ],
+      "boundary_label_position": [
+        255,
+        615
+      ]
+    },
+    {
+      "id": "request2",
+      "source": "gateway",
+      "target": "frontend",
+      "label": "전달·반환",
+      "kind": "request",
+      "boundaries": [
+        "TB2"
+      ],
+      "points": [
+        [
+          490,
+          591
+        ],
+        [
+          600,
+          591
+        ]
+      ],
+      "condition": "",
+      "note": "",
+      "label_position": [
+        545,
+        566
+      ],
+      "boundary_label_position": [
+        545,
+        615
+      ]
+    },
+    {
+      "id": "request3",
+      "source": "frontend",
+      "target": "core",
+      "label": "요청·결과",
+      "kind": "request",
+      "boundaries": [
+        "TB6"
+      ],
+      "points": [
+        [
+          780,
+          591
+        ],
+        [
+          890,
+          591
+        ]
+      ],
+      "condition": "",
+      "note": "",
+      "label_position": [
+        835,
+        566
+      ],
+      "boundary_label_position": [
+        835,
+        615
+      ]
+    },
+    {
+      "id": "request4",
+      "source": "core",
+      "target": "worker",
+      "label": "제어·계산 결과",
+      "kind": "request",
+      "boundaries": [
+        "TB6"
+      ],
+      "points": [
+        [
+          1070,
+          591
+        ],
+        [
+          1180,
+          591
+        ]
+      ],
+      "condition": "",
+      "note": "",
+      "label_position": [
+        1125,
+        566
+      ],
+      "boundary_label_position": [
+        1125,
+        615
+      ]
+    },
+    {
+      "id": "direct",
+      "source": "caller",
+      "target": "frontend",
+      "label": "직통 접속",
+      "kind": "conditional",
+      "boundaries": [
+        "TB1",
+        "TB2"
+      ],
+      "points": [
+        [
+          110,
+          525
+        ],
+        [
+          110,
+          478
+        ],
+        [
+          690,
+          478
+        ],
+        [
+          690,
+          525
+        ]
+      ],
+      "condition": "실제 listener에 도달할 수 있는 배포에서만 성립",
+      "note": "",
+      "label_position": [
+        250,
+        458
+      ],
+      "boundary_label_position": [
+        340,
+        458
+      ]
+    },
+    {
+      "id": "management",
+      "source": "change",
+      "target": "gateway",
+      "label": "관리 요청",
+      "kind": "control",
+      "boundaries": [
+        "TB1",
+        "TB2"
+      ],
+      "points": [
+        [
+          600,
+          145
+        ],
+        [
+          530,
+          145
+        ],
+        [
+          530,
+          428
+        ],
+        [
+          400,
+          428
+        ],
+        [
+          400,
+          525
+        ]
+      ],
+      "condition": "Gateway를 경유하는 관리 API를 실제 사용할 때. 다른 관리 경로는 해당 설치에서 별도 확인.",
+      "note": "",
+      "label_position": [
+        455,
+        407
+      ],
+      "boundary_label_position": [
+        455,
+        393
+      ]
+    },
+    {
+      "id": "cache-control",
+      "source": "core",
+      "target": "cache",
+      "label": "할당·공유 관리",
+      "kind": "state",
+      "boundaries": [
+        "TB3"
+      ],
+      "points": [
+        [
+          980,
+          657
+        ],
+        [
+          980,
+          825
+        ]
+      ],
+      "condition": "",
+      "note": "Core가 요청별 할당·공유 정보와 재사용 대상을 관리",
+      "label_position": [
+        864,
+        744
+      ]
+    },
+    {
+      "id": "cache-access",
+      "source": "worker",
+      "target": "cache",
+      "label": "KV 읽기·쓰기",
+      "kind": "state",
+      "boundaries": [
+        "TB3"
+      ],
+      "points": [
+        [
+          1270,
+          657
+        ],
+        [
+          1270,
+          891
+        ],
+        [
+          1070,
+          891
+        ]
+      ],
+      "condition": "",
+      "note": "worker의 실제 KV 읽기·쓰기와 요청·공유 집단의 대응을 확인",
+      "label_position": [
+        1160,
+        865
+      ]
+    },
+    {
+      "id": "runtime-host",
+      "source": "worker",
+      "target": "platform",
+      "label": "호스트·장치 접근",
+      "kind": "authority",
+      "boundaries": [
+        "TB7"
+      ],
+      "points": [
+        [
+          1360,
+          551
+        ],
+        [
+          1460,
+          551
+        ],
+        [
+          1460,
+          111
+        ],
+        [
+          1360,
+          111
+        ]
+      ],
+      "condition": "",
+      "note": "실행 계정·mount·장치·Secret의 실제 접근 범위를 확인",
+      "label_position": [
+        1530,
+        220
+      ],
+      "boundary_label_position": [
+        1530,
+        238
+      ]
+    },
+    {
+      "id": "gateway-log",
+      "source": "gateway",
+      "target": "observe",
+      "label": "접근 기록",
+      "kind": "record",
+      "boundaries": [
+        "TB8"
+      ],
+      "points": [
+        [
+          400,
+          657
+        ],
+        [
+          400,
+          714
+        ],
+        [
+          60,
+          714
+        ],
+        [
+          60,
+          825
+        ]
+      ],
+      "condition": "해당 기록 생성·수집 설정에 따름",
+      "note": "",
+      "label_position": [
+        260,
+        701
+      ],
+      "boundary_label_position": [
+        355,
+        701
+      ]
+    },
+    {
+      "id": "api-log",
+      "source": "frontend",
+      "target": "observe",
+      "label": "요청·오류 기록",
+      "kind": "record",
+      "boundaries": [
+        "TB8"
+      ],
+      "points": [
+        [
+          630,
+          657
+        ],
+        [
+          630,
+          748
+        ],
+        [
+          90,
+          748
+        ],
+        [
+          90,
+          825
+        ]
+      ],
+      "condition": "해당 기록 생성·수집 설정에 따름",
+      "note": "",
+      "label_position": [
+        350,
+        735
+      ],
+      "boundary_label_position": [
+        445,
+        735
+      ]
+    },
+    {
+      "id": "core-log",
+      "source": "core",
+      "target": "observe",
+      "label": "실행 상태 기록",
+      "kind": "record",
+      "boundaries": [
+        "TB8"
+      ],
+      "points": [
+        [
+          920,
+          657
+        ],
+        [
+          920,
+          782
+        ],
+        [
+          120,
+          782
+        ],
+        [
+          120,
+          825
+        ]
+      ],
+      "condition": "해당 기록 생성·수집 설정에 따름",
+      "note": "",
+      "label_position": [
+        600,
+        769
+      ],
+      "boundary_label_position": [
+        695,
+        769
+      ]
+    },
+    {
+      "id": "worker-log",
+      "source": "worker",
+      "target": "observe",
+      "label": "실행·진단 기록",
+      "kind": "record",
+      "boundaries": [
+        "TB8"
+      ],
+      "points": [
+        [
+          1210,
+          657
+        ],
+        [
+          1210,
+          816
+        ],
+        [
+          150,
+          816
+        ],
+        [
+          150,
+          825
+        ]
+      ],
+      "condition": "해당 기록 생성·수집 설정에 따름",
+      "note": "",
+      "label_position": [
+        800,
+        803
+      ],
+      "boundary_label_position": [
+        895,
+        803
+      ]
+    },
+    {
+      "id": "change-log",
+      "source": "change",
+      "target": "observe",
+      "label": "변경 기록",
+      "kind": "record",
+      "boundaries": [
+        "TB8"
+      ],
+      "points": [
+        [
+          630,
+          177
+        ],
+        [
+          630,
+          205
+        ],
+        [
+          500,
+          205
+        ],
+        [
+          500,
+          680
+        ],
+        [
+          30,
+          680
+        ],
+        [
+          30,
+          825
+        ]
+      ],
+      "condition": "배포·관리 도구의 실제 기록에 따름",
+      "note": "",
+      "label_position": [
+        170,
+        673
+      ],
+      "boundary_label_position": [
+        265,
+        673
+      ]
+    },
+    {
+      "id": "store",
+      "source": "observe",
+      "target": "sink",
+      "label": "저장·조회",
+      "kind": "record",
+      "boundaries": [
+        "TB8",
+        "TB9"
+      ],
+      "points": [
+        [
+          200,
+          891
+        ],
+        [
+          310,
+          891
+        ]
+      ],
+      "condition": "TB9는 실제 전송 hop이 존재할 때 적용. 수집·저장·조회 권한은 배포별 확인.",
+      "note": "",
+      "label_position": [
+        255,
+        865
+      ],
+      "boundary_label_position": [
+        255,
+        918
+      ]
+    },
+    {
+      "id": "usage",
+      "source": "worker",
+      "target": "sink",
+      "label": "내장 사용통계",
+      "kind": "conditional",
+      "boundaries": [
+        "TB8",
+        "TB9"
+      ],
+      "points": [
+        [
+          1320,
+          657
+        ],
+        [
+          1320,
+          1010
+        ],
+        [
+          400,
+          1010
+        ],
+        [
+          400,
+          957
+        ]
+      ],
+      "condition": "rank 0·프로세스의 실제 opt-out 판정·설정 목적지에 따름. 로그 수집기를 거치지 않는 로컬 파일·외부 보고 경로.",
+      "note": "rank 0의 로컬 사용통계 파일과 설정된 외부 보고 목적지를 각각 확인",
+      "label_position": [
+        1030,
+        974
+      ],
+      "boundary_label_position": [
+        1140,
+        974
+      ]
+    }
+  ],
+  "boundaries": {
+    "TB1": {
+      "id": "TB1",
+      "label": "사용자→서비스",
+      "difference": "자기 invoke/객체 ↔ 여러 모델·작업을 처리하는 서버",
+      "surface": "credential·model/adapter·입력·ID·관리 route·오류/metrics",
+      "condition": "해당 API 활성·도달·인증 후 모델/작업/객체 검사. 외부 관측자는 인증 예외와 자기 오류 응답도 볼 수 있음"
+    },
+    "TB2": {
+      "id": "TB2",
+      "label": "앞단/호출 계층→엔진",
+      "difference": "사용자별 정책 ↔ 공통 backend 또는 프로세스 실행 권한",
+      "surface": "대행 key·신뢰 metadata·내부 ID·직통 listener·라이브러리 인자",
+      "condition": "header 재생성·대행 범위·직통 접근·최종 handler. 내장 호출에는 HTTP 인증을 옮겨 적용하지 않음"
+    },
+    "TB3": {
+      "id": "TB3",
+      "label": "요청/주체→공유 상태",
+      "difference": "자기 자료 ↔ 여러 요청·모델·주체의 KV/버퍼/공유 weights",
+      "surface": "namespace·salt/key·block/region·offset/size·IPC handle·lease",
+      "condition": "실제 공유·등록·lookup·매핑·재사용·해제 위치. KV·client buffer·weights·compiled cache는 각각 소유권과 수명이 다름"
+    },
+    "TB4": {
+      "id": "TB4",
+      "label": "공급/승인→실행",
+      "difference": "source/staging/cache writer ↔ 승인·production 선택·runtime 권한",
+      "surface": "파일/shard/index·config/tokenizer/code·image·plugin·tensor update·snapshot",
+      "condition": "승인 기록과 실제 선택/해석/import/load 연결. cache/stream/seed/fallback·복원도 새 소비 경로로 포함"
+    },
+    "TB5": {
+      "id": "TB5",
+      "label": "참조 입력→서버 대리 접근",
+      "difference": "URL/path/object 지정 ↔ reader의 파일/망/클라우드 자격",
+      "surface": "URI·redirect·DNS·root·object version·source/key URI",
+      "condition": "해석된 최종 대상과 실제 fetch/stream/read의 자격·egress·ACL. 단순 URL 문자열과 서버 fetch를 구분"
+    },
+    "TB6": {
+      "id": "TB6",
+      "label": "실행 주체→내부 peer",
+      "difference": "연결 가능한 workload ↔ 요청·제어·tensor·KV를 받아 처리하는 core·worker",
+      "surface": "API↔core 요청·결과 채널·RPC/typed control·collective·rendezvous·room·remote block·update group/session",
+      "condition": "동일 노드 IPC/장치 통신과 다중 노드 transport를 각각 확인. peer 수용·메시지 권한·요청/모델/세대 매칭을 구분"
+    },
+    "TB7": {
+      "id": "TB7",
+      "label": "runtime→host/device",
+      "difference": "할당 workload ↔ host·다른 workload·장치/volume·Secret",
+      "surface": "mount·syscall/device handle·GPU/IPC·환경·실행 설정",
+      "condition": "실제 UID/capabilities·mount/ACL·device 공유·자격 전달. HTTP 사용자는 이 접근 능력을 자동 보유하지 않음"
+    },
+    "TB8": {
+      "id": "TB8",
+      "label": "실행→관측·진단·보존",
+      "difference": "비공개 자료/생성자 ↔ reader·replay·삭제/복원 주체",
+      "surface": "logs/trace/dump·본문·오류·식별정보·backup",
+      "condition": "생성 옵션·필드·수집 hop·sink ACL·재처리 consumer·retention. source 종결과 사본 수명은 별도"
+    },
+    "TB9": {
+      "id": "TB9",
+      "label": "통신 구간",
+      "difference": "endpoint의 신뢰 ↔ 특정 hop 관찰/변조 능력",
+      "surface": "API·peer/KV·object·관측 전송의 bytes/metadata·인증서",
+      "condition": "실제 TLS 종료점·상대 검증·native/IPC 보호를 hop별 확인. 암호화와 작업 인가는 별개"
+    },
+    "TB10": {
+      "id": "TB10",
+      "label": "고객→사업자",
+      "difference": "고객 submit/deploy/invoke ↔ 사업자 준비/runtime·운영",
+      "surface": "image/model import·고객 role·서비스 결과·고지",
+      "condition": "고객이 바꿀 수 있는 설정과 사업자만 확인할 수 있는 내부 실행/복구/폐기 분리"
+    },
+    "TB11": {
+      "id": "TB11",
+      "label": "job→객체·비동기 결과",
+      "difference": "특정 결과·작업에 대한 사용자 권한 ↔ 여러 객체를 다루는 서비스의 접근권",
+      "surface": "response/job ID·입출력 URI·조회·취소·통지 대상",
+      "condition": "독립 ID로 저장해 후속 요청에서 조회·취소하는 객체에 적용한다. 지역 Responses 저장소와 영속 job의 보존 기간·소유자·읽기/쓰기 권한은 각각 확인한다. 모든 비동기 호출에 적용하는 경계는 아니다."
+    }
+  },
+  "scenario_touchpoints": {
+    "SC-01-01": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "gateway"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-01-01",
+        "routes": "R01·03·07·09<br>POL-01·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-01-02": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "frontend"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-01-02",
+        "routes": "R01·03·07·09<br>POL-01·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-01-03": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "frontend",
+        "change"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-01-03",
+        "routes": "R01·03·07·09<br>POL-01·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-01-04": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "frontend"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-01-04",
+        "routes": "R01·03·07·09<br>POL-01·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-02-01": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2",
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-02-01",
+        "routes": "R01·02·03·05·09·11<br>POL-01·02·05·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-02-02": {
+      "nodes": [
+        "frontend",
+        "core"
+      ],
+      "boundaries": [
+        "TB2",
+        "TB3"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-02-02",
+        "routes": "R01·02·03·05·09·11<br>POL-01·02·05·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-02-03": {
+      "nodes": [
+        "caller",
+        "frontend"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB11"
+      ],
+      "note": "독립 ID로 저장 결과를 조회·취소하는 선택 기능이다. API 위치에 요약했으며 저장 결과의 소유권과 조회·취소 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-02-03",
+        "routes": "R01·02·03·05·09·11<br>POL-01·02·05·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-02-04": {
+      "nodes": [
+        "change",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-02-04",
+        "routes": "R01·02·03·05·09·11<br>POL-01·02·05·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-03-01": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "frontend"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-03-01",
+        "routes": "R01·02·03<br>POL-02·04·05",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-03-02": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "frontend",
+        "core"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-03-02",
+        "routes": "R01·02·03<br>POL-02·04·05",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-04-01": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "worker"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB6"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-04-01",
+        "routes": "R01·02·03·11<br>POL-02·04·07",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-04-02": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "worker",
+        "core"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB6"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-04-02",
+        "routes": "R01·02·03·11<br>POL-02·04·07",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-05-01": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "core",
+        "cache"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2",
+        "TB3"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-05-01",
+        "routes": "R01·02·03<br>POL-02·03·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-05-02": {
+      "nodes": [
+        "core",
+        "cache",
+        "worker"
+      ],
+      "boundaries": [
+        "TB3"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-05-02",
+        "routes": "R01·02·03<br>POL-02·03·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-05-03": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "cache"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB3"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-05-03",
+        "routes": "R01·02·03<br>POL-02·03·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-06-01": {
+      "nodes": [
+        "core",
+        "worker",
+        "cache"
+      ],
+      "boundaries": [
+        "TB3"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-06-01",
+        "routes": "R02·03<br>POL-02·03·04",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-06-02": {
+      "nodes": [
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB3",
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-06-02",
+        "routes": "R02·03<br>POL-02·03·04",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-07-01": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "core",
+        "worker"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB3"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-07-01",
+        "routes": "R01·02·03·11·12<br>POL-04·07",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-07-02": {
+      "nodes": [
+        "caller",
+        "core",
+        "cache",
+        "worker"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB3"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-07-02",
+        "routes": "R01·02·03·11·12<br>POL-04·07",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-07-03": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "frontend"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-07-03",
+        "routes": "R01·02·03·11·12<br>POL-04·07",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-07-04": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "observe"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-07-04",
+        "routes": "R01·02·03·11·12<br>POL-04·07",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-08-01": {
+      "nodes": [
+        "platform",
+        "frontend",
+        "core",
+        "worker"
+      ],
+      "boundaries": [
+        "TB6",
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-08-01",
+        "routes": "R04·07·12<br>POL-01·03·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-08-02": {
+      "nodes": [
+        "core",
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB6"
+      ],
+      "note": "침해된 worker와 같은 UID로 실행되는 구성요소의 접근 범위와 영향을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-08-02",
+        "routes": "R04·07·12<br>POL-01·03·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-08-03": {
+      "nodes": [
+        "core",
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB6",
+        "TB9"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-08-03",
+        "routes": "R04·07·12<br>POL-01·03·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-08-04": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "core",
+        "worker",
+        "cache"
+      ],
+      "boundaries": [
+        "TB3",
+        "TB6"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-08-04",
+        "routes": "R04·07·12<br>POL-01·03·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-09-01": {
+      "nodes": [
+        "approval"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-09-01",
+        "routes": "R05·06·09<br>POL-01·05·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-09-02": {
+      "nodes": [
+        "change",
+        "loader",
+        "platform"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-09-02",
+        "routes": "R05·06·09<br>POL-01·05·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-10-01": {
+      "nodes": [
+        "source",
+        "loader"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-10-01",
+        "routes": "R05·06·09<br>POL-02·05·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-10-02": {
+      "nodes": [
+        "source",
+        "loader"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-10-02",
+        "routes": "R05·06·09<br>POL-02·05·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-10-03": {
+      "nodes": [
+        "source",
+        "change",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-10-03",
+        "routes": "R05·06·09<br>POL-02·05·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-10-04": {
+      "nodes": [
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-10-04",
+        "routes": "R05·06·09<br>POL-02·05·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-11-01": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-11-01",
+        "routes": "R05·06·07<br>POL-01·05·06",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-11-02": {
+      "nodes": [
+        "source",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-11-02",
+        "routes": "R05·06·07<br>POL-01·05·06",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-11-03": {
+      "nodes": [
+        "source",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-11-03",
+        "routes": "R05·06·07<br>POL-01·05·06",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-11-04": {
+      "nodes": [
+        "frontend",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-11-04",
+        "routes": "R05·06·07<br>POL-01·05·06",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-11-05": {
+      "nodes": [
+        "change",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-11-05",
+        "routes": "R05·06·07<br>POL-01·05·06",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-11-06": {
+      "nodes": [
+        "source",
+        "loader",
+        "derived",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-11-06",
+        "routes": "R05·06·07<br>POL-01·05·06",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-11-07": {
+      "nodes": [
+        "source",
+        "loader",
+        "frontend"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-11-07",
+        "routes": "R05·06·07<br>POL-01·05·06",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-12-01": {
+      "nodes": [
+        "derived",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-12-01",
+        "routes": "R06·05·13<br>POL-02·03·05·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-12-02": {
+      "nodes": [
+        "source",
+        "derived",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-12-02",
+        "routes": "R06·05·13<br>POL-02·03·05·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-12-03": {
+      "nodes": [
+        "derived",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-12-03",
+        "routes": "R06·05·13<br>POL-02·03·05·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-13-01": {
+      "nodes": [
+        "source",
+        "approval",
+        "change",
+        "loader"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-13-01",
+        "routes": "R05·06·08<br>POL-05·06·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-13-02": {
+      "nodes": [
+        "source",
+        "loader"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-13-02",
+        "routes": "R05·06·08<br>POL-05·06·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-13-03": {
+      "nodes": [
+        "source",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-13-03",
+        "routes": "R05·06·08<br>POL-05·06·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-14-01": {
+      "nodes": [
+        "change",
+        "source",
+        "loader",
+        "platform"
+      ],
+      "boundaries": [
+        "TB5",
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-14-01",
+        "routes": "R05·06·07<br>POL-01·05·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-14-02": {
+      "nodes": [
+        "source",
+        "loader",
+        "platform"
+      ],
+      "boundaries": [
+        "TB5",
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-14-02",
+        "routes": "R05·06·07<br>POL-01·05·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-14-03": {
+      "nodes": [
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-14-03",
+        "routes": "R05·06·07<br>POL-01·05·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-14-04": {
+      "nodes": [
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-14-04",
+        "routes": "R05·06·07<br>POL-01·05·06·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-15-01": {
+      "nodes": [
+        "source",
+        "loader",
+        "derived",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-15-01",
+        "routes": "R05·06·13<br>POL-04·07·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-15-02": {
+      "nodes": [
+        "source",
+        "loader"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB5"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-15-02",
+        "routes": "R05·06·13<br>POL-04·07·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-15-03": {
+      "nodes": [
+        "source",
+        "loader",
+        "derived"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-15-03",
+        "routes": "R05·06·13<br>POL-04·07·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-16-01": {
+      "nodes": [
+        "source",
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB3",
+        "TB4",
+        "TB6"
+      ],
+      "note": "선택한 공유 가중치 daemon의 접점을 공급원·worker 위치에 요약했다. 공유 가중치 daemon을 선택한 환경에 적용한다.",
+      "source_refs": {
+        "scenario": "SC-16-01",
+        "routes": "R08·05·07·13<br>POL-02·03·05·06·07·09·11·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-16-02": {
+      "nodes": [
+        "source",
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB6"
+      ],
+      "note": "선택한 공유 가중치 daemon의 실제 client·메시지·해석기를 별도로 확인한다.",
+      "source_refs": {
+        "scenario": "SC-16-02",
+        "routes": "R08·05·07·13<br>POL-02·03·05·06·07·09·11·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-16-03": {
+      "nodes": [
+        "source",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB6"
+      ],
+      "note": "선택한 공유 가중치 publisher와 실제 소비자의 관계다.",
+      "source_refs": {
+        "scenario": "SC-16-03",
+        "routes": "R08·05·07·13<br>POL-02·03·05·06·07·09·11·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-16-04": {
+      "nodes": [
+        "source",
+        "loader",
+        "worker"
+      ],
+      "boundaries": [
+        "TB3",
+        "TB6"
+      ],
+      "note": "선택한 daemon의 전체 가중치 캐시 해제다. 해제 뒤 다른 소비자의 접근·재취득을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-16-04",
+        "routes": "R08·05·07·13<br>POL-02·03·05·06·07·09·11·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-17-01": {
+      "nodes": [
+        "change",
+        "loader",
+        "worker",
+        "frontend"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB6"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-17-01",
+        "routes": "R05·09·11·13<br>POL-02·05·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-17-02": {
+      "nodes": [
+        "approval",
+        "change",
+        "loader",
+        "frontend"
+      ],
+      "boundaries": [
+        "TB4"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-17-02",
+        "routes": "R05·09·11·13<br>POL-02·05·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-17-03": {
+      "nodes": [
+        "change",
+        "core",
+        "cache",
+        "worker"
+      ],
+      "boundaries": [
+        "TB3",
+        "TB4",
+        "TB6"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-17-03",
+        "routes": "R05·09·11·13<br>POL-02·05·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-18-01": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "core",
+        "worker",
+        "cache"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB3",
+        "TB6"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-18-01",
+        "routes": "R02·03·04·11<br>POL-02·04·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-18-02": {
+      "nodes": [
+        "core",
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB6",
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-18-02",
+        "routes": "R02·03·04·11<br>POL-02·04·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-18-03": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "frontend",
+        "core"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2",
+        "TB3"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-18-03",
+        "routes": "R02·03·04·11<br>POL-02·04·07·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-19-01": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "frontend",
+        "platform"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2",
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-19-01",
+        "routes": "R07·11·13<br>POL-01·06·07·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-19-02": {
+      "nodes": [
+        "frontend",
+        "worker",
+        "cache",
+        "platform"
+      ],
+      "boundaries": [
+        "TB3",
+        "TB7"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-19-02",
+        "routes": "R07·11·13<br>POL-01·06·07·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-19-03": {
+      "nodes": [
+        "sink",
+        "source",
+        "platform",
+        "gateway"
+      ],
+      "boundaries": [
+        "TB7",
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-19-03",
+        "routes": "R07·11·13<br>POL-01·06·07·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-20-01": {
+      "nodes": [
+        "approval",
+        "change",
+        "loader",
+        "platform"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-20-01",
+        "routes": "R13·05·09·12<br>POL-03·05·08·11·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-20-02": {
+      "nodes": [
+        "sink",
+        "change",
+        "loader"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-20-02",
+        "routes": "R13·05·09·12<br>POL-03·05·08·11·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-20-03": {
+      "nodes": [
+        "sink",
+        "source",
+        "derived",
+        "cache"
+      ],
+      "boundaries": [
+        "TB3",
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-20-03",
+        "routes": "R13·05·09·12<br>POL-03·05·08·11·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-20-04": {
+      "nodes": [
+        "change",
+        "frontend",
+        "worker"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB8"
+      ],
+      "note": "선택 snapshot 복원이다. snapshot을 사용하는 환경에서 복원·접수 순서를 확인한다.",
+      "source_refs": {
+        "scenario": "SC-20-04",
+        "routes": "R13·05·09·12<br>POL-03·05·08·11·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-21-01": {
+      "nodes": [
+        "caller",
+        "gateway",
+        "frontend",
+        "observe"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB2",
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-21-01",
+        "routes": "R03·12<br>POL-01·02·08·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-21-02": {
+      "nodes": [
+        "observe",
+        "sink"
+      ],
+      "boundaries": [
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-21-02",
+        "routes": "R03·12<br>POL-01·02·08·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-21-03": {
+      "nodes": [
+        "observe",
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB8",
+        "TB7"
+      ],
+      "note": "관측 자료를 실행에 다시 사용하는 선택 replay 접점이다. 실제로 배치한 replay 도구를 확인한다.",
+      "source_refs": {
+        "scenario": "SC-21-03",
+        "routes": "R03·12<br>POL-01·02·08·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-21-04": {
+      "nodes": [
+        "sink",
+        "observe",
+        "worker",
+        "platform"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB8",
+        "TB7"
+      ],
+      "note": "변조된 자료를 선택 replay가 읽는 접점이다. 진단 파일 변경 권한과 재실행 도구의 권한을 각각 확인한다.",
+      "source_refs": {
+        "scenario": "SC-21-04",
+        "routes": "R03·12<br>POL-01·02·08·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-22-01": {
+      "nodes": [
+        "change",
+        "worker",
+        "sink",
+        "platform"
+      ],
+      "boundaries": [
+        "TB8",
+        "TB9"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-22-01",
+        "routes": "R12·07·13<br>POL-08·09·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-22-02": {
+      "nodes": [
+        "worker",
+        "sink",
+        "platform"
+      ],
+      "boundaries": [
+        "TB8",
+        "TB9"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-22-02",
+        "routes": "R12·07·13<br>POL-08·09·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-22-03": {
+      "nodes": [
+        "sink",
+        "platform"
+      ],
+      "boundaries": [
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-22-03",
+        "routes": "R12·07·13<br>POL-08·09·13",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-23-01": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "observe",
+        "sink"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-23-01",
+        "routes": "R12·05·09·11<br>POL-07·08·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-23-02": {
+      "nodes": [
+        "frontend",
+        "core",
+        "worker",
+        "observe",
+        "sink"
+      ],
+      "boundaries": [
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-23-02",
+        "routes": "R12·05·09·11<br>POL-07·08·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-23-03": {
+      "nodes": [
+        "approval",
+        "loader",
+        "worker",
+        "observe",
+        "sink"
+      ],
+      "boundaries": [
+        "TB4",
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-23-03",
+        "routes": "R12·05·09·11<br>POL-07·08·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-23-04": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "core",
+        "worker"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB6"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-23-04",
+        "routes": "R12·05·09·11<br>POL-07·08·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-23-05": {
+      "nodes": [
+        "caller",
+        "frontend",
+        "worker",
+        "observe"
+      ],
+      "boundaries": [
+        "TB1",
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-23-05",
+        "routes": "R12·05·09·11<br>POL-07·08·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-23-06": {
+      "nodes": [
+        "sink"
+      ],
+      "boundaries": [
+        "TB8"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-23-06",
+        "routes": "R12·05·09·11<br>POL-07·08·11",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-24-01": {
+      "nodes": [
+        "frontend",
+        "core",
+        "worker",
+        "observe",
+        "platform"
+      ],
+      "boundaries": [
+        "TB8",
+        "TB9"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-24-01",
+        "routes": "R12·07<br>POL-01·08·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    },
+    "SC-24-02": {
+      "nodes": [
+        "observe",
+        "sink",
+        "platform"
+      ],
+      "boundaries": [
+        "TB8",
+        "TB9"
+      ],
+      "note": "강조한 위치에서 이 시나리오의 입력·변경·읽기 권한을 확인한다.",
+      "source_refs": {
+        "scenario": "SC-24-02",
+        "routes": "R12·07<br>POL-01·08·09",
+        "boundary_table": "참고자료/통합본/통합본.md#신뢰-경계"
+      }
+    }
+  },
+  "not_shown": "관리형 서비스는 TB10, 저장 결과 조회·취소는 TB11을 확인한다. PD·공유 가중치·replay는 해당 시나리오의 선택 기능 조건을 따른다. TB9는 실제 통신 구간별로 확인한다.",
+  "visual_groups": [
+    {
+      "id": "engine-scope",
+      "label": "vLLM 실행 기능 · 단일 노드 참조",
+      "x": 580,
+      "y": 235,
+      "width": 800,
+      "height": 750,
+      "fill": "#F1F6FC",
+      "stroke": "#B6C6D9",
+      "nodes": [
+        "loader",
+        "derived",
+        "frontend",
+        "core",
+        "worker",
+        "cache"
+      ],
+      "label_x": 850
+    },
+    {
+      "id": "organization-scope",
+      "label": "조직의 승인·배포",
+      "x": 300,
+      "y": 18,
+      "width": 490,
+      "height": 180,
+      "fill": "#FCF8F0",
+      "stroke": "#DCCDB0",
+      "nodes": [
+        "approval",
+        "change"
+      ]
+    },
+    {
+      "id": "caller-scope",
+      "label": "호출 측",
+      "x": 10,
+      "y": 500,
+      "width": 200,
+      "height": 182,
+      "fill": "#F5F6F8",
+      "stroke": "#CFD5DC",
+      "nodes": [
+        "caller"
+      ]
+    },
+    {
+      "id": "gateway-scope",
+      "label": "진입·라우팅",
+      "x": 300,
+      "y": 500,
+      "width": 200,
+      "height": 182,
+      "fill": "#F1F8F6",
+      "stroke": "#BDCEC9",
+      "nodes": [
+        "gateway"
+      ]
+    },
+    {
+      "id": "observation-scope",
+      "label": "관측·보존 · 배포별 위치 확인",
+      "x": 10,
+      "y": 800,
+      "width": 490,
+      "height": 184,
+      "fill": "#F7F4FA",
+      "stroke": "#D0C6DA",
+      "nodes": [
+        "observe",
+        "sink"
+      ],
+      "label_bottom": true
+    },
+    {
+      "id": "runtime-rights",
+      "label": "실행 권한·자원",
+      "x": 1170,
+      "y": 18,
+      "width": 200,
+      "height": 180,
+      "fill": "#F5F6F8",
+      "stroke": "#CFD5DC",
+      "nodes": [
+        "platform"
+      ]
+    }
+  ]
+}

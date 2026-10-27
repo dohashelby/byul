@@ -3,7 +3,7 @@ framework_id: CHK-REQ-005
 mechanism_ids:
 - mechanism-01
 - mechanism-08
-revision: 2
+revision: 3
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -37,7 +37,7 @@ unknown_criteria: API 표시명만 확인했거나 조건부 resolver·endpoint�
 remediation: '- 별칭·adapter·공유 가중치가 최종적으로 선택하는 모델을 확인하고 그 대상에 호출자의 사용 권한을 검사한다. 모델 선택 설정의 변경 권한을 제한하고 변경 이력을 남긴다.
 
   - 사용 종료한 모델의 신규 실행을 중단하고 Gateway·엔진의 남은 route·alias를 현재 승인 대상과 대조한다. 공용 API를 유지할 때도 퇴역 모델을 선택하지 않도록 설정한다. 기존 요청의 완료·중단과 자원 정리는 LIF에서 확인한다.'
-method_and_evidence: '모델 이름 생략·별칭·비허용 이름과 최종 선택 모델을 신원별로 비교한다. 정상 허용 호출도 확인한다. 【F20】MM 기본 LoRA, resolver, SageMaker adapter 주입은 조건부. 외부 SageMaker decorator의 정확한 header/검증은 미확인. model 필드 외 활성 selector를 목록화하고 최종 선택 adapter·revision·경로까지 인가 대조한다. 정상 대조: 허용 기본 모델/adapter 정상'
+method_and_evidence: '모델 이름 생략·별칭·비허용 이름과 최종 선택 모델을 신원별로 비교한다. 정상 허용 호출도 확인한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F20】MM 기본 LoRA, resolver, SageMaker adapter 주입은 조건부. 외부 SageMaker decorator의 정확한 header/검증은 미확인. model 필드 외 활성 selector를 목록화하고 최종 선택 adapter·revision·경로까지 인가 대조한다. 정상 대조: 허용 기본 모델/adapter 정상'
 remaining_setup: 활성 endpoint별 모델 선택 계측; 설치된 추가 기능만 시험; 퇴역 모델 시험 사본·최종 실행 모델 계측, 사용 종료 정책·기한 결정
 executor: null
 judge: null

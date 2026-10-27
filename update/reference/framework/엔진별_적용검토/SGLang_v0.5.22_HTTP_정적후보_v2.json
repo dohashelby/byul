@@ -1,0 +1,3550 @@
+{
+  "schema_version": "2.0",
+  "kind": "static_http_route_candidates",
+  "engine": "SGLang",
+  "version": "v0.5.22",
+  "source_commit": "baa9befa381511cd4d56f83980951e5a45fffc6d",
+  "reviewed_at": "2026-10-27",
+  "source_files": {
+    "python/sglang/srt/entrypoints/http_server.py": {
+      "sha256": "a89d20bb2fa8a86c511ab4d9d054f74d707423ab220f733ff25e62fcc0e49979",
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py"
+    },
+    "python/sglang/srt/entrypoints/v1_loads.py": {
+      "sha256": "c0dbf2fc90fe24dd568bb7f88e8d62d923e77af33b7f85603f7d39c409b8930e",
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/v1_loads.py"
+    },
+    "python/sglang/srt/entrypoints/elastic_ep.py": {
+      "sha256": "64b73e41deff7f54772baa6f50248723ff56ee3ef21af5a3505d12a93a8c87a9",
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/elastic_ep.py"
+    }
+  },
+  "extraction_scope": "Python AST decorator candidates and local include_router declarations; guards/paths preserved, source not executed",
+  "counts": {
+    "legacy_function_rows": 80,
+    "main_module_function_candidates": 83,
+    "included_module_function_candidates": 3,
+    "unique_source_functions": 86,
+    "candidate_instances": 86,
+    "decorator_registration_statements": 91,
+    "include_router_sites": 2,
+    "actual_api_count": null,
+    "actual_active_route_count": null
+  },
+  "runtime_registration_status": "unverified",
+  "effective_auth_status": "unverified",
+  "legacy_inventory": {
+    "path": "SGLang_v0.5.22_HTTP_route목록.json",
+    "sha256": "749e4773ba7ac314febd7a350f963799feb942305e6cf2720925005d93360a8f",
+    "unchanged_rows": [
+      {
+        "legacy_index": 0,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:699:ready"
+      },
+      {
+        "legacy_index": 1,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:707:health_generate"
+      },
+      {
+        "legacy_index": 2,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:787:get_model_info"
+      },
+      {
+        "legacy_index": 3,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:797:model_info"
+      },
+      {
+        "legacy_index": 4,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:838:get_server_info"
+      },
+      {
+        "legacy_index": 5,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:848:server_info"
+      },
+      {
+        "legacy_index": 6,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:883:set_internal_state"
+      },
+      {
+        "legacy_index": 7,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:917:generate_request"
+      },
+      {
+        "legacy_index": 8,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:978:encode_request"
+      },
+      {
+        "legacy_index": 9,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:991:classify_request"
+      },
+      {
+        "legacy_index": 10,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1011:flush_cache"
+      },
+      {
+        "legacy_index": 11,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1029:add_external_corpus"
+      },
+      {
+        "legacy_index": 12,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1054:remove_external_corpus"
+      },
+      {
+        "legacy_index": 13,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1072:list_external_corpora"
+      },
+      {
+        "legacy_index": 14,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1089:clear_hicache_storage_backend"
+      },
+      {
+        "legacy_index": 15,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1109:attach_hicache_storage_backend"
+      },
+      {
+        "legacy_index": 16,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1143:detach_hicache_storage_backend"
+      },
+      {
+        "legacy_index": 17,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1170:hicache_storage_backend_status"
+      },
+      {
+        "legacy_index": 18,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1188:start_profile_async"
+      },
+      {
+        "legacy_index": 19,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1199:stop_profile_async"
+      },
+      {
+        "legacy_index": 20,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1210:set_trace_level"
+      },
+      {
+        "legacy_index": 21,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1221:freeze_gc_async"
+      },
+      {
+        "legacy_index": 22,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1234:start_expert_distribution_record_async"
+      },
+      {
+        "legacy_index": 23,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1245:stop_expert_distribution_record_async"
+      },
+      {
+        "legacy_index": 24,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1256:dump_expert_distribution_record_async"
+      },
+      {
+        "legacy_index": 25,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1267:update_weights_from_disk"
+      },
+      {
+        "legacy_index": 26,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1296:init_weights_send_group_for_remote_instance"
+      },
+      {
+        "legacy_index": 27,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1315:send_weights_to_remote_instance"
+      },
+      {
+        "legacy_index": 28,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1333:get_remote_instance_transfer_engine_info"
+      },
+      {
+        "legacy_index": 29,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1344:remote_instance_transfer_engine_info"
+      },
+      {
+        "legacy_index": 30,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1371:init_weights_update_group"
+      },
+      {
+        "legacy_index": 31,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1387:destroy_weights_update_group"
+      },
+      {
+        "legacy_index": 32,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1403:update_weights_from_tensor"
+      },
+      {
+        "legacy_index": 33,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1425:begin_weight_update"
+      },
+      {
+        "legacy_index": 34,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1440:end_weight_update"
+      },
+      {
+        "legacy_index": 35,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1455:update_weights_from_distributed"
+      },
+      {
+        "legacy_index": 36,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1475:update_weights_from_ipc"
+      },
+      {
+        "legacy_index": 37,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1494:update_weight_version"
+      },
+      {
+        "legacy_index": 38,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1526:get_weights_by_name"
+      },
+      {
+        "legacy_index": 39,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1542:release_memory_occupation"
+      },
+      {
+        "legacy_index": 40,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1554:resume_memory_occupation"
+      },
+      {
+        "legacy_index": 41,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1566:check_weights"
+      },
+      {
+        "legacy_index": 42,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1588:slow_down"
+      },
+      {
+        "legacy_index": 43,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1602:pd_role_switch"
+      },
+      {
+        "legacy_index": 44,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1619:load_lora_adapter"
+      },
+      {
+        "legacy_index": 45,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1630:load_lora_adapter_from_tensors"
+      },
+      {
+        "legacy_index": 46,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1643:unload_lora_adapter"
+      },
+      {
+        "legacy_index": 47,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1653:open_session"
+      },
+      {
+        "legacy_index": 48,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1667:close_session"
+      },
+      {
+        "legacy_index": 49,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1678:configure_logging"
+      },
+      {
+        "legacy_index": 50,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1688:abort_request"
+      },
+      {
+        "legacy_index": 51,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1700:parse_function_call_request"
+      },
+      {
+        "legacy_index": 52,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1728:separate_reasoning_request"
+      },
+      {
+        "legacy_index": 53,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1766:pause_generation"
+      },
+      {
+        "legacy_index": 54,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1779:continue_generation"
+      },
+      {
+        "legacy_index": 55,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1794:openai_v1_completions"
+      },
+      {
+        "legacy_index": 56,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1804:openai_v1_chat_completions"
+      },
+      {
+        "legacy_index": 57,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1820:openai_v1_embeddings"
+      },
+      {
+        "legacy_index": 58,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1832:openai_v1_classify"
+      },
+      {
+        "legacy_index": 59,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1850:openai_v1_tokenize"
+      },
+      {
+        "legacy_index": 60,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1868:openai_v1_detokenize"
+      },
+      {
+        "legacy_index": 61,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1876:openai_v1_audio_transcriptions"
+      },
+      {
+        "legacy_index": 62,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1927:available_models"
+      },
+      {
+        "legacy_index": 63,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1959:retrieve_model"
+      },
+      {
+        "legacy_index": 64,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1984:v1_score_request"
+      },
+      {
+        "legacy_index": 65,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1992:v1_decisions_request"
+      },
+      {
+        "legacy_index": 66,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2000:v1_responses_request"
+      },
+      {
+        "legacy_index": 67,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2019:v1_retrieve_responses"
+      },
+      {
+        "legacy_index": 68,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2027:v1_cancel_responses"
+      },
+      {
+        "legacy_index": 69,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2037:v1_rerank_request"
+      },
+      {
+        "legacy_index": 70,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2065:ollama_chat"
+      },
+      {
+        "legacy_index": 71,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2071:ollama_generate"
+      },
+      {
+        "legacy_index": 72,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2079:ollama_tags"
+      },
+      {
+        "legacy_index": 73,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2085:ollama_show"
+      },
+      {
+        "legacy_index": 74,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2094:anthropic_v1_messages"
+      },
+      {
+        "legacy_index": 75,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2104:anthropic_v1_count_tokens"
+      },
+      {
+        "legacy_index": 76,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2115:systemone_decisions"
+      },
+      {
+        "legacy_index": 77,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2124:sagemaker_health"
+      },
+      {
+        "legacy_index": 78,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2130:sagemaker_chat_completions"
+      },
+      {
+        "legacy_index": 79,
+        "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2143:vertex_generate"
+      }
+    ]
+  },
+  "include_router_sites": [
+    {
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "line": 507,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L507",
+      "expression": "app.include_router(v1_loads_router)",
+      "router_alias": "v1_loads_router",
+      "import": {
+        "module": "sglang.srt.entrypoints.v1_loads",
+        "symbol": "router",
+        "level": 0,
+        "line": 503,
+        "conditions": []
+      },
+      "activation_conditions": [],
+      "lexical_scope": [],
+      "keyword_expressions": {},
+      "parent_include_chain": []
+    },
+    {
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "line": 523,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L523",
+      "expression": "app.include_router(elastic_ep_router)",
+      "router_alias": "elastic_ep_router",
+      "import": {
+        "module": "sglang.srt.entrypoints.elastic_ep",
+        "symbol": "router",
+        "level": 0,
+        "line": 510,
+        "conditions": []
+      },
+      "activation_conditions": [],
+      "lexical_scope": [],
+      "keyword_expressions": {},
+      "parent_include_chain": []
+    }
+  ],
+  "unresolved_static_sites": [],
+  "candidates": [
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:699:ready",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:699:ready",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "ready",
+      "line": 699,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L699",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/ready')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/ready')",
+          "line": 698,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L698",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/ready'",
+          "path_literal": "/ready",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:707:health_generate",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:707:health_generate",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "health_generate",
+      "line": 707,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L707",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/health')",
+        "app.get('/health_generate')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/health')",
+          "line": 705,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L705",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/health'",
+          "path_literal": "/health",
+          "dynamic_path": false,
+          "path_parameters": false
+        },
+        {
+          "expression": "app.get('/health_generate')",
+          "line": 706,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L706",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/health_generate'",
+          "path_literal": "/health_generate",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:787:get_model_info",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:787:get_model_info",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "get_model_info",
+      "line": 787,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L787",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/get_model_info')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/get_model_info')",
+          "line": 786,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L786",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/get_model_info'",
+          "path_literal": "/get_model_info",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:797:model_info",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:797:model_info",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "model_info",
+      "line": 797,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L797",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/model_info')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/model_info')",
+          "line": 796,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L796",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/model_info'",
+          "path_literal": "/model_info",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:838:get_server_info",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:838:get_server_info",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "get_server_info",
+      "line": 838,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L838",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/get_server_info')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/get_server_info')",
+          "line": 837,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L837",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/get_server_info'",
+          "path_literal": "/get_server_info",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:848:server_info",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:848:server_info",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "server_info",
+      "line": 848,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L848",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/server_info')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/server_info')",
+          "line": 847,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L847",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/server_info'",
+          "path_literal": "/server_info",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:883:set_internal_state",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:883:set_internal_state",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "set_internal_state",
+      "line": 883,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L883",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/set_internal_state', methods=['POST', 'PUT'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/set_internal_state', methods=['POST', 'PUT'])",
+          "line": 881,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L881",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST",
+            "PUT"
+          ],
+          "path_expression": "'/set_internal_state'",
+          "path_literal": "/set_internal_state",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:895:_dumper_control_handler",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:895:_dumper_control_handler",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "_dumper_control_handler",
+      "line": 895,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L895",
+      "lexical_scope": [],
+      "activation_conditions": [
+        {
+          "expression": "os.environ.get('DUMPER_SERVER_PORT') == 'reuse'",
+          "branch": "if",
+          "source_path": "python/sglang/srt/entrypoints/http_server.py",
+          "line": 891,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L891"
+        }
+      ],
+      "decorators": [
+        "app.api_route('/dumper/{method}', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/dumper/{method}', methods=['POST'])",
+          "line": 893,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L893",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/dumper/{method}'",
+          "path_literal": "/dumper/{method}",
+          "dynamic_path": false,
+          "path_parameters": true
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:917:generate_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:917:generate_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "generate_request",
+      "line": 917,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L917",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/generate', methods=['POST', 'PUT'], response_class=SGLangORJSONResponse)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/generate', methods=['POST', 'PUT'], response_class=SGLangORJSONResponse)",
+          "line": 912,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L912",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST",
+            "PUT"
+          ],
+          "path_expression": "'/generate'",
+          "path_literal": "/generate",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:978:encode_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:978:encode_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "encode_request",
+      "line": 978,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L978",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/encode', methods=['POST', 'PUT'])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/encode', methods=['POST', 'PUT'])",
+          "line": 977,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L977",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST",
+            "PUT"
+          ],
+          "path_expression": "'/encode'",
+          "path_literal": "/encode",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:991:classify_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:991:classify_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "classify_request",
+      "line": 991,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L991",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/classify', methods=['POST', 'PUT'])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/classify', methods=['POST', 'PUT'])",
+          "line": 990,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L990",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST",
+            "PUT"
+          ],
+          "path_expression": "'/classify'",
+          "path_literal": "/classify",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1011:flush_cache",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1011:flush_cache",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "flush_cache",
+      "line": 1011,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1011",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/flush_cache', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/flush_cache', methods=['GET', 'POST'])",
+          "line": 1009,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1009",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/flush_cache'",
+          "path_literal": "/flush_cache",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1029:add_external_corpus",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1029:add_external_corpus",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "add_external_corpus",
+      "line": 1029,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1029",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/add_external_corpus')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/add_external_corpus')",
+          "line": 1027,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1027",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/add_external_corpus'",
+          "path_literal": "/add_external_corpus",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1054:remove_external_corpus",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1054:remove_external_corpus",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "remove_external_corpus",
+      "line": 1054,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1054",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/remove_external_corpus')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/remove_external_corpus')",
+          "line": 1052,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1052",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/remove_external_corpus'",
+          "path_literal": "/remove_external_corpus",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1072:list_external_corpora",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1072:list_external_corpora",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "list_external_corpora",
+      "line": 1072,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1072",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/list_external_corpora')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/list_external_corpora')",
+          "line": 1070,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1070",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/list_external_corpora'",
+          "path_literal": "/list_external_corpora",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1089:clear_hicache_storage_backend",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1089:clear_hicache_storage_backend",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "clear_hicache_storage_backend",
+      "line": 1089,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1089",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/hicache/storage-backend/clear', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/hicache/storage-backend/clear', methods=['POST'])",
+          "line": 1087,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1087",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/hicache/storage-backend/clear'",
+          "path_literal": "/hicache/storage-backend/clear",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1109:attach_hicache_storage_backend",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1109:attach_hicache_storage_backend",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "attach_hicache_storage_backend",
+      "line": 1109,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1109",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/hicache/storage-backend', methods=['PUT'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/hicache/storage-backend', methods=['PUT'])",
+          "line": 1107,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1107",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "PUT"
+          ],
+          "path_expression": "'/hicache/storage-backend'",
+          "path_literal": "/hicache/storage-backend",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1143:detach_hicache_storage_backend",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1143:detach_hicache_storage_backend",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "detach_hicache_storage_backend",
+      "line": 1143,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1143",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/hicache/storage-backend', methods=['DELETE'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/hicache/storage-backend', methods=['DELETE'])",
+          "line": 1141,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1141",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "DELETE"
+          ],
+          "path_expression": "'/hicache/storage-backend'",
+          "path_literal": "/hicache/storage-backend",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1170:hicache_storage_backend_status",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1170:hicache_storage_backend_status",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "hicache_storage_backend_status",
+      "line": 1170,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1170",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/hicache/storage-backend')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/hicache/storage-backend')",
+          "line": 1168,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1168",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/hicache/storage-backend'",
+          "path_literal": "/hicache/storage-backend",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1188:start_profile_async",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1188:start_profile_async",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "start_profile_async",
+      "line": 1188,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1188",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/start_profile', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/start_profile', methods=['GET', 'POST'])",
+          "line": 1186,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1186",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/start_profile'",
+          "path_literal": "/start_profile",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1199:stop_profile_async",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1199:stop_profile_async",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "stop_profile_async",
+      "line": 1199,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1199",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/stop_profile', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/stop_profile', methods=['GET', 'POST'])",
+          "line": 1197,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1197",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/stop_profile'",
+          "path_literal": "/stop_profile",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1210:set_trace_level",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1210:set_trace_level",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "set_trace_level",
+      "line": 1210,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1210",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/set_trace_level', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/set_trace_level', methods=['GET', 'POST'])",
+          "line": 1208,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1208",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/set_trace_level'",
+          "path_literal": "/set_trace_level",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1221:freeze_gc_async",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1221:freeze_gc_async",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "freeze_gc_async",
+      "line": 1221,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1221",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/freeze_gc', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/freeze_gc', methods=['GET', 'POST'])",
+          "line": 1219,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1219",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/freeze_gc'",
+          "path_literal": "/freeze_gc",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1234:start_expert_distribution_record_async",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1234:start_expert_distribution_record_async",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "start_expert_distribution_record_async",
+      "line": 1234,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1234",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/start_expert_distribution_record', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/start_expert_distribution_record', methods=['GET', 'POST'])",
+          "line": 1232,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1232",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/start_expert_distribution_record'",
+          "path_literal": "/start_expert_distribution_record",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1245:stop_expert_distribution_record_async",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1245:stop_expert_distribution_record_async",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "stop_expert_distribution_record_async",
+      "line": 1245,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1245",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/stop_expert_distribution_record', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/stop_expert_distribution_record', methods=['GET', 'POST'])",
+          "line": 1243,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1243",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/stop_expert_distribution_record'",
+          "path_literal": "/stop_expert_distribution_record",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1256:dump_expert_distribution_record_async",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1256:dump_expert_distribution_record_async",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "dump_expert_distribution_record_async",
+      "line": 1256,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1256",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/dump_expert_distribution_record', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/dump_expert_distribution_record', methods=['GET', 'POST'])",
+          "line": 1254,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1254",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/dump_expert_distribution_record'",
+          "path_literal": "/dump_expert_distribution_record",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1267:update_weights_from_disk",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1267:update_weights_from_disk",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "update_weights_from_disk",
+      "line": 1267,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1267",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/update_weights_from_disk')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/update_weights_from_disk')",
+          "line": 1265,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1265",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/update_weights_from_disk'",
+          "path_literal": "/update_weights_from_disk",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1296:init_weights_send_group_for_remote_instance",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1296:init_weights_send_group_for_remote_instance",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "init_weights_send_group_for_remote_instance",
+      "line": 1296,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1296",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/init_weights_send_group_for_remote_instance')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/init_weights_send_group_for_remote_instance')",
+          "line": 1294,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1294",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/init_weights_send_group_for_remote_instance'",
+          "path_literal": "/init_weights_send_group_for_remote_instance",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1315:send_weights_to_remote_instance",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1315:send_weights_to_remote_instance",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "send_weights_to_remote_instance",
+      "line": 1315,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1315",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/send_weights_to_remote_instance')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/send_weights_to_remote_instance')",
+          "line": 1313,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1313",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/send_weights_to_remote_instance'",
+          "path_literal": "/send_weights_to_remote_instance",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1333:get_remote_instance_transfer_engine_info",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1333:get_remote_instance_transfer_engine_info",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "get_remote_instance_transfer_engine_info",
+      "line": 1333,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1333",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/get_remote_instance_transfer_engine_info')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/get_remote_instance_transfer_engine_info')",
+          "line": 1331,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1331",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/get_remote_instance_transfer_engine_info'",
+          "path_literal": "/get_remote_instance_transfer_engine_info",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1344:remote_instance_transfer_engine_info",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1344:remote_instance_transfer_engine_info",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "remote_instance_transfer_engine_info",
+      "line": 1344,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1344",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/remote_instance_transfer_engine_info')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/remote_instance_transfer_engine_info')",
+          "line": 1342,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1342",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/remote_instance_transfer_engine_info'",
+          "path_literal": "/remote_instance_transfer_engine_info",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1371:init_weights_update_group",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1371:init_weights_update_group",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "init_weights_update_group",
+      "line": 1371,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1371",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/init_weights_update_group')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/init_weights_update_group')",
+          "line": 1369,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1369",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/init_weights_update_group'",
+          "path_literal": "/init_weights_update_group",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1387:destroy_weights_update_group",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1387:destroy_weights_update_group",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "destroy_weights_update_group",
+      "line": 1387,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1387",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/destroy_weights_update_group')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/destroy_weights_update_group')",
+          "line": 1385,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1385",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/destroy_weights_update_group'",
+          "path_literal": "/destroy_weights_update_group",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1403:update_weights_from_tensor",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1403:update_weights_from_tensor",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "update_weights_from_tensor",
+      "line": 1403,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1403",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/update_weights_from_tensor')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/update_weights_from_tensor')",
+          "line": 1401,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1401",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/update_weights_from_tensor'",
+          "path_literal": "/update_weights_from_tensor",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1425:begin_weight_update",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1425:begin_weight_update",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "begin_weight_update",
+      "line": 1425,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1425",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/begin_weight_update')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/begin_weight_update')",
+          "line": 1423,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1423",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/begin_weight_update'",
+          "path_literal": "/begin_weight_update",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1440:end_weight_update",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1440:end_weight_update",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "end_weight_update",
+      "line": 1440,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1440",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/end_weight_update')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/end_weight_update')",
+          "line": 1438,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1438",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/end_weight_update'",
+          "path_literal": "/end_weight_update",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1455:update_weights_from_distributed",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1455:update_weights_from_distributed",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "update_weights_from_distributed",
+      "line": 1455,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1455",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/update_weights_from_distributed')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/update_weights_from_distributed')",
+          "line": 1453,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1453",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/update_weights_from_distributed'",
+          "path_literal": "/update_weights_from_distributed",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1475:update_weights_from_ipc",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1475:update_weights_from_ipc",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "update_weights_from_ipc",
+      "line": 1475,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1475",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/update_weights_from_ipc')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/update_weights_from_ipc')",
+          "line": 1473,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1473",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/update_weights_from_ipc'",
+          "path_literal": "/update_weights_from_ipc",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1494:update_weight_version",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1494:update_weight_version",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "update_weight_version",
+      "line": 1494,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1494",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/update_weight_version')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/update_weight_version')",
+          "line": 1492,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1492",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/update_weight_version'",
+          "path_literal": "/update_weight_version",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1526:get_weights_by_name",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1526:get_weights_by_name",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "get_weights_by_name",
+      "line": 1526,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1526",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/get_weights_by_name', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/get_weights_by_name', methods=['GET', 'POST'])",
+          "line": 1524,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1524",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/get_weights_by_name'",
+          "path_literal": "/get_weights_by_name",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1542:release_memory_occupation",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1542:release_memory_occupation",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "release_memory_occupation",
+      "line": 1542,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1542",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/release_memory_occupation', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/release_memory_occupation', methods=['GET', 'POST'])",
+          "line": 1540,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1540",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/release_memory_occupation'",
+          "path_literal": "/release_memory_occupation",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1554:resume_memory_occupation",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1554:resume_memory_occupation",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "resume_memory_occupation",
+      "line": 1554,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1554",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/resume_memory_occupation', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/resume_memory_occupation', methods=['GET', 'POST'])",
+          "line": 1552,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1552",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/resume_memory_occupation'",
+          "path_literal": "/resume_memory_occupation",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1566:check_weights",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1566:check_weights",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "check_weights",
+      "line": 1566,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1566",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/weights_checker', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/weights_checker', methods=['GET', 'POST'])",
+          "line": 1564,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1564",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/weights_checker'",
+          "path_literal": "/weights_checker",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1588:slow_down",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1588:slow_down",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "slow_down",
+      "line": 1588,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1588",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/slow_down', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/slow_down', methods=['GET', 'POST'])",
+          "line": 1586,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1586",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/slow_down'",
+          "path_literal": "/slow_down",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1602:pd_role_switch",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1602:pd_role_switch",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "pd_role_switch",
+      "line": 1602,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1602",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/pd_role_switch', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/pd_role_switch', methods=['POST'])",
+          "line": 1600,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1600",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/pd_role_switch'",
+          "path_literal": "/pd_role_switch",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1619:load_lora_adapter",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1619:load_lora_adapter",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "load_lora_adapter",
+      "line": 1619,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1619",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/load_lora_adapter', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/load_lora_adapter', methods=['POST'])",
+          "line": 1617,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1617",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/load_lora_adapter'",
+          "path_literal": "/load_lora_adapter",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1630:load_lora_adapter_from_tensors",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1630:load_lora_adapter_from_tensors",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "load_lora_adapter_from_tensors",
+      "line": 1630,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1630",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/load_lora_adapter_from_tensors', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/load_lora_adapter_from_tensors', methods=['POST'])",
+          "line": 1628,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1628",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/load_lora_adapter_from_tensors'",
+          "path_literal": "/load_lora_adapter_from_tensors",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1643:unload_lora_adapter",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1643:unload_lora_adapter",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "unload_lora_adapter",
+      "line": 1643,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1643",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/unload_lora_adapter', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/unload_lora_adapter', methods=['POST'])",
+          "line": 1641,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1641",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/unload_lora_adapter'",
+          "path_literal": "/unload_lora_adapter",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1653:open_session",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1653:open_session",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "open_session",
+      "line": 1653,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1653",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/open_session', methods=['GET', 'POST'])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/open_session', methods=['GET', 'POST'])",
+          "line": 1652,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1652",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/open_session'",
+          "path_literal": "/open_session",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1667:close_session",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1667:close_session",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "close_session",
+      "line": 1667,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1667",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/close_session', methods=['GET', 'POST'])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/close_session', methods=['GET', 'POST'])",
+          "line": 1666,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1666",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/close_session'",
+          "path_literal": "/close_session",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1678:configure_logging",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1678:configure_logging",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "configure_logging",
+      "line": 1678,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1678",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/configure_logging', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/configure_logging', methods=['GET', 'POST'])",
+          "line": 1676,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1676",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "GET",
+            "POST"
+          ],
+          "path_expression": "'/configure_logging'",
+          "path_literal": "/configure_logging",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1688:abort_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1688:abort_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "abort_request",
+      "line": 1688,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1688",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/abort_request')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/abort_request')",
+          "line": 1686,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1686",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/abort_request'",
+          "path_literal": "/abort_request",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1700:parse_function_call_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1700:parse_function_call_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "parse_function_call_request",
+      "line": 1700,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1700",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/parse_function_call')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/parse_function_call')",
+          "line": 1699,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1699",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/parse_function_call'",
+          "path_literal": "/parse_function_call",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1728:separate_reasoning_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1728:separate_reasoning_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "separate_reasoning_request",
+      "line": 1728,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1728",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/separate_reasoning')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/separate_reasoning')",
+          "line": 1727,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1727",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/separate_reasoning'",
+          "path_literal": "/separate_reasoning",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1766:pause_generation",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1766:pause_generation",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "pause_generation",
+      "line": 1766,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1766",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/pause_generation')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/pause_generation')",
+          "line": 1764,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1764",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/pause_generation'",
+          "path_literal": "/pause_generation",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1779:continue_generation",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1779:continue_generation",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "continue_generation",
+      "line": 1779,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1779",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/continue_generation')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/continue_generation')",
+          "line": 1777,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1777",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/continue_generation'",
+          "path_literal": "/continue_generation",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1794:openai_v1_completions",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1794:openai_v1_completions",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "openai_v1_completions",
+      "line": 1794,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1794",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/completions', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/completions', dependencies=[Depends(validate_json_request)])",
+          "line": 1793,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1793",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/completions'",
+          "path_literal": "/v1/completions",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1804:openai_v1_chat_completions",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1804:openai_v1_chat_completions",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "openai_v1_chat_completions",
+      "line": 1804,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1804",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/chat/completions', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/chat/completions', dependencies=[Depends(validate_json_request)])",
+          "line": 1803,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1803",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/chat/completions'",
+          "path_literal": "/v1/chat/completions",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1820:openai_v1_embeddings",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1820:openai_v1_embeddings",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "openai_v1_embeddings",
+      "line": 1820,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1820",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/embeddings', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/embeddings', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+          "line": 1815,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1815",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/embeddings'",
+          "path_literal": "/v1/embeddings",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1832:openai_v1_classify",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1832:openai_v1_classify",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "openai_v1_classify",
+      "line": 1832,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1832",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/classify', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/classify', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+          "line": 1827,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1827",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/classify'",
+          "path_literal": "/v1/classify",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1850:openai_v1_tokenize",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1850:openai_v1_tokenize",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "openai_v1_tokenize",
+      "line": 1850,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1850",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/tokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+        "app.post('/tokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)], include_in_schema=False)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/tokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+          "line": 1839,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1839",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/tokenize'",
+          "path_literal": "/v1/tokenize",
+          "dynamic_path": false,
+          "path_parameters": false
+        },
+        {
+          "expression": "app.post('/tokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)], include_in_schema=False)",
+          "line": 1844,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1844",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/tokenize'",
+          "path_literal": "/tokenize",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1868:openai_v1_detokenize",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1868:openai_v1_detokenize",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "openai_v1_detokenize",
+      "line": 1868,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1868",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/detokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+        "app.post('/detokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)], include_in_schema=False)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/detokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+          "line": 1857,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1857",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/detokenize'",
+          "path_literal": "/v1/detokenize",
+          "dynamic_path": false,
+          "path_parameters": false
+        },
+        {
+          "expression": "app.post('/detokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)], include_in_schema=False)",
+          "line": 1862,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1862",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/detokenize'",
+          "path_literal": "/detokenize",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1876:openai_v1_audio_transcriptions",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1876:openai_v1_audio_transcriptions",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "openai_v1_audio_transcriptions",
+      "line": 1876,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1876",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/audio/transcriptions')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/audio/transcriptions')",
+          "line": 1875,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1875",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/audio/transcriptions'",
+          "path_literal": "/v1/audio/transcriptions",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1927:available_models",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1927:available_models",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "available_models",
+      "line": 1927,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1927",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/v1/models', response_class=ORJSONResponse)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/v1/models', response_class=ORJSONResponse)",
+          "line": 1926,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1926",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/v1/models'",
+          "path_literal": "/v1/models",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1959:retrieve_model",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1959:retrieve_model",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "retrieve_model",
+      "line": 1959,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1959",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/v1/models/{model:path}', response_class=ORJSONResponse)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/v1/models/{model:path}', response_class=ORJSONResponse)",
+          "line": 1958,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1958",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/v1/models/{model:path}'",
+          "path_literal": "/v1/models/{model:path}",
+          "dynamic_path": false,
+          "path_parameters": true
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1984:v1_score_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1984:v1_score_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "v1_score_request",
+      "line": 1984,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1984",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/score', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/score', dependencies=[Depends(validate_json_request)])",
+          "line": 1983,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1983",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/score'",
+          "path_literal": "/v1/score",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:1992:v1_decisions_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:1992:v1_decisions_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "v1_decisions_request",
+      "line": 1992,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1992",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/decisions', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/decisions', dependencies=[Depends(validate_json_request)])",
+          "line": 1991,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1991",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/decisions'",
+          "path_literal": "/v1/decisions",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2000:v1_responses_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2000:v1_responses_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "v1_responses_request",
+      "line": 2000,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2000",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/responses', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/responses', dependencies=[Depends(validate_json_request)])",
+          "line": 1999,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1999",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/responses'",
+          "path_literal": "/v1/responses",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2019:v1_retrieve_responses",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2019:v1_retrieve_responses",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "v1_retrieve_responses",
+      "line": 2019,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2019",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/v1/responses/{response_id}')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/v1/responses/{response_id}')",
+          "line": 2018,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2018",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/v1/responses/{response_id}'",
+          "path_literal": "/v1/responses/{response_id}",
+          "dynamic_path": false,
+          "path_parameters": true
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2027:v1_cancel_responses",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2027:v1_cancel_responses",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "v1_cancel_responses",
+      "line": 2027,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2027",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/responses/{response_id}/cancel')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/responses/{response_id}/cancel')",
+          "line": 2026,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2026",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/responses/{response_id}/cancel'",
+          "path_literal": "/v1/responses/{response_id}/cancel",
+          "dynamic_path": false,
+          "path_parameters": true
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2037:v1_rerank_request",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2037:v1_rerank_request",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "v1_rerank_request",
+      "line": 2037,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2037",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.api_route('/v1/rerank', methods=['POST', 'PUT'], dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.api_route('/v1/rerank', methods=['POST', 'PUT'], dependencies=[Depends(validate_json_request)])",
+          "line": 2034,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2034",
+          "receiver": "app",
+          "decorator_method": "api_route",
+          "methods_declared": [
+            "POST",
+            "PUT"
+          ],
+          "path_expression": "'/v1/rerank'",
+          "path_literal": "/v1/rerank",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2051:ollama_root",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2051:ollama_root",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "ollama_root",
+      "line": 2051,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2051",
+      "lexical_scope": [],
+      "activation_conditions": [
+        {
+          "expression": "_ollama_root_route is not None",
+          "branch": "if",
+          "source_path": "python/sglang/srt/entrypoints/http_server.py",
+          "line": 2047,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2047"
+        }
+      ],
+      "decorators": [
+        "app.get(_ollama_root_route)",
+        "app.head(_ollama_root_route)"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get(_ollama_root_route)",
+          "line": 2049,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2049",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "_ollama_root_route",
+          "path_literal": null,
+          "dynamic_path": true,
+          "path_parameters": false
+        },
+        {
+          "expression": "app.head(_ollama_root_route)",
+          "line": 2050,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2050",
+          "receiver": "app",
+          "decorator_method": "head",
+          "methods_declared": [
+            "HEAD"
+          ],
+          "path_expression": "_ollama_root_route",
+          "path_literal": null,
+          "dynamic_path": true,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2059:sglang_root",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2059:sglang_root",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "sglang_root",
+      "line": 2059,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2059",
+      "lexical_scope": [],
+      "activation_conditions": [
+        {
+          "expression": "_ollama_root_route is not None",
+          "branch": "else",
+          "source_path": "python/sglang/srt/entrypoints/http_server.py",
+          "line": 2047,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2047"
+        }
+      ],
+      "decorators": [
+        "app.get('/')",
+        "app.head('/')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/')",
+          "line": 2057,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2057",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/'",
+          "path_literal": "/",
+          "dynamic_path": false,
+          "path_parameters": false
+        },
+        {
+          "expression": "app.head('/')",
+          "line": 2058,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2058",
+          "receiver": "app",
+          "decorator_method": "head",
+          "methods_declared": [
+            "HEAD"
+          ],
+          "path_expression": "'/'",
+          "path_literal": "/",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2065:ollama_chat",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2065:ollama_chat",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "ollama_chat",
+      "line": 2065,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2065",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post(os.environ.get('SGLANG_OLLAMA_CHAT_ROUTE', '/api/chat'))"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post(os.environ.get('SGLANG_OLLAMA_CHAT_ROUTE', '/api/chat'))",
+          "line": 2064,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2064",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "os.environ.get('SGLANG_OLLAMA_CHAT_ROUTE', '/api/chat')",
+          "path_literal": null,
+          "dynamic_path": true,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2071:ollama_generate",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2071:ollama_generate",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "ollama_generate",
+      "line": 2071,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2071",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post(os.environ.get('SGLANG_OLLAMA_GENERATE_ROUTE', '/api/generate'))"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post(os.environ.get('SGLANG_OLLAMA_GENERATE_ROUTE', '/api/generate'))",
+          "line": 2070,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2070",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "os.environ.get('SGLANG_OLLAMA_GENERATE_ROUTE', '/api/generate')",
+          "path_literal": null,
+          "dynamic_path": true,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2079:ollama_tags",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2079:ollama_tags",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "ollama_tags",
+      "line": 2079,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2079",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get(os.environ.get('SGLANG_OLLAMA_TAGS_ROUTE', '/api/tags'))"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get(os.environ.get('SGLANG_OLLAMA_TAGS_ROUTE', '/api/tags'))",
+          "line": 2078,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2078",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "os.environ.get('SGLANG_OLLAMA_TAGS_ROUTE', '/api/tags')",
+          "path_literal": null,
+          "dynamic_path": true,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2085:ollama_show",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2085:ollama_show",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "ollama_show",
+      "line": 2085,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2085",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post(os.environ.get('SGLANG_OLLAMA_SHOW_ROUTE', '/api/show'))"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post(os.environ.get('SGLANG_OLLAMA_SHOW_ROUTE', '/api/show'))",
+          "line": 2084,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2084",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "os.environ.get('SGLANG_OLLAMA_SHOW_ROUTE', '/api/show')",
+          "path_literal": null,
+          "dynamic_path": true,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2094:anthropic_v1_messages",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2094:anthropic_v1_messages",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "anthropic_v1_messages",
+      "line": 2094,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2094",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/messages', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/messages', dependencies=[Depends(validate_json_request)])",
+          "line": 2093,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2093",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/messages'",
+          "path_literal": "/v1/messages",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2104:anthropic_v1_count_tokens",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2104:anthropic_v1_count_tokens",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "anthropic_v1_count_tokens",
+      "line": 2104,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2104",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/messages/count_tokens', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/messages/count_tokens', dependencies=[Depends(validate_json_request)])",
+          "line": 2103,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2103",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/messages/count_tokens'",
+          "path_literal": "/v1/messages/count_tokens",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2115:systemone_decisions",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2115:systemone_decisions",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "systemone_decisions",
+      "line": 2115,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2115",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/v1/systemone', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/v1/systemone', dependencies=[Depends(validate_json_request)])",
+          "line": 2114,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2114",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/v1/systemone'",
+          "path_literal": "/v1/systemone",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2124:sagemaker_health",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2124:sagemaker_health",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "sagemaker_health",
+      "line": 2124,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2124",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.get('/ping')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.get('/ping')",
+          "line": 2123,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2123",
+          "receiver": "app",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/ping'",
+          "path_literal": "/ping",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2130:sagemaker_chat_completions",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2130:sagemaker_chat_completions",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "sagemaker_chat_completions",
+      "line": 2130,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2130",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post('/invocations')"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post('/invocations')",
+          "line": 2129,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2129",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/invocations'",
+          "path_literal": "/invocations",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/http_server.py:2143:vertex_generate",
+      "source_function_id": "python/sglang/srt/entrypoints/http_server.py:2143:vertex_generate",
+      "source_path": "python/sglang/srt/entrypoints/http_server.py",
+      "function": "vertex_generate",
+      "line": 2143,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2143",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "app.post(os.environ.get('AIP_PREDICT_ROUTE', '/vertex_generate'))"
+      ],
+      "registrations": [
+        {
+          "expression": "app.post(os.environ.get('AIP_PREDICT_ROUTE', '/vertex_generate'))",
+          "line": 2142,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2142",
+          "receiver": "app",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "os.environ.get('AIP_PREDICT_ROUTE', '/vertex_generate')",
+          "path_literal": null,
+          "dynamic_path": true,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": []
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/v1_loads.py:97:get_loads@python/sglang/srt/entrypoints/http_server.py:507",
+      "source_function_id": "python/sglang/srt/entrypoints/v1_loads.py:97:get_loads",
+      "source_path": "python/sglang/srt/entrypoints/v1_loads.py",
+      "function": "get_loads",
+      "line": 97,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/v1_loads.py#L97",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "router.get('/v1/loads')"
+      ],
+      "registrations": [
+        {
+          "expression": "router.get('/v1/loads')",
+          "line": 96,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/v1_loads.py#L96",
+          "receiver": "router",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/v1/loads'",
+          "path_literal": "/v1/loads",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": [
+        {
+          "source_path": "python/sglang/srt/entrypoints/http_server.py",
+          "line": 507,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L507",
+          "expression": "app.include_router(v1_loads_router)",
+          "router_alias": "v1_loads_router",
+          "import": {
+            "module": "sglang.srt.entrypoints.v1_loads",
+            "symbol": "router",
+            "level": 0,
+            "line": 503,
+            "conditions": []
+          },
+          "activation_conditions": [],
+          "lexical_scope": [],
+          "keyword_expressions": {}
+        }
+      ]
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/elastic_ep.py:17:scale_elastic_ep@python/sglang/srt/entrypoints/http_server.py:523",
+      "source_function_id": "python/sglang/srt/entrypoints/elastic_ep.py:17:scale_elastic_ep",
+      "source_path": "python/sglang/srt/entrypoints/elastic_ep.py",
+      "function": "scale_elastic_ep",
+      "line": 17,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/elastic_ep.py#L17",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "router.post('/scale_elastic_ep')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "router.post('/scale_elastic_ep')",
+          "line": 15,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/elastic_ep.py#L15",
+          "receiver": "router",
+          "decorator_method": "post",
+          "methods_declared": [
+            "POST"
+          ],
+          "path_expression": "'/scale_elastic_ep'",
+          "path_literal": "/scale_elastic_ep",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": [
+        {
+          "source_path": "python/sglang/srt/entrypoints/http_server.py",
+          "line": 523,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L523",
+          "expression": "app.include_router(elastic_ep_router)",
+          "router_alias": "elastic_ep_router",
+          "import": {
+            "module": "sglang.srt.entrypoints.elastic_ep",
+            "symbol": "router",
+            "level": 0,
+            "line": 510,
+            "conditions": []
+          },
+          "activation_conditions": [],
+          "lexical_scope": [],
+          "keyword_expressions": {}
+        }
+      ]
+    },
+    {
+      "candidate_id": "python/sglang/srt/entrypoints/elastic_ep.py:78:is_scaling_elastic_ep@python/sglang/srt/entrypoints/http_server.py:523",
+      "source_function_id": "python/sglang/srt/entrypoints/elastic_ep.py:78:is_scaling_elastic_ep",
+      "source_path": "python/sglang/srt/entrypoints/elastic_ep.py",
+      "function": "is_scaling_elastic_ep",
+      "line": 78,
+      "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/elastic_ep.py#L78",
+      "lexical_scope": [],
+      "activation_conditions": [],
+      "decorators": [
+        "router.get('/is_scaling_elastic_ep')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registrations": [
+        {
+          "expression": "router.get('/is_scaling_elastic_ep')",
+          "line": 76,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/elastic_ep.py#L76",
+          "receiver": "router",
+          "decorator_method": "get",
+          "methods_declared": [
+            "GET"
+          ],
+          "path_expression": "'/is_scaling_elastic_ep'",
+          "path_literal": "/is_scaling_elastic_ep",
+          "dynamic_path": false,
+          "path_parameters": false
+        }
+      ],
+      "auth_decorator_declarations": [
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "effective_auth_status": "unverified",
+      "runtime_registration_status": "unverified",
+      "include_chain": [
+        {
+          "source_path": "python/sglang/srt/entrypoints/http_server.py",
+          "line": 523,
+          "source_url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L523",
+          "expression": "app.include_router(elastic_ep_router)",
+          "router_alias": "elastic_ep_router",
+          "import": {
+            "module": "sglang.srt.entrypoints.elastic_ep",
+            "symbol": "router",
+            "level": 0,
+            "line": 510,
+            "conditions": []
+          },
+          "activation_conditions": [],
+          "lexical_scope": [],
+          "keyword_expressions": {}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,948 @@
+{
+  "record_kind": "framework_assessment_review",
+  "record_revision": 1,
+  "record_date": "2026-10-24",
+  "record_status": "평가 기록 작성 완료; 보완·재시험·정식 승인 결과 미확인",
+  "authored_by": "Codex 자료 대조",
+  "formal_reviewer": null,
+  "framework_check_id": "CHK-REQ-013",
+  "gua_check_id": "REQ-13",
+  "requirement_id": "requirement-5-1",
+  "related_question_ids": [
+    "Q-C02",
+    "Q-C11"
+  ],
+  "related_scenario_ids": [
+    "SC-21-01"
+  ],
+  "security_goal": "기밀성",
+  "protected_assets": {
+    "AS1": "응답·입력 사본·합성 system 문맥",
+    "AS6": "허용 반환 필드·옵션 정책"
+  },
+  "evaluation_purpose": "한 CPU chat 실행의 반환 정보 제한과 기존 프레임워크 판정·후속 처리 적용",
+  "execution_identity": {
+    "source_json_pointer": "/actual_cpu_runs/cases/0",
+    "case_name": "case1-budget127",
+    "execution_id": null,
+    "plan_ref": {
+      "kind": "PLAN",
+      "id": "PLAN-01M5M7P9A8D4KVD6V1J2BBKCSV",
+      "revision": 1,
+      "sha256": "5d86f4cba100f44da38997aa31cea60368c1977329bac31c3c3d10189ee4ab49"
+    },
+    "execution": {
+      "abort_reason": null,
+      "adapter": {
+        "name": "vllm",
+        "version": "0.3.0"
+      },
+      "executor": {
+        "config_sha256": "dd74fdae962562208ced8e9dd97dc81a29f042a7e8cf1b059b0ac128f3f807c2",
+        "name": "response_content",
+        "version": "0.1.0"
+      },
+      "finished_at": "2026-10-23T11:21:21Z",
+      "started_at": "2026-10-23T11:20:52Z",
+      "status": "COMPLETED"
+    }
+  },
+  "source_provenance": {
+    "repository": "dohashelby/gua",
+    "retrieval_commit": "24f7d90a2745c108d7d395e5082a3721a3198f0c",
+    "source_path": "docs/evidence/automation-phase2-20261023.json",
+    "url": "https://github.com/dohashelby/gua/blob/24f7d90a2745c108d7d395e5082a3721a3198f0c/docs/evidence/automation-phase2-20261023.json",
+    "source_file_sha256": "030b1ce89b0877bc1486fca7547bc35c1ad31c0c7fa504e2f0c07583fb0209e9",
+    "evidence_generated_at": "2026-10-23T11:22:42.276697+00:00",
+    "implementation_base": {
+      "branch": "codex/gua-windows-automation-phase1",
+      "commit": "1d1463274529708ae5fe5e04f42c134ba5a10ec3"
+    },
+    "execution_source_hash_comparisons": {
+      "executors/response_content.py": {
+        "sha256": "7099c3b74ff0e437f1a77b40e0ea42e6dd0e56949de750b6b448a701640fbedd",
+        "matches_execution_source_map": true
+      },
+      "executors/content_common.py": {
+        "sha256": "67185e59bf65cd08674bb6ffc2e25f1b455b68ac4b6698de7b8e92b9c06b505f",
+        "matches_execution_source_map": true
+      },
+      "core/judge.py": {
+        "sha256": "43ed9ddaeb4f9c5b0fc0a46ae1062b7e5c015ad898e2825f47bf8adadcc51f05",
+        "matches_execution_source_map": true
+      },
+      "judges/rule_table.py": {
+        "sha256": "975ac1bae78ba5180a2bc4cc288cc17b55770357b465b4df246a45cb1401e680",
+        "matches_execution_source_map": true
+      }
+    },
+    "raw_source_objects_independently_verified": false,
+    "raw_evidence_location_as_reported": "Separate local automation-phase2 output; stores/reports/bundles/request logs are preserved outside Git."
+  },
+  "environment": {
+    "engine_as_reported": {
+      "name": "vllm",
+      "version": "0.31.0",
+      "image_digest": "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b",
+      "source_commit_status": "UNVERIFIED"
+    },
+    "adapter_as_reported": {
+      "name": "vllm",
+      "version": "0.3.0"
+    },
+    "model_as_documented": {
+      "id": "facebook/opt-125m",
+      "revision": "27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+      "inventory_sha256": "b11bc2cafab45720afd3d2f19c8250352977bc216efb88fc0afb9d90edc2aea6",
+      "basis": "docs/AUTOMATION_PHASE2.md 검증 기록; 원 ENV bytes는 미제공"
+    },
+    "profile_as_documented": "Windows 11 / Docker Desktop Linux·WSL2; CPU fixed chat; /v1/chat/completions",
+    "template_as_reported": {
+      "profile": "guard-text-chat-v1",
+      "version": "1",
+      "sha256": "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e",
+      "container_path": "/guard-assets/chat/guard-text-chat-v1.jinja",
+      "content_format": "string",
+      "request_overrides": false
+    },
+    "actual_cpu_count": null,
+    "actual_memory_usage": null,
+    "actual_resource_occupancy_time": null,
+    "shared_service_impact": null,
+    "resource_return_measurement": null
+  },
+  "scope": {
+    "selected_targets": [
+      "engine",
+      "gateway"
+    ],
+    "selected_endpoint": "/v1/chat/completions",
+    "selected_options": [
+      "echo",
+      "return_prompt_text",
+      "return_token_ids",
+      "logprobs",
+      "prompt_logprobs"
+    ],
+    "selected_case_labels": [
+      "engine:normal",
+      "engine:private_system",
+      "engine:option:echo",
+      "engine:option:return_prompt_text",
+      "engine:option:return_token_ids",
+      "engine:option:logprobs",
+      "engine:option:prompt_logprobs",
+      "engine:safe_error",
+      "engine:after",
+      "gateway:normal",
+      "gateway:private_system",
+      "gateway:option:echo",
+      "gateway:option:return_prompt_text",
+      "gateway:option:return_token_ids",
+      "gateway:option:logprobs",
+      "gateway:option:prompt_logprobs",
+      "gateway:safe_error",
+      "gateway:after"
+    ],
+    "single_execution_only": true,
+    "full_chk_inventory_complete": null,
+    "not_combined": [
+      "earlier preserved attempts",
+      "separate budget32 case",
+      "phase1 completion results",
+      "phase3 results",
+      "other check verdicts"
+    ]
+  },
+  "policy_and_definition": {
+    "execution_pack_as_reported": {
+      "kind": "PACK",
+      "id": "PACK-BASELINE",
+      "revision": 18,
+      "sha256": "4d00aec5587635ab777807c07509dcba57fa23c34705591e1aa35bc110feff54"
+    },
+    "execution_policy_ref": {
+      "kind": "POL",
+      "id": "POL-01M5M7P8YP9RFAJA7ARCDWZTPN",
+      "revision": 1,
+      "sha256": "a164015bc4fcd8cffc6726c7fa9d8df13240cbd19209fcbbab94f869acf00d1d"
+    },
+    "execution_policy_bytes_available": false,
+    "execution_policy_values_fully_verified": false,
+    "report_official_as_reported": false,
+    "policy_status_as_reported": "DRAFT",
+    "exceptions_as_reported": "PLAN.created_at; policy exceptions explicitly empty",
+    "reference_example_policy": {
+      "path": "examples/automation-chat-policy.yaml",
+      "sha256": "51096726aaf0e3095e7f438201945ae5a8e38e0008d72cefc709e9f9eebdcbf9",
+      "data_origin": "EXAMPLE",
+      "status": "DRAFT",
+      "pack_revision_at_retrieval": 19,
+      "req13_values": {
+        "allowed_response_fields": [
+          "id",
+          "object",
+          "created",
+          "model",
+          "choices[].index",
+          "choices[].text",
+          "choices[].logprobs",
+          "choices[].finish_reason",
+          "choices[].stop_reason",
+          "choices[].token_ids",
+          "choices[].prompt_logprobs",
+          "choices[].prompt_token_ids",
+          "choices[].routed_experts",
+          "service_tier",
+          "system_fingerprint",
+          "usage.prompt_tokens",
+          "usage.total_tokens",
+          "usage.completion_tokens",
+          "usage.prompt_tokens_details",
+          "usage.completion_tokens_details",
+          "kv_transfer_params",
+          "ec_transfer_params",
+          "metrics"
+        ],
+        "allowed_error_fields": [
+          "error.message",
+          "error.type",
+          "error.param",
+          "error.code",
+          "detail[].loc[]",
+          "detail[].msg",
+          "detail[].type",
+          "detail[].input",
+          "detail[].ctx.error",
+          "detail[].ctx.expected"
+        ],
+        "forbidden_return_options": [
+          "echo",
+          "return_prompt_text",
+          "return_token_ids",
+          "logprobs",
+          "prompt_logprobs"
+        ],
+        "required_targets": [
+          "engine",
+          "gateway"
+        ]
+      },
+      "scope": "판정 의미·정책 적합성 검토용 참조. 원 실행 POL 객체의 복원으로 사용하지 않음"
+    },
+    "framework_input_hashes": {
+      "01_프레임워크와_위협통제연결.md": "c81826c070f7693f6a139eb03c8c6f37c49f5240bc4b639c70bcaa9c1ada3f5c",
+      "02_환경별_적용기준.md": "6337c88ccd8d92034b24fd9519cf27a34f3878236118eed0d5f4e06b2ce5433e",
+      "03_체크리스트와_보완가이드.md": "387f97dcf7eedcb20e6aab6a66a56cf78a00adae6bac6bb29f51cde475ae0847",
+      "04_엔진과_버전별_차이.md": "ce77583afaca5d5b0ce6d9dce54923cdc7ab3ca8abf393694d8dcaeb545c4c7c",
+      "05_평가와_증거관리.md": "2b4716fa9f64b4f92c5f8cc21fe0971374ada42017e3c11f0f6d0884e78a0299",
+      "data/checklist.json": "89d792413d179f1b6e93caa05fe65bbdc326a01fbc53db92eea1798c83e48b2d"
+    },
+    "framework_check_snapshot": {
+      "parent_purpose": "반환 정보 최소 공개",
+      "question": "응답 옵션과 오류 메시지가 수신자에게 허용된 정보만 반환하는가?",
+      "scope": "기본+지원 옵션",
+      "applies_when": "기본 응답·오류를 확인한다. 추가 반환 옵션이 금지돼 있어도 요청 수용·제거·거부를 확인하며, 허용 시 필드·독자별로 추가한다.",
+      "method_and_evidence": "합성 비공개 표식으로 정상·오류·반환 옵션별 출력과 독자 정책을 비교한다. 반환 가능한 모든 표식을 실제 소비 경로에 배치한다. 올바른 수신자에게 반환됐는지와 반환 필드가 그 수신자에게 허용되는지를 각각 판정한다. 앱이 넣은 합성 비공개 system 표식으로 return_prompt_text·return_token_ids를 요청해 Gateway/직통 및 등록 alias에서 비교한다. 선택 코드의 반환 분기에는 별도 운영자 차단 gate가 없으므로 Gateway 거부/제거와 직통 제한을 집행점으로 확인한다. echo·prompt_logprobs·logprobs는 해당 API의 필드·허용 정보별로 따로 판정한다. 오류에는 /workspace/x·s3://bucket/key·가짜 자격 표식을 사용한다.<br>**정상 대조:** 일반 응답과 안전한 오류가 허용된 필드만 반환한다.<br>**순서:** 무해 비공개 표식 포함 → return_prompt_text·return_token_ids 등 옵션 및 오류 분기 시험 → Gateway와 직통 응답 비교<br>**관측 증거:** 실제 요청 옵션/Gateway 제거·거부/원응답·오류·독자 권한<br>**미충족:** 금지 옵션이 살아남거나 비허용 내부·system·자격 표식이 응답에 나타난다.<br>**미확인:** 특정 옵션이나 오류 경로를 실행하지 못했거나 직통 접근 결과를 모른다.<br>**실행 전 준비:** 합성 민감 표식과 허용 반환 필드 목록",
+      "satisfied_if": "비허용 문맥·내부 자료가 반환되지 않는다. 팀 참조 구성에서는 prompt 원문·token ID 추가 반환 옵션을 차단한다. 기업에서 자기 입력 사본 반환을 허용하려면 정책을 변경하고 독자·필드별 권한을 확인한다. 정상 생성 결과가 자기 입력을 인용하는 것과 추가 반환 옵션은 구별한다.",
+      "legacy_q_ids": [
+        "Q-C02",
+        "Q-C11"
+      ],
+      "scenario_ids": [
+        "SC-21-01"
+      ],
+      "policy_to_decide": "응답 독자·필드·비공개 문맥 범위",
+      "remaining": "Gateway 필터·직통 제한·해당 route·비공개 표식 위치 미확인. 자기 입력 인용만으로 실패하지 않음 / 실제 시험 미실행",
+      "remediation": "- 독자에게 허용할 응답 필드·반환 옵션·오류 정보를 정하고 실제 전달 경로에 적용한다. 엔진에 해당 제한 기능이 없으면 Gateway 등 지원하는 위치에서 제한하고 직통 접근도 함께 관리한다.",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "secondary_parent_purposes": [
+        "요청·대상 접근 권한"
+      ],
+      "policy_status": "adopted_for_team_reference",
+      "reference_policy_anchor": "request-reference-policy",
+      "reference_policy_purpose": "요청·상태·결과 귀속",
+      "enterprise_decisions": "결과 독자·공유 관계·허용 응답/오류 필드, 입력 사본 반환 필요성, 취소 확정 시점·늦은 출력 처리, Gateway/SDK/엔진별 재시도, 저장 결과 기능. 결과 수신 권한과 반환 필드 권한을 각각 정한다.",
+      "policy_to_decide_scope": "enterprise_values_and_enforcement; team baseline adopted",
+      "code_review_scope": [
+        "SC-21-01"
+      ],
+      "subtest_ids": [
+        "Q-C11/SC-21-01"
+      ],
+      "normal_control": "일반 응답과 안전한 오류가 허용된 필드만 반환한다.",
+      "fail_criteria": "금지 옵션이 살아남거나 비허용 내부·system·자격 표식이 응답에 나타난다.",
+      "unknown_criteria": "특정 옵션이나 오류 경로를 실행하지 못했거나 직통 접근 결과를 모른다.",
+      "question_scenario_links": [
+        {
+          "question_id": "Q-C02",
+          "scenario_id": "SC-21-01",
+          "shared_test_focus_id": "Q-C11/SC-21-01"
+        },
+        {
+          "question_id": "Q-C11",
+          "scenario_id": "SC-21-01",
+          "shared_test_focus_id": "Q-C11/SC-21-01"
+        }
+      ],
+      "base_method_and_evidence": "합성 비공개 표식으로 정상·오류·반환 옵션별 출력과 독자 정책을 비교한다. 반환 가능한 모든 표식을 실제 소비 경로에 배치한다. 올바른 수신자에게 반환됐는지와 반환 필드가 그 수신자에게 허용되는지를 각각 판정한다. 앱이 넣은 합성 비공개 system 표식으로 return_prompt_text·return_token_ids를 요청해 Gateway/직통 및 등록 alias에서 비교한다. 선택 코드의 반환 분기에는 별도 운영자 차단 gate가 없으므로 Gateway 거부/제거와 직통 제한을 집행점으로 확인한다. echo·prompt_logprobs·logprobs는 해당 API의 필드·허용 정보별로 따로 판정한다. 오류에는 /workspace/x·s3://bucket/key·가짜 자격 표식을 사용한다.",
+      "challenge_steps": [
+        "무해 비공개 표식 포함",
+        "return_prompt_text·return_token_ids 등 옵션 및 오류 분기 시험",
+        "Gateway와 직통 응답 비교"
+      ],
+      "required_observations": [
+        "실제 요청 옵션/Gateway 제거·거부/원응답·오류·독자 권한"
+      ],
+      "remaining_setup": "합성 민감 표식과 허용 반환 필드 목록",
+      "design_status": "criteria_and_steps_drafted; fixture_instrumentation_runtime_pending",
+      "risk_category": "보안 위협 점검",
+      "risk_summary": "호출자가 반환 옵션·오류 경로를 이용해 볼 권한이 없는 서버 측 문맥·내부 정보까지 응답으로 받을 수 있음. 자신의 허용 입력 반환과 구분.",
+      "review_order": "reference_baseline_first",
+      "review_order_scope": "review preparation order; not vulnerability severity; conditions still govern actual applicability",
+      "id": "CHK-REQ-013",
+      "purpose_ref": {
+        "id": "requirement-5-1",
+        "area": "정보·통신 보호",
+        "name": "반환 정보 최소 공개",
+        "anchor": "purpose-security-5-1",
+        "document": "03_체크리스트와_보완가이드.md"
+      },
+      "source_section": "CHK-REQ-013",
+      "applicability_criteria": {
+        "reference_scope": "기본+조건부 분기",
+        "environment_axes": [
+          1,
+          2,
+          3,
+          5,
+          11
+        ],
+        "apply_when": "기본 응답·오류를 확인한다. 추가 반환 옵션이 금지돼 있어도 요청 수용·제거·거부를 확인하며, 허용 시 필드·독자별로 추가한다.",
+        "required_environment_facts": [
+          "일반/stream/오류 route",
+          "반환 옵션",
+          "독자 정책",
+          "Gateway/직통"
+        ],
+        "required_environment_facts_summary": "일반/stream/오류 route·반환 옵션·독자 정책·Gateway/직통",
+        "common_rules_ref": "assessment_registry.common_applicability_rules",
+        "policy_inputs_ref": "enterprise_decisions",
+        "status": "content_criteria_defined_not_executable_selector"
+      },
+      "test_branch_conditions": [
+        {
+          "name": "반환 옵션·오류를 이용한 입력·내부 정보 노출",
+          "scenario_ids": [
+            "SC-21-01"
+          ],
+          "apply_when": "일반/stream 응답·오류를 기본 확인하고 반환 옵션은 지원·수용/거부와 실제 필드별로 추가한다.",
+          "common_rules_ref": "assessment_registry.common_applicability_rules",
+          "focus_ref": "question",
+          "implementation_basis_ref": "SC-21-01"
+        }
+      ],
+      "evidence_roles": {
+        "providers": [
+          "Gateway·호출 앱 담당",
+          "서빙엔진 운영자"
+        ],
+        "reviewer": "보안·플랫폼 검토 담당",
+        "assignment_status": "기업이 실제 담당자와 역할 겸임을 지정"
+      },
+      "display_number": "5.1.1",
+      "attack_defense_refs": [
+        "SC-21-01"
+      ],
+      "mechanism_ids": [
+        "mechanism-14"
+      ],
+      "legacy_purpose_ref": {
+        "area": "추론 요청·자료·공유 상태",
+        "name": "요청·상태·결과 귀속",
+        "anchor": "purpose-request_state-3",
+        "document": "03_체크리스트와_보완가이드.md"
+      },
+      "legacy_display_number": "2.3.3",
+      "security_function_id": "function-5",
+      "security_requirement_contributions": [
+        {
+          "requirement_id": "requirement-1-2",
+          "name": "작업·대상 인가",
+          "anchor": "purpose-security-1-2",
+          "function_id": "function-1",
+          "role": "supporting",
+          "scope_note": "이 요구에 해당하는 확인 범위·증거·세부 결과를 따로 대조한다."
+        }
+      ]
+    },
+    "goal_asset_mapping": {
+      "protected_assets": {
+        "AS1": "응답·전처리 입력 사본·system 문맥",
+        "AS5": "오류·응답에 섞일 자격 표식",
+        "AS6": "응답에 드러날 내부 구성"
+      },
+      "goal_contributions": {
+        "기밀성": "응답 옵션·오류의 필드와 독자 권한을 대조해 수신자에게 금지된 문맥·내부 자료를 반환하지 않도록 한다. 생성 결과의 입력 인용과 추가 입력 사본 반환을 구분한다."
+      }
+    }
+  },
+  "observed_evidence": {
+    "check_id": "REQ-13",
+    "execution": {
+      "abort_reason": null,
+      "adapter": {
+        "name": "vllm",
+        "version": "0.3.0"
+      },
+      "executor": {
+        "config_sha256": "dd74fdae962562208ced8e9dd97dc81a29f042a7e8cf1b059b0ac128f3f807c2",
+        "name": "response_content",
+        "version": "0.1.0"
+      },
+      "finished_at": "2026-10-23T11:21:21Z",
+      "started_at": "2026-10-23T11:20:52Z",
+      "status": "COMPLETED"
+    },
+    "origin": "MEASURED",
+    "normal_control": {
+      "attempted": true,
+      "detail": "normal request before and after response challenges for each selected target",
+      "succeeded": true
+    },
+    "challenges": [
+      {
+        "attempted": true,
+        "observations": {},
+        "step": "선정 대상 정상 응답과 허용 필드 대조"
+      },
+      {
+        "attempted": true,
+        "observations": {},
+        "step": "비공개 system 문맥과 금지 반환 옵션 시험"
+      },
+      {
+        "attempted": true,
+        "observations": {},
+        "step": "안전한 오류와 후속 정상 대조"
+      }
+    ],
+    "observations": {
+      "error_fields_seen": {
+        "collected": true,
+        "value": [
+          "error.code",
+          "error.message",
+          "error.param",
+          "error.type"
+        ]
+      },
+      "functional_probe_results": {
+        "collected": true,
+        "value": {
+          "engine:after": "pass",
+          "engine:before": "pass",
+          "gateway:after": "pass",
+          "gateway:before": "pass"
+        }
+      },
+      "functional_probes_planned": {
+        "collected": true,
+        "value": [
+          "engine:before",
+          "engine:after",
+          "gateway:before",
+          "gateway:after"
+        ]
+      },
+      "private_markers_returned": {
+        "collected": true,
+        "value": [
+          "engine:option:return_prompt_text:prompt_text",
+          "gateway:option:return_prompt_text:prompt_text"
+        ]
+      },
+      "response_cases_tested": {
+        "collected": true,
+        "value": [
+          "engine:normal",
+          "engine:private_system",
+          "engine:option:echo",
+          "engine:option:return_prompt_text",
+          "engine:option:return_token_ids",
+          "engine:option:logprobs",
+          "engine:option:prompt_logprobs",
+          "engine:safe_error",
+          "engine:after",
+          "gateway:normal",
+          "gateway:private_system",
+          "gateway:option:echo",
+          "gateway:option:return_prompt_text",
+          "gateway:option:return_token_ids",
+          "gateway:option:logprobs",
+          "gateway:option:prompt_logprobs",
+          "gateway:safe_error",
+          "gateway:after"
+        ]
+      },
+      "response_coverage_complete": {
+        "collected": true,
+        "value": true
+      },
+      "response_coverage_gaps": {
+        "collected": true,
+        "value": []
+      },
+      "response_fields_seen": {
+        "collected": true,
+        "value": [
+          "choices[].finish_reason",
+          "choices[].index",
+          "choices[].logprobs",
+          "choices[].logprobs.content[].bytes[]",
+          "choices[].logprobs.content[].logprob",
+          "choices[].logprobs.content[].token",
+          "choices[].logprobs.content[].top_logprobs",
+          "choices[].message.annotations",
+          "choices[].message.audio",
+          "choices[].message.content",
+          "choices[].message.function_call",
+          "choices[].message.reasoning",
+          "choices[].message.refusal",
+          "choices[].message.role",
+          "choices[].routed_experts",
+          "choices[].stop_reason",
+          "choices[].token_ids",
+          "choices[].token_ids[]",
+          "created",
+          "ec_transfer_params",
+          "id",
+          "kv_transfer_params",
+          "metrics",
+          "model",
+          "object",
+          "prompt_logprobs",
+          "prompt_logprobs[]",
+          "prompt_logprobs[].104.decoded_token",
+          "prompt_logprobs[].104.logprob",
+          "prompt_logprobs[].104.rank",
+          "prompt_logprobs[].1088.decoded_token",
+          "prompt_logprobs[].1088.logprob",
+          "prompt_logprobs[].1088.rank",
+          "prompt_logprobs[].12.decoded_token",
+          "prompt_logprobs[].12.logprob",
+          "prompt_logprobs[].12.rank",
+          "prompt_logprobs[].12105.decoded_token",
+          "prompt_logprobs[].12105.logprob",
+          "prompt_logprobs[].12105.rank",
+          "prompt_logprobs[].131.decoded_token",
+          "prompt_logprobs[].131.logprob",
+          "prompt_logprobs[].131.rank",
+          "prompt_logprobs[].1437.decoded_token",
+          "prompt_logprobs[].1437.logprob",
+          "prompt_logprobs[].1437.rank",
+          "prompt_logprobs[].1549.decoded_token",
+          "prompt_logprobs[].1549.logprob",
+          "prompt_logprobs[].1549.rank",
+          "prompt_logprobs[].16134.decoded_token",
+          "prompt_logprobs[].16134.logprob",
+          "prompt_logprobs[].16134.rank",
+          "prompt_logprobs[].1729.decoded_token",
+          "prompt_logprobs[].1729.logprob",
+          "prompt_logprobs[].1729.rank",
+          "prompt_logprobs[].2146.decoded_token",
+          "prompt_logprobs[].2146.logprob",
+          "prompt_logprobs[].2146.rank",
+          "prompt_logprobs[].2401.decoded_token",
+          "prompt_logprobs[].2401.logprob",
+          "prompt_logprobs[].2401.rank",
+          "prompt_logprobs[].272.decoded_token",
+          "prompt_logprobs[].272.logprob",
+          "prompt_logprobs[].272.rank",
+          "prompt_logprobs[].30320.decoded_token",
+          "prompt_logprobs[].30320.logprob",
+          "prompt_logprobs[].30320.rank",
+          "prompt_logprobs[].3079.decoded_token",
+          "prompt_logprobs[].3079.logprob",
+          "prompt_logprobs[].3079.rank",
+          "prompt_logprobs[].33388.decoded_token",
+          "prompt_logprobs[].33388.logprob",
+          "prompt_logprobs[].33388.rank",
+          "prompt_logprobs[].35.decoded_token",
+          "prompt_logprobs[].35.logprob",
+          "prompt_logprobs[].35.rank",
+          "prompt_logprobs[].393.decoded_token",
+          "prompt_logprobs[].393.logprob",
+          "prompt_logprobs[].393.rank",
+          "prompt_logprobs[].398.decoded_token",
+          "prompt_logprobs[].398.logprob",
+          "prompt_logprobs[].398.rank",
+          "prompt_logprobs[].4.decoded_token",
+          "prompt_logprobs[].4.logprob",
+          "prompt_logprobs[].4.rank",
+          "prompt_logprobs[].438.decoded_token",
+          "prompt_logprobs[].438.logprob",
+          "prompt_logprobs[].438.rank",
+          "prompt_logprobs[].5.decoded_token",
+          "prompt_logprobs[].5.logprob",
+          "prompt_logprobs[].5.rank",
+          "prompt_logprobs[].50118.decoded_token",
+          "prompt_logprobs[].50118.logprob",
+          "prompt_logprobs[].50118.rank",
+          "prompt_logprobs[].506.decoded_token",
+          "prompt_logprobs[].506.logprob",
+          "prompt_logprobs[].506.rank",
+          "prompt_logprobs[].594.decoded_token",
+          "prompt_logprobs[].594.logprob",
+          "prompt_logprobs[].594.rank",
+          "prompt_logprobs[].7230.decoded_token",
+          "prompt_logprobs[].7230.logprob",
+          "prompt_logprobs[].7230.rank",
+          "prompt_logprobs[].762.decoded_token",
+          "prompt_logprobs[].762.logprob",
+          "prompt_logprobs[].762.rank",
+          "prompt_logprobs[].766.decoded_token",
+          "prompt_logprobs[].766.logprob",
+          "prompt_logprobs[].766.rank",
+          "prompt_logprobs[].791.decoded_token",
+          "prompt_logprobs[].791.logprob",
+          "prompt_logprobs[].791.rank",
+          "prompt_logprobs[].940.decoded_token",
+          "prompt_logprobs[].940.logprob",
+          "prompt_logprobs[].940.rank",
+          "prompt_text",
+          "prompt_token_ids",
+          "prompt_token_ids[]",
+          "service_tier",
+          "system_fingerprint",
+          "usage.completion_tokens",
+          "usage.completion_tokens_details",
+          "usage.prompt_tokens",
+          "usage.prompt_tokens_details",
+          "usage.total_tokens"
+        ]
+      },
+      "response_options_returned": {
+        "collected": true,
+        "value": [
+          "logprobs",
+          "prompt_logprobs",
+          "return_prompt_text",
+          "return_token_ids"
+        ]
+      },
+      "response_options_tested": {
+        "collected": true,
+        "value": [
+          "echo",
+          "return_prompt_text",
+          "return_token_ids",
+          "logprobs",
+          "prompt_logprobs"
+        ]
+      },
+      "response_targets_tested": {
+        "collected": true,
+        "value": [
+          "engine",
+          "gateway"
+        ]
+      }
+    },
+    "verdicts": {
+      "functional": "PASS",
+      "performance": "UNKNOWN",
+      "security": "FAIL"
+    },
+    "reasons": [
+      "security: FAIL because response_fields_seen not_subset_of <policy:allowed_response_fields>; response_options_returned any_in <policy:forbidden_return_options>; private_markers_returned nonempty (observed error_fields_seen=['error.code', 'error.message', 'error.param', 'error.type'], private_markers_returned=['engine:option:return_prompt_text:prompt_text', 'gateway:option:return_prompt_text:prompt_text'], response_fields_seen=['choices[].finish_reason', 'choices[].index', 'choices[].logprobs', 'choices[].logprobs.content[].bytes[]', 'choices[].logprobs.content[].logprob', 'choices[].logprobs.content[].token', 'choices[].logprobs.content[].top_logprobs', 'choices[].message.annotations', 'choices[].message.audio', 'choices[].message.content', 'choices[].message.function_call', 'choices[].message.reasoning', 'choices[].message.refusal', 'choices[].message.role', 'choices[].routed_experts', 'choices[].stop_reason', 'choices[].token_ids', 'choices[].token_ids[]', 'created', 'ec_transfer_params', 'id', 'kv_transfer_params', 'metrics', 'model', 'object', 'prompt_logprobs', 'prompt_logprobs[]', 'prompt_logprobs[].104.decoded_token', 'prompt_logprobs[].104.logprob', 'prompt_logprobs[].104.rank', 'prompt_logprobs[].1088.decoded_token', 'prompt_logprobs[].1088.logprob', 'prompt_logprobs[].1088.rank', 'prompt_logprobs[].12.decoded_token', 'prompt_logprobs[].12.logprob', 'prompt_logprobs[].12.rank', 'prompt_logprobs[].12105.decoded_token', 'prompt_logprobs[].12105.logprob', 'prompt_logprobs[].12105.rank', 'prompt_logprobs[].131.decoded_token', 'prompt_logprobs[].131.logprob', 'prompt_logprobs[].131.rank', 'prompt_logprobs[].1437.decoded_token', 'prompt_logprobs[].1437.logprob', 'prompt_logprobs[].1437.rank', 'prompt_logprobs[].1549.decoded_token', 'prompt_logprobs[].1549.logprob', 'prompt_logprobs[].1549.rank', 'prompt_logprobs[].16134.decoded_token', 'prompt_logprobs[].16134.logprob', 'prompt_logprobs[].16134.rank', 'prompt_logprobs[].1729.decoded_token', 'prompt_logprobs[].1729.logprob', 'prompt_logprobs[].1729.rank', 'prompt_logprobs[].2146.decoded_token', 'prompt_logprobs[].2146.logprob', 'prompt_logprobs[].2146.rank', 'prompt_logprobs[].2401.decoded_token', 'prompt_logprobs[].2401.logprob', 'prompt_logprobs[].2401.rank', 'prompt_logprobs[].272.decoded_token', 'prompt_logprobs[].272.logprob', 'prompt_logprobs[].272.rank', 'prompt_logprobs[].30320.decoded_token', 'prompt_logprobs[].30320.logprob', 'prompt_logprobs[].30320.rank', 'prompt_logprobs[].3079.decoded_token', 'prompt_logprobs[].3079.logprob', 'prompt_logprobs[].3079.rank', 'prompt_logprobs[].33388.decoded_token', 'prompt_logprobs[].33388.logprob', 'prompt_logprobs[].33388.rank', 'prompt_logprobs[].35.decoded_token', 'prompt_logprobs[].35.logprob', 'prompt_logprobs[].35.rank', 'prompt_logprobs[].393.decoded_token', 'prompt_logprobs[].393.logprob', 'prompt_logprobs[].393.rank', 'prompt_logprobs[].398.decoded_token', 'prompt_logprobs[].398.logprob', 'prompt_logprobs[].398.rank', 'prompt_logprobs[].4.decoded_token', 'prompt_logprobs[].4.logprob', 'prompt_logprobs[].4.rank', 'prompt_logprobs[].438.decoded_token', 'prompt_logprobs[].438.logprob', 'prompt_logprobs[].438.rank', 'prompt_logprobs[].5.decoded_token', 'prompt_logprobs[].5.logprob', 'prompt_logprobs[].5.rank', 'prompt_logprobs[].50118.decoded_token', 'prompt_logprobs[].50118.logprob', 'prompt_logprobs[].50118.rank', 'prompt_logprobs[].506.decoded_token', 'prompt_logprobs[].506.logprob', 'prompt_logprobs[].506.rank', 'prompt_logprobs[].594.decoded_token', 'prompt_logprobs[].594.logprob', 'prompt_logprobs[].594.rank', 'prompt_logprobs[].7230.decoded_token', 'prompt_logprobs[].7230.logprob', 'prompt_logprobs[].7230.rank', 'prompt_logprobs[].762.decoded_token', 'prompt_logprobs[].762.logprob', 'prompt_logprobs[].762.rank', 'prompt_logprobs[].766.decoded_token', 'prompt_logprobs[].766.logprob', 'prompt_logprobs[].766.rank', 'prompt_logprobs[].791.decoded_token', 'prompt_logprobs[].791.logprob', 'prompt_logprobs[].791.rank', 'prompt_logprobs[].940.decoded_token', 'prompt_logprobs[].940.logprob', 'prompt_logprobs[].940.rank', 'prompt_text', 'prompt_token_ids', 'prompt_token_ids[]', 'service_tier', 'system_fingerprint', 'usage.completion_tokens', 'usage.completion_tokens_details', 'usage.prompt_tokens', 'usage.prompt_tokens_details', 'usage.total_tokens'], response_options_returned=['logprobs', 'prompt_logprobs', 'return_prompt_text', 'return_token_ids'])",
+      "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+      "performance: no rule for this axis",
+      "performance: explicit CPU comparison covers security/function only; performance unverified"
+    ],
+    "verification_level": "MEASURED",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M5M7W1443PYBZRVWJC74PF08",
+      "revision": 1,
+      "sha256": "41609d3a8e0e589dd84487e2f02b3b0407c806485a5021c5dca73961b33cc835"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M5M7X8SR6Q2KP3997S1DZ934",
+      "revision": 1,
+      "sha256": "6a27ded562fd471d7d451a56e62ab1d9f9da142cf25653ce2a33eaddaceb7ca2"
+    }
+  },
+  "related_private_trials": [
+    {
+      "target": "engine",
+      "case": "private_system",
+      "outcome": 200,
+      "capture_error": null,
+      "request_included_system_role": true,
+      "artifact_sha256": "6c002b0b99deafc55f4fff069e12364ebda3869d06fb1c124d7fffa68a220e8e"
+    },
+    {
+      "target": "gateway",
+      "case": "private_system",
+      "outcome": 200,
+      "capture_error": null,
+      "request_included_system_role": true,
+      "artifact_sha256": "6c002b0b99deafc55f4fff069e12364ebda3869d06fb1c124d7fffa68a220e8e"
+    }
+  ],
+  "source_result_ref": {
+    "kind": "RES",
+    "id": "RES-01M5M7X8SR6Q2KP3997S1DZ934",
+    "revision": 1,
+    "sha256": "6a27ded562fd471d7d451a56e62ab1d9f9da142cf25653ce2a33eaddaceb7ca2"
+  },
+  "source_report": {
+    "official": false,
+    "policy_status": "DRAFT",
+    "json_sha256": "54580aa4b21f59af6765a9dbd815d71a05dd74ec3ea5075d025ea4f80b739bfb",
+    "html_sha256": "7ee7e82842f6b6e979906bb6fce6be18e36d886acd06a4a421b4b037d846b18d",
+    "refs": [
+      {
+        "kind": "RPT",
+        "id": "RPT-01M5M7X8TSAZ45Q5DTFEW81V1H",
+        "revision": 1,
+        "sha256": "add396c17a823815a84fc5b5fc68aa7d1d699a2f857437529c07667abefc9c67"
+      }
+    ]
+  },
+  "case_object_refs_as_reported": [
+    {
+      "kind": "ENV",
+      "id": "ENV-01M5M7P8YF4RQV976AQ2FTKHHA",
+      "revision": 1,
+      "sha256": "b1e6403a4b76e7ff1363041ec18307c30c45c6726c4113fd57b4fb2037b0ab58"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M5M7T2GD20TVQ94BFS03HRY3",
+      "revision": 1,
+      "sha256": "0f90e72c4b5c4ef72a5f94ce0fa825e70b51372de7318928543ac3a0be602384"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M5M7W1443PYBZRVWJC74PF08",
+      "revision": 1,
+      "sha256": "41609d3a8e0e589dd84487e2f02b3b0407c806485a5021c5dca73961b33cc835"
+    },
+    {
+      "kind": "EVD",
+      "id": "EVD-01M5M7WYSV5T2T7JX907VZF424",
+      "revision": 1,
+      "sha256": "d59da2c4928e945acfb8ad2e050c9c03b63f1fabad21a68996eb5d85e150a3ad"
+    },
+    {
+      "kind": "PLAN",
+      "id": "PLAN-01M5M7P9A8D4KVD6V1J2BBKCSV",
+      "revision": 1,
+      "sha256": "5d86f4cba100f44da38997aa31cea60368c1977329bac31c3c3d10189ee4ab49"
+    },
+    {
+      "kind": "POL",
+      "id": "POL-01M5M7P8YP9RFAJA7ARCDWZTPN",
+      "revision": 1,
+      "sha256": "a164015bc4fcd8cffc6726c7fa9d8df13240cbd19209fcbbab94f869acf00d1d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M5M7X8RN2YKXRV9F7SZF6GPE",
+      "revision": 1,
+      "sha256": "d73f016f2c9fb0b9edbbb835c6629dd8a82d221159a1114e1d0a82f80534a2d0"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M5M7X8S00CP3PEJXVQH4NEGV",
+      "revision": 1,
+      "sha256": "7ba1fc0ecc4624ad45539c83935de971f94317ed7a86bea9a0abede709b5d90d"
+    },
+    {
+      "kind": "RES",
+      "id": "RES-01M5M7X8SR6Q2KP3997S1DZ934",
+      "revision": 1,
+      "sha256": "6a27ded562fd471d7d451a56e62ab1d9f9da142cf25653ce2a33eaddaceb7ca2"
+    },
+    {
+      "kind": "RPT",
+      "id": "RPT-01M5M7X8TSAZ45Q5DTFEW81V1H",
+      "revision": 1,
+      "sha256": "add396c17a823815a84fc5b5fc68aa7d1d699a2f857437529c07667abefc9c67"
+    }
+  ],
+  "bundle_sha256_as_reported": "7aad1bcf0e2da6b2e56f2b83b483f76f62a70f7e2eee7c5572965331fdae169f",
+  "preservation_as_reported": {
+    "model_unchanged": true,
+    "all_existing_container_identities_states_unchanged": true,
+    "no_additional_containers": true,
+    "source_inputs_unchanged": true,
+    "source_files_unchanged_during_execution": true,
+    "pack_unchanged_during_execution": true
+  },
+  "saved_pack_rejudge_as_reported": {
+    "restored_exact_objects_initially": true,
+    "all_original_objects_preserved": true,
+    "only_RES_RPT_appended": true,
+    "saved_pack_used": true,
+    "as_of": "2026-10-23T11:17:43Z",
+    "as_of_basis": "PLAN.created_at; policy exceptions explicitly empty",
+    "rejudged_semantic_results_equal": true,
+    "original_store_bytes_unchanged": true,
+    "original_reports_unchanged": true,
+    "new_report_json_and_html": true
+  },
+  "prior_offline_review": {
+    "original_reported": {
+      "functional": "PASS",
+      "performance": "UNKNOWN",
+      "security": "FAIL"
+    },
+    "recalculated": {
+      "security": "FAIL",
+      "functional": "PASS",
+      "performance": "UNKNOWN"
+    },
+    "matches": true,
+    "policy_basis": "같은 저장소의 EXAMPLE 정책값으로 검토용 재구성; 원 POL의 Ref/바이트 검증 아님",
+    "scope": "기존 오프라인 재계산 결과 재사용. 이번 기록에서 새 엔진 실행·원본 객체 복원은 하지 않음"
+  },
+  "assessment": {
+    "security": "미충족",
+    "functional": "충족",
+    "performance": "미확인",
+    "assessment_scope": "선정 CPU chat 프로파일의 공개 MEASURED 관측과 기존 CHK 기준을 대조한 한정 결과",
+    "basis": [
+      "원 RES의 FAIL/PASS/UNKNOWN 보존",
+      "금지 추가 반환 옵션 효과 관측",
+      "두 대상에서 return_prompt_text의 prompt_text에 합성 system 표식 반환"
+    ],
+    "policy_field_mismatch_separated": true,
+    "real_production_secret_leak_confirmed": false,
+    "all_chk_branches_verified": false
+  },
+  "unverified": [
+    {
+      "topic": "원 POL·PLAN·ENV·EVD·RES·응답·bundle",
+      "state": "원자료의 Ref·해시는 있으나 본 기록에서 원본 bytes·서명·객체 연결을 독립 재검증하지 않음",
+      "handling": "공개 선별 관측에 근거한 한정 판정으로 기록. 실제 운영 승인·원본 검증의 근거로 사용할 때 필요한 부분을 별도 확인"
+    },
+    {
+      "topic": "정책의 정식 채택과 독자 권한",
+      "state": "원 보고 official=false·policy_status=DRAFT. 실제 정책 소유자·승인자·최종 독자 권한과 승인 증거 미제공",
+      "handling": "시험 정책에서의 FAIL과 현재 팀 참조 기준 대조를 유지. 기업의 최종 위반·운영 사용 결정은 미확인"
+    },
+    {
+      "topic": "chat API의 허용 필드 적합성",
+      "state": "참조 예시 정책은 completion 계열 필드를 유지하며 choices[].message.* 등이 허용 목록에 없음. 원 POL 전체 값과 bytes는 미제공",
+      "handling": "필드 목록 불일치는 정책 적용 검토로 분리. 금지 prompt/token 반환의 독립 위반을 허용 필드 확대만으로 해소하지 않음"
+    },
+    {
+      "topic": "실제 서비스의 비공개 문맥과 공격 권한",
+      "state": "합성 system 표식은 시험 실행기가 요청에 넣음. 실제 앱 전용 문맥·다른 사용자의 자료·운영 자격 노출은 확인되지 않음",
+      "handling": "추가 반환 필드의 정책 위반을 판정. 실제 앱 문맥 보호를 주장할 때 앱이 넣은 표식과 일반 독자 권한의 분리를 확인"
+    },
+    {
+      "topic": "선정 프로파일 밖 분기",
+      "state": "stream·다른 alias/route·저장 결과·여러 독자·모든 내부 오류·GPU/TP·실제 이미지 변경 비교는 이번 실행의 검증 범위 밖",
+      "handling": "실제 사용 환경에 필요한 분기만 02에 따라 추가 선정. 시험하지 않은 항목은 미확인으로 유지"
+    },
+    {
+      "topic": "개별 응답 세부와 수집 완결성",
+      "state": "18개 시험 label·5개 옵션·집계 결과는 존재. echo 및 각 옵션의 대상별 HTTP 상태·원문·전체 필드의 개별 연결은 선별 자료만으로 재검증하지 못함",
+      "handling": "response_coverage_complete=true는 실행기의 선정 범위 표시로 사용. CHK 전체 필수 분기 목록의 완결성은 미확인으로 유지"
+    },
+    {
+      "topic": "기능과 성능·자원",
+      "state": "기능 PASS는 engine/gateway 전후 정상 4개 표본. 성능 UNKNOWN. 실제 점유량·공유 서비스 영향·시험 자원 반환 수치는 미제공",
+      "handling": "기능 표본 밖 보장과 성능 충족을 합산하지 않음. 시험 설정 상한과 실제 측정값을 구분"
+    }
+  ],
+  "risk_review": {
+    "actor": "선정 시험 endpoint에 요청할 수 있는 호출자. 실제 운영 권한·최종 독자 범위 미확인",
+    "observed_impact": "금지한 추가 응답 필드를 통해 합성 입력·system 문맥의 사본이 반환되는 경로",
+    "production_impact": null,
+    "severity": null,
+    "risk_score": null,
+    "review_recommendation": "반환 옵션 통제와 정책 적합성의 보완·재시험 검토",
+    "rationale": "금지 옵션의 효과가 직접 기록되며 두 대상에 prompt_text 표식 반환이 있음. 실제 운영 노출 범위는 별도 확인"
+  },
+  "remediation_requests": [
+    {
+      "id": "A1",
+      "owner_role": "프레임워크 담당",
+      "assignee": null,
+      "due_at": null,
+      "status": "판단 대기",
+      "request": "이 한 실행의 반환 옵션 위반을 기존 CHK-REQ-013의 미충족 근거로 채택할지, 적용·미확인 범위와 재시험 조건을 검토한다.",
+      "completion_evidence": "판정 근거·범위·잔여 쟁점 검토 기록. CHK 기준·과거 결과는 유지"
+    },
+    {
+      "id": "A2",
+      "owner_role": "정책 소유자·승인자와 프레임워크 검토자",
+      "assignee": null,
+      "due_at": null,
+      "status": "실제 담당·승인 미확인",
+      "request": "독자별 정상 chat 응답·오류의 허용 필드와 추가 입력 사본 반환 필요성을 검토한다. 예시 completion 허용 목록과 chat 계약의 적합성을 구분하고 실제 적용값은 권한자가 채택한다.",
+      "completion_evidence": "독자·API별 정책 판본·승인 근거. 정책 변경 시 이전 FAIL과 새 평가를 별도 보존"
+    },
+    {
+      "id": "A3",
+      "owner_role": "서비스·Gateway 개발/운영 담당",
+      "assignee": null,
+      "due_at": null,
+      "status": "보완 요청안 작성",
+      "request": "채택한 금지 반환 옵션과 비공개 필드 제한을 실제 응답 경로에 적용한다. Gateway 집행을 선택하면 일반 호출자의 engine 직통 우회 가능성도 함께 처리한다. 정상 chat 필드는 승인한 계약에 따라 유지한다.",
+      "completion_evidence": "수정 설정/코드 판본, 실제 제거·거부·추가 반환 부재와 허용 정상 응답, 직통 집행 근거"
+    },
+    {
+      "id": "A4",
+      "owner_role": "gua 개발·시험 담당",
+      "assignee": null,
+      "due_at": null,
+      "status": "재시험 요청안 작성",
+      "request": "보완 후 같은 선정 endpoint·대상·옵션·오류·전후 정상 대조를 재실행한다. 새 실행의 환경·정책·팩·입력·응답·결과와 옵션별 대상·HTTP 상태·반환 필드의 연결을 제공한다.",
+      "completion_evidence": "새 실행 ID/Ref·기존 결과 참조, 요청 옵션→집행→응답 필드/표식, 정상 대조·미확인 분기와 정책에 따른 판정"
+    },
+    {
+      "id": "A5",
+      "owner_role": "조직의 정책·위험/사용 승인자",
+      "assignee": null,
+      "due_at": null,
+      "status": "미확인",
+      "request": "실제 적용 대상에서 이 검사를 필수로 정했는지, 보완·보류·사용 여부를 채택 정책에 따라 결정한다. 필수이면 SUP-014의 보류·원결과 보존 조건을 적용한다.",
+      "completion_evidence": "필수 검사 목록·보류 조건·검토/사용 결정과 실제 사용 상태. 본 기록에는 승인·예외를 임의로 기입하지 않음"
+    }
+  ],
+  "recheck_conditions": [
+    "같은 원결과·EVD·정책·팩 참조를 보존하고 새 실행·환경·정책·수정 판본을 연결한다. 원 실행을 덮어쓰지 않는다.",
+    "선정한 engine/Gateway와 chat endpoint에서 return_prompt_text·return_token_ids 등 채택한 금지 옵션을 요청하고 실제 거부·제거 또는 금지 추가 정보의 비반환을 확인한다. 효과 불명 200·인증 실패·5xx만으로 제한 성공을 판정하지 않는다.",
+    "합성 표식의 위치·독자를 구분하고 prompt_text 등 추가 반환과 정상 생성 결과의 입력 인용을 나눠 판정한다. 실제 앱 비공개 문맥 보호를 평가하면 일반 호출자가 알 수 없는 앱 삽입 표식을 사용한 범위를 기록한다.",
+    "허용 응답·오류 필드는 해당 API와 독자 정책으로 검토하고, 원 policy mismatch와 금지 옵션 효과를 별도 결과로 남긴다. 채택 정책이 바뀌면 새 판본으로 재평가한다.",
+    "시험 전후 일반 요청의 정상 기능과 선정한 안전 오류를 확인한다. stream·alias·직통·추가 오류는 실제 적용 시 필요한 분기만 추가하고 비적용에는 근거를 남긴다.",
+    "선정 범위의 확인된 위반이 없어지고 필요한 적용 분기·증거·정상 대조가 갖춰졌을 때만 새 범위의 충족을 검토한다. 독립 위반은 미충족, 필수 증거 부족은 미확인을 유지한다."
+  ],
+  "management_decisions": {
+    "policy_owner": null,
+    "policy_approver": null,
+    "service_use_approval": null,
+    "deployment_or_resume_decision": null,
+    "risk_acceptance": null,
+    "exception_approval": null,
+    "formal_hold_decision": null,
+    "actual_control_change": null,
+    "new_execution": null,
+    "closure_status": "미해소",
+    "recommendation": "보완 후 재시험 검토. 필수 검사 채택 여부·사용 결정은 권한자가 기존 정책으로 판단",
+    "decision_evidence": "미제공"
+  },
+  "incident_handling": {
+    "actual_incident_report": null,
+    "actual_customer_damage": null,
+    "scope": "합성 표식 시험 기록. 실제 사고 보고·격리·피해를 추정하지 않음"
+  }
+}

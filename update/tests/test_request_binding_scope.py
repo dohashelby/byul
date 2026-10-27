@@ -145,7 +145,7 @@ def test_json_and_html_report_explain_input_only_scope_and_output_gap(tmp_path, 
     draft, _ = run(tmp_path, World(**changes))
     assert draft.observations["collection_complete"].value is complete
     pack = baseline_pack()
-    assert pack.checks["REQ-11"].revision == 4
+    assert pack.checks["REQ-11"].revision == 5
     store = Store(tmp_path / "report-store")
     env = environment()
     pol = policy(pack.ref(), values={"REQ-11": VALUES},

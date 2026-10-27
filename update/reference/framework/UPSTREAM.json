@@ -1,74 +1,256 @@
 {
   "repository": "https://github.com/mg-princess/serving-security-framework",
-  "commit": "0ec5fb5fa5633b0817468b27684690a66fc7b4f5",
+  "commit": "8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e",
   "files": [
     {
-      "path": "select_checklist.py",
-      "sha256": "699ebe3882c5b37852bc8fa473943c57d0814e66da5aeaf78d7471376b78aa53"
+      "path": "01_프레임워크와_위협통제연결.md",
+      "sha256": "ac4c00edf3b7066480285f3a244de4f700847bac66b872f5d765916a037ec785"
+    },
+    {
+      "path": "02_환경별_적용기준.md",
+      "sha256": "0792044d40823c343dc7f8eca554ffaba15c278fb190566c382ec2752d14df5c"
+    },
+    {
+      "path": "03_체크리스트와_보완가이드.md",
+      "sha256": "54c5d63487f58efe9d79ec041ee39c7802fbc85edd4cc8d3d57eaec85e2bdf69"
+    },
+    {
+      "path": "04_엔진과_버전별_차이.md",
+      "sha256": "f2686b5d911f2d61b1f03377b2367a94e80a9c11d54ae52b425239f6849043b6"
+    },
+    {
+      "path": "05_평가와_증거관리.md",
+      "sha256": "1b91e36d0b726c30daf71f17c59f16c97d6a64ad4686fff1687d9e9755dece30"
     },
     {
       "path": "README.md",
-      "sha256": "a0d427a6739f9b1dcb40eb57078cbaa26e80a3aeef3f2c81c6b7d89f46513e96"
+      "sha256": "f90edf3c1dfc14b1bc099dc7a782722de3bb53a12029abdd027247c831d1589a"
     },
     {
-      "path": "data/source_manifest.json",
-      "sha256": "2c91e7553f95c51b01e6f6d9efaae0eafd9b764058f32e4a43f35a65fe619f73"
-    },
-    {
-      "path": "data/result_template.json",
-      "sha256": "a67996fc2ba3b9177d3253d1b4cc8c1b35b1896f637b9efc7aa871bd3b382eb0"
+      "path": "data/checklist.json",
+      "sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7"
     },
     {
       "path": "data/environment_template.json",
       "sha256": "748cbd7b6ee6909cd70d3f4debf9d759f2ddbbddf0777ebd799b80b2e3af23f3"
     },
     {
-      "path": "data/validation_report.json",
-      "sha256": "e929dcc6def5118d75578de7139512ded0f3984e9697653f99ea5fc4a1010531"
-    },
-    {
-      "path": "data/checklist.json",
-      "sha256": "7f857208af8071b9934695f32b8753000f0f7b79aa0d47d1bd42945184875ef0"
-    },
-    {
       "path": "data/pretest_baseline_20261025.json",
       "sha256": "8b44132f2773cf0d616dfedd7604e54234820a1773250e78996e6b468228be0a"
     },
     {
-      "path": "05_평가와_증거관리.md",
-      "sha256": "86d07f5782706b10edf8b7daf6fe4cc815cc67b871d701bb05f591a9325634fc"
+      "path": "data/result_template.json",
+      "sha256": "4fbb71881a7f77336bee90d7610b273b8b705a2475102343c95ccb0ec85d1108"
     },
     {
-      "path": "01_프레임워크와_위협통제연결.md",
-      "sha256": "ede17ca28e9a3222097bb7a8a64d6f63cfbb84d58da1c29fd664f39bc3460715"
+      "path": "data/source_manifest.json",
+      "sha256": "2c91e7553f95c51b01e6f6d9efaae0eafd9b764058f32e4a43f35a65fe619f73"
     },
     {
-      "path": "검수기록.md",
-      "sha256": "dcae716e298a1d0d4da29a0c21c4f5bf231abebf5fd2ccaef7f77f0fec799fdb"
+      "path": "data/threat_map.json",
+      "sha256": "5a775379b3b77bb230e775397563aa77dcd8d7e85825fda4b927ce111e92694e"
     },
     {
-      "path": "04_엔진과_버전별_차이.md",
-      "sha256": "9db04e1e64eff8fefad6ade3bdefc9a2cb91016a8341871373b9ae0767255897"
+      "path": "engine_sglang_basis_delta.py",
+      "sha256": "3b71d7239f4f2bb477926b8a87a4c576c6b5f47b0e65f277014ac718347c57ee"
     },
     {
-      "path": "02_환경별_적용기준.md",
-      "sha256": "c2f7d07f01f3c437ee17d837c2a93b48285e2a2126846c28079ed43b16e87422"
+      "path": "engine_sglang_inventory.py",
+      "sha256": "6bc40a84be2132828bd897a2b1fc187014769fb6340c76fa55ebbdb976635f10"
     },
     {
-      "path": "03_체크리스트와_보완가이드.md",
-      "sha256": "5fd88e26ced7868b11f8a612d0359af07080d6afac01c3551dcbbb2cd2ce427c"
+      "path": "select_checklist.py",
+      "sha256": "4c09bd884f48658a26bb19866207b099a0735eea2b6979c1d6f4cd362e94182b"
+    },
+    {
+      "path": "tests/fixtures/checklist_phase1_preservation.json",
+      "sha256": "8921635e5139ec2b09f3731df4319cf74b137c10b3dc8c152ceb544e53510c72"
+    },
+    {
+      "path": "tests/fixtures/q_selector_legacy_23.json",
+      "sha256": "9269a8ae322a3da4e8f65b3769422c4f5b1cdbb1182ee573972935bb41b3d70d"
+    },
+    {
+      "path": "tests/test_checklist_editorial.py",
+      "sha256": "a74f7ef839f9e55f242d27dcd065a454d2d478ba299eaf654804e2ae1c5038f7"
+    },
+    {
+      "path": "tests/test_engine_sglang_inventory.py",
+      "sha256": "b4f08068879a805e501f48803d3ec9d2acb75acc65f52518ea623cd2752c71f7"
+    },
+    {
+      "path": "tests/test_q_selector.py",
+      "sha256": "1d05cc05601241f9a8c159cc798749173a6a6ffbfcf93db8b1144e4e35423ca4"
+    },
+    {
+      "path": "tests/test_required_subresults.py",
+      "sha256": "f6900a329cf0e29269c13553197b53c5a50ddc9d30806da35678494ddc98fa92"
+    },
+    {
+      "path": "verify_explorer.cjs",
+      "sha256": "3d880f01be60dad2b180fbf06a5ab5eee4346ad0d446e699c1757703c65b64fb"
+    },
+    {
+      "path": "verify_framework.py",
+      "sha256": "f8fc400e3870b9ad1b4aa829bfe17659282f40c1d46891b73997089d36c60948"
+    },
+    {
+      "path": "개발전달/Q_보조기_입력과_추천출력.md",
+      "sha256": "2fddcd22407e9229fc2550fa637bba006133cf02fa63d3ded815747644504e55"
+    },
+    {
+      "path": "개발전달/examples/결과기록_합성예시_초안.json",
+      "sha256": "0827972422ed54915a1a13d2519af8c5703e1a9856deb49fe8c0c440eb44a072"
+    },
+    {
+      "path": "개발전달/verify_assessment_record_examples.py",
+      "sha256": "a17ccc7295153068eee6981cfeab872e24f480e8763c5aa13d486b8889778929"
+    },
+    {
+      "path": "개발전달/개발팀_인계명세.md",
+      "sha256": "84dba6b3de89f24e33f4fc16f847f93732c16eb074cd3cdd959f7779e877ccf3"
+    },
+    {
+      "path": "개발전달/결과기록_최소명세_초안.md",
+      "sha256": "6f1422ef4b5941eafd0f033b31ea1bdede7f851434971f2db5e099d74fc3370a"
+    },
+    {
+      "path": "개발전달/결과기록_필드사전_초안.json",
+      "sha256": "ffd0512b155d2824411616424e80b466d9beb390c9c2c931ef8d7c16d5828ec9"
+    },
+    {
+      "path": "개발전달/업데이트검증_폼명세.md",
+      "sha256": "f44b071357aa1f24e2ec66fae4eda58120f21cee9ed5f021c56ba1ec59a9edde"
+    },
+    {
+      "path": "노션_공유용/01_프로젝트_소개.md",
+      "sha256": "959c026288108caa9536bfeda80b8bd70a0299741b50f7371e1b4cde945a1cbb"
+    },
+    {
+      "path": "노션_공유용/02_보안_프레임워크.md",
+      "sha256": "b5dab3733a97b6dd89d38bca9a5fab5773493d6ede8b538f0981ed57ec38a353"
+    },
+    {
+      "path": "노션_공유용/02_환경별_적용기준.md",
+      "sha256": "77e5bce7fd3803c79a2871aac06c609a1785e19d21ea76a3ac4355d42e45b47b"
+    },
+    {
+      "path": "노션_공유용/03_vLLM_동작과_위협지도.md",
+      "sha256": "c8bd72a3e3ba75fae2b2a56d8c0cfc153cbeff41b3577ab5d3392c2914ca39da"
+    },
+    {
+      "path": "노션_공유용/04_환경별_적용과_체크리스트.md",
+      "sha256": "14f79670f58d8f6e484911eb06a9f879f822090bc6169e87a19ba4b9784b7ef7"
+    },
+    {
+      "path": "노션_공유용/05_위협통제_매트릭스.md",
+      "sha256": "17af9a4a8b22b6d75aa70b210c9e867b332d15b404e8a80aa2c5b84e7ccf24f6"
+    },
+    {
+      "path": "노션_공유용/06_평가와_솔루션_런타임.md",
+      "sha256": "82ddee04542733b0d9cbfc6bc88fee638671674158d88044227f35843ad5efbd"
+    },
+    {
+      "path": "노션_공유용/07_엔진별_적용가이드.md",
+      "sha256": "b158c092bbab0dea43ee5421e444c27a6a553a4e9ee32577c4b709b91c51bc7b"
+    },
+    {
+      "path": "노션_공유용/README.md",
+      "sha256": "a8e3ec295d75056a1a2ff93c8f5349360f4c30b76a6fa6290ef06a9cebd854e5"
+    },
+    {
+      "path": "노션_공유용/assets/serving-flow-threat-map.drawio.svg",
+      "sha256": "29641d119390368256d106a94462e53a4caa21a3dd149babfa65293c85230520"
+    },
+    {
+      "path": "노션_공유용/위협지도_탐색.html",
+      "sha256": "a68c9630cced92b5eb648a269f576608dd3be75f5e526b4be4f99f46be8a097e"
     },
     {
       "path": "시험전_1차확정_20261025.md",
-      "sha256": "440338ca03f7c88af749764bf675ec0894e9cf51575d5c850f42945c0224c654"
+      "sha256": "de80325172417edfd5ccb313f02d4b83ae934499a22c56e1611f5df4b252916f"
+    },
+    {
+      "path": "엔진별_적용검토/SGLang_v0.5.22.json",
+      "sha256": "fb15f008e6d511691ab296a0fc6d131c46244571d3348cb788cd3a8bdc9f84d4"
+    },
+    {
+      "path": "엔진별_적용검토/SGLang_v0.5.22.md",
+      "sha256": "ca0967a743f2ad8a23eac7bba5228de6c1f3141eeff7d55d79b20d856b87cabe"
+    },
+    {
+      "path": "엔진별_적용검토/SGLang_v0.5.22_HTTP_route목록.json",
+      "sha256": "749e4773ba7ac314febd7a350f963799feb942305e6cf2720925005d93360a8f"
+    },
+    {
+      "path": "엔진별_적용검토/SGLang_v0.5.22_HTTP_목록안내.md",
+      "sha256": "2e6dcfa7342e2546036c468a6f5a5e52dfa52b45cae998d9489321f8de4fe360"
+    },
+    {
+      "path": "엔진별_적용검토/SGLang_v0.5.22_HTTP_정적후보_v2.json",
+      "sha256": "e93aa12b38a13b7aaaed44dd64294b165c3ee473b233e221cecad99a590fdb1e"
+    },
+    {
+      "path": "엔진별_적용검토/SGLang_v0.5.22_기준차이_20261027.json",
+      "sha256": "4bbf707e6d9fb671c0d8ad7ac7b835c78f0620a96230e42b629c1a6fdb1da100"
+    },
+    {
+      "path": "엔진별_적용검토/vLLM_v0.31.0_진입경로.md",
+      "sha256": "cee3a17a35f81ffdf8c26658a5d6363846bfd811200a9425ad0f2bfddce8833c"
+    },
+    {
+      "path": "참고자료/통합본/통합본.md",
+      "sha256": "3f9545c311317a7f011440781ceeb7ffd6263446ff561c72963afcdabc5da0f9"
+    },
+    {
+      "path": "평가기록/20261024_REQ013_반환정보_평가기록.json",
+      "sha256": "9959f89a01153a6b6583a573c80ca1f876a12adadbdc43681c2bdeb761c0584c"
+    },
+    {
+      "path": "평가기록/20261024_REQ013_반환정보_평가기록.md",
+      "sha256": "5367fa493ea2f7a6df134040e4b1bca2a1661ea56d32fcc49c88bef583a235cc"
     }
   ],
   "legacy_retained": [
     "프레임워크_논리체크리스트검토_20261019.md",
     "프레임워크_사용성검토_20261019.md"
   ],
-  "previous_byul_commit": "d119ebe446144ae707e6f13ad11eb0d786788217",
-  "previous_checklist_sha256": "8c24b31ace48a695271766b2adc6360b8570590ee5d4485e451a50c48eaf4671",
-  "id_migration_basis": "Existing question and subtest_ids uniquely identify each internal ID in the old source; old/new subtest_ids and review_order match for all 77 rows. See ID_MAPPING.json.",
-  "merged_byul_main": "3b6a5d63ee4be9062a5a58e047789be929611839"
+  "previous_upstream_commit": "0ec5fb5fa5633b0817468b27684690a66fc7b4f5",
+  "historical_files": [
+    {
+      "path": "history/0ec5fb5fa5633b0817468b27684690a66fc7b4f5/검수기록.md",
+      "original_path": "검수기록.md",
+      "upstream_commit": "0ec5fb5fa5633b0817468b27684690a66fc7b4f5",
+      "sha256": "dcae716e298a1d0d4da29a0c21c4f5bf231abebf5fd2ccaef7f77f0fec799fdb"
+    },
+    {
+      "path": "history/0ec5fb5fa5633b0817468b27684690a66fc7b4f5/data/validation_report.json",
+      "original_path": "data/validation_report.json",
+      "upstream_commit": "0ec5fb5fa5633b0817468b27684690a66fc7b4f5",
+      "sha256": "e929dcc6def5118d75578de7139512ded0f3984e9697653f99ea5fc4a1010531"
+    },
+    {
+      "path": "history/0ec5fb5fa5633b0817468b27684690a66fc7b4f5/data/checklist.json",
+      "original_path": "data/checklist.json",
+      "upstream_commit": "0ec5fb5fa5633b0817468b27684690a66fc7b4f5",
+      "sha256": "7f857208af8071b9934695f32b8753000f0f7b79aa0d47d1bd42945184875ef0"
+    }
+  ],
+  "sync_base_byul_commit": "7e34575931c9ea81a7e68b0c5944459620039c2d",
+  "vendor_policy": "Selected criteria/data/handoff/engine documents and dependencies needed to run bundled validation commands; optional linked source/media remain exact upstream links in UPSTREAM_LINKS.json.",
+  "validation_commands": [
+    "python3 -B verify_framework.py",
+    "python3 -B select_checklist.py --self-test",
+    "python3 -B 개발전달/verify_assessment_record_examples.py",
+    "python3 -m unittest discover -s tests -v",
+    "node verify_explorer.cjs",
+    "python3 -B engine_sglang_inventory.py --validate-only"
+  ],
+  "previous_sync_metadata": {
+    "previous_byul_commit": "d119ebe446144ae707e6f13ad11eb0d786788217",
+    "previous_checklist_sha256": "8c24b31ace48a695271766b2adc6360b8570590ee5d4485e451a50c48eaf4671",
+    "id_migration_basis": "Existing question and subtest_ids uniquely identify each internal ID in the old source; old/new subtest_ids and review_order match for all 77 rows. See ID_MAPPING.json.",
+    "merged_byul_main": "3b6a5d63ee4be9062a5a58e047789be929611839"
+  },
+  "sync_date": "2026-10-27"
 }

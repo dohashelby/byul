@@ -4,7 +4,7 @@ mechanism_ids:
 - mechanism-11
 - mechanism-15
 - mechanism-16
-revision: 2
+revision: 3
 retired: false
 area: PLT
 purpose: 통신 접근·송신 제한
@@ -33,7 +33,7 @@ satisfied_if: 금지 송신은 차단되고 필요한 취득·서비스·관측�
 fail_criteria: 금지 목적지·작업의 송신이 실제 성공한다.
 unknown_criteria: 센서 관측·정책 적용 상태·최종 송신 결과가 부족해 실제 차단 여부를 판단할 수 없다.
 remediation: '- 모델 취득·엔진 실행·관측 단계별 허용 목적지·포트·프로토콜·작업을 정해 해당 송신 지점에 적용한다. DNS·redirect 뒤 최종 목적지와 정책 적용 상태를 기록하고 정상 허용 통신도 유지되는지 확인한다.'
-method_and_evidence: '프로세스별 DNS/연결·목적지·포트·정책 유효 상태와 허용/금지 무해 송신을 대조한다. rank0 worker의 env와 import 당시 config root를 기록한다. VLLM_NO_USAGE_STATS==1 또는 (VLLM_DO_NOT_TRACK or DO_NOT_TRACK or 0)==1 또는 do_not_track 파일 존재 여부를 대조한다. 문자열은 정확히 1일 때 참이며 VLLM_DO_NOT_TRACK=0은 DO_NOT_TRACK=1을 가린다. 새 프로세스별 초기/주기 파일 생성·통제된 수신처 송신을 관측하고 실행 중 env 변경만으로 중지됐다고 판정하지 않는다. 【F37】선정 protocol/endpoint scheme/exporter SDK 버전/인증서/프록시 전체 수집. SDK가 https를 TLS로 강제하는지 코드 확인 후 실제 handshake 시험. 승인 TLS endpoint, 인증서 불일치 endpoint, 비허용 endpoint를 격리 환경에서 대조하고 실제 handshake·peer·수신 기록을 확인한다. 정상 대조: 승인 collector로 연결·수집 성공하고 실제 TLS peer 검증 또는 채택한 보호 채널 확인.'
+method_and_evidence: '프로세스별 DNS/연결·목적지·포트·정책 유효 상태와 허용/금지 무해 송신을 대조한다. rank0 worker의 env와 import 당시 config root를 기록한다. VLLM_NO_USAGE_STATS==1 또는 (VLLM_DO_NOT_TRACK or DO_NOT_TRACK or 0)==1 또는 do_not_track 파일 존재 여부를 대조한다. 문자열은 정확히 1일 때 참이며 VLLM_DO_NOT_TRACK=0은 DO_NOT_TRACK=1을 가린다. 새 프로세스별 초기/주기 파일 생성·통제된 수신처 송신을 관측하고 실행 중 env 변경만으로 중지됐다고 판정하지 않는다.<br><br>**vLLM v0.31.0 구현 메모:** 【F37】선정 protocol/endpoint scheme/exporter SDK 버전/인증서/프록시 전체 수집. SDK가 https를 TLS로 강제하는지 코드 확인 후 실제 handshake 시험. 승인 TLS endpoint, 인증서 불일치 endpoint, 비허용 endpoint를 격리 환경에서 대조하고 실제 handshake·peer·수신 기록을 확인한다. 정상 대조: 승인 collector로 연결·수집 성공하고 실제 TLS peer 검증 또는 채택한 보호 채널 확인.'
 remaining_setup: 시험 목적지, 송신 제한을 적용할 위치, 실제 차단 여부를 확인할 기록
 executor: null
 judge: null

@@ -1,0 +1,698 @@
+{
+  "schema_version": "1.0",
+  "kind": "engine_profile_criteria_basis_delta",
+  "reviewed_at": "2026-10-27",
+  "historical_framework_commit": "729216b1ce76fd40c99c50cc4770fd86bc8310a7",
+  "historical_checklist_sha256": "7f857208af8071b9934695f32b8753000f0f7b79aa0d47d1bd42945184875ef0",
+  "current_basis_framework_commit": "c67d03a78115d0996dfb5b92e9231429a6aa703b",
+  "current_checklist_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+  "method": "json_field_and_historical_profile_hash_comparison",
+  "historical_hash_fields": [
+    "applies_when",
+    "satisfied_if",
+    "fail_criteria",
+    "unknown_criteria",
+    "test_branch_conditions"
+  ],
+  "check_ids_preserved": 77,
+  "changed_check_records": 39,
+  "unchanged_check_records": 38,
+  "changed_historical_hashes": 7,
+  "changed_test_branch_conditions": [
+    "CHK-LIF-004",
+    "CHK-LIF-012"
+  ],
+  "scope": "criteria-basis comparison only; historical profile rows/hashes unchanged; no engine/runtime revalidation",
+  "changes": [
+    {
+      "check_id": "CHK-SUP-003",
+      "json_pointer": "/supply_assessment_draft/2",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "9ac4c7cde00e0400f5d9ac2f995cc9782db22137cd9452577532a623260887c3",
+      "current_criteria_sha256": "9ac4c7cde00e0400f5d9ac2f995cc9782db22137cd9452577532a623260887c3",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-SUP-005",
+      "json_pointer": "/supply_assessment_draft/4",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "62eed9deb5ceaa6db5272fb4b6401e309066fefaea664211a4b4c610a838ae8b",
+      "current_criteria_sha256": "62eed9deb5ceaa6db5272fb4b6401e309066fefaea664211a4b4c610a838ae8b",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-SUP-006",
+      "json_pointer": "/supply_assessment_draft/5",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence",
+        "satisfied_if"
+      ],
+      "historical_criteria_sha256": "28716698994375826ca3710e915e7e2fd610d3f1fe2a9cfd211120b211f6dd20",
+      "current_criteria_sha256": "2563877cd53254c82355e6b18ed97d3b631031c636ca5ae9c1b8fa8dabb9048a",
+      "historical_hash_fields_changed": true,
+      "criteria_field_deltas": {
+        "satisfied_if": {
+          "old": "필요한 worker의 실제 적재 대상이 승인 내용과 일치한다. 공유·원격 weights를 사용하면 승인된 model·rank·generation·layout의 payload가 실제 적재돼야 한다. 전체 접수 재개는 C09에서 별도 판정한다.",
+          "current": "필요한 worker의 실제 적재 대상이 승인 내용과 일치한다. 공유·원격 weights를 사용하면 승인된 model·rank·generation·layout의 payload가 실제 적재돼야 한다. 전체 접수 준비·재개는 7.2 기동 준비 확인의 CHK-LIF-007·CHK-LIF-009에서 별도로 판정한다."
+        }
+      },
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-SUP-007",
+      "json_pointer": "/supply_assessment_draft/6",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "29ed94c8bf9598ddaf849d467ccc60844e9aae36d09cfb114cfccc8ef0238c7d",
+      "current_criteria_sha256": "29ed94c8bf9598ddaf849d467ccc60844e9aae36d09cfb114cfccc8ef0238c7d",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-SUP-008",
+      "json_pointer": "/supply_assessment_draft/7",
+      "changed_fields": [
+        "applicability_criteria",
+        "applies_when",
+        "method_and_evidence",
+        "satisfied_if",
+        "unknown_criteria"
+      ],
+      "historical_criteria_sha256": "71242f72fdfacf4215c2d1aba601d36efbcdd670cddd5ec759d65f2f39b853b7",
+      "current_criteria_sha256": "cd3b868e5eb9671773a16051a42a0000a4715c285728a3e9792ce24fb93b8d1d",
+      "historical_hash_fields_changed": true,
+      "criteria_field_deltas": {
+        "applies_when": {
+          "old": "요청의 코드 판본 선택 필드가 수용·전달되는지 확인한다. 금지 구성에서는 거부·제거를, 허용 구성에서는 실제 선택·소비 판본을 확인한다.",
+          "current": "요청의 코드 판본 선택 필드와 실제 지원·노출 경로를 먼저 확인한다. 금지 구성에서도 해당 필드의 거부·제거를 확인하고, 허용 구성에서는 실제 선택·소비 판본을 추가 확인한다. 입력 미지원·비노출을 근거로 확인하면 코드 소비 분기만 비적용 후보로 남긴다. 지원 여부나 선택 허용 정책이 미정이면 해당 분기의 적용을 미정으로 둔다."
+        },
+        "satisfied_if": {
+          "old": "허용 밖 선택이 코드 실행 전에 차단된다. 입력 미지원이면 근거와 함께 해당 없음.",
+          "current": "허용 밖 코드 판본 선택이 import·실행 전에 차단되고 승인한 정상 요청은 처리된다. 허용된 선택 분기에서는 최종 소비 코드가 승인 대상과 일치한다."
+        },
+        "unknown_criteria": {
+          "old": "kwargs 전달까지만 확인되고 선정 processor의 최종 코드 선택은 확인되지 않았다.",
+          "current": "적용한 분기에서 kwargs 전달까지만 확인했거나 선정 processor의 최종 코드 선택·실행 전 거부를 확인하지 못했다."
+        }
+      },
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-SUP-013",
+      "json_pointer": "/supply_assessment_draft/12",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "b0f6e113c7f6dd0ae5f44d324d94ff9aff3260035b8c1b561f1f8cf48ce28ef7",
+      "current_criteria_sha256": "b0f6e113c7f6dd0ae5f44d324d94ff9aff3260035b8c1b561f1f8cf48ce28ef7",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-SUP-015",
+      "json_pointer": "/supply_assessment_draft/14",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "challenge_steps",
+        "method_and_evidence",
+        "normal_control"
+      ],
+      "historical_criteria_sha256": "d8360fe7cf5cbb418a034be21a85fec33e62cfe00cce98d4cb75feec25ff0b00",
+      "current_criteria_sha256": "d8360fe7cf5cbb418a034be21a85fec33e62cfe00cce98d4cb75feec25ff0b00",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-001",
+      "json_pointer": "/request_state_assessment_draft/0",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "challenge_steps",
+        "method_and_evidence",
+        "normal_control"
+      ],
+      "historical_criteria_sha256": "eca2b274e082abb60f7977d4678af16053efb24832c9dd4b6ef7e4d415f6bf67",
+      "current_criteria_sha256": "eca2b274e082abb60f7977d4678af16053efb24832c9dd4b6ef7e4d415f6bf67",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-004",
+      "json_pointer": "/request_state_assessment_draft/3",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "bd633bdafdda667526681ac13cb77b250a109472dae4831a4f7bd5d80d8aa361",
+      "current_criteria_sha256": "bd633bdafdda667526681ac13cb77b250a109472dae4831a4f7bd5d80d8aa361",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-005",
+      "json_pointer": "/request_state_assessment_draft/4",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "0565dd10aed5d49ca65165fb1353d8463f9466bd3c4c6b8a67d4689cc69b34d8",
+      "current_criteria_sha256": "0565dd10aed5d49ca65165fb1353d8463f9466bd3c4c6b8a67d4689cc69b34d8",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-006",
+      "json_pointer": "/request_state_assessment_draft/5",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "54f2711f74bcc53bde5215738388f06ca5f85eb2aa36af3c3d285d70109f97b7",
+      "current_criteria_sha256": "54f2711f74bcc53bde5215738388f06ca5f85eb2aa36af3c3d285d70109f97b7",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-010",
+      "json_pointer": "/request_state_assessment_draft/9",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "ac82093cfe232d96997d9d43d809deb94bce2102dce3ef54cc1117d6fbb25393",
+      "current_criteria_sha256": "ac82093cfe232d96997d9d43d809deb94bce2102dce3ef54cc1117d6fbb25393",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-011",
+      "json_pointer": "/request_state_assessment_draft/10",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "e5a002a666f6b7bebd8d0ab3a91ed0eb5bc9e5ca574c2af5f01497f3c035a418",
+      "current_criteria_sha256": "e5a002a666f6b7bebd8d0ab3a91ed0eb5bc9e5ca574c2af5f01497f3c035a418",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-012",
+      "json_pointer": "/request_state_assessment_draft/11",
+      "changed_fields": [
+        "satisfied_if"
+      ],
+      "historical_criteria_sha256": "50add244f30daf95f94f432ffe9d1ff05482bcafd749cfcbba99b54c1bdc5e9b",
+      "current_criteria_sha256": "412c8c539d86679d0e420f391d688ab3d6612a74c1387248209e4dca1e851023",
+      "historical_hash_fields_changed": true,
+      "criteria_field_deltas": {
+        "satisfied_if": {
+          "old": "취소가 올바른 대상에 적용되고 늦은 결과가 비허용 소비자에게 전달되지 않는다. 실제 자원 회수는 C08에서 판정한다.",
+          "current": "취소가 올바른 대상에 적용되고 늦은 결과가 비허용 소비자에게 전달되지 않는다. 실제 작업·자원 회수는 6.4 종결·자원 회수의 CHK-LIF-010·CHK-LIF-011에서 별도로 판정한다."
+        }
+      },
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-014",
+      "json_pointer": "/request_state_assessment_draft/13",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence",
+        "normal_control"
+      ],
+      "historical_criteria_sha256": "6b9ea43bfa789edc6a3715ce6c4811d969f994cf22b2dcd319cb7c4d6f5ab324",
+      "current_criteria_sha256": "6b9ea43bfa789edc6a3715ce6c4811d969f994cf22b2dcd319cb7c4d6f5ab324",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-016",
+      "json_pointer": "/request_state_assessment_draft/15",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "challenge_steps",
+        "method_and_evidence",
+        "normal_control"
+      ],
+      "historical_criteria_sha256": "ada4f1cb698c57a36f4cda3af0b5a19acb145ee2ef00686e194fb0ebffe0cb5a",
+      "current_criteria_sha256": "ada4f1cb698c57a36f4cda3af0b5a19acb145ee2ef00686e194fb0ebffe0cb5a",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-REQ-017",
+      "json_pointer": "/request_state_assessment_draft/16",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "0b0b366df136f0dd12f2524e6e996b72f3dc06ae7265337000e88443a7a53ab3",
+      "current_criteria_sha256": "0b0b366df136f0dd12f2524e6e996b72f3dc06ae7265337000e88443a7a53ab3",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-PLT-002",
+      "json_pointer": "/platform_assessment_draft/1",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "8a7ce9f0aadb44f468222eced1a03d9ca79d95839015792b12f50624ccae1777",
+      "current_criteria_sha256": "8a7ce9f0aadb44f468222eced1a03d9ca79d95839015792b12f50624ccae1777",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-PLT-003",
+      "json_pointer": "/platform_assessment_draft/2",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "challenge_steps",
+        "method_and_evidence",
+        "normal_control"
+      ],
+      "historical_criteria_sha256": "7cbb0fa1713dfb3dff61125bb3baf5f92ea693105c25edec59158e284d381d98",
+      "current_criteria_sha256": "7cbb0fa1713dfb3dff61125bb3baf5f92ea693105c25edec59158e284d381d98",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-PLT-004",
+      "json_pointer": "/platform_assessment_draft/3",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "6bf03d3be08c176a414674cdf45fc93e1fb1bcca23dd25782baa6d7269bcdfe4",
+      "current_criteria_sha256": "6bf03d3be08c176a414674cdf45fc93e1fb1bcca23dd25782baa6d7269bcdfe4",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-PLT-007",
+      "json_pointer": "/platform_assessment_draft/6",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "dbaec7cec912dadcd75c0f971e193bfc147f2fd93fe19256c2768563b2becc84",
+      "current_criteria_sha256": "dbaec7cec912dadcd75c0f971e193bfc147f2fd93fe19256c2768563b2becc84",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-PLT-008",
+      "json_pointer": "/platform_assessment_draft/7",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "06d07bc1bbacfa4f8cc2504834cde74a6a0083453400af117585b1966e78ffbf",
+      "current_criteria_sha256": "06d07bc1bbacfa4f8cc2504834cde74a6a0083453400af117585b1966e78ffbf",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-003",
+      "json_pointer": "/lifecycle_assessment_draft/2",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "6cf08d06f7d740e6c459ad3c1b80fe0dc1bc6ed22e164a675ccc5108e1471e8c",
+      "current_criteria_sha256": "6cf08d06f7d740e6c459ad3c1b80fe0dc1bc6ed22e164a675ccc5108e1471e8c",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-004",
+      "json_pointer": "/lifecycle_assessment_draft/3",
+      "changed_fields": [
+        "test_branch_conditions"
+      ],
+      "historical_criteria_sha256": "41a9cbbe3a2f06a72355012070fb830fdf1b15df30b5c9af2e5c6444485aaee5",
+      "current_criteria_sha256": "7aa49a16387aabd38a162b25dcd2c0b41241dbfe04025817b09b2fc9b3f5c2a3",
+      "historical_hash_fields_changed": true,
+      "criteria_field_deltas": {
+        "test_branch_conditions": {
+          "old": [
+            {
+              "name": "느린 수신자로 출력 버퍼·연결 점유",
+              "scenario_ids": [
+                "SC-07-03"
+              ],
+              "apply_when": "streaming 연결의 느린 읽기와 연결 종료 경로가 있다.",
+              "common_rules_ref": "assessment_registry.common_applicability_rules",
+              "focus_ref": "question",
+              "implementation_basis_ref": "SC-07-03"
+            },
+            {
+              "name": "디버그 응답 보관으로 메모리 고갈",
+              "scenario_ids": [
+                "SC-07-04"
+              ],
+              "apply_when": "디버그 응답 보관으로 메모리 고갈이 실제 활성 route에서 수행된다.",
+              "common_rules_ref": "assessment_registry.common_applicability_rules",
+              "focus_ref": "question",
+              "implementation_basis_ref": "SC-07-04"
+            }
+          ],
+          "current": [
+            {
+              "name": "느린 수신자로 출력 버퍼·연결 점유",
+              "scenario_ids": [
+                "SC-07-03"
+              ],
+              "apply_when": "streaming 연결의 느린 읽기와 연결 종료 경로가 있다.",
+              "common_rules_ref": "assessment_registry.common_applicability_rules",
+              "focus_ref": "question",
+              "implementation_basis_ref": "SC-07-03"
+            },
+            {
+              "name": "디버그 응답 보관으로 메모리 고갈",
+              "scenario_ids": [
+                "SC-07-04"
+              ],
+              "apply_when": "선정 route에서 응답 debug buffering이 실제 활성화되어 응답을 보관한다. 비사용은 유효 설정·등록 및 도달 경로 근거로 확인하고 활성 여부를 모르면 미정으로 남긴다.",
+              "common_rules_ref": "assessment_registry.common_applicability_rules",
+              "focus_ref": "question",
+              "implementation_basis_ref": "SC-07-04"
+            }
+          ]
+        }
+      },
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-005",
+      "json_pointer": "/lifecycle_assessment_draft/4",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "31949f88dc23af213991490c9e2c9278258530d91ad219c409eb3fbefc7526a6",
+      "current_criteria_sha256": "31949f88dc23af213991490c9e2c9278258530d91ad219c409eb3fbefc7526a6",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-006",
+      "json_pointer": "/lifecycle_assessment_draft/5",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "cc2b6d2654f168abfff2c4082a3bcdcd9855286de78c24196d90947a3d2b490a",
+      "current_criteria_sha256": "cc2b6d2654f168abfff2c4082a3bcdcd9855286de78c24196d90947a3d2b490a",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-007",
+      "json_pointer": "/lifecycle_assessment_draft/6",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "5f02dc3c8f10bccad311c42589d4f8722fdce7dd2e243c01f163ed89e1a6f62f",
+      "current_criteria_sha256": "5f02dc3c8f10bccad311c42589d4f8722fdce7dd2e243c01f163ed89e1a6f62f",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-008",
+      "json_pointer": "/lifecycle_assessment_draft/7",
+      "changed_fields": [
+        "method_and_evidence",
+        "normal_control"
+      ],
+      "historical_criteria_sha256": "1aae588c50cc4176d5b66bc06e525a1a5bbf301989ceca1e7c8b08e216f4bb25",
+      "current_criteria_sha256": "1aae588c50cc4176d5b66bc06e525a1a5bbf301989ceca1e7c8b08e216f4bb25",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-009",
+      "json_pointer": "/lifecycle_assessment_draft/8",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "3ec60c3e3f462a87a825e7348157f7f583368ab6dc4e3b57c5d1aa83c489c959",
+      "current_criteria_sha256": "3ec60c3e3f462a87a825e7348157f7f583368ab6dc4e3b57c5d1aa83c489c959",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-011",
+      "json_pointer": "/lifecycle_assessment_draft/10",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "5dce7efa97a62753b0468ca3ddced97a1536a28b86f70f3ad9b51bd8f2803521",
+      "current_criteria_sha256": "5dce7efa97a62753b0468ca3ddced97a1536a28b86f70f3ad9b51bd8f2803521",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-012",
+      "json_pointer": "/lifecycle_assessment_draft/11",
+      "changed_fields": [
+        "applicability_criteria",
+        "applies_when",
+        "base_method_and_evidence",
+        "challenge_steps",
+        "method_and_evidence",
+        "normal_control",
+        "remaining_setup",
+        "required_observations",
+        "satisfied_if",
+        "test_branch_conditions",
+        "unknown_criteria"
+      ],
+      "historical_criteria_sha256": "a1ba36ae51481a7ec41db81676ae8f1d5fedf8f3d3f252a407843968d08f9753",
+      "current_criteria_sha256": "c5fe4ed499930fd9cce352386b95c962667cb94402290691b8e3324c12b920a1",
+      "historical_hash_fields_changed": true,
+      "criteria_field_deltas": {
+        "applies_when": {
+          "old": "Gateway·앱·엔진 등 실제 추론 retry가 있을 때 적용한다. 금지 구성은 retry 미발생 근거를 확인한다.",
+          "current": "앱·SDK·Gateway·엔진의 추론 자동 retry 주체·발동 조건과 허용 정책을 먼저 확인한다. 금지 구성은 자동 retry의 거부와 실제 미발생 근거를 확인하고, 허용·사용 구성은 원·새 attempt의 중복·잔존·비용을 대조한다. 실제 비사용 근거가 있으면 자동 retry 실행 분기만 비적용 후보로 남기며, 기능·정책 미정은 적용 미정으로 둔다. 취득 SDK retry는 LIF-002에서 확인한다."
+        },
+        "satisfied_if": {
+          "old": "팀 참조에서는 추론 자동 retry 비사용을 실제 설정·경로로 확인한다. 정책을 변경해 사용하는 경우에만 금지 중복 실행·반환·비용 누적이 없는지 판정한다.",
+          "current": "금지한 자동 재시도가 수행되지 않는다. 허용한 자동 retry는 정한 attempt·중복 실행·반환·잔존·누적 비용 한도를 지키며 이전 작업이 정한 상태로 종결된다."
+        },
+        "unknown_criteria": {
+          "old": "상위 앱의 retry 또는 내부 attempt·비용을 확인하지 못했다.",
+          "current": "적용한 자동 retry의 주체·발동·원/새 attempt·잔존 작업·누적 비용 또는 판정 한도를 확인하지 못했다. 수동 재호출만 확인한 경우 자동 retry의 증거는 미확인이다."
+        },
+        "test_branch_conditions": {
+          "old": [
+            {
+              "name": "자동 재시도로 중복 실행·결과 혼입",
+              "scenario_ids": [
+                "SC-18-03"
+              ],
+              "apply_when": "실제 추론 retry 또는 복수 시도가 있다. 취득 SDK retry와 구분한다.",
+              "common_rules_ref": "assessment_registry.common_applicability_rules",
+              "focus_ref": "question",
+              "implementation_basis_ref": "SC-18-03"
+            }
+          ],
+          "current": [
+            {
+              "name": "자동 재시도로 중복 실행·결과 혼입",
+              "scenario_ids": [
+                "SC-18-03"
+              ],
+              "apply_when": "앱·SDK·Gateway·엔진의 추론 자동 retry가 실제 사용·노출되거나 금지 정책의 거부 확인이 필요할 때 선정한다. 수동 재호출은 별도 대조이며 취득 SDK retry와 구분한다.",
+              "common_rules_ref": "assessment_registry.common_applicability_rules",
+              "focus_ref": "question",
+              "implementation_basis_ref": "SC-18-03"
+            }
+          ]
+        }
+      },
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-LIF-013",
+      "json_pointer": "/lifecycle_assessment_draft/12",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "bce31635fc6777428a274b47e6f9b580641327e4bee0b8e9bede110aed1e5b0f",
+      "current_criteria_sha256": "bce31635fc6777428a274b47e6f9b580641327e4bee0b8e9bede110aed1e5b0f",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-OBS-002",
+      "json_pointer": "/observability_assessment_draft/1",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "d738d97482d2ad0b14254e6c71998b5347e655fe25a2577c9b649938265cbed1",
+      "current_criteria_sha256": "d738d97482d2ad0b14254e6c71998b5347e655fe25a2577c9b649938265cbed1",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-OBS-003",
+      "json_pointer": "/observability_assessment_draft/2",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "2227d279db472b7db88aca90f61411108b6774f9919e12dd047e787ba38403d7",
+      "current_criteria_sha256": "2227d279db472b7db88aca90f61411108b6774f9919e12dd047e787ba38403d7",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-OBS-005",
+      "json_pointer": "/observability_assessment_draft/4",
+      "changed_fields": [
+        "applicability_criteria",
+        "applies_when",
+        "method_and_evidence",
+        "satisfied_if",
+        "unknown_criteria"
+      ],
+      "historical_criteria_sha256": "e6b79a04aa8ef652be42ad0695be6f6abf305b79de3eed22796c54fc26dffdf0",
+      "current_criteria_sha256": "0bc031c4684fb2d0079c3cfdf27eabf6b6a929cbd602f5bdb49821eeaaac56c5",
+      "historical_hash_fields_changed": true,
+      "criteria_field_deltas": {
+        "applies_when": {
+          "old": "usage 일부 또는 전체 보고를 허용할 때 적용한다. 금지 정책의 비활성 검증은 별도 점검으로 유지한다.",
+          "current": "usage 보고 허용 정책을 먼저 확인하고 일부 또는 전체 보고가 허용된 환경에 적용한다. 금지 정책의 비활성·거부 확인은 CHK-OBS-004에 남긴다. 허용 여부가 미정이면 적용을 미정으로 두고, 허용 분기가 확인된 뒤 필드·목적지·주기 값이 미정이면 적용을 유지하며 결과를 미확인으로 둔다."
+        },
+        "satisfied_if": {
+          "old": "팀 참조에서는 usage 보고를 비허용으로 둔다. 정책을 변경해 허용하는 환경에서만 허용 필드·목적지·주기를 대조한다. 근거 없이 prompt 송신을 주장하지 않는다.",
+          "current": "허용한 usage 보고가 정한 필드·목적지·주기 범위에서 생성·전송되고 허용 밖 항목·수신지의 보고는 차단된다."
+        },
+        "unknown_criteria": {
+          "old": "usage 허용이 승인되지 않았거나 payload·최종 목적지를 관측하지 못했다.",
+          "current": "적용한 허용 보고의 필드·목적지·주기 기준값이나 실제 payload·최종 수신 결과를 확인하지 못했다."
+        }
+      },
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-OBS-006",
+      "json_pointer": "/observability_assessment_draft/5",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "41ab0b09cb4e1be96f0064721974cf240f08e4208cc6160749c2799b5c033295",
+      "current_criteria_sha256": "41ab0b09cb4e1be96f0064721974cf240f08e4208cc6160749c2799b5c033295",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-OBS-007",
+      "json_pointer": "/observability_assessment_draft/6",
+      "changed_fields": [
+        "applicability_criteria",
+        "applies_when",
+        "base_method_and_evidence",
+        "method_and_evidence",
+        "satisfied_if",
+        "unknown_criteria"
+      ],
+      "historical_criteria_sha256": "9cc9fa8a392418c728a110723a476f3bbd676b9b5b022bce066433bf70a955db",
+      "current_criteria_sha256": "35b9cd30344c1ff0540c4782cc9432e841c25c2cc4a8efef5ca899f007bdb83f",
+      "historical_hash_fields_changed": true,
+      "criteria_field_deltas": {
+        "applies_when": {
+          "old": "실제 배치된 replay consumer가 진단 자료를 재실행할 때 적용한다. 읽기권과 실행권을 구분한다.",
+          "current": "replay consumer의 실제 배치·도달성과 실행 허용 정책을 먼저 확인한다. 배치된 consumer의 허용 실행과 금지 실행의 거부를 대조한다. 실제 비사용·미도달 근거가 있으면 해당 분기만 비적용 후보로 남기고, consumer나 정책이 미정이면 적용을 미정으로 둔다. 읽기권과 실행권은 구분한다."
+        },
+        "satisfied_if": {
+          "old": "팀 참조의 replay 비사용·미도달을 확인한다. 정책을 변경해 지원하는 환경에서도 읽기 권한이 실행 권한으로 자동 확대되지 않는다.",
+          "current": "자료 읽기만 허용된 주체의 replay 실행은 거부된다. 실행이 허용된 역할은 승인한 범위에서 정상 처리하며, replay 금지 정책에서는 실행이 시작되지 않는다."
+        },
+        "unknown_criteria": {
+          "old": "consumer 존재·실행 경로를 모른다. 비사용 근거가 있으면 해당 분기만 비적용 후보다.",
+          "current": "적용한 consumer에서 실제 호출·실행 또는 거부 기록, reader·실행 역할의 대응을 확인하지 못했다."
+        }
+      },
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-OBS-008",
+      "json_pointer": "/observability_assessment_draft/7",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence",
+        "remaining_setup"
+      ],
+      "historical_criteria_sha256": "54e1d6371d823ca0be2627c6d9c74995f6b63303387fd8138e94b2fbed0fbd20",
+      "current_criteria_sha256": "54e1d6371d823ca0be2627c6d9c74995f6b63303387fd8138e94b2fbed0fbd20",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    {
+      "check_id": "CHK-OBS-009",
+      "json_pointer": "/observability_assessment_draft/8",
+      "changed_fields": [
+        "base_method_and_evidence",
+        "method_and_evidence"
+      ],
+      "historical_criteria_sha256": "f71aa0a9a2eab1f05f21acac8a5306bf761b05af6a16e3adf473b957c5a86f89",
+      "current_criteria_sha256": "f71aa0a9a2eab1f05f21acac8a5306bf761b05af6a16e3adf473b957c5a86f89",
+      "historical_hash_fields_changed": false,
+      "criteria_field_deltas": {},
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    }
+  ]
+}

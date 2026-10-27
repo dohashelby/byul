@@ -1,0 +1,1272 @@
+{
+  "source": "23 original saved inputs; unchanged input objects; output expectations are current tests",
+  "cases": [
+    {
+      "case": "observed_control",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "profile_status_None",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": null,
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "profile_status_unknown",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "unknown",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "profile_status_PLANNED",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "PLANNED",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "profile_status_계획 값",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "계획 값",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "profile_status_True",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": true,
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "profile_status_missing",
+      "input": {
+        "id": "service-a-prod-r1",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "planned_control_planned",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "planned",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "planned_control_계획값",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "계획값",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "unparseable_reviewed_at",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "not-a-time",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "changed_profile_configuration_same_image",
+      "input": {
+        "id": "service-a-prod-r2",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 2,
+        "tp_groups": 2,
+        "gpu_count": null,
+        "model": "model-b",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r2",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-b.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "non_digest_image_identifier",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "not-a-digest",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "not-a-digest"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "malformed_boolean_control",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": "false",
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "unknown_boolean_control",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": null,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "contradictory_cache_control",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "prefix_cache_or_shared_cache": {
+            "feature": "prefix_cache_or_shared_cache",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": false
+      },
+      "inspected_q": "Q-C03"
+    },
+    {
+      "case": "cache_component_None",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": null,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "prefix_cache_or_shared_cache": {
+            "feature": "prefix_cache_or_shared_cache",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": false
+      },
+      "inspected_q": "Q-C03"
+    },
+    {
+      "case": "cache_component_1",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": 1,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "prefix_cache_or_shared_cache": {
+            "feature": "prefix_cache_or_shared_cache",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": false
+      },
+      "inspected_q": "Q-C03"
+    },
+    {
+      "case": "cache_component_true",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": "true",
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "prefix_cache_or_shared_cache": {
+            "feature": "prefix_cache_or_shared_cache",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": false
+      },
+      "inspected_q": "Q-C03"
+    },
+    {
+      "case": "other_engine_absence_control",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "sglang",
+        "version": "0.5.22",
+        "source_commit": "other-commit",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "sglang",
+              "version": "0.5.22",
+              "source_commit": "other-commit",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "native_no_tp_context",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "synthetic-native-engine",
+        "version": "test-version",
+        "source_commit": "test-commit",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": null,
+        "gpu_count": 0,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "r10_scope_True",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": true,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "r10_scope_None",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": null,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    },
+    {
+      "case": "r10_scope_False",
+      "input": {
+        "id": "service-a-prod-r1",
+        "profile_status": "observed",
+        "engine": "vllm",
+        "version": "0.31.0",
+        "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+        "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "dependencies": {},
+        "gateway": true,
+        "nodes": 1,
+        "tp_groups": 1,
+        "gpu_count": null,
+        "model": "approved-model-a",
+        "prefix_cache": true,
+        "shared_or_remote_weights": false,
+        "feature_absence_evidence": {
+          "shared_or_remote_weights": {
+            "feature": "shared_or_remote_weights",
+            "status": "reviewed",
+            "reviewer": "reviewer-a",
+            "reviewed_at": "2026-10-26T10:00:00+09:00",
+            "disabled": true,
+            "nonexposed": true,
+            "references": [
+              "evidence/config-a.json",
+              "evidence/route-a.json"
+            ],
+            "target": {
+              "engine": "vllm",
+              "version": "0.31.0",
+              "source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+              "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        },
+        "r10_features": false,
+        "managed_or_external_fallback": false,
+        "policy_revision": "POL-r1",
+        "policy_values": {},
+        "runtime_evidence": [
+          "evidence/config-a.json"
+        ],
+        "request_code_revision_selection": null,
+        "dynamic_import": null,
+        "alternate_sources_or_formats_or_derived_cache": null,
+        "remote_acquisition_or_retry": null,
+        "prefix_cache_or_shared_cache": true
+      },
+      "inspected_q": "Q-C13"
+    }
+  ]
+}

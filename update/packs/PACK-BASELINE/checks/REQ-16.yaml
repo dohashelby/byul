@@ -2,7 +2,7 @@ id: REQ-16
 framework_id: CHK-REQ-016
 mechanism_ids:
 - mechanism-04
-revision: 3
+revision: 4
 retired: false
 area: REQ
 purpose: 재사용 문맥의 호환성
@@ -22,11 +22,11 @@ policy_params:
 policy_prose:
   policy_to_decide: 공유 허용 관계·필수 문맥
   enterprise_decisions: 공유 단위(사용자/서비스 계정/tenant), 공개 prefix 공유 여부, 인증 주체 식별·salt 발급/덮어쓰기/검사 주체, 필요한 key 문맥, 비공개 정보와 공격자의 반복 관측 조건·통계 기준·성능 허용 범위. 같은 서비스 자격 뒤 여러 사용자가 있으면 추가 신원 전달이나 환경 분리가 필요한지 결정한다.
-normal_control: 같은 모델·adapter·문맥의 동일 입력만 기대한 캐시를 재사용한다.
+normal_control: 기본 모델·입력과 실제 활성 재사용 문맥이 같으면 기대한 캐시를 재사용한다. adapter·media는 해당 기능을 사용할 때만 정상 대조에 포함한다.
 challenge_steps:
-- 동일 입력 기준선
-- adapter 내용·model generation·media 식별 중 활성 조건 하나 변경
-- hit와 출력 비교
+- 텍스트 기본과 현재 활성 문맥의 동일 입력 기준선
+- 기본 모델의 승인 세대·입력 문맥 중 key에 영향을 주는 조건 하나를 변경하고, adapter 내용·media 식별은 실제 활성 기능에 한해 별도로 변형
+- 바뀐 문맥의 cache key·hit·실제 소비와 출력을 비사용 또는 새 문맥 정상 대조와 비교
 required_observations:
 - key: declared_cache_context_evidence
   type: dict
@@ -36,7 +36,7 @@ satisfied_if: 허용하지 않은 문맥 사이에 잘못 재사용되지 않는
 fail_criteria: 서로 다른 비공유 문맥이 같은 cache로 처리되어 잘못된 자료를 재사용한다.
 unknown_criteria: 활성 key 구성·실제 객체 변경·재사용 효과를 확인하지 못했다.
 remediation: '- 모델·입력·adapter·공유 집단 등 실제 재사용에 필요한 문맥을 캐시 키와 재사용 조건에 반영한다. 문맥이 바뀌면 이전 캐시를 구분하거나 무효화한다.'
-method_and_evidence: 'token·모델 문맥 등 필요한 요소를 하나씩 바꿔 key·lookup·실제 소비를 비교한다. 【F16】미디어 UUID 및 runtime LoRA는 선택 기능. UUID가 있어도 hash factors는 반영됨. 동일 UUID에 다른 내용, 동일 LoRA 이름·경로의 가중치 교체 전후를 cache 사용/비사용 대조로 확인한다. 정상 대조: 새 UUID·새 LoRA 경로 및 cache 비사용 결과와 일치'
+method_and_evidence: 'token·모델 문맥 등 필요한 요소를 하나씩 바꿔 key·lookup·실제 소비를 비교한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F16】미디어 UUID 및 runtime LoRA는 선택 기능. UUID가 있어도 hash factors는 반영됨. 동일 UUID에 다른 내용, 동일 LoRA 이름·경로의 가중치 교체 전후를 cache 사용/비사용 대조로 확인한다. 정상 대조: 새 UUID·새 LoRA 경로 및 cache 비사용 결과와 일치'
 remaining_setup: 텍스트 기본과 MM·LoRA 선택 분기 분리; 충돌 fixture 선정
 executor: null
 judge: null

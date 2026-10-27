@@ -1,0 +1,2549 @@
+{
+  "schema_version": "1.0",
+  "kind": "engine_source_applicability_review",
+  "reviewed_at": "2026-10-24",
+  "engine": "SGLang",
+  "version": "v0.5.22",
+  "source_commit": "baa9befa381511cd4d56f83980951e5a45fffc6d",
+  "release_url": "https://github.com/sgl-project/sglang/releases/tag/v0.5.22",
+  "framework_commit": "729216b1ce76fd40c99c50cc4770fd86bc8310a7",
+  "canonical_sha256": "7f857208af8071b9934695f32b8753000f0f7b79aa0d47d1bd42945184875ef0",
+  "scope": {
+    "proposed_baseline": "단일 노드 NVIDIA GPU·텍스트 모델 1개·TP·일반/streaming·Radix prefix cache; 비교를 위한 후보 구성",
+    "actual_environment": null,
+    "model": null,
+    "image_digest": null,
+    "gpu": null,
+    "tp_size": null,
+    "resolved_configuration": null,
+    "policy_approval": null,
+    "runtime_evidence": null,
+    "optional_features": [
+      "HiCache/외부 KV storage",
+      "native session 사용",
+      "Responses 저장",
+      "custom logit processor",
+      "동적 plugin/backend",
+      "공유 weights daemon",
+      "LoRA/live update",
+      "compile/CUDA Graph/선정 communicator",
+      "PD/PP/멀티노드",
+      "dump/replay/profiler"
+    ],
+    "excluded_from_completed_review": [
+      "GPU/HTTP 실행 시험",
+      "gua의 SGLang adapter 구현 확인",
+      "모든 선택 backend·native kernel 분석",
+      "취약점 전체 탐색",
+      "모든 serving-engine의 완전성"
+    ]
+  },
+  "requirement_ids": [
+    "requirement-1-1",
+    "requirement-1-2",
+    "requirement-1-3",
+    "requirement-1-4",
+    "requirement-1-5",
+    "requirement-1-6",
+    "requirement-1-7",
+    "requirement-2-1",
+    "requirement-2-2",
+    "requirement-2-3",
+    "requirement-3-1",
+    "requirement-3-2",
+    "requirement-3-3",
+    "requirement-3-4",
+    "requirement-4-1",
+    "requirement-4-2",
+    "requirement-4-3",
+    "requirement-4-4",
+    "requirement-5-1",
+    "requirement-5-2",
+    "requirement-5-3",
+    "requirement-5-4",
+    "requirement-5-5",
+    "requirement-5-6",
+    "requirement-5-7",
+    "requirement-6-1",
+    "requirement-6-2",
+    "requirement-6-3",
+    "requirement-6-4",
+    "requirement-7-1",
+    "requirement-7-2",
+    "requirement-7-3",
+    "requirement-7-4",
+    "requirement-8-1",
+    "requirement-8-2",
+    "requirement-8-3"
+  ],
+  "classification_counts": {
+    "외부 집행과 대응": 28,
+    "엔진 경로 대응": 35,
+    "선택 기능 대응": 10,
+    "동일 기능 매핑 보류": 3,
+    "부분 대응": 1
+  },
+  "classification_meaning": "조사한 대응 위치의 분류이며 구현 수·적용 확정 수·통과 수가 아니다. 선택 기능도 실제 등록/노출/소비와 정책을 확인한 뒤 적용한다.",
+  "runtime_summary": {
+    "not_run": 77,
+    "unverified": 77,
+    "passed": 0,
+    "failed": 0,
+    "not_applicable": 0
+  },
+  "components": [
+    {
+      "name": "보안 목표",
+      "reusable": "사용자 입력/출력·모델 weights·KV/session·운영 자격·서비스·평가 증거를 기밀성/무결성/가용성/책임 추적성에 연결한다.",
+      "remaining": "KV가 외부 파일/저장소에 지속되는 경우와 session 객체를 실제 보호 자산에 추가 식별한다."
+    },
+    {
+      "name": "거버넌스",
+      "reusable": "정책 소유·승인·겸임·예외 만료·필수 검사 미확인 처리 규칙을 재사용한다.",
+      "remaining": "SGLang 운영자, Gateway/신원, 모델/저장소, 관측 담당에게 기존 책임을 배정한다. 구체 인원·기한은 미정이다."
+    },
+    {
+      "name": "위험 관리",
+      "reusable": "정상/실패 흐름의 위협→통제→증거→잔여 위험 연결을 재사용한다.",
+      "remaining": "native generate/session, cache_salt, 선택 callable·HiCache·weights daemon을 별도 접점으로 기록한다. 모든 선택 backend 분석은 남는다."
+    },
+    {
+      "name": "보안 기능과 보호 요구",
+      "reusable": "여덟 기능·36개 요구·77개 CHK의 기존 보호 의미를 출발 기준으로 대응한다.",
+      "remaining": "session 객체 인가의 검사 분기와 지속 KV의 저장 보호/보존 범위가 명세 수준에서 더 필요하다. 아래 보완 후보를 따른다."
+    },
+    {
+      "name": "환경 확인",
+      "reusable": "활성·노출·소비·집행 주체에 따른 적용/조건부/미정 선정 규칙을 재사용한다.",
+      "remaining": "명령행 선언 기본값과 모델/장치별로 해석한 유효값을 구분한다. 현재 실제 설치 환경은 미선정이다."
+    },
+    {
+      "name": "생명주기",
+      "reusable": "반입→배포→준비→실행→변경→종결/복구→폐기의 인계 규칙을 재사용한다.",
+      "remaining": "scheduler ready/warmup·abort/정리·daemon 수명·session close·선택 KV 저장소를 실제 인계 대상으로 연결한다."
+    },
+    {
+      "name": "보호 요구의 적용과 검증",
+      "reusable": "정상 대조·최소 증거·세 판정과 관리 결정 분리를 재사용한다.",
+      "remaining": "SGLang adapter·계측·실행 증거는 개발/시험 담당이 만든다. 현재 77개 실행 판정은 모두 미확인이다."
+    }
+  ],
+  "framework_owner_followup": [
+    {
+      "id": "SG-PROFILE-01",
+      "status": "framework_owner_review_pending",
+      "subject": "native session 객체의 허용 행위",
+      "existing": "1.2 작업·대상 인가, 4.1 귀속, 1.7 철회, 6.4 회수는 재사용할 수 있다. REQ-006 적용 조건은 저장 Responses/결과 객체이며 session cache를 포함한다고 확정돼 있지 않다.",
+      "missing": "open/이어쓰기/close에 사용자·공유 집단·session ID·허용 행위가 어떻게 연결되는지 기존 CHK 분기로 명시하는 작업이 남는다.",
+      "recommendation": "session 사용 환경에 한해 A/B session의 이어쓰기·종료·중복 ID와 종료 중 진행 요청을 대조하는 적용 분기 초안을 검토한다. 기존 REQ-006 기준을 조용히 확대하거나 새 CHK를 즉시 신설하지 않는다.",
+      "developer_work": "실제 session 기능/도달성·Gateway identity/owner 연결·scheduler 상태 수명 확인, 시험/계측 구현",
+      "source_refs": [
+        "SESSIONHTTP",
+        "SESSION"
+      ]
+    },
+    {
+      "id": "SG-PROFILE-02",
+      "status": "framework_owner_review_pending",
+      "subject": "지속 KV 사본의 저장 보호와 보존",
+      "existing": "4.2/4.3과 REQ-015/016은 공유 집단·문맥 재사용을 다룬다. 1.4는 engine 권한을 다룬다. 5.4/5.7과 OBS-006/012는 현재 기록·진단·usage 원본/사본을 명시한다.",
+      "missing": "HiCacheFile 같은 KV 저장 bytes의 비허용 독자 접근·내용 변조·필요 암호화·보존/삭제를 기존 CHK만으로 충분히 평가할 명시적 범위·증거가 부족하다.",
+      "recommendation": "HiCache 등 지속 저장을 사용한다면 KV 사본까지 공통 저장 자료 범위를 넓힐지 요구 개정안으로 결정한다. 저장소/암호화 값을 미리 정하거나 현재 OBS 통과 결과를 KV 보호로 전용하지 않는다. 기본 비지속 Radix 구성에는 저장 분기를 강제하지 않는다.",
+      "developer_work": "선택 KV backend·실제 파일/원격 object·writer/reader/ACL·변조/삭제/복구 관측, 저장소 통제 구현",
+      "source_refs": [
+        "HICACHE",
+        "HICACHEIO"
+      ]
+    },
+    {
+      "id": "SG-PROFILE-03",
+      "status": "mapping_detail_pending",
+      "subject": "동일 기능 부재와 일부 분기의 차이",
+      "existing": "02/04의 기능 부재·매핑 미확인 분리와 분기별 결과 규칙이 이미 있다.",
+      "missing": "SGLang별 적용 기록에서 SUP-008·OBS-004/005의 대응 미확인과 LIF-013의 release 분기 차이를 아직 실제 설치 자료로 확정하지 못했다.",
+      "recommendation": "기존 규칙을 이 profile에 적용한다. 프레임워크 공통 절차를 추가로 만들 필요는 없고, 설치 대상이 선정되면 미확인/비적용의 근거와 분기 결과를 확정한다.",
+      "developer_work": "실제 schema/설치 확장/reporter/daemon 제어 경로·도달성 조사와 실행 증거 제공",
+      "source_refs": [
+        "INPUT",
+        "OTLP",
+        "WEIGHTPROTO"
+      ]
+    }
+  ],
+  "source_refs": {
+    "AUTH": {
+      "path": "python/sglang/srt/utils/auth.py",
+      "lines": [
+        38,
+        213
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/utils/auth.py#L38-L213",
+      "sha256": "1ecd821d5fefbb196c05f33e6ee1e0cf5731cca03b27e4cce5f563ba20e6b971",
+      "observation": "route별 NORMAL/ADMIN_OPTIONAL/ADMIN_FORCE와 키 조합을 처리한다. health/ready/metrics prefix와 OPTIONS의 허용 분기가 있다. 키는 최종 사용자 신원과 구분한다."
+    },
+    "HTTP": {
+      "path": "python/sglang/srt/entrypoints/http_server.py",
+      "lines": [
+        2670,
+        2685
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2670-L2685",
+      "sha256": "a89d20bb2fa8a86c511ab4d9d054f74d707423ab220f733ff25e62fcc0e49979",
+      "observation": "키·강제 관리 endpoint 조건에 따라 인증 middleware를 설치한다."
+    },
+    "ADMIN": {
+      "path": "python/sglang/srt/entrypoints/http_server.py",
+      "lines": [
+        1009,
+        1219
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1009-L1219",
+      "sha256": "a89d20bb2fa8a86c511ab4d9d054f74d707423ab220f733ff25e62fcc0e49979",
+      "observation": "cache·외부 corpus·HiCache·profiler·trace·GC 관리 route와 권한 등급이 등록된다."
+    },
+    "UPDATE": {
+      "path": "python/sglang/srt/entrypoints/http_server.py",
+      "lines": [
+        1265,
+        1649
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1265-L1649",
+      "sha256": "a89d20bb2fa8a86c511ab4d9d054f74d707423ab220f733ff25e62fcc0e49979",
+      "observation": "weights 변경·메모리 점유 반환/복귀·LoRA 관리 접점이 있다. 별도 weight-cache daemon의 release 프로토콜과 구분한다."
+    },
+    "LOAD": {
+      "path": "python/sglang/srt/model_loader/loader.py",
+      "lines": [
+        478,
+        600
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/model_loader/loader.py#L478-L600",
+      "sha256": "2d8d206eda68de8d2f5935c1fc869dba282152b2a097b890b9ad51fa1b79d2d3",
+      "observation": "실제 weights 형식·파일 목록·다운로드·선택적 checksum 검증을 결정한다. 이 검증만으로 조직 승인이나 사용 시점 불변성을 입증하지 않는다."
+    },
+    "COMMIT": {
+      "path": "python/sglang/srt/model_loader/loader.py",
+      "lines": [
+        845,
+        910
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/model_loader/loader.py#L845-L910",
+      "sha256": "2d8d206eda68de8d2f5935c1fc869dba282152b2a097b890b9ad51fa1b79d2d3",
+      "observation": "모델 준비와 weights 적재·후처리 경로가 구분된다."
+    },
+    "CONFIG": {
+      "path": "python/sglang/srt/configs/model_config.py",
+      "lines": [
+        492,
+        600
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/configs/model_config.py#L492-L600",
+      "sha256": "25e5f87f0dbebae2ae78201c9c20b1b74df4ed4fd0788ac55c333785f8e8ae4b",
+      "observation": "model config·하위 config를 revision/trust_remote_code 인수와 함께 읽는다. 호출된 SDK와 실제 소비 대상은 설치판에서 확인한다."
+    },
+    "MODELARGS": {
+      "path": "python/sglang/srt/arg_groups/fields/model.py",
+      "lines": [
+        90,
+        110
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/arg_groups/fields/model.py#L90-L110",
+      "sha256": "26a65a05158bee8cfab0dee6bfae04ff00dfd437da2a06e1094940828cac8580",
+      "observation": "모델 loader 추가 설정과 trust_remote_code 선언 기본값 False를 확인했다."
+    },
+    "VERIFY": {
+      "path": "python/sglang/srt/utils/model_file_verifier.py",
+      "lines": [
+        74,
+        98
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/utils/model_file_verifier.py#L74-L98",
+      "sha256": "1ea58843dbf5d688ac870d79d8c9e1abbd5a4da6292b291793d1c148e41c42b7",
+      "observation": "manifest에 열거된 파일의 SHA256 일치를 검사한다. 승인 목록 전체성과 manifest 변경 권한은 외부 증거가 필요하다."
+    },
+    "DOWNLOAD": {
+      "path": "python/sglang/srt/model_loader/weight_utils.py",
+      "lines": [
+        165,
+        175
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/model_loader/weight_utils.py#L165-L175",
+      "sha256": "a7757701b108c2c383d315ede8b37a2c18ab0f393529ff8c06bdd290a020da64",
+      "observation": "다운로드 파일 lock 경로를 사용한다. 저장소 자격·실제 파일 ACL은 운영 환경에서 확인한다."
+    },
+    "HF": {
+      "path": "python/sglang/srt/model_loader/weight_utils.py",
+      "lines": [
+        621,
+        714
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/model_loader/weight_utils.py#L621-L714",
+      "sha256": "a7757701b108c2c383d315ede8b37a2c18ab0f393529ff8c06bdd290a020da64",
+      "observation": "HF weights 취득 함수와 snapshot 다운로드 경로를 확인할 지점이다. 설치 huggingface_hub의 재시도·자격 선택은 추가 조사 대상이다."
+    },
+    "PT": {
+      "path": "python/sglang/srt/model_loader/weight_utils.py",
+      "lines": [
+        1398,
+        1415
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/model_loader/weight_utils.py#L1398-L1415",
+      "sha256": "a7757701b108c2c383d315ede8b37a2c18ab0f393529ff8c06bdd290a020da64",
+      "observation": "PT reader는 weights_only=True를 먼저 시도하고 legacy tar RuntimeError 조건에서 False로 재시도한다. 설치 torch와 공급물 허용 정책을 함께 확인한다."
+    },
+    "COMPILE": {
+      "path": "python/sglang/srt/compilation/backend.py",
+      "lines": [
+        94,
+        143
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/compilation/backend.py#L94-L143",
+      "sha256": "bda7b577ed36e526d5042fbdc55f1892c58e3fe4b1a9540482fecebdc3397594",
+      "observation": "compile cache의 읽기·쓰기·compiler 연결 경로가 있다. .py 이름의 cache index는 ast.literal_eval로 읽는다."
+    },
+    "COMPILEDIR": {
+      "path": "python/sglang/srt/compilation/backend.py",
+      "lines": [
+        407,
+        474
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/compilation/backend.py#L407-L474",
+      "sha256": "bda7b577ed36e526d5042fbdc55f1892c58e3fe4b1a9540482fecebdc3397594",
+      "observation": "cache hash·rank·model_tag별 경로 및 graph 코드 생성 경로가 있다. 실제 선택 여부와 모든 하위 compiler cache는 설치 구성에서 확인한다."
+    },
+    "PLUGIN": {
+      "path": "python/sglang/srt/plugins/__init__.py",
+      "lines": [
+        35,
+        141
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/plugins/__init__.py#L35-L141",
+      "sha256": "3a975a73f1a7887e68c81ea7a2530250597ac8ae978efc0b0f70f038a99a3164",
+      "observation": "sglang.srt.platforms/general plugin 발견·SGLANG_PLUGINS 필터·로드·hook 적용 경로가 있다. 설치된 그룹별 조사 필요."
+    },
+    "DYNAMIC": {
+      "path": "python/sglang/srt/mem_cache/storage/backend_factory.py",
+      "lines": [
+        21,
+        165
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/mem_cache/storage/backend_factory.py#L21-L165",
+      "sha256": "99a3585d4d715f74f1d4190a958c3e764dd0300d9b9d64cb955cd6705ca867a6",
+      "observation": "동적 storage backend의 module_path/class_name import 경로가 있다. general plugin 필터의 보호 범위와 별도다."
+    },
+    "CALLABLE": {
+      "path": "python/sglang/srt/sampling/custom_logit_processor.py",
+      "lines": [
+        15,
+        48
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/sampling/custom_logit_processor.py#L15-L48",
+      "sha256": "e490093f004e8ae8364d3b2259747c9c999854557d9aa4370b54a1d1b904a4bb",
+      "observation": "요청용 custom logit processor의 callable 역직렬화는 dill.loads를 사용한다."
+    },
+    "CALLGATE": {
+      "path": "python/sglang/srt/managers/tokenizer_manager.py",
+      "lines": [
+        1417,
+        1425
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/managers/tokenizer_manager.py#L1417-L1425",
+      "sha256": "c4300627da6161c7ec52998a4bf7ae13d19acf7bf3d075ed9de991097a73f355",
+      "observation": "custom logit processor 활성 여부를 검사하는 지점이다."
+    },
+    "CALLARGS": {
+      "path": "python/sglang/srt/arg_groups/fields/exec_.py",
+      "lines": [
+        68,
+        71
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/arg_groups/fields/exec_.py#L68-L71",
+      "sha256": "5e73f71dd01245cc9f57e30d4db9a984a8ce7d64576b9a4c86f5e6ef75ac5479",
+      "observation": "enable_custom_logit_processor 선언 기본값 False. 실제 실행의 유효값과 거부 결과는 미수집."
+    },
+    "JINJA": {
+      "path": "python/sglang/srt/parser/jinja_template_utils.py",
+      "lines": [
+        73,
+        80
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/parser/jinja_template_utils.py#L73-L80",
+      "sha256": "cf4ee4e07c7eee81eb5f5c34457e0f816d29e06f35ed17a1652f030d2b1e8807",
+      "observation": "template AST 분석은 transformers의 _compile_jinja_template에 의존한다. 실제 renderer 안전성은 설치 의존성과 함께 확인한다."
+    },
+    "CHATGATE": {
+      "path": "python/sglang/srt/entrypoints/openai/serving_chat.py",
+      "lines": [
+        1038,
+        1048
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/openai/serving_chat.py#L1038-L1048",
+      "sha256": "de02cd317a4208c7357f6860644e1a7d114cc3a3c55affa68829ab06bd2322c0",
+      "observation": "요청 chat_template override에 trust_request_chat_template 조건을 검사한다."
+    },
+    "CHAT": {
+      "path": "python/sglang/srt/entrypoints/openai/serving_chat.py",
+      "lines": [
+        1458,
+        1476
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/openai/serving_chat.py#L1458-L1476",
+      "sha256": "de02cd317a4208c7357f6860644e1a7d114cc3a3c55affa68829ab06bd2322c0",
+      "observation": "input_ids 입력이면 template 토큰화 경로를 건너뛰는 분기가 있다."
+    },
+    "RENDER": {
+      "path": "python/sglang/srt/entrypoints/openai/serving_chat.py",
+      "lines": [
+        1705,
+        1759
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/openai/serving_chat.py#L1705-L1759",
+      "sha256": "de02cd317a4208c7357f6860644e1a7d114cc3a3c55affa68829ab06bd2322c0",
+      "observation": "template kwargs와 render/encode 경로를 연결한다. 공급 template 허용과 최종 입력 정책을 따로 판정한다."
+    },
+    "INPUT": {
+      "path": "python/sglang/srt/managers/io_struct.py",
+      "lines": [
+        180,
+        300
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/managers/io_struct.py#L180-L300",
+      "sha256": "3d01e239ffb7918d7ab6959544007d8ec785932f548430b8dac8243a0afbbec0",
+      "observation": "native generate의 text/input_ids/input_embeds와 추가 반환·custom processor 입력 필드가 있다."
+    },
+    "VALIDATE": {
+      "path": "python/sglang/srt/managers/tokenizer_manager.py",
+      "lines": [
+        1308,
+        1375
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/managers/tokenizer_manager.py#L1308-L1375",
+      "sha256": "c4300627da6161c7ec52998a4bf7ae13d19acf7bf3d075ed9de991097a73f355",
+      "observation": "context length·절단·total token 조건을 검사한다. 이 구간을 input_ids 전체의 vocab 검증 증거로 사용하지 않는다."
+    },
+    "TOKENIZE": {
+      "path": "python/sglang/srt/managers/tokenizer_manager.py",
+      "lines": [
+        1535,
+        1625
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/managers/tokenizer_manager.py#L1535-L1625",
+      "sha256": "c4300627da6161c7ec52998a4bf7ae13d19acf7bf3d075ed9de991097a73f355",
+      "observation": "sampling normalize/verify와 tokenized request 구성·cache_salt·session 전달이 이어진다."
+    },
+    "SAMPLING": {
+      "path": "python/sglang/srt/sampling/sampling_params.py",
+      "lines": [
+        229,
+        305
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/sampling/sampling_params.py#L229-L305",
+      "sha256": "0929211a3fb57315e38a98489185f95e6926c7a23f7d6b946ec103f1a956ffdb",
+      "observation": "sampling 수치·logit_bias token·grammar 조합 검증이 있다. 모든 backend의 실행 안전성은 별도다."
+    },
+    "BASE": {
+      "path": "python/sglang/srt/entrypoints/openai/serving_base.py",
+      "lines": [
+        40,
+        135
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/openai/serving_base.py#L40-L135",
+      "sha256": "7ba9861f05e35aae3d3612c0f4a3a333a343e9dc24d6935f2a42012f5be3662a",
+      "observation": "model:adapter 선택과 OpenAI 요청 변환·stream 분기·예외 반환을 처리한다. 최종 사용자별 인가는 외부 정책과 대조한다."
+    },
+    "RETURN": {
+      "path": "python/sglang/srt/entrypoints/openai/serving_chat.py",
+      "lines": [
+        2008,
+        2235
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/openai/serving_chat.py#L2008-L2235",
+      "sha256": "de02cd317a4208c7357f6860644e1a7d114cc3a3c55affa68829ab06bd2322c0",
+      "observation": "stream에서 내부 prompt_token_ids를 추출하고 선택 조건에 따라 sglext.input_ids로 추가 반환한다. 정상 응답의 입력 인용과 구분한다."
+    },
+    "RETURNCHOICE": {
+      "path": "python/sglang/srt/entrypoints/openai/serving_chat.py",
+      "lines": [
+        2451,
+        2492
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/openai/serving_chat.py#L2451-L2492",
+      "sha256": "de02cd317a4208c7357f6860644e1a7d114cc3a3c55affa68829ab06bd2322c0",
+      "observation": "비스트리밍 choice의 prompt_token_ids 추가 반환 경로다. 실제 허용 필드는 조직 정책과 대조한다."
+    },
+    "ERROR": {
+      "path": "python/sglang/srt/entrypoints/http_server.py",
+      "lines": [
+        2173,
+        2177
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2173-L2177",
+      "sha256": "a89d20bb2fa8a86c511ab4d9d054f74d707423ab220f733ff25e62fcc0e49979",
+      "observation": "native 오류 envelope에서 str(e)를 반환한다. 실제 노출 필드는 합성 오류 시험으로 확인한다."
+    },
+    "STORE": {
+      "path": "python/sglang/srt/entrypoints/openai/serving_responses.py",
+      "lines": [
+        204,
+        213
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/openai/serving_responses.py#L204-L213",
+      "sha256": "641ac81e77d055e453d06825cb0a1588295f12b3f14647f0f0e8fb997851da3d",
+      "observation": "Responses 저장 dict·lock·활성 설정을 사용한다. session cache와 구분한다."
+    },
+    "OBJECT": {
+      "path": "python/sglang/srt/entrypoints/openai/serving_responses.py",
+      "lines": [
+        1581,
+        1628
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/openai/serving_responses.py#L1581-L1628",
+      "sha256": "641ac81e77d055e453d06825cb0a1588295f12b3f14647f0f0e8fb997851da3d",
+      "observation": "저장 response 조회·취소 함수는 ID 기반 lookup을 사용한다. 여기에는 사용자 principal 인수가 없으며 전체 경유 인가는 설치 환경에서 확인한다."
+    },
+    "STOREARGS": {
+      "path": "python/sglang/srt/arg_groups/fields/serving.py",
+      "lines": [
+        26,
+        31
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/arg_groups/fields/serving.py#L26-L31",
+      "sha256": "66a9ab458053c31290f21d9b7ce6686c7a9d83e6387f2a12a61a0e5599ff4923",
+      "observation": "Responses 저장 선언 기본값 False. 메모리 저장·크기/TTL 계약은 활성화할 때 조사한다."
+    },
+    "WAIT": {
+      "path": "python/sglang/srt/managers/tokenizer_manager.py",
+      "lines": [
+        1950,
+        1978
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/managers/tokenizer_manager.py#L1950-L1978",
+      "sha256": "c4300627da6161c7ec52998a4bf7ae13d19acf7bf3d075ed9de991097a73f355",
+      "observation": "응답 대기 중 연결 종료를 확인하고 abort를 요청한다."
+    },
+    "ABORT": {
+      "path": "python/sglang/srt/managers/tokenizer_manager.py",
+      "lines": [
+        2240,
+        2260
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/managers/tokenizer_manager.py#L2240-L2260",
+      "sha256": "c4300627da6161c7ec52998a4bf7ae13d19acf7bf3d075ed9de991097a73f355",
+      "observation": "요청 abort 전달 경로다. HTTP 취소 응답은 GPU 작업·자원 회수 완료의 증거와 구분한다."
+    },
+    "SCHEDABORT": {
+      "path": "python/sglang/srt/managers/scheduler.py",
+      "lines": [
+        5458,
+        5523
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/managers/scheduler.py#L5458-L5523",
+      "sha256": "ab23556739fc4a1a089da5d33f8cb925c14b7c68ae564294b5ed13d96b427c36",
+      "observation": "대기열·선택 상태별 abort와 자원 반환 경로가 다르다. grammar queue는 이후 prefill 처리 설명이 있어 즉시 모든 작업 종료로 해석하지 않는다."
+    },
+    "KEY": {
+      "path": "python/sglang/srt/mem_cache/radix_cache.py",
+      "lines": [
+        59,
+        77
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/mem_cache/radix_cache.py#L59-L77",
+      "sha256": "67fa9a88955b9d6071d233a8a5dc2e5c91683714ba7bc9c834c2e666d41bc090",
+      "observation": "RadixKey에 token_ids/extra_key/cache_salt가 포함된다."
+    },
+    "KEYMATCH": {
+      "path": "python/sglang/srt/mem_cache/radix_cache.py",
+      "lines": [
+        166,
+        175
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/mem_cache/radix_cache.py#L166-L175",
+      "sha256": "67fa9a88955b9d6071d233a8a5dc2e5c91683714ba7bc9c834c2e666d41bc090",
+      "observation": "extra_key/cache_salt 호환성을 비교한다. salt 자체는 인증된 사용자 소유권 증거가 아니다."
+    },
+    "RADIX": {
+      "path": "python/sglang/srt/mem_cache/radix_cache.py",
+      "lines": [
+        364,
+        508
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/mem_cache/radix_cache.py#L364-L508",
+      "sha256": "67fa9a88955b9d6071d233a8a5dc2e5c91683714ba7bc9c834c2e666d41bc090",
+      "observation": "cache match/insert와 요청 key 구성이 연결된다."
+    },
+    "BATCH": {
+      "path": "python/sglang/srt/sampling/sampling_batch_info.py",
+      "lines": [
+        466,
+        646
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/sampling/sampling_batch_info.py#L466-L646",
+      "sha256": "5ddd691c5a3bd5e7f78fb4700012e00da75baecfa5c2dde2adf3766ca3fdfb90",
+      "observation": "batch filter/merge 시 sampling 상태를 다루는 경로를 확인한다. 실제 grammar/mask/logit 상태 전부의 이행은 선택 backend에서 추적한다."
+    },
+    "GPU": {
+      "path": "python/sglang/srt/layers/attention/flashinfer_backend.py",
+      "lines": [
+        77,
+        106
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/layers/attention/flashinfer_backend.py#L77-L106",
+      "sha256": "a5649f67038153c35864b3f50d5c368071a56cbef75f266bec804dbf7e64363f",
+      "observation": "선택 GPU backend의 외부 kernel 의존성 조사 시작점이다. 이 파일 검토로 native kernel 메모리 안전성을 확정하지 않는다."
+    },
+    "GRAPH": {
+      "path": "python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py",
+      "lines": [
+        1117,
+        1240
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py#L1117-L1240",
+      "sha256": "fc3816702ccb5b3dc94bfcf2c597ee6e88351cd646d55ddf8033c936ab19974e",
+      "observation": "CUDA Graph capture 및 shape별 capture 경로다."
+    },
+    "GRAPHINPUT": {
+      "path": "python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py",
+      "lines": [
+        1404,
+        1450
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/model_executor/runner/decode_cuda_graph_runner.py#L1404-L1450",
+      "sha256": "fc3816702ccb5b3dc94bfcf2c597ee6e88351cd646d55ddf8033c936ab19974e",
+      "observation": "graph 재실행용 입력 buffer 복사 지점이다. 출력 소비 완료·동시 재사용은 실제 계측이 필요하다."
+    },
+    "ALLREDUCE": {
+      "path": "python/sglang/srt/distributed/device_communicators/custom_all_reduce.py",
+      "lines": [
+        230,
+        258
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/distributed/device_communicators/custom_all_reduce.py#L230-L258",
+      "sha256": "fe4ef6eee5003f0422accd49db00e2b4523e516645aeba2a2a63d545cfbb8de5",
+      "observation": "일반·graph 통신 buffer 등록 경로다. 실제 선택 communicator를 확인한다."
+    },
+    "ALLCLOSE": {
+      "path": "python/sglang/srt/distributed/device_communicators/custom_all_reduce.py",
+      "lines": [
+        332,
+        340
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/distributed/device_communicators/custom_all_reduce.py#L332-L340",
+      "sha256": "fe4ef6eee5003f0422accd49db00e2b4523e516645aeba2a2a63d545cfbb8de5",
+      "observation": "dispose와 공유 buffer 반환을 호출한다. GPU 완료·최종 참조 해제는 별도 증거가 필요하다."
+    },
+    "IPC": {
+      "path": "python/sglang/srt/managers/scheduler_components/ipc_channels.py",
+      "lines": [
+        25,
+        88
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/managers/scheduler_components/ipc_channels.py#L25-L88",
+      "sha256": "ec73fc4546bb75991daf1abf5be1b4f0fc23770eebcdb704ea0973e51285699e",
+      "observation": "scheduler의 ZMQ 수신·RPC·출력 및 선택 metrics IPC 채널을 구성한다."
+    },
+    "SOCKET": {
+      "path": "python/sglang/srt/utils/network.py",
+      "lines": [
+        400,
+        436
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/utils/network.py#L400-L436",
+      "sha256": "335811df5b7125ffa02dd12a206c3f42977b35091fe83618db4b511ad1ad1968",
+      "observation": "ZMQ endpoint bind/connect 경로다. 주소·소유자·namespace·접근 가능 peer를 설치 환경에서 확인한다."
+    },
+    "UNPICKLE": {
+      "path": "python/sglang/srt/utils/common.py",
+      "lines": [
+        3417,
+        3441
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/utils/common.py#L3417-L3441",
+      "sha256": "5423d1bb153e72852306934ab56ee0b3eccab8b3ec6395dc9da0fea79f7e74da",
+      "observation": "SafeUnpickler allowlist와 torch storage 특별 처리 경로가 있다. 모든 IPC reader가 이 함수를 쓰는지는 채널별 추가 확인한다."
+    },
+    "TLS": {
+      "path": "python/sglang/srt/entrypoints/http_server.py",
+      "lines": [
+        2726,
+        2747
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2726-L2747",
+      "sha256": "a89d20bb2fa8a86c511ab4d9d054f74d707423ab220f733ff25e62fcc0e49979",
+      "observation": "HTTP serving의 SSL 인수 전달 지점이다. 실제 API/IPC/TP 모든 구간의 보호는 배포 증거로 대조한다."
+    },
+    "OTLP": {
+      "path": "python/sglang/srt/observability/trace.py",
+      "lines": [
+        277,
+        290
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/observability/trace.py#L277-L290",
+      "sha256": "80744047cd397f72c346b4752694bb540d6942f550260c5f50d18524b02ba8e2",
+      "observation": "gRPC exporter는 insecure=True, HTTP exporter는 endpoint를 전달한다. 선택 프로토콜·구간 보호·collector 이후 sink는 별도로 대조한다."
+    },
+    "LOGARGS": {
+      "path": "python/sglang/srt/arg_groups/fields/observability.py",
+      "lines": [
+        30,
+        70
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/arg_groups/fields/observability.py#L30-L70",
+      "sha256": "b8b5086afdff9fcbc65934b1fbf948188067cebc822cc67452881dbc78c1ce92",
+      "observation": "log_requests 선언 기본값 False, 입력/출력을 담는 log level 및 선택 crash dump folder를 제공한다."
+    },
+    "LOGGER": {
+      "path": "python/sglang/srt/utils/request_logger.py",
+      "lines": [
+        89,
+        173
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/utils/request_logger.py#L89-L173",
+      "sha256": "d251e50b83fc6bd5723676d3b04114ea38780ccbfa81a3179835c334d1e01463",
+      "observation": "native/OpenAI 요청 로깅과 입력 토큰 decode/model_dump 경로다. 실제 writer·reader·sink 필드는 운영 증거가 필요하다."
+    },
+    "DUMP": {
+      "path": "python/sglang/srt/debug_utils/dump_loader.py",
+      "lines": [
+        32,
+        85
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/debug_utils/dump_loader.py#L32-L85",
+      "sha256": "6442333827aa908ae65f4f893e24d5b0769ac1dee41fde8fd83c0a05d1e76edd",
+      "observation": "debug dump reader의 torch.load(weights_only=False) 소비 지점이다. 도구의 실제 배치·사용·계정은 미확인이다."
+    },
+    "PROFILE": {
+      "path": "python/sglang/srt/managers/scheduler_components/profiler_manager.py",
+      "lines": [
+        318,
+        395
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/managers/scheduler_components/profiler_manager.py#L318-L395",
+      "sha256": "5bf4828dbb4471c87cbd6c363fe1ddd211efb9bf8b4ab9bebec1de6b710af90d",
+      "observation": "profiler 중지·각 backend 결과 처리 경로다. backend별 종료 계약과 실제 수집 중단을 구분한다."
+    },
+    "BUDGET": {
+      "path": "python/sglang/srt/arg_groups/fields/schedule.py",
+      "lines": [
+        27,
+        94
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/arg_groups/fields/schedule.py#L27-L94",
+      "sha256": "907f9f0a4280d4f04b9b0efc3d9727167fd6ec1d5ebfb1d957e78a91a1d852e9",
+      "observation": "동시 실행/대기 수·token pool·chunking·scheduling 정책 입력을 제공한다. None 선언값을 무제한 또는 유효 예산으로 단정하지 않고 해석 후 값을 수집한다."
+    },
+    "READY": {
+      "path": "python/sglang/srt/entrypoints/engine.py",
+      "lines": [
+        989,
+        1025
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/engine.py#L989-L1025",
+      "sha256": "e0c9beca051d080ef712fa54e914e337f97d9d04a36b3ae2e2551b8ca7a1520f",
+      "observation": "scheduler 준비 대기와 watchdog 연결 지점이다."
+    },
+    "LAUNCH": {
+      "path": "python/sglang/srt/entrypoints/engine.py",
+      "lines": [
+        1121,
+        1368
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/engine.py#L1121-L1368",
+      "sha256": "e0c9beca051d080ef712fa54e914e337f97d9d04a36b3ae2e2551b8ca7a1520f",
+      "observation": "subprocess와 선택 daemon 기동 흐름이다. 각 rank 준비·부분 실패·실제 mount/env는 별도 확인한다."
+    },
+    "WARMUP": {
+      "path": "python/sglang/srt/entrypoints/http_server.py",
+      "lines": [
+        2412,
+        2501
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L2412-L2501",
+      "sha256": "a89d20bb2fa8a86c511ab4d9d054f74d707423ab220f733ff25e62fcc0e49979",
+      "observation": "warmup과 준비 상태 전환 흐름이다. skip 설정과 실제 접수 gate를 대조한다."
+    },
+    "WATCH": {
+      "path": "python/sglang/srt/utils/watchdog.py",
+      "lines": [
+        103,
+        223
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/utils/watchdog.py#L103-L223",
+      "sha256": "55fa2c9afe8999abbb0b4d0f0aa31a33f935870838b220ac35f85d63b0228cf7",
+      "observation": "실행 지연 감시와 subprocess 사망 감지 경로가 있다. 종류별 통지 기한은 실제 시험으로 확인한다."
+    },
+    "SHUTDOWN": {
+      "path": "python/sglang/srt/entrypoints/engine.py",
+      "lines": [
+        1438,
+        1477
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/engine.py#L1438-L1477",
+      "sha256": "e0c9beca051d080ef712fa54e914e337f97d9d04a36b3ae2e2551b8ca7a1520f",
+      "observation": "engine shutdown과 선택 daemon 종료 호출이다. 전체 PID·socket·GPU 자원 반환 및 다음 기동은 미시험이다."
+    },
+    "WEIGHTARGS": {
+      "path": "python/sglang/srt/arg_groups/fields/model.py",
+      "lines": [
+        371,
+        397
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/arg_groups/fields/model.py#L371-L397",
+      "sha256": "26a65a05158bee8cfab0dee6bfae04ff00dfd437da2a06e1094940828cac8580",
+      "observation": "weight_cache_mode=off/daemon/client, 선언 기본값 off. engine 소속 daemon과 standalone daemon의 수명이 다르다."
+    },
+    "WEIGHTPROTO": {
+      "path": "python/sglang/srt/weight_cache/daemon.py",
+      "lines": [
+        556,
+        624
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/weight_cache/daemon.py#L556-L624",
+      "sha256": "046701fd8973435abca52142a6be88954610870397bbe3914c283f23ce74dfb6",
+      "observation": "query_config/fetch_state/ping을 처리하며 이 프로토콜에는 release 요청이 없다. shutdown은 model/entries 정리·empty_cache를 호출한다."
+    },
+    "WEIGHTLOAD": {
+      "path": "python/sglang/srt/weight_cache/ipc_loader.py",
+      "lines": [
+        85,
+        124
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/weight_cache/ipc_loader.py#L85-L124",
+      "sha256": "14487b4d00cd47e2000821c77969afb879a4e19a1257e3a846b0bfec897f8c44",
+      "observation": "daemon mode의 disk fallback 금지와 client mode의 fallback 분기가 있다."
+    },
+    "WEIGHTPEER": {
+      "path": "python/sglang/srt/weight_cache/ipc_loader.py",
+      "lines": [
+        451,
+        500
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/weight_cache/ipc_loader.py#L451-L500",
+      "sha256": "14487b4d00cd47e2000821c77969afb879a4e19a1257e3a846b0bfec897f8c44",
+      "observation": "socket lstat 종류·UID 검사, 부재와 연결 오류를 구분한다. 동일 UID의 모델별 소비 권한은 별도 확인한다."
+    },
+    "WEIGHTLIVE": {
+      "path": "python/sglang/srt/weight_cache/ipc_loader.py",
+      "lines": [
+        183,
+        228
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/weight_cache/ipc_loader.py#L183-L228",
+      "sha256": "14487b4d00cd47e2000821c77969afb879a4e19a1257e3a846b0bfec897f8c44",
+      "observation": "daemon PID 감시·사망 시 client 종료 경로가 있다. 실제 PID/참조 수명과 GPU 작업 완료는 미확인이다."
+    },
+    "SESSIONHTTP": {
+      "path": "python/sglang/srt/entrypoints/http_server.py",
+      "lines": [
+        1652,
+        1673
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/entrypoints/http_server.py#L1652-L1673",
+      "sha256": "a89d20bb2fa8a86c511ab4d9d054f74d707423ab220f733ff25e62fcc0e49979",
+      "observation": "native open_session/close_session route가 있다. 일반 응답 저장 객체와 별개다."
+    },
+    "SESSION": {
+      "path": "python/sglang/srt/session/session_controller.py",
+      "lines": [
+        370,
+        455
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/session/session_controller.py#L370-L455",
+      "sha256": "2b51362f01309df9cdd36b411a48cb9a595f914d340eeef7ca11eb346712554b",
+      "observation": "session ID 기반 조회·생성·종료와 진행 요청의 종료 지연·cache 반환 처리를 한다. tenant 소유권과 종료 권한은 전체 경유 구조로 확인한다."
+    },
+    "HICACHE": {
+      "path": "python/sglang/srt/mem_cache/hicache_storage.py",
+      "lines": [
+        386,
+        420
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/mem_cache/hicache_storage.py#L386-L420",
+      "sha256": "554ef42506f4415135e7af8b45a24a85b2a2e56d5d047b9235768b89885425e8",
+      "observation": "선택 HiCacheFile의 저장 경로와 모델·TP/PP/CP suffix를 구성한다."
+    },
+    "HICACHEIO": {
+      "path": "python/sglang/srt/mem_cache/hicache_storage.py",
+      "lines": [
+        484,
+        541
+      ],
+      "url": "https://github.com/sgl-project/sglang/blob/baa9befa381511cd4d56f83980951e5a45fffc6d/python/sglang/srt/mem_cache/hicache_storage.py#L484-L541",
+      "sha256": "554ef42506f4415135e7af8b45a24a85b2a2e56d5d047b9235768b89885425e8",
+      "observation": "KV cache raw bytes 파일의 read/write 경로다. 파일 접근·내용 변조·보존 정책을 cache key 검사와 구분한다."
+    }
+  },
+  "checks": [
+    {
+      "check_id": "CHK-SUP-001",
+      "question": "파일 제출·저장소 수정 권한과 승인 기록 변경 권한이 분리되어 있는가?",
+      "requirement_refs": [
+        "requirement-1-3",
+        "requirement-7-1"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "승인 기록·역할 분리는 조직 저장소/배포 절차에 대응한다. checksum 함수는 승인 권한 분리를 대신하지 않는다.",
+      "source_refs": [
+        "VERIFY",
+        "LOAD"
+      ],
+      "required_runtime_or_external_evidence": "실제 제출/승인 계정, 승인 저장소 ACL, 승인 변경 거부·정상 승인과 독립 이력",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-001",
+      "criteria_sha256": "d4eb36b769084a3b7e4349a2a640f636ba3bf1fa398e7873974c9ac0aa138f98"
+    },
+    {
+      "check_id": "CHK-SUP-002",
+      "question": "배포 담당자가 허용받은 모델을 허용받은 환경에만 배포할 수 있는가?",
+      "requirement_refs": [
+        "requirement-1-2",
+        "requirement-7-1"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "배포·승격 권한은 CI/CD·수동 배포 집행점에서 확인한다.",
+      "source_refs": [
+        "LAUNCH"
+      ],
+      "required_runtime_or_external_evidence": "배포 주체×모델×환경 허용표, 허용 밖 배포 거부·실제 실행 식별",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-002",
+      "criteria_sha256": "3f24b50ee7eee232c00bf1c993c16e17e3fbe8941d6815e8e68bfaf636dd5483"
+    },
+    {
+      "check_id": "CHK-SUP-003",
+      "question": "기본 모델과 함께 읽는 설정·tokenizer·chat template, 하위 모델·추가 공급원의 파일도 승인 범위에 포함되는가?",
+      "requirement_refs": [
+        "requirement-2-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "weights 외 config·tokenizer·template와 추가 모델을 소비 목록에 연결한다.",
+      "source_refs": [
+        "LOAD",
+        "CONFIG",
+        "RENDER"
+      ],
+      "required_runtime_or_external_evidence": "선정 모델의 실제 읽은 경로/판본·digest·승인 목록; 선택 draft/LoRA는 사용 시 추가",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-003",
+      "criteria_sha256": "9ac4c7cde00e0400f5d9ac2f995cc9782db22137cd9452577532a623260887c3"
+    },
+    {
+      "check_id": "CHK-SUP-004",
+      "question": "실제로 실행하는 이미지·패키지와 함께 설치되는 의존성도 모두 승인되어 있는가?",
+      "requirement_refs": [
+        "requirement-2-1"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "Python 환경·kernel·transformers/torch/SDK까지 실제 이미지/패키지와 대조한다.",
+      "source_refs": [
+        "LAUNCH",
+        "GPU",
+        "JINJA"
+      ],
+      "required_runtime_or_external_evidence": "실행 image digest/entrypoint·설치 의존성·승인 목록의 일치",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-004",
+      "criteria_sha256": "cb2765bb8fdcb0e06545d5a93cbb7d71d5a76965e80de1a21c16db7acd140dc5"
+    },
+    {
+      "check_id": "CHK-SUP-005",
+      "question": "승인 뒤 파일·symlink·마운트가 바뀌어도 승인하지 않은 자료의 사용을 막는가?",
+      "requirement_refs": [
+        "requirement-2-2"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "loader와 checksum 전후의 파일·symlink·mount 교체 통제를 대조한다.",
+      "source_refs": [
+        "LOAD",
+        "VERIFY"
+      ],
+      "required_runtime_or_external_evidence": "실제 mount/파일 권한, 무해 교체 시도, 사용 시점 실제 bytes 또는 교체 거부",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-005",
+      "criteria_sha256": "62eed9deb5ceaa6db5272fb4b6401e309066fefaea664211a4b4c610a838ae8b"
+    },
+    {
+      "check_id": "CHK-SUP-006",
+      "question": "각 worker가 배정받은 승인 모델 파일·shard를 실제로 메모리에 올리는가?",
+      "requirement_refs": [
+        "requirement-2-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "worker 적재와 선택 IPC weights의 실제 payload를 승인 대상에 연결한다.",
+      "source_refs": [
+        "COMMIT",
+        "WEIGHTLOAD"
+      ],
+      "required_runtime_or_external_evidence": "rank별 실제 모델/shard·적재 대상·승인 식별; daemon 사용 시 config/세대/transport payload",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-006",
+      "criteria_sha256": "28716698994375826ca3710e915e7e2fd610d3f1fe2a9cfd211120b211f6dd20"
+    },
+    {
+      "check_id": "CHK-SUP-007",
+      "question": "생성된 코드·파일이나 공유 컴파일 캐시를 권한 없이 바꿀 수 없는가?",
+      "requirement_refs": [
+        "requirement-2-2",
+        "requirement-3-3",
+        "requirement-1-4"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "compile cache index·하위 compiler·생성 graph의 writer와 소비자를 구분한다.",
+      "source_refs": [
+        "COMPILE",
+        "COMPILEDIR"
+      ],
+      "required_runtime_or_external_evidence": "실제 compile 활성·경로·writer/reader, 비허용 변조 거부와 정상 재사용",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-007",
+      "criteria_sha256": "29ed94c8bf9598ddaf849d467ccc60844e9aae36d09cfb114cfccc8ef0238c7d"
+    },
+    {
+      "check_id": "CHK-SUP-008",
+      "question": "요청에 넣은 값으로 허용받지 않은 코드 버전을 선택할 수 없는가?",
+      "requirement_refs": [
+        "requirement-3-2"
+      ],
+      "mapping_class": "U",
+      "mapping_label": "동일 기능 매핑 보류",
+      "source_observation": "선정 텍스트 API에서 요청별 코드 revision 선택과 동일한 필드→코드 소비 연결은 이번 조사에서 확보하지 못했다. custom callable은 SUP-012로 연결한다.",
+      "source_refs": [
+        "INPUT",
+        "CHATGATE",
+        "CALLABLE"
+      ],
+      "required_runtime_or_external_evidence": "활성 API schema와 확장 전체의 코드 판본 선택 전달 조사; 부재 확인 전에는 비적용 확정 보류",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-008",
+      "criteria_sha256": "71242f72fdfacf4215c2d1aba601d36efbcdd670cddd5ec759d65f2f39b853b7"
+    },
+    {
+      "check_id": "CHK-SUP-009",
+      "question": "모델에 포함된 추가 코드가 허용된 조건에서만 실행되는가?",
+      "requirement_refs": [
+        "requirement-3-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "model config의 trust_remote_code 전달과 선언 기본값을 대조한다.",
+      "source_refs": [
+        "CONFIG",
+        "MODELARGS"
+      ],
+      "required_runtime_or_external_evidence": "유효 설정·선정 모델의 실제 추가 코드 소비; 금지 코드 미실행과 승인 모델 정상 로딩",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-009",
+      "criteria_sha256": "41ed74fc009c88d189ef2c09b99139d21dc6b1fa53b05a63beb7d487f3fb4f40"
+    },
+    {
+      "check_id": "CHK-SUP-010",
+      "question": "승인하지 않은 플러그인을 실행하기 전에 허용 여부를 검사하는가?",
+      "requirement_refs": [
+        "requirement-3-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "플러그인 entry point 발견·필터·hook 적용을 실제 설치 그룹별로 연결한다.",
+      "source_refs": [
+        "PLUGIN"
+      ],
+      "required_runtime_or_external_evidence": "설치 entry point/distribution·실제 발견/로드 결과·허용 목록·필터 제외 정상 대조",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-010",
+      "criteria_sha256": "cbbad2b3d5ad1436b7379385d023ef05eb7d0bd240370999fe924795fdb29bf4"
+    },
+    {
+      "check_id": "CHK-SUP-011",
+      "question": "지원하는 실행 방식마다 외부 모듈을 불러오는 제한이 유지되는가?",
+      "requirement_refs": [
+        "requirement-3-2"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "HiCache 동적 backend import는 general plugin 발견과 별도 소비 경로다.",
+      "source_refs": [
+        "DYNAMIC"
+      ],
+      "required_runtime_or_external_evidence": "선택 backend/module/class·실행 모드별 실제 import·비허용 import 거부",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-011",
+      "criteria_sha256": "d68e9e20c04acd1095fdbbe3f2a82905c7fcc79f945bf4c986c2e3dab259a644"
+    },
+    {
+      "check_id": "CHK-SUP-012",
+      "question": "실제로 사용하는 파일·메시지 해석기가 금지된 객체나 동작을 거부하는가?",
+      "requirement_refs": [
+        "requirement-3-3"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "PT legacy tar fallback, 선택 callable/dump/daemon reader를 각각 조사한다.",
+      "source_refs": [
+        "PT",
+        "CALLABLE",
+        "CALLGATE",
+        "CALLARGS",
+        "UNPICKLE",
+        "DUMP"
+      ],
+      "required_runtime_or_external_evidence": "선택 reader·설치 torch/dill·유효 gate·무해 비허용 객체의 실제 부수 동작/거부와 정상 소비",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-012",
+      "criteria_sha256": "1a1dcaf1c894c8a4ab24ee7a8ff4481e4aa65626fceaa7c864637f50e360c92a"
+    },
+    {
+      "check_id": "CHK-SUP-013",
+      "question": "모델이 제공한 chat template을 해석할 때 허용된 동작 범위를 지키는가?",
+      "requirement_refs": [
+        "requirement-3-3"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "chat template renderer와 transformers의 실제 판본·sandbox 계약을 연결한다.",
+      "source_refs": [
+        "JINJA",
+        "RENDER"
+      ],
+      "required_runtime_or_external_evidence": "공급 template 출처·실제 renderer/의존성·금지 동작 거부·정상 render",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-013",
+      "criteria_sha256": "b0f6e113c7f6dd0ae5f44d324d94ff9aff3260035b8c1b561f1f8cf48ce28ef7"
+    },
+    {
+      "check_id": "CHK-SUP-014",
+      "question": "필수 검사가 실패하거나 오류·미지원·생략으로 끝나면 통과시키지 않는가?",
+      "requirement_refs": [
+        "requirement-7-1"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "조직의 필수 검사·보류 gate를 배포/사용 집행점에 연결한다.",
+      "source_refs": [
+        "LOAD",
+        "LAUNCH"
+      ],
+      "required_runtime_or_external_evidence": "필수 검사 채택·실패/오류/생략 묶음의 보류와 정상 묶음 허용; 승인/위험수용 기록 구분",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-014",
+      "criteria_sha256": "888927b0581a4e4e5a252e3f3712f1884ccc180edaa6bdddd171c9ba4761d9e1"
+    },
+    {
+      "check_id": "CHK-SUP-015",
+      "question": "모델·도구·설정이 바뀌면 더 이상 맞지 않는 생성물이나 캐시를 재사용하지 않는가?",
+      "requirement_refs": [
+        "requirement-4-3",
+        "requirement-2-2",
+        "requirement-7-3"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "다운로드·compile cache의 재사용 식별과 변경 후 재생성을 조사한다.",
+      "source_refs": [
+        "LOAD",
+        "COMPILE",
+        "COMPILEDIR"
+      ],
+      "required_runtime_or_external_evidence": "변경 전후 모델/도구/옵션·cache 식별·실제 재사용/재생성; 하위 compiler도 포함",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-015",
+      "criteria_sha256": "d8360fe7cf5cbb418a034be21a85fec33e62cfe00cce98d4cb75feec25ff0b00"
+    },
+    {
+      "check_id": "CHK-SUP-016",
+      "question": "중단되거나 실패한 생성물·부분 파일을 완성된 자료로 사용하지 않는가?",
+      "requirement_refs": [
+        "requirement-2-3",
+        "requirement-7-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "다운로드·compile 생성 중단 뒤 부분 파일의 소비를 조사한다.",
+      "source_refs": [
+        "HF",
+        "COMPILE",
+        "COMPILEDIR"
+      ],
+      "required_runtime_or_external_evidence": "생성 단계별 중단 기록·완료 표지·실제 읽은 파일·정상 재시작; 파일 존재만으로 완료 판정 금지",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-SUP-016",
+      "criteria_sha256": "321e10d317ace0036ce727b62199e6cf8bc83dfc1146fcdeaea59bd61b2cddaf"
+    },
+    {
+      "check_id": "CHK-REQ-001",
+      "question": "Gateway를 거치지 않은 요청으로 허용받지 않은 작업을 할 수 없는가?",
+      "requirement_refs": [
+        "requirement-1-2"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "Gateway 경유·직통과 SGLang 인증 middleware의 실제 설치/노출을 함께 확인한다.",
+      "source_refs": [
+        "AUTH",
+        "HTTP"
+      ],
+      "required_runtime_or_external_evidence": "실제 ingress/직통 경로·키 정책·허용/비허용 호출의 handler 수행 여부",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-001",
+      "criteria_sha256": "eca2b274e082abb60f7977d4678af16053efb24832c9dd4b6ef7e4d415f6bf67"
+    },
+    {
+      "check_id": "CHK-REQ-002",
+      "question": "Gateway·서버의 경로 설정에 따라 요청 경로가 바뀌어도 최종 실행 API에 필요한 인증·권한 검사가 적용되는가?",
+      "requirement_refs": [
+        "requirement-1-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "route match·Request path·root_path 변환과 권한 등급의 연결을 대조한다.",
+      "source_refs": [
+        "AUTH",
+        "TLS"
+      ],
+      "required_runtime_or_external_evidence": "프록시 재작성 전후 경로·최종 route·정규화·인증 결과; 비허용 handler 미수행",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-002",
+      "criteria_sha256": "7220c9366b4b42ae8b85fc1058156bb07d08827af9b1610291f14d09ddf17d63"
+    },
+    {
+      "check_id": "CHK-REQ-003",
+      "question": "일반 사용자가 허용받지 않은 관리·진단 작업을 할 수 없는가?",
+      "requirement_refs": [
+        "requirement-1-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "ADMIN_OPTIONAL과 키 조합, health/metrics 예외를 실제 역할 정책에 대조한다.",
+      "source_refs": [
+        "AUTH",
+        "ADMIN",
+        "UPDATE"
+      ],
+      "required_runtime_or_external_evidence": "route×키/역할×노출 표, 일반 사용자 관리 작업 거부·관리 정상 작업; API 상태코드와 실제 효과",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-003",
+      "criteria_sha256": "df20a2237caf9b361a59f522ef2d8212941e45365c10f425fe971acec33c3739"
+    },
+    {
+      "check_id": "CHK-REQ-004",
+      "question": "사용자가 보낸 값으로 권한 검사에 쓰는 신원을 사칭할 수 없는가?",
+      "requirement_refs": [
+        "requirement-1-1",
+        "requirement-1-2"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "SGLang의 공용 키와 Gateway가 검증한 최종 사용자 신원을 구분한다.",
+      "source_refs": [
+        "AUTH",
+        "BASE"
+      ],
+      "required_runtime_or_external_evidence": "외부 신원/header 제거·재생성·최종 인가 주체; 임의 사용자 값과 검증 신원 비교",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-004",
+      "criteria_sha256": "bd633bdafdda667526681ac13cb77b250a109472dae4831a4f7bd5d80d8aa361"
+    },
+    {
+      "check_id": "CHK-REQ-005",
+      "question": "최종 선택된 모델에 호출자의 사용 권한이 적용되고, 사용 종료한 모델의 실행이 차단되는가?",
+      "requirement_refs": [
+        "requirement-1-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "base model:adapter 선택과 native/관리 변경 경로의 최종 모델을 연결한다.",
+      "source_refs": [
+        "BASE",
+        "UPDATE",
+        "LOAD"
+      ],
+      "required_runtime_or_external_evidence": "호출자 허용표·최종 모델/adapter·사용 종료/alias 변경 뒤 실제 선택·거부",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-005",
+      "criteria_sha256": "0565dd10aed5d49ca65165fb1353d8463f9466bd3c4c6b8a67d4689cc69b34d8"
+    },
+    {
+      "check_id": "CHK-REQ-006",
+      "question": "저장된 결과를 조회하거나 취소할 때 해당 객체의 권한을 확인하는가?",
+      "requirement_refs": [
+        "requirement-1-2"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "enable_response_store와 response ID 조회·취소에 대응한다. session API를 이 항목 충족으로 합치지 않는다.",
+      "source_refs": [
+        "STORE",
+        "OBJECT",
+        "STOREARGS"
+      ],
+      "required_runtime_or_external_evidence": "A/B 저장 객체·owner·공유/이어쓰기/취소 정책·경유/직통 실제 객체 영향",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-006",
+      "criteria_sha256": "54f2711f74bcc53bde5215738388f06ca5f85eb2aa36af3c3d285d70109f97b7"
+    },
+    {
+      "check_id": "CHK-REQ-007",
+      "question": "chat template 적용으로 입력이 바뀐 뒤에도 필요한 제한이 유지되는가?",
+      "requirement_refs": [
+        "requirement-3-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "chat template kwargs·render·최종 입력 제한을 연결한다.",
+      "source_refs": [
+        "CHATGATE",
+        "RENDER",
+        "VALIDATE"
+      ],
+      "required_runtime_or_external_evidence": "render 전후 입력·최종 token/길이·필수 정책 집행; 정상 template 대조",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-007",
+      "criteria_sha256": "c631f2fbce2c80b03165f0331820afc02f7e8a711518a3926c7d8fc8488e0e1a"
+    },
+    {
+      "check_id": "CHK-REQ-008",
+      "question": "미리 만든 토큰 ID를 재사용하는 입력도 필요한 검사를 거치는가?",
+      "requirement_refs": [
+        "requirement-3-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "native input_ids와 OpenAI chat input_ids의 template 우회 경로가 있다.",
+      "source_refs": [
+        "INPUT",
+        "CHAT",
+        "TOKENIZE"
+      ],
+      "required_runtime_or_external_evidence": "외부 재사용 token 금지 정책의 거부/제거와 모델 미소비; 정책 변경 시 우회 입력 유효성·정책 검사",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-008",
+      "criteria_sha256": "e8b16abab912e19e69356fdec11df648dce1a72b58be4fca53794301c54ad94d"
+    },
+    {
+      "check_id": "CHK-REQ-009",
+      "question": "토큰 번호와 입력 길이가 실제 모델과 처리 단계에서 허용하는 범위 안에 있는가?",
+      "requirement_refs": [
+        "requirement-3-1",
+        "requirement-6-3"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "context/절단/total-token 검사와 최종 모델 입력을 대조한다. sampling용 vocab 검사를 모든 input_ids 검증으로 확대하지 않는다.",
+      "source_refs": [
+        "VALIDATE",
+        "TOKENIZE",
+        "SAMPLING"
+      ],
+      "required_runtime_or_external_evidence": "선정 모델 vocab·길이·변환 후 token의 실제 소비/거부·backend별 정상 범위",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-009",
+      "criteria_sha256": "c7452960e69adf838e181785bd5e0382af5a766c7ff0743406b6caab44ea5714"
+    },
+    {
+      "check_id": "CHK-REQ-010",
+      "question": "답변 생성 옵션의 값·개수·조합이 실제 실행 가능한 범위 안에 있는가?",
+      "requirement_refs": [
+        "requirement-3-1",
+        "requirement-6-3"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "SamplingParams.verify의 값·grammar 조합과 실제 runner 소비를 연결한다.",
+      "source_refs": [
+        "SAMPLING",
+        "TOKENIZE"
+      ],
+      "required_runtime_or_external_evidence": "수치/개수/조합 경계·정상 생성·오류 이후 후속 요청; 선택 custom processor 별도",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-010",
+      "criteria_sha256": "ac82093cfe232d96997d9d43d809deb94bce2102dce3ef54cc1117d6fbb25393"
+    },
+    {
+      "check_id": "CHK-REQ-011",
+      "question": "동시 요청과 스트리밍 응답이 각각 올바른 요청자에게 돌아가는가?",
+      "requirement_refs": [
+        "requirement-4-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "OpenAI 변환·stream 분기와 tokenizer 응답 대기를 요청 귀속에 연결한다.",
+      "source_refs": [
+        "BASE",
+        "WAIT"
+      ],
+      "required_runtime_or_external_evidence": "동시 A/B 요청·내외부 ID·stream chunk·실제 수신자와 결과; native API도 포함",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-011",
+      "criteria_sha256": "e5a002a666f6b7bebd8d0ab3a91ed0eb5bc9e5ca574c2af5f01497f3c035a418"
+    },
+    {
+      "check_id": "CHK-REQ-012",
+      "question": "취소하거나 연결을 끊은 요청의 늦은 결과가 다른 요청이나 새 시도에 섞이지 않는가?",
+      "requirement_refs": [
+        "requirement-4-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "연결 종료→abort 전달→scheduler 후처리와 늦은 결과 귀속을 연결한다.",
+      "source_refs": [
+        "WAIT",
+        "ABORT",
+        "SCHEDABORT"
+      ],
+      "required_runtime_or_external_evidence": "취소 대상/시도 ID·늦은 출력·새 요청 수신 결과; 자원 회수는 LIF-010에서 별도",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-012",
+      "criteria_sha256": "50add244f30daf95f94f432ffe9d1ff05482bcafd749cfcbba99b54c1bdc5e9b"
+    },
+    {
+      "check_id": "CHK-REQ-013",
+      "question": "응답 옵션과 오류 메시지가 수신자에게 허용된 정보만 반환하는가?",
+      "requirement_refs": [
+        "requirement-5-1",
+        "requirement-1-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "prompt_token_ids·native 추가 반환·오류 envelope를 endpoint별 독자 정책에 대조한다.",
+      "source_refs": [
+        "RETURN",
+        "RETURNCHOICE",
+        "INPUT",
+        "ERROR",
+        "BASE"
+      ],
+      "required_runtime_or_external_evidence": "정상/stream/오류 응답 필드·합성 내부 marker·수신자 정책; 정상 답변 인용과 추가 입력 반환 구분",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-013",
+      "criteria_sha256": "c87b45d66ccf349c38e13adca867ba44add7a51a76214667ce971601a999e45b"
+    },
+    {
+      "check_id": "CHK-REQ-014",
+      "question": "여러 실행 프로세스가 주고받는 중간 자료와 최종 출력이 원래 요청에 맞게 처리·반환되는가?",
+      "requirement_refs": [
+        "requirement-4-1",
+        "requirement-5-5"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "scheduler IPC와 TP communicator의 중간 자료·최종 출력 귀속을 추적한다.",
+      "source_refs": [
+        "IPC",
+        "ALLREDUCE"
+      ],
+      "required_runtime_or_external_evidence": "실제 TP rank/요청/세대·전달 payload와 최종 출력; PD/PP는 선택 시 별도",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-014",
+      "criteria_sha256": "6b9ea43bfa789edc6a3715ce6c4811d969f994cf22b2dcd319cb7c4d6f5ab324"
+    },
+    {
+      "check_id": "CHK-REQ-015",
+      "question": "캐시를 공유할 사용자 집단을 검증된 신원에 따라 결정하는가?",
+      "requirement_refs": [
+        "requirement-4-2",
+        "requirement-1-1",
+        "requirement-1-2",
+        "requirement-5-6"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "요청 cache_salt가 Radix key에 반영된다. 인증 신원→공유 집단 결정은 Gateway/환경 증거와 연결한다.",
+      "source_refs": [
+        "TOKENIZE",
+        "KEY",
+        "KEYMATCH",
+        "RADIX"
+      ],
+      "required_runtime_or_external_evidence": "검증 신원·신뢰 집단/주입 규칙·client salt 위조/누락·실제 교차 집단 hit/소비",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-015",
+      "criteria_sha256": "1b8b9269eea7ba8b1960c73d48106570eb6443d05c736a9e1ff6590d444f841a"
+    },
+    {
+      "check_id": "CHK-REQ-016",
+      "question": "캐시 식별값이 재사용에 필요한 모델·설정·자료의 차이를 구분하는가?",
+      "requirement_refs": [
+        "requirement-4-3",
+        "requirement-3-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "Radix key·extra_key·salt와 모델/adapter 변경의 cache 문맥을 대조한다.",
+      "source_refs": [
+        "KEY",
+        "KEYMATCH",
+        "RADIX",
+        "HICACHE"
+      ],
+      "required_runtime_or_external_evidence": "실제 cache 종류별 key·모델/판본/설정/adapter 문맥·호환/비호환 재사용 결과",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-016",
+      "criteria_sha256": "ada4f1cb698c57a36f4cda3af0b5a19acb145ee2ef00686e194fb0ebffe0cb5a"
+    },
+    {
+      "check_id": "CHK-REQ-017",
+      "question": "캐시 적중에 따른 시간 차이로 비공개 정보가 허용 범위 밖에 드러나지 않는가?",
+      "requirement_refs": [
+        "requirement-5-6",
+        "requirement-4-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "공유 Radix hit 경로를 위협 조건하의 시간 관측 시험에 연결한다.",
+      "source_refs": [
+        "RADIX"
+      ],
+      "required_runtime_or_external_evidence": "비공개 prefix·관측자/반복 예산·통계 기준·hit/지연 원인·허용/금지 추론 결과",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-017",
+      "criteria_sha256": "0b0b366df136f0dd12f2524e6e996b72f3dc06ae7265337000e88443a7a53ab3"
+    },
+    {
+      "check_id": "CHK-REQ-018",
+      "question": "batch slot을 옮기거나 재사용할 때 이전 요청의 제한 상태가 남지 않는가?",
+      "requirement_refs": [
+        "requirement-4-4"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "SGLang batch filter/merge의 sampling 상태 이동에 대응한다.",
+      "source_refs": [
+        "BATCH"
+      ],
+      "required_runtime_or_external_evidence": "요청→slot 이동·grammar/mask/logit 상태·독립 정상 결과; 선택 runner별 관측",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-018",
+      "criteria_sha256": "99457c02c7223ba5dade4b6916ec297e8b283390008054989b3310261ff9a001"
+    },
+    {
+      "check_id": "CHK-REQ-019",
+      "question": "실제 사용하는 GPU 연산 코드가 입력·버퍼 경계를 지키고 필요한 영역을 초기화하는가?",
+      "requirement_refs": [
+        "requirement-3-4",
+        "requirement-4-4"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "선택 attention/backend와 실제 설치 kernel의 dtype/shape 분기에 대응한다.",
+      "source_refs": [
+        "GPU"
+      ],
+      "required_runtime_or_external_evidence": "실제 GPU/backend/kernel 판본·경계 입력·메모리 계측·초기화/오류·정상 연산",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-019",
+      "criteria_sha256": "cd7f513cf4f551356ced2ac2d94bb8e752afcd87ad39266349529b3b0726f95f"
+    },
+    {
+      "check_id": "CHK-REQ-020",
+      "question": "CUDA Graph 재실행이 현재 입력을 쓰고 아직 읽는 출력 버퍼를 덮어쓰지 않는가?",
+      "requirement_refs": [
+        "requirement-4-4",
+        "requirement-3-4"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "decode CUDA Graph capture와 input buffer copy에 대응한다.",
+      "source_refs": [
+        "GRAPH",
+        "GRAPHINPUT"
+      ],
+      "required_runtime_or_external_evidence": "실제 graph 활성/mode·current input/유효 길이·출력 소비 시점·buffer 재사용·GPU 완료",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-020",
+      "criteria_sha256": "adad59cfa8ad5e536ba7e5a4f11e227606b11b4340b60b013001d37ca22fc19f"
+    },
+    {
+      "check_id": "CHK-REQ-021",
+      "question": "TP의 GPU 작업 재실행에 사용하는 통신 버퍼가 등록·종료·재기동 후에도 현재 실행의 유효한 버퍼를 참조하는가?",
+      "requirement_refs": [
+        "requirement-4-4",
+        "requirement-3-4",
+        "requirement-5-5"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "custom all-reduce의 graph buffer 등록과 dispose에 대응한다.",
+      "source_refs": [
+        "ALLREDUCE",
+        "ALLCLOSE"
+      ],
+      "required_runtime_or_external_evidence": "선택 communicator·등록/실행/종료/재기동 handle·세대/owner·GPU 완료와 최종 참조 해제",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-REQ-021",
+      "criteria_sha256": "a0496098dbddfd95f4da253d890b5e12c74f00f882d4718b63444cb728381d0b"
+    },
+    {
+      "check_id": "CHK-PLT-001",
+      "question": "엔진과 worker의 호스트·파일·장치 권한이 필요한 범위에 한정되는가?",
+      "requirement_refs": [
+        "requirement-1-4"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "engine/subprocess의 실제 UID·mount·장치·capability를 최소 권한 표에 대조한다.",
+      "source_refs": [
+        "LAUNCH"
+      ],
+      "required_runtime_or_external_evidence": "필요 권한표·실제 process/namespace·무해 비허용 파일/장치 접근 거부·정상 TP",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-001",
+      "criteria_sha256": "44ee4a6c3a9af914c74c2a3d192c2c119aeb5cedd30af15be54965e9c22ba807"
+    },
+    {
+      "check_id": "CHK-PLT-002",
+      "question": "같은 호스트의 내부 통신 접점에 허용된 프로세스만 접근하는가?",
+      "requirement_refs": [
+        "requirement-1-4",
+        "requirement-1-6"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "scheduler ZMQ·선택 weight daemon socket의 peer 접근을 채널별 확인한다.",
+      "source_refs": [
+        "IPC",
+        "SOCKET",
+        "WEIGHTPEER"
+      ],
+      "required_runtime_or_external_evidence": "주소/상위 경로·owner/mode·namespace·동일/다른 UID 비허용 peer의 연결과 실제 메시지 소비",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-002",
+      "criteria_sha256": "8a7ce9f0aadb44f468222eced1a03d9ca79d95839015792b12f50624ccae1777"
+    },
+    {
+      "check_id": "CHK-PLT-003",
+      "question": "모델 취득 계정이 허용된 저장소·파일에만 접근할 수 있는가?",
+      "requirement_refs": [
+        "requirement-1-5",
+        "requirement-2-1"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "HF 다운로드 또는 로컬 반입 주체의 실제 자격 범위를 대조한다.",
+      "source_refs": [
+        "HF",
+        "LOAD"
+      ],
+      "required_runtime_or_external_evidence": "SDK/provider identity·최종 저장소/객체·허용/비허용 접근 감사; 비밀값은 제외",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-003",
+      "criteria_sha256": "7cbb0fa1713dfb3dff61125bb3baf5f92ea693105c25edec59158e284d381d98"
+    },
+    {
+      "check_id": "CHK-PLT-004",
+      "question": "worker에 필요 없는 자격·비밀정보를 넘기지 않는가?",
+      "requirement_refs": [
+        "requirement-1-5",
+        "requirement-5-2"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "subprocess 생성 시 worker가 받는 env·파일·mount 자격을 조사한다.",
+      "source_refs": [
+        "LAUNCH"
+      ],
+      "required_runtime_or_external_evidence": "부모→worker의 자격 참조/수신자·필요성·실제 접근; 원문 secret 수집 금지",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-004",
+      "criteria_sha256": "6bf03d3be08c176a414674cdf45fc93e1fb1bcca23dd25782baa6d7269bcdfe4"
+    },
+    {
+      "check_id": "CHK-PLT-005",
+      "question": "자격이 만료되거나 없을 때 승인하지 않은 다른 방식으로 접근하지 않는가?",
+      "requirement_refs": [
+        "requirement-1-5",
+        "requirement-7-1"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "취득 SDK의 만료/누락 자격과 cache/anonymous/provider 대체를 조사한다.",
+      "source_refs": [
+        "HF",
+        "LOAD"
+      ],
+      "required_runtime_or_external_evidence": "선정 SDK 판본·만료/누락 별 실제 선택 자격/공급원·허용 대체 정책·취득 결과",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-005",
+      "criteria_sha256": "ed5316382eeb37910b740ce17cae22940a393d24615c6b684d29fa0a04408ab1"
+    },
+    {
+      "check_id": "CHK-PLT-006",
+      "question": "Core·worker의 공유 권한과 침해 영향을 확인하고, 해당 프로세스·내부 통신에 대한 외부 접근을 제한하는가?",
+      "requirement_refs": [
+        "requirement-1-4"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "동일 호스트 ZMQ·TP·reader가 공유하는 실제 UID/권한 경계를 기록한다.",
+      "source_refs": [
+        "IPC",
+        "SOCKET",
+        "UNPICKLE"
+      ],
+      "required_runtime_or_external_evidence": "채널별 serialization·허용 peer·UID/command 영향 범위·비허용 peer 차단과 잔여 위험",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-006",
+      "criteria_sha256": "7a0b19679fcf6c3e4adf4f60f1e1e03a03bf60f36f3fb6f31cdc3a639550c5fb"
+    },
+    {
+      "check_id": "CHK-PLT-007",
+      "question": "엔진의 외부 송신이 허용된 목적지와 작업에 한정되는가?",
+      "requirement_refs": [
+        "requirement-1-6",
+        "requirement-5-3"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "다운로드·실행·OTLP 등 실제 송신 목적지를 운영 송신 정책에 대조한다.",
+      "source_refs": [
+        "HF",
+        "OTLP"
+      ],
+      "required_runtime_or_external_evidence": "프로세스별 DNS/연결·허용 목적지/작업·금지 무해 송신 거부·필요 취득/추적 정상 동작",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-007",
+      "criteria_sha256": "dbaec7cec912dadcd75c0f971e193bfc147f2fd93fe19256c2768563b2becc84"
+    },
+    {
+      "check_id": "CHK-PLT-008",
+      "question": "API·내부 통신의 각 구간에서 통신 상대 인증과 기밀성·무결성 기준을 지키는가?",
+      "requirement_refs": [
+        "requirement-5-5",
+        "requirement-1-1",
+        "requirement-1-2"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "HTTP TLS 인수와 로컬 IPC/TP 각각의 전송 구간을 구분한다.",
+      "source_refs": [
+        "TLS",
+        "IPC",
+        "ALLREDUCE"
+      ],
+      "required_runtime_or_external_evidence": "호출자→Gateway→engine 및 IPC/TP 구간별 peer/보호 정책·실제 인증/암호화/OS 통제",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-008",
+      "criteria_sha256": "06d07bc1bbacfa4f8cc2504834cde74a6a0083453400af117585b1966e78ffbf"
+    },
+    {
+      "check_id": "CHK-PLT-009",
+      "question": "엔진에서 기록 수집기와 최종 저장소까지 필요한 전송 보호가 유지되는가?",
+      "requirement_refs": [
+        "requirement-5-5",
+        "requirement-8-3"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "OTLP gRPC/HTTP exporter와 collector→sink를 따로 연결한다.",
+      "source_refs": [
+        "OTLP"
+      ],
+      "required_runtime_or_external_evidence": "실제 exporter/SDK·endpoint·gRPC insecure 설정·망/인증/암호화·collector 이후 sink 구간",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-009",
+      "criteria_sha256": "dd483072d511f4a9a053a494a58f57862d7dcd171efd9b7ccba9d2976413d15b"
+    },
+    {
+      "check_id": "CHK-PLT-010",
+      "question": "자격을 철회한 뒤 새 접근을 정한 기한 안에 거부하는가?",
+      "requirement_refs": [
+        "requirement-1-7"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "정적 API key 및 외부 issuer/Gateway의 신규 접근 철회 계약을 대조한다.",
+      "source_refs": [
+        "AUTH",
+        "HTTP"
+      ],
+      "required_runtime_or_external_evidence": "실제 철회 주체/시각·전파 기한·key 갱신/재시작 조건·기한 뒤 신규 요청 거부",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-010",
+      "criteria_sha256": "4a05abcec213c1739ef9ce8b2ce5a0a4308a44b1fc1830bdd95250c548904bda"
+    },
+    {
+      "check_id": "CHK-PLT-011",
+      "question": "이미 열린 연결과 공유 자원 접근권도 정한 철회 정책대로 제한되는가?",
+      "requirement_refs": [
+        "requirement-1-7"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "열린 stream·native session·IPC handle의 철회 후 처리를 각각 선정한다.",
+      "source_refs": [
+        "WAIT",
+        "SESSION",
+        "WEIGHTLIVE"
+      ],
+      "required_runtime_or_external_evidence": "철회 전 확보한 연결/객체/handle·유지/종료 정책·기한 뒤 실제 접근",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-011",
+      "criteria_sha256": "43763466fca652a2446d579592b7c65c38bf505bf3105cc46b8e2bf98ccb8d26"
+    },
+    {
+      "check_id": "CHK-PLT-012",
+      "question": "폐기한 자격의 사본으로 다시 접근할 수 없는가?",
+      "requirement_refs": [
+        "requirement-1-7"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "배포·worker·파일/Secret 사본과 이전 key의 재사용 가능성을 조사한다.",
+      "source_refs": [
+        "AUTH",
+        "LAUNCH"
+      ],
+      "required_runtime_or_external_evidence": "자격 사본 위치/수신자·교체/폐기·기존 사본으로 실제 신규/기존 접근 결과",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-PLT-012",
+      "criteria_sha256": "a34954f29f53012da06b5866a2578ce421f0f2f4351456e7cdd8b683bbf86ad8"
+    },
+    {
+      "check_id": "CHK-OBS-001",
+      "question": "필수 접근·관리·승인 기록으로 누가 무엇을 어느 실행에서 했는지 확인할 수 있는가?",
+      "requirement_refs": [
+        "requirement-8-1"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "엔진 request 로그와 외부 승인/배포/관리 이력을 하나의 실행 식별로 연결한다.",
+      "source_refs": [
+        "LOGGER",
+        "LOAD",
+        "ADMIN"
+      ],
+      "required_runtime_or_external_evidence": "필수 사건 정책·주체/대상/실행 ID·실제 발생 사건과 확보 기록·승인 대상 일치",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-001",
+      "criteria_sha256": "a6e492c2aa69d2f9a53644740b85910c7b90eb9d8d01d78e398437ad11826def"
+    },
+    {
+      "check_id": "CHK-OBS-002",
+      "question": "준비·실패·종료 기록이 실제 실행 상태와 일치하는가?",
+      "requirement_refs": [
+        "requirement-8-3"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "준비·warmup·watchdog·shutdown·선택 profiler 상태를 실제 실행과 대조한다.",
+      "source_refs": [
+        "READY",
+        "WARMUP",
+        "WATCH",
+        "SHUTDOWN",
+        "PROFILE"
+      ],
+      "required_runtime_or_external_evidence": "상태 기록과 rank 준비/실패/작업 종료/수집 종료의 독립 관측·시각",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-002",
+      "criteria_sha256": "d738d97482d2ad0b14254e6c71998b5347e655fe25a2577c9b649938265cbed1"
+    },
+    {
+      "check_id": "CHK-OBS-003",
+      "question": "로그·진단·추적·덤프 파일에 허용된 정보만 남기는가?",
+      "requirement_refs": [
+        "requirement-5-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "request log level·crash dump·trace/profiler별 수집 필드를 조사한다.",
+      "source_refs": [
+        "LOGARGS",
+        "LOGGER",
+        "OTLP",
+        "PROFILE"
+      ],
+      "required_runtime_or_external_evidence": "유효 설정·sink별 실제 원본/사본·합성 민감 marker·필수 사건 유지",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-003",
+      "criteria_sha256": "2227d279db472b7db88aca90f61411108b6774f9919e12dd047e787ba38403d7"
+    },
+    {
+      "check_id": "CHK-OBS-004",
+      "question": "금지한 사용 통계 보고가 실제로 꺼진 상태를 유지하는가?",
+      "requirement_refs": [
+        "requirement-5-3"
+      ],
+      "mapping_class": "U",
+      "mapping_label": "동일 기능 매핑 보류",
+      "source_observation": "srt에서 usage_stats/telemetry/do_not_track 탐색과 관측 코드를 대조했으나 vLLM형 제품 사용 통계 reporter 대응은 확보하지 못했다. OTel/요청 token usage를 동일시하지 않는다.",
+      "source_refs": [
+        "LOGARGS",
+        "OTLP"
+      ],
+      "required_runtime_or_external_evidence": "선정 설치 패키지·entrypoint·내장 reporter/외부 송신 조사, 프로세스 초기/주기 생성·송신 관측 뒤 비사용 여부 판단",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-004",
+      "criteria_sha256": "7de8a2b4382edce6f6ac16988dcbfd31aaa64fa0bf52b3befb91eaf211b694a1"
+    },
+    {
+      "check_id": "CHK-OBS-005",
+      "question": "허용한 사용 통계 보고가 정한 항목과 목적지 범위를 지키는가?",
+      "requirement_refs": [
+        "requirement-5-3"
+      ],
+      "mapping_class": "U",
+      "mapping_label": "동일 기능 매핑 보류",
+      "source_observation": "허용 usage 보고도 같은 reporter 매핑이 먼저 필요하다. 팀 참조의 금지 정책은 유지한다.",
+      "source_refs": [
+        "LOGARGS",
+        "OTLP"
+      ],
+      "required_runtime_or_external_evidence": "기능 조사 결과·조직이 보고를 허용한 경우에만 필드/목적지/주기·실제 payload 대조",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-005",
+      "criteria_sha256": "e6b79a04aa8ef652be42ad0695be6f6abf305b79de3eed22796c54fc26dffdf0"
+    },
+    {
+      "check_id": "CHK-OBS-006",
+      "question": "기록·진단 사본의 조회·반출을 허용된 주체로 제한하고, 필요한 저장 암호화를 적용하는가?",
+      "requirement_refs": [
+        "requirement-5-4",
+        "requirement-1-2"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "request/crash/profiler dump와 collector 저장 사본의 독자·암호화는 저장소 집행점에서 확인한다.",
+      "source_refs": [
+        "LOGARGS",
+        "LOGGER",
+        "PROFILE"
+      ],
+      "required_runtime_or_external_evidence": "사본별 실제 reader/ACL·조회/반출·자료 등급별 암호화/복호화 권한·정상 조회",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-006",
+      "criteria_sha256": "41ab0b09cb4e1be96f0064721974cf240f08e4208cc6160749c2799b5c033295"
+    },
+    {
+      "check_id": "CHK-OBS-007",
+      "question": "진단 자료를 읽을 수 있다는 이유만으로 재실행까지 할 수 없는가?",
+      "requirement_refs": [
+        "requirement-1-2",
+        "requirement-3-2"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "debug dump loader 등 실제 배치된 consumer의 읽기권·실행권을 구분한다.",
+      "source_refs": [
+        "DUMP"
+      ],
+      "required_runtime_or_external_evidence": "배치/도달성·실행 계정·읽기 전용 역할의 실행 시도·승인 도구 정상 소비",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-007",
+      "criteria_sha256": "9cc9fa8a392418c728a110723a476f3bbd676b9b5b022bce066433bf70a955db"
+    },
+    {
+      "check_id": "CHK-OBS-008",
+      "question": "재실행 도구가 변조된 진단 자료를 거부하고, 자료 해석 시 파일·통신·코드 실행 권한을 승인 범위로 제한하는가?",
+      "requirement_refs": [
+        "requirement-3-3",
+        "requirement-2-2",
+        "requirement-1-2",
+        "requirement-1-4"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "dump reader의 역직렬화와 실행 권한을 선택 consumer별로 확인한다.",
+      "source_refs": [
+        "DUMP",
+        "PT"
+      ],
+      "required_runtime_or_external_evidence": "변조한 무해 dump의 소비/거부·파일/통신/코드 부수 동작·격리 권한·정상 자료 처리",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-008",
+      "criteria_sha256": "54e1d6371d823ca0be2627c6d9c74995f6b63303387fd8138e94b2fbed0fbd20"
+    },
+    {
+      "check_id": "CHK-OBS-009",
+      "question": "요청에 넣은 값으로 로그의 사용자·대상·상태를 위조할 수 없는가?",
+      "requirement_refs": [
+        "requirement-8-2",
+        "requirement-1-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "native/OpenAI request log의 사용자 입력과 신뢰 필드·사건 경계를 대조한다.",
+      "source_refs": [
+        "LOGGER",
+        "BASE"
+      ],
+      "required_runtime_or_external_evidence": "로그 형식/실제 sink parser·입력 개행/ID/header 변형·최종 소비된 주체/대상/상태",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-009",
+      "criteria_sha256": "f71aa0a9a2eab1f05f21acac8a5306bf761b05af6a16e3adf473b957c5a86f89"
+    },
+    {
+      "check_id": "CHK-OBS-010",
+      "question": "기록을 허락 없이 바꾸거나 지우는 일을 제한하고 확인할 수 있는가?",
+      "requirement_refs": [
+        "requirement-8-2",
+        "requirement-1-2"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "최종 기록 저장소의 writer/reader/admin 권한과 독립 탐지를 연결한다.",
+      "source_refs": [
+        "LOGGER"
+      ],
+      "required_runtime_or_external_evidence": "실제 ACL·비허용 변경/삭제 거부·필수 사건 탐지/기한·별도 보존 증거",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-010",
+      "criteria_sha256": "f61cac32dcd2889af7f39cf2763c3d3f09ae5fc60f79c3b0e33d13c408a8f96c"
+    },
+    {
+      "check_id": "CHK-OBS-011",
+      "question": "기록 수집 중단·누락·시각 오류를 표시하고, 증거가 부족한 시험은 미확인으로 처리하는가?",
+      "requirement_refs": [
+        "requirement-8-3"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "엔진→collector→sink 수집 건전성과 판정 종속 관계를 연결한다.",
+      "source_refs": [
+        "LOGGER",
+        "OTLP"
+      ],
+      "required_runtime_or_external_evidence": "장애/누락/시각 오류 주입·식별/경보 시각·대체 증거·확인 위반 유지/의존 시험 미확인",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-011",
+      "criteria_sha256": "2b122d5d43e9da0de1ee14705744bc559010f92af8dbfa531be49942a858f8ba"
+    },
+    {
+      "check_id": "CHK-OBS-012",
+      "question": "로그·사용 통계·진단의 원본과 사본이 정한 보존·삭제 범위를 지키는가?",
+      "requirement_refs": [
+        "requirement-5-7",
+        "requirement-1-7"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "실제 로그·진단·usage 사본/백업의 보존·삭제 계약을 확인한다.",
+      "source_refs": [
+        "LOGARGS",
+        "LOGGER",
+        "PROFILE"
+      ],
+      "required_runtime_or_external_evidence": "사본 목록·보존/예외/삭제 정책·실제 조회/복구 결과; KV 파일은 별도 범위 검토 필요",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-OBS-012",
+      "criteria_sha256": "c3285847c31e05c4d12fcfc7d062888cefe68d7cdd1d388e754c2e3aae3fb7da"
+    },
+    {
+      "check_id": "CHK-LIF-001",
+      "question": "모델을 가져와 해석·변환·로딩할 때 단계별·전체 자원 예산을 지키는가?",
+      "requirement_refs": [
+        "requirement-6-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "다운로드·loader·선택 compile의 단계별/누적 비용과 준비 조건을 연결한다.",
+      "source_refs": [
+        "HF",
+        "LOAD",
+        "COMPILEDIR",
+        "WARMUP"
+      ],
+      "required_runtime_or_external_evidence": "실제 모델/설정·단계별 시간/CPU/RAM/GPU/디스크/전체 비용·정상 준비·반환; 값은 미정 유지",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-001",
+      "criteria_sha256": "25c9a65da35c655a0e8b129e5ff0254067ced14e97d110246054eaf32a1a4056"
+    },
+    {
+      "check_id": "CHK-LIF-002",
+      "question": "모델 취득이 실패해도 반복·재시도로 비용이 끝없이 쌓이지 않는가?",
+      "requirement_refs": [
+        "requirement-6-2"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "HF 등 실제 취득 SDK/도구의 재시도 경로·예산을 확인한다.",
+      "source_refs": [
+        "HF"
+      ],
+      "required_runtime_or_external_evidence": "실제 SDK/환경·취득 실패별 횟수/시간/누적 비용·부분 파일 정리·정상 재취득",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-002",
+      "criteria_sha256": "a516d30ff19b70d7105054b6cc321ad5de8a77c3a2d5a3f5d6a4e247bb3c1bf7"
+    },
+    {
+      "check_id": "CHK-LIF-003",
+      "question": "처리 비용이 큰 요청과 동시 부하를 제한하면서 정상 요청도 처리할 수 있는가?",
+      "requirement_refs": [
+        "requirement-6-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "concurrency/queue/token pool/chunking과 native/추가 반환 비용을 대조한다.",
+      "source_refs": [
+        "BUDGET",
+        "INPUT",
+        "SAMPLING"
+      ],
+      "required_runtime_or_external_evidence": "해석 후 유효 예산·요청별/전체 자원·대기/공정성·정상 요청 성능; 금액/기한 임의 입력 금지",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-003",
+      "criteria_sha256": "6cf08d06f7d740e6c459ad3c1b80fe0dc1bc6ed22e164a675ccc5108e1471e8c"
+    },
+    {
+      "check_id": "CHK-LIF-004",
+      "question": "응답을 느리게 읽는 연결과 진단용 버퍼가 자원을 과도하게 차지하지 않는가?",
+      "requirement_refs": [
+        "requirement-6-1"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "stream 대기·출력 생성·연결 종료와 진단 buffer 비용을 연결한다.",
+      "source_refs": [
+        "BASE",
+        "WAIT",
+        "LOGARGS"
+      ],
+      "required_runtime_or_external_evidence": "느린 수신·종료 전후 queue/buffer/RAM/GPU·정리 조건·동시 정상 요청 영향",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-004",
+      "criteria_sha256": "41a9cbbe3a2f06a72355012070fb830fdf1b15df30b5c9af2e5c6444485aaee5"
+    },
+    {
+      "check_id": "CHK-LIF-005",
+      "question": "재배포할 때 이전 요청과 새 모델·설정이 잘못 섞이지 않는가?",
+      "requirement_refs": [
+        "requirement-7-3",
+        "requirement-4-1",
+        "requirement-4-3"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "Gateway 접수 중단과 engine 종료→새 rank 준비→재접수를 인계한다.",
+      "source_refs": [
+        "SHUTDOWN",
+        "READY",
+        "WARMUP"
+      ],
+      "required_runtime_or_external_evidence": "구/신 image·model·세대·진행 요청 방침·실제 gate·혼합 없는 후속 정상 요청",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-005",
+      "criteria_sha256": "31949f88dc23af213991490c9e2c9278258530d91ad219c409eb3fbefc7526a6"
+    },
+    {
+      "check_id": "CHK-LIF-006",
+      "question": "실행 중 변경이나 순차 교체 중에도 각 요청의 모델·상태가 일관되는가?",
+      "requirement_refs": [
+        "requirement-7-3",
+        "requirement-4-1",
+        "requirement-4-3"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "live weights·LoRA·관리 update route의 원자성/세대 일관성을 별도 선정한다.",
+      "source_refs": [
+        "UPDATE",
+        "COMMIT"
+      ],
+      "required_runtime_or_external_evidence": "선택 update/rolling 방식·요청별 최종 model/세대·중간 실패·rollback·cache 상태",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-006",
+      "criteria_sha256": "cc2b6d2654f168abfff2c4082a3bcdcd9855286de78c24196d90947a3d2b490a"
+    },
+    {
+      "check_id": "CHK-LIF-007",
+      "question": "필요한 worker와 모델 실행 준비가 끝난 뒤 요청을 받는가?",
+      "requirement_refs": [
+        "requirement-7-2",
+        "requirement-6-3"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "scheduler 준비와 HTTP warmup/status 전환을 실제 접수 gate에 연결한다.",
+      "source_refs": [
+        "READY",
+        "LAUNCH",
+        "WARMUP"
+      ],
+      "required_runtime_or_external_evidence": "필수 rank/모델/graph 준비·skip 유효값·준비 전 거부/보류·준비 후 정상 추론",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-007",
+      "criteria_sha256": "5f02dc3c8f10bccad311c42589d4f8722fdce7dd2e243c01f163ed89e1a6f62f"
+    },
+    {
+      "check_id": "CHK-LIF-008",
+      "question": "각 GPU 실행 프로세스의 예외·종료·지연·통신 정지를 감지해 상위 제어 프로세스에 알리는가?",
+      "requirement_refs": [
+        "requirement-6-3"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "forward watchdog·subprocess 사망 감지를 장애 종류별 통지에 연결한다.",
+      "source_refs": [
+        "WATCH",
+        "LAUNCH"
+      ],
+      "required_runtime_or_external_evidence": "rank 예외/사망/지연/통신 정지별 실제 상위 통지·기한·불완전 결과 처리",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-008",
+      "criteria_sha256": "1aae588c50cc4176d5b66bc06e525a1a5bbf301989ceca1e7c8b08e216f4bb25"
+    },
+    {
+      "check_id": "CHK-LIF-009",
+      "question": "일부 worker의 초기화나 모델 준비가 실패했을 때 성공으로 처리하지 않는가?",
+      "requirement_refs": [
+        "requirement-7-2",
+        "requirement-6-3"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "subprocess 초기화·scheduler ready·warmup의 부분 실패를 대조한다.",
+      "source_refs": [
+        "LAUNCH",
+        "READY",
+        "WARMUP"
+      ],
+      "required_runtime_or_external_evidence": "rank별 실패 주입·상위 상태·gate·성공 오기록 여부·후속 정상 기동",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-009",
+      "criteria_sha256": "3ec60c3e3f462a87a825e7348157f7f583368ab6dc4e3b57c5d1aa83c489c959"
+    },
+    {
+      "check_id": "CHK-LIF-010",
+      "question": "취소·연결 종료 후 실제 작업이 정한 기한 안에 중단되고, 더 이상 사용하지 않는 상태·자원이 정리되는가?",
+      "requirement_refs": [
+        "requirement-6-4",
+        "requirement-4-1",
+        "requirement-4-4"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "tokenizer disconnect/abort와 scheduler의 단계별 반환을 연결한다.",
+      "source_refs": [
+        "WAIT",
+        "ABORT",
+        "SCHEDABORT",
+        "SESSION"
+      ],
+      "required_runtime_or_external_evidence": "대기/계산/출력 단계별 abort·실제 GPU 작업 중단·req/KV/session 참조/자원 회수와 기한",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-010",
+      "criteria_sha256": "e6475e6bcb90ba426c7e5d56361b186b1d844cd6503b161c35de7d2b522bbd80"
+    },
+    {
+      "check_id": "CHK-LIF-011",
+      "question": "실패한 worker와 내부 통신·공유 자원을 정리해 다음 기동이 가능한가?",
+      "requirement_refs": [
+        "requirement-6-4",
+        "requirement-4-4",
+        "requirement-7-2"
+      ],
+      "mapping_class": "P",
+      "mapping_label": "엔진 경로 대응",
+      "source_observation": "engine·worker·communicator·선택 daemon 종료와 재기동을 연결한다.",
+      "source_refs": [
+        "SHUTDOWN",
+        "ALLCLOSE",
+        "WEIGHTLIVE"
+      ],
+      "required_runtime_or_external_evidence": "PID/socket/SHM/GPU/handle별 실제 반환·최종 참조·실패 뒤 정상 재기동",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-011",
+      "criteria_sha256": "5dce7efa97a62753b0468ca3ddced97a1536a28b86f70f3ad9b51bd8f2803521"
+    },
+    {
+      "check_id": "CHK-LIF-012",
+      "question": "재시도할 때 이전 작업이 남아 있는지 확인하고 중복 실행 비용을 제한하는가?",
+      "requirement_refs": [
+        "requirement-6-2",
+        "requirement-4-1"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "Gateway/앱/엔진의 추론 retry 실제 사용과 이전 작업 수명을 확인한다.",
+      "source_refs": [
+        "BASE",
+        "ABORT"
+      ],
+      "required_runtime_or_external_evidence": "retry 금지 유효 설정/경로·실제 재시도 미발생; 허용 시 이전/새 시도·중복 결과/비용·회수",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-012",
+      "criteria_sha256": "a1ba36ae51481a7ec41db81676ae8f1d5fedf8f3d3f252a407843968d08f9753"
+    },
+    {
+      "check_id": "CHK-LIF-013",
+      "question": "공유 가중치 전체 해제 후 재취득·대체 공급과 기존 참조의 사용이 승인·접근·수명 기준을 지키는가?",
+      "requirement_refs": [
+        "requirement-4-4",
+        "requirement-1-2",
+        "requirement-2-2",
+        "requirement-6-4",
+        "requirement-7-4"
+      ],
+      "mapping_class": "M",
+      "mapping_label": "부분 대응",
+      "source_observation": "weight daemon은 있으나 조사한 socket 프로토콜에는 전체 release 요청이 없다. daemon 종료·consumer 사망 감시·client fallback 부분을 대응한다.",
+      "source_refs": [
+        "WEIGHTARGS",
+        "WEIGHTPROTO",
+        "WEIGHTLOAD",
+        "WEIGHTPEER",
+        "WEIGHTLIVE"
+      ],
+      "required_runtime_or_external_evidence": "release 호출 분기는 설치/확장 도달성 근거로 비적용 검토; daemon 종료 권한·다른 consumer·재취득/fallback 승인·현재 참조/GPU 수명은 별도 미확인",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-013",
+      "criteria_sha256": "bce31635fc6777428a274b47e6f9b580641327e4bee0b8e9bede110aed1e5b0f"
+    },
+    {
+      "check_id": "CHK-LIF-014",
+      "question": "성능 진단 종료 응답과 실제 수집·자원 사용의 종료가 일치하는가?",
+      "requirement_refs": [
+        "requirement-6-4",
+        "requirement-8-3"
+      ],
+      "mapping_class": "C",
+      "mapping_label": "선택 기능 대응",
+      "source_observation": "profiler stop의 backend별 처리와 종료 계약을 연결한다.",
+      "source_refs": [
+        "ADMIN",
+        "PROFILE"
+      ],
+      "required_runtime_or_external_evidence": "선택 backend·stop 응답/실제 수집 중단·저장/전송/자원 반환·후속 정상 서비스",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-014",
+      "criteria_sha256": "c7c9964f740066e8262839210e2d95935414178cfe08586b88f055d391096103"
+    },
+    {
+      "check_id": "CHK-LIF-015",
+      "question": "이전 구성으로 복귀할 때도 현재 승인 기준을 만족하는가?",
+      "requirement_refs": [
+        "requirement-7-4",
+        "requirement-1-7",
+        "requirement-2-2"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "이전 배포 묶음으로 돌아갈 때 현재 승인·철회·유효 설정을 외부 gate와 대조한다.",
+      "source_refs": [
+        "LOAD",
+        "LAUNCH"
+      ],
+      "required_runtime_or_external_evidence": "복귀 대상 실물·현재 승인/철회·rollback 주체·검증 전 gate·후속 모델/요청",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-015",
+      "criteria_sha256": "928d9f16177184590fe73cc0545cd52e0ef1406db3ac8127936a0cbe54d0fbd1"
+    },
+    {
+      "check_id": "CHK-LIF-016",
+      "question": "변조된 복원 자료나 남은 상태가 복구 결과에 섞이지 않는가?",
+      "requirement_refs": [
+        "requirement-7-4",
+        "requirement-2-2",
+        "requirement-4-4"
+      ],
+      "mapping_class": "E",
+      "mapping_label": "외부 집행과 대응",
+      "source_observation": "일반 재배포 복원과 선택 상태 복원 자료의 출처·잔존 상태를 분리한다.",
+      "source_refs": [
+        "LOAD",
+        "SHUTDOWN",
+        "HICACHEIO"
+      ],
+      "required_runtime_or_external_evidence": "실제 backup/복원 범위·변조 무해 자료 거부·이전 cache/session 잔존·검증 전 서비스 gate",
+      "applicability_status": "environment_selection_pending",
+      "execution_status": "not_run",
+      "verdict": "unverified",
+      "original_criteria_ref": "../03_체크리스트와_보완가이드.md#CHK-LIF-016",
+      "criteria_sha256": "8418ab7db1524eb0842e841311aaa88d406d3f657e0bec6bd5b52f27a424bd38"
+    }
+  ],
+  "http_route_inventory": {
+    "reviewed_at": "2026-10-27",
+    "current": {
+      "path": "SGLang_v0.5.22_HTTP_정적후보_v2.json",
+      "schema_version": "2.0",
+      "sha256": "e93aa12b38a13b7aaaed44dd64294b165c3ee473b233e221cecad99a590fdb1e",
+      "kind": "static_http_route_candidates"
+    },
+    "legacy": {
+      "path": "SGLang_v0.5.22_HTTP_route목록.json",
+      "sha256": "749e4773ba7ac314febd7a350f963799feb942305e6cf2720925005d93360a8f",
+      "scope": "historical top-level decorator function list; 80 rows unchanged"
+    },
+    "guide": "SGLang_v0.5.22_HTTP_목록안내.md",
+    "runtime_registration_status": "unverified",
+    "effective_auth_status": "unverified",
+    "chk_handoff": [
+      "CHK-REQ-001",
+      "CHK-REQ-003",
+      "CHK-PLT-008"
+    ]
+  },
+  "criteria_basis": {
+    "historical": {
+      "framework_commit": "729216b1ce76fd40c99c50cc4770fd86bc8310a7",
+      "checklist_sha256": "7f857208af8071b9934695f32b8753000f0f7b79aa0d47d1bd42945184875ef0",
+      "profile_rows_and_hashes": "preserved"
+    },
+    "current_application": {
+      "framework_commit": "c67d03a78115d0996dfb5b92e9231429a6aa703b",
+      "checklist_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+      "delta_path": "SGLang_v0.5.22_기준차이_20261027.json",
+      "delta_sha256": "4bbf707e6d9fb671c0d8ad7ac7b835c78f0620a96230e42b629c1a6fdb1da100",
+      "engine_mapping_revalidation_status": "pending_for_selected_environment"
+    },
+    "criteria_link_meaning": "original_criteria_ref navigates to current 03; historical basis is identified by historical commit/hash and per-row criteria_sha256",
+    "comparison_scope": "JSON fields and historical profile hash comparison; not a new 77-check engine review"
+  }
+}

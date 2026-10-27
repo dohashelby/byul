@@ -1,0 +1,854 @@
+{
+  "commit": "baa9befa381511cd4d56f83980951e5a45fffc6d",
+  "path": "python/sglang/srt/entrypoints/http_server.py",
+  "routes": [
+    {
+      "function": "ready",
+      "line": 699,
+      "decorators": [
+        "app.get('/ready')"
+      ],
+      "registration": [
+        "app.get('/ready')"
+      ]
+    },
+    {
+      "function": "health_generate",
+      "line": 707,
+      "decorators": [
+        "app.get('/health')",
+        "app.get('/health_generate')"
+      ],
+      "registration": [
+        "app.get('/health')",
+        "app.get('/health_generate')"
+      ]
+    },
+    {
+      "function": "get_model_info",
+      "line": 787,
+      "decorators": [
+        "app.get('/get_model_info')"
+      ],
+      "registration": [
+        "app.get('/get_model_info')"
+      ]
+    },
+    {
+      "function": "model_info",
+      "line": 797,
+      "decorators": [
+        "app.get('/model_info')"
+      ],
+      "registration": [
+        "app.get('/model_info')"
+      ]
+    },
+    {
+      "function": "get_server_info",
+      "line": 838,
+      "decorators": [
+        "app.get('/get_server_info')"
+      ],
+      "registration": [
+        "app.get('/get_server_info')"
+      ]
+    },
+    {
+      "function": "server_info",
+      "line": 848,
+      "decorators": [
+        "app.get('/server_info')"
+      ],
+      "registration": [
+        "app.get('/server_info')"
+      ]
+    },
+    {
+      "function": "set_internal_state",
+      "line": 883,
+      "decorators": [
+        "app.api_route('/set_internal_state', methods=['POST', 'PUT'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/set_internal_state', methods=['POST', 'PUT'])"
+      ]
+    },
+    {
+      "function": "generate_request",
+      "line": 917,
+      "decorators": [
+        "app.api_route('/generate', methods=['POST', 'PUT'], response_class=SGLangORJSONResponse)"
+      ],
+      "registration": [
+        "app.api_route('/generate', methods=['POST', 'PUT'], response_class=SGLangORJSONResponse)"
+      ]
+    },
+    {
+      "function": "encode_request",
+      "line": 978,
+      "decorators": [
+        "app.api_route('/encode', methods=['POST', 'PUT'])"
+      ],
+      "registration": [
+        "app.api_route('/encode', methods=['POST', 'PUT'])"
+      ]
+    },
+    {
+      "function": "classify_request",
+      "line": 991,
+      "decorators": [
+        "app.api_route('/classify', methods=['POST', 'PUT'])"
+      ],
+      "registration": [
+        "app.api_route('/classify', methods=['POST', 'PUT'])"
+      ]
+    },
+    {
+      "function": "flush_cache",
+      "line": 1011,
+      "decorators": [
+        "app.api_route('/flush_cache', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/flush_cache', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "add_external_corpus",
+      "line": 1029,
+      "decorators": [
+        "app.post('/add_external_corpus')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/add_external_corpus')"
+      ]
+    },
+    {
+      "function": "remove_external_corpus",
+      "line": 1054,
+      "decorators": [
+        "app.post('/remove_external_corpus')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/remove_external_corpus')"
+      ]
+    },
+    {
+      "function": "list_external_corpora",
+      "line": 1072,
+      "decorators": [
+        "app.get('/list_external_corpora')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.get('/list_external_corpora')"
+      ]
+    },
+    {
+      "function": "clear_hicache_storage_backend",
+      "line": 1089,
+      "decorators": [
+        "app.api_route('/hicache/storage-backend/clear', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/hicache/storage-backend/clear', methods=['POST'])"
+      ]
+    },
+    {
+      "function": "attach_hicache_storage_backend",
+      "line": 1109,
+      "decorators": [
+        "app.api_route('/hicache/storage-backend', methods=['PUT'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/hicache/storage-backend', methods=['PUT'])"
+      ]
+    },
+    {
+      "function": "detach_hicache_storage_backend",
+      "line": 1143,
+      "decorators": [
+        "app.api_route('/hicache/storage-backend', methods=['DELETE'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/hicache/storage-backend', methods=['DELETE'])"
+      ]
+    },
+    {
+      "function": "hicache_storage_backend_status",
+      "line": 1170,
+      "decorators": [
+        "app.get('/hicache/storage-backend')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.get('/hicache/storage-backend')"
+      ]
+    },
+    {
+      "function": "start_profile_async",
+      "line": 1188,
+      "decorators": [
+        "app.api_route('/start_profile', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/start_profile', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "stop_profile_async",
+      "line": 1199,
+      "decorators": [
+        "app.api_route('/stop_profile', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/stop_profile', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "set_trace_level",
+      "line": 1210,
+      "decorators": [
+        "app.api_route('/set_trace_level', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/set_trace_level', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "freeze_gc_async",
+      "line": 1221,
+      "decorators": [
+        "app.api_route('/freeze_gc', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/freeze_gc', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "start_expert_distribution_record_async",
+      "line": 1234,
+      "decorators": [
+        "app.api_route('/start_expert_distribution_record', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/start_expert_distribution_record', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "stop_expert_distribution_record_async",
+      "line": 1245,
+      "decorators": [
+        "app.api_route('/stop_expert_distribution_record', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/stop_expert_distribution_record', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "dump_expert_distribution_record_async",
+      "line": 1256,
+      "decorators": [
+        "app.api_route('/dump_expert_distribution_record', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/dump_expert_distribution_record', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "update_weights_from_disk",
+      "line": 1267,
+      "decorators": [
+        "app.post('/update_weights_from_disk')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/update_weights_from_disk')"
+      ]
+    },
+    {
+      "function": "init_weights_send_group_for_remote_instance",
+      "line": 1296,
+      "decorators": [
+        "app.post('/init_weights_send_group_for_remote_instance')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/init_weights_send_group_for_remote_instance')"
+      ]
+    },
+    {
+      "function": "send_weights_to_remote_instance",
+      "line": 1315,
+      "decorators": [
+        "app.post('/send_weights_to_remote_instance')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/send_weights_to_remote_instance')"
+      ]
+    },
+    {
+      "function": "get_remote_instance_transfer_engine_info",
+      "line": 1333,
+      "decorators": [
+        "app.get('/get_remote_instance_transfer_engine_info')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.get('/get_remote_instance_transfer_engine_info')"
+      ]
+    },
+    {
+      "function": "remote_instance_transfer_engine_info",
+      "line": 1344,
+      "decorators": [
+        "app.get('/remote_instance_transfer_engine_info')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.get('/remote_instance_transfer_engine_info')"
+      ]
+    },
+    {
+      "function": "init_weights_update_group",
+      "line": 1371,
+      "decorators": [
+        "app.post('/init_weights_update_group')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/init_weights_update_group')"
+      ]
+    },
+    {
+      "function": "destroy_weights_update_group",
+      "line": 1387,
+      "decorators": [
+        "app.post('/destroy_weights_update_group')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/destroy_weights_update_group')"
+      ]
+    },
+    {
+      "function": "update_weights_from_tensor",
+      "line": 1403,
+      "decorators": [
+        "app.post('/update_weights_from_tensor')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/update_weights_from_tensor')"
+      ]
+    },
+    {
+      "function": "begin_weight_update",
+      "line": 1425,
+      "decorators": [
+        "app.post('/begin_weight_update')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/begin_weight_update')"
+      ]
+    },
+    {
+      "function": "end_weight_update",
+      "line": 1440,
+      "decorators": [
+        "app.post('/end_weight_update')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/end_weight_update')"
+      ]
+    },
+    {
+      "function": "update_weights_from_distributed",
+      "line": 1455,
+      "decorators": [
+        "app.post('/update_weights_from_distributed')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/update_weights_from_distributed')"
+      ]
+    },
+    {
+      "function": "update_weights_from_ipc",
+      "line": 1475,
+      "decorators": [
+        "app.post('/update_weights_from_ipc')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/update_weights_from_ipc')"
+      ]
+    },
+    {
+      "function": "update_weight_version",
+      "line": 1494,
+      "decorators": [
+        "app.post('/update_weight_version')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/update_weight_version')"
+      ]
+    },
+    {
+      "function": "get_weights_by_name",
+      "line": 1526,
+      "decorators": [
+        "app.api_route('/get_weights_by_name', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/get_weights_by_name', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "release_memory_occupation",
+      "line": 1542,
+      "decorators": [
+        "app.api_route('/release_memory_occupation', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/release_memory_occupation', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "resume_memory_occupation",
+      "line": 1554,
+      "decorators": [
+        "app.api_route('/resume_memory_occupation', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/resume_memory_occupation', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "check_weights",
+      "line": 1566,
+      "decorators": [
+        "app.api_route('/weights_checker', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/weights_checker', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "slow_down",
+      "line": 1588,
+      "decorators": [
+        "app.api_route('/slow_down', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/slow_down', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "pd_role_switch",
+      "line": 1602,
+      "decorators": [
+        "app.api_route('/pd_role_switch', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/pd_role_switch', methods=['POST'])"
+      ]
+    },
+    {
+      "function": "load_lora_adapter",
+      "line": 1619,
+      "decorators": [
+        "app.api_route('/load_lora_adapter', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/load_lora_adapter', methods=['POST'])"
+      ]
+    },
+    {
+      "function": "load_lora_adapter_from_tensors",
+      "line": 1630,
+      "decorators": [
+        "app.api_route('/load_lora_adapter_from_tensors', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/load_lora_adapter_from_tensors', methods=['POST'])"
+      ]
+    },
+    {
+      "function": "unload_lora_adapter",
+      "line": 1643,
+      "decorators": [
+        "app.api_route('/unload_lora_adapter', methods=['POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/unload_lora_adapter', methods=['POST'])"
+      ]
+    },
+    {
+      "function": "open_session",
+      "line": 1653,
+      "decorators": [
+        "app.api_route('/open_session', methods=['GET', 'POST'])"
+      ],
+      "registration": [
+        "app.api_route('/open_session', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "close_session",
+      "line": 1667,
+      "decorators": [
+        "app.api_route('/close_session', methods=['GET', 'POST'])"
+      ],
+      "registration": [
+        "app.api_route('/close_session', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "configure_logging",
+      "line": 1678,
+      "decorators": [
+        "app.api_route('/configure_logging', methods=['GET', 'POST'])",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.api_route('/configure_logging', methods=['GET', 'POST'])"
+      ]
+    },
+    {
+      "function": "abort_request",
+      "line": 1688,
+      "decorators": [
+        "app.post('/abort_request')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/abort_request')"
+      ]
+    },
+    {
+      "function": "parse_function_call_request",
+      "line": 1700,
+      "decorators": [
+        "app.post('/parse_function_call')"
+      ],
+      "registration": [
+        "app.post('/parse_function_call')"
+      ]
+    },
+    {
+      "function": "separate_reasoning_request",
+      "line": 1728,
+      "decorators": [
+        "app.post('/separate_reasoning')"
+      ],
+      "registration": [
+        "app.post('/separate_reasoning')"
+      ]
+    },
+    {
+      "function": "pause_generation",
+      "line": 1766,
+      "decorators": [
+        "app.post('/pause_generation')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/pause_generation')"
+      ]
+    },
+    {
+      "function": "continue_generation",
+      "line": 1779,
+      "decorators": [
+        "app.post('/continue_generation')",
+        "auth_level(AuthLevel.ADMIN_OPTIONAL)"
+      ],
+      "registration": [
+        "app.post('/continue_generation')"
+      ]
+    },
+    {
+      "function": "openai_v1_completions",
+      "line": 1794,
+      "decorators": [
+        "app.post('/v1/completions', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/completions', dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "openai_v1_chat_completions",
+      "line": 1804,
+      "decorators": [
+        "app.post('/v1/chat/completions', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/chat/completions', dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "openai_v1_embeddings",
+      "line": 1820,
+      "decorators": [
+        "app.post('/v1/embeddings', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/embeddings', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "openai_v1_classify",
+      "line": 1832,
+      "decorators": [
+        "app.post('/v1/classify', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/classify', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "openai_v1_tokenize",
+      "line": 1850,
+      "decorators": [
+        "app.post('/v1/tokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+        "app.post('/tokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)], include_in_schema=False)"
+      ],
+      "registration": [
+        "app.post('/v1/tokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+        "app.post('/tokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)], include_in_schema=False)"
+      ]
+    },
+    {
+      "function": "openai_v1_detokenize",
+      "line": 1868,
+      "decorators": [
+        "app.post('/v1/detokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+        "app.post('/detokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)], include_in_schema=False)"
+      ],
+      "registration": [
+        "app.post('/v1/detokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)])",
+        "app.post('/detokenize', response_class=ORJSONResponse, dependencies=[Depends(validate_json_request)], include_in_schema=False)"
+      ]
+    },
+    {
+      "function": "openai_v1_audio_transcriptions",
+      "line": 1876,
+      "decorators": [
+        "app.post('/v1/audio/transcriptions')"
+      ],
+      "registration": [
+        "app.post('/v1/audio/transcriptions')"
+      ]
+    },
+    {
+      "function": "available_models",
+      "line": 1927,
+      "decorators": [
+        "app.get('/v1/models', response_class=ORJSONResponse)"
+      ],
+      "registration": [
+        "app.get('/v1/models', response_class=ORJSONResponse)"
+      ]
+    },
+    {
+      "function": "retrieve_model",
+      "line": 1959,
+      "decorators": [
+        "app.get('/v1/models/{model:path}', response_class=ORJSONResponse)"
+      ],
+      "registration": [
+        "app.get('/v1/models/{model:path}', response_class=ORJSONResponse)"
+      ]
+    },
+    {
+      "function": "v1_score_request",
+      "line": 1984,
+      "decorators": [
+        "app.post('/v1/score', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/score', dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "v1_decisions_request",
+      "line": 1992,
+      "decorators": [
+        "app.post('/v1/decisions', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/decisions', dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "v1_responses_request",
+      "line": 2000,
+      "decorators": [
+        "app.post('/v1/responses', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/responses', dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "v1_retrieve_responses",
+      "line": 2019,
+      "decorators": [
+        "app.get('/v1/responses/{response_id}')"
+      ],
+      "registration": [
+        "app.get('/v1/responses/{response_id}')"
+      ]
+    },
+    {
+      "function": "v1_cancel_responses",
+      "line": 2027,
+      "decorators": [
+        "app.post('/v1/responses/{response_id}/cancel')"
+      ],
+      "registration": [
+        "app.post('/v1/responses/{response_id}/cancel')"
+      ]
+    },
+    {
+      "function": "v1_rerank_request",
+      "line": 2037,
+      "decorators": [
+        "app.api_route('/v1/rerank', methods=['POST', 'PUT'], dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.api_route('/v1/rerank', methods=['POST', 'PUT'], dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "ollama_chat",
+      "line": 2065,
+      "decorators": [
+        "app.post(os.environ.get('SGLANG_OLLAMA_CHAT_ROUTE', '/api/chat'))"
+      ],
+      "registration": [
+        "app.post(os.environ.get('SGLANG_OLLAMA_CHAT_ROUTE', '/api/chat'))"
+      ]
+    },
+    {
+      "function": "ollama_generate",
+      "line": 2071,
+      "decorators": [
+        "app.post(os.environ.get('SGLANG_OLLAMA_GENERATE_ROUTE', '/api/generate'))"
+      ],
+      "registration": [
+        "app.post(os.environ.get('SGLANG_OLLAMA_GENERATE_ROUTE', '/api/generate'))"
+      ]
+    },
+    {
+      "function": "ollama_tags",
+      "line": 2079,
+      "decorators": [
+        "app.get(os.environ.get('SGLANG_OLLAMA_TAGS_ROUTE', '/api/tags'))"
+      ],
+      "registration": [
+        "app.get(os.environ.get('SGLANG_OLLAMA_TAGS_ROUTE', '/api/tags'))"
+      ]
+    },
+    {
+      "function": "ollama_show",
+      "line": 2085,
+      "decorators": [
+        "app.post(os.environ.get('SGLANG_OLLAMA_SHOW_ROUTE', '/api/show'))"
+      ],
+      "registration": [
+        "app.post(os.environ.get('SGLANG_OLLAMA_SHOW_ROUTE', '/api/show'))"
+      ]
+    },
+    {
+      "function": "anthropic_v1_messages",
+      "line": 2094,
+      "decorators": [
+        "app.post('/v1/messages', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/messages', dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "anthropic_v1_count_tokens",
+      "line": 2104,
+      "decorators": [
+        "app.post('/v1/messages/count_tokens', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/messages/count_tokens', dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "systemone_decisions",
+      "line": 2115,
+      "decorators": [
+        "app.post('/v1/systemone', dependencies=[Depends(validate_json_request)])"
+      ],
+      "registration": [
+        "app.post('/v1/systemone', dependencies=[Depends(validate_json_request)])"
+      ]
+    },
+    {
+      "function": "sagemaker_health",
+      "line": 2124,
+      "decorators": [
+        "app.get('/ping')"
+      ],
+      "registration": [
+        "app.get('/ping')"
+      ]
+    },
+    {
+      "function": "sagemaker_chat_completions",
+      "line": 2130,
+      "decorators": [
+        "app.post('/invocations')"
+      ],
+      "registration": [
+        "app.post('/invocations')"
+      ]
+    },
+    {
+      "function": "vertex_generate",
+      "line": 2143,
+      "decorators": [
+        "app.post(os.environ.get('AIP_PREDICT_ROUTE', '/vertex_generate'))"
+      ],
+      "registration": [
+        "app.post(os.environ.get('AIP_PREDICT_ROUTE', '/vertex_generate'))"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,417 @@
+{
+  "ok": true,
+  "base_byul_commit": "7e34575931c9ea81a7e68b0c5944459620039c2d",
+  "framework_commit": "8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e",
+  "vendor_files_exact": 52,
+  "vendor_relative_links_checked": 3810,
+  "links_resolved_by_exact_upstream_map": 60,
+  "link_errors": [],
+  "original27_snapshot_created_this_task": true,
+  "old27_snapshot_files_equal_base": 80,
+  "new28_snapshot_files_equal_generated": 80,
+  "old_pack21_and_golden_and_dated_baseline_unchanged": true,
+  "only_product_source_diff": [
+    "update/src/guard/collectors/policy_template_metadata.json"
+  ],
+  "regeneration_byte_stable_files": 80,
+  "pack_revision": 28,
+  "fixed_chk_ids": 77,
+  "changed_definitions": 38,
+  "byte_preserved_definitions": 39,
+  "real_engine_gpu_aws_executed": false,
+  "update_default_tests": {
+    "passed": 4004,
+    "failed": 0,
+    "deselected": 19,
+    "seconds": 84.07,
+    "python": "3.12.13",
+    "command": "TMPDIR=<canonical task-owned directory> .venv/bin/python -m pytest",
+    "import_source": "this clone update/src/guard",
+    "engine_docker_network_markers_excluded": true
+  },
+  "vendor_unittests": 46,
+  "vendor_q_selector_tests": 12,
+  "example_mutations": 25,
+  "initial_default_tests": {
+    "passed": 3936,
+    "failed": 67,
+    "deselected": 19
+  },
+  "preserved_golden_bytes": true,
+  "current_golden_allowed_step_wording_changes": 33,
+  "byul_product_edits": "generated policy_template_metadata.json pack Ref only; runtime/platform/contracts and importer/overrides/judge unchanged",
+  "pr_merged": false,
+  "definition_delta": {
+    "pack_revision": 28,
+    "changed_count": 38,
+    "changed": [
+      {
+        "id": "LIF-03",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "LIF-05",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "LIF-06",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "LIF-07",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "LIF-08",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "normal_control"
+        ]
+      },
+      {
+        "id": "LIF-09",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "LIF-11",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "LIF-12",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "applies_when",
+          "normal_control",
+          "challenge_steps",
+          "required_observations_prose",
+          "satisfied_if",
+          "unknown_criteria",
+          "method_and_evidence",
+          "remaining_setup"
+        ]
+      },
+      {
+        "id": "LIF-13",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "OBS-02",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "OBS-03",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "OBS-05",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "applies_when",
+          "satisfied_if",
+          "unknown_criteria"
+        ]
+      },
+      {
+        "id": "OBS-06",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "OBS-07",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "applies_when",
+          "satisfied_if",
+          "unknown_criteria",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "OBS-08",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "method_and_evidence",
+          "remaining_setup"
+        ]
+      },
+      {
+        "id": "OBS-09",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "PLT-02",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "PLT-03",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "normal_control",
+          "challenge_steps",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "PLT-04",
+        "old_revision": 4,
+        "new_revision": 5,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "PLT-07",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "PLT-08",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "REQ-01",
+        "old_revision": 6,
+        "new_revision": 7,
+        "fields": [
+          "revision",
+          "normal_control",
+          "challenge_steps",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "REQ-04",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "REQ-05",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "REQ-06",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "REQ-10",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "REQ-11",
+        "old_revision": 4,
+        "new_revision": 5,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "REQ-12",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "satisfied_if"
+        ]
+      },
+      {
+        "id": "REQ-14",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "normal_control",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "REQ-16",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "normal_control",
+          "challenge_steps",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "REQ-17",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "SUP-03",
+        "old_revision": 3,
+        "new_revision": 4,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "SUP-05",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "SUP-06",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "satisfied_if",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "SUP-07",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "SUP-08",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "applies_when",
+          "satisfied_if",
+          "unknown_criteria"
+        ]
+      },
+      {
+        "id": "SUP-13",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "method_and_evidence"
+        ]
+      },
+      {
+        "id": "SUP-15",
+        "old_revision": 2,
+        "new_revision": 3,
+        "fields": [
+          "revision",
+          "normal_control",
+          "challenge_steps",
+          "method_and_evidence"
+        ]
+      }
+    ]
+  }
+}

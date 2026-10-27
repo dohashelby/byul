@@ -103,7 +103,7 @@ def test_actual_owned_jsonl_path_projects_auth_metadata_without_creating_engine_
     serialized = json.dumps(result)
     assert "PRIVATE_" not in serialized and "EXAMPLE-allowed" not in serialized and "EXAMPLE-model" not in serialized
     pack = baseline_pack()
-    assert pack.manifest.revision == 27 and pack.checks["REQ-05"].executor is pack.checks["REQ-05"].judge is None
+    assert pack.manifest.revision == 28 and pack.checks["REQ-05"].executor is pack.checks["REQ-05"].judge is None
 
 
 @pytest.mark.parametrize("change", [

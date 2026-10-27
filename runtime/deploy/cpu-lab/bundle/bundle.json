@@ -1,0 +1,43 @@
+{
+  "schema_version": "byul-policy-bundle/0.1",
+  "bundle_id": "bundle-cpu-vllm-local-policy-1",
+  "created_at": "2026-10-27T00:00:00+09:00",
+  "policy_ref": {
+    "policy_id": "cpu-vllm-local-policy",
+    "policy_version": "1",
+    "sha256": "013a51eea8a3dfe64ea12771d5cfaafa6cf68ab7d6e7fdc05f2cc7667be29989"
+  },
+  "target_ref": "cpu-vllm-lab-001",
+  "approval": {
+    "approved_by": "runtime-cpu-lab-owner",
+    "approved_at": "2026-10-27T00:00:00+09:00",
+    "approval_ref": "CPU-VLLM-LOCAL-APPROVAL"
+  },
+  "validity": {
+    "valid_from": "2026-01-01T00:00:00+00:00",
+    "valid_until": "2027-12-31T23:59:59+00:00"
+  },
+  "files": [
+    {
+      "role": "gateway_policy",
+      "path": "runtime-policy.json",
+      "schema_version": "runtime-mvp/1.1",
+      "sha256": "013a51eea8a3dfe64ea12771d5cfaafa6cf68ab7d6e7fdc05f2cc7667be29989",
+      "bytes": 437
+    },
+    {
+      "role": "policy_approvals",
+      "path": "policy-approvals.json",
+      "schema_version": "runtime-policy-approvals/1.0",
+      "sha256": "7605e0d615a818719895c32c88893afa8ff63cf8b57d0a0f674b42bf9cafdb52",
+      "bytes": 392
+    },
+    {
+      "role": "target",
+      "path": "target.json",
+      "schema_version": "runtime-target/1.0",
+      "sha256": "183bd696f4d91bad2d777e642ad8e2b1ecdd59ccdc65ba4fa12691299a6fcc7f",
+      "bytes": 262
+    }
+  ]
+}

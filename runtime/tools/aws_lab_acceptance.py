@@ -523,8 +523,16 @@ class AWSAcceptance:
         return result, result.stdout + result.stderr
 
     @staticmethod
-    def _log_received(logs: str, request_id: str | None) -> bool:
-        return bool(request_id and f"Received request chatcmpl-{request_id}" in logs)
+    def _log_received(logs: str, request_id: str | None, route: str) -> bool:
+        if request_id is None:
+            return False
+        if route == "/v1/chat/completions":
+            engine_id = f"chatcmpl-{request_id}"
+        elif route == "/v1/completions":
+            engine_id = f"cmpl-{request_id}-0"
+        else:
+            return False
+        return f"Received request {engine_id}" in logs
 
     def _engine_pod(self) -> tuple[dict[str, Any] | None, CommandResult]:
         result = self._kubectl("get", "pods", "-l", "app=serving-engine", "-o", "json")
@@ -784,7 +792,9 @@ class AWSAcceptance:
         detail = self._detail(request_id)
         record = _record_fields(detail)
         logs_result, logs = self._engine_logs(since)
-        log_match = logs_result.returncode == 0 and self._log_received(logs, request_id)
+        log_match = logs_result.returncode == 0 and self._log_received(
+            logs, request_id, "/v1/chat/completions"
+        )
         self.engine_log_format_confirmed = log_match
         facts = {
             "http_200": response.status == 200,
@@ -842,7 +852,8 @@ class AWSAcceptance:
         )
         ids = [item["request_id"] for item in attempts if item["request_id"]]
         log_absent = logs_result.returncode == 0 and all(
-            not self._log_received(logs, request_id) for request_id in ids
+            not self._log_received(logs, request_id, "/v1/chat/completions")
+            for request_id in ids
         )
         return {
             "auth_codes": auth_codes,

@@ -73,6 +73,8 @@ class ObservationFeed:
         self._lost_events_total = 0
         self._lost_events_by_source: Counter[str] = Counter()
         self._last_lost_at: str | None = None
+        self._writer_dropped_lines_total: int | None = None
+        self._last_writer_drop_at: str | None = None
         self._checkpoint_error: str | None = None
         self._seen: deque[str] = deque(maxlen=self._SEEN_LIMIT)
         self._seen_set: set[str] = set()
@@ -121,6 +123,8 @@ class ObservationFeed:
             lost_total = document.get("lost_events_total", 0)
             lost_by_source = document.get("lost_events_by_source", {})
             last_lost_at = document.get("last_lost_at")
+            writer_dropped = document.get("writer_dropped_lines_total")
+            last_writer_drop_at = document.get("last_writer_drop_at")
             keys = document.get("recent_event_keys", [])
             if (
                 not isinstance(offset, int)
@@ -148,6 +152,18 @@ class ObservationFeed:
                     for source, count in lost_by_source.items()
                 )
                 or (last_lost_at is not None and not isinstance(last_lost_at, str))
+                or (
+                    writer_dropped is not None
+                    and (
+                        not isinstance(writer_dropped, int)
+                        or isinstance(writer_dropped, bool)
+                        or writer_dropped < 0
+                    )
+                )
+                or (
+                    last_writer_drop_at is not None
+                    and not isinstance(last_writer_drop_at, str)
+                )
                 or not isinstance(keys, list)
                 or any(not isinstance(key, str) or not key for key in keys)
             ):
@@ -165,6 +181,8 @@ class ObservationFeed:
         self._lost_events_total = lost_total
         self._lost_events_by_source.update(lost_by_source)
         self._last_lost_at = last_lost_at
+        self._writer_dropped_lines_total = writer_dropped
+        self._last_writer_drop_at = last_writer_drop_at
         for key in keys[-self._SEEN_LIMIT :]:
             self._remember(key)
 
@@ -183,6 +201,8 @@ class ObservationFeed:
             "lost_events_total": self._lost_events_total,
             "lost_events_by_source": dict(self._lost_events_by_source),
             "last_lost_at": self._last_lost_at,
+            "writer_dropped_lines_total": self._writer_dropped_lines_total,
+            "last_writer_drop_at": self._last_writer_drop_at,
             "recent_event_keys": list(self._seen),
         }
         encoded = (json.dumps(document, ensure_ascii=False) + "\n").encode("utf-8")
@@ -297,6 +317,20 @@ class ObservationFeed:
             raise OSError(f"observation writer is not running (state={state})")
         reconnect_count = document.get("reconnect_count")
         last_gap = document.get("last_gap") if isinstance(document.get("last_gap"), dict) else None
+        dropped_lines_total = document.get("dropped_lines_total")
+        if dropped_lines_total is not None and (
+            not isinstance(dropped_lines_total, int)
+            or isinstance(dropped_lines_total, bool)
+            or dropped_lines_total < 0
+        ):
+            raise ValueError("observation writer dropped_lines_total is invalid")
+        redaction_error = document.get("last_redaction_error_class")
+        if redaction_error is not None and (
+            not isinstance(redaction_error, str) or not redaction_error
+        ):
+            raise ValueError(
+                "observation writer last_redaction_error_class is invalid"
+            )
         return (
             {
                 "configured": True,
@@ -318,9 +352,30 @@ class ObservationFeed:
                     if last_gap
                     else None
                 ),
+                "dropped_lines_total": dropped_lines_total,
+                "last_redaction_error_class": redaction_error,
             },
             started_at,
         )
+
+    def _update_writer_loss(self, heartbeat: dict[str, Any]) -> bool:
+        if self.kind != "tetragon":
+            return False
+        current = heartbeat.get("dropped_lines_total")
+        if not isinstance(current, int) or isinstance(current, bool):
+            return False
+        previous = self._writer_dropped_lines_total
+        changed = current != previous
+        if (previous is None and current > 0) or (
+            previous is not None and current > previous
+        ):
+            self._last_writer_drop_at = datetime.now(timezone.utc).isoformat()
+        elif previous is not None and current < previous and current > 0:
+            # A restarted writer reset its cumulative counter, then dropped
+            # lines before the first Gateway poll.
+            self._last_writer_drop_at = datetime.now(timezone.utc).isoformat()
+        self._writer_dropped_lines_total = current
+        return changed
 
     def _status(
         self,
@@ -350,6 +405,19 @@ class ObservationFeed:
                     ).total_seconds() <= self.heartbeat_stale_after_s
                 except ValueError:
                     loss_detected = None
+        redaction_loss_detected: bool | None = None
+        if self.kind == "tetragon" and self._writer_dropped_lines_total is not None:
+            redaction_loss_detected = False
+            if self._last_writer_drop_at is not None:
+                try:
+                    last_drop = self._parse_time(
+                        self._last_writer_drop_at, "last_writer_drop_at"
+                    )
+                    redaction_loss_detected = (
+                        datetime.now(timezone.utc) - last_drop
+                    ).total_seconds() <= self.heartbeat_stale_after_s
+                except ValueError:
+                    redaction_loss_detected = None
         return {
             "path": str(self.path),
             "kind": self.kind,
@@ -375,10 +443,25 @@ class ObservationFeed:
             "lost_events_by_source": lost_by_source,
             "last_lost_at": self._last_lost_at if self.kind == "hubble" else None,
             "loss_detected": loss_detected,
+            "dropped_lines_total": (
+                self._writer_dropped_lines_total
+                if self.kind == "tetragon"
+                else None
+            ),
+            "last_redaction_error_class": (
+                heartbeat.get("last_redaction_error_class")
+                if self.kind == "tetragon"
+                else None
+            ),
+            "last_redaction_drop_at": (
+                self._last_writer_drop_at if self.kind == "tetragon" else None
+            ),
+            "redaction_loss_detected": redaction_loss_detected,
         }
 
     def collect(self) -> tuple[dict[str, Any], str]:
         heartbeat, writer_started_at = self._read_heartbeat()
+        writer_loss_changed = self._update_writer_loss(heartbeat)
         mode = "append"
         with self.path.open("rb") as source:
             stat_result = os.fstat(source.fileno())
@@ -401,7 +484,7 @@ class ObservationFeed:
         if complete_length == 0:
             if len(payload) > self._MAX_LINE_BYTES:
                 raise ValueError("observation feed line exceeds 1 MiB")
-            if mode != "append":
+            if mode != "append" or writer_loss_changed:
                 self._write_checkpoint()
             value = self._status(
                 mode=mode,

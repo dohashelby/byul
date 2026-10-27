@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import patch
@@ -15,6 +16,7 @@ from urllib.request import Request, urlopen
 
 from serving_runtime.mvp.app import GatewayApp
 from serving_runtime.mvp.config import MVPConfig
+from serving_runtime.mvp.collectors import Collector
 from serving_runtime.mvp.mock_engine import MockEngine
 from serving_runtime.mvp.policy import load_policy
 from serving_runtime.mvp.store import JsonlStore
@@ -342,6 +344,90 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
             kubernetes={"state": "multiple_targets"},
         )
         self.assertEqual(multiple[0], "TARGET_UNAVAILABLE")
+
+    def test_hold_uses_instance_from_published_snapshot_while_callback_is_paused(self) -> None:
+        approved_digest = "sha256:" + "a" * 64
+        unapproved_digest = "sha256:" + "b" * 64
+        registration = load_target(
+            self.write(
+                "race.json",
+                target_document(
+                    engine={
+                        "kind": "mock",
+                        "version": "mock-1.0",
+                        "image_digest": approved_digest,
+                    },
+                    kubernetes=kubernetes_block(),
+                ),
+            )
+        )
+        registry = TargetRegistry(
+            registration,
+            data_dir=Path(self.temporary.name) / "race-data",
+            observation_session_id="race",
+        )
+        old = summarize_pods({"items": [pod("old", "u1", "c1")]}, "engine")
+        registry.observe_kubernetes(old, "kubernetes_api")
+        new = summarize_pods({"items": [pod("new", "u2", "c2")]}, "engine")
+        new["instance"]["image_digest"] = unapproved_digest
+        callback_entered = threading.Event()
+        release_callback = threading.Event()
+
+        def paused_callback(value, origin):
+            callback_entered.set()
+            release_callback.wait(timeout=5)
+            registry.observe_kubernetes(value, origin)
+
+        collector = Collector(
+            "target_pods",
+            lambda: (new, "kubernetes_api"),
+            on_collected=paused_callback,
+        )
+        worker = threading.Thread(target=collector.collect)
+        worker.start()
+        self.assertTrue(callback_entered.wait(timeout=5))
+        snapshot = collector.snapshot()
+        self.assertEqual(snapshot["state"], "ok")
+        engine_ok = {
+            "state": "ok",
+            "last_value": {
+                "engine.version": "mock-1.0",
+                "model.ids": ["test-model"],
+            },
+        }
+        hold = registry.hold(
+            policy_target_id="mock-engine-001",
+            backend_kind="mock",
+            engine_info=engine_ok,
+            kubernetes=snapshot["last_value"],
+        )
+        release_callback.set()
+        worker.join(timeout=5)
+        self.assertEqual(hold[0], "TARGET_MISMATCH")
+
+    def test_model_registration_matches_any_served_model_id(self) -> None:
+        registration = load_target(self.write("models.json", target_document()))
+        registry = TargetRegistry(
+            registration,
+            data_dir=Path(self.temporary.name) / "models-data",
+            observation_session_id="models",
+        )
+        status = registry.status(
+            policy_target_id="mock-engine-001",
+            backend_kind="mock",
+            engine_info={
+                "state": "ok",
+                "last_value": {
+                    "engine.version": "mock-1.0",
+                    "model.ids": ["other-model", "test-model"],
+                },
+            },
+            kubernetes=None,
+        )
+        row = next(item for item in status["comparison"] if item["field"] == "model.id")
+        self.assertEqual(row["state"], "match")
+        self.assertEqual(row["expected"], "test-model")
+        self.assertEqual(row["observed"], ["other-model", "test-model"])
 
 
 class TargetGatewayHttpTests(TempMixin, unittest.TestCase):

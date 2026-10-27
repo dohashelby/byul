@@ -207,7 +207,8 @@ class ApprovalVerifierTests(unittest.TestCase):
         self.assertEqual(verify().state, "unverified")  # B
         release_a.set()
         thread_a.join(timeout=10)
-        self.assertEqual(results["a"].state, "verified")  # A saw the old list
+        self.assertEqual(results["a"].state, "unverified")
+        self.assertEqual(results["a"].reason_code, "POLICY_APPROVAL_NOT_LISTED")
         self.approvals_path.write_text("{broken", encoding="utf-8")
         self.assertEqual(verify().state, "error")
 

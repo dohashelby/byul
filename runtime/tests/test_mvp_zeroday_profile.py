@@ -330,6 +330,20 @@ class ZerodayValidatorTests(PolicyFileMixin, unittest.TestCase):
                 decision = self.decide(chat(temperature=0.5), load_policy(path))
                 self.assertEqual(decision.reason_code, "UNSUPPORTED_FIELD")
 
+    def test_completions_never_accept_zeroday_extra_fields(self) -> None:
+        state = self.load(v12_document())
+        decision = validate_request(
+            json.dumps({
+                "model": "test-model",
+                "prompt": "hello",
+                "temperature": 0.5,
+            }).encode("utf-8"),
+            "application/json",
+            state,
+            request_kind="completions",
+        )
+        self.assertEqual(decision.reason_code, "UNSUPPORTED_FIELD")
+
 
 class ZerodayRelayPayloadTests(PolicyFileMixin, unittest.TestCase):
     def test_extra_fields_keep_original_values_and_gateway_values_win(self) -> None:

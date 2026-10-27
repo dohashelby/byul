@@ -79,6 +79,7 @@ class FakeBackend:
         self._required_authorization = required_authorization
         self.metrics_failure: str | None = None
         self.tokenize_failure = False
+        self.tokenize_failure_status = 500
         self.tokenize_response_body: bytes | None = None
         self.tokenize_calls = 0
         # Bodies the Gateway sent to the tokenizer, for test assertions only.
@@ -362,7 +363,10 @@ class FakeBackend:
                 with owner._lock:
                     owner.tokenize_calls += 1
                 if owner.tokenize_failure:
-                    self._send_json(500, {"error": {"code": "FAKE_TOKENIZE_FAILURE"}})
+                    self._send_json(
+                        owner.tokenize_failure_status,
+                        {"error": {"code": "FAKE_TOKENIZE_FAILURE"}},
+                    )
                     return
                 try:
                     content_length = int(self.headers.get("Content-Length", "0"))
@@ -464,12 +468,17 @@ class FakeBackend:
                     self._send_json(
                         200,
                         {
-                            "id": f"fake-{record['request_id']}",
+                            "id": f"cmpl-{record['request_id']}",
                             "object": "text_completion",
                             "model": owner.model_id,
                             "choices": [
                                 {"index": 0, "text": "fake response", "finish_reason": "stop"}
                             ],
+                            "usage": {
+                                "prompt_tokens": 3,
+                                "completion_tokens": 2,
+                                "total_tokens": 5,
+                            },
                         },
                     )
                     return

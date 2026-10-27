@@ -1,0 +1,16 @@
+{
+  "schema_version": "runtime-mvp/1.1",
+  "policy_id": "cpu-vllm-local-policy",
+  "policy_version": "1",
+  "target_id": "cpu-vllm-lab-001",
+  "allowed_models": [
+    "test-model"
+  ],
+  "output_default_tokens": 16,
+  "output_max_tokens": 64,
+  "max_body_bytes": 65536,
+  "max_context_tokens": 2048,
+  "valid_from": "2026-01-01T00:00:00+00:00",
+  "valid_until": "2027-12-31T23:59:59+00:00",
+  "approval_ref": "CPU-VLLM-LOCAL-APPROVAL"
+}

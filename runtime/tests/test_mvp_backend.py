@@ -724,6 +724,7 @@ class ExternalBackendHttpTests(unittest.TestCase):
         self.assertEqual(health["data_origin"], "external_backend")
         self.assertEqual(info["last_value"]["engine.kind"], "vllm")
         self.assertEqual(info["last_value"]["model.id"], "backend-test-model")
+        self.assertEqual(info["last_value"]["model.ids"], ["backend-test-model"])
         self.assertEqual(metrics["data_origin"], "external_backend")
         self.assertEqual(
             metrics["last_value"]["missing.metric"]["state"],

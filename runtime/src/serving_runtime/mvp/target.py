@@ -684,16 +684,54 @@ class TargetRegistry:
             rows.append(_row("engine.kind", registration.engine_kind, backend_kind, "backend_config", True))
             collector_state = engine_info.get("state") if engine_info else "disconnected"
             value = engine_info.get("last_value") if engine_info else None
-            for name, expected in (
-                ("engine.version", registration.engine_version),
-                ("model.id", registration.model_id),
-            ):
+            for name, expected in (("engine.version", registration.engine_version),):
                 if collector_state != "ok" or not isinstance(value, dict):
                     rows.append(_unknown(name, expected, "engine_api", f"engine_info {collector_state}"))
                 elif value.get(name) is None:
                     rows.append(_unknown(name, expected, "engine_api", "not reported by engine"))
                 else:
                     rows.append(_row(name, expected, value.get(name), "engine_api", collector_state == "ok"))
+            if collector_state != "ok" or not isinstance(value, dict):
+                rows.append(
+                    _unknown(
+                        "model.id",
+                        registration.model_id,
+                        "engine_api",
+                        f"engine_info {collector_state}",
+                    )
+                )
+            else:
+                model_ids = value.get("model.ids")
+                if isinstance(model_ids, list) and all(
+                    isinstance(item, str) for item in model_ids
+                ):
+                    rows.append(
+                        _membership_row(
+                            "model.id",
+                            registration.model_id,
+                            model_ids,
+                            "engine_api",
+                        )
+                    )
+                elif value.get("model.id") is not None:
+                    rows.append(
+                        _row(
+                            "model.id",
+                            registration.model_id,
+                            value.get("model.id"),
+                            "engine_api",
+                            True,
+                        )
+                    )
+                else:
+                    rows.append(
+                        _unknown(
+                            "model.id",
+                            registration.model_id,
+                            "engine_api",
+                            "not reported by engine",
+                        )
+                    )
             rows.append(
                 _unknown(
                     "model.revision",
@@ -703,7 +741,13 @@ class TargetRegistry:
                 )
             )
             if registration.kubernetes is not None:
-                instance = self.current_instance()
+                snapshot_instance = (
+                    kubernetes.get("instance")
+                    if isinstance(kubernetes, dict)
+                    and isinstance(kubernetes.get("instance"), dict)
+                    else None
+                )
+                instance = snapshot_instance or self.current_instance()
                 k8s_state = kubernetes.get("state") if kubernetes else "disconnected"
                 if instance is None:
                     rows.append(_unknown("engine.image_digest", registration.image_digest, "kubernetes_api", f"pod snapshot {k8s_state}"))
@@ -811,6 +855,23 @@ def _row(name: str, expected: Any, observed: Any, source: str, observed_ok: bool
     else:
         state = "match" if expected == observed else "mismatch"
     return {"field": name, "expected": expected, "observed": observed, "source": source, "state": state, "note": None}
+
+
+def _membership_row(
+    name: str, expected: Any, observed: list[str], source: str
+) -> dict[str, Any]:
+    if expected is None:
+        state = "not_declared"
+    else:
+        state = "match" if expected in observed else "mismatch"
+    return {
+        "field": name,
+        "expected": expected,
+        "observed": list(observed),
+        "source": source,
+        "state": state,
+        "note": None,
+    }
 
 
 def _unknown(name: str, expected: Any, source: str, note: str) -> dict[str, Any]:

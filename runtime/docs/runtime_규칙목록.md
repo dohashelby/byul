@@ -28,7 +28,7 @@
 | `MODEL_NOT_ALLOWED` | `allowed_models` | Gateway / `gateway` | 정책의 모델 허용 목록 밖이다. | `DENIED`·미전달 → `denied` | §4.2, §4.10 | update 담당 확인 필요 |
 | `MAX_TOKENS_EXCEEDED` | `output_max_tokens` | Gateway / `gateway` | 요청 출력 토큰 수가 정책 상한을 넘는다. | `DENIED`·미전달 → `denied` | §4.10 | update 담당 확인 필요 |
 | `CONTEXT_LIMIT_EXCEEDED` | `max_context_tokens` | Gateway / `gateway` | 입력 토큰과 출력 요청 합이 context 상한을 넘는다. | `DENIED`·미전달 → `denied` | §4.10 | update 담당 확인 필요 |
-| `CONTEXT_CHECK_UNAVAILABLE` | 없음 | Gateway / `gateway` | backend token count를 얻거나 검증할 수 없다. | `ERROR` → `error` | §4.10, §7.3 | update 담당 확인 필요 |
+| `CONTEXT_CHECK_UNAVAILABLE` | 없음 | Gateway / `gateway` | backend token count를 얻거나 검증할 수 없다. `/tokenize` HTTP 실패면 endpoint와 상태만 요청 context와 오류 메시지에 남기고 본문은 저장하지 않는다. | `ERROR` → `error` | §4.10, §7.3 | update 담당 확인 필요 |
 | `CONCURRENCY_LIMIT` | `max_concurrent_requests` | Gateway / `gateway` | 동시 요청 slot 상한에 도달했다. | `DENIED`·미전달 → `denied` | §4.2, §7.1 | update 담당 확인 필요 |
 | `CONNECTION_LIMIT` | `max_connections` | Gateway / `gateway` | 동시 client 연결 상한에 도달했다. | `ERROR` → `error` | §4.2, §7.1 | update 담당 확인 필요 |
 | `UNSUPPORTED_TRANSFER_ENCODING` | 없음 | Gateway / `gateway` | 요청의 `Transfer-Encoding`을 지원하지 않는다. | `INVALID` → `invalid` | §4.2, §4.10 | update 담당 확인 필요 |
@@ -39,7 +39,7 @@
 | `DUPLICATE_KEY` | 없음 | Gateway / `gateway` | JSON 객체에 중복 key가 있다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_REQUEST` | 없음 | Gateway / `gateway` | 최상위 요청이 JSON 객체가 아니다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `UNSUPPORTED_ALIAS` | 없음 | Gateway / `gateway` | 지원하지 않는 alias(`max_completion_tokens`)를 썼다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
-| `UNSUPPORTED_FIELD` | 없음 | Gateway / `gateway` | 정책 profile에 등록되지 않은 필드가 있다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
+| `UNSUPPORTED_FIELD` | 없음 | Gateway / `gateway` | 허용 필드 밖이다. `zeroday-lab`의 `extra_fields`는 chat route에만 적용하며 completions에서는 선언돼 있어도 이 코드로 거부한다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_MODEL` | 없음 | Gateway / `gateway` | `model`이 비어 있거나 문자열이 아니다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_MESSAGES` | 없음 | Gateway / `gateway` | `messages` 배열·role·content 모양이 지원 범위 밖이다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_PROMPT_TYPE` | 없음 | Gateway / `gateway` | completions `prompt`가 단일 문자열이 아니다. 문자열 배열·token-id 배열도 이 코드로 거부한다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |

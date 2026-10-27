@@ -11,6 +11,7 @@ from .approval import ApprovalResult
 from .auth import CHAT_ROUTE, COMPLETIONS_ROUTE, AuthState, not_configured
 from .backend import BackendConfig
 from .engine_client import EngineClient
+from .engine_client import TokenizeHTTPError
 from .policy import PolicyState
 from .policy_state import RevocationState, evaluate_policy
 from .relay import Relay, StreamResponse, engine_error
@@ -199,18 +200,24 @@ class RequestFlow:
             )
         except Exception as error:
             # Store only the exception class; backend messages may contain secrets.
-            self._records.set_context(
-                {
-                    "limit": context_limit,
-                    "input_tokens": None,
-                    "result": "unavailable",
-                    "error": type(error).__name__,
-                }
-            )
+            context_error = {
+                "limit": context_limit,
+                "input_tokens": None,
+                "result": "unavailable",
+                "error": type(error).__name__,
+                "endpoint": None,
+                "http_status": None,
+            }
+            message = "input token count is unavailable"
+            if isinstance(error, TokenizeHTTPError):
+                context_error["endpoint"] = error.endpoint
+                context_error["http_status"] = error.http_status
+                message += f" ({error.endpoint} HTTP {error.http_status})"
+            self._records.set_context(context_error)
             return engine_error(
                 503,
                 "CONTEXT_CHECK_UNAVAILABLE",
-                "input token count is unavailable",
+                message,
                 decision,
                 source="gateway",
             )

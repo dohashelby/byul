@@ -14,6 +14,15 @@ from .backend import BackendConfig, parse_prometheus_metrics
 from .mock_engine import _utc_now
 
 
+class TokenizeHTTPError(OSError):
+    """A body-free tokenizer HTTP failure safe for request records."""
+
+    def __init__(self, endpoint: str, http_status: int) -> None:
+        self.endpoint = endpoint
+        self.http_status = http_status
+        super().__init__(f"tokenize endpoint {endpoint} returned HTTP status {http_status}")
+
+
 class EngineClient:
     """Perform non-completion HTTP calls to the configured backend."""
 
@@ -78,15 +87,16 @@ class EngineClient:
         if request_kind == "chat" and self.backend.kind == "vllm":
             tokenize_request["add_generation_prompt"] = True
         payload = json.dumps(tokenize_request, ensure_ascii=False).encode("utf-8")
+        endpoint = "/tokenize"
         status, _, body = self.request(
             "POST",
-            "/tokenize",
+            endpoint,
             body=payload,
             request_id=f"{request_id}-tokenize",
             content_type="application/json",
         )
         if status != 200:
-            raise OSError(f"tokenize returned HTTP status {status}")
+            raise TokenizeHTTPError(endpoint, status)
         result = json.loads(body.decode("utf-8"))
         count = result.get("count") if isinstance(result, dict) else None
         if not isinstance(count, int) or isinstance(count, bool) or count < 0:
@@ -135,10 +145,18 @@ class EngineClient:
             model_id = entries[0].get("id")
             max_model_len = entries[0].get("max_model_len")
         if self.backend.kind == "mock":
+            available_ids = sorted(
+                {
+                    item.get("id")
+                    for item in entries
+                    if isinstance(item, dict) and isinstance(item.get("id"), str)
+                }
+            ) if isinstance(entries, list) else []
             value = {
                 "engine.kind": version.get("engine.kind"),
                 "engine.version": version.get("engine.version"),
                 "model.id": model_id,
+                "model.ids": available_ids,
                 "option.max_model_len": max_model_len,
             }
             value = {key: item for key, item in value.items() if item is not None}

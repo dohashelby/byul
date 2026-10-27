@@ -1,0 +1,13 @@
+{
+  "schema_version": "runtime-target/1.0",
+  "target_id": "cpu-vllm-lab-001",
+  "target_ref": "CPU-VLLM-LOCAL-20261027",
+  "engine": {
+    "kind": "vllm",
+    "version": "0.31.0"
+  },
+  "model": {
+    "id": "qwen2.5-0.5b-instruct"
+  },
+  "baseline_ref": null
+}

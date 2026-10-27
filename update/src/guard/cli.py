@@ -554,6 +554,45 @@ def capture_lifecycle_session(
         "bytes":len(raw.encode("utf-8"))}))
 
 
+@app.command("capture-kubernetes-lifecycle-session")
+def capture_kubernetes_lifecycle_session(
+    env: Path = typer.Option(...,"--env"),
+    target: Path = typer.Option(...,"--target"),
+    prepared: Path = typer.Option(...,"--prepared"),
+    output: Path = typer.Option(...,"--output"),
+    kubectl_binary: str = typer.Option("kubectl","--kubectl-binary"),
+    max_duration: float = typer.Option(180,"--max-duration"),
+    execute: bool = typer.Option(False,"--execute",help="명시 소유 Kubernetes 세션의 파일·프로세스 metadata만 읽기"),
+) -> None:
+    """명시 context/Pod 세대에서 고정 읽기 helper만 실행한다. 보안 판정은 UNKNOWN이다."""
+    import hashlib
+    from guard.collectors.kubernetes_lifecycle import load_inputs,validate_options,collect
+    from guard.collectors.route_observations import validate_output
+    try:
+        environment,topology,assets=load_inputs(env,target,prepared)
+        validate_options(kubectl_binary,max_duration)
+        validate_output(output,Path(__file__).resolve().parents[3])
+        if not execute:
+            typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}))
+            return
+        value=collect(environment,topology,assets,binary=kubectl_binary,duration=max_duration)
+        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
+        if len(raw.encode("utf-8"))>64*1024**2:raise ValueError("LIFECYCLE_SESSION_ATTACHMENT_BOUND")
+    except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError):
+        typer.echo("KUBERNETES_LIFECYCLE_CAPTURE_FAILED")
+        raise typer.Exit(2)
+    try:
+        validate_output(output,Path(__file__).resolve().parents[3])
+        with output.open("x",encoding="utf-8",newline="\n") as stream:stream.write(raw)
+    except (OSError,UnicodeError,ValueError):
+        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
+            "diagnostic_codes":["LIFECYCLE_SESSION_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
+        raise typer.Exit(1)
+    typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
+        "recordings":len(value["recordings"]),"sha256":hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        "bytes":len(raw.encode("utf-8"))}))
+
+
 @app.command("capture-stream-pressure")
 def capture_stream_pressure(
     env: Path = typer.Option(..., "--env"),

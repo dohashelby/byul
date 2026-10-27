@@ -2,6 +2,14 @@
 
 ## 2026-10-27 LIF-10 — native metadata 생산자·소유 기록 수집, 판정 미등록
 
+Kubernetes의 동일 파서/세션 수집 진입점은 `capture-kubernetes-lifecycle-session`이다.
+기존 HTTP의 명시 role/Pod 신원 대조를 공통화하고 고정 file/context/inventory helper만
+선택 container에서 실행한다. 별도 probe Pod나 HTTP 요청은 필요하지 않다. 기존 HTTP는
+Ready 검사를 유지하고 읽기 경로는 Running 세대의 장애 metadata를 보존한다. post-read 신원
+실패는 수집한 안전한 prefix와 구분한다. API imageID를 Docker config ID로 위조하지 않으며
+node runtime/manifest ancestry·생산자 인증·전체 회수는 미검증이다. 실제 cluster/GPU 실증이나
+자동화 등록 증가는 없다. 상세 입력과 제한은 RUNBOOK의 Kubernetes 절을 따른다.
+
 같은 생산자의 여러 프로세스 기록은 `capture-lifecycle-session`으로 연결한다. 소유 세대·
 세션 디렉터리·현재 프로세스와 파일 목록을 전후 대조하고, 기존 개별 수집을 재사용한다.
 목록과 실제 읽기 사이의 파일 신원 변화도 별도 표식으로 남긴다. 후속 목록·특정 기록·
@@ -131,7 +139,11 @@ runtime 담당자는 서버 생성 request_id와 principal·정책 판본·대�
 샌드박스를 확보한 뒤 정상/확인된 위반/미수집/지원 밖을 시험하고 제품 판정에 연결한다.
 이번에는 실제 엔진과 runtime·platform·contracts 제품 코드를 변경하지 않았다.
 
-## PLT-07 후속 송신 시험 조건 — 계획, 실행하지 않음
+## PLT-07 후속 송신 시험 조건 — 구현 전의 계획 기록
+
+아래는 당시 계획이다. 현행 `explicit-forbidden-egress-v1`의 제한된 독립 FAIL 연결은
+`tools/overrides/PLT-07.yaml`, `src/guard/executors/boundary_egress.py`와 RUNBOOK을 따른다.
+아래의 당시 미등록 상태를 현행 상태로 읽지 않는다. 전체 PASS·실제 엔진 실증은 여전히 미완료다.
 
 PLT-07 실행기·정책·판정 등록은 하지 않았다. Linux CPU의 소유 샌드박스로 검토할 수
 있고 AWS가 필수인 것은 아니다. 실제 사용 환경·기동·비용은 별도 승인 범위다.

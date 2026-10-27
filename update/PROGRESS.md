@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — LIF-10 Kubernetes 소유 읽기 경계
+
+- 한 일: 기준d26e248에서 공통 Kubernetes role/Pod 신원과 file packet 검사를 분리하고, 고정 metadata helper만 선택 container에서 읽는 세션 CLI를 구현했다. 기존 파서/부분 관측·저장 실패 보존을 재사용하고 Pod imageID를 별도 근거로 둔다. 기존 HTTP Ready 요구와 스트림 측정·native sensor bytes를 유지한다. PLT-07의 과거 미등록 계획과 현행 제한된 독립 FAIL 경계도 문서에서 구분했다.
+- 테스트 결과: 소스852파일 고정 후 공통 수집·기존 Kubernetes HTTP·CLI·불변식569통과/0실패/기존skip6/제외1(pytest54.32초·부모55.130초), 새EXAMPLE52건 포함. wheel 소스/설치본135파일 일치(부모11.929초). 새skip/제외·assert/판정 완화0. 실제 cluster/GPU 실행0. 상세 원본은 저장소 밖 byul-kubernetes-lifecycle-20261027T084942+0900이다.
+- 다음 단계: 관련 열린 초안 PR28에 추가 커밋·푸시하고 정확 head의 Linux 기본·wheel·공용/플랫폼·Docker CI를 확인한다. cluster/GPU·node runtime image·전체 회수는 별도 실증한다.
+- 막힌 것: CPU 구현에는 없음. 실제 클러스터/기동·기업 종료 기한/회수 대상은 미완료이며 자동화 등록 증가0이다. 새 의존성·클러스터/RBAC/Pod 생성·기존 자원 중단은 하지 않는다.
+
 ## 2026-10-27 — LIF-10 세션 프로세스·파일 목록과 요청 사건 연결
 
 - 한 일: 기준f47da3d의 생산자/개별 수집을 재사용하는 세션 CLI를 구현했다. 전후 census·개별 파일/소유 세대 변화와 실패를 구분하고, 지문/정확 사건 참조·모호한 ID 재사용·클록 문맥 분리 및 늦은 저장 실패의 metadata 표준 출력 보존을 연결했다. 실제 엔진 기동·종료나 기존 스트림 측정 변경은 없다.

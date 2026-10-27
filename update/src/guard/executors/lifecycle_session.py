@@ -165,10 +165,11 @@ def parse_inventory(raw, session):
     return value
 
 
-def inventory(docker,target,*,container,image,session):
+def inventory(docker,target,*,container,image,session,owner_identity=None):
     validate_owned_source(container=container,image=image,path="/guard-lifecycle/data/"+session)
     if re.fullmatch(r"[0-9a-f]{32}",session) is None:raise ValueError("LIFECYCLE_SESSION_INVALID")
-    before=identity(docker,target,container,image,5)
+    owner=identity if owner_identity is None else owner_identity
+    before=owner(docker,target,container,image,5)
     result=docker.exec_bounded(container,["python3","-c",INVENTORY_READER,session],timeout=5,max_bytes=65536)
     pipe=result.capture or {}
     if (result.returncode!=0 or pipe.get("complete") is not True or pipe.get("bounded_at_source") is not True
@@ -176,7 +177,7 @@ def inventory(docker,target,*,container,image,session):
         raise ValueError("LIFECYCLE_INVENTORY_TRANSPORT_INVALID")
     raw=result.stdout.encode()
     value=parse_inventory(raw,session)
-    try:stable=identity(docker,target,container,image,5)==before
+    try:stable=(owner(docker,target,container,image,5)==before and pipe.get("owner_binding_verified",True) is True)
     except Exception:stable=False
     return {"metadata":value,"owner":safe_owner(before),"owner_stable":stable,
             "capture_sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw)}
@@ -218,12 +219,13 @@ def request_index(recordings):
             "whole_run_coverage_verified":False,"scope":"declared fingerprint equality and assignment events; no stop duration or reclamation verdict"}
 
 
-def capture_session(docker,target,*,container,image,prepared):
+def capture_session(docker,target,*,container,image,prepared,owner_identity=None,read_file=None,image_check=None):
     result={"schema":"guard-lifecycle-session-capture/1","session":prepared["session"],"before":None,"after":None,
         "recordings":[],"diagnostic_codes":[],"live_census_stable":False,"recorded_files_covered":False,
         "python_processes_without_recording":[],"producer_authenticated":False,"record_authenticity_verified":False,
         "whole_run_coverage_verified":False,"product_connected":False,"security":"UNKNOWN"}
     arguments={"container":container,"image":image,"session":prepared["session"]}
+    if owner_identity is not None:arguments["owner_identity"]=owner_identity
     try:result["before"]=inventory(docker,target,**arguments)
     except Exception:result["diagnostic_codes"].append("LIFECYCLE_INITIAL_INVENTORY_UNAVAILABLE")
     before=result["before"]
@@ -236,7 +238,10 @@ def capture_session(docker,target,*,container,image,prepared):
             try:
                 if (not file["regular"] or file["uid"]!=before["metadata"]["directory_before"]["uid"]
                         or file["mode"]&0o077):raise ValueError("LIFECYCLE_SESSION_FILE_UNVERIFIED")
-                row["capture"]=capture(docker,target,source=source,prepared=prepared)
+                options={}
+                if read_file is not None:options["read_file"]=read_file
+                if image_check is not None:options["image_check"]=image_check
+                row["capture"]=capture(docker,target,source=source,prepared=prepared,**options)
                 row["session_owner_match"]=row["capture"]["provenance"]["owner"]==before["owner"]
                 if not row["session_owner_match"]:row["diagnostic_codes"].append("LIFECYCLE_SESSION_OWNER_CHANGED")
                 expected={k:file["bytes" if k=="size" else k] for k in ("device","inode","size","mtime_ns","ctime_ns")}

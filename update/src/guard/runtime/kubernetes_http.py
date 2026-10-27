@@ -23,11 +23,8 @@ from .bounded import capture_pipes
 
 
 PROFILE = "kubernetes-owned-sampling-http-v1"
-_NAME = re.compile(r"[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?\Z")
-_UID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
-_PIN = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}\Z")
-_FIELDS = ("namespace", "namespace_uid", "pod", "pod_uid", "container", "container_id",
-           "image", "image_id", "restart_count", "node", "pod_ip", "started_at")
+from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
+                                 validate_container_binding, verify_owned_pod)
 
 
 class KubernetesBindingError(RuntimeError):
@@ -45,23 +42,7 @@ def _validate(target, env):
                 or type(target.get("lab")) is not bool or target.get("topology") != "kubernetes-owned-direct"):
             raise ValueError
         for role in ("engine", "probe"):
-            item = k[role]
-            if type(item) is not dict or set(item) != set(_FIELDS):
-                raise ValueError
-            for field in ("namespace", "pod", "container", "node"):
-                if type(item[field]) is not str or not _NAME.fullmatch(item[field]):
-                    raise ValueError
-            for field in ("namespace_uid", "pod_uid"):
-                if type(item[field]) is not str or not _UID.fullmatch(item[field]):
-                    raise ValueError
-            if (not _PIN.fullmatch(item["image"])
-                    or not re.fullmatch(r"containerd://[0-9a-f]{64}", item["container_id"])
-                    or type(item["image_id"]) is not str or len(item["image_id"]) > 300
-                    or not re.fullmatch(r"(?:sha256:[0-9a-f]{64}|(?:docker-pullable://)?[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64})", item["image_id"])
-                    or type(item["restart_count"]) is not int or item["restart_count"] < 0
-                    or datetime.fromisoformat(item["started_at"].replace("Z", "+00:00")).tzinfo is None
-                    or ipaddress.ip_address(item["pod_ip"]).version != 4):
-                raise ValueError
+            validate_container_binding(k[role])
         endpoint = urlsplit(target["engine"]["trusted_url"])
         if (endpoint.scheme != "http" or endpoint.hostname != k["engine"]["pod_ip"]
                 or endpoint.username is not None or endpoint.password is not None
@@ -132,25 +113,10 @@ class KubernetesHTTP:
             if ns.get("uid") != expected["namespace_uid"] or ns.get("deletionTimestamp"):
                 raise KubernetesBindingError()
             pod = self._call([f"--namespace={expected['namespace']}", "get", "pod", expected["pod"], "-o", "json"])
-            meta, spec, status = pod["metadata"], pod["spec"], pod["status"]
-            containers = [x for x in spec["containers"] if x["name"] == expected["container"]]
-            states = [x for x in status["containerStatuses"] if x["name"] == expected["container"]]
-            if len(containers) != 1 or len(states) != 1:
-                raise KubernetesBindingError()
-            container, state = containers[0], states[0]
-            if (meta.get("name") != expected["pod"] or meta.get("namespace") != expected["namespace"]
-                    or meta.get("uid") != expected["pod_uid"] or meta.get("deletionTimestamp")
-                    or meta.get("labels", {}).get("guard.run") != self.binding["run_id"]
-                    or spec.get("nodeName") != expected["node"]
-                    or any(spec.get(x, False) is not False for x in ("hostNetwork", "hostPID", "hostIPC"))
-                    or container.get("image") != expected["image"]
-                    or status.get("phase") != "Running" or status.get("podIP") != expected["pod_ip"]
-                    or not any(x.get("type") == "Ready" and x.get("status") == "True" for x in status.get("conditions", []))
-                    or state.get("ready") is not True or state.get("containerID") != expected["container_id"]
-                    or state.get("imageID") != expected["image_id"]
-                    or type(state.get("restartCount")) is not int or state["restartCount"] != expected["restart_count"]
-                    or state.get("state", {}).get("running", {}).get("startedAt") != expected["started_at"]):
-                raise KubernetesBindingError()
+            try:
+                verify_owned_pod(pod, ns, expected, self.binding["run_id"])
+            except ValueError:
+                raise KubernetesBindingError() from None
 
     def __call__(self, network, requests, timeout):
         # No shared serialization lock: REQ-10's two invocations stay concurrent.

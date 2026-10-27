@@ -61,20 +61,10 @@ def validate_owned_source(*, container, image, path):
         raise ValueError("CAPTURE_PATH_INVALID")
 
 
-def _read_owned_file(docker, target, *, container, image, path, timeout=5, max_bytes=MAX_BYTES):
-    """고정 source bytes·fstat·pipe 상한·전후 소유 신원을 확인하며 생산자를 인증하지 않는다."""
-    validate_owned_source(container=container, image=image, path=path)
+def validate_file_result(result, *, max_bytes=MAX_BYTES):
+    """Shared bounded file packet/fstat checks; ownership stays with the transport."""
     if type(max_bytes) is not int or not MAX_BYTES <= max_bytes <= 262144:
         raise ValueError("CAPTURE_READ_BUDGET_INVALID")
-    deadline = time.monotonic() + timeout
-    def remaining():
-        value = deadline - time.monotonic()
-        if value <= 0:
-            raise ValueError("CAPTURE_DEADLINE")
-        return value
-    before = identity(docker, target, container, image, remaining())
-    result = docker.exec_bounded(container, ["python3", "-c", _FILE_READER, path, str(max_bytes)],
-                                 timeout=remaining(), max_bytes=2 * max_bytes)
     capture = result.capture or {}
     if (result.returncode != 0 or capture.get("complete") is not True
             or capture.get("bounded_at_source") is not True
@@ -99,11 +89,29 @@ def _read_owned_file(docker, target, *, container, image, path, timeout=5, max_b
             or packet.get("file_after") != file_identity or packet.get("path_after") != file_identity
             or file_identity["size"] != len(raw)):
         raise ValueError("CAPTURE_FILE_IDENTITY_INVALID")
+    return raw, file_identity
+
+
+def _read_owned_file(docker, target, *, container, image, path, timeout=5, max_bytes=MAX_BYTES):
+    """고정 source bytes·fstat·pipe 상한·전후 소유 신원을 확인하며 생산자를 인증하지 않는다."""
+    validate_owned_source(container=container, image=image, path=path)
+    if type(max_bytes) is not int or not MAX_BYTES <= max_bytes <= 262144:
+        raise ValueError("CAPTURE_READ_BUDGET_INVALID")
+    deadline = time.monotonic() + timeout
+    def remaining():
+        value = deadline - time.monotonic()
+        if value <= 0:
+            raise ValueError("CAPTURE_DEADLINE")
+        return value
+    before = identity(docker, target, container, image, remaining())
+    result = docker.exec_bounded(container, ["python3", "-c", _FILE_READER, path, str(max_bytes)],
+                                 timeout=remaining(), max_bytes=2 * max_bytes)
+    raw, file_identity = validate_file_result(result, max_bytes=max_bytes)
     after = identity(docker, target, container, image, remaining())
     if before != after:
         raise ValueError("CAPTURE_INSTANCE_CHANGED")
     return raw, {"capture_sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw),
-        "owner": before, "file_identity": packet.get("file_before"),
+        "owner": before, "file_identity": file_identity,
         "producer_authenticated": False, "record_authenticity_verified": False}
 
 

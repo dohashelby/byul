@@ -72,6 +72,52 @@ native ID 할당의 RETURN에 있는 외부/내부 지문 쌍을 보존하고, �
 부분 파일은 성공 참조로 쓰지 않는다. 입력/준비 검증 실패는 종료 코드2다. 결과의 출처 상한·
 생산자 인증 false·전체 범위 false·security UNKNOWN은 단일 파일 수집과 같다.
 
+## LIF-10 Kubernetes 파일·프로세스 읽기
+
+`capture-kubernetes-lifecycle-session --env <ENV> --target <target.json> --prepared <manifest.json>
+--output <새 JSON>`은 기본 입력 검증만 한다. `--execute`에서만 기존 kubectl·kubeconfig의
+명시 context로 선택한 Namespace/Pod를 get하고, 선택 container에서 고정 metadata helper를
+exec한다. Pod·namespace·RBAC·image·mount·설정을 생성/변경하지 않는다. 준비된 센서 자산과
+UID 소유 0700 세션 디렉터리는 별도로 승인된 기동 단계에서 제공해야 한다.
+
+target은 아래 **형식 예시**이며 모든 Ref·UID·세대·image 값은 실제 선택값으로 채운다.
+실제 클러스터 수집 완료를 뜻하지 않는다. `kubernetes.engine`의 필드는 기존 Kubernetes
+HTTP target의 동일 역할 형식을 재사용하며 probe Pod나 HTTP URL은 필요하지 않다.
+
+```json
+{
+  "schema": "guard-kubernetes-lifecycle-target/1",
+  "lab": true,
+  "run_id": "guard-owned-run",
+  "environment_ref": {"id": "ENV-ID", "revision": 1, "sha256": "정확한 정규 문서 해시"},
+  "kubernetes": {
+    "context": "명시-context",
+    "engine": {
+      "namespace": "owned-namespace", "namespace_uid": "실제 UUID",
+      "pod": "owned-engine", "pod_uid": "실제 UUID", "container": "engine",
+      "container_id": "containerd://실제-64hex", "image": "저장소@sha256:실제-64hex",
+      "image_id": "API가 보고한 정확한 imageID", "restart_count": 0,
+      "node": "실제-node", "pod_ip": "실제-IPv4", "started_at": "실제-aware-시각"
+    }
+  }
+}
+```
+
+get/exec 전후 Namespace UID·Pod UID·guard.run·node·spec image·보고 imageID·container ID·
+restart·startedAt을 대조한다. HTTP 경로의 Ready 요구는 유지한다. 파일 읽기는 같은 세대의
+Running container에서 Ready가 내려가도 장애 metadata를 읽을 수 있다. helper는
+`python3 -I -S -B`로 site hook/bytecode 쓰기를 건너뛰고 자기 프로세스만 끝내는 watchdog을
+사용한다. native 작업이나 다른 PID를 종료하지 않는다. 개별 호출은 최대5초, 전체 창 기본
+180초/상한300초이며 기업 종료 기한이 아니다. `/proc` 가시 영역은 Pod의 PID namespace 설정에
+따라 달라지므로 그 목록을 모든 worker의 목록으로 단정하지 않는다.
+
+Pod status의 `imageID`는 `reported_image_id`로 보존한다. spec/status의 선택값 일치는 Docker
+RepoDigests 대조나 node CRI image 검증이 아니다. `image_digest_verified`,
+`node_runtime_image_verified`, `manifest_ancestry_verified`는 이 경로에서 false다.
+세션 파서·행 chain·파일/fstat·프로세스 대조·지문 index·개별 실패/늦은 저장 실패 보존은
+기존 경로를 재사용한다. 생산자 인증/전체 실행 구간·회수는 미검증이며 출처는 EXAMPLE/DECLARED,
+security는 UNKNOWN이다. 주입 runner는 ENV 표시와 무관하게 EXAMPLE로 제한한다.
+
 ## PLT-08 명시 소유 API 시험 구간의 평문 성공
 
 `api_transport:real`은 기존 `guard select/run/judge/report`에서 사용한다.

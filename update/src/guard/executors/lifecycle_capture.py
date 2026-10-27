@@ -177,6 +177,8 @@ def process_context(docker, container, pid):
             or pipe.get("bounded_at_source") is not True or pipe.get("timed_out") is not False
             or pipe.get("truncated") is not False):
         raise ValueError("LIFECYCLE_PROCESS_TRANSPORT_INVALID")
+    if pipe.get("owner_binding_verified",True) is not True:
+        raise ValueError("LIFECYCLE_PROCESS_SOURCE_OWNER_UNVERIFIED")
     value = strict_json(result.stdout.encode(), limit=4096)
     if (type(value) is not dict or set(value) != {"schema","context","stable","same_executable"}
             or value["schema"] != "guard-lifecycle-process-context/1"
@@ -185,9 +187,10 @@ def process_context(docker, container, pid):
     return value["context"]
 
 
-def capture(docker, target, *, source, prepared):
+def capture(docker, target, *, source, prepared, read_file=None, image_check=None):
     validate_owned_source(**source)
-    raw, provenance = _read_owned_file(docker, target, **source, max_bytes=sensor.MAX_BYTES)
+    read = _read_owned_file if read_file is None else read_file
+    raw, provenance = read(docker, target, **source, max_bytes=sensor.MAX_BYTES)
     records, summary = parse_recording(raw, prepared)
     context = records[0]["payload"]["context"]
     expected_path = f"/guard-lifecycle/data/{prepared['session']}/pid-{context['pid']}-{context['start_ticks']}.jsonl"
@@ -196,26 +199,33 @@ def capture(docker, target, *, source, prepared):
     verified, image_verified, diagnostic = False, False, []
     # Keep the first safe recording if a later recheck fails.
     try:
-        image = docker.image_info(provenance["owner"]["image_id"],timeout=5)
-        digests = image.get("digests") if type(image) is dict else None
-        image_verified = (type(digests) is list and 1 <= len(digests) <= 128
-            and all(type(v) is str and re.fullmatch(r".+@sha256:[0-9a-f]{64}",v) is not None for v in digests)
-            and source["image"] in digests)
+        if image_check is not None:
+            image_verified = image_check(provenance,source) is True
+        else:
+            image = docker.image_info(provenance["owner"]["image_id"],timeout=5)
+            digests = image.get("digests") if type(image) is dict else None
+            image_verified = (type(digests) is list and 1 <= len(digests) <= 128
+                and all(type(v) is str and re.fullmatch(r".+@sha256:[0-9a-f]{64}",v) is not None for v in digests)
+                and source["image"] in digests)
     except Exception:
         diagnostic.append("LIFECYCLE_IMAGE_RECHECK_UNAVAILABLE")
     try:
         before = process_context(docker, source["container"], context["pid"])
-        later, second = _read_owned_file(docker, target, **source, max_bytes=sensor.MAX_BYTES)
+        later, second = read(docker, target, **source, max_bytes=sensor.MAX_BYTES)
         after = process_context(docker, source["container"], context["pid"])
         verified = (before == context == after and raw == later
                     and provenance["owner"] == second["owner"]
-                    and provenance["file_identity"] == second["file_identity"])
+                    and provenance["file_identity"] == second["file_identity"]
+                    and provenance.get("owner_binding_verified",True) is True
+                    and second.get("owner_binding_verified",True) is True)
     except Exception:
         diagnostic.append("LIFECYCLE_RECHECK_UNAVAILABLE")
     if not image_verified:
         diagnostic.append("LIFECYCLE_IMAGE_BINDING_UNVERIFIED")
     if not verified:
         diagnostic.append("LIFECYCLE_PROCESS_BINDING_UNVERIFIED")
+    if provenance.get("owner_binding_verified",True) is not True:
+        diagnostic.append("LIFECYCLE_INITIAL_OWNER_RECHECK_UNAVAILABLE")
     owner = dict(provenance["owner"])
     started = owner.pop("started_at")
     owner["started_at_sha256"] = hashlib.sha256(started.encode("utf-8","surrogatepass")).hexdigest()

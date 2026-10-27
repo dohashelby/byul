@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import socket
 import ssl
 import subprocess
 import sys
@@ -132,10 +133,35 @@ def test_tls_verification_failure_never_sends_http_or_retries_plaintext(monkeypa
     host = "localhost" if failure == "untrusted" else "127.0.0.1"
     out = http_probe.probe({"url": f"https://{host}:{port}/v1/models",
                             "headers": {"Authorization": "Bearer EXAMPLE_TLS_SENTINEL"}}, 3)
-    assert out["outcome"] == "error" and out["phase"] == "connect"
+    assert out["outcome"] == "error" and out["phase"] == "after_connect"
     assert "SSLCertVerificationError" in out["detail"]
     assert "EXAMPLE_TLS_SENTINEL" not in json.dumps(out)
     assert requests == []
+
+
+def test_tls_handshake_timeout_is_not_a_tcp_blocking_outcome():
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)  # TCP accepts, but this owned socket never replies to TLS.
+    try:
+        out = http_probe.probe({"url": f"https://127.0.0.1:{server.getsockname()[1]}/v1/models"}, 0.3)
+        assert out["outcome"] == "error" and out["phase"] == "after_connect"
+        assert "TimeoutError" in out["detail"]
+    finally:
+        server.close()
+
+
+@pytest.mark.parametrize("exception,expected", [(TimeoutError("EXAMPLE TCP timeout"), "timeout"),
+                                               (ConnectionRefusedError("EXAMPLE TCP refused"), "refused")])
+def test_https_tcp_failure_keeps_original_network_classification(monkeypatch, exception, expected):
+    closed = []
+    def connect():
+        raise exception
+    monkeypatch.setattr(http_probe.http.client, "HTTPSConnection", lambda *args, **kwargs:
+        SimpleNamespace(sock=None, connect=connect, close=lambda: closed.append(True)))
+    out = http_probe.probe({"url": "https://example.invalid/v1/models"}, 1)
+    assert out["outcome"] == expected and out["phase"] == "connect"
+    assert closed == [True]
 
 
 def test_standalone_probe_uses_tls_outside_guard_checkout(tmp_path, tls_server):

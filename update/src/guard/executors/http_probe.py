@@ -94,7 +94,11 @@ def probe(req: dict, timeout: float) -> dict:
         try:
             conn.connect()
         except BaseException as exc:  # noqa: BLE001 - 분류가 목적
-            out.update(outcome=_classify_connect_error(exc), phase="connect", detail=f"{type(exc).__name__}: {exc}")
+            # HTTPS connect() includes the TLS handshake after TCP succeeds.
+            # Its timeout is not evidence that the endpoint blocked TCP.
+            tcp_connected = parts.scheme == "https" and conn.sock is not None
+            out.update(outcome="error" if tcp_connected else _classify_connect_error(exc),
+                       phase="after_connect" if tcp_connected else "connect", detail=f"{type(exc).__name__}: {exc}")
             return out
         try:
             conn.request(out["method"], path, body=data, headers=headers)

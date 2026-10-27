@@ -370,6 +370,7 @@ class HttpCheckExecutor:
         fixture = summary.get("fixture", {})
         config = mask(execution_conditions(ctx.target, {
             **self.cfg, "request_timeout": ctx.timeout, "allow_mutating_routes": ctx.allow_mutating,
+            "http_probe_profile": http_probe.TRANSPORT_PROFILE,
         }, list(self.roles())), ctx.secrets)
         draft = EvidenceDraft(
             status=ExecStatus.COMPLETED,

@@ -1,5 +1,23 @@
 # 실행·실증 안내
 
+## 일반 HTTP 요청기의 HTTPS 전송
+
+`http_probe.py`는 패키지 밖 probe 컨테이너에서도 표준 라이브러리만 사용한다.
+`http://`는 HTTPConnection·기본80, `https://`는 HTTPSConnection·기본443으로 연결하고
+명시한 포트는 그대로 사용한다. TCP 사전 확인도 같은 포트에 연결만 하고 바이트를 보내지
+않는다. 지원 밖 scheme·잘못된 host/port는 네트워크 요청 없이 오류로 남긴다.
+
+HTTPS는 Python 기본 신뢰 저장소의 인증서·호스트명 검증을 사용한다. 인증서/호스트명 또는
+TLS 연결 실패는 미응답 오류이며 평문으로 재시도하거나 인증서 검증을 끄지 않는다. 기업 CA가
+필요하면 승인된 probe 이미지/환경의 신뢰 저장소를 준비해야 한다. 이번 보수는 CA 등록이나
+배포 설정 변경을 하지 않는다. 요청 헤더 값은 결과에 추가하지 않는다.
+
+공통 HTTP 실행기의 실행 조건/config 해시에 `http_probe_profile=http-probe/2`를 포함한다.
+과거 팩·EVD·비교 조건은 다시 쓰지 않는다. TCP 도달은 TLS 성공이 아니며 HTTP 성공도
+Gateway 재작성·최종 handler·기업 인가 또는 PLT-08 전체 준수의 증명이 아니다. stream_probe의
+전송/시간 측정과 제한된 HTTP-only 소유 endpoint 프로파일은 이 보수로 확장하지 않는다.
+테스트 인증서·키는 소유 localhost 서버용 EXAMPLE fixture이며 사용자 자격 증명이 아니다.
+
 ## LIF-10 native metadata 센서 준비와 소유 기록 수집
 
 현행 profile5/events5는 아래 REQ-02의 인증/serving 문맥도 관측한다. source23개를 대조하며

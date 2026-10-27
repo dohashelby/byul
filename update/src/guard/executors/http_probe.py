@@ -26,6 +26,17 @@ from urllib.parse import urlsplit
 UNREACHABLE_ERRNOS = {errno.ENETUNREACH, errno.EHOSTUNREACH}
 PREVIEW = 160
 MAX_BODY = 1_000_000
+TRANSPORT_PROFILE = "http-probe/2"
+
+
+def _target(url):
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"} or not parts.hostname:
+        raise ValueError("HTTP_PROBE_URL_INVALID")
+    port = parts.port if parts.port is not None else (443 if parts.scheme == "https" else 80)
+    if not 1 <= port <= 65535:
+        raise ValueError("HTTP_PROBE_URL_INVALID")
+    return parts, port
 
 
 def _classify_connect_error(exc: BaseException) -> str:
@@ -44,9 +55,9 @@ def tcp_probe(req: dict, timeout: float) -> dict:
     """TCP 연결만 시도하고 바로 닫는다(바이트를 보내지 않음). outcome: connected | refused | timeout | unreachable | dns_error | error."""
     started = time.monotonic()
     out: dict = {"id": req.get("id"), "method": "TCP", "url": req["url"]}
-    parts = urlsplit(req["url"])
     try:
-        sock = socket.create_connection((parts.hostname, parts.port or 80), timeout=timeout)
+        parts, port = _target(req["url"])
+        sock = socket.create_connection((parts.hostname, port), timeout=timeout)
         sock.close()
         out.update(outcome="connected", phase="connect", detail="tcp connected (no bytes sent)")
     except BaseException as exc:  # noqa: BLE001
@@ -61,7 +72,12 @@ def probe(req: dict, timeout: float) -> dict:
         return tcp_probe(req, timeout)
     started = time.monotonic()
     out: dict = {"id": req.get("id"), "method": req.get("method", "GET"), "url": req["url"]}
-    parts = urlsplit(req["url"])
+    try:
+        parts, port = _target(req["url"])
+    except (ValueError, TypeError):
+        out.update(outcome="error", phase="connect", detail="HTTP_PROBE_URL_INVALID",
+                   elapsed_ms=int((time.monotonic() - started) * 1000))
+        return out
     path = parts.path or "/"
     if parts.query:
         path += "?" + parts.query
@@ -70,7 +86,10 @@ def probe(req: dict, timeout: float) -> dict:
     headers = dict(req.get("headers") or {})
     if data is not None:
         headers.setdefault("Content-Type", "application/json")
-    conn = http.client.HTTPConnection(parts.hostname, parts.port or 80, timeout=timeout)
+    connection = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+    # HTTPSConnection verifies peer certificates and hostnames by default.
+    # A TLS failure must never retry the request over plaintext HTTP.
+    conn = connection(parts.hostname, port, timeout=timeout)
     try:
         try:
             conn.connect()

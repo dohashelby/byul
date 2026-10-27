@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-10-27 · 기존 Kubernetes HTTP 전용 전송은 당시4381bytes 요청기를 고정 자산/SHA로 읽고 실제 http-probe/1을 기록하며 일반 HTTP/HTTPS 요청기의 profile2와 분리한다. · 동적 소스 재사용으로 공개 fixture 지문이 바뀌거나 새 HTTPS 동작이 HTTP 전용 계약에 소급되는 것을 막기 위함이다.
+
 - 2026-10-27 · 일반 HTTP 요청기는 URL scheme별 표준 HTTP/HTTPS 전송과 기본 포트를 사용하고 TCP 연결 후 TLS 대기/검증 실패는 차단 timeout과 구분하며 평문 재시도 없이 실행 조건에 http-probe/2를 남긴다. · HTTPS를 평문으로 시험한 결과와 새 전송을 같은 비교 조건으로 취급하거나 TCP 도달/HTTP 성공을 TLS 배포·인가 전체 증명으로 확대하지 않기 위함이다.
 
 - 2026-10-27 · REQ-05의 native 적재/호출 객체는 기존 센서 profile3의 약한 참조 지문으로 관측하고 profile1·2는 당시 source/지점 집합으로 읽는다. · 객체/설정과 가중치 신원·실제 소비를 구분하고 과거 계약 소급과 관측 때문에 모델을 계속 붙잡는 일을 막기 위함이다.

@@ -225,6 +225,7 @@ class Ctx:
     sprobe: StreamProbe | None = None
     fixed_route_fixture: bool = False
     route_fixture_inputs: dict | None = None
+    http_probe_profile: str = http_probe.TRANSPORT_PROFILE
 
     @property
     def trusted_net(self) -> str:
@@ -370,7 +371,7 @@ class HttpCheckExecutor:
         fixture = summary.get("fixture", {})
         config = mask(execution_conditions(ctx.target, {
             **self.cfg, "request_timeout": ctx.timeout, "allow_mutating_routes": ctx.allow_mutating,
-            "http_probe_profile": http_probe.TRANSPORT_PROFILE,
+            "http_probe_profile": ctx.http_probe_profile,
         }, list(self.roles())), ctx.secrets)
         draft = EvidenceDraft(
             status=ExecStatus.COMPLETED,

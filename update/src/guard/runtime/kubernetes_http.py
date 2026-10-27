@@ -17,12 +17,12 @@ import threading
 import time
 from urllib.parse import urlsplit
 
-from guard.executors import http_probe
 from guard.models import canonical_json, sha256_hex
 from .bounded import capture_pipes
 
 
 PROFILE = "kubernetes-owned-sampling-http-v1"
+PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod)
 
@@ -69,7 +69,11 @@ class KubernetesHTTP:
         self.binary = binary
         self.runner = runner or capture_pipes
         self.injected = runner is not None
-        probe_source = Path(http_probe.__file__).read_text(encoding="utf-8")
+        # This profile admits only its pinned HTTP Pod endpoint below. Preserve
+        # its published source/fixture bytes when the general probe evolves.
+        probe_source = (Path(__file__).parent / "assets/http_probe_v1.py.txt").read_text(encoding="utf-8")
+        if sha256_hex(probe_source.encode("utf-8")) != PROBE_SOURCE_SHA256:
+            raise KubernetesBindingError()
         # The parent owns kubectl, not the remote exec process. A daemon timer
         # bounds this probe itself, including stdin and a slowly dripping body.
         # It terminates only this Python process, never a Pod or another PID.

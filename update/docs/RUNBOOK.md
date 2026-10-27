@@ -13,7 +13,11 @@ TLS handshake 실패나 대기는 `error/after_connect`이며 TCP 차단의 time
 필요하면 승인된 probe 이미지/환경의 신뢰 저장소를 준비해야 한다. 이번 보수는 CA 등록이나
 배포 설정 변경을 하지 않는다. 요청 헤더 값은 결과에 추가하지 않는다.
 
-공통 HTTP 실행기의 실행 조건/config 해시에 `http_probe_profile=http-probe/2`를 포함한다.
+일반 HTTP 실행기의 실행 조건/config 해시에 `http_probe_profile=http-probe/2`를 포함한다.
+기존 Kubernetes HTTP 전용 프로파일은 당시 요청기4381bytes/SHA256
+`ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d`를 고정 자산으로
+읽어 기존 fixture 지문을 유지하고 `http-probe/1`을 기록한다. 이 경로의 HTTPS target은
+kubectl/전송 전에 거부한다. 일반 요청기의 새 HTTPS 지원을 과거 전용 경로에 소급하지 않는다.
 과거 팩·EVD·비교 조건은 다시 쓰지 않는다. TCP 도달은 TLS 성공이 아니며 HTTP 성공도
 Gateway 재작성·최종 handler·기업 인가 또는 PLT-08 전체 준수의 증명이 아니다. stream_probe의
 전송/시간 측정과 제한된 HTTP-only 소유 endpoint 프로파일은 이 보수로 확장하지 않는다.

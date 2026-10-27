@@ -35,7 +35,8 @@ class KubernetesSamplingExecutor(SamplingValidationExecutor):
         keys = self.keys()
         ctx = Ctx(check=check, env=env, adapter=adapter, target=target, policy_values=policy_values,
                   timeout=float(self.cfg.get("request_timeout", 3)), allow_mutating=False, keys=keys,
-                  secrets=[v for v in keys.values() if v], cprobe=transport, workdir=workdir, started=utcnow())
+                  secrets=[v for v in keys.values() if v], cprobe=transport, workdir=workdir, started=utcnow(),
+                  http_probe_profile="http-probe/1")
         draft = self._finish(ctx)
         if transport.injected:
             draft.data_origin = DataOrigin.EXAMPLE

@@ -199,3 +199,17 @@ def test_product_records_transport_profile_in_comparison_conditions(tmp_path, mo
     assert evd.comparability.config_sha256 == sha256_hex(canonical_json(configs[0]))
     assert evd.execution.executor.config_sha256 == evd.comparability.config_sha256
     assert submitted and result.verdicts.security.value == "PASS"
+
+
+def test_http_only_kubernetes_transport_retains_its_source_and_profile(tmp_path):
+    from tests.test_kubernetes_sampling import inputs, env, run
+    from guard.runtime.kubernetes_http import KubernetesBindingError, KubernetesHTTP
+    target = inputs()
+    target["engine"]["trusted_url"] = target["engine"]["trusted_url"].replace("http:", "https:")
+    calls = []
+    with pytest.raises(KubernetesBindingError):
+        KubernetesHTTP(target, env(), duration=1, runner=lambda *args, **kwargs: calls.append(args))
+    assert calls == []
+    draft, _ = run(tmp_path)
+    assert draft.config["settings"]["http_probe_profile"] == "http-probe/1"
+    assert draft.comparability.fixture_sha256 == "4703cf633155da142282657b355ec2205a7d34bb38e35c17fe1b84dad49f669f"

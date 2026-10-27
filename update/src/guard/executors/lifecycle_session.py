@@ -6,6 +6,7 @@ import json
 import re
 
 from guard.adapters import vllm_lifecycle_links as links
+from guard.adapters import vllm_route_authentication
 from .lifecycle_capture import capture
 from .owned_capture import identity, strict_json, validate_owned_source
 
@@ -279,4 +280,5 @@ def capture_session(docker,target,*,container,image,prepared,owner_identity=None
         result["python_processes_without_recording"]=[{"pid":p["pid"],"start_ticks":p["start_ticks"]}
             for p in before["metadata"]["processes"] if p["same_executable"] and (p["pid"],p["start_ticks"]) not in recorded]
     result["request_index"]=request_index(result["recordings"])
+    result["route_authentication_index"]=vllm_route_authentication.index(result["recordings"])
     return result

@@ -26,9 +26,9 @@ import time
 import types
 import weakref
 
-PROFILE = "vllm-native-lifecycle-metadata/4"
+PROFILE = "vllm-native-lifecycle-metadata/5"
 COMMIT = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
-SCHEMA = "guard-native-lifecycle-events/4"
+SCHEMA = "guard-native-lifecycle-events/5"
 CONFIG_SCHEMA = "guard-native-lifecycle-settings/1"
 CONFIG_ENV = "GUARD_LIFECYCLE_CONFIG"
 CONFIG_PATH = "/guard-lifecycle/settings.json"
@@ -37,6 +37,9 @@ MAX_BYTES = 262144
 MAX_IDS = 8
 MAX_MODEL_OBJECTS = 64
 SOURCE_SHA = {
+ "vllm.entrypoints.serve.middleware.authenticate":"ceb576aa3c053a5bcf145cfbe3f81def0f7213480c4aa1531fc4c00e32955225",
+ "vllm.entrypoints.openai.models.serving":"39ecebf92abec7931b4c953e0d9743320dbd93532a8e3488307398c29dba2553",
+ "vllm.entrypoints.openai.models.api_router":"58d7bf90b7dd2a896441d3085b8a4467c12412120f21fe53d838109b7b85f48b",
  "vllm.model_executor.model_loader.weight_utils":"7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd",
  "vllm.model_executor.model_loader.base_loader":"5291c330c4ed5634a9ea1d535364c26162b60251aa2af03fd409b88c34d836e2",
  "vllm.model_executor.model_loader.default_loader":"d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
@@ -59,6 +62,8 @@ SOURCE_SHA = {
  "vllm.entrypoints.openai.completion.serving":"aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd",
 }
 POINTS = {
+ "vllm.entrypoints.serve.middleware.authenticate":{"AuthenticationMiddleware":("__call__","verify_token")},
+ "vllm.entrypoints.openai.models.serving":{"OpenAIServingModels":("show_available_models",)},
  "vllm.model_executor.model_loader.base_loader":{"BaseModelLoader":("load_model",)},
  "vllm.model_executor.model_loader.default_loader":{"DefaultModelLoader":("load_weights","_prepare_weights","_get_weights_iterator")},
  "vllm.v1.worker.cpu_model_runner":{"CPUModelRunner":("load_model","get_model")},
@@ -76,12 +81,16 @@ POINTS = {
 }
 _CHAIN = contextvars.ContextVar("guard_native_lifecycle_chain", default=())
 _ASGI_REQUEST = contextvars.ContextVar("guard_native_lifecycle_asgi_request", default=None)
+_ROUTE_REQUEST = contextvars.ContextVar("guard_native_route_request", default=None)
 FUNCTION_POINTS = {"vllm.model_executor.model_loader.weight_utils": (
     "safetensors_weights_iterator","pt_weights_iterator","multi_thread_pt_weights_iterator",
     "multi_thread_safetensors_weights_iterator","fastsafetensors_weights_iterator",
-    "instanttensor_weights_iterator","np_cache_weights_iterator")}
-WEIGHT_POINTS = {"weight_utils."+name for names in FUNCTION_POINTS.values() for name in names} | {
+    "instanttensor_weights_iterator","np_cache_weights_iterator"),
+    "vllm.entrypoints.openai.models.api_router":("models",)}
+WEIGHT_POINTS = {"weight_utils."+name for name in FUNCTION_POINTS["vllm.model_executor.model_loader.weight_utils"]} | {
     "DefaultModelLoader._prepare_weights","DefaultModelLoader._get_weights_iterator"}
+ROUTE_POINTS = {"AuthenticationMiddleware.__call__","AuthenticationMiddleware.verify_token",
+    "api_router.models","OpenAIServingModels.show_available_models"}
 _OBSERVER = None
 
 
@@ -324,12 +333,15 @@ class Observer:
         self.model_serial = 0
         self.model_lock = threading.RLock()
         self.weight_serial = 0
+        self.route_serial = 0
 
     def active(self):
         return self.disabled_pid != os.getpid() and not (self.pid == os.getpid()
             and self.writer is not None and self.writer.closed)
 
     def wanted(self, point, snapshot):
+        if point in ROUTE_POINTS:
+            return self.route_context() is not None
         if point in WEIGHT_POINTS:
             return True
         if point in {"BaseModelLoader.load_model","DefaultModelLoader.load_weights",
@@ -355,6 +367,7 @@ class Observer:
             self.writer, self.pools, self.pool_serial = None, {}, 0
             self.model_objects, self.model_serial, self.model_lock = {}, 0, threading.RLock()
             self.weight_serial = 0
+            self.route_serial = 0
             self.disabled_pid, self.empty_points = None, set()
             self.pid = os.getpid()
         if self.writer is None:
@@ -446,6 +459,11 @@ class Observer:
         return {"complete": True, "pool_sha256": entry["pool_sha256"], "blocks": rows}
 
     def snapshot(self, point, args, kwargs, result=None, returned=False):
+        if point in ROUTE_POINTS:
+            if self.route_context() is None:
+                return {"requests":[],"metadata":{},"selection_observed":False,"diagnostic":"SAMPLE_UNAVAILABLE"}
+            return {"requests":[],"metadata":{"route_authentication":self.route_metadata(point,args,kwargs,result,returned)},
+                "selection_observed":False}
         if point in WEIGHT_POINTS:
             return {"requests":[],"metadata":{"weight_selection":self.weight_metadata(point,args,kwargs,result,returned)},
                 "selection_observed":False}
@@ -582,6 +600,58 @@ class Observer:
             "load_dummy_weights":dummy,"lora_config_present":present("lora_config"),
             "speculative_config_present":present("speculative_config")}
 
+    @staticmethod
+    def scope_fingerprints(scope):
+        scope=scope if type(scope) is dict else {}
+        def digest(value):
+            return sha(value.encode()) if type(value) is str and len(value)<=4096 and "\x00" not in value else None
+        path,root=scope.get("path"),scope.get("root_path","")
+        return {"path":digest(path),"root":digest(root),"method":digest(scope.get("method")),
+            "relative":digest(path.removeprefix(root)) if type(path) is str and type(root) is str
+                and len(path)<=4096 and len(root)<=4096 else None}
+
+    def route_nonce(self,kind):
+        context=self._writer().context
+        with self.model_lock:
+            self.route_serial+=1
+            return sha(json.dumps([kind,self.config["session"],context,self.route_serial],
+                sort_keys=True,separators=(",",":")).encode())
+
+    def route_scope(self,scope):
+        if not self.active():return None
+        headers=scope.get("headers",())
+        if type(headers) not in (list,tuple) or len(headers)>64:return None
+        values=[pair[1] for pair in headers if type(pair) in (list,tuple) and len(pair)==2
+            and type(pair[0]) is bytes and pair[0].lower()==b"x-request-id"]
+        if len(values)!=1 or type(values[0]) is not bytes or not 0<len(values[0])<=512:return None
+        return {"pid":os.getpid(),"closed":False,"request":sha(values[0]),
+            "invocation":self.route_nonce("asgi-route"),**self.scope_fingerprints(scope)}
+
+    @staticmethod
+    def route_context():
+        value=_ROUTE_REQUEST.get()
+        return value if type(value) is dict and value.get("pid")==os.getpid() and value.get("closed") is False else None
+
+    def route_metadata(self,point,args,kwargs,result,returned):
+        context=self.route_context() or {}
+        parent=next((f for f in reversed(_CHAIN.get()) if f["point"]=="AuthenticationMiddleware.__call__"
+            and f.get("_auth_pid")==os.getpid()),{})
+        observed={}
+        if point=="AuthenticationMiddleware.__call__":
+            observed=self.scope_fingerprints(args[1] if len(args)>1 else kwargs.get("scope"))
+        elif point=="AuthenticationMiddleware.verify_token":observed=parent.get("_auth_scope",{})
+        elif point=="api_router.models":
+            observed=self.scope_fingerprints(attrs(args[0] if args else kwargs.get("request")).get("scope"))
+        return {"asgi_request_sha256":context.get("request"),"asgi_invocation_sha256":context.get("invocation"),
+            "entry_path_sha256":context.get("path"),"entry_root_path_sha256":context.get("root"),"entry_method_sha256":context.get("method"),
+            "auth_call_sha256":parent.get("_auth_call"),"observed_path_sha256":observed.get("path"),
+            "observed_root_path_sha256":observed.get("root"),"observed_method_sha256":observed.get("method"),
+            "auth_relative_path_sha256":observed.get("relative") if point.startswith("AuthenticationMiddleware.") else None,
+            "token_verified":result if point=="AuthenticationMiddleware.verify_token" and returned and type(result) is bool else None,
+            "returned_native_coroutine":type(result) is types.CoroutineType if point=="AuthenticationMiddleware.__call__" and returned else None,
+            "route_lookup_returned":True if point=="api_router.models" and returned else None,
+            "serving_method_returned":True if point=="OpenAIServingModels.show_available_models" and returned else None}
+
     def weight_frame(self, snapshot):
         context = self._writer().context
         with self.model_lock:
@@ -646,11 +716,19 @@ class Observer:
         def begin(args, kwargs):
             before = sample(args, kwargs)
             chain = _CHAIN.get()
+            frame={"point":point,"request_sha256":[r["request_sha256"] for r in before["requests"]]}
+            if point=="AuthenticationMiddleware.__call__":
+                try:
+                    metadata=before["metadata"]["route_authentication"]
+                    frame.update(_auth_pid=os.getpid(),_auth_call=observer.route_nonce("auth-call"),
+                        _auth_scope={"path":metadata["observed_path_sha256"],"root":metadata["observed_root_path_sha256"],
+                            "method":metadata["observed_method_sha256"],"relative":metadata["auth_relative_path_sha256"]})
+                    metadata["auth_call_sha256"]=frame["_auth_call"]
+                except Exception:pass
             payload = {"point": point, "phase": "CALL", "source_sha256": SOURCE_SHA[module_name], **before}
             wanted = observer.wanted(point,before)
             if wanted:
                 observer.emit("NATIVE", payload)
-            frame={"point":point,"request_sha256":[r["request_sha256"] for r in before["requests"]]}
             if point=="DefaultModelLoader.load_weights":
                 try:frame.update(observer.weight_frame(before))
                 except Exception:pass  # Missing association never changes native work.
@@ -667,7 +745,7 @@ class Observer:
         if inspect.iscoroutinefunction(original):
             @functools.wraps(original)
             async def asynchronous(*args, **kwargs):
-                if not observer.active():
+                if not observer.active() or point in ROUTE_POINTS and observer.route_context() is None:
                     return await original(*args,**kwargs)
                 (token, started), result, returned = begin(args, kwargs), None, False
                 try:
@@ -679,7 +757,7 @@ class Observer:
             return asynchronous
         @functools.wraps(original)
         def synchronous(*args, **kwargs):
-            if not observer.active():
+            if not observer.active() or point in ROUTE_POINTS and observer.route_context() is None:
                 return original(*args,**kwargs)
             (token, started), result, returned = begin(args, kwargs), None, False
             try:
@@ -770,8 +848,22 @@ class Middleware:
 
     async def __call__(self, scope, receive, send):
         observer = _OBSERVER
-        if observer is None or type(scope) is not dict or scope.get("type") != "http" or scope.get("path") != "/v1/completions":
-            return await self.app(scope, receive, send)
+        if observer is None or type(scope) is not dict or scope.get("type") != "http":
+            token=_ROUTE_REQUEST.set(None)
+            try:return await self.app(scope,receive,send)
+            finally:_ROUTE_REQUEST.reset(token)
+        try:context=observer.route_scope(scope)
+        except Exception:context=None
+        route_token=_ROUTE_REQUEST.set(context)
+        try:
+            return await self._observed(observer,scope,receive,send)
+        finally:
+            if context is not None:context["closed"]=True
+            _ROUTE_REQUEST.reset(route_token)
+
+    async def _observed(self,observer,scope,receive,send):
+        if scope.get("path")!="/v1/completions":
+            return await self.app(scope,receive,send)
         header = None
         headers = scope.get("headers", ())
         if type(headers) in (list, tuple):

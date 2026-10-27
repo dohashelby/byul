@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — REQ-02 인증·router 조회·serving 문맥 부분 생산자
+
+- 한 일: 기준645acf0의 ASGI/고정 source·소유 수집을 재사용해 인증 입력 지문·bool·동적 조회·async serving 반환을 연결했다. 동기 coroutine 생성과 async 완료를 구분하고 credential/본문을 읽지 않는다. profile5/source23과 profile4의 당시20개 source·가중치/고정 bytes 호환성을 분리했다. 판정·팩·스트림 측정은 유지한다.
+- 테스트 결과: 870파일 고정 후 동명 다른 클래스 본문을 고른 fixture 오류23건(768통과·기존skip6/제외1, pytest131.89초·부모133.686초)을 보존하고 클래스 범위를 고쳐404통과를 확인했다. 늦은 반환/비HTTP 문맥 보수를 재고정한 최종 영향793통과/0실패/기존skip6/제외1(pytest108.53초·부모109.775초), 새EXAMPLE35건·native 본문4개·profile4 고정 bytes/20개 source·현행23개 source를 대조했다. 검증 중 bytes 동일·설치 wheel139파일 일치(부모13.160초)이며 실제 엔진·Kubernetes/GPU 및 등록 증가는0이다. 원본은 저장소 밖 byul-route-auth-producer-20261027T123427+0900이다.
+- 다음 단계: 정적 검토·소스 고정·영향/필수 CI와 PR29 기반 후속 초안을 완료한다. 실제 handler 선택/재작성과 기업 권한은 지문으로 대체하지 않는다.
+- 막힌 것: 부분 생산자의 CPU 구현에는 없음. 신뢰 호출자·실제 routing/권한/독립 인과성·기업 정책·실제 대상 실증은 미완료다.
+
 ## 2026-10-27 — native 수집의 알려진 Docker stub 출처 보수
 
 - 한 일: 개별·세션 native 기록과 가중치 파일 수집이 Docker lab=true stub을 EXAMPLE로 유지하도록 맞췄다. ENV/native 입력 등급으로 알려진 stub을 승격하지 않는다. Kubernetes lab=true의 소유 비운영 선언·실제 대상 DECLARED 상한과 소유 신원 불일치 UNKNOWN은 보존한다. 센서/profile·팩·판정·스트림 측정은 유지한다.

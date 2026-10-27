@@ -42,6 +42,7 @@ configured_model_sha256 configured_revision_sha256 load_format_sha256 load_dummy
 lora_config_present speculative_config_present
 """.split())
 KEYS |= profiles.WEIGHT_KEYS
+KEYS |= profiles.ROUTE_KEYS
 POINTS = set(profiles.point_sources(sensor.PROFILE))
 WORDS = {*profiles.SCHEMAS, *profiles.SCHEMAS.values(), sensor.COMMIT, "START", "MODULE", "NATIVE", "ASGI", "END",
     "SEALED", "PROCESS_EXIT", "BOUND_REACHED", "CONTROL_UNAVAILABLE", "CALL", "RETURN", "RAISE",
@@ -83,7 +84,8 @@ def parse_recording(raw, prepared):
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
-    if prepared["profile"] != sensor.PROFILE:keys=keys-profiles.WEIGHT_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,profiles.V4_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
+    if prepared["profile"] != sensor.PROFILE:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
     source_hashes = profiles.source_hashes(prepared["profile"])
     point_sources=profiles.point_sources(prepared["profile"])
     points=set(point_sources)
@@ -155,6 +157,8 @@ def parse_recording(raw, prepared):
                 profiles.validate_model_selection(payload)
             if "weight_selection" in payload["metadata"]:
                 profiles.validate_weight_selection(payload)
+            if "route_authentication" in payload["metadata"]:
+                profiles.validate_route_authentication(payload)
             for request in payload["requests"]:
                 if (type(request) is not dict or set(request) != {"request_sha256","request_present",
                         "output_state_present","batch_row_present","status_code"}

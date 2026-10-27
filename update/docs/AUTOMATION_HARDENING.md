@@ -1,8 +1,18 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-27 REQ-02 — 인증 bool·serving 호출 부분 생산자
+
+profile5/source23은 기존 ASGI 지문·고정 code gate·소유 파일/세션 수집을 재사용해 인증 입력
+scope, bool 반환, 동적 router 조회와 async serving 반환을 구분한다. 동기 auth RETURN을
+다운스트림 완료로 해석하지 않고 자격 증명/본문/ModelList 내용도 읽지 않는다. 재사용 헤더와
+누락·늦은 자식 문맥·관측 상한을 보존한다. 과거 profile4의20개 source/가중치 의미와 고정
+bytes를 읽으며 profile1·2·3도 유지한다. REQ-02는 신뢰 호출자·유효 Gateway 재작성·실제
+handler 선택의 독립 대응과 기업 허용 관계가 남아 executor/judge 미등록·UNKNOWN이다.
+기술 제한은 RUNBOOK의 REQ-02 절을 따른다. 새 일반 실행 프레임워크·외부 계약은 없다.
+
 ## 2026-10-27 LIF-10 — native metadata 생산자·소유 기록 수집, 판정 미등록
 
-profile4는 REQ-05 조사에서 확인한 native 적재 객체·가중치 적재 함수 인수·runner 모델
+가중치 파일 선택이 추가된 profile4는 REQ-05 조사에서 확인한 native 적재 객체·가중치 적재 함수 인수·runner 모델
 호출을 같은 metadata/소유 수집 경계에 연결한다. 모델·revision 설정 지문과 객체 참조는
 최종 가중치 신원·실제 소비 증명이 아니다. 요청 연결은 native 호출 문맥의 scheduler ID
 관측이며 전체 실행·tensor/출력 귀속을 확정하지 않는다. profile1·2는 당시 source/지점

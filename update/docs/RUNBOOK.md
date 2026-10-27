@@ -2,6 +2,10 @@
 
 ## LIF-10 native metadata 센서 준비와 소유 기록 수집
 
+현행 profile5/events5는 아래 REQ-02의 인증/serving 문맥도 관측한다. source23개를 대조하며
+과거 profile4의20개 source·가중치 파일 선택과 고정 bytes를 그대로 읽는다. profile1·2·3의
+당시 의미도 유지한다. 새 준비·수집은 기존 CLI를 사용하고 자동 판정 등록은 늘리지 않는다.
+
 Docker 대상의 `lab=true`는 기존 진입점에서 stub을 뜻하므로 개별·세션 native 수집은
 ENV가 DECLARED/MEASURED로 입력돼도 EXAMPLE을 유지한다. `lab=false` 또는 과거 입력의
 미지정 표식은 EXAMPLE ENV를 승격하지 않으며 나머지도 DECLARED 상한이다. Kubernetes의
@@ -99,7 +103,7 @@ profile1은 고정된 과거 sensor bytes의 LF/CRLF 두 spelling과 manifest/�
 
 ### REQ-05 native 적재 객체와 모델 호출 관측
 
-profile4/events4는 기존 준비·소유 개별/세션 수집을 재사용한다. 추가 실행기나 판정을
+profile5/events5는 기존 준비·소유 개별/세션 수집을 재사용한다. 추가 실행기나 판정을
 등록하지 않는다. 고정 `BaseModelLoader.load_model`의 반환 객체와
 `DefaultModelLoader.load_weights`의 입력 객체, CPU/GPU runner의 적재 후 `self.model`,
 native `get_model` 반환, `GPUModelRunner._model_forward`의 호출 객체를 구분한다.
@@ -167,7 +171,35 @@ Docker stub(`lab=true`)은 EXAMPLE이다. Kubernetes의 `lab=true` 선언을 Doc
 맞지 않으면 해시는 보존하고 연결 미확인 상태를 유지한다.
 최종 모델·weights revision·실제 소비·생산자 인증·전체 실행 확인은 모두 false/UNKNOWN이다.
 
+## REQ-02 인증 입력·serving 호출 부분 관측
+
+profile5는 고정 `AuthenticationMiddleware.__call__`/`verify_token`, 모델 목록 router의
+동적 `models(request)` helper와 `OpenAIServingModels.show_available_models`를 관측한다.
+ASGI HTTP 호출에 유일한 `x-request-id` 헤더 하나(1~512bytes, 전체 header64개 이하)가 있을
+때만 별도 invocation 지문을 연다. 없는/중복/상한 초과 헤더는 연결하지 않으며 계획한
+요청의 미수집으로 다룬다. 고유 호출 지문과 동일 헤더 재사용의 모호함을 구분한다.
+
+진입 경로/root_path/method와 인증·router helper에서 관측한 scope의 지문을 구분한다.
+원문 경로·헤더 값·자격 증명·요청/응답 본문·ModelList 내용은 기록하지 않는다. `verify_token`
+반환 bool은 관측한 인증 함수 결과다. 동기 `__call__`은 awaitable을 반환하므로 그 RETURN은
+다운스트림 완료가 아니다. 원래 coroutine을 그대로 반환하고 추가 await·receive·send는
+하지 않는다. serving 반환은 원래 async 메서드의 await 반환이며 HTTP 전송/인가 완료가 아니다.
+
+같은 PID의 살아 있는 ASGI 문맥만 연결하며 호출이 끝나면 상속된 늦은 자식 문맥도 닫는다.
+살아 있을 때 시작했지만 종료 뒤 반환한 작업은 앞선 CALL을 유지하고 반환 연결은 미수집으로
+남긴다. 비HTTP 중첩 호출도 활성 HTTP 문맥에 결합하지 않는다.
+기존 completions의 callback 관측 범위·원래 ID 할당 연결·스트림 측정은 유지한다.
+새 인덱스 `route_authentication_index`는 소유/프로세스 문맥을 지문으로 구분하고 최대256개
+관측과 정확한 파일/행 참조를 보존한다. 초과·충돌 시 앞선 자료를 유지하고 미완전으로 남긴다.
+
+이것은 신뢰된 호출자·실제 router의 endpoint 선택·Gateway 유효 재작성 설정·최종 인가 판정이
+아니다. router decorator가 잡은 함수는 모듈 변수 교체만으로 계측되지 않아 동적 조회 helper와
+serving 메서드를 관측한다. 다른 handler/경로·동일 헤더 재사용·누락은 전체로 일반화하지 않는다.
+기업 허용 관계와 외부 요청/인증 입력/최종 handler의 독립 대응은 남아 있으며 모든 검증 flag는
+false·보안 UNKNOWN이다. EXAMPLE 조사와 실제 엔진 실증은 별도로 집계한다.
+
 ## LIF-10 Kubernetes 파일·프로세스 읽기
+
 
 `capture-kubernetes-lifecycle-session --env <ENV> --target <target.json> --prepared <manifest.json>
 --output <새 JSON>`은 기본 입력 검증만 한다. `--execute`에서만 기존 kubectl·kubeconfig의

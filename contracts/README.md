@@ -23,8 +23,8 @@ update ── run-context (격리 시험에서 runtime 통제를 켤 때) ┘   
 | 스키마 | 방향 | 무엇 | 기존 형식과의 관계 |
 | --- | --- | --- | --- |
 | `common` | - | ID, 참조, enum | guard SPEC §2.1~2.4 |
-| `environment` | platform → update, runtime | 기업 서빙 환경 | guard ENV 고유 필드 + runtime `runtime-target/1.0` + intent의 배치 정보 |
-| `policy` | platform → update, runtime | 기업 정책 한 판본 | `verification` = guard POL, `runtime.gateway` = `runtime-mvp/1.1·1.2`, `runtime.enforcement` = `runtime-enforcement-intent/1.x` 원문 |
+| `environment` | platform → update, runtime | 기업 서빙 환경 | guard ENV 고유 필드 + runtime `runtime-target/1.0` + intent의 배치 정보. 선택 `framework_profile`(아래 `framework-input`) |
+| `policy` | platform → update, runtime | 기업 정책 한 판본 | `verification` = guard POL, `runtime.gateway` = `runtime-mvp/1.1·1.2`, `runtime.enforcement` = `runtime-enforcement-intent/1.x` 원문. 선택 `framework_values`(아래 `framework-input`) |
 | `policy-bundle` | platform → runtime | 승인된 정책을 runtime 내부 형식 파일로 묶은 것 | §5.4 `approved-policy.json` |
 | `run-context` | update → runtime | 격리 시험 실행 문맥 | §5.4 `run-context.json` |
 | `verification-result` | update → platform | 검증 결과·보고서 화면 자료 (0.2) | guard RPT의 투영. 0.2부터 삭제된 update HTML 보고서가 보여주던 RPT 필드를 모두 담는다 |
@@ -34,6 +34,7 @@ update ── run-context (격리 시험에서 runtime 통제를 켤 때) ┘   
 | `runtime-request-detail` | runtime → platform | 요청 상세 (0.1, 신규) | `/api/requests/{id}` |
 | `revalidation-request` | runtime → platform → update | 재검증 요청 | `runtime-revalidation-request/1.0` |
 | `evidence-index` | update, runtime → platform | 증거 파일 목록 | §5.4 `evidence/index.json` |
+| `framework-input` | platform → update | environment·policy 선택 필드의 정의 묶음(독립 문서 아님): 환경 역할·확인 상태·12개 환경 조건·구조화된 비사용 근거, 36개 보호 요구별 승인 기준(유지·변경·확인 요청, 수치의 단위·범위·상태)·승인 조건 | framework `02`·`03`·Q 보조기 claim. 조건·요구 안의 키와 선택지는 `platform/web/src/lib/frameworkCatalog.ts`가 정한다. 현재 update·runtime은 읽지 않고 원본에 보존한다 |
 
 `examples/`에 스키마마다 예시가 있다. 전부 `EXAMPLE` 자료다.
 

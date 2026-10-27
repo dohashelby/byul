@@ -1011,6 +1011,8 @@ export interface components {
             facts: {
                 [key: string]: components["schemas"]["Environment_fact"];
             };
+            /** @description 선택. 프레임워크 12개 환경 조건·환경 역할·확인 상태·구조화된 비사용 근거. 없거나 null이면 기존 소비자 동작과 같다. */
+            framework_profile?: null | components["schemas"]["FrameworkInput_framework_profile"];
         };
         Environment_labels: {
             [key: string]: string;
@@ -1054,6 +1056,97 @@ export interface components {
                 /** @description 이 증거를 쓴 객체·사건. guard EVD 참조나 runtime event_id. */
                 refs?: string[];
             }[];
+        };
+        /** @constant */
+        FrameworkInput_catalog_version: "byul-framework-input/0.1";
+        FrameworkInput_input_key: string;
+        /** @description 선택지 하나(문자열), 예/아니오(boolean), 숫자, 짧은 서술, 선택지 여러 개(문자열 배열), 이름→값 표(예: 의존성 이름→판본). null은 모름. */
+        FrameworkInput_input_value: null | boolean | number | string | string[] | {
+            [key: string]: string | null;
+        };
+        FrameworkInput_input_values: {
+            [key: string]: components["schemas"]["FrameworkInput_input_value"];
+        };
+        /** @description 12개 환경 조건 하나의 실제 배포값. origin·source는 이 조건 값 전체의 출처다. */
+        FrameworkInput_environment_condition: {
+            values: components["schemas"]["FrameworkInput_input_values"];
+            origin: components["schemas"]["Common_data_origin"] | null;
+            source: string | null;
+        };
+        /** @description 기능 비사용 근거(프레임워크 Q 보조기 claim과 같은 항목). status가 reviewed이면 모든 항목이 채워져야 한다. reviewed여도 '비적용 후보'일 뿐이며 담당자가 제외 범위를 확인한다. */
+        FrameworkInput_absence_claim: {
+            /** @enum {unknown} */
+            status: "draft" | "reviewed";
+            reviewer: string | null;
+            reviewed_at: components["schemas"]["Common_nullable_timestamp"];
+            disabled: boolean | null;
+            nonexposed: boolean | null;
+            references: string[];
+            target: {
+                engine: string | null;
+                version: string | null;
+                source_commit: string | null;
+                image_digest: string | null;
+                /** @description 이 환경 문서에서 revision, created_at, framework_profile.absence_claims를 뺀 정규 JSON의 SHA-256. 환경 입력이 바뀌면 달라져 이전 근거와 연결이 끊긴다. */
+                environment_snapshot_sha256: components["schemas"]["Common_sha256"] | null;
+            };
+        };
+        /** @description 환경 역할·확인 상태·12개 환경 조건·비사용 근거. */
+        FrameworkInput_framework_profile: {
+            catalog_version: components["schemas"]["FrameworkInput_catalog_version"];
+            /** @description 입력 기준이 된 framework data/checklist.json 파일 bytes의 SHA-256. */
+            framework_checklist_sha256: components["schemas"]["Common_sha256"] | null;
+            /** @enum {unknown} */
+            role: "current" | "candidate" | "test" | null;
+            /**
+             * @description observed=실제 설치·설정에서 확인, planned=계획값.
+             * @enum {unknown}
+             */
+            profile_status: "observed" | "planned" | null;
+            conditions: {
+                [key: string]: components["schemas"]["FrameworkInput_environment_condition"];
+            };
+            /** @description 키는 environment facts의 등록 키와 같다. */
+            absence_claims: {
+                [key: string]: components["schemas"]["FrameworkInput_absence_claim"];
+            };
+        };
+        /** @description 정책 수치·기한 하나. 값과 함께 단위·적용 범위·측정 조건·상태를 둔다. 측정 후 결정이면 value는 null이다. */
+        FrameworkInput_policy_number: {
+            value: number | null;
+            unit: string | null;
+            scope: string | null;
+            condition: string | null;
+            /** @enum {unknown} */
+            status: "confirmed" | "after_measurement" | "undecided";
+        };
+        /** @description 보호 요구 하나의 승인 기준. decision은 기존 승인 정책을 유지·변경·확인 요청 중 무엇으로 처리하는지다. */
+        FrameworkInput_policy_requirement: {
+            /** @enum {unknown} */
+            decision: "keep" | "change" | "needs_confirmation" | null;
+            values: components["schemas"]["FrameworkInput_input_values"];
+            numbers: {
+                [key: string]: components["schemas"]["FrameworkInput_policy_number"];
+            };
+            /** @description 근거 문서·기존 승인 기록 위치. */
+            basis: string | null;
+            note: string | null;
+        };
+        /** @description 36개 보호 요구별 승인 기준값과 승인 조건. 실제 배포값은 environment에 둔다. */
+        FrameworkInput_framework_values: {
+            catalog_version: components["schemas"]["FrameworkInput_catalog_version"];
+            framework_checklist_sha256: components["schemas"]["Common_sha256"] | null;
+            /** @description 키는 보호 요구 번호(예: 3.1). */
+            requirements: {
+                [key: string]: components["schemas"]["FrameworkInput_policy_requirement"];
+            };
+            /** @description approval(누가·언제)에 더해 무엇을 어떤 조건으로 승인했는지. 서명이 아니다. */
+            approval_terms: {
+                /** @enum {unknown} */
+                decision: "adopted" | "conditional" | "rejected" | null;
+                scope: string | null;
+                conditions: string | null;
+            };
         };
         /**
          * 정책 번들 (platform → runtime)
@@ -1142,6 +1235,8 @@ export interface components {
                 /** @description runtime-exec-exceptions/1.0의 exceptions 배열 항목을 그대로 담는다. */
                 exec_exceptions: Record<string, never>[];
             };
+            /** @description 선택. 프레임워크 36개 보호 요구별 승인 기준값(유지·변경·확인 요청, 수치의 단위·범위·상태)과 승인 조건. 없거나 null이면 기존 소비자 동작과 같다. */
+            framework_values?: null | components["schemas"]["FrameworkInput_framework_values"];
         } & unknown;
         /**
          * 재검증 요청 (runtime → platform → update)

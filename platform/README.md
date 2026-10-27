@@ -73,7 +73,7 @@ BYUL_EXAMPLES_DIR=../.demo-data uv run byul-platform
 | 탭 | 주소 | 출처 |
 | --- | --- | --- |
 | 대시보드 | `/dashboard` | 요청 집계(runtime `/api/summary`), 정책·수집기 상태, 최신 검증 결과, 열린 재검증 수, 시간대별 요청·사건 그래프 |
-| 환경 / 정책 | `/environments`, `/policies`, `…/new`, `…/:id` | 플랫폼 저장소. 구역별 폼, 서버 스키마 검증 오류를 필드 옆에 표시, 판본 이력과 diff |
+| 환경 / 정책 | `/environments`, `/policies`, `…/new`, `…/:id` | 플랫폼 저장소. 구역별 폼, 서버 스키마 검증 오류를 필드 옆에 표시, 판본 이력과 diff. 프레임워크 입력(환경 12개 조건·기능 사용 여부와 비사용 근거, 보호 요구 36개·승인 조건)은 선택형 질문으로 받고 `web/src/lib/frameworkCatalog.ts`가 항목을 정한다 |
 | 검증 결과 | `/update/results` | update RPT → `verification-result` |
 | 재검증 요청 | `/runtime/revalidation` (이전 `/update/revalidation`) | runtime `/api/revalidation` → `revalidation-request` (시작 버튼 없음) |
 | 요청 내역 | `/runtime/requests` | runtime 요청 기록 → `runtime-event`(source=gateway) |

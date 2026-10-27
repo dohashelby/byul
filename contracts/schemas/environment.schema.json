@@ -97,6 +97,10 @@
         ]
       },
       "additionalProperties": { "$ref": "#/$defs/fact" }
+    },
+    "framework_profile": {
+      "description": "선택. 프레임워크 12개 환경 조건·환경 역할·확인 상태·구조화된 비사용 근거. 없거나 null이면 기존 소비자 동작과 같다.",
+      "$ref": "framework-input.schema.json#/$defs/framework_profile"
     }
   },
   "$defs": {

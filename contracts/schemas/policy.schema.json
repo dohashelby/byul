@@ -112,6 +112,10 @@
           "items": { "type": "object" }
         }
       }
+    },
+    "framework_values": {
+      "description": "선택. 프레임워크 36개 보호 요구별 승인 기준값(유지·변경·확인 요청, 수치의 단위·범위·상태)과 승인 조건. 없거나 null이면 기존 소비자 동작과 같다.",
+      "$ref": "framework-input.schema.json#/$defs/framework_values"
     }
   },
   "allOf": [

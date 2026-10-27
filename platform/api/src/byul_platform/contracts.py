@@ -31,6 +31,7 @@ COMPONENT_NAMES = {
     "runtime-request-detail": "RuntimeRequestDetail",
     "revalidation-request": "RevalidationRequest",
     "evidence-index": "EvidenceIndex",
+    "framework-input": "FrameworkInput",
 }
 
 
@@ -108,7 +109,8 @@ class Contracts:
             defs = body.pop("$defs", {})
             for key in ("$schema", "$id"):
                 body.pop(key, None)
-            if file_name != "common":
+            # common·framework-input은 $defs만 담은 정의 묶음이라 최상위 부품을 만들지 않는다.
+            if file_name not in ("common", "framework-input"):
                 out[name] = _rewrite_refs(body, name)
             for def_name, def_schema in defs.items():
                 out[f"{name}_{def_name}"] = _rewrite_refs(def_schema, name)

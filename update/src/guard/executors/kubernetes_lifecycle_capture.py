@@ -17,6 +17,11 @@ from .lifecycle_session import INVENTORY_READER
 PROFILE = "kubernetes-owned-lifecycle-read-v1"
 
 
+def validate_target(target,env):
+    """Keep runtime binding access inside the executor boundary, including dry runs."""
+    return validate_capture_target(target,env)
+
+
 class KubernetesCaptureError(ValueError):
     def __init__(self):
         super().__init__("KUBERNETES_CAPTURE_BINDING_UNAVAILABLE")
@@ -35,7 +40,7 @@ def supervised_source(source):
 
 class KubernetesLifecycleReader:
     def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None):
-        self.binding=validate_capture_target(target,env)
+        self.binding=validate_target(target,env)
         if (type(binary) is not str or not binary.strip() or type(duration) not in (int,float)
                 or not math.isfinite(duration) or not 0<duration<=300
                 or type(prepared.get("session")) is not str or re.fullmatch(r"[0-9a-f]{32}",prepared["session"]) is None):

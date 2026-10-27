@@ -8,7 +8,6 @@ from guard.collectors.file import load_environment
 from guard.collectors.lifecycle import load_prepared
 from guard.executors.owned_capture import strict_json
 from guard.models import DataOrigin
-from guard.runtime.kubernetes_binding import validate_capture_target
 
 
 def validate_options(binary,duration):
@@ -18,11 +17,13 @@ def validate_options(binary,duration):
 
 
 def load_inputs(env_path,target_path,prepared_path):
+    from guard.executors.kubernetes_lifecycle_capture import validate_target
+
     env=load_environment(Path(env_path))
     with Path(target_path).open("rb") as stream:
         target=strict_json(stream.read(65537))
     prepared=load_prepared(prepared_path)
-    validate_capture_target(target,env)
+    validate_target(target,env)
     return env,target,prepared
 
 

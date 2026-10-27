@@ -2,11 +2,15 @@
 
 ## 2026-10-27 LIF-10 — native metadata 생산자·소유 기록 수집, 판정 미등록
 
-profile3은 REQ-05 조사에서 확인한 native 적재 객체·가중치 적재 함수 인수·runner 모델
+profile4는 REQ-05 조사에서 확인한 native 적재 객체·가중치 적재 함수 인수·runner 모델
 호출을 같은 metadata/소유 수집 경계에 연결한다. 모델·revision 설정 지문과 객체 참조는
 최종 가중치 신원·실제 소비 증명이 아니다. 요청 연결은 native 호출 문맥의 scheduler ID
 관측이며 전체 실행·tensor/출력 귀속을 확정하지 않는다. profile1·2는 당시 source/지점
-집합과 고정 bytes로 읽으며 새 모델 의미를 소급하지 않는다. RUNBOOK의 REQ-05 절을 따른다.
+집합과 고정 bytes로 읽으며 새 모델 의미를 소급하지 않는다. profile3도 당시19개 source와
+고정 bytes로 읽는다. profile4의20개 source에는 가중치 iterator factory7개의 최종 파일
+인수 지문이 포함된다. 별도 `capture-native-weight-files`는 정확 ENV inventory와 소유 파일의
+스트리밍 SHA를 대조한다. generator 생성은 소비·tensor 적재·실행 완료 증명이 아니며,
+파일·소유 재확인·저장 실패는 앞서 얻은 안전한 해시를 지우지 않는다. RUNBOOK의 REQ-05 절을 따른다.
 
 센서 profile2는 ASGI 헤더 문맥과 native ID 할당 반환을 지문으로 연결한다. 같은 PID의
 동기 할당 지점만 관측하고 헤더를 재사용한 다중 내부 ID는 모호함으로 보존한다.

@@ -94,7 +94,7 @@ profile1은 고정된 과거 sensor bytes의 LF/CRLF 두 spelling과 manifest/�
 
 ### REQ-05 native 적재 객체와 모델 호출 관측
 
-profile3/events3는 기존 준비·소유 개별/세션 수집을 재사용한다. 추가 실행기나 판정을
+profile4/events4는 기존 준비·소유 개별/세션 수집을 재사용한다. 추가 실행기나 판정을
 등록하지 않는다. 고정 `BaseModelLoader.load_model`의 반환 객체와
 `DefaultModelLoader.load_weights`의 입력 객체, CPU/GPU runner의 적재 후 `self.model`,
 native `get_model` 반환, `GPUModelRunner._model_forward`의 호출 객체를 구분한다.
@@ -118,9 +118,44 @@ warmup 호출은 요청 사건으로 만들지 않는다. 세션 index는 최대
 `final_model_verified`·`actual_consumption_verified`·`weights_revision_verified`는 false다.
 
 profile1·2는 각각 고정 과거 source bytes, 당시17개 source와 지점 집합을 확인해 읽는다.
-과거 기록에 새 모델 필드·module·지점을 소급하지 않는다. 새 profile3은19개 source를
-대조한다. Gateway 인가 기록과 독립된 최종 가중치 신원·실제 요청별 소비·alias/퇴역/LoRA·
+과거 기록에 새 모델 필드·module·지점을 소급하지 않는다. profile3도 당시19개 source와
+고정 bytes로 읽으며 profile4는20개 source를 대조한다. Gateway 인가 기록과 독립된 최종 가중치 신원·실제 요청별 소비·alias/퇴역/LoRA·
 신뢰 생산자·기업 정책 대조는 남아 있다. 실제 엔진·Kubernetes/GPU 실증으로 집계하지 않는다.
+
+### REQ-05 native 파일 선택과 독립 파일 해시
+
+profile4는 고정 `DefaultModelLoader._prepare_weights`의 준비 목록과 `_get_weights_iterator`,
+`weight_utils`의7개 iterator factory 인수를 구분한다. 최종 factory 인수는 필터 후 목록이며,
+최대64개 경로를 POSIX CWD 기준 정규화한 지문으로 남긴다. 파일 목록이 list가 아니거나
+상한·CWD 변경이 있으면 미완전으로 남긴다. 부모 `load_weights` 호출 지문과 모델 객체
+지문이 같은 PID에서 연결된 경우만 파일 대조 대상으로 삼는다. 원래 generator를 그대로
+반환하며 센서는 이를 추가 소비하거나 tensor·내용을 읽지 않는다.
+
+`capture-native-weight-files` 입력은 `--env --target --prepared --context --model-manifest
+--native-session --output`이다. `--execute` 없이 입력과 출력 예약만 검사하며 접속·파일 생성을
+하지 않는다. context는 아래의 비공개 입력 형식이며 정확 ENV Ref·session·입력 bytes SHA를 채운다.
+
+```json
+{"schema":"guard-native-weight-files-context/1","environment_ref":{"id":"ENV-...","revision":1,"sha256":"정확 ENV SHA"},"session":"준비된32자hex","transport":"docker","model_root":"/models/소유-root","native_session_sha256":"세션파일 bytes SHA","model_manifest_sha256":"manifest파일 bytes SHA"}
+```
+
+기존 `guard.model-manifest/1`의 scope=all 파일 목록과 `ENV.model.inventory_sha256`가 정확히
+일치해야 한다. Docker target은 lab=true와 소유 run/container를, Kubernetes는 기존 고정
+context/namespace/Pod UID/container 세대 target을 사용한다. `.bin/.pt/.safetensors/.gguf` 중
+native 반환 사건에 관측된 최대32개 파일만 별도 stdlib helper가 SHA를 계산한다. 기본 파일당
+1GiB(상한도1GiB), 전체180초(최대300초), 각 소유 helper는 최대5초다. 큰 shard·원격/지원 밖
+로더는 미수집이며 상한을 모델 허용 정책으로 쓰지 않는다. 모델·Torch를 import하지 않는다.
+
+root와 resolved 경로의 디렉터리 구성요소는 nofollow로 열고, root 내부 snapshot→blob symlink만
+허용한다. root 밖 symlink·FIFO·특수 파일·상한 초과는 거부한다. 열린 FD 전후 신원과 logical
+경로 재확인을 별도로 보존한다. 이는 시점별 파일 대조이며 불변 mount·native 실제 파일 읽기·
+tensor 적재·최종 소비 증명이 아니다. 원문 경로·내용·예외는 출력하지 않는다.
+
+파일 불일치는 유효한 관측으로 보존하고 새 보안 FAIL/PASS를 만들지 않는다. 뒤 파일 실패는
+앞선 성공 해시를 유지한다. 늦은 소유/경로 재확인 실패도 해시를 유지하고 binding=false로
+남긴다. 출력 저장이 실패하면 종료1과 함께 전체 안전한 capture를 stdout에 남기며 기존
+출력 파일을 덮어쓰지 않는다. 자료 등급은 DECLARED 상한이고 대역은 EXAMPLE이다.
+최종 모델·weights revision·실제 소비·생산자 인증·전체 실행 확인은 모두 false/UNKNOWN이다.
 
 ## LIF-10 Kubernetes 파일·프로세스 읽기
 

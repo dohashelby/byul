@@ -41,7 +41,8 @@ model_selection owner_model_sha256 argument_model_sha256 returned_model_sha256
 configured_model_sha256 configured_revision_sha256 load_format_sha256 load_dummy_weights
 lora_config_present speculative_config_present
 """.split())
-POINTS = {c+"."+m for classes in sensor.POINTS.values() for c, methods in classes.items() for m in methods}
+KEYS |= profiles.WEIGHT_KEYS
+POINTS = set(profiles.point_sources(sensor.PROFILE))
 WORDS = {*profiles.SCHEMAS, *profiles.SCHEMAS.values(), sensor.COMMIT, "START", "MODULE", "NATIVE", "ASGI", "END",
     "SEALED", "PROCESS_EXIT", "BOUND_REACHED", "CONTROL_UNAVAILABLE", "CALL", "RETURN", "RAISE",
     "SAMPLE_UNAVAILABLE", "DISCONNECT_RECEIVED", "BODY_SEND_RETURN", "APP_RETURN", "APP_RAISE",
@@ -78,13 +79,14 @@ def parse_recording(raw, prepared):
         raise ValueError("LIFECYCLE_RECORDING_ROW_BOUND")
     previous, clock, rows = "0"*64, -1, []
     keys = KEYS - {"asgi_request_sha256"} if prepared["profile"] == profiles.LEGACY_PROFILE else KEYS
-    if prepared["profile"] != sensor.PROFILE:
+    if prepared["profile"] in {profiles.LEGACY_PROFILE,profiles.V2_PROFILE}:
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
+    if prepared["profile"] != sensor.PROFILE:keys=keys-profiles.WEIGHT_KEYS
     source_hashes = profiles.source_hashes(prepared["profile"])
-    selected_points = profiles.points(prepared["profile"])
-    points = {c+"."+m for classes in selected_points.values() for c,methods in classes.items() for m in methods}
+    point_sources=profiles.point_sources(prepared["profile"])
+    points=set(point_sources)
     for seq, line in enumerate(lines):
         row = strict_json(line, limit=16384)
         if (type(row) is not dict or set(row) != {"seq","event","monotonic_ns","previous_sha256","payload"}
@@ -151,6 +153,8 @@ def parse_recording(raw, prepared):
                 raise ValueError("LIFECYCLE_RECORDING_ASGI_ASSIGNMENT_INVALID")
             if "model_selection" in payload["metadata"]:
                 profiles.validate_model_selection(payload)
+            if "weight_selection" in payload["metadata"]:
+                profiles.validate_weight_selection(payload)
             for request in payload["requests"]:
                 if (type(request) is not dict or set(request) != {"request_sha256","request_present",
                         "output_state_present","batch_row_present","status_code"}
@@ -165,13 +169,12 @@ def parse_recording(raw, prepared):
             if type(chain) is not list or len(chain) > 4:
                 raise ValueError("LIFECYCLE_RECORDING_CHAIN_INVALID")
             for frame in chain:
-                if (type(frame) is not dict or set(frame) != {"point","request_sha256"}
+                if (not profiles.valid_call_frame(frame,prepared["profile"])
                         or frame["point"] not in points or type(frame["request_sha256"]) is not list
                         or len(frame["request_sha256"]) > sensor.MAX_IDS
                         or any(type(v) is not str or re.fullmatch(r"[0-9a-f]{64}",v) is None for v in frame["request_sha256"])):
                     raise ValueError("LIFECYCLE_RECORDING_CHAIN_INVALID")
-            expected = [m for m, classes in selected_points.items() if payload["point"].split(".")[0] in classes]
-            if len(expected) != 1 or payload.get("source_sha256") != source_hashes[expected[0]]:
+            if payload.get("source_sha256") != source_hashes[point_sources[payload["point"]]]:
                 raise ValueError("LIFECYCLE_RECORDING_POINT_SOURCE_INVALID")
         if row["event"] == "ASGI":
             if (set(payload) != {"request_sha256","phase","more_body"}

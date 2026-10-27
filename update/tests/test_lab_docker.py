@@ -109,6 +109,32 @@ def _api_transport_cli(docker, run_id, network, pinned, run_dir, env):
     assert store.verify() == []
 
 
+def _native_weight_hashes(docker, target, pinned):
+    """Real Linux file helper in the existing owned EXAMPLE source; never vLLM."""
+    import hashlib
+    from guard.executors.weight_file_capture import DockerWeightReader
+    seed = r'''
+import os
+from pathlib import Path
+root=Path('/guard-weights');root.mkdir(mode=0o700)
+(root/'a.bin').write_bytes(b'EXAMPLE-model-bytes')
+(root/'link.bin').symlink_to(root/'a.bin')
+(root/'escape.bin').symlink_to('/etc/hostname')
+os.mkfifo(root/'fifo.bin')
+'''
+    value=docker.exec_bounded(target["engine"]["container"],["python3","-I","-S","-B","-c",seed],timeout=5,max_bytes=4096)
+    assert value.returncode==0 and value.capture["complete"]
+    reader=DockerWeightReader(docker,target,duration=30)
+    for relative in ("a.bin","link.bin"):
+        packet,owner,stable=reader.read(target["engine"]["container"],pinned,"/guard-weights",relative,1024)
+        assert packet["content_sha256"]==hashlib.sha256(b'EXAMPLE-model-bytes').hexdigest()
+        assert packet["file_identity_stable"] and packet["logical_binding_stable"] and stable
+        assert packet["path_sha256"]==hashlib.sha256(("/guard-weights/"+relative).encode()).hexdigest()
+        assert "EXAMPLE-model-bytes" not in json.dumps(packet)
+    for relative,cap in (("escape.bin",1024),("fifo.bin",1024),("a.bin",1)):
+        with pytest.raises(ValueError):reader.read(target["engine"]["container"],pinned,"/guard-weights",relative,cap)
+
+
 def _lifecycle_session_inventory(docker, target, pinned):
     """Real Linux /proc/fd census in the existing EXAMPLE Python source only."""
     from guard.executors.lifecycle_session import inventory
@@ -177,6 +203,7 @@ def test_lab_topology_end_to_end(tmp_path, topology, expected):
         from guard.executors.pressure_resources import capture_resource_sample
         resource_target = {"run_id": run_id, "engine": {"container": resource_name, "image_digest": pinned}}
         _lifecycle_session_inventory(docker, resource_target, pinned)
+        _native_weight_hashes(docker, resource_target, pinned)
         observed = capture_resource_sample(docker, resource_target, environment(engine={"name": "engine-x", "image_digest": pinned}),
                                            deadline=time.monotonic() + 30, port=18000)
         assert observed["complete"] is True, observed["diagnostic_codes"]

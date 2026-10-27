@@ -93,7 +93,7 @@ def installed_worker(root: Path, wheel: Path) -> dict:
                      ["policy", "template", "--help"], ["evidence", "export", "--help"],
                      ["evidence", "restore", "--help"], ["prepare-lifecycle-sensor", "--help"],
                      ["capture-lifecycle-observations", "--help"], ["capture-lifecycle-session", "--help"],
-                     ["capture-kubernetes-lifecycle-session", "--help"]):
+                     ["capture-kubernetes-lifecycle-session", "--help"], ["capture-native-weight-files", "--help"]):
             cli(argv)
         lifecycle_assets = root / "lifecycle-assets"
         prepared = json.loads(cli(["prepare-lifecycle-sensor", "--output", str(lifecycle_assets)]))

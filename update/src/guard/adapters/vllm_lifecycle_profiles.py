@@ -10,7 +10,9 @@ LEGACY_PROFILE = "vllm-native-lifecycle-metadata/1"
 LEGACY_SCHEMA = "guard-native-lifecycle-events/1"
 V2_PROFILE = "vllm-native-lifecycle-metadata/2"
 V2_SCHEMA = "guard-native-lifecycle-events/2"
-SCHEMAS = {sensor.PROFILE: sensor.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA}
+V3_PROFILE = "vllm-native-lifecycle-metadata/3"
+V3_SCHEMA = "guard-native-lifecycle-events/3"
+SCHEMAS = {sensor.PROFILE: sensor.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA, V3_PROFILE: V3_SCHEMA}
 # Exact previously shipped LF/CRLF source spellings; no normalization on input.
 LEGACY_ASSETS = {
     (31143, "50143b5cf54aa8f5bbcfef769c286f65c971e0acd2caa111c625583f4baec3de"),
@@ -60,11 +62,57 @@ LEGACY_POINTS = {'vllm.v1.engine.input_processor': {'InputProcessor': ('assign_r
  'vllm.v1.worker.gpu_input_batch': {'InputBatch': ('remove_request',)}}
 
 
+V3_ASSETS = {(37472, '3cd9bf59b5c9f6e1edfd4c27aef4cdc568ac14db38bc29b4c1afaad629f22624'), (36695, '1f9b69ab3be55e8c5304028825c59fabe71c74bc949b3606fe3bc8effcadbb82')}
+V3_SOURCE_SHA = {'vllm.model_executor.model_loader.base_loader': '5291c330c4ed5634a9ea1d535364c26162b60251aa2af03fd409b88c34d836e2',
+ 'vllm.model_executor.model_loader.default_loader': 'd17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9',
+ 'vllm.v1.engine.input_processor': 'd79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b',
+ 'vllm.v1.engine.output_processor': 'c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54',
+ 'vllm.v1.engine.async_llm': 'ff933ed78aa3195782cf1c6d18c53897adfa5bf920421bd2bcc330f2adc84d1e',
+ 'vllm.v1.engine.core': 'f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b',
+ 'vllm.v1.engine.core_client': '24eecc78e8fc4849d4eac948c7586ee349ebfd503d07e80f05ec6c859da06fdd',
+ 'vllm.v1.core.sched.scheduler': 'f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a',
+ 'vllm.v1.core.sched.output': '972e0bc8e7af1f4262ac73f660f6b8f798ba780f86c031a9c8a7f10cbfaad3a8',
+ 'vllm.v1.core.kv_cache_manager': 'bd9bf46a2101f9368d4941867415a239d18d95e0b956f82f885ce25e10e69f3b',
+ 'vllm.v1.core.single_type_kv_cache_manager': '3a3cb20bd6aa1e0ad46471fc9e5e01ee5797ab4bb759e00ef5fb309d2830db13',
+ 'vllm.v1.core.kv_cache_coordinator': '6a1e00227b981a7bb6108a42db0e446c716f789274f40c63eb9a6ce4d699ddcb',
+ 'vllm.v1.core.block_pool': '05c73052934a9d4664ccd5df562ce71011278d9a511932da102ef2efff00e934',
+ 'vllm.v1.worker.gpu_model_runner': 'bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a',
+ 'vllm.v1.worker.gpu_input_batch': 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d',
+ 'vllm.v1.worker.cpu_model_runner': '69cd626ddbc3b1693e026fda99018201d8c9f4dd559540970e8ff265b7a97093',
+ 'vllm.v1.request': 'dd7c30bf8b0894dc123a739c299c0133566f8cc075b081e45905f1c29506e69d',
+ 'vllm.entrypoints.serve.utils.api_utils': 'ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba',
+ 'vllm.entrypoints.openai.completion.serving': 'aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd'}
+V3_POINTS = {'vllm.model_executor.model_loader.base_loader': {'BaseModelLoader': ('load_model',)},
+ 'vllm.model_executor.model_loader.default_loader': {'DefaultModelLoader': ('load_weights',)},
+ 'vllm.v1.worker.cpu_model_runner': {'CPUModelRunner': ('load_model', 'get_model')},
+ 'vllm.v1.engine.input_processor': {'InputProcessor': ('assign_request_id',)},
+ 'vllm.v1.engine.output_processor': {'OutputProcessor': ('add_request', 'abort_requests', '_finish_request')},
+ 'vllm.v1.engine.async_llm': {'AsyncLLM': ('abort',)},
+ 'vllm.v1.engine.core': {'EngineCore': ('abort_requests',)},
+ 'vllm.v1.core.sched.scheduler': {'Scheduler': ('finish_requests',
+                                                '_free_request_blocks',
+                                                '_drain_deferred_frees')},
+ 'vllm.v1.core.kv_cache_manager': {'KVCacheManager': ('free', 'pop_blocks_for_free')},
+ 'vllm.v1.core.single_type_kv_cache_manager': {'SingleTypeKVCacheManager': ('free', 'pop_blocks_for_free')},
+ 'vllm.v1.core.block_pool': {'BlockPool': ('free_blocks',)},
+ 'vllm.v1.worker.gpu_model_runner': {'GPUModelRunner': ('_update_states',
+                                                        'execute_model',
+                                                        'sample_tokens',
+                                                        'load_model',
+                                                        'get_model',
+                                                        '_model_forward'),
+                                     'AsyncGPUModelRunnerOutput': ('get_output',),
+                                     'AsyncGPUPoolingModelRunnerOutput': ('get_output',)},
+ 'vllm.v1.worker.gpu_input_batch': {'InputBatch': ('remove_request',)}}
+
+
 def asset_supported(profile, raw):
     if profile == LEGACY_PROFILE:
         return (len(raw), hashlib.sha256(raw).hexdigest()) in LEGACY_ASSETS
     if profile == V2_PROFILE:
         return (len(raw), hashlib.sha256(raw).hexdigest()) in V2_ASSETS
+    if profile == V3_PROFILE:
+        return (len(raw), hashlib.sha256(raw).hexdigest()) in V3_ASSETS
     if profile == sensor.PROFILE:
         return raw == Path(sensor.__file__).read_bytes()
     return False
@@ -73,6 +121,8 @@ def asset_supported(profile, raw):
 def source_hashes(profile):
     if profile == sensor.PROFILE:
         return sensor.SOURCE_SHA
+    if profile == V3_PROFILE:
+        return V3_SOURCE_SHA
     if profile in {LEGACY_PROFILE, V2_PROFILE}:
         return LEGACY_SOURCE_SHA
     raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
@@ -81,6 +131,8 @@ def source_hashes(profile):
 def points(profile):
     if profile == sensor.PROFILE:
         return sensor.POINTS
+    if profile == V3_PROFILE:
+        return V3_POINTS
     if profile in {LEGACY_PROFILE, V2_PROFILE}:
         return LEGACY_POINTS
     raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
@@ -100,3 +152,66 @@ def validate_model_selection(payload):
     if (model["returned_model_sha256"] is not None and (payload["phase"]!="RETURN" or payload["point"] not in
             {"BaseModelLoader.load_model","CPUModelRunner.get_model","GPUModelRunner.get_model"})):
         raise ValueError("LIFECYCLE_RECORDING_MODEL_RETURN_INVALID")
+
+
+def point_sources(profile):
+    result={cls+"."+method:module for module,classes in points(profile).items()
+        for cls,methods in classes.items() for method in methods}
+    expected=sum(len(methods) for classes in points(profile).values() for methods in classes.values())
+    if profile==sensor.PROFILE:
+        result.update({module.rsplit(".",1)[-1]+"."+method:module
+            for module,methods in sensor.FUNCTION_POINTS.items() for method in methods})
+        expected+=sum(len(methods) for methods in sensor.FUNCTION_POINTS.values())
+    if len(result)!=expected:raise ValueError("LIFECYCLE_POINT_AMBIGUOUS")
+    return result
+
+
+def valid_call_frame(frame,profile):
+    if type(frame) is not dict:return False
+    base={"point","request_sha256"}
+    if set(frame)==base:return True
+    extra={"weight_call_sha256","weight_model_sha256"}
+    if profile!=sensor.PROFILE or set(frame)!=base|extra or frame.get("point")!="DefaultModelLoader.load_weights":return False
+    return (type(frame["weight_call_sha256"]) is str and re.fullmatch(r"[0-9a-f]{64}",frame["weight_call_sha256"]) is not None
+        and (frame["weight_model_sha256"] is None or type(frame["weight_model_sha256"]) is str
+            and re.fullmatch(r"[0-9a-f]{64}",frame["weight_model_sha256"]) is not None))
+
+
+WEIGHT_KEYS={"weight_selection","weight_call_sha256","weight_model_sha256","cwd_sha256",
+    "source_model_sha256","source_revision_sha256","normalized_path_sha256","path_count","paths_complete",
+    "prepared_folder_sha256","prepared_use_safetensors","prepared_index_name_sha256","factory_returned_generator"}
+
+
+def validate_weight_selection(payload):
+    value=payload["metadata"]["weight_selection"]
+    if type(value) is not dict or set(value)!=WEIGHT_KEYS-{"weight_selection"} or payload["point"] not in sensor.WEIGHT_POINTS:
+        raise ValueError("LIFECYCLE_WEIGHT_METADATA_INVALID")
+    hashes={"weight_call_sha256","weight_model_sha256","cwd_sha256","source_model_sha256",
+        "source_revision_sha256","prepared_folder_sha256","prepared_index_name_sha256"}
+    if any(value[k] is not None and (type(value[k]) is not str or re.fullmatch(r"[0-9a-f]{64}",value[k]) is None) for k in hashes):
+        raise ValueError("LIFECYCLE_WEIGHT_HASH_INVALID")
+    paths=value["normalized_path_sha256"];count=value["path_count"]
+    if (type(paths) is not list or len(paths)>64 or any(type(v) is not str or re.fullmatch(r"[0-9a-f]{64}",v) is None for v in paths)
+            or count is not None and (type(count) is not int or not len(paths)<=count<2**63)
+            or type(value["paths_complete"]) is not bool or value["paths_complete"] and count!=len(paths)
+            or count is None and (paths or value["paths_complete"])):
+        raise ValueError("LIFECYCLE_WEIGHT_PATHS_INVALID")
+    for key in ("prepared_use_safetensors","factory_returned_generator"):
+        if value[key] is not None and type(value[key]) is not bool:raise ValueError("LIFECYCLE_WEIGHT_FLAG_INVALID")
+    if value["factory_returned_generator"] is not None and (payload["phase"]!="RETURN" or payload["point"]=="DefaultModelLoader._prepare_weights"):
+        raise ValueError("LIFECYCLE_WEIGHT_RETURN_INVALID")
+
+
+def returned_weight_selection(row):
+    if row["event"]!="NATIVE":return None
+    payload=row["payload"];value=payload["metadata"].get("weight_selection")
+    factories={module.rsplit(".",1)[-1]+"."+method for module,methods in sensor.FUNCTION_POINTS.items() for method in methods}
+    if payload["phase"]!="RETURN" or payload["point"] not in factories or value is None:return None
+    parent=next((f for f in reversed(payload.get("call_chain",[])) if f["point"]=="DefaultModelLoader.load_weights"),{})
+    linked=(value["weight_call_sha256"] is not None and value["weight_model_sha256"] is not None
+        and value["weight_call_sha256"]==parent.get("weight_call_sha256")
+        and value["weight_model_sha256"]==parent.get("weight_model_sha256"))
+    return {"point":payload["point"],"weight_call_sha256":value["weight_call_sha256"],
+        "weight_model_sha256":value["weight_model_sha256"],"paths":value["normalized_path_sha256"],
+        "paths_complete":value["paths_complete"],"path_count":value["path_count"],
+        "load_context_linked":linked,"factory_returned_generator":value["factory_returned_generator"]}

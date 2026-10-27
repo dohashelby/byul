@@ -17,6 +17,7 @@ import importlib.machinery
 import inspect
 import json
 import os
+import posixpath
 from pathlib import Path, PurePosixPath
 import re
 import sys
@@ -25,9 +26,9 @@ import time
 import types
 import weakref
 
-PROFILE = "vllm-native-lifecycle-metadata/3"
+PROFILE = "vllm-native-lifecycle-metadata/4"
 COMMIT = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
-SCHEMA = "guard-native-lifecycle-events/3"
+SCHEMA = "guard-native-lifecycle-events/4"
 CONFIG_SCHEMA = "guard-native-lifecycle-settings/1"
 CONFIG_ENV = "GUARD_LIFECYCLE_CONFIG"
 CONFIG_PATH = "/guard-lifecycle/settings.json"
@@ -36,6 +37,7 @@ MAX_BYTES = 262144
 MAX_IDS = 8
 MAX_MODEL_OBJECTS = 64
 SOURCE_SHA = {
+ "vllm.model_executor.model_loader.weight_utils":"7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd",
  "vllm.model_executor.model_loader.base_loader":"5291c330c4ed5634a9ea1d535364c26162b60251aa2af03fd409b88c34d836e2",
  "vllm.model_executor.model_loader.default_loader":"d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
  "vllm.v1.engine.input_processor":"d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
@@ -58,7 +60,7 @@ SOURCE_SHA = {
 }
 POINTS = {
  "vllm.model_executor.model_loader.base_loader":{"BaseModelLoader":("load_model",)},
- "vllm.model_executor.model_loader.default_loader":{"DefaultModelLoader":("load_weights",)},
+ "vllm.model_executor.model_loader.default_loader":{"DefaultModelLoader":("load_weights","_prepare_weights","_get_weights_iterator")},
  "vllm.v1.worker.cpu_model_runner":{"CPUModelRunner":("load_model","get_model")},
  "vllm.v1.engine.input_processor":{"InputProcessor":("assign_request_id",)},
  "vllm.v1.engine.output_processor":{"OutputProcessor":("add_request","abort_requests","_finish_request")},
@@ -74,6 +76,12 @@ POINTS = {
 }
 _CHAIN = contextvars.ContextVar("guard_native_lifecycle_chain", default=())
 _ASGI_REQUEST = contextvars.ContextVar("guard_native_lifecycle_asgi_request", default=None)
+FUNCTION_POINTS = {"vllm.model_executor.model_loader.weight_utils": (
+    "safetensors_weights_iterator","pt_weights_iterator","multi_thread_pt_weights_iterator",
+    "multi_thread_safetensors_weights_iterator","fastsafetensors_weights_iterator",
+    "instanttensor_weights_iterator","np_cache_weights_iterator")}
+WEIGHT_POINTS = {"weight_utils."+name for names in FUNCTION_POINTS.values() for name in names} | {
+    "DefaultModelLoader._prepare_weights","DefaultModelLoader._get_weights_iterator"}
 _OBSERVER = None
 
 
@@ -315,12 +323,15 @@ class Observer:
         self.model_objects = {}
         self.model_serial = 0
         self.model_lock = threading.RLock()
+        self.weight_serial = 0
 
     def active(self):
         return self.disabled_pid != os.getpid() and not (self.pid == os.getpid()
             and self.writer is not None and self.writer.closed)
 
     def wanted(self, point, snapshot):
+        if point in WEIGHT_POINTS:
+            return True
         if point in {"BaseModelLoader.load_model","DefaultModelLoader.load_weights",
                      "CPUModelRunner.load_model","GPUModelRunner.load_model"}:
             return True
@@ -343,6 +354,7 @@ class Observer:
                 os.close(self.writer.fd)
             self.writer, self.pools, self.pool_serial = None, {}, 0
             self.model_objects, self.model_serial, self.model_lock = {}, 0, threading.RLock()
+            self.weight_serial = 0
             self.disabled_pid, self.empty_points = None, set()
             self.pid = os.getpid()
         if self.writer is None:
@@ -434,6 +446,9 @@ class Observer:
         return {"complete": True, "pool_sha256": entry["pool_sha256"], "blocks": rows}
 
     def snapshot(self, point, args, kwargs, result=None, returned=False):
+        if point in WEIGHT_POINTS:
+            return {"requests":[],"metadata":{"weight_selection":self.weight_metadata(point,args,kwargs,result,returned)},
+                "selection_observed":False}
         owner = args[0] if args else None
         static = point.endswith(".assign_request_id")
         value = (args[0] if args else kwargs.get("request")) if static else (
@@ -567,6 +582,56 @@ class Observer:
             "load_dummy_weights":dummy,"lora_config_present":present("lora_config"),
             "speculative_config_present":present("speculative_config")}
 
+    def weight_frame(self, snapshot):
+        context = self._writer().context
+        with self.model_lock:
+            self.weight_serial += 1
+            digest = sha(json.dumps(["weight-call",self.config["session"],context,self.weight_serial],
+                sort_keys=True,separators=(",", ":")).encode())
+        return {"weight_call_sha256":digest,"weight_model_sha256":snapshot["metadata"].get(
+            "model_selection",{}).get("argument_model_sha256"),"_weight_pid":os.getpid()}
+
+    def weight_metadata(self, point, args, kwargs, result, returned):
+        parent = next((f for f in reversed(_CHAIN.get()) if f["point"] == "DefaultModelLoader.load_weights"
+            and f.get("_weight_pid") == os.getpid()), {})
+        cwd = os.getcwd()
+        def path_sha(value):
+            if type(value) is not str or not 0<len(value)<=4096 or "\x00" in value:
+                return None
+            if not value.startswith("/"):
+                if type(cwd) is not str or not cwd.startswith("/"):return None
+                value=posixpath.join(cwd,value)
+            return sha(posixpath.normpath(value).encode())
+        files=None;folder=None;use_safe=None;index=None;source=None;revision=None
+        if point=="DefaultModelLoader._prepare_weights":
+            source=args[1] if len(args)>1 else kwargs.get("model_name_or_path")
+            revision=args[3] if len(args)>3 else kwargs.get("revision")
+            if returned and type(result) is tuple and len(result)==4:
+                folder,files,use_safe,index=result
+        elif point=="DefaultModelLoader._get_weights_iterator":
+            value=args[1] if len(args)>1 else kwargs.get("source")
+            source,revision=attrs(value).get("model_or_path"),attrs(value).get("revision")
+        else:
+            offset=3 if point=="weight_utils.np_cache_weights_iterator" else 0
+            files=args[offset] if len(args)>offset else kwargs.get("hf_weights_files")
+        count=len(files) if type(files) is list else None
+        hashes=[path_sha(value) for value in files[:64]] if type(files) is list else []
+        return {"weight_call_sha256":parent.get("weight_call_sha256"),
+            "weight_model_sha256":parent.get("weight_model_sha256"),"cwd_sha256":id_sha(cwd),
+            "source_model_sha256":id_sha(source),"source_revision_sha256":id_sha(revision),
+            "normalized_path_sha256":[v for v in hashes if v is not None],"path_count":count,
+            "paths_complete":count is not None and count<=64 and all(v is not None for v in hashes)
+                and cwd==os.getcwd(),
+            "prepared_folder_sha256":path_sha(folder),"prepared_use_safetensors":use_safe if type(use_safe) is bool else None,
+            "prepared_index_name_sha256":id_sha(index),
+            "factory_returned_generator":type(result) is types.GeneratorType if returned and point!="DefaultModelLoader._prepare_weights" else None}
+
+    @staticmethod
+    def chain_rows():
+        return [{k:v for k,v in row.items() if k in {"point","request_sha256"} or
+            k in {"weight_call_sha256","weight_model_sha256"} and row.get("_weight_pid")==os.getpid()}
+            for row in _CHAIN.get()]
+
     def wrap(self, module_name, point, original):
         observer = self
         def sample(args, kwargs, result=None, returned=False):
@@ -585,15 +650,18 @@ class Observer:
             wanted = observer.wanted(point,before)
             if wanted:
                 observer.emit("NATIVE", payload)
-            return _CHAIN.set((*chain[-3:], {"point": point,
-                "request_sha256": [r["request_sha256"] for r in before["requests"]]})), wanted
+            frame={"point":point,"request_sha256":[r["request_sha256"] for r in before["requests"]]}
+            if point=="DefaultModelLoader.load_weights":
+                try:frame.update(observer.weight_frame(before))
+                except Exception:pass  # Missing association never changes native work.
+            return _CHAIN.set((*chain[-3:],frame)), wanted
         def finish(args, kwargs, result, returned, token, started):
             try:
                 after = sample(args,kwargs,result,returned)
                 if started or observer.wanted(point,after):
                     observer.emit("NATIVE", {"point": point, "phase": "RETURN" if returned else "RAISE",
                         "source_sha256": SOURCE_SHA[module_name], **after,
-                        "call_chain": list(_CHAIN.get())})
+                        "call_chain": observer.chain_rows()})
             finally:
                 _CHAIN.reset(token)
         if inspect.iscoroutinefunction(original):
@@ -637,6 +705,11 @@ class Observer:
                     raise ValueError("NATIVE_SENSOR_METHOD_UNAVAILABLE")
                 wrapped = self.wrap(module_name, class_name + "." + name, original)
                 targets.append((cls, name, staticmethod(wrapped) if static else wrapped))
+        for name in FUNCTION_POINTS.get(module_name, ()):
+            original=vars(module).get(name)
+            if not inspect.isfunction(original) or inspect.isasyncgenfunction(original):
+                raise ValueError("NATIVE_SENSOR_FUNCTION_UNAVAILABLE")
+            targets.append((module,name,self.wrap(module_name,module_name.rsplit(".",1)[-1]+"."+name,original)))
         # Do not leave a half-installed module when a required method is absent.
         for cls, name, wrapped in targets:
             setattr(cls, name, wrapped)

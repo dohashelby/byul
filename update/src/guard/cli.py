@@ -593,6 +593,41 @@ def capture_kubernetes_lifecycle_session(
         "bytes":len(raw.encode("utf-8"))}))
 
 
+@app.command("capture-native-weight-files")
+def capture_native_weight_files(
+    env: Path=typer.Option(...,"--env"),target: Path=typer.Option(...,"--target"),
+    prepared: Path=typer.Option(...,"--prepared"),context: Path=typer.Option(...,"--context"),
+    manifest: Path=typer.Option(...,"--model-manifest"),native_session: Path=typer.Option(...,"--native-session"),
+    output: Path=typer.Option(...,"--output"),max_duration: float=typer.Option(180,"--max-duration"),
+    max_file_bytes: int=typer.Option(1024**3,"--max-file-bytes"),kubectl_binary: str=typer.Option("kubectl","--kubectl-binary"),
+    execute: bool=typer.Option(False,"--execute",help="명시된 소유 모델 파일의 bytes 해시만 읽기"),
+) -> None:
+    """native iterator 경로 지문과 별도 파일 해시를 대조한다. 최종 모델/소비 판정은 미확인이다."""
+    import hashlib
+    from guard.collectors.native_weight_files import load_inputs,validate_options,collect
+    from guard.collectors.route_observations import validate_output
+    try:
+        inputs=load_inputs(env,target,prepared,context,manifest,native_session)
+        validate_options(max_duration,max_file_bytes)
+        if type(kubectl_binary) is not str or not kubectl_binary.strip():raise ValueError()
+        validate_output(output,Path(__file__).resolve().parents[3])
+        if not execute:
+            typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}));return
+        value=collect(inputs,duration=max_duration,max_file_bytes=max_file_bytes,binary=kubectl_binary)
+        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
+        if len(raw.encode())>16*1024**2:raise ValueError()
+    except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError):
+        typer.echo("NATIVE_WEIGHT_FILE_CAPTURE_FAILED");raise typer.Exit(2)
+    try:
+        validate_output(output,Path(__file__).resolve().parents[3])
+        with output.open("x",encoding="utf-8",newline="\n") as stream:stream.write(raw)
+    except (OSError,UnicodeError,ValueError):
+        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
+            "diagnostic_codes":["WEIGHT_FILE_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True));raise typer.Exit(1)
+    typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
+        "files":len(value["files"]),"sha256":hashlib.sha256(raw.encode()).hexdigest(),"bytes":len(raw.encode())}))
+
+
 @app.command("capture-stream-pressure")
 def capture_stream_pressure(
     env: Path = typer.Option(..., "--env"),

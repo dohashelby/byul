@@ -27,6 +27,25 @@ AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS �
 | `target.aws-lab.json` | 정책 묶음의 `target` 역할에 넣을 대상 등록 예시. image digest를 실제 값으로 교체해야 함 |
 | `host/byul-observation-feed.service` | AWS 호스트에서 수집기를 계속 돌리는 systemd 사용자 서비스 |
 | [`ACCEPTANCE.md`](ACCEPTANCE.md) | AWS 첫 완료 기준 8개 사례의 실행·증거·비용 절약 절차 |
+| `policy.aws-lab.json` | 정책 묶음의 gateway policy 역할에 넣을 LAB 시험 정책(아래 "LAB 시험값") |
+| `policy-approvals.aws-lab.json` | 위 정책의 LAB 승인 목록(SHA-256 대조). runtime 자체 기록이며 정식 승인 아님 |
+| `perf-plan.aws-lab.json` | B0/B1/B2 성능 비교 계획(`tools/perf_compare.py`) |
+
+## LAB 시험값 (2026-10-27, runtime 선정 · 다른 담당 확인 전)
+
+정책/검증·시험 담당의 값을 받기 전에 runtime이 정한 시험 출발값이다. 기업 운영값이나 정식 승인값이 아니다. update 점검(REQ-01·09·10·13, OBS-11)과 같은 시험에서 결과를 이으려면 같은 값을 써야 한다.
+
+| 값 | 설정 | 근거 |
+| --- | --- | --- |
+| 허용 모델 | `test-model` | AWS 묶음의 served model(Qwen2.5-0.5B-Instruct) |
+| 답변 기본/최대 | 128 / 256 토큰 | AWS-03이 최대+1(257)의 403을 확인 |
+| 질문+답변 한도 | 2048 토큰 | 엔진 `max model len 2048`과 같게 둬 Gateway 통과 뒤 엔진 거부가 섞이지 않게 함 |
+| 본문 크기 / 답변 개수 | 64 KiB / 1 | 기존 값 유지 |
+| 정책 기간 | 2026-10-27 ~ 2026-12-31 UTC | 만료 시 503이므로 발표 뒤까지 둠 |
+| 요청 옵션 | 추가 옵션 없음(schema 1.1) | 첫 인수 사례 8개에 필요 없음. 옵션 범위 시험은 별도 판본에서 정함 |
+| 성능 비교 | 동시 2, 답변 128, 예열 20·일반 100·stream 100, 3블록 | 엔진 `max num seqs 2`, `perf_compare.py` 기본 예산 |
+
+정책 파일을 한 글자라도 고치면 SHA-256이 바뀌어 Gateway가 503으로 막는다. 고칠 때는 `policy_version`을 올리고 `sha256sum policy.aws-lab.json` 값으로 승인 목록을 함께 갱신한다. 성능 계획의 B0/B1/B2 주소는 운영자가 준비하는 Gateway 구성의 자리값이다.
 
 UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`runtime/docs/결정기록_엔진UID.md`). Gateway 10000·observer 10004·공유 그룹 10010은 겹치지 않게 고른 프로젝트 선택값이다.
 

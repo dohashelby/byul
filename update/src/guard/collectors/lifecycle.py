@@ -126,7 +126,7 @@ def collect(docker, env, target, source, prepared):
     validate_binding(env,target,source,prepared)
     from guard.executors.lifecycle_capture import capture
     value = capture(docker,target,source=source,prepared=prepared)
-    origin = DataOrigin.EXAMPLE if env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED
+    origin = DataOrigin.EXAMPLE if env.data_origin == DataOrigin.EXAMPLE or target.get("lab") is True else DataOrigin.DECLARED
     return {**value, "data_origin":origin.value, "environment_ref":env.ref().model_dump(mode="json"),
         "origin_detail":"owned file and process context read; native producer assertions remain unauthenticated"}
 
@@ -146,6 +146,6 @@ def collect_session(docker,env,target,container,image,prepared):
     validate_session_binding(env,target,source,prepared)
     from guard.executors.lifecycle_session import capture_session
     value=capture_session(docker,target,container=container,image=image,prepared=prepared)
-    origin=DataOrigin.EXAMPLE if env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
+    origin=DataOrigin.EXAMPLE if env.data_origin==DataOrigin.EXAMPLE or target.get("lab") is True else DataOrigin.DECLARED
     return {**value,"data_origin":origin.value,"environment_ref":env.ref().model_dump(mode="json"),
         "origin_detail":"owned container census and recording bytes; producer assertions and fingerprint links remain unauthenticated"}

@@ -141,7 +141,8 @@ def collect(inputs,*,duration=180,max_file_bytes=1024**3,binary="kubectl",reader
         except Exception:row["diagnostic_codes"].append("WEIGHT_FILE_CAPTURE_UNAVAILABLE");gap=True
         rows.append(row)
     if not selected:gap=True;diagnostics.append("NATIVE_WEIGHT_SELECTION_UNAVAILABLE")
-    origin=DataOrigin.EXAMPLE if injected or env.data_origin==DataOrigin.EXAMPLE or inputs["native_origin"]=="EXAMPLE" else DataOrigin.DECLARED
+    example_target=context["transport"]=="docker" and inputs["target"].get("lab") is True
+    origin=DataOrigin.EXAMPLE if injected or example_target or env.data_origin==DataOrigin.EXAMPLE or inputs["native_origin"]=="EXAMPLE" else DataOrigin.DECLARED
     return {"schema":"guard-native-weight-files-capture/1","environment_ref":env.ref().model_dump(mode="json"),
         "session":inputs["prepared"]["session"],"data_origin":origin.value,"model_inventory_sha256":inputs["manifest"]["inventory_sha256"],
         "native_session_sha256":context["native_session_sha256"],"model_manifest_sha256":context["model_manifest_sha256"],

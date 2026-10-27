@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — native 수집의 알려진 Docker stub 출처 보수
+
+- 한 일: 개별·세션 native 기록과 가중치 파일 수집이 Docker lab=true stub을 EXAMPLE로 유지하도록 맞췄다. ENV/native 입력 등급으로 알려진 stub을 승격하지 않는다. Kubernetes lab=true의 소유 비운영 선언·실제 대상 DECLARED 상한과 소유 신원 불일치 UNKNOWN은 보존한다. 센서/profile·팩·판정·스트림 측정은 유지한다.
+- 테스트 결과: 866파일 고정 후 영향 suite749통과/새 회귀의 필드 위치 오류9건(기존skip6/제외1, pytest62.73초·부모63.714초)을 보존했다. 개별 수집의 summary 계약에 맞춰 새 회귀만 고친 뒤 직접·인접·불변식382통과/0실패/기존skip1/제외1(pytest18.30초·부모18.911초), 새EXAMPLE30건 포함이다. 검증 중 소스 동일·제품 bytes 불변·설치 wheel138파일 일치(부모10.932초)이며 실제 엔진·Kubernetes/GPU 실증과 등록 증가는0이다. 원본은 저장소 밖 byul-native-capture-origin-20261027T121307+0900이다.
+- 다음 단계: 소스 고정·회귀·최종 head CI와 PR29를 갱신한다. 기존 준비 실패 조사 근거와 REQ-02/LIF-04의 누락된 관측·정책 경계를 인계해 빈 실행기를 등록하지 않는다.
+- 막힌 것: 이번 출처 보수의 CPU 구현에는 없음. 준비 실패의 독립 worker/접수 gate·경로 인증/handler 연결·요청별 buffer 비용/회수 및 실제 대상 실증은 미완료다.
+
 ## 2026-10-27 — REQ-05 실제 Docker 대상 입력 호환 보수
 
 - 한 일: 기존 sandbox 진입점이 stub=true·실제 엔진=false로 쓰는 lab 표식을 확인해 native 파일 수집기의 bool 입력 검사와 맞췄다. run/container·pinned 이미지·정확 ENV/session/inventory 검사는 유지하고 Kubernetes의 lab=true 선언은 완화하지 않았다. 스트림 측정·센서 profile·팩·판정은 유지한다.

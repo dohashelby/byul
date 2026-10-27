@@ -2,6 +2,11 @@
 
 ## LIF-10 native metadata 센서 준비와 소유 기록 수집
 
+Docker 대상의 `lab=true`는 기존 진입점에서 stub을 뜻하므로 개별·세션 native 수집은
+ENV가 DECLARED/MEASURED로 입력돼도 EXAMPLE을 유지한다. `lab=false` 또는 과거 입력의
+미지정 표식은 EXAMPLE ENV를 승격하지 않으며 나머지도 DECLARED 상한이다. Kubernetes의
+`lab=true`는 소유 비운영 대상 선언으로 의미가 다르며 기존 전송·ENV 출처 상한을 따른다.
+
 아직 CheckDef executor/judge는 미등록이며 종료 기한·회수 대상은 기업 결정이다.
 이 절은 실제 생산자/파일 수집의 준비 경계다. 단일 파일 일치·HTTP 취소·finished ID·
 batch row 제거를 전체 Core/worker/GPU 회수나 LIF-10 PASS로 해석하지 않는다.
@@ -156,7 +161,10 @@ tensor 적재·최종 소비 증명이 아니다. 원문 경로·내용·예외�
 파일 불일치는 유효한 관측으로 보존하고 새 보안 FAIL/PASS를 만들지 않는다. 뒤 파일 실패는
 앞선 성공 해시를 유지한다. 늦은 소유/경로 재확인 실패도 해시를 유지하고 binding=false로
 남긴다. 출력 저장이 실패하면 종료1과 함께 전체 안전한 capture를 stdout에 남기며 기존
-출력 파일을 덮어쓰지 않는다. 자료 등급은 DECLARED 상한이고 대역은 EXAMPLE이다.
+출력 파일을 덮어쓰지 않는다. 자료 등급은 DECLARED 상한이고 대역·EXAMPLE 입력과 알려진
+Docker stub(`lab=true`)은 EXAMPLE이다. Kubernetes의 `lab=true` 선언을 Docker stub으로
+취급하지 않으며 실제 Kube 수집도 DECLARED 상한이다. native 소유자가 다른 전송의 신원과
+맞지 않으면 해시는 보존하고 연결 미확인 상태를 유지한다.
 최종 모델·weights revision·실제 소비·생산자 인증·전체 실행 확인은 모두 false/UNKNOWN이다.
 
 ## LIF-10 Kubernetes 파일·프로세스 읽기

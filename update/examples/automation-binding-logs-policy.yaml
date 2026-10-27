@@ -1,9 +1,8 @@
-# EXAMPLE/DRAFT limited connection and native INFO policy; not enterprise approval.
 data_origin: EXAMPLE
 status: DRAFT
 pack:
   id: PACK-BASELINE
-  revision: 28
+  revision: 29
 values:
   REQ-01:
     allowed_callers:

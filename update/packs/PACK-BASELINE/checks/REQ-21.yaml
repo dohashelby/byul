@@ -3,7 +3,7 @@ framework_id: CHK-REQ-021
 mechanism_ids:
 - mechanism-05
 - mechanism-16
-revision: 2
+revision: 3
 retired: false
 area: REQ
 purpose: 실행 상태·버퍼 수명
@@ -32,7 +32,7 @@ satisfied_if: 등록된 버퍼가 현재 실행·소유자와 일치하고, 다�
 fail_criteria: 종료된 세대의 잘못된 참조 사용이나 미해제로 다음 기동·자료 귀속이 깨진다.
 unknown_criteria: native 통신의 실제 참조 수명·해제 효과를 계측하지 못했다.
 remediation: '- TP graph 통신 buffer의 등록 정보·소유자·실행 세대를 관리한다. graph·통신기가 더 이상 해당 buffer를 참조하지 않고 관련 GPU 연산이 모두 끝난 뒤 참조를 해제한다. 종료·재기동 때 이전 등록 정보를 정리하고 새 실행에 유효한 참조만 사용한다.'
-method_and_evidence: rank별 buffer/IPC handle 등록·교환·소비·release와 재기동 후 새 참조를 확인한다. 종료 시간·자원 회수 판정은 C08과 공유한다.
+method_and_evidence: 선정 TP graph/communicator의 rank·process 세대마다 buffer/IPC handle 등록·교환·소비·GPU 완료·참조 해제·재등록 순서를 확인한다. 종료·재기동 뒤 현재 세대·소유자·유효 범위의 참조만 사용하는지 정상 TP graph 실행과 대조한다. CUDA Graph caller의 입력 갱신·출력 소비는 CHK-REQ-020에서, 그룹의 회수 기한·잔존 자원·후속 정상 기동은 CHK-LIF-011에서 별도로 판정하며 같은 native 수명 관측을 공유한다.
 remaining_setup: 선정 통신 backend·native 계측·격리 재기동 fixture
 executor: null
 judge: null

@@ -2,20 +2,20 @@ id: REQ-10
 framework_id: CHK-REQ-010
 mechanism_ids:
 - mechanism-03
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 최종 입력 검증
 secondary_purposes: []
-question: 답변 생성 옵션의 값·개수·조합이 실제 실행 가능한 범위 안에 있는가?
-scope: 기본+지원 옵션
+question: 생성 요청 옵션의 값·구조·개수·복잡도·조합이 실제 처리 단계의 허용 범위를 지키는가?
+scope: 기본 sampling+실제 지원 구조화 출력·tool 선택
 risk_category: 보안 위협·일반 장애 함께 점검
 risk_summary: 호출자가 지원 범위를 벗어난 sampling 조합·개수를 제출해 실행 오류를 유도할 수 있음. 한 요청의 오류가 타 요청까지 퍼지는지는 시험 필요.
 review_order: reference_baseline_first
 impact: null
 applies_when:
   always: true
-  prose: API가 받는 sampling 옵션의 값·조합을 확인한다. V2 count 한도 변형은 해당 processor가 실제 선택될 때 추가한다.
+  prose: API가 받는 sampling 옵션의 값·개수·조합을 기본 확인한다. V2 count 한도 변형은 해당 processor가 실제 선택될 때 추가한다. 구조화 출력(schema·grammar 등)이나 tools/tool_choice를 지원하면 해당 입력의 크기·깊이·복잡도와 상호 조합·backend 제약을 추가 확인한다. 허용/금지 조합은 실제 API·판본·backend의 지원 규칙과 채택한 정책에 따라 정한다.
 policy_params:
 - key: allowed_sampling_options
   type: list[str]
@@ -49,13 +49,16 @@ required_observations:
 - key: runner_consumption_verified
   type: bool
 required_observations_prose:
-- sampling 유효값/실제 runner·worker 제한/요청 오류·core·worker 생존
-satisfied_if: 모순·비허용 조합이 제한되고 허용 조합은 정상 처리된다. health 응답만으로 복구를 판정하지 않는다.
-fail_criteria: 불허 조합이 보호 요구를 깨뜨리거나 한 요청 오류가 정한 허용 범위 밖 다른 요청에 영향을 준다.
-unknown_criteria: worker 예외만 확인되고 API 거부·다른 요청·엔진 영향은 확인되지 않았다.
-remediation: '- 기본값·별칭을 적용한 최종 sampling 값과 옵션 조합을 실제 runner의 제약에 맞춰 검사한다. 요청별 값의 범위뿐 아니라 개수·조합 제약도 확인하고 오류가 공유 엔진 전체로 확대되는 경로를 보완한다.'
-method_and_evidence: '유한/비유한 값·min/max 등 관계 조건을 변환·기본값 적용 후 소비값과 비교한다. 옵션별 결과와 오류 뒤 추론을 기록한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F40】V2 해당 processor 도달 시 1024/1024/128 상한에서 ValueError 확인. API는 값 범위를 검사. 엔진 종료 전파는 확인하지 않음. 기존 입력 오류 시나리오의 V2 시험 변형이며 공유 엔진 종료는 미확인이다. V2가 실제 활성인 격리 환경에서 allowed IDs/logit_bias 1023·1024·1025, min_tokens>0에서 실제 all_stop_token_ids 127·128·129를 대조하고 병행 정상 요청과 후속 요청 생존을 확인한다. 모델 vocab/EOS 추가분 기록. 정상 대조: 경계 이내 유효 요청·병행 정상 요청 완료'
-remaining_setup: V2 count 한도는 실제 소비 조건 확인 후 한도+1까지; 부하·중단 상한 사전 설정
+- sampling 유효값·개수·관계/실제 runner·worker 제한/요청 오류·core·worker 생존
+- 선정 API·판본·구조화 출력 backend, 제출/정규화한 schema·grammar·tools/tool_choice, 실제 허용 조합과 크기·깊이·복잡도 기준
+- 제한/조합 검사·거부 지점과 고비용 재귀 변환·grammar 변환/컴파일·모델 제출의 실제 도달/미도달 근거
+- 허용 조합의 정상 처리와 비허용 입력의 거부·정규화, 비용·지연 및 병행/후속 정상 요청의 독립 결과
+satisfied_if: sampling과 실제 지원하는 구조화 출력·tool 선택이 채택한 값·개수·크기·깊이·복잡도·조합 기준과 backend 제약을 지키고 허용 입력은 정상 처리된다. 비허용 schema/grammar·조합은 해당 제한 지점에서 거부·제한되어 고비용 재귀 변환·grammar 변환/컴파일·모델 제출로 진행하지 않는다. 입력 구조를 읽는 데 필요한 제한 검사는 허용하며, 실제 처리 비용과 자원 예산은 CHK-LIF-003에서 함께 대조한다. health 응답만으로 복구를 판정하지 않는다.
+fail_criteria: 채택한 값·개수·크기·깊이·복잡도·조합 제한을 위반한 sampling·구조화 출력·tool 선택 입력이 해당 제한 지점을 넘어 수용·소비되거나, 비허용 입력이 고비용 후속 변환/컴파일·모델 제출로 진행한다. 한 요청 오류가 정한 허용 범위 밖 다른 요청에 영향을 주는 경우도 포함한다. 제한·조합 위반과 실제 비용·엔진/다른 요청 영향은 각각 증거로 기록한다.
+unknown_criteria: 적용할 옵션/구조화 출력·tool 선택의 제한·허용 조합·backend 제약·집행 위치 또는 변환 후 소비값을 확인하지 못했다. 객체 검증 오류나 HTTP400만 있고 실제 거부 지점·후속 변환/컴파일·모델 제출의 미도달 근거가 없는 부분은 미확인으로 남긴다. 엔진·다른 요청의 영향만 미확인인 경우에는 이미 확인한 제한·조합 위반의 미충족을 유지하고 영향의 확인 상태를 따로 남긴다.
+remediation: '- 기본값·별칭을 적용한 최종 sampling 값·개수·조합을 실제 runner 제약에 맞춰 검사한다. 지원하는 schema/grammar의 크기·깊이·복잡도와 tools/tool_choice의 상호 조합을 해당 API·backend 규칙에 따라 제한한다. 입력 구조를 읽는 데 필요한 제한 검사는 수행하되 고비용 재귀 변환·grammar 변환/컴파일·모델 제출로 진행하기 전에 비허용 입력을 거부·제한한다. 요청 오류와 비용이 공유 엔진 전체로 확대되는 경로를 보완하고 CHK-LIF-003의 자원 예산에 연결한다.'
+method_and_evidence: '유한/비유한 값·min/max 등 관계 조건을 변환·기본값 적용 후 소비값과 비교한다. 기존 sampling의 값·개수·조합 및 실제 V2 processor 조건을 유지한다. 구조화 출력·tool 선택을 실제 지원하면 schema/grammar의 크기·깊이·복잡도와 해당 API/backend의 상호 조합 규칙을 정상/비허용 입력으로 대조한다. 입력 구조를 읽는 제한 검사와 비싼 재귀 변환·grammar 변환/컴파일·모델 제출을 구분해 거부 지점·후속 도달/미도달을 확인한다. 객체 단위 예외나 HTTP 오류만으로 실제 경로 전체를 충족 처리하지 않는다. 옵션/구조/조합 결과와 오류 뒤 추론·다른 요청 영향은 따로 기록하며, 처리 비용·누적 자원 예산은 CHK-LIF-003과 관측을 공유한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F40】V2 해당 processor 도달 시 1024/1024/128 상한에서 ValueError 확인. API는 값 범위를 검사. 엔진 종료 전파는 확인하지 않음. 기존 입력 오류 시나리오의 V2 시험 변형이며 공유 엔진 종료는 미확인이다. V2가 실제 활성인 격리 환경에서 allowed IDs/logit_bias 1023·1024·1025, min_tokens>0에서 실제 all_stop_token_ids 127·128·129를 대조하고 병행 정상 요청과 후속 요청 생존을 확인한다. 모델 vocab/EOS 추가분 기록. 정상 대조: 경계 이내 유효 요청·병행 정상 요청 완료'
+remaining_setup: 기존 V2 count 한도는 실제 processor 소비 조건 확인 후 작은 경계 fixture로 시험한다. 선정 API/backend의 구조화 출력·tool 조합 지원 규칙과 크기·깊이·복잡도 기준·집행 위치, 실제 거부/후속 변환·컴파일·모델 제출 경계를 계측한다. 공식 고정판과 설치판의 호환성·부하/중단 상한을 먼저 확인한다.
 executor: sampling_validation
 judge:
   plugin: rule_table
@@ -120,3 +123,4 @@ limitations:
 - 실행 fixture의 max_tokens는 기업 출력 한도와 구분되는 작은 시험 예산이다. temperature 음수·top_p 범위·min_tokens와 max_tokens 관계의 제약 출처와 버전은 실행 설정의 DECLARED 참조이며 실제 빌드와 일치한다고 인증하지 않는다.
 - 정상 경계·동시 송신 정상 요청·후속 정상 추론과 health를 관측한다. health만으로 복구를 판정하지 않으며 두 송신의 병행이 worker 내부 실행 겹침이나 모든 worker 생존을 입증하지 않는다.
 - 실제 V2 활성·runner/worker 최종 소비값·allowed IDs/logit_bias/stop 개수 제한은 미계측이다. runner_consumption_verified=false로 보안 PASS를 보류하며 기능 PASS는 한 표본의 관측 범위다. API 수용·5xx·timeout만으로 메모리 손상·타 요청 피해·엔진 취약성을 확정하지 않는다.
+- 이 override의 실행 단계·정상 대조는 현재 sampling-api-v1 지원 프로파일에 한정한다. 새 schema/tool 선택·최종 소비 관측은 미구현·UNKNOWN이며 별도 연결이 필요하다.

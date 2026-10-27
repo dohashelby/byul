@@ -1,13 +1,26 @@
-# 예시 정책 (EXAMPLE, DRAFT). 보고서는 "공식 아님"으로 표시된다.
 data_origin: EXAMPLE
 status: DRAFT
-pack: { id: PACK-BASELINE, revision: 28 }
+pack:
+  id: PACK-BASELINE
+  revision: 29
 values:
-  REQ-01: { allowed_callers: [gateway-sa] }
-  REQ-03: { general_allowed_kinds: [inference] }   # 일반 호출자 = 추론만, 관리 호출자 = 관리·진단
-  PLT-01: { allowed_capabilities: [], allowed_mounts: ["/models:ro"], allowed_devices: [], require_non_root: true,
-            allowed_exec_writable_paths: ["/guard-cache"] }   # 컴파일 캐시 전용 exec 가능 tmpfs 1개
-scope: { include: [], exclude: [] }   # include가 비면 팩 전체
+  REQ-01:
+    allowed_callers:
+    - gateway-sa
+  REQ-03:
+    general_allowed_kinds:
+    - inference
+  PLT-01:
+    allowed_capabilities: []
+    allowed_mounts:
+    - /models:ro
+    allowed_devices: []
+    require_non_root: true
+    allowed_exec_writable_paths:
+    - /guard-cache
+scope:
+  include: []
+  exclude: []
 exceptions: []
 confirmed_by: null
 confirmed_at: null

@@ -1,11 +1,8 @@
-# EXAMPLE/DRAFT fixed chat test policy, not enterprise defaults or approval.
-# Adds REQ-07 and explicitly permits the readonly shipped fixture mount only in this example.
-# REQ-13 values are unchanged from the completion example; mismatches are not hidden.
 data_origin: EXAMPLE
 status: DRAFT
 pack:
   id: PACK-BASELINE
-  revision: 28
+  revision: 29
 values:
   REQ-01:
     allowed_callers:

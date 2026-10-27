@@ -2,7 +2,7 @@ id: LIF-08
 framework_id: CHK-LIF-008
 mechanism_ids:
 - mechanism-13
-revision: 3
+revision: 4
 retired: false
 area: LIF
 purpose: 실패 감지·상위 통지
@@ -31,7 +31,7 @@ satisfied_if: 정한 기한 안에 실패가 전달되고 불완전 작업을 �
 fail_criteria: 정한 감지·전달 기한을 넘기거나 실패를 성공으로 반환한다.
 unknown_criteria: 네 장애를 하나로 대신했거나 감지 기한·상위 전달을 못 본다.
 remediation: '- rank 예외·프로세스 종료·지연·통신 정지를 구분해 감지하고 영향받는 요청·실행 그룹에 오류를 전달한다. 감지·전달 기한을 정하고 실패를 정상 완료로 처리하는 경로를 보완한다.'
-method_and_evidence: rank별 무해 예외·프로세스 종료·제한 지연을 나눠 FAILURE·sentinel·timeout·Core 상태를 기록한다.
+method_and_evidence: 선정 executor에서 rank의 무해 예외·프로세스 종료·제한 지연·통신 정지를 각각 주입하고, fault 발생→감지→상위 전달·요청 실패 결과의 시각과 대응을 기록한다. 각 장애를 다른 종류의 장애 관측으로 대신하지 않는다. 초기화·모델 준비의 부분 실패 집계는 CHK-LIF-009에서, 실패 후 process·IPC·공유 자원 회수와 다음 기동은 CHK-LIF-011에서 판정한다. 같은 시험의 로그/API 표현과 실제 상태의 일치는 CHK-OBS-002에서 별도로 대조한다.
 remaining_setup: 장애별 안전 주입기·종료 상한·복구 절차
 executor: null
 judge: null

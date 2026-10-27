@@ -3,7 +3,7 @@ framework_id: CHK-PLT-008
 mechanism_ids:
 - mechanism-01
 - mechanism-16
-revision: 3
+revision: 4
 retired: false
 area: PLT
 purpose: 통신 상대·전송 보호
@@ -34,7 +34,7 @@ satisfied_if: API·내부 통신의 각 구간에서 채택한 상대 인증·�
 fail_criteria: 채택한 정책에서 금지한 평문 통신·비허용 상대 연결·변조 자료 수용이 확인되거나, 필수 상대 검증을 수행하지 않는다.
 unknown_criteria: API의 실제 종단·TLS 종료점 또는 내부 transport·peer·보호 설정과 결과를 확인하지 못했다. 필수 보호 요구가 미정이면 해당 기준의 판정을 보류한다.
 remediation: '- 호출 주체→Gateway→엔진과 내부 통신을 구간별로 나누고 채택한 상대 인증·기밀성·무결성 보호를 적용한다. TLS 종료 후 엔진까지의 구간도 확인한다. 인증서를 사용하는 구간에서는 신뢰되지 않거나 이름이 다른 인증서를 거부하는지 시험한다. 로컬 IPC는 실제 계정·namespace·접근권에 맞게 보호한다.'
-method_and_evidence: '제어 SHM/socket·overflow·collective·PP를 구분해 실제 peer·transport·접근권·보호를 확인한다. 각 속성별 결과를 남긴다.<br><br>**vLLM v0.31.0 구현 메모:** 【F21】실제 RPC_BASE_PATH, socket/SHM 소유자·mode·mount namespace·접근 가능한 PID/UID를 수집; 현재 접근 가능성과 임의 명령 실행 효과를 분리. 허용 프로세스·동일 UID 비허용 프로세스·다른 UID 비허용 프로세스에서 채널별 연결과 무해 메시지 수용을 대조한다. OS 권한·namespace와 실제 소비 여부를 기록한다. 정상 대조: 허용 프로세스의 TP 요청 정상 처리와 채널별 연결/소비 기록 확보. API는 호출 주체→Gateway, Gateway→엔진을 나눠 실제 TLS 종료점·재암호화·서버 인증·필요한 호출 주체 인증을 확인한다. Gateway가 없으면 직접 호출 구간을 확인한다. 인증서를 사용하는 구간에서 정상 인증서와 신뢰되지 않거나 이름이 다른 인증서를 대조한다. 채택 정책에서 금지한 평문 연결이 가능한지도 격리 환경에서 확인한다.'
+method_and_evidence: '서비스 API와 API/core/worker·rank 사이 실제 제어·데이터 통신을 구간별로 식별하고, 각 구간의 허용 peer·상대 확인·기밀성·무결성 요구와 정상 API·스트리밍·TP 처리를 대조한다. 제어 SHM/socket·overflow·collective·선택 PP/다중 노드 transport를 구분한다. 로컬 IPC의 UID·namespace·socket/SHM 접근과 무해 메시지 수용 관측은 CHK-PLT-002와 공유할 수 있다. 이 항목에서는 그 근거가 해당 구간의 보호 요구를 충족하는지 판정하고, 로컬 IPC 인가만으로 다른 구간의 전송 보호를 통과시키지 않는다. API는 실제 TLS 종료점·재암호화·서버 인증과 필요한 호출 주체 인증을 구분하며, 정상 인증서·신뢰되지 않거나 이름이 다른 인증서와 정책상 금지된 평문 연결을 격리 환경에서 대조한다. 관측 자료 전용 collector/sink 전송은 CHK-PLT-009에서 구간별로 판정한다. vLLM v0.31.0의 공통 【F21】 근거를 참조한다. 근거 원문: [F21](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33824).'
 remaining_setup: 실제 API·IPC·TP 구간과 보호 요구, TLS 시험 endpoint·인증서·지원 시험기 준비. 기업별 보호 방식·예외 결정 및 실제 시험 필요.
 executor: null
 judge: null

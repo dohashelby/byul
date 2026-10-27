@@ -2,7 +2,7 @@ id: SUP-07
 framework_id: CHK-SUP-007
 mechanism_ids:
 - mechanism-09
-revision: 3
+revision: 4
 retired: false
 area: SUP
 purpose: 실제 사용의 무결성
@@ -31,7 +31,7 @@ satisfied_if: 허용되지 않은 생성·변조 결과를 소비하지 않는�
 fail_criteria: 비허용 writer가 바꾼 생성물을 요구한 검사 없이 소비한다.
 unknown_criteria: cache 파일 변경은 확인했지만 소비 도달·내용 검증·권한 집행을 확인하지 못했다.
 remediation: '- 컴파일 결과·생성 파일·캐시의 작성자와 읽는 프로세스를 구분하고 저장 위치의 쓰기 권한을 제한한다. 생성 입력·도구·설정의 식별정보를 기록하고, 무단 변경된 결과를 읽기 전에 거부하거나 승인한 조건으로 다시 생성한다.'
-method_and_evidence: '생성 도구·입력·옵션·결과·consumer를 연결하고 다른 writer의 무해 교체 표식으로 재사용 여부를 확인한다. npcache는 생성과 재사용의 writer·권한을 따로 확인한다. 컴파일 캐시는 vLLM의 목록 해석과 실제 생성 코드 소비를 나누고 의존성 내부 검사는 조사 범위를 표시한다. cache 생성자·쓰기권·pickle 소비 위치를 기록한다. 승인 cache 정상 재사용과 비승인 writer의 무해 표식/격리 시험 cache 교체를 대조해 소비 전 제한 여부를 확인한다. safetensors 정책만으로 cache reader를 통과시키지 않는다.<br><br>**vLLM v0.31.0 구현 메모:** 【F03】실제 compilation backend·AOT 사용·캐시 활성값·의존성 판본을 기록. 단순 활성 시 선택으로 기본 캐시 조사를 건너뛰지 않음. 유효 VLLM_CACHE_ROOT·compilation_config.cache_dir·TORCHINDUCTOR_CACHE_DIR·TRITON_CACHE_DIR와 각 rank 실제 파일을 수집; 묶음별 빈 디렉터리 최초 생성/동일 묶음 재기동/다른 묶음 재사용 거절을 비교. 타 계정 쓰기 및 엔진 자신의 잔존 writer·오염 지속성도 확인. 정상 대조: 승인한 동일 묶음에서 정상 생성·재기동 후 결과와 필요 성능 유지.'
+method_and_evidence: '실제 파생·compiled·npcache의 생성자·writer·경로·consumer·reader와 소비 전 무결성 집행을 확인한다. 비허용 writer의 무해 변경·교체를 승인 생성물의 정상 소비와 비교하고, 변경된 파일이 실제 읽히는지와 거부를 기록한다. pickle 등 reader의 해석 안전성은 CHK-SUP-012와 증거를 공유한다. 【F03】실제 backend·AOT·기본 cache 활성값·의존성 판본을 고정하고 VLLM_CACHE_ROOT·compilation_config.cache_dir·TORCHINDUCTOR_CACHE_DIR·TRITON_CACHE_DIR 중 사용 경로와 rank별 파일을 조사한다. 타 계정과 엔진 자신의 잔존 writer·오염 지속성을 각각 확인한다. 근거 원문: [F03](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33609).'
 remaining_setup: 격리 cache와 안전한 계측; 임의 코드 실행 payload는 사용하지 않음
 executor: null
 judge: null

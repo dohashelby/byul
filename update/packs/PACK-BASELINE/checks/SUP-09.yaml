@@ -2,7 +2,7 @@ id: SUP-09
 framework_id: CHK-SUP-009
 mechanism_ids:
 - mechanism-09
-revision: 2
+revision: 3
 retired: false
 area: SUP
 purpose: 추가 코드 실행 허용
@@ -19,7 +19,7 @@ policy_params: []
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 필요한 모델 코드·plugin·모드·권한·공급 방식, 승인/변경 절차. auto_map 존재만으로 실행이나 거부를 확정하지 않고 실제 선택되는 코드 출처를 확인한다.
-normal_control: 추가 코드 없이 승인한 모델이 정상 로딩된다.
+normal_control: 추가 코드가 필요 없는 승인 모델의 정상 로딩을 확인한다. 추가 코드를 허용한 구성에서는 승인한 코드·판본·의존 파일을 사용하는 모델도 정상 로딩한다.
 challenge_steps:
 - 모델이 선택하는 auto_map·코드 출처 확인
 - 무해 표식 custom module fixture 준비

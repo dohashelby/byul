@@ -2,7 +2,7 @@ id: LIF-09
 framework_id: CHK-LIF-009
 mechanism_ids:
 - mechanism-10
-revision: 3
+revision: 4
 retired: false
 area: LIF
 purpose: 기동 준비 확인
@@ -26,12 +26,14 @@ challenge_steps:
 - 수정 후 재기동
 required_observations: []
 required_observations_prose:
-- 실패 단계/집계 기동 상태/임시 자원·재기동
-satisfied_if: 부분 준비를 성공으로 보고 서비스하지 않는다.
+- 실패한 구성요소·초기화/로딩 단계의 원결과와 상위 기동·그룹 상태의 대응
+- 부분 실패 후 readiness·접수 gate·진행 작업 상태와 수정 후 정상 기동 기록
+- 임시 자원·실패 후 재기동 관측은 CHK-LIF-011과 공유하고 해당 범위를 별도 판정
+satisfied_if: 일부 필수 초기화·모델 준비가 실패하면 그 결과를 상위 기동 실패로 반영하고 부분 준비를 전체 성공으로 보고 서비스하지 않는다.
 fail_criteria: 부분 준비 실패가 전체 성공으로 표시되거나 서비스에 들어간다.
 unknown_criteria: 실패한 구성요소와 집계 상태의 대응을 확인하지 못했다.
 remediation: '- 초기화·모델 준비 단계와 필수 rank의 성공·실패를 모아 전체 준비 상태를 판정한다. 일부 실패를 표시하고 서비스 수용을 보류하며 남은 자원 정리와 재기동 절차를 수행한다.'
-method_and_evidence: '설정·로딩·worker 준비 단계별 제한 실패에서 접수 gate·오류·남은 객체를 기록한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F32】기본 재배포는 외부 gateway/LB와 실제 승인 모델 준비 확인. live/keep/collective_rpc는 선택 구성에서만 도달성·상태 보존 확인; snapshot 경로와 일반기동 혼동 금지. 기본 재배포: 정상 로딩 완료·불완전 적재와 외부 요청 gate를 대조한다. 선택 live 변경을 사용하는 경우에만 abort/wait/keep의 요청·weights·cache 세대를 시험한다. 정상 대조: 기본: 정상 로딩 완료 후 요청과 실패 시 외부 gate 확인. 선택 live 활성 시에만 abort/wait/keep 및 모델·cache·요청 세대 추적.'
+method_and_evidence: '설정·모델 로딩·필수 worker 준비 중 한 구성요소를 제한적으로 실패시키고, 그 원결과가 상위 기동/그룹 상태와 readiness·서비스 비수용 결정에 반영되는지 대조한다. 수정 후 모든 필수 단계가 성공한 정상 기동의 완료 상태와 비교한다. 실패가 집계됐는지와 실제 접수 gate가 지켜졌는지는 각각 기록하고 CHK-LIF-007과 같은 관측을 공유할 수 있다. 부분 자원 회수·재기동 자체는 CHK-LIF-011에서 판정한다. vLLM v0.31.0의 공통 【F32】 근거 중 불완전 적재·기본 재배포 조건을 참조한다. 근거 원문: [F32](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33911).'
 remaining_setup: 작은 준비 실패 fixture·단계별 상태 계측
 executor: null
 judge: null

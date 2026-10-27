@@ -2,7 +2,7 @@
   "record_id": null,
   "assessment_id": "CHK-OBS-004",
   "protection_requirement_id": "requirement-5-3",
-  "checklist_revision": "sha256:cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+  "checklist_revision": "sha256:745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
   "test_branch_ref": {
     "name": "설정 조작으로 금지한 사용통계 보고 재개",
     "scenario_ids": [

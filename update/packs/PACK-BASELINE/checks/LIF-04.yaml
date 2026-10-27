@@ -2,7 +2,7 @@ id: LIF-04
 framework_id: CHK-LIF-004
 mechanism_ids:
 - mechanism-07
-revision: 2
+revision: 3
 retired: false
 area: LIF
 purpose: 자원 예산·공정성
@@ -31,7 +31,7 @@ satisfied_if: 대기·buffer 비용이 한도 안에 있고 종료 뒤 정리된
 fail_criteria: 느린 연결·진단이 정한 메모리·시간 예산을 넘겨 자원을 유지한다.
 unknown_criteria: buffer별 비용·회수 또는 허용 예산을 알 수 없다.
 remediation: '- 느린 수신자의 출력 buffer·보존 시간·전송 기한을 제한하고 필요할 때 역압력·취소를 적용한다. 사용하지 않는 진단 buffering을 끄고 활성 기능의 메모리 예산과 정리 시점을 관리한다.'
-method_and_evidence: 느린 스트림 읽기·연결 종료·debug 옵션에서 출력 대기·메모리·후속 정상 요청을 관측한다.
+method_and_evidence: 느린 스트림 읽기·연결 종료·debug 옵션에서 출력 대기·메모리·후속 정상 요청을 관측한다. 이 항목은 전송 중 대기·buffer 비용과 종료 뒤 해당 buffer 정리를 판정한다. 같은 연결 종료에서 내부 요청 실행·KV·전송 참조의 기한 내 종결은 CHK-LIF-010에서, debug 자료의 허용 필드는 CHK-OBS-003에서 따로 판정한다.
 remaining_setup: 수신 지연 제어기·진단 활성 조건·메모리 상한
 executor: null
 judge: null

@@ -2,12 +2,12 @@ id: PLT-12
 framework_id: CHK-PLT-012
 mechanism_ids:
 - mechanism-12
-revision: 2
+revision: 3
 retired: false
 area: PLT
 purpose: 권한 철회
 secondary_purposes: []
-question: 폐기한 자격의 사본으로 다시 접근할 수 없는가?
+question: 폐기 대상 자격의 남은 사본에 정한 교체·회수·삭제와 재사용 금지 기준이 적용되는가?
 scope: 자격 전달·저장·교체 시
 risk_category: 보안 위협 점검
 risk_summary: 폐기된 secret·이미지·설정 사본에 접근한 주체가 남은 자격을 재사용해 서비스에 다시 접근할 수 있음.
@@ -19,19 +19,20 @@ policy_params: []
 policy_prose:
   policy_to_decide: 자격 수명·사본 정리·교체 절차
   enterprise_decisions: 철회 대상·issuer·정책 캐시, 진행 요청과 기존 세션 처리, 자격 교체·사본 정리 담당과 근거.
-normal_control: 활성 자격 사본만 허용 위치에서 사용된다.
+normal_control: 활성 자격은 허용된 위치·수신자만 사용한다. 교체·폐기 후 사본은 정책이 정한 처리 기한과 보존 예외에 따라 정리되거나 제한된 상태로 보존된다.
 challenge_steps:
-- 시험 자격 교체·폐기
-- env·mount·backup 등 승인된 조사 위치 확인
-- 옛 자격으로 무해 신규 접근
+- 시험 자격의 대상 위치·수신자별 교체·폐기 기한·방법과 보존 예외를 기록
+- 자격 교체·폐기 후 env·mount·배포 Secret·임시 파일·snapshot/backup 등 승인된 조사 위치에서 이전 사본의 실제 처리 상태 확인
+- 남은 시험 사본·복원 경로의 재사용 시도를 대조하고 issuer 철회/만료 결과와 위치별 사본 처리 결과를 각각 기록
 required_observations: []
 required_observations_prose:
-- 사본 위치·owner/교체·삭제 기록/옛 자격 접근 결과
-satisfied_if: 폐기 대상 자격으로 비허용 접근이 성립하지 않는다.
-fail_criteria: 폐기 자격이 허용 범위 밖 사본으로 남아 재사용되거나 철회 기한 후 접근한다.
-unknown_criteria: 사본 위치·폐기 기한이 불명확하거나 외부 자격 검증 결과를 모른다.
+- 대상 위치·수신자별 사본 inventory, 교체·폐기 기한·방법·보존 예외와 승인
+- 실제 교체·회수·삭제 또는 제한 보존 상태·시각, 이전 사본/복원 경로의 재사용 시도와 issuer·집행점의 거부 결과(비밀 원문 제외)
+satisfied_if: 대상 위치·수신자별 사본이 정한 기한·방법에 따라 교체·회수·삭제되거나 승인된 보존 예외와 접근 제한을 지키며, 폐기한 자격의 비허용 재사용이 성립하지 않는다. issuer의 거부·만료와 실제 사본 처리는 각각 증거로 확인한다.
+fail_criteria: 대상 위치·수신자에 정한 사본 교체·회수·삭제 기한·방법 또는 보존 예외의 접근 제한을 위반하거나, 남은/복원된 폐기 자격으로 비허용 재사용이 성립한다.
+unknown_criteria: 사본의 대상 위치·수신자·기한·처리 방법·보존 예외 또는 실제 처리·재사용 경로의 증거를 확인하지 못했다. issuer의 신규 접근 거부만 확인한 경우 사본 처리 결과는 미확인으로 남긴다.
 remediation: '- 자격이 남을 수 있는 설정·파일·환경변수·백업·복원 자료를 관리하고 폐기 대상 사본을 삭제하거나 접근을 제한한다. 원 자격을 철회·교체해 사본이 복원돼도 금지된 접근에 재사용되지 않게 한다.'
-method_and_evidence: 시험 자격을 교체·철회하고 worker·임시 파일·배포 secret의 이전 사본으로 접근을 대조한다. snapshot·로그 등에 복사된 시험 자격도 포함한다. issuer 철회/만료와 사본의 실제 삭제는 별도 증거로 확인한다.
+method_and_evidence: 자격 교체·폐기 정책의 대상 위치·수신자·기한·방법·보존 예외를 먼저 고정한다. worker env·임시 파일·배포 Secret·mount·snapshot/backup 등 실제 사본 위치에서 교체·회수·삭제 또는 제한 보존 상태를 확인하고, 남은 시험 자격·복원 경로의 재사용 결과를 대조한다. issuer의 철회/만료는 CHK-PLT-010, 이미 열린 session/handle의 처리는 CHK-PLT-011과 증거를 공유하되 실제 사본 처리 결과와 각각 기록한다. 비밀 원문은 기록하지 않는다.
 remaining_setup: 사본 조사 범위·보존 예외·철회 기한; 비밀값 출력 금지
 executor: null
 judge: null

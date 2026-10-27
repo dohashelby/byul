@@ -176,8 +176,10 @@ fact_triggers:
   - REQ-06
   remote_acquisition_or_retry:
   - LIF-02
+  - LIF-03
   - OBS-06
   - PLT-03
+  - REQ-16
   - SUP-12
   - SUP-15
   - SUP-16
@@ -447,6 +449,11 @@ fact_trigger_sources:
     source: supply_assessment_draft/CHK-SUP-016/test_branch_conditions
     matched_terms:
     - 다운로드
+  - check: REQ-16
+    framework_id: CHK-REQ-016
+    source: request_state_assessment_draft/CHK-REQ-016/applicability_criteria
+    matched_terms:
+    - 다운로드
   - check: PLT-03
     framework_id: CHK-PLT-003
     source: platform_assessment_draft/CHK-PLT-003/applicability_criteria
@@ -462,6 +469,16 @@ fact_trigger_sources:
     source: lifecycle_assessment_draft/CHK-LIF-002/test_branch_conditions
     matched_terms:
     - 원격 취득
+  - check: LIF-03
+    framework_id: CHK-LIF-003
+    source: lifecycle_assessment_draft/CHK-LIF-003/applicability_criteria
+    matched_terms:
+    - 다운로드
+  - check: LIF-03
+    framework_id: CHK-LIF-003
+    source: lifecycle_assessment_draft/CHK-LIF-003/test_branch_conditions
+    matched_terms:
+    - 다운로드
   - check: OBS-06
     framework_id: CHK-OBS-006
     source: observability_assessment_draft/CHK-OBS-006/applicability_criteria

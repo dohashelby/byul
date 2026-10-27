@@ -26,9 +26,9 @@ import time
 import types
 import weakref
 
-PROFILE = "vllm-native-lifecycle-metadata/5"
+PROFILE = "vllm-native-lifecycle-metadata/6"
 COMMIT = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
-SCHEMA = "guard-native-lifecycle-events/5"
+SCHEMA = "guard-native-lifecycle-events/6"
 CONFIG_SCHEMA = "guard-native-lifecycle-settings/1"
 CONFIG_ENV = "GUARD_LIFECYCLE_CONFIG"
 CONFIG_PATH = "/guard-lifecycle/settings.json"
@@ -37,6 +37,8 @@ MAX_BYTES = 262144
 MAX_IDS = 8
 MAX_MODEL_OBJECTS = 64
 SOURCE_SHA = {
+ "vllm.entrypoints.generate.base.serving":"9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
+ "vllm.entrypoints.serve.engine.serving":"e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
  "vllm.entrypoints.serve.middleware.authenticate":"ceb576aa3c053a5bcf145cfbe3f81def0f7213480c4aa1531fc4c00e32955225",
  "vllm.entrypoints.openai.models.serving":"39ecebf92abec7931b4c953e0d9743320dbd93532a8e3488307398c29dba2553",
  "vllm.entrypoints.openai.models.api_router":"58d7bf90b7dd2a896441d3085b8a4467c12412120f21fe53d838109b7b85f48b",
@@ -62,6 +64,8 @@ SOURCE_SHA = {
  "vllm.entrypoints.openai.completion.serving":"aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd",
 }
 POINTS = {
+ "vllm.entrypoints.generate.base.serving":{"GenerateBaseServing":("_get_data_parallel_rank","_get_session_id_from_headers","_get_session_id","_get_priority")},
+ "vllm.entrypoints.serve.engine.serving":{"BaseServing":("_base_request_id",)},
  "vllm.entrypoints.serve.middleware.authenticate":{"AuthenticationMiddleware":("__call__","verify_token")},
  "vllm.entrypoints.openai.models.serving":{"OpenAIServingModels":("show_available_models",)},
  "vllm.model_executor.model_loader.base_loader":{"BaseModelLoader":("load_model",)},
@@ -91,6 +95,8 @@ WEIGHT_POINTS = {"weight_utils."+name for name in FUNCTION_POINTS["vllm.model_ex
     "DefaultModelLoader._prepare_weights","DefaultModelLoader._get_weights_iterator"}
 ROUTE_POINTS = {"AuthenticationMiddleware.__call__","AuthenticationMiddleware.verify_token",
     "api_router.models","OpenAIServingModels.show_available_models"}
+REQUEST_SELECTION_POINTS = {"GenerateBaseServing._get_data_parallel_rank","GenerateBaseServing._get_session_id_from_headers",
+    "GenerateBaseServing._get_session_id","GenerateBaseServing._get_priority","BaseServing._base_request_id"}
 _OBSERVER = None
 
 
@@ -340,6 +346,8 @@ class Observer:
             and self.writer is not None and self.writer.closed)
 
     def wanted(self, point, snapshot):
+        if point in REQUEST_SELECTION_POINTS:
+            return self.selection_context() is not None
         if point in ROUTE_POINTS:
             return self.route_context() is not None
         if point in WEIGHT_POINTS:
@@ -459,6 +467,11 @@ class Observer:
         return {"complete": True, "pool_sha256": entry["pool_sha256"], "blocks": rows}
 
     def snapshot(self, point, args, kwargs, result=None, returned=False):
+        if point in REQUEST_SELECTION_POINTS:
+            if self.selection_context() is None:
+                return {"requests":[],"metadata":{},"selection_observed":False,"diagnostic":"SAMPLE_UNAVAILABLE"}
+            return {"requests":[],"metadata":{"request_selection":self.request_selection(point,result,returned)},
+                "selection_observed":False}
         if point in ROUTE_POINTS:
             if self.route_context() is None:
                 return {"requests":[],"metadata":{},"selection_observed":False,"diagnostic":"SAMPLE_UNAVAILABLE"}
@@ -620,17 +633,52 @@ class Observer:
     def route_scope(self,scope):
         if not self.active():return None
         headers=scope.get("headers",())
-        if type(headers) not in (list,tuple) or len(headers)>64:return None
-        values=[pair[1] for pair in headers if type(pair) in (list,tuple) and len(pair)==2
+        values=([pair[1] for pair in headers if type(pair) in (list,tuple) and len(pair)==2
             and type(pair[0]) is bytes and pair[0].lower()==b"x-request-id"]
-        if len(values)!=1 or type(values[0]) is not bytes or not 0<len(values[0])<=512:return None
-        return {"pid":os.getpid(),"closed":False,"request":sha(values[0]),
+            if type(headers) in (list,tuple) and len(headers)<=64 else [])
+        request=sha(values[0]) if len(values)==1 and type(values[0]) is bytes and 0<len(values[0])<=512 else None
+        return {"pid":os.getpid(),"closed":False,"request":request,
             "invocation":self.route_nonce("asgi-route"),**self.scope_fingerprints(scope)}
 
     @staticmethod
-    def route_context():
+    def selection_context():
         value=_ROUTE_REQUEST.get()
         return value if type(value) is dict and value.get("pid")==os.getpid() and value.get("closed") is False else None
+
+    @staticmethod
+    def route_context():
+        value=Observer.selection_context()
+        return value if value is not None and value.get("request") is not None else None
+
+    def request_selection(self,point,result,returned,data=None):
+        context=self.selection_context() or {}
+        value={"asgi_request_sha256":context.get("request"),"asgi_invocation_sha256":context.get("invocation"),
+            "entry_path_sha256":context.get("path"),"entry_root_path_sha256":context.get("root"),"entry_method_sha256":context.get("method")}
+        for name in ("priority","session","rank","request_id"):
+            value[name+"_observed"]=False
+            value["selected_"+name+("_sha256" if name in {"session","request_id"} else "")]=None
+        def observe(name,item):
+            key="selected_"+name+("_sha256" if name in {"session","request_id"} else "")
+            if name in {"priority","rank"}:
+                valid=type(item) is int and -(2**63)<=item<2**63 or name=="rank" and item is None
+                selected=item if valid else None
+            else:
+                valid=item is None or type(item) is str and len(item)<=512
+                selected=sha(item.encode("utf-8","surrogatepass")) if valid and item is not None else None
+            value[name+"_observed"]=valid
+            value[key]=selected
+        if point=="InputProcessor.assign_request_id":
+            data=data or {}
+            missing=object()
+            for name,key in (("priority","priority"),("session","session_id"),("rank","data_parallel_rank"),("request_id","request_id")):
+                item=data.get(key,missing)
+                if item is not missing:observe(name,item)
+        elif returned:
+            name={"GenerateBaseServing._get_priority":"priority","GenerateBaseServing._get_data_parallel_rank":"rank",
+                "GenerateBaseServing._get_session_id_from_headers":"session","GenerateBaseServing._get_session_id":"session",
+                "BaseServing._base_request_id":"request_id"}[point]
+            observe(name,result)
+        return value
 
     def route_metadata(self,point,args,kwargs,result,returned):
         context=self.route_context() or {}
@@ -704,6 +752,18 @@ class Observer:
 
     def wrap(self, module_name, point, original):
         observer = self
+        def emit_input_selection(args,kwargs,phase):
+            started=time.monotonic_ns()
+            try:
+                if observer.selection_context() is None:raise ValueError("selection context closed")
+                request=args[0] if args else kwargs.get("request")
+                metadata={"request_selection":observer.request_selection(point,None,phase=="RETURN",attrs(request))}
+                diagnostic={}
+            except Exception:
+                metadata={};diagnostic={"diagnostic":"SAMPLE_UNAVAILABLE"}
+            observer.emit("SELECTION",{"point":point,"phase":phase,"source_sha256":SOURCE_SHA[module_name],
+                "requests":[],"metadata":metadata,"selection_observed":False,
+                "observation_started_ns":started,"observation_finished_ns":time.monotonic_ns(),**diagnostic})
         def sample(args, kwargs, result=None, returned=False):
             started = time.monotonic_ns()
             try:
@@ -729,6 +789,9 @@ class Observer:
             wanted = observer.wanted(point,before)
             if wanted:
                 observer.emit("NATIVE", payload)
+            if point=="InputProcessor.assign_request_id" and observer.selection_context() is not None:
+                frame["_input_selection_started"]=True
+                emit_input_selection(args,kwargs,"CALL")
             if point=="DefaultModelLoader.load_weights":
                 try:frame.update(observer.weight_frame(before))
                 except Exception:pass  # Missing association never changes native work.
@@ -740,12 +803,16 @@ class Observer:
                     observer.emit("NATIVE", {"point": point, "phase": "RETURN" if returned else "RAISE",
                         "source_sha256": SOURCE_SHA[module_name], **after,
                         "call_chain": observer.chain_rows()})
+                if point=="InputProcessor.assign_request_id" and _CHAIN.get()[-1].get("_input_selection_started"):
+                    emit_input_selection(args,kwargs,"RETURN" if returned else "RAISE")
             finally:
                 _CHAIN.reset(token)
         if inspect.iscoroutinefunction(original):
             @functools.wraps(original)
             async def asynchronous(*args, **kwargs):
                 if not observer.active() or point in ROUTE_POINTS and observer.route_context() is None:
+                    return await original(*args,**kwargs)
+                if point in REQUEST_SELECTION_POINTS and observer.selection_context() is None:
                     return await original(*args,**kwargs)
                 (token, started), result, returned = begin(args, kwargs), None, False
                 try:
@@ -758,6 +825,8 @@ class Observer:
         @functools.wraps(original)
         def synchronous(*args, **kwargs):
             if not observer.active() or point in ROUTE_POINTS and observer.route_context() is None:
+                return original(*args,**kwargs)
+            if point in REQUEST_SELECTION_POINTS and observer.selection_context() is None:
                 return original(*args,**kwargs)
             (token, started), result, returned = begin(args, kwargs), None, False
             try:

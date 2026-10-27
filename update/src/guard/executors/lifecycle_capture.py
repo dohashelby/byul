@@ -43,8 +43,10 @@ lora_config_present speculative_config_present
 """.split())
 KEYS |= profiles.WEIGHT_KEYS
 KEYS |= profiles.ROUTE_KEYS
+KEYS |= profiles.REQUEST_SELECTION_KEYS
 POINTS = set(profiles.point_sources(sensor.PROFILE))
 WORDS = {*profiles.SCHEMAS, *profiles.SCHEMAS.values(), sensor.COMMIT, "START", "MODULE", "NATIVE", "ASGI", "END",
+    "SELECTION",
     "SEALED", "PROCESS_EXIT", "BOUND_REACHED", "CONTROL_UNAVAILABLE", "CALL", "RETURN", "RAISE",
     "SAMPLE_UNAVAILABLE", "DISCONNECT_RECEIVED", "BODY_SEND_RETURN", "APP_RETURN", "APP_RAISE",
     *sensor.SOURCE_SHA, *POINTS}
@@ -62,7 +64,8 @@ def _safe(value, depth=0, *, keys=KEYS):
     if type(value) is list:
         return len(value) <= 64 and all(_safe(v, depth+1, keys=keys) for v in value)
     if type(value) is dict:
-        return set(value) <= keys and all(_safe(v, depth+1, keys=keys) for v in value.values())
+        return set(value) <= keys and all(profiles.valid_selected_integer(k,v) or _safe(v, depth+1, keys=keys)
+                                         for k,v in value.items())
     return False
 
 
@@ -84,8 +87,9 @@ def parse_recording(raw, prepared):
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
-    if prepared["profile"] not in {sensor.PROFILE,profiles.V4_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
-    if prepared["profile"] != sensor.PROFILE:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
+    if prepared["profile"] not in {sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,profiles.V5_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
+    if prepared["profile"] != sensor.PROFILE:keys=keys-profiles.REQUEST_SELECTION_KEYS
     source_hashes = profiles.source_hashes(prepared["profile"])
     point_sources=profiles.point_sources(prepared["profile"])
     points=set(point_sources)
@@ -95,7 +99,7 @@ def parse_recording(raw, prepared):
                 or not _safe(row, keys=keys) or type(row["seq"]) is not int or row["seq"] != seq
                 or type(row["monotonic_ns"]) is not int or row["monotonic_ns"] < clock
                 or row["previous_sha256"] != previous or canonical_row(row) != line
-                or row["event"] not in {"START","MODULE","NATIVE","ASGI","END"}
+                or row["event"] not in {"START","MODULE","NATIVE","ASGI","END","SELECTION"}
                 or type(row["payload"]) is not dict):
             raise ValueError("LIFECYCLE_RECORDING_ROW_INVALID")
         previous, clock = hashlib.sha256(line).hexdigest(), row["monotonic_ns"]
@@ -136,7 +140,14 @@ def parse_recording(raw, prepared):
                 if "inherited" in payload and payload["inherited"] is not True:
                     raise ValueError("LIFECYCLE_RECORDING_INHERITANCE_INVALID")
                 ready.add(payload["module"])
-        if row["event"] == "NATIVE":
+        if row["event"] in {"NATIVE","SELECTION"}:
+            if row["event"]=="SELECTION" and (header["profile"]!=sensor.PROFILE
+                    or payload.get("point")!="InputProcessor.assign_request_id" or payload.get("requests")!=[]
+                    or payload.get("selection_observed") is not False
+                    or type(payload.get("metadata")) is not dict
+                    or payload.get("metadata")=={} and payload.get("diagnostic")!="SAMPLE_UNAVAILABLE"
+                    or set(payload["metadata"]) not in (set(),{"request_selection"})):
+                raise ValueError("LIFECYCLE_SELECTION_EVENT_INVALID")
             required = {"point","phase","source_sha256","requests","metadata","selection_observed",
                         "observation_started_ns","observation_finished_ns"}
             if (not required <= set(payload) or not (set(payload)-required) <= {"call_chain","diagnostic"}
@@ -159,6 +170,10 @@ def parse_recording(raw, prepared):
                 profiles.validate_weight_selection(payload)
             if "route_authentication" in payload["metadata"]:
                 profiles.validate_route_authentication(payload)
+            if "request_selection" in payload["metadata"]:
+                if row["event"]=="NATIVE" and payload["point"]=="InputProcessor.assign_request_id":
+                    raise ValueError("LIFECYCLE_SELECTION_EVENT_REQUIRED")
+                profiles.validate_request_selection(payload)
             for request in payload["requests"]:
                 if (type(request) is not dict or set(request) != {"request_sha256","request_present",
                         "output_state_present","batch_row_present","status_code"}

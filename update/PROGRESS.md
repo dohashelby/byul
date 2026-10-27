@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — REQ-04 native 운영 선택값 부분 생산자
+
+- 한 일: 기준61ce4c0의 source/code gate·ASGI 문맥·소유 세션 수집을 재사용해 priority/session/rank/request-ID helper 반환과 InputProcessor 전달 필드를 연결했다. profile6/source25이며 profile5의 당시23개 source·지점·고정 bytes를 별도로 읽는다. 헤더 없는 호출도 개별 invocation으로 남기고 원문·자격 증명·추가 body/getter 접근 없이 반환/예외를 유지한다.
+- 테스트 결과: 877파일 고정 후 Fields 접근 오류20건(733통과, pytest62.27초·부모63.169초)과 수정 후 metadata 계약 오류1건(753통과,64.02초/64.737초)을 보존했다. 기존 NATIVE 본문을 복원하고 SELECTION을 분리한 재고정 소스는 영향758통과/0실패/기존skip1/제외1(65.51초/66.543초), 새EXAMPLE43건·native 본문6개·profile5 source23/지점/고정 bytes·원래 ASGI/첨부/불변식 회귀를 확인했다. 검증 중 bytes 동일·설치 wheel140파일 일치(부모10.064초)이며 실제 엔진·GPU·등록 증가는0이다. 원본은 저장소 밖 byul-header-consumer-review-20261027T144132+0900이다.
+- 다음 단계: 수정 종료 → 소스 고정 → 영향 검증 → 실패 수정·재검증 → 커밋·푸시·PR31 기반 후속 초안과 인계를 완료한다. PR33의 별도 프레임워크 갱신을 main 반영으로 표시하지 않는다.
+- 막힌 것: 부분 생산자의 CPU 구현에는 없음. 신뢰 principal·Gateway 정규화·기업 보호 필드/허용 관계·최종 worker 소비·실제 대상 실증과 executor/judge 연결은 미완료다.
+
 ## 2026-10-27 — HTTP 요청기의 HTTPS 전송·기본 포트 보수
 
 - 한 일: 기준09837cc에서 HTTPS URL에도 평문 요청기/기본80을 사용하던 오류를 URL별 HTTPSConnection/443으로 수정했다. 기본 인증서·호스트명 검증과 무재시도 경계를 유지하고 TCP 사전 확인은 바이트 없이 같은 포트를 사용한다. 실행 조건에 http-probe/2를 기록하며 스트림 측정·판정·팩·등록을 바꾸지 않는다.

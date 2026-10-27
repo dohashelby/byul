@@ -25,7 +25,7 @@ Gateway 재작성·최종 handler·기업 인가 또는 PLT-08 전체 준수의 
 
 ## LIF-10 native metadata 센서 준비와 소유 기록 수집
 
-현행 profile5/events5는 아래 REQ-02의 인증/serving 문맥도 관측한다. source23개를 대조하며
+현행 profile6/events6는 아래 REQ-02 인증/serving 문맥과 REQ-04 운영 선택값도 관측한다. source25개를 대조하며
 과거 profile4의20개 source·가중치 파일 선택과 고정 bytes를 그대로 읽는다. profile1·2·3의
 당시 의미도 유지한다. 새 준비·수집은 기존 CLI를 사용하고 자동 판정 등록은 늘리지 않는다.
 
@@ -196,7 +196,7 @@ Docker stub(`lab=true`)은 EXAMPLE이다. Kubernetes의 `lab=true` 선언을 Doc
 
 ## REQ-02 인증 입력·serving 호출 부분 관측
 
-profile5는 고정 `AuthenticationMiddleware.__call__`/`verify_token`, 모델 목록 router의
+profile5에서 도입한 인증 관측은 현행 profile6에서도 고정 `AuthenticationMiddleware.__call__`/`verify_token`, 모델 목록 router의
 동적 `models(request)` helper와 `OpenAIServingModels.show_available_models`를 관측한다.
 ASGI HTTP 호출에 유일한 `x-request-id` 헤더 하나(1~512bytes, 전체 header64개 이하)가 있을
 때만 별도 invocation 지문을 연다. 없는/중복/상한 초과 헤더는 연결하지 않으며 계획한
@@ -220,6 +220,35 @@ ASGI HTTP 호출에 유일한 `x-request-id` 헤더 하나(1~512bytes, 전체 he
 serving 메서드를 관측한다. 다른 handler/경로·동일 헤더 재사용·누락은 전체로 일반화하지 않는다.
 기업 허용 관계와 외부 요청/인증 입력/최종 handler의 독립 대응은 남아 있으며 모든 검증 flag는
 false·보안 UNKNOWN이다. EXAMPLE 조사와 실제 엔진 실증은 별도로 집계한다.
+
+## REQ-04 native 운영 선택값 부분 관측
+
+profile6는 고정 vLLM GenerateBaseServing의 priority·session·DP rank 선택 helper4개와
+BaseServing의 request-ID helper 반환을 관측한다. priority는 해석 가능한 헤더가 우선하고,
+session은 요청 필드→헤더→추가 인수 순서다. DP rank는 정수/None이며 request ID의 헤더
+우선순위도 유지한다. 원래 함수의 반환/예외·ID 변경·추가 header/body 접근 횟수를 바꾸지 않는다.
+InputProcessor.assign_request_id에서는 실제 전달 객체의 priority/session/rank/request-ID를
+인수·반환 시점에 구분해 별도 SELECTION 사건으로 읽고 기존 NATIVE ID 연결 사건의 정확한
+metadata 형식을 유지한다. 선택 샘플 실패도 기존 ID·ASGI 사건을 지우지 않는다.
+선택 helper와 입력 전달을 최종 worker 소비로 해석하지 않는다.
+
+session/request-ID는 최대512문자의 SHA 지문과 observed flag, priority/rank는 signed64 정수와
+observed flag로 기록한다. None의 관측과 지원 밖 자료의 미수집을 구분하며 큰 정수·문자열을
+자르거나 기본값으로 바꾸지 않는다. 원문 헤더·자격 증명·본문·예외 원문은 저장하지 않는다.
+부재/중복/상한 초과 x-request-id에서도 HTTP 호출마다 별도 invocation 지문을 만들고 클라이언트
+ID 연결은 null로 남긴다. 기존 인증 관측은 유일한 제한 헤더가 있을 때만 연결하는 조건을 유지한다.
+같은 PID의 살아 있는 문맥만 사용하며 비HTTP·늦은 자식·종료 뒤 반환을 구분한다.
+
+세션 출력 request_selection_index는 최대256개 사건과 소유/프로세스 문맥·정확 파일/행 참조를
+보존한다. 헤더 재사용은 모호함으로 남기고 후속 상한/미수집이 앞선 사건을 지우지 않는다.
+stored_index_complete는 저장된 인덱스의 완전성이지 전체 실행 수집/인과성/신원 인증이 아니다.
+신뢰 principal·Gateway의 외부 헤더 제거/재생성·보호할 운영 필드/기업 허용 관계·실제 worker
+소비가 없어 검증 flag는 false·보안 UNKNOWN이며 자동 executor/judge를 등록하지 않는다.
+
+과거 profile5의 source23·지점·당시 자산 bytes와 profile1·2·3·4를 읽는다. 새 source/지점·
+선택 metadata를 과거 기록에 소급하지 않는다. profile6의 추가 source2개는 고정 commit
+db9527a46873454610df6dbedf79a36d6bf1a7f6의 generate/base/serving.py 및 serve/engine/serving.py다.
+실제 이미지의 loaded code·자료 생산자의 진위 인증은 별도이며 EXAMPLE 회귀는 실측으로 승격하지 않는다.
 
 ## LIF-10 Kubernetes 파일·프로세스 읽기
 

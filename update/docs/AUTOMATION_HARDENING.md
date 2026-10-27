@@ -1,5 +1,20 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-27 REQ-04 — native 운영 선택값 부분 생산자
+
+현행 profile6/source25는 기존 ASGI·고정 source/code·소유 세션 수집을 재사용해
+priority/session/rank/request-ID helper의 실제 반환과 InputProcessor 전달 필드를 구분한다.
+입력 원문·자격 증명·본문을 추가로 읽지 않고 session/ID는 제한된 지문만 기록한다.
+음수 priority/rank는 해당 신규 필드에서만 허용하며 기존 시각/seq 등은 음수를 거부한다.
+profile5는 당시23개 source·지점·고정 LF/CRLF bytes로 읽고 profile1·2·3·4도 유지한다.
+
+헤더 없는 호출은 클라이언트 요청 ID를 채우지 않은 개별 HTTP invocation으로 남긴다.
+세션 출력의 request_selection_index는 소유/프로세스 문맥·정확 파일/행 참조·헤더 재사용
+모호함·미수집과 최대256개 상한을 보존한다. helper 반환·입력 전달은 신뢰 principal이나
+Gateway 정규화·최종 worker 소비·기업 허용 정책 증명이 아니다. REQ-04 executor/judge는
+미등록이며 팩30·77개 정의·보안 규칙 연결16개·기존 판정과 스트림 측정은 유지한다.
+자세한 형식과 제한은 RUNBOOK의 REQ-04 절을 따른다. 아래 profile5 설명은 이전 단계 기록이다.
+
 ## 2026-10-27 REQ-02 — 인증 bool·serving 호출 부분 생산자
 
 profile5/source23은 기존 ASGI 지문·고정 code gate·소유 파일/세션 수집을 재사용해 인증 입력

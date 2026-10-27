@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — REQ-05 실제 Docker 대상 입력 호환 보수
+
+- 한 일: 기존 sandbox 진입점이 stub=true·실제 엔진=false로 쓰는 lab 표식을 확인해 native 파일 수집기의 bool 입력 검사와 맞췄다. run/container·pinned 이미지·정확 ENV/session/inventory 검사는 유지하고 Kubernetes의 lab=true 선언은 완화하지 않았다. 스트림 측정·센서 profile·팩·판정은 유지한다.
+- 테스트 결과: 865파일 고정 후 영향 suite728통과/0실패/기존skip6/제외1(pytest63.33초·부모64.281초), 새EXAMPLE14건 포함이다. 검증 중 소스 bytes 동일·기존 테스트 함수 AST 동일·설치 wheel138파일 일치(부모16.452초)다. 실제 엔진 실행·등록 증가는0이며 원본은 저장소 밖 byul-native-weight-target-binding-20261027T114642+0900에 둔다.
+- 다음 단계: 직접·인접 계약·불변식과 최종 head 필수 CI를 확인하고 PR29를 갱신한다. OBS-02/LIF-09의 worker 독립 상태/부분 준비 실패·외부 접수 gate 대응 재사용 검토로 복귀한다.
+- 막힌 것: 이 입력 호환 보수의 CPU 구현에는 없음. 실제 대상 실증은 AWS GPU 할당량과 준비 조건, 최종 모델·실제 소비·인가 판정은 독립 근거가 필요하다.
+
 ## 2026-10-27 — REQ-05 native 파일 선택·소유 파일 해시 부분 관측
 
 - 한 일: 기준27715d2의 적재 호출·객체 관측을 재사용해 profile4에 최종 iterator factory 파일 인수 지문과 별도 소유 파일 SHA 대조 CLI를 연결했다. 과거 profile1·2·3 bytes/의미와 generator 반환·소비·기존 스트림 측정을 보존한다. 뒤 파일·소유 재확인·출력 저장 실패는 앞선 안전한 해시를 유지한다.

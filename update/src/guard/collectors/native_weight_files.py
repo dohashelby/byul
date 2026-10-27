@@ -40,7 +40,7 @@ def load_inputs(env_path,target_path,prepared_path,context_path,manifest_path,na
             or context["session"]!=prepared["session"] or type(context["transport"]) is not str or context["transport"] not in {"docker","kubernetes"}
             or context["native_session_sha256"]!=hashlib.sha256(native_raw).hexdigest()
             or context["model_manifest_sha256"]!=hashlib.sha256(manifest_raw).hexdigest()
-            or type(target) is not dict or target.get("lab") is not True):
+            or type(target) is not dict or type(target.get("lab")) is not bool):
         raise ValueError("WEIGHT_FILE_CONTEXT_INVALID")
     root=context["model_root"]
     if type(root) is not str or root=="/" or not root.startswith("/") or PurePosixPath(root).as_posix()!=root or "\x00" in root:

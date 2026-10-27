@@ -42,3 +42,8 @@ def test_kubernetes_rejects_unlisted_command_before_any_api(group,target,change)
         runner=lambda *a,**kw:pytest.fail("no API before command validation"))
     argv=["python3","-c",HASH_READER,ROOT,"a.bin","1024"];change(argv)
     with pytest.raises(KubernetesCaptureError):reader.exec_bounded("engine",argv,timeout=5,max_bytes=MAX_PACKET_BYTES)
+
+
+def test_docker_lab_false_convention_does_not_relax_kubernetes_lab_declaration(group,target):
+    with pytest.raises(ValueError):KubernetesWeightReader({**target,"lab":False},group.env,group.prepared,ROOT,["a.bin"],1024,
+        runner=lambda *a,**kw:pytest.fail("no API for an invalid Kubernetes target"))

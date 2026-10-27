@@ -261,6 +261,76 @@ def test_default_docker_path_uses_existing_capture_factory_and_owned_reader(inpu
     assert len(result["files"])==2 and all(r["capture_verified"] for r in result["files"])
 
 
+def native_target(inputs):
+    target=json.loads(inputs.paths[1].read_bytes())
+    target.update(lab=False,engine_kind="vllm")  # sandbox._up's actual-engine target convention.
+    inputs.paths[1].write_bytes(canonical_json(target))
+    return collector.load_inputs(*inputs.paths)
+
+
+def test_actual_engine_target_convention_reaches_owned_reader_without_promoting_origin(inputs,monkeypatch):
+    value=native_target(inputs);constructed=[]
+    def client(run_id):constructed.append(run_id);return object()
+    monkeypatch.setattr(owned_capture,"create_capture_client",client)
+    monkeypatch.setattr(files,"DockerWeightReader",lambda *a,**kw:SimpleNamespace(read=Reader(inputs.owner).read))
+    result=collector.collect(value,max_file_bytes=1024)
+    assert constructed==[value["target"]["run_id"]] and value["target"]["lab"] is False
+    assert len(result["files"])==2 and all(r["capture_verified"] for r in result["files"])
+    assert result["data_origin"]=="EXAMPLE" and result["security"]=="UNKNOWN" and result["engine_started"] is False
+
+
+@pytest.mark.parametrize("grade",["DECLARED","MEASURED"])
+def test_non_stub_target_is_still_declared_at_most_for_non_example_inputs(inputs,monkeypatch,grade):
+    from guard.models import DataOrigin
+    value=native_target(inputs)
+    env=value["env"].model_copy(deep=True);env.data_origin=DataOrigin(grade);env=env.seal()
+    ref=env.ref().model_dump(mode="json")
+    inputs.paths[0].write_bytes(canonical_json(env.to_dict()))
+    target=json.loads(inputs.paths[1].read_bytes());target["environment_ref"]=ref
+    inputs.paths[1].write_bytes(canonical_json(target))
+    native=json.loads(inputs.paths[5].read_bytes());native.update(environment_ref=ref,data_origin=grade)
+    native_raw=canonical_json(native);inputs.paths[5].write_bytes(native_raw)
+    context=json.loads(inputs.paths[3].read_bytes());context.update(environment_ref=ref,native_session_sha256=sha(native_raw))
+    inputs.paths[3].write_bytes(canonical_json(context))
+    value=collector.load_inputs(*inputs.paths)
+    monkeypatch.setattr(owned_capture,"create_capture_client",lambda *a:object())
+    monkeypatch.setattr(files,"DockerWeightReader",lambda *a,**kw:SimpleNamespace(read=Reader(inputs.owner).read))
+    result=collector.collect(value,max_file_bytes=1024)
+    assert result["data_origin"]=="DECLARED" and result["security"]=="UNKNOWN"
+    assert not result["final_model_verified"] and not result["actual_consumption_verified"]
+
+
+@pytest.mark.parametrize("lab",[None,0,1,"false",[],{}])
+def test_target_requires_explicit_boolean_lab_flag(inputs,lab):
+    target=json.loads(inputs.paths[1].read_bytes());target["lab"]=lab
+    inputs.paths[1].write_bytes(canonical_json(target))
+    with pytest.raises(ValueError):collector.load_inputs(*inputs.paths)
+
+
+@pytest.mark.parametrize("field",["label","image","name"])
+def test_non_stub_target_still_requires_owned_run_image_and_container(inputs,monkeypatch,field):
+    value=native_target(inputs);docker=Docker(inputs.case);original=docker.inspect_json
+    def inspect(container,**kwargs):
+        row=original(container,**kwargs)
+        if field=="label":row["Config"]["Labels"]["guard.run"]="other-run"
+        elif field=="image":row["Config"]["Image"]="other@sha256:"+"c"*64
+        else:row["Name"]="/other-container"
+        return row
+    monkeypatch.setattr(docker,"inspect_json",inspect)
+    monkeypatch.setattr(docker,"exec_bounded",lambda *a,**kw:pytest.fail("no helper before ownership verification"))
+    monkeypatch.setattr(owned_capture,"create_capture_client",lambda *a:docker)
+    result=collector.collect(value,max_file_bytes=1024)
+    assert result["collection_gap"] and all(r["capture"] is None for r in result["files"])
+    assert result["security"]=="UNKNOWN" and not result["actual_consumption_verified"]
+
+
+def test_non_stub_target_cli_dry_run_uses_no_runtime(inputs,monkeypatch):
+    native_target(inputs);output=inputs.case.root/"non-stub.json"
+    monkeypatch.setattr(owned_capture,"create_capture_client",lambda *a:pytest.fail("dry run must not construct runtime"))
+    result=CliRunner().invoke(app,cli_args(inputs,output))
+    assert result.exit_code==0 and not output.exists() and not json.loads(result.stdout)["capture_executed"]
+
+
 def cli_args(inputs,output):
     flags=("--env","--target","--prepared","--context","--model-manifest","--native-session")
     return ["capture-native-weight-files",*[v for pair in zip(flags,map(str,inputs.paths)) for v in pair],"--output",str(output)]

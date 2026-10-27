@@ -140,7 +140,9 @@ profile4는 고정 `DefaultModelLoader._prepare_weights`의 준비 목록과 `_g
 ```
 
 기존 `guard.model-manifest/1`의 scope=all 파일 목록과 `ENV.model.inventory_sha256`가 정확히
-일치해야 한다. Docker target은 lab=true와 소유 run/container를, Kubernetes는 기존 고정
+일치해야 한다. Docker target의 `lab`은 명시 bool이며 기존 진입점의 stub=true·실제 엔진=false를
+그대로 받는다. 어느 값이든 소유 run/container·정확 ENV Ref·pinned 이미지 확인이 필요하며
+실제 엔진 실행을 승인하거나 자료 등급을 높이지 않는다. Kubernetes는 기존 lab=true·고정
 context/namespace/Pod UID/container 세대 target을 사용한다. `.bin/.pt/.safetensors/.gguf` 중
 native 반환 사건에 관측된 최대32개 파일만 별도 stdlib helper가 SHA를 계산한다. 기본 파일당
 1GiB(상한도1GiB), 전체180초(최대300초), 각 소유 helper는 최대5초다. 큰 shard·원격/지원 밖

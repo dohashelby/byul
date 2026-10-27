@@ -1,0 +1,444 @@
+{
+  "status": "DRAFT_NOT_IMPLEMENTED",
+  "template_path": "data/result_template.json",
+  "template_bytes_sha256": "4fbb71881a7f77336bee90d7610b273b8b705a2475102343c95ccb0ec85d1108",
+  "enum_namespaces": {
+    "framework_projection": {
+      "applicability": {
+        "적용": "APPLICABLE",
+        "비적용": "NOT_APPLICABLE",
+        "미정": "UNDETERMINED",
+        "충돌": "CONFLICT"
+      },
+      "execution_status": {
+        "미실행": "NOT_RUN",
+        "대기": "PENDING",
+        "진행중": "RUNNING",
+        "완료": "COMPLETED",
+        "중단": "ABORTED"
+      },
+      "collection_status": {
+        "미수집": "NOT_COLLECTED",
+        "부분수집": "PARTIAL",
+        "수집완료": "COMPLETE"
+      },
+      "verdicts": {
+        "충족": "PASS",
+        "미충족": "FAIL",
+        "미확인": "UNKNOWN",
+        "비적용": "NOT_APPLICABLE"
+      }
+    },
+    "guard": "기존영문enum유지; collection_status는제품추가enum이아닌설계표시값"
+  },
+  "fields": [
+    {
+      "field": "record_id",
+      "type_proposal": "string|null",
+      "existing_byul_mapping": "EVD.id/명시 case 참조",
+      "implementation_status": "추가 case 식별 계약",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "assessment_id",
+      "type_proposal": "string",
+      "existing_byul_mapping": "CheckDef.framework_id→EVD.check_id 고정map",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "선정 담당 → PLAN",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "protection_requirement_id",
+      "type_proposal": "string",
+      "existing_byul_mapping": "CheckDef.purpose 및 supporting 기여",
+      "implementation_status": "요구별 단위기여 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "checklist_revision",
+      "type_proposal": "sha256 문자열",
+      "existing_byul_mapping": "팩 source 내용 bytes hash",
+      "implementation_status": "내용commit/형식/작성일 분리",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "test_branch_ref",
+      "type_proposal": "full branch object|null",
+      "existing_byul_mapping": "팩 legacy와 scope descriptor",
+      "implementation_status": "full ref 보존 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "선정 담당 → PLAN",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "test_case_id",
+      "type_proposal": "string|null",
+      "existing_byul_mapping": "절차가 선언한 case 식별",
+      "implementation_status": "범위별 case 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "test_case_parameters",
+      "type_proposal": "object",
+      "existing_byul_mapping": "EVD execution config/fixture",
+      "implementation_status": "직렬화 계약 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "question_id",
+      "type_proposal": "Q ID|null",
+      "existing_byul_mapping": "legacy canonical focus",
+      "implementation_status": "의미검증 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "선정 담당 → PLAN",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "subtest",
+      "type_proposal": "string",
+      "existing_byul_mapping": "표시 제목",
+      "implementation_status": "기존 설명",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "procedure_version",
+      "type_proposal": "string",
+      "existing_byul_mapping": "EVD.executor/절차 Ref",
+      "implementation_status": "수동 procedure Ref 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "environment_id",
+      "type_proposal": "string",
+      "existing_byul_mapping": "EVD.environment.id",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "environment_revision",
+      "type_proposal": "int>=1|null",
+      "existing_byul_mapping": "EVD.environment.revision",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "policy_revision",
+      "type_proposal": "int>=1|string|null",
+      "existing_byul_mapping": "PLAN.inputs.policy exactRef; BYUL policy namespace 별도",
+      "implementation_status": "판본 namespace 명시",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "execution_id",
+      "type_proposal": "EVD ID|null",
+      "existing_byul_mapping": "EVD.id와operator/procedure 신원; engine request 별도",
+      "implementation_status": "기존 참조 활용",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "applicability",
+      "type_proposal": "enum",
+      "existing_byul_mapping": "PLAN.item.applicability",
+      "implementation_status": "범위별 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "선정 담당 → PLAN",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "execution_status",
+      "type_proposal": "enum",
+      "existing_byul_mapping": "EVD.execution.status",
+      "implementation_status": "범위별 수행방식 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "collection_status",
+      "type_proposal": "enum",
+      "existing_byul_mapping": "EVD observations collected/필수목록",
+      "implementation_status": "명시 집계 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "security_verdict",
+      "type_proposal": "enum",
+      "existing_byul_mapping": "RES.verdicts.security",
+      "implementation_status": "범위별 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "판정 담당 → RES",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "functional_verdict",
+      "type_proposal": "enum",
+      "existing_byul_mapping": "RES.verdicts.functional",
+      "implementation_status": "범위별 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "판정 담당 → RES",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "performance_verdict",
+      "type_proposal": "enum",
+      "existing_byul_mapping": "RES.verdicts.performance",
+      "implementation_status": "범위별 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "판정 담당 → RES",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "policy_values",
+      "type_proposal": "object",
+      "existing_byul_mapping": "POL.values[check_id]",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "evidence",
+      "type_proposal": "array<evidence descriptor>",
+      "existing_byul_mapping": "EVD observations/artifacts/명시문서Ref",
+      "implementation_status": "case별 의미 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "facts",
+      "type_proposal": "array<fact descriptor>",
+      "existing_byul_mapping": "ENV.facts/ConditionEval/관측",
+      "implementation_status": "출처 참조 대응",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "limitations",
+      "type_proposal": "array<string>",
+      "existing_byul_mapping": "CheckDef/RPT 한계·RES reasons",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "검토/승인 담당 → 관리결정·RPT",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "remediation_owner",
+      "type_proposal": "string|null",
+      "existing_byul_mapping": "후속 관리 기록",
+      "implementation_status": "추가 관리 metadata",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "검토/승인 담당 → 관리결정·RPT",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "approval",
+      "type_proposal": "null|{approved_by,approved_at,decision:ACCEPT|REJECT,note,source_refs?}",
+      "existing_byul_mapping": "RPT.approval/정책승인 별도",
+      "implementation_status": "기존 결정 + 근거Ref 제안",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "검토/승인 담당 → 관리결정·RPT",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "environment_evidence_source",
+      "type_proposal": "null|{environment_ref,source,checked_at}",
+      "existing_byul_mapping": "ENV fact source/EVD env Ref",
+      "implementation_status": "채운 구조 제안",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "environment_checked_at",
+      "type_proposal": "RFC3339|null",
+      "existing_byul_mapping": "관측/검토 시각",
+      "implementation_status": "의미 대응",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "policy_source",
+      "type_proposal": "null|{policy_ref,data_origin,source_refs?}",
+      "existing_byul_mapping": "POL/원 BYUL 정책provenance",
+      "implementation_status": "채운 구조 제안",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "policy_approved_by",
+      "type_proposal": "string|null",
+      "existing_byul_mapping": "POL.confirmed_by; 진위 인증 아님",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "policy_checked_at",
+      "type_proposal": "RFC3339|null",
+      "existing_byul_mapping": "policy 검토/유효성 확인 시각",
+      "implementation_status": "실행시각과구분",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "입력/정책 담당 → ENV/POL",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "normal_control_result",
+      "type_proposal": "null|{attempted:bool,succeeded:bool|null,detail:string,evidence_refs?:array}",
+      "existing_byul_mapping": "EVD.normal_control",
+      "implementation_status": "기존 + 범위별Refs",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "stop_criteria_ref",
+      "type_proposal": "procedure ref|null",
+      "existing_byul_mapping": "실행기 제한/명시절차",
+      "implementation_status": "확장",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "recovery_procedure_ref",
+      "type_proposal": "procedure ref|null",
+      "existing_byul_mapping": "관리 수명주기/명시복구절차",
+      "implementation_status": "확장",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "remediation_due_at",
+      "type_proposal": "RFC3339|null",
+      "existing_byul_mapping": "후속 관리 결정",
+      "implementation_status": "확장",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "검토/승인 담당 → 관리결정·RPT",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "retest_conditions",
+      "type_proposal": "array<string|ref>",
+      "existing_byul_mapping": "재검증 trigger/명시조건",
+      "implementation_status": "매핑 명세",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "검토/승인 담당 → 관리결정·RPT",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "subtest_inventory_complete",
+      "type_proposal": "bool|null",
+      "existing_byul_mapping": "원값 보존; PLAN inventory snapshot이 권위",
+      "implementation_status": "의미/authority 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "선정 담당 → PLAN",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "engine_adapter_ref",
+      "type_proposal": "plugin ref|null",
+      "existing_byul_mapping": "EVD.execution.adapter",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "fixture_ref",
+      "type_proposal": "content ref|null",
+      "existing_byul_mapping": "EVD comparability.fixture_sha256/artifact",
+      "implementation_status": "판본/경로 보완",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "collection_adapter_ref",
+      "type_proposal": "plugin/content ref|null",
+      "existing_byul_mapping": "EVD.execution.executor·collector",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "started_at",
+      "type_proposal": "RFC3339|null",
+      "existing_byul_mapping": "EVD.execution.started_at",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "finished_at",
+      "type_proposal": "RFC3339|null",
+      "existing_byul_mapping": "EVD.execution.finished_at",
+      "implementation_status": "기존",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "수행/증거 담당 → EVD/절차Ref",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "scenario_ids",
+      "type_proposal": "array<SC ID>",
+      "existing_byul_mapping": "실제 canonical focus/CHK 허용관계",
+      "implementation_status": "의미검증 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "선정 담당 → PLAN",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "subtest_id",
+      "type_proposal": "canonical focus ID|null",
+      "existing_byul_mapping": "CheckDef.legacy.subtest_ids",
+      "implementation_status": "의미검증 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "선정 담당 → PLAN",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    },
+    {
+      "field": "shared_question_ids",
+      "type_proposal": "array<Q ID>",
+      "existing_byul_mapping": "같은 focus의 Q membership",
+      "implementation_status": "의미검증 추가",
+      "null_empty_not_applicable": "null=미제공/미확인; 빈 배열/객체=명시 항목0개(필수 부족 별도); 비적용은근거있는적용상태로표현",
+      "producer": "선정 담당 → PLAN",
+      "consumer": "기존 PLAN/EVD/RES/RPT→플랫폼 투영; 추가계약은미구현"
+    }
+  ],
+  "semantic_status": "FRAMEWORK_RULES_FINALIZED_20261027",
+  "implementation_status": "BYUL_STORAGE_API_SCHEMA_PROPOSAL_NOT_IMPLEMENTED",
+  "scope_note": "45개 기존 필드의 기록 의미는 03·05와 일치한다. type_proposal·영문 표시값·추가 구조의 저장/API 채택은 개발팀 설계 대상이다."
+}

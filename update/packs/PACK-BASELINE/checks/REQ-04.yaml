@@ -2,7 +2,7 @@ id: REQ-04
 framework_id: CHK-REQ-004
 mechanism_ids:
 - mechanism-01
-revision: 2
+revision: 3
 retired: false
 area: REQ
 purpose: 신원 인증·전달
@@ -31,7 +31,7 @@ satisfied_if: 사용자가 지정한 신원이 신뢰 신원으로 그대로 수
 fail_criteria: 비신뢰 입력이 인가 신원이나 보호된 운영 선택값을 덮어쓴다.
 unknown_criteria: 사용자 신원 전달 방식·앱 단위 권한 계약 또는 최종 소비값을 모른다.
 remediation: '- 사용자 신원은 앱·Gateway 등 검증한 구성요소에서 설정하고 외부 입력의 신원·보호 필드 덮어쓰기를 차단한다. 엔진에 전달되는 서비스 계정과 최종 사용자를 구분해 허용 작업을 확인한다.'
-method_and_evidence: '외부 신원 header를 변경하고 Gateway의 덮어쓰기·엔진의 신뢰 principal·최종 인가 결과를 확인한다. 【F13】임의 tenant header를 vLLM이 주체로 인증한다고 볼 근거 없음. session/priority/DP rank/request ID는 소비되지만 신원 증명 아님. SageMaker header명은 외부 의존성 확인 필요. Gateway에서 외부 신원 header 제거·검증 후 재생성을 확인하고, 실제 소비되는 X-Vllm-Priority·X-Session-ID·X-data-parallel-rank·X-Request-Id 조작의 영향과 권한 검사를 각각 확인한다. 정상 대조: 허용 앱 계정과 검증된 사용자 신원으로 정상 요청·세션 처리'
+method_and_evidence: '외부 신원 header를 변경하고 Gateway의 덮어쓰기·엔진의 신뢰 principal·최종 인가 결과를 확인한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F13】임의 tenant header를 vLLM이 주체로 인증한다고 볼 근거 없음. session/priority/DP rank/request ID는 소비되지만 신원 증명 아님. SageMaker header명은 외부 의존성 확인 필요. Gateway에서 외부 신원 header 제거·검증 후 재생성을 확인하고, 실제 소비되는 X-Vllm-Priority·X-Session-ID·X-data-parallel-rank·X-Request-Id 조작의 영향과 권한 검사를 각각 확인한다. 정상 대조: 허용 앱 계정과 검증된 사용자 신원으로 정상 요청·세션 처리'
 remaining_setup: 신뢰 header 목록과 전달 책임; 모든 header를 사용자 인가로 간주하지 않음
 executor: null
 judge: null

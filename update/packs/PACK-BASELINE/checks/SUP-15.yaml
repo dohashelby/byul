@@ -2,7 +2,7 @@ id: SUP-15
 framework_id: CHK-SUP-015
 mechanism_ids:
 - mechanism-04
-revision: 2
+revision: 3
 retired: false
 area: SUP
 purpose: 재사용 문맥의 호환성
@@ -19,11 +19,11 @@ policy_params: []
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 캐시 위치·writer·완료/원자적 공개 규칙·정리 방식, 모델 구조·weights 값·dtype·양자화·TP·도구/장치·설정 중 생성물에 영향을 주는 조건과 호환성 근거. 무관한 설정 변경까지 일괄 삭제하지 않는다.
-normal_control: 동일 모델·도구·설정 묶음만 기존 파생 결과를 재사용한다.
+normal_control: 보호·호환 조건이 같은 승인 묶음에서 기존 파생 결과를 정상 재사용한다. 결과에 영향이 없는 설정 차이는 동일성을 깨는 조건으로 취급하지 않는다.
 challenge_steps:
-- 정상 재사용 기준선
-- 모델·compiler·옵션 중 하나만 변경
-- 새 cache 생성 또는 기존 cache 거부 확인
+- 보호·호환 조건이 같은 승인 묶음의 정상 재사용 기준선
+- 모델 내용·compiler·옵션 중 보호·호환 조건에 영향이 있는 값 하나를 선정해 변경하고, 무관한 설정 변경은 별도 대조
+- 관련 조건 변경 시 정책에 맞는 재생성·재사용 거부 또는 검증된 호환 재사용을 확인하고, 무관한 변경에 일률적 무효화를 요구하지 않음
 required_observations: []
 required_observations_prose:
 - 생성 입력·도구 판본·옵션/cache key·경로/재사용 또는 재생성 기록
@@ -31,7 +31,7 @@ satisfied_if: 보호 조건이 달라진 결과는 재생성하거나 재사용�
 fail_criteria: 호환성이 확인되지 않은 다른 묶음의 파생 결과를 그대로 소비한다.
 unknown_criteria: cache key·실제 재사용 여부·의존성 호환 기준을 확인하지 못했다.
 remediation: '- 파생 결과를 만들 때 사용한 모델·도구·의존성·설정·실행 조건을 식별정보와 함께 기록한다. 현재 묶음과의 호환성을 확인하고 변경된 조건에 맞지 않는 캐시는 무효화하거나 다시 생성한다.'
-method_and_evidence: '원본·도구·옵션·캐시 식별·선정 consumer와 변경 후 선택을 대조한다. 【F03】실제 compilation backend·AOT 사용·캐시 활성값·의존성 판본을 기록. 단순 활성 시 선택으로 기본 캐시 조사를 건너뛰지 않음. 유효 VLLM_CACHE_ROOT·compilation_config.cache_dir·TORCHINDUCTOR_CACHE_DIR·TRITON_CACHE_DIR와 각 rank 실제 파일을 수집; 묶음별 빈 디렉터리 최초 생성/동일 묶음 재기동/다른 묶음 재사용 거절을 비교. 타 계정 쓰기 및 엔진 자신의 잔존 writer·오염 지속성도 확인. 정상 대조: 승인한 동일 묶음에서 정상 생성·재기동 후 결과와 필요 성능 유지.'
+method_and_evidence: '원본·도구·옵션·캐시 식별·선정 consumer와 변경 후 선택을 대조한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F03】실제 compilation backend·AOT 사용·캐시 활성값·의존성 판본을 기록. 단순 활성 시 선택으로 기본 캐시 조사를 건너뛰지 않음. 유효 VLLM_CACHE_ROOT·compilation_config.cache_dir·TORCHINDUCTOR_CACHE_DIR·TRITON_CACHE_DIR와 각 rank 실제 파일을 수집; 묶음별 빈 디렉터리 최초 생성/동일 묶음 재기동/다른 묶음 재사용 거절을 비교. 타 계정 쓰기 및 엔진 자신의 잔존 writer·오염 지속성도 확인. 정상 대조: 승인한 동일 묶음에서 정상 생성·재기동 후 결과와 필요 성능 유지.'
 remaining_setup: 변경별 재생성 대상 목록과 실제 cache 계측
 executor: null
 judge: null

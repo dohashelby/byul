@@ -2,7 +2,7 @@ id: REQ-12
 framework_id: CHK-REQ-012
 mechanism_ids:
 - mechanism-13
-revision: 2
+revision: 3
 retired: false
 area: REQ
 purpose: 요청·결과 귀속
@@ -27,7 +27,7 @@ challenge_steps:
 required_observations: []
 required_observations_prose:
 - 내부 attempt ID/abort 도달/늦은 chunk·B 결과·작업 상태
-satisfied_if: 취소가 올바른 대상에 적용되고 늦은 결과가 비허용 소비자에게 전달되지 않는다. 실제 자원 회수는 C08에서 판정한다.
+satisfied_if: 취소가 올바른 대상에 적용되고 늦은 결과가 비허용 소비자에게 전달되지 않는다. 실제 작업·자원 회수는 6.4 종결·자원 회수의 CHK-LIF-010·CHK-LIF-011에서 별도로 판정한다.
 fail_criteria: 늦은 A 결과가 B에 섞이거나 B가 A의 취소를 잘못 승계한다.
 unknown_criteria: abort 접수만 있고 내부 attempt·늦은 출력·실제 종결을 확인하지 못했다.
 remediation: '- 요청과 실행 시도마다 식별정보를 구분하고 취소 대상·종료 상태를 기록한다. 종료된 시도의 늦은 출력을 버리거나 격리하고 같은 외부 ID의 새 요청에 이전 취소·결과가 적용되지 않게 한다.'

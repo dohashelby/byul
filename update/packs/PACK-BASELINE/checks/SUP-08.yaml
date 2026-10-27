@@ -2,7 +2,7 @@ id: SUP-08
 framework_id: CHK-SUP-008
 mechanism_ids:
 - mechanism-09
-revision: 2
+revision: 3
 retired: false
 area: SUP
 purpose: 추가 코드 실행 허용
@@ -14,7 +14,7 @@ risk_summary: 일반 호출자가 요청 필드로 코드 판본을 바꿀 수 �
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 요청의 코드 판본 선택 필드가 수용·전달되는지 확인한다. 금지 구성에서는 거부·제거를, 허용 구성에서는 실제 선택·소비 판본을 확인한다.
+  prose: 요청의 코드 판본 선택 필드와 실제 지원·노출 경로를 먼저 확인한다. 금지 구성에서도 해당 필드의 거부·제거를 확인하고, 허용 구성에서는 실제 선택·소비 판본을 추가 확인한다. 입력 미지원·비노출을 근거로 확인하면 코드 소비 분기만 비적용 후보로 남긴다. 지원 여부나 선택 허용 정책이 미정이면 해당 분기의 적용을 미정으로 둔다.
 policy_params: []
 policy_prose:
   policy_to_decide: null
@@ -28,9 +28,9 @@ required_observations: []
 required_observations_prose:
 - 실제 지원·노출된 코드 판본 선택 필드, 호출자·선택 허용 범위와 유효 설정
 - 제출값·검증/제거·전달 결과, 최종 선택 모듈·출처·불변 판본과 import/실행 또는 사전 거부
-satisfied_if: 허용 밖 선택이 코드 실행 전에 차단된다. 입력 미지원이면 근거와 함께 해당 없음.
+satisfied_if: 허용 밖 코드 판본 선택이 import·실행 전에 차단되고 승인한 정상 요청은 처리된다. 허용된 선택 분기에서는 최종 소비 코드가 승인 대상과 일치한다.
 fail_criteria: 금지 override가 코드 선택에 반영되거나 승인 밖 코드가 소비된다.
-unknown_criteria: kwargs 전달까지만 확인되고 선정 processor의 최종 코드 선택은 확인되지 않았다.
+unknown_criteria: 적용한 분기에서 kwargs 전달까지만 확인했거나 선정 processor의 최종 코드 선택·실행 전 거부를 확인하지 못했다.
 remediation: '- 요청에서 코드 버전을 바꾸는 필드와 전달 경로를 제한한다. 운영 설정에 승인한 버전을 고정하고, 예외적으로 허용한 요청 값도 최종 코드 선택 전에 승인 범위와 대조한다.'
 method_and_evidence: 요청에서 코드 판본을 선택할 수 있는 필드와 실제 소비 모듈을 연결한다. 허용·비허용 선택값의 수용·제거·거부, 최종 코드 출처·판본과 실행 전 제한을 대조한다.
 remaining_setup: 실제 코드 선택 필드·소비 모듈·의존성 판본과 무해 판본 fixture; 비노출·미지원은 호출 경로 근거로 확인

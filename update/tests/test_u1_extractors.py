@@ -252,8 +252,8 @@ def test_legacy_checkdef_omits_new_optional_metadata():
     assert CheckDef.model_validate(check).model_dump(mode="json") == check
 
 
-def test_source_refresh_and_image_profile_revisions_preserve_other_definitions():
-    """팩23→27의 독립 변경 단계를 구분해 각 단계의 나머지76개 bytes를 보호한다."""
+def test_source_refresh_and_image_profile_revisions_preserve_other_definitions(tmp_path):
+    """팩23→27의 당시 변경 단계는 이번 main7e 보존본에서 그대로 확인한다."""
     prior = {f"{area}-{number:02d}": 1 for area, count in
              (("SUP", 16), ("REQ", 21), ("PLT", 12), ("LIF", 16), ("OBS", 12))
              for number in range(1, count + 1)}
@@ -262,7 +262,11 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
                   "REQ-15": 2, "REQ-16": 2, "PLT-01": 4, "PLT-04": 3, "LIF-07": 2,
                   "OBS-03": 2, "OBS-04": 2, "OBS-05": 2, "OBS-07": 2, "OBS-08": 2,
                   "OBS-09": 2, "OBS-11": 2})
-    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    import zipfile
+    historical_dir = tmp_path / "pack27"
+    with zipfile.ZipFile(ROOT / "tests/fixtures/pack27-checks/source.zip") as archive:
+        archive.extractall(historical_dir)
+    pack = load_pack(historical_dir)
     assert pack.manifest.revision == 27
     assert set(pack.checks) == set(prior) and len(prior) == 77
     expected = {cid: revision + 1 for cid, revision in prior.items()}
@@ -292,10 +296,10 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions()
     for cid, digest in pack25.items():
         if cid != "PLT-02":
             assert pack26[cid] == digest
-    # PACK26 -> current changes only PLT-01; old snapshots receive no new contract.
+    # PACK26 -> PACK27 changes only PLT-01; old snapshots receive no new contract.
     for cid, digest in pack26.items():
         if cid != "PLT-01":
-            assert sha256((ROOT / "packs/PACK-BASELINE/checks" / f"{cid}.yaml").read_bytes()).hexdigest() == digest
+            assert sha256((historical_dir / "checks" / f"{cid}.yaml").read_bytes()).hexdigest() == digest
     assert pack.checks["SUP-04"].collection_profile == "running-image-approval-v1"
     assert {check.framework_id for check in pack.checks.values()} == {
         "CHK-" + cid.split("-")[0] + "-" + cid.split("-")[1].zfill(3) for cid in prior}

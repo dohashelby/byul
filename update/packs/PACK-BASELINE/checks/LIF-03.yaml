@@ -2,7 +2,7 @@ id: LIF-03
 framework_id: CHK-LIF-003
 mechanism_ids:
 - mechanism-07
-revision: 2
+revision: 3
 retired: false
 area: LIF
 purpose: 자원 예산·공정성
@@ -31,7 +31,7 @@ satisfied_if: 요청별/전체 예산과 정상 서비스 기준을 만족한다
 fail_criteria: 정한 자원·대기·공정성 기준을 넘거나 한 요청 오류가 허용 범위 밖 서비스 장애를 만든다.
 unknown_criteria: 부하 상한·정상 성능 기준 미정 또는 queue·다른 요청 영향을 못 본다.
 remediation: '- 입력·출력 크기, 동시 실행·대기열, 처리 시간과 사용자별 자원 사용에 한도를 둔다. 과도한 부하·오류 요청이 있어도 정상 요청의 처리 기회가 유지되도록 제한·오류 처리 방식을 보완한다.'
-method_and_evidence: '합성 고비용 요청과 정상 workload를 섞어 queue·KV·지연·처리량·거부를 측정한다. 【F19】queue None 기본은 한도 미설정. n의 16384는 기업 안전예산이 아님. priority header가 body보다 우선. 실제 대기열·토큰·n 유효값을 수집하고 경계 부하를 가한다. body와 X-Vllm-Priority를 각각 조작하여 허용 우선순위만 집행되는지 확인한다. 정상 대조: 정한 정상 부하·허용 priority가 기능/성능 기준 충족'
+method_and_evidence: '합성 고비용 요청과 정상 workload를 섞어 queue·KV·지연·처리량·거부를 측정한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F19】queue None 기본은 한도 미설정. n의 16384는 기업 안전예산이 아님. priority header가 body보다 우선. 실제 대기열·토큰·n 유효값을 수집하고 경계 부하를 가한다. body와 X-Vllm-Priority를 각각 조작하여 허용 우선순위만 집행되는지 확인한다. 정상 대조: 정한 정상 부하·허용 priority가 기능/성능 기준 충족'
 remaining_setup: 부하·시간 중단값; 기본 무한 queue를 제한으로 가정하지 않음
 executor: null
 judge: null

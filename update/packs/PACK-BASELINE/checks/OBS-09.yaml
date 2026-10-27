@@ -2,7 +2,7 @@ id: OBS-09
 framework_id: CHK-OBS-009
 mechanism_ids:
 - mechanism-17
-revision: 3
+revision: 4
 retired: false
 area: OBS
 purpose: 기록 위변조 방지
@@ -73,7 +73,7 @@ satisfied_if: 비신뢰 입력이 신뢰 필드를 덮어쓰거나 별도 사건
 fail_criteria: 입력이 신뢰 필드를 덮거나 별도 허위 사건으로 해석된다.
 unknown_criteria: raw→collector→표시 변환을 확인하지 못했다. parser가 거부한 header는 해당 경로 거부로 기록한다.
 remediation: '- 신원·대상·상태의 신뢰 필드는 서버에서 만들고 요청 입력과 분리해 구조화한다. 줄바꿈·제어문자·필드 충돌을 처리하고 원본부터 수집기·화면까지 허위 사건이 만들어지지 않는지 확인한다.'
-method_and_evidence: '합성 구분문자·예약 필드 표식과 구조화 로그·원 사건을 비교한다. 【F25】formatter 개행 치환과 외부 request ID 수용 확인. HTTP parser가 개행 header를 허용한다는 주장 및 실제 로그 위조 결과는 미확인. HTTP parser가 수용하는 request_id/입력과 JSON 요청 필드에 구분문자·예약필드 유사 문자열을 주입하고 raw 로그→collector→화면의 이벤트 경계를 확인한다. CR/LF header가 parser에서 거절되면 그 결과를 기록한다. 정상 대조: 정상 ID·복수행 콘텐츠가 한 사건으로 정확히 기록'
+method_and_evidence: '합성 구분문자·예약 필드 표식과 구조화 로그·원 사건을 비교한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F25】formatter 개행 치환과 외부 request ID 수용 확인. HTTP parser가 개행 header를 허용한다는 주장 및 실제 로그 위조 결과는 미확인. HTTP parser가 수용하는 request_id/입력과 JSON 요청 필드에 구분문자·예약필드 유사 문자열을 주입하고 raw 로그→collector→화면의 이벤트 경계를 확인한다. CR/LF header가 parser에서 거절되면 그 결과를 기록한다. 정상 대조: 정상 ID·복수행 콘텐츠가 한 사건으로 정확히 기록'
 remaining_setup: 입력·기록 연결 표식과 실제 로그 파서; CRLF header 수용을 전제하지 않음
 executor: log_integrity
 judge:

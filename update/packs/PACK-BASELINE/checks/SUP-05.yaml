@@ -2,7 +2,7 @@ id: SUP-05
 framework_id: CHK-SUP-005
 mechanism_ids:
 - mechanism-08
-revision: 2
+revision: 3
 retired: false
 area: SUP
 purpose: 실제 사용의 무결성
@@ -31,7 +31,7 @@ satisfied_if: 변경 자체를 제한하거나, 변경된 내용의 사용을 �
 fail_criteria: 승인 후 교체된 비승인 자료가 제한 없이 소비된다.
 unknown_criteria: 쓰기 거부만 확인했으나 다른 교체 경로 또는 실제 소비 대상을 확인하지 못했다.
 remediation: '- 승인 파일과 symlink·mount를 변경할 권한을 제한하고, 불변 저장소 또는 실제 읽기 전 검증을 적용한다. 파일 선택부터 읽기까지 교체될 수 있는 지점을 확인하고, 승인 내용과 다른 파일의 사용을 막는다.'
-method_and_evidence: '격리된 사본으로 검사→배치→읽기 사이 교체를 시험하고 writer 권한·실제 읽기·거부를 기록한다. 【F34】VLLM_MODEL_REDIRECT_PATH가 설정되고 매핑 파일·대상 키가 존재할 때. 유효 env·redirect 파일 내용/digest·변경권한·resolved model/tokenizer 경로를 승인 묶음에 포함. 같은 표시명에 다른 무해 모델 경로를 넣어 승인 불일치 탐지 확인. 정상 대조: 승인한 redirect 매핑과 실제 파일로 정상 적재.'
+method_and_evidence: '격리된 사본으로 검사→배치→읽기 사이 교체를 시험하고 writer 권한·실제 읽기·거부를 기록한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F34】VLLM_MODEL_REDIRECT_PATH가 설정되고 매핑 파일·대상 키가 존재할 때. 유효 env·redirect 파일 내용/digest·변경권한·resolved model/tokenizer 경로를 승인 묶음에 포함. 같은 표시명에 다른 무해 모델 경로를 넣어 승인 불일치 탐지 확인. 정상 대조: 승인한 redirect 매핑과 실제 파일로 정상 적재.'
 remaining_setup: 교체 시점을 관측할 계측과 쓰기 권한별 시험 사본
 executor: null
 judge: null

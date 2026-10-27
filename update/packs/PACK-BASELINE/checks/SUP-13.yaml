@@ -2,7 +2,7 @@ id: SUP-13
 framework_id: CHK-SUP-013
 mechanism_ids:
 - mechanism-09
-revision: 2
+revision: 3
 retired: false
 area: SUP
 purpose: 자료 해석 안전성
@@ -31,7 +31,7 @@ satisfied_if: 금지 동작을 막고 정상 입력 해석은 유지한다.
 fail_criteria: 허용하지 않은 참조·동작이 실행되거나 정한 처리 한도를 넘긴다.
 unknown_criteria: sandbox 이름만 확인했거나 해당 template·renderer 분기에 도달하지 못했다.
 remediation: '- 모델이 제공한 chat template의 버전과 출처를 승인하고 실제 렌더러의 허용 동작을 제한한다. 외부 객체 참조·호출과 렌더링 비용을 정한 범위로 제한하고 실패한 변환 결과의 사용을 막는다.'
-method_and_evidence: 선정 renderer·제한 기능과 무해 경계 입력을 확인한다. 명시적 코드 실행 허용은 보호 목적 ④와 연결한다.
+method_and_evidence: 선정 renderer·제한 기능과 무해 경계 입력을 확인한다. 명시적 코드 실행 허용은 3.2 추가 코드 실행 허용의 해당 CHK-SUP-008·CHK-SUP-009·CHK-SUP-010·CHK-SUP-011에서 확인한다.
 remaining_setup: 허용 template 기능·처리 예산과 무해 검증 fixture
 executor: null
 judge: null

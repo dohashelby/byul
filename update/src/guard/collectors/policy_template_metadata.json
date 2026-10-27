@@ -2,8 +2,8 @@
   "pack": {
     "kind": "PACK",
     "id": "PACK-BASELINE",
-    "revision": 28,
-    "sha256": "e07ed32a08d7d1458f22d8127d5fb856a1337f0e77f2fc5d1dad27013d723f7d"
+    "revision": 29,
+    "sha256": "950393e82d607a8e5cb0a1fb3bf41010696bf22cc72a592605171714f7553aee"
   },
   "parameters": {
     "values.LIF-07.required_readiness_items": {

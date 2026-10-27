@@ -2,7 +2,7 @@ id: PLT-03
 framework_id: CHK-PLT-003
 mechanism_ids:
 - mechanism-11
-revision: 3
+revision: 4
 retired: false
 area: PLT
 purpose: 자격 제공·사용 제한
@@ -27,8 +27,8 @@ challenge_steps:
 required_observations: []
 required_observations_prose:
 - 최종 저장소·object/사용 identity·권한/허용·거부 감사 기록
-satisfied_if: 서버의 대리 접근권으로 허용 밖 자료를 취득하지 않는다.
-fail_criteria: 취득 주체가 금지 저장소·객체에 접근한다.
+satisfied_if: 실제 취득·반입·마운트 주체가 승인한 자격·권한으로 허용된 저장소 객체 또는 로컬 파일만 공급하고, 대리 접근권으로 허용 밖 자료를 취득하지 않는다.
+fail_criteria: 실제 취득·반입·마운트 주체가 같은 대리 자격이나 파일 권한으로 금지된 저장소·객체 또는 로컬 파일에 접근한다.
 unknown_criteria: URL 제출자와 서버 자격이 섞였거나 실제 대리 자격을 알 수 없다.
 remediation: '- 모델 취득 계정에 허용 저장소·객체·작업만 부여하고 서빙 계정의 자격과 분리한다. SDK가 실제 선택하는 자격과 redirect 뒤 최종 대상도 같은 허용 범위로 제한한다.'
 method_and_evidence: 명시 자격과 SDK 기본 자격의 선택·소비자·허용/금지 객체 접근을 확인한다. 로컬 공급은 실제 반입·마운트·파일 접근 주체와 권한을 대조한다. 비밀값은 기록하지 않는다.

@@ -25,6 +25,11 @@ required_observations:
 - key: runner_consumption_verified
   type: bool
 executor: sampling_validation
+normal_control: "허용 sampling 조합으로 정상 요청이 완료된다."
+challenge_steps:
+- "옵션별 경계 안 요청"
+- "한 옵션만 경계 밖으로 변경"
+- "해당 요청 오류와 병행·후속 정상 요청 상태 확인"
 judge:
   plugin: rule_table
   params:
@@ -78,3 +83,4 @@ limitations:
 - 실행 fixture의 max_tokens는 기업 출력 한도와 구분되는 작은 시험 예산이다. temperature 음수·top_p 범위·min_tokens와 max_tokens 관계의 제약 출처와 버전은 실행 설정의 DECLARED 참조이며 실제 빌드와 일치한다고 인증하지 않는다.
 - 정상 경계·동시 송신 정상 요청·후속 정상 추론과 health를 관측한다. health만으로 복구를 판정하지 않으며 두 송신의 병행이 worker 내부 실행 겹침이나 모든 worker 생존을 입증하지 않는다.
 - 실제 V2 활성·runner/worker 최종 소비값·allowed IDs/logit_bias/stop 개수 제한은 미계측이다. runner_consumption_verified=false로 보안 PASS를 보류하며 기능 PASS는 한 표본의 관측 범위다. API 수용·5xx·timeout만으로 메모리 손상·타 요청 피해·엔진 취약성을 확정하지 않는다.
+- 이 override의 실행 단계·정상 대조는 현재 sampling-api-v1 지원 프로파일에 한정한다. 새 schema/tool 선택·최종 소비 관측은 미구현·UNKNOWN이며 별도 연결이 필요하다.

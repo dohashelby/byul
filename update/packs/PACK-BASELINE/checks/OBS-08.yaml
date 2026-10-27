@@ -2,7 +2,7 @@ id: OBS-08
 framework_id: CHK-OBS-008
 mechanism_ids:
 - mechanism-09
-revision: 4
+revision: 5
 retired: false
 area: OBS
 purpose: 자료 해석 안전성
@@ -34,7 +34,7 @@ satisfied_if: 비허용 자료 실행·고권한 부수 동작을 막는다. 공
 fail_criteria: 비승인 자료를 허용 밖 reader로 해석하거나 금지 부수 동작이 발생한다.
 unknown_criteria: 외부 consumer·입력형식·실제 reader를 알 수 없다.
 remediation: '- replay에 사용할 진단 자료의 출처·식별정보·형식과 reader를 제한한다. 변조 자료를 사용 전에 거부하고 해석 프로세스의 파일·통신·코드 실행 권한을 승인 범위로 제한한다.'
-method_and_evidence: '자료 변경권과 실행권을 나누고 무해 변조 표식·출처 검사·parser 권한을 확인한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F24】진단 파일을 외부 도구가 읽어 재실행/역직렬화하는 consumer가 실제 배치될 때. 참조구성은 비사용. 외부 replay 도구 존재·실행계정·입력형식·reader를 먼저 확인. 있으면 읽기권만 가진 계정의 실행 시도, 변조한 무해 진단 fixture 소비를 확인. 정상 대조: 승인된 reader/실행 역할이 정상 자료를 제한 권한으로 처리.'
+method_and_evidence: '같은 승인 실행 역할과 실제 replay consumer를 고정하고 정상 합성 자료와 무해한 변조·출처/구조 변경 자료를 비교한다. digest·검증·최종 parser/reader·거부·객체 생성과 파일/통신/코드 부수 동작을 대조하고 실행 계정의 허용 권한 범위를 확인한다. 【F24】외부 replay 도구의 실제 배치·실행 계정·입력형식·reader 도달이 전제다. 누가 실행할 수 있는지는 CHK-OBS-007, 일반 파일·메시지 reader의 동일 해석 경로는 CHK-SUP-012와 증거를 공유한다. 근거 원문: [F24](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33733).'
 remaining_setup: 기본 비사용 여부와 실제 reader를 먼저 확인한다. 3.3 자료 해석 안전성의 CHK-SUP-012와 근거를 공유하고, replay의 읽기·실행 인가는 CHK-OBS-007에서 별도로 판정한다. Q-R05-07·Q-C11은 도출 근거로 유지한다.
 executor: null
 judge: null

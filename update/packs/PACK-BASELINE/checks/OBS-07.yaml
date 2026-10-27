@@ -2,7 +2,7 @@ id: OBS-07
 framework_id: CHK-OBS-007
 mechanism_ids:
 - mechanism-01
-revision: 4
+revision: 5
 retired: false
 area: OBS
 purpose: 작업·대상 인가
@@ -31,10 +31,10 @@ required_observations: []
 required_observations_prose:
 - consumer·실행 계정/reader·executor 역할/실제 실행 및 거부 기록
 satisfied_if: 자료 읽기만 허용된 주체의 replay 실행은 거부된다. 실행이 허용된 역할은 승인한 범위에서 정상 처리하며, replay 금지 정책에서는 실행이 시작되지 않는다.
-fail_criteria: 조회만 허용한 계정이 재실행 권한을 얻는다.
+fail_criteria: 읽기만 허용된 주체가 replay를 실행하거나, 실행 금지 정책의 작업이 실제 시작된다.
 unknown_criteria: 적용한 consumer에서 실제 호출·실행 또는 거부 기록, reader·실행 역할의 대응을 확인하지 못했다.
 remediation: '- 진단 자료 읽기 역할과 replay 실행 역할을 분리하고 실행 시 권한을 검사한다. replay를 사용하지 않는 구성에서는 실행 접점의 비사용·비노출을 확인한다.'
-method_and_evidence: '동일 합성 자료에 대해 reader와 실행 역할의 replay 호출·실행표식을 비교한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F24】진단 파일을 외부 도구가 읽어 재실행/역직렬화하는 consumer가 실제 배치될 때. 참조구성은 비사용. 외부 replay 도구 존재·실행계정·입력형식·reader를 먼저 확인. 있으면 읽기권만 가진 계정의 실행 시도, 변조한 무해 진단 fixture 소비를 확인. 정상 대조: 승인된 reader/실행 역할이 정상 자료를 제한 권한으로 처리.'
+method_and_evidence: '실제 배치된 replay consumer의 읽기 역할·실행 역할·허용 작업과 비사용/금지 정책을 확인한다. 같은 정상 합성 자료를 reader와 승인 실행 역할로 제출해 실제 실행표식·권한 검사·거부를 비교한다. 【F24】외부 도구의 존재·실행 계정·입력형식·reader를 먼저 식별한다. 이 행은 누가 replay를 시작할 수 있는지 판정하며, 자료 변조·reader의 금지 객체/부수 동작은 CHK-OBS-008에서 같은 consumer 관측과 함께 판정한다. 근거 원문: [F24](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33733).'
 remaining_setup: 기본 비사용; 외부 replay 구현·실행 역할 확정 후 시험
 executor: null
 judge: null

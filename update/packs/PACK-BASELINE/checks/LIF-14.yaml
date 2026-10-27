@@ -2,7 +2,7 @@ id: LIF-14
 framework_id: CHK-LIF-014
 mechanism_ids:
 - mechanism-13
-revision: 2
+revision: 3
 retired: false
 area: LIF
 purpose: 종결·자원 회수
@@ -32,7 +32,7 @@ satisfied_if: 선정 backend의 종료 계약을 충족한다. 모든 backend에
 fail_criteria: 종료 성공 표시 뒤 수집이 계속되거나 종료 실패를 성공으로 기록한다.
 unknown_criteria: API 200만 있고 실제 수집 종료·파일 상태를 확인하지 못했다.
 remediation: '- profiler의 시작·종료 요청과 실제 수집·출력·자원 정리 상태를 각각 기록한다. 종료 실패·지연을 성공으로 보고하지 않고 정한 기한 내 수집 중단·잔여 자원 정리를 확인한다.'
-method_and_evidence: 선정 진단 backend의 시작·수집·종료 계약과 산출 방식을 확인한다. 종료 응답·경고·실제 수집 상태·해당 산출물/전송·자원 사용과 다음 시작 가능 여부를 대조한다.
+method_and_evidence: '선정 진단 backend의 시작·수집·종료 계약과 산출 방식을 확인한다. 종료 응답·경고·실제 수집 상태·해당 산출물/전송·자원 사용과 다음 시작 가능 여부를 대조한다. 같은 시험의 종료 API·로그 표현과 실제 상태의 일치는 CHK-OBS-002에서 별도로 판정한다. vLLM v0.31.0의 공통 【F38】 근거를 사용할 때 실제 profiler 설정·route 등록·접근 범위와 격리된 backend 시작/정지 실패 주입 조건을 유지한다. 근거 원문: [F38](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33961).'
 remaining_setup: 짧은 profile fixture·오류 주입·종료 기한
 executor: null
 judge: null

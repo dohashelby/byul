@@ -1,7 +1,7 @@
 {
   "status": "DRAFT_NOT_IMPLEMENTED",
   "template_path": "data/result_template.json",
-  "template_bytes_sha256": "4fbb71881a7f77336bee90d7610b273b8b705a2475102343c95ccb0ec85d1108",
+  "template_bytes_sha256": "12c75213980f2d8a5204dc990ae66b45962864067dc8ac2affbc7bdc110c948a",
   "enum_namespaces": {
     "framework_projection": {
       "applicability": {

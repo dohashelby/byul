@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/mg-princess/serving-security-framework",
-  "commit": "8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e",
+  "commit": "91e84c778f4fc8ee1108eaf0551bf51f2f6a2061",
   "files": [
     {
       "path": "01_프레임워크와_위협통제연결.md",
@@ -8,27 +8,27 @@
     },
     {
       "path": "02_환경별_적용기준.md",
-      "sha256": "0792044d40823c343dc7f8eca554ffaba15c278fb190566c382ec2752d14df5c"
+      "sha256": "253362d1d6fed107cec55109e4a1a1ba1815e6606d842b300ce4beb46891bad5"
     },
     {
       "path": "03_체크리스트와_보완가이드.md",
-      "sha256": "54c5d63487f58efe9d79ec041ee39c7802fbc85edd4cc8d3d57eaec85e2bdf69"
+      "sha256": "8dc05b3e758ded02882278d1c9afc324e37d0d461e7ad3a7b81cf6ca07843d1d"
     },
     {
       "path": "04_엔진과_버전별_차이.md",
-      "sha256": "f2686b5d911f2d61b1f03377b2367a94e80a9c11d54ae52b425239f6849043b6"
+      "sha256": "878927d57508b619903dcb4d7c340b8e623b5bed3a3fbdcc118b642ff12b2b63"
     },
     {
       "path": "05_평가와_증거관리.md",
-      "sha256": "1b91e36d0b726c30daf71f17c59f16c97d6a64ad4686fff1687d9e9755dece30"
+      "sha256": "74b6a2f97c66837e4aa0d7ddbd0cfc9e20c5a76f086cb4fc159c78f957be25f6"
     },
     {
       "path": "README.md",
-      "sha256": "f90edf3c1dfc14b1bc099dc7a782722de3bb53a12029abdd027247c831d1589a"
+      "sha256": "8ead753c4149329179ab011c2baf8fab6728bc7e81025e7b93ad4ff5f82cc91a"
     },
     {
       "path": "data/checklist.json",
-      "sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7"
+      "sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f"
     },
     {
       "path": "data/environment_template.json",
@@ -40,7 +40,7 @@
     },
     {
       "path": "data/result_template.json",
-      "sha256": "4fbb71881a7f77336bee90d7610b273b8b705a2475102343c95ccb0ec85d1108"
+      "sha256": "12c75213980f2d8a5204dc990ae66b45962864067dc8ac2affbc7bdc110c948a"
     },
     {
       "path": "data/source_manifest.json",
@@ -52,27 +52,27 @@
     },
     {
       "path": "개발전달/Q_보조기_입력과_추천출력.md",
-      "sha256": "2fddcd22407e9229fc2550fa637bba006133cf02fa63d3ded815747644504e55"
+      "sha256": "84cbabff3251a29b0267ba6018fe4815e4e31744861c7f1d3eb2bb894ca06303"
     },
     {
       "path": "개발전달/examples/결과기록_합성예시_초안.json",
-      "sha256": "0827972422ed54915a1a13d2519af8c5703e1a9856deb49fe8c0c440eb44a072"
+      "sha256": "1f6654d1698256bd5669131fb4a790984e59190472b1ca2ad9c110effcf99e63"
     },
     {
       "path": "개발전달/개발팀_인계명세.md",
-      "sha256": "84dba6b3de89f24e33f4fc16f847f93732c16eb074cd3cdd959f7779e877ccf3"
+      "sha256": "0d272e11e2a1cad5cf6c6a9b32f120ebe84df9195789184c70a35881ac40c4ba"
     },
     {
       "path": "개발전달/결과기록_최소명세_초안.md",
-      "sha256": "6f1422ef4b5941eafd0f033b31ea1bdede7f851434971f2db5e099d74fc3370a"
+      "sha256": "e5fa6ed499eaf1f8c1dcd1d679e9b972356fc9eb0a5fa5a329fb2108c61ed44c"
     },
     {
       "path": "개발전달/결과기록_필드사전_초안.json",
-      "sha256": "ffd0512b155d2824411616424e80b466d9beb390c9c2c931ef8d7c16d5828ec9"
+      "sha256": "b98afabbd8def79dfb669c642d2febad49840587395ead3acfb18fb2181e491a"
     },
     {
       "path": "개발전달/업데이트검증_폼명세.md",
-      "sha256": "f44b071357aa1f24e2ec66fae4eda58120f21cee9ed5f021c56ba1ec59a9edde"
+      "sha256": "5faee25df566b1d954877c1eecf9f4122a4ff8a921e8d056009160f62c7fa743"
     },
     {
       "path": "시험전_1차확정_20261025.md",
@@ -81,15 +81,23 @@
     {
       "path": "엔진별_적용검토/vLLM_v0.31.0_진입경로.md",
       "sha256": "cee3a17a35f81ffdf8c26658a5d6363846bfd811200a9425ad0f2bfddce8833c"
+    },
+    {
+      "path": "개발전달/공식시험_대조표.md",
+      "sha256": "f1ea235d65a73fb473dde154cb2089390efd488432b6b9c764f256721dd2801a"
+    },
+    {
+      "path": "개발전달/공식시험_매핑.json",
+      "sha256": "c9cbb9f5278bdb24d042c4c95dd79f81f009da6495da379388c0cd2cea4e8d5b"
     }
   ],
   "legacy_retained": [
     "프레임워크_논리체크리스트검토_20261019.md",
     "프레임워크_사용성검토_20261019.md"
   ],
-  "previous_upstream_commit": "0ec5fb5fa5633b0817468b27684690a66fc7b4f5",
-  "sync_base_byul_commit": "7e34575931c9ea81a7e68b0c5944459620039c2d",
-  "vendor_policy": "Core criteria, handoff specifications and vLLM entry documentation only. Read complete validation tools, shared diagrams, SGLang inventories and historical records at the exact upstream commit. Original bytes are unchanged.",
+  "previous_upstream_commit": "8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e",
+  "sync_base_byul_commit": "3e40def8c1f653e87c125fa0844e9379f278a004",
+  "vendor_policy": "Core criteria and handoff sources (20 files), plus the official-test mapping Markdown/JSON (2 files). Validation packages, shared pages/HTML, complete engine inventories and historical raw copies remain upstream. Source bytes are unchanged.",
   "previous_sync_metadata": {
     "previous_byul_commit": "d119ebe446144ae707e6f13ad11eb0d786788217",
     "previous_checklist_sha256": "8c24b31ace48a695271766b2adc6360b8570590ee5d4485e451a50c48eaf4671",
@@ -123,5 +131,5 @@
   "bundled_tools": [
     "select_checklist.py"
   ],
-  "complete_upstream_source": "https://github.com/mg-princess/serving-security-framework/tree/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e"
+  "complete_upstream_source": "https://github.com/mg-princess/serving-security-framework/tree/91e84c778f4fc8ee1108eaf0551bf51f2f6a2061"
 }

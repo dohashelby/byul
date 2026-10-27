@@ -2,7 +2,7 @@ id: LIF-10
 framework_id: CHK-LIF-010
 mechanism_ids:
 - mechanism-13
-revision: 2
+revision: 3
 retired: false
 area: LIF
 purpose: 종결·자원 회수
@@ -31,7 +31,7 @@ satisfied_if: 정한 기한 안에 작업이 중단되고 scheduler·worker 상�
 fail_criteria: 요구한 종료 기한 뒤에도 해당 작업·참조가 지속된다.
 unknown_criteria: HTTP 취소 응답·집계 GPU 수치만 있고 해당 요청의 실제 종결을 모른다.
 remediation: '- 취소·연결 종료·timeout을 해당 내부 실행의 중단과 scheduler·worker 상태 정리까지 전달한다. stop 문자열로 응답을 끝냈는데 Core 실행이 남아 있으면 중단을 전달한다. 엔진 장애 시에는 오류 전달과 실행 그룹·잔존 자원 정리를 확인한다. 계산·전송·참조별 종료를 관측하고 기한을 넘긴 작업의 추가 정리 절차를 마련한다.'
-method_and_evidence: HTTP 종료·Core abort·finished ID·worker 행·KV 참조·GPU/전송 완료를 나눠 관측한다.
+method_and_evidence: HTTP 종료·Core abort·finished ID·worker 행·KV 참조·GPU/전송 완료를 나눠 관측한다. 같은 취소 시험에서 늦은 출력과 새 요청/attempt의 귀속은 CHK-REQ-012로 따로 판정한다. 올바른 출력 폐기만으로 내부 실행·자원의 회수가 완료됐다고 처리하지 않는다. worker/그룹 실패의 잔여 자원 정리는 CHK-LIF-011에서 판정한다.
 remaining_setup: 요청별 종결·회수 계측과 기한
 executor: null
 judge: null

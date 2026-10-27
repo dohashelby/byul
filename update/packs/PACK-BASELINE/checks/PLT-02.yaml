@@ -2,7 +2,7 @@ id: PLT-02
 framework_id: CHK-PLT-002
 mechanism_ids:
 - mechanism-01
-revision: 4
+revision: 5
 retired: false
 area: PLT
 purpose: 실행 최소 권한
@@ -44,8 +44,8 @@ required_observations:
   type: dict[str, pass|fail|no_response]
 required_observations_prose:
 - IPC 주소·소유자·mode/실제 process UID/연결·열기·작업 영향
-satisfied_if: 비허용 프로세스의 제어 메시지가 소비되지 않는다.
-fail_criteria: 비허용 주체가 보호해야 할 IPC 자료나 명령 접점에 접근한다.
+satisfied_if: 채널별 정책이 요구하는 연결·열기·자료 읽기/쓰기·명령 수용의 접근 제한을 지키고 허용 프로세스의 정상 IPC 작업은 유지된다. 연결 가능성, 보호 자료 접근, 명령 소비의 결과를 구분해 기록한다.
+fail_criteria: 채널 정책이 금지한 비허용 프로세스의 연결·열기·보호 자료 읽기/쓰기 또는 명령 수용이 실제 성립한다.
 unknown_criteria: 파일 mode만 확인하고 namespace·상위 디렉터리·실제 접속을 확인하지 못했다.
 remediation: '- 로컬 socket·공유 메모리와 이를 생성하는 디렉터리의 소유자·권한을 제한한다. 허용 프로세스가 사용할 접점과 명령 범위를 확인하고 비허용 계정의 읽기·연결·명령 전달을 차단한다.'
 method_and_evidence: '허용/비허용 시험 프로세스로 연결·메시지 수용을 대조하고 소켓·SHM 권한을 확보한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F21】실제 RPC_BASE_PATH, socket/SHM 소유자·mode·mount namespace·접근 가능한 PID/UID를 수집; 현재 접근 가능성과 임의 명령 실행 효과를 분리. 허용 프로세스·동일 UID 비허용 프로세스·다른 UID 비허용 프로세스에서 채널별 연결과 무해 메시지 수용을 대조한다. OS 권한·namespace와 실제 소비 여부를 기록한다. 정상 대조: 허용 프로세스의 TP 요청 정상 처리와 채널별 연결/소비 기록 확보.'

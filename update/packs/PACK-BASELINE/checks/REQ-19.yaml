@@ -2,7 +2,7 @@ id: REQ-19
 framework_id: CHK-REQ-019
 mechanism_ids:
 - mechanism-05
-revision: 2
+revision: 3
 retired: false
 area: REQ
 purpose: GPU 메모리 안전성
@@ -27,7 +27,7 @@ challenge_steps:
 required_observations: []
 required_observations_prose:
 - kernel·GPU·dtype/buffer 범위·초기화/동기화 오류·대조 출력
-satisfied_if: 시험한 범위에서 범위 밖 접근·이전 상태 혼입이 없고 필요한 검사가 작동한다. 계측 미비는 미확인으로 둔다.
+satisfied_if: 시험한 kernel 분기에서 주소·인덱스·크기 계산과 필요한 영역의 초기화가 유효한 범위를 지키고, 범위 밖 접근이나 초기화되지 않은 값의 소비가 확인되지 않으며 정상 대조 연산이 성립한다. slot 상태·graph replay·통신 버퍼의 소유자와 시간 순서는 CHK-REQ-018·CHK-REQ-020·CHK-REQ-021의 결과와 연결한다. 계측 미비는 미확인으로 둔다.
 fail_criteria: 유효 범위 밖 접근이나 초기화되지 않은 값의 소비가 증거로 확인된다.
 unknown_criteria: 집계 GPU 지표만 있거나 kernel·buffer 수준 증거를 얻지 못했다.
 remediation: '- 선택한 kernel·의존성의 수정 버전을 적용하고 실제 buffer 크기·입력 범위에 맞춰 접근·초기화 조건을 검사한다. 수정 전 임시 제한은 확인된 영향 경로에 적용하고 유효 입력의 정상 처리도 함께 확인한다.'

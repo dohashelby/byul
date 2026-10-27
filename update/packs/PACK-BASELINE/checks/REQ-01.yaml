@@ -2,7 +2,7 @@ id: REQ-01
 framework_id: CHK-REQ-001
 mechanism_ids:
 - mechanism-01
-revision: 7
+revision: 8
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -51,7 +51,7 @@ satisfied_if: 비허용 주체의 작업은 수행되지 않고 허용 요청은
 fail_criteria: 비허용 출발점이나 신원이 직통 경로에서 금지 작업을 실행한다.
 unknown_criteria: /v1만 확인했거나 /invocations 등 등록 경로·도달성·집행점을 확인하지 못했다.
 remediation: '- Gateway와 허용 호출자만 엔진에 접근하도록 배포망·수신 주소의 노출을 제한한다. 실제 열린 추론·관리 API 전체에서 경유·직통 경로의 작업 권한을 확인하고 우회 가능한 경로를 제한한다.'
-method_and_evidence: '실제 등록 route·listener와 접근 가능한 출발점을 확보하고 같은 무해 작업을 허용·비허용 신원으로 비교한다. Gateway가 있으면 경유·직통을, 없으면 직접 진입점의 인증·인가·노출 제한을 확인한다. 실제 경로 재작성과 최종 handler의 수행·거부를 연결한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F39】host None 일반 TCP launcher는 빈 호스트 bind; UDS/배포망 별도. CORS * 자체가 네트워크 접근·인가 우회 증거는 아님. 실제 bind·UDS·Gateway·방화벽·CORS 유효값을 기록하고 허용/비허용 Origin의 브라우저 및 비브라우저 직통 요청을 검사한다. 정상 대조: 허용 앱 경유 요청 정상'
+method_and_evidence: '실제 frontend·protocol·route·listener와 허용/비허용 출발점·신원을 목록화하고 동일 무해 작업의 수행·거부를 비교한다. Gateway 사용 시 경유·직통을, 비사용 시 직접 진입점의 인증·인가·노출 제한을 확인한다. 경로 재작성의 인증 입력–최종 handler 대응은 CHK-REQ-002와 공유 시험으로 연결한다. 【F39】일반 TCP의 실제 bind와 UDS·배포망·방화벽·Gateway를 확인한다. CORS 설정과 허용/비허용 Origin의 브라우저·비브라우저 호출은 실제 사용 경로에서 확인하며, CORS 선언만으로 직통 인가를 판정하지 않는다. 허용 앱·신원의 정상 추론과 비교한다. 근거 원문: [F39](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33565).'
 remaining_setup: 격리 endpoint와 허용표; OPTIONS 응답과 실제 작업 실행 구분
 executor: direct_route
 judge:

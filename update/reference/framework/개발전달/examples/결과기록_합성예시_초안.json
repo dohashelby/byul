@@ -7,7 +7,7 @@
     "repository": "mg-princess/serving-security-framework",
     "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
     "content_commit": null,
-    "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+    "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
     "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
     "schema_version": "0.2",
     "original_date": "2026-10-18"
@@ -21,14 +21,14 @@
         "record_id": "EXAMPLE-CASE-1",
         "assessment_id": "CHK-REQ-005",
         "protection_requirement_id": "requirement-1-2",
-        "checklist_revision": "sha256:cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+        "checklist_revision": "sha256:745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
         "test_branch_ref": {
           "assessment_id": "CHK-REQ-005",
           "checklist_ref": {
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -227,7 +227,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -244,7 +244,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -261,7 +261,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -284,7 +284,7 @@
               "repository": "mg-princess/serving-security-framework",
               "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
               "content_commit": null,
-              "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+              "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
               "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
               "schema_version": "0.2",
               "original_date": "2026-10-18"
@@ -401,7 +401,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -517,7 +517,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -605,7 +605,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -620,7 +620,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -652,7 +652,7 @@
         "record_id": "EXAMPLE-CASE-2",
         "assessment_id": "CHK-PLT-008",
         "protection_requirement_id": "requirement-5-5",
-        "checklist_revision": "sha256:cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+        "checklist_revision": "sha256:745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
         "test_branch_ref": null,
         "test_case_id": "synthetic-case-2",
         "test_case_parameters": {
@@ -840,7 +840,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -857,7 +857,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -874,7 +874,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -897,7 +897,7 @@
               "repository": "mg-princess/serving-security-framework",
               "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
               "content_commit": null,
-              "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+              "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
               "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
               "schema_version": "0.2",
               "original_date": "2026-10-18"
@@ -981,7 +981,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -1064,7 +1064,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -1187,7 +1187,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -1202,7 +1202,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -1237,7 +1237,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -1271,7 +1271,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -1304,14 +1304,14 @@
         "record_id": "EXAMPLE-CASE-3",
         "assessment_id": "CHK-LIF-013",
         "protection_requirement_id": "requirement-4-4",
-        "checklist_revision": "sha256:cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+        "checklist_revision": "sha256:745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
         "test_branch_ref": {
           "assessment_id": "CHK-LIF-013",
           "checklist_ref": {
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -1535,7 +1535,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -1558,7 +1558,7 @@
               "repository": "mg-princess/serving-security-framework",
               "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
               "content_commit": null,
-              "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+              "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
               "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
               "schema_version": "0.2",
               "original_date": "2026-10-18"
@@ -1642,7 +1642,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -1758,7 +1758,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -1874,7 +1874,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -1964,7 +1964,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -1979,7 +1979,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -1994,7 +1994,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2037,7 +2037,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2071,7 +2071,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2105,7 +2105,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2120,7 +2120,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2135,7 +2135,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2179,7 +2179,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2194,7 +2194,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2209,7 +2209,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2252,14 +2252,14 @@
         "record_id": "EXAMPLE-CASE-4",
         "assessment_id": "CHK-OBS-006",
         "protection_requirement_id": "requirement-5-4",
-        "checklist_revision": "sha256:cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+        "checklist_revision": "sha256:745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
         "test_branch_ref": {
           "assessment_id": "CHK-OBS-006",
           "checklist_ref": {
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -2458,7 +2458,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -2475,7 +2475,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -2498,7 +2498,7 @@
               "repository": "mg-princess/serving-security-framework",
               "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
               "content_commit": null,
-              "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+              "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
               "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
               "schema_version": "0.2",
               "original_date": "2026-10-18"
@@ -2582,7 +2582,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -2698,7 +2698,7 @@
                 "repository": "mg-princess/serving-security-framework",
                 "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                 "content_commit": null,
-                "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                 "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                 "schema_version": "0.2",
                 "original_date": "2026-10-18"
@@ -2788,7 +2788,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2803,7 +2803,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2838,7 +2838,7 @@
                   "repository": "mg-princess/serving-security-framework",
                   "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
                   "content_commit": null,
-                  "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+                  "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
                   "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
                   "schema_version": "0.2",
                   "original_date": "2026-10-18"
@@ -2973,7 +2973,7 @@
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -2990,7 +2990,7 @@
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -3012,7 +3012,7 @@
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -3029,7 +3029,7 @@
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -3051,7 +3051,7 @@
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -3068,7 +3068,7 @@
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -3090,7 +3090,7 @@
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"
@@ -3107,7 +3107,7 @@
             "repository": "mg-princess/serving-security-framework",
             "base_commit": "31d795f1292d854fc1ed0cca0301668eca89ceaf",
             "content_commit": null,
-            "checklist_file_sha256": "cf4903efe9a60543ceff5276a09ac2c40bb16d54658b21e5deafb03c948f8da7",
+            "checklist_file_sha256": "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f",
             "publication_status": "LOCAL_UNPUBLISHED_CANDIDATE",
             "schema_version": "0.2",
             "original_date": "2026-10-18"

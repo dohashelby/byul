@@ -2,7 +2,7 @@ id: REQ-12
 framework_id: CHK-REQ-012
 mechanism_ids:
 - mechanism-13
-revision: 3
+revision: 4
 retired: false
 area: REQ
 purpose: 요청·결과 귀속
@@ -29,7 +29,7 @@ required_observations_prose:
 - 내부 attempt ID/abort 도달/늦은 chunk·B 결과·작업 상태
 satisfied_if: 취소가 올바른 대상에 적용되고 늦은 결과가 비허용 소비자에게 전달되지 않는다. 실제 작업·자원 회수는 6.4 종결·자원 회수의 CHK-LIF-010·CHK-LIF-011에서 별도로 판정한다.
 fail_criteria: 늦은 A 결과가 B에 섞이거나 B가 A의 취소를 잘못 승계한다.
-unknown_criteria: abort 접수만 있고 내부 attempt·늦은 출력·실제 종결을 확인하지 못했다.
+unknown_criteria: abort 접수만 확인했거나 취소 대상·내부 attempt·늦은 chunk의 폐기/전달과 새 요청·시도의 연결을 확인하지 못했다. 실제 GPU 작업 중단·참조·자원 회수의 증거 부족은 CHK-LIF-010·CHK-LIF-011의 해당 결과에 남긴다.
 remediation: '- 요청과 실행 시도마다 식별정보를 구분하고 취소 대상·종료 상태를 기록한다. 종료된 시도의 늦은 출력을 버리거나 격리하고 같은 외부 ID의 새 요청에 이전 취소·결과가 적용되지 않게 한다.'
 method_and_evidence: 취소 대상·Core abort·worker finished·출력 폐기/반환을 연결한다. retry 사용 시 이전/새 attempt를 따로 추적한다.
 remaining_setup: 안전한 지연 주입과 attempt 식별 계측

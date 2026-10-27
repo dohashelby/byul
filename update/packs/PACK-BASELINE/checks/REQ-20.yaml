@@ -2,7 +2,7 @@ id: REQ-20
 framework_id: CHK-REQ-020
 mechanism_ids:
 - mechanism-05
-revision: 2
+revision: 3
 retired: false
 area: REQ
 purpose: 실행 상태·버퍼 수명
@@ -27,7 +27,7 @@ challenge_steps:
 required_observations: []
 required_observations_prose:
 - capture key·주소/입력 갱신·출력 소비/stream event·대조 출력
-satisfied_if: 유효 길이 밖·이전 요청 상태를 소비하지 않고 출력 수명이 보장된다. 주소 일치 assert만으로 충족 처리하지 않는다.
+satisfied_if: 현재 replay의 입력과 유효 길이가 실제 계산에 반영되고, 유효 길이 밖이나 이전 요청의 상태를 소비하지 않으며, 출력 소비가 끝나기 전에 같은 버퍼를 덮어쓰거나 다른 replay의 결과로 바꾸지 않는다. 입력 갱신·copy/동기화·소비·재사용 순서를 증거로 확인한다. kernel 자체의 주소·인덱스 계산은 CHK-REQ-019, TP native 등록 참조는 CHK-REQ-021의 결과와 연결한다. 주소 일치 assert만으로 충족 처리하지 않는다.
 fail_criteria: 이전 입력·출력의 재사용 또는 소비 전 overwrite로 결과 귀속이 깨진다.
 unknown_criteria: replay 도달·copy 완료·동기화 순서를 관측하지 못했다.
 remediation: '- CUDA Graph 재실행 전에 현재 입력을 갱신하고, 연산·출력 사용·buffer 재사용의 동기화 순서를 지킨다. 실행 모드나 buffer가 바뀌면 graph 관리자의 재캡처·재사용 조건을 확인한다.'

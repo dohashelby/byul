@@ -63,7 +63,7 @@ SUP:
   retired: false
 - id: SUP-11
   framework_id: CHK-SUP-011
-  question: 지원하는 실행 방식마다 외부 모듈을 불러오는 제한이 유지되는가?
+  question: 지원하는 Python 실행 모드가 달라져도 같은 동적 import 허용 검사가 유지되는가?
   subtest_ids:
   - Q-R05-06/SC-11-05
   retired: false
@@ -155,13 +155,13 @@ REQ:
   retired: false
 - id: REQ-09
   framework_id: CHK-REQ-009
-  question: 토큰 번호와 입력 길이가 실제 모델과 처리 단계에서 허용하는 범위 안에 있는가?
+  question: 지원하는 모델 입력의 값·길이·차원과 구성요소의 정합성이 실제 모델·처리 단계의 허용 범위 안에 있는가?
   subtest_ids:
   - Q-C04/SC-04-01
   retired: false
 - id: REQ-10
   framework_id: CHK-REQ-010
-  question: 답변 생성 옵션의 값·개수·조합이 실제 실행 가능한 범위 안에 있는가?
+  question: 생성 요청 옵션의 값·구조·개수·복잡도·조합이 실제 처리 단계의 허용 범위를 지키는가?
   subtest_ids:
   - Q-C04/SC-04-02
   retired: false
@@ -268,7 +268,7 @@ PLT:
   retired: false
 - id: PLT-06
   framework_id: CHK-PLT-006
-  question: Core·worker의 공유 권한과 침해 영향을 확인하고, 해당 프로세스·내부 통신에 대한 외부 접근을 제한하는가?
+  question: Core·worker가 공유하는 권한과 신뢰 범위가 채택한 격리 요구에 맞고, 한 worker 침해의 영향 범위를 확인했는가?
   subtest_ids:
   - Q-C07/SC-08-02
   retired: false
@@ -310,7 +310,7 @@ PLT:
   retired: false
 - id: PLT-12
   framework_id: CHK-PLT-012
-  question: 폐기한 자격의 사본으로 다시 접근할 수 없는가?
+  question: 폐기 대상 자격의 남은 사본에 정한 교체·회수·삭제와 재사용 금지 기준이 적용되는가?
   subtest_ids:
   - Q-C12/SC-19-03
   retired: false
@@ -329,7 +329,7 @@ LIF:
   retired: false
 - id: LIF-03
   framework_id: CHK-LIF-003
-  question: 처리 비용이 큰 요청과 동시 부하를 제한하면서 정상 요청도 처리할 수 있는가?
+  question: 처리 비용이 큰 요청과 동시 부하의 단계별·요청별·누적 예산을 제한하면서 정상 요청도 처리할 수 있는가?
   subtest_ids:
   - Q-C05/SC-07-01
   - Q-C05/SC-07-02
@@ -491,7 +491,7 @@ OBS:
   retired: false
 - id: OBS-12
   framework_id: CHK-OBS-012
-  question: 로그·사용 통계·진단의 원본과 사본이 정한 보존·삭제 범위를 지키는가?
+  question: 로그·사용 통계·진단의 원본·사본과 모델·입력·캐시 사본이 각각 정한 보존·삭제 범위를 지키는가?
   subtest_ids:
   - Q-C12/SC-20-03
   - Q-C11/SC-22-03

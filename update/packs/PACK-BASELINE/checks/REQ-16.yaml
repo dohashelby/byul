@@ -2,7 +2,7 @@ id: REQ-16
 framework_id: CHK-REQ-016
 mechanism_ids:
 - mechanism-04
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 재사용 문맥의 호환성
@@ -14,7 +14,7 @@ risk_summary: 호출자가 구분되지 않는 모델·자료 식별값을 이�
 review_order: reference_baseline_first
 impact: null
 applies_when:
-  prose: 선정 cache를 재사용할 때 실제 key 문맥을 확인한다. adapter·media 등의 문맥은 해당 기능을 사용할 때만 추가한다.
+  prose: 요청 처리에서 KV/prefix·입력/미디어 등 계산 상태를 cache로 재사용할 때 실제 key 문맥을 확인한다. 모델·adapter·media 등은 실제 활성 기능에 필요한 문맥으로 추가한다. 다운로드·변환·compile/npcache 생성물의 호환성은 CHK-SUP-015에서 대조한다.
 policy_params:
 - key: required_cache_contexts
   type: list[str]

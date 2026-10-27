@@ -88,7 +88,7 @@ def test_req09_same_raw_206_is_legacy_fail_but_new_unconfirmed_unknown(pack):
     data["challenge_rejection_results"]["length"] = "unverified"
     legacy = with_legacy_check(pack, "REQ-09").checks["REQ-09"]
     current = pack.checks["REQ-09"]
-    assert legacy.revision == 5 and current.revision == 7
+    assert legacy.revision == 5 and current.revision == 8
     assert len(current.required_observations) == 10
     _evd, old = judge(pack, legacy, data)
     evd, new = judge(pack, current, data)

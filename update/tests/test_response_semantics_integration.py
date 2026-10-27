@@ -184,7 +184,7 @@ def test_mount_policy_fail_does_not_turn_unknown_candidate_into_credential_acces
     supplied["forbidden_mount_paths"] = supplied["credential_candidate_paths"] = ["/EXAMPLE-forbidden/token"]
     old = with_legacy_check(pack, "PLT-04").checks["PLT-04"]
     current = pack.checks["PLT-04"]
-    assert old.revision == 2 and current.revision == 4 and len(current.required_observations) == 8
+    assert old.revision == 2 and current.revision == 5 and len(current.required_observations) == 8
     _old_evd, old_result = judge(pack, old, data, supplied=supplied)
     evd, new_result = judge(pack, current, data, supplied=supplied)
     assert old_result.verdicts.security.value == new_result.verdicts.security.value == "FAIL"

@@ -2,7 +2,7 @@ id: OBS-03
 framework_id: CHK-OBS-003
 mechanism_ids:
 - mechanism-14
-revision: 3
+revision: 4
 retired: false
 area: OBS
 purpose: 수집 정보 최소화
@@ -65,7 +65,7 @@ satisfied_if: 금지한 필드·문맥을 수집하지 않고 필요한 사건�
 fail_criteria: 금지 민감 필드가 기록되거나 수집 목적 밖 사본에 포함된다.
 unknown_criteria: 오류 분기·선택 로그 수준·원본 파일을 확인하지 못했다.
 remediation: '- 로그 수준·오류·debug·trace·dump별 허용 필드를 정하고 기록 생성·수집 단계에 필터를 적용한다. 합성 민감 표식으로 원본·사본을 확인하고 불필요한 본문·자격정보 기록을 제거한다.'
-method_and_evidence: '합성 민감 표식으로 생성 위치·필드·마스킹·sink를 확인한다. 실제 비밀값은 사용하지 않는다. 기본 엔진 예외 로그와 선택 debug 사본에 대해 허용 독자·비허용 사용자 계정으로 읽기·반출을 비교한다. 로컬 원본과 collector 이후 사본을 모두 확인한다. Tensor shape/anon_repr 정제와 원문 필드를 구분하며 수집기 필터만으로 로컬 원본까지 보호됐다고 판정하지 않는다. 앱이 넣은 합성 비공개 system 표식으로 return_prompt_text·return_token_ids를 요청해 Gateway/직통 및 등록 alias에서 비교한다. 선택 코드의 반환 분기에는 별도 운영자 차단 gate가 없으므로 Gateway 거부/제거와 직통 제한을 집행점으로 확인한다. echo·prompt_logprobs·logprobs는 해당 API의 필드·허용 정보별로 따로 판정한다. 오류에는 /workspace/x·s3://bucket/key·가짜 자격 표식을 사용한다. 기본 예외 dump도 포함하며 shape/anon_repr 정제와 원문 필드를 구분한다. 【F26】예외 dump는 기본 검토, debug response/output 로그는 설정별 확인; dump가 언제나 전체 프롬프트를 노출한다는 주장은 금지. 고유한 무해 시험 표식을 넣은 정상 요청과 안전하게 유도한 오류를 각각 실행하고 활성 로그·진단 사본의 필드를 대조한다. 정상 대조: 고유 시험 표식을 정상 요청·안전한 주입 예외에 넣고 각각 수집본/회전파일에서 허용 필드 확인.'
+method_and_evidence: '합성 민감 표식으로 생성 위치·필드·마스킹·sink를 확인한다. 실제 비밀값은 사용하지 않는다. 기본 엔진 예외 로그와 선택 debug 사본에 대해 허용 독자·비허용 사용자 계정으로 읽기·반출을 비교한다. 로컬 원본과 collector 이후 사본을 모두 확인한다. Tensor shape/anon_repr 정제와 원문 필드를 구분하며 수집기 필터만으로 로컬 원본까지 보호됐다고 판정하지 않는다. 앱이 넣은 합성 비공개 system 표식으로 return_prompt_text·return_token_ids를 요청해 Gateway/직통 및 등록 alias에서 비교한다. 선택 코드의 반환 분기에는 별도 운영자 차단 gate가 없으므로 Gateway 거부/제거와 직통 제한을 집행점으로 확인한다. echo·prompt_logprobs·logprobs는 해당 API의 필드·허용 정보별로 따로 판정한다. 오류에는 /workspace/x·s3://bucket/key·가짜 자격 표식을 사용한다. 기본 예외 dump도 포함하며 shape/anon_repr 정제와 원문 필드를 구분한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F26】예외 dump는 기본 검토, debug response/output 로그는 설정별 확인; dump가 언제나 전체 프롬프트를 노출한다는 주장은 금지. 고유한 무해 시험 표식을 넣은 정상 요청과 안전하게 유도한 오류를 각각 실행하고 활성 로그·진단 사본의 필드를 대조한다. 정상 대조: 고유 시험 표식을 정상 요청·안전한 주입 예외에 넣고 각각 수집본/회전파일에서 허용 필드 확인.'
 remaining_setup: 합성 표식과 허용 필드표; shape·anon_repr와 실제 프롬프트 내용을 구분해 수집
 executor: log_analysis
 judge:

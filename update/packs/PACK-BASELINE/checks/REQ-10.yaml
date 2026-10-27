@@ -2,7 +2,7 @@ id: REQ-10
 framework_id: CHK-REQ-010
 mechanism_ids:
 - mechanism-03
-revision: 3
+revision: 4
 retired: false
 area: REQ
 purpose: 최종 입력 검증
@@ -54,7 +54,7 @@ satisfied_if: 모순·비허용 조합이 제한되고 허용 조합은 정상 �
 fail_criteria: 불허 조합이 보호 요구를 깨뜨리거나 한 요청 오류가 정한 허용 범위 밖 다른 요청에 영향을 준다.
 unknown_criteria: worker 예외만 확인되고 API 거부·다른 요청·엔진 영향은 확인되지 않았다.
 remediation: '- 기본값·별칭을 적용한 최종 sampling 값과 옵션 조합을 실제 runner의 제약에 맞춰 검사한다. 요청별 값의 범위뿐 아니라 개수·조합 제약도 확인하고 오류가 공유 엔진 전체로 확대되는 경로를 보완한다.'
-method_and_evidence: '유한/비유한 값·min/max 등 관계 조건을 변환·기본값 적용 후 소비값과 비교한다. 옵션별 결과와 오류 뒤 추론을 기록한다. 【F40】V2 해당 processor 도달 시 1024/1024/128 상한에서 ValueError 확인. API는 값 범위를 검사. 엔진 종료 전파는 확인하지 않음. 기존 입력 오류 시나리오의 V2 시험 변형이며 공유 엔진 종료는 미확인이다. V2가 실제 활성인 격리 환경에서 allowed IDs/logit_bias 1023·1024·1025, min_tokens>0에서 실제 all_stop_token_ids 127·128·129를 대조하고 병행 정상 요청과 후속 요청 생존을 확인한다. 모델 vocab/EOS 추가분 기록. 정상 대조: 경계 이내 유효 요청·병행 정상 요청 완료'
+method_and_evidence: '유한/비유한 값·min/max 등 관계 조건을 변환·기본값 적용 후 소비값과 비교한다. 옵션별 결과와 오류 뒤 추론을 기록한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F40】V2 해당 processor 도달 시 1024/1024/128 상한에서 ValueError 확인. API는 값 범위를 검사. 엔진 종료 전파는 확인하지 않음. 기존 입력 오류 시나리오의 V2 시험 변형이며 공유 엔진 종료는 미확인이다. V2가 실제 활성인 격리 환경에서 allowed IDs/logit_bias 1023·1024·1025, min_tokens>0에서 실제 all_stop_token_ids 127·128·129를 대조하고 병행 정상 요청과 후속 요청 생존을 확인한다. 모델 vocab/EOS 추가분 기록. 정상 대조: 경계 이내 유효 요청·병행 정상 요청 완료'
 remaining_setup: V2 count 한도는 실제 소비 조건 확인 후 한도+1까지; 부하·중단 상한 사전 설정
 executor: sampling_validation
 judge:

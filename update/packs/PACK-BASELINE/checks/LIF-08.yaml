@@ -2,7 +2,7 @@ id: LIF-08
 framework_id: CHK-LIF-008
 mechanism_ids:
 - mechanism-13
-revision: 2
+revision: 3
 retired: false
 area: LIF
 purpose: 실패 감지·상위 통지
@@ -19,7 +19,7 @@ policy_params: []
 policy_prose:
   policy_to_decide: 실패 유형별 기한·격리·전체 중단 방침
   enterprise_decisions: 실패 유형별 감지·전달·중단·복구 절차와 책임자, 영향 요청 오류 처리·알림 경로.
-normal_control: 정상 TP 요청이 모든 rank 응답으로 완료된다.
+normal_control: 필수 rank가 맡은 계산·통신을 완료하고, 선정 executor의 출력 rank 또는 집계 경로가 최종 결과를 반환해 정상 TP 요청이 완료된다. 모든 rank가 같은 최종 출력을 반환한다고 가정하지 않는다.
 challenge_steps:
 - 격리 rank에 예외·사망·지연·통신 정지를 각각 단독 주입
 - 감지·상위 전달·요청 결과 기록

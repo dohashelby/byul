@@ -2,7 +2,7 @@ id: LIF-07
 framework_id: CHK-LIF-007
 mechanism_ids:
 - mechanism-10
-revision: 3
+revision: 4
 retired: false
 area: LIF
 purpose: 기동 준비 확인
@@ -34,7 +34,7 @@ satisfied_if: 필수 준비 미완료 상태에서는 접수를 허용하지 않
 fail_criteria: 필수 준비 조건 충족 전에 서비스 수용을 허용한다.
 unknown_criteria: health 응답만 있고 rank·model 준비 또는 실제 접수 시점을 모른다.
 remediation: '- 실제 모델 로딩과 필수 worker·실행 모드 준비를 서비스 수용 조건에 반영한다. 준비 확인용 정상 추론까지 성공한 뒤 요청을 받고 일부 준비 실패 시 수용을 보류한다.'
-method_and_evidence: 'rank별 로딩·KV·graph 준비와 service gate·정상 canary·접수 시각을 연결한다. 【F32】기본 재배포는 외부 gateway/LB와 실제 승인 모델 준비 확인. live/keep/collective_rpc는 선택 구성에서만 도달성·상태 보존 확인; snapshot 경로와 일반기동 혼동 금지. 기본 재배포: 정상 로딩 완료·불완전 적재와 외부 요청 gate를 대조한다. 선택 live 변경을 사용하는 경우에만 abort/wait/keep의 요청·weights·cache 세대를 시험한다. 정상 대조: 기본: 정상 로딩 완료 후 요청과 실패 시 외부 gate 확인. 선택 live 활성 시에만 abort/wait/keep 및 모델·cache·요청 세대 추적.'
+method_and_evidence: 'rank별 로딩·KV·graph 준비와 service gate·정상 canary·접수 시각을 연결한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F32】기본 재배포는 외부 gateway/LB와 실제 승인 모델 준비 확인. live/keep/collective_rpc는 선택 구성에서만 도달성·상태 보존 확인; snapshot 경로와 일반기동 혼동 금지. 기본 재배포: 정상 로딩 완료·불완전 적재와 외부 요청 gate를 대조한다. 선택 live 변경을 사용하는 경우에만 abort/wait/keep의 요청·weights·cache 세대를 시험한다. 정상 대조: 기본: 정상 로딩 완료 후 요청과 실패 시 외부 gate 확인. 선택 live 활성 시에만 abort/wait/keep 및 모델·cache·요청 세대 추적.'
 remaining_setup: 준비 gate·외부 proxy 확인; keep/dev 옵션 유효값 기록
 executor: null
 judge: null

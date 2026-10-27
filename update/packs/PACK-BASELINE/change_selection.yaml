@@ -367,6 +367,11 @@ fact_trigger_sources:
     source: lifecycle_assessment_draft/CHK-LIF-012/applicability_criteria
     matched_terms:
     - Gateway
+  - check: LIF-12
+    framework_id: CHK-LIF-012
+    source: lifecycle_assessment_draft/CHK-LIF-012/test_branch_conditions
+    matched_terms:
+    - Gateway
   managed_or_external_fallback:
   - check: SUP-12
     framework_id: CHK-SUP-012

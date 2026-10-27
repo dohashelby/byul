@@ -98,7 +98,9 @@ def _all(tmp_path):
     return out
 
 
-def test_http_executor_drafts_match_golden(tmp_path):
+def test_http_executor_drafts_match_golden(tmp_path, monkeypatch):
+    # The immutable PACK27 golden still checks the complete original payload.
+    monkeypatch.setitem(globals(), "PACK", _pack27())
     current = _all(tmp_path)
     if os.environ.get("GUARD_UPDATE_GOLDEN") == "1":
         GOLDEN.parent.mkdir(exist_ok=True)
@@ -122,3 +124,34 @@ def test_explicit_comparison_conditions_produce_config_hash(tmp_path):
     draft = executor.run(PACK.checks["REQ-01"], environment(model={"id":"m"}),
                          {"allowed_callers":["allowed"]}, VllmAdapter(), tmp_path / "work")
     assert draft.comparability.config_sha256 == sha256_hex(canonical_json(draft.config))
+
+
+def _pack27():
+    import zipfile
+    import yaml
+    from guard.models.checkdef import build_pack
+    archive_path = Path(__file__).parent / "fixtures/pack27-checks/source.zip"
+    with zipfile.ZipFile(archive_path) as archive:
+        manifest = yaml.safe_load(archive.read("pack.yaml"))
+        files = {row["path"]: archive.read(row["path"]) for row in manifest["files_sha256"]}
+    return build_pack(manifest, files)
+
+
+def test_current_http_draft_changes_only_canonical_procedure_words(tmp_path):
+    from copy import deepcopy
+    prior = _pack27()
+    old_steps = prior.checks["REQ-01"].challenge_steps
+    new_steps = PACK.checks["REQ-01"].challenge_steps
+    assert len(old_steps) == len(new_steps) == 3
+    expected = deepcopy(json.loads(GOLDEN.read_text(encoding="utf-8")))
+    expected_changes = 0
+    for name, payload in expected.items():
+        if name.startswith("role_"):
+            continue
+        for row in payload["challenges"]:
+            assert row["step"] in old_steps
+            row["step"] = new_steps[old_steps.index(row["step"])]
+            expected_changes += 1
+    assert expected_changes == 33
+    current = _all(tmp_path)
+    assert current == expected

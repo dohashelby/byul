@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACK_DIR = ROOT / "packs/PACK-BASELINE"
 T0 = datetime(2026, 10, 19, 0, 0, 0, tzinfo=timezone.utc)
 
-REQ01_STEPS = ["실제 route 목록 확보", "키 없음·오류·허용키로 Gateway와 직통 경로 비교", "handler 실행과 정책 거부를 대조"]
+REQ01_STEPS = ["실제 route·listener와 허용/비허용 호출 위치·신원 목록 확보", "Gateway 사용 시 경유·직통을, 비사용 시 직접 진입점의 무키·오키·허용키 요청과 노출 제한을 비교", "실제 handler의 실행·거부와 허용 요청의 정상 처리를 대조"]
 
 
 ROUTES = ["GET /v1/models", "POST /v1/completions", "POST /invocations"]  # "METHOD path" 키

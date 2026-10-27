@@ -220,18 +220,24 @@ def test_docker_uid_option_is_numeric_argv_not_shell():
         docker.exec_as_uid("EXAMPLE-engine", True, [], timeout=1)
 
 
-def test_only_new_definition_changes_and_legacy_76_hashes_are_preserved():
+def test_only_new_definition_changes_and_legacy_76_hashes_are_preserved(tmp_path):
     import hashlib
-    from tests.builders import ROOT, PACK_DIR
+    from tests.builders import ROOT
+    from guard.models.checkdef import load_pack
+    import zipfile
+    historical_dir = tmp_path / "pack27"
+    with zipfile.ZipFile(ROOT / "tests/fixtures/pack27-checks/source.zip") as archive:
+        archive.extractall(historical_dir)
+    historical_pack = load_pack(historical_dir)
     hashes = json.loads((ROOT / "tests/fixtures/pack25-check-hashes.json").read_text())
-    changed = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
+    changed = {p.stem for p in (historical_dir / "checks").glob("*.yaml")
                if hashlib.sha256(p.read_bytes()).hexdigest() != hashes[p.stem]}
     assert changed == {"PLT-01", "PLT-02"} and len(hashes) == 77
     previous = json.loads((ROOT / "tests/fixtures/pack26-check-hashes.json").read_text())
-    latest_changes = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
+    latest_changes = {p.stem for p in (historical_dir / "checks").glob("*.yaml")
                       if hashlib.sha256(p.read_bytes()).hexdigest() != previous[p.stem]}
     assert latest_changes == {"PLT-01"} and len(previous) == 77
-    check = baseline_pack().checks["PLT-02"]
+    check = historical_pack.checks["PLT-02"]
     assert check.revision == 3 and check.judge.params["pass_when_all"] == []
     assert check.fail_criteria == "비허용 주체가 보호해야 할 IPC 자료나 명령 접점에 접근한다."
 

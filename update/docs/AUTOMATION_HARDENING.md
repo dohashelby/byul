@@ -2,6 +2,12 @@
 
 ## 2026-10-27 LIF-10 — native metadata 생산자·소유 기록 수집, 판정 미등록
 
+profile3은 REQ-05 조사에서 확인한 native 적재 객체·가중치 적재 함수 인수·runner 모델
+호출을 같은 metadata/소유 수집 경계에 연결한다. 모델·revision 설정 지문과 객체 참조는
+최종 가중치 신원·실제 소비 증명이 아니다. 요청 연결은 native 호출 문맥의 scheduler ID
+관측이며 전체 실행·tensor/출력 귀속을 확정하지 않는다. profile1·2는 당시 source/지점
+집합과 고정 bytes로 읽으며 새 모델 의미를 소급하지 않는다. RUNBOOK의 REQ-05 절을 따른다.
+
 센서 profile2는 ASGI 헤더 문맥과 native ID 할당 반환을 지문으로 연결한다. 같은 PID의
 동기 할당 지점만 관측하고 헤더를 재사용한 다중 내부 ID는 모호함으로 보존한다.
 기존 profile1 자산/기록은 고정 bytes를 확인해 읽으며 새 의미를 소급하지 않는다.
@@ -129,7 +135,8 @@ PR #14의 소유 파일 수집을 재사용해 제품 명령 `guard capture-mode
   EXAMPLE 입력이 섞이면 EXAMPLE이며 그 외도 DECLARED를 넘지 않는다.
 
 Gateway 허용/거부·HTTP 200·응답 model·delivery.attempted는 최종 엔진 모델의 선택/사용
-증명이 아니다. 현재 그 생산자가 없어 결과는 항상 보안·기능·성능 UNKNOWN,
+증명이 아니다. profile3의 native 객체/호출 관측을 추가했지만 검증된 최종 모델 신원·
+실제 소비 생산자는 없어 Gateway 수집 결과는 항상 보안·기능·성능 UNKNOWN,
 `producer_authenticated=false`, `final_model_verified=false`,
 `actual_consumption_verified=false`, `product_connected=false`, `official=false`다.
 alias·LoRA·퇴역·대체 endpoint는 미시험으로 남기고 빈 실행기·판정기는 등록하지 않았다.

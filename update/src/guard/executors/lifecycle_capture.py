@@ -37,6 +37,9 @@ selected_scheduled_sha256 selected_finished_sha256 selection_complete scheduler_
 scheduled_sequence processed_sequence deferred_fences deferred_complete ownership
 complete groups pool_sha256 block_sha256 blocks ref_count is_null observed_request_sha256 pool call_chain module verified
 code_sha256 more_body inherited observation_started_ns observation_finished_ns
+model_selection owner_model_sha256 argument_model_sha256 returned_model_sha256
+configured_model_sha256 configured_revision_sha256 load_format_sha256 load_dummy_weights
+lora_config_present speculative_config_present
 """.split())
 POINTS = {c+"."+m for classes in sensor.POINTS.values() for c, methods in classes.items() for m in methods}
 WORDS = {*profiles.SCHEMAS, *profiles.SCHEMAS.values(), sensor.COMMIT, "START", "MODULE", "NATIVE", "ASGI", "END",
@@ -75,6 +78,13 @@ def parse_recording(raw, prepared):
         raise ValueError("LIFECYCLE_RECORDING_ROW_BOUND")
     previous, clock, rows = "0"*64, -1, []
     keys = KEYS - {"asgi_request_sha256"} if prepared["profile"] == profiles.LEGACY_PROFILE else KEYS
+    if prepared["profile"] != sensor.PROFILE:
+        keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
+            "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
+            "lora_config_present","speculative_config_present"}
+    source_hashes = profiles.source_hashes(prepared["profile"])
+    selected_points = profiles.points(prepared["profile"])
+    points = {c+"."+m for classes in selected_points.values() for c,methods in classes.items() for m in methods}
     for seq, line in enumerate(lines):
         row = strict_json(line, limit=16384)
         if (type(row) is not dict or set(row) != {"seq","event","monotonic_ns","previous_sha256","payload"}
@@ -113,10 +123,10 @@ def parse_recording(raw, prepared):
         if row["event"] == "MODULE":
             if (set(payload) not in ({"module","verified"}, {"module","verified","source_sha256","code_sha256"},
                     {"module","verified","source_sha256","code_sha256","inherited"})
-                    or payload.get("module") not in sensor.SOURCE_SHA or type(payload.get("verified")) is not bool):
+                    or payload.get("module") not in source_hashes or type(payload.get("verified")) is not bool):
                 raise ValueError("LIFECYCLE_RECORDING_MODULE_INVALID")
             if payload["verified"]:
-                if (payload.get("source_sha256") != sensor.SOURCE_SHA[payload["module"]]
+                if (payload.get("source_sha256") != source_hashes[payload["module"]]
                         or re.fullmatch(r"[0-9a-f]{64}", payload.get("code_sha256","")) is None):
                     raise ValueError("LIFECYCLE_RECORDING_MODULE_HASH_INVALID")
                 if "inherited" in payload and payload["inherited"] is not True:
@@ -131,7 +141,7 @@ def parse_recording(raw, prepared):
                     or type(payload.get("observation_started_ns")) is not int
                     or type(payload.get("observation_finished_ns")) is not int
                     or not 0 <= payload["observation_started_ns"] <= payload["observation_finished_ns"] <= row["monotonic_ns"]
-                    or payload.get("point") not in POINTS or payload.get("phase") not in {"CALL","RETURN","RAISE"}):
+                    or payload.get("point") not in points or payload.get("phase") not in {"CALL","RETURN","RAISE"}):
                 raise ValueError("LIFECYCLE_RECORDING_POINT_INVALID")
             asgi = payload["metadata"].get("asgi_request_sha256")
             if ("asgi_request_sha256" in payload["metadata"] and
@@ -139,6 +149,8 @@ def parse_recording(raw, prepared):
                      or payload["point"] != "InputProcessor.assign_request_id"
                      or type(asgi) is not str or re.fullmatch(r"[0-9a-f]{64}", asgi) is None)):
                 raise ValueError("LIFECYCLE_RECORDING_ASGI_ASSIGNMENT_INVALID")
+            if "model_selection" in payload["metadata"]:
+                validate_model_selection(payload)
             for request in payload["requests"]:
                 if (type(request) is not dict or set(request) != {"request_sha256","request_present",
                         "output_state_present","batch_row_present","status_code"}
@@ -154,12 +166,12 @@ def parse_recording(raw, prepared):
                 raise ValueError("LIFECYCLE_RECORDING_CHAIN_INVALID")
             for frame in chain:
                 if (type(frame) is not dict or set(frame) != {"point","request_sha256"}
-                        or frame["point"] not in POINTS or type(frame["request_sha256"]) is not list
+                        or frame["point"] not in points or type(frame["request_sha256"]) is not list
                         or len(frame["request_sha256"]) > sensor.MAX_IDS
                         or any(type(v) is not str or re.fullmatch(r"[0-9a-f]{64}",v) is None for v in frame["request_sha256"])):
                     raise ValueError("LIFECYCLE_RECORDING_CHAIN_INVALID")
-            expected = [m for m, classes in sensor.POINTS.items() if payload["point"].split(".")[0] in classes]
-            if len(expected) != 1 or payload.get("source_sha256") != sensor.SOURCE_SHA[expected[0]]:
+            expected = [m for m, classes in selected_points.items() if payload["point"].split(".")[0] in classes]
+            if len(expected) != 1 or payload.get("source_sha256") != source_hashes[expected[0]]:
                 raise ValueError("LIFECYCLE_RECORDING_POINT_SOURCE_INVALID")
         if row["event"] == "ASGI":
             if (set(payload) != {"request_sha256","phase","more_body"}
@@ -177,6 +189,22 @@ def parse_recording(raw, prepared):
         "incomplete_final_row":incomplete_tail,"discarded_tail_bytes":len(tail),
         "discarded_tail_sha256":hashlib.sha256(tail).hexdigest() if tail else None,
         "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False}
+
+
+def validate_model_selection(payload):
+    model = payload["metadata"]["model_selection"]
+    hashes = {"owner_model_sha256","argument_model_sha256","returned_model_sha256",
+        "configured_model_sha256","configured_revision_sha256","load_format_sha256"}
+    flags = {"load_dummy_weights","lora_config_present","speculative_config_present"}
+    points = {"BaseModelLoader.load_model","DefaultModelLoader.load_weights","CPUModelRunner.load_model",
+        "GPUModelRunner.load_model","CPUModelRunner.get_model","GPUModelRunner.get_model","GPUModelRunner._model_forward"}
+    if (type(model) is not dict or set(model) != hashes | flags or payload["point"] not in points
+            or any(model[k] is not None and (type(model[k]) is not str or re.fullmatch(r"[0-9a-f]{64}",model[k]) is None) for k in hashes)
+            or any(model[k] is not None and type(model[k]) is not bool for k in flags)):
+        raise ValueError("LIFECYCLE_RECORDING_MODEL_METADATA_INVALID")
+    if (model["returned_model_sha256"] is not None and (payload["phase"]!="RETURN" or payload["point"] not in
+            {"BaseModelLoader.load_model","CPUModelRunner.get_model","GPUModelRunner.get_model"})):
+        raise ValueError("LIFECYCLE_RECORDING_MODEL_RETURN_INVALID")
 
 
 def process_context(docker, container, pid):

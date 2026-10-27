@@ -13,6 +13,7 @@ MAX_FILES = 32
 MAX_PROCESSES = 128
 MAX_INDEX_IDS = 256
 MAX_INDEX_EVENTS = 4096
+MAX_MODEL_EVENTS = 256
 
 # No argv/environ, engine import, signal, directory creation or native cleanup.
 INVENTORY_READER = r'''
@@ -190,14 +191,14 @@ def _complete(value):
 
 
 def request_index(recordings):
-    domains={};ids_count=0;events_count=0;complete=True
+    domains={};ids_count=0;events_count=0;model_count=0;complete=True
     for capture_index,recording in enumerate(recordings):
         if recording["capture"] is None:continue
         value=recording["capture"];context=value["records"][0]["payload"]["context"]
         clock={k:context[k] for k in ("boot_sha256","pid_namespace","time_namespace","time_offsets_sha256")}
         domain={"owner_sha256":_digest(value["provenance"]["owner"]),"clock":clock}
         key=_digest(domain)
-        group=domains.setdefault(key,{**domain,"fingerprints":{},"assignments":[]})
+        group=domains.setdefault(key,{**domain,"fingerprints":{},"assignments":[],"model_observations":[]})
         for row in value["records"]:
             for fingerprint in links.fingerprints(row):
                 if fingerprint not in group["fingerprints"]:
@@ -212,6 +213,13 @@ def request_index(recordings):
                 asgi=links.asgi_assignment(row)
                 if asgi is not None:entry["asgi_request_sha256"]=asgi
                 group["assignments"].append(entry)
+            if row["event"]=="NATIVE" and "model_selection" in row["payload"]["metadata"]:
+                if model_count>=MAX_MODEL_EVENTS:complete=False;continue
+                group["model_observations"].append({"event":[capture_index,row["seq"]],
+                    "point":row["payload"]["point"],"phase":row["payload"]["phase"],
+                    "request_sha256":[r["request_sha256"] for r in row["payload"]["requests"]],
+                    "metadata":row["payload"]["metadata"]["model_selection"]})
+                model_count+=1
     for group in domains.values():
         values={}
         for row in group["assignments"]:
@@ -223,6 +231,7 @@ def request_index(recordings):
                 asgi_values.setdefault(row["asgi_request_sha256"],set()).add(row["internal_sha256"])
         group["ambiguous_asgi_request_sha256"]=sorted(k for k,v in asgi_values.items() if len(v)>1)
     return {"domains":domains,"stored_record_index_complete":complete,"producer_authenticated":False,
+            "final_model_verified":False,"actual_consumption_verified":False,"weights_revision_verified":False,
             "whole_run_coverage_verified":False,"scope":"declared fingerprint equality, ASGI header-context association and native assignment events; no stop duration or reclamation verdict"}
 
 

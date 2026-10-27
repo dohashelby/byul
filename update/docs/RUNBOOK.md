@@ -74,8 +74,8 @@ native ID 할당의 RETURN에 있는 외부/내부 지문 쌍을 보존하고, �
 
 ### ASGI 헤더 문맥과 native ID 할당
 
-새 자산은 private profile `vllm-native-lifecycle-metadata/2`와 event schema
-`guard-native-lifecycle-events/2`다. completion의 외부 ID는 헤더 원문과 다를 수 있으므로
+헤더 문맥은 private profile `vllm-native-lifecycle-metadata/2`와 event schema
+`guard-native-lifecycle-events/2`에서 추가했다. completion의 외부 ID는 헤더 원문과 다를 수 있으므로
 접두사/순번을 추측해 hash를 연결하지 않는다. `/v1/completions` middleware는 기존 헤더
 지문만 ContextVar에 두고, 같은 PID 문맥의 동기 `InputProcessor.assign_request_id`에서만
 `asgi_request_sha256`를 관측한다. 원래 함수가 반환한 사건의 외부/내부 ID 지문과 함께
@@ -90,7 +90,37 @@ output handler의 문맥을 다른 요청 ID에 적용하지 않으며 예외·�
 profile1은 고정된 과거 sensor bytes의 LF/CRLF 두 spelling과 manifest/개별 자산 SHA를
 모두 대조해 읽기만 지원한다. 과거 기록에 새 연결 필드를 소급하지 않으며 새 필드가
 섞인 profile1은 거부한다. 알 수 없는 sensor bytes와 profile/source 교차 조합도 거부한다.
-수집기는 과거 센서 파일을 import/실행하지 않는다. 새 자산 준비는 profile2만 생성한다.
+수집기는 과거 센서 파일을 import/실행하지 않는다. 현행 새 자산 준비는 profile3만 생성한다.
+
+### REQ-05 native 적재 객체와 모델 호출 관측
+
+profile3/events3는 기존 준비·소유 개별/세션 수집을 재사용한다. 추가 실행기나 판정을
+등록하지 않는다. 고정 `BaseModelLoader.load_model`의 반환 객체와
+`DefaultModelLoader.load_weights`의 입력 객체, CPU/GPU runner의 적재 후 `self.model`,
+native `get_model` 반환, `GPUModelRunner._model_forward`의 호출 객체를 구분한다.
+기존 source/loader code 대조를 거친 지점만 계측하고 원래 model/입력/반환 객체를 유지한다.
+
+객체 참조는 세션·물리 프로세스 문맥과 증가하는 세대 번호의 지문이다. raw `id()`·모델명·
+revision·경로·tensor·token·예외 원문은 저장하지 않는다. 약한 참조를 쓰고 최대64개의
+살아 있는 객체만 추적한다. 상한/약한 참조 미지원은 null이며 기존 참조를 지우거나
+다른 객체에 재사용하지 않는다. fork 뒤 추적을 초기화한다.
+
+`configured_model_sha256`/`configured_revision_sha256`/`load_format_sha256`는 **설정값**의
+지문이다. 객체 참조는 가중치 지문이 아니며 같은 객체의 in-place reload를 새 가중치
+revision으로 구분하지 못한다. wrapper의 참조와 native getter의 반환은 각각 기록하며
+서로 다른 객체를 자동으로 동일시하지 않는다. dummy/LoRA/speculative 설정의 존재도
+관측일 뿐 해당 선택 기능의 실제 소비 증명이 아니다.
+
+`_model_forward`의 요청 지문은 같은 호출 문맥에서 관측한 scheduler 선택 ID다.
+tensor row 귀속·장치 실행 완료·생성 출력 귀속은 확정하지 않는다. 해당 문맥이 없는
+warmup 호출은 요청 사건으로 만들지 않는다. 세션 index는 최대256개의 `model_observations`에
+정확한 파일/행 참조를 남긴다. 초과 시 미완전 표식과 앞선 관측을 보존한다.
+`final_model_verified`·`actual_consumption_verified`·`weights_revision_verified`는 false다.
+
+profile1·2는 각각 고정 과거 source bytes, 당시17개 source와 지점 집합을 확인해 읽는다.
+과거 기록에 새 모델 필드·module·지점을 소급하지 않는다. 새 profile3은19개 source를
+대조한다. Gateway 인가 기록과 독립된 최종 가중치 신원·실제 요청별 소비·alias/퇴역/LoRA·
+신뢰 생산자·기업 정책 대조는 남아 있다. 실제 엔진·Kubernetes/GPU 실증으로 집계하지 않는다.
 
 ## LIF-10 Kubernetes 파일·프로세스 읽기
 

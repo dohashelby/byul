@@ -25,16 +25,19 @@ import time
 import types
 import weakref
 
-PROFILE = "vllm-native-lifecycle-metadata/2"
+PROFILE = "vllm-native-lifecycle-metadata/3"
 COMMIT = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
-SCHEMA = "guard-native-lifecycle-events/2"
+SCHEMA = "guard-native-lifecycle-events/3"
 CONFIG_SCHEMA = "guard-native-lifecycle-settings/1"
 CONFIG_ENV = "GUARD_LIFECYCLE_CONFIG"
 CONFIG_PATH = "/guard-lifecycle/settings.json"
 MAX_ROWS = 512
 MAX_BYTES = 262144
 MAX_IDS = 8
+MAX_MODEL_OBJECTS = 64
 SOURCE_SHA = {
+ "vllm.model_executor.model_loader.base_loader":"5291c330c4ed5634a9ea1d535364c26162b60251aa2af03fd409b88c34d836e2",
+ "vllm.model_executor.model_loader.default_loader":"d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
  "vllm.v1.engine.input_processor":"d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
  "vllm.v1.engine.output_processor":"c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
  "vllm.v1.engine.async_llm":"ff933ed78aa3195782cf1c6d18c53897adfa5bf920421bd2bcc330f2adc84d1e",
@@ -54,6 +57,9 @@ SOURCE_SHA = {
  "vllm.entrypoints.openai.completion.serving":"aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd",
 }
 POINTS = {
+ "vllm.model_executor.model_loader.base_loader":{"BaseModelLoader":("load_model",)},
+ "vllm.model_executor.model_loader.default_loader":{"DefaultModelLoader":("load_weights",)},
+ "vllm.v1.worker.cpu_model_runner":{"CPUModelRunner":("load_model","get_model")},
  "vllm.v1.engine.input_processor":{"InputProcessor":("assign_request_id",)},
  "vllm.v1.engine.output_processor":{"OutputProcessor":("add_request","abort_requests","_finish_request")},
  "vllm.v1.engine.async_llm":{"AsyncLLM":("abort",)},
@@ -62,7 +68,7 @@ POINTS = {
  "vllm.v1.core.kv_cache_manager":{"KVCacheManager":("free","pop_blocks_for_free")},
  "vllm.v1.core.single_type_kv_cache_manager":{"SingleTypeKVCacheManager":("free","pop_blocks_for_free")},
  "vllm.v1.core.block_pool":{"BlockPool":("free_blocks",)},
- "vllm.v1.worker.gpu_model_runner":{"GPUModelRunner":("_update_states","execute_model","sample_tokens"),
+ "vllm.v1.worker.gpu_model_runner":{"GPUModelRunner":("_update_states","execute_model","sample_tokens","load_model","get_model","_model_forward"),
    "AsyncGPUModelRunnerOutput":("get_output",),"AsyncGPUPoolingModelRunnerOutput":("get_output",)},
  "vllm.v1.worker.gpu_input_batch":{"InputBatch":("remove_request",)},
 }
@@ -306,12 +312,20 @@ class Observer:
         self.pool_serial = 0
         self.disabled_pid = None
         self.empty_points = set()
+        self.model_objects = {}
+        self.model_serial = 0
+        self.model_lock = threading.RLock()
 
     def active(self):
         return self.disabled_pid != os.getpid() and not (self.pid == os.getpid()
             and self.writer is not None and self.writer.closed)
 
     def wanted(self, point, snapshot):
+        if point in {"BaseModelLoader.load_model","DefaultModelLoader.load_weights",
+                     "CPUModelRunner.load_model","GPUModelRunner.load_model"}:
+            return True
+        if point == "GPUModelRunner._model_forward" and not snapshot["requests"]:
+            return False  # Warmup/model profiling is not a request association.
         if snapshot["requests"] or snapshot["metadata"].get("pool",{}).get("blocks"):
             return True
         if point.endswith("._drain_deferred_frees") and any(p["blocks"] for p in self.pools.values()):
@@ -328,6 +342,7 @@ class Observer:
             if self.writer is not None and self.writer.fd is not None:
                 os.close(self.writer.fd)
             self.writer, self.pools, self.pool_serial = None, {}, 0
+            self.model_objects, self.model_serial, self.model_lock = {}, 0, threading.RLock()
             self.disabled_pid, self.empty_points = None, set()
             self.pid = os.getpid()
         if self.writer is None:
@@ -481,7 +496,76 @@ class Observer:
                 metadata["deferred_complete"] = len(pending) <= MAX_IDS
         if "BlockPool." in point:
             metadata["pool"] = self.pool_snapshot(owner)
-        return {"requests": rows, "metadata": metadata, "selection_observed": bool(raw_ids)}
+        model_points = {"BaseModelLoader.load_model","DefaultModelLoader.load_weights",
+            "CPUModelRunner.load_model","GPUModelRunner.load_model","CPUModelRunner.get_model",
+            "GPUModelRunner.get_model","GPUModelRunner._model_forward"}
+        if point in model_points:
+            metadata["model_selection"] = self.model_metadata(point,args,kwargs,result,returned)
+            raw_ids = ()
+            if point == "GPUModelRunner._model_forward":
+                frame = next((f for f in reversed(_CHAIN.get()) if f["point"] == "GPUModelRunner.execute_model"), None)
+                if frame is not None:
+                    # These are the selected scheduler IDs observed by the caller,
+                    # not a tensor/row ownership or successful generation proof.
+                    rows = [{"request_sha256":v,"request_present":None,"output_state_present":None,
+                        "batch_row_present":None,"status_code":None} for v in frame["request_sha256"]]
+                else:
+                    rows = []
+            else:
+                rows = []
+        return {"requests": rows, "metadata": metadata, "selection_observed": bool(rows) if point in model_points else bool(raw_ids)}
+
+    def model_reference(self, value):
+        if value is None:
+            return None
+        context = self._writer().context
+        with self.model_lock:
+            key = id(value)
+            entry = self.model_objects.get(key)
+            if entry is not None and entry[0]() is value:
+                return entry[1]
+            for stale in [k for k,v in self.model_objects.items() if v[0]() is None]:
+                del self.model_objects[stale]
+            if len(self.model_objects) >= MAX_MODEL_OBJECTS:
+                return None
+            try:
+                reference = weakref.ref(value)
+            except TypeError:
+                return None
+            self.model_serial += 1
+            raw = json.dumps([self.config["session"],context,self.model_serial],sort_keys=True,separators=(",", ":")).encode()
+            digest = sha(raw)
+            self.model_objects[key] = (reference,digest)
+            return digest
+
+    def model_metadata(self, point, args, kwargs, result, returned):
+        owner = args[0] if args else None
+        data = attrs(owner)
+        config = data.get("model_config")
+        argument = None
+        if point == "BaseModelLoader.load_model":
+            config = args[2] if len(args)>2 else kwargs.get("model_config")
+        if point == "DefaultModelLoader.load_weights":
+            argument = args[1] if len(args)>1 else kwargs.get("model")
+            config = args[2] if len(args)>2 else kwargs.get("model_config")
+        returned_model = result if returned and point in {
+            "BaseModelLoader.load_model","CPUModelRunner.get_model","GPUModelRunner.get_model"} else None
+        sentinel = object()
+        def present(name):
+            value = data.get(name,sentinel)
+            return None if value is sentinel else value is not None
+        dummy = None
+        if point in {"CPUModelRunner.load_model","GPUModelRunner.load_model"}:
+            value = args[1] if len(args)>1 else kwargs.get("load_dummy_weights",False)
+            dummy = value if type(value) is bool else None
+        return {"owner_model_sha256":self.model_reference(data.get("model")),
+            "argument_model_sha256":self.model_reference(argument),
+            "returned_model_sha256":self.model_reference(returned_model),
+            "configured_model_sha256":id_sha(attrs(config).get("model")),
+            "configured_revision_sha256":id_sha(attrs(config).get("revision")),
+            "load_format_sha256":id_sha(attrs(data.get("load_config")).get("load_format")),
+            "load_dummy_weights":dummy,"lora_config_present":present("lora_config"),
+            "speculative_config_present":present("speculative_config")}
 
     def wrap(self, module_name, point, original):
         observer = self

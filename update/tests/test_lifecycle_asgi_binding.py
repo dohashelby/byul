@@ -158,6 +158,7 @@ def legacy(case, crlf=False):
     bootstrap=(root/"sitecustomize.py").read_bytes().replace(previous.encode(),hashlib.sha256(raw).hexdigest().encode())
     (root/"sitecustomize.py").write_bytes(bootstrap)
     manifest["profile"]=profiles.LEGACY_PROFILE
+    manifest["source_sha256"]=profiles.LEGACY_SOURCE_SHA
     for name in ("guard_lifecycle_sensor.py","sitecustomize.py"):
         data=(root/name).read_bytes()
         manifest["assets"][name]={"sha256":hashlib.sha256(data).hexdigest(),"bytes":len(data)}

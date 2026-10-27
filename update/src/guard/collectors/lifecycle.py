@@ -68,7 +68,8 @@ def load_prepared(path):
             "assets","source_sha256","engine_started","image_contents_verified","product_connected"}
             or manifest["schema"] != "guard-lifecycle-assets/1" or type(manifest["profile"]) is not str
             or manifest["profile"] not in profiles.SCHEMAS
-            or manifest["public_commit"] != sensor.COMMIT or manifest["source_sha256"] != sensor.SOURCE_SHA
+            or manifest["public_commit"] != sensor.COMMIT
+            or manifest["source_sha256"] != profiles.source_hashes(manifest["profile"])
             or type(manifest["session"]) is not str or re.fullmatch(r"[0-9a-f]{32}",manifest["session"]) is None
             or manifest["engine_started"] is not False or manifest["image_contents_verified"] is not False
             or manifest["product_connected"] is not False

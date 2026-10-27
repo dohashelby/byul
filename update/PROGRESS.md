@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — REQ-05 native 적재 객체·호출 부분 관측
+
+- 한 일: 기준a7f848e의 고정 vLLM 적재/worker 경로를 대조해 기존 metadata 생산자·소유 수집에 객체 약한 참조와 native 적재/호출 사건을 연결했다. 모델 설정 지문·객체 참조·scheduler ID를 최종 가중치 신원/실제 소비로 승격하지 않는다. profile3과 고정 profile1·2의 당시 source/지점 읽기 호환성을 분리했다. Gateway 수집·팩·판정·스트림 측정은 유지한다.
+- 테스트 결과: 정적18항목·공식 고정source19개 SHA 대조와858파일 고정 후662통과/0실패/기존skip6/제외1(pytest60.83초·부모61.751초), 새EXAMPLE34건 포함. native 함수 본문4개를 사용하는 적재→호출 연쇄·약한 참조·구버전·수집/CLI/불변식/경계 회귀와 wheel136파일 일치(부모11.810초) 확인, 실행 중 소스 bytes 동일. 기존 v1 시험 manifest에 당시17개 source를 명시했으며 assert/기대값은 유지했다. 실제 엔진·Kubernetes/GPU 실증 및 등록 증가0, 상세 원본은 저장소 밖 byul-model-selection-producer-20261027T095940+0900이다.
+- 다음 단계: PR28 head a7f848e를 base로 후속 초안 PR을 만들고 정확 head의 Linux 기본·wheel·공용/플랫폼·Docker CI를 확인한다. 최종 가중치 신원·실제 소비·인가 판정은 관측 지문으로 대체하지 않는다.
+- 막힌 것: 객체 참조 관측의 CPU 구현에는 없음. 최종 모델 신원·실제 가중치 revision/소비·alias/퇴역·신뢰 생산자·기업 정책과 실제 엔진 실증은 미완료다.
+
 ## 2026-10-27 — LIF-10 ASGI 헤더 문맥·native 할당 연결
 
 - 한 일: 기준5db08ab에서 completion의 접두사/순번과 native ID 재할당을 소스로 확인했다. 같은 PID의 ASGI 헤더 지문을 동기 ID 할당 반환에 연결하고 헤더 재사용 모호함·누락을 유지한다. 새 센서 profile2와 고정 profile1 bytes의 읽기 호환성을 분리했다. 원문·native 소비/정리·기존 스트림 측정은 유지한다.

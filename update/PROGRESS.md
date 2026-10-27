@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-27 — LIF-10 ASGI 헤더 문맥·native 할당 연결
+
+- 한 일: 기준5db08ab에서 completion의 접두사/순번과 native ID 재할당을 소스로 확인했다. 같은 PID의 ASGI 헤더 지문을 동기 ID 할당 반환에 연결하고 헤더 재사용 모호함·누락을 유지한다. 새 센서 profile2와 고정 profile1 bytes의 읽기 호환성을 분리했다. 원문·native 소비/정리·기존 스트림 측정은 유지한다.
+- 테스트 결과: 정적17항목 대조·855파일 고정 후 직접/인접 수집·CLI·불변식·기존 의존 경계628통과/0실패/기존skip6/제외1(pytest52.02초·부모52.824초), 새EXAMPLE31건 포함. 고정 native 함수 본문 대조10통과(0.35초·1.110초), wheel136파일 소스/설치본 일치(부모9.798초). 실행 중 소스 bytes 동일, 기존 assert/skip/제외·팩·판정·스트림 측정 유지. 실제 엔진·cluster/GPU 실증 및 자동화 등록 증가0이다. 상세 원본은 저장소 밖 byul-lifecycle-asgi-binding-20261027T093715+0900이다.
+- 다음 단계: 같은 초안 PR28에 추가 커밋·푸시하고 새 정확 head의 Linux 기본·wheel·공용/플랫폼·Docker CI를 확인한다. ASGI 헤더 문맥을 고유 요청 신원이나 독립 인과성으로 승격하지 않는다.
+- 막힌 것: CPU 구현에는 없음. 고유 HTTP 신원·실제 생산자 인증·전체 종결/회수·기업 기한과 GPU 실증은 미완료다.
+
 ## 2026-10-27 — LIF-10 Kubernetes 소유 읽기 경계
 
 - 한 일: 기준d26e248에서 공통 Kubernetes role/Pod 신원과 file packet 검사를 분리하고, 고정 metadata helper만 선택 container에서 읽는 세션 CLI를 구현했다. 기존 파서/부분 관측·저장 실패 보존을 재사용하고 Pod imageID를 별도 근거로 둔다. 기존 HTTP Ready 요구와 스트림 측정·native sensor bytes를 유지한다. PLT-07의 과거 미등록 계획과 현행 제한된 독립 FAIL 경계도 문서에서 구분했다.

@@ -72,6 +72,26 @@ native ID 할당의 RETURN에 있는 외부/내부 지문 쌍을 보존하고, �
 부분 파일은 성공 참조로 쓰지 않는다. 입력/준비 검증 실패는 종료 코드2다. 결과의 출처 상한·
 생산자 인증 false·전체 범위 false·security UNKNOWN은 단일 파일 수집과 같다.
 
+### ASGI 헤더 문맥과 native ID 할당
+
+새 자산은 private profile `vllm-native-lifecycle-metadata/2`와 event schema
+`guard-native-lifecycle-events/2`다. completion의 외부 ID는 헤더 원문과 다를 수 있으므로
+접두사/순번을 추측해 hash를 연결하지 않는다. `/v1/completions` middleware는 기존 헤더
+지문만 ContextVar에 두고, 같은 PID 문맥의 동기 `InputProcessor.assign_request_id`에서만
+`asgi_request_sha256`를 관측한다. 원래 함수가 반환한 사건의 외부/내부 ID 지문과 함께
+index에 남긴다. 별도 receive/send·native 호출·스트림 시간 측정은 추가하지 않는다.
+
+헤더 누락/빈 값/상한 초과와 프로세스가 달라진 상속 문맥은 연결하지 않는다. 장수명
+output handler의 문맥을 다른 요청 ID에 적용하지 않으며 예외·취소·중첩 호출 뒤 문맥을
+복원한다. 같은 헤더가 여러 내부 ID와 연결되면 `ambiguous_asgi_request_sha256`로 남긴다.
+이는 헤더 문맥에 대한 생산자 주장이고 고유 HTTP 요청 신원·인증·인과성의 독립 증명은
+아니다. 전체 실행·종결/회수의 상한은 유지한다.
+
+profile1은 고정된 과거 sensor bytes의 LF/CRLF 두 spelling과 manifest/개별 자산 SHA를
+모두 대조해 읽기만 지원한다. 과거 기록에 새 연결 필드를 소급하지 않으며 새 필드가
+섞인 profile1은 거부한다. 알 수 없는 sensor bytes와 profile/source 교차 조합도 거부한다.
+수집기는 과거 센서 파일을 import/실행하지 않는다. 새 자산 준비는 profile2만 생성한다.
+
 ## LIF-10 Kubernetes 파일·프로세스 읽기
 
 `capture-kubernetes-lifecycle-session --env <ENV> --target <target.json> --prepared <manifest.json>

@@ -6,6 +6,7 @@ import json
 import re
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
+from guard.adapters import vllm_lifecycle_profiles as profiles
 from .owned_capture import _read_owned_file, strict_json, validate_owned_source
 
 CONTEXT_READER = r"""
@@ -31,20 +32,20 @@ seq event monotonic_ns previous_sha256 payload schema profile commit session
 settings_sha256 sensor_sha256 context producer_authenticated pid start_ticks uid
 boot_sha256 pid_namespace time_namespace time_offsets_sha256 reason point phase
 source_sha256 requests metadata selection_observed diagnostic request_sha256
-external_request_sha256 request_present output_state_present batch_row_present status_code
+external_request_sha256 asgi_request_sha256 request_present output_state_present batch_row_present status_code
 selected_scheduled_sha256 selected_finished_sha256 selection_complete scheduler_sequence
 scheduled_sequence processed_sequence deferred_fences deferred_complete ownership
 complete groups pool_sha256 block_sha256 blocks ref_count is_null observed_request_sha256 pool call_chain module verified
 code_sha256 more_body inherited observation_started_ns observation_finished_ns
 """.split())
 POINTS = {c+"."+m for classes in sensor.POINTS.values() for c, methods in classes.items() for m in methods}
-WORDS = {sensor.SCHEMA, sensor.PROFILE, sensor.COMMIT, "START", "MODULE", "NATIVE", "ASGI", "END",
+WORDS = {*profiles.SCHEMAS, *profiles.SCHEMAS.values(), sensor.COMMIT, "START", "MODULE", "NATIVE", "ASGI", "END",
     "SEALED", "PROCESS_EXIT", "BOUND_REACHED", "CONTROL_UNAVAILABLE", "CALL", "RETURN", "RAISE",
     "SAMPLE_UNAVAILABLE", "DISCONNECT_RECEIVED", "BODY_SEND_RETURN", "APP_RETURN", "APP_RAISE",
     *sensor.SOURCE_SHA, *POINTS}
 
 
-def _safe(value, depth=0):
+def _safe(value, depth=0, *, keys=KEYS):
     if depth > 12:
         return False
     if value is None or type(value) is bool:
@@ -54,9 +55,9 @@ def _safe(value, depth=0):
     if type(value) is str:
         return value in WORDS or re.fullmatch(r"(?:[0-9a-f]{32}|[0-9a-f]{64})", value) is not None
     if type(value) is list:
-        return len(value) <= 64 and all(_safe(v, depth+1) for v in value)
+        return len(value) <= 64 and all(_safe(v, depth+1, keys=keys) for v in value)
     if type(value) is dict:
-        return set(value) <= KEYS and all(_safe(v, depth+1) for v in value.values())
+        return set(value) <= keys and all(_safe(v, depth+1, keys=keys) for v in value.values())
     return False
 
 
@@ -73,10 +74,11 @@ def parse_recording(raw, prepared):
     if not 1 <= len(lines) <= sensor.MAX_ROWS:
         raise ValueError("LIFECYCLE_RECORDING_ROW_BOUND")
     previous, clock, rows = "0"*64, -1, []
+    keys = KEYS - {"asgi_request_sha256"} if prepared["profile"] == profiles.LEGACY_PROFILE else KEYS
     for seq, line in enumerate(lines):
         row = strict_json(line, limit=16384)
         if (type(row) is not dict or set(row) != {"seq","event","monotonic_ns","previous_sha256","payload"}
-                or not _safe(row) or type(row["seq"]) is not int or row["seq"] != seq
+                or not _safe(row, keys=keys) or type(row["seq"]) is not int or row["seq"] != seq
                 or type(row["monotonic_ns"]) is not int or row["monotonic_ns"] < clock
                 or row["previous_sha256"] != previous or canonical_row(row) != line
                 or row["event"] not in {"START","MODULE","NATIVE","ASGI","END"}
@@ -88,7 +90,8 @@ def parse_recording(raw, prepared):
     header = first["payload"]
     if (first["event"] != "START" or set(header) != {"schema","profile","commit","session","settings_sha256",
             "sensor_sha256","context","producer_authenticated"}
-            or header["schema"] != sensor.SCHEMA or header["profile"] != sensor.PROFILE
+            or header["schema"] != profiles.SCHEMAS.get(prepared["profile"])
+            or header["profile"] != prepared["profile"]
             or header["commit"] != sensor.COMMIT or header["session"] != prepared["session"]
             or header["settings_sha256"] != prepared["assets"]["settings.json"]["sha256"]
             or header["sensor_sha256"] != prepared["assets"]["guard_lifecycle_sensor.py"]["sha256"]
@@ -130,6 +133,12 @@ def parse_recording(raw, prepared):
                     or not 0 <= payload["observation_started_ns"] <= payload["observation_finished_ns"] <= row["monotonic_ns"]
                     or payload.get("point") not in POINTS or payload.get("phase") not in {"CALL","RETURN","RAISE"}):
                 raise ValueError("LIFECYCLE_RECORDING_POINT_INVALID")
+            asgi = payload["metadata"].get("asgi_request_sha256")
+            if ("asgi_request_sha256" in payload["metadata"] and
+                    (header["profile"] == profiles.LEGACY_PROFILE
+                     or payload["point"] != "InputProcessor.assign_request_id"
+                     or type(asgi) is not str or re.fullmatch(r"[0-9a-f]{64}", asgi) is None)):
+                raise ValueError("LIFECYCLE_RECORDING_ASGI_ASSIGNMENT_INVALID")
             for request in payload["requests"]:
                 if (type(request) is not dict or set(request) != {"request_sha256","request_present",
                         "output_state_present","batch_row_present","status_code"}

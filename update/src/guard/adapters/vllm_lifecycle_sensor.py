@@ -25,9 +25,9 @@ import time
 import types
 import weakref
 
-PROFILE = "vllm-native-lifecycle-metadata/1"
+PROFILE = "vllm-native-lifecycle-metadata/2"
 COMMIT = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
-SCHEMA = "guard-native-lifecycle-events/1"
+SCHEMA = "guard-native-lifecycle-events/2"
 CONFIG_SCHEMA = "guard-native-lifecycle-settings/1"
 CONFIG_ENV = "GUARD_LIFECYCLE_CONFIG"
 CONFIG_PATH = "/guard-lifecycle/settings.json"
@@ -67,6 +67,7 @@ POINTS = {
  "vllm.v1.worker.gpu_input_batch":{"InputBatch":("remove_request",)},
 }
 _CHAIN = contextvars.ContextVar("guard_native_lifecycle_chain", default=())
+_ASGI_REQUEST = contextvars.ContextVar("guard_native_lifecycle_asgi_request", default=None)
 _OBSERVER = None
 
 
@@ -428,6 +429,12 @@ class Observer:
         if static or point.endswith(".add_request") or point.endswith("._finish_request"):
             raw_ids = ids(attrs(value).get("request_id"))
             metadata = {"external_request_sha256": id_sha(attrs(value).get("external_req_id"))}
+        # Only the synchronous ID assignment observes this context. Long-lived
+        # output-handler tasks may inherit a request context and serve other IDs.
+        if static:
+            context = _ASGI_REQUEST.get()
+            if context is not None and context[0] == os.getpid() and context[1] is not None:
+                metadata["asgi_request_sha256"] = context[1]
         if returned and point.endswith(".abort_requests"):
             raw_ids = ids(result)
         if returned and point.endswith(".finish_requests"):
@@ -614,6 +621,7 @@ class Middleware:
             header = next((pair[1] for pair in headers if type(pair) in (list, tuple) and len(pair) == 2
                 and type(pair[0]) is bytes and pair[0].lower() == b"x-request-id"), None)
         request_sha = sha(header) if type(header) is bytes and 0 < len(header) <= 512 else None
+        context_token = _ASGI_REQUEST.set((os.getpid(), request_sha))
         def emit(phase, more_body=None):
             observer.emit("ASGI", {"request_sha256": request_sha, "phase": phase, "more_body": more_body})
         async def received():
@@ -633,7 +641,10 @@ class Middleware:
             returned = True
             return result
         finally:
-            emit("APP_RETURN" if returned else "APP_RAISE")
+            try:
+                emit("APP_RETURN" if returned else "APP_RAISE")
+            finally:
+                _ASGI_REQUEST.reset(context_token)
 
 
 def install(path=None):

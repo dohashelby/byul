@@ -208,15 +208,22 @@ def request_index(recordings):
             pair=links.assignment(row)
             if pair:
                 if len(group["assignments"])>=MAX_INDEX_IDS:complete=False;continue
-                group["assignments"].append({"external_sha256":pair[0],"internal_sha256":pair[1],
-                                             "event":[capture_index,row["seq"]]})
+                entry={"external_sha256":pair[0],"internal_sha256":pair[1],"event":[capture_index,row["seq"]]}
+                asgi=links.asgi_assignment(row)
+                if asgi is not None:entry["asgi_request_sha256"]=asgi
+                group["assignments"].append(entry)
     for group in domains.values():
         values={}
         for row in group["assignments"]:
             values.setdefault(row["external_sha256"],set()).add(row["internal_sha256"])
         group["ambiguous_external_sha256"]=sorted(k for k,v in values.items() if len(v)>1)
+        asgi_values={}
+        for row in group["assignments"]:
+            if "asgi_request_sha256" in row:
+                asgi_values.setdefault(row["asgi_request_sha256"],set()).add(row["internal_sha256"])
+        group["ambiguous_asgi_request_sha256"]=sorted(k for k,v in asgi_values.items() if len(v)>1)
     return {"domains":domains,"stored_record_index_complete":complete,"producer_authenticated":False,
-            "whole_run_coverage_verified":False,"scope":"declared fingerprint equality and assignment events; no stop duration or reclamation verdict"}
+            "whole_run_coverage_verified":False,"scope":"declared fingerprint equality, ASGI header-context association and native assignment events; no stop duration or reclamation verdict"}
 
 
 def capture_session(docker,target,*,container,image,prepared,owner_identity=None,read_file=None,image_check=None):

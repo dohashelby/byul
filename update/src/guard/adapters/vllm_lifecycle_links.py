@@ -16,6 +16,9 @@ def fingerprints(row):
         external = payload["metadata"].get("external_request_sha256")
         if _fingerprint(external):
             values.append(external)
+        asgi = asgi_assignment(row)
+        if asgi is not None:
+            values.append(asgi)
         return list(dict.fromkeys(values))
     return []
 
@@ -30,3 +33,11 @@ def assignment(row):
     if not _fingerprint(external):
         return None
     return external, payload["requests"][0]["request_sha256"]
+
+
+def asgi_assignment(row):
+    """An observed header-context association, never a unique HTTP identity."""
+    if assignment(row) is None:
+        return None
+    value = row["payload"]["metadata"].get("asgi_request_sha256")
+    return value if _fingerprint(value) else None

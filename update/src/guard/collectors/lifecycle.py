@@ -8,6 +8,7 @@ import re
 import uuid
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
+from guard.adapters import vllm_lifecycle_profiles as profiles
 from guard.collectors.file import load_environment
 from guard.collectors.route_observations import validate_output
 from guard.executors.owned_capture import strict_json, validate_owned_source
@@ -65,7 +66,8 @@ def load_prepared(path):
         manifest = strict_json(stream.read(16385),limit=16384)
     if (type(manifest) is not dict or set(manifest) != {"schema","profile","session","public_commit",
             "assets","source_sha256","engine_started","image_contents_verified","product_connected"}
-            or manifest["schema"] != "guard-lifecycle-assets/1" or manifest["profile"] != sensor.PROFILE
+            or manifest["schema"] != "guard-lifecycle-assets/1" or type(manifest["profile"]) is not str
+            or manifest["profile"] not in profiles.SCHEMAS
             or manifest["public_commit"] != sensor.COMMIT or manifest["source_sha256"] != sensor.SOURCE_SHA
             or type(manifest["session"]) is not str or re.fullmatch(r"[0-9a-f]{32}",manifest["session"]) is None
             or manifest["engine_started"] is not False or manifest["image_contents_verified"] is not False
@@ -73,6 +75,7 @@ def load_prepared(path):
             or type(manifest["assets"]) is not dict
             or set(manifest["assets"]) != {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json"}):
         raise ValueError("LIFECYCLE_ASSETS_INVALID")
+    source_supported = False
     for name, expected in manifest["assets"].items():
         if (type(expected) is not dict or set(expected) != {"sha256","bytes"}
                 or type(expected["bytes"]) is not int or not 0 < expected["bytes"] <= 262144
@@ -82,7 +85,9 @@ def load_prepared(path):
             raw = stream.read(262145)
         if len(raw) != expected["bytes"] or hashlib.sha256(raw).hexdigest() != expected["sha256"]:
             raise ValueError("LIFECYCLE_ASSET_BYTES_INVALID")
-    if manifest["assets"]["guard_lifecycle_sensor.py"]["sha256"] != hashlib.sha256(Path(sensor.__file__).read_bytes()).hexdigest():
+        if name == "guard_lifecycle_sensor.py":
+            source_supported = profiles.asset_supported(manifest["profile"], raw)
+    if not source_supported:
         raise ValueError("LIFECYCLE_ASSET_VERSION_UNAVAILABLE")
     return manifest
 

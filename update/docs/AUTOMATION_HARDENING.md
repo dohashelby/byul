@@ -2,6 +2,12 @@
 
 ## 2026-10-27 LIF-10 — native metadata 생산자·소유 기록 수집, 판정 미등록
 
+센서 profile2는 ASGI 헤더 문맥과 native ID 할당 반환을 지문으로 연결한다. 같은 PID의
+동기 할당 지점만 관측하고 헤더를 재사용한 다중 내부 ID는 모호함으로 보존한다.
+기존 profile1 자산/기록은 고정 bytes를 확인해 읽으며 새 의미를 소급하지 않는다.
+인증·고유 HTTP 신원·독립 인과성·전체 회수를 증명하지 않고 자동화 등록도 유지한다.
+기술 형식·미수집/호환성 제한은 RUNBOOK의 ASGI 절을 따른다.
+
 Kubernetes의 동일 파서/세션 수집 진입점은 `capture-kubernetes-lifecycle-session`이다.
 기존 HTTP의 명시 role/Pod 신원 대조를 공통화하고 고정 file/context/inventory helper만
 선택 container에서 실행한다. 별도 probe Pod나 HTTP 요청은 필요하지 않다. 기존 HTTP는

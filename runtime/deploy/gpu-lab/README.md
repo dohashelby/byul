@@ -27,6 +27,25 @@ AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS �
 | `target.aws-lab.json` | 정책 묶음의 `target` 역할에 넣을 대상 등록 예시. image digest를 실제 값으로 교체해야 함 |
 | `host/byul-observation-feed.service` | AWS 호스트에서 수집기를 계속 돌리는 systemd 사용자 서비스 |
 | [`ACCEPTANCE.md`](ACCEPTANCE.md) | AWS 첫 완료 기준 8개 사례의 실행·증거·비용 절약 절차 |
+| `policy.aws-lab.json` | 정책 묶음의 gateway policy 역할에 넣을 LAB 시험 정책(아래 "LAB 시험값") |
+| `policy-approvals.aws-lab.json` | 위 정책의 LAB 승인 목록(SHA-256 대조). runtime 자체 기록이며 정식 승인 아님 |
+| `perf-plan.aws-lab.json` | B0/B1/B2 성능 비교 계획(`tools/perf_compare.py`) |
+
+## LAB 시험값 (2026-10-27, runtime 선정 · 다른 담당 확인 전)
+
+정책/검증·시험 담당의 값을 받기 전에 runtime이 정한 시험 출발값이다. 기업 운영값이나 정식 승인값이 아니다. update 점검(REQ-01·09·10·13, OBS-11)과 같은 시험에서 결과를 이으려면 같은 값을 써야 한다.
+
+| 값 | 설정 | 근거 |
+| --- | --- | --- |
+| 허용 모델 | `test-model` | AWS 묶음의 served model(Qwen2.5-0.5B-Instruct) |
+| 답변 기본/최대 | 128 / 256 토큰 | AWS-03이 최대+1(257)의 403을 확인 |
+| 질문+답변 한도 | 2048 토큰 | 엔진 `max model len 2048`과 같게 둬 Gateway 통과 뒤 엔진 거부가 섞이지 않게 함 |
+| 본문 크기 / 답변 개수 | 64 KiB / 1 | 기존 값 유지 |
+| 정책 기간 | 2026-10-27 ~ 2026-12-31 UTC | 만료 시 503이므로 발표 뒤까지 둠 |
+| 요청 옵션 | 추가 옵션 없음(schema 1.1) | 첫 인수 사례 8개에 필요 없음. 옵션 범위 시험은 별도 판본에서 정함 |
+| 성능 비교 | 동시 2, 답변 128, 예열 20·일반 100·stream 100, 3블록 | 엔진 `max num seqs 2`, `perf_compare.py` 기본 예산 |
+
+정책 파일을 한 글자라도 고치면 SHA-256이 바뀌어 Gateway가 503으로 막는다. 고칠 때는 `policy_version`을 올리고 `sha256sum policy.aws-lab.json` 값으로 승인 목록을 함께 갱신한다. 성능 계획의 B0/B1/B2 주소는 운영자가 준비하는 Gateway 구성의 자리값이다.
 
 UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`runtime/docs/결정기록_엔진UID.md`). Gateway 10000·observer 10004·공유 그룹 10010은 겹치지 않게 고른 프로젝트 선택값이다.
 
@@ -61,16 +80,30 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
      --type strategic --patch-file deploy/gpu-lab/engine-management-sidecar.patch.yaml
    ```
    patch는 엔진 Pod를 다시 만든다(Recreate: GPU 반납 후 재기동·cold start). 시험 시간 계획에 넣는다.
-   AWS 묶음의 03은 client-side `kubectl apply`를 쓰고 `kubectl patch`는 last-applied 기록을 바꾸지 않으므로, 03을 다시 돌려도 **사이드카가 남을 것으로 본다**(클러스터 미검증). 그러면 03의 smoke 증거에 runtime 사이드카가 섞이므로, 03을 다시 돌리기 전에 patch 파일 주석의 명령으로 사이드카를 떼고 03이 끝나면 다시 붙인다. 근본 해결은 템플릿 반영(아래 표).
+   적용한 이미지 tag·patch·실제 Deployment/Pod imageID·정책과 run ID는 **통합 기록**으로 저장하고, 03의 `evidence/smoke-*`(기반 점검)와 섞지 않는다. 일반 시험 중에는 사이드카를 그대로 둔다. 03을 다시 돌릴 때만 아래 "03 기준 상태와 runtime 통합 층" 절차로 뗐다가 다시 붙인다.
 6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. AWS 인수 확인은 [`ACCEPTANCE.md`](ACCEPTANCE.md)의 `tools/aws_lab_acceptance.py`를 사용한다. kind 전용 `tools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.
 7. 접속: 서버에서 `kubectl --context byul-aws-lab -n serving-lab port-forward deploy/serving-gateway 8080`, 노트북에서 SSH 터널(`ssh -L 18081:127.0.0.1:8080 ubuntu@<host>`). 노트북의 개발 서버(`byul-dev`)가 8080을 쓰므로 로컬 포트는 다른 번호(예: 18081)를 쓴다.
 
-## AWS 묶음과 맞춰야 할 것 (환경 담당에게 요청)
+## 03 기준 상태와 runtime 통합 층 (AWS 묶음 방침)
 
-| 항목 | 지금 | 요청 | 이유 |
-| --- | --- | --- | --- |
-| 관리 수신부 | patch로 붙임. 03 재적용 때 남아 smoke 증거에 섞일 수 있음 | `engine.yaml.template`에 사이드카 컨테이너 추가 | 떼고 붙이는 절차 없이 환경 증거와 runtime 구성을 일치시키려고 |
-| 엔진 접근 정책 | observer 8001 경로 없음 | `network-policies.yaml`의 정책을 함께 적용 | 관측 조회 경로 |
+AWS 묶음의 03(`03-engine-smoke.sh`)은 **엔진 컨테이너만 있는 기준 상태**를 점검한다. runtime의 사이드카·관리 조회 정책·Cilium/Tetragon 통제는 엔진 템플릿(`engine.yaml.template`)에 넣지 않고, 이 폴더의 patch와 `apply -k`로 **별도 통합 층**으로 붙인다. 03은 남은 추가 컨테이너·init·volume과 추가 NetworkPolicy·TracingPolicy를 발견하면 중단하며 다른 팀 설정을 자동 삭제하지 않는다. `scale 0`이나 `apply`만으로는 patch로 붙인 사이드카가 지워지지 않는다.
+
+03 재검증이 필요할 때의 순서:
+
+1. 통합 증거(Gateway 기록·인수 시험 `evidence/`·통합 기록)를 먼저 반출한다.
+2. 아래 회수 목록을 실제로 적용한 자원 이름 그대로 회수한다.
+3. 엔진을 `kubectl --context byul-aws-lab -n serving-lab scale deployment/serving-engine --replicas=0` 하고 Pod 종료를 확인한다.
+4. 묶음 안내대로 03을 실행하고 `evidence/smoke-*`를 기반 점검 결과로 보관한다.
+5. 위 5·6단계로 통합 층을 다시 붙이고 통합 기록을 새로 저장한다.
+
+| 회수 대상 | 회수 방법 |
+| --- | --- |
+| 사이드카 컨테이너 `management-listener` | `engine-management-sidecar.patch.yaml` 주석의 `$patch: delete` 명령 |
+| NetworkPolicy `engine-management-observer` | `kubectl --context byul-aws-lab -n serving-lab delete networkpolicy engine-management-observer` |
+| 6단계에서 적용한 CiliumNetworkPolicy·TracingPolicy | 적용할 때 기록한 정확한 이름으로만 삭제 |
+| Service `serving-engine-management` 등 나머지 runtime 자원 | 03 검사 대상이 아니면 유지 가능. 전부 내릴 때는 `kubectl --context byul-aws-lab delete -k deploy/gpu-lab` |
+
+사이드카만 떼는 것으로 03 기준 복원이 끝나지 않는다. 회수와 재적용 모두 적용 기준 commit과 회수 목록을 함께 기록한다.
 
 엔진 캐시는 묶음 구조(현재 세대 폴더만 컨테이너 `/cache`에 마운트)를 그대로 쓴다. intent에 `assets.cache_mount_path: "/cache"`를 두어 Tetragon 캐시 규칙(TG-CACHE-01)이 `/cache`를 감시하고, 호스트 쪽 `cache_root`(`/srv/serving/cache`)와 세대 경로는 03이 만드는 `/srv/serving/cache/vllm/<digest hex>/<revision>/<profile>-profile-01`과 같게 둔다. 엔진은 다른 세대를 볼 수 없으므로 컨테이너 안 쓰기는 모두 "현재 세대", 그 밖은 "캐시 밖"으로 분류된다. 호스트에서 `serving-runtime enforce cache-check --intent deploy/gpu-lab/intent.aws-lab.json`으로 세대·권한을 점검한다.
 

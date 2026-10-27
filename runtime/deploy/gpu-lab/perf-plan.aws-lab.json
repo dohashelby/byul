@@ -1,0 +1,26 @@
+{
+  "schema": "runtime-perf-plan/1.0",
+  "modes": {
+    "B0": {
+      "gateway_url": "http://127.0.0.1:19080",
+      "description": "같은 Gateway·CNI·mount를 유지하고 추가 센서·판정·통신 규칙을 끈 기준 구성"
+    },
+    "B1": {
+      "gateway_url": "http://127.0.0.1:19081",
+      "description": "관측·수집을 켜고 Tetragon 규칙을 monitor로 둔 구성"
+    },
+    "B2": {
+      "gateway_url": "http://127.0.0.1:19082",
+      "description": "요청 옵션·작업 통신·선정 개별 거부를 추가한 구성"
+    }
+  },
+  "model": "test-model",
+  "prompts": [
+    "Summarize why reproducible measurements need fixed inputs in one sentence.",
+    "Return the numbers one through five separated by commas."
+  ],
+  "max_tokens": 128,
+  "n": 1,
+  "concurrency": 2,
+  "request_timeout_s": 300
+}

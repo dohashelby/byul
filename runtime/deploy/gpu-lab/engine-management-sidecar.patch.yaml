@@ -9,13 +9,13 @@
 # changes the Pod template, so the Recreate strategy restarts the engine (GPU
 # released and loaded again, cold start).
 #
-# The bundle's 03-engine-smoke.sh uses client-side `kubectl apply`. `kubectl
-# patch` does not update last-applied-configuration, so a later 03 apply is
-# expected to KEEP this sidecar (unverified on a cluster) and 03 evidence would
-# then include it. Remove the sidecar before re-running 03 and re-apply after:
+# Per the AWS bundle, 03-engine-smoke.sh checks the engine-only baseline and
+# stops if extra containers or policies are left; scale 0 or apply does not
+# remove this patched sidecar. Keep the sidecar during normal tests. Only when
+# re-running 03, export evidence, remove it (and the other runtime policies in
+# README.md "03 기준 상태와 runtime 통합 층"), run 03, then re-apply:
 #   kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine --type strategic \
 #     -p '{"spec":{"template":{"spec":{"containers":[{"name":"management-listener","$patch":"delete"}]}}}}'
-# The lasting fix is to add the container to engine.yaml.template (README.md).
 #
 # The sidecar requests no GPU. It runs under the Pod's RuntimeClass nvidia, but
 # the device plugin injects GPU devices only into the container that requests

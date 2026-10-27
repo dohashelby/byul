@@ -1,0 +1,13 @@
+{
+  "schema_version": "runtime-policy-approvals/1.0",
+  "entries": [
+    {
+      "policy_id": "cpu-vllm-local-policy",
+      "policy_version": "1",
+      "sha256": "013a51eea8a3dfe64ea12771d5cfaafa6cf68ab7d6e7fdc05f2cc7667be29989",
+      "approval_ref": "CPU-VLLM-LOCAL-APPROVAL",
+      "approved_at": "2026-10-27T00:00:00+09:00",
+      "valid_until": "2027-12-31T23:59:59+00:00"
+    }
+  ]
+}

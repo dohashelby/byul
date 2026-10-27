@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -13,6 +14,10 @@ from serving_runtime.mvp.auth import token_digest
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.mock_engine import MockEngine
 from serving_runtime.mvp.policy import load_policy
+from serving_runtime.mvp.relay import (
+    validate_completion_response,
+    validate_completion_stream,
+)
 from serving_runtime.mvp.store import JsonlStore
 
 
@@ -110,6 +115,69 @@ class CompletionRouteTests(unittest.TestCase):
         self.assertEqual(final["route"], "POST /v1/completions")
         self.assertNotIn("prompt", json.dumps(final))
         self.assertEqual(self.engine.receipts[-1]["route"], "POST /v1/completions")
+
+    def test_mock_completion_shape_matches_vllm_contract(self) -> None:
+        status, _, body = self.post(self.body())
+        self.assertEqual(status, 200)
+        document = json.loads(body)
+        self.assertTrue(document["id"].startswith("cmpl-"))
+        self.assertEqual(
+            set(document["usage"]),
+            {"prompt_tokens", "completion_tokens", "total_tokens"},
+        )
+
+    def test_completion_response_validation_rejects_wrong_shapes(self) -> None:
+        valid = {
+            "object": "text_completion",
+            "choices": [{"text": "ok"}],
+            "usage": {
+                "prompt_tokens": 1,
+                "completion_tokens": 2,
+                "total_tokens": 3,
+            },
+        }
+        self.assertTrue(validate_completion_response(json.dumps(valid).encode()))
+        invalid = (
+            {**valid, "object": "chat.completion"},
+            {**valid, "choices": []},
+            {**valid, "choices": [{"text": 1}]},
+            {**valid, "usage": {"prompt_tokens": 1, "completion_tokens": 2}},
+            {**valid, "usage": {"prompt_tokens": True, "completion_tokens": 2, "total_tokens": 3}},
+        )
+        for document in invalid:
+            with self.subTest(document=document):
+                self.assertFalse(
+                    validate_completion_response(json.dumps(document).encode())
+                )
+
+    def test_completion_stream_validation_requires_text_chunks_and_final_done(self) -> None:
+        chunk = b'data: {"choices":[{"text":"ok"}]}\n\ndata: [DONE]\n\n'
+        self.assertTrue(validate_completion_stream(chunk))
+        for payload in (
+            b'data: {"choices":[{"text":1}]}\n\ndata: [DONE]\n\n',
+            b'data: {broken}\n\ndata: [DONE]\n\n',
+            b'data: {"choices":[{"text":"ok"}]}\n\n',
+            b'data: [DONE]\n\ndata: {"choices":[{"text":"late"}]}\n\n',
+        ):
+            with self.subTest(payload=payload):
+                self.assertFalse(validate_completion_stream(payload))
+
+    def test_invalid_completion_shapes_use_engine_bad_response_502(self) -> None:
+        with patch(
+            "serving_runtime.mvp.relay.validate_completion_response",
+            return_value=False,
+        ):
+            status, _, body = self.post(self.body())
+        self.assertEqual(status, 502)
+        self.assertEqual(json.loads(body)["error"]["code"], "ENGINE_BAD_RESPONSE")
+
+        with patch(
+            "serving_runtime.mvp.relay.validate_completion_stream",
+            return_value=False,
+        ):
+            status, _, body = self.post(self.body(stream=True))
+        self.assertEqual(status, 502)
+        self.assertEqual(json.loads(body)["error"]["code"], "ENGINE_BAD_RESPONSE")
 
     def test_max_tokens_denied_invalid_prompt_and_unsupported_field(self) -> None:
         denied = self.post(self.body(max_tokens=129))

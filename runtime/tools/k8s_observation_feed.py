@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 import json
 import math
@@ -177,15 +178,24 @@ def _pump(
     output: BinaryIO,
     transform: Callable[[bytes], bytes | None],
     dropped: list[int],
+    error_class: list[str | None],
 ) -> None:
-    for line in iter(source.readline, b""):
-        cleaned = transform(line)
-        if cleaned is None:
-            dropped[0] += 1
-            continue
-        output.write(cleaned)
-        output.flush()
-    source.close()
+    try:
+        for line in iter(source.readline, b""):
+            cleaned = transform(line)
+            if cleaned is None:
+                dropped[0] += 1
+                continue
+            output.write(cleaned)
+            output.flush()
+    except Exception as error:
+        error_class[0] = type(error).__name__
+    finally:
+        try:
+            source.close()
+        except Exception as error:
+            if error_class[0] is None:
+                error_class[0] = type(error).__name__
 
 
 def _wait_for_hubble(
@@ -233,6 +243,28 @@ def _share_fd(descriptor: int) -> None:
         return
     os.fchown(descriptor, -1, _reader_gid)
     os.fchmod(descriptor, 0o640)
+
+
+def _open_append(path: Path) -> BinaryIO:
+    """Open one raw feed/log append target without following a symlink."""
+
+    try:
+        descriptor = os.open(
+            path,
+            os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW,
+            0o600,
+        )
+    except OSError as error:
+        if path.is_symlink():
+            raise OSError(f"refusing symbolic link append target: {path}") from error
+        raise
+    try:
+        os.fchmod(descriptor, 0o600)
+        _share_fd(descriptor)
+        return os.fdopen(descriptor, "ab")
+    except Exception:
+        os.close(descriptor)
+        raise
 
 
 class ReaderGroupError(ValueError):
@@ -394,6 +426,7 @@ class _Child:
         self.process: subprocess.Popen[bytes] | None = None
         self.pump: threading.Thread | None = None
         self.dropped_lines = [0]
+        self.pump_error: list[str | None] = [None]
 
     def returncode(self) -> int | None:
         return None if self.process is None else self.process.poll()
@@ -427,6 +460,7 @@ class _FeedGroup:
         # Last moment every child was seen running; a gap's backfill starts
         # before it because an exit is only noticed on the next tick.
         self.last_healthy_at: datetime | None = None
+        self.last_redaction_error_class: str | None = None
 
     def processes(self) -> list[tuple[str, object]]:
         return [
@@ -435,11 +469,20 @@ class _FeedGroup:
         ]
 
     def heartbeat_extra(self) -> dict[str, object]:
-        return {
+        extra: dict[str, object] = {
             "reconnect_count": self.reconnect_count,
             "open_gap": self.open_gap,
             "last_gap": self.last_gap,
         }
+        redacting = [child for child in self.children if child.transform is not None]
+        if redacting:
+            extra["dropped_lines_total"] = sum(
+                child.dropped_lines[0] for child in redacting
+            )
+            extra["last_redaction_error_class"] = (
+                self.last_redaction_error_class
+            )
+        return extra
 
 
 class _NotStarted:
@@ -693,9 +736,16 @@ class _Supervisor:
                 else:
                     child.process = _start(child.argv(since), subprocess.PIPE, child.error)
                     assert child.process.stdout is not None
+                    child.pump_error[0] = None
                     child.pump = threading.Thread(
                         target=_pump,
-                        args=(child.process.stdout, child.output, child.transform, child.dropped_lines),
+                        args=(
+                            child.process.stdout,
+                            child.output,
+                            child.transform,
+                            child.dropped_lines,
+                            child.pump_error,
+                        ),
                         name=f"{child.name}-redact",
                         daemon=True,
                     )
@@ -732,9 +782,27 @@ class _Supervisor:
                     for child in group.children
                     if child.returncode() is not None
                 ]
-                if exited:
+                dead_pumps = []
+                for child in group.children:
+                    if (
+                        child.transform is not None
+                        and child.pump is not None
+                        and not child.pump.is_alive()
+                        and child.returncode() is None
+                    ):
+                        error_class = child.pump_error[0]
+                        if error_class is not None:
+                            group.last_redaction_error_class = error_class
+                        dead_pumps.append(
+                            {
+                                "name": child.name,
+                                "pump_error": error_class or "PumpStopped",
+                            }
+                        )
+                failures = exited + dead_pumps
+                if failures:
                     _stop_children(group)
-                    self._open_gap(group, exited)
+                    self._open_gap(group, failures)
                 else:
                     group.last_healthy_at = datetime.now(timezone.utc)
                 continue
@@ -788,18 +856,20 @@ def run(
         )
     hubble_path = output_dir / "hubble.jsonl"
     tetragon_path = output_dir / "tetragon.jsonl"
-    for feed_file in (hubble_path, tetragon_path):
-        feed_file.touch(mode=0o600, exist_ok=True)
-        _share(feed_file)
     stop_requested = threading.Event()
     final_state = "error"
-    with (
-        hubble_path.open("ab") as hubble_output,
-        tetragon_path.open("ab") as tetragon_output,
-        (output_dir / "hubble.stderr.log").open("ab") as hubble_error,
-        (output_dir / "tetragon.stderr.log").open("ab") as tetragon_error,
-        (output_dir / "cilium-hubble-port-forward.log").open("ab") as port_forward_log,
-    ):
+    with ExitStack() as stack:
+        hubble_output = stack.enter_context(_open_append(hubble_path))
+        tetragon_output = stack.enter_context(_open_append(tetragon_path))
+        hubble_error = stack.enter_context(
+            _open_append(output_dir / "hubble.stderr.log")
+        )
+        tetragon_error = stack.enter_context(
+            _open_append(output_dir / "tetragon.stderr.log")
+        )
+        port_forward_log = stack.enter_context(
+            _open_append(output_dir / "cilium-hubble-port-forward.log")
+        )
         hubble_group = _FeedGroup(
             "hubble",
             feed_path=hubble_path,

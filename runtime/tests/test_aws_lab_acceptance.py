@@ -284,6 +284,24 @@ class DecisionTests(unittest.TestCase):
 
 
 class FakeExecutionTests(unittest.TestCase):
+    def test_engine_log_matching_is_route_aware(self) -> None:
+        request_id = "route-1"
+        chat = f"Received request chatcmpl-{request_id}"
+        completion = f"Received request cmpl-{request_id}-0"
+        self.assertTrue(
+            AWSAcceptance._log_received(
+                chat, request_id, "/v1/chat/completions"
+            )
+        )
+        self.assertFalse(
+            AWSAcceptance._log_received(chat, request_id, "/v1/completions")
+        )
+        self.assertTrue(
+            AWSAcceptance._log_received(
+                completion, request_id, "/v1/completions"
+            )
+        )
+
     def test_all_in_pod_python_snippets_compile(self) -> None:
         for code in (TCP_PROBE_CODE, WRITE_DENY_CODE, CACHE_WRITE_CODE):
             with self.subTest(code=code[:30]):

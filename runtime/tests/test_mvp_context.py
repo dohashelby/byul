@@ -213,12 +213,19 @@ class ContextCheckHttpTests(unittest.TestCase):
             config, load_policy(policy), backend_config=load_backend_config(backend_path, environ={})
         ).start()
         self.addCleanup(gateway.stop)
-        status, request_id, body = self.post(gateway, chat_body())
-        self.assertEqual(status, 503)
-        self.assertEqual(body["error"]["code"], "CONTEXT_CHECK_UNAVAILABLE")
-        self.assertEqual(fake.tokenize_calls, 1)
+        for expected_status in (400, 404, 500):
+            with self.subTest(status=expected_status):
+                fake.tokenize_failure_status = expected_status
+                status, request_id, body = self.post(gateway, chat_body())
+                self.assertEqual(status, 503)
+                self.assertEqual(body["error"]["code"], "CONTEXT_CHECK_UNAVAILABLE")
+                self.assertIn(f"/tokenize HTTP {expected_status}", body["error"]["message"])
+                context = self.final_record(request_id)["request"]["context"]
+                self.assertEqual(context["result"], "unavailable")
+                self.assertEqual(context["endpoint"], "/tokenize")
+                self.assertEqual(context["http_status"], expected_status)
+        self.assertEqual(fake.tokenize_calls, 3)
         self.assertEqual(fake.request_count, 0)
-        self.assertEqual(self.final_record(request_id)["request"]["context"]["result"], "unavailable")
 
         fake.tokenize_failure = False
         status, _, _ = self.post(gateway, chat_body())

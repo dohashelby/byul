@@ -779,6 +779,74 @@ class FeedReconnectTests(unittest.TestCase):
         self.assertEqual(self.group.reconnect_count, 0)
         self.assertIn("child exited during start", self.group.open_gap["last_error"])
 
+    def test_dead_redaction_pump_opens_gap_and_heartbeat_reports_loss(self) -> None:
+        child = self.group.children[0]
+        child.transform = lambda line: line
+        with (
+            patch.object(self.helper, "_start", side_effect=self.fake_start),
+            patch.object(self.helper, "assert_safe_context"),
+            patch.object(self.helper, "_pump", return_value=None),
+        ):
+            self.supervisor.start_group(self.group, since=None)
+            assert child.pump is not None
+            child.pump.join(timeout=5)
+            child.dropped_lines[0] = 2
+            child.pump_error[0] = "UnicodeEncodeError"
+            self.supervisor.tick()
+        heartbeat = self.heartbeat()
+        self.assertEqual(heartbeat["state"], "reconnecting")
+        self.assertEqual(heartbeat["dropped_lines_total"], 2)
+        self.assertEqual(
+            heartbeat["last_redaction_error_class"], "UnicodeEncodeError"
+        )
+        self.assertEqual(
+            heartbeat["open_gap"]["cause"],
+            [{"name": "tetragon", "pump_error": "UnicodeEncodeError"}],
+        )
+
+    def test_tetragon_collector_is_partial_after_recent_redaction_drop(self) -> None:
+        feed_path = self.root / "tetragon.jsonl"
+        feed_path.write_text("", encoding="utf-8")
+        now = datetime.now(timezone.utc).isoformat()
+        self.group.heartbeat_path.write_text(
+            json.dumps(
+                {
+                    "schema": HEARTBEAT_SCHEMA,
+                    "kind": "tetragon",
+                    "feed_path": str(feed_path),
+                    "started_at": now,
+                    "updated_at": now,
+                    "state": "running",
+                    "processes": [
+                        {"name": "tetragon", "running": True, "returncode": None}
+                    ],
+                    "dropped_lines_total": 1,
+                    "last_redaction_error_class": None,
+                }
+            ),
+            encoding="utf-8",
+        )
+        feed = ObservationFeed(
+            kind="tetragon",
+            path=feed_path,
+            data_dir=self.root / "partial-data",
+            data_origin="real",
+            environment=None,
+            run_id=None,
+            heartbeat_path=self.group.heartbeat_path,
+            heartbeat_stale_after_s=15,
+        )
+        collector = Collector(
+            "observation_feed_tetragon",
+            feed.collect,
+            interval_s=1,
+            stale_after_s=15,
+        )
+        collector.collect()
+        snapshot = collector.snapshot()
+        self.assertEqual(snapshot["state"], "partial")
+        self.assertTrue(snapshot["last_value"]["redaction_loss_detected"])
+
     def test_gateway_treats_reconnecting_writer_as_unavailable(self) -> None:
         feed_path = self.root / "tetragon.jsonl"
         feed_path.write_text("", encoding="utf-8")

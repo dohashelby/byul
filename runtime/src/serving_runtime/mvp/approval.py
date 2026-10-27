@@ -182,6 +182,7 @@ class HashListApprovalVerifier:
         # readable list already removed.
         self._next_ticket = 0
         self._stored_ticket = -1
+        self._stored_result: ApprovalResult | None = None
 
     def verify(
         self,
@@ -219,8 +220,10 @@ class HashListApprovalVerifier:
         with self._lock:
             if ticket < self._stored_ticket:
                 # A newer read already decided; this older outcome is stale.
-                return result
+                assert self._stored_result is not None
+                return self._stored_result
             self._stored_ticket = ticket
+            self._stored_result = result
             if result.state == "verified":
                 self._last_verified = {
                     "selector": selector,

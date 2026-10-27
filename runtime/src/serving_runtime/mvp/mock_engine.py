@@ -255,7 +255,11 @@ class MockEngine:
                         }
                     )
                     chunk = {
-                        "id": f"mock-{request_id}",
+                        "id": (
+                            f"cmpl-{request_id}"
+                            if completion
+                            else f"mock-{request_id}"
+                        ),
                         "object": (
                             "text_completion" if completion else "chat.completion.chunk"
                         ),
@@ -439,8 +443,12 @@ class MockEngine:
                 if owner.header_delay_s and owner._stop_event.wait(owner.header_delay_s):
                     return
                 if parsed.path == "/v1/completions":
+                    prompt_tokens = simulated_prompt_token_count(
+                        document.get("prompt")
+                    )
+                    completion_tokens = 2
                     response = {
-                        "id": f"mock-{request_id}",
+                        "id": f"cmpl-{request_id}",
                         "object": "text_completion",
                         "created": int(time.time()),
                         "model": model,
@@ -451,6 +459,11 @@ class MockEngine:
                                 "finish_reason": "stop",
                             }
                         ],
+                        "usage": {
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": prompt_tokens + completion_tokens,
+                        },
                     }
                 else:
                     response = {

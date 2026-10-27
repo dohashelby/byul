@@ -212,7 +212,7 @@ curl -H "Authorization: Bearer $LAB_TOKEN" -H 'Content-Type: application/json' \
 **시험 전용입니다.** 개발계획서 v1.4 D-09 기본 LAB 프로필(텍스트 전용, n=1, 5개 요청 필드)은 바꾸지 않습니다. 제로데이 시험에서 "Gateway가 막아서 엔진에 도달하지 않음"과 "엔진에 도달했을 때 탐지·차단됨"을 구분하려고, 정책으로 추가 요청 필드를 열 수 있게 한 계획서 범위 밖 확장입니다.
 
 - `runtime-mvp/1.2`는 1.1의 모든 필드에 `profile`(`default`·`zeroday-lab`), `extra_fields`, `max_n`(기본 1)을 더합니다. 1.0·1.1 문서에 이 필드를 넣으면 기존처럼 `UNKNOWN_FIELD`입니다.
-- `extra_fields`와 `max_n > 1`은 `zeroday-lab`에서만 허용합니다. `model`·`messages`·`max_tokens`·`stream`·`n`·`max_completion_tokens`는 열 수 없고, `max_completion_tokens` 별칭은 모든 프로필에서 계속 거부합니다.
+- `extra_fields`와 `max_n > 1`은 `zeroday-lab`에서만 허용합니다. 현재 `extra_fields`는 `POST /v1/chat/completions`에만 적용하고, route별 추가 필드 규칙이 생기기 전까지 `POST /v1/completions`에서는 정책에 이름이 있어도 400 `UNSUPPORTED_FIELD`로 거부합니다. `model`·`messages`·`max_tokens`·`stream`·`n`·`max_completion_tokens`는 열 수 없고, `max_completion_tokens` 별칭은 모든 프로필에서 계속 거부합니다.
 - 규칙은 `{"mode": "validate", "type": ..., 제약}` 또는 `{"mode": "passthrough"}`입니다. 제약은 `min`·`max`(integer/number), `max_length`(string), `max_items`·`items`·`max_bytes`(array), `max_bytes`(object)만 받고, 타입에 맞지 않는 제약·알 수 없는 키·`min > max`는 정책 오류입니다. bool은 숫자로 인정하지 않습니다.
 - 제약 위반은 400 `INVALID_EXTRA_FIELD`이며 메시지에는 필드 이름과 위반 제약만 남고 값은 남지 않습니다. 통과한 필드는 원래 값 그대로 backend에 전달하고, model 매핑·`max_tokens`·`stream`은 Gateway 값이 우선합니다. `n > 1`이 허용되면 `n`도 전달합니다.
 - 요청 기록·증거에는 정책 `profile`과 전달한 추가 필드의 **이름과 모드만** 남깁니다. 값은 저장하지 않습니다. `/api/status`·`/api/policy`와 대시보드는 `zeroday-lab`이면 "시험 전용 프로필: 검사하지 않고 전달하는 필드 N개" 경고를 표시합니다.
@@ -425,7 +425,7 @@ curl -N -H 'Content-Type: application/json' \
   http://127.0.0.1:8080/v1/chat/completions
 ```
 
-지원하는 요청은 `POST /v1/chat/completions`와 `POST /v1/completions`입니다. chat은 `messages`(role은 system/user/assistant, content는 문자열), completions는 단일 문자열 `prompt`만 받습니다(문자열 배열·token-id 배열 거부). 공통으로 `model`(허용 목록), `max_tokens`(생략 시 128), `stream`(bool, true면 SSE), `n`(1만)을 받습니다. completions의 `echo`·`suffix`·`best_of`·`logprobs`를 포함한 나머지 필드는 정책 `extra_fields`로 명시하지 않으면 허용하지 않습니다. 두 route는 같은 정책 유효성→인증→대상→본문→정책 판정→relay 순서를 쓰며 기록의 `route`로 구분하고 prompt 원문은 저장하지 않습니다. completions context 계산은 backend `/tokenize`에 `prompt`를 보냅니다. 실제 vLLM v0.31.0·SGLang completions schema와 활성 동작은 **미확인**이며, 모의 엔진과 시험 전용 가짜 backend로만 자동 시험했습니다.
+지원하는 요청은 `POST /v1/chat/completions`와 `POST /v1/completions`입니다. chat은 `messages`(role은 system/user/assistant, content는 문자열), completions는 단일 문자열 `prompt`만 받습니다(문자열 배열·token-id 배열 거부). 공통으로 `model`(허용 목록), `max_tokens`(생략 시 128), `stream`(bool, true면 SSE), `n`(1만)을 받습니다. completions의 `echo`·`suffix`·`best_of`·`logprobs`를 포함한 나머지 필드는 정책 `extra_fields` 선언 여부와 관계없이 현재 400 `UNSUPPORTED_FIELD`로 거부합니다. 두 route는 같은 정책 유효성→인증→대상→본문→정책 판정→relay 순서를 쓰며 기록의 `route`로 구분하고 prompt 원문은 저장하지 않습니다. completions context 계산은 backend `/tokenize`에 `prompt`를 보내며 실패 기록에는 endpoint와 HTTP 상태만 남기고 본문은 남기지 않습니다. 실제 vLLM v0.31.0·SGLang completions 활성 동작은 **미확인**이며, 모의 엔진과 시험 전용 가짜 backend로 자동 시험했습니다.
 
 | 상황 | HTTP | 결과 |
 | --- | --- | --- |

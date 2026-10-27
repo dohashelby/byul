@@ -50,6 +50,67 @@ _ENGINE_ERROR_BODY_LIMIT = 64 * 1024
 _ENGINE_MESSAGE_LIMIT = 256
 _CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f-\x9f]+")
 _RETRY_AFTER_SECONDS = re.compile(r"[0-9]{1,10}")
+_COMPLETION_STREAM_BODY_LIMIT = 64 * 1024 * 1024
+
+
+def _completion_choices(value: object) -> bool:
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(
+            isinstance(choice, dict) and isinstance(choice.get("text"), str)
+            for choice in value
+        )
+    )
+
+
+def validate_completion_response(body: bytes) -> bool:
+    """Validate the minimal non-stream vLLM completions response shape."""
+
+    try:
+        document = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
+        return False
+    if not isinstance(document, dict) or document.get("object") != "text_completion":
+        return False
+    if not _completion_choices(document.get("choices")):
+        return False
+    usage = document.get("usage")
+    if not isinstance(usage, dict):
+        return False
+    return all(
+        isinstance(usage.get(name), int) and not isinstance(usage.get(name), bool)
+        for name in ("prompt_tokens", "completion_tokens", "total_tokens")
+    )
+
+
+def validate_completion_stream(body: bytes) -> bool:
+    """Validate completion SSE data chunks and require a terminal [DONE]."""
+
+    saw_chunk = False
+    saw_done = False
+    for raw_line in body.splitlines():
+        line = raw_line.rstrip(b"\r")
+        if not line.startswith(b"data:"):
+            continue
+        data = line[5:].strip()
+        if data == b"[DONE]":
+            if saw_done:
+                return False
+            saw_done = True
+            continue
+        if saw_done:
+            return False
+        try:
+            document = json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
+            return False
+        if not isinstance(document, dict) or not _completion_choices(
+            document.get("choices")
+        ):
+            return False
+        saw_chunk = True
+    return saw_chunk and saw_done
 
 
 def _engine_message(body: bytes, *, truncated: bool) -> str | None:
@@ -277,6 +338,16 @@ class Relay:
                     ),
                     None,
                 )
+            if route == COMPLETIONS_ROUTE and not validate_completion_response(body):
+                return (
+                    engine_error(
+                        502,
+                        "ENGINE_BAD_RESPONSE",
+                        f"{self._backend_label()} returned an invalid completion response",
+                        allowed,
+                    ),
+                    None,
+                )
             return allowed, body
         except (TimeoutError, OSError, HTTPException) as error:
             if is_timeout(error):
@@ -353,6 +424,126 @@ class Relay:
                     "ENGINE_BAD_RESPONSE",
                     False,
                 )
+
+            if route == COMPLETIONS_ROUTE:
+                buffered: list[bytes] = []
+                buffered_size = 0
+                last_chunk_at = time.monotonic()
+                response_socket = connection.sock
+                if response_socket is None:
+                    response_file = getattr(engine_response, "fp", None)
+                    response_raw = getattr(response_file, "raw", None)
+                    response_socket = getattr(response_raw, "_sock", None)
+                while True:
+                    now = time.monotonic()
+                    deadline_remaining = self._request_deadline_s - (
+                        now - started_at
+                    )
+                    idle_remaining = self._stream_idle_timeout_s - (
+                        now - last_chunk_at
+                    )
+                    if deadline_remaining <= 0:
+                        return (
+                            engine_error(
+                                504,
+                                "STREAM_DEADLINE",
+                                "deadline exceeded",
+                                allowed,
+                            ),
+                            "deadline_exceeded",
+                            False,
+                        )
+                    if idle_remaining <= 0:
+                        return (
+                            engine_error(
+                                504,
+                                "STREAM_IDLE_TIMEOUT",
+                                "idle timeout",
+                                allowed,
+                            ),
+                            "idle_timeout",
+                            False,
+                        )
+                    if response_socket is not None:
+                        response_socket.settimeout(
+                            max(0.001, min(deadline_remaining, idle_remaining))
+                        )
+                    try:
+                        chunk = engine_response.read1(1024)
+                    except (socket.timeout, TimeoutError):
+                        code = (
+                            "STREAM_DEADLINE"
+                            if time.monotonic() - started_at
+                            >= self._request_deadline_s
+                            else "STREAM_IDLE_TIMEOUT"
+                        )
+                        return (
+                            engine_error(
+                                504,
+                                code,
+                                code.lower().replace("_", " "),
+                                allowed,
+                            ),
+                            code.lower(),
+                            False,
+                        )
+                    except (OSError, HTTPException):
+                        return (
+                            engine_error(
+                                502,
+                                "STREAM_RELAY_ERROR",
+                                "stream relay error",
+                                allowed,
+                            ),
+                            "relay_error",
+                            False,
+                        )
+                    if not chunk:
+                        break
+                    last_chunk_at = time.monotonic()
+                    buffered_size += len(chunk)
+                    if buffered_size > _COMPLETION_STREAM_BODY_LIMIT:
+                        return (
+                            engine_error(
+                                502,
+                                "ENGINE_BAD_RESPONSE",
+                                f"{self._backend_label()} returned an oversized completion stream",
+                                allowed,
+                            ),
+                            "ENGINE_BAD_RESPONSE",
+                            False,
+                        )
+                    buffered.append(chunk)
+                body = b"".join(buffered)
+                if not validate_completion_stream(body):
+                    return (
+                        engine_error(
+                            502,
+                            "ENGINE_BAD_RESPONSE",
+                            f"{self._backend_label()} returned an invalid completion stream",
+                            allowed,
+                        ),
+                        "ENGINE_BAD_RESPONSE",
+                        False,
+                    )
+                try:
+                    response.start_stream_response(request_id)
+                    response_started = True
+                    on_response_started()
+                    response.write_stream_chunk(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    return (
+                        engine_error(
+                            200,
+                            "CLIENT_DISCONNECTED",
+                            "client disconnected during streaming",
+                            allowed,
+                            source="client",
+                        ),
+                        "client_disconnected",
+                        response_started,
+                    )
+                return allowed, "completed", True
 
             try:
                 response.start_stream_response(request_id)

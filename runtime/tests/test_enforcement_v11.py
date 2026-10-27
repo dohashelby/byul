@@ -6,12 +6,15 @@ import copy
 import json
 import os
 from pathlib import Path
+import stat
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from serving_runtime.enforcement import cilium, tetragon
-from serving_runtime.enforcement.cache import check_cache
+from serving_runtime.enforcement.cache import _ancestor, check_cache
 from serving_runtime.enforcement.events import parse_tetragon, transform_lines
 from serving_runtime.enforcement.execpolicy import ExecPolicy, parse_exceptions, parse_timeline
 from serving_runtime.enforcement.intent import IntentError, load_intent, parse_intent
@@ -328,6 +331,38 @@ class CacheCheckTests(unittest.TestCase):
                     [(str(parent), ["group_or_other_writable"])],
                 )
                 os.chmod(parent, 0o755)
+        self.assertEqual(self.check()["state"], "ok")
+
+    def test_engine_traversal_and_current_owner_permissions_are_checked(self) -> None:
+        if os.getuid() == 0:
+            self.skipTest("ownership check needs a non-root test user")
+        self.current.mkdir(parents=True)
+        for path in (self.root, *self.current.parents):
+            if path.is_relative_to(self.root):
+                os.chmod(path, 0o755)
+        os.chmod(self.current, 0o700)
+        self.assertEqual(self.check()["state"], "ok")
+
+        ancestor = self.root / "vllm"
+        group_only = SimpleNamespace(
+            st_uid=(self.intent.assets.engine_uid + 1),
+            st_mode=(stat.S_IFDIR | 0o750),
+        )
+        with patch(
+            "serving_runtime.enforcement.cache.os.lstat",
+            return_value=group_only,
+        ):
+            problem = _ancestor(ancestor, self.intent.assets.engine_uid)
+        self.assertIn("engine_traverse_unverified", problem["problems"])
+
+        os.chmod(self.current, 0o500)
+        current = next(item for item in self.check()["generations"] if item["is_current"])
+        self.assertIn("engine_owner_write_missing", current["problems"])
+
+        os.chmod(self.current, 0o600)
+        current = next(item for item in self.check()["generations"] if item["is_current"])
+        self.assertIn("engine_owner_execute_missing", current["problems"])
+        os.chmod(self.current, 0o700)
         self.assertEqual(self.check()["state"], "ok")
 
 

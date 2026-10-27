@@ -24,6 +24,11 @@ def _entry(path: Path, cache_root: Path, current: Path, engine_uid: int) -> dict
         problems.append("owner_not_engine")
     if info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
         problems.append("group_or_other_writable")
+    if path == current:
+        if not info.st_mode & stat.S_IWUSR:
+            problems.append("engine_owner_write_missing")
+        if not info.st_mode & stat.S_IXUSR:
+            problems.append("engine_owner_execute_missing")
     relative = path.relative_to(cache_root)
     return {
         "path": str(path),
@@ -48,6 +53,14 @@ def _ancestor(path: Path, engine_uid: int) -> dict[str, Any] | None:
         problems.append("owner_not_engine_or_root")
     if info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
         problems.append("group_or_other_writable")
+    if info.st_uid == engine_uid:
+        if not info.st_mode & stat.S_IXUSR:
+            problems.append("engine_traverse_denied")
+    elif not info.st_mode & stat.S_IXOTH:
+        if info.st_mode & stat.S_IXGRP:
+            problems.append("engine_traverse_unverified")
+        else:
+            problems.append("engine_traverse_denied")
     if not problems:
         return None
     return {

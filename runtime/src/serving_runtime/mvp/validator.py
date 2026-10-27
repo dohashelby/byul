@@ -149,7 +149,13 @@ def validate_request(
         )
     input_field = "messages" if request_kind == "chat" else "prompt"
     allowed_fields = {"model", input_field, "max_tokens", "stream", "n"}
-    extra_rules = {rule.name: rule for rule in policy.extra_fields}
+    # The zeroday-lab field rules were exercised only for chat completions.
+    # Until each route has its own rules, completions keeps its fixed schema.
+    extra_rules = (
+        {rule.name: rule for rule in policy.extra_fields}
+        if request_kind == "chat"
+        else {}
+    )
     allowed_fields |= extra_rules.keys()
     unsupported = sorted(document.keys() - allowed_fields)
     if unsupported:

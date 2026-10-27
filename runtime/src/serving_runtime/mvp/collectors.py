@@ -150,6 +150,24 @@ class Collector:
                     datetime.now(timezone.utc) - last_lost
                 ).total_seconds() <= self.stale_after_s:
                     state = "partial"
+        if (
+            state == "ok"
+            and self.source == "observation_feed_tetragon"
+            and isinstance(last_value, dict)
+            and last_value.get("redaction_loss_detected") is True
+        ):
+            last_drop_at = last_value.get("last_redaction_drop_at")
+            try:
+                last_drop = datetime.fromisoformat(
+                    str(last_drop_at).replace("Z", "+00:00")
+                ).astimezone(timezone.utc)
+            except (TypeError, ValueError):
+                state = "partial"
+            else:
+                if (
+                    datetime.now(timezone.utc) - last_drop
+                ).total_seconds() <= self.stale_after_s:
+                    state = "partial"
         return {
             "source": self.source,
             "state": state,

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 from . import vllm_lifecycle_sensor as sensor
 
@@ -83,3 +84,19 @@ def points(profile):
     if profile in {LEGACY_PROFILE, V2_PROFILE}:
         return LEGACY_POINTS
     raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
+
+
+def validate_model_selection(payload):
+    model = payload["metadata"]["model_selection"]
+    hashes = {"owner_model_sha256","argument_model_sha256","returned_model_sha256",
+        "configured_model_sha256","configured_revision_sha256","load_format_sha256"}
+    flags = {"load_dummy_weights","lora_config_present","speculative_config_present"}
+    points = {"BaseModelLoader.load_model","DefaultModelLoader.load_weights","CPUModelRunner.load_model",
+        "GPUModelRunner.load_model","CPUModelRunner.get_model","GPUModelRunner.get_model","GPUModelRunner._model_forward"}
+    if (type(model) is not dict or set(model) != hashes | flags or payload["point"] not in points
+            or any(model[k] is not None and (type(model[k]) is not str or re.fullmatch(r"[0-9a-f]{64}",model[k]) is None) for k in hashes)
+            or any(model[k] is not None and type(model[k]) is not bool for k in flags)):
+        raise ValueError("LIFECYCLE_RECORDING_MODEL_METADATA_INVALID")
+    if (model["returned_model_sha256"] is not None and (payload["phase"]!="RETURN" or payload["point"] not in
+            {"BaseModelLoader.load_model","CPUModelRunner.get_model","GPUModelRunner.get_model"})):
+        raise ValueError("LIFECYCLE_RECORDING_MODEL_RETURN_INVALID")

@@ -150,7 +150,7 @@ def parse_recording(raw, prepared):
                      or type(asgi) is not str or re.fullmatch(r"[0-9a-f]{64}", asgi) is None)):
                 raise ValueError("LIFECYCLE_RECORDING_ASGI_ASSIGNMENT_INVALID")
             if "model_selection" in payload["metadata"]:
-                validate_model_selection(payload)
+                profiles.validate_model_selection(payload)
             for request in payload["requests"]:
                 if (type(request) is not dict or set(request) != {"request_sha256","request_present",
                         "output_state_present","batch_row_present","status_code"}
@@ -189,22 +189,6 @@ def parse_recording(raw, prepared):
         "incomplete_final_row":incomplete_tail,"discarded_tail_bytes":len(tail),
         "discarded_tail_sha256":hashlib.sha256(tail).hexdigest() if tail else None,
         "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False}
-
-
-def validate_model_selection(payload):
-    model = payload["metadata"]["model_selection"]
-    hashes = {"owner_model_sha256","argument_model_sha256","returned_model_sha256",
-        "configured_model_sha256","configured_revision_sha256","load_format_sha256"}
-    flags = {"load_dummy_weights","lora_config_present","speculative_config_present"}
-    points = {"BaseModelLoader.load_model","DefaultModelLoader.load_weights","CPUModelRunner.load_model",
-        "GPUModelRunner.load_model","CPUModelRunner.get_model","GPUModelRunner.get_model","GPUModelRunner._model_forward"}
-    if (type(model) is not dict or set(model) != hashes | flags or payload["point"] not in points
-            or any(model[k] is not None and (type(model[k]) is not str or re.fullmatch(r"[0-9a-f]{64}",model[k]) is None) for k in hashes)
-            or any(model[k] is not None and type(model[k]) is not bool for k in flags)):
-        raise ValueError("LIFECYCLE_RECORDING_MODEL_METADATA_INVALID")
-    if (model["returned_model_sha256"] is not None and (payload["phase"]!="RETURN" or payload["point"] not in
-            {"BaseModelLoader.load_model","CPUModelRunner.get_model","GPUModelRunner.get_model"})):
-        raise ValueError("LIFECYCLE_RECORDING_MODEL_RETURN_INVALID")
 
 
 def process_context(docker, container, pid):

@@ -61,3 +61,24 @@ handler param/loc·endpoint 경로·크기 제한과 sanitizer의 **30 passed / 
 제품 연결은 A 확정 SHA/팩 Ref/파일 인계가 필요하다. 응답 수신자·debug 로그 정책은 미정,
 OBS-06~08·10~12의 실제 저장·IAM·consumer·보존 집행은 외부 조건이 필요하다.
 이 대기를 다른 준비된 B 분기의 CPU 작업 대기로 확대하지 않는다.
+
+## A PR48 고정 소스의 fixture 제품 경로
+
+PR48 본문의 최종 통합 SHA `7acd3d02f01cda6910a9e7c062f36611dcac5d37`과
+PACK-BASELINE revision31 `54f4f2357533a8b201ad4397d4b182b08b89ee4821ffe67763e3fbecd8f369ac`을
+별도 checkout에 고정하고 B-2의 새 파일만 적용했다. A tracked 파일의 bytes는 변경하지 않았다.
+
+실제 참조 validation handler의 응답을 기존 ResponseContentExecutor에 공급하여
+실행→EVD→RES/RPT의 EXAMPLE PASS 및 추가 필드+후속 실패의 독립 FAIL을 확인했다.
+정확 Ref·store.verify·원문 표식/예외 미포함 검사도 통과했다.
+정상/옵션 추론은 대역이며 실제 모델·Docker·HTTP stream을 실행하지 않았다.
+새 executor 등록이나 기업 정책 PASS를 증명하지 않는다.
+
+첫 실행은 잘못된 cwd/PYTHONPATH로 이전 브랜치를 import해 원문 표식 검사에서 거부됐다.
+그 실행은 A 통합 증거로 사용하지 않는다. HEAD와 실제 import 파일 경로를 함께 검증하도록 보완하고
+고정 checkout에서 성공한 `a-integration-run-2`를 채택했다. 잘못된 import 경로의 음성 회귀도
+산출물 생성 전에 거부되는지 확인했다. 상세 기록은 외부 `a-integration-*-2.json`에 있다.
+
+OBS-03/09는 기존 제품 실행기·센서·수집 코드를 직접 수정하지 않았다.
+관련 변경은 실제 logger/formatter의 CPU 검증·계약 회귀·문서다. 실제 target/수집기 연결과
+response_content 파일 수정 소유권은 별도 인계가 필요하다.

@@ -95,3 +95,20 @@ delta/stream complete로 실행해 수집한다. 합성 생성 문자열을 직�
 생성 harness는 upstream conftest/engine import 대신 기존 dependency adapter만 사용한다.
 원래 시험 코드는 compile하여 실행하며 pytest raw diagnostics는 메모리에서만 처리한다.
 지속 산출물은 고정 시험 목록·카운터·시간뿐이다. 실제 제품 연결은 계속 A 인계 대기다.
+
+## A 고정 소스의 제품 경로 검증
+
+PR48이 최종 통합 head와 CI 성공으로 명시한 `7acd3d02f01cda6910a9e7c062f36611dcac5d37`을
+별도 검증 checkout에 고정하고 B-2의 새 파일만 적용한다. 기존 A 파일은 교체하지 않는다.
+`b2_integration_cpu.py`는 정확 A HEAD와 tracked 파일 불변을 확인한 뒤 기존 ResponseContentExecutor,
+run/judge/report/store를 그대로 재사용한다. 실제 참조 validation handler의 오류 응답을 수집 경계에
+공급하고 helper 관측과 기존 REQ-13 필드 판정을 대조한다.
+
+정상/옵션·추론 응답은 EXAMPLE transport이며 실제 엔진 성공으로 승격하지 않는다.
+EXAMPLE PASS 사례와 확인된 추가 응답 필드 + 후속 실패의 독립 FAIL 사례를 각각 EVD→RES/RPT로
+검증한다. 저장 Ref/해시·store.verify·합성 표식/예외 원문 미포함도 확인한다.
+이 시험은 새 product executor 등록이나 전체 실제 엔진 소비의 증명이 아니다.
+response_content 파일 소유권·운영 정책·실제 target 연결은 여전히 별도 인계가 필요하다.
+
+재현은 A 고정 checkout + B-2-only overlay에서 앞의 CPU 가상환경과 `PYTHONPATH=src:.`를 사용한다.
+`tools/b2_integration_cpu.py --source <pinned-vllm> --output <new-external-directory>`로 실행한다.

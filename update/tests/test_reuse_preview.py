@@ -32,7 +32,7 @@ def test_container_preview_uses_existing_fixed_fixture_without_docker(tmp_path, 
     assert preview.fixture_sha256 == sha256_hex(canonical_json({
         "sentinel_paths": ["/one", "/two"], "proc_cmd": PROC_CMD, "sentinel_cmd": SENTINEL_CMD}))
     assert preview.executor.name == "container_config"
-    assert preview.executor.version == ContainerConfigExecutor.version == "0.5.1"
+    assert preview.executor.version == ContainerConfigExecutor.version == "0.6.0"
     assert preview.config_sha256 == preview.executor.config_sha256
 
 

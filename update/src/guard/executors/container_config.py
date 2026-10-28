@@ -22,7 +22,9 @@ import re
 import secrets
 from typing import Any
 
+from guard.models import canonical_json, sha256_hex
 from .http_common import Ctx, HttpCheckExecutor, functional_requests, functional_results
+from .owned_capture import engine_identity
 from .running_image_approval import (PROFILE as SUPPLY_IMAGE_PROFILE,
                                      collect_running_image_approval, validate_image_approval_policy)
 
@@ -123,7 +125,7 @@ def _mount_key(m: dict) -> str:
 
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
-    version = "0.5.1"
+    version = "0.6.0"
     requires_roles = False
     requires_route_scope = False
     functional_via = "engine"
@@ -148,21 +150,70 @@ class ContainerConfigExecutor(HttpCheckExecutor):
     def collect(self, ctx: Ctx):
         if getattr(ctx.check, "collection_profile", None) == SUPPLY_IMAGE_PROFILE:
             return collect_running_image_approval(self._docker_obj(), ctx, self.cfg.get("container"))
+        completeness_gate = any(obs.key == "permission_scan_complete" for obs in ctx.check.required_observations)
         container = self.cfg.get("container") or ctx.target.get("engine", {}).get("container")
+        if completeness_gate and (type(container) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", container)):
+            raise ValueError("CONTAINER_TARGET_UNVERIFIED")
         if not container:
             raise RuntimeError("container_config: no target container (set [container_config].container)")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", container):
             raise RuntimeError(f"container_config: invalid container name {container!r}")
         docker = self._docker_obj()
+        anchor, intervals = None, {}
+        source_unverified = False
+        source_container = container
+        if completeness_gate:
+            try:
+                image = ctx.env.engine.image_digest
+                anchor = engine_identity(docker, ctx.target, ctx.env, container, image, 30)
+                if not anchor["started_at"]:
+                    raise ValueError("missing source generation")
+            except Exception:
+                raise ValueError("CONTAINER_TARGET_UNVERIFIED") from None
+            source_container = anchor["container_id"]
+
+        def check_owner():
+            nonlocal source_unverified
+            if anchor is None:
+                return
+            try:
+                current = engine_identity(docker, ctx.target, ctx.env, container, image, 5)
+                if current != anchor:
+                    raise ValueError("changed generation")
+            except Exception:
+                source_unverified = True
+                raise ValueError("CONTAINER_SOURCE_UNVERIFIED") from None
+
+        def bound(name, action):
+            if anchor is None:
+                return action()
+            try:
+                check_owner()
+                result = action()
+                check_owner()
+            except Exception:
+                intervals[name] = False
+                raise
+            intervals.setdefault(name, True)
+            return result
+
+        def inventory():
+            row = docker.inspect_json(source_container, timeout=30)
+            if type(row) is not dict:
+                raise ValueError("invalid inspect envelope")
+            if anchor is not None:
+                state, config = row.get("State"), row.get("Config")
+                if (type(state) is not dict or type(config) is not dict
+                        or {"container_id": row.get("Id"), "image_id": row.get("Image"),
+                            "started_at": state.get("StartedAt"), "image": config.get("Image")} != anchor):
+                    raise ValueError("CONTAINER_SOURCE_UNVERIFIED")
+            return row
 
         # Each permission source is independent. A later read failure must not
         # replace an already observed permission with an empty ABORTED record.
         errors, ins = [], {}
         try:
-            inspected = docker.inspect_json(container, timeout=30)
-            if type(inspected) is not dict:
-                raise ValueError("invalid inspect envelope")
-            ins = inspected
+            ins = bound("inventory", inventory)
         except Exception:
             errors.append("CONTAINER_INSPECTION_UNAVAILABLE")
         hc = ins.get("HostConfig") if type(ins.get("HostConfig")) is dict else {}
@@ -211,7 +262,7 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         # 2. 모든 프로세스의 유효 capability·UID
         procs, proc_rc = [], None
         try:
-            proc = docker.exec(container, ["sh", "-c", PROC_CMD], timeout=30)
+            proc = bound("process", lambda: docker.exec(source_container, ["sh", "-c", PROC_CMD], timeout=30))
             proc_rc = proc.returncode
             if type(proc.stdout) is not str:
                 raise ValueError("invalid process output")
@@ -225,9 +276,10 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         if not complete:
             errors.append("PROCESS_PERMISSION_SCAN_INCOMPLETE")
 
-        def write_probe(path):
+        def write_probe(path, source="sentinel"):
             try:
-                result = docker.exec(container, ["sh", "-c", SENTINEL_CMD, "_", path, secrets.token_hex(4)], timeout=30)
+                result = bound(source, lambda: docker.exec(source_container,
+                    ["sh", "-c", SENTINEL_CMD, "_", path, secrets.token_hex(4)], timeout=30))
                 value = result.stdout.strip()
                 if result.returncode == 0 and value in {"absent", "succeeded", "denied"}:
                     return value
@@ -247,7 +299,7 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         # 3-b. 쓰기 가능 + 실행 가능 마운트(그 자체가 권한): 마운트 표의 후보마다 실제 쓰기 시도
         mount_text, mount_rc = "", None
         try:
-            mt = docker.exec(container, ["sh", "-c", MOUNTS_CMD], timeout=30)
+            mt = bound("mount_table", lambda: docker.exec(source_container, ["sh", "-c", MOUNTS_CMD], timeout=30))
             mount_rc = mt.returncode
             if type(mt.stdout) is not str:
                 raise ValueError("invalid mount output")
@@ -263,14 +315,13 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         exec_checks: dict[str, str] = {}
         for c in candidates:
             if c["target"] not in exec_checks:
-                exec_checks[c["target"]] = write_probe(c["target"])
+                exec_checks[c["target"]] = write_probe(c["target"], "exec_sentinel")
         exec_writable = sorted(t for t, o in exec_checks.items() if o == "succeeded")
         permission_complete = (inspect_complete and complete and process_mounts_complete
                                and all(value != "error" for value in (*writes.values(), *exec_checks.values())))
         # Older saved definitions retain their original complete-list contract.
         # The new definition has an explicit whole-permission PASS gate so known
         # partial values can remain collected without manufacturing a PASS.
-        completeness_gate = any(obs.key == "permission_scan_complete" for obs in ctx.check.required_observations)
 
         # 4. 정상 대조(신뢰 출발점 → 엔진)
         probes = {fp.id: fp for fp in ctx.check.functional_probes}
@@ -278,8 +329,11 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         functional_attempted = False
         try:
             reqs, probes = functional_requests(ctx, via="engine")
-            functional_attempted = bool(reqs)
-            res = ctx.cprobe(ctx.trusted_net, reqs, max(ctx.timeout, 30.0)) if reqs else []
+            def normal_probe():
+                nonlocal functional_attempted
+                functional_attempted = bool(reqs)
+                return ctx.cprobe(ctx.trusted_net, reqs, max(ctx.timeout, 30.0)) if reqs else []
+            res = bound("normal_control", normal_probe)
             if (type(res) is not list or len(res) != len(reqs) or any(type(r) is not dict for r in res)
                     or [r.get("id") for r in res] != [r["id"] for r in reqs]):
                 raise ValueError("incomplete functional response correlation")
@@ -290,6 +344,8 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             errors.append("CONTAINER_FUNCTIONAL_PROBE_UNAVAILABLE")
         functional, functional_status, normal = functional_results(probes, func_raw, ctx.env.model.id)
         normal["attempted"] = functional_attempted
+        if source_unverified:
+            permission_complete = False
         observations = {
             "process_scan_complete": {"value": complete, "collected": True},
             "capabilities_effective": {"value": caps, "collected": any("caps" in p for p in procs)},
@@ -329,4 +385,8 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             "permission_scan_complete": permission_complete, "collection_errors": sorted(set(errors)),
             "fixture": {"sentinel_paths": list(writes), "proc_cmd": PROC_CMD, "sentinel_cmd": SENTINEL_CMD},
         }
+        if anchor is not None:
+            summary["source_binding"] = {"profile": "docker-engine-source-intervals/1",
+                "environment_ref": ctx.env.ref().model_dump(mode="json"),
+                "owner_sha256": sha256_hex(canonical_json(anchor)), "intervals_verified": intervals}
         return observations, normal, challenges, summary

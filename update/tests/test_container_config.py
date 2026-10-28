@@ -18,6 +18,9 @@ from tests.builders import baseline_pack, environment, policy, completion_respon
 LAB_POLICY = {"allowed_capabilities": [], "allowed_mounts": ["/models:ro"], "allowed_devices": [], "require_non_root": True,
               "allowed_exec_writable_paths": ["/guard-cache"]}
 DEFAULT_HEX = "00000000a80425fb"  # Docker 기본 capability 14개
+IMAGE = "example.invalid/engine@sha256:" + "a" * 64
+CONTAINER_ID = "a" * 64
+RUN = "EXAMPLE-permission-owner"
 
 
 def _hex(names):
@@ -34,20 +37,23 @@ class FakeDocker:
         self.child_caps_hex = child_caps_hex
         self.calls = []
         self.files = set()
+        self.owner_name = "guard-lab-engine"
 
     def inspect_json(self, container, *, timeout):
         self.calls.append(("inspect", container))
         mounts = [{"Type": "bind", "Destination": "/models", "RW": False, "Source": "/Users/x/guard-models"}]
         hc = {"Privileged": False, "CapAdd": None, "CapDrop": None, "Devices": [], "PidMode": "", "IpcMode": "private",
               "NetworkMode": "guard-net", "UTSMode": "", "ReadonlyRootfs": False, "SecurityOpt": None, "Tmpfs": None}
-        cfg = {"User": "", "Image": "vllm/vllm-openai-cpu@sha256:x", "Env": ["SECRET_TOKEN=do-not-record"]}
+        cfg = {"User": "", "Image": IMAGE, "Labels": {"guard.run": RUN}, "Env": ["SECRET_TOKEN=do-not-record"]}
         if self.profile in ("hardened", "tmp_exec"):
             hc.update(CapDrop=["ALL"], ReadonlyRootfs=True, SecurityOpt=["no-new-privileges:true"], Tmpfs={"/tmp": ""})
             cfg["User"] = "1000:1000"
         if self.profile == "overprivileged":
             hc.update(CapAdd=["SYS_ADMIN"])
             mounts.append({"Type": "bind", "Destination": "/guard-sentinel", "RW": True, "Source": "/x/sentinel"})
-        return {"HostConfig": hc, "Mounts": mounts, "Config": cfg}
+        return {"HostConfig": hc, "Mounts": mounts, "Config": cfg,
+                "Id": CONTAINER_ID, "Image": "sha256:" + "b" * 64, "Name": "/" + self.owner_name,
+                "State": {"Running": True, "StartedAt": "2026-10-28T00:00:00Z"}}
 
     def _caps(self):
         if self.profile in ("hardened", "tmp_exec"):
@@ -97,22 +103,26 @@ def _probe(network, requests, timeout):
     return [{"id": r["id"], "method": r["method"], "url": r["url"], **completion_response(r), "phase": "response"} for r in requests]
 
 
-def _target(tmp_path, container="guard-lab-engine"):
+def _target(tmp_path, container="guard-lab-engine", env=None):
     t = {"lab": True, "probe_image": "x", "origins": {"external": {"network": "ext"}, "trusted": {"network": "trusted"}},
          "gateway": {"url": "http://g:8080"}, "engine": {"trusted_url": "http://e:8000", "container": container},
          "direct_targets": [], "gateway_known_routes": []}
+    t["run_id"] = RUN
+    if env is not None:
+        t["environment_ref"] = env.ref().model_dump(mode="json")
     p = tmp_path / "target.json"
     p.write_text(json.dumps(t), encoding="utf-8")
     return p
 
 
 def _run(tmp_path, docker, values=None, cfg_extra=None, *, probe=_probe):
-    cfg = {"target": str(_target(tmp_path)), **(cfg_extra or {})}
+    env = environment({}, engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE}, model={"id": "m"})
+    docker.owner_name = (cfg_extra or {}).get("container", "guard-lab-engine")
+    cfg = {"target": str(_target(tmp_path, docker.owner_name, env)), **(cfg_extra or {})}
     registry.EXECUTORS["container_config:sim"] = lambda raw: ContainerConfigExecutor(cfg, container_probe=probe, docker=docker)
     try:
         store = Store(tmp_path / ".guard")
         pack = baseline_pack()
-        env = environment({}, engine={"name": "vllm", "version": "0.31.0"}, model={"id": "m"})
         pol = policy(pack.ref(), scope={"include": ["PLT-01"], "exclude": []}, values={"PLT-01": values or LAB_POLICY})
         store.put(env); store.put(pol)
         plan = select(pack, [env], pol); store.put(plan)
@@ -217,7 +227,8 @@ def test_policy_type_is_validated_before_running(tmp_path):
 def test_container_name_from_config_and_env_not_recorded(tmp_path):
     docker = FakeDocker("hardened")
     store, evd, _ = _run(tmp_path, docker, cfg_extra={"container": "prod-engine-1"})
-    assert {c[1] for c in docker.calls} == {"prod-engine-1"}
+    assert {c[1] for c in docker.calls} == {"prod-engine-1", CONTAINER_ID}
+    assert {c[1] for c in docker.calls if c[0] == "exec"} == {CONTAINER_ID}
     blob = "".join(p.read_bytes().decode("utf-8", "replace") for p in store.root.rglob("*") if p.is_file())
     assert "do-not-record" not in blob
 
@@ -270,7 +281,8 @@ class PartialDocker(FakeDocker):
         self.mount_text = mount_text
 
     def inspect_json(self, container, *, timeout):
-        if self.fault in {"inspect", "all"}:
+        # The permission inventory fails; owner checks remain a separate source.
+        if self.fault in {"inspect", "all"} and container == CONTAINER_ID:
             raise OSError("NEVER_PERSIST_INSPECT_SECRET")
         result = super().inspect_json(container, timeout=timeout)
         if self.inspect_change:

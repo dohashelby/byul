@@ -234,13 +234,20 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
 
 class RequestBindingExecutor(HttpCheckExecutor):
     name = "request_binding"
-    version = "0.3.1"
+    version = "0.3.2"
     requires_roles = False
     requires_route_scope = False
+    _uses_docker_identity = True
 
     def __init__(self, cfg, *args, docker=None, **kwargs):
         super().__init__({"request_timeout": 120.0, **cfg}, *args, **kwargs)
-        self.docker = docker or Docker("binding" + secrets.token_hex(4))
+        self.docker = (docker or Docker("binding" + secrets.token_hex(4))) if self._uses_docker_identity else None
+
+    def _api_model(self, ctx):
+        return ctx.env.model.id
+
+    def _template_snapshot(self, ctx, identity, argv, deadline):
+        return owned_template_snapshot(self.docker, ctx, identity, argv, deadline)
 
     def validate_policy(self, check, values):
         validate_request_binding_policy(values)
@@ -272,6 +279,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
 
     def collect(self, ctx):
         self.validate_policy(ctx.check, ctx.policy_values)
+        model = self._api_model(ctx)
         settings = {key: self.cfg.get(key, value) for key, value in DEFAULTS.items()}
         started = time.monotonic()
         deadline = started + settings["max_duration_seconds"]
@@ -303,7 +311,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
                 and argv[argv.index("--chat-template") + 1] == identity["container_path"])
         except Exception:
             pass
-        before = owned_template_snapshot(self.docker, ctx, identity, argv, deadline) if source_verified and template_supported else None
+        before = self._template_snapshot(ctx, identity, argv, deadline) if source_verified and template_supported else None
         identity_verified = bool(before and before.get("sha256") == identity.get("sha256")
             and all(type(before.get(key)) is str and before[key] for key in ("container_id", "started_at")))
         profile_supported = bool(policy_supported and source_verified and identity_verified and callable(ctx.sprobe))
@@ -347,7 +355,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
             return results
 
         for side in texts:
-            body = {"model": ctx.env.model.id, "messages": [{"role": "user", "content": texts[side]}],
+            body = {"model": model, "messages": [{"role": "user", "content": texts[side]}],
                     "add_generation_prompt": True, "add_special_tokens": False, "return_token_strs": False}
             request = content_request(ctx, "engine", "tokenize-" + side, "/tokenize", body)
             results = send([request])
@@ -365,7 +373,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
             gaps.append("two distinct independently tokenized text fixtures were not obtained")
 
         def inference(side, label, mode, case="generated", *, delay=0):
-            body = {"model": ctx.env.model.id, "messages": [{"role": "user", "content": texts[side]}],
+            body = {"model": model, "messages": [{"role": "user", "content": texts[side]}],
                     "max_tokens": settings["max_output_tokens"], "temperature": 0,
                     "return_token_ids": True, "return_prompt_text": True,
                     "add_generation_prompt": True, "add_special_tokens": False, "stream": mode == "sse"}
@@ -390,7 +398,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
 
         def analyze(response, side, mode, api_id):
             result = analyze_response(response, expected=expected[side], foreign=expected["B" if side == "A" else "A"],
-                                      model=ctx.env.model.id, max_output=settings["max_output_tokens"],
+                                      model=model, max_output=settings["max_output_tokens"],
                                       api_id=api_id, mode=mode)
             violations.extend(f"{response.get('id')}: {reason}" for reason in result["violations"])
             gaps.extend(f"{response.get('id')}: {reason}" for reason in result["gaps"])
@@ -430,7 +438,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
             controls["after"] = "pass" if results and analyze(results[0], "A", "json", rid)["verified"] else "no_response"
         controls = {label: controls.get(label, "no_response") for label in ("before", "after")}
         normal_ok = all(state == "pass" for state in controls.values())
-        after = owned_template_snapshot(self.docker, ctx, identity, argv, deadline) if identity_verified else None
+        after = self._template_snapshot(ctx, identity, argv, deadline) if identity_verified else None
         identity_verified = bool(after and before == after)
         if not identity_verified:
             gaps.append("owned engine and fixed template identity were not stable across collection")

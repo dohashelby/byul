@@ -18,13 +18,18 @@ import time
 from urllib.parse import urlsplit
 
 from guard.models import canonical_json, sha256_hex
-from .bounded import capture_pipes
+from .bounded import capture_pipes, strict_json
 
 
 PROFILE = "kubernetes-owned-sampling-http-v1"
+REQUEST_BINDING_PROFILE = "kubernetes-owned-request-binding-http-v1"
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod)
+
+
+BINDING_PROBE_SHA256 = "6ffd129cd855170a1a2fefb496efef4abfcfd7928d2dc6795c22344bd152a765"
+TEMPLATE_READER_SHA256 = "badf4bc4b01fc5bacbba103a606cac994e0921be28ef054116bd34dfd4b1c74b"
 
 
 class KubernetesBindingError(RuntimeError):
@@ -60,12 +65,28 @@ def _validate(target, env):
 
 
 class KubernetesHTTP:
-    def __init__(self, target, env, *, duration, binary="kubectl", runner=None):
+    def __init__(self, target, env, *, duration, binary="kubectl", runner=None, profile=PROFILE, clock=None):
+        if profile not in {PROFILE, REQUEST_BINDING_PROFILE}:
+            raise KubernetesBindingError()
+        self.profile = profile
+        if profile == REQUEST_BINDING_PROFILE:
+            try:
+                mapping=target["model_mapping"]
+                if (target.get("schema")!="guard-kubernetes-request-binding-target/1" or not env.hash_ok()
+                        or target.get("environment_ref")!=env.ref().model_dump(mode="json")
+                        or type(mapping) is not dict or set(mapping)!={"repository_id","revision","api_model"}
+                        or mapping["repository_id"]!=env.model.id or mapping["revision"]!=env.model.revision
+                        or type(mapping["api_model"]) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}",mapping["api_model"])):
+                    raise ValueError
+                self.model_mapping=deepcopy(mapping)
+            except (KeyError,TypeError,ValueError,AttributeError):
+                raise KubernetesBindingError() from None
         self.binding, self.endpoint = _validate(target, env)
         if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
                 or type(binary) is not str or not binary.strip()):
             raise KubernetesBindingError()
-        self.deadline = time.monotonic() + duration
+        self.clock = clock or time.monotonic
+        self.deadline = self.clock() + duration
         self.binary = binary
         self.runner = runner or capture_pipes
         self.injected = runner is not None
@@ -84,26 +105,43 @@ class KubernetesHTTP:
                        "watchdog.daemon=True\nwatchdog.start()\n"
                        + "exec(compile(" + repr(probe_source) + ",'guard-http-probe','exec'),{'__name__':'__main__'})\n")
         self.source_sha256 = sha256_hex(self.source.encode("utf-8"))
+        if profile == REQUEST_BINDING_PROFILE:
+            probe_source=(Path(__file__).parents[1]/"executors/stream_probe.py").read_text(encoding="utf-8")
+            if sha256_hex(probe_source.encode())!=BINDING_PROBE_SHA256:
+                raise KubernetesBindingError()
+            self.source=("import math,os,sys,threading\nlimit=float(sys.argv[1])\n"
+                "if not math.isfinite(limit) or not 0 < limit <= 120: sys.exit(124)\n"
+                "watchdog=threading.Timer(limit,lambda:os._exit(124))\nwatchdog.daemon=True\nwatchdog.start()\n"
+                + "exec(compile("+repr(probe_source)+",'guard-stream-probe','exec'),{'__name__':'__main__'})\n")
+            self.source_sha256=sha256_hex(self.source.encode())
         self.rows = []
         self.failed = False
+        self.cleanup_errors = []
         self.lock = threading.Lock()
 
-    def _call(self, args, *, payload=None, cap=262144):
-        remaining = self.deadline - time.monotonic()
+    def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False):
+        remaining = self.deadline - self.clock()
+        if budget is not None:remaining=min(remaining,budget)
         if remaining <= 0:
             raise KubernetesBindingError()
         argv = [self.binary, f"--context={self.binding['context']}", f"--request-timeout={remaining:.3f}s", *args]
         try:
             result = self.runner(argv, timeout=remaining, env_extra={}, max_stdout_bytes=cap,
                                  max_stderr_bytes=4096, **({"input_bytes": payload} if payload is not None else {}))
+            if self.profile==REQUEST_BINDING_PROFILE and (result.get("capture",{}).get("pipes_closed") is False
+                    or "child_reap" in result.get("capture",{}).get("read_errors",[])):
+                with self.lock:
+                    if "KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED" not in self.cleanup_errors:
+                        self.cleanup_errors.append("KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED")
             if (result["returncode"] != 0 or result["capture"]["complete"] is not True
-                    or self.deadline - time.monotonic() <= 0):
+                    or self.deadline - self.clock() <= 0):
                 raise KubernetesBindingError()
-            return json.loads(result["stdout_bytes"])
+            if allow_empty and result["stdout_bytes"]==b"":return None
+            return strict_json(result["stdout_bytes"],limit=cap) if self.profile==REQUEST_BINDING_PROFILE else json.loads(result["stdout_bytes"])
         except Exception:
             raise KubernetesBindingError() from None
 
-    def _verify(self):
+    def _verify(self, *, require_ready=True):
         # Namespace UIDs bind a named context to the selected cluster generation.
         namespaces = sorted({self.binding[role]["namespace"] for role in ("engine", "probe")})
         result = self._call(["get", "namespaces", *namespaces, "-o", "json"])
@@ -111,6 +149,7 @@ class KubernetesHTTP:
         actual = {x["metadata"]["name"]: x["metadata"] for x in items}
         if len(actual) != len(items) or set(actual) != set(namespaces):
             raise KubernetesBindingError()
+        pods={}
         for role in ("engine", "probe"):
             expected = self.binding[role]
             ns = actual[expected["namespace"]]
@@ -118,11 +157,16 @@ class KubernetesHTTP:
                 raise KubernetesBindingError()
             pod = self._call([f"--namespace={expected['namespace']}", "get", "pod", expected["pod"], "-o", "json"])
             try:
-                verify_owned_pod(pod, ns, expected, self.binding["run_id"])
+                verify_owned_pod(pod, ns, expected, self.binding["run_id"],require_ready=require_ready)
+                pods[role]=pod
             except ValueError:
                 raise KubernetesBindingError() from None
 
+        return pods
+
     def __call__(self, network, requests, timeout):
+        if self.profile==REQUEST_BINDING_PROFILE:
+            return self._binding_requests(network,requests,timeout)
         # No shared serialization lock: REQ-10's two invocations stay concurrent.
         with self.lock:
             if self.failed:
@@ -141,12 +185,12 @@ class KubernetesHTTP:
                     or (request["method"], url.path) not in {("GET", "/health"), ("POST", "/v1/completions")}):
                 raise KubernetesBindingError()
             self._verify()
-            payload = json.dumps({"requests": requests, "timeout": min(timeout, self.deadline - time.monotonic())},
+            payload = json.dumps({"requests": requests, "timeout": min(timeout, self.deadline - self.clock())},
                                  ensure_ascii=False, allow_nan=False).encode("utf-8")
             if len(payload) > 65536:
                 raise KubernetesBindingError()
             probe = self.binding["probe"]
-            source_budget = min(timeout, self.deadline - time.monotonic())
+            source_budget = min(timeout, self.deadline - self.clock())
             if source_budget <= 0:
                 raise KubernetesBindingError()
             raw = self._call([f"--namespace={probe['namespace']}", "exec", "-i", probe["pod"],
@@ -176,13 +220,100 @@ class KubernetesHTTP:
                                   "binding_verified_before_after": False, "diagnostic": "KUBERNETES_HTTP_BINDING_UNAVAILABLE"})
             raise KubernetesBindingError() from None
 
+    def _binding_requests(self, network, requests, timeout):
+        ids=[]
+        label=re.compile(r"(?:tokenize-[AB]|before|after|(?:json|sse)-(?:generated|distinct_body|collision_body|collision_header)-[AB])\Z")
+        try:
+            with self.lock:
+                if self.failed:raise KubernetesBindingError()
+            if (network!="kubernetes-probe" or type(requests) is not list or not 1<=len(requests)<=2
+                    or type(timeout) not in (int,float) or not math.isfinite(timeout) or not 0<timeout<=120):
+                raise KubernetesBindingError()
+            prepared=[]
+            for request in requests:
+                if type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
+                    raise KubernetesBindingError()
+                ids.append(request["id"])
+                value=deepcopy(request)
+                if value.pop("want_body",True) is not True:raise KubernetesBindingError()
+                url=urlsplit(value.get("url",""));mode=value.get("mode","json")
+                if (set(value)-{"id","mode","method","url","headers","body","read_delay_ms"}
+                        or value.get("method")!="POST" or mode not in {"json","sse"}
+                        or url.scheme!=self.endpoint.scheme or url.netloc!=self.endpoint.netloc or url.query or url.fragment
+                        or url.path not in {"/tokenize","/v1/chat/completions"}
+                        or url.path=="/tokenize" and mode!="json"
+                        or type(value.get("body")) is not dict or value["body"].get("model")!=self.model_mapping["api_model"]):
+                    raise KubernetesBindingError()
+                value.setdefault("mode","json");prepared.append(value)
+            if len(set(ids))!=len(ids):raise KubernetesBindingError()
+            self._verify()
+            remaining=min(float(timeout),self.deadline-self.clock())
+            if remaining<=0:raise KubernetesBindingError()
+            payload=json.dumps({"requests":prepared,"timeout":remaining},ensure_ascii=False,allow_nan=False).encode()
+            if len(payload)>128*1024:raise KubernetesBindingError()
+            probe=self.binding["probe"]
+            raw=self._call([f"--namespace={probe['namespace']}","exec","-i",probe["pod"],
+                f"--container={probe['container']}","--","python3","-c",self.source,str(remaining)],payload=payload,cap=2*1024**2,budget=remaining)
+            self._verify()
+            if (type(raw) is not list or len(raw)!=len(ids) or any(type(row) is not dict for row in raw)
+                    or len({row.get("id") for row in raw})!=len(ids) or {row.get("id") for row in raw}!=set(ids)):
+                raise KubernetesBindingError()
+            keys={"id","mode","method","outcome","body","body_bytes","body_sha256","body_truncated",
+                  "utf8_valid","capture_complete","eof","terminal_seen","events","content_type","connection_id",
+                  "dispatch_ms","request_sent_ms","headers_ms","end_ms","elapsed_ms","timing_basis"}
+            by_id={row["id"]:row for row in raw};results=[]
+            for request in prepared:
+                row=by_id[request["id"]];outcome=row.get("outcome")
+                if not (type(outcome) is int and 100<=outcome<=599 or type(outcome) is str and outcome in
+                        {"refused","timeout","unreachable","dns_error","error","probe_error"}):
+                    raise KubernetesBindingError()
+                if row.get("body") is not None and (type(row["body"]) is not str or len(row["body"].encode("utf-8"))>128*1024):
+                    raise KubernetesBindingError()
+                results.append({key:row[key] for key in keys if key in row})
+            with self.lock:
+                self.rows.extend({"id":row["id"],"binding_verified_before_after":True,"outcome":row["outcome"],
+                    "capture_complete":row.get("capture_complete") is True} for row in results)
+            return results
+        except Exception:
+            with self.lock:
+                self.failed=True
+                self.rows.extend({"id":rid,"binding_verified_before_after":False,"diagnostic":"KUBERNETES_HTTP_BINDING_UNAVAILABLE"} for rid in ids or [None])
+            raise KubernetesBindingError() from None
+
+    def template_snapshot(self, identity, argv, command, reader):
+        """Fixed bounded reader in the exact owned engine generation; no raw spec retained."""
+        try:
+            if (self.profile!=REQUEST_BINDING_PROFILE or sha256_hex(reader.encode())!=TEMPLATE_READER_SHA256
+                    or identity.get("container_path")!="/guard-assets/chat/guard-text-chat-v1.jinja"
+                    or type(command) is not list or not command or any(type(v) is not str or not v or len(v)>256 for v in command)):
+                raise KubernetesBindingError()
+            pods=self._verify();engine=self.binding["engine"]
+            container=next(row for row in pods["engine"]["spec"]["containers"] if row["name"]==engine["container"])
+            if (container.get("command")!=command or container.get("args")!=argv or not any(
+                    row.get("mountPath")==identity["container_path"] and row.get("readOnly") is True
+                    for row in container.get("volumeMounts",[]))):
+                raise KubernetesBindingError()
+            value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+                f"--container={engine['container']}","--","python3","-c",reader,identity["container_path"]],cap=1024,budget=5)
+            self._verify()
+            if (type(value) is not dict or set(value)!={"sha256","bytes"} or type(value["sha256"]) is not str
+                    or not re.fullmatch(r"[0-9a-f]{64}",value["sha256"]) or type(value["bytes"]) is not int or not 0<value["bytes"]<=8192):
+                raise KubernetesBindingError()
+            return {"container_id":engine["container_id"],"started_at":engine["started_at"],"image":engine["image"],
+                "selected_path":identity["container_path"],"readonly":True,**value,"namespace_uid":engine["namespace_uid"],
+                "pod_uid":engine["pod_uid"],"image_id":engine["image_id"],"restart_count":engine["restart_count"]}
+        except Exception:
+            with self.lock:self.failed=True
+            return None
+
     def report(self):
         with self.lock:
-            return {"profile": PROFILE, "binding": deepcopy(self.binding),
+            return {"profile": self.profile, "binding": deepcopy(self.binding),
                     "binding_sha256": sha256_hex(canonical_json(self.binding)),
                     "probe_source_sha256": self.source_sha256,
                     "requests": sorted(deepcopy(self.rows), key=lambda row: row["id"] or ""),
-                    "collection_gap": self.failed,
+                    "collection_gap": self.failed or (self.profile==REQUEST_BINDING_PROFILE and any(row.get("capture_complete") is not True for row in self.rows)),
+                    **({"cleanup_errors":list(self.cleanup_errors)} if self.profile==REQUEST_BINDING_PROFILE else {}),
                     "limitations": ["Explicit operator selection and guard.run label are not an approval signature.",
                                     "Pod spec digest and exact runtime imageID are bound; manifest-index ancestry is not verified.",
                                     "No GPU execution, runner consumption, resource/log isolation or deployed caller path proof."]}

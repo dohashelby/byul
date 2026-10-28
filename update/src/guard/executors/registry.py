@@ -21,6 +21,7 @@ from .response_content import ResponseContentExecutor
 from .log_analysis import LogAnalysisExecutor
 from .template_validation import TemplateValidationExecutor
 from .request_binding import RequestBindingExecutor
+from .kubernetes_request_binding import KubernetesRequestBindingExecutor
 from .log_integrity import LogIntegrityExecutor
 from .unix_ipc import UnixIPCExecutor
 from .boundary_egress import BoundaryEgressExecutor
@@ -40,6 +41,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "log_analysis:real": lambda cfg: LogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ")),
     "template_validation:real": lambda cfg: TemplateValidationExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ")),
     "request_binding:real": lambda cfg: RequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ")),
+    "request_binding:kubernetes": lambda cfg: KubernetesRequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ")),
     "log_integrity:real": lambda cfg: LogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ")),
     "unix_ipc:real": lambda cfg: UnixIPCExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ")),
     "boundary_egress:real": lambda cfg: BoundaryEgressExecutor(cfg.get("boundary_egress", {})),

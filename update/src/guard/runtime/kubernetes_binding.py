@@ -32,7 +32,7 @@ def validate_container_binding(item):
         raise ValueError
 
 
-def verify_owned_pod(pod, namespace, expected, run_id, *, require_ready=True):
+def verify_owned_pod(pod, namespace, expected, run_id, *, require_ready=True, terminated=False):
     if namespace.get("uid") != expected["namespace_uid"] or namespace.get("deletionTimestamp"):
         raise ValueError
     meta, spec, status = pod["metadata"], pod["spec"], pod["status"]
@@ -41,17 +41,24 @@ def verify_owned_pod(pod, namespace, expected, run_id, *, require_ready=True):
     if len(containers) != 1 or len(states) != 1:
         raise ValueError
     container, state = containers[0], states[0]
+    lifecycle=state.get("state",{}).get("terminated" if terminated else "running",{})
+    phase_ok=status.get("phase") in {"Succeeded","Failed"} if terminated else status.get("phase")=="Running"
+    if terminated:
+        if type(lifecycle.get("exitCode")) is not int:raise ValueError
+        finished=datetime.fromisoformat(lifecycle["finishedAt"].replace("Z","+00:00"))
+        started=datetime.fromisoformat(expected["started_at"].replace("Z","+00:00"))
+        if finished.tzinfo is None or finished<started:raise ValueError
     if (meta.get("name") != expected["pod"] or meta.get("namespace") != expected["namespace"]
-            or meta.get("uid") != expected["pod_uid"] or meta.get("deletionTimestamp")
+            or meta.get("uid") != expected["pod_uid"] or meta.get("deletionTimestamp") and not terminated
             or meta.get("labels", {}).get("guard.run") != run_id
             or spec.get("nodeName") != expected["node"]
             or any(spec.get(x, False) is not False for x in ("hostNetwork", "hostPID", "hostIPC"))
             or container.get("image") != expected["image"]
-            or status.get("phase") != "Running" or status.get("podIP") != expected["pod_ip"]
+            or not phase_ok or status.get("podIP") != expected["pod_ip"]
             or state.get("containerID") != expected["container_id"]
             or state.get("imageID") != expected["image_id"]
             or type(state.get("restartCount")) is not int or state["restartCount"] != expected["restart_count"]
-            or state.get("state", {}).get("running", {}).get("startedAt") != expected["started_at"]):
+            or lifecycle.get("startedAt") != expected["started_at"]):
         raise ValueError
     if require_ready and (not any(x.get("type") == "Ready" and x.get("status") == "True"
             for x in status.get("conditions", [])) or state.get("ready") is not True):
@@ -60,7 +67,7 @@ def verify_owned_pod(pod, namespace, expected, run_id, *, require_ready=True):
     return {"transport":"kubernetes", "namespace_uid":expected["namespace_uid"], "pod_uid":meta["uid"],
         "container":expected["container"], "container_id":state["containerID"], "node":spec["nodeName"],
         "image_reference":container["image"], "reported_image_id":state["imageID"],
-        "restart_count":state["restartCount"], "started_at":state["state"]["running"]["startedAt"]}
+        "restart_count":state["restartCount"], "started_at":lifecycle["startedAt"]}
 
 
 def validate_capture_target(target, env):

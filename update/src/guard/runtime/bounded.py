@@ -7,6 +7,7 @@ counts describe bytes observed before termination, not the full source size.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import os
 import subprocess
@@ -114,3 +115,21 @@ def capture_pipes(argv: list[str], *, timeout: float, env_extra: dict[str, str],
                                            "retained_sha256": hashlib.sha256(raw[name]).hexdigest()}
                                     for name, cap in (("stdout", max_stdout_bytes), ("stderr", max_stderr_bytes))},
                         "hash_scope": "exact retained CLI pipe bytes, before UTF-8 decoding or redaction; not daemon-file bytes"}}
+
+
+def strict_json(raw, *, limit=65536):
+    if type(raw) is not bytes or not 0 < len(raw) <= limit:
+        raise ValueError("CAPTURE_BYTE_BOUND")
+    def pairs(items):
+        out = {}
+        for key, value in items:
+            if key in out:
+                raise ValueError("CAPTURE_DUPLICATE_KEY")
+            out[key] = value
+        return out
+    def constant(_):
+        raise ValueError("CAPTURE_NONFINITE_NUMBER")
+    try:
+        return json.loads(raw.decode("utf-8"), object_pairs_hook=pairs, parse_constant=constant)
+    except (UnicodeError, RecursionError, json.JSONDecodeError):
+        raise ValueError("CAPTURE_INVALID_JSON") from None

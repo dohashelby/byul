@@ -1,3 +1,10 @@
+## 2026-10-28 — A-1 Kubernetes REQ-11 제품·전환 연결
+
+- 한 일: fcb6c40를 보존한 별도 worktree에서 A-2 c8f0e61 exact7파일을9c0a026 커밋으로 통합하고 SUP04 플랫폼 교차시험 target의 ENV Ref 누락을 맞췄다. 기존 KubernetesHTTP에 REQ11 JSON/SSE 프로파일·exact ENV/양쪽 세대·고정 template 읽기를 연결하고 기존 request_binding의 분석·판정/시간 계산을 재사용한다. 명시 API 모델명 매핑과 기존 CLI EVD→RES→RPT·반출/재판정, update의 API 종료/Ready 대기·후보 차단·복구 필요 진단을 연결했다.
+- 테스트 결과: 1057파일 고정 후 직접/불변식510통과·기존Windows skip6·제외1(pytest50.42초·부모51.549초), 인접CLI/전환/수집56통과(21.19/22.837초), 플랫폼 교차175통과(13.27/28.404초), wheel152파일 동일(부모12.241초). 검증 중1057파일 bytes 불변·실패0이며 새 skip/제외는 없다. 기존 REQ10 profile/v1 probe·stream_probe 시간 계산·strict_json 의미/alias·팩·공용 계약·core/models/store/judges·A-2 전용 bytes를 보존했다. 정확 최종 head 필수 CI는 별도 확인한다.
+- 다음 단계: 직접·인접/불변식·플랫폼 교차시험 → 실패 수정·재고정·재검증 → 설치 wheel·정확 통합 head CI·초안 PR·인터페이스/재개 인계.
+- 막힌 것: CPU 개발에는 없음. 로컬 kind API는 연결 거부였고 기동하지 않았다. AWS quota/자원·GPU 실행은 승인 대기이며 실제 Kubernetes/GPU 실증은0이다. GPU image/source 계약 미준비를 CPU digest 제한 해제로 대체하지 않는다. 기업 Gateway/호출자 허용표도 준비 전이다.
+
 ## 2026-10-28 — A-1 REQ-02 completion 등록 handler 연결
 
 - 한 일: 검증된 공동 소스8de64a6에서 기존 인증·세션·handler 수집을 POST /v1/completions의 고정 callback까지 연결했다. profile8/source26이며 native completion api_router checksum1개만 추가했다. 두 번째 raw_request 인자/키워드의 scope로 등록 endpoint/dependant와 실제 실행을 대조하고 본문·토큰·stream·원예외를 수집하지 않는다. profile7 고정 LF/CRLF bytes·source25·GET handler와 과거1~6 판독을 보존한다.

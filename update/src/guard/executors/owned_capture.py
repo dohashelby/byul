@@ -9,6 +9,7 @@ import time
 from pathlib import PurePosixPath
 
 from guard.runtime.docker import DockerError as SourceCaptureError
+from guard.runtime.bounded import strict_json
 from .log_analysis import _FILE_READER
 
 
@@ -21,22 +22,6 @@ def create_capture_client(run_id):
     return Docker(run_id)
 
 
-def strict_json(raw, *, limit=MAX_BYTES):
-    if type(raw) is not bytes or not 0 < len(raw) <= limit:
-        raise ValueError("CAPTURE_BYTE_BOUND")
-    def pairs(items):
-        out = {}
-        for key, value in items:
-            if key in out:
-                raise ValueError("CAPTURE_DUPLICATE_KEY")
-            out[key] = value
-        return out
-    def constant(_):
-        raise ValueError("CAPTURE_NONFINITE_NUMBER")
-    try:
-        return json.loads(raw.decode("utf-8"), object_pairs_hook=pairs, parse_constant=constant)
-    except (UnicodeError, RecursionError, json.JSONDecodeError):
-        raise ValueError("CAPTURE_INVALID_JSON") from None
 
 
 def validate_engine_target(env, target, container, image):

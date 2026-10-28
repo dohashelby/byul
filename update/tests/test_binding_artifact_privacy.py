@@ -166,7 +166,7 @@ def test_product_saved_evidence_and_report_replay_preserve_refs(tmp_path, monkey
     (evd,) = run_plan(store,pack,plan,RunConfig(executors={"request_binding":"privacy-sim"},adapter="vllm"))
     (result,) = judge_plan(store,pack,plan,as_of=T0)
     assert result.verdicts.security == Verdict.FAIL and evd.data_origin.value == "EXAMPLE"
-    assert evd.execution.executor.version == "0.3.1"
+    assert evd.execution.executor.version == "0.3.2"
     for artifact in evd.artifacts:
         text = (store.root / artifact.path).read_text(encoding="utf-8")
         assert PRIVATE_INPUT not in text and PRIVATE_OUTPUT not in text

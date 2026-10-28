@@ -198,7 +198,7 @@ def test_product_storage_report_restore_and_exact_rejudge_keep_packet_meaning(tm
         evd,=run_plan(store,pack,plan,RunConfig(executors={"request_binding":"json-sim"},adapter="vllm"))
     result,=judge_plan(store,pack,plan,as_of=T0)
     assert result.verdicts.security==expected and evd.data_origin.value=="EXAMPLE"
-    assert evd.execution.executor.version=="0.3.2"
+    assert evd.execution.executor.version=="0.3.3"
     assert not evd.observations["collection_complete"].value
     assert bool(evd.observations["security_violations"].value) is (expected==Verdict.FAIL)
     if mode=="later-artifact-failure":

@@ -72,11 +72,18 @@ class KubernetesHTTP:
         if profile == REQUEST_BINDING_PROFILE:
             try:
                 mapping=target["model_mapping"]
+                if type(mapping) is dict and mapping.get("schema")=="guard.model-request-mapping/1":
+                    from guard.collectors.model_mapping import validate_model_mapping
+                    validate_model_mapping(env,mapping)
+                    self.api_model=mapping["served_model_name"]
+                else:
+                    if (type(mapping) is not dict or set(mapping)!={"repository_id","revision","api_model"}
+                            or mapping["repository_id"]!=env.model.id or mapping["revision"]!=env.model.revision
+                            or type(mapping["api_model"]) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}",mapping["api_model"])):
+                        raise ValueError
+                    self.api_model=mapping["api_model"]
                 if (target.get("schema")!="guard-kubernetes-request-binding-target/1" or not env.hash_ok()
-                        or target.get("environment_ref")!=env.ref().model_dump(mode="json")
-                        or type(mapping) is not dict or set(mapping)!={"repository_id","revision","api_model"}
-                        or mapping["repository_id"]!=env.model.id or mapping["revision"]!=env.model.revision
-                        or type(mapping["api_model"]) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}",mapping["api_model"])):
+                        or target.get("environment_ref")!=env.ref().model_dump(mode="json")):
                     raise ValueError
                 self.model_mapping=deepcopy(mapping)
             except (KeyError,TypeError,ValueError,AttributeError):
@@ -114,6 +121,7 @@ class KubernetesHTTP:
                 "watchdog=threading.Timer(limit,lambda:os._exit(124))\nwatchdog.daemon=True\nwatchdog.start()\n"
                 + "exec(compile("+repr(probe_source)+",'guard-stream-probe','exec'),{'__name__':'__main__'})\n")
             self.source_sha256=sha256_hex(self.source.encode())
+        self.model_snapshots = []  # Transient raw pair for an explicit A-2 mapping only.
         self.rows = []
         self.failed = False
         self.cleanup_errors = []
@@ -146,6 +154,8 @@ class KubernetesHTTP:
         namespaces = sorted({self.binding[role]["namespace"] for role in ("engine", "probe")})
         result = self._call(["get", "namespaces", *namespaces, "-o", "json"])
         items = result["items"] if result.get("kind") == "List" else [result]
+        mapped=self.profile==REQUEST_BINDING_PROFILE and self.model_mapping.get("schema")=="guard.model-request-mapping/1"
+        if mapped and any(x.get("kind")!="Namespace" for x in items):raise KubernetesBindingError()
         actual = {x["metadata"]["name"]: x["metadata"] for x in items}
         if len(actual) != len(items) or set(actual) != set(namespaces):
             raise KubernetesBindingError()
@@ -157,11 +167,15 @@ class KubernetesHTTP:
                 raise KubernetesBindingError()
             pod = self._call([f"--namespace={expected['namespace']}", "get", "pod", expected["pod"], "-o", "json"])
             try:
+                if mapped and pod.get("kind")!="Pod":raise ValueError
                 verify_owned_pod(pod, ns, expected, self.binding["run_id"],require_ready=require_ready)
                 pods[role]=pod
             except ValueError:
                 raise KubernetesBindingError() from None
 
+        if mapped:
+            snapshot={"pod":pods["engine"],"namespace":next(x for x in items if x["metadata"]["name"]==self.binding["engine"]["namespace"])}
+            self.model_snapshots=([self.model_snapshots[0],snapshot] if self.model_snapshots else [snapshot])
         return pods
 
     def __call__(self, network, requests, timeout):
@@ -242,7 +256,7 @@ class KubernetesHTTP:
                         or url.scheme!=self.endpoint.scheme or url.netloc!=self.endpoint.netloc or url.query or url.fragment
                         or url.path not in {"/tokenize","/v1/chat/completions"}
                         or url.path=="/tokenize" and mode!="json"
-                        or type(value.get("body")) is not dict or value["body"].get("model")!=self.model_mapping["api_model"]):
+                        or type(value.get("body")) is not dict or value["body"].get("model")!=self.api_model):
                     raise KubernetesBindingError()
                 value.setdefault("mode","json");prepared.append(value)
             if len(set(ids))!=len(ids):raise KubernetesBindingError()

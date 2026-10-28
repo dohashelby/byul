@@ -73,7 +73,8 @@ class KubernetesLifecycleReader:
             self.gap=True
             raise KubernetesCaptureError() from None
 
-    def _owner(self,timeout):
+    def snapshot(self,timeout=5):
+        """Transient kind/name/transport-checked Pod/Namespace; never written raw."""
         deadline=time.monotonic()+timeout;expected=self.binding["engine"]
         try:
             namespace=strict_json(self._request(["get","namespace",expected["namespace"],"-o","json"],
@@ -83,10 +84,15 @@ class KubernetesLifecycleReader:
             pod=strict_json(self._request([f"--namespace={expected['namespace']}","get","pod",expected["pod"],"-o","json"],
                 deadline=deadline,cap=262144),limit=262144)
             if pod.get("kind")!="Pod":raise KubernetesCaptureError()
-            return verify_owned_pod(pod,namespace["metadata"],expected,self.binding["run_id"],require_ready=False)
+            verify_owned_pod(pod,namespace["metadata"],expected,self.binding["run_id"],require_ready=False)
+            return {"pod":pod,"namespace":namespace}
         except Exception:
             self.gap=True
             raise KubernetesCaptureError() from None
+
+    def _owner(self,timeout):
+        value=self.snapshot(timeout)
+        return verify_owned_pod(value["pod"],value["namespace"]["metadata"],self.binding["engine"],self.binding["run_id"],require_ready=False)
 
     def _selected(self,client,target,container,image):
         expected=self.binding["engine"]

@@ -234,7 +234,7 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
 
 class RequestBindingExecutor(HttpCheckExecutor):
     name = "request_binding"
-    version = "0.3.2"
+    version = "0.3.3"
     requires_roles = False
     requires_route_scope = False
     _uses_docker_identity = True
@@ -244,7 +244,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
         self.docker = (docker or Docker("binding" + secrets.token_hex(4))) if self._uses_docker_identity else None
 
     def _api_model(self, ctx):
-        return ctx.env.model.id
+        return ctx.api_model
 
     def _template_snapshot(self, ctx, identity, argv, deadline):
         return owned_template_snapshot(self.docker, ctx, identity, argv, deadline)

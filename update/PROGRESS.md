@@ -1,3 +1,10 @@
+## 2026-10-28 — A-1 A-2 모델 준비의 공통 요청·mount 소비 연결
+
+- 한 일: 검증된 Kubernetes REQ11 e4fe2f2를 보존한 별도 통합 worktree에서 A-2 c7bf2973 exact7파일을681698f 커밋으로 반영했다. A-2 매핑을 공통 요청/정상 응답 대조와 REQ11에 연결하고 ENV 모델 의미를 유지한다. 비교 조건에서 ENV Ref/host 위치와 모델·별칭 의미를 구분하며 기존 query의 전후 snapshot을 A-2 mount 분석기로 전달해 기존 첨부/수집 CLI를 사용한다. 전용 A-2/B 소스·새 실행기·판정 규칙은 추가하지 않는다.
+- 테스트 결과: 1066파일 고정 최초931통과·실패30·기존skip2·제외1(pytest123.90초·부모125.05초), 플랫폼175통과(11.10/17.933초). 공통 함수가 기존 duck-typed 호출 객체의 없는 필드를 요구한22실패는 공통 소비 경계를 보수했고, 새 시험의 누락 정책6개/stream tokenize packet 대역2개는 입력을 맞췄다. assert/판정 의미·A-2/B 원본은 유지했다. 재고정 동일 영향961통과·실패0·기존skip2·제외1(113.20/113.876초), 플랫폼175통과(11.35/14.362초), wheel155파일 동일(부모12.068초), 검증 중 bytes 불변. 재실행 명령 선택 오류1회는 pytest 미실행으로 별도 보존했다. 결과 문서만 갱신하고 정확 통합 head CI를 확인한다.
+- 다음 단계: 영향 검증 → 실패 수정·재고정·재검증 → 설치 wheel·커밋·푸시·후속 초안 PR·정확 head CI·A-2에 소비 경로/commit/예제 인계.
+- 막힌 것: 실제 Kubernetes/GPU와 worker 접근·소비·자원 반납은 미실증이며 AWS 실행 승인 대기다. 기존 capture lab=true gate를 완화하지 않으므로 lab=false mount 보조 관측은 미수집이다. 기업 경로/호출자 허용표는 준비 전이다.
+
 ## 2026-10-28 — A-1 Kubernetes REQ-11 제품·전환 연결
 
 - 한 일: fcb6c40를 보존한 별도 worktree에서 A-2 c8f0e61 exact7파일을9c0a026 커밋으로 통합하고 SUP04 플랫폼 교차시험 target의 ENV Ref 누락을 맞췄다. 기존 KubernetesHTTP에 REQ11 JSON/SSE 프로파일·exact ENV/양쪽 세대·고정 template 읽기를 연결하고 기존 request_binding의 분석·판정/시간 계산을 재사용한다. 명시 API 모델명 매핑과 기존 CLI EVD→RES→RPT·반출/재판정, update의 API 종료/Ready 대기·후보 차단·복구 필요 진단을 연결했다.

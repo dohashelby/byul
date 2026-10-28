@@ -561,21 +561,23 @@ def capture_kubernetes_lifecycle_session(
     prepared: Path = typer.Option(...,"--prepared"),
     output: Path = typer.Option(...,"--output"),
     kubectl_binary: str = typer.Option("kubectl","--kubectl-binary"),
+    model_mapping: Path | None = typer.Option(None,"--model-mapping",help="ENV에 결합된 명시 API 이름·모델 mount 매핑"),
     max_duration: float = typer.Option(180,"--max-duration"),
     execute: bool = typer.Option(False,"--execute",help="명시 소유 Kubernetes 세션의 파일·프로세스 metadata만 읽기"),
 ) -> None:
     """명시 context/Pod 세대에서 고정 읽기 helper만 실행한다. 보안 판정은 UNKNOWN이다."""
     import hashlib
-    from guard.collectors.kubernetes_lifecycle import load_inputs,validate_options,collect
+    from guard.collectors.kubernetes_lifecycle import load_inputs,load_model_mapping,validate_options,collect
     from guard.collectors.route_observations import validate_output
     try:
         environment,topology,assets=load_inputs(env,target,prepared)
+        mapping=load_model_mapping(environment,model_mapping) if model_mapping is not None else None
         validate_options(kubectl_binary,max_duration)
         validate_output(output,Path(__file__).resolve().parents[3])
         if not execute:
             typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}))
             return
-        value=collect(environment,topology,assets,binary=kubectl_binary,duration=max_duration)
+        value=collect(environment,topology,assets,binary=kubectl_binary,duration=max_duration,model_mapping=mapping)
         raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
         if len(raw.encode("utf-8"))>64*1024**2:raise ValueError("LIFECYCLE_SESSION_ATTACHMENT_BOUND")
     except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError):

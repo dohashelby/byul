@@ -30,6 +30,7 @@ from guard.runtime.comparison import execution_conditions
 
 from . import http_probe, stream_probe
 from .base import DraftArtifact, EvidenceDraft
+from guard.collectors.model_mapping import request_model_name
 
 ContainerProbe = Callable[[str, list[dict], float], list[dict]]  # network, requests, timeout → results
 StreamProbe = Callable[[str, list[dict], float], list[dict]]  # bounded connection-local JSON/SSE
@@ -84,6 +85,25 @@ def mask(value: Any, secrets_: list[str]) -> Any:
     if isinstance(value, list):
         return [mask(v, secrets_) for v in value]
     return value
+
+
+def request_model(env, target, *, transport=None):
+    if "model_mapping" not in target:
+        return env.model.id
+    value=target["model_mapping"]
+    # Compatibility for the already published minimal REQ-11 transport profile.
+    if (transport is not None and getattr(transport,"profile",None)=="kubernetes-owned-request-binding-http-v1"
+            and type(value) is dict and set(value)=={"repository_id","revision","api_model"}
+            and value==getattr(transport,"model_mapping",None)):
+        return transport.api_model
+    return request_model_name(env,value)
+
+
+class _FunctionalProbes(dict):
+    """Private request/result pair carries the same validated API model name."""
+    def __init__(self, values, expected_model):
+        super().__init__(values)
+        self.expected_model=expected_model
 
 
 def fill_model(body: Any, model: str | None) -> Any:
@@ -226,6 +246,10 @@ class Ctx:
     fixed_route_fixture: bool = False
     route_fixture_inputs: dict | None = None
     http_probe_profile: str = http_probe.TRANSPORT_PROFILE
+    api_model: str | None = field(init=False)
+
+    def __post_init__(self):
+        self.api_model=request_model(self.env,self.target,transport=self.cprobe)
 
     @property
     def trusted_net(self) -> str:
@@ -315,6 +339,7 @@ class HttpCheckExecutor:
             raise RuntimeError(f"{check.id}: route_scope is required for {self.name}")
         self.validate_policy(check, policy_values)  # 시험 시작 전(요청 0건)
         target = json.loads(Path(self.cfg["target"]).read_text(encoding="utf-8"))
+        request_model(env,target)  # Explicit malformed mappings fail before readiness/probe I/O.
         keys = self.keys()
 
         def make_ctx(cprobe: ContainerProbe, sprobe: StreamProbe | None = None) -> Ctx:
@@ -456,7 +481,7 @@ def probe_templates(ctx: Ctx, routes: dict[str, Route]) -> tuple[dict[str, Probe
     """"METHOD path" → 시험 요청(어댑터가 정함). 검증된 안전 프로브가 없는 상태 변경 경로는 보내지 않는다."""
     templates: dict[str, ProbeRequest] = {}
     skipped: dict[str, str] = {}
-    model, version = ctx.env.model.id, ctx.env.engine.version
+    model, version = request_model(ctx.env,ctx.target,transport=getattr(ctx,"cprobe",None)), ctx.env.engine.version
     for key, route in routes.items():
         digest = ctx.env.engine.image_digest
         # Preserve legacy three-argument adapters when no image was declared.
@@ -491,12 +516,15 @@ def inference_control_profile(fp) -> str | None:
 def functional_requests(ctx: Ctx, via: str = "gateway") -> tuple[list[dict], dict[str, Any]]:
     """CheckDef.functional_probes → (요청 목록, id→probe). gateway: 역할(as_role) 키로 Gateway 경유(외부 출발점),
     engine: 신뢰 출발점에서 엔진으로 직접(키는 역할이 설정돼 있을 때만). 실행기가 다룰 수 없는 경로면 거부."""
+    model=request_model(ctx.env,ctx.target,transport=getattr(ctx,"cprobe",None))
     probes = {fp.id: fp for fp in ctx.check.functional_probes}
+    if "model_mapping" in ctx.target:
+        probes = _FunctionalProbes(probes,model)
     reqs = []
     for pid, fp in probes.items():
         if fp.via != via:
             raise RuntimeError(f"functional probe {pid}: via={fp.via} is not supported by this executor (via={via})")
-        pr = ProbeRequest(fp.method.upper(), fp.path, fill_model(fp.body, ctx.env.model.id))
+        pr = ProbeRequest(fp.method.upper(), fp.path, fill_model(fp.body, model))
         if via == "gateway":
             if fp.as_role not in ctx.keys:
                 raise RuntimeError(f"functional probe {pid}: role {fp.as_role!r} not configured")
@@ -507,6 +535,8 @@ def functional_requests(ctx: Ctx, via: str = "gateway") -> tuple[list[dict], dic
 
 
 def functional_results(probes: dict[str, Any], results: dict[str, dict], expected_model: str | None = None) -> tuple[dict[str, str], dict[str, Any], dict]:
+    if isinstance(probes,_FunctionalProbes):
+        expected_model=probes.expected_model
     functional: dict[str, str] = {}
     status: dict[str, Any] = {}
     for pid, fp in probes.items():

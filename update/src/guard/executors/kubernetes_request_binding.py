@@ -3,6 +3,7 @@ from pathlib import Path
 
 from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
+from guard.runtime.comparison import model_request_conditions
 from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
 from .engine_identity import _READ_TEMPLATE
 from .http_common import Ctx
@@ -10,7 +11,7 @@ from .request_binding import RequestBindingExecutor, DEFAULTS
 
 
 class KubernetesRequestBindingExecutor(RequestBindingExecutor):
-    version="0.1.0"
+    version="0.1.1"
     _uses_docker_identity=False
 
     def __init__(self,cfg,*,runner=None,environ=None):
@@ -18,7 +19,7 @@ class KubernetesRequestBindingExecutor(RequestBindingExecutor):
         self._kubectl_runner=runner
 
     def _api_model(self,ctx):
-        return ctx.cprobe.model_mapping["api_model"]
+        return ctx.api_model
 
     def _template_snapshot(self,ctx,identity,argv,deadline):
         return ctx.cprobe.template_snapshot(identity,argv,ctx.target["engine"].get("command"),_READ_TEMPLATE)
@@ -48,8 +49,19 @@ class KubernetesRequestBindingExecutor(RequestBindingExecutor):
         observations,normal,challenges,summary=super().collect(ctx)
         report=ctx.cprobe.report()
         summary["kubernetes"]=report
+        if ctx.cprobe.model_mapping.get("schema")=="guard.model-request-mapping/1":
+            from .model_mounts import analyze_model_mount
+            snapshots=ctx.cprobe.model_snapshots
+            target={"schema":"guard-kubernetes-lifecycle-target/1","lab":ctx.target["lab"],
+                "run_id":ctx.cprobe.binding["run_id"],"environment_ref":ctx.env.ref().model_dump(mode="json"),
+                "kubernetes":{"context":ctx.cprobe.binding["context"],"engine":ctx.cprobe.binding["engine"]}}
+            before=snapshots[0] if snapshots else {}
+            after=snapshots[-1] if len(snapshots)==2 and not report["collection_gap"] else {}
+            summary["model_mount"]=analyze_model_mount(ctx.env,target,ctx.cprobe.model_mapping,before,after)
+            summary["model_mount"]["scope"]="first_to_last_verified_ready_snapshot"
+            summary["model_mount"]["whole_run_coverage_verified"]=False
         summary["model_mapping_sha256"]=sha256_hex(canonical_json(ctx.cprobe.model_mapping))
         summary["fixture"].update(transport_profile=REQUEST_BINDING_PROFILE,
-            probe_source_sha256=report["probe_source_sha256"],model_mapping_sha256=summary["model_mapping_sha256"])
+            probe_source_sha256=report["probe_source_sha256"],model_mapping_sha256=sha256_hex(canonical_json(model_request_conditions(ctx.cprobe.model_mapping))))
         summary["limitations"].append("Kubernetes Pod identity is not actual GPU/tensor/model-consumption or GPU-release proof.")
         return observations,normal,challenges,summary

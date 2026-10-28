@@ -30,7 +30,7 @@ def _inspection_matches(row, owner):
 
 class CredentialExposureExecutor(ContainerConfigExecutor):
     name = "credential_exposure"
-    version = "0.5.0"
+    version = "0.5.1"
 
     def validate_policy(self, check, values):
         validate_credential_policy(check, values)
@@ -80,6 +80,7 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
                 raise ValueError("CREDENTIAL_SOURCE_UNVERIFIED")
         except Exception:
             raise ValueError("CREDENTIAL_TARGET_UNVERIFIED") from None
+        source_container = anchor["container_id"]
         intervals = {name: False for name in ("mounts", "environment", "candidates", "normal_control")}
 
         def check_owner():
@@ -92,7 +93,7 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
 
         errors, inspected = [], None
         try:
-            inventory = docker.inspect_json(container, timeout=30)
+            inventory = docker.inspect_json(source_container, timeout=30)
             check_owner()
             if not _inspection_matches(inventory, anchor):
                 raise _SourceUnverified("CREDENTIAL_SOURCE_UNVERIFIED")
@@ -123,7 +124,7 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
         names, lines, complete = [], [], False
         try:
             check_owner()
-            raw = docker.exec(container, ["sh", "-c", ENV_CMD], timeout=30)
+            raw = docker.exec(source_container, ["sh", "-c", ENV_CMD], timeout=30)
             check_owner()
             intervals["environment"] = True
             lines = raw.stdout.splitlines()
@@ -153,11 +154,11 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
             if probed and mounts_collected and callable(call):
                 try:
                     check_owner()
-                    result = call(container, ["python3", "-c", METADATA_PROBE,
+                    result = call(source_container, ["python3", "-c", METADATA_PROBE,
                                   json.dumps(probed, ensure_ascii=False)],
                                   timeout=PROBE_TIMEOUT, max_bytes=MAX_OUTPUT_BYTES)
                     observed, candidate_detail = decode_metadata(result, probed)
-                    after = docker.inspect_json(container, timeout=5)
+                    after = docker.inspect_json(source_container, timeout=5)
                     check_owner()
                     if _inspection_matches(after, anchor) and after.get("Mounts") == mounts:
                         candidates.update(observed)

@@ -25,6 +25,7 @@ class FakeDocker:
         self.process_names, self.subject_matches = process_names, subject_matches
         self.source_changed, self.inspections = source_changed, 0
         self.requests = []
+        self.exec_targets = []
         self.payload_changes = {}
         self.capture_changes = {}
 
@@ -36,6 +37,7 @@ class FakeDocker:
                 "Mounts": deepcopy(self.mounts)}
 
     def exec(self, container, argv, *, timeout):
+        self.exec_targets.append(container)
         assert argv == ["sh", "-c", ENV_CMD]
         if self.environment_error:
             raise RuntimeError("EXAMPLE private environment reader detail")
@@ -43,6 +45,7 @@ class FakeDocker:
                          + "GUARD_READ_OK\n", "")
 
     def exec_bounded(self, container, argv, *, timeout, max_bytes):
+        self.exec_targets.append(container)
         assert argv[:3] == ["python3", "-c", METADATA_PROBE]
         assert timeout == PROBE_TIMEOUT and max_bytes == MAX_OUTPUT_BYTES
         paths = json.loads(argv[3])
@@ -298,7 +301,7 @@ def test_partial_mount_product_storage_report_and_exact_ref_replay(tmp_path, mon
     assert evd.execution.status == (ExecStatus.ABORTED if artifact_failure else ExecStatus.COMPLETED)
     assert evd.data_origin.value == "EXAMPLE" and result.verdicts.security == Verdict.FAIL
     assert evd.observations["forbidden_mount_violations"].value == ["/credentials"]
-    assert evd.execution.executor.version == "0.5.0"
+    assert evd.execution.executor.version == "0.5.1"
     assert "EXAMPLE_PRIVATE_ARTIFACT_CANARY" not in canonical_json(evd.to_dict()).decode()
     assert bool(evd.artifacts) is not artifact_failure
     report = build_report(store, pack, plan, as_of=env.created_at)

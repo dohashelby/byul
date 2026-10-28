@@ -155,7 +155,7 @@ def test_packet_product_storage_report_restore_and_exact_rejudge(tmp_path, monke
         evd, = run_plan(store, pack, plan, RunConfig(executors={"credential_exposure": "real"}, adapter="vllm"))
     result, = judge_plan(store, pack, plan, as_of=env.created_at)
     assert evd.data_origin.value == "EXAMPLE" and result.verdicts.security.value == expected
-    assert evd.execution.executor.version == "0.5.0"
+    assert evd.execution.executor.version == "0.5.1"
     assert evd.execution.status.value == ("ABORTED" if mode == "later_attachment_failure" else "COMPLETED")
     assert evd.observations["credential_candidates_complete"].value is (mode == "normal")
     if mode == "later_attachment_failure":

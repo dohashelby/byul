@@ -137,11 +137,27 @@ def test_generation_changes_withhold_only_unbound_intervals_and_retain_prior_fac
 
 
 def test_verified_normal_intervals_keep_existing_limited_observations():
-    observations, normal, _, detail = CredentialExposureExecutor({}, docker=BindingDocker()).collect(context(values()))
+    docker = BindingDocker()
+    observations, normal, _, detail = CredentialExposureExecutor({}, docker=docker).collect(context(values()))
     assert normal["succeeded"] and observations["credential_candidate_results"]["value"] == {PATH: "absent"}
     assert observations["credential_candidates_complete"]["value"] is True
     assert all(detail["source_binding"]["intervals_verified"].values())
+    assert docker.exec_targets == ["a" * 64, "a" * 64]
     assert CANARY not in json.dumps(detail)
+
+
+def test_temporary_name_mapping_between_owner_samples_cannot_select_another_generation():
+    class NameRemapped(FakeDocker):
+        def exec_bounded(self, container, *args, **kwargs):
+            # The name transiently selects B while owner samples see A. A's
+            # immutable ID still selects A and retains its readable result.
+            self.state = "absent" if container == "engine" else "candidate_readable"
+            return super().exec_bounded(container, *args, **kwargs)
+    docker = NameRemapped()
+    observations, _, _, _ = CredentialExposureExecutor({}, docker=docker).collect(context(values()))
+    assert observations["credential_candidate_results"]["value"] == {PATH: "candidate_readable"}
+    assert observations["credential_candidates_complete"]["value"] is False
+    assert docker.exec_targets == ["a" * 64, "a" * 64]
 
 
 @pytest.mark.parametrize("mode,expected", [("normal", "PASS"), ("wrong-owner", "UNKNOWN"),
@@ -194,7 +210,7 @@ def test_binding_product_cli_report_bundle_and_exact_ref_replay(tmp_path, monkey
     res, = store.find_latest("RES", lambda r: True)
     rpt, = store.find_latest("RPT", lambda r: True)
     assert res.verdicts.security.value == expected and evd.data_origin.value == "EXAMPLE"
-    assert evd.execution.executor.version == "0.5.0" and rpt.official is False
+    assert evd.execution.executor.version == "0.5.1" and rpt.official is False
     assert evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest
     assert CANARY not in canonical_json(evd.to_dict()).decode()
     if violated:

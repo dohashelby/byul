@@ -1,6 +1,6 @@
 # 자격·마운트 수집의 부분 실패
 
-`credential_exposure/0.5.0`는 기존 PLT-04의 `forbidden_mount_violations`
+`credential_exposure/0.5.1`는 기존 PLT-04의 `forbidden_mount_violations`
 관측과 판정 계약을 사용한다. 유효한 bind/volume 목적지와 명시 금지 경로의
 포함 관계가 확인되면, 다른 마운트 행의 형식 오류 때문에 이 위반을 버리지 않는다.
 부분 목록에 위반이 없으면 빈 안전 목록으로 기록하지 않고 미수집으로 남긴다.
@@ -32,6 +32,10 @@ tuple과 일치해야 한다. 뒤 구간에서 restart·container replacement·i
 구간에서 결합된 마운트 위반과 환경변수 이름은 지우지 않는다. 완전하지 않은
 마운트 목록의 유효한 금지 행을 보존하는 기존 계약도 유지한다.
 
+마운트 snapshot과 프로세스·후보 reader는 최초 검증한 불변 container ID로
+호출한다. 관측 사이에 이름이 잠시 다른 컨테이너로 재지정됐다 돌아와도 다른
+세대의 metadata를 읽지 않도록 한다. 전후 target 이름/소유 신원 대조도 유지한다.
+
 첨부의 `source_binding`은 `docker-engine-source-intervals/1`, 정확 ENV Ref,
 최초 owner tuple의 SHA-256, 구간별 신원 확인 여부만 기록한다. inspect 전체,
 Config.Env·StartedAt 원문·자격 내용·예외 원문은 저장하지 않는다. 입력 검증
@@ -57,5 +61,5 @@ Config.Env·StartedAt 원문·자격 내용·예외 원문은 저장하지 않�
 독립적으로 확보한 금지 마운트·환경변수 이름 위반을 지우지 않는다.
 
 정상 패킷과 기존 schema/profile·후보 상태의 의미는 그대로다. 중복 키 보수는
-0.4.2에서 도입됐으며 0.5.0은 위 신원·구간 계약의 소비를 추가한다. 과거 EVD는
+0.4.2에서 도입됐으며 0.5.1은 위 신원·구간 계약의 소비와 불변 ID 호출을 추가한다. 과거 EVD는
 고치지 않는다.

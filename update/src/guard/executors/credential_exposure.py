@@ -30,7 +30,7 @@ def _inspection_matches(row, owner):
 
 class CredentialExposureExecutor(ContainerConfigExecutor):
     name = "credential_exposure"
-    version = "0.5.1"
+    version = "0.5.2"
 
     def validate_policy(self, check, values):
         validate_credential_policy(check, values)
@@ -42,35 +42,19 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
         docker = self._docker_obj()
         if any(obs.key == "forbidden_mount_violations" for obs in ctx.check.required_observations):
             return self._collect_separated(ctx, container, docker)
-        # Saved definitions keep their historical field names and semantics.
-        ins = docker.inspect_json(container, timeout=30)
-        raw = docker.exec(container, ["sh", "-c", ENV_CMD], timeout=30)
-        lines = raw.stdout.splitlines()
-        pids = sum(s.startswith("PID ") for s in lines)
-        complete = raw.returncode == 0 and pids > 0 and lines.count("GUARD_READ_OK") == pids and "GUARD_READ_ERROR" not in lines
-        names = sorted({s for s in lines if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", s) and not s.startswith("GUARD_READ_")})
-        if any(s and not s.startswith(("PID ", "GUARD_READ_")) and s not in names for s in lines):
-            complete = False
-        # Values are not present even in the subprocess result or the artifact.
-        destinations = sorted(m["Destination"] for m in ins.get("Mounts", []) if m.get("Type") in {"bind", "volume"})
-        forbidden = ctx.policy_values.get("forbidden_mount_paths", [])
-        exposed = sorted(p for p in forbidden if any(p == d or p.startswith(d.rstrip("/") + "/")
-                                                      or d.startswith(p.rstrip("/") + "/") for d in destinations))
-        requests, probes = functional_requests(ctx, via="engine")
-        responses = ctx.cprobe(ctx.trusted_net, requests, ctx.timeout) if requests else []
-        functional, _, normal = functional_results(probes, dict(zip(probes, responses)), ctx.env.model.id)
-        obs = {
-            "process_scan_complete": {"value": complete, "collected": True},
-            "worker_env_names": {"value": names, "collected": bool(lines)},
-            "exposed_credential_paths": {"value": exposed, "collected": "Mounts" in ins},
-            "functional_probes_planned": {"value": list(probes), "collected": True},
-            "functional_probe_results": {"value": functional, "collected": bool(probes)},
-        }
-        return obs, normal, [{"step": s, "attempted": True} for s in ctx.check.challenge_steps], {
-            "credential_names": names, "mount_destinations": destinations, "scan_complete": complete,
-            "fixture": {"env_command": ENV_CMD, "policy": ctx.policy_values}}
+        # Old field names do not exempt a new live collection from source
+        # binding. Reading saved EVD/Ref objects never invokes this collector.
+        obs, normal, challenges, detail = self._collect_separated(ctx, container, docker, include_candidates=False)
+        legacy = {key: obs[key] for key in ("process_scan_complete", "worker_env_names",
+                  "functional_probes_planned", "functional_probe_results")}
+        legacy["exposed_credential_paths"] = obs["forbidden_mount_violations"]
+        summary = {key: detail[key] for key in ("credential_names", "mount_destinations", "scan_complete",
+                   "source_binding", "collection_errors")}
+        summary["source_binding"]["intervals_verified"].pop("candidates")
+        summary["fixture"] = {"env_command": ENV_CMD, "policy": ctx.policy_values}
+        return legacy, normal, challenges, summary
 
-    def _collect_separated(self, ctx, container, docker):
+    def _collect_separated(self, ctx, container, docker, *, include_candidates=True):
         # Missing declarations and a stable wrong instance fail before any
         # process scan, candidate read or normal-control request is attempted.
         try:
@@ -141,7 +125,7 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
         except Exception:
             errors.append("PROCESS_ENVIRONMENT_UNAVAILABLE")
 
-        requested = "credential_candidate_paths" in ctx.policy_values
+        requested = include_candidates and "credential_candidate_paths" in ctx.policy_values
         paths = candidate_paths(ctx.policy_values.get("credential_candidate_paths")) if requested else None
         candidates = {} if paths == [] else {path: "unknown" for path in paths or []}
         candidate_detail = {"profile": PROFILE, "code": "CANDIDATES_NOT_REQUESTED"}

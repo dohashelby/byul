@@ -11,6 +11,7 @@ from guard.runtime.docker import CmdResult
 from guard.store import Store
 from tests.builders import baseline_pack, environment, policy, completion_response
 from tests.response_semantics_support import with_legacy_check
+from tests.test_credential_mount_semantics import FakeDocker as CredentialFixture, IMAGE as CREDENTIAL_IMAGE, RUN as CREDENTIAL_RUN
 
 
 def pipeline(tmp_path, cid, factory, values):
@@ -26,6 +27,10 @@ def pipeline(tmp_path, cid, factory, values):
         values = {"allowed_endpoints": [pack.checks[cid].functional_probes[0].id],
                   "allowed_input_formats": ["token_ids"], **values}  # Explicit EXAMPLE test fixture, not defaults.
     env = environment(model={"id": "test"})
+    if cid == "PLT-04":
+        env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": CREDENTIAL_IMAGE}, model={"id": "test"})
+        target.update(environment_ref=env.ref().model_dump(mode="json"), run_id=CREDENTIAL_RUN)
+        path.write_text(json.dumps(target), encoding="utf-8")
     pol = policy(pack.ref(), scope={"include": [cid]}, values={cid: values})
     store.put(env); store.put(pol)
     plan = select(pack, [env], pol); store.put(plan)
@@ -77,8 +82,7 @@ def test_same_response_changes_with_explicit_rejection_policy(tmp_path):
 
 @pytest.mark.parametrize("leak, unreadable, expected", [(False,False,"PASS"),(True,False,"FAIL"),(False,True,"UNKNOWN"),(True,True,"FAIL")])
 def test_credential_exposure_contract(tmp_path, leak, unreadable, expected):
-    class Docker:
-        def inspect_json(self, container, *, timeout): return {"Mounts":[]}
+    class Docker(CredentialFixture):
         def exec(self, container, argv, *, timeout):
             assert argv == ["sh","-c",ENV_CMD]
             return CmdResult(0, "PID 1\nPATH\n" + ("GUARD_TEST_CREDENTIAL\n" if leak else "") +

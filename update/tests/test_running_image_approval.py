@@ -113,7 +113,7 @@ def test_approved_running_image_is_partial_unknown_not_full_supply_pass(tmp_path
     store, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch)
     assert evd.execution.status == ExecStatus.COMPLETED
     assert evd.data_origin.value == "EXAMPLE"
-    assert evd.execution.executor.name == "container_config" and evd.execution.executor.version == "0.5.1"
+    assert evd.execution.executor.name == "container_config" and evd.execution.executor.version == "0.6.1"
     assert result.verdicts.security == Verdict.UNKNOWN
     assert evd.observations["running_image_identity_verified"].value is True
     assert evd.observations["running_image_repo_digest"].value == PIN
@@ -273,12 +273,12 @@ def test_aborted_supply_collection_records_same_static_executor_version(tmp_path
     def interrupted(self, ctx):
         raise RuntimeError("EXAMPLE interrupted collection")
 
-    assert ContainerConfigExecutor.version == "0.5.1"
+    assert ContainerConfigExecutor.version == "0.6.1"
     monkeypatch.setattr(ContainerConfigExecutor, "collect", interrupted)
     _, _, _, evd, result, _, _ = _run(tmp_path, monkeypatch)
     assert evd.execution.status == ExecStatus.ABORTED
     assert evd.execution.executor.name == "container_config"
-    assert evd.execution.executor.version == ContainerConfigExecutor.version == "0.5.1"
+    assert evd.execution.executor.version == ContainerConfigExecutor.version == "0.6.1"
     assert result.verdicts.security == Verdict.UNKNOWN
 
 

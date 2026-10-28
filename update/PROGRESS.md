@@ -1,3 +1,10 @@
+## 2026-10-28 — A-1/A-2 현재 소스 결합과 이월 경계 통합
+
+- 한 일: A-1 PR57 exact02d1212(CI5개·기본5645통과)에서 A-2 PR55 c47445d(CI5개 성공)의 확정13파일 patch를 보존 반영했다. 전용 source2개 포함12파일 exact bytes와 공유 시험의 버전1줄/기존 hook 회귀를 보존했다. 새 container_config0.6.1·구 credential live0.5.2의 source 결합에 맞춰 두 현재 실행기의 정적 이월을 기존 None 경계로 재선정한다. 제품 Store/판정/선정의 합성 DECLARED 계약에서 새 권한 수집도 run/container 변경 시 이전 PASS를 이월하던 경로를 재현한 뒤 보수한다.
+- 테스트 결과: 최초1049파일 고정 영향632통과·실패1·기존skip1·제외1(pytest111.43초·부모112.364초)과 검증 중 bytes 불변을 보존했다. 새 권한 FAIL 재생 fixture가 저장 전 메모리 EVD를 먼저 판정해 정규화된 저장 EVD 재판정의 사유 문자열 키 순서와 달랐다. 제품과 같이 정확한 저장 Ref로 읽은 EVD를 최초 판정하도록 시험 자료만 보수하며 FAIL·Ref 동일성 기대값과 제품 판정기는 유지한다. 재고정 후 직접/동일 이월·재생 계약219통과·실패0·기존skip1·제외1(pytest25.97초·부모26.699초), 설치 wheel150파일 일치(부모14.054초)를 확인했다. 검증 중 source bytes 불변과 A-2 전용 source2개 exact bytes를 확인한 뒤 결과 문서만 갱신한다. 정확 통합 head 기본 CI는 별도로 확인한다.
+- 다음 단계: 직접 source 결합·선정·과거 PASS/FAIL Ref 재생·기존 비교·첨부 보존·불변식 검증 → 실패 수정·재검증 → wheel·커밋·푸시·후속 초안 PR·정확 head CI·A-2 인계.
+- 막힌 것: 이번 CPU 통합에는 없음. 기업 Gateway·호출자 허용표는 준비 전이다. 실제 worker 귀속/자격 사용·전체 체크리스트 완료·실제 엔진/GPU/AWS 실증 증가는0이다. root contracts/platform/runtime·core/models/store/judges·팩·registry·의존성·스트림 시간은 바꾸지 않는다.
+
 ## 2026-10-28 — A-1 현재 소스 결합 관측의 정적 이월 보수
 
 - 한 일: 현재 main4da12c0·PACK31에서 PLT-04의 현행 source-bound credential 프로파일을 고정 명령/정책만으로 이월하던 경계를 기존 None/PROCEDURE_OR_FIXTURE_UNCONFIRMED 재선정으로 보수한다. 합성 DECLARED 이전 PASS를 실제 Store·팩·rule_table·선정에 넣은 재현으로 run/container 변경에도 이월됨을 확인했으며 실제 엔진 PASS로 표시하지 않는다. 다른 실행기의 고정 이월과 두 실행 비교 조건·과거 Ref/판정 의미는 유지한다.

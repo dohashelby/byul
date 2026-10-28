@@ -12,6 +12,7 @@ from guard.core.judge import judge_evidence, judge_plan
 from guard.core.report import build_report
 from guard.core.select import select
 from guard.executors.credential_exposure import CredentialExposureExecutor
+from guard.executors.container_config import ContainerConfigExecutor
 from guard.executors.http_common import Ctx, http_probe
 from guard.executors.reuse import preview_inputs
 from guard.models import Evidence, canonical_json, sha256_hex
@@ -27,22 +28,31 @@ def forbidden(*args, **kwargs):
     raise AssertionError("static selection must not collect runtime identity or send requests")
 
 
-def _archive(tmp_path, *, violation=False, origin="DECLARED"):
+def _archive(tmp_path, *, violation=False, origin="DECLARED", cid="PLT-04"):
     """Real PACK31/rule_table; DECLARED inputs are synthetic, never MEASURED."""
     pack = baseline_pack()
-    check = pack.checks["PLT-04"]
+    check = pack.checks[cid]
     env = environment(origin=origin, engine={"name": "engine-x", "version": "1.0.0", "image_digest": IMAGE},
                       model={"id": "test"})
     values = {"forbidden_env_names": ["EXAMPLE_FORBIDDEN"], "forbidden_mount_paths": ["/credentials"],
               "credential_candidate_paths": ["/credentials/key"]}
+    executor_class = CredentialExposureExecutor
+    docker = FakeDocker(process_names=["EXAMPLE_FORBIDDEN"] if violation else [])
+    container, run = "engine", RUN
+    if cid == "PLT-01":
+        from tests.test_container_config import FakeDocker as PermissionDocker, LAB_POLICY, RUN as PERMISSION_RUN
+        values = deepcopy(LAB_POLICY)
+        docker = PermissionDocker("overprivileged" if violation else "hardened")
+        executor_class = ContainerConfigExecutor
+        container, run = docker.owner_name, PERMISSION_RUN
     pol = policy(pack.ref(), data_origin=origin, scope={"include": [check.id]}, values={check.id: values})
     store = Store(tmp_path / "store")
     assert put_pack(store, pack.path) == pack.ref()
     store.put_many([env, pol])
     prior = select(pack, [env], pol)
     store.put(prior)
-    target = {"run_id": RUN, "environment_ref": env.ref().model_dump(mode="json"),
-              "engine": {"container": "engine", "trusted_url": "http://engine:8000"},
+    target = {"run_id": run, "environment_ref": env.ref().model_dump(mode="json"),
+              "engine": {"container": container, "trusted_url": "http://engine:8000"},
               "origins": {"trusted": {"network": "EXAMPLE-trusted"}},
               "comparison_config": {"profile": "EXAMPLE-source-reuse-contract"}}
     path = tmp_path / "target.json"
@@ -54,14 +64,13 @@ def _archive(tmp_path, *, violation=False, origin="DECLARED"):
     adapter = VllmAdapter()
     ctx = Ctx(check=check, env=env, adapter=adapter, target={**deepcopy(target), "lab": True},
               policy_values=values, timeout=3.0, allow_mutating=False, keys={}, secrets=[],
-              cprobe=lambda net, requests, timeout: [completion_response(r) for r in requests],
+              cprobe=lambda net, requests, timeout: [{"id": r["id"], **completion_response(r)} for r in requests],
               workdir=tmp_path / "EXAMPLE-collector", started=T0)
-    draft = CredentialExposureExecutor(settings, docker=FakeDocker(
-        process_names=["EXAMPLE_FORBIDDEN"] if violation else []))._finish(ctx)
+    draft = executor_class(settings, docker=docker)._finish(ctx)
     assert draft.data_origin.value == "EXAMPLE"
     fixture = json.loads(draft.artifacts[0].path.read_text(encoding="utf-8").splitlines()[-1])["fixture"]
     assert sha256_hex(canonical_json(fixture)) == draft.comparability.fixture_sha256
-    executor = ExecutorInfo(name="credential_exposure", version=CredentialExposureExecutor.version,
+    executor = ExecutorInfo(name=executor_class.name, version=executor_class.version,
                             config_sha256=sha256_hex(canonical_json(draft.config)))
     assert executor.config_sha256 == draft.comparability.config_sha256
     # Store explicit DECLARED contract facts. This is not a live target PASS.
@@ -73,6 +82,8 @@ def _archive(tmp_path, *, violation=False, origin="DECLARED"):
         normal_control=draft.normal_control, challenges=draft.challenges,
         observations=draft.observations, comparability=draft.comparability).seal()
     store.put(evd)
+    # Match product judging: consume the exact persisted, canonical EVD.
+    evd = store.resolve(evd.ref())
     res = judge_evidence(check, evd, pol, T0, plan=prior)
     store.put(res)
     assert evd.data_origin.value == res.data_origin.value == origin
@@ -81,8 +92,9 @@ def _archive(tmp_path, *, violation=False, origin="DECLARED"):
 
 
 @pytest.mark.parametrize("change", ["same-declaration", "run", "container"])
-def test_current_source_is_reselected_without_runtime_io_or_store_writes(tmp_path, monkeypatch, change):
-    pack, env, pol, store, prior, evd, res, cfg, target, path = _archive(tmp_path)
+@pytest.mark.parametrize("cid", ["PLT-01", "PLT-04"])
+def test_current_source_is_reselected_without_runtime_io_or_store_writes(tmp_path, monkeypatch, change, cid):
+    pack, env, pol, store, prior, evd, res, cfg, target, path = _archive(tmp_path, cid=cid)
     if change == "run":
         target["run_id"] = "EXAMPLE-next-owner"
     elif change == "container":
@@ -93,14 +105,16 @@ def test_current_source_is_reselected_without_runtime_io_or_store_writes(tmp_pat
     before = {p.relative_to(store.root).as_posix(): p.read_bytes() for p in store.root.rglob("*") if p.is_file()}
     monkeypatch.setattr(CredentialExposureExecutor, "collect", forbidden)
     monkeypatch.setattr(CredentialExposureExecutor, "_docker_obj", forbidden)
+    monkeypatch.setattr(ContainerConfigExecutor, "collect", forbidden)
+    monkeypatch.setattr(ContainerConfigExecutor, "_docker_obj", forbidden)
     monkeypatch.setattr(subprocess, "Popen", forbidden)
     monkeypatch.setattr(socket, "socket", forbidden)
-    assert preview_inputs(pack.checks["PLT-04"], env, pol.values["PLT-04"], cfg) is None
+    assert preview_inputs(pack.checks[cid], env, pol.values[cid], cfg) is None
     context = build_context(store, prior.ref(), pack, [env], pol, cfg, as_of=T0, read_only=True)
     assert not context.full_scope and not context.carried_over
-    assert context.triggers["PLT-04"][0].refs == ["PROCEDURE_OR_FIXTURE_UNCONFIRMED"]
+    assert context.triggers[cid][0].refs == ["PROCEDURE_OR_FIXTURE_UNCONFIRMED"]
     plan = select(pack, [env], pol, context=context)
-    assert plan.item("PLT-04").selected and plan.item("PLT-04").carried_over is None
+    assert plan.item(cid).selected and plan.item(cid).carried_over is None
     assert store.resolve(evd.ref()).to_dict() == evd.to_dict()
     assert store.resolve(res.ref()).to_dict() == res.to_dict()
     after = {p.relative_to(store.root).as_posix(): p.read_bytes() for p in store.root.rglob("*") if p.is_file()}
@@ -108,8 +122,9 @@ def test_current_source_is_reselected_without_runtime_io_or_store_writes(tmp_pat
 
 
 @pytest.mark.parametrize("violation", [False, True])
-def test_saved_exact_refs_rejudge_report_export_and_restore_are_preserved(tmp_path, violation):
-    pack, env, pol, store, prior, evd, res, cfg, target, path = _archive(tmp_path, violation=violation)
+@pytest.mark.parametrize("cid", ["PLT-01", "PLT-04"])
+def test_saved_exact_refs_rejudge_report_export_and_restore_are_preserved(tmp_path, violation, cid):
+    pack, env, pol, store, prior, evd, res, cfg, target, path = _archive(tmp_path, violation=violation, cid=cid)
     expected = "FAIL" if violation else "PASS"
     assert judge_plan(store, pack, prior, T0)[0].ref() == res.ref()
     report = build_report(store, pack, prior, T0)

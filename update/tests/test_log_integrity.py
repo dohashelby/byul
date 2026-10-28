@@ -158,7 +158,7 @@ def test_actual_reference_consumer_and_display_contracts_with_synthetic_transpor
     for key in ("source_identity_before", "source_identity_after"):
         assert samples[key]["image"] == IMAGE and samples[key]["image_id"] == IMAGE_ID
         assert samples[key]["image_repo_digest_verified"] is True
-    assert all(item.collector == "log_integrity/0.2.1" for item in draft.artifacts)
+    assert all(item.collector == "log_integrity/0.3.0" for item in draft.artifacts)
     display = next(item.path for item in draft.artifacts if item.name.endswith(".html")).read_text(encoding="utf-8")
     assert "<script>guard_probe" not in display and display.count('data-event-index="') == 7
 

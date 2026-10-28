@@ -179,7 +179,7 @@ def test_healthy_controls_with_only_challenge_http200_error_are_security_unknown
 
     store, evd, result, sent = _pipeline(tmp_path, monkeypatch, challenge)
     assert evd.execution.status == ExecStatus.COMPLETED and evd.data_origin.value == "EXAMPLE"
-    assert evd.execution.executor.version == "0.5.0" and evd.execution.adapter.version == "0.4.2"
+    assert evd.execution.executor.version == "0.7.0" and evd.execution.adapter.version == "0.4.2"
     assert result.verdicts.security == Verdict.UNKNOWN and result.verdicts.functional == Verdict.PASS
     assert evd.normal_control.succeeded is True and len(sent) == 5
     assert evd.observations["challenge_outcomes"].value == {"token_id": "200", "length": "200"}

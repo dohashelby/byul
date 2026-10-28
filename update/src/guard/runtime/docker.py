@@ -113,7 +113,7 @@ class Docker:
         return res
 
     def _bounded_read(self, args: list[str], *, timeout: float, max_bytes: int) -> CmdResult:
-        """Log-only capture; injected Runner keeps its historical call contract.
+        """Bound owned capture output; injected Runner keeps its call contract.
 
         A custom runner without byte metadata is explicitly an unverified
         transport. It remains usable for tests, but cannot claim a source cap.
@@ -135,9 +135,16 @@ class Docker:
                                   "transport": "injected runner; pipe bound not established"})
 
     def exec_bounded(self, container: str, argv: list[str], *, timeout: float,
-                     max_bytes: int = 2 * 1024**2) -> CmdResult:
-        """Read-only file capture with an actual local CLI pipe budget."""
-        return self._bounded_read(["exec", container, *argv], timeout=timeout, max_bytes=max_bytes)
+                     max_bytes: int = 2 * 1024**2, uid: int | None = None) -> CmdResult:
+        """Bound owned read/probe output; an explicit numeric actor is optional.
+
+        The caller supplies the reviewed safe probe. The probe independently
+        verifies its actual UID, supplementary groups and namespace as needed.
+        """
+        if uid is not None and (type(uid) is not int or not 0 <= uid <= 2**31 - 1):
+            raise ValueError("invalid numeric bounded probe UID")
+        actor = [] if uid is None else ["--user", f"{uid}:{uid}"]
+        return self._bounded_read(["exec", *actor, container, *argv], timeout=timeout, max_bytes=max_bytes)
 
     @staticmethod
     def _check_secret_env(secret_env: dict[str, str]) -> None:

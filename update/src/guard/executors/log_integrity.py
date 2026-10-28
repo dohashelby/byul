@@ -18,10 +18,14 @@ from guard.automation_policy import validate_log_integrity_policy
 from guard.report.log_integrity import render_log_integrity, verify_log_display
 from guard.runtime.docker import Docker
 from .content_common import (append_artifact, content_request, control_state, json_body,
-                             record_content, redact_value, sample_artifact)
+                             redact_value, text_artifact)
 from .http_common import HttpCheckExecutor
 from .log_integrity_parser import (MAX_CAPTURE_BYTES, PROFILE, TRUSTED_FIELDS)
 from .log_integrity_contract import analyze_integrity_capture
+from .native_projection import (PROFILE as PROJECTION_PROFILE, MAX_BYTES,
+                                envelope, project_native, replay_native, render_projection)
+from .response_projection import log_metadata
+from guard.models import canonical_json, sha256_hex
 
 
 STEPS = ("multiline", "control-delimiters", "reserved-display")
@@ -39,7 +43,7 @@ def _pinned_image(value):
 
 class LogIntegrityExecutor(HttpCheckExecutor):
     name = "log_integrity"
-    version = "0.2.1"
+    version = "0.3.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -159,8 +163,8 @@ class LogIntegrityExecutor(HttpCheckExecutor):
                     "stderr_present": bool(result.stderr.strip()), "window": {"since": since, "until": until},
                     "error": "Docker CLI source read failed" if result.returncode else None,
                     "encoding": "retained CLI pipe bytes decoded as UTF-8; raw and decoded hashes are separate, not daemon-file hashes"}
-        except Exception as exc:
-            return {"text": "", "returncode": None, "truncated": False, "error": type(exc).__name__}
+        except Exception:
+            return {"text": "", "returncode": None, "truncated": False, "error": "NATIVE_CAPTURE_UNAVAILABLE"}
 
     def collect(self, ctx):
         self.validate_policy(ctx.check, ctx.policy_values)
@@ -213,15 +217,19 @@ class LogIntegrityExecutor(HttpCheckExecutor):
             if any(key.lower() == "x-request-id" for key in request["headers"]):
                 gaps.append(f"{label}: unexpected correlation header would hide the body trial")
                 continue
+            request_sha256 = sha256_hex(canonical_json(body))
             try:
                 responses = ctx.cprobe(ctx.trusted_net, [request], min(ctx.timeout, remaining))
                 if (type(responses) is not list or len(responses) != 1 or type(responses[0]) is not dict
                         or responses[0].get("id") != label):
                     raise ValueError("unrelated probe response")
                 response = responses[0]
-            except Exception as exc:
-                response = {"outcome": "probe_error", "phase": "collection", "detail": type(exc).__name__}
-            record_content(ctx, "trusted", "log-integrity", label, response)
+            except Exception:
+                response = {"outcome": "probe_error", "phase": "collection", "detail": "NATIVE_PROBE_UNAVAILABLE"}
+            outcome = response.get("outcome")
+            safe_outcome = outcome if (type(outcome) is int and 100 <= outcome <= 599 or type(outcome) is str and outcome in {"refused", "timeout", "unreachable", "dns_error", "error", "probe_error"}) else "probe_error"
+            ctx.record("trusted", "log-integrity", label, "allowed",
+                {**log_metadata({**response, "outcome": safe_outcome}), "method": request["method"]})
             state = control_state(response, ctx.env.model.id, "/v1/completions")
             value, error = json_body(response)
             response_id = value.get("id") if not error else None
@@ -232,7 +240,8 @@ class LogIntegrityExecutor(HttpCheckExecutor):
             if group:
                 attempted[group] = True
             trials.append({"case": label, "request_id": request_id, "request_id_trust": "untrusted_correlation",
-                           "http_outcome": response.get("outcome"), "response_id": response_id,
+                           "request_fixture_sha256": request_sha256,
+                           "http_outcome": safe_outcome, "response_id": response_id,
                            "normal_generation": state, "response_id_matches_body": response_matches})
         until = datetime.now(timezone.utc).isoformat(timespec="microseconds")
         capture = self._read(ctx, since, until, deadline) if verified else {"text": "", "returncode": None, "error": "identity unverified"}
@@ -246,33 +255,46 @@ class LogIntegrityExecutor(HttpCheckExecutor):
         fields_preserved, boundaries = analysis["fields_preserved"], analysis["boundaries"]
         normal_logs, normal_inference = analysis["normal_logs"], analysis["normal_inference"]
         controls = analysis["controls"]
+        # Verify the original message-to-display mapping transiently. Persist
+        # only the predicate transcript/display, with distinct original hashes.
         collection["capture_window"] = {"since": since, "until": until}
         collection["redaction"] = "configured authorization secrets and labelled credential values; source digests precede redaction"
-        displayed = redact_value(collection, ctx.secrets)
-        html = render_log_integrity(displayed)
-        display_verified = verify_log_display(html, displayed)
-        if not display_verified:
-            gaps.append("reference HTML event mapping could not be verified")
-        ctx.workdir.mkdir(parents=True, exist_ok=True)
-        # Persist the exact bytes hashed below; Windows text-mode newline
-        # translation would otherwise make the recorded display digest differ.
-        (ctx.workdir / "log_integrity_display.html").write_bytes(html.encode("utf-8"))
-        sample_artifact(ctx, "log_integrity_events.json", collection)
-        saved_capture = redact_value(capture, ctx.secrets)
-        saved_raw = saved_capture["text"].encode("utf-8")
-        saved_capture["persisted_decoded_sha256"] = hashlib.sha256(saved_raw).hexdigest()
-        saved_capture["persisted_decoded_bytes"] = len(saved_raw)
-        if "stderr_text" in saved_capture:
-            stderr_raw = saved_capture["stderr_text"].encode("utf-8")
-            saved_capture["persisted_stderr_sha256"] = hashlib.sha256(stderr_raw).hexdigest()
-            saved_capture["persisted_stderr_bytes"] = len(stderr_raw)
-        sample_artifact(ctx, "log_integrity_samples.json", {"schema": "guard-log-integrity-capture/2",
-                        "capture": saved_capture, "trials": trials, "initial_gaps": gaps_before_analysis,
-                        "max_events": self.cfg.get("max_events", 128), "policy_values": values,
-                        "source_identity_before": before_identity, "source_identity_after": after_identity,
-                        "native_contract": contract, "collection_sha256": hashlib.sha256(json.dumps(displayed, sort_keys=True, ensure_ascii=False).encode()).hexdigest(),
-                        "display_sha256": hashlib.sha256(html.encode()).hexdigest(), "display_verified": display_verified,
-                        "coverage_gaps": gaps, "violations": violations})
+        display_verified = False
+        try:
+            displayed = redact_value(collection, ctx.secrets)
+            source_html = render_log_integrity(displayed)
+            display_verified = verify_log_display(source_html, displayed)
+            if not display_verified:
+                gaps.append("reference HTML event mapping could not be verified")
+            sample = project_native(capture, trials, before_identity, after_identity,
+                initial_gaps=gaps_before_analysis, max_events=self.cfg.get("max_events", 128), analysis=analysis)
+            replay = analyze_integrity_capture(sample["capture"], sample["trials"],
+                sample["source_identity_before"], sample["source_identity_after"],
+                initial_gaps=sample["replay_initial_gaps"], max_events=sample["max_events"])
+            projected = replay["collection"]
+            projected["capture_window"] = sample["capture"]["window"]
+            projected["redaction"] = PROJECTION_PROFILE
+            html = render_projection(projected)
+            if not verify_log_display(html, projected):
+                raise ValueError("NATIVE_PROJECTION_DISPLAY_INVALID")
+            sample.update(policy_values=values, native_contract_sha256=sha256_hex(canonical_json(contract)),
+                source_display_sha256=hashlib.sha256(source_html.encode()).hexdigest(),
+                collection_sha256=hashlib.sha256(json.dumps(projected, sort_keys=True, ensure_ascii=False).encode()).hexdigest(),
+                display_sha256=hashlib.sha256(html.encode()).hexdigest(), display_verified=display_verified)
+            replay_native(sample)
+            # Format every safe value before any write. Each later IO failure
+            # remains independent so successful companion references survive.
+            documents = {"log_integrity_display.html": html,
+                "log_integrity_events.json": json.dumps(envelope(projected), ensure_ascii=False, indent=2),
+                "log_integrity_samples.json": json.dumps(envelope(sample), ensure_ascii=False, indent=2)}
+            if any(len(text.encode()) > MAX_BYTES for text in documents.values()):
+                raise ValueError("NATIVE_PROJECTION_STORAGE_BOUND")
+        except Exception:
+            ctx._failed_artifacts = {*getattr(ctx, "_failed_artifacts", ()),
+                "log_integrity_display.html", "log_integrity_events.json", "log_integrity_samples.json"}
+        else:
+            for filename, text in documents.items():
+                text_artifact(ctx, filename, text)
         obs = {
             "log_collector_profile": PROFILE, "log_client_request_id_trust": "untrusted_correlation",
             "log_trusted_fields": list(TRUSTED_FIELDS), "log_identity_verified": stable,

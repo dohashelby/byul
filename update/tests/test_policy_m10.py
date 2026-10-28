@@ -101,18 +101,18 @@ def run(tmp_path, monkeypatch, pack, vals, probe=None, missing_target=False):
 
 def test_registration_is_bounded_and_template_empty(pack):
     check = pack.checks["REQ-09"]
-    assert check.revision == 8 and pack.manifest.revision == 29 and not pack.reviewed
+    assert check.revision == 8 and pack.manifest.revision == 31 and not pack.reviewed
     assert contract_state(check) == "complete" and len(check.required_observations) == 10
     assert len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 25
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 54
-    assert len([c for c in pack.active_checks() if c.executor]) == 14
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 28
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 75
+    assert len([c for c in pack.active_checks() if c.executor]) == 17
     template = yaml.safe_load(build_policy_template(pack))
     assert template["values"]["REQ-09"] == {} and template["status"] == "DRAFT"
     assert template["confirmed_by"] is None and template["confirmed_at"] is None
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
-    assert len(rows) == 327 and sum(len(json.loads(r["check_ids"])) for r in rows) == 619
-    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=51, b=2, c=161, d=113)
+    assert len(rows) == 348 and sum(len(json.loads(r["check_ids"])) for r in rows) == 640
+    assert {c: sum(r["classification"] == c for r in rows) for c in "abcd"} == dict(a=72, b=2, c=161, d=113)
     for pid, key in zip(("P-DRAFT-INPUT-ENDPOINTS", "P-DRAFT-INPUT-FORMATS"), POLICIES):
         row = next(r for r in rows if r["proposed_policy_id"] == pid)
         assert row["classification"] == "a" and json.loads(row["current_param_paths"]) == [f"values.REQ-09.{key}"]
@@ -159,9 +159,12 @@ def test_unsupported_aborts_before_target_readiness_and_docker(tmp_path, monkeyp
     def forbidden(*args, **kwargs):
         raise AssertionError("readiness/Docker must never be entered")
     monkeypatch.setattr(http, "wait_engine", forbidden); monkeypatch.setattr(http, "Docker", forbidden)
-    _, _, evd, res, calls = run(tmp_path, monkeypatch, pack, values(pack.checks["REQ-09"], **{key: bad}),
-                                missing_target=True)
-    assert evd.execution.status == "ABORTED" and "INPUT_POLICY_UNSUPPORTED" in evd.execution.abort_reason
+    check = pack.checks["REQ-09"]
+    vals = values(check, **{key: bad})
+    with pytest.raises(ValueError, match="INPUT_POLICY_UNSUPPORTED"):
+        InputValidationExecutor({}).validate_policy(check, vals)
+    _, _, evd, res, calls = run(tmp_path, monkeypatch, pack, vals, missing_target=True)
+    assert evd.execution.status == "ABORTED" and evd.execution.abort_reason == "EXECUTOR_FAILURE"
     assert not calls and all(not o.collected for o in evd.observations.values())
     assert res.verdicts.security == res.verdicts.functional == "UNKNOWN"
 

@@ -1,6 +1,11 @@
 """INV-15 (판정 쪽): 판정 플러그인 실패·미완료 실행은 UNKNOWN. PASS·NOT_APPLICABLE로 바꾸지 않는다."""
 
+from types import SimpleNamespace
+
+import pytest
+
 from guard.judges import registry
+from guard.judges.base import JudgeOutput
 from guard.models import ExecStatus, Verdict
 from tests.builders import evidence
 from tests.judging import OK, REQ01, judge
@@ -33,7 +38,34 @@ def _with(plugin, fn):
 def test_plugin_exception_is_unknown():
     res = _with(Broken(), lambda: judge(evidence(observations=OK)))
     assert {res.verdicts.security, res.verdicts.functional, res.verdicts.performance} == {Verdict.UNKNOWN}
-    assert any("bad table" in r for r in res.reasons)
+    assert res.reasons == ["JUDGE_PLUGIN_FAILURE"]
+    assert "bad table" not in str(res.to_dict())
+
+
+@pytest.mark.parametrize("stage", ["functional", "performance", "reasons", "missing"])
+@pytest.mark.parametrize("initial", ["PASS", "FAIL", "UNKNOWN"])
+def test_late_plugin_error_withholds_any_pass_and_keeps_obtained_fail(monkeypatch, stage, initial):
+    fields = dict(verdicts={"security": initial, "functional": "PASS", "performance": "PASS"},
+                  reasons=[], missing_observations=[])
+    if stage in {"functional", "performance"}:
+        fields["verdicts"][stage] = "EXAMPLE_PRIVATE_INVALID_VERDICT"
+    elif stage == "reasons":
+        fields["reasons"] = None
+    else:
+        fields["missing_observations"] = None
+    # Deliberately bypass the output schema: malformed EXAMPLE plugin output.
+    output = JudgeOutput.model_construct(**fields)
+    plugin = SimpleNamespace(name="rule_table", version="EXAMPLE-invalid-output", judge=lambda *args: output)
+    monkeypatch.setitem(registry.JUDGES, "rule_table", plugin)
+    evd = evidence(observations=OK)
+    before = evd.to_dict()
+    res = judge(evd)
+    assert res.verdicts.security == (Verdict.FAIL if initial == "FAIL" else Verdict.UNKNOWN)
+    assert res.verdicts.functional == res.verdicts.performance == Verdict.UNKNOWN
+    assert Verdict.PASS not in res.verdicts.model_dump().values()
+    assert res.reasons == ["JUDGE_PLUGIN_FAILURE"] and res.missing_observations == []
+    assert "EXAMPLE_PRIVATE_INVALID_VERDICT" not in str(res.to_dict())
+    assert evd.to_dict() == before
 
 
 def test_plugin_cannot_emit_not_applicable():

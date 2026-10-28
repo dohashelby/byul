@@ -286,9 +286,9 @@ def test_post_observation_timeout_does_not_discard_previous_samples_or_expose_er
 
 def test_collection_setting_is_opt_in_versioned_and_strict():
     cfg = {"vocab_size": 50272, "vocab_source": "EXAMPLE source", "max_probe_tokens": 128}
-    assert InputValidationExecutor(cfg).version == "0.5.0"
-    assert InputValidationExecutor({**cfg, "length_cause_evidence": False}).version == "0.5.0"
-    assert InputValidationExecutor({**cfg, "length_cause_evidence": True}).version == "0.6.0"
+    assert InputValidationExecutor(cfg).version == "0.7.0"
+    assert InputValidationExecutor({**cfg, "length_cause_evidence": False}).version == "0.7.0"
+    assert InputValidationExecutor({**cfg, "length_cause_evidence": True}).version == "0.8.0"
     for value in (1, None, "true"):
         with pytest.raises(ValueError, match="explicit boolean"):
             InputValidationExecutor({**cfg, "length_cause_evidence": value}).validate_configuration(None)

@@ -304,8 +304,8 @@ def test_static_executor_version_and_no_dynamic_fixture_preview(tmp_path):
     cfg = {"adapter": {"name": "vllm"}, "executors": {"template_validation": "real"},
            "template_validation": {"target": str(path)}}
     env = environment(engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE}, model={"id": "fixture-model"})
-    assert TemplateValidationExecutor.version == "0.2.0"
-    assert TemplateValidationExecutor(cfg["template_validation"]).version == "0.2.0"
+    assert TemplateValidationExecutor.version == "0.4.0"
+    assert TemplateValidationExecutor(cfg["template_validation"]).version == "0.4.0"
     assert preview_inputs(definition(), env, VALUES, cfg) is None
 
 
@@ -355,7 +355,7 @@ def test_product_pipeline_and_portable_saved_pack_preserve_observation_only_cont
     (evd,) = run_plan(store, pack, plan, RunConfig(executors={"template_validation": "supply-sim"}, adapter="vllm"))
     (result,) = judge_plan(store, pack, plan, as_of=T0)
     assert evd.execution.status == ExecStatus.COMPLETED
-    assert evd.execution.executor.name == "template_validation" and evd.execution.executor.version == "0.2.0"
+    assert evd.execution.executor.name == "template_validation" and evd.execution.executor.version == "0.4.0"
     assert evd.data_origin.value == "EXAMPLE" and result.data_origin.value == "EXAMPLE"
     assert evd.observations["input_projection_exact_match"].value is True
     assert evd.observations["selected_template_approved"].value is False

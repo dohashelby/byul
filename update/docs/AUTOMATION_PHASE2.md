@@ -1,5 +1,7 @@
 # 자동화 2차: 변환 후 입력과 관측 계약
 
+> 2026-10-27 저장 경계 보수: 현재 `template_validation`은 0.4.0, 선택적 native 관측 첨부 사용 시 0.5.0이다. REQ-07의 `template-response-projection/1`은 원문 요청·응답·token 배열·preview·예외 대신 요청 fixture SHA, 응답 UTF-8 SHA/바이트 수/parse 상태와 허용 메타데이터만 저장한다. 렌더·소비 token 대조와 검토된 거부 증명은 원문을 메모리에서 확인한 뒤 계산하며 기존 관측·판정·source Ref를 유지한다. 잘못된 outcome은 고정 수집 공백이다. SUP-03도 고정 정상 요청을 hash로 저장하고 독립 소비 미확인·전체 UNKNOWN을 유지한다. 두 프로파일의 비교용 fixture SHA는 저장 투영과 별개로 기존 mask/정규화 식에서 계산한다. 과거 첨부·팩·증거는 수정하지 않는다. 아래는 최초 2차 구현 당시 기록이다.
+
 기준은 `1d1463274529708ae5fe5e04f42c134ba5a10ec3`(1차·초안 PR16)이고 작업 브랜치는 `codex/gua-automation-phase2`다. 원격 1차와 같은 커밋에서 시작했으며 main의 관계없는 변경은 합치지 않는다. [실행 프롬프트](AUTOMATION_PHASE2_PROMPT.md)를 문서로 만든 뒤 해당 범위를 구현·검증했다.
 
 ## 이번 묶음에서 바꾸는 것

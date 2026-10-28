@@ -1,23 +1,34 @@
 """REQ-09 bounded token-array checks using declared policy limits and a valid control."""
 from copy import deepcopy
+from guard.models import canonical_json, sha256_hex
 from guard.input_policy import contract_state, policy_context
 from .http_common import HttpCheckExecutor, functional_requests
 from .content_common import (append_artifact, bounded_probe, control_state, record_content,
                              sample_artifact)
-from .input_response_semantics import (contract_state as response_contract_state, rejection_proof,
-                                      response_capture_metadata)
+from .input_response_semantics import contract_state as response_contract_state, rejection_proof
+from .response_projection import capture_metadata as _capture_projection, log_metadata as _log_projection
+
+
+ARTIFACT_PROFILE = "input-response-projection/2"
+
+
+def _sample_projection(sample):
+    response = sample["response"]
+    return {"case": sample["case"],
+            "request_fixture_sha256": sha256_hex(canonical_json(sample["request"]["body"])),
+            "outcome": response.get("outcome"), "capture": _capture_projection(response)}
 
 
 class InputValidationExecutor(HttpCheckExecutor):
     name = "input_validation"
-    version = "0.5.0"
+    version = "0.7.0"
     requires_roles = False
     requires_route_scope = False
 
     def __init__(self, cfg, *args, **kwargs):
         super().__init__(cfg, *args, **kwargs)
         if cfg.get("length_cause_evidence") is True:
-            self.version = "0.6.0"
+            self.version = "0.8.0"
 
     def validate_configuration(self, check):
         """Validate execution bounds even when policy scope is unsupported."""
@@ -74,10 +85,11 @@ class InputValidationExecutor(HttpCheckExecutor):
                  "length": [0] * (ctx.policy_values["max_input_tokens"] + 1)}
         def send(req, label):
             r = bounded_probe(ctx, ctx.trusted_net, req)
-            record_content(ctx, "trusted", "input-validation", label, r)
+            record_content(ctx, "trusted", "input-validation", label, _log_projection(r))
             if semantic:
-                samples.append({"case": label, "request": deepcopy(req), "response": deepcopy(r),
-                                "capture": response_capture_metadata(r)})
+                # Native rejection and length-cause review need full transient
+                # data. Project only after both reviewers have finished.
+                samples.append({"case": label, "request": deepcopy(req), "response": deepcopy(r)})
             return r
 
         def control(label):
@@ -127,7 +139,10 @@ class InputValidationExecutor(HttpCheckExecutor):
             obs.update({key: {"value": value, "collected": True} for key, value in scope.items()})
         summary = {
             "challenge_outcomes": outcomes, "controls": controls,
-            "fixture": {"cases": cases, "control": fp.model_dump(mode="json"), "policy": ctx.policy_values,
+            "fixture": {"artifact_profile": ARTIFACT_PROFILE,
+                        "cases_sha256": sha256_hex(canonical_json(cases)),
+                        "control_sha256": sha256_hex(canonical_json(fp.model_dump(mode="json"))),
+                        "policy": ctx.policy_values,
                         "vocab_source": self.cfg["vocab_source"], **({"submitted_scope": scope} if scope else {})}}
         if semantic:
             # No consumer or damage sensor exists here. Preserve that gap even
@@ -143,12 +158,14 @@ class InputValidationExecutor(HttpCheckExecutor):
                 "limitations": ["accepted_challenges is the legacy raw HTTP 2xx list, not proof of consumption or damage.",
                                  "This collector has no consumer/damage sensor; automatic violations are never fabricated.",
                                  "Only exact reviewed image/response/request contracts can verify rejection.",
-                                 "Stored response bodies are masked and may be JSON-normalized; capture metadata retains original hashes and parse-state, not unmodified wire bytes."]})
+                                 "Request/response bodies, token IDs, previews and exception text are transient only; artifacts retain fixture/body hashes, parse state and fixed diagnostics."]})
             summary["fixture"]["response_evidence_profile"] = "input-response-evidence/1"
             if self.cfg.get("length_cause_evidence") is True:
                 summary["length_cause_evidence"] = cause_context
                 summary["fixture"]["length_cause_evidence_profile"] = (
                     cause_context.get("profile", "adapter-length-cause-unavailable/1")
                     if isinstance(cause_context, dict) else "adapter-length-cause-unavailable/1")
-            sample_artifact(ctx, "input_response_samples.json", {"samples": samples, "summary": summary})
+            sample_artifact(ctx, "input_response_samples.json", {
+                "artifact_profile": ARTIFACT_PROFILE,
+                "samples": [_sample_projection(sample) for sample in samples], "summary": summary})
         return obs, normal, [{"step": s, "attempted": len(outcomes) == len(cases)} for s in ctx.check.challenge_steps], summary

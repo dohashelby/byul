@@ -1,5 +1,104 @@
 # 기존 자동화 판정·준비 경로 보강
 
+## 2026-10-27 REQ-04 — native 운영 선택값 부분 생산자
+
+현행 profile6/source25는 기존 ASGI·고정 source/code·소유 세션 수집을 재사용해
+priority/session/rank/request-ID helper의 실제 반환과 InputProcessor 전달 필드를 구분한다.
+입력 원문·자격 증명·본문을 추가로 읽지 않고 session/ID는 제한된 지문만 기록한다.
+음수 priority/rank는 해당 신규 필드에서만 허용하며 기존 시각/seq 등은 음수를 거부한다.
+profile5는 당시23개 source·지점·고정 LF/CRLF bytes로 읽고 profile1·2·3·4도 유지한다.
+
+헤더 없는 호출은 클라이언트 요청 ID를 채우지 않은 개별 HTTP invocation으로 남긴다.
+세션 출력의 request_selection_index는 소유/프로세스 문맥·정확 파일/행 참조·헤더 재사용
+모호함·미수집과 최대256개 상한을 보존한다. helper 반환·입력 전달은 신뢰 principal이나
+Gateway 정규화·최종 worker 소비·기업 허용 정책 증명이 아니다. REQ-04 executor/judge는
+미등록이며 팩30·77개 정의·보안 규칙 연결16개·기존 판정과 스트림 측정은 유지한다.
+자세한 형식과 제한은 RUNBOOK의 REQ-04 절을 따른다. 아래 profile5 설명은 이전 단계 기록이다.
+
+## 2026-10-27 REQ-02 — 인증 bool·serving 호출 부분 생산자
+
+profile5/source23은 기존 ASGI 지문·고정 code gate·소유 파일/세션 수집을 재사용해 인증 입력
+scope, bool 반환, 동적 router 조회와 async serving 반환을 구분한다. 동기 auth RETURN을
+다운스트림 완료로 해석하지 않고 자격 증명/본문/ModelList 내용도 읽지 않는다. 재사용 헤더와
+누락·늦은 자식 문맥·관측 상한을 보존한다. 과거 profile4의20개 source/가중치 의미와 고정
+bytes를 읽으며 profile1·2·3도 유지한다. REQ-02는 신뢰 호출자·유효 Gateway 재작성·실제
+handler 선택의 독립 대응과 기업 허용 관계가 남아 executor/judge 미등록·UNKNOWN이다.
+기술 제한은 RUNBOOK의 REQ-02 절을 따른다. 새 일반 실행 프레임워크·외부 계약은 없다.
+
+## 2026-10-27 LIF-10 — native metadata 생산자·소유 기록 수집, 판정 미등록
+
+가중치 파일 선택이 추가된 profile4는 REQ-05 조사에서 확인한 native 적재 객체·가중치 적재 함수 인수·runner 모델
+호출을 같은 metadata/소유 수집 경계에 연결한다. 모델·revision 설정 지문과 객체 참조는
+최종 가중치 신원·실제 소비 증명이 아니다. 요청 연결은 native 호출 문맥의 scheduler ID
+관측이며 전체 실행·tensor/출력 귀속을 확정하지 않는다. profile1·2는 당시 source/지점
+집합과 고정 bytes로 읽으며 새 모델 의미를 소급하지 않는다. profile3도 당시19개 source와
+고정 bytes로 읽는다. profile4의20개 source에는 가중치 iterator factory7개의 최종 파일
+인수 지문이 포함된다. 별도 `capture-native-weight-files`는 정확 ENV inventory와 소유 파일의
+스트리밍 SHA를 대조한다. generator 생성은 소비·tensor 적재·실행 완료 증명이 아니며,
+파일·소유 재확인·저장 실패는 앞서 얻은 안전한 해시를 지우지 않는다. RUNBOOK의 REQ-05 절을 따른다.
+
+센서 profile2는 ASGI 헤더 문맥과 native ID 할당 반환을 지문으로 연결한다. 같은 PID의
+동기 할당 지점만 관측하고 헤더를 재사용한 다중 내부 ID는 모호함으로 보존한다.
+기존 profile1 자산/기록은 고정 bytes를 확인해 읽으며 새 의미를 소급하지 않는다.
+인증·고유 HTTP 신원·독립 인과성·전체 회수를 증명하지 않고 자동화 등록도 유지한다.
+기술 형식·미수집/호환성 제한은 RUNBOOK의 ASGI 절을 따른다.
+
+Kubernetes의 동일 파서/세션 수집 진입점은 `capture-kubernetes-lifecycle-session`이다.
+기존 HTTP의 명시 role/Pod 신원 대조를 공통화하고 고정 file/context/inventory helper만
+선택 container에서 실행한다. 별도 probe Pod나 HTTP 요청은 필요하지 않다. 기존 HTTP는
+Ready 검사를 유지하고 읽기 경로는 Running 세대의 장애 metadata를 보존한다. post-read 신원
+실패는 수집한 안전한 prefix와 구분한다. API imageID를 Docker config ID로 위조하지 않으며
+node runtime/manifest ancestry·생산자 인증·전체 회수는 미검증이다. 실제 cluster/GPU 실증이나
+자동화 등록 증가는 없다. 상세 입력과 제한은 RUNBOOK의 Kubernetes 절을 따른다.
+
+같은 생산자의 여러 프로세스 기록은 `capture-lifecycle-session`으로 연결한다. 소유 세대·
+세션 디렉터리·현재 프로세스와 파일 목록을 전후 대조하고, 기존 개별 수집을 재사용한다.
+목록과 실제 읽기 사이의 파일 신원 변화도 별도 표식으로 남긴다. 후속 목록·특정 기록·
+결과 저장 실패가 앞서 수집한 안전한 metadata를 지우지 않는다. 늦은 저장 실패는 해당
+metadata를 표준 출력으로 반환한다. 제한된 두 census와 지문 사건 index는 전체 실행 구간·
+실제 생산자 인증·요청 종결/회수 판정이 아니다. CLI는 기본 입력 검증이며 자동 판정 등록은 유지한다.
+
+`prepare-lifecycle-sensor`는 Python 3.12/Linux 소유 대상에 넣을 표준 라이브러리 센서와
+설정·bootstrap·bytes manifest를 만든다. source 후보는 공식 v0.31.0 commit
+`db9527a46873454610df6dbedf79a36d6bf1a7f6`이며 실제 image 내용 검증 완료를 뜻하지 않는다.
+센서는 고정 source SHA와 실제 loader code의 구조 지문을 대조한 module만 계측한다.
+외부/내부 ID 매핑, API abort, Core scheduler, KV 소유·지연 fence·pool 참조 수치,
+worker cached state/batch row, native host-copy 반환과 ASGI receive/send 반환을 구분한다.
+원래 함수의 반환/예외/취소와 입력 Iterator를 유지하고 generator 종료·CUDA 동기화·GC·
+fence 진전·참조 삭제를 대신하지 않는다. 원문 요청/응답/token/Secret/예외 이름·본문은 쓰지 않는다.
+
+기록은 프로세스별 PID/start·boot/PID/time namespace와 settings/asset SHA·행 해시 체인에 묶는다.
+클록은 host callback/metadata 관측 시각이며 CUDA 장치 시각·정확한 native 완료 시각이 아니다.
+metadata 읽기 구간을 별도로 남긴다. 새 파일은 256 KiB/512행 상한이며 기존 소유 파일 수집의
+기본 64 KiB는 유지한다. 기록 중단은 센서만 닫고 실제 작업을 종료하지 않는다.
+쓰기/상한/후속 프로세스 재확인 실패는 관측 공백이며 먼저 확보한 안전한 기록을 보존한다.
+
+`capture-lifecycle-observations`는 명시 `--execute`에서만 소유 파일·프로세스를 읽는다.
+정확 ENV Ref/세션/경로·자산 bytes·행 schema/sequence/chain·소유 container/image ID/RepoDigest·
+프로세스 시작/namespace를 대조한다. 단일 프로세스 파일 수집이며 전체 실행·모든 worker·GPU
+회수의 완전성을 확정하지 않는다. 동일 UID의 파일 생산자를 인증하지 않으므로 EXAMPLE 또는
+DECLARED 상한/UNKNOWN이며 CheckDef·judge·팩·자동화 등록은 바꾸지 않는다.
+실제 대상 계측과 기업 종료 기한·회수 대상·전체 수집/판정 연결은 미완료다.
+자세한 준비와 활성화 제한은 [RUNBOOK](RUNBOOK.md)의 LIF-10 절을 따른다.
+
+## 2026-10-26 PLT-08 — 명시 금지 평문 direct API 한 분기
+
+동일 제품 실행에서 기존 LIF-04의 소유 endpoint 고정·HTTP-only 정상 응답·source guard와
+전후 신원·시간창 수집을 재사용한다. 필수 primitive POL9개가 명시한 시험 direct hop에서
+금지 평문 정상 응답만 독립 보안 FAIL이다. 전체 PASS·배포 호출 앱/Gateway 경로·TLS·IPC/TP는
+미검증이며 출처는 DECLARED 상한/EXAMPLE이다. 기존 stream 측정·판정 코드는 바꾸지 않는다.
+자세한 실행과 제한은 [RUNBOOK](RUNBOOK.md)을 따른다.
+
+## 2026-10-26 PLT-07 — 명시 금지 TCP 연결 성공만 판정 연결
+
+기존 소유 컨테이너·image ID/RepoDigest·bridge endpoint·bounded 파일 수집을 재사용한다.
+추가 sender/receiver helper는 실제 UID/netns와 socket·일회성 수신 근거를 대조한다.
+사람이 해당 container UID+netns의 모든 프로세스에 명시한 금지 TCP 연결 성공만 기존
+`rule_table`의 독립 FAIL로 연결한다. 11개 필수 primitive 정책에는 기본값이 없고,
+정책 부재·worker-only 범위·시계/신원/수신 근거 부족은 미확인이다. 이 부분 연결은
+전체 PLT-07·worker/SDK/DNS/TLS·정책 만료 집행 완료가 아니며 새 PASS 규칙도 없다.
+[RUNBOOK](RUNBOOK.md)의 제한 프로파일과 실제 미실증 범위를 따른다.
+
 ## 2026-10-26 LIF-04 — 지속 지연 수신과 자원 수집, 판정 미등록
 
 기존 `stream_probe`를 재사용하고 optional `read_profile`이 있을 때만 chunk별 지연·명시 close를
@@ -65,7 +164,8 @@ PR #14의 소유 파일 수집을 재사용해 제품 명령 `guard capture-mode
   EXAMPLE 입력이 섞이면 EXAMPLE이며 그 외도 DECLARED를 넘지 않는다.
 
 Gateway 허용/거부·HTTP 200·응답 model·delivery.attempted는 최종 엔진 모델의 선택/사용
-증명이 아니다. 현재 그 생산자가 없어 결과는 항상 보안·기능·성능 UNKNOWN,
+증명이 아니다. profile3의 native 객체/호출 관측을 추가했지만 검증된 최종 모델 신원·
+실제 소비 생산자는 없어 Gateway 수집 결과는 항상 보안·기능·성능 UNKNOWN,
 `producer_authenticated=false`, `final_model_verified=false`,
 `actual_consumption_verified=false`, `product_connected=false`, `official=false`다.
 alias·LoRA·퇴역·대체 endpoint는 미시험으로 남기고 빈 실행기·판정기는 등록하지 않았다.
@@ -81,7 +181,11 @@ runtime 담당자는 서버 생성 request_id와 principal·정책 판본·대�
 샌드박스를 확보한 뒤 정상/확인된 위반/미수집/지원 밖을 시험하고 제품 판정에 연결한다.
 이번에는 실제 엔진과 runtime·platform·contracts 제품 코드를 변경하지 않았다.
 
-## PLT-07 후속 송신 시험 조건 — 계획, 실행하지 않음
+## PLT-07 후속 송신 시험 조건 — 구현 전의 계획 기록
+
+아래는 당시 계획이다. 현행 `explicit-forbidden-egress-v1`의 제한된 독립 FAIL 연결은
+`tools/overrides/PLT-07.yaml`, `src/guard/executors/boundary_egress.py`와 RUNBOOK을 따른다.
+아래의 당시 미등록 상태를 현행 상태로 읽지 않는다. 전체 PASS·실제 엔진 실증은 여전히 미완료다.
 
 PLT-07 실행기·정책·판정 등록은 하지 않았다. Linux CPU의 소유 샌드박스로 검토할 수
 있고 AWS가 필수인 것은 아니다. 실제 사용 환경·기동·비용은 별도 승인 범위다.

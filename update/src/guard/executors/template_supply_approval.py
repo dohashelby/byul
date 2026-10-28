@@ -11,8 +11,10 @@ import math
 import re
 import time
 
+from guard.models import canonical_json, sha256_hex
 from .content_common import content_request, control_state, json_body, sample_artifact
 from .engine_identity import owned_template_snapshot
+from .http_common import mask
 
 
 PROFILE = "fixed-template-supply-v1"
@@ -70,7 +72,7 @@ def _timestamp(value):
         return False
 
 
-def _target(ctx):
+def _target(ctx, *, profile_support=None):
     engine = ctx.target.get("engine")
     config = ctx.target.get("comparison_config")
     launch = config.get("launch") if type(config) is dict else None
@@ -99,7 +101,7 @@ def _target(ctx):
         index = argv.index("--served-model-name") + 1
         if argv.count("--served-model-name") != 1 or index >= len(argv) or argv[index] != model:
             return None
-    supported = getattr(ctx.adapter, "supports_template_profile", None)
+    supported = profile_support or getattr(ctx.adapter, "supports_template_profile", None)
     try:
         if not callable(supported) or not supported(selected):
             return None
@@ -108,7 +110,7 @@ def _target(ctx):
     return container, image, launch, selected
 
 
-def _snapshot(executor, ctx, target, deadline):
+def _snapshot(executor, ctx, target, deadline, *, expected_path=None):
     """공유 REQ-07 helper는 유지하고 이 프로파일의 identity 형식을 보강한다."""
     container, image, launch, identity = target
     try:
@@ -132,7 +134,8 @@ def _snapshot(executor, ctx, target, deadline):
             return None
         # 시간 epoch는 helper와 같고, 개별 snapshot의 남은 시간도 요청 timeout 안이다.
         snap = owned_template_snapshot(executor.docker, ctx, identity, launch["argv"],
-                                       min(deadline, time.monotonic() + ctx.timeout), monotonic=time.monotonic)
+                                       min(deadline, time.monotonic() + ctx.timeout), monotonic=time.monotonic,
+                                       **({"expected_path": expected_path} if expected_path is not None else {}))
         if (type(snap) is not dict or snap.get("container_id") != cid
                 or snap.get("started_at") != state["StartedAt"] or snap.get("image") != image
                 or snap.get("sha256") != identity["sha256"] or snap.get("readonly") is not True):
@@ -246,8 +249,12 @@ def collect(executor, ctx):
         "functional_probes_planned": {"value": list(functional), "collected": True},
         "functional_probe_results": {"value": functional, "collected": attempted},
     }
+    fixture = {"profile": PROFILE, "normal": ctx.check.functional_probes[0].model_dump(mode="json"),
+               "settings": limits, "endpoints": ["/tokenize", "/v1/chat/completions"]}
+    ctx._template_fixture_sha256 = sha256_hex(canonical_json(mask(fixture, ctx.secrets)))
     summary = {
-        "profile": PROFILE, "requests_sent": requests, "accepted_tokens": accepted_tokens,
+        "profile": PROFILE, "artifact_profile": "template-response-projection/1",
+        "requests_sent": requests, "accepted_tokens": accepted_tokens,
         "tokenize_response_token_count": tokenize_response_tokens,
         "identity_before": before, "identity_after": after,
         "collection_errors": sorted(set(errors)), "responses": responses,
@@ -262,8 +269,8 @@ def collect(executor, ctx):
             "Only the reviewed fixed template, full pinned ENV image, matching model and bounded normal chat are supported.",
             "Manual PASS is outside the existing REQ-07 bounded manual policy contract; declared FAIL and UNKNOWN are preserved.",
         ],
-        "fixture": {"profile": PROFILE, "normal": ctx.check.functional_probes[0].model_dump(mode="json"),
-                    "settings": limits, "endpoints": ["/tokenize", "/v1/chat/completions"]},
+        "fixture": {"profile": PROFILE, "normal_sha256": sha256_hex(canonical_json(fixture["normal"])),
+                    "settings": limits, "endpoints": fixture["endpoints"]},
     }
     if executor.cfg.get("native_observation_path") is not None:
         # Optional actual file capture, never an implicit new sensor/trust/verdict claim.

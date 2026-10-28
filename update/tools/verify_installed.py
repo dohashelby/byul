@@ -91,8 +91,21 @@ def installed_worker(root: Path, wheel: Path) -> dict:
         for argv in (["--help"], ["select", "--help"], ["run", "--help"], ["update", "--help"],
                      ["prepare-update", "--help"], ["judge", "--help"], ["report", "--help"],
                      ["policy", "template", "--help"], ["evidence", "export", "--help"],
-                     ["evidence", "restore", "--help"]):
+                     ["evidence", "restore", "--help"], ["prepare-lifecycle-sensor", "--help"],
+                     ["capture-lifecycle-observations", "--help"], ["capture-lifecycle-session", "--help"],
+                     ["capture-kubernetes-lifecycle-session", "--help"], ["capture-native-weight-files", "--help"]):
             cli(argv)
+        lifecycle_assets = root / "lifecycle-assets"
+        prepared = json.loads(cli(["prepare-lifecycle-sensor", "--output", str(lifecycle_assets)]))
+        assert prepared["prepared"] and prepared["engine_started"] is False and prepared["product_connected"] is False
+        from guard.collectors.lifecycle import load_prepared
+        lifecycle_manifest = load_prepared(lifecycle_assets / "manifest.json")
+        assert lifecycle_manifest["image_contents_verified"] is False
+        spec = importlib.util.spec_from_file_location("EXAMPLE_exported_lifecycle_sensor", lifecycle_assets / "guard_lifecycle_sensor.py")
+        exported = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(exported)
+        assert exported.install(path="/EXAMPLE-not-configured") is False
+        assert exported.PROFILE == lifecycle_manifest["profile"]
         pack_dir = root / "fixture-pack"
         pack = load_pack(pack_dir)
         inputs = root / "inputs"
@@ -320,9 +333,31 @@ def verify_analysis_modules(root: Path, store: Path, report: Path) -> dict:
     else:
         assert not corrupted["accepted"]
     assert inventory_tree(damaged) == damaged_before and inventory_tree(log_store) == before
+    projected_store, projected_report = fixture.build(root / "example-projected-log-store", root / "fixture-pack", projection=True)
+    projected_before = inventory_tree(projected_store)
+    projected = log_evidence.analyze_saved_logs(projected_store, projected_report)
+    assert projected["accepted"] and projected["official"] is False, projected
+    assert projected["checks"][0]["status"] == "PROJECTION_REPLAY_MATCH"
+    assert projected["checks"][0]["raw_source_replayed"] is False
+    assert log_evidence.main(["--store", str(projected_store), "--report", projected_report,
+                              "--output", str(root / "projected-log-analysis")]) == 0
+    assert inventory_tree(projected_store) == projected_before
+    for projection in (False, True):
+        native_store, native_report = fixture.build_native(root / ("native-projection" if projection else "native-legacy"),
+            root / "fixture-pack", projection=projection)
+        native_before = inventory_tree(native_store)
+        native = log_evidence.analyze_saved_logs(native_store, native_report)
+        assert native["accepted"] and native["official"] is False, native
+        row = native["checks"][0]
+        assert row["status"] == ("PROJECTION_REPLAY_MATCH" if projection else "REPLAY_MATCH")
+        if projection:
+            assert row["raw_source_replayed"] is False and row["original_native_parser_replayed"] is False
+        assert log_evidence.main(["--store", str(native_store), "--report", native_report,
+            "--output", str(root / ("native-projection-analysis" if projection else "native-legacy-analysis"))]) == 0
+        assert inventory_tree(native_store) == native_before
     return {"update_read_only": True, "audit_never_claims_two_image_trial": True,
             "log_read_only": True, "missing_log_evidence_never_accepted": True,
-            "example_log_replay": True, "log_tampering_rejected": True}
+            "example_log_replay": True, "log_tampering_rejected": True, "example_log_projection_replay": True, "example_native_legacy_and_projection_replay": True}
 
 
 def supervisor(args) -> None:

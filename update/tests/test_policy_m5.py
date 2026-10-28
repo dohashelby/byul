@@ -84,7 +84,7 @@ def test_inference_conflict_still_prevents_unproved_pass(pack):
 
 
 def test_approval_declarations_are_two_scalar_paths_not_item_evidence(pack):
-    assert pack.manifest.revision == 29 and not pack.reviewed
+    assert pack.manifest.revision == 31 and not pack.reviewed
     for cid in ("SUP-01", "SUP-02"):
         c = pack.checks[cid]
         assert c.revision == 3
@@ -97,7 +97,7 @@ def test_approval_declarations_are_two_scalar_paths_not_item_evidence(pack):
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
     row = next(r for r in rows if r["proposed_policy_id"] == "P-DRAFT-SUP-GOV-TOOL")
     assert row["classification"] == "a" and len(json.loads(row["current_param_paths"])) == 2
-    assert len(rows) == 327 and sum(len(json.loads(r["check_ids"])) for r in rows) == 619
+    assert len(rows) == 348 and sum(len(json.loads(r["check_ids"])) for r in rows) == 640
 
 
 @pytest.mark.parametrize("cid", ["SUP-01", "SUP-02"])

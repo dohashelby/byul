@@ -1,0 +1,68 @@
+{
+  "GenerateBaseServing._get_data_parallel_rank": {
+    "owner_class": "GenerateBaseServing",
+    "module": "vllm.entrypoints.generate.base.serving",
+    "method": "@staticmethod\ndef _get_data_parallel_rank(raw_request: Request | None) -> int | None:\n    \"\"\"Pulls the data parallel rank from a header, if provided.\"\"\"\n    if raw_request is None:\n        return None\n\n    rank_str = raw_request.headers.get(\"X-data-parallel-rank\")\n    if rank_str is None:\n        return None\n\n    try:\n        return int(rank_str)\n    except ValueError:\n        return None\n",
+    "full_source_sha256": "9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
+    "git_blob": "5142346df6619387174e94505b5af4659d58ec9b",
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/entrypoints/generate/base/serving.py",
+    "license": "Apache-2.0",
+    "copyright": "Copyright contributors to the vLLM project",
+    "license_file": "VLLM-LICENSE.txt"
+  },
+  "GenerateBaseServing._get_session_id_from_headers": {
+    "owner_class": "GenerateBaseServing",
+    "module": "vllm.entrypoints.generate.base.serving",
+    "method": "@staticmethod\ndef _get_session_id_from_headers(raw_request: Request | None) -> str | None:\n    if raw_request is None:\n        return None\n    if value := raw_request.headers.get(SESSION_ID_HEADER):\n        return value\n    return None\n",
+    "full_source_sha256": "9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
+    "git_blob": "5142346df6619387174e94505b5af4659d58ec9b",
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/entrypoints/generate/base/serving.py",
+    "license": "Apache-2.0",
+    "copyright": "Copyright contributors to the vLLM project",
+    "license_file": "VLLM-LICENSE.txt"
+  },
+  "GenerateBaseServing._get_session_id": {
+    "owner_class": "GenerateBaseServing",
+    "module": "vllm.entrypoints.generate.base.serving",
+    "method": "@staticmethod\ndef _get_session_id(\n    request: ChatCompletionRequest | CompletionRequest | ResponsesRequest,\n    raw_request: Request | None,\n) -> str | None:\n    if request.session_id:\n        return request.session_id\n    if value := GenerateBaseServing._get_session_id_from_headers(raw_request):\n        return value\n    if request.vllm_xargs:\n        session_id = request.vllm_xargs.get(\"session_id\")\n        if isinstance(session_id, str) and session_id:\n            return session_id\n    return None\n",
+    "full_source_sha256": "9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
+    "git_blob": "5142346df6619387174e94505b5af4659d58ec9b",
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/entrypoints/generate/base/serving.py",
+    "license": "Apache-2.0",
+    "copyright": "Copyright contributors to the vLLM project",
+    "license_file": "VLLM-LICENSE.txt"
+  },
+  "GenerateBaseServing._get_priority": {
+    "owner_class": "GenerateBaseServing",
+    "module": "vllm.entrypoints.generate.base.serving",
+    "method": "@staticmethod\ndef _get_priority(\n    request: ChatCompletionRequest | CompletionRequest | ResponsesRequest,\n    raw_request: Request | None,\n) -> int:\n    if raw_request is not None:\n        priority = raw_request.headers.get(PRIORITY_HEADER)\n        if priority is not None:\n            try:\n                return int(priority)\n            except ValueError:\n                pass\n    return request.priority\n",
+    "full_source_sha256": "9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
+    "git_blob": "5142346df6619387174e94505b5af4659d58ec9b",
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/entrypoints/generate/base/serving.py",
+    "license": "Apache-2.0",
+    "copyright": "Copyright contributors to the vLLM project",
+    "license_file": "VLLM-LICENSE.txt"
+  },
+  "BaseServing._base_request_id": {
+    "owner_class": "BaseServing",
+    "module": "vllm.entrypoints.serve.engine.serving",
+    "method": "@staticmethod\ndef _base_request_id(\n    raw_request: Request | None, default: str | None = None\n) -> str | None:\n    \"\"\"Pulls the request id to use from a header, if provided.\"\"\"\n    if raw_request is not None and (\n        (req_id := raw_request.headers.get(\"X-Request-Id\")) is not None\n    ):\n        return req_id\n\n    return random_uuid() if default is None else default\n",
+    "full_source_sha256": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
+    "git_blob": "86ba524946b2b3c07b4c4e332adfd5f60446c13b",
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/entrypoints/serve/engine/serving.py",
+    "license": "Apache-2.0",
+    "copyright": "Copyright contributors to the vLLM project",
+    "license_file": "VLLM-LICENSE.txt"
+  },
+  "InputProcessor.assign_request_id": {
+    "owner_class": "InputProcessor",
+    "module": "vllm.v1.engine.input_processor",
+    "method": "@staticmethod\ndef assign_request_id(request: EngineCoreRequest):\n    \"\"\"Replace the externally supplied request ID with an internal request ID\n    that adds 8 random characters in order to ensure uniqueness.\n    \"\"\"\n    if request.external_req_id is not None:\n        raise ValueError(\n            \"The external_req_id field should not be set on EngineCoreRequests\"\n            \" passed to vLLM; use the request_id field.\"\n        )\n    request.external_req_id = request.request_id\n    if envs.VLLM_DISABLE_REQUEST_ID_RANDOMIZATION:\n        logger.warning_once(\n            \"VLLM_DISABLE_REQUEST_ID_RANDOMIZATION is set and will be \"\n            \"removed in a future release. Duplicate externally-provided \"\n            \"request IDs may cause failures and/or subtle correctness errors.\"\n        )\n    else:\n        request.request_id = f\"{request.external_req_id}-{random_uuid():.8}\"\n",
+    "full_source_sha256": "d79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b",
+    "git_blob": "33d413ba2243d2f3af073410d3d717675bbbf14d",
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/v1/engine/input_processor.py",
+    "license": "Apache-2.0",
+    "copyright": "Copyright contributors to the vLLM project",
+    "license_file": "VLLM-LICENSE.txt"
+  }
+}

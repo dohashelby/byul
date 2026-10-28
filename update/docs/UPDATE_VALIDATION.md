@@ -1,5 +1,21 @@
 # 두 이미지 CPU 업데이트 비교 수락 도구
 
+## 2026-10-27 REQ-10 저장 투영의 두 전송 경로
+
+REQ-10의 Docker 로그에 응답 preview가, fixture에 원문 control이 남던 경계를 hash/parse 상태/허용 상태·메서드/유한 시간 metadata로 제한한다. REQ-09의 기존 투영 함수를 공용 보조 모듈로 추출하고 입력 검증·원인 수집·관측·판정은 바꾸지 않는다. REQ-10은 잘못된 transport outcome을 기존 고정 수집 오류로 제한하며 앞서 수집한 정상·수용 관측을 지우지 않는다. 응답 본문은 기존 추론 구조 검사에 메모리로만 전달한다.
+
+Kubernetes의 기존 소유·세대·IP 결합과 control SHA를 보존하고 이미 hash였던 control을 다시 pop/hash하지 않는다. 새 실행기는 Docker0.2.0/Kubernetes0.2.1이며 저장 profile은 `sampling-response-projection/1`다. CheckDef·팩·POL·소비 미확인·보안 UNKNOWN·기존 저장 증거는 유지한다. 원래 요청/관측 계산의 정적 대조와 내용 비저장·수집 공백·두 전송·제품 CLI/저장·불변식·wheel/CI 회귀로 검증하며 실제 엔진/GPU 실증으로 집계하지 않는다.
+
+
+## 2026-10-27 REQ-09 첨부의 원문 비저장
+
+`input_validation` 0.7.0(일반)·0.8.0(길이 원인 계측)은 기존 요청·정상 대조·원문 거부 검증·원인 계측을 메모리에서 유지한다. `input-response-evidence/1`의 판정 계산·CheckDef/POL·팩 revision은 바꾸지 않는다. 기존 저장 EVD와 첨부는 수정하거나 새 계약으로 소급하지 않는다.
+
+신규 첨부 표현은 `input-response-projection/2`다. 요청 body·token 배열·응답 body/preview/headers/detail은 저장하지 않으며, fixture/body SHA256·원래 JSON parse 상태·길이·허용 outcome·고정 진단과 기존 검증 출처를 남긴다. `probe_log.jsonl`도 허용 상태와 유한한 수치 메타데이터만 남긴다. fixture의 원문 cases/control 대신 각각의 정규 JSON hash를 사용하므로 과거 표현과 같은 비교 조건이라고 주장하지 않는다. 필요한 정의는 정확한 CheckDef Ref로 찾는다.
+
+길이 원인 수집기는 projection 전에 기존 full transient samples를 받는다. 첨부 hash가 원문 내용의 재현이나 독립 소비 증명이 되는 것은 아니며, HTTP200은 기존과 같이 소비·손상 증명으로 승격하지 않는다. 전체 legacy 실행기의 개인정보 경계를 일괄 검토했다는 뜻이 아니다. 이번 변경은 저장 표현의 보수이며 새 실제 엔진·GPU 시험 결과를 만들지 않는다. 의미·기록 보존과 원문 비저장 회귀, 인접 계약·불변식 및 wheel/최종 head CI로 검증한다.
+
+
 ## 2026-10-26 관측 확대 후보 — 기존 다섯 점검 반복 실증 제외
 
 이번 팩26 후보는 기존 76개 정의와 다섯 점검의 실행·판정·비교 경로를 보존했다.

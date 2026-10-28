@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from guard.adapters.base import EngineAdapter, ProbeRequest, Route
-from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, canonical_json, sha256_hex, utcnow
+from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.docker import Docker, DockerError, Mount
 from guard.runtime.comparison import execution_conditions
 
@@ -36,6 +36,17 @@ StreamProbe = Callable[[str, list[dict], float], list[dict]]  # bounded connecti
 HostProbe = Callable[[dict, float], dict]
 
 NO_RESPONSE = ("timeout", "unreachable")
+
+
+def incomplete_artifact_capture(draft: EvidenceDraft) -> EvidenceDraft:
+    """Retain collected facts; a failed capture never qualifies as complete."""
+    EvidenceDraft.model_validate(draft.model_dump())
+    draft.data_origin = min(draft.data_origin, DataOrigin.DECLARED, key=lambda value: ORIGIN_STRENGTH[value])
+    draft.status = ExecStatus.ABORTED
+    code = "ARTIFACT_CAPTURE_INCOMPLETE"
+    if code not in (draft.abort_reason or "").split("; "):
+        draft.abort_reason = f"{draft.abort_reason}; {code}" if draft.abort_reason else code
+    return draft
 TCP_BLOCKED = ("timeout", "refused", "unreachable")
 HANDLER_REACHED = "handler_reached"  # 검증된 안전 프로브가 인가 없이 핸들러에 닿음(어댑터 표의 기대 응답과 일치)
 MASK = "***"
@@ -100,23 +111,37 @@ def classify(res: dict, pr: ProbeRequest | None) -> Any:
     return o
 
 
-def docker_container_probe(docker: Docker, image: str) -> ContainerProbe:
+def docker_container_probe(docker: Docker, image: str, *, pull_never: bool = False,
+                           parent_deadline: float | None = None) -> ContainerProbe:
+    if type(pull_never) is not bool or parent_deadline is not None and (
+            type(parent_deadline) not in (int, float) or not math.isfinite(parent_deadline)):
+        raise ValueError("invalid HTTP probe lifecycle bounds")
     script = Path(http_probe.__file__).resolve()
     counter = {"n": 0}
     counter_lock = Lock()
 
     def run(network: str, requests: list[dict], timeout: float) -> list[dict]:
+        run_timeout = timeout * max(len(requests), 1) + 60
+        if parent_deadline is not None:
+            remaining = parent_deadline - time.monotonic()
+            if remaining <= 0:
+                raise DockerError("HTTP probe parent deadline expired")
+            run_timeout = min(run_timeout, remaining)
+            timeout = min(timeout, remaining)
         # Sampling checks issue a challenge and a valid control concurrently.
         # Reserve names before launching either subprocess; never share a name.
         with counter_lock:
             counter["n"] += 1
             suffix = f"probe{counter['n']}"
         res = docker.run_once(
-            image, suffix, network=network, timeout=timeout * max(len(requests), 1) + 60,
+            image, suffix, network=network, timeout=run_timeout,
             mounts=[Mount(script, "/probe/http_probe.py")], command=["python", "/probe/http_probe.py"],
             input=json.dumps({"timeout": timeout, "requests": requests}).encode(),  # 키는 stdin으로만
+            **({"pull_never": True} if pull_never else {}),
         )
         if res.returncode != 0:
+            if parent_deadline is not None:
+                raise DockerError("bounded HTTP probe unavailable")
             raise DockerError(f"probe container exited {res.returncode}: {res.stderr.strip()[:300]}")
         return json.loads(res.stdout)
 
@@ -200,6 +225,7 @@ class Ctx:
     sprobe: StreamProbe | None = None
     fixed_route_fixture: bool = False
     route_fixture_inputs: dict | None = None
+    http_probe_profile: str = http_probe.TRANSPORT_PROFILE
 
     @property
     def trusted_net(self) -> str:
@@ -328,24 +354,33 @@ class HttpCheckExecutor:
         for o in observations.values():
             if not o["collected"]:
                 o["value"] = None
-        ctx.workdir.mkdir(parents=True, exist_ok=True)
         summary = mask({"summary": True, "topology": ctx.target.get("topology"), "lab": bool(ctx.target.get("lab")),
                         **summary}, ctx.secrets)
         log_path = ctx.workdir / "probe_log.jsonl"
-        with log_path.open("w", encoding="utf-8", newline="\n") as stream:
-            stream.write("".join(json.dumps(x, ensure_ascii=False, default=str) + "\n" for x in [*ctx.log, summary]))
+        artifacts = []
+        try:
+            ctx.workdir.mkdir(parents=True, exist_ok=True)
+            with log_path.open("w", encoding="utf-8", newline="\n") as stream:
+                stream.write("".join(json.dumps(x, ensure_ascii=False, default=str) + "\n" for x in [*ctx.log, summary]))
+        except Exception:
+            # Only the artifact formatting/write boundary is recoverable here.
+            # Collector/configuration/model errors retain their existing boundary.
+            ctx._failed_artifacts = {*getattr(ctx, "_failed_artifacts", ()), "probe_log.jsonl"}
+        else:
+            artifacts.append(DraftArtifact(name="probe_log.jsonl", path=log_path, collector=f"{self.name}/{self.version}"))
         fixture = summary.get("fixture", {})
         config = mask(execution_conditions(ctx.target, {
             **self.cfg, "request_timeout": ctx.timeout, "allow_mutating_routes": ctx.allow_mutating,
+            "http_probe_profile": ctx.http_probe_profile,
         }, list(self.roles())), ctx.secrets)
-        return EvidenceDraft(
+        draft = EvidenceDraft(
             status=ExecStatus.COMPLETED,
             # 실험실(stub) 대상은 EXAMPLE. 실제 엔진 대상만 MEASURED (DECISIONS 5a/5b)
             data_origin=DataOrigin.EXAMPLE if ctx.target.get("lab") else DataOrigin.MEASURED,
             normal_control=normal,
             challenges=challenges,
             observations=observations,
-            artifacts=[DraftArtifact(name="probe_log.jsonl", path=log_path, collector=f"{self.name}/{self.version}")],
+            artifacts=artifacts,
             comparability={"fixture_sha256": sha256_hex(canonical_json(fixture)),
                            "config_sha256": sha256_hex(canonical_json(config)) if ctx.target.get("comparison_config") else None,
                            "model_inventory_sha256": ctx.env.model.inventory_sha256, "gpu": ctx.env.runtime.gpu_model,
@@ -354,6 +389,7 @@ class HttpCheckExecutor:
             started_at=ctx.started,
             finished_at=utcnow(),
         )
+        return incomplete_artifact_capture(draft) if getattr(ctx, "_failed_artifacts", ()) else draft
 
 
 # --- 공통 단계 ---------------------------------------------------------------------

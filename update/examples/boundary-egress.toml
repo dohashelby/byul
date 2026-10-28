@@ -1,0 +1,12 @@
+# EXAMPLE wiring only. Company policy values are deliberately absent.
+[adapter]
+name = "vllm"
+
+[executors]
+boundary_egress = "real"
+
+[boundary_egress]
+target = "<OWNED-SENDER-TARGET.json>"
+receiver_target = "<OWNED-RECEIVER-TARGET.json>"
+connect_timeout = 0.5
+max_duration_seconds = 30

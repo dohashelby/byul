@@ -1,5 +1,7 @@
 # Windows CPU 제품화와 자동화 1차
 
+> 2026-10-27 REQ-13 저장 경계 보수: 현재 `response_content` 0.2.0의 `response-content-projection/1`은 요청·응답 본문/token 배열·표식 값·preview·예외 대신 정규 요청 SHA·응답 UTF-8 SHA/바이트 수/parse 상태·표식 SHA·허용 metadata를 저장한다. 기존 JSON leaf 경로·반환 옵션·비공개 문맥/자기 입력 인용 분석은 원문을 메모리에서 확인하며 해당 관측과 정책 판정·fixture 비교 hash를 유지한다. 저장 metadata는 거부/소비 증명이 아니고, 뒤의 미수집이나 저장 실패가 이미 관측한 유출 FAIL을 지우지 않는다. 과거 팩·첨부·증거·Ref는 보존한다. 아래는 최초 1차 구현 당시 기록이다.
+
 기준: `codex/gua-policy-cache-m13` / `714b8bd60ebae3f8bde2bd056f7850ab38325209`.
 작업 브랜치: `codex/gua-windows-automation-phase1`. 상위 정책 PR이 미병합이므로 PR의 base는 M13이다.
 

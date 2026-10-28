@@ -5,10 +5,13 @@ still collect useful evidence, but cannot establish private-system coverage.
 """
 from __future__ import annotations
 
-from .content_common import (append_artifact, control_state, json_body, leaves, marker_fields,
-                             markers, sample_artifact, send_content, string_list, validate_content_settings)
+from guard.models import canonical_json, sha256_hex
+from .content_common import (append_artifact, bounded_probe, content_request, control_state, json_body, leaves, marker_fields,
+                             markers, sample_artifact, string_list, validate_content_settings)
 from .http_common import HttpCheckExecutor
+from .response_projection import capture_metadata, log_metadata
 
+ARTIFACT_PROFILE = "response-content-projection/1"
 OPTIONS = {"echo": True, "return_prompt_text": True, "return_token_ids": True,
            "logprobs": 1, "prompt_logprobs": 1}
 OPTION_FIELDS = {"return_prompt_text": {"prompt", "prompt_text"},
@@ -19,7 +22,7 @@ ENDPOINTS = {"/v1/completions", "/v1/chat/completions"}
 
 class ResponseContentExecutor(HttpCheckExecutor):
     name = "response_content"
-    version = "0.1.0"
+    version = "0.2.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -63,7 +66,11 @@ class ResponseContentExecutor(HttpCheckExecutor):
             return base
 
         def inspect(target, case, request_body, *, error=False, option=None, private=False):
-            result = send_content(ctx, target, case, endpoint, request_body)
+            request = content_request(ctx, target, case, endpoint, request_body)
+            network = ctx.trusted_net if target == "engine" else ctx.external_net
+            result = bounded_probe(ctx, network, request)
+            ctx.record("trusted" if target == "engine" else "external", target, case, "allowed",
+                       {**log_metadata(result), "method": request["method"]})
             status = result.get("outcome")
             value, reason = json_body(result)
             label = f"{target}:{case}"
@@ -113,9 +120,9 @@ class ResponseContentExecutor(HttpCheckExecutor):
                     # without an effect is not proof that the flag was blocked.
                     if option not in returned_options and not any(label in v for v in violations):
                         gaps.append(f"{label}: option accepted or ignored; rejection/stripping not observable")
-            samples.append({"target": target, "case": case, "request": request_body,
-                            "outcome": status, "response": value if value is not None else result.get("body"),
-                            "body_bytes": result.get("body_bytes"), "capture_error": reason})
+            samples.append({"target": target, "case": case,
+                            "request_fixture_sha256": sha256_hex(canonical_json(request_body)),
+                            "outcome": status, "capture": capture_metadata(result), "capture_error": reason})
             if value is not None and (expected_status or rejected_option):
                 covered.append(label)
             if option:
@@ -166,11 +173,13 @@ class ResponseContentExecutor(HttpCheckExecutor):
         normal = {"attempted": bool(controls), "succeeded": bool(controls) and len(controls) == len(planned)
                   and all(v == "pass" for v in controls.values()),
                   "detail": "normal request before and after response challenges for each selected target"}
-        sample_artifact(ctx, "response_samples.json", {"samples": samples, "markers": marks, "coverage_gaps": gaps})
+        sample_artifact(ctx, "response_samples.json", {"artifact_profile": ARTIFACT_PROFILE, "samples": samples,
+                        "marker_sha256": {role: sha256_hex(canonical_json(value)) for role, value in marks.items()},
+                        "coverage_gaps": gaps})
         attempts = [bool(samples), private_supported and any(s["case"] == "private_system" for s in samples),
                     any(s["case"] == "safe_error" for s in samples)]
         return obs, normal, [{"step": step, "attempted": attempts[index] if index < len(attempts) else False}
                              for index, step in enumerate(ctx.check.challenge_steps)], {
-            "violations": violations, "coverage_gaps": gaps,
+            "artifact_profile": ARTIFACT_PROFILE, "violations": violations, "coverage_gaps": gaps,
             "fixture": {"endpoint": endpoint, "max_tokens": 1, "marker_roles": sorted(marks), "policy": values,
                         "private_context": "system message" if private_supported else "unsupported"}}

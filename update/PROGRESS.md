@@ -1,5 +1,13 @@
 # PROGRESS
 
+## 2026-10-28 — A-1/A-2 메타데이터 파서 보수 통합
+
+- 한 일: A-1 f25631d의 등록 handler/source7·과거 profile 판독 위에 A-2 f92ae2f의 검토된 전용5파일을 정확 bytes로 반영했다. credential metadata의 중복 키·비정상 수·잘못된 UTF-8/구조를 기존 bounded strict_json으로 거부하고, 다른 출처에서 확인한 mount/env 위반과 후속 첨부 실패의 기존 관측·FAIL·Ref를 유지한다. 실행기0.4.2이며 공통 계약/registry/팩/판정 의미는 바꾸지 않는다.
+- 테스트 결과: A-2 독립 head의 필수5개 CI 성공을 원격에서 확인했지만 이 통합 소스의 성공으로 대체하지 않는다. 939파일 고정 후 직접/인접410통과·실패0·기존skip1·제외1(pytest49.78초·부모51.819초), 설치 wheel140파일 일치(부모20.897초), 검증 중 bytes 동일과 A-2 전용5파일 exact bytes를 확인했다. 이후 PROGRESS의 결과 기록만 반영하고 정확 통합 head 필수 CI를 확인한다.
+- 다음 단계: 통합 검증·커밋·푸시·후속 초안 PR·CI·인계를 마치고 A-2가 재현한 정확 ENV/소유 대상/세대 결합의 공통 경계를 별도 묶음으로 진행한다.
+- 막힌 것: 이 파서 보수에는 없음. 잘못된 대상의 안정성 문제는 이번에 해결했다고 주장하지 않는다. 실제 자격 사용·전체 PLT-04·REQ-02·실제 엔진 실증 증가는0이다.
+
+
 ## 2026-10-28 — A-1 REQ-02 등록 callback 관측 연결
 
 - 한 일: 공동 기준선2d210574(PR44 초안, 정확 head CI 필수5개 성공·기본5333통과)을 보존한 별도 후속 브랜치에서 고정 GET /v1/models의 등록 endpoint/dependant 참조·실제 callback·인증/경로 관측을 연결했다. profile7이며 profile6의 고정 LF/CRLF bytes·source25·기존 지점/SELECTION과 profile1~5 판독을 유지한다. 기존 제품 세션 수집 CLI에 원본 행 참조가 있는 별도 handler 색인을 추가했다.

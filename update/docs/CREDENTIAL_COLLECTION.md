@@ -1,6 +1,6 @@
 # 자격·마운트 수집의 부분 실패
 
-`credential_exposure/0.4.1`은 기존 PLT-04의 `forbidden_mount_violations`
+`credential_exposure/0.4.2`는 기존 PLT-04의 `forbidden_mount_violations`
 관측과 판정 계약을 사용한다. 유효한 bind/volume 목적지와 명시 금지 경로의
 포함 관계가 확인되면, 다른 마운트 행의 형식 오류 때문에 이 위반을 버리지 않는다.
 부분 목록에 위반이 없으면 빈 안전 목록으로 기록하지 않고 미수집으로 남긴다.
@@ -19,3 +19,12 @@
 마운트 금지 위반은 실제 자격 파일의 존재·내용·접근·서비스 사용 증명이 아니다.
 과거 저장 정의의 `exposed_credential_paths` 경로는 변경하지 않는다.
 시험의 Docker·HTTP 대역 결과는 EXAMPLE이며 실제 엔진·worker 집행 실증과 구분한다.
+
+자격 후보 metadata는 기존 bounded `strict_json`으로 읽는다. 주체 확인값·경로·상태
+등의 중복 JSON 키, NaN/Infinity 상수, 잘못된 UTF-8·기존 decoder의 중첩 해석 실패는
+`CANDIDATE_METADATA_UNAVAILABLE`과 후보 `unknown`으로 남긴다. 모순되는 값의
+마지막 항목을 택해 부재·접근 가능·주체 일치를 확정하지 않는다. 이런 패킷 오류도
+독립적으로 확보한 금지 마운트·환경변수 이름 위반을 지우지 않는다.
+
+정상 패킷과 기존 schema/profile·후보 상태의 의미는 그대로다. 실행기 버전을
+0.4.2로 기록하여 이 수집 경계가 달라졌음을 구분하며 과거 EVD를 고치지 않는다.

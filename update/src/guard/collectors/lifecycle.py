@@ -11,7 +11,7 @@ from guard.adapters import vllm_lifecycle_sensor as sensor
 from guard.adapters import vllm_lifecycle_profiles as profiles
 from guard.collectors.file import load_environment
 from guard.collectors.route_observations import validate_output
-from guard.executors.owned_capture import strict_json, validate_owned_source
+from guard.executors.owned_capture import strict_json, validate_owned_source, validate_engine_target, engine_identity
 from guard.models import DataOrigin
 from guard.update_validation import reserve_output
 
@@ -112,14 +112,10 @@ def validate_binding(env,target,source,prepared):
 
 def validate_session_binding(env,target,source,prepared):
     validate_owned_source(**source)
-    if (not env.hash_ok() or type(target) is not dict
-            or target.get("environment_ref") != env.ref().model_dump(mode="json")
-            or type(target.get("run_id")) is not str
-            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}",target["run_id"]) is None
-            or type(target.get("engine")) is not dict
-            or target["engine"].get("container") != source["container"]
-            or source["image"] != env.engine.image_digest):
-        raise ValueError("LIFECYCLE_CAPTURE_INPUT_INVALID")
+    try:
+        validate_engine_target(env,target,source["container"],source["image"])
+    except ValueError:
+        raise ValueError("LIFECYCLE_CAPTURE_INPUT_INVALID") from None
 
 
 def collect(docker, env, target, source, prepared):
@@ -145,7 +141,9 @@ def collect_session(docker,env,target,container,image,prepared):
     source={"container":container,"image":image,"path":"/guard-lifecycle/data/"+prepared["session"]}
     validate_session_binding(env,target,source,prepared)
     from guard.executors.lifecycle_session import capture_session
-    value=capture_session(docker,target,container=container,image=image,prepared=prepared)
+    def owner(client,topology,name,pin,timeout):
+        return engine_identity(client,topology,env,name,pin,timeout)
+    value=capture_session(docker,target,container=container,image=image,prepared=prepared,owner_identity=owner)
     origin=DataOrigin.EXAMPLE if env.data_origin==DataOrigin.EXAMPLE or target.get("lab") is True else DataOrigin.DECLARED
     return {**value,"data_origin":origin.value,"environment_ref":env.ref().model_dump(mode="json"),
         "origin_detail":"owned container census and recording bytes; producer assertions and fingerprint links remain unauthenticated"}

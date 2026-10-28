@@ -1,0 +1,16 @@
+# Proposal only: not loaded by pack generation, registry or CLI.
+# Full SUP-12 coverage remains unavailable; this proposal grants no PASS.
+status: PROPOSAL_NOT_APPLIED
+check_id: SUP-12
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all: []
+    fail_when_any:
+    - obs: decoder_forbidden_effects_seen
+      op: nonempty
+    axes: {}
+limitations:
+- Map only effects confirmed at the actual selected reader with an explicit policy.
+- Reference fixtures remain EXAMPLE evidence; no actual daemon/loader identity is verified.
+- No whole-check PASS from this one decoder branch, normal controls or a hash match.

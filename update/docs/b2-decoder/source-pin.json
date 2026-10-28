@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/vllm-project/vllm.git",
+  "tag": "v0.31.0",
+  "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+  "files": {
+    "vllm/v1/serial_utils.py": "8be308e0824103a9d061e95c43f915baf60136ded6cd0dc5721dd4a7fb1cca39",
+    "vllm/envs.py": "1d7101800f67b803a700fbf7489292cf1f0022b570085166ad407e6b1513dc15",
+    "tests/v1/test_serial_utils.py": "c2e2fc3650603fde8e7ccae58218b2af2c39c316673ca622764446b96badfedf"
+  },
+  "mapped_official_reference": "5d35ce3934a7804b298559d2d99eec33792e1eb9",
+  "compatibility": "mapped official encoder reference is distinct; this decoder CPU run uses the pinned tag source only"
+}

@@ -1,4 +1,4 @@
-한 일: structured-tools-v1 전용 입력·HTTP 실행 확장·요청 클래스 관측 투영·rule_table 자료·회귀·CPU 실행 도구 작성. sampling-api-v1 보존.
-검증: snapshot-2 영향/인접/불변식 207 passed, 1 deselected(기존 표지), pytest 35.44초/부모 35.574초. 첫 샌드박스 실행 5개 소켓 권한 실패 후 소스 수정 없이 제한 밖 재검증. 실제 vLLM 클래스·엔진 미실행.
-다음: 최종 head 필수 CI 확인. A의 공동 SHA·등록 인계 후 CLI→EVD→RES/RPT 연결 검증하고 다음 크기·깊이 분기를 선정.
-막힌 것: A 공동 SHA·정제/첨부 보존 API·등록/팩 인계, 실제 클래스 환경과 설치판/backend·엔진 실행 승인 미정. REQ-10 전체 완료 아님.
+한 일: 기존 PR43 구현·회귀 보존. B 전체 CPU 실행 원칙 갱신, 참조 vLLM 소스·시험용 격리 환경 준비 후 실제 요청 클래스 검증 완료.
+검증: 대역 영향/인접/불변식 207 passed·1 deselected 보존. 실제 클래스 정상 4건 수용·금지 1건 거부(25.32초), 공식 원문 CPU 시험 9 passed(pytest 4.02초/부모 6.66초). 기존 head 필수 CI 전부 통과. 제품 lock 미변경.
+다음: CPU 결과 문서 반영 head의 CI 확인. A 공동 SHA 인계 후 제품 등록/CLI→EVD→RES/RPT 연결 검증.
+막힌 것: 제품 연결에 필요한 A 확정 SHA·등록/팩·정제/첨부 계약 인계. 설치 대상/backend 및 실제 환경 실행 범위는 별도 미정. 참조 CPU 검증은 완료했으며 REQ-10 전체 완료는 아님.

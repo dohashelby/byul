@@ -23,18 +23,20 @@ response_format, 다중 제약, 크기·깊이·복잡도는 이 묶음에서 �
 등록·CLI·팩·기존 override는 수정하지 않았다. 현재 제품 자동 연결은 대기다.
 HTTP 200/400은 API 관측이다. 거부 위치·후속 변환 미도달은 증명하지 않는다.
 `validate_request_class`는 실제 클래스/정확한 거부 예외를 전달받아 CPU에서 호출할
-독립 진입점이다. 현재 회귀의 fake_class는 EXAMPLE 계약 대역이며 실제 vLLM이 아니다.
-실제 클래스 환경 의존성이 프로젝트 lock에 없으므로 임의 추가하지 않았다.
+독립 진입점이다. 회귀의 fake_class는 EXAMPLE 계약 대역이며 실제 vLLM이 아니다.
+2026-10-28 후속 작업에서 제품 lock과 분리한 Python 3.12 격리 환경을 준비해 실제
+참조 클래스 CPU 검증을 수행했다. B 전체의 환경 준비 기준은
+[CPU 실행 원칙](../b-work/CPU_EXECUTION.md)을 따른다.
 `project_validator`는 금지 조합의 실제 boundary 수용을 독립 위반으로 투영한다.
 `judge_params`는 기존 rule_table 형식이며 보안 PASS 규칙은 없다. 확인된 FAIL은
 다른 정상/누락 관측과 독립적이다. 첨부 저장 중 증거 보존은 A 공통 보수 인계가 필요하다.
 runner_consumption_verified는 항상 false다. 기존 sampling의 의미와 과거 Ref는 유지한다.
 
-실제 CPU 검증 재개 조건: 정확한 설치 소스 SHA, Python 3.12 환경과 의존성 명세,
+실제 CPU 검증 절차: 정확한 참조 소스 SHA, Python 3.12 환경과 의존성 명세,
 ChatCompletionRequest 및 VLLMValidationError 실제 import를 확인한다. 그 환경에서
 `validate_request_class(ChatCompletionRequest, VLLMValidationError, model=...)`를 호출하고
 설치판·소스 파일 bytes SHA·결과·CPU 벽시계를 저장소 밖 기록한다. 설치 대상 미정 상태에서
-참조 소스 검사나 대역 통과를 설치판 MEASURED로 보고하지 않는다.
+참조 소스 CPU 결과나 대역 통과를 설치판 실측으로 보고하지 않는다.
 
 ## A에게 전달할 최소 연결 요청
 
@@ -82,3 +84,6 @@ python update/tools/req10_request_class.py --source-root "$VLLM_SOURCE" --model 
 vllm 경로의 수정 유무, 실제 import 파일 경로를 확인하고 파일 bytes SHA를 기록한다.
 새 출력 파일만 허용하고 import/실행 실패의 원문은 저장하지 않는다.
 이 도구의 실행 성공도 전체 클래스 밖의 grammar/backend 경로를 확인하지 않는다.
+
+2026-10-28 후속 실제 CPU 결과와 재현 명령은 [CPU 참조 검증](CPU_REFERENCE.md)에 있다.
+참조 클래스 정상 4건 수용·금지 1건 거부, 원문 공식 시험 9개 통과를 확인했다.

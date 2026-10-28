@@ -39,6 +39,26 @@ def strict_json(raw, *, limit=MAX_BYTES):
         raise ValueError("CAPTURE_INVALID_JSON") from None
 
 
+def validate_engine_target(env, target, container, image):
+    """Bind a Docker engine source to the exact declared ENV; no I/O or verdict.
+
+    Gateway sources have a different identity and must not use this contract.
+    A valid declaration does not authenticate a producer or a worker process.
+    """
+    if (not env.hash_ok() or type(target) is not dict
+            or target.get("environment_ref") != env.ref().model_dump(mode="json")
+            or type(target.get("run_id")) is not str
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}",target["run_id"]) is None
+            or type(target.get("engine")) is not dict
+            or target["engine"].get("container") != container
+            or image != env.engine.image_digest):
+        raise ValueError("CAPTURE_ENGINE_TARGET_INVALID")
+    try:
+        validate_owned_source(container=container,image=image,path="/guard-observations/engine")
+    except ValueError:
+        raise ValueError("CAPTURE_ENGINE_TARGET_INVALID") from None
+
+
 def identity(docker, target, container, image, timeout):
     row = docker.inspect_json(container, timeout=timeout)
     cfg, state = row["Config"], row["State"]
@@ -51,6 +71,20 @@ def identity(docker, target, container, image, timeout):
         raise ValueError("CAPTURE_OWNER_UNVERIFIED")
     return {"container_id": row["Id"], "image_id": row["Image"], "started_at": state["StartedAt"],
             "image": cfg["Image"]}
+
+
+def engine_identity(docker, target, env, container, image, timeout):
+    """Check exact ENV inputs and the owned running engine at one instant.
+
+    Callers compare independent before/after identities for their source
+    interval. One successful inspection never proves interval stability,
+    credential use, worker attribution, or native producer authenticity.
+    """
+    validate_engine_target(env,target,container,image)
+    try:
+        return identity(docker,target,container,image,timeout)
+    except (KeyError,TypeError,AttributeError,ValueError):
+        raise ValueError("CAPTURE_OWNER_UNVERIFIED") from None
 
 
 def validate_owned_source(*, container, image, path):

@@ -20,17 +20,24 @@ from guard.executors.serialization_decode import analyze_decoder_trial, collect_
 PIN_PATH = Path(__file__).resolve().parents[1] / "docs/b2-decoder/source-pin.json"
 
 
-def source_scope(root):
-    import cloudpickle
-    import msgspec
-    import zmq
-
+def verify_source(root):
     pin = json.loads(PIN_PATH.read_text())
     if subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip() != pin["commit"]:
         raise ValueError("reference commit mismatch")
     for name, expected in pin["files"].items():
         if hashlib.sha256((root / name).read_bytes()).hexdigest() != expected:
             raise ValueError("reference file bytes mismatch")
+    if subprocess.check_output(["git", "-C", str(root), "status", "--porcelain", "--", "vllm"], text=True).strip():
+        raise ValueError("reference source tree is modified")
+    return pin
+
+
+def source_scope(root):
+    import cloudpickle
+    import msgspec
+    import zmq
+
+    pin = verify_source(root)
     # Execute the actual environment getter; change only this child process.
     path = root / "vllm/envs.py"
     tree = ast.parse(path.read_bytes(), filename=str(path))

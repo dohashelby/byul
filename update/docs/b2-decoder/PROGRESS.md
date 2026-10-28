@@ -24,3 +24,25 @@ wheel 빌드 및 whitespace 검사도 통과했다. 최종 HEAD CI는 PR과 외�
 추가 typed Tensor/모델 파일 reader·fallback·weights daemon peer 경로는 미검증이다.
 다음: A 인계 시 실제 consumer 대응·정책 Ref를 고정하고 실행→EVD→RES/RPT를 연결한다.
 외부 상세 자료는 `byul-b2-evidence-20261028/decoder-{snapshot,cpu,verification}-1.json`에 보존한다.
+
+## 같은 직렬화 기능의 공식 message lifetime 시험
+
+main/A 열린 PR/B-1과 다른 CHK를 입력·실행·관측·판정으로 대조하고 REUSE_REVIEW.md에 기록했다.
+REQ-16 기존 M12 판정/수동 경로와 공식 hash를 재사용해 별도 키 실행기/판정기는 만들지 않았다.
+원래 hash 시험2개 통과 자료는 외부 cache-official-reuse-1에 있다.
+
+REQ-14 PAYLOAD의 부족한 실제 CPU 실행은 같은 PR50에 모았다. 원래 encoder 거부,
+payload buffer 재사용, zero-copy frame 수명 시험의 정의·입력·assertion을 그대로 실행했다.
+codec/EngineCoreProc/EngineCoreOutputs는 고정 실제 모듈이며 target 타입·메서드의 대역은 없다.
+로컬 inproc 전송·CPU Tensor만 사용했고 선택 시험은 엔진 생성자/model/GPU/HTTP를 호출하지 않는다.
+
+우리 안전 요약/기존 decoder 계약 **22 passed / pytest0.18s / 부모0.303s**.
+고정 실제 공식 시험 **3 passed / 6.221s / skip0**, 원문 진단 미저장.
+공통 source 검증 helper 분리 뒤 기존 untyped decoder14사례도 재검증해 통과했다.
+wheel·whitespace 검사 통과. 최종 HEAD CI는 PR/외부 인계에 기록한다.
+제품 의존성/lock은 유지하고 시험 환경만 message-cpu-requirements.txt로 별도 고정했다.
+
+REQ-14의 worker 신뢰·peer 권한·NCCL/PD·실제 GPU 소비는 미검증이다.
+이번 source unit 성공을 전체 CHK PASS/설치판 호환성으로 확대하지 않는다.
+상세는 외부 message-source-snapshot-1.json, message-official-run-1/summary.json,
+decoder-cpu-2.json 및 message-import-attempt-*.json에 보존한다.

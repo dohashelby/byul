@@ -63,3 +63,34 @@ A 연결 요청: 고정 통합 SHA·등록/팩/CLI API, 실제 consumer와 decod
 그 소스에서 실행→EVD→RES/RPT를 확인해야 제품 연결을 마감한다. 공통 파일은 수정하지 않는다.
 자동 파일 형식 선택/fallback·weights daemon peer/UID·typed tensor·실제 모델 reader는 남은 별도 분기다.
 계측/생산자/정책이 없어 이를 “실제 실행만 남음”으로 표시하지 않는다.
+
+## 같은 직렬화 기능의 REQ-14 공식 시험 재사용
+
+다음 묶음의 main/A/B/다른 CHK 대조는 `REUSE_REVIEW.md`에 짧게 기록했다.
+공식 encoder 거부, payload buffer 재사용, caller 참조 해제 뒤 zero-copy frame 수명 시험을
+원래 입력·assertion으로 실행한다. 실제 vLLM codec·EngineCoreOutputs·EngineCoreProc 모듈과
+CPU Torch/NumPy/PyZMQ를 import한다. target 클래스·sender 메서드·타입 schema를 대역으로 교체하지 않는다.
+source pin·import 경로·CPU-only Torch를 확인하고 upstream conftest/engine fixture는 불러오지 않는다.
+엔진 생성자는 선택 시험에서 호출하지 않으며 소유한 로컬 inproc context는 원래 시험이 정리한다.
+
+새 실행기/판정기 대신 `b2_message_cpu.py`의 최소 시험 adapter만 추가한다. 수집 실패/skip/
+후속 process 실패는 성공으로 보고하지 않으며, 먼저 얻은 카운터는 보존하고 누락은 null이다.
+raw pytest 진단과 request/output/Tensor 값은 메모리에서만 처리한다.
+로그에는 검증된 카운터·시간·소스 metadata만 저장한다.
+
+이 시험은 단일 프로세스의 실제 codec/transport 동작이다. 침해 worker·peer 권한·NCCL·PD 전달·
+실제 GPU 소비나 REQ-14 전체를 증명하지 않는다. fixture의 규모는 기업 정책·예산이 아니다.
+REF 판본과 설치판의 호환성은 별도다. 제품 의존성/uv.lock에는 시험 패키지를 넣지 않는다.
+
+```sh
+uv venv --python 3.12 /path/to/b2-evidence/message-venv
+uv pip install --python /path/to/b2-evidence/message-venv/bin/python \
+  torch==2.14.0+cpu --index-url https://download.pytorch.org/whl/cpu
+uv pip install --python /path/to/b2-evidence/message-venv/bin/python \
+  -r docs/b2-decoder/message-cpu-requirements.txt
+PYTHONPATH=src:. /path/to/b2-evidence/message-venv/bin/python tools/b2_message_cpu.py \
+  --source /path/to/pinned-full-vllm-source --output /path/to/new-message-evidence
+```
+
+명세의 requirements는 이 CPU 검증 환경의 고정 기록이며 제품 설치 목록이 아니다.
+직접·간접 test dependency를 별도 가상환경에 설치했고 기존 시스템/다른 세션 환경은 바꾸지 않았다.

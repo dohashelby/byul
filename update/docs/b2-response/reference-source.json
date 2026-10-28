@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/vllm-project/vllm.git",
+  "tag": "v0.31.0",
+  "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+  "files": {
+    "vllm/exceptions.py": "22fe819c7ef10438f740c251d81af204871a04c3aa3eb1fd0e68604dc4c2146f",
+    "vllm/entrypoints/serve/engine/protocol.py": "9d865d7006ed6ede3417f75444f8b5dcd82769165e703b140b45ed639d0c16a4",
+    "vllm/entrypoints/serve/exception_handling/utils.py": "723214aa4c63418f1d5eb7c1ff2116eca474778576ac7198daa1f39217c17a4f",
+    "vllm/entrypoints/serve/exception_handling/handlers/validation.py": "ed14c81cc5685c7521ed1b5b8c51b4e7a5de05d2fb6310e7a3faa3d31548cca0",
+    "vllm/entrypoints/serve/exception_handling/handlers/http.py": "ae710c07f319f56e105a8d143300b0d1042ab4cdedc437da2c7dd88df21e5a18",
+    "vllm/entrypoints/serve/utils/request_logger.py": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d",
+    "vllm/logging_utils/formatter.py": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5"
+  }
+}

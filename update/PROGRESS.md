@@ -1227,3 +1227,9 @@ git status
 - 테스트 결과: 1070파일을 고정한 직접/동일 계약·인접·readiness·불변식615통과·실패0·기존Windows skip1·제외1(pytest44.04초·부모45.063초), 검증 중 bytes 불변이다. 두 판본의 기존 CLI 저장/반출·재판정·첨부 오류와 prebound/after_baseline 후보 누락·교체 시 기준판 보존을 확인했다. 이미지 layer 검토와 주입은 실제 GPU 실증이 아니다. 정확 HEAD의 필수 CI·wheel을 확인한다.
 - 다음 단계: 직접/동일 계약·인접·불변식 검증 → 실패 수정·재고정 → wheel·정확 HEAD CI·후속 초안 PR·인계, 승인된 실제 단일 dev GPU 제품 왕복.
 - 막힌 것: 전용 SSM role/profile 생성·연결은 사용자 확인 대기이며 실제 AWS 서버/SG/IAM은 생성하지 않았다. 기업 허용표·실제 GPU/worker 종료와 두 이미지 실행은 미실증이다.
+## 2026-10-29 — 개발자 A의 B-1 확정 전달물 통합
+
+- 한 일: 검증된 GPU pair811bdb5를 보존한 별도 통합 worktree에서 B의2505b2f/2528a98을 커밋 단위로 반영했다. 최종 전용4파일은 원본 commit blob을 유지하며 B 파일을 재작성하지 않았다. 공통 src·팩·registry·의존성·판정은 변경하지 않는다.
+- 테스트 결과: 1074파일 고정 B structured-tools/limits·sampling·Kubernetes·증거/불변식306통과·실패0·기존Windows skip1·제외1(pytest15.95초·부모17.829초), 검증 중 bytes 불변이며 전용4파일의 원본 commit blob이 같다. B의5사례는 EXAMPLE 제품 경로이며 실제 설치판 클래스·엔진 실증을 새로 집계하지 않는다. exact HEAD 필수 CI를 확인한다.
+- 다음 단계: 실패 수정·필요한 재검증 → 정확 통합 head의 초안 PR·CI·인계, B의 설치판 producer/정식 연결 계약과 실제 GPU 권한 확인 후 제품 실증을 이어간다.
+- 막힌 것: B 전체 CPU 도구는8761222 common source 불변을 요구해 현재 A source에서 전체 재실행할 수 없고 실제5d35ce source/증거의 로컬 재실행 자료도 미확보다. source pin/소비 API alias·validator producer·정식 정책/CheckDef 연결은 B/A 인계 조건으로 남긴다. AWS 관리 권한은 사용자 확인 대기다.

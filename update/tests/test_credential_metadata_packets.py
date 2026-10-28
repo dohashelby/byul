@@ -130,8 +130,11 @@ def test_packet_product_storage_report_restore_and_exact_rejudge(tmp_path, monke
     violated = mode in {"violation", "later_attachment_failure"}
     docker = PacketDocker(packet() if mode == "normal" else malformed("subject"),
         mounts=[{"Type": "bind", "Destination": "/credentials"}] if violated else [])
+    from tests.test_credential_mount_semantics import IMAGE, RUN
+    env = environment(engine={"name": "engine-x", "version": "1.0.0", "image_digest": IMAGE}, model={"id": "test"})
     target = tmp_path / "target.json"
     target.write_text(json.dumps({"lab": True, "probe_image": "EXAMPLE-unused",
+        "run_id": RUN, "environment_ref": env.ref().model_dump(mode="json"),
         "engine": {"container": "engine", "trusted_url": "http://engine:8000", "ready_timeout": 1},
         "origins": {"trusted": {"network": "trusted"}}, "gateway": {"url": "http://gateway:8080"}}))
     cfg = {"target": str(target)}
@@ -140,7 +143,6 @@ def test_packet_product_storage_report_restore_and_exact_rejudge(tmp_path, monke
     monkeypatch.setitem(registry.EXECUTORS, "credential_exposure:real",
         lambda raw: CredentialExposureExecutor(cfg, container_probe=probe, docker=docker))
     store, pack = Store(tmp_path / "store"), baseline_pack()
-    env = environment(model={"id": "test"})
     values = {"forbidden_env_names": [], "forbidden_mount_paths": ["/credentials"], "credential_candidate_paths": [PATH]}
     pol = policy(pack.ref(), scope={"include": ["PLT-04"], "exclude": []}, values={"PLT-04": values})
     store.put_many([env, pol]); plan = select(pack, [env], pol); store.put(plan)
@@ -153,7 +155,7 @@ def test_packet_product_storage_report_restore_and_exact_rejudge(tmp_path, monke
         evd, = run_plan(store, pack, plan, RunConfig(executors={"credential_exposure": "real"}, adapter="vllm"))
     result, = judge_plan(store, pack, plan, as_of=env.created_at)
     assert evd.data_origin.value == "EXAMPLE" and result.verdicts.security.value == expected
-    assert evd.execution.executor.version == "0.4.2"
+    assert evd.execution.executor.version == "0.5.0"
     assert evd.execution.status.value == ("ABORTED" if mode == "later_attachment_failure" else "COMPLETED")
     assert evd.observations["credential_candidates_complete"].value is (mode == "normal")
     if mode == "later_attachment_failure":

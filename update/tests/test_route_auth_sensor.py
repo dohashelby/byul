@@ -52,7 +52,7 @@ class ModelList:
     def __iter__(self):raise AssertionError("observer must not consume a response")
 
 
-def application(observer,monkeypatch,*,registry=None):
+def application(observer,monkeypatch,*,registry=None,router_factory=None):
     module=ModuleType(AUTH)
     import secrets
     module.__dict__.update(hashlib=hashlib,secrets=secrets,Headers=Headers,JSONResponse=Response,
@@ -68,10 +68,11 @@ def application(observer,monkeypatch,*,registry=None):
     router=ModuleType(ROUTER);router.JSONResponse=Response
     native("models",ROUTER,router.__dict__)
     endpoint=native("ModelsRouter.show_available_models",ROUTER,router.__dict__)
+    if router_factory is not None:router.router=router_factory(endpoint)
     observer.instrument(router)  # The endpoint's global helper resolves the wrapped function.
     async def app(scope,receive,send):
         request=SimpleNamespace(scope=scope,app=SimpleNamespace(state=SimpleNamespace(openai_serving_models=handler)))
-        response=await endpoint(request)
+        response=await endpoint(request) if router_factory is None else await router.router.dispatch(request)
         await response(scope,receive,send)
     monkeypatch.setattr(sensor,"_OBSERVER",observer)
     return sensor.Middleware(auth(app,[CANARY+"-credential"])),handler,output

@@ -281,5 +281,6 @@ def capture_session(docker,target,*,container,image,prepared,owner_identity=None
             for p in before["metadata"]["processes"] if p["same_executable"] and (p["pid"],p["start_ticks"]) not in recorded]
     result["request_index"]=request_index(result["recordings"])
     result["route_authentication_index"]=vllm_route_authentication.index(result["recordings"])
+    result["route_handler_index"]=vllm_route_authentication.handler_index(result["recordings"])
     result["request_selection_index"]=vllm_route_authentication.selection_index(result["recordings"])
     return result

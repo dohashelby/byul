@@ -1,7 +1,9 @@
 # B-1 입력 CPU 분기
 
-배정은 REQ-10 → REQ-08/09/07이다. B-2의 응답/로그/저장과 SUP·캐시·배포는
-수정하지 않는다. 별도 worktree/branch를 사용한다. PR43 head
+이 PR은 REQ-10과 REQ-08/09/07 입력 검증 및 관련 SUP-08 요청 gate를 다룬다.
+전체 공동 작업 목록은 B 38개이며 다음 묶음은 저장소 밖 byul-b-coordination의
+상대 선점 기록을 확인해 선택한다. SUP·캐시·배포를 전체 배정에서 제외하지 않는다.
+B-2가 선점한 응답/로그/저장·해석기 파일은 수정하지 않고 별도 worktree/branch를 쓴다. PR43 head
 8f05655c09bcee7156c17093a47b482a56abe2f4와 이전 CPU 증거를 보존하고 후속 PR46에
 전용 변경을 올린다. 공통 코드·sampling_validation·registry·팩은 변경하지 않는다.
 참조는 vLLM 5d35ce3934a7804b298559d2d99eec33792e1eb9다. 실제 설치판 및

@@ -12,6 +12,7 @@ from byul_platform.sources.runtime import (
     grade,
     observation_event,
     pick_gateway_record,
+    request_detail_doc,
     request_row,
     revalidation_request,
     runtime_status,
@@ -178,8 +179,6 @@ def test_request_row_keeps_null_not_zero():
 
 
 def test_captured_runtime_details_convert_to_valid_events(contracts):
-    from byul_platform.sources.runtime import request_detail_doc
-
     capture = load_json(FIXTURES / "runtime" / "capture.json")
     seen = set()
     for detail in capture["details"].values():
@@ -191,6 +190,62 @@ def test_captured_runtime_details_convert_to_valid_events(contracts):
         assert contracts.errors("runtime-request-detail", doc) == []
         assert doc["outcome"] == event["outcome"]
     assert seen == {"allowed", "denied", "invalid"}
+
+
+_MISSING = object()
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ({"mode": "off", "ready": True, "unavailable_reason_code": None}, {"mode": "off", "ready": True, "unavailable_reason_code": None}),
+        ({"mode": "per_principal", "ready": True, "unavailable_reason_code": None}, {"mode": "per_principal", "ready": True, "unavailable_reason_code": None}),
+        (
+            {"mode": "per_principal", "ready": False, "unavailable_reason_code": "CACHE_ISOLATION_KEY_MISSING"},
+            {"mode": "per_principal", "ready": False, "unavailable_reason_code": "CACHE_ISOLATION_KEY_MISSING"},
+        ),
+        (_MISSING, {"mode": None, "ready": False, "unavailable_reason_code": None}),
+        ({"mode": "per_principal", "ready": "yes", "unavailable_reason_code": None}, {"mode": None, "ready": False, "unavailable_reason_code": None}),
+    ],
+)
+def test_runtime_status_cache_isolation_is_explicit_or_unknown(contracts, raw, expected):
+    capture = copy.deepcopy(load_json(FIXTURES / "runtime" / "capture.json"))
+    endpoints = capture["endpoints"]
+    if raw is not _MISSING:
+        endpoints["status"]["policy"]["cache_isolation"] = raw
+    doc = runtime_status(
+        endpoints["status"],
+        endpoints["policy"],
+        endpoints["collectors"],
+        target=endpoints["target"],
+        summary=endpoints["summary"],
+        revalidation=endpoints["revalidation"],
+        observations=endpoints["observations"],
+        baseline=endpoints["baseline"],
+    )
+    assert doc["policy"]["cache_isolation"] == expected
+    assert contracts.errors("runtime-status", doc) == []
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ({"mode": "off", "applied": False}, {"mode": "off", "applied": False}),
+        ({"mode": "per_principal", "applied": True}, {"mode": "per_principal", "applied": True}),
+        (_MISSING, {"mode": None, "applied": None}),
+        ({"mode": "per_principal", "applied": "yes"}, {"mode": None, "applied": None}),
+    ],
+)
+def test_request_detail_cache_isolation_is_explicit_or_unknown(contracts, raw, expected):
+    capture = copy.deepcopy(load_json(FIXTURES / "runtime" / "capture.json"))
+    detail = next(iter(capture["details"].values()))
+    final = pick_gateway_record(detail["gateway_records"])
+    assert final is not None
+    if raw is not _MISSING:
+        final["request"]["cache_isolation"] = raw
+    doc = request_detail_doc(detail)
+    assert doc["request"]["cache_isolation"] == expected
+    assert contracts.errors("runtime-request-detail", doc) == []
 
 
 def test_captured_real_observation_shapes(contracts):

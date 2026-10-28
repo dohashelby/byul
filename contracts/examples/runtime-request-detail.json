@@ -18,6 +18,10 @@
     "model": null,
     "max_tokens": null,
     "n": null,
+    "cache_isolation": {
+      "mode": null,
+      "applied": null
+    },
     "extra_fields": [],
     "context": null
   },

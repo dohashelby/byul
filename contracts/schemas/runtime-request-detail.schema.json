@@ -30,11 +30,21 @@
     "request": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["model", "max_tokens", "n", "extra_fields", "context"],
+      "required": ["model", "max_tokens", "n", "cache_isolation", "extra_fields", "context"],
       "properties": {
         "model": { "type": ["string", "null"] },
         "max_tokens": { "type": ["integer", "null"] },
         "n": { "type": ["integer", "null"] },
+        "cache_isolation": {
+          "description": "요청에 적용된 사용자별 prefix cache 분리 상태. applied가 null이면 구형 runtime 또는 확인할 수 없는 형식이다.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "applied"],
+          "properties": {
+            "mode": { "enum": ["off", "per_principal", null] },
+            "applied": { "type": ["boolean", "null"] }
+          }
+        },
         "extra_fields": {
           "description": "추가 필드 이름과 처리 방식(값은 저장하지 않음).",
           "type": "array",

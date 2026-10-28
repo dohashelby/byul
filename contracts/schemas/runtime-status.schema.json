@@ -200,6 +200,7 @@
         "schema",
         "profile",
         "test_only",
+        "cache_isolation",
         "max_n",
         "passthrough_fields",
         "validate_count",
@@ -259,6 +260,34 @@
         "test_only": {
           "description": "시험 전용 프로필(zeroday-lab). 승인된 운영 정책이 아니다.",
           "type": "boolean"
+        },
+        "cache_isolation": {
+          "description": "사용자별 prefix cache 분리 설정과 현재 준비 상태. mode가 null이면 구형 runtime 또는 확인할 수 없는 형식이다.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "ready",
+            "unavailable_reason_code"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "off",
+                "per_principal",
+                null
+              ]
+            },
+            "ready": {
+              "type": "boolean"
+            },
+            "unavailable_reason_code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
         },
         "max_n": {
           "type": [

@@ -38,6 +38,11 @@
     "schema": "runtime-mvp/1.1",
     "profile": "default",
     "test_only": false,
+    "cache_isolation": {
+      "mode": "off",
+      "ready": true,
+      "unavailable_reason_code": null
+    },
     "max_n": 1,
     "passthrough_fields": [],
     "validate_count": 0,

@@ -59,6 +59,7 @@ function Overview({ d }: { d: RuntimeRequestDetail }) {
           ["모델", d.request.model],
           ["max_tokens", d.request.max_tokens],
           ["n", d.request.n],
+          ["캐시 분리", d.request.cache_isolation.applied === true ? "적용" : d.request.cache_isolation.applied === false ? "미적용" : "모름"],
           ["추가 필드", d.request.extra_fields.length ? d.request.extra_fields.map((x) => `${x.name}(${label(EXTRA_FIELD_MODE, x.mode)})`).join(", ") : null],
           ["요청 주체", authText(d)],
           ["context 검사", ctx ? `${label(CONTEXT_RESULT, ctx.result)} · 입력 ${ctx.input_tokens ?? "–"}토큰 / 한도 ${ctx.limit ?? "–"}` : "설정 안 됨"],

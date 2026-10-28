@@ -99,7 +99,22 @@ function ListInput({ value, onChange, placeholder }: { value: unknown; onChange:
   );
 }
 
-function KvInput({ value, onChange, keyLabel, valueLabel, suggestions }: { value: unknown; onChange: (v: unknown) => void; keyLabel: string; valueLabel: string; suggestions?: string[] }) {
+/** 이름→값 표. blank는 새 줄과 빈 칸의 값이다(null=모름, ""=빈 문자열). */
+export function KvInput({
+  value,
+  onChange,
+  keyLabel,
+  valueLabel,
+  suggestions,
+  blank = null,
+}: {
+  value: unknown;
+  onChange: (v: unknown) => void;
+  keyLabel: string;
+  valueLabel: string;
+  suggestions?: string[];
+  blank?: string | null;
+}) {
   const map = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, string | null>) : {};
   const [name, setName] = useState("");
   const listId = useId();
@@ -114,7 +129,7 @@ function KvInput({ value, onChange, keyLabel, valueLabel, suggestions }: { value
       {Object.entries(map).map(([k, v]) => (
         <div key={k} className={p.kvRow}>
           <span className="mono">{k}</span>
-          <input className="input" value={v ?? ""} placeholder={`${valueLabel} (모르면 비워 둠)`} onChange={(e) => put(k, e.target.value === "" ? null : e.target.value)} />
+          <input className="input" value={v ?? ""} placeholder={blank === null ? `${valueLabel} (모르면 비워 둠)` : valueLabel} onChange={(e) => put(k, e.target.value === "" ? blank : e.target.value)} />
           <button type="button" className="btn btn-small btn-ghost" onClick={() => put(k, undefined)} aria-label={`${k} 지우기`}>
             삭제
           </button>
@@ -132,7 +147,7 @@ function KvInput({ value, onChange, keyLabel, valueLabel, suggestions }: { value
           className="btn btn-small"
           disabled={!name.trim() || name.trim() in map}
           onClick={() => {
-            put(name.trim(), null);
+            put(name.trim(), blank);
             setName("");
           }}
         >
@@ -157,7 +172,7 @@ export function InputFieldView({ field, value, onChange, error }: { field: Input
         field.options.length <= 4 ? (
           <Segmented label={field.label} value={value} onChange={onChange} options={[...field.options, ...(outside ? [{ value, label: `${value} (목록 밖)` }] : []), UNKNOWN]} />
         ) : (
-          <select className="select" value={value === null ? "__null" : typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value === "__null" ? null : e.target.value)}>
+          <select className="select" aria-label={field.label} value={value === null ? "__null" : typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value === "__null" ? null : e.target.value)}>
             <option value="">선택 안 함</option>
             {field.options.map((o) => (
               <option key={o.value} value={o.value}>

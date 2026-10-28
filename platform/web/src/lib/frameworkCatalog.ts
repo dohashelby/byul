@@ -27,7 +27,7 @@ export type EnvCondition = {
   key: string;
   no: number;
   title: string;
-  /** 계약의 다른 구역에 이미 있는 값(여기서 다시 묻지 않음). */
+  /** 이 조건에서 받지 않는 값에 대한 안내. */
   elsewhere?: string;
   /** 우리 runtime을 Gateway로 쓰면 이미 갖고 있거나 수집하는 값. */
   runtime?: string;
@@ -42,7 +42,6 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "engine",
     no: 1,
     title: "엔진·버전·의존성",
-    elsewhere: "엔진 이름·버전·이미지 digest·소스 커밋은 위 '엔진' 구역에 입력합니다.",
     runtime: "runtime이 엔진 /version에서 종류·버전을 수집합니다. digest·커밋·의존성은 수집하지 않습니다.",
     baseChecks: ["SUP-003", "SUP-004", "REQ-001", "REQ-009", "PLT-002", "PLT-006", "OBS-004"],
     otherChecks: "분기 19 · 조건부 14 · 선정 구현 6",
@@ -57,7 +56,6 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "entry",
     no: 2,
     title: "진입 경로·인증·인가",
-    elsewhere: "Gateway 사용 여부는 아래 '사실' 구역의 Gateway 사용 값과 맞춥니다.",
     runtime: "byul runtime이 Gateway이면 인증 주체·역할·route 역할·허용 모델은 runtime 설정에 있습니다.",
     baseChecks: ["SUP-002", "REQ-001", "PLT-010", "LIF-010", "OBS-001"],
     otherChecks: "분기 7 · 조건부 6",
@@ -112,7 +110,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "users",
     no: 3,
     title: "사용자·역할·공유 관계",
-    elsewhere: "prefix cache 사용 여부는 아래 '사실' 구역에서 입력합니다. 공유 허용 범위는 정책(4.2)입니다.",
+    elsewhere: "공유 허용 범위는 정책(4.2)에서 정합니다.",
     runtime: "runtime에는 Gateway에 등록된 주체만 있습니다. 앱 내부 사용자는 알 수 없습니다.",
     baseChecks: ["SUP-001", "SUP-002", "SUP-014", "REQ-001", "PLT-001", "PLT-003", "PLT-006", "PLT-010", "PLT-012", "OBS-001", "OBS-010"],
     otherChecks: "분기 9 · 조건부 7",
@@ -127,7 +125,6 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "supply",
     no: 4,
     title: "모델·공급물·로딩",
-    elsewhere: "모델 ID·판본·snapshot 해시·토크나이저 판본은 위 '모델' 구역에 입력합니다.",
     runtime: "runtime이 모델 ID와 승인 자산 목록 대비 디스크 파일 해시를 수집합니다.",
     baseChecks: ["SUP-001", "SUP-002", "SUP-003", "SUP-004", "SUP-005", "SUP-014", "REQ-009", "PLT-003", "LIF-005", "LIF-015", "OBS-001"],
     otherChecks: "분기 13 · 선정 구현 2 · 조건부 7",
@@ -169,7 +166,6 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "placement",
     no: 6,
     title: "실행 배치·내부 통신",
-    elsewhere: "노드 수·TP 그룹 수·GPU 수·GPU 모델·드라이버는 위 '실행 자원' 구역에 입력합니다.",
     runtime: "runtime이 Pod 상태와 교체 이력을 수집합니다.",
     baseChecks: ["REQ-009", "PLT-001", "PLT-002", "PLT-006", "LIF-005", "LIF-010"],
     otherChecks: "분기 13 · 선정 구현 6 · 조건부 4",
@@ -185,7 +181,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "host",
     no: 7,
     title: "호스트·자격·외부 접근",
-    elsewhere: "배치 종류·namespace·포트는 위 '배치' 구역에 입력합니다. 비밀값 원문은 받지 않습니다.",
+    elsewhere: "비밀값 원문은 받지 않습니다.",
     runtime: "runtime이 Cilium·Hubble·Tetragon으로 송신 차단과 파일·실행 이벤트를 관측합니다(로컬 kind 확인).",
     baseChecks: ["SUP-004", "SUP-005", "REQ-001", "PLT-001", "PLT-002", "PLT-003", "PLT-006", "PLT-010", "PLT-012", "LIF-015", "OBS-004", "OBS-010", "OBS-011"],
     otherChecks: "분기 7 · 선정 구현 1 · 조건부 7",
@@ -203,7 +199,6 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "weights",
     no: 8,
     title: "가중치 제공·공유",
-    elsewhere: "공유·원격 가중치 사용 여부는 아래 '사실' 구역에서도 입력합니다.",
     baseChecks: [],
     otherChecks: "분기 3(SUP-006·012, REQ-005) · 조건부 1(LIF-013)",
     fields: [
@@ -263,7 +258,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "responsibility",
     no: 12,
     title: "운영 책임·관리형",
-    elsewhere: "관리형·외부 대체 사용 여부는 아래 '사실' 구역에서도 입력합니다. R14는 검토 대기입니다.",
+    elsewhere: "R14는 검토 대기입니다.",
     baseChecks: [],
     otherChecks: "연결된 CHK 없음(R14 검토 대기)",
     fields: [

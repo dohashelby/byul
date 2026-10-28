@@ -202,6 +202,9 @@ export const REGISTRATION: Record<string, string> = {
 
 export const DEPLOYMENT_KIND: Record<string, string> = { kubernetes: "Kubernetes", docker: "Docker", host: "호스트" };
 
+// 엔진 종류. 저장값은 runtime backend kind와 같은 소문자다.
+export const ENGINE_NAME: Record<string, string> = { vllm: "vLLM", sglang: "SGLang", "tensorrt-llm": "TensorRT-LLM" };
+
 export const FACT_LABEL: Record<string, string> = {
   gateway: "Gateway 사용",
   prefix_cache: "prefix cache",

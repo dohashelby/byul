@@ -447,6 +447,14 @@
   justify-content: space-between;
   gap: 8px 16px;
 }
+/* 조건 답에서 정해진 사실 값(직접 고르지 않음). */
+.factDerived {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  font-size: 13px;
+}
 .claimBox {
   display: flex;
   flex-direction: column;

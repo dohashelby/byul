@@ -1,5 +1,5 @@
 // 계약 문서를 JSON 그대로 편집하는 폼 부품. 경로는 JSON Pointer(서버 검증 오류와 같은 형식)다.
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import type { FieldIssue } from "../api/types";
 import p from "../pages/pages.module.css";
 
@@ -81,17 +81,44 @@ function Field({ label, ctx, path, children, hint }: { label: string; ctx: FormC
 
 const bad = (ctx: FormCtx, path: string) => (ctx.issues.some((i) => i.path === path) ? p.invalidInput : "");
 
-/** 문자열 칸. nullable이면 빈칸은 null(모름)로 저장한다. 빈 문자열을 만들지 않는다. */
-export function TextField({ ctx, path, label, nullable, optional, placeholder, hint }: { ctx: FormCtx; path: string; label: string; nullable?: boolean; optional?: boolean; placeholder?: string; hint?: string }) {
+/** 문자열 칸. nullable이면 빈칸은 null(모름)로 저장한다. 빈 문자열을 만들지 않는다. suggestions는 고를 수 있는 값이고 직접 입력도 받는다. */
+export function TextField({
+  ctx,
+  path,
+  label,
+  nullable,
+  optional,
+  placeholder,
+  hint,
+  suggestions,
+}: {
+  ctx: FormCtx;
+  path: string;
+  label: string;
+  nullable?: boolean;
+  optional?: boolean;
+  placeholder?: string;
+  hint?: string;
+  suggestions?: string[];
+}) {
   const v = getIn(ctx.doc, path);
+  const listId = useId();
   return (
     <Field label={label} ctx={ctx} path={path} hint={hint}>
       <input
         className={`input ${bad(ctx, path)}`}
+        list={suggestions?.length ? listId : undefined}
         value={typeof v === "string" ? v : ""}
         placeholder={nullable ? (placeholder ?? "모르면 비워 둠 (null)") : placeholder}
         onChange={(e) => ctx.set(path, e.target.value === "" && nullable ? null : e.target.value === "" && optional ? undefined : e.target.value)}
       />
+      {!!suggestions?.length && (
+        <datalist id={listId}>
+          {suggestions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      )}
     </Field>
   );
 }
@@ -133,6 +160,8 @@ export function SelectField({
   nullable?: boolean;
 }) {
   const v = getIn(ctx.doc, path);
+  // 이전 판본에 목록 밖 값이 있으면 지우지 않고 그대로 보여준다.
+  const outside = typeof v === "string" && v !== "" && !options.some((o) => o.value === v);
   return (
     <Field label={label} ctx={ctx} path={path}>
       <select className={`select ${bad(ctx, path)}`} value={typeof v === "string" ? v : ""} onChange={(e) => ctx.set(path, e.target.value === "" ? (nullable ? null : undefined) : e.target.value)}>
@@ -142,6 +171,7 @@ export function SelectField({
             {o.label}
           </option>
         ))}
+        {outside && <option value={v}>{v} (목록 밖)</option>}
       </select>
     </Field>
   );

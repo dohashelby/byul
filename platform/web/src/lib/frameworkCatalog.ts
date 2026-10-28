@@ -9,7 +9,9 @@ export const CATALOG_VERSION = "byul-framework-input/0.1";
 export const FRAMEWORK_CHECKLIST_SHA256 = "745e18640bc0c405baee1883dee53d1f35b644f0bc6116705a880b91893c590f";
 
 export type Choice = { value: string; label: string };
-type Base = { key: string; label: string; hint?: string; when?: { key: string; is: unknown[] } };
+/** 이 값이 나오면 질문을 보인다. cond가 있으면 다른 환경 조건 카드의 답을 본다. 답이 없으면(미입력) 숨긴다. */
+export type When = { cond?: string; key: string; is: unknown[] };
+type Base = { key: string; label: string; hint?: string; when?: When | When[] };
 export type InputField =
   | (Base & { kind: "tri"; yes?: string; no?: string })
   | (Base & { kind: "choice"; options: Choice[] })
@@ -56,24 +58,11 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "entry",
     no: 2,
     title: "진입 경로·인증·인가",
-    runtime: "byul runtime이 Gateway이면 인증 주체·역할·route 역할·허용 모델은 runtime 설정에 있습니다.",
+    elsewhere: "byul runtime을 Gateway로 쓴다고 보고 호출 경로·Gateway 종류·신원 검증 위치·엔진까지 전달되는 신원은 묻지 않습니다. runtime은 사용자 신원을 엔진에 넘기지 않고 자기 backend 자격만 씁니다. 엔진에 직접 닿는 길이 막혔는지는 따로 확인합니다.",
+    runtime: "인증 주체·역할·route 역할·허용 모델은 runtime 설정에 있습니다.",
     baseChecks: ["SUP-002", "REQ-001", "PLT-010", "LIF-010", "OBS-001"],
     otherChecks: "분기 7 · 조건부 6",
     fields: [
-      {
-        key: "call_path",
-        label: "호출 경로",
-        kind: "choice",
-        options: [c("direct", "클라이언트 → 엔진"), c("gateway", "클라이언트 → Gateway → 엔진"), c("app_gateway", "사용자 → 업무 앱 → Gateway → 엔진"), c("app_direct", "사용자 → 업무 앱 → 엔진"), c("in_process", "Python 내장 호출")],
-      },
-      { key: "gateway_kind", label: "Gateway 종류", kind: "choice", options: [c("byul_runtime", "byul runtime"), c("api_gateway", "API Gateway 제품"), c("service_mesh", "서비스 메시"), c("reverse_proxy", "reverse proxy")], when: { key: "call_path", is: ["gateway", "app_gateway"] } },
-      {
-        key: "identity_to_engine",
-        label: "엔진까지 전달되는 신원",
-        kind: "choice",
-        options: [c("none", "없음"), c("service_account", "공용 서비스 계정만"), c("user_header_verified", "검증된 사용자 header"), c("user_token", "사용자 토큰")],
-      },
-      { key: "identity_verifier", label: "신원 검증 위치", kind: "multi", options: [c("gateway", "Gateway"), c("app", "업무 앱·백엔드"), c("idp_proxy", "IdP 프록시"), c("engine", "엔진")] },
       {
         key: "direct_block",
         label: "엔진 직통 차단 수단",
@@ -116,9 +105,13 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     otherChecks: "분기 9 · 조건부 7",
     fields: [
       { key: "tenancy", label: "사용 구성", kind: "choice", options: [c("single_team", "한 팀"), c("multi_team", "한 조직의 여러 팀"), c("multi_org", "여러 조직·외부 고객")] },
-      { key: "shared_service_account", label: "공용 서비스 계정 뒤에 여러 사용자가 있음", kind: "tri", yes: "예", no: "아니오" },
-      { key: "operator_roles", label: "운영 역할", kind: "multi", options: [c("platform_ops", "플랫폼 운영"), c("ml_ops", "ML 운영"), c("security", "보안"), c("observer", "관측 전용"), c("vendor", "외부 사업자")] },
-      { key: "permission_table", label: "사용자·모델·작업 권한표 보유", kind: "tri", yes: "있음", no: "없음" },
+      {
+        key: "shared_service_account",
+        label: "공용 서비스 계정 뒤에 여러 사용자가 있음",
+        kind: "tri",
+        yes: "예",
+        no: "아니오",
+      },
     ],
   },
   {
@@ -142,24 +135,11 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "features",
     no: 5,
     title: "요청·활성 기능",
-    runtime: "byul runtime이 Gateway이면 엔진에 넘기는 필드는 runtime 허용 목록(chat messages, completions prompt 등)으로 제한됩니다.",
+    elsewhere: "byul runtime Gateway는 /v1/chat/completions·/v1/completions만 열고 엔진에 model·messages(문자열)·prompt(문자열)·max_tokens·stream·n만 넘깁니다. 그래서 스트리밍(항상 열림)·구조화 출력·tools·embedding·token ID·logprobs·미디어·Responses·batch는 묻지 않습니다. 허용 모델은 정책의 Gateway 설정에서 고릅니다.",
     baseChecks: ["SUP-003", "REQ-009", "LIF-005", "LIF-010"],
     otherChecks: "분기 15 · 조건부 11 · 선정 구현 3",
     fields: [
-      { key: "streaming", label: "스트리밍 응답", kind: "tri", yes: "사용", no: "사용 안 함" },
-      { key: "structured_output", label: "구조화 출력(schema·grammar)", kind: "tri", yes: "노출", no: "노출 안 함" },
-      { key: "structured_backend", label: "구조화 출력 backend", kind: "choice", options: [c("xgrammar", "xgrammar"), c("guidance", "guidance"), c("outlines", "outlines"), c("lm_format_enforcer", "lm-format-enforcer")], when: { key: "structured_output", is: [true] } },
-      { key: "tools", label: "tools·tool_choice", kind: "tri", yes: "노출", no: "노출 안 함" },
-      { key: "tool_choice_modes", label: "지원하는 tool_choice", kind: "multi", options: [c("none", "none"), c("auto", "auto"), c("required", "required"), c("named", "함수 지정")], when: { key: "tools", is: [true] } },
-      { key: "embedding_input", label: "embedding 직접 입력(prompt_embeds)", kind: "tri", yes: "수용", no: "수용 안 함" },
-      { key: "offset_params", label: "offset 파라미터(routed_experts_prompt_start 등)", kind: "tri", yes: "수용", no: "수용 안 함" },
-      { key: "token_id_input", label: "token ID 직접 입력", kind: "tri", yes: "수용", no: "수용 안 함" },
-      { key: "media_inputs", label: "미디어 입력", kind: "multi", options: [c("image", "이미지"), c("audio", "오디오"), c("video", "비디오"), c("none", "없음")] },
-      { key: "media_url_fetch", label: "미디어 URL 가져오기", kind: "tri", yes: "허용", no: "허용 안 함", when: { key: "media_inputs", is: ["image", "audio", "video"] } },
-      { key: "lora", label: "LoRA adapter 요청", kind: "tri", yes: "사용", no: "사용 안 함" },
-      { key: "responses_store", label: "Responses 결과 저장", kind: "tri", yes: "사용", no: "사용 안 함" },
-      { key: "batch_jobs", label: "영속 batch 작업", kind: "tri", yes: "사용", no: "사용 안 함" },
-      { key: "echo_logprobs", label: "입력 반환·logprobs 옵션", kind: "tri", yes: "노출", no: "노출 안 함" },
+      { key: "lora", label: "LoRA adapter 요청", kind: "tri", yes: "사용", no: "사용 안 함", hint: "정책의 허용 모델에 adapter 이름을 넣어 요청으로 고르게 하는지", when: { cond: "supply", key: "extra_files", is: ["lora", null] } },
     ],
   },
   {
@@ -235,7 +215,6 @@ export const ENV_CONDITIONS: EnvCondition[] = [
       { key: "load_pattern", label: "부하 모양", kind: "choice", options: [c("steady", "일정"), c("bursty", "급증 있음"), c("batch", "일괄 처리")] },
       { key: "budget_units", label: "예산 계측 단위", kind: "multi", options: [c("tokens", "token"), c("bytes", "bytes"), c("seconds", "시간"), c("requests", "요청 수"), c("gpu_memory", "GPU 메모리")] },
       { key: "retry_actors", label: "실제 자동 재시도 주체", kind: "multi", options: [c("app", "업무 앱"), c("sdk", "SDK"), c("gateway", "Gateway"), c("engine", "엔진"), c("none", "없음")] },
-      { key: "limit_enforcer", label: "구조화 출력·미디어 한도 집행 위치", kind: "multi", options: [c("gateway", "Gateway"), c("app", "업무 앱"), c("engine", "엔진"), c("none", "없음")] },
     ],
   },
   {
@@ -258,9 +237,9 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "responsibility",
     no: 12,
     title: "운영 책임·관리형",
-    elsewhere: "R14는 검토 대기입니다.",
+    elsewhere: "관리형 서비스나 외부 추론 대체를 쓰는 환경은 이 체크리스트로 전체 평가를 끝낼 수 없습니다. 볼 수 있는 항목만 점검합니다.",
     baseChecks: [],
-    otherChecks: "연결된 CHK 없음(R14 검토 대기)",
+    otherChecks: "연결된 점검 없음(프레임워크 평가 기준 마련 전)",
     fields: [
       { key: "operator", label: "엔진 운영 주체", kind: "choice", options: [c("self", "직접 운영"), c("cloud_managed", "클라우드 관리형"), c("vendor", "외부 사업자")] },
       { key: "evidence_access", label: "사업자가 주는 증거 범위", kind: "choice", options: [c("full", "설정·로그 모두"), c("partial", "일부"), c("none", "없음")], when: { key: "operator", is: ["cloud_managed", "vendor"] } },
@@ -730,9 +709,12 @@ export const SECURITY_FUNCTIONS: SecurityFunction[] = [
 export const ALL_REQUIREMENTS: Requirement[] = SECURITY_FUNCTIONS.flatMap((f) => f.requirements);
 
 /** when 조건에 맞는지. 조건 값이 배열(multi)이면 하나라도 겹치면 보인다. */
-export function visible(field: InputField, values: Record<string, unknown>): boolean {
+/** 질문을 보일지. when이 여러 개면 하나라도 맞으면 보인다. others는 환경 조건 카드별 답(cond가 있는 when에서 쓴다). */
+export function visible(field: InputField, values: Record<string, unknown>, others: Record<string, Record<string, unknown> | undefined> = {}): boolean {
   if (!field.when) return true;
-  const v = values[field.when.key];
-  if (Array.isArray(v)) return v.some((x) => field.when!.is.includes(x));
-  return field.when.is.includes(v);
+  return (Array.isArray(field.when) ? field.when : [field.when]).some((w) => {
+    const v = (w.cond ? others[w.cond] : values)?.[w.key];
+    if (Array.isArray(v)) return v.some((x) => w.is.includes(x));
+    return w.is.includes(v);
+  });
 }

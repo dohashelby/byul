@@ -1067,7 +1067,7 @@ export interface components {
         FrameworkInput_input_values: {
             [key: string]: components["schemas"]["FrameworkInput_input_value"];
         };
-        /** @description 12개 환경 조건 하나의 실제 배포값. origin·source는 이 조건 값 전체의 출처다. */
+        /** @description 12개 환경 조건 하나의 실제 배포값. origin·source는 이 조건 값 전체의 출처다. null이면 문서 전체 data_origin을 따르고 자료 위치는 기록하지 않은 것이다. */
         FrameworkInput_environment_condition: {
             values: components["schemas"]["FrameworkInput_input_values"];
             origin: components["schemas"]["Common_data_origin"] | null;

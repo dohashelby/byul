@@ -68,7 +68,7 @@ const FACT_HINT: Record<string, string> = {
   alternate_sources_or_formats_or_derived_cache: "대체 공급원·다른 형식·파생 캐시 중 하나라도 쓰는가 (묶음 전체)",
   remote_acquisition_or_retry: "모델을 원격에서 받거나 취득을 재시도하는가 (묶음 전체)",
   managed_or_external_fallback: "관리형 서비스나 외부 대체 추론을 쓰는가",
-  r10_features: "R10(미디어·URL·영속 작업 등) 기능을 쓰는가",
+  r10_features: "미디어 입력·URL 가져오기·영속 작업 같은 기능을 하나라도 쓰는가 (묶음 전체)",
   request_code_revision_selection: "요청으로 코드 판본을 고를 수 있는가",
 };
 
@@ -85,7 +85,7 @@ export function newEnvironment(): EnvironmentDoc {
       model: { id: null, revision: null, inventory_sha256: null },
     },
     deployment: null,
-    facts: {},
+    facts: Object.fromEntries(Object.entries(FIXED_FACTS).map(([k, f]) => [k, { value: f.value, origin: "DECLARED", source: f.source }])),
   } as EnvironmentDoc;
 }
 
@@ -142,8 +142,8 @@ function putKey(obj: Values, key: string, value: unknown): Values {
   return next;
 }
 
-function filled(fields: InputField[], values: Values): [number, number] {
-  const shown = fields.filter((f) => visible(f, values));
+function filled(fields: InputField[], values: Values, others?: Record<string, Values | undefined>): [number, number] {
+  const shown = fields.filter((f) => visible(f, values, others));
   return [shown.filter((f) => values[f.key] !== undefined).length, shown.length];
 }
 
@@ -243,10 +243,14 @@ export const CONDITION_FACTS: Record<string, string[]> = {
   responsibility: ["managed_or_external_fallback"],
 };
 
+/** 제품 전제로 정해진 사실. 묻지 않고 항상 이 값으로 저장한다. */
+export const FIXED_FACTS: Record<string, { value: boolean; source: string; note: string }> = {
+  gateway: { value: true, source: "byul runtime Gateway 전제", note: "byul runtime을 Gateway로 쓴다고 봅니다." },
+};
+
 type DerivedFact = { cond: string; key: string; from: string; yes: string[]; no: string[] };
 /** 조건 답 하나로 정해지는 사실. 따로 묻지 않고 그 답을 고칠 때 함께 바꾼다. 목록에 없는 답은 모름(null)이다. */
 export const DERIVED_FACTS: Record<string, DerivedFact> = {
-  gateway: { cond: "entry", key: "call_path", from: "호출 경로", yes: ["gateway", "app_gateway"], no: ["direct", "app_direct", "in_process"] },
   shared_or_remote_weights: { cond: "weights", key: "delivery", from: "가중치 공급 방식", yes: ["shared_daemon", "remote_streaming"], no: ["local_file"] },
 };
 
@@ -275,13 +279,21 @@ function withProfile(d: EnvironmentDoc, fn: (pr: Profile) => Profile): Environme
   return { ...d, framework_profile: fn(profileOf(d) ?? emptyProfile()) } as EnvironmentDoc;
 }
 
-/** 사실 하나를 넣거나(값) 지운다(undefined). 출처는 그 사실을 묻는 조건 카드의 값을 따른다. '사용 안 함'이 아니면 비사용 근거를 지운다. */
-function withFact(d: EnvironmentDoc, name: string, value: unknown, entry: CondEntry | undefined): EnvironmentDoc {
+/** 조건 카드별 답. 다른 카드의 답을 보고 나타나는 질문에 쓴다. */
+function conditionValues(profile: Profile | null): Record<string, Values | undefined> {
+  return Object.fromEntries(Object.entries(profile?.conditions ?? {}).map(([k, v]) => [k, v.values]));
+}
+
+/**
+ * 사실 하나를 넣거나(값) 지운다(undefined). 화면에서 고른 값이라 출처는 직접 입력(예시 문서면 예시)이다.
+ * update는 source가 없는 사실을 모름으로 보므로 어디서 입력했는지 항상 남긴다. '사용 안 함'이 아니면 비사용 근거를 지운다.
+ */
+function withFact(d: EnvironmentDoc, name: string, value: unknown, source = `byul platform 환경 입력 (${FACT_LABEL[name]})`): EnvironmentDoc {
   const prev = d.facts?.[name];
   const facts = { ...(d.facts ?? {}) } as Record<string, Fact>;
   if (value === undefined) delete facts[name];
   else {
-    const next = { value, origin: entry?.origin ?? prev?.origin ?? "DECLARED", source: entry?.source ?? prev?.source ?? null } as Fact;
+    const next = { value, origin: d.data_origin === "EXAMPLE" ? "EXAMPLE" : "DECLARED", source } as Fact;
     if (value === false && prev?.absence_evidence != null) next.absence_evidence = prev.absence_evidence;
     facts[name] = next;
   }
@@ -292,34 +304,71 @@ function withFact(d: EnvironmentDoc, name: string, value: unknown, entry: CondEn
   return out;
 }
 
-/** 조건 카드 하나를 고친다. 그 답으로 정해지는 사실과 사실의 출처도 함께 바꾼다. */
-function withCondition(d: EnvironmentDoc, key: string, patch: Partial<CondEntry>): EnvironmentDoc {
+/** 조건 카드 하나의 답을 고친다. 그 답으로 정해지는 사실도 함께 바꾼다. */
+function withCondition(d: EnvironmentDoc, key: string, values: Values): EnvironmentDoc {
   const before = profileOf(d)?.conditions[key];
-  const cur = before ?? { values: {}, origin: null, source: null };
-  const next = { ...cur, ...patch };
-  const empty = !Object.keys(next.values).length && next.origin === null && next.source === null;
+  // 이전 판본에 저장된 카드 출처는 지우지 않는다(화면에서는 더 묻지 않는다).
+  const next = { origin: null, source: null, ...before, values };
+  const empty = !Object.keys(values).length && next.origin === null && next.source === null;
   let out = withProfile(d, (pr) => ({ ...pr, conditions: putKey(pr.conditions, key, empty ? undefined : next) as Profile["conditions"] }));
   for (const name of CONDITION_FACTS[key] ?? []) {
     const rule = DERIVED_FACTS[name];
     const changed = rule && !Object.is(before?.values[rule.key], next.values[rule.key]);
-    if (changed) out = withFact(out, name, deriveFact(rule, next.values[rule.key]), next);
-    else if (out.facts?.[name] && (cur.origin !== next.origin || cur.source !== next.source)) out = withFact(out, name, out.facts[name].value, next);
+    if (changed) out = withFact(out, name, deriveFact(rule, next.values[rule.key]), `byul platform 환경 입력 (${rule.from} 답)`);
   }
   return out;
 }
 
-/** 카드 진행도: 보이는 조건 항목 + 따로 묻는 사실. 조건 답에서 정해지는 사실은 세지 않는다. */
+/** update에 넘길 비사용 근거 요약. 확인한 사실과 확인 자료가 없으면 근거로 보지 않는다(null). */
+export function claimSummary(name: string, claim: Claim): string | null {
+  const found = [claim.disabled && "기능 비활성", claim.nonexposed && "외부 비노출"].filter(Boolean);
+  if (!found.length || !claim.references.length) return null;
+  return [
+    `${claim.status === "reviewed" ? "검토 완료" : "작성 중"} 근거 framework_profile.absence_claims.${name}`,
+    `확인: ${found.join("·")}`,
+    `자료: ${claim.references.join(", ")}`,
+    `검토: ${claim.reviewer ?? "검토자 미기록"}, ${claim.reviewed_at ?? "시각 미기록"}`,
+  ].join(" / ");
+}
+
+/** 구조화된 비사용 근거를 고치고, 사실의 근거 요약을 그 내용으로 다시 만든다. */
+function withClaim(d: EnvironmentDoc, name: string, claim: Claim | undefined): EnvironmentDoc {
+  const out = withProfile(d, (pr) => ({ ...pr, absence_claims: putKey(pr.absence_claims, name, claim) as Profile["absence_claims"] }));
+  const fact = out.facts?.[name];
+  if (!fact) return out;
+  return { ...out, facts: { ...out.facts, [name]: { ...fact, absence_evidence: claim ? claimSummary(name, claim) : null } } } as EnvironmentDoc;
+}
+
+/**
+ * 화면에서 고친 문서를 저장 형식에 맞춘다. 사람이 고친 값이므로 자동 수집(MEASURED) 문서도 직접 입력(DECLARED)이 된다.
+ * 전제로 정해진 사실은 항상 그 값으로 둔다.
+ */
+function normalizeEnv(d: EnvironmentDoc): EnvironmentDoc {
+  let out = d.data_origin === "MEASURED" ? { ...d, data_origin: "DECLARED" as const } : d;
+  for (const [name, f] of Object.entries(FIXED_FACTS)) {
+    const cur = out.facts?.[name];
+    if (cur?.value !== f.value || cur.source !== f.source) out = withFact(out, name, f.value, f.source);
+  }
+  // 이전 화면에서 source 없이 저장한 사실은 update가 모름으로 보므로 출처를 채운다.
+  for (const [name, fact] of Object.entries(out.facts ?? {})) {
+    if (fact && !fact.source) out = { ...out, facts: { ...out.facts, [name]: { ...fact, source: `byul platform 환경 입력 (${FACT_LABEL[name] ?? name})` } } } as EnvironmentDoc;
+  }
+  return out;
+}
+
+/** 카드 진행도: 보이는 조건 항목 + 따로 묻는 사실. 조건 답이나 전제로 정해지는 사실은 세지 않는다. */
 function cardProgress(cond: EnvCondition, doc: EnvironmentDoc, profile: Profile | null): [number, number] {
-  const [d, t] = filled(cond.fields, profile?.conditions[cond.key]?.values ?? {});
-  const asked = (CONDITION_FACTS[cond.key] ?? []).filter((n) => !DERIVED_FACTS[n]);
+  const [d, t] = filled(cond.fields, profile?.conditions[cond.key]?.values ?? {}, conditionValues(profile));
+  const asked = (CONDITION_FACTS[cond.key] ?? []).filter((n) => !DERIVED_FACTS[n] && !FIXED_FACTS[n]);
   return [d + asked.filter((n) => doc.facts?.[n] !== undefined).length, t + asked.length];
 }
 
 type EnvEdit = { ctx: FormCtx; doc: EnvironmentDoc; profile: Profile | null; apply: (fn: (d: EnvironmentDoc) => EnvironmentDoc) => void; snapshot: string | null };
 
 export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
-  const ctx = useCtx(props);
-  const { doc, setDoc } = props;
+  const setDoc = (d: EnvironmentDoc) => props.setDoc(normalizeEnv(d));
+  const ctx = useCtx({ ...props, setDoc });
+  const { doc } = props;
   const profile = profileOf(doc);
   const apply = (fn: (d: EnvironmentDoc) => EnvironmentDoc) => setDoc(fn(doc));
   const setProfile = (fn: (pr: Profile) => Profile) => apply((d) => withProfile(d, fn));
@@ -373,24 +422,8 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
             />
             <span className="muted small">업데이트 평가에서는 현재·후보·시험 환경을 각각 다른 환경 ID로 저장합니다.</span>
           </div>
-          <div className={p.qField}>
-            <div className={p.qLabel}>값의 확인 상태</div>
-            <Segmented
-              label="값의 확인 상태"
-              value={profile?.profile_status ?? undefined}
-              onChange={(v) => setProfile((pr) => ({ ...pr, profile_status: (v ?? null) as string | null }))}
-              options={[
-                { value: "observed", label: "실제 설치·설정에서 확인" },
-                { value: "planned", label: "계획값" },
-              ]}
-            />
-            <span className="muted small">계획값이면 기능 비사용 근거가 있어도 비적용 후보가 되지 않습니다.</span>
-          </div>
-          <div className={p.qField}>
-            <OriginField label="값을 얻은 방법 (문서 전체)" value={doc.data_origin} onChange={(v) => v && ctx.set("/data_origin", v)} />
-            <FieldMessages ctx={ctx} path="/data_origin" exact />
-          </div>
         </div>
+        {doc.data_origin === "EXAMPLE" && <Note>예시·시연용 자료로 저장돼 있습니다. 판정 근거로 쓰지 않습니다.</Note>}
         <FieldMessages ctx={ctx} path="/framework_profile" exact />
       </section>
 
@@ -481,6 +514,7 @@ function FactRow({ name, entry, edit }: { name: string; entry: CondEntry | undef
   const fact = doc.facts?.[name];
   const base = `/facts/${name}`;
   const rule = DERIVED_FACTS[name];
+  const fixed = FIXED_FACTS[name];
   const claim = profile?.absence_claims[name];
   const answered = rule ? entry?.values[rule.key] !== undefined : false;
   return (
@@ -489,16 +523,16 @@ function FactRow({ name, entry, edit }: { name: string; entry: CondEntry | undef
         <div>
           <strong>{FACT_LABEL[name]}</strong> <span className="mono muted small">{name}</span>
           <div className="muted small">
-            {rule ? (answered ? `위 '${rule.from}' 답으로 정해집니다.` : fact ? `이전에 입력한 값입니다. 위 '${rule.from}'을 고르면 그 답으로 바뀝니다.` : `위 '${rule.from}'을 고르면 정해집니다.`) : FACT_HINT[name]}
+            {fixed ? fixed.note : rule ? (answered ? `위 '${rule.from}' 답으로 정해집니다.` : fact ? `이전에 입력한 값입니다. 위 '${rule.from}'을 고르면 그 답으로 바뀝니다.` : `위 '${rule.from}'을 고르면 정해집니다.`) : FACT_HINT[name]}
           </div>
         </div>
-        {rule ? (
-          <span className={p.factDerived}>{FACT_VALUE_LABEL(fact?.value)}</span>
+        {fixed || rule ? (
+          <span className={p.factDerived}>{FACT_VALUE_LABEL(fixed ? fixed.value : fact?.value)}</span>
         ) : (
           <Segmented
             label={FACT_LABEL[name]}
             value={fact ? fact.value : undefined}
-            onChange={(v) => apply((d) => withFact(d, name, v, entry))}
+            onChange={(v) => apply((d) => withFact(d, name, v))}
             options={[
               { value: true, label: "사용" },
               { value: false, label: "사용 안 함" },
@@ -509,19 +543,23 @@ function FactRow({ name, entry, edit }: { name: string; entry: CondEntry | undef
       </div>
       {fact?.value === false && (
         <>
-          <TextField ctx={ctx} path={`${base}/absence_evidence`} label="비사용 근거 요약 (update 전달용)" nullable placeholder="아래 구조화 근거에서 채울 수 있음" />
+          {!claim && fact.absence_evidence && <div className="small">이전에 적은 근거: {fact.absence_evidence}</div>}
+          {claim && (
+            <div className="small muted">
+              {fact.absence_evidence ? `update에 넘길 근거 요약: ${fact.absence_evidence}` : "확인한 사실(기능 비활성·외부 비노출)과 확인 자료를 하나 이상 채우면 근거 요약이 만들어집니다."}
+            </div>
+          )}
           <ClaimEditor
             name={name}
             claim={claim}
             doc={doc}
             snapshot={snapshot}
             issues={issuesAt(ctx.issues, `/framework_profile/absence_claims/${name}`)}
-            onChange={(next) => apply((d) => withProfile(d, (pr) => ({ ...pr, absence_claims: putKey(pr.absence_claims, name, next) as Profile["absence_claims"] })))}
-            onSummary={(text) => ctx.set(`${base}/absence_evidence`, text)}
+            onChange={(next) => apply((d) => withClaim(d, name, next))}
           />
         </>
       )}
-      <FieldMessages ctx={ctx} path={base} exact />
+      <FieldMessages ctx={ctx} path={base} />
     </div>
   );
 }
@@ -533,7 +571,6 @@ function ClaimEditor({
   snapshot,
   issues,
   onChange,
-  onSummary,
 }: {
   name: string;
   claim: Claim | undefined;
@@ -541,7 +578,6 @@ function ClaimEditor({
   snapshot: string | null;
   issues: FieldIssue[];
   onChange: (c: Claim | undefined) => void;
-  onSummary: (text: string) => void;
 }) {
   if (!claim) {
     return (
@@ -638,13 +674,6 @@ function ClaimEditor({
           >
             현재 환경으로 대상 고정
           </button>
-          <button
-            type="button"
-            className="btn btn-small btn-ghost"
-            onClick={() => onSummary(`구조화 근거 framework_profile.absence_claims.${name}: ${claim.reviewer ?? "검토자 미기록"}, ${claim.reviewed_at ?? "시각 미기록"}, 자료 ${claim.references.length}건`)}
-          >
-            요약을 근거 칸에 채우기
-          </button>
           <button type="button" className="btn btn-small btn-ghost" onClick={() => onChange(undefined)}>
             근거 삭제
           </button>
@@ -694,7 +723,8 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
   const { ctx, doc, profile, apply } = edit;
   const entry = profile?.conditions[cond.key];
   const values = entry?.values ?? {};
-  const update = (patch: Partial<CondEntry>) => apply((d) => withCondition(d, cond.key, patch));
+  const others = conditionValues(profile);
+  const update = (next: Values) => apply((d) => withCondition(d, cond.key, next));
   const path = `/framework_profile/conditions/${cond.key}`;
   const facts = CONDITION_FACTS[cond.key] ?? [];
   const own = issuesAt(ctx.issues, path);
@@ -722,14 +752,14 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
         <ContractFields cond={cond.key} ctx={ctx} doc={doc} />
         <div className={p.qGrid}>
           {cond.fields
-            .filter((f) => visible(f, values))
+            .filter((f) => visible(f, values, others))
             .map((f) => (
               <InputFieldView
                 key={f.key}
                 field={f}
                 value={values[f.key]}
                 error={issuesAt(ctx.issues, `${path}/values/${f.key}`)[0]?.message}
-                onChange={(v) => update({ values: putKey(values, f.key, v) })}
+                onChange={(v) => update(putKey(values, f.key, v))}
               />
             ))}
         </div>
@@ -740,13 +770,6 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
             ))}
           </div>
         )}
-        <div className={p.qGrid}>
-          <OriginField label="값을 얻은 방법" value={entry?.origin} onChange={(v) => update({ origin: v })} />
-          <label className={p.field}>
-            확인한 자료
-            <input className="input" value={entry?.source ?? ""} placeholder="예: helm values, 엔진 기동 인자, 운영 담당 확인" onChange={(e) => update({ source: e.target.value || null })} />
-          </label>
-        </div>
         <div className="small muted">
           관련 기본 확인 점검: <CheckChips checks={cond.baseChecks} /> {cond.baseChecks.length ? " · " : ""}
           {cond.otherChecks}

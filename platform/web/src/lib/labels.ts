@@ -214,7 +214,7 @@ export const FACT_LABEL: Record<string, string> = {
   alternate_sources_or_formats_or_derived_cache: "대체 출처·형식·파생 캐시",
   remote_acquisition_or_retry: "원격 취득·재시도",
   managed_or_external_fallback: "관리형·외부 대체",
-  r10_features: "R10 기능",
+  r10_features: "미디어·영속 작업 기능",
   request_code_revision_selection: "요청별 코드 판본 선택",
 };
 

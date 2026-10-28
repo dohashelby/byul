@@ -26,9 +26,9 @@ import time
 import types
 import weakref
 
-PROFILE = "vllm-native-lifecycle-metadata/7"
+PROFILE = "vllm-native-lifecycle-metadata/8"
 COMMIT = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
-SCHEMA = "guard-native-lifecycle-events/7"
+SCHEMA = "guard-native-lifecycle-events/8"
 CONFIG_SCHEMA = "guard-native-lifecycle-settings/1"
 CONFIG_ENV = "GUARD_LIFECYCLE_CONFIG"
 CONFIG_PATH = "/guard-lifecycle/settings.json"
@@ -37,6 +37,7 @@ MAX_BYTES = 262144
 MAX_IDS = 8
 MAX_MODEL_OBJECTS = 64
 SOURCE_SHA = {
+ "vllm.entrypoints.openai.completion.api_router":"b93b00298a74a62a3f2d8da1c0a9380a2be5823f5ab7ab99a2c911906280d769",
  "vllm.entrypoints.generate.base.serving":"9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2",
  "vllm.entrypoints.serve.engine.serving":"e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02",
  "vllm.entrypoints.serve.middleware.authenticate":"ceb576aa3c053a5bcf145cfbe3f81def0f7213480c4aa1531fc4c00e32955225",
@@ -90,12 +91,15 @@ FUNCTION_POINTS = {"vllm.model_executor.model_loader.weight_utils": (
     "safetensors_weights_iterator","pt_weights_iterator","multi_thread_pt_weights_iterator",
     "multi_thread_safetensors_weights_iterator","fastsafetensors_weights_iterator",
     "instanttensor_weights_iterator","np_cache_weights_iterator"),
-    "vllm.entrypoints.openai.models.api_router":("models","show_available_models",)}
+    "vllm.entrypoints.openai.models.api_router":("models","show_available_models",),
+    "vllm.entrypoints.openai.completion.api_router":("create_completion",)}
 WEIGHT_POINTS = {"weight_utils."+name for name in FUNCTION_POINTS["vllm.model_executor.model_loader.weight_utils"]} | {
     "DefaultModelLoader._prepare_weights","DefaultModelLoader._get_weights_iterator"}
 ROUTE_POINTS = {"AuthenticationMiddleware.__call__","AuthenticationMiddleware.verify_token",
     "api_router.models","OpenAIServingModels.show_available_models"}
 HANDLER_POINT = "api_router.show_available_models"
+HANDLER_POINTS = {HANDLER_POINT:("/v1/models","GET",0),
+    "api_router.create_completion":("/v1/completions","POST",1)}
 REQUEST_SELECTION_POINTS = {"GenerateBaseServing._get_data_parallel_rank","GenerateBaseServing._get_session_id_from_headers",
     "GenerateBaseServing._get_session_id","GenerateBaseServing._get_priority","BaseServing._base_request_id"}
 _OBSERVER = None
@@ -349,7 +353,7 @@ class Observer:
     def wanted(self, point, snapshot):
         if point in REQUEST_SELECTION_POINTS:
             return self.selection_context() is not None
-        if point in ROUTE_POINTS or point==HANDLER_POINT:
+        if point in ROUTE_POINTS or point in HANDLER_POINTS:
             return self.route_context() is not None
         if point in WEIGHT_POINTS:
             return True
@@ -769,8 +773,8 @@ class Observer:
         def sample(args, kwargs, result=None, returned=False):
             started = time.monotonic_ns()
             try:
-                if point==HANDLER_POINT:
-                    value=observer.handler_snapshot(args,kwargs,result,returned,binding[0])
+                if point in HANDLER_POINTS:
+                    value=observer.handler_snapshot(point,args,kwargs,result,returned,binding[0])
                 else:
                     value = observer.snapshot(point, args, kwargs, result, returned)
             except Exception:
@@ -815,7 +819,7 @@ class Observer:
         if inspect.iscoroutinefunction(original):
             @functools.wraps(original)
             async def asynchronous(*args, **kwargs):
-                if not observer.active() or (point in ROUTE_POINTS or point==HANDLER_POINT) and observer.route_context() is None:
+                if not observer.active() or (point in ROUTE_POINTS or point in HANDLER_POINTS) and observer.route_context() is None:
                     return await original(*args,**kwargs)
                 if point in REQUEST_SELECTION_POINTS and observer.selection_context() is None:
                     return await original(*args,**kwargs)
@@ -830,7 +834,7 @@ class Observer:
             return asynchronous
         @functools.wraps(original)
         def synchronous(*args, **kwargs):
-            if not observer.active() or (point in ROUTE_POINTS or point==HANDLER_POINT) and observer.route_context() is None:
+            if not observer.active() or (point in ROUTE_POINTS or point in HANDLER_POINTS) and observer.route_context() is None:
                 return original(*args,**kwargs)
             if point in REQUEST_SELECTION_POINTS and observer.selection_context() is None:
                 return original(*args,**kwargs)
@@ -844,11 +848,12 @@ class Observer:
         binding.append(synchronous)
         return synchronous
 
-    def handler_snapshot(self,args,kwargs,result,returned,wrapped):
+    def handler_snapshot(self,point,args,kwargs,result,returned,wrapped):
         context=self.route_context()
         if context is None:
             return {"requests":[],"metadata":{},"selection_observed":False,"diagnostic":"SAMPLE_UNAVAILABLE"}
-        request=args[0] if args else kwargs.get("raw_request")
+        path_expected,method_expected,position=HANDLER_POINTS[point]
+        request=args[position] if len(args)>position else kwargs.get("raw_request")
         scope=attrs(request).get("scope")
         scope=scope if type(scope) is dict else {}
         route=attrs(scope.get("route"))
@@ -856,8 +861,8 @@ class Observer:
         methods=route.get("methods")
         path=route.get("path")
         registered=(scope.get("endpoint") is wrapped and route.get("endpoint") is wrapped
-            and dependant.get("call") is wrapped and type(path) is str and path=="/v1/models"
-            and type(methods) is set and all(type(method) is str for method in methods) and methods=={"GET"})
+            and dependant.get("call") is wrapped and type(path) is str and path==path_expected
+            and type(methods) is set and all(type(method) is str for method in methods) and methods=={method_expected})
         observed=self.scope_fingerprints(scope)
         value={"asgi_request_sha256":context["request"],"asgi_invocation_sha256":context["invocation"],
             "entry_path_sha256":context.get("path"),"entry_root_path_sha256":context.get("root"),
@@ -867,18 +872,19 @@ class Observer:
         return {"requests":[],"metadata":{"route_handler":value},"selection_observed":False}
 
     @staticmethod
-    def handler_targets(module,original,wrapped):
+    def handler_targets(module,point,original,wrapped):
         # APIRouter has already captured the endpoint at decorator execution.
         # include_router copies endpoint; an existing route closure uses dependant.call.
         # Unknown or ambiguous layouts keep the native registration unchanged.
+        path_expected,method_expected,_=HANDLER_POINTS[point]
         routes=attrs(vars(module).get("router")).get("routes")
         if type(routes) is not list or not 1<=len(routes)<=64:return []
         found=[route for route in routes if attrs(route).get("endpoint") is original]
         if len(found)!=1:return []
         route=found[0];fields=attrs(route);dependant=fields.get("dependant")
         methods=fields.get("methods");path=fields.get("path")
-        if (type(path) is not str or path!="/v1/models" or type(methods) is not set
-                or not all(type(method) is str for method in methods) or methods!={"GET"}
+        if (type(path) is not str or path!=path_expected or type(methods) is not set
+                or not all(type(method) is str for method in methods) or methods!={method_expected}
                 or attrs(dependant).get("call") is not original):return []
         try:
             route_data=object.__getattribute__(route,"__dict__")
@@ -911,8 +917,8 @@ class Observer:
             point=module_name.rsplit(".",1)[-1]+"."+name
             wrapped=self.wrap(module_name,point,original)
             targets.append((module,name,wrapped))
-            if point==HANDLER_POINT:
-                registered=self.handler_targets(module,original,wrapped)
+            if point in HANDLER_POINTS:
+                registered=self.handler_targets(module,point,original,wrapped)
         # Do not leave a half-installed module when a required method is absent.
         for cls, name, wrapped in targets:
             setattr(cls, name, wrapped)

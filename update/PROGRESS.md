@@ -1,3 +1,10 @@
+## 2026-10-28 — A-1 REQ-02 completion 등록 handler 연결
+
+- 한 일: 검증된 공동 소스8de64a6에서 기존 인증·세션·handler 수집을 POST /v1/completions의 고정 callback까지 연결했다. profile8/source26이며 native completion api_router checksum1개만 추가했다. 두 번째 raw_request 인자/키워드의 scope로 등록 endpoint/dependant와 실제 실행을 대조하고 본문·토큰·stream·원예외를 수집하지 않는다. profile7 고정 LF/CRLF bytes·source25·GET handler와 과거1~6 판독을 보존한다.
+- 테스트 결과: 1052파일 고정 후 최초 명령의 파일명 지정 오류로 시험 미실행1회를 보존했다. 실제 영향 검증은610통과·실패15·기존skip1·제외1(pytest53.37초·부모54.111초)이며 source bytes 불변이었다. 새 EXAMPLE headers 대역이 native 본문의 get(key,default)를 지원하지 않는 같은 원인이어서 대역만 보수하고 기존 반환·거부·Ref 기대값과 제품 코드를 유지했다. 재고정625통과·실패0·기존skip1·제외1(pytest53.56초·부모54.559초), 설치 wheel150파일 일치(부모19.808초), 검증 중 bytes 불변과 기존 source25·고정 profile7 bytes 동일을 확인했다. 결과 문서만 갱신한 뒤 정확 head CI를 확인한다. EXAMPLE router/native 본문 회귀이며 실제 FastAPI/엔진 실증은 아니다.
+- 다음 단계: 소스 고정 → 영향 검증 → 실패 수정·재검증 → 설치 wheel·커밋·푸시·후속 초안 PR·정확 head CI·A-2 공통 인계.
+- 막힌 것: 이번 CPU 생산자 연결에는 없음. 기업 Gateway 변환/호출자 API·모델 허용표는 준비 전이며 신뢰 principal·전체 handler 범위·외부 ledger·자동 판정·실제 대상 실증은 미완료다. 팩/registry/CheckDef·판정 의미·의존성·스트림 시간 계산은 바꾸지 않는다.
+
 ## 2026-10-28 — A-1/A-2 현재 소스 결합과 이월 경계 통합
 
 - 한 일: A-1 PR57 exact02d1212(CI5개·기본5645통과)에서 A-2 PR55 c47445d(CI5개 성공)의 확정13파일 patch를 보존 반영했다. 전용 source2개 포함12파일 exact bytes와 공유 시험의 버전1줄/기존 hook 회귀를 보존했다. 새 container_config0.6.1·구 credential live0.5.2의 source 결합에 맞춰 두 현재 실행기의 정적 이월을 기존 None 경계로 재선정한다. 제품 Store/판정/선정의 합성 DECLARED 계약에서 새 권한 수집도 run/container 변경 시 이전 PASS를 이월하던 경로를 재현한 뒤 보수한다.

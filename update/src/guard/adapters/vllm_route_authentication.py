@@ -51,7 +51,7 @@ def handler_index(recordings):
     Gateway transformation, prove missing events absent, or issue a verdict.
     """
     from .vllm_lifecycle_profiles import handler_observation
-    from .vllm_lifecycle_sensor import HANDLER_POINT
+    from .vllm_lifecycle_sensor import HANDLER_POINTS
     events=[];invocations={};headers={};complete=True
     context_keys=("asgi_request_sha256","entry_path_sha256","entry_root_path_sha256","entry_method_sha256")
     for capture_index,recording in enumerate(recordings):
@@ -71,7 +71,7 @@ def handler_index(recordings):
                 else:ready.discard(payload["module"])
             observed=route_observation(row) or handler_observation(row)
             if observed is None:
-                if row["event"]=="NATIVE" and payload["point"] in ROUTE_POINTS|{HANDLER_POINT}:complete=False
+                if row["event"]=="NATIVE" and payload["point"] in ROUTE_POINTS|set(HANDLER_POINTS):complete=False
                 continue
             if len(events)>=MAX_EVENTS:
                 complete=False
@@ -84,6 +84,7 @@ def handler_index(recordings):
             if any(entry[k]!=metadata[k] for k in context_keys):
                 entry["metadata_consistent"]=False;complete=False
             module=("vllm.entrypoints.serve.middleware.authenticate" if observed["point"].startswith("AuthenticationMiddleware.")
+                else "vllm.entrypoints.openai.completion.api_router" if observed["point"]=="api_router.create_completion"
                 else "vllm.entrypoints.openai.models.api_router" if observed["point"].startswith("api_router.")
                 else "vllm.entrypoints.openai.models.serving")
             entry["source_modules_observed"] &= module in ready
@@ -98,13 +99,13 @@ def handler_index(recordings):
         selected=[by_reference[tuple(ref)] for ref in entry["events"]]
         auth=[event for event in selected if event["point"]=="AuthenticationMiddleware.verify_token"
             and event["phase"]=="RETURN" and event["metadata"]["token_verified"] is not None]
-        handler=[event for event in selected if event["point"]==HANDLER_POINT and event["phase"]=="CALL"]
+        handler=[event for event in selected if event["point"] in HANDLER_POINTS and event["phase"]=="CALL"]
         # Preserve individual results rather than choose a successful one from
         # duplicate, recursive, contradictory or interrupted authentication calls.
         entry["token_results"]=[{"event":event["event"],"auth_call_sha256":event["metadata"]["auth_call_sha256"],
             "token_verified":event["metadata"]["token_verified"]} for event in auth]
         entry["registered_handler_observed"]=any(event["metadata"]["registered_route_observed"] for event in handler)
-        entry["handler_return_observed"]=any(event["point"]==HANDLER_POINT and event["phase"]=="RETURN"
+        entry["handler_return_observed"]=any(event["point"] in HANDLER_POINTS and event["phase"]=="RETURN"
             and event["metadata"]["handler_returned"] is True for event in selected)
         auth_calls=[event for event in selected if event["point"]=="AuthenticationMiddleware.__call__" and event["phase"]=="CALL"]
         before=[event for event in auth if handler and event["event"][0]==handler[0]["event"][0]
@@ -122,7 +123,7 @@ def handler_index(recordings):
         "ambiguous_asgi_request_sha256":sorted(key for key,value in headers.items() if len(value)>1),
         "stored_index_complete":complete,"producer_authenticated":False,"registered_handler_verified":False,
         "authorization_verified":False,"whole_route_coverage_verified":False,"security":"UNKNOWN",
-        "scope":"declared registered GET /v1/models callback identity and auth/path association; no principal, policy or absence verdict"}
+        "scope":"declared registered GET /v1/models and POST /v1/completions callback identity and auth/path association; no principal, policy or absence verdict"}
 
 
 def selection_index(recordings):

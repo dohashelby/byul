@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/vllm-project/vllm.git",
+  "tag": "v0.31.0",
+  "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+  "files": {
+    "vllm/v1/serial_utils.py": "8be308e0824103a9d061e95c43f915baf60136ded6cd0dc5721dd4a7fb1cca39",
+    "vllm/envs.py": "1d7101800f67b803a700fbf7489292cf1f0022b570085166ad407e6b1513dc15",
+    "tests/v1/test_serial_utils.py": "c2e2fc3650603fde8e7ccae58218b2af2c39c316673ca622764446b96badfedf",
+    "vllm/v1/engine/core.py": "f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b",
+    "vllm/v1/engine/__init__.py": "e7532e6c9fde4643cf31cd793d4ae4a6d618c71c87208430fb6680105dc1af42",
+    "vllm/v1/outputs.py": "a4c73e7125781c339d42bdb7f8fdd3324a489742a4588d8c1b1638aa335fd138",
+    "vllm/v1/utils.py": "6d8d703e2918686bfe791936fc0e5e196cb77e4724e05f0da340ae783b12cb73"
+  },
+  "mapped_official_reference": "5d35ce3934a7804b298559d2d99eec33792e1eb9",
+  "compatibility": "mapped official encoder reference is distinct; this decoder CPU run uses the pinned tag source only"
+}

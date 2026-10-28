@@ -234,7 +234,7 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
 
 class RequestBindingExecutor(HttpCheckExecutor):
     name = "request_binding"
-    version = "0.3.4"
+    version = "0.3.5"
     requires_roles = False
     requires_route_scope = False
     _uses_docker_identity = True

@@ -1,23 +1,26 @@
 """GPU image contract through the same injected Kubernetes/product interfaces."""
 import pytest
 
-from guard.adapters.vllm import VllmAdapter, CHAT_REVIEWED_IMAGE, REQUEST_BINDING_GPU_IMAGE
+from guard.adapters.vllm import VllmAdapter, CHAT_REVIEWED_IMAGE, REQUEST_BINDING_GPU_IMAGE, REQUEST_BINDING_GPU_032_IMAGE
 from tests import test_kubernetes_request_binding as kube
 from tests.test_request_binding import judge
 
 
-def gpu_contract(monkeypatch):
+def gpu_contract(monkeypatch, version="0.31.0"):
     original_env, original_target = kube.env, kube.target
+    image = {"0.31.0": REQUEST_BINDING_GPU_IMAGE, "0.32.0": REQUEST_BINDING_GPU_032_IMAGE}[version]
 
     def environment():
         value = original_env().model_copy(deep=True)
-        value.engine.image_digest = REQUEST_BINDING_GPU_IMAGE
+        value.engine.image_digest = image
+        value.engine.version = version
         return value.seal()
 
     def target(environment_=None):
         value = original_target(environment_ or environment())
-        value["engine"]["image_digest"] = REQUEST_BINDING_GPU_IMAGE
-        value["kubernetes"]["engine"].update(image=REQUEST_BINDING_GPU_IMAGE, image_id=REQUEST_BINDING_GPU_IMAGE)
+        value["observed_version"] = version
+        value["engine"]["image_digest"] = image
+        value["kubernetes"]["engine"].update(image=image, image_id=image)
         value["comparison_config"]["launch"]["profile"] = "gpu-bounded-v1"
         return value
 
@@ -25,8 +28,9 @@ def gpu_contract(monkeypatch):
     monkeypatch.setattr(kube, "target", target)
 
 
-def test_gpu_runs_same_json_sse_cases_without_claiming_gpu_execution(tmp_path, monkeypatch):
-    gpu_contract(monkeypatch)
+@pytest.mark.parametrize("version", ["0.31.0", "0.32.0"])
+def test_gpu_runs_same_json_sse_cases_without_claiming_gpu_execution(tmp_path, monkeypatch, version):
+    gpu_contract(monkeypatch, version)
     draft, world = kube.run(tmp_path)
     assert draft.data_origin.value == "EXAMPLE"
     assert draft.observations["source_contract_verified"].value is True
@@ -39,21 +43,24 @@ def test_gpu_runs_same_json_sse_cases_without_claiming_gpu_execution(tmp_path, m
 
 
 @pytest.mark.parametrize("late", ["exception", "restart", "cleanup", "duplicate", "truncated"])
-def test_gpu_retains_independent_fail_after_later_gap(tmp_path, monkeypatch, late):
-    gpu_contract(monkeypatch)
+@pytest.mark.parametrize("version", ["0.31.0", "0.32.0"])
+def test_gpu_retains_independent_fail_after_later_gap(tmp_path, monkeypatch, late, version):
+    gpu_contract(monkeypatch, version)
     kube.test_independently_bound_fail_survives_later_collection_or_cleanup_gap(tmp_path, late)
 
 
 @pytest.mark.parametrize("mode,expected", [("normal", "UNKNOWN"), ("foreign", "FAIL"),
                                           ("attachment", "FAIL"), ("wrong-owner", "UNKNOWN")])
-def test_gpu_cli_refs_survive_export_restore_rejudge_and_attachment_error(tmp_path, monkeypatch, mode, expected):
-    gpu_contract(monkeypatch)
+@pytest.mark.parametrize("version", ["0.31.0", "0.32.0"])
+def test_gpu_cli_refs_survive_export_restore_rejudge_and_attachment_error(tmp_path, monkeypatch, mode, expected, version):
+    gpu_contract(monkeypatch, version)
     kube.test_existing_cli_evd_res_rpt_refs_export_restore_and_rejudge(tmp_path, monkeypatch, mode, expected)
 
 
 @pytest.mark.parametrize("damage", ["cpu_profile", "unknown_profile", "writable", "wrong_template"])
-def test_gpu_rejects_unreviewed_template_or_launch_before_requests(tmp_path, monkeypatch, damage):
-    gpu_contract(monkeypatch)
+@pytest.mark.parametrize("version", ["0.31.0", "0.32.0"])
+def test_gpu_rejects_unreviewed_template_or_launch_before_requests(tmp_path, monkeypatch, damage, version):
+    gpu_contract(monkeypatch, version)
     value = kube.target()
     if damage in {"cpu_profile", "unknown_profile"}:
         value["comparison_config"]["launch"]["profile"] = "cpu-bounded-v1" if damage == "cpu_profile" else "gpu-unbounded"
@@ -86,6 +93,10 @@ def test_gpu_rejects_unreviewed_template_or_launch_before_requests(tmp_path, mon
     ("vllm/vllm-openai@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3", "0.31.0"),
     ("vllm/vllm-openai@sha256:c76d0e2225a4b1cb1e2109ace39639f55e714abd1a7a427acc8b0bbd7f6a83b3", "0.31.0"),
     (REQUEST_BINDING_GPU_IMAGE, "0.32.0"),
+    (REQUEST_BINDING_GPU_032_IMAGE, "0.31.0"),
+    ("vllm/vllm-openai-cpu@sha256:827ef38187f9b52f2bb838695ef815ec5b65f4bf3e4c061b002b2b0a19cb0701", "0.32.0"),
+    ("vllm/vllm-openai@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34", "0.32.0"),
+    ("vllm/vllm-openai@sha256:bd8a5d7a8774800c92d714c0c226b32c1863f929150f36efd610aebcd12a335d", "0.32.0"),
 ])
 def test_gpu_contract_does_not_infer_tag_index_config_or_other_version(image, version):
     assert VllmAdapter().request_binding_contract(image, version) is None
@@ -99,3 +110,4 @@ def test_cpu_contract_and_other_gpu_gates_are_unchanged():
     assert gpu["sources"] == cpu["sources"]
     assert gpu["launch_profile"] == "gpu-bounded-v1"
     assert adapter.native_log_contract(REQUEST_BINDING_GPU_IMAGE, "0.31.0") is None
+    assert adapter.native_log_contract(REQUEST_BINDING_GPU_032_IMAGE, "0.32.0") is None

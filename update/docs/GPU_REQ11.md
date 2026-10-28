@@ -27,7 +27,30 @@ GPU target의 `comparison_config.launch.profile`은 `gpu-bounded-v1`을 명시�
 
 기존 `guard-text-chat-v1`의 정확한 metadata, regular readOnly 파일 bytes, 실제 Pod command/args, 선택 ENV·namespace/Pod/container/image 세대의 전후 일치를 요구한다. CPU 프로파일·미검토 template·쓰기 가능한 mount로 GPU 요청을 보내지 않는다. 고정 template 경로는 `/guard-assets/chat/guard-text-chat-v1.jinja`다. ConfigMap의 projected symlink를 사용하지 않고 소유 호스트의 고정 regular 파일을 정확 경로에 readOnly mount한다.
 
-기존 [Kubernetes REQ11](KUBERNETES_REQ11.md)의 직접 Pod IPv4 HTTP, JSON/SSE, 모델 매핑, prebound/after_baseline, EVD/RES/RPT·반출/복원·재판정을 그대로 사용한다. `request_binding:real`은0.3.4, `request_binding:kubernetes`는0.1.3이다. 공용 판정과 팩 revision은 변경하지 않는다. 독립 출력 oracle 부재는 security UNKNOWN으로 남기고, 독립 FAIL은 후속 누락·첨부·정리 오류가 있어도 보존한다.
+기존 [Kubernetes REQ11](KUBERNETES_REQ11.md)의 직접 Pod IPv4 HTTP, JSON/SSE, 모델 매핑, prebound/after_baseline, EVD/RES/RPT·반출/복원·재판정을 그대로 사용한다. `request_binding:real`은0.3.5, `request_binding:kubernetes`는0.1.4이다. 공용 판정과 팩 revision은 변경하지 않는다. 독립 출력 oracle 부재는 security UNKNOWN으로 남기고, 독립 FAIL은 후속 누락·첨부·정리 오류가 있어도 보존한다.
+
+## 실제 이미지 비교를 위한0.32 후보
+
+0.31 완료 소스8c4ed09는 보존한다. 공식0.32.0 GPU 후보는 별도 image/소비 소스 계약으로만 추가한다. 기존0.31 GPU·CPU 반환값과 CPU0.32 미지원, native 센서/로그 수집기의 gate는 유지한다.0.32 계측 프로파일이나 실제 GPU 결과를 추가한 것은 아니다.
+
+|0.32 식별 대상|SHA-256|
+|---|---|
+|index|`befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34`|
+|지원 linux/amd64 manifest|`6ee133356d49ed24cee03dd0cda3d3980279a11c107ce3e752c89e76540f41c9`|
+|config|`bd8a5d7a8774800c92d714c0c226b32c1863f929150f36efd610aebcd12a335d`|
+|설치 layer|`9e7501e79e298acddbaafcfb602f154e98ba83a7dd5ec5d711a816b27b1ec083`|
+
+지원 입력은 정확한 `vllm/vllm-openai@sha256:6ee133356d49ed24cee03dd0cda3d3980279a11c107ce3e752c89e76540f41c9`와 버전0.32.0의 조합이다. 설치 source2879개와 뒤의13layer를 확인했고 필요한 vLLM 소스의 덮어쓰기/제거는 없었다. 설치 `_version.py`는0.32.0이고 build 표시는5df63a7203cdb9328d824a27b682e77c7b9928be다.
+
+다음 세 파일에서 X-Request-Id 우선·body/default ID·chatcmpl 접두사, 실제 engine 입력 전달, JSON 및 첫 SSE chunk의 prompt IDs/text 반환을 대조했다. 해시를0.31에서 이월하지 않는다.
+
+|파일|SHA-256|
+|---|---|
+|serve/engine/serving.py|`e46693a37e9a8b1087c8cee8a1e2cb9a2ce3d052772e3771755ef59de0885cf4`|
+|openai/chat_completion/serving.py|`5e619c0a6866758a247c76e7b8c472f6e008ddbc720f7efe47cc6776cb986d4f`|
+|openai/chat_completion/protocol.py|`8744d5e2004b2d376e34cf17de51c919bca6d81b0cc8392da138db1ef05a7c61`|
+
+원자료는 같은 외부 검토 폴더의 `candidate-v0.32.0/`에 있다. 기존 GPU 회귀는 두 이미지/판본에 각각 적용하고, 기존 update CLI와 prebound/after_baseline의 후보 누락/교체·기준판 보존을 같은 인터페이스로 검증한다. 이는 EXAMPLE 소유 응답 주입이며 실제 두 이미지 엔진 기동이나 GPU 반납이 아니다.
 
 ## 실제 실행에서 남은 확인
 

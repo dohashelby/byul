@@ -11,7 +11,7 @@ from .request_binding import RequestBindingExecutor, DEFAULTS
 
 
 class KubernetesRequestBindingExecutor(RequestBindingExecutor):
-    version="0.1.3"
+    version="0.1.4"
     _uses_docker_identity=False
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):

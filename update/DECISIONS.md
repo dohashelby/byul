@@ -549,3 +549,4 @@
 
 - 2026-10-27: 인증 입력/bool·router 조회·async serving 반환을 profile5의 별도 살아 있는 ASGI 문맥/인덱스로 관측하고 profile4를 고정 호환한다. 동기 awaitable 반환·상속된 늦은 문맥·등록 endpoint와 모듈 변수의 차이를 실제 완료/인가로 오인하지 않기 위해서다.
 - 2026-10-28 · REQ11은 공식 GPU0.31.0의 exact amd64 manifest와 설치 소비 소스가 확인된 gpu-bounded-v1만 추가한다. · CPU digest/다른 수집기 제한과 과거 소비 계약을 보존하며 index/config/tag를 runtime imageID나 실제 GPU 소비 증명으로 바꾸지 않기 위함이다.
+- 2026-10-29 · REQ11의0.32 GPU 후보는 별도 exact amd64 manifest/소비3파일과 판본 조합으로 연결하고0.31·CPU·native gate를 보존한다. · 실제 두 이미지 비교 준비에서 후보 소스 근거를 기준판 해시로 이월하지 않기 위함이다.

@@ -29,6 +29,7 @@ CHAT_REVIEWED_IMAGE = "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed2
 # Official v0.31.0 linux/amd64 manifest, distinct from its multi-platform index
 # and config digest. Consumer source bytes were inspected in the OCI layers.
 REQUEST_BINDING_GPU_IMAGE = "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b"
+REQUEST_BINDING_GPU_032_IMAGE = "vllm/vllm-openai@sha256:6ee133356d49ed24cee03dd0cda3d3980279a11c107ce3e752c89e76540f41c9"
 TYPE_TEMPLATE_PROFILE = "guard-type-boundary-v1"
 TYPE_TEMPLATE_SHA256 = "38110f6e668d55f240ecfde0d38f5fecc7c11a742d76823ffd9d0918abb9fe36"
 TYPE_TEMPLATE_PATH = "/guard-assets/chat/guard-type-boundary-v1.jinja"
@@ -473,17 +474,22 @@ class VllmAdapter:
 
     def request_binding_contract(self, image_digest: str, engine_version: str) -> dict | None:
         """Consumer evidence in the inspected image, not an authenticated principal."""
-        if image_digest not in (CHAT_REVIEWED_IMAGE, REQUEST_BINDING_GPU_IMAGE) or engine_version != "0.31.0":
+        if (engine_version, image_digest) not in (("0.31.0", CHAT_REVIEWED_IMAGE),
+                ("0.31.0", REQUEST_BINDING_GPU_IMAGE), ("0.32.0", REQUEST_BINDING_GPU_032_IMAGE)):
             return None
         return {"profile": "request-connection-binding-v1", "engine_version": engine_version,
                 "image_digest": image_digest, "id_prefix": "chatcmpl-", "body_request_id": True,
                 "header_request_id": True, "header_precedence": True,
                 "consumer_prompt_ids": True, "consumer_prompt_text": True,
-                **({"launch_profile": "gpu-bounded-v1"} if image_digest == REQUEST_BINDING_GPU_IMAGE else {}),
-                "sources": [
+                **({"launch_profile": "gpu-bounded-v1"} if image_digest != CHAT_REVIEWED_IMAGE else {}),
+                "sources": ([
+                    {"path": "vllm/entrypoints/serve/engine/serving.py", "sha256": "e46693a37e9a8b1087c8cee8a1e2cb9a2ce3d052772e3771755ef59de0885cf4", "lines": "133-143"},
+                    {"path": "vllm/entrypoints/openai/chat_completion/serving.py", "sha256": "5e619c0a6866758a247c76e7b8c472f6e008ddbc720f7efe47cc6776cb986d4f", "lines": "310-405,540-573,749-791,1115-1128,1189-1205"},
+                    {"path": "vllm/entrypoints/openai/chat_completion/protocol.py", "sha256": "8744d5e2004b2d376e34cf17de51c919bca6d81b0cc8392da138db1ef05a7c61", "lines": "415-432,453-461"}]
+                    if image_digest == REQUEST_BINDING_GPU_032_IMAGE else [
                     {"path": "vllm/entrypoints/serve/engine/serving.py", "sha256": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02", "lines": "119-129"},
                     {"path": "vllm/entrypoints/openai/chat_completion/serving.py", "sha256": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002", "lines": "291-317,554-565,743-760,1190-1201"},
-                    {"path": "vllm/entrypoints/openai/chat_completion/protocol.py", "sha256": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1", "lines": "391-400,416-423,446-452"}]}
+                    {"path": "vllm/entrypoints/openai/chat_completion/protocol.py", "sha256": "4bdc71f668e4820d8ae5bae2a153fed0296b430cd6353ace8c0c27cfb982ebc1", "lines": "391-400,416-423,446-452"}])}
 
     def native_log_contract(self, image_digest: str, engine_version: str) -> dict | None:
         if image_digest != CHAT_REVIEWED_IMAGE or engine_version != "0.31.0":

@@ -7,7 +7,7 @@ import { KeyValue } from "../../components/DetailPanel";
 import { Dot, Query, StateView, WarningBox, ui } from "../../components/Misc";
 import { ChartCard, Donut, HBars, REQUEST_SERIES, TimeBars, TimeLine, type RequestKey } from "../../components/StackedBars";
 import { Value } from "../../components/Value";
-import { APPROVAL_DETAIL } from "../../lib/labels";
+import { APPROVAL_DETAIL, ENGINE_NAME } from "../../lib/labels";
 import { bucketize, inRange } from "../../lib/time";
 import { carry, useGlobalFilters } from "../../lib/url";
 import p from "../pages.module.css";
@@ -30,7 +30,7 @@ function Kv({ rows }: { rows: Row[] }) {
 
 export function ScopeChips({ status, observeEnv }: { status: RuntimeStatus; observeEnv: string | null }) {
   const external = status.backend.kind !== "mock";
-  const name = ({ vllm: "vLLM", sglang: "SGLang" } as Record<string, string>)[status.backend.kind] ?? status.backend.kind;
+  const name = ENGINE_NAME[status.backend.kind] ?? status.backend.kind;
   return (
     <div className={rt.scopeChips} aria-label="표시 범위">
       <span className={rt.scopeChip}>

@@ -194,7 +194,7 @@ def test_permission_binding_product_cli_report_restore_and_exact_refs(tmp_path, 
     store = Store(store_path)
     evd, = store.find_latest("EVD", lambda r: True); res, = store.find_latest("RES", lambda r: True)
     rpt, = store.find_latest("RPT", lambda r: True)
-    assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.6.1"
+    assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.6.2"
     assert res.verdicts.security.value == expected and rpt.official is False
     assert evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest
     assert CANARY not in canonical_json(evd.to_dict()).decode()

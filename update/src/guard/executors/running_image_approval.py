@@ -51,6 +51,9 @@ def validate_image_approval_policy(values):
 
 
 def _target(ctx, configured_container):
+    if (not ctx.env.hash_ok()
+            or ctx.target.get("environment_ref") != ctx.env.ref().model_dump(mode="json")):
+        return None
     engine = ctx.target.get("engine")
     if type(engine) is not dict:
         return None

@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-28 — A-1 REQ-11 모호한 JSON 응답 보수
+
+- 한 일: 고정0b82eea에서 JSON의 중복 소비 입력 키 순서가 귀속 확인과 위반을 바꾸는 EXAMPLE을 재현했다. request_binding0.3.1이 기존 strict_json으로 일반 응답·tokenizer·SSE frame의 모호한 JSON을 미수집으로 처리하고, 다른 유효 frame/연결에서 확인한 위반과 이후 첨부 실패의 FAIL/Ref를 유지한다. 공통 content_common·B/A-2 파일·팩·판정·시간/overlap 계산은 유지한다.
+- 테스트 결과: 943파일 고정 영향/인접373통과·실패0·기존skip1·제외1(pytest42.85초·부모44.918초), 설치 wheel140파일 일치(부모13.724초), 검증 중 bytes 불변을 확인했다. JSON/SSE 분석과 제품 EVD/RPT 저장·복원·정확 Ref 재판정을 포함한다. AST로 기존 시간/overlap·요청/fixture·projection 코드가 그대로임을 대조했고 이후 결과 문서만 반영한다. 실제 엔진 실증 증가는0이다.
+- 다음 단계: 커밋·푸시·후속 초안·정확 head CI·A-2 인계를 마친 뒤 A-2의 source interval 소비 PR52를 exact head 기준으로 검토·통합한다.
+- 막힌 것: 이 파서 보수에는 없음. REQ-11 생성 출력 귀속 oracle·실제 대상 실증·전체 보안 PASS는 미완료다. 사용자 확인에 따라 REQ-02/05 기업 정책 의존 판정은 준비 대기이며 임의의 허용 관계를 만들지 않는다.
+
 ## 2026-10-28 — A-1 Docker 엔진 소스의 ENV·소유 신원 공통 경계
 
 - 한 일: A-2의 안정된 잘못된 instance 재현 요청을 검토해 exact ENV Ref·engine.container·pin 이미지·소유 run 입력 확인과 실제 소유 신원을 기존 identity 위의 공통 함수로 결합했다. 기존 lifecycle 입력 검증·제품 세션의 owner callback이 소비한다. Gateway 자료에는 엔진 신원을 강제하지 않고 Kubernetes의 기존 UID/세대 계약과 구분한다.

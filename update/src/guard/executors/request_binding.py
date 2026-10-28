@@ -9,7 +9,6 @@ No abort, stored-result, retry, child-request or tenant authorization is tested.
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import secrets
 import time
@@ -20,6 +19,7 @@ from guard.runtime.docker import Docker
 from .content_common import append_artifact, content_request, json_body, sample_artifact
 from .engine_identity import owned_template_snapshot
 from .http_common import HttpCheckExecutor
+from .owned_capture import strict_json
 from .response_projection import capture_metadata, log_metadata
 
 
@@ -41,6 +41,23 @@ def _ids(value, maximum=128, *, empty=False):
 def rendered_text(text):
     """The fixed fixture's exact bytes; never execute arbitrary Jinja."""
     return "user: " + text + "\nassistant: "
+
+
+def _load_json(text):
+    # Transport/body helpers already enforce the existing capture bounds.
+    # Do not add a smaller limit when validating an individual SSE frame.
+    raw=text.encode("utf-8")
+    return strict_json(raw,limit=len(raw))
+
+
+def _response_object(response):
+    """Keep existing body bounds and reject ambiguous consumer/tokenizer JSON."""
+    try:
+        value,error=json_body(response)
+        if error:return value,error
+        return _load_json(response["body"]),None
+    except (ValueError,TypeError,UnicodeError,RecursionError):
+        return None,"response is not unambiguous JSON"
 
 
 def _analysis_projection(value):
@@ -87,7 +104,7 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
     finish_count, done_count, usage = 0, 0, None
     frames = []
     if mode == "json":
-        value, error = json_body(response)
+        value, error = _response_object(response)
         if error:
             gaps.append(error)
         else:
@@ -111,8 +128,8 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
             if done_count:
                 gaps.append("a data frame followed the stream terminal signal")
             try:
-                frame = json.loads(data)
-            except (TypeError, ValueError):
+                frame = _load_json(data)
+            except (TypeError, ValueError, UnicodeError, RecursionError):
                 gaps.append("an SSE data frame is not JSON")
                 continue
             if type(frame) is not dict:
@@ -217,7 +234,7 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
 
 class RequestBindingExecutor(HttpCheckExecutor):
     name = "request_binding"
-    version = "0.3.0"
+    version = "0.3.1"
     requires_roles = False
     requires_route_scope = False
 
@@ -334,7 +351,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
                     "add_generation_prompt": True, "add_special_tokens": False, "return_token_strs": False}
             request = content_request(ctx, "engine", "tokenize-" + side, "/tokenize", body)
             results = send([request])
-            value, error = json_body(results[0]) if results else (None, "not dispatched")
+            value, error = _response_object(results[0]) if results else (None, "not dispatched")
             if (not error and results[0].get("outcome") == 200 and _ids(value.get("tokens"))
                     and type(value.get("count")) is int and value["count"] == len(value["tokens"])
                     and type(value.get("max_model_len")) is int and value["max_model_len"] == launch.get("max_model_len")

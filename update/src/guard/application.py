@@ -152,7 +152,8 @@ def update_inputs(envs, cfg: dict):
             raise ValueError("KUBERNETES_TRANSITION_TARGETS_UNVERIFIED")
         try:
             KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
-                poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25))
+                poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
+                candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
         except Exception:
             raise ValueError("KUBERNETES_TRANSITION_CONFIGURATION_INVALID") from None
     return mode, side_cfgs, managed
@@ -193,7 +194,8 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
     kube_transition=None
     if any(c.get("executors",{}).get("request_binding")=="kubernetes" for c in side_cfgs.values()):
         kube_transition=KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
-            poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25))
+            poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
+                candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
     for side, env in zip((Side.baseline, Side.candidate), envs):
         if not any(item.selected for item in plan.items):
             break  # 이월 전용 PLAN은 엔진을 기동하지 않는다.
@@ -208,6 +210,7 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
                         if any(e.execution.status!=ExecStatus.COMPLETED for e in previous_evidence):
                             raise ValueError("BASELINE_EXECUTION_FAILED")
                         kube_transition.candidate_ready()
+                    side_cfg.raw["_kubernetes_target_sha256"]=kube_transition.transports[side.value].target_sha256
                 except Exception:
                     side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
                     lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
@@ -463,6 +466,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         c.get("executors",{}).get("request_binding")=="kubernetes" for c in cfg.get("sides",{}).values())
     if kube_requested:
         record("kubernetes-static-binding",prepared is not None,"Exact target/ENV declarations checked; actual cluster, Pods, template and GPU remain unverified")
+        if cfg.get("update",{}).get("kubernetes_candidate_binding")=="after_baseline":
+            record("candidate-binding-deferred",True,"Only baseline target is selected; exact candidate ENV/generation will be required after baseline API termination, before candidate dispatch")
         if not single and envs[0].engine.image_digest==envs[1].engine.image_digest:
             record("image-pair",False,"use different image digests for an update validation")
         return {"ready":all(c["ok"] for c in checks),"checks":checks,"check_support":check_support,

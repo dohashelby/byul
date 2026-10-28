@@ -11,12 +11,16 @@ from .request_binding import RequestBindingExecutor, DEFAULTS
 
 
 class KubernetesRequestBindingExecutor(RequestBindingExecutor):
-    version="0.1.1"
+    version="0.1.2"
     _uses_docker_identity=False
 
-    def __init__(self,cfg,*,runner=None,environ=None):
+    def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ)
+        if expected_target_sha256 is not None and (type(expected_target_sha256) is not str or len(expected_target_sha256)!=64
+                or any(c not in "0123456789abcdef" for c in expected_target_sha256)):
+            raise ValueError("KUBERNETES_REQUEST_BINDING_CONFIGURATION_INVALID")
         self._kubectl_runner=runner
+        self._expected_target_sha256=expected_target_sha256
 
     def _api_model(self,ctx):
         return ctx.api_model
@@ -32,6 +36,8 @@ class KubernetesRequestBindingExecutor(RequestBindingExecutor):
                 raise ValueError
             self.validate_policy(check,policy_values)
             target=strict_json(Path(self.cfg["target"]).read_bytes())
+            if self._expected_target_sha256 is not None and sha256_hex(canonical_json(target))!=self._expected_target_sha256:
+                raise ValueError
         except (KeyError,TypeError,ValueError,OSError):
             raise ValueError("KUBERNETES_REQUEST_BINDING_CONFIGURATION_INVALID") from None
         transport=KubernetesHTTP(target,env,duration=self.cfg.get("max_duration_seconds",DEFAULTS["max_duration_seconds"]),

@@ -1,3 +1,10 @@
+## 2026-10-28 — A-1 순차 Kubernetes 전환의 지연 후보 결합
+
+- 한 일: 검증된 모델 준비 통합ef75639를 별도 worktree로 보존 분리했다. 기존 prebound 계약을 유지하면서 명시 after_baseline 모드에서 기준판 API 종료 후 새 경로의 기존 candidate target 입력을 기다리고 exact ENV/세대/Ready를 확인한다. 선택 target의 정규 SHA를 공통 registry→실행기에 전달해 선택 이후 파일 교체를 요청 전 거부한다. API 전환 대기 한도를 기준판 요청 시간과 분리하며 stream 계산은 유지한다.
+- 테스트 결과: 1067파일 고정 직접/인접/불변식501통과·실패0·기존Windows skip1·제외1(pytest66.29초·부모67.889초), 플랫폼175통과(11.94/21.907초), wheel155파일 동일(부모13.457초). 기존 모드와 지연 모드·누락/불완전/외부ENV/신원재사용·대기 한도·선택 후 파일 교체·기존 CLI EVD/RES/RPT/기준판 첨부 보존을 확인했다. A-2/B·stream bytes와 검증 중1067파일 bytes 불변, 새 skip/제외0이다. 결과 문서만 갱신한 뒤 정확 head CI를 확인한다.
+- 다음 단계: 영향 검증 → 실패 수정·재고정·재검증 → 커밋·푸시·후속 초안 PR·정확 통합 head CI·A-2 인터페이스 및 GPU 재개 인계.
+- 막힌 것: 실제 Kubernetes·GPU 할당/반납·worker 종료는 미실증이고 AWS 실행은 승인 대기다. operator가 실제 후보 배포와 target 완성을 담당하며 제품은 배포/Pod/파일을 변경하지 않는다. 미검토 GPU source/image 및 기업 허용표를 임의로 채우지 않는다.
+
 ## 2026-10-28 — A-1 A-2 모델 준비의 공통 요청·mount 소비 연결
 
 - 한 일: 검증된 Kubernetes REQ11 e4fe2f2를 보존한 별도 통합 worktree에서 A-2 c7bf2973 exact7파일을681698f 커밋으로 반영했다. A-2 매핑을 공통 요청/정상 응답 대조와 REQ11에 연결하고 ENV 모델 의미를 유지한다. 비교 조건에서 ENV Ref/host 위치와 모델·별칭 의미를 구분하며 기존 query의 전후 snapshot을 A-2 mount 분석기로 전달해 기존 첨부/수집 CLI를 사용한다. 전용 A-2/B 소스·새 실행기·판정 규칙은 추가하지 않는다.

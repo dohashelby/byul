@@ -47,6 +47,17 @@ gate는 기준판 Ready 확인 → 기준판 실행 → 기준판 API 종료/부
 
 잘못된 선언은 원격 호출 전 고정 configuration/binding 진단으로 거부된다. 실제 응답 미수집·timeout·불완전 framing은 기존 UNKNOWN/gap이다. 뒤의 query/세대/collector 오류는 이미 전후 결합된 이전 packet의 독립 FAIL을 지우지 않는다. 첨부 실패는 ABORTED와 저장된 관측·성공 Ref를 함께 보존한다. 부모 pipe/child 회수 미확인은 `KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED`로 분리한다. remote probe는 고정 watchdog으로 자기 Python 프로세스만 종료하며 Pod를 삭제하지 않는다. 이를 Pod/GPU 정리 실증으로 확대하지 않는다.
 
+
+## 기준판 종료 후 후보 신원 선택
+
+기본 kubernetes_candidate_binding="prebound"는 이미 Running 세대가 확정된 양쪽 target을 사용한다. 단일 GPU에서 후보가 Pending인 순차 배포는 [update] kubernetes_candidate_binding="after_baseline"을 명시한다. candidate target 경로는 다른 파일의 새 경로이며 시작 시 없어야 한다. ENV·이미지·정책은 기존과 같이 먼저 준비하고, Pod UID/containerID/imageID·실제 started_at/restart를 미래 값으로 채우지 않는다.
+
+gate가 기준판 API 종료/부재를 확인한 다음 해당 경로의 완전한 기존 target JSON을 기다린다. operator가 후보를 배포하고 Running 세대를 얻은 뒤 atomic rename 등으로 이 소유 입력 파일을 완성한다. 제품은 파일·Pod·배포를 생성하거나 변경하지 않는다. 아직 파일이 없으면 WAITING_CANDIDATE_BINDING, 불완전 JSON·다른 ENV/모델/이미지·잘못된 context·재사용한 기준판 신원은 RECOVERY_REQUIRED로 후보 접수를 차단한다. 이후에도 exact 세대와 Ready를 확인하며 자동 discovery나 다른 Pod fallback은 없다.
+
+transition_timeout은 기준판 요청 실행이 끝난 뒤 시작하는 API 종료·후보 입력/Ready 대기의 공통 한도다. 스트림 시간 계산이나 요청 timeout을 바꾸지 않는다. 준비 단계는 이 모드에서 후보의 신원을 아직 검증하지 않았다고 구분한다. 선언 미확보를 가짜 ID나 CPU 자료의 MEASURED로 채우지 않는다.
+
+선택한 target의 정규 SHA를 공통 registry의 private 실행 입력으로 넘기고 실행기에서 다시 비교한다. 대기 이후 target 파일이 바뀌면 원격 요청 전에 ABORTED로 남긴다. 경로/원문 target을 새 증거 형식으로 복사하거나 hash를 Pod/image 신원으로 바꾸지 않는다. 앞서 저장한 기준판 EVD·RES·성공 첨부·독립 FAIL을 보존한다. 이 CPU 회귀는 실제 scheduler의 GPU 할당/반납·worker 정리·rollback 실증이 아니다.
+
 ## CPU 검증과 실제 실행 재개
 
 소유 kubectl/stdin 인터페이스 runner 대역으로 실제 파싱·source/세대·실행기·Store/판정/RPT·전환을 검증하고, 소유 loopback HTTP에서 동일 stream_probe 원본도 실행한다. A-2 c8f0e61의 exact7파일과 기존 플랫폼 교차시험의 ENV Ref 입력 보수를 통합하며 플랫폼 제품 코드/공용 계약은 유지한다. 2026-10-28 로컬 kind-bob-guard-lab API는 연결 거부 상태였고, 이 작업은 daemon/cluster를 기동·수정하지 않았다. 따라서 실제 Kubernetes와 GPU 실증은0이다.

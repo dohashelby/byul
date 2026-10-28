@@ -89,6 +89,7 @@ class KubernetesHTTP:
             except (KeyError,TypeError,ValueError,AttributeError):
                 raise KubernetesBindingError() from None
         self.binding, self.endpoint = _validate(target, env)
+        self.target_sha256=sha256_hex(canonical_json(target))
         if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
                 or type(binary) is not str or not binary.strip()):
             raise KubernetesBindingError()

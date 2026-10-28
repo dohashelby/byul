@@ -39,14 +39,14 @@
 | `DUPLICATE_KEY` | 없음 | Gateway / `gateway` | JSON 객체에 중복 key가 있다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_REQUEST` | 없음 | Gateway / `gateway` | 최상위 요청이 JSON 객체가 아니다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `UNSUPPORTED_ALIAS` | 없음 | Gateway / `gateway` | 지원하지 않는 alias(`max_completion_tokens`)를 썼다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
-| `UNSUPPORTED_FIELD` | 없음 | Gateway / `gateway` | 허용 필드 밖이다. `zeroday-lab`의 `extra_fields`는 chat route에만 적용하며 completions에서는 선언돼 있어도 이 코드로 거부한다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
+| `UNSUPPORTED_FIELD` | 없음 | Gateway / `gateway` | 허용 필드 밖이다. 모든 profile의 `extra_fields`는 chat route에만 적용하며 completions에서는 선언돼 있어도 이 코드로 거부한다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_MODEL` | 없음 | Gateway / `gateway` | `model`이 비어 있거나 문자열이 아니다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_MESSAGES` | 없음 | Gateway / `gateway` | `messages` 배열·role·content 모양이 지원 범위 밖이다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_PROMPT_TYPE` | 없음 | Gateway / `gateway` | completions `prompt`가 단일 문자열이 아니다. 문자열 배열·token-id 배열도 이 코드로 거부한다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_MAX_TOKENS` | 없음 | Gateway / `gateway` | `max_tokens`가 양의 정수가 아니다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `INVALID_STREAM` | 없음 | Gateway / `gateway` | `stream`이 boolean이 아니다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `N_UNSUPPORTED` | 없음 | Gateway / `gateway` | `n`이 정책의 정수 범위를 벗어난다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
-| `INVALID_EXTRA_FIELD` | 없음 | Gateway / `gateway` | 시험 profile의 추가 필드가 선언된 제약을 어긴다. | `INVALID` → `invalid` | §4.10의 LAB 확장 | update 담당 확인 필요 |
+| `INVALID_EXTRA_FIELD` | 없음 | Gateway / `gateway` | 기본 profile 또는 `zeroday-lab`의 추가 필드가 선언된 validate 제약을 어긴다. | `INVALID` → `invalid` | §4.10 | update 담당 확인 필요 |
 | `REQUEST_HEADER_TIMEOUT` | 없음 | Gateway / `gateway` | 절대 header 읽기 시간이 끝났다. | `INVALID` → `invalid` | §4.2, §7.1 | update 담당 확인 필요 |
 | `REQUEST_BODY_TIMEOUT` | 없음 | Gateway / `gateway` | 절대 body 읽기 시간이 끝났다. | `INVALID` → `invalid` | §4.2, §7.1 | update 담당 확인 필요 |
 | `CONNECTION_IO_TIMEOUT` | 없음 | Gateway / `gateway` | 파싱 뒤 연결 I/O 제한 시간을 넘었다. | `INVALID` → `invalid` | §4.2, §7.1 | update 담당 확인 필요 |

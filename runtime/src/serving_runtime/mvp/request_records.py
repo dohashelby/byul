@@ -151,7 +151,7 @@ class RequestRecords:
                 "model": decision.model,
                 "max_tokens": decision.max_tokens,
                 "n": decision.n,
-                # Test-only extra fields: names and modes only, never values.
+                # Policy-approved extra fields: names and modes only, never values.
                 "extra_fields": [
                     {"name": name, "mode": mode}
                     for name, mode in decision.extra_fields

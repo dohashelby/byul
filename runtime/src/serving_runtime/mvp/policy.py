@@ -11,7 +11,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ExtraFieldRule:
-    """One test-only request field opened by a runtime-mvp/1.2 zeroday-lab policy."""
+    """One additional request field declared by a runtime-mvp/1.2 policy."""
 
     name: str
     mode: str
@@ -208,6 +208,48 @@ def _parse_extra_fields(value: object) -> tuple[ExtraFieldRule, ...]:
     return tuple(rules)
 
 
+def _validate_default_extra_fields(rules: tuple[ExtraFieldRule, ...]) -> None:
+    """Require bounded validate rules for fields opened by the default profile."""
+
+    for rule in rules:
+        where = f"extra_fields.{rule.name}"
+        if rule.mode == "passthrough":
+            raise ValueError(f"{where} passthrough requires profile zeroday-lab")
+
+        constraints = rule.constraints
+        kind = constraints["type"]
+        if kind == "object":
+            raise ValueError(f"{where} type object is not allowed in profile default")
+        if kind in {"integer", "number"}:
+            missing = [name for name in ("min", "max") if name not in constraints]
+            if missing:
+                raise ValueError(
+                    f"{where} requires min and max in profile default; "
+                    f"missing: {', '.join(missing)}"
+                )
+        elif kind == "string" and "max_length" not in constraints:
+            raise ValueError(f"{where} requires max_length in profile default")
+        elif kind == "array":
+            missing = [name for name in ("max_items", "items") if name not in constraints]
+            if missing:
+                raise ValueError(
+                    f"{where} requires max_items and items in profile default; "
+                    f"missing: {', '.join(missing)}"
+                )
+            item_rule = constraints["items"]
+            item_kind = item_rule["type"]
+            item_where = f"{where}.items"
+            if item_kind in {"integer", "number"}:
+                item_missing = [name for name in ("min", "max") if name not in item_rule]
+                if item_missing:
+                    raise ValueError(
+                        f"{item_where} requires min and max in profile default; "
+                        f"missing: {', '.join(item_missing)}"
+                    )
+            elif item_kind == "string" and "max_length" not in item_rule:
+                raise ValueError(f"{item_where} requires max_length in profile default")
+
+
 def parse_policy_time(value: str) -> datetime:
     """Parse a policy timestamp, requiring an explicit UTC offset."""
 
@@ -382,16 +424,10 @@ def load_policy(path: str | Path) -> PolicyState:
                 digest,
             )
         if "extra_fields" in document:
-            if profile != "zeroday-lab":
-                return _error(
-                    path_text,
-                    loaded_at,
-                    "INVALID_POLICY",
-                    "extra_fields require profile zeroday-lab",
-                    digest,
-                )
             try:
                 extra_fields = _parse_extra_fields(document["extra_fields"])
+                if profile == "default":
+                    _validate_default_extra_fields(extra_fields)
             except ValueError as error:
                 return _error(path_text, loaded_at, "INVALID_POLICY", str(error), digest)
         if "max_n" in document:

@@ -222,8 +222,8 @@ def relay_payload(
     route: str = CHAT_ROUTE,
 ) -> bytes:
     relay_document: dict[str, Any] = {}
-    # Test-only extra fields keep the client's original value; the Gateway-owned
-    # fields below are written last so they always win.
+    # Policy-approved extra fields keep the client's original value; the
+    # Gateway-owned fields below are written last so they always win.
     for name, _mode in allowed.extra_fields:
         relay_document[name] = document[name]
     input_field = "messages" if route == CHAT_ROUTE else "prompt"

@@ -17,7 +17,7 @@ ENV_CMD = ('for d in /proc/[0-9]*; do echo "PID ${d#/proc/}"; '
 
 class CredentialExposureExecutor(ContainerConfigExecutor):
     name = "credential_exposure"
-    version = "0.4.1"
+    version = "0.4.2"
 
     def validate_policy(self, check, values):
         validate_credential_policy(check, values)

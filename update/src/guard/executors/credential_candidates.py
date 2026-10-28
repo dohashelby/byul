@@ -125,8 +125,12 @@ def decode_metadata(result, paths):
             or type(raw) is not bytes or len(raw) > MAX_OUTPUT_BYTES):
         return unknown, detail
     try:
-        value = json.loads(raw.decode("utf-8"))
-    except (ValueError, UnicodeError):
+        # The fixed producer emits one unambiguous JSON value. Duplicate
+        # subject/path fields cannot overwrite a contrary observation.
+        # Reuse the existing bounded parser; no new transport/schema contract.
+        from .owned_capture import strict_json
+        value = strict_json(raw, limit=MAX_OUTPUT_BYTES)
+    except ValueError:
         return unknown, detail
     if (type(value) is not dict or value.get("schema") != "guard-credential-metadata/1"
             or value.get("worker_subject_matches") is not True

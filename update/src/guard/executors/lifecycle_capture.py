@@ -44,6 +44,7 @@ lora_config_present speculative_config_present
 KEYS |= profiles.WEIGHT_KEYS
 KEYS |= profiles.ROUTE_KEYS
 KEYS |= profiles.REQUEST_SELECTION_KEYS
+KEYS |= profiles.HANDLER_KEYS
 POINTS = set(profiles.point_sources(sensor.PROFILE))
 WORDS = {*profiles.SCHEMAS, *profiles.SCHEMAS.values(), sensor.COMMIT, "START", "MODULE", "NATIVE", "ASGI", "END",
     "SELECTION",
@@ -87,9 +88,10 @@ def parse_recording(raw, prepared):
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
-    if prepared["profile"] not in {sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
-    if prepared["profile"] not in {sensor.PROFILE,profiles.V5_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
-    if prepared["profile"] != sensor.PROFILE:keys=keys-profiles.REQUEST_SELECTION_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
+    if prepared["profile"] not in {sensor.PROFILE,profiles.V6_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
+    if prepared["profile"] != sensor.PROFILE:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     source_hashes = profiles.source_hashes(prepared["profile"])
     point_sources=profiles.point_sources(prepared["profile"])
     points=set(point_sources)
@@ -141,7 +143,7 @@ def parse_recording(raw, prepared):
                     raise ValueError("LIFECYCLE_RECORDING_INHERITANCE_INVALID")
                 ready.add(payload["module"])
         if row["event"] in {"NATIVE","SELECTION"}:
-            if row["event"]=="SELECTION" and (header["profile"]!=sensor.PROFILE
+            if row["event"]=="SELECTION" and (header["profile"] not in {sensor.PROFILE,profiles.V6_PROFILE}
                     or payload.get("point")!="InputProcessor.assign_request_id" or payload.get("requests")!=[]
                     or payload.get("selection_observed") is not False
                     or type(payload.get("metadata")) is not dict
@@ -170,6 +172,8 @@ def parse_recording(raw, prepared):
                 profiles.validate_weight_selection(payload)
             if "route_authentication" in payload["metadata"]:
                 profiles.validate_route_authentication(payload)
+            if "route_handler" in payload["metadata"]:
+                profiles.validate_route_handler(payload)
             if "request_selection" in payload["metadata"]:
                 if row["event"]=="NATIVE" and payload["point"]=="InputProcessor.assign_request_id":
                     raise ValueError("LIFECYCLE_SELECTION_EVENT_REQUIRED")

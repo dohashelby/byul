@@ -16,7 +16,9 @@ V4_PROFILE = "vllm-native-lifecycle-metadata/4"
 V4_SCHEMA = "guard-native-lifecycle-events/4"
 V5_PROFILE = "vllm-native-lifecycle-metadata/5"
 V5_SCHEMA = "guard-native-lifecycle-events/5"
-SCHEMAS = {sensor.PROFILE: sensor.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA, V3_PROFILE: V3_SCHEMA, V4_PROFILE: V4_SCHEMA, V5_PROFILE: V5_SCHEMA}
+V6_PROFILE = "vllm-native-lifecycle-metadata/6"
+V6_SCHEMA = "guard-native-lifecycle-events/6"
+SCHEMAS = {sensor.PROFILE: sensor.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA, V3_PROFILE: V3_SCHEMA, V4_PROFILE: V4_SCHEMA, V5_PROFILE: V5_SCHEMA, V6_PROFILE: V6_SCHEMA}
 # Exact previously shipped LF/CRLF source spellings; no normalization on input.
 LEGACY_ASSETS = {
     (31143, "50143b5cf54aa8f5bbcfef769c286f65c971e0acd2caa111c625583f4baec3de"),
@@ -224,6 +226,78 @@ V5_FUNCTION_POINTS = {'vllm.model_executor.model_loader.weight_utils': ('safeten
                                                    'np_cache_weights_iterator'),
  'vllm.entrypoints.openai.models.api_router': ('models',)}
 
+V6_ASSETS = {(53372, 'f1780d8b0e25ea695b346cab5adf95c624d039c92ccdb33ecf7221c0957724a4'), (52361, '54c1ac305dc9abfbdfd75eedc90c21a404b3409f33e0b0d6619613add43f31e4')}
+V6_SOURCE_SHA = {'vllm.entrypoints.generate.base.serving': '9bffd4141b12973b37c08b19d603f2694c42d6fb41f9d1569c349445dc7d00b2',
+ 'vllm.entrypoints.serve.engine.serving': 'e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02',
+ 'vllm.entrypoints.serve.middleware.authenticate': 'ceb576aa3c053a5bcf145cfbe3f81def0f7213480c4aa1531fc4c00e32955225',
+ 'vllm.entrypoints.openai.models.serving': '39ecebf92abec7931b4c953e0d9743320dbd93532a8e3488307398c29dba2553',
+ 'vllm.entrypoints.openai.models.api_router': '58d7bf90b7dd2a896441d3085b8a4467c12412120f21fe53d838109b7b85f48b',
+ 'vllm.model_executor.model_loader.weight_utils': '7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd',
+ 'vllm.model_executor.model_loader.base_loader': '5291c330c4ed5634a9ea1d535364c26162b60251aa2af03fd409b88c34d836e2',
+ 'vllm.model_executor.model_loader.default_loader': 'd17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9',
+ 'vllm.v1.engine.input_processor': 'd79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b',
+ 'vllm.v1.engine.output_processor': 'c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54',
+ 'vllm.v1.engine.async_llm': 'ff933ed78aa3195782cf1c6d18c53897adfa5bf920421bd2bcc330f2adc84d1e',
+ 'vllm.v1.engine.core': 'f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b',
+ 'vllm.v1.engine.core_client': '24eecc78e8fc4849d4eac948c7586ee349ebfd503d07e80f05ec6c859da06fdd',
+ 'vllm.v1.core.sched.scheduler': 'f820bee4f42b878b262a30f3728a97d7413477b2a277748e20f2528ac2ec2f2a',
+ 'vllm.v1.core.sched.output': '972e0bc8e7af1f4262ac73f660f6b8f798ba780f86c031a9c8a7f10cbfaad3a8',
+ 'vllm.v1.core.kv_cache_manager': 'bd9bf46a2101f9368d4941867415a239d18d95e0b956f82f885ce25e10e69f3b',
+ 'vllm.v1.core.single_type_kv_cache_manager': '3a3cb20bd6aa1e0ad46471fc9e5e01ee5797ab4bb759e00ef5fb309d2830db13',
+ 'vllm.v1.core.kv_cache_coordinator': '6a1e00227b981a7bb6108a42db0e446c716f789274f40c63eb9a6ce4d699ddcb',
+ 'vllm.v1.core.block_pool': '05c73052934a9d4664ccd5df562ce71011278d9a511932da102ef2efff00e934',
+ 'vllm.v1.worker.gpu_model_runner': 'bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a',
+ 'vllm.v1.worker.gpu_input_batch': 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d',
+ 'vllm.v1.worker.cpu_model_runner': '69cd626ddbc3b1693e026fda99018201d8c9f4dd559540970e8ff265b7a97093',
+ 'vllm.v1.request': 'dd7c30bf8b0894dc123a739c299c0133566f8cc075b081e45905f1c29506e69d',
+ 'vllm.entrypoints.serve.utils.api_utils': 'ffb5e08c2b6cf6d0402c6ba31d0d05e53eb7e9e8c13b29700e84a4bfada420ba',
+ 'vllm.entrypoints.openai.completion.serving': 'aac889978efb034b95ab81ec59695d83ba7c879ab48cd5be2448c980f109a3bd'}
+V6_POINTS = {'vllm.entrypoints.generate.base.serving': {'GenerateBaseServing': ('_get_data_parallel_rank',
+                                                                    '_get_session_id_from_headers',
+                                                                    '_get_session_id',
+                                                                    '_get_priority')},
+ 'vllm.entrypoints.serve.engine.serving': {'BaseServing': ('_base_request_id',)},
+ 'vllm.entrypoints.serve.middleware.authenticate': {'AuthenticationMiddleware': ('__call__',
+                                                                                 'verify_token')},
+ 'vllm.entrypoints.openai.models.serving': {'OpenAIServingModels': ('show_available_models',)},
+ 'vllm.model_executor.model_loader.base_loader': {'BaseModelLoader': ('load_model',)},
+ 'vllm.model_executor.model_loader.default_loader': {'DefaultModelLoader': ('load_weights',
+                                                                            '_prepare_weights',
+                                                                            '_get_weights_iterator')},
+ 'vllm.v1.worker.cpu_model_runner': {'CPUModelRunner': ('load_model',
+                                                        'get_model')},
+ 'vllm.v1.engine.input_processor': {'InputProcessor': ('assign_request_id',)},
+ 'vllm.v1.engine.output_processor': {'OutputProcessor': ('add_request',
+                                                         'abort_requests',
+                                                         '_finish_request')},
+ 'vllm.v1.engine.async_llm': {'AsyncLLM': ('abort',)},
+ 'vllm.v1.engine.core': {'EngineCore': ('abort_requests',)},
+ 'vllm.v1.core.sched.scheduler': {'Scheduler': ('finish_requests',
+                                                '_free_request_blocks',
+                                                '_drain_deferred_frees')},
+ 'vllm.v1.core.kv_cache_manager': {'KVCacheManager': ('free',
+                                                      'pop_blocks_for_free')},
+ 'vllm.v1.core.single_type_kv_cache_manager': {'SingleTypeKVCacheManager': ('free',
+                                                                            'pop_blocks_for_free')},
+ 'vllm.v1.core.block_pool': {'BlockPool': ('free_blocks',)},
+ 'vllm.v1.worker.gpu_model_runner': {'GPUModelRunner': ('_update_states',
+                                                        'execute_model',
+                                                        'sample_tokens',
+                                                        'load_model',
+                                                        'get_model',
+                                                        '_model_forward'),
+                                     'AsyncGPUModelRunnerOutput': ('get_output',),
+                                     'AsyncGPUPoolingModelRunnerOutput': ('get_output',)},
+ 'vllm.v1.worker.gpu_input_batch': {'InputBatch': ('remove_request',)}}
+V6_FUNCTION_POINTS = {'vllm.model_executor.model_loader.weight_utils': ('safetensors_weights_iterator',
+                                                   'pt_weights_iterator',
+                                                   'multi_thread_pt_weights_iterator',
+                                                   'multi_thread_safetensors_weights_iterator',
+                                                   'fastsafetensors_weights_iterator',
+                                                   'instanttensor_weights_iterator',
+                                                   'np_cache_weights_iterator'),
+ 'vllm.entrypoints.openai.models.api_router': ('models',)}
+
 def asset_supported(profile, raw):
     if profile == LEGACY_PROFILE:
         return (len(raw), hashlib.sha256(raw).hexdigest()) in LEGACY_ASSETS
@@ -235,6 +309,8 @@ def asset_supported(profile, raw):
         return (len(raw), hashlib.sha256(raw).hexdigest()) in V4_ASSETS
     if profile == V5_PROFILE:
         return (len(raw), hashlib.sha256(raw).hexdigest()) in V5_ASSETS
+    if profile == V6_PROFILE:
+        return (len(raw), hashlib.sha256(raw).hexdigest()) in V6_ASSETS
     if profile == sensor.PROFILE:
         return raw == Path(sensor.__file__).read_bytes()
     return False
@@ -249,6 +325,8 @@ def source_hashes(profile):
         return V4_SOURCE_SHA
     if profile == V5_PROFILE:
         return V5_SOURCE_SHA
+    if profile == V6_PROFILE:
+        return V6_SOURCE_SHA
     if profile in {LEGACY_PROFILE, V2_PROFILE}:
         return LEGACY_SOURCE_SHA
     raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
@@ -263,6 +341,8 @@ def points(profile):
         return V4_POINTS
     if profile == V5_PROFILE:
         return V5_POINTS
+    if profile == V6_PROFILE:
+        return V6_POINTS
     if profile in {LEGACY_PROFILE, V2_PROFILE}:
         return LEGACY_POINTS
     raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
@@ -319,6 +399,30 @@ def route_observation(row):
     return {"point":payload["point"],"phase":payload["phase"],"metadata":dict(value)}
 
 
+HANDLER_KEYS={"route_handler","asgi_request_sha256","asgi_invocation_sha256","entry_path_sha256",
+    "entry_root_path_sha256","entry_method_sha256","observed_path_sha256","observed_root_path_sha256",
+    "observed_method_sha256","registered_route_observed","handler_returned"}
+
+
+def validate_route_handler(payload):
+    value=payload["metadata"]["route_handler"]
+    hashes=HANDLER_KEYS-{"route_handler","registered_route_observed","handler_returned"}
+    if (type(value) is not dict or set(value)!=hashes|{"registered_route_observed","handler_returned"}
+            or payload["point"]!=sensor.HANDLER_POINT
+            or any(value[k] is not None and (type(value[k]) is not str or re.fullmatch(r"[0-9a-f]{64}",value[k]) is None) for k in hashes)
+            or value["asgi_request_sha256"] is None or value["asgi_invocation_sha256"] is None
+            or type(value["registered_route_observed"]) is not bool
+            or value["handler_returned"] is not None and (value["handler_returned"] is not True or payload["phase"]!="RETURN")):
+        raise ValueError("LIFECYCLE_ROUTE_HANDLER_INVALID")
+
+
+def handler_observation(row):
+    if row["event"]!="NATIVE":return None
+    payload=row["payload"];value=payload["metadata"].get("route_handler")
+    if value is None:return None
+    return {"point":payload["point"],"phase":payload["phase"],"metadata":dict(value)}
+
+
 REQUEST_SELECTION_KEYS={"request_selection","priority_observed","session_observed","rank_observed","request_id_observed",
     "selected_priority","selected_session_sha256","selected_rank","selected_request_id_sha256"}
 
@@ -366,8 +470,8 @@ def point_sources(profile):
     result={cls+"."+method:module for module,classes in points(profile).items()
         for cls,methods in classes.items() for method in methods}
     expected=sum(len(methods) for classes in points(profile).values() for methods in classes.values())
-    if profile in {sensor.PROFILE,V4_PROFILE,V5_PROFILE}:
-        functions=sensor.FUNCTION_POINTS if profile==sensor.PROFILE else V5_FUNCTION_POINTS if profile==V5_PROFILE else V4_FUNCTION_POINTS
+    if profile in {sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE}:
+        functions=sensor.FUNCTION_POINTS if profile==sensor.PROFILE else V6_FUNCTION_POINTS if profile==V6_PROFILE else V5_FUNCTION_POINTS if profile==V5_PROFILE else V4_FUNCTION_POINTS
         result.update({module.rsplit(".",1)[-1]+"."+method:module
             for module,methods in functions.items() for method in methods})
         expected+=sum(len(methods) for methods in functions.values())
@@ -380,7 +484,7 @@ def valid_call_frame(frame,profile):
     base={"point","request_sha256"}
     if set(frame)==base:return True
     extra={"weight_call_sha256","weight_model_sha256"}
-    if profile not in {sensor.PROFILE,V4_PROFILE,V5_PROFILE} or set(frame)!=base|extra or frame.get("point")!="DefaultModelLoader.load_weights":return False
+    if profile not in {sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE} or set(frame)!=base|extra or frame.get("point")!="DefaultModelLoader.load_weights":return False
     return (type(frame["weight_call_sha256"]) is str and re.fullmatch(r"[0-9a-f]{64}",frame["weight_call_sha256"]) is not None
         and (frame["weight_model_sha256"] is None or type(frame["weight_model_sha256"]) is str
             and re.fullmatch(r"[0-9a-f]{64}",frame["weight_model_sha256"]) is not None))

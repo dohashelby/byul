@@ -25,7 +25,7 @@ Gateway 재작성·최종 handler·기업 인가 또는 PLT-08 전체 준수의 
 
 ## LIF-10 native metadata 센서 준비와 소유 기록 수집
 
-현행 profile6/events6는 아래 REQ-02 인증/serving 문맥과 REQ-04 운영 선택값도 관측한다. source25개를 대조하며
+현행 profile7/events7는 아래 REQ-02 인증/serving 문맥과 REQ-04 운영 선택값도 관측한다. source25개를 대조하며
 과거 profile4의20개 source·가중치 파일 선택과 고정 bytes를 그대로 읽는다. profile1·2·3의
 당시 의미도 유지한다. 새 준비·수집은 기존 CLI를 사용하고 자동 판정 등록은 늘리지 않는다.
 
@@ -196,7 +196,15 @@ Docker stub(`lab=true`)은 EXAMPLE이다. Kubernetes의 `lab=true` 선언을 Doc
 
 ## REQ-02 인증 입력·serving 호출 부분 관측
 
-profile5에서 도입한 인증 관측은 현행 profile6에서도 고정 `AuthenticationMiddleware.__call__`/`verify_token`, 모델 목록 router의
+현행 profile7은 고정 `GET /v1/models`의 등록 endpoint/dependant 참조와 실제 callback 호출도
+별도 `route_handler`로 관측한다. 기존 인증 metadata를 바꾸지 않고 profile6의 고정 bytes와
+당시 지점·SELECTION을 계속 읽는다. `capture-lifecycle-session`은 `route_handler_index`에
+물리 문맥·세션·invocation별 인증 bool/경로 변화/등록 참조 일치와 원본 행 참조를 남긴다.
+신뢰 신원·기업 인가·Gateway 설정·완전성의 증명이 아니므로 security는 UNKNOWN이며
+팩·자동 판정 등록은 유지한다. 구체적인 지원 경계·회귀·실증 절차는
+[REQ-02 등록 handler 부분 생산자](A1_ROUTE_HANDLER.md)를 따른다.
+
+profile5에서 도입한 인증 관측은 현행 profile7에서도 고정 `AuthenticationMiddleware.__call__`/`verify_token`, 모델 목록 router의
 동적 `models(request)` helper와 `OpenAIServingModels.show_available_models`를 관측한다.
 ASGI HTTP 호출에 유일한 `x-request-id` 헤더 하나(1~512bytes, 전체 header64개 이하)가 있을
 때만 별도 invocation 지문을 연다. 없는/중복/상한 초과 헤더는 연결하지 않으며 계획한

@@ -26,9 +26,9 @@ import time
 import types
 import weakref
 
-PROFILE = "vllm-native-lifecycle-metadata/6"
+PROFILE = "vllm-native-lifecycle-metadata/7"
 COMMIT = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
-SCHEMA = "guard-native-lifecycle-events/6"
+SCHEMA = "guard-native-lifecycle-events/7"
 CONFIG_SCHEMA = "guard-native-lifecycle-settings/1"
 CONFIG_ENV = "GUARD_LIFECYCLE_CONFIG"
 CONFIG_PATH = "/guard-lifecycle/settings.json"
@@ -90,11 +90,12 @@ FUNCTION_POINTS = {"vllm.model_executor.model_loader.weight_utils": (
     "safetensors_weights_iterator","pt_weights_iterator","multi_thread_pt_weights_iterator",
     "multi_thread_safetensors_weights_iterator","fastsafetensors_weights_iterator",
     "instanttensor_weights_iterator","np_cache_weights_iterator"),
-    "vllm.entrypoints.openai.models.api_router":("models",)}
+    "vllm.entrypoints.openai.models.api_router":("models","show_available_models",)}
 WEIGHT_POINTS = {"weight_utils."+name for name in FUNCTION_POINTS["vllm.model_executor.model_loader.weight_utils"]} | {
     "DefaultModelLoader._prepare_weights","DefaultModelLoader._get_weights_iterator"}
 ROUTE_POINTS = {"AuthenticationMiddleware.__call__","AuthenticationMiddleware.verify_token",
     "api_router.models","OpenAIServingModels.show_available_models"}
+HANDLER_POINT = "api_router.show_available_models"
 REQUEST_SELECTION_POINTS = {"GenerateBaseServing._get_data_parallel_rank","GenerateBaseServing._get_session_id_from_headers",
     "GenerateBaseServing._get_session_id","GenerateBaseServing._get_priority","BaseServing._base_request_id"}
 _OBSERVER = None
@@ -348,7 +349,7 @@ class Observer:
     def wanted(self, point, snapshot):
         if point in REQUEST_SELECTION_POINTS:
             return self.selection_context() is not None
-        if point in ROUTE_POINTS:
+        if point in ROUTE_POINTS or point==HANDLER_POINT:
             return self.route_context() is not None
         if point in WEIGHT_POINTS:
             return True
@@ -752,6 +753,7 @@ class Observer:
 
     def wrap(self, module_name, point, original):
         observer = self
+        binding = []
         def emit_input_selection(args,kwargs,phase):
             started=time.monotonic_ns()
             try:
@@ -767,7 +769,10 @@ class Observer:
         def sample(args, kwargs, result=None, returned=False):
             started = time.monotonic_ns()
             try:
-                value = observer.snapshot(point, args, kwargs, result, returned)
+                if point==HANDLER_POINT:
+                    value=observer.handler_snapshot(args,kwargs,result,returned,binding[0])
+                else:
+                    value = observer.snapshot(point, args, kwargs, result, returned)
             except Exception:
                 value = {"requests": [], "metadata": {}, "selection_observed": False, "diagnostic": "SAMPLE_UNAVAILABLE"}
             value["observation_started_ns"] = started
@@ -810,7 +815,7 @@ class Observer:
         if inspect.iscoroutinefunction(original):
             @functools.wraps(original)
             async def asynchronous(*args, **kwargs):
-                if not observer.active() or point in ROUTE_POINTS and observer.route_context() is None:
+                if not observer.active() or (point in ROUTE_POINTS or point==HANDLER_POINT) and observer.route_context() is None:
                     return await original(*args,**kwargs)
                 if point in REQUEST_SELECTION_POINTS and observer.selection_context() is None:
                     return await original(*args,**kwargs)
@@ -821,10 +826,11 @@ class Observer:
                     return result
                 finally:
                     finish(args, kwargs, result, returned, token, started)
+            binding.append(asynchronous)
             return asynchronous
         @functools.wraps(original)
         def synchronous(*args, **kwargs):
-            if not observer.active() or point in ROUTE_POINTS and observer.route_context() is None:
+            if not observer.active() or (point in ROUTE_POINTS or point==HANDLER_POINT) and observer.route_context() is None:
                 return original(*args,**kwargs)
             if point in REQUEST_SELECTION_POINTS and observer.selection_context() is None:
                 return original(*args,**kwargs)
@@ -835,11 +841,57 @@ class Observer:
                 return result
             finally:
                 finish(args, kwargs, result, returned, token, started)
+        binding.append(synchronous)
         return synchronous
+
+    def handler_snapshot(self,args,kwargs,result,returned,wrapped):
+        context=self.route_context()
+        if context is None:
+            return {"requests":[],"metadata":{},"selection_observed":False,"diagnostic":"SAMPLE_UNAVAILABLE"}
+        request=args[0] if args else kwargs.get("raw_request")
+        scope=attrs(request).get("scope")
+        scope=scope if type(scope) is dict else {}
+        route=attrs(scope.get("route"))
+        dependant=attrs(route.get("dependant"))
+        methods=route.get("methods")
+        path=route.get("path")
+        registered=(scope.get("endpoint") is wrapped and route.get("endpoint") is wrapped
+            and dependant.get("call") is wrapped and type(path) is str and path=="/v1/models"
+            and type(methods) is set and all(type(method) is str for method in methods) and methods=={"GET"})
+        observed=self.scope_fingerprints(scope)
+        value={"asgi_request_sha256":context["request"],"asgi_invocation_sha256":context["invocation"],
+            "entry_path_sha256":context.get("path"),"entry_root_path_sha256":context.get("root"),
+            "entry_method_sha256":context.get("method"),"observed_path_sha256":observed.get("path"),
+            "observed_root_path_sha256":observed.get("root"),"observed_method_sha256":observed.get("method"),
+            "registered_route_observed":registered,"handler_returned":True if returned else None}
+        return {"requests":[],"metadata":{"route_handler":value},"selection_observed":False}
+
+    @staticmethod
+    def handler_targets(module,original,wrapped):
+        # APIRouter has already captured the endpoint at decorator execution.
+        # include_router copies endpoint; an existing route closure uses dependant.call.
+        # Unknown or ambiguous layouts keep the native registration unchanged.
+        routes=attrs(vars(module).get("router")).get("routes")
+        if type(routes) is not list or not 1<=len(routes)<=64:return []
+        found=[route for route in routes if attrs(route).get("endpoint") is original]
+        if len(found)!=1:return []
+        route=found[0];fields=attrs(route);dependant=fields.get("dependant")
+        methods=fields.get("methods");path=fields.get("path")
+        if (type(path) is not str or path!="/v1/models" or type(methods) is not set
+                or not all(type(method) is str for method in methods) or methods!={"GET"}
+                or attrs(dependant).get("call") is not original):return []
+        try:
+            route_data=object.__getattribute__(route,"__dict__")
+            call_data=object.__getattribute__(dependant,"__dict__")
+        except (AttributeError,TypeError):return []
+        if (type(route_data) is not dict or type(call_data) is not dict
+                or route_data.get("endpoint") is not original or call_data.get("call") is not original):return []
+        return [(route_data,"endpoint",wrapped),(call_data,"call",wrapped)]
 
     def instrument(self, module):
         module_name = module.__name__
         targets = []
+        registered = []
         for class_name, methods in POINTS.get(module_name, {}).items():
             cls = vars(module).get(class_name)
             if not isinstance(cls, type):
@@ -856,10 +908,16 @@ class Observer:
             original=vars(module).get(name)
             if not inspect.isfunction(original) or inspect.isasyncgenfunction(original):
                 raise ValueError("NATIVE_SENSOR_FUNCTION_UNAVAILABLE")
-            targets.append((module,name,self.wrap(module_name,module_name.rsplit(".",1)[-1]+"."+name,original)))
+            point=module_name.rsplit(".",1)[-1]+"."+name
+            wrapped=self.wrap(module_name,point,original)
+            targets.append((module,name,wrapped))
+            if point==HANDLER_POINT:
+                registered=self.handler_targets(module,original,wrapped)
         # Do not leave a half-installed module when a required method is absent.
         for cls, name, wrapped in targets:
             setattr(cls, name, wrapped)
+        for data,name,wrapped in registered:
+            data[name]=wrapped
 
 
 class CheckedLoader:

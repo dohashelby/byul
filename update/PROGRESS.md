@@ -1,5 +1,12 @@
 # PROGRESS
 
+## 2026-10-28 — A-1 REQ-02 등록 callback 관측 연결
+
+- 한 일: 공동 기준선2d210574(PR44 초안, 정확 head CI 필수5개 성공·기본5333통과)을 보존한 별도 후속 브랜치에서 고정 GET /v1/models의 등록 endpoint/dependant 참조·실제 callback·인증/경로 관측을 연결했다. profile7이며 profile6의 고정 LF/CRLF bytes·source25·기존 지점/SELECTION과 profile1~5 판독을 유지한다. 기존 제품 세션 수집 CLI에 원본 행 참조가 있는 별도 handler 색인을 추가했다.
+- 테스트 결과: 938파일 고정 영향/인접472통과·실패0·기존skip1·제외1(pytest50.39초·부모51.061초)과 검증 전후 bytes 동일을 확인했다. 두 차례 파일명 지정 오류는 시험 미실행으로 별도 보존했다. 문서 초안 재고정 기본5359통과·실패0·기존skip13·제외19(pytest527.50초·부모529.073초), 설치 wheel140파일 일치(부모15.064초)와 검증 중938파일 bytes 불변을 확인했다. 이후 결과·현재 현황표·지원 경계 문서만 맞추고 문서 정합을 재검증한다. 실제 FastAPI/vLLM·Gateway·GPU/AWS 실증 증가는0이며 EXAMPLE router를 실제 대상으로 표시하지 않는다.
+- 다음 단계: 고정 소스 영향 검증 → 실패 수정·재검증 → wheel·커밋·푸시·후속 초안 PR·정확 head CI → A-2 소비용 공통 계약 인계와 준비된 A-1 후속 작업을 진행한다.
+- 막힌 것: CPU 생산자 구현에는 없음. 신뢰 principal·외부 probe ledger·유효 Gateway 변환·선정 API 기업 허용표·전체 handler 범위·실제 대상 실증이 없어 REQ-02 전체 판정 연결은 미완료다. PACK31과 executor/judge null·등록 개수는 그대로다.
+
 ## 2026-10-28 — A-1 공동 기준선 준비
 
 - 한 일: main4af4d31의 프레임워크91e84c7과 PR34head6f1f964의 기존 UPDATE 보수를 별도 worktree에서 결합했다. PACK31/DRAFT·정의77개·세 정의만 최소 revision 증가이며 루트 runtime/platform/contracts와 원본·A-2 작업을 보존한다. 검토한 A-2 head0b3e998의 PLT-04 부분 마운트·후속 준비 실패 보수3파일도 내용 기준으로 반영했다.

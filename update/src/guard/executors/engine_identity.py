@@ -18,7 +18,7 @@ print(json.dumps({'sha256':hashlib.sha256(b).hexdigest(),'bytes':len(b)}))
 """
 
 
-def owned_template_snapshot(docker, ctx, identity, argv, deadline, *, monotonic=None):
+def owned_template_snapshot(docker, ctx, identity, argv, deadline, *, monotonic=None, expected_path=None):
     """Inspect one owned running container using the deadline owner's clock.
 
     A caller with an injected clock passes that same callable; production
@@ -28,7 +28,8 @@ def owned_template_snapshot(docker, ctx, identity, argv, deadline, *, monotonic=
     try:
         container = ctx.target["engine"]["container"]
         path = identity.get("container_path")
-        if path != "/guard-assets/chat/guard-text-chat-v1.jinja":
+        selected_path = "/guard-assets/chat/guard-text-chat-v1.jinja" if expected_path is None else expected_path
+        if selected_path not in {"/guard-assets/chat/guard-text-chat-v1.jinja", "/guard-assets/chat/guard-type-boundary-v1.jinja"} or path != selected_path:
             return None
         remaining = deadline - clock()
         if remaining <= 0:

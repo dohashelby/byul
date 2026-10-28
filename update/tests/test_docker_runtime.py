@@ -55,6 +55,32 @@ def test_bad_run_id_rejected():
         Docker("../x", runner=FakeRunner())
 
 
+@pytest.mark.parametrize("uid", [0, 65534, 2**31 - 1])
+def test_bounded_exec_explicit_actor_keeps_uid_gid_and_existing_pipe_metadata(uid):
+    runner = FakeRunner(responses={"exec": "EXAMPLE metadata"})
+    result = Docker("bounded-actor", runner=runner).exec_bounded(
+        "EXAMPLE-container", ["python3", "-c", "print('EXAMPLE')"], timeout=2, max_bytes=8, uid=uid)
+    assert runner.calls[0]["argv"] == ["docker", "exec", "--user", f"{uid}:{uid}",
+                                       "EXAMPLE-container", "python3", "-c", "print('EXAMPLE')"]
+    assert runner.calls[0]["timeout"] == 2 and runner.calls[0]["input"] is None
+    assert result.stdout == "EXAMPLE " and result.capture["truncated"] is True
+    assert result.capture["bounded_at_source"] is False and result.capture["complete"] is False
+
+
+@pytest.mark.parametrize("uid", [-1, 2**31, True, False, "0", 1.0, [], {}])
+def test_invalid_bounded_actor_is_rejected_before_docker(uid):
+    runner = FakeRunner()
+    with pytest.raises(ValueError, match="numeric bounded probe UID"):
+        Docker("bounded-actor", runner=runner).exec_bounded("EXAMPLE", ["python3"], timeout=2, uid=uid)
+    assert runner.calls == []
+
+
+def test_bounded_exec_without_actor_preserves_legacy_argv():
+    runner = FakeRunner()
+    Docker("bounded-actor", runner=runner).exec_bounded("EXAMPLE", ["python3", "-V"], timeout=2)
+    assert runner.calls[0]["argv"] == ["docker", "exec", "EXAMPLE", "python3", "-V"]
+
+
 def test_ports_bound_to_loopback_only():
     r = FakeRunner()
     d = Docker("t1abc", runner=r)

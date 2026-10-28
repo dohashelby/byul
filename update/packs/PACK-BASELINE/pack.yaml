@@ -1,5 +1,5 @@
 pack_id: PACK-BASELINE
-revision: 29
+revision: 31
 engines:
 - vllm
 checks:
@@ -152,9 +152,9 @@ files_sha256:
 - path: checks/PLT-06.yaml
   sha256: b48934d399b2df27bcb1c09b674009c5c4c23ac50c241dcbf74e44d4f05c1188
 - path: checks/PLT-07.yaml
-  sha256: bd148793594c4cf737a9e0bbeb5c0d9f07645da0e2370acb5ffec8198692c4a2
+  sha256: 1d07770ea197706e27e252832294bd9f24671026e7be93e670395b7ac146e67d
 - path: checks/PLT-08.yaml
-  sha256: 27806edaaff4e6d883258ecebf93c90b002e18c4c6df0281328676b4ab07e57a
+  sha256: b2a5c2ffae8691582e2cfb670e36eaef7b355cc5935168dcc77f7794158f16ff
 - path: checks/PLT-09.yaml
   sha256: 2d282cefa8391f0d2d7fe6a2bd0a8f2dfe112b5bfd148d288c97459f74441c6f
 - path: checks/PLT-10.yaml
@@ -230,7 +230,7 @@ files_sha256:
 - path: checks/SUP-12.yaml
   sha256: 17818c57efdf7b3e084cf7c006f6bc4bd44df2394c6e405bc0c5271d4856bfc4
 - path: checks/SUP-13.yaml
-  sha256: 6d17da38b0ef8470a3f6eeb65e0668b6723c1cccc67470ced384cfe9f84a3404
+  sha256: a2c55976e407d47494d44e3664443b906855dc39bceffb91ea5930b2b6566c21
 - path: checks/SUP-14.yaml
   sha256: fcc208e79341969efcc1a66a7cd41e18f775e8d8748378ae774f949188c24b00
 - path: checks/SUP-15.yaml

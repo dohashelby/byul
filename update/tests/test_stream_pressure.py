@@ -55,6 +55,7 @@ class PressureWorld:
         self.run_id = "pressure-example-owned-probes"
         self.sample_started = threading.Event()
         self.actual_during_sample = threading.Event()
+        self.pressure_window_open = threading.Event()
         self.probe_times = []
 
     def inspect_json(self, container, *, timeout):
@@ -112,6 +113,10 @@ class PressureWorld:
             # Keep the synthetic client interval open while the second resource
             # sample runs. The first 'during' sample deliberately precedes HTTP.
             time.sleep(0.05)
+            # A loaded test host may let both sampler iterations run before
+            # this fake client starts. Admit the second sample only after the
+            # existing synthetic client interval is genuinely open.
+            self.pressure_window_open.set()
             if self.expected_during_samples == 2:
                 assert self.actual_during_sample.wait(1), "the actual client interval has no second source sample"
             # Client metadata uses floored milliseconds, so leave a margin
@@ -157,6 +162,8 @@ class PressureWorld:
     def sample(self, docker, target, env, *, deadline, port):
         assert docker is self and target["engine"]["image_digest"] == env.engine.image_digest
         assert deadline > 0 and 1 <= port <= 65535
+        if len(self.sample_calls) == 2 and self.expected_during_samples == 2:
+            assert self.pressure_window_open.wait(1), "synthetic client interval did not open"
         started = time.monotonic_ns()
         self.sample_calls.append(port)
         count = len(self.sample_calls)
@@ -190,6 +197,34 @@ class PressureWorld:
     def cleanup(self, *, timeout):
         self.cleanups.append(timeout)
         return []
+
+
+def test_early_sampler_waits_for_the_actual_synthetic_client_window():
+    class EarlySampler(PressureWorld):
+        def __init__(self):
+            super().__init__()
+            self.second_during_requested = threading.Event()
+
+        def sample(self, *args, **kwargs):
+            if len(self.sample_calls) == 2:
+                self.second_during_requested.set()
+            return super().sample(*args, **kwargs)
+
+        def probe(self, network, requests, timeout):
+            if len(requests) == 2:
+                assert self.second_during_requested.wait(1), "second sampler iteration was not reached"
+            return super().probe(network, requests, timeout)
+
+    env, target, cfg = inputs()
+    world = EarlySampler()
+    result = capture_pressure(world, env, target, cfg, probe=world.probe, sampler=world.sample)
+    during = [row for row in result["resource_samples"] if row["phase"] == "during"]
+    assert len(during) == 2
+    assert during[0]["phase_interval_verified"] is False
+    assert during[1]["phase_interval_verified"] is True
+    assert result["resource_samples_complete"] is True
+    assert result["client_intervals_overlap"] is True and result["read_procedure_verified"] is True
+    assert result["data_origin"] == "EXAMPLE"
 
 
 def test_capture_preserves_partial_scope_exact_inputs_and_drops_response_content():

@@ -103,7 +103,7 @@ def test_default_declared_does_not_recurse_or_change_automatic_fail(pack):
     evd = evd.seal(); pol = policy(pack.ref(), values={c.id: values(c)})
     result = judge_evidence(c, evd, pol, T0)
     assert result.judge.name == "declared" and result.verdicts.security == "UNKNOWN"
-    assert not any("judge plugin failure" in r for r in result.reasons)
+    assert "JUDGE_PLUGIN_FAILURE" not in result.reasons
     auto = evd.to_dict(); auto["execution"]["executor"].pop("default_judge")
     result = judge_evidence(c, Evidence.model_validate(auto).seal(), pol, T0)
     assert result.judge.name == "rule_table" and result.verdicts.security == "FAIL"

@@ -416,3 +416,29 @@ def test_proc_metadata_parser_uses_only_explicit_owned_fixture_tree(tmp_path, mo
     else:
         assert row["complete"] is True and row["owners"] == [OWNER] and row["socket_inode"] == "55"
     assert "/EXAMPLE/socket" not in json.dumps(value)
+
+
+def test_prior_lineage_ipc_revision_boundaries_are_preserved(tmp_path):
+    import hashlib
+    from tests.builders import ROOT
+    from tests.pack_lineage_support import historical_pack
+    pack = historical_pack("prior30", tmp_path / "prior30")
+    PACK_DIR = pack.path
+    hashes = json.loads((ROOT / "tests/fixtures/pack25-check-hashes.json").read_text())
+    pack29 = json.loads((ROOT / "tests/fixtures/pack29-check-hashes.json").read_text())
+    changed = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
+               if pack29[p.stem] != hashes[p.stem]}
+    assert changed == {"PLT-01", "PLT-02", "PLT-07", "PLT-08"} and len(hashes) == 77
+    previous = json.loads((ROOT / "tests/fixtures/pack26-check-hashes.json").read_text())
+    latest_changes = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
+                      if pack29[p.stem] != previous[p.stem]}
+    assert latest_changes == {"PLT-01", "PLT-07", "PLT-08"} and len(previous) == 77
+    predecessor = json.loads((ROOT / "tests/fixtures/pack27-check-hashes.json").read_text())
+    current_changes = {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
+                       if pack29[p.stem] != predecessor[p.stem]}
+    assert current_changes == {"PLT-07", "PLT-08"} and len(predecessor) == 77
+    assert {p.stem for p in (PACK_DIR / "checks").glob("*.yaml")
+            if hashlib.sha256(p.read_bytes()).hexdigest() != pack29[p.stem]} == {"SUP-13"}
+    check = pack.checks["PLT-02"]
+    assert check.revision == 3 and check.judge.params["pass_when_all"] == []
+    assert check.fail_criteria == "비허용 주체가 보호해야 할 IPC 자료나 명령 접점에 접근한다."

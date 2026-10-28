@@ -16,12 +16,15 @@ from .role_route import RoleRouteExecutor
 from .credential_exposure import CredentialExposureExecutor
 from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
+from .kubernetes_sampling import KubernetesSamplingExecutor
 from .response_content import ResponseContentExecutor
 from .log_analysis import LogAnalysisExecutor
 from .template_validation import TemplateValidationExecutor
 from .request_binding import RequestBindingExecutor
 from .log_integrity import LogIntegrityExecutor
 from .unix_ipc import UnixIPCExecutor
+from .boundary_egress import BoundaryEgressExecutor
+from .api_transport import APITransportExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
@@ -32,12 +35,15 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "credential_exposure:real": lambda cfg: CredentialExposureExecutor(cfg.get("credential_exposure", {})),
     "input_validation:real": lambda cfg: InputValidationExecutor(cfg.get("input_validation", {})),
     "sampling_validation:real": lambda cfg: SamplingValidationExecutor(cfg.get("sampling_validation", {})),
+    "sampling_validation:kubernetes": lambda cfg: KubernetesSamplingExecutor(cfg.get("sampling_validation", {}), environ=cfg.get("_runtime_environ")),
     "response_content:real": lambda cfg: ResponseContentExecutor(cfg.get("response_content", {}), environ=cfg.get("_runtime_environ")),
     "log_analysis:real": lambda cfg: LogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ")),
     "template_validation:real": lambda cfg: TemplateValidationExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ")),
     "request_binding:real": lambda cfg: RequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ")),
     "log_integrity:real": lambda cfg: LogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ")),
     "unix_ipc:real": lambda cfg: UnixIPCExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ")),
+    "boundary_egress:real": lambda cfg: BoundaryEgressExecutor(cfg.get("boundary_egress", {})),
+    "api_transport:real": lambda cfg: APITransportExecutor(cfg.get("api_transport", {})),
 }
 
 # 실행기 메타데이터: 이 실행기가 만든 증거를 판정하는 기본 판정기(없으면 CheckDef.judge).

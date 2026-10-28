@@ -183,6 +183,128 @@ def test_known_environment_violation_survives_missing_mount_inventory():
     assert "private" not in json.dumps(detail)
 
 
+@pytest.mark.parametrize("bad", [None, {}, {"Type": "bind", "Destination": "relative"},
+    {"Type": "bind", "Destination": "/credentials/../other"},
+    {"Type": "bind", "Destination": "/credentials//key"},
+    {"Type": "bind", "Destination": "/credentials\x00/key"}])
+@pytest.mark.parametrize("destination", ["/credentials", "/credentials/key", "/"])
+def test_partial_mount_list_preserves_independent_violation_without_candidate_absence(bad, destination):
+    from guard.core.judge import judge_evidence
+    from guard.models import Verdict
+    from tests.builders import T0, evidence, policy
+
+    docker = FakeDocker(mounts=[bad, {"Type": "bind", "Destination": destination}])
+    values = {"forbidden_env_names": [], "forbidden_mount_paths": ["/credentials"],
+              "credential_candidate_paths": ["/credentials/key"]}
+    observations, normal, _, detail = collect(docker, values)
+    assert observations["forbidden_mount_violations"] == {"value": ["/credentials"], "collected": True}
+    assert observations["credential_candidate_results"]["value"] == {"/credentials/key": "unknown"}
+    assert observations["credential_candidates_complete"]["value"] is False and docker.requests == []
+    assert "MOUNT_INVENTORY_INCOMPLETE" in detail["collection_errors"]
+    pack = baseline_pack()
+    result = judge_evidence(pack.checks["PLT-04"], evidence(check_id="PLT-04", observations=observations,
+        normal=normal), policy(pack.ref(), values={"PLT-04": values}), T0)
+    assert result.verdicts.security == Verdict.FAIL
+
+
+@pytest.mark.parametrize("mounts", [[None], [{"Type": "bind", "Destination": "/credentials//key"}],
+    [{"Type": "bind", "Destination": "/models"}, None]])
+def test_partial_mount_list_without_known_violation_cannot_prove_empty_safe_inventory(mounts):
+    from guard.core.judge import judge_evidence
+    from guard.models import Verdict
+    from tests.builders import T0, evidence, policy
+
+    values = {"forbidden_env_names": [], "forbidden_mount_paths": ["/credentials"],
+              "credential_candidate_paths": []}
+    observations, normal, _, detail = collect(FakeDocker(mounts=mounts), values)
+    assert observations["forbidden_mount_violations"] == {"value": None, "collected": False}
+    assert detail["forbidden_mount_violations"] is None
+    pack = baseline_pack()
+    result = judge_evidence(pack.checks["PLT-04"], evidence(check_id="PLT-04", observations=observations,
+        normal=normal), policy(pack.ref(), values={"PLT-04": values}), T0)
+    assert result.verdicts.security == Verdict.UNKNOWN
+
+
+def test_functional_preparation_failure_preserves_mount_and_environment_facts(monkeypatch):
+    import guard.executors.credential_exposure as collector
+
+    def unavailable(*args, **kwargs):
+        raise ValueError("EXAMPLE_PRIVATE_PREPARATION_CANARY")
+
+    monkeypatch.setattr(collector, "functional_requests", unavailable)
+    observations, normal, _, detail = collect(FakeDocker(
+        mounts=[{"Type": "bind", "Destination": "/credentials"}], process_names=["FORBIDDEN_CANARY"]),
+        {"forbidden_mount_paths": ["/credentials"]})
+    assert observations["forbidden_mount_violations"]["value"] == ["/credentials"]
+    assert "FORBIDDEN_CANARY" in observations["worker_env_names"]["value"]
+    assert observations["functional_probe_results"]["value"] == {"POST /v1/completions": "no_response"}
+    assert normal["attempted"] is False and normal["succeeded"] is False
+    assert detail["collection_errors"] == ["FUNCTIONAL_PROBE_UNAVAILABLE"]
+    assert "EXAMPLE_PRIVATE_PREPARATION_CANARY" not in json.dumps([observations, detail])
+
+
+@pytest.mark.parametrize("artifact_failure", [False, True])
+def test_partial_mount_product_storage_report_and_exact_ref_replay(tmp_path, monkeypatch, artifact_failure):
+    from pathlib import Path
+    from guard.core.judge import judge_plan
+    from guard.core.report import build_report
+    from guard.core.run import RunConfig, run_plan
+    from guard.core.select import select
+    from guard.executors import registry
+    from guard.models import ExecStatus, Verdict, canonical_json
+    from guard.store import Store
+    from guard.store.bundle import export_bundle, restore_bundle
+    from guard.store.packs import get_pack, put_pack
+    from tests.builders import PACK_DIR, environment, policy
+
+    target = tmp_path / "target.json"
+    target.write_text(json.dumps({"lab": True, "probe_image": "EXAMPLE-unused",
+        "engine": {"container": "engine", "trusted_url": "http://engine:8000", "ready_timeout": 1},
+        "origins": {"trusted": {"network": "trusted"}}, "gateway": {"url": "http://gateway:8080"}}))
+    docker = FakeDocker(mounts=[{"Type": "bind", "Destination": "/credentials"}, None],
+                        environment_error=True)
+    cfg = {"target": str(target)}
+    def probe(network, requests, timeout):
+        return [completion_response(request) for request in requests]
+    monkeypatch.setitem(registry.EXECUTORS, "credential_exposure:partial-sim",
+        lambda raw: CredentialExposureExecutor(cfg, container_probe=probe, docker=docker))
+    if artifact_failure:
+        original_open = Path.open
+        def open_path(path, *args, **kwargs):
+            if path.name == "probe_log.jsonl" and args and args[0] == "w":
+                raise OSError("EXAMPLE_PRIVATE_ARTIFACT_CANARY")
+            return original_open(path, *args, **kwargs)
+        monkeypatch.setattr(Path, "open", open_path)
+    store, pack = Store(tmp_path / "store"), baseline_pack()
+    env = environment(model={"id": "test"})
+    values = {"forbidden_env_names": [], "forbidden_mount_paths": ["/credentials"],
+              "credential_candidate_paths": ["/credentials/key"]}
+    pol = policy(pack.ref(), scope={"include": ["PLT-04"], "exclude": []}, values={"PLT-04": values})
+    store.put_many([env, pol]); plan = select(pack, [env], pol); store.put(plan)
+    evd, = run_plan(store, pack, plan, RunConfig(executors={"credential_exposure": "partial-sim"}, adapter="vllm"))
+    result, = judge_plan(store, pack, plan, as_of=env.created_at)
+    assert evd.execution.status == (ExecStatus.ABORTED if artifact_failure else ExecStatus.COMPLETED)
+    assert evd.data_origin.value == "EXAMPLE" and result.verdicts.security == Verdict.FAIL
+    assert evd.observations["forbidden_mount_violations"].value == ["/credentials"]
+    assert evd.execution.executor.version == "0.4.1"
+    assert "EXAMPLE_PRIVATE_ARTIFACT_CANARY" not in canonical_json(evd.to_dict()).decode()
+    assert bool(evd.artifacts) is not artifact_failure
+    report = build_report(store, pack, plan, as_of=env.created_at)
+    row, = [row for row in report.by_check if row.check_id == "PLT-04"]
+    assert row.single.security == Verdict.FAIL
+    assert result.ref() in report.inputs_manifest and evd.ref() in report.inputs_manifest
+    store.put(report)
+    put_pack(store, PACK_DIR)
+    original = evd.to_dict()
+    export_bundle(store.root, tmp_path / "partial.zip")
+    restore_bundle(tmp_path / "partial.zip", tmp_path / "restored")
+    restored = Store(tmp_path / "restored")
+    assert restored.verify() == [] and restored.resolve(evd.ref()).to_dict() == original
+    assert restored.resolve(report.ref()).to_dict() == report.to_dict()
+    replayed, = judge_plan(restored, get_pack(restored, pack.ref()), restored.resolve(plan.ref()), as_of=env.created_at)
+    assert replayed.ref() == result.ref() and replayed.verdicts.security == Verdict.FAIL
+
+
 def test_environment_name_with_marker_prefix_is_retained_and_remains_fail():
     from guard.core.judge import judge_evidence
     from guard.models import Verdict

@@ -80,9 +80,10 @@ def test_historical27_to28_revision_boundaries_are_preserved(tmp_path):
     assert all(not c.retired for c in current.checks.values()) and not current.reviewed
 
 
-def test_old28_and_current29_revision_and_supported_profiles(tmp_path):
+def test_historical28_to29_revision_and_supported_profiles(tmp_path):
     old = _unpack(28, tmp_path / "old28")
-    current = load_pack(ROOT / "packs/PACK-BASELINE")
+    from tests.pack_lineage_support import historical_pack
+    current = historical_pack("main29", tmp_path / "main29")
     assert old.manifest.revision == 28 and current.manifest.revision == 29
     assert len(current.manifest.files_sha256) == 79
     assert set(old.checks) == set(current.checks) and len(current.checks) == 77

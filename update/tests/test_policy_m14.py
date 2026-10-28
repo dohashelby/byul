@@ -37,28 +37,28 @@ def result(check, evd, vals):
 
 def test_registration_catalog_empty_template_and_no_new_executor(pack):
     check = pack.checks["REQ-15"]
-    assert (pack.manifest.revision, check.revision) == (29, 3) and not pack.reviewed
+    assert (pack.manifest.revision, check.revision) == (31, 3) and not pack.reviewed
     assert [(p.key, p.type, p.required) for p in check.policy_params] == [
         (k, t, True) for k, t in cache.POLICIES.items()]
     assert [(o.key, o.type) for o in check.required_observations] == [(cache.OBSERVATION, "dict")]
     assert check.executor is check.judge is None and len(pack.checks) == 77
-    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 25
-    assert sum(len(c.policy_params) for c in pack.active_checks()) == 54
-    assert sum(bool(c.executor) for c in pack.active_checks()) == 14
+    assert sum(bool(c.policy_params) for c in pack.active_checks()) == 28
+    assert sum(len(c.policy_params) for c in pack.active_checks()) == 75
+    assert sum(bool(c.executor) for c in pack.active_checks()) == 17
     assert not pack.checks["REQ-17"].policy_params
     text = build_policy_template(pack)
     doc = yaml.safe_load(text)
     assert doc["values"]["REQ-15"] == {} and doc["scope"] == {"include": [], "exclude": []}
     assert doc["status"] == "DRAFT" and doc["confirmed_by"] is None
     rows = list(csv.DictReader((ROOT / "docs/policy_catalog.csv").open(encoding="utf-8", newline="")))
-    assert len(rows) == 327 and sum(len(json.loads(r["check_ids"])) for r in rows) == 619
+    assert len(rows) == 348 and sum(len(json.loads(r["check_ids"])) for r in rows) == 640
     for suffix, key in (("PUBLIC-PREFIX", "public_prefix_sharing_allowed"), ("GROUP", "isolated_cache_groups"),
                         ("SALT", "cache_identity_policy_ref")):
         row = next(r for r in rows if r["proposed_policy_id"] == f"P-DRAFT-CACHE-{suffix}")
         assert row["classification"] == "a"
         assert json.loads(row["check_ids"]) == ["REQ-15", "REQ-16", "REQ-17"]
         assert json.loads(row["current_param_paths"]) == [f"values.REQ-15.{key}"]
-    assert {k: sum(r["classification"] == k for r in rows) for k in "abcd"} == dict(a=51, b=2, c=161, d=113)
+    assert {k: sum(r["classification"] == k for r in rows) for k in "abcd"} == dict(a=72, b=2, c=161, d=113)
 
 
 @pytest.mark.parametrize("key,bad", [("public_prefix_sharing_allowed", v) for v in (None, 0, "false", [])]

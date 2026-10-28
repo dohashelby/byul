@@ -1,5 +1,396 @@
 # 실행·실증 안내
 
+## 일반 HTTP 요청기의 HTTPS 전송
+
+`http_probe.py`는 패키지 밖 probe 컨테이너에서도 표준 라이브러리만 사용한다.
+`http://`는 HTTPConnection·기본80, `https://`는 HTTPSConnection·기본443으로 연결하고
+명시한 포트는 그대로 사용한다. TCP 사전 확인도 같은 포트에 연결만 하고 바이트를 보내지
+않는다. 지원 밖 scheme·잘못된 host/port는 네트워크 요청 없이 오류로 남긴다.
+
+HTTPS는 Python 기본 신뢰 저장소의 인증서·호스트명 검증을 사용한다. TCP 연결 후 인증서/호스트명·
+TLS handshake 실패나 대기는 `error/after_connect`이며 TCP 차단의 timeout으로 기록하지 않는다.
+평문으로 재시도하거나 인증서 검증을 끄지 않는다. 기업 CA가
+필요하면 승인된 probe 이미지/환경의 신뢰 저장소를 준비해야 한다. 이번 보수는 CA 등록이나
+배포 설정 변경을 하지 않는다. 요청 헤더 값은 결과에 추가하지 않는다.
+
+일반 HTTP 실행기의 실행 조건/config 해시에 `http_probe_profile=http-probe/2`를 포함한다.
+기존 Kubernetes HTTP 전용 프로파일은 당시 요청기4381bytes/SHA256
+`ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d`를 고정 자산으로
+읽어 기존 fixture 지문을 유지하고 `http-probe/1`을 기록한다. 이 경로의 HTTPS target은
+kubectl/전송 전에 거부한다. 일반 요청기의 새 HTTPS 지원을 과거 전용 경로에 소급하지 않는다.
+과거 팩·EVD·비교 조건은 다시 쓰지 않는다. TCP 도달은 TLS 성공이 아니며 HTTP 성공도
+Gateway 재작성·최종 handler·기업 인가 또는 PLT-08 전체 준수의 증명이 아니다. stream_probe의
+전송/시간 측정과 제한된 HTTP-only 소유 endpoint 프로파일은 이 보수로 확장하지 않는다.
+테스트 인증서·키는 소유 localhost 서버용 EXAMPLE fixture이며 사용자 자격 증명이 아니다.
+
+## LIF-10 native metadata 센서 준비와 소유 기록 수집
+
+현행 profile6/events6는 아래 REQ-02 인증/serving 문맥과 REQ-04 운영 선택값도 관측한다. source25개를 대조하며
+과거 profile4의20개 source·가중치 파일 선택과 고정 bytes를 그대로 읽는다. profile1·2·3의
+당시 의미도 유지한다. 새 준비·수집은 기존 CLI를 사용하고 자동 판정 등록은 늘리지 않는다.
+
+Docker 대상의 `lab=true`는 기존 진입점에서 stub을 뜻하므로 개별·세션 native 수집은
+ENV가 DECLARED/MEASURED로 입력돼도 EXAMPLE을 유지한다. `lab=false` 또는 과거 입력의
+미지정 표식은 EXAMPLE ENV를 승격하지 않으며 나머지도 DECLARED 상한이다. Kubernetes의
+`lab=true`는 소유 비운영 대상 선언으로 의미가 다르며 기존 전송·ENV 출처 상한을 따른다.
+
+아직 CheckDef executor/judge는 미등록이며 종료 기한·회수 대상은 기업 결정이다.
+이 절은 실제 생산자/파일 수집의 준비 경계다. 단일 파일 일치·HTTP 취소·finished ID·
+batch row 제거를 전체 Core/worker/GPU 회수나 LIF-10 PASS로 해석하지 않는다.
+
+```powershell
+guard prepare-lifecycle-sensor --output C:\guard-data\lifecycle-assets-new
+```
+
+새 저장소 밖 폴더에 `guard_lifecycle_sensor.py`, `sitecustomize.py`, `settings.json`,
+`manifest.json`을 만든다. 기존 출력은 덮어쓰지 않는다. 준비는 엔진/클라이언트/컨테이너를
+만들지 않고 image 내용 검증 완료도 표시하지 않는다. 센서는 표준 라이브러리만 사용하며
+준비와 수집은 같은 bytes의 센서 배포본을 사용한다.
+고정 source 후보 commit과 실제 source/loader code가 맞는 module에만 hook을 넣는다.
+현재 actual 대상의 모든 Core/worker 파일과 GPU 동작 검증은 미완료다.
+
+실제 활성화는 별도로 승인·준비된 **소유 격리 대상**에서만 한다. 고정 자산을 읽기 전용
+`/guard-lifecycle`에 두고, 설정의 `/guard-lifecycle/data/<session>`만 해당 engine UID 소유
+0700의 새 쓰기 공간으로 제공한다. `PYTHONPATH=/guard-lifecycle`과
+`GUARD_LIFECYCLE_CONFIG=/guard-lifecycle/settings.json`, native `--middleware
+guard_lifecycle_sensor:Middleware`가 필요한 새 계측 기동 설정이다. 이 설정은 기존 causal
+프로파일/ENV/fixture와 구분한다. 예전 증거에 소급하거나 기존 요청/스트림 측정을 바꾸지 않는다.
+이 문서는 로컬 Docker/엔진 기동이나 새 image/model 취득 승인이 아니다.
+
+센서는 실제 함수의 반환/예외/취소를 유지하며 원문 body·token·비밀·동적 예외 내용을 쓰지 않는다.
+입력 Iterator를 선소비하지 않고 request/tensor/block 객체를 영구 보유하지 않는다.
+generator close, 강제 GC·CUDA synchronize·fence 진전·참조 삭제를 수행하지 않는다.
+metadata 읽기 구간과 host callback 시각을 기록하며 장치 clock이나 정확한 내부 종결 시각이라고
+표현하지 않는다. 각 파일은 512행/256 KiB 상한이며 초과는 `BOUND_REACHED`다.
+
+관측을 마칠 때 소유 대상에서 `python /guard-lifecycle/guard_lifecycle_sensor.py --seal`로
+해당 **센서 기록만** 닫을 수 있다. 작업·worker는 종료하지 않는다. 프로세스가 종료되거나
+제어/쓰기/상한 문제가 생긴 기록은 별도 이유나 미완성 행으로 구분한다. 그 뒤 실제 프로세스가
+살아 있는 동안 생성된 `pid-<pid>-<start_ticks>.jsonl`을 읽는다.
+
+`capture-lifecycle-observations`에는 정확한 `--env`, `--target`, `--prepared <manifest.json>`,
+`--container`, `--image <고정 digest>`, `--path`, 저장소 밖 새 `--output`이 필요하다.
+target의 `environment_ref`는 해당 ENV의 정확 Ref이고 `engine.container`와 `run_id`는 소유
+대상과 같아야 한다. 파일 경로도 prepared session 및 기록 PID/start와 정확히 일치해야 한다.
+기본 실행은 입력 검증만 하고 `--execute`에서만 파일·프로세스·image metadata를 읽는다.
+
+원시 파일의 bytes SHA와 행 chain, schema·자산·세션, nofollow/fstat·소유 신원 전후 확인,
+실제 image ID→RepoDigest와 PID/start/UID/namespace 대조를 구분한다. 후속 확인 실패나 마지막
+부분 행 때문에 앞서 읽은 안전한 metadata를 지우지 않는다. 원문 tail은 hash/길이만 남긴다.
+`process_context_verified`는 살아 있는 프로세스 문맥의 일치이며 생산자 인증이 아니다.
+단일 supplied file 수집은 전체 프로세스 목록·모든 요청·native 회수 완전성을 확정하지 않는다.
+출처는 EXAMPLE/DECLARED 상한이고 전체 `security`는 UNKNOWN이다.
+
+세션의 여러 기록은 `capture-lifecycle-session --env <ENV> --target <target.json>
+--prepared <manifest.json> --container <소유 이름> --image <고정 digest> --output <새 JSON>`으로
+수집한다. 기본은 입력 검증이며 `--execute`에서만 같은 소유 컨테이너의 세션 디렉터리와
+프로세스를 읽는다. argv/environ·파일 본문은 목록 수집에 쓰지 않고 native 종료 요청도 보내지 않는다.
+기존 개별 기록 수집의 nofollow/fstat·행 chain·image·프로세스 문맥 대조를 그대로 재사용한다.
+
+`live_census_stable`은 전후의 제한된 목록과 소유 세대가 같다는 뜻이다. 두 시점 사이에 생겼다
+사라진 프로세스나 전체 시험 구간을 증명하지 않는다. `recorded_files_covered`도 그 목록에
+있는 파일의 안전한 기록 prefix와 파일 신원이 수집됐다는 뜻이며 native 종결·회수가 아니다.
+같은 Python 실행 파일을 쓰지만 기록이 없는 프로세스는 `python_processes_without_recording`에
+남긴다. 보조 프로세스도 포함할 수 있으므로 worker 누락으로 단정하지 않는다.
+
+요청 index는 `recordings[i].capture.records[seq]`의 정확한 사건 참조와 지문만 연결한다.
+native ID 할당의 RETURN에 있는 외부/내부 지문 쌍을 보존하고, 외부 ID 재사용은 모호한
+다중 연결로 남긴다. 소유 세대와 boot/PID·time namespace/offset 지문이 다른 자료는 분리한다.
+이 index는 인증된 귀속·전역 시각 순서·`abort_to_stop_seconds`나 전체 LIF-10 판정이 아니다.
+
+기술 상한은 파일32·현재 프로세스128·index 지문256·사건 참조4096이다. 초과·누락·개별 실패는
+표식으로 남기며 이미 수집한 다른 기록은 보존한다. 파일 저장은 새 JSON에만 하고, 늦은 저장
+실패는 종료 코드1과 `artifact_saved:false` 및 검증된 metadata 전체를 표준 출력으로 반환한다.
+부분 파일은 성공 참조로 쓰지 않는다. 입력/준비 검증 실패는 종료 코드2다. 결과의 출처 상한·
+생산자 인증 false·전체 범위 false·security UNKNOWN은 단일 파일 수집과 같다.
+
+### ASGI 헤더 문맥과 native ID 할당
+
+헤더 문맥은 private profile `vllm-native-lifecycle-metadata/2`와 event schema
+`guard-native-lifecycle-events/2`에서 추가했다. completion의 외부 ID는 헤더 원문과 다를 수 있으므로
+접두사/순번을 추측해 hash를 연결하지 않는다. `/v1/completions` middleware는 기존 헤더
+지문만 ContextVar에 두고, 같은 PID 문맥의 동기 `InputProcessor.assign_request_id`에서만
+`asgi_request_sha256`를 관측한다. 원래 함수가 반환한 사건의 외부/내부 ID 지문과 함께
+index에 남긴다. 별도 receive/send·native 호출·스트림 시간 측정은 추가하지 않는다.
+
+헤더 누락/빈 값/상한 초과와 프로세스가 달라진 상속 문맥은 연결하지 않는다. 장수명
+output handler의 문맥을 다른 요청 ID에 적용하지 않으며 예외·취소·중첩 호출 뒤 문맥을
+복원한다. 같은 헤더가 여러 내부 ID와 연결되면 `ambiguous_asgi_request_sha256`로 남긴다.
+이는 헤더 문맥에 대한 생산자 주장이고 고유 HTTP 요청 신원·인증·인과성의 독립 증명은
+아니다. 전체 실행·종결/회수의 상한은 유지한다.
+
+profile1은 고정된 과거 sensor bytes의 LF/CRLF 두 spelling과 manifest/개별 자산 SHA를
+모두 대조해 읽기만 지원한다. 과거 기록에 새 연결 필드를 소급하지 않으며 새 필드가
+섞인 profile1은 거부한다. 알 수 없는 sensor bytes와 profile/source 교차 조합도 거부한다.
+수집기는 과거 센서 파일을 import/실행하지 않는다. 현행 새 자산 준비는 profile3만 생성한다.
+
+### REQ-05 native 적재 객체와 모델 호출 관측
+
+profile5/events5는 기존 준비·소유 개별/세션 수집을 재사용한다. 추가 실행기나 판정을
+등록하지 않는다. 고정 `BaseModelLoader.load_model`의 반환 객체와
+`DefaultModelLoader.load_weights`의 입력 객체, CPU/GPU runner의 적재 후 `self.model`,
+native `get_model` 반환, `GPUModelRunner._model_forward`의 호출 객체를 구분한다.
+기존 source/loader code 대조를 거친 지점만 계측하고 원래 model/입력/반환 객체를 유지한다.
+
+객체 참조는 세션·물리 프로세스 문맥과 증가하는 세대 번호의 지문이다. raw `id()`·모델명·
+revision·경로·tensor·token·예외 원문은 저장하지 않는다. 약한 참조를 쓰고 최대64개의
+살아 있는 객체만 추적한다. 상한/약한 참조 미지원은 null이며 기존 참조를 지우거나
+다른 객체에 재사용하지 않는다. fork 뒤 추적을 초기화한다.
+
+`configured_model_sha256`/`configured_revision_sha256`/`load_format_sha256`는 **설정값**의
+지문이다. 객체 참조는 가중치 지문이 아니며 같은 객체의 in-place reload를 새 가중치
+revision으로 구분하지 못한다. wrapper의 참조와 native getter의 반환은 각각 기록하며
+서로 다른 객체를 자동으로 동일시하지 않는다. dummy/LoRA/speculative 설정의 존재도
+관측일 뿐 해당 선택 기능의 실제 소비 증명이 아니다.
+
+`_model_forward`의 요청 지문은 같은 호출 문맥에서 관측한 scheduler 선택 ID다.
+tensor row 귀속·장치 실행 완료·생성 출력 귀속은 확정하지 않는다. 해당 문맥이 없는
+warmup 호출은 요청 사건으로 만들지 않는다. 세션 index는 최대256개의 `model_observations`에
+정확한 파일/행 참조를 남긴다. 초과 시 미완전 표식과 앞선 관측을 보존한다.
+`final_model_verified`·`actual_consumption_verified`·`weights_revision_verified`는 false다.
+
+profile1·2는 각각 고정 과거 source bytes, 당시17개 source와 지점 집합을 확인해 읽는다.
+과거 기록에 새 모델 필드·module·지점을 소급하지 않는다. profile3도 당시19개 source와
+고정 bytes로 읽으며 profile4는20개 source를 대조한다. Gateway 인가 기록과 독립된 최종 가중치 신원·실제 요청별 소비·alias/퇴역/LoRA·
+신뢰 생산자·기업 정책 대조는 남아 있다. 실제 엔진·Kubernetes/GPU 실증으로 집계하지 않는다.
+
+### REQ-05 native 파일 선택과 독립 파일 해시
+
+profile4는 고정 `DefaultModelLoader._prepare_weights`의 준비 목록과 `_get_weights_iterator`,
+`weight_utils`의7개 iterator factory 인수를 구분한다. 최종 factory 인수는 필터 후 목록이며,
+최대64개 경로를 POSIX CWD 기준 정규화한 지문으로 남긴다. 파일 목록이 list가 아니거나
+상한·CWD 변경이 있으면 미완전으로 남긴다. 부모 `load_weights` 호출 지문과 모델 객체
+지문이 같은 PID에서 연결된 경우만 파일 대조 대상으로 삼는다. 원래 generator를 그대로
+반환하며 센서는 이를 추가 소비하거나 tensor·내용을 읽지 않는다.
+
+`capture-native-weight-files` 입력은 `--env --target --prepared --context --model-manifest
+--native-session --output`이다. `--execute` 없이 입력과 출력 예약만 검사하며 접속·파일 생성을
+하지 않는다. context는 아래의 비공개 입력 형식이며 정확 ENV Ref·session·입력 bytes SHA를 채운다.
+
+```json
+{"schema":"guard-native-weight-files-context/1","environment_ref":{"id":"ENV-...","revision":1,"sha256":"정확 ENV SHA"},"session":"준비된32자hex","transport":"docker","model_root":"/models/소유-root","native_session_sha256":"세션파일 bytes SHA","model_manifest_sha256":"manifest파일 bytes SHA"}
+```
+
+기존 `guard.model-manifest/1`의 scope=all 파일 목록과 `ENV.model.inventory_sha256`가 정확히
+일치해야 한다. Docker target의 `lab`은 명시 bool이며 기존 진입점의 stub=true·실제 엔진=false를
+그대로 받는다. 어느 값이든 소유 run/container·정확 ENV Ref·pinned 이미지 확인이 필요하며
+실제 엔진 실행을 승인하거나 자료 등급을 높이지 않는다. Kubernetes는 기존 lab=true·고정
+context/namespace/Pod UID/container 세대 target을 사용한다. `.bin/.pt/.safetensors/.gguf` 중
+native 반환 사건에 관측된 최대32개 파일만 별도 stdlib helper가 SHA를 계산한다. 기본 파일당
+1GiB(상한도1GiB), 전체180초(최대300초), 각 소유 helper는 최대5초다. 큰 shard·원격/지원 밖
+로더는 미수집이며 상한을 모델 허용 정책으로 쓰지 않는다. 모델·Torch를 import하지 않는다.
+
+root와 resolved 경로의 디렉터리 구성요소는 nofollow로 열고, root 내부 snapshot→blob symlink만
+허용한다. root 밖 symlink·FIFO·특수 파일·상한 초과는 거부한다. 열린 FD 전후 신원과 logical
+경로 재확인을 별도로 보존한다. 이는 시점별 파일 대조이며 불변 mount·native 실제 파일 읽기·
+tensor 적재·최종 소비 증명이 아니다. 원문 경로·내용·예외는 출력하지 않는다.
+
+파일 불일치는 유효한 관측으로 보존하고 새 보안 FAIL/PASS를 만들지 않는다. 뒤 파일 실패는
+앞선 성공 해시를 유지한다. 늦은 소유/경로 재확인 실패도 해시를 유지하고 binding=false로
+남긴다. 출력 저장이 실패하면 종료1과 함께 전체 안전한 capture를 stdout에 남기며 기존
+출력 파일을 덮어쓰지 않는다. 자료 등급은 DECLARED 상한이고 대역·EXAMPLE 입력과 알려진
+Docker stub(`lab=true`)은 EXAMPLE이다. Kubernetes의 `lab=true` 선언을 Docker stub으로
+취급하지 않으며 실제 Kube 수집도 DECLARED 상한이다. native 소유자가 다른 전송의 신원과
+맞지 않으면 해시는 보존하고 연결 미확인 상태를 유지한다.
+최종 모델·weights revision·실제 소비·생산자 인증·전체 실행 확인은 모두 false/UNKNOWN이다.
+
+## REQ-02 인증 입력·serving 호출 부분 관측
+
+profile5에서 도입한 인증 관측은 현행 profile6에서도 고정 `AuthenticationMiddleware.__call__`/`verify_token`, 모델 목록 router의
+동적 `models(request)` helper와 `OpenAIServingModels.show_available_models`를 관측한다.
+ASGI HTTP 호출에 유일한 `x-request-id` 헤더 하나(1~512bytes, 전체 header64개 이하)가 있을
+때만 별도 invocation 지문을 연다. 없는/중복/상한 초과 헤더는 연결하지 않으며 계획한
+요청의 미수집으로 다룬다. 고유 호출 지문과 동일 헤더 재사용의 모호함을 구분한다.
+
+진입 경로/root_path/method와 인증·router helper에서 관측한 scope의 지문을 구분한다.
+원문 경로·헤더 값·자격 증명·요청/응답 본문·ModelList 내용은 기록하지 않는다. `verify_token`
+반환 bool은 관측한 인증 함수 결과다. 동기 `__call__`은 awaitable을 반환하므로 그 RETURN은
+다운스트림 완료가 아니다. 원래 coroutine을 그대로 반환하고 추가 await·receive·send는
+하지 않는다. serving 반환은 원래 async 메서드의 await 반환이며 HTTP 전송/인가 완료가 아니다.
+
+같은 PID의 살아 있는 ASGI 문맥만 연결하며 호출이 끝나면 상속된 늦은 자식 문맥도 닫는다.
+살아 있을 때 시작했지만 종료 뒤 반환한 작업은 앞선 CALL을 유지하고 반환 연결은 미수집으로
+남긴다. 비HTTP 중첩 호출도 활성 HTTP 문맥에 결합하지 않는다.
+기존 completions의 callback 관측 범위·원래 ID 할당 연결·스트림 측정은 유지한다.
+새 인덱스 `route_authentication_index`는 소유/프로세스 문맥을 지문으로 구분하고 최대256개
+관측과 정확한 파일/행 참조를 보존한다. 초과·충돌 시 앞선 자료를 유지하고 미완전으로 남긴다.
+
+이것은 신뢰된 호출자·실제 router의 endpoint 선택·Gateway 유효 재작성 설정·최종 인가 판정이
+아니다. router decorator가 잡은 함수는 모듈 변수 교체만으로 계측되지 않아 동적 조회 helper와
+serving 메서드를 관측한다. 다른 handler/경로·동일 헤더 재사용·누락은 전체로 일반화하지 않는다.
+기업 허용 관계와 외부 요청/인증 입력/최종 handler의 독립 대응은 남아 있으며 모든 검증 flag는
+false·보안 UNKNOWN이다. EXAMPLE 조사와 실제 엔진 실증은 별도로 집계한다.
+
+## REQ-04 native 운영 선택값 부분 관측
+
+profile6는 고정 vLLM GenerateBaseServing의 priority·session·DP rank 선택 helper4개와
+BaseServing의 request-ID helper 반환을 관측한다. priority는 해석 가능한 헤더가 우선하고,
+session은 요청 필드→헤더→추가 인수 순서다. DP rank는 정수/None이며 request ID의 헤더
+우선순위도 유지한다. 원래 함수의 반환/예외·ID 변경·추가 header/body 접근 횟수를 바꾸지 않는다.
+InputProcessor.assign_request_id에서는 실제 전달 객체의 priority/session/rank/request-ID를
+인수·반환 시점에 구분해 별도 SELECTION 사건으로 읽고 기존 NATIVE ID 연결 사건의 정확한
+metadata 형식을 유지한다. 선택 샘플 실패도 기존 ID·ASGI 사건을 지우지 않는다.
+선택 helper와 입력 전달을 최종 worker 소비로 해석하지 않는다.
+
+session/request-ID는 최대512문자의 SHA 지문과 observed flag, priority/rank는 signed64 정수와
+observed flag로 기록한다. None의 관측과 지원 밖 자료의 미수집을 구분하며 큰 정수·문자열을
+자르거나 기본값으로 바꾸지 않는다. 원문 헤더·자격 증명·본문·예외 원문은 저장하지 않는다.
+부재/중복/상한 초과 x-request-id에서도 HTTP 호출마다 별도 invocation 지문을 만들고 클라이언트
+ID 연결은 null로 남긴다. 기존 인증 관측은 유일한 제한 헤더가 있을 때만 연결하는 조건을 유지한다.
+같은 PID의 살아 있는 문맥만 사용하며 비HTTP·늦은 자식·종료 뒤 반환을 구분한다.
+
+세션 출력 request_selection_index는 최대256개 사건과 소유/프로세스 문맥·정확 파일/행 참조를
+보존한다. 헤더 재사용은 모호함으로 남기고 후속 상한/미수집이 앞선 사건을 지우지 않는다.
+stored_index_complete는 저장된 인덱스의 완전성이지 전체 실행 수집/인과성/신원 인증이 아니다.
+신뢰 principal·Gateway의 외부 헤더 제거/재생성·보호할 운영 필드/기업 허용 관계·실제 worker
+소비가 없어 검증 flag는 false·보안 UNKNOWN이며 자동 executor/judge를 등록하지 않는다.
+
+과거 profile5의 source23·지점·당시 자산 bytes와 profile1·2·3·4를 읽는다. 새 source/지점·
+선택 metadata를 과거 기록에 소급하지 않는다. profile6의 추가 source2개는 고정 commit
+db9527a46873454610df6dbedf79a36d6bf1a7f6의 generate/base/serving.py 및 serve/engine/serving.py다.
+실제 이미지의 loaded code·자료 생산자의 진위 인증은 별도이며 EXAMPLE 회귀는 실측으로 승격하지 않는다.
+
+## LIF-10 Kubernetes 파일·프로세스 읽기
+
+
+`capture-kubernetes-lifecycle-session --env <ENV> --target <target.json> --prepared <manifest.json>
+--output <새 JSON>`은 기본 입력 검증만 한다. `--execute`에서만 기존 kubectl·kubeconfig의
+명시 context로 선택한 Namespace/Pod를 get하고, 선택 container에서 고정 metadata helper를
+exec한다. Pod·namespace·RBAC·image·mount·설정을 생성/변경하지 않는다. 준비된 센서 자산과
+UID 소유 0700 세션 디렉터리는 별도로 승인된 기동 단계에서 제공해야 한다.
+
+target은 아래 **형식 예시**이며 모든 Ref·UID·세대·image 값은 실제 선택값으로 채운다.
+실제 클러스터 수집 완료를 뜻하지 않는다. `kubernetes.engine`의 필드는 기존 Kubernetes
+HTTP target의 동일 역할 형식을 재사용하며 probe Pod나 HTTP URL은 필요하지 않다.
+
+```json
+{
+  "schema": "guard-kubernetes-lifecycle-target/1",
+  "lab": true,
+  "run_id": "guard-owned-run",
+  "environment_ref": {"id": "ENV-ID", "revision": 1, "sha256": "정확한 정규 문서 해시"},
+  "kubernetes": {
+    "context": "명시-context",
+    "engine": {
+      "namespace": "owned-namespace", "namespace_uid": "실제 UUID",
+      "pod": "owned-engine", "pod_uid": "실제 UUID", "container": "engine",
+      "container_id": "containerd://실제-64hex", "image": "저장소@sha256:실제-64hex",
+      "image_id": "API가 보고한 정확한 imageID", "restart_count": 0,
+      "node": "실제-node", "pod_ip": "실제-IPv4", "started_at": "실제-aware-시각"
+    }
+  }
+}
+```
+
+get/exec 전후 Namespace UID·Pod UID·guard.run·node·spec image·보고 imageID·container ID·
+restart·startedAt을 대조한다. HTTP 경로의 Ready 요구는 유지한다. 파일 읽기는 같은 세대의
+Running container에서 Ready가 내려가도 장애 metadata를 읽을 수 있다. helper는
+`python3 -I -S -B`로 site hook/bytecode 쓰기를 건너뛰고 자기 프로세스만 끝내는 watchdog을
+사용한다. native 작업이나 다른 PID를 종료하지 않는다. 개별 호출은 최대5초, 전체 창 기본
+180초/상한300초이며 기업 종료 기한이 아니다. `/proc` 가시 영역은 Pod의 PID namespace 설정에
+따라 달라지므로 그 목록을 모든 worker의 목록으로 단정하지 않는다.
+
+Pod status의 `imageID`는 `reported_image_id`로 보존한다. spec/status의 선택값 일치는 Docker
+RepoDigests 대조나 node CRI image 검증이 아니다. `image_digest_verified`,
+`node_runtime_image_verified`, `manifest_ancestry_verified`는 이 경로에서 false다.
+세션 파서·행 chain·파일/fstat·프로세스 대조·지문 index·개별 실패/늦은 저장 실패 보존은
+기존 경로를 재사용한다. 생산자 인증/전체 실행 구간·회수는 미검증이며 출처는 EXAMPLE/DECLARED,
+security는 UNKNOWN이다. 주입 runner는 ENV 표시와 무관하게 EXAMPLE로 제한한다.
+
+## PLT-08 명시 소유 API 시험 구간의 평문 성공
+
+`api_transport:real`은 기존 `guard select/run/judge/report`에서 사용한다.
+[설정 예제](../examples/api-transport.toml)와 기존 소유 target, 명시 POL을 제공한다.
+`guard policy template`의 PLT-08 필수9개 값은 비어 있으며 관측에서 자동 채우지 않는다.
+`api_hop_scope`는 `guard_probe_to_owned_direct_api`만 지원하고 CID·network/endpoint ID·IP·port,
+`plaintext_forbidden` 및 aware ISO 유효 시작/끝을 실제 수집과 대조한다. 불일치는 HTTP 전 거부한다.
+
+같은 제품 실행에서 기존 LIF-04의 bounded 정상/slow/병행/후속 요청을 수집한다.
+HTTP-only 수집기, 고정 소유 bridge 종단의 전후 안정성, source guard·시간창과 완전 정상
+응답이 결합된 명시 금지 평문 성공만 보안 FAIL이다. URL scheme이나 임의 수집 JSON을
+import해 판정하는 경로는 없다. 부가 자원·후속 스트림 수집 누락과 cleanup 실패는 이미
+확인한 초기 API 위반을 지우지 않는다. 필요한 종단·시간창 결합 자체가 없으면 UNKNOWN이다.
+
+출처는 기존 수집의 DECLARED 상한·EXAMPLE을 유지한다. 평문 허용·거부·timeout·미수집을
+전체 PASS로 해석하지 않는다. 시험 caller의 직접 구간이며 배포 호출 앱/Gateway 경로,
+암호학적 peer 확인·TLS 종료/재암호화·인증서·IPC/TP·무결성 변조와 전체 PASS는 미검증이다.
+실제 엔진·daemon 기동·이미지 pull·모델 다운로드를 이 실행기가 수행하지 않는다.
+
+## 첨부 읽기·저장 실패와 부분 증거
+
+실행기가 유효한 draft를 반환한 뒤 첨부 파일 읽기·Store 저장이 실패하면, EVD는
+`ABORTED`와 고정 `ARTIFACT_PERSISTENCE_INCOMPLETE` 진단을 남긴다. 이미 수집한 정식 관측,
+실제 정상/도전 사실, 성공한 첨부 참조를 빈 값으로 바꾸지 않는다. 원문 예외·실패 경로를
+진단에 넣지 않는다. 실패한 첨부를 성공으로 표시하거나 기존 파일·객체를 덮어쓰지 않는다.
+
+공통 HTTP 수집기가 draft를 반환하기 전 샘플·프로브 로그의 형식화/쓰기나 첨부 확인에서
+실패한 경우에는 `ARTIFACT_CAPTURE_INCOMPLETE`로 구별한다. 수집기가 유효하게 반환한
+관측·정상/도전 사실은 보존하고, 실패한 부분 파일은 첨부 참조에서 제외하며 다른 성공 첨부는
+계속 저장한다. `ABORTED`·최대 DECLARED(기존 EXAMPLE 유지) 관문은 같다. 뒤의 Store 저장도
+실패하면 두 고정 진단을 함께 남긴다. 일반 수집·설정·비교 조건·모델 검증 오류를 이 경계에서
+복구하거나 유효한 관측으로 추정하지 않는다. work/의 부분 파일은 검증 bundle에 포함되지 않는다.
+샘플 쓰기를 시도했으나 참조 생성 전에 파일이 사라진 경우도 실패로 남긴다. 쓰기를 시도하지 않은
+선택적 첨부의 기존 미생성 처리는 유지한다.
+
+OBS-09의 별도 참조 HTML도 같은 캡처 경계에서 UTF-8 bytes로 기록한다. 분석·렌더링·메모리
+상 표시 대응을 마친 뒤 인코딩/디렉터리/쓰기 실패나 파일 소실이 발생하면 실패한 HTML을
+제외하고 관측·다른 성공 첨부를 보존한다. 메모리상 표시 검증을 저장 성공으로 해석하지 않으며
+ABORTED는 기존 PASS 관문에서 보류된다. 정상 HTML bytes·해시·사건 대응은 유지한다.
+
+기존 PASS 관문이 실행 미완료를 보류하고, 기존 판정기는 독립적으로 확인한 위반을 유지한다.
+특정 판정에 실제 첨부가 필요하면 그 근거가 없는 범위는 계속 UNKNOWN이다. 출처는 최대
+DECLARED이며 EXAMPLE은 그대로다. 부분 사실 보존은 전체 실행·증거 수집 완료의 증명이 아니다.
+이 출처는 EVD의 `data_origin`이며, ABORTED 결과의 `verification_level`은 기존 규칙대로 null이다.
+ABORTED 증거는 기존 이월 관문에서 거부하며 과거 저장 EVD/RES·팩에는 새 의미를 소급하지 않는다.
+과거에 이미 빈 관측으로 저장된 EVD는 이 수정이나 재판정만으로 잃은 사실을 복원할 수 없다.
+
+일반 실행기 생성·수집·무효 draft 오류의 기존 빈 ABORTED 경계는 `EXECUTOR_FAILURE`,
+판정 플러그인의 기존 예외 경계는 `JUDGE_PLUGIN_FAILURE`로 진단한다. 이 두 경계에서는
+예외의 클래스 이름·문자열·입력·경로를 저장하거나 문자열화하지 않는다. 뒤쪽 판정 출력의
+오류가 확인되면 앞에서 적용한 PASS도 INV-15에 따라 UNKNOWN으로 보류하고 이미 확보한
+FAIL은 유지한다. 관측 복구·새 기업 기준을 추가하지 않으며 KeyboardInterrupt/SystemExit는
+그대로 전파한다. 과거 EVD/RES는
+고쳐 쓰지 않는다. 실행기 자체의 모든 자유 진단·기존 로그 재생 경계 전체를 바꾼 것은 아니다.
+
+## PLT-07 명시 금지 TCP 연결 한 분기
+
+`boundary_egress`는 기존 `guard select/run/judge/report` 경로에 연결한다.
+첫 분기는 이미 준비된 단일 소유 대상의 audit 구간이다. container ID·UID·netns·정책 구간이
+바뀌면 새 명시 정책이 필요하며, 두 이미지/재기동에 같은 식별자를 자동 이월하지 않는다.
+`examples/boundary-egress.toml`은 실행 설정 양식이며 회사 정책값을 제공하지 않는다.
+새 정책 양식은 현재 팩의 `guard policy template`로 만들고 PLT-07의 11개 필수 값을 사람이
+명시해야 한다. subject의 정확한 container ID·UID·netns와 별도 owned receiver ID·IPv4·port,
+금지 protocol/작업, aware ISO 적용 구간을 관측값이나 다른 점검 정책으로 보충하지 않는다.
+
+첫 프로파일 `explicit-forbidden-egress-v1`은 `subject_scope=all_processes_in_container_uid_netns`,
+`forbidden_protocol=tcp`, `forbidden_operation=tcp_connect`만 지원한다. 이는 해당 UID+netns의
+모든 프로세스를 포함하는 정책을 입력한 경우다. worker·SDK·특정 실행 파일만의 정책을
+이 프로파일로 바꾸지 않는다. 목록 밖 자동 금지, 허용 목록·유효 기간·유예의 기본값은 없다.
+
+송신 target과 receiver target은 이번 run의 별도 pinned Linux 컨테이너여야 한다.
+host/다른 컨테이너의 PID·network 공유나 proc/cgroup을 가리는 mount를 거부하며 명시 private
+cgroup namespace 프로파일을 요구한다. 소유 CID/image ID→RepoDigest/start와 bridge endpoint를
+전후 대조한다. 수신처는 패키지의 standalone `egress_receiver.py` source를 정확한
+`python3 -u -c <source> <port>` 명령으로 실행하고 새 `/guard-observations/egress.jsonl`을 만든다.
+실행기가 이 명령·실제 PID/start/UID/netns/listen socket·파일 수집 경계를 대조한다.
+수신처 준비는 승인된 격리 환경에서 수행하며 제품 실행기는 컨테이너·이미지·엔진을 만들지 않는다.
+
+송신 helper는 명시 숫자 UID로 실행해 실제 UID·netns를 검사한 뒤 소유 수신처 한 곳에
+32바이트의 무해 일회성 상관 표식을 보낸다. 표식 원문은 증거에 남기지 않는다.
+부모의 전체 예산과 검증된 Linux time namespace의 보수적 기한을 연결 전·송신 전에 확인한다.
+송신 쪽 실제 socket과 수신 쪽 reverse tuple·상관 해시·실제 수신 기록·정책 적용 구간이
+같은 사건으로 확인된 경우만 `forbidden_egress_successes`에 남긴다. 서로 다른 netns의
+resource tuple hash를 같다고 비교하지 않는다. UTC 시계가 맞지 않으면 허용 오차를 만들지 않는다.
+ACK는 부가 수집이다. TCP 연결·실제 표식 수신의 독립 근거가 완결됐다면 ACK 실패나
+연결 종료 뒤 peer 메타데이터 조회 실패로 과거 관측을 지우지 않는다. 정식 증거는 EVD의
+구조화 관측이며 중복 summary를 필수 Store artifact로 등록하지 않는다.
+
+이 독립 금지 연결 성공은 보안 FAIL이다. 거부·timeout·미수집은 보안 UNKNOWN이며 전체 차단
+성공으로 보지 않는다. 다른 후속 수집 오류로 이미 검증한 위반을 지우지 않는다. 정상 업무·
+전체 송신 제한·worker/SDK/usage·DNS/redirect/TLS·정책 단절·만료 집행·우회 원인은 미검증이다.
+보안 PASS와 기능·성능 PASS 규칙은 없고 전체 `egress_scope_complete=false`를 유지한다.
+EXAMPLE 대역·소유 시험 socket·격리 Docker stub은 실제 vLLM 실증으로 집계하지 않는다.
+
 ## LIF-04 느린 수신과 독립 자원 부분 관측
 
 `guard capture-stream-pressure`는 기존 SSE 수집에 명시적인 `slow-reader-v1`을 연결한다.

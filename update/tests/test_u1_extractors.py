@@ -316,3 +316,67 @@ def test_pack_rejects_unknown_change_selection_reference():
         entry["sha256"] = sha256_hex(files[entry["path"]])
     with pytest.raises(PackIntegrityError, match="unknown check"):
         build_pack(manifest, files)
+
+
+def test_prior_lineage_source_and_image_revision_boundaries_are_preserved(tmp_path):
+    """팩23→28의 독립 변경 단계를 구분해 각 단계의 나머지76개 bytes를 보호한다."""
+    prior = {f"{area}-{number:02d}": 1 for area, count in
+             (("SUP", 16), ("REQ", 21), ("PLT", 12), ("LIF", 16), ("OBS", 12))
+             for number in range(1, count + 1)}
+    prior.update({"SUP-01": 2, "SUP-02": 2, "SUP-14": 2, "REQ-01": 5, "REQ-03": 2,
+                  "REQ-07": 2, "REQ-09": 6, "REQ-10": 2, "REQ-11": 3, "REQ-13": 2,
+                  "REQ-15": 2, "REQ-16": 2, "PLT-01": 4, "PLT-04": 3, "LIF-07": 2,
+                  "OBS-03": 2, "OBS-04": 2, "OBS-05": 2, "OBS-07": 2, "OBS-08": 2,
+                  "OBS-09": 2, "OBS-11": 2})
+    from tests.pack_lineage_support import historical_pack
+    pack = historical_pack("prior30", tmp_path / "prior30")
+    assert pack.manifest.revision == 30
+    assert set(pack.checks) == set(prior) and len(prior) == 77
+    expected = {cid: revision + 1 for cid, revision in prior.items()}
+    expected["SUP-04"] += 1  # Only the new running-image profile changes after source refresh.
+    expected["PLT-02"] += 1  # Bounded Unix IPC access profile; all previous definitions remain unchanged.
+    expected["SUP-03"] += 1  # Observation-only template profile, not independent consumer proof.
+    expected["PLT-01"] += 1  # Complete permission collection gates PASS, preserving violation rules.
+    expected["PLT-07"] += 1  # Only the explicit forbidden egress profile changes after PACK27.
+    expected["PLT-08"] += 1  # Explicit owned API plaintext profile after PACK28.
+    expected["SUP-13"] += 1  # One fixed supplied-template type-reference branch after PACK29.
+    assert {cid: check.revision for cid, check in pack.checks.items()} == expected
+    frozen = json.loads((ROOT / "tests/fixtures/pack23-check-hashes.json").read_text(encoding="utf-8"))
+    previous = json.loads((ROOT / "tests/fixtures/pack24-check-hashes.json").read_text(encoding="utf-8"))
+    assert frozen["pack_revision"] == 23 and len(frozen["checks"]) == 77
+    assert previous["pack_revision"] == 24 and len(previous["checks"]) == 77
+    from hashlib import sha256
+    for path, digest in frozen["checks"].items():
+        if path != "checks/SUP-04.yaml":
+            assert previous["checks"][path] == digest
+    # Keep the old PACK24 -> PACK25 assertion against its immutable stage snapshot.
+    pack25 = json.loads((ROOT / "tests/fixtures/pack25-check-hashes.json").read_text(encoding="utf-8"))
+    assert len(pack25) == 77
+    for path, digest in previous["checks"].items():
+        if path != "checks/SUP-03.yaml":
+            assert pack25[Path(path).stem] == digest
+    # PACK26 is fixed from c9c6ab4 git objects, before the permission completeness change.
+    pack26 = json.loads((ROOT / "tests/fixtures/pack26-check-hashes.json").read_text(encoding="utf-8"))
+    assert len(pack26) == 77
+    # Keep PACK25 -> PACK26 against immutable snapshots: only the IPC definition changed.
+    for cid, digest in pack25.items():
+        if cid != "PLT-02":
+            assert pack26[cid] == digest
+    # PACK26 -> PACK27 changed only PLT-01; preserve that immutable stage too.
+    pack27 = json.loads((ROOT / "tests/fixtures/pack27-check-hashes.json").read_text(encoding="utf-8"))
+    assert len(pack27) == 77
+    for cid, digest in pack26.items():
+        if cid != "PLT-01":
+            assert pack27[cid] == digest
+    # Preserve PACK27 -> PACK28 against immutable snapshots, then compare the new stage.
+    pack28 = json.loads((ROOT / "tests/fixtures/pack28-check-hashes.json").read_text(encoding="utf-8"))
+    assert len(pack28) == 77
+    assert {cid for cid, digest in pack27.items() if pack28[cid] != digest} == {"PLT-07"}
+    pack29 = json.loads((ROOT / "tests/fixtures/pack29-check-hashes.json").read_text(encoding="utf-8"))
+    assert {cid for cid, digest in pack28.items() if pack29[cid] != digest} == {"PLT-08"}
+    current = {cid: sha256((pack.path / "checks" / f"{cid}.yaml").read_bytes()).hexdigest()
+               for cid in pack28}
+    assert {cid for cid, digest in pack29.items() if current[cid] != digest} == {"SUP-13"}
+    assert pack.checks["SUP-04"].collection_profile == "running-image-approval-v1"
+    assert {check.framework_id for check in pack.checks.values()} == {
+        "CHK-" + cid.split("-")[0] + "-" + cid.split("-")[1].zfill(3) for cid in prior}

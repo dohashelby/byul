@@ -26,6 +26,10 @@ CHAT_TEMPLATE_SHA256 = "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb6752
 CHAT_TEMPLATE_CONTAINER_PATH = "/guard-assets/chat/guard-text-chat-v1.jinja"
 CHAT_TEMPLATE_ASSET = Path(__file__).resolve().parent / "assets" / "chat" / "guard-text-chat-v1.jinja"
 CHAT_REVIEWED_IMAGE = "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b"
+TYPE_TEMPLATE_PROFILE = "guard-type-boundary-v1"
+TYPE_TEMPLATE_SHA256 = "38110f6e668d55f240ecfde0d38f5fecc7c11a742d76823ffd9d0918abb9fe36"
+TYPE_TEMPLATE_PATH = "/guard-assets/chat/guard-type-boundary-v1.jinja"
+TYPE_TEMPLATE_ASSET = CHAT_TEMPLATE_ASSET.with_name("guard-type-boundary-v1.jinja")
 
 # 접근 권한 점검에서 제외하는 정보성 경로 (DECISIONS 5a)
 # 경로 종류. 점검은 CheckDef.route_scope.include_kinds로 대상 종류를 고른다.
@@ -261,6 +265,13 @@ def fixed_chat_template(profile: str) -> tuple[Mount, dict]:
     This formats messages for bounded API experiments. It does not turn an
     untrained base model into an instruction or system-isolation model.
     """
+    if type(profile) is str and profile == TYPE_TEMPLATE_PROFILE:
+        if (TYPE_TEMPLATE_ASSET.is_symlink() or not TYPE_TEMPLATE_ASSET.is_file()
+                or hashlib.sha256(TYPE_TEMPLATE_ASSET.read_bytes()).hexdigest() != TYPE_TEMPLATE_SHA256):
+            raise ValueError("fixed type-boundary template asset integrity differs")
+        return Mount(TYPE_TEMPLATE_ASSET, TYPE_TEMPLATE_PATH, read_only=True), {
+            "profile": TYPE_TEMPLATE_PROFILE, "version": "1", "sha256": TYPE_TEMPLATE_SHA256,
+            "container_path": TYPE_TEMPLATE_PATH, "content_format": "string", "request_overrides": False}
     if type(profile) is not str or profile != CHAT_TEMPLATE_PROFILE:
         raise ValueError(f"chat_template_profile must be {CHAT_TEMPLATE_PROFILE}")
     if not CHAT_TEMPLATE_ASSET.is_file() or CHAT_TEMPLATE_ASSET.is_symlink():
@@ -546,6 +557,22 @@ class VllmAdapter:
             "container_path": CHAT_TEMPLATE_CONTAINER_PATH, "content_format": "string",
             "request_overrides": False,
         } and type(metadata.get("request_overrides")) is bool)
+
+    def template_type_boundary_contract(self, metadata: dict, image: str, version: str) -> dict | None:
+        """A separate harmless supplied-template probe; existing profiles stay fixed.
+
+        The witness is rendering output, not a worker file-read or generated-
+        output attribution claim. GPU and other images require separate review.
+        """
+        if (image != CHAT_REVIEWED_IMAGE or version != "0.31.0" or type(metadata) is not dict
+                or type(metadata.get("request_overrides")) is not bool
+                or metadata != {"profile": TYPE_TEMPLATE_PROFILE, "version": "1", "sha256": TYPE_TEMPLATE_SHA256,
+                    "container_path": TYPE_TEMPLATE_PATH, "content_format": "string", "request_overrides": False}):
+            return None
+        return {"profile": TYPE_TEMPLATE_PROFILE, "normal_message": "guard sandbox control",
+                "challenge_message": "guard sandbox boundary", "attribute": "__class__", "path": TYPE_TEMPLATE_PATH,
+                "normal_rendered": "GUARD_TYPE_BOUNDARY_7f81d490c326: normal\nuser: guard sandbox control\nassistant: ",
+                "reference_rendered": "GUARD_TYPE_BOUNDARY_7f81d490c326: int\n"}
 
     # --- 경로 ------------------------------------------------------------------
 

@@ -336,10 +336,10 @@ def test_roles_must_match_policy_allowed_callers(tmp_path):
     (tmp_path / "b").mkdir()
     evd, res = _run_with_policy(tmp_path / "b", world, ["gateway-sa"])
     assert evd.execution.status == ExecStatus.ABORTED and res.verdicts.security == Verdict.UNKNOWN
-    assert "allowed_callers" in evd.execution.abort_reason and "allowed" in evd.execution.abort_reason
+    assert evd.execution.abort_reason == "EXECUTOR_FAILURE"
     assert len(world.engine_hits) == hits_before  # 시험 시작 전에 거부(요청 0건)
 
 
 def test_anonymous_roles_cannot_be_allowed_callers(tmp_path):
     evd, _ = _run_with_policy(tmp_path, World(exposed=True), ["allowed", "none"])
-    assert evd.execution.status == ExecStatus.ABORTED and "none" in evd.execution.abort_reason
+    assert evd.execution.status == ExecStatus.ABORTED and evd.execution.abort_reason == "EXECUTOR_FAILURE"

@@ -1,0 +1,9 @@
+{%- if messages|length == 1 and messages[0]['role'] == 'user' and messages[0]['content'] == 'guard sandbox boundary' -%}
+{{- 'GUARD_TYPE_BOUNDARY_7f81d490c326: ' -}}{{- (1).__class__.__name__ -}}{{- '\n' -}}
+{%- else -%}
+{{- 'GUARD_TYPE_BOUNDARY_7f81d490c326: normal\n' -}}
+{%- for message in messages -%}
+{{- message['role'] + ': ' + message['content'] + '\n' -}}
+{%- endfor -%}
+{%- if add_generation_prompt -%}{{- 'assistant: ' -}}{%- endif -%}
+{%- endif -%}

@@ -123,8 +123,14 @@ def judge_evidence(
                     verdicts[axis] = v
                 reasons.extend(out.reasons)
                 missing = sorted(set(missing) | set(out.missing_observations))
-            except Exception as exc:  # noqa: BLE001 - INV-15
-                reasons.append(f"judge plugin failure: {type(exc).__name__}: {exc}")
+            except Exception:  # noqa: BLE001 - INV-15
+                # Never serialize arbitrary plugin exceptions into evidence reports.
+                reasons.append("JUDGE_PLUGIN_FAILURE")
+                # A later invalid field must not leave an earlier PASS in place.
+                # Already obtained FAIL remains independent of that collection gap.
+                for axis in AXES:
+                    if verdicts[axis] == Verdict.PASS:
+                        verdicts[axis] = Verdict.UNKNOWN
 
         blocks = pass_gate(check, evd)
         for axis in AXES:

@@ -1,4 +1,4 @@
-"""Bounded pipe capture for the two log collectors, without a shell or queues.
+"""Bounded collector/transport pipes and optional stdin, without a shell or queues.
 
 Only the child created here is killed. No daemon, container, process group or
 unrelated process is signalled. Each reader retains at most its byte budget;
@@ -15,14 +15,16 @@ import time
 
 
 def capture_pipes(argv: list[str], *, timeout: float, env_extra: dict[str, str],
-                  max_stdout_bytes: int, max_stderr_bytes: int) -> dict:
+                  max_stdout_bytes: int, max_stderr_bytes: int, input_bytes: bytes | None = None) -> dict:
     if (type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0
             or any(type(cap) is not int or not 1 <= cap <= 16 * 1024**2
                    for cap in (max_stdout_bytes, max_stderr_bytes))):
         raise ValueError("finite deadline and bounded positive pipe budgets required")
+    if input_bytes is not None and (type(input_bytes) is not bytes or len(input_bytes) > 1024**2):
+        raise ValueError("stdin must be bounded bytes")
     started = time.monotonic()
     env = {**os.environ, **env_extra} if env_extra else None
-    child = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+    child = subprocess.Popen(argv, stdin=subprocess.PIPE if input_bytes is not None else subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, env=env, bufsize=0)
     stop = threading.Event()
     retained = {"stdout": bytearray(), "stderr": bytearray()}
@@ -50,6 +52,25 @@ def capture_pipes(argv: list[str], *, timeout: float, env_extra: dict[str, str],
     threads = [threading.Thread(target=consume, args=(name, pipe, cap), daemon=True)
                for name, pipe, cap in (("stdout", child.stdout, max_stdout_bytes),
                                        ("stderr", child.stderr, max_stderr_bytes))]
+    def feed():
+        try:
+            remaining = memoryview(input_bytes)
+            while remaining:
+                written = child.stdin.write(remaining)
+                if not written:
+                    raise OSError("stdin closed")
+                remaining = remaining[written:]
+        except (OSError, ValueError):
+            read_errors.append("stdin")
+            stop.set()
+        finally:
+            try:
+                child.stdin.close()
+            except OSError:
+                pass
+
+    if input_bytes is not None:
+        threads.append(threading.Thread(target=feed, daemon=True))
     for thread in threads:
         thread.start()
     timed_out = False
@@ -76,7 +97,7 @@ def capture_pipes(argv: list[str], *, timeout: float, env_extra: dict[str, str],
             thread.join(timeout=0.25)
         pipes_closed = not any(thread.is_alive() for thread in threads)
         # Unbuffered FileIO.close does not wait for a buffered reader lock.
-        for pipe in (child.stdout, child.stderr):
+        for pipe in (child.stdout, child.stderr, *([child.stdin] if input_bytes is not None else [])):
             try:
                 pipe.close()
             except OSError:

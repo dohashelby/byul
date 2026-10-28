@@ -15,13 +15,16 @@ import secrets
 import time
 
 from guard.automation_policy import validate_request_binding_policy
+from guard.models import canonical_json, sha256_hex
 from guard.runtime.docker import Docker
-from .content_common import append_artifact, content_request, json_body, record_content, sample_artifact
+from .content_common import append_artifact, content_request, json_body, sample_artifact
 from .engine_identity import owned_template_snapshot
 from .http_common import HttpCheckExecutor
+from .response_projection import capture_metadata, log_metadata
 
 
 PROFILE = "request-connection-binding-v1"
+ARTIFACT_PROFILE = "request-binding-response-projection/1"
 ID_CASES = ("generated", "distinct_body", "collision_body", "collision_header")
 CASES = tuple(f"{mode}:{case}" for mode in ("json", "sse") for case in ID_CASES)
 SUPPORTED_POLICY = {"result_binding": "originating_connection",
@@ -38,6 +41,28 @@ def _ids(value, maximum=128, *, empty=False):
 def rendered_text(text):
     """The fixed fixture's exact bytes; never execute arbitrary Jinja."""
     return "user: " + text + "\nassistant: "
+
+
+def _analysis_projection(value):
+    """Storage only: keep the complete analyzer result transient and unchanged."""
+    result = {key: value[key] for key in ("verified", "gaps", "violations", "output_tokens",
+                                         "finish_signals", "terminal_signals") if key in value}
+    for key in ("api_ids", "consumer_ids", "consumer_texts"):
+        if key in value:
+            result[key + "_sha256"] = sha256_hex(canonical_json(value[key]))
+    return result
+
+
+def _timing_projection(value):
+    """Serialize existing measurements only; never change collection/overlap math."""
+    connection = value.get("connection_id")
+    result = {"id": value["id"], "connection_id_sha256": sha256_hex(canonical_json(connection))
+              if type(connection) is str else None}
+    for key in ("dispatch_ms", "request_sent_ms", "headers_ms", "end_ms"):
+        item = value.get(key)
+        result[key] = item if (type(item) in (int, float) and 0 <= item <= 86_400_000
+                               and math.isfinite(item)) else None
+    return result
 
 
 def analyze_response(response, *, expected, foreign, model, max_output, api_id=None, mode="json"):
@@ -192,7 +217,7 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
 
 class RequestBindingExecutor(HttpCheckExecutor):
     name = "request_binding"
-    version = "0.2.0"
+    version = "0.3.0"
     requires_roles = False
     requires_route_scope = False
 
@@ -288,12 +313,20 @@ class RequestBindingExecutor(HttpCheckExecutor):
                     raise ValueError("unrelated or duplicate collector response labels")
                 by_id = {result["id"]: result for result in results}
                 results = [by_id[request["id"]] for request in requests]
-            except Exception as exc:
-                results = [{"id": request["id"], "outcome": "probe_error", "detail": type(exc).__name__}
+            except Exception:
+                results = [{"id": request["id"], "outcome": "probe_error", "detail": "BINDING_PROBE_UNAVAILABLE"}
                            for request in requests]
-            for request, response in zip(requests, results):
-                record_content(ctx, "trusted", "request-binding", request["id"], response)
-                samples.append({"request": request, "response": response})
+            for index, (request, response) in enumerate(zip(requests, results)):
+                outcome = response.get("outcome")
+                if not (type(outcome) is int and 100 <= outcome <= 599
+                        or type(outcome) is str and outcome in {
+                            "refused", "timeout", "unreachable", "dns_error", "error", "probe_error"}):
+                    response = {"id": request["id"], "outcome": "probe_error", "detail": "BINDING_PROBE_UNAVAILABLE"}
+                    results[index] = response
+                ctx.record("trusted", "request-binding", request["id"], "allowed", log_metadata(response))
+                samples.append({"case": request["id"], "request_fixture_sha256": sha256_hex(canonical_json(request["body"])),
+                                "mode": request.get("mode", "json"), "outcome": response["outcome"],
+                                "capture": capture_metadata(response)})
             return results
 
         for side in texts:
@@ -373,10 +406,8 @@ class RequestBindingExecutor(HttpCheckExecutor):
                 if verified:
                     cases_verified.append(case_key)
                 pair_observations.append({"case": case_key, "overlap": overlap, "distinct_connections": connections,
-                    "verified": verified, "responses": analyses,
-                    "timings": [{key: result.get(key) for key in
-                                 ("id", "connection_id", "dispatch_ms", "request_sent_ms", "headers_ms", "end_ms")}
-                                for result in results]})
+                    "verified": verified, "responses": [_analysis_projection(item) for item in analyses],
+                    "timings": [_timing_projection(result) for result in results]})
             request, rid = inference("A", "after", "json")
             results = send([request], stream=True)
             controls["after"] = "pass" if results and analyze(results[0], "A", "json", rid)["verified"] else "no_response"
@@ -408,14 +439,17 @@ class RequestBindingExecutor(HttpCheckExecutor):
             "normal_controls": normal_ok, "functional_probes_planned": ["before", "after"],
             "functional_probe_results": controls}
         observations = {key: {"value": value, "collected": True} for key, value in obs_values.items()}
-        summary = {"profile": PROFILE, "requests_sent": sent, "settings": settings,
+        summary = {"profile": PROFILE, "artifact_profile": ARTIFACT_PROFILE,
+            "requests_sent": sent, "settings": settings,
             "verification_scope": {"input_projection_verified": input_projection_verified,
                 "output_binding_verified": False, "output_binding_gap": output_binding_gap,
                 "cases_verified_meaning": "input projection, connection overlap and response framing only",
                 "collection_complete_meaning": "bounded collector protocol complete; not generated-output ownership proof"},
             "source_contract": contract, "gaps": sorted(set(gaps)), "violations": sorted(set(violations)),
             "template_identity_before": before, "template_identity_after": after,
-            "pairs": pair_observations, "fixtures": expected,
+            "pairs": pair_observations,
+            "fixtures": {side: {key + "_sha256": sha256_hex(canonical_json(value)) for key, value in fixture.items()}
+                         for side, fixture in expected.items()},
             "fixture": {"profile": PROFILE, "settings": settings, "case_order": list(CASES),
                         "body_shape": {"user": "per-run synthetic A/B text", "output": settings["max_output_tokens"]}},
             "elapsed_seconds": time.monotonic() - started,
@@ -427,7 +461,8 @@ class RequestBindingExecutor(HttpCheckExecutor):
                 "Enterprise principals, gateway authorization, child IDs, randomization modes, cancellation, retries and stored results remain untested.",
                 "Generated prose is never an attribution oracle. Token IDs and rendered prompts are returned consumer-side projections.",
                 "Timeouts bound each dispatch batch and the shared deadline; Docker inspection and cleanup have their own bounds."]}
-        sample_artifact(ctx, "request_binding_samples.json", {"samples": samples, "summary": summary})
-        return observations, {"attempted": "before" in {sample["request"]["id"] for sample in samples},
+        sample_artifact(ctx, "request_binding_samples.json", {"artifact_profile": ARTIFACT_PROFILE,
+                                                            "samples": samples, "summary": summary})
+        return observations, {"attempted": "before" in {sample["case"] for sample in samples},
             "succeeded": normal_ok, "detail": "before/after fixed chat inference with exact consumer IDs and rendered input"}, [
                 {"step": step, "attempted": case in cases_attempted} for step, case in zip(ctx.check.challenge_steps, CASES)], summary

@@ -84,3 +84,18 @@ build_tok_params를 거친 재사용 token의 left/right 2-token 절단을 확�
 REQ-07은 실제 ChatCompletionRequest.build_chat_params/build_tok_params를 거친
 kwargs suffix 15/16-token 대조를 추가한다. 이 설정은 명시한 작은 시험 입력이며
 기업의 재사용 token 허용·절단/override 승인 정책을 대신하지 않는다.
+
+## 실제 OnlineRenderer core 검증 확장
+
+`--suite online`은 실제 OnlineRenderer.render_chat→preprocess_chat→renderer와
+InputProcessor 경로를 실행한다. 기존 PR46의 입력 기능 검증 공백이므로 같은 PR에
+추가한다. request의 kv_transfer_params.prompt_token_ids 재사용을 정상/빈 list/bool/
+음수/OOV/길이 초과로 비교하고 echo 시 재사용 키 제거·일반 렌더 경로를 확인한다.
+실제 template 허용 gate와 trusted kwargs 길이, 기본 MM kwargs/code_revision 거부도
+확인한다. opt-in의 text-only 수용은 실제 MM processor/코드 판본 소비를 의미하지 않는다.
+
+Typed ErrorResponse의 native code400/422를 관측한 경우에만 해당 core의 반환 거부로
+분류한다. 문자열 오류 본문은 저장하지 않는다. VLLMValidationError와 예상 밖 실행
+오류는 구분하고 함수 진입·최종 admission 해시·재사용 키 제거 여부만 기록한다.
+원문 수정·mock renderer/engine 없이 실제 생성자를 사용한다. 이것은 공개 HTTP routing,
+engine-aware model/identity 검사 또는 최종 worker 소비의 증명이 아니다.

@@ -68,3 +68,30 @@ v2-cpu-attempt-1.json/2.json, v2-pin-memory-check.json.
 생성 fixture 설정의 DECLARED와 실제 참조 코드 실행 결과를 구분한다.
 공식 AST 시험은 원문 assertion/parametrize를 유지했지만 실제 fixture로 setup을
 바꾼 이식이며 원문 전체 suite·실제 엔진 시험과 구분한다.
+
+## 후속: 실제 OnlineRenderer core 요청 gate
+
+같은 입력 기능의 미완료 CPU 지점을 찾아 PR46에 모았다. `--suite online`의 16사례와
+후속 정상16건을 실제 OnlineRenderer.render_chat/preprocess_chat 및 InputProcessor로
+실행했다(도구4.34초). 전용/기존 직접 회귀128 passed, pytest1.13초/부모1.27초.
+
+재사용 ID의 정상/빈 list/bool/음수/OOV/길이 초과를 대조하고, echo일 때 전달 ID를
+무시해 일반 메시지로 렌더한 뒤 admission되는 것을 확인했다. 실제 request와 sampling
+metadata에서 재사용 ID 키가 제거됐으며 저장본에는 해시/길이/유무만 남겼다.
+trust_request_chat_template=false의 직접/nested override는 native typed ErrorResponse
+code400으로 거부됐고 preprocess에 진입하지 않았다. 허용한 template/kwargs 길이
+15/16 경계도 확인했다. 기본 trust_request_mm_kwargs=false에서 code_revision과
+media kwargs는 실제 guard에서 거부됐다. opt-in의 text-only 수용은 별도 관측이며
+실제 멀티모달 processor·코드 판본·승인 대응은 미확인이다.
+
+최초 online 수집기는 SamplingParams에 없는 직접 kv_transfer_params 속성을 읽어
+normal/후속 metadata 수집에서 execution_error가 났다. 원문 소스의 실제 표현
+extra_args.kv_transfer_params로 수정하고 새 snapshot으로 16사례/후속을 재실행했다.
+초기 native 거부와 실패 증거는 online-run-1에 보존하며 통과로 소급하지 않는다.
+도구는 사례/후속 execution_error를 completed_with_case_errors로 구분하고 성공으로
+종료하지 않도록 했다. 이 값은 standalone 도구 진단이며 공용 ExecStatus가 아니다.
+
+증거: online-run-2/result.json, online-contracts-2.txt, online-snapshot-2.json,
+online-attempt-1-diagnosis.json. HTTP listener·engine-aware model/identity 검사·실제
+worker/모델 제출은 실행하지 않았다. API/설치판의 신원·승인·최종 소비 공백은 유지한다.
+기존 69사례와 이번16사례는 서로 다른 CPU 분기이며 전체 CHK 완료로 합산하지 않는다.

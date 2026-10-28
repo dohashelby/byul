@@ -44,7 +44,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--source-root', type=Path, required=True)
     parser.add_argument('--workdir', type=Path, required=True)
-    parser.add_argument('--suite', choices=('input', 'sampling', 'embeddings'), default='input')
+    parser.add_argument('--suite', choices=('input', 'sampling', 'embeddings', 'online'), default='input')
     args = parser.parse_args()
     root = args.source_root.resolve()
     if subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip() != SOURCE_COMMIT:
@@ -106,7 +106,7 @@ def main():
                 processor.renderer.tokenizer, (VLLMValidationError, ValidationError), tracked)
             observations = {'REQ-10': sampling_cpu.project(rows)}
             record['sampling_fixture_caps'] = {'origin': 'DECLARED', 'n': 4, 'stop_strings': 4, 'tokenized_bad_words': 4}
-        else:
+        elif args.suite == 'embeddings':
             import base64
             import io
             from guard.executors import embedding_cpu
@@ -123,10 +123,25 @@ def main():
             rows = embedding_cpu.run_reference(safe_load_prompt_embeds, processor.model_config, disabled,
                                               make_payload, VLLMValidationError, tracked)
             observations = {'REQ-09': embedding_cpu.project(rows)}
+        else:
+            from guard.executors import online_input_cpu
+            from vllm.renderers.online_renderer import OnlineRenderer, _reused_prompt_token_ids
+            from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+            from vllm.entrypoints.serve.engine.protocol import ErrorResponse
+            from vllm.entrypoints.generate.base.protocol import validate_request_mm_kwargs
+            tracked += [('online_render_chat', OnlineRenderer.render_chat),
+                        ('online_preprocess_chat', OnlineRenderer.preprocess_chat),
+                        ('reuse_input_gate', _reused_prompt_token_ids),
+                        ('template_gate', OnlineRenderer.validate_chat_template),
+                        ('mm_kwargs_gate', validate_request_mm_kwargs)]
+            rows = online_input_cpu.run_reference(processor, OnlineRenderer, ChatCompletionRequest,
+                                                 ErrorResponse, VLLMValidationError, tracked)
+            observations = online_input_cpu.project(rows)
         record['observed_source_file_bytes_sha256'] = {
             str(Path(sys.modules[fn.__module__].__file__).resolve().relative_to(root)): hashlib.sha256(Path(sys.modules[fn.__module__].__file__).read_bytes()).hexdigest()
             for _, fn in tracked if Path(sys.modules[fn.__module__].__file__).resolve().is_relative_to(root)}
-        record.update(status='completed', results=rows, observations_by_check=observations,
+        case_errors = any(r.get('outcome') == 'execution_error' or r.get('after', {}).get('outcome') == 'execution_error' for r in rows)
+        record.update(status='completed_with_case_errors' if case_errors else 'completed', results=rows, observations_by_check=observations,
                       fixture_config={'origin': 'DECLARED', 'vocab_size': 32, 'max_model_len': 16, 'hidden_size': 4},
                       source_file_bytes_sha256=hashlib.sha256(source_file.read_bytes()).hexdigest(),
                       dependencies={k: importlib.metadata.version(k) for k in ('torch', 'transformers', 'tokenizers', 'pydantic')})

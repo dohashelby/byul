@@ -10,7 +10,10 @@ from guard.executors.credential_candidates import (MAX_OUTPUT_BYTES, METADATA_PR
 from guard.executors.credential_exposure import CredentialExposureExecutor, ENV_CMD
 from guard.models.checkdef import FunctionalProbe, ObsSpec
 from guard.runtime.docker import CmdResult
-from tests.builders import baseline_pack, completion_response
+from tests.builders import baseline_pack, completion_response, environment
+
+IMAGE = "example.invalid/engine@sha256:" + "a" * 64
+RUN = "EXAMPLE-credential-owner"
 
 
 class FakeDocker:
@@ -22,16 +25,19 @@ class FakeDocker:
         self.process_names, self.subject_matches = process_names, subject_matches
         self.source_changed, self.inspections = source_changed, 0
         self.requests = []
+        self.exec_targets = []
         self.payload_changes = {}
         self.capture_changes = {}
 
     def inspect_json(self, container, *, timeout):
         self.inspections += 1
-        return {"Id": "other" if self.source_changed and self.inspections > 1 else "engine-id",
-                "Image": "sha256:EXAMPLE-IMAGE", "State": {"Running": True, "StartedAt": "EXAMPLE-T0"},
+        return {"Id": "b" * 64 if self.source_changed and self.requests else "a" * 64,
+                "Name": "/engine", "Config": {"Image": IMAGE, "Labels": {"guard.run": RUN}},
+                "Image": "sha256:" + "b" * 64, "State": {"Running": True, "StartedAt": "EXAMPLE-T0"},
                 "Mounts": deepcopy(self.mounts)}
 
     def exec(self, container, argv, *, timeout):
+        self.exec_targets.append(container)
         assert argv == ["sh", "-c", ENV_CMD]
         if self.environment_error:
             raise RuntimeError("EXAMPLE private environment reader detail")
@@ -39,6 +45,7 @@ class FakeDocker:
                          + "GUARD_READ_OK\n", "")
 
     def exec_bounded(self, container, argv, *, timeout, max_bytes):
+        self.exec_targets.append(container)
         assert argv[:3] == ["python3", "-c", METADATA_PROBE]
         assert timeout == PROBE_TIMEOUT and max_bytes == MAX_OUTPUT_BYTES
         paths = json.loads(argv[3])
@@ -75,9 +82,11 @@ def context(values, *, legacy=False, functional_error=False):
             raise RuntimeError("EXAMPLE private functional reader detail")
         return [completion_response(request) for request in requests]
 
+    env = environment(engine={"name": "engine-x", "version": "1.0.0", "image_digest": IMAGE}, model={"id": "test"})
     return SimpleNamespace(check=check, policy_values={"forbidden_env_names": ["FORBIDDEN_CANARY"],
-        "forbidden_mount_paths": [], **values}, target={"engine": {"container": "engine"}},
-        env=SimpleNamespace(model=SimpleNamespace(id="test")), request=request,
+        "forbidden_mount_paths": [], **values}, target={"engine": {"container": "engine"},
+        "run_id": RUN, "environment_ref": env.ref().model_dump(mode="json")},
+        env=env, request=request,
         engine_url="http://engine:8000", keys={}, trusted_net="trusted", timeout=3, cprobe=functional)
 
 
@@ -111,7 +120,7 @@ def test_missing_candidate_policy_is_unknown_and_explicit_empty_does_not_probe()
     assert detail["candidate_request"] == "explicit_empty"
     assert detail["candidate_configured"] is True
     assert missing.requests == empty.requests == []
-    assert missing.inspections == empty.inspections == 1
+    assert missing.inspections == empty.inspections == 7
 
 
 @pytest.mark.parametrize("state, complete", [("absent", True), ("denied", True),
@@ -174,7 +183,12 @@ def test_saved_definition_keeps_legacy_exposure_observation_and_makes_no_candida
 def test_known_environment_violation_survives_missing_mount_inventory():
     class MissingMounts(FakeDocker):
         def inspect_json(self, container, *, timeout):
-            raise RuntimeError("EXAMPLE private inspect detail")
+            row = super().inspect_json(container, timeout=timeout)
+            # Fail the inventory source, after the initial owner check. The
+            # environment interval still has its own verified owner checks.
+            if self.inspections == 2:
+                raise RuntimeError("EXAMPLE private inspect detail")
+            return row
     observations, _, _, detail = collect(MissingMounts(process_names=["FORBIDDEN_CANARY"]),
                                           {"credential_candidate_paths": ["/credentials/key"]})
     assert observations["forbidden_mount_violations"] == {"value": None, "collected": False}
@@ -257,8 +271,10 @@ def test_partial_mount_product_storage_report_and_exact_ref_replay(tmp_path, mon
     from guard.store.packs import get_pack, put_pack
     from tests.builders import PACK_DIR, environment, policy
 
+    env = environment(engine={"name": "engine-x", "version": "1.0.0", "image_digest": IMAGE}, model={"id": "test"})
     target = tmp_path / "target.json"
     target.write_text(json.dumps({"lab": True, "probe_image": "EXAMPLE-unused",
+        "run_id": RUN, "environment_ref": env.ref().model_dump(mode="json"),
         "engine": {"container": "engine", "trusted_url": "http://engine:8000", "ready_timeout": 1},
         "origins": {"trusted": {"network": "trusted"}}, "gateway": {"url": "http://gateway:8080"}}))
     docker = FakeDocker(mounts=[{"Type": "bind", "Destination": "/credentials"}, None],
@@ -276,7 +292,6 @@ def test_partial_mount_product_storage_report_and_exact_ref_replay(tmp_path, mon
             return original_open(path, *args, **kwargs)
         monkeypatch.setattr(Path, "open", open_path)
     store, pack = Store(tmp_path / "store"), baseline_pack()
-    env = environment(model={"id": "test"})
     values = {"forbidden_env_names": [], "forbidden_mount_paths": ["/credentials"],
               "credential_candidate_paths": ["/credentials/key"]}
     pol = policy(pack.ref(), scope={"include": ["PLT-04"], "exclude": []}, values={"PLT-04": values})
@@ -286,7 +301,7 @@ def test_partial_mount_product_storage_report_and_exact_ref_replay(tmp_path, mon
     assert evd.execution.status == (ExecStatus.ABORTED if artifact_failure else ExecStatus.COMPLETED)
     assert evd.data_origin.value == "EXAMPLE" and result.verdicts.security == Verdict.FAIL
     assert evd.observations["forbidden_mount_violations"].value == ["/credentials"]
-    assert evd.execution.executor.version == "0.4.2"
+    assert evd.execution.executor.version == "0.5.1"
     assert "EXAMPLE_PRIVATE_ARTIFACT_CANARY" not in canonical_json(evd.to_dict()).decode()
     assert bool(evd.artifacts) is not artifact_failure
     report = build_report(store, pack, plan, as_of=env.created_at)

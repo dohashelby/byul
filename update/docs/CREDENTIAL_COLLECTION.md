@@ -1,6 +1,6 @@
 # 자격·마운트 수집의 부분 실패
 
-`credential_exposure/0.4.2`는 기존 PLT-04의 `forbidden_mount_violations`
+`credential_exposure/0.5.1`는 기존 PLT-04의 `forbidden_mount_violations`
 관측과 판정 계약을 사용한다. 유효한 bind/volume 목적지와 명시 금지 경로의
 포함 관계가 확인되면, 다른 마운트 행의 형식 오류 때문에 이 위반을 버리지 않는다.
 부분 목록에 위반이 없으면 빈 안전 목록으로 기록하지 않고 미수집으로 남긴다.
@@ -15,6 +15,40 @@
 `no_response`다. 예외 원문은 기록하지 않는다. 후속 첨부 저장 실패에서도 기존
 공통 증거 경계가 보존한 관측과 독립 FAIL을 유지한다.
 
+## 현재 엔진 소스의 신원과 세대
+
+현행 `forbidden_mount_violations` 흐름은 [A-1의 공통 계약](A1_TARGET_BINDING.md)의
+`engine_identity`를 소비한다. seal이 유효한 ENV와 정확히 일치하는 target의
+`environment_ref`, 명시적인 `run_id`, `engine.container`, ENV의 pin 이미지가
+필요하다. 이전 target의 누락값을 현재 ENV에서 자동으로 채우지 않는다.
+처음부터 입력이 다르거나 실제 Config.Image·guard.run·컨테이너 신원이 맞지
+않으면 고정 오류 `CREDENTIAL_TARGET_UNVERIFIED`로 수집을 중단한다.
+안정된 잘못된 instance의 metadata를 자격 부재나 접근 거부로 채택하지 않는다.
+
+최초 검증한 owner tuple을 한 세대의 기준으로 두고 마운트·프로세스 환경·자격
+후보·정상 대조 구간마다 전후 신원을 대조한다. 마운트 목록 자체의 신원도 같은
+tuple과 일치해야 한다. 뒤 구간에서 restart·container replacement·image ID
+변화를 발견하면 해당 구간의 이름/후보/정상 응답을 채택하지 않는다. 앞서 별도
+구간에서 결합된 마운트 위반과 환경변수 이름은 지우지 않는다. 완전하지 않은
+마운트 목록의 유효한 금지 행을 보존하는 기존 계약도 유지한다.
+
+마운트 snapshot과 프로세스·후보 reader는 최초 검증한 불변 container ID로
+호출한다. 관측 사이에 이름이 잠시 다른 컨테이너로 재지정됐다 돌아와도 다른
+세대의 metadata를 읽지 않도록 한다. 전후 target 이름/소유 신원 대조도 유지한다.
+
+첨부의 `source_binding`은 `docker-engine-source-intervals/1`, 정확 ENV Ref,
+최초 owner tuple의 SHA-256, 구간별 신원 확인 여부만 기록한다. inspect 전체,
+Config.Env·StartedAt 원문·자격 내용·예외 원문은 저장하지 않는다. 입력 검증
+실패·관측 누락과 단순 빈 안전 목록을 구분하며 기업 정책·CheckDef·판정·PACK31은
+변경하지 않는다. CPU fixture는 명시적인 EXAMPLE ENV/pin/run으로 만들고,
+나중 inventory 오류는 최초 신원 확인 뒤 해당 관측 구간에 주입한다.
+
+저장된 EVD/RES/RPT·정확 Ref와 과거 정의의 `exposed_credential_paths` 경로는
+기존 의미를 유지한다. 새 신원 계약은 현행 분리 관측 경로의 live 수집에 적용하며,
+과거 증거에 소급해 신원 확인을 덧붙이지 않는다. Kubernetes의 credential 수집
+확장·실제 worker 귀속·자격 사용·생산자 인증·실제 파일/tensor 소비·전 구간
+무누락을 입증하지 않으며 PLT-04 전체 완료를 의미하지 않는다.
+
 이는 기존 제한 분기의 결함 보수다. 새 실행기·정책·팩·등록을 추가하지 않는다.
 마운트 금지 위반은 실제 자격 파일의 존재·내용·접근·서비스 사용 증명이 아니다.
 과거 저장 정의의 `exposed_credential_paths` 경로는 변경하지 않는다.
@@ -26,5 +60,6 @@
 마지막 항목을 택해 부재·접근 가능·주체 일치를 확정하지 않는다. 이런 패킷 오류도
 독립적으로 확보한 금지 마운트·환경변수 이름 위반을 지우지 않는다.
 
-정상 패킷과 기존 schema/profile·후보 상태의 의미는 그대로다. 실행기 버전을
-0.4.2로 기록하여 이 수집 경계가 달라졌음을 구분하며 과거 EVD를 고치지 않는다.
+정상 패킷과 기존 schema/profile·후보 상태의 의미는 그대로다. 중복 키 보수는
+0.4.2에서 도입됐으며 0.5.1은 위 신원·구간 계약의 소비와 불변 ID 호출을 추가한다. 과거 EVD는
+고치지 않는다.

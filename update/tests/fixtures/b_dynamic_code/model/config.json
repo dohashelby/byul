@@ -1,0 +1,1 @@
+{"model_type":"byul_cpu_probe_dynamic","architectures":["B1ProbeForCausalLM"],"auto_map":{"AutoConfig":"configuration_b1_probe.B1ProbeConfig"},"vocab_size":32,"hidden_size":4,"num_attention_heads":1,"num_hidden_layers":1,"max_position_embeddings":16}

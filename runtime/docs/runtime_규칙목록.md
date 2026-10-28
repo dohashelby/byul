@@ -29,6 +29,7 @@
 | `MAX_TOKENS_EXCEEDED` | `output_max_tokens` | Gateway / `gateway` | 요청 출력 토큰 수가 정책 상한을 넘는다. | `DENIED`·미전달 → `denied` | §4.10 | update 담당 확인 필요 |
 | `CONTEXT_LIMIT_EXCEEDED` | `max_context_tokens` | Gateway / `gateway` | 입력 토큰과 출력 요청 합이 context 상한을 넘는다. | `DENIED`·미전달 → `denied` | §4.10 | update 담당 확인 필요 |
 | `CONTEXT_CHECK_UNAVAILABLE` | 없음 | Gateway / `gateway` | backend token count를 얻거나 검증할 수 없다. `/tokenize` HTTP 실패면 endpoint와 상태만 요청 context와 오류 메시지에 남기고 본문은 저장하지 않는다. | `ERROR` → `error` | §4.10, §7.3 | update 담당 확인 필요 |
+| `CACHE_ISOLATION_UNAVAILABLE` | `cache_isolation` | Gateway / `gateway` | 정책이 `per_principal`인데 인증이 미구성·오류이거나, HMAC 키가 없거나 32바이트 미만·유효하지 않거나, backend가 vLLM이 아니어서 사용자별 prefix cache 분리를 적용할 수 없다. 상태 API의 `unavailable_reason_code`로 원인 범주만 구분하며 키·salt 값은 남기지 않는다. | `ERROR` → `error` | §4.10, §7.3 | update 담당 확인 필요 |
 | `CONCURRENCY_LIMIT` | `max_concurrent_requests` | Gateway / `gateway` | 동시 요청 slot 상한에 도달했다. | `DENIED`·미전달 → `denied` | §4.2, §7.1 | update 담당 확인 필요 |
 | `CONNECTION_LIMIT` | `max_connections` | Gateway / `gateway` | 동시 client 연결 상한에 도달했다. | `ERROR` → `error` | §4.2, §7.1 | update 담당 확인 필요 |
 | `UNSUPPORTED_TRANSFER_ENCODING` | 없음 | Gateway / `gateway` | 요청의 `Transfer-Encoding`을 지원하지 않는다. | `INVALID` → `invalid` | §4.2, §4.10 | update 담당 확인 필요 |

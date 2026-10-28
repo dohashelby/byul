@@ -6,7 +6,7 @@ import copy
 from pathlib import Path
 import threading
 import time
-from typing import Any
+from typing import Any, Mapping
 from uuid import uuid4
 
 from serving_runtime.enforcement.events import ObservationQuery
@@ -14,6 +14,7 @@ from serving_runtime.enforcement.intent import load_intent
 
 from .assets import check as check_assets, load_manifest as load_asset_manifest
 from .backend import BackendConfig, load_backend_config
+from .cache_isolation import CacheSaltKey, isolation_status
 from .collectors import (
     Collector,
     CollectorManager,
@@ -69,6 +70,7 @@ class GatewayApp:
         engine_address: tuple[str, int] | None = None,
         backend_config: BackendConfig | None = None,
         approval_verifier: ApprovalVerifier | None = None,
+        cache_salt_environ: Mapping[str, str] | None = None,
     ) -> None:
         if config.host != "127.0.0.1":
             raise ValueError("the MVP gateway must bind to 127.0.0.1")
@@ -130,6 +132,7 @@ class GatewayApp:
                 config.policy_approvals_path
             )
         self.auth_state = load_auth(config.auth_config_path)
+        self._cache_salt_key = CacheSaltKey.from_environ(cache_salt_environ)
         self._baseline = load_declaration(config.baseline_path, kind="baseline")
         self._manifest = load_declaration(config.manifest_path, kind="manifest")
         self._policy_history = PolicyHistory(
@@ -188,6 +191,7 @@ class GatewayApp:
             lambda: self.auth_state,
             self._target_hold,
             approval_result=self._approval_result,
+            cache_salt_key=self._cache_salt_key,
         )
 
         self._server: LimitedThreadingHTTPServer | None = None
@@ -437,6 +441,14 @@ class GatewayApp:
             )),
         }
 
+    def _cache_isolation_status(self, policy: Any) -> dict[str, Any]:
+        return isolation_status(
+            policy.cache_isolation if policy is not None else None,
+            self.auth_state,
+            self.backend.kind,
+            self._cache_salt_key,
+        )
+
     def _target_hold(self, policy_target_id: str | None) -> tuple[str, str] | None:
         # Without a registration there is nothing to compare; skip collector reads.
         if self._target.registration.state == "not_configured":
@@ -471,6 +483,7 @@ class GatewayApp:
             "valid_until": policy.valid_until if policy else None,
             "approval_ref": policy.approval_ref if policy else None,
             **self._profile_status(policy),
+            "cache_isolation": self._cache_isolation_status(policy),
             "error_code": self.policy_state.error_code,
             "error_message": self.policy_state.error_message,
         }
@@ -525,6 +538,7 @@ class GatewayApp:
         collectors = self.collectors_status()
         revalidation = self.revalidation_status()
         target = self.target_status()
+        cache_isolation = self._cache_isolation_status(policy)
         return {
             "status": (
                 "ok"
@@ -536,6 +550,7 @@ class GatewayApp:
                 and revalidation["storage"]["ok"]
                 and self.auth_state.state != "error"
                 and target["gateway_hold"] is None
+                and cache_isolation["ready"]
                 else "degraded"
             ),
             "auth": self.auth_state.status(),
@@ -554,6 +569,7 @@ class GatewayApp:
                 else f"external_{self.backend.kind}_backend"
             ),
             "backend_kind": self.backend.kind,
+            "cache_isolation": cache_isolation,
             "observation_session_id": self.observation_session_id,
             "environment": self.config.environment,
             "run_id": self.config.run_id,
@@ -568,6 +584,7 @@ class GatewayApp:
                 "sha256": self.policy_state.sha256,
                 "loaded_at": self.policy_state.loaded_at,
                 **self._profile_status(policy),
+                "cache_isolation": cache_isolation,
                 "error_code": self.policy_state.error_code,
                 "error_message": self.policy_state.error_message,
                 "loaded": policy_runtime["loaded"],

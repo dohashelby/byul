@@ -1,6 +1,6 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-10-26
+최종 갱신: 2026-10-28
 
 ## 현재 단계
 
@@ -206,3 +206,12 @@
 - 2026-10-27 사용자 요청으로 문서를 정리했다(**Claude 작성, Codex 교차 검수 전**). 667줄 README 전체를 `docs/상세_안내.md`로 옮기고(내용 유지, 제목·링크만 수정) `README.md`는 현재 상태·빠른 시작·환경별 안내·문서 목록만 담은 요약으로 새로 썼다. `docs/인계_안내.md`는 기준일 10/27, byul `runtime/` 경로, platform 화면 확인 방법, §3.5 CPU vLLM v0.31.0 점검(cpu-lab), §3.8 AWS GPU lab(미실행), 기능별 확인 수준(F1·F2·F6·SP2)을 갱신했다.
 - 2026-10-27 AWS dev 시험 노트북 준비(**Claude 실행, Codex 교차 검수 전**). ① `deploy/gpu-lab/README.md`·사이드카 patch 주석을 AWS 묶음 방침(03은 engine-only 기준, runtime 사이드카·정책은 별도 통합 층, 03 재검증 때만 반출→회수→scale 0→03→재적용)으로 통일하고 "엔진 템플릿에 사이드카 추가" 요청과 회수 목록을 정리했다. ② Gateway 이미지 `serving-gateway:rt-787bcfc`(linux/amd64, UID 10000, base `python:3.12-slim@sha256:12316deb…`(2026-10-26 빌드, 임시 DOCKER_CONFIG로 자격 helper를 우회해 새로 받음·사용자 Docker 설정 미변경), image ID `sha256:1779f567…`)를 빌드해 저장소 밖 `~/.local/state/serving-runtime/aws-lab/`에 tar(SHA-256 `fcdee189…`)와 빌드 기록(`*.build.txt`)으로 저장했다. ③ 같은 폴더에 AWS용 토큰 env(0600)와 해시만 든 `auth.json`(0600, `load_auth` state ok)을 만들었다. ④ 빈칸을 임시값으로 채운 사본에서 `kubectl kustomize`(7개 객체)와 `enforce render`(10개 후보), `load_target` 통과를 확인했다. 저장소의 `REPLACE…`는 템플릿으로 유지하고(Gateway tag·base digest는 빌드마다, 엔진 digest는 서버 03의 `images.lock`, 프로파일은 dev/reference 전환마다 달라짐) 서버 사본에서 채운다. unittest 482개 통과.
 - 2026-10-28 사용자 결정으로 추가개발 후보 B를 진행해 D-09 기본 텍스트 profile을 기존 5개 필드와 정책에 선언한 bounded validate 필드로 확대했다. 정책 1.2 기본 profile은 숫자 min·max, 문자열 max_length, 배열 max_items·items 및 항목 범위를 필수화하고 object·passthrough를 거부하며, `zeroday-lab`·1.0/1.1·`max_n`·예약 필드는 유지했다. 기본 sampling 예시와 정책/경계값/엔진 미도달·기록 시험을 추가했다. Codex 샌드박스에서는 전체 unittest 494개 중 393개 통과·소켓 제한 101개 skip·실패 0개였고, Claude가 샌드박스 밖에서 `.venv/bin/python -B -m unittest discover -s tests`를 다시 실행해 494개 전부 통과(skip 0)했다. 새 시험 12개(`tests/test_mvp_default_extra_fields.py`, 소켓 HTTP 엔진 미도달 시험 포함)도 밖에서 전부 통과했다. 실제 vLLM·SGLang은 미확인이고 예시 `approval_ref`는 승인값이 아니다. 다음 작업은 후보 C 검토다. **Codex 구현·시험, Claude 검수 완료**.
+
+## 2026-10-28 사용자별 vLLM prefix cache 분리 후보 A
+
+- 사용자 결정에 따라 정책 1.2의 선택 `cache_isolation`(`off` 기본·`per_principal`)과 LAB 인증 principal별 HMAC-SHA256 `cache_salt` 자동 주입을 구현했다. 키는 `SERVING_RUNTIME_CACHE_SALT_KEY` 환경변수의 32바이트 이상 값만 사용하며 키·salt는 기록·상태·오류에 남기지 않는다. chat·completions 두 route에 Gateway 소유 필드로 마지막에 쓰고, 클라이언트 `cache_salt`는 활성 모드에서 정책 선언도 요청도 거부한다.
+- 인증 미구성, 키 없음·짧음, vLLM 아닌 backend는 본문·엔진 전달 전 503 `CACHE_ISOLATION_UNAVAILABLE`로 보류한다. 기존 정책 → 인증 → 대상 → 본문 순서에서 cache 준비 판정은 대상 뒤·본문 앞이다. `mock`은 실제 cache 분리를 제공하지 않아 지원 불가이며, kind `vllm`인 가짜 HTTP backend만 주입 통합 시험에 사용한다.
+- `/api/status`·`/api/policy`는 `cache_isolation`의 mode·ready·`unavailable_reason_code`를, 요청 기록·조회는 mode·applied만 표시한다. 예시 `examples/mvp/policy-v1.2-cache-isolation.json`의 approval_ref는 승인값이 아니다. platform 화면 코드는 변경하지 않았다.
+- 후속 작업으로 contracts와 platform API 변환을 연결하고 platform 현황에 사용자별 캐시 분리 mode·준비 상태, 요청 상세에 적용 여부를 표시했다. Claude가 샌드박스 밖에서 contracts 검사 오류 0, platform API pytest 184개·web vitest 34개 통과, typecheck 성공을 확인했다. OpenAPI 재생성에 기존 framework nullable 표현 동기화가 함께 포함됐다. **Codex 구현·시험, Claude 검수 완료**.
+- 전용 시험 `tests/test_mvp_cache_isolation.py` 10개 중 정책/HMAC 4개는 Codex 환경에서 통과했고, HTTP 소켓 통합 6개는 샌드박스 제한으로 skip됐다. 전체 unittest는 504개 중 397개 통과·소켓 제한 등 기존/신규 107개 skip·실패 0개였다. Claude가 샌드박스 밖에서 `.venv/bin/python -B -m unittest discover -s tests`를 실행해 504개 전부 통과(skip 0)했고, 새 시험 10개(HTTP 통합 6개 포함)도 전부 통과했다. Claude 검수에서 발견한 비문자열 `cache_isolation`의 예외 누출을 문자열 선검사와 배열·객체·숫자·boolean·null 회귀시험으로 수정했다. 시험 메서드 수는 그대로이며, 수정 후 Codex 재시험도 전용 10개 중 4개 통과·6개 소켓 skip, 전체 504개 중 397개 통과·107개 skip·실패 0개였다. 수정 후 Claude가 샌드박스 밖에서 다시 실행해 runtime 504개 전부 통과(skip 0)했다.
+- 미확인: 실제 vLLM prefix cache 분리와 `prefix_cache_hits` 성질, GHSA-935w·GHSA-2823 잔여 엔진 결함, SGLang 지원, 성능 비용. 다음은 Claude 검수 후 CPU vLLM에서 principal A→B와 A→A의 `vllm:prefix_cache_queries`·`vllm:prefix_cache_hits` 성질 시험이다. **Codex 구현·시험, Claude 검수 지적 반영·재검수 완료**.

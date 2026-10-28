@@ -44,6 +44,10 @@ class RequestRecords:
         self._request_local.context = None
         self._request_local.auth = None
         self._request_local.route = route
+        self._request_local.cache_isolation_applied = False
+
+    def mark_cache_isolation_applied(self) -> None:
+        self._request_local.cache_isolation_applied = True
 
     def set_auth(self, auth: dict[str, Any]) -> None:
         """Attach the authentication outcome (never the credential) to this request."""
@@ -156,6 +160,16 @@ class RequestRecords:
                     {"name": name, "mode": mode}
                     for name, mode in decision.extra_fields
                 ],
+                "cache_isolation": {
+                    "mode": policy.cache_isolation if policy else None,
+                    "applied": bool(
+                        getattr(
+                            self._request_local,
+                            "cache_isolation_applied",
+                            False,
+                        )
+                    ),
+                },
                 "context": getattr(self._request_local, "context", None),
             },
             "delivery": {

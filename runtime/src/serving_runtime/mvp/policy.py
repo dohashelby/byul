@@ -35,6 +35,7 @@ class Policy:
     profile: str = "default"
     extra_fields: tuple[ExtraFieldRule, ...] = ()
     max_n: int = 1
+    cache_isolation: str = "off"
 
     def extra_field_rule(self, name: str) -> ExtraFieldRule | None:
         return next((rule for rule in self.extra_fields if rule.name == name), None)
@@ -72,7 +73,12 @@ _V11_FIELDS = _REQUIRED_FIELDS | {
     "approval_ref",
     "max_context_tokens",
 }
-_V12_FIELDS = _V11_FIELDS | {"profile", "extra_fields", "max_n"}
+_V12_FIELDS = _V11_FIELDS | {
+    "profile",
+    "extra_fields",
+    "max_n",
+    "cache_isolation",
+}
 _SCHEMA_FIELDS = {
     "runtime-mvp/1.0": _REQUIRED_FIELDS,
     "runtime-mvp/1.1": _V11_FIELDS,
@@ -413,6 +419,7 @@ def load_policy(path: str | Path) -> PolicyState:
     profile = "default"
     extra_fields: tuple[ExtraFieldRule, ...] = ()
     max_n = 1
+    cache_isolation = "off"
     if schema_version == "runtime-mvp/1.2":
         profile = document.get("profile", "default")
         if not isinstance(profile, str) or profile not in _PROFILES:
@@ -423,9 +430,28 @@ def load_policy(path: str | Path) -> PolicyState:
                 "profile must be default or zeroday-lab",
                 digest,
             )
+        cache_isolation = document.get("cache_isolation", "off")
+        if (
+            not isinstance(cache_isolation, str)
+            or cache_isolation not in {"off", "per_principal"}
+        ):
+            return _error(
+                path_text,
+                loaded_at,
+                "INVALID_POLICY",
+                "cache_isolation must be off or per_principal",
+                digest,
+            )
         if "extra_fields" in document:
             try:
                 extra_fields = _parse_extra_fields(document["extra_fields"])
+                if cache_isolation == "per_principal" and any(
+                    rule.name == "cache_salt" for rule in extra_fields
+                ):
+                    raise ValueError(
+                        "extra_fields.cache_salt conflicts with per_principal "
+                        "cache isolation"
+                    )
                 if profile == "default":
                     _validate_default_extra_fields(extra_fields)
             except ValueError as error:
@@ -466,5 +492,6 @@ def load_policy(path: str | Path) -> PolicyState:
         profile=profile,
         extra_fields=extra_fields,
         max_n=max_n,
+        cache_isolation=cache_isolation,
     )
     return PolicyState(True, policy, path_text, digest, loaded_at, None, None, raw)

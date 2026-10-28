@@ -97,6 +97,11 @@ class QueryService:
                 if isinstance(request.get("extra_fields"), list)
                 else []
             ),
+            "cache_isolation": (
+                request.get("cache_isolation")
+                if isinstance(request.get("cache_isolation"), dict)
+                else {"mode": None, "applied": False}
+            ),
             "result": result,
             "reason_code": decision.get("reason_code"),
             "http_status": decision.get("http_status"),

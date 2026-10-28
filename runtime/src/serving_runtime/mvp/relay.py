@@ -220,6 +220,7 @@ def relay_payload(
     *,
     stream: bool,
     route: str = CHAT_ROUTE,
+    cache_salt: str | None = None,
 ) -> bytes:
     relay_document: dict[str, Any] = {}
     # Policy-approved extra fields keep the client's original value; the
@@ -241,6 +242,10 @@ def relay_payload(
     )
     if allowed.n is not None and allowed.n > 1:
         relay_document["n"] = allowed.n
+    # The client cannot supply this field in per-principal mode. Write the
+    # derived Gateway value after every client-controlled field.
+    if cache_salt is not None:
+        relay_document["cache_salt"] = cache_salt
     return json.dumps(relay_document, ensure_ascii=False).encode("utf-8")
 
 
@@ -281,6 +286,7 @@ class Relay:
         allowed: Decision,
         *,
         route: str = CHAT_ROUTE,
+        cache_salt: str | None = None,
     ) -> tuple[Decision, bytes | None]:
         path = "/v1/chat/completions" if route == CHAT_ROUTE else "/v1/completions"
         connection, request_path = self._backend.connection(
@@ -291,7 +297,12 @@ class Relay:
                 "POST",
                 request_path,
                 body=relay_payload(
-                    self._backend, document, allowed, stream=False, route=route
+                    self._backend,
+                    document,
+                    allowed,
+                    stream=False,
+                    route=route,
+                    cache_salt=cache_salt,
                 ),
                 headers=self._backend.request_headers(
                     request_id=request_id, content_type="application/json"
@@ -382,6 +393,7 @@ class Relay:
         on_response_started: Callable[[], None],
         *,
         route: str = CHAT_ROUTE,
+        cache_salt: str | None = None,
     ) -> tuple[Decision, str, bool]:
         path = "/v1/chat/completions" if route == CHAT_ROUTE else "/v1/completions"
         connection, request_path = self._backend.connection(
@@ -394,7 +406,12 @@ class Relay:
                 "POST",
                 request_path,
                 body=relay_payload(
-                    self._backend, document, allowed, stream=True, route=route
+                    self._backend,
+                    document,
+                    allowed,
+                    stream=True,
+                    route=route,
+                    cache_salt=cache_salt,
                 ),
                 headers=self._backend.request_headers(
                     request_id=request_id, content_type="application/json"

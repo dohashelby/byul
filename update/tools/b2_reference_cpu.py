@@ -67,7 +67,8 @@ def selected(root, relative, names, scope):
     exec(compile(tree, str(path), "exec"), scope)
 
 
-async def run(root):
+def reference_scope(root, logger):
+    """Small dependency adapter shared with selected upstream CPU tests."""
     import regex
     import pydantic
     from fastapi import HTTPException, Request
@@ -75,13 +76,6 @@ async def run(root):
     from starlette.responses import JSONResponse
 
     pins = verify_source(root)
-    output = io.StringIO()
-    handler = logging.StreamHandler(output)
-    logger = logging.getLogger("b2.reference")
-    logger.handlers.clear()
-    logger.setLevel(logging.DEBUG)
-    logger.addHandler(handler)
-    logger.propagate = False
     scope = {"__name__": __name__, "re": regex, "HTTPStatus": HTTPStatus, "logger": logger, "Request": Request,
              "RequestValidationError": RequestValidationError, "JSONResponse": JSONResponse,
              "HTTPException": HTTPException, "BaseModel": pydantic.BaseModel,
@@ -100,6 +94,22 @@ async def run(root):
              "_MAX_ERROR_INPUT_CHARS", "_MAX_ERROR_CHARS", "_summarize_error_input", "_format_error",
              "_is_internal_loc_segment", "clean_loc_for_param", "validation_exception_handler"], scope)
     selected(root, "vllm/entrypoints/serve/exception_handling/handlers/http.py", ["http_exception_handler"], scope)
+    return scope, pins
+
+
+async def run(root):
+    import pydantic
+
+    output = io.StringIO()
+    handler = logging.StreamHandler(output)
+    logger = logging.getLogger("b2.reference")
+    logger.handlers.clear()
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+    logger.propagate = False
+    scope, pins = reference_scope(root, logger)
+    Request, RequestValidationError = scope["Request"], scope["RequestValidationError"]
+    HTTPException = scope["HTTPException"]
     responses = []
     for stack in (False, True):
         req = Request({"type": "http", "app": SimpleNamespace(state=SimpleNamespace(
@@ -146,6 +156,17 @@ async def run(root):
         request_logger.log_inputs("B2-SYNTHETIC", MARKS["private_system"], [1], None, None, None)
         logs.append({"level": logging.getLevelName(level), "capture": observe_error_log(output.getvalue(), marks=MARKS,
                      forbidden_contexts=None, source_complete=True)})
+    output_logs = []
+    for level in (logging.INFO, logging.DEBUG):
+        logger.setLevel(level)
+        for case, streaming, delta in (("normal", False, False), ("stream_delta", True, True),
+                                       ("stream_complete", True, False)):
+            output.seek(0); output.truncate(0)
+            request_logger.log_outputs("B2-SYNTHETIC", MARKS["private_system"], [1, 2],
+                                       finish_reason="stop", is_streaming=streaming, delta=delta)
+            output_logs.append({"case": case, "level": logging.getLevelName(level),
+                "capture": observe_error_log(output.getvalue(), marks=MARKS,
+                    forbidden_contexts=None, source_complete=True)})
     logger.setLevel(logging.INFO)
     integrity = []
     for case, identifier in (("normal", "B2-normal"), ("multiline", "B2-first\nFORGED-SOURCE"),
@@ -158,20 +179,80 @@ async def run(root):
         integrity.append({"case": case, "event_count": len(parsed["events"]), "complete": parsed["complete"],
                           "coverage_gaps": parsed["gaps"], "capture_sha256": parsed["decoded_capture_sha256"],
                           "sources": sorted({event["source"] for event in parsed["events"]})})
-    return {"schema": "byul-b2-reference-cpu/1", "source": pins,
+    return {"schema": "byul-b2-reference-cpu/2", "source": pins,
             "scope": "verbatim selected handler/model/logger/formatter definitions; synthetic dependency inputs",
             "engine_inference_executed": False, "enterprise_policy_status": "UNSET",
             "response_marker_rule": "EXAMPLE fixed synthetic system/path/address exclusion; not enterprise approval",
             "dependencies": {name: importlib.metadata.version(name) for name in ("pydantic", "fastapi", "starlette", "regex")},
             "python": sys.version.split()[0], "response_trials": responses,
-            "request_logger_trials": logs, "reference_collector_trials": integrity}
+            "request_logger_trials": logs, "request_logger_output_trials": output_logs,
+            "reference_collector_trials": integrity}
+
+
+def upstream_tests(root, output_dir):
+    """Run exact upstream CPU test definitions through the dependency adapter.
+
+    This explicitly selects validation-handler and sanitizer unit contracts;
+    source checks of other API modules are a different scope, not skipped tests.
+    Never rewrite their assertions or load upstream conftest/engine imports.
+    """
+    verify_source(root)
+    names = {
+        "tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py": [
+            "_fake_request", "TestValidationErrorParamFallback", "TestCleanLocForParam",
+            "TestValidationErrorDoesNotLeakServerPaths", "TestValidationErrorBodyIsBounded"],
+        "tests/entrypoints/serve/exception_handling/test_error_sanitization.py": [
+            "test_sanitize_message", "TestSanitizeMessageFilePaths", "TestSanitizeMessageCoversLeakPatterns"],
+    }
+    output_dir.mkdir(parents=True, exist_ok=False)
+    # A standalone generated module stays outside upstream conftest ancestry.
+    # It imports this reviewed adapter, then compiles original test definitions.
+    harness = output_dir / "test_upstream_b2.py"
+    harness.write_text(
+        "import json, logging, pytest\nfrom types import SimpleNamespace\n"
+        "from pathlib import Path\nfrom tools.b2_reference_cpu import reference_scope, selected\n"
+        f"root=Path({str(root)!r})\n"
+        "scope, _ = reference_scope(root, logging.getLogger('b2.official'))\n"
+        "globals().update({key:value for key,value in scope.items() if not key.startswith('__')})\n"
+        + "".join(f"selected(root, {path!r}, {nodes!r}, globals())\n" for path, nodes in names.items())
+        + f"__file__ = {str(harness)!r}\n",
+        encoding="utf-8")
+    launcher = output_dir / "run_upstream.py"
+    launcher.write_text(
+        "import pytest, sys, time, json\nstart=time.perf_counter()\n"
+        "class Summary:\n"
+        " def pytest_sessionfinish(self, session, exitstatus):\n"
+        "  stats=session.config.pluginmanager.get_plugin('terminalreporter').stats\n"
+        "  report={key:len(stats.get(key, [])) for key in ('passed','failed','error','skipped')}\n"
+        "  report.update(tests=session.testscollected, seconds=time.perf_counter()-start)\n"
+        "  print('B2_SUMMARY_JSON='+json.dumps(report))\n"
+        "raise SystemExit(pytest.main(sys.argv[1:], plugins=[Summary()]))\n")
+    import os
+    repo = Path(__file__).resolve().parents[1]
+    result = subprocess.run([sys.executable, str(launcher), "-q", str(harness), "--noconftest",
+        "-p", "no:cacheprovider", "--override-ini=addopts=", "--asyncio-mode=strict",
+        "--basetemp", str(output_dir / "temp")], capture_output=True, text=True,
+        env={**os.environ, "PYTHONPATH": os.pathsep.join([str(repo / "src"), str(repo)])})
+    # Raw pytest diagnostics stay in memory. Persist only fixed counters/timing.
+    matches = [line.split("B2_SUMMARY_JSON=", 1)[1] for line in result.stdout.splitlines()
+               if "B2_SUMMARY_JSON=" in line]
+    counts = json.loads(matches[-1]) if matches else {"diagnostic": "SAFE_SUMMARY_UNAVAILABLE"}
+    summary = {"returncode": result.returncode, "source_commit": json.loads(PINS.read_text())["commit"],
+               "scope": names, **counts}
+    (output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    print(json.dumps(summary))
+    if result.returncode:
+        raise RuntimeError("upstream CPU contract failed; inspect the pinned test/code, no raw diagnostics saved")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--upstream-tests", type=Path, help="new external directory for selected official test summary")
     args = parser.parse_args()
+    if args.upstream_tests:
+        upstream_tests(args.source.resolve(), args.upstream_tests.resolve())
     report = asyncio.run(run(args.source.resolve()))
     # Exclusive creation keeps prior evidence immutable.
     with args.output.open("x", encoding="utf-8") as stream:

@@ -71,3 +71,27 @@ OBS-09: 실제 NewLineFormatter 출력은 기존 parse_native_info로 소비한�
 OBS-06/07/08/10/11/12의 기존 log_evidence·capture 분석을 우선 재사용한다.
 실제 저장소/IAM/replay consumer/retention이 없는 경우 준비된 관측 계약과 남은 외부 조건을
 `storage-handoff.md`에 기록한다. 로컬 해시 확인으로 생산자 진위·권한 집행을 주장하지 않는다.
+
+## PR47 후속 CPU 마감
+
+공식 `test_validation_exception_handler.py`는 param fallback·내부 loc 제거·endpoint 경로
+비반환·오류 개수/입력 크기 제한을, `test_error_sanitization.py`는 주소/경로 정제와
+안전한 문구 보존을 이미 확인한다. 해당 클래스/함수의 원래 assertion을 고정 bytes로 실행한다.
+별도 API 모듈의 소스 import 확인 클래스는 이번 handler CPU 범위에 포함하지 않는다.
+새 skip이나 기존 기대값 변경은 없다. 전체 upstream suite 실행이라고 표시하지 않는다.
+
+우리 CHK의 추가 요구는 수신자별 허용 범위·지정 로그·정상/누락 의미·증거 원문 미보존이다.
+기업 정책과 실제 target은 여전히 미정이다. 고정 fixture의 필드/상한을 기업 정책에 등록하지 않는다.
+PR47의 출력 logger 공백은 실제 RequestLogger.log_outputs를 INFO/DEBUG 및 정상/stream
+delta/stream complete로 실행해 수집한다. 합성 생성 문자열을 직접 인자로 주며 실제 모델이
+해당 문자열을 생성하거나 stream 요청을 처리했다고 주장하지 않는다.
+
+관측 helper는 중복 키·후속 잘림 전에 수신한 완전한 JSON 문자열 token의 표식을 보존한다.
+문자열의 JSON escape 한 단계만 해석하고, 중복 키/불완전 구조는 필드 관측에 사용하지 않는다.
+거부된 구조에서 독립 위반은 유지하고, 재귀적 escape 해석으로 새 위반을 추정하지 않는다.
+
+공식 시험은 같은 격리 CPU 환경에 `pytest==9.1.1 pytest-asyncio==1.3.0`을 설치한 뒤
+기존 도구의 `--upstream-tests /path/to/new-external-directory` 옵션으로 실행한다.
+생성 harness는 upstream conftest/engine import 대신 기존 dependency adapter만 사용한다.
+원래 시험 코드는 compile하여 실행하며 pytest raw diagnostics는 메모리에서만 처리한다.
+지속 산출물은 고정 시험 목록·카운터·시간뿐이다. 실제 제품 연결은 계속 A 인계 대기다.

@@ -38,3 +38,26 @@ OBS-06~08·10~12의 외부 저장소·주체별 권한·replay consumer·보존 
 그 뒤 제공된 첫 저장소의 OBS-06 조회/반출 하위 결과부터 주체·정책·대상을 고정한다.
 상세 CPU 관측·실패했던 이전 도구 실행의 수정 이력·snapshot·의존성 목록은
 저장소 밖 `byul-b2-evidence-20261028/`에 보존한다.
+
+## 갱신 배정 후 PR47 마감
+
+공유 기록 `Projects/DEV/byul-b-coordination/{current,next}.json`을 `.lock` mkdir로
+짧게 보호하여 B-2 분기를 선점했다. B-1의 REQ-10·SUP-10 파일은 수정하지 않았다.
+
+직접 결함: 완전한 JSON 문자열 token 안의 escaped 표식이 중복 키/후속 잘림으로
+소실되던 경우를 보완했다. 구조는 UNKNOWN 자료로 유지하며 독립 위반만 보존한다.
+공식 시험의 원래 assertion을 재작성하지 않고 dependency adapter로 실행했다.
+handler param/loc·endpoint 경로·크기 제한과 sanitizer의 **30 passed / 0.262s**, skip 0.
+첫 harness의 pytest import-file identity 수집 오류를 수정했으며 원래 assertion은 그대로다.
+
+전용·인접 계약 **64 passed / pytest 0.23s / 부모 0.361s**.
+마지막 harness 경로 수정 뒤 adapter 직접 계약 **2 passed / 0.13s**를 재검증했다.
+실제 출력 logger 정상/stream delta/stream complete × INFO/DEBUG 6사례 모두에서
+합성 출력 표식을 관측했다. 실제 생성·전체 streaming HTTP·기업 허용 정책의 검증은 아니다.
+입력 logger의 INFO 무표식을 전체 logger 안전으로 확대하지 않는다.
+원문 미포함 assertion도 통과했다. 상세 자료는 `pr47-followup-*`, `pr47-upstream-2/summary.json`이다.
+
+같은 기능의 후속 구현·회귀·실제 CPU 검증을 열린 PR47에 모았다.
+제품 연결은 A 확정 SHA/팩 Ref/파일 인계가 필요하다. 응답 수신자·debug 로그 정책은 미정,
+OBS-06~08·10~12의 실제 저장·IAM·consumer·보존 집행은 외부 조건이 필요하다.
+이 대기를 다른 준비된 B 분기의 CPU 작업 대기로 확대하지 않는다.

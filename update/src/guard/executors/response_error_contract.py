@@ -7,11 +7,14 @@ An unset enterprise policy does not prevent collecting reference-code facts.
 from __future__ import annotations
 
 import hashlib
+import json
+import re
 
 from .content_common import MAX_SAMPLE_BYTES, json_body, leaves
 from .log_analysis_contract import strict_json_loads
 
 CONTEXTS = frozenset({"caller_input", "error_input", "private_system", "internal_path", "internal_address"})
+_JSON_STRING = re.compile(r'"(?:[^"\\\x00-\x1f]|\\["\\/bfnrt]|\\u[0-9a-fA-F]{4})*"')
 
 
 def _policy(marks, forbidden_contexts):
@@ -57,6 +60,17 @@ def observe_error_response(result, *, marks, allowed_fields=None, forbidden_cont
         text = ""
         gaps.append("BODY_UNAVAILABLE")
     summary = _summary(text, marks, forbidden_contexts, gaps)
+    # Complete JSON string tokens remain independently readable on the wire
+    # even when a duplicate key or later truncation prevents structural use.
+    # Keep this fact without accepting the ambiguous object or its field paths.
+    encoded_hits = set()
+    for match in _JSON_STRING.finditer(text):
+        token = json.loads(match.group())
+        encoded_hits.update(key for key, marker in marks.items() if marker in token)
+    summary["marker_contexts_seen"] = sorted(set(summary["marker_contexts_seen"]) | encoded_hits)
+    forbidden = encoded_hits & set(forbidden_contexts or ())
+    summary["forbidden_contexts_seen"] = sorted(set(summary["forbidden_contexts_seen"]) | forbidden)
+    summary["violations"] = sorted(set(summary["violations"]) | {"FORBIDDEN_MARKER:" + key for key in forbidden})
     status = result.get("outcome")
     if type(status) is not int or status != expected_status:
         gaps.append("EXPECTED_ERROR_STATUS_UNCONFIRMED")

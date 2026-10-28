@@ -9,6 +9,9 @@
     "vllm/entrypoints/serve/exception_handling/handlers/validation.py": "ed14c81cc5685c7521ed1b5b8c51b4e7a5de05d2fb6310e7a3faa3d31548cca0",
     "vllm/entrypoints/serve/exception_handling/handlers/http.py": "ae710c07f319f56e105a8d143300b0d1042ab4cdedc437da2c7dd88df21e5a18",
     "vllm/entrypoints/serve/utils/request_logger.py": "e7839742189c6f336f7d9fa3355cd78ccb1b1d63a8a24361b8b13a7f7cd0e83d",
-    "vllm/logging_utils/formatter.py": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5"
+    "vllm/logging_utils/formatter.py": "cc2153d8edfd59ed401f0c3f3ae985a7dd678799daad6829a2d33ac6ccb20ea5",
+    "tests/entrypoints/serve/exception_handling/test_validation_exception_handler.py": "1ab9b00627bde2e50748cb7cb3b1563411bc9f7fd4b7e8eb1d0723a1bf5ecaff",
+    "tests/entrypoints/serve/exception_handling/test_error_sanitization.py": "891cba7a409366ed87fb2d0a0dcab568bdcc42f89f91a82273b530a1fc997134",
+    "tests/entrypoints/serve/utils/test_request_logger.py": "49c923f56b3007a726cae60272ef0d7d958e86582fca614e89df05baa0783902"
   }
 }

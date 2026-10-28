@@ -80,6 +80,20 @@ def test_marker_in_escaped_literal_field_key_is_detected_without_saving_the_key(
     assert MARKS["private_system"] not in json.dumps(result)
 
 
+@pytest.mark.parametrize("body", ['{"error":"\\u0045XAMPLE_PRIVATE","error":null}',
+                                 '{"error":"\\u0045XAMPLE_PRIVATE","later":'])
+def test_complete_escaped_string_retains_independent_violation_when_structure_is_missing(body):
+    result = observe({"outcome": 400, "body": body})
+    assert result["violations"] == ["FORBIDDEN_MARKER:private_system"]
+    assert not result["complete"] and result["coverage_gaps"]
+    assert result["field_path_sha256"] == []
+
+
+def test_literal_backslash_escape_is_not_recursively_decoded_into_a_marker():
+    result = observe({"outcome": 400, "body": '{"error":{"message":"\\\\u0045XAMPLE_PRIVATE"}}'})
+    assert result["complete"] and not result["violations"]
+
+
 def test_later_log_failure_does_not_erase_observed_violation():
     result = observe_error_log("EXAMPLE_PRIVATE", marks=MARKS,
                               forbidden_contexts=["private_system"], source_complete=False)

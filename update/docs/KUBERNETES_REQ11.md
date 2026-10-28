@@ -62,6 +62,6 @@ transition_timeout은 기준판 요청 실행이 끝난 뒤 시작하는 API 종
 
 소유 kubectl/stdin 인터페이스 runner 대역으로 실제 파싱·source/세대·실행기·Store/판정/RPT·전환을 검증하고, 소유 loopback HTTP에서 동일 stream_probe 원본도 실행한다. A-2 c8f0e61의 exact7파일과 기존 플랫폼 교차시험의 ENV Ref 입력 보수를 통합하며 플랫폼 제품 코드/공용 계약은 유지한다. 2026-10-28 로컬 kind-bob-guard-lab API는 연결 거부 상태였고, 이 작업은 daemon/cluster를 기동·수정하지 않았다. 따라서 실제 Kubernetes와 GPU 실증은0이다.
 
-AWS quota 승인은 환경 생성·GPU 시험의 완료가 아니다. 승인 후 실제 재개에는 비용/자원 승인 확인, exact 설치 image/source/ENV·모델 revision/inventory/API명, 소유 Python probe와 RBAC, namespace/Pod/container 세대·readOnly template·command/args 준비가 필요하다. 기존 REQ11 allowlist는 검토된 CPU image/version에 한정돼 있다. 임의 GPU image를 넣거나 CPU digest 제한을 풀어 지원으로 처리하지 않는다. GPU 설치판의 pin/source/consumer 계약 검토가 별도로 필요하며 미지원이면 요청 없이 UNKNOWN으로 남긴다.
+AWS quota 승인은 환경 생성·GPU 시험의 완료가 아니다. 승인 후 실제 재개에는 비용/자원 승인 확인, exact 설치 image/source/ENV·모델 revision/inventory/API명, 소유 Python probe와 RBAC, namespace/Pod/container 세대·readOnly template·command/args 준비가 필요하다. 기존 CPU image/version 제한은 유지하며 추가로 검토한 단일 GPU amd64 manifest와 기동 선언은 [GPU REQ11 계약](GPU_REQ11.md)에 고정한다. 임의 GPU image를 넣거나 CPU digest 제한을 풀어 지원으로 처리하지 않는다. 검토하지 않은 설치판이면 요청 없이 UNKNOWN으로 남긴다.
 
 한 실행 담당자가 원자료를 수집한다. 준비·정상/거부/미수집 → 기준판 종료 → 후보 Ready → 후보 실행 → EVD/RES/RPT/반출·재판정 → 실제 작업 종료/장치 사용·메모리·자원 반납 확인 → 잔존 자원/비용 확인 순서를 수행한다. 실패 시 후보 접수를 중단하고 exact 이전 증거를 보존한 채 operator가 복구한다. GPU 미실증, 실제 Kubernetes 미확인, 기업 정책 준비 전을 각각 구분한다. sources/와 AWS 인계 원본은 읽기 전용이다.

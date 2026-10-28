@@ -234,7 +234,7 @@ def analyze_response(response, *, expected, foreign, model, max_output, api_id=N
 
 class RequestBindingExecutor(HttpCheckExecutor):
     name = "request_binding"
-    version = "0.3.3"
+    version = "0.3.4"
     requires_roles = False
     requires_route_scope = False
     _uses_docker_identity = True
@@ -305,7 +305,7 @@ class RequestBindingExecutor(HttpCheckExecutor):
             and contract.get("header_precedence") is True and contract.get("id_prefix") == "chatcmpl-")
         template_supported = False
         try:
-            template_supported = (launch.get("profile") == "cpu-bounded-v1"
+            template_supported = (launch.get("profile") == (contract or {}).get("launch_profile", "cpu-bounded-v1")
                 and ctx.adapter.supports_template_profile(identity) and type(argv) is list
                 and "--chat-template" in argv and argv.index("--chat-template") + 1 < len(argv)
                 and argv[argv.index("--chat-template") + 1] == identity["container_path"])

@@ -1215,3 +1215,9 @@ git status
 - 테스트 결과: 기본 전체 **3300 passed / 19 deselected**, pytest **75.86초**, 부모 벽시계 **76.145초**. 별도 Python 3.12 설치본 검증 통과.
 - 다음 단계: PR #10 검토·병합. 실제 엔진 시험·기업 승인 별도.
 - 막힌 것: 없음. [상세 기록](docs/FRAMEWORK_SYNC_20261026.md).
+## 2026-10-28 — 개발자 A 고정 GPU 이미지 REQ11 연결
+
+- 한 일: 기존 f77973a와 미커밋을 보존한 별도 A worktree에서 공식 GPU amd64 manifest/설치 layer·후속12layer를 확인하고 소비/native 소스 합집합28파일의 기존 해시 일치를 확인했다. REQ11에 exact GPU digest와 gpu-bounded-v1 기동 선언만 추가하고 기존 CPU·다른 수집기의 제한·판정·stream 계산은 유지했다.
+- 테스트 결과: 1069파일 고정 직접/인접·불변식482통과·실패0·기존Windows skip1·제외1(pytest29.17초·부모30.203초), 검증 중 source bytes 불변이다. GPU 입력에서도 기존 JSON/SSE·CLI EVD/RES/RPT·첨부 실패·독립 FAIL·반출/복원·재판정을 확인했다. 이미지 bytes 검토와 EXAMPLE 회귀는 엔진 기동이나 실제 GPU 실증이 아니다.
+- 다음 단계: CPU 영향 검증·실패 수정/재고정·설치물·정확 HEAD CI·초안 PR을 마감하고, 승인된 단일 dev GPU에서 REQ11 기존 CLI→EVD/RES/RPT→반출/복원·재판정과 실제 종료를 확인한다.
+- 막힌 것: 실제 환경은 아직 미생성·미실증이다. 기업 경로/호출자 허용표는 준비 전이며 새 권한·비용 확대는 자동 승인하지 않는다.

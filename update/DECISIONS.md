@@ -548,3 +548,4 @@
 - 2026-10-27: native 최종 iterator 파일 인수와 별도 소유 파일 SHA를 profile4/비공개 대조 CLI로만 연결한다. generator 생성·시점별 파일 일치를 최종 가중치/소비 증명으로 바꾸지 않고 과거 profile3의19개 source/고정 bytes를 유지하기 위해서다.
 
 - 2026-10-27: 인증 입력/bool·router 조회·async serving 반환을 profile5의 별도 살아 있는 ASGI 문맥/인덱스로 관측하고 profile4를 고정 호환한다. 동기 awaitable 반환·상속된 늦은 문맥·등록 endpoint와 모듈 변수의 차이를 실제 완료/인가로 오인하지 않기 위해서다.
+- 2026-10-28 · REQ11은 공식 GPU0.31.0의 exact amd64 manifest와 설치 소비 소스가 확인된 gpu-bounded-v1만 추가한다. · CPU digest/다른 수집기 제한과 과거 소비 계약을 보존하며 index/config/tag를 runtime imageID나 실제 GPU 소비 증명으로 바꾸지 않기 위함이다.

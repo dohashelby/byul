@@ -26,6 +26,9 @@ CHAT_TEMPLATE_SHA256 = "e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb6752
 CHAT_TEMPLATE_CONTAINER_PATH = "/guard-assets/chat/guard-text-chat-v1.jinja"
 CHAT_TEMPLATE_ASSET = Path(__file__).resolve().parent / "assets" / "chat" / "guard-text-chat-v1.jinja"
 CHAT_REVIEWED_IMAGE = "vllm/vllm-openai-cpu@sha256:8024248339dc6878daa5349344ed29d49c8a6732f6bdf7400fda32ce33e4b30b"
+# Official v0.31.0 linux/amd64 manifest, distinct from its multi-platform index
+# and config digest. Consumer source bytes were inspected in the OCI layers.
+REQUEST_BINDING_GPU_IMAGE = "vllm/vllm-openai@sha256:a4a4c0437bf7240089da5f08aa370c4aee17ae5290f7a3b468825ee26c4c3a6b"
 TYPE_TEMPLATE_PROFILE = "guard-type-boundary-v1"
 TYPE_TEMPLATE_SHA256 = "38110f6e668d55f240ecfde0d38f5fecc7c11a742d76823ffd9d0918abb9fe36"
 TYPE_TEMPLATE_PATH = "/guard-assets/chat/guard-type-boundary-v1.jinja"
@@ -470,12 +473,13 @@ class VllmAdapter:
 
     def request_binding_contract(self, image_digest: str, engine_version: str) -> dict | None:
         """Consumer evidence in the inspected image, not an authenticated principal."""
-        if image_digest != CHAT_REVIEWED_IMAGE or engine_version != "0.31.0":
+        if image_digest not in (CHAT_REVIEWED_IMAGE, REQUEST_BINDING_GPU_IMAGE) or engine_version != "0.31.0":
             return None
         return {"profile": "request-connection-binding-v1", "engine_version": engine_version,
                 "image_digest": image_digest, "id_prefix": "chatcmpl-", "body_request_id": True,
                 "header_request_id": True, "header_precedence": True,
                 "consumer_prompt_ids": True, "consumer_prompt_text": True,
+                **({"launch_profile": "gpu-bounded-v1"} if image_digest == REQUEST_BINDING_GPU_IMAGE else {}),
                 "sources": [
                     {"path": "vllm/entrypoints/serve/engine/serving.py", "sha256": "e5239ca4e2119fd019ee0ffcbf6e68f642b7ce94bad1b3fabe22ccdd8cf9eb02", "lines": "119-129"},
                     {"path": "vllm/entrypoints/openai/chat_completion/serving.py", "sha256": "532dadea845c77a5a79011027b9989987c3e32467614e993f439f29c924de002", "lines": "291-317,554-565,743-760,1190-1201"},

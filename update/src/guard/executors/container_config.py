@@ -125,7 +125,7 @@ def _mount_key(m: dict) -> str:
 
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
-    version = "0.6.1"
+    version = "0.6.2"
     requires_roles = False
     requires_route_scope = False
     functional_via = "engine"

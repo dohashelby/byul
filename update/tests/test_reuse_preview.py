@@ -29,7 +29,7 @@ def test_source_bound_container_preview_cannot_confirm_live_identity_without_doc
     check = baseline_pack().checks["PLT-01"]
     preview = preview_inputs(check, environment(), {}, cfg)
     assert preview is None
-    assert ContainerConfigExecutor.version == "0.6.1"
+    assert ContainerConfigExecutor.version == "0.6.2"
 
 
 def test_supply_image_identity_cannot_borrow_platform_sentinel_fixture(tmp_path, monkeypatch):

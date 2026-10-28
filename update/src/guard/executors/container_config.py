@@ -125,7 +125,7 @@ def _mount_key(m: dict) -> str:
 
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
-    version = "0.6.0"
+    version = "0.6.1"
     requires_roles = False
     requires_route_scope = False
     functional_via = "engine"
@@ -152,30 +152,23 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             return collect_running_image_approval(self._docker_obj(), ctx, self.cfg.get("container"))
         completeness_gate = any(obs.key == "permission_scan_complete" for obs in ctx.check.required_observations)
         container = self.cfg.get("container") or ctx.target.get("engine", {}).get("container")
-        if completeness_gate and (type(container) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", container)):
+        if type(container) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", container):
             raise ValueError("CONTAINER_TARGET_UNVERIFIED")
-        if not container:
-            raise RuntimeError("container_config: no target container (set [container_config].container)")
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", container):
-            raise RuntimeError(f"container_config: invalid container name {container!r}")
         docker = self._docker_obj()
         anchor, intervals = None, {}
         source_unverified = False
         source_container = container
-        if completeness_gate:
-            try:
-                image = ctx.env.engine.image_digest
-                anchor = engine_identity(docker, ctx.target, ctx.env, container, image, 30)
-                if not anchor["started_at"]:
-                    raise ValueError("missing source generation")
-            except Exception:
-                raise ValueError("CONTAINER_TARGET_UNVERIFIED") from None
-            source_container = anchor["container_id"]
+        try:
+            image = ctx.env.engine.image_digest
+            anchor = engine_identity(docker, ctx.target, ctx.env, container, image, 30)
+            if not anchor["started_at"]:
+                raise ValueError("missing source generation")
+        except Exception:
+            raise ValueError("CONTAINER_TARGET_UNVERIFIED") from None
+        source_container = anchor["container_id"]
 
         def check_owner():
             nonlocal source_unverified
-            if anchor is None:
-                return
             try:
                 current = engine_identity(docker, ctx.target, ctx.env, container, image, 5)
                 if current != anchor:
@@ -185,8 +178,6 @@ class ContainerConfigExecutor(HttpCheckExecutor):
                 raise ValueError("CONTAINER_SOURCE_UNVERIFIED") from None
 
         def bound(name, action):
-            if anchor is None:
-                return action()
             try:
                 check_owner()
                 result = action()
@@ -201,12 +192,11 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             row = docker.inspect_json(source_container, timeout=30)
             if type(row) is not dict:
                 raise ValueError("invalid inspect envelope")
-            if anchor is not None:
-                state, config = row.get("State"), row.get("Config")
-                if (type(state) is not dict or type(config) is not dict
-                        or {"container_id": row.get("Id"), "image_id": row.get("Image"),
-                            "started_at": state.get("StartedAt"), "image": config.get("Image")} != anchor):
-                    raise ValueError("CONTAINER_SOURCE_UNVERIFIED")
+            state, config = row.get("State"), row.get("Config")
+            if (type(state) is not dict or type(config) is not dict
+                    or {"container_id": row.get("Id"), "image_id": row.get("Image"),
+                        "started_at": state.get("StartedAt"), "image": config.get("Image")} != anchor):
+                raise ValueError("CONTAINER_SOURCE_UNVERIFIED")
             return row
 
         # Each permission source is independent. A later read failure must not
@@ -385,8 +375,7 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             "permission_scan_complete": permission_complete, "collection_errors": sorted(set(errors)),
             "fixture": {"sentinel_paths": list(writes), "proc_cmd": PROC_CMD, "sentinel_cmd": SENTINEL_CMD},
         }
-        if anchor is not None:
-            summary["source_binding"] = {"profile": "docker-engine-source-intervals/1",
-                "environment_ref": ctx.env.ref().model_dump(mode="json"),
-                "owner_sha256": sha256_hex(canonical_json(anchor)), "intervals_verified": intervals}
+        summary["source_binding"] = {"profile": "docker-engine-source-intervals/1",
+            "environment_ref": ctx.env.ref().model_dump(mode="json"),
+            "owner_sha256": sha256_hex(canonical_json(anchor)), "intervals_verified": intervals}
         return observations, normal, challenges, summary

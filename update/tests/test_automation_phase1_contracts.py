@@ -22,7 +22,8 @@ from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle
 from tests import test_direct_route as direct
 from tests import test_role_route as role
-from tests.test_container_config import FakeDocker, LAB_POLICY, _probe
+from tests.test_container_config import FakeDocker, LAB_POLICY, _probe, IMAGE as PERMISSION_IMAGE, RUN as PERMISSION_RUN
+from tests.test_credential_mount_semantics import FakeDocker as CredentialFixture, IMAGE as CREDENTIAL_IMAGE, RUN as CREDENTIAL_RUN
 from tests.builders import PACK_DIR, baseline_pack, environment, policy
 from tests.prepared_fixtures import manual_setup_seed, put_baseline_snapshot
 from tests.response_semantics_support import materialize_pack21
@@ -39,7 +40,7 @@ VALUES = {
 }
 
 
-def _executor(tmp_path, cid, expected, *, violation_and_missing=False):
+def _executor(tmp_path, cid, expected, *, violation_and_missing=False, env=None):
     """Choose the fixture situation, never inject the expected verdict into a judge."""
     if cid == 'REQ-01':
         world = direct.World(exposed=expected == 'FAIL', openapi_ok=expected != 'UNKNOWN')
@@ -69,12 +70,11 @@ def _executor(tmp_path, cid, expected, *, violation_and_missing=False):
                     if argv == ['sh', '-c', PROC_CMD] and (expected == 'UNKNOWN' or violation_and_missing):
                         return CmdResult(0, result.stdout + 'PID 998\nGUARD_READ_ERROR\n', '')
                     return result
-            ex = ContainerConfigExecutor(cfg, container_probe=_probe,
-                docker=ProcFixture('default' if expected == 'FAIL' else 'hardened'))
+            docker = ProcFixture('default' if expected == 'FAIL' else 'hardened')
+            docker.owner_name = 'engine'
+            ex = ContainerConfigExecutor(cfg, container_probe=_probe, docker=docker)
         elif cid == 'PLT-04':
-            class EnvFixture:
-                def inspect_json(self, container, *, timeout):
-                    return {'Mounts': []}
+            class EnvFixture(CredentialFixture):
                 def exec(self, container, argv, *, timeout):
                     assert argv == ['sh', '-c', ENV_CMD]
                     text = 'PID 1\nPATH\n'
@@ -92,6 +92,10 @@ def _executor(tmp_path, cid, expected, *, violation_and_missing=False):
                 container_probe=probe)
     data = json.loads(target.read_text(encoding='utf-8'))
     data['lab'] = True
+    if cid in {'PLT-01', 'PLT-04'}:
+        assert env is not None
+        data.update(environment_ref=env.ref().model_dump(mode='json'),
+                    run_id=PERMISSION_RUN if cid == 'PLT-01' else CREDENTIAL_RUN)
     target.write_text(json.dumps(data), encoding='utf-8')
     return ex
 
@@ -102,6 +106,9 @@ def _run(tmp_path, monkeypatch, cid, expected, *, violation_and_missing=False):
     pack = materialize_pack21(tmp_path / 'historical-pack21')
     env = environment({'gateway': {'value': True, 'origin': 'EXAMPLE', 'source': 'synthetic topology'}},
         engine={'name': 'vllm', 'version': '0.31.0'}, model={'id': 'test-model'})
+    if cid in {'PLT-01', 'PLT-04'}:
+        env.engine.image_digest = PERMISSION_IMAGE if cid == 'PLT-01' else CREDENTIAL_IMAGE
+        env = env.seal()
     pol = policy(pack.ref(), scope={'include': [cid]}, values={cid: VALUES[cid]})
     def create(folder):
         st = Store(folder / 'store')
@@ -115,7 +122,7 @@ def _run(tmp_path, monkeypatch, cid, expected, *, violation_and_missing=False):
     st, plan, _ = manual_setup_seed('automation-phase1-inputs', {
         'pack': pack.model_dump(mode='json'), 'environment': env.to_dict(), 'policy': pol.to_dict(),
     }, tmp_path, create)
-    executor = _executor(tmp_path, cid, expected, violation_and_missing=violation_and_missing)
+    executor = _executor(tmp_path, cid, expected, violation_and_missing=violation_and_missing, env=env)
     name = pack.checks[cid].executor
     monkeypatch.setitem(registry.EXECUTORS, f'{name}:contract', lambda raw: executor)
     evd, = run_plan(st, pack, plan, RunConfig(executors={name: 'contract'}, adapter='vllm'))

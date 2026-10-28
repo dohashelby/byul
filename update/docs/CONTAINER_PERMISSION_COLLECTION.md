@@ -1,6 +1,6 @@
 # 실행 권한 관측의 소유 대상·세대
 
-`container_config/0.6.0`은 현행 PLT-01의 `permission_scan_complete` 흐름에서
+`container_config/0.6.1`은 현행 PLT-01과 이전 관측 필드의 새 live 권한 수집에서
 [공통 엔진 소스 계약](A1_TARGET_BINDING.md)을 소비한다. 정확한 ENV Ref·pin 이미지·
 소유 run·engine.container와 실제 실행 instance가 일치해야 한다. 처음부터 다른
 대상이나 누락된 기술 입력은 `CONTAINER_TARGET_UNVERIFIED`로 거부하며 프로세스
@@ -22,8 +22,11 @@ SHA-256과 구간별 신원 확인 여부만 남긴다. inspect 전체·Config.E
 원문은 기록하지 않는다. CPU 회귀는 명시적인 EXAMPLE ENV/pin/run과 소유 대역을
 쓰며 inventory 오류는 초기 신원 확인과 구분해 해당 관측 source에만 주입한다.
 
-SUP-04 실행 이미지 승인 분기는 기존 전용 계약을 사용한다. 과거 정의의 완전 목록
-계약과 저장된 EVD/RES/RPT·정확 Ref는 재해석하지 않는다. 이 live 수집 연결은 실제
+SUP-04 실행 이미지 승인 분기는 기존 전용 계약을 사용한다. 이전 관측 필드로 새로
+수집할 때도 같은 ENV/owner 결합을 적용하며, `permission_scan_complete`의 유무가
+신원 검증을 생략하는 조건이 되지 않는다. 과거 정의의 완전 목록 의미와 저장된
+EVD/RES/RPT·정확 Ref 재판정은 유지한다. 저장 증거 재생은 live collector를 호출하지
+않는다. 이 live 수집 연결은 실제
 Docker daemon·정책 집행·worker 귀속·생산자 인증·Kubernetes 권한 수집·전 구간
 무누락이나 PLT-01 전체 완료의 실증이 아니다. 정적 이월 미리보기와 동적 소유 세대의
 관계는 공통 reuse 경계의 별도 검토 대상으로 남긴다.

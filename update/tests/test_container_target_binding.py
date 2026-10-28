@@ -130,14 +130,24 @@ def test_later_generation_change_withholds_new_source_and_keeps_bound_inventory(
     assert CANARY not in json.dumps([observations, summary])
 
 
-def test_saved_definition_without_new_permission_gate_keeps_legacy_shape():
+def test_saved_definition_without_new_permission_gate_keeps_fields_with_bound_live_sources():
+    ctx = context()
+    ctx.check = SimpleNamespace(collection_profile=None, required_observations=[],
+        functional_probes=ctx.check.functional_probes, challenge_steps=ctx.check.challenge_steps)
+    docker = World()
+    observations, _, _, summary = ContainerConfigExecutor({}, docker=docker).collect(ctx)
+    assert "permission_scan_complete" not in observations and "source_binding" in summary
+    assert {row[1] for row in docker.calls if row[0] == "exec"} == {CONTAINER_ID}
+
+
+def test_legacy_permission_live_also_rejects_a_stable_wrong_owner():
     ctx = context()
     ctx.check = SimpleNamespace(collection_profile=None, required_observations=[],
         functional_probes=ctx.check.functional_probes, challenge_steps=ctx.check.challenge_steps)
     docker = World(wrong="owner")
-    observations, _, _, summary = ContainerConfigExecutor({}, docker=docker).collect(ctx)
-    assert "permission_scan_complete" not in observations and "source_binding" not in summary
-    assert {row[1] for row in docker.calls} == {"guard-lab-engine"}
+    with pytest.raises(ValueError, match="^CONTAINER_TARGET_UNVERIFIED$"):
+        ContainerConfigExecutor({}, docker=docker).collect(ctx)
+    assert not docker.data_reads and not docker.files
 
 
 @pytest.mark.parametrize("mode,expected", [("normal", "PASS"), ("wrong-owner", "UNKNOWN"),
@@ -184,7 +194,7 @@ def test_permission_binding_product_cli_report_restore_and_exact_refs(tmp_path, 
     store = Store(store_path)
     evd, = store.find_latest("EVD", lambda r: True); res, = store.find_latest("RES", lambda r: True)
     rpt, = store.find_latest("RPT", lambda r: True)
-    assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.6.0"
+    assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.6.1"
     assert res.verdicts.security.value == expected and rpt.official is False
     assert evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest
     assert CANARY not in canonical_json(evd.to_dict()).decode()

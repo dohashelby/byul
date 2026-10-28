@@ -3,7 +3,7 @@ from copy import deepcopy
 import json
 import pytest
 
-from guard.collectors.model_mounts import analyze_model_mount
+from guard.executors.model_mounts import analyze_model_mount
 from tests.test_model_mapping import declared_mapping
 from tests.test_kubernetes_sampling import inputs, IMAGE
 

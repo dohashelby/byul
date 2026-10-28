@@ -47,7 +47,7 @@ Linux CI의 같은 시험은 실제 symlink를 쓰며 기존 inventory symlink �
 
 ## 선정 관측: 모델 hostPath mount 선언
 
-`model_mounts.analyze_model_mount`는 A-1 수집부가 메모리로 제공할 전후 Pod/Namespace
+`executors.model_mounts.analyze_model_mount`는 A-1 수집부가 메모리로 제공할 전후 Pod/Namespace
 자료를 기존 binding 검증기에 전달한다. ENV Ref·namespace/Pod UID·container ID·
 image ID·restart·startedAt·Ready가 고정된 같은 세대에서, `/models`와 선언한 호스트
 snapshot의 단일 hostPath/Directory 연결 및 readOnly 설정만 투영한다.

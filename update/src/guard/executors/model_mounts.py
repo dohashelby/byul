@@ -1,7 +1,7 @@
 """A1 Kubernetes binding을 소비하는 model hostPath 선언 분석. 수집 연결은 제안 상태."""
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.kubernetes_binding import validate_capture_target, verify_owned_pod
-from .model_mapping import validate_model_mapping
+from guard.collectors.model_mapping import validate_model_mapping
 
 
 def _projection(pod, container, mapping):

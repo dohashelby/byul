@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=78.1.1,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "byul-b-cpu-plugin-probe"
+version = "0.0.1"
+requires-python = ">=3.12,<3.13"
+
+[project.entry-points."vllm.general_plugins"]
+byul-approved = "byul_b_cpu_probe.approved:general"
+byul-unapproved = "byul_b_cpu_probe.unapproved:general"
+
+[project.entry-points."vllm.endpoint_plugins"]
+byul-approved = "byul_b_cpu_probe.approved:endpoint"
+byul-unapproved = "byul_b_cpu_probe.unapproved:endpoint"
+byul-task-mismatch = "byul_b_cpu_probe.mismatch:endpoint"
+
+[project.entry-points."vllm.logits_processors"]
+byul-approved = "byul_b_cpu_probe.approved:Logits"
+byul-unapproved = "byul_b_cpu_probe.unapproved:Logits"
+
+[project.entry-points."vllm.io_processor_plugins"]
+byul-approved = "byul_b_cpu_probe.approved:io_factory"
+byul-unapproved = "byul_b_cpu_probe.unapproved:io_factory"

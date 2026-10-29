@@ -52,3 +52,32 @@ aux/첨부 실패 보존을 직접 회귀했다. collector `de799c2`의 승인 l
 `31c4d3bd3ff6416b9a174dcfe7514766e7be12e4fb819499499bd32a6f830dfe`를 연결한 뒤
 producer 직접 계약 **62 passed / pytest 1.52초 / 부모 wall 1.58초**를 확인했다.
 실제 CPU 재실행은 통합 snapshot을 인계받은 collector 담당자가 한 번 수행한다.
+
+## 실제 CPU 재검증과 Kubernetes 연결 잔여 — 2026-10-29
+
+통합 코드 `a5ab8992b25ed2a0c452b3734856de5244212229`에서 target031 실제 16건과
+후속 정상 16건을 한 번 수집했다. tokenizer/config 독립 domain 0..31·model vocab32와
+실제 parsed→processor→admitted `[32]`의 동일 hash를 확인했고, 세 EVD는
+COMPLETED/DECLARED이며 REQ-08 security FAIL을 보존했다. REQ-07·SUP-08 및 나머지
+판정 축은 UNKNOWN이다. 실제 CPU 수집 38.52초, 파이프라인 부모 wall 40.60초이며
+Store 오류0·exact Ref 재판정 동일·정제 첨부3개의 bytes/SHA 일치를 확인했다.
+독립 검토자는 기존 OOV 오라클 finding의 해결을 읽기 전용으로 확인했다.
+
+로컬 전체 회귀는 **6269 passed / 기존 제외19**, pytest **160.79초**, 부모 wall
+**161.31초**다. 최초 실행은 Mac 기본 임시 경로의 심볼릭 링크를 기존 출력 정책이
+거부해 8건 실패했고, 원본 로그를 보존했다. 기존 실경로 설정 `TMPDIR=/private/tmp`로
+같은 코드 전체를 재검증했으며 코드·시험·판정·제외 조건은 바꾸지 않았다.
+
+원본 `/private/tmp/byul-online-input-product-target031-20261029-2`와 형제 증거 폴더
+`byul-b1-online-evidence-20261029/product-target031-run-2`의 파일35개 hash를 대조했다.
+후자의 Store에서 bundle export→새 경로 restore를 실행해 manifest·7종 객체의 exact Ref
+일치와 복원 Store 오류0을 확인했다. 이전 `-1`과 환경152개 freeze는 원본대로 보존한다.
+전체 로그는 `/private/tmp/byul-online-input-local-final-20261029/`에 있다.
+
+이 결과는 CPU 단계의 근거다. 사용자 최신 마감 기준에 따라 현재 묶음은 Kubernetes
+실제 대상의 요청·실제 프로세스 수집·판정·증거 저장·복구/정리 연결까지 계속 개발한다.
+B 전용 native snapshot과 실행 orchestration은 별도 worktree에서 병렬 작성 중이며,
+A 공통 Online HTTP profile·source-qualified sensor/parser·소유 session seal 확장과
+승인 대상·run/복구 담당자 인계는 [구체 요청](https://github.com/dohashelby/byul/pull/67#issuecomment-6492998272)으로 남겼다.
+현재 Kubernetes 실수집·실행 준비 완료·영구 제품 등록을 집계하지 않는다. GitHub CI의
+결제 차단은 별도 대기로 유지하며 이 CPU 단계만을 위한 추가 PR은 만들지 않는다.

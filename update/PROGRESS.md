@@ -1413,3 +1413,10 @@ git status
 - 첫 고정 검증: Windows804통과·새시험3실패·6오류·기존skip1/제외1(174.94초),1189파일 불변을 보존했다. 긴 parameter 이름이 Windows32767자 환경변수 한도를 넘고, 실제 put이 occupied 상태에서 BaseException을 교체하지 않는 원래 동작과 시험가정이 달랐다. 중복 ASGI fixture가 모든 nonce를 중복시켜 call 자체가 거부된 원인도 확인했다. 짧은 시험ID·원래 Exception/그외 BaseException 의미와 취소 시험·ASGI nonce만 중복시키는 대역으로 보수하며 제품 guard/code literal은 변경하지 않는다. pytest 종료 뒤 긴 행 정규식에 머문 소유 요약기만, 원본로그와 독립파일불변성 receipt를 남기고 종료했다. 검증중 소스변경이나 시험중단은 없었다.
 
 - 보수·설치 마감: 정확0c12a4d/같은guard ac48622에서 Windows183통과·기존skip1/제외1(42.12/42.776초),동일1189bytes Linux영향814통과·제외1(50.06/50.392초),183파일 source/wheel/격리설치 일치와 준비CLI3·제품CLI4 각정확6Ref 왕복(8.988초),실제LinuxFD/의존성/owncode/fork16사례(.044초)를 확인했다. 검증중 소스변경·새skip/제외·제품가정완화는 없었다. 이전native10 전체6942/실제REQ11wheel은 당시판본 근거로 보존한다. 최종 결과 문서만 갱신하고 초안PR·정확HEAD CI·인계를 마감한다.
+
+## 2026-10-30 — A-1 OBS01 필수 사건 기록 제품 묶음
+
+- 한 일: 확정ec4df88와c9기준·기존미커밋/전용bytes를 보존하고 SC23-03/02를 기존 CLI에 연결하는 required_event_record:kubernetes를 작성한다. OBS01 전용 허용/거부/후속정상 공개profile·별도 소유 정제record reader·명시 ENV/target/source주장/기업event policy/actor/필수사건/기한POL·현재request 및record 귀속대조·DRAFT77개/다른76bytes 보존을 포함한다. REQ02의 미인증 주장을 독립 사건 증거로 바꾸지 않는다.
+- 테스트 결과: 구현·시험·계약 문서 초안 후 AST/원본보존 정적검토 단계다. 고정checkpoint→검토된전체pin→직접/인접/불변식→동일bytes Linux/설치CLI·정확6Ref 검증 전에는 새 통과로 기록하지 않는다. 정상·잘못된귀속 후보·누락·교체/재시작·재확보·후속첨부/정리·민감필드재라벨 거부를 준비했다.
+- 다음 단계: 영향검증·설치·정확커밋/Ref 인계를 마감한 뒤 준비된 본인 담당개발을 이어간다. 기록metadata와공개응답은 trusted principal/감사생산자·승인/배포 실제사건의 독립증거가 아니므로 모든축UNKNOWN과scope/producer/independenttriggerfalse를 유지한다.
+- 막힌 것: 실제 trusted Gateway/감사생산자와관리·승인·소비·배포 발생원, 기업보존/기한조건·실제환경실증·전체OBS01/부모A는 미완료다. 필수미지원사건을missing에남기며 기존독립FAIL·기본native8~11/B/A2와원래GPU창종료·추가Start0·마지막확인stopped·CI결제차단을유지한다.

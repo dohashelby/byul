@@ -28,7 +28,8 @@ MODEL_AUTHORIZATION_PROFILE = "kubernetes-owned-model-authorization-http-v1"
 ONLINE_INPUT_PROFILE = "kubernetes-owned-online-input-http-v1"
 TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
 REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
-_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE})
+from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
+_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE})
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -75,7 +76,7 @@ class KubernetesHTTP:
         if profile not in {PROFILE, *_BINDING_PROFILES}:
             raise KubernetesBindingError()
         self.profile = profile
-        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
             raise KubernetesBindingError()
         if profile in _BINDING_PROFILES:
             try:
@@ -109,7 +110,7 @@ class KubernetesHTTP:
         self.injected = runner is not None
         self.process_observation_origin = ('EXAMPLE' if self.injected or target['lab']
             or env.data_origin.value == 'EXAMPLE' else 'MEASURED')
-        if profile in {ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE} and self.process_observation_origin != 'EXAMPLE':
+        if profile in {ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE} and self.process_observation_origin != 'EXAMPLE':
             self.process_observation_origin = env.data_origin.value
         # This profile admits only its pinned HTTP Pod endpoint below. Preserve
         # its published source/fixture bytes when the general probe evolves.
@@ -146,6 +147,9 @@ class KubernetesHTTP:
         self._model_authorization_token = None
         self._model_authorization_cases = set()
         self._model_normal_credential = None
+        self._required_event_token = None
+        self._required_event_cases = set()
+        self._required_event_credential = None
         self._online_dispatch = threading.Lock()
         self._online_token = None
         self._online_cases = set()
@@ -310,6 +314,9 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._model_authorization_request(request)
+                elif self.profile == REQUIRED_EVENT_PROFILE:
+                    if len(requests)!=1:raise KubernetesBindingError()
+                    self._required_event_request(request,timeout)
                 elif self.profile == ONLINE_INPUT_PROFILE:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
@@ -451,6 +458,21 @@ class KubernetesHTTP:
                     self._model_normal_credential = headers["Authorization"]  # transient, never report/config
         except (KeyError, TypeError, ValueError):
             raise KubernetesBindingError() from None
+
+
+    def _required_event_request(self,request,timeout):
+        from .kubernetes_observation import validate_request
+        try:
+            slot,token,credential=validate_request(request,api_model=self.api_model,timeout=timeout)
+            with self.lock:
+                if (slot in self._required_event_cases or 'after' in self._required_event_cases
+                        or slot!='before' and 'before' not in self._required_event_cases
+                        or self._required_event_token is not None and token!=self._required_event_token
+                        or slot=='after' and credential!=self._required_event_credential
+                        or slot=='denied' and credential==self._required_event_credential):raise ValueError
+                self._required_event_token=token;self._required_event_cases.add(slot)
+                if slot=='before':self._required_event_credential=credential
+        except (KeyError,TypeError,ValueError):raise KubernetesBindingError() from None
 
 
     def _online_input_request(self, request, timeout):

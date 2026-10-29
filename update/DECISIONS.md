@@ -584,3 +584,7 @@
 
 ## 2026-10-30 A1 LIF09 초기화 부분 실패 관측
 native14는 native8~13 bytes를 보존하고 source/code/descriptor 검증 후 원호출을 관측한다. 한 선언 단계의 같은 프로세스 준비/상위 결과만 결합하며 phase/scenario·READY·API200·종료 파일을 전체 모델/서비스/복귀 증명으로 올리지 않는다. 새 명시 HTTP 프로필에서 running engine Ready=false만 허용하고 소유 probe Ready=true와 기존 세대/source/image/lab 관문을 유지한다. 전체 범위UNKNOWN/null·미완료와 부모A39/56/4·A1 19/27/2·기존비용/권한/소유권 경계를 유지한다.
+
+
+## 2026-10-30 A1 LIF11 선정 자원 회수/후속 기동 관측
+선정 자원 census는 승인된 numeric PID/start/uid/namespace·FD/device/inode만 읽고 scan/신호/내용을 추가하지 않는다. selected FD 부재≠전체 자원 반환이다. 무조건 절대 기한과 실패 trigger에 조건부인 기한을 구분하며 전후 소유/시계 결합이 있는 명시 절대 잔존 위반만 기존 rule_table functional FAIL에 연결한다. 전체 PASS/회수/후속기동은 미완료로 유지하고 후속 오류가 독립 FAIL을 지우지 않게 한다. 기존 native8~14/A2/B 원본·lab/source/image/PID 관문·권한/비용을 보존한다.

@@ -1502,3 +1502,10 @@ git status
 막힌 것: 실제 실패/복귀 기동 lineage·독립접수/모델준비·신뢰 생산자·GPU창 종료/Start0·CI결제 차단. 기존실증은 당시 source만 증명한다.
 
 - 검증 마감: 검증 소스99e7f82efd45dcd18518ae577a0ede0e160a519b, 고정 공통 소비4b0483e48d7da0fc7b0aeaa5ff01e7549177bdf9. 첫 Windows26실패와 named pipe 보수 후 Windows1실패612통과/Linux1실패613통과 로그·1263파일 명세를 보존했다. 유일한 응답ID 불일치 wire 중단 기대를 보수한 후 Windows174통과/기존skip1·deselect1(55.99초/부모56.788초), 동일1263파일 Linux175통과/기존deselect1(16.99초/부모17.296초)을 확인했다. 제품 소스/팩/빌드 변경 없음과 소스-wheel217파일 bytes 동일성을 확인해 기존 인접 통과와 격리 설치217파일/CLI4사례/정확24Ref 왕복7.986초를 재사용했다. 공통 소비325파일/경로제외0/hash자동승인false, A2선정12/B원본27/native8~13을 보존했다. 전체 소스 변경·관문완화·새skip/제외·기대값 완화는 없다. 원GPU창종료/Start0/실제실증미완료·모든 새 판정UNKNOWN/normal succeeded=null·단일 선언 단계만 연결·부모A39 및 전체LIF09 완료false를 유지한다. 기존Linux전체6942는 당시 native10 소스의 이력이며 새 소스 전체 통과로 표시하지 않는다.
+
+
+## 2026-10-30 A1 LIF11 선정 자원 회수/후속 기동 관측
+한 일: 원팩 두 분기를 보존하고 선정 PID/start·FD/inode의 닫힌 Linux census를 기존 Kubernetes CLI/팩/등록·native13/14·증거 경계에 연결했다. 명시 무조건 절대 회수 기한의 동일 자원 잔존은 functional 독립 FAIL이며 조건부 장애 기한·전체 회수/후속 기동은 별도 미확인이다.
+검증: 구현·회귀·문서 초안 종료·source/hash 고정 뒤 영향/Linux/설치본 CLI/정확Ref 검증 예정이다. 현재 새 소스 통과/실제 실증을 선언하지 않는다.
+다음: 고정 검증/필요 보수/커밋·초안PR·정확CI/인계 후 준비된 담당 개발 지속.
+막힌 것: 실제 실패/회수 인과·전체 자원/공유참조/GPU·같은 환경의 다음 정상 기동 lineage·원GPU창종료/Start0·CI결제 차단.

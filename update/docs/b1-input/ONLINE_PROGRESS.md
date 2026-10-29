@@ -99,3 +99,25 @@ AST 동일성을 대조했고, 실제 현재 소스에서 strict component와 On
 source pin 대조 기록은 `/private/tmp/byul-online-input-pin-refresh-20261029.json`,
 정상 소비 기록은 `/private/tmp/byul-online-input-pin-refresh-positive-20261029.json`이다.
 이 변경은 고정 소스의 집중 검토 대상에 포함한다.
+
+## B 전용 Kubernetes 연결 소스의 로컬 검증
+
+코드 snapshot `c0a1d413cf0244c9d9c579b53fe34fc813b25d15`의 최종 전체 회귀는
+**6390 passed / 기존 제외19**, pytest **154.12초**·부모 wall **154.55초**다.
+검증 중 source는 변경하지 않았다. 검토 5건(이미지/출처 자격, 기본거부 gate 연결,
+실제 길이 경계, 정상 after 대조, text-only probe 제한)과 gate의 check 오귀속 후속을
+수정했고 검토자가 해당 지적의 해결만 확인했다. 전용 native 회귀48건·runner 회귀73건과
+실제 generate/pooling 두 객체의 길이 경계 관측10.10초를 재사용했다.
+
+최종 native bytes SHA는 `bd15958029e91ba189c2fe588009a97ddd4d3d339e32824e5e5016a52fa736b1`이다.
+wheel의 guard158파일은 소스 bytes와 같고, 별도 Python3.12 환경의 설치본에서 stdlib-only
+callback import와 미지원 point의 unavailable 반환을 확인했다. native 경계 직접 관측 두
+판본과 최종 로그/소스 pin 대조·wheel 검증은 형제 증거 폴더에 보존한다.
+
+이 단계에서 실행 명령·실제 객체 snapshot·B native join/판정·EVD/RES/RPT·Store 검증·
+export/restore·exactRef 재판정·소유 probe/session 정리 본체를 작성했다. A native/HTTP/seal
+및 provenance 계약·literal pin은 미확정 값으로 차단한다. 실제 배포 대상의 model/domain/
+활성 기능·운영/복구 담당·정확 복구 절차를 받은 뒤 확정 통합 source에서 실행해야 한다.
+기존 CPU 증거와 EXAMPLE 회귀를 Kubernetes 실측으로 집계하지 않으며 전체 묶음의
+실환경 마감은 남겨 둔다. 명령과 입력은 `KUBERNETES_RUN.md`, callback은
+`NATIVE_CALLBACK.md`를 따른다.

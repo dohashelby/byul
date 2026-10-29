@@ -79,3 +79,20 @@ REQ08 정상 ID의 reuse도 실제 decoder admission이 model max보다 길면 �
 After는 보호필드 없는 독립 text 요청으로 제한한다. 그 요청의 renderer parsed defaults, 실제 InputProcessor CALL/RETURN, config와 독립 input/admitted domain membership=True, 비어 있지 않은 integer ID와 동일 admission hash를 확인한다. OOV32가 반환된 after는 정상으로 인정하지 않으며 primary의 이미 확인된 위반은 보존한다.
 
 messages는 role(system/user/assistant)와 문자열 content만 허용하고 remote URL/data URI·image/audio/video/file 항목을 거부한다. primary와 after 각각 canonical body 128KiB 상한을 적용한다. 이는 선정된 안전 text probe의 기술 범위다.
+
+## 실제 실행 재개와 운영자 복구 인계
+
+A의 현재 `KubernetesTransition`은 읽기 전용 전환 gate다. 배포·종료·복원은 운영자가 수행한다.
+실제 실행 전 A/운영자는 복원할 exact manifest/config bytes, 해당 namespace/workload/run 소유
+검증 조건, 승인된 Recreate/복구 명령과 성공 확인 절차를 제공해야 한다. 이 입력이 없는 동안
+현재 B 실행을 Kubernetes 실행 준비 완료로 집계하지 않는다.
+
+B 도구는 원본 EVD/RES/RPT를 보존하고 소유 계측 session/probe를 종료한다. 서비스 실패·GPU
+오류가 발생하면 해당 run의 복구 담당자가 승인된 절차로 복원한다. 재시작 뒤에는 실제 새
+Pod/container/image/restart/start 신원으로 target을 다시 수집하고 정상 대조를 새 run과
+별도 exact Ref로 남긴다. 자동으로 최신 revision/다른 Pod를 선택하거나 기존 target 신원을
+재사용하지 않는다. Ready 상태와 실제 worker 종료/GPU 반납 관측은 각각 확인한다.
+
+최종 로컬 고정 코드 `c0a1d413`은 전체6390건·기존제외19 통과(pytest154.12초/부모154.55초),
+native48건·runner73건 및 검토 지적 해결 확인을 마쳤다. 실제 Kubernetes 요청은 실행하지
+않았으며 A 미확정 capability/source/provenance pin의 요청 전 차단은 유지한다.

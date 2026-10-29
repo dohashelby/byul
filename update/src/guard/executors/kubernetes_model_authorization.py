@@ -11,7 +11,6 @@ from pathlib import Path
 import re
 import uuid
 
-from guard.collectors.lifecycle import load_prepared
 from guard.adapters.vllm_model_authorization import project_native
 from guard.models import DataOrigin, ExecStatus, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
@@ -106,6 +105,8 @@ class KubernetesModelAuthorizationExecutor(HttpCheckExecutor):
 
     def run(self, check, env, policy_values, adapter, workdir):
         self.validate_policy(check, policy_values)
+        # Asset preparation imports application helpers; defer until registry loading is complete.
+        from guard.collectors.lifecycle import load_prepared
         try:
             if set(self.cfg) - {"target", "prepared", "roles", "kubectl_binary", "max_duration_seconds"} or adapter is None:
                 raise ValueError

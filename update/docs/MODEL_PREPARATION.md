@@ -1,5 +1,27 @@
 # 모델·inventory와 모델 mount 준비
 
+## 2026-10-29 inventory 수집 중 교체 보수
+
+기존 `inventory`·`build_manifest`·`inspect_snapshot` 제품 경로에서 파일을
+읽는 descriptor의 device/inode/크기/mtime을 선택한 파일과 대조한다.
+경로와 descriptor의 ctime 의미가 다른 OS가 있어 각각의 관측원 안에서 전후
+ctime 안정성을 확인하며 두 값을 같은 시각이라고 가정하지 않는다.
+각 읽기 후와 전체 수집 종료 시 논리 경로의 해석 대상·파일 상태·선정 목록·root
+신원이 바뀌면 완전 inventory를 반환하지 않는다. snapshot 소비는 기존
+`MODEL_SNAPSHOT_UNAVAILABLE`을 유지하며 임의 예외 원문을 저장하지 않는다.
+동일한 파일의 출력 형식·정렬·bytes·정규 inventory hash와 symlink 추적 규칙은 같다.
+
+이것은 조사 도중 발견한 교체를 누락하지 않는 보수다. 파일시스템의 원자적
+snapshot/잠금·불변성·후속 worker의 같은 bytes 소비·tensor/rank 완전 적재를
+보장하지 않는다. 실제 Kubernetes worker의 open/read/load와 source/model 세대
+귀속은 공통 관측과 별도 연결해야 하며 SUP03/05/06 보안 완료로 집계하지 않는다.
+같은 metadata를 유지한 in-place 변경/복원이나 마지막 조회 이후의 변경까지
+탐지·차단한다고 주장하지 않는다. metadata 점검을 위해 모델 전체 bytes를
+중복해서 읽거나 새로운 파일시스템 잠금·시간 기준을 추가하지 않는다.
+
+아래는 최초 준비 당시 기록이다. 공통 모델 매핑/mount 제품 소비는 `ef75639`
+및 현재 공동 기준 `c9af729`에 통합됐으며, 이 보수는 그 코드를 재적용하지 않는다.
+
 이 문서는 A-2 전용 준비 흐름이다. 공통 기준은 `fcb6c40f`의 profile8,
 `validate_capture_target`과 `verify_owned_pod`다. 새 공통 CLI·전송·등록·판정은
 추가하지 않는다. `model_mapping`과 `model_mounts`는 공통 연결 전의 제안 소비자다.

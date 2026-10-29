@@ -15,16 +15,44 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import stat
 
 from guard.models.hashing import canonical_json, sha256_hex  # noqa: E402
 
 
-def _file_sha256(path: Path) -> str:
+def _file_identity(value):
+    return (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns,
+            value.st_ctime_ns, stat.S_IFMT(value.st_mode))
+
+
+def _file_source(path: Path):
+    resolved = path.resolve(strict=True)
+    value = resolved.stat()
+    if not stat.S_ISREG(value.st_mode):
+        raise ValueError("MODEL_INVENTORY_NOT_REGULAR")
+    return resolved, _file_identity(value)
+
+
+def _file_sha256(path: Path, *, expected_identity=None) -> str:
+    # Path metadata alone cannot bind a digest to the descriptor actually read.
+    expected = _file_identity(path.stat()) if expected_identity is None else expected_identity
+    if expected[-1] != stat.S_IFREG:
+        raise ValueError("MODEL_INVENTORY_NOT_REGULAR")
     h = hashlib.sha256()
+    count = 0
     with path.open("rb") as f:
+        before = _file_identity(os.fstat(f.fileno()))
+        # ctime has different meanings in some Windows stat/fstat results.
+        # Keep its stability checks within each source, never equate clocks.
+        if before[:4] != expected[:4] or before[5] != expected[5]:
+            raise RuntimeError("MODEL_INVENTORY_SOURCE_CHANGED")
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
+            count += len(chunk)
+        if _file_identity(os.fstat(f.fileno())) != before or count != before[2]:
+            raise RuntimeError("MODEL_INVENTORY_SOURCE_CHANGED")
     return h.hexdigest()
 
 
@@ -56,15 +84,30 @@ def inventory(snapshot: Path, scope: str = "all") -> dict:
     if scope not in ("vllm", "all"):
         raise ValueError(scope)
     snapshot = Path(snapshot).expanduser()
+    root = snapshot.resolve(strict=True)
+    root_stat = root.stat()
+    if not stat.S_ISDIR(root_stat.st_mode):
+        raise ValueError("MODEL_INVENTORY_ROOT_INVALID")
+    root_identity = (root, root_stat.st_dev, root_stat.st_ino)
     all_paths = sorted(p.relative_to(snapshot).as_posix() for p in snapshot.rglob("*") if not p.is_dir())
     selected = set(vllm_read_files(all_paths) if scope == "vllm" else all_paths)
-    files = []
-    for p in sorted(snapshot.rglob("*")):
-        if p.is_dir() or p.relative_to(snapshot).as_posix() not in selected:
-            continue
-        real = p.resolve(strict=True)
-        files.append({"path": p.relative_to(snapshot).as_posix(), "bytes": real.stat().st_size, "sha256": _file_sha256(real)})
-    files.sort(key=lambda f: f["path"])
+    files, sources = [], {}
+    for relative in sorted(selected):
+        path = snapshot / relative
+        real, identity = _file_source(path)
+        digest = _file_sha256(real, expected_identity=identity)
+        if _file_source(path) != (real, identity):
+            raise RuntimeError("MODEL_INVENTORY_SOURCE_CHANGED")
+        sources[relative] = (real, identity)
+        files.append({"path": relative, "bytes": identity[2], "sha256": digest})
+    # Recheck earlier files too: a later read may overlap their replacement.
+    current_paths = sorted(p.relative_to(snapshot).as_posix() for p in snapshot.rglob("*") if not p.is_dir())
+    current_selected = set(vllm_read_files(current_paths) if scope == "vllm" else current_paths)
+    current_root = snapshot.resolve(strict=True)
+    current_stat = current_root.stat()
+    if (current_selected != selected or (current_root, current_stat.st_dev, current_stat.st_ino) != root_identity
+            or any(_file_source(snapshot / relative) != value for relative, value in sources.items())):
+        raise RuntimeError("MODEL_INVENTORY_SOURCE_CHANGED")
     return {"scope": scope, "file_count": len(files), "total_bytes": sum(f["bytes"] for f in files), "files": files,
             "inventory_sha256": sha256_hex(canonical_json(files))}
 

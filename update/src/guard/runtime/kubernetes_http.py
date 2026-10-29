@@ -27,7 +27,8 @@ VALIDATION_ERROR_PROFILE = "kubernetes-owned-validation-error-http-v1"
 MODEL_AUTHORIZATION_PROFILE = "kubernetes-owned-model-authorization-http-v1"
 ONLINE_INPUT_PROFILE = "kubernetes-owned-online-input-http-v1"
 TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
-_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE})
+REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
+_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE})
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -74,7 +75,7 @@ class KubernetesHTTP:
         if profile not in {PROFILE, *_BINDING_PROFILES}:
             raise KubernetesBindingError()
         self.profile = profile
-        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
             raise KubernetesBindingError()
         if profile in _BINDING_PROFILES:
             try:
@@ -108,7 +109,7 @@ class KubernetesHTTP:
         self.injected = runner is not None
         self.process_observation_origin = ('EXAMPLE' if self.injected or target['lab']
             or env.data_origin.value == 'EXAMPLE' else 'MEASURED')
-        if profile in {ONLINE_INPUT_PROFILE, TERMINATION_PROFILE} and self.process_observation_origin != 'EXAMPLE':
+        if profile in {ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE} and self.process_observation_origin != 'EXAMPLE':
             self.process_observation_origin = env.data_origin.value
         # This profile admits only its pinned HTTP Pod endpoint below. Preserve
         # its published source/fixture bytes when the general probe evolves.
@@ -151,6 +152,8 @@ class KubernetesHTTP:
         self._online_pending = None
         self._termination_token = None
         self._termination_cases = set()
+        self._attempt_token = None
+        self._attempt_cases = []
 
     def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False):
         remaining = self.deadline - self.clock()
@@ -229,7 +232,7 @@ class KubernetesHTTP:
             with self.lock:self.snapshot_reads.append(row)
 
     def __call__(self, network, requests, timeout):
-        if self.profile in {ONLINE_INPUT_PROFILE, TERMINATION_PROFILE}:
+        if self.profile in {ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE}:
             # These closed procedures are serial; legacy sampling/REQ10 stay concurrent.
             with self._online_dispatch:
                 return self._binding_requests(network, requests, timeout)
@@ -315,6 +318,10 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._termination_request(request, timeout)
+                elif self.profile == REQUEST_ATTEMPTS_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._attempt_request(request, timeout)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -323,7 +330,7 @@ class KubernetesHTTP:
                 url=urlsplit(value.get("url",""));mode=value.get("mode","json")
                 allowed={"id","mode","method","url","headers","body","read_delay_ms"}
                 paths={"/tokenize","/v1/chat/completions"}
-                if self.profile==TERMINATION_PROFILE:
+                if self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE}:
                     allowed.add("read_profile");paths.add("/v1/completions")
                 if (set(value)-allowed
                         or value.get("method")!="POST" or mode not in {"json","sse"}
@@ -349,7 +356,7 @@ class KubernetesHTTP:
             keys={"id","mode","method","outcome","body","body_bytes","body_sha256","body_truncated",
                   "utf8_valid","capture_complete","eof","terminal_seen","events","content_type","connection_id",
                   "dispatch_ms","request_sent_ms","headers_ms","end_ms","elapsed_ms","timing_basis"}
-            if self.profile==TERMINATION_PROFILE:
+            if self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE}:
                 keys|={"client_closed","client_close_ms","read_count","read_pause_count","read_observations","stop_reason","relative_clock"}
             by_id={row["id"]:row for row in raw};results=[]
             for request in prepared:
@@ -363,7 +370,9 @@ class KubernetesHTTP:
             with self.lock:
                 self.rows.extend({"id":row["id"],"binding_verified_before_after":True,"outcome":row["outcome"],
                     "capture_complete":row.get("capture_complete") is True,
-                    **({"expected_client_close":self._termination_close(row)} if self.profile==TERMINATION_PROFILE else {})} for row in results)
+                    **({"expected_client_close":self._termination_close(row,
+                        "req12-disconnect" if self.profile==REQUEST_ATTEMPTS_PROFILE else "lif10-disconnect")}
+                        if self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE} else {})} for row in results)
             return results
         except Exception:
             with self.lock:
@@ -590,10 +599,10 @@ class KubernetesHTTP:
             raise KubernetesBindingError() from None
 
     @staticmethod
-    def _termination_close(row):
+    def _termination_close(row,expected_id="lif10-disconnect"):
         """A client handle close is an observation, never server/native completion."""
         body=row.get("body");reads=row.get("read_observations")
-        return (row.get("id")=="lif10-disconnect" and row.get("mode")=="sse"
+        return (row.get("id")==expected_id and row.get("mode")=="sse"
             and type(row.get("outcome")) is int and row["outcome"]==200
             and row.get("content_type")=="text/event-stream" and row.get("client_closed") is True
             and row.get("stop_reason")=="client_close" and row.get("capture_complete") is False
@@ -609,6 +618,47 @@ class KubernetesHTTP:
             and all(type(reads[0][k]) is int for k in reads[0]) and reads[0]["seq"]==0
             and reads[0]["bytes"]==1 and 0<=reads[0]["started_ms"]<=reads[0]["finished_ms"]
             and type(row.get("client_close_ms")) is int and row["client_close_ms"]>=reads[0]["finished_ms"])
+
+    def _attempt_request(self,request,timeout):
+        """Closed repeated-external-ID procedure; session tags are auxiliary, not attempt IDs."""
+        try:
+            order=("normal-first","normal-repeat","disconnect","replacement","after")
+            if (type(request) is not dict or set(request)-{"id","mode","method","url","headers","body","want_body","read_delay_ms","read_profile"}
+                    or timeout>30 or request.get("method")!="POST" or request.get("want_body",True) is not True
+                    or type(request.get("read_delay_ms",0)) is not int or request.get("read_delay_ms",0)!=0):raise ValueError
+            case=request.get("id","").removeprefix("req12-")
+            if request.get("id")!="req12-"+case or case not in order:raise ValueError
+            headers=request.get("headers");body=request.get("body")
+            if type(headers) is not dict or set(headers)!={"X-Request-Id"} or type(headers["X-Request-Id"]) is not str:raise ValueError
+            group="normal" if case.startswith("normal-") else "shared" if case in {"disconnect","replacement"} else "after"
+            token=re.fullmatch(r"byul-req12-([0-9a-f]{32})-"+group,headers["X-Request-Id"])
+            if token is None:raise ValueError
+            closed=case=="disconnect"
+            expected={"model":self.api_model,"prompt":"hello","max_tokens":8 if closed else 1,"temperature":0,"stream":closed,
+                "session_id":"byul-req12-"+token[1]+"-"+case}
+            if (urlsplit(request.get("url","")).path!="/v1/completions" or request.get("mode","json")!=("sse" if closed else "json")
+                    or type(body) is not dict or body!=expected or type(body.get("model")) is not str
+                    or type(body.get("prompt")) is not str or type(body.get("session_id")) is not str
+                    or type(body.get("max_tokens")) is not int or type(body.get("temperature")) is not int
+                    or type(body.get("stream")) is not bool):raise ValueError
+            if closed:
+                read=request.get("read_profile")
+                if (type(read) is not dict or read!={"profile":"slow-reader-v1","chunk_bytes":1,"interval_ms":1,"close_after_reads":1}
+                        or type(read.get("profile")) is not str
+                        or any(type(read[k]) is not int for k in ("chunk_bytes","interval_ms","close_after_reads"))):raise ValueError
+            elif "read_profile" in request:raise ValueError
+            with self.lock:
+                if self._attempt_token is not None and self._attempt_token!=token[1]:raise ValueError
+                prior=tuple(self._attempt_cases)
+                # A failed normal control may omit both challenge requests and
+                # still collect the final normal request; never send replacement alone.
+                valid=(not prior and case==order[0] or prior==order[:1] and case==order[1]
+                    or prior==order[:2] and case in {order[2],order[4]}
+                    or prior==order[:3] and case in {order[3],order[4]}
+                    or prior==order[:4] and case==order[4])
+                if not valid:raise ValueError
+                self._attempt_token=token[1];self._attempt_cases.append(case)
+        except (KeyError,TypeError,ValueError,AttributeError):raise KubernetesBindingError() from None
 
     def template_snapshot(self, identity, argv, command, reader):
         """Fixed bounded reader in the exact owned engine generation; no raw spec retained."""
@@ -658,15 +708,17 @@ class KubernetesHTTP:
                     "probe_source_sha256": self.source_sha256,
                     "requests": sorted(deepcopy(self.rows), key=lambda row: row["id"] or ""),
                     "collection_gap": self.failed or (self.profile in _BINDING_PROFILES and any(row.get("capture_complete") is not True
-                        and not (self.profile==TERMINATION_PROFILE and row.get("expected_client_close") is True) for row in self.rows))
+                        and not (self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE} and row.get("expected_client_close") is True) for row in self.rows))
                         or (self.profile == ONLINE_INPUT_PROFILE and self._online_pending is not None)
-                        or (self.profile==TERMINATION_PROFILE and bool(self.cleanup_errors)),
+                        or (self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE} and bool(self.cleanup_errors)),
                     **({"snapshot_reads":deepcopy(self.snapshot_reads)} if self.snapshot_reads else {}),
                     **({"cleanup_errors":list(self.cleanup_errors)} if self.profile in _BINDING_PROFILES else {}),
                     **({"input_contract_version":1,"data_origin":self.process_observation_origin,
                         "native_consumption_verified":False} if self.profile==ONLINE_INPUT_PROFILE else {}),
                     **({"data_origin":self.process_observation_origin,"native_termination_verified":False,
                         "termination_contract_version":1} if self.profile==TERMINATION_PROFILE else {}),
+                    **({"data_origin":self.process_observation_origin,"attempt_contract_version":1,
+                        "native_attempt_delivery_verified":False} if self.profile==REQUEST_ATTEMPTS_PROFILE else {}),
                     "limitations": ["Explicit operator selection and guard.run label are not an approval signature.",
                                     "Pod spec digest and exact runtime imageID are bound; manifest-index ancestry is not verified.",
                                     "No GPU execution, runner consumption, resource/log isolation or deployed caller path proof."]}

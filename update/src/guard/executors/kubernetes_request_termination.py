@@ -46,16 +46,29 @@ def normalize_policy(values):
 class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
     name="request_termination";version="0.1.0"
     requires_roles=False;requires_route_scope=False;functional_via="engine"
+    check_id="LIF-10";collection_profile=PROFILE;policy_prefix="termination"
+    policy_normalizer=staticmethod(normalize_policy);transport_profile=TERMINATION_PROFILE
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target_sha256=expected_target_sha256
 
     def validate_policy(self,check,values):
-        if check.id!="LIF-10" or getattr(check,"collection_profile",None)!=PROFILE:
+        consumer=self._consumer(check)
+        if consumer is not self:return consumer.validate_policy(check,values)
+        if check.id!=self.check_id or getattr(check,"collection_profile",None)!=self.collection_profile:
             raise ValueError("TERMINATION_PROFILE_UNSUPPORTED")
-        normalize_policy(values)
+        self.policy_normalizer(values)
+
+    def _consumer(self,check):
+        if self.check_id=="LIF-10" and check.id=="REQ-12":
+            from .kubernetes_request_attempts import KubernetesRequestAttemptsExecutor
+            return KubernetesRequestAttemptsExecutor(self.cfg,runner=self.runner,environ=self._environ,
+                expected_target_sha256=self.expected_target_sha256)
+        return self
 
     def run(self,check,env,policy_values,adapter,workdir):
+        consumer=self._consumer(check)
+        if consumer is not self:return consumer.run(check,env,policy_values,adapter,workdir)
         self.validate_policy(check,policy_values)
         from guard.collectors.lifecycle import load_prepared
         try:
@@ -63,18 +76,18 @@ class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             with Path(self.cfg["target"]).open("rb") as stream:target=strict_json(stream.read(65537),limit=65536)
             digest=sha256_hex(canonical_json(target))
-            if (digest!=policy_values["termination_target_sha256"] or env.ref().sha256!=policy_values["termination_environment_sha256"]
+            if (digest!=policy_values[self.policy_prefix+"_target_sha256"] or env.ref().sha256!=policy_values[self.policy_prefix+"_environment_sha256"]
                     or self.expected_target_sha256 is not None and self.expected_target_sha256!=digest):raise ValueError
             prepared=load_prepared(self.cfg["prepared"])
             if prepared["profile"] not in {"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9"}:raise ValueError
-            start,end=normalize_policy(policy_values)
+            start,end=self.policy_normalizer(policy_values)
             if not start<=utcnow()<=end:raise ValueError
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError("TERMINATION_CONFIGURATION_INVALID") from None
         transport=KubernetesHTTP(target,env,duration=self.cfg.get("max_duration_seconds",120),runner=self.runner,
-            binary=self.cfg.get("kubectl_binary","kubectl"),profile=TERMINATION_PROFILE)
+            binary=self.cfg.get("kubectl_binary","kubectl"),profile=self.transport_profile)
         ctx=Ctx(check=check,env=env,adapter=adapter,target=target,policy_values=policy_values,timeout=10,
             allow_mutating=False,keys={"none":None},secrets=[],cprobe=transport,workdir=workdir,started=utcnow(),
-            http_probe_profile=TERMINATION_PROFILE)
+            http_probe_profile=self.transport_profile)
         ctx._termination_prepared=prepared
         return self._finish(ctx)
 

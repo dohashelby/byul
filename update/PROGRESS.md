@@ -1380,3 +1380,10 @@ git status
 - 다음 단계: 통합 source 고정→영향검증→설치CLI→확정 commit/push·초안PR·정확HEAD CI·A2 소비 인계. 본인 REQ12/잔여 취소·관측 개발을 이어간다.
 - 막힌 것: 정식 Kubernetes IPC actor/소켓·egress/worker 계약·명시 기업POL·실제 신뢰 source/image/producer·native0.32·TP/다중GPU·whole security/worker 실제 소비는 미완료다. 원래 GPU 승인창 종료·추가Start0·stopped·CI 결제 차단과 부모 A39/A1 19/A2 20 범위는 유지한다.
 
+## 2026-10-30 — A-1 REQ12 외부 ID 재사용·native 선택 관측
+
+- 한 일: 확정6bb1649에서 기존 request_termination:kubernetes를 명시 REQ12 절차로 확장한다. 같은 외부ID 정상 재요청2회와 SSE 종료A/같은외부ID 대체B/후속정상 요청을 닫힌 공개 profile로 연결하고, 보조session 표식과 실제 native ID·invocation·PID/start의 유일 관계를 투영한다. ASGI 기록에 attempt 필드가 없는 공백은 순서로 채우지 않고 null로 보존한다. 77개·두분기·원래기준·다른76개 bytes를 유지한 DRAFT 팩이다.
+- 테스트 결과: 제품/반례/정확Ref·실제 stdlib 전송 테스트와 문서 초안 작성, 정적 검토 단계이며 아직 source 고정·검증 전이다. 기존native8/9·B/A2 원본 및 CLI 의미를 보존한다.
+- 다음 단계: 구현·정적 검토 종료→source고정·검토pin→직접/인접/불변식→Linux/설치·정확6Ref→commit/push·초안PR·정확HEAD CI·인계. actual 늦은 chunk/소비자 귀속의 공통 관측 계약도 준비한다.
+- 막힌 것: 실제 취소대상/늦은chunk 폐기·전달·자동retry·신뢰producer/source/image/기업POL·worker/GPU와 전체 두분기 완료는 미확인이다. 후보는 독립FAIL이 아니며 전축UNKNOWN·late_delivery/automatic_retry/scope_complete=false를 유지한다. 원승인창종료·추가Start0·stopped·CI결제차단·부모A39/A1담당19 범위를 축소하지 않는다.
+

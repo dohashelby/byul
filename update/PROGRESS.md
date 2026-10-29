@@ -1460,3 +1460,5 @@ git status
 - 테스트 결과: 구현·시험·계약 정적 검토 단계다. 소스 고정 후 직접/인접/불변식·동일bytes Linux·설치CLI/정확Ref를 검증한다. 실행 전 통과를 기록하지 않으며 정상/후보/누락·중복·내용교체·restart/후속 수집·첨부·정리 오류를 포함한다.
 - 다음 단계: 고정 소비 pin과 검증·초안PR·정확HEAD CI·인계를 마감하고 다음 준비된 담당개발을 계속한다. 원팩31/다른76정의·A2/B 원본·과거실증을 보존한다.
 - 막힌 것: 실제 trusted issuer/principal·Gateway 정규화/engine 소비 생산자·PID/start·최종권한 정책과 실제 환경/전체REQ04·부모A는 미완료다. normal_control=null·producer/principal/scopefalse·전축UNKNOWN, 원GPU창종료/추가Start0/마지막확인stopped·CI결제차단을 유지한다.
+
+- 첫 고정 검증: 637552b/1217파일 불변에서 Windows505통과·새시험2실패·기존skip1/제외1(207.21/207.913초)을 보존했다. 새 시험이 Observation을 dict로 접근했고 native0.32용 ENV 변경 뒤 seal을 빠뜨린 준비 오류다. 두 시험 준비만 보수하며 제품guard/팩/정책·기대 판정·원본bytes는 변경하지 않는다. 모든 검증 handle 종료 후 재고정해 직접/불변식·Linux/설치를 확인한다.

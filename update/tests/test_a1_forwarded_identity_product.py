@@ -169,8 +169,8 @@ def test_operating_selector_zero_one_are_not_principal_or_raw_field_leaks(tmp_pa
     draft=product.KubernetesForwardedIdentityExecutor({'target':str(target),'roles':{'allowed':'KEY'},'header':header},runner=world.runner,
         environ={'KEY':CREDENTIAL,'REQ04_NORMAL':'0','REQ04_ALTERNATE':'1'}).run(pack.checks['REQ-04'],env,values,VllmAdapter(),tmp_path/'work')
     assert draft.data_origin.value=='EXAMPLE' and draft.status.value=='COMPLETED'
-    assert len(draft.observations['forwarded_records']['value'])==12
-    c,=draft.observations['forwarded_conflict_candidates']['value']
+    assert len(draft.observations['forwarded_records'].value)==12
+    c,=draft.observations['forwarded_conflict_candidates'].value
     assert c['field_kind']=='operating_selector' and not c['confirmed_violation']
 
 
@@ -260,7 +260,7 @@ def test_policy_and_exact_configuration_rejected_before_any_io(tmp_path,damage):
     elif damage=='same-claim':keys['REQ04_ALTERNATE']=NORMAL
     elif damage=='credential-claim':keys['REQ04_NORMAL']=CREDENTIAL
     elif damage=='production':world.t['lab']=False
-    elif damage=='native032':env=env.model_copy(update={'engine':env.engine.model_copy(update={'version':'0.32.0'})})
+    elif damage=='native032':env=env.model_copy(update={'engine':env.engine.model_copy(update={'version':'0.32.0'})}).seal()
     else:expected='0'*64
     if damage in {'production','native032'}:
         values['forwarded_environment_sha256']=env.ref().sha256

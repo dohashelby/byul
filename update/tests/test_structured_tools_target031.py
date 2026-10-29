@@ -55,6 +55,7 @@ def test_capture_pins_target_profile_dependencies_and_followups(capture_fixture,
 
 
 @pytest.mark.parametrize('changes', [{'model': {'id': 'other-model'}},
+    {'engine': {'name': 'other-engine', 'version': 'reference-' + producer.TARGET031_COMMIT}},
     {'engine': {'name': 'vllm', 'version': '0.31.0'}},
     {'engine': {'name': 'vllm', 'version': 'reference-' + producer.SOURCE_COMMIT}}])
 def test_environment_mismatch_prevents_capture(tmp_path, monkeypatch, changes):

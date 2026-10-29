@@ -354,6 +354,11 @@ class KubernetesHTTP:
         from .kubernetes_process import capture
         return capture(self,candidate_paths)
 
+    def normal_requests(self, network, requests, timeout):
+        """Existing PLT01/04 completion control, with an explicit wire ID map."""
+        from .kubernetes_functional import capture
+        return capture(self,network,requests,timeout)
+
     def report(self):
         with self.lock:
             return {"profile": self.profile, "binding": deepcopy(self.binding),

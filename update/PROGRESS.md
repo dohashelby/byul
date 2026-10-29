@@ -1464,3 +1464,10 @@ git status
 - 첫 고정 검증: 637552b/1217파일 불변에서 Windows505통과·새시험2실패·기존skip1/제외1(207.21/207.913초)을 보존했다. 새 시험이 Observation을 dict로 접근했고 native0.32용 ENV 변경 뒤 seal을 빠뜨린 준비 오류다. 두 시험 준비만 보수하며 제품guard/팩/정책·기대 판정·원본bytes는 변경하지 않는다. 모든 검증 handle 종료 후 재고정해 직접/불변식·Linux/설치를 확인한다.
 
 - 검증 마감: 정확c5905e5/검토pin8af2031의 Windows205통과·기존skip1/제외1(74.82/75.627초),동일1217bytes Linux508통과·제외1(70.28/70.602초),source/wheel/격리설치196파일일치와설치CLI4/정확24Ref왕복(7.720초)을확인했다. 초기505통과/2시험준비실패와원소스를보존했으며제품guard변경·기대값완화·새제외·검증중변경은없다. 소유HTTP소켓3요청·정상/선언위반후보·누락/교체·후속오류·원문비저장을확인했다. B전체304파일고정소비·A2선정12/B원본27·기존native8~11/IPC/원팩31을보존한다. 새실제Kubernetes/worker/GPU·trusted issuer/producer/PID-start·기업권한정책·전체REQ04/부모A는미완료다. 결과문서만갱신하고초안PR/정확HEAD CI/인계를마감한다.
+
+## 2026-10-30 — A-1 REQ06 저장 응답 객체 제품
+
+- 한 일: f8995a8에서 보관0.31의Responses router/serving/protocol3파일을 정적으로 재사용해 REQ06 SC02-03의두주체/소유UUID·생성receipt·정상조회/취소/previous/overwrite효과와 Gateway/직통을 기존4Pod 전송·registry/명시DRAFT팩/CLI에 연결했다. 일반mutating gate·원본B/A2·원팩31·나머지76정의는 보존한다.
+- 테스트 결과: 구현·시험·계약 초안과 정적 검토 후 소스 고정/영향/설치 검증 전이다. 정상/선언위반후보·store비활성·동기취소·누락·교체/restart·후속수집/첨부/정리·원문비저장과 정확Ref 왕복을 준비했다. 실행 전 통과를 기록하지 않는다.
+- 다음 단계: 고정 소비pin·직접/인접/불변식·동일bytesLinux·설치CLI/정확Ref·초안PR/정확HEAD CI/인계를 마감하고 준비된 담당개발을 계속한다. 프로브소유ID 제한을 실제owner/권한 또는worker효과 인증으로 올리지 않는다.
+- 막힌 것: 실제principal/owner·공유/작업권한표·store/worker생산자·실제효과/PID-start·실제환경/전체REQ06·부모A는 미완료다. 전축UNKNOWN/normalnull/producer-owner-worker-scopefalse와원GPU창종료/추가Start0/마지막확인stopped/CI결제차단을 유지한다.

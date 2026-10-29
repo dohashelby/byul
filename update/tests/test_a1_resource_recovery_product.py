@@ -72,7 +72,12 @@ class World(BaseWorld):
             pipe={'complete':True,'bounded_at_source':True,'timed_out':False,'truncated':False}
             if self.mode=='http-cleanup' and slot=='after':pipe.update(pipes_closed=False,read_errors=['child_reap'])
             return {'returncode':0,'stdout_bytes':canonical_json([row]),'stderr_bytes':PRIVATE.encode(),'capture':pipe}
-        return super().runner(argv,**kwargs)
+        result=super().runner(argv,**kwargs)
+        if 'namespaces' in argv:
+            value=json.loads(result['stdout_bytes'])
+            for item in value['items']:item['kind']='Namespace'
+            result['stdout_bytes']=canonical_json(value)
+        return result
 
 
 def inputs(tmp_path,group,target,mode,branch):
@@ -150,7 +155,7 @@ def test_both_registered_cli_branches_independent_fail_unknown_and_exact_refs(tm
 def test_full_two_branches_and_original_76_definition_bytes_remain(tmp_path):
     seed=baseline_pack();receipt=derive(seed.path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
     assert len(pack.checks)==77 and receipt['unchanged_definition_bytes']==76 and not receipt['full_LIF11_complete']
-    assert set(pack.checks['LIF-11'].legacy['scenario_ids'])=={'SC-18-02','SC-17-01'}
+    assert set(pack.checks['LIF-11'].legacy.scenario_ids)=={'SC-18-02','SC-17-01'}
     for name in ('question','normal_control','challenge_steps','satisfied_if','fail_criteria','unknown_criteria','legacy','method_and_evidence'):
         assert getattr(seed.checks['LIF-11'],name)==getattr(pack.checks['LIF-11'],name)
     for p in seed.path.rglob('*'):

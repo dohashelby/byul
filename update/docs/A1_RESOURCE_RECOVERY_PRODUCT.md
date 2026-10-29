@@ -28,4 +28,6 @@ HTTP는 기존 초기화의 닫힌 절차를 별도 `KubernetesRecoveryHTTP.perf
 
 원GPU창종료·추가Start0·마지막 확인stopped·기존46.66USD/과거 사용량·보존120GiB EBS 과금·CI 결제 차단을 유지한다. 실제 재개에는 새 시간 승인과 현재 자원/활성작업/quota/잔여총비용·정확 ENV/POL/model/source/image·선정 자원/주체/시계·안전 실패/복구·다음 정상 기동 및 정리 책임이 필요하다. LIF08 감지/전달·LIF09 준비 집계·B LIF07 readiness 판정과 구분한다.
 
+첫 고정 시험에서 새 census가 초 단위 utcnow로 나노초 helper 측정을 감싼 결함을 확인했다. 관측 값은 같은 초의741ms였는데 host 끝이0ms로 잘려 명시100ms 오차에서도 미확인으로 처리됐다. 이 새 경계만 time.time_ns의 전후 bracket과 정밀 ISO 시각으로 보수하고 전역 시계·스트림 계산·정책 오차는 변경하지 않았다. 시험 응답의 Namespace kind를 기존 계약대로 제공하고 Legacy 구조는 typed attribute로 읽도록 보수했다. 기존 검사를 없애거나 정상/위반 기대값을 낮추지 않는다.
+
 현재 구현·회귀·문서 초안 종료 후 소스 고정·영향/Linux/설치본 정확Ref 검증을 준비한다. 시험 성공·새 CI·실제 실증·전체 완료를 미리 선언하지 않는다. 검증 종료 후 확정 커밋/PR/검토한 파일 bytes·지원/미지원과 재개 조건을 A1 인계에 기록한다.

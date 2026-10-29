@@ -1,9 +1,10 @@
 """Closed selected-resource census over the existing owned lifecycle reader."""
 from pathlib import Path
+from datetime import datetime,timezone
 import hashlib,time
 from guard.adapters import resource_recovery_probe as probe
 from guard.adapters import vllm_initialization_sensor as initialization,vllm_rank_failure_sensor as rank
-from guard.models import canonical_json,sha256_hex,utcnow
+from guard.models import canonical_json,sha256_hex
 from guard.runtime.bounded import strict_json
 from guard.executors.kubernetes_lifecycle_capture import KubernetesLifecycleReader,KubernetesCaptureError,supervised_source
 
@@ -28,8 +29,9 @@ class KubernetesResourceRecoveryReader(KubernetesLifecycleReader):
         probe.validate_selection(selection)
         if type(max_clock_skew_ms) is not int or not 0<=max_clock_skew_ms<=60000:raise KubernetesCaptureError()
         row={'profile':PROFILE,'selection_sha256':sha256_hex(canonical_json(selection)),'probe_source_sha256':PROBE_SOURCE_SHA256,
-            'started_at':utcnow().isoformat(),'finished_at':None,'collected':False,'owner_binding_verified':False,
+            'started_at':datetime.now(timezone.utc).isoformat(),'finished_at':None,'collected':False,'owner_binding_verified':False,
             'clock_window_verified':False,'packet':None,'diagnostic_codes':[]}
+        host_started_ns=time.time_ns()
         deadline=min(self.deadline,time.monotonic()+5);cleanup=self._parent_cleanup_failures
         try:
             before=self._owner(self._remaining(deadline));role=self.binding['engine'];budget=self._remaining(deadline)
@@ -48,12 +50,11 @@ class KubernetesResourceRecoveryReader(KubernetesLifecycleReader):
             row['owner_binding_verified']=self._owner(self._remaining(deadline))==before and cleanup==self._parent_cleanup_failures
         except Exception:
             self.gap=True;row['diagnostic_codes'].append('RESOURCE_CENSUS_COLLECTION_OR_OWNER_UNAVAILABLE')
-        row['finished_at']=utcnow().isoformat()
+        host_finished_ns=time.time_ns()
+        row['finished_at']=datetime.now(timezone.utc).isoformat()
         if row['collected']:
-            from datetime import datetime
-            start=datetime.fromisoformat(row['started_at']).timestamp()*10**9;end=datetime.fromisoformat(row['finished_at']).timestamp()*10**9
             skew=max_clock_skew_ms*10**6;packet=row['packet']
-            row['clock_window_verified']=bool(start<=end and start-skew<=packet['started_wall_ns']<=packet['finished_wall_ns']<=end+skew)
+            row['clock_window_verified']=bool(host_started_ns<=host_finished_ns and host_started_ns-skew<=packet['started_wall_ns']<=packet['finished_wall_ns']<=host_finished_ns+skew)
         if not row['owner_binding_verified'] or not row['clock_window_verified']:self.gap=True
         self.censuses.append(row);return row
 

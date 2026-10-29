@@ -1,16 +1,34 @@
-"""Existing container_config dispatch for A-2's API-only SUP-04 consumer."""
+"""Existing container_config dispatch for A-2's selected Kubernetes consumers."""
 from pathlib import Path
 
-from guard.models import DataOrigin, canonical_json, sha256_hex, utcnow
+from guard.models import DataOrigin, ORIGIN_STRENGTH, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP, KubernetesBindingError, REQUEST_BINDING_PROFILE
 from .http_common import Ctx, HttpCheckExecutor
 from .running_image_approval import PROFILE, validate_image_approval_policy, collect_kubernetes_running_image_approval
+from .container_config import collect_kubernetes_process_permissions
+
+
+def normalize_process_capture_paths(value):
+    from guard.runtime.kubernetes_process import paths
+    return paths(value)
+
+
+def validate_process_capture_target(target,environment):
+    from guard.runtime.kubernetes_process import source
+    KubernetesHTTP(target,environment,duration=300,profile=REQUEST_BINDING_PROFILE)
+    source()
+
+
+def collect_process_capture(environment,target,*,binary='kubectl',duration=300,candidate_paths=None,runner=None):
+    transport=KubernetesHTTP(target,environment,duration=duration,binary=binary,
+                             runner=runner,profile=REQUEST_BINDING_PROFILE)
+    return transport.process_snapshot(candidate_paths)
 
 
 class KubernetesContainerConfigExecutor(HttpCheckExecutor):
     name="container_config"
-    version="0.1.0"
+    version="0.2.0"
     requires_roles=False
     requires_route_scope=False
     functional_via="engine"
@@ -24,6 +42,17 @@ class KubernetesContainerConfigExecutor(HttpCheckExecutor):
         self._expected_target_sha256=expected_target_sha256
 
     def validate_policy(self,check,values):
+        if (check.id=="PLT-01" and check.executor==self.name and any(
+                obs.key=="permission_scan_complete" and obs.type=="bool" for obs in check.required_observations)):
+            from guard.core.select import check_policy_value
+            try:
+                if type(values) is not dict:raise ValueError
+                for param in check.policy_params:
+                    if param.required and param.key not in values:raise ValueError
+                    if param.key in values:check_policy_value(check.id,param.key,param.type,values[param.key])
+            except (ValueError,TypeError):
+                raise ValueError("KUBERNETES_PROCESS_PERMISSION_POLICY_INVALID") from None
+            return
         if check.id!="SUP-04" or getattr(check,"collection_profile",None)!=PROFILE:
             raise ValueError("KUBERNETES_CONTAINER_PROFILE_UNSUPPORTED")
         validate_image_approval_policy(values)
@@ -46,10 +75,18 @@ class KubernetesContainerConfigExecutor(HttpCheckExecutor):
             workdir=workdir,started=utcnow())
         draft=self._finish(ctx)
         draft.cleanup_errors.extend(transport.report()["cleanup_errors"])
-        if transport.injected:draft.data_origin=DataOrigin.EXAMPLE
+        # Source provenance can only lower the existing draft, including an
+        # artifact failure's DECLARED ceiling. A real-target flag alone never
+        # promotes an EXAMPLE ENV or a live producer's EXAMPLE record.
+        origins=[draft.data_origin,DataOrigin(transport.process_observation_origin)]
+        if hasattr(ctx,"_kubernetes_process_data_origin"):
+            origins.append(DataOrigin(ctx._kubernetes_process_data_origin))
+        draft.data_origin=min(origins,key=lambda origin:ORIGIN_STRENGTH[origin])
         return draft
 
     def collect(self,ctx):
+        if ctx.check.id=="PLT-01":
+            return collect_kubernetes_process_permissions(ctx)
         snapshots=[]
         for _ in range(2):
             try:snapshots.append(ctx.cprobe.snapshot())

@@ -1,5 +1,9 @@
 # DECISIONS
 
+- 2026-10-29 · process collector는 입력/정적 옵션을 처리하고 runtime 생성/프로그램 검증/포착은 기존 Kubernetes executor 경계에 둔다. · 기본 전체 시험에서 확인된 runtime 의존 아키텍처를 보존하고 같은 CLI/정책·출처·프로그램 bytes의 의미를 유지하기 위함이다.
+
+- 2026-10-29 · A2 c4fdbe4의 PLT01/04 전용5파일은 원본 bytes로 통합하고 최소 공통 dispatcher/registry 및 최약 출처 제한만 추가한다. · 정상 대조 성공을 전체 PASS로 올리거나 lab=false/기본 runner로 EXAMPLE을 MEASURED로 승격하지 않으며 기존 container 사실/worker 접근 구분과 독립 FAIL을 보존하기 위함이다.
+
 - 2026-10-29 · PLT08의 Kubernetes 한 구간 입력은 Docker 식별자 대신 정확 ENV/target/양쪽 binding hash와 명시 정책창을 결합하고 기존 정상 대조 source만 재사용한다. · 형식의 검증을 현재 PACK31의 정식 활성화로 오인하거나 Docker 필수값·기존 UNKNOWN/독립FAIL 의미를 우회하지 않기 위함이다.
 
 - 2026-10-29 · PLT01/04 정상 대조는 기존 completions 경로/본문·고정 JSON 수집기를 유지하고 공백을 포함한 논리ID만 명시 wire ID로 정확 결합한다. · 요청을 chat으로 대체하거나 부분200을 성공으로 만들지 않고 기존 CheckDef/기능 판정과 REQ11·REQ10의 지원 범위를 보존하기 위함이다.

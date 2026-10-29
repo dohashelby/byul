@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 PLT01/04 확정 소비의 공통 등록
+
+- 한 일: 확정e8e915b를 보존한 분리 공간에서 A2 c4fdbe4 전용5파일을 원본 추적 cherry-pick으로 통합한다. 기존 container_config:kubernetes에 PLT01의 전용 수집을 연결하고 credential_exposure:kubernetes를 등록한다. 필수 permission 관문/정책 타입과 target hash를 I/O 전에 검사하고 최종 EVD 출처는 공통 live 기록/전송 경계보다 승격하지 않는다. 기존 SUP04 경로와 전용 bytes·팩31·판정은 유지한다.
+- 테스트 결과: 최초1108파일 고정 영향602통과/기존skip1·제외1(103.94/104.919초), 설치판165파일/등록CLI3사례 통과 뒤 기본 전체6284통과·아키텍처1실패(754.50/756.300초)를 확인했다. 공통 process collector의 runtime 직접 import를 기존 executor 함수 경계로 이동하고 같은 입력/출력·프로그램 bytes·검증 의미를 보존했다. 고정v2 영향/원래 아키텍처 계약630통과/기존skip1·제외1(76.00/77.137초), 최종 기본 전체6285통과·실패0·기존skip13/제외19(708.94/710.416초), source/wheel/격리설치165파일 일치(18.416초), 설치판의 실제 등록CLI3사례·각 정확6Ref 왕복(11.316초)도 통과했다. 검증 중1108파일 bytes 불변, A2 전용5파일 원본 일치다. 가장 긴 단계는 기본 전체의 아키텍처 첫 실패 보수/재검증이며 기존 사례/assert/허용목록은 유지했다.
+- 다음 단계: 영향/기본 전체 실패 보수·재고정·필요 재검증→wheel/정확HEAD CI·초안PR·인계. 정확 설치판 소비가 확인되면 같은 승인 인스턴스의 새 소유권/예산·기한/할당량을 확인해 실제 metadata/정상 대조를 준비한다.
+- 막힌 것: worker/source/model 귀속·무해 파일/device 접근·전체 권한/자격 PASS, native0.32·TP2는 미완료다. hosted CI5는 계정 문제로 미실행이며 현재 GPU는 stopped다. A39/56/4·A1 19/27/2 범위와 기존 실제 Ref/증거 정리는 보존한다.
+
 ## 2026-10-29 — A-1 PLT08 Kubernetes 구간의 정책 결합 입력
 
 - 한 일: 확정f333fff를 보존한 분리 공간에서 A2 PLT08 요청의 versioned 구간 정책과 body 없는 live packet을 준비한다. Docker CID/network/endpoint를 재사용하지 않고 정확 ENV/target/양쪽 binding hash·IP/포트·명시 금지/유효창을 I/O 전에 결합한다. 기존 normal_requests와 구조 검증을 재사용하며 원문 body는 저장하지 않는다. HTTP 응답/완전성·정책창·세대·부모정리와 전체 보호 범위를 구분한다.

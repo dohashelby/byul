@@ -16,6 +16,7 @@ from .fake import FakeExecutor
 from .role_route import RoleRouteExecutor
 from .kubernetes_routes import KubernetesDirectRouteExecutor, KubernetesRoleRouteExecutor
 from .credential_exposure import CredentialExposureExecutor
+from .kubernetes_credential_exposure import KubernetesCredentialExposureExecutor
 from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
 from .kubernetes_sampling import KubernetesSamplingExecutor
@@ -40,6 +41,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "container_config:real": lambda cfg: ContainerConfigExecutor(cfg.get("container_config", {})),
     "container_config:kubernetes": lambda cfg: KubernetesContainerConfigExecutor(cfg.get("container_config", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "credential_exposure:real": lambda cfg: CredentialExposureExecutor(cfg.get("credential_exposure", {})),
+    "credential_exposure:kubernetes": lambda cfg: KubernetesCredentialExposureExecutor(cfg.get("credential_exposure", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "input_validation:real": lambda cfg: InputValidationExecutor(cfg.get("input_validation", {})),
     "sampling_validation:real": lambda cfg: SamplingValidationExecutor(cfg.get("sampling_validation", {})),
     "sampling_validation:kubernetes": lambda cfg: KubernetesSamplingExecutor(cfg.get("sampling_validation", {}), environ=cfg.get("_runtime_environ")),

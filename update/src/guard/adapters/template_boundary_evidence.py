@@ -40,7 +40,7 @@ def _template(value):
     return isinstance(value, dict) and value.get('status') == 'collected' and value.get('sha256') == TYPE_TEMPLATE_SHA256
 
 def analyze_row(row, case):
-    """An actual runtime attribute decision must belong to this exact render tree."""
+    """Fixed-template reference output must belong to this exact render tree."""
     expected_messages = CHALLENGE if case == 'challenge' else NORMAL
     if (not isinstance(row, dict) or row.get('case_id') != case or row.get('fixture_sha256') != TYPE_TEMPLATE_SHA256
             or row.get('messages_sha256') != native_digest(expected_messages)
@@ -104,22 +104,28 @@ def analyze_row(row, case):
         and _text(actual, REFERENCE_TEXT) and _text(row.get('result_summary'), REFERENCE_TEXT)
         and any(_text(returns.get(key, {}).get('metadata', {}).get('result_summary'), REFERENCE_TEXT) for key, _ in tokenizers))
     allowed, denied = False, False
+    compile_allowed, compile_denied = False, False
     for identity, value in returns.items():
         metadata = value.get('metadata', {})
         if (value.get('point') not in _ATTR_POINTS or metadata.get('attribute') != '__class__'
                 or metadata.get('object_case') != 'integer_one' or metadata.get('attribute_result_status') != 'collected'
-                or metadata.get('evaluation_context') != 'template_runtime'
+                or metadata.get('evaluation_context') not in {'template_runtime', 'compile_or_optimize'}
                 or not any(under(identity, parent) for parent, _ in tokenizers)):
             continue
         # The outer Jinja method's decision governs nested superclass decisions.
         parent = calls.get(identity, {}).get('binding', {}).get('parent_call_id_sha256')
         if calls.get(parent, {}).get('point') in _ATTR_POINTS:
             continue
-        allowed |= metadata.get('attribute_allowed') is True
-        denied |= metadata.get('attribute_allowed') is False
+        if metadata['evaluation_context'] == 'template_runtime':
+            allowed |= metadata.get('attribute_allowed') is True
+            denied |= metadata.get('attribute_allowed') is False
+        else:
+            compile_allowed |= metadata.get('attribute_allowed') is True
+            compile_denied |= metadata.get('attribute_allowed') is False
     return {'case_id': case, 'qualified': bool(selected), 'normal': bool(normal),
         'attribute_allowed_runtime': allowed, 'attribute_denied_runtime': denied,
-        'reference_consumed': bool(rendered_reference and allowed and not denied),
+        'attribute_allowed_compile': compile_allowed, 'attribute_denied_compile': compile_denied,
+        'reference_consumed': bool(rendered_reference),
         'invocation_id_sha256': row['invocation_id_sha256'],
         'messages_sha256': row['messages_sha256'],
         'observation_gaps': ['event_limit_exceeded'] if 'event_limit_exceeded' in row.get('observation_gaps', []) else [],

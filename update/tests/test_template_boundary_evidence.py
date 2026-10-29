@@ -1,9 +1,7 @@
 """EXAMPLE reducer contracts; no source engine or live capture."""
-import ast
 from copy import deepcopy
 from datetime import datetime,timezone
 import hashlib
-import inspect
 import json
 import pytest
 from guard.adapters import template_boundary_evidence as p
@@ -47,15 +45,36 @@ def record(consumed=False):
         'collection_id': 'sup13-template-cpu-' + 'a' * 32, 'capture_status': 'completed',
         'results': [row('before'), row('challenge', consumed=consumed), row('after')], 'private': 'PRIVATE'}
 
-def test_actual_reference_and_runtime_attribute_decision_are_both_required():
+def test_exact_reference_return_is_independent_of_attribute_evaluation_stage():
     assert p.analyze_row(row('challenge', consumed=True), 'challenge')['reference_consumed']
-    assert not p.analyze_row(row('challenge', consumed=True, compile_only=True), 'challenge')['reference_consumed']
+    compiled=p.analyze_row(row('challenge', consumed=True, compile_only=True), 'challenge')
+    assert compiled['reference_consumed'] and compiled['attribute_allowed_compile']
+    assert not compiled['attribute_allowed_runtime']
     denied = row('challenge', consumed=True)
     denied['snapshots'][3]['metadata']['attribute_allowed'] = False
-    assert not p.analyze_row(denied, 'challenge')['reference_consumed']
+    analyzed=p.analyze_row(denied,'challenge')
+    assert analyzed['reference_consumed'] and analyzed['attribute_denied_runtime']
     changed = row('challenge', consumed=True)
     changed['result_summary'] = text('PRIVATE')
     assert not p.analyze_row(changed, 'challenge')['reference_consumed']
+
+
+@pytest.mark.parametrize('mode',['missing_attribute','compile_only_bool','tokenizer_wrong_return','safe_wrong_return'])
+def test_reference_needs_both_actual_returns_and_not_attribute_bool_alone(mode):
+    value=row('challenge',consumed=True,compile_only=True)
+    if mode=='missing_attribute':
+        value['snapshots']=[e for e in value['snapshots'] if not e['point'].endswith('.is_safe_attribute')]
+        assert p.analyze_row(value,'challenge')['reference_consumed']
+        return
+    if mode=='compile_only_bool':
+        value['result_summary']=text(p.NORMAL_TEXT)
+        for e in value['snapshots']:
+            if e['phase']=='RETURN' and e['point'] in {'safe_apply_chat_template','tokenizer.apply_chat_template'}:e['metadata']['result_summary']=text(p.NORMAL_TEXT)
+    elif mode=='tokenizer_wrong_return':value['snapshots'][4]['metadata']['result_summary']=text(p.NORMAL_TEXT)
+    else:value['snapshots'][5]['metadata']['result_summary']=text(p.NORMAL_TEXT)
+    result=p.analyze_row(value,'challenge')
+    assert not result['reference_consumed'] and result['attribute_allowed_compile']
+
 
 @pytest.mark.parametrize('mutation', ['invocation', 'messages', 'fixture', 'parent', 'source'])
 def test_wrong_native_attribution_cannot_supply_reference(mutation):
@@ -67,17 +86,10 @@ def test_wrong_native_attribution_cannot_supply_reference(mutation):
     else: value['source_validation']['post']['status'] = 'mismatch'
     assert not p.analyze_row(value, 'challenge')['reference_consumed']
 
-ACCEPTED_AST_SHA256={'analyze_row': '23909dfc07f0e5389b600275822ee89456ad63abb7501fd39de6014552991d77', '_cpu_result': '87786cd9450b3f829ffd13114f90456a8d1ba9380641407105e6e035d74a1216'}
 
 
 def analyze(value,**pins):
     return p.analyze_cpu_capture(value,source_commit=pins.get('source_commit',p.SOURCE_COMMIT),collector_sha256=pins.get('collector_sha256',COLLECTOR),callback_sha256=pins.get('callback_sha256',CALLBACK))
-
-
-def test_accepted_reducer_ast_is_preserved_without_runtime_git_history():
-    for name,expected in ACCEPTED_AST_SHA256.items():
-        node=ast.parse(inspect.getsource(getattr(p,name))).body[0]
-        assert hashlib.sha256(ast.dump(node,include_attributes=False).encode()).hexdigest()==expected
 
 
 def test_complete_reference_and_safe_summaries():

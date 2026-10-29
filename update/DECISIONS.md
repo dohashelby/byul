@@ -580,3 +580,7 @@
 
 - PACK31의 Docker 필수 신원을 제거하거나 빈 값으로 채우지 않고 검토된 정확Ref에서 별도 DRAFT Kubernetes 한 구간 팩을 생성한다. 새 팩도77개 점검·PLT08의 API/IPC-TP 필수 결과·기존 판정 의미를 유지하며 정책 관측값을 승인으로 사용하지 않는다. 공통 기록의 source-correlated 요청/선택 컨테이너 주체와 HTTP status·정책창·완전 응답을 각각 표시해 worker/배포caller 보호로 승격하지 않는다.
 - 2026-10-29 A1: B REQ10 전용24파일과c9기본 pin을 보존한 채 A1 정식 등록이 들어간c4e872e를 새 literal 소비 기준으로 제공한다. 같은 전체 검사를 새 고정 commit에 적용하고 B helper bytes/import/팩/프레임워크를 더 확인하며 런타임 관측 hash 승인·공통 경로 제외·B 전용파일 재작성은 하지 않는다. CPU proposal Ref를 그대로 쓰고 실제 배포/runner/GPU 완료와 분리하기 위함이다.
+
+
+## 2026-10-30 A1 LIF09 초기화 부분 실패 관측
+native14는 native8~13 bytes를 보존하고 source/code/descriptor 검증 후 원호출을 관측한다. 한 선언 단계의 같은 프로세스 준비/상위 결과만 결합하며 phase/scenario·READY·API200·종료 파일을 전체 모델/서비스/복귀 증명으로 올리지 않는다. 새 명시 HTTP 프로필에서 running engine Ready=false만 허용하고 소유 probe Ready=true와 기존 세대/source/image/lab 관문을 유지한다. 전체 범위UNKNOWN/null·미완료와 부모A39/56/4·A1 19/27/2·기존비용/권한/소유권 경계를 유지한다.

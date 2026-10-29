@@ -1473,3 +1473,5 @@ git status
 - 막힌 것: 실제principal/owner·공유/작업권한표·store/worker생산자·실제효과/PID-start·실제환경/전체REQ06·부모A는 미완료다. 전축UNKNOWN/normalnull/producer-owner-worker-scopefalse와원GPU창종료/추가Start0/마지막확인stopped/CI결제차단을 유지한다.
 
 - 첫 고정 검증: feb4957/1225파일 불변의Windows610통과·새시험31실패·기존skip1/제외1(237.05/237.911초)을보존했다. 제품POL의목록형식을지원되는list[str]로고치고,부정시험scope가공유역할사전을변경하던격리오류를deepcopy로보수한다. 지원타입회귀를추가하며정책/기대판정·기존제외는완화하지않는다. 모든검증handle종료후새소스를재고정한다.
+
+- 제품 검증 마감: 정확bef4e0e/검토pind5f06b2의Windows 187 passed, 1 skipped, 1 deselected in 52.80s·부모53.596초,동일1225bytes Linux 642 passed, 1 deselected in 84.25s (0:01:24)·부모84.71초,source/wheel/격리설치201파일일치·설치CLI4/정확24Ref왕복7.906초를확인했다. 첫610통과/31실패·원소스와실패로그를보존했고POL지원타입/list[str]·시험역할사전격리를보수했다. 소유HTTP실제소켓5요청·두origin/네동작의정상·선언위반후보·store비활성/동기취소·누락/교체·후속오류·원문비저장을확인했다. 검증중변경/새제외/기대값완화없음,B309전체pin·B원c9/A2선정12/B원본27/native8~11/IPC/원팩31을보존한다. 실제principal/owner/생산자·worker효과·기업정책/실제환경·전체REQ06/부모A는미완료이며전축UNKNOWN·normalnull·신뢰/전체범위false다. 결과문서만갱신하고초안PR/정확HEAD CI/인계를마감한다.

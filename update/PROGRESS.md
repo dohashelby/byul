@@ -1329,8 +1329,8 @@ git status
 - 테스트 결과: 고정1136파일의 Windows/Linux bytes 일치·검증 중 불변. Linux 전체6460통과/실패0/기존제외19(pytest276.42초·Linux부모277.389초), B 원본symlink5반례 포함이다. Windows pin+정식CLI18통과(13.37/14.355초), wheel/설치167파일 일치와 정식 설치본CLI4사례/각6Ref왕복도 통과(4.502초)했다. 첫 Windows365통과·7실패 중 신규시험2개의null/미수집 계약 가정만 보수했고 B5개는Win1314실패를 보존해 Linux에서 검증했다. WSL 임시환경/상위tmp폴더 준비실패는 별도 보존하고 환경만 보수했다. 새skip·판정/기대값 완화는 없다. 실제 vLLM CPU/GPU 실측으로 승격하지 않는다.
 - 다음 단계: 명시 소비 pin·제품 CLI/Ref·격리 설치를 검증하고 정확 통합HEAD CI/초안PR/인계로 마감한 뒤 A1 본인19개의 인증/요청·철회·취소·종료·관측 제품 연결을 이어간다. B가 이 고정 소비 기준을 수락해 기본 도구를 옮기는 단계와 실제 배포 대상 관측은 별도로 남긴다.
 - 막힌 것: 현재 A1 Python에는torch/xgrammar/transformers와 전체 고정 vLLM CPU source가 없고 B Mac의 실제CPU 원본을 새 통합 실측으로 소급하지 않는다. 같은 GPU 인스턴스의 두 Start는 용량 부족으로 거부돼 stopped이며 새 설치/실증은 없었다. 기존13:23:57UTC/46.66USD와EBS 보존을 유지하고 같은 시간창 Start는 더 반복하지 않는다. CI5는 계정 결제 차단이다.
- ### 2026-10-29 A-1 REQ02 소유 기록 제품 묶음
+### 2026-10-29 A-1 REQ02 소유 기록 제품 묶음
 - 한 일: 고정 session·사전 file bytes pin·정확 ENV/target·유효창·소유 engine 전후 세대에 결합한 기록 수집을 정식 route_record:kubernetes 실행기에 연결했다. PACK31에서 REQ02만 바꾸는 명시 DRAFT 팩과 hash/enum 관측을 추가했다. native lab/source/image gate와 B 원본은 유지한다.
-- 검증: 구현/사례/문서 초안을 마쳤으며 소스 고정 후 직접·인접·불변식·설치본 CLI/Ref 왕복 검증 예정이다. 이전6460통과/설치167파일/REQ11실증을 새 소스 근거로 이월하지 않는다.
+- 검증: 첫 Windows 영향검증358통과/새16실패는 관측 객체의 불허 필드를 제거해 보수했다. 재고정213b486 기준 Windows155통과·기존skip1/제외1(47.26초/부모47.929초), 같은1140파일 bytes의 Linux 영향375통과·제외1(18.48초/부모18.757초), Windows 설치168파일 및 설치본 CLI4사례의6Ref 반출/복원·재판정 통과(8.217초). 검증 중 source 변경0. 이전6460전체통과/설치167파일/REQ11실증을 새 소스 근거로 이월하지 않는다.
 - 다음: 이 부분 묶음 마감 후 B REQ13 폐쇄3요청 공개 전송을 별도 확정하고 Online은 전송·serving callback/parser·출처/세션 경계로 나눈다.
 - 막힌 것: 실제 인가 생산자·정상/거부 ledger·기업 rewrite/principal POL·handler 귀속이 없어 REQ02 전체 미완료/전축UNKNOWN이다. GPU stopped·추가Start중단·CI결제차단 유지. 부모39/56/4 및 A1 19/27/2 범위 유지.

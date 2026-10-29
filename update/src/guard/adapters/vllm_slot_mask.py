@@ -205,7 +205,9 @@ def snapshot_slot_mask(point,args,kwargs,*,phase,result=None,exception=None,bind
                 data['argument_request_sha256']=_rid(rid)
                 if point.endswith('add_request'):
                     if phase=='RETURN':data['assigned_slot_index']=_integer(result)
-                    allowed=_get(_get(request,'sampling_params'),'allowed_token_ids')
+                    data['argument_constraint']={'status':'unavailable'}
+                    params=_get(request,'sampling_params',_MISSING)
+                    allowed=_get(params,'allowed_token_ids',_MISSING) if params is not _MISSING and params is not None else _MISSING
                     if allowed is None:data['argument_constraint']={'status':'collected','restricted':False,'count':0,'sha256':digest(None)}
                     elif type(allowed) is list and len(allowed)<=MAX_COLUMNS and all(type(v) is int and v>=0 for v in allowed):
                         data['argument_constraint']={'status':'collected','restricted':bool(allowed),'count':len(allowed),'sha256':digest(allowed)}

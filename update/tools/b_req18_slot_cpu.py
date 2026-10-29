@@ -155,7 +155,7 @@ def capture_slot_cpu(source_root:Path,workdir:Path,*,source_profile='target031')
     except Exception as error:record['error_type']=type(error).__name__
     record['capture_finished_at']=datetime.now(timezone.utc).isoformat()
     record['source_validation']['post']=_post(root,own,native_sha)
-    record['capture_status']='completed' if len(record['results'])==3 and all(r['collected'] and r.get('source_validation',{}).get('pre')=='verified' and r.get('source_validation',{}).get('post',{}).get('status')=='verified' for r in record['results']) and isinstance(record['followup'],dict) and record['followup'].get('matches_standalone') is True and record['source_validation']['post']['status']=='verified' else 'incomplete'
+    record['capture_status']='completed' if len(record['results'])==3 and all(r['collected'] and r.get('source_validation',{}).get('pre')=='verified' and r.get('source_validation',{}).get('post',{}).get('status')=='verified' for r in record['results']) and isinstance(record['followup'],dict) and record['followup'].get('collected') is True and record['followup'].get('matches_standalone') is True and record['source_validation']['post']['status']=='verified' else 'incomplete'
     record['auxiliary_write']={'status':'completed'}
     try:(workdir/'result.json').write_text(json.dumps(record,indent=2))
     except Exception as error:record.update(capture_status='incomplete',auxiliary_write={'status':'failed','error_type':type(error).__name__})

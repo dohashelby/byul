@@ -173,3 +173,28 @@ def test_single_file_asset_load_needs_only_standard_library():
         'assert not any(k=="guard" or k.startswith("guard.") or k=="torch" for k in sys.modules); '
         'print(json.dumps(m.snapshot_slot_mask("unknown",(),{},phase="CALL")))',native.__file__],capture_output=True,text=True)
     assert process.returncode==0 and json.loads(process.stdout)['status']=='unavailable'
+
+
+@pytest.mark.parametrize('failure',['missing_params','none_params','missing_allowed','property_unreadable','fields_unreadable'])
+def test_unreadable_add_constraint_is_not_reported_as_unrestricted(batch,failure):
+    class PropertyParams:
+        @property
+        def allowed_token_ids(self):raise AssertionError('PROPERTY_MUST_NOT_RUN')
+    class UnreadableFields:
+        @property
+        def __dict__(self):raise RuntimeError('PRIVATE_FIELDS_ERROR')
+    if failure=='missing_params':request=SimpleNamespace(req_id='PRIVATE_RID')
+    elif failure=='none_params':request=SimpleNamespace(req_id='PRIVATE_RID',sampling_params=None)
+    elif failure=='missing_allowed':request=SimpleNamespace(req_id='PRIVATE_RID',sampling_params=SimpleNamespace())
+    elif failure=='property_unreadable':request=SimpleNamespace(req_id='PRIVATE_RID',sampling_params=PropertyParams())
+    else:request=SimpleNamespace(req_id='PRIVATE_RID',sampling_params=UnreadableFields())
+    result=native.snapshot_slot_mask('InputBatch.add_request',(batch,request),{},phase='RETURN',result=1)
+    assert result['metadata']['argument_constraint']=={'status':'unavailable'}
+    assert 'PRIVATE_' not in json.dumps(result)
+
+
+@pytest.mark.parametrize('allowed,restricted,count',[ (None,False,0),([1,2],True,2),([],False,0)])
+def test_present_actual_allowed_field_keeps_null_and_list_distinct(batch,allowed,restricted,count):
+    request=SimpleNamespace(req_id='PRIVATE_RID',sampling_params=SimpleNamespace(allowed_token_ids=allowed))
+    result=native.snapshot_slot_mask('InputBatch.add_request',(batch,request),{},phase='RETURN',result=1)
+    assert result['metadata']['argument_constraint']=={'status':'collected','restricted':restricted,'count':count,'sha256':native.digest(allowed)}

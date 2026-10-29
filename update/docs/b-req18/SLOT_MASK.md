@@ -90,3 +90,13 @@ status=collected, restricted=false, count=0(지정된 ID 없음), sha256=canonic
 원시 요청 ID는 SHA만 반환하며, assigned_slot_index는 실제 add_request 반환값이다.
 행 source_validation은 각 trial의 pre/post 검사를 유지하고 어느 trial의 post가 미수집이면
 전체 capture는 incomplete로 남긴다. 앞서 확인한 독립 mismatch를 지우지 않는다.
+
+## 관측 누락 보완
+
+add_request의 실제 sampling_params 객체와 allowed_token_ids 필드에 각각 sentinel을 적용한다.
+params 누락·None·필드 누락·읽기 실패는 argument_constraint.status=unavailable이며,
+실제 필드가 존재하고 값이 None인 경우만 수집된 unrestricted로 기록한다. 실제 목록은
+별도 count/hash를 유지한다. 후속 대조의 출력 hash가 같아도 mask/metadata 수집이 없으면
+완료로 처리하지 않는다. followup.collected=true와 출력 동치를 함께 요구하며, 이전
+확인된 trial mismatch는 incomplete 상태에서도 보존한다. 이 보완은 영향 unit으로 검증하고
+기존 실제 5.31초 경계와 feasibility 자료를 재실행하지 않는다.

@@ -100,3 +100,18 @@ def test_trial_source_unknown_remains_incomplete_even_if_final_check_recovers(tm
     record=collector.capture_slot_cpu(tmp_path/'source',tmp_path/'work')
     assert record['source_validation']['post']=={'status':'verified'}
     assert record['capture_status']=='incomplete' and record['results'][1]['source_invariant_mismatch'] is True
+
+
+@pytest.mark.parametrize('collected',[False,None])
+def test_followup_same_output_without_collected_mask_is_incomplete_and_keeps_mismatch(tmp_path,example_boundary,monkeypatch,collected):
+    def run(root,record):
+        record['data_origin']='EXAMPLE';record['results'].extend(row(c) for c in ('standalone-b','condense-reuse','swap'))
+        record['results'][1].update(source_invariant_mismatch=True,output_matches_standalone=False)
+        record['followup']={'matches_standalone':True,'sampled_ids_sha256':'e'*64,
+            'host_mask_status':'unavailable','metadata_mask_status':'unavailable'}
+        if collected is not None:record['followup']['collected']=collected
+    monkeypatch.setattr(collector,'_run_actual',run)
+    record=collector.capture_slot_cpu(tmp_path/'source',tmp_path/'work')
+    assert record['capture_status']=='incomplete'
+    assert record['results'][1]['source_invariant_mismatch'] is True
+    assert record['followup']['sampled_ids_sha256']==record['results'][0]['sampled_ids_sha256']

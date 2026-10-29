@@ -39,7 +39,8 @@ class World(HTTPWorld):
     def add_attempt(self,rid,sid,slot):
         saved=[]
         if self.mode=='ambiguous-invocation' and slot in {'disconnect','replacement'}:
-            original=self.producer.observer.route_nonce;self.producer.observer.route_nonce=lambda _: 'f'*64
+            original=self.producer.observer.route_nonce
+            self.producer.observer.route_nonce=lambda kind: 'f'*64 if kind=='asgi-route' else original(kind)
         else:original=None
         async def run():
             await invoke(self.producer,label=rid,sid=sid,receive_disconnect=slot=='disconnect',saved=saved)
@@ -96,7 +97,7 @@ def test_product11_output_binding_and_exact_ref_roundtrip(tmp_path,group,native_
     world,values,pack,_=inputs(tmp_path,group,native_target,monkeypatch,mode,loop=owned_loop)
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr('guard.executors.kubernetes_lifecycle_capture.capture_pipes',world.runner)
     def forbidden(*a,**kw):raise AssertionError('unexpected runtime')
-    monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket,'socket',forbidden)
+    monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket.socket,'__new__',staticmethod(forbidden))
     if mode=='attachment':
         original=Path.open
         def open_file(path,*a,**kw):

@@ -152,13 +152,30 @@ def test_real_collector_aggregation_is_observed_without_equating_provided_and_st
     assert puts[1]['provided_text']!=puts[1]['stored_text']
 
 
-@pytest.mark.parametrize('error_type',[RuntimeError,asyncio.CancelledError,KeyboardInterrupt])
+@pytest.mark.parametrize('error_type',[RuntimeError])
 def test_real_collector_raises_the_exact_original_exception(world,error_type):
     error=error_type(CANARY)
     with pytest.raises(error_type) as caught:asyncio.run(invoke(world,output_error=error))
     assert caught.value is error
     _,rows,_=packet(world)
     assert any(r['event']=='OUTPUT' and r['payload']['phase']=='RAISE' and r['payload']['point']=='RequestOutputCollector.get' for r in rows)
+
+
+@pytest.mark.parametrize('error_type',[asyncio.CancelledError,KeyboardInterrupt])
+def test_real_occupied_collector_keeps_unsupported_baseexception_behavior(world,error_type):
+    # Native put only replaces a pending output for Exception, not BaseException.
+    # Observe that exact behavior rather than inventing a new supported input.
+    asyncio.run(invoke(world,output_error=error_type(CANARY)));_,rows,_=packet(world)
+    assert not any(r['event']=='OUTPUT' and r['payload']['phase']=='RAISE' for r in rows)
+
+
+@pytest.mark.parametrize('error_type',[RuntimeError,asyncio.CancelledError,KeyboardInterrupt])
+def test_thin_wrapper_preserves_original_baseexception_instance(world,error_type):
+    error=error_type(CANARY)
+    def native_method(owner):raise error
+    wrapped=world.observer.output_wrap('RequestOutputCollector.close',native_method)
+    with pytest.raises(error_type) as caught:wrapped(Box())
+    assert caught.value is error
 
 
 def test_cancel_suspended_get_keeps_native_cancellation_and_does_not_consume(world):
@@ -195,7 +212,7 @@ def test_weak_identity_expiry_bound_reuse_and_process_generation(monkeypatch):
     pid[0]=43;assert registry.identify(value,'output')!=second and registry.generation==1
 
 
-@pytest.mark.parametrize('text',['', 'x'*65536,'x'*65537,'한'*30000,None])
+@pytest.mark.parametrize('text',['', 'x'*65536,'x'*65537,'한'*30000,None],ids=['empty','at-limit','over-limit','utf8-over-limit','unsupported'])
 def test_text_hash_bound_and_unsupported_outputs(text):
     value=Box(outputs=[Box(text=text)]);sample=output.text_samples(value);metadata.validate_text(sample)
     expected=type(text) is str and len(text.encode())<=65536

@@ -1409,3 +1409,5 @@ git status
 - 테스트 결과: 구현·시험·문서 초안 완료 후 AST/원본보존 정적검토→고정checkpoint→검토된 전체 pin→직접/인접/불변식·Linux·설치CLI/정확Ref 검증 순서다. 아직 새 검증 결과로 간주하지 않는다.
 - 다음 단계: 고정판 검증과 설치·커밋·초안PR·정확HEAD CI·인계 마감 후 준비된 담당 요청/취소/종료/관측 개발을 계속한다.
 - 막힌 것: 실제client수신·늦은출력 폐기/전달 정책·신뢰producer/image·자동retry·현재serving/worker/GPU 실증·전체REQ12/A39는 미완료다. 기존8/9/10와 B27/A2원본을 보존하며 원래GPU창종료·추가Start0·CI결제차단을 유지한다.
+
+- 첫 고정 검증: Windows804통과·새시험3실패·6오류·기존skip1/제외1(174.94초),1189파일 불변을 보존했다. 긴 parameter 이름이 Windows32767자 환경변수 한도를 넘고, 실제 put이 occupied 상태에서 BaseException을 교체하지 않는 원래 동작과 시험가정이 달랐다. 중복 ASGI fixture가 모든 nonce를 중복시켜 call 자체가 거부된 원인도 확인했다. 짧은 시험ID·원래 Exception/그외 BaseException 의미와 취소 시험·ASGI nonce만 중복시키는 대역으로 보수하며 제품 guard/code literal은 변경하지 않는다. pytest 종료 뒤 긴 행 정규식에 머문 소유 요약기만, 원본로그와 독립파일불변성 receipt를 남기고 종료했다. 검증중 소스변경이나 시험중단은 없었다.

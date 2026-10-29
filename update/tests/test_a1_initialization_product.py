@@ -125,8 +125,13 @@ def test_registered_cli_preparation_and_aggregate_claims_exact_refs(tmp_path,gro
         assert not world.sent and all(e.observations[k].value is None and not e.observations[k].collected for k in flags)
     else:
         assert all(e.observations[k].value is False for k in flags)
-        assert len(world.sent)=={'engine-replaced':1,'probe-not-ready':0}.get(mode,2)
-    if mode in {'normal','partial-failure','recovered-normal','dead-process','engine-not-ready','after-timeout','seal-failure','http-cleanup','attachment'}:
+        assert len(world.sent)=={'engine-replaced':1,'wrong-response-id':1,'probe-not-ready':0}.get(mode,2)
+        if mode=='wrong-response-id':
+            assert e.execution.status.value=='ABORTED'
+            trials=e.observations['init_observation_trials'].value
+            assert len(trials)==2 and all('outcome' not in row for row in trials)
+            assert all('normal_shape_verified' not in row for row in trials)
+    if mode in {'normal','partial-failure','recovered-normal','dead-process','engine-not-ready','after-timeout','wrong-response-id','seal-failure','http-cleanup','attachment'}:
         samples=e.observations['init_native_samples'].value;correspondence=e.observations['init_correspondence'].value
         assert samples and correspondence and all(not c['confirmed_violation'] for c in correspondence)
         if mode=='dead-process':assert all(not r['process_binding_verified'] for r in samples)

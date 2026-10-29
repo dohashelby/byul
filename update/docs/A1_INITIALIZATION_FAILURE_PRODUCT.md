@@ -27,3 +27,5 @@ native14의 자체 관측 함수 code 계약은 CPython3.12.14 `986d4162ad54ff84
 실제 재개에는 현재 소유 자원·ENV/POL·full model/revision/alias·source/image·필수 단계/rank·안전 실패 활성·원결과·상위/접수 관측·수정 후 정상 기동 lineage·복구/정리 책임이 필요하다. LIF08 실행 중 네 fault, LIF11 부분 회수/재기동, B LIF07 readiness 전용 분석은 별도다. 원GPU 승인창 종료·추가Start0·마지막확인stopped·기존46.66USD·보존EBS 과금·CI결제 차단을 유지하며 이 묶음에서 AWS 기동/비용/권한을 변경하지 않는다.
 
 현재 구현·회귀·문서 초안 단계다. 소스 고정·직접/인접/Linux·설치본 정확Ref·확정 소비 커밋/bytes/CI 인계는 검증 종료 후 기록한다. 이전 PR124의212파일 설치와 실제 배포04f7856 wheel156파일을 이 새 소스의 검증으로 재사용하지 않는다.
+
+첫 영향 시험의 Windows named pipe는 고정 Linux 함수의 Connection 검사와 맞지 않았다. 시험 소유 실제 pipe/EOF를 위임하는 Connection 어댑터로 OS 경계를 보수하고 고정 소스 assertion은 보존했다. 이후 양 OS에서 유일한 실패는 첫 응답 ID 불일치 때 전송기가 후속 wire 요청을 보내지 않는 기존 거부 동작과 새 시험의2회 전송 기대가 충돌한 것이었다. 시험은 wire1회·두 관측 시도에 승인 outcome/정상 shape 없음·ABORTED/UNKNOWN·안전 native 증거 보존을 함께 검증한다. 제품 코드/관문/정상 기대·기존 사례를 완화하지 않는다.

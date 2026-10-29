@@ -77,6 +77,7 @@ class World(RouteWorld):
             if self.mode=='partial' and len(self.sent)==25:row['capture_complete']=False
             if self.mode=='timeout' and len(self.sent)==25:row.update(outcome='timeout',capture_complete=False)
             if self.mode=='before-error' and len(self.sent)==1:row['outcome']=500
+            if self.mode=='cross-error' and request['method']=='GET' and request['url'].endswith('_A_read') and request['headers']['Authorization']=='Bearer '+KEY_B:row['outcome']=503
             if self.mode=='wrong-id' and len(self.sent)==25:row['id']='foreign'
             if self.mode=='late-restart' and len(self.sent)==25:self.changed=True
             if self.mode=='parent-cleanup' and len(self.sent)==25:pipe.update(pipes_closed=False,read_errors=['child_reap'])
@@ -101,7 +102,7 @@ def inputs(tmp_path,mode='enforced',*,origins=None,operations=None):
 
 
 @pytest.mark.parametrize('mode',['enforced','vulnerable','store-disabled','synchronous','missing-id','wrong-id','partial','late-restart',
-    'engine-replaced','after-error','parent-cleanup','cleanup-error','attachment','timeout','before-error'])
+    'engine-replaced','after-error','parent-cleanup','cleanup-error','attachment','timeout','before-error','cross-error'])
 def test_existing_registry_cli_all_operations_exact_refs_and_no_raw_objects(tmp_path,monkeypatch,mode):
     env,world,values,pack,_=inputs(tmp_path,mode)
     for key,value in {'REQ06_A':KEY_A,'REQ06_B':KEY_B}.items():monkeypatch.setenv(key,value)
@@ -141,6 +142,7 @@ def test_existing_registry_cli_all_operations_exact_refs_and_no_raw_objects(tmp_
     if mode=='enforced':assert world.cleanup_attempts==4 and all(r['api_cancelled_observed'] for r in e.observations['stored_cleanup'].value)
     if mode=='store-disabled':assert missing and not any(r['stage'].startswith('cross-') for r in trials)
     if mode=='synchronous':assert missing and not any(r['action']=='cancel' and r['attempted'] for r in trials)
+    if mode=='cross-error':assert any(m['reason']=='cross_response_or_effect_unavailable' for m in missing)
     if mode in {'wrong-id','late-restart','engine-replaced','after-error','parent-cleanup','cleanup-error'}:
         assert any(r['attempted'] and not r['binding_verified'] or r.get('diagnostic') for r in trials) and effects
     assert not any(s in canonical_json(e.to_dict()).decode() for s in (PRIVATE,KEY_A,KEY_B,'resp_byul_req06_','foreign-response'))

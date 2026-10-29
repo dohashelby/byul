@@ -52,6 +52,8 @@ class KubernetesStoredResponsesExecutor(HttpCheckExecutor):
                 if not row['capture_complete']:diagnostics.append('STORED_RESPONSE_CAPTURE_INCOMPLETE')
                 if normal and not(row['outcome']==200 and row['object_shape_verified']):
                     unavailable(origin,owner,kind,stage,'normal_object_effect_unavailable');diagnostics.append('STORED_RESPONSE_NORMAL_UNAVAILABLE')
+                if not normal and (row['outcome'] not in {200,401,403,404} or row['outcome']==200 and not row['object_shape_verified']):
+                    unavailable(origin,owner,kind,stage,'cross_response_or_effect_unavailable');diagnostics.append('STORED_RESPONSE_CROSS_EFFECT_UNAVAILABLE')
             except Exception:
                 observed=ctx.cprobe.report()['requests']
                 if observed and all(observed[-1].get(k)==row[k] for k in ('origin','actor','owner_claim','kind','action','stage')):

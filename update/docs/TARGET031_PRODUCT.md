@@ -39,8 +39,8 @@ runner·서비스 전체 생존은 이 직접 CPU 호출 범위 밖이다.
 정식 overlay pin에 반영한 뒤 실행한다.
 
 ```sh
-VLLM_TARGET_DEVICE=cpu CUDA_VISIBLE_DEVICES= VLLM_PLUGINS= HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH="$TARGET_SOURCE:src:." "$TARGET_CPU/bin/python" tools/req10_tools_cpu.py --source-profile vllm-031 --source-root "$TARGET_SOURCE" --output "$NEW_JSON"
-VLLM_TARGET_DEVICE=cpu CUDA_VISIBLE_DEVICES= VLLM_PLUGINS= HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH="$TARGET_SOURCE:src:." "$TARGET_CPU/bin/python" tools/req10_tools_cpu_pipeline.py --source-profile vllm-031 --source-root "$TARGET_SOURCE" --output-root "$NEW_DIRECTORY"
+VLLM_TARGET_DEVICE=cpu CUDA_VISIBLE_DEVICES= VLLM_PLUGINS= HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH="src:.:$TARGET_SOURCE" "$TARGET_CPU/bin/python" tools/req10_tools_cpu.py --source-profile vllm-031 --source-root "$TARGET_SOURCE" --output "$NEW_JSON"
+VLLM_TARGET_DEVICE=cpu CUDA_VISIBLE_DEVICES= VLLM_PLUGINS= HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH="src:.:$TARGET_SOURCE" "$TARGET_CPU/bin/python" tools/req10_tools_cpu_pipeline.py --source-profile vllm-031 --source-root "$TARGET_SOURCE" --output-root "$NEW_DIRECTORY"
 ```
 
 A 연결 제안은 기존 executor 계약을 그대로 사용한다. 전용 이름
@@ -54,4 +54,42 @@ EvidenceDraft→EVD→RES→RPT를 검증한다. 공통 registry/CLI/팩은 변�
 
 코드 묶음 직접·인접·기존 source pin/metadata 회귀: 138 passed, pytest 4.87초.
 기존 5d pin/metadata 계약과 0.31 ENV·의존성·후속 변환·독립 FAIL·첨부 실패 분기를
-포함한다. 정식 overlay pin 인계 후 실제 도구 CPU 실행을 진행한다.
+포함한다. 정식 overlay pin은 producer bytes
+`cc3a855716218daffbd64457d619770eea70f40da5b209c23475a20b90144f4b`로
+고정한 뒤 실제 도구를 실행했다.
+
+2026-10-29 실제 target CPU 도구 2개를 완료했다.
+
+- direct: `/private/tmp/byul-target031-product-direct-20261029-1.json`.
+- pipeline: `/private/tmp/byul-target031-product-core-20261029-1/`.
+  COMPLETED/DECLARED, 수집 관측 5개·정제 첨부 1개, 부모 벽시계 7.14초.
+- none/auto/required는 요청·sampling·backend·JSON 변환에 진입한 뒤 수용됐다.
+  named-only는 schema 없이 backend에 진입한 뒤 수용됐다. named-json은 요청
+  validator에서 거부됐고 같은 동기 호출의 sampling/backend/JSON 변환 진입은 없었다.
+- 각 사례 뒤 정상 auto/schema 변환 5건은 모두 수용·JSON 변환 진입했다.
+  controls 9개 모두 pass, security UNKNOWN·functional PASS·runner=false를 유지한다.
+- `store.verify()` 오류 0, 보존한 exact PACK/EVD Ref로 재판정한 RES Ref 동일,
+  RPT inputs_manifest의 exact EVD·RES Ref 포함을 확인했다. `postverify-1.json`에 저장했다.
+- PACK: `PACK-B-REQ10-031-CPU-PROPOSAL` revision 1,
+  SHA256 `27da82f96dd8b5d5e4f9ccc7efb45a8be9c9a9d118294fddf9f1a7617745f7d1`.
+- EVD: `EVD-01M631YV2BYFDZM3CTPVFPNVS2` revision 1,
+  SHA256 `efaf3defe320300b9beab71038b866bbcc0974dd59bdb7bbfdbbfb3ecbd64344`.
+
+정확 target 의존성 환경은 Python 3.12.13, torch 2.13.0, xgrammar 0.2.7,
+transformers 5.17.0, pydantic 2.14.1이다. 최초 원문 CPU 설치 148개 freeze는
+`/private/tmp/byul-target031-exact-evidence-20261029/dependencies.freeze.txt`에 유지했다.
+기존 b1 도구가 사용하는 개발용 pytest를 추가한 뒤 151개 snapshot은
+`/private/tmp/byul-target031-product-dependencies-20261029/with-pytest.freeze.txt`에
+별도로 보존했다. 추가 후 uv pip check도 전체 151개 호환을 확인했다.
+
+첫 직접 도구 실행은 PYTHONPATH에서 target source의 tools 패키지가 local 도구보다
+먼저 선택되어 import에 실패했다. local `src:.`을 먼저 둔 재현 명령으로 수정했다.
+다음 실행에서는 개발용 pytest가 없어 중단됐고, 격리 환경에 이를 추가한 뒤 성공했다.
+두 사전 실패에서는 출력 증거를 생성하지 않았다. vLLM 원문이나 소스 검증 gate는
+변경하지 않았다. import 중 host FFmpeg/opencv AVF class 중복 경고를 관측했지만
+직접 5조합·후속 변환과 core 연결은 모두 종료코드 0으로 완료했다.
+
+같은 frozen producer의 기본 reference 경로도 별도 기존 5d CPU 환경에서 실제 실행했다.
+`/private/tmp/byul-reference-product-smoke-20261029-1.json`에 5d identity·기존 5행,
+정상 4/금지 1·기존 controls 4개와 후속 필드 없는 기존 형식을 확인했다.
+두 vLLM source checkout은 전후 clean을 유지했다.

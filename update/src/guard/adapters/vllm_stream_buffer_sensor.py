@@ -26,7 +26,7 @@ MAX_ROWS=2048
 MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_stream_buffer_sensor.py'
 # Added only after the completed own-source offline code review, before freeze.
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'ceec7cda9f19079820d1b9b1051a2325b1260911e880923d54dc1d50e32893ad','cpython-3.12.3':'875b72bd80b035631cba745eb877dce59d2adff2dd3b9a67667296fa0b5c12f0'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'16cff77067f6032fcff094bca87118cf050d538c42bc53f5039249d0a8b206a7','cpython-3.12.3':'9bca107c7a4dfada88b60f899272129fb2edb964202f4f7eb88fc3e4550f5c6c'}
 _BASE=None
 _SEND=contextvars.ContextVar('guard_stream_buffer_send',default=None)
 
@@ -85,15 +85,20 @@ def expected_codes(module,base):
     name=module.__name__;path=vars(module).get('__file__')
     path_before=os.stat(path,follow_symlinks=False)
     if not stat.S_ISREG(path_before.st_mode):raise ValueError
-    fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_NONBLOCK',0))
+    fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_NONBLOCK',0)|getattr(os,'O_BINARY',0))
     try:
         before=os.fstat(fd)
         if not stat.S_ISREG(before.st_mode) or not 0<before.st_size<=131072:raise ValueError
         with os.fdopen(fd,'rb',closefd=False) as stream:raw=stream.read(131073)
         after=os.fstat(fd)
         path_after=os.stat(path,follow_symlinks=False)
-        identity=lambda v:(v.st_dev,v.st_ino,v.st_mode,v.st_size,v.st_mtime_ns,v.st_ctime_ns)
-        if len(raw)!=before.st_size or len({identity(v) for v in (path_before,before,after,path_after)})!=1 or sha(raw)!=SOURCE_ADDITIONS[name]:raise ValueError
+        # Windows path stat reports birth time while fstat reports a different
+        # ctime contract. Compare each ctime to its same-API after observation;
+        # every API still agrees on device/inode/mode/size/mtime. Linux also
+        # requires all four ctimes to agree.
+        identity=lambda v:(v.st_dev,v.st_ino,v.st_mode,v.st_size,v.st_mtime_ns)+(() if os.name=='nt' else (v.st_ctime_ns,))
+        if (len(raw)!=before.st_size or len({identity(v) for v in (path_before,before,after,path_after)})!=1
+                or path_before.st_ctime_ns!=path_after.st_ctime_ns or before.st_ctime_ns!=after.st_ctime_ns or sha(raw)!=SOURCE_ADDITIONS[name]):raise ValueError
     finally:os.close(fd)
     root=compile(raw,path,'exec',dont_inherit=True,optimize=0);result={}
     def visit(code):

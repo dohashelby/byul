@@ -43,7 +43,13 @@ class World(BaseWorld):
         self.group.raw_by_pid[42]=revised(self.group.raw_by_pid[42],change)
 
     def runner(self,argv,**kwargs):
-        if 'exec' not in argv or 'input_bytes' not in kwargs:return super().runner(argv,**kwargs)
+        if 'exec' not in argv or 'input_bytes' not in kwargs:
+            result=super().runner(argv,**kwargs)
+            if 'namespaces' in argv:
+                value=json.loads(result['stdout_bytes'])
+                for item in value['items']:item['kind']='Namespace'
+                result['stdout_bytes']=canonical_json(value)
+            return result
         spec=json.loads(kwargs['input_bytes']);request,=spec['requests'];self.sent.append(request);slot=request['id'].removeprefix('lif04-')
         self.add_native(request['headers']['X-Request-Id'])
         if self.mode=='after-timeout' and slot=='normal-after':raise TimeoutError(PRIVATE)
@@ -116,7 +122,7 @@ def test_registered_cli_native_samples_and_exact_ref_roundtrip(tmp_path,group,na
     assert all(e.observations[key].value is False for key in ('buffer_producer_authenticated','buffer_inventory_complete','buffer_release_verified','buffer_scope_complete'))
     if mode=='actual-lab-false':assert not world.sent and e.execution.status.value=='ABORTED'
     else:
-        assert len(world.sent)=={'before-shape':2,'engine-replaced':1}.get(mode,5)
+        assert len(world.sent)=={'before-shape':2,'engine-replaced':1,'wrong-response-id':2}.get(mode,5)
         assert world.native_ops.count('seal')==(0 if mode=='engine-replaced' else 1)
     samples=e.observations['buffer_native_samples'].value;cases=e.observations['buffer_cases'].value
     if mode in {'normal','budget-candidate','after-timeout','seal-failure','attachment','http-cleanup','wrong-response-id','native-one-missing'}:assert samples and cases
@@ -185,7 +191,11 @@ def test_same_pinned_stdlib_source_executes_five_bounded_owned_socket_requests()
         selected=target();selected['engine']['trusted_url']=url;pods=PodWorld(selected)
         def runner(argv,**kwargs):
             if 'exec' in argv:return capture_pipes([sys.executable,'-c',argv[-2],argv[-1]],**kwargs)
-            return pods.runner(argv,**kwargs)
+            result=pods.runner(argv,**kwargs);value=json.loads(result['stdout_bytes'])
+            if 'namespaces' in argv:
+                for item in value['items']:item['kind']='Namespace'
+            else:value['kind']='Pod'
+            result['stdout_bytes']=canonical_json(value);return result
         transport=KubernetesStreamBufferHTTP(selected,env(),read_profiles=profiles,runner=runner,duration=60);replies=[]
         for slot in ('normal-before','normal','slow','slow-close','normal-after'):
             streaming=slot in profiles

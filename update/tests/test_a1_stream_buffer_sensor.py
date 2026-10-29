@@ -20,7 +20,7 @@ class ExampleConnection:
     def __init__(self,*args):pass
     def receive_data(self,value):pass
     def next_event(self):return None
-    def send(self,*,event):return getattr(event,'data',b'EXAMPLE-framing')
+    def send(self,event):return getattr(event,'data',b'EXAMPLE-framing')
 
 
 def example_event(**values):return SimpleNamespace(**values)
@@ -33,12 +33,6 @@ class Transport:
     def write(self,value):self.raw.append(value)
     def close(self):self.closed=True
     def is_closing(self):return self.closed
-
-
-class AnnNames(ast.NodeTransformer):
-    def visit_arg(self,node):node.annotation=None;return node
-    def visit_FunctionDef(self,node):node.returns=None;return self.generic_visit(node)
-    def visit_AsyncFunctionDef(self,node):node.returns=None;return self.generic_visit(node)
 
 
 def module_from_reference(name):
@@ -157,6 +151,43 @@ def test_native8_and_old_profiles_stay_default_and_source_bytes_unchanged():
     assert base8.PROFILE=='vllm-native-lifecycle-metadata/8'
     assert hashlib.sha256(Path(base8.__file__).read_bytes()).hexdigest()==sensor.BASE8_SHA256
     assert sensor.PROFILE=='vllm-native-lifecycle-metadata/12'
+
+
+@pytest.mark.parametrize('damage',['inode','mtime','ctime'])
+def test_actual_source_read_keeps_same_api_stability_checks(monkeypatch,damage):
+    world=make_observer();module=module_from_reference('uvicorn.protocols.http.h11_impl');original=sensor.os.stat;calls=[]
+    def changed(path,*a,**kw):
+        value=original(path,*a,**kw)
+        if str(path)==module.__file__:
+            calls.append(True)
+            if len(calls)==2:
+                fields={k:getattr(value,k) for k in ('st_dev','st_ino','st_mode','st_size','st_mtime_ns','st_ctime_ns')}
+                fields[{'inode':'st_ino','mtime':'st_mtime_ns','ctime':'st_ctime_ns'}[damage]]+=1
+                return SimpleNamespace(**fields)
+        return value
+    monkeypatch.setattr(sensor.os,'stat',changed)
+    with pytest.raises(ValueError):sensor.expected_codes(module,world.base)
+
+
+@pytest.mark.parametrize('damage',['none','process','duplicate','parent','source'])
+def test_projection_requires_unique_physical_process_and_actual_parent_drain(damage):
+    world=make_observer();rid='byul-lif04-'+'ab'*16+'-slow';asyncio.run(invoke(world,rid))
+    rows=[{'event':'START','payload':{'context':CONTEXT},'seq':0,'monotonic_ns':0}]
+    rows.extend({**r,'seq':i+1} for i,r in enumerate(world.observer.recorded))
+    recording={'capture':{'records':rows,'process_context_verified':damage!='process','image_digest_verified':False},
+        'session_owner_match':True,'listed_file_identity_match':True}
+    if damage=='parent':
+        for row in rows:
+            if row['event']=='STREAM_BUFFER' and row['payload']['phase'].startswith('DRAIN'):row['payload']['parent_call_sha256']='0'*64
+    if damage=='source':
+        for row in rows:
+            if row['event']=='STREAM_BUFFER':row['payload']['source_verified']=False
+    packet={'recordings':[recording]* (2 if damage=='duplicate' else 1)}
+    limits={'buffer_release_deadline_ms':10,'buffer_max_write_bytes':0,'buffer_max_process_rss_bytes':2**62,'buffer_max_send_wait_ms':1000}
+    result=metadata.project(packet,[{'attempted':True,'case_id':'lif04-slow','request_id_sha256':hashlib.sha256(rid.encode()).hexdigest()}],limits)
+    case,=result['cases'];assert bool(case['drain_intervals_ns'])==(damage=='none')
+    assert not case['producer_authenticated'] and not case['full_buffer_inventory_verified'] and not case['release_verified']
+    assert case['process_rss_is_connection_cost'] is False and result['samples']
 
 
 def test_actual_send_exception_and_observer_failure_preserve_original_semantics():

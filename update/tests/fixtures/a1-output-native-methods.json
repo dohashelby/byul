@@ -1,0 +1,51 @@
+{
+  "RequestOutputCollector.__init__": {
+    "method": "def __init__(self, output_kind: RequestOutputKind, request_id: str):\n        self.aggregate = output_kind == RequestOutputKind.DELTA\n        self.request_id = request_id\n        self.output: RequestOutput | PoolingRequestOutput | Exception | None = None\n        self.ready = asyncio.Event()\n\n        self._input_stream_task: asyncio.Task | None = None",
+    "full_source_sha256": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "license": "Apache-2.0",
+    "origin": "vllm/v1/engine/output_processor.py"
+  },
+  "RequestOutputCollector.put": {
+    "method": "def put(self, output: RequestOutput | PoolingRequestOutput | Exception) -> None:\n        \"\"\"Non-blocking put operation.\"\"\"\n        if self.output is None or isinstance(output, Exception):\n            self.output = output\n            self.ready.set()\n        elif isinstance(self.output, RequestOutput) and isinstance(\n            output, RequestOutput\n        ):\n            # This ensures that request outputs with different request indexes\n            # (if n > 1) do not override each other.\n            self.output.add(output, aggregate=self.aggregate)\n        elif isinstance(self.output, PoolingRequestOutput) and isinstance(\n            output, PoolingRequestOutput\n        ):\n            self.output = output",
+    "full_source_sha256": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "license": "Apache-2.0",
+    "origin": "vllm/v1/engine/output_processor.py"
+  },
+  "RequestOutputCollector.get": {
+    "method": "async def get(self) -> RequestOutput | PoolingRequestOutput:\n        \"\"\"Get operation blocks on put event.\"\"\"\n        while (output := self.output) is None:\n            await self.ready.wait()\n        self.output = None\n        self.ready.clear()\n        if isinstance(output, Exception):\n            raise output\n        return output",
+    "full_source_sha256": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "license": "Apache-2.0",
+    "origin": "vllm/v1/engine/output_processor.py"
+  },
+  "RequestOutputCollector.get_nowait": {
+    "method": "def get_nowait(self) -> RequestOutput | PoolingRequestOutput | None:\n        \"\"\"Non-blocking get operation.\"\"\"\n        output = self.output\n        if output is not None:\n            self.output = None\n            self.ready.clear()\n        if isinstance(output, Exception):\n            raise output\n        return output",
+    "full_source_sha256": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "license": "Apache-2.0",
+    "origin": "vllm/v1/engine/output_processor.py"
+  },
+  "RequestOutputCollector.close": {
+    "method": "def close(self):\n        if self._input_stream_task is not None:\n            self._input_stream_task.cancel()\n        self._input_stream_task = None",
+    "full_source_sha256": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "license": "Apache-2.0",
+    "origin": "vllm/v1/engine/output_processor.py"
+  },
+  "RequestState.make_request_output": {
+    "method": "def make_request_output(\n        self,\n        new_token_ids: list[int],\n        pooling_output: torch.Tensor | None,\n        finish_reason: FinishReason | None,\n        stop_reason: int | str | None,\n        kv_transfer_params: dict[str, Any] | None = None,\n        ec_transfer_params: dict[str, Any] | None = None,\n    ) -> RequestOutput | PoolingRequestOutput | None:\n        finished = finish_reason is not None\n        final_only = self.output_kind == RequestOutputKind.FINAL_ONLY\n\n        if not finished and final_only:\n            # Only the final output is required in FINAL_ONLY mode.\n            return None\n\n        if self.stream_interval > 1:\n            assert self.detokenizer is not None\n\n            # Send output request only when\n            # 1. It has finished, or\n            # 2. It is the first token, or\n            # 3. It has reached the stream interval number of tokens\n            if not (\n                finished\n                or self.sent_tokens_offset == 0\n                or self.detokenizer.num_output_tokens() - self.sent_tokens_offset\n                >= self.stream_interval\n            ):\n                return None\n\n            if self.output_kind == RequestOutputKind.DELTA:\n                # Send tokens from the offset in DELTA mode, otherwise all\n                # tokens are sent.\n                new_token_ids = self.detokenizer.output_token_ids[\n                    self.sent_tokens_offset :\n                ]\n                self.sent_tokens_offset = self.detokenizer.num_output_tokens()\n\n        external_req_id = self.external_req_id\n\n        if pooling_output is not None:\n            return self._new_request_output(\n                external_req_id,\n                [self._new_pooling_output(pooling_output)],\n                finished,\n            )\n\n        output = self._new_completion_output(new_token_ids, finish_reason, stop_reason)\n\n        if self.parent_req is None:\n            outputs = [output]\n        else:\n            outputs, finished = self.parent_req.get_outputs(self.request_id, output)\n            if not outputs:\n                return None\n            external_req_id = self.parent_req.external_req_id\n\n        return self._new_request_output(\n            external_req_id,\n            outputs,\n            finished,\n            kv_transfer_params,\n            ec_transfer_params,\n        )",
+    "full_source_sha256": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "license": "Apache-2.0",
+    "origin": "vllm/v1/engine/output_processor.py"
+  },
+  "OutputProcessor.add_request": {
+    "method": "def add_request(\n        self,\n        request: EngineCoreRequest,\n        prompt: str | None,\n        parent_req: ParentRequest | None = None,\n        request_index: int = 0,\n        queue: RequestOutputCollector | None = None,\n    ) -> None:\n        request_id = request.request_id\n        req_state = self.request_states.get(request_id)\n        if req_state is not None:\n            self._update_streaming_request_state(req_state, request, prompt)\n            return\n\n        req_state = RequestState.from_new_request(\n            tokenizer=self.tokenizer,\n            request=request,\n            prompt=prompt,\n            parent_req=parent_req,\n            request_index=request_index,\n            queue=queue,\n            log_stats=self.log_stats,\n            stream_interval=self.stream_interval,\n        )\n        self.request_states[request_id] = req_state\n        if parent_req:\n            self.parent_requests[parent_req.request_id] = parent_req\n\n        # Track the external_req_id -> [internal_req_id, ...] mapping\n        self.external_req_ids[req_state.external_req_id].append(request_id)\n        self._update_admission_stats()",
+    "full_source_sha256": "c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "license": "Apache-2.0",
+    "origin": "vllm/v1/engine/output_processor.py"
+  }
+}

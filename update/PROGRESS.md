@@ -1395,3 +1395,17 @@ git status
 - 다음 단계: 정적검토·source고정·검토pin→직접/인접/불변식→Linux/설치CLI·정확Ref→commit/push·초안PR·정확HEAD CI·인계. 실제 늦은chunk원천/소비자·취소/timeout/stop과 본인 관측 분기를 이어간다.
 - 막힌 것: producer/image신뢰·actual serving/hook/worker/GPU·실제client수신·native늦은출력원천·자동retry·기업POL·전체LIF10/REQ12/A39는 미완료다. 새profile10을B/A2전용소비나native0.32 지원으로 가정하지 않는다. 원승인창만료·추가Start0·마지막stopped·CI결제차단을 유지한다.
 
+## 2026-10-30 — A-1 native output collector/consumer 귀속 보완 착수
+
+- 한 일: 확정56a752d에서 보존된0.31 output_processor.py의 정확c72d0149...bytes를 확인하고 collector put/get/get_nowait·native add_request·RequestState 출력 생성 경로를 검토했다. RequestOutput.request_id는 외부ID이며 내부attempt로 쓰지 않는다. 명시11의 bounded weak identity·text hash와 닫힌metadata 초안2파일을 작성한다. collector 합산/교체를 실제원문·token 보존이나 단순 객체ID 동등성으로 오판하지 않게 한다.
+- 테스트 결과: source 정적 검토·초안 단계이며11은미등록/미고정/미검증이다. 기존8/9/10·B/A2 bytes와 제품흐름은 유지한다.
+- 다음 단계: 실제 native add/state/collector put/get와 살아있는ASGI invocation의 producer/wrapper·code provenance·strict parser·REQ12 소비·metadata 판본/정책/오류 의미를 마친 뒤 source고정·직접/인접/설치/Ref 검증한다. 반복시도/늦은chunk와실제수신·자원회수는별도다.
+- 막힌 것: actual serving/worker/GPU·producer/image·기업POL·native출력과최종client전달·자동retry·전체두분기/부모A는미완료다. 추가Start/시간/비용승인없음과원래stopped/CI결제차단을유지한다.
+
+
+## 2026-10-30 — A-1 native11 출력 귀속 제품 묶음 고정 준비
+
+- 한 일: controller11·정확10/8의5assets·slots 안전 관측·유일call/source/code·닫힌OUTPUT parser·REQ12 collector/객체/텍스트SHA/실제caller 소비·derived팩3/check7을 연결했다. 합산/객체수정·누락/중복·다른caller를 구분하며 원문/예외/token은 남기지 않는다.
+- 테스트 결과: 구현·시험·문서 초안 완료 후 AST/원본보존 정적검토→고정checkpoint→검토된 전체 pin→직접/인접/불변식·Linux·설치CLI/정확Ref 검증 순서다. 아직 새 검증 결과로 간주하지 않는다.
+- 다음 단계: 고정판 검증과 설치·커밋·초안PR·정확HEAD CI·인계 마감 후 준비된 담당 요청/취소/종료/관측 개발을 계속한다.
+- 막힌 것: 실제client수신·늦은출력 폐기/전달 정책·신뢰producer/image·자동retry·현재serving/worker/GPU 실증·전체REQ12/A39는 미완료다. 기존8/9/10와 B27/A2원본을 보존하며 원래GPU창종료·추가Start0·CI결제차단을 유지한다.

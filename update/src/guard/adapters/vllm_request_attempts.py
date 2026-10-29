@@ -3,12 +3,15 @@ from __future__ import annotations
 import hashlib
 from .vllm_lifecycle_links import assignment, asgi_assignment
 from . import vllm_attempt_sensor as attempt_sensor
+from . import vllm_request_output_sensor as output_sensor
+from .vllm_request_outputs import project_outputs
 
 MAX_EVENTS=4096
 
 
 def project_attempts(packet,trials):
     result={"bindings":[],"events":[],"conflict_candidates":[],"unbound_asgi_events":[],"asgi_events":[],
+        "output_events":[],"output_links":[],"native_output_collector_binding_observed":False,
         "diagnostic_codes":[],"native_attempt_binding_observed":False,"late_delivery_verified":False,
         "automatic_retry_verified":False,"whole_scope_complete":False,"asgi_invocation_binding_observed":False}
     if not packet:
@@ -62,7 +65,7 @@ def project_attempts(packet,trials):
                 result["diagnostic_codes"].append("REQUEST_ATTEMPT_EVENT_BOUND_REACHED")
                 return result
             payload=row["payload"]
-            if row["event"]=="ATTEMPT" and capture["records"][0]["payload"]["profile"]==attempt_sensor.PROFILE:
+            if row["event"]=="ATTEMPT" and capture["records"][0]["payload"]["profile"]in {attempt_sensor.PROFILE,output_sensor.PROFILE}:
                 aligned=[v for v in result["bindings"] if v["recording"]==index
                     and v["asgi_invocation_sha256"]==payload["asgi_invocation_sha256"]
                     and v["external_request_sha256"]==payload["asgi_request_sha256"]
@@ -102,5 +105,6 @@ def project_attempts(packet,trials):
         for trial in trials:
             if trial.get("normal_shape_verified") and not any(e["case_id"]==trial["case_id"] and e["phase"]=="BODY_SEND_RETURN" for e in result["asgi_events"]):
                 result["diagnostic_codes"].append("REQUEST_ATTEMPT_BODY_CALLBACK_UNAVAILABLE")
+    project_outputs(packet,result)
     result["diagnostic_codes"]=sorted(set(result["diagnostic_codes"]+["REQUEST_ATTEMPT_LATE_DELIVERY_UNVERIFIED","REQUEST_ATTEMPT_AUTOMATIC_RETRY_UNVERIFIED"]))
     return result

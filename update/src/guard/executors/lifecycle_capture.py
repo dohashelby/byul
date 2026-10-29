@@ -11,6 +11,7 @@ from guard.adapters import vllm_lifecycle_profiles as profiles
 from guard.adapters import vllm_online_sensor as online
 from guard.adapters import vllm_online_metadata as online_metadata
 from guard.adapters import vllm_attempt_sensor as attempt, vllm_attempt_metadata as attempt_metadata
+from guard.adapters import vllm_request_output_sensor as output_sensor, vllm_request_output_metadata as output_metadata
 from .owned_capture import _read_owned_file, strict_json, validate_owned_source, EXTENDED_RECORDING_PROFILE
 
 CONTEXT_READER = r"""
@@ -80,7 +81,8 @@ def canonical_row(row):
 
 def parse_recording(raw, prepared):
     is_online = prepared["profile"] == online.PROFILE
-    is_attempt = prepared["profile"] == attempt.PROFILE
+    is_output = prepared["profile"] == output_sensor.PROFILE
+    is_attempt = prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE}
     if type(raw) is not bytes or not 0 < len(raw) <= (attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES):
         raise ValueError("LIFECYCLE_RECORDING_BYTES_INVALID")
     lines = raw.splitlines(keepends=True)
@@ -94,10 +96,10 @@ def parse_recording(raw, prepared):
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     words = WORDS
     if is_online:
         keys = keys | {"online_input", "online_code_sha256", "online_runtime"}
@@ -106,6 +108,9 @@ def parse_recording(raw, prepared):
     if is_attempt:
         keys=keys|attempt_metadata.FIELDS
         words=words|{"ATTEMPT",*attempt_metadata.PHASES,*attempt.RUNTIME_CODE_CONTRACTS}
+    if is_output:
+        keys=keys|output_metadata.LINK_FIELDS|output_metadata.TEXT_FIELDS|output_metadata.ITEM_FIELDS
+        words=words|{"OUTPUT",output_sensor.OUTPUT_SCHEMA,*output_sensor.POINTS,*output_sensor.RUNTIME_CODE_CONTRACTS}
     source_hashes = profiles.source_hashes(prepared["profile"])
     point_sources=profiles.point_sources(prepared["profile"])
     points=set(point_sources)
@@ -125,7 +130,7 @@ def parse_recording(raw, prepared):
                 or not _safe(safe_row, keys=keys, words=words) or type(row["seq"]) is not int or row["seq"] != seq
                 or type(row["monotonic_ns"]) is not int or row["monotonic_ns"] < clock
                 or row["previous_sha256"] != previous or canonical_row(row) != line
-                or row["event"] not in ({"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT"} if is_attempt else {"START","MODULE","NATIVE","ASGI","END","SELECTION"})
+                or row["event"] not in ({"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT","OUTPUT"} if is_output else {"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT"} if is_attempt else {"START","MODULE","NATIVE","ASGI","END","SELECTION"})
                 or type(row["payload"]) is not dict):
             raise ValueError("LIFECYCLE_RECORDING_ROW_INVALID")
         previous, clock = hashlib.sha256(line).hexdigest(), row["monotonic_ns"]
@@ -154,6 +159,7 @@ def parse_recording(raw, prepared):
     online_orphans = 0
     online_runtime = None
     attempt_runtime=None;attempt_calls={};attempt_events=0
+    output_runtime=None;output_calls={};output_events=0
     for row in rows[1:]:
         payload = row["payload"]
         if row["event"] == "START":
@@ -189,10 +195,10 @@ def parse_recording(raw, prepared):
                 if "inherited" in payload and payload["inherited"] is not True:
                     raise ValueError("LIFECYCLE_RECORDING_INHERITANCE_INVALID")
                 ready.add(payload["module"])
-            elif is_online:
+            elif is_online or is_output:
                 ready.discard(payload["module"])
         if row["event"] in {"NATIVE","SELECTION"}:
-            if row["event"]=="SELECTION" and (header["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
+            if row["event"]=="SELECTION" and (header["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
                     or payload.get("point")!="InputProcessor.assign_request_id" or payload.get("requests")!=[]
                     or payload.get("selection_observed") is not False
                     or type(payload.get("metadata")) is not dict
@@ -266,6 +272,16 @@ def parse_recording(raw, prepared):
                     raise ValueError("LIFECYCLE_RECORDING_CHAIN_INVALID")
             if payload.get("source_sha256") != source_hashes[point_sources[payload["point"]]]:
                 raise ValueError("LIFECYCLE_RECORDING_POINT_SOURCE_INVALID")
+        if row["event"]=="OUTPUT":
+            output_metadata.validate_output_link(payload)
+            if output_sensor.MODULE not in ready:raise ValueError("OUTPUT_SOURCE_MODULE_UNAVAILABLE")
+            if output_runtime is not None and payload["observer_runtime"]!=output_runtime:raise ValueError("OUTPUT_OBSERVER_RUNTIME_MISMATCH")
+            output_runtime=payload["observer_runtime"];output_events+=1
+            key=payload["call_sha256"];identity=(payload["point"],payload["collector_sha256"])
+            call=output_calls.setdefault(key,{"identity":identity,"calls":0,"ends":0})
+            if call["identity"]!=identity:raise ValueError("OUTPUT_CALL_BINDING_MISMATCH")
+            call["calls"]+=payload["phase"]=="CALL"
+            call["ends"]+=payload["phase"] in {"RETURN","RAISE"}
         if row["event"]=="ATTEMPT":
             attempt_metadata.validate_attempt(payload)
             if attempt_runtime is not None and payload["observer_runtime"]!=attempt_runtime:
@@ -288,6 +304,8 @@ def parse_recording(raw, prepared):
                 raise ValueError("LIFECYCLE_RECORDING_ASGI_INVALID")
         if row["event"] == "END" and row is not rows[-1]:
             raise ValueError("LIFECYCLE_RECORDING_AFTER_END")
+    if is_output and output_runtime is not None and attempt_runtime is not None and output_runtime!=attempt_runtime:
+        raise ValueError("OUTPUT_INVOCATION_RUNTIME_MISMATCH")
     end = rows[-1]["payload"] if rows[-1]["event"] == "END" else {}
     if rows[-1]["event"] == "END" and (set(end) != {"reason"} or end["reason"] not in {"SEALED","PROCESS_EXIT","BOUND_REACHED","CONTROL_UNAVAILABLE"}):
         raise ValueError("LIFECYCLE_RECORDING_END_INVALID")
@@ -295,6 +313,9 @@ def parse_recording(raw, prepared):
         "incomplete_final_row":incomplete_tail,"discarded_tail_bytes":len(tail),
         "discarded_tail_sha256":hashlib.sha256(tail).hexdigest() if tail else None,
         "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False,
+        **({"output_observer_runtime":output_runtime,"output_event_count":output_events,
+            "output_incomplete_calls":sum(v["calls"]!=1 or v["ends"]!=1 for v in output_calls.values()),
+            "output_observer_code_sha256":output_sensor.RUNTIME_CODE_CONTRACTS.get(output_runtime)} if is_output else {}),
         **({"attempt_observer_runtime":attempt_runtime,"attempt_event_count":attempt_events,
             "attempt_incomplete_invocations":sum(v["enters"]!=1 or v["ends"]!=1 for v in attempt_calls.values()),
             "attempt_late_callbacks":sum(v["late"] for v in attempt_calls.values()),
@@ -329,7 +350,7 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     validate_owned_source(**source)
     read = _read_owned_file if read_file is None else read_file
     is_online = prepared["profile"] == online.PROFILE
-    is_attempt=prepared["profile"]==attempt.PROFILE
+    is_attempt=prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE}
     limit = attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES
     read_options = {"read_profile":EXTENDED_RECORDING_PROFILE} if (is_online or is_attempt) and read_file is None else {}
     raw, provenance = read(docker, target, **source, max_bytes=limit, **read_options)

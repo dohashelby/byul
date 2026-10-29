@@ -14,6 +14,8 @@ LIMITATIONS=['REQ12 SC18-01/03의 취소/연결 종료·같은 외부ID 새시�
 
 LIMITATIONS.append('명시 native10은 별도 ATTEMPT event의 ASGI invocation·observer code·같은 PID/start 결합을 추가한다. 옛 ASGI 행의 attempt_case_id=null은 유지하며 ASGI send 반환을 실제client 수신/native출력원천·늦은chunk 폐기/전달로 올리지 않는다. native8/9 기본·기존제한과 B/A2전용10 미지원은 보존한다.')
 
+LIMITATIONS.append('명시 native11은 실제 add_request/RequestState의 native ID와 약한 참조 collector/output nonce, put의 입력/저장 객체 및 get의 반환 객체·호출 invocation을 구분해 연결한다. 합치기/객체 수정·누락·중복·프로세스 세대가 다르면 근거 부족을 남긴다. collector 반환은 client 전달·worker/GPU·늦은 결과 정책위반의 독립 증명이 아니다.')
+
 def derive(seed,output):
  seed=Path(seed).resolve();output=Path(output).resolve()
  if output.exists() or output.is_relative_to(seed):raise ValueError("NEW_EXTERNAL_PACK_DIRECTORY_REQUIRED")
@@ -21,12 +23,12 @@ def derive(seed,output):
  manifest=yaml.safe_load(raw.pop("pack.yaml").decode("utf-8"));original=build_pack(manifest,raw)
  if original.ref().model_dump(mode="json")!=SEED_REF or len(original.checks)!=77:raise ValueError("REVIEWED_PACK31_REQUIRED")
  check=yaml.safe_load(raw["checks/REQ-12.yaml"].decode("utf-8"))
- check.update(revision=6,executor="request_termination",collection_profile=PROFILE,
+ check.update(revision=7,executor="request_termination",collection_profile=PROFILE,
   policy_params=[{"key":k,"type":v,"required":True} for k,v in POLICY_TYPES.items()],
   required_observations=[{"key":k,"type":v} for k,v in OBSERVATIONS.items()],
   judge={"plugin":"rule_table","params":{"pass_when_all":[],"fail_when_any":[]}},limitations=deepcopy(LIMITATIONS))
  changed=dict(raw);changed["checks/REQ-12.yaml"]=yaml.safe_dump(check,allow_unicode=True,sort_keys=False).encode("utf-8")
- new=deepcopy(manifest);new.update(pack_id=PACK_ID,revision=2,review={"status":"DRAFT","reviewer":None,"reviewed_at":None},
+ new=deepcopy(manifest);new.update(pack_id=PACK_ID,revision=3,review={"status":"DRAFT","reviewer":None,"reviewed_at":None},
   files_sha256=[{"path":name,"sha256":sha256_hex(data)} for name,data in sorted(changed.items())])
  result=build_pack(new,changed)
  if list(result.checks)!=list(original.checks):raise ValueError("PACK_CHECK_SCOPE_CHANGED")

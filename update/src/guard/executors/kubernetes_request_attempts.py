@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from guard.adapters.vllm_request_attempts import project_attempts
 from guard.adapters import vllm_attempt_sensor as attempt_sensor
+from guard.adapters import vllm_request_output_sensor as output_sensor
 from guard.models import canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import REQUEST_ATTEMPTS_PROFILE
@@ -15,7 +16,8 @@ POLICY_TYPES={"attempt_environment_sha256":"str","attempt_target_sha256":"str","
 OBSERVATIONS={"request_attempt_trials":"list","request_attempt_native_bindings":"list","request_attempt_native_events":"list",
     "request_attempt_conflict_candidates":"list","request_attempt_unbound_asgi_events":"list","native_attempt_binding_observed":"bool",
     "late_delivery_verified":"bool","automatic_retry_verified":"bool","request_attempt_scope_complete":"bool",
-    "request_attempt_asgi_events":"list","asgi_invocation_binding_observed":"bool"}
+    "request_attempt_asgi_events":"list","asgi_invocation_binding_observed":"bool",
+    "request_attempt_output_events":"list","request_attempt_output_links":"list","native_output_collector_binding_observed":"bool"}
 CASES=("normal-first","normal-repeat","disconnect","replacement","after")
 
 def normalize_policy(values):
@@ -31,9 +33,9 @@ def normalize_policy(values):
 
 
 class KubernetesRequestAttemptsExecutor(KubernetesRequestTerminationExecutor):
-    version="0.2.0";check_id="REQ-12";collection_profile=PROFILE;policy_prefix="attempt"
+    version="0.3.0";check_id="REQ-12";collection_profile=PROFILE;policy_prefix="attempt"
     policy_normalizer=staticmethod(normalize_policy);transport_profile=REQUEST_ATTEMPTS_PROFILE
-    supported_native_profiles=KubernetesRequestTerminationExecutor.supported_native_profiles|{attempt_sensor.PROFILE}
+    supported_native_profiles=KubernetesRequestTerminationExecutor.supported_native_profiles|{attempt_sensor.PROFILE,output_sensor.PROFILE}
 
     def collect(self,ctx):
         start,end=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex
@@ -103,6 +105,7 @@ class KubernetesRequestAttemptsExecutor(KubernetesRequestTerminationExecutor):
         incomplete=bool(packet is None or not packet["recorded_files_covered"])
         gaps={"REQUEST_ATTEMPT_CLIENT_CLOSE_UNVERIFIED","REQUEST_ATTEMPT_NORMAL_CONTROL_UNVERIFIED","REQUEST_ATTEMPT_PROBE_UNAVAILABLE",
             "REQUEST_ATTEMPT_POLICY_WINDOW_UNVERIFIED","REQUEST_ATTEMPT_NATIVE_PREFLIGHT_UNAVAILABLE","REQUEST_ATTEMPT_SEAL_UNVERIFIED","REQUEST_ATTEMPT_CAPTURE_UNAVAILABLE",
+            "REQUEST_ATTEMPT_OUTPUT_CAPTURE_INCOMPLETE","REQUEST_ATTEMPT_OUTPUT_LINK_UNAVAILABLE",
             "REQUEST_ATTEMPT_EVENT_BOUND_REACHED","REQUEST_ATTEMPT_INVOCATION_CAPTURE_INCOMPLETE","REQUEST_ATTEMPT_BODY_CALLBACK_UNAVAILABLE"}
         ctx._termination_gap=bool(incomplete or gaps.intersection(summary["diagnostic_codes"]) or summary["http_transport"]["collection_gap"])
         ctx._termination_cleanup=list(summary["http_transport"]["cleanup_errors"])
@@ -112,6 +115,8 @@ class KubernetesRequestAttemptsExecutor(KubernetesRequestTerminationExecutor):
             "request_attempt_native_events":projected["events"],"request_attempt_conflict_candidates":projected["conflict_candidates"],
             "request_attempt_unbound_asgi_events":projected["unbound_asgi_events"],"native_attempt_binding_observed":projected["native_attempt_binding_observed"],
             "request_attempt_asgi_events":projected["asgi_events"],"asgi_invocation_binding_observed":projected["asgi_invocation_binding_observed"],
+            "request_attempt_output_events":projected["output_events"],"request_attempt_output_links":projected["output_links"],
+            "native_output_collector_binding_observed":projected["native_output_collector_binding_observed"],
             "late_delivery_verified":False,"automatic_retry_verified":False,"request_attempt_scope_complete":False}
         normal={"attempted":bool(bycase.get("normal-first",{}).get("attempted")),
             "succeeded":all(bycase.get(c,{}).get("normal_shape_verified") for c in CASES[:2]) if bycase else None,

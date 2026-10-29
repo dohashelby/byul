@@ -188,7 +188,7 @@ def capture_template_cpu(source_root,workdir,*,source_profile='target031'):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--source-root',type=Path,required=True);p.add_argument('--workdir',type=Path,required=True);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--source-root',type=Path,required=True);p.add_argument('--workdir','--output',dest='workdir',type=Path,required=True);a=p.parse_args()
     r=capture_template_cpu(a.source_root,a.workdir);print(r['capture_status']);return 0 if r['capture_status']=='completed' else 2
 
 if __name__=='__main__':raise SystemExit(main())

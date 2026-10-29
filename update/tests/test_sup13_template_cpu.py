@@ -95,3 +95,11 @@ def test_wrapper_unknown_containers_are_not_inspected(bad):
 
 def test_oversized_wrapper_mapping_is_unavailable():
     assert c._snapshot_arguments('tokenizer.apply_chat_template',{'args':(),'kwargs':dict.fromkeys(range(33))})==((),{})
+
+
+def test_cli_output_alias_reuses_same_capture_api(monkeypatch,tmp_path):
+    called=[]
+    def capture(source,work):called.append((source,work));return {'capture_status':'completed'}
+    monkeypatch.setattr(c,'capture_template_cpu',capture)
+    monkeypatch.setattr(c.sys,'argv',['collector','--source-root',str(tmp_path/'source'),'--output',str(tmp_path/'owned')])
+    assert c.main()==0 and called==[(tmp_path/'source',tmp_path/'owned')]

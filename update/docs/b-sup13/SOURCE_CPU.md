@@ -57,3 +57,20 @@ messages SHA가 고정 fixture/해당 case와 일치함을 확인했다. 정상 
 첫 정상 컴파일의 attr 판단은 compile_or_optimize, challenge의 판단은 template_runtime으로
 각각 관측했다. 실제 경계에서는 overflow가 없고 overflow 실패 보존은 EXAMPLE 회귀로 검증했다.
 정식 component 검증·EVD 수집은 root 최종 pin 이후 별도 한 번으로 남아 있다.
+
+## 공통 명령 분석 재사용
+
+`guard.adapters.template_boundary_evidence.analyze_cpu_capture(record, *, source_commit,
+collector_sha256, callback_sha256)`는 기존 producer1080c66의 행/CPU 분석을 공유한다.
+동일한 고정 template/메시지/정상·참조 반환 의미와 호출 트리·runtime 속성 판단을 유지한다.
+호출자는 승인한 source commit 및 collector/native SHA를 반드시 명시하고 누락된 핀은
+미수집으로 처리한다. 분석은 프로세스 실행·등록·팩 작성·POL 기본값을 만들지 않는다.
+기존 `_analyze_row`/`_cpu_result`는 함수명·명시 인자와 로컬 SHA/date helper 참조만
+기계적으로 바꿨고 정규화 AST SHA를 전용 회귀에 고정했다. shallow checkout에서도
+과거 git history를 읽지 않고 동일성을 검사한다. caller가 실제 source/component/import
+검증을 수행한 collector의 안전 record를 전달하는 기존 경계는 유지한다.
+
+공통 executor의 child는 `python -m tools.b_sup13_template_cpu --source-root PATH --output OWNED`
+형상을 사용한다. `--output`은 기존 `--workdir`와 같은 dest의 별칭이며 capture API와
+실제 source 경계는 유지한다. 이전 임시 pack formal 준비 launcher는 실행하지 않는다.
+정식 수집은 통합된 공통 executor/명령을 통해 한 번 실행한다.

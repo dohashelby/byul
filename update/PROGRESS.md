@@ -1449,3 +1449,5 @@ git status
 - 테스트 결과: 정상/HTTP실패·형식누락/교체·재시작/잘못된ID·method/같은nativeID충돌/native누락·후속seal·첨부·정리·원문비저장 시험과실제소유HTTP소켓프로브를준비했다. 아직검증전이며소스고정후직접/인접/불변식·동일bytesLinux·설치/정확Ref를확인한다.
 - 다음 단계: 고정 소비 pin·검증·초안PR·정확HEAD CI와인계를마감하고다음본인개발을이어간다. health응답·정상구조/clientclose·native사건을독립worker상태로올리지않으며normal_control.succeeded=null·전축UNKNOWN·scopefalse를유지한다.
 - 막힌 것: 기업상태의미·독립worker/생산자·실제환경실증과profiler/backend·승인/소비분기는미완료다. 부모A39/56/4·A119/27/2·원GPU창종료/추가Start0/마지막확인stopped·CI결제차단은유지한다.
+
+- 첫 고정 검증: 1fffcdd/1210파일 불변에서Windows1027통과·새OBS02시험19실패·기존skip1/제외1(316.30/317.231초)을보존했다. 새공개프로필이Ctx의공통최소모델매핑소비목록에누락되어기존3필드매핑을fullschema로오검사한제품누락이다. 동일원인설치CLI실패도보존했다. OBS02정확프로필을기존검증된transport/mapping동일성조건에추가하고변조매핑거부시험을추가하며기존정책/신뢰/기대값은완화하지않는다. 모든검증handle종료후고정source를보수한다.

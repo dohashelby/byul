@@ -297,3 +297,13 @@ def test_actual_or_unreviewed_engine_cannot_open_state_profile(damage):
     with pytest.raises(http.KubernetesBindingError):http.KubernetesHTTP(target,env,duration=30,runner=world.runner,profile=http.OBSERVATION_STATE_PROFILE)
     assert not world.calls
 
+
+def test_validated_state_transport_reuses_exact_minimal_mapping_without_accepting_mutation():
+    from guard.executors.http_common import request_model
+    env=public_env();target=public_target();world=PodWorld(target)
+    t=http.KubernetesHTTP(target,env,duration=30,runner=world.runner,profile=http.OBSERVATION_STATE_PROFILE)
+    assert request_model(env,target,transport=t)=='fixture-model'
+    changed=deepcopy(target);changed['model_mapping']['api_model']='other'
+    with pytest.raises(ValueError,match='MODEL_MAPPING_INVALID'):request_model(env,changed,transport=t)
+    assert not world.calls
+

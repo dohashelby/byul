@@ -1359,3 +1359,10 @@ git status
 - 다음 단계: 고정 소스 영향 검증→실패 보수→설치→commit/push·초안PR·정확HEAD CI·B 공개 HTTP 조기 인계. native callback/hook/parser/provenance/request-call-session-PID-start는 별도 묶음으로 이어간다.
 - 막힌 것: B의128KiB 제안은 기존16KiB wire 상한 전체를 지원하지 않는다. HTTP200/400은 native 소비·서버·GPU 실증이 아니다. 기존 lab/source/image와0.32 미지원·CI 결제 차단·GPU stopped·원래 승인창 종료 및 추가Start0을 유지한다. 부모A39·A1담당19와 B 전용 소유권은 축소하지 않는다.
 
+## 2026-10-29 — A-1 Online native hook·parser 공통 계측
+
+- 한 일: 확정Online HTTP a673e5f를 보존한 별도 공간에서 B callback 두 확정 커밋을 원본 추적 반영하고3파일 bytes·48개 직접 단위를 확인했다. 기본 /8 source를 그대로 보존한 명시 /9 controller에서 고정 base/callback·공식0.31 source/code·8개 실제 hook·살아 있는 chat ASGI·call/session/PID/start를 연결한다. 닫힌 metadata validator·기존 의미의 loaded code hash와 별도 relative code/1·콜백 provenance·선정 /9만의2MiB 읽기를 추가한다. 기존 lab/source/image/0.32와 B 전용 소유권은 유지한다.
+- 테스트 결과: 구현·실제 source method fixture·새 시험·문서의 정적 검토 뒤 고정 소스로 직접/같은 계약/이전 native 판본/불변식·Linux·설치를 검증한다. 신규 계측 검증 전이며 B callback48통과를 serving hook 검증으로 세지 않는다.
+- 다음 단계: 영향 검증·실패 보수·소스 재고정→설치·공개 CLI·정확Ref 범위 확인→commit/push·초안PR·정확HEAD CI·고정 소스/B 소비 판본 인계. 본인 취소/종료/관측과 A2 확정 IPC/worker 소비도 준비 순서대로 이어간다.
+- 막힌 것: 실제 getter/계측 비용·serving/worker/GPU·image ancestry·실제0.31 수집·B 전용 source pin/정책/소비·전체 Online은 미완료다. CI 결제 차단과 원래 GPU 승인창 종료·stopped·추가Start0을 유지한다. 부모A39/A1담당19/필수 결과를 축소하지 않는다.
+

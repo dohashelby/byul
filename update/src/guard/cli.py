@@ -465,11 +465,12 @@ def verify(config: Path = ConfigOpt, store: Optional[Path] = StoreOpt) -> None:
 
 
 @app.command("prepare-lifecycle-sensor")
-def prepare_lifecycle_sensor(output: Path = typer.Option(..., "--output")) -> None:
+def prepare_lifecycle_sensor(output: Path = typer.Option(..., "--output"),
+    profile: str | None = typer.Option(None, "--profile")) -> None:
     """소유 대상용 native metadata 센서를 준비한다. 엔진·클라이언트를 만들지 않는다."""
     from guard.collectors.lifecycle import prepare_assets
     try:
-        value = prepare_assets(output, Path(__file__).resolve().parents[3])
+        value = prepare_assets(output, Path(__file__).resolve().parents[3], profile=profile)
     except (OSError, ValueError, TypeError):
         typer.echo("LIFECYCLE_PREPARATION_FAILED")
         raise typer.Exit(2)

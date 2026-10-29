@@ -4,10 +4,13 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from copy import deepcopy
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
 from guard.adapters import vllm_lifecycle_profiles as profiles
-from .owned_capture import _read_owned_file, strict_json, validate_owned_source
+from guard.adapters import vllm_online_sensor as online
+from guard.adapters import vllm_online_metadata as online_metadata
+from .owned_capture import _read_owned_file, strict_json, validate_owned_source, EXTENDED_RECORDING_PROFILE
 
 CONTEXT_READER = r"""
 import hashlib,json,os,pathlib,sys
@@ -53,7 +56,7 @@ WORDS = {*profiles.SCHEMAS, *profiles.SCHEMAS.values(), sensor.COMMIT, "START", 
     *sensor.SOURCE_SHA, *POINTS}
 
 
-def _safe(value, depth=0, *, keys=KEYS):
+def _safe(value, depth=0, *, keys=KEYS, words=WORDS):
     if depth > 12:
         return False
     if value is None or type(value) is bool:
@@ -61,11 +64,11 @@ def _safe(value, depth=0, *, keys=KEYS):
     if type(value) is int:
         return 0 <= value < 2**63
     if type(value) is str:
-        return value in WORDS or re.fullmatch(r"(?:[0-9a-f]{32}|[0-9a-f]{64})", value) is not None
+        return value in words or re.fullmatch(r"(?:[0-9a-f]{32}|[0-9a-f]{64})", value) is not None
     if type(value) is list:
-        return len(value) <= 64 and all(_safe(v, depth+1, keys=keys) for v in value)
+        return len(value) <= 64 and all(_safe(v, depth+1, keys=keys, words=words) for v in value)
     if type(value) is dict:
-        return set(value) <= keys and all(profiles.valid_selected_integer(k,v) or _safe(v, depth+1, keys=keys)
+        return set(value) <= keys and all(profiles.valid_selected_integer(k,v) or _safe(v, depth+1, keys=keys, words=words)
                                          for k,v in value.items())
     return False
 
@@ -75,12 +78,13 @@ def canonical_row(row):
 
 
 def parse_recording(raw, prepared):
-    if type(raw) is not bytes or not 0 < len(raw) <= sensor.MAX_BYTES:
+    is_online = prepared["profile"] == online.PROFILE
+    if type(raw) is not bytes or not 0 < len(raw) <= (online.MAX_BYTES if is_online else sensor.MAX_BYTES):
         raise ValueError("LIFECYCLE_RECORDING_BYTES_INVALID")
     lines = raw.splitlines(keepends=True)
     incomplete_tail = not raw.endswith(b"\n")
     tail = lines.pop() if incomplete_tail else b""
-    if not 1 <= len(lines) <= sensor.MAX_ROWS:
+    if not 1 <= len(lines) <= (online.MAX_ROWS if is_online else sensor.MAX_ROWS):
         raise ValueError("LIFECYCLE_RECORDING_ROW_BOUND")
     previous, clock, rows = "0"*64, -1, []
     keys = KEYS - {"asgi_request_sha256"} if prepared["profile"] == profiles.LEGACY_PROFILE else KEYS
@@ -88,17 +92,31 @@ def parse_recording(raw, prepared):
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
-    if prepared["profile"] not in {sensor.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
-    if prepared["profile"] not in {sensor.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
-    if prepared["profile"] not in {sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
-    if prepared["profile"] not in {sensor.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
+    words = WORDS
+    if is_online:
+        keys = keys | {"online_input", "online_code_sha256"}
+        words = words | {online.PROFILE, online.SCHEMA, online.CALLBACK_MODULE, *online.SOURCE_ADDITIONS, *online.POINT_CONTRACTS}
     source_hashes = profiles.source_hashes(prepared["profile"])
     point_sources=profiles.point_sources(prepared["profile"])
     points=set(point_sources)
     for seq, line in enumerate(lines):
         row = strict_json(line, limit=16384)
+        safe_row = row
+        if is_online and type(row) is dict and type(row.get("payload")) is dict:
+            payload = row["payload"]
+            metadata = payload.get("metadata")
+            if type(metadata) is dict and "online_input" in metadata:
+                if row.get("event") != "NATIVE" or set(metadata) != {"online_input"}:
+                    raise ValueError("ONLINE_NATIVE_METADATA_INVALID")
+                online_metadata.validate_snapshot(metadata["online_input"], payload.get("point"), payload.get("phase"))
+                safe_row = deepcopy(row)
+                safe_row["payload"]["metadata"]["online_input"] = None
         if (type(row) is not dict or set(row) != {"seq","event","monotonic_ns","previous_sha256","payload"}
-                or not _safe(row, keys=keys) or type(row["seq"]) is not int or row["seq"] != seq
+                or not _safe(safe_row, keys=keys, words=words) or type(row["seq"]) is not int or row["seq"] != seq
                 or type(row["monotonic_ns"]) is not int or row["monotonic_ns"] < clock
                 or row["previous_sha256"] != previous or canonical_row(row) != line
                 or row["event"] not in {"START","MODULE","NATIVE","ASGI","END","SELECTION"}
@@ -126,24 +144,39 @@ def parse_recording(raw, prepared):
                 for k in ("boot_sha256","time_offsets_sha256"))):
         raise ValueError("LIFECYCLE_RECORDING_CONTEXT_INVALID")
     ready = set()
+    online_calls = {}
+    online_orphans = 0
     for row in rows[1:]:
         payload = row["payload"]
         if row["event"] == "START":
             raise ValueError("LIFECYCLE_RECORDING_RESTARTED")
         if row["event"] == "MODULE":
-            if (set(payload) not in ({"module","verified"}, {"module","verified","source_sha256","code_sha256"},
+            callback_module = is_online and payload.get("module") == online.CALLBACK_MODULE
+            module_hashes = {**source_hashes, online.CALLBACK_MODULE: online.CALLBACK_SHA256} if callback_module else source_hashes
+            module_payload = dict(payload)
+            if is_online and "online_code_sha256" in module_payload:
+                contract = online.MODULE_CONTRACTS.get(module_payload.get("module"), {})
+                if module_payload.pop("online_code_sha256") != contract.get("code_sha256") or not contract:
+                    raise ValueError("ONLINE_MODULE_CODE_INVALID")
+            if (set(module_payload) not in ({"module","verified"}, {"module","verified","source_sha256","code_sha256"},
                     {"module","verified","source_sha256","code_sha256","inherited"})
-                    or payload.get("module") not in source_hashes or type(payload.get("verified")) is not bool):
+                    or payload.get("module") not in module_hashes or type(payload.get("verified")) is not bool):
                 raise ValueError("LIFECYCLE_RECORDING_MODULE_INVALID")
             if payload["verified"]:
-                if (payload.get("source_sha256") != source_hashes[payload["module"]]
+                if (payload.get("source_sha256") != module_hashes[payload["module"]]
                         or re.fullmatch(r"[0-9a-f]{64}", payload.get("code_sha256","")) is None):
                     raise ValueError("LIFECYCLE_RECORDING_MODULE_HASH_INVALID")
+                if callback_module and payload["code_sha256"] != online.CALLBACK_CODE_SHA256:
+                    raise ValueError("ONLINE_CALLBACK_CODE_INVALID")
+                if is_online and payload["module"] in online.MODULE_CONTRACTS and "online_code_sha256" not in payload:
+                    raise ValueError("ONLINE_MODULE_CODE_INVALID")
                 if "inherited" in payload and payload["inherited"] is not True:
                     raise ValueError("LIFECYCLE_RECORDING_INHERITANCE_INVALID")
                 ready.add(payload["module"])
+            elif is_online:
+                ready.discard(payload["module"])
         if row["event"] in {"NATIVE","SELECTION"}:
-            if row["event"]=="SELECTION" and (header["profile"] not in {sensor.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
+            if row["event"]=="SELECTION" and (header["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
                     or payload.get("point")!="InputProcessor.assign_request_id" or payload.get("requests")!=[]
                     or payload.get("selection_observed") is not False
                     or type(payload.get("metadata")) is not dict
@@ -178,6 +211,24 @@ def parse_recording(raw, prepared):
                 if row["event"]=="NATIVE" and payload["point"]=="InputProcessor.assign_request_id":
                     raise ValueError("LIFECYCLE_SELECTION_EVENT_REQUIRED")
                 profiles.validate_request_selection(payload)
+            if is_online and payload["point"] in online.POINT_CONTRACTS:
+                if (set(payload["metadata"]) != {"online_input"} or payload["requests"] != []
+                        or payload["selection_observed"] is not False or row["event"] != "NATIVE"
+                        or online.CALLBACK_MODULE not in ready or point_sources[payload["point"]] not in ready):
+                    raise ValueError("ONLINE_POINT_PROVENANCE_INVALID")
+                snapshot = online_metadata.validate_snapshot(payload["metadata"]["online_input"],
+                    payload["point"], payload["phase"], context, prepared["session"])
+                call = snapshot["binding"]["call_id_sha256"]
+                if payload["phase"] == "CALL":
+                    if call in online_calls:raise ValueError("ONLINE_CALL_ID_REUSED")
+                    online_calls[call] = {"point":payload["point"], "binding":snapshot["binding"], "closed":False}
+                elif call not in online_calls:
+                    online_orphans += 1
+                else:
+                    first_call = online_calls[call]
+                    if first_call["closed"] or first_call["point"] != payload["point"] or first_call["binding"] != snapshot["binding"]:
+                        raise ValueError("ONLINE_CALL_BINDING_MISMATCH")
+                    first_call["closed"] = True
             for request in payload["requests"]:
                 if (type(request) is not dict or set(request) != {"request_sha256","request_present",
                         "output_state_present","batch_row_present","status_code"}
@@ -214,7 +265,11 @@ def parse_recording(raw, prepared):
     return rows, {"recording_closed": bool(end) and not incomplete_tail, "recording_end": end.get("reason"),
         "incomplete_final_row":incomplete_tail,"discarded_tail_bytes":len(tail),
         "discarded_tail_sha256":hashlib.sha256(tail).hexdigest() if tail else None,
-        "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False}
+        "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False,
+        **({"online_code_contract":online.CODE_CONTRACT,
+            "online_incomplete_calls":sum(not call["closed"] for call in online_calls.values()) + online_orphans,
+            "online_callback_provenance":({"module":online.CALLBACK_MODULE, "bytes_sha256":online.CALLBACK_SHA256,
+                "code_sha256":online.CALLBACK_CODE_SHA256} if online.CALLBACK_MODULE in ready else None)} if is_online else {})}
 
 
 def process_context(docker, container, pid):
@@ -237,7 +292,10 @@ def process_context(docker, container, pid):
 def capture(docker, target, *, source, prepared, read_file=None, image_check=None):
     validate_owned_source(**source)
     read = _read_owned_file if read_file is None else read_file
-    raw, provenance = read(docker, target, **source, max_bytes=sensor.MAX_BYTES)
+    is_online = prepared["profile"] == online.PROFILE
+    limit = online.MAX_BYTES if is_online else sensor.MAX_BYTES
+    read_options = {"read_profile":EXTENDED_RECORDING_PROFILE} if is_online and read_file is None else {}
+    raw, provenance = read(docker, target, **source, max_bytes=limit, **read_options)
     records, summary = parse_recording(raw, prepared)
     context = records[0]["payload"]["context"]
     expected_path = f"/guard-lifecycle/data/{prepared['session']}/pid-{context['pid']}-{context['start_ticks']}.jsonl"
@@ -258,7 +316,7 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
         diagnostic.append("LIFECYCLE_IMAGE_RECHECK_UNAVAILABLE")
     try:
         before = process_context(docker, source["container"], context["pid"])
-        later, second = read(docker, target, **source, max_bytes=sensor.MAX_BYTES)
+        later, second = read(docker, target, **source, max_bytes=limit, **read_options)
         after = process_context(docker, source["container"], context["pid"])
         verified = (before == context == after and raw == later
                     and provenance["owner"] == second["owner"]
@@ -278,6 +336,8 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     owner["started_at_sha256"] = hashlib.sha256(started.encode("utf-8","surrogatepass")).hexdigest()
     safe_provenance = {**provenance,"owner":owner}
     return {"schema":"guard-lifecycle-capture/1", "records":records, "summary":summary,
+        **({"online_callback_provenance":summary["online_callback_provenance"],
+            "online_code_contract":online.CODE_CONTRACT} if is_online else {}),
         "provenance":safe_provenance, "process_context_verified":verified, "image_digest_verified":image_verified,
         "diagnostic_codes":diagnostic, "product_connected":False, "security":"UNKNOWN",
         "producer_authenticated":False, "record_authenticity_verified":False,

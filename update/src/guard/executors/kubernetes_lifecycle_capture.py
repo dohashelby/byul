@@ -8,9 +8,10 @@ import time
 from types import SimpleNamespace
 
 from guard.models import canonical_json, sha256_hex
+from guard.adapters import vllm_online_sensor as online
 from guard.runtime.bounded import capture_pipes
 from guard.runtime.kubernetes_binding import validate_capture_target, verify_owned_pod, project_owned_snapshot
-from .owned_capture import _FILE_READER, MAX_BYTES, strict_json, validate_file_result, validate_owned_source
+from .owned_capture import _FILE_READER, MAX_BYTES, strict_json, validate_file_result, validate_owned_source, EXTENDED_RECORDING_PROFILE
 from .lifecycle_capture import CONTEXT_READER
 from .lifecycle_session import INVENTORY_READER
 from .session_seal import SESSION_SEALER
@@ -41,6 +42,8 @@ def supervised_source(source):
 
 class KubernetesLifecycleReader:
     def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None):
+        if prepared.get("profile") == online.PROFILE and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+            raise KubernetesCaptureError()
         self._initialize(validate_target(target,env),target,prepared,binary=binary,duration=duration,runner=runner)
 
     def _initialize(self,binding,target,prepared,*,binary,duration,runner):
@@ -52,6 +55,8 @@ class KubernetesLifecycleReader:
             raise KubernetesCaptureError()
         self.target_sha256=sha256_hex(canonical_json(target))
         self.session=prepared["session"]
+        self.file_read_profile = EXTENDED_RECORDING_PROFILE if prepared.get("profile") == online.PROFILE else None
+        self.file_read_limit = online.MAX_BYTES if self.file_read_profile is not None else 262144
         self.binary=binary;self.deadline=time.monotonic()+duration
         self.runner=runner or capture_pipes;self.injected=runner is not None
         self.programs={"file":_FILE_READER,"context":CONTEXT_READER,"inventory":INVENTORY_READER,"seal":SESSION_SEALER}
@@ -117,10 +122,10 @@ class KubernetesLifecycleReader:
                 or argv[:2]!=["python3","-c"] or type(max_bytes) is not int):
             raise KubernetesCaptureError()
         if argv[2]==_FILE_READER and len(argv)==5:
-            if not re.fullmatch(r"[1-9][0-9]{4,5}",argv[4]) and argv[4]!="262144":
+            if not re.fullmatch(r"[1-9][0-9]{4,6}",argv[4]):
                 raise KubernetesCaptureError()
             budget=int(argv[4])
-            if not MAX_BYTES<=budget<=262144 or str(budget)!=argv[4] or max_bytes!=2*budget:
+            if not MAX_BYTES<=budget<=self.file_read_limit or str(budget)!=argv[4] or max_bytes!=2*budget:
                 raise KubernetesCaptureError()
             prefix=re.escape("/guard-lifecycle/data/"+self.session+"/")
             if re.fullmatch(prefix+r"pid-[1-9][0-9]{0,9}-[1-9][0-9]{0,19}\.jsonl",argv[3]) is None:
@@ -167,9 +172,9 @@ class KubernetesLifecycleReader:
     def read_file(self,client,target,*,container,image,path,timeout=5,max_bytes=MAX_BYTES):
         self._selected(client,target,container,image)
         validate_owned_source(container=container,image=image,path=path)
-        if type(max_bytes) is not int or not MAX_BYTES<=max_bytes<=262144:raise KubernetesCaptureError()
+        if type(max_bytes) is not int or not MAX_BYTES<=max_bytes<=self.file_read_limit:raise KubernetesCaptureError()
         result=self.exec_bounded(container,["python3","-c",_FILE_READER,path,str(max_bytes)],timeout=timeout,max_bytes=2*max_bytes)
-        raw,file_identity=validate_file_result(result,max_bytes=max_bytes)
+        raw,file_identity=validate_file_result(result,max_bytes=max_bytes,read_profile=self.file_read_profile)
         role=self.binding["engine"]
         return raw,{"capture_sha256":hashlib.sha256(raw).hexdigest(),"bytes":len(raw),"owner":result.owner_before,
             "file_identity":file_identity,"producer_authenticated":False,"record_authenticity_verified":False,

@@ -9,6 +9,7 @@ import uuid
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
 from guard.adapters import vllm_lifecycle_profiles as profiles
+from guard.adapters import vllm_online_sensor as online
 from guard.collectors.file import load_environment
 from guard.collectors.route_observations import validate_output
 from guard.executors.owned_capture import strict_json, validate_owned_source, validate_engine_target, engine_identity
@@ -16,12 +17,15 @@ from guard.models import DataOrigin
 from guard.update_validation import reserve_output
 
 
-def prepare_assets(output, repository):
+def prepare_assets(output, repository, *, profile=None):
+    selected = sensor if profile in (None, sensor.PROFILE) else online if profile == online.PROFILE else None
+    if selected is None:
+        raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
     output = Path(output).absolute()
     if any(parent.is_symlink() or parent.is_junction() or (parent/".git").exists() for parent in output.parents):
         raise ValueError("LIFECYCLE_OUTPUT_IN_REPOSITORY")
     output = reserve_output(output, protected=[Path(repository)])
-    source = Path(sensor.__file__).read_bytes()
+    source = Path(selected.__file__).read_bytes()
     digest = hashlib.sha256(source).hexdigest()
     session = uuid.uuid4().hex
     config = {"schema":sensor.CONFIG_SCHEMA, "session":session,
@@ -45,14 +49,21 @@ def prepare_assets(output, repository):
     ).encode()
     values = {"guard_lifecycle_sensor.py":source, "sitecustomize.py":bootstrap,
               "settings.json":(json.dumps(config,sort_keys=True,indent=2)+"\n").encode()}
+    if selected is online:
+        from guard.adapters import vllm_online_input as callback
+        base_raw, callback_raw = Path(sensor.__file__).read_bytes(), Path(callback.__file__).read_bytes()
+        if (hashlib.sha256(base_raw).hexdigest() != online.BASE_SHA256
+                or hashlib.sha256(callback_raw).hexdigest() != online.CALLBACK_SHA256):
+            raise ValueError("LIFECYCLE_ONLINE_DEPENDENCY_UNAVAILABLE")
+        values.update({"guard_lifecycle_base.py":base_raw, "guard_online_input_callback.py":callback_raw})
     assets = {}
     for name, data in values.items():
         with (output/name).open("xb") as stream:
             stream.write(data)
         assets[name] = {"sha256":hashlib.sha256(data).hexdigest(),"bytes":len(data)}
-    manifest = {"schema":"guard-lifecycle-assets/1", "profile":sensor.PROFILE, "session":session,
+    manifest = {"schema":"guard-lifecycle-assets/1", "profile":selected.PROFILE, "session":session,
         "public_commit":sensor.COMMIT, "assets":assets,
-        "source_sha256":sensor.SOURCE_SHA, "engine_started":False,
+        "source_sha256":profiles.source_hashes(selected.PROFILE), "engine_started":False,
         "image_contents_verified":False, "product_connected":False}
     with (output/"manifest.json").open("x",encoding="utf-8",newline="\n") as stream:
         json.dump(manifest,stream,sort_keys=True,indent=2)
@@ -74,7 +85,9 @@ def load_prepared(path):
             or manifest["engine_started"] is not False or manifest["image_contents_verified"] is not False
             or manifest["product_connected"] is not False
             or type(manifest["assets"]) is not dict
-            or set(manifest["assets"]) != {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json"}):
+            or set(manifest["assets"]) != ({"guard_lifecycle_sensor.py","sitecustomize.py","settings.json",
+                "guard_lifecycle_base.py","guard_online_input_callback.py"} if manifest["profile"] == online.PROFILE
+                else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json"})):
         raise ValueError("LIFECYCLE_ASSETS_INVALID")
     source_supported = False
     for name, expected in manifest["assets"].items():
@@ -86,6 +99,10 @@ def load_prepared(path):
             raw = stream.read(262145)
         if len(raw) != expected["bytes"] or hashlib.sha256(raw).hexdigest() != expected["sha256"]:
             raise ValueError("LIFECYCLE_ASSET_BYTES_INVALID")
+        if manifest["profile"] == online.PROFILE and name in {"guard_lifecycle_base.py", "guard_online_input_callback.py"}:
+            required = online.BASE_SHA256 if name == "guard_lifecycle_base.py" else online.CALLBACK_SHA256
+            if hashlib.sha256(raw).hexdigest() != required:
+                raise ValueError("LIFECYCLE_ONLINE_DEPENDENCY_UNAVAILABLE")
         if name == "guard_lifecycle_sensor.py":
             source_supported = profiles.asset_supported(manifest["profile"], raw)
     if not source_supported:
@@ -111,6 +128,8 @@ def validate_binding(env,target,source,prepared):
 
 
 def validate_session_binding(env,target,source,prepared):
+    if prepared["profile"] == online.PROFILE and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+        raise ValueError("LIFECYCLE_ONLINE_ENGINE_UNSUPPORTED")
     validate_owned_source(**source)
     try:
         validate_engine_target(env,target,source["container"],source["image"])

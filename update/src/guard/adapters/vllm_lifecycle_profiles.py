@@ -5,6 +5,7 @@ import hashlib
 import re
 from pathlib import Path
 from . import vllm_lifecycle_sensor as sensor
+from . import vllm_online_sensor as online
 
 LEGACY_PROFILE = "vllm-native-lifecycle-metadata/1"
 LEGACY_SCHEMA = "guard-native-lifecycle-events/1"
@@ -20,7 +21,7 @@ V6_PROFILE = "vllm-native-lifecycle-metadata/6"
 V6_SCHEMA = "guard-native-lifecycle-events/6"
 V7_PROFILE = "vllm-native-lifecycle-metadata/7"
 V7_SCHEMA = "guard-native-lifecycle-events/7"
-SCHEMAS = {sensor.PROFILE: sensor.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA, V3_PROFILE: V3_SCHEMA, V4_PROFILE: V4_SCHEMA, V5_PROFILE: V5_SCHEMA, V6_PROFILE: V6_SCHEMA, V7_PROFILE: V7_SCHEMA}
+SCHEMAS = {sensor.PROFILE: sensor.SCHEMA, online.PROFILE: online.SCHEMA, LEGACY_PROFILE: LEGACY_SCHEMA, V2_PROFILE: V2_SCHEMA, V3_PROFILE: V3_SCHEMA, V4_PROFILE: V4_SCHEMA, V5_PROFILE: V5_SCHEMA, V6_PROFILE: V6_SCHEMA, V7_PROFILE: V7_SCHEMA}
 # Exact previously shipped LF/CRLF source spellings; no normalization on input.
 LEGACY_ASSETS = {
     (31143, "50143b5cf54aa8f5bbcfef769c286f65c971e0acd2caa111c625583f4baec3de"),
@@ -377,6 +378,8 @@ V7_FUNCTION_POINTS = {'vllm.model_executor.model_loader.weight_utils': ('safeten
 
 
 def asset_supported(profile, raw):
+    if profile == online.PROFILE:
+        return raw == Path(online.__file__).read_bytes()
     if profile == LEGACY_PROFILE:
         return (len(raw), hashlib.sha256(raw).hexdigest()) in LEGACY_ASSETS
     if profile == V2_PROFILE:
@@ -397,6 +400,8 @@ def asset_supported(profile, raw):
 
 
 def source_hashes(profile):
+    if profile == online.PROFILE:
+        return {**sensor.SOURCE_SHA, **online.SOURCE_ADDITIONS}
     if profile == V7_PROFILE:
         return V7_SOURCE_SHA
     if profile == sensor.PROFILE:
@@ -415,6 +420,8 @@ def source_hashes(profile):
 
 
 def points(profile):
+    if profile == online.PROFILE:
+        return online.points(sensor)
     if profile == V7_PROFILE:
         return V7_POINTS
     if profile == sensor.PROFILE:
@@ -554,8 +561,8 @@ def point_sources(profile):
     result={cls+"."+method:module for module,classes in points(profile).items()
         for cls,methods in classes.items() for method in methods}
     expected=sum(len(methods) for classes in points(profile).values() for methods in classes.values())
-    if profile in {sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE}:
-        functions=sensor.FUNCTION_POINTS if profile==sensor.PROFILE else V7_FUNCTION_POINTS if profile==V7_PROFILE else V6_FUNCTION_POINTS if profile==V6_PROFILE else V5_FUNCTION_POINTS if profile==V5_PROFILE else V4_FUNCTION_POINTS
+    if profile in {sensor.PROFILE,online.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE}:
+        functions=online.functions(sensor) if profile==online.PROFILE else sensor.FUNCTION_POINTS if profile==sensor.PROFILE else V7_FUNCTION_POINTS if profile==V7_PROFILE else V6_FUNCTION_POINTS if profile==V6_PROFILE else V5_FUNCTION_POINTS if profile==V5_PROFILE else V4_FUNCTION_POINTS
         result.update({module.rsplit(".",1)[-1]+"."+method:module
             for module,methods in functions.items() for method in methods})
         expected+=sum(len(methods) for methods in functions.values())
@@ -568,7 +575,7 @@ def valid_call_frame(frame,profile):
     base={"point","request_sha256"}
     if set(frame)==base:return True
     extra={"weight_call_sha256","weight_model_sha256"}
-    if profile not in {sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE} or set(frame)!=base|extra or frame.get("point")!="DefaultModelLoader.load_weights":return False
+    if profile not in {sensor.PROFILE,online.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE} or set(frame)!=base|extra or frame.get("point")!="DefaultModelLoader.load_weights":return False
     return (type(frame["weight_call_sha256"]) is str and re.fullmatch(r"[0-9a-f]{64}",frame["weight_call_sha256"]) is not None
         and (frame["weight_model_sha256"] is None or type(frame["weight_model_sha256"]) is str
             and re.fullmatch(r"[0-9a-f]{64}",frame["weight_model_sha256"]) is not None))

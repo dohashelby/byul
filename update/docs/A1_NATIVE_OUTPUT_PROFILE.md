@@ -17,3 +17,5 @@ collector 반환과 ASGI send 반환은 client 수신·늦은 chunk 전달/폐�
 검증은 실제 공개 메서드 본문 발췌의 collector put/get/close·add_request·make_request_output과 EXAMPLE 의존성으로 수행한다. 원본 전체 파일 SHA·발췌 출처/라이선스는 tests/fixtures/a1-output-native-methods.json에 고정한다. 합치기·동일 예외·중단된 get 취소·weak 만료/주소 재사용/PID·한도·텍스트 한도·metadata/code 변경·누락/중복·옛 프로필 거부·실패 MODULE·제품 CLI의 후속 오류 및 정확6 Ref 왕복을 확인한다. 최종 실행 결과와 파일 bytes SHA는 고정 커밋 인계에 기록한다.
 
 원래 GPU 승인창 종료·추가 Start0·마지막 확인 stopped·기존 총비용을 유지한다. 실제 재개에는 새 시간 승인과 정확 ENV/POL/세대·준비 소비자·소유권/정리/Stop 절차가 필요하다. 원격 CI는 결제 차단으로 runner 실행 여부와 독립 검증을 구분한다.
+
+검증 마감: guard checkpoint ac48622f0926a64fd5f85fd251ed01837c2d623a, 정확 시험 소스 0c12a4d7012dec58763770951cdd73b5c35e93ab. Windows 첫804통과/3실패/6오류/기존skip1·제외1(174.94초)을 보존하고 새 시험만 보수했다. Windows 보수183통과/기존skip1·제외1(42.12/42.776초), 동일1189bytes Linux814통과/제외1(50.06/50.392초),183개 source/wheel/격리설치 파일 일치, 설치본 준비CLI3·제품CLI4의 각정확6Ref 반출/복원·재판정(8.988초)을 확인했다. Linux 실제FD·고정의존성과 owncode 변경거부·소유CPU fork16사례(.044초)도 통과했다. 모든 실행은 CPU/EXAMPLE이며 새 serving/worker/GPU 실증이 아니다. 직전 native10의 Linux전체6942는 그 판본 근거로 보존하고 이번에 변하지 않은 전체시험을 반복하지 않았다.

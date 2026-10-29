@@ -1411,3 +1411,5 @@ git status
 - 막힌 것: 실제client수신·늦은출력 폐기/전달 정책·신뢰producer/image·자동retry·현재serving/worker/GPU 실증·전체REQ12/A39는 미완료다. 기존8/9/10와 B27/A2원본을 보존하며 원래GPU창종료·추가Start0·CI결제차단을 유지한다.
 
 - 첫 고정 검증: Windows804통과·새시험3실패·6오류·기존skip1/제외1(174.94초),1189파일 불변을 보존했다. 긴 parameter 이름이 Windows32767자 환경변수 한도를 넘고, 실제 put이 occupied 상태에서 BaseException을 교체하지 않는 원래 동작과 시험가정이 달랐다. 중복 ASGI fixture가 모든 nonce를 중복시켜 call 자체가 거부된 원인도 확인했다. 짧은 시험ID·원래 Exception/그외 BaseException 의미와 취소 시험·ASGI nonce만 중복시키는 대역으로 보수하며 제품 guard/code literal은 변경하지 않는다. pytest 종료 뒤 긴 행 정규식에 머문 소유 요약기만, 원본로그와 독립파일불변성 receipt를 남기고 종료했다. 검증중 소스변경이나 시험중단은 없었다.
+
+- 보수·설치 마감: 정확0c12a4d/같은guard ac48622에서 Windows183통과·기존skip1/제외1(42.12/42.776초),동일1189bytes Linux영향814통과·제외1(50.06/50.392초),183파일 source/wheel/격리설치 일치와 준비CLI3·제품CLI4 각정확6Ref 왕복(8.988초),실제LinuxFD/의존성/owncode/fork16사례(.044초)를 확인했다. 검증중 소스변경·새skip/제외·제품가정완화는 없었다. 이전native10 전체6942/실제REQ11wheel은 당시판본 근거로 보존한다. 최종 결과 문서만 갱신하고 초안PR·정확HEAD CI·인계를 마감한다.

@@ -76,6 +76,9 @@ class KubernetesHTTP:
         if profile not in {PROFILE, *_BINDING_PROFILES}:
             raise KubernetesBindingError()
         self.profile = profile
+        self.lab = target.get('lab')
+        self.engine_name = env.engine.name
+        self.engine_version = env.engine.version
         if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
             raise KubernetesBindingError()
         if profile in _BINDING_PROFILES:
@@ -159,7 +162,7 @@ class KubernetesHTTP:
         self._attempt_token = None
         self._attempt_cases = []
 
-    def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False):
+    def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False, on_document=None):
         remaining = self.deadline - self.clock()
         if budget is not None:remaining=min(remaining,budget)
         if remaining <= 0:
@@ -173,6 +176,11 @@ class KubernetesHTTP:
                 with self.lock:
                     if "KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED" not in self.cleanup_errors:
                         self.cleanup_errors.append("KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED")
+            if on_document is not None:
+                # Retain a separately validated typed document even if later
+                # pipe/reap/deadline checks fail. Every existing success gate
+                # still runs below; this callback never makes capture succeed.
+                on_document(strict_json(result['stdout_bytes'],limit=cap))
             if (result["returncode"] != 0 or result["capture"]["complete"] is not True
                     or self.deadline - self.clock() <= 0):
                 raise KubernetesBindingError()
@@ -717,6 +725,12 @@ class KubernetesHTTP:
         """Existing PLT01/04 completion control, with an explicit wire ID map."""
         from .kubernetes_functional import capture
         return capture(self,network,requests,timeout)
+
+    def ipc_snapshot(self, policy_values, *, actor_specs, connect_timeout, total_timeout):
+        """Explicit lab IPC actor snapshot; dedicated PLT02 consumer is separate."""
+        from .kubernetes_ipc import capture
+        return capture(self,policy_values,actor_specs=actor_specs,
+            connect_timeout=connect_timeout,total_timeout=total_timeout)
 
     def api_hop_snapshot(self, policy_values, timeout):
         """One explicit policy-bound HTTP hop for the existing PLT08 consumer."""

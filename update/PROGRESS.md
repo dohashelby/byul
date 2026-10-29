@@ -1433,3 +1433,10 @@ git status
 - 막힌 것: 실제worker/message소비·Kubernetes IPC transport·동일UID비승인process·SHM/TCP/TP·전체IPC인벤토리/부모A는미완료다. 기존원래GPU창종료·추가Start0·마지막확인stopped·새시간/비용미승인·CI결제차단을유지한다.
 
 - 통합검증 마감: 정확fa9ee19/검토pin4693f1d에서Windows260통과·기존skip1/제외1(31.53/32.156초),동일1199bytes Linux261통과·제외1(22.21/22.677초),source/wheel/격리설치186파일일치·기존CLI6/36Ref왕복(12.476초)을확인했다. 실제소유Linux임시socket2개에서각수신payload0bytes·SO_PEERCRED/첫path안정·둘째metadata불명·소유임시정리를확인했다. 이는EXAMPLE프로토콜검증이며새serving/worker/Kubernetes/GPU실증이아니다. A2원본4파일/과거팩Ref와source를보존하고검증중변경·새제외없이결과문서만갱신한다.
+
+## 2026-10-30 — A-1 Kubernetes IPC 공통 전송
+
+- 한 일: d1fafb0의 전용 원본과 공동 c9 기준을 보존하고 기존 KubernetesHTTP에 명시 정책/actor 기반 ipc_snapshot을 추가했다. 원본 A2 probe bytes, 소유 자식 자격 제한과 FD anchor, 전후 수집·세대 결합·엄격한 정제 parser·후속 실패 시 완료 packet 보존을 포함한다. 기존 전송 capture 성공 gate와 registry/전용 판정은 유지한다.
+- 테스트 결과: 구현·시험·계약 정적 검토를 마쳤으며 고정 소스 직접/인접·Linux 소유 임시 socket·설치 검증 전이다. 실행하지 않은 시험을 통과로 기록하지 않는다.
+- 다음 단계: 공통 전송 고정본과 정확 bytes/명령/지원 범위를 A2 소비용으로 인계한 뒤 본인19개 준비된 개발을 계속한다. 기존 CLI 회귀와 새 공통 API 검증은 구분한다.
+- 막힌 것: A2 새 envelope/groups 전용 소비·정상/위반/증거 왕복과 실제 worker/GPU/Kubernetes 실증·전체 PLT02/부모 A는 미완료다. EXAMPLE/UNKNOWN·생산자/worker/scope false와 원래 GPU 창 종료·추가 Start0·CI 결제 차단을 유지한다.

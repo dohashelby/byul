@@ -31,10 +31,12 @@ from .unix_ipc import UnixIPCExecutor
 from .boundary_egress import BoundaryEgressExecutor
 from .api_transport import APITransportExecutor
 from .kubernetes_api_transport import KubernetesAPITransportExecutor
+from .kubernetes_route_record import KubernetesRouteRecordExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
+    "route_record:kubernetes": lambda cfg: KubernetesRouteRecordExecutor(cfg.get("route_record", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "fake": lambda cfg: FakeExecutor(cfg.get("fake", {}).get("scenario", "pass"), cfg.get("fake", {}).get("scenarios", {})),
     "direct_route:real": lambda cfg: DirectRouteExecutor(cfg.get("direct_route", {}), environ=cfg.get("_runtime_environ")),
     "role_route:real": lambda cfg: RoleRouteExecutor(cfg.get("role_route", {}), environ=cfg.get("_runtime_environ")),

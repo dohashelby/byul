@@ -40,7 +40,11 @@ def supervised_source(source):
 
 class KubernetesLifecycleReader:
     def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None):
-        self.binding=validate_target(target,env)
+        self._initialize(validate_target(target,env),target,prepared,binary=binary,duration=duration,runner=runner)
+
+    def _initialize(self,binding,target,prepared,*,binary,duration,runner):
+        # Internal reuse only: callers must supply their profile's validated binding.
+        self.binding=binding
         if (type(binary) is not str or not binary.strip() or type(duration) not in (int,float)
                 or not math.isfinite(duration) or not 0<duration<=300
                 or type(prepared.get("session")) is not str or re.fullmatch(r"[0-9a-f]{32}",prepared["session"]) is None):

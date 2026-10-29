@@ -38,3 +38,12 @@ collection ID·수집 시각을 유지하며 capture 1회, 두 EVD ABORTED, 정�
 정제 첨부에 보존하며
 미관측 Python mode/source validation을 검증 성공으로 채우지 않는다. 소비 판정 로직은 그대로다.
 최종 전용 회귀 **43 passed / pytest 1.27초 / 부모 wall 1.45초**. 실제 CPU는 root 통합 후 지정 담당자 한 번 실행한다.
+
+최종 공통 검증: 고정 code7f196917에서 로컬 기본 전체6177 passed/기존19 deselected,
+pytest140.07초·부모140.424초. 직접collector35·producer43 통과, 집중 검토1건 수정·해결확인 완료.
+실제target031 수집1회12행+전후각12를두EVD/RES·RPT하나에공유했고, 동일collectionID·실제시각·ENV/PLANRef·행·첨부bytes를확인했다.
+두번째pipeline73.995초·COMPLETED/DECLARED·전축UNKNOWN·Store0·exactRef재판정동일이다.
+제품src/lock/공유팩은PR81과같아 wheel157파일 일치 결과를 재사용한다.
+검증된Store/최종객체/의존성참조/전체시험로그는 형제폴더 byul-b1-dynamic-evidence-20261029/product-target031-run-2에복사보존,복사Store검증도0이다.
+원본/private/tmp와이전run1은보존했다. 최종GitHub5CI는계정결제/한도복구후같은head에서재개한다.
+영구등록·실제설치승인·지원mode채택·최종모델code소비는A/기업정책/실제대상잔여다.

@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed OBS01 checkpoint: explicit public requests/owned records; native contracts retained
+# Reviewed A2 IPC error-phase checkpoint: four original files; full common contracts retained
 # and REQ12 consumer; native8/9 and all previous full-scope gates retained.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='3ae7cc2c979195c9c55cec4aba0e213f1a78e842'
+REVIEWED_COMMON_COMMIT='4693f1d9cf29b5f641c631b9e8a3d87346fad072'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

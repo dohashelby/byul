@@ -1424,3 +1424,10 @@ git status
 - 첫 고정 검증: e84778a/1197파일 불변에서 Windows930통과·새시험1실패·기존skip1/제외1(319.74/320.513초)을 보존했다. HTTP 부모 정리 오류는기록됐으나 `_finish`가cleanup만으로실행을ABORTED로내리지않은누락을보수한다. 전후API정상구조를OBS01필수감사정상대조성공으로오해하지않도록 normal_control.succeeded=null과명시시험을추가한다. 기존guard/probe/전용bytes와테스트기대값·제외범위는유지하고새소스를재고정해영향만검증한다.
 
 - 보수·설치 마감: 정확0ac92da/guard3ae7cc2의Windows197통과·기존skip1/제외1(71.56/72.26초),동일1197bytes Linux영향932통과·제외1(101.67/101.983초),source/wheel/격리설치186파일일치와제품CLI4 각정확6Ref왕복(8.192초)을확인했다. 검증중변경·새제외없음,이전전체6942/실제REQ11wheel은당시판본근거다. 결과문서만갱신하고초안PR·정확HEAD CI·인계를마감한다. 전체OBS01·A39/실제신뢰생산자·실제환경은미완료다.
+
+## 2026-10-30 — A-1 A2 IPC 오류 단계 고정 소비 통합
+
+- 한 일: 확정17c8098에서 A2 PR114의3ecfd5f를cherry-pick -x로4693f1d에소비했다. 전용4파일 bytes·git원본·인계SHA일치를확인했다. 실제zero-payload connect의EACCES/EPERM만denied이며사전metadata/peer/사후조회실패는unknown이다. 이전유효path의독립관측/FAIL과정상응답상관·owner/PID/start/namespace/cutoff·기존판정은유지한다. A1전체검토pin만4693f1d로갱신하고B c9원본검사는그대로둔다.
+- 테스트 결과: A2의기존142/설치CLI6/36Ref는그고정원본판본근거로보존한다. 새통합소스는별도영향/설치검증전이며이번기록을새CPU수집/실제환경실증으로소급하지않는다. Source고정후직접/인접/불변식·동일bytes Linux·설치/정확Ref를확인한다.
+- 다음 단계: 변화가있는오류단계/독립FAIL보존과고정sourcepin을검증하고확정커밋/원본bytes/지원범위를인계한다. 현재없는Kubernetes IPC공개계약은별도actor-probe/realworker·UID/groups/PID/start/ns·socket세대·정상응답·시간출력/오류범위를고정해야하며제안서를현재지원으로올리지않는다.
+- 막힌 것: 실제worker/message소비·Kubernetes IPC transport·동일UID비승인process·SHM/TCP/TP·전체IPC인벤토리/부모A는미완료다. 기존원래GPU창종료·추가Start0·마지막확인stopped·새시간/비용미승인·CI결제차단을유지한다.

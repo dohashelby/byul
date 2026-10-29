@@ -85,3 +85,23 @@ share_mem=False 복사 경로, 실제 모델·worker·GPU 소비는 이번 관�
 전후 정상 대조·aux 참조 정리, 원문 canary 미저장을 확인했다(0.097초).
 msgspec 0.22.0/cloudpickle 3.1.2/pyzmq 27.2.0이며 기존 환경과의 의존성 차이에 대한
 직접 확인이다. 기존 untyped 수집 코드와 사례를 바꾸지 않았다.
+
+## 검토 수정과 재검증
+
+기존 공식 함수 helper는 부모 Python의 최적화 설정을 상속해 `-O`에서 원문 assert가
+생략될 수 있었다. 공식 AST 컴파일에 `optimize=0`을 명시했고, typed 실행은
+`sys.flags.optimize`가 켜져 있으면 source·target 실행 전에 거부한다. 실제 `-O`
+subprocess에서 원문의 실패 assert가 AssertionError로 관측되는 회귀와 `-O`/`-OO`
+typed CLI의 사전 거부 회귀를 추가했다.
+
+기존 untyped 세 함수의 동일성 검사는 승인 기준 bd491e8에서 지원 Python 3.12로
+산출한 AST dump(include_attributes=False) SHA256 세 개를 검토된 fixture로 고정했다.
+CI는 이 fixture와 현재 함수 AST를 대조하므로 얕은 checkout에서도 Git 과거 이력을
+조회하지 않는다. vLLM source 신원과 파일 bytes는 기존 source pin 경계에서 검증한다.
+
+수정 묶음 직접·관련 회귀 **55 passed**, pytest 1.29초. 소스 고정 후 typed CPU를
+한 번 재실행해 원문 공식 정상 대조 3개·24사례·전후 대조 48건을 다시 완료했다.
+결과 `/private/tmp/byul-sup12-typed-cpu-20261029-2.json`, 부모 벽시계 **7.35초**,
+aux 참조 정리 전부 확인. 새 도구 bytes SHA256은
+`110c0fd7090daba0ea22334004161dfec5fefe18dce119379c32508b55f3e8fc`다.
+기존 untyped 함수 AST/default 동작과 공식 message 3개 결과는 그대로 재사용한다.

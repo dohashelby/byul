@@ -245,7 +245,7 @@ def typed_official_controls(root, encoder_class, decoder_class, torch, np):
         raise ValueError("typed official test inventory mismatch")
     selected = ast.Module(body=nodes, type_ignores=[])
     namespace = {"torch": torch, "np": np, "MsgpackEncoder": encoder_class, "MsgpackDecoder": decoder_class}
-    exec(compile(selected, str(path), "exec"), namespace)
+    exec(compile(selected, str(path), "exec", optimize=0), namespace)
     controls = []
     for name in sorted(TYPED_OFFICIAL_NAMES):
         try:
@@ -258,6 +258,8 @@ def typed_official_controls(root, encoder_class, decoder_class, torch, np):
 
 
 def run_typed(root):
+    if sys.flags.optimize:
+        raise ValueError("TYPED_CPU_REQUIRES_ASSERTIONS")
     from tools.b1_integration_cpu import verify_tool_checkout
     from guard.executors.structured_tools_cpu import _verify_source
     verify_tool_checkout(Path(__file__).resolve().parents[2])

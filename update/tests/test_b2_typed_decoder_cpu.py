@@ -1,5 +1,7 @@
 """EXAMPLE safe multi-frame observation tests; real typed modules run separately."""
 import ast
+import hashlib
+import os
 import json
 from pathlib import Path
 import subprocess
@@ -76,15 +78,52 @@ def test_official_assertions_execute_and_only_safe_results_remain(tmp_path):
     assert 'PRIVATE_' not in json.dumps(result)
 
 
+# AST dump SHA256 from accepted bd491e846b8ee74284bf538426b6b79b19772ef8,
+# generated with supported Python 3.12 and include_attributes=False. No Git
+# history is needed at test time (including checkout fetch-depth=1).
+ACCEPTED_UNTYPED_AST_SHA256 = {
+    'verify_source': '337bb496c72ca546b0455c4e1951d89f8a4a7711a8f427fbf4613b3e03f021d2',
+    'source_scope': '9162138923fcf4d36106ffde2acf73bb9fd328339a8d5b5c010b6bd0d23b3ac4',
+    'run': 'c0afe6b545b881e30bdd4af619e495f5d1b19cb6ff1fb8cc0c8da28fecc9c108',
+}
+
+
 def test_untyped_helpers_ast_identical_to_accepted_base():
-    root = Path(__file__).resolve().parents[2]
-    before = subprocess.check_output(['git', '-C', str(root), 'show',
-        'bd491e846b8ee74284bf538426b6b79b19772ef8:update/tools/b2_decoder_cpu.py'], text=True)
-    def functions(source):
-        return {n.name: ast.dump(n, include_attributes=False) for n in ast.parse(source).body if isinstance(n, ast.FunctionDef)}
-    original, current = functions(before), functions(Path(tool.__file__).read_text())
-    for name in ('verify_source', 'source_scope', 'run'):
-        assert current[name] == original[name]
+    current = {n.name: hashlib.sha256(ast.dump(n, include_attributes=False).encode()).hexdigest()
+               for n in ast.parse(Path(tool.__file__).read_text()).body if isinstance(n, ast.FunctionDef)}
+    assert {name: current[name] for name in ACCEPTED_UNTYPED_AST_SHA256} == ACCEPTED_UNTYPED_AST_SHA256
+
+
+def test_optimized_helper_keeps_original_assertion_failure(tmp_path):
+    path = tmp_path / 'tests/v1/test_serial_utils.py'
+    path.parent.mkdir(parents=True)
+    path.write_text('def test_dict_serialization():\n assert 1 == 1\n'
+        'def test_tensor_serialization():\n assert False, "PRIVATE_OPTIMIZED_ASSERT"\n'
+        'def test_numpy_array_serialization():\n assert 2 == 2\n')
+    update = Path(tool.__file__).resolve().parents[1]
+    code = ('import json,sys; from pathlib import Path; '
+            'from tools.b2_decoder_cpu import typed_official_controls; '
+            'print(json.dumps(typed_official_controls(Path(sys.argv[1]),None,None,None,None)))')
+    result = subprocess.run([sys.executable, '-O', '-c', code, str(tmp_path)],
+        cwd=update, env={**os.environ, 'PYTHONPATH': os.pathsep.join([str(update / 'src'), str(update)])},
+        text=True, capture_output=True)
+    assert result.returncode == 0
+    failed, = [row for row in json.loads(result.stdout) if row['outcome'] != 'passed']
+    assert failed['case_id'] == 'test_tensor_serialization' and failed['exception_type'] == 'AssertionError'
+    assert 'PRIVATE_OPTIMIZED_ASSERT' not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize('optimization', ['-O', '-OO'])
+def test_optimized_typed_cli_rejects_before_source_or_target_execution(tmp_path, optimization):
+    update = Path(tool.__file__).resolve().parents[1]
+    output = tmp_path / 'output.json'
+    result = subprocess.run([sys.executable, optimization, str(Path(tool.__file__).resolve()),
+        '--profile', 'typed', '--source', str(tmp_path / 'no-target-checkout'), '--output', str(output)],
+        cwd=update, env={**os.environ, 'PYTHONPATH': os.pathsep.join([str(update / 'src'), str(update)])},
+        text=True, capture_output=True)
+    assert result.returncode != 0 and 'TYPED_CPU_REQUIRES_ASSERTIONS' in result.stderr
+    assert 'verify_source' not in result.stderr and 'vllm' not in result.stdout
+    assert not output.exists()
 
 
 def test_main_defaults_to_existing_untyped_api(tmp_path, monkeypatch):

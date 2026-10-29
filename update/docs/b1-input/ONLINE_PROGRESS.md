@@ -81,3 +81,21 @@ A 공통 Online HTTP profile·source-qualified sensor/parser·소유 session sea
 승인 대상·run/복구 담당자 인계는 [구체 요청](https://github.com/dohashelby/byul/pull/67#issuecomment-6492998272)으로 남겼다.
 현재 Kubernetes 실수집·실행 준비 완료·영구 제품 등록을 집계하지 않는다. GitHub CI의
 결제 차단은 별도 대기로 유지하며 이 CPU 단계만을 위한 추가 PR은 만들지 않는다.
+
+## 새 native 모듈과 기존 CPU 도구의 소스 소비
+
+Kubernetes용 B 전용 `guard/adapters/vllm_online_input.py`를 추가했으므로 기존 CPU 도구의
+전체 `guard` snapshot pin도 정확한 새 소스에 맞췄다. 명시 component는
+`abd0a9f23fbc0dcf39d47d8886b32476d3801d27`이며, 이전 `c0af481`과 pinned scope를
+비교한 제품 차이는 이 파일 하나다. `packs`, lock, pyproject, framework는 같다.
+공동 base c9af729·B1 helper SHA858666·pinned scope·index/worktree/archive 및 shadow
+검증은 그대로이며, 실행 시 HEAD에서 승인값을 만들지 않는다.
+
+B 전용 도구7개는 component/gate/collector 승인 literal만 변경했다. 해당 할당값을 제외한
+AST 동일성을 대조했고, 실제 현재 소스에서 strict component와 Online/plugin/dynamic
+세 소비 gate를 통과했다. 기존 정상·위반·미수집·변조·unconfigured pin 회귀는
+**280 passed / pytest 10.83초 / 부모 wall 10.99초**다. 실제 엔진 수집은 반복하지 않았다.
+이전 CPU 결과는 당시 소스·해시·Ref로 보존하며, 이번 갱신을 새 실수집으로 집계하지 않는다.
+source pin 대조 기록은 `/private/tmp/byul-online-input-pin-refresh-20261029.json`,
+정상 소비 기록은 `/private/tmp/byul-online-input-pin-refresh-positive-20261029.json`이다.
+이 변경은 고정 소스의 집중 검토 대상에 포함한다.

@@ -60,6 +60,15 @@ class SelectedOverlayProfile:
         object.__setattr__(self,'expected_sha256',MappingProxyType(expected))
 
 
+SELECTED_PROFILE = SelectedOverlayProfile(
+    expected_sha256={
+        'update/src/guard/executors/structured_tools.py': '2f3ab5cbb0f2eeeb2969cf995a9d57b84f9642924e5c8410383dd52e9d013f4c',
+        'update/src/guard/executors/structured_tools_cpu.py': '6d304fd619944f14fd6ae7dec8484f602d3129df3b5573388304844730115a78',
+    },
+    source_provenance_commit='6b45702d482b2f6143ec4415b16bcf5ac4eb9c15',
+)
+
+
 def verify_snapshot(repo, commit, paths, *, selected_overlay=None):
     """Require ancestry, clean index/worktree and exact pinned file bytes.
 
@@ -191,7 +200,7 @@ def main():
     import sys
     if sys.flags.optimize:raise ValueError("normal Python required for verification assertions")
     repo=Path(__file__).resolve().parents[2];source=args.source.resolve()
-    verify_baseline(repo)
+    verify_baseline(repo, selected_overlay=SELECTED_PROFILE)
     if subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()!=SOURCE_COMMIT:raise ValueError('reference SHA mismatch')
     verify_snapshot(source,SOURCE_COMMIT,('vllm',))
     from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
@@ -208,6 +217,8 @@ def main():
     outcomes=validate_request_class(ChatCompletionRequest,VLLMValidationError,model='fixture-model')
     assert outcomes=={'none':'accepted','auto':'accepted','required':'accepted','named-only':'accepted','named-json':'rejected'}
     summary={'base_sha':BASE_SHA,'pack_revision':31,'framework_sha':FRAMEWORK_SHA,'source_sha':SOURCE_COMMIT,'actual_request_class_outcomes':outcomes,
+        'selected_source_sha256':dict(SELECTED_PROFILE.expected_sha256),
+        'selected_source_provenance_commit':SELECTED_PROFILE.source_provenance_commit,
         'inference_transport_origin':'EXAMPLE','production_registration_changed':False,'installed_target':None,
         'cases':[run_case(args.output/s,s,outcomes) for s in SCENARIOS]}
     summary['source_file_bytes_sha256']={str(f.relative_to(repo)):hashlib.sha256(f.read_bytes()).hexdigest() for f in (

@@ -22,6 +22,10 @@ def installed_fixture(tmp_path, monkeypatch):
     shutil.copytree(original, copied, ignore=shutil.ignore_patterns('__pycache__', '*.egg-info', 'build'))
     distribution = SimpleNamespace(version='0.0.1', files=[Path(name) for name in collector.FIXTURE_SHA256],
                                    locate_file=lambda name: copied / str(name))
+    monkeypatch.syspath_prepend(str(copied))
+    for name in tuple(sys.modules):
+        if name == 'byul_b_cpu_probe' or name.startswith('byul_b_cpu_probe.'):
+            monkeypatch.delitem(sys.modules, name)
     monkeypatch.setattr(collector.metadata, 'distribution', lambda name: distribution)
     def entries(*, group):
         return [SimpleNamespace(name=name, value=value, dist=SimpleNamespace(metadata={'Name': collector.FIXTURE_DIST}))
@@ -122,3 +126,78 @@ def test_foreign_lif14_gate_cannot_replace_the_fixed_verifier(tmp_path):
         text=True,capture_output=True)
     assert result.returncode!=0 and 'PLUGIN_CPU_COMPONENT_GATE_IDENTITY_MISMATCH' in result.stderr
     assert not marker.exists() and not output.exists()
+
+
+def test_unloaded_shadow_fixture_is_rejected_without_executing_its_code(installed_fixture, tmp_path, monkeypatch):
+    root, _, _ = installed_fixture
+    shadow = tmp_path/'shadow'/'byul_b_cpu_probe';shadow.mkdir(parents=True)
+    (shadow/'__init__.py').write_text('')
+    marker=tmp_path/'shadow-executed';events=tmp_path/'shadow-events.json'
+    (shadow/'approved.py').write_text("from pathlib import Path\nimport json\n"
+        "def general():\n Path("+repr(str(marker))+").write_text('executed')\n"
+        " Path("+repr(str(events))+").write_text(json.dumps({'plugin':'byul-unapproved','phase':'general_hook'}))\n")
+    monkeypatch.syspath_prepend(str(shadow.parent))
+    for name in tuple(sys.modules):
+        if name=='byul_b_cpu_probe' or name.startswith('byul_b_cpu_probe.'):
+            monkeypatch.delitem(sys.modules,name)
+    with pytest.raises(ValueError,match='PLUGIN_CPU_FIXTURE_RESOLVER_MISMATCH'):
+        collector.verify_fixture(root)
+    assert not marker.exists() and not events.exists()
+    # Controlled EXAMPLE counterfactual: demonstrate the blocked shadow's effect
+    # in a separate process, never in the collector or against external code.
+    process=subprocess.run([sys.executable,'-c','from byul_b_cpu_probe.approved import general; general()'],
+        cwd=tmp_path,env={**os.environ,'PYTHONPATH':str(shadow.parent)},capture_output=True,text=True)
+    assert process.returncode==0 and marker.read_text()=='executed'
+    assert json.loads(events.read_text())=={'plugin':'byul-unapproved','phase':'general_hook'}
+
+
+def test_final_auxiliary_write_failure_returns_actual_rows_and_known_violation(tmp_path,monkeypatch):
+    monkeypatch.setattr(collector,'verify_profile',lambda *a: collector.FIXTURE_SHA256)
+    monkeypatch.setattr(collector,'verify_loaded_target',lambda root: None)
+    monkeypatch.setitem(sys.modules,'vllm',SimpleNamespace())
+    monkeypatch.setitem(sys.modules,'torch',SimpleNamespace(version=SimpleNamespace(cuda=None)))
+    monkeypatch.setattr(collector,'post_validation',lambda *a,**kw: {'status':'verified'})
+    def launch(argv,**kw):
+        case=argv[argv.index('--case')+1];work=Path(argv[argv.index('--workdir')+1])
+        row={'case_id':case,'status':'completed','target_started':True,'event_collection_status':'completed',
+            'events':[{'plugin':'byul-unapproved','phase':'import'}] if case=='general-disabled' else [],
+            'after':{'status':'completed','events':[{'plugin':'byul-approved','phase':'general_hook'}]}}
+        (work/(case+'.json')).write_text(json.dumps(row))
+        return SimpleNamespace(returncode=0)
+    monkeypatch.setattr(collector.subprocess,'run',launch)
+    original=Path.open
+    def failed(path,*a,**kw):
+        if path==tmp_path/'capture'/'result.json':
+            raise OSError('PRIVATE_AUXILIARY_ERROR')
+        return original(path,*a,**kw)
+    monkeypatch.setattr(Path,'open',failed)
+    record=collector.capture(tmp_path/'source',tmp_path/'capture',source_profile='target031')
+    assert record['capture_status']=='incomplete' and len(record['results'])==10
+    assert record['source_validation']['post']['status']=='verified'
+    assert record['observations']['plugin_loading_confirmed_violations']['value']==['general-disabled']
+    assert record['auxiliary_write']=={'status':'failed','error_type':'OSError'}
+    assert 'PRIVATE_' not in json.dumps(record)
+
+
+def test_cli_reports_incomplete_collector_as_failure(tmp_path,monkeypatch):
+    monkeypatch.setattr(collector,'capture',lambda *a,**kw: {'capture_status':'incomplete'})
+    monkeypatch.setattr(sys,'argv',['plugin-cpu','--source-root',str(tmp_path),'--workdir',str(tmp_path/'output')])
+    assert collector.main()==2
+
+
+
+def test_submodule_finder_shadow_is_rejected_before_package_execution(installed_fixture,tmp_path,monkeypatch):
+    import importlib.util
+    root,_,_=installed_fixture
+    marker=tmp_path/'submodule-executed'
+    shadow=tmp_path/'shadow-approved.py'
+    shadow.write_text('from pathlib import Path\nPath('+repr(str(marker))+').write_text("executed")\n')
+    class Finder:
+        def find_spec(self,name,path=None,target=None):
+            if name=='byul_b_cpu_probe.approved':
+                return importlib.util.spec_from_file_location(name,shadow)
+            return None
+    monkeypatch.setattr(sys,'meta_path',[Finder(),*sys.meta_path])
+    with pytest.raises(ValueError,match='PLUGIN_CPU_FIXTURE_RESOLVER_MISMATCH'):
+        collector.verify_fixture(root)
+    assert not marker.exists() and 'byul_b_cpu_probe' not in sys.modules

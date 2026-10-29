@@ -59,6 +59,37 @@ def verify_checkout(repo):
     component_gate.snapshot_helper.verify_snapshot(repo, PRODUCT_COMPONENT_COMMIT, FIXTURE_SCOPE)
 
 
+def verify_fixture_resolver(dist):
+    """Inspect the real finder chain without importing the fixture package."""
+    package = 'byul_b_cpu_probe'
+    package_dir = Path(dist.locate_file(package)).resolve()
+    def find(name, path):
+        # Calling find_spec directly for submodules avoids util.find_spec's
+        # implicit parent-package import. This uses the same finder order.
+        for finder in sys.meta_path:
+            method = getattr(finder, 'find_spec', None)
+            if method is not None:
+                spec = method(name, path, None)
+                if spec is not None:
+                    return spec
+        return None
+    top = find(package, None)
+    if (top is None or top.origin is None or not Path(top.origin).resolve().samefile(package_dir / '__init__.py')
+            or top.submodule_search_locations is None
+            or {Path(path).resolve() for path in top.submodule_search_locations} != {package_dir}):
+        raise ValueError('PLUGIN_CPU_FIXTURE_RESOLVER_MISMATCH')
+    for relative in FIXTURE_SHA256:
+        if relative.endswith('/__init__.py'):
+            continue
+        name = relative[:-3].replace('/', '.')
+        spec = find(name, list(top.submodule_search_locations))
+        if spec is None or spec.origin is None or not Path(spec.origin).resolve().samefile(dist.locate_file(relative)):
+            raise ValueError('PLUGIN_CPU_FIXTURE_RESOLVER_MISMATCH')
+    loaded = sys.modules.get(package)
+    if loaded is not None and {Path(path).resolve() for path in getattr(loaded, '__path__', [])} != {package_dir}:
+        raise ValueError('PLUGIN_CPU_FIXTURE_RESOLVER_MISMATCH')
+
+
 def verify_fixture(repo):
     root = repo / FIXTURE_SCOPE[0]
     project_bytes = (root / 'pyproject.toml').read_bytes()
@@ -75,6 +106,7 @@ def verify_fixture(repo):
               if str(path).startswith('byul_b_cpu_probe/') and str(path).endswith('.py')}
     if actual != expected:
         raise ValueError('PLUGIN_CPU_FIXTURE_BYTES_MISMATCH')
+    verify_fixture_resolver(dist)
     for group in GROUPS:
         planned = FIXTURE_ENTRYPOINTS[group]
         if definition['entry-points'][group] != planned:
@@ -259,8 +291,13 @@ def capture(source_root: Path, workdir: Path, *, source_profile: str='reference5
         'endpoint_openapi_replacement_verified': False, 'results': results, 'observations': project(results),
         'fixture_file_bytes_sha256': fixture_hashes, 'own_producer_sha256': producer_hash,
         'parent_wall_seconds': time.perf_counter() - start}
-    with (workdir / 'result.json').open('x') as stream:
-        json.dump(record, stream, indent=2)
+    record['auxiliary_write'] = {'status': 'completed'}
+    try:
+        with (workdir / 'result.json').open('x') as stream:
+            json.dump(record, stream, indent=2)
+    except Exception as error:
+        record['capture_status'] = 'incomplete'
+        record['auxiliary_write'] = {'status': 'failed', 'error_type': type(error).__name__}
     return record
 
 

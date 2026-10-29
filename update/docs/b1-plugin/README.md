@@ -125,3 +125,22 @@ route 충돌·OpenAPI 교체·model config 기반 IO 선택·실제 runner token
 # workdir은 새 외부 디렉터리. local tools/src를 source보다 먼저 선택한다.
 VLLM_TARGET_DEVICE=cpu VLLM_LOGGING_LEVEL=CRITICAL CUDA_VISIBLE_DEVICES= HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH="src:.:$VLLM_SOURCE" "$CPU_VENV/bin/python" tools/b1_plugin_cpu.py --source-profile target031 --source-root "$VLLM_SOURCE" --workdir "$FRESH_PLUGIN_EVIDENCE"
 ```
+
+### Collector 경계 보완
+
+설치 metadata와 bytes가 맞더라도 미로드 상태의 PYTHONPATH package가 실제 import를
+가로챌 수 있다. 사례 실행 전 finder 순서대로 top package와 각 fixture submodule의
+spec origin·package 검색 경로를 고정 설치물과 대조한다. submodule spec을 찾기 위해
+부모 package를 import하지 않으며, 검증 전 fixture 코드를 실행하지 않는다. 이미
+로드된 모듈의 설치 경로 검사도 유지한다. 잘못된 shadow가 만든 event를 source filter
+위반으로 오분류하지 않도록 target_started 이전에 차단한다.
+
+최종 result.json은 보조 저장본이다. 이 쓰기가 실패해도 collector는 직접 수집한
+results·observations·source 검증 metadata를 보존해 반환하고 capture_status=incomplete,
+auxiliary_write.status=failed와 예외 타입만 남긴다. 보조 저장 실패와 core 정제 첨부
+저장 실패는 서로 다른 경계다. CLI도 incomplete를 실패 종료로 표시한다.
+
+관련 직접 회귀 **43 passed / pytest 1.76초**. 통제된 tmp shadow의 동작과 사전 차단,
+submodule finder shadow의 코드 미실행, 보조 쓰기 실패 뒤 독립 위반 보존, CLI 실패
+상태를 확인했다. 기존 -1 실제 기록과 의존성 기록은 보존하고, 고정 소스 통합 뒤
+선정 target031 파이프라인을 한 번 재실행한다.

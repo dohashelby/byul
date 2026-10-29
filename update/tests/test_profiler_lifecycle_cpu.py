@@ -20,7 +20,7 @@ def check():
 
 
 def record(*, native_after=False):
-    phase = {'wrapper_running_after': False, 'native_after': {'value': native_after, 'collected': True},
+    phase = {'native_probe_qualified': True, 'wrapper_running_after': False, 'native_after': {'value': native_after, 'collected': True},
         'recorded_tag_events': 1, 'output': {'tag_events': 1}}
     return {'rows': [{'case_id': name, 'capture_status': 'completed', 'primary': dict(phase), 'next': dict(phase),
                      'final_native': {'value': False, 'collected': True}} for name in module.CASE_IDS]}
@@ -107,3 +107,26 @@ def test_optional_torch_import_is_lazy():
         'import sys; import guard.executors.profiler_lifecycle_cpu; print("torch" in sys.modules)'],
         cwd=update, env={**os.environ, 'PYTHONPATH': os.pathsep.join([str(update / 'src'), str(update)])}, text=True, capture_output=True)
     assert result.returncode == 0 and result.stdout.strip() == 'False'
+
+
+@pytest.mark.parametrize('during,qualified', [(True, True), (False, False), (None, False)])
+def test_native_after_requires_before_false_and_during_true(during, qualified):
+    state = {'value': during, 'collected': during is not None}
+    actual, after = module.qualify_native_after({'value': False, 'collected': True}, state,
+                                                {'value': False, 'collected': True})
+    assert actual is qualified
+    assert after == ({'value': False, 'collected': True} if qualified else {'value': None, 'collected': False})
+
+
+def test_recovery_restores_only_the_owned_regular_fixture(tmp_path):
+    owner = tmp_path / 'owned'
+    owner.mkdir()
+    path = owner / 'primary'
+    path.write_bytes(module.COLLISION_BYTES)
+    module.restore_owned_directory(path, owner)
+    assert path.is_dir()
+    other = tmp_path / 'other'
+    other.write_bytes(module.COLLISION_BYTES)
+    with pytest.raises(ValueError, match='PROFILER_CPU_RECOVERY_OWNERSHIP_UNVERIFIED'):
+        module.restore_owned_directory(other, owner)
+    assert other.is_file()

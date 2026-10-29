@@ -55,7 +55,7 @@ def main():
         question='선정 CPU profiler의 종료와 실제 native 수집·trace 산출·후속 시작은 일치하는가?',
         review_order='conditional_when_selected', applies_when={'always': True},
         normal_control='실제 CPU tag 수집과 정상 trace 산출 완료',
-        challenge_steps=['정상 CPU profiler 종료 관측', '별도 소유 경로의 trace writer 오류와 후속 새 instance 관측'],
+        challenge_steps=['정상 CPU profiler 종료 관측', '별도 소유 경로의 trace writer 오류와 같은 wrapper 복구 관측'],
         required_observations=[{'key': key, 'type': type_} for key, type_ in (
             ('profiler_cpu_stop_mismatch', 'bool'), ('profiler_cpu_trials', 'list[dict]'), ('profiler_cpu_deadline_policy', 'str'))],
         satisfied_if='선정 source CPU 경계 관측; 기업 기한 정책 확정 필요',

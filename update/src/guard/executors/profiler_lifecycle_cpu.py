@@ -23,6 +23,7 @@ PROFILE = 'torch-profiler-lifecycle-reference-cpu-v1'
 TAG = 'byul_lif14_cpu_work'
 PREFIX = 'BYUL_LIF14_SAFE='
 CASE_IDS = ('normal', 'trace_directory_failure')
+COLLISION_BYTES = b'owned directory collision fixture'
 
 
 def native_state(torch):
@@ -35,6 +36,19 @@ def native_state(torch):
     except Exception:
         return {'value': None, 'collected': False}
 
+
+
+def qualify_native_after(before, during, after):
+    qualified = before == {'value': False, 'collected': True} and during == {'value': True, 'collected': True}
+    return qualified, after if qualified else {'value': None, 'collected': False}
+
+
+def restore_owned_directory(path, owner):
+    if (path.parent.resolve() != owner.resolve() or path.is_symlink() or not path.is_file()
+            or path.read_bytes() != COLLISION_BYTES):
+        raise ValueError('PROFILER_CPU_RECOVERY_OWNERSHIP_UNVERIFIED')
+    path.unlink()
+    path.mkdir()
 
 def output_summary(path):
     result = {'trace_files': 0, 'table_files': 0, 'tag_events': 0, 'files': []}
@@ -90,7 +104,10 @@ def _phase(wrapper, torch, log_events):
             row['stop_entries'] = sorted(entries) if old_profile is None else None
             row['stop_entry_collection_status'] = 'collected' if old_profile is None else 'unavailable_existing_profile'
             row['stop_warning_types'] = log_events[count_before:]
-            row.update(wrapper_running_after=wrapper.is_running, native_after=native_state(torch))
+            probe = native_state(torch)
+            qualified, effective = qualify_native_after(row['native_before'], row.get('native_during'), probe)
+            row.update(wrapper_running_after=wrapper.is_running, native_after_probe=probe,
+                       native_probe_qualified=qualified, native_after=effective)
         try:
             row['recorded_tag_events'] = sum(event.name == TAG for event in wrapper.profiler.events())
             row['event_collection_status'] = 'collected'
@@ -131,7 +148,7 @@ def child_case(source_root, owned_parent, case_id):
     module.logger.addHandler(handler)
     wrappers, cleanup = [], []
     directory = None
-    result = {'case_id': case_id, **metadata, 'next_instance': 'new_wrapper', 'constructor_returned': False}
+    result = {'case_id': case_id, **metadata, 'next_instance': 'same_wrapper', 'constructor_returned': False}
     def cleanup_owned():
         for instance in reversed(wrappers):
             entry = {'shutdown_returned': False}
@@ -162,14 +179,17 @@ def child_case(source_root, owned_parent, case_id):
                     return instance
                 output = directory / 'primary'
                 if case_id == 'trace_directory_failure':
-                    output.write_bytes(b'owned directory collision fixture')
+                    output.write_bytes(COLLISION_BYTES)
                 result['injection_stage'] = 'default_trace_handler_directory_creation' if case_id != 'normal' else None
                 primary = make(output)
                 result['constructor_returned'] = True
                 result['primary'] = _phase(primary, torch, logs)
                 result['primary']['output'] = output_summary(output)
-                result['next'] = _phase(make(directory / 'next'), torch, logs)
-                result['next']['output'] = output_summary(directory / 'next')
+                if case_id == 'trace_directory_failure':
+                    restore_owned_directory(output, directory)
+                    result['recovery_action'] = 'owned_regular_file_replaced_with_directory'
+                result['next'] = _phase(primary, torch, logs)
+                result['next']['output'] = output_summary(output)
                 result['capture_status'] = 'completed'
             finally:
                 cleanup_owned()
@@ -177,8 +197,14 @@ def child_case(source_root, owned_parent, case_id):
         result.update(capture_status='execution_error', error_type=type(error).__name__)
     finally:
         module.logger.removeHandler(handler)
+        qualified = any(result.get(phase, {}).get('native_probe_qualified') is True for phase in ('primary', 'next'))
+        for entry in cleanup:
+            entry['native_after_probe'] = entry['native_after']
+            if not qualified:
+                entry['native_after'] = {'value': None, 'collected': False}
         result['cleanup'] = cleanup
-        result['final_native'] = native_state(torch)
+        result['final_native_probe'] = native_state(torch)
+        result['final_native'] = result['final_native_probe'] if qualified else {'value': None, 'collected': False}
         result['owned_directory_removed'] = directory is not None and not Path(directory).exists()
     _verify_source(source_root, expected_commit=SOURCE_COMMIT)
     return result
@@ -217,7 +243,7 @@ def capture(source_root, owned_parent):
 def project(record):
     rows = record['rows']
     phases = [row.get(phase, {}) for row in rows for phase in ('primary', 'next')]
-    known = [phase for phase in phases if type(phase.get('wrapper_running_after')) is bool
+    known = [phase for phase in phases if phase.get('native_probe_qualified') is True and type(phase.get('wrapper_running_after')) is bool
              and phase.get('native_after', {}).get('collected') is True]
     mismatch = any(phase['wrapper_running_after'] is False and phase['native_after']['value'] is True for phase in known)
     return {'profiler_cpu_stop_mismatch': {'value': mismatch if known else None, 'collected': bool(known)},

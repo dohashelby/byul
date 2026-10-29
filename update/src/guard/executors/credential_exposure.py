@@ -28,6 +28,50 @@ def _inspection_matches(row, owner):
             "started_at": row["State"].get("StartedAt"), "image": row["Config"].get("Image")} == owner
 
 
+def parse_environment_names(text, returncode):
+    """Keep names from identified records; only a complete scan proves absence.
+
+    A malformed/duplicate PID or misplaced marker cannot borrow another
+    process's completion marker. Values and unrelated text are never returned.
+    Names observed before a later collection failure remain positive facts.
+    This parser does not establish worker attribution or PID/start stability.
+    """
+    if type(text) is not str:
+        return [], False
+    names, pids = set(), set()
+    current, closed = False, False
+    complete = type(returncode) is int and returncode == 0
+    for line in text.splitlines():
+        if line.startswith("PID") and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", line):
+            if current and not closed:
+                complete = False
+            match = re.fullmatch(r"PID ([1-9][0-9]{0,9})", line)
+            pid = int(match[1]) if match else None
+            current = pid is not None and pid <= 2147483647 and pid not in pids
+            closed = False
+            if current:
+                pids.add(pid)
+            else:
+                complete = False
+            continue
+        if not line:
+            continue  # The fixed producer emits a blank line for an empty environment.
+        if not current:
+            complete = False
+        elif line in {"GUARD_READ_OK", "GUARD_READ_ERROR"}:
+            if closed or line == "GUARD_READ_ERROR":
+                complete = False
+            closed = True
+        elif closed:
+            complete = False
+        elif re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", line):
+            names.add(line)
+        else:
+            complete = False
+    complete = complete and bool(pids) and current and closed
+    return sorted(names), complete
+
+
 class CredentialExposureExecutor(ContainerConfigExecutor):
     name = "credential_exposure"
     version = "0.5.2"
@@ -105,21 +149,15 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
             path == destination or path.startswith(destination.rstrip("/") + "/")
             or destination.startswith(path.rstrip("/") + "/") for destination in destinations))
 
-        names, lines, complete = [], [], False
+        names, complete = [], False
         try:
             check_owner()
             raw = docker.exec(source_container, ["sh", "-c", ENV_CMD], timeout=30)
             check_owner()
             intervals["environment"] = True
-            lines = raw.stdout.splitlines()
-            pids = sum(line.startswith("PID ") for line in lines)
-            complete = (raw.returncode == 0 and pids > 0 and lines.count("GUARD_READ_OK") == pids
-                        and "GUARD_READ_ERROR" not in lines)
-            names = sorted({line for line in lines if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", line)
-                            and line not in {"GUARD_READ_OK", "GUARD_READ_ERROR"}})
-            if any(line and not line.startswith("PID ") and line not in {"GUARD_READ_OK", "GUARD_READ_ERROR"}
-                   and line not in names for line in lines):
-                complete = False
+            names, complete = parse_environment_names(raw.stdout, raw.returncode)
+            if not complete:
+                errors.append("PROCESS_ENVIRONMENT_INCOMPLETE")
         except _SourceUnverified:
             errors.append("PROCESS_SOURCE_UNVERIFIED")
         except Exception:
@@ -173,7 +211,9 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
             check_owner()
             intervals["normal_control"] = True
             if (type(responses) is not list or len(responses) != len(probes)
-                    or any(type(response) is not dict for response in responses)):
+                    or any(type(response) is not dict for response in responses)
+                    or any("id" in response for response in responses)
+                    and [response.get("id") for response in responses] != [request["id"] for request in requests]):
                 responses = []
                 errors.append("FUNCTIONAL_PROBE_UNAVAILABLE")
         except Exception:
@@ -192,7 +232,8 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
         mount_fact_collected = mounts_collected or bool(violations)
         obs = {
             "process_scan_complete": {"value": complete, "collected": True},
-            "worker_env_names": {"value": names if lines else None, "collected": bool(lines)},
+            "worker_env_names": {"value": names if complete or names else None,
+                                 "collected": complete or bool(names)},
             # A valid forbidden row proves overlap even in a partial list.
             # An incomplete list with no known violation proves no absence.
             "forbidden_mount_violations": {"value": violations if mount_fact_collected else None,

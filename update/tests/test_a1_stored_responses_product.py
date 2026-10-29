@@ -154,7 +154,7 @@ def test_existing_registry_cli_all_operations_exact_refs_and_no_raw_objects(tmp_
     cli(['verify','--store',tmp_path/'restored','--config',cfg])
 
 
-def scope_value():return {'session':SESSION,'origins':['gateway','direct'],'operations':['read','cancel','previous','overwrite'],'roles':ROLES}
+def scope_value():return {'session':SESSION,'origins':['gateway','direct'],'operations':['read','cancel','previous','overwrite'],'roles':deepcopy(ROLES)}
 
 
 def test_fresh_scope_never_accepts_foreign_previous_role_or_uncreated_object():
@@ -225,6 +225,7 @@ def test_public_transport_has_no_arbitrary_path_or_foreign_object_entry(tmp_path
 def test_pack_preserves_full_original_branch_and_other76_bytes(tmp_path):
     seed=baseline_pack();r=derive(seed.path,tmp_path/'pack');pack=load_pack(tmp_path/'pack')
     assert len(pack.checks)==77 and r['unchanged_definition_bytes']==76 and not r['full_REQ06_complete']
+    assert all(p.type=='list[str]' for p in pack.checks['REQ-06'].policy_params if p.key in {'stored_origins','stored_operations'})
     for key in ('question','challenge_steps','normal_control','fail_criteria','unknown_criteria','satisfied_if','legacy','method_and_evidence'):
         assert getattr(seed.checks['REQ-06'],key)==getattr(pack.checks['REQ-06'],key)
     for p in seed.path.rglob('*'):

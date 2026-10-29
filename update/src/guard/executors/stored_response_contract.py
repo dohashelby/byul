@@ -7,7 +7,7 @@ from guard.runtime.kubernetes_stored_response_scope import normalize_scope
 PROFILE='kubernetes-stored-response-ownership-v1'
 POLICY_TYPES={'stored_environment_sha256':'str','stored_target_sha256':'str','stored_session':'str',
  'stored_identity_policy_sha256':'str','stored_api_router_source_sha256':'str','stored_serving_source_sha256':'str','stored_protocol_source_sha256':'str',
- 'stored_validity_start':'str','stored_validity_end':'str','stored_origins':'list','stored_operations':'list','stored_retention':'str'}
+ 'stored_validity_start':'str','stored_validity_end':'str','stored_origins':'list[str]','stored_operations':'list[str]','stored_retention':'str'}
 OBSERVATIONS={'stored_trials':'list','stored_objects':'list','stored_effects':'list','stored_missing':'list','stored_conflict_candidates':'list',
  'stored_cleanup':'list','stored_producer_authenticated':'bool','stored_object_owner_verified':'bool','stored_worker_effect_verified':'bool','stored_scope_complete':'bool'}
 

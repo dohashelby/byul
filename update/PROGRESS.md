@@ -1471,3 +1471,5 @@ git status
 - 테스트 결과: 구현·시험·계약 초안과 정적 검토 후 소스 고정/영향/설치 검증 전이다. 정상/선언위반후보·store비활성·동기취소·누락·교체/restart·후속수집/첨부/정리·원문비저장과 정확Ref 왕복을 준비했다. 실행 전 통과를 기록하지 않는다.
 - 다음 단계: 고정 소비pin·직접/인접/불변식·동일bytesLinux·설치CLI/정확Ref·초안PR/정확HEAD CI/인계를 마감하고 준비된 담당개발을 계속한다. 프로브소유ID 제한을 실제owner/권한 또는worker효과 인증으로 올리지 않는다.
 - 막힌 것: 실제principal/owner·공유/작업권한표·store/worker생산자·실제효과/PID-start·실제환경/전체REQ06·부모A는 미완료다. 전축UNKNOWN/normalnull/producer-owner-worker-scopefalse와원GPU창종료/추가Start0/마지막확인stopped/CI결제차단을 유지한다.
+
+- 첫 고정 검증: feb4957/1225파일 불변의Windows610통과·새시험31실패·기존skip1/제외1(237.05/237.911초)을보존했다. 제품POL의목록형식을지원되는list[str]로고치고,부정시험scope가공유역할사전을변경하던격리오류를deepcopy로보수한다. 지원타입회귀를추가하며정책/기대판정·기존제외는완화하지않는다. 모든검증handle종료후새소스를재고정한다.

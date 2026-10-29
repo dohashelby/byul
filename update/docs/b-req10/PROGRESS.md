@@ -15,3 +15,16 @@ COMPLETED/DECLARED, 관측5·첨부1, 보안 UNKNOWN·기능 PASS, 부모 5.30�
 실제 서버 전처리·compiler·runner·서비스 생존. 참조5d35는 0.33rc 계열이며
 0.31 대상과 request validator AST만 동일하고 sampling/backend AST는 다르다.
 자세한 연결 제안과 관측 한계는 VALIDATOR_HANDOFF.md에 보존했다.
+## 2026-10-29 B 기준선 소비·validator 연결
+
+- 범위: CHK-REQ-010 / REQ-10의 schema/tools 5조합. 기존 numeric sampling 유지.
+- 공동 base c9af729/PACK31/framework91e84c7 소비 검증 완료. B 전용 두 파일의 고정 SHA256 overlay와 나머지 공통 파일 bytes를 각각 검증한다.
+- 실제 참조5d35 요청→sampling→xgrammar 관측을 전용 producer에서 수집하고 기존 EVD→RES→RPT에 연결했다. source와 제품 import 경로, 독립 FAIL·첨부 실패 보존을 검증했다.
+- 검토3건(소스 pin·제품 import·관측 뒤 metadata 실패)을 수정하고 검토 agent가 해결을 확인했다. 추가 export-ignore 누락도 tracked 집합 대조로 거부한다.
+- 직접/인접/불변식303통과·기존제외1. 제품 source0675f76 전체5979통과·기존제외19(pytest173.94초/부모174.468초), 1085파일 불변. 이후 도구 gate 보수의 동일 계약55통과(7.45초). wheel/설치156파일 일치.
+- 첫 전체 회귀의 capture CLI8실패는 기본 임시 경로의 symlink 거부에서 발생했다. TMPDIR=/private/tmp에서 관련97개와 전체를 통과했고 제품 코드·판정·skip은 유지했다.
+- 최종 실제 참조 제품 경로: DECLARED, 관측5·첨부1, COMPLETED, security UNKNOWN/functional PASS. 기록은 `/private/tmp/byul-b-req10-evidence-20261029/final-live-pipeline-1/`.
+- 목표0.31db9527a의 원문 CPU 의존성 별도 환경에서도 직접5조합+후속정상5건을 완료했다(36.41초). torch2.13.0/xgrammar0.2.7/transformers5.17.0, 설치148개 일관성 확인. 이 실행은 참조5d producer와 분리된 직접 CPU 진단이다.
+- 다음: 초안 PR·정확 HEAD CI·A 정식 등록/팩 인계. 운영 PACK31과 numeric sampling은 A 확정 연결에서 보존한다. 실제 이미지/Pod/모델·backend launch·runner/GPU·복구/정리 실증은 미완료다.
+- A 입력: `VALIDATOR_HANDOFF.md`와 별도 최소 등록안. 기준선 파일 두 개의 위치는 사용자에게 확인 요청 중이다.
+

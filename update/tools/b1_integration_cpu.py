@@ -92,6 +92,8 @@ def verify_snapshot(repo, commit, paths, *, selected_overlay=None):
     comparison='HEAD' if selected_overlay is not None else commit
     if git('diff','--cached',comparison,'--',*paths) or git('diff',comparison,'--',*paths):
         raise ValueError('pinned source/index modified')
+    tracked={raw.decode() for raw in git('ls-tree','-r','--name-only','-z',commit,'--',*paths).split(b'\0') if raw}
+    seen=set()
     with tarfile.open(fileobj=io.BytesIO(git('archive',commit,'--',*paths))) as archive:
         for entry in archive:
             target=repo/entry.name
@@ -99,14 +101,18 @@ def verify_snapshot(repo, commit, paths, *, selected_overlay=None):
                 if target.is_symlink() or not target.is_dir():
                     raise ValueError('pinned source directory mismatch: '+entry.name)
             elif entry.issym():
+                seen.add(entry.name)
                 if not target.is_symlink() or target.readlink().as_posix()!=entry.linkname:
                     raise ValueError('pinned source symlink mismatch: '+entry.name)
             elif entry.isfile():
+                seen.add(entry.name)
                 if entry.name in expected:continue
                 if target.is_symlink() or not target.is_file() or target.read_bytes()!=archive.extractfile(entry).read():
                     raise ValueError('pinned source bytes mismatch: '+entry.name)
             else:
                 raise ValueError('unsupported pinned source entry: '+entry.name)
+    if seen != tracked:
+        raise ValueError('pinned source archive omitted tracked files')
     for path,digest in expected.items():
         target=repo/path
         if target.is_symlink() or not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest()!=digest:

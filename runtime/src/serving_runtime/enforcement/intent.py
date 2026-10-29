@@ -608,23 +608,23 @@ def parse_intent(document: Any) -> EnforcementIntent:
                 ):
                     if mount.is_relative_to(supply) or Path(supply).is_relative_to(mount):
                         raise IntentError("$.assets.cache_mount_path must be separate from supply paths")
-            # With cache_mount_path, cache_root is a host path while the supply
-            # paths are container paths, so this host/container comparison no
-            # longer constrains anything; the mount check above guards the
-            # container side instead.
-            for supply in filter(None, (protected.model_dir, assets.tokenizer_dir)):
-                if Path(supply).is_relative_to(assets.cache_root) or Path(
+            # Without a separate mount, cache_root and supply paths share the
+            # container coordinate. With one, cache_root is a host path and the
+            # mount check above guards the container side instead.
+            if assets.cache_mount_path is None:
+                for supply in filter(None, (protected.model_dir, assets.tokenizer_dir)):
+                    if Path(supply).is_relative_to(assets.cache_root) or Path(
+                        assets.cache_root
+                    ).is_relative_to(supply):
+                        raise IntentError("$.assets.cache_root must be separate from supply paths")
+                manifest = Path(assets.manifest_path)
+                manifest_parent = manifest.parent
+                if manifest.is_relative_to(assets.cache_root) or Path(
                     assets.cache_root
-                ).is_relative_to(supply):
-                    raise IntentError("$.assets.cache_root must be separate from supply paths")
-            manifest = Path(assets.manifest_path)
-            manifest_parent = manifest.parent
-            if manifest.is_relative_to(assets.cache_root) or Path(
-                assets.cache_root
-            ).is_relative_to(manifest_parent):
-                raise IntentError(
-                    "$.assets.cache_root must be separate from the approved manifest mount"
-                )
+                ).is_relative_to(manifest_parent):
+                    raise IntentError(
+                        "$.assets.cache_root must be separate from the approved manifest mount"
+                    )
         if "phase_binaries" in root:
             phases_raw = _object(root["phase_binaries"], "$.phase_binaries", set(PHASES))
             for phase in PHASES:

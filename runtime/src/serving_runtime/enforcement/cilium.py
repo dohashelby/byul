@@ -85,7 +85,9 @@ def _dns_egress(intent: EnforcementIntent, *, inspect_names: bool) -> dict[str, 
 
 def engine_egress(intent: EnforcementIntent) -> dict[str, Any]:
     has_fqdn = any(item.fqdn is not None for item in intent.engine_egress_allow)
-    rules: list[dict[str, Any]] = [_dns_egress(intent, inspect_names=has_fqdn)]
+    rules: list[dict[str, Any]] = []
+    if has_fqdn:
+        rules.append(_dns_egress(intent, inspect_names=True))
     for item in intent.engine_egress_allow:
         rule: dict[str, Any] = {
             "toPorts": [_port_rule(item.port, item.protocol)],
@@ -95,6 +97,10 @@ def engine_egress(intent: EnforcementIntent) -> dict[str, Any]:
         else:
             rule["toCIDR"] = [item.cidr]
         rules.append(rule)
+    if not rules:
+        # Cilium's explicit empty rule enables egress default-deny without
+        # allowing any destination.
+        rules.append({})
     return {
         "apiVersion": "cilium.io/v2",
         "kind": "CiliumNetworkPolicy",

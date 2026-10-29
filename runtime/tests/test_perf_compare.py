@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
 import json
+import os
 from pathlib import Path
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 from tools.perf_compare import (
     BLOCK_ORDERS,
+    PlanError,
+    _error_code,
+    _read_inference_token,
+    _request_once,
     build_block_comparisons,
+    build_parser,
     execute_plan,
     load_plan,
     write_outputs,
@@ -20,11 +28,13 @@ from tools.perf_compare import (
 
 SECRET_PROMPT = "PERF-SECRET-PROMPT-MUST-NOT-BE-STORED"
 SECRET_RESPONSE = "PERF-SECRET-RESPONSE-MUST-NOT-BE-STORED"
+SECRET_TOKEN = "perf-secret-token-must-not-be-stored"
 
 
 class _GatewayHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     seen_modes: list[str] = []
+    seen_authorization: list[str | None] = []
     lock = threading.Lock()
 
     def log_message(self, format: str, *args: object) -> None:
@@ -38,6 +48,7 @@ class _GatewayHandler(BaseHTTPRequestHandler):
         mode = parts[0] if parts else ""
         with self.lock:
             self.seen_modes.append(mode)
+            self.seen_authorization.append(self.headers.get("Authorization"))
             request_number = len(self.seen_modes)
         if mode == "B2":
             payload = json.dumps(
@@ -107,6 +118,7 @@ def _phase(
 class PerfCompareTests(unittest.TestCase):
     def setUp(self) -> None:
         _GatewayHandler.seen_modes = []
+        _GatewayHandler.seen_authorization = []
         try:
             self.server = ThreadingHTTPServer(("127.0.0.1", 0), _GatewayHandler)
         except PermissionError as error:
@@ -168,6 +180,7 @@ class PerfCompareTests(unittest.TestCase):
                 for _phase_name in ("warmup", "normal", "stream")
             ]
             self.assertEqual(_GatewayHandler.seen_modes, expected_modes)
+            self.assertEqual(set(_GatewayHandler.seen_authorization), {None})
             self.assertEqual([block["status"] for block in report["blocks"]], ["failed"] * 3)
             self.assertTrue(
                 all(
@@ -208,6 +221,95 @@ class PerfCompareTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 write_outputs(report, raw, root / "out")
             self.assertTrue(all(path.exists() for path in paths.values()))
+
+    def test_bearer_header_reaches_every_phase_without_token_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            report, raw = execute_plan(
+                load_plan(self._write_plan(root)),
+                warmup_count=1,
+                normal_count=1,
+                stream_count=1,
+                block_count=1,
+                bearer_token=SECRET_TOKEN,
+                run_id="authenticated-perf-run",
+            )
+            paths = write_outputs(report, raw, root / "out")
+            self.assertEqual(len(_GatewayHandler.seen_authorization), 9)
+            self.assertEqual(
+                set(_GatewayHandler.seen_authorization),
+                {f"Bearer {SECRET_TOKEN}"},
+            )
+            written = b"\n".join(path.read_bytes() for path in paths.values())
+            self.assertNotIn(SECRET_TOKEN.encode(), written)
+
+
+class PerfTokenFileTests(unittest.TestCase):
+    def test_cli_accepts_optional_token_env_file(self) -> None:
+        args = build_parser().parse_args(
+            ["plan.json", "--out-dir", "out", "--token-env-file", "tokens.env"]
+        )
+        self.assertEqual(args.token_env_file, "tokens.env")
+        self.assertIsNone(
+            build_parser().parse_args(["plan.json", "--out-dir", "out"]).token_env_file
+        )
+
+    def test_token_file_rejects_group_or_other_access(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "tokens.env"
+            path.write_text(
+                f"RUNTIME_INFERENCE_TOKEN={SECRET_TOKEN}\n"
+                "RUNTIME_VIEWER_TOKEN=viewer-token-for-shared-aws-file\n",
+                encoding="utf-8",
+            )
+            os.chmod(path, 0o640)
+            with self.assertRaisesRegex(PlanError, "group or others"):
+                _read_inference_token(path)
+            os.chmod(path, 0o600)
+            self.assertEqual(_read_inference_token(path), SECRET_TOKEN)
+
+    def test_auth_statuses_have_distinct_fallback_error_codes(self) -> None:
+        self.assertEqual(_error_code(None, 401), "AUTH_HTTP_401")
+        self.assertEqual(_error_code(None, 403), "ACCESS_HTTP_403")
+
+    def test_request_adds_bearer_header_without_exposing_it_in_result(self) -> None:
+        captured: dict[str, object] = {}
+
+        class Response:
+            status = 200
+            will_close = False
+            fp = BytesIO(b'{"usage":{"completion_tokens":1}}')
+
+            def getheader(self, name: str) -> str | None:
+                return {
+                    "Content-Length": "33",
+                    "X-Request-ID": "request-1",
+                }.get(name)
+
+        class Connection:
+            def __init__(self, host: str, port: int, timeout: float) -> None:
+                captured["endpoint"] = (host, port, timeout)
+
+            def request(self, method: str, path: str, *, body: bytes, headers: dict[str, str]) -> None:
+                captured["request"] = (method, path, body, headers)
+
+            def getresponse(self) -> Response:
+                return Response()
+
+            def close(self) -> None:
+                return
+
+        with patch("tools.perf_compare.http.client.HTTPConnection", Connection):
+            result = _request_once(
+                "http://gateway.example:8080",
+                {"stream": False},
+                stream=False,
+                timeout_s=2,
+                bearer_token=SECRET_TOKEN,
+            )
+        headers = captured["request"][3]
+        self.assertEqual(headers["Authorization"], f"Bearer {SECRET_TOKEN}")
+        self.assertNotIn(SECRET_TOKEN, json.dumps(result))
 
 class PerfComparisonFormulaTests(unittest.TestCase):
     def test_injected_small_run_keeps_order_failures_and_private_artifacts(self) -> None:

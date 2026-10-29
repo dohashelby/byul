@@ -1030,9 +1030,15 @@ class LabChecker:
             ),
             lambda result: result.returncode != 0,
         )
-        dns = self._retry(
+        engine_dns = self._retry(
             lambda: self._exec(
                 case, self.pods["engine"], "python", "-c", DNS_SCRIPT
+            ),
+            lambda result: result.returncode != 0,
+        )
+        gateway_dns = self._retry(
+            lambda: self._exec(
+                case, self.pods["gateway"], "python", "-c", DNS_SCRIPT
             ),
             lambda result: result.returncode == 0,
         )
@@ -1041,12 +1047,13 @@ class LabChecker:
             gateway_ok
             and direct.returncode != 0
             and external.returncode != 0
-            and dns.returncode == 0
+            and engine_dns.returncode != 0
+            and gateway_dns.returncode == 0
         ):
             self._set(
                 case,
                 "passed",
-                "Gateway 경유·DNS는 허용되고 other-client 직통·engine 외부 연결은 차단",
+                "Gateway 경유·Gateway DNS는 허용되고 other-client 직통·engine 외부·DNS는 차단",
             )
         else:
             self._set(case, "failed", "Cilium 적용 후 허용/차단 결과가 기대와 다름")
@@ -1612,7 +1619,11 @@ class LabChecker:
             if cilium_ok:
                 self._run_case("L-07", self._l07)
             else:
-                self._set(self.cases["L-07"], "not_run", "L-02 engine egress 정책이 없어 engine 거부를 판정할 수 없음")
+                self._set(
+                    self.cases["L-07"],
+                    "not_run",
+                    "L-02 통신 정책 판정 실패로 engine 거부를 신뢰할 수 없음",
+                )
             self._run_case("L-08", self._l08)
         finally:
             if not self._delete_task_pods(self.cases["L-08"]):

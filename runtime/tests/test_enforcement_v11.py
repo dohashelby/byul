@@ -617,6 +617,32 @@ class CacheMountPathTests(unittest.TestCase):
         self.assertIsNone(intent.assets.cache_mount_path)
         self.assertEqual(intent.assets.engine_cache_watch_root, intent.assets.cache_root)
 
+    def test_host_cache_root_may_overlap_container_supply_with_mount(self) -> None:
+        document = self.mounted_document()
+        document["assets"]["cache_root"] = "/models/cache-host"
+        document["assets"]["manifest_path"] = "/models/.byul-model-ready.json"
+        document["protected_paths"]["model_dir"] = "/models"
+        intent = parse_intent(document)
+        self.assertEqual(intent.assets.cache_root, "/models/cache-host")
+        self.assertEqual(intent.assets.cache_mount_path, "/cache")
+
+    def test_host_cache_root_may_overlap_container_manifest_with_mount(self) -> None:
+        document = self.mounted_document()
+        document["assets"]["cache_root"] = "/approved/cache-host"
+        document["assets"]["manifest_path"] = "/approved/manifest.json"
+        intent = parse_intent(document)
+        self.assertEqual(intent.assets.manifest_path, "/approved/manifest.json")
+
+    def test_host_cache_root_overlap_is_rejected_without_mount(self) -> None:
+        document = v11_document()
+        document["assets"]["cache_root"] = "/models/cache-host"
+        document["protected_paths"]["model_dir"] = "/models"
+        document["protected_paths"]["cache_dir"] = (
+            "/models/cache-host/vllm/image-example/revision-example/default"
+        )
+        with self.assertRaisesRegex(IntentError, "cache_root must be separate from supply paths"):
+            parse_intent(document)
+
     def test_aws_lab_intent_parses_and_watches_cache_mount(self) -> None:
         intent = load_intent(self.AWS_INTENT)
         self.assertEqual(intent.assets.engine_uid, 2000)

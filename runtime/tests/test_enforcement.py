@@ -128,13 +128,30 @@ class ManifestTests(unittest.TestCase):
         self.assertIn("candidate-cluster-unapplied-unverified",
                       gateway["metadata"]["annotations"].values())
 
-    def test_no_fqdn_keeps_dns_l4_only_and_empty_allowlist_defaults_deny(self) -> None:
+    def test_empty_engine_allowlist_renders_deny_all_without_dns(self) -> None:
         document = intent_document()
         document["engine_egress_allow"] = []
         egress = render_cilium(parse_intent(document))["cilium-engine-egress.json"]
-        rules = egress["spec"]["egress"]
+        self.assertEqual(egress["spec"]["egress"], [{}])
+
+    def test_cidr_only_engine_allowlist_does_not_render_dns(self) -> None:
+        document = intent_document()
+        document["engine_egress_allow"] = [
+            {"cidr": "192.0.2.0/24", "port": 443, "protocol": "TCP"}
+        ]
+        rules = render_cilium(parse_intent(document))["cilium-engine-egress.json"]["spec"]["egress"]
         self.assertEqual(len(rules), 1)
-        self.assertNotIn("rules", rules[0]["toPorts"][0])
+        self.assertEqual(rules[0]["toCIDR"], ["192.0.2.0/24"])
+        self.assertNotIn("toEndpoints", rules[0])
+
+    def test_fqdn_engine_allowlist_renders_dns_inspection(self) -> None:
+        document = intent_document()
+        document["engine_egress_allow"] = [
+            {"fqdn": "telemetry.example.invalid", "port": 443, "protocol": "TCP"}
+        ]
+        rules = render_cilium(parse_intent(document))["cilium-engine-egress.json"]["spec"]["egress"]
+        self.assertEqual(rules[0]["toPorts"][0]["rules"]["dns"], [{"matchPattern": "*"}])
+        self.assertEqual(rules[1]["toFQDNs"], [{"matchName": "telemetry.example.invalid"}])
 
     def test_tetragon_monitor_has_file_rules_without_override_or_exec_policy(self) -> None:
         manifests = render_tetragon(self.intent)

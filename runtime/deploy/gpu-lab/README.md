@@ -45,7 +45,13 @@ AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS �
 | 요청 옵션 | 추가 옵션 없음(schema 1.1) | 첫 인수 사례 8개에 필요 없음. 옵션 범위 시험은 별도 판본에서 정함 |
 | 성능 비교 | 동시 2, 답변 128, 예열 20·일반 100·stream 100, 3블록 | 엔진 `max num seqs 2`, `perf_compare.py` 기본 예산 |
 
-정책 파일을 한 글자라도 고치면 SHA-256이 바뀌어 Gateway가 503으로 막는다. 고칠 때는 `policy_version`을 올리고 `sha256sum policy.aws-lab.json` 값으로 승인 목록을 함께 갱신한다. 성능 계획의 B0/B1/B2 주소는 운영자가 준비하는 Gateway 구성의 자리값이다.
+정책 파일을 한 글자라도 고치면 SHA-256이 바뀌어 Gateway가 503으로 막는다. 고칠 때는 `policy_version`을 올리고 `sha256sum policy.aws-lab.json` 값으로 승인 목록을 함께 갱신한다. 성능 계획의 B0/B1/B2 주소는 운영자가 준비하는 Gateway 구성의 자리값이다. 인증이 고정된 이 Gateway로 성능 비교를 실행할 때는 소유자만 읽는 인수용 token 파일에서 inference token을 읽힌다. 옵션을 생략하면 기존처럼 Authorization 헤더를 보내지 않는다.
+
+```bash
+.venv/bin/python -B tools/perf_compare.py deploy/gpu-lab/perf-plan.aws-lab.json \
+  --token-env-file ~/runtime-acceptance.env \
+  --out-dir evidence/perf
+```
 
 UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`runtime/docs/결정기록_엔진UID.md`). Gateway 10000·observer 10004·공유 그룹 10010은 겹치지 않게 고른 프로젝트 선택값이다.
 
@@ -81,7 +87,7 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
    ```
    patch는 엔진 Pod를 다시 만든다(Recreate: GPU 반납 후 재기동·cold start). 시험 시간 계획에 넣는다.
    적용한 이미지 tag·patch·실제 Deployment/Pod imageID·정책과 run ID는 **통합 기록**으로 저장하고, 03의 `evidence/smoke-*`(기반 점검)와 섞지 않는다. 일반 시험 중에는 사이드카를 그대로 둔다. 03을 다시 돌릴 때만 아래 "03 기준 상태와 runtime 통합 층" 절차로 뗐다가 다시 붙인다.
-6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. AWS 인수 확인은 [`ACCEPTANCE.md`](ACCEPTANCE.md)의 `tools/aws_lab_acceptance.py`를 사용한다. kind 전용 `tools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.
+6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. 이 intent의 빈 `engine_egress_allow`는 DNS 허용 없이 Cilium의 deny-all egress 규칙으로 렌더돼 AWS 묶음의 "엔진 egress 없음"과 맞는다. AWS 인수 확인은 [`ACCEPTANCE.md`](ACCEPTANCE.md)의 `tools/aws_lab_acceptance.py`를 사용한다. kind 전용 `tools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.
 7. 접속: 서버에서 `kubectl --context byul-aws-lab -n serving-lab port-forward deploy/serving-gateway 8080`, 노트북에서 SSH 터널(`ssh -L 18081:127.0.0.1:8080 ubuntu@<host>`). 노트북의 개발 서버(`byul-dev`)가 8080을 쓰므로 로컬 포트는 다른 번호(예: 18081)를 쓴다.
 
 ## 03 기준 상태와 runtime 통합 층 (AWS 묶음 방침)

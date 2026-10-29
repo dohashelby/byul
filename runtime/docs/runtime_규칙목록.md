@@ -103,7 +103,7 @@
 | ID(정책 이름) | source/enforcer | 허용·제한 의미 | 계약 결과 | 계획서 참조 | update `check_id` |
 | --- | --- | --- | --- | --- | --- |
 | `runtime-engine-ingress` | Cilium 후보 / 직접 사건 없음 | Gateway는 engine API TCP port로, observer는 management port로만 engine에 들어온다. 1.0 intent는 두 역할이 API port를 함께 쓴다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.3, §4.12 | update 담당 확인 필요 |
-| `runtime-engine-egress` | Cilium 후보 / 직접 사건 없음 | DNS와 선언된 engine 송신 CIDR/FQDN·port만 연다. FQDN이 있으면 DNS 이름 관측 규칙도 렌더한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.3, §4.12 | update 담당 확인 필요 |
+| `runtime-engine-egress` | Cilium 후보 / 직접 사건 없음 | 선언된 engine 송신 CIDR/FQDN·port만 연다. FQDN이 있을 때만 DNS와 이름 관측 규칙을 렌더하며, 빈 목록은 송신을 전부 막는다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.3, §4.12 | update 담당 확인 필요 |
 | `runtime-gateway-egress` | Cilium 후보 / 직접 사건 없음 | Gateway에서 engine API TCP port와 DNS로만 나가게 한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.3, §4.12 | update 담당 확인 필요 |
 | `runtime-acquire-egress` | Cilium 후보 / 직접 사건 없음 | acquire 역할만 승인한 artifact endpoint/CIDR/FQDN·port와 DNS에 나가게 한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.12 | update 담당 확인 필요 |
 | `runtime-observer-{index}-egress` | Cilium 후보 / 직접 사건 없음 | 각 observer가 engine management listener, DNS, 선택 kube-apiserver(`observer_kube_api_port` 하나, 기본 6443)와 observer 허용 시험 receiver에만 나가게 한다. | 직접 outcome 없음; Hubble flow는 `observed` | §4.12 | update 담당 확인 필요 |

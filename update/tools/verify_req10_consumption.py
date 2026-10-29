@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed Online native checkpoint: explicit /9 hooks, callback dependency,
-# strict metadata/parser and selected bounded recording reads.
+# Reviewed LIF10 checkpoint: closed disconnect profile and native projection,
+# preserving Online native /9 and all previous consumer gates.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='aa10a698587502b5c6f0760d5ae52694e2bf8de3'
+REVIEWED_COMMON_COMMIT='586cb4df2b02da3bf187b3bbc242e993f988d8a2'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

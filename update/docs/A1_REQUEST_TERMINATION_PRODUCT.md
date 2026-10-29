@@ -76,8 +76,9 @@ false이며 모든 판정 축은 UNKNOWN이다. 신뢰할 독립 근거가 준�
 summary의 hash/enum/count만 보존한다. 전후 교체/restart·누락·후속 수집/첨부/정리 실패는
 앞선 관측을 지우지 않는다. 실행 ABORTED와 판정 UNKNOWN은 구분한다.
 
-검증 예정은 직접 제품CLI·정확6Ref 왕복, 인접 HTTP/native/registry·불변식, 같은 고정
-bytes의 Linux와 격리 설치다. 실제 serving/worker/GPU·운영자 정책/신뢰 결합은 미실증이다.
+고정1165파일에서 Windows영향521통과·기존skip1/제외1, 같은 bytes Linux영향522통과·제외1,
+source/wheel/격리설치176파일 일치와 설치CLI4사례·각 정확6Ref 왕복을 확인했다.
+실제 stdlib 소유 loopback3요청을 포함하며 실제 serving/worker/GPU·운영자 정책/신뢰 결합은 미실증이다.
 기존 실제 REQ11 wheel04f7856이나 CPU/EXAMPLE 성과를 이 소스의 실제 실행으로 소급하지 않는다.
 REQ12의 재시도/늦은 출력, LIF11 그룹 장애, 다른 취소/timeout/stop과 profiler/decoder는 별도
 개발·소비·실증이 필요하다. 원래 GPU 승인창 종료·추가Start0·stopped와 CI 결제 차단을 유지한다.

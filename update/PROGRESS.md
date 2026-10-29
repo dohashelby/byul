@@ -1369,7 +1369,7 @@ git status
 ## 2026-10-30 — A-1 LIF10 연결 종료·native 종결 관측
 
 - 한 일: 확정 e24dfb5에서 기존 HTTP/native/session/CLI를 재사용해 LIF10 명시6POL·고정 JSON 전후 대조·소유 SSE1byte 후 client close·선정 session seal/capture·요청별 state/KV/worker 관측을 연결했다. 정확 source/lab/image gate와7개 회수 범위를 보존하며 다른 clock의 직접 차감·EXAMPLE 승격·부분 전체완료를 막는다. 원래77개·다른76개 정의 bytes와 질문/판정 기준을 보존하는 DRAFT 팩을 제공한다.
-- 테스트 결과: 구현·직접/제품/반례 테스트·문서 초안 작성 단계이며 아직 source 고정·검증 전이다. 실제 serving/worker/GPU 실증 결과가 아니다.
+- 테스트 결과: 586cb4d checkpoint와 검토된 소비 pin의1165파일 고정으로 Windows영향521통과·기존skip1/제외1(120.84/121.626초), 같은 bytes Linux영향522통과·제외1(36.94/37.257초)를 확인했다. source·wheel·격리설치176파일 일치, 설치CLI4사례·각6Ref 반출/복원·재판정이11.189초에 통과했다. 실제 stdlib 소유 loopback3요청과 client handle 종료·정상전후 대조, native 요청 결합·시계 불일치·기한후 active 후보·세대/수집/seal/첨부/정리 실패를 확인했다. 새skip/검사제외·기대값 완화·검증 중 source변경은 없다. 실제 serving/worker/GPU 실증 결과가 아니다. 마지막 결과 문서만 갱신한다.
 - 다음 단계: 정적 검토·고정 snapshot→직접/인접/불변식→Linux/설치·정확6Ref→commit/push·초안PR·정확HEAD CI·본인 인계. 다음 REQ12/종료 모드와 A2 준비된 확정 IPC/worker 소비를 이어간다.
 - 막힌 것: 전체 취소/timeout/stop·각 실행단계·독립 종결/전송/GPU proof·신뢰 producer·실제 기업POL 결합은 미완료다. 후보는 confirmed_violation=false, 모든 축 UNKNOWN이다. GPU 승인창 종료·추가Start0·stopped·CI 결제 차단과 부모A39/A1담당19·필수결과를 유지한다.
 

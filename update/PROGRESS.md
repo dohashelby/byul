@@ -1362,7 +1362,7 @@ git status
 ## 2026-10-29 — A-1 Online native hook·parser 공통 계측
 
 - 한 일: 확정Online HTTP a673e5f를 보존한 별도 공간에서 B callback 두 확정 커밋을 원본 추적 반영하고3파일 bytes·48개 직접 단위를 확인했다. 기본 /8 source를 그대로 보존한 명시 /9 controller에서 고정 base/callback·공식0.31 source/code·8개 실제 hook·살아 있는 chat ASGI·call/session/PID/start를 연결한다. 닫힌 metadata validator·기존 의미의 loaded code hash와 별도 relative code/1·콜백 provenance·선정 /9만의2MiB 읽기를 추가한다. 기존 lab/source/image/0.32와 B 전용 소유권은 유지한다.
-- 테스트 결과: 구현·실제 source method fixture·새 시험·문서의 정적 검토 뒤 고정 소스로 직접/같은 계약/이전 native 판본/불변식·Linux·설치를 검증한다. 신규 계측 검증 전이며 B callback48통과를 serving hook 검증으로 세지 않는다.
+- 테스트 결과: 1160파일 고정 최초영향533통과·새 fixture code2실패·기존skip1/제외1(55.45/56.798초), fixture compile의 원래 import 문맥과 독립seal을 보완한320통과(22.13/23.011초)를 보존했다. 첫 Linux전체6729통과·새 compiler fixture35오류/제외19(330.72/331.779초)를 확인하고 같은 immutable source의 CPython3.12.3/3.12.14 offline code 계약을 별도 literal로 고정했다. 최종 Windows323통과·기존skip1/제외1(21.51/22.424초), Linux영향324통과/제외1(3.63/3.901초), Linux전체6767통과/제외19(287.50/288.465초)이며 source bytes는 검증 중 불변이다. source·wheel·격리설치174파일 일치, 설치 공개CLI3사례·8개 source body code·6개 callback/writer/parser 이벤트를4.055초에 확인했다. Linux 실제 소유 임시FD/정확module admission·원래 import예외 보존·불일치거부9사례가 통과했다(4.888초). 설치 helper의 잘못된 -mguard 호출 실패를 보존하고 OUT만 -mguard.cli로 수정했다. 실제 serving/GPU 실행이나 새skip/검사제외는 없다. 마지막 결과 문서만 갱신한다.
 - 다음 단계: 영향 검증·실패 보수·소스 재고정→설치·공개 CLI·정확Ref 범위 확인→commit/push·초안PR·정확HEAD CI·고정 소스/B 소비 판본 인계. 본인 취소/종료/관측과 A2 확정 IPC/worker 소비도 준비 순서대로 이어간다.
 - 막힌 것: 실제 getter/계측 비용·serving/worker/GPU·image ancestry·실제0.31 수집·B 전용 source pin/정책/소비·전체 Online은 미완료다. CI 결제 차단과 원래 GPU 승인창 종료·stopped·추가Start0을 유지한다. 부모A39/A1담당19/필수 결과를 축소하지 않는다.
 

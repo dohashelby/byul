@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed Online HTTP checkpoint: closed input envelope and pair sequencing
-# join the prior fixed REQ05/REQ13/session common source.
+# Reviewed Online native checkpoint: explicit /9 hooks, callback dependency,
+# strict metadata/parser and selected bounded recording reads.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='1c1f0e8b2acf1be0782b498fd524453e04c1414e'
+REVIEWED_COMMON_COMMIT='aa10a698587502b5c6f0760d5ae52694e2bf8de3'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

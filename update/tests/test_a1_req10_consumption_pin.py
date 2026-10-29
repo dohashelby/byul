@@ -10,7 +10,7 @@ from tests.test_b1_integration_pin import pinned_repo,overlay_repo,git,commit_fi
 
 def test_actual_fixed_integration_snapshot_passes_and_original_B_default_still_rejects():
     repo=Path(__file__).resolve().parents[2]
-    assert consumer.REVIEWED_COMMON_COMMIT=='4b0483e48d7da0fc7b0aeaa5ff01e7549177bdf9'
+    assert consumer.REVIEWED_COMMON_COMMIT=='84dc6951d776fec468cc8187b5c55bdf0795048c'
     assert consumer.PINNED_PATHS==original.PINNED_PATHS
     assert original.BASE_SHA=='c9af729cd1893eda14d0bb222a8fab46c2a6d7b8'
     with pytest.raises(ValueError,match='outside selected overlay'):

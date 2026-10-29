@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed LIF09 product checkpoint; full common contracts retained, including
+# Reviewed LIF11 product checkpoint; full common contracts retained, including
 # A2 IPC/REQ12/native8~14 and all previous full-scope gates.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='4b0483e48d7da0fc7b0aeaa5ff01e7549177bdf9'
+REVIEWED_COMMON_COMMIT='84dc6951d776fec468cc8187b5c55bdf0795048c'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

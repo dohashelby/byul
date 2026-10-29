@@ -1,5 +1,4 @@
 """REQ-10 tool consumes a fixed common snapshot, including shadow-file gates."""
-from pathlib import Path
 import hashlib
 import subprocess
 
@@ -24,11 +23,14 @@ def pinned_repo(tmp_path):
     return tmp_path, git(tmp_path, 'rev-parse', 'HEAD').decode().strip()
 
 
-def test_current_common_snapshot_and_historical_reference_pin():
+def test_pinned_constants_and_baseline_gate_with_synthetic_history(overlay_repo, monkeypatch):
     assert BASE_SHA == 'c9af729cd1893eda14d0bb222a8fab46c2a6d7b8'
     assert FRAMEWORK_SHA == '91e84c778f4fc8ee1108eaf0551bf51f2f6a2061'
     assert SOURCE_COMMIT == '5d35ce3934a7804b298559d2d99eec33792e1eb9'
-    verify_baseline(Path(__file__).resolve().parents[2])
+    repo, baseline, _ = overlay_repo
+    git(repo, 'checkout', '-q', '--detach', baseline)
+    monkeypatch.setattr(integration_tool, 'BASE_SHA', baseline)
+    verify_baseline(repo)
 
 
 @pytest.mark.parametrize('mutation', ['dirty', 'staged', 'index_only', 'missing', 'untracked', 'ignored', 'legacy_pyc', 'symlink'])
@@ -243,3 +245,22 @@ def test_selected_overlay_added_file_must_be_committed(overlay_repo):
     git(repo, '-c', 'user.name=Pin Test', '-c', 'user.email=pin@example.invalid', 'commit', '-qm', 'untrack producer')
     with pytest.raises(ValueError, match='must be tracked'):
         verify_snapshot(repo, baseline, OVERLAY_SCOPE, selected_overlay=profile)
+
+
+@pytest.mark.parametrize('metadata', ['pack_id', 'pack_revision', 'framework_commit'])
+def test_baseline_rejects_wrong_metadata_after_snapshot_matches(overlay_repo, monkeypatch, metadata):
+    repo, baseline, _ = overlay_repo
+    git(repo, 'checkout', '-q', '--detach', baseline)
+    if metadata == 'framework_commit':
+        (repo / 'update/reference/framework/UPSTREAM.json').write_text('{"commit": "' + '0' * 40 + '"}')
+        expected_error = 'framework baseline mismatch'
+    else:
+        pack_id = 'OTHER' if metadata == 'pack_id' else 'PACK-BASELINE'
+        revision = 30 if metadata == 'pack_revision' else 31
+        (repo / 'update/packs/PACK-BASELINE/pack.yaml').write_text(f'pack_id: {pack_id}\nrevision: {revision}\n')
+        expected_error = 'PACK31 baseline mismatch'
+    commit_fixture(repo, 'wrong metadata')
+    # Pin the synthetic bytes so the independent metadata gate is exercised.
+    monkeypatch.setattr(integration_tool, 'BASE_SHA', git(repo, 'rev-parse', 'HEAD').decode().strip())
+    with pytest.raises(ValueError, match=expected_error):
+        verify_baseline(repo)

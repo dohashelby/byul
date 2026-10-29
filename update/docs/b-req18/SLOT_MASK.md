@@ -20,9 +20,7 @@ source-invariant mismatch는 확인한 현재 제약과 실제 metadata-mask/CPU
 기업 기준을 등록하지 않는다. 각 trial source 전후 확인과 후속 정상·source postcheck·보조 쓰기 실패를 구분하며,
 이미 확인된 독립 관측을 지우지 않도록 결과를 순차 보존한다.
 
-component pin은 미설정이며 실행 전 닫힌다. B1 helper858666/basec9와 전체 scope를 유지한다.
-새 SRC를 거부하는 legacy gate를 완화하지 않는다. root가 고정 native component commit을
-명시 승인·연결한 뒤 그 최종 source에서 정식 CPU→EVD 실행을 한 번 수행한다.
+component pin은 ee1ff38421dc710685e3ebaa670b1e083991e9b5로 연결했다. B1 helper858666/basec9와 전체 scope를 유지하고 legacy gate의 신규 파일 검증도 보존했다. 통합 고정 snapshot에서 정식 CPU→EVD를 1회 수행했다. 정확한 해시와 최종 결과는 README.md에 기록한다.
 
 ## B 내부 native callback 제안
 
@@ -45,8 +43,7 @@ GPU tensor는 descriptor만 읽고 `.cpu()`/`.numpy()`/GPU `.tolist()`·수정·
 
 B join은 A가 검증한 동일 source/code·PID/start/session·요청·instance에서 slot 세대 변화,
 refresh RETURN→동일 metadata/mask의 Sampler CALL/RETURN과 사이의 상태 갱신 부재를 확인해야 한다.
-copy 인과는 승인 source의 실제 branch 조건과 RETURN 관측에서 평가하며 외부 verified flag나
-생성되지 않는 source_copy_verified stub를 요구하지 않는다. source 명령 발행과 GPU kernel 결과
+실제 branch 조건과 RETURN 관측은 host/metadata 진단에 보존한다. CUDA copy/DMA 완료와 stream 순서는 별도 실제 계측이 필요하며 외부 verified flag나 생성되지 않는 source_copy_verified stub를 사용하지 않는다. source 명령 발행과 GPU kernel 결과
 확인은 분리한다. GPU 값·실제 결과가 미확인이면 그 범위는 UNKNOWN이다.
 
 기술 수집 상한은8개 요청행·vocab262144개·weak object128개다. 이는 기업/서비스 한도가 아니며
@@ -81,7 +78,7 @@ EXAMPLE 단위 회귀21개는0.56초에 통과했다. 실물 native 경계는
 실Sampler 반환 count/hash가 수집됐다. 단순opaquehandle 일치만 검사한 결과가 아니다.
 실제shape 요약은 actual-shape-summary.json, helper AST동일성과 단일파일변경범위는
 packaging-impact.json에 기록했다. 직전 ac91/1b39 native 경계 결과와 feasibility 원본을 보존한다.
-최종 packaging 변경은 import경계만 검증했고 정식 CPU capture/EVD는 아직 실행하지 않았다.
+이 경계 시험은 당시 import경계 검증으로 보존한다. 이후 통합 snapshot에서 정식 CPU capture/EVD를 1회 완료했으며 README.md의 최종 결과로 연결한다.
 
 
 argument_constraint의 정확한 키는 status/restricted/count/sha256이다. 실제 None 제약은

@@ -55,12 +55,20 @@ Kubernetes instance bootstrap만으로 active V1을 추정하지 않는다. actu
 
 단일 scoped capture를 EVD/RES/RPT와 Store에 연결하고 exactRef 재판정·Store 검증·bundle export/restore·복원 Store 재판정을 수행한다. output은 새 경로이며 기존 증거를 삭제하지 않는다. 독립 FAIL은 후속/첨부/cleanup 실패로 사라지지 않는다. 관측 artifact에는 bool/count/enum/hash만 남기고 raw request·토큰 배열·예외 본문·원문 pointer를 남기지 않는다.
 
-finally에서 owned session seal과 기존 probe watchdog/cleanup report를 확인한다. engine Pod 삭제·공유 GPU kill을 하지 않으며 cleanup 미확인은 증거와 운영자 복구 인계에 남긴다. source gate는 신규 native module의 고정 snapshot으로 coordinating session이 component/helper/collector literal pin을 갱신한 뒤 사용한다. 기존 기준선 불일치를 무시하거나 임시 skip하지 않는다. 고정 component는 03dca131…, gate는 6a43fc77…, collector는 12f82368…, callback은 9be674fc…다. A profile/keyspace/caller code pin은 미확정 None으로 닫혀 있다.
+finally에서 owned session seal과 기존 probe watchdog/cleanup report를 확인한다. engine Pod 삭제·공유 GPU kill을 하지 않으며 cleanup 미확인은 증거와 운영자 복구 인계에 남긴다. source gate는 신규 native module의 고정 snapshot으로 coordinating session이 component/helper/collector literal pin을 갱신한 뒤 사용한다. 기존 기준선 불일치를 무시하거나 임시 skip하지 않는다. 고정 component는 ee1ff38421dc710685e3ebaa670b1e083991e9b5, gate SHA256은 5f9e45cb57979970e821857a2a26de06509622f5b681d8d6fb0938b254dbf7e2, collector SHA256은 e0fd82cba3189964e00d1049a76882cd711eb08077c21e666528c7c045b1490f, callback SHA256은 659d615f133cdc96ef54163678753a60e6b8ee51aa0e78e0560e0d308f7f50da다. A profile/keyspace/caller code pin은 미확정 None으로 닫혀 있다.
 
 현재 실제 Kubernetes는 미실행이다. B 단위 EXAMPLE과 source CPU 결과는 실제 Kubernetes 완료로 집계하지 않는다. 승인된 A profile/target/provenance·cohort 실행·판정·EVD/복원·소유 cleanup의 실제 확인이 끝나야 live 묶음을 마감한다.
-
-로컬 검증: 외부 /private/tmp의 새 basetemp에서 EXAMPLE 전용 회귀 34 passed(pytest 0.49초, 부모 벽시계 0.623초). 실제 source CPU는 coordinating session의 ancestor/pin이 일치하는 통합 snapshot에서 validator가 한 번 실행한다. 이 branch에서 다른 SHA로 component를 복제해 actual guard 통과로 주장하지 않는다. 실제 Kubernetes와 source CPU 재실행은 수행하지 않았다.
 
 수정된 경계: 실제 실행 본체는 기존 raw source-qualified assign_request_id의 request_selection 기록으로 request map을 만들고, 공통 반환에 없는 slot_request_index를 읽지 않는다. writer의 CALL/RETURN은 선정 PID 전체에서 point/batch/call ID로 짝지으며 open/orphan/duplicate/RAISE 및 refresh CALL부터 Sampler RETURN을 가로지르는 writer는 UNKNOWN이다. CPU source formal 결과는 재실행하지 않는다. CUDA ordering 지원에는 A의 실제 stream·copy 완료·actor/thread 문맥과 관련 writer pair의 검증 가능한 수집이 필요하며, GPU readback/동기화/새 stream/context 생성이나 미emit verified bool로 대체하지 않는다.
 
 이번 fix-only 검증은 EXAMPLE 전용 40 passed(pytest 0.51초, 부모 벽시계 0.667초)다. 기존 formal source CPU 1회 결과를 재사용했고 실제 CPU/Kubernetes 추가 실행은 없다.
+
+## 최종 로컬 검증 (2026-10-29)
+
+고정 코드 c8bea9520b8177d9cbe8af963da3153c58650cf6에서 기본 suite 6514 passed, 기존 19 deselected다. pytest 128.69초·부모 벽시계 129.097초이며 소스 변경 없이 실행했다. native/CPU 직접 회귀31개와 producer fix-only40개가 포함된다. 고정 변경의 집중 검토와 지적사항 확인을 완료했다.
+
+실제 source CPU 수집은 bcfa8f2에서 1회, 3 trials·42 native snapshots·수집8.782초·전체명령11.50초다. 모든 trial 전후 source guard, 후속 대조, Store verify(오류0), 정확 Ref 재판정, export/restore를 통과했다. EVD COMPLETED/DECLARED, 3개 판정 축 UNKNOWN이다. 후속 producer 수정은 Kubernetes 함수5개에 한정되며 CPU 핵심3개 함수 AST 동일성으로 실제 CPU 결과를 재사용했다. wheel159개 guard 파일 바이트 일치와 격리 import도 재사용한다.
+
+EVD: EVD-01M63SN83QZ5CG88PKC03FRKQC@1 (sha256 5e64af9a9b1a26f250a172763d707dc8e3bdedb28e08202d5c31ec622f175eac). RES: RES-01M63SNJC64G64KW00WJJM8M6Z (sha256 b1e8a3e96968343b5d8ec95b82124e3184d1a8b7afe63ab3b8b0406c2d4eea23). RPT: RPT-01M63SNJC7SEV31QRNG0Y5DV9Z (sha256 18891cd91900cbc8cde7da779a55f11d9bff34732f6c3c642af13d543e5b4eca).
+
+영속 증거는 저장소 옆 byul-b-req18-slot-evidence-20261029에 보존한다. 실제 Kubernetes/GPU 요청은 0회다. A profile·native keyspace·hook/code/image pin·writer coverage·owned seal 및 CUDA copy/stream 완료 관측이 남아 있다. 따라서 현재 상태는 B 로컬 구현·검증 완료와 실제 대상 연결 대기다.

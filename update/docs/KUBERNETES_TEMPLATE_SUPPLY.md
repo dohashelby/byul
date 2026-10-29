@@ -25,6 +25,11 @@ correlation ID로 `/tokenize`와 고정 정상 chat을 각각 한 번 보낸다.
 inventory를 API alias로 덮어쓰지 않는다. 다른 served-model-name이나 기동 옵션은
 선택 불일치로 처리한다.
 
+실제 A-1 인계 target처럼 `launch.model`이 없는 경우에는 이미 검증된 공통
+repository/revision 매핑을 사용한다. 별도 `launch.model` 선언이 있으면 같은
+ENV repository와 일치해야 한다. 기존 Docker 프로파일의 필수 모델 선언 검사는
+유지한다.
+
 `allowed_template_sha256`는 명시 목록이며 빈 목록도 그대로 소비한다. 관측에서
 승인값을 보충하지 않는다. 전후 신원이 안정된 경우의 승인 일치/불일치와 엔진이
 보고한 정확 token ID 대응은 관측이다. `template_consumer_verified`와

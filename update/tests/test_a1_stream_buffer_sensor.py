@@ -2,7 +2,7 @@
 import ast,asyncio,copy,hashlib,json,logging,os,threading,time,types
 from pathlib import Path
 from types import SimpleNamespace
-import h11,pytest
+import pytest
 from guard.adapters import vllm_lifecycle_sensor as base8,vllm_stream_buffer_sensor as sensor,vllm_stream_buffer_metadata as metadata
 from guard.collectors import lifecycle
 from guard.executors.lifecycle_capture import parse_recording
@@ -11,6 +11,21 @@ from tests.test_lifecycle_sensor import CONTEXT
 REPO=Path(__file__).resolve().parents[2]
 REFERENCES=Path(__file__).parent/'fixtures/uvicorn-054'
 PRIVATE='EXAMPLE_STREAM_BUFFER_PRIVATE'
+
+
+class ExampleConnection:
+    """Protocol dependency double; no h11 parser/serializer correctness claim."""
+    they_are_waiting_for_100_continue=False
+    our_state='EXAMPLE-open'
+    def __init__(self,*args):pass
+    def receive_data(self,value):pass
+    def next_event(self):return None
+    def send(self,*,event):return getattr(event,'data',b'EXAMPLE-framing')
+
+
+def example_event(**values):return SimpleNamespace(**values)
+h11=SimpleNamespace(Connection=ExampleConnection,SERVER='EXAMPLE-server',ERROR='EXAMPLE-error',MUST_CLOSE='EXAMPLE-close',
+    Response=example_event,Data=example_event,EndOfMessage=example_event,ConnectionClosed=example_event,LocalProtocolError=RuntimeError)
 
 
 class Transport:
@@ -33,8 +48,8 @@ def module_from_reference(name):
     classes=[copy.deepcopy(n) for n in tree.body if isinstance(n,ast.ClassDef) and n.name in wanted]
     for node in classes:
         if node.name!='RequestResponseCycle' and node.name!='FlowControl':node.body=[n for n in node.body if isinstance(n,ast.FunctionDef) and n.name=='connection_lost']
-    future=copy.deepcopy(tree.body[0]);assert isinstance(future,ast.ImportFrom) and future.module=='__future__'
-    tree=ast.Module(body=[future,*classes],type_ignores=[]);module=types.ModuleType(name);module.__file__=str(path)
+    futures=[copy.deepcopy(n) for n in tree.body if isinstance(n,ast.ImportFrom) and n.module=='__future__']
+    tree=ast.Module(body=[*futures,*classes],type_ignores=[]);module=types.ModuleType(name);module.__file__=str(path)
     module.__dict__.update(asyncio=asyncio,h11=h11,logging=logging,CLOSE_HEADER=(b'connection',b'close'),TRACE_LOG_LEVEL=5,
         STATUS_PHRASES={200:b'OK',500:b'Internal Server Error'},cast=lambda _,v:v)
     exec(compile(ast.fix_missing_locations(tree),str(path),'exec',dont_inherit=True,optimize=0),module.__dict__)

@@ -63,9 +63,9 @@ class SelectedOverlayProfile:
 SELECTED_PROFILE = SelectedOverlayProfile(
     expected_sha256={
         'update/src/guard/executors/structured_tools.py': '2f3ab5cbb0f2eeeb2969cf995a9d57b84f9642924e5c8410383dd52e9d013f4c',
-        'update/src/guard/executors/structured_tools_cpu.py': '6d304fd619944f14fd6ae7dec8484f602d3129df3b5573388304844730115a78',
+        'update/src/guard/executors/structured_tools_cpu.py': '4cf55312ac71115faa116f5624293c75c4b1a1f21d8557ded56b03914f1de87f',
     },
-    source_provenance_commit='6b45702d482b2f6143ec4415b16bcf5ac4eb9c15',
+    source_provenance_commit='29fc171fc8843cc183fcecf27a2ce08d13e275bf',
 )
 
 
@@ -129,6 +129,22 @@ def verify_baseline(repo, *, selected_overlay=None):
         raise ValueError('PACK31 baseline mismatch')
     if framework['commit']!=FRAMEWORK_SHA:
         raise ValueError('framework baseline mismatch')
+
+
+def verify_tool_checkout(repo):
+    """Bind already imported product modules to this tool's approved snapshot."""
+    import sys
+    expected = repo / 'update/src/guard'
+    for name, module in tuple(sys.modules.items()):
+        if name != 'guard' and not name.startswith('guard.'):
+            continue
+        filename = getattr(module, '__file__', None)
+        if filename is None:
+            raise ValueError('own product import mismatch')
+        path = Path(filename).resolve()
+        if not any(parent.is_dir() and parent.samefile(expected) for parent in path.parents):
+            raise ValueError('own product import mismatch')
+    verify_baseline(repo, selected_overlay=SELECTED_PROFILE)
 
 
 def proposal_fixture(folder):

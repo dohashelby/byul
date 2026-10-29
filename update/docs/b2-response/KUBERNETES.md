@@ -38,7 +38,7 @@ capture_validation_error(
 )
 ```
 
-collector는 고정된 `/tokenize` before→고정 validation 오류→`/tokenize` after를 기존 공개 transport로 실행하고 `finally`에서 소유 probe cleanup 보고를 확인한다. 임의 body factory·외부 관측 JSON·REQ11 ID 우회·private transport 호출을 사용하지 않는다. 본문·오류 표식·raw field key는 collector의 메모리에서만 `response_error_contract.observe_error_response`와 `response_projection`을 통과한다. case ID는 req13-error-before/primary/after 고정이며 nonce는 X-Request-Id에만 쓴다. 정제 request_summaries에 POST/path·request ID hash·body hash·실제 attempted/binding·요청별 UTC·raw response bytes hash를 남긴다. collector 전체 시각과 각 요청 시각은 구분한다. raw response bytes hash와 helper decoded UTF-8 capture hash는 서로 다른 표현이며 동일성을 가정하지 않는다.
+collector는 고정된 `/tokenize` before→고정 validation 오류→`/tokenize` after를 기존 공개 transport로 실행하고 `finally`에서 소유 probe cleanup 보고를 확인한다. 임의 body factory·외부 관측 JSON·REQ11 ID 우회·private transport 호출을 사용하지 않는다. 본문·오류 표식·raw field key는 collector의 메모리에서 `response_error_contract.observe_error_response`로 분석하고, 정제 관측만 반환한다. case ID는 req13-error-before/primary/after 고정이며 nonce는 X-Request-Id와 synthetic `max_tokens` 오류 표식에 쓴다. 정제 request_summaries에 POST/path·request ID hash·body hash·실제 attempted/binding·요청별 UTC·raw response bytes hash를 남긴다. collector 전체 시각과 각 요청 시각은 구분한다. raw response bytes hash와 helper decoded UTF-8 capture hash는 서로 다른 표현이며 동일성을 가정하지 않는다.
 
 HTTP error 400..599의 독립 필드 관측은 보존하되, 예상 validation status400과 다른 경우는 gap이다. 2xx/3xx·transport 오류는 오류 필드 정책으로 승격하지 않는다.
 

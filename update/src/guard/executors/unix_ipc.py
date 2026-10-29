@@ -20,7 +20,7 @@ from .http_common import HttpCheckExecutor, functional_requests, functional_resu
 
 
 PROFILE = "unix-ipc-access-v1"
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 _PIN = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}")
 _NS = re.compile(r"(mnt|net|pid|user):\[[0-9]+\]")
 _ID = re.compile(r"[0-9a-f]{64}")

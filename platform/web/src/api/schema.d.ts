@@ -1012,7 +1012,7 @@ export interface components {
                 [key: string]: components["schemas"]["Environment_fact"];
             };
             /** @description 선택. 프레임워크 12개 환경 조건·환경 역할·확인 상태·구조화된 비사용 근거. 없거나 null이면 기존 소비자 동작과 같다. */
-            framework_profile?: null | components["schemas"]["FrameworkInput_framework_profile"];
+            framework_profile?: components["schemas"]["FrameworkInput_framework_profile"];
         };
         Environment_labels: {
             [key: string]: string;
@@ -1091,7 +1091,7 @@ export interface components {
                 environment_snapshot_sha256: components["schemas"]["Common_sha256"] | null;
             };
         };
-        /** @description 환경 역할·확인 상태·12개 환경 조건·비사용 근거. */
+        /** @description 환경 역할·확인 상태·12개 환경 조건·비사용 근거. null이면 입력 없음. */
         FrameworkInput_framework_profile: {
             catalog_version: components["schemas"]["FrameworkInput_catalog_version"];
             /** @description 입력 기준이 된 framework data/checklist.json 파일 bytes의 SHA-256. */
@@ -1110,7 +1110,7 @@ export interface components {
             absence_claims: {
                 [key: string]: components["schemas"]["FrameworkInput_absence_claim"];
             };
-        };
+        } | null;
         /** @description 정책 수치·기한 하나. 값과 함께 단위·적용 범위·측정 조건·상태를 둔다. 측정 후 결정이면 value는 null이다. */
         FrameworkInput_policy_number: {
             value: number | null;
@@ -1132,7 +1132,7 @@ export interface components {
             basis: string | null;
             note: string | null;
         };
-        /** @description 36개 보호 요구별 승인 기준값과 승인 조건. 실제 배포값은 environment에 둔다. */
+        /** @description 36개 보호 요구별 승인 기준값과 승인 조건. 실제 배포값은 environment에 둔다. null이면 입력 없음. */
         FrameworkInput_framework_values: {
             catalog_version: components["schemas"]["FrameworkInput_catalog_version"];
             framework_checklist_sha256: components["schemas"]["Common_sha256"] | null;
@@ -1147,7 +1147,7 @@ export interface components {
                 scope: string | null;
                 conditions: string | null;
             };
-        };
+        } | null;
         /**
          * 정책 번들 (platform → runtime)
          * @description runtime 계획서 §5.4의 approved-policy.json. 플랫폼이 CONFIRMED 정책을 runtime 내부 형식 파일로 변환해 해시와 함께 묶는다. runtime은 내부 형식을 그대로 쓰고, 이 목록으로 파일 bytes를 대조한다. 번들은 서명이 아니다.
@@ -1236,7 +1236,7 @@ export interface components {
                 exec_exceptions: Record<string, never>[];
             };
             /** @description 선택. 프레임워크 36개 보호 요구별 승인 기준값(유지·변경·확인 요청, 수치의 단위·범위·상태)과 승인 조건. 없거나 null이면 기존 소비자 동작과 같다. */
-            framework_values?: null | components["schemas"]["FrameworkInput_framework_values"];
+            framework_values?: components["schemas"]["FrameworkInput_framework_values"];
         } & unknown;
         /**
          * 재검증 요청 (runtime → platform → update)
@@ -1441,6 +1441,12 @@ export interface components {
                 model: string | null;
                 max_tokens: number | null;
                 n: number | null;
+                /** @description 요청에 적용된 사용자별 prefix cache 분리 상태. applied가 null이면 구형 runtime 또는 확인할 수 없는 형식이다. */
+                cache_isolation: {
+                    /** @enum {unknown} */
+                    mode: "off" | "per_principal" | null;
+                    applied: boolean | null;
+                };
                 /** @description 추가 필드 이름과 처리 방식(값은 저장하지 않음). */
                 extra_fields: {
                     name: string;
@@ -1557,6 +1563,13 @@ export interface components {
                 profile: string | null;
                 /** @description 시험 전용 프로필(zeroday-lab). 승인된 운영 정책이 아니다. */
                 test_only: boolean;
+                /** @description 사용자별 prefix cache 분리 설정과 현재 준비 상태. mode가 null이면 구형 runtime 또는 확인할 수 없는 형식이다. */
+                cache_isolation: {
+                    /** @enum {unknown} */
+                    mode: "off" | "per_principal" | null;
+                    ready: boolean;
+                    unavailable_reason_code: string | null;
+                };
                 max_n: number | null;
                 /** @description 검사하지 않고 엔진에 전달하는 추가 필드 이름(값은 없다). */
                 passthrough_fields: string[];

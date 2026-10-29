@@ -9,6 +9,11 @@ from typing import Callable, Protocol
 
 from .approval import ApprovalResult
 from .auth import CHAT_ROUTE, COMPLETIONS_ROUTE, AuthState, not_configured
+from .cache_isolation import (
+    CacheSaltKey,
+    isolation_status,
+    unavailable_message,
+)
 from .backend import BackendConfig
 from .engine_client import EngineClient
 from .engine_client import TokenizeHTTPError
@@ -101,6 +106,7 @@ class RequestFlow:
         auth_state: Callable[[], AuthState] | None = None,
         target_hold: Callable[[str | None], tuple[str, str] | None] | None = None,
         approval_result: Callable[[], ApprovalResult | None] | None = None,
+        cache_salt_key: CacheSaltKey | None = None,
     ) -> None:
         self._auth_state = auth_state or not_configured
         self._target_hold = target_hold or (lambda _policy_target: None)
@@ -108,6 +114,7 @@ class RequestFlow:
         self._policy_state = policy_state
         self._revocation_state = revocation_state
         self._approval_result = approval_result or (lambda: None)
+        self._cache_salt_key = cache_salt_key or CacheSaltKey.from_environ({})
         self._records = records
         self._engine_client = engine_client
         self._relay = relay
@@ -437,6 +444,30 @@ class RequestFlow:
             )
             return
 
+        cache_status = isolation_status(
+            policy.cache_isolation if policy is not None else None,
+            auth_state,
+            self._backend.kind,
+            self._cache_salt_key,
+        )
+        if not cache_status["ready"]:
+            unavailable_reason = cache_status["unavailable_reason_code"]
+            self.finish_without_relay(
+                response,
+                request_id,
+                Decision(
+                    result="ERROR",
+                    http_status=503,
+                    reason_code="CACHE_ISOLATION_UNAVAILABLE",
+                    rule_id="cache_isolation",
+                    message=unavailable_message(unavailable_reason),
+                    model=None,
+                    max_tokens=None,
+                ),
+                close_connection=True,
+            )
+            return
+
         body = response.read_request_body(content_length)
         incomplete = len(body) != content_length
         if incomplete:
@@ -548,6 +579,39 @@ class RequestFlow:
                 )
                 return
 
+        cache_salt: str | None = None
+        if policy is not None and policy.cache_isolation == "per_principal":
+            if principal is None:
+                self.finish_without_relay(
+                    response,
+                    request_id,
+                    engine_error(
+                        503,
+                        "CACHE_ISOLATION_UNAVAILABLE",
+                        "cache isolation authentication is unavailable",
+                        decision,
+                        source="gateway",
+                    ),
+                    stream=stream,
+                )
+                return
+            try:
+                cache_salt = self._cache_salt_key.derive(principal.principal_id)
+            except RuntimeError:
+                self.finish_without_relay(
+                    response,
+                    request_id,
+                    engine_error(
+                        503,
+                        "CACHE_ISOLATION_UNAVAILABLE",
+                        "cache isolation key is unavailable",
+                        decision,
+                        source="gateway",
+                    ),
+                    stream=stream,
+                )
+                return
+
         if not self._concurrency.try_acquire():
             limited = Decision(
                 result="DENIED",
@@ -584,6 +648,8 @@ class RequestFlow:
                     stream=stream,
                 )
                 return
+            if cache_salt is not None:
+                self._records.mark_cache_isolation_applied()
             started = self._records.build(
                 "started",
                 request_id,
@@ -647,6 +713,7 @@ class RequestFlow:
                         acquired_at,
                         record_response_started,
                         route=route,
+                        cache_salt=cache_salt,
                     )
                 )
                 backend_receipt = self._engine_client.backend_receipt(request_id)
@@ -699,7 +766,11 @@ class RequestFlow:
                 return
 
             final_decision, engine_body = self._relay.relay(
-                request_id, document, decision, route=route
+                request_id,
+                document,
+                decision,
+                route=route,
+                cache_salt=cache_salt,
             )
             backend_receipt = self._engine_client.backend_receipt(request_id)
             completed = (

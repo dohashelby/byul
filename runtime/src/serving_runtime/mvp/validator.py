@@ -23,7 +23,7 @@ class Decision:
     message: str
     model: str | None
     max_tokens: int | None
-    # Test-only fields (runtime-mvp/1.2 zeroday-lab) that passed validation, as
+    # Additional runtime-mvp/1.2 fields that passed policy validation, as
     # (name, mode) pairs. Values are never kept here.
     extra_fields: tuple[tuple[str, str], ...] = ()
     n: int | None = None
@@ -149,8 +149,8 @@ def validate_request(
         )
     input_field = "messages" if request_kind == "chat" else "prompt"
     allowed_fields = {"model", input_field, "max_tokens", "stream", "n"}
-    # The zeroday-lab field rules were exercised only for chat completions.
-    # Until each route has its own rules, completions keeps its fixed schema.
+    # Extra-field rules apply only to chat completions. Until each route has its
+    # own rules, completions keeps its fixed schema for every policy profile.
     extra_rules = (
         {rule.name: rule for rule in policy.extra_fields}
         if request_kind == "chat"

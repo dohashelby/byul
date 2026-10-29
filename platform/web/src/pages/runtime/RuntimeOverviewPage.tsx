@@ -107,6 +107,17 @@ export function RuntimeOverviewPage() {
             ["로딩 검증", pol.load_valid ? "유효" : "무효 — 추론 요청은 503", { problem: !pol.load_valid }],
             ["승인 확인", APPROVAL_DETAIL[pol.approval_state] ?? pol.approval_state, { problem: !["not_configured", "verified"].includes(pol.approval_state) }],
             ["Gateway 활성", pol.gateway_active ? "활성" : "비활성 — 추론 요청은 503", { problem: !pol.gateway_active }],
+            [
+              "사용자별 캐시 분리",
+              pol.cache_isolation.mode === "off"
+                ? "꺼짐(사용자 간 prefix cache 공유)"
+                : pol.cache_isolation.mode === "per_principal"
+                  ? pol.cache_isolation.ready
+                    ? "켜짐"
+                    : `준비 불가(${pol.cache_isolation.unavailable_reason_code ?? "unknown"})`
+                  : "모름",
+              { problem: pol.cache_isolation.mode === "per_principal" && !pol.cache_isolation.ready },
+            ],
             ...(!pol.load_valid ? ([["사유", `${pol.error_code ?? ""} ${pol.error_message ?? ""}`.trim(), { problem: true }]] as Row[]) : []),
             [
               "API 인증",

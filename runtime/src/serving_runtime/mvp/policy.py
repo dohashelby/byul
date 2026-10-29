@@ -11,7 +11,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ExtraFieldRule:
-    """One test-only request field opened by a runtime-mvp/1.2 zeroday-lab policy."""
+    """One additional request field declared by a runtime-mvp/1.2 policy."""
 
     name: str
     mode: str
@@ -35,6 +35,7 @@ class Policy:
     profile: str = "default"
     extra_fields: tuple[ExtraFieldRule, ...] = ()
     max_n: int = 1
+    cache_isolation: str = "off"
 
     def extra_field_rule(self, name: str) -> ExtraFieldRule | None:
         return next((rule for rule in self.extra_fields if rule.name == name), None)
@@ -72,7 +73,12 @@ _V11_FIELDS = _REQUIRED_FIELDS | {
     "approval_ref",
     "max_context_tokens",
 }
-_V12_FIELDS = _V11_FIELDS | {"profile", "extra_fields", "max_n"}
+_V12_FIELDS = _V11_FIELDS | {
+    "profile",
+    "extra_fields",
+    "max_n",
+    "cache_isolation",
+}
 _SCHEMA_FIELDS = {
     "runtime-mvp/1.0": _REQUIRED_FIELDS,
     "runtime-mvp/1.1": _V11_FIELDS,
@@ -206,6 +212,48 @@ def _parse_extra_fields(value: object) -> tuple[ExtraFieldRule, ...]:
             constraints["items"] = _parse_item_rule(f"{where}.items", rule["items"])
         rules.append(ExtraFieldRule(name, "validate", constraints))
     return tuple(rules)
+
+
+def _validate_default_extra_fields(rules: tuple[ExtraFieldRule, ...]) -> None:
+    """Require bounded validate rules for fields opened by the default profile."""
+
+    for rule in rules:
+        where = f"extra_fields.{rule.name}"
+        if rule.mode == "passthrough":
+            raise ValueError(f"{where} passthrough requires profile zeroday-lab")
+
+        constraints = rule.constraints
+        kind = constraints["type"]
+        if kind == "object":
+            raise ValueError(f"{where} type object is not allowed in profile default")
+        if kind in {"integer", "number"}:
+            missing = [name for name in ("min", "max") if name not in constraints]
+            if missing:
+                raise ValueError(
+                    f"{where} requires min and max in profile default; "
+                    f"missing: {', '.join(missing)}"
+                )
+        elif kind == "string" and "max_length" not in constraints:
+            raise ValueError(f"{where} requires max_length in profile default")
+        elif kind == "array":
+            missing = [name for name in ("max_items", "items") if name not in constraints]
+            if missing:
+                raise ValueError(
+                    f"{where} requires max_items and items in profile default; "
+                    f"missing: {', '.join(missing)}"
+                )
+            item_rule = constraints["items"]
+            item_kind = item_rule["type"]
+            item_where = f"{where}.items"
+            if item_kind in {"integer", "number"}:
+                item_missing = [name for name in ("min", "max") if name not in item_rule]
+                if item_missing:
+                    raise ValueError(
+                        f"{item_where} requires min and max in profile default; "
+                        f"missing: {', '.join(item_missing)}"
+                    )
+            elif item_kind == "string" and "max_length" not in item_rule:
+                raise ValueError(f"{item_where} requires max_length in profile default")
 
 
 def parse_policy_time(value: str) -> datetime:
@@ -371,6 +419,7 @@ def load_policy(path: str | Path) -> PolicyState:
     profile = "default"
     extra_fields: tuple[ExtraFieldRule, ...] = ()
     max_n = 1
+    cache_isolation = "off"
     if schema_version == "runtime-mvp/1.2":
         profile = document.get("profile", "default")
         if not isinstance(profile, str) or profile not in _PROFILES:
@@ -381,17 +430,30 @@ def load_policy(path: str | Path) -> PolicyState:
                 "profile must be default or zeroday-lab",
                 digest,
             )
+        cache_isolation = document.get("cache_isolation", "off")
+        if (
+            not isinstance(cache_isolation, str)
+            or cache_isolation not in {"off", "per_principal"}
+        ):
+            return _error(
+                path_text,
+                loaded_at,
+                "INVALID_POLICY",
+                "cache_isolation must be off or per_principal",
+                digest,
+            )
         if "extra_fields" in document:
-            if profile != "zeroday-lab":
-                return _error(
-                    path_text,
-                    loaded_at,
-                    "INVALID_POLICY",
-                    "extra_fields require profile zeroday-lab",
-                    digest,
-                )
             try:
                 extra_fields = _parse_extra_fields(document["extra_fields"])
+                if cache_isolation == "per_principal" and any(
+                    rule.name == "cache_salt" for rule in extra_fields
+                ):
+                    raise ValueError(
+                        "extra_fields.cache_salt conflicts with per_principal "
+                        "cache isolation"
+                    )
+                if profile == "default":
+                    _validate_default_extra_fields(extra_fields)
             except ValueError as error:
                 return _error(path_text, loaded_at, "INVALID_POLICY", str(error), digest)
         if "max_n" in document:
@@ -430,5 +492,6 @@ def load_policy(path: str | Path) -> PolicyState:
         profile=profile,
         extra_fields=extra_fields,
         max_n=max_n,
+        cache_isolation=cache_isolation,
     )
     return PolicyState(True, policy, path_text, digest, loaded_at, None, None, raw)

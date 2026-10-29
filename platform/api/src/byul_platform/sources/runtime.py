@@ -31,6 +31,7 @@ _LOCAL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _REQUEST_ID = re.compile(r"^[0-9a-f]{32}$")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _PHASES = {"loading", "compiling", "inferring", "maintenance", "unknown"}
+_CACHE_ISOLATION_MODES = {"off", "per_principal"}
 
 # contracts README "runtime data_origin → 등급"
 _MEASURED = {"real", "external_backend", "kubernetes_api", "local_file"}
@@ -88,6 +89,35 @@ def _policy_ref(value: object) -> dict[str, str] | None:
 
 def _str_or_none(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _cache_isolation_status(value: object) -> dict[str, Any]:
+    unknown = {"mode": None, "ready": False, "unavailable_reason_code": None}
+    if not isinstance(value, dict) or not {"mode", "ready", "unavailable_reason_code"} <= value.keys():
+        return unknown
+    mode = value.get("mode")
+    ready = value.get("ready")
+    reason = value.get("unavailable_reason_code")
+    if mode is None:
+        return unknown
+    if mode not in _CACHE_ISOLATION_MODES or not isinstance(ready, bool):
+        return unknown
+    if reason is not None and not isinstance(reason, str):
+        return unknown
+    return {"mode": mode, "ready": ready, "unavailable_reason_code": reason}
+
+
+def _cache_isolation_request(value: object) -> dict[str, Any]:
+    unknown = {"mode": None, "applied": None}
+    if not isinstance(value, dict) or not {"mode", "applied"} <= value.keys():
+        return unknown
+    mode = value.get("mode")
+    applied = value.get("applied")
+    if mode is not None and mode not in _CACHE_ISOLATION_MODES:
+        return unknown
+    if not isinstance(applied, bool):
+        return unknown
+    return {"mode": mode, "applied": applied}
 
 
 # --- Gateway 판정 → runtime-event ----------------------------------------------
@@ -557,6 +587,13 @@ def runtime_status(
     hold = st_target.get("gateway_hold")
     extra = [_d(x) for x in _l(st_policy.get("extra_fields"))]
     counts = _d(st_target.get("counts"))
+    if "cache_isolation" in st_policy:
+        raw_cache_isolation = st_policy.get("cache_isolation")
+    elif "cache_isolation" in status:
+        raw_cache_isolation = status.get("cache_isolation")
+    else:
+        raw_cache_isolation = current_policy.get("cache_isolation")
+    cache_isolation = _cache_isolation_status(raw_cache_isolation)
     collector_items = []
     for item in _l(collectors.get("collectors")):
         if not isinstance(item, dict):
@@ -613,6 +650,7 @@ def runtime_status(
             "schema": _str_or_none(st_policy.get("schema_version")),
             "profile": _str_or_none(st_policy.get("profile")),
             "test_only": st_policy.get("test_only") is True,
+            "cache_isolation": cache_isolation,
             "max_n": _int(st_policy.get("max_n")),
             "passthrough_fields": [str(x.get("name")) for x in extra if x.get("mode") == "passthrough"],
             "validate_count": _int(st_policy.get("validate_count")),
@@ -818,6 +856,7 @@ def request_detail_doc(detail: dict[str, Any]) -> dict[str, Any]:
             "model": _str_or_none(request.get("model")),
             "max_tokens": _int(request.get("max_tokens")),
             "n": _int(request.get("n")),
+            "cache_isolation": _cache_isolation_request(request.get("cache_isolation")),
             "extra_fields": [
                 {"name": str(x.get("name")), "mode": _str_or_none(x.get("mode"))}
                 for x in _l(request.get("extra_fields")) if isinstance(x, dict)

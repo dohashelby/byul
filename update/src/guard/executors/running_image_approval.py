@@ -9,6 +9,9 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
+from guard.models import canonical_json, sha256_hex
+from guard.runtime.kubernetes_binding import validate_container_binding, verify_owned_pod
+
 from .http_common import functional_requests, functional_results
 
 
@@ -19,6 +22,7 @@ _PINNED = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}")
 _IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
 _CONTAINER_ID = re.compile(r"[0-9a-f]{64}")
 _CONTAINER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+KUBERNETES_CONSUMER_VERSION = "0.1.0"
 
 
 def _pinned(value):
@@ -88,6 +92,109 @@ def _snapshot(inspected, container, pinned, run_id):
     return {"container_id": inspected["Id"], "name": inspected["Name"],
             "image_id": image_id, "configured_image": pinned,
             "started_at": state["StartedAt"], "owned_run_id": run_id}
+
+
+def analyze_kubernetes_running_image(env, target, before, after):
+    """기존 A1 target과 {pod, namespace} 전후 쌍의 API 신원만 소비한다.
+
+    수집·kubectl wrapper·새 target 계약은 만들지 않는다. API imageID가 pinned
+    문자열과 같더라도 node runtime RepoDigest/source 계보 증명이 아니다.
+    이 소비부에는 아직 그 공통 생산자가 없으므로 승인 관측을 만들지 않는다.
+    """
+    result = {
+        "consumer_version": KUBERNETES_CONSUMER_VERSION,
+        "interface_status": "PROPOSED_CONSUMER",
+        "api_identity_stable": False,
+        "identity_before": None, "identity_after": None,
+        "runtime_image_relation_verified": False,
+        "producer_authenticated": False,
+        "diagnostic_codes": [],
+    }
+    try:
+        if (not env.hash_ok() or type(target) is not dict
+                or target.get("schema") != "guard-kubernetes-request-binding-target/1"
+                or target.get("topology") != "kubernetes-owned-direct"
+                or type(target.get("lab")) is not bool
+                or target.get("environment_ref") != env.ref().model_dump(mode="json")):
+            raise ValueError
+        bound = target["kubernetes"]
+        expected = bound["engine"]
+        validate_container_binding(expected)
+        if (type(bound["context"]) is not str
+                or not re.fullmatch(r"[A-Za-z0-9._:@/-]{1,200}", bound["context"])
+                or type(bound["run_id"]) is not str
+                or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", bound["run_id"])
+                or not _pinned(expected["image"])
+                or target["engine"]["image_digest"] != expected["image"]
+                or not _manifest_matches(expected["image"], env.engine.image_digest)):
+            raise ValueError
+    except (KeyError, TypeError, ValueError, AttributeError):
+        result["diagnostic_codes"] = ["RUNNING_IMAGE_TARGET_UNVERIFIED"]
+        return result
+
+    owners = []
+    for index, snapshot in enumerate((before, after)):
+        try:
+            pod, namespace = snapshot["pod"], snapshot["namespace"]
+            if (pod.get("kind") != "Pod" or namespace.get("kind") != "Namespace"
+                    or namespace["metadata"].get("name") != expected["namespace"]):
+                raise ValueError
+            owner = verify_owned_pod(pod, namespace["metadata"], expected, bound["run_id"])
+        except (KeyError, TypeError, ValueError, AttributeError):
+            result["diagnostic_codes"] = ["RUNNING_IMAGE_IDENTITY_UNVERIFIED" if index == 0
+                                          else "RUNNING_IMAGE_SOURCE_CHANGED"]
+            return result
+        owners.append(owner)
+        result["identity_before" if index == 0 else "identity_after"] = owner
+    if owners[0] != owners[1]:
+        result["diagnostic_codes"] = ["RUNNING_IMAGE_SOURCE_CHANGED"]
+        return result
+    result.update(api_identity_stable=True,
+                  environment_ref=env.ref().model_dump(mode="json"),
+                  owner_sha256=sha256_hex(canonical_json(owners[0])),
+                  diagnostic_codes=["RUNNING_IMAGE_RUNTIME_RELATION_UNAVAILABLE"])
+    return result
+
+
+def collect_kubernetes_running_image_approval(ctx, before, after):
+    """A1의 공통 수집/전송 연결용 전용 소비 경계. 아직 registry에는 미연결.
+
+    before/after는 동일 수집 구간에서 공통 생산자가 제공해야 한다. 지금은 API
+    metadata만 있으므로 정상 추론도 시도하지 않는다. 승인 빈 목록을 포함해
+    어느 정책에서도 API 선언만으로 실제 비승인 실행 FAIL을 만들지 않는다.
+    """
+    validate_image_approval_policy(ctx.policy_values)
+    analysis = analyze_kubernetes_running_image(ctx.env, ctx.target, before, after)
+    observations = {
+        "running_image_identity_verified": {"value": False, "collected": True},
+        "running_image_repo_digest": {"value": None, "collected": False},
+        "running_image_approved": {"value": None, "collected": False},
+        "running_image_unapproved": {"value": None, "collected": False},
+        "supply_execution_scope_complete": {"value": False, "collected": True},
+        "functional_probes_planned": {"value": [p.id for p in ctx.check.functional_probes], "collected": True},
+        "functional_probe_results": {"value": {}, "collected": False},
+    }
+    normal = {"attempted": False, "succeeded": None,
+              "detail": "Kubernetes runtime image relation unavailable; inference not attempted"}
+    challenges = [{"step": step, "attempted": False,
+                   "observations": {"profile": PROFILE, "scope": "Kubernetes API metadata only"}}
+                  for step in ctx.check.challenge_steps]
+    summary = {
+        "profile": PROFILE, "kubernetes_image": analysis,
+        "collection_errors": analysis["diagnostic_codes"],
+        "not_exercised": ["runtime_repo_digest_relation", "image_source_lineage", "package_inventory",
+                          "native_libraries", "entrypoint_mutation", "mounted_code_overrides",
+                          "deployment_gate_challenge", "functional_inference"],
+        "limitations": [
+            "Kubernetes API identity is not node-runtime RepoDigest or image/source consumption proof.",
+            "The common runtime-image producer and production dispatch are not connected.",
+            "No approval, security PASS or confirmed unapproved execution follows from API imageID.",
+            "Only the supplied before/after API snapshots are compared; collection times are not established.",
+        ],
+        "fixture": {"profile": PROFILE, "consumer_version": KUBERNETES_CONSUMER_VERSION,
+                    "scope": "kubernetes-api-metadata-only"},
+    }
+    return observations, normal, challenges, summary
 
 
 def collect_running_image_approval(docker, ctx, configured_container=None):

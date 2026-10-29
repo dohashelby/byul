@@ -13,6 +13,7 @@ from guard.adapters import vllm_online_sensor as online
 from guard.adapters import vllm_attempt_sensor as attempt
 from guard.adapters import vllm_request_output_sensor as output_sensor
 from guard.adapters import vllm_stream_buffer_sensor as stream_sensor
+from guard.adapters import vllm_rank_failure_sensor as rank_sensor
 from guard.collectors.file import load_environment
 from guard.collectors.route_observations import validate_output
 from guard.executors.owned_capture import strict_json, validate_owned_source, validate_engine_target, engine_identity
@@ -21,7 +22,7 @@ from guard.update_validation import reserve_output
 
 
 def prepare_assets(output, repository, *, profile=None):
-    selected = sensor if profile in (None, sensor.PROFILE) else online if profile == online.PROFILE else attempt if profile == attempt.PROFILE else output_sensor if profile == output_sensor.PROFILE else stream_sensor if profile == stream_sensor.PROFILE else None
+    selected = sensor if profile in (None, sensor.PROFILE) else online if profile == online.PROFILE else attempt if profile == attempt.PROFILE else output_sensor if profile == output_sensor.PROFILE else stream_sensor if profile == stream_sensor.PROFILE else rank_sensor if profile == rank_sensor.PROFILE else None
     if selected is None:
         raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
     output = Path(output).absolute()
@@ -65,9 +66,9 @@ def prepare_assets(output, repository, *, profile=None):
                 or hashlib.sha256(invocation_raw).hexdigest()!=output_sensor.INVOCATION10_SHA256):
             raise ValueError("LIFECYCLE_OUTPUT_DEPENDENCY_UNAVAILABLE")
         values.update({"guard_lifecycle_base.py":base_raw,"guard_attempt_invocation.py":invocation_raw})
-    elif selected in (attempt,stream_sensor):
+    elif selected in (attempt,stream_sensor,rank_sensor):
         base_raw=Path(sensor.__file__).read_bytes()
-        if hashlib.sha256(base_raw).hexdigest()!=(attempt.BASE_SHA256 if selected is attempt else stream_sensor.BASE8_SHA256):
+        if hashlib.sha256(base_raw).hexdigest()!=(attempt.BASE_SHA256 if selected is attempt else selected.BASE8_SHA256):
             raise ValueError("LIFECYCLE_ATTEMPT_DEPENDENCY_UNAVAILABLE")
         values["guard_lifecycle_base.py"]=base_raw
     assets = {}
@@ -103,7 +104,7 @@ def load_prepared(path):
                 "guard_lifecycle_base.py","guard_online_input_callback.py"} if manifest["profile"] == online.PROFILE
                 else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py","guard_attempt_invocation.py"}
                     if manifest["profile"]==output_sensor.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py"}
-                    if manifest["profile"] in {attempt.PROFILE,stream_sensor.PROFILE} else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json"})):
+                    if manifest["profile"] in {attempt.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE} else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json"})):
         raise ValueError("LIFECYCLE_ASSETS_INVALID")
     source_supported = False
     for name, expected in manifest["assets"].items():
@@ -121,6 +122,8 @@ def load_prepared(path):
                 raise ValueError("LIFECYCLE_ONLINE_DEPENDENCY_UNAVAILABLE")
         if manifest["profile"]==attempt.PROFILE and name=="guard_lifecycle_base.py" and hashlib.sha256(raw).hexdigest()!=attempt.BASE_SHA256:
             raise ValueError("LIFECYCLE_ATTEMPT_DEPENDENCY_UNAVAILABLE")
+        if manifest["profile"]==rank_sensor.PROFILE and name=="guard_lifecycle_base.py" and hashlib.sha256(raw).hexdigest()!=rank_sensor.BASE8_SHA256:
+            raise ValueError("LIFECYCLE_RANK_DEPENDENCY_UNAVAILABLE")
         if manifest["profile"]==stream_sensor.PROFILE and name=="guard_lifecycle_base.py" and hashlib.sha256(raw).hexdigest()!=stream_sensor.BASE8_SHA256:
             raise ValueError("LIFECYCLE_STREAM_DEPENDENCY_UNAVAILABLE")
         if manifest["profile"]==output_sensor.PROFILE and name in {"guard_lifecycle_base.py","guard_attempt_invocation.py"}:
@@ -151,6 +154,8 @@ def validate_binding(env,target,source,prepared):
 
 
 def validate_session_binding(env,target,source,prepared):
+    if prepared["profile"]==rank_sensor.PROFILE and (env.engine.name!="vllm" or env.engine.version!="0.31.0"):
+        raise ValueError("LIFECYCLE_RANK_ENGINE_UNSUPPORTED")
     if prepared["profile"] in {attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE} and (env.engine.name!="vllm" or env.engine.version!="0.31.0"):
         raise ValueError("LIFECYCLE_ATTEMPT_ENGINE_UNSUPPORTED")
     if prepared["profile"] == online.PROFILE and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):

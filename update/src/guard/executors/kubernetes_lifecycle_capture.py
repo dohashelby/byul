@@ -12,6 +12,7 @@ from guard.adapters import vllm_online_sensor as online
 from guard.adapters import vllm_attempt_sensor as attempt
 from guard.adapters import vllm_request_output_sensor as output_sensor
 from guard.adapters import vllm_stream_buffer_sensor as stream_sensor
+from guard.adapters import vllm_rank_failure_sensor as rank_sensor
 from guard.runtime.bounded import capture_pipes
 from guard.runtime.kubernetes_binding import validate_capture_target, verify_owned_pod, project_owned_snapshot
 from .owned_capture import _FILE_READER, MAX_BYTES, strict_json, validate_file_result, validate_owned_source, EXTENDED_RECORDING_PROFILE
@@ -45,6 +46,8 @@ def supervised_source(source):
 
 class KubernetesLifecycleReader:
     def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None):
+        if prepared.get("profile")==rank_sensor.PROFILE and (env.engine.name!="vllm" or env.engine.version!="0.31.0"):
+            raise KubernetesCaptureError()
         if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
             raise KubernetesCaptureError()
         self._initialize(validate_target(target,env),target,prepared,binary=binary,duration=duration,runner=runner)
@@ -58,8 +61,8 @@ class KubernetesLifecycleReader:
             raise KubernetesCaptureError()
         self.target_sha256=sha256_hex(canonical_json(target))
         self.session=prepared["session"]
-        self.file_read_profile = EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE} else None
-        self.file_read_limit = stream_sensor.MAX_BYTES if prepared.get("profile")==stream_sensor.PROFILE else attempt.MAX_BYTES if prepared.get("profile") in {attempt.PROFILE,output_sensor.PROFILE} else online.MAX_BYTES if self.file_read_profile is not None else 262144
+        self.file_read_profile = EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE} else None
+        self.file_read_limit = rank_sensor.MAX_BYTES if prepared.get("profile")==rank_sensor.PROFILE else stream_sensor.MAX_BYTES if prepared.get("profile")==stream_sensor.PROFILE else attempt.MAX_BYTES if prepared.get("profile") in {attempt.PROFILE,output_sensor.PROFILE} else online.MAX_BYTES if self.file_read_profile is not None else 262144
         self.binary=binary;self.deadline=time.monotonic()+duration
         self.runner=runner or capture_pipes;self.injected=runner is not None
         self.programs={"file":_FILE_READER,"context":CONTEXT_READER,"inventory":INVENTORY_READER,"seal":SESSION_SEALER}

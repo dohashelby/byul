@@ -1,3 +1,10 @@
+## 2026-10-30 — A-1 LIF08 선정 mp rank 실패 관측 제품 묶음
+
+- 한 일: PR123 확정683e48d를 보존하고 선정 mp의 worker 예외 응답·collective RPC/Future 결과·사망 monitor·core 실패 표식을 분리한 명시 native13/parser와 닫힌 six-probe·LIF08 전용 소비·DRAFT팩/registry를 초안으로 연결했다. 예외/사망/지연/통신정지 네 조건과 원팩 정상/output rank 기준·다른76정의·native8~12·A2/B 원본을 유지한다. callback·RPC·worker 상태를 바꾸거나 실제 장애를 주입하지 않는다.
+- 테스트 결과: 원본 MP/core 설치 캐시 bytes와 고정 공개 소스를 정적으로 확인했다. 원본 메서드 code·소유 CPU child 네 설정·기존 CLI/정확Ref·실제 localhost HTTP의 회귀 초안을 준비했다. runtime code 오프라인 최종 검토·소스 고정 전이며 기능 시험을 아직 실행하지 않았다.
+- 다음 단계: 구현/회귀/문서 검토 종료→자기 code 리터럴·전체 공통 소비 pin과 source/hash 고정→영향/불변식·동일 bytes Linux→설치본 CLI·정확Ref→확정 커밋/PR/정확HEAD CI/인계. 큰 실제 fault 제어 미준비와 준비된 독립 개발을 구분한다.
+- 막힌 것: 네 안전 fault 각각의 실제 활성·발생 시계·rank/group/요청 결합·감지/상위 접수·기한·실제 필수 rank 정상 계산/통신과 복구가 미완료다. 관측 표식만으로 fault/수신·네 종류 완료를 추정하지 않으며 전축UNKNOWN·정상null·생산자/전체범위false다. 원GPU창종료/Start0/마지막stopped·보존EBS과금·CI결제차단·A39/56/4·A1 19/27/2는 유지한다.
+
 ## 2026-10-30 — A-1 LIF04 선택 transport buffer 관측 제품 연결
 
 - 한 일: PR122 이후 전용 stream_buffer:kubernetes와 명시 native12를 준비했다. 원팩31·LIF04 두 분기/질문/기준·다른76정의·A2/B 원본·기본8/9~11을 보존하고 기존 CLI/증거 경로를 사용한다. 실제 고정 Uvicorn send/drain/connection_lost와 선택 asyncio TCP buffer/kernel queue·전체process RSS를 구분한다. HTTP 다섯 요청·수신/시간/출력 한도·POL16개와 오류/누락 의미를 닫았다.

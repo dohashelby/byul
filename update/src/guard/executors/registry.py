@@ -37,12 +37,14 @@ from .kubernetes_observation_state import KubernetesObservationStateExecutor
 from .kubernetes_forwarded_identity import KubernetesForwardedIdentityExecutor
 from .kubernetes_stored_responses import KubernetesStoredResponsesExecutor
 from .kubernetes_stream_buffer import KubernetesStreamBufferExecutor
+from .kubernetes_rank_failure import KubernetesRankFailureExecutor
 from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
 from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
+    "rank_failure:kubernetes": lambda cfg: KubernetesRankFailureExecutor(cfg.get("rank_failure", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "stream_buffer:kubernetes": lambda cfg: KubernetesStreamBufferExecutor(cfg.get("stream_buffer", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "stored_responses:kubernetes": lambda cfg: KubernetesStoredResponsesExecutor(cfg.get("stored_responses", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "forwarded_identity:kubernetes": lambda cfg: KubernetesForwardedIdentityExecutor(cfg.get("forwarded_identity", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),

@@ -24,6 +24,19 @@ def admission(meta, ids, *, matches_reuse=False):
         processor_input_count=len(ids), processor_input_ids_sha256=product.digest(ids), processor_input_matches_reuse=matches_reuse)
 
 
+def token_domain(ids, *, size=32, model_size=32):
+    valid_ids = list(range(size))
+    exact_ints = all(type(value) is int for value in ids)
+    return {'status': 'collected', 'model_vocab_size': model_size,
+        'tokenizer_id_count': size, 'min': 0, 'max': size - 1,
+        'canonical_sha256': product.digest(valid_ids), 'contiguous_from_zero': True,
+        'request_ids_in_domain': exact_ints and all(value in valid_ids for value in ids),
+        'request_ids_within_model_vocab': exact_ints and all(0 <= value < model_size for value in ids),
+        'request_ids_canonical_sha256': product.digest(ids),
+        'tokenizer_file_sha256': 'd' * 64, 'model_config_file_sha256': 'c' * 64,
+        'private': CANARY}
+
+
 def example_record(profile='reference5d'):
     now = datetime.now(timezone.utc)
     validation = {'pre': 'verified', 'post': {'status': 'verified'}, 'boundary': 'source_fixture_component'}
@@ -40,6 +53,7 @@ def example_record(profile='reference5d'):
         meta = {'request_parsed': True, 'trust_request_chat_template': case['trust_template'],
             'trust_request_mm_kwargs': case['trust_mm'], 'effective_max_model_len': 16,
             'effective_vocab_size': 32, 'effective_max_token_id': 31,
+            'token_id_domain': token_domain(fields.get('kv_transfer_params', {}).get('prompt_token_ids', [5, 3, 4])),
             'parsed_fields': {key: {'present': True, 'fixture_matches': True, 'canonical_sha256': product.digest(value)}
                               for key, value in fields.items()}, 'private': CANARY}
         events = ['online_render_chat', 'template_gate', 'mm_kwargs_gate', 'online_preprocess_chat', 'reuse_input_gate']
@@ -350,3 +364,97 @@ def test_optimized_parent_rejects_before_source(tmp_path, flag):
         env={**os.environ, 'PYTHONPATH': str(script.parents[1]) + ':' + str(script.parents[1] / 'src')})
     assert process.returncode != 0 and 'ONLINE_INPUT_CPU_REQUIRES_NORMAL_PYTHON312' in process.stderr
     assert not output.exists()
+
+
+@pytest.mark.parametrize('profile', ['reference5d', 'target031'])
+def test_cached_bound_does_not_replace_independent_fixed_domain(private, profile):
+    raw = example_record(profile)
+    value = bad_admission(raw, 'reuse-oov')
+    value['safe_metadata']['effective_max_token_id'] = 32
+    shared, calls, drafts = private_drafts(private, raw, profile)
+    assert len(calls) == 1
+    assert drafts['REQ-08'].observations['online_input_confirmed_violations'].value == ['reuse-oov']
+    assert shared.record['source_scope_qualification']['reuse-oov']['eligible'] is True
+    saved = next(item for item in shared.record['results'] if item['case_id'] == 'reuse-oov')
+    assert saved['safe_metadata']['effective_max_token_id'] == 32
+    assert saved['safe_metadata']['token_id_domain']['max'] == 31
+    assert saved['safe_metadata']['token_id_domain']['canonical_sha256'] == product.digest(list(range(32)))
+    assert saved['expected'] == 'rejected' and saved['fixture_canonical_sha256'] == product.describe(pipeline._CASES['reuse-oov'])['fixture_canonical_sha256']
+    assert CANARY not in drafts['REQ-08'].artifacts[0].path.read_text()
+
+
+@pytest.mark.parametrize('fault', ['missing', 'unavailable', 'tokenizer_hash', 'model_hash', 'domain_hash',
+    'request_hash', 'count', 'max', 'membership', 'model_size', 'added_token'])
+def test_unavailable_or_mismatched_domain_keeps_other_independent_violation(private, fault):
+    raw = example_record('target031')
+    value = bad_admission(raw, 'reuse-oov')
+    value['safe_metadata']['effective_max_token_id'] = 32
+    proof = value['safe_metadata']['token_id_domain']
+    if fault == 'missing':
+        value['safe_metadata'].pop('token_id_domain')
+    elif fault == 'unavailable':
+        value['safe_metadata']['token_id_domain'] = {'status': 'unavailable', 'error_type': 'OSError', 'exception': CANARY}
+    elif fault in ('tokenizer_hash', 'model_hash', 'domain_hash', 'request_hash'):
+        key = {'tokenizer_hash': 'tokenizer_file_sha256', 'model_hash': 'model_config_file_sha256',
+            'domain_hash': 'canonical_sha256', 'request_hash': 'request_ids_canonical_sha256'}[fault]
+        proof[key] = '0' * 64
+    elif fault == 'count': proof['tokenizer_id_count'] = 33
+    elif fault == 'max': proof['max'] = 32
+    elif fault == 'membership': proof['request_ids_in_domain'] = True
+    elif fault == 'model_size': proof['model_vocab_size'] = 33
+    else:
+        value['safe_metadata']['token_id_domain'] = token_domain([32], size=33, model_size=33)
+    bad_admission(raw, 'reuse-negative')
+    shared, calls, drafts = private_drafts(private, raw, 'target031')
+    assert len(calls) == 1 and drafts['REQ-08'].status == ExecStatus.ABORTED
+    assert drafts['REQ-08'].observations['online_input_confirmed_violations'].value == ['reuse-negative']
+    decision = shared.record['source_scope_qualification']['reuse-oov']
+    assert decision == {'eligible': False, 'reason': 'token_domain_unavailable' if fault in ('missing', 'unavailable') else 'token_domain_mismatch'}
+    saved = next(item for item in shared.record['results'] if item['case_id'] == 'reuse-oov')
+    assert saved['safe_metadata']['admission_completed'] is True
+    assert saved['producer_scope_eligibility'] == decision
+    assert CANARY not in drafts['REQ-08'].artifacts[0].path.read_text()
+
+
+def test_valid_input_has_no_false_oov_violation(private):
+    raw = example_record('target031')
+    value = row(raw, 'reuse-valid')
+    value['safe_metadata']['effective_max_token_id'] = 32
+    _, _, drafts = private_drafts(private, raw, 'target031')
+    assert drafts['REQ-08'].observations['online_input_confirmed_violations'].value == []
+
+
+@pytest.mark.parametrize('fault', ['none', 'missing_domain', 'added_token', 'auxiliary', 'artifact'])
+def test_oov_core_verdict_shared_capture_window_and_failure_preservation(tmp_path, monkeypatch, fault):
+    raw = example_record('target031')
+    value = bad_admission(raw, 'reuse-oov')
+    value['safe_metadata']['effective_max_token_id'] = 32
+    if fault == 'missing_domain': value['safe_metadata'].pop('token_id_domain')
+    elif fault == 'added_token': value['safe_metadata']['token_id_domain'] = token_domain([32], size=33, model_size=33)
+    elif fault == 'auxiliary':
+        raw.update(capture_status='incomplete', auxiliary_write={'status': 'failed', 'error_type': 'OSError'})
+    calls = []
+    def capture(*args, **kwargs):
+        calls.append(kwargs)
+        return deepcopy(raw)
+    monkeypatch.setattr(pipeline, 'verify_runtime_components', lambda repo: None)
+    monkeypatch.setattr(pipeline, 'COLLECTOR_SHA256', PRODUCER_HASH)
+    monkeypatch.setattr(pipeline.collector, 'capture_online', capture, raising=False)
+    if fault == 'artifact':
+        monkeypatch.setattr(pipeline, '_write_artifact', lambda *args: (_ for _ in ()).throw(OSError(CANARY)))
+    output = tmp_path / 'EXAMPLE-oov'
+    summary = pipeline.run_pipeline(tmp_path / 'source', output, source_profile='target031', origin=DataOrigin.EXAMPLE)
+    assert calls == [{'source_profile': 'target031'}] and summary['capture_invocations'] == 1
+    assert summary['checks']['REQ-08']['verdicts']['security'] == ('UNKNOWN' if fault in ('missing_domain', 'added_token') else 'FAIL')
+    assert summary['exact_ref_rejudgment_unchanged'] and summary['store_verify_errors'] == []
+    evidence = [json.loads((output / ('EVD-' + cid + '.json')).read_text()) for cid in pipeline.CHECKS]
+    assert len({item['execution']['started_at'] for item in evidence}) == 1
+    assert len({item['execution']['finished_at'] for item in evidence}) == 1
+    assert summary['collection_id'] == COLLECTION_ID
+    assert len({item['execution']['executor']['config_sha256'] for item in evidence}) == 1
+    if fault != 'artifact':
+        artifacts = [json.loads(path.read_text()) for path in output.rglob('online-input-*.json')]
+        assert len(artifacts) == 3 and {item['collection_id'] for item in artifacts} == {COLLECTION_ID}
+    assert summary['checks']['REQ-08']['execution_status'] == ('COMPLETED' if fault == 'none' else 'ABORTED')
+    for path in output.rglob('*'):
+        if path.is_file(): assert CANARY not in path.read_text(errors='replace')

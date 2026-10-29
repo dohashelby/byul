@@ -32,15 +32,15 @@ SOURCE_PROFILES = {'reference5d': '5d35ce3934a7804b298559d2d99eec33792e1eb9',
                    'target031': 'db9527a46873454610df6dbedf79a36d6bf1a7f6'}
 GATE_SHA256 = '1af43f4ae68271b494a8528cd1190763612735bb963ec00f0a1f4992fb802308'
 COMPONENT_COMMIT = 'c0af481dad68000d14211f3e03b07e62ab1ee7ea'
-# Reviewed collector snapshot eb7f568; runtime bytes never become approval.
-COLLECTOR_SHA256 = '80b91e1b417763bf4bc2910332eb4dd5c5d5184e44d3c52bc5edd443f0e539ef'
+# Reviewed collector snapshot de799c2; runtime bytes never become approval.
+COLLECTOR_SHA256 = '31c4d3bd3ff6416b9a174dcfe7514766e7be12e4fb819499499bd32a6f830dfe'
 CHECKS = ('REQ-07', 'REQ-08', 'SUP-08')
 _CASES = {case['id']: case for case in product.fixtures()}
 _TARGET_EXCLUDED = {'reuse-empty', 'reuse-bool', 'reuse-echo-ignores-ids'}
 _EVENTS = {'render_cmpl', 'render_chat', 'render_chat_async', 'validate_token_ids', 'process_inputs', 'validate_prompt_len',
            'validate_model_input', 'online_render_chat', 'online_preprocess_chat', 'reuse_input_gate',
            'template_gate', 'mm_kwargs_gate'}
-_REASONS = {'source_contract_observed', 'source_expectation_unavailable', 'consumption_unavailable'}
+_REASONS = {'source_contract_observed', 'source_expectation_unavailable', 'consumption_unavailable', 'token_domain_unavailable', 'token_domain_mismatch'}
 _OUTCOMES = {'accepted', 'rejected', 'execution_error', 'unsupported'}
 _VALIDATION = {'verified', 'unavailable', 'mismatch'}
 _ERROR_TYPES = {name for name, value in vars(builtins).items()
@@ -111,11 +111,51 @@ def _sha256(value):
     return isinstance(value, str) and re.fullmatch('[0-9a-f]{64}', value) is not None
 
 
+def _token_domain(value):
+    if not isinstance(value, dict):
+        return {'status': 'unavailable'}
+    safe = {'status': 'collected' if value.get('status') == 'collected' else 'unavailable'}
+    if safe['status'] == 'unavailable':
+        if 'error_type' in value:
+            error = value['error_type']
+            safe['error_type'] = error if isinstance(error, str) and error in _ERROR_TYPES else 'Exception'
+        return safe
+    for key in ('model_vocab_size', 'tokenizer_id_count', 'min', 'max'):
+        if type(value.get(key)) is int and value[key] >= 0:
+            safe[key] = value[key]
+    for key in ('contiguous_from_zero', 'request_ids_in_domain', 'request_ids_within_model_vocab'):
+        if type(value.get(key)) is bool:
+            safe[key] = value[key]
+    for key in ('canonical_sha256', 'request_ids_canonical_sha256', 'tokenizer_file_sha256', 'model_config_file_sha256'):
+        if _sha256(value.get(key)):
+            safe[key] = value[key]
+    return safe
+
+
+def _independent_oov(metadata, ids, config_hashes):
+    """The owned tokenizer/model files establish the domain, independent of its cached bound."""
+    proof = metadata.get('token_id_domain', {})
+    if proof.get('status') != 'collected':
+        return False, 'token_domain_unavailable'
+    hashes = config_hashes if isinstance(config_hashes, dict) else {}
+    expected = {'model_vocab_size': 32, 'tokenizer_id_count': 32, 'min': 0, 'max': 31,
+        'canonical_sha256': _digest(list(range(32))), 'contiguous_from_zero': True,
+        'request_ids_in_domain': False, 'request_ids_within_model_vocab': False,
+        'request_ids_canonical_sha256': _digest(ids)}
+    matches = (all(proof.get(key) == value for key, value in expected.items())
+        and _sha256(hashes.get('tokenizer.json')) and _sha256(hashes.get('config.json'))
+        and proof.get('tokenizer_file_sha256') == hashes['tokenizer.json']
+        and proof.get('model_config_file_sha256') == hashes['config.json'])
+    return bool(matches), 'source_contract_observed' if matches else 'token_domain_mismatch'
+
+
 def _safe_metadata(value, case):
     value = value if isinstance(value, dict) else {}
     safe = {key: value[key] for key in _BOOL_META if type(value.get(key)) is bool}
     safe.update({key: value[key] for key in _INT_META if type(value.get(key)) is int and value[key] >= 0})
     safe.update({key: value[key] for key in _HASH_META if _sha256(value.get(key))})
+    if 'token_id_domain' in value:
+        safe['token_id_domain'] = _token_domain(value['token_id_domain'])
     parsed = value.get('parsed_fields') if isinstance(value.get('parsed_fields'), dict) else {}
     safe['parsed_fields'] = {}
     for field in case['fields']:
@@ -155,7 +195,7 @@ def _literal_override_consumed(metadata):
         and metadata['prompt_count'] == 2)
 
 
-def _scope_eligible(row, case, profile):
+def _scope_eligible(row, case, profile, config_hashes=None):
     if profile == 'target031' and case['id'] in _TARGET_EXCLUDED:
         return False, 'source_expectation_unavailable'
     meta = _safe_metadata(row.get('safe_metadata'), case)
@@ -178,7 +218,11 @@ def _scope_eligible(row, case, profile):
             ids = case['fields']['kv_transfer_params']['prompt_token_ids']
             exact_input = _consumed_ids(meta, ids)
             if case['id'] == 'reuse-oov':
-                exact_input = exact_input and type(meta.get('effective_max_token_id')) is int and max(ids) > max(meta['effective_vocab_size'] - 1, meta['effective_max_token_id'])
+                domain_oov, reason = _independent_oov(meta, ids, config_hashes)
+                if not domain_oov:
+                    return False, reason
+                # A gate trace cannot replace actual consumption of the fixed OOV request.
+                return bool(exact_input), 'source_contract_observed' if exact_input else 'consumption_unavailable'
             if case['id'] == 'reuse-long':
                 exact_input = exact_input and len(ids) >= meta['effective_max_model_len']
             eligible = exact_input or (profile == 'reference5d' and 'reuse_input_gate' in events)
@@ -206,14 +250,14 @@ def _utc(value):
     return result
 
 
-def _safe_rows(rows, profile):
+def _safe_rows(rows, profile, config_hashes):
     safe = []
     for row in rows:
         if not isinstance(row, dict) or not isinstance(row.get('case_id'), str) or row['case_id'] not in _CASES:
             continue
         case = _CASES[row['case_id']]
         declared = row.get('source_scope_eligibility') if isinstance(row.get('source_scope_eligibility'), dict) else {}
-        eligible, reason = _scope_eligible(row, case, profile)
+        eligible, reason = _scope_eligible(row, case, profile, config_hashes)
         after = row.get('after') if isinstance(row.get('after'), dict) else {}
         safe.append({'case_id': row['case_id'], 'check_id': row.get('check_id') if row.get('check_id') in CHECKS else None,
             'stage': row.get('stage') if row.get('stage') == product.describe(case)['stage'] else 'unknown',
@@ -244,7 +288,7 @@ def _source_bound(row, profile, collection_id):
         and validation['boundary'] == 'source_fixture_component' and validation['post']['status'] in {'verified', 'unavailable'})
 
 
-def _project(rows, profile, collection_id):
+def _project(rows, profile, collection_id, config_hashes):
     qualified, decisions = [], {}
     counts = {}
     for row in rows:
@@ -254,7 +298,7 @@ def _project(rows, profile, collection_id):
         if not isinstance(row, dict) or not isinstance(row.get('case_id'), str) or row['case_id'] not in _CASES:
             continue
         key, case = row['case_id'], _CASES[row['case_id']]
-        eligible, reason = _scope_eligible(row, case, profile)
+        eligible, reason = _scope_eligible(row, case, profile, config_hashes)
         declared = row.get('source_scope_eligibility') if isinstance(row.get('source_scope_eligibility'), dict) else {}
         bound = _source_bound(row, profile, collection_id) and counts[key] == 1
         eligible = bound and eligible and declared.get('eligible') is True
@@ -297,7 +341,7 @@ def _validated_record(raw, profile, producer_sha256):
         'source_features': {key: {'present': value['present']} for key, value in raw.get('source_features', {}).items()
             if key in _EVENTS and isinstance(value, dict) and type(value.get('present')) is bool},
         'fixture_config': {'origin': 'DECLARED', 'vocab_size': 32, 'max_model_len': 16, 'hidden_size': 4},
-        'results': _safe_rows(raw['results'], profile)}
+        'results': _safe_rows(raw['results'], profile, hashes)}
 
 
 def _write_artifact(path, record):
@@ -331,7 +375,7 @@ class _SharedCapture:
         try:
             raw = deepcopy(self.capture_fn(self.source_root, Path(workdir) / 'owned-online-input-cpu', source_profile=self.source_profile))
             record = _validated_record(raw, self.source_profile, self.producer_sha256)
-            projection, qualified, decisions = _project(raw['results'], self.source_profile, record['collection_id'])
+            projection, qualified, decisions = _project(raw['results'], self.source_profile, record['collection_id'], record['config_file_bytes_sha256'])
             record['source_scope_qualification'] = decisions
             for row in record['results']:
                 row['producer_scope_eligibility'] = decisions.get(row['case_id'], {'eligible': False, 'reason': 'consumption_unavailable'})

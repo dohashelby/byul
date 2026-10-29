@@ -27,3 +27,28 @@ collector 담당자의 읽기 전용 API 대조에서도 필드·enum·hash·시
 다음: 양 구현 source freeze·직접 회귀·집중 검토 후 통합 snapshot의 실제 CPU는 지정 담당자가 한 번 실행한다.
 남은 A 조건: 정식 등록/공유팩·기업 허용 template/한도·API 모델 신원·MM 코드 판본과 최종 worker 소비.
 모델 weights·HTTP listener·GPU·다른 backend를 사용하지 않는다. 기존 69/16 성과를 새 사례로 재집계하지 않는다.
+
+
+## OOV 독립 domain 근거와 공유 판정 보정 — 2026-10-29
+
+확인한 결함: producer가 검증 대상 tokenizer의 cached max token ID를 OOV 허용 범위의
+기준으로 다시 사용했다. target031의 cached max는 32였지만 실제 고정 tokenizer의
+model·added ID 합집합은 0..31이고 model vocab 크기는 32였다. 실제 parsed request의
+`[32]`가 InputProcessor에 그대로 전달되고 admission을 마친 관측이 이 순환 기준 때문에
+confirmed FAIL 입력에서 빠졌다.
+
+수정: cached max는 진단값으로 보존하고 owned tokenizer/config 파일에서 독립 수집한
+ID domain 요약을 기준으로 삼는다. 파일 SHA256을 capture config hashes와 결합하고,
+선정 fixture의 ID count/min/max/정규 hash·0부터 연속 여부·model vocab32·요청 hash·
+실제 membership을 확인한다. 이 근거와 parsed/processor/admitted hash가 일치하면
+기존 product projection에 reuse-oov 행을 전달한다. domain 근거 누락·불일치 또는
+실제 added token32를 포함하는 다른 domain은 정제 metadata와 제외 이유를 보존한다.
+reference의 다른 gate 조건과 target의 미보장 3사례, 모든 원래 fixture expected/hash,
+제품 project/judge와 source·helper gate를 유지했다.
+
+정제 첨부에는 ID집합 전체나 token 문자열 대신 count/min/max/hash·범위 여부만 저장한다.
+한 번의 수집을 공유하는 세 EVD의 ID·UTC 시각·각 첨부·정확 Ref·Store 검증과 독립 FAIL의
+aux/첨부 실패 보존을 직접 회귀했다. collector `de799c2`의 승인 literal SHA256
+`31c4d3bd3ff6416b9a174dcfe7514766e7be12e4fb819499499bd32a6f830dfe`를 연결한 뒤
+producer 직접 계약 **62 passed / pytest 1.52초 / 부모 wall 1.58초**를 확인했다.
+실제 CPU 재실행은 통합 snapshot을 인계받은 collector 담당자가 한 번 수행한다.

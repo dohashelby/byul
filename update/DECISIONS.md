@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-10-29 · A2 자격수집 a0248fa는 전용3파일 원본 bytes로 공통 process 확정본 위에 통합한다. · 부분 scan의 앞선 환경 이름/독립 FAIL과 기존 ID 없는 callback을 보존하며 명시된 응답ID 불일치·완료 구간 오류로 환경 부재나 정상 대조를 확정하지 않기 위함이다.
+
 - 2026-10-29 · PLT01/04 공통 process 입력은 고정 reader의 선택 컨테이너 보고와 capture 주체를 분리하고 worker/source/model 귀속은 별도 근거 없으면 false로 고정한다. · metadata·동일 UID·PID 목록을 실제 worker 전체/파일 소비/권한 PASS로 올리지 않으며 기존 전용 분석과 의미를 보존하기 위함이다.
 
 - 2026-10-29 · REQ01/03은 기존 수집·안전 프로브·판정을 유지하고 선택한 네 Pod의 정확 세대/고정 HTTP-TCP 전송만 공통 경계로 연결한다. · Pod 이름/label을 외부대역·기업 principal·Gateway 변환표로 추정하지 않고 미지원 Service/TLS/host나 실제 실증으로 범위를 확대하지 않기 위함이다.

@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 자격 환경 수집 확정본 통합
+
+- 한 일: 공통 process acf91e6을 보존한 분리 공간에서 A2 확정a0248fa를 원본 추적 cherry-pick으로 통합했다. 전용 실행기·신규 회귀·문서3파일은 원본 bytes 그대로다. PID별 환경 이름/완료 구간과 명시된 응답ID를 검증하며 앞선 양성 관측·독립 FAIL, ID 없는 기존 순서형 callback 의미를 유지한다. 공통 producer 및 PLT01/04 Kubernetes 전용 소비 연결은 서로 구분한다.
+- 테스트 결과: 1097파일 고정 전용·공통 process·동일 계약·인접·불변식505통과/기존skip1·제외1(pytest65.68초/부모66.588초), wheel 빌드2.195초·소스/wheel/격리 설치162파일 일치(부모11.265초), 검증 중 bytes 불변이다. 기존 CLI3사례의 부분 수집UNKNOWN·양성독립FAIL·첨부실패와 정확6Ref 반출/복원·저장팩 재판정을 확인했다. 가장 긴 단계는 영향 CPU 시험이며 무변경 Linux reader의 기존 격리 검증을 재사용한다. 기존 시험·assert·skip·정책·팩31·core/models/store/judges·외부 contracts·루트 runtime/platform은 수정하지 않는다.
+- 다음 단계: 통합 영향 시험과 설치판 일치 → 정확 HEAD 초안PR/CI 상태·인계 → 준비된 A2 Kubernetes 전용 소비 확정본과 다음 공통 담당 분기. 임의 환경 JSON을 실제 측정 생산자로 승격하지 않는다.
+- 막힌 것: 계정 문제로 hosted CI5는 실행 전 차단 조건이다. 실제 worker/source/model 귀속·전체 보안 완료는 미확인이며 기존 native0.32/lifecycle 관문을 유지한다. 실제 EC2 stopped/증거 반출·소유 worker/GPU/임시 접근 정리 확인은 기존 원장으로 보존하고 재시작하지 않는다. 부모 A39/56/4·A1 19/27/2의 잔여 분기는 유지한다.
+
 ## 2026-10-29 — A-1 선택 컨테이너 process 공통 입력
 
 - 한 일: 확정c5aa3e0를 보존한 분리 공간에서 A2 PLT01/04 요청의 공통 selector/고정 Linux reader/포착·CLI를 구현한다. 기존 정확 ENV/모델 매핑과 엔진/프로브 세대 전후 검증을 재사용하며 PID/start·UID/CapEff/mount namespace·환경 이름과 명시 후보 lstat metadata만 반환한다. reader 주체와 관측 PID를 분리하고 worker/source/model 귀속·전체worker·접근 시험은 미검증으로 고정한다. API 후속 실패와 개별 필드/선언 변경은 앞선 packet/관측을 보존한다.

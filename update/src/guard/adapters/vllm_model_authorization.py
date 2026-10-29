@@ -9,7 +9,7 @@ def _time(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def project_native(packet, attempts, *, grants, retired):
+def project_native(packet, attempts, *, grants, retired, principals):
     """Only the internal current capture_session result is consumed, never an import.
 
     The old index's explicit false final-model/consumption flags remain false.
@@ -71,7 +71,7 @@ def project_native(packet, attempts, *, grants, retired):
                 model, revision = safe["configured_model_sha256"], safe["configured_revision_sha256"]
                 if (_sha(model) and _sha(revision) and attempt["attempted"]
                         and attempt["binding_verified"] and attempt["policy_window_verified"]):
-                    principal = values["allowed_principal_sha256"] if attempt["role"] == "allowed" else values["denied_principal_sha256"]
+                    principal = principals[attempt["role"]]
                     if (principal, model, revision) not in grants:
                         conflicts.append({"case_id": attempt["case_id"], "model_sha256": model,
                                           "revision_sha256": revision, "confirmed_violation": False})

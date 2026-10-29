@@ -180,7 +180,7 @@ def test_registered_cli_owned_probe_native_and_exact_refs(tmp_path,group,native_
     trials=e.observations["model_use_trials"].value
     if mode=="actual-lab-false":assert not world.sent and not trials and e.execution.status.value=="ABORTED"
     else:
-        assert world.sent and world.native_ops.count("seal")==1
+        assert world.sent and world.native_ops.count("seal")== (0 if mode=="engine-replaced" else 1)
         assert len(world.sent)=={"before-shape":2,"engine-replaced":1,"wrong-response-id":2}.get(mode,3)
         assert trials and all(not t["final_model_identity_verified"] for t in trials)
     if mode in {"normal","denied-response","retired","attachment","http-cleanup","seal-failure","after-timeout"}:

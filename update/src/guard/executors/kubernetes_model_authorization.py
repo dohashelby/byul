@@ -219,7 +219,8 @@ class KubernetesModelAuthorizationExecutor(HttpCheckExecutor):
                     "diagnostic_codes": packet["diagnostic_codes"], "transport": reader.report()}
                 if not packet["recorded_files_covered"]:
                     summary["diagnostic_codes"].append("MODEL_NATIVE_RECORDING_GAP")
-        trials, conflicts, retired = project_native(packet, summary["attempts"], grants=grants, retired=retired_models)
+        trials, conflicts, retired = project_native(packet, summary["attempts"], grants=grants, retired=retired_models,
+            principals={"allowed":values["allowed_principal_sha256"], "denied":values["denied_principal_sha256"]})
         observations = {key: {"value": value, "collected": True} for key, value in {
             "model_use_trials": trials, "configured_model_policy_conflicts": conflicts,
             "configured_retired_model_uses": retired, "model_authorization_scope_complete": False,

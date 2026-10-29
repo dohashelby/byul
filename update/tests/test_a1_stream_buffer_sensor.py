@@ -1,5 +1,5 @@
 """Real fixed Uvicorn method bodies; framework/transport I/O remain EXAMPLE."""
-import ast,asyncio,copy,hashlib,json,logging,os,threading,time,types
+import ast,asyncio,builtins,copy,hashlib,json,logging,os,threading,time,types
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
@@ -38,17 +38,18 @@ class Transport:
 def module_from_reference(name):
     path=REFERENCES/(name.rsplit('.',1)[-1]+'.py');raw=path.read_bytes()
     assert hashlib.sha256(raw).hexdigest()==sensor.SOURCE_ADDITIONS[name]
-    wanted=set(sensor.TARGETS[name]);tree=ast.parse(raw,filename=str(path))
-    classes=[copy.deepcopy(n) for n in tree.body if isinstance(n,ast.ClassDef) and n.name in wanted]
-    for node in classes:
-        if node.name!='RequestResponseCycle' and node.name!='FlowControl':node.body=[n for n in node.body if isinstance(n,ast.FunctionDef) and n.name=='connection_lost']
-    futures=[copy.deepcopy(n) for n in tree.body if isinstance(n,ast.ImportFrom) and n.module=='__future__']
-    tree=ast.Module(body=[*futures,*classes],type_ignores=[]);module=types.ModuleType(name);module.__file__=str(path)
+    wanted=set(sensor.TARGETS[name]);root=compile(raw,str(path),'exec',dont_inherit=True,optimize=0)
+    # Extract class code from the complete compilation. Recompiling class ASTs
+    # loses module import symbol information used by CPython 3.12 codegen.
+    # No upstream module imports, I/O or server constructors execute here.
+    classes=[c for c in root.co_consts if isinstance(c,types.CodeType) and c.co_name in wanted]
+    module=types.ModuleType(name);module.__file__=str(path)
     module.__dict__.update(asyncio=asyncio,h11=h11,logging=logging,CLOSE_HEADER=(b'connection',b'close'),TRACE_LOG_LEVEL=5,
         STATUS_PHRASES={200:b'OK',500:b'Internal Server Error'},cast=lambda _,v:v)
-    exec(compile(ast.fix_missing_locations(tree),str(path),'exec',dont_inherit=True,optimize=0),module.__dict__)
-    for cls in classes:
-        if cls.name.endswith('Protocol'):setattr(vars(module)[cls.name],'_unset_keepalive_if_required',lambda self:None)
+    for code in classes:
+        bases=(asyncio.Protocol,) if code.co_name.endswith('Protocol') else ()
+        cls=builtins.__build_class__(types.FunctionType(code,module.__dict__),code.co_name,*bases);setattr(module,code.co_name,cls)
+        if code.co_name.endswith('Protocol'):setattr(cls,'_unset_keepalive_if_required',lambda self:None)
     return module
 
 

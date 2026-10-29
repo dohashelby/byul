@@ -24,6 +24,19 @@ class MQ:
     def create_from_handle(*a):return MQ()
 
 
+class OwnedReadyConnection(Connection):
+    """EXAMPLE Windows named pipe adapter for Linux's exact Connection contract.
+
+    The pinned source assertion is unchanged. Payload/EOF and wait still use
+    this test's actual owned pipe; the adapter owns no serving process.
+    """
+    def __init__(self,inner):
+        self._inner=inner
+        super().__init__(inner.fileno(),readable=True,writable=False)
+    def recv(self):return self._inner.recv()
+    def _close(self):self._inner.close()
+
+
 def make_world(session='a'*32,mode='normal'):
     raw=REFERENCE.read_bytes();assert hashlib.sha256(raw).hexdigest()==sensor.SOURCE_ADDITIONS[sensor.MP]
     compiled=codes(compile(raw,str(REFERENCE),'exec',dont_inherit=True,optimize=0))
@@ -58,7 +71,7 @@ def make_world(session='a'*32,mode='normal'):
     world=NS(observer=observer,module=module,base=base,created=[],terminated=[],mode=mode)
     def make_worker(**kw):
         rank=kw['rank'];reader,writer=multiprocessing.Pipe(duplex=False);death_reader,death_writer=multiprocessing.Pipe(duplex=False)
-        handle=NS(rank=rank,ready_pipe=reader,death_writer=death_writer,proc=NS(_popen=NS(pid=os.getpid())))
+        handle=NS(rank=rank,ready_pipe=OwnedReadyConnection(reader),death_writer=death_writer,proc=NS(_popen=NS(pid=os.getpid())))
         world.created.append((handle,death_reader))
         if not (world.mode=='eof' and rank==1):
             writer.send({'status':'NOT_READY' if world.mode=='partial-failure' and rank==1 else 'READY',

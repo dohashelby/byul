@@ -1373,3 +1373,10 @@ git status
 - 다음 단계: 정적 검토·고정 snapshot→직접/인접/불변식→Linux/설치·정확6Ref→commit/push·초안PR·정확HEAD CI·본인 인계. 다음 REQ12/종료 모드와 A2 준비된 확정 IPC/worker 소비를 이어간다.
 - 막힌 것: 전체 취소/timeout/stop·각 실행단계·독립 종결/전송/GPU proof·신뢰 producer·실제 기업POL 결합은 미완료다. 후보는 confirmed_violation=false, 모든 축 UNKNOWN이다. GPU 승인창 종료·추가Start0·stopped·CI 결제 차단과 부모A39/A1담당19·필수결과를 유지한다.
 
+## 2026-10-30 — A-1 A2 확정 IPC·가중치 수집 보수 통합
+
+- 한 일: 확정 LIF10 a043d9f 위에서 A2의0df509e/90f839b/47ba33e를 원본 추적 cherry-pick하고9개 전용파일 bytes를 보존한다. IPC 정상 대조의 응답ID 대응, 후속 transport/report 오류의 이전 파일 packet 보존, 명시 native9의 공통 parser/상한 소비를 기존 실행기·capture CLI에서 재사용한다. A측 전체 snapshot 검토 pin만 갱신하며 원본 B/c9 gate와 모든 경로·shadow 검사를 유지한다.
+- 테스트 결과: A2 원본9파일 bytes 일치와1172파일 고정으로 Windows영향308통과·기존skip1/제외1(33.07/34.153초), 같은 bytes Linux영향309통과·제외1(11.06/11.352초)를 확인했다. source·wheel·격리설치176파일 일치, native 수집CLI5사례(2.021초: 정상저장4·예상첨부실패 정제복구1)와 IPC 정식CLI6사례·각6Ref 왕복(12.227초)이 통과했다. IPC 독립FAIL과 native 파일 불일치/기존packet을 후속 실패 뒤에도 보존했다. 새skip/제외·원본 전용파일 수정·검증 중 source변경은 없다. A2의 과거 판본 근거는 따로 보존하며 실제/GPU 결과로 소급하지 않는다. 마지막 결과 문서만 갱신한다.
+- 다음 단계: 통합 source 고정→영향검증→설치CLI→확정 commit/push·초안PR·정확HEAD CI·A2 소비 인계. 본인 REQ12/잔여 취소·관측 개발을 이어간다.
+- 막힌 것: 정식 Kubernetes IPC actor/소켓·egress/worker 계약·명시 기업POL·실제 신뢰 source/image/producer·native0.32·TP/다중GPU·whole security/worker 실제 소비는 미완료다. 원래 GPU 승인창 종료·추가Start0·stopped·CI 결제 차단과 부모 A39/A1 19/A2 20 범위는 유지한다.
+

@@ -46,6 +46,23 @@ producer는 collector의 ENV Ref·target hash·API alias hash·실제 수집 시
 
 원 CheckDef의 `error_fields_seen`은 raw field path를 요구하므로 이번 producer에서는 미수집/null로 유지한다. hash를 raw path인 것처럼 넣지 않는다. 대신 B 전용 외부 DRAFT에만 `response_violations` required observation과 nonempty FAIL rule 한 개를 추가한다. 이 값은 **동일한 기존 POL.allowed_error_fields의 허용 밖 오류 필드**를 정제해 표현한 것이다. 새 기업 기준을 추가하지 않으며 원 required observations·required policy params·기존 judge 규칙은 보존한다. 정식 shared CheckDef/pack/registry 변경은 A 승인·단일 작성 대기다.
 
+## 로컬 고정 검증 — 2026-10-29
+
+고정 코드 `5da3c3c0194054b9e5d5f553a4f436286d061f29`의 전체 회귀는 **6443 passed /
+기존 제외19**, pytest **182.18초**·부모 wall **183.05초**다. 소스는 검증 중 변경하지 않았다.
+collector 직접40건 및 collector/producer 관련53건의 회귀를 포함한다. 두 고정 변경은
+독립 집중 검토에서 코드 지적이 없었고, 실제 호출·nonce 용도를 설명하는 문서1곳을 교정했다.
+
+전용 도구·시험·문서6파일만 추가했으며 guard/packs/pyproject/lock/framework와 설치물은
+선행 PR95와 같다. wheel158파일 bytes/별도 설치 검증을 재사용한다. strict component
+`abd0a9f`·gate SHA28fc03·collector SHA`d1c18ad127ed56d7844e22381fb9b21b20af684224a57df10f65b550cb078a46`
+및 기존 helper bytes 소비를 직접 확인했다. 기존 0.31 handler CPU 증거는 재실행하지 않았다.
+
+현재 A profile/source pin 미지원 경로에서 실제 요청은 0건이다. 이 결과를 실제 Kubernetes
+수집·native handler 소비·모델 추론·복구 실증으로 집계하지 않는다. 승인된 exact target과
+POL/PACK, A 공개 profile 및 소스 승인값, 실행/복구 절차를 받은 뒤 동일 통합 소스에서
+실제 오류 응답·대조·저장·정리를 검증해야 해당 실환경 분기를 마감한다.
+
 원REQ13에 별도 forbidden-context 정책이 없으므로 `forbidden_contexts=None`을 그대로 전달한다. caller/error 입력 인용을 비공개 누출로 바꾸거나 synthetic marker를 임의 금지하지 않는다. helper의 MARKER_POLICY_UNSET은 사실대로 남긴다.
 
 전체 `response_coverage_complete=False`, success response fields·private markers·options·원 functional_probes_planned/results는 null/미수집이다. 전후 tokenize 결과로 전체 functional PASS를 만들지 않는다. ErrorOnlyScopedBoundExecutor는 부분범위 ABORTED를 남기며 정상 오류 필드여도 security/functional 전체 판정은 UNKNOWN이다. 이미 확인한 허용 밖 필드는 after·첨부·cleanup·component postcheck 실패에도 독립 FAIL로 남긴다.

@@ -19,10 +19,50 @@ from .structured_tools import CASE_IDS, SOURCE_COMMIT, cases, project_validator
 
 PROFILE = 'structured-tools-reference-cpu-v1'
 def _verify_source(root):
-    head = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
-    changes = subprocess.check_output(['git', '-C', str(root), 'status', '--porcelain', '--', 'vllm'], text=True, stderr=subprocess.DEVNULL)
-    if head != SOURCE_COMMIT or changes:
+    """Pin the complete reference package, including files Git status can hide."""
+    import io
+    import tarfile
+
+    root = Path(root)
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(root), *args], stderr=subprocess.DEVNULL)
+    def mismatch():
         raise ValueError('STRUCTURED_TOOLS_REFERENCE_MISMATCH')
+
+    if git('rev-parse', 'HEAD').decode().strip() != SOURCE_COMMIT:
+        mismatch()
+    if git('diff', '--cached', SOURCE_COMMIT, '--', 'vllm') or git('diff', SOURCE_COMMIT, '--', 'vllm'):
+        mismatch()
+    tracked = {raw.decode() for raw in git('ls-tree', '-r', '--name-only', '-z', SOURCE_COMMIT, '--', 'vllm').split(b'\0') if raw}
+    seen = set()
+    with tarfile.open(fileobj=io.BytesIO(git('archive', SOURCE_COMMIT, '--', 'vllm'))) as archive:
+        for entry in archive:
+            target = root / entry.name
+            if entry.isdir():
+                if target.is_symlink() or not target.is_dir():
+                    mismatch()
+            elif entry.issym():
+                if not target.is_symlink() or target.readlink().as_posix() != entry.linkname:
+                    mismatch()
+                seen.add(entry.name)
+            elif entry.isfile():
+                if target.is_symlink() or not target.is_file() or target.read_bytes() != archive.extractfile(entry).read():
+                    mismatch()
+                seen.add(entry.name)
+            else:
+                mismatch()
+    # export-ignore must not silently remove tracked files from byte verification.
+    if not tracked or seen != tracked:
+        mismatch()
+    for options in (('--exclude-standard',), ('--ignored', '--exclude-standard')):
+        for raw in git('ls-files', '--others', '-z', *options, '--', 'vllm').split(b'\0'):
+            if not raw:
+                continue
+            path = Path(raw.decode())
+            target = root / path
+            if path.parent.name == '__pycache__' and path.suffix == '.pyc' and target.is_file() and not target.is_symlink():
+                continue
+            mismatch()
 
 
 def _run(request_class, backend_validator, rejection_type, tracked, model):
@@ -81,18 +121,20 @@ def capture_reference(source_root, *, model):
     tracked = [('request_validator', request.check_structured_outputs_count),
                ('sampling_conversion', request.to_sampling_params), ('backend_validator', validator),
                ('json_conversion', xgrammar.Grammar.from_json_schema)]
-    rows = _run(request, validator, exceptions.VLLMValidationError, tracked, model)
-    _verify_source(root)
-    return {'profile': PROFILE, 'reference_commit': SOURCE_COMMIT, 'source_clean_verified': True,
+    # Collect auxiliary metadata before execution so later lookup failures cannot lose rows.
+    record = {'profile': PROFILE, 'reference_commit': SOURCE_COMMIT, 'source_clean_verified': True,
             'reference_describe': subprocess.check_output(['git', '-C', str(root), 'describe', '--always', '--tags'], text=True).strip(),
             'producer_file_bytes_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             'scope': 'reference_cpu_request_sampling_xgrammar_conversion', 'installed_target': None,
             'backend': 'xgrammar', 'server_preprocessing_verified': False,
-            'runner_consumption_verified': False, 'rows': rows,
+            'runner_consumption_verified': False,
             'source_file_bytes_sha256': {Path(m.__file__).resolve().relative_to(root).as_posix():
                 hashlib.sha256(Path(m.__file__).read_bytes()).hexdigest() for m in modules},
             'dependencies': {k: importlib.metadata.version(k) for k in ('torch', 'xgrammar', 'pydantic')},
             'python_version': sys.version.split()[0]}
+    rows = _run(request, validator, exceptions.VLLMValidationError, tracked, model)
+    _verify_source(root)
+    return {**record, 'rows': rows}
 
 
 def produce_reference_draft(check, env, workdir, *, source_root, model):

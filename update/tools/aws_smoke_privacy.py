@@ -291,6 +291,9 @@ def owned_mutation(kind, run_id):
     meta = value["metadata"]
     if meta.get("labels", {}).get("guard.run") != run_id or not meta.get("uid") or not meta.get("resourceVersion"):
         raise CaptureError("OWNERSHIP_UNVERIFIED", projected(value))
+    policy_scope = {"policyTypes": ["Ingress"], "podSelector": render_policy(run_id)["spec"]["podSelector"]}
+    if kind == "revoke" and any(value.get("spec", {}).get(key) != expected for key, expected in policy_scope.items()):
+        raise CaptureError("OWNED_POLICY_SCOPE_UNVERIFIED", projected(value))
     patch = [{"op": "test", "path": "/metadata/uid", "value": meta["uid"]},
              {"op": "test", "path": "/metadata/resourceVersion", "value": meta["resourceVersion"]},
              {"op": "test", "path": "/metadata/labels/guard.run", "value": run_id}]
@@ -301,7 +304,13 @@ def owned_mutation(kind, run_id):
             raise CaptureError("JOB_COMPLETION_UNVERIFIED")
         patch.append({"op": "add", "path": "/spec/ttlSecondsAfterFinished", "value": 0})
     after = call(["-n", NAMESPACE, "patch", resource, name, "--type=json", "-p", json.dumps(patch), "-o", "json"])
-    if after["metadata"]["uid"] != meta["uid"] or kind == "revoke" and after["spec"].get("ingress") != []:
+    # The typed Kubernetes API omits an empty ingress list. Explicit Ingress
+    # scope and the same owned selector must still hold; null/nonempty lists
+    # and changed scope are not evidence that the temporary grant was revoked.
+    if (after["metadata"]["uid"] != meta["uid"] or kind == "revoke" and (
+            after["metadata"].get("labels", {}).get("guard.run") != run_id
+            or any(after.get("spec", {}).get(key) != expected for key, expected in policy_scope.items())
+            or after["spec"].get("ingress", []) != [])):
         raise CaptureError("OWNED_MUTATION_UNVERIFIED")
     if kind != "revoke":
         call(["-n", NAMESPACE, "wait", "--for=delete", "job/" + name, "--timeout=30s"], json_result=False, timeout=35)

@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-10-29 · bootstrap 임시 접근 회수는 정확 소유 Ingress 타입/selector·UID/run을 확인한 뒤 API의 생략된 빈 ingress를 빈 목록과 같이 처리하고 실제 차단 대조를 별도로 수행한다. · Kubernetes의 빈 필드 직렬화 차이를 회수 실패로 오인하지 않으면서 null·남은 규칙·대상 변경은 승인하지 않기 위함이다.
+
 - 2026-10-29 · A-2 inventory 안정성04353f4는 확정 전용3파일 bytes로 통합하고 stat/fstat 각 관측원의 안정성과 실제 열린 파일 신원을 구분한다. · 기존 모델 준비 제품 경로를 유지하며 metadata 변경 미관측을 불변 bytes·worker 소비·보안 완료로 확대하지 않기 위함이다.
 
 - 2026-10-29 · container_config의 명시 Kubernetes 구현은 SUP04 API-only 소비부터 기존 제품 경로에 연결하고 다른 점검·HTTP/정상 추론·node 이미지 승인으로 자동 확장하지 않는다. · 확정 A-2 분석기와 기존 판정을 보존하며 미준비 runtime 관계와 부분 제품 연결의 UNKNOWN을 구분하기 위함이다.

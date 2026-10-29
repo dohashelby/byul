@@ -137,6 +137,7 @@ def test_active_gpu_owner_is_not_removed_or_ignored(field):
 def test_cleanup_tests_uid_version_and_owner_before_atomic_patch(monkeypatch, mode):
     value = {"metadata": {"uid": "exact-uid", "resourceVersion": "18", "labels": {"guard.run": RUN_ID}},
              "spec": {"ingress": [{"from": []}]}, "status": {"conditions": [{"type": "Complete", "status": "True"}]}}
+    if mode == "revoke": value["spec"].update(privacy.render_policy(RUN_ID)["spec"])
     calls = []
     def call(args, **kwargs):
         calls.append(args)
@@ -147,7 +148,7 @@ def test_cleanup_tests_uid_version_and_owner_before_atomic_patch(monkeypatch, mo
                 {"op": "test", "path": "/metadata/resourceVersion", "value": "18"},
                 {"op": "test", "path": "/metadata/labels/guard.run", "value": RUN_ID}]
             assert patch[-1]["value"] == ([] if mode == "revoke" else 0)
-            return {**value, "spec": {"ingress": []}}
+            return {**value, "spec": {**value["spec"], "ingress": []}}
         return {"stdout_bytes": b""}
     monkeypatch.setattr(privacy, "call", call)
     result = privacy.owned_mutation(mode, RUN_ID)
@@ -163,6 +164,44 @@ def test_other_owner_is_never_patched(monkeypatch):
     monkeypatch.setattr(privacy, "call", call)
     with pytest.raises(privacy.CaptureError, match="OWNERSHIP_UNVERIFIED"): privacy.owned_mutation("revoke", RUN_ID)
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize("shape", ["omitted", "empty", "null", "nonempty", "selector", "type", "owner", "uid"])
+def test_revoke_typed_api_empty_list_and_scope_changes(monkeypatch, shape):
+    before=privacy.render_policy(RUN_ID)
+    before["metadata"].update(uid="exact-uid",resourceVersion="18")
+    after=deepcopy(before);after["spec"].pop("ingress")
+    if shape=="empty":after["spec"]["ingress"]=[]
+    elif shape=="null":after["spec"]["ingress"]=None
+    elif shape=="nonempty":after["spec"]["ingress"]=[{}]
+    elif shape=="selector":after["spec"]["podSelector"]={}
+    elif shape=="type":after["spec"]["policyTypes"]=["Egress"]
+    elif shape=="owner":after["metadata"]["labels"]["guard.run"]="other"
+    elif shape=="uid":after["metadata"]["uid"]="replacement"
+    calls=[]
+    def call(args,**kwargs):
+        calls.append(args)
+        return {"stdout_bytes":json.dumps(before).encode()} if "get" in args else after
+    monkeypatch.setattr(privacy,"call",call)
+    if shape in {"omitted","empty"}:
+        result=privacy.owned_mutation("revoke",RUN_ID)
+        assert result["temporary_access_revoked"] is True and result["deny_only_policy_retained"] is True
+    else:
+        with pytest.raises(privacy.CaptureError,match="OWNED_MUTATION_UNVERIFIED"):
+            privacy.owned_mutation("revoke",RUN_ID)
+    assert len(calls)==2 and "patch" in calls[-1]
+
+
+@pytest.mark.parametrize("field,value",[("policyTypes",["Egress"]),("podSelector",{})])
+def test_revoke_refuses_foreign_policy_scope_before_mutation(monkeypatch,field,value):
+    before=privacy.render_policy(RUN_ID);before["metadata"].update(uid="exact-uid",resourceVersion="18")
+    before["spec"][field]=value;calls=[]
+    def call(args,**kwargs):
+        calls.append(args);return {"stdout_bytes":json.dumps(before).encode()}
+    monkeypatch.setattr(privacy,"call",call)
+    with pytest.raises(privacy.CaptureError,match="OWNED_POLICY_SCOPE_UNVERIFIED"):
+        privacy.owned_mutation("revoke",RUN_ID)
+    assert len(calls)==1 and "get" in calls[0]
 
 
 @pytest.mark.parametrize("denied", [False, True])

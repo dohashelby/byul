@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 실제 bootstrap 접근 회수의 API 응답 처리
+
+- 한 일: 모델 안정성 통합16d97de의 정확CI5개 성공·기본6000통과/제외19(176.33/178.261초)와 source tree 일치를 외부 인계에 마감했다. 별도 A-1 공간에서 bootstrap helper의 회수 후 빈 ingress 생략 응답을 처리한다. 패치 전후 소유 UID/run·정확 Ingress 타입/selector를 확인하고 명시 null·비어 있지 않은 규칙·scope 교체는 거부한다. 기존 atomic UID/resourceVersion/run 테스트·원문 비저장·Job TTL 정리는 유지한다.
+- 테스트 결과: 1082파일 고정 helper/같은 계약·REQ11 제품/불변식209통과·기존skip1/제외1(pytest27.28초/부모29.158초), 검증 중 source bytes 불변을 확인했다. 누락/빈 ingress 정상과 null/남은 규칙/selector·type·UID·소유자 변경 거부를 검증했다. 결과 문서만 갱신하고 정확HEAD CI를 확인한다. src·팩·빌드 설정이 불변인 설치 wheel은16d97de의 검증된156파일 일치를 재사용한다.
+- 다음 단계: 고정 source 영향 검증·첫 실패 보존·정확HEAD CI/초안PR·인계 후 실제03의 회수 단계부터 재개하고 동일 출발점의 차단 대조·REQ11 EVD/RES/RPT 왕복·두 이미지 전환을 계속한다.
+- 막힌 것: 소유 g6.2xlarge의 CUDA vector-add 및 일반 생성·SSE 구조/모델/사용량 검증은 성공했다. 첫03은144행 회수 확인에서 실패했고 실제 API는 Ingress 타입·소유 selector와 생략된 ingress를 반환했다. 원본 파일·실패 Ref·로그 hash·성공 응답 요약을 보존한다. 이 코드 보수만으로 실제 송신 차단·worker/GPU 반납·보안 분기 완료를 주장하지 않는다.
+
 ## 2026-10-29 — A-1 모델 inventory 안정성 확정 전달물 통합
 
 - 한 일: 검증된 SUP04 통합6b2a157을 보존한 별도 A-1 공간에서 A-2 확정04353f4의 전용3파일을0a34814로 반영했다. 전용 bytes와 기존 inventory/manifest/snapshot 제품 경로를 유지하며 공통 실행기·정책·팩31·판정·외부 계약은 변경하지 않는다. 이전 통합6b2a157의 필수CI5개 성공·기본5978통과/제외19(289.43/290.943초), 플랫폼175·Docker stub2·설치156파일 일치는 외부 인계에 마감했다.

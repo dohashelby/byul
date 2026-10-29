@@ -25,7 +25,8 @@ PROFILE = "kubernetes-owned-sampling-http-v1"
 REQUEST_BINDING_PROFILE = "kubernetes-owned-request-binding-http-v1"
 VALIDATION_ERROR_PROFILE = "kubernetes-owned-validation-error-http-v1"
 MODEL_AUTHORIZATION_PROFILE = "kubernetes-owned-model-authorization-http-v1"
-_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE})
+ONLINE_INPUT_PROFILE = "kubernetes-owned-online-input-http-v1"
+_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE})
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -72,7 +73,7 @@ class KubernetesHTTP:
         if profile not in {PROFILE, *_BINDING_PROFILES}:
             raise KubernetesBindingError()
         self.profile = profile
-        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
             raise KubernetesBindingError()
         if profile in _BINDING_PROFILES:
             try:
@@ -106,6 +107,8 @@ class KubernetesHTTP:
         self.injected = runner is not None
         self.process_observation_origin = ('EXAMPLE' if self.injected or target['lab']
             or env.data_origin.value == 'EXAMPLE' else 'MEASURED')
+        if profile == ONLINE_INPUT_PROFILE and self.process_observation_origin != 'EXAMPLE':
+            self.process_observation_origin = env.data_origin.value
         # This profile admits only its pinned HTTP Pod endpoint below. Preserve
         # its published source/fixture bytes when the general probe evolves.
         probe_source = (Path(__file__).parent / "assets/http_probe_v1.py.txt").read_text(encoding="utf-8")
@@ -141,6 +144,10 @@ class KubernetesHTTP:
         self._model_authorization_token = None
         self._model_authorization_cases = set()
         self._model_normal_credential = None
+        self._online_dispatch = threading.Lock()
+        self._online_token = None
+        self._online_cases = set()
+        self._online_pending = None
 
     def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False):
         remaining = self.deadline - self.clock()
@@ -219,6 +226,10 @@ class KubernetesHTTP:
             with self.lock:self.snapshot_reads.append(row)
 
     def __call__(self, network, requests, timeout):
+        if self.profile == ONLINE_INPUT_PROFILE:
+            # Only this profile is serial; legacy sampling/REQ10 concurrency stays unchanged.
+            with self._online_dispatch:
+                return self._binding_requests(network, requests, timeout)
         if self.profile in _BINDING_PROFILES:
             return self._binding_requests(network,requests,timeout)
         # No shared serialization lock: REQ-10's two invocations stay concurrent.
@@ -293,6 +304,10 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._model_authorization_request(request)
+                elif self.profile == ONLINE_INPUT_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._online_input_request(request, timeout)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -414,6 +429,112 @@ class KubernetesHTTP:
         except (KeyError, TypeError, ValueError):
             raise KubernetesBindingError() from None
 
+
+    def _online_input_request(self, request, timeout):
+        """Closed text/JSON Online envelope; native admission remains a separate fact."""
+        try:
+            if (type(request) is not dict or set(request) - {"id", "mode", "method", "url", "headers", "body", "want_body", "read_delay_ms"}
+                    or request.get("method") != "POST" or request.get("mode", "json") != "json"
+                    or request.get("want_body", True) is not True
+                    or type(request.get("read_delay_ms", 0)) is not int or request.get("read_delay_ms", 0) != 0
+                    or timeout > 30):
+                raise ValueError
+            label = request.get("id")
+            if type(label) is not str:
+                raise ValueError
+            match = re.fullmatch(r"online-([a-z][a-z0-9-]{0,59})-(primary|after)", label)
+            if match is None:
+                raise ValueError
+            case, phase = match.groups()
+            headers = request.get("headers")
+            if type(headers) is not dict or set(headers) != {"X-Request-Id"} or type(headers["X-Request-Id"]) is not str:
+                raise ValueError
+            rid = re.fullmatch(r"byul-online-([0-9a-f]{32})-" + re.escape(case) + "-" + phase, headers["X-Request-Id"])
+            body = request.get("body")
+            normal = {"model", "messages", "max_tokens", "stream"}
+            extra = {"kv_transfer_params", "echo", "chat_template", "chat_template_kwargs",
+                     "mm_processor_kwargs", "media_io_kwargs"}
+            if (rid is None or urlsplit(request.get("url", "")).path != "/v1/chat/completions"
+                    or type(body) is not dict or set(body) - (normal | (extra if phase == "primary" else set()))
+                    or body.get("model") != self.api_model or type(body.get("max_tokens")) is not int
+                    or body["max_tokens"] != 1 or body.get("stream", False) is not False
+                    or type(body.get("messages")) is not list or not 1 <= len(body["messages"]) <= 16):
+                raise ValueError
+            uri = re.compile(r"(?i)(?:[a-z][a-z0-9+.-]*://|data:|www\.)")
+            for message in body["messages"]:
+                if (type(message) is not dict or set(message) != {"role", "content"}
+                        or message["role"] not in {"system", "user", "assistant"}
+                        or type(message["content"]) is not str or len(message["content"]) > 4096
+                        or uri.search(message["content"])):
+                    raise ValueError
+            for key in ("chat_template_kwargs", "mm_processor_kwargs", "media_io_kwargs"):
+                if key in body and body[key] is not None and type(body[key]) is not dict:
+                    raise ValueError
+            if "chat_template" in body and body["chat_template"] is not None and type(body["chat_template"]) is not str:
+                raise ValueError
+            if "echo" in body and body["echo"] is not None and type(body["echo"]) is not bool:
+                raise ValueError
+            if "kv_transfer_params" in body and body["kv_transfer_params"] is not None:
+                transfer = body["kv_transfer_params"]
+                if type(transfer) is not dict or set(transfer) - {"prompt_token_ids"}:
+                    raise ValueError
+                if "prompt_token_ids" in transfer:
+                    ids = transfer["prompt_token_ids"]
+                    if (type(ids) is not list or len(ids) > 4096
+                            or any(type(value) is not int or not -(2**63) <= value < 2**63 for value in ids)):
+                        raise ValueError
+            # All nested fields are bounded JSON data, never Python objects,
+            # iterators, media/remote addresses, arbitrary request parameters.
+            nodes = 0
+            def bounded(value, depth=0, allow_uri=False):
+                nonlocal nodes
+                nodes += 1
+                if depth > 12 or nodes > 4096:
+                    raise ValueError
+                if value is None or type(value) is bool:
+                    return
+                if type(value) is int:
+                    if value.bit_length() > 256:
+                        raise ValueError
+                    return
+                if type(value) is float:
+                    if not math.isfinite(value):
+                        raise ValueError
+                    return
+                if type(value) is str:
+                    if len(value) > 4096 or not allow_uri and uri.search(value):
+                        raise ValueError
+                    return
+                if type(value) is list:
+                    for item in value:
+                        bounded(item, depth + 1)
+                    return
+                if type(value) is dict:
+                    for key, item in value.items():
+                        if type(key) is not str or not 1 <= len(key) <= 128:
+                            raise ValueError
+                        bounded(item, depth + 1, allow_uri=depth == 0 and key == "model")
+                    return
+                raise ValueError
+            bounded(body)
+            wire_body = json.dumps(body, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+            if len(wire_body) > 16384:
+                raise ValueError
+            with self.lock:
+                if (self._online_token is not None and rid[1] != self._online_token
+                        or phase == "primary" and (self._online_pending is not None
+                            or case in self._online_cases or len(self._online_cases) >= 16)
+                        or phase == "after" and self._online_pending != case):
+                    raise ValueError
+                self._online_token = rid[1]
+                if phase == "primary":
+                    self._online_cases.add(case)
+                    self._online_pending = case
+                else:
+                    self._online_pending = None
+        except (KeyError, TypeError, ValueError, OverflowError):
+            raise KubernetesBindingError() from None
+
     def template_snapshot(self, identity, argv, command, reader):
         """Fixed bounded reader in the exact owned engine generation; no raw spec retained."""
         try:
@@ -461,9 +582,12 @@ class KubernetesHTTP:
                     "binding_sha256": sha256_hex(canonical_json(self.binding)),
                     "probe_source_sha256": self.source_sha256,
                     "requests": sorted(deepcopy(self.rows), key=lambda row: row["id"] or ""),
-                    "collection_gap": self.failed or (self.profile in _BINDING_PROFILES and any(row.get("capture_complete") is not True for row in self.rows)),
+                    "collection_gap": self.failed or (self.profile in _BINDING_PROFILES and any(row.get("capture_complete") is not True for row in self.rows))
+                        or (self.profile == ONLINE_INPUT_PROFILE and self._online_pending is not None),
                     **({"snapshot_reads":deepcopy(self.snapshot_reads)} if self.snapshot_reads else {}),
                     **({"cleanup_errors":list(self.cleanup_errors)} if self.profile in _BINDING_PROFILES else {}),
+                    **({"input_contract_version":1,"data_origin":self.process_observation_origin,
+                        "native_consumption_verified":False} if self.profile==ONLINE_INPUT_PROFILE else {}),
                     "limitations": ["Explicit operator selection and guard.run label are not an approval signature.",
                                     "Pod spec digest and exact runtime imageID are bound; manifest-index ancestry is not verified.",
                                     "No GPU execution, runner consumption, resource/log isolation or deployed caller path proof."]}

@@ -1352,3 +1352,10 @@ git status
 - 다음: 이 실행/관측 연결을 확정한 뒤 native 최종 모델·실제 주체/기업 정책/퇴역 전후 매핑 귀속을 이어가며, 별도 Online HTTP·hook/callback/parser/provenance 묶음도 유지한다.
 - 막힌 것: 현행 Kubernetes image_check=False·최종 file/tensor 정체·주체/alias/LoRA·퇴역 전후 실제 대조가 미확인이다. configured-policy/퇴역 후보는 confirmed FAIL이 아니며 전축UNKNOWN·REQ05 세분기/필수2결과 미완료다. native0.32/lab/source/image gate·원본B·c9·기존근거·stopped/추가Start중단·CI결제차단 유지.
 
+## 2026-10-29 — A-1 Online 공개 HTTP 입력 계약
+
+- 한 일: REQ05 확정9ef3993을 보존한 별도 공간에서 B PR95 e317a42의 실제 runner/callback bytes와 요청 형식을 읽고 ONLINE_INPUT_PROFILE /1을 기존 KubernetesHTTP 공개 ABI에 추가한다. 고정 API alias·0.31·전후 engine/probe 세대·one-request·최대16개 primary→after 쌍·30초 호출·16KiB wire body·닫힌 JSON/보호 필드를 검증한다. Online만 직렬화하며 기존 프로필·stream 소스·native gate·B 원본은 유지한다. 보고서에 본문 없이 출처 상한과 native 미검증을 표시하고 after 누락을 gap으로 남긴다.
+- 테스트 결과: 구현·새 직접 시험·계약 문서를 정적 검토하고 소스를 고정한 뒤 직접/기존 HTTP 소비/불변식·Linux 동일 bytes·설치 공개 ABI를 확인한다. 검증 전이다.
+- 다음 단계: 고정 소스 영향 검증→실패 보수→설치→commit/push·초안PR·정확HEAD CI·B 공개 HTTP 조기 인계. native callback/hook/parser/provenance/request-call-session-PID-start는 별도 묶음으로 이어간다.
+- 막힌 것: B의128KiB 제안은 기존16KiB wire 상한 전체를 지원하지 않는다. HTTP200/400은 native 소비·서버·GPU 실증이 아니다. 기존 lab/source/image와0.32 미지원·CI 결제 차단·GPU stopped·원래 승인창 종료 및 추가Start0을 유지한다. 부모A39·A1담당19와 B 전용 소유권은 축소하지 않는다.
+

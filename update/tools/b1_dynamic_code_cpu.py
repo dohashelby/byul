@@ -18,7 +18,7 @@ SOURCE_COMMIT='5d35ce3934a7804b298559d2d99eec33792e1eb9'
 FIXTURE=Path(__file__).resolve().parents[1]/'tests/fixtures/b_dynamic_code'
 TARGET031_COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 SOURCE_PROFILES={'reference5d':SOURCE_COMMIT,'target031':TARGET031_COMMIT}
-GATE_SHA256='28fc03ab321513141ce38d8da4d0a092f797ed3ad4cbdc31d9816a4f13149885'
+GATE_SHA256='6a43fc77530e1b6be3b08e7776ffac9ca1be790a9d1d69366280ee0ae4191bc3'
 FIXTURE_SHA256={
     'model/config.json':'25189bcbe70696eb0dc17af32def6890888d561abd4cf901733dad9167dcf8fe',
     'model/configuration_b1_probe.py':'47eb4be6c67ce9b7f086017787999c323a9c5f5b46669d0043cf8d07c3683ea2',

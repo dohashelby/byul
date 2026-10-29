@@ -21,8 +21,9 @@ from tools import lif14_profiler_cpu as component_gate
 SOURCE_COMMIT = '5d35ce3934a7804b298559d2d99eec33792e1eb9'
 FIXTURE_DIST = 'byul-b-cpu-plugin-probe'
 TARGET031_COMMIT = 'db9527a46873454610df6dbedf79a36d6bf1a7f6'
-PRODUCT_COMPONENT_COMMIT = 'ac8ffbadbb85dbbfe7c96fa36785ae9546e2c8c7'
-GATE_SHA256 = '28fc03ab321513141ce38d8da4d0a092f797ed3ad4cbdc31d9816a4f13149885'
+PRODUCT_COMPONENT_COMMIT = '03dca131690199381d8e401349dcd3934e644bd8'
+FIXTURE_COMPONENT_COMMIT = 'ac8ffbadbb85dbbfe7c96fa36785ae9546e2c8c7'
+GATE_SHA256 = '6a43fc77530e1b6be3b08e7776ffac9ca1be790a9d1d69366280ee0ae4191bc3'
 FIXTURE_SCOPE = ('update/tests/fixtures/b_plugin_probe',)
 SOURCE_PROFILES = {'reference5d': SOURCE_COMMIT, 'target031': TARGET031_COMMIT}
 
@@ -56,7 +57,7 @@ def verify_checkout(repo):
         raise ValueError('PLUGIN_CPU_COMPONENT_GATE_IDENTITY_MISMATCH') from None
     component_gate.verify_component(repo)  # Reuse helper own identity/hash/scope checks.
     component_gate.snapshot_helper.verify_snapshot(repo, PRODUCT_COMPONENT_COMMIT, component_gate.PINNED_PATHS)
-    component_gate.snapshot_helper.verify_snapshot(repo, PRODUCT_COMPONENT_COMMIT, FIXTURE_SCOPE)
+    component_gate.snapshot_helper.verify_snapshot(repo, FIXTURE_COMPONENT_COMMIT, FIXTURE_SCOPE)
 
 
 def verify_fixture_resolver(dist):
@@ -283,6 +284,7 @@ def capture(source_root: Path, workdir: Path, *, source_profile: str='reference5
         {'plugin': 'byul-approved', 'phase': 'general_hook'} in row.get('after', {}).get('events', []) for row in results)
     record = {'source_commit': SOURCE_PROFILES[source_profile], 'source_profile': source_profile,
         'product_component_commit': PRODUCT_COMPONENT_COMMIT,
+        'fixture_component_commit': FIXTURE_COMPONENT_COMMIT,
         'source_validation': {'pre': 'verified', 'post': post, 'boundary': 'source_fixture_component'},
         'capture_status': 'completed' if complete else 'incomplete',
         'scope': 'reference_installed_plugin_cpu_only' if source_profile == 'reference5d' else 'target031_source_installed_plugin_cpu_only',

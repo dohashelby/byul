@@ -90,6 +90,7 @@ class KubernetesHTTP:
                 raise KubernetesBindingError() from None
         self.binding, self.endpoint = _validate(target, env)
         self.target_sha256=sha256_hex(canonical_json(target))
+        self.environment_ref=(deepcopy(target["environment_ref"]) if profile==REQUEST_BINDING_PROFILE else None)
         if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
                 or type(binary) is not str or not binary.strip()):
             raise KubernetesBindingError()
@@ -358,6 +359,11 @@ class KubernetesHTTP:
         """Existing PLT01/04 completion control, with an explicit wire ID map."""
         from .kubernetes_functional import capture
         return capture(self,network,requests,timeout)
+
+    def api_hop_snapshot(self, policy_values, timeout):
+        """One explicit policy-bound HTTP hop for the existing PLT08 consumer."""
+        from .kubernetes_api_hop import capture
+        return capture(self,policy_values,timeout)
 
     def report(self):
         with self.lock:

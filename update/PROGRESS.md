@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 PLT08 Kubernetes 구간의 정책 결합 입력
+
+- 한 일: 확정f333fff를 보존한 분리 공간에서 A2 PLT08 요청의 versioned 구간 정책과 body 없는 live packet을 준비한다. Docker CID/network/endpoint를 재사용하지 않고 정확 ENV/target/양쪽 binding hash·IP/포트·명시 금지/유효창을 I/O 전에 결합한다. 기존 normal_requests와 구조 검증을 재사용하며 원문 body는 저장하지 않는다. HTTP 응답/완전성·정책창·세대·부모정리와 전체 보호 범위를 구분한다.
+- 테스트 결과: 1103파일 고정 직접/동일계약·인접·불변식372통과/기존skip1·제외1(pytest31.52초/부모32.286초), wheel 빌드2.703초·소스/wheel/격리설치164파일 일치(부모17.387초), 검증 중 bytes 불변이다. 실제 로컬 소켓의 같은 고정 source·범위불일치 pre-I/O 거부·부분200·유효창 만료·후속세대/정리실패를 확인했다. PACK31/PLT08 revision5의 Docker 필수 POL과 NO_POLICY_VALUE·전용 판정/실행기·팩/외부제품은 유지한다. 가장 긴 검증은 CPU 영향 시험이며 실제GPU/무변경 native source는 재실행하지 않았다.
+- 다음 단계: 공통 계약 검증·실패 보수·재고정·설치/초안PR·정확HEAD CI·인계. A2 확정 소비와 A1 versioned 정책/CheckDef/registry를 함께 연결하기 전 새 POL의 정식 PLT08 실행 완료로 표시하지 않는다. 준비된 PLT01/04 확정 통합을 우선한다.
+- 막힌 것: 정책의 기존/신규 profile별 정식 입력·CheckDef 통합과 A2 PLT08 전용 소비는 남아 있다. 관문을 dummy 값이나 required 완화로 우회하지 않는다. TLS/CA/실제 배포경로·IPC/TP·worker 소비·보안 전체는 미완료, CI5는 계정 차단, GPU/EC2는 stopped다.
+
 ## 2026-10-29 — A-1 기존 PLT01/04 정상 대조 전송
 
 - 한 일: A2 확정 통합616fdaa를 보존한 분리 공간에서 기존 CheckDef의 completions 정상 대조 한 건을 같은 고정 수집기·정확 ENV/모델 별칭·엔진/프로브 전후 세대에 연결한다. 논리ID의 공백은 명시 고정 wire ID로 결합해 원래ID를 돌려주고 경로·본문은 유지한다. 완전한 EOF/UTF8/비절단·길이/hash 확인 전 body는 구조 검증에 제공하지 않는다.

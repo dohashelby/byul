@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 REQ01/03 선택 Pod 전송 연결
+
+- 한 일: 확정a742714와 원본을 보존한 별도 worktree에서 기존 direct_route/role_route의 수집·안전 프로브·정책·판정을 재사용하고 Kubernetes 대상 선택/전송만 연결한다. 정확 ENV/모델 별칭과 엔진/신뢰 프로브에 비신뢰 프로브·Gateway의 독립 Pod 세대를 더해 전후 검증한다. 같은 고정 stdlib HTTP/TCP 프로브와 bounded kubectl을 사용하며 역할 키는 stdin에만 전달한다.
+- 테스트 결과: 1091파일 고정 영향338통과/신규CLI 정리실패 종료코드 기대1건 오류/기존skip1·제외1(85.20/86.264초) 뒤 새 시험의 기존 exit1 기대를 바로잡아 직접/동일계약·불변식204통과(32.31/33.058초)를 확인했다. 정적 검토에서 개별 timeout의 합계가 직렬 결과 반환 직전에 프로브를 끊을 수 있는 경계를 찾아 기존 전체 실행 예산을 사용하도록 보수했다. 실제 소켓의 직렬 timeout·정확 프로그램 HTTP/TCP를 포함한 최종 직접/기존 동일 계약·인접·불변식340통과/기존skip1·제외1(65.74/66.770초), source/wheel/격리설치159파일 일치(부모11.114초), 검증 중 bytes 불변이다. A2 SUP03 전용4파일은 확정 bytes로 유지한다. 기존 실제04f REQ11·A2 SUP04/SUP03과 이번 CPU 연결은 구분한다.
+- 다음 단계: 영향 검증·첫 실패 보수·재고정·설치물·초안PR/정확HEAD CI 상태·인계. A2 실제 SUP03 이후 활성작업/다음 사용자를 확인해 임시 접근 회수·후보 worker/GPU 정리와 EC2 Stop을 마감한다.
+- 막힌 것: 이번 지원은 선택 Pod IPv4/HTTP·단일 ENV뿐이다. 현재 실제 환경에는 Gateway·신뢰 principal/기업 허용표·외부 출발점 구성이 없어 REQ01/03 실제 실증은 대기다. Service/TLS/host·두 이미지 update·native0.32/worker handler 소비나 인터넷 외부대역을 지원/증명했다고 표시하지 않는다. 계정 문제로 필수 hosted CI는 실행 전 차단 조건을 유지한다.
+
 ## 2026-10-29 — A-1 실제 순차 전환 마감과 A-2 SUP03 공통 등록
 
 - 한 일: 고정04f7856 설치156파일로 실제 L4 dev 기준판0.31→후보0.32 after_baseline을 실행했다. 두 측 모두 MEASURED/COMPLETED 8사례·기능 PASS/보안 UNKNOWN이고 정확9Ref의 원격/로컬 복원·저장팩 재판정이 일치했다. 기준판의 선택 cgroup/PID/start 종료·GPU compute process 없음/메모리0MiB를 후보 시작 전에 별도 호스트 근거로 확인했다. 현재 후보 실측 ENV·전체34 inventory·Pod/프로브/compute 사실과 A2 API-only 실행차례를 외부 A1 인계에 제공했다. 이어 A2의9a632c3/9144f96 전용4파일을 원본 bytes로 통합하고 정식 registry에 template_validation:kubernetes를 연결한다.

@@ -14,6 +14,7 @@ from .kubernetes_container_config import KubernetesContainerConfigExecutor
 from .direct_route import DirectRouteExecutor
 from .fake import FakeExecutor
 from .role_route import RoleRouteExecutor
+from .kubernetes_routes import KubernetesDirectRouteExecutor, KubernetesRoleRouteExecutor
 from .credential_exposure import CredentialExposureExecutor
 from .input_validation import InputValidationExecutor
 from .sampling_validation import SamplingValidationExecutor
@@ -34,6 +35,8 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "fake": lambda cfg: FakeExecutor(cfg.get("fake", {}).get("scenario", "pass"), cfg.get("fake", {}).get("scenarios", {})),
     "direct_route:real": lambda cfg: DirectRouteExecutor(cfg.get("direct_route", {}), environ=cfg.get("_runtime_environ")),
     "role_route:real": lambda cfg: RoleRouteExecutor(cfg.get("role_route", {}), environ=cfg.get("_runtime_environ")),
+    "direct_route:kubernetes": lambda cfg: KubernetesDirectRouteExecutor(cfg.get("direct_route", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "role_route:kubernetes": lambda cfg: KubernetesRoleRouteExecutor(cfg.get("role_route", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "container_config:real": lambda cfg: ContainerConfigExecutor(cfg.get("container_config", {})),
     "container_config:kubernetes": lambda cfg: KubernetesContainerConfigExecutor(cfg.get("container_config", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "credential_exposure:real": lambda cfg: CredentialExposureExecutor(cfg.get("credential_exposure", {})),

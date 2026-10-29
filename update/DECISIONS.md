@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-10-29 · REQ01/03은 기존 수집·안전 프로브·판정을 유지하고 선택한 네 Pod의 정확 세대/고정 HTTP-TCP 전송만 공통 경계로 연결한다. · Pod 이름/label을 외부대역·기업 principal·Gateway 변환표로 추정하지 않고 미지원 Service/TLS/host나 실제 실증으로 범위를 확대하지 않기 위함이다.
+
 - 2026-10-29 · SUP03의 확정 전용2커밋/4파일 bytes를 보존하고 기존 registry와 같은 KubernetesHTTP에 등록한다. · template bytes/API 입력 projection과 실제 worker 소비를 구분하고 기존 UNKNOWN·정책·팩31·Docker 의미를 유지하며, CI 계정 외부 차단은 로컬/실제 근거와 별도로 미완료 처리하기 위함이다.
 
 - 2026-10-29 · 순차 전환의 기준판 종료 대기만 require_ready=False/allow_terminating=True로 정확 소유 세대의 삭제 진행을 기다리고, terminal phase/부재를 보기 전에는 종료로 표시하지 않는다. · 정상 grace period와 교체/restart를 구분하면서 일반 HTTP/Ready/실증/worker-GPU 반납 관문을 유지하기 위함이다.

@@ -92,7 +92,8 @@ def request_model(env, target, *, transport=None):
         return env.model.id
     value=target["model_mapping"]
     # Compatibility for the already published minimal REQ-11 transport profile.
-    if (transport is not None and getattr(transport,"profile",None)=="kubernetes-owned-request-binding-http-v1"
+    if (transport is not None and getattr(transport,"profile",None) in {
+            "kubernetes-owned-request-binding-http-v1", "kubernetes-owned-routes-http-v1"}
             and type(value) is dict and set(value)=={"repository_id","revision","api_model"}
             and value==getattr(transport,"model_mapping",None)):
         return transport.api_model

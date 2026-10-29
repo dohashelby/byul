@@ -29,7 +29,9 @@ ONLINE_INPUT_PROFILE = "kubernetes-owned-online-input-http-v1"
 TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
 REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
-_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE})
+from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
+_CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
+_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE})
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -79,8 +81,9 @@ class KubernetesHTTP:
         self.lab = target.get('lab')
         self.engine_name = env.engine.name
         self.engine_version = env.engine.version
-        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
             raise KubernetesBindingError()
+        if profile==OBSERVATION_STATE_PROFILE and target.get('lab') is not True:raise KubernetesBindingError()
         if profile in _BINDING_PROFILES:
             try:
                 mapping=target["model_mapping"]
@@ -161,6 +164,8 @@ class KubernetesHTTP:
         self._termination_cases = set()
         self._attempt_token = None
         self._attempt_cases = []
+        self._state_token = None
+        self._state_cases = set()
 
     def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False, on_document=None):
         remaining = self.deadline - self.clock()
@@ -244,7 +249,7 @@ class KubernetesHTTP:
             with self.lock:self.snapshot_reads.append(row)
 
     def __call__(self, network, requests, timeout):
-        if self.profile in {ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE}:
+        if self.profile in {ONLINE_INPUT_PROFILE, *_CLOSE_PROFILES}:
             # These closed procedures are serial; legacy sampling/REQ10 stay concurrent.
             with self._online_dispatch:
                 return self._binding_requests(network, requests, timeout)
@@ -325,6 +330,9 @@ class KubernetesHTTP:
                 elif self.profile == REQUIRED_EVENT_PROFILE:
                     if len(requests)!=1:raise KubernetesBindingError()
                     self._required_event_request(request,timeout)
+                elif self.profile == OBSERVATION_STATE_PROFILE:
+                    if len(requests)!=1:raise KubernetesBindingError()
+                    self._state_request(request,timeout)
                 elif self.profile == ONLINE_INPUT_PROFILE:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
@@ -345,9 +353,9 @@ class KubernetesHTTP:
                 url=urlsplit(value.get("url",""));mode=value.get("mode","json")
                 allowed={"id","mode","method","url","headers","body","read_delay_ms"}
                 paths={"/tokenize","/v1/chat/completions"}
-                if self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE}:
+                if self.profile in _CLOSE_PROFILES:
                     allowed.add("read_profile");paths.add("/v1/completions")
-                if (set(value)-allowed
+                if self.profile != OBSERVATION_STATE_PROFILE and (set(value)-allowed
                         or value.get("method")!="POST" or mode not in {"json","sse"}
                         or url.scheme!=self.endpoint.scheme or url.netloc!=self.endpoint.netloc or url.query or url.fragment
                         or url.path not in paths
@@ -371,11 +379,12 @@ class KubernetesHTTP:
             keys={"id","mode","method","outcome","body","body_bytes","body_sha256","body_truncated",
                   "utf8_valid","capture_complete","eof","terminal_seen","events","content_type","connection_id",
                   "dispatch_ms","request_sent_ms","headers_ms","end_ms","elapsed_ms","timing_basis"}
-            if self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE}:
+            if self.profile in _CLOSE_PROFILES:
                 keys|={"client_closed","client_close_ms","read_count","read_pause_count","read_observations","stop_reason","relative_clock"}
             by_id={row["id"]:row for row in raw};results=[]
             for request in prepared:
                 row=by_id[request["id"]];outcome=row.get("outcome")
+                if self.profile==OBSERVATION_STATE_PROFILE and (row.get('method')!=request['method'] or row.get('mode')!=request['mode']):raise KubernetesBindingError()
                 if not (type(outcome) is int and 100<=outcome<=599 or type(outcome) is str and outcome in
                         {"refused","timeout","unreachable","dns_error","error","probe_error"}):
                     raise KubernetesBindingError()
@@ -386,8 +395,8 @@ class KubernetesHTTP:
                 self.rows.extend({"id":row["id"],"binding_verified_before_after":True,"outcome":row["outcome"],
                     "capture_complete":row.get("capture_complete") is True,
                     **({"expected_client_close":self._termination_close(row,
-                        "req12-disconnect" if self.profile==REQUEST_ATTEMPTS_PROFILE else "lif10-disconnect")}
-                        if self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE} else {})} for row in results)
+                        "req12-disconnect" if self.profile==REQUEST_ATTEMPTS_PROFILE else "obs02-disconnect" if self.profile==OBSERVATION_STATE_PROFILE else "lif10-disconnect")}
+                        if self.profile in _CLOSE_PROFILES else {})} for row in results)
             return results
         except Exception:
             with self.lock:
@@ -395,6 +404,19 @@ class KubernetesHTTP:
                 self.rows.extend({"id":rid,"binding_verified_before_after":False,"diagnostic":"KUBERNETES_HTTP_BINDING_UNAVAILABLE"} for rid in ids or [None])
             raise KubernetesBindingError() from None
 
+
+    def _state_request(self,request,timeout):
+        from .kubernetes_observation_state import validate_request
+        try:
+            slot,token=validate_request(request,api_model=self.api_model,engine_url=self.endpoint.geturl(),timeout=timeout)
+            with self.lock:
+                seen=self._state_cases
+                if (self._state_token is not None and token!=self._state_token or slot in seen or 'health-after' in seen
+                        or slot!='health-before' and 'health-before' not in seen
+                        or slot in {'disconnect','normal-after'} and 'normal-before' not in seen
+                        or slot=='health-after' and 'normal-after' not in seen):raise ValueError
+                self._state_token=token;seen.add(slot)
+        except Exception:raise KubernetesBindingError() from None
 
     def _validation_error_request(self, request):
         """Closed REQ13 wire contract; no arbitrary prompt/error body/header."""
@@ -744,9 +766,9 @@ class KubernetesHTTP:
                     "probe_source_sha256": self.source_sha256,
                     "requests": sorted(deepcopy(self.rows), key=lambda row: row["id"] or ""),
                     "collection_gap": self.failed or (self.profile in _BINDING_PROFILES and any(row.get("capture_complete") is not True
-                        and not (self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE} and row.get("expected_client_close") is True) for row in self.rows))
+                        and not (self.profile in _CLOSE_PROFILES and row.get("expected_client_close") is True) for row in self.rows))
                         or (self.profile == ONLINE_INPUT_PROFILE and self._online_pending is not None)
-                        or (self.profile in {TERMINATION_PROFILE,REQUEST_ATTEMPTS_PROFILE} and bool(self.cleanup_errors)),
+                        or (self.profile in _CLOSE_PROFILES and bool(self.cleanup_errors)),
                     **({"snapshot_reads":deepcopy(self.snapshot_reads)} if self.snapshot_reads else {}),
                     **({"cleanup_errors":list(self.cleanup_errors)} if self.profile in _BINDING_PROFILES else {}),
                     **({"input_contract_version":1,"data_origin":self.process_observation_origin,
@@ -755,6 +777,8 @@ class KubernetesHTTP:
                         "termination_contract_version":1} if self.profile==TERMINATION_PROFILE else {}),
                     **({"data_origin":self.process_observation_origin,"attempt_contract_version":1,
                         "native_attempt_delivery_verified":False} if self.profile==REQUEST_ATTEMPTS_PROFILE else {}),
+                    **({'data_origin':self.process_observation_origin,'state_contract_version':1,
+                        'native_state_comparison_verified':False} if self.profile==OBSERVATION_STATE_PROFILE else {}),
                     "limitations": ["Explicit operator selection and guard.run label are not an approval signature.",
                                     "Pod spec digest and exact runtime imageID are bound; manifest-index ancestry is not verified.",
                                     "No GPU execution, runner consumption, resource/log isolation or deployed caller path proof."]}

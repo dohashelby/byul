@@ -1442,3 +1442,10 @@ git status
 - 막힌 것: A2 새 envelope/groups 전용 소비·정상/위반/증거 왕복과 실제 worker/GPU/Kubernetes 실증·전체 PLT02/부모 A는 미완료다. EXAMPLE/UNKNOWN·생산자/worker/scope false와 원래 GPU 창 종료·추가 Start0·CI 결제 차단을 유지한다.
 
 - 공통 전송 검증 마감: 정확722d9db/검토pin6fe9cf5에서 Windows686통과·기존skip1/제외1(89.50/90.51초),동일1204파일 Linux687통과·제외1(39.40/39.662초),source/wheel/격리설치189파일일치와설치공개API4사례(.792초),기존CLI6/정확36Ref반출·복원·재판정(10.536초)을확인했다. 실제소유Linux임시socket의connected/denied/symlink·누락unknown,0payload·peerPID/UID/namespace·actor정리·FD4→4를확인했다. 후속deadline으로앞선행을보존했다. 최초deadline fixture는AF_UNIX backlog의즉시EAGAIN으로의도한대기를만들지못했으며실패원본을보존하고소유수집지연을명시주입한EXAMPLE fixture만보수했다. 제품/source변경·새skip/제외는없다. A2선정12/B원본27bytes와기존실증판본을보존한다. 새PLT02 Kubernetes전용소비·전체판정/실제환경완료는별도다.
+
+## 2026-10-30 — A-1 OBS02 상태 대조 제품
+
+- 한 일: ab84db5의 공통/전용 bytes를 보존하고 본인 OBS02 SC23-04를 observation_state:kubernetes와 명시 DRAFT 팩에 연결했다. 정확ENV/target/선택prepared와 전후Pod세대, 닫힌health/정상요청/clientclose, native8~11의선택·수집·정제관계와기존CLI/정확Ref를재사용한다.
+- 테스트 결과: 정상/HTTP실패·형식누락/교체·재시작/잘못된ID·method/같은nativeID충돌/native누락·후속seal·첨부·정리·원문비저장 시험과실제소유HTTP소켓프로브를준비했다. 아직검증전이며소스고정후직접/인접/불변식·동일bytesLinux·설치/정확Ref를확인한다.
+- 다음 단계: 고정 소비 pin·검증·초안PR·정확HEAD CI와인계를마감하고다음본인개발을이어간다. health응답·정상구조/clientclose·native사건을독립worker상태로올리지않으며normal_control.succeeded=null·전축UNKNOWN·scopefalse를유지한다.
+- 막힌 것: 기업상태의미·독립worker/생산자·실제환경실증과profiler/backend·승인/소비분기는미완료다. 부모A39/56/4·A119/27/2·원GPU창종료/추가Start0/마지막확인stopped·CI결제차단은유지한다.

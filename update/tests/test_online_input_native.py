@@ -18,6 +18,7 @@ class Tokenizer:
 
 
 class Model:
+    runner_type='generate'
     max_model_len=16
     def get_vocab_size(self):return 32
 
@@ -44,7 +45,7 @@ def test_render_call_records_parsed_hashes_without_body_or_mutation(owner,parsed
     assert fields['chat_template']['explicitly_set'] is True and fields['echo']['explicitly_set'] is False
     assert fields['kv_transfer_params']['canonical_sha256']==digest({'prompt_token_ids':[32]})
     assert result['metadata']['trust_request_chat_template'] is False
-    assert result['metadata']['effective_config']=={'max_model_len':16,'model_vocab_size':32}
+    assert result['metadata']['effective_config']=={'max_model_len':16,'model_vocab_size':32,'runner_type':'generate'}
     assert vars(parsed_request)==original and 'PRIVATE_' not in json.dumps(result)
 
 
@@ -184,3 +185,35 @@ def test_unknown_point_and_bad_call_shapes_do_not_throw():
         ('OnlineRenderer.render_chat',iter(()),{},'CALL'),('OnlineRenderer.render_chat',(),{},'BAD')]:
         result=native.snapshot_online_input(point,args,kwargs,phase=phase)
         assert result['status']=='unavailable' and result['metadata']=={}
+
+
+@pytest.mark.parametrize('runner_type',['generate','pooling','draft','unknown',None])
+def test_effective_runner_type_is_actual_closed_source_enum(owner,runner_type):
+    owner.model_config.runner_type=runner_type
+    result=native.snapshot_online_input('InputProcessor._validate_prompt_len',(owner,16,'decoder'),{},phase='CALL')
+    assert result['metadata']['candidate_prompt_count']==16
+    assert result['metadata']['effective_config']['runner_type']==(runner_type if runner_type in ('generate','pooling','draft') else 'unavailable')
+    assert result['metadata']['prompt_type']=='decoder'
+    assert 'length_violation' not in result['metadata']
+
+
+@pytest.mark.parametrize('point,argname',[
+    ('InputProcessor._validate_prompt_len','prompt_len'),
+    ('InputProcessor._validate_model_input','prompt_input')])
+@pytest.mark.parametrize('prompt_type',['decoder','encoder','unknown',None])
+@pytest.mark.parametrize('phase',['CALL','RETURN','RAISE'])
+def test_validation_point_prompt_type_uses_actual_positional_or_keyword_argument(owner,point,argname,prompt_type,phase):
+    value=16 if argname=='prompt_len' else {'prompt_token_ids':[3]*16}
+    kwargs={argname:value,'prompt_type':prompt_type}
+    result=native.snapshot_online_input(point,(owner,),kwargs,phase=phase,exception=ValueError('PRIVATE_ERROR'))
+    assert result['metadata']['prompt_type']==(prompt_type if prompt_type in ('decoder','encoder') else 'unavailable')
+    positional=native.snapshot_online_input(point,(owner,value,prompt_type),{},phase=phase)
+    assert positional['metadata']['prompt_type']==result['metadata']['prompt_type']
+    assert result['metadata']['effective_config']['runner_type']=='generate'
+
+
+def test_missing_model_config_does_not_invent_generate(owner):
+    owner.model_config=SimpleNamespace(max_model_len=16,get_vocab_size=lambda:32)
+    result=native.snapshot_online_input('InputProcessor._validate_prompt_len',(owner,16,'decoder'),{},phase='RETURN')
+    assert result['metadata']['effective_config']['runner_type']=='unavailable'
+    assert result['metadata']['prompt_type']=='decoder'

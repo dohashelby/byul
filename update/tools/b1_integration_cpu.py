@@ -8,6 +8,8 @@ import argparse
 from copy import deepcopy
 import hashlib
 import inspect
+import io
+import tarfile
 import json
 from pathlib import Path
 import subprocess
@@ -24,9 +26,55 @@ from guard.store import Store
 from guard.store.packs import put_pack,get_pack
 from tests.builders import baseline_pack,environment,policy,completion_response
 
-BASE_SHA='876122211fe47d12f8fcbd69dab5883974ace168'
+BASE_SHA='c9af729cd1893eda14d0bb222a8fab46c2a6d7b8'
+FRAMEWORK_SHA='91e84c778f4fc8ee1108eaf0551bf51f2f6a2061'
+PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',
+              'update/pyproject.toml','update/reference/framework')
 SCENARIOS=('normal','violation_after_failure','missing','unsupported','artifact_failure')
 CANARY='B1_PRIVATE_EXCEPTION_DO_NOT_SAVE'
+
+
+def verify_snapshot(repo, commit, paths):
+    """Require ancestry, clean index/worktree and exact pinned file bytes.
+
+    Include ignored files: an ignored .py can shadow an otherwise clean import.
+    Ordinary Python __pycache__ files are runtime caches, not added source files.
+    """
+    def git(*args):
+        return subprocess.check_output(['git','-C',str(repo),*args])
+    subprocess.run(['git','-C',str(repo),'merge-base','--is-ancestor',commit,'HEAD'],check=True)
+    if git('diff','--cached',commit,'--',*paths) or git('diff',commit,'--',*paths):
+        raise ValueError('pinned source/index modified')
+    with tarfile.open(fileobj=io.BytesIO(git('archive',commit,'--',*paths))) as archive:
+        for entry in archive:
+            target=repo/entry.name
+            if entry.isdir():
+                if target.is_symlink() or not target.is_dir():
+                    raise ValueError('pinned source directory mismatch: '+entry.name)
+            elif entry.issym():
+                if not target.is_symlink() or target.readlink().as_posix()!=entry.linkname:
+                    raise ValueError('pinned source symlink mismatch: '+entry.name)
+            elif entry.isfile():
+                if target.is_symlink() or not target.is_file() or target.read_bytes()!=archive.extractfile(entry).read():
+                    raise ValueError('pinned source bytes mismatch: '+entry.name)
+            else:
+                raise ValueError('unsupported pinned source entry: '+entry.name)
+    for options in (('--exclude-standard',),('--ignored','--exclude-standard')):
+        for raw in git('ls-files','--others','-z',*options,'--',*paths).split(b'\0'):
+            if not raw:continue
+            path=Path(raw.decode())
+            if path.parent.name=='__pycache__' and path.suffix=='.pyc':continue
+            raise ValueError('pinned source untracked/ignored file: '+str(path))
+
+
+def verify_baseline(repo):
+    verify_snapshot(repo,BASE_SHA,PINNED_PATHS)
+    pack=yaml.safe_load((repo/'update/packs/PACK-BASELINE/pack.yaml').read_text())
+    framework=json.loads((repo/'update/reference/framework/UPSTREAM.json').read_text())
+    if (pack['pack_id'],pack['revision'])!=('PACK-BASELINE',31):
+        raise ValueError('PACK31 baseline mismatch')
+    if framework['commit']!=FRAMEWORK_SHA:
+        raise ValueError('framework baseline mismatch')
 
 
 def proposal_fixture(folder):
@@ -98,19 +146,23 @@ def main():
     import sys
     if sys.flags.optimize:raise ValueError("normal Python required for verification assertions")
     repo=Path(__file__).resolve().parents[2];source=args.source.resolve()
-    subprocess.run(['git','-C',str(repo),'merge-base','--is-ancestor',BASE_SHA,'HEAD'],check=True)
-    if subprocess.check_output(['git','-C',str(repo),'diff',BASE_SHA,'--','update/src/guard','update/packs','update/uv.lock'],text=True):raise ValueError('pinned common/executor source must remain unchanged')
+    verify_baseline(repo)
     if subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()!=SOURCE_COMMIT:raise ValueError('reference SHA mismatch')
-    if subprocess.check_output(['git','-C',str(source),'status','--porcelain','--','vllm'],text=True):raise ValueError('reference modified')
+    verify_snapshot(source,SOURCE_COMMIT,('vllm',))
     from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
     from vllm.exceptions import VLLMValidationError
-    if not Path(inspect.getfile(ChatCompletionRequest)).resolve().is_relative_to(source):raise ValueError('reference import mismatch')
-    for fn in (run_plan,project_validator,validate_request_class):
-        if not Path(inspect.getfile(fn)).resolve().is_relative_to(repo/'update'):raise ValueError('own product import mismatch')
+    for cls in (ChatCompletionRequest,VLLMValidationError):
+        if not Path(inspect.getfile(cls)).resolve().is_relative_to(source/'vllm'):raise ValueError('reference import mismatch')
+    for obj in (judge_plan,build_report,RunConfig,run_plan,select,registry,
+                StructuredToolsExecutor,judge_params,project_validator,validate_request_class,
+                load_pack,sha256_hex,Store,put_pack,get_pack):
+        if not Path(inspect.getfile(obj)).resolve().is_relative_to(repo/'update/src/guard'):raise ValueError('own product import mismatch')
+    for obj in (baseline_pack,environment,policy,completion_response):
+        if not Path(inspect.getfile(obj)).resolve().is_relative_to(repo/'update/tests'):raise ValueError('own fixture import mismatch')
     args.output.mkdir(parents=True,exist_ok=False)
     outcomes=validate_request_class(ChatCompletionRequest,VLLMValidationError,model='fixture-model')
     assert outcomes=={'none':'accepted','auto':'accepted','required':'accepted','named-only':'accepted','named-json':'rejected'}
-    summary={'base_sha':BASE_SHA,'source_sha':SOURCE_COMMIT,'actual_request_class_outcomes':outcomes,
+    summary={'base_sha':BASE_SHA,'pack_revision':31,'framework_sha':FRAMEWORK_SHA,'source_sha':SOURCE_COMMIT,'actual_request_class_outcomes':outcomes,
         'inference_transport_origin':'EXAMPLE','production_registration_changed':False,'installed_target':None,
         'cases':[run_case(args.output/s,s,outcomes) for s in SCENARIOS]}
     summary['source_file_bytes_sha256']={str(f.relative_to(repo)):hashlib.sha256(f.read_bytes()).hexdigest() for f in (

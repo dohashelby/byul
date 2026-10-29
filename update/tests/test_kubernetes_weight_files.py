@@ -12,7 +12,7 @@ from tests.test_lifecycle_sensor import writer_factory
 from tests.test_native_weight_files import packet, ROOT, sha
 
 
-@pytest.mark.parametrize("mode",[None,"not-ready","late-owner"])
+@pytest.mark.parametrize("mode",[None,"not-ready","late-owner","cleanup"])
 def test_owned_kubernetes_hash_read_preserves_packet_after_generation_recheck_gap(group,target,mode):
     world=World(group,target,"not-ready" if mode=="not-ready" else None);commands=[]
     def runner(argv,**kwargs):
@@ -24,7 +24,8 @@ def test_owned_kubernetes_hash_read_preserves_packet_after_generation_recheck_ga
         assert kwargs["max_stdout_bytes"]==MAX_PACKET_BYTES
         if mode=="late-owner":world.bad_owner=True
         return {"returncode":0,"stdout_bytes":json.dumps(packet(ROOT+"/a.bin")).encode(),"stderr_bytes":b"EXAMPLE-private",
-            "capture":{"complete":True,"bounded_at_source":True,"timed_out":False,"truncated":False}}
+            "capture":{"complete":True,"bounded_at_source":True,"timed_out":False,"truncated":False,
+                "pipes_closed":mode!="cleanup","read_errors":["child_reap"] if mode=="cleanup" else []}}
     reader=KubernetesWeightReader(target,group.env,group.prepared,ROOT,["a.bin"],1024,runner=runner)
     value,owner,stable=reader.read("engine",IMAGE,ROOT,"a.bin",1024)
     assert value["content_sha256"]==sha(b"EXAMPLE-model-bytes") and len(commands)==1
@@ -32,6 +33,9 @@ def test_owned_kubernetes_hash_read_preserves_packet_after_generation_recheck_ga
     report=reader.report()
     assert report["profile"]=="kubernetes-owned-weight-file-read-v1" and report["injected_runner"]
     assert not report["node_runtime_image_verified"] and "EXAMPLE-private" not in json.dumps(report)
+    if mode=="cleanup":
+        assert report["collection_gap"] and report["parent_cleanup_unverified"]
+        assert stable and value["file_identity_stable"] and value["logical_binding_stable"]
 
 
 @pytest.mark.parametrize("change",[lambda a:a.__setitem__(0,"sh"),lambda a:a.__setitem__(2,"print('private')"),

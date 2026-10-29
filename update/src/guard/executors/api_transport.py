@@ -153,6 +153,49 @@ def project_capture(capture, env, target, settings, policy, started, finished):
     return trial, bool(success and policy["plaintext_forbidden"]), DataOrigin(capture["data_origin"])
 
 
+def collect_kubernetes_api_transport(ctx):
+    """Consume one live shared hop, never a caller-supplied capture dictionary."""
+    from guard.runtime.kubernetes_api_hop import PROFILE as KUBE_PROFILE, normalize_policy as kube_policy
+    from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+    if (not isinstance(ctx.cprobe, KubernetesHTTP) or ctx.cprobe.profile != REQUEST_BINDING_PROFILE
+            or ctx.cprobe.target_sha256 != sha256_hex(canonical_json(ctx.target))
+            or not callable(getattr(ctx.cprobe, "api_hop_snapshot", None))):
+        raise ValueError("KUBERNETES_API_TRANSPORT_COMMON_INTERFACE_UNAVAILABLE")
+    policy = kube_policy(ctx.policy_values)
+    record = ctx.cprobe.api_hop_snapshot(policy, ctx.timeout)
+    if (type(record) is not dict or record.get("schema") != "guard-kubernetes-api-hop-capture/1"
+            or record.get("profile") != KUBE_PROFILE or record.get("target_sha256") != ctx.cprobe.target_sha256
+            or record.get("environment_ref") != ctx.env.ref().model_dump(mode="json")
+            or record.get("policy_binding_verified") is not True):
+        raise ValueError("KUBERNETES_API_TRANSPORT_BINDING_UNVERIFIED")
+    ctx._kubernetes_api_hop_data_origin = DataOrigin(record["data_origin"])
+    normal_success = all(record.get(key) is True for key in (
+        "available", "policy_binding_verified", "policy_window_verified", "capture_executed",
+        "binding_verified_before_after", "normal_response_schema_verified"))
+    violated = normal_success and record.get("transport") == "plain_http" and policy["plaintext_forbidden"]
+    observations = {
+        "forbidden_plaintext_successes": {"value": ["owned_kubernetes_direct_api_plaintext"] if violated else [],
+                                          "collected": True},
+        "api_transport_trials": {"value": [record], "collected": True},
+        "api_transport_scope_complete": {"value": False, "collected": True},
+    }
+    # This is an attempted public normal-control call, not proof of an HTTP
+    # dispatch when an owner/transport gap prevents a bound response.
+    normal = {"attempted": True, "succeeded": normal_success,
+              "detail": "one policy-bound owned Kubernetes API hop; full API and IPC/TP scope unverified"}
+    summary = {"profile": KUBE_PROFILE, "one_hop_normal_response_verified": normal_success,
+        "kubernetes": ctx.cprobe.report(), "api_transport_scope_complete": False,
+        "internal_IPC_TP_scope_complete": False,
+        "fixture": {"profile": KUBE_PROFILE, "policy_sha256": record["policy_sha256"],
+                    "probe_source_sha256": record["probe_source_sha256"],
+                    "normal_control_source_sha256": record["normal_control_source_sha256"]},
+        "limitations": ["One fixed HTTP probe-to-owned-Pod hop is distinct from the deployed caller path.",
+            "No TLS/CA/peer, Service/Gateway, worker identity or IPC/TP protection is established.",
+            "Observer UTC/source hashes are not remote clock or producer authentication.",
+            "Explicit allowed plaintext or a missing/denied/partial response cannot establish whole protection."]}
+    return observations, normal, [{"step": step, "attempted": False} for step in ctx.check.challenge_steps], summary
+
+
 class APITransportExecutor:
     name, version = "api_transport", "0.1.0"
 

@@ -24,7 +24,8 @@ from .bounded import capture_pipes, strict_json
 PROFILE = "kubernetes-owned-sampling-http-v1"
 REQUEST_BINDING_PROFILE = "kubernetes-owned-request-binding-http-v1"
 VALIDATION_ERROR_PROFILE = "kubernetes-owned-validation-error-http-v1"
-_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE})
+MODEL_AUTHORIZATION_PROFILE = "kubernetes-owned-model-authorization-http-v1"
+_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE})
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -71,7 +72,7 @@ class KubernetesHTTP:
         if profile not in {PROFILE, *_BINDING_PROFILES}:
             raise KubernetesBindingError()
         self.profile = profile
-        if profile == VALIDATION_ERROR_PROFILE and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
             raise KubernetesBindingError()
         if profile in _BINDING_PROFILES:
             try:
@@ -137,6 +138,9 @@ class KubernetesHTTP:
         self.lock = threading.Lock()
         self._validation_error_token = None  # transient; never part of report/evidence
         self._validation_error_cases = set()
+        self._model_authorization_token = None
+        self._model_authorization_cases = set()
+        self._model_normal_credential = None
 
     def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False):
         remaining = self.deadline - self.clock()
@@ -285,6 +289,10 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._validation_error_request(request)
+                elif self.profile == MODEL_AUTHORIZATION_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._model_authorization_request(request)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -366,6 +374,43 @@ class KubernetesHTTP:
                     raise ValueError
                 self._validation_error_token = token
                 self._validation_error_cases.add(slot)
+        except (KeyError, TypeError, ValueError):
+            raise KubernetesBindingError() from None
+
+
+    def _model_authorization_request(self, request):
+        """One owned credential matrix against the exact selected base-model alias."""
+        try:
+            if (type(request) is not dict or set(request) - {"id", "mode", "method", "url", "headers", "body", "want_body"}
+                    or request.get("mode", "json") != "json" or request.get("method") != "POST"
+                    or request.get("want_body", True) is not True):
+                raise ValueError
+            slot = {"req05-model-before": "before", "req05-model-challenge": "challenge",
+                    "req05-model-after": "after"}[request["id"]]
+            headers = request["headers"]
+            if (type(headers) is not dict or set(headers) != {"X-Request-Id", "Authorization"}
+                    or type(headers["X-Request-Id"]) is not str or type(headers["Authorization"]) is not str
+                    or len(headers["Authorization"]) > 4103
+                    or re.fullmatch(r"Bearer [A-Za-z0-9._~+/-]{1,4096}={0,2}", headers["Authorization"]) is None):
+                raise ValueError
+            match = re.fullmatch(r"byul-req05-model-([0-9a-f]{32})-" + slot, headers["X-Request-Id"])
+            body = {"model": self.api_model, "messages": [{"role": "user", "content": "hello"}],
+                    "max_tokens": 1, "stream": False}
+            if (match is None or type(request.get("body")) is not dict
+                    or canonical_json(request["body"]) != canonical_json(body)
+                    or urlsplit(request.get("url", "")).path != "/v1/chat/completions"):
+                raise ValueError
+            with self.lock:
+                if (slot in self._model_authorization_cases or "after" in self._model_authorization_cases
+                        or slot != "before" and "before" not in self._model_authorization_cases
+                        or self._model_authorization_token is not None and match[1] != self._model_authorization_token
+                        or slot == "after" and headers["Authorization"] != self._model_normal_credential
+                        or slot == "challenge" and headers["Authorization"] == self._model_normal_credential):
+                    raise ValueError
+                self._model_authorization_token = match[1]
+                self._model_authorization_cases.add(slot)
+                if slot == "before":
+                    self._model_normal_credential = headers["Authorization"]  # transient, never report/config
         except (KeyError, TypeError, ValueError):
             raise KubernetesBindingError() from None
 

@@ -1346,3 +1346,9 @@ git status
 - 다음: 이 독립 계측 경계를 고정 제공하고 Online HTTP·serving hook/callback/parser/provenance/request-session join을 별도 묶음으로 이어간다. REQ05 등 본인 준비 분기는 큰 Online 미완성에 종속시키지 않는다.
 - 막힌 것: Online 전체·source/image/실제 serving·worker/GPU 회수는 미완료이며 기존 native0.32/lab/source/image gate와 stopped/추가Start중단을 유지한다. B 소비 pin/종결 범위 검증과 실제 ENV/POL/소유자 실행이 필요하다.
 
+### 2026-10-29 A-1 REQ05 소유 probe/native 제품 연결
+- 한 일: 한 선정 base-model alias에 명시한 서로 다른 allowed/denied 자격으로 before/challenge/after를 보내는 폐쇄 공개 HTTP profile과 model_authorization:kubernetes 실행기를 연결했다. source/model grant·퇴역 목록·시간·ENV/target POL을 명시하고 기존 prepared native session/request index·loader/forward 객체 관계를 소비한다. PACK31에서 REQ05만 바꾸는 DRAFT 팩을 제공한다.
+- 검증: 구현/제품 CLI·정확Ref 왕복/오류 사례/문서 초안을 마치고 소스 고정 후 직접·인접·불변식·설치 검증 예정이다. metadata나 source/image 미확인을 최종 모델 사용·인가 증명으로 올리지 않는다.
+- 다음: 이 실행/관측 연결을 확정한 뒤 native 최종 모델·실제 주체/기업 정책/퇴역 전후 매핑 귀속을 이어가며, 별도 Online HTTP·hook/callback/parser/provenance 묶음도 유지한다.
+- 막힌 것: 현행 Kubernetes image_check=False·최종 file/tensor 정체·주체/alias/LoRA·퇴역 전후 실제 대조가 미확인이다. configured-policy/퇴역 후보는 confirmed FAIL이 아니며 전축UNKNOWN·REQ05 세분기/필수2결과 미완료다. native0.32/lab/source/image gate·원본B·c9·기존근거·stopped/추가Start중단·CI결제차단 유지.
+

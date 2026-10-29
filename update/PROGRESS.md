@@ -1340,3 +1340,9 @@ git status
 - 다음: 작은 전송의 commit·공개 판본·bytes hash·소비 범위를 B 인계 파일에 제공한 뒤 별도 Online 계측/본인 준비 분기를 이어간다.
 - 막힌 것: B의 literal source pin 갱신/소비 검증과 실제0.31 ENV/POL/대상 세대/정상 대조/소유·정리 실행은 별도 미완료다. GPU stopped/추가Start중단·CI결제차단과 부모39/56/4·A1 19/27/2를 유지한다.
 
+### 2026-10-29 A-1 선정 native session 종료 경계
+- 한 일: 기존 KubernetesLifecycleReader에 exact prepared session의 고정 stdlib seal_session을 추가했다. 소유 private/nofollow/regular/nlink·경로 identity와 engine 전후 세대를 확인하며 marker 생성만으로 true를 반환하지 않고 bounded terminal END/two-census 안정성을 요구한다.
+- 검증: 구현·공개 의미·프로토콜 사례 초안 종료. 소스 고정 후 직접/동일계약/불변식, Linux 실제 FD·두 Writer 격리 경계와 설치본을 확인할 예정이다. 원문 tail/예외는 저장하지 않는다.
+- 다음: 이 독립 계측 경계를 고정 제공하고 Online HTTP·serving hook/callback/parser/provenance/request-session join을 별도 묶음으로 이어간다. REQ05 등 본인 준비 분기는 큰 Online 미완성에 종속시키지 않는다.
+- 막힌 것: Online 전체·source/image/실제 serving·worker/GPU 회수는 미완료이며 기존 native0.32/lab/source/image gate와 stopped/추가Start중단을 유지한다. B 소비 pin/종결 범위 검증과 실제 ENV/POL/소유자 실행이 필요하다.
+

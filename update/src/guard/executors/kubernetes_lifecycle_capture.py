@@ -13,6 +13,7 @@ from guard.runtime.kubernetes_binding import validate_capture_target, verify_own
 from .owned_capture import _FILE_READER, MAX_BYTES, strict_json, validate_file_result, validate_owned_source
 from .lifecycle_capture import CONTEXT_READER
 from .lifecycle_session import INVENTORY_READER
+from .session_seal import SESSION_SEALER
 
 PROFILE = "kubernetes-owned-lifecycle-read-v1"
 
@@ -53,9 +54,9 @@ class KubernetesLifecycleReader:
         self.session=prepared["session"]
         self.binary=binary;self.deadline=time.monotonic()+duration
         self.runner=runner or capture_pipes;self.injected=runner is not None
-        self.programs={"file":_FILE_READER,"context":CONTEXT_READER,"inventory":INVENTORY_READER}
+        self.programs={"file":_FILE_READER,"context":CONTEXT_READER,"inventory":INVENTORY_READER,"seal":SESSION_SEALER}
         self.wrapped={key:supervised_source(value) for key,value in self.programs.items()}
-        self.rows=[];self.gap=False
+        self.rows=[];self.gap=False;self._parent_cleanup_failures=0
 
     def _remaining(self,deadline):
         value=min(self.deadline,deadline)-time.monotonic()
@@ -68,6 +69,9 @@ class KubernetesLifecycleReader:
         try:
             result=self.runner(argv,timeout=remaining,env_extra={},max_stdout_bytes=cap,max_stderr_bytes=4096)
             pipe=result["capture"];raw=result["stdout_bytes"]
+            if pipe.get("pipes_closed") is False or "child_reap" in pipe.get("read_errors",[]):
+                self.gap=True
+                self._parent_cleanup_failures+=1
             if (result["returncode"]!=0 or pipe.get("complete") is not True
                     or pipe.get("bounded_at_source") is not True or pipe.get("timed_out") is not False
                     or pipe.get("truncated") is not False or type(raw) is not bytes or len(raw)>cap):
@@ -126,6 +130,8 @@ class KubernetesLifecycleReader:
             return "context"
         if argv[2]==INVENTORY_READER and len(argv)==4 and max_bytes==65536 and argv[3]==self.session:
             return "inventory"
+        if argv[2]==SESSION_SEALER and len(argv)==4 and max_bytes==4096 and argv[3]==self.session:
+            return "seal"
         raise KubernetesCaptureError()
 
     def exec_bounded(self,container,argv,*,timeout,max_bytes):
@@ -173,6 +179,30 @@ class KubernetesLifecycleReader:
                 "node_runtime_image_verified":False,
                 "manifest_ancestry_verified":False,"transport":PROFILE}}
 
+    def seal_session(self):
+        """Signal exactly this session and verify stable terminal recording tails.
+
+        Full parser/source/process coverage remains capture_session's boundary.
+        This never stops the serving process, another session, or a GPU worker.
+        """
+        cleanup_before=self._parent_cleanup_failures
+        try:
+            result=self.exec_bounded(self.binding["engine"]["container"],
+                ["python3","-c",SESSION_SEALER,self.session],timeout=5,max_bytes=4096)
+            value=strict_json(result.stdout.encode(),limit=4096)
+            if (type(value) is not dict or set(value)!={"schema","session","sealed","recordings_closed","terminal_inventory_sha256"}
+                    or value["schema"]!="guard-session-seal/1" or value["session"]!=self.session
+                    or value["sealed"] is not True or type(value["recordings_closed"]) is not int
+                    or not 1<=value["recordings_closed"]<=32
+                    or type(value["terminal_inventory_sha256"]) is not str
+                    or re.fullmatch(r"[0-9a-f]{64}",value["terminal_inventory_sha256"]) is None
+                    or result.owner_binding_verified is not True or self._parent_cleanup_failures!=cleanup_before):
+                raise KubernetesCaptureError()
+            return {"sealed":True}
+        except Exception:
+            self.gap=True
+            return {"sealed":False}
+
     @staticmethod
     def image_check(provenance,source):
         # Pod spec/status matching is not the Docker RepoDigests proof used by this flag.
@@ -184,4 +214,5 @@ class KubernetesLifecycleReader:
             "programs":{k:{"source_sha256":hashlib.sha256(v.encode()).hexdigest(),
                 "supervisor_sha256":hashlib.sha256(self.wrapped[k].encode()).hexdigest()} for k,v in self.programs.items()},
             "reads":self.rows,"collection_gap":self.gap,"node_runtime_image_verified":False,
+            **({"parent_cleanup_unverified":True} if self._parent_cleanup_failures else {}),
             "producer_authenticated":False,"engine_started":False,"injected_runner":self.injected}

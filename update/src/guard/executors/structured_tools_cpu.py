@@ -232,7 +232,7 @@ def produce_reference_draft(check, env, workdir, *, source_root, model):
 
 
 def produce_target031_draft(check, env, workdir, *, source_root, model):
-    if (not env.hash_ok() or type(model) is not str or not model or env.model.id != model
+    if (not env.hash_ok() or env.engine.name != 'vllm' or type(model) is not str or not model or env.model.id != model
             or env.engine.version != 'reference-' + TARGET031_COMMIT):
         raise ValueError('STRUCTURED_TOOLS_TARGET031_ENVIRONMENT_MISMATCH')
     return _produce_draft(check, env, workdir, source_root=source_root, model=model,

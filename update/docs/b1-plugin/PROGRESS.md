@@ -47,3 +47,13 @@ security FAIL/UNKNOWN·정확 Ref 재판정·Store 검증·정제 첨부를 확�
 `cd281c1c1f820773661ebcfeb8743ebf960a44087dcf2bcb2acc4328b6fe0503`을 연결했다.
 producer 직접 계약 **42 passed / pytest 0.99초 / 부모 wall 1.07초**를 확인했다.
 실제 source CPU 재실행은 공동 snapshot을 인계받은 collector 담당자가 한 번 수행한다.
+
+최종 통합 검증: collector 직접43·producer 직접42 통과, 집중 검토2건 수정·해결확인 완료.
+고정 code8f14e96의 로컬 기본 전체6115 passed/기존19 deselected, pytest174.12초·부모174.754초.
+실제 target031 두번째pipeline은76.08초, 10사례+후속10·ASGI4, 관측4/정제첨부1,
+COMPLETED/DECLARED·전축UNKNOWN·Store0·정확Ref재판정/RPT참조 일치다.
+제품src/pack/deps가PR81과같아 wheel157파일 일치 결과를 재사용한다.
+검증된 Store와 최종 객체·의존성 참조·전체시험 로그는 형제폴더
+byul-b1-plugin-evidence-20261029/product-target031-run-2에 별도 보존했고 복사본Store검증도0이다.
+원래/private/tmp기록은 유지했다. GitHub 필수5CI는 계정결제/한도복구후 동일head에서 재개한다.
+공통등록·기업승인·실제runner/IO·서비스/GPU소비는 A/실제대상 잔여로 유지한다.

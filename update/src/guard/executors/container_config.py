@@ -123,6 +123,85 @@ def _mount_key(m: dict) -> str:
     return f"{m.get('Destination')}:{'rw' if m.get('RW') else 'ro'}"
 
 
+def read_kubernetes_process_observations(ctx, candidate_paths=None):
+    """Consume the live common reader; caller-supplied packets are not inputs."""
+    from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+    if (not isinstance(ctx.cprobe, KubernetesHTTP) or ctx.cprobe.profile != REQUEST_BINDING_PROFILE
+            or ctx.cprobe.target_sha256 != sha256_hex(canonical_json(ctx.target))
+            or not callable(getattr(ctx.cprobe, "process_snapshot", None))):
+        raise ValueError("KUBERNETES_PROCESS_COMMON_INTERFACE_UNAVAILABLE")
+    from guard.runtime.kubernetes_process import PROFILE
+    record = ctx.cprobe.process_snapshot(candidate_paths)
+    if (type(record) is not dict or record.get("profile") != PROFILE
+            or record.get("target_sha256") != ctx.cprobe.target_sha256):
+        raise ValueError("KUBERNETES_PROCESS_COMMON_RECORD_INVALID")
+    from guard.models import DataOrigin
+    ctx._kubernetes_process_data_origin = DataOrigin(record["data_origin"])
+    return record
+
+
+def kubernetes_process_rows(record):
+    """Stable reported processes, without classifying them as model workers."""
+    packet = record.get("packet")
+    if (record.get("available") is not True or record.get("binding_verified_before_after") is not True
+            or type(packet) is not dict or packet.get("capture_process_excluded") is not True
+            or packet.get("capture_subject", {}).get("identity_stable") is not True):
+        return []
+    return [row for row in packet["processes"] if row["pid_identity_stable"] is True]
+
+
+def kubernetes_process_control(ctx):
+    """Use the existing CheckDef/validator through the common live transport."""
+    from guard.runtime.kubernetes_http import KubernetesBindingError
+    requests, probes = functional_requests(ctx, via="engine")
+    try:
+        responses = ctx.cprobe.normal_requests(ctx.trusted_net, requests, ctx.timeout) if requests else []
+    except KubernetesBindingError:
+        # A later control/owner/cleanup gap does not erase earlier process facts.
+        responses = []
+    raw = dict(zip(probes, responses))
+    for pid, response in raw.items():
+        ctx.record("trusted", "functional-engine", pid, probes[pid].as_role, response)
+    functional, _, normal = functional_results(probes, raw)
+    return ({"functional_probes_planned": {"value": list(probes), "collected": True},
+             "functional_probe_results": {"value": functional, "collected": bool(probes)}}, normal)
+
+
+def collect_kubernetes_process_permissions(ctx):
+    """PLT01's limited actual process facts; whole permission scope stays open."""
+    if ctx.check.id != "PLT-01":
+        raise ValueError("KUBERNETES_PROCESS_PERMISSION_CHECK_UNSUPPORTED")
+    record = read_kubernetes_process_observations(ctx)
+    rows = kubernetes_process_rows(record)
+    status = [row for row in rows if row["uid_effective"] is not None and row["cap_eff"] is not None]
+    caps = sorted({cap for row in status for cap in decode_caps(row["cap_eff"])})
+    uids = sorted({row["uid_effective"] for row in status})
+    observations = {key: {"value": None, "collected": False} for key in
+        ("mounts", "devices", "privileged", "host_namespaces", "sentinel_results", "exec_writable_mounts")}
+    observations.update({
+        "permission_scan_complete": {"value": False, "collected": True},
+        "process_scan_complete": {"value": False, "collected": True},
+        "capabilities_effective": {"value": caps if status else None, "collected": bool(status)},
+        # A known root process is positive evidence in the selected container.
+        # No observed root is not proof that every worker is non-root.
+        "root_uid_present": {"value": True if 0 in uids else None, "collected": 0 in uids},
+    })
+    functional, normal = kubernetes_process_control(ctx)
+    observations.update(functional)
+    summary = {"profile": "kubernetes-process-permission-consumer-v1", "process_observation": record,
+        "reported_process_uids": uids, "reported_capabilities_effective": caps,
+        "kubernetes": ctx.cprobe.report(),
+        "worker_subject_verified": False, "permission_scan_complete": False,
+        "fixture": {"process_profile": record["profile"], "program_sha256": record["program_sha256"],
+                    "declared_control": [probe.model_dump(mode="json") for probe in ctx.check.functional_probes]},
+        "limitations": ["Container-reported PID/UID/capability facts do not establish whole-worker coverage.",
+            "Collector identity is distinct and excluded; no source/model worker classification is inferred.",
+            "Actual process mounts, host isolation, device permissions and harmless access tests are unavailable."]}
+    challenges = [{"step": step, "attempted": index == 0 and type(record.get("packet")) is dict}
+                  for index, step in enumerate(ctx.check.challenge_steps)]
+    return observations, normal, challenges, summary
+
+
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
     version = "0.6.2"

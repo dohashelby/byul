@@ -5,7 +5,8 @@ from pathlib import PurePosixPath
 import re
 from guard.credential_policy import manual_pass_ceiling, validate_credential_policy
 from guard.models import canonical_json
-from .container_config import ContainerConfigExecutor
+from .container_config import (ContainerConfigExecutor, kubernetes_process_rows,
+                               read_kubernetes_process_observations, kubernetes_process_control)
 from .credential_candidates import (MAX_OUTPUT_BYTES, METADATA_PROBE, PROFILE, PROBE_TIMEOUT,
                                     candidate_paths, decode_metadata, shadowed_paths)
 from .http_common import functional_requests, functional_results
@@ -70,6 +71,44 @@ def parse_environment_names(text, returncode):
             complete = False
     complete = complete and bool(pids) and current and closed
     return sorted(names), complete
+
+
+def collect_kubernetes_credential_exposure(ctx):
+    """Keep observed container metadata separate from worker credential claims."""
+    if ctx.check.id != "PLT-04":
+        raise ValueError("KUBERNETES_CREDENTIAL_CHECK_UNSUPPORTED")
+    selected = candidate_paths(ctx.policy_values.get("credential_candidate_paths"))
+    record = read_kubernetes_process_observations(ctx, selected)
+    rows = kubernetes_process_rows(record)
+    names = sorted({name for row in rows for name in row["environment_names"]})
+    # v1 explicitly reports no source-bound worker identity/access. Its names
+    # and lstat metadata must not fill the existing worker/access observations.
+    observations = {
+        "process_scan_complete": {"value": False, "collected": True},
+        "worker_env_names": {"value": None, "collected": False},
+        "forbidden_mount_violations": {"value": None, "collected": False},
+        "credential_candidates_planned": {"value": selected or [], "collected": True},
+        "credential_candidate_results": {"value": {path: "unknown" for path in selected or []}, "collected": True},
+        "credential_candidates_complete": {"value": selected == [], "collected": True},
+    }
+    functional, normal = kubernetes_process_control(ctx)
+    observations.update(functional)
+    summary = {"profile": "kubernetes-credential-metadata-consumer-v1", "process_observation": record,
+        "container_environment_names_observed": names, "worker_subject_verified": False,
+        "candidate_access_verified": False, "kubernetes": ctx.cprobe.report(),
+        "candidate_request": "missing" if selected is None else "explicit_empty" if not selected else "explicit_paths",
+        "fixture": {"process_profile": record["profile"], "program_sha256": record["program_sha256"],
+                    "candidate_paths": selected,
+                    "declared_control": [probe.model_dump(mode="json") for probe in ctx.check.functional_probes]},
+        "limitations": ["Container-reported environment names are not source-bound worker environment names.",
+            "Candidate lstat absence/mode does not establish a worker's namespace, effective access or credential use.",
+            "Pod volumeMount declarations are not observed process mounts or actual credential access.",
+            "An explicit empty candidate list tests no path; whole-worker credential coverage is unverified."]}
+    packet = record.get("packet")
+    challenges = [{"step": step, "attempted": type(packet) is dict and
+                   (index == 0 or index == 1 and bool(packet.get("candidate_metadata")))}
+                  for index, step in enumerate(ctx.check.challenge_steps)]
+    return observations, normal, challenges, summary
 
 
 class CredentialExposureExecutor(ContainerConfigExecutor):

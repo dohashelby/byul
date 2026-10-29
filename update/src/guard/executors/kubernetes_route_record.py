@@ -113,8 +113,7 @@ class KubernetesRouteRecordExecutor(KubernetesContainerConfigExecutor):
                    "producer_authenticated": False, "probe_ledger_verified": False,
                    "authorization_scope_complete": False, "native_worker_verified": False,
                    "fixture": {"profile": PROFILE}}
-        observations = {key: {"value": False if kind == "bool" else None, "collected": kind == "bool",
-                              "collector": self.name + "/" + self.version, "unit": None}
+        observations = {key: {"value": False if kind == "bool" else None, "collected": kind == "bool"}
                         for key, kind in OBSERVATIONS.items()}
         reader = None
         try:

@@ -1,0 +1,26 @@
+# REQ13 제품 Kubernetes 오류 필드 실행기
+
+`guard.executors.kubernetes_response_error.KubernetesResponseErrorExecutor`는
+`response_content`의 기존 네 정책 필수값을 유지하며 제품 adapter의 실제 수집·투영을 재사용한다.
+구성은 target, kubectl_binary(기본 kubectl), request_timeout(기본10초),
+max_duration_seconds(기본60초)이다. target의 환경 Ref와 승인 expected_target_sha256,
+공개 전송의 소유 대상·이미지·API model alias 검증을 거친다. repository ID와 API alias는 구분한다.
+선정 vLLM0.31.0 및 validation-error 전용 공개 프로파일만 지원한다.
+현재 설치 A 소스/profile 미지원은 수집 전 닫힌다.
+
+정식 CheckDef의 원 required observations·POL·PASS 규칙을 유지하고, 승인된 조건부 오류
+필드 FAIL 규칙이 있는지 요청 전에 검사한다. 해당 규칙 미지원이면
+REQ13_RULE_UNSUPPORTED/ABORTED로 요청0건을 남긴다. registry·CheckDef 변경과 공통 명령
+등록은 A 작성 범위이며 이번 파일들은 해당 등록이나 실제 K8 실행을 수행하지 않는다.
+
+실제 /tokenize 전후 대조와 무해 형식 오류 응답 한 종류만 다룬다. 수집된 필드 SHA와 실제
+allowed_error_fields의 차집합을 정제 adapter가 검증하고 response_violations 추가 관측으로
+전달한다. 전체 coverage는 false, 원 성공/옵션/비공개/추론 기능 관측은 null 미수집이다.
+HTTP 오류 응답 관측과 native handler·모델·GPU 소비는 별도 범위다.
+정상 대조는 수집·binding·완전성이 확인된 성공/실패만 True/False로 기록하며 나머지는 None이다.
+후속 정상·cleanup·첨부 실패는 이미 확인한 독립 위반을 지우지 않는다.
+첨부에는 안전한 hash/count/enum만 기록하고 본문·field key·token·Secret·예외 문장은 저장하지 않는다.
+
+전용 unit은 EXAMPLE 대상/전송 대역과 메모리상 CheckDef 규칙을 사용한다.
+기존 whole PASS 유지·partial FAIL/UNKNOWN·정상3값·후기 오류 보존·요청전 gate를 검증한다.
+실제 K8/네트워크/기존 CPU 시험은 실행하지 않는다.

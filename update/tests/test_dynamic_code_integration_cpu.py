@@ -361,3 +361,45 @@ def test_unattributed_record_is_cached_as_uncollected_for_both_checks(private, f
     for draft in values:
         assert draft.status == ExecStatus.ABORTED and not draft.observations and not draft.artifacts
         assert CANARY not in draft.model_dump_json()
+
+
+def test_case_preparation_failure_keeps_known_rows_in_both_core_results(tmp_path, monkeypatch):
+    raw = add_violation(example_record('target031'))
+    # Two completed source-qualified children precede the third case's mkdir/copy error.
+    raw['rows'] = raw['rows'][:3]
+    case = product.fixtures()[2]
+    raw['rows'][2] = {**case, 'case_identity': product.identity(case),
+        'outcome': 'execution_error', 'target_started': False, 'events': [],
+        'preparation_status': 'failed', 'child_executed': False,
+        'event_collection_status': 'not_collected', 'error_type': 'OSError', 'exception': CANARY, 'path': CANARY,
+        'source_profile': raw['source_profile'], 'source_commit': raw['source_commit'],
+        'collection_id': raw['collection_id']}
+    raw['capture_status'] = 'incomplete'
+    calls = []
+    def capture(*args, **kwargs):
+        calls.append(kwargs)
+        return deepcopy(raw)
+    monkeypatch.setattr(pipeline, 'verify_runtime_components', lambda repo: None)
+    monkeypatch.setattr(pipeline, 'COLLECTOR_SHA256', PRODUCER_HASH)
+    monkeypatch.setattr(pipeline.collector, 'capture', capture)
+    output = tmp_path / 'EXAMPLE-partial-capture'
+    summary = pipeline.run_pipeline(tmp_path / 'source', output, source_profile='target031', origin=DataOrigin.EXAMPLE)
+    assert calls == [{'source_profile': 'target031'}] and summary['capture_invocations'] == 1
+    assert summary['collection_id'] == raw['collection_id']
+    assert summary['exact_ref_rejudgment_unchanged'] and summary['store_verify_errors'] == []
+    for cid, observation in (('SUP-09', 'dynamic_code_confirmed_violations'),
+                             ('SUP-11', 'dynamic_mode_confirmed_violations')):
+        assert summary['checks'][cid]['execution_status'] == 'ABORTED'
+        assert summary['checks'][cid]['verdicts']['security'] == 'FAIL'
+        evidence = json.loads((output / ('EVD-' + cid + '.json')).read_text())
+        assert evidence['observations'][observation]['value'] == ['autoconfig-False-O']
+        assert evidence['execution']['abort_reason'] == 'DYNAMIC_CPU_CAPTURE_INCOMPLETE'
+        saved = json.loads((output / 'store' / evidence['artifacts'][0]['path']).read_text())['rows'][2]
+        assert saved['preparation_status'] == 'failed' and saved['child_executed'] is False
+        assert saved['event_collection_status'] == 'not_collected'
+        assert saved['python_optimize'] is None and saved['source_validation']['pre'] == 'unavailable'
+        assert datetime.fromisoformat(evidence['execution']['started_at'].replace('Z', '+00:00')) == datetime.fromisoformat(raw['capture_started_at'])
+        assert datetime.fromisoformat(evidence['execution']['finished_at'].replace('Z', '+00:00')) == datetime.fromisoformat(raw['capture_finished_at'])
+    for path in output.rglob('*'):
+        if path.is_file():
+            assert CANARY not in path.read_text(errors='replace')

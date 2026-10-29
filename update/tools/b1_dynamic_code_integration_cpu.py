@@ -32,8 +32,8 @@ SOURCE_PROFILES = {'reference5d': '5d35ce3934a7804b298559d2d99eec33792e1eb9',
                    'target031': 'db9527a46873454610df6dbedf79a36d6bf1a7f6'}
 GATE_SHA256 = '1af43f4ae68271b494a8528cd1190763612735bb963ec00f0a1f4992fb802308'
 COMPONENT_COMMIT = 'c0af481dad68000d14211f3e03b07e62ab1ee7ea'
-# Reviewed collector snapshot 4b6e53b; runtime hashes never become approval.
-COLLECTOR_SHA256 = '5d98ca0feea7be74c98ab2f575e8439d5638d84ec04912d879fdb345c7aed0b5'
+# Reviewed collector snapshot f239748; runtime hashes never become approval.
+COLLECTOR_SHA256 = '5c74ada591ae00df75c52cf7eb920dce586aec9d16e547846391e35bce10b269'
 CHECKS = ('SUP-09', 'SUP-11')
 _CASES = {case['case_id']: case for case in product.fixtures()}
 _MODES = {'normal': 0, 'O': 1, 'OO': 2}
@@ -119,7 +119,7 @@ def _safe_rows(rows):
         validation = _validation(row.get('source_validation'))
         safe.append({**case, 'case_identity': row.get('case_identity') if row.get('case_identity') == product.identity(case) else None,
             'outcome': _outcome(row.get('outcome')), 'events': _phases(row.get('events', [])),
-            'event_collection_status': row.get('event_collection_status') if row.get('event_collection_status') in ('completed', 'partial', 'read_error') else 'unknown',
+            'event_collection_status': row.get('event_collection_status') if row.get('event_collection_status') in ('completed', 'partial', 'read_error', 'not_collected') else 'unknown',
             'target_started': row.get('target_started') is True,
             'python_optimize': row.get('python_optimize') if type(row.get('python_optimize')) is int and row['python_optimize'] in (0, 1, 2) else None,
             'source_profile': row.get('source_profile') if isinstance(row.get('source_profile'), str) and row['source_profile'] in SOURCE_PROFILES else None,
@@ -129,6 +129,10 @@ def _safe_rows(rows):
             'selected_fixture_source_matches': row.get('selected_fixture_source_matches') is True,
             'before': {'outcome': _outcome(row.get('before', {}).get('outcome')) if isinstance(row.get('before'), dict) else 'unknown'},
             'after': {'outcome': _outcome(row.get('after', {}).get('outcome')) if isinstance(row.get('after'), dict) else 'unknown'}})
+        if row.get('preparation_status') in ('completed', 'failed'):
+            safe[-1]['preparation_status'] = row['preparation_status']
+        if type(row.get('child_executed')) is bool:
+            safe[-1]['child_executed'] = row['child_executed']
     return safe
 
 

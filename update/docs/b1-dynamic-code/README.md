@@ -71,3 +71,23 @@ scope/사례/표식 enum/hash/완전성이다. 미수집은 UNKNOWN이며 관측
 cpu-assertions-1/2.json, snapshot-1/2.json, contracts-1/2.txt와 cpu-install 기록에 있다.
 재개 첫 행동은 실제 설치 코드/정책과 profile 등록 계약을 고정해 기존 실행→EVD→RES/RPT
 경로를 검증하는 것이다. 기존 CPU 결과를 설치 대상 실측으로 소급하지 않는다.
+
+## SUP-09·011 target031 CPU 연결 준비 (2026-10-29)
+
+기존 12사례와 전·후 builtin 대조 각 12회를 하나의 `capture()`로 수집한다.
+기본 프로파일 `reference5d`는 기존 5d35ce3이며, 명시적인 `target031`은
+v0.31.0 db9527a46873454610df6dbedf79a36d6bf1a7f6이다. 두 `get_config`
+함수 AST SHA256은 `18fab20b836ee6402aa12ecf8eba294c45a3f7bd033a315ea8395ac43a0eb942`로
+같다. Transformers와 Torch 버전은 각 CPU 환경의 실제 값으로 기록한다.
+
+수집 전·후 전체 source bytes/commit, 고정 3파일 fixture manifest, 제품 component와
+검사 helper의 파일·함수 origin을 검증한다. 부모는 normal Python이며 child의
+normal/`-O`/`-OO`는 필수 사례로 유지하고 실제 `sys.flags.optimize`를 기록한다.
+각 child는 새 소유 HF cache를 사용하며 `VLLM_PLUGINS=''`로 격리한다.
+수집 ID와 UTC 시작·종료 시각을 두 점검 EVD에 공유하며 별도 재실행하지 않는다.
+명시적인 source/fixture 불일치행은 producer의 판정 입력에서 제외하고,
+정제 가능한 관측과 검증된 다른 행은 보존한다. 후속 검사 불가 및 보조
+`result.json` 저장 실패는 incomplete와 예외 타입만 남기며 기존 행을 보존한다.
+
+범위는 DECLARED 로컬 CPU custom-config loader이며 installed target은 null,
+runner hook은 미검증이다. 실제 target CPU 결과는 통합 소스 확정 후 기록한다.

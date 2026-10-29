@@ -18,7 +18,7 @@ transformers>=5.10.4,<5.18.0을 확인한다. 버전 판정에는 해당 CPU 의
 packaging을 사용한다. 제품 pyproject.toml/uv.lock에는 의존성을 추가하지 않는다.
 실제 target cpu.txt 전체 설치·freeze·uv pip check 결과는 저장소 밖에 보존한다.
 
-전용 executor는 입력 model과 ENV.model.id, ENV.engine.version의
+전용 executor는 ENV.engine.name=vllm, 입력 model과 ENV.model.id, ENV.engine.version의
 `reference-db9527a46873454610df6dbedf79a36d6bf1a7f6` 일치 및 ENV 해시를
 수집 전에 검증한다. source가 다른 ENV에는 관측을 귀속하지 않는다.
 

@@ -1,5 +1,9 @@
 # REQ-10 structured-tools-v1 (B)
 
+2026-10-29 후속: CHK-REQ-010의 목표 0.31 source CPU producer와 정확 의존성 검증은
+[TARGET031_PRODUCT.md](TARGET031_PRODUCT.md), A 등록·CLI 인계는
+[TARGET031_A_HANDOFF.md](TARGET031_A_HANDOFF.md)를 따른다. 아래 내용은 기존 참조 분기의 기록이다.
+
 기준 main: 4af4d31bc951bc4a6e8bfefe4381e63e5305075c, PACK29/DRAFT.
 공식 시험/요청 클래스 기준: vllm-project/vllm commit
 5d35ce3934a7804b298559d2d99eec33792e1eb9.

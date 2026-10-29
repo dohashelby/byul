@@ -72,7 +72,7 @@ callback은 안전 snapshot이며 native producer 인증을 자체 제공하지 
 
 이미지 digest 검증이 없는 진단 recording은 자격 관측으로 승격하지 않는다. 각 native point는 고정 `ONLINE_POINT_CONTRACTS`의 module/source/code hash, prepared 선정 source hash, 실제 MODULE 기록을 모두 비교한다. callback bytes/code provenance도 같은 capture에 필요하다. 새 `capture.online_callback_provenance={module,bytes_sha256,code_sha256}`는 A 추가 지원 제안이다. 현재 `ONLINE_POINT_CONTRACTS`와 `ONLINE_CALLBACK_CODE_SHA256`는 None이며 A가 검증된 출력과 literal contract를 제공하기 전 닫힌다. 기존 Kubernetes image_check=False를 완화하지 않는다.
 
-REQ07/SUP08은 없는 template_consumed/MM최종소비 플래그를 요구하지 않는다. 실제 renderer CALL/RETURN 및 parsed 보호필드 보존, source-qualified gate CALL/RETURN의 trust=false와 source의 default-deny 조건을 admission에 연결해 gate 우회를 판정한다. template은 직접값이 None이 아니거나 nested chat_template이 None이 아닌 경우, MM은 kwargs가 비어 있지 않은 경우다. empty MM kwargs는 거부 대상에 넣지 않는다. 이는 해당 gate의 우회이며 template 최종 렌더 효과·MM 코드 최종 실행은 별도 관측이다.
+REQ07/SUP08은 없는 template_consumed/MM최종소비 플래그를 요구하지 않는다. 실제 renderer CALL/RETURN 및 parsed 보호필드 보존, source-qualified gate CALL/RETURN의 trust=false와 source의 default-deny 조건을 admission에 연결해 gate 우회를 판정한다. template은 직접값이 None이 아니거나 nested chat_template이 None이 아닌 경우, MM은 kwargs가 비어 있지 않은 경우다. empty MM kwargs는 거부 대상에 넣지 않는다. template_gate_bypass와 mm_gate_bypass를 독립 관측하고 REQ07에는 template gate, SUP08에는 MM gate만 귀속한다. 교차 필드·혼합 필드도 같은 규칙을 적용한다. 이는 해당 gate의 우회이며 template 최종 렌더 효과·MM 코드 최종 실행은 별도 관측이다.
 
 REQ08 정상 ID의 reuse도 실제 decoder admission이 model max보다 길면 위반이다. REQ07 역시 같은 경계를 사용한다. 길이가 같은 경우는 source input_processor의 실제 runner_type=generate 조건일 때만 위반이며 pooling/미확인을 generate로 추정하지 않는다. 실제 validation CALL의 prompt_type=decoder와 입력 길이/해시·config가 일치해야 한다. encoder/MM 길이 경계는 확장하지 않는다.
 

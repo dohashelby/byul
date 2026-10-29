@@ -67,7 +67,7 @@ _HASH_KEYS = {'asgi_request_id_sha256', 'native_request_id_sha256', 'call_id_sha
               'session_id_sha256', 'process_start_sha256', 'parsed_fields_sha256',
               'input_ids_sha256', 'admitted_ids_sha256', 'domain_sha256', 'config_sha256'}
 _BOOL_KEYS = {'native_returned', 'request_ids_in_domain', 'request_ids_within_model_vocab',
-              'default_deny_bypass', 'length_source_verified', 'trust_request_chat_template',
+              'template_gate_bypass', 'mm_gate_bypass', 'length_source_verified', 'trust_request_chat_template',
               'trust_request_mm_kwargs', 'source_field_supported', 'after_admitted'}
 
 
@@ -397,7 +397,7 @@ def _join_native(packet, case, request_hashes, *, target, prepared, manifest):
         native.update(domain_sha256=domain.get('canonical_sha256'),
             request_ids_in_domain=domain.get('request_ids_in_domain'),
             request_ids_within_model_vocab=domain.get('request_ids_within_model_vocab'))
-    native['default_deny_bypass'] = _gate_bypass(primary, fields)
+    native.update(_gate_bypass(primary, fields))
     native['runner_type'] = config.get('runner_type')
     native['prompt_type'] = 'decoder' if _decoder_length(primary, metadata) else 'unavailable'
     native['length_source_verified'] = native['prompt_type'] == 'decoder'
@@ -425,8 +425,9 @@ def _fields_match(parsed, fields, *, explicit=False):
 
 
 def _gate_bypass(snapshots, fields):
+    result = {'template_gate_bypass': False, 'mm_gate_bypass': False}
     if not isinstance(ONLINE_POINT_CONTRACTS, dict):
-        return False
+        return result
     for point, trust, names, contract_name in (
         ('OnlineRenderer.validate_chat_template', 'trust_request_chat_template', ('chat_template', 'chat_template_kwargs'), 'template_nonnull'),
         ('protocol.validate_request_mm_kwargs', 'trust_request_mm_kwargs', ('mm_processor_kwargs', 'media_io_kwargs'), 'mm_nonempty')):
@@ -442,8 +443,8 @@ def _gate_bypass(snapshots, fields):
             continue
         if all(s.get('metadata', {}).get(trust) is False
                and _fields_match(s['metadata'].get('parsed_fields'), selected) for s in pair):
-            return True
-    return False
+            result['template_gate_bypass' if contract_name == 'template_nonnull' else 'mm_gate_bypass'] = True
+    return result
 
 
 def _decoder_length(snapshots, metadata):
@@ -528,9 +529,9 @@ def _qualify(raw, case, *, target_sha256, manifest_sha256, session):
             violation = bool(same_admission and _sha(safe.get('domain_sha256')) and _sha(safe.get('config_sha256'))
                 and (safe.get('request_ids_in_domain') is False or safe.get('request_ids_within_model_vocab') is False)) or length_violation
         elif case['check_id'] == 'REQ-07':
-            violation = safe.get('default_deny_bypass') is True or length_violation
+            violation = safe.get('template_gate_bypass') is True or length_violation
         else:
-            violation = safe.get('default_deny_bypass') is True
+            violation = safe.get('mm_gate_bypass') is True
     return {'case_id': case['id'], 'check_id': case['check_id'], 'qualified': bool(qualified),
             'violation': bool(qualified and violation), 'metadata': safe}
 

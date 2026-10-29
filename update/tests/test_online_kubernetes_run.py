@@ -56,7 +56,7 @@ def fact(inputs, case):
         **{k: 'c' * 64 for k in runner._HASH_KEYS},
         'parsed_fields_sha256': runner.digest(runner._case_fields(case)),
         'request_ids_in_domain': False, 'request_ids_within_model_vocab': False,
-        'default_deny_bypass': True, 'trust_request_chat_template': False, 'trust_request_mm_kwargs': False,
+        'template_gate_bypass': True, 'mm_gate_bypass': True, 'trust_request_chat_template': False, 'trust_request_mm_kwargs': False,
         'private': PRIVATE}
 
 
@@ -375,7 +375,7 @@ def test_actual_gate_pair_default_deny_join_without_invented_consumption_flags(i
                 'metadata': {trust_key: trust, 'parsed_fields': {k: {'present': True, 'status': 'collected',
                     'canonical_sha256': runner._native_digest(v)} for k, v in fields.items()}}}}}})
     raw = runner._join_native(packet, case, hashes, target=inputs[3], prepared=inputs[4], manifest=inputs[-1])
-    assert raw is not None and raw['default_deny_bypass'] is expected
+    assert raw is not None and raw['mm_gate_bypass' if is_mm else 'template_gate_bypass'] is expected
     safe = runner._qualify(raw, case, target_sha256=runner.digest(inputs[3]),
         manifest_sha256=runner.digest(inputs[-1]), session=inputs[4]['session'])
     assert safe['violation'] is expected
@@ -391,7 +391,7 @@ def test_valid_id_overlong_and_equal_generate_boundary(inputs, check, count, mod
     case['check_id'] = check
     case['body']['kv_transfer_params']['prompt_token_ids'] = [3] * count
     raw = fact(inputs, case)
-    raw.update(default_deny_bypass=False, request_ids_in_domain=True, request_ids_within_model_vocab=True,
+    raw.update(template_gate_bypass=False, mm_gate_bypass=False, request_ids_in_domain=True, request_ids_within_model_vocab=True,
         length_source_verified=True, prompt_type=prompt_type, runner_type=mode,
         prompt_count=count, effective_max_model_len=16,
         input_ids_sha256=runner._native_digest([3] * count), admitted_ids_sha256=runner._native_digest([3] * count))
@@ -472,3 +472,38 @@ def test_length_native_validation_point_is_joined_to_real_admission(inputs, mode
     safe = runner._qualify(raw, case, target_sha256=runner.digest(inputs[3]),
         manifest_sha256=runner.digest(inputs[-1]), session=inputs[4]['session'])
     assert safe['violation'] is expected
+
+
+@pytest.mark.parametrize('check', ['REQ-07', 'SUP-08'])
+@pytest.mark.parametrize('kind', ['template', 'mm', 'mixed'])
+def test_gate_failures_are_attributed_to_their_own_check_only(inputs, check, kind):
+    case = inputs[-1]['cases'][0]
+    case['check_id'] = check
+    fields = {}
+    if kind in {'template', 'mixed'}:
+        fields['chat_template'] = 'owned template'
+    if kind in {'mm', 'mixed'}:
+        fields['mm_processor_kwargs'] = {'code_revision': 'owned'}
+    case['body'] = {**case['after_body'], **fields}
+    hashes = ['1' * 64, '2' * 64]
+    packet = native_packet(inputs, case, hashes)
+    records = packet['recordings'][0]['capture']['records']
+    binding = deepcopy(records[2]['payload']['metadata']['online_input']['binding'])
+    for point, trust_key, names in (
+        ('OnlineRenderer.validate_chat_template', 'trust_request_chat_template', ('chat_template', 'chat_template_kwargs')),
+        ('protocol.validate_request_mm_kwargs', 'trust_request_mm_kwargs', ('mm_processor_kwargs', 'media_io_kwargs'))):
+        for phase in ('CALL', 'RETURN'):
+            snapshot = {'schema': 'byul-online-input-snapshot/1', 'point': point,
+                'phase': phase, 'status': 'collected', 'binding': binding,
+                'metadata': {trust_key: False, 'parsed_fields': {k: {'present': True, 'status': 'collected',
+                    'canonical_sha256': runner._native_digest(v)} for k, v in fields.items() if k in names}}}
+            records.append({'event': 'NATIVE', 'payload': {'point': point, 'source_sha256': '9' * 64,
+                                                        'metadata': {'online_input': snapshot}}})
+    raw = runner._join_native(packet, case, hashes, target=inputs[3], prepared=inputs[4], manifest=inputs[-1])
+    assert raw is not None
+    assert raw['template_gate_bypass'] is (kind in {'template', 'mixed'})
+    assert raw['mm_gate_bypass'] is (kind in {'mm', 'mixed'})
+    safe = runner._qualify(raw, case, target_sha256=runner.digest(inputs[3]),
+        manifest_sha256=runner.digest(inputs[-1]), session=inputs[4]['session'])
+    assert safe['violation'] is (kind == 'mixed' or (check == 'REQ-07' and kind == 'template')
+                                or (check == 'SUP-08' and kind == 'mm'))

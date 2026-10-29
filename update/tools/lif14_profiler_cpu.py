@@ -23,7 +23,7 @@ from tools.b1_integration_cpu import BASE_SHA, PINNED_PATHS, verify_snapshot
 
 # Filled with the reviewed frozen module commit by the coordinating session.
 # An unconfigured pin refuses execution; HEAD is never used as the expected pin.
-PRODUCT_COMPONENT_COMMIT = None
+PRODUCT_COMPONENT_COMMIT = '383f8952171b58b0af78621263eeed5ef0705c07'
 
 
 def verify_component(repo):

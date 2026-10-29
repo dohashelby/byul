@@ -14,6 +14,19 @@ from tools import b_online_kubernetes_run as runner
 PRIVATE = 'PRIVATE_BODY_TOKEN_EXCEPTION_DO_NOT_PERSIST'
 
 
+@pytest.fixture(autouse=True)
+def example_source_contracts(monkeypatch):
+    points = ('OnlineRenderer.render_chat', 'OnlineRenderer.validate_chat_template',
+              'protocol.validate_request_mm_kwargs', 'InputProcessor.process_inputs',
+              'InputProcessor._validate_prompt_len', 'InputProcessor._validate_model_input')
+    contracts = {point: {'module': 'EXAMPLE-source-module', 'source_sha256': '9' * 64,
+        'code_sha256': '8' * 64, 'default_deny': ('template_nonnull' if point.endswith('validate_chat_template')
+            else 'mm_nonempty' if point.endswith('validate_request_mm_kwargs') else 'decoder_length')}
+        for point in points}
+    monkeypatch.setattr(runner, 'ONLINE_POINT_CONTRACTS', contracts)
+    monkeypatch.setattr(runner, 'ONLINE_CALLBACK_CODE_SHA256', '7' * 64)
+
+
 @pytest.fixture
 def inputs(tmp_path):
     environment = env()
@@ -43,8 +56,7 @@ def fact(inputs, case):
         **{k: 'c' * 64 for k in runner._HASH_KEYS},
         'parsed_fields_sha256': runner.digest(runner._case_fields(case)),
         'request_ids_in_domain': False, 'request_ids_within_model_vocab': False,
-        'template_consumed': True, 'trust_request_chat_template': False,
-        'mm_override_consumed': True, 'trust_request_mm_kwargs': False,
+        'default_deny_bypass': True, 'trust_request_chat_template': False, 'trust_request_mm_kwargs': False,
         'private': PRIVATE}
 
 
@@ -211,30 +223,45 @@ def test_new_runs_never_reuse_capture_or_collection_generation(tmp_path, inputs)
 def native_packet(inputs, case, request_hashes):
     """Synthetic output at the existing parse_recording boundary; EXAMPLE only."""
     context = {'pid': 123, 'start_ticks': 456}
-    records = [{'event': 'START', 'payload': {'context': context}}]
-    configuration = {'model_vocab_size': 32, 'max_model_len': 100}
+    inputs[4]['source_sha256'] = {'EXAMPLE-source-module': '9' * 64}
+    records = [{'event': 'START', 'payload': {'context': context}},
+               {'event': 'MODULE', 'payload': {'module': 'EXAMPLE-source-module', 'verified': True,
+                                              'source_sha256': '9' * 64, 'code_sha256': '8' * 64}}]
+    configuration = {'model_vocab_size': 32, 'max_model_len': 100, 'runner_type': 'generate'}
     domain = {'status': 'collected', 'canonical_sha256': runner._native_digest(list(range(32))),
         'request_ids_in_domain': False, 'request_ids_within_model_vocab': False,
         'request_ids_canonical_sha256': runner._native_digest([32])}
     inputs[-1]['domain_config_sha256'] = runner.digest({
         'effective_config': configuration, 'token_id_domain_sha256': domain['canonical_sha256']})
-    for request_hash in request_hashes:
+    for index, request_hash in enumerate(request_hashes):
         binding = {'pid': 123, 'asgi_request_id_sha256': request_hash, 'native_request_id_sha256': 'd' * 64,
             'call_id_sha256': 'e' * 64, 'session_id_sha256': runner._native_digest(inputs[4]['session']),
             'process_start_sha256': runner._native_digest(456)}
-        ids = {'status': 'collected', 'count': 1, 'canonical_sha256': runner._native_digest([32])}
+        actual_ids = [32] if index == 0 else [3]
+        actual_domain = {**domain, 'request_ids_in_domain': index == 1, 'request_ids_within_model_vocab': index == 1,
+                         'request_ids_canonical_sha256': runner._native_digest(actual_ids)}
+        ids = {'status': 'collected', 'count': 1, 'integer_ids': True, 'canonical_sha256': runner._native_digest(actual_ids)}
         metadata = {'native_request_id_sha256': 'd' * 64, 'native_request_binding_matches': True,
-            'processor_input': ids, 'admitted': ids, 'token_id_domain': domain, 'effective_config': configuration}
+            'processor_input': ids, 'admitted': ids, 'token_id_domain': actual_domain,
+            'admitted_token_id_domain': actual_domain, 'effective_config': configuration}
         parsed = {'parsed_fields': {k: {'present': True, 'explicitly_set': True, 'status': 'collected',
             'canonical_sha256': runner._native_digest(v)} for k, v in runner._case_fields(case).items()}}
+        if index == 1:
+            parsed = {'parsed_fields': {field: {'present': True, 'explicitly_set': False, 'status': 'collected',
+                'canonical_sha256': runner._native_digest(False if field == 'echo' else None)} for field in
+                ('chat_template', 'chat_template_kwargs', 'mm_processor_kwargs', 'media_io_kwargs', 'kv_transfer_params', 'echo')}}
         for point, phase, value in [('OnlineRenderer.render_chat', 'CALL', parsed),
+                ('OnlineRenderer.render_chat', 'RETURN', parsed),
                 ('InputProcessor.process_inputs', 'CALL', metadata), ('InputProcessor.process_inputs', 'RETURN', metadata)]:
-            records.append({'event': 'NATIVE', 'payload': {'metadata': {'online_input': {
+            records.append({'event': 'NATIVE', 'payload': {'point': point, 'source_sha256': '9' * 64, 'metadata': {'online_input': {
                 'schema': 'byul-online-input-snapshot/1', 'point': point, 'phase': phase,
                 'status': 'collected', 'binding': deepcopy(binding), 'metadata': deepcopy(value)}}}})
     return {'recorded_files_covered': True, 'live_census_stable': True, 'recordings': [{
         'session_owner_match': True, 'listed_file_identity_match': True, 'capture': {
-            'process_context_verified': True, 'summary': {'recording_closed': True}, 'records': records}}]}
+            'process_context_verified': True, 'image_digest_verified': True,
+            'online_callback_provenance': {'module': 'guard.adapters.vllm_online_input',
+                'bytes_sha256': runner.A_SOURCE_PINS['adapters/vllm_online_input.py'], 'code_sha256': '7' * 64},
+            'summary': {'recording_closed': True}, 'records': records}}]}
 
 
 def test_native_join_uses_callback_fields_and_independent_domain(inputs):
@@ -255,8 +282,8 @@ def test_native_join_rejects_cross_generation_unqualified_payloads(inputs, chang
     hashes = ['1' * 64, '2' * 64]
     packet = native_packet(inputs, case, hashes)
     capture = packet['recordings'][0]['capture']
-    first = capture['records'][1]['payload']['metadata']['online_input']
-    returned = capture['records'][3]['payload']['metadata']['online_input']
+    first = capture['records'][2]['payload']['metadata']['online_input']
+    returned = capture['records'][5]['payload']['metadata']['online_input']
     if change == 'process': returned['binding']['process_start_sha256'] = '0' * 64
     elif change == 'call': returned['binding']['call_id_sha256'] = '0' * 64
     elif change == 'domain': inputs[-1]['domain_config_sha256'] = '0' * 64
@@ -305,3 +332,143 @@ def test_production_adapter_calls_public_http_reader_and_one_capture(tmp_path, i
     assert all(p['headers'].get('X-Request-Id') for p in packets)
     assert not summary['execution_complete'] and summary['restore_verified']
     assert all(r.verdicts.security.value == 'UNKNOWN' for r in Store(tmp_path / 'public/store').iter_kind('RES'))
+
+
+@pytest.mark.parametrize('change', ['image', 'callback_bytes', 'callback_code', 'source', 'module_code', 'missing_contract'])
+def test_diagnostic_recordings_never_promoted_without_provenance(inputs, monkeypatch, change):
+    case = inputs[-1]['cases'][1]
+    hashes = ['1' * 64, '2' * 64]
+    packet = native_packet(inputs, case, hashes)
+    capture = packet['recordings'][0]['capture']
+    if change == 'image': capture['image_digest_verified'] = False
+    elif change == 'callback_bytes': capture['online_callback_provenance']['bytes_sha256'] = '0' * 64
+    elif change == 'callback_code': capture['online_callback_provenance']['code_sha256'] = '0' * 64
+    elif change == 'source': inputs[4]['source_sha256']['EXAMPLE-source-module'] = '0' * 64
+    elif change == 'module_code': capture['records'][1]['payload']['code_sha256'] = '0' * 64
+    else: monkeypatch.setattr(runner, 'ONLINE_POINT_CONTRACTS', None)
+    assert runner._join_native(packet, case, hashes, target=inputs[3], prepared=inputs[4], manifest=inputs[-1]) is None
+
+
+@pytest.mark.parametrize('fields,trust,expected', [
+    ({'chat_template': 'hello'}, False, True), ({'chat_template': ''}, False, True),
+    ({'chat_template_kwargs': {'chat_template': 'hello'}}, False, True),
+    ({'chat_template_kwargs': {}}, False, False), ({'chat_template': 'hello'}, True, False),
+    ({'mm_processor_kwargs': {'code_revision': 'owned'}}, False, True),
+    ({'media_io_kwargs': {'video': {'num_frames': 1}}}, False, True),
+    ({'mm_processor_kwargs': {}}, False, False), ({'media_io_kwargs': {}}, False, False),
+])
+def test_actual_gate_pair_default_deny_join_without_invented_consumption_flags(inputs, fields, trust, expected):
+    case = inputs[-1]['cases'][0]
+    is_mm = any(k in fields for k in ('mm_processor_kwargs', 'media_io_kwargs'))
+    case['check_id'] = 'SUP-08' if is_mm else 'REQ-07'
+    case['body'] = {**case['after_body'], **fields}
+    hashes = ['1' * 64, '2' * 64]
+    packet = native_packet(inputs, case, hashes)
+    records = packet['recordings'][0]['capture']['records']
+    binding = deepcopy(records[2]['payload']['metadata']['online_input']['binding'])
+    point = 'protocol.validate_request_mm_kwargs' if is_mm else 'OnlineRenderer.validate_chat_template'
+    trust_key = 'trust_request_mm_kwargs' if is_mm else 'trust_request_chat_template'
+    for phase in ('CALL', 'RETURN'):
+        records.append({'event': 'NATIVE', 'payload': {'point': point, 'source_sha256': '9' * 64,
+            'metadata': {'online_input': {'schema': 'byul-online-input-snapshot/1', 'point': point,
+                'phase': phase, 'status': 'collected', 'binding': binding,
+                'metadata': {trust_key: trust, 'parsed_fields': {k: {'present': True, 'status': 'collected',
+                    'canonical_sha256': runner._native_digest(v)} for k, v in fields.items()}}}}}})
+    raw = runner._join_native(packet, case, hashes, target=inputs[3], prepared=inputs[4], manifest=inputs[-1])
+    assert raw is not None and raw['default_deny_bypass'] is expected
+    safe = runner._qualify(raw, case, target_sha256=runner.digest(inputs[3]),
+        manifest_sha256=runner.digest(inputs[-1]), session=inputs[4]['session'])
+    assert safe['violation'] is expected
+
+
+@pytest.mark.parametrize('check', ['REQ-07', 'REQ-08'])
+@pytest.mark.parametrize('count,mode,prompt_type,expected', [
+    (17, 'generate', 'decoder', True), (16, 'generate', 'decoder', True),
+    (16, 'pooling', 'decoder', False), (16, 'unavailable', 'decoder', False),
+    (17, 'generate', 'encoder', False), (15, 'generate', 'decoder', False)])
+def test_valid_id_overlong_and_equal_generate_boundary(inputs, check, count, mode, prompt_type, expected):
+    case = deepcopy(inputs[-1]['cases'][1])
+    case['check_id'] = check
+    case['body']['kv_transfer_params']['prompt_token_ids'] = [3] * count
+    raw = fact(inputs, case)
+    raw.update(default_deny_bypass=False, request_ids_in_domain=True, request_ids_within_model_vocab=True,
+        length_source_verified=True, prompt_type=prompt_type, runner_type=mode,
+        prompt_count=count, effective_max_model_len=16,
+        input_ids_sha256=runner._native_digest([3] * count), admitted_ids_sha256=runner._native_digest([3] * count))
+    safe = runner._qualify(raw, case, target_sha256=runner.digest(inputs[3]),
+        manifest_sha256=runner.digest(inputs[-1]), session=inputs[4]['session'])
+    assert safe['violation'] is expected
+
+
+def test_oov_after_is_not_normal_and_does_not_erase_primary_fail(inputs):
+    case = inputs[-1]['cases'][1]
+    hashes = ['1' * 64, '2' * 64]
+    packet = native_packet(inputs, case, hashes)
+    records = packet['recordings'][0]['capture']['records']
+    for record in records[6:]:
+        snapshot = record['payload']['metadata']['online_input']
+        if snapshot['point'] == 'InputProcessor.process_inputs':
+            m = snapshot['metadata']
+            m['processor_input']['canonical_sha256'] = runner._native_digest([32])
+            m['admitted']['canonical_sha256'] = runner._native_digest([32])
+            for key in ('token_id_domain', 'admitted_token_id_domain'):
+                m[key].update(request_ids_in_domain=False, request_ids_within_model_vocab=False,
+                    request_ids_canonical_sha256=runner._native_digest([32]))
+    raw = runner._join_native(packet, case, hashes, target=inputs[3], prepared=inputs[4], manifest=inputs[-1])
+    assert raw is not None and raw['after_admitted'] is False
+    assert runner._qualify(raw, case, target_sha256=runner.digest(inputs[3]),
+        manifest_sha256=runner.digest(inputs[-1]), session=inputs[4]['session'])['violation']
+
+
+@pytest.mark.parametrize('content', [[{'type': 'image_url', 'image_url': {'url': 'http://example.invalid'}}],
+    [{'type': 'input_audio', 'input_audio': {'data': 'AAAA'}}], [{'type': 'video_url'}],
+    [{'type': 'file'}], 'https://example.invalid/x', 'data:audio/wav;base64,AAAA'])
+def test_non_text_or_remote_messages_rejected_before_session(tmp_path, inputs, content):
+    inputs[-1]['cases'][0]['body']['messages'][0]['content'] = content
+    with pytest.raises(ValueError, match='TEXT_ONLY'):
+        runner.run_pipeline(*inputs, tmp_path / 'bad', execute=True)
+    assert not (tmp_path / 'bad').exists()
+
+
+def test_request_body_bound_is_checked_before_session(tmp_path, inputs):
+    inputs[-1]['cases'][0]['body']['messages'][0]['content'] = 'x' * 131072
+    with pytest.raises(ValueError, match='REQUEST_TOO_LARGE'):
+        runner.run_pipeline(*inputs, tmp_path / 'bad', execute=True)
+    assert not (tmp_path / 'bad').exists()
+
+
+@pytest.mark.parametrize('mode,prompt_type,expected', [('generate', 'decoder', True),
+    ('pooling', 'decoder', False), ('generate', 'encoder', False)])
+def test_length_native_validation_point_is_joined_to_real_admission(inputs, mode, prompt_type, expected):
+    case = inputs[-1]['cases'][1]
+    case['body']['kv_transfer_params']['prompt_token_ids'] = [3] * 16
+    hashes = ['1' * 64, '2' * 64]
+    packet = native_packet(inputs, case, hashes)
+    records = packet['recordings'][0]['capture']['records']
+    config = {'model_vocab_size': 32, 'max_model_len': 16, 'runner_type': mode}
+    for index, record in enumerate(records[2:], 2):
+        snapshot = record['payload']['metadata']['online_input']
+        if snapshot['point'] != 'InputProcessor.process_inputs':
+            continue
+        m = snapshot['metadata']
+        m['effective_config'] = config
+        if index < 6:
+            ids = {'status': 'collected', 'count': 16, 'integer_ids': True,
+                   'canonical_sha256': runner._native_digest([3] * 16)}
+            m['processor_input'] = m['admitted'] = ids
+            for key in ('token_id_domain', 'admitted_token_id_domain'):
+                m[key].update(request_ids_in_domain=True, request_ids_within_model_vocab=True,
+                    request_ids_canonical_sha256=ids['canonical_sha256'])
+    inputs[-1]['domain_config_sha256'] = runner.digest({'effective_config': config,
+        'token_id_domain_sha256': runner._native_digest(list(range(32)))})
+    binding = deepcopy(records[4]['payload']['metadata']['online_input']['binding'])
+    point = 'InputProcessor._validate_prompt_len'
+    records.append({'event': 'NATIVE', 'payload': {'point': point, 'source_sha256': '9' * 64,
+        'metadata': {'online_input': {'schema': 'byul-online-input-snapshot/1', 'point': point,
+            'phase': 'CALL', 'status': 'collected', 'binding': binding,
+            'metadata': {'candidate_prompt_count': 16, 'prompt_type': prompt_type, 'effective_config': config}}}}})
+    raw = runner._join_native(packet, case, hashes, target=inputs[3], prepared=inputs[4], manifest=inputs[-1])
+    assert raw is not None
+    safe = runner._qualify(raw, case, target_sha256=runner.digest(inputs[3]),
+        manifest_sha256=runner.digest(inputs[-1]), session=inputs[4]['session'])
+    assert safe['violation'] is expected

@@ -56,7 +56,7 @@ B `_ProductionSession`은 기존 public API를 연결한다.
 
 `_join_native`는 현재 run의 `capture_session` 반환만 받는다. 외부 native JSON ingest 경로는 없다. session owner·file identity·process context 및 parser의 module/source/code 검증을 통과한 기록에서 같은 ASGI/PID/start 그룹을 만든다. `InputProcessor.process_inputs` CALL/RETURN은 native RID와 call hash가 같아야 하며, callback이 독립 해시한 실제 RID도 binding과 일치해야 한다. render CALL의 실제 parsed field별 hash는 발송한 field와 비교한다. request/body hash와 ID 문자열 hash는 각각 callback ASCII canonical JSON과 raw UTF-8 규칙을 구분한다.
 
-REQ08은 실제 input/admitted hash가 같은 상태에서 독립 tokenizer ID-set/model membership 위반을 확인한다. REQ07은 확인된 template 소비/trust 경계 또는 실제 설정 길이 초과 admission, SUP08은 실제 MM override 소비/trust 경계 사실이 필요하다. template/MM의 실제 소비 증거를 A hook에서 확보하지 못하면 해당 사실은 UNKNOWN이다. parsed presence·HTTP200/400·빈 trace로 native 소비를 추정하지 않는다. 단순 거부 응답에 source별 거부 성공을 부여하지 않는다. source 미지원·binding 누락·domain/config 불일치도 미수집이다.
+REQ08은 실제 input/admitted hash가 같은 상태에서 독립 tokenizer ID-set/model membership 위반을 확인한다. REQ07과 SUP08은 source-qualified gate의 실제 보호필드·trust·default-deny 조건과 admission을 연결한다. REQ07의 실제 decoder 길이 경계도 확인한다. 해당 gate 귀속을 확보하지 못하면 UNKNOWN이며, template 최종 효과와 MM 최종 소비는 별도 관측이다. parsed presence·HTTP200/400·빈 trace로 native 소비를 추정하지 않는다. 단순 거부 응답에 source별 거부 성공을 부여하지 않는다. source 미지원·binding 누락·domain/config 불일치도 미수집이다.
 
 callback은 안전 snapshot이며 native producer 인증을 자체 제공하지 않는다. Kubernetes API 소유 확인과 소스 계측으로 확인한 범위는 DECLARED로 유지한다. 실제 serving model weights/GPU worker 소비 및 runtime image ancestry는 별도 지원 범위다.
 
@@ -67,3 +67,15 @@ callback은 안전 snapshot이며 native producer 인증을 자체 제공하지 
 출력 `store/`, `summary.json`, `evidence.zip`, `restored/`에는 exact ENV/POL/PACK/PLAN/EVD/RES/RPT Ref와 결과가 보존된다. 기존 core `select/run/judge/report`, Store 검증, exactRef 재판정, bundle export/restore 및 복원 Store의 같은 Ref 재판정을 수행한다. 복원 실패도 원 Store/EVD를 삭제하지 않는다. 기존 출력은 덮어쓰지 않는다.
 
 로컬 EXAMPLE 회귀 통과 후에도 A 지원·운영자 승인 입력·실제 remote 실행·native 귀속·Store/복구·owned cleanup이 모두 확인되어야 실제 묶음을 마감한다. 현 단계는 B orchestration 준비이며 실제 Kubernetes 실수집은 대기다.
+
+## 집중검토 보수 계약
+
+이미지 digest 검증이 없는 진단 recording은 자격 관측으로 승격하지 않는다. 각 native point는 고정 `ONLINE_POINT_CONTRACTS`의 module/source/code hash, prepared 선정 source hash, 실제 MODULE 기록을 모두 비교한다. callback bytes/code provenance도 같은 capture에 필요하다. 새 `capture.online_callback_provenance={module,bytes_sha256,code_sha256}`는 A 추가 지원 제안이다. 현재 `ONLINE_POINT_CONTRACTS`와 `ONLINE_CALLBACK_CODE_SHA256`는 None이며 A가 검증된 출력과 literal contract를 제공하기 전 닫힌다. 기존 Kubernetes image_check=False를 완화하지 않는다.
+
+REQ07/SUP08은 없는 template_consumed/MM최종소비 플래그를 요구하지 않는다. 실제 renderer CALL/RETURN 및 parsed 보호필드 보존, source-qualified gate CALL/RETURN의 trust=false와 source의 default-deny 조건을 admission에 연결해 gate 우회를 판정한다. template은 직접값이 None이 아니거나 nested chat_template이 None이 아닌 경우, MM은 kwargs가 비어 있지 않은 경우다. empty MM kwargs는 거부 대상에 넣지 않는다. 이는 해당 gate의 우회이며 template 최종 렌더 효과·MM 코드 최종 실행은 별도 관측이다.
+
+REQ08 정상 ID의 reuse도 실제 decoder admission이 model max보다 길면 위반이다. REQ07 역시 같은 경계를 사용한다. 길이가 같은 경우는 source input_processor의 실제 runner_type=generate 조건일 때만 위반이며 pooling/미확인을 generate로 추정하지 않는다. 실제 validation CALL의 prompt_type=decoder와 입력 길이/해시·config가 일치해야 한다. encoder/MM 길이 경계는 확장하지 않는다.
+
+After는 보호필드 없는 독립 text 요청으로 제한한다. 그 요청의 renderer parsed defaults, 실제 InputProcessor CALL/RETURN, config와 독립 input/admitted domain membership=True, 비어 있지 않은 integer ID와 동일 admission hash를 확인한다. OOV32가 반환된 after는 정상으로 인정하지 않으며 primary의 이미 확인된 위반은 보존한다.
+
+messages는 role(system/user/assistant)와 문자열 content만 허용하고 remote URL/data URI·image/audio/video/file 항목을 거부한다. primary와 after 각각 canonical body 128KiB 상한을 적용한다. 이는 선정된 안전 text probe의 기술 범위다.

@@ -48,10 +48,14 @@ A_SOURCE_PINS = {
     'executors/kubernetes_lifecycle_capture.py': None,
     'executors/lifecycle_capture.py': None,
     'executors/lifecycle_session.py': None,
-    'adapters/vllm_online_input.py': 'bda42db95d8b0bb1ba58c1fca8e5e93886f4f8ef87d595d486203e9acbce808e',
+    'adapters/vllm_online_input.py': 'bd15958029e91ba189c2fe588009a97ddd4d3d339e32824e5e5016a52fa736b1',
     'adapters/vllm_lifecycle_profiles.py': None,
     'adapters/vllm_lifecycle_sensor.py': None,
 }
+# A must supply reviewed point/module/source/code contracts and callback code
+# provenance. Diagnostic records cannot authorize these literals.
+ONLINE_POINT_CONTRACTS = None
+ONLINE_CALLBACK_CODE_SHA256 = None
 PROPOSED_A_ABI = {
     'http': 'ONLINE_INPUT_PROFILE; existing KubernetesHTTP.__call__ with online case IDs',
     'native': 'source-qualified NATIVE metadata.online_input snapshot namespace',
@@ -63,7 +67,7 @@ _HASH_KEYS = {'asgi_request_id_sha256', 'native_request_id_sha256', 'call_id_sha
               'session_id_sha256', 'process_start_sha256', 'parsed_fields_sha256',
               'input_ids_sha256', 'admitted_ids_sha256', 'domain_sha256', 'config_sha256'}
 _BOOL_KEYS = {'native_returned', 'request_ids_in_domain', 'request_ids_within_model_vocab',
-              'template_consumed', 'trust_request_chat_template', 'mm_override_consumed',
+              'default_deny_bypass', 'length_source_verified', 'trust_request_chat_template',
               'trust_request_mm_kwargs', 'source_field_supported', 'after_admitted'}
 
 
@@ -114,6 +118,17 @@ def proposal_pack(folder):
     return load_pack(folder)
 
 
+def _safe_text_body(body):
+    if len(canonical_json(body)) > 131072:
+        raise ValueError('ONLINE_K8S_REQUEST_TOO_LARGE')
+    for message in body['messages']:
+        if (type(message) is not dict or set(message) != {'role', 'content'}
+                or message['role'] not in {'system', 'user', 'assistant'}
+                or type(message['content']) is not str
+                or re.search(r'(?i)(?:[a-z][a-z0-9+.-]*://|data:|www\.)', message['content'])):
+            raise ValueError('ONLINE_K8S_TEXT_ONLY_MESSAGES_REQUIRED')
+
+
 def validate_inputs(env, policy, pack, target, prepared, manifest, *, duration, binary):
     if (not env.hash_ok() or not policy.hash_ok() or env.engine.name != 'vllm'
             or policy.pack != pack.ref() or set(pack.checks) != set(CHECKS)
@@ -151,11 +166,14 @@ def validate_inputs(env, policy, pack, target, prepared, manifest, *, duration, 
                 or type(case['id']) is not str or not re.fullmatch('[a-z][a-z0-9-]{0,59}', case['id'])
                 or case['id'] in seen or case['check_id'] not in CHECKS):
             raise ValueError('ONLINE_K8S_CASES_INVALID')
+        if set(case['after_body']) - {'model', 'messages', 'max_tokens', 'stream'}:
+            raise ValueError('ONLINE_K8S_AFTER_MUST_BE_NORMAL')
         for body in (case['body'], case['after_body']):
             if (type(body) is not dict or set(body) - _BODY_KEYS or body.get('model') != transport.api_model
                     or body.get('stream', False) is not False or type(body.get('max_tokens')) is not int or body.get('max_tokens') != 1
                     or type(body.get('messages')) is not list or not body['messages']):
                 raise ValueError('ONLINE_K8S_REQUEST_INVALID')
+            _safe_text_body(body)
         seen.add(case['id']); checks.add(case['check_id'])
     return transport
 
@@ -169,7 +187,8 @@ def _capture_target(env, target):
 
 def _approved_capabilities():
     """Source pins are set only after A approves the small HTTP/native/seal delta."""
-    if any(not _sha(value) for value in A_SOURCE_PINS.values()):
+    if (any(not _sha(value) for value in A_SOURCE_PINS.values())
+            or not isinstance(ONLINE_POINT_CONTRACTS, dict) or not _sha(ONLINE_CALLBACK_CODE_SHA256)):
         raise RuntimeError('ONLINE_K8S_A_CAPABILITY_UNAVAILABLE')
     root = Path(__file__).resolve().parents[1] / 'src/guard'
     modules = (kubernetes_http, lifecycle_reader, lifecycle_capture, lifecycle_session,
@@ -184,7 +203,8 @@ def _approved_capabilities():
     for function, path in ((kubernetes_http.KubernetesHTTP.__call__, 'runtime/kubernetes_http.py'),
                            (lifecycle_session.capture_session, 'executors/lifecycle_session.py'),
                            (lifecycle_reader.KubernetesLifecycleReader.snapshot, 'executors/kubernetes_lifecycle_capture.py'),
-                           (lifecycle_reader.KubernetesLifecycleReader.seal_session, 'executors/kubernetes_lifecycle_capture.py')):
+                           (lifecycle_reader.KubernetesLifecycleReader.seal_session, 'executors/kubernetes_lifecycle_capture.py'),
+                           (modules[4].snapshot_online_input, 'adapters/vllm_online_input.py')):
         if not Path(inspect.getsourcefile(function)).resolve().samefile(root / path):
             raise RuntimeError('ONLINE_K8S_A_FUNCTION_ORIGIN_MISMATCH')
     if not isinstance(kubernetes_http.ONLINE_INPUT_PROFILE, str):
@@ -285,7 +305,9 @@ def _native_admission(snapshots):
             or last.get('status') != 'collected'):
         return None
     meta = last.get('metadata', {})
-    if (meta.get('native_request_id_sha256') != binding['native_request_id_sha256']
+    if (first.get('metadata', {}).get('processor_input') != meta.get('processor_input')
+            or first.get('metadata', {}).get('effective_config') != meta.get('effective_config')
+            or meta.get('native_request_id_sha256') != binding['native_request_id_sha256']
             or meta.get('native_request_binding_matches') is not True):
         return None
     for key in ('processor_input', 'admitted'):
@@ -303,20 +325,39 @@ def _join_native(packet, case, request_hashes, *, target, prepared, manifest):
     Matching snapshots stay in one actual PID/start and one ASGI request; native
     CALL/RETURN must have the same native request and call identity.
     """
+    if not isinstance(ONLINE_POINT_CONTRACTS, dict) or not _sha(ONLINE_CALLBACK_CODE_SHA256):
+        return None
     domains = {}
     for row in packet.get('recordings', []):
         capture = row.get('capture') or {}
         if (not row.get('session_owner_match') or not row.get('listed_file_identity_match')
-                or capture.get('process_context_verified') is not True):
+                or capture.get('process_context_verified') is not True
+                or capture.get('image_digest_verified') is not True):
+            continue
+        callback = capture.get('online_callback_provenance', {})  # proposed A output, not operator input
+        if (callback.get('module') != 'guard.adapters.vllm_online_input'
+                or callback.get('bytes_sha256') != A_SOURCE_PINS['adapters/vllm_online_input.py']
+                or callback.get('code_sha256') != ONLINE_CALLBACK_CODE_SHA256):
             continue
         records = capture.get('records', [])
         if not records:
             continue
         context = records[0]['payload']['context']
+        modules = {r['payload'].get('module'): r['payload'] for r in records
+                   if r.get('event') == 'MODULE' and r['payload'].get('verified') is True}
         for record in records:
             payload = record.get('payload', {})
             snapshot = payload.get('metadata', {}).get('online_input')
             if record.get('event') != 'NATIVE' or not isinstance(snapshot, dict):
+                continue
+            contract = ONLINE_POINT_CONTRACTS.get(payload.get('point'), {})
+            module = modules.get(contract.get('module'), {})
+            if (not contract or snapshot.get('point') != payload.get('point')
+                    or not _sha(contract.get('source_sha256')) or not _sha(contract.get('code_sha256'))
+                    or prepared.get('source_sha256', {}).get(contract['module']) != contract['source_sha256']
+                    or payload.get('source_sha256') != contract['source_sha256']
+                    or module.get('source_sha256') != contract['source_sha256']
+                    or module.get('code_sha256') != contract['code_sha256']):
                 continue
             binding = snapshot.get('binding', {})
             asgi = binding.get('asgi_request_id_sha256')
@@ -336,14 +377,10 @@ def _join_native(packet, case, request_hashes, *, target, prepared, manifest):
         return None
     snapshots, admitted = candidates[0]
     metadata = admitted['metadata']
-    parsed = [s.get('metadata', {}).get('parsed_fields') for s in snapshots[request_hashes[0]]
-              if s.get('point') == 'OnlineRenderer.render_chat' and s.get('phase') == 'CALL']
+    primary = snapshots[request_hashes[0]]
     fields = _case_fields(case)
-    if (len(parsed) != 1 or not isinstance(parsed[0], dict) or not fields
-            or any(parsed[0].get(k, {}).get('present') is not True
-                or parsed[0][k].get('explicitly_set') is not True
-                or parsed[0][k].get('status') != 'collected'
-                or parsed[0][k].get('canonical_sha256') != _native_digest(v) for k, v in fields.items())):
+    rendered = _pair(primary, 'OnlineRenderer.render_chat')
+    if rendered is None or not _fields_match(rendered[0]['metadata'].get('parsed_fields'), fields, explicit=True):
         return None
     domain = metadata.get('token_id_domain', {})
     config = metadata.get('effective_config', {})
@@ -355,19 +392,103 @@ def _join_native(packet, case, request_hashes, *, target, prepared, manifest):
         'admitted_ids_sha256': metadata['admitted']['canonical_sha256'],
         'prompt_count': metadata['admitted']['count'], 'config_sha256': config_hash,
         'effective_max_model_len': config.get('max_model_len'),
-        'after_admitted': _native_admission(snapshots[request_hashes[1]]) is not None}
+        'after_admitted': _normal_after(snapshots[request_hashes[1]], config, domain, case['after_body'])}
     if (domain.get('status') == 'collected' and domain.get('request_ids_canonical_sha256') == native['input_ids_sha256']):
         native.update(domain_sha256=domain.get('canonical_sha256'),
             request_ids_in_domain=domain.get('request_ids_in_domain'),
             request_ids_within_model_vocab=domain.get('request_ids_within_model_vocab'))
-    # Explicit source-gate consumption facts are required for template/MM. Their
-    # future A hook mapping is not inferred from parsed presence or HTTP success.
-    for key in ('template_consumed', 'trust_request_chat_template', 'mm_override_consumed', 'trust_request_mm_kwargs'):
-        if type(metadata.get(key)) is bool:
-            native[key] = metadata[key]
+    native['default_deny_bypass'] = _gate_bypass(primary, fields)
+    native['runner_type'] = config.get('runner_type')
+    native['prompt_type'] = 'decoder' if _decoder_length(primary, metadata) else 'unavailable'
+    native['length_source_verified'] = native['prompt_type'] == 'decoder'
     return {**native, 'case_id': case['id'], 'check_id': case['check_id'], 'target_sha256': digest(target),
         'manifest_sha256': digest(manifest), 'session': prepared['session'],
         'source_verified': True, 'generation_verified': True, 'request_join_verified': True}
+
+
+def _pair(snapshots, point):
+    calls = [s for s in snapshots if s.get('point') == point and s.get('phase') == 'CALL']
+    returns = [s for s in snapshots if s.get('point') == point and s.get('phase') == 'RETURN']
+    if len(calls) != 1 or len(returns) != 1:
+        return None
+    if (not _sha(calls[0].get('binding', {}).get('call_id_sha256'))
+            or calls[0]['binding']['call_id_sha256'] != returns[0].get('binding', {}).get('call_id_sha256')):
+        return None
+    return calls[0], returns[0]
+
+
+def _fields_match(parsed, fields, *, explicit=False):
+    return isinstance(parsed, dict) and all(isinstance(parsed.get(k), dict)
+        and parsed[k].get('present') is True and parsed[k].get('status') == 'collected'
+        and (not explicit or parsed[k].get('explicitly_set') is True)
+        and parsed[k].get('canonical_sha256') == _native_digest(v) for k, v in fields.items())
+
+
+def _gate_bypass(snapshots, fields):
+    if not isinstance(ONLINE_POINT_CONTRACTS, dict):
+        return False
+    for point, trust, names, contract_name in (
+        ('OnlineRenderer.validate_chat_template', 'trust_request_chat_template', ('chat_template', 'chat_template_kwargs'), 'template_nonnull'),
+        ('protocol.validate_request_mm_kwargs', 'trust_request_mm_kwargs', ('mm_processor_kwargs', 'media_io_kwargs'), 'mm_nonempty')):
+        contract = ONLINE_POINT_CONTRACTS.get(point, {})
+        if contract.get('default_deny') != contract_name:
+            continue
+        selected = {k: fields[k] for k in names if k in fields}
+        forbidden = ((selected.get('chat_template') is not None or
+            isinstance(selected.get('chat_template_kwargs'), dict) and selected['chat_template_kwargs'].get('chat_template') is not None)
+            if contract_name == 'template_nonnull' else any(bool(v) for v in selected.values()))
+        pair = _pair(snapshots, point)
+        if not forbidden or pair is None:
+            continue
+        if all(s.get('metadata', {}).get(trust) is False
+               and _fields_match(s['metadata'].get('parsed_fields'), selected) for s in pair):
+            return True
+    return False
+
+
+def _decoder_length(snapshots, metadata):
+    count = metadata.get('admitted', {}).get('count')
+    for snapshot in snapshots:
+        point = snapshot.get('point')
+        if snapshot.get('phase') != 'CALL' or point not in {'InputProcessor._validate_prompt_len', 'InputProcessor._validate_model_input'}:
+            continue
+        if ONLINE_POINT_CONTRACTS.get(point, {}).get('default_deny') != 'decoder_length':
+            continue
+        m = snapshot.get('metadata', {})
+        same = (m.get('candidate_prompt_count') == count if point.endswith('_validate_prompt_len') else
+                m.get('processor_input', {}).get('canonical_sha256') == metadata.get('processor_input', {}).get('canonical_sha256'))
+        if m.get('prompt_type') == 'decoder' and m.get('effective_config') == metadata.get('effective_config') and same:
+            return True
+    return False
+
+
+def _normal_after(snapshots, configuration, domain, body):
+    admitted = _native_admission(snapshots)
+    rendered = _pair(snapshots, 'OnlineRenderer.render_chat')
+    if admitted is None or rendered is None or _case_fields({'body': body}):
+        return False
+    parsed = rendered[0].get('metadata', {}).get('parsed_fields', {})
+    for field in ('chat_template', 'chat_template_kwargs', 'mm_processor_kwargs', 'media_io_kwargs', 'kv_transfer_params', 'echo'):
+        item = parsed.get(field, {})
+        neutral = (False,) if field == 'echo' else (None, {})
+        if (item.get('status') != 'collected' or item.get('explicitly_set') is not False
+                or item.get('canonical_sha256') not in {_native_digest(v) for v in neutral}):
+            return False
+    m = admitted['metadata']
+    if m.get('effective_config') != configuration:
+        return False
+    for key, ids_key in (('token_id_domain', 'processor_input'), ('admitted_token_id_domain', 'admitted')):
+        proof = m.get(key, {})
+        if (proof.get('status') != 'collected' or proof.get('canonical_sha256') != domain.get('canonical_sha256')
+                or proof.get('request_ids_in_domain') is not True or proof.get('request_ids_within_model_vocab') is not True
+                or proof.get('request_ids_canonical_sha256') != m[ids_key]['canonical_sha256']
+                or m[ids_key].get('integer_ids') is not True or m[ids_key].get('count', 0) <= 0):
+            return False
+    maximum = configuration.get('max_model_len')
+    count = m['admitted']['count']
+    return (type(maximum) is int and maximum > 0 and count <= maximum
+            and not (count == maximum and configuration.get('runner_type') == 'generate')
+            and m['processor_input']['canonical_sha256'] == m['admitted']['canonical_sha256'])
 
 
 def _case_fields(case):
@@ -383,6 +504,9 @@ def _qualify(raw, case, *, target_sha256, manifest_sha256, session):
     for key in ('prompt_count', 'effective_max_model_len'):
         if type(raw.get(key)) is int and raw[key] >= 0:
             safe[key] = raw[key]
+    for key, values in (('runner_type', {'generate', 'pooling', 'draft'}), ('prompt_type', {'decoder', 'encoder'})):
+        if raw.get(key) in values:
+            safe[key] = raw[key]
     qualified = (raw.get('case_id') == case['id'] and raw.get('check_id') == case['check_id']
         and raw.get('target_sha256') == target_sha256 and raw.get('manifest_sha256') == manifest_sha256
         and raw.get('session') == session and raw.get('source_verified') is True
@@ -395,16 +519,18 @@ def _qualify(raw, case, *, target_sha256, manifest_sha256, session):
     if qualified and safe.get('native_returned') is True:
         same_admission = (_sha(safe.get('input_ids_sha256')) and
             safe.get('input_ids_sha256') == safe.get('admitted_ids_sha256'))
+        length_violation = (same_admission and safe.get('length_source_verified') is True
+            and safe.get('prompt_type') == 'decoder' and type(safe.get('prompt_count')) is int
+            and type(safe.get('effective_max_model_len')) is int and safe['effective_max_model_len'] > 0
+            and (safe['prompt_count'] > safe['effective_max_model_len'] or
+                 safe['prompt_count'] == safe['effective_max_model_len'] and safe.get('runner_type') == 'generate'))
         if case['check_id'] == 'REQ-08':
-            # Independent tokenizer/model membership, never cached max_token_id.
             violation = bool(same_admission and _sha(safe.get('domain_sha256')) and _sha(safe.get('config_sha256'))
-                and (safe.get('request_ids_in_domain') is False or safe.get('request_ids_within_model_vocab') is False))
+                and (safe.get('request_ids_in_domain') is False or safe.get('request_ids_within_model_vocab') is False)) or length_violation
         elif case['check_id'] == 'REQ-07':
-            violation = (safe.get('template_consumed') is True and safe.get('trust_request_chat_template') is False)
-            violation |= (type(safe.get('prompt_count')) is int and type(safe.get('effective_max_model_len')) is int
-                          and safe['prompt_count'] > safe['effective_max_model_len'])
+            violation = safe.get('default_deny_bypass') is True or length_violation
         else:
-            violation = safe.get('mm_override_consumed') is True and safe.get('trust_request_mm_kwargs') is False
+            violation = safe.get('default_deny_bypass') is True
     return {'case_id': case['id'], 'check_id': case['check_id'], 'qualified': bool(qualified),
             'violation': bool(qualified and violation), 'metadata': safe}
 

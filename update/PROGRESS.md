@@ -1317,3 +1317,9 @@ git status
 - 테스트 결과: 1074파일 고정 B structured-tools/limits·sampling·Kubernetes·증거/불변식306통과·실패0·기존Windows skip1·제외1(pytest15.95초·부모17.829초), 검증 중 bytes 불변이며 전용4파일의 원본 commit blob이 같다. B의5사례는 EXAMPLE 제품 경로이며 실제 설치판 클래스·엔진 실증을 새로 집계하지 않는다. exact HEAD 필수 CI를 확인한다.
 - 다음 단계: 실패 수정·필요한 재검증 → 정확 통합 head의 초안 PR·CI·인계, B의 설치판 producer/정식 연결 계약과 실제 GPU 권한 확인 후 제품 실증을 이어간다.
 - 막힌 것: B 전체 CPU 도구는8761222 common source 불변을 요구해 현재 A source에서 전체 재실행할 수 없고 실제5d35ce source/증거의 로컬 재실행 자료도 미확보다. source pin/소비 API alias·validator producer·정식 정책/CheckDef 연결은 B/A 인계 조건으로 남긴다. AWS 관리 권한은 사용자 확인 대기다.
+# 2026-10-29 A1 PLT08 Kubernetes 한 구간 제품 연결
+
+- 한 일: A2 확정6c92cb6 전용4파일 bytes를 보존해 반영하고 기존 api_transport:kubernetes를 등록했다. 검토된 PACK31 정확Ref에서 생성하는 DRAFT PACK-KUBERNETES-API-HOP@1은77개ID/76개 정의 bytes와 PLT08 질문·기준·판정을 보존하며 profile/필수POL9개/제한만 versioning한다. 공통 body-free 기록에 고정 요청ID/method/route와 전후 세대가 확인된 선택 probe→engine endpoint 주체를 분리했다.
+- 테스트 결과: 고정1114파일 불변. 직접/동일 계약·인접·불변식442통과(pytest70.35초·부모71.485초), 전체6321통과/실패0/기존skip13·제외19(pytest835.62초·부모837.234초). wheel/격리 설치166파일 일치와 정식 설치본 CLI3사례/각6Ref의 verify·반출/복원·같은 시각 저장팩 재판정도 통과(6.828초)했다. CPU 사례는 EXAMPLE이며 actual로 승격하지 않는다.
+- 다음 단계: 현재 한 구간의 정식 선정→실행→EVD/RES/RPT→verify→반출/복원·저장팩 재판정과 설치 일치를 마감하고 정확HEAD CI/PR/인계를 남긴다. B REQ10 고정 소비 기준과 본인19개 잔여 제품 연결을 이어간다.
+- 막힌 것: AWS 같은 기존 g6.2xlarge 재시작은 InsufficientInstanceCapacity로 거부되고 stopped 재조회됐다. PLT01/04 및 새 PLT08 실제 실증은 미완료이며 원래13:23:57UTC/46.66USD 상한을 유지한다. CI5도 결제/한도로 시작 전 차단된다. API 전체·TLS/CA·배포caller·worker·IPC/TP/다중GPU·기업정책은 이 한 구간으로 완료하지 않는다.

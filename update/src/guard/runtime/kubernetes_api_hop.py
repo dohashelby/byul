@@ -12,7 +12,7 @@ import re
 
 from guard.models import canonical_json, sha256_hex, utcnow
 from .kubernetes_http import KubernetesBindingError, REQUEST_BINDING_PROFILE
-from .kubernetes_functional import LOGICAL_ID
+from .kubernetes_functional import LOGICAL_ID, WIRE_ID
 
 PROFILE='explicit-owned-kubernetes-api-plaintext-v1'
 SCOPE='guard_probe_to_owned_kubernetes_direct_api'
@@ -59,6 +59,7 @@ def capture(transport,values,timeout):
         'policy_binding_verified':False,'policy_window_verified':False,
         'capture_executed':False,
         'binding_verified_before_after':False,'normal_response_schema_verified':False,
+        'request':None,'subjects':None,'http_status_observed':False,
         'initial_response':None,'diagnostic_codes':[],
         'started_at':started.isoformat(),'environment_ref':deepcopy(transport.environment_ref),
         'target_sha256':transport.target_sha256,
@@ -96,6 +97,19 @@ def capture(transport,values,timeout):
         result['initial_response']={k:response[k] for k in
             ('id','method','outcome','capture_complete','body_bytes','elapsed_ms') if k in response}
         result['binding_verified_before_after']=True
+        # These identify the fixed source's correlated attempt and its selected
+        # container generations. A timeout/refusal does not prove delivery, and
+        # neither the probe nor an API container is an authenticated caller or
+        # a source-bound model worker.
+        result['request']={'logical_id':LOGICAL_ID,'wire_id':WIRE_ID,
+            'method':'POST','route':'/v1/completions',
+            'identity_basis':'fixed-source-correlated-attempt'}
+        result['subjects']={'source_role':'selected_probe_container',
+            'source':deepcopy(transport.binding['probe']),
+            'destination_role':'selected_engine_container_endpoint',
+            'destination':deepcopy(transport.binding['engine']),
+            'worker_subject_verified':False,'deployed_caller_verified':False}
+        result['http_status_observed']=type(response['outcome']) is int
     except Exception:
         result['diagnostic_codes'].append('KUBERNETES_API_HOP_UNAVAILABLE')
     finally:

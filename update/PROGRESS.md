@@ -1383,7 +1383,7 @@ git status
 ## 2026-10-30 — A-1 REQ12 외부 ID 재사용·native 선택 관측
 
 - 한 일: 확정6bb1649에서 기존 request_termination:kubernetes를 명시 REQ12 절차로 확장한다. 같은 외부ID 정상 재요청2회와 SSE 종료A/같은외부ID 대체B/후속정상 요청을 닫힌 공개 profile로 연결하고, 보조session 표식과 실제 native ID·invocation·PID/start의 유일 관계를 투영한다. ASGI 기록에 attempt 필드가 없는 공백은 순서로 채우지 않고 null로 보존한다. 77개·두분기·원래기준·다른76개 bytes를 유지한 DRAFT 팩이다.
-- 테스트 결과: 제품/반례/정확Ref·실제 stdlib 전송 테스트와 문서 초안 작성, 정적 검토 단계이며 아직 source 고정·검증 전이다. 기존native8/9·B/A2 원본 및 CLI 의미를 보존한다.
+- 테스트 결과: e7ed2da checkpoint와 검토pin의1177파일 고정으로 Windows영향550통과·기존skip1/제외1(149.97/150.676초), 같은 bytes Linux영향551통과·제외1(48.42/48.718초), source·wheel·격리설치178파일 일치 및 설치CLI4사례·각6Ref 왕복(9.126초)을 확인했다. 실제 stdlib 소유loopback5요청, 같은외부ID·보조session/nativeID 구분, 호출결합 충돌/누락·교체·후속수집/seal/첨부/정리 오류를 확인했으며 기존 LIF10도 회귀했다. native8/9·B27/A2전용9·parser/stream probe bytes 및 기존 판정 의미를 보존했다. 새skip/제외·기대값 완화·검증 중 source변경은 없다. CPU/EXAMPLE이고 마지막 결과 문서만 갱신한다.
 - 다음 단계: 구현·정적 검토 종료→source고정·검토pin→직접/인접/불변식→Linux/설치·정확6Ref→commit/push·초안PR·정확HEAD CI·인계. actual 늦은 chunk/소비자 귀속의 공통 관측 계약도 준비한다.
 - 막힌 것: 실제 취소대상/늦은chunk 폐기·전달·자동retry·신뢰producer/source/image/기업POL·worker/GPU와 전체 두분기 완료는 미확인이다. 후보는 독립FAIL이 아니며 전축UNKNOWN·late_delivery/automatic_retry/scope_complete=false를 유지한다. 원승인창종료·추가Start0·stopped·CI결제차단·부모A39/A1담당19 범위를 축소하지 않는다.
 

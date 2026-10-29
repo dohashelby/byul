@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed A2 fixed consumer checkpoint: IPC response correlation and
-# native weight transport/profile9 consumption; previous common gates retained.
+# Reviewed REQ12 checkpoint: closed repeated-ID request procedure and native
+# attempt observation; A2 repairs and all previous common gates retained.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='fa08389e6d9cafe9a58f257503a739efee43eea5'
+REVIEWED_COMMON_COMMIT='e7ed2da919dec91af9585c2f271d0be56c34edfe'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

@@ -37,9 +37,28 @@ PACK-B-LIF14-CPU-PROPOSAL/DRAFT와 reference CPU ENV/POL을 만들고 process-lo
 기존 B1 두 파일 overlay gate는 유지한다. 도구는 검토된 새 module commit을
 product_component_commit으로 명시 고정한 뒤 기존 verify_snapshot의 전체
 PINNED_PATHS 검사를 사용한다. c9 공동 기준 metadata도 별도로 보존한다.
-현재 component pin 미설정 시 실제 도구 실행은 거부한다. module 소스 고정 commit을
-주세션에 인계한 뒤 정식 핀 값을 연결하고 실제 pipeline을 검증한다.
+component pin은 검토된 module snapshot commit으로 명시 고정한다. 소스가 바뀌면
+이전 pin 검사는 실행을 거부하며, 새 고정 값을 연결한 뒤 실제 pipeline을 검증한다.
+검사 helper 자체도 자기 checkout의 파일·함수 경로 신원과 bytes SHA256
+858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf,
+승인된 정확 scope/base를 검증한다. foreign noop helper와 빈 scope를 거부하며
+기존 B1 source·공동 기준은 변경하지 않는다.
 
 직접·기존 RuleTable/core run 회귀는 79 passed(pytest 0.59초)다. source import의
 optional torch 경계, native 미수집·export 오류 분리·functional 독립 FAIL,
 ENV binding·첨부 실패 보존·미설정 component pin을 검증했다.
+
+
+검증 전 source 신원 확인을 마친 child의 qualified CPU 관측은 후속 검증 오류와
+함께 보존한다. post source 검사는 명시적인 source 불일치와 I/O·Git 검사 불가를
+status·예외 타입으로 구분하고 전체 실행은 ABORTED로 남긴다. parent 후속 검사가
+실패해도 각 child의 기존 사전·후속 상태를 덮어쓰지 않는다. child 후속 검사가
+불완전하면 소유 CPU 과정의 관측은 유지하되 선택된 source pin의 최종 귀속은
+미확인으로 표시한다. 사전 신원 미확인·native 미수집을 수집된 false로 만들지 않는다.
+독립적인 qualified 종료 불일치는 기존 core/RuleTable을 거쳐 functional FAIL로
+남고 source 불일치를 target 소비 PASS로 표현하지 않는다.
+
+이 수정 묶음 직접·기존 RuleTable/core 회귀는 **88 passed / pytest 0.84초**다.
+parent/child 후속 검사 불가·명시 불일치, core EVD의 독립 FAIL 보존, initial 미확인,
+foreign helper/빈 scope 거부를 포함한다. 새 component pin 연결 전 실제 CPU 측정은
+추가하지 않았으며, 후속 실제 결과·정확 Ref는 핀 연결 뒤 갱신한다.

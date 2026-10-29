@@ -22,7 +22,7 @@ def check():
 def record(*, native_after=False):
     phase = {'native_probe_qualified': True, 'wrapper_running_after': False, 'native_after': {'value': native_after, 'collected': True},
         'recorded_tag_events': 1, 'output': {'tag_events': 1}}
-    return {'rows': [{'case_id': name, 'capture_status': 'completed', 'primary': dict(phase), 'next': dict(phase),
+    return {'capture_status': 'completed', 'rows': [{'case_id': name, 'source_preverified': True, 'capture_status': 'completed', 'primary': dict(phase), 'next': dict(phase),
                      'final_native': {'value': False, 'collected': True}} for name in module.CASE_IDS]}
 
 
@@ -130,3 +130,113 @@ def test_recovery_restores_only_the_owned_regular_fixture(tmp_path):
     with pytest.raises(ValueError, match='PROFILER_CPU_RECOVERY_OWNERSHIP_UNVERIFIED'):
         module.restore_owned_directory(other, owner)
     assert other.is_file()
+
+
+@pytest.mark.parametrize('failure,status', [(OSError('PRIVATE_POST_SOURCE_IO'), 'unavailable'),
+    (ValueError('STRUCTURED_TOOLS_REFERENCE_MISMATCH'), 'source_mismatch')])
+def test_post_source_check_retains_verified_child_facts_and_records_attribution(monkeypatch, failure, status):
+    row = record(native_after=True)['rows'][0]
+    def unavailable(*a, **kw):
+        raise failure
+    monkeypatch.setattr(module, '_verify_source', unavailable)
+    result = module.post_source_check(row, Path('/EXAMPLE-source'))
+    assert result['capture_status'] == 'post_source_check_incomplete'
+    assert result['source_postcheck'] == {'status': status, 'error_type': type(failure).__name__}
+    assert result['source_attribution'] != 'pre_and_post_verified'
+    observation = module.project({'rows': [result]})
+    assert observation['profiler_cpu_stop_mismatch'] == {'value': True, 'collected': True}
+    assert 'PRIVATE_' not in json.dumps(result)
+
+
+@pytest.mark.parametrize('failure,status', [(OSError('PRIVATE_PARENT_SOURCE_IO'), 'unavailable'),
+    (ValueError('STRUCTURED_TOOLS_REFERENCE_MISMATCH'), 'source_mismatch')])
+def test_parent_postcheck_failure_keeps_qualified_fail_through_core(tmp_path, monkeypatch, failure, status):
+    from guard.core.run import RunConfig, run_plan
+    from guard.core.select import select
+    from guard.core.judge import judge_evidence
+    from guard.executors import registry
+    from guard.models.checkdef import AppliesWhen, JudgeSpec, ObsSpec
+    from guard.store import Store
+    from tests.builders import policy
+    validations = []
+    def verify(*a, **kw):
+        validations.append(True)
+        if len(validations) > 1:
+            raise failure
+    monkeypatch.setattr(module, '_verify_source', verify)
+    child_rows = record(native_after=True)['rows']
+    def launch(argv, **kw):
+        row = dict(child_rows[module.CASE_IDS.index(argv[argv.index('--child-case') + 1])],
+                   source_commit=module.SOURCE_COMMIT, source_postcheck={'status': 'verified'},
+                   source_attribution='pre_and_post_verified')
+        return SimpleNamespace(stdout=module.PREFIX + json.dumps(row), returncode=0)
+    monkeypatch.setattr(module.subprocess, 'run', launch)
+    pack = baseline_pack()
+    selected = check().model_copy(update={'applies_when': AppliesWhen(always=True), 'executor': module.ProfilerLifecycleCPUExecutor.name,
+        'required_observations': [ObsSpec(key=key,type='bool' if key.endswith('mismatch') else 'list[dict]') for key in
+            ('profiler_cpu_stop_mismatch','profiler_cpu_trials')],
+        'judge': JudgeSpec(plugin='rule_table',params=module.judge_params())})
+    pack.checks['LIF-14'] = selected  # Explicit EXAMPLE in-memory proposal.
+    env = environment(engine={'name': 'vllm','version': 'reference-' + module.SOURCE_COMMIT})
+    pol = policy(pack.ref(), values={}, scope={'include':['LIF-14']})
+    store = Store(tmp_path/'store');store.put_many([env,pol])
+    plan = select(pack,[env],pol);store.put(plan)
+    monkeypatch.setitem(registry.EXECUTORS,'profiler_lifecycle_cpu:unit',lambda cfg: module.ProfilerLifecycleCPUExecutor(cfg))
+    evd, = run_plan(store,pack,plan,RunConfig(executors={'profiler_lifecycle_cpu':'unit'},
+        raw={'source_root':str(tmp_path/'source'),'owned_parent':str(tmp_path/'owned')}))
+    assert evd.execution.status == ExecStatus.ABORTED
+    assert all(item.attempted for item in evd.challenges)
+    assert evd.observations['profiler_cpu_stop_mismatch'].value is True
+    judged = judge_evidence(selected,evd,pol,plan.created_at,plan=plan)
+    assert judged.verdicts.functional == Verdict.FAIL and judged.verdicts.security == Verdict.UNKNOWN
+    artifact = json.loads((store.root / evd.artifacts[0].path).read_text())
+    assert artifact['source_postcheck']['status'] == status
+    assert all(row['source_postcheck']['status']=='verified' for row in artifact['rows'])
+    assert 'PRIVATE_' not in json.dumps(artifact)
+
+
+def test_unverified_initial_source_is_not_a_collected_false():
+    data = record(native_after=True)
+    for row in data['rows']:
+        row['source_preverified'] = False
+    assert module.project(data)['profiler_cpu_stop_mismatch'] == {'value': None, 'collected': False}
+
+
+def test_component_rejects_foreign_noop_helper_before_output(tmp_path):
+    update = Path(tool.__file__).resolve().parents[1]
+    foreign = tmp_path/'foreign'/'tools';foreign.mkdir(parents=True)
+    (foreign/'__init__.py').write_text('')
+    marker = tmp_path/'noop-was-called'
+    (foreign/'b1_integration_cpu.py').write_text("BASE_SHA=" + repr(tool.BASE_SHA) + "\nPINNED_PATHS=()\n"
+        "def verify_snapshot(*a,**kw):\n from pathlib import Path\n Path(" + repr(str(marker)) + ").write_text('noop')\n")
+    output = tmp_path/'output'
+    result = subprocess.run([sys.executable,str(Path(tool.__file__).resolve()),'--source-root',str(tmp_path/'missing'),
+        '--output-root',str(output)],cwd=update,
+        env={**os.environ,'PYTHONPATH':os.pathsep.join([str(foreign.parent),str(update/'src'),str(update)])},
+        text=True,capture_output=True)
+    assert result.returncode != 0 and 'LIF14_SNAPSHOT_HELPER_IDENTITY_OR_SCOPE_MISMATCH' in result.stderr
+    assert not marker.exists() and not output.exists()
+
+
+def test_component_rejects_empty_scope_even_for_own_helper(monkeypatch):
+    monkeypatch.setattr(tool.snapshot_helper,'PINNED_PATHS',())
+    with pytest.raises(ValueError,match='LIF14_SNAPSHOT_HELPER_IDENTITY_OR_SCOPE_MISMATCH'):
+        tool.verify_component(Path(__file__).resolve().parents[2])
+
+
+@pytest.mark.parametrize('status', ['unavailable', 'source_mismatch'])
+def test_child_postcheck_incomplete_rows_remain_facts_under_parent_verified_snapshot(tmp_path, monkeypatch, status):
+    monkeypatch.setattr(module, '_verify_source', lambda *a, **kw: None)
+    rows = record(native_after=True)['rows']
+    def launch(argv, **kw):
+        row = dict(rows[module.CASE_IDS.index(argv[argv.index('--child-case')+1])],
+                   source_commit=module.SOURCE_COMMIT, capture_status='post_source_check_incomplete',
+                   source_postcheck={'status':status,'error_type':'OSError' if status=='unavailable' else 'ValueError'},
+                   source_attribution='postcheck_unavailable' if status=='unavailable' else 'unconfirmed_after_source_mismatch')
+        return SimpleNamespace(stdout=module.PREFIX+json.dumps(row),returncode=0)
+    monkeypatch.setattr(module.subprocess,'run',launch)
+    result = module.capture(tmp_path/'source',tmp_path/'owned')
+    assert result['capture_status']=='child_capture_incomplete'
+    assert result['source_postcheck']['status']=='verified'
+    assert all(row['source_postcheck']['status']==status for row in result['rows'])
+    assert verdict(module.project(result))['functional']==Verdict.FAIL

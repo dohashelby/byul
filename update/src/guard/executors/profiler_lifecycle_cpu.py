@@ -120,6 +120,24 @@ def _phase(wrapper, torch, log_events):
     return row
 
 
+
+def post_source_check(record, source_root):
+    """Keep measured process facts while recording incomplete selected-source binding."""
+    try:
+        _verify_source(source_root, expected_commit=SOURCE_COMMIT)
+        state = {'status': 'verified'}
+    except ValueError as error:
+        state = {'status': 'source_mismatch' if error.args == ('STRUCTURED_TOOLS_REFERENCE_MISMATCH',) else 'unavailable',
+                 'error_type': type(error).__name__}
+    except Exception as error:
+        state = {'status': 'unavailable', 'error_type': type(error).__name__}
+    record['source_postcheck'] = state
+    record['source_attribution'] = 'pre_and_post_verified' if state['status'] == 'verified' else (
+        'unconfirmed_after_source_mismatch' if state['status'] == 'source_mismatch' else 'postcheck_unavailable')
+    if state['status'] != 'verified':
+        record['capture_status'] = 'post_source_check_incomplete'
+    return record
+
 def child_case(source_root, owned_parent, case_id):
     """Invoke real source methods; no injected methods, decoded values or raw logs."""
     if sys.flags.optimize or case_id not in CASE_IDS:
@@ -136,7 +154,8 @@ def child_case(source_root, owned_parent, case_id):
     files = {Path(inspect.getfile(obj)).resolve() for obj in objects}
     if any(not path.is_relative_to(source_root / 'vllm') for path in files):
         raise ValueError('PROFILER_SOURCE_IMPORT_MISMATCH')
-    metadata = {'source_commit': SOURCE_COMMIT, 'profile': PROFILE,
+    metadata = {'source_commit': SOURCE_COMMIT, 'source_commit_role': 'selected_pin',
+        'source_preverified': True, 'fact_scope': 'owned_cpu_process_measurement', 'profile': PROFILE,
         'dependencies': {'torch': importlib.metadata.version('torch')},
         'source_file_bytes_sha256': {path.relative_to(source_root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in files}}
     logs = []
@@ -206,8 +225,7 @@ def child_case(source_root, owned_parent, case_id):
         result['final_native_probe'] = native_state(torch)
         result['final_native'] = result['final_native_probe'] if qualified else {'value': None, 'collected': False}
         result['owned_directory_removed'] = directory is not None and not Path(directory).exists()
-    _verify_source(source_root, expected_commit=SOURCE_COMMIT)
-    return result
+    return post_source_check(result, source_root)
 
 
 def capture(source_root, owned_parent):
@@ -222,27 +240,36 @@ def capture(source_root, owned_parent):
     env = {**os.environ, 'PYTHONPATH': os.pathsep.join([str(repo_update / 'src'), str(repo_update), str(source_root)]),
         'VLLM_TARGET_DEVICE': 'cpu', 'CUDA_VISIBLE_DEVICES': '', 'VLLM_PLUGINS': '',
         'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1'}
+    producer_sha256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     rows = []
     for case_id in CASE_IDS:
-        process = subprocess.run([sys.executable, '-m', __name__, '--child-case', case_id,
-            '--source-root', str(source_root), '--owned-parent', str(owned_parent)], env=env, capture_output=True, text=True)
+        try:
+            process = subprocess.run([sys.executable, '-m', __name__, '--child-case', case_id,
+                '--source-root', str(source_root), '--owned-parent', str(owned_parent)], env=env, capture_output=True, text=True)
+        except Exception as error:
+            rows.append({'case_id': case_id, 'capture_status': 'child_launch_unavailable', 'error_type': type(error).__name__})
+            continue
         values = [line[len(PREFIX):] for line in process.stdout.splitlines() if line.startswith(PREFIX)]
         try:
             row = json.loads(values[-1])
-            if row['case_id'] != case_id or row['source_commit'] != SOURCE_COMMIT or process.returncode != 0:
+            if row['case_id'] != case_id or row['source_commit'] != SOURCE_COMMIT or row.get('source_preverified') is not True:
                 raise ValueError
+            if process.returncode != 0:
+                row.update(capture_status='child_exit_incomplete', child_returncode=process.returncode)
         except (IndexError, KeyError, TypeError, ValueError):
             row = {'case_id': case_id, 'capture_status': 'child_capture_unavailable', 'child_returncode': process.returncode}
         rows.append(row)
-    _verify_source(source_root, expected_commit=SOURCE_COMMIT)
-    return {'profile': PROFILE, 'source_commit': SOURCE_COMMIT, 'scope': 'reference_cpu_profiler_lifecycle',
+    record = {'profile': PROFILE, 'source_commit': SOURCE_COMMIT, 'source_commit_role': 'selected_pin',
+        'source_preverified': True, 'scope': 'reference_cpu_profiler_lifecycle',
+        'capture_status': 'completed' if all(row.get('capture_status') == 'completed' for row in rows) else 'child_capture_incomplete',
         'installed_target': None, 'enterprise_deadline_policy': None, 'rows': rows,
-        'own_producer_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
+        'own_producer_sha256': producer_sha256}
+    return post_source_check(record, source_root)
 
 
 def project(record):
     rows = record['rows']
-    phases = [row.get(phase, {}) for row in rows for phase in ('primary', 'next')]
+    phases = [row.get(phase, {}) for row in rows if row.get('source_preverified') is True for phase in ('primary', 'next')]
     known = [phase for phase in phases if phase.get('native_probe_qualified') is True and type(phase.get('wrapper_running_after')) is bool
              and phase.get('native_after', {}).get('collected') is True]
     mismatch = any(phase['wrapper_running_after'] is False and phase['native_after']['value'] is True for phase in known)
@@ -270,13 +297,15 @@ class ProfilerLifecycleCPUExecutor:
         start = datetime.now(timezone.utc)
         record = capture(**self.cfg)
         obs = project(record)
-        complete = all(row.get('capture_status') == 'completed' for row in record['rows'])
+        complete = record.get('capture_status') == 'completed' and all(row.get('capture_status') == 'completed' for row in record['rows'])
+        attempted = {row.get('case_id') for row in record['rows']} == set(CASE_IDS) and all(
+            row.get('source_preverified') is True and 'primary' in row and 'next' in row for row in record['rows'])
         normal = next((row for row in record['rows'] if row['case_id'] == 'normal'), {})
         normal_ok = (normal.get('primary', {}).get('recorded_tag_events', 0) or 0) > 0 and normal.get('primary', {}).get('output', {}).get('tag_events', 0) > 0
         draft = EvidenceDraft(status=ExecStatus.COMPLETED if complete else ExecStatus.ABORTED,
             data_origin=DataOrigin.EXAMPLE if env.data_origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
             normal_control={'attempted': bool(normal), 'succeeded': normal_ok}, observations=obs,
-            challenges=[{'step': step, 'attempted': complete} for step in check.challenge_steps],
+            challenges=[{'step': step, 'attempted': attempted} for step in check.challenge_steps],
             config={'profile': PROFILE, 'source_commit': SOURCE_COMMIT}, started_at=start,
             finished_at=datetime.now(timezone.utc), abort_reason=None if complete else 'PROFILER_CPU_CAPTURE_INCOMPLETE',
             cleanup_errors=['PROFILER_CPU_NATIVE_SHUTDOWN_UNVERIFIED'] if any(

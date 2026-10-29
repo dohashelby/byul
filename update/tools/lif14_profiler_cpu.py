@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import inspect
 import json
 from pathlib import Path
 import re
@@ -19,7 +20,12 @@ from guard.executors.profiler_lifecycle_cpu import SOURCE_COMMIT, PROFILE, Profi
 from guard.models import CheckDef, Environment, Policy, load_pack
 from guard.store import Store
 from guard.store.packs import put_pack
-from tools.b1_integration_cpu import BASE_SHA, PINNED_PATHS, verify_snapshot
+from tools import b1_integration_cpu as snapshot_helper
+
+BASE_SHA = 'c9af729cd1893eda14d0bb222a8fab46c2a6d7b8'
+PINNED_PATHS = ('update/src/guard', 'update/packs', 'update/uv.lock',
+                'update/pyproject.toml', 'update/reference/framework')
+HELPER_SHA256 = '858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 
 # Filled with the reviewed frozen module commit by the coordinating session.
 # An unconfigured pin refuses execution; HEAD is never used as the expected pin.
@@ -29,6 +35,17 @@ PRODUCT_COMPONENT_COMMIT = '383f8952171b58b0af78621263eeed5ef0705c07'
 def verify_component(repo):
     if not isinstance(PRODUCT_COMPONENT_COMMIT, str) or re.fullmatch('[0-9a-f]{40}', PRODUCT_COMPONENT_COMMIT) is None:
         raise ValueError('LIF14_PRODUCT_COMPONENT_PIN_UNCONFIGURED')
+    helper_file = repo / 'update/tools/b1_integration_cpu.py'
+    try:
+        imported = Path(snapshot_helper.__file__).resolve()
+        function_file = Path(inspect.getsourcefile(snapshot_helper.verify_snapshot)).resolve()
+        if (helper_file.is_symlink() or not imported.samefile(helper_file) or not function_file.samefile(helper_file)
+                or hashlib.sha256(helper_file.read_bytes()).hexdigest() != HELPER_SHA256):
+            raise ValueError
+        if snapshot_helper.BASE_SHA != BASE_SHA or snapshot_helper.PINNED_PATHS != PINNED_PATHS:
+            raise ValueError
+    except (OSError, TypeError, AttributeError, ValueError):
+        raise ValueError('LIF14_SNAPSHOT_HELPER_IDENTITY_OR_SCOPE_MISMATCH') from None
     expected = repo / 'update/src/guard'
     for name, module in tuple(sys.modules.items()):
         if name != 'guard' and not name.startswith('guard.'):
@@ -36,7 +53,7 @@ def verify_component(repo):
         filename = getattr(module, '__file__', None)
         if filename is None or not any(parent.is_dir() and parent.samefile(expected) for parent in Path(filename).resolve().parents):
             raise ValueError('LIF14_OWN_PRODUCT_IMPORT_MISMATCH')
-    verify_snapshot(repo, PRODUCT_COMPONENT_COMMIT, PINNED_PATHS)
+    snapshot_helper.verify_snapshot(repo, PRODUCT_COMPONENT_COMMIT, PINNED_PATHS)
 
 
 def main():

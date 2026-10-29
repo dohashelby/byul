@@ -3,7 +3,8 @@
 검토 기준은 `f82c37d459cac36e4322de47e2bfb31e3b765088`이다. 기존
 `A_CLI_HANDOFF.md`의 0675f76 reference 인계에서 달라진 부분을 정리한다.
 A가 검토할 등록 제안이며 제품 registry·CLI·PACK31은 변경하지 않았다.
-최종 source SHA는 ENV.engine.name 검증 보수 검토 후 확정한다.
+최종 producer 보수는 `240387cba6dfed35a259bb8baf493341f6ca3b1f`이며,
+고정 bytes SHA256은 `1eac6f0fe8067a9ace386ee3d8b3e5bbc728387578c4b1f429e1495dc576cb87`이다.
 
 ## 달라진 실행 경계와 입력
 
@@ -19,12 +20,12 @@ sampling, xgrammar backend·JSON 변환 진입을 관측한다. 실제 API·runn
 별도 수집 범위이며 `installed_target=null`, server preprocessing·runner flag는 false다.
 
 설정은 여전히 `source_root`와 `model` 두 개다. 0.31 진입점은 capture 전에
-ENV hash 유효성, 비어 있지 않은 설정 model과 `ENV.model.id`의 일치,
+ENV hash 유효성, `ENV.engine.name=vllm`, 비어 있지 않은 설정 model과 `ENV.model.id`의 일치,
 `ENV.engine.version=reference-db9527a46873454610df6dbedf79a36d6bf1a7f6`를 검사한다.
 ENV 불일치는 `STRUCTURED_TOOLS_TARGET031_ENVIRONMENT_MISMATCH`로 수집 전에 거부한다.
 source_root의 정확 HEAD·전체 vllm bytes·index·미추적/ignored 파일과 실제 import 위치를
 실행 전후 확인한다. ENV의 source 결합은 위 version 문자열로 수행한다.
-A 입력의 engine.name은 `vllm`이며 f82c37d에서 빠진 이름 대조는 추가 보수 검토 중이다.
+다른 engine.name은 capture 이전에 거부하며 회귀와 검토로 확인했다.
 HTTP의 ENV 저장소 모델→API 이름 매핑은 기존 `ctx.api_model` 경계에 남는다.
 
 준비한 source는 `/private/tmp/byul-req10-target031-20261029`, Python 3.12 환경은
@@ -102,6 +103,14 @@ read -r PLAN_REF _ < "$RUN_ROOT/select.log"
 Store verify 오류는 0개이고 정확 Ref 재판정의 RES Ref가 같으며 RPT에 해당 EVD/RES가
 포함됐다. 이는 담당자가 수행한 실행 기록이며 이 문서 작업에서 재실행하지 않았다.
 위 Ref는 원본으로 유지하고 최종 source 보수 후 새 실행의 Ref를 별도로 기록한다.
+
+최종 보수 source의 실제 재실행은
+`/private/tmp/byul-target031-product-evidence-20261029/final-core/`에 있다.
+PACK Ref는 위와 같고, EVD `EVD-01M6322BPP3BFC6W2J7S8F043S@1`의 SHA256은
+`568a52cd277817f23980429ae40677adc6fa45565c6c0b226efbbcdc6002f70f`다.
+COMPLETED/DECLARED·관측5·첨부1·정상 controls9개·후속5건을 확인했고,
+`postverify.json`의 Store 오류0·정확 Ref 재판정 일치·RPT Ref 연결을 확인했다.
+최종 영향/불변식 회귀319통과·기존제외1(14.04초), 집중 검토 지적 해결 확인을 완료했다.
 
 출력은 수집 관측 5개, CPU rows 5건과 각 후속 정상 변환, 정제 첨부
 `structured-tools-vllm-031-cpu.json`, 기존 EVD→RES→RPT다. origin은 DECLARED 상한이며

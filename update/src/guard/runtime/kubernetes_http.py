@@ -98,6 +98,8 @@ class KubernetesHTTP:
         self.binary = binary
         self.runner = runner or capture_pipes
         self.injected = runner is not None
+        self.process_observation_origin = ('EXAMPLE' if self.injected or target['lab']
+            or env.data_origin.value == 'EXAMPLE' else 'MEASURED')
         # This profile admits only its pinned HTTP Pod endpoint below. Preserve
         # its published source/fixture bytes when the general probe evolves.
         probe_source = (Path(__file__).parent / "assets/http_probe_v1.py.txt").read_text(encoding="utf-8")
@@ -346,6 +348,11 @@ class KubernetesHTTP:
         except Exception:
             with self.lock:self.failed=True
             return None
+
+    def process_snapshot(self, candidate_paths=None):
+        """Fixed process metadata read for existing permission/credential consumers."""
+        from .kubernetes_process import capture
+        return capture(self,candidate_paths)
 
     def report(self):
         with self.lock:

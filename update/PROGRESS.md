@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 선택 컨테이너 process 공통 입력
+
+- 한 일: 확정c5aa3e0를 보존한 분리 공간에서 A2 PLT01/04 요청의 공통 selector/고정 Linux reader/포착·CLI를 구현한다. 기존 정확 ENV/모델 매핑과 엔진/프로브 세대 전후 검증을 재사용하며 PID/start·UID/CapEff/mount namespace·환경 이름과 명시 후보 lstat metadata만 반환한다. reader 주체와 관측 PID를 분리하고 worker/source/model 귀속·전체worker·접근 시험은 미검증으로 고정한다. API 후속 실패와 개별 필드/선언 변경은 앞선 packet/관측을 보존한다.
+- 테스트 결과: 1096파일 고정 직접/인접·불변식402통과/기존skip1·제외1(70.19/71.050초), source/wheel/격리설치162파일 일치(부모12.676초), 검증 중 bytes 불변이다. 기존 WSL Ubuntu/Python3.12.3의 독립 PID/mount namespace에서 같은 고정 프로그램을 실행해 UID0/2000 제어 process·PID목록/metadata 안정성·환경값/파일내용 미출력·파일 내용/non-directory open 금지 제어를 확인했다(프로그램7.469초/검증 부모8.077초). 본인 제어 자원만 사용한 EXAMPLE이며 cluster/GPU 실증으로 집계하지 않는다. A2의 새 자격수집 보수a0248fa는 다음 별도 통합 대상이다.
+- 다음 단계: 고정 source 영향 검증·실패 보수·재고정·설치물·초안PR/정확HEAD CI 상태·본인 인계, A2 기존 전용 실행기의 live 공통 입력 소비와 정확Ref 왕복을 연결한다. 공통 reader만으로 PLT01/04 전환 완료를 표시하지 않는다.
+- 막힌 것: native0.32·실제 worker/source/model 세대 귀속과 승인 주체의 무해 접근은 이번 metadata 경계 밖이다. 기존 lifecycle lab/source gate는 유지한다. 실제EC2는 소유worker/GPU/task·임시접근 회수·원격/로컬 증거 보존 뒤 정상Stop으로 stopped가 확인됐고 암호화120GiB EBS는 보존/과금한다. 계정 문제로 hosted CI는 실행 전 차단 조건을 유지하며 전체 A39개 Goal은 active다.
+
 ## 2026-10-29 — A-1 REQ01/03 선택 Pod 전송 연결
 
 - 한 일: 확정a742714와 원본을 보존한 별도 worktree에서 기존 direct_route/role_route의 수집·안전 프로브·정책·판정을 재사용하고 Kubernetes 대상 선택/전송만 연결한다. 정확 ENV/모델 별칭과 엔진/신뢰 프로브에 비신뢰 프로브·Gateway의 독립 Pod 세대를 더해 전후 검증한다. 같은 고정 stdlib HTTP/TCP 프로브와 bounded kubectl을 사용하며 역할 키는 stdin에만 전달한다.

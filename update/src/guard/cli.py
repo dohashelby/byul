@@ -595,6 +595,48 @@ def capture_kubernetes_lifecycle_session(
         "bytes":len(raw.encode("utf-8"))}))
 
 
+@app.command("capture-kubernetes-process-snapshot")
+def capture_kubernetes_process_snapshot(
+    env: Path=typer.Option(...,"--env"),target: Path=typer.Option(...,"--target"),
+    output: Path=typer.Option(...,"--output"),
+    candidate_paths: Path | None=typer.Option(None,"--candidate-paths",help="명시한 후보 경로 목록 JSON; lstat metadata만"),
+    kubectl_binary: str=typer.Option("kubectl","--kubectl-binary"),
+    max_duration: float=typer.Option(300,"--max-duration"),
+    execute: bool=typer.Option(False,"--execute",help="선택 컨테이너의 process metadata·환경 이름만 읽기"),
+) -> None:
+    """기존 권한/자격 소비자의 공통 입력. worker/source 귀속과 보안 판정은 미확인이다."""
+    import hashlib
+    from guard.collectors.kubernetes_process import load_inputs,validate_options,collect
+    from guard.collectors.route_observations import validate_output
+    try:
+        environment,topology,selected=load_inputs(env,target,candidate_paths)
+        validate_options(kubectl_binary,max_duration)
+        validate_output(output,Path(__file__).resolve().parents[3])
+        if not execute:
+            typer.echo(json.dumps({"capture_executed":False,"engine_started":False,
+                "worker_subject_verified":False,"worker_inventory_complete":False,"security":"UNKNOWN"}))
+            return
+        value=collect(environment,topology,binary=kubectl_binary,duration=max_duration,candidate_paths=selected)
+        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
+        if len(raw.encode())>1024**2:
+            raise ValueError('KUBERNETES_PROCESS_ATTACHMENT_BOUND')
+    except (OSError,ValueError,TypeError,KeyError,RuntimeError,yaml.YAMLError):
+        typer.echo('KUBERNETES_PROCESS_CAPTURE_FAILED')
+        raise typer.Exit(2)
+    try:
+        validate_output(output,Path(__file__).resolve().parents[3])
+        with output.open('x',encoding='utf-8',newline='\n') as stream:stream.write(raw)
+    except (OSError,UnicodeError,ValueError):
+        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
+            "diagnostic_codes":["PROCESS_SNAPSHOT_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
+        raise typer.Exit(1)
+    typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"available":value['available'],
+        "worker_subject_verified":False,"worker_inventory_complete":False,"security":"UNKNOWN",
+        "sha256":hashlib.sha256(raw.encode()).hexdigest(),"bytes":len(raw.encode())}))
+    if not value['available']:
+        raise typer.Exit(1)
+
+
 @app.command("capture-native-weight-files")
 def capture_native_weight_files(
     env: Path=typer.Option(...,"--env"),target: Path=typer.Option(...,"--target"),

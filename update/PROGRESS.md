@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 SUP04 확정 소비의 Kubernetes 제품 연결·승인 환경 준비
+
+- 한 일: 9c863a7의 필수 CI5개 성공·기본5919통과/제외19(pytest262.91초/부모264.630초), 플랫폼175·Docker stub2·설치155파일 일치를 외부 인계에 마감했다. 별도 통합 공간에서 A-2 확정 baf2d8b의3파일을5c3e5b8로 보존 반영하고 기존 container_config:kubernetes0.1.0에 API-only 소비를 연결한다. 공통 snapshot의 수집 구간·소스/target/정제 문서 hash를 기존 첨부로 전달하며 전용 분석기·정책·팩31·판정 의미와 정적 이월 None을 유지한다.
+- 테스트 결과: A-2 head의 CI5개·기본5940통과/제외19·직접284통과와 원래 Windows CP949 실패10/UTF8 영향10통과를 구분해 재사용했다. 통합1081파일 고정 영향414통과·신규시험1실패·기존skip1/제외1(56.55/57.352초) 뒤 NOT_RUN의 executor=None 계약을 신규시험에서 정확히 확인하도록 보완했다. 제품·기존 기대값을 유지한 직접/같은 계약/불변식183통과·기존skip1/제외1(16.64/17.311초), 소스·wheel·격리설치156파일 일치(설치 부모15.043초)를 확인했다. 검증 중 bytes 불변이며 결과 문서만 갱신하고 정확 HEAD CI를 확인한다. 본인 기존 Python3.12 venv를 재사용하고 통합 source/tmp/DB는 분리했다.
+- 다음 단계: API-only 실제 registry/CLI·정확Ref·반출/복원·후속 snapshot/첨부/정리 실패 보존 검증과 commit/push·초안PR·CI·인계를 마감한다. GPU 설치 대기로 독립 제품 연결을 멈추지 않고 REQ01/03 전송 전환도 이어간다.
+- 막힌 것: API snapshot은 node runtime 이미지 관계·승인·정상 추론의 증명이 아니며 보안 UNKNOWN이다. 사용자의 별도 SSM 최소 role/profile 생성·연결 승인 후 us-east-1a에 g6.2xlarge i-033320574ba74f6b9 한 대를 생성했고 SSM Online/첫 고정 호스트 명령 성공을 확인했다. 암호화gp3 120GiB·IMDSv2/hop1·인바운드0을 적용했으며 과금 원장의 보수 시작05:23:57UTC와 첫8시간 한도를 유지한다. 검토된 사본+9c wheel의 정확 archive를 전송하고 새 호스트의01 설치를 진행한다. 아직 실제 Kubernetes/GPU 계산·REQ11·A39개 완료가 아니다. GPU 소유/비용/정리 책임은 A1 인계파일에 기록한다.
+
 ## 2026-10-29 — A-1 c9af729 공통 정제 snapshot 소비 경계
 
 - 한 일: 공동 base c9af729를 별도 A-1 worktree로 보존 분리했다. A-2 SUP04 공통 입력 요청에 맞춰 기존 verify_owned_pod 뒤 신원·mount 선언만 깊은 복사로 전달하고 KubernetesHTTP.model_snapshots·KubernetesLifecycleReader.snapshot의 기존 A-2 분석 소비 경로에 연결한다. 내부 {pod, namespace}와 A1-kubernetes-req11/1·model mapping/1·기존 lab gate를 유지한다. REQ11 전송 실행기는0.1.5이며 요청/판정/stream 소스와 A-2/B 전용 파일은 유지한다.

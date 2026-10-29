@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-10-29 · container_config의 명시 Kubernetes 구현은 SUP04 API-only 소비부터 기존 제품 경로에 연결하고 다른 점검·HTTP/정상 추론·node 이미지 승인으로 자동 확장하지 않는다. · 확정 A-2 분석기와 기존 판정을 보존하며 미준비 runtime 관계와 부분 제품 연결의 UNKNOWN을 구분하기 위함이다.
+
 - 2026-10-29 · 공동 base는 c9af729로 고정하고 A-1은 기존 Kubernetes 내부 snapshot 형태에서 검증된 소유 신원·mount 선언만 깊은 복사로 전달한다. · A-2의 기존 소비 의미와 lab/신뢰 gate를 보존하며 Pod API imageID를 node runtime·RepoDigest·manifest 계보 증명으로 승격하지 않기 위함이다.
 
 - 2026-10-28: 공동 기준선은 main4af4d31·원문91e84c7에 기존 PR34 UPDATE 보수를 보존하고 PACK31/DRAFT로 구성하며, CheckDef는 두 계보의 최고 revision부터 최소 증가한다. 과거 팩·Ref는 고정 보존하고 A-1만 공통 파일·팩을 작성해 A-2 전용 구현과 충돌을 줄인다.

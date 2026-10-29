@@ -10,6 +10,7 @@ from guard.adapters.vllm import VllmAdapter
 
 from .base import Executor
 from .container_config import ContainerConfigExecutor
+from .kubernetes_container_config import KubernetesContainerConfigExecutor
 from .direct_route import DirectRouteExecutor
 from .fake import FakeExecutor
 from .role_route import RoleRouteExecutor
@@ -33,6 +34,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "direct_route:real": lambda cfg: DirectRouteExecutor(cfg.get("direct_route", {}), environ=cfg.get("_runtime_environ")),
     "role_route:real": lambda cfg: RoleRouteExecutor(cfg.get("role_route", {}), environ=cfg.get("_runtime_environ")),
     "container_config:real": lambda cfg: ContainerConfigExecutor(cfg.get("container_config", {})),
+    "container_config:kubernetes": lambda cfg: KubernetesContainerConfigExecutor(cfg.get("container_config", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "credential_exposure:real": lambda cfg: CredentialExposureExecutor(cfg.get("credential_exposure", {})),
     "input_validation:real": lambda cfg: InputValidationExecutor(cfg.get("input_validation", {})),
     "sampling_validation:real": lambda cfg: SamplingValidationExecutor(cfg.get("sampling_validation", {})),

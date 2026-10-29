@@ -17,7 +17,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 
-from guard.models import canonical_json, sha256_hex
+from guard.models import canonical_json, sha256_hex, utcnow
 from .bounded import capture_pipes, strict_json
 
 
@@ -123,6 +123,7 @@ class KubernetesHTTP:
                 + "exec(compile("+repr(probe_source)+",'guard-stream-probe','exec'),{'__name__':'__main__'})\n")
             self.source_sha256=sha256_hex(self.source.encode())
         self.model_snapshots = []  # Transient allowlisted pair for the existing A-2 consumer.
+        self.snapshot_reads = []
         self.rows = []
         self.failed = False
         self.cleanup_errors = []
@@ -150,13 +151,14 @@ class KubernetesHTTP:
         except Exception:
             raise KubernetesBindingError() from None
 
-    def _verify(self, *, require_ready=True):
+    def _verify(self, *, require_ready=True, capture_snapshot=False):
         # Namespace UIDs bind a named context to the selected cluster generation.
         namespaces = sorted({self.binding[role]["namespace"] for role in ("engine", "probe")})
         result = self._call(["get", "namespaces", *namespaces, "-o", "json"])
         items = result["items"] if result.get("kind") == "List" else [result]
         mapped=self.profile==REQUEST_BINDING_PROFILE and self.model_mapping.get("schema")=="guard.model-request-mapping/1"
-        if mapped and any(x.get("kind")!="Namespace" for x in items):raise KubernetesBindingError()
+        snapshot_required=mapped or capture_snapshot
+        if snapshot_required and any(x.get("kind")!="Namespace" for x in items):raise KubernetesBindingError()
         actual = {x["metadata"]["name"]: x["metadata"] for x in items}
         if len(actual) != len(items) or set(actual) != set(namespaces):
             raise KubernetesBindingError()
@@ -168,18 +170,40 @@ class KubernetesHTTP:
                 raise KubernetesBindingError()
             pod = self._call([f"--namespace={expected['namespace']}", "get", "pod", expected["pod"], "-o", "json"])
             try:
-                if mapped and pod.get("kind")!="Pod":raise ValueError
+                if snapshot_required and pod.get("kind")!="Pod":raise ValueError
                 verify_owned_pod(pod, ns, expected, self.binding["run_id"],require_ready=require_ready)
                 pods[role]=pod
             except ValueError:
                 raise KubernetesBindingError() from None
 
-        if mapped:
+        if snapshot_required:
             snapshot=project_owned_snapshot(pods["engine"],
                 next(x for x in items if x["metadata"]["name"]==self.binding["engine"]["namespace"]),
                 self.binding["engine"],self.binding["run_id"],require_ready=require_ready)
             self.model_snapshots=([self.model_snapshots[0],snapshot] if self.model_snapshots else [snapshot])
         return pods
+
+    def snapshot(self):
+        """Existing bound API reads only; no HTTP/exec or node image relation."""
+        row={"profile":"kubernetes-owned-pod-api-read-v1", "started_at":utcnow().isoformat(),
+             "target_sha256":self.target_sha256,
+             "source_file_sha256":None,
+             "collected":False,"diagnostic_codes":[]}
+        try:
+            row["source_file_sha256"]=sha256_hex(Path(__file__).read_bytes())
+            with self.lock:
+                if self.failed:raise KubernetesBindingError()
+            self._verify(capture_snapshot=True)
+            value=deepcopy(self.model_snapshots[-1])
+            row.update(collected=True,snapshot_sha256=sha256_hex(canonical_json(value)))
+            return value
+        except Exception:
+            with self.lock:self.failed=True
+            row["diagnostic_codes"]=["KUBERNETES_HTTP_BINDING_UNAVAILABLE"]
+            raise KubernetesBindingError() from None
+        finally:
+            row["finished_at"]=utcnow().isoformat()
+            with self.lock:self.snapshot_reads.append(row)
 
     def __call__(self, network, requests, timeout):
         if self.profile==REQUEST_BINDING_PROFILE:
@@ -330,6 +354,7 @@ class KubernetesHTTP:
                     "probe_source_sha256": self.source_sha256,
                     "requests": sorted(deepcopy(self.rows), key=lambda row: row["id"] or ""),
                     "collection_gap": self.failed or (self.profile==REQUEST_BINDING_PROFILE and any(row.get("capture_complete") is not True for row in self.rows)),
+                    **({"snapshot_reads":deepcopy(self.snapshot_reads)} if self.snapshot_reads else {}),
                     **({"cleanup_errors":list(self.cleanup_errors)} if self.profile==REQUEST_BINDING_PROFILE else {}),
                     "limitations": ["Explicit operator selection and guard.run label are not an approval signature.",
                                     "Pod spec digest and exact runtime imageID are bound; manifest-index ancestry is not verified.",

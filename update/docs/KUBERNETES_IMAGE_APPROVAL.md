@@ -5,6 +5,25 @@
 새 target 형식·kubectl wrapper·공용 스키마·실행기 종류를 만들지 않는다.
 공통 생산자·전송·registry 연결은 A-1 담당이며 이 변경에는 포함하지 않는다.
 
+전용 실행 진입은 `KubernetesImageApprovalExecutor`이며 기존 logical
+`container_config`와 `Ctx`·`_finish`·저장/판정 경로를 재사용한다. 공통
+`KubernetesHTTP.owned_snapshot()`의 기존 `{pod, namespace}` 쌍을 두 번 받아
+소비한다. A-1의 이 공개 생산자·registry·추가 관측 CheckDef가 준비되기 전에는 실제 제품 수락
+미완료다. 생산자가 없으면 ABORTED 고정 진단을 반환하며 Docker나 target 선언을
+대신 사용하지 않는다. 원문 API 응답의 조회/정제 코드를 전용 파일에 복제하지 않는다.
+
+새 진입은 `kubernetes_image_api_identity_stable/before/after` 추가 관측에 API
+신원을 보존한다. 두 번째 조회·세대 결합·첨부 실패는 ABORTED와 기존 관측을
+함께 남긴다. 이 관측으로 승인/비승인·실제 worker 소비나 보안 PASS를 만들지
+않으며 원래 7개 승인/기능 관측과 판정 규칙은 유지한다. runner 주입은 target의
+lab=false와 관계없이 EXAMPLE이다. 정상 추론은 이 API-only 진입에서 미시도다.
+
+현재 팩31은 새 3키를 정의하지 않아 기존 EVD 정규화에서 제외한다. 공통 코어를
+우회하지 않고 A-1에 최소 관측 정의 등록을 요청한다. 전용 시험의
+`PACK-EXAMPLE-KUBE-IMAGE/1`은 원래 SUP04 CheckDef에 이 3키만 더한 별도
+EXAMPLE/DRAFT 팩이며, 현행 팩31이나 정식 제품 지원으로 대신 표시하지 않는다.
+정본 팩의 파일·생성기·공유 builder는 변경하지 않는다. 기존 판정 조건은 같다.
+
 `before`와 `after`는 기존 `{pod, namespace}` 쌍이다. ENV seal/정확 Ref,
 명시 context·소유 run, namespace 이름/UID, Pod UID, containerID, imageID,
 restartCount, startedAt, Running/Ready를 기존 `verify_owned_pod`로 대조한다.

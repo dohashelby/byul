@@ -22,7 +22,7 @@ _PINNED = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}")
 _IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}")
 _CONTAINER_ID = re.compile(r"[0-9a-f]{64}")
 _CONTAINER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
-KUBERNETES_CONSUMER_VERSION = "0.1.0"
+KUBERNETES_CONSUMER_VERSION = "0.1.1"
 
 
 def _pinned(value):
@@ -157,7 +157,7 @@ def analyze_kubernetes_running_image(env, target, before, after):
 
 
 def collect_kubernetes_running_image_approval(ctx, before, after):
-    """A1의 공통 수집/전송 연결용 전용 소비 경계. 아직 registry에는 미연결.
+    """A1의 공통 수집/전송 연결용 전용 소비 경계.
 
     before/after는 동일 수집 구간에서 공통 생산자가 제공해야 한다. 지금은 API
     metadata만 있으므로 정상 추론도 시도하지 않는다. 승인 빈 목록을 포함해
@@ -187,7 +187,7 @@ def collect_kubernetes_running_image_approval(ctx, before, after):
                           "deployment_gate_challenge", "functional_inference"],
         "limitations": [
             "Kubernetes API identity is not node-runtime RepoDigest or image/source consumption proof.",
-            "The common runtime-image producer and production dispatch are not connected.",
+            "This API metadata consumer receives no node-runtime image/source relation.",
             "No approval, security PASS or confirmed unapproved execution follows from API imageID.",
             "Only the supplied before/after API snapshots are compared; collection times are not established.",
         ],

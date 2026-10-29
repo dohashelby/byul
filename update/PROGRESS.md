@@ -1342,7 +1342,7 @@ git status
 
 ### 2026-10-29 A-1 선정 native session 종료 경계
 - 한 일: 기존 KubernetesLifecycleReader에 exact prepared session의 고정 stdlib seal_session을 추가했다. 소유 private/nofollow/regular/nlink·경로 identity와 engine 전후 세대를 확인하며 marker 생성만으로 true를 반환하지 않고 bounded terminal END/two-census 안정성을 요구한다.
-- 검증: 구현·공개 의미·프로토콜 사례 초안 종료. 소스 고정 후 직접/동일계약/불변식, Linux 실제 FD·두 Writer 격리 경계와 설치본을 확인할 예정이다. 원문 tail/예외는 저장하지 않는다.
+- 검증: 첫 Windows289통과/새12 fixture 준비오류는 시험 import만 보수했다. 고정9721ed6·동일1145파일 bytes에서 Windows 보수145통과·기존skip1/제외1(10.02초/부모10.689초), Linux 영향302통과·제외1(14.71초/부모15.086초). Linux 실제FD/nofollow/hardlink/두 로컬Writer격리8사례(부모8.578초, 루트FD만 EXAMPLE치환), Windows 설치169파일 일치 및 격리 설치본 공개API4사례(1.328초) 통과. source변경0, 실제serving/Kubernetes/GPU실증 아님. 원문 tail/예외는 report에 저장하지 않는다.
 - 다음: 이 독립 계측 경계를 고정 제공하고 Online HTTP·serving hook/callback/parser/provenance/request-session join을 별도 묶음으로 이어간다. REQ05 등 본인 준비 분기는 큰 Online 미완성에 종속시키지 않는다.
 - 막힌 것: Online 전체·source/image/실제 serving·worker/GPU 회수는 미완료이며 기존 native0.32/lab/source/image gate와 stopped/추가Start중단을 유지한다. B 소비 pin/종결 범위 검증과 실제 ENV/POL/소유자 실행이 필요하다.
 

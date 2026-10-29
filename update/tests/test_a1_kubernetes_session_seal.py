@@ -7,6 +7,8 @@ import pytest
 from guard.executors.kubernetes_lifecycle_capture import KubernetesLifecycleReader, KubernetesCaptureError, supervised_source
 from guard.executors.session_seal import SESSION_SEALER
 from tests.test_kubernetes_lifecycle import group, target, World, PRIVATE
+from tests.test_lifecycle_capture import case, external
+from tests.test_lifecycle_sensor import writer_factory
 
 
 @pytest.mark.parametrize("damage", [None, "unclosed", "empty", "wrong-session", "bad-hash", "extra",

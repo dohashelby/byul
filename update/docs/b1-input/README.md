@@ -45,7 +45,7 @@ B-1 전용 Python 3.12 venv에 이전 CPU freeze를 --torch-backend cpu로 설�
 ```sh
 export VLLM_TARGET_DEVICE=cpu VLLM_LOGGING_LEVEL=CRITICAL CUDA_VISIBLE_DEVICES= VLLM_PLUGINS=
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
-export PYTHONPATH="$VLLM_SOURCE:$BYUL_B1_REPO/update/src"
+export PYTHONPATH="$BYUL_B1_REPO/update/src:$BYUL_B1_REPO/update:$VLLM_SOURCE"
 "$CPU_VENV/bin/python" "$BYUL_B1_REPO/update/tools/b1_input_cpu.py" --source-root "$VLLM_SOURCE" --workdir "$FRESH_B1_EVIDENCE_DIR"
 ```
 
@@ -101,3 +101,40 @@ Typed ErrorResponse의 native code400/422를 관측한 경우에만 해당 core�
 오류는 구분하고 함수 진입·최종 admission 해시·재사용 키 제거 여부만 기록한다.
 원문 수정·mock renderer/engine 없이 실제 생성자를 사용한다. 이것은 공개 HTTP routing,
 engine-aware model/identity 검사 또는 최종 worker 소비의 증명이 아니다.
+
+
+## OnlineRenderer target031 연결 준비 (2026-10-29)
+
+`--suite online --source-profile target031`은 선정 db9527a46873454610df6dbedf79a36d6bf1a7f6의
+실제 OnlineRenderer와 InputProcessor를 사용한다. 기본 `reference5d`와 기존 입력·sampling·
+embedding suite, GPT2/WordLevel context builder의 코드는 유지한다. 기존 Online16 입력과
+각 사례의 후속 정상 대조16을 재사용하며 새16시험 개발로 집계하지 않는다.
+
+실제 0.31 정상 1건 feasibility에서 render_chat·preprocess_chat·reuse helper와
+InputProcessor 진입, prompt_count3을 확인했다(9.40초). 이 준비 관측은 정식 제품 증거에
+집계하지 않는다. `_C`·Triton 부재 경고에도 선택한 CPU admission은 완료됐다.
+정식 capture는 vLLM import 전에 VLLM_CACHE_ROOT와 HF cache를 새 소유 workdir 아래로
+설정한다. 가중치·모델 연산·네트워크·서비스·GPU는 사용하지 않는다.
+
+0.31에는 BaseRenderer.validate_token_ids가 없고 InputProcessor._validate_model_input의
+음수·OOV 검사와 _validate_prompt_len을 직접 추적한다. 함수 부재는 source_features에
+present=false로 남긴다. 0.31 reuse helper는 pop 뒤 빈 값에 fallback하며 5d의 bool·echo
+검사를 포함하지 않는다. 따라서 target의 reuse-empty/reuse-bool/reuse-echo-ignores-ids는
+원본 expected/hash/check_id/stage를 보존하고 별도 source_scope_eligibility를 관측 전용으로
+둔다. 나머지 필수 검증은 파싱된 필드 해시·실제 적용 fixture 설정·gate trace와 실제
+processor 입력·반환 해시를 통해 귀속한다. typed400 또는 빈 trace만으로 소비를 확정하지 않는다.
+
+capture_online() 한 번의 수집 ID·UTC 시작/종료 시각과16행을 REQ07·08·SUP08이 공유한다.
+기업 한도는 설정하지 않고 작은 max_model_len16/vocab32를 DECLARED fixture로 유지한다.
+사례별 생성자·실행·후속 관측 및 보조 저장 실패 시 이미 검증된 다른 행과 독립 위반은
+보존하고 incomplete를 반환한다. 명시 source 불일치행의 판정 자격과 정제 관측은 분리한다.
+
+```sh
+# update/ cwd, 부모 normal Python
+PYTHONPATH="src:.:$VLLM_SOURCE" "$CPU_VENV/bin/python" -m tools.b1_input_cpu \
+  --suite online --source-profile target031 --source-root "$VLLM_SOURCE" \
+  --workdir "$FRESH_ONLINE_CPU_EVIDENCE"
+```
+
+정식 target16 수집 결과는 collector·producer 통합 소스 확정 후 기록한다. 기존 참조5d16행·
+후속16 원본은 유지한다. installed target은 null이고 최종 runner 소비는 미검증이다.

@@ -1,3 +1,10 @@
+## 2026-10-30 — A-1 LIF04 선택 transport buffer 관측 제품 연결
+
+- 한 일: PR122 이후 전용 stream_buffer:kubernetes와 명시 native12를 준비했다. 원팩31·LIF04 두 분기/질문/기준·다른76정의·A2/B 원본·기본8/9~11을 보존하고 기존 CLI/증거 경로를 사용한다. 실제 고정 Uvicorn send/drain/connection_lost와 선택 asyncio TCP buffer/kernel queue·전체process RSS를 구분한다. HTTP 다섯 요청·수신/시간/출력 한도·POL16개와 오류/누락 의미를 닫았다.
+- 테스트 결과: 구현·시험·문서 초안과 자기 code 오프라인 검토까지 준비했다. 기능 검증은 소스 고정 뒤 실행하며 아직 통과로 기록하지 않는다. 고정 실제 메서드 본문·소유 Linux 소켓·제품 정상/후보/누락/교체/후속오류·정확Ref 시험을 포함한다.
+- 다음 단계: 검토 checkpoint와 전체 공통 소비 pin 고정→직접/동일계약·인접·불변식→같은 bytes Linux→wheel/설치 CLI→확정 인계·초안PR·정확HEAD CI. 이후 준비된 본인 담당 개발을 이어간다.
+- 막힌 것: 실제 선택 이미지 Uvicorn 포함/세대·전체 serving buffer inventory·client close 회수 시계·debug 활성/정책·producer 신뢰/실제 Kubernetes/GPU 실증은 미완료다. 전축UNKNOWN·normal_control=null·producer/inventory/release/scope=false, CI결제차단·원GPU창종료/Start0/마지막stopped를 유지한다. 부모A39/56/4·A1 19/27/2 전체 완료 수는 늘리지 않는다.
+
 ## 2026-10-29 — A-1 PLT01/04 확정 소비의 공통 등록
 
 - 한 일: 확정e8e915b를 보존한 분리 공간에서 A2 c4fdbe4 전용5파일을 원본 추적 cherry-pick으로 통합한다. 기존 container_config:kubernetes에 PLT01의 전용 수집을 연결하고 credential_exposure:kubernetes를 등록한다. 필수 permission 관문/정책 타입과 target hash를 I/O 전에 검사하고 최종 EVD 출처는 공통 live 기록/전송 경계보다 승격하지 않는다. 기존 SUP04 경로와 전용 bytes·팩31·판정은 유지한다.

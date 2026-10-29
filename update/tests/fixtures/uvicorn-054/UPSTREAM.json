@@ -1,0 +1,31 @@
+{
+  "upstream": "https://github.com/Kludex/uvicorn",
+  "tag": "0.54.0",
+  "commit": "3eb9a9ab9af69005c687728097461c1fd2a95db9",
+  "files": {
+    "uvicorn/protocols/http/h11_impl.py": {
+      "sha256": "a3154a6c2cfaaaebe19ac7aa255dfe9b6b7b490de1da95274c033aa093e8c322",
+      "bytes": 20886,
+      "url": "https://raw.githubusercontent.com/Kludex/uvicorn/3eb9a9ab9af69005c687728097461c1fd2a95db9/uvicorn/protocols/http/h11_impl.py"
+    },
+    "uvicorn/protocols/http/httptools_impl.py": {
+      "sha256": "1d4e1c579df4168433a61a01f10c628b31c1790e72dd9769d2b8633b22214033",
+      "bytes": 22564,
+      "url": "https://raw.githubusercontent.com/Kludex/uvicorn/3eb9a9ab9af69005c687728097461c1fd2a95db9/uvicorn/protocols/http/httptools_impl.py"
+    },
+    "uvicorn/protocols/http/flow_control.py": {
+      "sha256": "d39d16560df512f3ce907c329c2a0c3f5cd7165fef3b753876eae5739bf2a785",
+      "bytes": 1701,
+      "url": "https://raw.githubusercontent.com/Kludex/uvicorn/3eb9a9ab9af69005c687728097461c1fd2a95db9/uvicorn/protocols/http/flow_control.py"
+    },
+    "uvicorn/__init__.py": {
+      "sha256": "c2aaed31a2528ef6b35eddd90482cd8840acd7cfb0a95e504f20f6eab0187026",
+      "bytes": 147,
+      "url": "https://raw.githubusercontent.com/Kludex/uvicorn/3eb9a9ab9af69005c687728097461c1fd2a95db9/uvicorn/__init__.py"
+    }
+  },
+  "license": "BSD-3-Clause",
+  "license_sha256": "efe1acf3e62fb99c288b0ec73e5a773b7268ef4320fe757ea994214e4b63c371",
+  "test_reference_only": true,
+  "selected_image_contents_verified": false
+}

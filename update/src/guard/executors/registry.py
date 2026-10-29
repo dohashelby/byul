@@ -33,10 +33,12 @@ from .api_transport import APITransportExecutor
 from .kubernetes_api_transport import KubernetesAPITransportExecutor
 from .kubernetes_route_record import KubernetesRouteRecordExecutor
 from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
+from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
+    "request_termination:kubernetes": lambda cfg: KubernetesRequestTerminationExecutor(cfg.get("request_termination", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "model_authorization:kubernetes": lambda cfg: KubernetesModelAuthorizationExecutor(cfg.get("model_authorization", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "route_record:kubernetes": lambda cfg: KubernetesRouteRecordExecutor(cfg.get("route_record", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "fake": lambda cfg: FakeExecutor(cfg.get("fake", {}).get("scenario", "pass"), cfg.get("fake", {}).get("scenarios", {})),

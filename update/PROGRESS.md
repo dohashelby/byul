@@ -1366,3 +1366,10 @@ git status
 - 다음 단계: 영향 검증·실패 보수·소스 재고정→설치·공개 CLI·정확Ref 범위 확인→commit/push·초안PR·정확HEAD CI·고정 소스/B 소비 판본 인계. 본인 취소/종료/관측과 A2 확정 IPC/worker 소비도 준비 순서대로 이어간다.
 - 막힌 것: 실제 getter/계측 비용·serving/worker/GPU·image ancestry·실제0.31 수집·B 전용 source pin/정책/소비·전체 Online은 미완료다. CI 결제 차단과 원래 GPU 승인창 종료·stopped·추가Start0을 유지한다. 부모A39/A1담당19/필수 결과를 축소하지 않는다.
 
+## 2026-10-30 — A-1 LIF10 연결 종료·native 종결 관측
+
+- 한 일: 확정 e24dfb5에서 기존 HTTP/native/session/CLI를 재사용해 LIF10 명시6POL·고정 JSON 전후 대조·소유 SSE1byte 후 client close·선정 session seal/capture·요청별 state/KV/worker 관측을 연결했다. 정확 source/lab/image gate와7개 회수 범위를 보존하며 다른 clock의 직접 차감·EXAMPLE 승격·부분 전체완료를 막는다. 원래77개·다른76개 정의 bytes와 질문/판정 기준을 보존하는 DRAFT 팩을 제공한다.
+- 테스트 결과: 구현·직접/제품/반례 테스트·문서 초안 작성 단계이며 아직 source 고정·검증 전이다. 실제 serving/worker/GPU 실증 결과가 아니다.
+- 다음 단계: 정적 검토·고정 snapshot→직접/인접/불변식→Linux/설치·정확6Ref→commit/push·초안PR·정확HEAD CI·본인 인계. 다음 REQ12/종료 모드와 A2 준비된 확정 IPC/worker 소비를 이어간다.
+- 막힌 것: 전체 취소/timeout/stop·각 실행단계·독립 종결/전송/GPU proof·신뢰 producer·실제 기업POL 결합은 미완료다. 후보는 confirmed_violation=false, 모든 축 UNKNOWN이다. GPU 승인창 종료·추가Start0·stopped·CI 결제 차단과 부모A39/A1담당19·필수결과를 유지한다.
+

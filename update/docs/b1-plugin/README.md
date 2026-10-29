@@ -144,3 +144,62 @@ auxiliary_write.status=failed와 예외 타입만 남긴다. 보조 저장 실�
 submodule finder shadow의 코드 미실행, 보조 쓰기 실패 뒤 독립 위반 보존, CLI 실패
 상태를 확인했다. 기존 -1 실제 기록과 의존성 기록은 보존하고, 고정 소스 통합 뒤
 선정 target031 파이프라인을 한 번 재실행한다.
+
+## 최종 0.31 CPU 증거 연결 결과 — 2026-10-29
+
+최종 코드 snapshot `8f14e969d97249ca5b626ec439aa84101fa908dd`에서 선정 target031
+파이프라인을 한 번 실행했다. source `db9527a...`, 고정 fixture와 실제 installed
+entrypoint inventory를 검증한 뒤 기존 10사례와 각 후속 정상 대조 10건을 완료했다.
+수집 source/fixture/component의 parent·child pre/post 검사는 모두 verified였고,
+auxiliary_write는 completed였다. source-filter 위반 후보는 확인되지 않았다.
+
+기존 standalone JSON을 변환해 재생한 결과가 아니라, collector가 직접 실행해 반환한
+record를 전용 EvidenceDraft와 기존 core에 연결한 결과다. COMPLETED/DECLARED,
+수집 관측 4개·정제 첨부 1개이며 security/functional/performance 모두 UNKNOWN이다.
+기업 승인 정책·설치 이미지·실제 runner/IO 소비·권한·영구 등록은 남아 있다.
+
+- 최종 실제 원본: `/private/tmp/byul-sup10-product-target031-20261029-2/`.
+  collector 부모 71.70초, pipeline 부모 76.08초. 시간은 해당 CPU 수집의 경과이며
+  기업의 성능 한도나 처리율 기준으로 사용하지 않는다.
+- Store.verify 오류 0, 정확한 PACK/EVD Ref로 재판정한 RES Ref 동일,
+  RPT의 exact EVD·RES Ref 포함을 `postverify-1.json`에서 확인했다.
+- PACK `PACK-B-SUP10-PLUGIN-CPU-TARGET031`, revision 1,
+  SHA256 `0d342ce0a7a3bf092b2d17f6144a0c858fe3f0ff7230ebc2db3a88f3acc85a92`.
+- EVD `EVD-01M638WHVSGF4WR7R5JRVMBZHR`, revision 1,
+  SHA256 `e87830619f5925f82540fa8a0f60e330be9ac221437f81155b16b7dafe4dd6d2`.
+- RES `RES-01M638YW4E267VXF8Y8A4EB6HC`, revision 1,
+  SHA256 `c9b8f378b0af95a359e22925ed3b00383b250f3653bb1842f124196835d92f9f`.
+- Collector bytes `cd281c1c1f820773661ebcfeb8743ebf960a44087dcf2bcb2acc4328b6fe0503`,
+  pipeline bytes `99280bab1b33d9076041b0b1654117b606fb4f6f0d8d3c7436fae85204f3e5dc`.
+
+두 검토 수정 전의 target -1 원본은
+`/private/tmp/byul-sup10-product-target031-20261029-1/`에 그대로 보존했다.
+최종 실행의 152개 설치 package/version은 이 -1 freeze와 동일함을 직접 대조했고,
+`dependency-reference.json`에서 원본 freeze와 SHA256을 참조한다. 이전 151개 환경
+명세와 fixture 설치 전 기록도 유지한다. 제품 dependencies/lock·vLLM source는 바꾸지 않았다.
+
+기본 reference5d 실제 smoke 원본은
+`/private/tmp/byul-sup10-reference-smoke-20261029-1/`에 보존했다. 기존 10사례·후속 10건과
+기본 source 선택이 정상 완료됐다. 검토 수정 뒤 read_events/child/main AST가 같은
+부분의 정상 동작은 `/private/tmp/byul-sup10-reference-static-impact-20261029.json`으로
+영향을 확인해 재사용했다. 추가 reference 전체 재실행이나 과거 JSON의 새 pipeline
+소비 실증으로 집계하지 않는다. 새로운 공통 fixture lookup 정상 경로는 target -2에서
+실측했다. 각 source/의존성 조합의 CPU 관측이며 설치 이미지 업데이트 비교 쌍은 별도다.
+
+### ASGI 요청 집계 정정
+
+이전 문서의 'ASGI 3건' 문구와 원본 기록은 보존한다. 원래 child 코드는 endpoint의
+네 사례 모두 TestClient GET을 호출하며 최신 target -1/-2와 reference -1의 case별
+asgi_control_status도 다음 네 건을 기록한다. 따라서 최신 실측 집계는 **4건**이다.
+사례·호출을 추가하거나 제거해 수치를 맞추지 않았다.
+
+| 기존 endpoint 사례 | 실제 status |
+| --- | --- |
+| endpoint-allowlisted | 200 |
+| endpoint-disabled | 404 |
+| endpoint-unset | 404 |
+| endpoint-task-mismatch | 404 |
+
+in-memory ASGI 요청이며 외부 HTTP나 네트워크 listener를 기동하지 않았다. 원래 corpus
+재사용이므로 새 10개 시험 개발로 계상하지 않는다. endpoint route 충돌·OpenAPI 교체를
+추가 시험한 결과도 아니다.

@@ -16,7 +16,7 @@ from guard.adapters import vllm_lifecycle_sensor as legacy, vllm_lifecycle_profi
 from guard.adapters import vllm_online_sensor as online, vllm_online_input as callback
 from guard.collectors import lifecycle
 from guard.executors import lifecycle_capture as capture, owned_capture
-from tests.test_lifecycle_capture import external, revised, case
+from tests.test_lifecycle_capture import external, revised, case, Docker, IMAGE
 from tests.test_lifecycle_sensor import FakeOS, SilentThread, CONTEXT, CANARY, writer_factory
 from tests.test_lifecycle_session import group
 from tests.test_kubernetes_lifecycle import target
@@ -44,6 +44,14 @@ def native(point, namespace=None):
         qualname=point
     else:
         source='\n'*(row['first_line']-1)+row['method'];qualname=point.split('.',1)[1]
+    # CPython uses module import bindings to select LOAD_GLOBAL/LOAD_ATTR call
+    # forms. Preserve this compile context, without executing any import.
+    lines=source.splitlines(keepends=True)
+    for entry in row['module_imports']:
+        pieces=entry['source'].splitlines(keepends=True)
+        assert entry['line']+len(pieces)-1 < row['first_line']-1
+        lines[entry['line']-1:entry['line']-1+len(pieces)]=pieces
+    source=''.join(lines)
     code=compile(source,row['filename'],'exec',flags=row['compiler_flags'],dont_inherit=True,optimize=0)
     body=find(code,qualname)
     assert legacy.code_digest(body)==contract['function_code_sha256']
@@ -121,6 +129,38 @@ def test_actual_reuse_pop_is_observed_before_and_after_without_content(world):
     assert snapshots[0]['metadata']['parsed_fields']['kv_transfer_params']['canonical_sha256']!=snapshots[1]['metadata']['parsed_fields']['kv_transfer_params']['canonical_sha256']
     assert snapshots[1]['metadata']['reused']['min']==-1 and summary['online_incomplete_calls']==0
     assert summary['online_callback_provenance']['bytes_sha256']==online.CALLBACK_SHA256
+
+
+def test_actual_processor_invocation_passes_native_id_to_nested_validation(world):
+    check=wrapped(world,'InputProcessor._validate_prompt_len',{'VLLMValidationError':RuntimeError})
+    error=RuntimeError(CANARY)
+    owner=SimpleNamespace(skip_prompt_length_check=False,model_config=SimpleNamespace(max_model_len=16,runner_type='generate'),supports_mm_inputs=False)
+    def validate(*args):
+        check(owner,1,'decoder')
+        raise error
+    owner._validate_params=validate
+    process=wrapped(world,'InputProcessor.process_inputs')
+    with pytest.raises(RuntimeError) as caught:
+        run_chat(world,lambda:process(owner,'EXAMPLE-NATIVE-RID',{'prompt_token_ids':[1]},None,()))
+    assert caught.value is error
+    _,rows,_=packet(world)
+    snapshots=[r['payload']['metadata']['online_input'] for r in rows if r['event']=='NATIVE']
+    assert len(snapshots)==4 and {s['binding']['native_request_id_sha256'] for s in snapshots}=={legacy.id_sha('EXAMPLE-NATIVE-RID')}
+    assert snapshots[0]['binding']['call_id_sha256']==snapshots[-1]['binding']['call_id_sha256']
+    assert snapshots[1]['binding']['call_id_sha256']==snapshots[2]['binding']['call_id_sha256']
+    assert snapshots[0]['binding']['call_id_sha256']!=snapshots[1]['binding']['call_id_sha256']
+
+
+def test_actual_async_render_preserves_same_cancellation(world):
+    error=asyncio.CancelledError(CANARY)
+    def fail(tokenizer):raise error
+    render=wrapped(world,'OnlineRenderer.render_chat',{'is_mistral_tokenizer':fail})
+    owner=SimpleNamespace(renderer=SimpleNamespace(tokenizer=None),parser=None)
+    with pytest.raises(asyncio.CancelledError) as caught:run_chat(world,lambda:render(owner,SimpleNamespace()))
+    assert caught.value is error
+    _,rows,_=packet(world)
+    snapshots=[r['payload']['metadata']['online_input'] for r in rows if r['event']=='NATIVE']
+    assert [s['phase'] for s in snapshots]==['CALL','RAISE'] and snapshots[-1]['metadata']['exception_type']=='Exception'
 
 
 @pytest.mark.parametrize('count,runner_type,raises',[(15,'generate',False),(16,'generate',True),(16,'pooling',False),(17,'pooling',True)])
@@ -218,6 +258,27 @@ def test_large_read_is_explicit_and_old_read_contract_stays_closed():
     for profile in (None,'unknown'):
         with pytest.raises(ValueError):owned_capture._read_budget(online.MAX_BYTES,profile)
     with pytest.raises(ValueError):owned_capture._read_budget(online.MAX_BYTES+1,owned_capture.EXTENDED_RECORDING_PROFILE)
+
+
+def test_large_recording_uses_actual_owned_file_protocol_and_rechecks(world):
+    for _ in range(1500):world.writer.write('ASGI',{'request_sha256':'d'*64,'phase':'APP_RETURN','more_body':None})
+    raw,_,_=packet(world);assert len(raw)>262144
+    selected={'container':'EXAMPLE-engine','image':IMAGE,'path':'/guard-lifecycle/data/'+world.prepared['session']+'/pid-42-99.jsonl'}
+    target={'run_id':'EXAMPLE-lifecycle','engine':{'container':'EXAMPLE-engine'}}
+    fake_case=SimpleNamespace(raw=raw);client=Docker(fake_case)
+    result=capture.capture(client,target,source=selected,prepared=world.prepared)
+    assert result['process_context_verified'] and result['summary']['recording_closed']
+    assert client.read_budgets==[(online.MAX_BYTES,2*online.MAX_BYTES)]*2
+    assert result['online_callback_provenance']['bytes_sha256']==online.CALLBACK_SHA256
+    assert result['security']=='UNKNOWN' and result['producer_authenticated'] is False
+
+
+def test_standalone_seal_loads_only_fixed_base_without_installing_hooks(monkeypatch):
+    calls=[]
+    monkeypatch.setattr(online,'_BASE',None)
+    monkeypatch.setattr(online,'_private_base',lambda:SimpleNamespace(seal=lambda path:calls.append(path)))
+    online.seal()
+    assert calls==['/guard-lifecycle/settings.json'] and online._BASE is None
 
 
 def test_kubernetes_large_recording_budget_is_selected_profile_only(group,target):

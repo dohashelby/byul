@@ -315,15 +315,20 @@ def configure(base, callback):
     return base
 
 
+def _private_base():
+    raw = _asset("guard_lifecycle_base.py", BASE_SHA256)
+    base = types.ModuleType("_guard_online_private_base")
+    base.__file__ = "/guard-lifecycle/guard_lifecycle_base.py"
+    exec(compile(raw, base.__file__, "exec", dont_inherit=True, optimize=0), base.__dict__)
+    return base
+
+
 def install(path=None):
     global _BASE
     if _BASE is not None or sys.version_info[:2] != (3, 12) or sys.flags.optimize != 0:
         return False
     try:
-        raw = _asset("guard_lifecycle_base.py", BASE_SHA256)
-        base = types.ModuleType("_guard_online_private_base")
-        base.__file__ = "/guard-lifecycle/guard_lifecycle_base.py"
-        exec(compile(raw, base.__file__, "exec", dont_inherit=True, optimize=0), base.__dict__)
+        base = _private_base()
         raw = _asset("guard_online_input_callback.py", CALLBACK_SHA256)
         code = compile(raw, "guard/adapters/vllm_online_input.py", "exec", dont_inherit=True, optimize=0)
         if base.code_digest(code) != CALLBACK_CODE_SHA256:
@@ -347,5 +352,13 @@ class Middleware:
 
 
 def seal(path="/guard-lifecycle/settings.json"):
-    if _BASE is None:raise ValueError("ONLINE_SENSOR_NOT_INSTALLED")
-    return _BASE.seal(path)
+    # Separate marker helper: no hook/callback installation or engine imports.
+    return (_BASE if _BASE is not None else _private_base()).seal(path)
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] != ["--seal"]:
+        raise SystemExit("NATIVE_SENSOR_SEAL_ARGUMENTS_REQUIRED")
+    try:seal()
+    except Exception:
+        raise SystemExit("NATIVE_SENSOR_SEAL_UNAVAILABLE") from None

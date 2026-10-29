@@ -9,7 +9,125 @@
     "compiler_flags": 0,
     "license": "Apache-2.0",
     "license_file": "VLLM-LICENSE.txt",
-    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/renderers/online_renderer.py"
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/renderers/online_renderer.py",
+    "module_imports": [
+      {
+        "line": 3,
+        "source": "import time\n"
+      },
+      {
+        "line": 4,
+        "source": "from collections.abc import Sequence\n"
+      },
+      {
+        "line": 5,
+        "source": "from dataclasses import dataclass\n"
+      },
+      {
+        "line": 6,
+        "source": "from http import HTTPStatus\n"
+      },
+      {
+        "line": 7,
+        "source": "from typing import TYPE_CHECKING, Any, TypeAlias, cast\n"
+      },
+      {
+        "line": 9,
+        "source": "from openai.types.responses import ResponseFunctionToolCall, ResponseOutputItem\n"
+      },
+      {
+        "line": 10,
+        "source": "from openai.types.responses.tool import Mcp, Tool\n"
+      },
+      {
+        "line": 11,
+        "source": "from openai_harmony import Message as OpenAIMessage\n"
+      },
+      {
+        "line": 12,
+        "source": "from openai_harmony import ToolNamespaceConfig\n"
+      },
+      {
+        "line": 14,
+        "source": "from vllm.config import ModelConfig\n"
+      },
+      {
+        "line": 15,
+        "source": "from vllm.entrypoints.chat_utils import (\n    ChatCompletionMessageParam,\n    ChatTemplateContentFormatOption,\n    ConversationMessage,\n)\n"
+      },
+      {
+        "line": 20,
+        "source": "from vllm.entrypoints.generate.base.protocol import validate_request_mm_kwargs\n"
+      },
+      {
+        "line": 21,
+        "source": "from vllm.entrypoints.openai.chat_completion.protocol import (\n    ChatCompletionNamedToolChoiceParam,\n    ChatCompletionRequest,\n)\n"
+      },
+      {
+        "line": 25,
+        "source": "from vllm.entrypoints.openai.completion.protocol import (\n    CompletionRequest,\n)\n"
+      },
+      {
+        "line": 28,
+        "source": "from vllm.entrypoints.openai.parser.harmony_utils import (\n    BUILTIN_TOOL_TO_MCP_SERVER_LABEL,\n    build_harmony_preamble,\n    extract_instructions_from_messages,\n    get_user_message,\n    has_custom_tools,\n    parse_chat_inputs_to_harmony_messages,\n    render_for_completion,\n)\n"
+      },
+      {
+        "line": 37,
+        "source": "from vllm.entrypoints.openai.responses.harmony import (\n    construct_harmony_previous_input_messages,\n    response_input_to_harmony,\n)\n"
+      },
+      {
+        "line": 41,
+        "source": "from vllm.entrypoints.openai.responses.protocol import ResponsesRequest\n"
+      },
+      {
+        "line": 42,
+        "source": "from vllm.entrypoints.openai.responses.utils import (\n    construct_input_messages,\n    construct_tool_dicts,\n    extract_tool_types,\n)\n"
+      },
+      {
+        "line": 47,
+        "source": "from vllm.entrypoints.serve import create_error_response\n"
+      },
+      {
+        "line": 48,
+        "source": "from vllm.entrypoints.serve.engine.protocol import ErrorResponse\n"
+      },
+      {
+        "line": 49,
+        "source": "from vllm.entrypoints.serve.utils.request_logger import RequestLogger\n"
+      },
+      {
+        "line": 50,
+        "source": "from vllm.exceptions import VLLMValidationError\n"
+      },
+      {
+        "line": 51,
+        "source": "from vllm.inputs import (\n    EngineInput,\n    PromptType,\n    SingletonPrompt,\n    TokensPrompt,\n    tokens_input,\n)\n"
+      },
+      {
+        "line": 58,
+        "source": "from vllm.logger import init_logger\n"
+      },
+      {
+        "line": 59,
+        "source": "from vllm.parser import Parser, ParserManager\n"
+      },
+      {
+        "line": 60,
+        "source": "from vllm.renderers import BaseRenderer, ChatParams, TokenizeParams, merge_kwargs\n"
+      },
+      {
+        "line": 61,
+        "source": "from vllm.renderers.inputs.preprocess import (\n    parse_model_prompt,\n    prompt_to_seq,\n)\n"
+      },
+      {
+        "line": 65,
+        "source": "from vllm.utils.mistral import is_mistral_tokenizer, is_mistral_tool_parser\n"
+      },
+      {
+        "line": 66,
+        "source": "from vllm.utils.mistral import mt as _mt\n"
+      }
+    ]
   },
   "OnlineRenderer.validate_chat_template": {
     "module": "vllm.renderers.online_renderer",
@@ -21,7 +139,125 @@
     "compiler_flags": 0,
     "license": "Apache-2.0",
     "license_file": "VLLM-LICENSE.txt",
-    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/renderers/online_renderer.py"
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/renderers/online_renderer.py",
+    "module_imports": [
+      {
+        "line": 3,
+        "source": "import time\n"
+      },
+      {
+        "line": 4,
+        "source": "from collections.abc import Sequence\n"
+      },
+      {
+        "line": 5,
+        "source": "from dataclasses import dataclass\n"
+      },
+      {
+        "line": 6,
+        "source": "from http import HTTPStatus\n"
+      },
+      {
+        "line": 7,
+        "source": "from typing import TYPE_CHECKING, Any, TypeAlias, cast\n"
+      },
+      {
+        "line": 9,
+        "source": "from openai.types.responses import ResponseFunctionToolCall, ResponseOutputItem\n"
+      },
+      {
+        "line": 10,
+        "source": "from openai.types.responses.tool import Mcp, Tool\n"
+      },
+      {
+        "line": 11,
+        "source": "from openai_harmony import Message as OpenAIMessage\n"
+      },
+      {
+        "line": 12,
+        "source": "from openai_harmony import ToolNamespaceConfig\n"
+      },
+      {
+        "line": 14,
+        "source": "from vllm.config import ModelConfig\n"
+      },
+      {
+        "line": 15,
+        "source": "from vllm.entrypoints.chat_utils import (\n    ChatCompletionMessageParam,\n    ChatTemplateContentFormatOption,\n    ConversationMessage,\n)\n"
+      },
+      {
+        "line": 20,
+        "source": "from vllm.entrypoints.generate.base.protocol import validate_request_mm_kwargs\n"
+      },
+      {
+        "line": 21,
+        "source": "from vllm.entrypoints.openai.chat_completion.protocol import (\n    ChatCompletionNamedToolChoiceParam,\n    ChatCompletionRequest,\n)\n"
+      },
+      {
+        "line": 25,
+        "source": "from vllm.entrypoints.openai.completion.protocol import (\n    CompletionRequest,\n)\n"
+      },
+      {
+        "line": 28,
+        "source": "from vllm.entrypoints.openai.parser.harmony_utils import (\n    BUILTIN_TOOL_TO_MCP_SERVER_LABEL,\n    build_harmony_preamble,\n    extract_instructions_from_messages,\n    get_user_message,\n    has_custom_tools,\n    parse_chat_inputs_to_harmony_messages,\n    render_for_completion,\n)\n"
+      },
+      {
+        "line": 37,
+        "source": "from vllm.entrypoints.openai.responses.harmony import (\n    construct_harmony_previous_input_messages,\n    response_input_to_harmony,\n)\n"
+      },
+      {
+        "line": 41,
+        "source": "from vllm.entrypoints.openai.responses.protocol import ResponsesRequest\n"
+      },
+      {
+        "line": 42,
+        "source": "from vllm.entrypoints.openai.responses.utils import (\n    construct_input_messages,\n    construct_tool_dicts,\n    extract_tool_types,\n)\n"
+      },
+      {
+        "line": 47,
+        "source": "from vllm.entrypoints.serve import create_error_response\n"
+      },
+      {
+        "line": 48,
+        "source": "from vllm.entrypoints.serve.engine.protocol import ErrorResponse\n"
+      },
+      {
+        "line": 49,
+        "source": "from vllm.entrypoints.serve.utils.request_logger import RequestLogger\n"
+      },
+      {
+        "line": 50,
+        "source": "from vllm.exceptions import VLLMValidationError\n"
+      },
+      {
+        "line": 51,
+        "source": "from vllm.inputs import (\n    EngineInput,\n    PromptType,\n    SingletonPrompt,\n    TokensPrompt,\n    tokens_input,\n)\n"
+      },
+      {
+        "line": 58,
+        "source": "from vllm.logger import init_logger\n"
+      },
+      {
+        "line": 59,
+        "source": "from vllm.parser import Parser, ParserManager\n"
+      },
+      {
+        "line": 60,
+        "source": "from vllm.renderers import BaseRenderer, ChatParams, TokenizeParams, merge_kwargs\n"
+      },
+      {
+        "line": 61,
+        "source": "from vllm.renderers.inputs.preprocess import (\n    parse_model_prompt,\n    prompt_to_seq,\n)\n"
+      },
+      {
+        "line": 65,
+        "source": "from vllm.utils.mistral import is_mistral_tokenizer, is_mistral_tool_parser\n"
+      },
+      {
+        "line": 66,
+        "source": "from vllm.utils.mistral import mt as _mt\n"
+      }
+    ]
   },
   "OnlineRenderer.preprocess_chat": {
     "module": "vllm.renderers.online_renderer",
@@ -33,7 +269,125 @@
     "compiler_flags": 0,
     "license": "Apache-2.0",
     "license_file": "VLLM-LICENSE.txt",
-    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/renderers/online_renderer.py"
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/renderers/online_renderer.py",
+    "module_imports": [
+      {
+        "line": 3,
+        "source": "import time\n"
+      },
+      {
+        "line": 4,
+        "source": "from collections.abc import Sequence\n"
+      },
+      {
+        "line": 5,
+        "source": "from dataclasses import dataclass\n"
+      },
+      {
+        "line": 6,
+        "source": "from http import HTTPStatus\n"
+      },
+      {
+        "line": 7,
+        "source": "from typing import TYPE_CHECKING, Any, TypeAlias, cast\n"
+      },
+      {
+        "line": 9,
+        "source": "from openai.types.responses import ResponseFunctionToolCall, ResponseOutputItem\n"
+      },
+      {
+        "line": 10,
+        "source": "from openai.types.responses.tool import Mcp, Tool\n"
+      },
+      {
+        "line": 11,
+        "source": "from openai_harmony import Message as OpenAIMessage\n"
+      },
+      {
+        "line": 12,
+        "source": "from openai_harmony import ToolNamespaceConfig\n"
+      },
+      {
+        "line": 14,
+        "source": "from vllm.config import ModelConfig\n"
+      },
+      {
+        "line": 15,
+        "source": "from vllm.entrypoints.chat_utils import (\n    ChatCompletionMessageParam,\n    ChatTemplateContentFormatOption,\n    ConversationMessage,\n)\n"
+      },
+      {
+        "line": 20,
+        "source": "from vllm.entrypoints.generate.base.protocol import validate_request_mm_kwargs\n"
+      },
+      {
+        "line": 21,
+        "source": "from vllm.entrypoints.openai.chat_completion.protocol import (\n    ChatCompletionNamedToolChoiceParam,\n    ChatCompletionRequest,\n)\n"
+      },
+      {
+        "line": 25,
+        "source": "from vllm.entrypoints.openai.completion.protocol import (\n    CompletionRequest,\n)\n"
+      },
+      {
+        "line": 28,
+        "source": "from vllm.entrypoints.openai.parser.harmony_utils import (\n    BUILTIN_TOOL_TO_MCP_SERVER_LABEL,\n    build_harmony_preamble,\n    extract_instructions_from_messages,\n    get_user_message,\n    has_custom_tools,\n    parse_chat_inputs_to_harmony_messages,\n    render_for_completion,\n)\n"
+      },
+      {
+        "line": 37,
+        "source": "from vllm.entrypoints.openai.responses.harmony import (\n    construct_harmony_previous_input_messages,\n    response_input_to_harmony,\n)\n"
+      },
+      {
+        "line": 41,
+        "source": "from vllm.entrypoints.openai.responses.protocol import ResponsesRequest\n"
+      },
+      {
+        "line": 42,
+        "source": "from vllm.entrypoints.openai.responses.utils import (\n    construct_input_messages,\n    construct_tool_dicts,\n    extract_tool_types,\n)\n"
+      },
+      {
+        "line": 47,
+        "source": "from vllm.entrypoints.serve import create_error_response\n"
+      },
+      {
+        "line": 48,
+        "source": "from vllm.entrypoints.serve.engine.protocol import ErrorResponse\n"
+      },
+      {
+        "line": 49,
+        "source": "from vllm.entrypoints.serve.utils.request_logger import RequestLogger\n"
+      },
+      {
+        "line": 50,
+        "source": "from vllm.exceptions import VLLMValidationError\n"
+      },
+      {
+        "line": 51,
+        "source": "from vllm.inputs import (\n    EngineInput,\n    PromptType,\n    SingletonPrompt,\n    TokensPrompt,\n    tokens_input,\n)\n"
+      },
+      {
+        "line": 58,
+        "source": "from vllm.logger import init_logger\n"
+      },
+      {
+        "line": 59,
+        "source": "from vllm.parser import Parser, ParserManager\n"
+      },
+      {
+        "line": 60,
+        "source": "from vllm.renderers import BaseRenderer, ChatParams, TokenizeParams, merge_kwargs\n"
+      },
+      {
+        "line": 61,
+        "source": "from vllm.renderers.inputs.preprocess import (\n    parse_model_prompt,\n    prompt_to_seq,\n)\n"
+      },
+      {
+        "line": 65,
+        "source": "from vllm.utils.mistral import is_mistral_tokenizer, is_mistral_tool_parser\n"
+      },
+      {
+        "line": 66,
+        "source": "from vllm.utils.mistral import mt as _mt\n"
+      }
+    ]
   },
   "online_renderer._reused_prompt_token_ids": {
     "module": "vllm.renderers.online_renderer",
@@ -45,7 +399,125 @@
     "compiler_flags": 0,
     "license": "Apache-2.0",
     "license_file": "VLLM-LICENSE.txt",
-    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/renderers/online_renderer.py"
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/renderers/online_renderer.py",
+    "module_imports": [
+      {
+        "line": 3,
+        "source": "import time\n"
+      },
+      {
+        "line": 4,
+        "source": "from collections.abc import Sequence\n"
+      },
+      {
+        "line": 5,
+        "source": "from dataclasses import dataclass\n"
+      },
+      {
+        "line": 6,
+        "source": "from http import HTTPStatus\n"
+      },
+      {
+        "line": 7,
+        "source": "from typing import TYPE_CHECKING, Any, TypeAlias, cast\n"
+      },
+      {
+        "line": 9,
+        "source": "from openai.types.responses import ResponseFunctionToolCall, ResponseOutputItem\n"
+      },
+      {
+        "line": 10,
+        "source": "from openai.types.responses.tool import Mcp, Tool\n"
+      },
+      {
+        "line": 11,
+        "source": "from openai_harmony import Message as OpenAIMessage\n"
+      },
+      {
+        "line": 12,
+        "source": "from openai_harmony import ToolNamespaceConfig\n"
+      },
+      {
+        "line": 14,
+        "source": "from vllm.config import ModelConfig\n"
+      },
+      {
+        "line": 15,
+        "source": "from vllm.entrypoints.chat_utils import (\n    ChatCompletionMessageParam,\n    ChatTemplateContentFormatOption,\n    ConversationMessage,\n)\n"
+      },
+      {
+        "line": 20,
+        "source": "from vllm.entrypoints.generate.base.protocol import validate_request_mm_kwargs\n"
+      },
+      {
+        "line": 21,
+        "source": "from vllm.entrypoints.openai.chat_completion.protocol import (\n    ChatCompletionNamedToolChoiceParam,\n    ChatCompletionRequest,\n)\n"
+      },
+      {
+        "line": 25,
+        "source": "from vllm.entrypoints.openai.completion.protocol import (\n    CompletionRequest,\n)\n"
+      },
+      {
+        "line": 28,
+        "source": "from vllm.entrypoints.openai.parser.harmony_utils import (\n    BUILTIN_TOOL_TO_MCP_SERVER_LABEL,\n    build_harmony_preamble,\n    extract_instructions_from_messages,\n    get_user_message,\n    has_custom_tools,\n    parse_chat_inputs_to_harmony_messages,\n    render_for_completion,\n)\n"
+      },
+      {
+        "line": 37,
+        "source": "from vllm.entrypoints.openai.responses.harmony import (\n    construct_harmony_previous_input_messages,\n    response_input_to_harmony,\n)\n"
+      },
+      {
+        "line": 41,
+        "source": "from vllm.entrypoints.openai.responses.protocol import ResponsesRequest\n"
+      },
+      {
+        "line": 42,
+        "source": "from vllm.entrypoints.openai.responses.utils import (\n    construct_input_messages,\n    construct_tool_dicts,\n    extract_tool_types,\n)\n"
+      },
+      {
+        "line": 47,
+        "source": "from vllm.entrypoints.serve import create_error_response\n"
+      },
+      {
+        "line": 48,
+        "source": "from vllm.entrypoints.serve.engine.protocol import ErrorResponse\n"
+      },
+      {
+        "line": 49,
+        "source": "from vllm.entrypoints.serve.utils.request_logger import RequestLogger\n"
+      },
+      {
+        "line": 50,
+        "source": "from vllm.exceptions import VLLMValidationError\n"
+      },
+      {
+        "line": 51,
+        "source": "from vllm.inputs import (\n    EngineInput,\n    PromptType,\n    SingletonPrompt,\n    TokensPrompt,\n    tokens_input,\n)\n"
+      },
+      {
+        "line": 58,
+        "source": "from vllm.logger import init_logger\n"
+      },
+      {
+        "line": 59,
+        "source": "from vllm.parser import Parser, ParserManager\n"
+      },
+      {
+        "line": 60,
+        "source": "from vllm.renderers import BaseRenderer, ChatParams, TokenizeParams, merge_kwargs\n"
+      },
+      {
+        "line": 61,
+        "source": "from vllm.renderers.inputs.preprocess import (\n    parse_model_prompt,\n    prompt_to_seq,\n)\n"
+      },
+      {
+        "line": 65,
+        "source": "from vllm.utils.mistral import is_mistral_tokenizer, is_mistral_tool_parser\n"
+      },
+      {
+        "line": 66,
+        "source": "from vllm.utils.mistral import mt as _mt\n"
+      }
+    ]
   },
   "protocol.validate_request_mm_kwargs": {
     "module": "vllm.entrypoints.generate.base.protocol",
@@ -57,7 +529,49 @@
     "compiler_flags": 0,
     "license": "Apache-2.0",
     "license_file": "VLLM-LICENSE.txt",
-    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/entrypoints/generate/base/protocol.py"
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/entrypoints/generate/base/protocol.py",
+    "module_imports": [
+      {
+        "line": 6,
+        "source": "import json\n"
+      },
+      {
+        "line": 7,
+        "source": "from typing import Annotated, Any, Literal, TypeAlias\n"
+      },
+      {
+        "line": 9,
+        "source": "from pydantic import (\n    BaseModel,\n    Field,\n    model_serializer,\n)\n"
+      },
+      {
+        "line": 15,
+        "source": "import vllm.envs as envs\n"
+      },
+      {
+        "line": 16,
+        "source": "from vllm.config.utils import replace\n"
+      },
+      {
+        "line": 17,
+        "source": "from vllm.entrypoints.chat_utils import make_tool_call_id\n"
+      },
+      {
+        "line": 18,
+        "source": "from vllm.entrypoints.serve.engine.protocol import OpenAIBaseModel, UsageInfo\n"
+      },
+      {
+        "line": 19,
+        "source": "from vllm.exceptions import VLLMValidationError\n"
+      },
+      {
+        "line": 20,
+        "source": "from vllm.logger import init_logger\n"
+      },
+      {
+        "line": 21,
+        "source": "from vllm.sampling_params import StructuredOutputsParams\n"
+      }
+    ]
   },
   "InputProcessor.process_inputs": {
     "module": "vllm.v1.engine.input_processor",
@@ -69,7 +583,117 @@
     "compiler_flags": 0,
     "license": "Apache-2.0",
     "license_file": "VLLM-LICENSE.txt",
-    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/v1/engine/input_processor.py"
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/v1/engine/input_processor.py",
+    "module_imports": [
+      {
+        "line": 4,
+        "source": "import time\n"
+      },
+      {
+        "line": 5,
+        "source": "from collections.abc import Callable, Mapping\n"
+      },
+      {
+        "line": 6,
+        "source": "from functools import partial\n"
+      },
+      {
+        "line": 7,
+        "source": "from typing import Any, Literal\n"
+      },
+      {
+        "line": 9,
+        "source": "import vllm.envs as envs\n"
+      },
+      {
+        "line": 10,
+        "source": "from vllm.config import VllmConfig\n"
+      },
+      {
+        "line": 11,
+        "source": "from vllm.exceptions import VLLMValidationError\n"
+      },
+      {
+        "line": 12,
+        "source": "from vllm.inputs import (\n    EngineInput,\n    PromptType,\n    SingletonInput,\n    split_enc_dec_input,\n)\n"
+      },
+      {
+        "line": 18,
+        "source": "from vllm.logger import init_logger\n"
+      },
+      {
+        "line": 19,
+        "source": "from vllm.lora.request import LoRARequest\n"
+      },
+      {
+        "line": 20,
+        "source": "from vllm.multimodal import MULTIMODAL_REGISTRY, MultiModalRegistry\n"
+      },
+      {
+        "line": 21,
+        "source": "from vllm.multimodal.encoder_budget import MultiModalBudget\n"
+      },
+      {
+        "line": 22,
+        "source": "from vllm.multimodal.inputs import MultiModalFeatureSpec\n"
+      },
+      {
+        "line": 23,
+        "source": "from vllm.multimodal.utils import argsort_mm_positions\n"
+      },
+      {
+        "line": 24,
+        "source": "from vllm.platforms import current_platform\n"
+      },
+      {
+        "line": 25,
+        "source": "from vllm.pooling_params import PoolingParams\n"
+      },
+      {
+        "line": 26,
+        "source": "from vllm.renderers import BaseRenderer, renderer_from_config\n"
+      },
+      {
+        "line": 27,
+        "source": "from vllm.renderers.inputs.preprocess import parse_model_prompt\n"
+      },
+      {
+        "line": 28,
+        "source": "from vllm.sampling_params import SamplingParams\n"
+      },
+      {
+        "line": 29,
+        "source": "from vllm.tasks import GENERATION_TASKS, POOLING_TASKS, SupportedTask\n"
+      },
+      {
+        "line": 30,
+        "source": "from vllm.tokenizers import TokenizerLike\n"
+      },
+      {
+        "line": 31,
+        "source": "from vllm.utils import length_from_prompt_token_ids_or_embeds, random_uuid\n"
+      },
+      {
+        "line": 32,
+        "source": "from vllm.utils.async_utils import make_async\n"
+      },
+      {
+        "line": 33,
+        "source": "from vllm.utils.diffusion import validate_diffusion_sampling_params\n"
+      },
+      {
+        "line": 34,
+        "source": "from vllm.utils.jsontree import json_iter_leaves\n"
+      },
+      {
+        "line": 35,
+        "source": "from vllm.v1.engine import EngineCoreRequest\n"
+      },
+      {
+        "line": 36,
+        "source": "from vllm.v1.kv_hints import KvHintsEnvelope\n"
+      }
+    ]
   },
   "InputProcessor._validate_prompt_len": {
     "module": "vllm.v1.engine.input_processor",
@@ -81,7 +705,117 @@
     "compiler_flags": 0,
     "license": "Apache-2.0",
     "license_file": "VLLM-LICENSE.txt",
-    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/v1/engine/input_processor.py"
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/v1/engine/input_processor.py",
+    "module_imports": [
+      {
+        "line": 4,
+        "source": "import time\n"
+      },
+      {
+        "line": 5,
+        "source": "from collections.abc import Callable, Mapping\n"
+      },
+      {
+        "line": 6,
+        "source": "from functools import partial\n"
+      },
+      {
+        "line": 7,
+        "source": "from typing import Any, Literal\n"
+      },
+      {
+        "line": 9,
+        "source": "import vllm.envs as envs\n"
+      },
+      {
+        "line": 10,
+        "source": "from vllm.config import VllmConfig\n"
+      },
+      {
+        "line": 11,
+        "source": "from vllm.exceptions import VLLMValidationError\n"
+      },
+      {
+        "line": 12,
+        "source": "from vllm.inputs import (\n    EngineInput,\n    PromptType,\n    SingletonInput,\n    split_enc_dec_input,\n)\n"
+      },
+      {
+        "line": 18,
+        "source": "from vllm.logger import init_logger\n"
+      },
+      {
+        "line": 19,
+        "source": "from vllm.lora.request import LoRARequest\n"
+      },
+      {
+        "line": 20,
+        "source": "from vllm.multimodal import MULTIMODAL_REGISTRY, MultiModalRegistry\n"
+      },
+      {
+        "line": 21,
+        "source": "from vllm.multimodal.encoder_budget import MultiModalBudget\n"
+      },
+      {
+        "line": 22,
+        "source": "from vllm.multimodal.inputs import MultiModalFeatureSpec\n"
+      },
+      {
+        "line": 23,
+        "source": "from vllm.multimodal.utils import argsort_mm_positions\n"
+      },
+      {
+        "line": 24,
+        "source": "from vllm.platforms import current_platform\n"
+      },
+      {
+        "line": 25,
+        "source": "from vllm.pooling_params import PoolingParams\n"
+      },
+      {
+        "line": 26,
+        "source": "from vllm.renderers import BaseRenderer, renderer_from_config\n"
+      },
+      {
+        "line": 27,
+        "source": "from vllm.renderers.inputs.preprocess import parse_model_prompt\n"
+      },
+      {
+        "line": 28,
+        "source": "from vllm.sampling_params import SamplingParams\n"
+      },
+      {
+        "line": 29,
+        "source": "from vllm.tasks import GENERATION_TASKS, POOLING_TASKS, SupportedTask\n"
+      },
+      {
+        "line": 30,
+        "source": "from vllm.tokenizers import TokenizerLike\n"
+      },
+      {
+        "line": 31,
+        "source": "from vllm.utils import length_from_prompt_token_ids_or_embeds, random_uuid\n"
+      },
+      {
+        "line": 32,
+        "source": "from vllm.utils.async_utils import make_async\n"
+      },
+      {
+        "line": 33,
+        "source": "from vllm.utils.diffusion import validate_diffusion_sampling_params\n"
+      },
+      {
+        "line": 34,
+        "source": "from vllm.utils.jsontree import json_iter_leaves\n"
+      },
+      {
+        "line": 35,
+        "source": "from vllm.v1.engine import EngineCoreRequest\n"
+      },
+      {
+        "line": 36,
+        "source": "from vllm.v1.kv_hints import KvHintsEnvelope\n"
+      }
+    ]
   },
   "InputProcessor._validate_model_input": {
     "module": "vllm.v1.engine.input_processor",
@@ -93,6 +827,116 @@
     "compiler_flags": 0,
     "license": "Apache-2.0",
     "license_file": "VLLM-LICENSE.txt",
-    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/v1/engine/input_processor.py"
+    "source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/v1/engine/input_processor.py",
+    "module_imports": [
+      {
+        "line": 4,
+        "source": "import time\n"
+      },
+      {
+        "line": 5,
+        "source": "from collections.abc import Callable, Mapping\n"
+      },
+      {
+        "line": 6,
+        "source": "from functools import partial\n"
+      },
+      {
+        "line": 7,
+        "source": "from typing import Any, Literal\n"
+      },
+      {
+        "line": 9,
+        "source": "import vllm.envs as envs\n"
+      },
+      {
+        "line": 10,
+        "source": "from vllm.config import VllmConfig\n"
+      },
+      {
+        "line": 11,
+        "source": "from vllm.exceptions import VLLMValidationError\n"
+      },
+      {
+        "line": 12,
+        "source": "from vllm.inputs import (\n    EngineInput,\n    PromptType,\n    SingletonInput,\n    split_enc_dec_input,\n)\n"
+      },
+      {
+        "line": 18,
+        "source": "from vllm.logger import init_logger\n"
+      },
+      {
+        "line": 19,
+        "source": "from vllm.lora.request import LoRARequest\n"
+      },
+      {
+        "line": 20,
+        "source": "from vllm.multimodal import MULTIMODAL_REGISTRY, MultiModalRegistry\n"
+      },
+      {
+        "line": 21,
+        "source": "from vllm.multimodal.encoder_budget import MultiModalBudget\n"
+      },
+      {
+        "line": 22,
+        "source": "from vllm.multimodal.inputs import MultiModalFeatureSpec\n"
+      },
+      {
+        "line": 23,
+        "source": "from vllm.multimodal.utils import argsort_mm_positions\n"
+      },
+      {
+        "line": 24,
+        "source": "from vllm.platforms import current_platform\n"
+      },
+      {
+        "line": 25,
+        "source": "from vllm.pooling_params import PoolingParams\n"
+      },
+      {
+        "line": 26,
+        "source": "from vllm.renderers import BaseRenderer, renderer_from_config\n"
+      },
+      {
+        "line": 27,
+        "source": "from vllm.renderers.inputs.preprocess import parse_model_prompt\n"
+      },
+      {
+        "line": 28,
+        "source": "from vllm.sampling_params import SamplingParams\n"
+      },
+      {
+        "line": 29,
+        "source": "from vllm.tasks import GENERATION_TASKS, POOLING_TASKS, SupportedTask\n"
+      },
+      {
+        "line": 30,
+        "source": "from vllm.tokenizers import TokenizerLike\n"
+      },
+      {
+        "line": 31,
+        "source": "from vllm.utils import length_from_prompt_token_ids_or_embeds, random_uuid\n"
+      },
+      {
+        "line": 32,
+        "source": "from vllm.utils.async_utils import make_async\n"
+      },
+      {
+        "line": 33,
+        "source": "from vllm.utils.diffusion import validate_diffusion_sampling_params\n"
+      },
+      {
+        "line": 34,
+        "source": "from vllm.utils.jsontree import json_iter_leaves\n"
+      },
+      {
+        "line": 35,
+        "source": "from vllm.v1.engine import EngineCoreRequest\n"
+      },
+      {
+        "line": 36,
+        "source": "from vllm.v1.kv_hints import KvHintsEnvelope\n"
+      }
+    ]
   }
 }

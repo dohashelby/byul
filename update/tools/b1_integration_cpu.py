@@ -6,6 +6,10 @@ are EXAMPLE even when their validation input came from actual CPU execution.
 from __future__ import annotations
 import argparse
 from copy import deepcopy
+from dataclasses import dataclass
+from collections.abc import Mapping
+from types import MappingProxyType
+import re
 import hashlib
 import inspect
 import io
@@ -32,18 +36,52 @@ PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',
               'update/pyproject.toml','update/reference/framework')
 SCENARIOS=('normal','violation_after_failure','missing','unsupported','artifact_failure')
 CANARY='B1_PRIVATE_EXCEPTION_DO_NOT_SAVE'
+SELECTED_OVERLAY_PATHS=frozenset({
+    'update/src/guard/executors/structured_tools.py',
+    'update/src/guard/executors/structured_tools_cpu.py',
+})
 
 
-def verify_snapshot(repo, commit, paths):
+@dataclass(frozen=True)
+class SelectedOverlayProfile:
+    """Explicit reviewed SHA256 pins; source commit is provenance metadata only."""
+    expected_sha256: Mapping[str,str]
+    source_provenance_commit: str
+
+    def __post_init__(self):
+        expected=dict(self.expected_sha256)
+        if set(expected)!=SELECTED_OVERLAY_PATHS:
+            raise ValueError('selected overlay requires exactly the two approved B source paths')
+        if any(not isinstance(value,str) or re.fullmatch('[0-9a-f]{64}',value) is None
+               for value in expected.values()):
+            raise ValueError('selected overlay requires fixed SHA256 values')
+        if not isinstance(self.source_provenance_commit,str) or re.fullmatch('[0-9a-f]{40}',self.source_provenance_commit) is None:
+            raise ValueError('selected overlay requires full source provenance commit metadata')
+        object.__setattr__(self,'expected_sha256',MappingProxyType(expected))
+
+
+def verify_snapshot(repo, commit, paths, *, selected_overlay=None):
     """Require ancestry, clean index/worktree and exact pinned file bytes.
 
     Include ignored files: an ignored .py can shadow an otherwise clean import.
     Ordinary Python __pycache__ files are runtime caches, not added source files.
+    The optional selected profile permits only its two fixed byte hashes.
     """
     def git(*args):
         return subprocess.check_output(['git','-C',str(repo),*args])
     subprocess.run(['git','-C',str(repo),'merge-base','--is-ancestor',commit,'HEAD'],check=True)
-    if git('diff','--cached',commit,'--',*paths) or git('diff',commit,'--',*paths):
+    expected={}
+    if selected_overlay is not None:
+        if not isinstance(selected_overlay,SelectedOverlayProfile):
+            raise ValueError('selected overlay requires an explicit SelectedOverlayProfile')
+        expected=selected_overlay.expected_sha256
+        if any(not any(Path(path).is_relative_to(Path(scope)) for scope in paths) for path in expected):
+            raise ValueError('selected overlay paths outside pinned scope')
+        changed={raw.decode() for raw in git('diff','--name-only','-z',commit,'HEAD','--',*paths).split(b'\0') if raw}
+        if not changed.issubset(expected):
+            raise ValueError('pinned source changed outside selected overlay')
+    comparison='HEAD' if selected_overlay is not None else commit
+    if git('diff','--cached',comparison,'--',*paths) or git('diff',comparison,'--',*paths):
         raise ValueError('pinned source/index modified')
     with tarfile.open(fileobj=io.BytesIO(git('archive',commit,'--',*paths))) as archive:
         for entry in archive:
@@ -55,10 +93,17 @@ def verify_snapshot(repo, commit, paths):
                 if not target.is_symlink() or target.readlink().as_posix()!=entry.linkname:
                     raise ValueError('pinned source symlink mismatch: '+entry.name)
             elif entry.isfile():
+                if entry.name in expected:continue
                 if target.is_symlink() or not target.is_file() or target.read_bytes()!=archive.extractfile(entry).read():
                     raise ValueError('pinned source bytes mismatch: '+entry.name)
             else:
                 raise ValueError('unsupported pinned source entry: '+entry.name)
+    for path,digest in expected.items():
+        target=repo/path
+        if target.is_symlink() or not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest()!=digest:
+            raise ValueError('selected overlay bytes mismatch: '+path)
+        if not git('ls-files','-z','--',path):
+            raise ValueError('selected overlay must be tracked: '+path)
     for options in (('--exclude-standard',),('--ignored','--exclude-standard')):
         for raw in git('ls-files','--others','-z',*options,'--',*paths).split(b'\0'):
             if not raw:continue
@@ -67,8 +112,8 @@ def verify_snapshot(repo, commit, paths):
             raise ValueError('pinned source untracked/ignored file: '+str(path))
 
 
-def verify_baseline(repo):
-    verify_snapshot(repo,BASE_SHA,PINNED_PATHS)
+def verify_baseline(repo, *, selected_overlay=None):
+    verify_snapshot(repo,BASE_SHA,PINNED_PATHS,selected_overlay=selected_overlay)
     pack=yaml.safe_load((repo/'update/packs/PACK-BASELINE/pack.yaml').read_text())
     framework=json.loads((repo/'update/reference/framework/UPSTREAM.json').read_text())
     if (pack['pack_id'],pack['revision'])!=('PACK-BASELINE',31):

@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 실제 순차 전환 마감과 A-2 SUP03 공통 등록
+
+- 한 일: 고정04f7856 설치156파일로 실제 L4 dev 기준판0.31→후보0.32 after_baseline을 실행했다. 두 측 모두 MEASURED/COMPLETED 8사례·기능 PASS/보안 UNKNOWN이고 정확9Ref의 원격/로컬 복원·저장팩 재판정이 일치했다. 기준판의 선택 cgroup/PID/start 종료·GPU compute process 없음/메모리0MiB를 후보 시작 전에 별도 호스트 근거로 확인했다. 현재 후보 실측 ENV·전체34 inventory·Pod/프로브/compute 사실과 A2 API-only 실행차례를 외부 A1 인계에 제공했다. 이어 A2의9a632c3/9144f96 전용4파일을 원본 bytes로 통합하고 정식 registry에 template_validation:kubernetes를 연결한다.
+- 테스트 결과: 04f의 로컬 전체5983통과/13실패/12오류/기존skip13/제외19(1166.33/1170.414초)에서 본인 Windows tmp 길이로 발생한25건을 짧은 독립 경로의 영향100통과(72.75/73.933초)로 해소했다. 단일 clean 전체 재실행이나 CI 성공으로 보고하지 않는다. 이번1087파일 고정 SUP03 정식 registry/CLI·인접·불변식314통과/기존skip1/제외1(46.42/47.752초), source/wheel/격리설치157파일 일치(부모14.372초), 검증 중 bytes 불변을 확인했다. 첫108통과/206setup오류는 본인 짧은tmp 상위폴더 누락(6.08/7.282초)이며 실행보조의 폴더 준비만 보완했다. 제품/시험 assert는 변경하지 않았다. 문서 결과만 갱신하고 정확HEAD CI 미실행 조건을 별도로 기록한다.
+- 다음 단계: SUP03 정식 등록 직접/인접·불변식→설치물→초안PR/정확HEAD CI 상태·인계, 준비된 A2 실제소비와 기존 REQ01/03 공통 경계 개발을 이어간다. 다른 실제 활성작업이 없으면 후보 worker/GPU 정리·증거 보존·소유 EC2 Stop을 확인한다.
+- 막힌 것: GitHub 계정 결제/한도 문제로04f CI는 runner/step 시작 전 차단됐고 사용자도 당장 복구 불가를 알렸다. CI 미완료를 유지한다. SUP03 template bytes/API 입력 projection은 worker 실제 open/read/load·tensor 소비를 증명하지 않고 세 축 UNKNOWN을 유지한다. 신규 공통 변경은 아직 실제 엔진에 설치하지 않았다. 현재 후보의 최종 정리/Stop과 기업정책·native0.32는 미완료다.
+
 ## 2026-10-29 — A-1 실제 REQ11 왕복과 순차 종료 대기 경계
 
 - 한 일: 고정9c wheel의 실제 L4/Kubernetes REQ11 8사례를 MEASURED/COMPLETED·functional PASS/security UNKNOWN으로 실행하고6개 정확 Ref의 원격/로컬 verify·반출/복원·저장팩 재판정 일치를 확인했다. 소스28파일·모델전체34파일 inventory와 실제 대상/프로브·회수 근거를 외부 A1 인계에 고정했다. 별도 작업 공간에서 정상 Terminating/최종 phase 지연이 전환 대기를 즉시 거부하는 경계를 보수한다. Ready 요청의 기본 검증은 그대로 두고 전환 gate의 require_ready=False 대기에서만 같은 소유 세대의 삭제 진행을 허용한다.

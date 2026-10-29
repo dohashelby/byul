@@ -1391,6 +1391,7 @@ git status
 
 - 한 일: 확정243918a와 기존8/9/B/A2 bytes를 보존하고 명시10의4assets·고정base8/source/code·닫힌ATTEMPT parser·선정2MiB 읽기·REQ12 native selection/invocation 소비를 연결한다. ASGI callback 반환·실제client수신·native출력원천을 구분하고, 늦거나다른PID context·중복/누락·후속실패는 미확인/고정진단으로 남긴다. REQ12 derived팩revision2/check6은 원래77개·두분기·기준·다른76개 bytes를 보존한다.
 - 테스트 결과: 9ea23af guard와1182파일 고정 첫영향751통과·새시험12실패·기존skip1/제외1(142.89/143.998초)을 보존했다. socket 차단 뒤 만든 asyncio loop의 자체 self-pipe 생성이 막혔고, 새 CLI manifest/공개 오류 형식 가정2곳이 달랐다. 소유 loop를 차단 전에 만들고 동일 외부socket 금지·제품 기대값·asset4/3개·정확 거부 진단을 유지한다. 제품/runtime/code literal 변경 없이 새시험만 보수하고 source 재고정 후 검증한다. 실제 serving/worker/GPU 성과가 아니다.
+- 보수 검증: 고정72d3a7e에서 Windows175통과·기존skip1/제외1(39.18/39.823초), 동일1182bytes Linux전체6942통과·제외19(333.11/334.482초), source·wheel·격리설치180파일 일치와 준비CLI3·제품CLI4·각정확6Ref 왕복(7.745초)을 확인했다. Linux 실제소유FD/code admission·거부10사례(.087초)가 통과했다. 설치 OUT 하네스 native 지역변수의 module alias 충돌 실패는 보존하고 하네스만 수정했다. 제품·기대값·새skip/제외·검증중source변경은 없으며 마지막 결과 문서만 갱신한다. 이전whole6767/REQ12 설치178/실제REQ11wheel은 각 당시 판본의 근거로 따로 보존한다.
 - 다음 단계: 정적검토·source고정·검토pin→직접/인접/불변식→Linux/설치CLI·정확Ref→commit/push·초안PR·정확HEAD CI·인계. 실제 늦은chunk원천/소비자·취소/timeout/stop과 본인 관측 분기를 이어간다.
 - 막힌 것: producer/image신뢰·actual serving/hook/worker/GPU·실제client수신·native늦은출력원천·자동retry·기업POL·전체LIF10/REQ12/A39는 미완료다. 새profile10을B/A2전용소비나native0.32 지원으로 가정하지 않는다. 원승인창만료·추가Start0·마지막stopped·CI결제차단을 유지한다.
 

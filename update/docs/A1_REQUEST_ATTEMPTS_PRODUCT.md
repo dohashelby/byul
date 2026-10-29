@@ -68,7 +68,7 @@ LIF10/11 자원 회수 요구도 유지한다. native event 투영은4096개 상
 원문 요청/응답/헤더/토큰/오류/Pod env/argv는 증거에 저장하지 않는다. 정제 hash·enum·bool만 남긴다.
 seal 실패에도 같은 session 수집을 시도하며 후속 수집/첨부/정리 실패가 이전 관측을 지우지 않는다.
 
-고정1177파일에서 Windows영향550통과·기존skip1/제외1, 같은 bytes Linux영향551통과·제외1을
+기존243918a의 고정1177파일에서 Windows영향550통과·기존skip1/제외1, 같은 bytes Linux영향551통과·제외1을
 확인했다. 인접 LIF10/HTTP/native/registry·불변식과 실제 stdlib 소유loopback5요청을 포함한다.
 source/wheel/격리설치178파일 일치와 설치CLI4사례·각 정확6Ref 반출/복원·재판정도 통과했다.
 기존 실제 REQ11·CPU/EXAMPLE·설치 성과를 새 source의 실제 실증으로 소급하지 않는다.

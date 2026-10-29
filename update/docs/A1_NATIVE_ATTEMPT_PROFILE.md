@@ -54,8 +54,13 @@ derived REQ12 팩은 revision2/check revision6으로 새 두 관측을 명시한
 유효창을 재사용하며 정책·승인값을 관측에서 만들지 않는다. 판정 축은 모두 UNKNOWN이다.
 수집/seal/첨부/parent cleanup 실패가 이전 metadata를 지우지 않으며 ABORTED와 UNKNOWN을 구분한다.
 
-현재 구현·회귀·문서 초안 단계다. source 고정 후 직접/동일계약·불변식·Linux 동일bytes·
-격리설치/기존 CLI·정확 Ref 왕복·정확HEAD CI로 확인한다. 실제 serving/hook/worker/GPU 실행은
+9ea23af 제품guard와72d3a7e 시험 보수의1182파일 고정으로 최초영향751통과·새시험12실패를
+보존하고, 소유 asyncio loop/CLI manifest·공개 오류 형식을 보수한 Windows175통과·기존skip1/제외1
+(39.18/39.823초)를 확인했다. 같은 bytes Linux전체6942통과·제외19(333.11/334.482초),
+source/wheel/격리설치180파일 일치·준비CLI3/제품CLI4·각 정확6Ref 왕복(7.745초),
+실제 Linux 소유FD/code admission·거부10사례를 확인했다. 설치 OUT 하네스의 변수 이름 충돌
+실패를 보존하고 하네스만 수정했으며 제품·code literal·검사·기대값·skip/제외를 완화하지 않았다.
+검증 중 source bytes는 불변이며 마지막 결과 문서만 갱신한다. 실제 serving/hook/worker/GPU 실행은
 없으며 CPU/EXAMPLE을 실제 인수로 올리지 않는다. B Online9/A2 전용 native file10 소비, native0.32·
 다중GPU/TP·실제 기업POL은 이 계약의 자동 지원이 아니다. 원래 GPU 승인창 종료·추가Start0·
 마지막 확인stopped와 CI 결제 차단·부모A39/A1담당19 전체범위를 유지한다.

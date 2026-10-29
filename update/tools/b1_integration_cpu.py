@@ -63,9 +63,9 @@ class SelectedOverlayProfile:
 SELECTED_PROFILE = SelectedOverlayProfile(
     expected_sha256={
         'update/src/guard/executors/structured_tools.py': '2f3ab5cbb0f2eeeb2969cf995a9d57b84f9642924e5c8410383dd52e9d013f4c',
-        'update/src/guard/executors/structured_tools_cpu.py': '4cf55312ac71115faa116f5624293c75c4b1a1f21d8557ded56b03914f1de87f',
+        'update/src/guard/executors/structured_tools_cpu.py': 'cc3a855716218daffbd64457d619770eea70f40da5b209c23475a20b90144f4b',
     },
-    source_provenance_commit='29fc171fc8843cc183fcecf27a2ce08d13e275bf',
+    source_provenance_commit='adb47c424ee61fe9b445cfa7ff9f32ebf33f31e0',
 )
 
 

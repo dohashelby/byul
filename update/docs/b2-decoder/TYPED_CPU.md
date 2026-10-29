@@ -79,3 +79,9 @@ VLLM_TARGET_DEVICE=cpu CUDA_VISIBLE_DEVICES= VLLM_PLUGINS= HF_HUB_OFFLINE=1 TRAN
 모델 파일 reader·fallback·weights daemon peer, OOB tensor provider,
 share_mem=False 복사 경로, 실제 모델·worker·GPU 소비는 이번 관측에 포함하지 않는다.
 설치판/consumer 신원·기업 정책과 A 제품 연결은 기존 SUP-12 인계 항목으로 남긴다.
+
+동일 151개 의존성 환경에서 기존 기본 untyped 경로도 추가 smoke를 수행했다.
+`/private/tmp/byul-sup12-untyped-smoke-20261029-1.json`에 14사례·기존 assertion 통과,
+전후 정상 대조·aux 참조 정리, 원문 canary 미저장을 확인했다(0.097초).
+msgspec 0.22.0/cloudpickle 3.1.2/pyzmq 27.2.0이며 기존 환경과의 의존성 차이에 대한
+직접 확인이다. 기존 untyped 수집 코드와 사례를 바꾸지 않았다.

@@ -1,0 +1,60 @@
+"""Collector failure-preservation contracts using EXAMPLE-only local replacements."""
+import json
+from pathlib import Path
+import pytest
+from tools import b_sup13_template_cpu as c
+
+@pytest.fixture
+def boundary(monkeypatch):
+    monkeypatch.setattr(c,'verify_component',lambda:None)
+    monkeypatch.setattr(c,'_verify_source',lambda root:None)
+    monkeypatch.setattr(c,'_post',lambda *a,**k:{'status':'verified'})
+
+
+def rows(record):
+    record['data_origin']='EXAMPLE'
+    for case in ('before','challenge','after'):
+        record['results'].append({'case_id':case,'outcome':'returned','snapshots':[{'metadata':{'attribute':'__class__','attribute_allowed':True}}],
+            'source_validation':{'pre':'verified','post':{'status':'verified'},'boundary':'source_component'}})
+
+
+def test_formal_component_is_closed_without_root_pin():
+    assert c.PRODUCT_COMPONENT_COMMIT is None
+    with pytest.raises(ValueError,match='SUP13_COMPONENT_PIN_UNCONFIGURED'):c.verify_component()
+
+@pytest.mark.parametrize('profile',['reference5d','target032',''])
+def test_wrong_profile_before_capture(tmp_path,profile):
+    with pytest.raises(ValueError,match='SUP13_PROFILE_INVALID'):c.capture_template_cpu(tmp_path,tmp_path/'work',source_profile=profile)
+    assert not (tmp_path/'work').exists()
+
+
+def test_completed_example_contract(tmp_path,boundary,monkeypatch):
+    monkeypatch.setattr(c,'_run_actual',lambda root,workdir,record:rows(record))
+    r=c.capture_template_cpu(tmp_path,tmp_path/'work')
+    assert r['capture_status']=='completed' and r['data_origin']=='EXAMPLE'
+    assert r['installed_target'] is None and not r['full_scope_coverage']
+    assert r['auxiliary_write']=={'status':'completed'}
+
+
+def test_late_failure_keeps_known_attribute_true(tmp_path,boundary,monkeypatch):
+    def run(root,workdir,record):rows(record);raise OSError('PRIVATE')
+    monkeypatch.setattr(c,'_run_actual',run)
+    r=c.capture_template_cpu(tmp_path,tmp_path/'work')
+    assert r['capture_status']=='incomplete' and r['results'][1]['snapshots'][0]['metadata']['attribute_allowed'] is True
+    assert r['error_type']=='OSError' and 'PRIVATE' not in json.dumps(r)
+
+
+def test_final_guard_failure_keeps_independent_facts(tmp_path,boundary,monkeypatch):
+    monkeypatch.setattr(c,'_run_actual',lambda root,workdir,record:rows(record))
+    monkeypatch.setattr(c,'_post',lambda *a,**k:{'status':'unavailable','error_type':'OSError'})
+    r=c.capture_template_cpu(tmp_path,tmp_path/'work')
+    assert r['capture_status']=='incomplete' and len(r['results'])==3
+    assert r['results'][1]['snapshots'][0]['metadata']['attribute_allowed'] is True
+
+
+def test_auxiliary_failure_keeps_facts(tmp_path,boundary,monkeypatch):
+    def run(root,workdir,record):rows(record);(workdir/'result.json').mkdir()
+    monkeypatch.setattr(c,'_run_actual',run)
+    r=c.capture_template_cpu(tmp_path,tmp_path/'work')
+    assert r['capture_status']=='incomplete' and r['auxiliary_write']['status']=='failed'
+    assert len(r['results'])==3

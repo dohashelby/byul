@@ -1323,3 +1323,9 @@ git status
 - 테스트 결과: 고정1114파일 불변. 직접/동일 계약·인접·불변식442통과(pytest70.35초·부모71.485초), 전체6321통과/실패0/기존skip13·제외19(pytest835.62초·부모837.234초). wheel/격리 설치166파일 일치와 정식 설치본 CLI3사례/각6Ref의 verify·반출/복원·같은 시각 저장팩 재판정도 통과(6.828초)했다. CPU 사례는 EXAMPLE이며 actual로 승격하지 않는다.
 - 다음 단계: 현재 한 구간의 정식 선정→실행→EVD/RES/RPT→verify→반출/복원·저장팩 재판정과 설치 일치를 마감하고 정확HEAD CI/PR/인계를 남긴다. B REQ10 고정 소비 기준과 본인19개 잔여 제품 연결을 이어간다.
 - 막힌 것: AWS 같은 기존 g6.2xlarge 재시작은 InsufficientInstanceCapacity로 거부되고 stopped 재조회됐다. PLT01/04 및 새 PLT08 실제 실증은 미완료이며 원래13:23:57UTC/46.66USD 상한을 유지한다. CI5도 결제/한도로 시작 전 차단된다. API 전체·TLS/CA·배포caller·worker·IPC/TP/다중GPU·기업정책은 이 한 구간으로 완료하지 않는다.
+# 2026-10-29 A1 B REQ10 고정 CPU 소비의 정식 등록
+
+- 한 일: B 확정57a7537의18커밋·24파일 bytes를 보존해 통합했다. 기존 CLI에 reference-cpu/source031 두 전용 클래스를 등록하고 B 기존 CPU proposal의 정확 팩 Ref와 같은 입력 생성기를 제공한다. PACK31 numeric/Kubernetes 경로는 유지한다. 제품 snapshot c4e872e를 literal 소비 기준으로 두고 원래 B의 전체 source/index/archive/shadow 검사를 재사용하며 helper bytes·import·PACK31·framework도 대조한다. B의 c9 기본 pin이나 전용 파일은 재작성하지 않는다.
+- 테스트 결과: 고정1136파일의 Windows/Linux bytes 일치·검증 중 불변. Linux 전체6460통과/실패0/기존제외19(pytest276.42초·Linux부모277.389초), B 원본symlink5반례 포함이다. Windows pin+정식CLI18통과(13.37/14.355초), wheel/설치167파일 일치와 정식 설치본CLI4사례/각6Ref왕복도 통과(4.502초)했다. 첫 Windows365통과·7실패 중 신규시험2개의null/미수집 계약 가정만 보수했고 B5개는Win1314실패를 보존해 Linux에서 검증했다. WSL 임시환경/상위tmp폴더 준비실패는 별도 보존하고 환경만 보수했다. 새skip·판정/기대값 완화는 없다. 실제 vLLM CPU/GPU 실측으로 승격하지 않는다.
+- 다음 단계: 명시 소비 pin·제품 CLI/Ref·격리 설치를 검증하고 정확 통합HEAD CI/초안PR/인계로 마감한 뒤 A1 본인19개의 인증/요청·철회·취소·종료·관측 제품 연결을 이어간다. B가 이 고정 소비 기준을 수락해 기본 도구를 옮기는 단계와 실제 배포 대상 관측은 별도로 남긴다.
+- 막힌 것: 현재 A1 Python에는torch/xgrammar/transformers와 전체 고정 vLLM CPU source가 없고 B Mac의 실제CPU 원본을 새 통합 실측으로 소급하지 않는다. 같은 GPU 인스턴스의 두 Start는 용량 부족으로 거부돼 stopped이며 새 설치/실증은 없었다. 기존13:23:57UTC/46.66USD와EBS 보존을 유지하고 같은 시간창 Start는 더 반복하지 않는다. CI5는 계정 결제 차단이다.

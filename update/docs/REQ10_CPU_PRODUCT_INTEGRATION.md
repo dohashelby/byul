@@ -19,10 +19,13 @@ origin/EXAMPLE 또는 DECLARED, model과 새 output을 명시하면 B 기존 CPU
 EXAMPLE을 유지한다.0.31은 전용 reference ENV와 model 일치도 검사한다. 서버 전처리,
 runner·GPU·실제 모델 세대·서비스 생존은 이 CPU 변환 경계의 결과로 대신하지 않는다.
 
-소스 gate는 검토한 공통 통합 커밋의 전체 기존 범위·archive bytes·index/dirty·shadow를
-같은 방식으로 검사하는 명시 소비 pin으로 연결한다. 실행 중 읽은 해시를 승인하거나
-공통 경로를 제외하지 않는다. B 원본의 c9 기본 pin은 보존하며 A1이 제공한 고정 소비
-커밋/해시 인계를 B가 받아 기본 도구를 옮기는 단계는 별도다.
+소스 gate는 A1 제품 snapshot `c4e872e298bd12d29e0bb358f9dcc69bf79e6598`를
+literal 소비 기준으로 고정한다. `python tools/verify_req10_consumption.py --output <새 영수증>`를
+실행 전후 사용하면 B의 같은 `verify_snapshot`으로 ancestor·전체 기존 범위·archive
+bytes·index/dirty·shadow를 검사한다. B helper bytes와 실제 import 위치, PACK31 정확
+Ref·framework도 대조한다. 실행 중 읽은 해시를 승인하거나 공통 경로를 제외하지 않는다.
+B 원본의 c9 기본 pin·전용24파일은 보존한다. 이 A1 소비 기준은 새 registry와 두 전용
+CPU 실행기 bytes를 모두 포함하며 B가 기본 도구의 소비 기준을 옮기는 수락 단계는 별도다.
 
 CPU 주입 사례와 설치본 CLI의 정확 Ref 왕복은 제품 연결 회귀다. 기존 B 실제 CPU
 EVD는 당시 source/environment Ref로 보존하고 새 통합 소스의 live 실행으로 소급하지

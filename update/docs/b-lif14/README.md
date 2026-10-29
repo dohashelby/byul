@@ -6,7 +6,7 @@ TorchProfilerWrapper와 실제 ProfilerConfig를 사용한다. torch는 child �
 lazy import한다. 제품 의존성·lock·공통 registry/CLI·팩은 변경하지 않는다.
 
 정상과 소유 출력 경로가 regular file인 오류 사례를 별도 child process로 실행한다.
-CPU activities, delay/wait/warmup/max iteration 0, shapes/memory/stack/flops=false,
+CPU activities, local_rank=1, delay/wait/warmup/max iteration 0, shapes/memory/stack/flops=false,
 4×4 CPU 연산과 고정 tag는 유한 기술 fixture다. 각 사례는 실제 start→tag 연산→stop,
 같은 wrapper의 next start→tag→stop을 관측한다. 오류 사례의 regular file은 소유 경로와
 fixture bytes·symlink 여부를 확인한 뒤 디렉터리로 복원한다.
@@ -44,11 +44,6 @@ component pin은 검토된 module snapshot commit으로 명시 고정한다. 소
 승인된 정확 scope/base를 검증한다. foreign noop helper와 빈 scope를 거부하며
 기존 B1 source·공동 기준은 변경하지 않는다.
 
-직접·기존 RuleTable/core run 회귀는 79 passed(pytest 0.59초)다. source import의
-optional torch 경계, native 미수집·export 오류 분리·functional 독립 FAIL,
-ENV binding·첨부 실패 보존·미설정 component pin을 검증했다.
-
-
 검증 전 source 신원 확인을 마친 child의 qualified CPU 관측은 후속 검증 오류와
 함께 보존한다. post source 검사는 명시적인 source 불일치와 I/O·Git 검사 불가를
 status·예외 타입으로 구분하고 전체 실행은 ABORTED로 남긴다. parent 후속 검사가
@@ -60,5 +55,59 @@ status·예외 타입으로 구분하고 전체 실행은 ABORTED로 남긴다. 
 
 이 수정 묶음 직접·기존 RuleTable/core 회귀는 **88 passed / pytest 0.84초**다.
 parent/child 후속 검사 불가·명시 불일치, core EVD의 독립 FAIL 보존, initial 미확인,
-foreign helper/빈 scope 거부를 포함한다. 새 component pin 연결 전 실제 CPU 측정은
-추가하지 않았으며, 후속 실제 결과·정확 Ref는 핀 연결 뒤 갱신한다.
+foreign helper/빈 scope 거부를 포함한다.
+
+
+## 고정 수정본 실제 결과
+
+component `c0af481dad68000d14211f3e03b07e62ab1ee7ea`, producer SHA256
+`ff3d4e1d80c779e709a2acfff5a97b19d34c53ce93c052f63649db4842394c3a`로
+실행했다. Python 3.12.13·torch 2.13.0 CPU 환경에서 normal과 trace_directory_failure,
+각 same-wrapper next phase의 native before=false/during=true/after=false를 수집했다.
+오류 phase는 RuntimeError 경고·None 반환·trace 미산출, 소유 경로 복구 뒤 next는
+실제 trace 산출을 확인했다. local_rank=1은 source의 rank별 표 출력 분기 입력이며
+이 결과를 TP=1 worker rank0·HTTP·GPU 실증으로 사용하지 않는다.
+
+결과는 COMPLETED/DECLARED, 관측 3개·정제 첨부 1개, 부모 9.414초다.
+전축 UNKNOWN이며 기업 종료 기한은 null/collected=false다. native 수집 종료와
+소유 raw 디렉터리 삭제, Store 오류 0개·exact Ref 재판정 일치·RPT 정확 Ref를 확인했다.
+151개 의존성 정합성 검사도 통과했다. 원본과 의존성·재판정 확인은
+`/private/tmp/byul-lif14-product-cpu-20261029-2/`에 보존한다. 초기 고정본 기록은
+`/private/tmp/byul-lif14-product-cpu-20261029-1/`에 별도로 남긴다.
+
+- PACK `PACK-B-LIF14-CPU-PROPOSAL@1`: `c356d237978a0c8f7f7111b0c3ecb9b7cb13491ba9e5c4946d67ed46ef4f5ac2`
+- EVD `EVD-01M636FHQVYKG4ECKM91FZXJE0@1`: `b6173f08f40cf066d24338b0a5e4f15f6a270136d6ba37fa46a1c7a380f6ffc0`
+- RES `RES-01M636FTT84D2C83QQAJ4R7NCP@1`: `331c6c14f10f8b2ae3de671585cc522fc153d7dd8727f3f1e7e111ebb4bfe1fb`
+- RPT `RPT-01M636FTTAWX27S683W5KSCC0Q@1`: `42d43571851aa4b237f1f901ffa810a2afed628e1aa1e59c37157d8d359e0bc7`
+
+검토 지적 2건은 수정 후 해당 경로 해결 확인을 마쳤다. 공통·불변식 회귀는
+134 passed/기존 1 deselected, pytest 0.73초·부모 0.880초다.
+wheel/설치 파일 157개 일치, 격리 설치 검증 성공이며 기록은
+`/private/tmp/byul-lif14-installed-20261029/summary.json`이다.
+
+## 재실행과 A 연결
+
+이 checkout의 `update`에서 source 전체 이력과 위 고정 component commit이 있는 상태로
+실행한다. source-root는 깨끗한 db9527a 전체 source이고 output-root는 새 경로를 사용한다.
+CPU 의존성 환경은 실제 기록의 dependencies.freeze.txt와 대조한다.
+
+```sh
+PYTHONPATH="$PWD/src:$PWD:/private/tmp/byul-req10-target031-20261029" \
+TMPDIR=/private/tmp VLLM_TARGET_DEVICE=cpu CUDA_VISIBLE_DEVICES= VLLM_PLUGINS= \
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+/private/tmp/byul-req10-target031-cpu-20261029/bin/python \
+  -m tools.lif14_profiler_cpu \
+  --source-root /private/tmp/byul-req10-target031-20261029 \
+  --output-root /private/tmp/byul-lif14-new-run
+```
+
+A 영구 등록 제안은 `profiler_lifecycle_cpu:component-cpu-proposal` 키와
+`ProfilerLifecycleCPUExecutor` factory다. 입력은 source_root·owned_parent 두 값이며
+관측 JSON 입력을 받지 않는다. DRAFT check/pack·ENV·POL·PLAN은 실제 결과 폴더에 있다.
+A가 공통 registry/팩에 반영한 확정 SHA/팩 Ref를 제공하면 해당 승인 delta를 고정해
+정식 CLI 소비를 검증한다. 기존 B1 gate의 공통 소스 허용 범위는 그대로 유지한다.
+
+실제 서비스 분기는 A가 확인한 이미지 digest·활성 profiler backend/route·Pod 세대와
+공유 run 담당자, 승인된 소유 출력 경로·복구 절차를 입력받아 연결한다. 종료 기한과
+미완료 표시는 기업 정책 결정이 남아 있다. 현 직접 Pod HTTP profile의 지원 범위와
+lab/source/digest gate를 유지하며, 서비스 시험을 위해 profiler를 임의 활성화하지 않는다.

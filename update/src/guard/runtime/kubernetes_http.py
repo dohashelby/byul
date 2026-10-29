@@ -23,6 +23,8 @@ from .bounded import capture_pipes, strict_json
 
 PROFILE = "kubernetes-owned-sampling-http-v1"
 REQUEST_BINDING_PROFILE = "kubernetes-owned-request-binding-http-v1"
+VALIDATION_ERROR_PROFILE = "kubernetes-owned-validation-error-http-v1"
+_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE})
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -66,10 +68,12 @@ def _validate(target, env):
 
 class KubernetesHTTP:
     def __init__(self, target, env, *, duration, binary="kubectl", runner=None, profile=PROFILE, clock=None):
-        if profile not in {PROFILE, REQUEST_BINDING_PROFILE}:
+        if profile not in {PROFILE, *_BINDING_PROFILES}:
             raise KubernetesBindingError()
         self.profile = profile
-        if profile == REQUEST_BINDING_PROFILE:
+        if profile == VALIDATION_ERROR_PROFILE and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+            raise KubernetesBindingError()
+        if profile in _BINDING_PROFILES:
             try:
                 mapping=target["model_mapping"]
                 if type(mapping) is dict and mapping.get("schema")=="guard.model-request-mapping/1":
@@ -90,7 +94,7 @@ class KubernetesHTTP:
                 raise KubernetesBindingError() from None
         self.binding, self.endpoint = _validate(target, env)
         self.target_sha256=sha256_hex(canonical_json(target))
-        self.environment_ref=(deepcopy(target["environment_ref"]) if profile==REQUEST_BINDING_PROFILE else None)
+        self.environment_ref=(deepcopy(target["environment_ref"]) if profile in _BINDING_PROFILES else None)
         if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
                 or type(binary) is not str or not binary.strip()):
             raise KubernetesBindingError()
@@ -116,7 +120,7 @@ class KubernetesHTTP:
                        "watchdog.daemon=True\nwatchdog.start()\n"
                        + "exec(compile(" + repr(probe_source) + ",'guard-http-probe','exec'),{'__name__':'__main__'})\n")
         self.source_sha256 = sha256_hex(self.source.encode("utf-8"))
-        if profile == REQUEST_BINDING_PROFILE:
+        if profile in _BINDING_PROFILES:
             probe_source=(Path(__file__).parents[1]/"executors/stream_probe.py").read_text(encoding="utf-8")
             if sha256_hex(probe_source.encode())!=BINDING_PROBE_SHA256:
                 raise KubernetesBindingError()
@@ -131,6 +135,8 @@ class KubernetesHTTP:
         self.failed = False
         self.cleanup_errors = []
         self.lock = threading.Lock()
+        self._validation_error_token = None  # transient; never part of report/evidence
+        self._validation_error_cases = set()
 
     def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False):
         remaining = self.deadline - self.clock()
@@ -141,7 +147,7 @@ class KubernetesHTTP:
         try:
             result = self.runner(argv, timeout=remaining, env_extra={}, max_stdout_bytes=cap,
                                  max_stderr_bytes=4096, **({"input_bytes": payload} if payload is not None else {}))
-            if self.profile==REQUEST_BINDING_PROFILE and (result.get("capture",{}).get("pipes_closed") is False
+            if self.profile in _BINDING_PROFILES and (result.get("capture",{}).get("pipes_closed") is False
                     or "child_reap" in result.get("capture",{}).get("read_errors",[])):
                 with self.lock:
                     if "KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED" not in self.cleanup_errors:
@@ -150,7 +156,7 @@ class KubernetesHTTP:
                     or self.deadline - self.clock() <= 0):
                 raise KubernetesBindingError()
             if allow_empty and result["stdout_bytes"]==b"":return None
-            return strict_json(result["stdout_bytes"],limit=cap) if self.profile==REQUEST_BINDING_PROFILE else json.loads(result["stdout_bytes"])
+            return strict_json(result["stdout_bytes"],limit=cap) if self.profile in _BINDING_PROFILES else json.loads(result["stdout_bytes"])
         except Exception:
             raise KubernetesBindingError() from None
 
@@ -159,7 +165,7 @@ class KubernetesHTTP:
         namespaces = sorted({self.binding[role]["namespace"] for role in ("engine", "probe")})
         result = self._call(["get", "namespaces", *namespaces, "-o", "json"])
         items = result["items"] if result.get("kind") == "List" else [result]
-        mapped=self.profile==REQUEST_BINDING_PROFILE and self.model_mapping.get("schema")=="guard.model-request-mapping/1"
+        mapped=self.profile in _BINDING_PROFILES and self.model_mapping.get("schema")=="guard.model-request-mapping/1"
         snapshot_required=mapped or capture_snapshot
         if snapshot_required and any(x.get("kind")!="Namespace" for x in items):raise KubernetesBindingError()
         actual = {x["metadata"]["name"]: x["metadata"] for x in items}
@@ -209,7 +215,7 @@ class KubernetesHTTP:
             with self.lock:self.snapshot_reads.append(row)
 
     def __call__(self, network, requests, timeout):
-        if self.profile==REQUEST_BINDING_PROFILE:
+        if self.profile in _BINDING_PROFILES:
             return self._binding_requests(network,requests,timeout)
         # No shared serialization lock: REQ-10's two invocations stay concurrent.
         with self.lock:
@@ -275,7 +281,11 @@ class KubernetesHTTP:
                 raise KubernetesBindingError()
             prepared=[]
             for request in requests:
-                if type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
+                if self.profile == VALIDATION_ERROR_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._validation_error_request(request)
+                elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
                 value=deepcopy(request)
@@ -322,6 +332,41 @@ class KubernetesHTTP:
             with self.lock:
                 self.failed=True
                 self.rows.extend({"id":rid,"binding_verified_before_after":False,"diagnostic":"KUBERNETES_HTTP_BINDING_UNAVAILABLE"} for rid in ids or [None])
+            raise KubernetesBindingError() from None
+
+
+    def _validation_error_request(self, request):
+        """Closed REQ13 wire contract; no arbitrary prompt/error body/header."""
+        try:
+            if (type(request) is not dict or set(request) - {"id", "mode", "method", "url", "headers", "body", "want_body"}
+                    or request.get("mode", "json") != "json" or request.get("method") != "POST"
+                    or request.get("want_body", True) is not True):
+                raise ValueError
+            slot = {"req13-error-before": "before", "req13-error-primary": "primary",
+                    "req13-error-after": "after"}[request["id"]]
+            headers = request["headers"]
+            if type(headers) is not dict or set(headers) != {"X-Request-Id"} or type(headers["X-Request-Id"]) is not str:
+                raise ValueError
+            match = re.fullmatch(r"byul-req13-error-([0-9a-f]{32})-" + slot, headers["X-Request-Id"])
+            if match is None:
+                raise ValueError
+            token = match[1]
+            body = ({"model": self.api_model, "messages": [{"role": "user", "content": "hello"}],
+                     "max_tokens": "b2error-" + token[:12], "stream": False} if slot == "primary" else
+                    {"model": self.api_model, "prompt": "hello", "add_special_tokens": False, "return_token_strs": False})
+            path = "/v1/chat/completions" if slot == "primary" else "/tokenize"
+            url = urlsplit(request.get("url", ""))
+            if (type(request.get("body")) is not dict or canonical_json(request["body"]) != canonical_json(body)
+                    or url.path != path):
+                raise ValueError
+            with self.lock:
+                if (slot in self._validation_error_cases or "after" in self._validation_error_cases
+                        or slot != "before" and "before" not in self._validation_error_cases
+                        or self._validation_error_token is not None and token != self._validation_error_token):
+                    raise ValueError
+                self._validation_error_token = token
+                self._validation_error_cases.add(slot)
+        except (KeyError, TypeError, ValueError):
             raise KubernetesBindingError() from None
 
     def template_snapshot(self, identity, argv, command, reader):
@@ -371,9 +416,9 @@ class KubernetesHTTP:
                     "binding_sha256": sha256_hex(canonical_json(self.binding)),
                     "probe_source_sha256": self.source_sha256,
                     "requests": sorted(deepcopy(self.rows), key=lambda row: row["id"] or ""),
-                    "collection_gap": self.failed or (self.profile==REQUEST_BINDING_PROFILE and any(row.get("capture_complete") is not True for row in self.rows)),
+                    "collection_gap": self.failed or (self.profile in _BINDING_PROFILES and any(row.get("capture_complete") is not True for row in self.rows)),
                     **({"snapshot_reads":deepcopy(self.snapshot_reads)} if self.snapshot_reads else {}),
-                    **({"cleanup_errors":list(self.cleanup_errors)} if self.profile==REQUEST_BINDING_PROFILE else {}),
+                    **({"cleanup_errors":list(self.cleanup_errors)} if self.profile in _BINDING_PROFILES else {}),
                     "limitations": ["Explicit operator selection and guard.run label are not an approval signature.",
                                     "Pod spec digest and exact runtime imageID are bound; manifest-index ancestry is not verified.",
                                     "No GPU execution, runner consumption, resource/log isolation or deployed caller path proof."]}

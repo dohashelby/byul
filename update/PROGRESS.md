@@ -1334,3 +1334,9 @@ git status
 - 검증: 첫 Windows 영향검증358통과/새16실패는 관측 객체의 불허 필드를 제거해 보수했다. 재고정213b486 기준 Windows155통과·기존skip1/제외1(47.26초/부모47.929초), 같은1140파일 bytes의 Linux 영향375통과·제외1(18.48초/부모18.757초), Windows 설치168파일 및 설치본 CLI4사례의6Ref 반출/복원·재판정 통과(8.217초). 검증 중 source 변경0. 이전6460전체통과/설치167파일/REQ11실증을 새 소스 근거로 이월하지 않는다.
 - 다음: 이 부분 묶음 마감 후 B REQ13 폐쇄3요청 공개 전송을 별도 확정하고 Online은 전송·serving callback/parser·출처/세션 경계로 나눈다.
 - 막힌 것: 실제 인가 생산자·정상/거부 ledger·기업 rewrite/principal POL·handler 귀속이 없어 REQ02 전체 미완료/전축UNKNOWN이다. GPU stopped·추가Start중단·CI결제차단 유지. 부모39/56/4 및 A1 19/27/2 범위 유지.
+### 2026-10-29 A-1 B REQ13 공개 전송
+- 한 일: B PR97 875ede64의 폐쇄3요청에 맞춘 VALIDATION_ERROR_PROFILE을 기존 KubernetesHTTP 공개 ABI에 추가했다. 정확 ENV/API alias/소유 engine+probe 전후 세대·고정 probe bytes·시간/출력/cleanup 경계를 재사용하고 기존 두 profile의 요청 범위는 유지한다.
+- 검증: 소스/사례/문서 초안 종료 후 고정하여 직접·인접·설치 검증 예정. 원문 오류응답은 transient로만 반환하고 body-free report만 저장한다.
+- 다음: 작은 전송의 commit·공개 판본·bytes hash·소비 범위를 B 인계 파일에 제공한 뒤 별도 Online 계측/본인 준비 분기를 이어간다.
+- 막힌 것: B의 literal source pin 갱신/소비 검증과 실제0.31 ENV/POL/대상 세대/정상 대조/소유·정리 실행은 별도 미완료다. GPU stopped/추가Start중단·CI결제차단과 부모39/56/4·A1 19/27/2를 유지한다.
+

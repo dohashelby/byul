@@ -132,3 +132,25 @@ def test_malformed_control_stops_before_challenge(tmp_path):
     draft, calls = run(tmp_path, malformed=True)
     assert len(calls) == 1 and not draft.normal_control.succeeded
     assert all(not c.attempted for c in draft.challenges)
+
+
+def test_api_alias_is_used_for_request_and_response_without_changing_repository_identity(tmp_path):
+    from tests.test_model_mapping import declared_mapping
+    env, mapping = declared_mapping()
+    calls = []
+    def probe(network, requests, timeout):
+        request, = requests
+        calls.append(request)
+        return [{'id': request['id'], 'outcome': 400 if request['id'].endswith('named-json') else 200,
+            'body': json.dumps({'model': mapping['served_model_name'], 'choices': [{'message': {'role': 'assistant',
+                'content': 'ok'}, 'finish_reason': 'stop'}], 'usage': {'completion_tokens': 1}})}]
+    target = tmp_path / 'target.json'
+    target.write_text(json.dumps({'lab': True, 'origins': {'trusted': {'network': 'trusted-net'}},
+        'engine': {'trusted_url': 'http://engine:8000'}, 'model_mapping': mapping}))
+    executor = StructuredToolsExecutor({'target': str(target), 'source_commit': SOURCE_COMMIT,
+        'backend': None, 'supported': True}, container_probe=probe)
+    before = env.ref()
+    draft = executor.run(check(), env, {}, VllmAdapter(), tmp_path / 'work')
+    assert len(calls) == 7 and all(c['body']['model'] == mapping['served_model_name'] for c in calls)
+    assert draft.normal_control.succeeded
+    assert env.ref() == before and env.model.id == mapping['repository_id']

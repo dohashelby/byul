@@ -102,7 +102,7 @@ class StructuredToolsExecutor(HttpCheckExecutor):
     def collect(self, ctx):
         outcomes, controls, attempts = {}, {}, []
         planned = ["before", "none", "auto", "required", "named-only", "after"]
-        payloads = cases(ctx.env.model.id)
+        payloads = cases(ctx.api_model)
 
         def send(key, body):
             request = {"id": f"structured-tools-{key}", "method": "POST",
@@ -120,7 +120,7 @@ class StructuredToolsExecutor(HttpCheckExecutor):
                     try:
                         data = json.loads(reply.get("body") or "")
                         choices, usage = data["choices"], data["usage"]
-                        valid = (data.get("model") == ctx.env.model.id and type(choices) is list
+                        valid = (data.get("model") == ctx.api_model and type(choices) is list
                                  and len(choices) == 1 and type(choices[0]) is dict
                                  and type(choices[0].get("message")) is dict
                                  and choices[0]["message"].get("role") == "assistant"

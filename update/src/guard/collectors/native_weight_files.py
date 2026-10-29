@@ -141,6 +141,26 @@ def collect(inputs,*,duration=180,max_file_bytes=1024**3,binary="kubectl",reader
         except Exception:row["diagnostic_codes"].append("WEIGHT_FILE_CAPTURE_UNAVAILABLE");gap=True
         rows.append(row)
     if not selected:gap=True;diagnostics.append("NATIVE_WEIGHT_SELECTION_UNAVAILABLE")
+    transport={"profile":context["transport"]+"-owned-weight-file-read-v1"}
+    if injected:
+        transport={"profile":"injected-owned-weight-read-v1"}
+    else:
+        try:
+            report=getattr(reader,"report",None)
+            if report is not None:
+                if not callable(report):raise ValueError()
+                transport=report()
+                if (type(transport) is not dict or any(key in transport and type(transport[key]) is not bool
+                        for key in ("collection_gap","parent_cleanup_unverified"))):
+                    raise ValueError()
+                if transport.get("collection_gap") is True or transport.get("parent_cleanup_unverified") is True:
+                    gap=True;diagnostics.append("WEIGHT_FILE_TRANSPORT_INCOMPLETE")
+        except Exception:
+            # Reporting/parent cleanup is downstream of independently verified
+            # file bytes and generations. Keep those packets and withhold
+            # whole-capture completeness without serializing exception text.
+            gap=True;diagnostics.append("WEIGHT_FILE_TRANSPORT_REPORT_UNAVAILABLE")
+            transport={"profile":context["transport"]+"-owned-weight-file-read-v1","collection_gap":True}
     example_target=context["transport"]=="docker" and inputs["target"].get("lab") is True
     origin=DataOrigin.EXAMPLE if injected or example_target or env.data_origin==DataOrigin.EXAMPLE or inputs["native_origin"]=="EXAMPLE" else DataOrigin.DECLARED
     return {"schema":"guard-native-weight-files-capture/1","environment_ref":env.ref().model_dump(mode="json"),
@@ -150,5 +170,4 @@ def collect(inputs,*,duration=180,max_file_bytes=1024**3,binary="kubectl",reader
         "files":rows,"collection_gap":gap,"diagnostic_codes":sorted(set(diagnostics)),"security":"UNKNOWN",
         "producer_authenticated":False,"final_model_verified":False,"actual_consumption_verified":False,
         "weights_revision_verified":False,"whole_run_coverage_verified":False,"engine_started":False,
-        "transport":({"profile":"injected-owned-weight-read-v1"} if injected else reader.report()
-            if hasattr(reader,"report") else {"profile":context["transport"]+"-owned-weight-file-read-v1"})}
+        "transport":transport}

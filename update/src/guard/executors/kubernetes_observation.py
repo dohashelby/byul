@@ -135,8 +135,8 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
             'required_event_records_collected':bool(summary['snapshots']),'required_event_producer_authenticated':False,
             'required_event_independent_trigger_verified':False,'required_event_scope_complete':False}
         normal_rows=[r for r in summary['trials'] if r['role']=='allowed']
-        normal={'attempted':any(r['attempted'] for r in normal_rows),'succeeded':bool(len(normal_rows)==2 and all(r['normal_shape_verified'] for r in normal_rows)),
-            'detail':'소유 probe의 전후 정상 응답 구조이며 실제 신뢰 주체·승인·worker 실행 완료 증명이 아니다.'}
+        normal={'attempted':any(r['attempted'] for r in normal_rows),'succeeded':None,
+            'detail':'전후 응답 구조는 trials에 보존한다. OBS01 정상대조의 신뢰 주체·필수 감사 사건/기한/보존은 독립 확인되지 않았다.'}
         summary['diagnostic_codes']=sorted(set(summary['diagnostic_codes']))
         challenges=[{'step':step,'attempted':any(r['attempted'] for r in summary['trials']),
             'observations':{'required_event_scope_complete':False}} for step in ctx.check.challenge_steps]
@@ -146,6 +146,6 @@ class KubernetesRequiredEventExecutor(HttpCheckExecutor):
         draft=super()._finish(ctx)
         ceiling=DataOrigin.EXAMPLE if self.runner is not None or ctx.target['lab'] or ctx.env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED
         draft.data_origin=min(draft.data_origin,ceiling,key=lambda origin:ORIGIN_STRENGTH[origin])
-        if ctx._obs_gap:draft.status=ExecStatus.ABORTED
+        if ctx._obs_gap or ctx._obs_cleanup:draft.status=ExecStatus.ABORTED
         draft.cleanup_errors.extend(ctx._obs_cleanup)
         return draft

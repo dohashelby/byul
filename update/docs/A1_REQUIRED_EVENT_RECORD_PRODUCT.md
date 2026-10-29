@@ -16,6 +16,8 @@
 
 누락·다른 귀속·중복·기한 부족·필수 미지원 사건은 명시 관측으로 남긴다. 뒤 파일/정리/첨부 오류가 이전 정제 기록과 후보를 지우지 않는다. 초기 읽기 중단 후 최종 기록을 확보하면 recovered 관측을 남기지만 기존 reader gap도 보존한다. 선언된 actor/대상 불일치와 중복은 confirmed_violation=false 후보다. 접근 응답과 기록 주장은 실제 trusted principal·승인·배포 사건의 독립 증거가 아니므로 producer_authenticated/independent_trigger_verified/scope_complete=false와 모든 판정 축UNKNOWN을 유지한다. 다른 기존 체크에서 확인한 독립FAIL 의미는 바꾸지 않는다.
 
+HTTP/record 부모 정리 오류가 남으면 실행도 ABORTED로 기록한다. 전후 API 응답 구조는 trials의 관측으로만 남기며, OBS01 정상대조 전체의 `succeeded`는 독립 감사 근거가 없는 동안 null이다. 절차 실행이 COMPLETED여도 정상대조·점검의 PASS를 의미하지 않는다.
+
 선택된 관리·승인·공급물 소비·배포 사건은 실제 독립 발생원과 생성·전달·보존 계약이 준비되지 않으면 missing에 남는다. 이 기능만으로 전체 OBS01 두분기나 부모A를 완료 처리하지 않는다. 재개에는 실제 trusted Gateway principal/감사 생산자와 정확 ENV/source/image/정책·정상/위반/누락/교체/복구 절차가 필요하다. 기존GPU창 만료·추가Start0·마지막확인stopped·기존 비용·CI결제차단은 유지한다.
 
 구현·시험·문서 초안을 마친 뒤 고정 checkpoint와 검토된 전체 소비 pin을 만든다. 직접/인접/불변식·동일 bytes Linux·183 이상 설치본 CLI/6Ref 왕복의 실제 결과와 지원 범위는 최종 고정 인계에 기록한다. CPU/EXAMPLE과 새 실제 배포·worker/GPU 실증은 구분한다.

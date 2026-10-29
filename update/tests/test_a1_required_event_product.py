@@ -138,6 +138,7 @@ def test_existing_cli_records_and_exact_refs_preserve_unknown_and_followup_facts
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     assert e.data_origin.value=='EXAMPLE' and all(getattr(res.verdicts,k).value=='UNKNOWN' for k in ('security','functional','performance'))
+    assert e.normal_control.succeeded is None
     for key in ('required_event_producer_authenticated','required_event_independent_trigger_verified','required_event_scope_complete'):assert e.observations[key].value is False
     assert e.execution.status.value==('COMPLETED' if mode=='normal' else 'ABORTED')
     if mode=='normal':

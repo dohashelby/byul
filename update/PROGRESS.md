@@ -1420,3 +1420,5 @@ git status
 - 테스트 결과: 구현·시험·계약 문서 초안 후 AST/원본보존 정적검토 단계다. 고정checkpoint→검토된전체pin→직접/인접/불변식→동일bytes Linux/설치CLI·정확6Ref 검증 전에는 새 통과로 기록하지 않는다. 정상·잘못된귀속 후보·누락·교체/재시작·재확보·후속첨부/정리·민감필드재라벨 거부를 준비했다.
 - 다음 단계: 영향검증·설치·정확커밋/Ref 인계를 마감한 뒤 준비된 본인 담당개발을 이어간다. 기록metadata와공개응답은 trusted principal/감사생산자·승인/배포 실제사건의 독립증거가 아니므로 모든축UNKNOWN과scope/producer/independenttriggerfalse를 유지한다.
 - 막힌 것: 실제 trusted Gateway/감사생산자와관리·승인·소비·배포 발생원, 기업보존/기한조건·실제환경실증·전체OBS01/부모A는 미완료다. 필수미지원사건을missing에남기며 기존독립FAIL·기본native8~11/B/A2와원래GPU창종료·추가Start0·마지막확인stopped·CI결제차단을유지한다.
+
+- 첫 고정 검증: e84778a/1197파일 불변에서 Windows930통과·새시험1실패·기존skip1/제외1(319.74/320.513초)을 보존했다. HTTP 부모 정리 오류는기록됐으나 `_finish`가cleanup만으로실행을ABORTED로내리지않은누락을보수한다. 전후API정상구조를OBS01필수감사정상대조성공으로오해하지않도록 normal_control.succeeded=null과명시시험을추가한다. 기존guard/probe/전용bytes와테스트기대값·제외범위는유지하고새소스를재고정해영향만검증한다.

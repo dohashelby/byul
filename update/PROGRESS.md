@@ -1440,3 +1440,5 @@ git status
 - 테스트 결과: 구현·시험·계약 정적 검토를 마쳤으며 고정 소스 직접/인접·Linux 소유 임시 socket·설치 검증 전이다. 실행하지 않은 시험을 통과로 기록하지 않는다.
 - 다음 단계: 공통 전송 고정본과 정확 bytes/명령/지원 범위를 A2 소비용으로 인계한 뒤 본인19개 준비된 개발을 계속한다. 기존 CLI 회귀와 새 공통 API 검증은 구분한다.
 - 막힌 것: A2 새 envelope/groups 전용 소비·정상/위반/증거 왕복과 실제 worker/GPU/Kubernetes 실증·전체 PLT02/부모 A는 미완료다. EXAMPLE/UNKNOWN·생산자/worker/scope false와 원래 GPU 창 종료·추가 Start0·CI 결제 차단을 유지한다.
+
+- 공통 전송 검증 마감: 정확722d9db/검토pin6fe9cf5에서 Windows686통과·기존skip1/제외1(89.50/90.51초),동일1204파일 Linux687통과·제외1(39.40/39.662초),source/wheel/격리설치189파일일치와설치공개API4사례(.792초),기존CLI6/정확36Ref반출·복원·재판정(10.536초)을확인했다. 실제소유Linux임시socket의connected/denied/symlink·누락unknown,0payload·peerPID/UID/namespace·actor정리·FD4→4를확인했다. 후속deadline으로앞선행을보존했다. 최초deadline fixture는AF_UNIX backlog의즉시EAGAIN으로의도한대기를만들지못했으며실패원본을보존하고소유수집지연을명시주입한EXAMPLE fixture만보수했다. 제품/source변경·새skip/제외는없다. A2선정12/B원본27bytes와기존실증판본을보존한다. 새PLT02 Kubernetes전용소비·전체판정/실제환경완료는별도다.

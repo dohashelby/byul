@@ -119,7 +119,9 @@ def test_registered_cli_native_samples_and_exact_ref_roundtrip(tmp_path,group,na
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     assert e.data_origin.value=='EXAMPLE' and all(getattr(res.verdicts,a).value=='UNKNOWN' for a in ('security','functional','performance'))
     assert e.normal_control.succeeded is None
-    assert all(e.observations[key].value is False for key in ('buffer_producer_authenticated','buffer_inventory_complete','buffer_release_verified','buffer_scope_complete'))
+    flags=('buffer_producer_authenticated','buffer_inventory_complete','buffer_release_verified','buffer_scope_complete')
+    if mode=='actual-lab-false':assert all(e.observations[key].value is None and not e.observations[key].collected for key in flags)
+    else:assert all(e.observations[key].value is False for key in flags)
     if mode=='actual-lab-false':assert not world.sent and e.execution.status.value=='ABORTED'
     else:
         assert len(world.sent)=={'before-shape':2,'engine-replaced':1,'wrong-response-id':2}.get(mode,5)

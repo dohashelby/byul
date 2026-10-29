@@ -22,6 +22,6 @@ native12는 immutable base8을 private로 읽으며 기본8·9~11 bytes와 설�
 
 실제 await/call 직전·직후 시간을 관측 I/O와 구분하며 drain을 같은 요청/연결/PID/start/session의 부모 send 구간에 결합한다. 선택 asyncio selector TCP의 실제 bytearray 쓰기버퍼 길이와 Linux own socket TIOCOUTQ/전후 inode를 읽는다. 전체process RSS는 연결별 배타 비용이 아니다. uvloop/다른 transport/지원 OS가 아닌 kernel queue는 null이고0으로 채우지 않는다. socket 주소·본문·헤더·원문 예외를 보존하지 않는다. weak transport256개·요청8개/연결·2048행/2MiB를 넘으면 관측 공백이다. 추가 recv/send·worker 종료·별도 Pod Python을 실제 hook으로 위장하지 않는다.
 
-제품은 관측 가능한 send/drain/close·PID/start·세대 범위만 연결한다. 예산초과는 확인되지 않은 후보이고, 정상 대조의 succeeded=null·세 축 UNKNOWN·producer/inventory/release/scope=false다. 전체 serving buffer 인벤토리·연결 종료 시계/회수·실제 debug는 미완료다. 관측 helper나 등록만으로 두 분기 완료를 기록하지 않는다. 실제 source/principal/worker/메모리 비용/기업 예산이 없으면 UNKNOWN이고 독립 FAIL은 보존한다. 소유 Linux 소켓 시험과 고정 실제 메서드 본문 시험도 CPU/EXAMPLE이며 실제 vLLM/Kubernetes/GPU 실증이 아니다.
+제품은 관측 가능한 send/drain/close·PID/start·세대 범위만 연결한다. 예산초과는 확인되지 않은 후보이고, 정상 대조의 succeeded=null·세 축 UNKNOWN·수집된 producer/inventory/release/scope=false다. lab=false 등 I/O 전 구성 관문에서 거부되면 기존 공통 실행기의 미수집 value=null/collected=false를 유지한다. 미수집을 false 관측으로 채우지 않는다. 전체 serving buffer 인벤토리·연결 종료 시계/회수·실제 debug는 미완료다. 관측 helper나 등록만으로 두 분기 완료를 기록하지 않는다. 실제 source/principal/worker/메모리 비용/기업 예산이 없으면 UNKNOWN이고 독립 FAIL은 보존한다. 소유 Linux 소켓 시험과 고정 실제 메서드 본문 시험도 CPU/EXAMPLE이며 실제 vLLM/Kubernetes/GPU 실증이 아니다.
 
 원GPU창종료·추가Start0·마지막확인stopped·46.66USD 기존상한·CI결제차단을 유지한다. 새 실제 기동/기간/비용/IAM 승인은 없으며 fresh ENV/POL/자원·소유권/차례·관측/정리 책임과 새 시간 승인 없이는 실제 실증을 재개하지 않는다. 준비된 독립 개발은 계속한다.

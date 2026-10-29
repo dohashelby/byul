@@ -20,7 +20,7 @@ from .http_common import HttpCheckExecutor, functional_requests, functional_resu
 
 
 PROFILE = "unix-ipc-access-v1"
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 _PIN = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}")
 _NS = re.compile(r"(mnt|net|pid|user):\[[0-9]+\]")
 _ID = re.compile(r"[0-9a-f]{64}")
@@ -228,6 +228,16 @@ class UnixIPCExecutor(HttpCheckExecutor):
                 planned = list(probes)
                 control_attempted = bool(requests) or control_attempted
                 responses = ctx.cprobe(ctx.trusted_net, requests, min(ctx.timeout, deadline - time.monotonic()))
+                # Keep the published no-ID callback form, but an explicit ID
+                # must correspond to this request. Positional zip must not
+                # adopt an unrelated or extra response as the normal control.
+                if (type(responses) is not list or len(responses) != len(requests)
+                        or len(requests) != len(probes)
+                        or any(type(response) is not dict for response in responses)
+                        or any("id" in response for response in responses)
+                        and [response.get("id") for response in responses] != [request["id"] for request in requests]):
+                    responses = []
+                    errors.append("IPC_NORMAL_CONTROL_RESPONSE_UNCORRELATED")
                 functional, _, _ = functional_results(probes, dict(zip(probes, responses)), ctx.env.model.id)
                 normal_ok = bool(len(connected_controls) == len(paths)
                                  and functional and all(v == "pass" for v in functional.values())

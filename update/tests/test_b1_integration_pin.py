@@ -93,6 +93,16 @@ def test_direct_bytes_check_ignores_git_assume_unchanged_hint(pinned_repo):
         verify_snapshot(repo, commit, ('source',))
 
 
+def test_export_ignore_cannot_hide_assume_unchanged_source(pinned_repo):
+    repo, commit = pinned_repo
+    git(repo, 'update-index', '--assume-unchanged', 'source/module.py')
+    (repo / 'source/module.py').write_text('VALUE = 2\n')
+    (repo / '.git/info/attributes').write_text('source/module.py export-ignore\n')
+    assert not git(repo, 'diff', commit, '--', 'source')
+    with pytest.raises(ValueError, match='archive omitted tracked files'):
+        verify_snapshot(repo, commit, ('source',))
+
+
 OVERLAY_BYTES = {
     'update/src/guard/executors/structured_tools.py': b'APPROVED = "selected model"\n',
     'update/src/guard/executors/structured_tools_cpu.py': b'APPROVED = "CPU producer"\n',

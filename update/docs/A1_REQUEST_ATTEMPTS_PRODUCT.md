@@ -4,6 +4,8 @@ REQ12의 SC-18-01/SC-18-03 두 분기, 취소 의미·늦은 결과·자동 retr
 요구를 보존한다. 이 묶음은 기존 request_termination:kubernetes 실행기를 명시 REQ12
 collection profile로 확장한다. 별도 CPU 제품이나 외부 capture JSON 실행기를 만들지 않는다.
 현재 실제 늦은 chunk 폐기/전달·자동 Gateway/SDK retry는 미확인이며 전체 REQ12 완료가 아니다.
+명시 native10의 추가 ASGI invocation 관측은 A1_NATIVE_ATTEMPT_PROFILE.md에 정의하며,
+derived 팩 revision2/check revision6의 별도 추가 관측이다. 과거 revision1과 정확 Ref는 보존한다.
 
 공개 HTTP는 REQUEST_ATTEMPTS_PROFILE = kubernetes-owned-request-attempts-http-v1이다.
 명시 profile 외 기존 전송의 요청·ID·제한은 유지한다. native8/9 prepared session·정확 ENV·모델

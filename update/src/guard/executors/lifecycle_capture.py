@@ -10,6 +10,7 @@ from guard.adapters import vllm_lifecycle_sensor as sensor
 from guard.adapters import vllm_lifecycle_profiles as profiles
 from guard.adapters import vllm_online_sensor as online
 from guard.adapters import vllm_online_metadata as online_metadata
+from guard.adapters import vllm_attempt_sensor as attempt, vllm_attempt_metadata as attempt_metadata
 from .owned_capture import _read_owned_file, strict_json, validate_owned_source, EXTENDED_RECORDING_PROFILE
 
 CONTEXT_READER = r"""
@@ -79,12 +80,13 @@ def canonical_row(row):
 
 def parse_recording(raw, prepared):
     is_online = prepared["profile"] == online.PROFILE
-    if type(raw) is not bytes or not 0 < len(raw) <= (online.MAX_BYTES if is_online else sensor.MAX_BYTES):
+    is_attempt = prepared["profile"] == attempt.PROFILE
+    if type(raw) is not bytes or not 0 < len(raw) <= (attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES):
         raise ValueError("LIFECYCLE_RECORDING_BYTES_INVALID")
     lines = raw.splitlines(keepends=True)
     incomplete_tail = not raw.endswith(b"\n")
     tail = lines.pop() if incomplete_tail else b""
-    if not 1 <= len(lines) <= (online.MAX_ROWS if is_online else sensor.MAX_ROWS):
+    if not 1 <= len(lines) <= (attempt.MAX_ROWS if is_attempt else online.MAX_ROWS if is_online else sensor.MAX_ROWS):
         raise ValueError("LIFECYCLE_RECORDING_ROW_BOUND")
     previous, clock, rows = "0"*64, -1, []
     keys = KEYS - {"asgi_request_sha256"} if prepared["profile"] == profiles.LEGACY_PROFILE else KEYS
@@ -92,15 +94,18 @@ def parse_recording(raw, prepared):
         keys = keys - {"model_selection","owner_model_sha256","argument_model_sha256","returned_model_sha256",
             "configured_model_sha256","configured_revision_sha256","load_format_sha256","load_dummy_weights",
             "lora_config_present","speculative_config_present"}
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
-    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V4_PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.WEIGHT_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V5_PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.ROUTE_KEYS-{"asgi_request_sha256"})
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}:keys=keys-profiles.REQUEST_SELECTION_KEYS
+    if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     words = WORDS
     if is_online:
         keys = keys | {"online_input", "online_code_sha256", "online_runtime"}
         words = words | {online.PROFILE, online.SCHEMA, online.CALLBACK_MODULE, *online.SOURCE_ADDITIONS,
             *online.POINT_CONTRACTS, *online.RUNTIME_CONTRACTS}
+    if is_attempt:
+        keys=keys|attempt_metadata.FIELDS
+        words=words|{"ATTEMPT",*attempt_metadata.PHASES,*attempt.RUNTIME_CODE_CONTRACTS}
     source_hashes = profiles.source_hashes(prepared["profile"])
     point_sources=profiles.point_sources(prepared["profile"])
     points=set(point_sources)
@@ -120,7 +125,7 @@ def parse_recording(raw, prepared):
                 or not _safe(safe_row, keys=keys, words=words) or type(row["seq"]) is not int or row["seq"] != seq
                 or type(row["monotonic_ns"]) is not int or row["monotonic_ns"] < clock
                 or row["previous_sha256"] != previous or canonical_row(row) != line
-                or row["event"] not in {"START","MODULE","NATIVE","ASGI","END","SELECTION"}
+                or row["event"] not in ({"START","MODULE","NATIVE","ASGI","END","SELECTION","ATTEMPT"} if is_attempt else {"START","MODULE","NATIVE","ASGI","END","SELECTION"})
                 or type(row["payload"]) is not dict):
             raise ValueError("LIFECYCLE_RECORDING_ROW_INVALID")
         previous, clock = hashlib.sha256(line).hexdigest(), row["monotonic_ns"]
@@ -148,6 +153,7 @@ def parse_recording(raw, prepared):
     online_calls = {}
     online_orphans = 0
     online_runtime = None
+    attempt_runtime=None;attempt_calls={};attempt_events=0
     for row in rows[1:]:
         payload = row["payload"]
         if row["event"] == "START":
@@ -186,7 +192,7 @@ def parse_recording(raw, prepared):
             elif is_online:
                 ready.discard(payload["module"])
         if row["event"] in {"NATIVE","SELECTION"}:
-            if row["event"]=="SELECTION" and (header["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
+            if row["event"]=="SELECTION" and (header["profile"] not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,profiles.V6_PROFILE,profiles.V7_PROFILE}
                     or payload.get("point")!="InputProcessor.assign_request_id" or payload.get("requests")!=[]
                     or payload.get("selection_observed") is not False
                     or type(payload.get("metadata")) is not dict
@@ -260,6 +266,19 @@ def parse_recording(raw, prepared):
                     raise ValueError("LIFECYCLE_RECORDING_CHAIN_INVALID")
             if payload.get("source_sha256") != source_hashes[point_sources[payload["point"]]]:
                 raise ValueError("LIFECYCLE_RECORDING_POINT_SOURCE_INVALID")
+        if row["event"]=="ATTEMPT":
+            attempt_metadata.validate_attempt(payload)
+            if attempt_runtime is not None and payload["observer_runtime"]!=attempt_runtime:
+                raise ValueError("ATTEMPT_OBSERVER_RUNTIME_MISMATCH")
+            attempt_runtime=payload["observer_runtime"];attempt_events+=1
+            invocation=payload["asgi_invocation_sha256"]
+            identity={k:payload[k] for k in ("asgi_request_sha256","asgi_invocation_sha256","entry_path_sha256","entry_root_path_sha256","entry_method_sha256")}
+            call=attempt_calls.setdefault(invocation,{"identity":identity,"enters":0,"ends":0,"late":0,"unhashed":0})
+            if call["identity"]!=identity:raise ValueError("ATTEMPT_INVOCATION_BINDING_MISMATCH")
+            call["enters"]+=payload["phase"]=="APP_ENTER"
+            call["ends"]+=payload["phase"] in {"APP_RETURN","APP_RAISE"}
+            call["late"]+=not payload["context_live"]
+            call["unhashed"]+=payload["phase"].startswith("BODY_SEND_") and not payload["body_hash_complete"]
         if row["event"] == "ASGI":
             if (set(payload) != {"request_sha256","phase","more_body"}
                     or payload["request_sha256"] is not None and (type(payload["request_sha256"]) is not str
@@ -276,6 +295,11 @@ def parse_recording(raw, prepared):
         "incomplete_final_row":incomplete_tail,"discarded_tail_bytes":len(tail),
         "discarded_tail_sha256":hashlib.sha256(tail).hexdigest() if tail else None,
         "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False,
+        **({"attempt_observer_runtime":attempt_runtime,"attempt_event_count":attempt_events,
+            "attempt_incomplete_invocations":sum(v["enters"]!=1 or v["ends"]!=1 for v in attempt_calls.values()),
+            "attempt_late_callbacks":sum(v["late"] for v in attempt_calls.values()),
+            "attempt_unhashed_bodies":sum(v["unhashed"] for v in attempt_calls.values()),
+            "attempt_observer_code_sha256":attempt.RUNTIME_CODE_CONTRACTS.get(attempt_runtime)} if is_attempt else {}),
         **({"online_code_contract":online.CODE_CONTRACT,
             "online_runtime":online_runtime,
             "online_incomplete_calls":sum(not call["closed"] for call in online_calls.values()) + online_orphans,
@@ -305,8 +329,9 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     validate_owned_source(**source)
     read = _read_owned_file if read_file is None else read_file
     is_online = prepared["profile"] == online.PROFILE
-    limit = online.MAX_BYTES if is_online else sensor.MAX_BYTES
-    read_options = {"read_profile":EXTENDED_RECORDING_PROFILE} if is_online and read_file is None else {}
+    is_attempt=prepared["profile"]==attempt.PROFILE
+    limit = attempt.MAX_BYTES if is_attempt else online.MAX_BYTES if is_online else sensor.MAX_BYTES
+    read_options = {"read_profile":EXTENDED_RECORDING_PROFILE} if (is_online or is_attempt) and read_file is None else {}
     raw, provenance = read(docker, target, **source, max_bytes=limit, **read_options)
     records, summary = parse_recording(raw, prepared)
     context = records[0]["payload"]["context"]

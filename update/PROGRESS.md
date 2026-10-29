@@ -1387,3 +1387,10 @@ git status
 - 다음 단계: 구현·정적 검토 종료→source고정·검토pin→직접/인접/불변식→Linux/설치·정확6Ref→commit/push·초안PR·정확HEAD CI·인계. actual 늦은 chunk/소비자 귀속의 공통 관측 계약도 준비한다.
 - 막힌 것: 실제 취소대상/늦은chunk 폐기·전달·자동retry·신뢰producer/source/image/기업POL·worker/GPU와 전체 두분기 완료는 미확인이다. 후보는 독립FAIL이 아니며 전축UNKNOWN·late_delivery/automatic_retry/scope_complete=false를 유지한다. 원승인창종료·추가Start0·stopped·CI결제차단·부모A39/A1담당19 범위를 축소하지 않는다.
 
+## 2026-10-30 — A-1 native10 ASGI invocation 관측·REQ12 소비
+
+- 한 일: 확정243918a와 기존8/9/B/A2 bytes를 보존하고 명시10의4assets·고정base8/source/code·닫힌ATTEMPT parser·선정2MiB 읽기·REQ12 native selection/invocation 소비를 연결한다. ASGI callback 반환·실제client수신·native출력원천을 구분하고, 늦거나다른PID context·중복/누락·후속실패는 미확인/고정진단으로 남긴다. REQ12 derived팩revision2/check6은 원래77개·두분기·기준·다른76개 bytes를 보존한다.
+- 테스트 결과: real middleware/writer/parser와 복사한 native assign body·병렬동일ID·return/exception/cancel·늦은/forkcontext·큰body·변조code/metadata 및 기존CLI/6Ref 실패사례 초안을 작성했다. source 고정·검증 전이며 실제 serving/worker/GPU 성과가 아니다.
+- 다음 단계: 정적검토·source고정·검토pin→직접/인접/불변식→Linux/설치CLI·정확Ref→commit/push·초안PR·정확HEAD CI·인계. 실제 늦은chunk원천/소비자·취소/timeout/stop과 본인 관측 분기를 이어간다.
+- 막힌 것: producer/image신뢰·actual serving/hook/worker/GPU·실제client수신·native늦은출력원천·자동retry·기업POL·전체LIF10/REQ12/A39는 미완료다. 새profile10을B/A2전용소비나native0.32 지원으로 가정하지 않는다. 원승인창만료·추가Start0·마지막stopped·CI결제차단을 유지한다.
+

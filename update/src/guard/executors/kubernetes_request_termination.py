@@ -48,6 +48,7 @@ class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
     requires_roles=False;requires_route_scope=False;functional_via="engine"
     check_id="LIF-10";collection_profile=PROFILE;policy_prefix="termination"
     policy_normalizer=staticmethod(normalize_policy);transport_profile=TERMINATION_PROFILE
+    supported_native_profiles=frozenset({"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9"})
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target_sha256=expected_target_sha256
@@ -79,7 +80,7 @@ class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
             if (digest!=policy_values[self.policy_prefix+"_target_sha256"] or env.ref().sha256!=policy_values[self.policy_prefix+"_environment_sha256"]
                     or self.expected_target_sha256 is not None and self.expected_target_sha256!=digest):raise ValueError
             prepared=load_prepared(self.cfg["prepared"])
-            if prepared["profile"] not in {"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9"}:raise ValueError
+            if prepared["profile"] not in self.supported_native_profiles:raise ValueError
             start,end=self.policy_normalizer(policy_values)
             if not start<=utcnow()<=end:raise ValueError
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError("TERMINATION_CONFIGURATION_INVALID") from None

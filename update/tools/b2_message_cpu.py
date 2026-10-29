@@ -48,7 +48,21 @@ def safe_summary(stdout, returncode):
     return {"status": "PASSED" if success else "NOT_PASSED", "returncode": returncode, **value}
 
 
+def child_environment(root, repo):
+    """Own tools/product package first; the pinned target supplies vLLM last."""
+    return {**os.environ, "PYTHONPATH": os.pathsep.join([str(repo), str(repo / "src"), str(root)]),
+            "VLLM_TARGET_DEVICE": "cpu", "CUDA_VISIBLE_DEVICES": "", "VLLM_ALLOW_INSECURE_SERIALIZATION": "0"}
+
+
+def verify_own_helper():
+    actual = Path(inspect.getfile(verify_source)).resolve()
+    expected = Path(__file__).resolve().with_name("b2_decoder_cpu.py")
+    if not actual.is_file() or not expected.is_file() or not actual.samefile(expected):
+        raise ValueError("imported decoder helper is outside the own checkout")
+
+
 def load_official_tests(root, namespace):
+    verify_own_helper()
     verify_source(root)
     import pytest
     import torch
@@ -76,11 +90,14 @@ def load_official_tests(root, namespace):
 
 
 def run(root, output):
+    verify_own_helper()
     pin = verify_source(root)
     output.mkdir(parents=True, exist_ok=False)
     harness = output / "test_official_message.py"
-    harness.write_text("from pathlib import Path\nfrom tools.b2_message_cpu import load_official_tests\n"
-                       + f"load_official_tests(Path({str(root)!r}), globals())\n")
+    harness.write_text("from pathlib import Path\nimport tools.b2_message_cpu as message_tool\n"
+                       + f"if not Path(message_tool.__file__).samefile(Path({str(Path(__file__).resolve())!r})):\n"
+                       + " raise ValueError('imported message tool is outside the own checkout')\n"
+                       + f"message_tool.load_official_tests(Path({str(root)!r}), globals())\n")
     launcher = output / "run_tests.py"
     launcher.write_text(
         "import pytest,sys,time,json\nstart=time.perf_counter()\n"
@@ -92,8 +109,7 @@ def run(root, output):
         + f"  print({PREFIX!r}+json.dumps(result))\n"
         "raise SystemExit(pytest.main(sys.argv[1:],plugins=[Summary()]))\n")
     repo = Path(__file__).resolve().parents[1]
-    env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(root), str(repo / "src"), str(repo)]),
-           "VLLM_TARGET_DEVICE": "cpu", "CUDA_VISIBLE_DEVICES": "", "VLLM_ALLOW_INSECURE_SERIALIZATION": "0"}
+    env = child_environment(root, repo)
     result = subprocess.run([sys.executable, str(launcher), "-q", str(harness), "--noconftest",
         "-p", "no:cacheprovider", "--override-ini=addopts=", "--basetemp", str(output / "temp")],
         capture_output=True, text=True, env=env)

@@ -81,3 +81,47 @@ plugin_cpu_phases/plugin_loading_confirmed_violations/완전성 관측과 기존
 기업 승인 정책을 받은 뒤 설치 inventory와 결과를 대응하고, A 확정 소스에서
 실행→EVD→RES/RPT와 첨부 저장 실패 회귀를 수행한다. 현재 standalone JSON은
 정식 제품 객체가 아니고 실제 설치판의 MEASURED로 소급하지 않는다.
+
+## 0.31 source 선정과 직접 collector API
+
+기존 10사례·후속 10건·ASGI 3건은 같은 corpus로 재사용한다. 새 10개 시험 개발로
+집계하지 않는다. 기본 reference5d는 기존 5d35ce3이며, target031은 정확히
+`db9527a46873454610df6dbedf79a36d6bf1a7f6`를 선택한다. HEAD나 설치 버전을 보고
+source를 자동 선택하지 않는다.
+
+`tools.b1_plugin_cpu.capture(source_root, workdir, source_profile='reference5d')`는
+source·fixture를 검증한 뒤 실제 child 실행으로 얻은 dict를 직접 반환한다. 기존 CLI는
+이 API를 사용하며 `--source-profile reference5d|target031`을 받는다. 외부 결과 JSON을
+수집값으로 주입하는 진입점은 제공하지 않는다. 정식 소비 도구는 이 반환 record를
+기존 project/judge와 EvidenceDraft→core 객체 흐름에 연결한다. 영구 제품 등록과
+기업 설치물 승인·권한·실제 worker/IO 소비는 A 경계로 유지한다.
+
+검증은 다음 고정 범위를 사용한다.
+
+- 공통 guard/packs/lock/framework는 component commit
+  `ac8ffbadbb85dbbfe7c96fa36785ae9546e2c8c7`의 전체 snapshot으로 확인한다.
+- 기존 LIF-14 검증 함수를 재사용하기 전에 해당 도구의 own 파일·함수 경로와 bytes
+  `1af43f4ae68271b494a8528cd1190763612735bb963ec00f0a1f4992fb802308`을 확인한다.
+  그 함수가 기존 B1 helper의 own 신원·고정 bytes·scope 검사를 수행한다.
+- fixture는 검토된 pyproject SHA256, Python 파일 6개의 정확한 set/hash,
+  entrypoint 표를 상수로 둔다. 기대값을 runtime Git 이력이나 현재 파일로 재승인하지 않는다.
+  실제 실행에서는 fixture source 전체 snapshot의 untracked/ignored shadow도 검사한다.
+- 설치 배포물의 .py set/bytes, 이름·버전, 네 group의 실제 entrypoint inventory,
+  로드된 fixture 모듈의 설치 경로를 확인한다. 실제 vLLM 전체 source bytes와 import 경로도
+  고정 source별로 확인한다. target031은 기존 정확 CPU 의존성 확인을 재사용한다.
+- 최적화 모드 실행은 source·target 실행 전에 거부한다. collector 자체 bytes도 사례
+  실행 전에 기록하고 후속 검사에서 일치를 확인한다. 후속 검증 오류는 incomplete와
+  검사 상태·예외 타입으로 남기며 앞선 정제 event·독립 위반을 보존한다.
+
+source 차이는 기존 source filter의 의미와 분리한다. 두 source의 group/general/endpoint
+loader, V1 logits loader, IO 선택 함수, endpoint init_state는 AST가 동일하다.
+endpoint attach는 0.31의 단순 attach와 5d의 같은 path/method route 교체·OpenAPI 재설정이
+다르다. 기존 corpus의 고유 fixture route는 이 충돌 동작을 시험하지 않는다.
+route 충돌·OpenAPI 교체·model config 기반 IO 선택·실제 runner token/IO pre/post 소비는
+이번 CPU 관측으로 확인하지 않는다. installed_target=null, runner_hook_verified=false와
+보안 PASS 규칙 부재를 유지한다.
+
+```sh
+# workdir은 새 외부 디렉터리. local tools/src를 source보다 먼저 선택한다.
+VLLM_TARGET_DEVICE=cpu VLLM_LOGGING_LEVEL=CRITICAL CUDA_VISIBLE_DEVICES= HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH="src:.:$VLLM_SOURCE" "$CPU_VENV/bin/python" tools/b1_plugin_cpu.py --source-profile target031 --source-root "$VLLM_SOURCE" --workdir "$FRESH_PLUGIN_EVIDENCE"
+```

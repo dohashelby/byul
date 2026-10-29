@@ -142,7 +142,37 @@ def _online_eligibility(case,row,profile):
 
 
 
-def _online_collect_case(case,processor,online_class,request_class,error_class,rejection_type,tracked):
+
+def _online_token_id_domain(config_folder,model_vocab_size,request_ids):
+    """Read independent owned tokenizer IDs; never use the cached max as oracle."""
+    from guard.executors.input_cpu import digest
+    try:
+        tokenizer_bytes=(config_folder/'tokenizer.json').read_bytes()
+        model_bytes=(config_folder/'config.json').read_bytes()
+        tokenizer=json.loads(tokenizer_bytes);model=json.loads(model_bytes)
+        if (type(model_vocab_size) is not int or model_vocab_size<=0
+                or type(model.get('vocab_size')) is not int or model['vocab_size']!=model_vocab_size):
+            raise ValueError('ONLINE_CPU_MODEL_DOMAIN_UNAVAILABLE')
+        vocab=tokenizer['model']['vocab']
+        if not isinstance(vocab,dict):raise ValueError('ONLINE_CPU_TOKENIZER_DOMAIN_UNAVAILABLE')
+        values=list(vocab.values())+[item['id'] for item in tokenizer.get('added_tokens',[])]
+        if not values or any(type(value) is not int or value<0 for value in values):
+            raise ValueError('ONLINE_CPU_TOKENIZER_DOMAIN_UNAVAILABLE')
+        ids=sorted(set(values))
+        if not isinstance(request_ids,list):raise ValueError('ONLINE_CPU_REQUEST_DOMAIN_UNAVAILABLE')
+        return {'status':'collected','model_vocab_size':model_vocab_size,'tokenizer_id_count':len(ids),
+            'min':ids[0],'max':ids[-1],'canonical_sha256':digest(ids),
+            'contiguous_from_zero':ids[0]==0 and ids[-1]+1==len(ids),
+            'request_ids_in_domain':all(type(value) is int and value in set(ids) for value in request_ids),
+            'request_ids_within_model_vocab':all(type(value) is int and 0<=value<model_vocab_size for value in request_ids),
+            'request_ids_canonical_sha256':digest(request_ids),
+            'tokenizer_file_sha256':hashlib.sha256(tokenizer_bytes).hexdigest(),
+            'model_config_file_sha256':hashlib.sha256(model_bytes).hexdigest()}
+    except Exception as error:
+        return {'status':'unavailable','error_type':type(error).__name__}
+
+
+def _online_collect_case(case,processor,online_class,request_class,error_class,rejection_type,tracked,*,config_folder=None):
     from guard.executors import online_input_cpu as product
     from guard.executors.input_cpu import digest
     from guard.executors.structured_limits import observe_call
@@ -178,6 +208,8 @@ def _online_collect_case(case,processor,online_class,request_class,error_class,r
                 details.update(processor_input_count=len(ids) if ids is not None else None,
                     processor_input_ids_sha256=digest(ids) if ids is not None else None,
                     processor_input_matches_reuse=digest(ids)==digest(fields.get('kv_transfer_params',{}).get('prompt_token_ids')))
+                details['token_id_domain']=_online_token_id_domain(config_folder,
+                    processor.model_config.get_vocab_size(),ids)
                 admitted=processor.process_inputs('b1-online-fixture',inputs[0],params,('generate',))
                 details.update(admission_completed=True,prompt_count=len(admitted.prompt_token_ids),
                     admitted_token_ids_canonical_sha256=digest(admitted.prompt_token_ids),
@@ -247,7 +279,7 @@ def capture_online(source_root:Path,workdir:Path,*,source_profile='reference5d')
                 'after':{'outcome':'not_collected','events':[]},'safe_metadata':{}}
             try:
                 _online_verify_profile(root,source_profile)
-                row=_online_collect_case(case,processor,OnlineRenderer,ChatCompletionRequest,ErrorResponse,VLLMValidationError,tracked)
+                row=_online_collect_case(case,processor,OnlineRenderer,ChatCompletionRequest,ErrorResponse,VLLMValidationError,tracked,config_folder=config_folder)
                 pre='verified'
             except Exception as error:
                 row['error_type']=type(error).__name__

@@ -138,3 +138,18 @@ PYTHONPATH="src:.:$VLLM_SOURCE" "$CPU_VENV/bin/python" -m tools.b1_input_cpu \
 
 정식 target16 수집 결과는 collector·producer 통합 소스 확정 후 기록한다. 기존 참조5d16행·
 후속16 원본은 유지한다. installed target은 null이고 최종 runner 소비는 미검증이다.
+
+
+### 독립 token ID domain 근거
+
+검증 대상 캐시의 max_token_id를 허용 범위의 oracle로 사용하지 않는다. 소유
+`tokenizer.json`의 model.vocab·added_tokens ID 합집합에서 count/min/max·정규 해시와
+0부터의 연속 여부를 별도 수집한다. `config.json`의 vocab_size는 실제 ModelConfig
+값과 대조하고, 실제 InputProcessor에 전달하는 ID의 tokenizer/model membership과
+정규 해시를 기록한다. 두 설정 파일 bytes SHA를 capture의 config hash와 연결한다.
+문자열 vocabulary와 ID 집합 전체는 제품 첨부에 저장하지 않는다.
+
+0.31 캐시가 보고한32는 기존 effective_max_token_id 진단값으로 보존한다. 독립
+vocabulary/model domain0..31 밖의 ID32가 실제 processor에서 수용되었다면 기존
+REQ08 FAIL을 보존한다. 독립 domain 근거가 없거나 설정 hash가 다르면 해당 자격은
+UNKNOWN이다. 원본16입력·expected·기존 actual1은 유지한다.

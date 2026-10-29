@@ -289,3 +289,65 @@ def test_target_range_rejection_requires_actual_processor_input_consumption():
     assert collector._online_eligibility(case,row,'target031')['eligible'] is False
     row['events'].append('process_inputs');row['safe_metadata']['processor_input_matches_reuse']=True
     assert collector._online_eligibility(case,row,'target031')['eligible'] is True
+
+
+@pytest.fixture
+def independent_domain_files(tmp_path):
+    folder=tmp_path/'domain';folder.mkdir()
+    # EXAMPLE ID values only; arbitrary token labels must never enter evidence.
+    (folder/'tokenizer.json').write_text(json.dumps({'model':{'type':'WordLevel',
+        'vocab':{'PRIVATE_LABEL_'+str(i):i for i in range(32)}},'added_tokens':[{'id':i} for i in (0,1,2)]}))
+    (folder/'config.json').write_text(json.dumps({'vocab_size':32}))
+    return folder
+
+
+def test_independent_domain_excludes_32_even_if_cached_max_reports_32(independent_domain_files):
+    folder=independent_domain_files
+    proof=collector._online_token_id_domain(folder,32,[32])
+    assert proof=={'status':'collected','model_vocab_size':32,'tokenizer_id_count':32,
+        'min':0,'max':31,'canonical_sha256':digest(list(range(32))),'contiguous_from_zero':True,
+        'request_ids_in_domain':False,'request_ids_within_model_vocab':False,
+        'request_ids_canonical_sha256':digest([32]),
+        'tokenizer_file_sha256':hashlib.sha256((folder/'tokenizer.json').read_bytes()).hexdigest(),
+        'model_config_file_sha256':hashlib.sha256((folder/'config.json').read_bytes()).hexdigest()}
+    assert 'PRIVATE_LABEL' not in json.dumps(proof)
+    # Reported cache max32 is a separate observed diagnostic, not an input here.
+    assert 'effective_max_token_id' not in proof
+
+
+@pytest.mark.parametrize('ids,in_domain,in_model',[([0,31],True,True),([-1],False,False),([True],False,False)])
+def test_request_membership_uses_exact_independent_ids(independent_domain_files,ids,in_domain,in_model):
+    proof=collector._online_token_id_domain(independent_domain_files,32,ids)
+    assert proof['status']=='collected'
+    assert proof['request_ids_in_domain'] is in_domain and proof['request_ids_within_model_vocab'] is in_model
+    assert proof['request_ids_canonical_sha256']==digest(ids)
+
+
+def test_actual_added_token_32_is_preserved_as_distinct_domain_evidence(independent_domain_files):
+    folder=independent_domain_files;file=folder/'tokenizer.json';obj=json.loads(file.read_text());obj['added_tokens'].append({'id':32});file.write_text(json.dumps(obj))
+    proof=collector._online_token_id_domain(folder,32,[32])
+    assert proof['tokenizer_id_count']==33 and proof['max']==32 and proof['canonical_sha256']==digest(list(range(33)))
+    assert proof['request_ids_in_domain'] is True and proof['request_ids_within_model_vocab'] is False
+
+
+@pytest.mark.parametrize('failure',['missing','bad_model','malformed'])
+def test_missing_or_unbound_domain_is_unknown_with_only_error_type(independent_domain_files,failure):
+    folder=independent_domain_files
+    if failure=='missing':(folder/'tokenizer.json').unlink()
+    elif failure=='bad_model':(folder/'config.json').write_text('{"vocab_size":33}')
+    else:(folder/'tokenizer.json').write_text('PRIVATE_INVALID_JSON')
+    proof=collector._online_token_id_domain(folder,32,[32])
+    assert proof['status']=='unavailable' and set(proof)=={'status','error_type'}
+    assert 'PRIVATE_' not in json.dumps(proof)
+
+
+def test_primary_and_followup_proofs_bind_actual_processor_inputs(example_runtime,independent_domain_files):
+    processor,_=example_runtime
+    tracked,_=collector._online_inventory(ExampleBase,ExampleProcessor,ExampleOnline,example_reuse,example_mm_gate)
+    case=next(c for c in product.fixtures() if c['id']=='reuse-oov')
+    row=collector._online_collect_case(case,processor,ExampleOnline,ExampleRequest,type('ExampleError',(),{}),ValueError,tracked,config_folder=independent_domain_files)
+    primary=row['safe_metadata'];followup=row['after']['safe_metadata']
+    assert primary['token_id_domain']['request_ids_canonical_sha256']==primary['processor_input_ids_sha256']==primary['admitted_token_ids_canonical_sha256']==digest([32])
+    assert primary['token_id_domain']['request_ids_in_domain'] is False
+    assert followup['token_id_domain']['request_ids_canonical_sha256']==followup['processor_input_ids_sha256']==digest([3,4])
+    assert followup['token_id_domain']['request_ids_in_domain'] is True

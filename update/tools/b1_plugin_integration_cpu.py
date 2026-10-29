@@ -6,6 +6,7 @@ No observation JSON input, engine startup or installed-target claim is accepted.
 from __future__ import annotations
 
 import argparse
+import builtins
 from datetime import datetime, timezone
 import hashlib
 import inspect
@@ -37,10 +38,13 @@ SOURCE_PROFILES = {
 }
 GATE_SHA256 = '1af43f4ae68271b494a8528cd1190763612735bb963ec00f0a1f4992fb802308'
 COMPONENT_COMMIT = 'c0af481dad68000d14211f3e03b07e62ab1ee7ea'
-# Reviewed collector snapshot 68db72f; runtime bytes never become approval.
-COLLECTOR_SHA256 = '9a704be6bc6b89968091db0732f4460e75f371418dc77e3c8c57f0016580ff2e'
+# Reviewed collector snapshot 1839c77; runtime bytes never become approval.
+COLLECTOR_SHA256 = 'cd281c1c1f820773661ebcfeb8743ebf960a44087dcf2bcb2acc4328b6fe0503'
 _CASES = {case: (group, configured) for case, group, configured in plugin_loading.CASES}
 _STATUSES = {'completed', 'execution_error', 'child_execution_error', 'unsupported', 'partial', 'read_error'}
+_VALIDATION_STATUSES = {'verified', 'unavailable', 'mismatch'}
+_ERROR_TYPES = {name for name, value in vars(builtins).items()
+                if isinstance(value, type) and issubclass(value, Exception)}
 
 
 def _source_commit(source_profile):
@@ -97,6 +101,46 @@ def _events(value):
         return None
 
 
+def _safe_error_type(value):
+    return value if isinstance(value, str) and value in _ERROR_TYPES else 'Exception'
+
+
+def _safe_validation(value):
+    validation = value if isinstance(value, dict) else {}
+    post = validation.get('post') if isinstance(validation.get('post'), dict) else {}
+    pre_status, post_status = validation.get('pre'), post.get('status')
+    safe = {'pre': pre_status if isinstance(pre_status, str) and pre_status in _VALIDATION_STATUSES else 'unavailable',
+            'post': {'status': post_status if isinstance(post_status, str) and post_status in _VALIDATION_STATUSES else 'unavailable'},
+            'boundary': 'source_fixture_component' if validation.get('boundary') == 'source_fixture_component' else 'unavailable'}
+    if 'error_type' in post:
+        safe['post']['error_type'] = _safe_error_type(post['error_type'])
+    return safe
+
+
+def _qualified_rows(rows, source_profile):
+    """Attribute events per child before reusing the unchanged product projection."""
+    qualified = []
+    for row in rows:
+        if not isinstance(row, dict):
+            qualified.append(row)
+            continue
+        validation = row.get('source_validation')
+        validation = validation if isinstance(validation, dict) else {}
+        post = validation.get('post')
+        post = post if isinstance(post, dict) else {}
+        if (row.get('target_started') is True
+                and row.get('source_profile') == source_profile
+                and row.get('source_commit') == _source_commit(source_profile)
+                and validation.get('pre') == 'verified'
+                and validation.get('boundary') == 'source_fixture_component'
+                and isinstance(post.get('status'), str)
+                and post.get('status') in {'verified', 'unavailable'}):
+            qualified.append(row)
+        else:
+            qualified.append({'case_id': row.get('case_id'), 'status': 'source_attribution_unavailable'})
+    return qualified
+
+
 def _safe_rows(rows):
     """Persist only the existing case/event vocabulary, never arbitrary extras."""
     safe = []
@@ -110,6 +154,9 @@ def _safe_rows(rows):
             'status': _status(row.get('status')), 'target_started': row.get('target_started') is True,
             'events': _events(row.get('events', [])),
             'event_collection_status': _status(row.get('event_collection_status', 'completed')),
+            'source_profile': row.get('source_profile') if isinstance(row.get('source_profile'), str) and row.get('source_profile') in SOURCE_PROFILES else None,
+            'source_commit': row.get('source_commit') if isinstance(row.get('source_commit'), str) and row.get('source_commit') in SOURCE_PROFILES.values() else None,
+            'source_validation': _safe_validation(row.get('source_validation')),
             'after': {'status': _status(after.get('status')), 'events': _events(after.get('events', []))}})
     return safe
 
@@ -136,14 +183,21 @@ def _validated_record(record, source_profile, producer_sha256):
             raise ValueError('SUP10_CPU_FIXTURE_HASH_INVALID')
     post = validation.get('post')
     post_status = post.get('status') if isinstance(post, dict) else None
-    if post_status not in {'verified', 'unavailable', 'mismatch'}:
+    if not isinstance(post_status, str) or post_status not in _VALIDATION_STATUSES:
         post_status = 'unavailable'
-    return {'profile': PROFILE, 'source_profile': source_profile, 'source_commit': commit,
+    safe = {'profile': PROFILE, 'source_profile': source_profile, 'source_commit': commit,
         'scope': 'source_cpu_installed_plugin_entry_points', 'installed_target': None,
         'runner_hook_verified': False, 'capture_status': record['capture_status'],
         'source_validation': {'pre': 'verified', 'post': {'status': post_status}, 'boundary': 'source_fixture_component'},
         'own_producer_sha256': producer_sha256, 'fixture_file_bytes_sha256': dict(hashes),
         'results': _safe_rows(record['results'])}
+    auxiliary = record.get('auxiliary_write')
+    if (isinstance(auxiliary, dict) and isinstance(auxiliary.get('status'), str)
+            and auxiliary['status'] in {'completed', 'failed'}):
+        safe['auxiliary_write'] = {'status': auxiliary['status']}
+        if auxiliary['status'] == 'failed':
+            safe['auxiliary_write']['error_type'] = _safe_error_type(auxiliary.get('error_type'))
+    return safe
 
 
 def _normal_control(rows):
@@ -176,21 +230,26 @@ def _produce_draft(check, env, workdir, *, source_root, source_profile, capture_
     try:
         raw = capture_fn(Path(source_root), Path(workdir) / 'owned-plugin-cpu', source_profile=source_profile)
         record = _validated_record(raw, source_profile, producer_sha256)
-        observations = plugin_loading.project(raw['results'])
+        qualified = _qualified_rows(raw['results'], source_profile)
+        observations = plugin_loading.project(qualified)
     except Exception:
         return EvidenceDraft(status=ExecStatus.ABORTED, data_origin=origin,
             normal_control={'attempted': False, 'succeeded': None}, config=config,
             abort_reason='SUP10_CPU_CAPTURE_UNAVAILABLE', started_at=started, finished_at=datetime.now(timezone.utc))
-    attempted, normal = _normal_control(raw['results'])
+    attempted, normal = _normal_control(qualified)
     complete = (record['capture_status'] == 'completed'
                 and record['source_validation']['post']['status'] == 'verified'
+                and record.get('auxiliary_write', {}).get('status') != 'failed'
+                and all(row['source_validation']['post']['status'] == 'verified' for row in record['results'])
                 and observations['plugin_cpu_cases_complete']['value'] is True and normal)
     observations['runner_hook_verified'] = {'value': False, 'collected': True}
     draft = EvidenceDraft(status=ExecStatus.COMPLETED if complete else ExecStatus.ABORTED, data_origin=origin,
         normal_control={'attempted': attempted, 'succeeded': bool(normal and complete) if attempted else None},
         observations=observations, config=config,
         challenges=[{'step': step, 'attempted': bool(raw['results'])} for step in check.challenge_steps],
-        abort_reason=None if complete else 'SUP10_CPU_CAPTURE_INCOMPLETE',
+        abort_reason=(None if complete else 'SUP10_CPU_CAPTURE_INCOMPLETE'
+                      + ('; SUP10_CPU_AUXILIARY_WRITE_FAILED'
+                         if record.get('auxiliary_write', {}).get('status') == 'failed' else '')),
         started_at=started, finished_at=datetime.now(timezone.utc))
     artifact = Path(workdir) / 'plugin-source-cpu.json'
     try:

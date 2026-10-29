@@ -24,6 +24,9 @@ def example_record(source_profile='reference5d'):
     for case, group, configured in plugin_loading.CASES:
         rows.append({'case_id': case, 'group': group, 'configured_names': configured,
             'status': 'completed', 'target_started': True, 'event_collection_status': 'completed',
+            'source_profile': source_profile, 'source_commit': pipeline.SOURCE_PROFILES[source_profile],
+            'source_validation': {'pre': 'verified', 'post': {'status': 'verified', 'exception': CANARY},
+                                  'boundary': 'source_fixture_component'},
             'events': [], 'after': {'status': 'completed', 'events': [
                 {'plugin': 'byul-approved', 'phase': 'general_hook'}]}, 'private': CANARY})
     return {'source_profile': source_profile, 'source_commit': pipeline.SOURCE_PROFILES[source_profile],
@@ -148,11 +151,21 @@ def test_environment_hash_and_source_profile_are_checked_before_capture(tmp_path
     ('normal', 'UNKNOWN', 'COMPLETED'), ('violation', 'FAIL', 'COMPLETED'),
     ('uncollected', 'UNKNOWN', 'ABORTED'), ('unsupported', 'UNKNOWN', 'ABORTED'),
     ('violation_after_failure', 'FAIL', 'ABORTED'), ('artifact_failure', 'FAIL', 'ABORTED'),
+    ('auxiliary_write_failure', 'FAIL', 'ABORTED'), ('known_child_mismatch', 'UNKNOWN', 'ABORTED'),
+    ('mixed_attribution', 'FAIL', 'ABORTED'),
 ])
 def test_example_capture_core_refs_privacy_and_registry_restoration(tmp_path, monkeypatch, scenario, security, execution):
     record = example_record('target031')
-    if scenario in ('violation', 'violation_after_failure', 'artifact_failure'):
+    if scenario in ('violation', 'violation_after_failure', 'artifact_failure',
+                    'auxiliary_write_failure', 'known_child_mismatch', 'mixed_attribution'):
         violation(record, later_failure=scenario == 'violation_after_failure')
+    if scenario == 'auxiliary_write_failure':
+        record.update(capture_status='incomplete', auxiliary_write={
+            'status': 'failed', 'error_type': 'PermissionError', 'exception': CANARY, 'path': CANARY})
+    if scenario == 'known_child_mismatch':
+        record['results'][1]['source_validation']['post']['status'] = 'mismatch'
+    if scenario == 'mixed_attribution':
+        record['results'][0].pop('source_validation')
     if scenario == 'unsupported':
         record['capture_status'] = 'incomplete'
         for row in record['results']:
@@ -293,3 +306,81 @@ def test_runtime_postcheck_keeps_prior_artifact_failure_and_facts(tmp_path, monk
     assert draft.abort_reason == 'ARTIFACT_CAPTURE_INCOMPLETE; SUP10_COMPONENT_POSTCHECK_UNAVAILABLE'
     assert draft.observations['plugin_loading_confirmed_violations'].value == ['general-disabled']
     assert CANARY not in draft.model_dump_json()
+
+
+@pytest.mark.parametrize('validation', ['post_mismatch', 'pre_unavailable', 'missing', 'wrong_boundary',
+                                        'wrong_source', 'post_missing', 'not_started'])
+def test_unqualified_child_events_are_retained_without_confirmed_violation(tmp_path, monkeypatch, validation):
+    record = example_record()
+    row = record['results'][0]
+    row['events'] = [{'plugin': 'byul-unapproved', 'phase': 'general_hook'}]
+    row['status'] = 'execution_error'
+    if validation == 'post_mismatch':
+        row['source_validation']['post'] = {'status': 'mismatch', 'error_type': 'ValueError', 'error': CANARY}
+    elif validation == 'pre_unavailable':
+        row['source_validation']['pre'] = 'unavailable'
+    elif validation == 'missing':
+        row.pop('source_validation')
+    elif validation == 'wrong_boundary':
+        row['source_validation']['boundary'] = CANARY
+    elif validation == 'wrong_source':
+        row['source_commit'] = pipeline.SOURCE_PROFILES['target031']
+    elif validation == 'not_started':
+        row['target_started'] = False
+    else:
+        row['source_validation'].pop('post')
+    draft = private_draft(tmp_path, record, monkeypatch)
+    assert draft.status == ExecStatus.ABORTED
+    assert draft.observations['plugin_loading_confirmed_violations'].value == []
+    assert draft.observations['plugin_cpu_phases'].value['general-allowlisted'] == 'unknown'
+    artifact = json.loads(draft.artifacts[0].path.read_text())
+    saved = artifact['results'][0]
+    assert saved['events'] == row['events'] and saved['target_started'] is row['target_started']
+    assert saved['status'] == 'execution_error'
+    assert CANARY not in draft.artifacts[0].path.read_text()
+    if validation == 'post_mismatch':
+        assert saved['source_validation']['post'] == {'status': 'mismatch', 'error_type': 'ValueError'}
+        assert artifact['source_validation']['post']['status'] == 'verified'
+
+
+def test_child_postcheck_unavailable_keeps_preverified_independent_violation(tmp_path, monkeypatch):
+    record = violation(example_record())
+    record['results'][1]['source_validation']['post'] = {'status': 'unavailable', 'error_type': 'OSError'}
+    record['results'][1]['status'] = 'execution_error'
+    record['capture_status'] = 'incomplete'
+    draft = private_draft(tmp_path, record, monkeypatch)
+    assert draft.status == ExecStatus.ABORTED
+    assert draft.observations['plugin_loading_confirmed_violations'].value == ['general-disabled']
+    saved = json.loads(draft.artifacts[0].path.read_text())['results'][1]
+    assert saved['source_validation']['post'] == {'status': 'unavailable', 'error_type': 'OSError'}
+
+
+def test_auxiliary_write_failure_keeps_qualified_violation_and_safe_status(tmp_path, monkeypatch):
+    record = violation(example_record())
+    record.update(capture_status='incomplete', auxiliary_write={
+        'status': 'failed', 'error_type': 'PermissionError', 'exception': CANARY, 'path': CANARY})
+    draft = private_draft(tmp_path, record, monkeypatch)
+    assert draft.status == ExecStatus.ABORTED
+    assert draft.abort_reason == 'SUP10_CPU_CAPTURE_INCOMPLETE; SUP10_CPU_AUXILIARY_WRITE_FAILED'
+    assert draft.observations['plugin_loading_confirmed_violations'].value == ['general-disabled']
+    saved = json.loads(draft.artifacts[0].path.read_text())
+    assert saved['auxiliary_write'] == {'status': 'failed', 'error_type': 'PermissionError'}
+    assert CANARY not in draft.artifacts[0].path.read_text()
+
+
+def test_verified_violation_survives_other_child_mismatch_and_missing_validation(tmp_path, monkeypatch):
+    record = violation(example_record())
+    untrusted = record['results'][0]
+    untrusted['events'] = [{'plugin': 'byul-unapproved', 'phase': 'general_hook'}]
+    untrusted['source_validation']['post']['status'] = 'mismatch'
+    record['results'][2].pop('source_validation')
+    record['capture_status'] = 'incomplete'
+    record['source_validation']['post']['status'] = 'unavailable'
+    draft = private_draft(tmp_path, record, monkeypatch)
+    assert draft.status == ExecStatus.ABORTED
+    assert draft.observations['plugin_loading_confirmed_violations'].value == ['general-disabled']
+    assert draft.observations['plugin_cpu_phases'].value['general-allowlisted'] == 'unknown'
+    assert draft.observations['plugin_cpu_phases'].value['general-unset'] == 'unknown'
+    saved = json.loads(draft.artifacts[0].path.read_text())['results']
+    assert saved[0]['events'] == untrusted['events']
+    assert saved[0]['source_validation']['post']['status'] == 'mismatch'

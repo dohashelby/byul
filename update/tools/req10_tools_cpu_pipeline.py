@@ -22,6 +22,7 @@ from guard.executors.structured_tools import SOURCE_COMMIT, judge_params
 from guard.models import CheckDef, Environment, Policy, load_pack
 from guard.store import Store
 from guard.store.packs import put_pack
+from tools.b1_integration_cpu import verify_tool_checkout
 
 
 def main():
@@ -29,6 +30,7 @@ def main():
     parser.add_argument('--source-root', type=Path, required=True)
     parser.add_argument('--output-root', type=Path, required=True)
     args = parser.parse_args()
+    verify_tool_checkout(Path(__file__).resolve().parents[2])
     args.output_root.mkdir(parents=True, exist_ok=False)
     started = time.perf_counter()
     now = datetime.now(timezone.utc)

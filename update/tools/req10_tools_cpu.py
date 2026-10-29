@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 from guard.executors.structured_tools_cpu import capture_reference, project
+from tools.b1_integration_cpu import verify_tool_checkout
 
 
 def main():
@@ -12,6 +13,7 @@ def main():
     parser.add_argument('--model', default='fixture-model')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    verify_tool_checkout(Path(__file__).resolve().parents[2])
     if args.output.exists():
         raise SystemExit('Output exists; choose a fresh path')
     record = capture_reference(args.source_root, model=args.model)

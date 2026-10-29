@@ -772,6 +772,85 @@ class StatusClassificationTests(unittest.TestCase):
         self.assertEqual(calculate_overall(["not_run", "failed"]), "failed")
 
 
+class L02ConnectivityTests(unittest.TestCase):
+    def checker(self, directory: str) -> LabChecker:
+        checker = LabChecker(
+            context="kind-runtime-lab",
+            namespace="serving-lab",
+            state_dir=Path(directory),
+            cleanup=False,
+            repo_root=ROOT,
+            sleeper=lambda _seconds: None,
+        )
+        checker.pods = {
+            "engine": "engine-pod",
+            "gateway": "gateway-pod",
+            "other": "other-pod",
+        }
+        checker.rendered_dir.mkdir(parents=True)
+        for name in (
+            "cilium-engine-ingress.json",
+            "cilium-engine-egress.json",
+            "cilium-gateway-egress.json",
+        ):
+            (checker.rendered_dir / name).write_text("{}\n", encoding="utf-8")
+        return checker
+
+    @staticmethod
+    def result(returncode: int, stdout: str = "") -> ProcessResult:
+        return ProcessResult(("stub",), returncode, stdout, "")
+
+    def run_l02(
+        self, checker: LabChecker, *, engine_dns: int, gateway_dns: int
+    ) -> list[str]:
+        dns_pods: list[str] = []
+
+        def execute(_case: dict, pod: str, *arguments: str, **_kwargs) -> ProcessResult:
+            script = arguments[-1]
+            if script == EXTERNAL_CONNECT_SCRIPT:
+                return self.result(7)
+            if script == DNS_SCRIPT:
+                dns_pods.append(pod)
+                return self.result(engine_dns if pod == "engine-pod" else gateway_dns)
+            raise AssertionError(f"unexpected exec script: {script}")
+
+        with (
+            patch.object(checker, "_runtime", return_value=self.result(0)),
+            patch.object(checker, "_apply", return_value=self.result(0)),
+            patch.object(
+                checker,
+                "_gateway_request",
+                return_value=self.result(0, '{"status": 200}'),
+            ),
+            patch.object(checker, "_direct_engine_request", return_value=self.result(7)),
+            patch.object(checker, "_exec", side_effect=execute),
+        ):
+            checker._l02(checker.cases["L-02"])
+        return dns_pods
+
+    def test_l02_requires_gateway_dns_and_blocked_engine_dns(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            checker = self.checker(directory)
+            dns_pods = self.run_l02(checker, engine_dns=7, gateway_dns=0)
+            case = checker.cases["L-02"]
+        self.assertEqual(case["status"], "passed")
+        self.assertEqual(dns_pods, ["engine-pod", "gateway-pod"])
+        self.assertIn("Gateway DNS는 허용", case["summary"])
+        self.assertIn("engine 외부·DNS는 차단", case["summary"])
+
+    def test_l02_fails_for_unexpected_dns_results(self) -> None:
+        for label, engine_dns, gateway_dns in (
+            ("engine-dns-allowed", 0, 0),
+            ("gateway-dns-blocked", 7, 7),
+        ):
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                checker = self.checker(directory)
+                self.run_l02(
+                    checker, engine_dns=engine_dns, gateway_dns=gateway_dns
+                )
+                self.assertEqual(checker.cases["L-02"]["status"], "failed")
+
+
 class ReportTests(unittest.TestCase):
     def test_json_and_markdown_reports_redact_secret_values(self) -> None:
         report = {
@@ -831,6 +910,11 @@ class LabIntentTests(unittest.TestCase):
             self.assertIn(label, manifest)
         self.assertIn("http://serving-engine.serving-lab.svc.cluster.local:8000", manifest)
         self.assertIn('command: ["serving-runtime"]', manifest)
+        gateway_deployment = manifest.split(
+            "kind: Deployment\nmetadata:\n  name: serving-gateway", 1
+        )[1].split("---", 1)[0]
+        self.assertIn("image: serving-runtime-lab:dev", gateway_deployment)
+        self.assertIn("FROM python:3.12-slim", dockerfile)
         self.assertIn("FakeBackend(host=\"0.0.0.0\", port=8000)", runner)
         self.assertIn("TEST ONLY", runner)
         tetragon_values = (ROOT / "deploy/lab/tetragon-values.yaml").read_text(

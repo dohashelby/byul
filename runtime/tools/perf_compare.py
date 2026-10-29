@@ -18,6 +18,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import statistics
 import time
 from typing import Any, Callable, Sequence
@@ -36,6 +37,7 @@ BLOCK_ORDERS = (
     ("B1", "B2", "B0"),
     ("B2", "B0", "B1"),
 )
+_TOKEN = re.compile(r"[\x21-\x7e]{16,512}")
 
 
 class PlanError(ValueError):
@@ -242,6 +244,33 @@ def load_plan(path: str | Path) -> PerfPlan:
     )
 
 
+def _read_inference_token(path: Path) -> str:
+    try:
+        information = path.stat()
+        raw = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise PlanError("token env file could not be read") from error
+    if information.st_mode & 0o077:
+        raise PlanError("token env file must not be accessible by group or others")
+    values: dict[str, str] = {}
+    for line in raw.splitlines():
+        if not line or line.lstrip().startswith("#"):
+            continue
+        key, separator, value = line.partition("=")
+        if separator != "=" or key not in {
+            "RUNTIME_INFERENCE_TOKEN",
+            "RUNTIME_VIEWER_TOKEN",
+        }:
+            raise PlanError("token env file has an unsupported line")
+        if key in values or _TOKEN.fullmatch(value) is None:
+            raise PlanError("token env file has a duplicate key or invalid token")
+        values[key] = value
+    try:
+        return values["RUNTIME_INFERENCE_TOKEN"]
+    except KeyError as error:
+        raise PlanError("token env file must contain RUNTIME_INFERENCE_TOKEN") from error
+
+
 def _endpoint(base_url: str) -> tuple[str, str, int, str]:
     parsed = urlsplit(base_url)
     scheme = parsed.scheme
@@ -271,6 +300,10 @@ def _error_code(document: object, status: int) -> str:
             code = error.get("code")
             if isinstance(code, str) and code:
                 return code[:128]
+    if status == 401:
+        return "AUTH_HTTP_401"
+    if status == 403:
+        return "ACCESS_HTTP_403"
     return f"HTTP_{status}"
 
 
@@ -287,6 +320,7 @@ def _request_once(
     *,
     stream: bool,
     timeout_s: float,
+    bearer_token: str | None = None,
 ) -> dict[str, Any]:
     """Issue one request and return measurements without returning body text."""
 
@@ -307,11 +341,17 @@ def _request_once(
         body = json.dumps(
             payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False
         ).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream" if stream else "application/json",
+        }
+        if bearer_token is not None:
+            headers["Authorization"] = f"Bearer {bearer_token}"
         connection.request(
             "POST",
             path,
             body=body,
-            headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
+            headers=headers,
         )
         response = connection.getresponse()
         status = response.status
@@ -470,6 +510,7 @@ def _run_phase(
     block_index: int,
     run_index: int,
     request_function: RequestFunction,
+    bearer_token: str | None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     stream = phase == "stream"
     started = time.monotonic_ns()
@@ -486,11 +527,16 @@ def _run_phase(
         }
         if plan.temperature is not None:
             payload["temperature"] = plan.temperature
+        request_kwargs = {
+            "stream": stream,
+            "timeout_s": plan.request_timeout_s,
+        }
+        if bearer_token is not None:
+            request_kwargs["bearer_token"] = bearer_token
         measured = request_function(
             plan.modes[mode_name].gateway_url,
             payload,
-            stream=stream,
-            timeout_s=plan.request_timeout_s,
+            **request_kwargs,
         )
         return {
             "meter_type": "builtin",
@@ -593,6 +639,7 @@ def execute_plan(
     block_count: int = len(BLOCK_ORDERS),
     request_function: RequestFunction = _request_once,
     run_id: str | None = None,
+    bearer_token: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Execute selected fixed blocks and return the report and raw table."""
 
@@ -633,6 +680,7 @@ def execute_plan(
                     block_index=block_index,
                     run_index=run_index,
                     request_function=request_function,
+                    bearer_token=bearer_token,
                 )
                 phases[phase] = summary
                 run_rows.extend(rows)
@@ -879,6 +927,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("plan", help="runtime-perf-plan/1.0 JSON")
     parser.add_argument("--out-dir", required=True, help="배타 생성할 보고서 폴더")
+    parser.add_argument(
+        "--token-env-file",
+        help="소유자 전용 env 파일의 RUNTIME_INFERENCE_TOKEN으로 Bearer 인증",
+    )
     parser.add_argument("--warmup-count", type=int, default=DEFAULT_WARMUP)
     parser.add_argument("--normal-count", type=int, default=DEFAULT_NORMAL)
     parser.add_argument("--stream-count", type=int, default=DEFAULT_STREAM)
@@ -896,12 +948,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         plan = load_plan(args.plan)
+        bearer_token = (
+            _read_inference_token(Path(args.token_env_file).expanduser())
+            if args.token_env_file
+            else None
+        )
         report, raw = execute_plan(
             plan,
             warmup_count=args.warmup_count,
             normal_count=args.normal_count,
             stream_count=args.stream_count,
             block_count=args.blocks,
+            bearer_token=bearer_token,
         )
         paths = write_outputs(report, raw, args.out_dir)
     except (OSError, PlanError, ValueError) as error:

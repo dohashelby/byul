@@ -31,6 +31,7 @@ from .unix_ipc import UnixIPCExecutor
 from .boundary_egress import BoundaryEgressExecutor
 from .api_transport import APITransportExecutor
 from .kubernetes_api_transport import KubernetesAPITransportExecutor
+from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
@@ -57,6 +58,8 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "boundary_egress:real": lambda cfg: BoundaryEgressExecutor(cfg.get("boundary_egress", {})),
     "api_transport:real": lambda cfg: APITransportExecutor(cfg.get("api_transport", {})),
     "api_transport:kubernetes": lambda cfg: KubernetesAPITransportExecutor(cfg.get("api_transport", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "structured_tools_cpu:reference-cpu": lambda cfg: StructuredToolsCPUExecutor(cfg.get("structured_tools_cpu", {})),
+    "structured_tools_target031_cpu:source031": lambda cfg: StructuredToolsTarget031CPUExecutor(cfg.get("structured_tools_target031_cpu", {})),
 }
 
 # 실행기 메타데이터: 이 실행기가 만든 증거를 판정하는 기본 판정기(없으면 CheckDef.judge).

@@ -161,7 +161,9 @@ def _context(owner):
     model = _get(owner, 'model_config')
     renderer = _get(owner, 'renderer')
     tokenizer = _get(renderer, 'tokenizer')
-    config = {'max_model_len': _small_int(_get(model, 'max_model_len')), 'model_vocab_size': None}
+    runner_type = _get(model, 'runner_type')
+    config = {'max_model_len': _small_int(_get(model, 'max_model_len')), 'model_vocab_size': None,
+              'runner_type': runner_type if type(runner_type) is str and runner_type in ('generate', 'pooling', 'draft') else 'unavailable'}
     try:
         size = model.get_vocab_size()
         config['model_vocab_size'] = _small_int(size) if size > 0 else None
@@ -262,6 +264,9 @@ def snapshot_online_input(point, args, kwargs, *, phase, result=None, exception=
             metadata['processor_input'] = _ids(request_ids)
         elif point == 'InputProcessor._validate_prompt_len':
             metadata['candidate_prompt_count'] = _small_int(_arg(args, kwargs, 1, 'prompt_len'))
+        if point in {'InputProcessor._validate_prompt_len', 'InputProcessor._validate_model_input'}:
+            prompt_type = _arg(args, kwargs, 2, 'prompt_type')
+            metadata['prompt_type'] = prompt_type if type(prompt_type) is str and prompt_type in ('encoder', 'decoder') else 'unavailable'
         if model is not None:
             metadata['token_id_domain'] = _domain(tokenizer, config['model_vocab_size'], request_ids)
         if phase == 'RETURN':

@@ -40,7 +40,7 @@ metadata의 주요 키는 다음과 같다.
   echo/kv_transfer_params 값을 정규 JSON hash로만 기록한다. 원래 HTTP body와의 보존 여부는
   요청 측 field hash와 대조한다. reuse helper가 필드를 pop하므로 CALL 관측을 사용한다.
 - `trust_request_chat_template`, `trust_request_mm_kwargs`,
-  `effective_config.max_model_len/model_vocab_size`, `reported_cache_max_token_id`.
+  `effective_config.max_model_len/model_vocab_size/runner_type`, `reported_cache_max_token_id`.
 - `processor_input`, `admitted`, `reused`, `rendered_inputs`: 실제 ID sequence의
   status/count/canonical_sha256/integer_ids/min/max. 원문 ID sequence는 출력하지 않는다.
 - `token_id_domain`, `admitted_token_id_domain`: 실제 tokenizer.get_vocab() ID 합집합의
@@ -72,7 +72,7 @@ unit의 EXAMPLE 객체는 ABI·비변경·비소모·누락 처리 회귀다. �
 별도 owned `/tmp` 산출물로 기록한다. 실제 serving process의 A hook·capability/session 결합과
 Kubernetes 수집·판정·저장·복구/정리 완료 여부는 해당 실행에서 검증한다.
 
-## 고정 코드 직접 검증 (2026-10-29)
+## 초기 고정 코드 직접 검증 (2026-10-29)
 
 - 모듈: `src/guard/adapters/vllm_online_input.py`, SHA256
   `bda42db95d8b0bb1ba58c1fca8e5e93886f4f8ef87d595d486203e9acbce808e`.
@@ -92,3 +92,25 @@ Kubernetes 수집·판정·저장·복구/정리 완료 여부는 해당 실행�
 위 직접 시험은 실제 객체를 callback에 전달하는 경계 시험이다. serving hook, ASGI binding,
 Kubernetes 실행 상태는 모두 미검증으로 기록했다. 최종 source-qualified A hook 등록과
 session/capability, 실제 serving 요청 세대 결합은 A/B 통합 실행의 잔여 조건이다.
+
+### 길이 검증의 실제 조건
+
+`effective_config.runner_type`은 실제 ModelConfig 필드에서 generate/pooling/draft만
+선별하고 불명확하면 unavailable로 남긴다(db9527a `config/scheduler.py:21`).
+`InputProcessor._validate_prompt_len`·`_validate_model_input`의 `metadata.prompt_type`은
+실제 인자의 decoder/encoder를 선별하며, 없거나 다른 값이면 unavailable이다.
+선정 chat decoder에서 `length == max_model_len`의 거부 조건은 실제 runner_type이
+`generate`인 경우다(`input_processor.py:544`). 더 큰 길이의 분기와 구분한다.
+이 callback은 violation bool을 만들지 않으며 encoder/MM의 별도 길이 조건으로
+확대하지 않는다. template/MM은 기존 실제 trust·parsed/gate 반환 관측을 유지한다.
+
+
+길이 관측 보완의 최종 module SHA256은
+`bd15958029e91ba189c2fe588009a97ddd4d3d339e32824e5e5016a52fa736b1`이다.
+unit48개가0.06초에 통과했다. 실제0.31 public 생성자로 만든 generate·pooling
+InputProcessor 두 객체에서 decoder16/16 동등 경계를 직접 확인했다(10.10초).
+`_validate_prompt_len`과 `_validate_model_input` 모두 generate는 실제
+VLLMValidationError RAISE, pooling은 실제 RETURN을 관측했고 callback의
+runner_type·prompt_type은 각 실제 객체·인자와 일치했다. 결과는
+`/private/tmp/byul-online-native-length-locor3k_/summary.json`에 보존했다.
+초기 bda42d module/actual 기록은 유지하며 기존 CPU16+후속16은 재실행하지 않았다.

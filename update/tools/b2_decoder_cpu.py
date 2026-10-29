@@ -318,6 +318,8 @@ def run_typed(root):
 
 
 def main():
+    if sys.flags.optimize:
+        raise ValueError("DECODER_CPU_REQUIRES_ASSERTIONS")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=("untyped", "typed"), default="untyped")
     parser.add_argument("--source", type=Path, required=True)

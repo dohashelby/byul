@@ -114,14 +114,15 @@ def test_optimized_helper_keeps_original_assertion_failure(tmp_path):
 
 
 @pytest.mark.parametrize('optimization', ['-O', '-OO'])
-def test_optimized_typed_cli_rejects_before_source_or_target_execution(tmp_path, optimization):
+@pytest.mark.parametrize('profile', ['typed', 'untyped'])
+def test_optimized_cli_rejects_before_source_or_target_execution(tmp_path, optimization, profile):
     update = Path(tool.__file__).resolve().parents[1]
     output = tmp_path / 'output.json'
     result = subprocess.run([sys.executable, optimization, str(Path(tool.__file__).resolve()),
-        '--profile', 'typed', '--source', str(tmp_path / 'no-target-checkout'), '--output', str(output)],
+        '--profile', profile, '--source', str(tmp_path / 'no-target-checkout'), '--output', str(output)],
         cwd=update, env={**os.environ, 'PYTHONPATH': os.pathsep.join([str(update / 'src'), str(update)])},
         text=True, capture_output=True)
-    assert result.returncode != 0 and 'TYPED_CPU_REQUIRES_ASSERTIONS' in result.stderr
+    assert result.returncode != 0 and 'DECODER_CPU_REQUIRES_ASSERTIONS' in result.stderr
     assert 'verify_source' not in result.stderr and 'vllm' not in result.stdout
     assert not output.exists()
 

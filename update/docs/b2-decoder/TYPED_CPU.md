@@ -105,3 +105,11 @@ CI는 이 fixture와 현재 함수 AST를 대조하므로 얕은 checkout에서�
 aux 참조 정리 전부 확인. 새 도구 bytes SHA256은
 `110c0fd7090daba0ea22334004161dfec5fefe18dce119379c32508b55f3e8fc`다.
 기존 untyped 함수 AST/default 동작과 공식 message 3개 결과는 그대로 재사용한다.
+
+CLI 진입점도 typed/untyped 모두 최적화 모드를 선행 거부하도록 연결했다. 기존
+untyped 세 함수와 기본 선택은 유지한다. 두 profile × `-O`/`-OO` subprocess 회귀를
+포함한 관련 시험은 **57 passed / pytest 0.96초**다. 최종 소스 고정 뒤 typed 24사례를
+한 번 재실행해 공식 대조 3개·전후 대조 48건·aux 참조 정리를 확인했다(**6.47초**).
+최종 결과는 `/private/tmp/byul-sup12-typed-cpu-20261029-3.json`, 도구 bytes SHA256은
+`a2fe73872fc90b19a708dda2a0eac3fcd52341ad0ada556e2b515062c993d63d`다.
+기존 untyped 14사례의 실제 결과는 함수 AST가 같은 앞선 smoke를 재사용한다.

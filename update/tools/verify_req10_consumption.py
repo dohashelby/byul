@@ -5,7 +5,7 @@ import argparse,hashlib,json,subprocess,sys
 # Reviewed OBS01 checkpoint: explicit public requests/owned records; native contracts retained
 # and REQ12 consumer; native8/9 and all previous full-scope gates retained.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='9c77748fd6e5f15e5eeeabd889179fde75bb6b43'
+REVIEWED_COMMON_COMMIT='3ae7cc2c979195c9c55cec4aba0e213f1a78e842'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

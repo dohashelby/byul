@@ -194,7 +194,9 @@ def test_explicit_prepare_cli_keeps_default8_and_fixed_base_dependency(external)
     new=runner.invoke(app,['prepare-lifecycle-sensor','--profile',attempt.PROFILE,'--output',str(external/'new')]);assert new.exit_code==0,new.stdout
     old=runner.invoke(app,['prepare-lifecycle-sensor','--output',str(external/'old')]);assert old.exit_code==0
     bad=runner.invoke(app,['prepare-lifecycle-sensor','--profile','unknown','--output',str(external/'bad')]);assert bad.exit_code!=0
-    assert len(json.loads(new.stdout)['assets'])==4 and len(json.loads(old.stdout)['assets'])==3
+    assert json.loads(new.stdout)['profile']==attempt.PROFILE and json.loads(old.stdout)['profile']==legacy.PROFILE
+    assert len(lifecycle.load_prepared(external/'new/manifest.json')['assets'])==4
+    assert len(lifecycle.load_prepared(external/'old/manifest.json')['assets'])==3
     assert json.loads(old.stdout)['profile']==legacy.PROFILE
     path=external/'new/guard_lifecycle_base.py';path.write_bytes(path.read_bytes()+b'#changed')
     with pytest.raises(ValueError):lifecycle.load_prepared(external/'new/manifest.json')
@@ -204,6 +206,11 @@ def test_selected10_reader_does_not_open_native032_or_nonlab(group,target):
     prepared={**group.prepared,'profile':attempt.PROFILE};calls=[]
     reader=KubernetesLifecycleReader(target,group.env,prepared,runner=lambda *a,**kw:calls.append(a))
     assert reader.file_read_limit==attempt.MAX_BYTES and reader.file_read_profile=='owned-jsonl-2m-v1' and not calls
-    for env,value in [(group.env.model_copy(update={'engine':group.env.engine.model_copy(update={'version':'0.32.0'})}),target),(group.env,{**target,'lab':False})]:
-        with pytest.raises(KubernetesCaptureError):KubernetesLifecycleReader(value,env,prepared,runner=lambda *a,**kw:calls.append(a))
+    changed=group.env.model_copy(deep=True);changed.engine.version='0.32.0';changed=changed.seal()
+    selected={**target,'environment_ref':changed.ref().model_dump(mode='json')}
+    with pytest.raises(KubernetesCaptureError,match='^KUBERNETES_CAPTURE_BINDING_UNAVAILABLE$'):
+        KubernetesLifecycleReader(selected,changed,prepared,runner=lambda *a,**kw:calls.append(a))
+    with pytest.raises(ValueError,match='^KUBERNETES_CAPTURE_TARGET_INVALID$') as error:
+        KubernetesLifecycleReader({**target,'lab':False},group.env,prepared,runner=lambda *a,**kw:calls.append(a))
+    assert type(error.value) is ValueError
     assert not calls

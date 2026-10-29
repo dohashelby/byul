@@ -7,7 +7,7 @@ from . import vllm_online_sensor as online
 
 FIELDS = frozenset({"chat_template", "chat_template_kwargs", "mm_processor_kwargs", "media_io_kwargs", "echo", "kv_transfer_params"})
 EXCEPTIONS = {name for name, value in vars(builtins).items()
-    if isinstance(value, type) and issubclass(value, Exception)} | {"VLLMValidationError"}
+    if isinstance(value, type) and issubclass(value, Exception)} | {"VLLMValidationError", "WindowsError"}
 
 
 def sha(value):

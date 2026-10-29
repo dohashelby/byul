@@ -54,7 +54,7 @@ def native(point, namespace=None):
     source=''.join(lines)
     code=compile(source,row['filename'],'exec',flags=row['compiler_flags'],dont_inherit=True,optimize=0)
     body=find(code,qualname)
-    assert legacy.code_digest(body)==contract['function_code_sha256']
+    assert legacy.code_digest(body)==online.runtime_contract()['function_codes'][point]
     fn=types.FunctionType(body,{'__name__':row['module'],**(namespace or {})})
     node=next(n for n in ast.walk(ast.parse(source)) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)) and n.name==qualname.split('.')[-1])
     fn.__defaults__=tuple(ast.literal_eval(n) for n in node.args.defaults) or None
@@ -70,7 +70,7 @@ def world(external,monkeypatch):
     exec(compile(Path(legacy.__file__).read_bytes(),legacy.__file__,'exec',dont_inherit=True,optimize=0),base.__dict__)
     cb=types.ModuleType('_test_private_callback')
     code=compile(Path(callback.__file__).read_bytes(),'guard/adapters/vllm_online_input.py','exec',dont_inherit=True,optimize=0)
-    assert legacy.code_digest(code)==online.CALLBACK_CODE_SHA256
+    assert legacy.code_digest(code)==online.runtime_contract()['callback_code_sha256']
     exec(code,cb.__dict__)
     fake=FakeOS();monkeypatch.setattr(online,'os',fake)
     base.os=fake;base._open_directory=lambda p:10;base._context=lambda:dict(CONTEXT)
@@ -83,7 +83,8 @@ def world(external,monkeypatch):
     # Module records are EXAMPLE fixtures; copied function bodies have independent literal code checks.
     for module,contract in online.MODULE_CONTRACTS.items():
         writer.write('MODULE',{'module':module,'verified':True,'source_sha256':contract['source_sha256'],
-            'code_sha256':'c'*64,'online_code_sha256':contract['code_sha256']})
+            'code_sha256':'c'*64,'online_code_sha256':online.runtime_contract()['module_codes'][module],
+            'online_runtime':online.runtime_name()})
     return SimpleNamespace(root=external,prepared=prepared,base=base,observer=observer,writer=writer,fake=fake,callback=cb)
 
 
@@ -279,6 +280,41 @@ def test_standalone_seal_loads_only_fixed_base_without_installing_hooks(monkeypa
     monkeypatch.setattr(online,'_private_base',lambda:SimpleNamespace(seal=lambda path:calls.append(path)))
     online.seal()
     assert calls==['/guard-lifecycle/settings.json'] and online._BASE is None
+
+
+def test_unreviewed_runtime_cannot_install_or_read_source_assets(monkeypatch):
+    calls=[];monkeypatch.setattr(online,'_BASE',None)
+    monkeypatch.setattr(online,'runtime_name',lambda:'cpython-3.12.9')
+    monkeypatch.setattr(online,'_asset',lambda *a:calls.append(a))
+    assert online.install() is False and not calls
+    with pytest.raises(ValueError):online.runtime_contract()
+
+
+def test_recording_cannot_mix_two_approved_compilers_in_one_process(world):
+    raw,_,_=packet(world)
+    other=next(name for name in online.RUNTIME_CONTRACTS if name!=online.runtime_name())
+    def change(rows):
+        row=next(r['payload'] for r in rows if r['event']=='MODULE' and r['payload']['module'] in online.MODULE_CONTRACTS)
+        row['online_runtime']=other;row['online_code_sha256']=online.runtime_contract(other)['module_codes'][row['module']]
+    with pytest.raises(ValueError,match='ONLINE_CODE_RUNTIME_MISMATCH'):
+        capture.parse_recording(revised(raw,change),world.prepared)
+
+
+def test_rejudge_accepts_other_fixed_compiler_contract_without_runtime_hash_approval(world):
+    reuse=wrapped(world,'online_renderer._reused_prompt_token_ids')
+    run_chat(world,lambda:reuse(SimpleNamespace(kv_transfer_params={'prompt_token_ids':[2]})))
+    raw,_,_=packet(world)
+    other=next(name for name in online.RUNTIME_CONTRACTS if name!=online.runtime_name());codes=online.runtime_contract(other)
+    def change(rows):
+        for row in rows:
+            payload=row['payload']
+            if row['event']=='MODULE' and payload['module']==online.CALLBACK_MODULE:
+                payload['online_runtime']=other;payload['code_sha256']=codes['callback_code_sha256']
+            elif row['event']=='MODULE' and payload['module'] in online.MODULE_CONTRACTS:
+                payload['online_runtime']=other;payload['online_code_sha256']=codes['module_codes'][payload['module']]
+    _,summary=capture.parse_recording(revised(raw,change),world.prepared)
+    assert summary['online_runtime']==other and summary['online_callback_provenance']['code_sha256']==codes['callback_code_sha256']
+    assert not summary['whole_run_coverage_verified']
 
 
 def test_kubernetes_large_recording_budget_is_selected_profile_only(group,target):

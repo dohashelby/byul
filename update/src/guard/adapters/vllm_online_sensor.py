@@ -39,49 +39,63 @@ FUNCTION_ADDITIONS = {
 # REVIEWED_PINS
 BASE_SHA256 = '2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd'
 CALLBACK_SHA256 = "bd15958029e91ba189c2fe588009a97ddd4d3d339e32824e5e5016a52fa736b1"
-CALLBACK_CODE_SHA256 = '1728a373625ec44d943c9762ea6b31c85571876897a0ed81a1d321e4e5eee2a3'
-CALLBACK_FUNCTION_SHA256 = '70369194951aaf040b401ecb9c5e9d5492285da1c98802860fd09b347b604cf2'
-MODULE_CONTRACTS = {'vllm.entrypoints.generate.base.protocol': {'code_sha256': '4925c4d0e258e9aad091f229d6747c429c3307337ab894437479b707277211b4',
-                                             'filename': 'vllm/entrypoints/generate/base/protocol.py',
+MODULE_CONTRACTS = {'vllm.entrypoints.generate.base.protocol': {'filename': 'vllm/entrypoints/generate/base/protocol.py',
                                              'source_sha256': '67ede411b35a8344ddb87bfaaf1a1abea8acd39a4d23655e34032015505167c0'},
- 'vllm.renderers.online_renderer': {'code_sha256': '561c1cfbf72b5ecc908310596018c3a99254f44156410a81520a893710aca4b4',
-                                    'filename': 'vllm/renderers/online_renderer.py',
+ 'vllm.renderers.online_renderer': {'filename': 'vllm/renderers/online_renderer.py',
                                     'source_sha256': '1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e'},
- 'vllm.v1.engine.input_processor': {'code_sha256': '82734a678f09390c1cf59c4899fcf567c254557508cfdfd0971c5101e40c0f2a',
-                                    'filename': 'vllm/v1/engine/input_processor.py',
+ 'vllm.v1.engine.input_processor': {'filename': 'vllm/v1/engine/input_processor.py',
                                     'source_sha256': 'd79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b'}}
 POINT_CONTRACTS = {'InputProcessor._validate_model_input': {'async': False,
                                           'filename': 'vllm/v1/engine/input_processor.py',
-                                          'function_code_sha256': '9e741ab702847ae7123ebbe6224083c3feb3152aa122adb4e692d5f27edb4f0f',
                                           'module': 'vllm.v1.engine.input_processor'},
  'InputProcessor._validate_prompt_len': {'async': False,
                                          'filename': 'vllm/v1/engine/input_processor.py',
-                                         'function_code_sha256': '9b5e805454a645106f9ecef9c3a2d6ff5205158f28668c1d676e2a70ca57faae',
                                          'module': 'vllm.v1.engine.input_processor'},
  'InputProcessor.process_inputs': {'async': False,
                                    'filename': 'vllm/v1/engine/input_processor.py',
-                                   'function_code_sha256': '8cc4c2a41215abc29a20967c52e17e362a3f6abf63f618ecad9d1f4534d32ae0',
                                    'module': 'vllm.v1.engine.input_processor'},
  'OnlineRenderer.preprocess_chat': {'async': True,
                                     'filename': 'vllm/renderers/online_renderer.py',
-                                    'function_code_sha256': 'c39dd01ebda9161eb33195c08c44a987c42f5c09af68dcde1c49a850d8e178d1',
                                     'module': 'vllm.renderers.online_renderer'},
  'OnlineRenderer.render_chat': {'async': True,
                                 'filename': 'vllm/renderers/online_renderer.py',
-                                'function_code_sha256': '12781547cd1bca158c29ea2e7e86eec8510b4569d5f3cf8b0ea7f454c5d5a562',
                                 'module': 'vllm.renderers.online_renderer'},
  'OnlineRenderer.validate_chat_template': {'async': False,
                                            'filename': 'vllm/renderers/online_renderer.py',
-                                           'function_code_sha256': 'c797417738f55004bd75a709c3e60f22584b64ea77f91323e509d5f2fc25782c',
                                            'module': 'vllm.renderers.online_renderer'},
  'online_renderer._reused_prompt_token_ids': {'async': False,
                                               'filename': 'vllm/renderers/online_renderer.py',
-                                              'function_code_sha256': '14f7fbe2beb7e1227751a2eccc7cc424b3464a46124f91f552ab3f5991ec0830',
                                               'module': 'vllm.renderers.online_renderer'},
  'protocol.validate_request_mm_kwargs': {'async': False,
                                          'filename': 'vllm/entrypoints/generate/base/protocol.py',
-                                         'function_code_sha256': '2df55628e9262c2c8c87bdbf904c02a58eedfe5f41118c378129da6e93b0de44',
                                          'module': 'vllm.entrypoints.generate.base.protocol'}}
+
+RUNTIME_CONTRACTS = {'cpython-3.12.14': {'callback_code_sha256': '1728a373625ec44d943c9762ea6b31c85571876897a0ed81a1d321e4e5eee2a3',
+                     'callback_function_sha256': '70369194951aaf040b401ecb9c5e9d5492285da1c98802860fd09b347b604cf2',
+                     'function_codes': {'InputProcessor._validate_model_input': '9e741ab702847ae7123ebbe6224083c3feb3152aa122adb4e692d5f27edb4f0f',
+                                        'InputProcessor._validate_prompt_len': '9b5e805454a645106f9ecef9c3a2d6ff5205158f28668c1d676e2a70ca57faae',
+                                        'InputProcessor.process_inputs': '8cc4c2a41215abc29a20967c52e17e362a3f6abf63f618ecad9d1f4534d32ae0',
+                                        'OnlineRenderer.preprocess_chat': 'c39dd01ebda9161eb33195c08c44a987c42f5c09af68dcde1c49a850d8e178d1',
+                                        'OnlineRenderer.render_chat': '12781547cd1bca158c29ea2e7e86eec8510b4569d5f3cf8b0ea7f454c5d5a562',
+                                        'OnlineRenderer.validate_chat_template': 'c797417738f55004bd75a709c3e60f22584b64ea77f91323e509d5f2fc25782c',
+                                        'online_renderer._reused_prompt_token_ids': '14f7fbe2beb7e1227751a2eccc7cc424b3464a46124f91f552ab3f5991ec0830',
+                                        'protocol.validate_request_mm_kwargs': '2df55628e9262c2c8c87bdbf904c02a58eedfe5f41118c378129da6e93b0de44'},
+                     'module_codes': {'vllm.entrypoints.generate.base.protocol': '4925c4d0e258e9aad091f229d6747c429c3307337ab894437479b707277211b4',
+                                      'vllm.renderers.online_renderer': '561c1cfbf72b5ecc908310596018c3a99254f44156410a81520a893710aca4b4',
+                                      'vllm.v1.engine.input_processor': '82734a678f09390c1cf59c4899fcf567c254557508cfdfd0971c5101e40c0f2a'}},
+ 'cpython-3.12.3': {'callback_code_sha256': 'd30da68b43da5f70cca1a1f0b49291e53496e64ec9e8513acf50b2f285ab075b',
+                    'callback_function_sha256': 'c29bc425984626fda69d8af826ed0595097233f4841b55a4f5ca0cacd6e43a6f',
+                    'function_codes': {'InputProcessor._validate_model_input': '63b07fe66433d2d4462fc57dbbc53d65a30ca0bc1c347937e052b0ea54ca5fe1',
+                                       'InputProcessor._validate_prompt_len': '9b5e805454a645106f9ecef9c3a2d6ff5205158f28668c1d676e2a70ca57faae',
+                                       'InputProcessor.process_inputs': '336ac2d4cf2aa135bfe76766ccf05de1e15cf1a78b35710f861dff6cba34c9c1',
+                                       'OnlineRenderer.preprocess_chat': 'f2cbf70e51aa44010f0061aee1e340bfb0456af6e142c3b82d430973147aee70',
+                                       'OnlineRenderer.render_chat': 'e3dceceaf9209a7cb35a1665adcfc633d7dc3f73d3786dab4a67fcf02b6364f5',
+                                       'OnlineRenderer.validate_chat_template': 'c797417738f55004bd75a709c3e60f22584b64ea77f91323e509d5f2fc25782c',
+                                       'online_renderer._reused_prompt_token_ids': '14f7fbe2beb7e1227751a2eccc7cc424b3464a46124f91f552ab3f5991ec0830',
+                                       'protocol.validate_request_mm_kwargs': '2df55628e9262c2c8c87bdbf904c02a58eedfe5f41118c378129da6e93b0de44'},
+                    'module_codes': {'vllm.entrypoints.generate.base.protocol': '9c600ebedf518e29d3a801b9431f629862f3a354510e4cd199c5fed7fbc885d9',
+                                     'vllm.renderers.online_renderer': 'ace99d2bbdf4b720bae445f4cee623b607090288e35442e4250e462b195ac958',
+                                     'vllm.v1.engine.input_processor': 'e79004d94a39740156c6420b87e077a04ef4840eff62b06b38da6e7191decd39'}}}
 
 _NATIVE = contextvars.ContextVar("guard_online_native_call", default=None)
 _BASE = None
@@ -89,6 +103,17 @@ _BASE = None
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+
+
+def runtime_name():
+    return sys.implementation.name + "-" + ".".join(map(str, sys.version_info[:3]))
+
+
+def runtime_contract(runtime=None):
+    selected = runtime_name() if runtime is None else runtime
+    if type(selected) is not str or selected not in RUNTIME_CONTRACTS:
+        raise ValueError("ONLINE_CODE_RUNTIME_UNSUPPORTED")
+    return RUNTIME_CONTRACTS[selected]
 
 
 def relative_code(code, filename):
@@ -135,11 +160,13 @@ def _asset(name, expected):
 
 def configure(base, callback):
     """Configure a privately loaded /8 module; never mutate the installed /8."""
+    codes = runtime_contract()
+    runtime = runtime_name()
     if (sys.version_info[:2] != (3, 12) or sys.flags.optimize != 0
             or callback.__dict__.get("SCHEMA") != "byul-online-input-snapshot/1"
             or set(callback.POINTS) != set(POINT_CONTRACTS)
             or not inspect.isfunction(callback.snapshot_online_input)
-            or base.code_digest(relative_code(callback.snapshot_online_input.__code__, "guard/adapters/vllm_online_input.py")) != CALLBACK_FUNCTION_SHA256):
+            or base.code_digest(relative_code(callback.snapshot_online_input.__code__, "guard/adapters/vllm_online_input.py")) != codes["callback_function_sha256"]):
         raise ValueError("ONLINE_CALLBACK_CODE_UNAVAILABLE")
     combined_points, combined_functions = points(base), functions(base)
     base.PROFILE, base.SCHEMA = PROFILE, SCHEMA
@@ -147,7 +174,7 @@ def configure(base, callback):
     base.POINTS, base.FUNCTION_POINTS = combined_points, combined_functions
     base.MAX_ROWS, base.MAX_BYTES = MAX_ROWS, MAX_BYTES
     base.__file__ = __file__  # START identifies this explicit controller asset.
-    callback_info = {"source_sha256": CALLBACK_SHA256, "code_sha256": CALLBACK_CODE_SHA256}
+    callback_info = {"source_sha256": CALLBACK_SHA256, "code_sha256": codes["callback_code_sha256"], "online_runtime": runtime}
     snapshot_callback = callback.snapshot_online_input
 
     class OnlineObserver(base.Observer):
@@ -175,7 +202,7 @@ def configure(base, callback):
             contract = POINT_CONTRACTS[point]
             if (module_name != contract["module"] or not inspect.isfunction(original)
                     or inspect.iscoroutinefunction(original) != contract["async"]
-                    or base.code_digest(relative_code(original.__code__, contract["filename"])) != contract["function_code_sha256"]):
+                    or base.code_digest(relative_code(original.__code__, contract["filename"])) != codes["function_codes"][point]):
                 raise ValueError("ONLINE_POINT_CODE_UNAVAILABLE")
             observer = self
 
@@ -273,7 +300,7 @@ def configure(base, callback):
                 actual = self.original.get_code(self.name)
                 expected = compile(raw, filename, "exec", dont_inherit=True, optimize=0)
                 if (base.code_digest(actual) != base.code_digest(expected)
-                        or base.code_digest(relative_code(actual, contract["filename"])) != contract["code_sha256"]):
+                        or base.code_digest(relative_code(actual, contract["filename"])) != codes["module_codes"][self.name]):
                     raise ValueError()
             except Exception:
                 self.observer.emit("MODULE", {"module": self.name, "verified": False})
@@ -283,7 +310,7 @@ def configure(base, callback):
             except Exception:self.observer.emit("MODULE", {"module": self.name, "verified": False})
             else:
                 info = {"source_sha256": contract["source_sha256"], "code_sha256": base.code_digest(actual),
-                    "online_code_sha256": contract["code_sha256"]}
+                    "online_code_sha256": codes["module_codes"][self.name], "online_runtime": runtime}
                 self.observer.modules[self.name] = info
                 self.observer.emit("MODULE", {"module": self.name, "verified": True, **info})
 
@@ -328,10 +355,11 @@ def install(path=None):
     if _BASE is not None or sys.version_info[:2] != (3, 12) or sys.flags.optimize != 0:
         return False
     try:
+        codes = runtime_contract()
         base = _private_base()
         raw = _asset("guard_online_input_callback.py", CALLBACK_SHA256)
         code = compile(raw, "guard/adapters/vllm_online_input.py", "exec", dont_inherit=True, optimize=0)
-        if base.code_digest(code) != CALLBACK_CODE_SHA256:
+        if base.code_digest(code) != codes["callback_code_sha256"]:
             return False
         callback = types.ModuleType("_guard_online_private_callback")
         exec(code, callback.__dict__)

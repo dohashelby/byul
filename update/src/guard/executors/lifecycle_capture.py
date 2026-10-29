@@ -98,8 +98,9 @@ def parse_recording(raw, prepared):
     if prepared["profile"] not in {sensor.PROFILE,online.PROFILE,profiles.V7_PROFILE}:keys=keys-(profiles.HANDLER_KEYS-profiles.ROUTE_KEYS)
     words = WORDS
     if is_online:
-        keys = keys | {"online_input", "online_code_sha256"}
-        words = words | {online.PROFILE, online.SCHEMA, online.CALLBACK_MODULE, *online.SOURCE_ADDITIONS, *online.POINT_CONTRACTS}
+        keys = keys | {"online_input", "online_code_sha256", "online_runtime"}
+        words = words | {online.PROFILE, online.SCHEMA, online.CALLBACK_MODULE, *online.SOURCE_ADDITIONS,
+            *online.POINT_CONTRACTS, *online.RUNTIME_CONTRACTS}
     source_hashes = profiles.source_hashes(prepared["profile"])
     point_sources=profiles.point_sources(prepared["profile"])
     points=set(point_sources)
@@ -146,6 +147,7 @@ def parse_recording(raw, prepared):
     ready = set()
     online_calls = {}
     online_orphans = 0
+    online_runtime = None
     for row in rows[1:]:
         payload = row["payload"]
         if row["event"] == "START":
@@ -154,9 +156,17 @@ def parse_recording(raw, prepared):
             callback_module = is_online and payload.get("module") == online.CALLBACK_MODULE
             module_hashes = {**source_hashes, online.CALLBACK_MODULE: online.CALLBACK_SHA256} if callback_module else source_hashes
             module_payload = dict(payload)
+            selected_codes = None
+            if is_online and (callback_module or payload.get("module") in online.MODULE_CONTRACTS) and payload.get("verified") is True:
+                selected_codes = online.runtime_contract(module_payload.get("online_runtime", ""))
+                observed_runtime = module_payload.pop("online_runtime")
+                if online_runtime is not None and observed_runtime != online_runtime:
+                    raise ValueError("ONLINE_CODE_RUNTIME_MISMATCH")
+                online_runtime = observed_runtime
             if is_online and "online_code_sha256" in module_payload:
                 contract = online.MODULE_CONTRACTS.get(module_payload.get("module"), {})
-                if module_payload.pop("online_code_sha256") != contract.get("code_sha256") or not contract:
+                if (selected_codes is None or not contract
+                        or module_payload.pop("online_code_sha256") != selected_codes["module_codes"].get(module_payload.get("module"))):
                     raise ValueError("ONLINE_MODULE_CODE_INVALID")
             if (set(module_payload) not in ({"module","verified"}, {"module","verified","source_sha256","code_sha256"},
                     {"module","verified","source_sha256","code_sha256","inherited"})
@@ -166,7 +176,7 @@ def parse_recording(raw, prepared):
                 if (payload.get("source_sha256") != module_hashes[payload["module"]]
                         or re.fullmatch(r"[0-9a-f]{64}", payload.get("code_sha256","")) is None):
                     raise ValueError("LIFECYCLE_RECORDING_MODULE_HASH_INVALID")
-                if callback_module and payload["code_sha256"] != online.CALLBACK_CODE_SHA256:
+                if callback_module and payload["code_sha256"] != selected_codes["callback_code_sha256"]:
                     raise ValueError("ONLINE_CALLBACK_CODE_INVALID")
                 if is_online and payload["module"] in online.MODULE_CONTRACTS and "online_code_sha256" not in payload:
                     raise ValueError("ONLINE_MODULE_CODE_INVALID")
@@ -267,9 +277,11 @@ def parse_recording(raw, prepared):
         "discarded_tail_sha256":hashlib.sha256(tail).hexdigest() if tail else None,
         "source_profile_modules": sorted(ready), "whole_run_coverage_verified": False,
         **({"online_code_contract":online.CODE_CONTRACT,
+            "online_runtime":online_runtime,
             "online_incomplete_calls":sum(not call["closed"] for call in online_calls.values()) + online_orphans,
             "online_callback_provenance":({"module":online.CALLBACK_MODULE, "bytes_sha256":online.CALLBACK_SHA256,
-                "code_sha256":online.CALLBACK_CODE_SHA256} if online.CALLBACK_MODULE in ready else None)} if is_online else {})}
+                "code_sha256":online.runtime_contract(online_runtime)["callback_code_sha256"],
+                "code_runtime":online_runtime} if online.CALLBACK_MODULE in ready else None)} if is_online else {})}
 
 
 def process_context(docker, container, pid):

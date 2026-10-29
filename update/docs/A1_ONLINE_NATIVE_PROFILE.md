@@ -23,7 +23,8 @@ mount에 배치하고, 기존 sitecustomize·GUARD_LIFECYCLE_CONFIG·ASGI middle
 직접 실행한다. 이 프로세스에서만 hook이 설치된다. 별도 Pod exec의 Python은 serving hook이 아니다.
 이미 선정 vLLM module이 import됐거나 source/code·함수 형태가 다르면 설치/해당 hook을 닫고
 원래 native 실행을 유지한다. 직접 경로·임의 import module·임의 callback은 설정으로 받지 않는다.
-Python3.12·optimize0과 vllm0.31.0·정확 source db9527a46873454610df6dbedf79a36d6bf1a7f6만 대상이다.
+검토된 CPython3.12.3/3.12.14·optimize0과 vllm0.31.0·정확 source
+db9527a46873454610df6dbedf79a36d6bf1a7f6만 대상이다. 다른 Python patch/구현은 /9 설치를 닫는다.
 
 | module | source bytes SHA256 | actual point |
 | --- | --- | --- |
@@ -50,8 +51,14 @@ InputProcessor의 실제 request_id 인자 hash를 중첩 validation 호출에 �
 기존 MODULE `code_sha256`은 실제 filename·line·bytecode·예외표를 포함한 의미를 유지한다.
 새 `online_code_sha256`과 `python312-source-relative-code/1`은 검증한 같은 실행 code의
 모든 nested co_filename만 해당 repository-relative filename으로 대체해 기존 code_digest를 계산한다.
-두 hash는 서로 다른 값이다. B가 새 고정 POINT_CONTRACTS/MODULE_CONTRACTS의 source 및
-function code literal을 검토해 새 필드를 소비해야 한다. 관측 시 읽은 hash로 pin을 승인하지 않는다.
+두 hash는 서로 다른 값이다. 같은 source라도 CPython patch에 따라 compile graph가 다르므로
+고정 RUNTIME_CONTRACTS에 두 compiler의 module/function/callback code literal을 별도로 둔다.
+값은 검토된 immutable source의 offline compile에서 얻었고 실제 대상 code를 읽어 승인하지 않았다.
+controller는 실제 interpreter 이름/정확 판본으로 이미 고정된 계약을 선택하며 미등록 판본을 거부한다.
+MODULE의 online_runtime을 기록하고 parser는 한 PID/start 기록에서 compiler 혼합을 거부한다.
+수집 호스트와 다른 검토 compiler의 기록도 해당 literal로 재판정할 수 있다.
+B가 새 POINT_CONTRACTS/MODULE_CONTRACTS 및 RUNTIME_CONTRACTS의 source/function/module literal을
+검토해 새 필드를 소비해야 한다. 관측 시 읽은 hash로 pin을 승인하지 않는다.
 callback code는 고정 `guard/adapters/vllm_online_input.py` filename으로 compile한 실행 module
 graph의 hash이며 `online_callback_provenance`에 source bytes/code와 함께 별도 기록한다.
 

@@ -1348,7 +1348,7 @@ git status
 
 ### 2026-10-29 A-1 REQ05 소유 probe/native 제품 연결
 - 한 일: 한 선정 base-model alias에 명시한 서로 다른 allowed/denied 자격으로 before/challenge/after를 보내는 폐쇄 공개 HTTP profile과 model_authorization:kubernetes 실행기를 연결했다. source/model grant·퇴역 목록·시간·ENV/target POL을 명시하고 기존 prepared native session/request index·loader/forward 객체 관계를 소비한다. PACK31에서 REQ05만 바꾸는 DRAFT 팩을 제공한다.
-- 검증: 구현/제품 CLI·정확Ref 왕복/오류 사례/문서 초안을 마치고 소스 고정 후 직접·인접·불변식·설치 검증 예정이다. metadata나 source/image 미확인을 최종 모델 사용·인가 증명으로 올리지 않는다.
+- 검증: registry의 순환 import와 adapter 선언주체 전달 오류를 자기 파일에서 보수했다. 보수606c235·동일1150파일 bytes의 Linux 영향449통과·기존제외1(40.94초/부모41.565초), Windows 보수209통과·기존skip1/제외1(105.50초/부모106.682초). 기존 전송 등은 앞선436통과와 같은 공통 소스 근거를 재사용한다. 설치171파일·격리 설치본 CLI4사례6Ref 반출/복원·재판정 통과(15.085초), source변경0. 설치 helper의 시험 fixture 해시 사슬 줄바꿈 누락만 별도 보수했고 실패 기록을 보존했다. metadata나 source/image 미확인을 최종 모델 사용·인가 증명으로 올리지 않는다.
 - 다음: 이 실행/관측 연결을 확정한 뒤 native 최종 모델·실제 주체/기업 정책/퇴역 전후 매핑 귀속을 이어가며, 별도 Online HTTP·hook/callback/parser/provenance 묶음도 유지한다.
 - 막힌 것: 현행 Kubernetes image_check=False·최종 file/tensor 정체·주체/alias/LoRA·퇴역 전후 실제 대조가 미확인이다. configured-policy/퇴역 후보는 confirmed FAIL이 아니며 전축UNKNOWN·REQ05 세분기/필수2결과 미완료다. native0.32/lab/source/image gate·원본B·c9·기존근거·stopped/추가Start중단·CI결제차단 유지.
 

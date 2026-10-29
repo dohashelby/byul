@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed selected-session seal checkpoint: only the bounded control/terminal
-# helper and existing Kubernetes reader change in this bundle's pinned scope.
+# Reviewed REQ05 checkpoint: owned credential requests, explicit internal
+# product executor/adapter and dispatch join the prior fixed common source.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='9721ed6a30b7b9bf68df4954cd74ab935631c39f'
+REVIEWED_COMMON_COMMIT='606c235e9c0bb5ef139eaca20225d4c7c05ec259'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

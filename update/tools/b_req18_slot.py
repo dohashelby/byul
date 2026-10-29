@@ -412,8 +412,46 @@ def _interval_verified(packet, process, prepared=None):
     return found
 
 
+def _writer_spans(events):
+    """Pair every observed writer in this PID; incomplete epochs stay unknown."""
+    opened, closed, spans = {}, set(), []
+    for event in events:
+        snapshot = event['snapshot']
+        point = snapshot.get('point', '')
+        if not point.startswith('InputBatch.'):
+            continue
+        batch = snapshot.get('metadata', {}).get('batch_token')
+        call = snapshot.get('binding', {}).get('call_id_sha256')
+        if not _sha(batch) or not _sha(call):
+            return None
+        key = (point, batch, call)
+        phase = snapshot.get('phase')
+        if phase == 'CALL':
+            if key in opened or key in closed:
+                return None
+            opened[key] = event['seq']
+        elif phase == 'RETURN':
+            if key not in opened or key in closed:
+                return None
+            begin = opened.pop(key)
+            if event['seq'] <= begin:
+                return None
+            closed.add(key)
+            spans.append((begin, event['seq'], key))
+        else:  # RAISE and missing phases cannot prove a completed writer epoch.
+            return None
+    return None if opened else spans
+
+
 def _sampler_flow(events, index, batch):
     current = events[index]['snapshot']['metadata']
+    spans = _writer_spans(events)
+    refresh = events[index]['snapshot']
+    key = (refresh.get('point'), batch, refresh.get('binding', {}).get('call_id_sha256'))
+    own = [span for span in spans or [] if span[2] == key and span[1] == events[index]['seq']]
+    if spans is None or len(own) != 1:
+        return None
+    interval_start = own[0][0]
     token, mask_token = current.get('sampling_metadata_token'), current.get('sampling_mask_token')
     if not _sha(token):
         return None
@@ -436,6 +474,9 @@ def _sampler_flow(events, index, batch):
             if (s.get('phase') != 'RETURN' or em.get('sampling_metadata_token') != token
                     or em.get('sampling_mask_token') != mask_token or em.get('sampling_mask') != current.get('sampling_mask')):
                 return None
+            if any(other != key and other[1] == batch and begin <= end['seq'] and finish >= interval_start
+                   for begin, finish, other in spans):
+                return None
             caller = end.get('caller_provenance', {}) or {}
             expected = (POINT_CONTRACTS or {}).get('GPUModelRunner.sample_tokens', {})
             if (caller.get('point') != 'GPUModelRunner.sample_tokens' or not _sha(expected.get('source_sha256'))
@@ -457,9 +498,7 @@ def _mask_row_consumed(metadata, row, dimensions, *, refresh_rebuilt=False):
             or not 0 <= cpu['masked_count'] <= cpu['cells']):
         return False
     if mask['device_type'] == 'cuda':
-        contract = (POINT_CONTRACTS or {}).get('InputBatch.refresh_metadata', {})
-        return (refresh_rebuilt and metadata.get('has_allowed_token_ids') is True
-                and contract.get('branch') == 'copy_active_host_mask_rows' and isinstance(contract.get('copy_helper'), dict))
+        return False  # No actual CUDA copy/stream ordering observation exists.
     matches = [r for r in mask.get('cpu_rows', []) if r.get('slot_index') == row.get('slot_index')]
     return (mask.get('values_collected') is True and len(matches) == 1
             and matches[0].get('cpu_mask') == cpu)
@@ -474,7 +513,7 @@ def _native_result(events, bootstrap, request_b_sha, *, standalone_b_sha=None, p
     process, batch, dimensions = bootstrap
     selected = [e for e in events if e['domain'] == process]
     previous, transitions, constraints = {}, {}, {}
-    findings, normal = [], False
+    findings, normal, gpu_gap = [], False, False
     for index, event in enumerate(selected):
         s = event['snapshot']; m = s.get('metadata', {}); rows = m.get('rows', [])
         if m.get('batch_token') == batch and s.get('point') == 'InputBatch.add_request' and s.get('phase') == 'RETURN':
@@ -513,6 +552,20 @@ def _native_result(events, bootstrap, request_b_sha, *, standalone_b_sha=None, p
             if row.get('request_sha256') == standalone_b_sha:
                 normal |= bool(absent or allocated and _mask_row_consumed(m, row, dimensions, refresh_rebuilt=rebuilt) and row['cpu_mask']['masked_count'] == 0)
             prior = transitions.get((row.get('slot_index'), request_b_sha), {})
+            if (allocated and mask.get('device_type') == 'cuda' and row.get('request_sha256') == request_b_sha
+                    and prior.get('request_sha256') == prior_request_sha
+                    and constraints.get(prior_request_sha, {}).get('restricted') is True
+                    and constraints.get(prior_request_sha, {}).get('sha256') == prior_constraint_sha):
+                host = row.get('cpu_mask', {})
+                if (host.get('status') == 'collected' and _sha(host.get('mask_sha256'))
+                        and type(host.get('masked_count')) is int and 0 <= host['masked_count'] <= dimensions['vocab_size']):
+                    gpu_gap = True
+                    findings.append({'slot_index': row['slot_index'], 'request_sha256': request_b_sha,
+                        'host_mask_sha256': host['mask_sha256'], 'host_masked_count': host['masked_count'],
+                        'sampling_metadata_token': m['sampling_metadata_token'], 'sampling_mask_token': m['sampling_mask_token'],
+                        'mask_device_type': 'cuda', 'sampler_argument_identity_matched': True,
+                        'qualified': False, 'mismatch': None, 'gpu_consumption_verified': False})
+                continue
             if (not allocated or row.get('request_sha256') != request_b_sha or prior.get('request_sha256') != prior_request_sha
                     or constraints.get(prior_request_sha, {}).get('restricted') is not True
                     or constraints.get(prior_request_sha, {}).get('sha256') != prior_constraint_sha
@@ -524,9 +577,11 @@ def _native_result(events, bootstrap, request_b_sha, *, standalone_b_sha=None, p
                 'prior_request_sha256': prior_request_sha, 'host_mask_sha256': cpu['mask_sha256'],
                 'host_masked_count': cpu['masked_count'], 'sampling_metadata_token': m['sampling_metadata_token'],
                 'sampling_mask_token': m['sampling_mask_token'], 'mask_device_type': mask.get('device_type'),
-                'source_mask_argument_matched': True, 'mismatch': inherited})
-    return {**empty, 'rows': findings, 'collected': bool(findings) and normal,
-            'mismatch': normal and any(f['mismatch'] for f in findings), 'complete': bool(findings) and normal,
+                'source_mask_argument_matched': True, 'qualified': True, 'mismatch': inherited})
+    return {**empty, 'rows': findings, 'collected': any(f.get('qualified') for f in findings) and normal,
+            'mismatch': normal and any(f.get('qualified') and f['mismatch'] for f in findings),
+            'complete': any(f.get('qualified') for f in findings) and normal and not gpu_gap,
+            'gaps': ['GPU_ORDERING_CONTEXT_UNAVAILABLE'] if gpu_gap else [],
             'standalone_unrestricted_source_path_observed': normal}
 
 
@@ -537,7 +592,7 @@ def _capture_kubernetes(env, target, prepared, manifest, *, duration, binary):
     for module_name, expected in A_SOURCE_PINS.items():
         module = importlib.import_module(module_name)
         file = root / ('/'.join(module_name.split('.')[1:]) + '.py')
-        _identity(module, module.__dict__.get('__loader__').get_code if False else module, file, expected)
+        _identity(module, module, file, expected)
     # Existing public APIs; new profile and seal are proposed A capabilities.
     transport = kubernetes_http.KubernetesHTTP(target, env, duration=duration, binary=binary,
                                                profile=kubernetes_http.SLOT_MASK_PROFILE)
@@ -574,9 +629,9 @@ def _capture_kubernetes(env, target, prepared, manifest, *, duration, binary):
             gaps.append('REQ18_SEAL_UNAVAILABLE')
         finally:
             packet = collect()  # Preserve already checked events if seal fails.
-            # Proposed A request index must join sent ASGI hashes to actual native
-            # request IDs. Never assume a serving prefix or use HTTP200 as proof.
-            mapping = packet.get('slot_request_index', {})
+            # Read the existing raw source-qualified request selection records.
+            # No external or synthetic map is accepted. Never assume a serving prefix or use HTTP200 as proof.
+            mapping = _request_map(packet, prepared)
             b = mapping.get(ids.get('request-b'))
             if _sha(b):
                 result = _native_result(_native_events(packet, prepared), bootstrap, b,
@@ -600,7 +655,7 @@ def _capture_kubernetes(env, target, prepared, manifest, *, duration, binary):
             cleanup.append('REQ18_OWNED_CLEANUP_UNVERIFIED')
     if result is not None:
         result.update(collection_id=token, started_at=began, finished_at=datetime.now(timezone.utc).isoformat(),
-                      cleanup_errors=cleanup, gaps=gaps, target_sha256=digest(target), manifest_sha256=digest(manifest))
+                      cleanup_errors=cleanup, gaps=sorted(set(gaps + result.get('gaps', []))), target_sha256=digest(target), manifest_sha256=digest(manifest))
         result['complete'] &= not cleanup and not gaps
     return result
 

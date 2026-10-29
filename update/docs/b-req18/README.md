@@ -39,13 +39,13 @@ cohort는 B 도구 전용 입력이다. schema=byul-req18-cohort/1, exact enviro
 
 필요한 A 지원은 명시 SLOT_MASK_PROFILE의 bounded completions/cohort/allowed-ID 전송, metadata.slot_mask parser·source hooks·callback provenance, exact owned session seal, 실제 runtime image proof 및 writer-hook 설치 coverage다. 새 전체 session framework나 REQ11 ID/private transport 우회는 요구하지 않는다. 신규 A keyspace와 signatures는 현재 제안이며 지원 완료로 표시하지 않는다.
 
-native namespace는 B callback guard.adapters.vllm_slot_mask.snapshot_slot_mask의 byul-v1-slot-mask-snapshot/1 반환을 사용한다. InputBatch ctor/add/remove/condense/swap/refresh와 Sampler.forward 실제 CALL/RETURN을 source/module/code hash에 연결한다. A_SOURCE_PINS·POINT_CONTRACTS·callback code provenance가 미설정이면 실제 호출 전에 닫힌다. refresh_metadata는 None을 반환하고 batch_update가 있을 때 self.sampling_metadata를 교체한다. source-copy 판단은 refresh CALL→RETURN의 metadata token 교체와 host row 보존·has_allowed_token_ids=True, 정확한 _make_sampling_metadata/copy_slice/Sampler symbol·source/codehash와 실제 non-None branch·device/dtype/shape에서 계산한다. 복사가 실행됐다고 token 미교체 경로에서 추정하지 않는다. 외부 JSON verified 플래그나 callback이 생성하지 않는 copy_verified 플래그는 입력하지 않는다.
+native namespace는 B callback guard.adapters.vllm_slot_mask.snapshot_slot_mask의 byul-v1-slot-mask-snapshot/1 반환을 사용한다. InputBatch ctor/add/remove/condense/swap/refresh와 Sampler.forward 실제 CALL/RETURN을 source/module/code hash에 연결한다. A_SOURCE_PINS·POINT_CONTRACTS·callback code provenance가 미설정이면 실제 호출 전에 닫힌다. refresh_metadata는 None을 반환하고 batch_update가 있을 때 self.sampling_metadata를 교체한다. refresh CALL→RETURN의 metadata token 교체·host row·non-None branch·device/dtype/shape는 진단 정황이다. 정확한 source/codehash와 closed record도 CUDA copy/DMA 완료나 stream 인과를 증명하지 않는다. CUDA 소비 predicate와 FAIL에는 사용하지 않는다. 외부 JSON verified 플래그나 callback이 생성하지 않는 copy_verified 플래그는 입력하지 않는다.
 
 ## 조건부 진단과 미확인 범위
 
 CPU FAIL에는 per-trial source 검증, 실제 unrestricted B, 동일 fixed logits, slot 재사용, 실제 metadata 인자 동일성·Sampler 정상 반환, 실측 host/metadata mask 불일치와 standalone 대비 실제 출력 차이가 필요하다. 늦은 trial/followup/global postcheck 오류가 앞서 검증된 독립 trial을 소거하지 않도록 보존한다. vacated row의 stale 값만으로 소비 FAIL을 만들지 않는다.
 
-Kubernetes 하위 진단명은 “stale host-mask source path가 동일 Sampler 연산 인자로 전달됨”이다. 현재 B 제약/실 host row 불일치, 이전 A row signature, 실제 slot 재사용, refresh RETURN의 actual metadata/mask opaque handle와 Sampler CALL/RETURN의 동일성, 해당 source-copy branch와 완결된 writer interval이 필요하다. mask=None와 allocated zero row를 구분한다. GPU tensor를 CPU로 복사하거나 주소·포인터 원문을 저장하지 않는다. GPU 물리값·DMA 완료·최종 GPU 출력 차이는 미검증이다.
+Kubernetes의 CPU 실제 mask 값 경로에서만 “stale host-mask가 동일 Sampler 연산 인자로 전달됨”을 판정한다. CUDA에서는 host row와 metadata/mask opaque handle의 동일성만 진단으로 보존하고, 실제 copy/DMA/stream ordering 문맥이 없어 GPU_ORDERING_CONTEXT_UNAVAILABLE·UNKNOWN으로 남긴다. CPU 실제 값 경로에는 현재 B 제약/실 host row와 실제 Sampler 인자 mask row의 일치, 이전 A row signature, 실제 slot 재사용, refresh의 metadata/mask handle와 Sampler CALL/RETURN의 동일성 및 완결된 writer interval이 필요하다. 같은 descriptor·source branch·metadata 교체가 관측돼도 CUDA 소비 확정에는 사용하지 않는다. mask=None와 allocated zero row를 구분한다. GPU tensor를 CPU로 복사하거나 주소·포인터 원문을 저장하지 않는다. GPU 물리값·DMA 완료·최종 GPU 출력 차이는 미검증이다.
 
 writer interval은 단순 “추가 event 없음”으로 완결성을 추정하지 않는다. 선정 PID/start에서 stable census·recorded files·SEALED recording·비잘림과 source-qualified 실제 writer hook 설치 coverage를 확인한다. 제안 capture.slot_writer_coverage는 schema=byul-v1-slot-hook-coverage/1와 각 writer point의 hook_installed/source/codehash를 A 설치 단계가 검증해 제공해야 한다. 부족하면 UNKNOWN이다. source-copy/DMA 순서·동일 mask의 중간 갱신을 판단할 수 없으면 FAIL을 만들지 않는다.
 
@@ -60,3 +60,7 @@ finally에서 owned session seal과 기존 probe watchdog/cleanup report를 확�
 현재 실제 Kubernetes는 미실행이다. B 단위 EXAMPLE과 source CPU 결과는 실제 Kubernetes 완료로 집계하지 않는다. 승인된 A profile/target/provenance·cohort 실행·판정·EVD/복원·소유 cleanup의 실제 확인이 끝나야 live 묶음을 마감한다.
 
 로컬 검증: 외부 /private/tmp의 새 basetemp에서 EXAMPLE 전용 회귀 34 passed(pytest 0.49초, 부모 벽시계 0.623초). 실제 source CPU는 coordinating session의 ancestor/pin이 일치하는 통합 snapshot에서 validator가 한 번 실행한다. 이 branch에서 다른 SHA로 component를 복제해 actual guard 통과로 주장하지 않는다. 실제 Kubernetes와 source CPU 재실행은 수행하지 않았다.
+
+수정된 경계: 실제 실행 본체는 기존 raw source-qualified assign_request_id의 request_selection 기록으로 request map을 만들고, 공통 반환에 없는 slot_request_index를 읽지 않는다. writer의 CALL/RETURN은 선정 PID 전체에서 point/batch/call ID로 짝지으며 open/orphan/duplicate/RAISE 및 refresh CALL부터 Sampler RETURN을 가로지르는 writer는 UNKNOWN이다. CPU source formal 결과는 재실행하지 않는다. CUDA ordering 지원에는 A의 실제 stream·copy 완료·actor/thread 문맥과 관련 writer pair의 검증 가능한 수집이 필요하며, GPU readback/동기화/새 stream/context 생성이나 미emit verified bool로 대체하지 않는다.
+
+이번 fix-only 검증은 EXAMPLE 전용 40 passed(pytest 0.51초, 부모 벽시계 0.667초)다. 기존 formal source CPU 1회 결과를 재사용했고 실제 CPU/Kubernetes 추가 실행은 없다.

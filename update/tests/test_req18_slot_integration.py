@@ -171,11 +171,24 @@ def native_events():
     batch, standalone, prior, current = 'a' * 64, 'b' * 64, 'c' * 64, 'd' * 64
     domain = (123, 456)
     events = []
-    def event(point, phase, metadata, call='f' * 64):
-        events.append({'seq': len(events) + 1, 'domain': domain,
-            'caller_provenance': {'point': 'GPUModelRunner.sample_tokens', 'module': 'EXAMPLE-v1-runner', 'source_sha256': '8' * 64, 'code_sha256': '9' * 64},
-            'snapshot': {
-            'point': point, 'phase': phase, 'binding': {'call_id_sha256': call}, 'metadata': deepcopy(metadata)}})
+    last_state = {}
+    def event(point, phase, metadata, call=None):
+        call = call or producer.native_digest([point, len(events)])
+        def append(kind, value):
+            events.append({'seq': len(events) + 1, 'domain': domain,
+                'caller_provenance': {'point': 'GPUModelRunner.sample_tokens', 'module': 'EXAMPLE-v1-runner',
+                    'source_sha256': '8' * 64, 'code_sha256': '9' * 64},
+                'snapshot': {'point': point, 'phase': kind, 'binding': {'call_id_sha256': call}, 'metadata': deepcopy(value)}})
+        if point.startswith('InputBatch.') and phase == 'RETURN':
+            matching = [e for e in events if e['snapshot']['point'] == point and e['snapshot']['phase'] == 'CALL'
+                        and e['snapshot']['binding']['call_id_sha256'] == call]
+            if not matching:
+                before = {**metadata, **last_state.get(metadata['batch_token'], {})}
+                before.pop('assigned_slot_index', None)
+                append('CALL', before)
+        append(phase, metadata)
+        if point.startswith('InputBatch.') and phase == 'RETURN':
+            last_state[metadata['batch_token']] = deepcopy(metadata)
     def batch_state(rows):
         return {'batch_token': batch, 'dimensions': dimensions, 'rows': rows, 'slot_map_complete': True}
     first = {'slot_index': 0, 'request_sha256': standalone, 'restricted': False,
@@ -185,8 +198,8 @@ def native_events():
     metadata = {**batch_state([first]), 'sampling_metadata_token': '1' * 64,
         'sampling_mask_token': None, 'sampling_mask': {'status': 'absent'}}
     event('InputBatch.refresh_metadata', 'RETURN', metadata)
-    event('Sampler.forward', 'CALL', metadata)
-    event('Sampler.forward', 'RETURN', metadata)
+    event('Sampler.forward', 'CALL', metadata, call='7' * 64)
+    event('Sampler.forward', 'RETURN', metadata, call='7' * 64)
     mask = {'status': 'collected', 'cells': 8, 'masked_count': 7, 'mask_sha256': '2' * 64}
     event('InputBatch.add_request', 'RETURN', {**batch_state([
         {'slot_index': 0, 'request_sha256': prior, 'restricted': True, 'cpu_mask': mask}]), 'assigned_slot_index': 0,
@@ -236,8 +249,11 @@ def test_missing_native_consumption_epoch_or_control_never_produces_fail(monkeyp
             row = event['snapshot']['metadata']['sampling_mask']['cpu_rows'][0]
             row['cpu_mask'] = {**row['cpu_mask'], 'mask_sha256': '0' * 64}
     elif change == 'intervening_update':
-        event = deepcopy(events[4]); event['seq'] = 8.5
-        events.insert(-1, event)
+        writer = deepcopy(next(e for e in events if e['snapshot']['point'] == 'InputBatch.remove_request'))
+        writer['snapshot']['binding']['call_id_sha256'] = '0' * 64
+        writer['snapshot']['phase'] = 'CALL'; writer['seq'] = events[-2]['seq'] + 0.1
+        returned = deepcopy(writer); returned['snapshot']['phase'] = 'RETURN'; returned['seq'] += 0.1
+        events[-1:-1] = [writer, returned]
     elif change == 'no_v1_caller': events[-1]['caller_provenance'] = None
     elif change == 'no_source_branch': monkeypatch.setattr(producer, 'POINT_CONTRACTS', {})
     else: prior = '0' * 64
@@ -262,7 +278,11 @@ def test_gpu_descriptor_only_requires_reviewed_source_copy_path_without_readback
         'GPUModelRunner.sample_tokens': {'module': 'EXAMPLE-v1-runner', 'source_sha256': '8' * 64, 'code_sha256': '9' * 64},
         'InputBatch.refresh_metadata': {'branch': 'copy_active_host_mask_rows', 'copy_helper': {'module': 'EXAMPLE-reviewed'}}})
     result = analyze(events, bootstrap, standalone, prior, current)
-    assert result['mismatch'] and result['gpu_execution_verified'] is False
+    assert not result['collected'] and not result['mismatch'] and result['gpu_execution_verified'] is False
+    assert result['gaps'] == ['GPU_ORDERING_CONTEXT_UNAVAILABLE']
+    assert result['rows'] and result['rows'][0]['host_masked_count'] == 7
+    assert result['rows'][0]['sampler_argument_identity_matched'] is True
+    assert result['rows'][0]['qualified'] is False and result['rows'][0]['mismatch'] is None
 
 
 def test_writer_coverage_is_not_inferred_from_empty_or_truncated_metadata(monkeypatch):
@@ -329,3 +349,94 @@ def test_late_component_guard_error_aborts_but_keeps_verified_cpu_fail(tmp_path,
         source_root=tmp_path / 'source', execute=True)
     assert summary['execution_status'] == 'ABORTED' and summary['security'] == 'FAIL'
     assert summary['diagnostics'] == ['REQ18_COMPONENT_POSTCHECK_UNAVAILABLE']
+
+
+@pytest.mark.parametrize('kind', ['crossing', 'open', 'orphan', 'duplicate', 'raise'])
+def test_entire_writer_call_lifetime_is_required_for_cpu_native_reducer(monkeypatch, kind):
+    monkeypatch.setattr(producer, 'POINT_CONTRACTS', {'Sampler.forward': {'branch': 'apply_nonnull_allowed_mask'},
+        'GPUModelRunner.sample_tokens': {'module': 'EXAMPLE-v1-runner', 'source_sha256': '8' * 64, 'code_sha256': '9' * 64}})
+    events, bootstrap, standalone, prior, current = native_events()
+    call = deepcopy(next(e for e in events if e['snapshot']['point'] == 'InputBatch.remove_request'))
+    call['snapshot']['binding']['call_id_sha256'] = '0' * 64
+    call['snapshot']['phase'] = 'CALL'
+    refresh = next(i for i, e in enumerate(events) if e['snapshot']['point'] == 'InputBatch.refresh_metadata'
+                   and e['snapshot']['phase'] == 'RETURN' and e['snapshot']['metadata'].get('sampling_mask_token'))
+    call['seq'] = events[refresh]['seq'] - 0.1
+    returned = deepcopy(call)
+    returned['snapshot']['phase'] = 'RETURN'
+    returned['seq'] = events[-1]['seq'] + 1
+    if kind == 'orphan':
+        events.append(returned)
+    else:
+        events.insert(refresh, call)
+        if kind != 'open':
+            if kind == 'raise': returned['snapshot']['phase'] = 'RAISE'
+            events.append(returned)
+        if kind == 'duplicate': events.append(deepcopy(returned))
+    result = analyze(events, bootstrap, standalone, prior, current)
+    assert not result['collected'] and not result['mismatch']
+    # The independent formal source-CPU criterion remains intact.
+    assert producer._cpu_result(mismatch(cpu_record()))['mismatch'] is True
+
+
+def test_actual_capture_shape_request_selection_reaches_native_analysis(tmp_path, inputs, monkeypatch):
+    """EXAMPLE public-interface doubles; real raw request-map join is exercised."""
+    from types import SimpleNamespace
+    environment, _, _, destination, prepared, manifest = live_inputs(inputs)
+    events, bootstrap, standalone, prior, current = native_events()
+    contract = {'module': 'EXAMPLE-source', 'source_sha256': '8' * 64, 'code_sha256': '9' * 64}
+    monkeypatch.setattr(producer, 'A_SOURCE_PINS', {'guard.runtime.kubernetes_http': '8' * 64})
+    monkeypatch.setattr(producer, 'CALLBACK_CODE_SHA256', '9' * 64)
+    monkeypatch.setattr(producer, 'POINT_CONTRACTS', {
+        'InputProcessor.assign_request_id': contract,
+        'Sampler.forward': {'branch': 'apply_nonnull_allowed_mask'},
+        'GPUModelRunner.sample_tokens': {'module': 'EXAMPLE-v1-runner', 'source_sha256': '8' * 64, 'code_sha256': '9' * 64}})
+    prepared['source_sha256'] = {'EXAMPLE-source': '8' * 64}
+    monkeypatch.setattr(producer, '_identity', lambda *args: None)
+    monkeypatch.setattr(producer.kubernetes_http, 'SLOT_MASK_PROFILE', 'EXAMPLE-slot-profile', raising=False)
+    sent, observed, reads = {}, [], []
+    class HTTP:
+        def __init__(self, *args, **kwargs): pass
+        def __call__(self, network, requests, timeout):
+            actors = {'standalone-b': standalone, 'request-a': prior, 'request-b': current, 'followup-b': 'e' * 64}
+            for request in requests:
+                asgi = producer.hashlib.sha256(request['headers']['X-Request-Id'].encode()).hexdigest()
+                sent[asgi] = actors[request['id'].removeprefix('req18-slot-')]
+            return [{'outcome': 200}]
+        def report(self): return {'cleanup_errors': []}
+    class Reader:
+        def __init__(self, target, env, prepared, **kwargs): self.binding = target['kubernetes']
+        def snapshot(self): return {'EXAMPLE-generation': 1}
+        def seal_session(self): return {'sealed': True}
+        def owner_identity(self, *args): pass
+        def read_file(self, *args): pass
+        def image_check(self, *args): return True
+    def capture(*args, **kwargs):
+        reads.append('capture')
+        records = [{'event': 'MODULE', 'payload': {**contract, 'verified': True}}]
+        records.extend({'event': 'SELECTION', 'payload': {'point': 'InputProcessor.assign_request_id',
+            'source_sha256': '8' * 64, 'metadata': {'request_selection': {
+                'asgi_request_sha256': asgi, 'selected_request_id_sha256': native, 'request_id_observed': True}}}}
+            for asgi, native in sent.items())
+        return {'recordings': [{'session_owner_match': True, 'listed_file_identity_match': True,
+            'capture': {'image_digest_verified': True, 'process_context_verified': True, 'records': records}}],
+            'slot_request_index': {key: '0' * 64 for key in sent}}  # Must be ignored.
+    def snapshots(packet, prepared):
+        if len(reads) == 1:
+            return [{'domain': bootstrap[0], 'snapshot': {'point': 'InputBatch.__init__', 'phase': 'RETURN',
+                'metadata': {'batch_token': bootstrap[1], 'dimensions': bootstrap[2]}}}]
+        return events
+    analyze_original = producer._native_result
+    def analyze_spy(events, bootstrap, request, **kwargs):
+        observed.append((request, kwargs))
+        return analyze_original(events, bootstrap, request, **kwargs)
+    monkeypatch.setattr(producer.kubernetes_http, 'KubernetesHTTP', HTTP)
+    monkeypatch.setattr(producer.readers, 'KubernetesLifecycleReader', Reader)
+    monkeypatch.setattr(producer.lifecycle_session, 'capture_session', capture)
+    monkeypatch.setattr(producer, '_native_events', snapshots)
+    monkeypatch.setattr(producer, '_interval_verified', lambda *args: True)
+    monkeypatch.setattr(producer, '_native_result', analyze_spy)
+    result = producer._capture_kubernetes(environment, destination, prepared, manifest, duration=60, binary='kubectl')
+    assert len(reads) == 2 and len(observed) == 1
+    assert observed[0][0] == current and observed[0][1]['standalone_b_sha'] == standalone
+    assert result['collected'] and result['mismatch']

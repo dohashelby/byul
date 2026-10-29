@@ -82,7 +82,6 @@ class World(FullWorld):
 def inputs(tmp_path, mode=None):
     env, topology = full_inputs()
     launch = topology["comparison_config"]["launch"]
-    launch["model"] = env.model.id
     launch["argv"].extend(["--served-model-name", "fixture-model"])
     path = tmp_path / "target.json"
     path.write_bytes(canonical_json(topology))
@@ -195,6 +194,19 @@ def test_static_reuse_never_proves_current_file_or_pod(tmp_path, monkeypatch):
         {"executors": {"template_validation": "kubernetes"}, "template_validation": cfg,
          "adapter": {"name": "vllm"}}) is None
     assert not world.calls and not world.packets
+
+
+@pytest.mark.parametrize("conflict", [False, True])
+def test_optional_launch_model_declaration_must_match_the_validated_repository(tmp_path, conflict):
+    env, topology, world, cfg = inputs(tmp_path)
+    assert "model" not in topology["comparison_config"]["launch"]
+    topology["comparison_config"]["launch"]["model"] = "other/repository" if conflict else env.model.id
+    Path(cfg["target"]).write_bytes(canonical_json(topology))
+    draft = KubernetesTemplateSupplyExecutor(cfg, runner=world.runner).run(
+        baseline_pack().checks["SUP-03"], env, VALUES, VllmAdapter(), tmp_path / "work")
+    assert draft.observations["template_identity_verified"].value is (not conflict)
+    if conflict:
+        assert not world.packets and world.template_reads == 0
 
 
 @pytest.mark.parametrize("mode", [None, "http-error", "restart", "attachment", "missing-policy"])

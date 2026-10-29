@@ -93,7 +93,8 @@ def _target(ctx, *, profile_support=None, kubernetes=False):
     if (type(container) is not str or not _NAME.fullmatch(container)
             or type(image) is not str or len(image) > 512 or not _PINNED.fullmatch(image)
             or image != ctx.env.engine.image_digest
-            or type(model) is not str or not model or launch.get("model") != model
+            or type(model) is not str or not model
+            or (not kubernetes or "model" in launch) and launch.get("model") != model
             or type(run_id) is not str or not run_id
             or not ctx.env.engine.version or ctx.target.get("observed_version") != ctx.env.engine.version
             or type(argv) is not list or not argv or len(argv) > 128

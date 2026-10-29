@@ -236,3 +236,17 @@ def test_owned_local_selector_socket_samples_buffer_and_kernel_queue_without_pri
             for transport in selected:transport.abort()
             server.close();await server.wait_closed()
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('kind',['bytearray','deque','memoryview','overflow','unknown-piece'])
+def test_selected_transport_buffer_shapes_are_bounded_and_unsupported_is_null(kind):
+    import collections
+    from asyncio.selector_events import _SelectorSocketTransport
+    selected=object.__new__(_SelectorSocketTransport);selected._sock=None;selected._closing=False
+    selected._buffer=bytearray(b'ab') if kind=='bytearray' else collections.deque([memoryview(b'ab')]) if kind=='memoryview' else collections.deque([b'ab'])
+    if kind=='overflow':selected._buffer=collections.deque([b'x']*1025)
+    if kind=='unknown-piece':selected._buffer=collections.deque([object()])
+    value=sensor.transport_metrics(selected)
+    if kind in {'overflow','unknown-piece'}:assert value['transport_kind']=='unsupported' and value['write_buffer_bytes'] is None
+    else:assert value['transport_kind']=='asyncio-selector-tcp' and value['write_buffer_bytes']==2
+    assert value['kernel_outq_bytes'] is None and not value['socket_identity_stable']

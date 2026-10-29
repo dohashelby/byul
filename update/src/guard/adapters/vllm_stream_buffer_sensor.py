@@ -26,7 +26,7 @@ MAX_ROWS=2048
 MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_stream_buffer_sensor.py'
 # Added only after the completed own-source offline code review, before freeze.
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'16cff77067f6032fcff094bca87118cf050d538c42bc53f5039249d0a8b206a7','cpython-3.12.3':'9bca107c7a4dfada88b60f899272129fb2edb964202f4f7eb88fc3e4550f5c6c'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'9ce758b73185aedbab0f9d46ea379f12af3f189d3e9fc9460cab57bc9ef12c50','cpython-3.12.3':'8cef15ad93903b20197b5f5bbec66504b9017b438a4e50082b9c104832eb5a4e'}
 _BASE=None
 _SEND=contextvars.ContextVar('guard_stream_buffer_send',default=None)
 
@@ -63,11 +63,17 @@ def transport_metrics(transport):
     except (OSError,ValueError,AttributeError):pass
     try:
         from asyncio.selector_events import _SelectorSocketTransport
-        import socket
+        import socket,collections
         if type(transport) is not _SelectorSocketTransport:return value
         data=attrs(transport);buffer=data.get('_buffer');sock=data.get('_sock')
-        if type(buffer) is not bytearray:return value
-        value.update(transport_kind='asyncio-selector-tcp',write_buffer_bytes=integer(len(buffer)),
+        if type(buffer) is bytearray:buffer_bytes=len(buffer)
+        elif type(buffer) is collections.deque and len(buffer)<=1024:
+            pieces=tuple(buffer)
+            if any(type(item) not in (bytes,bytearray,memoryview) for item in pieces):return value
+            buffer_bytes=sum(len(item) for item in pieces)
+            if len(buffer)!=len(pieces) or attrs(transport).get('_buffer') is not buffer:return value
+        else:return value
+        value.update(transport_kind='asyncio-selector-tcp',write_buffer_bytes=integer(buffer_bytes),
             transport_closing=data.get('_closing') if type(data.get('_closing')) is bool else None)
         if sys.platform!='linux' or type(sock) is not socket.socket:return value
         import array,fcntl

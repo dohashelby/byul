@@ -174,22 +174,29 @@ def capture(source_root:Path,workdir:Path,*,source_profile='reference5d')->dict:
     started=datetime.now(timezone.utc).isoformat()
     workdir.mkdir(parents=True,exist_ok=False);rows=[];start=time.perf_counter()
     for case in fixtures():
-        folder=workdir/case['case_id'];folder.mkdir()
-        shutil.copytree(FIXTURE/'model',folder/'model');shutil.copytree(FIXTURE/'builtin',folder/'builtin')
-        env=os.environ.copy();env.update(HF_MODULES_CACHE=str(folder/'hf-modules'),
-            BYUL_B_DYNAMIC_EVENTS=str(folder/'events.jsonl'),VLLM_PLUGINS='')
-        flags={'normal':[],'O':['-O'],'OO':['-OO']}[case['mode']]
-        cmd=[sys.executable,*flags,str(Path(__file__).resolve()),'--source-root',str(root),
-            '--workdir',str(folder),'--case',case['case_id'],'--source-profile',source_profile,
-            '--collection-id',collection_id]
+        folder=workdir/case['case_id'];prepared=False
         began=time.perf_counter()
         try:
+            folder.mkdir()
+            shutil.copytree(FIXTURE/'model',folder/'model');shutil.copytree(FIXTURE/'builtin',folder/'builtin')
+            prepared=True
+            env=os.environ.copy();env.update(HF_MODULES_CACHE=str(folder/'hf-modules'),
+                BYUL_B_DYNAMIC_EVENTS=str(folder/'events.jsonl'),VLLM_PLUGINS='')
+            flags={'normal':[],'O':['-O'],'OO':['-OO']}[case['mode']]
+            cmd=[sys.executable,*flags,str(Path(__file__).resolve()),'--source-root',str(root),
+                '--workdir',str(folder),'--case',case['case_id'],'--source-profile',source_profile,
+                '--collection-id',collection_id]
             completed=subprocess.run(cmd,env=env,capture_output=True)
             file=folder/'case.json'
             row=json.loads(file.read_text()) if file.exists() else {**case,'case_identity':identity(case),'outcome':'execution_error'}
             row.update(exit_code=completed.returncode,parent_wall_seconds=time.perf_counter()-began)
         except Exception as error:
-            row={**case,'case_identity':identity(case),'outcome':'execution_error','error_type':type(error).__name__}
+            row={**case,'case_identity':identity(case),'outcome':'execution_error','error_type':type(error).__name__,
+                 'parent_wall_seconds':time.perf_counter()-began}
+            if not prepared:
+                row.update(preparation_status='failed',child_executed=False,target_started=False,
+                    event_collection_status='not_collected',source_profile=source_profile,
+                    source_commit=SOURCE_PROFILES[source_profile],collection_id=collection_id)
         rows.append(row)
     finished=datetime.now(timezone.utc).isoformat()
     post=post_validation(root,source_profile,producer_sha256)

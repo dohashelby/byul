@@ -35,7 +35,7 @@ SUP-11의 mode 차이는 같은 entry의 정상 baseline 거부·완전한 marke
 ```sh
 export VLLM_TARGET_DEVICE=cpu VLLM_LOGGING_LEVEL=CRITICAL CUDA_VISIBLE_DEVICES= VLLM_PLUGINS=
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
-export PYTHONPATH="$VLLM_SOURCE:$BYUL_B1_REPO/update/src"
+export PYTHONPATH="$BYUL_B1_REPO/update/src:$BYUL_B1_REPO/update:$VLLM_SOURCE"
 "$CPU_VENV/bin/python" "$BYUL_B1_REPO/update/tools/b1_dynamic_code_cpu.py" --source-root "$VLLM_SOURCE" --workdir "$FRESH_DYNAMIC_EVIDENCE"
 ```
 
@@ -91,3 +91,18 @@ normal/`-O`/`-OO`는 필수 사례로 유지하고 실제 `sys.flags.optimize`�
 
 범위는 DECLARED 로컬 CPU custom-config loader이며 installed target은 null,
 runner hook은 미검증이다. 실제 target CPU 결과는 통합 소스 확정 후 기록한다.
+
+사례별 디렉터리 생성·fixture 복사 실패는 해당 사례의 준비 실패와 child 미실행으로
+기록하고 다음 사례를 계속한다. 앞서 검증된 정상 baseline과 import 위반 행,
+실제 수집 ID·시각은 보존하며 capture는 incomplete로 반환한다.
+
+선정 0.31 소스와 해당 CPU 환경을 지정한 정식 소비 제안 실행 명령은 다음과 같다.
+부모는 normal로 실행하고 도구가 필수 `-O`·`-OO` child를 생성한다.
+
+```sh
+cd "$BYUL_B1_REPO/update"
+PYTHONPATH="$BYUL_B1_REPO/update/src:$BYUL_B1_REPO/update:$VLLM_SOURCE" \
+  "$CPU_VENV/bin/python" -m tools.b1_dynamic_code_integration_cpu \
+  --source-profile target031 --source-root "$VLLM_SOURCE" \
+  --output-root "$FRESH_DYNAMIC_PRODUCT_EVIDENCE"
+```

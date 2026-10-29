@@ -174,3 +174,39 @@ c.execute(case,Path(FOLDER),source_root=Path(FOLDER),collection_id='EXAMPLE')
     assert record['error_type']=='OSError' and record['target_started'] is False
     assert record['source_validation']['pre']=='unavailable'
     assert 'PRIVATE_' not in json.dumps(record)
+
+
+@pytest.mark.parametrize('operation',['mkdir','copytree'])
+def test_late_case_preparation_error_keeps_qualified_independent_violations(tmp_path,example_capture,monkeypatch,operation):
+    failed_case='autoconfig-False-OO'
+    if operation=='copytree':
+        original=shutil.copytree
+        def failed_copy(source,destination,*a,**kw):
+            if Path(destination).parent.name==failed_case:
+                raise OSError('PRIVATE_PREPARATION_ERROR')
+            return original(source,destination,*a,**kw)
+        monkeypatch.setattr(collector.shutil,'copytree',failed_copy)
+    else:
+        original=Path.mkdir
+        def failed_mkdir(path,*a,**kw):
+            if path.name==failed_case:raise OSError('PRIVATE_PREPARATION_ERROR')
+            return original(path,*a,**kw)
+        monkeypatch.setattr(Path,'mkdir',failed_mkdir)
+    record=collector.capture(tmp_path/'source',tmp_path/'output',source_profile='target031')
+    assert record['capture_status']=='incomplete' and len(record['rows'])==12
+    assert len(example_capture)==11
+    assert record['observations']['SUP-09']['dynamic_code_confirmed_violations']['value']==['autoconfig-False-O']
+    assert record['observations']['SUP-11']['dynamic_mode_confirmed_violations']['value']==['autoconfig-False-O']
+    assert record['observations']['complete'] is False
+    normal,optimized,failed=record['rows'][:3]
+    assert normal['outcome']=='rejected_at_trust_gate' and optimized['events']==[{'phase':'import'}]
+    assert all(r['source_validation']['post']=={'status':'verified'} for r in (normal,optimized))
+    assert failed['case_identity']==identity(next(c for c in fixtures() if c['case_id']==failed_case))
+    assert failed['error_type']=='OSError' and failed['preparation_status']=='failed'
+    assert failed['child_executed'] is False and failed['target_started'] is False
+    assert failed['event_collection_status']=='not_collected'
+    assert 'python_optimize' not in failed and 'exit_code' not in failed and 'source_validation' not in failed
+    assert all(r['collection_id']==record['collection_id'] for r in record['rows'])
+    assert datetime.fromisoformat(record['capture_started_at'])<=datetime.fromisoformat(record['capture_finished_at'])
+    assert record['auxiliary_write']=={'status':'completed'}
+    assert 'PRIVATE_' not in json.dumps(record)

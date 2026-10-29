@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 실제 REQ11 왕복과 순차 종료 대기 경계
+
+- 한 일: 고정9c wheel의 실제 L4/Kubernetes REQ11 8사례를 MEASURED/COMPLETED·functional PASS/security UNKNOWN으로 실행하고6개 정확 Ref의 원격/로컬 verify·반출/복원·저장팩 재판정 일치를 확인했다. 소스28파일·모델전체34파일 inventory와 실제 대상/프로브·회수 근거를 외부 A1 인계에 고정했다. 별도 작업 공간에서 정상 Terminating/최종 phase 지연이 전환 대기를 즉시 거부하는 경계를 보수한다. Ready 요청의 기본 검증은 그대로 두고 전환 gate의 require_ready=False 대기에서만 같은 소유 세대의 삭제 진행을 허용한다.
+- 테스트 결과: 회수 보수913c115의 정확CI5개 성공·기본6010통과/제외19(194.52/195.883초), 설치156파일 동등과 source tree 일치를 마감했다. 이번1083파일 고정 영향364통과·신규 fixture 인자 누락1실패·기존skip1/제외1(59.02/60.331초) 뒤 신규시험의 context/timeout 호출만 보완했다. 제품/기존 기대값을 유지한 직접·동일 전환/요청 계약·불변식182통과·기존skip1/제외1(21.31/22.352초), source/wheel/격리설치156파일 일치(설치 부모22.270초), 검증 중 bytes 불변을 확인했다. 문서 결과만 갱신하고 정확HEAD CI를 확인한다.
+- 다음 단계: 영향 검증·오류 보수·설치/정확CI를 마감하고 같은 고정 제품 판본으로 기준판→실제 후보 세대를 순차 실행한다. 기존 첫 실제 Ref는 보존한다.
+- 막힌 것: 삭제 중 Ready 요청은 계속 금지하며 UID/containerID/imageID/restart/start/소유자·namespace를 계속 확인한다. API phase/부재를 실제 worker/GPU 반납으로 승격하지 않는다. 후보0.32 exact image의 사전 확보는 성공했지만 아직 후보 Pod/worker를 생성하거나 미래 신원을 채우지 않았다. 독립 출력 oracle·A39개 전체 보안 완료는 미확보다.
+
 ## 2026-10-29 — A-1 실제 bootstrap 접근 회수의 API 응답 처리
 
 - 한 일: 모델 안정성 통합16d97de의 정확CI5개 성공·기본6000통과/제외19(176.33/178.261초)와 source tree 일치를 외부 인계에 마감했다. 별도 A-1 공간에서 bootstrap helper의 회수 후 빈 ingress 생략 응답을 처리한다. 패치 전후 소유 UID/run·정확 Ingress 타입/selector를 확인하고 명시 null·비어 있지 않은 규칙·scope 교체는 거부한다. 기존 atomic UID/resourceVersion/run 테스트·원문 비저장·Job TTL 정리는 유지한다.

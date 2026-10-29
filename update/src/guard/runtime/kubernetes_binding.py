@@ -32,7 +32,10 @@ def validate_container_binding(item):
         raise ValueError
 
 
-def verify_owned_pod(pod, namespace, expected, run_id, *, require_ready=True, terminated=False):
+def verify_owned_pod(pod, namespace, expected, run_id, *, require_ready=True, terminated=False, allow_terminating=False):
+    if (type(allow_terminating) is not bool or allow_terminating
+            and (require_ready is not False or terminated is not False)):
+        raise ValueError
     if namespace.get("uid") != expected["namespace_uid"] or namespace.get("deletionTimestamp"):
         raise ValueError
     meta, spec, status = pod["metadata"], pod["spec"], pod["status"]
@@ -41,15 +44,22 @@ def verify_owned_pod(pod, namespace, expected, run_id, *, require_ready=True, te
     if len(containers) != 1 or len(states) != 1:
         raise ValueError
     container, state = containers[0], states[0]
-    lifecycle=state.get("state",{}).get("terminated" if terminated else "running",{})
-    phase_ok=status.get("phase") in {"Succeeded","Failed"} if terminated else status.get("phase")=="Running"
-    if terminated:
+    pending_deletion=allow_terminating and meta.get("deletionTimestamp") is not None
+    if pending_deletion:
+        deletion=datetime.fromisoformat(meta["deletionTimestamp"].replace("Z","+00:00"))
+        if deletion.tzinfo is None:raise ValueError
+    terminal_state=terminated or pending_deletion and type(state.get("state",{}).get("terminated")) is dict
+    lifecycle=state.get("state",{}).get("terminated" if terminal_state else "running",{})
+    phase_ok=(status.get("phase") in {"Succeeded","Failed"} if terminated else
+        status.get("phase") in {"Running","Succeeded","Failed"} if pending_deletion and terminal_state else
+        status.get("phase")=="Running")
+    if terminal_state:
         if type(lifecycle.get("exitCode")) is not int:raise ValueError
         finished=datetime.fromisoformat(lifecycle["finishedAt"].replace("Z","+00:00"))
         started=datetime.fromisoformat(expected["started_at"].replace("Z","+00:00"))
         if finished.tzinfo is None or finished<started:raise ValueError
     if (meta.get("name") != expected["pod"] or meta.get("namespace") != expected["namespace"]
-            or meta.get("uid") != expected["pod_uid"] or meta.get("deletionTimestamp") and not terminated
+            or meta.get("uid") != expected["pod_uid"] or meta.get("deletionTimestamp") and not (terminated or pending_deletion)
             or meta.get("labels", {}).get("guard.run") != run_id
             or spec.get("nodeName") != expected["node"]
             or any(spec.get(x, False) is not False for x in ("hostNetwork", "hostPID", "hostIPC"))

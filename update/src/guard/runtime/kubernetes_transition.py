@@ -66,7 +66,11 @@ class KubernetesTransition:
                         verify_owned_pod(pod,meta,expected,transport.binding["run_id"],require_ready=False,terminated=True)
                         stopped=True
                     except ValueError:
-                        verify_owned_pod(pod,meta,expected,transport.binding["run_id"],require_ready=False)
+                        # A selected Pod may still report Running while its
+                        # deletion is pending, or while its final phase lags the
+                        # container state. Keep waiting on that exact generation;
+                        # this neither admits requests nor declares it stopped.
+                        verify_owned_pod(pod,meta,expected,transport.binding["run_id"],require_ready=False,allow_terminating=True)
                 if stopped:
                     if "BASELINE_API_TERMINATION_OBSERVED" not in self.events:self.events.append("BASELINE_API_TERMINATION_OBSERVED")
                     if "candidate" not in self.transports:

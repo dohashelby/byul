@@ -41,6 +41,8 @@ gate는 기준판 Ready 확인 → 기준판 실행 → 기준판 API 종료/부
 
 생성·삭제·배포 변경·rollback은 operator가 수행한다. 후보는 실제 containerID/started_at가 확보된 Running 세대에서 선택한다. 아직 신원이 없는 Pending Pod를 미래 값으로 채워 선택하지 않는다. 교체·restart·종료 대기 실패는 recovery required이며 자동으로 다른 Pod나 최신 revision을 고르지 않는다. API의 terminated/absence 및 Ready는 node-side 작업 종료나 GPU 반납 증명이 아니다. 직접 `guard run`은 선택한 환경의 요청/증거 경로이며 이 전환 조율은 `guard update` 경로의 범위다.
 
+기준판 종료 gate는 정확 소유 세대의 `deletionTimestamp`가 있는 동안 Running 또는 최종 container state의 phase 지연을 기다릴 수 있다. 이 한정 호출은 `require_ready=False, allow_terminating=True`이며 UID·namespace·containerID·imageID·restart·시작 시각과 terminal 시간의 검증을 유지한다. terminal Pod phase 또는 API 부재를 보기 전에는 종료로 표시하거나 후보를 접수하지 않는다. 일반 HTTP/Ready 검증에는 이 허용을 적용하지 않는다.
+
 `prepare-update`는 이 경로에서 Docker daemon을 요구하거나 시작하지 않고 정적 target/ENV/정책/프로파일을 확인한다. 실제 cluster·readiness·worker/GPU를 검증했다고 표시하지 않는다. 같은 이미지 두 개로 하는 CPU 전환 회귀는 두 이미지 업데이트 실증이 아니며 기존 image-pair 준비 gate를 유지한다.
 
 ## 오류·누락·정리

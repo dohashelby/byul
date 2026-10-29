@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-10-29 · 순차 전환의 기준판 종료 대기만 require_ready=False/allow_terminating=True로 정확 소유 세대의 삭제 진행을 기다리고, terminal phase/부재를 보기 전에는 종료로 표시하지 않는다. · 정상 grace period와 교체/restart를 구분하면서 일반 HTTP/Ready/실증/worker-GPU 반납 관문을 유지하기 위함이다.
+
 - 2026-10-29 · bootstrap 임시 접근 회수는 정확 소유 Ingress 타입/selector·UID/run을 확인한 뒤 API의 생략된 빈 ingress를 빈 목록과 같이 처리하고 실제 차단 대조를 별도로 수행한다. · Kubernetes의 빈 필드 직렬화 차이를 회수 실패로 오인하지 않으면서 null·남은 규칙·대상 변경은 승인하지 않기 위함이다.
 
 - 2026-10-29 · A-2 inventory 안정성04353f4는 확정 전용3파일 bytes로 통합하고 stat/fstat 각 관측원의 안정성과 실제 열린 파일 신원을 구분한다. · 기존 모델 준비 제품 경로를 유지하며 metadata 변경 미관측을 불변 bytes·worker 소비·보안 완료로 확대하지 않기 위함이다.

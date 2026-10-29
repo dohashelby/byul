@@ -90,7 +90,7 @@ async def invoke(world,rid,*,protocol='h11_impl',failure=None,paused=True):
     before=len(world.observer.recorded);await cycle.run_asgi(world.base.Middleware(app))
     cls=module.H11Protocol;parent=object.__new__(cls);parent.__dict__.update(connections=set(),logger=logging.getLogger('owned-example'),cycle=cycle,
         conn=conn,flow=flow,transport=transport,timeout_keep_alive_task=None)
-    parent.connection_lost(None)
+    parent.client=('127.0.0.1',1);parent.connection_lost(None)
     return world.observer.recorded[before:]
 
 

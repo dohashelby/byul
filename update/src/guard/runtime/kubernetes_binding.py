@@ -70,6 +70,61 @@ def verify_owned_pod(pod, namespace, expected, run_id, *, require_ready=True, te
         "restart_count":state["restartCount"], "started_at":lifecycle["startedAt"]}
 
 
+def project_owned_snapshot(pod, namespace, expected, run_id, *, require_ready=True):
+    """Existing in-memory {pod, namespace} input, restricted to identity/mount facts.
+
+    Verify the original API objects before projecting. This is not an export
+    schema or node-side image proof. Callers must not persist this input: model
+    host paths remain transient declarations for the existing A-2 consumer.
+    """
+    if (pod.get("kind") != "Pod" or namespace.get("kind") != "Namespace"
+            or namespace["metadata"].get("name") != expected["namespace"]):
+        raise ValueError
+    verify_owned_pod(pod, namespace["metadata"], expected, run_id, require_ready=require_ready)
+
+    def fields(value, names):
+        if type(value) is not dict:
+            raise ValueError
+        return {key: deepcopy(value[key]) for key in names if key in value}
+
+    def rows(value, names):
+        if type(value) is not list:
+            raise ValueError
+        return [fields(row, names) for row in value]
+
+    container, = [row for row in pod["spec"]["containers"] if row["name"] == expected["container"]]
+    selected = fields(container, ("name", "image"))
+    if "volumeMounts" in container:
+        selected["volumeMounts"] = rows(container["volumeMounts"],
+            ("name", "mountPath", "readOnly", "subPath", "subPathExpr", "mountPropagation"))
+    spec = fields(pod["spec"], ("nodeName", "hostNetwork", "hostPID", "hostIPC"))
+    spec["containers"] = [selected]
+    if "volumes" in pod["spec"]:
+        volumes = pod["spec"]["volumes"]
+        if type(volumes) is not list:
+            raise ValueError
+        spec["volumes"] = []
+        for volume in volumes:
+            row = fields(volume, ("name",))
+            if "hostPath" in volume:
+                row["hostPath"] = fields(volume["hostPath"], ("path", "type"))
+            spec["volumes"].append(row)
+    state, = [row for row in pod["status"]["containerStatuses"] if row["name"] == expected["container"]]
+    selected_state = fields(state, ("name", "containerID", "imageID", "restartCount", "ready"))
+    selected_state["state"] = {"running": fields(state["state"]["running"], ("startedAt",))}
+    status = fields(pod["status"], ("phase", "podIP"))
+    status["containerStatuses"] = [selected_state]
+    conditions = pod["status"].get("conditions", [])
+    if type(conditions) is not list or any(type(row) is not dict for row in conditions):
+        raise ValueError
+    status["conditions"] = rows([row for row in conditions if row.get("type") == "Ready"], ("type", "status"))
+    metadata = fields(pod["metadata"], ("name", "namespace", "uid", "deletionTimestamp"))
+    metadata["labels"] = {"guard.run": pod["metadata"]["labels"]["guard.run"]}
+    return {"pod": {"kind": "Pod", "metadata": metadata, "spec": spec, "status": status},
+            "namespace": {"kind": "Namespace", "metadata": fields(namespace["metadata"],
+                ("name", "uid", "deletionTimestamp"))}}
+
+
 def validate_capture_target(target, env):
     try:
         if (type(target) is not dict or set(target) != {"schema","run_id","environment_ref","lab","kubernetes"}

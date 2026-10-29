@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.bounded import capture_pipes
-from guard.runtime.kubernetes_binding import validate_capture_target, verify_owned_pod
+from guard.runtime.kubernetes_binding import validate_capture_target, verify_owned_pod, project_owned_snapshot
 from .owned_capture import _FILE_READER, MAX_BYTES, strict_json, validate_file_result, validate_owned_source
 from .lifecycle_capture import CONTEXT_READER
 from .lifecycle_session import INVENTORY_READER
@@ -74,7 +74,7 @@ class KubernetesLifecycleReader:
             raise KubernetesCaptureError() from None
 
     def snapshot(self,timeout=5):
-        """Transient kind/name/transport-checked Pod/Namespace; never written raw."""
+        """Transient verified identity/mount projection; never a raw API object."""
         deadline=time.monotonic()+timeout;expected=self.binding["engine"]
         try:
             namespace=strict_json(self._request(["get","namespace",expected["namespace"],"-o","json"],
@@ -84,8 +84,7 @@ class KubernetesLifecycleReader:
             pod=strict_json(self._request([f"--namespace={expected['namespace']}","get","pod",expected["pod"],"-o","json"],
                 deadline=deadline,cap=262144),limit=262144)
             if pod.get("kind")!="Pod":raise KubernetesCaptureError()
-            verify_owned_pod(pod,namespace["metadata"],expected,self.binding["run_id"],require_ready=False)
-            return {"pod":pod,"namespace":namespace}
+            return project_owned_snapshot(pod,namespace,expected,self.binding["run_id"],require_ready=False)
         except Exception:
             self.gap=True
             raise KubernetesCaptureError() from None

@@ -25,7 +25,7 @@ PROFILE = "kubernetes-owned-sampling-http-v1"
 REQUEST_BINDING_PROFILE = "kubernetes-owned-request-binding-http-v1"
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
-                                 validate_container_binding, verify_owned_pod)
+                                 validate_container_binding, verify_owned_pod, project_owned_snapshot)
 
 
 BINDING_PROBE_SHA256 = "6ffd129cd855170a1a2fefb496efef4abfcfd7928d2dc6795c22344bd152a765"
@@ -122,7 +122,7 @@ class KubernetesHTTP:
                 "watchdog=threading.Timer(limit,lambda:os._exit(124))\nwatchdog.daemon=True\nwatchdog.start()\n"
                 + "exec(compile("+repr(probe_source)+",'guard-stream-probe','exec'),{'__name__':'__main__'})\n")
             self.source_sha256=sha256_hex(self.source.encode())
-        self.model_snapshots = []  # Transient raw pair for an explicit A-2 mapping only.
+        self.model_snapshots = []  # Transient allowlisted pair for the existing A-2 consumer.
         self.rows = []
         self.failed = False
         self.cleanup_errors = []
@@ -175,7 +175,9 @@ class KubernetesHTTP:
                 raise KubernetesBindingError() from None
 
         if mapped:
-            snapshot={"pod":pods["engine"],"namespace":next(x for x in items if x["metadata"]["name"]==self.binding["engine"]["namespace"])}
+            snapshot=project_owned_snapshot(pods["engine"],
+                next(x for x in items if x["metadata"]["name"]==self.binding["engine"]["namespace"]),
+                self.binding["engine"],self.binding["run_id"],require_ready=require_ready)
             self.model_snapshots=([self.model_snapshots[0],snapshot] if self.model_snapshots else [snapshot])
         return pods
 

@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-10-29 · 공동 base는 c9af729로 고정하고 A-1은 기존 Kubernetes 내부 snapshot 형태에서 검증된 소유 신원·mount 선언만 깊은 복사로 전달한다. · A-2의 기존 소비 의미와 lab/신뢰 gate를 보존하며 Pod API imageID를 node runtime·RepoDigest·manifest 계보 증명으로 승격하지 않기 위함이다.
+
 - 2026-10-28: 공동 기준선은 main4af4d31·원문91e84c7에 기존 PR34 UPDATE 보수를 보존하고 PACK31/DRAFT로 구성하며, CheckDef는 두 계보의 최고 revision부터 최소 증가한다. 과거 팩·Ref는 고정 보존하고 A-1만 공통 파일·팩을 작성해 A-2 전용 구현과 충돌을 줄인다.
 
 - 2026-10-27 · REQ-04는 기존 native/ASGI·소유 세션 경계에서 실제 helper 반환과 InputProcessor 필드를 관측하며 헤더 없는 호출도 별도 invocation으로 보존하고 profile5의 source23·지점·자산 bytes를 고정해 읽는다. · 운영 선택값·클라이언트 ID를 신뢰 신원/최종 worker 소비/기업 인가로 승격하지 않고 과거 기록의 의미를 보존하기 위함이다.

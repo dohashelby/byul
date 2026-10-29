@@ -1,3 +1,10 @@
+## 2026-10-29 — A-1 c9af729 공통 정제 snapshot 소비 경계
+
+- 한 일: 공동 base c9af729를 별도 A-1 worktree로 보존 분리했다. A-2 SUP04 공통 입력 요청에 맞춰 기존 verify_owned_pod 뒤 신원·mount 선언만 깊은 복사로 전달하고 KubernetesHTTP.model_snapshots·KubernetesLifecycleReader.snapshot의 기존 A-2 분석 소비 경로에 연결한다. 내부 {pod, namespace}와 A1-kubernetes-req11/1·model mapping/1·기존 lab gate를 유지한다. REQ11 전송 실행기는0.1.5이며 요청/판정/stream 소스와 A-2/B 전용 파일은 유지한다.
+- 테스트 결과: 1076파일 고정 영향 회귀373통과·기존skip1/제외1·신규시험 setup오류2(pytest53.29초/부모54.737초) 뒤 신규시험의 누락 fixture import만 보완했다. 제품/기대값을 유지한 직접·같은 소비계약·불변식217통과·기존skip1/제외1(10.73/12.159초), 소스·wheel·격리설치155파일 일치(설치검증 부모15.277초)를 확인했다. 각 검증 중 bytes 불변이며 결과 문서만 갱신했다. 정확 HEAD 기본 suite·플랫폼/공용계약·Docker stub CI는 별도 인계로 확인한다. 기존 CPU 연결 결과를 새 실제 Kubernetes/GPU 결과로 집계하지 않는다.
+- 다음 단계: 고정 source 영향 검증 → 실패 수정·재고정·재검증 → commit/push·초안 PR·정확 HEAD CI·A-2 인터페이스 인계 → 새 확정 전달물의 공통 소비 연결을 이어간다.
+- 막힌 것: 실제 AWS 현재 상태는 Windows 브라우저 URL 확인 제한으로 재확인하지 못했다. 과거 전용 SSM 관리 권한 승인 대기를 새 승인으로 간주하지 않으며 자원 생성/변경/Stop0이다. node containerd 이미지 관계 생산자·실제 worker/GPU·기업 Gateway/모델 허용표는 미준비다. SUP04의 POST /v1/completions와 REQ11 지원 범위를 자동으로 합치지 않는다. 정제 입력 계약은 docs/KUBERNETES_SNAPSHOT_BOUNDARY.md를 따른다.
+
 ## 2026-10-28 — A-1 순차 Kubernetes 전환의 지연 후보 결합
 
 - 한 일: 검증된 모델 준비 통합ef75639를 별도 worktree로 보존 분리했다. 기존 prebound 계약을 유지하면서 명시 after_baseline 모드에서 기준판 API 종료 후 새 경로의 기존 candidate target 입력을 기다리고 exact ENV/세대/Ready를 확인한다. 선택 target의 정규 SHA를 공통 registry→실행기에 전달해 선택 이후 파일 교체를 요청 전 거부한다. API 전환 대기 한도를 기준판 요청 시간과 분리하며 stream 계산은 유지한다.

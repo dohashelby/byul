@@ -21,3 +21,5 @@ HTTP/record 부모 정리 오류가 남으면 실행도 ABORTED로 기록한다.
 선택된 관리·승인·공급물 소비·배포 사건은 실제 독립 발생원과 생성·전달·보존 계약이 준비되지 않으면 missing에 남는다. 이 기능만으로 전체 OBS01 두분기나 부모A를 완료 처리하지 않는다. 재개에는 실제 trusted Gateway principal/감사 생산자와 정확 ENV/source/image/정책·정상/위반/누락/교체/복구 절차가 필요하다. 기존GPU창 만료·추가Start0·마지막확인stopped·기존 비용·CI결제차단은 유지한다.
 
 구현·시험·문서 초안을 마친 뒤 고정 checkpoint와 검토된 전체 소비 pin을 만든다. 직접/인접/불변식·동일 bytes Linux·183 이상 설치본 CLI/6Ref 왕복의 실제 결과와 지원 범위는 최종 고정 인계에 기록한다. CPU/EXAMPLE과 새 실제 배포·worker/GPU 실증은 구분한다.
+
+검증 마감: guard checkpoint3ae7cc2c979195c9c55cec4aba0e213f1a78e842·정확 시험 소스0ac92da729310aebc959a4ea7dc0ef38e8248c49. Windows 첫930통과/새실패1/기존skip1·제외1(319.74/320.513초)을 보존하고 cleanup 실행상태·정상대조 의미를 보수했다. Windows 보수197통과/기존skip1·제외1(71.56/72.26초),동일1197bytes Linux영향932통과/제외1(101.67/101.983초),source/wheel/격리설치186파일 일치와 설치본CLI4 각정확6Ref 반출/복원·재판정(8.192초)을 확인했다. 새skip/제외나 검증중소스변경은 없다. 모든 결과는 CPU/EXAMPLE이며 실제 감사생산자·주체·승인·배포·worker/GPU 실증은 별도다. 이전전체6942는당시native10판본 근거로유지하고이번변하지않은전체시험은반복하지않았다.

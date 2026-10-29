@@ -18,6 +18,8 @@ HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 BASE_SHA='c9af729cd1893eda14d0bb222a8fab46c2a6d7b8'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock','update/pyproject.toml','update/reference/framework')
 BUILDER_SHA256='cf92c4c32588314f83a637523785e0ebb5e6dd6bbab50954fa1a24c2f86e39bb'
+MAX_EVENTS=128
+MAX_WRAPPER_ARGS=32
 TEMPLATE_SHA256='38110f6e668d55f240ecfde0d38f5fecc7c11a742d76823ffd9d0918abb9fe36'
 
 
@@ -55,6 +57,31 @@ def _post(root,own,callback,*,component=True):
     except Exception as error:return {'status':'unavailable','error_type':type(error).__name__}
 
 
+
+def _snapshot_arguments(point,values):
+    """Normalize only bounded builtin wrapper containers, never descriptors."""
+    kwargs={k:values[k] for k in ('conversation','messages','chat_template') if k in values}
+    if point!='tokenizer.apply_chat_template':return (),kwargs
+    wrapped_args=values.get('args',())
+    wrapped_kwargs=values.get('kwargs',{})
+    if type(wrapped_args) is not tuple or len(wrapped_args)>MAX_WRAPPER_ARGS or type(wrapped_kwargs) is not dict or len(wrapped_kwargs)>MAX_WRAPPER_ARGS:
+        return (),{}
+    for key in ('conversation','messages','chat_template'):
+        if key in wrapped_kwargs:kwargs[key]=wrapped_kwargs[key]
+    # Method callback convention includes actual self before public positional args.
+    return (values.get('self'),*wrapped_args),kwargs
+
+
+def _retain_event(row,snapshot):
+    if len(row['snapshots'])>=MAX_EVENTS:
+        gaps=row.setdefault('observation_gaps',[])
+        if 'event_limit_exceeded' not in gaps:gaps.append('event_limit_exceeded')
+        row['dropped_event_count']=row.get('dropped_event_count',0)+1
+        return False
+    row['snapshots'].append(snapshot)
+    return True
+
+
 def _run_actual(root,workdir,record,*,component=True):
     # Direct boundary use still pins source and producer bytes; only the formal component is pending root freeze.
     _verify_source(root)
@@ -87,7 +114,7 @@ def _run_actual(root,workdir,record,*,component=True):
             record['results'].append(row)
             pre=_post(root,record['own_producer_sha256'],record['native_callback_sha256'],component=component)
             if pre['status']!='verified':row['source_validation']['pre']='unavailable';row['source_validation']['post']=pre;continue
-            bindings={};events=[]
+            bindings={};events=row['snapshots']
             def observe(frame,event,arg):
                 selected=codes.get(frame.f_code)
                 if selected is None:return trace
@@ -101,7 +128,9 @@ def _run_actual(root,workdir,record,*,component=True):
                         parent=parent.f_back
                     bindings[id(frame)]=binding
                 phase={'call':'CALL','return':'RETURN','exception':'RAISE'}.get(event)
-                if phase and len(events)<128:
+                if phase and len(events)>=MAX_EVENTS:
+                    _retain_event(row,None)
+                elif phase:
                     values=frame.f_locals
                     if point.endswith('.is_safe_attribute'):
                         args=(values.get('self'),values.get('obj'),values.get('attr'),values.get('value'));context='unavailable';ancestor=frame.f_back
@@ -111,8 +140,8 @@ def _run_actual(root,workdir,record,*,component=True):
                             if ancestor.f_code.co_filename=='<template>':context='template_runtime'
                             ancestor=ancestor.f_back
                         kwargs={'evaluation_context':context}
-                    else:args=();kwargs={k:values[k] for k in ('conversation','messages','chat_template') if k in values}
-                    events.append(native.snapshot_template_boundary(point,args,kwargs,phase=phase,result=arg if event=='return' else None,exception=arg[1] if event=='exception' else None,binding=bindings.get(id(frame))))
+                    else:args,kwargs=_snapshot_arguments(point,values)
+                    _retain_event(row,native.snapshot_template_boundary(point,args,kwargs,phase=phase,result=arg if event=='return' else None,exception=arg[1] if event=='exception' else None,binding=bindings.get(id(frame))))
                 if event=='return':bindings.pop(id(frame),None)
                 return trace
             def trace(frame,event,arg):
@@ -151,7 +180,7 @@ def capture_template_cpu(source_root,workdir,*,source_profile='target031'):
     try:_run_actual(root,workdir,record)
     except Exception as error:record['error_type']=type(error).__name__
     record['capture_finished_at']=datetime.now(timezone.utc).isoformat();record['source_validation']['post']=_post(root,record['own_producer_sha256'],record['native_callback_sha256'])
-    record['capture_status']='completed' if len(record['results'])==3 and all(r['source_validation']['post']['status']=='verified' and r['snapshots'] and 'observer_error_type' not in r for r in record['results']) and record['source_validation']['post']['status']=='verified' and 'error_type' not in record and 'shutdown_error_type' not in record else 'incomplete'
+    record['capture_status']='completed' if len(record['results'])==3 and all(r['source_validation']['post']['status']=='verified' and r['snapshots'] and 'observer_error_type' not in r and not r.get('observation_gaps') for r in record['results']) and record['source_validation']['post']['status']=='verified' and 'error_type' not in record and 'shutdown_error_type' not in record else 'incomplete'
     record['auxiliary_write']={'status':'completed'}
     try:(workdir/'result.json').write_text(json.dumps(record,indent=2))
     except Exception as error:record.update(capture_status='incomplete',auxiliary_write={'status':'failed','error_type':type(error).__name__})

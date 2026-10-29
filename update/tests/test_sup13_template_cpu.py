@@ -58,3 +58,40 @@ def test_auxiliary_failure_keeps_facts(tmp_path,boundary,monkeypatch):
     r=c.capture_template_cpu(tmp_path,tmp_path/'work')
     assert r['capture_status']=='incomplete' and r['auxiliary_write']['status']=='failed'
     assert len(r['results'])==3
+
+
+def test_event_overflow_is_incomplete_and_preserves_known_observations(tmp_path,boundary,monkeypatch):
+    def run(root,workdir,record):
+        rows(record)
+        challenge=record['results'][1]
+        for _ in range(c.MAX_EVENTS):c._retain_event(challenge,{'status':'collected'})
+    monkeypatch.setattr(c,'_run_actual',run)
+    r=c.capture_template_cpu(tmp_path,tmp_path/'work')
+    challenge=r['results'][1]
+    assert r['capture_status']=='incomplete' and len(challenge['snapshots'])==c.MAX_EVENTS
+    assert challenge['observation_gaps']==['event_limit_exceeded'] and challenge['dropped_event_count']==1
+    assert challenge['snapshots'][0]['metadata']['attribute_allowed'] is True
+    assert len(r['results'])==3
+
+
+@pytest.mark.parametrize('phase',['CALL','RETURN'])
+@pytest.mark.parametrize('positional',[False,True])
+def test_actual_wrapper_arguments_reach_snapshot(phase,positional):
+    messages=c.native.CHALLENGE;template='PRIVATE_TEMPLATE'
+    values={'self':object(),'args':(messages,) if positional else (),
+        'kwargs':{'chat_template':template,**({} if positional else {'conversation':messages})}}
+    args,kwargs=c._snapshot_arguments('tokenizer.apply_chat_template',values)
+    s=c.native.snapshot_template_boundary('tokenizer.apply_chat_template',args,kwargs,phase=phase,result='PRIVATE_RENDER')
+    assert s['metadata']['messages_sha256']==c.native.digest(messages)
+    assert s['metadata']['messages_case']=='challenge' and s['metadata']['template']==c.native._text(template)
+    assert 'PRIVATE' not in json.dumps(s)
+
+
+@pytest.mark.parametrize('bad',[object(),iter(())])
+def test_wrapper_unknown_containers_are_not_inspected(bad):
+    args,kwargs=c._snapshot_arguments('tokenizer.apply_chat_template',{'args':bad,'kwargs':{}})
+    assert args==() and kwargs=={}
+
+
+def test_oversized_wrapper_mapping_is_unavailable():
+    assert c._snapshot_arguments('tokenizer.apply_chat_template',{'args':(),'kwargs':dict.fromkeys(range(33))})==((),{})

@@ -55,3 +55,11 @@ def test_attribute_evaluation_phase_preserves_actual_context(context):
     value=n.snapshot_template_boundary('SandboxedEnvironment.is_safe_attribute',(object(),1,'__class__',int),{'evaluation_context':context},phase='RETURN',result=False)
     assert value['metadata']['evaluation_context']==context
     assert value['metadata']['attribute_result_status']=='collected'
+
+
+@pytest.mark.parametrize('phase',['CALL','RETURN'])
+def test_selected_tokenizer_positional_template_signature(phase):
+    value=n.snapshot_template_boundary('tokenizer.apply_chat_template',(object(),n.NORMAL,None,None,'PRIVATE_TEMPLATE'),{},phase=phase,result='PRIVATE_RENDER')
+    assert value['metadata']['messages_case']=='normal'
+    assert value['metadata']['template']==n._text('PRIVATE_TEMPLATE')
+    assert 'PRIVATE' not in json.dumps(value)

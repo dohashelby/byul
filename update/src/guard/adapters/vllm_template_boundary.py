@@ -34,7 +34,7 @@ def snapshot_template_boundary(point,args,kwargs,*,phase,result=None,exception=N
         'status':'unavailable','metadata':{},'binding':{}}
     try:
         if out['point']=='unsupported' or out['phase']=='unsupported':return out
-        if type(args) not in (list,tuple) or type(kwargs) is not dict:return out
+        if type(args) not in (list,tuple) or len(args)>33 or type(kwargs) is not dict or len(kwargs)>32:return out
         if type(binding) is dict:
             out['binding']={k:v for k,v in binding.items() if k in ('asgi_request_id_sha256','native_request_id_sha256','call_id_sha256','session_id_sha256','process_start_sha256','parent_call_id_sha256','invocation_id_sha256') and type(v) is str and len(v)==64 and all(c in '0123456789abcdef' for c in v)}
             if type(binding.get('pid')) is int and 0<binding['pid']<2**63:out['binding']['pid']=binding['pid']
@@ -53,12 +53,15 @@ def snapshot_template_boundary(point,args,kwargs,*,phase,result=None,exception=N
             # Only explicit builtin containers are inspected. Never consume an iterator.
             conversation=kwargs.get('conversation',kwargs.get('messages'))
             if conversation is None and point=='safe_apply_chat_template' and len(args)>2:conversation=args[2]
+            if conversation is None and point=='tokenizer.apply_chat_template' and len(args)>1:conversation=args[1]
             if type(conversation) in (list,tuple) and len(conversation)==1 and type(conversation[0]) is dict:
                 m=conversation[0]
                 if set(m)=={'role','content'} and type(m['role']) is str and type(m['content']) is str and len(m['content'])<=MAX_TEXT:
                     msgs=[{'role':m['role'],'content':m['content']}]
                     data.update(messages_sha256=digest(msgs),messages_case='normal' if msgs==NORMAL else 'challenge' if msgs==CHALLENGE else 'other')
             template=kwargs.get('chat_template')
+            # Selected Transformers public signature: conversation, tools, documents, chat_template.
+            if template is None and point=='tokenizer.apply_chat_template' and len(args)>4:template=args[4]
             data['template']=_text(template)
             if phase=='RETURN':
                 data['result_summary']=_summary(result)

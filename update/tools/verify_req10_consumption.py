@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed REQ02 product checkpoint: only registry, reader initialization reuse,
-# and the closed declared route-record executor changed in the pinned scope.
+# Reviewed REQ13 checkpoint: REQ02 is retained and only the explicit closed
+# validation-error profile extends the common HTTP source in this bundle.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='213b4868c68bb6373fd489a840228ba1b177f160'
+REVIEWED_COMMON_COMMIT='728d974197c41220a3f99214076826b234e2f8f9'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

@@ -1431,3 +1431,5 @@ git status
 - 테스트 결과: A2의기존142/설치CLI6/36Ref는그고정원본판본근거로보존한다. 새통합소스는별도영향/설치검증전이며이번기록을새CPU수집/실제환경실증으로소급하지않는다. Source고정후직접/인접/불변식·동일bytes Linux·설치/정확Ref를확인한다.
 - 다음 단계: 변화가있는오류단계/독립FAIL보존과고정sourcepin을검증하고확정커밋/원본bytes/지원범위를인계한다. 현재없는Kubernetes IPC공개계약은별도actor-probe/realworker·UID/groups/PID/start/ns·socket세대·정상응답·시간출력/오류범위를고정해야하며제안서를현재지원으로올리지않는다.
 - 막힌 것: 실제worker/message소비·Kubernetes IPC transport·동일UID비승인process·SHM/TCP/TP·전체IPC인벤토리/부모A는미완료다. 기존원래GPU창종료·추가Start0·마지막확인stopped·새시간/비용미승인·CI결제차단을유지한다.
+
+- 통합검증 마감: 정확fa9ee19/검토pin4693f1d에서Windows260통과·기존skip1/제외1(31.53/32.156초),동일1199bytes Linux261통과·제외1(22.21/22.677초),source/wheel/격리설치186파일일치·기존CLI6/36Ref왕복(12.476초)을확인했다. 실제소유Linux임시socket2개에서각수신payload0bytes·SO_PEERCRED/첫path안정·둘째metadata불명·소유임시정리를확인했다. 이는EXAMPLE프로토콜검증이며새serving/worker/Kubernetes/GPU실증이아니다. A2원본4파일/과거팩Ref와source를보존하고검증중변경·새제외없이결과문서만갱신한다.

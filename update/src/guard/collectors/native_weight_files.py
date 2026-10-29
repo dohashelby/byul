@@ -7,10 +7,11 @@ from pathlib import Path, PurePosixPath
 import re
 
 from guard.adapters import vllm_lifecycle_profiles as profiles
+from guard.adapters import vllm_lifecycle_sensor as legacy_sensor, vllm_online_sensor as online_sensor
 from guard.collectors.file import load_environment
 from guard.collectors.lifecycle import load_prepared
 from guard.collectors.model_manifest import _load_manifest
-from guard.executors.lifecycle_capture import parse_recording, canonical_row, _safe
+from guard.executors.lifecycle_capture import parse_recording, canonical_row
 from guard.executors.owned_capture import strict_json, validate_owned_source
 from guard.models import DataOrigin, canonical_json, sha256_hex
 
@@ -75,15 +76,22 @@ def load_inputs(env_path,target_path,prepared_path,context_path,manifest_path,na
             or type(native.get("recordings")) is not list or len(native["recordings"])>32
             or native.get("data_origin") not in {"EXAMPLE","DECLARED","MEASURED"}):
         raise ValueError("WEIGHT_NATIVE_SESSION_INVALID")
+    recording_profile=online_sensor if prepared["profile"]==online_sensor.PROFILE else legacy_sensor
     selections=[];owners={};gap=False
     for index,recording in enumerate(native["recordings"]):
         try:
             capture=recording["capture"]
             if type(capture) is not dict:raise ValueError()
             source_rows=capture["records"]
-            if type(source_rows) is not list or not 1<=len(source_rows)<=512 or any(not _safe(row) for row in source_rows):raise ValueError()
-            pieces=[canonical_row(row) for row in source_rows]
-            if any(len(v)>16384 for v in pieces) or sum(map(len,pieces))>262144:raise ValueError()
+            if type(source_rows) is not list or not 1<=len(source_rows)<=recording_profile.MAX_ROWS:raise ValueError()
+            pieces=[];remaining=recording_profile.MAX_BYTES
+            for row in source_rows:
+                piece=canonical_row(row)
+                if len(piece)>16384 or len(piece)>remaining:raise ValueError()
+                pieces.append(piece);remaining-=len(piece)
+            # The common parser owns profile-specific metadata, provenance and
+            # hash-chain admission. Its default _safe whitelist is not the /9
+            # validator; do not discard valid Online rows before that parser.
             rows,_=parse_recording(b"".join(pieces),prepared)
             owner=capture["provenance"]["owner"]
             if type(owner) is not dict:raise ValueError()

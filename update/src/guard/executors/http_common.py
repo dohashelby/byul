@@ -95,7 +95,8 @@ def request_model(env, target, *, transport=None):
     if (transport is not None and getattr(transport,"profile",None) in {
             "kubernetes-owned-request-binding-http-v1", "kubernetes-owned-routes-http-v1",
             "kubernetes-owned-model-authorization-http-v1", "kubernetes-owned-termination-http-v1", "kubernetes-owned-request-attempts-http-v1",
-            "kubernetes-owned-required-event-http-v1", "kubernetes-owned-observation-state-http-v1"}
+            "kubernetes-owned-required-event-http-v1", "kubernetes-owned-observation-state-http-v1",
+            "kubernetes-owned-forwarded-identity-http-v1"}
             and type(value) is dict and set(value)=={"repository_id","revision","api_model"}
             and value==getattr(transport,"model_mapping",None)):
         return transport.api_model

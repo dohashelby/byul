@@ -1453,3 +1453,10 @@ git status
 - 첫 고정 검증: 1fffcdd/1210파일 불변에서Windows1027통과·새OBS02시험19실패·기존skip1/제외1(316.30/317.231초)을보존했다. 새공개프로필이Ctx의공통최소모델매핑소비목록에누락되어기존3필드매핑을fullschema로오검사한제품누락이다. 동일원인설치CLI실패도보존했다. OBS02정확프로필을기존검증된transport/mapping동일성조건에추가하고변조매핑거부시험을추가하며기존정책/신뢰/기대값은완화하지않는다. 모든검증handle종료후고정source를보수한다.
 
 - 보수·제품 검증 마감: 정확a4aa0e9/guard검토pin01150be에서Windows225통과·기존skip1/제외1(60.38/61.079초),동일1210파일Linux영향1048통과·제외1(107.30/107.842초),source/wheel/격리설치192파일일치와설치CLI4각정확6Ref반출·복원·저장팩재판정(7.874초)을확인했다. Native8과실제10/11hook소비·소유HTTP5요청·정상/실패/누락/교체·후속오류와전축UNKNOWN을검증했다. 첫19실패와설치실패원본을보존했으며기대값/정책/제외완화·검증중소스변경은없다. A2선정12/B원본27/native8~11/stream/IPC bytes와원팩31을보존한다. 실제worker/기업상태의미·profiler/backend·승인/소비사건·실제Kubernetes/GPU와전체OBS02/부모A는미완료다. 결과문서만갱신하고초안PR·정확HEAD CI·인계를마감한다.
+
+## 2026-10-30 — A-1 REQ04 전달 신원 제품
+
+- 한 일: c88a951 기준의4Pod owner/HTTP·고정파일 reader를 재사용해 REQ04 SC01-04의 닫힌 normal-before/alternate/normal-after와 Gateway/engine 정제 기록을 registry/명시 DRAFT 팩/기존 CLI에 연결했다. 같은 자격·정확ENV/target/model/source/policy/session과 call/operation 관계, identity claim/운영 selector를 구분한다.
+- 테스트 결과: 구현·시험·계약 정적 검토 단계다. 소스 고정 후 직접/인접/불변식·동일bytes Linux·설치CLI/정확Ref를 검증한다. 실행 전 통과를 기록하지 않으며 정상/후보/누락·중복·내용교체·restart/후속 수집·첨부·정리 오류를 포함한다.
+- 다음 단계: 고정 소비 pin과 검증·초안PR·정확HEAD CI·인계를 마감하고 다음 준비된 담당개발을 계속한다. 원팩31/다른76정의·A2/B 원본·과거실증을 보존한다.
+- 막힌 것: 실제 trusted issuer/principal·Gateway 정규화/engine 소비 생산자·PID/start·최종권한 정책과 실제 환경/전체REQ04·부모A는 미완료다. normal_control=null·producer/principal/scopefalse·전축UNKNOWN, 원GPU창종료/추가Start0/마지막확인stopped·CI결제차단을 유지한다.

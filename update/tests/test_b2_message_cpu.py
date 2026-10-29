@@ -1,5 +1,6 @@
 """Only our safe result boundary; real source tests run in the isolated CPU tool."""
 import json
+import builtins
 from pathlib import Path
 import subprocess
 import sys
@@ -67,3 +68,55 @@ def test_own_decoder_helper_from_another_checkout_is_rejected(tmp_path, monkeypa
     monkeypatch.setattr(runner, "verify_source", namespace["verify_source"])
     with pytest.raises(ValueError, match="outside the own checkout"):
         runner.verify_own_helper()
+
+
+
+@pytest.mark.parametrize("flags,environment_optimize", [(["-O"], None), (["-OO"], None), ([], "1")])
+@pytest.mark.parametrize("entry", ["run", "load_official_tests"])
+def test_optimized_entry_is_rejected_before_source_or_output(tmp_path, flags, environment_optimize, entry):
+    missing_source = tmp_path / "missing-source"
+    output = tmp_path / "must-not-exist"
+    repo = Path(runner.__file__).resolve().parents[1]
+    env = runner.child_environment(missing_source, repo)
+    env.pop("PYTHONOPTIMIZE", None)
+    if environment_optimize is not None:
+        env["PYTHONOPTIMIZE"] = environment_optimize
+    invocation = (f"message_tool.run(Path({str(missing_source)!r}), Path({str(output)!r}))" if entry == "run"
+                  else f"message_tool.load_official_tests(Path({str(missing_source)!r}), {{}})")
+    script = (
+        "from pathlib import Path\nimport tools.b2_message_cpu as message_tool\ntry:\n " + invocation + "\n"
+        "except ValueError as exc:\n"
+        " if str(exc) != 'normal Python required for official verification assertions': raise\n"
+        " print('OPTIMIZATION_REJECTED')\n"
+        "else: raise RuntimeError('optimized verification was accepted')\n"
+    )
+    result = subprocess.run([sys.executable, *flags, "-c", script], cwd=tmp_path,
+                            env=env, capture_output=True, text=True)
+    assert result.returncode == 0
+    assert result.stdout.strip() == "OPTIMIZATION_REJECTED"
+    assert not missing_source.exists() and not output.exists()
+
+
+def test_selected_definition_assertions_survive_an_optimized_compile_default(tmp_path, monkeypatch):
+    path = tmp_path / "official_tests.py"
+    source = "import unavailable_engine\n"
+    for name in sorted(runner.NAMES):
+        if name in {"CustomClass", "RequestWithTensor"}:
+            source += f"class {name}: pass\n"
+        elif name.startswith("test_"):
+            source += f"def {name}():\n    assert False, 'original assertion'\n"
+        else:
+            source += f"def {name}(): return None\n"
+    path.write_text(source)
+    def compile_with_optimized_default(*args, **kwargs):
+        kwargs.setdefault("optimize", 2)
+        return builtins.compile(*args, **kwargs)
+    monkeypatch.setattr(runner, "compile", compile_with_optimized_default, raising=False)
+    namespace = {}
+    exec(runner.compile_official_definitions(path), namespace)
+    tests = [namespace[name] for name in runner.NAMES if name.startswith("test_")]
+    assert len(tests) == 3
+    for function in tests:
+        assert function.__code__.co_filename == str(path)
+        with pytest.raises(AssertionError, match="original assertion"):
+            function()

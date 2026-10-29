@@ -27,9 +27,9 @@ import됐는지 확인하는 기존 검사도 유지했다.
   macOS의 기존 exact CPU 환경에서 EngineCoreProc를 포함한 실제 target import가 완료됐다.
   설치·환경 변경은 하지 않았다.
 
-원본 결과는 `/private/tmp/byul-codec-message-runner-20261029/run-1/summary.json`에 있다.
+첫 import 충돌 수정의 원본 결과는 `/private/tmp/byul-codec-message-runner-20261029/run-1/summary.json`에 있다.
 `real_target_modules_imported=true`, `official_test_assertions_modified=false`와 고정 source
-metadata를 확인했다. 저장된 tool bytes SHA256과 최종 실행 파일 bytes의 일치도 확인했다.
+metadata를 확인했다. 당시 저장한 tool bytes SHA256은 다음과 같다.
 
 ```text
 082455b44ee990acee4974f446b579aca90a8a025ec9904f5811cca3e7320a5a
@@ -51,3 +51,29 @@ cd /Users/mgprincess/Desktop/BoB/프로젝트/byul-b-codec-runner/update
 raw pytest stdout/stderr는 child 결과의 메모리 안에서만 처리하고 고정 카운터·시간·source
 metadata만 저장한다. 이 수정은 기존 공식 시험 runner의 실행 정확성과 기존 관측의 재사용을
 마감하며 제품 serialization 구현·공용 계약·registry·팩·다른 decoder 도구는 변경하지 않는다.
+
+
+## 최적화 모드의 assertion 제거 차단
+
+추가 검토에서 `PYTHONOPTIMIZE=1`을 child가 상속하면 원문 assertion이 제거돼 잘못된
+성공 카운터가 만들어질 수 있음을 확인했다. `run`과 `load_official_tests`는 source 검증보다
+먼저 `sys.flags.optimize`를 검사해 고정 ValueError로 거부한다. 선택 AST는 기존 NAMES와
+원문 assertion을 유지하고 `optimize=0`으로 명시 컴파일한다.
+
+최종 전용 회귀는 **19 passed / pytest 2.34초 / 부모 wall 2.92초**다.
+실제 subprocess의 `-O`·`-OO`·`PYTHONOPTIMIZE=1` 각각에서 두 진입점이 없는 source를
+검증·실행하기 전에 고정 오류로 거부하고 output을 만들지 않는지 확인했다. 컴파일 기본값을
+2로 둔 합성 선택 정의에서도 세 시험의 `assert False`가 모두 AssertionError를 내는지 확인했다.
+기존 성공 3건 조건·실패/skip 보존·stdout privacy 회귀도 유지했다.
+
+새 tool bytes로 원문 공식 CPU 시험을 한 번 재실행했다.
+**3 passed / failed=0 / error=0 / skipped=0 / pytest 7.8064초 / 부모 wall 9.15초**다.
+원본은 `/private/tmp/byul-codec-message-runner-20261029/run-2/summary.json`이며,
+실행 파일 bytes가 아래 기록 SHA256과 같은지 확인했다.
+
+```text
+1bfba2cb86e802a034cc2132298db2f98ef806f07cdab17006e1163e31d65d85
+```
+
+source·기존 151개 CPU 환경·원문 공식 시험 assertion은 변경하지 않았다.
+이번 재실행은 새 output `run-2`를 사용했고 다른 typed decoder 검증은 재사용했다.

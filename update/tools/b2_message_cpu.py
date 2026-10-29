@@ -61,7 +61,19 @@ def verify_own_helper():
         raise ValueError("imported decoder helper is outside the own checkout")
 
 
+def compile_official_definitions(path):
+    tree = ast.parse(path.read_bytes(), filename=str(path))
+    nodes = [node for node in tree.body if isinstance(node, (ast.ClassDef, ast.FunctionDef)) and node.name in NAMES]
+    if {node.name for node in nodes} != NAMES:
+        raise ValueError("official test definition inventory mismatch")
+    tree.body = [ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), *nodes]
+    ast.fix_missing_locations(tree)
+    return compile(tree, str(path), "exec", optimize=0)
+
+
 def load_official_tests(root, namespace):
+    if sys.flags.optimize:
+        raise ValueError("normal Python required for official verification assertions")
     verify_own_helper()
     verify_source(root)
     import pytest
@@ -77,19 +89,15 @@ def load_official_tests(root, namespace):
         if not Path(inspect.getfile(obj)).resolve().is_relative_to(root / "vllm"):
             raise ValueError("imported target source is outside the pinned checkout")
     path = root / "tests/v1/test_serial_utils.py"
-    tree = ast.parse(path.read_bytes(), filename=str(path))
-    nodes = [node for node in tree.body if isinstance(node, (ast.ClassDef, ast.FunctionDef)) and node.name in NAMES]
-    if {node.name for node in nodes} != NAMES:
-        raise ValueError("official test definition inventory mismatch")
-    tree.body = [ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), *nodes]
-    ast.fix_missing_locations(tree)
     namespace.update(torch=torch, pytest=pytest, dataclass=dataclass,
                      MsgpackEncoder=MsgpackEncoder, MsgpackDecoder=MsgpackDecoder)
     # Keep pytest's harness identity; code objects retain upstream locations.
-    exec(compile(tree, str(path), "exec"), namespace)
+    exec(compile_official_definitions(path), namespace)
 
 
 def run(root, output):
+    if sys.flags.optimize:
+        raise ValueError("normal Python required for official verification assertions")
     verify_own_helper()
     pin = verify_source(root)
     output.mkdir(parents=True, exist_ok=False)

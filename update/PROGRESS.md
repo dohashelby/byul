@@ -1589,3 +1589,5 @@ git status
 # 2026-10-30 A1 A2 native16 전용 소비 통합 착수
 
 - A2 PR140/9bda8b3 세 원본 파일을 bytes 그대로 소비하고 기존 OBS02 native16 공통 사건 뒤 전용 선택/진행 후보를 연결한다. 원 native16 metadata와 pin을 복원하고 native17은 명시적 별도 공통 투영으로 기존 FD/read 기능을 유지한다. 정상/누락/다른귀속/부분/후기consumer·수집·첨부 오류 및 정확Ref를 선정했으며 검증 전 초안이다. 실제SUP05/06·worker/tensor/권한·전체분기완료를 주장하지 않는다.
+
+- A2 native16 확정9bda8b3 세파일의원bytes와f8ced901/e7494eda 원pin을보존한 정식OBS02 소비를source9997936/pin1dab9b2에서검증했다. 직접각19·인접각90/동일1370불변, 원A2단위24는변경없는원본근거재사용. 설치252/A2native16 CLI4·정확24Ref와native17 인접CLI4·정확24Ref를각각확인, 전체공통360/제외0. 초기양쪽3실패는loader없는fixture와부모gap재계산을보수했고 loader없는음성대조·consumer오류/ABORTED·기존공통사실보존을추가했다. 실제SUP05/06/worker/tensor/권한/전체Goal 완료는아니다.

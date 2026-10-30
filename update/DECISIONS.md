@@ -625,3 +625,5 @@ native17은 기존 OBS02 제품의 별도 명시적 공통 profile이다. 사전
 native17 ctime은 고정 runtime/API별 기준을 함께 저장한다. Windows path stat의생성시각과 FD fstat의변경시각은 숫자가일치해도같은증거로인정하지않는다. 모든metadata비교를유지하고 FD read buffer/범위/참조bytes관측과승인권한을분리한다. 공개prepare/기존OBS02 CLI의소비위치와정확Ref 검증을마감하되 actual C safe_open/tensor/worker/authority·A2전용분석을 별도미완료로남긴다.
 
 A2 native16 소비기의 source pin을 현재 읽은hash로승인하거나 전용원본을수정하지않는다. 공개된 native16 metadata 원bytes를유지하고 native17의확장은 별도공통adapter에서닫힌journal을재사용한다. A2 analyze는 기존admitted native16packet만소비하며 예외는정제localgap으로남겨 앞선공통사실·독립FAIL을보존한다.
+
+A2 native16 고정 소비는 원본3파일/source pin을그대로보존하고A1의기존OBS02 연결점·공통기준만갱신한다. native17새투영은원journal을직접재사용하며16로header를바꾸지않는다. 전용consumer오류는부모수집의gap재계산뒤에도정제진단·ABORTED로남기고 기존paired common사실·독립FAIL을삭제하지않는다. 다른실행·loader없는부분사례를같은loader에의귀속으로완화하지않는다.

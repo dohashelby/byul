@@ -8,4 +8,6 @@ A2 SOURCE_PINS의 원래 metadata f8ced901.../sensor e7494eda...를 유지한다
 
 정식 제품 연결과 CPU/설치/정확Ref 검증을 마감한 범위만 인계한다. SUP05/06 정식 등록·실제 file/FD/tensor·worker 역할·승인/검사 신뢰·전체 분기 완료를 뜻하지 않는다. native0.32/source/image/lab gate, B c9 원pin, full snapshot 검토 및 운영 비용·소유권 제한을 유지한다.
 
-상태: source 고정 전 구현·회귀 초안. 검증은 고정 소스에서 실행하며 최초 실패와 보수를 분리해 보존한다.
+상태: 고정 source 9997936a2e038dbfcdd11c1c9399f08b276f4906 / 검토 pin 1dab9b2630ee92761d8a79de54e007d1e2f35ea7의 변경 영향 검증과 설치본 인계 범위를 마감했다.
+
+검증은 직접 Win/Linux각19, 인접각90, 동일1370파일불변이다. A2 원본24시험 통과는 변경 없는 원본 소비기/common source에 대해 첫source5e78dfe에서 재사용한다. 설치252파일 일치, A2 native16 기존CLI4/정확24Ref와 native17 인접CLI4/정확24Ref 반출/복원·저장팩 재판정을 각각 확인했다. 전체 공통소비360/제외0/실행hash자동승인false다. 현재 전체suite나 실제 serving/worker/GPU·전체분기 성공을 뜻하지 않는다.

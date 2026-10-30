@@ -1520,3 +1520,5 @@ git status
 막힌 것: 실제 issuer/cache/event/시간/자격/철회 전 정상/새 연결/전파·원GPU창종료/Start0·CI결제 차단.
 
 - A1 PLT10 선택 자격 관측: 고정15036af Windows234/Linux235, source/wheel/설치225파일, CLI4 정확24Refs, 검토된 전체333소비452fdff. 초기14실패는 소유 ASGI loop 준비 보수; source/native/gate/판정 assert 유지. 실제 issuer 철회/전파·전체PLT10 미완료, 원GPU Start0/CI결제차단 유지.
+
+- A1 PLT11/SC19-02: 원criteria/76bytes 보존 파생팩·기존 CLI/registry와 닫힌 keep-alive5GET/동일 probe socket 및 별도 새 연결/native8 결합 초안. 구현/직접·인접회귀/문서 종료 후 고정·검증 준비이며 미검증·전체분기 미완료. issuer/cache/잔존 정책 질문 대기; source/lab/image/native0.32/원GPU Start0/CI결제차단 유지.

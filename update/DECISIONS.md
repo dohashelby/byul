@@ -592,3 +592,5 @@ native14는 native8~13 bytes를 보존하고 source/code/descriptor 검증 후 �
 
 ## 2026-10-30 A1 PLT10 자격 철회/신규 접근 관측
 NetworkPolicy 회수≠credential issuer 철회. PLT10은 기존 native8과5개 고정GETmodels를 재사용하고 키값/키hash/Authorization·원문 오류를 증거로 남기지 않는다. 선언issuer 사건과 무조건 deny-after 제약을 구분하며 실제 source/process/정상control 결합된 제약 위반만 functional FAIL이고 security/전체scope는UNKNOWN/false다. 후속 오류가 독립FAIL을 지우지 않게 하고 기존8~14/A2/B 원본·source/lab/image/PID 관문·권한/비용을 보존한다.
+
+- A1 PLT11은 새 GET을 기존 session 증명으로 재분류하지 않는다. 첫 범위는 auto_open=0의 동일 probe TCP keep-alive/socket identity 대조이며 실제 앱session/handle·serving receipt·issuer 사건/전파와 분리한다. 명시 unconditional 재사용 금지 제약의 독립 functional FAIL만 소비하고 security/전체scope UNKNOWN을 유지한다. 고정 framing/source gate·키원문/hash 비보존을 유지한다.

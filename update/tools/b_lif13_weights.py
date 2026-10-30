@@ -199,7 +199,7 @@ def _read_fact(value, config):
         'peer_generation_verified_claimed': value.get('peer_generation_verified') is True,
         'daemon_generation_sha256_claimed': value.get('daemon_generation_sha256') if _sha(value.get('daemon_generation_sha256')) else None,
         'status': value.get('status') if value.get('status') in {'read', 'unavailable', 'read_error', 'unsupported_non_cuda',
-            'unsupported_layout', 'unsupported_empty', 'not_attempted'} else 'unavailable'}
+            'unsupported_layout', 'unsupported_empty', 'not_attempted', 'daemon_epoch_changed', 'daemon_epoch_unavailable'} else 'unavailable'}
 
 
 def project(raw, config):
@@ -227,7 +227,9 @@ def project(raw, config):
         relation = ('same' if before['digest_sha256'] == after['digest_sha256'] else 'changed') if comparable else 'unavailable'
         reads.append({'slot': row['slot'], 'baseline': before, 'held_after': after, 'digest_relation': relation,
             'native_measurement_verified': False,
-            'cleanup_claimed': {k: row.get('cleanup', {}).get(k) is True for k in ('references_dropped', 'device_sync_complete')},
+            'cleanup_claimed': {**{k: row.get('cleanup', {}).get(k) is True for k in ('references_dropped', 'device_sync_complete')},
+                'owned_sockets_closed': row.get('cleanup', {}).get('owned_sockets_closed')
+                    if type(row.get('cleanup', {}).get('owned_sockets_closed')) is bool else None},
             'process_cleanup_claimed': {k: row.get('process_cleanup', {}).get(k) is True for k in ('joined', 'forced', 'exit_ok')}})
         follow = row.get('followup_get_state', {}); follow = follow if type(follow) is dict else {}
         followups.append({'slot': row['slot'], 'attempted': follow.get('attempted') is True,

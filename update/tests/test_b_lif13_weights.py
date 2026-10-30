@@ -271,3 +271,29 @@ def test_partial_or_cpu_only_exports_cannot_claim_native_cleanup(case):
     assert not first['baseline']['exports_claimed']['all_received_cuda_rebuilt_claimed']
     assert not second['baseline']['exports_claimed']['cuda_handoff_seen_claimed']
     assert result['cleanup']['exported_counters_reclaimed_verified'] is None
+
+
+@pytest.mark.parametrize('value,expected', [(True, True), (False, False), (None, None), (1, None)])
+def test_owned_socket_cleanup_retains_boolean_or_uncollected(case, value, expected):
+    raw = native_capture(case); raw['consumers'][0]['cleanup']['owned_sockets_closed'] = value
+    result = tool.project(raw, case['config'])
+    assert result['existing_native_references']['consumers'][0]['cleanup_claimed']['owned_sockets_closed'] is expected
+    assert result['existing_native_references']['consumers'][1]['cleanup_claimed']['owned_sockets_closed'] is None
+    assert result['cleanup']['daemon_native_cleanup_verified'] is None
+
+
+@pytest.mark.parametrize('status', ['daemon_epoch_changed', 'daemon_epoch_unavailable'])
+def test_pre_read_epoch_status_survives_without_claiming_cuda_read(case, status):
+    raw = native_capture(case); raw['consumers'][0]['held_after'] = {'collected': False, 'status': status,
+        'peer_generation_verified': False, 'daemon_generation_sha256': None}
+    result = tool.project(raw, case['config']); fact = result['existing_native_references']['consumers'][0]
+    assert fact['held_after']['status'] == status and not fact['held_after']['collected']
+    assert not fact['held_after']['peer_generation_verified_claimed'] and fact['digest_relation'] == 'unavailable'
+
+
+def test_post_read_epoch_failure_preserves_observed_digest_without_promotion(case):
+    raw = native_capture(case); raw['consumers'][0]['held_after'].update(peer_generation_verified=False)
+    result = tool.project(raw, case['config']); held = result['existing_native_references']['consumers'][0]['held_after']
+    assert held['collected'] and held['digest_sha256'] == 'a' * 64 and held['selected_count'] == 1
+    assert not held['peer_generation_verified_claimed']
+    assert not result['existing_native_references']['consumers'][0]['native_measurement_verified']

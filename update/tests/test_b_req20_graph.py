@@ -456,3 +456,23 @@ def test_sampled_copy_completion_does_not_establish_graph_hidden_output_consumpt
     assert result['graph_output_consumption'] == {'collected': False, 'verified': None,
         'sampled_output_is_graph_output_verified': None}
     assert 'LOGITS_SAMPLER_LINEAGE_UNOBSERVED' in result['gaps'] and not result['confirmed_violations']
+
+
+def test_same_call_id_in_independent_worker_generation_does_not_drop_observations(case):
+    raw = capture(case, consumer_rows(case)); other = deepcopy(raw['native_rows'])
+    for row in other:
+        row['binding']['pid'] = 21
+        row['binding']['process_start_sha256'] = tool.digest(200)
+        row['generation_sha256'] = '8' * 64
+    raw['native_rows'].extend(other)
+    result = project(case, raw)
+    assert len(result['graph_contexts']) == 2
+    assert len(result['sampled_output_copy_completion']) == 2
+    assert all(p['event_complete'] is True for p in result['sampled_output_copy_completion'])
+    assert {r['binding']['pid'] for r in result['rows']} == {20, 21}
+    assert result['graph_output_consumption']['verified'] is None
+    # 同じworkerの再読込だけは二重計数しない。
+    raw['native_rows'].extend(deepcopy(raw['native_rows']))
+    repeated = project(case, raw)
+    assert len(repeated['rows']) == len(result['rows'])
+    assert len(repeated['sampled_output_copy_completion']) == 2

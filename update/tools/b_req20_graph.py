@@ -401,7 +401,10 @@ def project(raw, env, target, prepared, manifest):
         snapshot = _safe_snapshot(row)
         if snapshot is None:
             continue
-        b, m = snapshot['binding'], snapshot['metadata']; unique = (b['call_id_sha256'], snapshot['point'], snapshot['phase'])
+        b, m = snapshot['binding'], snapshot['metadata']
+        generation = row.get('generation_sha256') if _sha(row.get('generation_sha256')) else None
+        unique = (generation, b['session_id_sha256'], b['pid'], b['process_start_sha256'],
+            b['native_request_id_sha256'], b['call_id_sha256'], snapshot['point'], snapshot['phase'])
         if unique in seen:
             continue
         seen.add(unique)

@@ -175,3 +175,84 @@ def test_actual_startup_pair_has_no_request_ids_and_stays_unqualified(case):
     assert len(value['method_pairs'])==1 and value['method_pairs'][0]['generation_verified'] is False
     assert value['qualified_rows']==0 and value['ready_send_observed'] is None and value['expected_ranks'] is None and value['rank_coverage_verified'] is None
     assert all(not any(k in r['binding'] for k in ('call_id_sha256','asgi_request_id_sha256','native_request_id_sha256')) for r in value['rows'])
+
+@pytest.mark.parametrize('changed',['manifest','prepared_asset','store'])
+def test_capture_mutation_is_detected_from_pre_capture_baseline_with_safe_facts(case,changed):
+    def backend(*args):
+        value=capture(case)
+        if changed=='manifest':case['args']['manifest'].write_text('{}')
+        elif changed=='prepared_asset':(case['args']['prepared'].parent/'settings.json').write_text('{}')
+        else:
+            extra=case['env'].model_copy(update={'id':new_id('ENV'),'content_sha256':''}).seal();case['source'].put(extra)
+        return value
+    with pytest.raises(tool.EvidencePreservationError) as error:tool.run(**case['args'],execute=True,_example_capture=backend)
+    assert len(error.value.safe_facts['rows'])==2 and error.value.safe_facts['method_pairs']
+    assert 'ORIGINAL_INPUT_CHANGED' in error.value.recovery['issues'] and not error.value.recovery['success']
+    assert not case['args']['output'].exists() and PRIVATE not in json.dumps(error.value.safe_facts)
+
+@pytest.mark.parametrize('kind',['array','duplicate','nonfinite','directory','symlink','oversize','bare_snapshot','binding'])
+def test_import_capture_rejects_unbound_or_unsafe_files_before_store_clone(case,kind):
+    import os
+    p=case['args']['output'].parent/'input.json';value=capture(case)
+    if kind=='array':p.write_text('[]')
+    elif kind=='duplicate':p.write_text('{"schema":1,"schema":2}')
+    elif kind=='nonfinite':p.write_text('{"a":NaN}')
+    elif kind=='directory':p.mkdir()
+    elif kind=='symlink':p.symlink_to(case['args']['manifest'])
+    elif kind=='oversize':p.write_bytes(b' '*2097153)
+    elif kind=='bare_snapshot':p.write_text(json.dumps(snapshot(case)))
+    elif kind=='binding':value['target_sha256']='0'*64;p.write_text(json.dumps(value))
+    with pytest.raises(tool.EvidencePreservationError) as error:tool.run(**case['args'],import_capture=p)
+    assert not case['args']['output'].exists() and not error.value.recovery['success']
+    assert not error.value.safe_facts['rows']
+
+
+def test_import_cli_actual_producer_records_roundtrip_without_live_execution(case):
+    import os
+    from types import SimpleNamespace
+    from guard.adapters.vllm_worker_readiness import WorkerReadinessObserver
+    class Worker:pass
+    owner=Worker();owner.rank=0;owner.local_rank=0;owner.model_config=SimpleNamespace(enforce_eager=False)
+    owner.vllm_config=SimpleNamespace(compilation_config=SimpleNamespace(cudagraph_mode='FULL'))
+    binding={'pid':os.getpid(),'session_id_sha256':tool.digest(case['prepared']['session']),'process_start_sha256':'b'*64}
+    observer=WorkerReadinessObserver();rows=[observer.snapshot('Worker.load_model',(),{},phase='CALL')]
+    rows.extend(observer.snapshot('Worker.load_model',(owner,),{'load_dummy_weights':False},phase=phase,binding=binding) for phase in ('CALL','RETURN'))
+    raw=capture(case,rows);raw['observer_close']=observer.close();p=case['args']['output'].parent/'input.json';p.write_text(json.dumps(raw))
+    before=tool._inventory(case['source'].root);input_before=p.read_bytes()
+    argv=[sys.executable,'-m','tools.b_lif07_readiness']
+    for key,value in case['args'].items():argv.extend(['--'+('plan' if key=='plan_id' else key.replace('_','-')),str(value)])
+    argv.extend(['--import-capture',str(p)])
+    r=subprocess.run(argv,capture_output=True,text=True);assert r.returncode==0,r.stderr
+    summary=json.loads(r.stdout);assert summary['imported_from_file'] and summary['input_mode']=='imported_observation_file' and not summary['actual_target_executed'] and summary['requests']==0
+    out=case['args']['output'];saved=json.loads((out/'worker-readiness.json').read_text());assert len(saved['rows'])==3 and len(saved['method_pairs'])==1
+    assert saved['qualified_rows']==0 and saved['ready_send_observed'] is None and saved['data_origin']=='EXAMPLE'
+    assert not saved['source_authentication_verified'] and PRIVATE not in json.dumps(saved)
+    st=Store.read_only(out/'store');restored=Store.read_only(out/'restored');assert tool._refs(st)==tool._refs(restored) and st.verify()==restored.verify()==[]
+    assert tool._inventory(case['source'].root)==before and p.read_bytes()==input_before
+    evd,=st.iter_kind('EVD');res,=st.iter_kind('RES');assert evd.data_origin.value=='DECLARED' and len(evd.artifacts)==1
+    assert res.verdicts.model_dump(mode='json')=={k:'UNKNOWN' for k in ('security','functional','performance')}
+
+
+def test_import_and_live_modes_are_explicitly_separate(case):
+    with pytest.raises(ValueError,match='MODES_EXCLUSIVE'):tool.run(**case['args'],execute=True,import_capture='unused.json')
+    assert not case['args']['output'].exists()
+
+
+def test_import_file_mutated_during_projection_keeps_safe_facts(case,monkeypatch):
+    p=case['args']['output'].parent/'input.json';p.write_text(json.dumps(capture(case)))
+    original=tool.project
+    def changing(raw,*args):
+        value=original(raw,*args)
+        if raw.get('snapshots'):p.write_text('{}')
+        return value
+    monkeypatch.setattr(tool,'project',changing)
+    with pytest.raises(tool.EvidencePreservationError) as error:tool.run(**case['args'],import_capture=p)
+    assert len(error.value.safe_facts['rows'])==2 and 'ORIGINAL_INPUT_CHANGED' in error.value.recovery['issues']
+    assert not case['args']['output'].exists() and PRIVATE not in json.dumps(error.value.safe_facts)
+
+
+def test_native_shared_observation_gap_is_preserved(case):
+    from guard.adapters import vllm_worker_readiness as native
+    row=snapshot(case);gap='OBSERVATION_GAP_PENDING_INVALIDATED';assert gap in native.GAPS
+    row['gaps']=[gap,PRIVATE];value=project(case,capture(case,[row]))
+    assert value['rows'][0]['gaps']==[gap] and PRIVATE not in json.dumps(value)

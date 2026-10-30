@@ -20,3 +20,15 @@ A에 필요한 최소 연결은 다음과 같다. 이는 B의 공용 계약 확�
 - native worker/probe/host monotonic과 Kubernetes wall clock을 구분한다. A가 제공한 인과 receipt나 검증된 동일 clock 영역 없이 서로 빼거나 준비 전후 순서를 확정하지 않는다.
 
 소비기는 정제 첨부 저장 실패 시 같은 safe facts를 원 manual note와 반환 summary에 보존한다. 이후 Store/보고서 저장까지 실패하면 safe_facts와 명시 실패·복구 상태를 예외/CLI에 남긴다. worker observer.close와 host 소유 파일·프로브 정리는 별도 항목이며 reader seal만으로 worker cache 정리를 확정하지 않는다. 현재 전체 정상·원 challenge와 실GPU/Kubernetes/controlled delay는 미수행이다.
+
+## 기수집 snapshot 파일 소비
+
+`--import-capture /owned/capture.json`은 라이브 `--execute`와 별도인 명시적 입력 경로다. prepared와 target/ENV/session/run_id를 정확히 묶은 기존 `byul-lif07-worker-readiness-capture/1` envelope 안에 실제 observer의 `snapshots`를 넣는다. binding 없는 단독 snapshot이나 임의 JSON 배열은 받지 않는다. import와 execute를 함께 지정하지 않는다.
+
+```sh
+PYTHONPATH=src:. python -m tools.b_lif07_readiness --store SOURCE --plan PLAN --pack packs/PACK-BASELINE --target target.json --prepared prepared/manifest.json --manifest cohort.json --output /fresh/import --entered-by operator --import-capture /owned/capture.json
+```
+
+입력은 symlink 없는 regular file·2MiB 이하·중복 키/비유한 값 없는 strict JSON object이며 첫 읽기 전후 파일 identity/크기/변경 시각을 대조한다. capture 전 원Store inventory와 manifest/target/prepared 및 준비 asset bytes를 고정하고 import/project 전후·증거 저장 후 다시 대조한다. 수집 중 원본 변경은 실패로 남기고 이미 정제한 safe facts를 보존한다. 원본을 덮어쓰거나 재수집해 오류를 지우지 않는다.
+
+import는 신고된 관측을 기존 manual EVD로 보존한다. 파일의 source/worker/READY 긍정 플래그는 자격으로 사용하지 않는다. ENV가 EXAMPLE이면 capture도 EXAMPLE로 강제하며, DECLARED 파일도 대상 source/GPU/worker 진위 검증을 부여하지 않는다. capture의 알려지지 않은 필드·원 prompt/token/RID/secret은 projection에서 제거하며 원 JSON bytes를 artifact로 복사하지 않는다. CLI summary의 `actual_target_executed=False`, `input_mode=imported_observation_file`과 세 UNKNOWN으로 구분한다.

@@ -4,6 +4,9 @@ import argparse
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
+import hashlib
+import os
+import stat
 from pathlib import Path
 import re
 
@@ -191,21 +194,79 @@ def project(raw, env, target, prepared, manifest):
         'gaps': sorted(gaps)}
 
 
-def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by, execute=False, _example_capture=None):
+def _regular_bytes(path):
+    """기존 2MiB JSON 상한과 strict parser를 위한 안정된 소유 파일 읽기."""
+    path = Path(path).absolute()
+    if any(p.is_symlink() for p in (path, *path.parents)):
+        raise ValueError('LIF07_INPUT_SYMLINK')
+    selected = path.lstat()
+    if not stat.S_ISREG(selected.st_mode) or not 0 < selected.st_size <= 2097152:
+        raise ValueError('LIF07_INPUT_REGULAR_BOUNDED_FILE_REQUIRED')
+    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_NOFOLLOW', 0))
+    with os.fdopen(fd, 'rb') as stream:
+        before = os.fstat(stream.fileno())
+        if (not stat.S_ISREG(before.st_mode) or not 0 < before.st_size <= 2097152
+                or (selected.st_dev, selected.st_ino) != (before.st_dev, before.st_ino)):
+            raise ValueError('LIF07_INPUT_REGULAR_BOUNDED_FILE_REQUIRED')
+        raw = stream.read(2097153); after = os.fstat(stream.fileno()); current = path.lstat()
+        identity = lambda st: (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+        if (identity(before) != identity(after) or identity(after) != identity(current)
+                or not stat.S_ISREG(current.st_mode) or len(raw) != before.st_size
+                or any(p.is_symlink() for p in (path, *path.parents))):
+            raise ValueError('LIF07_INPUT_CHANGED_DURING_READ')
+        return raw
+
+
+def _input_hash(path):
+    return hashlib.sha256(_regular_bytes(path)).hexdigest()
+
+
+def _unchanged(source, before, inputs):
+    try:
+        return _inventory(source.root) == before and all(_input_hash(p) == h for p, h in inputs.items())
+    except (OSError, ValueError):
+        return False
+
+
+def _import_capture(path):
+    from guard.runtime.bounded import strict_json
+    raw = _regular_bytes(path)
+    value = strict_json(raw, limit=2097152)
+    if type(value) is not dict or value.get('schema') != SCHEMA:
+        raise ValueError('LIF07_BOUND_CAPTURE_OBJECT_REQUIRED')
+    return value, hashlib.sha256(raw).hexdigest()
+
+
+def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by, execute=False, import_capture=None, _example_capture=None):
     source, original, plan, env, policy, t, assets, m = preflight(store=store, plan_id=plan_id, pack=pack,
         target=target, prepared=prepared, manifest=manifest, output=output, entered_by=entered_by)
+    # preflight가 확인한 원본을 backend/project 실행 전에 고정한다.
+    before = _inventory(source.root)
+    input_paths = [Path(p) for p in (target, prepared, manifest)] + [Path(prepared).parent / n for n in assets['assets']]
+    inputs = {str(p): _input_hash(p) for p in input_paths}
+    if import_capture is not None and (_example_capture is not None or execute):
+        raise ValueError('LIF07_IMPORT_AND_LIVE_MODES_EXCLUSIVE')
     if _example_capture is not None and env.data_origin.value != 'EXAMPLE':
         raise ValueError('LIF07_EXAMPLE_CAPTURE_REQUIRES_EXAMPLE_ENV')
     binding = {k: v.ref().model_dump(mode='json') for k, v in [('environment', env), ('policy', policy), ('plan', plan), ('pack', original)]}
-    if not execute:
+    if not execute and import_capture is None:
         return {'executed': False, 'requests': 0, 'capability_supported': False, 'gaps': sorted(GAPS - {'INVALID_SNAPSHOT', 'SNAPSHOT_COORDINATE_AMBIGUOUS'}), **binding}
-    # 공통 실제 source/profile/controlled-delay 계약이 없으면 대상 I/O 0으로 닫힌다.
-    raw = _empty(env, t, assets, m) if _example_capture is None else _example_capture(env, t, assets, m)
-    record = project(raw, env, t, assets, m)
-    before = _inventory(source.root); inputs = {str(p): digest(Path(p).read_bytes().hex()) for p in (target, prepared, manifest)}
-    out = Path(output); out.mkdir(parents=True, exist_ok=False)
+    out = Path(output)
     stages = {k: False for k in ('artifact_stored', 'manual_evidence_stored', 'report_stored', 'bundle_restored', 'summary_stored')}; issues = []
+    record = project(_empty(env, t, assets, m), env, t, assets, m)
     try:
+        if import_capture is not None:
+            raw, capture_hash = _import_capture(import_capture); inputs[str(Path(import_capture))] = capture_hash
+        else:
+            # 승인 실제 capability가 없으므로 backend는 호출하지 않는다.
+            raw = _empty(env, t, assets, m) if _example_capture is None else _example_capture(env, t, assets, m)
+        record = project(raw, env, t, assets, m)
+        record['input_mode'] = 'imported_observation_file' if import_capture is not None else 'EXAMPLE_callback' if _example_capture is not None else 'closed_live_capability'
+        record['source_authentication_verified'] = False
+        if not _unchanged(source, before, inputs):
+            issues.append('ORIGINAL_INPUT_CHANGED')
+            raise ValueError('LIF07_ORIGINAL_INPUT_CHANGED')
+        out.mkdir(parents=True, exist_ok=False)
         export_bundle(source.root, out / 'source.zip'); restore_bundle(out / 'source.zip', out / 'store'); dest = Store(out / 'store')
         attachment = 'worker-readiness.json'
         try: _write(out / attachment, record); stages['artifact_stored'] = True
@@ -218,7 +279,7 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
             limitations=['required_readiness_items와 기업 기한·수락 기준은 입력 그대로다. 단계 RETURN과 generator factory 반환은 준비 완료 근거로 사용하지 않는다.',
                 'PodReady/HTTP200/단발 CPU generation_readiness를 rank·model 준비 완료로 올리지 않는다.',
                 'host/probe/native clock domain은 독립이다. A 인과 receipt 없는 교차 시각 순서는 미확인이다.',
-                '실제 대상 요청·Pod 변경·지연 0. EXAMPLE snapshot은 실제 worker/GPU 실증으로 집계하지 않는다.'])
+                '실제 대상 요청·Pod 변경·지연 0. EXAMPLE snapshot은 실제 worker/GPU 실증으로 집계하지 않는다. 입력 관측 파일은 신고된 관측의 증거화이며 외부 source/worker/READY 진위 인증은 미수집이다.'])
         entry['normal_control']['result'] = 'not_attempted'
         for c in entry['challenges']: c['attempted'] = False
         entry['observation_notes'][0]['answer'] = '출처=' + record['data_origin'] + '; metadata행=' + str(len(record['rows'])) + '; 메서드짝=' + str(len(record['method_pairs'])) + '; 실제 READY/지연/접수/복구 receipt 미수집. gaps=' + str(record['gaps'])
@@ -235,20 +296,25 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
         replay = judge_plan(restored, original, plan, as_of=as_of)
         if _refs(restored) != refs or [r.ref() for r in replay] != [r.ref() for r in results]: raise ValueError('LIF07_EXACT_REF_RESTORE_MISMATCH')
         verify_complete(restored); stages['bundle_restored'] = True
-        if _inventory(source.root) != before or any(digest(Path(p).read_bytes().hex()) != h for p, h in inputs.items()): raise ValueError('LIF07_ORIGINAL_INPUT_CHANGED')
+        if not _unchanged(source, before, inputs):
+            issues.append('ORIGINAL_INPUT_CHANGED'); raise ValueError('LIF07_ORIGINAL_INPUT_CHANGED')
         summary = {'executed': True, 'actual_target_executed': False, 'requests': 0, 'status': 'stored', **binding,
-            'capability_supported': False, 'full_scope_coverage': False, 'capture_origin': record['data_origin'],
+            'capability_supported': False, 'full_scope_coverage': False, 'capture_origin': record['data_origin'], 'input_mode': record['input_mode'], 'imported_from_file': import_capture is not None, 'source_authentication_verified': False,
             'source_unchanged': True, 'exact_refs_restored': True, 'issues': issues,
             'verdicts': {k: 'UNKNOWN' for k in ('security', 'functional', 'performance')}, 'report': report.ref().model_dump(mode='json')}
         if attachment is None: summary['safe_facts'] = record
         _write(out / 'summary.json', summary); stages['summary_stored'] = True
         return summary
-    except Exception: raise EvidencePreservationError(record, stages, issues, out) from None
+    except Exception:
+        if import_capture is not None and 'input_mode' not in record:
+            issues.append('CAPTURE_IMPORT_OR_PROJECT_UNAVAILABLE')
+        raise EvidencePreservationError(record, stages, issues, out) from None
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('store', 'pack', 'target', 'prepared', 'manifest', 'output'): parser.add_argument('--' + name, type=Path, required=True)
+    parser.add_argument('--import-capture', type=Path)
     parser.add_argument('--plan', dest='plan_id', required=True); parser.add_argument('--entered-by', required=True); parser.add_argument('--execute', action='store_true')
     try: print(json.dumps(run(**vars(parser.parse_args(argv))), ensure_ascii=False))
     except EvidencePreservationError as error: parser.exit(1, json.dumps({'recovery': error.recovery, 'safe_facts': error.safe_facts}, ensure_ascii=False) + '\n')

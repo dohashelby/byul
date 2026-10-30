@@ -109,6 +109,8 @@ class World:
         else:raw=('\n'.join(json.dumps(row) for row in values)+'\n').encode()
         if self.mode=='cap-prefix':
             raw+=b' '*(collector.MAX_LOG_BYTES-len(raw))
+        if self.mode=='utf8-suffix':raw+=b'\xe3'
+        if self.mode=='utf8-only':raw=b'\xe3\n\xff'
         if self.mode=='oversize':raw=b'x'*(collector.MAX_LOG_BYTES+1)
         if self.mode=='unbounded':pipe['bounded_at_source']=False
         if self.mode=='timeout':pipe.update(complete=False,timed_out=True)
@@ -257,3 +259,22 @@ def test_owned_cache_cleanup_failure_keeps_already_verified_predicates(context,m
     assert value['analysis_binding_verified'] and value['source_generation_verified']
     assert value['cleanup']['complete'] is False and 'CLEANUP_UNVERIFIED' in value['gaps']
     assert list(context.work.iterdir())==[]
+
+
+def test_complete_verified_rows_survive_later_invalid_utf8_line(context):
+    value,_=run(context,'utf8-suffix')
+    assert value['field_violation_count']==value['forbidden_error_input_count']==1
+    assert value['analysis_binding_verified'] and value['source_generation_verified']
+    assert value['source_reads'][0]['event_count']==value['source_reads'][0]['trial_linked_event_count']==2
+    assert value['source_reads'][0]['complete'] is False and value['coverage_complete'] is False
+    assert {'SOURCE_UTF8_INCOMPLETE','SOURCE_CAPTURE_INCOMPLETE'}<=set(value['gaps'])
+    assert '\ufffd' not in json.dumps(value,ensure_ascii=False)
+
+
+def test_invalid_utf8_only_produces_no_predicate_or_replacement_context(context):
+    value,_=run(context,'utf8-only')
+    assert value['violation_codes']==[] and value['field_violation_count']==value['forbidden_error_input_count']==0
+    assert value['analysis_binding_verified'] is False and value['exception_dump_verified'] is None
+    assert value['source_reads'][0]['event_count']==0 and value['source_reads'][0]['complete'] is False
+    assert value['coverage_complete'] is False and 'SOURCE_UTF8_INCOMPLETE' in value['gaps']
+    assert '\ufffd' not in json.dumps(value,ensure_ascii=False)

@@ -195,9 +195,16 @@ def capture_log_minimization(env,http_target,policy_values,*,source_id,expected_
             if not row['binding_verified']:gap('SOURCE_BINDING_UNAVAILABLE');return
             if row['returncode']!=0 or type(raw.get('stdout_bytes')) is not bytes:gap('SOURCE_READ_UNAVAILABLE');return
             if raw.get('capture',{}).get('bounded_at_source') is not True:gap('SOURCE_CAPTURE_INCOMPLETE');return
-            text=raw['stdout_bytes'].decode('utf-8','strict');row['byte_count']=len(raw['stdout_bytes'])
+            row['byte_count']=len(raw['stdout_bytes'])
             if row['byte_count']>MAX_LOG_BYTES:gap('SOURCE_CAPTURE_INCOMPLETE');return
-            row['complete']=_pipe_complete(raw,MAX_LOG_BYTES) and row['byte_count']<MAX_LOG_BYTES and len(text.splitlines())<MAX_LOG_LINES
+            lines=[];invalid_utf8=False
+            for line in raw['stdout_bytes'].splitlines(keepends=True):
+                try:lines.append(line.decode('utf-8','strict'))
+                except UnicodeDecodeError:invalid_utf8=True
+            text=''.join(lines)
+            if invalid_utf8:gap('SOURCE_UTF8_INCOMPLETE')
+            row['complete']=(_pipe_complete(raw,MAX_LOG_BYTES) and row['byte_count']<MAX_LOG_BYTES
+                and len(raw['stdout_bytes'].splitlines())<MAX_LOG_LINES and not invalid_utf8)
             if not row['complete']:gap('SOURCE_CAPTURE_INCOMPLETE')
             correlation={'normal':'byul-req13-error-'+token+'-before','error':'byul-req13-error-'+token+'-primary'}
             captures={'source':{'id':source_id,'kind':'kubernetes_pod_logs','role':'engine'},

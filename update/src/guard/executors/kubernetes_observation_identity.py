@@ -57,8 +57,22 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
         value=super().project_native(ctx,packet,trials)
         value['identity_native_models']=contract.native_models(packet,trials)
         if ctx._termination_prepared['profile'] in {weight_sensor.PROFILE,read_sensor.PROFILE}:
-            value['weight_iteration']=weight_metadata.project(packet,include_native17=ctx._termination_prepared['profile']==read_sensor.PROFILE)
+            value['weight_iteration']=read_metadata.project_iterations(packet) if ctx._termination_prepared['profile']==read_sensor.PROFILE else weight_metadata.project(packet)
             value['identity_native_models']=weight_metadata.attach_configured_models(value['identity_native_models'],value['weight_iteration'])
+        if ctx._termination_prepared['profile']==weight_sensor.PROFILE:
+            from guard.collectors import native_weight_iteration as dedicated
+            try:
+                value['weight_selection_iteration']=dedicated.analyze(packet)
+                for trial in value['identity_native_models']:
+                    for model in trial['configured_model_candidates']:
+                        locator=model['native_locator']
+                        model['weight_selection_iteration_candidates']=[candidate for candidate in value['weight_selection_iteration']['candidates']
+                            if candidate['root_event'][0]==locator['recording'] and candidate['model_object_sha256']==model['session_model_object_sha256']
+                            and all(event[1]<locator['forward_seq'] for event in candidate['source_events'])]
+            except (ValueError,KeyError,TypeError,OSError,RuntimeError):
+                value['weight_selection_iteration']=None
+                value['weight_selection_iteration_diagnostic']='NATIVE_WEIGHT_ITERATION_CONSUMER_UNAVAILABLE'
+                ctx._termination_gap=True
         if ctx._termination_prepared['profile']==read_sensor.PROFILE:
             value['eager_file_reads']=read_metadata.project(packet,ctx._termination_prepared)
             value['identity_native_models']=read_metadata.attach_configured_models(value['identity_native_models'],value['eager_file_reads'])

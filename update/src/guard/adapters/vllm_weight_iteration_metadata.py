@@ -108,13 +108,11 @@ def journal(rows):
     return {'facts':facts,'roots':roots,'missing':sorted(set(missing))}
 
 
-def project(packet,*,include_native17=False):
-    if type(include_native17) is not bool:raise ValueError('WEIGHT_ITERATION_PROFILE_INVALID')
-    accepted={sensor.PROFILE,'vllm-native-lifecycle-metadata/17'} if include_native17 else {sensor.PROFILE}
+def project(packet):
     samples=[];models=[];missing=[]
     for number,recording in enumerate((packet or {}).get('recordings',[])):
         capture=recording.get('capture') or {};records=capture.get('records',[])
-        if not records or records[0]['payload'].get('profile') not in accepted:continue
+        if not records or records[0]['payload'].get('profile')!=sensor.PROFILE:continue
         events=[row for row in records if row['event']=='WEIGHT_ITERATION'];data=journal(events)
         context=records[0]['payload']['context'];bound=bool(capture.get('process_context_verified') and recording.get('session_owner_match') and recording.get('listed_file_identity_match'))
         for fact in data['facts']:samples.append({'recording':number,'pid':context['pid'],'start_ticks':context['start_ticks'],'process_binding_verified':bound,**fact})

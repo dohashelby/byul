@@ -1585,3 +1585,7 @@ git status
 - 검증 전 초안이다. C safe_open/mmap/torch.load read·최종tensor/backend·worker역할·승인권한·실제GPU는 미연결/UNKNOWN이다. 기존 CI 외부차단·GPU창종료/Start0·46.66USD/과거사용량/120GiB EBS·부모/A1 전체범위를 유지한다.
 
 - native17 고정source51e9a5c/pin7dc3416: 직접Win/Linux각38, 인접각313, 동일1365파일불변; 설치251/준비CLI2/기존OBS02 CLI4·정확24Ref(9.689초), 전체공통359/제외0. 첫source의scope/불변식근거는별도재사용하며 현재전체suite로합산하지않는다. 초기Win9/Linux8 실패와 보수 후Win1 실패는 원문·source별로보존했다. CPython3.12.14의 stat/fstat ctime 의미를 명시해 서로다른기준의일치를거부하고 필드/신뢰검사/원assert/새skip을완화하지않았다. EXAMPLE FD/read 사실은 실제serving/tensor/worker/승인/전체분기완료와분리한다.
+
+# 2026-10-30 A1 A2 native16 전용 소비 통합 착수
+
+- A2 PR140/9bda8b3 세 원본 파일을 bytes 그대로 소비하고 기존 OBS02 native16 공통 사건 뒤 전용 선택/진행 후보를 연결한다. 원 native16 metadata와 pin을 복원하고 native17은 명시적 별도 공통 투영으로 기존 FD/read 기능을 유지한다. 정상/누락/다른귀속/부분/후기consumer·수집·첨부 오류 및 정확Ref를 선정했으며 검증 전 초안이다. 실제SUP05/06·worker/tensor/권한·전체분기완료를 주장하지 않는다.

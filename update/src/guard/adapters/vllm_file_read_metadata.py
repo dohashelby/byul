@@ -1,5 +1,6 @@
 """Closed native17 FD/read journal, independent of model approval and tensor use."""
 from . import vllm_file_read_sensor as sensor,vllm_weight_iteration_sensor as iteration
+from . import vllm_weight_iteration_metadata as iteration_metadata
 
 SNAPSHOT=frozenset({'device_sha256','inode_sha256','mode','uid','bytes','mtime_ns','ctime_ns','ctime_basis','regular'})
 TRUTH=('worker_assignment_verified','approved_model_file_verified','producer_authenticated','tensor_storage_applied_verified',
@@ -133,3 +134,27 @@ def attach_configured_models(trials,projection):
                 and row['model_object_sha256']==model['session_model_object_sha256'] and row['read_seq']<locator['forward_seq']]
             model['actual_tensor_consumption_verified']=False
     return trials
+
+
+def project_iterations(packet):
+    samples=[];models=[];missing=[]
+    for number,recording in enumerate((packet or {}).get('recordings',[])):
+        capture=recording.get('capture') or {};records=capture.get('records',[])
+        if not records or records[0]['payload'].get('profile')!=sensor.PROFILE:continue
+        events=[row for row in records if row['event']=='WEIGHT_ITERATION'];data=iteration_metadata.journal(events)
+        context=records[0]['payload']['context'];bound=bool(capture.get('process_context_verified') and recording.get('session_owner_match') and recording.get('listed_file_identity_match'))
+        for fact in data['facts']:samples.append({'recording':number,'pid':context['pid'],'start_ticks':context['start_ticks'],'process_binding_verified':bound,**fact})
+        for root in data['roots']:
+            facts=[fact for fact in data['facts'] if fact['root_load_sha256']==root['call_sha256'] and fact['model_object_sha256']==root['model_object_sha256']
+                and fact['factory_present'] and fact['source_pair_verified'] and fact['root_load_active_observed'] and root['factory_seq']<fact['end_seq']]
+            callbacks=[fact for fact in facts if fact['parameter_callback_returned_observed']]
+            models.append({'recording':number,**root,'pid':context['pid'],'start_ticks':context['start_ticks'],'process_binding_verified':bound,
+                'loader_call_model_link_observed':bool(bound and root['loader_call_sha256'] and root['loader_model_sha256']==root['model_object_sha256'] and root['model_object_sha256']),
+                'same_process_iteration_observed':bool(bound and root['source_verified'] and facts and root['model_object_sha256']),
+                'step_yields_observed':len(facts),'parameter_callback_returns_observed':len(callbacks),
+                'source_events':[[number,fact['end_seq']] for fact in facts[:64]],'source_event_locators_complete':len(facts)<=64,
+                'recording_closed':capture.get('summary',{}).get('recording_closed') is True,**{key:False for key in iteration_metadata.TRUTH},'scope_complete':False})
+        missing.extend(data['missing'])
+    missing.extend(['worker_FD_read_and_range_unverified','tensor_storage_and_backend_apply_completion_unverified','worker_assignment_and_rank_shard_inventory_unverified','approval_and_inspection_authority_unverified'])
+    if not samples:missing.append('source_bound_weight_iteration_unavailable')
+    return {'schema':'guard-weight-iteration-projection/1','samples':samples,'model_candidates':models,'missing':sorted(set(missing)),**{key:False for key in iteration_metadata.TRUTH},'scope_complete':False}

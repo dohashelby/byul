@@ -159,7 +159,7 @@ def parse_recording(raw, prepared):
     if is_worker_startup:
         keys=keys|startup_metadata.FIELDS|startup_metadata.LINK_FIELDS|startup_metadata.CLOSE_FIELDS|startup_metadata.LIMIT_FIELDS|startup_metadata.CLOSE_RESULT_FIELDS|startup_contract.SNAPSHOT_FIELDS|startup_contract.BINDING_FIELDS|startup_contract.METADATA_FIELDS|startup_contract.TRANSITION_FIELDS|set(startup_contract.SOURCE_SHA256)
         words=words|{'WORKER_STARTUP','WORKER_STARTUP_LINK','WORKER_STARTUP_CLOSE','WORKER_STARTUP_LIMIT',startup_sensor.EVENT_SCHEMA,startup_sensor.LINK_SCHEMA,startup_sensor.CLOSE_SCHEMA,startup_sensor.LIMIT_SCHEMA,
-            *startup_contract.SPAN_NAMES,*startup_metadata.ENTRY_KINDS,*startup_metadata.PHASES,*startup_sensor.RUNTIME_CODE_CONTRACTS,
+            *startup_contract.SPAN_NAMES,*startup_contract.SOURCE_SHA256,*startup_metadata.ENTRY_KINDS,*startup_metadata.PHASES,*startup_sensor.RUNTIME_CODE_CONTRACTS,
             startup_callback.SCHEMA,*startup_callback.POINTS,*startup_callback.PHASES,*startup_callback.STATUSES,*startup_callback.GRAPH_MODES,*startup_callback.GAPS,
             'CALLBACK_UNAVAILABLE','CALLBACK_CLOSE_UNAVAILABLE','unsupported','calls'}
     source_hashes = profiles.source_hashes(prepared["profile"])

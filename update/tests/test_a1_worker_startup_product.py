@@ -143,3 +143,14 @@ def test_existing_identity_cli_profile19_facts_and_exact_ref_roundtrip(tmp_path,
     restored=Store.read_only(tmp_path/'restored')
     assert refs==sorted((o.kind.value,o.id,o.revision,o.content_sha256) for kind in ('ENV','POL','PLAN','EVD','RES','RPT') for o in restored.iter_kind(kind))
 
+
+
+def test_unknown_module_stays_rejected_in_new_recording_profile(tmp_path,group,native_target,writer_factory,monkeypatch):
+    from guard.executors.lifecycle_capture import parse_recording
+    world,values,pack=inputs(tmp_path,group,native_target,monkeypatch,'normal')
+    world.add_native('EXAMPLE-public-canary')
+    def changed(rows):
+        row=next(row for row in rows if row['event']=='MODULE')
+        row['payload']['module']='EXAMPLE_UNREVIEWED_MODULE'
+    raw=revised(world.group.raw_by_pid[42],changed)
+    with pytest.raises(ValueError,match='LIFECYCLE_RECORDING_ROW_INVALID'):parse_recording(raw,world.group.prepared)

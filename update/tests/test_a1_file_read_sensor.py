@@ -27,6 +27,10 @@ def scope_value(path,*,env=None,target=None,hash_model_bytes=True,max_hash_bytes
 def make_world(tmp_path,patch,*,session='b'*32,path=None,scope_path=None,mode='normal'):
     path=path or tmp_path/'public-example.safetensors'
     if not path.exists():path.write_bytes(MODEL_BYTES)
+    # Explicit EXAMPLE normal fixture: Windows 3.12 stat/fstat can report
+    # different ctime semantics. Equalize this owned fixture's mtime/creation
+    # timestamp; the parser still compares every field and rejects differences.
+    created=path.stat().st_ctime_ns;os.utime(path,ns=(created,created))
     if scope_path is None:
         value=scope_value(path);scope_path=tmp_path/'scope.json';scope_path.write_bytes(deploy_scope(value,canonical_json(value),session))
     private=types.ModuleType('_file_read_test_iteration');private.__file__=iteration.__file__
@@ -127,6 +131,17 @@ def test_missing_close_and_missing_step_do_not_erase_read(tmp_path,monkeypatch):
     result=metadata.journal(reads,prepared_for(world),[]);sample,=result['facts']
     assert sample['source_fd_read_return_observed'] and not sample['close_observed'] and not sample['iterator_step_link_observed']
     assert 'file_close_unavailable' in result['missing'] and 'file_read_iterator_step_link_unavailable' in result['missing']
+
+
+def test_path_ctime_disagreement_remains_visible_without_discarding_fd_bytes(tmp_path,monkeypatch):
+    world=make_world(tmp_path,monkeypatch);list(world.load());rows=packet(world)['recordings'][0]['capture']['records']
+    reads=[row for row in rows if row['event']=='FILE_READ'];weights=[row for row in rows if row['event']=='WEIGHT_ITERATION']
+    for row in reads:
+        for key in ('path_before','path_after'):
+            if row['payload'][key]:row['payload'][key]['ctime_ns']-=1000
+    sample,=metadata.journal(reads,prepared_for(world),weights)['facts']
+    assert sample['fd_metadata_stable_observed'] and sample['declared_reference_bytes_match_observed']
+    assert sample['path_fd_metadata_match_observed'] is False
 
 
 @pytest.mark.parametrize('phase',['read','close'])

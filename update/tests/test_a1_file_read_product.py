@@ -122,10 +122,10 @@ def test_existing_identity_product_native17_consumption_and_exact_refs(tmp_path,
         assert any(row['same_process_iteration_observed'] and row['parameter_callback_returns_observed']>0 for row in weights)
     elif mode=='no-iteration':assert not any(row['same_process_iteration_observed'] for row in weights)
     else:assert weights==[]
-    reads=evd.observations['eager_file_reads'].value['samples']
+    reads=[sample for row in candidates for model in row['configured_model_candidates'] for sample in model.get('eager_file_read_candidates',[])]
     if mode in {'normal','partial','late-callback','later-record-error','attachment'}:
         assert any(row['source_fd_read_return_observed'] and row['iterator_step_link_observed'] and row['declared_reference_bytes_match_observed'] for row in reads)
-    elif mode=='no-iteration':assert reads==[]
+    else:assert reads==[]
     assert all(not row['approved_model_file_verified'] and not row['tensor_storage_applied_verified'] for row in reads)
     assert all(not row['tensor_storage_applied_verified'] and not row['worker_assignment_verified'] for row in weights)
     refs=sorted((obj.kind.value,obj.id,obj.revision,obj.content_sha256) for kind in ('ENV','POL','PLAN','EVD','RES','RPT') for obj in store.iter_kind(kind));assert len(refs)==6

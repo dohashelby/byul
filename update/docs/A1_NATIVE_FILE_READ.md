@@ -15,3 +15,5 @@ schema `guard-native-file-read/1`에는 OPEN_RETURN/OPEN_RAISE, READ_RETURN/READ
 일반 C 확장 `safe_open`/mmap, torch.load의 실제 FD read, 실제 tensor/rank/shard/worker 역할·승인 생산자 연결은 별도 미완료다. native0.32·기존 source/image/lab gate를 유지한다. CPU EXAMPLE의 synthetic bytes·가짜 decoder 시험을 실제 safetensors/serving/GPU 실증으로 올리지 않는다. 실제 운영 대상의 적재 전략은 아직 확인되지 않았다.
 
 사용자 결정은 승인·검사 권한/신뢰, 허용 모델·파일·이미지·작업·주체, 정책 효력·철회·기한·보존, 실제 운영 대상·관측 범위·책임이다. 기술 계약 초안과 독립 구현은 A1이 맡고 실제 권한 근거가 없으면 판정은 UNKNOWN이다.
+
+Windows Python3.12의 실제 EXAMPLE 진단에서 경로 stat와 FD fstat의 ctime 값이 다른 표본을 보존했다. 수집기는 이 필드를 무시하지 않는다. 경로/FD metadata 일치는 false로 남으며 앞서 반환된 FD bytes·범위 및 hash 관측과 구분된다. 정상 시험용 공개 synthetic 파일만 생성/수정 시각을 명시적으로 맞추고, 별도 회귀에서 ctime 차이를 그대로 거부하는지 확인한다. 실제 Windows 경로 결합 성공을 이 fixture로 추정하지 않는다.

@@ -108,6 +108,11 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
                 ctx._termination_cleanup.append('OBSERVATION_IDENTITY_RECORD_PARENT_CLEANUP_UNVERIFIED');state['gap']=True
         if state['gap']:
             summary['diagnostic_codes'].append('OBSERVATION_IDENTITY_RECORD_COLLECTION_INCOMPLETE');ctx._termination_gap=True
+        if summary['projection'].get('weight_selection_iteration_diagnostic')=='NATIVE_WEIGHT_ITERATION_CONSUMER_UNAVAILABLE':
+            # Parent collection computes its gap after project_native. Preserve
+            # this local consumer failure after that calculation, without losing
+            # the already-admitted common projection or independent facts.
+            summary['diagnostic_codes'].append('NATIVE_WEIGHT_ITERATION_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         values={'identity_record_collections':state['collections'],'identity_declared_records':projected['records'],
             'identity_native_models':models,'identity_binding_candidates':projected['candidates'],
             'identity_conflict_candidates':projected['conflict_candidates'],'identity_missing':projected['missing'],

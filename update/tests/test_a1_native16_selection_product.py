@@ -70,18 +70,21 @@ def inputs(tmp_path,group,target,patch,mode):
     producer=make_world('late-callback' if mode=='late-callback' else 'normal',session=group.prepared['session'])
     if mode=='no-iteration':producer.load().close()
     elif mode=='partial':
-        iterator=producer.load();next(iterator);iterator.close()
+        def partial_load(weights):
+            iterator=producer.auto._load_module('',producer.model,weights)
+            assert next(iterator)=='weight';iterator.close();return {'weight'}
+        producer.model.load_weights=partial_load;assert producer.run_loader() is None
+    elif mode=='unbound-partial':
+        iterator=producer.load();assert next(iterator)=='weight';iterator.close()
     elif mode=='late-callback':
-        iterator=producer.load()
-        assert next(iterator)=='weight'
-        with pytest.raises(OSError,match=PRIVATE):next(iterator)
+        with pytest.raises(OSError,match=PRIVATE):producer.run_loader()
     else:assert producer.run_loader() is None
     result=World.__new__(World);result.__dict__.update(world.__dict__)
     result.weight_mode=mode;result.weight_events=producer.observer.recorded;result.weight_model=producer.observer.model_reference(producer.model);result.weight_inserted=False
     return result,values,pack
 
 
-@pytest.mark.parametrize('mode',['normal','no-iteration','partial','late-callback','wrong-source','wrong-model','later-record-error','attachment','consumer-error'])
+@pytest.mark.parametrize('mode',['normal','no-iteration','partial','unbound-partial','late-callback','wrong-source','wrong-model','later-record-error','attachment','consumer-error'])
 def test_existing_identity_product_dedicated_native16_consumption_and_exact_refs(tmp_path,group,native_target,writer_factory,monkeypatch,mode):
     world,values,pack=inputs(tmp_path,group,native_target,monkeypatch,mode)
     if mode=='consumer-error':
@@ -114,7 +117,7 @@ def test_existing_identity_product_dedicated_native16_consumption_and_exact_refs
     assert all(evd.observations[key].value is False for key in contract.TRUTH_FIELDS)
     candidates=evd.observations['identity_native_models'].value
     weights=[weight for row in candidates for model in row['configured_model_candidates'] for weight in model.get('weight_iteration_candidates',[])]
-    if mode in {'normal','partial','late-callback','later-record-error','attachment','consumer-error'}:
+    if mode in {'normal','partial','unbound-partial','late-callback','later-record-error','attachment','consumer-error'}:
         assert any(row['same_process_iteration_observed'] and row['parameter_callback_returns_observed']>0 for row in weights)
     elif mode=='no-iteration':assert not any(row['same_process_iteration_observed'] for row in weights)
     else:assert weights==[]

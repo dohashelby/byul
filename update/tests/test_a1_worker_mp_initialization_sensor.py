@@ -18,6 +18,7 @@ def make_world(tmp_path,patch,*,mode='normal',session='b'*32,path=None,scope_pat
         return sensor.configure(private.configure(*args,**kwargs),initialization,private)
     with patch.context() as local:
         local.setattr(startup,'configure',configure)
+        local.setattr(startup,'StartupObservation',private.StartupObservation)
         world=startup_world(tmp_path,local,mode=mode,session=session,path=path,scope_path=scope_path,otel_available=True)
     parent=mp_world(session=session,mode='partial-failure' if mode=='partial-failure' else 'normal')
     # Restore only the original EXAMPLE fixture descriptors before exact source admission.

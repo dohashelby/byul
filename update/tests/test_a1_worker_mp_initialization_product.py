@@ -59,7 +59,7 @@ class World(original.World):
 
 def inputs(tmp_path,group,target,mode,patch,worker_mode):
     old,values,pack,receipt=ORIGINAL_INPUTS(tmp_path,group,target,mode)
-    native={'schema':'guard-kubernetes-lifecycle-target/1','lab':old.target['lab'],'run_id':old.target['run_id'],
+    native={'schema':'guard-kubernetes-lifecycle-target/1','lab':old.target['lab'],'run_id':old.target['kubernetes']['run_id'],
         'environment_ref':group.env.ref().model_dump(mode='json'),
         'kubernetes':{k:old.target['kubernetes'][k] for k in ('context','engine')}}
     path=tmp_path/'example-public.safetensors';path.write_bytes(MODEL_BYTES)
@@ -108,6 +108,8 @@ def test_existing_LIF09_CLI_worker_facts_and_exact_refs(tmp_path,group,native_ta
 def test_public_prepare_thirteen_original_assets(tmp_path,group,native_target):
     from tests.test_a1_model_read_scope import reference
     env,target,manifest=reference(tmp_path,group,native_target)
+    for name,value in [('environment',env.to_dict()),('target',target)]:
+        (tmp_path/(name+'.json')).write_bytes(canonical_json(value))
     runner=CliRunner();scope=tmp_path/'scope.json'
     result=runner.invoke(app,['prepare-model-read-scope','--env',str(tmp_path/'environment.json'),'--target',str(tmp_path/'target.json'),
         '--model-manifest',str(manifest),'--model-root','/models/UNMOUNTED','--nonsecret-model-weights','--output',str(scope)])

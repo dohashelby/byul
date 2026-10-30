@@ -21,7 +21,7 @@ from guard.core.select import select
 from guard.executors import dynamic_code_cpu as product, registry
 from guard.executors.base import DraftArtifact, EvidenceDraft
 from guard.executors.http_common import incomplete_artifact_capture
-from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, load_pack
+from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, load_pack, new_id
 from guard.store import Store
 from guard.store.packs import get_pack, put_pack
 from tools import b1_dynamic_code_cpu as collector
@@ -326,9 +326,9 @@ def run_pipeline(source_root, output_root, *, source_profile='reference5d', orig
     output_root.mkdir(parents=True, exist_ok=False)
     now = datetime.now(timezone.utc)
     pack = proposal_pack(output_root / 'proposal-pack', source_profile)
-    env = Environment(id='ENV-B-DYNAMIC-CPU-' + source_profile.upper(), created_at=now, data_origin=origin,
+    env = Environment(id=new_id('ENV'), created_at=now, data_origin=origin,
                       engine={'name': 'vllm', 'version': 'reference-' + commit}).seal()
-    policy = Policy(id='POL-B-DYNAMIC-CPU-' + source_profile.upper(), created_at=now, data_origin=origin,
+    policy = Policy(id=new_id('POL'), created_at=now, data_origin=origin,
                     status='DRAFT', pack=pack.ref(), scope={'include': list(CHECKS)}).seal()
     store = Store(output_root / 'store')
     put_pack(store, pack.path)

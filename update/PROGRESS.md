@@ -1576,3 +1576,5 @@ git status
 
 - A2 최신647553f 제품수락과 worker/acquisition 미지원 초안을 대조하고 보존 source5파일/21함수를 검토했다. 별도 opt-in native16의 실제 generator step 및 parameter callback-return을 기존 OBS02 identity 제품에 연결하는 구현·회귀·문서 초안을 진행한다. 원 native8~15/A2/B bytes·기존팩/정책·판정은 보존한다.
 - 같은 native8 load-call/model 객체와의 결합, 누락/중복/다른귀속/부분소비/종결/후속오류를 구분한다. factory·yield·callback-return은 FD 읽기/최종tensor/worker배정/실제승인 증명이 아니며 UNKNOWN과 진실값false를 유지한다. 소스 고정 검증 전 통과·현재 지원·실제 실행·전체완료를 주장하지 않는다.
+
+- 고정sourcef1d4149/pinc8c4b26: 직접Win/Linux각36, 인접Win `635 passed in 991.34s (0:16:31)`·Linux `635 passed in 222.87s (0:03:42)`, 동일1358파일 불변. 설치248/CLI4·정확24Ref(29.963초), 전체소비356/제외0. 최초실패와OS별컴파일cache·새fixture 시각 보수를보존했고 gate/원assert/새skip/실행시hash승인없다. source-bound iterator/callback-return을 기존 OBS02에서소비하지만 실제FD/tensor/권한/worker·전체A/A1/분기완료는미확인이다. 원GPU창종료/Start0/비용·EBS/과거실증·B Windows원fixture 실패와CI차단을유지한다.

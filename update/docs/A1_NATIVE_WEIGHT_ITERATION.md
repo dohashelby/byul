@@ -1,6 +1,6 @@
 # OBS02와 가중치 소비의 공통 iterator 계약 초안
 
-대상은 OBS02 SC23-03의 기존 `observation_identity:kubernetes` 제품 경로와 A2 SUP03/05/06의 후속 전용 분석이다. 부모 A39/56/4, A1 19/27/2, A2 20/29/2와 원래 완료 기준을 유지한다. 이 묶음은 원본 B PR130을 통합한 `3c2f1bb`에서 이어간다. 구현·회귀·문서 초안 후 고정 검증 전이며, 아래 새 판본을 실제 serving 지원이나 전체 분기 완료로 선언하지 않는다.
+대상은 OBS02 SC23-03의 기존 `observation_identity:kubernetes` 제품 경로와 A2 SUP03/05/06의 후속 전용 분석이다. 부모 A39/56/4, A1 19/27/2, A2 20/29/2와 원래 완료 기준을 유지한다. 이 묶음은 원본 B PR130을 통합한 `3c2f1bb`에서 이어간다. 공통 구현·기존 제품 연결과 고정 소스 CPU/설치 검증을 마쳤다. 새 판본의 실제 serving/worker 실증과 전체 분기 완료는 미확인이다.
 
 고정 대상 소스는 vLLM `db9527a46873454610df6dbedf79a36d6bf1a7f6`이다. 보존된 이미지 layer `30530efd7061ec4f5a1a5f179219c218fc72c486dd215339940b33f7455eb26b`의 source manifest와 5파일/21함수를 대조했다. 실제 hook은 `default_loader.py` SHA `d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9`, `weight_utils.py` SHA `7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd`, `models/utils.py` SHA `7171b6347b3cbab213df299fa317094ac6c9b2b397daf6a2ec93ff3a152b0e75`의 다섯 generator 지점이다. 원본 SPDX·copyright를 시험 참고 파일에 보존한다. 이 출처 확인은 현재 실행 중인 이미지·worker 인수 근거가 아니다.
 
@@ -38,3 +38,15 @@ ENV Ref, target/run/session, namespace/Pod/container/image/restart/start는 기�
 worker FD/open/read/mmap identity·byte 범위, 실제 torch/safetensors 구현과 tensor storage·backend 적용 완료, required tensor inventory·rank/shard/TP coverage, cross-process worker 배정, 실제 취득/cache/retry/usage/telemetry 생산자와 승인·검사 신뢰 연결은 미완료다. 이번 hook 하나로 해결하지 않는다. 실제 실행에는 새 승인 시간·소유권·활성 작업·quota·잔여 총비용·fresh ENV/target/POL·실행 순서·복구/정리 책임이 필요하다. 원GPU창 종료, 추가 Start0, 총46.66USD·과거 사용량·보존120GiB EBS 비용을 유지한다.
 
 검증은 source/hash 고정 후 직접/동일 계약·인접/불변식·양쪽 OS·설치본 CLI/정확 Ref 범위를 나눠 기록한다. 기존 B Windows POSIX fixture 실패와 CI 결제 차단은 별개로 보존한다. helper/profile/등록, 제품 연결, 실제 실증, 전체 분기 완료를 구분하며 결과와 정확 커밋은 고정 인계에 기록한다.
+
+## 고정 소스와 검증 범위
+
+검증 source `f1d41491c80a0f51b6464393ef8146080bbce67f`, A측 검토 checkpoint `c8c4b26b017cedda7cbc982226b1bb89a7e78be7`의1358파일을 고정했다. 직접 시험 Windows36통과(112.172초), Linux36통과(23.523초), 인접 회귀 Windows `635 passed in 991.34s (0:16:31)`(부모993.944초)·Linux `635 passed in 222.87s (0:03:42)`(부모223.83초)로 구분한다. 현재 전체 suite 통과를 주장하지 않는다. 변경없는 불변식은 첫source20dae43의Linux125/Windows124통과·기존skip1을 재사용했으며 source pin9시험은 새source에서 다시 확인했다.
+
+격리 Windows 설치 source/wheel/installed248파일일치(41.603초), 설치 CLI4·정확24Ref 왕복·저장팩 재판정(29.963초), 전체 공통 소비356/제외0/자동승인false를 확인했다. 설치 CLI는 normal/선언대상충돌/후속기록오류/첨부오류에서 source-bound iterator 후보와 load-call을 소비하지만 실제 승인·FD읽기·tensor 적용·worker배정은 확인하지 않는다. 기존 B 원본23, native8~15 센서 등103파일 bytes와 native1~7 고정표를 보존했다. A1 소유 profile 인식표 한 파일의 native16 추가는 전체 소비 검사에 그대로 포함했다.
+
+첫source20dae43의 Windows5실패/155통과·기존skip1, Linux27실패/134통과를 보존했다. 정적 컴파일 도구가 OS별 bytecode cache를 공유해 Linux observer 고정값을 잘못 산출했고, 예제 native 기록 삽입이 원NATIVE 시각 필드를 이동하지 않았다. 두 명령 종료·소스불변을 확인한 뒤 컴파일 cache를 분리하고 새fixture의 기존 시각 규약을 보수했다. observer 함수 로직·parser gate·assert·기존 B pin은 완화하지 않았다. 올바른 코드 hash는 CPython3.12.14 `b30ec8ba3447ba218cb37838a55af0d28893a5e4518e7421de119e22ff7426f9`, CPython3.12.3 `e93012cf2ef2f74defbb675b7aa2df03c37c243b84b09b42588371b926419626`이다.
+
+공통 recording 상한은2048행/2MiB다. 상한·누락·미종결·부분 소비에서는 이미 확인된 짝지은 사건과 전체 coverage를 나누고, 이후 model/request 결합이 없으면 후보를 만들지 않는다. 이 상한 안의 관측을 전체 모델·tensor inventory 또는 실제 worker 완료로 올리지 않는다. 새 판본 준비는 `guard prepare-lifecycle-sensor --profile vllm-native-lifecycle-metadata/16 --output NEW_EXTERNAL_DIRECTORY`이며, 실제 설치·기동을 수행하는 명령이 아니다. 이미 승인된 ENV/target/prepared/POL을 명시해 기존 identity registry와 CLI를 사용한다. CI5는 정확 최종 HEAD 성공 전 미확인이다.
+
+설치본 공개 prepare CLI도 별도 통과(9.674초)했고 원 native8 base bytes/새sensor bytes/manifest를 확인했다. 엔진·네트워크 호출을 금지한 준비 검사이며 실제 기동·실증은 수행하지 않았다.

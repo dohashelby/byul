@@ -617,3 +617,5 @@ B PR130의21파일은 확정tree bytes로통합하고 전용수집/판정/source
 B immutable21+전이의존2 통합은 Linux/설치본 근거와 Windows 원fixture10실패를 분리해 초안PR로인계한다. A가B원본을고치거나 gate/검증제외로성공을만들지 않는다. B033의 ancestry거부와 A검토354 전체소비는별개다. 원OBS06/REQ09 전체완료·실제GPU·부모Goal완료를선언하지않는다.
 
 native16은 고정된 undecorated generator 구간의 실제 진행과 callback-return만 공통 사건으로 제공하고 기존 OBS02 제품이 소비한다. decorator 반환·generator 생성·독립파일hash를 실제worker FD읽기/최종tensor/실제승인으로 올리지 않으며 A2 전용 분석은 확정 원본을 기다린다. 정책 미확정은 독립 공통 코드의 일괄 차단 사유로 삼지 않는다.
+
+소스코드 고정값은 독립 OS source compiler에서 산출하고 bytecode cache를공유하지않는다. 실제5지점의 코드/시각 gate가 초기사례를거부한 근거를보존하며 새fixture오류·컴파일도구보수는 제품허용범위완화와구분한다. native16은 기존OBS02/정확Ref에서소비하되 native9 A2전용소비·FD/tensor/승인·실제worker는별도미완료다.

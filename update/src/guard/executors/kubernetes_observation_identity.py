@@ -76,6 +76,21 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
         if ctx._termination_prepared['profile']==read_sensor.PROFILE:
             value['eager_file_reads']=read_metadata.project(packet,ctx._termination_prepared)
             value['identity_native_models']=read_metadata.attach_configured_models(value['identity_native_models'],value['eager_file_reads'])
+            try:
+                from guard.collectors import native_model_file_reads as dedicated_reads
+                value['scoped_file_read_candidates']=dedicated_reads.analyze(packet,ctx._termination_prepared)
+                for trial in value['identity_native_models']:
+                    for model in trial['configured_model_candidates']:
+                        locator=model['native_locator']
+                        model['scoped_file_read_candidates']=[candidate for candidate in value['scoped_file_read_candidates']['candidates']
+                            if candidate['recording']==locator['recording']
+                            and candidate['observed_model_object_sha256']==model['session_model_object_sha256']
+                            and all(event[0]==locator['recording'] and event[1]<locator['forward_seq']
+                                for event in [candidate['root_event'],*candidate['source_events']])]
+            except (ImportError,ValueError,KeyError,TypeError,OSError,RuntimeError):
+                value['scoped_file_read_candidates']=None
+                value['scoped_file_read_candidates_diagnostic']='NATIVE_MODEL_FILE_READ_CONSUMER_UNAVAILABLE'
+                ctx._termination_gap=True
         return value
 
     def collect(self,ctx):
@@ -113,6 +128,8 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
             # this local consumer failure after that calculation, without losing
             # the already-admitted common projection or independent facts.
             summary['diagnostic_codes'].append('NATIVE_WEIGHT_ITERATION_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
+        if summary['projection'].get('scoped_file_read_candidates_diagnostic')=='NATIVE_MODEL_FILE_READ_CONSUMER_UNAVAILABLE':
+            summary['diagnostic_codes'].append('NATIVE_MODEL_FILE_READ_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         values={'identity_record_collections':state['collections'],'identity_declared_records':projected['records'],
             'identity_native_models':models,'identity_binding_candidates':projected['candidates'],
             'identity_conflict_candidates':projected['conflict_candidates'],'identity_missing':projected['missing'],

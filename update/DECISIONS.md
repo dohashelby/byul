@@ -631,3 +631,5 @@ A2 native16 고정 소비는 원본3파일/source pin을그대로보존하고A1�
 B4cfc의변경파일과전이의존성은원bytes로통합한다. B rootAGENTS는참조로보존하고A1규칙에적용하지않는다. 원B HTTP/component/sourcepin을A1이변조하거나실행중hash로승인하지않는다. 같은닫힌wire메서드와정확구sourceRef를검토해새A고정소비기준을제공하고B는전용pin/소비수락을확정한다. Graph모듈가용성은actual worker/callback/close 계약완료가아니다.
 
 B 전달물 오류fixture를A1에서재작성하거나새skip/assert완화로통과시키지않는다. 실제 반환오류에대한A1제품경계시험과원B실패를함께인계한다. Graph LF/CRLF의동일컴파일코드도파일bytes가다르면sourcegate는거부한다. BHTTPpin갱신과nativeGraph실제hook은별도미연결이다.
+
+native17 전용분석은A2원본을재작성하지않고기존OBS02관측에붙인다. 공통고정4pin/native16/B원본을보존한다. bound/unbound partial을구분하고선행read와후기close/root/collector상태를합쳐성공으로만들지않는다. 전용실패는ABORTED/정제진단,앞선common사실과독립FAIL은보존한다.

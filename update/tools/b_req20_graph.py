@@ -32,9 +32,33 @@ POINTS = {'GPUModelRunner._prepare_input_ids', 'GPUModelRunner._prepare_inputs',
 MODES = {'NONE', 'FULL', 'PIECEWISE', 'FULL_AND_PIECEWISE'}
 GAPS = {'NATIVE_GRAPH_CAPABILITY_UNAVAILABLE', 'COLLECTION_INCOMPLETE', 'GENERATION_CHANGED',
     'TOKEN_LENGTH_UNVERIFIED', 'TOKEN_LENGTH_DIFFERENT', 'CLEANUP_UNVERIFIED',
+    'SESSION_SEAL_UNVERIFIED', 'FINAL_CAPTURE_UNAVAILABLE', 'NATIVE_COORDINATE_AMBIGUOUS',
     'GRAPH_OUTPUT_CONSUMPTION_UNOBSERVED', 'LOGITS_SAMPLER_LINEAGE_UNOBSERVED',
     'CONSUMER_LINEAGE_UNVERIFIED', 'OUTPUT_BOUND', 'OUTPUT_METADATA_UNAVAILABLE',
     'COPY_COMPLETION_UNOBSERVED', 'VALUE_COMPARISON_UNOBSERVED', 'NO_NATIVE_GRAPH_EVENTS', 'AFTER_CONTROL_UNAVAILABLE'}
+
+
+class EvidencePreservationError(RuntimeError):
+    """저장 실패를 숨기지 않고 이미 수집한 정제 facts와 복구 상태를 전달한다."""
+    def __init__(self, safe_facts, stages, issues, output):
+        super().__init__('REQ20_EVIDENCE_PRESERVATION_FAILED')
+        self.safe_facts = deepcopy(safe_facts)
+        self.recovery = {'status': 'failed', 'success': False, 'output': str(output),
+            'stages': deepcopy(stages), 'issues': sorted(set(issues + ['EVIDENCE_PRESERVATION_FAILED'])),
+            'capture_rerun_required': False, 'owned_partial_files_retained': True}
+
+
+def _tensor_metadata(value):
+    value = value if type(value) is dict else {}; descriptor = value.get('descriptor', {})
+    descriptor = descriptor if type(descriptor) is dict else {}; shape = descriptor.get('shape')
+    valid = (descriptor.get('status') == 'collected' and type(shape) is list and len(shape) <= 3
+        and all(type(n) is int and 0 <= n < 2**63 for n in shape)
+        and descriptor.get('device_type') in {'cpu', 'cuda'}
+        and descriptor.get('dtype') in {'torch.bool', 'torch.float32', 'torch.float16', 'torch.bfloat16', 'torch.int32', 'torch.int64'})
+    return {'tensor_token': value.get('tensor_token') if _sha(value.get('tensor_token')) else None,
+        'descriptor': {'status': 'collected' if valid else 'unavailable',
+            'shape': shape if valid else None, 'device_type': descriptor.get('device_type') if valid else None,
+            'dtype': descriptor.get('dtype') if valid else None, 'values_collected': False}}
 
 
 def digest(value):
@@ -189,8 +213,10 @@ def _safe_snapshot(snapshot):
         out['binding'][key] = binding.get(key) if _sha(binding.get(key)) else None
     out['binding']['pid'] = binding.get('pid') if type(binding.get('pid')) is int and binding['pid'] > 0 else None
     m = out['metadata']
-    for key in ('owner_token', 'input_batch_token', 'entry_token', 'graph_token', 'event_token', 'stream_token', 'retained_device_output_token', 'actual_graph_key_token'):
+    for key in ('owner_token', 'input_batch_token', 'entry_token', 'graph_token', 'event_token', 'stream_token', 'retained_device_output_token', 'actual_graph_key_token', 'returned_output_token', 'producer_stream_token'):
         m[key] = metadata.get(key) if _sha(metadata.get(key)) else None
+    for key in ('retained_output', 'copy_host_output'):
+        m[key] = _tensor_metadata(metadata.get(key))
     for key in ('runtime_mode', 'selected_runtime_mode'):
         m[key] = metadata.get(key) if metadata.get(key) in MODES else None
     m['forward_context_state'] = metadata.get('forward_context_state') if metadata.get('forward_context_state') in {'available', 'absent', 'unavailable'} else 'unavailable'
@@ -355,11 +381,23 @@ def _capture_kubernetes(env, target, prepared, manifest, *, duration, binary):
         record['gaps'].append('COLLECTION_INCOMPLETE')
     finally:
         try:
-            sealed = reader.seal_session().get('sealed') is True; collect()
+            sealed = reader.seal_session().get('sealed') is True
         except Exception:
-            record['gaps'].append('CLEANUP_UNVERIFIED')
+            record['gaps'].append('SESSION_SEAL_UNVERIFIED')
+        finally:
+            # seal과독립적으로마지막read를시도하여이미확인된관측을보존한다.
+            try:
+                collect()
+            except Exception:
+                record['gaps'].append('FINAL_CAPTURE_UNAVAILABLE')
+        if not sealed:
+            record['gaps'].append('SESSION_SEAL_UNVERIFIED')
+        try:
+            probe_clean = not bool(transport.report().get('cleanup_errors'))
+        except Exception:
+            probe_clean = False
         record['cleanup'] = {'attempted': True, 'sealed': sealed,
-            'owned_probe_cleanup_complete': not bool(transport.report().get('cleanup_errors')),
+            'owned_probe_cleanup_complete': probe_clean,
             'worker_observer_close_verified': None, 'complete': False}
         if not record['cleanup']['complete']:
             record['gaps'].append('CLEANUP_UNVERIFIED')
@@ -394,7 +432,8 @@ def project(raw, env, target, prepared, manifest):
         if type(item) is dict and item.get('id') in {'tokenize-A', 'tokenize-B', 'before', 'after', 'json-distinct_body-A', 'json-distinct_body-B'}:
             safe['request_summaries'].append({'id': item['id'], 'outcome': item.get('outcome') if type(item.get('outcome')) is int else None,
                 'capture_complete': item.get('capture_complete') is True})
-    seen = set()
+    seen = {}
+    safe['ambiguous_coordinates'] = []
     for row in rows:
         if type(row) is not dict:
             continue
@@ -405,16 +444,25 @@ def project(raw, env, target, prepared, manifest):
         generation = row.get('generation_sha256') if _sha(row.get('generation_sha256')) else None
         unique = (generation, b['session_id_sha256'], b['pid'], b['process_start_sha256'],
             b['native_request_id_sha256'], b['call_id_sha256'], snapshot['point'], snapshot['phase'])
-        if unique in seen:
-            continue
-        seen.add(unique)
         provenance = (row.get('source_qualified') is True and row.get('actual_worker_observed') is True
             and all(_sha(b.get(k)) for k in ('call_id_sha256', 'native_request_id_sha256', 'session_id_sha256', 'process_start_sha256'))
-            and b['session_id_sha256'] == digest(prepared['session']) and type(b['pid']) is int and _sha(row.get('generation_sha256')))
-        safe['rows'].append({**snapshot, 'source_qualified': bool(provenance), 'graph_context_qualified': False,
-            'qualified': False, 'version_change_candidate': False,
-            'generation_sha256': row.get('generation_sha256') if _sha(row.get('generation_sha256')) else None,
-            'native_record_seq': row.get('native_record_seq') if type(row.get('native_record_seq')) is int and row['native_record_seq'] >= 0 else None})
+            and b['session_id_sha256'] == digest(prepared['session']) and type(b['pid']) is int and generation is not None)
+        candidate = {**snapshot, 'source_qualified': bool(provenance), 'graph_context_qualified': False,
+            'qualified': False, 'version_change_candidate': False, 'generation_sha256': generation,
+            'native_record_seq': row.get('native_record_seq') if type(row.get('native_record_seq')) is int and row['native_record_seq'] >= 0 else None}
+        fingerprint = canonical_json(candidate)
+        known = seen.setdefault(unique, {'facts': set(), 'indices': []})
+        if fingerprint in known['facts']:
+            continue
+        known['facts'].add(fingerprint)
+        known['indices'].append(len(safe['rows'])); safe['rows'].append(candidate)
+        if len(known['facts']) > 1:
+            if len(known['facts']) == 2:
+                safe['ambiguous_coordinates'].append({'generation_sha256': generation, 'binding': deepcopy(b),
+                    'point': snapshot['point'], 'phase': snapshot['phase']})
+            for index in known['indices']:
+                safe['rows'][index].update(ambiguous=True, source_qualified=False)
+            safe['gaps'].append('NATIVE_COORDINATE_AMBIGUOUS')
     def domain(row):
         return (row['generation_sha256'], row['binding']['session_id_sha256'], *tuple(row['binding'][k] for k in ('pid', 'process_start_sha256', 'native_request_id_sha256')))
     # buffer/validlen, 실제 graph key, consumer event를 실제 producer의 서로 다른 point에서 결합한다.
@@ -513,51 +561,68 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
     output = Path(output); output.mkdir(parents=True, exist_ok=False)
     export_bundle(source.root, output / 'source.zip'); restore_bundle(output / 'source.zip', output / 'store'); dest = Store(output / 'store')
     raw = (_example_capture or _capture_kubernetes)(env, t, assets, m, duration=duration, binary=binary)
-    record = project(raw, env, t, assets, m); issues = []; attachment = 'graph-capture.json'
+    record = project(raw, env, t, assets, m)
+    stages = {k: False for k in ('artifact_stored', 'manual_evidence_stored', 'report_stored', 'bundle_restored', 'summary_stored')}
+    issues = []
     try:
-        _write(output / attachment, record)
-    except OSError:
-        attachment = None; issues.append('ARTIFACT_WRITE_UNAVAILABLE')
-    doc = build_template(dest, original, plan, include_automated=True)
-    doc['checks'] = [x for x in doc['checks'] if x['check_id'] == 'REQ-20' and x['side'] == 'single']
-    if len(doc['checks']) != 1:
-        raise ValueError('REQ20_ORIGINAL_SINGLE_MANUAL_FORM_REQUIRED')
-    entry = doc['checks'][0]
-    entry.update(entered_by=entered_by, entered_at=record['finished_at'], started_at=record['started_at'],
-        finished_at=record['finished_at'], attachments=[attachment] if attachment else [],
-        verdicts={'security': 'UNKNOWN', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'},
-        basis='source/세대/request/graph 계보와 정제 callback 관측만 사용한다. version 변화 후보는 GPU overwrite 확정이 아니다.',
-        limitations=['전체 정상 대조·challenge·기업 수치/성능 기준 미수집.',
-            '실제 입력/출력 값 비교 producer가 없어 확정 위반/PASS를 제출하지 않는다.',
-            'EXAMPLE capture는 실제 worker/GPU 실측으로 집계하지 않는다. 입력자는 신고자다.'])
-    entry['normal_control']['result'] = 'not_attempted'
-    for c in entry['challenges']:
-        c['attempted'] = False
-    entry['observation_notes'][0]['answer'] = (f"출처={record['data_origin']}; qualified행={sum(r['qualified'] for r in record['rows'])}; "
-        f"version변화후보={record['candidate_count']}; gap={record['gaps']}. 값 정합·전체 정상 대조는 UNKNOWN이다.")
-    form = output / 'manual-evidence.yaml'
-    try:
-        with form.open('x', encoding='utf-8') as stream:
-            stream.write(dump_template(doc))
-    except OSError:
-        issues.append('MANUAL_FORM_WRITE_UNAVAILABLE')
-    import_evidence(dest, original, form, document=doc); as_of = datetime.now(timezone.utc).replace(microsecond=0)
-    results = judge_plan(dest, original, plan, as_of=as_of); report = build_report(dest, original, plan, as_of=as_of)
-    dest.put(report); verify_complete(dest); refs = _refs(dest)
-    export_bundle(dest.root, output / 'evidence.zip'); restore_bundle(output / 'evidence.zip', output / 'restored')
-    restored = Store(output / 'restored'); replay = judge_plan(restored, original, plan, as_of=as_of)
-    if _refs(restored) != refs or [r.ref() for r in replay] != [r.ref() for r in results]:
-        raise ValueError('REQ20_EXACT_REF_RESTORE_MISMATCH')
-    verify_complete(restored)
-    if _inventory(source.root) != before or any(hashlib.sha256(Path(p).read_bytes()).hexdigest() != h for p, h in inputs.items()):
-        raise ValueError('REQ20_ORIGINAL_INPUT_CHANGED')
-    summary = {'executed': True, **binding, 'collector_calls': 1, 'security': 'UNKNOWN',
-        'candidate_count': record['candidate_count'], 'qualified_rows': sum(r['qualified'] for r in record['rows']),
-        'capture_origin': record['data_origin'], 'real_gpu_execution_verified': False,
-        'native_capability_supported': supported, 'full_scope_coverage': False, 'issues': issues,
-        'source_unchanged': True, 'exact_refs_restored': True, 'report': report.ref().model_dump(mode='json')}
-    _write(output / 'summary.json', summary)
-    return summary
+        issues = []; attachment = 'graph-capture.json'
+        try:
+            _write(output / attachment, record)
+            stages['artifact_stored'] = True
+        except OSError:
+            attachment = None; issues.append('ARTIFACT_WRITE_UNAVAILABLE')
+        doc = build_template(dest, original, plan, include_automated=True)
+        doc['checks'] = [x for x in doc['checks'] if x['check_id'] == 'REQ-20' and x['side'] == 'single']
+        if len(doc['checks']) != 1:
+            raise ValueError('REQ20_ORIGINAL_SINGLE_MANUAL_FORM_REQUIRED')
+        entry = doc['checks'][0]
+        entry.update(entered_by=entered_by, entered_at=record['finished_at'], started_at=record['started_at'],
+            finished_at=record['finished_at'], attachments=[attachment] if attachment else [],
+            verdicts={'security': 'UNKNOWN', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'},
+            basis='source/세대/request/graph 계보와 정제 callback 관측만 사용한다. version 변화 후보는 GPU overwrite 확정이 아니다.',
+            limitations=['전체 정상 대조·challenge·기업 수치/성능 기준 미수집.',
+                '실제 입력/출력 값 비교 producer가 없어 확정 위반/PASS를 제출하지 않는다.',
+                'EXAMPLE capture는 실제 worker/GPU 실측으로 집계하지 않는다. 입력자는 신고자다.'])
+        entry['normal_control']['result'] = 'not_attempted'
+        for c in entry['challenges']:
+            c['attempted'] = False
+        entry['observation_notes'][0]['answer'] = (f"출처={record['data_origin']}; qualified행={sum(r['qualified'] for r in record['rows'])}; "
+            f"version변화후보={record['candidate_count']}; gap={record['gaps']}. 값 정합·전체 정상 대조는 UNKNOWN이다.")
+        if attachment is None:
+            entry['observation_notes'][0]['answer'] += '\nREQ20_SAFE_FACTS=' + canonical_json(record).decode('utf-8')
+            entry['limitations'].append('정제첨부보관실패: 기존manual노트와반환safe_facts에정제관측을보존했다.')
+        form = output / 'manual-evidence.yaml'
+        try:
+            with form.open('x', encoding='utf-8') as stream:
+                stream.write(dump_template(doc))
+        except OSError:
+            issues.append('MANUAL_FORM_WRITE_UNAVAILABLE')
+        import_evidence(dest, original, form, document=doc); stages['manual_evidence_stored'] = True; as_of = datetime.now(timezone.utc).replace(microsecond=0)
+        results = judge_plan(dest, original, plan, as_of=as_of); report = build_report(dest, original, plan, as_of=as_of)
+        dest.put(report); stages['report_stored'] = True; verify_complete(dest); refs = _refs(dest)
+        export_bundle(dest.root, output / 'evidence.zip'); restore_bundle(output / 'evidence.zip', output / 'restored')
+        restored = Store(output / 'restored'); replay = judge_plan(restored, original, plan, as_of=as_of)
+        if _refs(restored) != refs or [r.ref() for r in replay] != [r.ref() for r in results]:
+            raise ValueError('REQ20_EXACT_REF_RESTORE_MISMATCH')
+        verify_complete(restored); stages['bundle_restored'] = True
+        if _inventory(source.root) != before or any(hashlib.sha256(Path(p).read_bytes()).hexdigest() != h for p, h in inputs.items()):
+            raise ValueError('REQ20_ORIGINAL_INPUT_CHANGED')
+        summary = {'executed': True, 'status': 'stored', 'facts_storage': 'artifact' if attachment else 'manual_declared_observation_notes', **binding, 'collector_calls': 1, 'security': 'UNKNOWN',
+            'candidate_count': record['candidate_count'], 'qualified_rows': sum(r['qualified'] for r in record['rows']),
+            'capture_origin': record['data_origin'], 'real_gpu_execution_verified': False,
+            'native_capability_supported': supported, 'full_scope_coverage': False, 'issues': issues,
+            'source_unchanged': True, 'exact_refs_restored': True, 'report': report.ref().model_dump(mode='json')}
+        if attachment is None:
+            summary['safe_facts'] = record
+        try:
+            _write(output / 'summary.json', summary)
+        except OSError:
+            issues.append('SUMMARY_WRITE_UNAVAILABLE')
+            raise
+        stages['summary_stored'] = True
+        return summary
+    except Exception:
+        raise EvidencePreservationError(record, stages, issues, output) from None
 
 
 def main(argv=None):
@@ -569,6 +634,8 @@ def main(argv=None):
     parser.add_argument('--binary', default='kubectl')
     try:
         print(json.dumps(run(**vars(parser.parse_args(argv))), ensure_ascii=False))
+    except EvidencePreservationError as error:
+        parser.exit(1, json.dumps({'recovery': error.recovery, 'safe_facts': error.safe_facts}, ensure_ascii=False) + '\n')
     except Exception:
         parser.exit(1, 'REQ20_GRAPH_EVIDENCE_UNAVAILABLE\n')
 

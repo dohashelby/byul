@@ -27,3 +27,7 @@ source/code·세대·session·현재 request가 맞는 graph key, 실제 mode, s
 소유 session seal, 소유 HTTP probe 정리, worker 내부 B observer의 `close()`를 구분한다. seal은 worker의 B cache 해제를 증명하지 않는다. 현재 worker 종료 hook과 `.close()` 호출 연결은 A 소유의 미확정 조건이며 `worker_observer_close_verified=None`으로 남긴다. 호스트 증거 파일은 append-only 보존한다.
 
 `sampled_output_copy_completion`은 AsyncGPUModelRunnerOutput의 sampled_token_ids 복사 event에 한정한다. `graph_output_consumption`은 별도 미수집 상태다. CUDAGraphWrapper의 hidden_states 출력과 sampled_token_ids·CPU 복사본의 opaque identity/shape를 각각 기록하며 같은 tensor로 추정하지 않는다. compute_logits/Sampler 등 중간 계산 계보는 `LOGITS_SAMPLER_LINEAGE_UNOBSERVED`로 남긴다. sampled-copy 완료 True도 graph 출력의 소비 완료·overwrite 안전·현재 값 일치 판정으로 사용하지 않는다.
+
+seal 실패와 마지막 수집은 독립적이다. seal이 예외·False여도 마지막 capture를 한 번 시도하며 seal 불확인과 최종 read 실패를 별도로 기록한다. 같은 full coordinate의 동일 관측은 중복 제거하지만 상충한 안전 metadata는 모두 남겨 ambiguous/gap으로 표시하고 자격을 부여하지 않는다.
+
+retained GPU tensor·CPU copy tensor의 안전 descriptor/token, 반환 객체 token, producer stream token을 원 observer의 별도 필드로 보존한다. 첨부 쓰기 실패 시 같은 정제 record를 기존 manual 관측 노트와 반환 summary의 `safe_facts`에 보존한다. 이 경로는 원문·probe body·pointer·GPU 값·비밀을 포함하지 않는다. Store/report 등 후속 저장까지 실패하면 `EvidencePreservationError`의 `safe_facts`·단계별 recovery를 전달하고 CLI는 비정상 종료하며 같은 안전 JSON을 오류 출력으로 제공한다. 파일·관측을 수집 재실행으로 대체하거나 저장 성공으로 표시하지 않는다.

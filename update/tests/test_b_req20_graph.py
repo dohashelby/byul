@@ -476,3 +476,143 @@ def test_same_call_id_in_independent_worker_generation_does_not_drop_observation
     repeated = project(case, raw)
     assert len(repeated['rows']) == len(result['rows'])
     assert len(repeated['sampled_output_copy_completion']) == 2
+
+
+def detailed_capture(case):
+    rows = consumer_rows(case)
+    rows[0]['metadata']['output'] = {'complete': True, 'tensor_items': [{'tensor_token': '4' * 64,
+        'descriptor': {'status': 'collected', 'shape': [2, 64]}}]}
+    for row in rows[1:]:
+        row['metadata'].update(retained_device_output_token='6' * 64, returned_output_token='7' * 64,
+            producer_stream_token='8' * 64, stream_token='9' * 64,
+            retained_output={'tensor_token': '6' * 64, 'descriptor': {'status': 'collected', 'device_type': 'cuda',
+                'dtype': 'torch.int64', 'shape': [1, 1], 'values_collected': False, 'raw': PRIVATE}},
+            copy_host_output={'tensor_token': 'a' * 64, 'descriptor': {'status': 'collected', 'device_type': 'cpu',
+                'dtype': 'torch.int64', 'shape': [1, 1], 'values_collected': False, 'raw': PRIVATE}})
+    return capture(case, rows)
+
+
+def test_existing_safe_retained_host_output_return_and_producer_stream_facts_survive(case):
+    result = project(case, detailed_capture(case))
+    graph = next(r for r in result['rows'] if r['point'] == 'CUDAGraphWrapper.__call__')
+    returned = next(r for r in result['rows'] if r['point'].endswith('get_output') and r['phase'] == 'RETURN')
+    metadata = returned['metadata']
+    assert graph['metadata']['output_metadata']['shapes'] == [[2, 64]]
+    assert metadata['retained_output']['tensor_token'] == '6' * 64
+    assert metadata['retained_output']['descriptor']['shape'] == [1, 1]
+    assert metadata['retained_output']['descriptor']['device_type'] == 'cuda'
+    assert metadata['copy_host_output']['tensor_token'] == 'a' * 64
+    assert metadata['copy_host_output']['descriptor']['device_type'] == 'cpu'
+    assert metadata['returned_output_token'] == '7' * 64 and metadata['producer_stream_token'] == '8' * 64
+    assert metadata['stream_token'] == '9' * 64
+    assert result['graph_output_consumption']['verified'] is None and PRIVATE not in json.dumps(result)
+
+
+@pytest.mark.parametrize('last_read_fails,seal_raises', [(False, True), (True, True), (False, False)])
+def test_final_collection_is_attempted_independently_of_session_seal(case, monkeypatch, last_read_fails, seal_raises):
+    state = {'reads': 0, 'seal': 0, 'labels': []}
+    class Transport:
+        api_model = 'fixture-model'
+        def __init__(self, *args, **kwargs): pass
+        def __call__(self, network, requests, timeout):
+            label = requests[0]['id']; state['labels'].append(label)
+            return [{'id': label, 'outcome': 200, 'capture_complete': True, 'utf8_valid': True,
+                'body_truncated': False, 'body': json.dumps({'tokens': [3, 4], 'count': 2}) if label.startswith('tokenize') else PRIVATE}]
+        def report(self): return {'cleanup_errors': []}
+    class Reader:
+        def __init__(self, *args, **kwargs): self.binding = {'engine': case['target']['kubernetes']['engine']}
+        def snapshot(self): return {'EXAMPLE-generation': 1}
+        def owner_identity(self, *args, **kwargs): raise AssertionError('no real owner read')
+        def read_file(self, *args, **kwargs): raise AssertionError('no real file read')
+        def image_check(self, *args, **kwargs): raise AssertionError('no real image read')
+        def seal_session(self):
+            state['seal'] += 1
+            if seal_raises: raise OSError(PRIVATE)
+            return {'sealed': False}
+    def read(*args, **kwargs):
+        state['reads'] += 1
+        if state['seal'] and last_read_fails: raise OSError(PRIVATE)
+        return {'EXAMPLE-read-index': state['reads']}
+    def metadata(packet, prepared, ids):
+        row = snapshot(case); row['source_qualified'] = row['actual_worker_observed'] = False
+        row['metadata']['buffers']['input_ids']['descriptor']['shape'] = [packet['EXAMPLE-read-index']]
+        return [row]
+    monkeypatch.setattr(tool, '_capability', lambda prepared: True)
+    monkeypatch.setattr('guard.runtime.kubernetes_http.KubernetesHTTP', Transport)
+    monkeypatch.setattr('guard.executors.kubernetes_lifecycle_capture.KubernetesLifecycleReader', Reader)
+    monkeypatch.setattr('guard.executors.lifecycle_session.capture_session', read)
+    monkeypatch.setattr(tool, '_native_rows', metadata)
+    raw = tool._capture_kubernetes(case['env'], case['target'], case['prepared'], case['manifest'], duration=180, binary='kubectl')
+    assert state['seal'] == 1 and state['reads'] == 4
+    assert len(raw['native_rows']) == (3 if last_read_fails else 4)
+    assert 'SESSION_SEAL_UNVERIFIED' in raw['gaps']
+    assert ('FINAL_CAPTURE_UNAVAILABLE' in raw['gaps']) == last_read_fails
+    assert not raw['cleanup']['sealed'] and raw['cleanup']['owned_probe_cleanup_complete']
+    assert raw['cleanup']['worker_observer_close_verified'] is None
+    assert all('body' not in row for row in raw['request_summaries'])
+    assert PRIVATE not in json.dumps(project(case, raw))
+
+
+def test_artifact_failure_preserves_exact_safe_facts_in_manual_and_summary(case, monkeypatch):
+    write = tool._write; raw = detailed_capture(case)
+    def fail_artifact(path, value):
+        if path.name == 'graph-capture.json': raise OSError(PRIVATE)
+        return write(path, value)
+    monkeypatch.setattr(tool, '_write', fail_artifact)
+    result = tool.run(**case['args'], execute=True, _example_capture=lambda *a, **kw: deepcopy(raw))
+    doc = yaml.safe_load((case['args']['output'] / 'manual-evidence.yaml').read_text())
+    answer = doc['checks'][0]['observation_notes'][0]['answer']
+    recovered = json.loads(answer.split('\nREQ20_SAFE_FACTS=', 1)[1])
+    assert recovered == result['safe_facts']
+    assert recovered['sampled_output_copy_completion'][0]['event_complete'] is True
+    assert recovered['graph_output_consumption']['verified'] is None
+    returned = next(r for r in recovered['rows'] if r['point'].endswith('get_output') and r['phase'] == 'RETURN')
+    assert returned['metadata']['copy_host_output']['tensor_token'] == 'a' * 64
+    assert returned['native_record_seq'] > returned['observer_seq']
+    assert result['facts_storage'] == 'manual_declared_observation_notes' and result['status'] == 'stored'
+    evidence, = Store.read_only(case['args']['output'] / 'store').iter_kind('EVD')
+    assert not evidence.artifacts and PRIVATE not in json.dumps(result)
+    assert 'REQ20_SAFE_FACTS=' in json.dumps(evidence.observations['declared_observation_notes'].value, ensure_ascii=False)
+
+
+def test_all_evidence_storage_failures_surface_safe_facts_and_recovery(case, monkeypatch):
+    raw = detailed_capture(case); original_open = Path.open
+    def blocked_open(path, *args, **kwargs):
+        if path.name == 'manual-evidence.yaml' and args and args[0] == 'x': raise OSError(PRIVATE)
+        return original_open(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', blocked_open)
+    monkeypatch.setattr(tool, '_write', lambda *a, **kw: (_ for _ in ()).throw(OSError(PRIVATE)))
+    monkeypatch.setattr(tool, 'import_evidence', lambda *a, **kw: (_ for _ in ()).throw(OSError(PRIVATE)))
+    with pytest.raises(tool.EvidencePreservationError) as error:
+        tool.run(**case['args'], execute=True, _example_capture=lambda *a, **kw: deepcopy(raw))
+    assert not error.value.recovery['success'] and error.value.recovery['status'] == 'failed'
+    assert not error.value.recovery['stages']['artifact_stored'] and not error.value.recovery['stages']['manual_evidence_stored']
+    assert not error.value.recovery['capture_rerun_required']
+    assert error.value.safe_facts['sampled_output_copy_completion'][0]['event_complete'] is True
+    assert PRIVATE not in json.dumps({'recovery': error.value.recovery, 'safe_facts': error.value.safe_facts})
+
+
+def test_cli_preservation_failure_has_nonzero_exit_and_safe_json(case, monkeypatch, capsys):
+    facts = project(case, detailed_capture(case))
+    def failed(**kwargs): raise tool.EvidencePreservationError(facts, {'manual_evidence_stored': False}, [], case['args']['output'])
+    monkeypatch.setattr(tool, 'run', failed)
+    argv = []
+    for key, value in case['args'].items(): argv.extend(['--' + ('plan' if key == 'plan_id' else key.replace('_', '-')), str(value)])
+    with pytest.raises(SystemExit) as error: tool.main(argv)
+    assert error.value.code == 1
+    result = json.loads(capsys.readouterr().err)
+    assert result['recovery']['status'] == 'failed' and result['safe_facts'] == facts
+
+
+def test_same_coordinate_conflicting_metadata_preserves_both_and_is_ambiguous(case):
+    raw = detailed_capture(case)
+    returned = next(r for r in raw['native_rows'] if r['point'].endswith('get_output') and r['phase'] == 'RETURN')
+    other = deepcopy(returned); other['metadata']['event_query']['complete'] = False
+    other['metadata']['consumer']['event_completion_verified'] = False
+    raw['native_rows'].extend([other, deepcopy(other)])
+    result = project(case, raw)
+    returns = [r for r in result['rows'] if r['point'].endswith('get_output') and r['phase'] == 'RETURN']
+    assert len(returns) == 2 and all(r['ambiguous'] and not r['source_qualified'] for r in returns)
+    assert {r['metadata']['event_query']['complete'] for r in returns} == {True, False}
+    assert len(result['ambiguous_coordinates']) == 1 and 'NATIVE_COORDINATE_AMBIGUOUS' in result['gaps']
+    assert not result['sampled_output_copy_completion']

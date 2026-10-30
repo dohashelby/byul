@@ -1617,3 +1617,5 @@ B readiness571c3e5→통합source d0f2ed4: Linux직접283/인접229통과, Windo
 native19 worker startup공통을기존OBS02제품에연결하는초안을마쳤다. 원native8/16/17/18·Bcallback/helper bytes와source/image/lab·native0.32제한을보존한다. Source/decorator·callbackcode·명시root link·session observer정리·closedparser·기존CLI/Ref사례를고정검증한다. LIF09 native14 MPI/READY분기는대체하지않고후속결합으로남긴다. actual worker/GPU0/정책U1~U6미확정·C CPU11의존성답변대기.
 
 native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인접Win291/Linux292통과(기존skip/deselected유지), guard265 source/wheel/Windows설치일치·Linux설치CLI4/정확24Ref복원재판정. 초기fixture/pycache/vocabulary와설치후처리alias실패를보존하고영향만보수했다. 실제worker/GPU/C/Torch0, Bnative/LIF09MPI14추가결합·CI5/기업정책미완료.
+
+- A-1 LIF09 SC17-01 후속: native20에 원 Worker19·MP14 bytes를 조합하고 기존 initialization:kubernetes/팩 파생/EVD 관측에 별도 Worker events/candidates/missing을 연결했다. 정확 ENV/target/model scope·source/image/lab·세대·선정 seal·기존 정상/실패/복구 질문과 UNKNOWN을 유지한다. source 고정 후 직접/인접/설치/정확 Ref 검증 대기다. 실제 worker/GPU·fault/repair/service lineage와 전체 분기는 미완료이며 원GPU창 종료·추가 Start0·의존성 답변 대기를 유지한다.

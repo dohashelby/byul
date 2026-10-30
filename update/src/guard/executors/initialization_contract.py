@@ -6,7 +6,7 @@ POLICY_TYPES={'init_environment_sha256':'str','init_target_sha256':'str','init_p
  'init_validity_start':'str','init_validity_end':'str','init_executor_backend':'str','init_expected_ranks':'list[str]',
  'init_scenario_sha256':'str','init_phase':'str','init_required_stages':'list[str]','init_failure_rank':'int',
  'init_failure_stage':'str','init_preparation_deadline_ms':'int','init_recovery_deadline_ms':'int'}
-OBSERVATIONS={'init_observation_trials':'list','init_native_samples':'list','init_native_calls':'list','init_correspondence':'list',
+OBSERVATIONS={'init_worker_startup_events':'list','init_worker_startup_candidates':'list','init_worker_startup_missing':'list','init_observation_trials':'list','init_native_samples':'list','init_native_calls':'list','init_correspondence':'list',
  'init_missing':'list','init_producer_authenticated':'bool','init_all_preparation_verified':'bool','init_service_gate_verified':'bool',
  'init_cross_phase_lineage_verified':'bool','init_scope_complete':'bool'}
 

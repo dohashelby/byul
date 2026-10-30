@@ -13,11 +13,11 @@ import uuid
 from guard.adapters import vllm_template_boundary as native
 
 SOURCE_COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
-PRODUCT_COMPONENT_COMMIT='4a7d7f6511293d0245ba9678aba7c437642eabd2'
+PRODUCT_COMPONENT_COMMIT='505bbbcb5fcb2eeed86c1739731b09b73e92990e'
 HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 BASE_SHA='c9af729cd1893eda14d0bb222a8fab46c2a6d7b8'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock','update/pyproject.toml','update/reference/framework')
-BUILDER_SHA256='df714bbc7cc99f029a3871034a80335deb16b9eb9dca8fc26e6324fe3678706b'
+BUILDER_SHA256='b2ffa5aa4c3afe4b8c412e03f2352b5864fe5dc0c56d2482e143f001c24f087a'
 MAX_EVENTS=128
 MAX_WRAPPER_ARGS=32
 TEMPLATE_SHA256='38110f6e668d55f240ecfde0d38f5fecc7c11a742d76823ffd9d0918abb9fe36'

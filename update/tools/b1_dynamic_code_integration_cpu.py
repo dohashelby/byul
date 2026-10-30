@@ -30,10 +30,10 @@ from tools import lif14_profiler_cpu as component_gate
 PROFILE = 'sup09-11-shared-source-cpu-proposal-v1'
 SOURCE_PROFILES = {'reference5d': '5d35ce3934a7804b298559d2d99eec33792e1eb9',
                    'target031': 'db9527a46873454610df6dbedf79a36d6bf1a7f6'}
-GATE_SHA256 = 'd1a9bcc91c85ead9ff226dddd198bf26ecf14f12aacaa89f8ea4903984163a7d'
-COMPONENT_COMMIT = '4a7d7f6511293d0245ba9678aba7c437642eabd2'
+GATE_SHA256 = '11e97be27027e378e451e67981a538747469b46cb821be83716869d1190a1e99'
+COMPONENT_COMMIT = '505bbbcb5fcb2eeed86c1739731b09b73e92990e'
 # Reviewed collector snapshot f239748; runtime hashes never become approval.
-COLLECTOR_SHA256 = 'af0e3f4da5d2fee984b445565b270eac4f57cdb5a547cd57b448e2ee274a83e6'
+COLLECTOR_SHA256 = '12200336591df96e724bff338d5bd70da46781f697337d88b94b630991765cd1'
 CHECKS = ('SUP-09', 'SUP-11')
 _CASES = {case['case_id']: case for case in product.fixtures()}
 _MODES = {'normal': 0, 'O': 1, 'OO': 2}

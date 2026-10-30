@@ -59,6 +59,14 @@ def make_world(session='a'*32,mode='normal',patch=None):
     observer=Observer()
     for module in (wrapper,worker,router):
         observer.instrument(module)
+        # instrument() checks/wraps points; CheckedLoader separately emits this
+        # MODULE journal in a real import. The EXAMPLE module executes selected
+        # exact bodies, so supply that explicit fixture precondition from the
+        # already pinned full-source code, never from an unchecked live module.
+        info={'source_sha256':sensor.SOURCE_ADDITIONS[module.__name__],
+            'code_sha256':base.code_digest(loaded[module.__name__]['<module>'])}
+        observer.modules[module.__name__]=info
+        observer.emit('MODULE',{'module':module.__name__,'verified':True,**info})
         assert observer.modules[module.__name__]['source_sha256']==sensor.SOURCE_ADDITIONS[module.__name__]
     backend=Backend(mode);profile=torch_cls();profile.__dict__.update(_active=False,_running=False,_delay_iters=1 if mode=='delayed' else 0,
         _max_iters=1 if mode=='automatic-stop' else 0,_active_iteration_count=0,_profiling_for_iters=0,

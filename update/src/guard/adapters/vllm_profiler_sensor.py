@@ -26,7 +26,7 @@ POINTS=frozenset(POINT_SOURCES)
 MAX_ROWS=2048
 MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_profiler_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'d8c771878b4ed643fed2f773292906f8ef3d2eb4fd029e6df707625ac9e7342b','cpython-3.12.3':'d8c771878b4ed643fed2f773292906f8ef3d2eb4fd029e6df707625ac9e7342b'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'d8c771878b4ed643fed2f773292906f8ef3d2eb4fd029e6df707625ac9e7342b','cpython-3.12.3':'e6610f2a9ad34582058a182261d6acf9219e2124d27d643233c12b0c0a694e6c'}
 _BASE=None
 _CALL=contextvars.ContextVar('guard_profiler_call',default=None)
 

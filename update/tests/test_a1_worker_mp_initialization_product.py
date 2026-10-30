@@ -51,7 +51,9 @@ class World(original.World):
                 # Keep source/other model facts, while explicit Worker events are absent.
                 values=[r for r in values if r['event'] not in {'WORKER_STARTUP','WORKER_STARTUP_LINK'}]
             if self.worker_mode=='duplicate':
-                values.append(deepcopy(next(r for r in values if r['event']=='WORKER_STARTUP' and r['payload']['phase']=='CALL')))
+                duplicate=deepcopy(next(r for r in values if r['event']=='WORKER_STARTUP' and r['payload']['phase']=='CALL'))
+                duplicate['monotonic_ns']=max(r['monotonic_ns'] for r in values)+1
+                values.append(duplicate)
             rows[-1]['monotonic_ns']=max(rows[-1]['monotonic_ns'],max(r['monotonic_ns'] for r in values)+1)
             rows[index:index]=values
         self.group.raw_by_pid[42]=revised(self.group.raw_by_pid[42],insert)
@@ -136,7 +138,8 @@ def test_joint_events_are_not_admitted_by_relabeling_old_profiles(tmp_path,group
     from guard.executors.lifecycle_capture import parse_recording
     world,values,pack,receipt=inputs(tmp_path,group,native_target,'normal',monkeypatch,'normal')
     world.add_native()
-    assert parse_recording(group.raw_by_pid[42],group.prepared)['summary']['initialization_event_count']>0
+    records,summary=parse_recording(group.raw_by_pid[42],group.prepared)
+    assert summary['initialization_event_count']>0
     prepared=deepcopy(group.prepared);prepared['profile']=profile
     def header(rows):
         rows[0]['payload'].update(profile=profile,schema='guard-native-lifecycle-events/'+profile.rsplit('/',1)[1])

@@ -41,7 +41,7 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
     supported_native_profiles=KubernetesRequestTerminationExecutor.supported_native_profiles|{attempt_sensor.PROFILE,output_sensor.PROFILE}
 
     def collect(self,ctx):
-        start,end=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex
+        start,end=self.policy_normalizer(ctx.policy_values);token=uuid.uuid4().hex
         summary={'profile':PROFILE,'trials':[],'native':None,'diagnostic_codes':[],'fixture':{'profile':PROFILE},
             'producer_authenticated':False,'worker_identity_verified':False,'state_semantics_verified':False,'whole_scope_complete':False,
             'scope':'HTTP availability, normal output shape, client close and source-correlated native facts; no independent worker/state truth'}

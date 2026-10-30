@@ -1524,3 +1524,5 @@ git status
 - A1 PLT11/SC19-02: 원criteria/76bytes 보존 파생팩·기존 CLI/registry와 닫힌 keep-alive5GET/동일 probe socket 및 별도 새 연결/native8 결합 초안. 구현/직접·인접회귀/문서 종료 후 고정·검증 준비이며 미검증·전체분기 미완료. issuer/cache/잔존 정책 질문 대기; source/lab/image/native0.32/원GPU Start0/CI결제차단 유지.
 
 - A1 PLT11 선정 probe keep-alive: 고정f0c0972 Windows264/Linux265, source/wheel/설치229파일, CLI4 정확24Refs(7.772초), 전체337 고정 소비372f354. 초기pin실패는 세 A1파일을 기존 reviewed blob bytes에 맞춘 것으로 보수; AST/판정/gate 유지. 실제 issuer/앱session·handle·전체PLT11 미완료. 다음PLT12 원범위·필수정책/관측 경계 검토.
+
+- A1 OBS02 SC23-05 profiler: 고정0.31 공식/이미지source3개 일치, opt-in native15(call/parent/object/source/code/전후flag)와 typed parser·기존 OBS02 HTTP/CLI·원기준파생팩 연결 초안. backend stop 예외와 stop후출력 예외를 분리하고 모든축UNKNOWN/실제backend·산출·다음시작 미확인을 유지한다. 회귀/문서 종료 뒤 고정·검증·설치/PR/인계를 진행하며 현재 미검증이다.

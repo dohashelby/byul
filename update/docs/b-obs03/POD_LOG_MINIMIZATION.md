@@ -79,3 +79,29 @@ python -B -m pytest tests/test_log_minimization_evidence.py -q --basetemp=EXTERN
 실제 collector/A108 HTTP 연결은 별도 고정 소스 통합 검증으로 구분한다.
 preflight의 lazy import·출력 미생성·torch/vLLM 미수입은 새 Python subprocess에서 확인한다.
 같은 pytest 수집 과정에서 collector 시험 모듈이 먼저 import되더라도 이 검증은 독립적으로 동작한다.
+
+## 고정 소스 검증 결과 (2026-10-30)
+
+검토 소스 `60f88b0261a1d79f229ba0c913a54a6725bafd6a`의 collector·bridge와
+수정된 UTF-8/전체 분기 교집합/lazy-import 경계를 검증했다. collector 직접 60개,
+bridge 직접 30개 및 지적사항 관련 회귀를 재사용했다. 실제 collector와 A 공개 metadata
+reader를 EXAMPLE 전송에 연결한 원 manual→EVD→RES→RPT→반출/복원 통합은
+2개 통과(0.91초)했다. wheel의 guard 168개 파일이 소스·설치본과 같고 새 모듈을
+독립 import했으며 torch/vLLM은 로딩하지 않았다.
+
+A108 고정 소비 소스 `be0eebefef6586dfca75384b229e93530ad7fbfb`에서는 실제
+stdlib HTTP 자식으로 loopback 200/400/200 한 번을 확인했다. 로그·metadata는
+EXAMPLE 입력이며 실제 Kubernetes 결과는 0회다. UTF-8 수정 후의 통합 소스는
+위 직접 회귀로 확인하고 같은 HTTP 실행은 반복하지 않았다.
+
+기존 PR #130 통합 component `4a7d7f6511293d0245ba9678aba7c437642eabd2`의
+전체 pin 대상 tree가 검토 소스와 같음을 확인했다. B 전용 11개 도구의 component·
+의존 SHA literal만 갱신하고 나머지 AST, 원 helper858·공동 기준선·팩·fixtureac8을
+보존했다. 원 strict gate와 REQ09 수집 의존성 확인도 통과했다. 기존 source CPU
+실측과 설치 검증을 재사용한다.
+
+원본 실패·수정 회귀·설치 검증·정제된 EXAMPLE Store와 검토 소스는 저장소 밖
+`byul-b-record-access-evidence-20261030/obs03-selected`에 보존했다. 실제 대상 실행은
+승인된 target/POL과 A 공개 HTTP capability를 갖춘 통합 소스에서 위 명령의
+`--execute`로 수행한다. caller/private 문맥, 다른 필수 로그 사본, 모델 정상 대조와
+실제 운영 환경은 남은 범위다.

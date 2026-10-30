@@ -19,13 +19,15 @@ from tests.test_a1_kubernetes_model_authorization_product import World as BaseWo
 from tests.test_route_auth_sensor import begin,application,scope,invoke,AUTH
 from tests.test_registered_route_handler import Router
 from tests.test_completion_handler_sensor import application as completion_app,MODULE as COMPLETION
+from tests.test_a1_attempt_binding_product import owned_loop
 from guard.adapters import vllm_lifecycle_sensor as sensor
 from tools.build_kubernetes_native_route_pack import derive
 
 PRIVATE='EXAMPLE_REQ02_NATIVE_PRIVATE'
 
 class World(BaseWorld):
-    def setup(self,writer_factory,monkeypatch):
+    def setup(self,writer_factory,monkeypatch,loop):
+        self.loop=loop
         self.observer,self.writer,self.fake=begin(self.group,writer_factory,monkeypatch)
         self.writer.write('MODULE',{'module':COMPLETION,'verified':True,'source_sha256':sensor.SOURCE_SHA[COMPLETION],'code_sha256':'c'*64})
         self.get_app,_,_=application(self.observer,monkeypatch,router_factory=Router)
@@ -42,8 +44,8 @@ class World(BaseWorld):
         role='missing' if 'Authorization' not in request['headers'] else 'wrong' if self.mode=='denied' else 'valid'
         value=scope(role,header=rid,path='/v1/completions' if completion else '/v1/models');value['method']=request['method']
         selected=self.post_app if completion else self.get_app
-        asyncio.run(invoke(selected,value))
-        if self.mode=='duplicate' and request['id']=='req02-models-before':asyncio.run(invoke(selected,deepcopy(value)))
+        self.loop.run_until_complete(invoke(selected,value))
+        if self.mode=='duplicate' and request['id']=='req02-models-before':self.loop.run_until_complete(invoke(selected,deepcopy(value)))
         self.group.raw_by_pid[42]=bytes(self.fake.data)
         if self.mode=='source-module-missing':
             self.group.raw_by_pid[42]=revised(self.group.raw_by_pid[42],lambda rows:rows.__setitem__(slice(None),[r for r in rows if not(r['event']=='MODULE' and r['payload']['module']==AUTH)]))
@@ -71,10 +73,10 @@ class World(BaseWorld):
                     self.group.raw_by_pid[42]=revised(self.group.raw_by_pid[42],lambda rows:rows.__setitem__(slice(None),[r for r in rows if not(r['event']=='MODULE' and r['payload']['module']==AUTH)]))
         return super().runner(argv,**kwargs)
 
-def inputs(tmp_path,group,target,monkeypatch,writer_factory,mode):
+def inputs(tmp_path,group,target,monkeypatch,writer_factory,mode,loop):
     env=group.env.model_copy(deep=True);env.model.id='EXAMPLE-model';env.model.revision='EXAMPLE-revision';group.env=env.seal()
     target=deepcopy(target);target['environment_ref']=group.env.ref().model_dump(mode='json')
-    world=World(group,target,mode);world.setup(writer_factory,monkeypatch)
+    world=World(group,target,mode);world.setup(writer_factory,monkeypatch,loop)
     shutil.copytree(group.manifest_path.parent,tmp_path/'prepared')
     derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack');now=utcnow()
     values={'route_native_environment_sha256':group.env.ref().sha256,'route_native_target_sha256':sha256_hex(canonical_json(world.target)),
@@ -84,8 +86,8 @@ def inputs(tmp_path,group,target,monkeypatch,writer_factory,mode):
 
 @pytest.mark.parametrize('mode',['normal','denied','missing-key','rewrite','duplicate','source-module-missing','after-timeout','wrong-response-method',
     'native-partial','native-one-missing','engine-replaced','seal-failure','unclosed','attachment','http-cleanup'])
-def test_registered_product_keeps_observations_unknown_and_exact_refs(tmp_path,group,native_target,monkeypatch,writer_factory,mode):
-    world,values,pack=inputs(tmp_path,group,native_target,monkeypatch,writer_factory,mode)
+def test_registered_product_keeps_observations_unknown_and_exact_refs(tmp_path,group,native_target,monkeypatch,writer_factory,mode,owned_loop):
+    world,values,pack=inputs(tmp_path,group,native_target,monkeypatch,writer_factory,mode,owned_loop)
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr('guard.executors.kubernetes_lifecycle_capture.capture_pipes',world.runner)
     def forbidden(*a,**kw):raise AssertionError('unexpected external execution')
     monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket,'socket',forbidden)
@@ -160,9 +162,9 @@ def test_closed_own_profile_rejects_bad_request_before_io(bad):
     assert calls==[]
 
 @pytest.mark.parametrize('bad',['prepared-pin','lab-false','native032','key-env','key-shape','unknown-config'])
-def test_preflight_keeps_source_lab_profile_and_explicit_key_boundaries(tmp_path,group,native_target,monkeypatch,writer_factory,bad):
+def test_preflight_keeps_source_lab_profile_and_explicit_key_boundaries(tmp_path,group,native_target,monkeypatch,writer_factory,bad,owned_loop):
     from guard.executors.kubernetes_native_route import KubernetesNativeRouteExecutor
-    world,values,pack=inputs(tmp_path,group,native_target,monkeypatch,writer_factory,'normal')
+    world,values,pack=inputs(tmp_path,group,native_target,monkeypatch,writer_factory,'normal',owned_loop)
     cfg={'target':str(tmp_path/'target.json'),'prepared':str(tmp_path/'prepared/manifest.json')};environ={}
     if bad=='prepared-pin':values['route_native_prepared_sha256']='0'*64
     if bad=='lab-false':world.target['lab']=False;values['route_native_target_sha256']=sha256_hex(canonical_json(world.target))

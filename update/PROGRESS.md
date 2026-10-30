@@ -1539,3 +1539,8 @@ git status
 - A2 fac0907302d78c271d0b571d2413f7a8f4b295e5의4파일을 원본 bytes로 통합하고 기존 ab84 public IPC v1에 최소 unix_ipc:kubernetes registry·wrapper·PLT02 명시 DRAFT팩을 연결했다. 실제 groups·actor/collector/source·owner/peer 조건과 독립FAIL은 A2 전용 소비를 재사용한다.
 - source0bb4253/검토pin07cdbe6: Windows456통과·기존skip1/미선정1, Linux457통과/미선정1·동일1314파일, 소비344파일, 설치236일치, 설치CLI4사례·정확24Ref 반출/복원·저장팩 재판정을 확인했다. 후속 수집/normal/report/첨부/정리 오류가 앞선 독립FAIL을 지우지 않는다. 설치 대역의 argv 위치 오류와 수정 결과를 함께 보존했으며 제품/gate/assert 의미는 그대로다.
 - 지원은 lab=true/vLLM0.31/CPython3.12 CPU/EXAMPLE 제품 연결이다. 실제Kubernetes/socket/actor/worker/message·전체IPC/PLT02와 현재 전체suite는 미확인이다. 부모A39/56/4·A1 19/27/2·A2 20/29/2와 원승인/비용/Start0·CI결제 외부차단을 유지한다. 다음은 새 확정 인계 범위를 대조한 뒤 PLT07 최소 egress 공통 계약이다.
+# 2026-10-30 A1 PLT07 최소 Kubernetes 공통 입력 착수
+
+- A2의 확정 egress 검토와 현재 공통 입력을 대조했다. 기존 sender/receiver/ACK/receipt·원Docker 실행기/POL/판정 bytes를 보존하며 공개 egress_snapshot·정확13키 Kube POL binding·8키 receiver target·typed 부분 관측·전체30초/행·출력 한도를 구현했다. 실제 credential이 명시 actor와 이미 같을 때만 단일 TCP helper를 허용하고 새 기동/권한 전환은 없다.
+- 구현·회귀·문서 초안 및 정적검토 뒤 source/hash 고정 전이다. 아직 새 통과/설치/실제 실행을 주장하지 않는다. A2 전용 envelope 소비와 정식 registry/팩/CLI는 새 확정 전달물 뒤 별도로 연결하며 helper를 전체5분기/취득/cache/usage/telemetry 완료로 집계하지 않는다.
+- B PR130 f154419의 OBS06 수동 증거와 REQ09 source-CPU 문서를 확인했다. 새 A registry/팩 등록 요구와 직접 제품 경로를 구분했으며 전체 B branch 또는 미완성 전용 소스를 대신 작성하지 않았다. 원GPU창 종료/Start0·비용·기존Goal/담당 범위를 유지한다.

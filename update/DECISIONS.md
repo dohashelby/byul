@@ -601,3 +601,6 @@ NetworkPolicy 회수≠credential issuer 철회. PLT10은 기존 native8과5개 
 2026-10-30 PLT02: A2 fac0907의 실제 groups·actor/collector/source·경로별 전후 근거 소비를 원본 bytes로 통합한다. A1은 기존 public IPC v1의 wrapper/정식등록/팩·핀·cleanup/출처 경계만 연결하고, 후속 수집·정상/report/첨부/정리 오류가 앞선 독립FAIL을 지우지 않게 한다. 원본probe·legacy parser·공통source pins는 유지한다.
 
 사용자 답변: A1이 사건/출처/물리세대 결합·계측·parser·제품 소비의 기술 계약을 설계하고, 실제 승인/검사 주체·허용 대상·정책·운영 범위는 사용자 결정으로 남긴다. 기존 OBS01 /1 선언과 native8 configured-object/load 경계의 결합 후보는 기존 CLI에서 소비하되 실제 승인/검사/최종 tensor 소비로 승격하지 않으며 근거 전 모든 판정축 UNKNOWN을 유지한다.
+# 2026-10-30 A1 PLT07 Kubernetes 공통 경계
+
+기존 Docker CID/POL·A2 predicate와 sender/receiver bytes는 유지한다. 새 Kube capability는 정확 full containerd ID·양쪽 target SHA와 명시 UID/netns·소유 receiver/source를 요구하고, 실행 helper 자체의 현재 UID/GID/groups가 이미 일치할 때만 송신한다. 다른 UID 전환/새 Pod 또는 receiver 기동·worker/SDK/기업 허용표는 추가하지 않는다. 공통 typed 부분 자료와 전용 분석·정식 제품·actual·전체5분기를 분리하고, 후속 오류가 이전 자료를 지우지 않게 한다. UNKNOWN/EXAMPLE·source/image/lab/native0.32 관문을 유지한다.

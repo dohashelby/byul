@@ -754,6 +754,13 @@ class KubernetesHTTP:
         return capture(self,policy_values,actor_specs=actor_specs,
             connect_timeout=connect_timeout,total_timeout=total_timeout)
 
+    def egress_snapshot(self, policy_values, *, receiver_target, actor_spec, connect_timeout, total_timeout):
+        """One explicit owned TCP sample; A2 owns the dedicated consumer."""
+        from .kubernetes_egress import capture
+        try:return capture(self,policy_values,receiver_target=receiver_target,actor_spec=actor_spec,
+            connect_timeout=connect_timeout,total_timeout=total_timeout)
+        except Exception:raise ValueError('KUBERNETES_EGRESS_INPUT_INVALID') from None
+
     def api_hop_snapshot(self, policy_values, timeout):
         """One explicit policy-bound HTTP hop for the existing PLT08 consumer."""
         from .kubernetes_api_hop import capture

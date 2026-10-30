@@ -29,4 +29,8 @@ POL은 정확 route_native_environment_sha256, route_native_target_sha256, route
 
 후속 HTTP/native 수집·교체/restart·부분 파일·seal/report·첨부·parent 정리 실패가 앞선 정제 trials/index 자료를 지우지 않게 한다. 기술 수집 불완전은 ABORTED이고 선언된 deny+handler 관측은 미인증 후보로 남긴다. 새 PASS/독립 위반 규칙은 만들지 않으며 기존 다른 점검의 독립 FAIL은 유지한다. 원문 요청/응답·키와 키hash·Pod env/argv·임의 예외문은 저장하지 않는다.
 
-현재 구현·회귀·문서 초안 종료와 정적검토 뒤 source/hash 고정 전이다. 직접/인접/동일bytes Linux·설치CLI와 정확 Ref를 실행 전 통과로 기록하지 않는다. 실제 serving/Gateway/backend/Kubernetes/GPU 검증·전체REQ02/부모A 완료는 별도다. 원GPU 승인창 종료/추가Start0·46.66USD/기존 사용량/보존120GiB EBS·CI결제 외부차단·부모A39/56/4·A1 19/27/2·c9와 원본/sources/worktree/팩/Ref를 보존한다.
+검증 source는 `3b871a8a2fe55256f890c0e1591d13a648d72c0b`, 검토 pin은 `065eb9b1e24648c84efa9ec4fd327088e9b85e3b`다. Windows45통과72.41초(parent73.535), 동일1324파일 Linux45통과21.68초(parent22.549)를 확인했다. 설치241파일 일치20.413초, 격리 설치본 CLI4사례(normal/after-timeout/native-one-missing/attachment)15.488초·정확24Ref 반출/복원·저장팩 재판정, 전체소비349파일·기존96파일 보존을 확인했다. native8..15 hook/source bytes와 기존 IPC/egress method는 그대로다. 이전 인접 통과를 새 전체suite 통과로 합산하지 않는다.
+
+실패 이력은 보존했다. 최초 d91b4f0의 Windows356통과/신규15실패/기존skip1/미선정1은 새profile 모델별칭 호환 누락과 시험 report 기본출력의 source report.json 생성이 있었다. 생성 보고서는 저장소 밖 증거로 보존하고 출력 경로를 fixture tmp로 고쳤으며 최초 전체 source 불변 성공을 주장하지 않는다. f2af6d4는 Windows54통과/12실패·Linux381통과/12실패였고 신규fixture가 외부socket 차단 뒤 asyncio 루프를 만들어 막힌 경우다. 기존 owned_loop를 재사용했고 차단·기대 판정은 유지했다. e51b819의35/35통과와 정리 사례1실패 후, 기존 CLI cleanup exit1을 명시 검증하고 새제품의 cleanup ABORTED를 연결했다. 최신45/45는 이 보수·pin에 필요한 직접 범위이며 변경 없는 인접 근거와 구분한다.
+
+최종 문서 마감 커밋·검증 source·wheel source·정확HEAD CI를 구분한다. 실제 serving/Gateway/backend/Kubernetes/GPU 검증·전체REQ02/부모A 완료는 별도다. 원GPU 승인창 종료/추가Start0·46.66USD/기존 사용량/보존120GiB EBS·CI결제 외부차단·부모A39/56/4·A1 19/27/2·c9와 원본/sources/worktree/팩/Ref를 보존한다.

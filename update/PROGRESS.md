@@ -1552,3 +1552,8 @@ git status
 
 - 기존 native8 hook/route_handler_index·고정 source/PID/session reader/seal을 재사용해 REQ02 전용3HTTP·native_route:kubernetes registry·명시 DRAFT팩·동일 recording metadata 결합을 구현했다. 기존 route_record 제품과 다른76개 정의·A2/B/native8~15 bytes를 보존한다. 명시 환경 변수 시험 키만 선택 소비하고 값/키hash를 저장하지 않는다.
 - 준비된 본인 분기 개발이며 실제 principal/권한/Gateway rewriting 정책 미확정을 독립 코드 전체의 차단으로 삼지 않는다. 모든판정UNKNOWN/normal null·실제producer/nodeimage/worker/전체scopefalse를 유지한다. 구현/회귀/문서 초안 종료 후 source고정·영향/설치·정확Ref·커밋/초안PR/CI/인계를 이어간다. 아직 시험 통과나 실제 실증을 기록하지 않는다.
+# 2026-10-30 A1 REQ02 native 인증·등록 handler 제품 검증 마감
+
+- 고정 source3b871a8/검토pin065eb9b에서 Windows45·Linux45통과/동일1324파일, source/wheel/설치241일치, 설치CLI4·정확24Ref 반출/복원·저장팩 재판정·전체소비349를 확인했다. 기존96파일/native8~15·IPC/egress 메서드·원PACK31/76정의와 route_record를 보존했다.
+- 최초 모델별칭 호환 누락/시험report source출력, 다음fixture event-loop 생성 순서, cleanup exit1/ABORTED 보수를 원본 실패와 함께 기록했다. 기존 socket 차단·판정기대·source/lab/image/완전성 관문과 B원본c9 pin을 유지했다. 각 고정source의 직접/인접/설치 범위를 구분하며 현재 전체suite 통과로 합산하지 않는다.
+- 새제품은 자기 요청·같은 native recording의 auth bool/경로/등록 callback·source/module/seq 관측이다. 실제principal/정책/Gateway rewrite/producer/nodeimage/worker/전체scope는 false, 판정전축UNKNOWN/normal null·actual0이다. 다음 확정 전달물과 준비된 본인 분기를 이어가며 원승인창/추가Start0/비용/EBS·Goal범위를 유지한다.

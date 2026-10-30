@@ -309,3 +309,22 @@ def test_capture_mode_must_equal_original_selected_zero_copy(case, mode):
         result = tool.project(raw, case['config'])
         assert result['mode'] == 'zero_copy'
         assert result['existing_native_references']['consumers'][0]['digest_relation'] == 'same'
+
+
+def test_actual_native_cpu_by_value_unavailable_status_is_preserved(case):
+    raw = native_capture(case)
+    raw['consumers'][0]['held_after'] = {'collected': False, 'status': 'unsupported_cpu_by_value',
+        'cuda_ipc_rebuilt': None, 'is_cuda': None, 'device_index': None, 'selected_count': None,
+        'digest_sha256': None, 'read_completion': None, 'shape': None, 'dtype': None}
+    fact = tool.project(raw, case['config'])['existing_native_references']['consumers'][0]
+    assert fact['held_after']['status'] == 'unsupported_cpu_by_value' and not fact['held_after']['collected']
+    assert fact['digest_relation'] == 'unavailable'
+
+
+def test_cpu_by_value_cannot_be_native_path_even_with_valid_digest(case):
+    raw = native_capture(case)
+    raw['consumers'][0]['held_after'].update(status='unsupported_cpu_by_value', is_cuda=False, cuda_ipc_rebuilt=False)
+    fact = tool.project(raw, case['config'])['existing_native_references']['consumers'][0]
+    assert fact['held_after']['status'] == 'unsupported_cpu_by_value'
+    assert not fact['held_after']['native_path_claimed'] and fact['digest_relation'] == 'unavailable'
+    assert not fact['native_measurement_verified']

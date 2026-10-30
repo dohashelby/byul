@@ -199,7 +199,7 @@ def _read_fact(value, config):
         'peer_generation_verified_claimed': value.get('peer_generation_verified') is True,
         'daemon_generation_sha256_claimed': value.get('daemon_generation_sha256') if _sha(value.get('daemon_generation_sha256')) else None,
         'status': value.get('status') if value.get('status') in {'read', 'unavailable', 'read_error', 'unsupported_non_cuda',
-            'unsupported_layout', 'unsupported_empty', 'not_attempted', 'daemon_epoch_changed', 'daemon_epoch_unavailable'} else 'unavailable'}
+            'unsupported_layout', 'unsupported_empty', 'unsupported_cpu_by_value', 'not_attempted', 'daemon_epoch_changed', 'daemon_epoch_unavailable'} else 'unavailable'}
 
 
 def project(raw, config):

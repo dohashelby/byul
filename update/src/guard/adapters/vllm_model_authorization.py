@@ -71,6 +71,7 @@ def project_configured_models(packet, attempts, *, locators=False):
                         'same_process_request_assignment_observed':any(a.get('event',[None])[0]==capture_index for a in assignments),
                         'context':dict(capture['records'][0]['payload']['context']),
                         'capture_sha256':capture['provenance']['capture_sha256'],
+                        'native_image_reference':dict(capture['provenance'].get('native_image_reference',{})),
                         'recording_closed':capture.get('summary',{}).get('recording_closed') is True,
                         'recorded_modules':[{k:event['payload'].get(k) for k in ('module','verified','source_sha256','code_sha256')}
                             for event in capture['records'] if event['event']=='MODULE']}

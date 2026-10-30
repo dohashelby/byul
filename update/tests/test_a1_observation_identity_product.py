@@ -143,20 +143,25 @@ def test_registered_identity_records_native_candidates_and_exact_refs(tmp_path,g
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     assert e.data_origin.value=='EXAMPLE' and all(getattr(res.verdicts,k).value=='UNKNOWN' for k in ('security','functional','performance'))
     assert e.normal_control.succeeded is None
-    preflight=mode in {'version032','prepared-mismatch'}
-    if preflight:assert not world.sent and world.record_reads==0
+    preflight=mode in {'version032','prepared-mismatch','actual-lab-false'}
+    if preflight:
+        assert not world.sent and world.record_reads==0 and e.execution.status.value=='ABORTED'
+        assert all(e.observations[key].collected is False for key in contract.TRUTH_FIELDS)
     else:
         for key in contract.TRUTH_FIELDS:assert e.observations[key].value is False
         candidates=e.observations['identity_binding_candidates'].value
         if mode in {'normal','attachment','late-record-error','record-cleanup'}:
-            assert any(c['same_process_native_model_link_observed'] and c['declared_record_pair_consistent'] for c in candidates)
+            assert any(c['same_process_configured_object_observed'] and c['declared_record_pair_consistent'] for c in candidates)
+            assert all(c['same_process_native_model_link_observed'] is False and c['native']['source_image_digest_verified'] is False for c in candidates)
+            assert all(c['api_image_reference_bound'] is True for c in candidates)
             for c in candidates:
                 assert not c['actual_inventory_verified'] and not c['actual_consumption_verified'] and not c['approval_authority_verified'] and not c['confirmed_violation']
                 assert c['native']['native_locator']['capture_sha256']
         if mode=='normal':
             assert len(world.sent)==5 and world.record_reads==3 and e.execution.status.value=='COMPLETED'
             assert all(c['declared_record_pair_consistent'] and c['configured_ENV_model_match_observed'] for c in candidates)
-        if mode in {'cross-process','cross-clock','unclosed'}:assert not any(c['same_process_native_model_link_observed'] for c in candidates)
+        if mode in {'cross-process','cross-clock','unclosed'}:
+            assert not any(c['same_process_configured_object_observed'] or c['same_process_native_model_link_observed'] for c in candidates)
         if mode in {'duplicate-approval','duplicate-consumption','wrong-declared-target','wrong-declared-policy'}:
             assert e.observations['identity_conflict_candidates'].value and not any(c['declared_record_pair_consistent'] for c in candidates)
         if mode in {'record-extra','wrong-record-source','wrong-record-target','forged-authentication'}:

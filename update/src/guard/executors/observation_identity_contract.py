@@ -9,7 +9,7 @@ PROFILE='kubernetes-observation-identity-candidates-v1'
 POLICY_TYPES={**BASE_POLICY,'identity_prepared_sha256':'str','identity_record_session':'str','identity_record_source_sha256':'str'}
 TRUTH_FIELDS=('identity_producer_authenticated','identity_approval_authority_verified','identity_approval_model_scope_verified',
  'identity_inspection_verified','identity_actual_consumption_verified','identity_record_worker_generation_verified',
- 'identity_record_time_order_verified','identity_enterprise_policy_adopted','identity_scope_complete')
+ 'identity_record_time_order_verified','identity_node_runtime_image_verified','identity_enterprise_policy_adopted','identity_scope_complete')
 OBSERVATIONS={'identity_record_collections':'list','identity_declared_records':'list','identity_native_models':'list',
  'identity_binding_candidates':'list','identity_conflict_candidates':'list','identity_missing':'list',**{k:'bool' for k in TRUTH_FIELDS}}
 SEMANTIC_GAPS=('approval_authority_unverified','approval_model_scope_not_in_OBS01_v1','inspection_contract_unavailable',
@@ -46,13 +46,17 @@ def correlate(snapshots,models,*,run_sha256,target_sha256,source_sha256,model_sh
         consumed=[r for r in records if r['record']['event']=='ARTIFACT_CONSUMED' and r['record']['request_sha256']==trial['request_id_sha256']]
         for native in trial['configured_model_candidates']:
             locator=native['native_locator']
-            native_link=(trial['binding_verified'] and trial['policy_window_verified'] and native['same_process_loader_object_linked']
-                and native['source_process_context_verified'] and native['source_image_digest_verified']
+            object_link=(trial['binding_verified'] and trial['policy_window_verified'] and native['same_process_loader_object_linked']
+                and native['source_process_context_verified']
                 and locator['recording_closed'] and locator['loader_sequences_complete'] and locator['same_process_request_assignment_observed'])
+            native_link=object_link and native['source_image_digest_verified']
+            api=locator['native_image_reference']
+            api_link=api.get('api_binding_verified_before') is True and api.get('api_binding_verified_after') is True
             configured_match=(native['configured_model_sha256']==model_sha256 and native['configured_revision_sha256']==revision_sha256)
             row={'case_id':trial['case_id'],'request_id_sha256':trial['request_id_sha256'],
                 'native':native,'expected_ENV_model_sha256':model_sha256,'expected_ENV_revision_sha256':revision_sha256,
                 'declared_ENV_inventory_sha256':inventory_sha256,'actual_inventory_verified':False,
+                'same_process_configured_object_observed':bool(object_link),'api_image_reference_bound':bool(api_link),
                 'same_process_native_model_link_observed':bool(native_link),'configured_ENV_model_match_observed':bool(configured_match),
                 'consumption_record_count':len(consumed),'approval_record_count':0,'consumption_locator':None,'approval_locator':None,
                 'declared_record_pair_consistent':False,'mismatched_fields':[],'missing_fields':[],
@@ -77,6 +81,7 @@ def correlate(snapshots,models,*,run_sha256,target_sha256,source_sha256,model_sh
                     # physical model, authenticated issuer or actual tensor use.
                     row['declared_record_pair_consistent']=not row['missing_fields'] and not row['mismatched_fields']
             if not native_link:missing.append('same_process_native_model_link_unavailable')
+            if not native['source_image_digest_verified']:missing.append('node_runtime_image_unverified')
             if not consumed or row['approval_record_count']==0:missing.append('declared_approval_consumption_pair_unavailable')
             if not configured_match or row['mismatched_fields'] or len(consumed)>1 or row['approval_record_count']>1:
                 conflicts.append({'case_id':trial['case_id'],'configured_ENV_model_match_observed':bool(configured_match),

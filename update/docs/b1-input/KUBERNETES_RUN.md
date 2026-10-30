@@ -1,10 +1,10 @@
 # Online Kubernetes 실행 인계
 
-REQ-07·REQ-08·SUP-08의 B 전용 orchestration 소스다. 현재 A Online HTTP 프로필·native payload 검증·session seal 지원이 없어 `--execute`도 요청 전에 닫힌다. 이 상태를 세 ABORTED EVD/RES와 RPT, 검증 가능한 export/restore로 남긴다. 실제 Kubernetes 완료는 운영자 실행 뒤 확정한다. CPU16 결과와 EXAMPLE 회귀는 별도다.
+REQ-07·REQ-08·SUP-08의 B 전용 orchestration 소스다. A108의 공개 Online HTTP 프로필·`/9` native parser·owned session seal 계약을 소비한다. 이 B 브랜치에는 A108 공통 소스가 아직 통합되지 않아 exact source gate에서 요청 전에 닫힌다. 미수집 상태를 세 ABORTED EVD/RES와 RPT, 검증 가능한 export/restore로 남긴다. 실제 Kubernetes 완료는 운영자 실행 뒤 확정한다. CPU16 결과와 EXAMPLE 회귀는 별도다.
 
 ## 실행 입력과 명령
 
-Python 3.12 정상 모드, 설치된 kubectl, 승인된 Linux/원격 실행 호스트를 사용한다. 현재 Mac에는 kubectl이 없고 Docker daemon도 가동되지 않았다. Mac 우회·daemon 기동·새 서버 생성은 이 도구 범위에 없다. 도구는 checkout의 `tools`에 있으며 wheel 정식 executor/registry 등록은 A 후속 작업이다.
+실행 호스트는 Python 3.12 정상 모드와 kubectl을 사용한다. native `/9` controller의 승인된 serving 런타임은 CPython 3.12.3·3.12.14다. 로컬 도구 회귀 환경 3.12.13을 serving 설치 승인으로 이월하지 않는다. 현재 Mac에는 kubectl이 없고 Docker daemon도 가동되지 않았다. Mac 우회·daemon 기동·새 서버 생성은 이 도구 범위에 없다. 도구는 checkout의 `tools`에 있으며 wheel 정식 executor/registry 등록은 A 후속 작업이다.
 
 ```sh
 PYTHONPATH=src:. .venv/bin/python -m tools.b_online_kubernetes_run prepare-pack --output /owned/new-online-pack
@@ -12,7 +12,7 @@ PYTHONPATH=src:. .venv/bin/python -m tools.b_online_kubernetes_run run \
   --env /owned/ENV.json --policy /owned/POL.json --pack /owned/new-online-pack \
   --target /owned/http-target.json --prepared /owned/sensor/manifest.json \
   --case-manifest /owned/approved-cases.json --output /owned/new-run
-# 동일 입력의 승인된 실제 실행에만 --execute 추가. 현재 A capability gate에서 닫힘.
+# 동일 입력의 승인된 실제 실행에만 --execute 추가. 현재 checkout은 A108 source gate에서 닫힘.
 ```
 
 POL은 출력된 exact PACK Ref와 세 check를 포함해야 한다. Pack은 외부 DRAFT이며 실행기는 `online_input_kubernetes`, judge는 기존 `online_input_cpu.judge_params()`의 fail 규칙만 사용한다. CPU fixture/project/source eligibility는 호출하지 않는다. 기존 Pack31·REQ10 numeric/schema-tools는 변경하지 않는다.
@@ -31,26 +31,29 @@ case manifest는 B 도구 로컬 입력이며 공통 교환 계약을 추가하�
 
 domain/config 값은 `SHA256(canonical_json({effective_config: 실제값, token_id_domain_sha256: 실제 독립 vocabulary ID-set hash}))`다. 실제 모델/config·tokenizer domain에 맞춰 운영자가 준비하며 B native join에서 실제 값과 비교한다. cached max-token 값을 허용 oracle로 쓰지 않는다.
 
-활성 trust/template/MM 설정에서 가능한 정상·위반·지원 밖 사례를 운영자가 선택한다. 실제 모델의 OOV/negative/길이 사례는 격리 승인 없이 발송하지 않는다. 요청은 최대16 primary+16 after이며 sensor의 기존 MAX_ROWS512/MAX_BYTES262144 범위를 해제하지 않는다. 사례별 실제 hook 수에 따라 더 작은 subset이 필요할 수 있다. 실제 잘림·누락은 gap으로 남기고, 먼저 검증된 독립 위반은 보존한다.
+활성 trust/template/MM 설정에서 가능한 정상·위반·지원 밖 사례를 운영자가 선택한다. 실제 모델의 OOV/negative/길이 사례는 격리 승인 없이 발송하지 않는다. 요청은 최대16 primary+16 after다. 명시적 `/9`의 writer/parser·owned file reader는 2048행/2MiB를 지원하고, 기본 `/8`의 512행/256KiB는 유지한다. 현재 A108 `SESSION_SEALER` census는 파일당 256KiB까지 허용하므로 256KiB 초과 `/9` 파일의 seal은 실패·gap으로 남는다. 사례별 실제 hook 수에 따라 더 작은 subset이 필요할 수 있다. 실제 잘림·누락은 gap으로 남기고, 먼저 검증된 독립 위반은 보존한다.
 
-## production 본체와 A 최소 변경 요청
+## production 본체와 A108 소비 계약
 
 B `_ProductionSession`은 기존 public API를 연결한다.
 
 1. `KubernetesHTTP(...profile=ONLINE_INPUT_PROFILE)`과 `KubernetesLifecycleReader(...)` 생성.
 2. reader `snapshot()`으로 선정 engine 세대를 확인한다.
 3. 공개 transport `__call__('kubernetes-probe', [request], timeout=30)`로 사례 primary와 after를 보낸다. 각 호출의 기존 전후 Pod 검증을 유지한다. body/response는 transient이며 저장하지 않는다.
-4. reader의 **추가 제안** `seal_session() -> {'sealed': bool}`을 호출하고, seal 실패 때도 기존 `lifecycle_session.capture_session(reader, target, container=..., image=..., prepared=..., owner_identity=reader.owner_identity, read_file=reader.read_file, image_check=reader.image_check)`로 수집을 시도한다. 실제 파일은 한 run에서 한 번 수집하며 세 EVD가 공유한다.
+4. reader의 공개 `seal_session() -> {'sealed': bool}`을 호출하고, seal 실패 때도 기존 `lifecycle_session.capture_session(reader, target, container=..., image=..., prepared=..., owner_identity=reader.owner_identity, read_file=reader.read_file, image_check=reader.image_check)`로 수집을 시도한다. 실제 파일은 한 run에서 한 번 수집하며 세 EVD가 공유한다.
 5. B가 parser 검증된 recordings를 요청별로 join한 뒤 판정용 정제 관측을 만든다. reader 최종 snapshot·session census·recording 종료/잘림을 완결성과 별도로 확인한다.
 6. `finally`에서 소유 session seal을 재시도하고 transport cleanup report를 확인한다. 고정 HTTP probe watchdog은 자기 실행 프로세스만 끝낸다. Pod 삭제·GPU kill·클러스터 변경은 수행하지 않는다. cleanup 미확인은 EVD와 summary에 남고 복구 담당자에게 인계한다.
 
-필요한 A 변경은 다음 세 지점이다. 전용 새 전체 session collector API는 요구하지 않는다.
+A108 확정 source `e24dfb5653d66f9d82fc4537a995208f29ad113e`의 공개 계약을 사용한다.
+참조 checkout `414a7c9`의 추가 변경은 B REQ13 adapter이며 승인 A 파일 bytes는 같다.
 
-- `runtime/kubernetes_http.py`: 명시적 `ONLINE_INPUT_PROFILE`, `online-<case>-primary/after` ID, `/v1/chat/completions` JSON과 허용 reuse/echo/template/MM 필드·X-Request-Id. 기존 두 프로필의 제한·source/digest/ENV/model mapping gate 유지. 별도 private `_call`이나 REQ11 ID 우회는 없다.
-- native sensor/profiles 및 `lifecycle_capture.parse_recording`: source/module/code hash가 검증된 hook에서 `metadata.online_input` namespace의 B `guard.adapters.vllm_online_input.snapshot_online_input` 전체 반환값을 검증·기록. 함수/phase는 B callback의 닫힌 POINTS를 따른다. callback 파일 bytes/code provenance도 승인 소스에 포함한다. ASGI/native request, call, session, PID/start binding은 A가 실제 문맥에서 공급한다. payload namespace와 아래 binding 해시 규칙은 **A 미확정 제안**이며 현재 동작 계약으로 간주하지 않는다.
-- `KubernetesLifecycleReader.seal_session() -> {'sealed': bool}`: exact selected session만 고정 프로그램으로 seal하고 세대 전후를 검증. 임의 exec/경로/명령 입력을 받지 않는다. 이 공개 지원이 생길 때까지 B가 임의 kubectl 쓰기로 대체하지 않는다.
+- `ONLINE_INPUT_PROFILE`은 `kubernetes-owned-online-input-http-v1`이다. `online-<case>-primary/after` ID와 `byul-online-<run nonce>-<case>-primary/after` X-Request-Id를 사용한다. 같은 nonce의 primary→after 직렬 순서를 유지한다. 공개 HTTP gate는 body 16KiB, messages 최대16개, 문자열당4096자, reuse ID 최대4096개와 닫힌 JSON 필드·중첩 제한을 검사한다. B의 선행 body 상한128KiB와 구분하며, 최종 전송은 A의 더 작은 한도를 따른다.
+- prepared는 명시적 `vllm-native-lifecycle-metadata/9`를 사용한다. 기본 `/8`은 변경하지 않는다. parser는 callback bytes/code와 module source/코드, CALL/RETURN·RAISE의 binding을 검증한다.
+- `online_code_contract`는 `python312-source-relative-code/1`이다. MODULE의 `online_code_sha256`를 callback provenance의 `code_runtime`에 해당하는 승인 module code와 비교한다. 기존 `code_sha256`는 원래 filename을 보존한 코드 해시이므로 source-relative 승인값과 별도로 유지한다. A controller는 각 hook의 승인 function code·async·module도 검사한다.
+- callback provenance는 `{module, bytes_sha256, code_sha256, code_runtime}`이며 3.12.3·3.12.14 각각의 고정 literal을 사용한다. 런타임·manifest·진단값으로 승인 literal을 생성하지 않는다.
+- `KubernetesLifecycleReader.seal_session()`은 선정된 session만 봉인하고 고정 프로그램의 전후 세대를 확인한다. B는 공개 API를 호출하고 실패 때에도 수집과 owned cleanup을 시도한다.
 
-`A_SOURCE_PINS`의 B callback bytes는 고정하고 미확정 A source는 None으로 닫힌다. 승인된 HTTP/reader/parser/session/native callback/sensor/profiles exact bytes가 확정되면 root가 literal hash를 연결하고 동일 source로 검증해야 한다. 런타임 파일해시나 manifest의 `verified=true`로 승인값을 생성하지 않는다.
+`A_SOURCE_PINS`는 이 계약에 필요한 A 파일과 B callback bytes를 고정한다. 현재 checkout의 A 공통 파일이 일치하지 않으면 요청 전 중단한다. A108이 통합된 후에도 `image_check=False`가 유지되므로 `image_digest_verified=True`를 요구하는 B native join은 진단 recording을 자격 관측으로 올리지 않는다. 이미지 증명 지원은 별도 대기다.
 
 ## native 관측과 판정 경계
 
@@ -70,7 +73,7 @@ callback은 안전 snapshot이며 native producer 인증을 자체 제공하지 
 
 ## 집중검토 보수 계약
 
-이미지 digest 검증이 없는 진단 recording은 자격 관측으로 승격하지 않는다. 각 native point는 고정 `ONLINE_POINT_CONTRACTS`의 module/source/code hash, prepared 선정 source hash, 실제 MODULE 기록을 모두 비교한다. callback bytes/code provenance도 같은 capture에 필요하다. 새 `capture.online_callback_provenance={module,bytes_sha256,code_sha256}`는 A 추가 지원 제안이다. 현재 `ONLINE_POINT_CONTRACTS`와 `ONLINE_CALLBACK_CODE_SHA256`는 None이며 A가 검증된 출력과 literal contract를 제공하기 전 닫힌다. 기존 Kubernetes image_check=False를 완화하지 않는다.
+이미지 digest 검증이 없는 진단 recording은 자격 관측으로 승격하지 않는다. 각 native point는 고정 `ONLINE_POINT_CONTRACTS`의 module/source/code hash, prepared 선정 source hash, 실제 MODULE 기록을 모두 비교한다. callback bytes/code provenance도 같은 capture에 필요하다. `capture.online_callback_provenance={module,bytes_sha256,code_sha256,code_runtime}`와 `online_code_contract`는 A108 확정 출력이다. `ONLINE_POINT_CONTRACTS`와 `ONLINE_RUNTIME_CONTRACTS`에는 해당 A source의 고정 literal을 사용한다. 기존 Kubernetes image_check=False를 완화하지 않는다.
 
 REQ07/SUP08은 없는 template_consumed/MM최종소비 플래그를 요구하지 않는다. 실제 renderer CALL/RETURN 및 parsed 보호필드 보존, source-qualified gate CALL/RETURN의 trust=false와 source의 default-deny 조건을 admission에 연결해 gate 우회를 판정한다. template은 직접값이 None이 아니거나 nested chat_template이 None이 아닌 경우, MM은 kwargs가 비어 있지 않은 경우다. empty MM kwargs는 거부 대상에 넣지 않는다. template_gate_bypass와 mm_gate_bypass를 독립 관측하고 REQ07에는 template gate, SUP08에는 MM gate만 귀속한다. 교차 필드·혼합 필드도 같은 규칙을 적용한다. 이는 해당 gate의 우회이며 template 최종 렌더 효과·MM 코드 최종 실행은 별도 관측이다.
 
@@ -95,4 +98,11 @@ Pod/container/image/restart/start 신원으로 target을 다시 수집하고 정
 
 최종 로컬 고정 코드 `c0a1d413`은 전체6390건·기존제외19 통과(pytest154.12초/부모154.55초),
 native48건·runner73건 및 검토 지적 해결 확인을 마쳤다. 실제 Kubernetes 요청은 실행하지
-않았으며 A 미확정 capability/source/provenance pin의 요청 전 차단은 유지한다.
+않았으며 당시의 A 미확정 pin 차단 결과다. 현재 소비 계약은 아래 A108 갱신을 따른다.
+
+
+## A108 소비 갱신의 검증 범위
+
+기존 CPU16+after16 실측, native callback bytes와 CPU source pins는 그대로 보존한다.
+이번 변경은 B 명령의 source/runtime code 계약·명시적 `/9` 선택·기존 수집/판정/저장/owned seal 연결의 직접 회귀에 한정한다. 실제 Kubernetes 요청은 실행하지 않았다.
+A source 통합, image 증명, 256KiB 초과 recording seal, 승인 target/config와 복구 절차가 남아 있어 실제 실행 준비 완료로 집계하지 않는다.

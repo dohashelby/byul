@@ -12,6 +12,8 @@ from tests.test_kubernetes_request_binding import env, target
 from tools import b_online_kubernetes_run as runner
 
 PRIVATE = 'PRIVATE_BODY_TOKEN_EXCEPTION_DO_NOT_PERSIST'
+APPROVED_POINTS = deepcopy(runner.ONLINE_POINT_CONTRACTS)
+APPROVED_RUNTIMES = deepcopy(runner.ONLINE_RUNTIME_CONTRACTS)
 
 
 @pytest.fixture(autouse=True)
@@ -24,7 +26,9 @@ def example_source_contracts(monkeypatch):
             else 'mm_nonempty' if point.endswith('validate_request_mm_kwargs') else 'decoder_length')}
         for point in points}
     monkeypatch.setattr(runner, 'ONLINE_POINT_CONTRACTS', contracts)
-    monkeypatch.setattr(runner, 'ONLINE_CALLBACK_CODE_SHA256', '7' * 64)
+    monkeypatch.setattr(runner, 'ONLINE_RUNTIME_CONTRACTS', {
+        'cpython-3.12.3': {'callback_code_sha256': '7' * 64,
+                         'module_codes': {'EXAMPLE-source-module': '8' * 64}}})
 
 
 @pytest.fixture
@@ -34,7 +38,7 @@ def inputs(tmp_path):
     pack = runner.proposal_pack(tmp_path / 'pack')
     policy = Policy(id='POL-ONLINE-K8S-EXAMPLE', created_at=datetime.now(timezone.utc),
         data_origin=DataOrigin.EXAMPLE, status='DRAFT', pack=pack.ref(), scope={'include': list(runner.CHECKS)}).seal()
-    prepared = {'session': 'a' * 32}
+    prepared = {'session': 'a' * 32, 'profile': runner.ONLINE_PROFILE}
     body = {'model': 'fixture-model', 'messages': [{'role': 'user', 'content': PRIVATE}], 'max_tokens': 1}
     cases = [{'id': 'case-' + check.lower(), 'check_id': check,
         'body': {**deepcopy(body), 'kv_transfer_params': {'prompt_token_ids': [32]}},
@@ -226,7 +230,8 @@ def native_packet(inputs, case, request_hashes):
     inputs[4]['source_sha256'] = {'EXAMPLE-source-module': '9' * 64}
     records = [{'event': 'START', 'payload': {'context': context}},
                {'event': 'MODULE', 'payload': {'module': 'EXAMPLE-source-module', 'verified': True,
-                                              'source_sha256': '9' * 64, 'code_sha256': '8' * 64}}]
+                                              'source_sha256': '9' * 64, 'code_sha256': '6' * 64,
+                                              'online_runtime': 'cpython-3.12.3', 'online_code_sha256': '8' * 64}}]
     configuration = {'model_vocab_size': 32, 'max_model_len': 100, 'runner_type': 'generate'}
     domain = {'status': 'collected', 'canonical_sha256': runner._native_digest(list(range(32))),
         'request_ids_in_domain': False, 'request_ids_within_model_vocab': False,
@@ -259,8 +264,10 @@ def native_packet(inputs, case, request_hashes):
     return {'recorded_files_covered': True, 'live_census_stable': True, 'recordings': [{
         'session_owner_match': True, 'listed_file_identity_match': True, 'capture': {
             'process_context_verified': True, 'image_digest_verified': True,
+            'online_code_contract': runner.ONLINE_CODE_CONTRACT,
             'online_callback_provenance': {'module': 'guard.adapters.vllm_online_input',
-                'bytes_sha256': runner.A_SOURCE_PINS['adapters/vllm_online_input.py'], 'code_sha256': '7' * 64},
+                'bytes_sha256': runner.A_SOURCE_PINS['adapters/vllm_online_input.py'], 'code_sha256': '7' * 64,
+                'code_runtime': 'cpython-3.12.3'},
             'summary': {'recording_closed': True}, 'records': records}}]}
 
 
@@ -293,10 +300,12 @@ def test_native_join_rejects_cross_generation_unqualified_payloads(inputs, chang
     assert runner._join_native(packet, case, hashes, target=inputs[3], prepared=inputs[4], manifest=inputs[-1]) is None
 
 
-def test_production_adapter_calls_public_http_reader_and_one_capture(tmp_path, inputs, monkeypatch):
-    """Future A ABI exercised via EXAMPLE doubles, never an actual K8 result."""
+@pytest.mark.parametrize('native',[False,True])
+def test_production_adapter_calls_public_http_reader_and_one_capture(tmp_path, inputs, monkeypatch,native):
+    """A108 public ABI exercised via EXAMPLE doubles, never an actual K8 result."""
     events = []
     packets = []
+    if native:native_packet(inputs,inputs[-1]['cases'][0],['1'*64,'2'*64])
     monkeypatch.setattr(runner, '_approved_capabilities', lambda: None)
     monkeypatch.setattr(runner.kubernetes_http, 'ONLINE_INPUT_PROFILE', 'EXAMPLE-online-profile', raising=False)
     real_transport = runner.kubernetes_http.KubernetesHTTP
@@ -320,6 +329,14 @@ def test_production_adapter_calls_public_http_reader_and_one_capture(tmp_path, i
         def image_check(self, *args, **kwargs): return False
     def capture(*args, **kwargs):
         events.append('capture')
+        assert kwargs['image_check']({}, {}) is False
+        if native:
+            recordings=[]
+            for index,case in enumerate(inputs[-1]['cases']):
+                hashes=[runner.hashlib.sha256(p['headers']['X-Request-Id'].encode()).hexdigest()
+                        for p in packets[index*2:index*2+2]]
+                recordings.extend(native_packet(inputs,case,hashes)['recordings'])
+            return {'recordings':recordings,'live_census_stable':True,'recorded_files_covered':True}
         # Empty native packet proves that HTTP success cannot produce a FAIL.
         return {'recordings': [], 'live_census_stable': False, 'recorded_files_covered': False}
     monkeypatch.setattr(runner.kubernetes_http, 'KubernetesHTTP', PublicHTTP)
@@ -330,8 +347,12 @@ def test_production_adapter_calls_public_http_reader_and_one_capture(tmp_path, i
     assert len(packets) == 6 and all(p['id'].startswith('online-') for p in packets)
     assert all(p['body']['model'] == 'fixture-model' for p in packets)
     assert all(p['headers'].get('X-Request-Id') for p in packets)
-    assert not summary['execution_complete'] and summary['restore_verified']
-    assert all(r.verdicts.security.value == 'UNKNOWN' for r in Store(tmp_path / 'public/store').iter_kind('RES'))
+    assert summary['execution_complete'] is native and summary['restore_verified']
+    store=Store(tmp_path / 'public/store')
+    if native:
+        assert {r.check_id:r.verdicts.security.value for r in store.iter_kind('RES')}['REQ-08']=='FAIL'
+        assert all(len(e.artifacts)==1 for e in store.iter_kind('EVD'))
+    else:assert all(r.verdicts.security.value=='UNKNOWN' for r in store.iter_kind('RES'))
 
 
 @pytest.mark.parametrize('change', ['image', 'callback_bytes', 'callback_code', 'source', 'module_code', 'missing_contract'])
@@ -344,7 +365,7 @@ def test_diagnostic_recordings_never_promoted_without_provenance(inputs, monkeyp
     elif change == 'callback_bytes': capture['online_callback_provenance']['bytes_sha256'] = '0' * 64
     elif change == 'callback_code': capture['online_callback_provenance']['code_sha256'] = '0' * 64
     elif change == 'source': inputs[4]['source_sha256']['EXAMPLE-source-module'] = '0' * 64
-    elif change == 'module_code': capture['records'][1]['payload']['code_sha256'] = '0' * 64
+    elif change == 'module_code': capture['records'][1]['payload']['online_code_sha256'] = '0' * 64
     else: monkeypatch.setattr(runner, 'ONLINE_POINT_CONTRACTS', None)
     assert runner._join_native(packet, case, hashes, target=inputs[3], prepared=inputs[4], manifest=inputs[-1]) is None
 
@@ -507,3 +528,62 @@ def test_gate_failures_are_attributed_to_their_own_check_only(inputs, check, kin
         manifest_sha256=runner.digest(inputs[-1]), session=inputs[4]['session'])
     assert safe['violation'] is (kind == 'mixed' or (check == 'REQ-07' and kind == 'template')
                                 or (check == 'SUP-08' and kind == 'mm'))
+
+
+def approved_packet(inputs,case,hashes,runtime,monkeypatch):
+    """EXAMPLE parser-output shape with A108's frozen runtime/source literals."""
+    packet=native_packet(inputs,case,hashes)
+    monkeypatch.setattr(runner,'ONLINE_POINT_CONTRACTS',deepcopy(APPROVED_POINTS))
+    monkeypatch.setattr(runner,'ONLINE_RUNTIME_CONTRACTS',deepcopy(APPROVED_RUNTIMES))
+    capture=packet['recordings'][0]['capture'];codes=APPROVED_RUNTIMES[runtime]
+    capture['online_callback_provenance'].update(code_runtime=runtime,code_sha256=codes['callback_code_sha256'])
+    records=capture['records'];modules={}
+    for record in records:
+        if record['event']!='NATIVE':continue
+        payload=record['payload'];contract=APPROVED_POINTS[payload['point']]
+        payload['source_sha256']=contract['source_sha256']
+        payload['phase']=payload['metadata']['online_input']['phase']
+        modules[contract['module']]={'event':'MODULE','payload':{'module':contract['module'],'verified':True,
+            'source_sha256':contract['source_sha256'],'code_sha256':'6'*64,
+            'online_runtime':runtime,'online_code_sha256':codes['module_codes'][contract['module']]}}
+    capture['records']=[records[0],*modules.values(),*[r for r in records if r['event']=='NATIVE']]
+    inputs[4]['source_sha256']={c['module']:c['source_sha256'] for c in APPROVED_POINTS.values()}
+    return packet
+
+
+@pytest.mark.parametrize('runtime',['cpython-3.12.3','cpython-3.12.14'])
+def test_frozen_a108_relative_code_contracts_accept_both_native_runtimes(inputs,monkeypatch,runtime):
+    case=inputs[-1]['cases'][1];hashes=['1'*64,'2'*64]
+    packet=approved_packet(inputs,case,hashes,runtime,monkeypatch)
+    raw=runner._join_native(packet,case,hashes,target=inputs[3],prepared=inputs[4],manifest=inputs[-1])
+    assert raw is not None and raw['after_admitted'] is True
+    assert runner._qualify(raw,case,target_sha256=runner.digest(inputs[3]),
+        manifest_sha256=runner.digest(inputs[-1]),session=inputs[4]['session'])['violation']
+    assert 'cpython-3.12.13' not in runner.ONLINE_RUNTIME_CONTRACTS
+
+
+@pytest.mark.parametrize('mutation',['contract','callback_runtime','callback_code','module_runtime','relative_code','image','session','asgi','file'])
+def test_a108_code_provenance_and_attribution_gaps_stay_unqualified(inputs,monkeypatch,mutation):
+    case=inputs[-1]['cases'][1];hashes=['1'*64,'2'*64]
+    packet=approved_packet(inputs,case,hashes,'cpython-3.12.3',monkeypatch)
+    row=packet['recordings'][0];capture=row['capture']
+    if mutation=='contract':capture['online_code_contract']='legacy-code'
+    elif mutation=='callback_runtime':capture['online_callback_provenance']['code_runtime']='cpython-3.12.13'
+    elif mutation=='callback_code':capture['online_callback_provenance']['code_sha256']='0'*64
+    elif mutation in {'module_runtime','relative_code'}:
+        for record in capture['records']:
+            if record['event']=='MODULE':
+                record['payload']['online_runtime' if mutation=='module_runtime' else 'online_code_sha256']='cpython-3.12.14' if mutation=='module_runtime' else '0'*64
+    elif mutation=='image':capture['image_digest_verified']=False
+    elif mutation=='file':row['listed_file_identity_match']=False
+    else:
+        for record in capture['records']:
+            if record['event']=='NATIVE':record['payload']['metadata']['online_input']['binding']['session_id_sha256' if mutation=='session' else 'asgi_request_id_sha256']='0'*64
+    assert runner._join_native(packet,case,hashes,target=inputs[3],prepared=inputs[4],manifest=inputs[-1]) is None
+
+
+def test_explicit_online_prepared_profile_required_before_public_transport(inputs,monkeypatch):
+    monkeypatch.setattr(runner,'_approved_capabilities',lambda:None)
+    prepared={**inputs[4],'profile':'vllm-native-lifecycle-metadata/8'}
+    with pytest.raises(ValueError,match='EXPLICIT_ONLINE_PROFILE_REQUIRED'):
+        runner._ProductionSession(inputs[0],inputs[3],prepared,inputs[-1],duration=60,binary='kubectl')

@@ -121,3 +121,12 @@ export/restore·exactRef 재판정·소유 probe/session 정리 본체를 작성
 기존 CPU 증거와 EXAMPLE 회귀를 Kubernetes 실측으로 집계하지 않으며 전체 묶음의
 실환경 마감은 남겨 둔다. 명령과 입력은 `KUBERNETES_RUN.md`, callback은
 `NATIVE_CALLBACK.md`를 따른다.
+
+
+## 2026-10-30 A108 Online K8 소비 계약 갱신
+
+기존 `b_online_kubernetes_run.py`에서 A108 `e24dfb5653d66f9d82fc4537a995208f29ad113e`의 exact source pins와 `/9` source-relative code 계약을 소비한다. callback provenance의 `code_runtime`으로 CPython3.12.3·3.12.14 고정 code literal을 선택하고 MODULE `online_code_sha256`를 검증한다. hook source·ASGI/native/call·PID/start·session·nonce·domain/config·after 대조와 독립 FAIL을 유지한다. 기존 public HTTP→owned seal→capture_session→판정→Store/export/restore 경로를 전용 EXAMPLE 대역으로 검증한다.
+
+현재 B 브랜치에는 A108 공통 bytes가 미통합되어 source gate가 요청 전에 닫힌다. A108 reader의 `image_check=False`도 유지되어 diagnostic recording은 B native join의 image gate를 통과하지 않는다. `/9` read/parser2MiB·2048행과 기본 `/8`256KiB·512행, 현행 session seal256KiB 상한을 구분한다. 256KiB 초과 `/9` 파일의 owned seal 지원은 A 후속 대기다. local Python3.12.13 회귀와 serving native 승인3.12.3/.14를 구분한다.
+
+CPU16+after16 실측 재실행0, 실제 Kubernetes/네트워크0, callback SHA bd159580… bytes·기존 CPU pin·A 공통/runtime/registry/팩 수정0이다. 직접 영향 테스트 결과는 커밋 인계 보고에 기록한다. 실제 실행 준비 완료·실수집·영구 제품 등록으로 집계하지 않는다.

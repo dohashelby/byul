@@ -1,6 +1,6 @@
 """Owned Online Kubernetes orchestration; unavailable A capabilities fail closed.
 
-The proposed A adapter ABI below is deliberately not a published guard ABI.
+Consumes the frozen A108 public HTTP, owned seal and Online /9 parser contracts.
 No CPU collection, response-only admission inference, or kubectl mutation occurs.
 """
 from __future__ import annotations
@@ -41,26 +41,87 @@ from guard.store.packs import get_pack, put_pack
 CHECKS = ('REQ-07', 'REQ-08', 'SUP-08')
 EXECUTOR = 'online_input_kubernetes'
 PROFILE = 'byul-online-input-kubernetes-orchestration/1'
-# A must review/freeze the ABI and exact source before these are configured.
-# Runtime discovery, supplied manifests and verified=true cannot approve source.
-A_SOURCE_PINS = {
-    'runtime/kubernetes_http.py': None,
-    'executors/kubernetes_lifecycle_capture.py': None,
-    'executors/lifecycle_capture.py': None,
-    'executors/lifecycle_session.py': None,
-    'adapters/vllm_online_input.py': 'bd15958029e91ba189c2fe588009a97ddd4d3d339e32824e5e5016a52fa736b1',
-    'adapters/vllm_lifecycle_profiles.py': None,
-    'adapters/vllm_lifecycle_sensor.py': None,
-}
-# A must supply reviewed point/module/source/code contracts and callback code
-# provenance. Diagnostic records cannot authorize these literals.
-ONLINE_POINT_CONTRACTS = None
-ONLINE_CALLBACK_CODE_SHA256 = None
-PROPOSED_A_ABI = {
-    'http': 'ONLINE_INPUT_PROFILE; existing KubernetesHTTP.__call__ with online case IDs',
-    'native': 'source-qualified NATIVE metadata.online_input snapshot namespace',
-    'seal': 'KubernetesLifecycleReader.seal_session() -> {sealed: bool}; own selected session only',
-}
+# Frozen from A108 e24dfb5653d66f9d82fc4537a995208f29ad113e; the
+# reference checkout 414a7c9 changes only B REQ13 adapter, not these A bytes.
+# Runtime discovery and operator manifests never create approved source pins.
+A_SOURCE_PINS = {'runtime/kubernetes_http.py': '3da64c61ccceda9899e57d022b3ff7afaee3a85906d118a9309f368dd8f38566',
+ 'executors/kubernetes_lifecycle_capture.py': '9313ece704ffcab509cdf6ac22e6ff0b3f8395d2effecd77a21633342fa0e0f7',
+ 'executors/lifecycle_capture.py': '3c593cf8fb7961d452fc16a6e611dd3d406d626ffa846265ba17dac5f3bc684c',
+ 'executors/lifecycle_session.py': '38526674e8df7de6b25499e924f30c4ed6e94e3346ff944249a5fee00de467e1',
+ 'adapters/vllm_online_input.py': 'bd15958029e91ba189c2fe588009a97ddd4d3d339e32824e5e5016a52fa736b1',
+ 'adapters/vllm_lifecycle_profiles.py': 'ca77c6f19c5bae155061ba40ce9bd316d71626d47c59357f16b640e531cdb4a1',
+ 'adapters/vllm_lifecycle_sensor.py': '2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd',
+ 'adapters/vllm_online_sensor.py': '2774c821bcf92f08bcc042d6b5d5e1b16aabaf5832c23fec6a76c6019faee830',
+ 'adapters/vllm_online_metadata.py': '206d5df86bac7ea0b3a7b882d115314662792128bd9ec6d5dfb959a5225e8860',
+ 'executors/owned_capture.py': '81d23f82cb4a619d86a30d3bab65adfb305edb9633faa496bdd401924851e950',
+ 'executors/session_seal.py': '9a7e887a3234e5a361a89161f9c4b60927f6a471b9d0f7bf23d44987123ba1c4',
+ 'collectors/lifecycle.py': '7780652391c3102883e167b6d03b40231c9bc62b63deb0d967be22bbd4896a82',
+ 'runtime/kubernetes_binding.py': '25dd7ef74b40645d43f022573c9fa6636de76e714865c5f1d29f0d1cbec84e48',
+ 'runtime/bounded.py': '25c81666a17e13651c0b5b3bd67c9f310c6feee8311fcac408404d895dc67290'}
+ONLINE_PROFILE = 'vllm-native-lifecycle-metadata/9'
+ONLINE_CODE_CONTRACT = 'python312-source-relative-code/1'
+ONLINE_POINT_CONTRACTS = {'InputProcessor._validate_model_input': {'async': False,
+                                          'filename': 'vllm/v1/engine/input_processor.py',
+                                          'module': 'vllm.v1.engine.input_processor',
+                                          'source_sha256': 'd79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b',
+                                          'default_deny': 'decoder_length'},
+ 'InputProcessor._validate_prompt_len': {'async': False,
+                                         'filename': 'vllm/v1/engine/input_processor.py',
+                                         'module': 'vllm.v1.engine.input_processor',
+                                         'source_sha256': 'd79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b',
+                                         'default_deny': 'decoder_length'},
+ 'InputProcessor.process_inputs': {'async': False,
+                                   'filename': 'vllm/v1/engine/input_processor.py',
+                                   'module': 'vllm.v1.engine.input_processor',
+                                   'source_sha256': 'd79601e4a053a7bacb0d6a23e273348435e4ab70c6a315dcccb2d428ed57d96b'},
+ 'OnlineRenderer.preprocess_chat': {'async': True,
+                                    'filename': 'vllm/renderers/online_renderer.py',
+                                    'module': 'vllm.renderers.online_renderer',
+                                    'source_sha256': '1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e'},
+ 'OnlineRenderer.render_chat': {'async': True,
+                                'filename': 'vllm/renderers/online_renderer.py',
+                                'module': 'vllm.renderers.online_renderer',
+                                'source_sha256': '1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e'},
+ 'OnlineRenderer.validate_chat_template': {'async': False,
+                                           'filename': 'vllm/renderers/online_renderer.py',
+                                           'module': 'vllm.renderers.online_renderer',
+                                           'source_sha256': '1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e',
+                                           'default_deny': 'template_nonnull'},
+ 'online_renderer._reused_prompt_token_ids': {'async': False,
+                                              'filename': 'vllm/renderers/online_renderer.py',
+                                              'module': 'vllm.renderers.online_renderer',
+                                              'source_sha256': '1ada26191425fd9d56c3525949f999826dad9f2c82df94ad586a1cf6f67b089e'},
+ 'protocol.validate_request_mm_kwargs': {'async': False,
+                                         'filename': 'vllm/entrypoints/generate/base/protocol.py',
+                                         'module': 'vllm.entrypoints.generate.base.protocol',
+                                         'source_sha256': '67ede411b35a8344ddb87bfaaf1a1abea8acd39a4d23655e34032015505167c0',
+                                         'default_deny': 'mm_nonempty'}}
+ONLINE_RUNTIME_CONTRACTS = {'cpython-3.12.14': {'callback_code_sha256': '1728a373625ec44d943c9762ea6b31c85571876897a0ed81a1d321e4e5eee2a3',
+                     'callback_function_sha256': '70369194951aaf040b401ecb9c5e9d5492285da1c98802860fd09b347b604cf2',
+                     'function_codes': {'InputProcessor._validate_model_input': '9e741ab702847ae7123ebbe6224083c3feb3152aa122adb4e692d5f27edb4f0f',
+                                        'InputProcessor._validate_prompt_len': '9b5e805454a645106f9ecef9c3a2d6ff5205158f28668c1d676e2a70ca57faae',
+                                        'InputProcessor.process_inputs': '8cc4c2a41215abc29a20967c52e17e362a3f6abf63f618ecad9d1f4534d32ae0',
+                                        'OnlineRenderer.preprocess_chat': 'c39dd01ebda9161eb33195c08c44a987c42f5c09af68dcde1c49a850d8e178d1',
+                                        'OnlineRenderer.render_chat': '12781547cd1bca158c29ea2e7e86eec8510b4569d5f3cf8b0ea7f454c5d5a562',
+                                        'OnlineRenderer.validate_chat_template': 'c797417738f55004bd75a709c3e60f22584b64ea77f91323e509d5f2fc25782c',
+                                        'online_renderer._reused_prompt_token_ids': '14f7fbe2beb7e1227751a2eccc7cc424b3464a46124f91f552ab3f5991ec0830',
+                                        'protocol.validate_request_mm_kwargs': '2df55628e9262c2c8c87bdbf904c02a58eedfe5f41118c378129da6e93b0de44'},
+                     'module_codes': {'vllm.entrypoints.generate.base.protocol': '4925c4d0e258e9aad091f229d6747c429c3307337ab894437479b707277211b4',
+                                      'vllm.renderers.online_renderer': '561c1cfbf72b5ecc908310596018c3a99254f44156410a81520a893710aca4b4',
+                                      'vllm.v1.engine.input_processor': '82734a678f09390c1cf59c4899fcf567c254557508cfdfd0971c5101e40c0f2a'}},
+ 'cpython-3.12.3': {'callback_code_sha256': 'd30da68b43da5f70cca1a1f0b49291e53496e64ec9e8513acf50b2f285ab075b',
+                    'callback_function_sha256': 'c29bc425984626fda69d8af826ed0595097233f4841b55a4f5ca0cacd6e43a6f',
+                    'function_codes': {'InputProcessor._validate_model_input': '63b07fe66433d2d4462fc57dbbc53d65a30ca0bc1c347937e052b0ea54ca5fe1',
+                                       'InputProcessor._validate_prompt_len': '9b5e805454a645106f9ecef9c3a2d6ff5205158f28668c1d676e2a70ca57faae',
+                                       'InputProcessor.process_inputs': '336ac2d4cf2aa135bfe76766ccf05de1e15cf1a78b35710f861dff6cba34c9c1',
+                                       'OnlineRenderer.preprocess_chat': 'f2cbf70e51aa44010f0061aee1e340bfb0456af6e142c3b82d430973147aee70',
+                                       'OnlineRenderer.render_chat': 'e3dceceaf9209a7cb35a1665adcfc633d7dc3f73d3786dab4a67fcf02b6364f5',
+                                       'OnlineRenderer.validate_chat_template': 'c797417738f55004bd75a709c3e60f22584b64ea77f91323e509d5f2fc25782c',
+                                       'online_renderer._reused_prompt_token_ids': '14f7fbe2beb7e1227751a2eccc7cc424b3464a46124f91f552ab3f5991ec0830',
+                                       'protocol.validate_request_mm_kwargs': '2df55628e9262c2c8c87bdbf904c02a58eedfe5f41118c378129da6e93b0de44'},
+                    'module_codes': {'vllm.entrypoints.generate.base.protocol': '9c600ebedf518e29d3a801b9431f629862f3a354510e4cd199c5fed7fbc885d9',
+                                     'vllm.renderers.online_renderer': 'ace99d2bbdf4b720bae445f4cee623b607090288e35442e4250e462b195ac958',
+                                     'vllm.v1.engine.input_processor': 'e79004d94a39740156c6420b87e077a04ef4840eff62b06b38da6e7191decd39'}}}
 _BODY_KEYS = {'model', 'messages', 'max_tokens', 'stream', 'kv_transfer_params', 'echo',
               'chat_template', 'chat_template_kwargs', 'mm_processor_kwargs', 'media_io_kwargs'}
 _HASH_KEYS = {'asgi_request_id_sha256', 'native_request_id_sha256', 'call_id_sha256',
@@ -186,39 +247,35 @@ def _capture_target(env, target):
 
 
 def _approved_capabilities():
-    """Source pins are set only after A approves the small HTTP/native/seal delta."""
-    if (any(not _sha(value) for value in A_SOURCE_PINS.values())
-            or not isinstance(ONLINE_POINT_CONTRACTS, dict) or not _sha(ONLINE_CALLBACK_CODE_SHA256)):
-        raise RuntimeError('ONLINE_K8S_A_CAPABILITY_UNAVAILABLE')
+    """Require the exact reviewed A108 implementation before any network call."""
     root = Path(__file__).resolve().parents[1] / 'src/guard'
-    modules = (kubernetes_http, lifecycle_reader, lifecycle_capture, lifecycle_session,
-        importlib.import_module('guard.adapters.vllm_online_input'),
-        importlib.import_module('guard.adapters.vllm_lifecycle_profiles'),
-        importlib.import_module('guard.adapters.vllm_lifecycle_sensor'))
-    for module, (relative, expected) in zip(modules, A_SOURCE_PINS.items()):
+    modules = {}
+    for relative, expected in A_SOURCE_PINS.items():
         path = root / relative
-        if (path.is_symlink() or not Path(module.__file__).resolve().samefile(path)
+        if (not _sha(expected) or path.is_symlink() or not path.is_file()
                 or hashlib.sha256(path.read_bytes()).hexdigest() != expected):
             raise RuntimeError('ONLINE_K8S_A_SOURCE_MISMATCH')
+        module = importlib.import_module('guard.' + relative[:-3].replace('/', '.'))
+        if not Path(module.__file__).resolve().samefile(path):
+            raise RuntimeError('ONLINE_K8S_A_SOURCE_MISMATCH')
+        modules[relative] = module
     for function, path in ((kubernetes_http.KubernetesHTTP.__call__, 'runtime/kubernetes_http.py'),
                            (lifecycle_session.capture_session, 'executors/lifecycle_session.py'),
                            (lifecycle_reader.KubernetesLifecycleReader.snapshot, 'executors/kubernetes_lifecycle_capture.py'),
                            (lifecycle_reader.KubernetesLifecycleReader.seal_session, 'executors/kubernetes_lifecycle_capture.py'),
-                           (modules[4].snapshot_online_input, 'adapters/vllm_online_input.py')):
+                           (modules['adapters/vllm_online_input.py'].snapshot_online_input, 'adapters/vllm_online_input.py')):
         if not Path(inspect.getsourcefile(function)).resolve().samefile(root / path):
             raise RuntimeError('ONLINE_K8S_A_FUNCTION_ORIGIN_MISMATCH')
-    if not isinstance(kubernetes_http.ONLINE_INPUT_PROFILE, str):
+    if kubernetes_http.ONLINE_INPUT_PROFILE != 'kubernetes-owned-online-input-http-v1':
         raise RuntimeError('ONLINE_K8S_A_PROFILE_UNAVAILABLE')
 
 
 class _ProductionSession:
-    """B adapter: existing public HTTP, reader and capture_session; proposed seal.
-
-    Native metadata.online_input and seal_session are pending A review. Missing
-    source approval prevents every network call, including reader.snapshot().
-    """
+    """Connect exact A108 public HTTP, owned seal and parser-checked capture."""
     def __init__(self, env, target, prepared, manifest, *, duration, binary):
         _approved_capabilities()
+        if prepared.get('profile') != ONLINE_PROFILE:
+            raise ValueError('ONLINE_K8S_EXPLICIT_ONLINE_PROFILE_REQUIRED')
         self.transport = kubernetes_http.KubernetesHTTP(target, env, duration=duration, binary=binary,
             profile=kubernetes_http.ONLINE_INPUT_PROFILE)
         self.capture_target = _capture_target(env, target)
@@ -321,11 +378,11 @@ def _native_admission(snapshots):
 def _join_native(packet, case, request_hashes, *, target, prepared, manifest):
     """Join only this run's parser-checked native files, never external facts JSON.
 
-    metadata.online_input is a proposed A namespace, currently source-pin closed.
+    Online /9 metadata carries A's source-relative module/callback code proof.
     Matching snapshots stay in one actual PID/start and one ASGI request; native
     CALL/RETURN must have the same native request and call identity.
     """
-    if not isinstance(ONLINE_POINT_CONTRACTS, dict) or not _sha(ONLINE_CALLBACK_CODE_SHA256):
+    if not isinstance(ONLINE_POINT_CONTRACTS, dict):
         return None
     domains = {}
     for row in packet.get('recordings', []):
@@ -334,10 +391,12 @@ def _join_native(packet, case, request_hashes, *, target, prepared, manifest):
                 or capture.get('process_context_verified') is not True
                 or capture.get('image_digest_verified') is not True):
             continue
-        callback = capture.get('online_callback_provenance', {})  # proposed A output, not operator input
-        if (callback.get('module') != 'guard.adapters.vllm_online_input'
+        callback = capture.get('online_callback_provenance') or {}
+        codes = ONLINE_RUNTIME_CONTRACTS.get(callback.get('code_runtime'), {})
+        if (capture.get('online_code_contract') != ONLINE_CODE_CONTRACT or not codes
+                or callback.get('module') != 'guard.adapters.vllm_online_input'
                 or callback.get('bytes_sha256') != A_SOURCE_PINS['adapters/vllm_online_input.py']
-                or callback.get('code_sha256') != ONLINE_CALLBACK_CODE_SHA256):
+                or callback.get('code_sha256') != codes['callback_code_sha256']):
             continue
         records = capture.get('records', [])
         if not records:
@@ -353,11 +412,12 @@ def _join_native(packet, case, request_hashes, *, target, prepared, manifest):
             contract = ONLINE_POINT_CONTRACTS.get(payload.get('point'), {})
             module = modules.get(contract.get('module'), {})
             if (not contract or snapshot.get('point') != payload.get('point')
-                    or not _sha(contract.get('source_sha256')) or not _sha(contract.get('code_sha256'))
+                    or not _sha(contract.get('source_sha256'))
                     or prepared.get('source_sha256', {}).get(contract['module']) != contract['source_sha256']
                     or payload.get('source_sha256') != contract['source_sha256']
                     or module.get('source_sha256') != contract['source_sha256']
-                    or module.get('code_sha256') != contract['code_sha256']):
+                    or module.get('online_runtime') != callback['code_runtime']
+                    or module.get('online_code_sha256') != codes['module_codes'].get(contract['module'])):
                 continue
             binding = snapshot.get('binding', {})
             asgi = binding.get('asgi_request_id_sha256')
@@ -367,7 +427,7 @@ def _join_native(packet, case, request_hashes, *, target, prepared, manifest):
                     or binding.get('process_start_sha256') != _native_digest(context.get('start_ticks'))
                     or asgi not in request_hashes):
                 continue
-            domains.setdefault((context['pid'], context['start_ticks']), {h: [] for h in request_hashes})[asgi].append(snapshot)
+            domains.setdefault((context['pid'], context['start_ticks'], callback['code_runtime']), {h: [] for h in request_hashes})[asgi].append(snapshot)
     candidates = []
     for snapshots in domains.values():
         admitted = _native_admission(snapshots[request_hashes[0]])

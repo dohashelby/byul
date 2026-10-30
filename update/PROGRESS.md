@@ -1621,3 +1621,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - A-1 LIF09 SC17-01 후속: native20에 원 Worker19·MP14 bytes를 조합하고 기존 initialization:kubernetes/팩 파생/EVD 관측에 별도 Worker events/candidates/missing을 연결했다. 정확 ENV/target/model scope·source/image/lab·세대·선정 seal·기존 정상/실패/복구 질문과 UNKNOWN을 유지한다. source 고정 후 직접/인접/설치/정확 Ref 검증 대기다. 실제 worker/GPU·fault/repair/service lineage와 전체 분기는 미완료이며 원GPU창 종료·추가 Start0·의존성 답변 대기를 유지한다.
 
 - A-1 native20/LIF09 마감: source250722f/reviewa391bc0, 직접 고유33각OS·인접Windows313/Linux314·guard267설치·CLI4/정확24Ref 왕복. 기존14/19·B 원본11파일 유지, Worker/MP를 별도 EVD 관측으로 연결했다. 초기 fixture·닫힌 사건/함수표 누락과 원 실패를 보존하고 변경 영향만 재검증했다. 실제 fault/repair/worker/rank/tensor/GPU/service lineage·CI5·전체LIF09/부모A는 미완료이며 추가Start0·의존성 승인은 대기다.
+
+- A-1 native21/LIF09 초안: 원14/19/20·B bytes를 유지하고 WorkerProc 생성자/Wrapper/Worker 객체 결합과 선정 원 pipe send/close를 기존 CLI/파생팩/EVD에 연결했다. 열린 main·실패/부분/중복·다른 귀속/thread·세대 종료·관측/수집/첨부 오류를 CPU EXAMPLE+소유 stdlib pipe로 검증한다. source 고정 뒤 검증 대기이며 실제 producer/worker/READY 수신/전체 모델/GPU/service·fault/repair lineage와 전체 분기는 미완료다. 원GPU창 종료/추가Start0·C/CPU 의존성 답변 대기·CI 결제 차단을 유지한다.

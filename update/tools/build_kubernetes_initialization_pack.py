@@ -10,7 +10,7 @@ from tools.build_kubernetes_api_pack import SEED_REF
 PACK_ID='PACK-KUBERNETES-MP-INITIALIZATION'
 LIMITATIONS=[
  '원팩31 LIF09/SC17-01 원질문·정상·부분 실패·수정 후 정상 기동과 FAIL/UNKNOWN 기준 및 다른76개 bytes를 유지하는 DRAFT다.',
- 'native14 또는 명시 native20/vLLM0.31/mp/lab=true의 한 선언 단계 관측을 지원한다. native20은 원 Worker19·MP14를 조합하고 Worker 사실을 별도 관측으로 소비하며 cross-process 결합을 인증하지 않는다. normal·partial-failure·recovered-normal 이름/시나리오 hash는 실제 대응이나 장애 활성 증명이 아니다.',
+ 'native14 또는 명시 native20/21/vLLM0.31/mp/lab=true의 한 선언 단계 관측을 지원한다. native20은 원 Worker19·MP14를 조합하고 Worker 사실을 별도 관측으로 소비하며 cross-process 결합을 인증하지 않는다. normal·partial-failure·recovered-normal 이름/시나리오 hash는 실제 대응이나 장애 활성 증명이 아니다.',
  '정확 ENV/target/prepared·전체 모델 inventory/revision·API 별칭·필수 rank·준비 단계worker-ready/model-load/admission·실패 예정 rank/단계·준비/복귀 기한과 aware600초 이하 창을 명시한다. 기업 정책을 채우거나 읽은 hash를 자동 승인하지 않는다.',
  'MultiprocExecutor._init_executor와 WorkerProc 두 static 준비 메서드의 원반환/예외/인자·descriptor·정리를 보존한다. 실제 소스/code·session/PID/start/call/부모/객체·필수 rank 입력/반환과 상위 반환/예외의 같은 프로세스 구간을 대조한다.',
  'WorkerProc의 READY 응답·필수 rank 목록 반환·상위 기동 반환은 전 worker의 모델 적재/통신/실제 serving 완료가 아니다. 기존native8의 모델 관측을 보존하지만 cross-process root failure/전체 model readiness를 자동 결합하지 않는다.',
@@ -31,12 +31,12 @@ def derive(seed,output):
     manifest=yaml.safe_load(raw.pop('pack.yaml').decode('utf-8'));original=build_pack(manifest,raw)
     if original.ref().model_dump(mode='json')!=SEED_REF or len(original.checks)!=77:raise ValueError('REVIEWED_PACK31_REQUIRED')
     check=yaml.safe_load(raw['checks/LIF-09.yaml'].decode('utf-8'))
-    check.update(revision=6,executor='initialization',collection_profile=PROFILE,
+    check.update(revision=7,executor='initialization',collection_profile=PROFILE,
         policy_params=[{'key':k,'type':v,'required':True} for k,v in POLICY_TYPES.items()],
         required_observations=[{'key':k,'type':v} for k,v in OBSERVATIONS.items()],
         judge={'plugin':'rule_table','params':{'pass_when_all':[],'fail_when_any':[]}},limitations=deepcopy(LIMITATIONS))
     changed=dict(raw);changed['checks/LIF-09.yaml']=yaml.safe_dump(check,allow_unicode=True,sort_keys=False).encode('utf-8')
-    new=deepcopy(manifest);new.update(pack_id=PACK_ID,revision=2,review={'status':'DRAFT','reviewer':None,'reviewed_at':None},
+    new=deepcopy(manifest);new.update(pack_id=PACK_ID,revision=3,review={'status':'DRAFT','reviewer':None,'reviewed_at':None},
         files_sha256=[{'path':name,'sha256':sha256_hex(data)} for name,data in sorted(changed.items())])
     result=build_pack(new,changed)
     if list(result.checks)!=list(original.checks):raise ValueError('PACK_CHECK_SCOPE_CHANGED')

@@ -655,3 +655,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - A-1 LIF09: Worker19·MP14 원본을 바꾸지 않고 명시 native20/13자산으로 조합한다. 부모 MP와 Worker 사실은 별도 EVD 필드로 소비하며 PID/시간 일치만으로 start/assignment/rank/shard·실제 실패/서비스/수정 후 계보를 결합하지 않는다. 기존 정책·정상/부분 실패/수정 후 질문과 UNKNOWN을 유지하고 원 journal header를 relabel하지 않는다.
 
 - A-1 native20/LIF09 마감: source250722f/reviewa391bc0, 직접 고유33각OS·인접Windows313/Linux314·guard267설치·CLI4/정확24Ref 왕복. 기존14/19·B 원본11파일 유지, Worker/MP를 별도 EVD 관측으로 연결했다. 초기 fixture·닫힌 사건/함수표 누락과 원 실패를 보존하고 변경 영향만 재검증했다. 실제 fault/repair/worker/rank/tensor/GPU/service lineage·CI5·전체LIF09/부모A는 미완료이며 추가Start0·의존성 승인은 대기다.
+
+- A-1 LIF09 native21은 정확 source/decorator/descriptor를 보존한 constructor→Wrapper→Worker opaque 결합과 해당 worker_main의 원 READY pipe 위임만 관측한다. 새 send/close·전역 Connection patch·payload/handle/FD/주소/env/argv 저장을 하지 않는다. 원 반환/예외/정리를 유지하며 READY send 반환과 main 종료를 전체 준비·수신·서비스 접수로 쓰지 않는다. 옛14/19/20과 저장팩/Ref를 유지하고 새 세대 관측을 명시한 check만21 실행에 사용한다.

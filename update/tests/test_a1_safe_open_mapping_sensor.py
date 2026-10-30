@@ -154,7 +154,7 @@ def test_bounded_snapshot_retains_complete_prefix_without_raw_addresses(monkeypa
     raw=b'1000-2000 r--p 00000000 00:00 7 /EXAMPLE-public\nmalformed\n'
     original=builtins.open
     monkeypatch.setattr(builtins,'open',lambda path,*a,**kw:io.BytesIO(raw) if path=='/proc/self/maps' else original(path,*a,**kw))
-    result=sensor.mapping_snapshot(observer,(os.makedev(0,0),7))
+    result=sensor.mapping_snapshot(observer,(os.makedev(0,0) if hasattr(os,'makedev') else 0,7))
     if sys.platform.startswith('linux'):
         assert result['status']=='bounded' and len(result['matches'])==1 and result['matches'][0]['mapped_bytes']==4096
         assert '1000' not in json.dumps(result) and '/EXAMPLE-public' not in json.dumps(result)
@@ -171,3 +171,10 @@ def test_mapping_collection_failure_does_not_change_original_tensor_return_or_cl
         assert result['samples'] and all(row['before']['status']=='unavailable' for row in result['samples'])
         assert PRIVATE not in json.dumps(result)
     finally:world.cleanup()
+
+
+def test_reviewed_code_contract_matches_loaded_source_and_independent_compile():
+    runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]))
+    namespace=types.ModuleType('_mapping_independent_compile');namespace.__file__=sensor.__file__
+    exec(compile(Path(sensor.__file__).read_bytes(),sensor.__file__,'exec',dont_inherit=True,optimize=0),vars(namespace))
+    assert namespace.code_contract(base8)==sensor.code_contract(base8)==sensor.RUNTIME_CODE_CONTRACTS[runtime]

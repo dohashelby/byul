@@ -21,8 +21,7 @@ LIBRARY_FILES={'__init__.py':'92c988289b8c225a92f25e487ad5d7a1eb7e326eec0fedfc6b
  '_safetensors_rust.abi3.so':'e6f17a9e9846bc2bc4ad94cc5431746b59785de3d2681ef2666e8890ae192dfb'}
 MAX_ROWS=2048;MAX_BYTES=2*1024**2;MAX_MAP_BYTES=2*1024**2;MAX_MAP_ROWS=16384;MAX_MATCHES=32;MAX_REGIONS=256;MAX_CONTEXTS=256
 CODE_FILENAME='guard/adapters/vllm_safe_open_mapping_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'10f2126f05c92bc289b80fc3159e7a1a958de56404a140031fd9e7b34604ca05',
- 'cpython-3.12.3':'0cb277ef789ccb6431408d06223472c9a7846342955496840ef606c2cd63eb7c'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'10f2126f05c92bc289b80fc3159e7a1a958de56404a140031fd9e7b34604ca05','cpython-3.12.3':'0cb277ef789ccb6431408d06223472c9a7846342955496840ef606c2cd63eb7c'}
 TRUTH=('worker_assignment_verified','approved_model_file_verified','producer_authenticated','tensor_storage_applied_verified',
  'model_bytes_read_verified','native_loaded_memory_verified','mapping_release_verified','scope_complete')
 _BASE=None

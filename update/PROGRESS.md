@@ -1567,5 +1567,7 @@ git status
 - 공통입력·전용소비·정식 registry/팩/CLI는 연결됐고 확인된 금지TCP FAIL은 ACK/후속pipe/report/첨부/정리 오류 뒤 보존된다. 거부·필수근거 누락/교체는UNKNOWN, normal false/null·기능/성능UNKNOWN·전체scopefalse다. 실제socket/Kubernetes/worker/GPU0·전체5분기/현재전체suite는 미확인이고 기존Goal·승인창/Start0/46.66USD/EBS·CI외부차단을유지한다.
 # 2026-10-30 A1 B PR130 원본 bytes 통합 착수
 
-- B 확정f154419/PR130의 OBS06 소유로그 수동증거 및 REQ09 sourceCPU subset21파일을 원본bytes로 가져왔다. 공통의존성4파일은현A1과B동일하고 새registry/core/팩변경은없다. B전용코드/판정/component033·gate/collector pin과 원helper c9는 재작성하지 않는다.
+- B 확정f154419/PR130의 OBS06 소유로그 수동증거 및 REQ09 sourceCPU subset21파일+전이의존2파일을 원본bytes로 가져왔다. 공통의존성5파일은현A1과B동일하고 새registry/core/팩변경은없다. B전용코드/판정/component033·gate/collector pin과 원helper c9는 재작성하지 않는다.
 - A1검토전체snapshot만갱신하고 B의기존component gate가현재A소스를거부하는부분은전용pin소비갱신으로남긴다. Windows scratch stat0777 vs Bfixture POSIX0700 assert를관측했으며 원시험의양쪽결과를그대로기록하고 새skip/제외/assert완화는없다. 고정후영향/설치·정확Ref를검증하며 새actualCPU/Kubernetes/principal/암호화/GPU나전체B/A완료는주장하지않는다.
+
+- 고정source e40fcfd / 검토pin299ea03: Linux339통과(동일1349파일), Windows328통과/기존skip1/미선정1·원B POSIX0700 fixture로10실패. 원B보수/새skip/제외/assert완화 없음. Windows 실제collector·전범위 성공은 미확인이고 B확정보수가 필요하다. 설치246일치/공개main CLI4·정확24Ref(15.100초)와 전체소비354는통과. 실제Kube/worker/GPU/신규sourceCPU0, B033 ancestor gate 거부를유지한다.

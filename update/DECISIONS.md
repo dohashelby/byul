@@ -613,3 +613,5 @@ A2 9482a75의3원본 bytes를 보존하며 A1은 기존 egress v1의 wrapper/reg
 # 2026-10-30 B 기록접근/입력 CPU 확정 통합
 
 B PR130의21파일은 확정tree bytes로통합하고 전용수집/판정/source pin은B가유지한다. 원component033/collector literal을현재A의읽은hash로자동승인하지않고 A1검토전체snapshot과별도로남긴다. 원Store/Ref/whole normal·암호화UNKNOWN/후기독립FAIL을보존하고 실제CPU원결과와새A통합을구분한다. POSIXscratch fixture/Windowsstat 차이는 원검증에드러내며 새skip·assert완화·원B재작성을하지않는다.
+
+B immutable21+전이의존2 통합은 Linux/설치본 근거와 Windows 원fixture10실패를 분리해 초안PR로인계한다. A가B원본을고치거나 gate/검증제외로성공을만들지 않는다. B033의 ancestry거부와 A검토354 전체소비는별개다. 원OBS06/REQ09 전체완료·실제GPU·부모Goal완료를선언하지않는다.

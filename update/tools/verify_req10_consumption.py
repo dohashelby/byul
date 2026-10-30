@@ -5,7 +5,7 @@ import argparse,hashlib,json,subprocess,sys
 # Reviewed REQ02 native route product checkpoint; fixed IPC/egress and native8~15
 # retain the full original common scope and all trust/whole-scope gates.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='075a0f058c8881a7c01e7be0fda3ee32c1330ece'
+REVIEWED_COMMON_COMMIT='065eb9b1e24648c84efa9ec4fd327088e9b85e3b'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

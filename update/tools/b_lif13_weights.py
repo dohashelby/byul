@@ -177,6 +177,7 @@ def _rpc_fact(value):
 
 
 def _read_fact(value, config):
+    from tools.b_lif13_weights_native import READ_STATUSES
     value = value if type(value) is dict else {}; shape, count = value.get('shape'), value.get('selected_count')
     valid = (value.get('collected') is True and value.get('read_completion') is True
         and type(count) is int and 0 < count <= config['read_elements']
@@ -198,11 +199,11 @@ def _read_fact(value, config):
         'source_validation_claimed': _source_status(value.get('source_validation')),
         'peer_generation_verified_claimed': value.get('peer_generation_verified') is True,
         'daemon_generation_sha256_claimed': value.get('daemon_generation_sha256') if _sha(value.get('daemon_generation_sha256')) else None,
-        'status': value.get('status') if value.get('status') in {'read', 'unavailable', 'read_error', 'unsupported_non_cuda',
-            'unsupported_layout', 'unsupported_empty', 'unsupported_cpu_by_value', 'not_attempted', 'daemon_epoch_changed', 'daemon_epoch_unavailable'} else 'unavailable'}
+        'status': value.get('status') if type(value.get('status')) is str and value['status'] in READ_STATUSES else 'unavailable'}
 
 
 def project(raw, config):
+    from tools.b_lif13_weights_native import FOLLOWUP_REASONS
     expected = {'schema': CAPTURE_SCHEMA, 'config_sha256': digest(config), 'environment_ref': config['environment_ref'],
         'policy_ref': config['policy_ref'], 'plan_ref': config['plan_ref'], 'target_sha256': config['target_sha256'],
         'source_commit': SOURCE_COMMIT, 'data_origin': config['data_origin'], 'mode': config['mode']}
@@ -235,7 +236,7 @@ def project(raw, config):
         followups.append({'slot': row['slot'], 'attempted': follow.get('attempted') is True,
             'status': follow.get('status') if follow.get('status') in STATUS else 'unavailable',
             'rpc_claimed': _rpc_fact(follow), 'exports_claimed': _exports(follow.get('exports')),
-            'reason': follow.get('reason') if follow.get('reason') in {'weights_released', 'cache_key_mismatch', 'daemon_error', 'rpc_error', 'unavailable', 'not_attempted', 'ok'} else 'unavailable'})
+            'reason': follow.get('reason') if (follow.get('reason') is None or type(follow.get('reason')) is str) and follow.get('reason') in FOLLOWUP_REASONS else 'unavailable'})
     release = raw.get('release', {}); release = release if type(release) is dict else {}
     source_files = raw.get('source_file_bytes_sha256', {})
     client_claim = bool(CLIENT_SOURCE_FILES and source_files == CLIENT_SOURCE_FILES)

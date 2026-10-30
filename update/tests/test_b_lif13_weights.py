@@ -328,3 +328,50 @@ def test_cpu_by_value_cannot_be_native_path_even_with_valid_digest(case):
     assert fact['held_after']['status'] == 'unsupported_cpu_by_value'
     assert not fact['held_after']['native_path_claimed'] and fact['digest_relation'] == 'unavailable'
     assert not fact['native_measurement_verified']
+
+
+def test_single_native_closed_read_vocabulary_preserves_every_known_helper_status(case):
+    from tools import b_lif13_weights_native as native
+    assert type(native.READ_STATUSES) is frozenset
+    for status in native.READ_STATUSES:
+        fact = tool._read_fact(native._unavailable_read(status), case['config'])
+        assert fact['status'] == status
+        assert not fact['native_path_claimed'] and not fact['collected']
+    assert {'source_unavailable', 'daemon_epoch_changed', 'daemon_epoch_unavailable', 'unsupported_cpu_by_value'} <= native.READ_STATUSES
+
+
+def test_single_native_closed_followup_vocabulary_preserves_known_reasons(case):
+    from tools import b_lif13_weights_native as native
+    assert type(native.FOLLOWUP_REASONS) is frozenset and None in native.FOLLOWUP_REASONS
+    for reason in native.FOLLOWUP_REASONS:
+        raw = native_capture(case)
+        raw['consumers'][0]['followup_get_state'] = {'attempted': False, 'status': 'unavailable', 'reason': reason}
+        result = tool.project(raw, case['config'])
+        assert result['post_acquisition']['consumers'][0]['reason'] == reason
+        assert not result['post_acquisition']['consumers'][0]['attempted']
+        assert not result['qualification']['measurement_verified']
+
+
+def test_native_unknown_status_reason_stays_redacted_without_open_membership(case):
+    from tools import b_lif13_weights_native as native
+    raw = native_capture(case); raw['consumers'][0]['held_after'] = native._unavailable_read(PRIVATE)
+    raw['consumers'][0]['followup_get_state'].update(attempted=False, reason=PRIVATE)
+    result = tool.project(raw, case['config'])
+    assert result['existing_native_references']['consumers'][0]['held_after']['status'] == 'unavailable'
+    assert result['post_acquisition']['consumers'][0]['reason'] == 'unavailable'
+    assert not result['existing_native_references']['consumers'][0]['held_after']['native_path_claimed']
+    assert PRIVATE not in json.dumps(result)
+
+
+def test_native_vocab_import_occurs_only_at_consumption_boundary():
+    code = '''
+import sys
+from tools import b_lif13_weights as tool
+assert 'tools.b_lif13_weights_native' not in sys.modules
+value=tool._read_fact({'status':'unavailable','collected':False},{'read_elements':1,'device_index':0})
+assert value['status']=='unavailable'
+assert 'tools.b_lif13_weights_native' in sys.modules
+assert 'torch' not in sys.modules and 'vllm' not in sys.modules
+'''
+    value = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+    assert value.returncode == 0, value.stderr

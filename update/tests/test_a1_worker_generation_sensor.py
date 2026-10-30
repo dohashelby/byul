@@ -8,7 +8,7 @@ from contextlib import nullcontext
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace as NS
-import builtins,hashlib,multiprocessing,os,sys,threading,time,types
+import builtins,hashlib,json,multiprocessing,os,sys,threading,time,types
 import pytest
 from guard.adapters import vllm_lifecycle_sensor as base8,vllm_weight_iteration_sensor as iteration
 from guard.adapters import vllm_file_read_sensor as scope17,vllm_safe_open_mapping_sensor as mapping

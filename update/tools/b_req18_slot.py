@@ -27,7 +27,7 @@ from guard.core.select import select
 from guard.executors import registry, kubernetes_lifecycle_capture as readers, lifecycle_session
 from guard.executors.base import DraftArtifact, EvidenceDraft
 from guard.executors.http_common import incomplete_artifact_capture
-from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, canonical_json, load_pack
+from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, canonical_json, load_pack, new_id
 from guard.runtime import kubernetes_http
 from guard.runtime.bounded import strict_json
 from guard.store import Store
@@ -39,9 +39,9 @@ PROFILE = 'byul-req18-v1-slot-diagnostic/1'
 EXECUTOR = 'req18_slot_diagnostic'
 SOURCE_COMMIT = 'db9527a46873454610df6dbedf79a36d6bf1a7f6'
 # Root configures reviewed literals after the new native module is frozen.
-COMPONENT_COMMIT = '033972019f117d78c1742a3f958fe8d7910087ce'
-GATE_SHA256 = 'a636271465f58b48b9c3ff031213057821a1309dbc5b033a685d205edc46efff'
-COLLECTOR_SHA256 = '464d01376788d1e96ca6cf0ac3d23558527c4fcb06571c591be3febe8e3ec7b3'
+COMPONENT_COMMIT = '505bbbcb5fcb2eeed86c1739731b09b73e92990e'
+GATE_SHA256 = '11e97be27027e378e451e67981a538747469b46cb821be83716869d1190a1e99'
+COLLECTOR_SHA256 = '231a0695287c5cbdf24dbd4c5a98847f505fd4ebab2e47ea1c1daed19fa71c54'
 CALLBACK_SHA256 = '659d615f133cdc96ef54163678753a60e6b8ee51aa0e78e0560e0d308f7f50da'
 CALLBACK_CODE_SHA256 = None
 A_SOURCE_PINS = None
@@ -794,9 +794,9 @@ def run_cpu_pipeline(source_root, output, *, execute=True):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     pack = proposal_pack(output / 'proposal-pack')
-    env = Environment(id='ENV-B-REQ18-SOURCE-CPU', data_origin=DataOrigin.DECLARED,
+    env = Environment(id=new_id('ENV'), data_origin=DataOrigin.DECLARED,
         engine={'name': 'vllm', 'version': 'source-' + SOURCE_COMMIT}).seal()
-    policy = Policy(id='POL-B-REQ18-SOURCE-CPU', data_origin=DataOrigin.DECLARED,
+    policy = Policy(id=new_id('POL'), data_origin=DataOrigin.DECLARED,
         status='DRAFT', pack=pack.ref(), scope={'include': ['REQ-18']}).seal()
     return run_pipeline('cpu', env, policy, pack, output / 'run', source_root=source_root, execute=execute)
 

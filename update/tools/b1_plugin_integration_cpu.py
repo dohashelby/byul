@@ -25,7 +25,7 @@ from guard.core.select import select
 from guard.executors import plugin_loading, registry
 from guard.executors.base import DraftArtifact, EvidenceDraft
 from guard.executors.http_common import incomplete_artifact_capture
-from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, load_pack
+from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, load_pack, new_id
 from guard.store import Store
 from guard.store.packs import get_pack, put_pack
 from tools import b1_plugin_cpu as collector
@@ -36,10 +36,10 @@ SOURCE_PROFILES = {
     'reference5d': '5d35ce3934a7804b298559d2d99eec33792e1eb9',
     'target031': 'db9527a46873454610df6dbedf79a36d6bf1a7f6',
 }
-GATE_SHA256 = 'a636271465f58b48b9c3ff031213057821a1309dbc5b033a685d205edc46efff'
-COMPONENT_COMMIT = '033972019f117d78c1742a3f958fe8d7910087ce'
+GATE_SHA256 = '11e97be27027e378e451e67981a538747469b46cb821be83716869d1190a1e99'
+COMPONENT_COMMIT = '505bbbcb5fcb2eeed86c1739731b09b73e92990e'
 # Reviewed collector snapshot 1839c77; runtime bytes never become approval.
-COLLECTOR_SHA256 = '8a66a40d15889ec628bacb64bcc8d41c5878ac1d46ef3e9f4c57878cacda43fe'
+COLLECTOR_SHA256 = '6ad0d70e3c0ef4ede80dac9e7edbc71bf280051d31ac83b432b03e8ce82971bd'
 _CASES = {case: (group, configured) for case, group, configured in plugin_loading.CASES}
 _STATUSES = {'completed', 'execution_error', 'child_execution_error', 'unsupported', 'partial', 'read_error'}
 _VALIDATION_STATUSES = {'verified', 'unavailable', 'mismatch'}
@@ -322,9 +322,9 @@ def run_pipeline(source_root, output_root, *, source_profile='reference5d', orig
     output_root.mkdir(parents=True, exist_ok=False)
     now = datetime.now(timezone.utc)
     pack = proposal_pack(output_root / 'proposal-pack', source_profile)
-    env = Environment(id='ENV-B-SUP10-CPU-' + source_profile.upper(), created_at=now, data_origin=origin,
+    env = Environment(id=new_id('ENV'), created_at=now, data_origin=origin,
         engine={'name': 'vllm', 'version': 'reference-' + commit}).seal()
-    policy = Policy(id='POL-B-SUP10-CPU-' + source_profile.upper(), created_at=now, data_origin=origin,
+    policy = Policy(id=new_id('POL'), created_at=now, data_origin=origin,
         status='DRAFT', pack=pack.ref(), scope={'include': ['SUP-10']}).seal()
     store = Store(output_root / 'store')
     put_pack(store, pack.path)

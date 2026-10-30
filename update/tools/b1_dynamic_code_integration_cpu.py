@@ -21,7 +21,7 @@ from guard.core.select import select
 from guard.executors import dynamic_code_cpu as product, registry
 from guard.executors.base import DraftArtifact, EvidenceDraft
 from guard.executors.http_common import incomplete_artifact_capture
-from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, load_pack
+from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, load_pack, new_id
 from guard.store import Store
 from guard.store.packs import get_pack, put_pack
 from tools import b1_dynamic_code_cpu as collector
@@ -30,10 +30,10 @@ from tools import lif14_profiler_cpu as component_gate
 PROFILE = 'sup09-11-shared-source-cpu-proposal-v1'
 SOURCE_PROFILES = {'reference5d': '5d35ce3934a7804b298559d2d99eec33792e1eb9',
                    'target031': 'db9527a46873454610df6dbedf79a36d6bf1a7f6'}
-GATE_SHA256 = 'a636271465f58b48b9c3ff031213057821a1309dbc5b033a685d205edc46efff'
-COMPONENT_COMMIT = '033972019f117d78c1742a3f958fe8d7910087ce'
+GATE_SHA256 = '11e97be27027e378e451e67981a538747469b46cb821be83716869d1190a1e99'
+COMPONENT_COMMIT = '505bbbcb5fcb2eeed86c1739731b09b73e92990e'
 # Reviewed collector snapshot f239748; runtime hashes never become approval.
-COLLECTOR_SHA256 = 'c2b3bddcb2b482f8b7488e452515606a818539ff6e710e4ca9aebd7b47e4fd7d'
+COLLECTOR_SHA256 = '12200336591df96e724bff338d5bd70da46781f697337d88b94b630991765cd1'
 CHECKS = ('SUP-09', 'SUP-11')
 _CASES = {case['case_id']: case for case in product.fixtures()}
 _MODES = {'normal': 0, 'O': 1, 'OO': 2}
@@ -326,9 +326,9 @@ def run_pipeline(source_root, output_root, *, source_profile='reference5d', orig
     output_root.mkdir(parents=True, exist_ok=False)
     now = datetime.now(timezone.utc)
     pack = proposal_pack(output_root / 'proposal-pack', source_profile)
-    env = Environment(id='ENV-B-DYNAMIC-CPU-' + source_profile.upper(), created_at=now, data_origin=origin,
+    env = Environment(id=new_id('ENV'), created_at=now, data_origin=origin,
                       engine={'name': 'vllm', 'version': 'reference-' + commit}).seal()
-    policy = Policy(id='POL-B-DYNAMIC-CPU-' + source_profile.upper(), created_at=now, data_origin=origin,
+    policy = Policy(id=new_id('POL'), created_at=now, data_origin=origin,
                     status='DRAFT', pack=pack.ref(), scope={'include': list(CHECKS)}).seal()
     store = Store(output_root / 'store')
     put_pack(store, pack.path)

@@ -25,7 +25,7 @@ from guard.executors import online_input_cpu as product, registry
 from guard.executors import input_cpu as req09_product
 from guard.executors.base import DraftArtifact, EvidenceDraft
 from guard.executors.http_common import incomplete_artifact_capture
-from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, Mode, load_pack
+from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, Mode, load_pack, new_id
 from guard.store import Store
 from guard.store.bundle import export_bundle, restore_bundle, verify_complete
 from guard.store.packs import get_pack, put_pack
@@ -35,10 +35,10 @@ from tools import lif14_profiler_cpu as component_gate
 PROFILE = 'online-input-source-cpu-proposal-v1'
 SOURCE_PROFILES = {'reference5d': '5d35ce3934a7804b298559d2d99eec33792e1eb9',
                    'target031': 'db9527a46873454610df6dbedf79a36d6bf1a7f6'}
-GATE_SHA256 = 'a636271465f58b48b9c3ff031213057821a1309dbc5b033a685d205edc46efff'
-COMPONENT_COMMIT = '033972019f117d78c1742a3f958fe8d7910087ce'
+GATE_SHA256 = '11e97be27027e378e451e67981a538747469b46cb821be83716869d1190a1e99'
+COMPONENT_COMMIT = '505bbbcb5fcb2eeed86c1739731b09b73e92990e'
 # Reviewed collector snapshot de799c2; runtime bytes never become approval.
-COLLECTOR_SHA256 = '6a868f41865a0a98bbd47be9641bfe2b11289a0836d2ebe47e76ed8c2fafe535'
+COLLECTOR_SHA256 = 'b2ffa5aa4c3afe4b8c412e03f2352b5864fe5dc0c56d2482e143f001c24f087a'
 CHECKS = ('REQ-07', 'REQ-08', 'SUP-08')
 _CASES = {case['id']: case for case in product.fixtures()}
 _TARGET_EXCLUDED = {'reuse-empty', 'reuse-bool', 'reuse-echo-ignores-ids'}
@@ -485,9 +485,9 @@ def run_pipeline(source_root, output_root, *, source_profile='reference5d', orig
     output_root.mkdir(parents=True, exist_ok=False)
     now = datetime.now(timezone.utc)
     pack = proposal_pack(output_root / 'proposal-pack', source_profile)
-    env = Environment(id='ENV-B-ONLINE-INPUT-CPU-' + source_profile.upper(), created_at=now, data_origin=origin,
+    env = Environment(id=new_id('ENV'), created_at=now, data_origin=origin,
                       engine={'name': 'vllm', 'version': 'reference-' + commit}).seal()
-    policy = Policy(id='POL-B-ONLINE-INPUT-CPU-' + source_profile.upper(), created_at=now, data_origin=origin,
+    policy = Policy(id=new_id('POL'), created_at=now, data_origin=origin,
                     status='DRAFT', pack=pack.ref(), scope={'include': list(CHECKS)}).seal()
     store = Store(output_root / 'store')
     put_pack(store, pack.path)

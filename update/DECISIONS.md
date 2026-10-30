@@ -627,3 +627,5 @@ native17 ctime은 고정 runtime/API별 기준을 함께 저장한다. Windows p
 A2 native16 소비기의 source pin을 현재 읽은hash로승인하거나 전용원본을수정하지않는다. 공개된 native16 metadata 원bytes를유지하고 native17의확장은 별도공통adapter에서닫힌journal을재사용한다. A2 analyze는 기존admitted native16packet만소비하며 예외는정제localgap으로남겨 앞선공통사실·독립FAIL을보존한다.
 
 A2 native16 고정 소비는 원본3파일/source pin을그대로보존하고A1의기존OBS02 연결점·공통기준만갱신한다. native17새투영은원journal을직접재사용하며16로header를바꾸지않는다. 전용consumer오류는부모수집의gap재계산뒤에도정제진단·ABORTED로남기고 기존paired common사실·독립FAIL을삭제하지않는다. 다른실행·loader없는부분사례를같은loader에의귀속으로완화하지않는다.
+
+B4cfc의변경파일과전이의존성은원bytes로통합한다. B rootAGENTS는참조로보존하고A1규칙에적용하지않는다. 원B HTTP/component/sourcepin을A1이변조하거나실행중hash로승인하지않는다. 같은닫힌wire메서드와정확구sourceRef를검토해새A고정소비기준을제공하고B는전용pin/소비수락을확정한다. Graph모듈가용성은actual worker/callback/close 계약완료가아니다.

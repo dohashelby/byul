@@ -1591,3 +1591,7 @@ git status
 - A2 PR140/9bda8b3 세 원본 파일을 bytes 그대로 소비하고 기존 OBS02 native16 공통 사건 뒤 전용 선택/진행 후보를 연결한다. 원 native16 metadata와 pin을 복원하고 native17은 명시적 별도 공통 투영으로 기존 FD/read 기능을 유지한다. 정상/누락/다른귀속/부분/후기consumer·수집·첨부 오류 및 정확Ref를 선정했으며 검증 전 초안이다. 실제SUP05/06·worker/tensor/권한·전체분기완료를 주장하지 않는다.
 
 - A2 native16 확정9bda8b3 세파일의원bytes와f8ced901/e7494eda 원pin을보존한 정식OBS02 소비를source9997936/pin1dab9b2에서검증했다. 직접각19·인접각90/동일1370불변, 원A2단위24는변경없는원본근거재사용. 설치252/A2native16 CLI4·정확24Ref와native17 인접CLI4·정확24Ref를각각확인, 전체공통360/제외0. 초기양쪽3실패는loader없는fixture와부모gap재계산을보수했고 loader없는음성대조·consumer오류/ABORTED·기존공통사실보존을추가했다. 실제SUP05/06/worker/tensor/권한/전체Goal 완료는아니다.
+
+# 2026-10-31 A1 B4cfc 로그/Graph/ID 확정 전달물 통합 착수
+
+- B PR130 고정27파일+전이3개 bytes를보존하고 기존 OBS03/manual/Ref와 REQ20준비경계를검토했다. B oldHTTPpin3da의정확A참조1c1f와현재A0fc의닫힌요청AST동일성을확인했으며 원B gate는거부그대로다. nativeGraph None/실제source-callback-close미지원·oldWindowsfixture실패를유지하고 검토fullsnapshot/영향/설치/CLI·Ref를별도로확인한다. 실제Kube/GPU/전체Goal완료를선언하지않는다.

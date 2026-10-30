@@ -20,7 +20,7 @@ from guard.executors import registry
 from guard.executors.structured_tools_cpu import (PROFILE, StructuredToolsCPUExecutor,
     TARGET031_COMMIT, TARGET031_PROFILE, StructuredToolsTarget031CPUExecutor)
 from guard.executors.structured_tools import SOURCE_COMMIT, judge_params
-from guard.models import CheckDef, Environment, Policy, load_pack
+from guard.models import CheckDef, Environment, Policy, load_pack, new_id
 from guard.store import Store
 from guard.store.packs import put_pack
 from tools.b1_integration_cpu import verify_tool_checkout
@@ -39,8 +39,8 @@ def main():
     executor_class = StructuredToolsTarget031CPUExecutor if target031 else StructuredToolsCPUExecutor
     executor_name = executor_class.name
     pack_id = 'PACK-B-REQ10-031-CPU-PROPOSAL' if target031 else 'PACK-B-REQ10-CPU-PROPOSAL'
-    env_id = 'ENV-B-REQ10-031-CPU-REFERENCE' if target031 else 'ENV-B-REQ10-CPU-REFERENCE'
-    policy_id = 'POL-B-REQ10-031-CPU-PROPOSAL' if target031 else 'POL-B-REQ10-CPU-PROPOSAL'
+    env_id = new_id('ENV')
+    policy_id = new_id('POL')
     args.output_root.mkdir(parents=True, exist_ok=False)
     started = time.perf_counter()
     now = datetime.now(timezone.utc)

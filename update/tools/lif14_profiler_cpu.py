@@ -17,7 +17,7 @@ from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.executors import registry
 from guard.executors.profiler_lifecycle_cpu import SOURCE_COMMIT, PROFILE, ProfilerLifecycleCPUExecutor, judge_params
-from guard.models import CheckDef, Environment, Policy, load_pack
+from guard.models import CheckDef, Environment, Policy, load_pack, new_id
 from guard.store import Store
 from guard.store.packs import put_pack
 from tools import b1_integration_cpu as snapshot_helper
@@ -29,7 +29,7 @@ HELPER_SHA256 = '858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6b
 
 # Filled with the reviewed frozen module commit by the coordinating session.
 # An unconfigured pin refuses execution; HEAD is never used as the expected pin.
-PRODUCT_COMPONENT_COMMIT = '033972019f117d78c1742a3f958fe8d7910087ce'
+PRODUCT_COMPONENT_COMMIT = '505bbbcb5fcb2eeed86c1739731b09b73e92990e'
 
 
 def verify_component(repo):
@@ -88,9 +88,9 @@ def main():
         'files_sha256': [{'path': 'checks/LIF-14.yaml', 'sha256': hashlib.sha256(body).hexdigest()}], 'review': {'status': 'DRAFT'}}
     (pack_dir / 'pack.yaml').write_text(yaml.safe_dump(manifest, sort_keys=False))
     pack = load_pack(pack_dir)
-    env = Environment(id='ENV-B-LIF14-CPU-REFERENCE', created_at=now, data_origin='DECLARED',
+    env = Environment(id=new_id('ENV'), created_at=now, data_origin='DECLARED',
         engine={'name': 'vllm', 'version': 'reference-' + SOURCE_COMMIT}).seal()
-    policy = Policy(id='POL-B-LIF14-CPU-PROPOSAL', created_at=now, data_origin='DECLARED', status='DRAFT', pack=pack.ref()).seal()
+    policy = Policy(id=new_id('POL'), created_at=now, data_origin='DECLARED', status='DRAFT', pack=pack.ref()).seal()
     store = Store(args.output_root / 'store')
     put_pack(store, pack_dir)
     store.put_many([env, policy])

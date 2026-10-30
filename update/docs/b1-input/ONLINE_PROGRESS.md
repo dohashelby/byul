@@ -130,3 +130,5 @@ export/restore·exactRef 재판정·소유 probe/session 정리 본체를 작성
 현재 B 브랜치에는 A108 공통 bytes가 미통합되어 source gate가 요청 전에 닫힌다. A108 reader의 `image_check=False`도 유지되어 diagnostic recording은 B native join의 image gate를 통과하지 않는다. `/9` read/parser2MiB·2048행과 기본 `/8`256KiB·512행, 현행 session seal256KiB 상한을 구분한다. 256KiB 초과 `/9` 파일의 owned seal 지원은 A 후속 대기다. local Python3.12.13 회귀와 serving native 승인3.12.3/.14를 구분한다.
 
 CPU16+after16 실측 재실행0, 실제 Kubernetes/네트워크0, callback SHA bd159580… bytes·기존 CPU pin·A 공통/runtime/registry/팩 수정0이다. 직접 영향 테스트 결과는 커밋 인계 보고에 기록한다. 실제 실행 준비 완료·실수집·영구 제품 등록으로 집계하지 않는다.
+
+고정 B 소스935ca783의 전용86개 통과(pytest1.90초/부모2.222초)·source 전후 동일과 집중검토 무결함을 확인했다. 별도 A108+선정 B4파일 통합83fe528887db8fa2dd6b1415c6b8295eef2bdb3c에서 실제 capability 검사1회(0.0025초)를 통과했다. A 기존 tracked source 전체·14승인pin·registry/팩/lock bytes가 유지됐고 실제 공개 image_check=False와 native join 미수집을 확인했다. 실제 HTTP/엔진/GPU 실행 및 동일86개 재시험은 하지 않았다. 통합은 guard/packs/dependency bytes를 바꾸지 않아 직전 wheel164개 결과를 재사용했다. 이미지 검증/프로필별 seal 관문은 기존 A 요청6502275726에 묶어 갱신했다.

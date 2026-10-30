@@ -604,3 +604,6 @@ NetworkPolicy 회수≠credential issuer 철회. PLT10은 기존 native8과5개 
 # 2026-10-30 A1 PLT07 Kubernetes 공통 경계
 
 기존 Docker CID/POL·A2 predicate와 sender/receiver bytes는 유지한다. 새 Kube capability는 정확 full containerd ID·양쪽 target SHA와 명시 UID/netns·소유 receiver/source를 요구하고, 실행 helper 자체의 현재 UID/GID/groups가 이미 일치할 때만 송신한다. 다른 UID 전환/새 Pod 또는 receiver 기동·worker/SDK/기업 허용표는 추가하지 않는다. 공통 typed 부분 자료와 전용 분석·정식 제품·actual·전체5분기를 분리하고, 후속 오류가 이전 자료를 지우지 않게 한다. UNKNOWN/EXAMPLE·source/image/lab/native0.32 관문을 유지한다.
+# 2026-10-30 REQ02 native route 제품
+
+기존 native8 인증 bool·등록 callback 관측과 REQ02 자체HTTP ID를 같은 recording/entry method-path·source/module/seq로 연결하되, 실제principal 권한·Gateway rewrite와 producer/worker 인증은 false로 남긴다. 선택된 시험 키 변수 하나만 사용하고 키값/키hash는 저장하지 않는다. 기존 선언파일 route_record·다른 점검 ID/profile·source/image/lab/native0.32 관문을 보존한다. 기술 관측 제품 연결과 사용자 기업 정책/실제 환경을 분리한다.

@@ -1548,3 +1548,7 @@ git status
 
 - source6db0549/검토pin cf7c757, 기존66파일과 이전 Kube method AST 보존. 신규33사례 Windows/Linux 통과, 전체소비347·설치239파일 일치·격리 공개method6사례/typed JSON 왕복·원문 비저장을 확인했다. 첫 source7c의 Windows443/Linux444통과와 신규fixture 실패1을 함께 보존하고 Ref 일관성만 보수했다. guard bytes는 같아 인접 검증·wheel/설치를 재사용했으며 전체suite 성공으로 합산하지 않는다.
 - 공통 입력은 제공됐지만 A2 새 envelope 소비·정식 PLT07 registry/팩/CLI·실제 실증·전체5분기는 미완료다. 기존 IPC CLI20사례/PR133 설치CLI4·정확24Ref는 해당 source/경로의 근거다. 실제 worker/권한/기동·승인/비용/Goal 경계를 유지하고 새 확정 전용 전달물 또는 준비된 A1 분기를 계속한다.
+# 2026-10-30 A1 REQ02 native 인증·등록 handler 연결 착수
+
+- 기존 native8 hook/route_handler_index·고정 source/PID/session reader/seal을 재사용해 REQ02 전용3HTTP·native_route:kubernetes registry·명시 DRAFT팩·동일 recording metadata 결합을 구현했다. 기존 route_record 제품과 다른76개 정의·A2/B/native8~15 bytes를 보존한다. 명시 환경 변수 시험 키만 선택 소비하고 값/키hash를 저장하지 않는다.
+- 준비된 본인 분기 개발이며 실제 principal/권한/Gateway rewriting 정책 미확정을 독립 코드 전체의 차단으로 삼지 않는다. 모든판정UNKNOWN/normal null·실제producer/nodeimage/worker/전체scopefalse를 유지한다. 구현/회귀/문서 초안 종료 후 source고정·영향/설치·정확Ref·커밋/초안PR/CI/인계를 이어간다. 아직 시험 통과나 실제 실증을 기록하지 않는다.

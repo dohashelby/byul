@@ -25,13 +25,14 @@ PROFILE = "kubernetes-owned-sampling-http-v1"
 REQUEST_BINDING_PROFILE = "kubernetes-owned-request-binding-http-v1"
 VALIDATION_ERROR_PROFILE = "kubernetes-owned-validation-error-http-v1"
 MODEL_AUTHORIZATION_PROFILE = "kubernetes-owned-model-authorization-http-v1"
+ROUTE_AUTHENTICATION_PROFILE = "kubernetes-owned-native-route-http-v1"
 ONLINE_INPUT_PROFILE = "kubernetes-owned-online-input-http-v1"
 TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
 REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
-_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE})
+_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE})
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -78,6 +79,8 @@ class KubernetesHTTP:
         if profile not in {PROFILE, *_BINDING_PROFILES}:
             raise KubernetesBindingError()
         self.profile = profile
+        if profile==ROUTE_AUTHENTICATION_PROFILE and (target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0'):
+            raise KubernetesBindingError()
         self.lab = target.get('lab')
         self.engine_name = env.engine.name
         self.engine_version = env.engine.version
@@ -319,7 +322,10 @@ class KubernetesHTTP:
                 raise KubernetesBindingError()
             prepared=[]
             for request in requests:
-                if self.profile == VALIDATION_ERROR_PROFILE:
+                if self.profile == ROUTE_AUTHENTICATION_PROFILE:
+                    if len(requests)!=1:raise KubernetesBindingError()
+                    self._native_route_request(request)
+                elif self.profile == VALIDATION_ERROR_PROFILE:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._validation_error_request(request)
@@ -355,7 +361,13 @@ class KubernetesHTTP:
                 paths={"/tokenize","/v1/chat/completions"}
                 if self.profile in _CLOSE_PROFILES:
                     allowed.add("read_profile");paths.add("/v1/completions")
-                if self.profile != OBSERVATION_STATE_PROFILE and (set(value)-allowed
+                if self.profile == ROUTE_AUTHENTICATION_PROFILE:
+                    # The new closed GET/POST contract above replaces only the
+                    # old POST-only path/body shape. Preserve common URL/field bounds.
+                    if (set(value)-allowed or mode!='json' or url.scheme!=self.endpoint.scheme
+                            or url.netloc!=self.endpoint.netloc or url.query or url.fragment
+                            or url.username is not None or url.password is not None):raise KubernetesBindingError()
+                elif self.profile != OBSERVATION_STATE_PROFILE and (set(value)-allowed
                         or value.get("method")!="POST" or mode not in {"json","sse"}
                         or url.scheme!=self.endpoint.scheme or url.netloc!=self.endpoint.netloc or url.query or url.fragment
                         or url.path not in paths
@@ -384,7 +396,7 @@ class KubernetesHTTP:
             by_id={row["id"]:row for row in raw};results=[]
             for request in prepared:
                 row=by_id[request["id"]];outcome=row.get("outcome")
-                if self.profile==OBSERVATION_STATE_PROFILE and (row.get('method')!=request['method'] or row.get('mode')!=request['mode']):raise KubernetesBindingError()
+                if self.profile in {OBSERVATION_STATE_PROFILE,ROUTE_AUTHENTICATION_PROFILE} and (row.get('method')!=request['method'] or row.get('mode')!=request['mode']):raise KubernetesBindingError()
                 if not (type(outcome) is int and 100<=outcome<=599 or type(outcome) is str and outcome in
                         {"refused","timeout","unreachable","dns_error","error","probe_error"}):
                     raise KubernetesBindingError()
@@ -416,6 +428,29 @@ class KubernetesHTTP:
                         or slot in {'disconnect','normal-after'} and 'normal-before' not in seen
                         or slot=='health-after' and 'normal-after' not in seen):raise ValueError
                 self._state_token=token;seen.add(slot)
+        except Exception:raise KubernetesBindingError() from None
+
+    def _native_route_request(self,request):
+        """REQ02 owns these three IDs; no other check's request bypass is used."""
+        try:
+            slots=('models-before','completion','models-after');slot=request.get('id','').removeprefix('req02-')
+            if slot not in slots or request['id']!='req02-'+slot or request.get('mode','json')!='json':raise ValueError
+            headers=request.get('headers')
+            if (type(headers) is not dict or set(headers) not in ({'X-Request-Id'},{'X-Request-Id','Authorization'})
+                    or type(headers['X-Request-Id']) is not str):raise ValueError
+            if 'Authorization' in headers and (type(headers['Authorization']) is not str
+                    or re.fullmatch('Bearer [!-~]{1,512}',headers['Authorization']) is None):raise ValueError
+            token=re.fullmatch('byul-req02-([0-9a-f]{32})-'+slot,headers['X-Request-Id'])
+            completion=slot=='completion';body={'model':self.api_model,'prompt':'hello','max_tokens':1,'temperature':0,'stream':False} if completion else None
+            if (token is None or request.get('method')!=('POST' if completion else 'GET')
+                    or urlsplit(request.get('url','')).path!=('/v1/completions' if completion else '/v1/models')
+                    or request.get('body')!=body or any(k in request for k in ('read_profile','read_delay_ms','max_body_bytes','max_body_lines'))):raise ValueError
+            if completion and (type(request['body'].get('max_tokens')) is not int or type(request['body'].get('temperature')) is not int or type(request['body'].get('stream')) is not bool):raise ValueError
+            with self.lock:
+                prior=getattr(self,'_native_route_slots',[])
+                if prior!=list(slots[:len(prior)]) or len(prior)>=3 or slots[len(prior)]!=slot:raise ValueError
+                if getattr(self,'_native_route_token',token[1])!=token[1]:raise ValueError
+                self._native_route_token=token[1];self._native_route_slots=[*prior,slot]
         except Exception:raise KubernetesBindingError() from None
 
     def _validation_error_request(self, request):

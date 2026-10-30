@@ -89,6 +89,7 @@ class KubernetesNativeRouteExecutor(KubernetesRequestTerminationExecutor):
         ctx._termination_gap=bool(summary['diagnostic_codes'] or summary['http_transport']['collection_gap']
             or packet is None or not packet['recorded_files_covered'] or 'NATIVE_ROUTE_INDEX_INCOMPLETE' in projection['missing'])
         ctx._termination_cleanup=list(summary['http_transport']['cleanup_errors'])
+        if ctx._termination_cleanup:ctx._termination_gap=True
         if reader is not None and summary['native'] is not None and summary['native']['transport'].get('parent_cleanup_unverified'):
             ctx._termination_cleanup.append('NATIVE_ROUTE_PARENT_CLEANUP_UNVERIFIED');ctx._termination_gap=True
         values={'native_route_trials':summary['trials'],'native_route_events':projection['events'],'native_route_associations':projection['associations'],

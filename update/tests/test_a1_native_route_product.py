@@ -103,11 +103,11 @@ def test_registered_product_keeps_observations_unknown_and_exact_refs(tmp_path,g
     cfg=tmp_path/'guard.toml';cfg.write_text('[executors]\nnative_route="kubernetes"\n[adapter]\nname="vllm"\n[native_route]\ntarget='+json.dumps(str(tmp_path/'target.json'))
         +'\nprepared='+json.dumps(str(tmp_path/'prepared/manifest.json'))+('\nprobe_key_env="BYUL_EXAMPLE_REQ02_KEY"' if mode!='missing-key' else '')+'\n',encoding='utf-8')
     runner=CliRunner();common=['--store',tmp_path/'store','--config',cfg]
-    def cli(args):
-        result=runner.invoke(app,list(map(str,args)));assert result.exit_code==0,(result.output,result.exception)
+    def cli(args,expected=0):
+        result=runner.invoke(app,list(map(str,args)));assert result.exit_code==expected,(result.output,result.exception)
         assert PRIVATE not in result.output and key not in result.output
     cli(['select','--pack',pack.path,'--env',tmp_path/'environment.json','--policy',tmp_path/'policy.json',*common]);plan,=Store.read_only(tmp_path/'store').iter_kind('PLAN')
-    cli(['run','--plan',plan.id,'--pack',pack.path,*common]);cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
+    cli(['run','--plan',plan.id,'--pack',pack.path,*common],1 if mode=='http-cleanup' else 0);cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     assert e.data_origin.value=='EXAMPLE' and e.normal_control.succeeded is None
     if mode in {'normal','denied','missing-key','rewrite','duplicate'}:assert e.execution.status.value=='COMPLETED'

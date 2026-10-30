@@ -129,12 +129,14 @@ class KubernetesResponseErrorExecutor(ResponseContentExecutor):
         # Original inference observations remain null; tokenize has a separate control scope.
         controls=record.get('normal_controls',{}) if record else {}
         attempted=any(v.get('attempted') is True for v in controls.values())
+        primary_attempted=any(item.get('case_id')=='req13-error-primary' and item.get('attempted') is True
+            for item in record.get('request_summaries',[])) if record else False
         cleanup=record.get('cleanup',{}) if record else {}
         cleanup_errors=['REQ13_OWNED_PROBE_CLEANUP_UNVERIFIED'] if record and (cleanup.get('collected') is not True or cleanup.get('complete') is not True or cleanup.get('collection_gap') is True) else []
         draft=EvidenceDraft(status=ExecStatus.ABORTED,
             data_origin=DataOrigin.EXAMPLE if env.data_origin==DataOrigin.EXAMPLE else DataOrigin.DECLARED,
             normal_control={'attempted':attempted,'succeeded':_normal_control(controls) if attempted else None},
-            observations=observations,challenges=[{'step':step,'attempted':i==2 and error is not None} for i,step in enumerate(check.challenge_steps)],
+            observations=observations,challenges=[{'step':step,'attempted':i==2 and primary_attempted} for i,step in enumerate(check.challenge_steps)],
             config={'profile':PROFILE,'capture_calls':capture_calls,'full_req13_coverage':False,'normal_control_scope':'tokenize_api_shape_only',
                 'handler_consumption_verified':False,'native_handler_consumption_verified':False,'model_inference_verified':False,
                 'source_profile':'vllm-031-validation-error','target_sha256':_digest(target) if target else None,
@@ -147,6 +149,7 @@ class KubernetesResponseErrorExecutor(ResponseContentExecutor):
         if record is not None:
             try:
                 path=Path(workdir)/'req13-error.json'
+                path.parent.mkdir(parents=True,exist_ok=True)
                 with path.open('xb') as stream:stream.write(canonical_json({**record,'producer_diagnostics':diagnostics}))
                 draft.artifacts=[DraftArtifact(name=path.name,path=path,collector=PROFILE)]
             except Exception:draft=incomplete_artifact_capture(draft)

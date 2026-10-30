@@ -62,6 +62,37 @@ def test_exact_public_alias_policy_and_optional_violation(context):
     assert c.environment.model.id not in json.dumps(draft.config)
 
 
+def test_missing_nested_workdir_writes_artifact_and_preserves_existing_bytes(context,tmp_path):
+    c=context;c.work=tmp_path/'missing'/'nested'/'work'
+    assert not c.work.exists()
+    draft=run(c)
+    path=c.work/'req13-error.json'
+    assert len(draft.artifacts)==1 and draft.artifacts[0].path==path
+    original=path.read_bytes()
+    assert json.loads(original)['error_observation']['violations']
+    assert verdict(c,draft).verdicts['security'].value=='FAIL'
+    repeated=run(c)
+    assert repeated.artifacts==[] and path.read_bytes()==original
+    assert verdict(c,repeated).verdicts['security'].value=='FAIL'
+
+
+@pytest.mark.parametrize('primary_attempted',[True,False,None])
+def test_primary_request_attempt_is_independent_of_error_observation(context,primary_attempted):
+    c=context;c.raw['error_observation']=None
+    if primary_attempted is None:
+        c.raw['request_summaries']=[item for item in c.raw['request_summaries'] if item['case_id']!='req13-error-primary']
+    else:
+        primary=next(item for item in c.raw['request_summaries'] if item['case_id']=='req13-error-primary')
+        primary['attempted']=primary_attempted
+        if not primary_attempted:primary.update(started_at=None,finished_at=None)
+    c.raw['attempted_requests']=sum(item['attempted'] for item in c.raw['request_summaries'])
+    draft=run(c)
+    assert draft.artifacts and draft.normal_control.attempted is True
+    assert draft.challenges[2].attempted is (primary_attempted is True)
+    assert all(not challenge.attempted for challenge in draft.challenges[:2])
+    assert 'response_violations' not in draft.observations
+
+
 @pytest.mark.parametrize('mutation',['after_unknown','after_fail','cleanup','artifact','all_unknown'])
 def test_independent_fail_survives_late_missing_and_artifact_errors(context,mutation):
     c=context

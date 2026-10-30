@@ -22,6 +22,8 @@ allowed_error_fields의 차집합을 정제 adapter가 검증하고 response_vio
 HTTP 오류 응답 관측과 native handler·모델·GPU 소비는 별도 범위다.
 정상 대조는 수집·binding·완전성이 확인된 성공/실패만 True/False로 기록하며 나머지는 None이다.
 후속 정상·cleanup·첨부 실패는 이미 확인한 독립 위반을 지우지 않는다.
+오류 challenge의 시도 여부는 primary 요청 요약의 attempted 값으로 기록한다.
+증거 작업 디렉터리는 필요하면 생성하며, 기존 첨부 파일은 덮어쓰지 않는다.
 첨부에는 안전한 hash/count/enum만 기록하고 본문·field key·token·Secret·예외 문장은 저장하지 않는다.
 
 전용 unit은 EXAMPLE 대상/전송 대역과 메모리상 CheckDef 규칙을 사용한다.

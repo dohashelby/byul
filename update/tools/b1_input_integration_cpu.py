@@ -18,11 +18,16 @@ from guard.core.judge import judge_plan
 from guard.core.report import build_report
 from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
+from guard.core.select import check_policy_value
+from guard.collectors.manual import build_template, dump_template, import_evidence
+from guard.input_policy import policy_context
 from guard.executors import online_input_cpu as product, registry
+from guard.executors import input_cpu as req09_product
 from guard.executors.base import DraftArtifact, EvidenceDraft
 from guard.executors.http_common import incomplete_artifact_capture
-from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, load_pack
+from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, Mode, load_pack
 from guard.store import Store
+from guard.store.bundle import export_bundle, restore_bundle, verify_complete
 from guard.store.packs import get_pack, put_pack
 from tools import b1_input_cpu as collector
 from tools import lif14_profiler_cpu as component_gate
@@ -535,14 +540,305 @@ def run_pipeline(source_root, output_root, *, source_profile='reference5d', orig
     return summary
 
 
+REQ09_PROFILE = 'b1-req09-target031-cpu/1'
+REQ09_PACK_REF = {'kind': 'PACK', 'id': 'PACK-BASELINE', 'revision': 31,
+    'sha256': '54f4f2357533a8b201ad4397d4b182b08b89ee4821ffe67763e3fbecd8f369ac'}
+REQ09_OVERRIDE = 'source CPU InputProcessor mask/offset boundary only; model/HTTP not executed'
+_REQ09_META = ('prompt_count', 'token_ids_canonical_sha256', 'embedding_shape', 'embedding_dtype',
+    'embedding_bytes_sha256', 'mask_count', 'mask_canonical_sha256', 'routed_experts_prompt_start')
+_REQ09_OBSERVATIONS = {
+    'accepted_challenges': 'list[str]', 'challenge_outcomes': 'dict[str, outcome]',
+    'challenges_planned': 'list[str]', 'functional_probes_planned': 'list[str]',
+    'functional_probe_results': 'dict[str, outcome]', 'input_endpoints_tested': 'list[str]',
+    'input_formats_tested': 'list[str]', 'challenge_rejection_results': 'dict[str, outcome]',
+    'challenge_consumption': 'dict[str, outcome]', 'confirmed_input_violations': 'list[str]'}
+
+
+def _req09_inventory(root):
+    return {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(Path(root).rglob('*')) if path.is_file()}
+
+
+def _req09_refs(store):
+    return sorted((obj.kind.value, obj.id, obj.revision, obj.content_sha256)
+        for kind in ('ENV', 'POL', 'CHG', 'PLAN', 'EVD', 'RES', 'RPT') for obj in store.iter_kind(kind))
+
+
+def _req09_preflight(source_store, plan_id, pack_path, output_root, entered_by):
+    source = Store.read_only(Path(source_store))
+    verify_complete(source)
+    pack = load_pack(Path(pack_path))
+    plan = source.latest(plan_id)
+    if (plan.kind != 'PLAN' or plan.mode != Mode.audit or len(plan.inputs.environments) != 1
+            or plan.inputs.pack != pack.ref() or pack.ref().model_dump(mode='json') != REQ09_PACK_REF
+            or get_pack(source, plan.inputs.pack).ref() != pack.ref()):
+        raise ValueError('REQ09_ORIGINAL_PACK31_AUDIT_PLAN_REQUIRED')
+    check = pack.checks['REQ-09']
+    if (check.revision != 8 or check.executor != 'input_validation'
+            or check.judge is None or check.judge.plugin != 'rule_table'
+            or {key.key: key.type for key in check.required_observations} != _REQ09_OBSERVATIONS
+            or [(key.key, key.type, key.required) for key in check.policy_params] != [
+                ('max_input_tokens', 'int', True), ('rejection_codes', 'list[str]', True),
+                ('allowed_endpoints', 'list[str]', True), ('allowed_input_formats', 'list[str]', True)]
+            or len(check.required_observations_prose) != 4 or len(check.challenge_steps) != 2
+            or not plan.item('REQ-09').selected or plan.item('REQ-09').check_revision != 8):
+        raise ValueError('REQ09_ORIGINAL_DEFINITION_REQUIRED')
+    env = source.resolve(plan.inputs.environments[0])
+    if (env.engine.name != 'vllm' or env.engine.version != 'source-' + SOURCE_PROFILES['target031']
+            or env.engine.image_digest is not None or any(value is not None for value in env.model.model_dump().values())):
+        raise ValueError('REQ09_SOURCE_ONLY_ENVIRONMENT_REQUIRED')
+    policy = source.resolve(plan.inputs.policy)
+    values = policy.values.get('REQ-09', {})
+    if policy.pack != pack.ref() or any(key.key not in values for key in check.policy_params):
+        raise ValueError('REQ09_PINNED_POLICY_REQUIRED')
+    for key in check.policy_params:
+        check_policy_value(check.id, key.key, key.type, values[key.key])
+    if (values['max_input_tokens'] <= 0 or not values['rejection_codes']
+            or policy_context(check, values).blocked):
+        raise ValueError('REQ09_POLICY_PROFILE_UNSUPPORTED')
+    output_root = Path(output_root).absolute()
+    if (output_root.exists() or output_root.is_symlink()
+            or output_root.resolve().is_relative_to(source.root.resolve())
+            or source.root.resolve().is_relative_to(output_root.resolve())
+            or type(entered_by) is not str or not entered_by.strip()):
+        raise ValueError('REQ09_FRESH_OUTPUT_AND_DECLARED_OPERATOR_REQUIRED')
+    return source, pack, plan, env
+
+
+def _req09_metadata(value, *, admitted=False):
+    if type(value) is not dict or any(key not in value for key in (*_REQ09_META, 'canonical_sha256')):
+        return None
+    safe = {key: value[key] for key in _REQ09_META}
+    for key in ('prompt_count', 'mask_count'):
+        if safe[key] is not None and (type(safe[key]) is not int or not 0 <= safe[key] <= 262144):
+            return None
+    for key in ('token_ids_canonical_sha256', 'embedding_bytes_sha256', 'mask_canonical_sha256'):
+        if safe[key] is not None and not _sha256(safe[key]):
+            return None
+    shape = safe['embedding_shape']
+    if shape is not None and (type(shape) is not list or not 1 <= len(shape) <= 4
+            or any(type(size) is not int or not 0 <= size <= 262144 for size in shape)):
+        return None
+    if (safe['embedding_dtype'] not in (None, 'torch.float32')
+            or type(safe['routed_experts_prompt_start']) is not int
+            or safe['routed_experts_prompt_start'].bit_length() > 256
+            or value['canonical_sha256'] != req09_product.digest(safe)):
+        return None
+    safe['canonical_sha256'] = value['canonical_sha256']
+    if admitted:
+        if (value.get('admission_completed') is not True or not _sha256(value.get('processor_input_sha256'))
+                or value.get('processor_output_sha256') != safe['canonical_sha256']):
+            return None
+        safe.update(admission_completed=True, processor_input_sha256=value['processor_input_sha256'],
+                    processor_output_sha256=value['processor_output_sha256'])
+    return safe
+
+
+def _req09_expected_input(case):
+    value = {'prompt_count': 3, 'token_ids_canonical_sha256': None, 'embedding_shape': None,
+        'embedding_dtype': None, 'embedding_bytes_sha256': None, 'mask_count': None,
+        'mask_canonical_sha256': None, 'routed_experts_prompt_start': 0}
+    if case['kind'] in ('mask', 'shape'):
+        shape = case['value']['shape']
+        elements = 1
+        for size in shape: elements *= size
+        value.update(embedding_shape=shape, embedding_dtype='torch.float32',
+                     embedding_bytes_sha256=hashlib.sha256(bytes(elements * 4)).hexdigest())
+        if case['kind'] == 'mask':
+            count = case['value']['mask_length']
+            value.update(token_ids_canonical_sha256=req09_product.digest([3, 4, 5]),
+                         mask_count=count, mask_canonical_sha256=req09_product.digest([False] * count))
+    else:
+        value.update(token_ids_canonical_sha256=req09_product.digest([3, 4, 5]),
+                     routed_experts_prompt_start=case['value'])
+    return value
+
+
+def _req09_record(raw):
+    if (type(raw) is not dict or raw.get('profile') != REQ09_PROFILE
+            or raw.get('source_profile') != 'target031' or raw.get('source_commit') != SOURCE_PROFILES['target031']
+            or raw.get('scope') != 'source_cpu_input_processor_boundary_only'
+            or raw.get('data_origin') != 'DECLARED' or raw.get('installed_target') is not None
+            or raw.get('runner_consumption_verified') is not False
+            or raw.get('own_producer_sha256') != COLLECTOR_SHA256
+            or type(raw.get('collection_id')) is not str
+            or re.fullmatch('req09-target031-cpu-[0-9a-f]{32}', raw['collection_id']) is None
+            or type(raw.get('results')) is not list or len(raw['results']) > 12
+            or raw.get('fixture_config') != {'origin': 'DECLARED', 'vocab_size': 32, 'max_model_len': 16, 'hidden_size': 4}
+            or raw.get('effective_config') != {'vocab_size': 32, 'max_model_len': 16, 'hidden_size': 4}):
+        raise ValueError('REQ09_CAPTURE_ATTRIBUTION_OR_FIXTURE_MISMATCH')
+    validation = _validation(raw.get('source_validation'))
+    if validation['pre'] != 'verified' or validation['boundary'] != 'source_fixture_component':
+        raise ValueError('REQ09_CAPTURE_SOURCE_PRECHECK_UNAVAILABLE')
+    hashes = raw.get('config_file_bytes_sha256')
+    if (type(hashes) is not dict or not {'config.json', 'tokenizer.json'} <= set(hashes)
+            or any(name not in _CONFIG_FILES or not _sha256(value) for name, value in hashes.items())):
+        raise ValueError('REQ09_CONFIG_BYTES_UNAVAILABLE')
+    started, finished = _utc(raw.get('started_at')), _utc(raw.get('finished_at'))
+    if finished < started:
+        raise ValueError('REQ09_CAPTURE_TIME_INVALID')
+    cases = {case['id']: case for case in req09_product.fixtures() if case['check_id'] == 'REQ-09'}
+    counts = {}
+    for row in raw['results']:
+        if type(row) is dict and type(row.get('case_id')) is str:
+            counts[row['case_id']] = counts.get(row['case_id'], 0) + 1
+    rows, qualified = [], []
+    for row in raw['results']:
+        if type(row) is not dict or row.get('case_id') not in cases:
+            continue
+        case = cases[row['case_id']]
+        spec = req09_product.describe(case)
+        source = _validation(row.get('source_validation'))
+        inputs = _req09_metadata(row.get('input_metadata'))
+        admitted = _req09_metadata(row.get('admitted_metadata'), admitted=True)
+        events = _events(row.get('events'))
+        eligible = (counts[row['case_id']] == 1 and all(row.get(key) == value for key, value in spec.items())
+            and row.get('source_profile') == 'target031' and row.get('source_commit') == SOURCE_PROFILES['target031']
+            and row.get('collection_id') == raw['collection_id']
+            and source['pre'] == 'verified' and source['post']['status'] == 'verified'
+            and source['boundary'] == 'source_fixture_component' and 'process_inputs' in events
+            and inputs is not None and all(inputs[key] == value for key, value in _req09_expected_input(case).items()))
+        if row.get('outcome') == 'accepted':
+            eligible = (eligible and admitted is not None and admitted['processor_input_sha256'] == inputs['canonical_sha256']
+                and all(admitted[key] == inputs[key] for key in _REQ09_META))
+        elif row.get('outcome') != 'rejected':
+            eligible = False
+        after = row.get('after') if type(row.get('after')) is dict else {}
+        safe_row = {**spec, 'outcome': _outcome(row.get('outcome')), 'events': events,
+            'input_metadata': inputs, 'admitted_metadata': admitted, 'source_validation': source,
+            'qualified': bool(eligible), 'after': {'outcome': _outcome(after.get('outcome')),
+                'events': _events(after.get('events')),
+                'admitted_metadata': _req09_metadata(after.get('admitted_metadata'), admitted=True)}}
+        rows.append(safe_row)
+        if eligible:
+            qualified.append({**spec, 'outcome': row['outcome'], 'admitted_metadata': admitted})
+    observation = req09_product.project(qualified)['REQ-09']['input_cpu_confirmed_violations']
+    record = {key: raw[key] for key in ('profile', 'source_profile', 'source_commit', 'scope', 'collection_id',
+        'fixture_config', 'own_producer_sha256')}
+    record.update(data_origin='DECLARED', installed_target=None, runner_consumption_verified=False,
+        started_at=started.isoformat(), finished_at=finished.isoformat(), source_validation=validation,
+        config_file_bytes_sha256=dict(hashes), results=rows, full_scope_coverage=False,
+        capture_status=raw.get('capture_status') if raw.get('capture_status') in ('completed', 'incomplete') else 'incomplete',
+        auxiliary_write={'status': 'completed' if (raw.get('auxiliary_write') or {}).get('status') == 'completed' else 'failed'},
+        confirmed_input_violations=observation['value'] if observation['collected'] else None)
+    record['effective_config'] = {'vocab_size': 32, 'max_model_len': 16, 'hidden_size': 4}
+    record['observed_source_file_bytes_sha256'] = {key: value for key, value in
+        (raw.get('observed_source_file_bytes_sha256') or {}).items()
+        if key in {'vllm/renderers/base.py', 'vllm/v1/engine/input_processor.py'} and _sha256(value)}
+    record['source_features'] = {key: {'present': value['present']} for key, value in
+        (raw.get('source_features') or {}).items() if key in _EVENTS and type(value) is dict
+        and type(value.get('present')) is bool}
+    return record
+
+
+def run_req09_pipeline(source_root, output_root, *, source_store, plan_id, pack_path, entered_by):
+    """원 REQ-09 정의의 source CPU 부분 관측을 기존 수동 증거로 연결한다."""
+    _require_normal_python()
+    source, pack, plan, env = _req09_preflight(source_store, plan_id, pack_path, output_root, entered_by)
+    repo = Path(__file__).resolve().parents[2]
+    verify_runtime_components(repo)
+    before = _req09_inventory(source.root)
+    output_root = Path(output_root)
+    output_root.mkdir(parents=True, exist_ok=False)
+    export_bundle(source.root, output_root / 'source.zip')
+    restore_bundle(output_root / 'source.zip', output_root / 'store')
+    destination = Store(output_root / 'store')
+    raw = collector.capture_req09_target031(Path(source_root), output_root / 'capture')
+    record = _req09_record(raw)
+    record['source_environment_origin'] = env.data_origin.value
+    issues = []
+    try:
+        verify_runtime_components(repo)
+    except Exception:
+        issues.append('REQ09_COMPONENT_POSTCHECK_UNAVAILABLE')
+    attachment = 'req09-input-cpu.json'
+    try:
+        _write_artifact(output_root / attachment, record)
+    except Exception:
+        attachment = None
+        issues.append('REQ09_ARTIFACT_WRITE_UNAVAILABLE')
+    doc = build_template(destination, pack, plan, include_automated=True)
+    doc['checks'] = [entry for entry in doc['checks'] if entry['check_id'] == 'REQ-09' and entry['side'] == 'single']
+    if len(doc['checks']) != 1:
+        raise ValueError('REQ09_ORIGINAL_MANUAL_ENTRY_REQUIRED')
+    entry = doc['checks'][0]
+    violations = record['confirmed_input_violations']
+    entry.update(override_reason=REQ09_OVERRIDE, entered_by=entered_by, entered_at=record['finished_at'],
+        started_at=record['started_at'], finished_at=record['finished_at'], attachments=[attachment] if attachment else [],
+        verdicts={'security': 'FAIL' if violations else 'UNKNOWN', 'functional': 'UNKNOWN', 'performance': 'UNKNOWN'},
+        basis='선정 source CPU InputProcessor의 고정 mask/offset 대응과 실제 수용을 대조했다. HTTP·모델 소비는 미실행이다.',
+        limitations=['source CPU InputProcessor 부분 관측; 전체 질문의 정상 대조·token/길이 HTTP·모델 소비 미실행.',
+                    'shape expected=None은 관측만 하며 위반을 생성하지 않음. 기업 승인 진위·runner 소비·전체 scope UNKNOWN.'])
+    entry['normal_control']['result'] = 'not_attempted'
+    for challenge in entry['challenges']: challenge['attempted'] = False
+    for observation in entry['required_observations']:
+        selected = observation['key'] == 'confirmed_input_violations' and violations is not None
+        observation.update(value=violations if selected else None, collected=selected)
+    answers = [
+        '로컬 fixture vocab=32/max_model_len=16/hidden_size=4는 source CPU 조건이다. 기업 제한·HTTP token/길이 집행 전체는 UNKNOWN.',
+        'mask/embedding 제출·수용의 정제 hash/count/shape/dtype를 첨부했다. 실제 모델 consumer·전체 dtype/shape 규칙은 UNKNOWN.',
+        '독립 offset 입력의 고정 경계와 실제 InputProcessor 수용을 대조했다. 확인된 부분 위반=' + json.dumps(violations) + '.',
+        '출처는 고정 source CPU 직접 호출의 DECLARED 관측이다. 사례별 후속 정상 admission만 기록하며 HTTP/worker/모델·메모리/타 요청 영향은 UNKNOWN.']
+    for note, answer in zip(entry['observation_notes'], answers): note['answer'] = answer
+    form = output_root / 'manual-evidence.yaml'
+    try:
+        with form.open('x', encoding='utf-8') as stream: stream.write(dump_template(doc))
+    except OSError:
+        issues.append('REQ09_MANUAL_FORM_WRITE_UNAVAILABLE')
+    import_evidence(destination, pack, form, document=doc)
+    as_of = datetime.now(timezone.utc).replace(microsecond=0)
+    results = judge_plan(destination, pack, plan, as_of=as_of)
+    report = build_report(destination, pack, plan, as_of=as_of)
+    destination.put(report)
+    verify_complete(destination)
+    refs = _req09_refs(destination)
+    export_bundle(destination.root, output_root / 'evidence.zip')
+    restore_bundle(output_root / 'evidence.zip', output_root / 'restored')
+    restored = Store(output_root / 'restored')
+    replay = judge_plan(restored, pack, plan, as_of=as_of)
+    if (_req09_refs(restored) != refs or [item.ref() for item in replay] != [item.ref() for item in results]):
+        raise ValueError('REQ09_EXACT_REF_RESTORE_MISMATCH')
+    rereport = build_report(restored, pack, plan, as_of=as_of)
+    if rereport.model_dump(exclude={'id', 'content_sha256', 'created_at'}) != report.model_dump(exclude={'id', 'content_sha256', 'created_at'}):
+        raise ValueError('REQ09_RESTORED_REPORT_MISMATCH')
+    verify_complete(restored)
+    if _req09_inventory(source.root) != before:
+        raise ValueError('REQ09_SOURCE_STORE_CHANGED')
+    summary = {'profile': REQ09_PROFILE, 'source_profile': 'target031', 'source_commit': SOURCE_PROFILES['target031'],
+        'capture_invocations': 1, 'pack': pack.ref().model_dump(mode='json'), 'plan': plan.ref().model_dump(mode='json'),
+        'policy': plan.inputs.policy.model_dump(mode='json'), 'environment': env.ref().model_dump(mode='json'),
+        'collection_id': record['collection_id'], 'source_store_unchanged': True, 'exact_refs_preserved': True,
+        'installed_target': None, 'runner_consumption_verified': False, 'full_scope_coverage': False,
+        'as_of': as_of.isoformat(), 'issues': issues, 'confirmed_input_violations': violations,
+        'checks': {'REQ-09': {'execution_status': 'COMPLETED', 'data_origin': 'DECLARED',
+            'verdicts': next(item.verdicts.model_dump(mode='json') for item in results if item.check_id == 'REQ-09')}},
+        'store_verify_errors': destination.verify()}
+    _write_artifact(output_root / 'summary.json', summary)
+    return summary
+
+
 def main():
     _require_normal_python()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-profile', choices=tuple(SOURCE_PROFILES), default='reference5d')
     parser.add_argument('--source-root', type=Path, required=True)
     parser.add_argument('--output-root', type=Path, required=True)
+    parser.add_argument('--check', choices=('REQ-09',))
+    parser.add_argument('--source-store', type=Path)
+    parser.add_argument('--plan', dest='plan_id')
+    parser.add_argument('--pack', dest='pack_path', type=Path)
+    parser.add_argument('--entered-by')
     args = parser.parse_args()
-    summary = run_pipeline(args.source_root, args.output_root, source_profile=args.source_profile)
+    if args.check == 'REQ-09':
+        if args.source_profile != 'target031' or any(value is None for value in
+                (args.source_store, args.plan_id, args.pack_path, args.entered_by)):
+            parser.error('REQ-09는 target031과 원 Store/PLAN/PACK/입력자가 필요합니다')
+        summary = run_req09_pipeline(args.source_root, args.output_root, source_store=args.source_store,
+            plan_id=args.plan_id, pack_path=args.pack_path, entered_by=args.entered_by)
+    else:
+        if any(value is not None for value in (args.source_store, args.plan_id, args.pack_path, args.entered_by)):
+            parser.error('원본 증거 연결 옵션은 --check REQ-09에만 적용합니다')
+        summary = run_pipeline(args.source_root, args.output_root, source_profile=args.source_profile)
     print(json.dumps(summary))
     return 0 if all(check['execution_status'] == 'COMPLETED' for check in summary['checks'].values()) and not summary['store_verify_errors'] else 2
 

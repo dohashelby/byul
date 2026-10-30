@@ -1,5 +1,48 @@
 # B-1 입력 CPU 분기
 
+## 원 PACK31 REQ-09의 target031 부분 증거 연결
+
+기존 Online 3점검 proposal 경로와 별도로 `b1_input_integration_cpu.py --check REQ-09`
+모드를 제공한다. 원 PACK31 REQ-09 revision 8·`input_validation`·필수 정책 4개·구조화 관측
+10개·원 질문/설명/챌린지를 그대로 사용한다. 새 팩·실행기 등록·정책 기본값을 만들지 않는다.
+
+```text
+python -B tools/b1_input_integration_cpu.py \
+  --check REQ-09 --source-profile target031 --source-root EXACT_TARGET031_SOURCE \
+  --output-root FRESH_OUTPUT --source-store ORIGINAL_STORE --plan EXISTING_PLAN_ID \
+  --pack ORIGINAL_PACK31 --entered-by DECLARED_OPERATOR
+```
+
+이 명령은 명시한 CPU 152 의존 환경에서 실행한다. 제품 의존성이나 기본 guard CLI에
+torch를 추가하지 않는다. source ENV는 `source-db9527a46873454610df6dbedf79a36d6bf1a7f6`,
+image/model 필드는 null이어야 하며 원 Store에서 PLAN의 정확 ENV/POL/PACK Ref를 확인한다.
+기존 정책 4개가 없거나 기존 입력 정책 프로파일과 맞지 않으면 수집 전에 닫는다.
+단위 시험의 승인 bytes 대역은 EXAMPLE ENV로만 한정한다.
+
+기존 26개 input fixture 중 REQ-09의 mask 5개·shape 2개·offset 5개와 각각의 후속 정상
+admission만 한 번 수집한다. source/producer/config/fixture 귀속과 행별 전후 검증,
+실제 `process_inputs` 진입, 입력/수용 metadata hash 대응을 확인한 행에만 기존
+`input_cpu.project`를 적용한다. mask/offset이 유효값으로 정규화되면 그 행을 위반으로
+투영하지 않는다. shape의 `expected=None`은 관측만 한다. 후속 정상은 `hello world`의
+2-token source CPU admission이며 HTTP·모델 처리 성공을 뜻하지 않는다.
+
+원 Store는 읽기 전용 bundle로 새 output/store에 복원한 뒤 기존 manual v3 override로
+REQ-09 한 항목만 추가한다. 전체 normal control은 `not_attempted`, 원 token/길이 챌린지
+2개는 false다. `confirmed_input_violations` 외의 9개 관측은 null/미수집이며 endpoint나
+입력 형식의 제출·소비를 창작하지 않는다. 확인된 독립 mask/offset 위반만 신고 security
+FAIL이고 나머지는 UNKNOWN이다. 기능·성능·runner 소비·전체 질문은 UNKNOWN으로 남긴다.
+수동 EVD는 기존 계약대로 DECLARED이며 기업 승인 진위나 실행 환경 인증을 생성하지 않는다.
+
+정제 첨부에는 source/fixture/config와 count/shape/dtype/hash/offset·관측 enum만 남긴다.
+실제 배열·tensor 본문·예외 본문은 저장하지 않는다. 첨부 쓰기나 독립적인 후처리 실패가
+이미 확인한 FAIL을 지우지 않는다. 같은 as-of의 judge/report·verify·export/restore와
+정확 Ref를 대조하고 원 Store bytes를 보존한다. 원래 3개 gate/component/collector pin은
+이 모드 추가로 갱신하지 않으며 root의 별도 고정 소스 승인 후 실제 실행한다.
+
+전용 회귀는 `tests/test_req09_input_integration_cpu.py`다. 기존 Online·다른 입력/샘플링
+실측을 반복하거나 합산하지 않는다. 실제 CPU 수집은 collector와 bridge 통합 후 별도로
+한 번 수행하며 단위 EXAMPLE 결과를 실제 수집으로 표시하지 않는다.
+
 이 PR은 REQ-10과 REQ-08/09/07 입력 검증 및 관련 SUP-08 요청 gate를 다룬다.
 전체 공동 작업 목록은 B 38개이며 다음 묶음은 저장소 밖 byul-b-coordination의
 상대 선점 기록을 확인해 선택한다. SUP·캐시·배포를 전체 배정에서 제외하지 않는다.

@@ -633,3 +633,5 @@ B4cfc의변경파일과전이의존성은원bytes로통합한다. B rootAGENTS�
 B 전달물 오류fixture를A1에서재작성하거나새skip/assert완화로통과시키지않는다. 실제 반환오류에대한A1제품경계시험과원B실패를함께인계한다. Graph LF/CRLF의동일컴파일코드도파일bytes가다르면sourcegate는거부한다. BHTTPpin갱신과nativeGraph실제hook은별도미연결이다.
 
 native17 전용분석은A2원본을재작성하지않고기존OBS02관측에붙인다. 공통고정4pin/native16/B원본을보존한다. bound/unbound partial을구분하고선행read와후기close/root/collector상태를합쳐성공으로만들지않는다. 전용실패는ABORTED/정제진단,앞선common사실과독립FAIL은보존한다.
+
+새전용결합을기존identity_native_models/summary에추가하며A2의원본bytes와sourcegate를그대로소비한다. 동일recording/model/forward이전root와FDsource locator만귀속한다. loader없는부분read는공통사실로보존하되전용loader후보로승격하지않는다. 전용오류는부모gap재계산뒤정제진단/ABORTED로남기며공통관측·기존독립FAIL을삭제하지않는다.

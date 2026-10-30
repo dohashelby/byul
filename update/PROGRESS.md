@@ -1599,3 +1599,5 @@ git status
 B4cfc 원본27+전이3파일을소비했다. A1 경계각4/인접각70·설치258/OBS03 CLI4·정확24Ref·REQ20미지원요청0·공통366/제외0을확인했다. 원B직접Win220pass4fail/Linux222pass2fail은그대로보존하며 제품거부검증으로원fixture실패를지우지않는다. actual/CI5/전체완료는미확인이다.
 
 A2 native17 ebb7a1f 전용3파일을원bytes로소비하고 본인OBS02에같은recording/model/forward이전파일읽기후보를연결한다. 실제승인/worker/tensor/전체분기증명으로승격하지않으며source고정뒤변경영향을검증한다.
+
+A2 native17 ebb7a1f 원본3/공통4pin을보존한OBS02전용소비를source6418de1/pinc90964c에서검증했다. 직접각48·인접각90/동일1395불변,설치259/CLI4·정확24Ref·공통367/제외0. bound/unbound partial·미진행/잘못된귀속·후기오류/소비실패를구분하고앞선공통read를보존한다. 실제worker/tensor/승인·전체분기는UNKNOWN/미완료다.

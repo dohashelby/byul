@@ -297,3 +297,15 @@ def test_post_read_epoch_failure_preserves_observed_digest_without_promotion(cas
     assert held['collected'] and held['digest_sha256'] == 'a' * 64 and held['selected_count'] == 1
     assert not held['peer_generation_verified_claimed']
     assert not result['existing_native_references']['consumers'][0]['native_measurement_verified']
+
+
+@pytest.mark.parametrize('mode', ['zero_copy', 'copy'])
+def test_capture_mode_must_equal_original_selected_zero_copy(case, mode):
+    raw = native_capture(case); raw['mode'] = mode
+    if mode == 'copy':
+        with pytest.raises(ValueError, match='LIF13_CAPTURE_CONFIG_OR_REF_MISMATCH'):
+            tool.project(raw, case['config'])
+    else:
+        result = tool.project(raw, case['config'])
+        assert result['mode'] == 'zero_copy'
+        assert result['existing_native_references']['consumers'][0]['digest_relation'] == 'same'

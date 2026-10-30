@@ -205,7 +205,7 @@ def _read_fact(value, config):
 def project(raw, config):
     expected = {'schema': CAPTURE_SCHEMA, 'config_sha256': digest(config), 'environment_ref': config['environment_ref'],
         'policy_ref': config['policy_ref'], 'plan_ref': config['plan_ref'], 'target_sha256': config['target_sha256'],
-        'source_commit': SOURCE_COMMIT, 'data_origin': config['data_origin']}
+        'source_commit': SOURCE_COMMIT, 'data_origin': config['data_origin'], 'mode': config['mode']}
     if type(raw) is not dict or any(raw.get(k) != v for k, v in expected.items()):
         raise ValueError('LIF13_CAPTURE_CONFIG_OR_REF_MISMATCH')
     dates = {k: datetime.fromisoformat(raw[k].replace('Z', '+00:00')) for k in ('started_at', 'finished_at')}

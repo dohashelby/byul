@@ -20,4 +20,8 @@ connect_timeout은0<초<=2, 전체 total_timeout은 connect+1<초<=30이며 sour
 
 이번 묶음은 공통 method/schema/source와 명시 CPU EXAMPLE fixture·고정 bytes·오류 범위를 먼저 제공한다. 새 `boundary_egress:kubernetes` 등록은 아직 없다. A2가 기존 forbidden_egress_successes/egress_trials/egress_scope_complete=false와 rule_table을 이 envelope에 연결한 확정 커밋을 전달하면 A1이 최소 wrapper/registry/명시팩·검토 pin·기존 CLI→EVD/RES/RPT→verify→반출/복원·정확Ref 재판정을 마감한다. helper만으로 전체 분기를 완료하지 않는다.
 
-구현·시험·문서 초안 종료 후 source/hash를 고정하고 영향 Windows/동일bytes Linux·격리 설치 공개 ABI를 검증한다. 기존 제품 CLI/Refs 검증은 해당 고정 source의 근거로만 재사용한다. 실제 socket/actor/Kubernetes/serving/backend/GPU 검증은 없다. 실제 재개에는 새 시간 승인·현재 소유/작업/quota/잔여46.66USD 총비용·fresh ENV/target/POL/actor/receiver·실행 차례/복구·정리 책임이 필요하다. 원GPU창 종료/추가Start0·보존120GiB EBS 과금·CI결제 외부차단·부모A39/56/4·A1 19/27/2와 원본/sources/·기존worktree를 유지한다.
+검증 source는 `6db05493f09973e875aaed50ffec0a66a772ec5f`, 검토 소비 pin은 `cf7c757f0dda6cbdc546c7b5b8800b9951143235`다. 최초 source7c3160d에서 Windows443통과/실패1/기존skip1/미선정1, Linux444통과/실패1/미선정1을 보존했다. 실패는 신규 native0.32 fixture의 ENV만 바꾸고 모델 mapping Ref를 갱신하지 않아 기존 mapping gate가 먼저 거부한 경우다. 해당 시험 입력의 model/receiver/source-target Ref만 일관되게 고쳐 동일1319파일에서 신규33사례를 Windows1.23초(parent2.105)/Linux1.12초(parent1.686)에 모두 통과했다. 제품·gate·assert·skip은 바꾸지 않았고 이전 인접 통과를 새 전체 suite 통과로 합산하지 않는다.
+
+두 source의 guard bytes는 동일하므로 source7c3160d에서 빌드·검증한 wheel/설치239파일 일치를 재사용했다(설치24.726초). source6db0549에서 격리 설치본 공개 method6사례와 typed JSON 왕복·원문 비저장을1.573초에 확인했다. 전체 소비347파일·원본66파일·이전 KubernetesHTTP 모든 method AST를 보존했다. 현재 제품 CLI/정확Ref의 인접 근거는 source7c의 기존 IPC20사례 및 PR133 source0bb/설치CLI4·24Ref이며 새 PLT07 CLI 완료로 소급하지 않는다. 최종 문서 마감 커밋과 검증 source/wheel source/정확HEAD CI를 구분한다.
+
+실제 socket/actor/Kubernetes/serving/backend/GPU 검증은 없다. 실제 재개에는 새 시간 승인·현재 소유/작업/quota/잔여46.66USD 총비용·fresh ENV/target/POL/actor/receiver·실행 차례/복구·정리 책임이 필요하다. 원GPU창 종료/추가Start0·보존120GiB EBS 과금·CI결제 외부차단·부모A39/56/4·A1 19/27/2와 원본/sources/·기존worktree를 유지한다.

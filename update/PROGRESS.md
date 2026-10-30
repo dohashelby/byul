@@ -1544,3 +1544,7 @@ git status
 - A2의 확정 egress 검토와 현재 공통 입력을 대조했다. 기존 sender/receiver/ACK/receipt·원Docker 실행기/POL/판정 bytes를 보존하며 공개 egress_snapshot·정확13키 Kube POL binding·8키 receiver target·typed 부분 관측·전체30초/행·출력 한도를 구현했다. 실제 credential이 명시 actor와 이미 같을 때만 단일 TCP helper를 허용하고 새 기동/권한 전환은 없다.
 - 구현·회귀·문서 초안 및 정적검토 뒤 source/hash 고정 전이다. 아직 새 통과/설치/실제 실행을 주장하지 않는다. A2 전용 envelope 소비와 정식 registry/팩/CLI는 새 확정 전달물 뒤 별도로 연결하며 helper를 전체5분기/취득/cache/usage/telemetry 완료로 집계하지 않는다.
 - B PR130 f154419의 OBS06 수동 증거와 REQ09 source-CPU 문서를 확인했다. 새 A registry/팩 등록 요구와 직접 제품 경로를 구분했으며 전체 B branch 또는 미완성 전용 소스를 대신 작성하지 않았다. 원GPU창 종료/Start0·비용·기존Goal/담당 범위를 유지한다.
+# 2026-10-30 A1 PLT07 최소 공통 입력 검증 마감
+
+- source6db0549/검토pin cf7c757, 기존66파일과 이전 Kube method AST 보존. 신규33사례 Windows/Linux 통과, 전체소비347·설치239파일 일치·격리 공개method6사례/typed JSON 왕복·원문 비저장을 확인했다. 첫 source7c의 Windows443/Linux444통과와 신규fixture 실패1을 함께 보존하고 Ref 일관성만 보수했다. guard bytes는 같아 인접 검증·wheel/설치를 재사용했으며 전체suite 성공으로 합산하지 않는다.
+- 공통 입력은 제공됐지만 A2 새 envelope 소비·정식 PLT07 registry/팩/CLI·실제 실증·전체5분기는 미완료다. 기존 IPC CLI20사례/PR133 설치CLI4·정확24Ref는 해당 source/경로의 근거다. 실제 worker/권한/기동·승인/비용/Goal 경계를 유지하고 새 확정 전용 전달물 또는 준비된 A1 분기를 계속한다.

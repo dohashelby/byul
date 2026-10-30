@@ -7,11 +7,12 @@ from pathlib import Path
 import re
 import sys
 from guard.models import DataOrigin,ExecStatus,canonical_json
+from guard.automation_policy import string_list
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP
 from .base import DraftArtifact,EvidenceDraft
 from .http_common import incomplete_artifact_capture
-from .response_content import ResponseContentExecutor
+from .response_content import OPTIONS,ResponseContentExecutor
 
 PROFILE='req13-kubernetes-error-fields/1'
 CAPTURE_PROFILE='kubernetes-owned-validation-error-http-v1'
@@ -64,6 +65,16 @@ class KubernetesResponseErrorExecutor(ResponseContentExecutor):
         if expected_target_sha256 is not None and not _sha(expected_target_sha256):raise ValueError('REQ13_TARGET_HASH_INVALID')
         self._expected_target_sha256=expected_target_sha256
         self._transport_factory=_transport_factory
+
+    def validate_policy(self,check,values):
+        """An explicit empty error allowlist forbids every collected error field."""
+        self.validate_configuration(check)
+        for key in _POLICY_KEYS:
+            string_list(values,key,empty=key in {'allowed_error_fields','forbidden_return_options'})
+        if set(values['forbidden_return_options'])-OPTIONS.keys():
+            raise ValueError('unsupported forbidden return option; cannot silently omit it')
+        if set(values['required_targets'])-{'engine','gateway'}:
+            raise ValueError('required_targets supports engine and gateway only')
 
     def validate_configuration(self,check):
         allowed={'target','kubectl_binary','request_timeout','max_duration_seconds','allow_mutating_routes'}

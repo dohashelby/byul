@@ -103,6 +103,45 @@ def test_original_policy_params_still_required(context,missing):
     assert context.calls==[]
 
 
+def test_empty_error_allowlist_reaches_capture_and_forbids_every_field(context):
+    c=context;values=deepcopy(VALUES);values['allowed_error_fields']=[]
+    pol=policy(c.pack.ref(),scope={'include':['REQ-13']},values={'REQ-13':values})
+    c.raw.clear();c.raw.update(error_record((c.environment,pol,c.pack,c.target)))
+    draft=run(c,values=values)
+    expected=sorted('NONPERMITTED_FIELD_SHA256:'+parent.hashlib.sha256(field.encode()).hexdigest() for field in FIELDS)
+    assert len(c.calls)==1 and c.calls[0][2]['allowed_error_fields']==[]
+    assert draft.config['capture_calls']==1
+    assert draft.config['allowed_error_fields_sha256']==parent._digest([])
+    assert draft.observations['response_violations'].collected
+    assert draft.observations['response_violations'].value==expected
+    assert draft.status==ExecStatus.ABORTED and draft.normal_control.succeeded is True
+    assert draft.observations['response_coverage_complete'].value is False
+    evd=evidence(check_id='REQ-13',status=draft.status,normal=draft.normal_control.model_dump(),observations={k:v.model_dump() for k,v in draft.observations.items()})
+    result=judge_evidence(c.check,evd,pol,c.environment.created_at)
+    assert result.verdicts.security.value=='FAIL' and result.verdicts.functional.value=='UNKNOWN'
+    artifact=json.loads(draft.artifacts[0].path.read_text())
+    assert artifact['allowed_error_fields_sha256']==parent._digest([])
+    assert artifact['error_observation']['violations']==expected
+
+
+@pytest.mark.parametrize('key',list(VALUES))
+@pytest.mark.parametrize('invalid',[None,'error.message',('error.message',),1,True,[None],[''],[' '],['id','id']])
+def test_policy_lists_reject_null_wrong_types_blank_and_duplicates(context,key,invalid):
+    values=deepcopy(VALUES);values[key]=invalid
+    with pytest.raises(ValueError):run(context,values=values)
+    assert context.calls==[]
+
+
+@pytest.mark.parametrize(('key','invalid'),[
+    ('allowed_response_fields',[]),('required_targets',[]),
+    ('forbidden_return_options',['unsupported']),('required_targets',['unsupported']),
+])
+def test_other_policy_limits_still_reject_before_capture(context,key,invalid):
+    values=deepcopy(VALUES);values[key]=invalid
+    with pytest.raises(ValueError):run(context,values=values)
+    assert context.calls==[]
+
+
 def test_unsupported_a_source_is_zero_requests(context):
     c=context;c.executor=parent.KubernetesResponseErrorExecutor(c.cfg)
     draft=run(c)

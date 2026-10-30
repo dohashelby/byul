@@ -2,6 +2,9 @@
 
 `guard.executors.kubernetes_response_error.KubernetesResponseErrorExecutor`는
 `response_content`의 기존 네 정책 필수값을 유지하며 제품 adapter의 실제 수집·투영을 재사용한다.
+선택 실행기의 `allowed_error_fields=[]`는 수집한 모든 오류 필드를 금지한다.
+미지정·None은 필수값 누락으로 거부하며, 네 정책의 list[str]·중복·공백 검사와
+나머지 정책의 빈 목록·지원 대상·옵션 제한은 유지한다.
 구성은 target, kubectl_binary(기본 kubectl), request_timeout(기본10초),
 max_duration_seconds(기본60초)이다. target의 환경 Ref와 승인 expected_target_sha256,
 공개 전송의 소유 대상·이미지·API model alias 검증을 거친다. repository ID와 API alias는 구분한다.

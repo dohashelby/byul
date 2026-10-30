@@ -5,7 +5,7 @@ import argparse,hashlib,json,subprocess,sys
 # Reviewed native17 eager FD/read/OBS02 checkpoint; native8~15/REQ02/IPC
 # retain the full original common scope and all trust/whole-scope gates.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='da6143bc08a01c57ac9750d83d1ffb35cc253576'
+REVIEWED_COMMON_COMMIT='7dc3416f4e41c5e958ca017b0edc54c3b138c3ba'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

@@ -29,7 +29,7 @@ HELPER_SHA256 = '858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6b
 
 # Filled with the reviewed frozen module commit by the coordinating session.
 # An unconfigured pin refuses execution; HEAD is never used as the expected pin.
-PRODUCT_COMPONENT_COMMIT = '505bbbcb5fcb2eeed86c1739731b09b73e92990e'
+PRODUCT_COMPONENT_COMMIT = '0d0c116c4a1ed1ef1ba93a80b236bdedd2d73670'
 
 
 def verify_component(repo):

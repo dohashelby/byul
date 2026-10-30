@@ -635,3 +635,5 @@ B 전달물 오류fixture를A1에서재작성하거나새skip/assert완화로통
 native17 전용분석은A2원본을재작성하지않고기존OBS02관측에붙인다. 공통고정4pin/native16/B원본을보존한다. bound/unbound partial을구분하고선행read와후기close/root/collector상태를합쳐성공으로만들지않는다. 전용실패는ABORTED/정제진단,앞선common사실과독립FAIL은보존한다.
 
 새전용결합을기존identity_native_models/summary에추가하며A2의원본bytes와sourcegate를그대로소비한다. 동일recording/model/forward이전root와FDsource locator만귀속한다. loader없는부분read는공통사실로보존하되전용loader후보로승격하지않는다. 전용오류는부모gap재계산뒤정제진단/ABORTED로남기며공통관측·기존독립FAIL을삭제하지않는다.
+
+B native producer를A1이재작성하거나원sourcepin·실제release승인경계를완화하지않는다. 이번통합에서는actual native --execute/RPC/IPC/release/daemon start/GPU start를하지않고원B CPU EXAMPLE·기본preflight·정제선언capture/정확Ref만검증한다. guard불변범위의기존설치근거는새도구의실제실증으로승격하지않는다.

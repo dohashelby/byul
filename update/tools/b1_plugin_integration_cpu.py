@@ -36,10 +36,10 @@ SOURCE_PROFILES = {
     'reference5d': '5d35ce3934a7804b298559d2d99eec33792e1eb9',
     'target031': 'db9527a46873454610df6dbedf79a36d6bf1a7f6',
 }
-GATE_SHA256 = 'a2b7cbd39cf03bb76e505ff29288b6b2b81fe57e9361e2560bfb929edb056de6'
-COMPONENT_COMMIT = '299ea03f5a3e64e822733cd74adce510d6f6e667'
+GATE_SHA256 = '9f674608b94df277f7c35b7827ad72ca23ef55c0bf0dde0afa432d1c76b7f771'
+COMPONENT_COMMIT = '42e62a14776893dec8d70d7bd8e49769ce08b4de'
 # Reviewed collector snapshot 1839c77; runtime bytes never become approval.
-COLLECTOR_SHA256 = 'e31a3a59f4ebc1c12da5deb0be07f6b2005dc8635a2b2ce7a615728cf9e0205c'
+COLLECTOR_SHA256 = '378c2765877904ad768da7c015a9b8b21f3d35c1d54d5ad30481c6c9dfba7a57'
 _CASES = {case: (group, configured) for case, group, configured in plugin_loading.CASES}
 _STATUSES = {'completed', 'execution_error', 'child_execution_error', 'unsupported', 'partial', 'read_error'}
 _VALIDATION_STATUSES = {'verified', 'unavailable', 'mismatch'}

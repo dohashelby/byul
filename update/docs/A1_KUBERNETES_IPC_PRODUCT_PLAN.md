@@ -11,3 +11,5 @@
 실제 실행·전체PLT02/부모A 완료는 별도다. 원GPU 승인창 종료·Start0·역사적stopped·46.66USD와 EBS 과금·CI결제 차단을 유지한다. 실제 새 시간 승인과 현재 소유/작업/quota/잔여비용·fresh ENV/target/POL·실행 차례/복구·정리 책임 없이 기동하지 않는다.
 
 이 확정 전달물 통합을 닫은 뒤 A2-platform-process-common-input-request.json과 A2-egress-contract-review-3ecfd5f.json에서 PLT07 최소 Kubernetes 전송 요구를 확인한다. 기존 sender/receiver/ACK/receipt를 재사용하되 아직 없는 interface를 지원으로 가정하지 않는다. 취득/cache/usage/telemetry 전체를 이 계약으로 마감하지 않는다. B PR130의 신규 고정 전달물은 등록 인계 범위를 별도로 확인하고 전용 소유권과 원본 bytes를 유지한다.
+
+마감 검증: source0bb4253/검토pin07cdbe6, Windows456·기존skip1/미선정1·Linux457/미선정1·1314동일파일·전체소비344·설치236일치·CLI4/정확24Ref를 확인했다. 실행 중 source 변경은0이다. 설치 대역 argv 위치 보수 전 실패와 보수 후7.974초 결과를 모두 보존했다. 마지막 변경은 이 문서·제품 문서·PROGRESS뿐이며 구현 검증과 최종 HEAD CI를 구분한다. 실제IPC/worker·전체분기는 미완료다.

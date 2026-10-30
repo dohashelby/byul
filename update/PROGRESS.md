@@ -1534,3 +1534,8 @@ git status
 - OBS02 SC23-03 첫 공통 제품 검증: 고정562d825 Windows43/Linux43·동일1306파일, 소스/wheel/설치234파일·설치본CLI4/정확24Refs15.428초, 공통342 고정pin3aeefcd. 초기535/536인접 통과와 external fixture 준비오류33·후속image 증명 가정5실패를 보존했다. 기존 node image false/강한 native결합false 관문을 유지하며 제한된 동일 process/object·API imageID·선언 pair 후보만 제공한다. 새skip/제외·실행중변경·runtime hash승인0. 실제 승인·검사 생산자/worker tensor/기업정책·전체분기는 UNKNOWN/미완료이며 다음A2 IPC·egress 준비를 이어간다.
 
 - PLT02/A2 전달 통합: fac0907/PR131 전용4파일을 원본 커밋으로 통합했고 기존3ec→d1 보수도 보존한다. 실제 groups·collector 구분/전후 actor/socket/owner·normal 응답 대응은 전용 소비를 그대로 쓴다. A1의 최소 Kube wrapper/registry/PLT02 파생팩과 새정식CLI/정확Ref 회귀·문서를 준비하며 현재 새소스 미고정/미검증이다. A2의 전용 함수6사례·legacyCLI6/36Refs를 이번 새등록 검증으로 집계하지 않는다. 실제worker/message/전체IPC·CI5는 미완료이며 다음은 확인된 전달물과 PLT07 egress 공통 계약이다.
+# 2026-10-30 PLT02 Kubernetes 고정 A2 소비 제품 연결 마감
+
+- A2 fac0907302d78c271d0b571d2413f7a8f4b295e5의4파일을 원본 bytes로 통합하고 기존 ab84 public IPC v1에 최소 unix_ipc:kubernetes registry·wrapper·PLT02 명시 DRAFT팩을 연결했다. 실제 groups·actor/collector/source·owner/peer 조건과 독립FAIL은 A2 전용 소비를 재사용한다.
+- source0bb4253/검토pin07cdbe6: Windows456통과·기존skip1/미선정1, Linux457통과/미선정1·동일1314파일, 소비344파일, 설치236일치, 설치CLI4사례·정확24Ref 반출/복원·저장팩 재판정을 확인했다. 후속 수집/normal/report/첨부/정리 오류가 앞선 독립FAIL을 지우지 않는다. 설치 대역의 argv 위치 오류와 수정 결과를 함께 보존했으며 제품/gate/assert 의미는 그대로다.
+- 지원은 lab=true/vLLM0.31/CPython3.12 CPU/EXAMPLE 제품 연결이다. 실제Kubernetes/socket/actor/worker/message·전체IPC/PLT02와 현재 전체suite는 미확인이다. 부모A39/56/4·A1 19/27/2·A2 20/29/2와 원승인/비용/Start0·CI결제 외부차단을 유지한다. 다음은 새 확정 인계 범위를 대조한 뒤 PLT07 최소 egress 공통 계약이다.

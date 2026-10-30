@@ -33,4 +33,6 @@ max_duration_seconds = 30
 
 실제 worker/message 소비, 같은 UID의 비허용 프로세스, abstract Unix·SHM·TCP·TP·전체IPC inventory·기업 운영 인가는 미지원이다. helper/probe actor와 실제 serving worker의 권한을 구분한다. 원문 response/요청·메시지·비밀·Pod env/argv·임의 예외 원문을 저장하지 않는다. 정제 source/capture/actor/path SHA와 결과 metadata 및 EVD/RES/RPT 정확 Ref만 소비한다.
 
-현재 구현·직접/인접 회귀·문서 초안 종료 후 source 고정 준비 단계다. 새 정식 CLI/설치/전체통과·실제 실증을 아직 주장하지 않는다. 부모A39/56/4·A1 19/27/2·A2 20/29/2·c9와 원본/worktree/sources/·과거 팩/Ref/실증을 유지한다. 원GPU창 종료/Start0·기존46.66USD/과거 사용량·보존120GiB EBS 과금·CI결제 차단을 유지하며 새 기동/기간/비용/IAM을 승인하지 않는다.
+검증 source는 `0bb4253071ce159544128c1c301f64aab835d450`, 검토 소비 pin은 `07cdbe683b46688a94f4a7740797720755dcc0a7`이다. Windows 영향456통과/기존skip1/미선정1, 동일1314파일 Linux457통과/미선정1을 확인했다. 전체 소비344파일·A2 전용4파일·기존 공통 IPC 메서드 bytes를 보존했고 source/wheel/격리 설치236파일이 일치했다. 설치본 정식 registry/CLI4사례(normal/violation/partial/attachment)는 정확24Ref 반출/복원·저장팩 재판정과 원문 비저장을 확인했다. Windows parent139.791초, Linux 시험42.16초, 설치 검증21.186초, 설치CLI7.974초다. 설치 검증 도구 첫 실행은 프로그램 argv 위치 오기로 실패했다. 실패 기록을 보존하고 `python3 -c PROGRAM`의 실제 마지막 인수에 동일 고정 SHA 검사를 적용했으며 제품 소스·판정/assert 의미·gate는 변경하지 않았다.
+
+이는 CPU/EXAMPLE에서 전송 I/O만 대역으로 둔 제품 연결 검증이다. 현재 전체 suite·실제 Kubernetes/socket/actor/serving/backend/worker/GPU 또는 전체 PLT02 완료를 주장하지 않는다. 최종 문서 마감 커밋과 검증 source를 구분하고 정확 HEAD 필수CI5는 성공 전 미확인이다. 부모A39/56/4·A1 19/27/2·A2 20/29/2·c9와 원본/worktree/sources/·과거 팩/Ref/실증을 유지한다. 원GPU창 종료/Start0·기존46.66USD/과거 사용량·보존120GiB EBS 과금·CI결제 차단을 유지하며 새 기동/기간/비용/IAM을 승인하지 않는다.

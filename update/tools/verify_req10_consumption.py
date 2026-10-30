@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed closed Kubernetes egress common checkpoint; full common contracts,
-# fixed A2 IPC consumer and native8~15 retain all previous full-scope gates.
+# Reviewed REQ02 native route product checkpoint; fixed IPC/egress and native8~15
+# retain the full original common scope and all trust/whole-scope gates.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='cf7c757f0dda6cbdc546c7b5b8800b9951143235'
+REVIEWED_COMMON_COMMIT='34cebdcaddf1daceb5827d4c19d8c26e77a273ed'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

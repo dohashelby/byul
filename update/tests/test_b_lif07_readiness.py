@@ -256,3 +256,259 @@ def test_native_shared_observation_gap_is_preserved(case):
     row=snapshot(case);gap='OBSERVATION_GAP_PENDING_INVALIDATED';assert gap in native.GAPS
     row['gaps']=[gap,PRIVATE];value=project(case,capture(case,[row]))
     assert value['rows'][0]['gaps']==[gap] and PRIVATE not in json.dumps(value)
+
+
+def test_regular_reader_keeps_stable_independent_path_and_fd_ctime_domains(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    path = tmp_path / 'capture.json'; content = b'{"EXAMPLE":true}'
+    path.write_bytes(content)
+    original = tool.os.fstat
+    def fd_stat(fd):
+        value = original(fd)
+        return SimpleNamespace(**{k: getattr(value, k) for k in
+            ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_mode')}, st_ctime_ns=value.st_ctime_ns + 1000000)
+    monkeypatch.setattr(tool.os, 'fstat', fd_stat)
+    assert tool._regular_bytes(path) == content
+
+
+@pytest.mark.parametrize('domain', ['fd', 'path'])
+def test_regular_reader_rejects_ctime_change_within_each_stat_domain(tmp_path, monkeypatch, domain):
+    from types import SimpleNamespace
+    path = tmp_path / 'capture.json'; path.write_bytes(b'{"EXAMPLE":true}')
+    original_fd, original_path = tool.os.fstat, Path.lstat
+    count = [0]
+    def changed(value, delta):
+        return SimpleNamespace(**{k: getattr(value, k) for k in
+            ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_mode')}, st_ctime_ns=value.st_ctime_ns + delta)
+    def fd_stat(fd):
+        count[0] += 1
+        value = original_fd(fd)
+        return changed(value, count[0]) if domain == 'fd' else value
+    def path_stat(selected, *args, **kwargs):
+        value = original_path(selected, *args, **kwargs)
+        return changed(value, 1) if domain == 'path' and selected == path and count[0] >= 2 else value
+    monkeypatch.setattr(tool.os, 'fstat', fd_stat)
+    monkeypatch.setattr(Path, 'lstat', path_stat)
+    with pytest.raises(ValueError, match='^LIF07_INPUT_CHANGED_DURING_READ$'):
+        tool._regular_bytes(path)
+
+
+def test_regular_reader_rejects_actual_path_replacement_after_fd_read(tmp_path, monkeypatch):
+    import os
+    path = tmp_path / 'capture.json'; path.write_bytes(b'{"EXAMPLE":true}')
+    replacement = tmp_path / 'replacement.json'; replacement.write_bytes(path.read_bytes())
+    original = tool.os.fstat; count = [0]
+    def fd_stat(fd):
+        value = original(fd); count[0] += 1
+        if count[0] == 2: os.replace(replacement, path)
+        return value
+    monkeypatch.setattr(tool.os, 'fstat', fd_stat)
+    with pytest.raises(ValueError, match='^LIF07_INPUT_CHANGED_DURING_READ$'):
+        tool._regular_bytes(path)
+
+
+@pytest.mark.parametrize('other', ['execute', 'import', 'example'])
+def test_native_collection_mode_is_exclusive_before_helper_or_output(case, monkeypatch, other):
+    calls = []
+    monkeypatch.setattr(tool, '_collect_native', lambda *a: calls.append(a))
+    options = {'execute': True} if other == 'execute' else {'import_capture': 'unused.json'} if other == 'import' else {'_example_capture': lambda *a: capture(case)}
+    with pytest.raises(ValueError, match='MODES_EXCLUSIVE'):
+        tool.run(**case['args'], collect_native=True, **options)
+    assert calls == [] and not case['args']['output'].exists()
+
+
+def native_observation(case, rows=None):
+    """정제 codec의 EXAMPLE 입력. 실제 native packet은 별도 실 helper 연결 시험에서 만든다."""
+    from guard.adapters import vllm_worker_generation_metadata as meta
+    raw = capture(case, rows)
+    raw['native21'] = meta.project(None, {'profile': tool.NATIVE_OBSERVATION_PROFILE, 'session': case['prepared']['session']})
+    raw['native_collection'] = {'initial_capture_attempted': True, 'final_capture_attempted': True,
+        'process_recordings': [], 'live_census_stable': False, 'recorded_files_covered': False,
+        'reader_collection_gap': True, 'parser_diagnostic_codes': [], 'snapshot_omitted_count': 0}
+    raw['cleanup'].update(pre_snapshot_attempted=True, pre_snapshot_verified=True,
+        post_snapshot_attempted=True, post_snapshot_verified=False, api_epoch_same=None,
+        selected_session_seal_attempted=True, selected_session_sealed=False,
+        final_capture_attempted=True, final_capture_complete=False)
+    return raw
+
+
+def test_native21_outer_source_facts_and_bootstrap_send_stay_separate_from_readiness(case):
+    from tools import b_lif07_native_capture as helper
+    raw = native_observation(case)
+    for row in raw['snapshots']:
+        row['stage'] = 'initial'
+        row['native_outer'].update(recording=0, source_verified=True, callback_code_verified=True,
+            source_contract_verified=True, process_binding_verified=True, observer_runtime='cpython-3.12.3',
+            entry_kind='direct-body', raw=PRIVATE)
+    raw['native21']['ready_sends'] = [{'stage': 'initial', 'recording': 0, 'operation': 'SEND', 'status': 'READY',
+        'terminal_phase': 'RETURN', 'paired': True, 'source_main_entry_observed': True,
+        'original_send_return_observed': True, 'actual_worker_verified': True, 'service_gate_verified': True, 'raw': PRIVATE}]
+    raw['native21']['missing'].extend(['worker_main_terminal_not_observed', PRIVATE])
+    raw['native_collection']['parser_diagnostic_codes'] = [next(iter(helper.PARSER_DIAGNOSTIC_CODES)), PRIVATE]
+    value = tool.project(raw, case['env'], case['target'], case['prepared'], case['manifest'], native_observation=True)
+    assert value['rows'][0]['native_outer']['source_verified'] is True
+    assert value['rows'][0]['metadata']['source_qualified'] is False
+    assert value['native21']['ready_sends'][0]['original_send_return_observed'] is True
+    assert value['native21']['ready_sends'][0]['actual_worker_verified'] is False
+    assert value['native21']['ready_sends'][0]['service_gate_verified'] is False
+    assert 'worker_main_terminal_not_observed' in value['native21']['missing']
+    assert value['native21']['additional_missing_count'] == 1
+    assert value['native_collection']['additional_parser_diagnostic_count'] == 1
+    assert value['ready_send_observed'] is value['post_ready_canary'] is value['rank_coverage_verified'] is None
+    assert value['target_io_attempted'] is True and value['target_http_requests'] == value['controlled_delay_requests'] == 0
+    assert PRIVATE not in json.dumps(value)
+
+
+def test_imported_native21_extra_box_does_not_gain_live_source_facts(case):
+    raw = native_observation(case)
+    for row in raw['snapshots']:
+        row['native_outer'].update(source_verified=True, callback_code_verified=True, source_contract_verified=True)
+    value = project(case, raw)
+    assert value['native21'] is value['native_collection'] is None
+    assert value['target_io_attempted'] is False
+    assert all(not row['native_outer']['source_verified'] and not row['native_outer']['source_contract_verified'] for row in value['rows'])
+    assert value['qualified_rows'] == 0 and value['ready_send_observed'] is None
+
+
+@pytest.mark.parametrize('different', ['stage', 'recording', 'process_domain'])
+def test_native_method_pairs_never_join_other_capture_or_recording_domains(case, different):
+    rows = [snapshot(case), snapshot(case, 'RETURN', 2)]
+    for row in rows:
+        row['stage'] = 'initial'; row['native_outer']['recording'] = 0
+        row['native_outer']['process_domain'] = {'pid': 20, 'start_ticks': 99, 'boot_sha256': '1' * 64}
+    if different == 'stage': rows[1]['stage'] = 'final'
+    elif different == 'recording': rows[1]['native_outer']['recording'] = 1
+    else: rows[1]['native_outer']['process_domain']['start_ticks'] = 100
+    assert project(case, capture(case, rows))['method_pairs'] == []
+
+
+def test_repeated_journal_prefix_is_preserved_per_stage_and_late_gap_keeps_initial_pair(case):
+    rows = [snapshot(case), snapshot(case, 'RETURN', 2)]
+    for row in rows: row['stage'] = 'initial'; row['native_outer']['recording'] = 0
+    repeated = deepcopy(rows)
+    for row in repeated: row['stage'] = 'final'
+    complete = project(case, capture(case, rows + repeated))
+    assert len(complete['rows']) == 4 and len(complete['method_pairs']) == 2
+    assert {row['stage'] for row in complete['method_pairs']} == {'initial', 'final'}
+    incomplete = native_observation(case, rows)
+    incomplete['cleanup'].update(selected_session_sealed=False, final_capture_complete=False)
+    value = tool.project(incomplete, case['env'], case['target'], case['prepared'], case['manifest'], native_observation=True)
+    assert len(value['method_pairs']) == 1 and value['method_pairs'][0]['stage'] == 'initial'
+    assert not value['cleanup']['selected_session_sealed'] and not value['cleanup']['final_capture_complete']
+    assert value['expected_ranks'] is value['rank_coverage_verified'] is None
+
+
+def test_native_projection_across_recordings_keeps_more_than_one_journal_rows(case):
+    raw = native_observation(case, [])
+    raw['native21']['generation_events'] = [{'stage': 'initial', 'recording': recording, 'event_seq': seq,
+        'point': 'WorkerProc.worker_main', 'phase': 'CALL'} for recording in (0, 1) for seq in range(1025)]
+    value = tool.project(raw, case['env'], case['target'], case['prepared'], case['manifest'], native_observation=True)
+    assert len(value['native21']['generation_events']) == 2050
+    assert all(row['actual_worker_verified'] is False for row in value['native21']['generation_events'])
+    assert value['full_scope_coverage'] is False
+
+
+@pytest.mark.parametrize('failure', ['artifact', 'store'])
+def test_native_storage_failure_preserves_observation_and_independent_seal_cleanup(case, monkeypatch, failure):
+    raw = native_observation(case, [])
+    calls = []
+    def collect(*args):
+        calls.append(True); return raw
+    monkeypatch.setattr(tool, '_collect_native', collect)
+    if failure == 'artifact':
+        original = tool._write
+        def write(path, value):
+            if path.name == 'worker-readiness.json': raise OSError(PRIVATE)
+            return original(path, value)
+        monkeypatch.setattr(tool, '_write', write)
+        summary = tool.run(**case['args'], collect_native=True)
+        facts = summary['safe_facts']
+        entry, = yaml.safe_load((case['args']['output'] / 'manual-evidence.yaml').read_text())['checks']
+        assert 'LIF07_SAFE_FACTS=' in entry['observation_notes'][0]['answer'] and entry['attachments'] == []
+    else:
+        monkeypatch.setattr(tool, 'import_evidence', lambda *a, **k: (_ for _ in ()).throw(OSError(PRIVATE)))
+        with pytest.raises(tool.EvidencePreservationError) as error: tool.run(**case['args'], collect_native=True)
+        assert not error.value.recovery['capture_rerun_required']
+        facts = error.value.safe_facts
+    assert calls == [True] and facts['native21']['missing']
+    assert facts['cleanup']['selected_session_seal_attempted'] is True
+    assert facts['cleanup']['selected_session_sealed'] is False
+    assert facts['cleanup']['gpu_model_recovery_verified'] is None and PRIVATE not in json.dumps(facts)
+
+
+def test_native_collection_input_mutation_keeps_safe_facts_and_pre_backend_baseline(case, monkeypatch):
+    raw = native_observation(case, [])
+    calls = []
+    def collect(*args):
+        calls.append(True); case['args']['manifest'].write_text('{}'); return raw
+    monkeypatch.setattr(tool, '_collect_native', collect)
+    with pytest.raises(tool.EvidencePreservationError) as error: tool.run(**case['args'], collect_native=True)
+    assert calls == [True] and error.value.safe_facts['native21']['missing']
+    assert 'ORIGINAL_INPUT_CHANGED' in error.value.recovery['issues']
+    assert not case['args']['output'].exists()
+
+
+def test_actual_native_helper_default_public_entrypoint_store_restore_preserved(request, monkeypatch):
+    """실 Bhelper·실 A default packet/project를 연결한다. Reader 전송만 EXAMPLE이며 실제 대상 0회다."""
+    import contextlib
+    import hashlib
+    import io
+    import os
+    import shutil
+    from tools import b_lif07_native_capture as helper
+    from tests.test_b_lif07_native_capture import make_inputs, UnavailableReader
+    temp = TemporaryDirectory(prefix='byul-lif07-native-consumer-contract-')
+    request.addfinalizer(temp.cleanup)
+    root = Path(temp.name).resolve()
+    env, target, prepared, manifest = make_inputs(root)
+    manifest['request']['messages'][0]['content'] = 'hello'
+    pack = baseline_pack()
+    policy = Policy(id=new_id('POL'), data_origin=DataOrigin.EXAMPLE, status='DRAFT', pack=pack.ref(),
+        scope={'include': ['LIF-07']}, values={'LIF-07': {}}).seal()
+    source = Store(root / 'source'); put_pack(source, PACK_DIR); source.put_many([env, policy])
+    plan = select(pack, [env], policy); source.put(plan)
+    for name, value in (('target', target), ('manifest', manifest)):
+        (root / (name + '.json')).write_text(json.dumps(value))
+    args = dict(store=source.root, plan_id=plan.id, pack=PACK_DIR, target=root / 'target.json',
+        prepared=root / 'prepared/manifest.json', manifest=root / 'manifest.json', output=root / 'output', entered_by='EXAMPLE-native-contract')
+    before = tool._inventory(source.root)
+    original = helper.collect_startup
+    helper_calls = []
+    def example_transport(*a, **kwargs):
+        helper_calls.append(True)
+        return original(*a, **kwargs, _reader_factory=UnavailableReader)
+    monkeypatch.setattr(helper, 'collect_startup', example_transport)
+    argv = []
+    for key, value in args.items(): argv.extend(['--' + ('plan' if key == 'plan_id' else key.replace('_', '-')), str(value)])
+    argv.append('--collect-native')
+    stdout = io.StringIO(); stderr = io.StringIO()
+    destination = Path(os.environ.get('BYUL_LIF07_NATIVE_CONTRACT_EVIDENCE', '/private/tmp/byul-b-lif07-native-consumer-20261031/contract-case'))
+    assert not destination.exists()
+    try:
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr): tool.main(argv)
+        summary = json.loads(stdout.getvalue())
+        out = args['output']; saved = json.loads((out / 'worker-readiness.json').read_text())
+        st, restored = Store.read_only(out / 'store'), Store.read_only(out / 'restored')
+        assert helper_calls == [True] and summary['input_mode'] == 'native_startup_observation'
+        assert summary['requests'] == 0 and summary['actual_target_executed'] is False
+        assert summary['target_io_attempted'] is True and summary['target_io_origin'] == 'EXAMPLE'
+        assert summary['selected_session_seal_attempted'] and summary['selected_session_sealed']
+        assert saved['native21']['missing'] and saved['native_collection']['parser_diagnostic_codes']
+        assert len(saved['native_collection']['capture_states']) == 2
+        assert saved['ready_send_observed'] is saved['rank_coverage_verified'] is None
+        assert saved['qualified_rows'] == 0 and saved['source_authentication_verified'] is False
+        assert tool._refs(st) == tool._refs(restored) and st.verify() == restored.verify() == []
+        evd, = st.iter_kind('EVD'); res, = st.iter_kind('RES')
+        assert evd.data_origin.value == 'DECLARED' and not evd.normal_control.attempted
+        assert res.verdicts.model_dump(mode='json') == {k: 'UNKNOWN' for k in ('security', 'functional', 'performance')}
+        assert tool._inventory(source.root) == before and PRIVATE not in json.dumps(saved)
+    finally:
+        destination.mkdir(parents=True)
+        shutil.copytree(root, destination / 'case')
+        (destination / 'stdout.log').write_text(stdout.getvalue())
+        (destination / 'stderr.log').write_text(stderr.getvalue())
+        (destination / 'invocation.json').write_text(json.dumps({'entrypoint': 'tools.b_lif07_readiness.main(argv)',
+            'argv': argv, 'pytest_process_argv': sys.argv, 'helper_calls': len(helper_calls),
+            'helper_source_sha256': hashlib.sha256(Path(helper.__file__).read_bytes()).hexdigest(),
+            'EXAMPLE_reader': 'UnavailableReader; original public capture_session and generation_metadata.project used',
+            'actual_target_worker_GPU': 0, 'source_store_inventory': before}, ensure_ascii=False, indent=2))

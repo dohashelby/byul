@@ -41,3 +41,25 @@ import는 신고된 관측을 기존 manual EVD로 보존한다. 파일의 sourc
 보존 RPT는 `RPT-01M671SK359WND9216SX6S2PMW@1`(SHA `bdda98d760d8ec6ef4cbbf7265b422ad272149b6c981e63cfb1fae47131b3377`)다. 저장소 밖 `byul-b-record-access-evidence-20261030/lif07-worker-readiness/import-cli-case`에 실제 argv/stdout/stderr, EXAMPLE 입력, 정제 첨부, 원본/출력/복원 Store·반출본·보고서와 SHA manifest를 보존했다. 세 축 UNKNOWN·실제 요청/Pod변경/지연0·source 자격False를 유지한다. 이 증거는 실제 Kubernetes 실행 준비 완료나 전체 LIF07 완료로 집계하지 않는다.
 
 검토된 관측기와 기존 승인 A138 호환 adapter를 포함한 guard component는 `b15b629431777a86a151353728e612c760aff789`다. 기존 helper858·fixtureac8·전체 고정 scope를 보존하고 관련 strict11경로와 source/wheel/격리설치170파일 일치·설치본 lazy import를 확인했다. A 공유 runtime·HTTP·팩·계약은 수정하지 않았다.
+
+## native21 관측 전용 수집
+
+A152 `c39a36b7a6f306b910f0314b0deee10b55390dc4`의 공개 native21 준비·reader·parser를 소비하는 별도 모드다. 기존 공개 준비 명령으로 모델 읽기 범위를 결합한 `vllm-native-lifecycle-metadata/21` 자산을 준비한 뒤 다음 명령을 사용한다.
+
+```sh
+PYTHONPATH=src:. python -m tools.b_lif07_readiness --store SOURCE --plan PLAN --pack packs/PACK-BASELINE --target target.json --prepared prepared/manifest.json --manifest cohort.json --output /fresh/native --entered-by operator --collect-native
+```
+
+`--collect-native`, `--execute`, `--import-capture`는 함께 지정하지 않는다. 기본 preflight와 기존 `--execute`는 native 수집 helper를 호출하지 않는다. `--execute`의 전체 준비·Unready HTTP·controlled delay 계약은 계속 `None`이다. 관측 전용 수집은 그 계약과 독립적으로 기존 `collect_startup` helper를 호출하며, 읽기 전후 선정 Pod 세대 확인·최초 journal 수집·선정 session seal·마지막 journal 수집·후기 상태와 observer 정리를 각각 보존한다.
+
+HTTP 요청·Pod 변경·지연 요청은 0이다. 선정 session seal은 해당 session의 control 파일 신호를 실제로 변경하므로 `selected_session_seal_attempted`와 `selected_session_sealed`를 별도로 기록한다. 초기·마지막 capture, target 읽기 시도와 host 소유 정리도 별도다. seal 성공으로 worker·모델·GPU 복구를 확정하지 않는다.
+
+초기와 마지막 관측은 `stage=initial/final`로 나누고 recording·PID/start·원 outer seq와 callback local seq를 구분한다. 같은 journal prefix의 재관측은 보존하되 다른 stage·recording 사이의 CALL/RETURN을 합쳐 메서드 짝이나 새 세대로 만들지 않는다. 후기 수집·census·seal 실패가 앞선 정제 사실을 지우지 않는다. 원 snapshot 512행 상한을 유지하며 생략 개수와 gap을 기록한다.
+
+A parser가 검증한 Worker source/body/entry/code 사실, 국소 객체 생성 후보와 선정 원 pipe의 bootstrap `SEND`/`CLOSE` CALL·RETURN·RAISE를 정제해 첨부한다. `READY`와 `other`, worker main의 terminal 미관측도 구분한다. callback의 `source_qualified`·실제 worker 자격은 계속 False이고, 실제 body 진입·GPU 완료·전체 rank/model 준비·상위 EngineCore READY 수신·서비스 gate는 미수집이다. bootstrap READY 전송은 KV·warmup 완료나 receiver 확인과 별개다. `tp_groups`로 필수 rank 목록을 만들지 않는다.
+
+추가 native21 사실은 실제 helper→공개 reader/capture_session→검증된 packet 경로에서만 소비한다. `--import-capture` 파일에 추가된 native21 상자나 긍정 플래그는 이 경로의 자격을 얻지 못한다. 모델 repository/revision/inventory와 API alias는 기존 `guard.model-request-mapping`·transport `api_model` 검증을 유지한다. 원문 payload·요청·IPC handle·FD·주소·예외문은 첨부하지 않는다.
+
+입력 reader는 path-stat끼리와 FD-stat끼리 ctime 안정성을 확인하고, path→FD→path의 device/inode/size/mtime 및 regular-file·symlink 교체 방어를 유지한다. 서로 다른 stat 계열의 ctime 의미를 같다고 가정하지 않는다. 별도 macOS 직접 회귀로 이 경계와 실제 경로 교체 거부를 확인하며 Windows 실행 결과와 구분한다. A가 승인한 runtime/code literal만 소비하고 macOS Python 3.12.13을 새 native runtime으로 승인하지 않는다.
+
+현재 고정 A152의 공통 eager import 간선 때문에 기존 기본 preflight의 callback-module 미적재 회귀 1건은 실패 근거로 보존한다. 같은 공개 target validator를 직접 호출하는 동치 경로를 사용해도 공통 registry/report 간선이 남는다. 원 assertion과 기본 모드 관찰 계약을 유지하며 A 공통 lazy 수정 확정 후 그 한 사례를 재검증한다. 새 native 관측의 동작과 이 공통 의존성 수정을 구분한다.

@@ -1557,3 +1557,7 @@ git status
 - 고정 source3b871a8/검토pin065eb9b에서 Windows45·Linux45통과/동일1324파일, source/wheel/설치241일치, 설치CLI4·정확24Ref 반출/복원·저장팩 재판정·전체소비349를 확인했다. 기존96파일/native8~15·IPC/egress 메서드·원PACK31/76정의와 route_record를 보존했다.
 - 최초 모델별칭 호환 누락/시험report source출력, 다음fixture event-loop 생성 순서, cleanup exit1/ABORTED 보수를 원본 실패와 함께 기록했다. 기존 socket 차단·판정기대·source/lab/image/완전성 관문과 B원본c9 pin을 유지했다. 각 고정source의 직접/인접/설치 범위를 구분하며 현재 전체suite 통과로 합산하지 않는다.
 - 새제품은 자기 요청·같은 native recording의 auth bool/경로/등록 callback·source/module/seq 관측이다. 실제principal/정책/Gateway rewrite/producer/nodeimage/worker/전체scope는 false, 판정전축UNKNOWN/normal null·actual0이다. 다음 확정 전달물과 준비된 본인 분기를 이어가며 원승인창/추가Start0/비용/EBS·Goal범위를 유지한다.
+# 2026-10-30 A1 PLT07 고정 전용 소비 제품 연결 착수
+
+- A2 확정9482a75/PR135 전용3파일 bytes를 통합했다. 기존 공통2596337 method/source와 원분석을 재사용해 boundary_egress:kubernetes wrapper/registry·명시POL13/DRAFT팩·정확Ref 시험을 연결했다. 공통 미등록 상태 시험은 새 명시 factory와 기존 Docker factory를 함께 확인하도록 갱신한다.
+- 원PACK31/DockerPOL11/기존rule_table 독립FAIL·5분기와 다른76개 정의·A2원본3bytes/native/REQ02/IPC를 보존한다. 구현/회귀/문서 초안 종료 후 source고정·영향/설치/CLI·정확Ref·커밋/PR/CI/인계 전이며 실제/전체분기 완료를 주장하지 않는다. 새기동·권한·비용은없고원Goal/Start0/EBS경계를유지한다.

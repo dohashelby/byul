@@ -148,11 +148,14 @@ def test_bad_input_has_no_network_or_helper_execution(bad):
     assert result['sender'] is None and not result['requested_observations_complete']
     assert not calls
 
-def test_source_literals_and_no_implicit_formal_registration():
+def test_source_literals_explicit_registration_and_original_docker_factory():
     program,_=e.source();compile(program,'EXAMPLE-egress','exec')
     assert len(program.encode())<128*1024
     from guard.executors.registry import resolve_executor
-    assert resolve_executor('boundary_egress','kubernetes') is None
+    from guard.executors.kubernetes_egress_product import KubernetesEgressProductExecutor
+    from guard.executors.boundary_egress import BoundaryEgressExecutor
+    assert isinstance(resolve_executor('boundary_egress','kubernetes')({'boundary_egress':{}}),KubernetesEgressProductExecutor)
+    assert isinstance(resolve_executor('boundary_egress','real')({'boundary_egress':{}}),BoundaryEgressExecutor)
 
 @pytest.mark.parametrize('field',['source','helper','contract','file-reader'])
 def test_modified_source_is_rejected_without_approving_runtime_hash(monkeypatch,field):

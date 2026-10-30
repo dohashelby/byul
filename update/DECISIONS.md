@@ -607,3 +607,6 @@ NetworkPolicy 회수≠credential issuer 철회. PLT10은 기존 native8과5개 
 # 2026-10-30 REQ02 native route 제품
 
 기존 native8 인증 bool·등록 callback 관측과 REQ02 자체HTTP ID를 같은 recording/entry method-path·source/module/seq로 연결하되, 실제principal 권한·Gateway rewrite와 producer/worker 인증은 false로 남긴다. 선택된 시험 키 변수 하나만 사용하고 키값/키hash는 저장하지 않는다. 기존 선언파일 route_record·다른 점검 ID/profile·source/image/lab/native0.32 관문을 보존한다. 기술 관측 제품 연결과 사용자 기업 정책/실제 환경을 분리한다.
+# 2026-10-30 PLT07 전용 소비 정식 연결
+
+A2 9482a75의3원본 bytes를 보존하며 A1은 기존 egress v1의 wrapper/registry/POL13 명시팩·검토pin·CLI/Ref만 연결한다. 원래 Docker/POL11·predicate와 A2 분석은 재작성하지 않는다. 필수 사건 검증 뒤 ACK/최종clock/후속수집·첨부·정리 오류가 독립FAIL을지우지않게 하고 technical ABORTED/기존cleanup exit1을유지한다. source/lab/image/native032/UNKNOWN·실제·전체5분기/Goal·권한비용 경계를 유지한다.

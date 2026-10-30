@@ -623,7 +623,7 @@ def point_sources(profile):
     result={cls+"."+method:module for module,classes in points(profile).items()
         for cls,methods in classes.items() for method in methods}
     expected=sum(len(methods) for classes in points(profile).values() for methods in classes.values())
-    if profile in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE}:
+    if profile in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE}:
         functions=online.functions(sensor) if profile==online.PROFILE else sensor.FUNCTION_POINTS if profile in {sensor.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE} else V7_FUNCTION_POINTS if profile==V7_PROFILE else V6_FUNCTION_POINTS if profile==V6_PROFILE else V5_FUNCTION_POINTS if profile==V5_PROFILE else V4_FUNCTION_POINTS
         result.update({module.rsplit(".",1)[-1]+"."+method:module
             for module,methods in functions.items() for method in methods})
@@ -637,7 +637,7 @@ def valid_call_frame(frame,profile):
     base={"point","request_sha256"}
     if set(frame)==base:return True
     extra={"weight_call_sha256","weight_model_sha256"}
-    if profile not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE} or set(frame)!=base|extra or frame.get("point")!="DefaultModelLoader.load_weights":return False
+    if profile not in {sensor.PROFILE,online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,V4_PROFILE,V5_PROFILE,V6_PROFILE,V7_PROFILE} or set(frame)!=base|extra or frame.get("point")!="DefaultModelLoader.load_weights":return False
     return (type(frame["weight_call_sha256"]) is str and re.fullmatch(r"[0-9a-f]{64}",frame["weight_call_sha256"]) is not None
         and (frame["weight_model_sha256"] is None or type(frame["weight_model_sha256"]) is str
             and re.fullmatch(r"[0-9a-f]{64}",frame["weight_model_sha256"]) is not None))

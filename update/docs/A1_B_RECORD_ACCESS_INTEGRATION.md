@@ -1,0 +1,15 @@
+# B PR130 고정 전달물 통합 범위
+
+A1 기준647553f/PR137 위에 B 확정f1544197f3b73ce827e8d0de569c7b536df2f1ad/PR130의21파일과 고정 전이 의존2파일을 확정 tree bytes로 가져온다. PR base058ac56과의 diff가 선정한 파일은 각 최종 파일 전체 bytes로 소비하므로 그 파일에 포함된 앞선 B 구현도 보존한다. 전이 의존은 같은 f154 tree의 profiler_lifecycle_cpu와 원본 companion test뿐이다. profiler 정식 등록이나 실제 Torch 실행을 추가하지 않는다. 원 B branch 전체나 미완성 폴더를 import하지 않는다. B 전용 수집/분석/판정·원 source pin/collector hash는 재작성하지 않는다. 공통 input_cpu/online_input_cpu/structured_tools/manual 및 structured_tools_cpu5파일은 B 확정본과 현재 A1 bytes가 같다. core/models/store/judges·외부contracts·루트runtime·원PACK31/다른정의는 수정하지 않는다.
+
+OBS06 제품 경로는 B의 `python -m guard.collectors.record_access_evidence --store ORIGINAL --plan PLAN_ID --pack ORIGINAL_PACK31 --target TARGET --subjects SUBJECTS --output FRESH --entered-by OPERATOR`다. 기본은 preflight만 하고 `--execute`가 있을 때 소유 capture를 한 번 호출한다. 정확 원ENV/POL/PACK/PLAN Ref·target·두주체 plan과 전후 sourceStore/입력 bytes를 검증하고 원본은 읽기 전용으로 보존한다. 새 Store 사본만 기존 manual import→judge/report→verify→bundle반출/복원·정확Ref 경로로 append한다. 새 A registry/팩/CLI 우회 경로는 없다. 상세 계약은 원본 `docs/b-obs06/POD_LOG_ACCESS.md`를 따른다.
+
+실제 collector는 기존 A public metadata reader·고정 source와 전후 선정namespace/Pod/container/image/restart/start를 재사용한다. 명시 whoami 전체그룹/사용자 일치와 allowed-before→unauthorized→allowed-after의 logs 결과를 구분한다. 관측한 주체를 기업 허용값으로 만들지 않고, 실제 승인 principal/대상/운영 범위는 operator가 확정해야 한다. 원문 로그·주체·로그hash·임의예외를 결과/첨부에 저장하지 않는다. 선정 비허용 조회의 독립 FAIL과 후기 오류를 보존하지만 저장암호화·전체원normal/backup/collector coverage·실제principal/GPU 전체는 UNKNOWN/미완료다.
+
+REQ09는 원PACK31 revision8/POL4/원10관측 중 qualified confirmed_input_violations만 기존 수동 증거로 투영하는 B `tools.b1_input_integration_cpu.run_req09_pipeline`를 원본대로 제공한다. mask/shape/offset12행과후속12의 sourceCPU subset은 HTTP/worker/최종모델 소비나 전체REQ09가 아니다. 원26/Online16/sampling 경로·rawfixtures와 후기 unavailable에서 이미 자격을 갖춘 FAIL 보존·mismatch 거부 의미는 유지한다. B의 de8597c 실제 sourceCPU22.067초·12+12/7거부5수용·위반[]/세축UNKNOWN은 과거 고정 근거이며 이 A통합 소스의 새 실제CPU 실증으로 소급하지 않는다.
+
+신뢰 경계는 셋으로 구분한다. B 원본helper/defaultc9는 그대로다. 이번 B 도구의 component033972019f117d78c1742a3f958fe8d7910087ce와 gate/collector literal도 정확 B bytes로 보존한다. A1은 자기 verify_req10_consumption에서 검토한 전체공통snapshot literal만 새 소스로 고정한다. 현재 A소스는 B component033과 다르므로 B의 실제 sourceCPU entry가 그 gate를 거부하는 것이 정상이다. B는 전달받은 새A통합 소스를 검토해 전용pin/소비를 갱신한다. 관측한 current hash를 승인값으로 사용하거나 경로·assert·skip/gate를 완화하지 않는다. 기존 REQ10 등록은 반복하지 않는다.
+
+플랫폼 관측도 분리한다. 가져온 B collector fixture는 로컬 scratch의 POSIX mode가0700임을 assert한다. 이번 Windows3.12 사전관측의 TemporaryDirectory stat mode는0777이었다. 이를 ACL 동등성이나 실제 노출로 추정하지 않는다. 원B 시험을 그대로 양쪽에서 실행해 지원/미지원 결과를 기록하고, A1이 B원본 assert를 바꾸거나 새skip/제외로 통과시키지 않는다. actual Windows collector/NTFS ACL 보장은 별도 검토 대상이다. Linux에서의 같은bytes/격리 설치와 Windows의 기존 수동 증거 소비 검증을 구분한다.
+
+현재 원본21파일+의존2파일·대조/구현·시험선정·문서 초안 종료 후 source/hash 고정 전이다. 직접/동일계약/인접/설치/기존CLI·정확Ref와 새실제CPU·Kubernetes를 구분하며 검증 전 통과를 주장하지 않는다. 실제Kubernetes·principal·로그접근·저장암호화·모델/GPU는0회다. 부모A39/56/4·A1 19/27/2·B38/소유권·c9/sources/기존미커밋/worktree/팩/Ref/실증·원GPU창종료/추가Start0/46.66USD/기존사용량/120GiB EBS·CI결제 차단을 유지한다.

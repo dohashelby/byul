@@ -1,5 +1,51 @@
 # B-1 입력 CPU 분기
 
+## 원 PACK31 REQ-09의 target031 부분 증거 연결
+
+기존 Online 3점검 proposal 경로와 별도로 `b1_input_integration_cpu.py --check REQ-09`
+모드를 제공한다. 원 PACK31 REQ-09 revision 8·`input_validation`·필수 정책 4개·구조화 관측
+10개·원 질문/설명/챌린지를 그대로 사용한다. 새 팩·실행기 등록·정책 기본값을 만들지 않는다.
+
+```text
+python -B tools/b1_input_integration_cpu.py \
+  --check REQ-09 --source-profile target031 --source-root EXACT_TARGET031_SOURCE \
+  --output-root FRESH_OUTPUT --source-store ORIGINAL_STORE --plan EXISTING_PLAN_ID \
+  --pack ORIGINAL_PACK31 --entered-by DECLARED_OPERATOR
+```
+
+이 명령은 명시한 CPU 152 의존 환경에서 실행한다. 제품 의존성이나 기본 guard CLI에
+torch를 추가하지 않는다. source ENV는 `source-db9527a46873454610df6dbedf79a36d6bf1a7f6`,
+image/model 필드는 null이어야 하며 원 Store에서 PLAN의 정확 ENV/POL/PACK Ref를 확인한다.
+기존 정책 4개가 없거나 기존 입력 정책 프로파일과 맞지 않으면 수집 전에 닫는다.
+단위 시험의 승인 bytes 대역은 EXAMPLE ENV로만 한정한다.
+
+기존 26개 input fixture 중 REQ-09의 mask 5개·shape 2개·offset 5개와 각각의 후속 정상
+admission만 한 번 수집한다. source/producer/config/fixture 귀속과 행별 전후 검증,
+실제 `process_inputs` 진입, 입력/수용 metadata hash 대응을 확인한 행에만 기존
+`input_cpu.project`를 적용한다. mask/offset이 유효값으로 정규화되면 그 행을 위반으로
+투영하지 않는다. shape의 `expected=None`은 관측만 한다. 후속 정상은 `hello world`의
+2-token source CPU admission이며 HTTP·모델 처리 성공을 뜻하지 않는다.
+행의 사전 source 검증과 실제 동일한 invalid 입력 수용을 확인한 뒤 후기 검사가
+명시적으로 `unavailable`인 경우에는 그 독립 위반을 보존한다. 수집 상태는 incomplete,
+전체 범위는 UNKNOWN으로 남긴다. 명시적 mismatch·누락·알 수 없는 상태는 자격을 주지 않는다.
+
+원 Store는 읽기 전용 bundle로 새 output/store에 복원한 뒤 기존 manual v3 override로
+REQ-09 한 항목만 추가한다. 전체 normal control은 `not_attempted`, 원 token/길이 챌린지
+2개는 false다. `confirmed_input_violations` 외의 9개 관측은 null/미수집이며 endpoint나
+입력 형식의 제출·소비를 창작하지 않는다. 확인된 독립 mask/offset 위반만 신고 security
+FAIL이고 나머지는 UNKNOWN이다. 기능·성능·runner 소비·전체 질문은 UNKNOWN으로 남긴다.
+수동 EVD는 기존 계약대로 DECLARED이며 기업 승인 진위나 실행 환경 인증을 생성하지 않는다.
+
+정제 첨부에는 source/fixture/config와 count/shape/dtype/hash/offset·관측 enum만 남긴다.
+실제 배열·tensor 본문·예외 본문은 저장하지 않는다. 첨부 쓰기나 독립적인 후처리 실패가
+이미 확인한 FAIL을 지우지 않는다. 같은 as-of의 judge/report·verify·export/restore와
+정확 Ref를 대조하고 원 Store bytes를 보존한다. 원래 3개 gate/component/collector pin은
+이 모드 추가로 갱신하지 않으며 root의 별도 고정 소스 승인 후 실제 실행한다.
+
+전용 회귀는 `tests/test_req09_input_integration_cpu.py`다. 기존 Online·다른 입력/샘플링
+실측을 반복하거나 합산하지 않는다. 실제 CPU 수집은 collector와 bridge 통합 후 별도로
+한 번 수행하며 단위 EXAMPLE 결과를 실제 수집으로 표시하지 않는다.
+
 이 PR은 REQ-10과 REQ-08/09/07 입력 검증 및 관련 SUP-08 요청 gate를 다룬다.
 전체 공동 작업 목록은 B 38개이며 다음 묶음은 저장소 밖 byul-b-coordination의
 상대 선점 기록을 확인해 선택한다. SUP·캐시·배포를 전체 배정에서 제외하지 않는다.
@@ -45,7 +91,7 @@ B-1 전용 Python 3.12 venv에 이전 CPU freeze를 --torch-backend cpu로 설�
 ```sh
 export VLLM_TARGET_DEVICE=cpu VLLM_LOGGING_LEVEL=CRITICAL CUDA_VISIBLE_DEVICES= VLLM_PLUGINS=
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
-export PYTHONPATH="$VLLM_SOURCE:$BYUL_B1_REPO/update/src"
+export PYTHONPATH="$BYUL_B1_REPO/update/src:$BYUL_B1_REPO/update:$VLLM_SOURCE"
 "$CPU_VENV/bin/python" "$BYUL_B1_REPO/update/tools/b1_input_cpu.py" --source-root "$VLLM_SOURCE" --workdir "$FRESH_B1_EVIDENCE_DIR"
 ```
 
@@ -101,3 +147,61 @@ Typed ErrorResponse의 native code400/422를 관측한 경우에만 해당 core�
 오류는 구분하고 함수 진입·최종 admission 해시·재사용 키 제거 여부만 기록한다.
 원문 수정·mock renderer/engine 없이 실제 생성자를 사용한다. 이것은 공개 HTTP routing,
 engine-aware model/identity 검사 또는 최종 worker 소비의 증명이 아니다.
+
+
+## OnlineRenderer target031 연결 준비 (2026-10-29)
+
+`--suite online --source-profile target031`은 선정 db9527a46873454610df6dbedf79a36d6bf1a7f6의
+실제 OnlineRenderer와 InputProcessor를 사용한다. 기본 `reference5d`와 기존 입력·sampling·
+embedding suite, GPT2/WordLevel context builder의 코드는 유지한다. 기존 Online16 입력과
+각 사례의 후속 정상 대조16을 재사용하며 새16시험 개발로 집계하지 않는다.
+
+실제 0.31 정상 1건 feasibility에서 render_chat·preprocess_chat·reuse helper와
+InputProcessor 진입, prompt_count3을 확인했다(9.40초). 이 준비 관측은 정식 제품 증거에
+집계하지 않는다. `_C`·Triton 부재 경고에도 선택한 CPU admission은 완료됐다.
+정식 capture는 vLLM import 전에 VLLM_CACHE_ROOT와 HF cache를 새 소유 workdir 아래로
+설정한다. 가중치·모델 연산·네트워크·서비스·GPU는 사용하지 않는다.
+
+0.31에는 BaseRenderer.validate_token_ids가 없고 InputProcessor._validate_model_input의
+음수·OOV 검사와 _validate_prompt_len을 직접 추적한다. 함수 부재는 source_features에
+present=false로 남긴다. 0.31 reuse helper는 pop 뒤 빈 값에 fallback하며 5d의 bool·echo
+검사를 포함하지 않는다. 따라서 target의 reuse-empty/reuse-bool/reuse-echo-ignores-ids는
+원본 expected/hash/check_id/stage를 보존하고 별도 source_scope_eligibility를 관측 전용으로
+둔다. 나머지 필수 검증은 파싱된 필드 해시·실제 적용 fixture 설정·gate trace와 실제
+processor 입력·반환 해시를 통해 귀속한다. typed400 또는 빈 trace만으로 소비를 확정하지 않는다.
+
+capture_online() 한 번의 수집 ID·UTC 시작/종료 시각과16행을 REQ07·08·SUP08이 공유한다.
+기업 한도는 설정하지 않고 작은 max_model_len16/vocab32를 DECLARED fixture로 유지한다.
+사례별 생성자·실행·후속 관측 및 보조 저장 실패 시 이미 검증된 다른 행과 독립 위반은
+보존하고 incomplete를 반환한다. 명시 source 불일치행의 판정 자격과 정제 관측은 분리한다.
+
+```sh
+# update/ cwd, 부모 normal Python
+PYTHONPATH="src:.:$VLLM_SOURCE" "$CPU_VENV/bin/python" -m tools.b1_input_cpu \
+  --suite online --source-profile target031 --source-root "$VLLM_SOURCE" \
+  --workdir "$FRESH_ONLINE_CPU_EVIDENCE"
+```
+
+정식 target16 수집 결과는 collector·producer 통합 소스 확정 후 기록한다. 기존 참조5d16행·
+후속16 원본은 유지한다. installed target은 null이고 최종 runner 소비는 미검증이다.
+
+
+### 독립 token ID domain 근거
+
+검증 대상 캐시의 max_token_id를 허용 범위의 oracle로 사용하지 않는다. 소유
+`tokenizer.json`의 model.vocab·added_tokens ID 합집합에서 count/min/max·정규 해시와
+0부터의 연속 여부를 별도 수집한다. `config.json`의 vocab_size는 실제 ModelConfig
+값과 대조하고, 실제 InputProcessor에 전달하는 ID의 tokenizer/model membership과
+정규 해시를 기록한다. 두 설정 파일 bytes SHA를 capture의 config hash와 연결한다.
+문자열 vocabulary와 ID 집합 전체는 제품 첨부에 저장하지 않는다.
+
+0.31 캐시가 보고한32는 기존 effective_max_token_id 진단값으로 보존한다. 독립
+vocabulary/model domain0..31 밖의 ID32가 실제 processor에서 수용되었다면 기존
+REQ08 FAIL을 보존한다. 독립 domain 근거가 없거나 설정 hash가 다르면 해당 자격은
+UNKNOWN이다. 원본16입력·expected·기존 actual1은 유지한다.
+
+## REQ-09 target031 실제 CPU 결과 — 2026-10-30
+
+고정 소스 de8597cf00e0526dd3b274d5a100a55bbb80bc6a에서 원 PACK31/REQ09rev8의 source-CPU 부분을 1회 실행했다. 실제 InputProcessor mask·shape·offset 12행과 후속 정상12건을 수집했고 7거부·5수용, 모든 후속 정상·source/config 전후 확인·12행 자격 검증이 완료됐다. shape2행은 관측만 보존하며 모델 consumer 위반으로 해석하지 않는다. 확인 위반은 없고 보안·기능·성능은 모두 UNKNOWN이다. 원typed10관측 중 confirmed_input_violations=[]만 수집되며 나머지9개는 null/미수집, 전체 normal/challenge는 미시도로 유지했다.
+
+수집22.067초·CLI24.371초, capture_invocations=1이다. 원 Store를 보존하고 EVD→RES→RPT·동일 as-of·정확Ref·반출/복원·3개Store verify오류0을 확인했다. 전체tracked1153파일과 외부source는 수집 전후 불변이었다. 기존152환경·의존성은 재사용했고 Online16/기존26·69/sampling/공식전체를 재실행하지 않았다. 후기 source 검사 unavailable에도 이미 확인된 위반을 보존하는 검토 수정과 해당회귀33개를 통과했고, 명시mismatch는 계속 제외한다. 실제HTTP/서빙/Kubernetes/GPU 실행은0회다.

@@ -610,3 +610,6 @@ NetworkPolicy 회수≠credential issuer 철회. PLT10은 기존 native8과5개 
 # 2026-10-30 PLT07 전용 소비 정식 연결
 
 A2 9482a75의3원본 bytes를 보존하며 A1은 기존 egress v1의 wrapper/registry/POL13 명시팩·검토pin·CLI/Ref만 연결한다. 원래 Docker/POL11·predicate와 A2 분석은 재작성하지 않는다. 필수 사건 검증 뒤 ACK/최종clock/후속수집·첨부·정리 오류가 독립FAIL을지우지않게 하고 technical ABORTED/기존cleanup exit1을유지한다. source/lab/image/native032/UNKNOWN·실제·전체5분기/Goal·권한비용 경계를 유지한다.
+# 2026-10-30 B 기록접근/입력 CPU 확정 통합
+
+B PR130의21파일은 확정tree bytes로통합하고 전용수집/판정/source pin은B가유지한다. 원component033/collector literal을현재A의읽은hash로자동승인하지않고 A1검토전체snapshot과별도로남긴다. 원Store/Ref/whole normal·암호화UNKNOWN/후기독립FAIL을보존하고 실제CPU원결과와새A통합을구분한다. POSIXscratch fixture/Windowsstat 차이는 원검증에드러내며 새skip·assert완화·원B재작성을하지않는다.

@@ -1607,3 +1607,5 @@ B LIF13 a8ea25d 여섯파일을원bytes로통합한다. shared guard259/검토pi
 B a8ea LIF13 원본6/guard259불변을sourcea0a909e에서확인했다. Linux86pass/Windows76pass10fail, Linux설치CLI4·정확24Ref·native기본preflight/execute0/RPC0·공통367/제외0을분리인계한다. Windows POSIX경로/symlink/pipe/getpgid보수와actual daemon/source/IPC/recovery는미완료다.
 
 OBS02 SC23-03 native18 ordinary safe_open mapping의source/code/scope/PID/root/loader/model 경계와typed parser·기존CLI/EVD제품소비를동시에연결한초안을고정한다. 실제C/worker/tensor/승인·회수와분리하며원8/16/17/A2/Bbytes를보존한다.
+
+OBS02 native18 ordinary safe_open mapping을sourceecbbcac/pineba2440에서직접각49·인접각103/동일1407불변으로검증했다. 설치261/public준비CLI2/OBS02 CLI4·정확24Ref·공통369/제외0. Linux 소유mmap EXAMPLE와Cgate/class대역을구분하고actualC/serving/worker/인가·전체Goal완료로올리지않는다.

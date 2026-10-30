@@ -641,3 +641,5 @@ B native producer를A1이재작성하거나원sourcepin·실제release승인경�
 Windows 원B실패10개를새skip/경로gate완화/시험재작성으로숨기지않는다. POSIX public계약은Linux설치본에서검증하고실패/성공범위를각각보존한다. 정적client3bytes는실제daemon/image/인가증거가아니며선언capture/native기본preflight를actualzero-copy로승격하지않는다.
 
 mapping은파일read/fault·Tensor소비·인가·release와별개다. oldsource전략을바꾸거나C opaque함수반환을권한검증으로승격하지않는다. 메타데이터수집실패는원C값/예외/정리를바꾸지않으며rawmaps/주소/주소hash/내용을저장하지않는다. 새profile은기존OBS02소비와검증·인계까지같은묶음에서마감한다.
+
+observer code hash의first-line/line-table도계약이다. literal줄수변경으로생긴초기실패를원본으로남기고동일관문을보수한뒤독립compile대조를추가했다. region opaque좌표는mapping세대/존속증거가아니다. 새common관측은기존OBS02CLI/증거/정확Ref까지같은묶음에서연결하되actualC와전용A2소비·실제정책은별도다.

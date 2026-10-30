@@ -42,6 +42,8 @@ class World(IdentityWorld):
                     for key in ('operation_started_ns','operation_finished_ns'):
                         if row['payload'][key] is not None:row['payload'][key]+=offset
                     if self.weight_mode=='wrong-source':row['payload']['source_sha256']='0'*64
+                if row['event'] in {'NATIVE','SELECTION'}:
+                    for key in ('observation_started_ns','observation_finished_ns'):row['payload'][key]+=offset
             extra=values[-1]['monotonic_ns']-start+1
             for row in rows[index:]:row['monotonic_ns']+=extra
             if self.weight_mode!='wrong-model':

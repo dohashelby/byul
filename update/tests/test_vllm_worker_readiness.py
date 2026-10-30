@@ -289,3 +289,80 @@ def test_real_minimal_startup_binding_needs_no_request_or_external_call_id(obser
     assert last['metadata']['source_qualified'] is False
     assert last['metadata']['ready_send_verified'] is None
     assert observer.close()['pending_calls'] == 0
+
+
+def test_binding_gap_cannot_reuse_old_call_after_missing_return_and_call(observer):
+    worker = owner()
+    first = emit(observer, worker)
+    missing_return = emit(observer, worker, phase='RETURN', given={})
+    missing_call = emit(observer, worker, given={})
+    last = emit(observer, worker, phase='RETURN')
+    assert 'OBSERVATION_GAP_PENDING_INVALIDATED' in missing_return['gaps']
+    assert not missing_return['metadata']['call_transition']['paired']
+    assert not missing_call['metadata']['call_transition']['paired']
+    assert not last['metadata']['call_transition']['paired']
+    assert last['metadata']['rank'] == first['metadata']['rank'] == 0
+    assert last['metadata']['source_qualified'] is False
+    assert last['metadata']['ready_send_verified'] is None
+    assert observer.close()['pending_calls'] == 0
+
+
+@pytest.mark.parametrize('gap_kind', ['busy', 'read_unavailable'])
+def test_callback_gap_invalidates_same_thread_pending_and_allows_fresh_pair(observer, monkeypatch, gap_kind):
+    worker = owner()
+    old = emit(observer, worker)
+    if gap_kind == 'busy':
+        observer._lock.acquire()
+        try:
+            gap = emit(observer, worker, phase='RETURN')
+        finally:
+            observer._lock.release()
+        assert gap['gaps'] == ['OBSERVER_BUSY']
+    else:
+        original = observer._metadata
+        def unavailable(*args, **kwargs):
+            raise ValueError('PRIVATE_READ_ERROR')
+        monkeypatch.setattr(observer, '_metadata', unavailable)
+        gap = emit(observer, worker, phase='RETURN')
+        monkeypatch.setattr(observer, '_metadata', original)
+        assert 'OBSERVER_READ_UNAVAILABLE' in gap['gaps']
+    end = emit(observer, worker, phase='RETURN')
+    assert not end['metadata']['call_transition']['paired']
+    assert end['metadata']['owner_token'] == old['metadata']['owner_token']
+    fresh = emit(observer, worker, call='d')
+    returned = emit(observer, worker, phase='RETURN', call='d')
+    assert returned['metadata']['call_transition']['paired']
+    assert returned['metadata']['call_transition']['call_seq'] == fresh['seq']
+    assert 'PRIVATE' not in json.dumps(gap)
+
+
+def test_other_thread_busy_gap_does_not_invalidate_current_thread_source_pair(observer):
+    worker = owner()
+    first = emit(observer, worker)
+    rows = []
+    observer._lock.acquire()
+    try:
+        child = threading.Thread(target=lambda: rows.append(emit(observer, worker)))
+        child.start(); child.join(timeout=2)
+        assert not child.is_alive()
+    finally:
+        observer._lock.release()
+    assert rows[0]['gaps'] == ['OBSERVER_BUSY']
+    end = emit(observer, worker, phase='RETURN')
+    assert end['metadata']['call_transition']['paired']
+    assert end['metadata']['call_transition']['call_seq'] == first['seq']
+
+
+def test_reentrant_busy_gap_during_metadata_read_cannot_pair_old_source_call(observer, monkeypatch):
+    worker = owner()
+    emit(observer, worker)
+    original = observer._metadata
+    nested = []
+    def interrupted(*args, **kwargs):
+        nested.append(emit(observer, worker, phase='RETURN'))
+        return original(*args, **kwargs)
+    monkeypatch.setattr(observer, '_metadata', interrupted)
+    end = emit(observer, worker, phase='RETURN')
+    assert nested[0]['gaps'] == ['OBSERVER_BUSY']
+    assert 'OBSERVATION_GAP_PENDING_INVALIDATED' in end['gaps']
+    assert not end['metadata']['call_transition']['paired']

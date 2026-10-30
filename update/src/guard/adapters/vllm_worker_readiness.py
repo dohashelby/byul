@@ -26,7 +26,7 @@ GAPS = frozenset({'PROCESS_CHANGED', 'OBSERVER_BUSY', 'OBSERVER_CLOSED',
     'OWNER_CHANGED', 'RANK_UNAVAILABLE', 'CONFIG_UNAVAILABLE',
     'DUMMY_FLAG_UNAVAILABLE', 'SOURCE_CALL_RAISED', 'SOURCE_POINT_PROVENANCE_REQUIRED',
     'GPU_COMPLETION_UNOBSERVED', 'READY_SEND_UNOBSERVED', 'SERVICE_GATE_UNOBSERVED',
-    'OBSERVER_READ_UNAVAILABLE', 'UNFINISHED_SOURCE_CALLS'})
+    'OBSERVER_READ_UNAVAILABLE', 'UNFINISHED_SOURCE_CALLS', 'OBSERVATION_GAP_PENDING_INVALIDATED'})
 
 
 def _uint(value):
@@ -57,6 +57,8 @@ class WorkerReadinessObserver:
         self._objects = []
         self._calls = {}
         self._stacks = {}
+        self._threads = {}
+        self._taints = threading.local()
         self._scope = None
         self._seq = 0
         self._closed = False
@@ -65,7 +67,27 @@ class WorkerReadinessObserver:
         self._objects.clear()
         self._calls.clear()
         self._stacks.clear()
+        self._threads.clear()
+        self._taints = threading.local()
         self._scope = None
+
+    def _taint(self):
+        # 실제 thread마다 bool 하나만 둔다. thread 종료 때 runtime이 회수하며
+        # 다른 thread가 표식을 덮어쓰거나 소비하지 않는다. lock 대기는 없다.
+        self._taints.pending_gap = True
+
+    def _invalidate_taints(self, gaps):
+        if not getattr(self._taints, 'pending_gap', False):
+            return
+        self._taints.pending_gap = False
+        ident = threading.get_ident()
+        tokens = [token for token, thread_id in self._threads.items() if thread_id == ident]
+        for token in tokens:
+            for key in self._stacks.pop(token, []):
+                self._calls.pop(key, None)
+            self._threads.pop(token, None)
+        if tokens:
+            gaps.add('OBSERVATION_GAP_PENDING_INVALIDATED')
 
     def _token(self, value, gaps):
         self._objects[:] = [(ref, token) for ref, token in self._objects if ref() is not None]
@@ -120,6 +142,8 @@ class WorkerReadinessObserver:
         thread, owner = data['thread_token'], data['owner_token']
         if (scope is None or thread is None or owner is None
                 or data['rank'] is None or data['local_rank'] is None):
+            self._taint()
+            self._invalidate_taints(gaps)
             gaps.add('CALL_BINDING_UNAVAILABLE')
             return value
         evidence = tuple(binding.get(k) for k in BINDING_HASHES)
@@ -144,6 +168,7 @@ class WorkerReadinessObserver:
                 key = (scope, thread, seq, point)
                 self._calls[key] = (seq, owner, evidence, data['rank'], data['local_rank'])
                 self._stacks.setdefault(thread, []).append(key)
+                self._threads[thread] = threading.get_ident()
             return value
         if not stack:
             gaps.add('CALL_PAIR_UNAVAILABLE')
@@ -158,6 +183,7 @@ class WorkerReadinessObserver:
                 for pending in stack:
                     self._calls.pop(pending, None)
                 self._stacks.pop(thread, None)
+                self._threads.pop(thread, None)
                 gaps.add('CALL_ORDER_UNAVAILABLE')
             else:
                 gaps.add('CALL_PAIR_UNAVAILABLE')
@@ -165,6 +191,7 @@ class WorkerReadinessObserver:
         stack.pop()
         if not stack:
             self._stacks.pop(thread, None)
+            self._threads.pop(thread, None)
         self._calls.pop(key)
         if previous is None:
             gaps.add('CALL_PAIR_UNAVAILABLE')
@@ -194,6 +221,7 @@ class WorkerReadinessObserver:
             output['gaps'] = ['PROCESS_CHANGED']
             return output
         if not self._lock.acquire(blocking=False):
+            self._taint()
             output['gaps'] = ['OBSERVER_BUSY']
             return output
         gaps = set()
@@ -201,12 +229,18 @@ class WorkerReadinessObserver:
             if self._closed:
                 output['gaps'] = ['OBSERVER_CLOSED']
                 return output
+            self._invalidate_taints(gaps)
             if (output['point'] == 'unsupported' or output['phase'] == 'unsupported'
                     or type(args) not in (tuple, list) or type(kwargs) is not dict):
-                output['gaps'] = ['CALL_CONTRACT_UNAVAILABLE']
+                if output['point'] != 'unsupported':
+                    self._taint()
+                    self._invalidate_taints(gaps)
+                output['gaps'] = sorted(gaps | {'CALL_CONTRACT_UNAVAILABLE'})
                 return output
             if not args or args[0] is None:
-                output['gaps'] = ['OWNER_UNAVAILABLE']
+                self._taint()
+                self._invalidate_taints(gaps)
+                output['gaps'] = sorted(gaps | {'OWNER_UNAVAILABLE'})
                 return output
             scope = self._binding_scope(output['binding'])
             if scope is not None:
@@ -217,6 +251,7 @@ class WorkerReadinessObserver:
             self._seq += 1
             output['seq'] = self._seq
             data = self._metadata(point, args[0], kwargs, gaps)
+            self._invalidate_taints(gaps)
             data['call_transition'] = self._transition(point, phase, output['binding'], data, self._seq, scope, gaps)
             if phase == 'RAISE':
                 gaps.add('SOURCE_CALL_RAISED')
@@ -225,7 +260,9 @@ class WorkerReadinessObserver:
             output.update(status='metadata_collected', metadata=data, gaps=sorted(gaps))
             return output
         except Exception:
-            output['gaps'] = ['OBSERVER_READ_UNAVAILABLE']
+            self._taint()
+            self._invalidate_taints(gaps)
+            output['gaps'] = sorted(gaps | {'OBSERVER_READ_UNAVAILABLE'})
             return output
         finally:
             self._lock.release()
@@ -239,10 +276,12 @@ class WorkerReadinessObserver:
         if not self._lock.acquire(blocking=False):
             return {'complete': False, 'pending_calls': None, 'collection_gap': True, 'gaps': ['OBSERVER_BUSY']}
         try:
+            taint_gaps = set()
             pending = len(self._calls)
+            self._invalidate_taints(taint_gaps)
             self._clear()
             self._closed = True
-            return {'complete': True, 'pending_calls': pending, 'collection_gap': bool(pending),
-                'gaps': ['UNFINISHED_SOURCE_CALLS'] if pending else []}
+            return {'complete': True, 'pending_calls': pending, 'collection_gap': bool(pending or taint_gaps),
+                'gaps': sorted(taint_gaps | ({'UNFINISHED_SOURCE_CALLS'} if pending else set()))}
         finally:
             self._lock.release()

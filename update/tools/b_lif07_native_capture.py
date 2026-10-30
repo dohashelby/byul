@@ -30,7 +30,9 @@ GAPS = frozenset({'LIF07_NATIVE_READER_UNAVAILABLE','LIF07_NATIVE_PRE_SNAPSHOT_U
  'LIF07_NATIVE_CENSUS_OR_COVERAGE_UNVERIFIED','LIF07_NATIVE_PARSER_ADDITIONAL_GAP','LIF07_NATIVE_SNAPSHOT_BOUND'})
 PARSER_DIAGNOSTIC_CODES = frozenset({'LIFECYCLE_INITIAL_INVENTORY_UNAVAILABLE','LIFECYCLE_FINAL_INVENTORY_UNAVAILABLE',
  'LIFECYCLE_PROCESS_RECORDING_UNAVAILABLE','LIFECYCLE_SESSION_OWNER_CHANGED','LIFECYCLE_LISTED_FILE_CHANGED',
- 'LIFECYCLE_SESSION_CENSUS_UNVERIFIED'})
+ 'LIFECYCLE_SESSION_CENSUS_UNVERIFIED','LIFECYCLE_IMAGE_RECHECK_UNAVAILABLE',
+ 'LIFECYCLE_RECHECK_UNAVAILABLE','LIFECYCLE_IMAGE_BINDING_UNVERIFIED','LIFECYCLE_PROCESS_BINDING_UNVERIFIED',
+ 'LIFECYCLE_INITIAL_OWNER_RECHECK_UNAVAILABLE'})
 PROJECTION_MISSING_CODES = frozenset({'worker_generation_observation_unavailable','worker_generation_object_link_unavailable',
  'worker_selected_ready_send_unavailable','worker_generation_observer_close_unavailable_or_ambiguous',
  'worker_generation_unique_call_pair_unavailable','worker_ready_pipe_unique_call_pair_unavailable',
@@ -103,7 +105,7 @@ def _projection(packet, prepared, stage):
     from guard.adapters import vllm_worker_startup_metadata as startup
     result = meta.project(None,prepared)
     result['missing'] = []
-    snapshots, closes, generation_closes, recordings, gaps = [], [], [], [], set()
+    snapshots, closes, generation_closes, recordings, gaps, validated = [], [], [], [], set(), set()
     allowed_missing = PROJECTION_MISSING_CODES | {'worker_generation_'+v for v in sensor.GAPS}
     for index, recording in enumerate((packet or {}).get('recordings',[])):
         capture = recording.get('capture') or {}; rows = capture.get('records',[])
@@ -116,13 +118,16 @@ def _projection(packet, prepared, stage):
         recordings.append(process)
         try: projected = meta.project({'recordings':[recording]},prepared)
         except (ValueError,KeyError,TypeError,OSError,RuntimeError):
-            gaps.add('LIF07_NATIVE_PARTIAL_PROJECTION'); continue
+            gaps.add('LIF07_NATIVE_PARTIAL_PROJECTION'); projected = None
+        if projected is not None:
+            key = _recording_key(process)
+            if key is not None: validated.add(key)
         for key in ('events','model_candidates','generation_events','generation_candidates','ready_sends'):
-            for row in projected[key]:
+            for row in (projected[key] if projected is not None else []):
                 item = deepcopy(row); item.update(stage=stage,recording=index); result[key].append(item)
-        for value in projected['missing']:
+        for value in (projected['missing'] if projected is not None else []):
             result['missing'].append(value if value in allowed_missing else 'LIF07_NATIVE_ADDITIONAL_PROJECTION_GAP')
-        for event in projected['events']:
+        for event in (projected['events'] if projected is not None else []):
             callback = event.get('callback')
             if type(callback) is not dict: continue
             item = deepcopy(callback)
@@ -141,16 +146,65 @@ def _projection(packet, prepared, stage):
             snapshots.append(item)
         for row in rows:
             payload = row['payload']
-            if row['event']=='WORKER_STARTUP_CLOSE':
-                startup.validate_close(payload)
-                closes.append({**process,'event_seq':row['seq'],'result':deepcopy(payload['result'])})
-            elif row['event']=='WORKER_GENERATION_CLOSE':
-                meta.validate_close(payload)
-                generation_closes.append({**process,'event_seq':row['seq'],**{k:payload[k] for k in ('local_observer_closed','cleared_local_worker_bindings')}})
+            try:
+                if row['event']=='WORKER_STARTUP_CLOSE':
+                    startup.validate_close(payload)
+                    closes.append({**process,'event_seq':row['seq'],'result':deepcopy(payload['result'])})
+                elif row['event']=='WORKER_GENERATION_CLOSE':
+                    meta.validate_close(payload)
+                    generation_closes.append({**process,'event_seq':row['seq'],**{k:payload[k] for k in ('local_observer_closed','cleared_local_worker_bindings')}})
+            except (ValueError,KeyError,TypeError):
+                validated.discard(_recording_key(process));gaps.add('LIF07_NATIVE_PARTIAL_PROJECTION')
     if not result['events'] and not result['generation_events']:
         default = meta.project(None,prepared); result['missing'] += default['missing']
     result['missing'] = sorted(set(result['missing']))
-    return result,snapshots,closes,generation_closes,recordings,gaps
+    return result,snapshots,closes,generation_closes,recordings,gaps,validated
+
+
+def _recording_key(row):
+    values = tuple(row.get(k) for k in ('recording','pid','start_ticks'))
+    if any(type(v) is not int or not 0 <= v < 2**63 for v in values) or values[1] == 0 or values[2] == 0:
+        return None
+    return values
+
+
+def _observer_closed(result, validated_final):
+    """초기 재관측은 유지하되 최종 선정 recording의 정확한 close census만 집계한다."""
+    states=[v for v in result['native_collection']['capture_states'] if v['stage']=='final']
+    if (len(states)!=1 or not states[0]['capture_succeeded'] or states[0]['recorded_files_covered'] is not True
+            or states[0]['live_census_stable'] is not True):return None
+    selected=[r for r in result['native_collection']['process_recordings'] if r['stage']=='final']
+    keys=[_recording_key(r) for r in selected]
+    if (not selected or None in keys or len(set(keys))!=len(keys)
+            or any(k not in validated_final for k in keys)
+            or any(not all(r[k] is True for k in ('process_context_verified','session_owner_match','listed_file_identity_match')) for r in selected)):
+        return None
+    groups={k:[] for k in keys}
+    for row in result['observer_closes']:
+        if row['stage']!='final':continue
+        key=_recording_key(row)
+        if key not in groups:return None
+        groups[key].append(row)
+    for rows in groups.values():
+        if len(rows)!=1:return False
+        value=rows[0]['result']
+        if value['complete'] is not True or value['pending_calls']!=0 or value['collection_gap'] is not False:return False
+    return True
+
+
+def _diagnostics(packet):
+    values=[packet.get('diagnostic_codes',[])]
+    for row in packet.get('recordings',[]):
+        values.append(row.get('diagnostic_codes',[]))
+        capture=row.get('capture')
+        if type(capture) is dict:values.append(capture.get('diagnostic_codes',[]))
+    codes=set();unknown=False
+    for value in values:
+        if type(value) is not list:unknown=True;continue
+        for code in value:
+            if type(code) is str and code in PARSER_DIAGNOSTIC_CODES:codes.add(code)
+            else:unknown=True
+    return codes,unknown
 
 
 def collect_startup(env,target,prepared,manifest,*,duration=180,binary='kubectl',_runner=None,_reader_factory=None,_capture_session=None):
@@ -179,7 +233,7 @@ def collect_startup(env,target,prepared,manifest,*,duration=180,binary='kubectl'
         'source_validation':{'reviewed_common_commit':proof['reviewed_common_commit'],'approved_native_source_commit':APPROVED_SOURCE_COMMIT,
             'runtime_hash_approval':False,'producer_authenticated':False}}
     result['native21']['missing']=[]
-    reader = None; epochs = {}; gaps = set(); packet_values = []
+    reader = None; epochs = {}; gaps = set(); packet_values = []; validated_final=set()
     def take(stage):
         result['native_collection'][stage+'_capture_attempted'] = True
         if stage=='final': result['cleanup']['final_capture_attempted'] = True
@@ -213,17 +267,16 @@ def collect_startup(env,target,prepared,manifest,*,duration=180,binary='kubectl'
             except Exception: gaps.add('LIF07_NATIVE_POST_SNAPSHOT_UNAVAILABLE')
     for stage,packet in packet_values:
         try:
-            projected,snapshots,closes,generation_closes,recordings,partial=_projection(packet,prepared,stage)
+            projected,snapshots,closes,generation_closes,recordings,partial,validated=_projection(packet,prepared,stage)
             for key in ('events','model_candidates','generation_events','generation_candidates','ready_sends'):result['native21'][key].extend(projected[key])
             result['native21']['missing']=sorted(set(result['native21']['missing']+projected['missing']))
             result['snapshots']+=snapshots;result['observer_closes']+=closes;result['generation_closes']+=generation_closes
             result['native_collection']['process_recordings']+=recordings;gaps.update(partial)
+            if stage=='final':validated_final.update(validated)
         except Exception:gaps.add('LIF07_NATIVE_PROJECTION_UNAVAILABLE')
-        codes=list(packet.get('diagnostic_codes',[]))
-        for recording in packet.get('recordings',[]):codes.extend(recording.get('diagnostic_codes',[]))
-        for code in codes:
-            if code in PARSER_DIAGNOSTIC_CODES:result['native_collection']['parser_diagnostic_codes'].append(code)
-            else:gaps.add('LIF07_NATIVE_PARSER_ADDITIONAL_GAP')
+        codes,unknown=_diagnostics(packet)
+        result['native_collection']['parser_diagnostic_codes'].extend(codes)
+        if unknown:gaps.add('LIF07_NATIVE_PARSER_ADDITIONAL_GAP')
         if stage=='final':result['cleanup']['final_capture_complete']=packet.get('recorded_files_covered') is True
         if not packet.get('live_census_stable') or not packet.get('recorded_files_covered'):gaps.add('LIF07_NATIVE_CENSUS_OR_COVERAGE_UNVERIFIED')
     states=result['native_collection']['capture_states']
@@ -237,8 +290,7 @@ def collect_startup(env,target,prepared,manifest,*,duration=180,binary='kubectl'
     if 'initial' in epochs and 'final' in epochs:
         result['cleanup']['api_epoch_same']=epochs['initial']==epochs['final']
         if not result['cleanup']['api_epoch_same']:gaps.add('LIF07_NATIVE_API_EPOCH_CHANGED')
-    if result['observer_closes']:
-        result['cleanup']['worker_observer_closed']=all(r['result']['complete'] and r['result']['pending_calls']==0 and not r['result']['collection_gap'] for r in result['observer_closes'])
+    result['cleanup']['worker_observer_closed']=_observer_closed(result,validated_final)
     if result['cleanup']['worker_observer_closed'] is not True:gaps.add('LIF07_NATIVE_OBSERVER_CLOSE_UNVERIFIED')
     if reader is not None:
         try:

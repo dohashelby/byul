@@ -147,7 +147,7 @@ def test_input_contract_rejects_before_reader_or_target_io(inputs,change):
 def test_per_recording_projection_error_does_not_discard_other_recording(inputs):
     packet=unavailable_callback_packet(inputs[2]);broken=deepcopy(packet['recordings'][0]);broken['capture']['records'][1]['payload']['source_files']={}
     packet['recordings'].append(broken)
-    projected,rows,closes,generation_closes,processes,gaps=tool._projection(packet,inputs[2],'initial')
+    projected,rows,closes,generation_closes,processes,gaps,validated=tool._projection(packet,inputs[2],'initial')
     assert len(rows)==1 and len(projected['events'])==1 and len(processes)==2 and 'LIF07_NATIVE_PARTIAL_PROJECTION' in gaps
     assert rows[0]['native_outer']['native_record_seq']==1 and rows[0]['seq'] is None
 
@@ -164,3 +164,65 @@ def test_reader_construction_failure_is_safe_and_does_not_claim_cleanup(inputs):
     value=tool.collect_startup(*inputs,_reader_factory=factory)
     assert not value['cleanup']['selected_session_seal_attempted'] and not value['cleanup']['final_capture_attempted']
     assert value['cleanup']['owned_host_complete'] is None and value['gaps'] and PRIVATE not in json.dumps(value)
+
+
+def close_census_packet(prepared,*,records=1):
+    """집계용 EXAMPLE census와 실 B.close 기본값. worker/GPU truth는 모두 False다."""
+    from guard.adapters import vllm_worker_startup_sensor as startup, vllm_worker_readiness as callback
+    packet=unavailable_callback_packet(prepared);packet.update(live_census_stable=True,recorded_files_covered=True)
+    first=packet['recordings'][0];first['diagnostic_codes']=[]
+    observer=callback.WorkerReadinessObserver();closed=observer.close()
+    value={'schema':startup.CLOSE_SCHEMA,'session_sha256':startup.sha(prepared['session'].encode()),
+        'observer_runtime':'cpython-3.12.3','observer_code_sha256':startup.RUNTIME_CODE_CONTRACTS['cpython-3.12.3'],
+        'result':closed,**{k:False for k in startup.TRUTH}}
+    first['capture']['records'].append({'seq':2,'monotonic_ns':5,'event':'WORKER_STARTUP_CLOSE','payload':value})
+    first.update(session_owner_match=True,listed_file_identity_match=True);first['capture']['process_context_verified']=True
+    for index in range(1,records):
+        row=deepcopy(first);context=row['capture']['records'][0]['payload']['context'];context['pid']+=index
+        for event in row['capture']['records']:
+            if event['event']=='WORKER_STARTUP':
+                event['payload']['callback']['binding'].update(pid=context['pid'],process_start_sha256=startup.sha(startup.canonical(context)))
+        packet['recordings'].append(row)
+    return packet
+
+
+@pytest.mark.parametrize('fault',['missing_close','duplicate_close','projection_failure'])
+def test_close_census_requires_exactly_one_valid_close_for_each_final_recording(inputs,fault):
+    initial=close_census_packet(inputs[2]);final=close_census_packet(inputs[2],records=2 if fault!='duplicate_close' else 1)
+    if fault=='missing_close':final['recordings'][1]['capture']['records']=[r for r in final['recordings'][1]['capture']['records'] if r['event']!='WORKER_STARTUP_CLOSE']
+    elif fault=='duplicate_close':
+        rows=final['recordings'][0]['capture']['records'];duplicate=deepcopy(rows[-1]);duplicate.update(seq=3,monotonic_ns=6);rows.append(duplicate)
+    else:final['recordings'][1]['capture']['records'][1]['payload']['source_files']={}
+    packets=iter([initial,final]);result=tool.collect_startup(*inputs,_reader_factory=UnavailableReader,_capture_session=lambda *a,**k:next(packets))
+    assert result['cleanup']['worker_observer_closed'] is not True and 'LIF07_NATIVE_OBSERVER_CLOSE_UNVERIFIED' in result['gaps']
+    assert result['observer_closes'] and any(r['stage']=='initial' for r in result['observer_closes'])
+    if fault=='duplicate_close':assert len([r for r in result['observer_closes'] if r['stage']=='final'])==2
+    if fault=='projection_failure':assert len([r for r in result['observer_closes'] if r['stage']=='final'])==2
+    assert PRIVATE not in json.dumps(result)
+
+
+def test_close_census_counts_reobserved_initial_final_event_once_per_final_recording(inputs):
+    packet=close_census_packet(inputs[2]);result=tool.collect_startup(*inputs,_reader_factory=UnavailableReader,_capture_session=lambda *a,**k:deepcopy(packet))
+    assert len(result['observer_closes'])==2 and {r['stage'] for r in result['observer_closes']}=={'initial','final'}
+    assert result['cleanup']['worker_observer_closed'] is True
+    assert result['cleanup']['gpu_model_recovery_verified'] is None and not result['native21']['actual_worker_verified']
+
+
+@pytest.mark.parametrize('field',['process_context_verified','session_owner_match','listed_file_identity_match','coverage'])
+def test_close_census_requires_final_process_file_and_coverage_provenance(inputs,field):
+    initial=close_census_packet(inputs[2]);final=close_census_packet(inputs[2]);row=final['recordings'][0]
+    if field=='coverage':final['recorded_files_covered']=False
+    elif field=='process_context_verified':row['capture'][field]=False
+    else:row[field]=False
+    packets=iter([initial,final]);result=tool.collect_startup(*inputs,_reader_factory=UnavailableReader,_capture_session=lambda *a,**k:next(packets))
+    assert result['cleanup']['worker_observer_closed'] is None and len(result['observer_closes'])==2
+    assert 'LIF07_NATIVE_OBSERVER_CLOSE_UNVERIFIED' in result['gaps']
+
+
+def test_nested_capture_diagnostics_preserve_real_public_codes_and_filter_private(inputs):
+    packet=unavailable_callback_packet(inputs[2]);expected={'LIFECYCLE_RECHECK_UNAVAILABLE','LIFECYCLE_PROCESS_BINDING_UNVERIFIED','LIFECYCLE_INITIAL_OWNER_RECHECK_UNAVAILABLE',
+        'LIFECYCLE_IMAGE_RECHECK_UNAVAILABLE','LIFECYCLE_IMAGE_BINDING_UNVERIFIED'}
+    packet['recordings'][0]['capture']['diagnostic_codes']=[*expected,PRIVATE,{'raw':PRIVATE}]
+    result=tool.collect_startup(*inputs,_reader_factory=UnavailableReader,_capture_session=lambda *a,**k:deepcopy(packet))
+    assert expected<=set(result['native_collection']['parser_diagnostic_codes'])
+    assert 'LIF07_NATIVE_PARSER_ADDITIONAL_GAP' in result['gaps'] and PRIVATE not in json.dumps(result)

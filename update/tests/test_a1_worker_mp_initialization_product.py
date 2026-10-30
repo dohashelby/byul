@@ -129,3 +129,16 @@ def test_public_prepare_thirteen_original_assets(tmp_path,group,native_target):
 def test_profile20_retains_exact_scope_and_native032_gate(tmp_path,group,native_target,monkeypatch,change):
     monkeypatch.setattr(admission,'sensor',sensor)
     admission.test_new_profile_preserves_exact_target_model_and_native032_rejection_before_probe(tmp_path,group,native_target,change)
+
+
+@pytest.mark.parametrize('profile',['vllm-native-lifecycle-metadata/14','vllm-native-lifecycle-metadata/19'])
+def test_joint_events_are_not_admitted_by_relabeling_old_profiles(tmp_path,group,native_target,writer_factory,monkeypatch,profile):
+    from guard.executors.lifecycle_capture import parse_recording
+    world,values,pack,receipt=inputs(tmp_path,group,native_target,'normal',monkeypatch,'normal')
+    world.add_native()
+    assert parse_recording(group.raw_by_pid[42],group.prepared)['summary']['initialization_event_count']>0
+    prepared=deepcopy(group.prepared);prepared['profile']=profile
+    def header(rows):
+        rows[0]['payload'].update(profile=profile,schema='guard-native-lifecycle-events/'+profile.rsplit('/',1)[1])
+    raw=revised(group.raw_by_pid[42],header)
+    with pytest.raises(ValueError,match='LIFECYCLE_RECORDING_ROW_INVALID'):parse_recording(raw,prepared)

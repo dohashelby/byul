@@ -114,6 +114,17 @@ def test_exact_native_flags_do_not_certify_backend_stop_or_trace_completion(monk
         parent=next(p for p in events if p['call_sha256']==failed[0]['parent_call_sha256'] and p['phase']=='RETURN')
         assert parent['point']=='WorkerProfiler._call_stop' and parent['state_after']['running'] is False
     assert world.backend.starts==1 and world.backend.stops==(0 if mode=='start-failure' else 1)
+    rows=[{'seq':0,'event':'START','payload':{'context':dict(CONTEXT)}}]+[
+        {'seq':index+1,**row} for index,row in enumerate(world.observer.recorded)]
+    capture={'records':rows,'summary':{'recording_closed':True},'process_context_verified':True,'image_digest_verified':False}
+    packet={'recordings':[{'capture':capture,'session_owner_match':True,'listed_file_identity_match':True}]}
+    projected=metadata.project(packet,['0'])
+    assert projected['complete_calls'] and all(row['recording_closed'] for row in projected['samples'])
+    assert any(row['flag_adapter_conflict_observed'] for row in projected['conflict_candidates'])==bool(failed)
+    assert not projected['backend_collection_stopped_verified'] and not projected['trace_output_completed_verified']
+    capture['summary']['recording_closed']=False
+    unclosed=metadata.project(packet,['0'])
+    assert unclosed['complete_calls']==0 and unclosed['conflict_candidates']==[]
 
 
 def test_registered_callback_code_mismatch_rejects_atomically(monkeypatch):

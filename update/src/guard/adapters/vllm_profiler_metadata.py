@@ -60,7 +60,7 @@ def project(packet,required_ranks=()):
             payload=row['payload'];validate_sample(payload)
             sample={'recording':number,'seq':row['seq'],'monotonic_ns':row['monotonic_ns'],'pid':context['pid'],'start_ticks':context['start_ticks'],
                 'physical_process_binding_verified':bound,'image_digest_verified':capture.get('image_digest_verified') is True,
-                'recording_closed':capture.get('recording_closed') is True,**payload}
+                'recording_closed':capture.get('summary',{}).get('recording_closed') is True,**payload}
             samples.append(sample);calls.setdefault((number,payload['call_sha256']),[]).append(sample)
     complete={}
     for key,rows in calls.items():

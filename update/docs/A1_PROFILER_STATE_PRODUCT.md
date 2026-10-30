@@ -23,3 +23,6 @@ POL8은 기존 observation_state_environment_sha256, observation_state_target_sh
 
 
 2차 고정10214cb의 Windows9실패/301통과/기존skip1·제외1(104.11초, 부모108.917초)와 동일bytes Linux9실패/302통과/기존제외1(29.41초, 부모30.272초)을 보존한다. native15 원함수/코드계약/등록8사례는 모두 통과했다. 제품 결함은 redacted summary를 원 typed packet으로 잘못 소비해 profiler 관측이 비었던 것이다. 기존 OBS02에 검증된 packet의 project_native hook을 추가하고 새 소비자는 요약 전의 typed recording을 투영하도록 보수했다. 기본 OBS02 투영 의미는 같다. 두 실행 종료 후만 수정했다. timeout 이후 health-after가 전송되지 않는4회·세대교체 이후 추가 요청이 없는1회라는 기존 latch 의미를 새 시험의 잘못된5회 가정 대신 명시하고, 후속 미전송과 정상 수집 COMPLETED assert를 강화했다. Source gate/정책/판정·정확Ref/후속오류·개인정보 assert를 유지한다.
+
+
+3차 고정77e97ad의 Windows8실패/302통과/기존skip1·제외1(100.06초, 부모100.768초), Linux8실패/303통과/기존제외1(30.76초, 부모31.067초)을 보존한다. typed profiler 사건20개가 실제로 전달되는 것은 확인했고 남은 결함은 기존 capture schema의 summary.recording_closed를 top-level에서 찾은 새 projector의 잘못된 lookup이었다. 검증된 summary의 정확한 closure flag를 소비하도록 보수하며 누락 시 false라는 gate를 유지한다. 원함수 회귀에 closed packet에서만 call/candidate가 성립하고 unclosed이면 둘 다 보류되는 독립 projection 검증을 추가했다. 두 실행 종료 뒤만 수정했으며 원 Source/물리주체/call/rank/closure gate와 판정/개인정보/정확Ref assert를 유지한다.

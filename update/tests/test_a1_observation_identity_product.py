@@ -16,7 +16,7 @@ from guard.adapters import vllm_lifecycle_sensor as sensor
 from guard.store import Store
 from tests.builders import baseline_pack,policy,T0
 from tests.test_lifecycle_sensor import writer_factory
-from tests.test_lifecycle_capture import case,revised
+from tests.test_lifecycle_capture import case,external,revised
 from tests.test_kubernetes_lifecycle import group,target as native_target
 from tests.test_a1_observation_state_product import World as StateWorld,inputs as state_inputs
 from tests.test_a1_kubernetes_model_authorization_product import World as ModelWorld,GPU

@@ -40,3 +40,5 @@ producer_authenticated/approval_authority_verified/approval_model_scope_verified
 첫 공통 묶음은 기존 관측/reader/parser·중간 수집 hook·정식 제품 소비·팩·직접/인접/불변식·설치/Ref 검증이다. 새 실제 승인·검사 생산자 설치, 인증, inspection schema 또는 actual worker/tensor hook 확장은 후속 별도 묶음이다. 사용자가 확정할 값은 실제 승인/검사 주체와 신뢰 근거, 허용 대상/행위/주체, 정책 판본·효력/철회/기한/보존 예외, 실제 배포/관측 범위다. 기술 계약 문서를 사용자에게 다시 만들도록 요구하지 않는다.
 
 현재 구현·회귀·문서 초안을 작성한 단계다. 고정 검증·설치본·확정 커밋/PR·실제 실증은 아직 주장하지 않는다. 원GPU창종료/Start0·기존46.66USD/과거사용량·보존120GiB EBS 과금·CI결제 차단과 실제04f7856 wheel의 과거 근거를 유지한다. 새로운 기동·기간·비용·IAM 승인은 없다.
+
+첫 고정 c01027909155ff918618a64237c165c06baa8d09의 동일1306파일에서 Windows535통과/기존skip1·제외1/새준비오류33(381.27초, 부모388.673초), Linux536통과/기존제외1/새준비오류33(123.51초, 부모124.099초)을 보존했다. 새 시험 모듈이 기존 case fixture의 external 의존 fixture를 가져오지 않은 준비 누락이다. 두 실행 종료 후 그 import만 추가하고 기존 사례·assert·source/정책/판정 gate를 유지했다. guard 실행 bytes와 검토 pin a003f3b는 그대로이며 바뀌지 않은 인접535/536통과를 재사용한다. 새 제품/핀 직접 검증을 재고정해 수행하고 전체suite를 새로 통과했다고 합산하지 않는다.

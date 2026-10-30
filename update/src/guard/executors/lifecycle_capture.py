@@ -146,7 +146,7 @@ def parse_recording(raw, prepared):
         words=words|{'WEIGHT_ITERATION',weight_sensor.EVENT_SCHEMA,*weight_sensor.PHASES,*weight_sensor.POINTS,*weight_sensor.SOURCE_ADDITIONS,*weight_sensor.RUNTIME_CODE_CONTRACTS,'NEXT','SEND','THROW','CLOSE','exception','base-exception'}
     if is_read:
         keys=keys|read_metadata.FIELDS|read_metadata.SNAPSHOT|{'offset'}
-        words=words|{'FILE_READ',read_sensor.EVENT_SCHEMA,*read_sensor.PHASES,*read_sensor.RUNTIME_CODE_CONTRACTS,'disabled','unavailable','complete','too-large'}
+        words=words|{'FILE_READ',read_sensor.EVENT_SCHEMA,*read_sensor.PHASES,*read_sensor.RUNTIME_CODE_CONTRACTS,'disabled','unavailable','complete','too-large','change','creation'}
     source_hashes = profiles.source_hashes(prepared["profile"])
     point_sources=profiles.point_sources(prepared["profile"])
     points=set(point_sources)

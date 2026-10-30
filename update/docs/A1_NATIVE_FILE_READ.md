@@ -16,4 +16,4 @@ schema `guard-native-file-read/1`에는 OPEN_RETURN/OPEN_RAISE, READ_RETURN/READ
 
 사용자 결정은 승인·검사 권한/신뢰, 허용 모델·파일·이미지·작업·주체, 정책 효력·철회·기한·보존, 실제 운영 대상·관측 범위·책임이다. 기술 계약 초안과 독립 구현은 A1이 맡고 실제 권한 근거가 없으면 판정은 UNKNOWN이다.
 
-Windows Python3.12의 실제 EXAMPLE 진단에서 경로 stat와 FD fstat의 ctime 값이 다른 표본을 보존했다. 수집기는 이 필드를 무시하지 않는다. 경로/FD metadata 일치는 false로 남으며 앞서 반환된 FD bytes·범위 및 hash 관측과 구분된다. 정상 시험용 공개 synthetic 파일만 생성/수정 시각을 명시적으로 맞추고, 별도 회귀에서 ctime 차이를 그대로 거부하는지 확인한다. 실제 Windows 경로 결합 성공을 이 fixture로 추정하지 않는다.
+Windows Python3.12의 실제 EXAMPLE 진단에서 경로 stat와 FD fstat의 ctime 값이 다른 표본을 보존했다. 고정 CPython3.12.14의 [경로 구현](https://raw.githubusercontent.com/python/cpython/v3.12.14/Modules/posixmodule.c)은 ctime에 생성 시각을 복사하고, [FD 구현](https://raw.githubusercontent.com/python/cpython/v3.12.14/Python/fileutils.c)은 변경 시각을 반환한다. schema의 `ctime_basis`는 이 기준을 보존한다. 모든 metadata 필드를 비교하므로 Windows 경로/FD 완전 일치는 숫자가 우연히 같더라도 false다. FD metadata 안정성·read bytes·hash와 구분한다. fixture 시각을 조작하거나 ctime을 무시해 성공시키지 않는다. 해당 Windows ctime 의미는 고정 runtime의 소비 계약이며 다른 runtime 지원을 추정하지 않는다.

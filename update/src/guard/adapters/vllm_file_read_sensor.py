@@ -24,7 +24,7 @@ MAX_SCOPE_BYTES=262144
 MAX_HASH_BYTES=2**31
 CODE_FILENAME='guard/adapters/vllm_file_read_sensor.py'
 SCOPE_PATH='/guard-lifecycle/model-read-scope.json'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': '52ca1a3bc23cc2a6670b6e8859ad5b5162f9091dce90b2506fe03216c8d134f1', 'cpython-3.12.3': '136e4530b1afe4932f79a59cefd9e4d3c0148e6b9f0aefc2b86b7d8389c89464'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': 'd9dd0c102ee3b8c5a7ff96923bfafb8817910223a43878fe5e1e3b2c742ad8c8', 'cpython-3.12.3': 'ef55a0b253c4fcb7b6fa331d64d53a7d0e615de8f93647bd44ca9ae23ccd1fa3'}
 _BASE=None
 
 
@@ -76,7 +76,7 @@ def fd_snapshot(stream):
     try:
         value=os.fstat(stream.fileno());offset=stream.tell()
         result={'device_sha256':sha(str(value.st_dev).encode()),'inode_sha256':sha(str(value.st_ino).encode()),'mode':value.st_mode,'uid':getattr(value,'st_uid',0),
-            'bytes':value.st_size,'mtime_ns':value.st_mtime_ns,'ctime_ns':value.st_ctime_ns,'offset':offset,
+            'bytes':value.st_size,'mtime_ns':value.st_mtime_ns,'ctime_ns':value.st_ctime_ns,'ctime_basis':'change','offset':offset,
             'regular':stat.S_ISREG(value.st_mode)}
         return result if all(0<=v<2**63 for v in result.values() if type(v) is int) else None
     except BaseException:return None
@@ -86,7 +86,8 @@ def path_snapshot(path):
     try:
         value=os.stat(path,follow_symlinks=False)
         result={'device_sha256':sha(str(value.st_dev).encode()),'inode_sha256':sha(str(value.st_ino).encode()),'mode':value.st_mode,'uid':getattr(value,'st_uid',0),
-            'bytes':value.st_size,'mtime_ns':value.st_mtime_ns,'ctime_ns':value.st_ctime_ns,'regular':stat.S_ISREG(value.st_mode)}
+            'bytes':value.st_size,'mtime_ns':value.st_mtime_ns,'ctime_ns':value.st_ctime_ns,
+            'ctime_basis':'creation' if os.name=='nt' else 'change','regular':stat.S_ISREG(value.st_mode)}
         return result if all(0<=v<2**63 for v in result.values() if type(v) is int) else None
     except BaseException:return None
 
@@ -185,7 +186,8 @@ def code_contract(base):
 
 def configure(base,iteration,*,scope_path=SCOPE_PATH):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected):raise ValueError('FILE_READ_OBSERVER_CODE_UNAVAILABLE')
+    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected
+            or (runtime,os.name) not in {('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}):raise ValueError('FILE_READ_OBSERVER_CODE_UNAVAILABLE')
     iteration.configure(base);base.PROFILE,base.SCHEMA=PROFILE,SCHEMA;base.__file__=__file__;base.MAX_ROWS,base.MAX_BYTES=MAX_ROWS,MAX_BYTES
     class FileObserver(FileObservation,base.Observer):
         def __init__(self,*args,**kwargs):

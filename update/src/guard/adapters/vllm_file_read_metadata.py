@@ -1,7 +1,7 @@
 """Closed native17 FD/read journal, independent of model approval and tensor use."""
 from . import vllm_file_read_sensor as sensor,vllm_weight_iteration_sensor as iteration
 
-SNAPSHOT=frozenset({'device_sha256','inode_sha256','mode','uid','bytes','mtime_ns','ctime_ns','regular'})
+SNAPSHOT=frozenset({'device_sha256','inode_sha256','mode','uid','bytes','mtime_ns','ctime_ns','ctime_basis','regular'})
 TRUTH=('worker_assignment_verified','approved_model_file_verified','producer_authenticated','tensor_storage_applied_verified',
     'decoder_completion_verified','nofollow_components_verified')
 FIELDS=frozenset({'schema','point','phase','source_module','source_sha256','source_method_code_sha256','source_verified',
@@ -37,7 +37,10 @@ def validate_sample(value):
             if row is None:continue
             if (type(row) is not dict or set(row)!=(SNAPSHOT|{'offset'} if key.startswith('fd_') else SNAPSHOT)
                     or type(row['regular']) is not bool or any(not sensor.fingerprint(row[k]) for k in ('device_sha256','inode_sha256'))
-                    or any(type(v) is not int or not 0<=v<2**63 for k,v in row.items() if k not in {'regular','device_sha256','inode_sha256'})):raise ValueError
+                    or row['ctime_basis'] not in {'change','creation'}
+                    or any(type(v) is not int or not 0<=v<2**63 for k,v in row.items() if k not in {'regular','device_sha256','inode_sha256','ctime_basis'})):raise ValueError
+            expected_basis='creation' if runtime=='cpython-3.12.14' and key.startswith('path_') else 'change'
+            if row['ctime_basis']!=expected_basis:raise ValueError
         if value['exception_kind'] not in ({'exception','base-exception'} if phase.endswith('RAISE') else {None}):raise ValueError
         if value['hash_status'] not in {'disabled','unavailable','complete','too-large'}:raise ValueError
         if phase=='READ_RETURN':

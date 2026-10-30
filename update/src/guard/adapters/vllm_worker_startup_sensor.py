@@ -22,7 +22,7 @@ CALLBACK_SHA256='a583d32f31d74def618256557ee9e7aee801d5fe1ff55e27b6221d7f2420a96
 SUPPORT_SHA256='659d615f133cdc96ef54163678753a60e6b8ee51aa0e78e0560e0d308f7f50da'
 MAX_ROWS=2048;MAX_BYTES=2*1024**2;MAX_CALLS=256
 CODE_FILENAME='guard/adapters/vllm_worker_startup_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': '2ed8e7c4527e9446782ed8bf5e795f474ce10f932e469013aab9e0cc10b23139', 'cpython-3.12.3': '2ed8e7c4527e9446782ed8bf5e795f474ce10f932e469013aab9e0cc10b23139'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': '2ed8e7c4527e9446782ed8bf5e795f474ce10f932e469013aab9e0cc10b23139', 'cpython-3.12.3': 'cfc2c11176e641d9e70d869e70422f12eb5a7d85c365ae69600a8a9da336b4a6'}
 TRUTH=('actual_worker_observed','producer_authenticated','approved_model_file_verified','tensor_storage_applied_verified','gpu_completion_verified','all_model_ready_verified','ready_send_verified','service_gate_verified','scope_complete')
 _ACTIVE=contextvars.ContextVar('guard_worker_startup_call',default=None)
 _BASE=None

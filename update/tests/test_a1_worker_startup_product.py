@@ -13,7 +13,7 @@ from guard.models import canonical_json,sha256_hex
 from guard.store import Store
 from tests.builders import policy,T0
 from tests.test_lifecycle_sensor import writer_factory
-from tests.test_lifecycle_capture import revised
+from tests.test_lifecycle_capture import case,revised
 from tests.test_kubernetes_lifecycle import group,target as native_target
 from tests.test_a1_observation_identity_product import World as IdentityWorld,inputs as identity_inputs
 from tests.test_a1_worker_startup_sensor import make_world,scope_value,MODEL_BYTES,PRIVATE

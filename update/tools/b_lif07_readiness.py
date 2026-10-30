@@ -27,6 +27,8 @@ NATIVE_CONTRACT = None
 UNREADY_HTTP_CONTRACT = None
 DELAY_CONTRACT = None
 NATIVE_OBSERVATION_PROFILE = 'vllm-native-lifecycle-metadata/21'
+CALLBACK_ERRORS = frozenset({'CALLBACK_UNAVAILABLE'})
+CALLBACK_CLOSE_GAPS = frozenset({'CALLBACK_CLOSE_UNAVAILABLE'})
 GAPS = frozenset({'WORKER_SOURCE_CONTRACT_UNAVAILABLE', 'UNREADY_HTTP_UNAVAILABLE',
     'CONTROLLED_DELAY_UNAVAILABLE', 'READY_SEND_UNOBSERVED', 'NATIVE_OUTER_BINDING_UNVERIFIED',
     'ORDER_UNVERIFIED', 'INVALID_SNAPSHOT', 'SNAPSHOT_COORDINATE_AMBIGUOUS', 'WORKER_CLEANUP_UNVERIFIED'})
@@ -148,8 +150,12 @@ def _safe_snapshot(value, *, native_observation=False):
         safe_outer['observer_runtime'] = outer.get('observer_runtime') if type(outer.get('observer_runtime')) is str and outer['observer_runtime'] in RUNTIME_CODE_CONTRACTS else None
     else:
         safe_outer['observer_runtime'] = None
-    for key in ('source_verified', 'callback_code_verified', 'callback_error', 'process_binding_verified'):
+    for key in ('source_verified', 'callback_code_verified', 'process_binding_verified'):
         safe_outer[key] = outer.get(key) if native_observation and type(outer.get(key)) is bool else False
+    error = outer.get('callback_error')
+    collected = native_observation and 'callback_error' in outer and (error is None or type(error) is str and error in CALLBACK_ERRORS)
+    safe_outer['callback_error'] = error if collected else None
+    safe_outer['callback_error_collected'] = bool(collected)
     return {'stage': value.get('stage') if value.get('stage') in ('initial', 'final') else None, 'schema': native.SCHEMA, 'point': value['point'], 'phase': value['phase'], 'status': value['status'],
         'seq': value['seq'], 'binding': safe_binding, 'metadata': safe, 'native_outer': safe_outer,
         'gaps': sorted({g for g in value.get('gaps', []) if type(g) is str and g in native.GAPS})}
@@ -180,7 +186,7 @@ def _safe_native21(value):
     integers = frozenset({'recording', 'pid', 'start_ticks', 'event_seq', 'rank', 'local_rank', 'operation_started_ns',
         'operation_finished_ns', 'constructor_event_seq', 'wrapper_event_seq', 'worker_event_seq', 'link_event_seq',
         'worker_start_seq', 'worker_end_seq', 'root_event_seq', 'start_seq', 'end_seq'})
-    booleans = frozenset({'process_binding_verified', 'source_verified', 'callback_code_verified', 'callback_error',
+    booleans = frozenset({'process_binding_verified', 'source_verified', 'callback_code_verified',
         'local_object_generation_candidate', 'local_worker_generation_model_candidate', 'same_startup_model_root_candidate',
         'paired', 'source_main_entry_observed', 'original_send_return_observed', 'original_send_raise_observed',
         'original_close_return_observed', 'original_close_raise_observed', 'outer_call_pair_verified', 'callback_method_pair_verified',
@@ -204,6 +210,11 @@ def _safe_native21(value):
             safe['source_files'] = {k: v for k, v in sources.items() if startup_contract.SOURCE_SHA256.get(k) == v}
         if not nested and type(item.get('worker_generation_candidates')) is list and len(item['worker_generation_candidates']) <= 256:
             safe['worker_generation_candidates'] = [r for v in item['worker_generation_candidates'] if (r := row(v, nested=True)) is not None]
+        if 'callback_error' in item:
+            error = item['callback_error']
+            collected = error is None or type(error) is str and error in CALLBACK_ERRORS
+            safe['callback_error'] = error if collected else None
+            safe['callback_error_collected'] = collected
         safe.update({k: False for k in generation.TRUTH})
         return safe
     missing = helper.PROJECTION_MISSING_CODES
@@ -255,7 +266,7 @@ def _safe_native_collection(raw):
                 close = item.get('result'); close = close if type(close) is dict else {}
                 safe['result'] = {k: close.get(k) if type(close.get(k)) is bool else None for k in ('complete', 'collection_gap')}
                 safe['result']['pending_calls'] = close.get('pending_calls') if type(close.get('pending_calls')) is int and 0 <= close['pending_calls'] <= 512 else None
-                safe['result']['gaps'] = sorted({v for v in close.get('gaps', []) if type(v) is str and v in callback.GAPS})
+                safe['result']['gaps'] = sorted({v for v in close.get('gaps', []) if type(v) is str and v in callback.GAPS | CALLBACK_CLOSE_GAPS})
             else:
                 safe['local_observer_closed'] = item.get('local_observer_closed') if type(item.get('local_observer_closed')) is bool else None
                 safe['cleared_local_worker_bindings'] = item.get('cleared_local_worker_bindings') if type(item.get('cleared_local_worker_bindings')) is int and 0 <= item['cleared_local_worker_bindings'] <= 256 else None
@@ -311,7 +322,7 @@ def project(raw, env, target, prepared, manifest, *, native_observation=False):
         from guard.adapters import vllm_worker_readiness as native
         safe_close = {k: close.get(k) if type(close.get(k)) is bool else None for k in ('complete', 'collection_gap')}
         safe_close['pending_calls'] = close.get('pending_calls') if type(close.get('pending_calls')) is int and 0 <= close['pending_calls'] <= 512 else None
-        safe_close['gaps'] = sorted({g for g in close.get('gaps', []) if type(g) is str and g in native.GAPS})
+        safe_close['gaps'] = sorted({g for g in close.get('gaps', []) if type(g) is str and g in native.GAPS | CALLBACK_CLOSE_GAPS})
     native_view = _safe_native21(raw.get('native21')) if native_observation else None
     native_info, closes, generation_closes = _safe_native_collection(raw) if native_observation else (None, [], [])
     if native_observation:
@@ -428,14 +439,15 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
         doc['checks'] = [x for x in doc['checks'] if x['check_id'] == 'LIF-07' and x['side'] == 'single']; entry, = doc['checks']
         entry.update(entered_by=entered_by, entered_at=record['finished_at'], started_at=record['started_at'], finished_at=record['finished_at'],
             attachments=[attachment] if attachment else [], verdicts={k: 'UNKNOWN' for k in ('security', 'functional', 'performance')},
-            basis='worker 메서드 단계의 정제 metadata를 보존한다. 실제 READY-send/지연/접수·준비후canary 미관측으로 전체 준비 판정은 UNKNOWN이다.',
+            basis=('worker 메서드 단계와 선정 bootstrap SEND 관측 상태는 첨부에 보존한다. 상위 READY 전송·수신·서비스 접수·canary와 지연·복구 receipt는 미확인으로 전체 준비 판정은 UNKNOWN이다.' if collect_native else
+                'worker 메서드 단계의 정제 metadata를 보존한다. 실제 READY-send/지연/접수·준비후canary 미관측으로 전체 준비 판정은 UNKNOWN이다.'),
             limitations=['required_readiness_items와 기업 기한·수락 기준은 입력 그대로다. 단계 RETURN과 generator factory 반환은 준비 완료 근거로 사용하지 않는다.',
                 'PodReady/HTTP200/단발 CPU generation_readiness를 rank·model 준비 완료로 올리지 않는다.',
                 'host/probe/native clock domain은 독립이다. A 인과 receipt 없는 교차 시각 순서는 미확인이다.',
                 'HTTP 요청·Pod 변경·지연 0. native 관측 모드의 읽기·선정 session seal 시도와 결과는 별도 보존한다. EXAMPLE snapshot과 외곽 source/code 사실을 실제 worker/GPU·상위 READY·서비스 자격으로 올리지 않는다.'])
         entry['normal_control']['result'] = 'not_attempted'
         for c in entry['challenges']: c['attempted'] = False
-        entry['observation_notes'][0]['answer'] = '출처=' + record['data_origin'] + '; metadata행=' + str(len(record['rows'])) + '; 메서드짝=' + str(len(record['method_pairs'])) + '; 실제 READY/지연/접수/복구 receipt 미수집. gaps=' + str(record['gaps'])
+        entry['observation_notes'][0]['answer'] = '출처=' + record['data_origin'] + '; metadata행=' + str(len(record['rows'])) + '; 메서드짝=' + str(len(record['method_pairs'])) + ('; 선정 bootstrap SEND 관측 상태는 첨부에 보존; 상위 READY 전송·수신·서비스 접수·canary와 지연·복구 receipt 미확인. gaps=' if collect_native else '; 실제 READY/지연/접수/복구 receipt 미수집. gaps=') + str(record['gaps'])
         if attachment is None: entry['observation_notes'][0]['answer'] += '\nLIF07_SAFE_FACTS=' + canonical_json(record).decode('utf-8')
         form = out / 'manual-evidence.yaml'
         try:

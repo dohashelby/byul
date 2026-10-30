@@ -63,3 +63,7 @@ A parser가 검증한 Worker source/body/entry/code 사실, 국소 객체 생성
 입력 reader는 path-stat끼리와 FD-stat끼리 ctime 안정성을 확인하고, path→FD→path의 device/inode/size/mtime 및 regular-file·symlink 교체 방어를 유지한다. 서로 다른 stat 계열의 ctime 의미를 같다고 가정하지 않는다. 별도 macOS 직접 회귀로 이 경계와 실제 경로 교체 거부를 확인하며 Windows 실행 결과와 구분한다. A가 승인한 runtime/code literal만 소비하고 macOS Python 3.12.13을 새 native runtime으로 승인하지 않는다.
 
 현재 고정 A152의 공통 eager import 간선 때문에 기존 기본 preflight의 callback-module 미적재 회귀 1건은 실패 근거로 보존한다. 같은 공개 target validator를 직접 호출하는 동치 경로를 사용해도 공통 registry/report 간선이 남는다. 원 assertion과 기본 모드 관찰 계약을 유지하며 A 공통 lazy 수정 확정 후 그 한 사례를 재검증한다. 새 native 관측의 동작과 이 공통 의존성 수정을 구분한다.
+
+A의 callback 오류는 `None` 또는 `CALLBACK_UNAVAILABLE` enum으로, 정리 실패는 `CALLBACK_CLOSE_UNAVAILABLE` gap으로 보존한다. 알 수 없는 값은 원문을 저장하지 않고 미수집 상태와 구분한다. native manual 본문은 선정 bootstrap SEND의 관측 상태를 첨부로 안내하고, 상위 READY·receiver·서비스·canary는 별도 미확인으로 적는다.
+
+직접 연결 시험은 기본적으로 회차별 소유 임시 폴더에서 실행하고 정상 finalizer로 정리한다. 보존이 필요할 때만 `BYUL_LIF07_NATIVE_CONTRACT_EVIDENCE`에 새 외부 경로를 명시한다. 이미 존재하는 보존 경로는 재사용·삭제하지 않는다. 최초 1532161 판본의 273개 보존 파일과 Ref는 당시 source 근거로 유지하며, 이후 helper 수정 결과를 소급하지 않는다.

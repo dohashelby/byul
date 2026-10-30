@@ -482,8 +482,10 @@ def test_actual_native_helper_default_public_entrypoint_store_restore_preserved(
     for key, value in args.items(): argv.extend(['--' + ('plan' if key == 'plan_id' else key.replace('_', '-')), str(value)])
     argv.append('--collect-native')
     stdout = io.StringIO(); stderr = io.StringIO()
-    destination = Path(os.environ.get('BYUL_LIF07_NATIVE_CONTRACT_EVIDENCE', '/private/tmp/byul-b-lif07-native-consumer-20261031/contract-case'))
-    assert not destination.exists()
+    requested_evidence = os.environ.get('BYUL_LIF07_NATIVE_CONTRACT_EVIDENCE')
+    destination = Path(requested_evidence) if requested_evidence else None
+    if destination is not None:
+        assert not destination.exists()
     try:
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr): tool.main(argv)
         summary = json.loads(stdout.getvalue())
@@ -503,12 +505,91 @@ def test_actual_native_helper_default_public_entrypoint_store_restore_preserved(
         assert res.verdicts.model_dump(mode='json') == {k: 'UNKNOWN' for k in ('security', 'functional', 'performance')}
         assert tool._inventory(source.root) == before and PRIVATE not in json.dumps(saved)
     finally:
-        destination.mkdir(parents=True)
-        shutil.copytree(root, destination / 'case')
-        (destination / 'stdout.log').write_text(stdout.getvalue())
-        (destination / 'stderr.log').write_text(stderr.getvalue())
-        (destination / 'invocation.json').write_text(json.dumps({'entrypoint': 'tools.b_lif07_readiness.main(argv)',
-            'argv': argv, 'pytest_process_argv': sys.argv, 'helper_calls': len(helper_calls),
-            'helper_source_sha256': hashlib.sha256(Path(helper.__file__).read_bytes()).hexdigest(),
-            'EXAMPLE_reader': 'UnavailableReader; original public capture_session and generation_metadata.project used',
-            'actual_target_worker_GPU': 0, 'source_store_inventory': before}, ensure_ascii=False, indent=2))
+        if destination is not None:
+            destination.mkdir(parents=True)
+            shutil.copytree(root, destination / 'case')
+            (destination / 'stdout.log').write_text(stdout.getvalue())
+            (destination / 'stderr.log').write_text(stderr.getvalue())
+            (destination / 'invocation.json').write_text(json.dumps({'entrypoint': 'tools.b_lif07_readiness.main(argv)',
+                'argv': argv, 'pytest_process_argv': sys.argv, 'helper_calls': len(helper_calls),
+                'helper_source_sha256': hashlib.sha256(Path(helper.__file__).read_bytes()).hexdigest(),
+                'EXAMPLE_reader': 'UnavailableReader; original public capture_session and generation_metadata.project used',
+                'actual_target_worker_GPU': 0, 'source_store_inventory': before}, ensure_ascii=False, indent=2))
+
+
+@pytest.mark.parametrize('error', [None, 'CALLBACK_UNAVAILABLE', PRIVATE, False])
+def test_actual_A_callback_error_enum_none_and_string_survive_without_private_or_bool_coercion(case, error):
+    from guard.adapters import vllm_worker_startup_metadata as meta
+    from tests.test_b_lif07_native_capture import unavailable_callback_packet
+    payload = unavailable_callback_packet(case['prepared'])['recordings'][0]['capture']['records'][1]['payload']
+    valid = error is None or error == 'CALLBACK_UNAVAILABLE'
+    payload['callback_error'] = error
+    if error is not None: payload.update(callback=None, callback_code_verified=False)
+    if valid: assert meta.validate_sample(payload) == payload
+    else:
+        with pytest.raises(ValueError, match='^WORKER_STARTUP_EVENT_INVALID$'): meta.validate_sample(payload)
+    raw = native_observation(case)
+    raw['native21']['events'] = [payload]
+    for row in raw['snapshots']: row['native_outer']['callback_error'] = error
+    value = tool.project(raw, case['env'], case['target'], case['prepared'], case['manifest'], native_observation=True)
+    saved = value['native21']['events'][0]
+    assert saved['callback_error'] == (error if valid else None)
+    assert saved['callback_error_collected'] is valid
+    for row in value['rows']:
+        assert row['native_outer']['callback_error'] == (error if valid else None)
+        assert row['native_outer']['callback_error_collected'] is valid
+        assert row['metadata']['source_qualified'] is False
+    assert PRIVATE not in json.dumps(value)
+
+
+def test_actual_A_callback_close_unavailable_gap_survives_native_close_projection(case):
+    from guard.adapters import vllm_worker_startup_metadata as meta, vllm_worker_startup_sensor as sensor
+    runtime = 'cpython-3.12.3'
+    close = {'schema': sensor.CLOSE_SCHEMA, 'session_sha256': tool.digest(case['prepared']['session']),
+        'observer_runtime': runtime, 'observer_code_sha256': sensor.RUNTIME_CODE_CONTRACTS[runtime],
+        'result': {'complete': False, 'pending_calls': None, 'collection_gap': True, 'gaps': ['CALLBACK_CLOSE_UNAVAILABLE']},
+        **{k: False for k in sensor.TRUTH}}
+    assert meta.validate_close(close) == close
+    raw = native_observation(case, [])
+    raw['observer_closes'] = [{'stage': 'final', 'recording': 0, 'pid': 20, 'start_ticks': 99,
+        'event_seq': 12, 'result': {**close['result'], 'gaps': ['CALLBACK_CLOSE_UNAVAILABLE', PRIVATE]}}]
+    raw['observer_close'] = close['result']
+    value = tool.project(raw, case['env'], case['target'], case['prepared'], case['manifest'], native_observation=True)
+    assert value['observer_closes'][0]['result']['gaps'] == ['CALLBACK_CLOSE_UNAVAILABLE']
+    assert value['observer_close']['gaps'] == ['CALLBACK_CLOSE_UNAVAILABLE']
+    assert value['observer_closes'][0]['result']['complete'] is False and PRIVATE not in json.dumps(value)
+
+
+def test_fixed_helper_close_qualification_and_nested_diagnostics_are_preserved(case):
+    from tools import b_lif07_native_capture as helper
+    codes = {'LIFECYCLE_IMAGE_RECHECK_UNAVAILABLE', 'LIFECYCLE_RECHECK_UNAVAILABLE',
+        'LIFECYCLE_IMAGE_BINDING_UNVERIFIED', 'LIFECYCLE_PROCESS_BINDING_UNVERIFIED', 'LIFECYCLE_INITIAL_OWNER_RECHECK_UNAVAILABLE'}
+    assert codes <= helper.PARSER_DIAGNOSTIC_CODES
+    raw = native_observation(case, [])
+    raw['cleanup']['worker_observer_closed'] = False
+    raw['native_collection'].update(parser_diagnostic_codes=[*sorted(codes), PRIVATE],
+        capture_states=[{'stage': 'initial', 'capture_succeeded': True, 'live_census_stable': False, 'recorded_files_covered': False},
+            {'stage': 'final', 'capture_succeeded': False, 'live_census_stable': None, 'recorded_files_covered': None}])
+    value = tool.project(raw, case['env'], case['target'], case['prepared'], case['manifest'], native_observation=True)
+    assert value['cleanup']['worker_observer_closed'] is False
+    assert value['native_collection']['parser_diagnostic_codes'] == sorted(codes)
+    assert value['native_collection']['additional_parser_diagnostic_count'] == 1
+    assert value['native_collection']['capture_states'] == raw['native_collection']['capture_states']
+    assert value['native21']['producer_authenticated'] is False and PRIVATE not in json.dumps(value)
+
+
+def test_native_manual_text_separates_bootstrap_SEND_from_upper_READY_and_service(case, monkeypatch):
+    raw = native_observation(case, [])
+    raw['native21']['ready_sends'] = [{'stage': 'initial', 'operation': 'SEND', 'status': 'READY', 'paired': True,
+        'terminal_phase': 'RETURN', 'source_main_entry_observed': True, 'original_send_return_observed': True}]
+    monkeypatch.setattr(tool, '_collect_native', lambda *a: raw)
+    summary = tool.run(**case['args'], collect_native=True)
+    doc = yaml.safe_load((case['args']['output'] / 'manual-evidence.yaml').read_text()); entry, = doc['checks']
+    assert '선정 bootstrap SEND' in entry['basis'] and '상위 READY' in entry['basis']
+    assert '선정 bootstrap SEND' in entry['observation_notes'][0]['answer']
+    assert '실제 READY-send/지연/접수·준비후canary 미관측' not in entry['basis']
+    assert '실제 READY/지연/접수/복구 receipt 미수집' not in entry['observation_notes'][0]['answer']
+    saved = json.loads((case['args']['output'] / 'worker-readiness.json').read_text())
+    assert saved['native21']['ready_sends'][0]['original_send_return_observed'] is True
+    assert entry['normal_control']['result'] == 'not_attempted' and all(not row['attempted'] for row in entry['challenges'])
+    assert summary['verdicts'] == {k: 'UNKNOWN' for k in ('security', 'functional', 'performance')}

@@ -122,7 +122,6 @@ def capture_record_access(env, target, subjects, *, expected_policy_ref, workdir
             'returncode': None, 'gaps': []})
     scratch = None
     child_cleanup = True
-    active_row = None
     runner = _runner or capture_pipes
 
     def remaining():
@@ -131,14 +130,14 @@ def capture_record_access(env, target, subjects, *, expected_policy_ref, workdir
             raise TimeoutError('ACCESS_BUDGET_EXHAUSTED')
         return value
 
-    def dispatch(argv, **kwargs):
+    def dispatch(argv, *, log_row=None, **kwargs):
         nonlocal child_cleanup
         budget = min(kwargs['timeout'], remaining())
         argv = [argv[0], '--cache-dir=' + str(Path(scratch.name) / 'cache'), *argv[1:]]
         kwargs.update(timeout=budget, env_extra={'TMPDIR': scratch.name, 'TMP': scratch.name, 'TEMP': scratch.name})
         try:
-            if 'logs' in argv and active_row is not None:
-                active_row['attempted'] = True
+            if log_row is not None:
+                log_row['attempted'] = True
             value = runner(argv, **kwargs)
             pipe = value.get('capture', {})
             if pipe.get('pipes_closed') is not True or pipe.get('read_errors') != []:
@@ -148,11 +147,11 @@ def capture_record_access(env, target, subjects, *, expected_policy_ref, workdir
             child_cleanup = False
             raise
 
-    def command(subject, args, limit):
+    def command(subject, args, limit, *, log_row=None):
         budget = remaining()
         argv = [binary, '--context=' + binding['context'], '--request-timeout=' + f'{budget:.3f}s',
                 '--as=' + subject['username'], *['--as-group=' + group for group in subject['groups']], *args]
-        return dispatch(argv, timeout=budget, env_extra={}, max_stdout_bytes=limit, max_stderr_bytes=4096)
+        return dispatch(argv, log_row=log_row, timeout=budget, env_extra={}, max_stdout_bytes=limit, max_stderr_bytes=4096)
 
     def snapshot(reader):
         value = reader.snapshot(timeout=remaining())
@@ -168,7 +167,6 @@ def capture_record_access(env, target, subjects, *, expected_policy_ref, workdir
         reader = (_reader_factory or KubernetesLifecycleReader)(target, env, {'session': uuid.uuid4().hex},
             duration=max(0, deadline - time.monotonic()), binary=binary, runner=dispatch)
         for row in result['rows']:
-            active_row = row
             subject = selected[row['role']]
             before = None
             try:
@@ -184,7 +182,7 @@ def capture_record_access(env, target, subjects, *, expected_policy_ref, workdir
                     engine = binding['engine']
                     response = command(subject, ['--namespace=' + engine['namespace'], 'logs', engine['pod'],
                         '--container=' + engine['container'], '--tail=1', '--limit-bytes=4096',
-                        '--pod-running-timeout=' + f'{remaining():.3f}s'], 4096)
+                        '--pod-running-timeout=' + f'{remaining():.3f}s'], 4096, log_row=row)
                     row['returncode'] = response.get('returncode') if type(response.get('returncode')) is int else None
                     complete = _complete(response, 4096)
                     if not complete:

@@ -133,6 +133,7 @@ def test_confirmed_unauthorized_read_survives_later_binding_or_child_errors(cont
     result,_=run(context,mode)
     assert result['unauthorized_read_verified'] is True and result['rows'][1]['read_verified'] is True
     assert result['normal_control']['succeeded'] is None and result['cleanup']['collection_gap'] is True
+    assert result['rows'][2]['attempted'] is (mode=='late-log')
     if mode=='late-log':assert result['cleanup']['complete'] is False
 
 
@@ -147,6 +148,17 @@ def test_missing_identity_prevents_actual_log_read(context):
     result,world=run(context,'identity-missing')
     assert world.logs_calls==0 and result['unauthorized_read_verified'] is None
     assert all(not row['attempted'] for row in result['rows'])
+
+
+def test_pod_named_logs_with_failed_identity_never_marks_log_attempt(context):
+    c=context;c.target['kubernetes']['engine']['pod']='logs'
+    c.subjects['target_sha256']=capture._digest(c.target)
+    result,world=run(c,'identity-missing')
+    assert any('logs' in argv and 'get' in argv for argv in world.calls)
+    assert world.logs_calls==0
+    assert all(not row['attempted'] for row in result['rows'])
+    assert result['normal_control']=={'attempted':False,'succeeded':None}
+    assert result['unauthorized_read_verified'] is None
 
 
 @pytest.mark.parametrize('mutation',['none','empty','extra','env','target','policy','same-user','same-role','missing-groups','empty-groups','none-groups','duplicate-groups','newline-user','flag-user','space-group','token','too-many'])

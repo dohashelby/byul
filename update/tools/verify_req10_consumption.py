@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed REQ02 native route product checkpoint; fixed IPC/egress and native8~15
+# Reviewed fixed A2 PLT07 product registration checkpoint; native8~15/REQ02/IPC
 # retain the full original common scope and all trust/whole-scope gates.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='065eb9b1e24648c84efa9ec4fd327088e9b85e3b'
+REVIEWED_COMMON_COMMIT='cd128d54fa6ca2487f9d0928f13ac023ebbaba0b'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

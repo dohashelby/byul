@@ -13,6 +13,11 @@ from guard.models import canonical_json, sha256_hex
 SCHEMA = 'byul-lif07-worker-readiness-capture/1'
 PROFILE = 'owned-worker-phase-readiness/1'
 NATIVE_PROFILE = 'vllm-native-lifecycle-metadata/21'
+# 원 public session 32 files × native21 2048 rows × initial/final 관측, 정책 수치가 아니다.
+MAX_PROCESS_RECORDINGS = 2 * 32
+MAX_NATIVE21_ROWS = MAX_PROCESS_RECORDINGS * 2048
+MAX_CLOSE_ROWS = MAX_NATIVE21_ROWS
+MAX_CALLBACK_SNAPSHOTS = 512
 APPROVED_SOURCE_COMMIT = 'b88b4a6491a9a0c2908b962b837247c0cea80b55'
 REVIEWED_COMMON_COMMIT = '062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89'
 GATE_SOURCE_COMMIT = 'c39a36b7a6f306b910f0314b0deee10b55390dc4'
@@ -64,6 +69,7 @@ def _inputs(env, target, prepared, manifest, duration, binary):
     if any(type(v) is not dict for v in (target,prepared,manifest)):
         raise ValueError('LIF07_NATIVE_TYPED_INPUTS_REQUIRED')
     if (not env.hash_ok() or env.engine.name != 'vllm' or env.engine.version != '0.31.0'
+            or env.runtime.gpu_count != 1 or env.runtime.tp_groups != 1
             or target.get('lab') is not True or target.get('environment_ref') != env.ref().model_dump(mode='json')
             or prepared.get('profile') != NATIVE_PROFILE or prepared.get('public_commit') != 'db9527a46873454610df6dbedf79a36d6bf1a7f6'
             or prepared.get('source_sha256') != source_hashes(NATIVE_PROFILE)
@@ -162,7 +168,7 @@ def collect_startup(env,target,prepared,manifest,*,duration=180,binary='kubectl'
         'target_sha256':_digest(target),'session':prepared['session'],'run_id':manifest['run_id'],
         'started_at':now,'finished_at':now,'data_origin':'EXAMPLE' if injected or env.data_origin.value=='EXAMPLE' else 'DECLARED',
         'snapshots':[],'native21':meta.project(None,prepared),'observer_closes':[],'generation_closes':[],
-        'native_collection':{'initial_capture_attempted':False,'final_capture_attempted':False,'process_recordings':[],
+        'native_collection':{'initial_capture_attempted':False,'final_capture_attempted':False,'process_recordings':[],'capture_states':[],
             'live_census_stable':None,'recorded_files_covered':None,'parser_diagnostic_codes':[],
             'reader_collection_gap':None,'snapshot_omitted_count':0,'node_runtime_image_verified':False,'producer_authenticated':False,'record_authenticity_verified':False},
         'cleanup':{'pre_snapshot_attempted':False,'pre_snapshot_verified':False,'post_snapshot_attempted':False,
@@ -177,11 +183,14 @@ def collect_startup(env,target,prepared,manifest,*,duration=180,binary='kubectl'
     def take(stage):
         result['native_collection'][stage+'_capture_attempted'] = True
         if stage=='final': result['cleanup']['final_capture_attempted'] = True
+        state={'stage':stage,'capture_succeeded':False,'live_census_stable':None,'recorded_files_covered':None}
+        result['native_collection']['capture_states'].append(state)
         engine=reader.binding['engine']
         packet=capture(reader,native,container=engine['container'],image=engine['image'],prepared=prepared,
             owner_identity=reader.owner_identity,read_file=reader.read_file,image_check=reader.image_check)
         if type(packet) is not dict:
             raise ValueError('LIF07_NATIVE_PACKET_UNAVAILABLE')
+        state.update(capture_succeeded=True,live_census_stable=packet.get('live_census_stable') is True,recorded_files_covered=packet.get('recorded_files_covered') is True)
         packet_values.append((stage,packet))
     try:
         reader=reader_factory(native,env,prepared,binary=binary,duration=duration,runner=_runner)
@@ -210,17 +219,21 @@ def collect_startup(env,target,prepared,manifest,*,duration=180,binary='kubectl'
             result['snapshots']+=snapshots;result['observer_closes']+=closes;result['generation_closes']+=generation_closes
             result['native_collection']['process_recordings']+=recordings;gaps.update(partial)
         except Exception:gaps.add('LIF07_NATIVE_PROJECTION_UNAVAILABLE')
-        for code in packet.get('diagnostic_codes',[]):
+        codes=list(packet.get('diagnostic_codes',[]))
+        for recording in packet.get('recordings',[]):codes.extend(recording.get('diagnostic_codes',[]))
+        for code in codes:
             if code in PARSER_DIAGNOSTIC_CODES:result['native_collection']['parser_diagnostic_codes'].append(code)
             else:gaps.add('LIF07_NATIVE_PARSER_ADDITIONAL_GAP')
-        result['native_collection']['live_census_stable']=packet.get('live_census_stable') is True
-        result['native_collection']['recorded_files_covered']=packet.get('recorded_files_covered') is True
         if stage=='final':result['cleanup']['final_capture_complete']=packet.get('recorded_files_covered') is True
         if not packet.get('live_census_stable') or not packet.get('recorded_files_covered'):gaps.add('LIF07_NATIVE_CENSUS_OR_COVERAGE_UNVERIFIED')
+    states=result['native_collection']['capture_states']
+    if states:
+        for key in ('live_census_stable','recorded_files_covered'):
+            result['native_collection'][key]=all(v['capture_succeeded'] and v[key] is True for v in states)
     if not packet_values:result['native21']=meta.project(None,prepared)
-    if len(result['snapshots'])>512:
-        result['native_collection']['snapshot_omitted_count']=len(result['snapshots'])-512
-        result['snapshots']=result['snapshots'][:512];gaps.add('LIF07_NATIVE_SNAPSHOT_BOUND')
+    if len(result['snapshots'])>MAX_CALLBACK_SNAPSHOTS:
+        result['native_collection']['snapshot_omitted_count']=len(result['snapshots'])-MAX_CALLBACK_SNAPSHOTS
+        result['snapshots']=result['snapshots'][:MAX_CALLBACK_SNAPSHOTS];gaps.add('LIF07_NATIVE_SNAPSHOT_BOUND')
     if 'initial' in epochs and 'final' in epochs:
         result['cleanup']['api_epoch_same']=epochs['initial']==epochs['final']
         if not result['cleanup']['api_epoch_same']:gaps.add('LIF07_NATIVE_API_EPOCH_CHANGED')

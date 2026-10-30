@@ -88,3 +88,7 @@ python -B -m pytest tests/test_record_access_evidence.py -q --basetemp=EXTERNAL_
 원 질문/2개 관측 설명/6개 단계·정확 Ref·전체 normal 미시도, 독립 FAIL·불확실
 UNKNOWN·암호화 미수집·후기 실패·출력 append-only·bundle 복원·원문 비저장을 확인한다.
 실제 Pod 로그 접근, 저장 암호화 또는 실제 principal 권한 시험의 결과를 생성하지 않는다.
+
+## 통합 검증 결과 — 2026-10-30
+
+collector49개·후속수정 직접7개·증거연결22개의 고정 결과를 재사용했다. root가 실제collector→공개A metadata reader→EXAMPLE 전송→원manual import/판정/보고서/Store/반출복원을 1회 연결해 통과했다(0.56초). Pod 이름 logs가metadata조회 시도로 오인되던1건을 수정했고 검토자가 해당diff 해결을 확인했다. 원Store와 입력은 불변, 원문/주체/로그hash는 첨부에 없다. 전체normal 미시도·저장암호화UNKNOWN과 독립FAIL이 복원Store에도 유지됐다. wheel166개 source/설치 bytes와 신규2모듈 import가 일치하며 Torch/vLLM은 부모에 로딩되지 않았다. 실제principal/Kubernetes/저장암호화 실행은0회다.

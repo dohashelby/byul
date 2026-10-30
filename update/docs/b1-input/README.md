@@ -199,3 +199,9 @@ PYTHONPATH="src:.:$VLLM_SOURCE" "$CPU_VENV/bin/python" -m tools.b1_input_cpu \
 vocabulary/model domain0..31 밖의 ID32가 실제 processor에서 수용되었다면 기존
 REQ08 FAIL을 보존한다. 독립 domain 근거가 없거나 설정 hash가 다르면 해당 자격은
 UNKNOWN이다. 원본16입력·expected·기존 actual1은 유지한다.
+
+## REQ-09 target031 실제 CPU 결과 — 2026-10-30
+
+고정 소스 de8597cf00e0526dd3b274d5a100a55bbb80bc6a에서 원 PACK31/REQ09rev8의 source-CPU 부분을 1회 실행했다. 실제 InputProcessor mask·shape·offset 12행과 후속 정상12건을 수집했고 7거부·5수용, 모든 후속 정상·source/config 전후 확인·12행 자격 검증이 완료됐다. shape2행은 관측만 보존하며 모델 consumer 위반으로 해석하지 않는다. 확인 위반은 없고 보안·기능·성능은 모두 UNKNOWN이다. 원typed10관측 중 confirmed_input_violations=[]만 수집되며 나머지9개는 null/미수집, 전체 normal/challenge는 미시도로 유지했다.
+
+수집22.067초·CLI24.371초, capture_invocations=1이다. 원 Store를 보존하고 EVD→RES→RPT·동일 as-of·정확Ref·반출/복원·3개Store verify오류0을 확인했다. 전체tracked1153파일과 외부source는 수집 전후 불변이었다. 기존152환경·의존성은 재사용했고 Online16/기존26·69/sampling/공식전체를 재실행하지 않았다. 후기 source 검사 unavailable에도 이미 확인된 위반을 보존하는 검토 수정과 해당회귀33개를 통과했고, 명시mismatch는 계속 제외한다. 실제HTTP/서빙/Kubernetes/GPU 실행은0회다.

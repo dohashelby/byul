@@ -647,3 +647,5 @@ observer code hash의first-line/line-table도계약이다. literal줄수변경�
 B LIF07의 source_qualified/actual_worker/ready 긍정신고는 자격근거로쓰지않는다. 원 B NATIVE/UnreadyHTTP/delay None gate를유지하고 원 공개 import 경로만 검증한다. 현재 common0fc2dec는 B가명시적으로 검토고정한A138호환으로 소비하며 runtimehash자동승인·profile완화·A1전용B재작성은하지않는다.
 
 열린질문: native18 실제 C/CPU 검증용 Torch2.13.0+cpu/safetensors0.8.0+전이9의 고정250MiB/전용3GiB 실행안은 CLAUDE18 신규의존성규칙에따라현재채팅답변대기다. 기존프로젝트의존성/원환경/AWS/GPU는변경하지않으며 B통합·독립개발은계속한다. B Windows ctime basis 문제는 원 B 담당자의 고정 보수를 받아소비하며 비교삭제/자동허용으로우회하지않는다.
+
+Worker.init_device/initialize_from_config/compile_or_warm_up_model은원 tracing decorator를보존한다. 고정source/code와backendalias·closurefunc를확인해원바깥callable을한번호출하며바깥RETURN을내부진입/GPU/READY/승인으로추정하지않는다. B원callback/helper는private고정import간선으로원bytes를소비하고guardnamespace를변경하지않는다. 같은PID/시간중첩대신정확factory record와startupcontext를결합하며helper/EXAMPLE를실제worker로표시하지않는다.

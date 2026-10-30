@@ -2,6 +2,7 @@
 from guard.models import canonical_json,sha256_hex,utcnow
 from guard.adapters import vllm_safe_open_mapping_sensor as mapping_sensor
 from guard.adapters import vllm_safe_open_mapping_metadata as mapping_metadata
+from guard.adapters import vllm_worker_startup_sensor as startup_sensor,vllm_worker_startup_metadata as startup_metadata
 from guard.adapters import vllm_file_read_sensor as read_sensor,vllm_file_read_metadata as read_metadata
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor,vllm_weight_iteration_metadata as weight_metadata
 from guard.runtime.bounded import strict_json
@@ -19,7 +20,7 @@ OBSERVATIONS={**BASE_OBSERVATIONS,**contract.OBSERVATIONS}
 
 class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
     name='observation_identity';version='0.2.0';collection_profile=PROFILE
-    supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8',weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE})
+    supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8',weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE})
     policy_normalizer=staticmethod(contract.normalize_policy)
 
     def run(self,check,env,policy_values,adapter,workdir):
@@ -101,6 +102,16 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
                 value['identity_native_models']=mapping_metadata.attach_configured_models(value['identity_native_models'],value['safe_open_mappings'])
             except (ValueError,KeyError,TypeError,OSError,RuntimeError):
                 value['safe_open_mappings']=None;value['safe_open_mapping_diagnostic']='SAFE_OPEN_MAPPING_CONSUMER_UNAVAILABLE';ctx._termination_gap=True
+        if ctx._termination_prepared['profile']==startup_sensor.PROFILE:
+            value['weight_iteration']=startup_metadata.project_iterations(packet)
+            value['identity_native_models']=weight_metadata.attach_configured_models(value['identity_native_models'],value['weight_iteration'])
+            try:
+                value['safe_open_mappings']=startup_metadata.project_mappings(packet,ctx._termination_prepared)
+                value['identity_native_models']=mapping_metadata.attach_configured_models(value['identity_native_models'],value['safe_open_mappings'])
+                value['worker_startup']=startup_metadata.project(packet,ctx._termination_prepared)
+                value['identity_native_models']=startup_metadata.attach_configured_models(value['identity_native_models'],value['worker_startup'])
+            except (ValueError,KeyError,TypeError,OSError,RuntimeError):
+                value['worker_startup']=None;value['worker_startup_diagnostic']='WORKER_STARTUP_CONSUMER_UNAVAILABLE';ctx._termination_gap=True
         return value
 
     def collect(self,ctx):
@@ -142,6 +153,8 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
             summary['diagnostic_codes'].append('NATIVE_MODEL_FILE_READ_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         if summary['projection'].get('safe_open_mapping_diagnostic')=='SAFE_OPEN_MAPPING_CONSUMER_UNAVAILABLE':
             summary['diagnostic_codes'].append('SAFE_OPEN_MAPPING_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
+        if summary['projection'].get('worker_startup_diagnostic')=='WORKER_STARTUP_CONSUMER_UNAVAILABLE':
+            summary['diagnostic_codes'].append('WORKER_STARTUP_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         values={'identity_record_collections':state['collections'],'identity_declared_records':projected['records'],
             'identity_native_models':models,'identity_binding_candidates':projected['candidates'],
             'identity_conflict_candidates':projected['conflict_candidates'],'identity_missing':projected['missing'],

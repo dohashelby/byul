@@ -9,6 +9,7 @@ import uuid
 
 from guard.adapters import vllm_lifecycle_sensor as sensor
 from guard.adapters import vllm_safe_open_mapping_sensor as mapping_sensor
+from guard.adapters import vllm_worker_startup_sensor as startup_sensor,vllm_worker_startup_contract as startup_contract
 from guard.adapters import vllm_lifecycle_profiles as profiles
 from guard.adapters import vllm_online_sensor as online
 from guard.adapters import vllm_attempt_sensor as attempt
@@ -27,11 +28,11 @@ from guard.update_validation import reserve_output
 
 
 def prepare_assets(output, repository, *, profile=None, model_read_scope=None):
-    selected = sensor if profile in (None, sensor.PROFILE) else online if profile == online.PROFILE else attempt if profile == attempt.PROFILE else output_sensor if profile == output_sensor.PROFILE else stream_sensor if profile == stream_sensor.PROFILE else rank_sensor if profile == rank_sensor.PROFILE else init_sensor if profile == init_sensor.PROFILE else profiler_sensor if profile == profiler_sensor.PROFILE else weight_sensor if profile == weight_sensor.PROFILE else read_sensor if profile == read_sensor.PROFILE else mapping_sensor if profile == mapping_sensor.PROFILE else None
+    selected = sensor if profile in (None, sensor.PROFILE) else online if profile == online.PROFILE else attempt if profile == attempt.PROFILE else output_sensor if profile == output_sensor.PROFILE else stream_sensor if profile == stream_sensor.PROFILE else rank_sensor if profile == rank_sensor.PROFILE else init_sensor if profile == init_sensor.PROFILE else profiler_sensor if profile == profiler_sensor.PROFILE else weight_sensor if profile == weight_sensor.PROFILE else read_sensor if profile == read_sensor.PROFILE else mapping_sensor if profile == mapping_sensor.PROFILE else startup_sensor if profile == startup_sensor.PROFILE else None
     if selected is None:
         raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
     from guard.collectors import model_read_scope as scope_contract
-    if selected in (read_sensor,mapping_sensor):
+    if selected in (read_sensor,mapping_sensor,startup_sensor):
         if model_read_scope is None:raise ValueError('MODEL_READ_SCOPE_REQUIRED')
         scope,scope_raw=scope_contract.load_scope(model_read_scope)
     elif model_read_scope is not None:raise ValueError('MODEL_READ_SCOPE_PROFILE_MISMATCH')
@@ -63,16 +64,26 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None):
     ).encode()
     values = {"guard_lifecycle_sensor.py":source, "sitecustomize.py":bootstrap,
               "settings.json":(json.dumps(config,sort_keys=True,indent=2)+"\n").encode()}
-    if selected in (read_sensor,mapping_sensor):
+    if selected in (read_sensor,mapping_sensor,startup_sensor):
         base_raw=Path(sensor.__file__).read_bytes();iteration_raw=Path(weight_sensor.__file__).read_bytes()
         if (hashlib.sha256(base_raw).hexdigest()!=read_sensor.BASE8_SHA256 or hashlib.sha256(iteration_raw).hexdigest()!=read_sensor.ITERATION16_SHA256):
             raise ValueError('LIFECYCLE_FILE_READ_DEPENDENCY_UNAVAILABLE')
         deployed=scope_contract.deploy_scope(scope,scope_raw,session)
         values.update({'guard_lifecycle_base.py':base_raw,'guard_weight_iteration.py':iteration_raw,'model-read-scope.json':deployed})
-        if selected is mapping_sensor:
+        if selected in (mapping_sensor,startup_sensor):
             scope_module=Path(read_sensor.__file__).read_bytes()
             if hashlib.sha256(scope_module).hexdigest()!=mapping_sensor.SCOPE17_SHA256:raise ValueError('SAFE_OPEN_MAPPING_SCOPE_DEPENDENCY_UNAVAILABLE')
             values['guard_file_read_scope.py']=scope_module
+        if selected is startup_sensor:
+            from guard.adapters import vllm_worker_readiness as startup_callback,vllm_slot_mask as startup_support
+            for filename,module,digest in (
+                ('guard_safe_open_mapping.py',mapping_sensor,startup_sensor.MAPPING18_SHA256),
+                ('guard_worker_startup_contract.py',startup_contract,startup_sensor.CONTRACT_SHA256),
+                ('guard_worker_readiness_callback.py',startup_callback,startup_sensor.CALLBACK_SHA256),
+                ('guard_worker_readiness_support.py',startup_support,startup_sensor.SUPPORT_SHA256)):
+                raw=Path(module.__file__).read_bytes()
+                if hashlib.sha256(raw).hexdigest()!=digest:raise ValueError('WORKER_STARTUP_DEPENDENCY_UNAVAILABLE')
+                values[filename]=raw
     elif selected is online:
         from guard.adapters import vllm_online_input as callback
         base_raw, callback_raw = Path(sensor.__file__).read_bytes(), Path(callback.__file__).read_bytes()
@@ -100,7 +111,7 @@ def prepare_assets(output, repository, *, profile=None, model_read_scope=None):
         "public_commit":sensor.COMMIT, "assets":assets,
         "source_sha256":profiles.source_hashes(selected.PROFILE), "engine_started":False,
         "image_contents_verified":False, "product_connected":False}
-    if selected in (read_sensor,mapping_sensor):manifest['model_read_scope']=scope_contract.scope_summary(scope)
+    if selected in (read_sensor,mapping_sensor,startup_sensor):manifest['model_read_scope']=scope_contract.scope_summary(scope)
     with (output/"manifest.json").open("x",encoding="utf-8",newline="\n") as stream:
         json.dump(manifest,stream,sort_keys=True,indent=2)
         stream.write("\n")
@@ -113,8 +124,8 @@ def load_prepared(path):
         raw_manifest=stream.read(262145)
         manifest = strict_json(raw_manifest,limit=262144)
     if (type(manifest) is not dict or set(manifest) != ({"schema","profile","session","public_commit",
-            "assets","source_sha256","engine_started","image_contents_verified","product_connected"} | ({'model_read_scope'} if manifest.get('profile') in {read_sensor.PROFILE,mapping_sensor.PROFILE} else set()))
-            or manifest.get('profile') not in {read_sensor.PROFILE,mapping_sensor.PROFILE} and len(raw_manifest)>16384
+            "assets","source_sha256","engine_started","image_contents_verified","product_connected"} | ({'model_read_scope'} if manifest.get('profile') in {read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE} else set()))
+            or manifest.get('profile') not in {read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE} and len(raw_manifest)>16384
             or manifest["schema"] != "guard-lifecycle-assets/1"  or type(manifest["profile"]) is not str
             or manifest["profile"] not in profiles.SCHEMAS
             or manifest["public_commit"] != sensor.COMMIT
@@ -123,7 +134,7 @@ def load_prepared(path):
             or manifest["engine_started"] is not False or manifest["image_contents_verified"] is not False
             or manifest["product_connected"] is not False
             or type(manifest["assets"]) is not dict
-            or set(manifest["assets"]) != ({'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','guard_file_read_scope.py','model-read-scope.json'} if manifest['profile']==mapping_sensor.PROFILE else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','model-read-scope.json'} if manifest['profile']==read_sensor.PROFILE else {"guard_lifecycle_sensor.py" ,"sitecustomize.py","settings.json",
+            or set(manifest["assets"]) != ({'model-read-scope.json', 'guard_file_read_scope.py', 'guard_worker_readiness_callback.py', 'guard_worker_readiness_support.py', 'guard_lifecycle_base.py', 'guard_worker_startup_contract.py', 'settings.json', 'guard_weight_iteration.py', 'guard_lifecycle_sensor.py', 'guard_safe_open_mapping.py', 'sitecustomize.py'} if manifest['profile']==startup_sensor.PROFILE else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','guard_file_read_scope.py','model-read-scope.json'} if manifest['profile']==mapping_sensor.PROFILE else {'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','model-read-scope.json'} if manifest['profile']==read_sensor.PROFILE else {"guard_lifecycle_sensor.py" ,"sitecustomize.py","settings.json",
                 "guard_lifecycle_base.py","guard_online_input_callback.py"} if manifest["profile"] == online.PROFILE
                 else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py","guard_attempt_invocation.py"}
                     if manifest["profile"]==output_sensor.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py"}
@@ -158,13 +169,19 @@ def load_prepared(path):
         if manifest["profile"]==output_sensor.PROFILE and name in {"guard_lifecycle_base.py","guard_attempt_invocation.py"}:
             required=output_sensor.BASE8_SHA256 if name=="guard_lifecycle_base.py" else output_sensor.INVOCATION10_SHA256
             if hashlib.sha256(raw).hexdigest()!=required:raise ValueError("LIFECYCLE_OUTPUT_DEPENDENCY_UNAVAILABLE")
-        if manifest['profile'] in {read_sensor.PROFILE,mapping_sensor.PROFILE}:
-            required={'guard_lifecycle_base.py':read_sensor.BASE8_SHA256,'guard_weight_iteration.py':read_sensor.ITERATION16_SHA256,**({'guard_file_read_scope.py':mapping_sensor.SCOPE17_SHA256} if manifest['profile']==mapping_sensor.PROFILE else {})}.get(name)
+        if manifest['profile'] in {read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE}:
+            required={'guard_lifecycle_base.py':read_sensor.BASE8_SHA256,'guard_weight_iteration.py':read_sensor.ITERATION16_SHA256,**({'guard_file_read_scope.py':mapping_sensor.SCOPE17_SHA256} if manifest['profile'] in {mapping_sensor.PROFILE,startup_sensor.PROFILE} else {})}.get(name)
             if required is not None and hashlib.sha256(raw).hexdigest()!=required:raise ValueError('LIFECYCLE_FILE_READ_DEPENDENCY_UNAVAILABLE')
             if name=='model-read-scope.json':
                 from guard.collectors.model_read_scope import scope_summary
                 value=read_sensor.validate_scope(strict_json(raw,limit=262144),session=manifest['session'])
                 if scope_summary(value)!=manifest['model_read_scope']:raise ValueError('MODEL_READ_SCOPE_MANIFEST_MISMATCH')
+        if manifest['profile']==startup_sensor.PROFILE:
+            dependency={'guard_lifecycle_base.py':startup_sensor.BASE8_SHA256,'guard_weight_iteration.py':startup_sensor.ITERATION16_SHA256,
+                'guard_file_read_scope.py':startup_sensor.SCOPE17_SHA256,'guard_safe_open_mapping.py':startup_sensor.MAPPING18_SHA256,
+                'guard_worker_startup_contract.py':startup_sensor.CONTRACT_SHA256,'guard_worker_readiness_callback.py':startup_sensor.CALLBACK_SHA256,
+                'guard_worker_readiness_support.py':startup_sensor.SUPPORT_SHA256}.get(name)
+            if dependency is not None and hashlib.sha256(raw).hexdigest()!=dependency:raise ValueError('WORKER_STARTUP_DEPENDENCY_UNAVAILABLE')
         if name == "guard_lifecycle_sensor.py":
             source_supported = profiles.asset_supported(manifest["profile"], raw)
     if not source_supported:

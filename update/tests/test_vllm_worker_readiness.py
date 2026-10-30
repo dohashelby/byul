@@ -270,3 +270,22 @@ def test_unsupported_generator_or_contract_cannot_claim_ready(observer, point, p
 def test_constructor_limits_are_explicit(key, value):
     with pytest.raises(ValueError):
         native.WorkerReadinessObserver(**{key: value})
+
+
+@pytest.mark.parametrize('phase', ['RETURN', 'RAISE'])
+def test_real_minimal_startup_binding_needs_no_request_or_external_call_id(observer, phase):
+    worker = owner()
+    startup = {'session_id_sha256': 'b' * 64, 'process_start_sha256': 'c' * 64,
+        'pid': os.getpid()}
+    first = emit(observer, worker, given=startup)
+    last = emit(observer, worker, phase=phase, given=startup)
+    assert first['binding'] == last['binding'] == startup
+    assert not any(key in last['binding'] for key in (
+        'call_id_sha256', 'asgi_request_id_sha256', 'native_request_id_sha256'))
+    transition = last['metadata']['call_transition']
+    assert transition['paired'] is True and transition['call_seq'] == first['seq']
+    assert transition['same_owner'] is transition['same_thread'] is True
+    assert transition['returned'] is (phase == 'RETURN')
+    assert last['metadata']['source_qualified'] is False
+    assert last['metadata']['ready_send_verified'] is None
+    assert observer.close()['pending_calls'] == 0

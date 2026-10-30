@@ -87,7 +87,7 @@ class WorkerReadinessObserver:
     @staticmethod
     def _binding_scope(binding):
         if binding.get('pid') != os.getpid() or not all(binding.get(k) for k in (
-                'session_id_sha256', 'process_start_sha256', 'call_id_sha256')):
+                'session_id_sha256', 'process_start_sha256')):
             return None
         return tuple(binding[k] for k in ('session_id_sha256', 'process_start_sha256', 'pid'))
 
@@ -118,44 +118,65 @@ class WorkerReadinessObserver:
         value = {'paired': False, 'call_seq': None, 'end_seq': None,
             'same_owner': None, 'same_thread': None, 'returned': None}
         thread, owner = data['thread_token'], data['owner_token']
-        if scope is None or thread is None or owner is None:
+        if (scope is None or thread is None or owner is None
+                or data['rank'] is None or data['local_rank'] is None):
             gaps.add('CALL_BINDING_UNAVAILABLE')
             return value
-        key = (scope, thread, tuple(binding.get(k) for k in BINDING_HASHES), point)
+        evidence = tuple(binding.get(k) for k in BINDING_HASHES)
+        stack = self._stacks.get(thread, [])
         if phase == 'CALL':
-            if key in self._calls:
-                # 같은 키의 중복은 어느 호출에도 연결하지 않고 추가 보관하지 않는다.
-                self._calls[key] = None
+            # 기동에는 요청 ID가 없다. seq는 이 observer의 로컬 호출 좌표일 뿐이다.
+            # 명시된 외부 call ID가 있으면 중복을 감지하되 없는 ID를 만들지 않는다.
+            external_call = binding.get('call_id_sha256')
+            duplicate = next((key for key in stack if key[3] == point
+                and self._calls.get(key) is not None
+                and external_call is not None
+                and self._calls[key][2][BINDING_HASHES.index('call_id_sha256')] == external_call), None)
+            if duplicate is not None:
+                self._calls[duplicate] = None
                 gaps.add('DUPLICATE_CALL')
             elif len(self._calls) >= self._max_pending:
+                # 추적하지 못한 중첩 CALL의 RETURN이 이전 CALL과 연결되지 않게 한다.
+                for key in stack:
+                    self._calls[key] = None
                 gaps.add('CALL_BOUND')
             else:
-                self._calls[key] = (seq, owner)
+                key = (scope, thread, seq, point)
+                self._calls[key] = (seq, owner, evidence, data['rank'], data['local_rank'])
                 self._stacks.setdefault(thread, []).append(key)
             return value
-        if key not in self._calls:
+        if not stack:
             gaps.add('CALL_PAIR_UNAVAILABLE')
             return value
-        stack = self._stacks.get(thread, [])
-        if not stack or stack[-1] != key:
-            # 순서가 불명확해진 thread의 pending은 후속 RETURN에도 재사용하지 않는다.
-            for pending in stack:
-                self._calls.pop(pending, None)
-            self._stacks.pop(thread, None)
-            gaps.add('CALL_ORDER_UNAVAILABLE')
+        key = stack[-1]
+        previous = self._calls[key]
+        if key[3] != point or (previous is not None and previous[2] != evidence):
+            # LIFO 밖의 같은 경계가 있으면 이 thread의 남은 연결도 보류한다.
+            earlier = any(candidate[3] == point and self._calls.get(candidate) is not None
+                and self._calls[candidate][2] == evidence for candidate in stack[:-1])
+            if earlier:
+                for pending in stack:
+                    self._calls.pop(pending, None)
+                self._stacks.pop(thread, None)
+                gaps.add('CALL_ORDER_UNAVAILABLE')
+            else:
+                gaps.add('CALL_PAIR_UNAVAILABLE')
             return value
         stack.pop()
         if not stack:
             self._stacks.pop(thread, None)
-        previous = self._calls.pop(key)
+        self._calls.pop(key)
         if previous is None:
             gaps.add('CALL_PAIR_UNAVAILABLE')
             return value
-        call_seq, before_owner = previous
+        call_seq, before_owner, _evidence, rank, local_rank = previous
         same = owner == before_owner
         value.update(call_seq=call_seq, end_seq=seq, same_owner=same, same_thread=True)
         if not same:
             gaps.add('OWNER_CHANGED')
+            return value
+        if (rank, local_rank) != (data['rank'], data['local_rank']):
+            gaps.add('CALL_PAIR_UNAVAILABLE')
             return value
         value.update(paired=True, returned=phase == 'RETURN')
         return value

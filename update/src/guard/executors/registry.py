@@ -40,6 +40,7 @@ from .kubernetes_stream_buffer import KubernetesStreamBufferExecutor
 from .kubernetes_rank_failure import KubernetesRankFailureExecutor
 from .kubernetes_initialization import KubernetesInitializationExecutor
 from .kubernetes_resource_recovery import KubernetesResourceRecoveryExecutor
+from .kubernetes_credential_revocation import KubernetesCredentialRevocationExecutor
 from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
 from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
@@ -49,6 +50,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "rank_failure:kubernetes": lambda cfg: KubernetesRankFailureExecutor(cfg.get("rank_failure", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "initialization:kubernetes": lambda cfg: KubernetesInitializationExecutor(cfg.get("initialization", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "resource_recovery:kubernetes": lambda cfg: KubernetesResourceRecoveryExecutor(cfg.get("resource_recovery", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "credential_revocation:kubernetes": lambda cfg: KubernetesCredentialRevocationExecutor(cfg.get("credential_revocation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "stream_buffer:kubernetes": lambda cfg: KubernetesStreamBufferExecutor(cfg.get("stream_buffer", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "stored_responses:kubernetes": lambda cfg: KubernetesStoredResponsesExecutor(cfg.get("stored_responses", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "forwarded_identity:kubernetes": lambda cfg: KubernetesForwardedIdentityExecutor(cfg.get("forwarded_identity", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),

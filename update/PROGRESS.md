@@ -1511,3 +1511,10 @@ git status
 막힌 것: 실제 실패/회수 인과·전체 자원/공유참조/GPU·같은 환경의 다음 정상 기동 lineage·원GPU창종료/Start0·CI결제 차단.
 
 - 검증 마감: 정확 source f1bda4d9a0d726644defaaa005437038948bbe21, 검토 고정 공통 소비c0686ab20d5653091754570853472f9880930dc2. 첫 Windows33실패426통과/Linux33실패427통과와1273파일 명세를 보존했다. 새 census clock 정밀도·시험 Namespace/Legacy 보수 후 Windows194통과/기존skip1·deselect1(98.93초/부모99.812초), 동일1273파일 Linux195통과/기존deselect1(29.46초/부모29.718초), 소스-wheel-격리설치222파일 일치·설치본 두 분기4사례/정확24Ref 왕복8.226초를 확인했다. source/hash 고정 뒤 변경0·새skip/제외0·승인값 자동채움0이며 공통330파일/경로제외0·A2선정12/B원본27/native8~14를 보존했다. 바뀌지 않은 인접 통과를 재사용하고 전체suite를 새로 통과했다고 주장하지 않는다. 실제 소유 Linux CPU socket/shm/alias/child census와 두 분기의 무조건 절대 기한 잔존 FAIL/조건부UNKNOWN/누락/재사용/교체·후속 수집/첨부/부모 정리 오류 뒤 독립FAIL 및 정확Ref를 검증했다. 이 근거는 CPU/EXAMPLE이며 실제 serving/TP/GPU·실패 후 전체 회수/후속 정상 기동·부모A39/56/4·A1 19/27/2 전체 완료가 아니다. 원GPU창종료/Start0·기존비용/EBS과금·CI결제 외부차단과 과거실증source04f7856을 유지한다.
+
+
+## 2026-10-30 A1 PLT10 자격 철회/신규 접근 관측
+한 일: PLT10 원정상/issuer 철회/전파 기준을 보존하고 두 자격의5개 고정GETmodels·native8 auth/등록handler를 기존 Kubernetes CLI/팩/증거 경계에 연결했다. 실제 issuer/전파·principal·독립연결receipt는 미확인이고 별도 명시 무조건 접근 금지 제약의functional FAIL만 제공한다.
+검증: 구현·회귀·문서 종료 후 source 고정/영향/Linux/설치본 정확Ref 검증 준비. 현재 통과/실증/전체 완료를 선언하지 않는다.
+다음: 고정검증/보수/커밋·초안PR·정확CI/인계; LIF12 실제retry주체 질문은 대기하며 독립 담당 개발 지속.
+막힌 것: 실제 issuer/cache/event/시간/자격/철회 전 정상/새 연결/전파·원GPU창종료/Start0·CI결제 차단.

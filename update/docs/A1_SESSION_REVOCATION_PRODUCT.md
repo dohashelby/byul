@@ -17,3 +17,6 @@ POL15는 `session_environment_sha256`, `session_target_sha256`, `session_prepare
 CPU의 고정 auth/등록 handler/native 프로토콜 대역은 EXAMPLE이다. 별도 소유 실제 Linux TCP 시험은 동일 keep-alive와 서버 조기 종료/재연결 금지의 근거이며 실제 Pod/issuer/serving/GPU 인수가 아니다. 구현·회귀·문서 초안 단계이며 고정·검증·설치·커밋·초안PR·정확CI·인계 전에는 기능 완료로 기록하지 않는다. PLT11 전체와 부모A39/56/4·A1 19/27/2 완료 수를 늘리지 않는다.
 
 실제 issuer/cache/사건 및 실제 session/handle 종류·코드/설정·잔존 정책 질문은 대기 중이다. 실제 증명에는 철회 전 정상/철회/동일·신규 접근/기한과 복구·정리 책임 및 정확 ENV/POL/source/image/model이 필요하다. 원GPU 승인창 종료/Start0/마지막확인stopped·기존46.66USD·보존120GiB EBS과금·CI결제 차단을 유지한다. 과거 배포wheel04f7856/156파일·REQ11 MEASURED Ref와 PR127/225파일의 CPU검증을 이 새 소스의 검증으로 소급하지 않는다.
+
+
+첫 고정9a737f4/1288파일 검증의 Windows1실패/459통과/기존skip1·제외1(212.36초, 부모213.688초), 동일bytes Linux1실패/460통과/기존제외1(69.24초, 부모69.701초)을 보존한다. 새 PLT11 제품과 실제 소유 Linux keep-alive/조기종료 시험은 통과했고 실패는 검토된 고정 소비 검사 한 건이다. Python Windows text 작성의 CRLF와 Git LF의 차이가 http_common·새 kubernetes_session_revocation 실행기·registry 세 파일에서 확인됐다. 두 실행 종료 후 이 세 파일을 이미 검토해 고정한372f354의 원래 blob bytes로 맞추고 위치를 포함한 AST 동일성을 확인했다. 새 해시를 승인값으로 삼거나 gate를 빼지 않았으며 동일 pin/B 원본/native/source gate/정책·판정·assert를 유지했다. 초기manifest/로그와 전후hash는 별도로 보존하고 영향 재검증한다.

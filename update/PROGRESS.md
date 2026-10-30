@@ -1571,3 +1571,8 @@ git status
 - A1검토전체snapshot만갱신하고 B의기존component gate가현재A소스를거부하는부분은전용pin소비갱신으로남긴다. Windows scratch stat0777 vs Bfixture POSIX0700 assert를관측했으며 원시험의양쪽결과를그대로기록하고 새skip/제외/assert완화는없다. 고정후영향/설치·정확Ref를검증하며 새actualCPU/Kubernetes/principal/암호화/GPU나전체B/A완료는주장하지않는다.
 
 - 고정source e40fcfd / 검토pin299ea03: Linux339통과(동일1349파일), Windows328통과/기존skip1/미선정1·원B POSIX0700 fixture로10실패. 원B보수/새skip/제외/assert완화 없음. Windows 실제collector·전범위 성공은 미확인이고 B확정보수가 필요하다. 설치246일치/공개main CLI4·정확24Ref(15.100초)와 전체소비354는통과. 실제Kube/worker/GPU/신규sourceCPU0, B033 ancestor gate 거부를유지한다.
+
+# 2026-10-30 A1 OBS02/native16 공통 iterator 계측 착수
+
+- A2 최신647553f 제품수락과 worker/acquisition 미지원 초안을 대조하고 보존 source5파일/21함수를 검토했다. 별도 opt-in native16의 실제 generator step 및 parameter callback-return을 기존 OBS02 identity 제품에 연결하는 구현·회귀·문서 초안을 진행한다. 원 native8~15/A2/B bytes·기존팩/정책·판정은 보존한다.
+- 같은 native8 load-call/model 객체와의 결합, 누락/중복/다른귀속/부분소비/종결/후속오류를 구분한다. factory·yield·callback-return은 FD 읽기/최종tensor/worker배정/실제승인 증명이 아니며 UNKNOWN과 진실값false를 유지한다. 소스 고정 검증 전 통과·현재 지원·실제 실행·전체완료를 주장하지 않는다.

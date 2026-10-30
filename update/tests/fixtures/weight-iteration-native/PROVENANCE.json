@@ -1,0 +1,31 @@
+{
+  "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+  "license": "Apache-2.0; original SPDX/copyright preserved",
+  "source_reference_only": true,
+  "files": {
+    "default_loader.py.txt": {
+      "sha256": "d17ab54969489de2338bea88190b4af78c8a1f66e866796f612ff554eea3cca9",
+      "bytes": 21126,
+      "cached_manifest_equal": true,
+      "immutable_public_source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/model_executor/model_loader/default_loader.py",
+      "archived_image_layer": "sha256:30530efd7061ec4f5a1a5f179219c218fc72c486dd215339940b33f7455eb26b",
+      "active_runtime_or_worker_verified": false
+    },
+    "weight_utils.py.txt": {
+      "sha256": "7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd",
+      "bytes": 65986,
+      "cached_manifest_equal": true,
+      "immutable_public_source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/model_executor/model_loader/weight_utils.py",
+      "archived_image_layer": "sha256:30530efd7061ec4f5a1a5f179219c218fc72c486dd215339940b33f7455eb26b",
+      "active_runtime_or_worker_verified": false
+    },
+    "models-utils.py.txt": {
+      "sha256": "7171b6347b3cbab213df299fa317094ac6c9b2b397daf6a2ec93ff3a152b0e75",
+      "bytes": 42028,
+      "cached_manifest_equal": true,
+      "immutable_public_source_url": "https://github.com/vllm-project/vllm/blob/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/model_executor/models/utils.py",
+      "archived_image_layer": "sha256:30530efd7061ec4f5a1a5f179219c218fc72c486dd215339940b33f7455eb26b",
+      "active_runtime_or_worker_verified": false
+    }
+  }
+}

@@ -1,5 +1,6 @@
 """OBS02 reuses closed OBS01 record reads and native8 model attribution facts."""
 from guard.models import canonical_json,sha256_hex,utcnow
+from guard.adapters import vllm_weight_iteration_sensor as weight_sensor,vllm_weight_iteration_metadata as weight_metadata
 from guard.runtime.bounded import strict_json
 from .kubernetes_observation_state import KubernetesObservationStateExecutor
 from .kubernetes_observation import RequiredEventReader
@@ -14,8 +15,8 @@ OBSERVATIONS={**BASE_OBSERVATIONS,**contract.OBSERVATIONS}
 
 
 class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
-    name='observation_identity';version='0.1.0';collection_profile=PROFILE
-    supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8'})
+    name='observation_identity';version='0.2.0';collection_profile=PROFILE
+    supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8',weight_sensor.PROFILE})
     policy_normalizer=staticmethod(contract.normalize_policy)
 
     def run(self,check,env,policy_values,adapter,workdir):
@@ -54,6 +55,9 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
     def project_native(self,ctx,packet,trials):
         value=super().project_native(ctx,packet,trials)
         value['identity_native_models']=contract.native_models(packet,trials)
+        if ctx._termination_prepared['profile']==weight_sensor.PROFILE:
+            value['weight_iteration']=weight_metadata.project(packet)
+            value['identity_native_models']=weight_metadata.attach_configured_models(value['identity_native_models'],value['weight_iteration'])
         return value
 
     def collect(self,ctx):
@@ -79,7 +83,7 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
             model_sha256=sha256_hex(ctx.env.model.id.encode()),revision_sha256=sha256_hex(ctx.env.model.revision.encode()),
             inventory_sha256=ctx.env.model.inventory_sha256)
         summary.update(profile=PROFILE,identity_projection=projected,identity_record_collections=state['collections'],
-            scope='OBS01 /1 declarations and source-bound native8 configured-object candidates; approval/inspection authority, approved physical model scope, actual tensor use and enterprise policy remain unverified.')
+            scope='OBS01 /1 declarations and source-bound native8/16 configured-object and iterator candidates; approval/inspection authority, approved physical model scope, actual tensor use and enterprise policy remain unverified.')
         if state['reader'] is not None:
             summary['identity_record_transport']=state['reader'].report()
             if summary['identity_record_transport'].get('parent_cleanup_unverified'):

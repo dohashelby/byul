@@ -10,7 +10,8 @@ from guard.adapters import vllm_worker_startup_sensor as sensor
 from guard.executors.kubernetes_lifecycle_capture import KubernetesLifecycleReader,KubernetesCaptureError
 from guard.models import canonical_json,sha256_hex
 from tests.test_a1_model_read_scope import reference
-from tests.test_lifecycle_capture import case
+from tests.test_lifecycle_capture import case,external
+from tests.test_lifecycle_sensor import writer_factory
 from tests.test_kubernetes_lifecycle import group,target as native_target
 REPO=Path(__file__).resolve().parents[2]
 

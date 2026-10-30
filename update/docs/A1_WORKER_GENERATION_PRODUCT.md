@@ -1,6 +1,6 @@
 # LIF09 Worker 생성 세대·선정 READY 전송
 
-상태: 구현·시험 초안이며 source/hash 고정과 검증 전이다. 새 native21을 현재 지원·실증 완료로 표시하지 않는다.
+상태: source b88b4a6491a9a0c2908b962b837247c0cea80b55 / reviewed common 062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89의 native21 공통 계측·LIF09 CPU EXAMPLE 제품·설치 검증 마감. 실제 serving/worker/GPU·전체 분기는 미완료다.
 
 SC17-01의 정상·부분 실패·수정 후 기동과 실제 요청 수용 질문을 유지한다. 원 native14/19/20과 B callback/helper bytes를 보존하고 명시 native21으로 기존 initialization:kubernetes 제품에 생성자–Wrapper–Worker 객체와 선정 pipe 사건을 더한다. B/A2 전용 소비·판정은 대신 작성하지 않는다. 기존 OBS02 U1~U6 정책도 미확정이다.
 
@@ -23,3 +23,12 @@ init_native_samples/calls/correspondence의 부모 MP와 기존 init_worker_star
 검증 범위는 정확 source/decorator·원 호출/예외·소유 CPU pipe·열린 main·중복/누락·다른 귀속/thread/세대·후속 계측/수집/첨부/정리 오류와 기존 CLI/증거/보고/verify/반출/복원·저장 팩 정확 Ref이다. source namespace·모델·dependency·PID/start/time·전송을 재배치한 fixture는 CPU EXAMPLE이며 실제 serving 관측으로 대체하지 않는다.
 
 원GPU창 종료·추가 Start0·46.66USD/사용량·보존120GiB EBS·CI 결제 차단과 C/CPU 11의존성 답변 대기를 유지한다. 실제 실패 주입·복구/재배포·worker/GPU 실증은 fresh 시간·소유권·활성작업·quota·잔여비용·ENV/target/POL·실행/복구/정리 책임이 별도로 필요하다.
+
+
+검증 결과: 양쪽 직접 고유49사례다. source df4a795의44통과와 새 시험 파일 json import 누락5실패를 보존하고, 제품 코드·assert·기대값을 바꾸지 않은 b88b4a6에서 영향5사례를 다시 확인했다. 인접 Windows337통과/기존1skip·1deselected, Linux338통과/기존1deselected이며 source1435파일 전후 변화0이다. 생성/원 pipe 정상·생성자 실패·send 실패·busy loop 실패·close 후 오류, 관측 준비/기록/결합 오류의 원 호출/정리 보존, 다른 thread/종료 세대·선정 close·열린 main, 문맥/정확 link/중복/누락·옛 판본 거부와 기존 CLI 후속 수집/첨부 오류를 확인했다.
+
+source/wheel/Windows 격리 설치270파일 일치, wheelSHA f238da1dac617fb4c23e202ad6fd74682aaf8cf73e4f61094995a4d79c0d6220. Linux 격리 설치의 공개 LIF09 CLI 정상·send 실패·seal 실패·첨부 오류4사례에서 각각6Ref·합계24Ref를 verify/export/restore·저장 팩 정확 Ref 재판정으로 대조했다. Source bytes·namespace·model·PID/start/time·전송은 명시 EXAMPLE이며 소유 stdlib pipe 위임만 실제 CPU I/O다. 실제 vLLM 패키지/serving/worker/GPU·Torch/safetensors 실행과 새 의존성 설치는0이다.
+
+관측 code pin은 직접 source compile 기준 Windows3.12.14의 d61dcbfaf7dfb6862f0933c48f06a5b7735eb8433b8e7416a0a4169a75620881, Linux3.12.3의 b6ef5fd638b33995eaa1217bf56279e2b3e9cf6e67781e60b7e9d9deef75e686이다. vendor 세 point·OTel wrapper와 stdlib send/close code도 판본별 literal로 검토했다. source/실행 입력 hash를 자동 승인하지 않았으며 gate/assert 완화·경로 제외·새 skip이 없다.
+
+원13파일·B bytes·옛14/19/20 및 과거 저장 팩/Ref를 보존했다. collection profile은 기존 v1이고 executor0.3.0·파생 pack3/LIF09rev7이 새 생성/pipe 관측을 명시한다. 실제 producer/worker 역할·부모 cohort와 rank/shard·READY 수신/서비스/전체 준비·fault/repair lineage 및 CI5는 여전히 미확인이다. 전체 판정UNKNOWN, normal_control.succeeded=null과 원GPU창 종료/추가Start0·원예산·EBS과금·C/CPU 의존성 답변 대기를 유지한다.

@@ -11,7 +11,7 @@ from guard.adapters import vllm_slot_mask as native
 
 SOURCE_COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 SOURCE_PROFILE='target031'
-PRODUCT_COMPONENT_COMMIT='0d0c116c4a1ed1ef1ba93a80b236bdedd2d73670'  # Root fixes this after native-source freeze.
+PRODUCT_COMPONENT_COMMIT='b15b629431777a86a151353728e612c760aff789'  # Root fixes this after native-source freeze.
 HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 BASE_SHA='c9af729cd1893eda14d0bb222a8fab46c2a6d7b8'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock','update/pyproject.toml','update/reference/framework')

@@ -35,10 +35,10 @@ from tools import lif14_profiler_cpu as component_gate
 PROFILE = 'online-input-source-cpu-proposal-v1'
 SOURCE_PROFILES = {'reference5d': '5d35ce3934a7804b298559d2d99eec33792e1eb9',
                    'target031': 'db9527a46873454610df6dbedf79a36d6bf1a7f6'}
-GATE_SHA256 = '3ada5b08959d2935d8cf0d43d60e09eeaca4c0c560eda8accd22da9631f41d75'
-COMPONENT_COMMIT = '0d0c116c4a1ed1ef1ba93a80b236bdedd2d73670'
+GATE_SHA256 = '942f0dfeb9418a6e934b063c6767405aaa1fa3706ae3f12fa98818e6ff77a76e'
+COMPONENT_COMMIT = 'b15b629431777a86a151353728e612c760aff789'
 # Reviewed collector snapshot de799c2; runtime bytes never become approval.
-COLLECTOR_SHA256 = 'a5030100108bede6cae19c77bbb8474a9e5a7be96d01af8510f49306cc0b5cc8'
+COLLECTOR_SHA256 = '83bc61aad3c386de9b8d9bfc61a520a99b02dc225da6044269fb5440ec6f9a86'
 CHECKS = ('REQ-07', 'REQ-08', 'SUP-08')
 _CASES = {case['id']: case for case in product.fixtures()}
 _TARGET_EXCLUDED = {'reuse-empty', 'reuse-bool', 'reuse-echo-ignores-ids'}

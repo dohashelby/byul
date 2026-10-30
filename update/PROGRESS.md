@@ -1518,3 +1518,5 @@ git status
 검증: 구현·회귀·문서 종료 후 source 고정/영향/Linux/설치본 정확Ref 검증 준비. 현재 통과/실증/전체 완료를 선언하지 않는다.
 다음: 고정검증/보수/커밋·초안PR·정확CI/인계; LIF12 실제retry주체 질문은 대기하며 독립 담당 개발 지속.
 막힌 것: 실제 issuer/cache/event/시간/자격/철회 전 정상/새 연결/전파·원GPU창종료/Start0·CI결제 차단.
+
+- A1 PLT10 선택 자격 관측: 고정15036af Windows234/Linux235, source/wheel/설치225파일, CLI4 정확24Refs, 검토된 전체333소비452fdff. 초기14실패는 소유 ASGI loop 준비 보수; source/native/gate/판정 assert 유지. 실제 issuer 철회/전파·전체PLT10 미완료, 원GPU Start0/CI결제차단 유지.

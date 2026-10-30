@@ -19,3 +19,10 @@
 실제 재개에는 선택 issuer/유효 정책/cache·시험 자격·철회 전 정상·실제 사건/시계/전파·새 접근/receipt·복구/정리 책임과 정확 ENV/POL/source/image/model이 필요하다. source/lab/image/PID 관문과 native0.32 미지원·원GPU창종료/Start0·마지막확인stopped·기존46.66USD/보존120GiB EBS과금·CI결제 차단을 유지한다. 이 문서나 구현은 새 기동/시간/비용/권한 승인이 아니다.
 
 현재 구현·회귀·문서 초안을 마치고 source 고정/검증을 준비한다. 검증 성공·실제 실증·전체 Goal 완료를 미리 선언하지 않는다.
+
+
+고정 검증 source15036af963dddb3b4b00ed9bbd4225b8078a09c1의1280파일을 보존했다. 초기14실패 뒤 시험 loop 준비만 보수하여 Windows234통과/기존skip1·제외1(63.34초, 부모63.994초), 같은 전체bytes의 Linux235통과/기존제외1(19.53초, 부모20.072초)을 확인했다. 초기 Windows416/Linux417의 변하지 않은 인접 통과는 재사용하며 같은 전체 시험을 반복하지 않았다. 새 skip·제외·판정 완화는 없다.
+
+source/wheel/격리 설치225파일 일치, 설치본 정식 CLI4사례(거부·무조건 수락·조건부 수락·첨부 실패)와 정확24Refs 왕복/저장팩 재판정(7.773초), 전체333파일의 검토된 고정 소비452fdff를 확인했다. B 원본27파일·기존c9 pin·A2 전용12파일·native8~14 및 기존 resource probe는 보존한다. 실제 소유 CPU socket의5연결은 직접 시험 근거이며 실제 Pod/issuer/새 serving/GPU 검증은 아니다. 기존 배포wheel04f7856/156파일·과거 MEASURED Ref는 별도 근거다.
+
+이번 단계는 PLT10 선택 자격 관측 및 명시 무조건 제약 판정의 제품 연결·CPU/설치 검증이다. 실제 철회 issuer/cache 사건·철회 전 정상·전파·독립 새 연결 receipt·보안 principal은 미확인이고 전체 PLT10/부모A39 완료가 아니다. 정확 최종HEAD CI는 push 뒤 별도 기록하며 현재 결제 차단을 성공으로 처리하지 않는다. 새GPU/시간/권한/비용 승인은 없고 Start0·마지막확인stopped·보존120GiB EBS과금을 유지한다. 다음에는 PLT11 기존 세션/handle의 실제 수락 주체·종료/유지 정책 경계를 검토하며 LIF12 자동 retry 주체 답변 대기를 별도로 유지한다.

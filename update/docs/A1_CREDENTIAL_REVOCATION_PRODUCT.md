@@ -27,3 +27,10 @@ CPU 검증은 기존 고정 AuthenticationMiddleware/ModelsRouter/serving 함수
 현재 구현·회귀·문서 초안 종료 뒤 source 고정·영향/Linux·설치본/정확Ref·커밋/초안PR/정확CI/인계를 준비한다. 이전 LIF11의222파일/CPU 검증과 실제 배포04f7856 wheel을 이 새 소스 검증으로 소급하지 않는다.
 
 첫 고정 소스 ee9a137의 Windows14실패/416통과·Linux14실패/417통과 기록과1280파일 hash를 보존한다. 공통 원인은 소유 EXAMPLE ASGI 대역의 asyncio.run()이 외부 I/O 금지 패치 뒤 event loop 내부 wakeup socket을 새로 만드는 시험 준비 오류였다. 별도 소유 fixture에서 loop를 패치 전에 만들고 finally로 닫으며, 같은 고정 native 함수·실제 coroutine 호출·외부 socket/Popen 금지·5요청·독립 FAIL·정확Ref assert를 유지한다. 제품 guard/native/전송 gate와 기대 판정을 바꾸지 않는다. 두 검증 종료 확인 후 이 시험·문서만 고치고 영향 재검증한다.
+
+
+고정 검증 source15036af963dddb3b4b00ed9bbd4225b8078a09c1의1280파일을 보존했다. 초기14실패 뒤 시험 loop 준비만 보수하여 Windows234통과/기존skip1·제외1(63.34초, 부모63.994초), 같은 전체bytes의 Linux235통과/기존제외1(19.53초, 부모20.072초)을 확인했다. 초기 Windows416/Linux417의 변하지 않은 인접 통과는 재사용하며 같은 전체 시험을 반복하지 않았다. 새 skip·제외·판정 완화는 없다.
+
+source/wheel/격리 설치225파일 일치, 설치본 정식 CLI4사례(거부·무조건 수락·조건부 수락·첨부 실패)와 정확24Refs 왕복/저장팩 재판정(7.773초), 전체333파일의 검토된 고정 소비452fdff를 확인했다. B 원본27파일·기존c9 pin·A2 전용12파일·native8~14 및 기존 resource probe는 보존한다. 실제 소유 CPU socket의5연결은 직접 시험 근거이며 실제 Pod/issuer/새 serving/GPU 검증은 아니다. 기존 배포wheel04f7856/156파일·과거 MEASURED Ref는 별도 근거다.
+
+이번 단계는 PLT10 선택 자격 관측 및 명시 무조건 제약 판정의 제품 연결·CPU/설치 검증이다. 실제 철회 issuer/cache 사건·철회 전 정상·전파·독립 새 연결 receipt·보안 principal은 미확인이고 전체 PLT10/부모A39 완료가 아니다. 정확 최종HEAD CI는 push 뒤 별도 기록하며 현재 결제 차단을 성공으로 처리하지 않는다. 새GPU/시간/권한/비용 승인은 없고 Start0·마지막확인stopped·보존120GiB EBS과금을 유지한다. 다음에는 PLT11 기존 세션/handle의 실제 수락 주체·종료/유지 정책 경계를 검토하며 LIF12 자동 retry 주체 답변 대기를 별도로 유지한다.

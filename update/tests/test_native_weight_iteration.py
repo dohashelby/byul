@@ -101,6 +101,38 @@ def test_output_path_bound_keeps_known_candidate_and_reports_incomplete():
     assert 'weight_selection_paths_incomplete' in result['missing']
 
 
+def failed_recording():
+    # Exact failure row shape emitted by capture_session after one read fails.
+    return {'pid':43,'start_ticks':99,'capture':None,'session_owner_match':False,
+        'listed_file_identity_match':False,'diagnostic_codes':['LIFECYCLE_PROCESS_RECORDING_UNAVAILABLE']}
+
+
+@pytest.mark.parametrize('position',[0,1])
+def test_one_failed_recording_preserves_other_admitted_pairs_and_locators(position):
+    source=selection(fixture());before=analyze(source)
+    source['recordings'].insert(position,failed_recording());saved=deepcopy(source)
+    result=analyze(source);assert source==saved
+    assert len(result['candidates'])==len(before['candidates']) and result['candidates']
+    expected_recording=1 if position==0 else 0
+    for candidate in result['candidates']:
+        assert candidate['selection_event'][0]==candidate['root_event'][0]==expected_recording
+        assert all(event[0]==expected_recording for event in candidate['source_events'])
+        assert not candidate['per_file_consumption_verified'] and not candidate['scope_complete']
+    assert 'weight_recording_capture_unavailable' in result['missing'] and result['security']=='UNKNOWN'
+
+
+def test_all_recordings_unavailable_is_unknown_without_candidates():
+    result=analyze({'recordings':[failed_recording()]})
+    assert not result['candidates'] and result['security']=='UNKNOWN'
+    assert 'weight_recording_capture_unavailable' in result['missing']
+
+
+def test_unavailable_capture_cannot_claim_process_binding():
+    source=selection(fixture());failed=failed_recording();failed['session_owner_match']=True
+    source['recordings'].append(failed)
+    with pytest.raises(ValueError,match='NATIVE_WEIGHT_ITERATION_INPUT_INVALID'):analyze(source)
+
+
 def test_unverified_root_does_not_join():
     source=selection(fixture())
     for row in source['recordings'][0]['capture']['records']:

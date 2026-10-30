@@ -12,7 +12,7 @@ from guard.adapters import vllm_weight_iteration_metadata as common
 from guard.adapters import vllm_weight_iteration_sensor as sensor
 from guard.models import canonical_json, sha256_hex
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 SCHEMA = "guard-native-weight-selection-iteration/1"
 SOURCE_PINS = {
     "vllm_weight_iteration_metadata.py": "f8ced901b1b1c7d918f96c9ef8ec0899696c2d161efbaefdd43dbedd340f04c0",
@@ -59,7 +59,12 @@ def _analyze(packet):
     _require(type(packet) is dict and type(packet.get("recordings")) is list and len(packet["recordings"]) <= 32)
     selections, missing, seen = [], [], set()
     for index, recording in enumerate(packet["recordings"]):
-        _require(type(recording) is dict and type(recording.get("capture")) is dict)
+        _require(type(recording) is dict and "capture" in recording)
+        if recording["capture"] is None:
+            _require(recording.get("session_owner_match") is False and recording.get("listed_file_identity_match") is False)
+            missing.append("weight_recording_capture_unavailable")
+            continue
+        _require(type(recording["capture"]) is dict)
         capture = recording["capture"]; rows = capture.get("records")
         _require(type(rows) is list and len(rows) <= sensor.MAX_ROWS and len(canonical_json(rows)) <= sensor.MAX_BYTES)
         if not rows:

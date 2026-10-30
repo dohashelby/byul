@@ -4,6 +4,8 @@
 
 공개 함수는 `guard.collectors.native_weight_iteration.analyze(packet)`이다. 입력은 A1의 기존 `capture_session` 경로에서 prepared/ENV/target/source/code/session/clock/hashchain/process binding을 이미 검증한 normalized packet이다. 임의 JSON을 신뢰 관측으로 반입하는 도구가 아니다. 이 함수는 새 profile16만 명시적으로 받고, 고정 metadata/sensor bytes를 literal과 대조하며, 공통 journal/project 및 returned_weight_selection을 재사용한다.
 
+판본 0.1.1은 `capture_session`이 개별 읽기 실패 때 내보내는 `capture=None`과 두 binding=false 행을 불완전 수집으로 남긴다. 다른 recording의 유효 paired 사실과 원래 recording 번호·source locator는 보존한다. 누락 행에서 관측을 만들거나 전체 수집 완료를 주장하지 않으며, binding=true인 모순 행과 malformed/unsupported 입력은 여전히 거부한다.
+
 같은 recording·loader call·model object에 속하고 선택 뒤에 관측된 paired yield만 후보로 결합한다. 서로 다른 recording/PID·call·model을 이어 붙이지 않는다. root_load는 전체 모델 세대가 아닌 generator 구간 ID다. 한 load call의 여러 선택은 후보의 모호성으로 남기며 파일별 실제 진행을 추정하지 않는다. 경로 hash·locators·후보 개수는 제한하고, prefix/부분 진행과 coverage를 구분한다.
 
 native16 proxy 반환에서는 legacy `factory_returned_generator`가 false일 수 있다. 원값을 그대로 남기고, 실제 진행은 공통 paired step에서 따로 읽는다. 값을 true로 바꾸거나 flag를 삭제하지 않는다. callback의 반환 후 이름 yield는 callback 구현·최종 tensor 저장·GPU 완료의 증명이 아니다.

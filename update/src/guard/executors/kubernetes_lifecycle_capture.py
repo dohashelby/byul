@@ -15,6 +15,7 @@ from guard.adapters import vllm_stream_buffer_sensor as stream_sensor
 from guard.adapters import vllm_rank_failure_sensor as rank_sensor
 from guard.adapters import vllm_initialization_sensor as init_sensor
 from guard.adapters import vllm_profiler_sensor as profiler_sensor
+from guard.adapters import vllm_file_read_sensor as read_sensor
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor
 from guard.runtime.bounded import capture_pipes
 from guard.runtime.kubernetes_binding import validate_capture_target, verify_owned_pod, project_owned_snapshot
@@ -49,10 +50,12 @@ def supervised_source(source):
 
 class KubernetesLifecycleReader:
     def __init__(self,target,env,prepared,*,binary="kubectl",duration=180,runner=None):
-        if prepared.get("profile") in {rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE} and (env.engine.name!="vllm" or env.engine.version!="0.31.0"):
+        if prepared.get("profile") in {rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE} and (env.engine.name!="vllm" or env.engine.version!="0.31.0"):
             raise KubernetesCaptureError()
         if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
             raise KubernetesCaptureError()
+        from guard.collectors.model_read_scope import validate_binding
+        validate_binding(prepared,env,target)
         self._initialize(validate_target(target,env),target,prepared,binary=binary,duration=duration,runner=runner)
 
     def _initialize(self,binding,target,prepared,*,binary,duration,runner):
@@ -64,8 +67,8 @@ class KubernetesLifecycleReader:
             raise KubernetesCaptureError()
         self.target_sha256=sha256_hex(canonical_json(target))
         self.session=prepared["session"]
-        self.file_read_profile = EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE} else None
-        self.file_read_limit = weight_sensor.MAX_BYTES if prepared.get("profile")==weight_sensor.PROFILE else profiler_sensor.MAX_BYTES if prepared.get("profile")==profiler_sensor.PROFILE else init_sensor.MAX_BYTES if prepared.get("profile")==init_sensor.PROFILE else rank_sensor.MAX_BYTES if prepared.get("profile")==rank_sensor.PROFILE else stream_sensor.MAX_BYTES if prepared.get("profile")==stream_sensor.PROFILE else attempt.MAX_BYTES if prepared.get("profile") in {attempt.PROFILE,output_sensor.PROFILE} else online.MAX_BYTES if self.file_read_profile is not None else 262144
+        self.file_read_profile = EXTENDED_RECORDING_PROFILE if prepared.get("profile") in {online.PROFILE,attempt.PROFILE,output_sensor.PROFILE,stream_sensor.PROFILE,rank_sensor.PROFILE,init_sensor.PROFILE,profiler_sensor.PROFILE,weight_sensor.PROFILE,read_sensor.PROFILE} else None
+        self.file_read_limit = weight_sensor.MAX_BYTES if prepared.get("profile") in {weight_sensor.PROFILE,read_sensor.PROFILE} else profiler_sensor.MAX_BYTES if prepared.get("profile")==profiler_sensor.PROFILE else init_sensor.MAX_BYTES if prepared.get("profile")==init_sensor.PROFILE else rank_sensor.MAX_BYTES if prepared.get("profile")==rank_sensor.PROFILE else stream_sensor.MAX_BYTES if prepared.get("profile")==stream_sensor.PROFILE else attempt.MAX_BYTES if prepared.get("profile") in {attempt.PROFILE,output_sensor.PROFILE} else online.MAX_BYTES if self.file_read_profile is not None else 262144
         self.binary=binary;self.deadline=time.monotonic()+duration
         self.runner=runner or capture_pipes;self.injected=runner is not None
         self.programs={"file":_FILE_READER,"context":CONTEXT_READER,"inventory":INVENTORY_READER,"seal":SESSION_SEALER}

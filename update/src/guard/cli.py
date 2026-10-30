@@ -464,13 +464,37 @@ def verify(config: Path = ConfigOpt, store: Optional[Path] = StoreOpt) -> None:
     raise typer.Exit(1 if problems else 0)
 
 
+@app.command("prepare-model-read-scope")
+def prepare_model_read_scope(env: Path = typer.Option(...,"--env"),target: Path = typer.Option(...,"--target"),
+    model_manifest: Path = typer.Option(...,"--model-manifest"),model_root: str = typer.Option(...,"--model-root"),
+    output: Path = typer.Option(...,"--output"),nonsecret_model_weights: bool = typer.Option(False,"--nonsecret-model-weights"),
+    hash_model_bytes: bool = typer.Option(False,"--hash-model-bytes"),max_hash_bytes: int = typer.Option(2**31,"--max-hash-bytes")) -> None:
+    """선언한 비밀 아닌 safetensors 참조 범위를 만든다. 모델 파일을 읽지 않는다."""
+    from guard.collectors.file import load_environment
+    from guard.collectors.model_read_scope import build_scope
+    from guard.executors.owned_capture import strict_json
+    from guard.collectors.route_observations import validate_output
+    from guard.models import canonical_json
+    try:
+        environment=load_environment(env)
+        with target.open('rb') as stream:topology=strict_json(stream.read(65537))
+        value=build_scope(environment,topology,model_manifest,model_root,nonsecret_model_weights=nonsecret_model_weights,
+            hash_model_bytes=hash_model_bytes,max_hash_bytes=max_hash_bytes)
+        validate_output(output,Path(__file__).resolve().parents[3]);destination=output.absolute()
+        with destination.open('xb') as stream:stream.write(canonical_json(value))
+    except (OSError,ValueError,TypeError):
+        typer.echo("MODEL_READ_SCOPE_PREPARATION_FAILED");raise typer.Exit(2)
+    typer.echo(json.dumps({"prepared":True,"model_files_read":False,"approval_verified":False}))
+
+
 @app.command("prepare-lifecycle-sensor")
 def prepare_lifecycle_sensor(output: Path = typer.Option(..., "--output"),
-    profile: str | None = typer.Option(None, "--profile")) -> None:
+    profile: str | None = typer.Option(None, "--profile"),
+    model_read_scope: Path | None = typer.Option(None, "--model-read-scope")) -> None:
     """소유 대상용 native metadata 센서를 준비한다. 엔진·클라이언트를 만들지 않는다."""
     from guard.collectors.lifecycle import prepare_assets
     try:
-        value = prepare_assets(output, Path(__file__).resolve().parents[3], profile=profile)
+        value = prepare_assets(output, Path(__file__).resolve().parents[3], profile=profile,model_read_scope=model_read_scope)
     except (OSError, ValueError, TypeError):
         typer.echo("LIFECYCLE_PREPARATION_FAILED")
         raise typer.Exit(2)

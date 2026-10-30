@@ -1578,3 +1578,8 @@ git status
 - 같은 native8 load-call/model 객체와의 결합, 누락/중복/다른귀속/부분소비/종결/후속오류를 구분한다. factory·yield·callback-return은 FD 읽기/최종tensor/worker배정/실제승인 증명이 아니며 UNKNOWN과 진실값false를 유지한다. 소스 고정 검증 전 통과·현재 지원·실제 실행·전체완료를 주장하지 않는다.
 
 - 고정sourcef1d4149/pinc8c4b26: 직접Win/Linux각36, 인접Win `635 passed in 991.34s (0:16:31)`·Linux `635 passed in 222.87s (0:03:42)`, 동일1358파일 불변. 설치248/CLI4·정확24Ref(29.963초), 전체소비356/제외0. 최초실패와OS별컴파일cache·새fixture 시각 보수를보존했고 gate/원assert/새skip/실행시hash승인없다. source-bound iterator/callback-return을 기존 OBS02에서소비하지만 실제FD/tensor/권한/worker·전체A/A1/분기완료는미확인이다. 원GPU창종료/Start0/비용·EBS/과거실증·B Windows원fixture 실패와CI차단을유지한다.
+
+# 2026-10-30 A1 OBS02/native17 eager FD/read 구현 초안
+
+- 고정된 eager source의 원본 binary open/read/close를 세션·ENV/대상·모델참조 범위와 결합해 기존 OBS02에서 소비한다. 별도 모델 helper read/전략전환/global builtins 변경은 없다. native8/native16/A2/B 센서·원본 bytes를 보존한다. 원문·credential hash는 수집하지 않으며 명시한 비밀 아닌 safetensors read buffer hash만 허용한다.
+- 검증 전 초안이다. C safe_open/mmap/torch.load read·최종tensor/backend·worker역할·승인권한·실제GPU는 미연결/UNKNOWN이다. 기존 CI 외부차단·GPU창종료/Start0·46.66USD/과거사용량/120GiB EBS·부모/A1 전체범위를 유지한다.

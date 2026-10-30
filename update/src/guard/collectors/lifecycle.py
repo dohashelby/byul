@@ -16,6 +16,7 @@ from guard.adapters import vllm_stream_buffer_sensor as stream_sensor
 from guard.adapters import vllm_rank_failure_sensor as rank_sensor
 from guard.adapters import vllm_initialization_sensor as init_sensor
 from guard.adapters import vllm_profiler_sensor as profiler_sensor
+from guard.adapters import vllm_file_read_sensor as read_sensor
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor
 from guard.collectors.file import load_environment
 from guard.collectors.route_observations import validate_output
@@ -24,10 +25,15 @@ from guard.models import DataOrigin
 from guard.update_validation import reserve_output
 
 
-def prepare_assets(output, repository, *, profile=None):
-    selected = sensor if profile in (None, sensor.PROFILE) else online if profile == online.PROFILE else attempt if profile == attempt.PROFILE else output_sensor if profile == output_sensor.PROFILE else stream_sensor if profile == stream_sensor.PROFILE else rank_sensor if profile == rank_sensor.PROFILE else init_sensor if profile == init_sensor.PROFILE else profiler_sensor if profile == profiler_sensor.PROFILE else weight_sensor if profile == weight_sensor.PROFILE else None
+def prepare_assets(output, repository, *, profile=None, model_read_scope=None):
+    selected = sensor if profile in (None, sensor.PROFILE) else online if profile == online.PROFILE else attempt if profile == attempt.PROFILE else output_sensor if profile == output_sensor.PROFILE else stream_sensor if profile == stream_sensor.PROFILE else rank_sensor if profile == rank_sensor.PROFILE else init_sensor if profile == init_sensor.PROFILE else profiler_sensor if profile == profiler_sensor.PROFILE else weight_sensor if profile == weight_sensor.PROFILE else read_sensor if profile == read_sensor.PROFILE else None
     if selected is None:
         raise ValueError("LIFECYCLE_PROFILE_UNAVAILABLE")
+    from guard.collectors import model_read_scope as scope_contract
+    if selected is read_sensor:
+        if model_read_scope is None:raise ValueError('MODEL_READ_SCOPE_REQUIRED')
+        scope,scope_raw=scope_contract.load_scope(model_read_scope)
+    elif model_read_scope is not None:raise ValueError('MODEL_READ_SCOPE_PROFILE_MISMATCH')
     output = Path(output).absolute()
     if any(parent.is_symlink() or parent.is_junction() or (parent/".git").exists() for parent in output.parents):
         raise ValueError("LIFECYCLE_OUTPUT_IN_REPOSITORY")
@@ -56,7 +62,13 @@ def prepare_assets(output, repository, *, profile=None):
     ).encode()
     values = {"guard_lifecycle_sensor.py":source, "sitecustomize.py":bootstrap,
               "settings.json":(json.dumps(config,sort_keys=True,indent=2)+"\n").encode()}
-    if selected is online:
+    if selected is read_sensor:
+        base_raw=Path(sensor.__file__).read_bytes();iteration_raw=Path(weight_sensor.__file__).read_bytes()
+        if (hashlib.sha256(base_raw).hexdigest()!=read_sensor.BASE8_SHA256 or hashlib.sha256(iteration_raw).hexdigest()!=read_sensor.ITERATION16_SHA256):
+            raise ValueError('LIFECYCLE_FILE_READ_DEPENDENCY_UNAVAILABLE')
+        deployed=scope_contract.deploy_scope(scope,scope_raw,session)
+        values.update({'guard_lifecycle_base.py':base_raw,'guard_weight_iteration.py':iteration_raw,'model-read-scope.json':deployed})
+    elif selected is online:
         from guard.adapters import vllm_online_input as callback
         base_raw, callback_raw = Path(sensor.__file__).read_bytes(), Path(callback.__file__).read_bytes()
         if (hashlib.sha256(base_raw).hexdigest() != online.BASE_SHA256
@@ -83,6 +95,7 @@ def prepare_assets(output, repository, *, profile=None):
         "public_commit":sensor.COMMIT, "assets":assets,
         "source_sha256":profiles.source_hashes(selected.PROFILE), "engine_started":False,
         "image_contents_verified":False, "product_connected":False}
+    if selected is read_sensor:manifest['model_read_scope']=scope_contract.scope_summary(scope)
     with (output/"manifest.json").open("x",encoding="utf-8",newline="\n") as stream:
         json.dump(manifest,stream,sort_keys=True,indent=2)
         stream.write("\n")
@@ -92,10 +105,12 @@ def prepare_assets(output, repository, *, profile=None):
 def load_prepared(path):
     path = Path(path)
     with path.open("rb") as stream:
-        manifest = strict_json(stream.read(16385),limit=16384)
-    if (type(manifest) is not dict or set(manifest) != {"schema","profile","session","public_commit",
-            "assets","source_sha256","engine_started","image_contents_verified","product_connected"}
-            or manifest["schema"] != "guard-lifecycle-assets/1" or type(manifest["profile"]) is not str
+        raw_manifest=stream.read(262145)
+        manifest = strict_json(raw_manifest,limit=262144)
+    if (type(manifest) is not dict or set(manifest) != ({"schema","profile","session","public_commit",
+            "assets","source_sha256","engine_started","image_contents_verified","product_connected"} | ({'model_read_scope'} if manifest.get('profile')==read_sensor.PROFILE else set()))
+            or manifest.get('profile')!=read_sensor.PROFILE and len(raw_manifest)>16384
+            or manifest["schema"] != "guard-lifecycle-assets/1"  or type(manifest["profile"]) is not str
             or manifest["profile"] not in profiles.SCHEMAS
             or manifest["public_commit"] != sensor.COMMIT
             or manifest["source_sha256"] != profiles.source_hashes(manifest["profile"])
@@ -103,7 +118,7 @@ def load_prepared(path):
             or manifest["engine_started"] is not False or manifest["image_contents_verified"] is not False
             or manifest["product_connected"] is not False
             or type(manifest["assets"]) is not dict
-            or set(manifest["assets"]) != ({"guard_lifecycle_sensor.py","sitecustomize.py","settings.json",
+            or set(manifest["assets"]) != ({'guard_lifecycle_sensor.py','sitecustomize.py','settings.json','guard_lifecycle_base.py','guard_weight_iteration.py','model-read-scope.json'} if manifest['profile']==read_sensor.PROFILE else {"guard_lifecycle_sensor.py" ,"sitecustomize.py","settings.json",
                 "guard_lifecycle_base.py","guard_online_input_callback.py"} if manifest["profile"] == online.PROFILE
                 else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py","guard_attempt_invocation.py"}
                     if manifest["profile"]==output_sensor.PROFILE else {"guard_lifecycle_sensor.py","sitecustomize.py","settings.json","guard_lifecycle_base.py"}
@@ -138,6 +153,13 @@ def load_prepared(path):
         if manifest["profile"]==output_sensor.PROFILE and name in {"guard_lifecycle_base.py","guard_attempt_invocation.py"}:
             required=output_sensor.BASE8_SHA256 if name=="guard_lifecycle_base.py" else output_sensor.INVOCATION10_SHA256
             if hashlib.sha256(raw).hexdigest()!=required:raise ValueError("LIFECYCLE_OUTPUT_DEPENDENCY_UNAVAILABLE")
+        if manifest['profile']==read_sensor.PROFILE:
+            required={'guard_lifecycle_base.py':read_sensor.BASE8_SHA256,'guard_weight_iteration.py':read_sensor.ITERATION16_SHA256}.get(name)
+            if required is not None and hashlib.sha256(raw).hexdigest()!=required:raise ValueError('LIFECYCLE_FILE_READ_DEPENDENCY_UNAVAILABLE')
+            if name=='model-read-scope.json':
+                from guard.collectors.model_read_scope import scope_summary
+                value=read_sensor.validate_scope(strict_json(raw,limit=262144),session=manifest['session'])
+                if scope_summary(value)!=manifest['model_read_scope']:raise ValueError('MODEL_READ_SCOPE_MANIFEST_MISMATCH')
         if name == "guard_lifecycle_sensor.py":
             source_supported = profiles.asset_supported(manifest["profile"], raw)
     if not source_supported:

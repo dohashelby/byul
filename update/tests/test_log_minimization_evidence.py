@@ -1,7 +1,9 @@
 """원 OBS-03 manual 제품 연결의 EXAMPLE 회귀. 실제 Kubernetes/API 실행 0회."""
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
 
 import pytest
@@ -53,7 +55,8 @@ def case(tmp_path, monkeypatch):
     calls = []
     def example_capture(environment, target_value, policy_values, **kwargs):
         assert environment.data_origin == DataOrigin.EXAMPLE
-        assert policy_values == values and kwargs['expected_policy_ref'] == pol.ref()
+        assert bridge._digest(policy_values) == capture['policy_values_sha256']
+        assert kwargs['expected_policy_ref'].model_dump(mode='json') == capture['policy_ref']
         calls.append((environment.ref(), kwargs))
         return deepcopy(capture)
     monkeypatch.setattr(bridge, '_capture', example_capture)
@@ -68,11 +71,31 @@ def latest_evidence(case):
 
 
 def test_preflight_does_not_import_collector_or_make_output(case):
-    result = bridge.run(**case['args'])
+    root = Path(__file__).resolve().parents[1]
+    program = '''
+import json,sys
+from pathlib import Path
+from guard.collectors import log_minimization_evidence as bridge
+args=json.loads(sys.argv[1])
+assert Path(bridge.__file__).resolve()==Path(sys.argv[2]).resolve()
+result=bridge.run(**args)
+assert not Path(args['output']).exists()
+assert 'guard.collectors.kubernetes_log_minimization' not in sys.modules
+assert 'torch' not in sys.modules and 'vllm' not in sys.modules
+print(json.dumps(result))
+'''
+    environment = dict(os.environ, PYTHONPATH=os.pathsep.join(map(str, (root / 'src', root))),
+        PYTHONNOUSERSITE='1', PYTHONDONTWRITEBYTECODE='1', PYTHONOPTIMIZE='0')
+    before = bridge._inventory(case['source'].root)
+    checked = subprocess.run([sys.executable, '-B', '-P', '-c', program,
+        json.dumps({key: str(value) for key, value in case['args'].items()}),
+        str(root / 'src/guard/collectors/log_minimization_evidence.py')],
+        cwd=case['source'].root.parent, env=environment, capture_output=True, text=True)
+    assert checked.returncode == 0, checked.stderr
+    result = json.loads(checked.stdout)
     assert result['preflight'] and result['collector_calls'] == 0 and not case['calls']
     assert result['pack'] == bridge.PACK_REF and not case['args']['output'].exists()
-    assert 'guard.collectors.kubernetes_log_minimization' not in sys.modules
-    assert 'torch' not in sys.modules and 'vllm' not in sys.modules
+    assert bridge._inventory(case['source'].root) == before
 
 
 def test_original_manual_definition_and_scoped_declared_fail_roundtrip(case):
@@ -91,7 +114,7 @@ def test_original_manual_definition_and_scoped_declared_fail_roundtrip(case):
         assert evidence.observations[key].value is None and not evidence.observations[key].collected
     assert evidence.observations['log_coverage_complete'].value is False
     assert evidence.observations['log_source_ids_tested'].value == ['EXAMPLE-pod-stdout']
-    assert evidence.observations['log_required_branches_tested'].value == ['error', 'normal']
+    assert evidence.observations['log_required_branches_tested'].value == []
     doc = yaml.safe_load((case['args']['output'] / 'manual-evidence.yaml').read_text())
     (entry,) = doc['checks']; original = case['pack'].checks['OBS-03']
     assert entry['question'] == original.question and original.revision == 5
@@ -221,6 +244,26 @@ def test_unverified_dump_never_becomes_verified_branch(case):
     evidence = latest_evidence(case)
     assert 'exception_dump' not in evidence.observations['log_required_branches_tested'].value
     assert evidence.observations['log_fields_seen'].value is None
+
+
+@pytest.mark.parametrize('scope', ['single_partial', 'single_full_required', 'multiple_missing'])
+def test_global_branch_coverage_requires_every_declared_source(case, scope):
+    if scope.startswith('single'):
+        values = {**case['values'], 'required_sources': [case['args']['source_id']]}
+        pol = case['pol'].model_copy(update={'revision': 2, 'values': {'OBS-03': values}}).seal()
+        case['source'].put(pol)
+        plan = select(case['pack'], [case['env']], pol); case['source'].put(plan)
+        case['args']['plan_id'] = plan.id
+        case['capture'].update(policy_ref=pol.ref().model_dump(mode='json'), policy_values_sha256=bridge._digest(values))
+    if scope == 'single_full_required':
+        case['capture'].update(exception_dump_verified=True, branches_tested=['normal', 'error', 'exception_dump'])
+    bridge.run(**case['args'], execute=True)
+    evidence = latest_evidence(case)
+    expected = [] if scope == 'multiple_missing' else ['normal', 'error']
+    if scope == 'single_full_required': expected.append('exception_dump')
+    assert evidence.observations['log_required_branches_tested'].value == expected
+    source_branches = ['error', 'exception_dump', 'normal'] if scope == 'single_full_required' else ['error', 'normal']
+    assert evidence.observations['log_sources_tested'].value == {case['args']['source_id']: source_branches}
 
 
 def test_existing_output_and_original_refs_are_preserved(case):

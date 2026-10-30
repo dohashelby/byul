@@ -237,11 +237,13 @@ def run(*, store, plan_id, pack, target, source_id, output, entered_by, execute=
         f"부분 tokenize 정상={capture['normal_control']['succeeded']}. "
         '원 필드명·본문·원문 hash는 미수집이며 전체 모델 정상 대조/다른 문맥·사본은 UNKNOWN이다.')
     read = any(row['attempted'] and row['binding_verified'] and row['returncode'] == 0 for row in capture['source_reads'])
+    global_branches = [branch for branch in values['required_branches']
+        if set(values['required_sources']) == {source_id} and branch in capture['branches_tested']]
     observations = {
         'log_coverage_complete': (False, True), 'log_coverage_gaps': (['OBS03_SELECTED_SOURCE_PARTIAL_SCOPE', *capture['gaps']], True),
         'log_source_ids_tested': ([source_id] if read else None, read),
         'log_sources_tested': ({source_id: capture['branches_tested']} if read else None, read),
-        'log_required_branches_tested': (capture['branches_tested'] if read else None, read),
+        'log_required_branches_tested': (global_branches if read else None, read),
         'log_marker_contexts_seen': (capture['marker_contexts_seen'] if read else None, read)}
     for obs in entry['required_observations']:
         value, collected = observations.get(obs['key'], (None, False))

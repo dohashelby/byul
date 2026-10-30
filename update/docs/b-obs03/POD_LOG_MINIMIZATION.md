@@ -53,6 +53,10 @@ pipe hash·임의 필드명 또는 그 hash·전체 projection은 저장하지 �
 enum만 기록한다. 저장 필드 이름을 새 필수 관측으로 만들지 않는다. 원래 정상 대조는
 모델 추론까지 완료하지 않았으므로 `not_attempted`로 남기고, 부분 tokenize의 3개
 상태와 정상 결과는 artifact/설명에 따로 기록한다. 원 챌린지 전체도 미시도 상태를 유지한다.
+`log_sources_tested`는 선정 source의 실제 분기를 나타낸다. 전체
+`log_required_branches_tested`는 기업의 모든 required_sources에서 확인한 분기의 교집합이다.
+선정 source 외의 필수 사본을 수집하지 않았다면 전체 분기 목록은 비어 있다. 필수 source가
+선정 하나인 경우에만 실제 확인한 required_branches를 기업 목록 순서대로 기록한다.
 
 수동 EVD의 출처는 기존 계약대로 DECLARED다. EXAMPLE ENV의 단위 fixture는 artifact와
 관측 설명에 EXAMPLE을 명시하며 실제 Kubernetes 관측으로 세지 않는다. 정책·신고 입력자의
@@ -73,3 +77,5 @@ python -B -m pytest tests/test_log_minimization_evidence.py -q --basetemp=EXTERN
 전용 시험은 EXAMPLE capture 한 경계만 대체한다. 원 정의·정확 Ref·정책 보존·privacy·
 후기 실패와 독립 FAIL·UNKNOWN 범위·원 Store 보존·복원/공개 CLI를 확인한다.
 실제 collector/A108 HTTP 연결은 별도 고정 소스 통합 검증으로 구분한다.
+preflight의 lazy import·출력 미생성·torch/vLLM 미수입은 새 Python subprocess에서 확인한다.
+같은 pytest 수집 과정에서 collector 시험 모듈이 먼저 import되더라도 이 검증은 독립적으로 동작한다.

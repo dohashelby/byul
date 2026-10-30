@@ -105,7 +105,7 @@ def test_registered_product_keeps_observations_unknown_and_exact_refs(tmp_path,g
         result=runner.invoke(app,list(map(str,args)));assert result.exit_code==0,(result.output,result.exception)
         assert PRIVATE not in result.output and key not in result.output
     cli(['select','--pack',pack.path,'--env',tmp_path/'environment.json','--policy',tmp_path/'policy.json',*common]);plan,=Store.read_only(tmp_path/'store').iter_kind('PLAN')
-    cli(['run','--plan',plan.id,'--pack',pack.path,*common]);cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['verify',*common])
+    cli(['run','--plan',plan.id,'--pack',pack.path,*common]);cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');e,=store.iter_kind('EVD');res,=store.iter_kind('RES')
     assert e.data_origin.value=='EXAMPLE' and e.normal_control.succeeded is None
     if mode in {'normal','denied','missing-key','rewrite','duplicate'}:assert e.execution.status.value=='COMPLETED'

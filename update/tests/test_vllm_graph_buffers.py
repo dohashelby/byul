@@ -388,3 +388,19 @@ def test_example_native_probe_skips_capture_uninitialized_and_device_switch_and_
     assert result['reason'] == reason
     assert calls == (['query'] if case == 'exception' else [])
     assert 'PRIVATE' not in json.dumps(result)
+
+
+@pytest.mark.parametrize('count,complete', [(1, True), (8, True), (9, False), (0, False)])
+def test_output_capture_bound_and_empty_never_claim_complete(observer, count, complete):
+    gaps = set()
+    output = observer._output([Tensor() for _ in range(count)], gaps)
+    assert len(output['tensor_items']) == min(count, 8)
+    assert output['complete'] is complete
+    assert ('OUTPUT_BOUND' in gaps) is (count > 8)
+    if count == 0:
+        assert 'OUTPUT_METADATA_UNAVAILABLE' in gaps
+    assert all(item['descriptor']['values_collected'] is False for item in output['tensor_items'])
+
+
+def test_absent_output_is_uncollected(observer):
+    assert observer._output(None, set()) == {'tensor_items': [], 'complete': None}

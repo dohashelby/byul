@@ -220,14 +220,16 @@ class GraphBufferObserver:
     def _output(self, value, gaps):
         if value is None:
             return {'tensor_items': [], 'complete': None}
+        bounded = True
         if type(value) in (tuple, list):
-            if len(value) > MAX_OUTPUT_TENSORS:
+            bounded = len(value) <= MAX_OUTPUT_TENSORS
+            if not bounded:
                 gaps.add('OUTPUT_BOUND')
             items = value[:MAX_OUTPUT_TENSORS]
         else:
             items = (value,)
         tensors = [self._tensor(item, gaps) for item in items]
-        complete = all(item['descriptor'].get('status') == 'collected' for item in tensors)
+        complete = bool(tensors) and bounded and all(item['descriptor'].get('status') == 'collected' for item in tensors)
         if not complete:
             gaps.add('OUTPUT_METADATA_UNAVAILABLE')
         return {'tensor_items': tensors, 'complete': complete}

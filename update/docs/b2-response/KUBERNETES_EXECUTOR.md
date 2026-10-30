@@ -29,3 +29,11 @@ HTTP 오류 응답 관측과 native handler·모델·GPU 소비는 별도 범위
 전용 unit은 EXAMPLE 대상/전송 대역과 메모리상 CheckDef 규칙을 사용한다.
 기존 whole PASS 유지·partial FAIL/UNKNOWN·정상3값·후기 오류 보존·요청전 gate를 검증한다.
 실제 K8/네트워크/기존 CPU 시험은 실행하지 않는다.
+
+## 통합 상태 — 2026-10-30
+
+빈 오류 허용 목록은 명시 deny-all로 보존하고 원4POL의 누락·None·타입 검사를 유지한다. 공통 runner가 전달하는 새 중첩 workdir을 실행기가 생성하며, 첨부 xb 저장 실패에도 독립 FAIL을 보존한다. challenge 시도는 실제 primary 요청 요약에서 읽는다. 직접 정책 영향143개 및 마지막 전용71개, 통합 core/첨부 영향77개가 통과했고 집중검토 지적은 수정 확인됐다. 중복 시험을 성과 수로 합산하지 않는다.
+
+A108의 확정 HTTP 소스를 변경하지 않고 실제 stdlib 자식·loopback으로 EXAMPLE 200→400→200, 필드 hash 위반1개와 정리를 확인했다. 이는 실제 Kubernetes·모델 추론 결과와 구분한다. 기존 adapter19개와 실제 HTTP 소비 증거는 adapter bytes가 같아 재사용했다.
+
+A 공통 변경은 source-cpu 등록과 함께 묶어 요청한다. REQ13은 response_content:kubernetes-error-fields 등록, 기존 내부 _runtime_environ/_kubernetes_target_sha256 전달, 단독 실행에서 선정 target hash 공급이 필요하다. CheckDef의 기존 필수 관측·네 POL·PASS 규칙을 유지하고 coverage=false에서만 optional response_violations nonempty를 확인하는 조건부 FAIL 규칙을 제안한다. 공통 수정 반영 후 정확 통합 소스로 공통 명령→EVD/RES/RPT·Store/복원을 검증해야 한다. 현재 이 최종 경로와 실제 Kubernetes 실행은 0회다.

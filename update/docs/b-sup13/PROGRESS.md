@@ -8,3 +8,5 @@
 ## 공통 runner의 새 작업 경로 보수 — 2026-10-30
 
 REQ13 연결 검토에서 core/run의 workdir이 미생성 경로임을 확인했고 같은 조건을 SUP13에도 적용했다. executor가 자기 중첩 경로를 만든 뒤 기존 strict 경로·fresh child·append-only 첨부 검사를 수행한다. 실제 common 경로 형태를 사용한 회귀를 추가해 전용30개 통과(pytest0.99초/부모1.102초), source bytes 전후 동일을 확인했다. 기존 실제 source 경계는 재사용하며 최종 공통 CLI는 A 등록 대기다.
+
+통합 source ae115d2의 wheel164파일과 설치 bytes가 일치했고 수정된 SUP13 부모와 신규 REQ13 부모/adapter의 설치 import가 확인됐다. 기존 CPU/native 경계 실험은 반복하지 않았다. 공통 core/첨부77개 통과, source bytes 전후 동일.

@@ -53,3 +53,7 @@ ENV는 source-db9527a46873454610df6dbedf79a36d6bf1a7f6이며 model/image를 지�
 ## 실제 환경 잔여
 
 Kubernetes/GPU는 실제 실행0회다. 승인된 공급 template/모델·이미지/세대/설정·POL·run/복구 담당자와 대상이 아직 없다. 기존 CPU image adapter gate를 확대하지 않는다. 실제 배포 대상에서는 승인된 template와 기존 전송/수집 경로를 재사용해 필요한 분기만 검증하고 owned 계측/probe만 정리한다. Pod/공유GPU·서버를 기동하거나 중단하지 않는다. SUP-13 전체 완료로 집계하지 않는다.
+
+## 부모·고정 producer 분리
+
+공통 부모는 A가 등록한 확정 통합 checkout에서 실행하고, producer_checkout은 검토된 독립 B checkout 2e3345d5270e6b12843645c86a0139fc7a594f03을 가리킨다. child component8d33d7e·collector/native 승인 SHA와 전체 snapshot 검사는 유지한다. 이후 부모에 추가된 다른 점검 모듈을 기존 child source로 오인하지 않는다. 이 고정 checkout의 strict preflight1회 통과 결과를 보존했고 실제 collector는 추가 실행하지 않았다. 부모 workdir 생성 보수 후 전용30개가 통과했으며 기존 wheel162개 증거는 당시 bytes에 귀속한다. 새 부모 수정의 최종 설치 검증은 변경 대상에 맞춰 확인한다.

@@ -82,3 +82,10 @@ PACK-BASELINE revision31 `54f4f2357533a8b201ad4397d4b182b08b89ee4821ffe67763e3fb
 OBS-03/09는 기존 제품 실행기·센서·수집 코드를 직접 수정하지 않았다.
 관련 변경은 실제 logger/formatter의 CPU 검증·계약 회귀·문서다. 실제 target/수집기 연결과
 response_content 파일 수정 소유권은 별도 인계가 필요하다.
+
+## 공통 제품 연결 — 2026-10-30
+
+한 일: B97의 오류 필드 수집·투영을 설치 adapter와 기존 response_content 선택 실행기로 연결했다. 원4POL·coverage=false/null·독립 FAIL·정상3값·정리/첨부 보존을 유지하며 검토3결함(빈 목록, 새 workdir, 시도 기록)을 수정했다. SUP13의 동일 workdir 결함도 보수했다.
+검증: adapter19·정책 영향143·최종 전용71·SUP13 전용30은 각 고정 소스 직접 결과를 재사용했다. 통합 core/첨부77통과(pytest3.05초/부모3.210초), wheel164파일 source/설치 bytes 동일·3모듈 import·부모 Torch/vLLM 미로딩. A108 public HTTP 실제 stdlib/loopback EXAMPLE 200→400→200/필드hash위반1개/cleanup을 확인했다. 실제 K8/GPU0, 최종 공통EVD0.
+다음: PR112에 SUP13과 묶어 반영하고, A 등록·대상 hash 공급·조건부 FAIL 규칙이 포함된 exact 통합 소스에서 공통 명령/Store/복원 검증.
+병목·조치: A 소유 변경을 기존 요청6502275726 하나로 갱신했다. 독립적인 Online Kubernetes 계약 소비 작업을 이어간다. CI 결제 차단은 별도다.

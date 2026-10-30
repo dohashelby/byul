@@ -251,6 +251,7 @@ def test_parent_barrier_and_cleanup_are_separate_from_daemon_recovery(cfg, sourc
     class Process:
         def __init__(self, argv, **kwargs):
             assert argv[-2:] == ['--child', '--execute'] and kwargs['start_new_session'] is True
+            assert kwargs['bufsize'] == 0
             self.stdin = Stream();self.stdout = Stream();self.returncode = None;self.pid = 10000 + len(processes)
             processes.append(self)
         def wait(self, timeout):self.returncode = 0
@@ -279,6 +280,7 @@ def test_parent_barrier_and_cleanup_are_separate_from_daemon_recovery(cfg, sourc
     monkeypatch.setattr(native, '_socket_identity', lambda *a: (1, 2, 501))
     monkeypatch.setattr(native, '_proc_identity', lambda *a: {k: cfg['daemon'][k] for k in (
         'pid', 'uid', 'start_ticks', 'boot_id_sha256', 'pid_namespace_inode', 'mount_namespace_inode')})
+    monkeypatch.setattr(native, '_send_child', lambda process, packet, deadline: actions.append(packet))
     monkeypatch.setattr(native.subprocess, 'Popen', Process)
     monkeypatch.setattr(native, '_receive', receive)
     monkeypatch.setattr(native, '_load_native', lambda *a: {})
@@ -291,3 +293,99 @@ def test_parent_barrier_and_cleanup_are_separate_from_daemon_recovery(cfg, sourc
     assert result['data_origin'] == 'EXAMPLE' and not result['release_authorization_verified']
     assert all(row['digest_equal'] is True and row['process_cleanup']['joined'] for row in result['consumers'])
     assert '_digest_key' not in json.dumps(result) and cfg['entry_name'] not in json.dumps(result)
+
+
+def test_full_nonreader_pipe_send_stops_at_deadline_without_buffered_flush():
+    import os
+    import time
+    read_fd, write_fd = os.pipe()
+    try:
+        os.set_blocking(write_fd, False)
+        for _ in range(4096):
+            try:os.write(write_fd, b'x' * 4096)
+            except BlockingIOError:break
+        else:pytest.fail('EXAMPLE pipe를 상한 안에 채우지 못함')
+        began = time.monotonic()
+        with pytest.raises(TimeoutError, match='CHILD_SEND_DEADLINE'):
+            native._send_fd(write_fd, b'bounded command\n', began + 0.03)
+        assert time.monotonic() - began < 2
+    finally:
+        os.close(write_fd);os.close(read_fd)
+
+
+def test_closed_child_reader_causes_broken_pipe_without_hanging():
+    import os
+    read_fd, write_fd = os.pipe();os.close(read_fd)
+    try:
+        with pytest.raises(BrokenPipeError):
+            native._send_fd(write_fd, b'command\n', native.time.monotonic() + 1)
+    finally:
+        os.close(write_fd)
+
+
+def test_kill_race_and_close_failure_do_not_skip_second_child_cleanup(monkeypatch):
+    closed = []
+    class Stream:
+        def __init__(self, name, fail=False):self.name, self.fail = name, fail
+        def close(self):
+            closed.append(self.name)
+            if self.fail:raise BrokenPipeError('EXAMPLE')
+    class Process:
+        def __init__(self, pid, fail):
+            self.pid = pid;self.returncode = None;self.calls = 0
+            self.stdin = Stream(str(pid) + '-stdin', fail);self.stdout = Stream(str(pid) + '-stdout', fail)
+        def poll(self):return self.returncode
+        def wait(self, timeout):
+            self.calls += 1
+            if self.calls == 1:raise native.subprocess.TimeoutExpired('EXAMPLE', timeout)
+            self.returncode = 0
+    def getpgid(pid):
+        if pid == 100:raise ProcessLookupError('EXAMPLE exit race')
+        return pid
+    killed = []
+    monkeypatch.setattr(native.os, 'getpgid', getpgid)
+    monkeypatch.setattr(native.os, 'killpg', lambda pid, sig: killed.append(pid))
+    children = [Process(100, True), Process(200, False)]
+    facts = [native._finish_child(child, native.time.monotonic() + 1, 2 - i) for i, child in enumerate(children)]
+    assert all(row['joined'] for row in facts) and killed == [200]
+    assert 'STDIN_CLOSE_UNAVAILABLE' in facts[0]['errors'] and 'STDOUT_CLOSE_UNAVAILABLE' in facts[0]['errors']
+    assert facts[1]['stdin_closed'] and facts[1]['stdout_closed']
+    assert closed == ['100-stdin', '100-stdout', '200-stdin', '200-stdout']
+
+
+@pytest.mark.parametrize('epoch,reads,verified', [('pre_changed', 0, False), ('pre_missing', 0, None),
+    ('post_changed', 1, False), ('same', 1, True)])
+def test_held_read_checks_daemon_epoch_before_and_after_without_extra_rpc(cfg, monkeypatch, epoch, reads, verified):
+    cfg['_source_root'] = 'EXAMPLE-source';calls = [];epoch_calls = []
+    monkeypatch.setattr(native, '_status_source', lambda root: {'status': 'verified'})
+    def check(*args):
+        epoch_calls.append(1)
+        if epoch == 'pre_changed' or (epoch == 'post_changed' and len(epoch_calls) == 2):
+            raise ValueError('EXAMPLE changed daemon')
+        if epoch == 'pre_missing':raise OSError('EXAMPLE missing daemon')
+        return 'f' * 64
+    def read(*args):
+        calls.append(1)
+        return {'status': 'read', 'collected': True, 'digest_sha256': 'a' * 64, 'selected_count': 16}
+    monkeypatch.setattr(native, '_daemon_epoch', check)
+    monkeypatch.setattr(native, '_read_cuda', read)
+    monkeypatch.setattr(native, '_rpc', lambda *a: pytest.fail('epoch 확인에 추가 RPC 금지'))
+    result = native._held_read(None, object(), cfg, (1, 2, 501))
+    assert len(calls) == reads and result['peer_generation_verified'] is verified
+    if reads:
+        assert result['digest_sha256'] == 'a' * 64 and result['selected_count'] == 16
+    else:
+        assert not result['collected'] and result['digest_sha256'] is None
+
+
+@pytest.mark.parametrize('dispatched,closed', [(False, True), (True, False), (True, True)])
+def test_followup_error_preserves_mutable_dispatch_and_socket_cleanup_note(cfg, monkeypatch, dispatched, closed):
+    def rpc(config, modules, command, identity, deadline, note):
+        note.update(attempted=dispatched, socket_closed=closed, actor_real_uid=123)
+        raise OSError('EXAMPLE private path must not be saved')
+    monkeypatch.setattr(native, '_rpc', rpc)
+    note = {'attempted': False, 'status': 'unavailable'}
+    result = native._followup_state(cfg, {}, (), native.time.monotonic() + 1, note)
+    assert result is note and result['attempted'] is dispatched and result['socket_closed'] is closed
+    assert result['actor_real_uid'] == 123 and result['status'] == 'unavailable' and result['reason'] == 'rpc_error'
+    assert 'private path' not in json.dumps(result)

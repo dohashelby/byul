@@ -188,18 +188,22 @@ def _socket_identity(config):
     return (info.st_dev, info.st_ino, info.st_uid)
 
 
-def _check_peer(sock, config, identity):
+def _daemon_epoch(config, identity):
     if _socket_identity(config) != tuple(identity):
         raise ValueError('LIF13_SOCKET_CHANGED')
-    creds = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize('3i'))
-    pid, uid, _ = struct.unpack('3i', creds)
     expected = config['daemon']
-    if pid != expected['pid'] or uid != expected['uid']:
-        raise ValueError('LIF13_PEER_CHANGED')
-    actual = _proc_identity(pid)
+    actual = _proc_identity(expected['pid'])
     if any(actual[k] != expected[k] for k in actual):
         raise ValueError('LIF13_PEER_CHANGED')
     return digest({**actual, 'socket_identity': list(identity)})
+
+
+def _check_peer(sock, config, identity):
+    creds = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize('3i'))
+    pid, uid, _ = struct.unpack('3i', creds)
+    if pid != config['daemon']['pid'] or uid != config['daemon']['uid']:
+        raise ValueError('LIF13_PEER_CHANGED')
+    return _daemon_epoch(config, identity)
 
 
 class BoundedSocket:
@@ -335,6 +339,44 @@ def _torch_runtime(torch):
     return result
 
 
+def _held_read(torch, tensor, config, identity):
+    source_pre = _status_source(config['_source_root'])['status']
+    if source_pre != 'verified':
+        return {**_unavailable_read('source_unavailable'), 'peer_generation_verified': None}
+    try:
+        generation = _daemon_epoch(config, identity)
+    except ValueError:
+        return {**_unavailable_read('daemon_epoch_changed'), 'peer_generation_verified': False}
+    except Exception:
+        return {**_unavailable_read('daemon_epoch_unavailable'), 'peer_generation_verified': None}
+    try:
+        result = _read_cuda(torch, tensor, config)
+    except Exception:
+        result = _unavailable_read('read_error')
+    result['daemon_generation_sha256'] = generation
+    try:
+        result['peer_generation_verified'] = _daemon_epoch(config, identity) == generation
+    except Exception:
+        result['peer_generation_verified'] = False
+    result['source_validation'] = {'pre': source_pre, 'post': _status_source(config['_source_root'])['status']}
+    return result
+
+
+def _followup_state(config, native, identity, deadline, note):
+    response = None
+    try:
+        response, receipt = _rpc(config, native, 'get_state', identity, deadline, note)
+        note.update(receipt)
+        if note['status'] == 'ok':
+            _, note['exports'] = _consume_exports(response, native['protocol'], config['device_index'], None, deadline)
+    except Exception:
+        # _rpc의 finally가 남긴 socket_closed·실제 dispatch/actor facts를 덮어쓰지 않는다.
+        note.update(status='unavailable', reason='rpc_error')
+    finally:
+        response = None
+    return note
+
+
 def _child_emit(stream, slot, stage, facts):
     stream.write(json.dumps({'slot': slot, 'stage': stage, 'facts': facts}, allow_nan=False) + '\n');stream.flush()
 
@@ -378,23 +420,11 @@ def _child_main():
         _child_emit(safe_out, slot, 'baseline', baseline)
         command = json.loads(sys.stdin.buffer.readline(4097))
         if command.get('action') == 'after' and tensor is not None:
-            try:
-                pre_read = _status_source(config['_source_root'])['status']
-                if pre_read != 'verified':
-                    raise ValueError('LIF13_CLIENT_SOURCE_CHANGED')
-                held = _read_cuda(torch, tensor, config)
-                held['source_validation'] = {'pre': pre_read,
-                                            'post': _status_source(config['_source_root'])['status']}
-            except Exception:
-                held = _unavailable_read('read_error')
-            try:
-                follow_response, follow = _rpc(config, native, 'get_state', identity, deadline, follow)
-                if follow['status'] == 'ok':
-                    _, follow['exports'] = _consume_exports(follow_response, native['protocol'],
-                        config['device_index'], None, deadline)
-                follow_response = None
-            except Exception:
-                follow = {'attempted': True, 'status': 'unavailable', 'reason': 'rpc_error'}
+            held = _held_read(torch, tensor, config, identity)
+            if held['status'] in ('daemon_epoch_changed', 'daemon_epoch_unavailable'):
+                follow.update(status='unavailable', reason='peer_epoch_unavailable')
+            else:
+                _followup_state(config, native, identity, deadline, follow)
             equal = baseline['digest_sha256'] == held['digest_sha256'] if baseline['collected'] and held['collected'] else None
             _child_emit(safe_out, slot, 'after', {'held_after': held, 'digest_equal': equal, 'followup_get_state': follow})
     except Exception:
@@ -455,6 +485,76 @@ def _receive(jobs, stage, deadline, record):
     return not pending
 
 
+def _send_fd(fd, data, deadline):
+    """non-reader도 전체 기한 안에 중단한다. parent pipe에는 buffered writer를 쓰지 않는다."""
+    os.set_blocking(fd, False)
+    remaining = memoryview(data)
+    with selectors.DefaultSelector() as selector:
+        selector.register(fd, selectors.EVENT_WRITE)
+        while remaining:
+            budget = deadline - time.monotonic()
+            if budget <= 0 or not selector.select(budget):
+                raise TimeoutError('LIF13_CHILD_SEND_DEADLINE')
+            try:
+                count = os.write(fd, remaining)
+            except BlockingIOError:
+                continue
+            if count <= 0:
+                raise BrokenPipeError('LIF13_CHILD_PIPE_CLOSED')
+            remaining = remaining[count:]
+
+
+def _send_child(process, packet, deadline):
+    data = json.dumps(packet, ensure_ascii=False, allow_nan=False).encode() + b'\n'
+    if len(data) > 65536:
+        raise ValueError('LIF13_CHILD_INPUT_BOUND')
+    _send_fd(process.stdin.fileno(), data, deadline)
+
+
+def _finish_child(process, deadline, remaining_children):
+    facts = {'joined': False, 'forced': False, 'exit_ok': False,
+             'stdin_closed': None, 'stdout_closed': None, 'errors': []}
+    # Popen(bufsize=0)의 FileIO close이므로 숨은 buffered flush가 없다.
+    try:
+        process.stdin.close();facts['stdin_closed'] = True
+    except Exception:
+        facts['stdin_closed'] = False;facts['errors'].append('STDIN_CLOSE_UNAVAILABLE')
+    try:
+        if process.poll() is None:
+            process.wait(timeout=max(0, (deadline - time.monotonic()) / max(2, remaining_children * 2)))
+    except subprocess.TimeoutExpired:
+        facts['forced'] = True
+    except Exception:
+        facts['errors'].append('WAIT_UNAVAILABLE');facts['forced'] = True
+    try:
+        if process.poll() is None:
+            facts['forced'] = True
+            try:
+                if os.getpgid(process.pid) == process.pid:
+                    os.killpg(process.pid, signal.SIGKILL)
+                else:
+                    facts['errors'].append('OWNED_GROUP_UNAVAILABLE')
+            except ProcessLookupError:
+                pass
+            except Exception:
+                facts['errors'].append('KILL_UNAVAILABLE')
+            try:
+                process.wait(timeout=max(0, (deadline - time.monotonic()) / max(1, remaining_children)))
+            except Exception:
+                facts['errors'].append('JOIN_UNAVAILABLE')
+    finally:
+        try:
+            process.stdout.close();facts['stdout_closed'] = True
+        except Exception:
+            facts['stdout_closed'] = False;facts['errors'].append('STDOUT_CLOSE_UNAVAILABLE')
+    try:
+        facts['joined'] = process.poll() is not None
+        facts['exit_ok'] = process.returncode == 0
+    except Exception:
+        facts['errors'].append('PROCESS_STATUS_UNAVAILABLE')
+    return facts
+
+
 def _run_native(config, source_root, record):
     if platform.system() != 'Linux' or platform.machine() not in ('x86_64', 'amd64') or not hasattr(socket, 'SO_PEERCRED'):
         record['gaps'].append('LINUX_AMD64_CUDA_REQUIRED');return
@@ -468,10 +568,10 @@ def _run_native(config, source_root, record):
     try:
         for slot in range(2):
             process = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--child', '--execute'],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True)
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True, bufsize=0)
             job = {'slot': slot, 'process': process, 'messages': [], 'received': set(), 'buffer': b'', 'eof': False};jobs.append(job)
             packet = {'slot': slot, 'config': config, 'identity': list(identity), 'deadline': collection_deadline}
-            process.stdin.write(json.dumps(packet).encode() + b'\n');process.stdin.flush()
+            _send_child(process, packet, collection_deadline)
         ready = _receive(jobs, 'baseline', collection_deadline, record)
         baselines = [row['baseline'] for row in record['consumers']]
         ready = ready and all(b.get('collected') is True and b.get('is_cuda') is True and b.get('cuda_ipc_rebuilt') is True and b.get('exports', {}).get('complete') is True
@@ -487,39 +587,31 @@ def _run_native(config, source_root, record):
             except Exception:
                 record['gaps'].append('RELEASE_RESPONSE_UNAVAILABLE')
             for job in jobs:
-                try:job['process'].stdin.write(b'{"action":"after"}\n');job['process'].stdin.flush()
+                try:_send_child(job['process'], {'action': 'after'}, collection_deadline)
                 except OSError:record['gaps'].append('CHILD_COMMAND_UNAVAILABLE')
             if not _receive(jobs, 'after', collection_deadline, record):record['gaps'].append('AFTER_READ_INCOMPLETE')
         else:
             record['gaps'].append('BASELINE_COHORT_UNAVAILABLE')
             for job in jobs:
-                try:job['process'].stdin.write(b'{"action":"close"}\n');job['process'].stdin.flush()
+                try:_send_child(job['process'], {'action': 'close'}, deadline)
                 except OSError:pass
         _receive(jobs, 'cleanup', deadline, record)
     except Exception:
         record['gaps'].append('COLLECTION_INCOMPLETE')
     finally:
         complete = True
-        for job in jobs:
-            process = job['process'];forced = False
+        for index, job in enumerate(jobs):
             try:
-                process.wait(timeout=max(0.01, deadline - time.monotonic()))
-            except subprocess.TimeoutExpired:
-                forced = True
-                if process.poll() is None and os.getpgid(process.pid) == process.pid:
-                    os.killpg(process.pid, signal.SIGKILL)
-                try:process.wait(timeout=1)
-                except subprocess.TimeoutExpired:complete = False
-            finally:
-                if process.stdin:process.stdin.close()
-                if process.stdout:process.stdout.close()
-            row = record['consumers'][job['slot']]
-            row['process_cleanup'] = {'joined': process.poll() is not None, 'forced': forced,
-                                      'exit_ok': process.returncode == 0}
-            complete = complete and process.poll() is not None
+                facts = _finish_child(job['process'], deadline, len(jobs) - index)
+            except Exception:
+                facts = {'joined': False, 'forced': False, 'exit_ok': False, 'errors': ['CHILD_CLEANUP_UNAVAILABLE']}
+            record['consumers'][job['slot']]['process_cleanup'] = facts
+            complete = complete and facts['joined']
         config.pop('_digest_key', None)
-        record['cleanup']['owned_children_complete'] = complete and len(jobs) == 2
+        record['cleanup']['owned_children_complete'] = complete
+        record['cleanup']['created_children'] = len(jobs)
         record['cleanup']['collection_gap'] = any(row.get('process_cleanup', {}).get('forced')
+            or row.get('process_cleanup', {}).get('errors')
             or row.get('cleanup', {}).get('references_dropped') is not True for row in record['consumers'])
 
 

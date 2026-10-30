@@ -1,10 +1,10 @@
-# LIF-15·16 선정 LAB 정책 복귀·복원 관측
+# 선정 LAB 정책 복귀·보존·수집 관측
 
 기존 `serving_runtime.mvp` 구현과 원 PACK31 manual v3 경로를 재사용했다.
-제품 runtime·CLI·registry·팩과 의존성은 수정하지 않았다. 실제 실행 대상은
-소유한 localhost Gateway이며 backend는 기존 EXAMPLE MockEngine이다.
+제품 runtime·CLI·registry·팩과 의존성은 수정하지 않았다.
+LIF-15·16은 소유한 localhost Gateway와 기존 EXAMPLE MockEngine을 사용했다.
 실제 모델·이미지 복원, vLLM 추론, GPU·Kubernetes 실행은 0회다.
-두 흐름은 서로 다른 소스·입력의 독립 시험이며 판본 비교쌍으로 사용하지 않는다.
+각 흐름은 해당 소스·입력의 독립 audit이며 판본 비교쌍으로 사용하지 않는다.
 
 ## LIF-15 현재 승인과 정책 복귀
 
@@ -104,3 +104,33 @@ artifact 80개와 DB를 포함한 bundle 파일 81개를 구분해 기록한다.
 EVD 본문·첨부를 직접 조회하는 API는 제공하지 않는다. 이번 확인 범위는 보고서와
 정확 Ref의 조회다. 플랫폼 증거는 같은 외부 증거 루트의 `platform-results-consumption`에
 보존한다. 소유 서버·포트와 브라우저 탭을 정리했으며 기존 사용자 자료·서비스는 유지했다.
+
+
+## OBS-12 선정 LAB 용량 상한
+
+고정 소스 `a8ea25daeb09d63816649929eb8afb55afdc225e`의 기존 RecordRetention·JsonlStore·QueryService를 사용했다. 관련 runtime 3파일은 이전 dcaf/6c와 같은 bytes다. 새 소유 LAB의 합성 managed journal 3,000bytes에 fixture 상한 2,259bytes를 적용했다. report-only 1회는 파일을 보존했고 enforce 1회에서 오래된 request의 gateway 2행·receipt 1행, 741bytes를 size 사유로 함께 삭제했다. age 삭제는 0행이며 fresh reader의 부재 조회, hold·undated·recent 유지, audit 1개와 새 retention reader의 last_deletion을 확인했다(0.192초).
+
+2,259bytes는 managed journal 합계다. holds·audit 등을 포함한 디렉터리는 3,727bytes다. 기본 5GiB·기업 보존 기준·원격/backup/Q-C12 자산·물리 소거·payload 복구는 미수집이다. ENV는 실제 `byul-runtime-record-retention/0.0.0.dev0`, CPU·EXAMPLE fixture·model/image null을 기록한다. 원 OBS12rev3의 2prose·전체 normal/4challenge 미시도·3UNKNOWN을 유지한다.
+
+원 capture와 기존 age 증거를 보존하고 기존 CLI 11개로 원 manual EVD→RES→RPT·정확 Ref 복원을 확인했다. 후속 메타 정정은 대상 runtime/backend/retention child 0개와 Git helper 최소 4개·동기 회수의 범위를 구분하며, 같은 관측을 사용해 필요한 metadata CLI 8개만 추가했다. 최신 EVD/RES는 revision 2, RPT는 `RPT-01M66W5E4ZAD378EE6XD5BAF3C@1`이다. 집중 검토와 정정 확인을 통과했다.
+
+원 명령/입력은 저장소 밖 `byul-b-record-access-evidence-20261030/obs12-lab-bytecap/capture/{command,config}.json`, 공통 명령은 `evidence-scope-correction/commands.json`, 최신 증거는 같은 폴더의 `final-proof.json`·`report.json`·`evidence.zip`에 있다. 원 capture SHA는 `1c2a5d21ee1149e6a65dc001cbbdea32e16df0a271498fcb98f7521ad3f04e58`다.
+
+## OBS-11 선정 파일 수집·오류 표시·복구
+
+같은 a8 소스의 public heartbeat writer·ObservationFeed·Collector/CollectorManager를 실제 소유 프로세스와 파일에 실행했다. 독립 stdout 발행·stderr receipt를 남기는 publisher의 입력은 EXAMPLE이며 실제 kernel/Tetragon/Pod 사건은 0회다. 기업 5POL는 미입력 그대로이고 PLAN의 NO_EXECUTOR/NO_POLICY_VALUE와 audit records=[]를 보존한다.
+
+첫 cohort는 3행의 실제 발행·fsync receipt와 저장 event key를 대조했다. 정상 → heartbeat updated_at의 +120초 fixture(원 60초 미래 입력 관문) 오류 → 실제 IsADirectoryError → 복구를 관측했고, pending 2행 재수집 후 총3행의 중복·거부·분실은 0이었다(0.451초). 이는 시스템 시계 변경이나 실제 clock uncertainty 측정 결과가 아니다.
+
+독립 cohort2는 실제 기본 heartbeat 15초·collector 15초·interval 5초를 유지했다. publisher 생존과 heartbeat bytes 불변 상태에서 monotonic 15.351760초를 기다렸다. 대기 중 manager는 중지되어 자동 polling은 0회였다. 실제 snapshot은 ok→stale→stale(last_error에 expired)→ok이며, 새 reader의 조회1→1→1→2와 별도 receipt2개가 일치했다(wall 15.945초). 두 cohort는 각각의 PID·collection_id·시간·hash로 구분한다. 자식은 각각 exit0, 강제 종료0, manager thread0·stream close를 확인했다.
+
+원 OBS11rev3의 2prose와 기업 기한이 필요한 normal 미시도, challenge True/True/False, 3UNKNOWN을 유지했다. 운영 경보 기한·기업5POL·종속 RES 자동 전파·실제 시계 오차·연속 polling 탐지는 미수집이다. 원 CLI11개와 expiry append8개 뒤, 최신 limitation을 첫 cohort/두 번째 cohort별로 한정한 metadata CLI8개만 추가했다. 원 두 capture·이전9objects/Refs는 보존하고 EVD/RES revision3→새 RPT `RPT-01M66X9QGFPYKKMK81YE59MN0G@1`, 복원12objects·verify/contract 오류0을 확인했다. 집중 검토와 정정 확인을 통과했다.
+
+원 명령/입력과 독립 receipt는 저장소 밖 `byul-b-record-access-evidence-20261030/obs11-lab-feed/{capture,capture-expiry}`의 `command.json`·`config.json`·`publisher-receipts.jsonl`에 있다. 최신 공통 명령과 원 manual·보고서·반출은 `evidence-scope-correction/{commands.json,manual-evidence.yaml,final-proof.json,report.json,evidence.zip}`에 보존했다. 원 capture SHA는 `0fc6b43a17e302092f17fa7d16ee9a87a1e6e13add586536db11b22f880350b4`, expiry SHA는 `b4cc7dbda1c4f3d22b261ff47787294a1c511aae7395e5f5db49fcd9a3c34b35`다.
+
+
+## A 통합에서 발견한 시험 fixture 보수
+
+A PR145의 고정 전달물 시험은 Linux에서 정책 결합 오류2건이 소비기 도달 전 fixture assert로 중단됐다. 원2실패를 보존하고 fixture의 기대값을 현재 PLAN의 정확 POL에서 독립적으로 가져오도록 수정했다. 변조된 반환5종이 실제 소비기까지 호출1회 도달한 뒤 기존 정확 binding/origin 오류와 EVD 미생성을 확인하며, 정상 POL revision2의 빈 금지 목록과 다중 source 기대를 보존한다. Graph용 EXAMPLE 소스는 검토한 LF bytes로 쓰고 실제 CRLF bytes 변경은 원 gate가 거부하는 회귀를 추가했다. 직접 영향15개 고유 case와 집중 검토를 통과했다. 실행 호스트는 macOS이며 A의 과거 Windows/Linux 실패 원본과 구분한다. 제품 판정·source gate·skip은 변경하지 않았다.
+
+B HTTP adapter는 기존 검토·검증된 A138 소비 branch `e327d74d13a953181e51c3d0fbdce33802db3c01`의 원 bytes를 재사용했다. 고정 A108 `3da64…`와 A138 `0fc2…` 두 source만 허용한다. B 본선의 공통 HTTP `ed3feb…`에 대한 직접 확인은 기존처럼 `REQ13_A_CAPABILITY_UNAVAILABLE`로 거부됐다. 이 거부와 초기 orchestration의 잘못된 양성 기대를 증거에 남겼으며 해당 runtime hash를 승인값으로 추가하지 않았다. A 공통 HTTP 수정·실제 요청은 0회다.

@@ -643,3 +643,5 @@ Windows 원B실패10개를새skip/경로gate완화/시험재작성으로숨기�
 mapping은파일read/fault·Tensor소비·인가·release와별개다. oldsource전략을바꾸거나C opaque함수반환을권한검증으로승격하지않는다. 메타데이터수집실패는원C값/예외/정리를바꾸지않으며rawmaps/주소/주소hash/내용을저장하지않는다. 새profile은기존OBS02소비와검증·인계까지같은묶음에서마감한다.
 
 observer code hash의first-line/line-table도계약이다. literal줄수변경으로생긴초기실패를원본으로남기고동일관문을보수한뒤독립compile대조를추가했다. region opaque좌표는mapping세대/존속증거가아니다. 새common관측은기존OBS02CLI/증거/정확Ref까지같은묶음에서연결하되actualC와전용A2소비·실제정책은별도다.
+
+B LIF07의 source_qualified/actual_worker/ready 긍정신고는 자격근거로쓰지않는다. 원 B NATIVE/UnreadyHTTP/delay None gate를유지하고 원 공개 import 경로만 검증한다. 현재 common0fc2dec는 B가명시적으로 검토고정한A138호환으로 소비하며 runtimehash자동승인·profile완화·A1전용B재작성은하지않는다.

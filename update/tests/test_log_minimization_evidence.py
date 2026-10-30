@@ -55,8 +55,11 @@ def case(tmp_path, monkeypatch):
     calls = []
     def example_capture(environment, target_value, policy_values, **kwargs):
         assert environment.data_origin == DataOrigin.EXAMPLE
-        assert bridge._digest(policy_values) == capture['policy_values_sha256']
-        assert kwargs['expected_policy_ref'].model_dump(mode='json') == capture['policy_ref']
+        expected_store = Store.read_only(args['store'])
+        expected_plan = expected_store.latest(args['plan_id'])
+        expected_policy = expected_store.resolve(expected_plan.inputs.policy)
+        assert bridge._digest(policy_values) == bridge._digest(expected_policy.values['OBS-03'])
+        assert kwargs['expected_policy_ref'].model_dump(mode='json') == expected_plan.inputs.policy.model_dump(mode='json')
         calls.append((environment.ref(), kwargs))
         return deepcopy(capture)
     monkeypatch.setattr(bridge, '_capture', example_capture)
@@ -208,7 +211,10 @@ def test_collector_binding_mismatch_never_creates_evidence(case, bad):
     key = {'policy_hash': 'policy_values_sha256', 'policy_ref': 'policy_ref', 'target_hash': 'target_sha256',
            'source_id': 'source_id', 'origin': 'data_origin'}[bad]
     case['capture'][key] = 'DECLARED' if bad == 'origin' else PRIVATE
-    with pytest.raises(ValueError): bridge.run(**case['args'], execute=True)
+    expected_error = 'OBS03_CAPTURE_ID_ORIGIN_INVALID' if bad == 'origin' else 'OBS03_CAPTURE_BINDING_INVALID'
+    with pytest.raises(ValueError, match=f'^{expected_error}$'):
+        bridge.run(**case['args'], execute=True)
+    assert len(case['calls']) == 1
     assert not list(Store.read_only(case['args']['output'] / 'store').iter_kind('EVD'))
 
 
@@ -221,6 +227,12 @@ def test_original_empty_forbidden_list_is_not_filled_or_rejected(case, key):
     args = {**case['args'], 'plan_id': plan.id}
     result = bridge.run(**args)
     assert result['policy_values_sha256'] == bridge._digest(pol.values['OBS-03']) and not case['calls']
+    assert pol.values['OBS-03'][key] == []
+    case['args']['plan_id'] = plan.id
+    case['capture'].update(policy_ref=pol.ref().model_dump(mode='json'),
+        policy_values_sha256=bridge._digest(pol.values['OBS-03']))
+    executed = bridge.run(**case['args'], execute=True)
+    assert executed['policy'] == pol.ref().model_dump(mode='json') and len(case['calls']) == 1
     assert pol.values['OBS-03'][key] == []
 
 

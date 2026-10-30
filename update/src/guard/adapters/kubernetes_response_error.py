@@ -29,6 +29,7 @@ SUPPORTED_ENGINE_VERSION = '0.31.0'
 # Reviewed A profile/source must be fixed before real network use. Never learn
 # an approval from runtime bytes, target JSON, an environment or a test adapter.
 A_HTTP_SOURCE_SHA256 = '3da64c61ccceda9899e57d022b3ff7afaee3a85906d118a9309f368dd8f38566'
+A138_HTTP_SOURCE_SHA256 = '0fc2dec617cff1dd87ff42bf9f9913348383b2f2a3429a8df2e9985418145182'
 HELPER_PINS = {
     'executors/response_error_contract.py':'2cf7d60d45c19114a17ca37ade0aeb46466e60e246a39076c4e3139ad5ed1a70',
     'executors/template_validation.py':'6c68fc91d1a9cb93ed83036c53a391381efe9e653a581e965a1e8290003b4b78',
@@ -62,10 +63,10 @@ def verify_product_helpers():
 
 
 def verify_a_capability():
-    if not _sha(A_HTTP_SOURCE_SHA256):raise ValueError('REQ13_A_CAPABILITY_UNAVAILABLE')
+    if not all(_sha(pin) for pin in (A_HTTP_SOURCE_SHA256, A138_HTTP_SOURCE_SHA256)):raise ValueError('REQ13_A_CAPABILITY_UNAVAILABLE')
     expected=Path(__file__).resolve().parents[1]/'runtime/kubernetes_http.py'
     if (expected.is_symlink() or not Path(kubernetes_http.__file__).resolve().samefile(expected)
-            or hashlib.sha256(expected.read_bytes()).hexdigest()!=A_HTTP_SOURCE_SHA256
+            or hashlib.sha256(expected.read_bytes()).hexdigest() not in (A_HTTP_SOURCE_SHA256, A138_HTTP_SOURCE_SHA256)
             or getattr(kubernetes_http,'VALIDATION_ERROR_PROFILE',None)!=VALIDATION_ERROR_PROFILE):
         raise ValueError('REQ13_A_CAPABILITY_UNAVAILABLE')
     for fn in (kubernetes_http.KubernetesHTTP.__init__,kubernetes_http.KubernetesHTTP.__call__,kubernetes_http.KubernetesHTTP.report):

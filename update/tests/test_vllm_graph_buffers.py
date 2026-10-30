@@ -249,7 +249,7 @@ def context_module(tmp_path, monkeypatch):
     import types
     from guard.adapters import vllm_graph_buffers as graph
     source = '_forward_context = None\ndef is_forward_context_available():\n    return _forward_context is not None\ndef get_forward_context():\n    assert _forward_context is not None\n    return _forward_context\n'
-    path = tmp_path / 'forward_context.py';path.write_text(source)
+    path = tmp_path / 'forward_context.py';path.write_bytes(source.encode('utf-8'))
     module = types.ModuleType('vllm.forward_context');module.__file__ = str(path)
     exec(compile(source, str(path), 'exec'), vars(module))
     monkeypatch.setitem(sys.modules, 'vllm.forward_context', module)
@@ -404,3 +404,17 @@ def test_output_capture_bound_and_empty_never_claim_complete(observer, count, co
 
 def test_absent_output_is_uncollected(observer):
     assert observer._output(None, set()) == {'tensor_items': [], 'complete': None}
+
+
+def test_reviewed_context_fixture_lf_bytes_are_accepted_and_crlf_change_is_rejected(tmp_path, monkeypatch, observer):
+    graph, module, path = context_module(tmp_path, monkeypatch)
+    approved = path.read_bytes()
+    assert b'\n' in approved and b'\r' not in approved
+    wrapper = Object(runtime_mode=Object(_name_='FULL'), concrete_cudagraph_entries={})
+    first = emit(observer, 'CUDAGraphWrapper.__call__', wrapper, 'CALL')
+    assert first['metadata']['forward_context_state'] == 'absent'
+    assert observer._context_cache
+    path.write_bytes(approved.replace(b'\n', b'\r\n'))
+    changed = emit(observer, 'CUDAGraphWrapper.__call__', wrapper, 'RETURN')
+    assert changed['metadata']['forward_context_state'] == 'unavailable'
+    assert observer._context_cache == {} and module._forward_context is None

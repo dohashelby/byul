@@ -44,6 +44,10 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
         """Project the validated packet before its redacted artifact summary."""
         return project(packet,trials,ctx.policy_values['observation_state_required_components'])
 
+    def after_trial(self,ctx,row):
+        """Optional bounded follow-up collection; the base state procedure has none."""
+        return None
+
     def collect(self,ctx):
         start,end=self.policy_normalizer(ctx.policy_values);token=uuid.uuid4().hex
         summary={'profile':PROFILE,'trials':[],'native':None,'diagnostic_codes':[],'fixture':{'profile':PROFILE},
@@ -97,6 +101,8 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
                     if row['attempted']:row['finished_at']=utcnow().isoformat()
                     row['policy_window_verified']=bool(row['started_at'] and start<=_time(row['started_at'])<=_time(row['finished_at'])<=end)
                     if row['attempted'] and not row['policy_window_verified']:summary['diagnostic_codes'].append('OBSERVATION_STATE_POLICY_WINDOW_UNVERIFIED')
+                    try:self.after_trial(ctx,row)
+                    except Exception:summary['diagnostic_codes'].append('OBSERVATION_STATE_FOLLOWUP_UNAVAILABLE')
         except Exception:summary['diagnostic_codes'].append('OBSERVATION_STATE_NATIVE_PREFLIGHT_UNAVAILABLE')
         finally:
             if reader is not None:
@@ -128,7 +134,8 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
         gaps={'OBSERVATION_STATE_NATIVE_PREFLIGHT_UNAVAILABLE','OBSERVATION_STATE_PROBE_UNAVAILABLE','OBSERVATION_STATE_SEAL_UNVERIFIED',
             'OBSERVATION_STATE_CAPTURE_UNAVAILABLE','OBSERVATION_STATE_POLICY_WINDOW_UNVERIFIED','OBSERVATION_STATE_CLIENT_CLOSE_UNVERIFIED',
             'OBSERVATION_STATE_HEALTH_CAPTURE_UNVERIFIED','OBSERVATION_STATE_NORMAL_CONTROL_UNVERIFIED',
-            'OBSERVATION_STATE_NATIVE_COVERAGE_UNVERIFIED','OBSERVATION_STATE_NATIVE_UNAVAILABLE','OBSERVATION_STATE_EVENT_BOUND_REACHED'}
+            'OBSERVATION_STATE_NATIVE_COVERAGE_UNVERIFIED','OBSERVATION_STATE_NATIVE_UNAVAILABLE','OBSERVATION_STATE_EVENT_BOUND_REACHED',
+            'OBSERVATION_STATE_FOLLOWUP_UNAVAILABLE'}
         ctx._termination_gap=bool(gaps.intersection(summary['diagnostic_codes']) or summary['http_transport']['collection_gap'])
         ctx._termination_cleanup=list(summary['http_transport']['cleanup_errors'])
         if reader is not None and reader.report().get('parent_cleanup_unverified'):

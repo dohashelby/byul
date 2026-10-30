@@ -596,3 +596,6 @@ NetworkPolicy 회수≠credential issuer 철회. PLT10은 기존 native8과5개 
 - A1 PLT11은 새 GET을 기존 session 증명으로 재분류하지 않는다. 첫 범위는 auto_open=0의 동일 probe TCP keep-alive/socket identity 대조이며 실제 앱session/handle·serving receipt·issuer 사건/전파와 분리한다. 명시 unconditional 재사용 금지 제약의 독립 functional FAIL만 소비하고 security/전체scope UNKNOWN을 유지한다. 고정 framing/source gate·키원문/hash 비보존을 유지한다.
 
 - A1 OBS02 profiler는 vLLM adapter의 RAISE/RETURN과 내부 running flag를 실제 backend 수집/trace 산출/전송 종료로 올리지 않는다. 공식 source에서 _call_stop은 예외 후에도 running=false이고 Torch adapter에는 stop후출력도 있다. 실제 등록 callback을 검사하고 원 결과/예외/순서·native8~14 bytes를 보존한다. 새 start/stop HTTP·다른PID 시간/hash 기반 RPC 결합·B 전용 service 판정은 하지 않는다.
+# 2026-10-30 OBS02 SC23-03 공통 결합 후보
+
+사용자 답변: A1이 사건/출처/물리세대 결합·계측·parser·제품 소비의 기술 계약을 설계하고, 실제 승인/검사 주체·허용 대상·정책·운영 범위는 사용자 결정으로 남긴다. 기존 OBS01 /1 선언과 native8 configured-object/load 경계의 결합 후보는 기존 CLI에서 소비하되 실제 승인/검사/최종 tensor 소비로 승격하지 않으며 근거 전 모든 판정축 UNKNOWN을 유지한다.

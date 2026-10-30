@@ -28,3 +28,40 @@ python -m tools.b_lif13_weights --store STORE --plan PLAN --pack packs/PACK-BASE
 원 get_state는 모든 CUDA TensorEntry의 IPC sent-counter를 발행한다. native producer는 모든 CUDA entry를 원 rebuild로 한 번 받아 미선정 참조를 정상 drop하고 선정한 한 tensor만 bounded read한다. 전체 값 read·모델 구성 관측으로 확장하지 않는다. payload 제한·timeout·unpickle·부분 rebuild 실패는 release 미시도여도 daemon native handoff에 영향을 남길 수 있다. child 종료·참조 drop과 daemon limbo/counter·allocator 전역 회수를 구분하며 후자는 UNKNOWN이다. 직접 counter를 조작하지 않고 기존 외부 recovery owner와 승인 절차가 필요하다.
 
 baseline·후속 get_state의 received/rebuilt CUDA entry 수와 CPU by-value 수, runtime torch version/reductions 파일 SHA를 선언 facts로 보존한다. original module 검증과 실행 daemon 인증을 구분하며 count 완전성은 daemon counter 회수 완료가 아니다. release dispatch의 real/effective UID도 daemon UID와 별개로 보존하며 UID 일치만으로 기업 release 권한을 승인하지 않는다.
+
+## Linux CPU peer·수신 상한 검증
+
+선정 native script의 `_proc_identity`, `_socket_identity`, `_daemon_epoch`, `_check_peer`, `BoundedSocket`을 실제 Linux 커널과 연결하는 명시적 추가 검증이다. 소유한 표준 라이브러리 AF_UNIX peer 한 개를 만들고 실제 `SO_PEERCRED`·`/proc/<pid>/stat`·boot/PID/mount namespace 및 socket inode를 읽는다. 정상 peer, 잘못된 PID·epoch, 실제 socket 교체와 수신 상한 초과를 구분한다. 기존 37개 EXAMPLE 단위 회귀와 A147 Linux 86개는 회귀 근거로 재사용하며, 실제 peer 확인 근거는 이 별도 명령의 Linux 출력에 연결한다.
+
+입력은 고정 native 파일 한 개와 새 출력 경로뿐이다. native 원본은 `0ae9cc56dcce903d059fab8ff2d2e12f23cef3ba:update/tools/b_lif13_weights_native.py`의 Git blob이며 SHA-256은 `8548dc812acdc421e313c5532d6cd4d6bd214c19d51b79adc96ffb7b7804c4da`다. probe 기준은 `33731b1734f8a2e63c8e4938b553eca7096f6268`의 `update/tests/linux_cpu/lif13_peer_probe.py`이며 SHA-256은 `98e43d911fa41c6328e90b6c6e9f6cdf3258b741560a8da7896f2e731543d3b3`다. 작업 트리의 newline 변환을 거치지 않고 LF 원 bytes를 준비한다. 이미 선택·승인한 Linux/amd64 시험 환경의 Python 3.12와 표준 라이브러리만 사용하며 새 설치·GPU/모델·daemon 기동은 필요하지 않다.
+
+저장소 루트에서 다음과 같이 입력을 고정한다. 해당 Git 객체와 probe 파일이 있는 체크아웃을 사용하거나, 같은 bytes의 두 파일을 기존 WSL에 전달한다. probe는 `update/tests/linux_cpu/` 경로 구조를 유지하며, 고정 native 파일은 외부 소유 경로에 둔다.
+
+```sh
+LIF13_PEER_RUN_DIR=$(mktemp -d /tmp/byul-lif13-peer.XXXXXX)
+git show 0ae9cc56dcce903d059fab8ff2d2e12f23cef3ba:update/tools/b_lif13_weights_native.py > "$LIF13_PEER_RUN_DIR/frozen_native.py"
+printf '8548dc812acdc421e313c5532d6cd4d6bd214c19d51b79adc96ffb7b7804c4da  %s\n' "$LIF13_PEER_RUN_DIR/frozen_native.py" | sha256sum --check -
+printf '98e43d911fa41c6328e90b6c6e9f6cdf3258b741560a8da7896f2e731543d3b3  update/tests/linux_cpu/lif13_peer_probe.py\n' | sha256sum --check -
+```
+
+실행 명령은 하나다. 출력 경로는 아직 존재하지 않아야 한다.
+
+```sh
+python3.12 -I -S -B update/tests/linux_cpu/lif13_peer_probe.py \
+  --native-script "$LIF13_PEER_RUN_DIR/frozen_native.py" \
+  --output "$LIF13_PEER_RUN_DIR/proof"
+```
+
+실행 조건은 Linux/x86_64, Python 3.12, 읽을 수 있는 `/proc` 및 `SO_PEERCRED`, 소유 임시 폴더에서의 AF_UNIX socket 생성이다. probe가 만든 짧은 socket 경로와 0700 폴더·0600 socket만 사용한다. 기존 vLLM·서비스 socket이나 운영 자료를 입력하지 않는다. 잘못된 peer/epoch와 inode 교체는 원 native 검사 함수의 거부로, 큰 frame은 payload 수신·fixture decoder 진입 전에 원 `BoundedSocket`이 거부하는지 확인한다.
+
+출력은 새 폴더의 `proof.json` 한 개이며 schema는 `byul-lif13-linux-peer-probe/1`이다. 실제 실행 argv·Python/OS·고정 native 전후 SHA와 다음 세 단계의 관측·거부 결과를 남긴다.
+
+1. `peer_identity_and_mismatch`: 실제 peer 신원 확인과 잘못된 PID·epoch 거부.
+2. `oversize_before_payload_decoder`: payload 수신·fixture decoder 진입 전 상한 거부.
+3. `socket_replacement_epoch`: 실제 socket inode 교체 뒤 세대 검사 거부.
+
+지원 Linux에서 세 단계와 정리를 확인한 경우에만 `VERIFIED_LINUX_KERNEL_FIXTURE`·종료 코드 0을 반환한다. 기술 검증 실패는 `FAILED`·종료 코드 1로 앞서 얻은 사실과 정리 오류를 보존한다. 지원 밖 환경은 `UNSUPPORTED`·종료 코드 2와 미실행 개수를 남긴다. `source_python_module_executed`는 고정 Python script 모듈의 적재 여부다. 고정 source 읽기·SHA·새 출력 경로 등 입력 검증에서 먼저 닫히면 proof 생성 전 stderr의 `FAILED`·종료 코드 1이 남을 수 있다. 이 상태는 별도 kernel fixture의 결과이며 원 LIF13 정책 판정을 채우지 않는다.
+
+정리는 `owned_sockets_closed`, `owned_peer_reaped`, `owned_streams_closed`, fixture 폴더 생성·제거, socket 경로 제거, 강제 종료 여부와 오류로 나누어 보존한다. 8-byte fixture frame은 수신 상한을 검사하기 위한 별도 입력이다. 원 vLLM `recv_msg`·pickle·get_state·release, 실제 CUDA IPC·가중치 참조·모델 복구는 이 명령에서 미수집이며 기존 세 결과와 전체 LIF13은 UNKNOWN을 유지한다.
+
+현재 실제 Linux 실측은 대기다. 기존 WSL에서 위 한 명령을 실행한 `proof.json`·종료 코드와 원 argv를 인계받아 해당 플랫폼 결과를 확인한다. 본문의 `/tmp` 준비 명령은 Linux용이다. macOS guard 입력·출력은 `/private/tmp` 같은 symlink 없는 실제 소유 경로를 사용한다. macOS에서는 Linux 경로를 우회하지 않고 `UNSUPPORTED`와 종료 코드 2를 남기는 범위 및 syntax 확인만 사용한다. 이 경우 native import·peer·AF_UNIX·GPU 실행을 성공으로 집계하지 않는다. 도구가 소유한 자식·socket·stream·임시 폴더를 finally에서 정리하며, 결과와 고정 입력은 검토용으로 보존한다. daemon 복구·다른 프로세스 종료·GPU reset·새 AWS 자원은 수행하지 않는다.

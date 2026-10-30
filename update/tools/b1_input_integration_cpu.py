@@ -689,13 +689,15 @@ def _req09_record(raw):
         case = cases[row['case_id']]
         spec = req09_product.describe(case)
         source = _validation(row.get('source_validation'))
+        raw_validation = row.get('source_validation') if type(row.get('source_validation')) is dict else {}
+        raw_post = raw_validation.get('post') if type(raw_validation.get('post')) is dict else {}
         inputs = _req09_metadata(row.get('input_metadata'))
         admitted = _req09_metadata(row.get('admitted_metadata'), admitted=True)
         events = _events(row.get('events'))
         eligible = (counts[row['case_id']] == 1 and all(row.get(key) == value for key, value in spec.items())
             and row.get('source_profile') == 'target031' and row.get('source_commit') == SOURCE_PROFILES['target031']
             and row.get('collection_id') == raw['collection_id']
-            and source['pre'] == 'verified' and source['post']['status'] == 'verified'
+            and source['pre'] == 'verified' and raw_post.get('status') in {'verified', 'unavailable'}
             and source['boundary'] == 'source_fixture_component' and 'process_inputs' in events
             and inputs is not None and all(inputs[key] == value for key, value in _req09_expected_input(case).items()))
         if row.get('outcome') == 'accepted':
@@ -718,7 +720,9 @@ def _req09_record(raw):
     record.update(data_origin='DECLARED', installed_target=None, runner_consumption_verified=False,
         started_at=started.isoformat(), finished_at=finished.isoformat(), source_validation=validation,
         config_file_bytes_sha256=dict(hashes), results=rows, full_scope_coverage=False,
-        capture_status=raw.get('capture_status') if raw.get('capture_status') in ('completed', 'incomplete') else 'incomplete',
+        capture_status='completed' if (raw.get('capture_status') == 'completed'
+            and validation['post']['status'] == 'verified'
+            and all(row['source_validation']['post']['status'] == 'verified' for row in rows)) else 'incomplete',
         auxiliary_write={'status': 'completed' if (raw.get('auxiliary_write') or {}).get('status') == 'completed' else 'failed'},
         confirmed_input_violations=observation['value'] if observation['collected'] else None)
     record['effective_config'] = {'vocab_size': 32, 'max_model_len': 16, 'hidden_size': 4}

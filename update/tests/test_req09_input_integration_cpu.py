@@ -158,7 +158,7 @@ def test_only_actual_bad_mask_or_offset_admission_is_independent_fail(case, case
     assert evd(case).observations['input_endpoints_tested'].value is None
 
 
-@pytest.mark.parametrize('change', ['shape', 'normalized_mask', 'normalized_offset', 'source_mismatch', 'source_unavailable', 'duplicate', 'fixture', 'input_hash', 'no_trace'])
+@pytest.mark.parametrize('change', ['shape', 'normalized_mask', 'normalized_offset', 'source_mismatch', 'post_missing', 'post_invalid', 'duplicate', 'fixture', 'input_hash', 'no_trace'])
 def test_unknown_without_exact_supported_violation(case, change):
     target = admit(case['raw'], 'offset--1')
     if change == 'shape':
@@ -173,7 +173,8 @@ def test_unknown_without_exact_supported_violation(case, change):
         target['admitted_metadata'].update(canonical_sha256=pipeline.req09_product.digest(base),
                                           processor_output_sha256=pipeline.req09_product.digest(base))
     elif change == 'source_mismatch': target['source_validation']['post']['status'] = 'mismatch'
-    elif change == 'source_unavailable': target['source_validation']['post']['status'] = 'unavailable'
+    elif change == 'post_missing': target['source_validation']['post'] = {}
+    elif change == 'post_invalid': target['source_validation']['post']['status'] = 'invalid'
     elif change == 'duplicate': case['raw']['results'].append(deepcopy(target)); case['raw']['results'].pop(0)
     elif change == 'fixture': target['fixture_canonical_sha256'] = '0' * 64
     elif change == 'input_hash': target['input_metadata']['canonical_sha256'] = '0' * 64
@@ -181,6 +182,21 @@ def test_unknown_without_exact_supported_violation(case, change):
     result = pipeline.run_req09_pipeline(**case['args'])
     assert result['checks']['REQ-09']['verdicts']['security'] == 'UNKNOWN'
     assert not result['confirmed_input_violations']
+
+
+@pytest.mark.parametrize('case_id', ['mask-1', 'offset--1'])
+def test_known_invalid_admission_survives_unavailable_later_source_check(case, case_id):
+    target = admit(case['raw'], case_id)
+    target['source_validation']['post']['status'] = 'unavailable'
+    result = pipeline.run_req09_pipeline(**case['args'])
+    assert result['confirmed_input_violations'] == [case_id]
+    assert result['checks']['REQ-09']['verdicts']['security'] == 'FAIL'
+    evidence = evd(case)
+    assert evidence.observations['confirmed_input_violations'].value == [case_id]
+    assert evidence.observations['declared_verdicts'].value['security'] == 'FAIL'
+    artifact = json.loads((case['args']['output_root'] / 'req09-input-cpu.json').read_text())
+    assert artifact['capture_status'] == 'incomplete' and artifact['full_scope_coverage'] is False
+    assert next(item for item in artifact['results'] if item['case_id'] == case_id)['qualified']
 
 
 @pytest.mark.parametrize('late', ['after', 'top_post', 'artifact', 'component_post', 'export'])

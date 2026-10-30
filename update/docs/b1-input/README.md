@@ -25,6 +25,9 @@ admission만 한 번 수집한다. source/producer/config/fixture 귀속과 행�
 `input_cpu.project`를 적용한다. mask/offset이 유효값으로 정규화되면 그 행을 위반으로
 투영하지 않는다. shape의 `expected=None`은 관측만 한다. 후속 정상은 `hello world`의
 2-token source CPU admission이며 HTTP·모델 처리 성공을 뜻하지 않는다.
+행의 사전 source 검증과 실제 동일한 invalid 입력 수용을 확인한 뒤 후기 검사가
+명시적으로 `unavailable`인 경우에는 그 독립 위반을 보존한다. 수집 상태는 incomplete,
+전체 범위는 UNKNOWN으로 남긴다. 명시적 mismatch·누락·알 수 없는 상태는 자격을 주지 않는다.
 
 원 Store는 읽기 전용 bundle로 새 output/store에 복원한 뒤 기존 manual v3 override로
 REQ-09 한 항목만 추가한다. 전체 normal control은 `not_attempted`, 원 token/길이 챌린지

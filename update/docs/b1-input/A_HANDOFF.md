@@ -19,6 +19,9 @@ EXAMPLE fixture만 사용하며 수집기 실제 실행은 통합 후 한 번으
 artifact·후속 정상·마지막 component 확인이나 export 실패가 독립적으로 확인된 위반을
 삭제하지 않는 기존 수동 증거/판정 계약을 사용한다. 원 모델 consumer·HTTP·메모리 영향과
 전체 REQ-09 충족은 남은 범위로 표시한다.
+행별 사전 검증·실제 invalid 입력 수용·입출력 동일성을 확인했다면 명시적 후기
+`unavailable`이 독립 FAIL을 지우지 않는다. 이 경우 수집은 incomplete이고 전체 범위는
+UNKNOWN이다. 명시적 source mismatch·후기 상태 누락/오류는 계속 자격에서 제외한다.
 
 PR43은 보존한다. PR46은 그 브랜치를 base로 하는 B-1 전용 후속이다.
 REQ-10 structured_limits.py/sampling_cpu.py, REQ-07·08·09 input_cpu.py,

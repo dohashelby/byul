@@ -649,3 +649,5 @@ B LIF07의 source_qualified/actual_worker/ready 긍정신고는 자격근거로�
 열린질문: native18 실제 C/CPU 검증용 Torch2.13.0+cpu/safetensors0.8.0+전이9의 고정250MiB/전용3GiB 실행안은 CLAUDE18 신규의존성규칙에따라현재채팅답변대기다. 기존프로젝트의존성/원환경/AWS/GPU는변경하지않으며 B통합·독립개발은계속한다. B Windows ctime basis 문제는 원 B 담당자의 고정 보수를 받아소비하며 비교삭제/자동허용으로우회하지않는다.
 
 Worker.init_device/initialize_from_config/compile_or_warm_up_model은원 tracing decorator를보존한다. 고정source/code와backendalias·closurefunc를확인해원바깥callable을한번호출하며바깥RETURN을내부진입/GPU/READY/승인으로추정하지않는다. B원callback/helper는private고정import간선으로원bytes를소비하고guardnamespace를변경하지않는다. 같은PID/시간중첩대신정확factory record와startupcontext를결합하며helper/EXAMPLE를실제worker로표시하지않는다.
+
+code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가sourcebytes를직접compile한다. 이번unknownmodule거부시험과원SourceHash검사를유지하고profile19의고정네module이름만privacy vocabulary에추가했다. 설치후처리는pytest current alias를실제사례로세지않으며통과한CLI/Store를재실행하거나변경하지않고정확Ref검증으로회수한다.

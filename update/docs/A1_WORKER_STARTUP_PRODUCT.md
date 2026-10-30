@@ -1,6 +1,6 @@
 # Worker startup·OBS02 공통 계측
 
-상태: 구현 중인 native19 초안. runtime code literal은 아직 준비되지 않았고 소스 고정·시험·설치·실제 실행을 하지 않았다. 준비된 제품 지원이나 기존 native18 실제 검증으로 집계하지 않는다.
+상태: source aed77b040b65bfc3c929bb38ee0ebcf028881989 / reviewed common bc1f0b3174172e616d1fbf2be5033cc815c095a0의 공통 hook/parser·기존 OBS02 CPU/EXAMPLE 소비·설치 검증 마감. 실제 serving/worker/GPU·기업 승인과 전체 분기는 미완료다.
 
 기존 native8/16/17/18 소스와 B readiness callback/helper bytes를 보존한 private 조합이다. 새 main vllm-native-lifecycle-metadata/19, recording guard-native-lifecycle-events/19, Worker event/link/close/limit 각각 /1을 명시한다. 기존 OBS02 observation_identity 제품 경로와 설정·EVD/RES/RPT/verify/export/restore/정확 Ref 소비를 연결한다. B tools.b_lif07_readiness의 NATIVE/Unready HTTP/delay 계약은 아직 None이며 B 전용 소비·판정·pin 갱신은 B가 맡는다. LIF09의 native14 MPI/READY 대기 분기는 유지하고 이 새 profile로 대체하지 않는다. LIF09의 추가 결합은 후속 범위다.
 
@@ -16,3 +16,11 @@ startup context의 원 모델 적재 root FACTORY 기록을 journal lock 안에�
 
 검증 계획: 정확 source/decorator·원 반환/예외·callback 코드 교체·세대/누락/중복/부분·scope 교체·상한·후속 수집/첨부·선정 observer 정리를 CPU EXAMPLE로 확인한다. CPU fixture의 함수 namespace·trace backend·모델·PID/start 재배치는 EXAMPLE이며 serving hook/GPU 실증으로 쓰지 않는다. 원 B Windows LIF07/LIF13 실패와 기존 CI 결제 차단을 보존한다. 원GPU창 종료·추가 Start0·46.66USD/과거사용량·보존120GiB EBS를 유지한다. C·Torch 검증의 새 11의존성 설치는 별도 답변 대기이며 이번 계측 개발은 기존 의존성만 사용한다.
 
+
+검증 결과: 양쪽 직접 고유53사례(원 sensor/contract27, 준비·target8, 제품·미등록 module 거부9, full consumption pin9)를 변경 영향과 동일 bytes 근거로 연결했다. source21d64fe sensor27과 a4660f5 준비8은 관련 source/test bytes가 그대로이며 변경된 aed77b0 제품9/pin9을 확인했다. 인접 Windows291통과/기존1skip·1deselected, Linux292통과/기존1deselected. source1423파일 전후 변화0이다. 초기 fixture 전이 누락·공유 pycache code pin 준비 오류·네 고정 module vocabulary 누락과 원 실패를 보존했다. gate/assert/원 사례를 삭제·완화하거나 새 skip을 추가하지 않았다.
+
+hook/contract code pin은 source bytes 직접 compile로 Windows3.12.14의 2ed8e7c4527e9446782ed8bf5e795f474ce10f932e469013aab9e0cc10b23139, Linux3.12.3의 cfc2c11176e641d9e70d869e70422f12eb5a7d85c365ae69600a8a9da336b4a6을 고정했다. compiler별 Worker body·OTEL wrapper·B callback/helper literal도 별도다. 실행 입력에서 읽은 hash를 승인값으로 쓰지 않는다. 네 메서드의 source/decorator admission을 검증했으며 실제 원 load_model body의 정상/후속 callback 예외와 init_device body의 거부·trace wrapper 보존을 EXAMPLE dependencies로 확인했다. 실제 init/KV-cache/compile/warmup/GPU 경로 전체 실행·backend/READY 완료를 뜻하지 않는다.
+
+source/wheel/Windows 격리설치 guard265파일 일치, wheelSHA d451e13e0ea565a86bde92d04f1c3e2c7af8bec6138ba674312196bb5bc46b49. Linux 별도 격리설치에서 공개 guard CLI 정상·late callback·후속 수집 오류·첨부 오류 네 사례와 각각6Ref, 합계24Ref의 저장/verify/export/restore·저장 팩 재판정을 확인했다. 네 CLI 사례는 통과했고 후속 수집기의 pytest current symlink 중복 계수만 기존 네 Store 읽기로 보수했다. 첫 실패/로그/Store/Refs를 보존하고 CLI·수집을 재실행하지 않았다. 설치본 guard 경로와 265bytes 및 Source 불변을 확인했다.
+
+B native LIF07 consumption·실제 hook 운영 연결, LIF09 MPI14 추가 결합, 실제 assignment/authority/U1~U6, fresh 운영 재개와 CI5는 별도다. B 원 Windows LIF07/LIF13 이식 실패26개는 이전 PR149 근거로 남으며 이번 인접 통과를 해당 보수로 소급하지 않는다. native0.32·C/Torch·GPU 실증0과 원46.66USD/사용량/보존120GiB EBS를 유지한다.

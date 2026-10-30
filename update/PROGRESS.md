@@ -1615,3 +1615,5 @@ B 확정571c3e5 전용20파일을원bytes로통합했다. LIF07 bounded observer
 B readiness571c3e5→통합source d0f2ed4: Linux직접283/인접229통과, Windows264/19실패·인접221/7실패를원본보존했다. B LIF07 원fixture ctime basis 차이·닫힌거부를독립확인했고기존LIF13 POSIX/symlink제약은미해결이다. guard262 source/wheel/Windows설치일치·Linux격리설치 B공개CLI4사례/정확24Ref복원재판정·A138 HTTP고정소비를확인했다. actual0/세축UNKNOWN/CI5미확인/전체분기미완료.
 
 native19 worker startup공통을기존OBS02제품에연결하는초안을마쳤다. 원native8/16/17/18·Bcallback/helper bytes와source/image/lab·native0.32제한을보존한다. Source/decorator·callbackcode·명시root link·session observer정리·closedparser·기존CLI/Ref사례를고정검증한다. LIF09 native14 MPI/READY분기는대체하지않고후속결합으로남긴다. actual worker/GPU0/정책U1~U6미확정·C CPU11의존성답변대기.
+
+native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인접Win291/Linux292통과(기존skip/deselected유지), guard265 source/wheel/Windows설치일치·Linux설치CLI4/정확24Ref복원재판정. 초기fixture/pycache/vocabulary와설치후처리alias실패를보존하고영향만보수했다. 실제worker/GPU/C/Torch0, Bnative/LIF09MPI14추가결합·CI5/기업정책미완료.

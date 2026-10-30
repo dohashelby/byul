@@ -27,7 +27,7 @@ from guard.core.select import select
 from guard.executors import registry, kubernetes_lifecycle_capture as readers, lifecycle_session
 from guard.executors.base import DraftArtifact, EvidenceDraft
 from guard.executors.http_common import incomplete_artifact_capture
-from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, canonical_json, load_pack
+from guard.models import CheckDef, DataOrigin, Environment, ExecStatus, Policy, canonical_json, load_pack, new_id
 from guard.runtime import kubernetes_http
 from guard.runtime.bounded import strict_json
 from guard.store import Store
@@ -794,9 +794,9 @@ def run_cpu_pipeline(source_root, output, *, execute=True):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     pack = proposal_pack(output / 'proposal-pack')
-    env = Environment(id='ENV-B-REQ18-SOURCE-CPU', data_origin=DataOrigin.DECLARED,
+    env = Environment(id=new_id('ENV'), data_origin=DataOrigin.DECLARED,
         engine={'name': 'vllm', 'version': 'source-' + SOURCE_COMMIT}).seal()
-    policy = Policy(id='POL-B-REQ18-SOURCE-CPU', data_origin=DataOrigin.DECLARED,
+    policy = Policy(id=new_id('POL'), data_origin=DataOrigin.DECLARED,
         status='DRAFT', pack=pack.ref(), scope={'include': ['REQ-18']}).seal()
     return run_pipeline('cpu', env, policy, pack, output / 'run', source_root=source_root, execute=execute)
 

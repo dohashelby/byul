@@ -124,7 +124,10 @@ class TemplateSourceCPUExecutor:
         # Preserve the original [] / ['__class__'] contract and original
         # inference functional fixture. Core select owns missing/None handling.
         validate_policy(check, policy_values, {})
-        workdir = Path(workdir).resolve(strict=True)
+        # The common runner passes a fresh path; the executor owns its creation.
+        workdir = Path(workdir)
+        workdir.mkdir(parents=True, exist_ok=True)
+        workdir = workdir.resolve(strict=True)
         raw_result, record, gaps = None, None, []
         began = datetime.now(timezone.utc)
         child = None

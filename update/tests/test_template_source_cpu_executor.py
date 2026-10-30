@@ -84,6 +84,19 @@ def test_real_child_owned_path_fixed_argv_and_safe_draft_without_parent_torch(tm
     assert PRIVATE not in artifact and 'guard sandbox' not in artifact
 
 
+def test_common_runner_fresh_nested_workdir_collects_and_saves_artifact(tmp_path):
+    cfg, env, _, collector = world(tmp_path, consumed=True)
+    work = tmp_path / 'store' / 'work' / 'PLAN-new' / 'SUP-13' / 'candidate'
+    assert not work.exists()
+    draft = run((cfg, env, work, collector))
+    assert draft.status == ExecStatus.COMPLETED
+    assert draft.normal_control.succeeded is True
+    assert judge(draft).verdicts['security'].value == 'FAIL'
+    assert len(draft.artifacts) == 1
+    assert draft.artifacts[0].path == work / 'template-source-cpu.json'
+    assert draft.artifacts[0].path.is_file()
+
+
 @pytest.mark.parametrize('action', ['', 'sys.exit(9)', 'value=None; raise OSError("PRIVATE_SOURCE_CHILD_STDERR_OR_EXCEPTION")'])
 def test_independent_existing_rule_fail_survives_child_late_failure(tmp_path, action):
     draft = run(world(tmp_path, consumed=True, action=action))

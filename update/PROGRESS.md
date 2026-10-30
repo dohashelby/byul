@@ -1595,3 +1595,5 @@ git status
 # 2026-10-31 A1 B4cfc 로그/Graph/ID 확정 전달물 통합 착수
 
 - B PR130 고정27파일+전이3개 bytes를보존하고 기존 OBS03/manual/Ref와 REQ20준비경계를검토했다. B oldHTTPpin3da의정확A참조1c1f와현재A0fc의닫힌요청AST동일성을확인했으며 원B gate는거부그대로다. nativeGraph None/실제source-callback-close미지원·oldWindowsfixture실패를유지하고 검토fullsnapshot/영향/설치/CLI·Ref를별도로확인한다. 실제Kube/GPU/전체Goal완료를선언하지않는다.
+
+B4cfc 원본27+전이3파일을소비했다. A1 경계각4/인접각70·설치258/OBS03 CLI4·정확24Ref·REQ20미지원요청0·공통366/제외0을확인했다. 원B직접Win220pass4fail/Linux222pass2fail은그대로보존하며 제품거부검증으로원fixture실패를지우지않는다. actual/CI5/전체완료는미확인이다.

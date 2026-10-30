@@ -25,3 +25,5 @@ CPU 검증은 기존 고정 AuthenticationMiddleware/ModelsRouter/serving 함수
 실제 실증에는 선택 issuer/유효 정책/cache·시험 자격·철회 전 정상/원사건·시계·실제 새 접근과 거부/허용·전파·복구/정리 책임 및 정확 ENV/POL/source/image/model이 필요하다. 원GPU 승인창 종료·추가Start0·마지막확인stopped·기존46.66USD/과거 사용량·보존120GiB EBS과금·CI 결제 차단을 유지한다. 별도 새 시간/권한/민감 접근을 이 구현에서 승인하지 않는다.
 
 현재 구현·회귀·문서 초안 종료 뒤 source 고정·영향/Linux·설치본/정확Ref·커밋/초안PR/정확CI/인계를 준비한다. 이전 LIF11의222파일/CPU 검증과 실제 배포04f7856 wheel을 이 새 소스 검증으로 소급하지 않는다.
+
+첫 고정 소스 ee9a137의 Windows14실패/416통과·Linux14실패/417통과 기록과1280파일 hash를 보존한다. 공통 원인은 소유 EXAMPLE ASGI 대역의 asyncio.run()이 외부 I/O 금지 패치 뒤 event loop 내부 wakeup socket을 새로 만드는 시험 준비 오류였다. 별도 소유 fixture에서 loop를 패치 전에 만들고 finally로 닫으며, 같은 고정 native 함수·실제 coroutine 호출·외부 socket/Popen 금지·5요청·독립 FAIL·정확Ref assert를 유지한다. 제품 guard/native/전송 gate와 기대 판정을 바꾸지 않는다. 두 검증 종료 확인 후 이 시험·문서만 고치고 영향 재검증한다.

@@ -29,6 +29,16 @@ PRIVATE='EXAMPLE_PLT10_PRIVATE_RESPONSE'
 REPO=Path(__file__).resolve().parents[2]
 
 
+@pytest.fixture
+def serving_loop():
+    # Create the owned ASGI loop before the test forbids all new runtime sockets.
+    # asyncio.run() would create its private wakeup socket inside the HTTP fake
+    # and mask the native callback with the deliberate external-I/O assertion.
+    loop=asyncio.new_event_loop()
+    try:yield loop
+    finally:loop.close()
+
+
 class ModelList:
     def __init__(self):self.data=[]
     def model_dump(self):return {'object':'list','data':[{'id':'fixture-model'}]}
@@ -42,7 +52,8 @@ class OwnedResponse:
 
 
 class World(BaseWorld):
-    def __init__(self,group,target,mode,factory,patch):
+    def __init__(self,group,target,mode,factory,patch,loop):
+        self.loop=loop
         super().__init__(group,target,mode);self.observer,self.writer,self.fake=auth.begin(group,factory,patch);self.sealed=False
         patch.setattr(auth,'Response',OwnedResponse)
         async def registry():return ModelList()
@@ -55,8 +66,8 @@ class World(BaseWorld):
         value={'type':'http','method':'GET','path':'/v1/models','root_path':'',
             'headers':[(b'x-request-id',(rid+'-other' if self.mode=='native-unbound' else rid).encode()),
                 (b'authorization',('Bearer '+(RETIRED if role=='retired' else CONTROL)).encode())]}
-        response=asyncio.run(auth.invoke(self.app,value))
-        if self.mode=='native-duplicate':asyncio.run(auth.invoke(self.app,value))
+        response=self.loop.run_until_complete(auth.invoke(self.app,value))
+        if self.mode=='native-duplicate':self.loop.run_until_complete(auth.invoke(self.app,value))
         self.group.raw_by_pid[42]=bytes(self.fake.data)
         return response[0]['status'],b''.join(m.get('body',b'') for m in response).decode()
     def close_native(self):
@@ -87,11 +98,11 @@ class World(BaseWorld):
         return result
 
 
-def inputs(tmp_path,group,target,mode,factory,patch):
+def inputs(tmp_path,group,target,mode,factory,patch,loop):
     environment=group.env.model_copy(deep=True);environment.model.id='EXAMPLE-model';environment.model.revision='EXAMPLE-revision';environment.model.inventory_sha256='b'*64
     if mode=='version032':environment.engine.version='0.32.0'
     group.env=environment.seal();target=deepcopy(target);target['environment_ref']=group.env.ref().model_dump(mode='json')
-    world=World(group,target,mode,factory,patch);derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack');now=utcnow()
+    world=World(group,target,mode,factory,patch,loop);derive(baseline_pack().path,tmp_path/'pack');pack=load_pack(tmp_path/'pack');now=utcnow()
     deadline=now+timedelta(seconds=30) if mode=='before-deadline' else now-timedelta(seconds=30)
     values={'revocation_environment_sha256':group.env.ref().sha256,'revocation_target_sha256':sha256_hex(canonical_json(world.target)),
         'revocation_prepared_sha256':sha256_hex(canonical_json(group.prepared)),'revocation_validity_start':(now-timedelta(seconds=120)).isoformat(),
@@ -105,8 +116,8 @@ def inputs(tmp_path,group,target,mode,factory,patch):
 @pytest.mark.parametrize('mode',['denied','accepted','conditional','before-deadline','before-shape','native-unbound','native-duplicate',
     'engine-replaced','seal-failure','native-one-missing','native-partial','attachment','after-timeout','http-cleanup','late-protocol',
     'missing-credential','same-credential','actual-lab-false','version032'])
-def test_registered_cli_auth_samples_absolute_constraint_and_exact_refs(tmp_path,group,native_target,writer_factory,monkeypatch,mode):
-    world,values,pack=inputs(tmp_path,group,native_target,mode,writer_factory,monkeypatch)
+def test_registered_cli_auth_samples_absolute_constraint_and_exact_refs(tmp_path,group,native_target,writer_factory,monkeypatch,serving_loop,mode):
+    world,values,pack=inputs(tmp_path,group,native_target,mode,writer_factory,monkeypatch,serving_loop)
     monkeypatch.setattr(http,'capture_pipes',world.runner);monkeypatch.setattr('guard.executors.kubernetes_lifecycle_capture.capture_pipes',world.runner)
     def forbidden(*a,**kw):raise AssertionError('unexpected runtime')
     monkeypatch.setattr(subprocess,'Popen',forbidden);monkeypatch.setattr(socket,'socket',forbidden)
@@ -166,8 +177,8 @@ def test_pack_keeps_original_issuer_new_access_criteria_and_other76(tmp_path):
 
 @pytest.mark.parametrize('key,value',[('revocation_deadline_basis','auto'),('revocation_max_new_access_samples',4),('revocation_max_clock_skew_ms',True),
     ('revocation_subject_label','unknown-key'),('revocation_issuer_id',''),('revocation_event_at','2026-10-30T00:00:00')])
-def test_policy_rejects_inferred_subject_deadline_or_extra_calls(tmp_path,group,native_target,writer_factory,monkeypatch,key,value):
-    _,values,_=inputs(tmp_path,group,native_target,'denied',writer_factory,monkeypatch);values[key]=value
+def test_policy_rejects_inferred_subject_deadline_or_extra_calls(tmp_path,group,native_target,writer_factory,monkeypatch,serving_loop,key,value):
+    _,values,_=inputs(tmp_path,group,native_target,'denied',writer_factory,monkeypatch,serving_loop);values[key]=value
     with pytest.raises(ValueError,match='CREDENTIAL_REVOCATION_POLICY_INVALID'):normalize_policy(values)
 
 

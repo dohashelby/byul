@@ -1526,3 +1526,5 @@ git status
 - A1 PLT11 선정 probe keep-alive: 고정f0c0972 Windows264/Linux265, source/wheel/설치229파일, CLI4 정확24Refs(7.772초), 전체337 고정 소비372f354. 초기pin실패는 세 A1파일을 기존 reviewed blob bytes에 맞춘 것으로 보수; AST/판정/gate 유지. 실제 issuer/앱session·handle·전체PLT11 미완료. 다음PLT12 원범위·필수정책/관측 경계 검토.
 
 - A1 OBS02 SC23-05 profiler: 고정0.31 공식/이미지source3개 일치, opt-in native15(call/parent/object/source/code/전후flag)와 typed parser·기존 OBS02 HTTP/CLI·원기준파생팩 연결 초안. backend stop 예외와 stop후출력 예외를 분리하고 모든축UNKNOWN/실제backend·산출·다음시작 미확인을 유지한다. 회귀/문서 종료 뒤 고정·검증·설치/PR/인계를 진행하며 현재 미검증이다.
+
+- A1 OBS02 profiler CPU 검증 마감: 고정d94f614 Windows310/Linux311·동일1300파일, source/wheel/설치232파일 및 설치본4사례/정확24Refs(7.810초), 공통340 고정 소비36c378a. 초기 loader 준비·판본별 compiled cache·typed packet 투영·closure lookup 실패와 보수를 보존했다. 새skip/제외·runtime hash 승인0, 기존 native8~14·A2/B 원본·원3분기/76정의 bytes 유지. 실제backend 수집/종료·trace 산출/전송·다음 정상시작/RPC·producer 신뢰는 UNKNOWN이며 전체OBS02·A39/56/4·A1 19/27/2 미완료. 원GPU창종료/Start0·46.66USD/EBS과금·CI결제 차단을 유지한다.

@@ -15,3 +15,5 @@ API·worker·wrapper의 실제 call 연결은 같은 process/context/객체의 �
 구현 순서는 source provenance와 native15 hook/schema/parser → 기존 CLI/정제 projection/원기준 파생팩 → 정상/실패/stop후산출실패/지연시작/자동stop/중복·누락/교체·후속수집·첨부 오류/정확Ref 회귀·문서 → 고정 source/hash → 영향/Linux·설치본 → 확정커밋·초안PR·정확CI·인계다. 관련 공통 파일은 A1만 수정하고 기존 native8~14와 모든 A2/B 전용 파일은 보존한다. 큰 미완성 부분을 다른 준비된 개발의 선행조건으로 삼지 않는다.
 
 GPU 승인창 종료·추가Start0·마지막 확인stopped·기존46.66USD/과거사용량·보존120GiB EBS과금·CI결제 차단을 유지한다. 실제 재개에는 새 시간 승인·같은 자원의 fresh소유권/활성작업/quota/잔여총비용·정확ENV/POL·준비된 profiler 소비자와 복구/정리 책임이 필요하다. 이번 소스 개발은 새 기동/기간/비용/권한 승인이 아니다. 전체 OBS02/부모A/전체77개 완료 수를 늘리지 않는다.
+
+이 순서의 CPU 제품 연결 검증은 source d94f6146a83c29653ae8d66d92c028604124839d에서 마감했다. Windows310/Linux311·동일1300파일, source/wheel/설치232파일, 설치본4사례/정확24Ref 왕복, 검토 공통340파일 pin36c378a을 제공한다. 초기 세 차수 실패와 보수 근거는 제품 계약 문서에 남겼고 새 skip/제외·런타임 hash 자동 승인은 없다. 실제 backend 활동·산출/전송·다음 정상 시작·API-worker RPC 및 producer 신뢰는 별도 미완료이며, B의 구체적 service 시험 계약을 기다린다. 큰 미완성 부분과 관계없이 다음 준비된 A1 담당 개발을 이어간다.

@@ -16,7 +16,7 @@ POL8은 기존 observation_state_environment_sha256, observation_state_target_sh
 
 `profiler_native_samples`, `profiler_worker_calls`, `profiler_rank_status`, `profiler_conflict_candidates`, `profiler_missing`과 backend_collection_stopped/trace_output_completed/cross_process_rpc/scope_complete=false를 기록한다. 원래 state_* 관측과 함께 모든 판정축 UNKNOWN·normal_control.succeeded=null을 유지한다. source/객체·필수rank·call pair·정리/교체/restart·후속 수집/seal/첨부 오류는 미확인 또는 ABORTED이며 앞선 정제 관측과 독립 FAIL을 지우지 않는다. 단위 helper나 등록만으로 분기를 완료하지 않는다.
 
-구현·회귀·문서 초안 단계이며 아직 고정 검증·설치본·확정PR·실제 환경 검증을 주장하지 않는다. CPU exact native-body와 backend/trace/route 대역은 EXAMPLE이다. 실제 소스/image/producer/principal/POL·정상시작/수집/정지·backend 실패·산출/전송·다음 시작/복구/정리 책임의 증거가 별도로 필요하다. 원GPU창 종료/Start0/마지막확인stopped·기존46.66USD·보존120GiB EBS과금·CI결제 차단을 유지하고 새 기동/기간/비용/권한을 승인하지 않는다.
+고정 소스 d94f6146a83c29653ae8d66d92c028604124839d의 CPU 영향·설치본 검증을 마감했다. CPU exact native-body와 backend/trace/route 대역은 EXAMPLE이다. 실제 소스/image/producer/principal/POL·정상시작/수집/정지·backend 실패·산출/전송·다음 시작/복구/정리 책임의 증거가 별도로 필요하다. 원GPU창 종료/Start0/마지막확인stopped·기존46.66USD·보존120GiB EBS과금·CI결제 차단을 유지하고 새 기동/기간/비용/권한을 승인하지 않는다.
 
 
 첫 고정af64e48/1300파일의 Windows31실패/737통과/기존skip1·제외1(120.94초, 부모121.975초), 같은bytes Linux32실패/737통과/기존제외1(40.71초, 부모41.006초)을 보존한다. 두 실행 종료 후 단위 native fixture가 instrument()와 CheckedLoader의 역할을 혼동한 준비 누락을 수정했다. source/함수/등록 검사 뒤, 실제 loader가 별도로 제공하는 MODULE ready journal을 고정 source/code 기반의 EXAMPLE 입력으로 명시한다. 실제 loader나 source gate를 완화하지 않고 기존 hash/등록/정확body/assert를 유지한다. Linux 추가 실패는 같은3.12 pyc tag를 공유한 준비 과정의 외국판 compiled cache 영향으로 확인했다. 동일 source를 양 interpreter에서 pyc import 없이 새로 compile한14/3 계약을 각각 literal 고정하고 검증 cache를 판본별 독립 경로로 분리한다. 런타임 읽은 해시 자동 승인·검사 제외·skip 추가는 없다.
@@ -26,3 +26,7 @@ POL8은 기존 observation_state_environment_sha256, observation_state_target_sh
 
 
 3차 고정77e97ad의 Windows8실패/302통과/기존skip1·제외1(100.06초, 부모100.768초), Linux8실패/303통과/기존제외1(30.76초, 부모31.067초)을 보존한다. typed profiler 사건20개가 실제로 전달되는 것은 확인했고 남은 결함은 기존 capture schema의 summary.recording_closed를 top-level에서 찾은 새 projector의 잘못된 lookup이었다. 검증된 summary의 정확한 closure flag를 소비하도록 보수하며 누락 시 false라는 gate를 유지한다. 원함수 회귀에 closed packet에서만 call/candidate가 성립하고 unclosed이면 둘 다 보류되는 독립 projection 검증을 추가했다. 두 실행 종료 뒤만 수정했으며 원 Source/물리주체/call/rank/closure gate와 판정/개인정보/정확Ref assert를 유지한다.
+
+최종 고정 d94f6146a83c29653ae8d66d92c028604124839d의 동일1300파일에서 Windows310통과/기존skip1·제외1(107.76초, 부모108.497초), Linux311통과/기존제외1(38.55초, 부모38.845초)을 확인했다. 새 skip/제외·검증 중 변경은 없다. 첫 영향 검증에서 통과한 변경 없는 인접737사례는 재사용하며 전체 suite의 새 통과로 합산하지 않는다. 전체 공통340파일은 검토한36c378a98cbf3053b8524b0bd1fc8cb714bb963a를 literal pin으로 소비하고 원 B helper/default c9·A2/B bytes·기존 native8~14와 resource probe를 보존한다.
+
+동일 소스의 wheel과 격리 설치232파일 bytes 일치 및 표준 설치 CLI를 확인했다. 격리 설치본 canonical CLI4사례(정상/backend stop 예외/stop 뒤 출력 예외/후속첨부 오류)는 7.810초에 실행→관측→판정→보고→검증→반출/복원·재판정까지 사례별6개, 총24개 정확 Ref가 일치했다. 세 정상 수집 사례는 COMPLETED, 첨부 오류는 ABORTED이며 모든 판정축 UNKNOWN이다. 후속 오류에서도 앞선 정제 후보 관측을 보존한다. 설치 검증 준비의 첫 중복 copy 오류는 이미 존재하는 prepared 자산의 bytes 동일성을 확인하도록 OUT fixture만 수정했으며 실패 기록과 제품 소스를 보존했다. 이 검증은 실제 serving/torch/backend/GPU가 아닌 EXAMPLE이다.

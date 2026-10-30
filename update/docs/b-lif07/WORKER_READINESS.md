@@ -32,3 +32,12 @@ PYTHONPATH=src:. python -m tools.b_lif07_readiness --store SOURCE --plan PLAN --
 입력은 symlink 없는 regular file·2MiB 이하·중복 키/비유한 값 없는 strict JSON object이며 첫 읽기 전후 파일 identity/크기/변경 시각을 대조한다. capture 전 원Store inventory와 manifest/target/prepared 및 준비 asset bytes를 고정하고 import/project 전후·증거 저장 후 다시 대조한다. 수집 중 원본 변경은 실패로 남기고 이미 정제한 safe facts를 보존한다. 원본을 덮어쓰거나 재수집해 오류를 지우지 않는다.
 
 import는 신고된 관측을 기존 manual EVD로 보존한다. 파일의 source/worker/READY 긍정 플래그는 자격으로 사용하지 않는다. ENV가 EXAMPLE이면 capture도 EXAMPLE로 강제하며, DECLARED 파일도 대상 source/GPU/worker 진위 검증을 부여하지 않는다. capture의 알려지지 않은 필드·원 prompt/token/RID/secret은 projection에서 제거하며 원 JSON bytes를 artifact로 복사하지 않는다. CLI summary의 `actual_target_executed=False`, `input_mode=imported_observation_file`과 세 UNKNOWN으로 구분한다.
+
+
+## 검증과 보존한 증거
+
+관측기 초기29건과 startup binding 영향10건을 재사용하고, 관측 공백 수정의 직접 영향11건을 확인했다. 소비기 입력 고정·파일 수입의 직접 영향18건과 고정 변경 집중 검토를 통과했다. producer가 실제 만든 기본 미수집·최소 startup CALL/RETURN 파일을 공개 CLI로 넣어 원 manual EVD/RES/RPT와 정확 Ref 복원을 확인했다. 단위시험 임시 Store는 정상 finalizer에서 삭제돼, 검토용 산출물을 남기는 공개 명령1건만 별도 소유 경로에서 실행했다(0.514초). 기존 시험 함수·assert를 그대로 사용했고 전체 suite·실제 worker/GPU는 실행하지 않았다.
+
+보존 RPT는 `RPT-01M671SK359WND9216SX6S2PMW@1`(SHA `bdda98d760d8ec6ef4cbbf7265b422ad272149b6c981e63cfb1fae47131b3377`)다. 저장소 밖 `byul-b-record-access-evidence-20261030/lif07-worker-readiness/import-cli-case`에 실제 argv/stdout/stderr, EXAMPLE 입력, 정제 첨부, 원본/출력/복원 Store·반출본·보고서와 SHA manifest를 보존했다. 세 축 UNKNOWN·실제 요청/Pod변경/지연0·source 자격False를 유지한다. 이 증거는 실제 Kubernetes 실행 준비 완료나 전체 LIF07 완료로 집계하지 않는다.
+
+검토된 관측기와 기존 승인 A138 호환 adapter를 포함한 guard component는 `b15b629431777a86a151353728e612c760aff789`다. 기존 helper858·fixtureac8·전체 고정 scope를 보존하고 관련 strict11경로와 source/wheel/격리설치170파일 일치·설치본 lazy import를 확인했다. A 공유 runtime·HTTP·팩·계약은 수정하지 않았다.

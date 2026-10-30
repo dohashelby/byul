@@ -127,3 +127,10 @@ EVD 본문·첨부를 직접 조회하는 API는 제공하지 않는다. 이번 
 원 OBS11rev3의 2prose와 기업 기한이 필요한 normal 미시도, challenge True/True/False, 3UNKNOWN을 유지했다. 운영 경보 기한·기업5POL·종속 RES 자동 전파·실제 시계 오차·연속 polling 탐지는 미수집이다. 원 CLI11개와 expiry append8개 뒤, 최신 limitation을 첫 cohort/두 번째 cohort별로 한정한 metadata CLI8개만 추가했다. 원 두 capture·이전9objects/Refs는 보존하고 EVD/RES revision3→새 RPT `RPT-01M66X9QGFPYKKMK81YE59MN0G@1`, 복원12objects·verify/contract 오류0을 확인했다. 집중 검토와 정정 확인을 통과했다.
 
 원 명령/입력과 독립 receipt는 저장소 밖 `byul-b-record-access-evidence-20261030/obs11-lab-feed/{capture,capture-expiry}`의 `command.json`·`config.json`·`publisher-receipts.jsonl`에 있다. 최신 공통 명령과 원 manual·보고서·반출은 `evidence-scope-correction/{commands.json,manual-evidence.yaml,final-proof.json,report.json,evidence.zip}`에 보존했다. 원 capture SHA는 `0fc6b43a17e302092f17fa7d16ee9a87a1e6e13add586536db11b22f880350b4`, expiry SHA는 `b4cc7dbda1c4f3d22b261ff47787294a1c511aae7395e5f5db49fcd9a3c34b35`다.
+
+
+## A 통합에서 발견한 시험 fixture 보수
+
+A PR145의 고정 전달물 시험은 Linux에서 정책 결합 오류2건이 소비기 도달 전 fixture assert로 중단됐다. 원2실패를 보존하고 fixture의 기대값을 현재 PLAN의 정확 POL에서 독립적으로 가져오도록 수정했다. 변조된 반환5종이 실제 소비기까지 호출1회 도달한 뒤 기존 정확 binding/origin 오류와 EVD 미생성을 확인하며, 정상 POL revision2의 빈 금지 목록과 다중 source 기대를 보존한다. Graph용 EXAMPLE 소스는 검토한 LF bytes로 쓰고 실제 CRLF bytes 변경은 원 gate가 거부하는 회귀를 추가했다. 직접 영향15개 고유 case와 집중 검토를 통과했다. 실행 호스트는 macOS이며 A의 과거 Windows/Linux 실패 원본과 구분한다. 제품 판정·source gate·skip은 변경하지 않았다.
+
+B HTTP adapter는 기존 검토·검증된 A138 소비 branch `e327d74d13a953181e51c3d0fbdce33802db3c01`의 원 bytes를 재사용했다. 고정 A108 `3da64…`와 A138 `0fc2…` 두 source만 허용한다. B 본선의 공통 HTTP `ed3feb…`에 대한 직접 확인은 기존처럼 `REQ13_A_CAPABILITY_UNAVAILABLE`로 거부됐다. 이 거부와 초기 orchestration의 잘못된 양성 기대를 증거에 남겼으며 해당 runtime hash를 승인값으로 추가하지 않았다. A 공통 HTTP 수정·실제 요청은 0회다.

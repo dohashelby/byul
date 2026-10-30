@@ -20,3 +20,10 @@ CPU의 고정 auth/등록 handler/native 프로토콜 대역은 EXAMPLE이다. �
 
 
 첫 고정9a737f4/1288파일 검증의 Windows1실패/459통과/기존skip1·제외1(212.36초, 부모213.688초), 동일bytes Linux1실패/460통과/기존제외1(69.24초, 부모69.701초)을 보존한다. 새 PLT11 제품과 실제 소유 Linux keep-alive/조기종료 시험은 통과했고 실패는 검토된 고정 소비 검사 한 건이다. Python Windows text 작성의 CRLF와 Git LF의 차이가 http_common·새 kubernetes_session_revocation 실행기·registry 세 파일에서 확인됐다. 두 실행 종료 후 이 세 파일을 이미 검토해 고정한372f354의 원래 blob bytes로 맞추고 위치를 포함한 AST 동일성을 확인했다. 새 해시를 승인값으로 삼거나 gate를 빼지 않았으며 동일 pin/B 원본/native/source gate/정책·판정·assert를 유지했다. 초기manifest/로그와 전후hash는 별도로 보존하고 영향 재검증한다.
+
+
+검증 source f0c09729f8926099a81cdc3cf877bba716a9d0c5의1288파일을 고정했다. 초기 고정소스의 Windows459/Linux460 통과와 유일 pin bytes 실패를 보존하고, 검토된372f354의 같은 세 blob/LF bytes로 맞춘 뒤 Windows264통과/기존skip1·제외1(109.33초, 부모110.036초), 동일bytes Linux265통과/기존제외1(37.69초, 부모37.981초)을 확인했다. 제품 AST/판정/기존 gate/assert는 바뀌지 않았고 새 skip·제외·런타임 해시 승인·경로 제외는 없다. 변하지 않은 인접 결과를 재사용했다.
+
+source/wheel/격리 설치229파일 일치, 설치본 CLI4사례(거부·무조건 수락·조건부 수락·첨부 실패), 정확24Refs 반출/복원·저장팩 재판정(7.772초), 검토된372f354 전체337파일 소비를 확인했다. 소유 실제 Linux TCP 서버의 동일 keep-alive/별도 새 연결 및 서버 조기 종료 후 암묵 재연결 금지를 직접 검증했다. 이 근거는 CPU/EXAMPLE이며 실제 Pod/issuer/serving/GPU 인수가 아니다. A2 전용12/B 원본27·기존c9 pin·native8~14/resource probe·기존 framing bytes와 과거 배포wheel04f7856/156파일·MEASURED Ref를 보존했다.
+
+마감 범위는 선정 probe HTTP keep-alive의 제품 연결/명시 unconditional 재사용 금지 제약/CPU·설치 검증이다. 실제 issuer/cache/event·전체 애플리케이션 session/handle·잔존 정책의 최종 실증과 PLT11 전체/부모A39 완료는 미확인이다. 정확 최종HEAD CI는 push 뒤 따로 기록하고 기존 결제 차단을 성공으로 처리하지 않는다. 원GPU창종료/Start0/마지막확인stopped·46.66USD/보존120GiB EBS과금을 유지한다. 다음 PLT12는 실제 사본 위치·수신자·처리 기한/방법/보존 예외·재사용 경계가 준비됐는지 원기준과 기존 공통 관측을 대조한다. PLT10/11 issuer·session 및 LIF12 retry 주체 질문 대기는 별도로 보존한다.

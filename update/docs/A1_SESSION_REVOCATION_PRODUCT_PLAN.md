@@ -13,3 +13,10 @@
 직접 검증은 소유 로컬 실제 keep-alive 서버에서 같은 연결/재연결·조기 종료·timeout·비정상 body·기한/clock·정리 실패를 구분한다. 제품 회귀는 고정 auth/등록 handler/native8 EXAMPLE와 기존 정식 registry/CLI의 정상·명시 위반·조건부·누락·중복·교체/restart·seal/capture/첨부/정리 후속 오류·정확Ref·비밀 원문/hash 비보존이다. 구현·회귀·문서 종료 뒤 source를 고정하고 영향/Linux/설치본·확정 커밋·초안PR·정확CI·인계를 마감한다. 관측 helper만으로 묶음이나 전체 PLT11을 마감하지 않는다.
 
 실제 실증은 실제 session 종류/issuer/cache/사건·철회 전 정상·잔존 정책/시계·기존/신규 접근·복구/정리 책임과 정확 ENV/POL/source/image/model이 필요하다. 원GPU 승인창 종료/추가Start0/마지막확인stopped·기존46.66USD/보존120GiB EBS과금·CI 결제 차단을 유지한다. 새 기동·시간·비용·권한 승인이 아니다. LIF12 자동 retry 주체 질문도 별도로 대기하며 두 질문을 전체 담당 개발 중단의 선행조건으로 삼지 않는다.
+
+
+검증 source f0c09729f8926099a81cdc3cf877bba716a9d0c5의1288파일을 고정했다. 초기 고정소스의 Windows459/Linux460 통과와 유일 pin bytes 실패를 보존하고, 검토된372f354의 같은 세 blob/LF bytes로 맞춘 뒤 Windows264통과/기존skip1·제외1(109.33초, 부모110.036초), 동일bytes Linux265통과/기존제외1(37.69초, 부모37.981초)을 확인했다. 제품 AST/판정/기존 gate/assert는 바뀌지 않았고 새 skip·제외·런타임 해시 승인·경로 제외는 없다. 변하지 않은 인접 결과를 재사용했다.
+
+source/wheel/격리 설치229파일 일치, 설치본 CLI4사례(거부·무조건 수락·조건부 수락·첨부 실패), 정확24Refs 반출/복원·저장팩 재판정(7.772초), 검토된372f354 전체337파일 소비를 확인했다. 소유 실제 Linux TCP 서버의 동일 keep-alive/별도 새 연결 및 서버 조기 종료 후 암묵 재연결 금지를 직접 검증했다. 이 근거는 CPU/EXAMPLE이며 실제 Pod/issuer/serving/GPU 인수가 아니다. A2 전용12/B 원본27·기존c9 pin·native8~14/resource probe·기존 framing bytes와 과거 배포wheel04f7856/156파일·MEASURED Ref를 보존했다.
+
+마감 범위는 선정 probe HTTP keep-alive의 제품 연결/명시 unconditional 재사용 금지 제약/CPU·설치 검증이다. 실제 issuer/cache/event·전체 애플리케이션 session/handle·잔존 정책의 최종 실증과 PLT11 전체/부모A39 완료는 미확인이다. 정확 최종HEAD CI는 push 뒤 따로 기록하고 기존 결제 차단을 성공으로 처리하지 않는다. 원GPU창종료/Start0/마지막확인stopped·46.66USD/보존120GiB EBS과금을 유지한다. 다음 PLT12는 실제 사본 위치·수신자·처리 기한/방법/보존 예외·재사용 경계가 준비됐는지 원기준과 기존 공통 관측을 대조한다. PLT10/11 issuer·session 및 LIF12 retry 주체 질문 대기는 별도로 보존한다.

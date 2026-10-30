@@ -1583,3 +1583,5 @@ git status
 
 - 고정된 eager source의 원본 binary open/read/close를 세션·ENV/대상·모델참조 범위와 결합해 기존 OBS02에서 소비한다. 별도 모델 helper read/전략전환/global builtins 변경은 없다. native8/native16/A2/B 센서·원본 bytes를 보존한다. 원문·credential hash는 수집하지 않으며 명시한 비밀 아닌 safetensors read buffer hash만 허용한다.
 - 검증 전 초안이다. C safe_open/mmap/torch.load read·최종tensor/backend·worker역할·승인권한·실제GPU는 미연결/UNKNOWN이다. 기존 CI 외부차단·GPU창종료/Start0·46.66USD/과거사용량/120GiB EBS·부모/A1 전체범위를 유지한다.
+
+- native17 고정source51e9a5c/pin7dc3416: 직접Win/Linux각38, 인접각313, 동일1365파일불변; 설치251/준비CLI2/기존OBS02 CLI4·정확24Ref(9.689초), 전체공통359/제외0. 첫source의scope/불변식근거는별도재사용하며 현재전체suite로합산하지않는다. 초기Win9/Linux8 실패와 보수 후Win1 실패는 원문·source별로보존했다. CPython3.12.14의 stat/fstat ctime 의미를 명시해 서로다른기준의일치를거부하고 필드/신뢰검사/원assert/새skip을완화하지않았다. EXAMPLE FD/read 사실은 실제serving/tensor/worker/승인/전체분기완료와분리한다.

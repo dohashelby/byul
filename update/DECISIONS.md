@@ -621,3 +621,5 @@ native16은 고정된 undecorated generator 구간의 실제 진행과 callback-
 소스코드 고정값은 독립 OS source compiler에서 산출하고 bytecode cache를공유하지않는다. 실제5지점의 코드/시각 gate가 초기사례를거부한 근거를보존하며 새fixture오류·컴파일도구보수는 제품허용범위완화와구분한다. native16은 기존OBS02/정확Ref에서소비하되 native9 A2전용소비·FD/tensor/승인·실제worker는별도미완료다.
 
 native17은 기존 OBS02 제품의 별도 명시적 공통 profile이다. 사전 ENV/target/model/revision/inventory/비밀 아닌 참조 파일 범위가 없으면 준비를 거부한다. FD metadata/원본 read buffer/선언 참조일치는 실제승인·최종tensor 소비가 아니다. 기존 native16 bytes와 판정/신뢰/lab/source/image gate를 보존하고 일반 C 경로 지원을 가정하거나 serving 적재전략을 강제하지 않는다.
+
+native17 ctime은 고정 runtime/API별 기준을 함께 저장한다. Windows path stat의생성시각과 FD fstat의변경시각은 숫자가일치해도같은증거로인정하지않는다. 모든metadata비교를유지하고 FD read buffer/범위/참조bytes관측과승인권한을분리한다. 공개prepare/기존OBS02 CLI의소비위치와정확Ref 검증을마감하되 actual C safe_open/tensor/worker/authority·A2전용분석을 별도미완료로남긴다.

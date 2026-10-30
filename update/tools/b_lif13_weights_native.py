@@ -33,6 +33,11 @@ from datetime import datetime, timezone
 CONFIG_SCHEMA = 'byul-lif13-native-config/1'
 SCHEMA = 'byul-lif13-native-capture/1'
 SOURCE_COMMIT = 'db9527a46873454610df6dbedf79a36d6bf1a7f6'
+READ_STATUSES = frozenset({'read', 'unavailable', 'read_error', 'unsupported_non_cuda',
+    'unsupported_layout', 'unsupported_empty', 'unsupported_cpu_by_value', 'not_attempted',
+    'source_unavailable', 'daemon_epoch_changed', 'daemon_epoch_unavailable'})
+FOLLOWUP_REASONS = frozenset({None, 'weights_released', 'cache_key_mismatch', 'daemon_error',
+    'rpc_error', 'peer_epoch_unavailable', 'unavailable', 'not_attempted', 'ok'})
 PREFIX = 'vllm/model_executor/model_loader/weight_cache/'
 SOURCE_FILES = {PREFIX + 'daemon.py': 'f4fc42549b0cce117cc006506d80b0d493f095f58825f89494a8d6ce43849e63',
     PREFIX + 'protocol.py': 'cee8d02d5d5bdfbcd4a8e873cc9095008f3cd0f4280e7eb4f74369b6bec654db',

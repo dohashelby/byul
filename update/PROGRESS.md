@@ -1532,3 +1532,5 @@ git status
 - A1 OBS02 SC23-03 재개: 사용자 답변에 따라 A1 공통 사건/출처·세대 결합·계측/parser와 사용자 승인 주체/허용 대상/정책을 분리했다. 기존 OBS01 /1·native8 model/load 관측을 기존 CLI/원기준 DRAFT팩의 선언 결합 후보로 연결하고 후속 수집 오류 보존 회귀·문서를 작성했다. 현재 미고정/미검증이며 실제 승인·검사 생산자/worker tensor 소비는 미연결·모든축UNKNOWN이다. 다음은 고정 영향/설치·정확Ref/PR/CI외부차단 인계 후 A2 기존IPC 소비 대조와 PLT07 egress 요청이다.
 
 - OBS02 SC23-03 첫 공통 제품 검증: 고정562d825 Windows43/Linux43·동일1306파일, 소스/wheel/설치234파일·설치본CLI4/정확24Refs15.428초, 공통342 고정pin3aeefcd. 초기535/536인접 통과와 external fixture 준비오류33·후속image 증명 가정5실패를 보존했다. 기존 node image false/강한 native결합false 관문을 유지하며 제한된 동일 process/object·API imageID·선언 pair 후보만 제공한다. 새skip/제외·실행중변경·runtime hash승인0. 실제 승인·검사 생산자/worker tensor/기업정책·전체분기는 UNKNOWN/미완료이며 다음A2 IPC·egress 준비를 이어간다.
+
+- PLT02/A2 전달 통합: fac0907/PR131 전용4파일을 원본 커밋으로 통합했고 기존3ec→d1 보수도 보존한다. 실제 groups·collector 구분/전후 actor/socket/owner·normal 응답 대응은 전용 소비를 그대로 쓴다. A1의 최소 Kube wrapper/registry/PLT02 파생팩과 새정식CLI/정확Ref 회귀·문서를 준비하며 현재 새소스 미고정/미검증이다. A2의 전용 함수6사례·legacyCLI6/36Refs를 이번 새등록 검증으로 집계하지 않는다. 실제worker/message/전체IPC·CI5는 미완료이며 다음은 확인된 전달물과 PLT07 egress 공통 계약이다.

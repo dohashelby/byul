@@ -598,4 +598,6 @@ NetworkPolicy 회수≠credential issuer 철회. PLT10은 기존 native8과5개 
 - A1 OBS02 profiler는 vLLM adapter의 RAISE/RETURN과 내부 running flag를 실제 backend 수집/trace 산출/전송 종료로 올리지 않는다. 공식 source에서 _call_stop은 예외 후에도 running=false이고 Torch adapter에는 stop후출력도 있다. 실제 등록 callback을 검사하고 원 결과/예외/순서·native8~14 bytes를 보존한다. 새 start/stop HTTP·다른PID 시간/hash 기반 RPC 결합·B 전용 service 판정은 하지 않는다.
 # 2026-10-30 OBS02 SC23-03 공통 결합 후보
 
+2026-10-30 PLT02: A2 fac0907의 실제 groups·actor/collector/source·경로별 전후 근거 소비를 원본 bytes로 통합한다. A1은 기존 public IPC v1의 wrapper/정식등록/팩·핀·cleanup/출처 경계만 연결하고, 후속 수집·정상/report/첨부/정리 오류가 앞선 독립FAIL을 지우지 않게 한다. 원본probe·legacy parser·공통source pins는 유지한다.
+
 사용자 답변: A1이 사건/출처/물리세대 결합·계측·parser·제품 소비의 기술 계약을 설계하고, 실제 승인/검사 주체·허용 대상·정책·운영 범위는 사용자 결정으로 남긴다. 기존 OBS01 /1 선언과 native8 configured-object/load 경계의 결합 후보는 기존 CLI에서 소비하되 실제 승인/검사/최종 tensor 소비로 승격하지 않으며 근거 전 모든 판정축 UNKNOWN을 유지한다.

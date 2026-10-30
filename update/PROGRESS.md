@@ -1625,3 +1625,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - A-1 native21/LIF09 초안: 원14/19/20·B bytes를 유지하고 WorkerProc 생성자/Wrapper/Worker 객체 결합과 선정 원 pipe send/close를 기존 CLI/파생팩/EVD에 연결했다. 열린 main·실패/부분/중복·다른 귀속/thread·세대 종료·관측/수집/첨부 오류를 CPU EXAMPLE+소유 stdlib pipe로 검증한다. source 고정 뒤 검증 대기이며 실제 producer/worker/READY 수신/전체 모델/GPU/service·fault/repair lineage와 전체 분기는 미완료다. 원GPU창 종료/추가Start0·C/CPU 의존성 답변 대기·CI 결제 차단을 유지한다.
 
 - A-1 native21/LIF09 마감: sourceb88b4a6/review062af9d, 직접 고유49각OS·인접Windows337/Linux338·guard270설치·CLI4/정확24Ref 왕복. 원13파일 유지, 생성자/Wrapper/Worker 객체와 선정 원 pipe send/close를 별도 EVD로 연결했다. 원 실패(json 시험 import5)와 영향5 재검증을 보존했으며 제품 코드·assert·gate 변경은 없다. 실제 worker/GPU·전체 준비/서비스/fault/repair·CI5·전체분기는 미완료이고 추가Start0·C/CPU 의존성 답변 대기다.
+
+- 2026-10-31 A-1 LIF09 native22 초안: Linux 선정 READY creator/reader-recv/sender와 원14/21 사건 Ref 연결, closed prepare/parser 및 기존 LIF09 소비 초안을 작성했다. 원14/19/20/21/B bytes를 보존한다. 기능·회귀·설치·정확Ref·확정 commit/PR 검증은 미완료이며 새 지원/실제 실증/전체 완료를 주장하지 않는다. 다음은 원본 source 경계/프로세스 fixture 및 부정·오류 사례를 마무리한 뒤 source/hash 고정이다.

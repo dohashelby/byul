@@ -659,3 +659,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - A-1 LIF09 native21은 정확 source/decorator/descriptor를 보존한 constructor→Wrapper→Worker opaque 결합과 해당 worker_main의 원 READY pipe 위임만 관측한다. 새 send/close·전역 Connection patch·payload/handle/FD/주소/env/argv 저장을 하지 않는다. 원 반환/예외/정리를 유지하며 READY send 반환과 main 종료를 전체 준비·수신·서비스 접수로 쓰지 않는다. 옛14/19/20과 저장팩/Ref를 유지하고 새 세대 관측을 명시한 check만21 실행에 사용한다.
 
 - A-1 native21/LIF09 마감: sourceb88b4a6/review062af9d, 직접 고유49각OS·인접Windows337/Linux338·guard270설치·CLI4/정확24Ref 왕복. 원13파일 유지, 생성자/Wrapper/Worker 객체와 선정 원 pipe send/close를 별도 EVD로 연결했다. 원 실패(json 시험 import5)와 영향5 재검증을 보존했으며 제품 코드·assert·gate 변경은 없다. 실제 worker/GPU·전체 준비/서비스/fault/repair·CI5·전체분기는 미완료이고 추가Start0·C/CPU 의존성 답변 대기다.
+
+- 2026-10-31 A-1 LIF09 endpoint 초안: Linux exact stdlib Connection/FIFO만 세션·boot·namespace/time domain token으로 관측하며 get_mp_context를 추가 호출하지 않는다. Windows HANDLE과 fork 상속은 미검증이다. producer/worker 신뢰·tensor/GPU·전체 준비·서비스 접수 판정은 올리지 않는다. native22는 source/제품 검증 완료 전 미지원 초안이다.

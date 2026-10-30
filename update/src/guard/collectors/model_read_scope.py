@@ -52,7 +52,7 @@ def scope_summary(value):
 
 
 def validate_binding(prepared,env,target):
-    if prepared.get('profile') not in {sensor.PROFILE,'vllm-native-lifecycle-metadata/18','vllm-native-lifecycle-metadata/19','vllm-native-lifecycle-metadata/20','vllm-native-lifecycle-metadata/21'}:return
+    if prepared.get('profile') not in {sensor.PROFILE,'vllm-native-lifecycle-metadata/18','vllm-native-lifecycle-metadata/19','vllm-native-lifecycle-metadata/20','vllm-native-lifecycle-metadata/21','vllm-native-lifecycle-metadata/22'}:return
     value=prepared.get('model_read_scope',{})
     if type(env.model.id) is not str or type(env.model.revision) is not str:raise ValueError('MODEL_READ_SCOPE_MODEL_BINDING_REQUIRED')
     if (value.get('environment_ref')!=env.ref().model_dump(mode='json') or value.get('target_sha256')!=sha256_hex(canonical_json(target))

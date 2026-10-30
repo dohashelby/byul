@@ -127,7 +127,15 @@ def test_bad_input_has_no_network_or_helper_execution(bad):
     if bad=='uid':actor['uid']=True
     if bad=='timeout':kwargs['total_timeout']=31
     if bad=='lab':target['lab']=False
-    if bad=='version':env=env.model_copy(deep=True);env.engine.version='0.32.0';env=env.seal();target['environment_ref']=env.ref().model_dump(mode='json')
+    if bad=='version':
+        # Keep every other exact Ref coherent so the selected capability's
+        # native0.32 rejection, rather than an earlier mapping mismatch, is tested.
+        env=env.model_copy(deep=True);env.engine.version='0.32.0';env=env.seal()
+        target['environment_ref']=env.ref().model_dump(mode='json')
+        target['model_mapping']['environment_ref']=env.ref().model_dump(mode='json')
+        receiver['environment_ref']=env.ref().model_dump(mode='json')
+        receiver['source_target_sha256']=sha256_hex(canonical_json(target))
+        p['source_target_sha256']=receiver['source_target_sha256'];p['receiver_target_sha256']=sha256_hex(canonical_json(receiver))
     if bad=='expired':p['validity_end']=(datetime.now(timezone.utc)-timedelta(seconds=1)).isoformat()
     if bad=='receiver-context':receiver['context']='other'
     calls=[]

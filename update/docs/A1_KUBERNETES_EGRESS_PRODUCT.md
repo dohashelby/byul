@@ -30,4 +30,6 @@ wrapper는 A2 collection_errors·공통 요청 metadata 불완전/진단·public
 
 지원은 lab=true/vLLM0.31/CPython3.12 EXAMPLE이다. API 이미지/선정 source·코드 metadata를 producer 인증/노드 이미지/manifest ancestry/실제worker 신뢰로 올리지 않는다. 실제 worker/SDK·취득/cache/usage/telemetry·DNS/redirect/TLS/proxy/전체송신/기업 인가·native0.32는 별도 미완료다. 수신기는 이미 소유·기동된 같은 cluster/context/run fixture만 사용하며 새 Pod/server/운영 sink를 만들거나 Start하지 않는다.
 
-현재 구현·회귀·문서 초안 종료와 source/hash 고정 준비 단계다. 새 통과/설치/CLI·정확Ref·실제를 검증 전 주장하지 않는다. 공통 입력·전용 소비·정식 제품 연결·실제 실증·전체5분기를 구분한다. 부모A39/56/4·A1 19/27/2·A2 20/29/2와c9/sources/기존미커밋/worktree/팩/Ref/실증·원GPU창종료/추가Start0/기존46.66USD/EBS·CI결제 차단을 유지한다.
+검증 source는 `7b6b660e09f61cee812fda57491443a2e10c78ee`, 검토 소비 pin은 `cd128d54fa6ca2487f9d0928f13ac023ebbaba0b`다. Windows 영향470통과/기존skip1/미선정1(147.80초/parent154.651), 동일1331파일 Linux471통과/미선정1(46.44초/parent47.349), 전체소비351파일·원본104파일을 확인했다. source/wheel/설치243파일 일치28.261초, 격리 설치본 CLI4사례(completed/denied/later-transport/attachment)15.231초·정확24Ref 반출/복원·저장팩 재판정을 확인했다. A2 원본3파일과 기존 KubeHTTP 전체bytes·REQ02/native/IPC/egress 공통source·원Docker/판정은 그대로다. 실행 중 source 변경·새skip/제외는0이다.
+
+현재 전체suite/실제socket·Kubernetes·worker·GPU 또는 전체5분기 통과로 확대하지 않는다. 최종 문서 마감 커밋과 검증source/wheel source·정확HEAD CI를 구분하며 필수CI5는 성공 전 미확인이다. 공통 입력·전용 소비·정식 제품 연결은 제공됐지만 실제 실증·전체5분기는 미완료다. 부모A39/56/4·A1 19/27/2·A2 20/29/2와c9/sources/기존미커밋/worktree/팩/Ref/실증·원GPU창종료/추가Start0/기존46.66USD/EBS·CI결제 차단을 유지한다.

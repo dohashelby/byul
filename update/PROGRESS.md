@@ -1561,3 +1561,7 @@ git status
 
 - A2 확정9482a75/PR135 전용3파일 bytes를 통합했다. 기존 공통2596337 method/source와 원분석을 재사용해 boundary_egress:kubernetes wrapper/registry·명시POL13/DRAFT팩·정확Ref 시험을 연결했다. 공통 미등록 상태 시험은 새 명시 factory와 기존 Docker factory를 함께 확인하도록 갱신한다.
 - 원PACK31/DockerPOL11/기존rule_table 독립FAIL·5분기와 다른76개 정의·A2원본3bytes/native/REQ02/IPC를 보존한다. 구현/회귀/문서 초안 종료 후 source고정·영향/설치/CLI·정확Ref·커밋/PR/CI/인계 전이며 실제/전체분기 완료를 주장하지 않는다. 새기동·권한·비용은없고원Goal/Start0/EBS경계를유지한다.
+# 2026-10-30 A1 PLT07 egress 정식 제품 통합 검증 마감
+
+- 고정 source7b6b660/검토pin cd128d5에서 Windows470통과·기존skip1/미선정1, Linux471통과/미선정1·동일1331파일, 소비351·보존104·설치243일치·설치CLI4/정확24Ref 반출/복원·저장팩 재판정을 확인했다. A2 9482a75의3원본 bytes·공통KubeHTTP전체/egress/source/native/REQ02/IPC·원Docker/POL11/판정/5분기/76정의를 보존했다.
+- 공통입력·전용소비·정식 registry/팩/CLI는 연결됐고 확인된 금지TCP FAIL은 ACK/후속pipe/report/첨부/정리 오류 뒤 보존된다. 거부·필수근거 누락/교체는UNKNOWN, normal false/null·기능/성능UNKNOWN·전체scopefalse다. 실제socket/Kubernetes/worker/GPU0·전체5분기/현재전체suite는 미확인이고 기존Goal·승인창/Start0/46.66USD/EBS·CI외부차단을유지한다.

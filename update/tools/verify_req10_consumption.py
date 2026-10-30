@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed PLT10 product checkpoint; full common contracts retained, including
+# Reviewed PLT11 product checkpoint; full common contracts retained, including
 # A2 IPC/REQ12/native8~14 and all previous full-scope gates.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='452fdff069ad81b2232c153183b5b87a50e49c33'
+REVIEWED_COMMON_COMMIT='372f354409ec7decdc4633a1c7f5e0edfe3cf2e4'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

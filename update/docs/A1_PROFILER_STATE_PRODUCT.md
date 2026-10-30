@@ -20,3 +20,6 @@ POL8은 기존 observation_state_environment_sha256, observation_state_target_sh
 
 
 첫 고정af64e48/1300파일의 Windows31실패/737통과/기존skip1·제외1(120.94초, 부모121.975초), 같은bytes Linux32실패/737통과/기존제외1(40.71초, 부모41.006초)을 보존한다. 두 실행 종료 후 단위 native fixture가 instrument()와 CheckedLoader의 역할을 혼동한 준비 누락을 수정했다. source/함수/등록 검사 뒤, 실제 loader가 별도로 제공하는 MODULE ready journal을 고정 source/code 기반의 EXAMPLE 입력으로 명시한다. 실제 loader나 source gate를 완화하지 않고 기존 hash/등록/정확body/assert를 유지한다. Linux 추가 실패는 같은3.12 pyc tag를 공유한 준비 과정의 외국판 compiled cache 영향으로 확인했다. 동일 source를 양 interpreter에서 pyc import 없이 새로 compile한14/3 계약을 각각 literal 고정하고 검증 cache를 판본별 독립 경로로 분리한다. 런타임 읽은 해시 자동 승인·검사 제외·skip 추가는 없다.
+
+
+2차 고정10214cb의 Windows9실패/301통과/기존skip1·제외1(104.11초, 부모108.917초)와 동일bytes Linux9실패/302통과/기존제외1(29.41초, 부모30.272초)을 보존한다. native15 원함수/코드계약/등록8사례는 모두 통과했다. 제품 결함은 redacted summary를 원 typed packet으로 잘못 소비해 profiler 관측이 비었던 것이다. 기존 OBS02에 검증된 packet의 project_native hook을 추가하고 새 소비자는 요약 전의 typed recording을 투영하도록 보수했다. 기본 OBS02 투영 의미는 같다. 두 실행 종료 후만 수정했다. timeout 이후 health-after가 전송되지 않는4회·세대교체 이후 추가 요청이 없는1회라는 기존 latch 의미를 새 시험의 잘못된5회 가정 대신 명시하고, 후속 미전송과 정상 수집 COMPLETED assert를 강화했다. Source gate/정책/판정·정확Ref/후속오류·개인정보 assert를 유지한다.

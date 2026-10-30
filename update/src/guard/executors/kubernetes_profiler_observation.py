@@ -35,9 +35,14 @@ class KubernetesProfilerObservationExecutor(KubernetesObservationStateExecutor):
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):raise ValueError('PROFILER_OBSERVATION_PREPARED_UNAVAILABLE') from None
         return super().run(check,env,policy_values,adapter,workdir)
 
+    def project_native(self,ctx,packet,trials):
+        result=super().project_native(ctx,packet,trials)
+        result['profiler_projection']=metadata.project(packet,ctx.policy_values['profiler_required_ranks'])
+        return result
+
     def collect(self,ctx):
         observations,normal,challenges,summary=super().collect(ctx)
-        projection=metadata.project(summary.get('native'),ctx.policy_values['profiler_required_ranks'])
+        projection=summary['projection'].pop('profiler_projection')
         summary['profile']=PROFILE;summary['profiler_projection']=projection
         summary['scope']='Existing closed HTTP normal controls and same-process source-bound profiler adapter/flag facts; no profiler start/stop requests, independent backend/trace transfer or cross-process API/worker causality.'
         if (not projection['samples'] or 'required_profiler_worker_rank_unavailable' in projection['missing']

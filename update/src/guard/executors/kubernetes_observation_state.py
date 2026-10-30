@@ -40,6 +40,10 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
     policy_normalizer=staticmethod(normalize_policy);transport_profile=OBSERVATION_STATE_PROFILE
     supported_native_profiles=KubernetesRequestTerminationExecutor.supported_native_profiles|{attempt_sensor.PROFILE,output_sensor.PROFILE}
 
+    def project_native(self,ctx,packet,trials):
+        """Project the validated packet before its redacted artifact summary."""
+        return project(packet,trials,ctx.policy_values['observation_state_required_components'])
+
     def collect(self,ctx):
         start,end=self.policy_normalizer(ctx.policy_values);token=uuid.uuid4().hex
         summary={'profile':PROFILE,'trials':[],'native':None,'diagnostic_codes':[],'fixture':{'profile':PROFILE},
@@ -111,7 +115,7 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
                         'capture_sha256':r['capture']['provenance']['capture_sha256'] if r['capture'] else None,
                         'image_digest_verified':r['capture']['image_digest_verified'] if r['capture'] else False}
                         for r in packet['recordings']] if packet else []}
-        projected=project(packet,summary['trials'],ctx.policy_values['observation_state_required_components'])
+        projected=self.project_native(ctx,packet,summary['trials'])
         for stage,normal in (('health-before','normal-before'),('health-after','normal-after')):
             h=bycase.get(stage,{});n=bycase.get(normal,{})
             if h.get('http_available') is True and n.get('attempted') and not n.get('normal_shape_verified'):

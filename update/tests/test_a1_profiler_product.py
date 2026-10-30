@@ -96,7 +96,8 @@ def test_registered_cli_profiler_facts_and_source_failures_exact_refs(tmp_path,g
     preflight=mode in {'profile8','version032','actual-lab-false','prepared-mismatch'}
     if preflight:assert not world.sent and e.observations['profiler_native_samples'].value is None
     else:
-        assert len(world.sent)==(3 if mode=='wrong-response-id' else 5)
+        assert len(world.sent)=={'wrong-response-id':3,'after-timeout':4,'engine-replaced':1}.get(mode,5)
+        if mode in {'after-timeout','engine-replaced'}:assert all(row['id']!='obs02-health-after' for row in world.sent)
         assert all(e.observations[key].value is False for key in ('profiler_backend_collection_stopped_verified','profiler_trace_output_completed_verified',
             'profiler_cross_process_rpc_verified','profiler_scope_complete','state_semantics_verified','state_scope_complete'))
     if mode in {'normal','backend-stop-failure','post-stop-output-failure','start-failure','attachment','after-timeout','seal-failure','http-cleanup'}:
@@ -105,6 +106,7 @@ def test_registered_cli_profiler_facts_and_source_failures_exact_refs(tmp_path,g
         conflict=mode in {'backend-stop-failure','post-stop-output-failure','attachment','after-timeout','seal-failure','http-cleanup'}
         assert any(c['flag_adapter_conflict_observed'] for c in candidates)==conflict
         assert all(not c['actual_backend_stop_failed_verified'] and not c['actual_collection_continued_verified'] and not c['confirmed_full_state_violation'] for c in candidates)
+    if mode in {'normal','backend-stop-failure','post-stop-output-failure','start-failure'}:assert e.execution.status.value=='COMPLETED'
     if mode in {'native-one-missing','native-partial','native-census-gap','after-timeout','attachment','seal-failure','engine-replaced','wrong-response-id',
         'missing-profiler','wrong-rank','profile8','version032','actual-lab-false','prepared-mismatch','http-cleanup','unsafe-profiler-record'}:assert e.execution.status.value=='ABORTED'
     assert bool(e.execution.cleanup_errors)==(mode=='http-cleanup')

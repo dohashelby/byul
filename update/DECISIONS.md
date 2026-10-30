@@ -653,3 +653,5 @@ Worker.init_device/initialize_from_config/compile_or_warm_up_model은원 tracing
 code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가sourcebytes를직접compile한다. 이번unknownmodule거부시험과원SourceHash검사를유지하고profile19의고정네module이름만privacy vocabulary에추가했다. 설치후처리는pytest current alias를실제사례로세지않으며통과한CLI/Store를재실행하거나변경하지않고정확Ref검증으로회수한다.
 
 - A-1 LIF09: Worker19·MP14 원본을 바꾸지 않고 명시 native20/13자산으로 조합한다. 부모 MP와 Worker 사실은 별도 EVD 필드로 소비하며 PID/시간 일치만으로 start/assignment/rank/shard·실제 실패/서비스/수정 후 계보를 결합하지 않는다. 기존 정책·정상/부분 실패/수정 후 질문과 UNKNOWN을 유지하고 원 journal header를 relabel하지 않는다.
+
+- A-1 native20/LIF09 마감: source250722f/reviewa391bc0, 직접 고유33각OS·인접Windows313/Linux314·guard267설치·CLI4/정확24Ref 왕복. 기존14/19·B 원본11파일 유지, Worker/MP를 별도 EVD 관측으로 연결했다. 초기 fixture·닫힌 사건/함수표 누락과 원 실패를 보존하고 변경 영향만 재검증했다. 실제 fault/repair/worker/rank/tensor/GPU/service lineage·CI5·전체LIF09/부모A는 미완료이며 추가Start0·의존성 승인은 대기다.

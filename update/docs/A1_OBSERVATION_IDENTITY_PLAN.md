@@ -13,3 +13,5 @@
 이 묶음과 들어온 확정 전달물을 순서대로 닫은 뒤 A2의 기존 IPC 인계 d1fafb0/ab84db5와 마지막 소비 기준을 대조한다. 새 envelope/supplementary groups 전용 소비는 A2 확정 커밋으로 받는다. 다음 공통 후보는 A2 PLT07 egress 요청이며 A2-platform-process-common-input-request.json/A2-egress-contract-review-3ecfd5f.json을 확인한 뒤 기존 sender/receiver/ACK/receipt를 재사용할 최소 Kubernetes 계약을 정한다. 아직 없는 공개 interface를 지원으로 간주하지 않고 취득/cache/usage/telemetry 전체 완료로 확대하지 않는다.
 
 원GPU 승인창종료·추가Start0·마지막stopped는시각있는이력·46.66USD/보존120GiB EBS 과금·CI결제 차단을 유지한다. 과거 차단 횟수는 재개 후 그대로 쓰지 않는다. Goal 도구 active와 현재 소스/실행 근거가 우선이며 이번 재개에는 새 기동/기간/비용/IAM 승인이 없다.
+
+첫 공통 제품 묶음의 고정562d825에서 직접 Windows43/Linux43·동일1306파일, 소스/wheel/설치234파일, 설치본4사례/정확24Ref(15.428초), 검토 공통342파일 pin3aeefcd를 확인했다. 첫535/536인접 통과와 준비오류33, 다음5실패/38통과 및 보수 근거는 계약 문서에 남겼다. 실제 node image 증명은 기존 false gate를 유지하고 제한된 process/object·API imageID 사실을 별도로 제공한다. 실제 producer/승인·검사/소비·정책/운영 실증과 전체분기 완료는 미완료다. 다음은 확정 PR/정확CI 외부차단/인계 마감 후 A2 IPC·egress 계약 대조다.

@@ -14,7 +14,7 @@ GENERATION21_SHA256='5ebdbd58401bcd47ee5fd4159e82b78f13ae47773eaefd4c02ba6f2ac18
 CONTRACT_SHA256='e99df63bf7ed6c72f72421a8017dad9a87d39a6c5d4254c167ac0c64df68c745'
 MAX_BYTES=2097152;MAX_ROWS=2048;MAX_CALLS=256
 CODE_FILENAME='guard/adapters/vllm_ready_endpoint_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': 'e2f65909add0628e9c05653f807ddc87e8b8f5d28c206a239f33c28a265cd54c', 'cpython-3.12.3': '8efd6d441cc35e7d5444a1fe0e8757d9aafa403be51999cd74c35d0ceffa5aac'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': '41e3588a4580773827a05056d0136c1e8817dfd4fd33c80b63e009d2796fbfac', 'cpython-3.12.3': '21b6c5e7e4c7716aa06ae7a919b2bdc60b18d92b47104eddbf07329f2792602f'}
 TRUTH=('producer_authenticated','actual_worker_verified','cross_process_lineage_verified','tensor_storage_applied_verified',
        'gpu_completion_verified','all_model_ready_verified','ready_delivery_verified','service_gate_verified','scope_complete')
 GAPS=frozenset({'unsupported-platform','endpoint-delegate-unqualified','endpoint-domain-unavailable','endpoint-unavailable',
@@ -132,6 +132,7 @@ class EndpointObservation:
             try:
                 init=_INIT.get();module=sys.modules.get(observer.endpoint_contract.MP)
                 if observer.endpoint_active() and current(init) and init.get('seq') is not None:
+                    if sys.platform!='linux':observer.endpoint_gap('unsupported-platform','WorkerProc.make_worker_process')
                     if (vars(module).get('WorkerProc') is not qualified['worker_class']
                             or vars(module).get('UnreadyWorkerProcHandle') is not qualified['handle_class']
                             or vars(module).get('get_mp_context') is not qualified['get_mp_context']

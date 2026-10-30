@@ -17,7 +17,7 @@ from tests.test_a1_ready_endpoint_sensor import make_world,records,rebase_rows
 from tests.test_a1_file_read_sensor import scope_value,MODEL_BYTES
 from tests.test_kubernetes_lifecycle import group,target as native_target
 from tests.test_lifecycle_sensor import writer_factory
-from tests.test_lifecycle_capture import revised
+from tests.test_lifecycle_capture import case,external,revised
 
 REPO=Path(__file__).resolve().parents[2];ORIGINAL_INPUTS=original.inputs
 PRIVATE='EXAMPLE_READY_ENDPOINT_PRODUCT_PRIVATE'

@@ -67,8 +67,10 @@ def make_world(tmp_path,patch,*,session='b'*32,mode='normal',path=None,scope_pat
     # Keep exact source helper bodies; only dependency namespaces are EXAMPLE.
     mp.get_mp_context=utilities.get_mp_context
     world.source.worker.torch.accelerator.device_count=lambda:64
+    world.config.parallel_config.world_size=world.config.parallel_config.local_world_size=2
+    world.config.parallel_config.tensor_parallel_size=2
     def queues(owner,*args):
-        owner.worker_response_mq=NS(export_handle=lambda:NS(local_reader_ranks=[],remote_subscribe_addr=None),wait_until_ready=lambda:None)
+        owner.worker_response_mq=NS(export_handle=lambda:NS(local_reader_ranks=[0],remote_subscribe_addr=None),wait_until_ready=lambda:None)
         owner.peer_response_handles=[];owner.rpc_broadcast_mq=None
     mp.WorkerProc._init_message_queues=queues
     world.executor=mp.MultiprocExecutor();world.executor.__dict__.update(parent.executor.__dict__)

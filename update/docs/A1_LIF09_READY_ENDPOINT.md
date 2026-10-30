@@ -1,6 +1,6 @@
 # LIF09 선정 READY endpoint 연결 초안
 
-상태: 구현 초안. 기능 시험·고정 소스·설치·정확 Ref 검증·확정 전달은 아직 마감하지 않았다. native22는 현재 배포·소비 승인 판본이 아니다. 기존 확정 소비는 PR152 `c39a36b7a6f306b910f0314b0deee10b55390dc4`의 native21까지다.
+상태: CPU/EXAMPLE 제품 연결 검증 완료. 검증 source는 `726254ed6b53c3906790fe3790550865ac0832cd`, 검토된 공통 소비 기준은 `46a92f3f2abf7d8abdfae81cf9b3aa354dce3733`다. native22는 명시한 Linux endpoint 관측과 Windows prepare/parser/미지원 처리 범위만 제공한다. 실제 serving/worker/GPU·전체 LIF09 및 정확 HEAD CI5 성공은 미완료다. 기존14/19/20/21과 과거 저장 팩·Ref는 보존한다.
 
 SC17-01의 원래 요구는 rank별 준비 실패, 정상 canary, worker/model 세대, 실제 수용 gate, 복구 후 관측이다. 다음 endpoint 후보는 그 결합 근거 하나이며 전체 분기를 대신하지 않는다.
 
@@ -14,8 +14,10 @@ Linux의 정확 stdlib Connection/FIFO만 endpoint 식별 대상으로 삼는다
 
 Windows PipeConnection은 원 vLLM 수신 코드의 Connection assert에서 recv 전에 중단됐다. HANDLE의 fstat 변환은 수행하지 않는다. Windows에서는 prepare/parser/미지원 처리 범위를 따로 검증해야 한다. fork의 observer 상속은 미검증이며 초기 후보의 긍정 결합은 명시 spawn 범위로 한정한다. native0.32·미검토 extension/elastic/forkserver는 미지원이다.
 
-관측 결과는 `init_ready_endpoint_events`, `init_ready_endpoint_candidates`에 기존 Worker/MP 사실과 별도로 제공할 예정이다. 정확 ENV·target·run·source/image·model revision/inventory와 기존 init_* 정책을 재사용한다. 필요한 제품 검증은 기존 CLI 선정→수집→EVD/RES/RPT→verify→반출/복원→저장 팩 정확 Ref 재판정이다. 기존 정상/위반/누락/수집·첨부·정리 오류의 독립 사실과 FAIL을 보존한다.
+관측 결과는 `init_ready_endpoint_events`, `init_ready_endpoint_candidates`에 기존 Worker/MP 사실과 별도로 제공한다. 정확 ENV·target·run·source/image·model revision/inventory와 기존 init_* 정책을 재사용한다. 필요한 제품 검증은 기존 CLI 선정→수집→EVD/RES/RPT→verify→반출/복원→저장 팩 정확 Ref 재판정이다. 기존 정상/위반/누락/수집·첨부·정리 오류의 독립 사실과 FAIL을 보존한다.
 
 실제 producer/worker 인증, 전체 tensor/GPU/model 적용, 모든 rank의 KV cache/compile/warmup, gateway/LB 서비스 접수, 장애 활성·복구 계보는 계속 미검증이다. 함수 반환·READY·HTTP200·endpoint 후보를 해당 의미로 승격하지 않는다. OBS02 U1–U6, 실제 운영 허용 범위와 책임, fresh 시간 승인·소유권·활성 작업·quota·잔여 총비용·ENV/POL·실행 차례·정리는 별도 입력이다. 기존 GPU 창은 종료됐고 추가 Start는 0이다.
 
 사전 근거는 `A1-LIF09-ready-endpoint-source-audit-v1.json`, `A1-LIF09-ready-endpoint-next-contract-v1.json`, `ready-pipe-identity-feasibility/verified-contract-scope-v1.json`에 있다. Windows 소유 stdlib 4사례와 Linux 8사례는 기능 마감 또는 실제 serving 실증이 아니다. 추가 `system_utils.py`는 upstream `db9527a46873454610df6dbedf79a36d6bf1a7f6` blob `ae09ed2dbeb038151c017261363a20f2a09accae`와 과거 승인 이미지 캐시의 원 bytes가 일치한다.
+
+검증은 Windows/Linux 직접57개씩, 인접 Windows377개(기존skip1·기본제외1)/Linux378개(기본제외1), 설치273파일 일치, 격리 설치본 CLI4사례·정확24Ref 반출/복원·저장팩 재판정으로 마쳤다. 동일 전체 suite·실제 엔진/GPU 시험으로 확대하지 않는다. 원 source body 시험의 Process.start는 inline EXAMPLE 대역이다. 두 recording의 양성 결합 시험도 명시적으로 재배치한 논리 EXAMPLE identity이며 물리 worker/생산자 인증을 뜻하지 않는다. 설치본 네 사례는 같은 인터프리터 역할을 PID 선언만으로 긍정 결합하지 않으며 모든 판정 축은 UNKNOWN이다. 초기 실패 source581c9d4와 보수 근거는 별도로 보존했다.

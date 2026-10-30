@@ -1627,3 +1627,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - A-1 native21/LIF09 마감: sourceb88b4a6/review062af9d, 직접 고유49각OS·인접Windows337/Linux338·guard270설치·CLI4/정확24Ref 왕복. 원13파일 유지, 생성자/Wrapper/Worker 객체와 선정 원 pipe send/close를 별도 EVD로 연결했다. 원 실패(json 시험 import5)와 영향5 재검증을 보존했으며 제품 코드·assert·gate 변경은 없다. 실제 worker/GPU·전체 준비/서비스/fault/repair·CI5·전체분기는 미완료이고 추가Start0·C/CPU 의존성 답변 대기다.
 
 - 2026-10-31 A-1 LIF09 native22 초안: Linux 선정 READY creator/reader-recv/sender와 원14/21 사건 Ref 연결, closed prepare/parser 및 기존 LIF09 소비 초안을 작성했다. 원14/19/20/21/B bytes를 보존한다. 기능·회귀·설치·정확Ref·확정 commit/PR 검증은 미완료이며 새 지원/실제 실증/전체 완료를 주장하지 않는다. 다음은 원본 source 경계/프로세스 fixture 및 부정·오류 사례를 마무리한 뒤 source/hash 고정이다.
+
+- A-1 native22/LIF09 source726254e 검증: 직접57개씩, 인접 W377(기존skip1·기본제외1)/L378(기본제외1), 설치273파일·격리 CLI4/정확24Ref를 마쳤다. 기존43adapter bytes와76정의·과거팩/Ref, B 원 c9 pin을 보존한다. 최초source581c9d4의 W2실패/11설정오류·L20실패/11설정오류 및 fixture/명시 미지원 gap 보수를 보존했다. CPU EXAMPLE source bodies/inline Process.start 대역·소유 pipe 범위이며 실제 serving/worker/Torch/GPU와 전체 준비·fault/repair/service·전체 분기는 미완료, CI5도 미확인이다. 원GPU창종료/추가Start0·기존비용/EBS·의존성 질문 대기를 유지한다.

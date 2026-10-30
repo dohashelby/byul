@@ -645,3 +645,5 @@ mapping은파일read/fault·Tensor소비·인가·release와별개다. oldsource
 observer code hash의first-line/line-table도계약이다. literal줄수변경으로생긴초기실패를원본으로남기고동일관문을보수한뒤독립compile대조를추가했다. region opaque좌표는mapping세대/존속증거가아니다. 새common관측은기존OBS02CLI/증거/정확Ref까지같은묶음에서연결하되actualC와전용A2소비·실제정책은별도다.
 
 B LIF07의 source_qualified/actual_worker/ready 긍정신고는 자격근거로쓰지않는다. 원 B NATIVE/UnreadyHTTP/delay None gate를유지하고 원 공개 import 경로만 검증한다. 현재 common0fc2dec는 B가명시적으로 검토고정한A138호환으로 소비하며 runtimehash자동승인·profile완화·A1전용B재작성은하지않는다.
+
+열린질문: native18 실제 C/CPU 검증용 Torch2.13.0+cpu/safetensors0.8.0+전이9의 고정250MiB/전용3GiB 실행안은 CLAUDE18 신규의존성규칙에따라현재채팅답변대기다. 기존프로젝트의존성/원환경/AWS/GPU는변경하지않으며 B통합·독립개발은계속한다. B Windows ctime basis 문제는 원 B 담당자의 고정 보수를 받아소비하며 비교삭제/자동허용으로우회하지않는다.

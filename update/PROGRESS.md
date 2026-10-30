@@ -1611,3 +1611,5 @@ OBS02 SC23-03 native18 ordinary safe_open mapping의source/code/scope/PID/root/l
 OBS02 native18 ordinary safe_open mapping을sourceecbbcac/pineba2440에서직접각49·인접각103/동일1407불변으로검증했다. 설치261/public준비CLI2/OBS02 CLI4·정확24Ref·공통369/제외0. Linux 소유mmap EXAMPLE와Cgate/class대역을구분하고actualC/serving/worker/인가·전체Goal완료로올리지않는다.
 
 B 확정571c3e5 전용20파일을원bytes로통합했다. LIF07 bounded observer→공개 preflight/정제capture 수입→manual/Ref 경로와 실제 worker hook/READY-send/UnreadyHTTP/delay 미연결을 구분한다. B가고정한A138 HTTP호환·OBS03/Graph fixture보수·componentpin을소비하며공통HTTP원bytes/helper858/c9보존. 고정영향검증 전.
+
+B readiness571c3e5→통합source d0f2ed4: Linux직접283/인접229통과, Windows264/19실패·인접221/7실패를원본보존했다. B LIF07 원fixture ctime basis 차이·닫힌거부를독립확인했고기존LIF13 POSIX/symlink제약은미해결이다. guard262 source/wheel/Windows설치일치·Linux격리설치 B공개CLI4사례/정확24Ref복원재판정·A138 HTTP고정소비를확인했다. actual0/세축UNKNOWN/CI5미확인/전체분기미완료.

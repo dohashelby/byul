@@ -1,4 +1,4 @@
-"""REQ-13 product-path fixture check on a pinned A integration checkout.
+"""REQ-13 product-path fixture check on an approved integration snapshot.
 
 Actual reference validation handler + existing executor/EVD/judge/RPT; normal
 inference transport is EXAMPLE. No Docker/engine launch or network request.
@@ -15,30 +15,74 @@ import logging
 from pathlib import Path
 import re
 import subprocess
+import sys
 from types import SimpleNamespace
 
 from tools.b2_reference_cpu import reference_scope
+from tools.b1_integration_cpu import BASE_SHA as COMMON_BASE_SHA, verify_tool_checkout, verify_snapshot
 
-A_SHA = "7acd3d02f01cda6910a9e7c062f36611dcac5d37"
+BASE_SHA = "fc3c4c174ef9dd4b53bc966b75ec4e131bdf1f2a"
+REFERENCE_SHA = "db9527a46873454610df6dbedf79a36d6bf1a7f6"
+B2_FILE_SHA256 = {
+    "update/tools/b1_integration_cpu.py": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
+    "update/src/guard/executors/response_error_contract.py": "2cf7d60d45c19114a17ca37ade0aeb46466e60e246a39076c4e3139ad5ed1a70",
+    "update/tools/b2_reference_cpu.py": "45e29826bac697bfe7e357d95fcd7ba871c8a5f150b93fac590ad4ec91de0940",
+    "update/tests/builders.py": "bc2274445bc40ea3747a420e0f7ec480270199562466675bdf491d5dab188cd1",
+    "update/tests/test_response_content.py": "40450eb1100de2e4170f17f96d7a545db8abc2d36e579ad4df3be6e608b2ca26",
+    "update/docs/b2-response/reference-source.json": "4f025a9f416861ebb33d510bf17587cc76ef4f53640ca0fb57bfdb0ccd9c10e4",
+}
+
+
+def verify_consumption_checkout(repo):
+    """Consume the approved common/B1 overlay plus fixed B2 source and fixtures."""
+    verify_tool_checkout(repo)
+    verify_snapshot(repo, BASE_SHA, tuple(B2_FILE_SHA256))
+    for relative, expected in B2_FILE_SHA256.items():
+        path = repo / relative
+        if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            raise ValueError("B2 source/helper bytes mismatch: " + relative)
+
+
+def verify_reference_source(source):
+    if subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip() != REFERENCE_SHA:
+        raise ValueError("B2 reference HEAD mismatch")
+    verify_snapshot(source, REFERENCE_SHA, ("vllm",))
+
+
+def verify_helper_imports(repo, functions):
+    """Use filesystem identity so aliases still identify the same exact file."""
+    for function, relative in functions:
+        actual = Path(inspect.getfile(function)).resolve()
+        expected = repo / relative
+        if not actual.is_file() or not expected.is_file() or not actual.samefile(expected):
+            raise ValueError("imported product/helper source is outside the pinned checkout")
 
 
 def run(source, output):
+    if sys.flags.optimize:
+        raise ValueError("normal Python required for verification assertions")
     import pydantic
     import pytest
     from guard.core.report import build_report
+    from guard.core.judge import judge_plan
+    from guard.store.packs import get_pack, put_pack
     from guard.executors.response_error_contract import observe_error_response
     from tests.builders import baseline_pack
     from tests.test_response_content import VALUES, response_probe, run_content
 
     repo = Path(__file__).resolve().parents[2]
-    if subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip() != A_SHA:
-        raise ValueError("run in the dedicated pinned A checkout with B-2-only overlay")
-    # HEAD alone cannot prove which checkout PYTHONPATH imported.
-    for function in (build_report, run_content, reference_scope, observe_error_response):
-        if not Path(inspect.getfile(function)).resolve().is_relative_to(repo / "update"):
-            raise ValueError("imported product/helper source is outside the pinned checkout")
-    if subprocess.check_output(["git", "-C", str(repo), "diff", "--name-only", "HEAD"], text=True).strip():
-        raise ValueError("tracked A source files must remain unchanged")
+    verify_helper_imports(repo, (
+        (verify_tool_checkout, "update/tools/b1_integration_cpu.py"),
+        (verify_snapshot, "update/tools/b1_integration_cpu.py"),
+        (build_report, "update/src/guard/core/report.py"),
+        (observe_error_response, "update/src/guard/executors/response_error_contract.py"),
+        (baseline_pack, "update/tests/builders.py"),
+        (response_probe, "update/tests/test_response_content.py"),
+        (run_content, "update/tests/test_response_content.py"),
+        (reference_scope, "update/tools/b2_reference_cpu.py"),
+    ))
+    verify_consumption_checkout(repo)
+    verify_reference_source(source)
     output.mkdir(parents=True, exist_ok=False)
     scope, pins = reference_scope(source, logging.getLogger("b2.integration.reference"))
     fields = ["error.message", "error.type", "error.param", "error.code"]
@@ -83,6 +127,10 @@ def run(source, output):
         assert evd.normal_control.succeeded is (not violation)
         pack = baseline_pack()
         plan = store.resolve(evd.plan)
+        put_pack(store, pack.path)
+        replay, = judge_plan(store, get_pack(store, plan.inputs.pack), plan,
+                             store.resolve(plan.inputs.environments[0]).created_at)
+        assert replay.ref() == res.ref() and replay.evidence == evd.ref()
         rpt = build_report(store, pack, plan, plan.created_at)
         store.put(rpt)
         assert store.verify() == []
@@ -96,10 +144,13 @@ def run(source, output):
         summaries.append({"case": case, "data_origin": "EXAMPLE", "evidence": evd.ref().model_dump(mode="json"),
             "result": res.ref().model_dump(mode="json"), "report": rpt.ref().model_dump(mode="json"),
             "security": res.verdicts.security.value, "normal_control": evd.normal_control.succeeded,
-            "actual_error_observations": observed, "store_verified": True, "raw_markers_absent": True})
-    own_files = [p for p in repo.rglob("*") if p.is_file() and p.suffix in {".py", ".json", ".md", ".yaml"}
-                 and ("b2-response" in str(p) or p.name in {"b2_integration_cpu.py", "b2_reference_cpu.py", "response_error_contract.py"})]
-    report = {"schema": "byul-b2-pinned-a-integration/1", "a_commit": A_SHA,
+            "actual_error_observations": observed, "store_verified": True, "raw_markers_absent": True,
+            "exact_ref_rejudge_preserved": True})
+    verify_reference_source(source)
+    verify_consumption_checkout(repo)
+    own_files = [repo / relative for relative in B2_FILE_SHA256] + [Path(__file__).resolve()]
+    report = {"schema": "byul-b2-pinned-integration/2", "base_commit": BASE_SHA,
+        "common_baseline_commit": COMMON_BASE_SHA, "b2_source_pins_sha256": B2_FILE_SHA256,
         "b2_overlay_sha256": {str(p.relative_to(repo)): hashlib.sha256(p.read_bytes()).hexdigest() for p in own_files},
         "reference_commit": pins["commit"], "normal_inference_origin": "EXAMPLE",
         "actual_reference_error_handler_executed": True, "engine_inference_executed": False,
@@ -107,7 +158,7 @@ def run(source, output):
         "cases": summaries}
     with (output / "summary.json").open("x") as stream:
         json.dump(report, stream, indent=2); stream.write("\n")
-    print("Pinned A fixture execution→EVD→RES/RPT passed: EXAMPLE PASS and independent FAIL retained")
+    print("Approved fixture execution→EVD→RES/RPT passed: EXAMPLE PASS and independent FAIL retained")
 
 
 if __name__ == "__main__":

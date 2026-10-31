@@ -667,3 +667,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - A-1 PLT12는 같은 required_event_record:kubernetes의 명시 copy profile로 추가한다. OBS01 /1/역할/요청 의미와 A2 후보 코드·원 기준을 보존하며 new copy_inventory는 비민감 정책 입력이다. producer/source hash·파일 소유 결합·자기 complete/처리/issuer 선언은 실제 사본/처리/reuse 신뢰가 아니다. 실제 값·운영 주체와 승인 질문은 미확정으로 두고 이 소프트웨어 단계는 읽기 전용·모든 축UNKNOWN이다.
 
 - A-1 PLT12의 copy source/session/inventory/policy 결합은 비민감 선언의 귀속·정합성 검사다. producer·사본 멤버십/처리·issuer/reuse 집행의 인증이 아니며 complete 선언·처리실패 선언을 실제 PASS/FAIL로 올리지 않는다. 기존 CLI cleanup 미완료 종료코드1과 앞선 유효 관측/후속오류 보존을 유지한다. 실제 운영 주체·위치/수신자·기한/방법/보존예외·재사용/복구 정책은 미확정으로 남긴다.
+
+- B154 원7파일의 A152 native21 source gate는 확정 bytes로 보존한다. 새 A공통 소비 검증383파일과 B 고정 old gate의 거부는 각각 기록한다. A가 B source pin/함수/private gate/판본을 바꾸지 않는다. Linux LIF13 peer·epoch·bounded recv는 실제 kernel·EXAMPLE frame의 별도 검증이며 원 vLLM recv_msg/RPC/weights/GPU·전체 판정 근거로 올리지 않는다.

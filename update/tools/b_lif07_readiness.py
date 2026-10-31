@@ -9,6 +9,7 @@ import os
 import stat
 from pathlib import Path
 import re
+from uuid import uuid4
 
 from guard.collectors.lifecycle import load_prepared
 from guard.collectors.manual import build_template, dump_template, import_evidence
@@ -351,6 +352,84 @@ def project(raw, env, target, prepared, manifest, *, native_observation=False):
         'gaps': sorted(gaps)}
 
 
+
+def _http_policy(env, target, prepared, manifest, start, end):
+    try:
+        began, ended = [datetime.fromisoformat(value.replace('Z', '+00:00')) for value in (start, end)]
+        if (any(value.tzinfo is None or value.utcoffset() is None for value in (began, ended))
+                or not 0 < (ended - began).total_seconds() <= 600
+                or not began <= datetime.now(timezone.utc) <= ended):
+            raise ValueError
+    except (AttributeError, TypeError, ValueError):
+        raise ValueError('LIF07_HTTP_EXPLICIT_VALIDITY_WINDOW_REQUIRED') from None
+    body = manifest['request']
+    if body['messages'] != [{'role': 'user', 'content': 'hello'}]:
+        raise ValueError('LIF07_HTTP_FIXED_HELLO_REQUIRED')
+    return {'readiness_environment_sha256': env.ref().sha256, 'readiness_target_sha256': digest(target),
+        'readiness_session': prepared['session'], 'readiness_cohort_sha256': digest(manifest),
+        'readiness_validity_start': start, 'readiness_validity_end': end}
+
+
+def _collect_http(env, target, prepared, manifest, start, end):
+    """공개 A sample/report를 검증하며 부분 사실과 finally 보고 실패를 분리한다."""
+    values = _http_policy(env, target, prepared, manifest, start, end)
+    sample_id = uuid4().hex
+    result = {'snapshot': None, 'sample_id': sample_id, 'report_attempted': False, 'report_validated': False,
+        'source_validation': None, 'sample_attempted': False, 'collection_gap': True, 'gaps': []}
+    collector = None; expected = None
+    from tools import b_lif07_native_capture as helper
+    try:
+        proof = helper.verify_source()
+        if type(proof) is not dict or proof.get('reviewed_common_commit') != helper.HTTP_REVIEWED_COMMON_COMMIT:
+            raise ValueError
+        result['source_validation'] = {'reviewed_common_commit': helper.HTTP_REVIEWED_COMMON_COMMIT,
+            'runtime_hash_approval': False, 'producer_authenticated': False}
+    except Exception:
+        result['gaps'].append('HTTP_SOURCE_UNAVAILABLE')
+        return result
+    from guard.runtime.kubernetes_worker_readiness import KubernetesWorkerReadinessHTTP, validate_snapshot
+    try:
+        collector = KubernetesWorkerReadinessHTTP(target, env, duration=180)
+        expected = {'sample_id': sample_id, 'environment_ref': env.ref().model_dump(mode='json'),
+            'target_sha256': digest(target), 'session': prepared['session'], 'cohort_sha256': digest(manifest),
+            'run_id': manifest['run_id'], 'binding_sha256': digest(collector.binding),
+            'expected_sources': helper.HTTP_EXPECTED_SOURCES}
+        result['sample_attempted'] = True
+        result['snapshot'] = validate_snapshot(collector.sample(values, sample_id=sample_id), **expected)
+    except Exception:
+        result['gaps'].append('HTTP_SAMPLE_UNAVAILABLE')
+    finally:
+        if collector is not None:
+            result['report_attempted'] = True
+            try:
+                packet = validate_snapshot(collector.report(), **expected)
+                # report는 sample과 같은 관측의 정제 복사이며 새 HTTP 요청을 만들지 않는다.
+                if result['snapshot'] is not None and packet != result['snapshot']:
+                    raise ValueError
+                result['snapshot'] = packet; result['report_validated'] = True
+            except Exception:
+                result['gaps'].append('HTTP_REPORT_UNAVAILABLE')
+    result['collection_gap'] = bool(result['gaps'] or result['snapshot'] is None or result['snapshot']['collection_gap'])
+    return result
+
+
+def _attach_http(record, observation):
+    record['http_observation'] = observation
+    packet = observation['snapshot']
+    record['requests'] = sum(row['attempted'] for row in packet['requests']) if packet is not None else 0
+    record['http_requests_attempted'] = record['target_http_requests'] = record['requests']
+    record['http_collection_attempted'] = observation['sample_attempted']
+    record['target_io_attempted'] = True if record['requests'] else None if observation['sample_attempted'] else False
+    record['target_io_origin'] = 'EXAMPLE'
+    if packet is not None:
+        record['started_at'], record['finished_at'] = packet['started_at'], packet['finished_at']
+        record['data_origin'] = packet['data_origin']
+        record['cleanup']['owned_host_complete'] = None
+    else:
+        record['cleanup']['owned_host_complete'] = None
+    record['gaps'] = sorted((set(record['gaps']) - ({'UNREADY_HTTP_UNAVAILABLE'} if packet is not None else set())) | set(observation['gaps']))
+    return record
+
 def _regular_bytes(path):
     """기존 2MiB JSON 상한과 strict parser를 위한 안정된 소유 파일 읽기."""
     path = Path(path).absolute()
@@ -398,21 +477,25 @@ def _import_capture(path):
     return value, hashlib.sha256(raw).hexdigest()
 
 
-def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by, execute=False, import_capture=None, collect_native=False, _example_capture=None):
+def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by, execute=False, import_capture=None, collect_native=False, collect_http=False, http_validity_start=None, http_validity_end=None, _example_capture=None):
     source, original, plan, env, policy, t, assets, m = preflight(store=store, plan_id=plan_id, pack=pack,
         target=target, prepared=prepared, manifest=manifest, output=output, entered_by=entered_by)
     # preflight가 확인한 원본을 backend/project 실행 전에 고정한다.
     before = _inventory(source.root)
     input_paths = [Path(p) for p in (target, prepared, manifest)] + [Path(prepared).parent / n for n in assets['assets']]
     inputs = {str(p): _input_hash(p) for p in input_paths}
-    if (sum((bool(execute), import_capture is not None, bool(collect_native))) > 1
-            or collect_native and _example_capture is not None
+    if (sum((bool(execute), import_capture is not None, bool(collect_native), bool(collect_http))) > 1
+            or (collect_native or collect_http) and _example_capture is not None
             or import_capture is not None and _example_capture is not None):
         raise ValueError('LIF07_IMPORT_AND_LIVE_MODES_EXCLUSIVE')
+    if collect_http:
+        _http_policy(env, t, assets, m, http_validity_start, http_validity_end)
+    elif http_validity_start is not None or http_validity_end is not None:
+        raise ValueError('LIF07_HTTP_WINDOW_REQUIRES_HTTP_MODE')
     if _example_capture is not None and env.data_origin.value != 'EXAMPLE':
         raise ValueError('LIF07_EXAMPLE_CAPTURE_REQUIRES_EXAMPLE_ENV')
     binding = {k: v.ref().model_dump(mode='json') for k, v in [('environment', env), ('policy', policy), ('plan', plan), ('pack', original)]}
-    if not execute and import_capture is None and not collect_native:
+    if not execute and import_capture is None and not collect_native and not collect_http:
         return {'executed': False, 'requests': 0, 'capability_supported': False, 'gaps': sorted(GAPS - {'INVALID_SNAPSHOT', 'SNAPSHOT_COORDINATE_AMBIGUOUS'}), **binding}
     out = Path(output)
     stages = {k: False for k in ('artifact_stored', 'manual_evidence_stored', 'report_stored', 'bundle_restored', 'summary_stored')}; issues = []
@@ -422,11 +505,16 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
             raw, capture_hash = _import_capture(import_capture); inputs[str(Path(import_capture))] = capture_hash
         elif collect_native:
             raw = _collect_native(env, t, assets, m)
+        elif collect_http:
+            raw = _empty(env, t, assets, m)
+            http_observation = _collect_http(env, t, assets, m, http_validity_start, http_validity_end)
         else:
             # 승인 실제 capability가 없으므로 backend는 호출하지 않는다.
             raw = _empty(env, t, assets, m) if _example_capture is None else _example_capture(env, t, assets, m)
         record = project(raw, env, t, assets, m, native_observation=collect_native)
-        record['input_mode'] = 'native_startup_observation' if collect_native else 'imported_observation_file' if import_capture is not None else 'EXAMPLE_callback' if _example_capture is not None else 'closed_live_capability'
+        if collect_http:
+            record = _attach_http(record, http_observation)
+        record['input_mode'] = 'http_readiness_observation' if collect_http else 'native_startup_observation' if collect_native else 'imported_observation_file' if import_capture is not None else 'EXAMPLE_callback' if _example_capture is not None else 'closed_live_capability'
         record['source_authentication_verified'] = False
         if not _unchanged(source, before, inputs):
             issues.append('ORIGINAL_INPUT_CHANGED')
@@ -440,15 +528,19 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
         doc['checks'] = [x for x in doc['checks'] if x['check_id'] == 'LIF-07' and x['side'] == 'single']; entry, = doc['checks']
         entry.update(entered_by=entered_by, entered_at=record['finished_at'], started_at=record['started_at'], finished_at=record['finished_at'],
             attachments=[attachment] if attachment else [], verdicts={k: 'UNKNOWN' for k in ('security', 'functional', 'performance')},
-            basis=('worker 메서드 단계와 선정 bootstrap SEND 관측 상태는 첨부에 보존한다. 상위 READY 전송·수신·서비스 접수·canary와 지연·복구 receipt는 미확인으로 전체 준비 판정은 UNKNOWN이다.' if collect_native else
+            basis=('선정 health/chat HTTP 결과와 독립 API Pod readiness는 첨부에 보존한다. native 인과·상위 READY·준비 전 접수·준비 후 canary·통제 지연은 미확인으로 전체 준비 판정은 UNKNOWN이다.' if collect_http else
+                'worker 메서드 단계와 선정 bootstrap SEND 관측 상태는 첨부에 보존한다. 상위 READY 전송·수신·서비스 접수·canary와 지연·복구 receipt는 미확인으로 전체 준비 판정은 UNKNOWN이다.' if collect_native else
                 'worker 메서드 단계의 정제 metadata를 보존한다. 실제 READY-send/지연/접수·준비후canary 미관측으로 전체 준비 판정은 UNKNOWN이다.'),
             limitations=['required_readiness_items와 기업 기한·수락 기준은 입력 그대로다. 단계 RETURN과 generator factory 반환은 준비 완료 근거로 사용하지 않는다.',
                 'PodReady/HTTP200/단발 CPU generation_readiness를 rank·model 준비 완료로 올리지 않는다.',
                 'host/probe/native clock domain은 독립이다. A 인과 receipt 없는 교차 시각 순서는 미확인이다.',
-                'HTTP 요청·Pod 변경·지연 0. native 관측 모드의 읽기·선정 session seal 시도와 결과는 별도 보존한다. EXAMPLE snapshot과 외곽 source/code 사실을 실제 worker/GPU·상위 READY·서비스 자격으로 올리지 않는다.'])
+                ('선정 HTTP 요청 수·전송/응답·독립 API readiness는 첨부에 보존한다. EXAMPLE 전송 관측과 실제 worker/GPU·상위 READY·서비스 준비는 구분한다. Pod 변경·지연은 0이다.' if collect_http else
+                'HTTP 요청·Pod 변경·지연 0. native 관측 모드의 읽기·선정 session seal 시도와 결과는 별도 보존한다. EXAMPLE snapshot과 외곽 source/code 사실을 실제 worker/GPU·상위 READY·서비스 자격으로 올리지 않는다.')])
         entry['normal_control']['result'] = 'not_attempted'
         for c in entry['challenges']: c['attempted'] = False
         entry['observation_notes'][0]['answer'] = '출처=' + record['data_origin'] + '; metadata행=' + str(len(record['rows'])) + '; 메서드짝=' + str(len(record['method_pairs'])) + ('; 선정 bootstrap SEND 관측 상태는 첨부에 보존; 상위 READY 전송·수신·서비스 접수·canary와 지연·복구 receipt 미확인. gaps=' if collect_native else '; 실제 READY/지연/접수/복구 receipt 미수집. gaps=') + str(record['gaps'])
+        if collect_http:
+            entry['observation_notes'][0]['answer'] = '출처=' + record['data_origin'] + '; 선정 HTTP 시도=' + str(record['requests']) + '; 결과·누락·정리는 첨부 보존. native 인과·상위 READY·준비 전 접수·준비 후 canary·지연/복구 미확인.'
         if attachment is None: entry['observation_notes'][0]['answer'] += '\nLIF07_SAFE_FACTS=' + canonical_json(record).decode('utf-8')
         form = out / 'manual-evidence.yaml'
         try:
@@ -464,7 +556,7 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
         verify_complete(restored); stages['bundle_restored'] = True
         if not _unchanged(source, before, inputs):
             issues.append('ORIGINAL_INPUT_CHANGED'); raise ValueError('LIF07_ORIGINAL_INPUT_CHANGED')
-        summary = {'executed': True, 'actual_target_executed': record['target_io_attempted'] if collect_native and record['data_origin'] != 'EXAMPLE' else False, 'native_observation_invoked': collect_native, 'target_io_attempted': record['target_io_attempted'], 'target_io_origin': record['data_origin'], 'selected_session_seal_attempted': record['cleanup'].get('selected_session_seal_attempted'), 'selected_session_sealed': record['cleanup'].get('selected_session_sealed'), 'requests': 0, 'status': 'stored', **binding,
+        summary = {'executed': True, 'actual_target_executed': record['target_io_attempted'] if collect_native and record['data_origin'] != 'EXAMPLE' else False, 'native_observation_invoked': collect_native, 'target_io_attempted': record['target_io_attempted'], 'target_io_origin': record['data_origin'], 'selected_session_seal_attempted': record['cleanup'].get('selected_session_seal_attempted'), 'selected_session_sealed': record['cleanup'].get('selected_session_sealed'), 'requests': record['requests'], 'http_requests_attempted': record.get('http_requests_attempted', 0), 'http_observation_invoked': collect_http, 'status': 'stored', **binding,
             'capability_supported': False, 'full_scope_coverage': False, 'capture_origin': record['data_origin'], 'input_mode': record['input_mode'], 'imported_from_file': import_capture is not None, 'source_authentication_verified': False,
             'source_unchanged': True, 'exact_refs_restored': True, 'issues': issues,
             'verdicts': {k: 'UNKNOWN' for k in ('security', 'functional', 'performance')}, 'report': report.ref().model_dump(mode='json')}
@@ -482,6 +574,8 @@ def main(argv=None):
     for name in ('store', 'pack', 'target', 'prepared', 'manifest', 'output'): parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--import-capture', type=Path)
     parser.add_argument('--collect-native', action='store_true')
+    parser.add_argument('--collect-http', action='store_true')
+    parser.add_argument('--http-validity-start'); parser.add_argument('--http-validity-end')
     parser.add_argument('--plan', dest='plan_id', required=True); parser.add_argument('--entered-by', required=True); parser.add_argument('--execute', action='store_true')
     try: print(json.dumps(run(**vars(parser.parse_args(argv))), ensure_ascii=False))
     except EvidencePreservationError as error: parser.exit(1, json.dumps({'recovery': error.recovery, 'safe_facts': error.safe_facts}, ensure_ascii=False) + '\n')

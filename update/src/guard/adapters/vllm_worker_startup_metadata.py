@@ -200,8 +200,8 @@ def _project_iterations(packet,profile,*,upper_anchors=False):
                 'source_event_locators_complete':len(facts)<=64,'recording_closed':capture.get('summary',{}).get('recording_closed') is True,
                 **{key:False for key in weights.TRUTH},'scope_complete':False})
             if upper_anchors:
-                models[-1]['first_source_event']=[number,facts[0]['end_seq']] if facts else None
-                models[-1]['last_source_event']=[number,facts[-1]['end_seq']] if facts else None
+                models[-1]['first_source_event']=[number,min(fact['end_seq'] for fact in facts)] if facts else None
+                models[-1]['last_source_event']=[number,max(fact['end_seq'] for fact in facts)] if facts else None
         missing+=data['missing']
     missing+=['worker_FD_read_and_range_unverified','tensor_storage_and_backend_apply_completion_unverified','worker_assignment_and_rank_shard_inventory_unverified','approval_and_inspection_authority_unverified']
     if not samples:missing.append('source_bound_weight_iteration_unavailable')

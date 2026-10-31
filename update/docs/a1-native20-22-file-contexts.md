@@ -13,11 +13,11 @@
 
 ## 반환과 귀속
 
-`recordings`는 누락된 항목도 원 인덱스를 보존한다. 자료가 있는 항목은 PID/start, image/process 결합, 동일 process generation 중복과 각 투영 단계 상태를 제공한다. `projected`는 함수 단계가 반환됐다는 뜻이다. 전체 수집·정책·worker 검증 완료가 아니다. 같은 PID/start가 여러 recording에 나타나거나 image/process 결합이 부족하면 자료는 남기되 결합 기반 후보는 비활성화한다.
+`recordings`는 누락된 항목도 원 인덱스를 보존한다. 자료가 있는 항목은 PID/start, image/process 결합, 동일 process generation 중복과 각 투영 단계 상태를 제공한다. `projected`는 함수 단계가 반환됐다는 뜻이다. 전체 수집·정책·worker 검증 완료가 아니다. 같은 PID/start가 여러 recording에 나타나거나 process 결합이 부족하면 자료는 남기되 결합 기반 후보는 비활성화한다. 기존 Kubernetes reader의 API 이미지 결합과 별도의 node/runtime 이미지 검증을 분리한다. node/runtime 검증 false는 프로세스 관측을 지우지 않으며, 파일·root 후보의 `image_binding_verified`를 false로 유지한다.
 
-`startup_generation`은 기존 해당 profile의 공개 MP/startup/generation/endpoint 투영을 재사용한다. native22의 전체 recording 간 endpoint 후보 계산도 보존한다. 각 recording의 독립 부분 투영을 별도로 유지하여 한 recording의 오류가 다른 관측을 지우지 않게 한다. 새 파일 투영의 엄격한 image·generation 결합을 거친 `model_candidates`를 공통 모델 연결에서 사용한다.
+`startup_generation`은 기존 해당 profile의 공개 MP/startup/generation/endpoint 투영을 재사용한다. native22의 전체 recording 간 endpoint 후보 계산도 보존한다. 각 recording의 독립 부분 투영을 별도로 유지하여 한 recording의 오류가 다른 관측을 지우지 않게 한다. 공통 worker/startup journal의 파일·root 사실을 별도 `model_candidates`로 제공하며 PID/start·세션 결합을 공통 모델 연결에서 사용한다. 기존 endpoint 투영의 더 강한 node/runtime 이미지 조건과 그 false 값은 원 의미대로 보존한다. 파일·root 후보를 검증된 endpoint/worker로 승격하지 않는다.
 
-`weight_iteration`은 기존 공통 journal을 재사용한다. root FACTORY·model/loader/call·terminal/close와 원 source 이벤트를 유지한다. source locator 목록의 기존 64개 한도와 별도로 **전체** 사실의 `first_source_event`·`last_source_event`를 제공한다. 잘린 목록의 마지막 항목을 전체 상한으로 사용하지 않는다.
+`weight_iteration`은 기존 공통 journal을 재사용한다. root FACTORY·model/loader/call·terminal/close와 원 source 이벤트를 유지한다. source locator 목록의 기존 64개 한도와 별도로 **전체** 사실의 최소·최대 Ref인 `first_source_event`·`last_source_event`를 제공한다. 잘린 목록의 마지막 항목을 전체 상한으로 사용하지 않는다.
 
 `safe_open_mappings`도 기존 정제 journal을 재사용한다. 세션에 묶인 file/scope/context/operation/source 정보와 recording/PID/start/image 결합, context의 첫/마지막 mapping Ref를 반환한다. 원 maps·주소·파일 내용·텐서 값·예외 원문을 추가하지 않는다. mapping·파일 선택·함수 반환을 실제 read/tensor/backend 적용이나 승인으로 승격하지 않는다.
 

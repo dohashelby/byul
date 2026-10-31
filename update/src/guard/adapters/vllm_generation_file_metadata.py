@@ -88,7 +88,7 @@ def project_file_contexts(packet,prepared):
             'startup_generation':None,'missing':[],'diagnostics':[],**{key:False for key in TRUTH}}
     try:
         # Keep the existing projection's full cross-recording endpoint semantics.
-        # The indexed file views below additionally require image/unique-generation binding.
+        # The indexed file views below retain independent process/image binding axes.
         result['startup_generation']=PROFILES[profile][1](packet,prepared)
     except (KeyError,ValueError,TypeError,IndexError,OSError,RuntimeError,AttributeError):
         result['missing'].append(ERROR)
@@ -104,24 +104,40 @@ def project_file_contexts(packet,prepared):
             continue
         capture=recording['capture'];context=header['context'];duplicate=counts[(context['pid'],context['start_ticks'])]!=1
         image=capture.get('image_digest_verified') is True
-        bound=bool(not duplicate and image and capture.get('process_context_verified') is True
+        bound=bool(not duplicate and capture.get('process_context_verified') is True
                    and recording.get('session_owner_match') is True and recording.get('listed_file_identity_match') is True)
         entry.update(pid=context['pid'],start_ticks=context['start_ticks'],process_binding_verified=bound,
                      image_binding_verified=image,duplicate_process_generation=duplicate,status='projected')
         if duplicate:result['missing'].append('generation_file_duplicate_process_generation')
+        if not image:result['missing'].append('generation_file_node_runtime_image_unverified')
         if not bound:
             entry['status']='partial';result['missing'].append('generation_file_process_or_image_binding_unavailable')
             result['diagnostics'].append({'recording':index,'stage':'binding','code':'GENERATION_FILE_CONTEXT_BINDING_UNAVAILABLE'})
         # Padding preserves original Ref recording indices without rewriting any capture/header.
         selected={'recordings':[{'capture':None,'session_owner_match':False,'listed_file_identity_match':False}
                                 for _ in range(index)]+[recording]}
-        for stage in ('startup_generation','weight_iteration','safe_open_mappings'):
+        for stage in ('startup_generation','worker_file_roots','weight_iteration','safe_open_mappings'):
             try:
                 if stage=='startup_generation':
                     value=PROFILES[profile][1](selected,prepared)
                     for key,rows in value.items():
                         if type(rows) is list and all(type(row) is dict for row in rows):_restrict(rows,bound,image)
-                    result['model_candidates'].extend(value['model_candidates']);entry[stage]=value
+                    entry[stage]=value
+                elif stage=='worker_file_roots':
+                    data=startup.journal(capture['records'],prepared,context)
+                    originals=entry.get('startup_generation',{}).get('model_candidates',[])
+                    value={'model_candidates':[],'missing':data['missing']}
+                    for root in data['model_candidates']:
+                        # File/root facts have process attribution independent of
+                        # the stronger endpoint/node-runtime-image proof above.
+                        row={'recording':index,'pid':context['pid'],'start_ticks':context['start_ticks'],
+                             'process_binding_verified':bound,'image_binding_verified':image,**root}
+                        original=[candidate for candidate in originals if candidate['worker_call_sha256']==root['worker_call_sha256']]
+                        if len(original)==1 and 'worker_generation_candidates' in original[0]:
+                            row['worker_generation_candidates']=original[0]['worker_generation_candidates']
+                            row['local_worker_generation_model_candidate']=original[0].get('local_worker_generation_model_candidate',False)
+                        value['model_candidates'].append(row)
+                    result['model_candidates'].extend(value['model_candidates'])
                 else:
                     value=(startup._project_iterations(selected,profile,upper_anchors=True) if stage=='weight_iteration'
                            else startup._project_mappings(selected,prepared,profile))

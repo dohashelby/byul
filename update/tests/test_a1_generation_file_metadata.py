@@ -89,7 +89,11 @@ def test_unbound_recording_preserves_facts_without_joining_a_worker(tmp_path,mon
     packet['recordings'][0]['capture'][bound_key]=False
     value=common.project_file_contexts(packet,prepared)
     assert value['weight_iteration']['samples'] and value['safe_open_mappings']['samples']
-    assert all(not row['process_binding_verified'] for row in value['model_candidates'])
+    if bound_key=='process_context_verified':
+        assert all(not row['process_binding_verified'] for row in value['model_candidates'])
+    else:
+        assert all(row['process_binding_verified'] and not row['image_binding_verified'] for row in value['model_candidates'])
+        assert all(value[key] is False for key in common.TRUTH)
 
 
 def test_partial_root_and_full_upper_anchor_are_not_a_truncated_forward_proof(tmp_path,monkeypatch):
@@ -97,6 +101,11 @@ def test_partial_root_and_full_upper_anchor_are_not_a_truncated_forward_proof(tm
     value=common.project_file_contexts(packet,prepared);root,=value['weight_iteration']['model_candidates']
     assert len(root['source_events'])==64 and not root['source_event_locators_complete']
     assert root['last_source_event'][1]>root['source_events'][-1][1]
+    facts=[row for row in value['weight_iteration']['samples'] if row['root_load_sha256']==root['call_sha256']
+           and row['model_object_sha256']==root['model_object_sha256'] and row['factory_present'] and row['source_pair_verified']
+           and row['root_load_active_observed'] and root['factory_seq']<row['end_seq']]
+    assert root['first_source_event']==[0,min(row['end_seq'] for row in facts)]
+    assert root['last_source_event']==[0,max(row['end_seq'] for row in facts)]
     candidate={'session_model_object_sha256':root['model_object_sha256'],'native_locator':{
         'context':world.observer.writer.context,'recording':0,'forward_seq':len(packet['recordings'][0]['capture']['records'])+1}}
     trials=[{'configured_model_candidates':[candidate]}];common.attach_configured_models(trials,value)

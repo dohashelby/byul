@@ -141,7 +141,8 @@ def load_prepared(path):
     with path.open("rb") as stream:
         raw_manifest=stream.read(262145)
         manifest = strict_json(raw_manifest,limit=262144)
-    if (type(manifest) is not dict or set(manifest) != ({"schema","profile","session","public_commit",
+    if (type(manifest) is not dict or type(manifest.get("profile")) is not str
+            or set(manifest) != ({"schema","profile","session","public_commit",
             "assets","source_sha256","engine_started","image_contents_verified","product_connected"} | ({'model_read_scope'} if manifest.get('profile') in {read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} else set()))
             or manifest.get('profile') not in {read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,joint_sensor.PROFILE,generation_sensor.PROFILE,endpoint_sensor.PROFILE} and len(raw_manifest)>16384
             or manifest["schema"] != "guard-lifecycle-assets/1"  or type(manifest["profile"]) is not str

@@ -1643,3 +1643,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - A-1 LIF12 source d73d197 검증: 직접 Windows/Linux154개씩, 인접 Windows283개(기존INV03skip1·기본제외1)/Linux284개(기본제외1), 설치277파일·격리 CLI4/정확24Ref 반출/복원·저장팩 재판정을 마쳤다. 원 LIF10/REQ12·71보호파일/B7bytes·76정의·과거팩/Ref를 보존하고 전체공통385파일 고정 소비로 확장했다. 정상·수동·자동 선언과 ID/clock/counter/후속오류를 구분하지만 실제 producer/retry/nonoccurrence/worker 종료/비용 집행은 미연결·모든 축UNKNOWN·전체분기false다. CI5/실제 환경은 별도 미완료, 추가Start/새 의존성0이다.
 
 - A-1 Worker HTTP 공통 입력 초안: B154 LIF07의 Running/Unready health 전후·한 token chat 범위를 별도 공개 profile/schema에 구현하고, 기존 A1 LIF09가 이미 사용한 startup 결합을 공유한다. 원 probe/일반 Ready gate/B7·전용 분석은 유지한다. 정확 ENV/model/세대/session/기한·출력/정리·후기 오류·엄격 envelope 검증과 직접/기존 LIF09 CLI 시험 초안·정적 검토를 마쳤으며 소스 고정 후 영향 검증 대기다. 실제 Kubernetes/worker/GPU·B 제품 연결/지연·전체 준비는 미연결이다.
+
+- A-1 Worker HTTP source f6fe356: 원 runtime 그대로 초기 Windows/Linux180통과+시험 계약 보수1개씩 통과, 인접 Windows265(기존skip1)/Linux266, 설치279파일·격리API6/기존LIF09 CLI4·정확24Ref 왕복을 확인했다. 공통387파일 검토 pin과 B7/probe/generic gate 원 bytes를 보존한다. B 전용 연결·실제 cluster/worker/GPU·delay·전체LIF07/09/부모A는 미완료이며 exactHEAD CI는 별도다.

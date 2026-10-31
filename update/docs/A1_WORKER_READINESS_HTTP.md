@@ -1,6 +1,6 @@
 # Worker readiness HTTP 공통 입력
 
-상태: 구현·시험·문서 초안을 마쳤으며 고정 소스의 검증은 대기 중이다. 검증 완료 인계의 정확 commit/파일 bytes와 지원 범위를 확인한 뒤 소비한다. 실제 Kubernetes/worker/GPU와 B 전용 제품 연결은 미검증이다. 기존 A1 LIF09에는 이미 Running/Unready engine·Ready probe를 묶은 completion 관측이 있다. 이를 새로 구현하거나 B에게 다른 점검의 profile/RID/private _verify(False)를 쓰게 하지 않는다.
+상태: CPU/EXAMPLE 공통 입력과 기존 LIF09 결합 소비의 영향·설치 검증 완료. 검증 source는 `f6fe35603075101a11cccd6ed6160c021a5b5a00`, 공통 검토 기준은 `f277fecd6df1e59505c0ad731032593f6fb22885`다. 정확 HEAD CI는 별도 미확인이다. 검증 완료 인계의 정확 commit/파일 bytes와 지원 범위를 확인한 뒤 소비한다. 실제 Kubernetes/worker/GPU와 B 전용 제품 연결은 미검증이다. 기존 A1 LIF09에는 이미 Running/Unready engine·Ready probe를 묶은 completion 관측이 있다. 이를 새로 구현하거나 B에게 다른 점검의 profile/RID/private _verify(False)를 쓰게 하지 않는다.
 
 기존 선정 startup Pod 결합을 `kubernetes_startup_binding.read_startup_binding` 경계로 추출하고 LIF09의 old before/after completion 절차·판정·probe 원 bytes를 유지한다. B LIF07 공개 경계는 `guard.runtime.kubernetes_worker_readiness.KubernetesWorkerReadinessHTTP(target, env, *, runner=None, duration=120, binary='kubectl', clock=None)`, `.sample(policy_values, *, sample_id)`, `.report()`다. profile은 `kubernetes-owned-worker-readiness-http-v1`, envelope schema는 `guard-kubernetes-worker-readiness-http/1`이다. 객체당 한 sample이며 자유 요청·재시도·다른 점검 ID는 허용하지 않는다. 미실행 report는 null, 실행 이후는 정제 결과의 독립 복사다.
 
@@ -19,3 +19,5 @@ POL 입력은 정확히 `readiness_environment_sha256`, `readiness_target_sha256
 실제 소비는 A1 LIF09의 공통 startup 결합과 B 전용 새 health/chat 소비를 분리한다. B 전용7파일과 old native21 source gate는 원 bytes로 보존하며 B가 새 고정 source pin/수집·분석·판정을 연결한다. controlled delay/resume/fault·Pod/worker 변경·service gate 활성화는 이 작은 계약에서 구현하거나 승인하지 않는다.
 
 부모 A39/56/4·A1 19/27/2, A157의 LIF12 선언 제품 성과와 실제 미연결 범위, A156 B 실패/원본/kernel3/Ref6, A155 PLT12, 기존팩/Ref/실증을 보존한다. 원GPU창 종료/추가Start0·46.66USD/과거사용량/보존120GiB EBS 비용·CI 결제 차단과 의존성 질문 대기를 유지한다. 이 초안은 새 기동·시간·비용·권한·실제 대상 시험 승인이 아니다.
+
+검증: 초기 source88bff39에서 Windows/Linux 각각180통과·1실패였다. 실패는 새 시험이 기존 generic snapshot의 예외 계약을 잘못 가정한 것으로, 제품 코드는 그대로 두고 예외·failed 상태·wire0을 요구하도록 수정했다. sourcef6fe356에서 그1사례를 각각 재검증했다. 기존180사례는 바뀌지 않았으며 새 전체181개 실행으로 표기하지 않는다. 인접 Windows265통과(기존INV03 skip1·기본제외1)/Linux266통과(기본제외1), Windows source/wheel/설치279파일 일치, 격리 Linux 공개HTTP/parser6사례와 기존LIF09 CLI4사례·정확24Ref 반출/복원·저장팩 재판정을 확인했다. 입력1467파일은 검증 중 변경0이다. 실제 stdlib loopback은 고정 probe의3개 요청만 확인했으며 fake Kubernetes identity를 실제 cluster/worker/GPU나 native 인과 증거로 올리지 않는다. 새 skip/제외·assert 삭제/완화·gate 우회는 없다.

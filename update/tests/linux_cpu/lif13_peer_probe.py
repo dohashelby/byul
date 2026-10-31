@@ -29,23 +29,40 @@ def sha(raw):return hashlib.sha256(raw).hexdigest()
 
 def environment():
     supported=(sys.platform=='linux' and platform.machine().lower() in {'x86_64','amd64'}
-        and sys.version_info[:2]==(3,12) and hasattr(socket,'SO_PEERCRED')
+        and sys.version_info[:2]==(3,12) and sys.flags.optimize==0 and hasattr(socket,'SO_PEERCRED')
         and all(Path(p).exists() for p in ('/proc/self/stat','/proc/sys/kernel/random/boot_id','/proc/self/ns/pid','/proc/self/ns/mnt')))
     return {'supported':supported,'system':platform.system(),'machine':platform.machine(),
         'python':platform.python_version(),'SO_PEERCRED_available':hasattr(socket,'SO_PEERCRED'),
-        'isolated':bool(sys.flags.isolated),'no_site':bool(sys.flags.no_site)}
+        'isolated':bool(sys.flags.isolated),'no_site':bool(sys.flags.no_site),'optimize':sys.flags.optimize}
 
 
 def source_bytes(path):
     path=Path(path).absolute()
-    if any(p.is_symlink() for p in (path,*path.parents)) or not path.is_file():raise ValueError('SOURCE_REGULAR_FILE_REQUIRED')
-    value=path.stat()
-    if not stat.S_ISREG(value.st_mode) or not 0<value.st_size<=1024*1024:raise ValueError('SOURCE_BOUND')
-    with path.open('rb') as stream:raw=stream.read(1024*1024+1)
-    after=path.stat()
-    if (value.st_dev,value.st_ino,value.st_size,value.st_mtime_ns,value.st_ctime_ns)!=(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns,after.st_ctime_ns) or len(raw)!=value.st_size:
-        raise ValueError('SOURCE_CHANGED_DURING_READ')
+    if any(p.is_symlink() for p in (path,*path.parents)):raise ValueError('SOURCE_REGULAR_FILE_REQUIRED')
+    selected=path.lstat()
+    identity=lambda value:(value.st_dev,value.st_ino,value.st_size,value.st_mtime_ns,value.st_ctime_ns)
+    if not stat.S_ISREG(selected.st_mode) or not 0<selected.st_size<=1024*1024:raise ValueError('SOURCE_BOUND')
+    # FIFO/leaf-symlink 교체에도 open/read가 대기하지 않는다. FD와 경로는 같은 stat API로 비교한다.
+    fd=os.open(path,os.O_RDONLY|os.O_NONBLOCK|os.O_NOFOLLOW)
+    with os.fdopen(fd,'rb') as stream:
+        before=os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode) or not 0<before.st_size<=1024*1024:raise ValueError('SOURCE_BOUND')
+        if identity(selected)!=identity(before):raise ValueError('SOURCE_CHANGED_DURING_READ')
+        raw=stream.read(1024*1024+1);after=os.fstat(stream.fileno());current=path.lstat()
+        if (identity(before)!=identity(after) or identity(after)!=identity(current) or len(raw)!=before.st_size
+                or not stat.S_ISREG(current.st_mode) or any(p.is_symlink() for p in (path,*path.parents))):
+            raise ValueError('SOURCE_CHANGED_DURING_READ')
     return path,raw
+
+
+def recheck_sources(proof,native_path,probe_path):
+    """한 source 재검사 실패로 다른 source/앞선 단계/정리 proof를 잃지 않는다."""
+    proof['source_after']={}
+    for name,path in (('native',native_path),('probe',probe_path)):
+        try:proof['source_after'][name+'_sha256']=sha(source_bytes(path)[1])
+        except BaseException as error:proof['cleanup']['errors'].append('source_recheck_'+name+':'+type(error).__name__)
+    proof['source_unchanged']=proof['source_before']==proof['source_after']
+    return proof['source_unchanged']
 
 
 def load_native(path,raw):
@@ -151,13 +168,14 @@ def run_probe(native_path,output):
         'cleanup':{'owned_sockets_closed':True,'owned_peer_reaped':True,'owned_streams_closed':True,
             'owned_fixture_directory_created':False,'owned_fixture_directory_removed':True,'socket_path_removed':True,'forced_child_termination':False,'errors':[]}}
     if not host['supported']:
-        proof['reason']='LINUX_X86_64_PYTHON312_PROC_SO_PEERCRED_REQUIRED'
-        proof['source_after']={'native_sha256':sha(source_bytes(native_path)[1]),'probe_sha256':sha(source_bytes(probe_path)[1])}
-        proof['source_unchanged']=proof['source_before']==proof['source_after'];proof['finished_at']=datetime.now(timezone.utc).isoformat()
-        proof['wall_seconds']=time.monotonic()-began
+        proof['reason']='PYTHON_OPTIMIZATION_UNSUPPORTED' if host['optimize'] else 'LINUX_X86_64_PYTHON312_PROC_SO_PEERCRED_REQUIRED'
+        unchanged=recheck_sources(proof,native_path,probe_path)
+        proof['finished_at']=datetime.now(timezone.utc).isoformat();proof['wall_seconds']=time.monotonic()-began
+        if not unchanged:proof['status']='FAILED'
         with (output/'proof.json').open('x') as stream:json.dump(proof,stream,ensure_ascii=False,indent=2)
-        print(json.dumps({'status':'UNSUPPORTED','returncode':2,'kernel_cases_executed':0,'proof':str(output/'proof.json')}))
-        return 2
+        code=2 if unchanged else 1
+        print(json.dumps({'status':proof['status'],'returncode':code,'kernel_cases_executed':0,'proof':str(output/'proof.json')}))
+        return code
     fixture=None;process=None;owned=[];address=None;failure=None;active=None
     try:
         native=load_native(native_path,native_raw);proof['source_python_module_executed']=True
@@ -241,11 +259,7 @@ def run_probe(native_path,output):
             try:fixture.cleanup()
             except BaseException as error:cleanup['errors'].append('directory_cleanup:'+type(error).__name__)
             cleanup['owned_fixture_directory_removed']=not Path(fixture.name).exists();cleanup['socket_path_removed']=not address.exists()
-        proof['source_after']={}
-        for name,path in (('native',native_path),('probe',probe_path)):
-            try:proof['source_after'][name+'_sha256']=sha(source_bytes(path)[1])
-            except BaseException as error:cleanup['errors'].append('source_recheck:'+type(error).__name__)
-        proof['source_unchanged']=proof['source_before']==proof['source_after']
+        recheck_sources(proof,native_path,probe_path)
         success=(failure is None and proof['kernel_cases_executed']==proof['kernel_cases_passed']==3 and proof['source_unchanged']
             and all(cleanup[k] for k in ('owned_sockets_closed','owned_peer_reaped','owned_streams_closed','owned_fixture_directory_removed','socket_path_removed'))
             and not cleanup['forced_child_termination'] and not cleanup['errors'] and cleanup.get('owned_peer_returncode')==0)

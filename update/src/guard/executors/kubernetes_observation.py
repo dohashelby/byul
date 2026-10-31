@@ -31,18 +31,30 @@ class RequiredEventReader(KubernetesLifecycleReader):
 
 
 class KubernetesRequiredEventExecutor(HttpCheckExecutor):
-    name='required_event_record';version='0.1.0';requires_roles=True;requires_route_scope=False;functional_via='engine'
+    name='required_event_record';version='0.2.0';requires_roles=True;requires_route_scope=False;functional_via='engine'
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
 
     def validate_policy(self,check,values):
+        if check.id=='PLT-12':
+            from . import credential_copy_contract as copy_contract
+            if getattr(check,'collection_profile',None)!=copy_contract.PROFILE:raise ValueError('COPY_PROFILE_UNSUPPORTED')
+            copy_contract.normalize_policy(values);return
         if check.id!='OBS-01' or getattr(check,'collection_profile',None)!=PROFILE:raise ValueError('OBSERVATION_PROFILE_UNSUPPORTED')
         normalize_policy(values)
 
     def run(self,check,env,policy_values,adapter,workdir):
         self.validate_policy(check,policy_values)
+        if check.id=='PLT-12':
+            from .kubernetes_credential_copy import KubernetesCredentialCopyRecordExecutor
+            if set(self.cfg)-{'target','roles','copy_inventory','kubectl_binary','max_duration_seconds'}:
+                raise ValueError('COPY_CONFIGURATION_INVALID')
+            selected={key:value for key,value in self.cfg.items() if key!='roles'}
+            return KubernetesCredentialCopyRecordExecutor(selected,runner=self.runner,environ=self._environ,
+                expected_target_sha256=self.expected_target).run(check,env,policy_values,adapter,workdir)
         try:
-            if (set(self.cfg)-{'target','roles','kubectl_binary','max_duration_seconds'} or adapter is None
+            if (set(self.cfg)-{'target','roles','copy_inventory','kubectl_binary','max_duration_seconds'} or adapter is None
+                    or 'copy_inventory' in self.cfg and (type(self.cfg['copy_inventory']) is not str or not self.cfg['copy_inventory'])
                     or set(self.roles())!={'allowed','denied'}
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
             keys=self.keys()

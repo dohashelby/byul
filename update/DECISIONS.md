@@ -663,3 +663,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 2026-10-31 A-1 LIF09 endpoint 초안: Linux exact stdlib Connection/FIFO만 세션·boot·namespace/time domain token으로 관측하며 get_mp_context를 추가 호출하지 않는다. Windows HANDLE과 fork 상속은 미검증이다. producer/worker 신뢰·tensor/GPU·전체 준비·서비스 접수 판정은 올리지 않는다. native22는 source/제품 검증 완료 전 미지원 초안이다.
 
 - A-1 LIF09 native22는 기존 실행기의 명시 판본으로 creator/selected recv/sender의 정확 원14/21 사건 Ref와 Linux held-FIFO domain 후보를 제공한다. PID/rank/time-only join·Windows HANDLE 변환·get_mp_context 추가 호출을 하지 않는다. 양성 EXAMPLE 두 identity와 inline Process.start 대역은 물리 worker 증거가 아니다. runtime endpoint token과 코드 승인 pin을 구분하며 실제 trust/전체 준비/service·fault/repair 판정을 올리지 않는다.
+
+- A-1 PLT12는 같은 required_event_record:kubernetes의 명시 copy profile로 추가한다. OBS01 /1/역할/요청 의미와 A2 후보 코드·원 기준을 보존하며 new copy_inventory는 비민감 정책 입력이다. producer/source hash·파일 소유 결합·자기 complete/처리/issuer 선언은 실제 사본/처리/reuse 신뢰가 아니다. 실제 값·운영 주체와 승인 질문은 미확정으로 두고 이 소프트웨어 단계는 읽기 전용·모든 축UNKNOWN이다.

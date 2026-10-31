@@ -416,10 +416,12 @@ def _collect_http(env, target, prepared, manifest, start, end):
 def _attach_http(record, observation):
     record['http_observation'] = observation
     packet = observation['snapshot']
-    record['requests'] = sum(row['attempted'] for row in packet['requests']) if packet is not None else 0
+    record['requests'] = (sum(row['attempted'] for row in packet['requests']) if packet is not None
+        else None if observation['sample_attempted'] else 0)
     record['http_requests_attempted'] = record['target_http_requests'] = record['requests']
     record['http_collection_attempted'] = observation['sample_attempted']
-    record['target_io_attempted'] = True if record['requests'] else None if observation['sample_attempted'] else False
+    api_collected = packet is not None and any(row['collected'] is True for row in packet['api_readiness'])
+    record['target_io_attempted'] = True if record['requests'] or api_collected else None if observation['sample_attempted'] else False
     record['target_io_origin'] = 'EXAMPLE'
     if packet is not None:
         record['started_at'], record['finished_at'] = packet['started_at'], packet['finished_at']
@@ -540,7 +542,7 @@ def run(*, store, plan_id, pack, target, prepared, manifest, output, entered_by,
         for c in entry['challenges']: c['attempted'] = False
         entry['observation_notes'][0]['answer'] = '출처=' + record['data_origin'] + '; metadata행=' + str(len(record['rows'])) + '; 메서드짝=' + str(len(record['method_pairs'])) + ('; 선정 bootstrap SEND 관측 상태는 첨부에 보존; 상위 READY 전송·수신·서비스 접수·canary와 지연·복구 receipt 미확인. gaps=' if collect_native else '; 실제 READY/지연/접수/복구 receipt 미수집. gaps=') + str(record['gaps'])
         if collect_http:
-            entry['observation_notes'][0]['answer'] = '출처=' + record['data_origin'] + '; 선정 HTTP 시도=' + str(record['requests']) + '; 결과·누락·정리는 첨부 보존. native 인과·상위 READY·준비 전 접수·준비 후 canary·지연/복구 미확인.'
+            entry['observation_notes'][0]['answer'] = '출처=' + record['data_origin'] + '; 선정 HTTP 시도=' + ('미수집' if record['requests'] is None else str(record['requests'])) + '; 결과·누락·정리는 첨부 보존. native 인과·상위 READY·준비 전 접수·준비 후 canary·지연/복구 미확인.'
         if attachment is None: entry['observation_notes'][0]['answer'] += '\nLIF07_SAFE_FACTS=' + canonical_json(record).decode('utf-8')
         form = out / 'manual-evidence.yaml'
         try:

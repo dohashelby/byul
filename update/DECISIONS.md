@@ -699,3 +699,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - B의 http_observation_invoked는 collect_http 호출 선택이며 target HTTP 실행 증거가 아니다. 실제 거부는 저장된 http_observation.gaps와 sample_attempted=false, target_io_attempted=false, requests0로 검증한다. A1 시험의 신규 fixture/메타데이터 기대 오류는 원 결과를 보존하고 제품/gate 수정 없이 선정 영향만 보수·재검증했다. 최신 전체suite 통과로 재집계하지 않는다.
 
 - native19 전용 소비는 공통 startup 성공 뒤 별도 경계로 한정한다. public parser와 A2의 원8파일 pins를 유지하고 CPU fixture의 library_identity 대역을 EXAMPLE로 명시한다. startup 종료와 untruncated 마지막mapping을 selected forward와 비교하며 부분/후속오류로 앞선 사실·독립FAIL을 지우지 않는다. B 원 소유 승인쌍은 바꾸지 않고 A 공통389파일 새 pin 검토를 분리한다.
+
+- native19 양성 fixture는 원 A2와 같은 EXAMPLE library 대역 시점을 따른다. immutable observer code 검사 전 대역을 적용한 원실패를 보존하고 준비순서만 보수했다. source gate/parser/production library gate/원 assert는 유지한다. startup 호출 종료·root/link와 잘리지 않은 mapping 마지막 경계를 forward 이전에 대조하며 실제 worker/READY로 승격하지 않는다.

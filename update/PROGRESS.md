@@ -1665,3 +1665,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - OBS02/native18 A2 PR162 연결의 source6077141 영향 검증 마감: 원 v1 양OS78통과4실패9준비오류→시험 보수 v2 양26통과3실패(native18제품25통과)→B 저장관측 보수 v3 양4통과를 각 소스대로 보존한다. 인접W258/기존skip1·제외1/L259·제외1, wheel280·양설치CLI4/정확24Ref, 소스13사례/각78Ref 원반출물이다. 공통3e105b7/388파일이며 B 원승인쌍은 미소비 새A를 닫힌 상태로 거부한다. 실제worker/GPU/승인/tensor/전체분기와 CI5는 미완료다.
 
 - A-1 OBS02/native19: A2 PR163 715755e의 전용3파일 원bytes를 기존 identity 실행기0.4.0에 연결한다. 동일 startup/model/loader/root/process와 startup 종료·잘린 마지막mapping·root 마지막seq를 forward 이전에 결합하며 첨부 원자성과 공통/전용 소비 오류 격리를 추가했다. 고정 검증 대기이며 EXAMPLE library 대역을 명시한다. 실제 worker/READY/승인/최종tensor·GPU·SUP05/06 전체 완료로 집계하지 않는다.
+
+- OBS02/native19 A2 PR163 연결 검증: 원source9b795c4 양78통과9실패를 보존하고, fixture 준비순서만 보수한3fd89be의 선정28개 양OS통과. 인접W138/기존skip1·L139, guard281 설치일치·양설치CLI4/각24Ref와 소스CLI13/각78Ref 원반출물 확보. common d2ef4b9/389파일, B 원승인쌍 미승인 거부/HTTP0 유지. 실제worker/승인/최종tensor/전체분기와 정확HEAD CI5는 미완료다.

@@ -67,3 +67,9 @@ python3.12 -I -S -B update/tests/linux_cpu/lif13_peer_probe.py \
 정리는 `owned_sockets_closed`, `owned_peer_reaped`, `owned_streams_closed`, fixture 폴더 생성·제거, socket 경로 제거, 강제 종료 여부와 오류로 나누어 보존한다. 8-byte fixture frame은 수신 상한을 검사하기 위한 별도 입력이다. 원 vLLM `recv_msg`·pickle·get_state·release, 실제 CUDA IPC·가중치 참조·모델 복구는 이 명령에서 미수집이며 기존 세 결과와 전체 LIF13은 UNKNOWN을 유지한다.
 
 현재 실제 Linux 실측은 대기다. 기존 WSL에서 위 한 명령을 실행한 `proof.json`·종료 코드와 원 argv를 인계받아 해당 플랫폼 결과를 확인한다. 본문의 `/tmp` 준비 명령은 Linux용이다. macOS guard 입력·출력은 `/private/tmp` 같은 symlink 없는 실제 소유 경로를 사용한다. macOS에서는 Linux 경로를 우회하지 않고 `UNSUPPORTED`와 종료 코드 2를 남기는 범위 및 syntax 확인만 사용한다. 이 경우 native import·peer·AF_UNIX·GPU 실행을 성공으로 집계하지 않는다. 도구가 소유한 자식·socket·stream·임시 폴더를 finally에서 정리하며, 결과와 고정 입력은 검토용으로 보존한다. daemon 복구·다른 프로세스 종료·GPU reset·새 AWS 자원은 수행하지 않는다.
+
+### 기존 Linux 실행 결과 수신 상태
+
+A156 고정 head `3feae2234a4516e024882fd2206c062d52e1e287`는 원 probe SHA `789b08ff1acc549e478558fa8317eac074905e675d4cce87deede99f5d528e2d`와 원 native SHA `8548dc812acdc421e313c5532d6cd4d6bd214c19d51b79adc96ffb7b7804c4da`의 기존 Linux/amd64·Python3.12 실행에서 kernel3단계·source 전후 일치·소유 자원 정리 통과를 보고했다. B는 이 실행을 반복하지 않는다. 원 `result/proof.json`·명령/인터프리터·stdout/stderr·전후 SHA·cleanup 기록은 [A156 인계 요청](https://github.com/dohashelby/byul/pull/156#issuecomment-6537473675)으로 수신 대기 중이며, B의 원자료 확인과 A의 통과 보고를 구분한다.
+
+해당 실행의 kernel 관측과 EXAMPLE frame은 원 daemon/RPC/release·vLLM recv_msg·weights/GPU 결과와 별도다. 원 LIF13 필수 세부 결과·정책·세 축 UNKNOWN을 유지한다. Windows 권한/열린 FD 차이의 실패는 원 기록으로 보존하고 현재 Linux 대상 결과를 대신하는 Mac 우회나 새 skip을 추가하지 않는다.

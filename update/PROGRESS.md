@@ -1,3 +1,10 @@
+## 2026-10-28 — A-1 현재 소스 결합 관측의 정적 이월 보수
+
+- 한 일: 현재 main4da12c0·PACK31에서 PLT-04의 현행 source-bound credential 프로파일을 고정 명령/정책만으로 이월하던 경계를 기존 None/PROCEDURE_OR_FIXTURE_UNCONFIRMED 재선정으로 보수한다. 합성 DECLARED 이전 PASS를 실제 Store·팩·rule_table·선정에 넣은 재현으로 run/container 변경에도 이월됨을 확인했으며 실제 엔진 PASS로 표시하지 않는다. 다른 실행기의 고정 이월과 두 실행 비교 조건·과거 Ref/판정 의미는 유지한다.
+- 테스트 결과: 1047파일 고정 후 직접/인접440통과·실패0·기존skip1·제외1(pytest61.46초·부모62.398초), 설치 wheel150파일 일치(부모15.780초)를 확인했다. 검증 중 source bytes 불변이며 runtime 변화는 reuse._http_fixture의 현행 source-bound credential 분기뿐이다. 기존 다른 이월·두 실행 비교·EVD/RES/RPT 반출/복원·정확 Ref 재판정·독립 FAIL·첨부 실패·불변식을 확인했다. 이후 결과 문서만 반영하고 정확 head CI를 확인한다. 실제 엔진/GPU/AWS 사용은0이다.
+- 다음 단계: 직접·인접 이월/재생·첨부 보수·불변식 검증 → 실패 수정·재검증 → wheel·커밋·푸시·초안 PR·정확 head CI → A-2의 기존 preview 훅 소비 인계.
+- 막힌 것: 이번 공통 이월 보수에는 없음. A-2의 새 permission/구 credential live 결합은 별도 작업이며 기업 Gateway·호출자 허용표는 준비 전이다. 전체 PLT-04·신규 자동 판정/점검 완료·실제 대상 실증 증가는0이다.
+
 # PROGRESS
 
 ## 2026-10-28 — A-1 REQ-11 모호한 JSON 응답 보수

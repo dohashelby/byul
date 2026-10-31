@@ -86,6 +86,24 @@ def test_executor_plugin_can_supply_pure_inputs_without_core_name_branch(monkeyp
     assert preview.fixture_sha256 == sha256_hex(canonical_json({"case": "fixed"}))
 
 
+def test_executor_hook_can_withhold_dynamic_source_without_http_fallback(tmp_path, monkeypatch):
+    from guard.executors.container_config import ContainerConfigExecutor
+
+    class SourceBoundExecutor(ContainerConfigExecutor):
+        def preview_reuse_inputs(self, check, env, values, adapter):
+            return None
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("a dynamic-source hook must not collect or fall back to static HTTP fixture")
+
+    monkeypatch.setattr(SourceBoundExecutor, "collect", forbidden)
+    monkeypatch.setattr(SourceBoundExecutor, "_docker_obj", forbidden)
+    monkeypatch.setitem(registry.EXECUTORS, "container_config:source-bound", lambda cfg: SourceBoundExecutor(cfg["container_config"]))
+    cfg = _cfg(tmp_path, "container_config")
+    cfg["executors"]["container_config"] = "source-bound"
+    assert preview_inputs(baseline_pack().checks["PLT-01"], environment(), {}, cfg) is None
+
+
 def test_fixed_routes_can_be_prepared_without_observed_registrations(tmp_path, monkeypatch):
     from guard.executors.direct_route import DirectRouteExecutor
 

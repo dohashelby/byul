@@ -36,7 +36,7 @@ bootstrap에서 이미 fixture가 import되면 target attribution을 UNKNOWN으�
 uv pip install --python "$CPU_VENV/bin/python" --no-deps "$BYUL_B1_REPO/update/tests/fixtures/b_plugin_probe"
 export VLLM_TARGET_DEVICE=cpu VLLM_LOGGING_LEVEL=CRITICAL CUDA_VISIBLE_DEVICES= VLLM_PLUGINS=
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
-export PYTHONPATH="$VLLM_SOURCE:$BYUL_B1_REPO/update/src"
+export PYTHONPATH="$BYUL_B1_REPO/update/src:$BYUL_B1_REPO/update:$VLLM_SOURCE"
 "$CPU_VENV/bin/python" "$BYUL_B1_REPO/update/tools/b1_plugin_cpu.py" --source-root "$VLLM_SOURCE" --workdir "$FRESH_PLUGIN_EVIDENCE"
 ```
 
@@ -203,3 +203,18 @@ asgi_control_status도 다음 네 건을 기록한다. 따라서 최신 실측 �
 in-memory ASGI 요청이며 외부 HTTP나 네트워크 listener를 기동하지 않았다. 원래 corpus
 재사용이므로 새 10개 시험 개발로 계상하지 않는다. endpoint route 충돌·OpenAPI 교체를
 추가 시험한 결과도 아니다.
+
+정식 로컬 EVD→RES→RPT 재실행은 `update`에서 아래와 같이 호출한다.
+CPU_VENV는 검토된 의존성과 고정 fixture가 설치된 환경, VLLM_SOURCE는 깨끗한
+db9527a source, FRESH_PLUGIN_REPORT는 존재하지 않는 새 출력 경로다.
+
+```sh
+VLLM_TARGET_DEVICE=cpu VLLM_LOGGING_LEVEL=CRITICAL CUDA_VISIBLE_DEVICES= \
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONPATH="$PWD/src:$PWD:$VLLM_SOURCE" \
+"$CPU_VENV/bin/python" -m tools.b1_plugin_integration_cpu \
+  --source-profile target031 --source-root "$VLLM_SOURCE" \
+  --output-root "$FRESH_PLUGIN_REPORT"
+```
+
+제품 소스 hash와 실행 로직은 바꾸지 않고, 자기 checkout의 tools 패키지가
+참조 source의 동명 패키지보다 먼저 해석되도록 기존 CLI 예제의 PYTHONPATH를 맞췄다.

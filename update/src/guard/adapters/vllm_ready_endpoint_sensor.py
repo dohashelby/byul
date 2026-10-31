@@ -10,11 +10,11 @@ PROFILE='vllm-native-lifecycle-metadata/22';SCHEMA='guard-native-lifecycle-event
 COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 EVENT_SCHEMA='guard-native-ready-endpoint/1';GAP_SCHEMA='guard-native-ready-endpoint-gap/1'
 CLOSE_SCHEMA='guard-native-ready-endpoint-close/1'
-GENERATION21_SHA256='5ebdbd58401bcd47ee5fd4159e82b78f13ae47773eaefd4c02ba6f2ac182a8d1'
-CONTRACT_SHA256='e99df63bf7ed6c72f72421a8017dad9a87d39a6c5d4254c167ac0c64df68c745'
+GENERATION21_SHA256='186ee38bcc29da4ffa4cc88c6b386f60f67d343cbc58613cf925213611ab18d2'
+CONTRACT_SHA256='ddae1078d9807910c9f79a815f2abeab6b1c340e8122eb4c3bca9a7b71ef3d7d'
 MAX_BYTES=2097152;MAX_ROWS=2048;MAX_CALLS=256
 CODE_FILENAME='guard/adapters/vllm_ready_endpoint_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': '41e3588a4580773827a05056d0136c1e8817dfd4fd33c80b63e009d2796fbfac', 'cpython-3.12.3': '21b6c5e7e4c7716aa06ae7a919b2bdc60b18d92b47104eddbf07329f2792602f'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': 'fc03a9b4650914f6d36cfff3d1ceb42e83d492e4398d70c26481bb99718659e5', 'cpython-3.12.14': 'fc03a9b4650914f6d36cfff3d1ceb42e83d492e4398d70c26481bb99718659e5', 'cpython-3.12.3': '3b9be5384b7936011557d943b2783d32b86e29e52aeeebac025d99fc9cc1146c'}
 TRUTH=('producer_authenticated','actual_worker_verified','cross_process_lineage_verified','tensor_storage_applied_verified',
        'gpu_completion_verified','all_model_ready_verified','ready_delivery_verified','service_gate_verified','scope_complete')
 GAPS=frozenset({'unsupported-platform','endpoint-delegate-unqualified','endpoint-domain-unavailable','endpoint-unavailable',
@@ -304,9 +304,9 @@ def code_contract(base,contract):
 
 def configure(base,generation,contract):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None
+    if ((sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None
             or code_contract(base,contract)!=expected or base.PROFILE!='vllm-native-lifecycle-metadata/21'
-            or base.SCHEMA!='guard-native-lifecycle-events/21'):
+            or base.SCHEMA!='guard-native-lifecycle-events/21') or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0))):
         raise ValueError('READY_ENDPOINT_CODE_UNAVAILABLE')
     artifact(generation.__file__,GENERATION21_SHA256);artifact(contract.__file__,CONTRACT_SHA256)
     base.SOURCE_SHA={**base.SOURCE_SHA,**contract.SOURCE_SHA256};base.PROFILE,base.SCHEMA=PROFILE,SCHEMA

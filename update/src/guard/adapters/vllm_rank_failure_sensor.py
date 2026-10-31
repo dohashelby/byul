@@ -26,7 +26,7 @@ MAX_ROWS=2048
 MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_rank_failure_sensor.py'
 # Own completed source must be reviewed offline before any installation/freeze.
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'31c2a7bf9d0b72322e731905a7d373d595957c638245ecef2b16dd70cc109ad3','cpython-3.12.3':'76c5d6932a22838fbcd8c49a39f98e6170b1b7591b2f2b11d860f996874de972'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '31c2a7bf9d0b72322e731905a7d373d595957c638245ecef2b16dd70cc109ad3', 'cpython-3.12.14':'31c2a7bf9d0b72322e731905a7d373d595957c638245ecef2b16dd70cc109ad3','cpython-3.12.3':'76c5d6932a22838fbcd8c49a39f98e6170b1b7591b2f2b11d860f996874de972'}
 _BASE=None
 _CALL=contextvars.ContextVar('guard_rank_failure_call',default=None)
 
@@ -242,7 +242,7 @@ def code_contract(base):
 
 def configure(base):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected:
+    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected) or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0)):
         raise ValueError('RANK_FAILURE_OBSERVER_CODE_UNAVAILABLE')
     base.PROFILE,base.SCHEMA=PROFILE,SCHEMA;base.__file__=__file__;base.MAX_ROWS,base.MAX_BYTES=MAX_ROWS,MAX_BYTES
     base.SOURCE_SHA={**base.SOURCE_SHA,**SOURCE_ADDITIONS}

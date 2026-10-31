@@ -174,7 +174,7 @@ def test_source_code_substitution_is_rejected_before_module_mutation():
 def test_profile_requires_exact_base8_and_reviewed_compiler_contract():
     assert hashlib.sha256(Path(base8.__file__).read_bytes()).hexdigest()==sensor.BASE8_SHA256
     assert sensor.code_contract(base8) in set(sensor.RUNTIME_CODE_CONTRACTS.values())
-    assert set(sensor.RUNTIME_POINT_CODES)=={'cpython-3.12.14','cpython-3.12.3'}
+    assert set(sensor.RUNTIME_POINT_CODES)=={'cpython-3.12.14','cpython-3.12.3','cpython-3.12.15'}
     assert all(set(value)==sensor.POINTS for value in sensor.RUNTIME_POINT_CODES.values())
 
 

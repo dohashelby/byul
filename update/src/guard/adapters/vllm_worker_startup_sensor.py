@@ -14,15 +14,15 @@ CLOSE_SCHEMA='guard-native-worker-startup-close/1'
 LIMIT_SCHEMA='guard-native-worker-startup-limit/1'
 COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 BASE8_SHA256='2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd'
-ITERATION16_SHA256='e7494edaa0a512201652228acc73ac13621cb40d938e6f23b6d4eaba73d05bc6'
-SCOPE17_SHA256='7729661d6611e40f527760b3029822bb9cb690f8a48931aa9e9c9fb00cab08e5'
-MAPPING18_SHA256='8984896304147ac6c47b3a3f84a56b2831df0f302e52fd95d8f9ccf7d103f92d'
+ITERATION16_SHA256='6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648'
+SCOPE17_SHA256='e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d'
+MAPPING18_SHA256='dd9e75f2752e042b43527ddd9cf13cc06a3c82fd4c5ba73cfe7114df7dcafaf1'
 CONTRACT_SHA256='6788df2f4c6f04f46e681eb5eab48631e2ba037754d26166bb02341e4b592950'
 CALLBACK_SHA256='a583d32f31d74def618256557ee9e7aee801d5fe1ff55e27b6221d7f2420a965'
 SUPPORT_SHA256='659d615f133cdc96ef54163678753a60e6b8ee51aa0e78e0560e0d308f7f50da'
 MAX_ROWS=2048;MAX_BYTES=2*1024**2;MAX_CALLS=256
 CODE_FILENAME='guard/adapters/vllm_worker_startup_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': '2ed8e7c4527e9446782ed8bf5e795f474ce10f932e469013aab9e0cc10b23139', 'cpython-3.12.3': 'cfc2c11176e641d9e70d869e70422f12eb5a7d85c365ae69600a8a9da336b4a6'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': 'e572bde10b082c4d117f12857045224766996d76c589f3925501dbfc971dc9b4', 'cpython-3.12.14': 'e572bde10b082c4d117f12857045224766996d76c589f3925501dbfc971dc9b4', 'cpython-3.12.3': '1201dd1198e60884e32ac494380f5693f83a15666d7ddd8653870aacc8ad067b'}
 TRUTH=('actual_worker_observed','producer_authenticated','approved_model_file_verified','tensor_storage_applied_verified','gpu_completion_verified','all_model_ready_verified','ready_send_verified','service_gate_verified','scope_complete')
 _ACTIVE=contextvars.ContextVar('guard_worker_startup_call',default=None)
 _BASE=None
@@ -166,8 +166,8 @@ def code_contract(base,contract):
 
 def configure(base,iteration,scope,mapping,contract,callback,support,*,scope_path='/guard-lifecycle/model-read-scope.json'):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base,contract)!=expected
-            or (runtime,os.name) not in {('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}):raise ValueError('WORKER_STARTUP_OBSERVER_CODE_UNAVAILABLE')
+    if ((sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base,contract)!=expected
+            or (runtime,os.name) not in {('cpython-3.12.15','posix'),('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}) or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0))):raise ValueError('WORKER_STARTUP_OBSERVER_CODE_UNAVAILABLE')
     for module,digest in ((mapping,MAPPING18_SHA256),(contract,CONTRACT_SHA256),(callback,CALLBACK_SHA256),(support,SUPPORT_SHA256)):
         contract.artifact(module.__file__,digest)
     mapping.configure(base,iteration,scope,scope_path=scope_path)

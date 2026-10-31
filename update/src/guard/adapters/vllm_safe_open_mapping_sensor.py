@@ -11,8 +11,8 @@ SCHEMA='guard-native-lifecycle-events/18'
 EVENT_SCHEMA='guard-native-safe-open-mapping/1'
 COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 BASE8_SHA256='2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd'
-ITERATION16_SHA256='e7494edaa0a512201652228acc73ac13621cb40d938e6f23b6d4eaba73d05bc6'
-SCOPE17_SHA256='7729661d6611e40f527760b3029822bb9cb690f8a48931aa9e9c9fb00cab08e5'
+ITERATION16_SHA256='6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648'
+SCOPE17_SHA256='e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d'
 WEIGHTS='vllm.model_executor.model_loader.weight_utils'
 POINT='weight_utils.safetensors_weights_iterator'
 PHASES=frozenset({'OPEN_RETURN','OPEN_RAISE','ENTER_RETURN','ENTER_RAISE','TENSOR_RETURN','TENSOR_RAISE','EXIT_RETURN','EXIT_RAISE','LIBRARY_UNAVAILABLE'})
@@ -21,7 +21,7 @@ LIBRARY_FILES={'__init__.py':'92c988289b8c225a92f25e487ad5d7a1eb7e326eec0fedfc6b
  '_safetensors_rust.abi3.so':'e6f17a9e9846bc2bc4ad94cc5431746b59785de3d2681ef2666e8890ae192dfb'}
 MAX_ROWS=2048;MAX_BYTES=2*1024**2;MAX_MAP_BYTES=2*1024**2;MAX_MAP_ROWS=16384;MAX_MATCHES=32;MAX_REGIONS=256;MAX_CONTEXTS=256
 CODE_FILENAME='guard/adapters/vllm_safe_open_mapping_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'10f2126f05c92bc289b80fc3159e7a1a958de56404a140031fd9e7b34604ca05','cpython-3.12.3':'0cb277ef789ccb6431408d06223472c9a7846342955496840ef606c2cd63eb7c'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '0cbc2284c14f344373a29bfd8b377c8b1ae521ffae8dba649399d9c61b7f00f2', 'cpython-3.12.14':'0cbc2284c14f344373a29bfd8b377c8b1ae521ffae8dba649399d9c61b7f00f2','cpython-3.12.3':'58aa89782629b8a3d2b51a27aeac321c5da9c7f7977fe12672fc3e8f4fabce28'}
 TRUTH=('worker_assignment_verified','approved_model_file_verified','producer_authenticated','tensor_storage_applied_verified',
  'model_bytes_read_verified','native_loaded_memory_verified','mapping_release_verified','scope_complete')
 _BASE=None
@@ -205,8 +205,8 @@ def code_contract(base):
 
 def configure(base,iteration,scope,*,scope_path='/guard-lifecycle/model-read-scope.json'):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected
-            or (runtime,os.name) not in {('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}):raise ValueError('SAFE_OPEN_MAPPING_OBSERVER_CODE_UNAVAILABLE')
+    if ((sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected
+            or (runtime,os.name) not in {('cpython-3.12.15','posix'),('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}) or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0))):raise ValueError('SAFE_OPEN_MAPPING_OBSERVER_CODE_UNAVAILABLE')
     iteration.configure(base);base.PROFILE,base.SCHEMA=PROFILE,SCHEMA;base.__file__=__file__;base.MAX_ROWS,base.MAX_BYTES=MAX_ROWS,MAX_BYTES
     class MappingObserver(MappingObservation,base.Observer):
         def __init__(self,*args,**kwargs):

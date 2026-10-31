@@ -24,12 +24,12 @@ COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 MODULE='vllm.v1.engine.output_processor'
 SOURCE_SHA256='c72d0149e18d6da71d53e23b6550d09310af6917523fef6e282b0907d36b8d54'
 BASE8_SHA256='2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd'
-INVOCATION10_SHA256='071763bfd2553ea20986c0b9a946d4017d167ea4d6cc06f25363bc6cf4abbca3'
+INVOCATION10_SHA256='f2dd190ed06a60f6e42f104851722f4295a060dace32ae55686284f39ac3f375'
 MAX_IDENTITIES=4096
 MAX_OUTPUTS=8
 TEXT_HASH_LIMIT=65536
 # Filled from completed, fixed own-source offline code review before admission.
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'4a9b7ce7ec7b106061d6579caaf7f11e8df8ced600f24f17001d4e692868f610','cpython-3.12.3':'e1876cc5a37e78b95a533bef0f5cc197170505f7242ced14311df49f27b0f15a'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '4a9b7ce7ec7b106061d6579caaf7f11e8df8ced600f24f17001d4e692868f610', 'cpython-3.12.14':'4a9b7ce7ec7b106061d6579caaf7f11e8df8ced600f24f17001d4e692868f610','cpython-3.12.3':'e1876cc5a37e78b95a533bef0f5cc197170505f7242ced14311df49f27b0f15a'}
 CODE_FILENAME='guard/adapters/vllm_request_output_sensor.py'
 MAX_ROWS=2048
 MAX_BYTES=2*1024**2
@@ -187,7 +187,7 @@ def code_contract(base):
 
 def configure(base,invocation):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None:raise ValueError('OUTPUT_RUNTIME_UNAVAILABLE')
+    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None) or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0)):raise ValueError('OUTPUT_RUNTIME_UNAVAILABLE')
     if code_contract(base)!=expected:raise ValueError('OUTPUT_CODE_UNAVAILABLE')
     invocation.configure(base)
     base.PROFILE,base.SCHEMA=PROFILE,SCHEMA;base.__file__=__file__

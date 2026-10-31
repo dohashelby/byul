@@ -15,7 +15,7 @@ POINTS=frozenset(c+'.'+m for c,methods in TARGETS.items() for m in methods)
 MAX_ROWS=2048
 MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_initialization_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'986d4162ad54ff844f8ba71daf144548cbd94ed30b658c57518ca8fccf4e57da','cpython-3.12.3':'24cddf109ec01d401855a8b6076e753829d94b3869652388d05c85f11c0808d4'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '986d4162ad54ff844f8ba71daf144548cbd94ed30b658c57518ca8fccf4e57da', 'cpython-3.12.14':'986d4162ad54ff844f8ba71daf144548cbd94ed30b658c57518ca8fccf4e57da','cpython-3.12.3':'24cddf109ec01d401855a8b6076e753829d94b3869652388d05c85f11c0808d4'}
 _BASE=None
 _CALL=contextvars.ContextVar('guard_initialization_call',default=None)
 
@@ -145,7 +145,7 @@ def code_contract(base):
 
 def configure(base):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected:
+    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected) or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0)):
         raise ValueError('INITIALIZATION_OBSERVER_CODE_UNAVAILABLE')
     base.PROFILE,base.SCHEMA=PROFILE,SCHEMA;base.__file__=__file__;base.MAX_ROWS,base.MAX_BYTES=MAX_ROWS,MAX_BYTES
     base.SOURCE_SHA={**base.SOURCE_SHA,**SOURCE_ADDITIONS}

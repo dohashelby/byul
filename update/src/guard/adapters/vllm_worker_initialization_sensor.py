@@ -9,12 +9,12 @@ import hashlib, os, stat, sys, types
 PROFILE = 'vllm-native-lifecycle-metadata/20'
 SCHEMA = 'guard-native-lifecycle-events/20'
 COMMIT = 'db9527a46873454610df6dbedf79a36d6bf1a7f6'
-STARTUP19_SHA256 = '96544214cb02a84517b6329149ef0897150b98cfbedee60c8baa2189a07f94a1'
-INITIALIZATION14_SHA256 = 'f0c392ac9024fb3bb7a1cbdd65bb8c3f4ab23bcfa61065af06d4f91542d09ce5'
+STARTUP19_SHA256 = '2fb8b6386bc59e236c9227251da05f8e8704e08a935dcff27a8c18bc57ed91f4'
+INITIALIZATION14_SHA256 = 'eefd1a435ae07e703c0fbb02ad7b54b7e7b44f33b67716d44eb55af93a504fa9'
 MAX_BYTES = 2*1024**2
 MAX_ROWS = 2048
 CODE_FILENAME = 'guard/adapters/vllm_worker_initialization_sensor.py'
-RUNTIME_CODE_CONTRACTS = {'cpython-3.12.14':'408b2a00bf2cc124e612ed865b1de8ca84889cd9c4e1e8194b5a9d8683312ea1','cpython-3.12.3':'575420ab0646cec6d3cef30960771e43c4230ca910fcad55508557283cdf68b1'}
+RUNTIME_CODE_CONTRACTS = {'cpython-3.12.15': '31f3f980d30eee8b742a01324627f8f46697d8c1874b8d30f59437c0c62cbdc7', 'cpython-3.12.14':'31f3f980d30eee8b742a01324627f8f46697d8c1874b8d30f59437c0c62cbdc7','cpython-3.12.3':'ffd60e9b03352d84cf223b3b1aeb6da1ce77239ca641d4ba84e06058cca67779'}
 _BASE = None
 
 
@@ -52,10 +52,10 @@ def code_contract(base):
 def configure(base, initialization, startup):
     runtime = 'cpython-'+'.'.join(map(str,sys.version_info[:3]))
     expected = RUNTIME_CODE_CONTRACTS.get(runtime)
-    if (sys.implementation.name != 'cpython' or sys.flags.optimize != 0 or expected is None
+    if ((sys.implementation.name != 'cpython' or sys.flags.optimize != 0 or expected is None
             or code_contract(base) != expected
-            or (runtime,os.name) not in {('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}
-            or base.PROFILE != 'vllm-native-lifecycle-metadata/19' or base.SCHEMA != 'guard-native-lifecycle-events/19'):
+            or (runtime,os.name) not in {('cpython-3.12.15','posix'),('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}
+            or base.PROFILE != 'vllm-native-lifecycle-metadata/19' or base.SCHEMA != 'guard-native-lifecycle-events/19') or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0))):
         raise ValueError('WORKER_INITIALIZATION_CODE_UNAVAILABLE')
     artifact(startup.__file__, STARTUP19_SHA256)
     artifact(initialization.__file__, INITIALIZATION14_SHA256)

@@ -26,7 +26,7 @@ MAX_ROWS=2048
 MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_stream_buffer_sensor.py'
 # Added only after the completed own-source offline code review, before freeze.
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'9ce758b73185aedbab0f9d46ea379f12af3f189d3e9fc9460cab57bc9ef12c50','cpython-3.12.3':'8cef15ad93903b20197b5f5bbec66504b9017b438a4e50082b9c104832eb5a4e'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '9ce758b73185aedbab0f9d46ea379f12af3f189d3e9fc9460cab57bc9ef12c50', 'cpython-3.12.14':'9ce758b73185aedbab0f9d46ea379f12af3f189d3e9fc9460cab57bc9ef12c50','cpython-3.12.3':'8cef15ad93903b20197b5f5bbec66504b9017b438a4e50082b9c104832eb5a4e'}
 _BASE=None
 _SEND=contextvars.ContextVar('guard_stream_buffer_send',default=None)
 
@@ -222,7 +222,7 @@ def code_contract(base):
 
 def configure(base):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected:raise ValueError('STREAM_BUFFER_OBSERVER_CODE_UNAVAILABLE')
+    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected) or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0)):raise ValueError('STREAM_BUFFER_OBSERVER_CODE_UNAVAILABLE')
     base.PROFILE,base.SCHEMA=PROFILE,SCHEMA;base.__file__=__file__;base.MAX_ROWS,base.MAX_BYTES=MAX_ROWS,MAX_BYTES
     base.SOURCE_SHA={**base.SOURCE_SHA,**SOURCE_ADDITIONS}
     class StreamObserver(StreamObservation,base.Observer):

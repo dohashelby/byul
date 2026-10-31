@@ -13,7 +13,7 @@ EVENT_SCHEMA='guard-native-file-read/1'
 SCOPE_SCHEMA='guard-native-model-read-scope/1'
 COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 BASE8_SHA256='2a05816b0fc2b83141409ae929187437e5afddfe1dbf5c6d099859fc57bb4ddd'
-ITERATION16_SHA256='e7494edaa0a512201652228acc73ac13621cb40d938e6f23b6d4eaba73d05bc6'
+ITERATION16_SHA256='6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648'
 WEIGHTS='vllm.model_executor.model_loader.weight_utils'
 SOURCE_ADDITIONS={WEIGHTS:'7d2573931b9684147b17018c1f6de318eea1c105556ffea03154201a72418afd'}
 POINT='weight_utils.safetensors_weights_iterator'
@@ -24,7 +24,7 @@ MAX_SCOPE_BYTES=262144
 MAX_HASH_BYTES=2**31
 CODE_FILENAME='guard/adapters/vllm_file_read_sensor.py'
 SCOPE_PATH='/guard-lifecycle/model-read-scope.json'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': 'd9dd0c102ee3b8c5a7ff96923bfafb8817910223a43878fe5e1e3b2c742ad8c8', 'cpython-3.12.3': 'ef55a0b253c4fcb7b6fa331d64d53a7d0e615de8f93647bd44ca9ae23ccd1fa3'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': 'b5bced97c15c7efc267d175fd39e3a9b6dfb8cbe87459bacf2f8c89214f663e2', 'cpython-3.12.14': 'b5bced97c15c7efc267d175fd39e3a9b6dfb8cbe87459bacf2f8c89214f663e2', 'cpython-3.12.3': 'b2c28706d6c5ca0a8dc3dac0f0e46514c1235b53e20f6e62b4de1c61783e0b56'}
 _BASE=None
 
 
@@ -186,8 +186,8 @@ def code_contract(base):
 
 def configure(base,iteration,*,scope_path=SCOPE_PATH):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected
-            or (runtime,os.name) not in {('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}):raise ValueError('FILE_READ_OBSERVER_CODE_UNAVAILABLE')
+    if ((sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected
+            or (runtime,os.name) not in {('cpython-3.12.15','posix'),('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}) or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0))):raise ValueError('FILE_READ_OBSERVER_CODE_UNAVAILABLE')
     iteration.configure(base);base.PROFILE,base.SCHEMA=PROFILE,SCHEMA;base.__file__=__file__;base.MAX_ROWS,base.MAX_BYTES=MAX_ROWS,MAX_BYTES
     class FileObserver(FileObservation,base.Observer):
         def __init__(self,*args,**kwargs):

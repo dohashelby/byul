@@ -26,7 +26,7 @@ POINTS=frozenset(POINT_SOURCES)
 MAX_ROWS=2048
 MAX_BYTES=2*1024**2
 CODE_FILENAME='guard/adapters/vllm_profiler_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'d8c771878b4ed643fed2f773292906f8ef3d2eb4fd029e6df707625ac9e7342b','cpython-3.12.3':'e6610f2a9ad34582058a182261d6acf9219e2124d27d643233c12b0c0a694e6c'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628', 'cpython-3.12.14':'40ce580a64fec147cc1fa5ecc33d8eafae24d61a0753d3b06aa7d61d58701628','cpython-3.12.3':'423b896038c2ab86cf4b718d4be0ff71c6f22ce7102e7d58c97ccb68589308de'}
 _BASE=None
 _CALL=contextvars.ContextVar('guard_profiler_call',default=None)
 
@@ -181,7 +181,7 @@ def code_contract(base):
 
 def configure(base):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected:raise ValueError('PROFILER_OBSERVER_CODE_UNAVAILABLE')
+    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base)!=expected) or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0)):raise ValueError('PROFILER_OBSERVER_CODE_UNAVAILABLE')
     base.PROFILE,base.SCHEMA=PROFILE,SCHEMA;base.__file__=__file__;base.MAX_ROWS,base.MAX_BYTES=MAX_ROWS,MAX_BYTES
     if any(key in base.SOURCE_SHA and base.SOURCE_SHA[key]!=value for key,value in SOURCE_ADDITIONS.items()):raise ValueError('PROFILER_SOURCE_CONFLICT')
     base.SOURCE_SHA={**base.SOURCE_SHA,**SOURCE_ADDITIONS}

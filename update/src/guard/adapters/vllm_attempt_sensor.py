@@ -20,7 +20,7 @@ BODY_HASH_LIMIT=65536
 CODE_FILENAME="guard/adapters/vllm_attempt_sensor.py"
 # Offline source/code review fills these literals before profile admission.
 # A target's observed code hash is never an approval value.
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14':'b6ba96a8055d77fd6e848e7aaebe63770568c038a0252a6f3e3b2d367ea0f20f','cpython-3.12.3':'63377a277dbaf2452c6f3fa14ef93c4816c5528c021d40694cb5d36453040b56'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': 'b6ba96a8055d77fd6e848e7aaebe63770568c038a0252a6f3e3b2d367ea0f20f', 'cpython-3.12.14':'b6ba96a8055d77fd6e848e7aaebe63770568c038a0252a6f3e3b2d367ea0f20f','cpython-3.12.3':'63377a277dbaf2452c6f3fa14ef93c4816c5528c021d40694cb5d36453040b56'}
 _BASE=None
 
 
@@ -47,7 +47,7 @@ def configure(base):
     """Configure only a private exact-byte /8 module; installed /8 and /9 stay unchanged."""
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]))
     expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None:raise ValueError('ATTEMPT_RUNTIME_UNAVAILABLE')
+    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None) or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0)):raise ValueError('ATTEMPT_RUNTIME_UNAVAILABLE')
     base.PROFILE,base.SCHEMA=PROFILE,SCHEMA
     base.MAX_ROWS,base.MAX_BYTES=MAX_ROWS,MAX_BYTES
     base.__file__=__file__

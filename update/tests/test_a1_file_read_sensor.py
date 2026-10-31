@@ -164,6 +164,7 @@ def test_observer_code_and_instrumented_source_gates_remain_closed(tmp_path,monk
     private=types.ModuleType('base');exec(compile(Path(base8.__file__).read_bytes(),base8.__file__,'exec'),private.__dict__)
     monkeypatch.setitem(sensor.RUNTIME_CODE_CONTRACTS,'cpython-3.12.14','0'*64)
     monkeypatch.setitem(sensor.RUNTIME_CODE_CONTRACTS,'cpython-3.12.3','0'*64)
+    monkeypatch.setitem(sensor.RUNTIME_CODE_CONTRACTS,'cpython-3.12.15','0'*64)
     with pytest.raises(ValueError,match='FILE_READ_OBSERVER_CODE'):sensor.configure(private,iteration)
 
 

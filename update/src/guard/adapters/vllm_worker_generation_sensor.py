@@ -11,11 +11,11 @@ COMMIT='db9527a46873454610df6dbedf79a36d6bf1a7f6'
 EVENT_SCHEMA='guard-native-worker-generation/1';LINK_SCHEMA='guard-native-worker-generation-link/1'
 PIPE_SCHEMA='guard-native-worker-ready-send/1';GAP_SCHEMA='guard-native-worker-generation-gap/1'
 CLOSE_SCHEMA='guard-native-worker-generation-close/1'
-JOINT20_SHA256='9e79860b36be98326f714dd2983884e7cf6a13ffac880f34a235de426e979719'
-CONTRACT_SHA256='b87ff3a7236cf889208d439c45fe71150cbc1ed1ac24165cdf27a159b4b9dbca'
+JOINT20_SHA256='b7447db52f40b61b20361703ce786d591ada767602e6ec5ea38404e90e559cf1'
+CONTRACT_SHA256='f0c37215577292ce7b89b535cf147553ac22f5ae6ef6a08708cf055f4d4eb27a'
 MAX_BYTES=2097152;MAX_ROWS=2048;MAX_CALLS=256
 CODE_FILENAME='guard/adapters/vllm_worker_generation_sensor.py'
-RUNTIME_CODE_CONTRACTS={'cpython-3.12.14': 'd61dcbfaf7dfb6862f0933c48f06a5b7735eb8433b8e7416a0a4169a75620881', 'cpython-3.12.3': 'b6ef5fd638b33995eaa1217bf56279e2b3e9cf6e67781e60b7e9d9deef75e686'}
+RUNTIME_CODE_CONTRACTS={'cpython-3.12.15': '0763e2269203f831cb3b382f04687271155d8b60f6f824fbb2ce415c2718dbdf', 'cpython-3.12.14': '0763e2269203f831cb3b382f04687271155d8b60f6f824fbb2ce415c2718dbdf', 'cpython-3.12.3': '578be44bc128f8304768d9e5536b6ce6d12fa6a7a1bf936fa6df1d019209ddc6'}
 TRUTH=('producer_authenticated','actual_worker_verified','cross_process_lineage_verified','tensor_storage_applied_verified','gpu_completion_verified','all_model_ready_verified','ready_delivery_verified','service_gate_verified','scope_complete')
 GAPS=frozenset({'calls-bound','callable-changed','selected-pipe-unavailable','pipe-code-unavailable','other-thread','worker-object-unbound','worker-object-unqualified','worker-object-bound','constructor-worker-ambiguous','wrapper-outside-constructor'})
 _CONTEXT=contextvars.ContextVar('guard_worker_generation_call',default=None)
@@ -267,9 +267,9 @@ def code_contract(base,contract):
 
 def configure(base,joint,contract):
     runtime='cpython-'+'.'.join(map(str,sys.version_info[:3]));expected=RUNTIME_CODE_CONTRACTS.get(runtime)
-    if (sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base,contract)!=expected
-            or (runtime,os.name) not in {('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}
-            or base.PROFILE!='vllm-native-lifecycle-metadata/20' or base.SCHEMA!='guard-native-lifecycle-events/20'):
+    if ((sys.implementation.name!='cpython' or sys.flags.optimize!=0 or expected is None or code_contract(base,contract)!=expected
+            or (runtime,os.name) not in {('cpython-3.12.15','posix'),('cpython-3.12.14','nt'),('cpython-3.12.3','posix')}
+            or base.PROFILE!='vllm-native-lifecycle-metadata/20' or base.SCHEMA!='guard-native-lifecycle-events/20') or (runtime == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0))):
         raise ValueError('WORKER_GENERATION_CODE_UNAVAILABLE')
     artifact(joint.__file__,JOINT20_SHA256);artifact(contract.__file__,CONTRACT_SHA256)
     if any(n in base.SOURCE_SHA and base.SOURCE_SHA[n]!=d for n,d in contract.SOURCE_SHA256.items()):raise ValueError('WORKER_GENERATION_SOURCE_CONFLICT')

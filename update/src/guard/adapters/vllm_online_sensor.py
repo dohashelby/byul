@@ -70,7 +70,7 @@ POINT_CONTRACTS = {'InputProcessor._validate_model_input': {'async': False,
                                          'filename': 'vllm/entrypoints/generate/base/protocol.py',
                                          'module': 'vllm.entrypoints.generate.base.protocol'}}
 
-RUNTIME_CONTRACTS = {'cpython-3.12.14': {'callback_code_sha256': '1728a373625ec44d943c9762ea6b31c85571876897a0ed81a1d321e4e5eee2a3',
+RUNTIME_CONTRACTS = {'cpython-3.12.15': {'callback_code_sha256': '1728a373625ec44d943c9762ea6b31c85571876897a0ed81a1d321e4e5eee2a3', 'callback_function_sha256': '70369194951aaf040b401ecb9c5e9d5492285da1c98802860fd09b347b604cf2', 'function_codes': {'InputProcessor._validate_model_input': '9e741ab702847ae7123ebbe6224083c3feb3152aa122adb4e692d5f27edb4f0f', 'InputProcessor._validate_prompt_len': '9b5e805454a645106f9ecef9c3a2d6ff5205158f28668c1d676e2a70ca57faae', 'InputProcessor.process_inputs': '8cc4c2a41215abc29a20967c52e17e362a3f6abf63f618ecad9d1f4534d32ae0', 'OnlineRenderer.preprocess_chat': 'c39dd01ebda9161eb33195c08c44a987c42f5c09af68dcde1c49a850d8e178d1', 'OnlineRenderer.render_chat': '12781547cd1bca158c29ea2e7e86eec8510b4569d5f3cf8b0ea7f454c5d5a562', 'OnlineRenderer.validate_chat_template': 'c797417738f55004bd75a709c3e60f22584b64ea77f91323e509d5f2fc25782c', 'online_renderer._reused_prompt_token_ids': '14f7fbe2beb7e1227751a2eccc7cc424b3464a46124f91f552ab3f5991ec0830', 'protocol.validate_request_mm_kwargs': '2df55628e9262c2c8c87bdbf904c02a58eedfe5f41118c378129da6e93b0de44'}, 'module_codes': {'vllm.entrypoints.generate.base.protocol': '4925c4d0e258e9aad091f229d6747c429c3307337ab894437479b707277211b4', 'vllm.renderers.online_renderer': '561c1cfbf72b5ecc908310596018c3a99254f44156410a81520a893710aca4b4', 'vllm.v1.engine.input_processor': '82734a678f09390c1cf59c4899fcf567c254557508cfdfd0971c5101e40c0f2a'}}, 'cpython-3.12.14': {'callback_code_sha256': '1728a373625ec44d943c9762ea6b31c85571876897a0ed81a1d321e4e5eee2a3',
                      'callback_function_sha256': '70369194951aaf040b401ecb9c5e9d5492285da1c98802860fd09b347b604cf2',
                      'function_codes': {'InputProcessor._validate_model_input': '9e741ab702847ae7123ebbe6224083c3feb3152aa122adb4e692d5f27edb4f0f',
                                         'InputProcessor._validate_prompt_len': '9b5e805454a645106f9ecef9c3a2d6ff5205158f28668c1d676e2a70ca57faae',
@@ -111,7 +111,7 @@ def runtime_name():
 
 def runtime_contract(runtime=None):
     selected = runtime_name() if runtime is None else runtime
-    if type(selected) is not str or selected not in RUNTIME_CONTRACTS:
+    if (type(selected) is not str or selected not in RUNTIME_CONTRACTS) or (runtime is None and (selected == 'cpython-3.12.15' and (sys.platform != 'linux' or os.name != 'posix' or os.uname().machine != 'x86_64' or sys.flags.optimize != 0))):
         raise ValueError("ONLINE_CODE_RUNTIME_UNSUPPORTED")
     return RUNTIME_CONTRACTS[selected]
 

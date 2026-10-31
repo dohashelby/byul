@@ -1,7 +1,7 @@
 // 계약 스키마(environment, policy)의 필드와 프레임워크 입력(framework_profile, framework_values)을 구역별 폼으로 나눈다.
 // 프레임워크 입력은 선택지 위주다. 값이 없으면 미입력, null이면 '모름'으로 저장한다.
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useDocList, useDocRevisions } from "../api/hooks";
+import { useDocList, useDocRevisions, useEnvironmentRevision } from "../api/hooks";
 import type { EnvironmentDoc, FieldIssue, PolicyDoc } from "../api/types";
 import { InputFieldView, KvInput, NumberEntry, Segmented, type PolicyNumber } from "../components/Choice";
 import {
@@ -33,28 +33,6 @@ import {
 } from "../lib/frameworkCatalog";
 import { DEPLOYMENT_KIND, ENGINE_NAME, FACT_LABEL } from "../lib/labels";
 import p from "./pages.module.css";
-
-// 자료 등급(data_origin)은 '값을 얻은 방법'으로 묻는다. 입력 폼에서는 EXAMPLE(예시·시연)을 고르지 않는다.
-const ORIGIN_SEG = [
-  { value: "DECLARED", label: "직접 입력" },
-  { value: "MEASURED", label: "자동 수집" },
-];
-const ORIGIN_HINT: Record<string, string> = {
-  DECLARED: "사람이 확인하고 적거나 설정 파일에서 옮겨 적은 값",
-  MEASURED: "도구가 실제 환경에서 읽어 온 값 (예: runtime이 엔진에서 조회)",
-  EXAMPLE: "예시·시연용 자료로 저장돼 있습니다. 판정 근거로 쓰지 않습니다. 직접 입력이나 자동 수집으로 바꾸세요.",
-};
-
-/** 값을 얻은 방법. 고른 값의 뜻을 아래 한 줄로 보여준다. */
-function OriginField({ label, value, onChange }: { label: string; value: string | null | undefined; onChange: (v: string | null) => void }) {
-  return (
-    <div className={p.qField}>
-      <div className={p.qLabel}>{label}</div>
-      <Segmented label={label} value={value ?? undefined} onChange={(v) => onChange((v ?? null) as string | null)} options={ORIGIN_SEG} />
-      <span className={value === "EXAMPLE" ? p.fieldWarn : "muted small"}>{value ? ORIGIN_HINT[value] : "직접 입력: 사람이 적은 값 · 자동 수집: 도구가 읽어 온 값"}</span>
-    </div>
-  );
-}
 
 export const REGISTERED_FACTS = Object.keys(FACT_LABEL);
 
@@ -169,8 +147,8 @@ function CheckChips({ checks }: { checks: string[] }) {
   );
 }
 
-function Note({ children, tone }: { children: ReactNode; tone?: "info" | "new" }) {
-  return <div className={`${p.noteBox} ${tone === "new" ? p.noteNew : ""}`}>{children}</div>;
+function Note({ children }: { children: ReactNode }) {
+  return <div className={p.noteBox}>{children}</div>;
 }
 
 function ReadOnly({ label, value }: { label: string; value: string }) {
@@ -808,33 +786,212 @@ function valuesOf(doc: PolicyDoc): FrameworkValues | null {
   return v && typeof v === "object" ? (v as FrameworkValues) : null;
 }
 
+/** 구체적인 질문은 '변경'을 고를 때 나타난다. 이미 저장된 값이 있으면 숨기지 않는다. */
+function showDetail(entry: ReqEntry | undefined): boolean {
+  return entry?.decision === "change" || Object.keys(entry?.values ?? {}).length > 0 || Object.keys(entry?.numbers ?? {}).length > 0;
+}
+
 function reqProgress(req: Requirement, entry: ReqEntry | undefined): [number, number] {
+  if (!showDetail(entry)) return [entry?.decision ? 1 : 0, 1];
   const [d, t] = filled(req.fields, entry?.values ?? {});
   const nums = req.numbers.filter((x) => entry?.numbers[x.key]).length;
   return [d + nums + (entry?.decision ? 1 : 0), t + req.numbers.length + 1];
 }
 
+/** 저장할 때마다 정책 판본을 올린다. 끝의 숫자를 올리고, 숫자가 없으면 붙인다. */
+export function nextPolicyVersion(version: string): string {
+  const m = /^(.*?)(\d+)$/.exec(version);
+  return m ? `${m[1]}${Number(m[2]) + 1}` : `${version}-2`;
+}
+
+/** 사람이 고친 문서는 직접 입력(DECLARED)이다. 예시 문서는 예시로 둔다. */
+function normalizePolicy(d: PolicyDoc): PolicyDoc {
+  return d.data_origin === "MEASURED" ? { ...d, data_origin: "DECLARED" } : d;
+}
+
+// runtime 정책 값은 해당 보호 요구 카드에서 받는다. 오류가 있으면 그 카드를 펼친다.
+const GATEWAY_PATHS: Record<string, string[]> = {
+  "1.2": ["allowed_models"],
+  "3.1": ["output_default_tokens", "output_max_tokens", "max_body_bytes", "max_context_tokens", "max_n", "extra_fields"],
+};
+
+function GatewayFields({ req, ctx }: { req: string; ctx: FormCtx }) {
+  if (req === "1.2") {
+    return (
+      <div className={p.formGrid}>
+        <ListField ctx={ctx} path="/runtime/gateway/allowed_models" label="허용 모델" />
+      </div>
+    );
+  }
+  if (req !== "3.1") return null;
+  return (
+    <div className="stack" style={{ gap: 10 }}>
+      <div className={p.formGrid}>
+        <NumberField ctx={ctx} path="/runtime/gateway/output_default_tokens" label="기본 출력 토큰" />
+        <NumberField ctx={ctx} path="/runtime/gateway/output_max_tokens" label="최대 출력 토큰" />
+        <NumberField ctx={ctx} path="/runtime/gateway/max_body_bytes" label="최대 본문 바이트" />
+        <NumberField ctx={ctx} path="/runtime/gateway/max_context_tokens" label="최대 context 토큰 (입력+출력)" nullable />
+        <NumberField ctx={ctx} path="/runtime/gateway/max_n" label="max_n (선택)" optional />
+      </div>
+      <ExtraFieldsEditor ctx={ctx} />
+      <FieldMessages ctx={ctx} path="/runtime/gateway" exact />
+    </div>
+  );
+}
+
+type ExtraRule = Record<string, unknown>;
+const EXTRA_TYPES = [
+  { value: "number", label: "실수" },
+  { value: "integer", label: "정수" },
+  { value: "boolean", label: "참·거짓" },
+  { value: "string", label: "문자열" },
+  { value: "array", label: "문자열 목록" },
+];
+// runtime이 항상 직접 검증하는 필드라 추가로 열 수 없다(RESERVED_REQUEST_FIELDS).
+const RESERVED_FIELDS = ["model", "messages", "max_tokens", "stream", "n", "max_completion_tokens"];
+
+/** 기본 profile에서 runtime이 요구하는 범위가 빠졌으면 그 이름을 돌려준다. */
+function missingBounds(rule: ExtraRule): string | null {
+  const unset = (...keys: string[]) => keys.filter((k) => typeof rule[k] !== "number");
+  const items = rule.items as ExtraRule | undefined;
+  const missing =
+    rule.type === "number" || rule.type === "integer"
+      ? unset("min", "max")
+      : rule.type === "string"
+        ? unset("max_length")
+        : rule.type === "array"
+          ? [...unset("max_items"), ...(typeof items?.max_length === "number" ? [] : ["항목 최대 길이"])]
+          : [];
+  return missing.length ? missing.join("·") : null;
+}
+
+function isEditableRule(rule: ExtraRule): boolean {
+  if (rule.mode !== "validate") return false;
+  if (rule.type === "array") return (rule.items as ExtraRule | undefined)?.type === "string";
+  return EXTRA_TYPES.some((t) => t.value === rule.type);
+}
+
+function BoundInput({ label, value, onChange }: { label: string; value: unknown; onChange: (v: number | undefined) => void }) {
+  return <input className="input" type="number" aria-label={label} placeholder={label} style={{ maxWidth: 120 }} value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} />;
+}
+
+/** chat 요청에서 엔진에 더 넘길 필드(runtime.gateway.extra_fields). 기본 profile은 범위가 있는 validate 규칙만 받는다. */
+function ExtraFieldsEditor({ ctx }: { ctx: FormCtx }) {
+  const path = "/runtime/gateway/extra_fields";
+  const rules = (getIn(ctx.doc, path) ?? {}) as Record<string, ExtraRule>;
+  const [name, setName] = useState("");
+  const write = (next: Record<string, ExtraRule>) => ctx.set(path, Object.keys(next).length ? next : undefined);
+  const put = (key: string, rule: ExtraRule | undefined) => write(putKey(rules, key, rule) as Record<string, ExtraRule>);
+  const trimmed = name.trim();
+  const reserved = RESERVED_FIELDS.includes(trimmed);
+  return (
+    <div className={`${p.qField} ${p.qWide}`}>
+      <div className={p.qLabel}>추가 허용 필드</div>
+      <span className="muted small">chat 요청에서 엔진에 더 넘길 필드입니다. 비워 두면 기본 필드만 넘깁니다. 객체 필드는 열 수 없습니다.</span>
+      {Object.entries(rules).map(([key, rule]) => {
+        const editable = isEditableRule(rule);
+        const lacking = editable ? missingBounds(rule) : null;
+        const set = (k: string, v: unknown) => put(key, putKey(rule, k, v));
+        const items = (rule.items ?? {}) as ExtraRule;
+        return (
+          <div key={key} className={p.ruleRow}>
+            <span className="mono">{key}</span>
+            {editable ? (
+              <>
+                <select
+                  className="select"
+                  aria-label={`${key} 형식`}
+                  style={{ maxWidth: 140 }}
+                  value={String(rule.type)}
+                  onChange={(e) => put(key, e.target.value === "array" ? { mode: "validate", type: "array", items: { type: "string" } } : { mode: "validate", type: e.target.value })}
+                >
+                  {EXTRA_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                {(rule.type === "number" || rule.type === "integer") && (
+                  <>
+                    <BoundInput label="최소" value={rule.min} onChange={(v) => set("min", v)} />
+                    <BoundInput label="최대" value={rule.max} onChange={(v) => set("max", v)} />
+                  </>
+                )}
+                {rule.type === "string" && <BoundInput label="최대 길이" value={rule.max_length} onChange={(v) => set("max_length", v)} />}
+                {rule.type === "array" && (
+                  <>
+                    <BoundInput label="최대 개수" value={rule.max_items} onChange={(v) => set("max_items", v)} />
+                    <BoundInput label="항목 최대 길이" value={items.max_length} onChange={(v) => set("items", putKey(items, "max_length", v))} />
+                  </>
+                )}
+              </>
+            ) : (
+              <span className="muted small">{JSON.stringify(rule)} (시험용 규칙, 화면에서 고칠 수 없음)</span>
+            )}
+            <button type="button" className="btn btn-small btn-ghost" onClick={() => put(key, undefined)} aria-label={`${key} 지우기`}>
+              삭제
+            </button>
+            {lacking && <span className={p.fieldWarn}>필요한 범위가 비어 있습니다: {lacking}</span>}
+          </div>
+        );
+      })}
+      <div className={p.ruleRow}>
+        <input className="input" aria-label="추가할 필드 이름" value={name} placeholder="예: temperature" style={{ maxWidth: 240 }} onChange={(e) => setName(e.target.value)} />
+        <button
+          type="button"
+          className="btn btn-small"
+          disabled={!trimmed || reserved || trimmed in rules}
+          onClick={() => {
+            put(trimmed, { mode: "validate", type: "number" });
+            setName("");
+          }}
+        >
+          필드 추가
+        </button>
+        {reserved && <span className={p.fieldWarn}>runtime이 직접 다루는 필드라 열 수 없습니다.</span>}
+      </div>
+      <FieldMessages ctx={ctx} path={path} />
+    </div>
+  );
+}
+
 export function PolicyForm(props: FormProps<PolicyDoc>) {
-  const ctx = useCtx(props);
-  const { doc, setDoc } = props;
+  const setDoc = (d: PolicyDoc) => props.setDoc(normalizePolicy(d));
+  const ctx = useCtx({ ...props, setDoc });
+  const { doc } = props;
   const envs = useDocList("environments");
   const envId = doc.environment_ref?.id ?? null;
   const envRevs = useDocRevisions("environments", envId);
+  const baseEnv = useEnvironmentRevision(envId, doc.environment_ref?.revision ?? null).data?.document;
   const fv = valuesOf(doc);
   const setFv = (fn: (v: FrameworkValues) => FrameworkValues) => setDoc({ ...doc, framework_values: fn(fv ?? emptyValues()) } as PolicyDoc);
   const [filter, setFilter] = useState<"all" | "undecided" | "measure">("all");
 
+  // 대상 ID는 기준 환경을 따르고, 허용 모델이 비어 있으면 환경의 모델로 시작한다.
+  useEffect(() => {
+    if (!baseEnv) return;
+    const ref = baseEnv.target.target_ref;
+    const model = doc.runtime.gateway.allowed_models.length ? null : baseEnv.target.model.id;
+    if (doc.target_ref === ref && !model) return;
+    const next = { ...doc, target_ref: ref };
+    setDoc(model ? setIn(next, "/runtime/gateway/allowed_models", [model]) : next);
+  }, [baseEnv]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const active = useMemo(() => ALL_REQUIREMENTS.filter((r) => !r.fixed), []);
   const totals = useMemo(
     () =>
-      ALL_REQUIREMENTS.reduce(
+      active.reduce(
         (acc, r) => {
           const e = fv?.requirements[r.id];
           return { decided: acc.decided + (e?.decision ? 1 : 0), measure: acc.measure + Object.values(e?.numbers ?? {}).filter((x) => x.status === "after_measurement").length };
         },
         { decided: 0, measure: 0 },
       ),
-    [fv],
+    [active, fv],
   );
+  // 근거 칸은 문서에 하나다. 계약의 요구별 basis에 같은 값을 넣어 저장한다.
+  const entries = Object.values(fv?.requirements ?? {});
+  const basis = entries.find((e) => e.basis)?.basis ?? null;
 
   return (
     <div className="stack">
@@ -842,24 +999,19 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
         <a href="#pol-basic">기본·유효 기간</a>
         <a href="#pol-approval">승인 조건</a>
         <a href="#pol-reqs">
-          36개 보호 요구 <Progress done={totals.decided} total={ALL_REQUIREMENTS.length} />
+          보호 요구 <Progress done={totals.decided} total={active.length} />
         </a>
-        <a href="#pol-gateway">Gateway 정책</a>
         <a href="#pol-advanced">고급(JSON)</a>
       </nav>
 
       <section id="pol-basic" className="card card-pad stack">
         <h2>기본 정보·유효 기간</h2>
-        <div className="small muted">상태는 이번 단계에서 항상 초안(DRAFT)입니다. 승인(CONFIRMED 전환)은 다음 단계입니다.</div>
+        <div className="small muted">
+          {props.isNew ? "판본은 1부터 시작하고 저장할 때마다 자동으로 올라갑니다." : `현재 판본 ${doc.policy_version}. 저장하면 다음 판본의 초안(DRAFT)이 됩니다.`}
+        </div>
+        {doc.data_origin === "EXAMPLE" && <Note>예시·시연용 자료로 저장돼 있습니다. 판정 근거로 쓰지 않습니다.</Note>}
         <div className={p.formGrid}>
           {props.isNew ? <TextField ctx={ctx} path="/policy_id" label="정책 ID" /> : <ReadOnly label="정책 ID" value={doc.policy_id} />}
-          <TextField ctx={ctx} path="/policy_version" label="정책 판본" />
-          <ReadOnly label="상태" value="DRAFT" />
-          <div className={p.qField}>
-            <OriginField label="값을 얻은 방법 (문서 전체)" value={doc.data_origin} onChange={(v) => v && ctx.set("/data_origin", v)} />
-            <FieldMessages ctx={ctx} path="/data_origin" exact />
-          </div>
-          <TextField ctx={ctx} path="/target_ref" label="대상 ID (target_ref)" />
           <label className={p.field}>
             기준 환경
             <select
@@ -879,7 +1031,8 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
             </select>
             <FieldMessages ctx={ctx} path="/environment_ref" />
           </label>
-          {doc.environment_ref && (
+          {doc.environment_ref ? <ReadOnly label="대상 ID (기준 환경)" value={doc.target_ref} /> : <TextField ctx={ctx} path="/target_ref" label="대상 ID (target_ref)" />}
+          {doc.environment_ref && (envRevs.data?.items.length ?? 0) > 1 && (
             <label className={p.field}>
               환경 판본
               <select
@@ -890,13 +1043,12 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
                   if (r) ctx.set("/environment_ref", { id: r.doc_id, revision: r.revision, sha256: r.sha256 });
                 }}
               >
-                {(envRevs.data?.items ?? [{ revision: doc.environment_ref.revision }]).map((r) => (
+                {envRevs.data?.items.map((r) => (
                   <option key={r.revision} value={r.revision}>
                     판본 {r.revision}
                   </option>
                 ))}
               </select>
-              <span className="muted mono">{doc.environment_ref.sha256.slice(0, 16)}…</span>
             </label>
           )}
           <DateTimeField ctx={ctx} path="/validity/valid_from" label="유효 시작" />
@@ -926,8 +1078,21 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
             <input
               className="input"
               value={fv?.approval_terms.scope ?? ""}
-              placeholder="예: 운영 서비스 A의 현재 환경, 36개 요구 전체"
+              placeholder="예: 운영 서비스 A의 현재 환경, 보호 요구 전체"
               onChange={(e) => setFv((x) => ({ ...x, approval_terms: { ...x.approval_terms, scope: e.target.value || null } }))}
+            />
+          </label>
+          <label className={p.field}>
+            근거 문서
+            <input
+              className="input"
+              value={basis ?? ""}
+              disabled={!entries.length}
+              placeholder={entries.length ? "예: 보안정책 v3 §4" : "보호 요구를 하나 이상 결정하면 입력할 수 있습니다"}
+              onChange={(e) => {
+                const value = e.target.value || null;
+                setFv((x) => ({ ...x, requirements: Object.fromEntries(Object.entries(x.requirements).map(([k, v]) => [k, { ...v, basis: value }])) }));
+              }}
             />
           </label>
           {fv?.approval_terms.decision === "conditional" && (
@@ -948,7 +1113,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
 
       <section id="pol-reqs" className="card card-pad stack">
         <div className="row wrap" style={{ justifyContent: "space-between" }}>
-          <h2>36개 보호 요구별 승인 기준</h2>
+          <h2>보호 요구별 승인 기준</h2>
           <Segmented
             label="보기"
             value={filter}
@@ -961,25 +1126,25 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
           />
         </div>
         <div className="small muted">
-          요구마다 기존 승인 정책을 <b>유지</b>·<b>변경</b>·<b>확인 필요</b> 중에서 고르고, 변경하거나 아직 없는 값만 채웁니다. 수치는 단위·적용 범위와 함께 확정·측정 후
-          결정·미정 상태로 남기고, 근거 없는 숫자를 채우지 않습니다. 결정 {totals.decided}/{ALL_REQUIREMENTS.length} · 측정 후 결정 수치 {totals.measure}개
+          요구마다 기존 승인 정책을 <b>유지</b>·<b>변경</b>·<b>확인 필요</b> 중에서 고릅니다. 구체적인 값은 변경을 고르면 나타납니다. 수치는 확정·측정 후 결정·미정 상태로 남기고, 근거 없는 숫자를 채우지 않습니다. 결정 {totals.decided}/{active.length} · 측정 후 결정 수치 {totals.measure}개
         </div>
         {SECURITY_FUNCTIONS.map((fn) => {
           const reqs = fn.requirements.filter((r) => {
             const e = fv?.requirements[r.id];
-            if (filter === "undecided") return !e?.decision;
+            if (filter === "undecided") return !r.fixed && !e?.decision;
             if (filter === "measure") return Object.values(e?.numbers ?? {}).some((x) => x.status === "after_measurement");
             return true;
           });
           if (!reqs.length) return null;
-          const decided = fn.requirements.filter((r) => fv?.requirements[r.id]?.decision).length;
+          const countable = fn.requirements.filter((r) => !r.fixed);
+          const decided = countable.filter((r) => fv?.requirements[r.id]?.decision).length;
           return (
             <div key={fn.no} className="stack" style={{ gap: 8 }}>
               <div className={p.fnHead}>
                 <span>
                   {fn.no}. {fn.title}
                 </span>
-                <Progress done={decided} total={fn.requirements.length} />
+                <Progress done={decided} total={countable.length} />
               </div>
               {reqs.map((r) => (
                 <RequirementCard
@@ -987,27 +1152,14 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
                   req={r}
                   entry={fv?.requirements[r.id]}
                   ctx={ctx}
-                  onChange={(next) => setFv((x) => ({ ...x, requirements: putKey(x.requirements, r.id, next) as FrameworkValues["requirements"] }))}
+                  isNew={props.isNew}
+                  emptyModels={!doc.runtime.gateway.allowed_models.length}
+                  onChange={(next) => setFv((x) => ({ ...x, requirements: putKey(x.requirements, r.id, next && next.basis === null ? { ...next, basis } : next) as FrameworkValues["requirements"] }))}
                 />
               ))}
             </div>
           );
         })}
-      </section>
-
-      <section id="pol-gateway" className="card card-pad stack">
-        <h2>Gateway 정책 (runtime.gateway)</h2>
-        <div className="small muted">byul runtime이 요청마다 집행하는 값입니다. 1.2 허용 모델, 3.1 입력·출력·본문 한도와 같은 값이어야 합니다.</div>
-        <div className={p.formGrid}>
-          <ListField ctx={ctx} path="/runtime/gateway/allowed_models" label="허용 모델" />
-          <NumberField ctx={ctx} path="/runtime/gateway/output_default_tokens" label="기본 출력 토큰" />
-          <NumberField ctx={ctx} path="/runtime/gateway/output_max_tokens" label="최대 출력 토큰" />
-          <NumberField ctx={ctx} path="/runtime/gateway/max_body_bytes" label="최대 본문 바이트" />
-          <NumberField ctx={ctx} path="/runtime/gateway/max_context_tokens" label="최대 context 토큰" nullable />
-          <TextField ctx={ctx} path="/runtime/gateway/profile" label="profile (선택)" optional placeholder="비우면 필드 없음" />
-          <NumberField ctx={ctx} path="/runtime/gateway/max_n" label="max_n (선택)" optional />
-        </div>
-        <GatewayConsistency doc={doc} fv={fv} />
       </section>
 
       <details id="pol-advanced" className={`card card-pad ${p.fold}`}>
@@ -1021,6 +1173,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
             <NumberField ctx={ctx} path="/verification/pack/revision" label="팩 판본" />
             <ListField ctx={ctx} path="/verification/scope/include" label="범위 포함" />
             <ListField ctx={ctx} path="/verification/scope/exclude" label="범위 제외" />
+            <SelectField ctx={ctx} path="/runtime/gateway/profile" label="runtime profile" options={[{ value: "default", label: "기본 (default)" }, { value: "zeroday-lab", label: "시험용 (zeroday-lab)" }]} />
             <JsonField ctx={ctx} path="/verification/values" label="점검별 정책 값 (check_id → 값)" rows={6} />
             <JsonField ctx={ctx} path="/verification/exceptions" label="예외 목록" rows={4} />
             <JsonField ctx={ctx} path="/runtime/enforcement" label="집행 의도 (runtime.enforcement)" rows={8} hint='쓰지 않으면 null. 예: {"intent_schema": "runtime-enforcement-intent/1.1", "intent": {...}}' />
@@ -1032,73 +1185,55 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
   );
 }
 
-/** 승인 기준과 runtime 집행 설정이 어긋나면 알린다. 저장은 막지 않는다. */
-function GatewayConsistency({ doc, fv }: { doc: PolicyDoc; fv: FrameworkValues | null }) {
-  const out: string[] = [];
-  const nums = fv?.requirements["3.1"]?.numbers ?? {};
-  const gw = doc.runtime.gateway;
-  const maxOut = nums.max_output_tokens;
-  if (maxOut?.status === "confirmed" && maxOut.value != null && maxOut.unit === "token" && maxOut.value !== gw.output_max_tokens) {
-    out.push(`3.1 출력 길이 한도(${maxOut.value} token)와 최대 출력 토큰(${gw.output_max_tokens})이 다릅니다.`);
-  }
-  const body = nums.max_body;
-  if (body?.status === "confirmed" && body.value != null) {
-    const bytes = body.unit === "KiB" ? body.value * 1024 : body.value;
-    if (bytes !== gw.max_body_bytes) out.push(`3.1 본문 크기 한도(${body.value} ${body.unit})와 최대 본문 바이트(${gw.max_body_bytes})가 다릅니다.`);
-  }
-  if (!out.length) return null;
-  return (
-    <div className="stack" style={{ gap: 4 }}>
-      {out.map((m) => (
-        <span key={m} className={p.fieldWarn}>
-          {m}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function RequirementCard({ req, entry, ctx, onChange }: { req: Requirement; entry: ReqEntry | undefined; ctx: FormCtx; onChange: (e: ReqEntry | undefined) => void }) {
+function RequirementCard({ req, entry, ctx, isNew, emptyModels, onChange }: { req: Requirement; entry: ReqEntry | undefined; ctx: FormCtx; isNew: boolean; emptyModels: boolean; onChange: (e: ReqEntry | undefined) => void }) {
   const cur = entry ?? emptyReq();
   const update = (patch: Partial<ReqEntry>) => {
     const next = { ...cur, ...patch };
-    const empty = next.decision === null && !Object.keys(next.values).length && !Object.keys(next.numbers).length && next.basis === null && next.note === null;
+    const empty = next.decision === null && !Object.keys(next.values).length && !Object.keys(next.numbers).length && next.note === null;
     onChange(empty ? undefined : next);
   };
   const [done, total] = reqProgress(req, entry);
   const path = `/framework_values/requirements/${req.id}`;
   const errs = issuesAt(ctx.issues, path);
+  const hasError = errs.length > 0 || (GATEWAY_PATHS[req.id] ?? []).some((k) => issuesAt(ctx.issues, `/runtime/gateway/${k}`).length > 0);
+  // 허용 모델은 필수라 비어 있으면 처음부터 펼친다.
+  const [open, setOpen] = useState(() => hasError || (req.id === "1.2" && emptyModels));
+  useEffect(() => {
+    if (hasError) setOpen(true);
+  }, [hasError]);
   return (
-    <details className={p.fold} open={errs.length > 0 || undefined}>
+    <details className={p.fold} open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary className={p.foldHead}>
         <span className={p.foldNo}>{req.id}</span>
         <span className={p.foldTitle}>{req.title}</span>
-        {entry?.decision && <span className={p.decision}>{DECISION_LABEL[entry.decision]}</span>}
-        {req.newBranch && <span className={p.newTag}>새 분기</span>}
-        <Progress done={done} total={total} />
+        {req.fixed ? <span className={p.decision}>runtime이 정함</span> : entry?.decision && <span className={p.decision}>{DECISION_LABEL[entry.decision]}</span>}
+        {!req.fixed && <Progress done={done} total={total} />}
       </summary>
       <div className={p.foldBody}>
-        <div className={p.qField}>
-          <div className={p.qLabel}>기존 승인 정책 처리</div>
-          <Segmented
-            label="기존 승인 정책 처리"
-            value={cur.decision ?? undefined}
-            onChange={(v) => update({ decision: (v ?? null) as string | null })}
-            options={[
-              { value: "keep", label: "유지" },
-              { value: "change", label: "변경" },
-              { value: "needs_confirmation", label: "확인 필요" },
-            ]}
-          />
-        </div>
-        {(req.see || req.gateway || req.newBranch) && (
-          <Note tone={req.newBranch ? "new" : "info"}>
-            {req.newBranch && <div>{req.newBranch}</div>}
+        {(req.fixed || req.see || req.gateway) && (
+          <Note>
+            {req.fixed && <div>{req.fixed}</div>}
             {req.see && <div>{req.see}</div>}
             {req.gateway && <div>{req.gateway}</div>}
           </Note>
         )}
-        {req.fields.length > 0 && (
+        <GatewayFields req={req.id} ctx={ctx} />
+        {!req.fixed && (
+          <div className={p.qField}>
+            <div className={p.qLabel}>기존 승인 정책 처리</div>
+            <Segmented
+              label="기존 승인 정책 처리"
+              value={cur.decision ?? undefined}
+              onChange={(v) => update({ decision: (v ?? null) as string | null })}
+              options={[
+                { value: "keep", label: "유지" },
+                { value: "change", label: isNew ? "변경·새로 정함" : "변경" },
+                { value: "needs_confirmation", label: "확인 필요" },
+              ]}
+            />
+          </div>
+        )}
+        {showDetail(entry) && req.fields.length > 0 && (
           <div className={p.qGrid}>
             {req.fields
               .filter((f) => visible(f, cur.values))
@@ -1113,7 +1248,7 @@ function RequirementCard({ req, entry, ctx, onChange }: { req: Requirement; entr
               ))}
           </div>
         )}
-        {req.numbers.length > 0 && (
+        {showDetail(entry) && req.numbers.length > 0 && (
           <div className="stack" style={{ gap: 8 }}>
             <div className={p.qLabel}>수치·기한</div>
             {req.numbers.map((d) => (
@@ -1126,16 +1261,6 @@ function RequirementCard({ req, entry, ctx, onChange }: { req: Requirement; entr
             ))}
           </div>
         )}
-        <div className={p.qGrid}>
-          <label className={p.field}>
-            근거 (기존 승인 기록·문서 위치)
-            <input className="input" value={cur.basis ?? ""} placeholder="예: 보안정책 v3 §4.2" onChange={(e) => update({ basis: e.target.value || null })} />
-          </label>
-          <label className={p.field}>
-            메모
-            <input className="input" value={cur.note ?? ""} onChange={(e) => update({ note: e.target.value || null })} />
-          </label>
-        </div>
         <div className="small muted">
           관련 점검: <CheckChips checks={req.checks} />
         </div>

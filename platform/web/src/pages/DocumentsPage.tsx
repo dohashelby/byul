@@ -17,7 +17,7 @@ import { DataTable } from "../components/DataTable";
 import { PageHead, Query, StateView } from "../components/Misc";
 import { AnyValue, Short, Time, Value } from "../components/Value";
 import { DOC_STATUS } from "../lib/labels";
-import { EnvironmentForm, PolicyForm, factWarnings, newEnvironment, newPolicy } from "./forms";
+import { EnvironmentForm, PolicyForm, factWarnings, newEnvironment, newPolicy, nextPolicyVersion } from "./forms";
 import p from "./pages.module.css";
 
 const TITLE: Record<DocKind, string> = { environments: "환경", policies: "정책" };
@@ -148,7 +148,7 @@ export function PolicyEditorPage() {
 
   const onSave = () => {
     if (!doc) return;
-    save.mutate(doc, {
+    save.mutate(isNew ? doc : { ...doc, policy_version: nextPolicyVersion(doc.policy_version) }, {
       onSuccess: (res) => {
         setIssues([]);
         setSavedRev(res.saved.meta.revision);

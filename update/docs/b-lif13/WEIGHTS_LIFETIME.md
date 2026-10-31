@@ -35,7 +35,7 @@ baseline·후속 get_state의 received/rebuilt CUDA entry 수와 CPU by-value �
 
 입력은 고정 native 파일 한 개와 새 출력 경로뿐이다. native 원본은 `0ae9cc56dcce903d059fab8ff2d2e12f23cef3ba:update/tools/b_lif13_weights_native.py`의 Git blob이며 SHA-256은 `8548dc812acdc421e313c5532d6cd4d6bd214c19d51b79adc96ffb7b7804c4da`다. probe 기준은 `e9b98d4d40d702d0e517cda0116dde55ae5d873f`의 `update/tests/linux_cpu/lif13_peer_probe.py`이며 SHA-256은 `789b08ff1acc549e478558fa8317eac074905e675d4cce87deede99f5d528e2d`다. 작업 트리의 newline 변환을 거치지 않고 LF 원 bytes를 준비한다. 이미 선택·승인한 Linux/amd64 시험 환경의 Python 3.12와 표준 라이브러리만 사용하며 새 설치·GPU/모델·daemon 기동은 필요하지 않다.
 
-저장소 루트에서 다음과 같이 입력을 고정한다. 해당 Git 객체와 probe 파일이 있는 체크아웃을 사용하거나, 같은 bytes의 두 파일을 기존 WSL에 전달한다. probe는 `update/tests/linux_cpu/` 경로 구조를 유지하며, 고정 native 파일은 외부 소유 경로에 둔다.
+저장소 루트에서 다음과 같이 입력을 고정한다. 해당 Git 객체와 probe 파일이 있는 정확한 체크아웃을 사용한다. 필요하면 기존 WSL 저장소에서 승인된 B head의 detached worktree를 만들어 원 A 체크아웃을 보존한다. probe는 그 체크아웃의 `update/tests/linux_cpu/lif13_peer_probe.py`에서 실행한다. 출력 보호가 `parents[3]`을 저장소 루트로 사용하므로 probe 한 파일을 `/tmp`에 평면 복사한 배치는 지원하지 않는다. native 파일만 Git blob의 LF bytes로 체크아웃 밖 소유 경로에 고정하고, 출력도 체크아웃 밖 fresh 경로에 둔다.
 
 ```sh
 LIF13_PEER_RUN_DIR=$(mktemp -d /tmp/byul-lif13-peer.XXXXXX)

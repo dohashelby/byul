@@ -15,7 +15,7 @@ def test_original_B154_seven_files_are_exact_confirmed_bytes():
 
 def test_new_A_full_common_pin_passes_while_original_B_native_pin_stays_closed():
     proof=gate.verify(ROOT)
-    assert proof['files_verified']==385 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
+    assert proof['files_verified']==387 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
     assert not proof['original_B_default_pin_changed']
     with pytest.raises(ValueError,match='^LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE$'):native.verify_source()
 

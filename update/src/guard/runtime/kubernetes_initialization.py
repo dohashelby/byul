@@ -4,6 +4,7 @@ import re,threading
 from guard.models import canonical_json,sha256_hex
 from .bounded import strict_json
 from .kubernetes_http import KubernetesHTTP,KubernetesBindingError,REQUEST_BINDING_PROFILE
+from .kubernetes_startup_binding import read_startup_binding
 
 PROFILE='kubernetes-owned-mp-initialization-http-v1'
 SLOTS=('before','after')
@@ -62,16 +63,7 @@ class KubernetesInitializationHTTP:
                 raise KubernetesBindingError() from None
 
     def _verify_startup(self):
-        pods=self.base._verify(require_ready=False,capture_snapshot=True)
-        probe=pods['probe'];selected=self.binding['probe']['container']
-        states=[v for v in probe['status']['containerStatuses'] if v.get('name')==selected]
-        if (len(states)!=1 or states[0].get('ready') is not True or not any(v.get('type')=='Ready' and v.get('status')=='True' for v in probe['status'].get('conditions',[]))):
-            raise KubernetesBindingError()
-        engine=pods['engine'];states=[v for v in engine['status']['containerStatuses'] if v.get('name')==self.binding['engine']['container']]
-        conditions=[v.get('status') for v in engine['status'].get('conditions',[]) if v.get('type')=='Ready']
-        if len(states)!=1 or len(conditions)!=1 or conditions[0] not in {'True','False','Unknown'} or type(states[0].get('ready')) is not bool:
-            return None
-        return {'pod_ready':True if conditions[0]=='True' else False if conditions[0]=='False' else None,'container_ready':states[0]['ready']}
+        return read_startup_binding(self.base)['engine_readiness']
 
     def report(self):
         return {'profile':PROFILE,'target_sha256':self.target_sha256,'binding':deepcopy(self.binding),'environment_ref':deepcopy(self.base.environment_ref),

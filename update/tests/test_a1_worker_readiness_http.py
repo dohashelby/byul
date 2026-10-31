@@ -225,7 +225,8 @@ def test_deadline_or_clock_regression_preserves_typed_first_document(after):
 def test_old_generic_Ready_gate_and_old_LIF09_namespace_are_distinct():
     environment,world,values=inputs('unready')
     generic=KubernetesHTTP(world.target,environment,runner=world.runner,duration=30,profile=REQUEST_BINDING_PROFILE)
-    assert generic.snapshot()['collected'] is False and not world.execs
+    with pytest.raises(KubernetesBindingError):generic.snapshot()
+    assert not world.execs and generic.failed is True
     transport=KubernetesWorkerReadinessHTTP(world.target,environment,runner=world.runner)
     with pytest.raises(KubernetesBindingError):transport('kubernetes-probe',[],1)
     with pytest.raises(TypeError):transport.sample(values,sample_id='d'*32,request={'method':'DELETE'})

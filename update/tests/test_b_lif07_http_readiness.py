@@ -199,7 +199,60 @@ def test_HTTP_no_valid_packet_keeps_target_IO_unknown_unless_not_invoked(case, s
     observation = {'snapshot': None, 'sample_attempted': sample_attempted, 'collection_gap': True,
         'report_attempted': sample_attempted, 'report_validated': False, 'gaps': ['HTTP_SAMPLE_UNAVAILABLE']}
     value = tool._attach_http(record, observation)
-    assert value['requests'] == value['http_requests_attempted'] == 0
+    assert value['requests'] is (None if sample_attempted else 0)
+    assert value['http_requests_attempted'] is value['target_http_requests'] is value['requests']
     assert value['http_collection_attempted'] is sample_attempted
     assert value['target_io_attempted'] is (None if sample_attempted else False)
     assert value['cleanup']['owned_host_complete'] is None
+
+
+@pytest.mark.parametrize('api_collected,attempted', [(True, False), (False, False), (False, True)])
+def test_HTTP_valid_partial_counts_and_API_read_are_independently_preserved(case, api_collected, attempted):
+    record = tool.project(tool._empty(case['env'], case['target'], case['prepared'], case['manifest']),
+        case['env'], case['target'], case['prepared'], case['manifest'])
+    packet = {'requests': [{'attempted': attempted}], 'api_readiness': [{'collected': api_collected}],
+        'started_at': record['started_at'], 'finished_at': record['finished_at'], 'data_origin': 'EXAMPLE'}
+    value = tool._attach_http(record, {'snapshot': packet, 'sample_attempted': True, 'gaps': []})
+    assert value['requests'] == value['http_requests_attempted'] == value['target_http_requests'] == int(attempted)
+    assert value['target_io_attempted'] is (True if attempted or api_collected else None)
+
+
+@pytest.mark.parametrize('failure', ['artifact', 'original_input'])
+def test_HTTP_unvalidated_after_sample_retains_null_in_storage_and_recovery(case, monkeypatch, failure):
+    world, _, window = configure(case, monkeypatch)
+    original = public.KubernetesWorkerReadinessHTTP
+    def collector(*args, **kwargs):
+        value = original(*args, **kwargs); sample, report = value.sample, value.report
+        def invalid_sample(*args, **kwargs):
+            packet = sample(*args, **kwargs); packet['body'] = PRIVATE; return packet
+        def invalid_report():
+            packet = report(); packet['body'] = PRIVATE
+            if failure == 'original_input': case['args']['manifest'].write_text('{}')
+            return packet
+        value.sample, value.report = invalid_sample, invalid_report
+        return value
+    monkeypatch.setattr(public, 'KubernetesWorkerReadinessHTTP', collector)
+    if failure == 'artifact':
+        write = tool._write
+        def unavailable(path, value):
+            if path.name == 'worker-readiness.json': raise OSError(PRIVATE)
+            return write(path, value)
+        monkeypatch.setattr(tool, '_write', unavailable)
+        summary = tool.run(**case['args'], collect_http=True, **window)
+        facts = summary['safe_facts']
+        assert summary['requests'] is summary['http_requests_attempted'] is None
+        entry, = yaml.safe_load((case['args']['output'] / 'manual-evidence.yaml').read_text())['checks']
+        note = entry['observation_notes'][0]['answer']
+        assert '선정 HTTP 시도=미수집' in note and '선정 HTTP 시도=None' not in note
+        embedded = json.loads(note.split('LIF07_SAFE_FACTS=', 1)[1])
+        assert embedded['requests'] is embedded['http_requests_attempted'] is embedded['target_http_requests'] is None
+        assert summary['exact_refs_restored']
+    else:
+        with pytest.raises(tool.EvidencePreservationError) as error:
+            tool.run(**case['args'], collect_http=True, **window)
+        facts = error.value.safe_facts
+        assert 'ORIGINAL_INPUT_CHANGED' in error.value.recovery['issues']
+        assert not case['args']['output'].exists()
+    assert len(world.execs) == 3 and facts['http_observation']['snapshot'] is None
+    assert facts['requests'] is facts['http_requests_attempted'] is facts['target_http_requests'] is None
+    assert facts['target_io_attempted'] is None and PRIVATE not in json.dumps(facts)

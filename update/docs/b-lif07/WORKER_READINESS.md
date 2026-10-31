@@ -77,3 +77,27 @@ native21 원 소스 승인 `b88b4a6491a9a0c2908b962b837247c0cea80b55`와 bootstr
 A156가 보고한 원 입력파일 변경 시험의 keyword 인자 누락은 해당 fixture가 `native_observation`을 원 project에 그대로 전달하도록 보수했다. 입력 변경 감지·안전 facts 보존·출력/EVD 미생성·비공개 값 비저장 assert를 유지하며 원 실패를 보존한다. 이 보수와 source 소비 추가는 actual worker/READY 수신/서비스/GPU 실증을 추가하지 않는다.
 
 고정 A156 소비 소스에서 새 helper와 consumer를 함께 연결한 공개 `main(argv)`→원 Store/반출·복원 1건이 통과했다(1.10초). A 공개 gate와 실제 B helper는 주입 없이 실행했고 reader 전송만 `UnavailableReader` EXAMPLE로 바꿨다. 새 보고서는 `RPT-01M67VAS8V18B8QQV30DS9EQ3J@1`, SHA `de39ccdd3b00181442b1af016ec7ab923bafc837a87c2f901da159f68111cbec`다. 첨부 reviewed common은 `9d8987a…`, native 승인은 원 `b88b4a6…`이며 원 source·정확6Ref·복원 검증·3UNKNOWN과 실제 대상0을 보존한다. 이전 A152/EXAMPLE 보고서와 원 실패는 새 결과로 덮어쓰지 않는다.
+
+### Running/Unready health/chat 실행
+
+A158 고정 `1c3018f8cde4a4b8e674d112cee8e3626813b022` / 검토 common `f277fecd6df1e59505c0ad731032593f6fb22885`의 공개 `KubernetesWorkerReadinessHTTP.sample/report`와 `validate_snapshot`을 기존 B 명령에서 `--collect-http`로 소비한다. source gate의 원 A152/A156 허용은 유지하며 새 정확 pair와 미리 검토한 collector/binding/probe SHA만 추가한다. A full387 manifest는 `a5f030e4c9b37b5fea23dff42a98937ba53b1ac47a34c3d56dfa5fe5586ce58b`다.
+
+기존 source Store·PLAN·원 PACK31·target·prepared·owner/recovery owner cohort manifest를 사용한다. manifest의 API model은 `guard.model-request-mapping/1` alias이며 요청은 `hello` 한 개·max_tokens1·temperature0이다. 공개 API가 비stream chat을 구성한다. 기존 POL의 `required_readiness_items`와 manual CheckDef는 유지한다. 두 명시 실행 시각은 timezone을 포함하고 현재 시각을 포함하는 최대600초 창이어야 한다. 공개 API의 여섯 결합값은 ENV SHA·target SHA·prepared session·manifest SHA와 이 두 시각으로 구성한다.
+
+`update/`에서 기존 승인 대상·입력·실행 창과 run/복구 담당자를 확정한 후 다음 명령을 사용한다. 환경 변수에는 기존 파일 경로와 정확 PLAN ID, 새 외부 output, 담당자, 확정 실행 시각을 넣는다.
+
+```sh
+PYTHONPATH="$PWD/src:$PWD" uv run --frozen python -m tools.b_lif07_readiness \
+  --store "$BYUL_LIF07_STORE" --plan "$BYUL_LIF07_PLAN" \
+  --pack "$PWD/packs/PACK-BASELINE" --target "$BYUL_LIF07_TARGET" \
+  --prepared "$BYUL_LIF07_PREPARED" --manifest "$BYUL_LIF07_MANIFEST" \
+  --output "$BYUL_LIF07_OUTPUT" --entered-by "$BYUL_LIF07_OWNER" \
+  --collect-http --http-validity-start "$BYUL_LIF07_HTTP_START" \
+  --http-validity-end "$BYUL_LIF07_HTTP_END"
+```
+
+이 모드는 `--collect-native`·capture 수입·closed execute와 배타적이다. 동일한 fresh sample ID로 health→canary→health 최대3회만 수행하고 독립 API Pod/container Ready 관측·정확 namespace/Pod/image/restart/start/run 결합을 저장한다. 후기 report·부모 정리 오류·부분 응답은 앞서 검증한 HTTP 사실과 함께 보존한다. `requests/http_requests_attempted`는 검증된 packet의 시도 합계다. sample 미호출은0, 호출 후 유효 packet을 얻지 못한 계수는 null로 저장하고 manual에는 미수집으로 적는다. HTTP0회라도 검증된 API 수집이 있으면 target I/O는 true이며, 호출 뒤 관측을 얻지 못하면 null이다. coarse host/worker/GPU 정리는 미확인으로 유지하고 공통 API의 cleanup 오류를 그대로 첨부한다. 소유 probe parent의 종료·stream 회수는 기존 공통 bounded 전송이 담당하고 대상 Pod/worker를 종료하지 않는다.
+
+HTTP envelope는 EXAMPLE이다. HTTP200·독립 PodReady와 native monotonic 시각을 worker 준비 전 접수·상위 READY·서비스 접수·GPU 완료로 결합하지 않는다. 원 normal/challenge 미시도·정책 미입력·세 축 UNKNOWN을 유지하며 controlled delay/resume는 다음 공통 입력 대기다. 원본 입력 변경은 안전한 HTTP facts를 복구 정보에 보존하고 EVD 저장 전 거부한다.
+
+직접21사례와 추가 영향3사례, P2 미수집 계수·API I/O의 영향7사례, 기존 기본/수입/native 직접 영향3사례를 확인했다. 각 고정 판본의 영향 범위이며 고유 사례 수를 합산하지 않는다. 주 세션은 실제 source gate/full387·공개 sample/report/parser에 EXAMPLE 전송만 연결한 Unready3요청→공개 main(argv)/원 Store/정확6Ref 복원1건을 확인했다(0.725초). 보고서는 `RPT-01M67W0C3NH0W6EFYZY64TM10D@1`, SHA `1125de5b14bad8f8a6f2ccf6b8a1386db3b57b07bdc90d65cade96a4e9314ef1`다. 이 제품 연결은 소비기694/a98 판본의 유효 Unready3요청 결과로 보존한다. 후속 P2의 미수집/null 보수는 별도7사례로 검증했고 기존 결과를 새 소스에서 재실행한 것으로 표시하지 않는다. 원 actor의 source 대역 CLI·이전 native21·실제 Linux kernel 보고와 판본별 증거를 따로 보존한다. 실제 Kubernetes/worker/GPU 실행은0이며 실제 대상 재개에는 승인 대상 접근·현재 ENV/POL/image/model·실행 창·run/복구 담당자가 필요하다.

@@ -103,7 +103,8 @@ def test_existing_registry_cli_copy_records_and_exact_refs(tmp_path,monkeypatch,
         assert PRIVATE not in result.output
     cli(['select','--pack',pack.path,'--env',tmp_path/'environment.json','--policy',tmp_path/'policy.json',*common])
     plan,=Store.read_only(tmp_path/'store').iter_kind('PLAN');assert next(i for i in plan.items if i.check_id=='PLT-12').selected
-    cli(['run','--plan',plan.id,'--pack',pack.path,*common])
+    # Existing CLI deliberately returns 1 when owned capture cleanup is incomplete.
+    cli(['run','--plan',plan.id,'--pack',pack.path,*common],1 if mode=='record-cleanup' else 0)
     cli(['judge','--plan',plan.id,'--as-of',T0.isoformat(),*common]);cli(['report','--plan',plan.id,'--as-of',T0.isoformat(),'--json',tmp_path/'report.json',*common]);cli(['verify',*common])
     store=Store.read_only(tmp_path/'store');evd,=store.iter_kind('EVD');result,=store.iter_kind('RES')
     assert evd.data_origin.value=='EXAMPLE' and evd.normal_control.attempted is False and evd.normal_control.succeeded is None

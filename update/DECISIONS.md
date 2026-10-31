@@ -685,3 +685,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - B154 고정 승인쌍은 A152/A156에 한정되며 현재 A158 공통387파일의 자동 승인이 아니다. 현재소스의 B 실패/fixture오류를 기록하고 승인된 A156+같은Bbytes 참조102통과를 별도 근거로 제공한다. B 원본을 재작성·완화·skip하지 않으며 현재 버전 소비 pin과 fixture 확장은 B가 검토한다. 원 kernel proof 반출과 새로운 실제 실증을 구분한다.
 
 - B160의 사전검토 A158 source 쌍은 확정 원 bytes로 소비한다. A측 통합시험의 기존 거부 기대는 B의 명시 새쌍에 맞춰 승인을 요구하고 미승인쌍 음성검사는 계속 유지한다. B fixture/assert/pin을 대신 완화하지 않는다. guard source/wheel279 bytes는 변하지 않으며 B 소스전용 gate와 설치본 혼합경계는 분리한다.
+
+- B160의 현재source pair 소비 성공은 B의 확정 사전검토 literal·원fullscope gate를 사용한 결과다. 원B 파일·FS실패와 과거거부/Ref를 유지하며 새skip/검사제외나 runtime hash승인은 없다. source CLI4/24Ref와 설치guard+Bsource 혼합의 import거부/무요청·UNKNOWN은 다른 범위다. 후자를 설치제품 성공이나 실제 worker 준비로 올리지 않는다.

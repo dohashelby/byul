@@ -1651,3 +1651,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - B154 a7c6cab source65f1f87: 원6bytes 통합/입력교체 fixture 보수 확인, 현재A Windows104통과3실패8오류·Linux106통과1실패8오류를 보존했다. 미승인current source pair와 B exact gate fixture 가정, 기존Windows2차이를 분리한다. 승인A156참조 a17d48d의 B2모듈102통과·정확6Ref 현재A 재판정과 A158설치279 bytes 재사용을 확인했다. 현재 B pin의 A158 미소비·실제환경/전체Goal은 미완료다.
 
 - A-1 B160 b6c2bd6: 원7파일 bytes의 --collect-http·A158 exact source 소비를 통합하고 실제B gate/공개A API/parser·B main/정확Ref4사례 초안과 정적 검토를 마쳤다. 이전B154 원실패·A156참조102·원kernel8반출을 보존한다. 고정 영향 검증 전이며 실제cluster/worker/GPU·native 인과·상위READY/통제지연은 미연결이다.
+
+- A-1 B160 source1506685: 원7파일/원probe 보존, Linux155통과·Windows152통과3실패(원FS권한/열린FD차이), 실제B gate/full387→공개HTTP/parser→B main4사례·각OS24Ref 저장팩 왕복을 확인했다. 이전source거부/fixture8오류는 해소됐다. guard279 wheel/설치·인접 검증은 bytes동일로 재사용하고 혼합설치 source gate 거부/HTTP0/UNKNOWN·정확6Ref를 별도로 확인했다. 실제cluster/worker/GPU·인과/상위READY/통제지연·전체A/B는 미완료다.

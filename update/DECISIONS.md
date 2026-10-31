@@ -701,3 +701,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - native19 전용 소비는 공통 startup 성공 뒤 별도 경계로 한정한다. public parser와 A2의 원8파일 pins를 유지하고 CPU fixture의 library_identity 대역을 EXAMPLE로 명시한다. startup 종료와 untruncated 마지막mapping을 selected forward와 비교하며 부분/후속오류로 앞선 사실·독립FAIL을 지우지 않는다. B 원 소유 승인쌍은 바꾸지 않고 A 공통389파일 새 pin 검토를 분리한다.
 
 - native19 양성 fixture는 원 A2와 같은 EXAMPLE library 대역 시점을 따른다. immutable observer code 검사 전 대역을 적용한 원실패를 보존하고 준비순서만 보수했다. source gate/parser/production library gate/원 assert는 유지한다. startup 호출 종료·root/link와 잘리지 않은 mapping 마지막 경계를 forward 이전에 대조하며 실제 worker/READY로 승격하지 않는다.
+
+- native16 capture=None은 두 binding=false인 admitted 실패행에만 허용하는 A2 원 보수로 소비한다. 누락을 관측/전체완료로 만들지 않고 다른 recording의 사실을 지우지 않는다. A1 executor 판본0.4.1·전체389파일 고정 pin을 갱신하며 source gate/parser·B 원 c9/helper/승인쌍과 native17/18/19 원bytes를 유지한다.

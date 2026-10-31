@@ -87,7 +87,7 @@ def _attach_startup_file_contexts(trials,projection):
 
 
 class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
-    name='observation_identity';version='0.4.0';collection_profile=PROFILE
+    name='observation_identity';version='0.4.1';collection_profile=PROFILE
     supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8',weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE})
     policy_normalizer=staticmethod(contract.normalize_policy)
 

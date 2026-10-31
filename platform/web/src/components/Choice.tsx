@@ -264,20 +264,28 @@ export function NumberEntry({ def, value, onChange }: { def: NumberDef; value: P
           value={typeof cur.value === "number" ? cur.value : ""}
           onChange={(e) => set({ value: e.target.value === "" ? null : Number(e.target.value) })}
         />
-        <select className="select" aria-label={`${def.label} 단위`} disabled={value === undefined} value={cur.unit ?? ""} onChange={(e) => set({ unit: e.target.value || null })}>
-          {def.units.map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
-        <select className="select" aria-label={`${def.label} 적용 범위`} disabled={value === undefined} value={cur.scope ?? ""} onChange={(e) => set({ scope: e.target.value || null })}>
-          {def.scopes.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        {def.units.length > 1 ? (
+          <select className="select" aria-label={`${def.label} 단위`} disabled={value === undefined} value={cur.unit ?? ""} onChange={(e) => set({ unit: e.target.value || null })}>
+            {def.units.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="muted small">{def.units[0]}</span>
+        )}
+        {def.scopes.length > 1 ? (
+          <select className="select" aria-label={`${def.label} 적용 범위`} disabled={value === undefined} value={cur.scope ?? ""} onChange={(e) => set({ scope: e.target.value || null })}>
+            {def.scopes.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="muted small">{def.scopes[0]}</span>
+        )}
         <input
           className="input"
           aria-label={`${def.label} 측정 조건`}

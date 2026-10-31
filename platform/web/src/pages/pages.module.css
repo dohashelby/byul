@@ -416,9 +416,11 @@
   color: var(--text-2);
   font-size: 12px;
 }
-.noteNew {
-  border-left-color: var(--warn);
-  background: var(--warn-soft);
+.ruleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 .fnHead {
   display: flex;

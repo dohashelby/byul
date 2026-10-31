@@ -58,7 +58,7 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "entry",
     no: 2,
     title: "진입 경로·인증·인가",
-    elsewhere: "byul runtime을 Gateway로 쓴다고 보고 호출 경로·Gateway 종류·신원 검증 위치·엔진까지 전달되는 신원은 묻지 않습니다. runtime은 사용자 신원을 엔진에 넘기지 않고 자기 backend 자격만 씁니다. 엔진에 직접 닿는 길이 막혔는지는 따로 확인합니다.",
+    elsewhere: "byul runtime을 Gateway로 쓴다고 보고 호출 경로·Gateway 종류·신원 검증 위치·엔진까지 전달되는 신원은 묻지 않습니다. runtime은 사용자 신원을 엔진에 넘기지 않고 자기 backend 자격만 씁니다(cache 격리를 켜면 호출자별로 만든 salt만 더합니다). 엔진에 직접 닿는 길이 막혔는지는 따로 확인합니다.",
     runtime: "인증 주체·역할·route 역할·허용 모델은 runtime 설정에 있습니다.",
     baseChecks: ["SUP-002", "REQ-001", "PLT-010", "LIF-010", "OBS-001"],
     otherChecks: "분기 7 · 조건부 6",
@@ -135,10 +135,12 @@ export const ENV_CONDITIONS: EnvCondition[] = [
     key: "features",
     no: 5,
     title: "요청·활성 기능",
-    elsewhere: "byul runtime Gateway는 /v1/chat/completions·/v1/completions만 열고 엔진에 model·messages(문자열)·prompt(문자열)·max_tokens·stream·n만 넘깁니다. 그래서 스트리밍(항상 열림)·구조화 출력·tools·embedding·token ID·logprobs·미디어·Responses·batch는 묻지 않습니다. 허용 모델은 정책의 Gateway 설정에서 고릅니다.",
+    elsewhere: "byul runtime Gateway는 /v1/chat/completions·/v1/completions만 열고 기본으로 model·messages(문자열)·prompt(문자열)·max_tokens·stream·n만 넘깁니다. chat 요청은 정책의 추가 허용 필드만큼 더 넘길 수 있습니다. 객체 필드는 열 수 없어 스트리밍(항상 열림)·구조화 출력·tools·embedding·token ID·미디어·Responses·batch는 묻지 않습니다.",
     baseChecks: ["SUP-003", "REQ-009", "LIF-005", "LIF-010"],
     otherChecks: "분기 15 · 조건부 11 · 선정 구현 3",
     fields: [
+      { key: "offset_params", label: "offset 파라미터(routed_experts_prompt_start 등)", kind: "tri", yes: "수용", no: "수용 안 함", hint: "정책의 추가 허용 필드로 열었는지" },
+      { key: "echo_logprobs", label: "입력 반환·logprobs 옵션", kind: "tri", yes: "노출", no: "노출 안 함", hint: "정책의 추가 허용 필드로 열었는지" },
       { key: "lora", label: "LoRA adapter 요청", kind: "tri", yes: "사용", no: "사용 안 함", hint: "정책의 허용 모델에 adapter 이름을 넣어 요청으로 고르게 하는지", when: { cond: "supply", key: "extra_files", is: ["lora", null] } },
     ],
   },
@@ -260,8 +262,8 @@ export type Requirement = {
   see?: string;
   /** byul runtime 정책 필드와 이어지는 값. */
   gateway?: string;
-  /** 2026-10-27 framework 동기화에서 새 분기로 생긴 정책 항목(enterprise_decisions 원문에는 아직 없음). */
-  newBranch?: string;
+  /** byul runtime이 고정으로 정해 따로 결정하지 않는 요구의 안내. */
+  fixed?: string;
 };
 export type SecurityFunction = { no: number; title: string; requirements: Requirement[] };
 
@@ -277,18 +279,14 @@ export const SECURITY_FUNCTIONS: SecurityFunction[] = [
         id: "1.1",
         title: "신원 인증·전달",
         checks: ["REQ-004"],
-        fields: [
-          { key: "auth_methods", label: "인증 방식", kind: "multi", options: [c("api_key", "API key"), c("oidc", "OIDC·JWT"), c("mtls", "mTLS"), c("session", "세션 쿠키"), c("gateway_internal", "Gateway 내부 인증")] },
-          { key: "identity_source", label: "권한 판단에 쓰는 신원", kind: "choice", options: [c("authn_result", "인증 결과만"), c("verified_app_header", "앱이 검증해 넘긴 header"), c("service_account", "서비스 계정")] },
-          yesNo("strip_identity_headers", "외부에서 온 신원 header 제거·재생성", "적용", "적용 안 함"),
-        ],
+        fixed: "byul runtime이 정합니다. Gateway가 토큰 해시로 호출자를 인증하고 그 결과로만 권한을 판단하며, 엔진으로 보내는 header는 새로 만들어 외부 신원 header를 넘기지 않습니다.",
+        fields: [],
         numbers: [],
       },
       {
         id: "1.2",
         title: "작업·대상 인가",
         checks: ["REQ-001", "REQ-002", "REQ-003", "REQ-005", "REQ-006", "SUP-002", "OBS-007"],
-        gateway: "허용 모델은 아래 'Gateway 정책'의 허용 모델과 같아야 합니다.",
         fields: [
           { key: "model_access", label: "모델 사용 권한 단위", kind: "choice", options: [c("authenticated", "인증된 모두"), c("per_role", "역할별 허용표"), c("per_user", "사용자별 허용표")] },
           { key: "direct_access", label: "엔진 직통을 허용할 주체", kind: "multi", options: [c("none", "없음"), c("ops", "운영 관리자"), c("monitoring", "모니터링"), c("test_harness", "시험 도구")] },
@@ -401,22 +399,14 @@ export const SECURITY_FUNCTIONS: SecurityFunction[] = [
         id: "3.1",
         title: "최종 입력 검증",
         checks: ["REQ-007", "REQ-008", "REQ-009", "REQ-010"],
-        gateway: "출력 토큰·본문 크기·context 한도는 아래 'Gateway 정책' 값과 같아야 합니다.",
-        newBranch: "구조화 출력·tool 조합·embedding·offset 항목은 2026-10-27 새 분기(REQ-009·010)에서 생긴 정책입니다.",
+        see: "byul runtime은 chat·completions 두 경로만 열고 텍스트 입력만 받습니다. 객체 필드를 열 수 없어 구조화 출력은 쓸 수 없습니다.",
         fields: [
-          { key: "endpoints", label: "허용 endpoint", kind: "multi", options: [c("chat", "chat"), c("completions", "completions"), c("embeddings", "embeddings"), c("responses", "responses"), c("tokenize", "tokenize")] },
-          { key: "input_formats", label: "허용 입력 형식", kind: "multi", options: [c("text", "텍스트"), c("token_ids", "token ID"), c("prompt_embeds", "embedding")] },
           { key: "template_override", label: "요청자의 template 변경", kind: "choice", options: [c("forbidden", "금지"), c("admin_only", "운영자만"), c("allowed", "허용")] },
-          { key: "structured_output", label: "구조화 출력", kind: "choice", options: [c("forbidden", "금지"), c("limited", "한도 안에서 허용"), c("allowed", "허용")] },
           { key: "tool_choice", label: "허용 tool_choice", kind: "multi", options: [c("none", "none"), c("auto", "auto"), c("required", "required"), c("named", "함수 지정")] },
           { key: "offset_params", label: "offset 파라미터", kind: "choice", options: [c("forbidden", "금지"), c("allowed", "허용")] },
         ],
         numbers: [
           n("max_input_tokens", "입력 길이 한도", ["token"], ["모델별", "호출자별"]),
-          n("max_output_tokens", "출력 길이 한도", ["token"], ["모델별", "호출자별"]),
-          n("max_body", "본문 크기 한도", ["bytes", "KiB"], ["요청별"]),
-          n("schema_size", "구조화 출력 schema 크기", ["bytes", "KiB"], ["요청별"]),
-          n("schema_depth", "구조화 출력 깊이", ["단계"], ["요청별"]),
         ],
       },
       {
@@ -539,7 +529,7 @@ export const SECURITY_FUNCTIONS: SecurityFunction[] = [
           { key: "decrypt_roles", label: "복호화·열람 역할", kind: "multi", options: [c("security", "보안"), c("ops", "운영"), c("app_owner", "앱 담당")] },
           { key: "key_management", label: "키 관리", kind: "choice", options: [c("kms", "KMS"), c("hsm", "HSM"), c("app", "앱 자체")] },
         ],
-        numbers: [n("export_ttl", "반출 임시 권한 기간", ["시간", "일"], ["반출 건별"])],
+        numbers: [],
       },
       {
         id: "5.5",
@@ -581,7 +571,6 @@ export const SECURITY_FUNCTIONS: SecurityFunction[] = [
         title: "자원 예산·공정성",
         checks: ["LIF-001", "LIF-003", "LIF-004"],
         gateway: "동시 처리 한도는 runtime --max-concurrency와 같아야 합니다.",
-        newBranch: "미디어 처리 단계·누적 예산은 2026-10-27 새 분기(LIF-003)에서 생긴 정책입니다.",
         fields: [
           { key: "overflow", label: "한도 초과 시", kind: "choice", options: [c("reject", "거부"), c("queue", "대기"), c("degrade", "축소 처리")] },
           { key: "acquisition_retry", label: "모델 취득 재시도", kind: "choice", options: [c("forbidden", "금지"), c("limited", "한도 안에서 허용")] },

@@ -1,11 +1,11 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import type { EnvironmentDoc } from "../src/api/types";
+import type { EnvironmentDoc, PolicyDoc } from "../src/api/types";
 import { canonicalJson, environmentSnapshotSha256 } from "../src/lib/canonical";
 import { ALL_REQUIREMENTS, ENV_CONDITIONS, SECURITY_FUNCTIONS, visible, type InputField } from "../src/lib/frameworkCatalog";
-import { CONDITION_FACTS, DERIVED_FACTS, EnvironmentForm, REGISTERED_FACTS, claimSummary, deriveFact, newEnvironment } from "../src/pages/forms";
-import { renderAt } from "./helpers";
+import { CONDITION_FACTS, DERIVED_FACTS, EnvironmentForm, PolicyForm, REGISTERED_FACTS, claimSummary, deriveFact, newEnvironment, newPolicy, nextPolicyVersion } from "../src/pages/forms";
+import { mockApi, renderAt } from "./helpers";
 
 describe("environment snapshot", () => {
   it("matches the server hash (platform documents.environment_snapshot_sha256)", async () => {
@@ -87,10 +87,10 @@ describe("questions that appear only when needed", () => {
 
   it("drops questions the byul runtime Gateway already decides", () => {
     const keys = ENV_CONDITIONS.flatMap((c) => c.fields.map((f) => f.key));
-    for (const k of ["identity_to_engine", "streaming", "structured_output", "tools", "embedding_input", "token_id_input", "media_inputs", "responses_store", "batch_jobs", "echo_logprobs", "limit_enforcer"])
+    for (const k of ["identity_to_engine", "streaming", "structured_output", "tools", "embedding_input", "token_id_input", "media_inputs", "responses_store", "batch_jobs", "limit_enforcer"])
       expect(keys).not.toContain(k);
-    // 허용 모델은 runtime 정책에서 고르는 값이라 LoRA 요청 질문은 남긴다.
-    expect(keys).toContain("lora");
+    // 허용 모델·추가 허용 필드는 runtime 정책에서 고르는 값이라 관련 질문은 남긴다.
+    for (const k of ["lora", "offset_params", "echo_logprobs"]) expect(keys).toContain(k);
   });
 
   it("points every cross-card trigger at a real question", () => {
@@ -177,5 +177,70 @@ describe("environment form: one question per value", () => {
     expect(claimSummary("prefix_cache", claim)).toBeNull();
     expect(claimSummary("prefix_cache", { ...claim, references: ["values.yaml#L40"] })).toContain("기능 비활성");
     expect(claimSummary("prefix_cache", { ...claim, disabled: null, references: ["values.yaml#L40"] })).toBeNull();
+  });
+});
+
+describe("policy form", () => {
+  const ENV = {
+    meta: {},
+    document: { ...newEnvironment(), environment_id: "env-a", target: { target_ref: "svc-a", engine: { name: "vllm" }, model: { id: "model-a" } } },
+  };
+  const LIST = { items: [{ doc_id: "env-a", revision: 1, sha256: "a".repeat(64) }], source: {} };
+  const setup = (initial: PolicyDoc = newPolicy(), isNew = true) => {
+    mockApi({ "/api/environments": LIST, "/api/environments/env-a/revisions": LIST, "/api/environments/env-a/revisions/1": ENV });
+    const state = { doc: initial };
+    const Harness = () => {
+      const [d, setD] = useState(initial);
+      state.doc = d;
+      return <PolicyForm doc={d} setDoc={setD} issues={[]} warnings={[]} isNew={isNew} />;
+    };
+    renderAt("/", "/", <Harness />);
+    return state;
+  };
+
+  it("asks one question per value", () => {
+    setup();
+    expect(screen.queryByRole("radiogroup", { name: /값을 얻은 방법/ })).toBeNull();
+    expect(screen.queryByText("Gateway 정책 (runtime.gateway)")).toBeNull();
+    expect(screen.getAllByText(/^허용 모델/)).toHaveLength(1);
+    expect(ALL_REQUIREMENTS.flatMap((r) => r.numbers.map((n) => n.key))).not.toContain("max_output_tokens");
+    expect(ALL_REQUIREMENTS.flatMap((r) => r.numbers.map((n) => n.key))).not.toContain("export_ttl");
+    expect(ALL_REQUIREMENTS.find((r) => r.id === "1.1")?.fixed).toBeTruthy();
+  });
+
+  it("shows detailed questions only after choosing change", () => {
+    const state = setup();
+    const group = screen.getAllByRole("radiogroup", { name: "기존 승인 정책 처리" })[0];
+    expect(screen.queryByRole("radiogroup", { name: "모델 사용 권한 단위" })).toBeNull();
+    fireEvent.click(within(group).getByRole("radio", { name: "변경·새로 정함" }));
+    expect(screen.getByRole("radiogroup", { name: "모델 사용 권한 단위" })).toBeTruthy();
+    expect((state.doc as unknown as { framework_values: { requirements: Record<string, { decision: string }> } }).framework_values.requirements["1.2"].decision).toBe("change");
+  });
+
+  it("follows the base environment for target and models", async () => {
+    const state = setup();
+    const select = (await screen.findByRole("option", { name: "env-a" })).closest("select")!;
+    fireEvent.change(select, { target: { value: "env-a" } });
+    await waitFor(() => expect(state.doc.target_ref).toBe("svc-a"));
+    expect(state.doc.runtime.gateway.allowed_models).toEqual(["model-a"]);
+    expect(screen.queryByLabelText(/target_ref/)).toBeNull();
+  });
+
+  it("edits bounded extra fields and refuses reserved names", () => {
+    const state = setup();
+    const input = screen.getByRole("textbox", { name: "추가할 필드 이름" });
+    fireEvent.change(input, { target: { value: "stream" } });
+    expect((screen.getByRole("button", { name: "필드 추가" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(input, { target: { value: "temperature" } });
+    fireEvent.click(screen.getByRole("button", { name: "필드 추가" }));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "최대" }), { target: { value: "1" } });
+    expect(screen.getByText(/필요한 범위가 비어 있습니다: min/)).toBeTruthy();
+    expect(state.doc.runtime.gateway.extra_fields).toEqual({ temperature: { mode: "validate", type: "number", max: 1 } });
+  });
+
+  it("raises the policy version on save", () => {
+    expect(nextPolicyVersion("1")).toBe("2");
+    expect(nextPolicyVersion("v9")).toBe("v10");
+    expect(nextPolicyVersion("draft")).toBe("draft-2");
   });
 });

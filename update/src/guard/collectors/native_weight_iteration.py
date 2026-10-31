@@ -16,7 +16,7 @@ VERSION = "0.1.1"
 SCHEMA = "guard-native-weight-selection-iteration/1"
 SOURCE_PINS = {
     "vllm_weight_iteration_metadata.py": "f8ced901b1b1c7d918f96c9ef8ec0899696c2d161efbaefdd43dbedd340f04c0",
-    "vllm_weight_iteration_sensor.py": "e7494edaa0a512201652228acc73ac13621cb40d938e6f23b6d4eaba73d05bc6",
+    "vllm_weight_iteration_sensor.py": "6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648",
 }
 MAX_SELECTIONS = 256
 MAX_CANDIDATES = 256

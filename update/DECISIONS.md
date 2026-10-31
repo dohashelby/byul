@@ -695,3 +695,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 실제 C 직접대조로 확인한 namespace 차이는 합성 FunctionType 모듈의 __builtins__만 보완한다. 원worker3498의 실패와5receipt를 유지하고 assert AST가 같은 영향 worker68eb의 alias1을 합쳐6계약 근거를 제시하며 최초 전체실행6통과로 바꾸지 않는다. library descriptor/bytes·자기process mapping은 실제 관측이고 application/worker/model/정책 귀속은 EXAMPLE/UNKNOWN이다. helper/기술검증·actual C 하위관측·서빙/승인·최종소비/해제를 분리한다.
 
 - native18 A2 전용 분석은 원bytes로 소비하고 A1 제품 연결에서 root와 전후 locator를 엄격히 결합한다. 전용 오류는 기존 공통 관측을 지우지 않으며 공통 실패 뒤 재호출하지 않는다. 공통 pin은 전체 동일 경로 검토 후 새 고정 커밋으로 갱신하며 B160 원 승인쌍/원c9/helper는 보존한다. 새 A 기준은 B 재검토 전 거부됨을 시험하고 우회 승인하지 않는다.
+
+- B의 http_observation_invoked는 collect_http 호출 선택이며 target HTTP 실행 증거가 아니다. 실제 거부는 저장된 http_observation.gaps와 sample_attempted=false, target_io_attempted=false, requests0로 검증한다. A1 시험의 신규 fixture/메타데이터 기대 오류는 원 결과를 보존하고 제품/gate 수정 없이 선정 영향만 보수·재검증했다. 최신 전체suite 통과로 재집계하지 않는다.

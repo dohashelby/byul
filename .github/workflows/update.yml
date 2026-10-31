@@ -33,10 +33,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          # Pinned-commit tests read history with git show.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          # Native sensor code contracts are exact per interpreter; POSIX supports 3.12.3.
+          python-version: "3.12.3"
       - run: python -m pip install uv==0.12.11
       - run: uv sync --frozen
       - name: Measure default suite parent wall clock

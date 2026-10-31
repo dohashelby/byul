@@ -669,3 +669,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - A-1 PLT12의 copy source/session/inventory/policy 결합은 비민감 선언의 귀속·정합성 검사다. producer·사본 멤버십/처리·issuer/reuse 집행의 인증이 아니며 complete 선언·처리실패 선언을 실제 PASS/FAIL로 올리지 않는다. 기존 CLI cleanup 미완료 종료코드1과 앞선 유효 관측/후속오류 보존을 유지한다. 실제 운영 주체·위치/수신자·기한/방법/보존예외·재사용/복구 정책은 미확정으로 남긴다.
 
 - B154 원7파일의 A152 native21 source gate는 확정 bytes로 보존한다. 새 A공통 소비 검증383파일과 B 고정 old gate의 거부는 각각 기록한다. A가 B source pin/함수/private gate/판본을 바꾸지 않는다. Linux LIF13 peer·epoch·bounded recv는 실제 kernel·EXAMPLE frame의 별도 검증이며 원 vLLM recv_msg/RPC/weights/GPU·전체 판정 근거로 올리지 않는다.
+
+- B154의 raw7파일·원 source gate c39/062를 유지하고 새A공통9d/383 source 검증과 source gate 거부를 구분한다. 원B source의 native CLI 통과/6Ref와 새A의 거부를 섞지 않는다. B 입력변경 fixture의 native_observation keyword 누락과 Win 환경 오류는 B가 보수할 전달 근거로 남긴다. 독립 Linux peer3단계는 실제kernel/EXAMPLE frame이며 전체 LIF13·실제 worker/weights/GPU 판정으로 승격하지 않는다.

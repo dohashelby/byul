@@ -7,7 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from guard.cli import app
-from guard.collectors import record_access_evidence as bridge
+from guard.executors import record_access_evidence as bridge
 from guard.core.select import select
 from guard.models import DataOrigin, Mode
 from guard.store import Store

@@ -18,8 +18,8 @@ def rows(record):
             'source_validation':{'pre':'verified','post':{'status':'verified'},'boundary':'source_component'}})
 
 
-def test_formal_component_is_closed_without_root_pin():
-    assert c.PRODUCT_COMPONENT_COMMIT is None
+def test_formal_component_is_closed_without_root_pin(monkeypatch):
+    monkeypatch.setattr(c,'PRODUCT_COMPONENT_COMMIT',None)
     with pytest.raises(ValueError,match='SUP13_COMPONENT_PIN_UNCONFIGURED'):c.verify_component()
 
 @pytest.mark.parametrize('profile',['reference5d','target032',''])

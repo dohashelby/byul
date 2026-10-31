@@ -11,7 +11,7 @@ import yaml
 from typer.testing import CliRunner
 
 from guard.cli import app
-from guard.collectors import log_minimization_evidence as bridge
+from guard.executors import log_minimization_evidence as bridge
 from guard.core.select import select
 from guard.models import DataOrigin
 from guard.store import Store
@@ -78,12 +78,12 @@ def test_preflight_does_not_import_collector_or_make_output(case):
     program = '''
 import json,sys
 from pathlib import Path
-from guard.collectors import log_minimization_evidence as bridge
+from guard.executors import log_minimization_evidence as bridge
 args=json.loads(sys.argv[1])
 assert Path(bridge.__file__).resolve()==Path(sys.argv[2]).resolve()
 result=bridge.run(**args)
 assert not Path(args['output']).exists()
-assert 'guard.collectors.kubernetes_log_minimization' not in sys.modules
+assert 'guard.executors.kubernetes_log_minimization' not in sys.modules
 assert 'torch' not in sys.modules and 'vllm' not in sys.modules
 print(json.dumps(result))
 '''
@@ -92,7 +92,7 @@ print(json.dumps(result))
     before = bridge._inventory(case['source'].root)
     checked = subprocess.run([sys.executable, '-B', '-P', '-c', program,
         json.dumps({key: str(value) for key, value in case['args'].items()}),
-        str(root / 'src/guard/collectors/log_minimization_evidence.py')],
+        str(root / 'src/guard/executors/log_minimization_evidence.py')],
         cwd=case['source'].root.parent, env=environment, capture_output=True, text=True)
     assert checked.returncode == 0, checked.stderr
     result = json.loads(checked.stdout)

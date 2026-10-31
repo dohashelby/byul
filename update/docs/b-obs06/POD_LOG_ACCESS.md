@@ -12,7 +12,7 @@
 검사하며 출력 디렉터리 생성과 Kubernetes I/O를 수행하지 않는다.
 
 ```text
-python -m guard.collectors.record_access_evidence \
+python -m guard.executors.record_access_evidence \
   --store EXISTING_STORE --plan EXISTING_PLAN_ID --pack ORIGINAL_PACK31 \
   --target OWNED_TARGET_JSON --subjects SUBJECT_PLAN_JSON \
   --output FRESH_OUTPUT --entered-by DECLARED_OPERATOR

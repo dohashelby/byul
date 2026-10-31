@@ -2,8 +2,8 @@
 import json
 from types import SimpleNamespace
 
-from guard.collectors import kubernetes_record_access as collector
-from guard.collectors import record_access_evidence as bridge
+from guard.executors import kubernetes_record_access as collector
+from guard.executors import record_access_evidence as bridge
 from guard.models import DataOrigin
 from guard.store import Store
 from tests.test_record_access_evidence import case as prepared_case

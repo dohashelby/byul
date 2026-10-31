@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from guard.collectors import kubernetes_record_access as capture
+from guard.executors import kubernetes_record_access as capture
 from guard.models import DataOrigin
 from guard.runtime.bounded import capture_pipes
 from tests.builders import policy

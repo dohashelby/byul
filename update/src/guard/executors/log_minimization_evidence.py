@@ -106,7 +106,7 @@ def preflight(*, store, plan_id, pack, target, source_id, output, entered_by):
 
 
 def _capture(env, target, values, *, source_id, expected_policy_ref, workdir):
-    from guard.collectors.kubernetes_log_minimization import capture_log_minimization
+    from guard.executors.kubernetes_log_minimization import capture_log_minimization
     return capture_log_minimization(env, target, values, source_id=source_id,
                                     expected_policy_ref=expected_policy_ref, workdir=workdir)
 

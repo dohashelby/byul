@@ -129,7 +129,7 @@ def _codes(value):
 
 
 def _capture(environment, target, subjects, *, expected_policy_ref, workdir, binary, duration, timeout):
-    from guard.collectors.kubernetes_record_access import capture_record_access
+    from guard.executors.kubernetes_record_access import capture_record_access
     return capture_record_access(environment, target, subjects, expected_policy_ref=expected_policy_ref,
                                  workdir=workdir, binary=binary, duration=duration, timeout=timeout)
 

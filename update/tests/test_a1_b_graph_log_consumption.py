@@ -7,7 +7,7 @@ import types
 import pytest
 
 from guard.adapters import vllm_graph_buffers as graph
-from guard.collectors import log_minimization_evidence as bridge
+from guard.executors import log_minimization_evidence as bridge
 from guard.store import Store
 from tests.test_log_minimization_evidence import case as prepared_case
 from tests.test_vllm_graph_buffers import Object

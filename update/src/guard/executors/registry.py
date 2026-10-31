@@ -50,6 +50,7 @@ from .kubernetes_native_route import KubernetesNativeRouteExecutor
 from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
 from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
+from .template_source_cpu import TemplateSourceCPUExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
@@ -87,6 +88,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "log_analysis:real": lambda cfg: LogAnalysisExecutor(cfg.get("log_analysis", {}), environ=cfg.get("_runtime_environ")),
     "template_validation:real": lambda cfg: TemplateValidationExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ")),
     "template_validation:kubernetes": lambda cfg: KubernetesTemplateSupplyExecutor(cfg.get("template_validation", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "template_validation:source-cpu": lambda cfg: TemplateSourceCPUExecutor(cfg.get("template_validation", {})),
     "request_binding:real": lambda cfg: RequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ")),
     "request_binding:kubernetes": lambda cfg: KubernetesRequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "log_integrity:real": lambda cfg: LogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ")),

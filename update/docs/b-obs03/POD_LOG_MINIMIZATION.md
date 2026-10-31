@@ -10,7 +10,7 @@ override에 연결한다. CLI 등록·임시 팩·판정 기준·새 기업 정�
 collector를 import하지 않고 Kubernetes/API 요청이나 출력 경로 생성을 수행하지 않는다.
 
 ```text
-python -m guard.collectors.log_minimization_evidence \
+python -m guard.executors.log_minimization_evidence \
   --store ORIGINAL_STORE --plan EXISTING_PLAN_ID --pack ORIGINAL_PACK31 \
   --target EXACT_HTTP_TARGET_JSON --source-id DECLARED_POD_STDOUT_SOURCE_ID \
   --output FRESH_OUTPUT --entered-by DECLARED_OPERATOR

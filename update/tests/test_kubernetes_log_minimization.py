@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from guard.collectors import kubernetes_log_minimization as collector
+from guard.executors import kubernetes_log_minimization as collector
 from guard.models import DataOrigin
 from tests.builders import policy
 from tests.test_kubernetes_request_binding import env,target

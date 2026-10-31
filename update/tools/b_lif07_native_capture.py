@@ -62,7 +62,7 @@ def verify_source():
     root = Path(__file__).resolve().parents[2]
     path = root / 'update/tools/verify_req10_consumption.py'
     callback = root / 'update/src/guard/adapters/vllm_worker_readiness.py'
-    gate_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+    gate_sha256 = None if path.is_symlink() else hashlib.sha256(path.read_bytes()).hexdigest()
     approved_pair = (gate_sha256, gate.REVIEWED_COMMON_COMMIT) in APPROVED_GATE_PROFILES
     if (path.is_symlink() or not approved_pair
             or Path(gate.__file__).resolve() != path or Path(inspect.getsourcefile(gate.verify)).resolve() != path

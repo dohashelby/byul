@@ -284,3 +284,11 @@ def test_selected_a156_source_provenance_reaches_native21_capture(inputs,monkeyp
         'runtime_hash_approval':False,'producer_authenticated':False}
     assert result['data_origin']=='EXAMPLE' and result['requests']==result['pod_changes']==0
     assert result['ready_receiver_verified'] is None and result['service_gate_verified'] is None
+
+
+def test_source_gate_symlink_rejected_before_read(example_source_gate):
+    select,calls,root=example_source_gate;select(tool.REVIEWED_COMMON_COMMIT)
+    path=root/'update/tools/verify_req10_consumption.py'
+    path.unlink();path.symlink_to(root/'EXAMPLE-missing-gate')
+    with pytest.raises(ValueError,match='LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE'):tool.verify_source()
+    assert calls==[]

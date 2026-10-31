@@ -335,7 +335,8 @@ def project(raw, env, target, prepared, manifest, *, native_observation=False):
     source_validation = None
     if native_observation:
         claimed = raw.get('source_validation'); claimed = claimed if type(claimed) is dict else {}
-        source_validation = {'reviewed_common_commit': helper.REVIEWED_COMMON_COMMIT if claimed.get('reviewed_common_commit') == helper.REVIEWED_COMMON_COMMIT else None,
+        reviewed_common = claimed.get('reviewed_common_commit')
+        source_validation = {'reviewed_common_commit': reviewed_common if type(reviewed_common) is str and reviewed_common in helper.APPROVED_REVIEWED_COMMON_COMMITS else None,
             'approved_native_source_commit': helper.APPROVED_SOURCE_COMMIT if claimed.get('approved_native_source_commit') == helper.APPROVED_SOURCE_COMMIT else None,
             'runtime_hash_approval': False, 'producer_authenticated': False}
     return {'schema': SCHEMA, 'profile': PROFILE, 'environment_ref': env.ref().model_dump(mode='json'),

@@ -84,7 +84,19 @@ def test_existing_OBS02_keeps_common_facts_and_original_dedicated_gate_closed(tm
     from guard.collectors import native_weight_iteration as dedicated
     from guard.store import Store
     from tests import test_a1_weight_iteration_product as product
-    original=dedicated.analyze;rejections=[]
+    import hashlib,importlib.util,subprocess
+    # The approved new owner delivery restores the production consumer. Keep
+    # the negative case on an explicit immutable stale-owner fixture instead.
+    repo=Path(__file__).resolve().parents[2]
+    raw=subprocess.check_output(['git','show','3edb6ca39f99d17d18a6ad699d197adb40bb8635:update/src/guard/collectors/native_weight_iteration.py'],cwd=repo)
+    assert hashlib.sha256(raw).hexdigest()=='fd782cc94436b580c39eaad6a5b40553cd29850bb67710f9a5f1d32cf0c4d4e4'
+    fixture=tmp_path/'stale-owner';source=fixture/'collectors/native_weight_iteration.py';source.parent.mkdir(parents=True);source.write_bytes(raw)
+    (fixture/'adapters').mkdir()
+    for name in ('vllm_weight_iteration_metadata.py','vllm_weight_iteration_sensor.py'):
+        (fixture/'adapters'/name).write_bytes((Path(dedicated.__file__).resolve().parents[1]/'adapters'/name).read_bytes())
+    spec=importlib.util.spec_from_file_location('guard.collectors._stale_owner_native16',source)
+    stale=importlib.util.module_from_spec(spec);spec.loader.exec_module(stale)
+    original=stale.analyze;rejections=[]
     def observed(value):
         try:return original(value)
         except ValueError as error:

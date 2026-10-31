@@ -12,11 +12,11 @@ VERSION='0.1.0'
 SCHEMA='guard-native-scoped-mapping-candidates/1'
 SOURCE_PINS={
     'vllm_safe_open_mapping_metadata.py':'833030d5d24aad97bc7ec0050ef105488daeb0f2023987d75bb1d8ffdbc0be29',
-    'vllm_safe_open_mapping_sensor.py':'8984896304147ac6c47b3a3f84a56b2831df0f302e52fd95d8f9ccf7d103f92d',
+    'vllm_safe_open_mapping_sensor.py':'dd9e75f2752e042b43527ddd9cf13cc06a3c82fd4c5ba73cfe7114df7dcafaf1',
     'vllm_file_read_metadata.py':'b8c08652687eaf03a4749f85f099b0bcf3a09e2ec27a7e96eb767efdff346c93',
-    'vllm_file_read_sensor.py':'7729661d6611e40f527760b3029822bb9cb690f8a48931aa9e9c9fb00cab08e5',
+    'vllm_file_read_sensor.py':'e32c0a53e810735f9eaca1a648397af49ca259d264020fd0f99193c401b2697d',
     'vllm_weight_iteration_metadata.py':'f8ced901b1b1c7d918f96c9ef8ec0899696c2d161efbaefdd43dbedd340f04c0',
-    'vllm_weight_iteration_sensor.py':'e7494edaa0a512201652228acc73ac13621cb40d938e6f23b6d4eaba73d05bc6',
+    'vllm_weight_iteration_sensor.py':'6048767399a893605c693c49f89a3f97360ec081b59169b7ac29fb08ac9e7648',
 }
 MAX_CANDIDATES=128
 MAX_EVENTS=64

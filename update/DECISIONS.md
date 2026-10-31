@@ -703,3 +703,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - native19 양성 fixture는 원 A2와 같은 EXAMPLE library 대역 시점을 따른다. immutable observer code 검사 전 대역을 적용한 원실패를 보존하고 준비순서만 보수했다. source gate/parser/production library gate/원 assert는 유지한다. startup 호출 종료·root/link와 잘리지 않은 mapping 마지막 경계를 forward 이전에 대조하며 실제 worker/READY로 승격하지 않는다.
 
 - native16 capture=None은 두 binding=false인 admitted 실패행에만 허용하는 A2 원 보수로 소비한다. 누락을 관측/전체완료로 만들지 않고 다른 recording의 사실을 지우지 않는다. A1 executor 판본0.4.1·전체389파일 고정 pin을 갱신하며 source gate/parser·B 원 c9/helper/승인쌍과 native17/18/19 원bytes를 유지한다.
+
+- native16 부분iterator의 귀속은 원 DefaultModelLoader 호출 경계 안에서만 검증한다. 경계 밖 fixture의 정상 미귀속을 지우거나 assert를 완화하지 않고 입력을 구체적 bound early-close로 보수했으며 비소진을 추가 검증했다. CI가 고른3.12.15와 고정 지원 ABI3.12.14nt/3.12.3posix 차이는 정제 근거로 남기고 source/code gate를 자동완화하거나 검사설정을 바꾸지 않는다.

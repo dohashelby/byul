@@ -1669,3 +1669,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - OBS02/native19 A2 PR163 연결 검증: 원source9b795c4 양78통과9실패를 보존하고, fixture 준비순서만 보수한3fd89be의 선정28개 양OS통과. 인접W138/기존skip1·L139, guard281 설치일치·양설치CLI4/각24Ref와 소스CLI13/각78Ref 원반출물 확보. common d2ef4b9/389파일, B 원승인쌍 미승인 거부/HTTP0 유지. 실제worker/승인/최종tensor/전체분기와 정확HEAD CI5는 미완료다.
 
 - A-1 native16 부분수집: A2 f8f6025/PR143 전용3 원bytes의 analyze0.1.1을 기존 OBS02 0.4.1에서 소비한다. native17/PR144는 재적용하지 않았다. 다른 capture=None/binding=false가 있어도 유효 selection/iterator와 원recording index를 보존하는 정식CLI·후속첨부 복합오류·정확Ref 시험 초안을 고정한다. 실제 worker/승인/tensor/전체분기와 CI5는 미완료다.
+
+- native16 f8 부분capture 제품 소비 검증: 원68ad6d5 양55통과1실패를 보존하고 bound-partial fixture만 보수한e8ada7d 해당1사례 양통과. 인접W60/기존skip1·L61, guard281 설치일치·양설치CLI4/각24Ref, 원소스6+부분delta1/각42Ref. common4b6c0d2/389파일 고정·B미승인 거부 유지. PR166 실제CI는 Python3.12.15/native code gate 포함 default615실패169오류이며 CI5미완료, 결제차단으로 보지 않는다. 실제worker/승인/tensor/전체분기는 별도다.

@@ -44,12 +44,12 @@ def normalize_policy(values):
 
 
 class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
-    name="request_termination";version="0.1.0"
+    name="request_termination";version="0.2.0"
     requires_roles=False;requires_route_scope=False;functional_via="engine"
     check_id="LIF-10";collection_profile=PROFILE;policy_prefix="termination"
     policy_normalizer=staticmethod(normalize_policy);transport_profile=TERMINATION_PROFILE
     supported_native_profiles=frozenset({"vllm-native-lifecycle-metadata/8","vllm-native-lifecycle-metadata/9"})
-    configuration_keys=frozenset({'target','prepared','kubectl_binary','max_duration_seconds'})
+    configuration_keys=frozenset({'target','prepared','retry_scope','kubectl_binary','max_duration_seconds'})
 
     def __init__(self,cfg,*,runner=None,environ=None,expected_target_sha256=None):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target_sha256=expected_target_sha256
@@ -62,6 +62,10 @@ class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
         self.policy_normalizer(values)
 
     def _consumer(self,check):
+        if self.check_id=="LIF-10" and check.id=="LIF-12":
+            from .kubernetes_retry_records import KubernetesRetryRecordExecutor
+            return KubernetesRetryRecordExecutor(self.cfg,runner=self.runner,environ=self._environ,
+                expected_target_sha256=self.expected_target_sha256)
         if self.check_id=="LIF-10" and check.id=="REQ-12":
             from .kubernetes_request_attempts import KubernetesRequestAttemptsExecutor
             return KubernetesRequestAttemptsExecutor(self.cfg,runner=self.runner,environ=self._environ,
@@ -75,6 +79,7 @@ class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
         from guard.collectors.lifecycle import load_prepared
         try:
             if set(self.cfg)-self.configuration_keys or adapter is None:raise ValueError
+            if 'retry_scope' in self.cfg and (type(self.cfg['retry_scope']) is not str or not self.cfg['retry_scope']):raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             with Path(self.cfg["target"]).open("rb") as stream:target=strict_json(stream.read(65537),limit=65536)
             digest=sha256_hex(canonical_json(target))

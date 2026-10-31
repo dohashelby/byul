@@ -1637,3 +1637,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - A-1 B154 native21 소비 검토: 확정cbd7bae의 전용7파일을 A155903dd6f 위에 원 bytes로 받았다. 원 gate/c39/062 pin을 유지했고 현 A공통9d/383과의 차이·정확 거부/대상 미진입 시험을 분리했다. 실제 native 제품 지원은 B의 검토된 pin 갱신 전 미연결이다. B 원 EXAMPLE 시험과 독립 Linux stdlib peer3단계의 소스/소유 정리 경계를 검토하고 source 고정 후 검증 대기다. 새 worker/GPU/daemon/RPC/자격/Start/의존성 실행0이며 전체분기 미완료다.
 
 - A-1 B154 sourcea5c855b 결과 고정: B원7bytes 유지, 직접 W96통과/4실패·L98통과/2실패를 원 fixture 인자 누락·새 A 원gate 거부·Win권한/열린FD 차이로 구분했다. B원cbd/공통A1521438파일의 두node는 nativeCLI1통과/fixture1실패; 원6Ref를 현재A CLI 저장팩으로 재판정해 일치했다. LIF13 실제 Linux kernel3단계/소유정리 통과, frame EXAMPLE·원daemon/RPC/GPU0. Aguard275/383공통·wheel/설치 근거는 A155와 동일 재사용. 새A native제품은 B검토pin 갱신 전 미지원이며 전체분기/CI5 미완료다.
+
+- A-1 LIF12 선언 기록 제품 초안: 원 자동 retry/정상·수동대조·도전/원·새 attempt/잔존·반환·비용 기준을 보존하고 기존 request_termination 명시분기·소유 OBS01 reader·파생팩을 CLI까지 연결했다. source/code/config/image/model/ENV/run/session/PID-start·worker/clock·단위/source/epoch를 닫힌 비민감 scope에 고정한다. parser/후속오류/CLI·Ref 시험과 정적 검토를 마쳤으며 source 고정 후 검증 대기다. 원B7bytes·A2/adapters·과거팩/Ref를 유지하고 실제producer/retry/trigger/nonoccurrence/worker/cost는 미연결/UNKNOWN이다.

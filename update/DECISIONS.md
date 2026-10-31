@@ -671,3 +671,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - B154 원7파일의 A152 native21 source gate는 확정 bytes로 보존한다. 새 A공통 소비 검증383파일과 B 고정 old gate의 거부는 각각 기록한다. A가 B source pin/함수/private gate/판본을 바꾸지 않는다. Linux LIF13 peer·epoch·bounded recv는 실제 kernel·EXAMPLE frame의 별도 검증이며 원 vLLM recv_msg/RPC/weights/GPU·전체 판정 근거로 올리지 않는다.
 
 - B154의 raw7파일·원 source gate c39/062를 유지하고 새A공통9d/383 source 검증과 source gate 거부를 구분한다. 원B source의 native CLI 통과/6Ref와 새A의 거부를 섞지 않는다. B 입력변경 fixture의 native_observation keyword 누락과 Win 환경 오류는 B가 보수할 전달 근거로 남긴다. 독립 Linux peer3단계는 실제kernel/EXAMPLE frame이며 전체 LIF13·실제 worker/weights/GPU 판정으로 승격하지 않는다.
+
+- A-1 LIF12는 기존 request_termination:kubernetes의 명시 retry-record profile로 확장한다. 실제 retry나 실패 주입을 구현하지 않고 원 LIF10/REQ12 절차와 B/A2 원본을 유지한다. 같은 선정 process/worker/domain의 선언 내부 시간만 계산하고 다른 PID의 domain hash로 시계를 결합하지 않는다. 비용은 고정 단위/source/epoch별로만 비교하고 reset 이후는 미확인이다. 선언·모델 파일/Pod 소유·source/code hash를 실제 생산자/worker/retry/비용 인증으로 올리지 않는다. 새 공통2파일에 따라 A측 정확 소비 범위만383→385로 검토하며 B 원 c9/pin/gate와 전용7bytes는 바꾸지 않는다.

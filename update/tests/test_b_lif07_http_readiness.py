@@ -256,3 +256,35 @@ def test_HTTP_unvalidated_after_sample_retains_null_in_storage_and_recovery(case
     assert len(world.execs) == 3 and facts['http_observation']['snapshot'] is None
     assert facts['requests'] is facts['http_requests_attempted'] is facts['target_http_requests'] is None
     assert facts['target_io_attempted'] is None and PRIVATE not in json.dumps(facts)
+
+
+@pytest.mark.parametrize('reviewed,mode', [
+    (COMMON, 'normal'),
+    ('df6255e96a877ebfbe185230ed87320aa84d2c30', 'cleanup-after-canary'),
+    ('062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89', 'normal'),
+    ('9d8987a5a306ffce28fcb735e012c400589303f2', 'normal'),
+    (PRIVATE, 'normal'), (None, 'normal'), ([], 'normal'),
+])
+def test_HTTP_approved_feature_scope_preserves_selected_common_and_closes_others(case, monkeypatch, reviewed, mode):
+    """source gate의 확정 proof/set만 EXAMPLE 주입하고 실제 공개 sample/report/validator를 소비한다."""
+    world, created, window = configure(case, monkeypatch, mode)
+    approved = frozenset({COMMON, 'df6255e96a877ebfbe185230ed87320aa84d2c30'})
+    monkeypatch.setattr(helper, 'HTTP_APPROVED_REVIEWED_COMMON_COMMITS', approved, raising=False)
+    monkeypatch.setattr(helper, 'verify_source', lambda: {'reviewed_common_commit': reviewed})
+    observation = collect(case, window)
+    if type(reviewed) is str and reviewed in approved:
+        assert observation['source_validation'] == {'reviewed_common_commit': reviewed,
+            'runtime_hash_approval': False, 'producer_authenticated': False}
+        packet = observation['snapshot']; assert len(created) == 1 and observation['report_validated']
+        assert packet['requests'][0]['outcome'] == 200
+        assert all(packet[key] is False for key in public.FLAGS)
+        if mode == 'cleanup-after-canary':
+            assert len(world.execs) == 2 and packet['cleanup_errors'] and observation['collection_gap']
+            assert packet['requests'][1]['outcome'] == 200
+        else:
+            assert len(world.execs) == 3 and packet['sampling_complete']
+    else:
+        assert observation['source_validation'] is observation['snapshot'] is None
+        assert observation['gaps'] == ['HTTP_SOURCE_UNAVAILABLE'] and not observation['sample_attempted']
+        assert created == [] and not world.calls and not world.execs
+    assert PRIVATE not in json.dumps(observation) and A_PRIVATE not in json.dumps(observation)

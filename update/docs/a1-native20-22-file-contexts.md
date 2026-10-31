@@ -36,3 +36,17 @@
 초안 종료 후 소스와 bytes hash를 고정한다. 직접 검증은 세 profile의 정상·부분·누락·다른 귀속·중복·restart·잘못된 metadata·전체 상한·scope 거부와 입력 불변을 확인한다. 제품 검증은 세 profile의 정상·부분·후속 수집·첨부·다른 모델 사례를 기존 CLI·정확 Ref 왕복으로 확인한다. 기존 native19 공통 계약과 관련 parser/등록/불변식을 인접 검증한다. 설치본·정확 HEAD CI5와 A2/B 소비 검토 pin은 각각 별도로 인계한다.
 
 EXAMPLE 계측 fixture는 고정된 원본 native 함수 본문을 사용하지만 serving·Torch·C decoder·worker·권한은 모의 namespace다. library facade는 실제 관측기 code admission 후에만 대체하며 EXAMPLE로 기록한다. 실제 serving/backend/GPU·신뢰 생산자·승인·전체 분기 완료로 집계하지 않는다. 새 SDK/provider/취득 stage/resource 계측은 후속 독립 묶음이며 LIF12 요청 retry를 취득으로 바꾸지 않는다.
+
+
+## 검증 마감
+
+고정 검증 source는 `0b6ac4470482ea30d0bebd557defbc15acddf818`, 공통 소비 검토 커밋은 `084aca740c3193527c908aa2b4c596d936c01148`이다. 전체 공통 390파일의 검토 manifest는 `9566ce4ecf7dccac0ccb6486d880ee3b3e5dedd8a67c7687c61a1a6db67e15ad`이며 경로 제외·런타임 해시 승인은 없다.
+
+- 직접 Windows3.12.14/Linux3.12.15 각각36통과. 메타데이터21사례와 정식 OBS02 CLI15사례(세 profile×정상/부분/후속 수집 오류/첨부 오류/다른 모델), 정확90Ref 왕복을 포함한다. 입력 불변·원 recording 인덱스·잘린 목록과 다른 전체 상한·부분 루트·scope/코드 거부를 확인했다.
+- 인접/불변식 Windows244통과·기존 INV03 skip1, Linux245통과. 기존 native19 공개 기본 동작과 관측기 코드 gate·native0.32 거부·B 원 source gate를 재사용했다. 전체 suite 성공은 별도다.
+- wheel SHA256 `2c9b20a97cb27dfb6bdfdcd867099474ffd907d652a89fa49906cc7a885a8c3c`: Windows/Linux 설치282파일 일치, 각각 CLI4사례·정확24Ref 및 원팩·복원·저장팩 재판정. 세 profile의 정상과22 첨부 오류를 설치본에서 확인했다.
+- 원 source 증거 zip15사례/90Ref는 Windows `4f5d1130ea51162ae745c5419b2fc331005df198dfcf165e6cceb70d53ccfcf3`; Linux의 별도 원 zip과 반출 bytes 일치 근거도 인계에 기록한다. 설치본 원 증거 zip은 Windows `bc74da1035889fdadd65447222646ba1caf9e171f8ceb1c2b5c863f93d22f5f3`, Linux `0e580422c5e8c8fc68567b82d576315722c5efdfc633da1a8a2f8eb384b70ea8`이다.
+
+초기 시험 수집의 fixture 함수명 오류와 첫 직접24통과/12실패씩의 원 결과를 보존했다. 제품 실패는 새 초안이 기존 Kubernetes API 이미지 결합과 별도의 node/runtime 이미지 미검증을 합친 데서 발생했다. 기존 reader/image gate를 바꾸지 않고 두 의미를 분리했다. native22 endpoint의 더 강한 false 값은 보존하며, 공통 startup journal의 프로세스/파일 root 사실을 별도 제공했다. 초안의 이미지/프로세스 결합 시험은 이 기존 계약을 명시적으로 검증하도록 정정했다. 기존 제품 assert·사례·gate·검사 범위는 제거하지 않았다. source locator는 journal 그룹 순서가 아닌 전체 최소·최대 Ref로 고정했다.
+
+A2 전용 소비·분석·새 pin, B 승인 source pair, 정확 통합 HEAD CI5, 실제 serving/worker/backend/GPU·승인·최종 tensor는 미완료다. 공통 입력 제공과 OBS02 공통 제품 소비를 전용 SUP05/06 또는 전체 A39/A1완료로 집계하지 않는다.

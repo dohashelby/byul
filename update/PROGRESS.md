@@ -1645,3 +1645,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - A-1 Worker HTTP 공통 입력 초안: B154 LIF07의 Running/Unready health 전후·한 token chat 범위를 별도 공개 profile/schema에 구현하고, 기존 A1 LIF09가 이미 사용한 startup 결합을 공유한다. 원 probe/일반 Ready gate/B7·전용 분석은 유지한다. 정확 ENV/model/세대/session/기한·출력/정리·후기 오류·엄격 envelope 검증과 직접/기존 LIF09 CLI 시험 초안·정적 검토를 마쳤으며 소스 고정 후 영향 검증 대기다. 실제 Kubernetes/worker/GPU·B 제품 연결/지연·전체 준비는 미연결이다.
 
 - A-1 Worker HTTP source f6fe356: 원 runtime 그대로 초기 Windows/Linux180통과+시험 계약 보수1개씩 통과, 인접 Windows265(기존skip1)/Linux266, 설치279파일·격리API6/기존LIF09 CLI4·정확24Ref 왕복을 확인했다. 공통387파일 검토 pin과 B7/probe/generic gate 원 bytes를 보존한다. B 전용 연결·실제 cluster/worker/GPU·delay·전체LIF07/09/부모A는 미완료이며 exactHEAD CI는 별도다.
+
+- A-1 B154 a7c6cab 확정 보수6파일 원 bytes를 A158 후속에 통합했다. B가 승인한 A152/A156 정확 쌍과 현재 A158 거부를 구분하며 source/provenance·fixture/정적 검토 후 고정 검증 대기다. 원 kernel3은 원8파일 반출로 제공하고 실제 daemon/GPU/worker·원LIF13 UNKNOWN은 유지한다.

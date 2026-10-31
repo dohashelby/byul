@@ -67,3 +67,13 @@ A parser가 검증한 Worker source/body/entry/code 사실, 국소 객체 생성
 A의 callback 오류는 `None` 또는 `CALLBACK_UNAVAILABLE` enum으로, 정리 실패는 `CALLBACK_CLOSE_UNAVAILABLE` gap으로 보존한다. 알 수 없는 값은 원문을 저장하지 않고 미수집 상태와 구분한다. native manual 본문은 선정 bootstrap SEND의 관측 상태를 첨부로 안내하고, 상위 READY·receiver·서비스·canary는 별도 미확인으로 적는다.
 
 직접 연결 시험은 기본적으로 회차별 소유 임시 폴더에서 실행하고 정상 finalizer로 정리한다. 보존이 필요할 때만 `BYUL_LIF07_NATIVE_CONTRACT_EVIDENCE`에 새 외부 경로를 명시한다. 이미 존재하는 보존 경로는 재사용·삭제하지 않는다. 최초 1532161 판본의 273개 보존 파일과 Ref는 당시 source 근거로 유지하며, 이후 helper 수정 결과를 소급하지 않는다.
+
+### A156 고정 공통 소스 소비
+
+A156 고정 head `3feae2234a4516e024882fd2206c062d52e1e287`(통합 source `a5c855bd431a3ccaaad9209da243437456f9bcc2`)는 B154 전용7파일을 원 bytes로 포함한다. 원 A152 gate와 검토 common `062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89`의 허용은 유지하고, 검토한 A156 gate bytes와 common `9d8987a5a306ffce28fcb735e012c400589303f2`의 정확한 쌍만 추가한다. 각 gate의 원 full-scope ancestor/index/archive/shadow·PACK31·framework·helper858 검사를 그대로 수행한다. 현재 소스의 해시를 새 승인값으로 채택하지 않는다.
+
+native21 원 소스 승인 `b88b4a6491a9a0c2908b962b837247c0cea80b55`와 bootstrap/상위 READY 구분은 유지한다. 소비 첨부의 `reviewed_common_commit`에는 실제 선택한 검토 common을 보존하며 `approved_native_source_commit`은 원 native21 승인값이다. 이 두 값은 서로 다른 역할이다. A156 full383 소비 검증의 manifest는 `35054eaf31cc41a50c9f8ad568510f7afe5cacac27d1ceadac05bad65cde3070`이며 원 A152 full378 근거도 보존한다. 미승인 gate/common 조합은 수집 전 닫힌다.
+
+A156가 보고한 원 입력파일 변경 시험의 keyword 인자 누락은 해당 fixture가 `native_observation`을 원 project에 그대로 전달하도록 보수했다. 입력 변경 감지·안전 facts 보존·출력/EVD 미생성·비공개 값 비저장 assert를 유지하며 원 실패를 보존한다. 이 보수와 source 소비 추가는 actual worker/READY 수신/서비스/GPU 실증을 추가하지 않는다.
+
+고정 A156 소비 소스에서 새 helper와 consumer를 함께 연결한 공개 `main(argv)`→원 Store/반출·복원 1건이 통과했다(1.10초). A 공개 gate와 실제 B helper는 주입 없이 실행했고 reader 전송만 `UnavailableReader` EXAMPLE로 바꿨다. 새 보고서는 `RPT-01M67VAS8V18B8QQV30DS9EQ3J@1`, SHA `de39ccdd3b00181442b1af016ec7ab923bafc837a87c2f901da159f68111cbec`다. 첨부 reviewed common은 `9d8987a…`, native 승인은 원 `b88b4a6…`이며 원 source·정확6Ref·복원 검증·3UNKNOWN과 실제 대상0을 보존한다. 이전 A152/EXAMPLE 보고서와 원 실패는 새 결과로 덮어쓰지 않는다.

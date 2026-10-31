@@ -1,6 +1,6 @@
 # PLT12 사본 처리 기록 소비 초안
 
-상태: 구현·시험 코드 초안. 아직 검증 source/hash를 고정하지 않았고 기능·설치·정확 Ref 검증과 확정 커밋/전달은 마감 전이다. 실제 사본 멤버십·처리·재사용 집행은 미연결이며 전체 PLT12/부모 A 완료를 주장하지 않는다.
+상태: CPU/EXAMPLE 선언 기록의 제품 연결 검증 완료. 검증 source는 `fe1e5b395416f73899a2fb640af7f60035a48750`, 검토된 공통 소비 기준은 `9d8987a5a306ffce28fcb735e012c400589303f2`다. 정확 HEAD CI와 실제 환경 검증은 별도 미완료다. 실제 사본 멤버십·처리·재사용 집행은 미연결이며 전체 PLT12/부모 A 완료를 주장하지 않는다.
 
 소비자는 기존 `required_event_record:kubernetes` 실행기다. PLT12의 명시 `kubernetes-credential-copy-record-observation-v1` 선택에서만 새 기록 계약을 사용하며, OBS01 /1의 사건·역할·요청 의미는 유지한다. 공통 `RequiredEventReader`의 선정 소유 session 파일 읽기와 ENV/target/Pod/container/image/restart/start 경계를 재사용한다. A-2의 credential 후보 관측·파일 판정은 수정하지 않는다.
 
@@ -31,3 +31,5 @@ projection은 같은 사건의 반복 snapshot을 중복 집계하지 않고, ID
 팩 생성기는 원 PACK31의 PLT12 질문·정상대조·절차·PASS/FAIL/UNKNOWN 문구와 나머지76개 정의 bytes를 보존한다. 기존 select→run/수집→EVD→RES→RPT→verify→반출/복원·저장팩 정확 Ref 재판정 경로를 사용한다.
 
 실제 생산자·신뢰·사본의 멤버십/위치/수신자, 처리 기한/방법/보존 예외, 허용 수집 범위, 실제 reuse enforcer·issuer·정상대조와 복구/정리 책임은 기존 질문의 미확정 입력이다. 실제 사본 내용 취득·교체/회수/삭제·권한 변경·자격 재사용은 이 읽기 전용 기록 묶음의 수행 결과가 아니다. 원 source/image/lab gate·native0.32 미지원과 원GPU창종료/추가Start0·기존 비용/EBS·CI 경계는 유지한다.
+
+검증은 Windows/Linux 직접91개씩, 인접 Windows304개(기존skip1·기본제외1)/Linux305개(기본제외1), Windows 설치275파일 일치와 격리 Linux 설치본 CLI4사례(정상·재사용 허용 선언·후속 수집 오류·첨부 오류)의 정확24Ref 반출/복원·저장팩 재판정으로 마쳤다. 최초source821a577의 두 OS 90통과/1실패와 기존 cleanup 오류 CLI 종료코드1에 맞춘 시험 보수 근거를 보존했다. 새 skip·assert 삭제·게이트 우회·제품 판정 변경은 없다. 이 결과는 전체 suite·실제 자격/사본 처리·재사용 집행·serving/worker/GPU 실증을 뜻하지 않는다.

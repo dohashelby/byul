@@ -665,3 +665,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - A-1 LIF09 native22는 기존 실행기의 명시 판본으로 creator/selected recv/sender의 정확 원14/21 사건 Ref와 Linux held-FIFO domain 후보를 제공한다. PID/rank/time-only join·Windows HANDLE 변환·get_mp_context 추가 호출을 하지 않는다. 양성 EXAMPLE 두 identity와 inline Process.start 대역은 물리 worker 증거가 아니다. runtime endpoint token과 코드 승인 pin을 구분하며 실제 trust/전체 준비/service·fault/repair 판정을 올리지 않는다.
 
 - A-1 PLT12는 같은 required_event_record:kubernetes의 명시 copy profile로 추가한다. OBS01 /1/역할/요청 의미와 A2 후보 코드·원 기준을 보존하며 new copy_inventory는 비민감 정책 입력이다. producer/source hash·파일 소유 결합·자기 complete/처리/issuer 선언은 실제 사본/처리/reuse 신뢰가 아니다. 실제 값·운영 주체와 승인 질문은 미확정으로 두고 이 소프트웨어 단계는 읽기 전용·모든 축UNKNOWN이다.
+
+- A-1 PLT12의 copy source/session/inventory/policy 결합은 비민감 선언의 귀속·정합성 검사다. producer·사본 멤버십/처리·issuer/reuse 집행의 인증이 아니며 complete 선언·처리실패 선언을 실제 PASS/FAIL로 올리지 않는다. 기존 CLI cleanup 미완료 종료코드1과 앞선 유효 관측/후속오류 보존을 유지한다. 실제 운영 주체·위치/수신자·기한/방법/보존예외·재사용/복구 정책은 미확정으로 남긴다.

@@ -1631,3 +1631,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - A-1 native22/LIF09 source726254e 검증: 직접57개씩, 인접 W377(기존skip1·기본제외1)/L378(기본제외1), 설치273파일·격리 CLI4/정확24Ref를 마쳤다. 기존43adapter bytes와76정의·과거팩/Ref, B 원 c9 pin을 보존한다. 최초source581c9d4의 W2실패/11설정오류·L20실패/11설정오류 및 fixture/명시 미지원 gap 보수를 보존했다. CPU EXAMPLE source bodies/inline Process.start 대역·소유 pipe 범위이며 실제 serving/worker/Torch/GPU와 전체 준비·fault/repair/service·전체 분기는 미완료, CI5도 미확인이다. 원GPU창종료/추가Start0·기존비용/EBS·의존성 질문 대기를 유지한다.
 
 - A-1 PLT12 사본 기록 제품 초안: 원 사본 정책·실제 처리·재사용 요구와 다른76정의/A2원본을 보존하고 기존 required_event_record/OBS01 reader에 닫힌 UUID inventory·처리/reuse/issuer 선언의 읽기 전용 소비를 연결했다. 정상/상충/누락/교체/후속오류·CLI/정확Ref 시험을 작성했고 source 고정 후 검증 대기다. 실제 producer·사본 멤버십/처리/reuse·issuer는 미연결/UNKNOWN이고 비밀 취득/변경/재사용 요청·AWS/Start/새 의존성은0이다.
+
+- A-1 PLT12 사본 선언 sourcefe1e5b3: 기존 required_event_record0.2/OBS01 reader·새 닫힌 copy profile·파생pack1/PLT12rev4를 CLI까지 연결했다. 직접 W/L91씩, 인접 W304(기존skip1·제외1)/L305(제외1), 설치275파일·격리CLI4/정확24Ref를 검증했다. 최초821a577 두 OS90통과/1실패는 cleanup 오류의 기존 종료코드1 시험 보수로 마감했다. A2/B bytes·원 기준/76정의·과거팩/Ref를 유지한다. 실제 사본/producer/처리/reuse/issuer 미연결·모든 축UNKNOWN·전체분기false, 정확HEAD CI5 미확인, 추가Start/새 의존성0이다.

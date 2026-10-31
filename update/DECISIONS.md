@@ -683,3 +683,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - B154의 A156 정확 gate/common 허용은 A158의 새 공통 기준 승인이 아니다. B전용 원 bytes를 유지하고 현재full387 검증과 B exact-pair 거부, 승인된 A156 reference 소비를 별도로 검증한다. B fixture/runtime pin을 A측에서 완화하거나 새 skip/우회로 통과시키지 않는다.
 
 - B154 고정 승인쌍은 A152/A156에 한정되며 현재 A158 공통387파일의 자동 승인이 아니다. 현재소스의 B 실패/fixture오류를 기록하고 승인된 A156+같은Bbytes 참조102통과를 별도 근거로 제공한다. B 원본을 재작성·완화·skip하지 않으며 현재 버전 소비 pin과 fixture 확장은 B가 검토한다. 원 kernel proof 반출과 새로운 실제 실증을 구분한다.
+
+- B160의 사전검토 A158 source 쌍은 확정 원 bytes로 소비한다. A측 통합시험의 기존 거부 기대는 B의 명시 새쌍에 맞춰 승인을 요구하고 미승인쌍 음성검사는 계속 유지한다. B fixture/assert/pin을 대신 완화하지 않는다. guard source/wheel279 bytes는 변하지 않으며 B 소스전용 gate와 설치본 혼합경계는 분리한다.

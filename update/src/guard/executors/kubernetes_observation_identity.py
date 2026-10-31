@@ -52,8 +52,42 @@ def _attach_scoped_mapping_contexts(trials,projection):
     return trials
 
 
+def _attach_startup_file_contexts(trials,projection):
+    """Match both admitted startup and loader root, including terminal bounds."""
+    attachments=[]
+    for trial in trials:
+        for model in trial['configured_model_candidates']:
+            locator=model['native_locator'];context=locator['context'];joined=[]
+            for candidate in projection['candidates']:
+                if not (model['same_process_loader_object_linked'] and model['source_process_context_verified']
+                        and candidate['recording']==locator['recording']
+                        and candidate['pid']==context['pid'] and candidate['start_ticks']==context['start_ticks']
+                        and candidate['observed_model_object_sha256']==model['session_model_object_sha256']):continue
+                events=[candidate[key] for key in ('startup_call_event','startup_terminal_event','root_event','root_link_event','first_mapping_event','last_mapping_event')]
+                if not all(event[0]==locator['recording'] and event[1]<locator['forward_seq']
+                        for event in [*events,*candidate['mapping_source_events']]):continue
+                roots=[root for root in model.get('weight_iteration_candidates',[])
+                    if root['recording']==candidate['recording'] and root['pid']==candidate['pid'] and root['start_ticks']==candidate['start_ticks']
+                    and root['model_object_sha256']==candidate['observed_model_object_sha256']
+                    and root['call_sha256']==candidate['root_load_sha256'] and root['loader_call_sha256']==candidate['loader_call_sha256']
+                    and root['factory_seq']==candidate['root_event'][1] and root['last_seq']<locator['forward_seq']
+                    and root['process_binding_verified'] and root['source_verified'] and root['loader_call_model_link_observed']]
+                if not roots:continue
+                if not any(start['recording']==candidate['recording'] and start['pid']==candidate['pid'] and start['start_ticks']==candidate['start_ticks']
+                        and start['model_object_sha256']==candidate['observed_model_object_sha256'] and start['root_load_sha256']==candidate['root_load_sha256']
+                        and start['worker_call_sha256']==candidate['startup_call_sha256'] and start['worker_point']==candidate['startup_point']
+                        and start['worker_start_seq']==candidate['startup_call_event'][1] and start['worker_end_seq']==candidate['startup_terminal_event'][1]
+                        and start['root_event_seq']==candidate['root_event'][1] and start['link_event_seq']==candidate['root_link_event'][1]
+                        and start['same_startup_model_root_candidate'] and start['process_binding_verified']
+                        for start in model.get('worker_startup_candidates',[])):continue
+                joined.append(candidate)
+            attachments.append((model,joined))
+    for model,candidates in attachments:model['scoped_startup_file_context_candidates']=candidates
+    return trials
+
+
 class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
-    name='observation_identity';version='0.3.0';collection_profile=PROFILE
+    name='observation_identity';version='0.4.0';collection_profile=PROFILE
     supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8',weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE})
     policy_normalizer=staticmethod(contract.normalize_policy)
 
@@ -157,6 +191,15 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
                 value['identity_native_models']=startup_metadata.attach_configured_models(value['identity_native_models'],value['worker_startup'])
             except (ValueError,KeyError,TypeError,OSError,RuntimeError):
                 value['worker_startup']=None;value['worker_startup_diagnostic']='WORKER_STARTUP_CONSUMER_UNAVAILABLE';ctx._termination_gap=True
+            if value['worker_startup'] is not None:
+                try:
+                    from guard.collectors import native_worker_model_files as dedicated_startup_files
+                    value['scoped_startup_file_contexts']=dedicated_startup_files.analyze(packet,ctx._termination_prepared)
+                    _attach_startup_file_contexts(value['identity_native_models'],value['scoped_startup_file_contexts'])
+                except (ImportError,ValueError,KeyError,TypeError,OSError,RuntimeError):
+                    value['scoped_startup_file_contexts']=None
+                    value['scoped_startup_file_context_diagnostic']='NATIVE_WORKER_FILE_CONSUMER_UNAVAILABLE'
+                    ctx._termination_gap=True
         return value
 
     def collect(self,ctx):
@@ -182,7 +225,7 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
             model_sha256=sha256_hex(ctx.env.model.id.encode()),revision_sha256=sha256_hex(ctx.env.model.revision.encode()),
             inventory_sha256=ctx.env.model.inventory_sha256)
         summary.update(profile=PROFILE,identity_projection=projected,identity_record_collections=state['collections'],
-            scope='OBS01 /1 declarations and source-bound native8/16/17/18 configured-object, iterator, scoped eager FD/read and safe_open context candidates; approval/inspection authority, approved physical model scope, actual tensor use and enterprise policy remain unverified.')
+            scope='OBS01 /1 declarations and source-bound native8/16/17/18/19 configured-object, iterator, scoped eager FD/read, safe_open and startup/file context candidates; approval/inspection authority, approved physical model scope, actual tensor use and enterprise policy remain unverified.')
         if state['reader'] is not None:
             summary['identity_record_transport']=state['reader'].report()
             if summary['identity_record_transport'].get('parent_cleanup_unverified'):
@@ -202,6 +245,8 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
             summary['diagnostic_codes'].append('NATIVE_MODEL_MAPPING_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         if summary['projection'].get('worker_startup_diagnostic')=='WORKER_STARTUP_CONSUMER_UNAVAILABLE':
             summary['diagnostic_codes'].append('WORKER_STARTUP_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
+        if summary['projection'].get('scoped_startup_file_context_diagnostic')=='NATIVE_WORKER_FILE_CONSUMER_UNAVAILABLE':
+            summary['diagnostic_codes'].append('NATIVE_WORKER_FILE_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         values={'identity_record_collections':state['collections'],'identity_declared_records':projected['records'],
             'identity_native_models':models,'identity_binding_candidates':projected['candidates'],
             'identity_conflict_candidates':projected['conflict_candidates'],'identity_missing':projected['missing'],

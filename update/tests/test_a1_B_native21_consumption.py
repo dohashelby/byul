@@ -18,7 +18,7 @@ def test_original_B160_eight_files_are_exact_confirmed_bytes():
 
 def test_new_A_full_common_pin_passes_while_unreviewed_B160_pair_is_closed():
     proof=gate.verify(ROOT)
-    assert proof['files_verified']==388 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
+    assert proof['files_verified']==389 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
     assert not proof['original_B_default_pin_changed']
     assert gate.REVIEWED_COMMON_COMMIT not in native.APPROVED_REVIEWED_COMMON_COMMITS
     with pytest.raises(ValueError,match='^LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE$'):native.verify_source()

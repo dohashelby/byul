@@ -1663,3 +1663,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - A-1 OBS02/native18: A2 PR162 0adedb5의 전용3파일 원bytes를 소비해 기존 identity 실행기 0.3.0의 summary/EVD에 동일 recording/PID/start/model/loader/root 및 forward 이전 context 후보를 연결했다. 잘린 마지막 source locator·원자적 첨부·후속 소비 오류/공통 사실 보존과 기존 CLI/정확Ref 검증 초안을 고정한다. 실제 worker/승인/tensor/해제 및 SUP05/06 전체 완료가 아니며 PR164 실제C CPU 구성요소 근거는 별도다.
 
 - OBS02/native18 A2 PR162 연결의 source6077141 영향 검증 마감: 원 v1 양OS78통과4실패9준비오류→시험 보수 v2 양26통과3실패(native18제품25통과)→B 저장관측 보수 v3 양4통과를 각 소스대로 보존한다. 인접W258/기존skip1·제외1/L259·제외1, wheel280·양설치CLI4/정확24Ref, 소스13사례/각78Ref 원반출물이다. 공통3e105b7/388파일이며 B 원승인쌍은 미소비 새A를 닫힌 상태로 거부한다. 실제worker/GPU/승인/tensor/전체분기와 CI5는 미완료다.
+
+- A-1 OBS02/native19: A2 PR163 715755e의 전용3파일 원bytes를 기존 identity 실행기0.4.0에 연결한다. 동일 startup/model/loader/root/process와 startup 종료·잘린 마지막mapping·root 마지막seq를 forward 이전에 결합하며 첨부 원자성과 공통/전용 소비 오류 격리를 추가했다. 고정 검증 대기이며 EXAMPLE library 대역을 명시한다. 실제 worker/READY/승인/최종tensor·GPU·SUP05/06 전체 완료로 집계하지 않는다.

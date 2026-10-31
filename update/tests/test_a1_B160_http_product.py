@@ -50,7 +50,7 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
     # real closed gate and exact product refs until B reviews that fixed pair.
     if gate.REVIEWED_COMMON_COMMIT not in helper.APPROVED_REVIEWED_COMMON_COMMITS:
         proof=gate.verify(Path(__file__).resolve().parents[2])
-        assert proof['files_verified']==388 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
+        assert proof['files_verified']==389 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
         with pytest.raises(ValueError,match='^LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE$'):helper.verify_source()
         now=utcnow();argv=['--collect-http']
         window={'http_validity_start':(now-timedelta(seconds=30)).isoformat(),'http_validity_end':(now+timedelta(minutes=3)).isoformat()}

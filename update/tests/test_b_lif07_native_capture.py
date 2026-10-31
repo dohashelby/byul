@@ -226,3 +226,61 @@ def test_nested_capture_diagnostics_preserve_real_public_codes_and_filter_privat
     result=tool.collect_startup(*inputs,_reader_factory=UnavailableReader,_capture_session=lambda *a,**k:deepcopy(packet))
     assert expected<=set(result['native_collection']['parser_diagnostic_codes'])
     assert 'LIF07_NATIVE_PARSER_ADDITIONAL_GAP' in result['gaps'] and PRIVATE not in json.dumps(result)
+
+
+@pytest.fixture
+def example_source_gate(tmp_path, monkeypatch):
+    """고정 원 gate bytes/출처 검사와 delegation만 검증하는 EXAMPLE 전송이다."""
+    import types
+    import tools
+    root=tmp_path/'EXAMPLE-source';path=root/'update/tools/verify_req10_consumption.py'
+    path.parent.mkdir(parents=True)
+    original=(REPO/'update/tools/verify_req10_consumption.py').read_bytes()
+    new_common='9d8987a5a306ffce28fcb735e012c400589303f2'
+    old=original.replace(new_common.encode(),tool.REVIEWED_COMMON_COMMIT.encode())
+    assert tool.hashlib.sha256(old).hexdigest()==tool.GATE_SHA256
+    callback=root/'update/src/guard/adapters/vllm_worker_readiness.py'
+    callback.parent.mkdir(parents=True);callback.write_bytes((REPO/'update/src/guard/adapters/vllm_worker_readiness.py').read_bytes())
+    calls=[];namespace={'calls':calls}
+    # fullscope 실행은 root의 실제 A152/A156 proof를 재사용한다.
+    exec(compile('def verify(root):\n calls.append(root)\n return {"reviewed_common_commit": common, "runtime_hash_approval": False}\n',str(path),'exec'),namespace)
+    gate=types.SimpleNamespace(__file__=str(path),verify=namespace['verify'])
+    monkeypatch.setattr(tools,'verify_req10_consumption',gate,raising=False)
+    monkeypatch.setattr(tool,'__file__',str(root/'update/tools/b_lif07_native_capture.py'))
+    def select(common, file_common=None, mutate=False):
+        namespace['common']=common;gate.REVIEWED_COMMON_COMMIT=common
+        raw=old.replace(tool.REVIEWED_COMMON_COMMIT.encode(),(file_common or common).encode())
+        path.write_bytes(raw+(b'\n# EXAMPLE unreviewed variation\n' if mutate else b''))
+    return select,calls,root
+
+
+@pytest.mark.parametrize('common',sorted(tool.APPROVED_REVIEWED_COMMON_COMMITS))
+def test_reviewed_gate_pair_delegates_unchanged_fullscope_and_records_source(example_source_gate,common):
+    select,calls,root=example_source_gate;select(common)
+    proof=tool.verify_source()
+    assert calls==[root]
+    assert proof=={'reviewed_common_commit':common,'runtime_hash_approval':False}
+    assert tool.APPROVED_SOURCE_COMMIT=='b88b4a6491a9a0c2908b962b837247c0cea80b55'
+    assert tool.NATIVE_PROFILE=='vllm-native-lifecycle-metadata/21'
+
+
+@pytest.mark.parametrize('common,file_common,mutate',[
+    (tool.REVIEWED_COMMON_COMMIT,'9d8987a5a306ffce28fcb735e012c400589303f2',False),
+    ('9d8987a5a306ffce28fcb735e012c400589303f2',tool.REVIEWED_COMMON_COMMIT,False),
+    ('0'*40,None,False),(tool.REVIEWED_COMMON_COMMIT,None,True),
+    ('9d8987a5a306ffce28fcb735e012c400589303f2',None,True),
+])
+def test_unreviewed_or_mixed_gate_pair_rejected_before_fullscope(example_source_gate,common,file_common,mutate):
+    select,calls,_=example_source_gate;select(common,file_common,mutate)
+    with pytest.raises(ValueError,match='LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE'):tool.verify_source()
+    assert calls==[]
+
+
+def test_selected_a156_source_provenance_reaches_native21_capture(inputs,monkeypatch):
+    common='9d8987a5a306ffce28fcb735e012c400589303f2'
+    monkeypatch.setattr(tool,'verify_source',lambda:{'reviewed_common_commit':common,'runtime_hash_approval':False})
+    result=tool.collect_startup(*inputs,_reader_factory=UnavailableReader)
+    assert result['source_validation']=={'reviewed_common_commit':common,'approved_native_source_commit':tool.APPROVED_SOURCE_COMMIT,
+        'runtime_hash_approval':False,'producer_authenticated':False}
+    assert result['data_origin']=='EXAMPLE' and result['requests']==result['pod_changes']==0
+    assert result['ready_receiver_verified'] is None and result['service_gate_verified'] is None

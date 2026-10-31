@@ -22,6 +22,13 @@ APPROVED_SOURCE_COMMIT = 'b88b4a6491a9a0c2908b962b837247c0cea80b55'
 REVIEWED_COMMON_COMMIT = '062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89'
 GATE_SOURCE_COMMIT = 'c39a36b7a6f306b910f0314b0deee10b55390dc4'
 GATE_SHA256 = '5ac8204da0bc92858ab64591078d4ddb19aa2ed10a25f5437031611c1620282e'
+# gate bytes와 검토 common은 독립 허용 목록이 아니라 승인된 정확한 조합이다.
+APPROVED_GATE_PROFILES = frozenset({
+    (GATE_SHA256, REVIEWED_COMMON_COMMIT),
+    ('67b917029c6458fc16cc53be787134d652fdb096673721a486febe4d68a0c0b6',
+     '9d8987a5a306ffce28fcb735e012c400589303f2'),
+})
+APPROVED_REVIEWED_COMMON_COMMITS = frozenset(pair[1] for pair in APPROVED_GATE_PROFILES)
 CALLBACK_SHA256 = 'a583d32f31d74def618256557ee9e7aee801d5fe1ff55e27b6221d7f2420a965'
 GAPS = frozenset({'LIF07_NATIVE_READER_UNAVAILABLE','LIF07_NATIVE_PRE_SNAPSHOT_UNAVAILABLE',
  'LIF07_NATIVE_POST_SNAPSHOT_UNAVAILABLE','LIF07_NATIVE_API_EPOCH_CHANGED','LIF07_NATIVE_INITIAL_CAPTURE_UNAVAILABLE',
@@ -55,10 +62,11 @@ def verify_source():
     root = Path(__file__).resolve().parents[2]
     path = root / 'update/tools/verify_req10_consumption.py'
     callback = root / 'update/src/guard/adapters/vllm_worker_readiness.py'
-    if (path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != GATE_SHA256
+    gate_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+    approved_pair = (gate_sha256, gate.REVIEWED_COMMON_COMMIT) in APPROVED_GATE_PROFILES
+    if (path.is_symlink() or not approved_pair
             or Path(gate.__file__).resolve() != path or Path(inspect.getsourcefile(gate.verify)).resolve() != path
-            or callback.is_symlink() or hashlib.sha256(callback.read_bytes()).hexdigest() != CALLBACK_SHA256
-            or gate.REVIEWED_COMMON_COMMIT != REVIEWED_COMMON_COMMIT):
+            or callback.is_symlink() or hashlib.sha256(callback.read_bytes()).hexdigest() != CALLBACK_SHA256):
         raise ValueError('LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE')
     return gate.verify(root)
 

@@ -5,7 +5,7 @@ import argparse,hashlib,json,subprocess,sys
 # Reviewed B4cfc immutable log/graph/ID and native16/17 common checkpoint; native8~15/REQ02/IPC
 # retain the full original common scope and all trust/whole-scope gates.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='3e105b75b7a1c24bf0bab7e950667581063b43b4'
+REVIEWED_COMMON_COMMIT='d2ef4b9cf6010fc940b113f764170c355b1c7f15'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

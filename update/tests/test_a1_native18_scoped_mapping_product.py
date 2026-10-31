@@ -12,6 +12,7 @@ from tests.test_native_model_mappings import fixture as mapping_fixture
 from tests.test_a1_safe_open_mapping_product import test_existing_identity_product_native18_consumption_and_exact_refs as run_existing_product
 from tests.test_kubernetes_lifecycle import group,target as native_target
 from tests.test_lifecycle_sensor import writer_factory
+from tests.test_lifecycle_capture import case,external
 from tests.test_a1_weight_iteration_sensor import PRIVATE
 
 

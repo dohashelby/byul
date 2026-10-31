@@ -60,7 +60,11 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
         # B defines this flag as collect_http, even when the source gate stops
         # that invocation before any HTTP request or target exec.
         assert summary['http_observation_invoked'] is True and summary['source_unchanged'] and summary['exact_refs_restored']
-        assert 'HTTP_SOURCE_UNAVAILABLE' in json.dumps(summary)
+        record=summary['safe_facts'] if mode=='attachment' else json.loads((out/'worker-readiness.json').read_text(encoding='utf-8'))
+        observation=record['http_observation']
+        assert observation['gaps']==['HTTP_SOURCE_UNAVAILABLE'] and observation['snapshot'] is None
+        assert observation['source_validation'] is None and observation['sample_attempted'] is False
+        assert record['target_io_attempted'] is False and record['http_collection_attempted'] is False
         assert tool._inventory(case['source'].root)==before and processes
         left=Store.read_only(out/'store');right=Store.read_only(out/'restored')
         objects=[obj for kind in ('ENV','POL','PLAN','EVD','RES','RPT') for obj in left.iter_kind(kind)]

@@ -4,6 +4,7 @@ import importlib
 import inspect
 import sys
 import types
+from pathlib import Path
 
 import pytest
 from guard.adapters import vllm_lifecycle_sensor as base8
@@ -11,6 +12,9 @@ from guard.adapters import vllm_online_sensor as online
 from guard.adapters import vllm_weight_iteration_sensor as iteration
 from guard.adapters import vllm_weight_iteration_metadata as metadata
 from tests.test_a1_weight_iteration_sensor import make_world,packet
+from tests.test_kubernetes_lifecycle import group,target as native_target
+from tests.test_lifecycle_sensor import writer_factory
+from tests.test_lifecycle_capture import case,external
 
 SENSORS=('attempt','file_read','initialization','profiler','rank_failure','ready_endpoint',
          'request_output','safe_open_mapping','stream_buffer','weight_iteration',
@@ -73,3 +77,25 @@ def test_resealed_unknown_runtime_does_not_become_an_approval():
         for record in row['capture']['records']:
             if record['event']=='WEIGHT_ITERATION':record['payload']['observer_runtime']='cpython-3.12.16'
     with pytest.raises(ValueError):metadata.project(value)
+
+
+@pytest.mark.parametrize('mode',['normal','partial','later-record-error','attachment'])
+def test_existing_OBS02_keeps_common_facts_and_original_dedicated_gate_closed(tmp_path,group,native_target,writer_factory,monkeypatch,mode):
+    from guard.collectors import native_weight_iteration as dedicated
+    from guard.store import Store
+    from tests import test_a1_weight_iteration_product as product
+    original=dedicated.analyze;rejections=[]
+    def observed(value):
+        try:return original(value)
+        except ValueError as error:
+            assert str(error)=='NATIVE_WEIGHT_ITERATION_COMMON_SOURCE_MISMATCH'
+            rejections.append('NATIVE_WEIGHT_ITERATION_COMMON_SOURCE_MISMATCH')
+            raise
+    monkeypatch.setattr(dedicated,'analyze',observed)
+    product.test_existing_identity_product_native16_consumption_and_exact_refs(tmp_path,group,native_target,writer_factory,monkeypatch,mode)
+    assert rejections
+    evd,=Store.read_only(tmp_path/'store').iter_kind('EVD')
+    models=[model for row in evd.observations['identity_native_models'].value for model in row['configured_model_candidates']]
+    assert any(model.get('weight_iteration_candidates') for model in models)
+    assert all(model.get('weight_selection_iteration_candidates',[])==[] for model in models)
+    assert evd.execution.status.value=='ABORTED'

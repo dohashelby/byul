@@ -1,5 +1,6 @@
 """EXAMPLE exact upstream bodies + real B callback/writer/parser; no serving/GPU."""
 import ast
+import os
 import asyncio
 from copy import deepcopy
 import hashlib
@@ -72,7 +73,12 @@ def world(external,monkeypatch):
     code=compile(Path(callback.__file__).read_bytes(),'guard/adapters/vllm_online_input.py','exec',dont_inherit=True,optimize=0)
     assert legacy.code_digest(code)==online.runtime_contract()['callback_code_sha256']
     exec(code,cb.__dict__)
-    fake=FakeOS();monkeypatch.setattr(online,'os',fake)
+    fake=FakeOS();
+    class HostRuntimeOS:
+        name=os.name
+        if hasattr(os,'uname'):uname=staticmethod(os.uname)
+        def __getattr__(self,key):return getattr(fake,key)
+    monkeypatch.setattr(online,'os',HostRuntimeOS())
     base.os=fake;base._open_directory=lambda p:10;base._context=lambda:dict(CONTEXT)
     base.threading=SimpleNamespace(RLock=threading.RLock,Thread=SilentThread,Event=threading.Event)
     online.configure(base,cb)

@@ -1,4 +1,5 @@
 """Explicit10 real middleware/writer/parser; native producer is CPU EXAMPLE."""
+import os
 import asyncio
 from copy import deepcopy
 import hashlib
@@ -31,7 +32,12 @@ def world(external,monkeypatch):
     assert lifecycle.load_prepared(external/'assets/manifest.json')==prepared
     base=types.ModuleType('_attempt_base_fixture');base.__file__=legacy.__file__
     exec(compile(Path(legacy.__file__).read_bytes(),legacy.__file__,'exec',dont_inherit=True,optimize=0),base.__dict__)
-    fake=FakeOS();base.os=fake;monkeypatch.setattr(attempt,'os',fake)
+    fake=FakeOS();base.os=fake
+    class HostRuntimeOS:
+        name=os.name
+        if hasattr(os,'uname'):uname=staticmethod(os.uname)
+        def __getattr__(self,key):return getattr(fake,key)
+    monkeypatch.setattr(attempt,'os',HostRuntimeOS())
     base._context=lambda:dict(CONTEXT);base._open_directory=lambda p:10
     base.threading=SimpleNamespace(RLock=threading.RLock,Thread=SilentThread,Event=threading.Event)
     attempt.configure(base)

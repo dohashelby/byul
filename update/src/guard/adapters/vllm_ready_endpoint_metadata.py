@@ -64,7 +64,7 @@ def validate_event(value):
             elif (value['reader_token'] is None or value['wait_seq'] is None or value['wait_payload_sha256'] is None
                   or value['delegate_code_sha256']!=contract.DELEGATE_CODES[runtime]['recv']):raise ValueError
         if value['phase']=='CALL' and (value['endpoint_after_sha256'] is not None or op=='RECV' and value['status'] is not None):raise ValueError
-        if runtime!='cpython-3.12.3' and any(value[k] is not None for k in ('endpoint_before_sha256','endpoint_after_sha256')):raise ValueError
+        if runtime not in {'cpython-3.12.3','cpython-3.12.15'} and any(value[k] is not None for k in ('endpoint_before_sha256','endpoint_after_sha256')):raise ValueError
     except (KeyError,TypeError,ValueError):raise ValueError('READY_ENDPOINT_EVENT_INVALID') from None
 
 

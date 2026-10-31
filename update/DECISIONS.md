@@ -693,3 +693,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - 새 승인 답변은 고정 native18 C·CPU 의존성11개와 전용환경/합성6사례만 허용한다. 프로젝트·기존환경·AWS/GPU·serving/worker·기업승인/최종tensor 소비 범위나 기존46.66USD/과거사용량·시간을 확대/초기화하지 않는다.
 
 - 실제 C 직접대조로 확인한 namespace 차이는 합성 FunctionType 모듈의 __builtins__만 보완한다. 원worker3498의 실패와5receipt를 유지하고 assert AST가 같은 영향 worker68eb의 alias1을 합쳐6계약 근거를 제시하며 최초 전체실행6통과로 바꾸지 않는다. library descriptor/bytes·자기process mapping은 실제 관측이고 application/worker/model/정책 귀속은 EXAMPLE/UNKNOWN이다. helper/기술검증·actual C 하위관측·서빙/승인·최종소비/해제를 분리한다.
+
+- native18 A2 전용 분석은 원bytes로 소비하고 A1 제품 연결에서 root와 전후 locator를 엄격히 결합한다. 전용 오류는 기존 공통 관측을 지우지 않으며 공통 실패 뒤 재호출하지 않는다. 공통 pin은 전체 동일 경로 검토 후 새 고정 커밋으로 갱신하며 B160 원 승인쌍/원c9/helper는 보존한다. 새 A 기준은 B 재검토 전 거부됨을 시험하고 우회 승인하지 않는다.

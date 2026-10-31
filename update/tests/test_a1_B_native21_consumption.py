@@ -16,20 +16,19 @@ def test_original_B160_eight_files_are_exact_confirmed_bytes():
     assert native.GATE_SOURCE_COMMIT=='c39a36b7a6f306b910f0314b0deee10b55390dc4'
     assert native.REVIEWED_COMMON_COMMIT=='062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89'
 
-def test_new_A_full_common_pin_and_B160_reviewed_source_both_pass():
+def test_new_A_full_common_pin_passes_while_unreviewed_B160_pair_is_closed():
     proof=gate.verify(ROOT)
-    assert proof['files_verified']==387 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
+    assert proof['files_verified']==388 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
     assert not proof['original_B_default_pin_changed']
-    accepted=native.verify_source()
-    assert accepted['reviewed_common_commit']==gate.REVIEWED_COMMON_COMMIT and accepted['files_verified']==387
-    assert accepted['paths_excluded']==[] and accepted['runtime_hash_approval'] is False
+    assert gate.REVIEWED_COMMON_COMMIT not in native.APPROVED_REVIEWED_COMMON_COMMITS
+    with pytest.raises(ValueError,match='^LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE$'):native.verify_source()
 
 def test_real_B_gate_still_rejects_an_unapproved_pair_before_reader_or_remote_IO(tmp_path,monkeypatch):
     from tests.test_b_lif07_native_capture import make_inputs
     env,target,prepared,manifest=make_inputs(tmp_path)
-    # Explicit negative case: remove only the new reviewed pair in this test.
-    # No production gate or B original bytes are changed.
-    monkeypatch.setattr(native,'APPROVED_GATE_PROFILES',frozenset(pair for pair in native.APPROVED_GATE_PROFILES if pair[1]!=native.HTTP_REVIEWED_COMMON_COMMIT))
+    # The new A common pair has not been reviewed by B. Its literal approval
+    # set remains intact; no source gate replacement is used here.
+    assert gate.REVIEWED_COMMON_COMMIT not in native.APPROVED_REVIEWED_COMMON_COMMITS
     def forbidden(*args,**kwargs):raise AssertionError('unreviewed native capture reached reader or remote IO')
     monkeypatch.setattr(socket,'socket',forbidden);monkeypatch.setattr(subprocess,'Popen',forbidden)
     with pytest.raises(ValueError,match='^LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE$'):
@@ -42,5 +41,5 @@ def test_B_reviewed_exact_A152_A156_A158_pairs_are_closed_and_literal():
         ("67b917029c6458fc16cc53be787134d652fdb096673721a486febe4d68a0c0b6","9d8987a5a306ffce28fcb735e012c400589303f2"),
         ("15701b1e83eab8665414456b3072bcad73ee2220ed02e9f63a06a3441b55d157","f277fecd6df1e59505c0ad731032593f6fb22885")})
     assert gate.REVIEWED_COMMON_COMMIT=="f277fecd6df1e59505c0ad731032593f6fb22885"
-    assert gate.REVIEWED_COMMON_COMMIT in native.APPROVED_REVIEWED_COMMON_COMMITS
+    assert gate.REVIEWED_COMMON_COMMIT not in native.APPROVED_REVIEWED_COMMON_COMMITS
     assert PREVIOUS_B154_BYTES["update/tests/linux_cpu/lif13_peer_probe.py"]==REVIEWED_B_BYTES["update/tests/linux_cpu/lif13_peer_probe.py"]

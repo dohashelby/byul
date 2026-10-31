@@ -1659,3 +1659,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - B391506a metadata source24ad477의 원bytes pin1사례가 양OS 통과했고 검증 중1471파일 변경0이다. B source/runtime 동작은 source1506685와 같아 기능·설치·각24Ref를 재사용한다. 후속C CPU 의존성11개·다운로드250MiB/전용3GiB·합성6사례 승인 답변을 받았으며 이 문서묶음 인계 후 승인된 고정실행안을 진행한다.
 
 - 승인된 native18 C·CPU 구성요소6계약을 원5receipt+namespace 보완 alias1 영향검증으로 확인했다. 최초6사례 프로세스의 실패·설치전 metadata오분류와 원본을 보존하며 assert AST/guard/gate는 동일하다. 실제 C0.8/Torch2.13+cpu·자기mapping만 관측했고 vLLM/ENV/model/callback EXAMPLE·worker/승인/최종tensor/해제 미확인이다. 누적202775336bytes/전용958570431bytes로 각상한 안이며1407source 전후동일, 대상10파일은 현재source와 같다. 원증거zip435bfdbb…를 반출했고 native0.32/serving/GPU/부모A 미완료를 유지한다.
+
+- A-1 OBS02/native18: A2 PR162 0adedb5의 전용3파일 원bytes를 소비해 기존 identity 실행기 0.3.0의 summary/EVD에 동일 recording/PID/start/model/loader/root 및 forward 이전 context 후보를 연결했다. 잘린 마지막 source locator·원자적 첨부·후속 소비 오류/공통 사실 보존과 기존 CLI/정확Ref 검증 초안을 고정한다. 실제 worker/승인/tensor/해제 및 SUP05/06 전체 완료가 아니며 PR164 실제C CPU 구성요소 근거는 별도다.

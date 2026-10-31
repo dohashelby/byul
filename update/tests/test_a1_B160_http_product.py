@@ -17,6 +17,7 @@ from guard.runtime.kubernetes_worker_readiness import FLAGS
 from guard.store import Store
 from tools import b_lif07_readiness as tool
 from tools import b_lif07_native_capture as helper
+from tools import verify_req10_consumption as gate
 from tests.test_b_lif07_readiness import case, PRIVATE
 from tests.test_b_lif07_http_readiness import World, A_PRIVATE
 
@@ -45,6 +46,39 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
             if path.name=='worker-readiness.json':raise OSError(PRIVATE)
             return original(path,value)
         monkeypatch.setattr(tool,'_write',unavailable)
+    # A new common integration is not an implicit B approval. Exercise the
+    # real closed gate and exact product refs until B reviews that fixed pair.
+    if gate.REVIEWED_COMMON_COMMIT not in helper.APPROVED_REVIEWED_COMMON_COMMITS:
+        proof=gate.verify(Path(__file__).resolve().parents[2])
+        assert proof['files_verified']==388 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
+        with pytest.raises(ValueError,match='^LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE$'):helper.verify_source()
+        now=utcnow();argv=['--collect-http']
+        window={'http_validity_start':(now-timedelta(seconds=30)).isoformat(),'http_validity_end':(now+timedelta(minutes=3)).isoformat()}
+        for key,value in {**case['args'],**window}.items():argv+=['--'+('plan' if key=='plan_id' else key.replace('_','-')),str(value)]
+        tool.main(argv);summary=json.loads(capsys.readouterr().out);out=case['args']['output']
+        assert world.execs==[] and summary['requests']==summary['http_requests_attempted']==0
+        assert not summary['http_observation_invoked'] and summary['source_unchanged'] and summary['exact_refs_restored']
+        assert 'HTTP_SOURCE_UNAVAILABLE' in json.dumps(summary)
+        assert tool._inventory(case['source'].root)==before and processes
+        left=Store.read_only(out/'store');right=Store.read_only(out/'restored')
+        objects=[obj for kind in ('ENV','POL','PLAN','EVD','RES','RPT') for obj in left.iter_kind(kind)]
+        assert len(objects)==6 and left.verify()==right.verify()==[]
+        assert all(right.resolve(obj.ref()).to_dict()==obj.to_dict() for obj in objects)
+        result,=left.iter_kind('RES');report,=left.iter_kind('RPT');plan,=left.iter_kind('PLAN')
+        assert result.verdicts.model_dump(mode='json')=={key:'UNKNOWN' for key in ('security','functional','performance')}
+        runner=CliRunner();checked=runner.invoke(app,['judge','--plan',plan.id,'--as-of',report.created_at.isoformat(),'--store',str(out/'restored')])
+        assert checked.exit_code==0
+        checked=runner.invoke(app,['verify','--store',str(out/'restored')]);assert checked.exit_code==0
+        final=Store.read_only(out/'restored');assert final.verify()==[]
+        assert all(final.resolve(obj.ref()).to_dict()==obj.to_dict() for obj in objects)
+        assert [obj.ref() for obj in final.iter_kind('RES')]==[result.ref()]
+        saved=tmp_path/'product';shutil.copytree(out,saved)
+        receipt={'case':mode,'source_gate':proof,'B_pair_approved':False,'requests':0,
+            'source_gate_API_parser_mocked':False,'actual_target_worker_GPU':False,
+            'exact_refs':[obj.ref().model_dump(mode='json') for obj in objects],
+            'original_export_sha256':sha256_hex((saved/'evidence.zip').read_bytes()),'saved_pack_rejudge_equal':True}
+        (tmp_path/'a1-product-receipt.json').write_bytes(canonical_json(receipt))
+        return
     proof=helper.verify_source()
     assert proof['files_verified']==387 and proof['reviewed_common_commit']=='f277fecd6df1e59505c0ad731032593f6fb22885'
     assert proof['runtime_hash_approval'] is False and proof['paths_excluded']==[]

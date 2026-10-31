@@ -18,8 +18,42 @@ from .kubernetes_observation_state import OBSERVATIONS as BASE_OBSERVATIONS
 OBSERVATIONS={**BASE_OBSERVATIONS,**contract.OBSERVATIONS}
 
 
+def _attach_scoped_mapping_contexts(trials,projection):
+    """Attach bounded candidates to the same admitted root before a forward.
+
+    The untruncated last locator is mandatory: the first 64 source events
+    alone cannot establish that the whole context preceded this forward.
+    Compute every attachment before mutating models so a consumer error
+    cannot leave a partially attached dedicated projection.
+    """
+    attachments=[]
+    for trial in trials:
+        for model in trial['configured_model_candidates']:
+            locator=model['native_locator'];context=locator['context'];joined=[]
+            for candidate in projection['candidates']:
+                if not (model['same_process_loader_object_linked'] and model['source_process_context_verified']
+                        and candidate['recording']==locator['recording']
+                        and candidate['pid']==context['pid'] and candidate['start_ticks']==context['start_ticks']
+                        and candidate['observed_model_object_sha256']==model['session_model_object_sha256']):continue
+                events=[candidate['root_event'],candidate['first_source_event'],candidate['last_source_event'],*candidate['source_events']]
+                if not all(event[0]==locator['recording'] and event[1]<locator['forward_seq'] for event in events):continue
+                if not candidate['root_last_seq']<locator['forward_seq']:continue
+                if not any(root['recording']==candidate['recording'] and root['pid']==candidate['pid']
+                        and root['start_ticks']==candidate['start_ticks']
+                        and root['model_object_sha256']==candidate['observed_model_object_sha256']
+                        and root['call_sha256']==candidate['root_load_sha256']
+                        and root['loader_call_sha256']==candidate['loader_call_sha256']
+                        and root['factory_seq']==candidate['root_event'][1] and root['last_seq']==candidate['root_last_seq']
+                        and root['process_binding_verified'] and root['source_verified'] and root['loader_call_model_link_observed']
+                        for root in model.get('weight_iteration_candidates',[])):continue
+                joined.append(candidate)
+            attachments.append((model,joined))
+    for model,candidates in attachments:model['scoped_mapping_context_candidates']=candidates
+    return trials
+
+
 class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
-    name='observation_identity';version='0.2.0';collection_profile=PROFILE
+    name='observation_identity';version='0.3.0';collection_profile=PROFILE
     supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8',weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE})
     policy_normalizer=staticmethod(contract.normalize_policy)
 
@@ -102,6 +136,17 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
                 value['identity_native_models']=mapping_metadata.attach_configured_models(value['identity_native_models'],value['safe_open_mappings'])
             except (ValueError,KeyError,TypeError,OSError,RuntimeError):
                 value['safe_open_mappings']=None;value['safe_open_mapping_diagnostic']='SAFE_OPEN_MAPPING_CONSUMER_UNAVAILABLE';ctx._termination_gap=True
+            # Dedicated consumption is isolated from the already-admitted
+            # common facts. Never re-project after a common consumer failure.
+            if value['safe_open_mappings'] is not None:
+                try:
+                    from guard.collectors import native_model_mappings as dedicated_mappings
+                    value['scoped_mapping_contexts']=dedicated_mappings.analyze(packet,ctx._termination_prepared)
+                    _attach_scoped_mapping_contexts(value['identity_native_models'],value['scoped_mapping_contexts'])
+                except (ImportError,ValueError,KeyError,TypeError,OSError,RuntimeError):
+                    value['scoped_mapping_contexts']=None
+                    value['scoped_mapping_context_diagnostic']='NATIVE_MODEL_MAPPING_CONSUMER_UNAVAILABLE'
+                    ctx._termination_gap=True
         if ctx._termination_prepared['profile']==startup_sensor.PROFILE:
             value['weight_iteration']=startup_metadata.project_iterations(packet)
             value['identity_native_models']=weight_metadata.attach_configured_models(value['identity_native_models'],value['weight_iteration'])
@@ -137,7 +182,7 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
             model_sha256=sha256_hex(ctx.env.model.id.encode()),revision_sha256=sha256_hex(ctx.env.model.revision.encode()),
             inventory_sha256=ctx.env.model.inventory_sha256)
         summary.update(profile=PROFILE,identity_projection=projected,identity_record_collections=state['collections'],
-            scope='OBS01 /1 declarations and source-bound native8/16/17 configured-object, iterator and scoped eager FD/read candidates; approval/inspection authority, approved physical model scope, actual tensor use and enterprise policy remain unverified.')
+            scope='OBS01 /1 declarations and source-bound native8/16/17/18 configured-object, iterator, scoped eager FD/read and safe_open context candidates; approval/inspection authority, approved physical model scope, actual tensor use and enterprise policy remain unverified.')
         if state['reader'] is not None:
             summary['identity_record_transport']=state['reader'].report()
             if summary['identity_record_transport'].get('parent_cleanup_unverified'):
@@ -153,6 +198,8 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
             summary['diagnostic_codes'].append('NATIVE_MODEL_FILE_READ_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         if summary['projection'].get('safe_open_mapping_diagnostic')=='SAFE_OPEN_MAPPING_CONSUMER_UNAVAILABLE':
             summary['diagnostic_codes'].append('SAFE_OPEN_MAPPING_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
+        if summary['projection'].get('scoped_mapping_context_diagnostic')=='NATIVE_MODEL_MAPPING_CONSUMER_UNAVAILABLE':
+            summary['diagnostic_codes'].append('NATIVE_MODEL_MAPPING_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         if summary['projection'].get('worker_startup_diagnostic')=='WORKER_STARTUP_CONSUMER_UNAVAILABLE':
             summary['diagnostic_codes'].append('WORKER_STARTUP_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         values={'identity_record_collections':state['collections'],'identity_declared_records':projected['records'],

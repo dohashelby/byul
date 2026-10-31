@@ -6,7 +6,7 @@ B 소비기는 원 PACK31 LIF07 revision 5의 질문·정상 대조·challenge 3
 PYTHONPATH=src:. python -m tools.b_lif07_readiness --store SOURCE --plan PLAN --pack packs/PACK-BASELINE --target target.json --prepared prepared/manifest.json --manifest cohort.json --output /fresh/output --entered-by operator
 ```
 
-기본은 preflight이며 native observer·torch·vLLM import와 대상 I/O를 수행하지 않는다. `--execute`는 기존 원Store를 export/restore한 신선한 Store에 현재 capability 공백과 관측을 저장한다. 승인된 A worker/READY-send·Unready HTTP·별도 지연 계약은 모두 `None`이라 실제 요청·Pod 변경·지연은 0이다. 다른 점검 profile이나 private `_verify(False)`로 관문을 우회하지 않는다.
+기본은 preflight이며 고정 callback의 metadata 정의·closed vocabulary 적재를 허용한다. observer 생성·snapshot·close 실행, native 수집 helper·torch·vLLM import와 대상 I/O는 수행하지 않는다. `--execute`는 기존 원Store를 export/restore한 신선한 Store에 현재 capability 공백과 관측을 저장한다. 승인된 A worker/READY-send·Unready HTTP·별도 지연 계약은 모두 `None`이라 실제 요청·Pod 변경·지연은 0이다. 다른 점검 profile이나 private `_verify(False)`로 관문을 우회하지 않는다.
 
 manifest는 `byul-lif07-cohort/1`, 정확 ENV Ref/target canonical SHA/session/run_id/owner/recovery_owner와 단일 `request`를 요구한다. 요청은 기존 chat body의 API alias·user message 1개·max_tokens 1·temperature 0이다. ENV 모델 repository/revision/inventory와 `guard.model-request-mapping`의 API model은 별도로 검증한다. prompt·token·RID·secret을 증거에 저장하지 않는다.
 
@@ -62,7 +62,7 @@ A parser가 검증한 Worker source/body/entry/code 사실, 국소 객체 생성
 
 입력 reader는 path-stat끼리와 FD-stat끼리 ctime 안정성을 확인하고, path→FD→path의 device/inode/size/mtime 및 regular-file·symlink 교체 방어를 유지한다. 서로 다른 stat 계열의 ctime 의미를 같다고 가정하지 않는다. 별도 macOS 직접 회귀로 이 경계와 실제 경로 교체 거부를 확인하며 Windows 실행 결과와 구분한다. A가 승인한 runtime/code literal만 소비하고 macOS Python 3.12.13을 새 native runtime으로 승인하지 않는다.
 
-현재 고정 A152의 공통 eager import 간선 때문에 기존 기본 preflight의 callback-module 미적재 회귀 1건은 실패 근거로 보존한다. 같은 공개 target validator를 직접 호출하는 동치 경로를 사용해도 공통 registry/report 간선이 남는다. 원 assertion과 기본 모드 관찰 계약을 유지하며 A 공통 lazy 수정 확정 후 그 한 사례를 재검증한다. 새 native 관측의 동작과 이 공통 의존성 수정을 구분한다.
+고정 A metadata import로 callback 모듈이 적재된다는 이유로 실패했던 기존 preflight 결과는 당시 test 가정의 역사 근거로 보존한다. CheckDef의 관측 범위는 실행·대상 I/O이며 모듈 미적재를 필수로 요구하지 않는다. 공통 코드의 정확성 결함으로 집계하지 않고, fresh subprocess에서 tool import 전부터 실제 실행을 직접 계측한다. 정확한 callback source 경로와 원 code qualname을 거르는 profile을 설치해 import·preflight·closed execute 각 phase의 WorkerReadinessObserver.__init__/snapshot/close 호출을 모두 0으로 확인한다. socket bind/connect·subprocess audit, Torch/vLLM/helper 미수입과 출력 조건을 함께 유지한다. 측정 뒤 별도 양성 대조 phase에서 원본 생성자·미지원 snapshot·close를 한 번씩 호출해 같은 filter가 각각 1회를 포착하는지 확인한다. 모듈 삭제·메서드 stub 치환·새 skip 없이 실제 무실행 계약을 검증하며 과거 실패를 소급해 통과로 바꾸지 않는다.
 
 A의 callback 오류는 `None` 또는 `CALLBACK_UNAVAILABLE` enum으로, 정리 실패는 `CALLBACK_CLOSE_UNAVAILABLE` gap으로 보존한다. 알 수 없는 값은 원문을 저장하지 않고 미수집 상태와 구분한다. native manual 본문은 선정 bootstrap SEND의 관측 상태를 첨부로 안내하고, 상위 READY·receiver·서비스·canary는 별도 미확인으로 적는다.
 

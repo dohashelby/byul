@@ -55,20 +55,62 @@ def project(case,raw):return tool.project(raw,case['env'],case['target'],case['p
 
 def test_fresh_preflight_and_closed_execute_have_no_native_heavy_import_or_io(case):
     args={k:str(v) if isinstance(v,Path) else v for k,v in case['args'].items()}
+    callback_path=Path(__file__).resolve().parents[1]/'src/guard/adapters/vllm_worker_readiness.py'
     code='''
-import json,sys
+import json,sys,threading
 from pathlib import Path
+expected=Path(sys.argv[2]).resolve()
+methods={"WorkerReadinessObserver."+name for name in ("__init__","snapshot","close")}
+counts={name:0 for name in methods};phases={};forbidden=[]
+phase="import"
+def audit(event,args):
+    if event in ("socket.bind","socket.connect","subprocess.Popen"):
+        forbidden.append(event)
+        raise RuntimeError(event)
+def profile(frame,event,arg):
+    if event=="call" and frame.f_code.co_qualname in methods and Path(frame.f_code.co_filename).resolve()==expected:
+        counts[frame.f_code.co_qualname]+=1
+sys.addaudithook(audit)
+sys.setprofile(profile);threading.setprofile(profile)
+def measured(name):
+    phases[name]={"observer_calls":dict(counts),"callback_metadata_loaded":"guard.adapters.vllm_worker_readiness" in sys.modules}
+    assert all(value==0 for value in counts.values()),(name,counts)
+    assert not forbidden
+    assert "torch" not in sys.modules and "vllm" not in sys.modules
+    assert "tools.b_lif07_native_capture" not in sys.modules
 from tools import b_lif07_readiness as tool
-sys.addaudithook(lambda e,a: (_ for _ in ()).throw(RuntimeError(e)) if e in ('socket.bind','socket.connect','subprocess.Popen') else None)
-a=json.loads(sys.argv[1]);r=tool.run(**a)
-assert not r['executed'] and r['requests']==0 and not Path(a['output']).exists()
-assert 'guard.adapters.vllm_worker_readiness' not in sys.modules
-assert 'torch' not in sys.modules and 'vllm' not in sys.modules
-r=tool.run(**a,execute=True)
-assert r['requests']==0 and not r['actual_target_executed']
-assert 'guard.adapters.vllm_worker_readiness' not in sys.modules
+measured("import")
+a=json.loads(sys.argv[1])
+assert not Path(a["output"]).exists()
+phase="preflight";r=tool.run(**a)
+assert not r["executed"] and r["requests"]==0 and not Path(a["output"]).exists()
+measured("preflight")
+phase="closed_execute";r=tool.run(**a,execute=True)
+assert r["requests"]==0 and not r["actual_target_executed"]
+assert r["executed"] and Path(a["output"]).is_dir()
+measured("closed_execute")
+phase="positive_control"
+from guard.adapters.vllm_worker_readiness import WorkerReadinessObserver
+for name in ("__init__","snapshot","close"):
+    original=getattr(WorkerReadinessObserver,name).__code__
+    assert Path(original.co_filename).resolve()==expected and original.co_qualname in methods
+observer=WorkerReadinessObserver()
+unsupported=observer.snapshot("EXAMPLE.unsupported",(),{},phase="CALL")
+closed=observer.close()
+assert unsupported["status"]=="unavailable" and closed["complete"]
+assert counts=={name:1 for name in methods},counts
+assert not forbidden and "torch" not in sys.modules and "vllm" not in sys.modules
+assert "tools.b_lif07_native_capture" not in sys.modules
+sys.setprofile(None);threading.setprofile(None)
+print(json.dumps({"phases":phases,"positive_control":counts,"forbidden_io_events":forbidden,"callback_source":str(expected)}))
 '''
-    r=subprocess.run([sys.executable,'-c',code,json.dumps(args)],capture_output=True,text=True);assert r.returncode==0,r.stderr
+    r=subprocess.run([sys.executable,'-c',code,json.dumps(args),str(callback_path)],capture_output=True,text=True);assert r.returncode==0,r.stderr
+    measured=json.loads(r.stdout)
+    assert set(measured['phases'])=={'import','preflight','closed_execute'}
+    assert all(all(value==0 for value in row['observer_calls'].values()) for row in measured['phases'].values())
+    assert measured['positive_control']=={'WorkerReadinessObserver.'+name:1 for name in ('__init__','snapshot','close')}
+    assert measured['forbidden_io_events']==[]
+    print(r.stdout,end='')
 
 @pytest.mark.parametrize('key',['session','target_sha256','environment_ref','owner','recovery_owner'])
 def test_manifest_mismatch_rejected_before_output(case,key):

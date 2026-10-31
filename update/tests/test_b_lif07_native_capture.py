@@ -235,10 +235,10 @@ def example_source_gate(tmp_path, monkeypatch):
     import tools
     root=tmp_path/'EXAMPLE-source';path=root/'update/tools/verify_req10_consumption.py'
     path.parent.mkdir(parents=True)
-    original=(REPO/'update/tools/verify_req10_consumption.py').read_bytes()
-    new_common='9d8987a5a306ffce28fcb735e012c400589303f2'
-    old=original.replace(new_common.encode(),tool.REVIEWED_COMMON_COMMIT.encode()).replace(
-        tool.HTTP_REVIEWED_COMMON_COMMIT.encode(),tool.REVIEWED_COMMON_COMMIT.encode())
+    import subprocess
+    # Read the approved historical bytes; current A gate is a different contract.
+    old=subprocess.check_output(['git','show',
+        tool.GATE_SOURCE_COMMIT+':update/tools/verify_req10_consumption.py'],cwd=REPO)
     assert tool.hashlib.sha256(old).hexdigest()==tool.GATE_SHA256
     callback=root/'update/src/guard/adapters/vllm_worker_readiness.py'
     callback.parent.mkdir(parents=True);callback.write_bytes((REPO/'update/src/guard/adapters/vllm_worker_readiness.py').read_bytes())

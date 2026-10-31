@@ -9,6 +9,7 @@ from guard.executors.kubernetes_observation_identity import _attach_startup_file
 from guard.models import canonical_json,sha256_hex
 from guard.store import Store
 from tests.test_native_worker_model_files import fixture as startup_fixture
+from tests import test_a1_worker_startup_product as startup_product
 from tests.test_a1_worker_startup_product import test_existing_identity_cli_profile19_facts_and_exact_ref_roundtrip as run_existing_product
 from tests.test_kubernetes_lifecycle import group,target as native_target
 from tests.test_lifecycle_sensor import writer_factory
@@ -75,7 +76,14 @@ def test_original_native19_analysis_existing_CLI_saved_pack_and_exact_refs(tmp_p
     # The original source-body fixture uses an EXAMPLE safe_open class. This
     # explicit library test double is not an actual C/worker observation;
     # A2's eight immutable source pins and packet/profile parser stay real.
-    monkeypatch.setattr(mapping,'library_identity',lambda original,cache:True)
+    original_world=startup_product.make_world
+    def example_library_world(*args,**kwargs):
+        world=original_world(*args,**kwargs)
+        # Match the original A2 fixture: complete the immutable code contract
+        # check first, then substitute only the EXAMPLE library observation.
+        monkeypatch.setattr(mapping,'library_identity',lambda original,cache:True)
+        return world
+    monkeypatch.setattr(startup_product,'make_world',example_library_world)
     calls=[]
     if mode in {'dedicated-error','common-error'}:
         def unavailable(*args,**kwargs):

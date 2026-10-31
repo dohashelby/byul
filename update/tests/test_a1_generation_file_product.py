@@ -9,7 +9,7 @@ from guard.models import sha256_hex
 from guard.store import Store
 from tests import test_a1_worker_startup_product as old
 from tests.test_a1_observation_identity_product import World as IdentityWorld
-from tests.test_a1_ready_endpoint_sensor import reindex_rows
+from tests.test_a1_ready_endpoint_sensor import rebase_rows
 from tests.test_a1_generation_file_metadata import FACTORIES
 from tests.test_kubernetes_lifecycle import group,target as native_target
 from tests.test_lifecycle_sensor import writer_factory
@@ -34,7 +34,7 @@ class World(IdentityWorld):
                 row['monotonic_ns']+=offset;payload=row['payload']
                 for key in ('operation_started_ns','operation_finished_ns','call_started_ns','observation_started_ns','observation_finished_ns'):
                     if key in payload and payload[key] is not None:payload[key]+=offset
-            values=reindex_rows(values,rows[0]['payload']['context'],start_index=index)
+            values=rebase_rows(values,rows[0]['payload']['context'],start_index=index)
             extra=values[-1]['monotonic_ns']-start+1
             for row in rows[index:]:
                 row['monotonic_ns']+=extra

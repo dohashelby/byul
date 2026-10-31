@@ -1689,3 +1689,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 
 ### 2026-10-31 A2 ABI 확정682538f 소비 검증 착수
 - 원5파일 bytes·상수 외 AST 동등 검토. 현재3소비자 pin 일치, native19의 startup metadata1pin 불일치 유지. 기존 음성 native16은 과거 원소비기 blob 격리 fixture로 명시하고 원 assert를 유지. 전체390 검토 pin·영향/설치/CLI Ref·정확CI는 고정 후 마감하며 아직 통과를 선언하지 않음.
+
+- A2 ABI 원6825파일 bytes 통합 source d20f161: W/L 직접102, CLI15/90Ref씩; 인접W213/기존skip1,L214. 설치282·CLI4/24Ref 산출물 독립검증. 첫 보조도구 prefix 분류 exit1 보존·제품 재실행0. native19 target1pin 여전히 원 gate 거부, common facts/UNKNOWN 유지. 정확 CI5/actual/A2 새 owner pin 별도.

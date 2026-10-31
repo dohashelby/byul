@@ -23,3 +23,15 @@ native19 음성 사례는 현재 생산 소비기의 원 pin을 실제로 사용
 새 native20~22 전용 소비는 이 전달물에 없다. A2가 요청한 공개 startup `spans`의 paired return/callback 사실은 이미 계산한 공통 journal에서 제공할 후속 준비 작업이다. 그 전용 분석을 A1이 대신 만들거나 세 나머지 복구 경로의 선행조건으로 삼지 않는다.
 
 CPU/EXAMPLE·설치·소스 일치는 실제 serving/worker/backend/GPU·승인·최종 tensor·전체 분기 완료가 아니다. 원 GPU 승인창 종료·추가 Start0·46.66USD·과거 사용량·120GiB EBS와 소유권을 유지하며 새 AWS·IAM·기간·비용 확대는 하지 않는다. 실제 신뢰·정책 생산자가 없는 OBS02 판정은 UNKNOWN이다.
+
+
+## 검증 마감
+
+고정 검증 source `d20f1619912648234199c0736c7dc034a19c681e`, A1 검토 공통 source `9bd56adf55afb40371973ddac57067560bef2990`를 사용했다. 공통390파일 manifest는 `77ef5d0c99550dddbcc26b4ce6a3c0519be72755d3152622350e8bb216c70285`다. 원5경로 검사·원 B helper·c9·B 승인 pair와 모든 A2 원 bytes를 보존했으며 런타임 해시 승인·검사 제외는 없다.
+
+- Windows3.12.14/Linux3.12.15 직접102통과씩. 세 일치 소비기 원 시험·native16/17/18 CLI 각4사례와 stale19 CLI3사례, 합계15사례·정확90Ref씩의 반출·복원·저장팩 재판정을 포함한다.
+- 인접/불변식 Windows213통과·기존 INV03 skip1, Linux214통과. 명시 과거 원 소비기 fixture에서 stale16 음성4사례의 원 assert·Ref 검증을 유지했다.
+- wheel SHA256 `3780062c80c02bc3a9925240b957cec22d5b42adc842f8910acc2bbbcbc57154`, source d20f161: 두 OS 설치282파일 일치·native16/17/18 정상과 stale19 정상의 CLI4사례 산출물·정확24Ref를 확인했다. 첫 설치 보조도구는 줄인 pytest 임시 폴더명을 긴 prefix로 비교해 exit1이었다. 원 실패를 보존하고 제품을 재실행하지 않았으며, 설치본에서 원 저장소/복원/UNKNOWN·후보/거부 의미와 정확 Ref·원 zip을 별도 읽기 전용 finalizer로 재검증해 마감했다. 이를 최초 wrapper exit0으로 바꾸지 않는다.
+- 원 source zip Windows 7e7d20204e36a93ed6976d31e8410a167663b2a326dfbe158d2413d49b1e66a1 / Linux 5ad277494bafc25b4646564eef20415021c205015f3cb6daad43fb92b5a8263e; 원 설치 zip Windows a888ca42bea0a7139aa3cf26d5e77189eabe98071ff489c78d180a0143dbdf0f / Linux 9eeca7359ee4dfe30172c3dbe5a5b36096ee20bed54df8b7c83703b661eb67f8. Linux 반출 bytes는 일치하며 원 exports를 보존했다.
+
+native19의 원 소비기 positive 범위는 아직 승인되지 않았다. 정확 startup metadata pin의 A2 새 확정본이 필요하다. 공통 native20~22 공개 투영은 PR172를 재사용하며, 계산된 startup spans의 공개 전달은 후속 독립 준비 작업으로 확인했다. 전체 suite·정확 HEAD CI5·실제 serving/worker/backend/GPU·승인·tensor 및 A39/A1전체 완료를 주장하지 않는다.

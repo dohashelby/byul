@@ -1679,3 +1679,7 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 
 - ABI 마감: 공통 검토 b3e3bb0 / 검증 source d8c685b→089ebc3→fixture전용 f26f458. Windows/Linux3.12.3 직접369 및 보수143/출력37 통과, Linux3.12.15 최초265/104오류→delta76/28오류→출력37 통과. 원 실패 보존; 새 전체 suite 통과로 집계하지 않음.
 - 인접 Linux142, Windows135+짧은경로delta6/기존skip1. 설치 wheel089ebc3 SHA ad5a59481370b5e530dc8aaf37c86feb57cf2bd9ae2ccdc093bae66a3a295093: W3.12.14/L3.12.15 각각281파일·CLI4/24Ref·원팩/복원/재판정. A2/B pin 미갱신·closed 유지, exactHEAD CI5와 actual 별도.
+
+
+### 2026-10-31 A-1 native20~22 공통 파일 투영 착수
+- PR169 3466c50 기준. 기존19 journal 추출·명시20~22 공개 투영·OBS02 소비/정확 root 상한 연결 초안. A2 전용 분석·핀·actual 별도. 직접/인접/설치/CLI Ref 검증은 고정 후 수행하며 아직 성공을 선언하지 않음.

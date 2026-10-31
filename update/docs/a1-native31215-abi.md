@@ -33,7 +33,7 @@ A-2의 `native_weight_iteration`, `native_model_file_reads`, `native_model_mappi
 ## 검증 마감 범위
 
 - 최초 고정 source `d8c685b93c7eedbd93df316d944af9041cd0d00a`: Windows 3.12.14·Linux 3.12.3 직접 영향 시험 각각 369 통과. Linux 3.12.15는 265 통과·104 오류였다. 초기 구조화 시험 도구의 spawn/진단 API 오류와 원 결과도 보존했다.
-- Linux 오류는 host 정보를 가지지 않은 세 EXAMPLE OS 객체(55+37+28 사례, 일부는 후속 재검증에서 드러남)와 Linux endpoint parser의 누락 12 사례였다. 실제 host 정보만 위임하는 fixture facade를 사용하고, parser는 검토한 두 Linux patch 버전에만 endpoint 지문을 허용했다. 기존 file-name/writer 모의 동작·assert·source/code gate는 유지했다.
+- Linux 오류는 host 정보를 가지지 않은 세 EXAMPLE OS 객체(attempt27·Online37·output28 사례; output28은 후속 재검증에서도 남았던 같은 사례)와 Linux endpoint parser의 누락 12 사례였다. 실제 host 정보만 위임하는 fixture facade를 사용하고, parser는 검토한 두 Linux patch 버전에만 endpoint 지문을 허용했다. 기존 file-name/writer 모의 동작·assert·source/code gate는 유지했다.
 - 보수 source `089ebc33f297e553faf9927fc887e3ab4cb57444`: Windows 3.12.14·Linux 3.12.3 영향 143 통과씩. Linux 3.12.15 최초 실패 범위는 76 통과·출력 fixture 28 오류였다. fixture 전용 보수 source `f26f4588cb1f77db8281f1087ecc3d9278ff5aca`에서 출력 시험 전체 37개가 세 인터프리터 모두 통과했다. 이를 새 HEAD 전체 369개 단일 실행으로 표기하지 않는다.
 - 인접/불변식·B 원 gate: Linux 3.12.15 142 통과. Windows 135 통과·기존 INV03 skip 1·Git 준비 오류 6을 보존했으며, 짧은 전용 임시 경로에서 해당 6개가 통과했다. 짧은 경로의 첫 실행은 부모 폴더 누락으로 준비 실패한 기록을 별도로 보존했다. 기존 B fixture·gate는 변경하지 않았다.
 - 보수 소스의 오프라인 컴파일 재대조는 세 인터프리터 모두 관측기13/소스50/표준연결4에서 불일치 0이다. A-1의 검토 소비 커밋은 `b3e3bb054bc281e270a0e7be885951a479d993d0`이며, 최종 fixture 보수와 문서 마감은 공통 pin 범위의 bytes를 변경하지 않는다.

@@ -635,3 +635,40 @@ def test_native_manual_text_separates_bootstrap_SEND_from_upper_READY_and_servic
     assert saved['native21']['ready_sends'][0]['original_send_return_observed'] is True
     assert entry['normal_control']['result'] == 'not_attempted' and all(not row['attempted'] for row in entry['challenges'])
     assert summary['verdicts'] == {k: 'UNKNOWN' for k in ('security', 'functional', 'performance')}
+
+
+@pytest.mark.parametrize('claimed', [
+    '062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89',
+    '9d8987a5a306ffce28fcb735e012c400589303f2',
+    PRIVATE, None, [],
+])
+def test_native_reviewed_common_provenance_preserves_exact_known_set_without_import_truth(case, monkeypatch, claimed):
+    """소비기 단독 EXAMPLE codec: helper의 확정 known set만 주입하며 실제 source 검증은 수행하지 않는다."""
+    from tools import b_lif07_native_capture as helper
+    approved = frozenset({'062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89',
+        '9d8987a5a306ffce28fcb735e012c400589303f2'})
+    monkeypatch.setattr(helper, 'APPROVED_REVIEWED_COMMON_COMMITS', approved, raising=False)
+    raw = native_observation(case)
+    raw['source_validation'] = {'reviewed_common_commit': claimed,
+        'approved_native_source_commit': helper.APPROVED_SOURCE_COMMIT,
+        'runtime_hash_approval': True, 'producer_authenticated': True}
+    for row in raw['snapshots']:
+        row['stage'] = 'initial'
+        row['native_outer'].update(recording=0, source_verified=True,
+            process_domain={'pid': 20, 'start_ticks': 99, 'boot_sha256': '1' * 64})
+    native = tool.project(raw, case['env'], case['target'], case['prepared'], case['manifest'], native_observation=True)
+    imported = project(case, raw)
+    expected = claimed if type(claimed) is str and claimed in approved else None
+    assert native['native_source_validation'] == {'reviewed_common_commit': expected,
+        'approved_native_source_commit': helper.APPROVED_SOURCE_COMMIT,
+        'runtime_hash_approval': False, 'producer_authenticated': False}
+    assert imported['native_source_validation'] is None
+    for value in (native, imported):
+        assert value['qualified_rows'] == 0 and value['ready_send_observed'] is None
+        assert all(row['metadata']['source_qualified'] is False for row in value['rows'])
+        assert [(row['stage'], row['seq'], row['native_outer']['recording'], row['native_outer']['process_domain'])
+            for row in value['rows']] == [('initial', seq, 0, {'pid': 20, 'start_ticks': 99, 'boot_sha256': '1' * 64,
+                'time_offsets_sha256': None, 'pid_namespace': None, 'time_namespace': None}) for seq in (1, 2)]
+        assert PRIVATE not in json.dumps(value)
+    assert all(row['native_outer']['source_verified'] is False for row in imported['rows'])
+    assert native['data_origin'] == imported['data_origin'] == 'EXAMPLE'

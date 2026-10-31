@@ -13,3 +13,5 @@ source/image/lab/native0.32 미지원·실제 native/HTTP 인과·상위READY/�
 검증: Linux155통과, Windows152통과·3실패다. 남은3실패는 B 원 symlink 권한2건(Win1314)과 열린FD 경로 교체1건(Win5)이며 원본/실패 로그를 유지했다. 이전 A159의 source 거부·fixture8오류는 B160의 명시 승인과 fixture 보수로 재발하지 않았다. 실제 B gate/full387·공개 A sample/report/parser를 사용한 B main4사례가 양OS에서 통과했고 사례별6Ref·각각24Ref를 반출/복원·저장팩 재판정했다. 원 bundle8개의 bytes를 재반출 없이 복사·hash 대조했다. source1471파일은 검증 중 변경0, guard279와 패키지/팩/빌드 bytes가 A158 wheel과 같으므로 그 설치/인접 검증을 재사용했다.
 
 격리 Linux 설치 guard279 + B source 혼합은 원 source 전용 import gate가 REQ10_COMMON_IMPORT_MISMATCH로 거부한다. B 공개 명령은 HTTP_SOURCE_UNAVAILABLE·sample 미호출·HTTP/프로세스/socket0·3축UNKNOWN과 정확6Ref를 보존했다. 이는 설치본 경계의 fail-closed 확인이며 B 전체 설치 실행 성공이 아니다. 새 설치/의존성·gate 우회는 없고 실제 native/GPU/서비스 준비나 통제지연은 미완료다.
+
+후속 문서 판본: B 확정391506a의 입력변경 설명1행을 원bytes로 소비했다. 저장 전 검사와 저장 후 재검사의 출력/facts 보존을 구분한다. 기능source1506685의 Btools/guard/팩/빌드는 같으며 A측 commit/doc hash 데이터2상수 외 시험 제어 AST도 동일하다. metadata 검증source24ad477에서 원bytes pin1사례를 Windows/Linux 각각 통과했다. 기능155/Windows152+원FS3·CLI각4/정확24Ref·설치 혼합거부 결과는 이전scope로 재사용하며 새 전체시험/설치 실행으로 집계하지 않는다.

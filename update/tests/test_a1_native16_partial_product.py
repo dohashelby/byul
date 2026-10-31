@@ -21,6 +21,16 @@ def test_original_f8_partial_capture_existing_product_and_exact_refs(tmp_path,gr
         def inputs(path,grouping,target,patch,base_mode):
             return original_inputs(path,grouping,target,patch,'native-one-missing')
         monkeypatch.setattr(product,'identity_inputs',inputs)
+    if mode=='partial':
+        original_world=product.make_world
+        def partial_world(*args,**kwargs):
+            world=original_world(*args,**kwargs)
+            def early_close(values):
+                iterator=world.auto._load_module('',world.model,values)
+                assert next(iterator)=='weight';iterator.close();return {'weight'}
+            world.model.load_weights=early_close
+            return world
+        monkeypatch.setattr(product,'make_world',partial_world)
     def observed(packet):
         if mode=='dedicated-error':raise ValueError(PRIVATE)
         result=analyze(packet)
@@ -37,7 +47,7 @@ def test_original_f8_partial_capture_existing_product_and_exact_refs(tmp_path,gr
                 and all(event[0] in available for event in candidate['source_events']) for candidate in result['candidates'])
         return result
     monkeypatch.setattr(dedicated,'analyze',observed)
-    old_mode='attachment' if mode=='other-missing-attachment' else 'normal' if mode in {'other-capture-missing','dedicated-error'} else mode
+    old_mode='attachment' if mode=='other-missing-attachment' else 'normal' if mode in {'other-capture-missing','dedicated-error','partial'} else mode
     product.test_existing_identity_product_native16_consumption_and_exact_refs(tmp_path,group,native_target,writer_factory,monkeypatch,old_mode)
     store=Store.read_only(tmp_path/'store');evd,=store.iter_kind('EVD')
     models=[model for trial in evd.observations['identity_native_models'].value for model in trial['configured_model_candidates']]
@@ -48,6 +58,7 @@ def test_original_f8_partial_capture_existing_product_and_exact_refs(tmp_path,gr
     else:
         assert calls and selections and all(candidate['same_loader_call_candidate'] for candidate in selections)
         assert all(candidate['per_file_consumption_verified'] is False and candidate['scope_complete'] is False for candidate in selections)
+        if mode=='partial':assert any(candidate['root_exhausted_observed'] is False for candidate in selections)
     if missing_mode:assert evd.execution.status.value=='ABORTED'
     if mode in {'attachment','other-missing-attachment','later-record-error'}:assert evd.execution.status.value=='ABORTED'
     assert PRIVATE not in canonical_json(evd.to_dict()).decode()

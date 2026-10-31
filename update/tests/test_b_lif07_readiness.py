@@ -283,8 +283,8 @@ def test_import_and_live_modes_are_explicitly_separate(case):
 def test_import_file_mutated_during_projection_keeps_safe_facts(case,monkeypatch):
     p=case['args']['output'].parent/'input.json';p.write_text(json.dumps(capture(case)))
     original=tool.project
-    def changing(raw,*args):
-        value=original(raw,*args)
+    def changing(raw,*args, native_observation=False):
+        value=original(raw,*args, native_observation=native_observation)
         if raw.get('snapshots'):p.write_text('{}')
         return value
     monkeypatch.setattr(tool,'project',changing)

@@ -1647,3 +1647,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - A-1 Worker HTTP source f6fe356: 원 runtime 그대로 초기 Windows/Linux180통과+시험 계약 보수1개씩 통과, 인접 Windows265(기존skip1)/Linux266, 설치279파일·격리API6/기존LIF09 CLI4·정확24Ref 왕복을 확인했다. 공통387파일 검토 pin과 B7/probe/generic gate 원 bytes를 보존한다. B 전용 연결·실제 cluster/worker/GPU·delay·전체LIF07/09/부모A는 미완료이며 exactHEAD CI는 별도다.
 
 - A-1 B154 a7c6cab 확정 보수6파일 원 bytes를 A158 후속에 통합했다. B가 승인한 A152/A156 정확 쌍과 현재 A158 거부를 구분하며 source/provenance·fixture/정적 검토 후 고정 검증 대기다. 원 kernel3은 원8파일 반출로 제공하고 실제 daemon/GPU/worker·원LIF13 UNKNOWN은 유지한다.
+
+- B154 a7c6cab source65f1f87: 원6bytes 통합/입력교체 fixture 보수 확인, 현재A Windows104통과3실패8오류·Linux106통과1실패8오류를 보존했다. 미승인current source pair와 B exact gate fixture 가정, 기존Windows2차이를 분리한다. 승인A156참조 a17d48d의 B2모듈102통과·정확6Ref 현재A 재판정과 A158설치279 bytes 재사용을 확인했다. 현재 B pin의 A158 미소비·실제환경/전체Goal은 미완료다.

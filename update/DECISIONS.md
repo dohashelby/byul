@@ -681,3 +681,5 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - Worker HTTP의 sampling_complete는 닫힌 HTTP/API 수집의 기술적 완전성이다. 503/timeout·shape 실패가 관측 가능하고 실제 worker/rank/model/GPU/receiver/서비스 준비 판정은 전부 false/UNKNOWN으로 유지한다. 기존 generic snapshot은 Unready에서 예외를 내며 새 시험도 그 계약을 요구한다. 새 common collector/parser는 B 전용 소비·정책·인과 receipt를 대신하지 않는다.
 
 - B154의 A156 정확 gate/common 허용은 A158의 새 공통 기준 승인이 아니다. B전용 원 bytes를 유지하고 현재full387 검증과 B exact-pair 거부, 승인된 A156 reference 소비를 별도로 검증한다. B fixture/runtime pin을 A측에서 완화하거나 새 skip/우회로 통과시키지 않는다.
+
+- B154 고정 승인쌍은 A152/A156에 한정되며 현재 A158 공통387파일의 자동 승인이 아니다. 현재소스의 B 실패/fixture오류를 기록하고 승인된 A156+같은Bbytes 참조102통과를 별도 근거로 제공한다. B 원본을 재작성·완화·skip하지 않으며 현재 버전 소비 pin과 fixture 확장은 B가 검토한다. 원 kernel proof 반출과 새로운 실제 실증을 구분한다.

@@ -9,10 +9,19 @@ import time
 from pathlib import PurePosixPath
 
 from guard.runtime.docker import DockerError as SourceCaptureError
+from guard.runtime.bounded import strict_json
 from .log_analysis import _FILE_READER
 
 
 MAX_BYTES = 65536
+EXTENDED_RECORDING_PROFILE = "owned-jsonl-2m-v1"
+
+
+def _read_budget(max_bytes, read_profile):
+    ceiling = 2 * 1024**2 if read_profile == EXTENDED_RECORDING_PROFILE else 262144
+    if (read_profile not in (None, EXTENDED_RECORDING_PROFILE) or type(max_bytes) is not int
+            or not MAX_BYTES <= max_bytes <= ceiling):
+        raise ValueError("CAPTURE_READ_BUDGET_INVALID")
 
 
 def create_capture_client(run_id):
@@ -21,22 +30,6 @@ def create_capture_client(run_id):
     return Docker(run_id)
 
 
-def strict_json(raw, *, limit=MAX_BYTES):
-    if type(raw) is not bytes or not 0 < len(raw) <= limit:
-        raise ValueError("CAPTURE_BYTE_BOUND")
-    def pairs(items):
-        out = {}
-        for key, value in items:
-            if key in out:
-                raise ValueError("CAPTURE_DUPLICATE_KEY")
-            out[key] = value
-        return out
-    def constant(_):
-        raise ValueError("CAPTURE_NONFINITE_NUMBER")
-    try:
-        return json.loads(raw.decode("utf-8"), object_pairs_hook=pairs, parse_constant=constant)
-    except (UnicodeError, RecursionError, json.JSONDecodeError):
-        raise ValueError("CAPTURE_INVALID_JSON") from None
 
 
 def validate_engine_target(env, target, container, image):
@@ -95,10 +88,9 @@ def validate_owned_source(*, container, image, path):
         raise ValueError("CAPTURE_PATH_INVALID")
 
 
-def validate_file_result(result, *, max_bytes=MAX_BYTES):
+def validate_file_result(result, *, max_bytes=MAX_BYTES, read_profile=None):
     """Shared bounded file packet/fstat checks; ownership stays with the transport."""
-    if type(max_bytes) is not int or not MAX_BYTES <= max_bytes <= 262144:
-        raise ValueError("CAPTURE_READ_BUDGET_INVALID")
+    _read_budget(max_bytes, read_profile)
     capture = result.capture or {}
     if (result.returncode != 0 or capture.get("complete") is not True
             or capture.get("bounded_at_source") is not True
@@ -126,11 +118,10 @@ def validate_file_result(result, *, max_bytes=MAX_BYTES):
     return raw, file_identity
 
 
-def _read_owned_file(docker, target, *, container, image, path, timeout=5, max_bytes=MAX_BYTES):
+def _read_owned_file(docker, target, *, container, image, path, timeout=5, max_bytes=MAX_BYTES, read_profile=None):
     """고정 source bytes·fstat·pipe 상한·전후 소유 신원을 확인하며 생산자를 인증하지 않는다."""
     validate_owned_source(container=container, image=image, path=path)
-    if type(max_bytes) is not int or not MAX_BYTES <= max_bytes <= 262144:
-        raise ValueError("CAPTURE_READ_BUDGET_INVALID")
+    _read_budget(max_bytes, read_profile)
     deadline = time.monotonic() + timeout
     def remaining():
         value = deadline - time.monotonic()
@@ -140,7 +131,7 @@ def _read_owned_file(docker, target, *, container, image, path, timeout=5, max_b
     before = identity(docker, target, container, image, remaining())
     result = docker.exec_bounded(container, ["python3", "-c", _FILE_READER, path, str(max_bytes)],
                                  timeout=remaining(), max_bytes=2 * max_bytes)
-    raw, file_identity = validate_file_result(result, max_bytes=max_bytes)
+    raw, file_identity = validate_file_result(result, max_bytes=max_bytes, read_profile=read_profile)
     after = identity(docker, target, container, image, remaining())
     if before != after:
         raise ValueError("CAPTURE_INSTANCE_CHANGED")

@@ -20,7 +20,7 @@ from .http_common import HttpCheckExecutor, functional_requests, functional_resu
 
 
 PROFILE = "unix-ipc-access-v1"
-VERSION = "0.1.1"
+VERSION = "0.1.3"
 _PIN = re.compile(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}")
 _NS = re.compile(r"(mnt|net|pid|user):\[[0-9]+\]")
 _ID = re.compile(r"[0-9a-f]{64}")
@@ -43,6 +43,17 @@ def policy_shape(values):
 def _integers(value, keys):
     return type(value) is dict and set(value) == set(keys) and all(
         type(value[k]) is int and value[k] >= 0 for k in keys)
+
+
+def path_connection(prior, trial, after):
+    """대조된 소켓/owner와 peer의 연결 사실. 호출자가 source/actor를 검증한다."""
+    stable = prior.get("complete") is True and after == prior
+    peer = trial.get("peer", {})
+    verified = (stable and trial.get("path_stable") is True
+                and trial.get("identity") == prior.get("identity")
+                and any(owner["pid"] == peer.get("pid") and owner["uid"] == peer.get("uid")
+                        for owner in prior.get("owners", [])))
+    return stable, bool(verified and trial.get("outcome") == "connected")
 
 
 def _parse(result, mode, uid, count):
@@ -201,14 +212,8 @@ class UnixIPCExecutor(HttpCheckExecutor):
                     errors.append("IPC_NAMESPACE_MISMATCH")
                     continue
                 for index, (p, trial, a) in enumerate(zip(prior["rows"], attempt["rows"], after["rows"])):
-                    stable = p.get("complete") is True and a == p
-                    peer = trial.get("peer", {})
-                    verified = (stable and trial.get("path_stable") is True
-                                and trial.get("identity") == p.get("identity")
-                                and any(owner["pid"] == peer.get("pid") and owner["uid"] == peer.get("uid")
-                                        for owner in p.get("owners", [])))
+                    stable, connected = path_connection(p, trial, a)
                     key = hashlib.sha256(paths[index].encode()).hexdigest()
-                    connected = verified and trial.get("outcome") == "connected"
                     allowed = str(uid) in ctx.policy_values["allowed_ipc_uids"]
                     trials.append({"path_sha256": key, "actor_uid": uid, "allowed": allowed,
                                    "outcome": trial.get("outcome", "unknown"), "connection_verified": connected})
@@ -228,6 +233,16 @@ class UnixIPCExecutor(HttpCheckExecutor):
                 planned = list(probes)
                 control_attempted = bool(requests) or control_attempted
                 responses = ctx.cprobe(ctx.trusted_net, requests, min(ctx.timeout, deadline - time.monotonic()))
+                # Keep the published no-ID callback form, but an explicit ID
+                # must correspond to this request. Positional zip must not
+                # adopt an unrelated or extra response as the normal control.
+                if (type(responses) is not list or len(responses) != len(requests)
+                        or len(requests) != len(probes)
+                        or any(type(response) is not dict for response in responses)
+                        or any("id" in response for response in responses)
+                        and [response.get("id") for response in responses] != [request["id"] for request in requests]):
+                    responses = []
+                    errors.append("IPC_NORMAL_CONTROL_RESPONSE_UNCORRELATED")
                 functional, _, _ = functional_results(probes, dict(zip(probes, responses)), ctx.env.model.id)
                 normal_ok = bool(len(connected_controls) == len(paths)
                                  and functional and all(v == "pass" for v in functional.values())

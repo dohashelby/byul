@@ -17,14 +17,29 @@ import threading
 import time
 from urllib.parse import urlsplit
 
-from guard.models import canonical_json, sha256_hex
-from .bounded import capture_pipes
+from guard.models import canonical_json, sha256_hex, utcnow
+from .bounded import capture_pipes, strict_json
 
 
 PROFILE = "kubernetes-owned-sampling-http-v1"
+REQUEST_BINDING_PROFILE = "kubernetes-owned-request-binding-http-v1"
+VALIDATION_ERROR_PROFILE = "kubernetes-owned-validation-error-http-v1"
+MODEL_AUTHORIZATION_PROFILE = "kubernetes-owned-model-authorization-http-v1"
+ROUTE_AUTHENTICATION_PROFILE = "kubernetes-owned-native-route-http-v1"
+ONLINE_INPUT_PROFILE = "kubernetes-owned-online-input-http-v1"
+TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
+REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
+from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
+from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
+_CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
+_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE})
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
-                                 validate_container_binding, verify_owned_pod)
+                                 validate_container_binding, verify_owned_pod, project_owned_snapshot)
+
+
+BINDING_PROBE_SHA256 = "6ffd129cd855170a1a2fefb496efef4abfcfd7928d2dc6795c22344bd152a765"
+TEMPLATE_READER_SHA256 = "badf4bc4b01fc5bacbba103a606cac994e0921be28ef054116bd34dfd4b1c74b"
 
 
 class KubernetesBindingError(RuntimeError):
@@ -60,15 +75,52 @@ def _validate(target, env):
 
 
 class KubernetesHTTP:
-    def __init__(self, target, env, *, duration, binary="kubectl", runner=None):
+    def __init__(self, target, env, *, duration, binary="kubectl", runner=None, profile=PROFILE, clock=None):
+        if profile not in {PROFILE, *_BINDING_PROFILES}:
+            raise KubernetesBindingError()
+        self.profile = profile
+        if profile==ROUTE_AUTHENTICATION_PROFILE and (target.get('lab') is not True or env.engine.name!='vllm' or env.engine.version!='0.31.0'):
+            raise KubernetesBindingError()
+        self.lab = target.get('lab')
+        self.engine_name = env.engine.name
+        self.engine_version = env.engine.version
+        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+            raise KubernetesBindingError()
+        if profile==OBSERVATION_STATE_PROFILE and target.get('lab') is not True:raise KubernetesBindingError()
+        if profile in _BINDING_PROFILES:
+            try:
+                mapping=target["model_mapping"]
+                if type(mapping) is dict and mapping.get("schema")=="guard.model-request-mapping/1":
+                    from guard.collectors.model_mapping import validate_model_mapping
+                    validate_model_mapping(env,mapping)
+                    self.api_model=mapping["served_model_name"]
+                else:
+                    if (type(mapping) is not dict or set(mapping)!={"repository_id","revision","api_model"}
+                            or mapping["repository_id"]!=env.model.id or mapping["revision"]!=env.model.revision
+                            or type(mapping["api_model"]) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}",mapping["api_model"])):
+                        raise ValueError
+                    self.api_model=mapping["api_model"]
+                if (target.get("schema")!="guard-kubernetes-request-binding-target/1" or not env.hash_ok()
+                        or target.get("environment_ref")!=env.ref().model_dump(mode="json")):
+                    raise ValueError
+                self.model_mapping=deepcopy(mapping)
+            except (KeyError,TypeError,ValueError,AttributeError):
+                raise KubernetesBindingError() from None
         self.binding, self.endpoint = _validate(target, env)
+        self.target_sha256=sha256_hex(canonical_json(target))
+        self.environment_ref=(deepcopy(target["environment_ref"]) if profile in _BINDING_PROFILES else None)
         if (type(duration) not in (int, float) or not math.isfinite(duration) or not 0 < duration <= 300
                 or type(binary) is not str or not binary.strip()):
             raise KubernetesBindingError()
-        self.deadline = time.monotonic() + duration
+        self.clock = clock or time.monotonic
+        self.deadline = self.clock() + duration
         self.binary = binary
         self.runner = runner or capture_pipes
         self.injected = runner is not None
+        self.process_observation_origin = ('EXAMPLE' if self.injected or target['lab']
+            or env.data_origin.value == 'EXAMPLE' else 'MEASURED')
+        if profile in {ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE} and self.process_observation_origin != 'EXAMPLE':
+            self.process_observation_origin = env.data_origin.value
         # This profile admits only its pinned HTTP Pod endpoint below. Preserve
         # its published source/fixture bytes when the general probe evolves.
         probe_source = (Path(__file__).parent / "assets/http_probe_v1.py.txt").read_text(encoding="utf-8")
@@ -84,33 +136,79 @@ class KubernetesHTTP:
                        "watchdog.daemon=True\nwatchdog.start()\n"
                        + "exec(compile(" + repr(probe_source) + ",'guard-http-probe','exec'),{'__name__':'__main__'})\n")
         self.source_sha256 = sha256_hex(self.source.encode("utf-8"))
+        if profile in _BINDING_PROFILES:
+            probe_source=(Path(__file__).parents[1]/"executors/stream_probe.py").read_text(encoding="utf-8")
+            if sha256_hex(probe_source.encode())!=BINDING_PROBE_SHA256:
+                raise KubernetesBindingError()
+            self.source=("import math,os,sys,threading\nlimit=float(sys.argv[1])\n"
+                "if not math.isfinite(limit) or not 0 < limit <= 120: sys.exit(124)\n"
+                "watchdog=threading.Timer(limit,lambda:os._exit(124))\nwatchdog.daemon=True\nwatchdog.start()\n"
+                + "exec(compile("+repr(probe_source)+",'guard-stream-probe','exec'),{'__name__':'__main__'})\n")
+            self.source_sha256=sha256_hex(self.source.encode())
+        self.model_snapshots = []  # Transient allowlisted pair for the existing A-2 consumer.
+        self.snapshot_reads = []
         self.rows = []
         self.failed = False
+        self.cleanup_errors = []
         self.lock = threading.Lock()
+        self._validation_error_token = None  # transient; never part of report/evidence
+        self._validation_error_cases = set()
+        self._model_authorization_token = None
+        self._model_authorization_cases = set()
+        self._model_normal_credential = None
+        self._required_event_token = None
+        self._required_event_cases = set()
+        self._required_event_credential = None
+        self._online_dispatch = threading.Lock()
+        self._online_token = None
+        self._online_cases = set()
+        self._online_pending = None
+        self._termination_token = None
+        self._termination_cases = set()
+        self._attempt_token = None
+        self._attempt_cases = []
+        self._state_token = None
+        self._state_cases = set()
 
-    def _call(self, args, *, payload=None, cap=262144):
-        remaining = self.deadline - time.monotonic()
+    def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False, on_document=None):
+        remaining = self.deadline - self.clock()
+        if budget is not None:remaining=min(remaining,budget)
         if remaining <= 0:
             raise KubernetesBindingError()
         argv = [self.binary, f"--context={self.binding['context']}", f"--request-timeout={remaining:.3f}s", *args]
         try:
             result = self.runner(argv, timeout=remaining, env_extra={}, max_stdout_bytes=cap,
                                  max_stderr_bytes=4096, **({"input_bytes": payload} if payload is not None else {}))
+            if self.profile in _BINDING_PROFILES and (result.get("capture",{}).get("pipes_closed") is False
+                    or "child_reap" in result.get("capture",{}).get("read_errors",[])):
+                with self.lock:
+                    if "KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED" not in self.cleanup_errors:
+                        self.cleanup_errors.append("KUBERNETES_PROBE_PARENT_CLEANUP_UNVERIFIED")
+            if on_document is not None:
+                # Retain a separately validated typed document even if later
+                # pipe/reap/deadline checks fail. Every existing success gate
+                # still runs below; this callback never makes capture succeed.
+                on_document(strict_json(result['stdout_bytes'],limit=cap))
             if (result["returncode"] != 0 or result["capture"]["complete"] is not True
-                    or self.deadline - time.monotonic() <= 0):
+                    or self.deadline - self.clock() <= 0):
                 raise KubernetesBindingError()
-            return json.loads(result["stdout_bytes"])
+            if allow_empty and result["stdout_bytes"]==b"":return None
+            return strict_json(result["stdout_bytes"],limit=cap) if self.profile in _BINDING_PROFILES else json.loads(result["stdout_bytes"])
         except Exception:
             raise KubernetesBindingError() from None
 
-    def _verify(self):
+    def _verify(self, *, require_ready=True, capture_snapshot=False):
         # Namespace UIDs bind a named context to the selected cluster generation.
         namespaces = sorted({self.binding[role]["namespace"] for role in ("engine", "probe")})
         result = self._call(["get", "namespaces", *namespaces, "-o", "json"])
         items = result["items"] if result.get("kind") == "List" else [result]
+        mapped=self.profile in _BINDING_PROFILES and self.model_mapping.get("schema")=="guard.model-request-mapping/1"
+        snapshot_required=mapped or capture_snapshot
+        if snapshot_required and any(x.get("kind")!="Namespace" for x in items):raise KubernetesBindingError()
         actual = {x["metadata"]["name"]: x["metadata"] for x in items}
         if len(actual) != len(items) or set(actual) != set(namespaces):
             raise KubernetesBindingError()
+        pods={}
         for role in ("engine", "probe"):
             expected = self.binding[role]
             ns = actual[expected["namespace"]]
@@ -118,11 +216,48 @@ class KubernetesHTTP:
                 raise KubernetesBindingError()
             pod = self._call([f"--namespace={expected['namespace']}", "get", "pod", expected["pod"], "-o", "json"])
             try:
-                verify_owned_pod(pod, ns, expected, self.binding["run_id"])
+                if snapshot_required and pod.get("kind")!="Pod":raise ValueError
+                verify_owned_pod(pod, ns, expected, self.binding["run_id"],require_ready=require_ready)
+                pods[role]=pod
             except ValueError:
                 raise KubernetesBindingError() from None
 
+        if snapshot_required:
+            snapshot=project_owned_snapshot(pods["engine"],
+                next(x for x in items if x["metadata"]["name"]==self.binding["engine"]["namespace"]),
+                self.binding["engine"],self.binding["run_id"],require_ready=require_ready)
+            self.model_snapshots=([self.model_snapshots[0],snapshot] if self.model_snapshots else [snapshot])
+        return pods
+
+    def snapshot(self):
+        """Existing bound API reads only; no HTTP/exec or node image relation."""
+        row={"profile":"kubernetes-owned-pod-api-read-v1", "started_at":utcnow().isoformat(),
+             "target_sha256":self.target_sha256,
+             "source_file_sha256":None,
+             "collected":False,"diagnostic_codes":[]}
+        try:
+            row["source_file_sha256"]=sha256_hex(Path(__file__).read_bytes())
+            with self.lock:
+                if self.failed:raise KubernetesBindingError()
+            self._verify(capture_snapshot=True)
+            value=deepcopy(self.model_snapshots[-1])
+            row.update(collected=True,snapshot_sha256=sha256_hex(canonical_json(value)))
+            return value
+        except Exception:
+            with self.lock:self.failed=True
+            row["diagnostic_codes"]=["KUBERNETES_HTTP_BINDING_UNAVAILABLE"]
+            raise KubernetesBindingError() from None
+        finally:
+            row["finished_at"]=utcnow().isoformat()
+            with self.lock:self.snapshot_reads.append(row)
+
     def __call__(self, network, requests, timeout):
+        if self.profile in {ONLINE_INPUT_PROFILE, *_CLOSE_PROFILES}:
+            # These closed procedures are serial; legacy sampling/REQ10 stay concurrent.
+            with self._online_dispatch:
+                return self._binding_requests(network, requests, timeout)
+        if self.profile in _BINDING_PROFILES:
+            return self._binding_requests(network,requests,timeout)
         # No shared serialization lock: REQ-10's two invocations stay concurrent.
         with self.lock:
             if self.failed:
@@ -141,12 +276,12 @@ class KubernetesHTTP:
                     or (request["method"], url.path) not in {("GET", "/health"), ("POST", "/v1/completions")}):
                 raise KubernetesBindingError()
             self._verify()
-            payload = json.dumps({"requests": requests, "timeout": min(timeout, self.deadline - time.monotonic())},
+            payload = json.dumps({"requests": requests, "timeout": min(timeout, self.deadline - self.clock())},
                                  ensure_ascii=False, allow_nan=False).encode("utf-8")
             if len(payload) > 65536:
                 raise KubernetesBindingError()
             probe = self.binding["probe"]
-            source_budget = min(timeout, self.deadline - time.monotonic())
+            source_budget = min(timeout, self.deadline - self.clock())
             if source_budget <= 0:
                 raise KubernetesBindingError()
             raw = self._call([f"--namespace={probe['namespace']}", "exec", "-i", probe["pod"],
@@ -176,13 +311,516 @@ class KubernetesHTTP:
                                   "binding_verified_before_after": False, "diagnostic": "KUBERNETES_HTTP_BINDING_UNAVAILABLE"})
             raise KubernetesBindingError() from None
 
+    def _binding_requests(self, network, requests, timeout):
+        ids=[]
+        label=re.compile(r"(?:tokenize-[AB]|before|after|(?:json|sse)-(?:generated|distinct_body|collision_body|collision_header)-[AB])\Z")
+        try:
+            with self.lock:
+                if self.failed:raise KubernetesBindingError()
+            if (network!="kubernetes-probe" or type(requests) is not list or not 1<=len(requests)<=2
+                    or type(timeout) not in (int,float) or not math.isfinite(timeout) or not 0<timeout<=120):
+                raise KubernetesBindingError()
+            prepared=[]
+            for request in requests:
+                if self.profile == ROUTE_AUTHENTICATION_PROFILE:
+                    if len(requests)!=1:raise KubernetesBindingError()
+                    self._native_route_request(request)
+                elif self.profile == VALIDATION_ERROR_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._validation_error_request(request)
+                elif self.profile == MODEL_AUTHORIZATION_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._model_authorization_request(request)
+                elif self.profile == REQUIRED_EVENT_PROFILE:
+                    if len(requests)!=1:raise KubernetesBindingError()
+                    self._required_event_request(request,timeout)
+                elif self.profile == OBSERVATION_STATE_PROFILE:
+                    if len(requests)!=1:raise KubernetesBindingError()
+                    self._state_request(request,timeout)
+                elif self.profile == ONLINE_INPUT_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._online_input_request(request, timeout)
+                elif self.profile == TERMINATION_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._termination_request(request, timeout)
+                elif self.profile == REQUEST_ATTEMPTS_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._attempt_request(request, timeout)
+                elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
+                    raise KubernetesBindingError()
+                ids.append(request["id"])
+                value=deepcopy(request)
+                if value.pop("want_body",True) is not True:raise KubernetesBindingError()
+                url=urlsplit(value.get("url",""));mode=value.get("mode","json")
+                allowed={"id","mode","method","url","headers","body","read_delay_ms"}
+                paths={"/tokenize","/v1/chat/completions"}
+                if self.profile in _CLOSE_PROFILES:
+                    allowed.add("read_profile");paths.add("/v1/completions")
+                if self.profile == ROUTE_AUTHENTICATION_PROFILE:
+                    # The new closed GET/POST contract above replaces only the
+                    # old POST-only path/body shape. Preserve common URL/field bounds.
+                    if (set(value)-allowed or mode!='json' or url.scheme!=self.endpoint.scheme
+                            or url.netloc!=self.endpoint.netloc or url.query or url.fragment
+                            or url.username is not None or url.password is not None):raise KubernetesBindingError()
+                elif self.profile != OBSERVATION_STATE_PROFILE and (set(value)-allowed
+                        or value.get("method")!="POST" or mode not in {"json","sse"}
+                        or url.scheme!=self.endpoint.scheme or url.netloc!=self.endpoint.netloc or url.query or url.fragment
+                        or url.path not in paths
+                        or url.path=="/tokenize" and mode!="json"
+                        or type(value.get("body")) is not dict or value["body"].get("model")!=self.api_model):
+                    raise KubernetesBindingError()
+                value.setdefault("mode","json");prepared.append(value)
+            if len(set(ids))!=len(ids):raise KubernetesBindingError()
+            self._verify()
+            remaining=min(float(timeout),self.deadline-self.clock())
+            if remaining<=0:raise KubernetesBindingError()
+            payload=json.dumps({"requests":prepared,"timeout":remaining},ensure_ascii=False,allow_nan=False).encode()
+            if len(payload)>128*1024:raise KubernetesBindingError()
+            probe=self.binding["probe"]
+            raw=self._call([f"--namespace={probe['namespace']}","exec","-i",probe["pod"],
+                f"--container={probe['container']}","--","python3","-c",self.source,str(remaining)],payload=payload,cap=2*1024**2,budget=remaining)
+            self._verify()
+            if (type(raw) is not list or len(raw)!=len(ids) or any(type(row) is not dict for row in raw)
+                    or len({row.get("id") for row in raw})!=len(ids) or {row.get("id") for row in raw}!=set(ids)):
+                raise KubernetesBindingError()
+            keys={"id","mode","method","outcome","body","body_bytes","body_sha256","body_truncated",
+                  "utf8_valid","capture_complete","eof","terminal_seen","events","content_type","connection_id",
+                  "dispatch_ms","request_sent_ms","headers_ms","end_ms","elapsed_ms","timing_basis"}
+            if self.profile in _CLOSE_PROFILES:
+                keys|={"client_closed","client_close_ms","read_count","read_pause_count","read_observations","stop_reason","relative_clock"}
+            by_id={row["id"]:row for row in raw};results=[]
+            for request in prepared:
+                row=by_id[request["id"]];outcome=row.get("outcome")
+                if self.profile in {OBSERVATION_STATE_PROFILE,ROUTE_AUTHENTICATION_PROFILE} and (row.get('method')!=request['method'] or row.get('mode')!=request['mode']):raise KubernetesBindingError()
+                if not (type(outcome) is int and 100<=outcome<=599 or type(outcome) is str and outcome in
+                        {"refused","timeout","unreachable","dns_error","error","probe_error"}):
+                    raise KubernetesBindingError()
+                if row.get("body") is not None and (type(row["body"]) is not str or len(row["body"].encode("utf-8"))>128*1024):
+                    raise KubernetesBindingError()
+                results.append({key:row[key] for key in keys if key in row})
+            with self.lock:
+                self.rows.extend({"id":row["id"],"binding_verified_before_after":True,"outcome":row["outcome"],
+                    "capture_complete":row.get("capture_complete") is True,
+                    **({"expected_client_close":self._termination_close(row,
+                        "req12-disconnect" if self.profile==REQUEST_ATTEMPTS_PROFILE else "obs02-disconnect" if self.profile==OBSERVATION_STATE_PROFILE else "lif10-disconnect")}
+                        if self.profile in _CLOSE_PROFILES else {})} for row in results)
+            return results
+        except Exception:
+            with self.lock:
+                self.failed=True
+                self.rows.extend({"id":rid,"binding_verified_before_after":False,"diagnostic":"KUBERNETES_HTTP_BINDING_UNAVAILABLE"} for rid in ids or [None])
+            raise KubernetesBindingError() from None
+
+
+    def _state_request(self,request,timeout):
+        from .kubernetes_observation_state import validate_request
+        try:
+            slot,token=validate_request(request,api_model=self.api_model,engine_url=self.endpoint.geturl(),timeout=timeout)
+            with self.lock:
+                seen=self._state_cases
+                if (self._state_token is not None and token!=self._state_token or slot in seen or 'health-after' in seen
+                        or slot!='health-before' and 'health-before' not in seen
+                        or slot in {'disconnect','normal-after'} and 'normal-before' not in seen
+                        or slot=='health-after' and 'normal-after' not in seen):raise ValueError
+                self._state_token=token;seen.add(slot)
+        except Exception:raise KubernetesBindingError() from None
+
+    def _native_route_request(self,request):
+        """REQ02 owns these three IDs; no other check's request bypass is used."""
+        try:
+            slots=('models-before','completion','models-after');slot=request.get('id','').removeprefix('req02-')
+            if slot not in slots or request['id']!='req02-'+slot or request.get('mode','json')!='json':raise ValueError
+            headers=request.get('headers')
+            if (type(headers) is not dict or set(headers) not in ({'X-Request-Id'},{'X-Request-Id','Authorization'})
+                    or type(headers['X-Request-Id']) is not str):raise ValueError
+            if 'Authorization' in headers and (type(headers['Authorization']) is not str
+                    or re.fullmatch('Bearer [!-~]{1,512}',headers['Authorization']) is None):raise ValueError
+            token=re.fullmatch('byul-req02-([0-9a-f]{32})-'+slot,headers['X-Request-Id'])
+            completion=slot=='completion';body={'model':self.api_model,'prompt':'hello','max_tokens':1,'temperature':0,'stream':False} if completion else None
+            if (token is None or request.get('method')!=('POST' if completion else 'GET')
+                    or urlsplit(request.get('url','')).path!=('/v1/completions' if completion else '/v1/models')
+                    or request.get('body')!=body or any(k in request for k in ('read_profile','read_delay_ms','max_body_bytes','max_body_lines'))):raise ValueError
+            if completion and (type(request['body'].get('max_tokens')) is not int or type(request['body'].get('temperature')) is not int or type(request['body'].get('stream')) is not bool):raise ValueError
+            with self.lock:
+                prior=getattr(self,'_native_route_slots',[])
+                if prior!=list(slots[:len(prior)]) or len(prior)>=3 or slots[len(prior)]!=slot:raise ValueError
+                if getattr(self,'_native_route_token',token[1])!=token[1]:raise ValueError
+                self._native_route_token=token[1];self._native_route_slots=[*prior,slot]
+        except Exception:raise KubernetesBindingError() from None
+
+    def _validation_error_request(self, request):
+        """Closed REQ13 wire contract; no arbitrary prompt/error body/header."""
+        try:
+            if (type(request) is not dict or set(request) - {"id", "mode", "method", "url", "headers", "body", "want_body"}
+                    or request.get("mode", "json") != "json" or request.get("method") != "POST"
+                    or request.get("want_body", True) is not True):
+                raise ValueError
+            slot = {"req13-error-before": "before", "req13-error-primary": "primary",
+                    "req13-error-after": "after"}[request["id"]]
+            headers = request["headers"]
+            if type(headers) is not dict or set(headers) != {"X-Request-Id"} or type(headers["X-Request-Id"]) is not str:
+                raise ValueError
+            match = re.fullmatch(r"byul-req13-error-([0-9a-f]{32})-" + slot, headers["X-Request-Id"])
+            if match is None:
+                raise ValueError
+            token = match[1]
+            body = ({"model": self.api_model, "messages": [{"role": "user", "content": "hello"}],
+                     "max_tokens": "b2error-" + token[:12], "stream": False} if slot == "primary" else
+                    {"model": self.api_model, "prompt": "hello", "add_special_tokens": False, "return_token_strs": False})
+            path = "/v1/chat/completions" if slot == "primary" else "/tokenize"
+            url = urlsplit(request.get("url", ""))
+            if (type(request.get("body")) is not dict or canonical_json(request["body"]) != canonical_json(body)
+                    or url.path != path):
+                raise ValueError
+            with self.lock:
+                if (slot in self._validation_error_cases or "after" in self._validation_error_cases
+                        or slot != "before" and "before" not in self._validation_error_cases
+                        or self._validation_error_token is not None and token != self._validation_error_token):
+                    raise ValueError
+                self._validation_error_token = token
+                self._validation_error_cases.add(slot)
+        except (KeyError, TypeError, ValueError):
+            raise KubernetesBindingError() from None
+
+
+    def _model_authorization_request(self, request):
+        """One owned credential matrix against the exact selected base-model alias."""
+        try:
+            if (type(request) is not dict or set(request) - {"id", "mode", "method", "url", "headers", "body", "want_body"}
+                    or request.get("mode", "json") != "json" or request.get("method") != "POST"
+                    or request.get("want_body", True) is not True):
+                raise ValueError
+            slot = {"req05-model-before": "before", "req05-model-challenge": "challenge",
+                    "req05-model-after": "after"}[request["id"]]
+            headers = request["headers"]
+            if (type(headers) is not dict or set(headers) != {"X-Request-Id", "Authorization"}
+                    or type(headers["X-Request-Id"]) is not str or type(headers["Authorization"]) is not str
+                    or len(headers["Authorization"]) > 4103
+                    or re.fullmatch(r"Bearer [A-Za-z0-9._~+/-]{1,4096}={0,2}", headers["Authorization"]) is None):
+                raise ValueError
+            match = re.fullmatch(r"byul-req05-model-([0-9a-f]{32})-" + slot, headers["X-Request-Id"])
+            body = {"model": self.api_model, "messages": [{"role": "user", "content": "hello"}],
+                    "max_tokens": 1, "stream": False}
+            if (match is None or type(request.get("body")) is not dict
+                    or canonical_json(request["body"]) != canonical_json(body)
+                    or urlsplit(request.get("url", "")).path != "/v1/chat/completions"):
+                raise ValueError
+            with self.lock:
+                if (slot in self._model_authorization_cases or "after" in self._model_authorization_cases
+                        or slot != "before" and "before" not in self._model_authorization_cases
+                        or self._model_authorization_token is not None and match[1] != self._model_authorization_token
+                        or slot == "after" and headers["Authorization"] != self._model_normal_credential
+                        or slot == "challenge" and headers["Authorization"] == self._model_normal_credential):
+                    raise ValueError
+                self._model_authorization_token = match[1]
+                self._model_authorization_cases.add(slot)
+                if slot == "before":
+                    self._model_normal_credential = headers["Authorization"]  # transient, never report/config
+        except (KeyError, TypeError, ValueError):
+            raise KubernetesBindingError() from None
+
+
+    def _required_event_request(self,request,timeout):
+        from .kubernetes_observation import validate_request
+        try:
+            slot,token,credential=validate_request(request,api_model=self.api_model,timeout=timeout)
+            with self.lock:
+                if (slot in self._required_event_cases or 'after' in self._required_event_cases
+                        or slot!='before' and 'before' not in self._required_event_cases
+                        or self._required_event_token is not None and token!=self._required_event_token
+                        or slot=='after' and credential!=self._required_event_credential
+                        or slot=='denied' and credential==self._required_event_credential):raise ValueError
+                self._required_event_token=token;self._required_event_cases.add(slot)
+                if slot=='before':self._required_event_credential=credential
+        except (KeyError,TypeError,ValueError):raise KubernetesBindingError() from None
+
+
+    def _online_input_request(self, request, timeout):
+        """Closed text/JSON Online envelope; native admission remains a separate fact."""
+        try:
+            if (type(request) is not dict or set(request) - {"id", "mode", "method", "url", "headers", "body", "want_body", "read_delay_ms"}
+                    or request.get("method") != "POST" or request.get("mode", "json") != "json"
+                    or request.get("want_body", True) is not True
+                    or type(request.get("read_delay_ms", 0)) is not int or request.get("read_delay_ms", 0) != 0
+                    or timeout > 30):
+                raise ValueError
+            label = request.get("id")
+            if type(label) is not str:
+                raise ValueError
+            match = re.fullmatch(r"online-([a-z][a-z0-9-]{0,59})-(primary|after)", label)
+            if match is None:
+                raise ValueError
+            case, phase = match.groups()
+            headers = request.get("headers")
+            if type(headers) is not dict or set(headers) != {"X-Request-Id"} or type(headers["X-Request-Id"]) is not str:
+                raise ValueError
+            rid = re.fullmatch(r"byul-online-([0-9a-f]{32})-" + re.escape(case) + "-" + phase, headers["X-Request-Id"])
+            body = request.get("body")
+            normal = {"model", "messages", "max_tokens", "stream"}
+            extra = {"kv_transfer_params", "echo", "chat_template", "chat_template_kwargs",
+                     "mm_processor_kwargs", "media_io_kwargs"}
+            if (rid is None or urlsplit(request.get("url", "")).path != "/v1/chat/completions"
+                    or type(body) is not dict or set(body) - (normal | (extra if phase == "primary" else set()))
+                    or body.get("model") != self.api_model or type(body.get("max_tokens")) is not int
+                    or body["max_tokens"] != 1 or body.get("stream", False) is not False
+                    or type(body.get("messages")) is not list or not 1 <= len(body["messages"]) <= 16):
+                raise ValueError
+            uri = re.compile(r"(?i)(?:[a-z][a-z0-9+.-]*://|data:|www\.)")
+            for message in body["messages"]:
+                if (type(message) is not dict or set(message) != {"role", "content"}
+                        or message["role"] not in {"system", "user", "assistant"}
+                        or type(message["content"]) is not str or len(message["content"]) > 4096
+                        or uri.search(message["content"])):
+                    raise ValueError
+            for key in ("chat_template_kwargs", "mm_processor_kwargs", "media_io_kwargs"):
+                if key in body and body[key] is not None and type(body[key]) is not dict:
+                    raise ValueError
+            if "chat_template" in body and body["chat_template"] is not None and type(body["chat_template"]) is not str:
+                raise ValueError
+            if "echo" in body and body["echo"] is not None and type(body["echo"]) is not bool:
+                raise ValueError
+            if "kv_transfer_params" in body and body["kv_transfer_params"] is not None:
+                transfer = body["kv_transfer_params"]
+                if type(transfer) is not dict or set(transfer) - {"prompt_token_ids"}:
+                    raise ValueError
+                if "prompt_token_ids" in transfer:
+                    ids = transfer["prompt_token_ids"]
+                    if (type(ids) is not list or len(ids) > 4096
+                            or any(type(value) is not int or not -(2**63) <= value < 2**63 for value in ids)):
+                        raise ValueError
+            # All nested fields are bounded JSON data, never Python objects,
+            # iterators, media/remote addresses, arbitrary request parameters.
+            nodes = 0
+            def bounded(value, depth=0, allow_uri=False):
+                nonlocal nodes
+                nodes += 1
+                if depth > 12 or nodes > 4096:
+                    raise ValueError
+                if value is None or type(value) is bool:
+                    return
+                if type(value) is int:
+                    if value.bit_length() > 256:
+                        raise ValueError
+                    return
+                if type(value) is float:
+                    if not math.isfinite(value):
+                        raise ValueError
+                    return
+                if type(value) is str:
+                    if len(value) > 4096 or not allow_uri and uri.search(value):
+                        raise ValueError
+                    return
+                if type(value) is list:
+                    for item in value:
+                        bounded(item, depth + 1)
+                    return
+                if type(value) is dict:
+                    for key, item in value.items():
+                        if type(key) is not str or not 1 <= len(key) <= 128:
+                            raise ValueError
+                        bounded(item, depth + 1, allow_uri=depth == 0 and key == "model")
+                    return
+                raise ValueError
+            bounded(body)
+            wire_body = json.dumps(body, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+            if len(wire_body) > 16384:
+                raise ValueError
+            with self.lock:
+                if (self._online_token is not None and rid[1] != self._online_token
+                        or phase == "primary" and (self._online_pending is not None
+                            or case in self._online_cases or len(self._online_cases) >= 16)
+                        or phase == "after" and self._online_pending != case):
+                    raise ValueError
+                self._online_token = rid[1]
+                if phase == "primary":
+                    self._online_cases.add(case)
+                    self._online_pending = case
+                else:
+                    self._online_pending = None
+        except (KeyError, TypeError, ValueError, OverflowError):
+            raise KubernetesBindingError() from None
+
+    def _termination_request(self, request, timeout):
+        """Owned one-byte SSE close only; no cancel/admin endpoint or worker signal."""
+        try:
+            allowed={"id","mode","method","url","headers","body","want_body","read_delay_ms","read_profile"}
+            if (type(request) is not dict or set(request)-allowed or timeout>30
+                    or type(request.get("method")) is not str or request.get("method")!="POST"
+                    or type(request.get("mode","json")) is not str or type(request.get("url")) is not str
+                    or request.get("want_body",True) is not True
+                    or type(request.get("read_delay_ms",0)) is not int or request.get("read_delay_ms",0)!=0):
+                raise ValueError
+            match=re.fullmatch(r"lif10-(before|disconnect|after)",request.get("id",""))
+            if match is None:raise ValueError
+            slot=match[1];headers=request.get("headers");body=request.get("body")
+            if type(headers) is not dict or set(headers)!={"X-Request-Id"} or type(headers["X-Request-Id"]) is not str:
+                raise ValueError
+            token=re.fullmatch(r"byul-lif10-([0-9a-f]{32})-"+slot,headers["X-Request-Id"])
+            expected={"model":self.api_model,"prompt":"hello","max_tokens":8 if slot=="disconnect" else 1,
+                "temperature":0,"stream":slot=="disconnect"}
+            if (token is None or urlsplit(request.get("url","")).path!="/v1/completions"
+                    or request.get("mode","json")!=("sse" if slot=="disconnect" else "json")
+                    or type(body) is not dict or type(body.get("model")) is not str or type(body.get("prompt")) is not str
+                    or body!=expected or type(body.get("max_tokens")) is not int
+                    or type(body.get("temperature")) is not int or type(body.get("stream")) is not bool):
+                raise ValueError
+            if slot=="disconnect":
+                read=request.get("read_profile")
+                if (type(read) is not dict or type(read.get("profile")) is not str
+                        or read!={"profile":"slow-reader-v1","chunk_bytes":1,"interval_ms":1,"close_after_reads":1}
+                        or any(type(read[k]) is not int for k in ("chunk_bytes","interval_ms","close_after_reads"))):
+                    raise ValueError
+            elif "read_profile" in request:raise ValueError
+            with self.lock:
+                if (self._termination_token is not None and token[1]!=self._termination_token
+                        or slot in self._termination_cases or "after" in self._termination_cases
+                        or slot!="before" and "before" not in self._termination_cases):
+                    raise ValueError
+                self._termination_token=token[1];self._termination_cases.add(slot)
+        except (KeyError,TypeError,ValueError):
+            raise KubernetesBindingError() from None
+
+    @staticmethod
+    def _termination_close(row,expected_id="lif10-disconnect"):
+        """A client handle close is an observation, never server/native completion."""
+        body=row.get("body");reads=row.get("read_observations")
+        return (row.get("id")==expected_id and row.get("mode")=="sse"
+            and type(row.get("outcome")) is int and row["outcome"]==200
+            and row.get("content_type")=="text/event-stream" and row.get("client_closed") is True
+            and row.get("stop_reason")=="client_close" and row.get("capture_complete") is False
+            and row.get("eof") is False and row.get("terminal_seen") is False
+            and row.get("body_truncated") is False and row.get("utf8_valid") is True
+            and type(row.get("read_count")) is int and row["read_count"]==1
+            and type(row.get("read_pause_count")) is int and row["read_pause_count"]==0
+            and type(body) is str and len(body.encode("utf-8"))==1
+            and row.get("body_sha256")==sha256_hex(body.encode("utf-8"))
+            and type(row.get("body_bytes")) is int and row["body_bytes"]==1
+            and type(reads) is list and len(reads)==1 and type(reads[0]) is dict
+            and set(reads[0])=={"seq","started_ms","finished_ms","bytes"}
+            and all(type(reads[0][k]) is int for k in reads[0]) and reads[0]["seq"]==0
+            and reads[0]["bytes"]==1 and 0<=reads[0]["started_ms"]<=reads[0]["finished_ms"]
+            and type(row.get("client_close_ms")) is int and row["client_close_ms"]>=reads[0]["finished_ms"])
+
+    def _attempt_request(self,request,timeout):
+        """Closed repeated-external-ID procedure; session tags are auxiliary, not attempt IDs."""
+        try:
+            order=("normal-first","normal-repeat","disconnect","replacement","after")
+            if (type(request) is not dict or set(request)-{"id","mode","method","url","headers","body","want_body","read_delay_ms","read_profile"}
+                    or timeout>30 or request.get("method")!="POST" or request.get("want_body",True) is not True
+                    or type(request.get("read_delay_ms",0)) is not int or request.get("read_delay_ms",0)!=0):raise ValueError
+            case=request.get("id","").removeprefix("req12-")
+            if request.get("id")!="req12-"+case or case not in order:raise ValueError
+            headers=request.get("headers");body=request.get("body")
+            if type(headers) is not dict or set(headers)!={"X-Request-Id"} or type(headers["X-Request-Id"]) is not str:raise ValueError
+            group="normal" if case.startswith("normal-") else "shared" if case in {"disconnect","replacement"} else "after"
+            token=re.fullmatch(r"byul-req12-([0-9a-f]{32})-"+group,headers["X-Request-Id"])
+            if token is None:raise ValueError
+            closed=case=="disconnect"
+            expected={"model":self.api_model,"prompt":"hello","max_tokens":8 if closed else 1,"temperature":0,"stream":closed,
+                "session_id":"byul-req12-"+token[1]+"-"+case}
+            if (urlsplit(request.get("url","")).path!="/v1/completions" or request.get("mode","json")!=("sse" if closed else "json")
+                    or type(body) is not dict or body!=expected or type(body.get("model")) is not str
+                    or type(body.get("prompt")) is not str or type(body.get("session_id")) is not str
+                    or type(body.get("max_tokens")) is not int or type(body.get("temperature")) is not int
+                    or type(body.get("stream")) is not bool):raise ValueError
+            if closed:
+                read=request.get("read_profile")
+                if (type(read) is not dict or read!={"profile":"slow-reader-v1","chunk_bytes":1,"interval_ms":1,"close_after_reads":1}
+                        or type(read.get("profile")) is not str
+                        or any(type(read[k]) is not int for k in ("chunk_bytes","interval_ms","close_after_reads"))):raise ValueError
+            elif "read_profile" in request:raise ValueError
+            with self.lock:
+                if self._attempt_token is not None and self._attempt_token!=token[1]:raise ValueError
+                prior=tuple(self._attempt_cases)
+                # A failed normal control may omit both challenge requests and
+                # still collect the final normal request; never send replacement alone.
+                valid=(not prior and case==order[0] or prior==order[:1] and case==order[1]
+                    or prior==order[:2] and case in {order[2],order[4]}
+                    or prior==order[:3] and case in {order[3],order[4]}
+                    or prior==order[:4] and case==order[4])
+                if not valid:raise ValueError
+                self._attempt_token=token[1];self._attempt_cases.append(case)
+        except (KeyError,TypeError,ValueError,AttributeError):raise KubernetesBindingError() from None
+
+    def template_snapshot(self, identity, argv, command, reader):
+        """Fixed bounded reader in the exact owned engine generation; no raw spec retained."""
+        try:
+            if (self.profile!=REQUEST_BINDING_PROFILE or sha256_hex(reader.encode())!=TEMPLATE_READER_SHA256
+                    or identity.get("container_path")!="/guard-assets/chat/guard-text-chat-v1.jinja"
+                    or type(command) is not list or not command or any(type(v) is not str or not v or len(v)>256 for v in command)):
+                raise KubernetesBindingError()
+            pods=self._verify();engine=self.binding["engine"]
+            container=next(row for row in pods["engine"]["spec"]["containers"] if row["name"]==engine["container"])
+            if (container.get("command")!=command or container.get("args")!=argv or not any(
+                    row.get("mountPath")==identity["container_path"] and row.get("readOnly") is True
+                    for row in container.get("volumeMounts",[]))):
+                raise KubernetesBindingError()
+            value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+                f"--container={engine['container']}","--","python3","-c",reader,identity["container_path"]],cap=1024,budget=5)
+            self._verify()
+            if (type(value) is not dict or set(value)!={"sha256","bytes"} or type(value["sha256"]) is not str
+                    or not re.fullmatch(r"[0-9a-f]{64}",value["sha256"]) or type(value["bytes"]) is not int or not 0<value["bytes"]<=8192):
+                raise KubernetesBindingError()
+            return {"container_id":engine["container_id"],"started_at":engine["started_at"],"image":engine["image"],
+                "selected_path":identity["container_path"],"readonly":True,**value,"namespace_uid":engine["namespace_uid"],
+                "pod_uid":engine["pod_uid"],"image_id":engine["image_id"],"restart_count":engine["restart_count"]}
+        except Exception:
+            with self.lock:self.failed=True
+            return None
+
+    def process_snapshot(self, candidate_paths=None):
+        """Fixed process metadata read for existing permission/credential consumers."""
+        from .kubernetes_process import capture
+        return capture(self,candidate_paths)
+
+    def normal_requests(self, network, requests, timeout):
+        """Existing PLT01/04 completion control, with an explicit wire ID map."""
+        from .kubernetes_functional import capture
+        return capture(self,network,requests,timeout)
+
+    def ipc_snapshot(self, policy_values, *, actor_specs, connect_timeout, total_timeout):
+        """Explicit lab IPC actor snapshot; dedicated PLT02 consumer is separate."""
+        from .kubernetes_ipc import capture
+        return capture(self,policy_values,actor_specs=actor_specs,
+            connect_timeout=connect_timeout,total_timeout=total_timeout)
+
+    def egress_snapshot(self, policy_values, *, receiver_target, actor_spec, connect_timeout, total_timeout):
+        """One explicit owned TCP sample; A2 owns the dedicated consumer."""
+        from .kubernetes_egress import capture
+        try:return capture(self,policy_values,receiver_target=receiver_target,actor_spec=actor_spec,
+            connect_timeout=connect_timeout,total_timeout=total_timeout)
+        except Exception:raise ValueError('KUBERNETES_EGRESS_INPUT_INVALID') from None
+
+    def api_hop_snapshot(self, policy_values, timeout):
+        """One explicit policy-bound HTTP hop for the existing PLT08 consumer."""
+        from .kubernetes_api_hop import capture
+        return capture(self,policy_values,timeout)
+
     def report(self):
         with self.lock:
-            return {"profile": PROFILE, "binding": deepcopy(self.binding),
+            return {"profile": self.profile, "binding": deepcopy(self.binding),
                     "binding_sha256": sha256_hex(canonical_json(self.binding)),
                     "probe_source_sha256": self.source_sha256,
                     "requests": sorted(deepcopy(self.rows), key=lambda row: row["id"] or ""),
-                    "collection_gap": self.failed,
+                    "collection_gap": self.failed or (self.profile in _BINDING_PROFILES and any(row.get("capture_complete") is not True
+                        and not (self.profile in _CLOSE_PROFILES and row.get("expected_client_close") is True) for row in self.rows))
+                        or (self.profile == ONLINE_INPUT_PROFILE and self._online_pending is not None)
+                        or (self.profile in _CLOSE_PROFILES and bool(self.cleanup_errors)),
+                    **({"snapshot_reads":deepcopy(self.snapshot_reads)} if self.snapshot_reads else {}),
+                    **({"cleanup_errors":list(self.cleanup_errors)} if self.profile in _BINDING_PROFILES else {}),
+                    **({"input_contract_version":1,"data_origin":self.process_observation_origin,
+                        "native_consumption_verified":False} if self.profile==ONLINE_INPUT_PROFILE else {}),
+                    **({"data_origin":self.process_observation_origin,"native_termination_verified":False,
+                        "termination_contract_version":1} if self.profile==TERMINATION_PROFILE else {}),
+                    **({"data_origin":self.process_observation_origin,"attempt_contract_version":1,
+                        "native_attempt_delivery_verified":False} if self.profile==REQUEST_ATTEMPTS_PROFILE else {}),
+                    **({'data_origin':self.process_observation_origin,'state_contract_version':1,
+                        'native_state_comparison_verified':False} if self.profile==OBSERVATION_STATE_PROFILE else {}),
                     "limitations": ["Explicit operator selection and guard.run label are not an approval signature.",
                                     "Pod spec digest and exact runtime imageID are bound; manifest-index ancestry is not verified.",
                                     "No GPU execution, runner consumption, resource/log isolation or deployed caller path proof."]}

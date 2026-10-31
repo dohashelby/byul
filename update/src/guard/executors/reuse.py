@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
 import json
 from pathlib import Path
 
@@ -75,23 +74,12 @@ def preview_inputs(check, env, values: dict, cfg: dict) -> ExecutionPreview | No
 
 
 def _http_fixture(executor, check, env, values, adapter, target, keys):
-    if executor.name == "container_config":
-        from .running_image_approval import PROFILE
-        if getattr(check, "collection_profile", None) == PROFILE:
-            # Running identity is collected on the target, not the PLT-01 sentinel fixture.
-            return None
-        from .container_config import DEFAULT_SENTINELS, PROC_CMD, SENTINEL_CMD
-        return {"sentinel_paths": list(dict.fromkeys(executor.cfg.get("sentinel_paths", DEFAULT_SENTINELS))),
-                "proc_cmd": PROC_CMD, "sentinel_cmd": SENTINEL_CMD}
-    if executor.name == "credential_exposure":
-        from .credential_exposure import ENV_CMD
-        fixture = {"env_command": ENV_CMD, "policy": values}
-        if any(obs.key == "forbidden_mount_violations" for obs in check.required_observations):
-            from .credential_candidates import MAX_OUTPUT_BYTES, METADATA_PROBE, PROFILE, PROBE_TIMEOUT
-            fixture.update(candidate_profile=PROFILE,
-                           candidate_probe_sha256=hashlib.sha256(METADATA_PROBE.encode()).hexdigest(),
-                           candidate_probe_timeout=PROBE_TIMEOUT, candidate_output_limit=MAX_OUTPUT_BYTES)
-        return fixture
+    if executor.name in {"container_config", "credential_exposure"}:
+        # All current live profiles bind observations to a runtime owner and
+        # generation, including old CheckDef field names. Static commands and
+        # policies cannot confirm that identity even if declared names match.
+        # Saved EVD/Ref replay does not use this preview boundary.
+        return None
     if executor.name in {"direct_route", "role_route"} and executor.cfg.get("comparison_routes") is not None:
         from .http_common import Ctx, RouteSet, probe_templates
         from .route_fixture import manifest, resolve_routes

@@ -1,0 +1,24 @@
+{
+  "upstream": "https://github.com/vllm-project/vllm",
+  "commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+  "files": {
+    "multiproc_executor.py": {
+      "source_path": "vllm/v1/executor/multiproc_executor.py",
+      "sha256": "11a1554380d1efa516bb481416c798798d5839f38ac3b0f379ef4b8b547f4d1b",
+      "bytes": 45449,
+      "url": "https://raw.githubusercontent.com/vllm-project/vllm/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/v1/executor/multiproc_executor.py"
+    },
+    "core.py": {
+      "source_path": "vllm/v1/engine/core.py",
+      "sha256": "f116962c35d9d312b20b0b76c34a8cdaa6d3f1d31f2036db4e123957d2d1555b",
+      "bytes": 109767,
+      "url": "https://raw.githubusercontent.com/vllm-project/vllm/db9527a46873454610df6dbedf79a36d6bf1a7f6/vllm/v1/engine/core.py"
+    }
+  },
+  "license": "Apache-2.0",
+  "license_url": "https://raw.githubusercontent.com/vllm-project/vllm/db9527a46873454610df6dbedf79a36d6bf1a7f6/LICENSE",
+  "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+  "test_reference_only": true,
+  "new_actual_runtime_approval": false,
+  "four_fault_activation_verified": false
+}

@@ -13,6 +13,10 @@ import subprocess
 import sys
 import time
 import traceback
+import inspect
+from copy import deepcopy
+from datetime import datetime, timezone
+from uuid import uuid4
 from guard.executors.input_cpu import PROFILE, run_reference, project
 from guard.executors.structured_tools import SOURCE_COMMIT
 
@@ -40,12 +44,446 @@ def build_context(folder):
     return InputProcessor(config)
 
 
+
+ONLINE_SOURCE_PROFILES={'reference5d':SOURCE_COMMIT,'target031':'db9527a46873454610df6dbedf79a36d6bf1a7f6'}
+ONLINE_GATE_SHA256='942f0dfeb9418a6e934b063c6767405aaa1fa3706ae3f12fa98818e6ff77a76e'
+ONLINE_EXCLUDED_TARGET031={'reuse-empty','reuse-bool','reuse-echo-ignores-ids'}
+
+
+def _online_verify_checkout():
+    from tools import lif14_profiler_cpu as gate
+    expected=Path(__file__).resolve().parent/'lif14_profiler_cpu.py'
+    try:
+        if (expected.is_symlink() or not Path(gate.__file__).resolve().samefile(expected)
+            or not Path(inspect.getsourcefile(gate.verify_component)).resolve().samefile(expected)
+            or hashlib.sha256(expected.read_bytes()).hexdigest()!=ONLINE_GATE_SHA256):raise ValueError
+    except (OSError,TypeError,AttributeError,ValueError):
+        raise ValueError('ONLINE_CPU_COMPONENT_GATE_IDENTITY_MISMATCH') from None
+    gate.verify_component(Path(__file__).resolve().parents[2])
+
+
+def _online_verify_profile(root,profile):
+    if profile not in ONLINE_SOURCE_PROFILES or sys.flags.optimize or sys.version_info[:2]!=(3,12):
+        raise ValueError('ONLINE_CPU_PROFILE_OR_PYTHON_INVALID')
+    _online_verify_checkout()
+    from guard.executors.structured_tools_cpu import _verify_source,_validate_target031_dependencies
+    _verify_source(root,expected_commit=ONLINE_SOURCE_PROFILES[profile])
+    if profile=='target031':_validate_target031_dependencies()
+    for name,module in tuple(sys.modules.items()):
+        if name=='vllm' or name.startswith('vllm.'):
+            file=getattr(module,'__file__',None)
+            if file is None or not Path(file).resolve().is_relative_to(root/'vllm'):
+                raise ValueError('ONLINE_CPU_IMPORT_MISMATCH')
+
+
+def _online_post(root,profile,producer_sha256,config_folder=None,config_hashes=None):
+    try:
+        _online_verify_profile(root,profile)
+        if hashlib.sha256(Path(__file__).read_bytes()).hexdigest()!=producer_sha256:
+            raise ValueError('ONLINE_CPU_COLLECTOR_BYTES_CHANGED')
+        if config_folder is not None and _online_config_hashes(config_folder)!=config_hashes:
+            raise ValueError('ONLINE_CPU_CONFIG_BYTES_CHANGED')
+        return {'status':'verified'}
+    except ValueError as error:return {'status':'mismatch','error_type':type(error).__name__}
+    except Exception as error:return {'status':'unavailable','error_type':type(error).__name__}
+
+
+def _online_config_hashes(folder):
+    return {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in folder.glob('*') if p.is_file()}
+
+
+def _online_inventory(base,processor,online,reuse,mm_gate):
+    selected=[('render_cmpl',base.render_cmpl),('render_chat',base.render_chat),
+        ('render_chat_async',base.render_chat_async),('process_inputs',processor.process_inputs),
+        ('validate_prompt_len',processor._validate_prompt_len),('validate_model_input',processor._validate_model_input),
+        ('online_render_chat',online.render_chat),('online_preprocess_chat',online.preprocess_chat),
+        ('reuse_input_gate',reuse),('template_gate',online.validate_chat_template),('mm_kwargs_gate',mm_gate)]
+    inventory={name:{'present':True} for name,_ in selected}
+    present=hasattr(base,'validate_token_ids');inventory['validate_token_ids']={'present':present}
+    if present:selected.append(('validate_token_ids',base.validate_token_ids))
+    return selected,inventory
+
+
+def _online_eligibility(case,row,profile):
+    if profile=='target031' and case['id'] in ONLINE_EXCLUDED_TARGET031:
+        return {'eligible':False,'reason':'source_expectation_unavailable'}
+    metadata=row.get('safe_metadata',{})
+    fields=metadata.get('parsed_fields',{})
+    parsed=metadata.get('request_parsed') is True and all(
+        fields.get(name,{}).get('present') is True and fields[name].get('fixture_matches') is True
+        for name in case['fields'])
+    events=set(row.get('events',[]))
+    gate={'REQ-08':'reuse_input_gate','REQ-07':'template_gate','SUP-08':'mm_kwargs_gate'}[case['check_id']]
+    if not parsed:return {'eligible':False,'reason':'consumption_unavailable'}
+    # Direct InputProcessor returns are independent facts; trace alone and
+    # text-only admission do not establish application of MM overrides.
+    from guard.executors.input_cpu import digest
+    consumed=metadata.get('admission_completed') is True
+    guarded=gate in events and 'online_render_chat' in events
+    range_case=case['id'] in ('reuse-negative','reuse-oov','reuse-long')
+    if row.get('outcome')=='rejected':
+        observed=(metadata.get('processor_input_matches_reuse') is True and 'process_inputs' in events
+                  if profile=='target031' and range_case else guarded)
+    elif row.get('outcome')=='accepted':
+        if case['check_id']=='REQ-08' and case['id'] not in ('reuse-empty','reuse-bool','reuse-echo-ignores-ids'):
+            ids=case['fields'].get('kv_transfer_params',{}).get('prompt_token_ids')
+            observed=consumed and metadata.get('processor_input_matches_reuse') is True and all(
+                metadata.get(key)==digest(ids) for key in ('processor_input_ids_sha256','admitted_token_ids_canonical_sha256'))
+        elif case['check_id']=='REQ-07':
+            count=metadata.get('prompt_count')
+            applied_override=case['id'] in ('template-untrusted','template-nested-untrusted') and all(
+                metadata.get(key)==digest([3,4]) for key in ('processor_input_ids_sha256','admitted_token_ids_canonical_sha256'))
+            exceeded=case['id']=='kwargs-trusted-overbound' and metadata.get('effective_max_model_len')==16 and type(count) is int and count>=16
+            observed=consumed and (guarded or applied_override or exceeded)
+        else:observed=consumed and guarded
+    else:observed=False
+    if observed:return {'eligible':True,'reason':'source_contract_observed'}
+    return {'eligible':False,'reason':'consumption_unavailable'}
+
+
+
+
+def _online_token_id_domain(config_folder,model_vocab_size,request_ids):
+    """Read independent owned tokenizer IDs; never use the cached max as oracle."""
+    from guard.executors.input_cpu import digest
+    try:
+        tokenizer_bytes=(config_folder/'tokenizer.json').read_bytes()
+        model_bytes=(config_folder/'config.json').read_bytes()
+        tokenizer=json.loads(tokenizer_bytes);model=json.loads(model_bytes)
+        if (type(model_vocab_size) is not int or model_vocab_size<=0
+                or type(model.get('vocab_size')) is not int or model['vocab_size']!=model_vocab_size):
+            raise ValueError('ONLINE_CPU_MODEL_DOMAIN_UNAVAILABLE')
+        vocab=tokenizer['model']['vocab']
+        if not isinstance(vocab,dict):raise ValueError('ONLINE_CPU_TOKENIZER_DOMAIN_UNAVAILABLE')
+        values=list(vocab.values())+[item['id'] for item in tokenizer.get('added_tokens',[])]
+        if not values or any(type(value) is not int or value<0 for value in values):
+            raise ValueError('ONLINE_CPU_TOKENIZER_DOMAIN_UNAVAILABLE')
+        ids=sorted(set(values))
+        if not isinstance(request_ids,list):raise ValueError('ONLINE_CPU_REQUEST_DOMAIN_UNAVAILABLE')
+        return {'status':'collected','model_vocab_size':model_vocab_size,'tokenizer_id_count':len(ids),
+            'min':ids[0],'max':ids[-1],'canonical_sha256':digest(ids),
+            'contiguous_from_zero':ids[0]==0 and ids[-1]+1==len(ids),
+            'request_ids_in_domain':all(type(value) is int and value in set(ids) for value in request_ids),
+            'request_ids_within_model_vocab':all(type(value) is int and 0<=value<model_vocab_size for value in request_ids),
+            'request_ids_canonical_sha256':digest(request_ids),
+            'tokenizer_file_sha256':hashlib.sha256(tokenizer_bytes).hexdigest(),
+            'model_config_file_sha256':hashlib.sha256(model_bytes).hexdigest()}
+    except Exception as error:
+        return {'status':'unavailable','error_type':type(error).__name__}
+
+
+def _online_collect_case(case,processor,online_class,request_class,error_class,rejection_type,tracked,*,config_folder=None):
+    from guard.executors import online_input_cpu as product
+    from guard.executors.input_cpu import digest
+    from guard.executors.structured_limits import observe_call
+    row={**product.describe(case),'target_started':False}
+    try:
+        online=online_class(processor.model_config,processor.renderer,request_logger=None,chat_template=None,
+            chat_template_content_format='auto',trust_request_chat_template=case['trust_template'],
+            trust_request_mm_kwargs=case['trust_mm'])
+        def invoke(fields,details,*,primary=False):
+            try:
+                obj=request_class(model='fixture-model',messages=[{'role':'user','content':'hello world'}],
+                    max_tokens=1,**deepcopy(fields))
+                details.update(effective_max_model_len=processor.model_config.max_model_len,
+                    effective_vocab_size=processor.model_config.get_vocab_size(),
+                    effective_max_token_id=processor.renderer.tokenizer.max_token_id,
+                    request_parsed=True,parsed_fields={name:{
+                    'present':name in obj.model_fields_set,
+                    'fixture_matches':digest(getattr(obj,name,None))==digest(value),
+                    'canonical_sha256':digest(getattr(obj,name,None))} for name,value in fields.items()},
+                    trust_request_chat_template=online.trust_request_chat_template,
+                    trust_request_mm_kwargs=online.trust_request_mm_kwargs)
+                if primary:row['target_started']=True
+                result=__import__('asyncio').run(online.render_chat(obj))
+                if isinstance(result,error_class):
+                    code=result.error.code
+                    if type(code) is int and code in (400,422):
+                        details.update(rejection_basis='native_typed_error_response',native_error_code=code)
+                        raise product.NativeRequestRejected()
+                    raise RuntimeError('ONLINE_CPU_NATIVE_ERROR_CATEGORY_UNSUPPORTED')
+                _,inputs=result
+                params=obj.to_sampling_params(max_tokens=1,default_sampling_params={})
+                ids=inputs[0].get('prompt_token_ids')
+                details.update(processor_input_count=len(ids) if ids is not None else None,
+                    processor_input_ids_sha256=digest(ids) if ids is not None else None,
+                    processor_input_matches_reuse=digest(ids)==digest(fields.get('kv_transfer_params',{}).get('prompt_token_ids')))
+                details['token_id_domain']=_online_token_id_domain(config_folder,
+                    processor.model_config.get_vocab_size(),ids)
+                admitted=processor.process_inputs('b1-online-fixture',inputs[0],params,('generate',))
+                details.update(admission_completed=True,prompt_count=len(admitted.prompt_token_ids),
+                    admitted_token_ids_canonical_sha256=digest(admitted.prompt_token_ids),
+                    reuse_field_removed='prompt_token_ids' not in (obj.kv_transfer_params or {}),
+                    sampling_reuse_field_present='prompt_token_ids' in ((params.extra_args or {}).get('kv_transfer_params') or {}))
+            except Exception as error:
+                details['error_type']=type(error).__name__
+                raise
+        details={}
+        row.update(observe_call(lambda:invoke(case['fields'],details,primary=True),(rejection_type,product.NativeRequestRejected),tracked))
+        row['safe_metadata']=details
+        after={}
+        row['after']=observe_call(lambda:invoke({},after),(rejection_type,product.NativeRequestRejected),tracked)
+        row['after']['safe_metadata']=after
+    except Exception as error:
+        row['error_type']=type(error).__name__
+        row.setdefault('outcome','execution_error');row.setdefault('events',[])
+        row.setdefault('after',{'outcome':'not_collected','events':[]})
+        row.setdefault('safe_metadata',{})
+    return row
+
+
+def capture_online(source_root:Path,workdir:Path,*,source_profile='reference5d')->dict:
+    from guard.executors import online_input_cpu as product
+    if sys.flags.optimize:raise ValueError('ONLINE_CPU_REQUIRES_NORMAL_PYTHON')
+    root=source_root.resolve()
+    _online_verify_profile(root,source_profile)
+    workdir.mkdir(parents=True,exist_ok=False)
+    producer_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    collection_id='online-cpu-'+uuid4().hex
+    started=datetime.now(timezone.utc).isoformat();began=time.perf_counter()
+    record={'profile':'b1-online-input-cpu-v1','suite':'online','scope':'reference_cpu_admission_only',
+        'source_profile':source_profile,'source_commit':ONLINE_SOURCE_PROFILES[source_profile],
+        'installed_target':None,'runner_consumption_verified':False,'runner_hook_verified':False,
+        'own_producer_sha256':producer_sha256,'collection_id':collection_id,'capture_started_at':started,
+        'fixture_config':{'origin':'DECLARED','vocab_size':32,'max_model_len':16,'hidden_size':4},
+        'source_validation':{'pre':'verified','boundary':'source_fixture_component'},'results':[]}
+    settings={'VLLM_CACHE_ROOT':str(workdir/'vllm-cache'),'HF_HOME':str(workdir/'hf-home'),
+        'HF_HUB_CACHE':str(workdir/'hf-home/hub'),'HF_MODULES_CACHE':str(workdir/'hf-modules'),
+        'VLLM_PLUGINS':'','VLLM_TARGET_DEVICE':'cpu','CUDA_VISIBLE_DEVICES':'',
+        'HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1'}
+    previous={k:os.environ.get(k) for k in settings};os.environ.update(settings)
+    processor=None;config_folder=workdir/'local-config';config_hashes={}
+    try:
+        import torch
+        if torch.version.cuda is not None:raise ValueError('ONLINE_CPU_REQUIRES_CPU_TORCH')
+        from vllm.renderers.base import BaseRenderer
+        from vllm.v1.engine.input_processor import InputProcessor
+        from vllm.renderers.online_renderer import OnlineRenderer,_reused_prompt_token_ids
+        from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
+        from vllm.entrypoints.serve.engine.protocol import ErrorResponse
+        from vllm.entrypoints.generate.base.protocol import validate_request_mm_kwargs
+        from vllm.exceptions import VLLMValidationError
+        processor=build_context(config_folder)
+        config_hashes=_online_config_hashes(config_folder)
+        record['effective_config']={'max_model_len':processor.model_config.max_model_len,
+            'vocab_size':processor.model_config.get_vocab_size(),'dtype':str(processor.model_config.dtype),
+            'enforce_eager':processor.model_config.enforce_eager,
+            'max_token_id':processor.renderer.tokenizer.max_token_id}
+        tracked,inventory=_online_inventory(BaseRenderer,InputProcessor,OnlineRenderer,_reused_prompt_token_ids,validate_request_mm_kwargs)
+        record.update(source_features=inventory,config_file_bytes_sha256=config_hashes,
+            observed_source_file_bytes_sha256={str(Path(inspect.getsourcefile(fn)).resolve().relative_to(root)):
+                hashlib.sha256(Path(inspect.getsourcefile(fn)).read_bytes()).hexdigest() for _,fn in tracked},
+            dependencies={k:importlib.metadata.version(k) for k in ('torch','transformers','tokenizers','pydantic')})
+        for case in product.fixtures():
+            row={**product.describe(case),'outcome':'execution_error','target_started':False,'events':[],
+                'after':{'outcome':'not_collected','events':[]},'safe_metadata':{}}
+            try:
+                _online_verify_profile(root,source_profile)
+                row=_online_collect_case(case,processor,OnlineRenderer,ChatCompletionRequest,ErrorResponse,VLLMValidationError,tracked,config_folder=config_folder)
+                pre='verified'
+            except Exception as error:
+                row['error_type']=type(error).__name__
+                pre='mismatch' if isinstance(error,ValueError) else 'unavailable'
+            row.update(source_profile=source_profile,source_commit=ONLINE_SOURCE_PROFILES[source_profile],collection_id=collection_id,
+                source_validation={'pre':pre,'post':_online_post(root,source_profile,producer_sha256,config_folder,config_hashes),
+                                   'boundary':'source_fixture_component'})
+            row['source_scope_eligibility']=_online_eligibility(case,row,source_profile)
+            record['results'].append(row)
+    except Exception as error:
+        record['error_type']=type(error).__name__
+    finally:
+        if processor is not None:
+            try:processor.renderer.shutdown()
+            except Exception as error:record['shutdown_error_type']=type(error).__name__
+        record['capture_finished_at']=datetime.now(timezone.utc).isoformat()
+        record['source_validation']['post']=_online_post(root,source_profile,producer_sha256,
+            config_folder if config_hashes else None,config_hashes)
+        for key,value in previous.items():
+            if value is None:os.environ.pop(key,None)
+            else:os.environ[key]=value
+    record['config_file_bytes_sha256']=config_hashes
+    record['observations_by_check']=product.project([r for r in record['results']
+        if r['source_scope_eligibility']['eligible'] and r['source_validation']['pre']=='verified'
+        and r['source_validation']['post']['status'] in ('verified','unavailable')])
+    complete=len(record['results'])==len(product.fixtures()) and all(
+        r.get('outcome') in ('accepted','rejected') and r.get('after',{}).get('outcome')=='accepted'
+        and r['source_validation']['pre']=='verified' and r['source_validation']['post']['status']=='verified'
+        and bool(r.get('events')) and r.get('after',{}).get('safe_metadata',{}).get('admission_completed') is True
+        and 'process_inputs' in r.get('after',{}).get('events',[]) for r in record['results'])
+    record.update(capture_status='completed' if complete and record['source_validation']['post']['status']=='verified'
+        and 'error_type' not in record and 'shutdown_error_type' not in record else 'incomplete',
+        parent_wall_seconds=time.perf_counter()-began,auxiliary_write={'status':'completed'})
+    try:(workdir/'result.json').write_text(json.dumps(record,indent=2))
+    except Exception as error:
+        record.update(capture_status='incomplete',auxiliary_write={'status':'failed','error_type':type(error).__name__})
+    return record
+
+
+def _req09_cases():
+    from guard.executors.input_cpu import fixtures
+    return [case for case in fixtures() if case['check_id']=='REQ-09' and case['kind'] in {'mask','shape','offset'}]
+
+
+def _req09_metadata(prompt,offset):
+    from guard.executors.input_cpu import digest
+    ids=prompt.get('prompt_token_ids');tensor=prompt.get('prompt_embeds');mask=prompt.get('is_token_ids')
+    shape=list(tensor.shape) if tensor is not None else None
+    metadata={'prompt_count':len(ids) if ids is not None else shape[0] if shape else None,
+        'token_ids_canonical_sha256':digest(ids) if ids is not None else None,
+        'embedding_shape':shape,'embedding_dtype':str(tensor.dtype) if tensor is not None else None,
+        'embedding_bytes_sha256':hashlib.sha256(tensor.detach().cpu().contiguous().numpy().tobytes()).hexdigest() if tensor is not None else None,
+        'mask_count':len(mask) if mask is not None else None,
+        'mask_canonical_sha256':digest(mask) if mask is not None else None,
+        'routed_experts_prompt_start':offset}
+    metadata['canonical_sha256']=digest(metadata)
+    return metadata
+
+
+def _req09_collect_case(case,processor,sampling_class,embeds_input,tensor_zeros,rejection_type,tracked):
+    from guard.executors.input_cpu import describe
+    from guard.executors.structured_limits import observe_call
+    row=describe(case)
+    def invoke(*,normal=False):
+        value=deepcopy(case['value']);offset=value if case['kind']=='offset' and not normal else 0
+        if normal:
+            prompt=processor.renderer.render_cmpl([{'prompt':'hello world'}])[0]
+        elif case['kind']=='offset':
+            prompt={'type':'token','prompt_token_ids':[3,4,5]}
+        else:
+            kwargs={'prompt_token_ids':[3,4,5],'is_token_ids':[False]*value['mask_length']} if case['kind']=='mask' else {}
+            prompt=embeds_input(tensor_zeros(value['shape']),**kwargs)
+        input_metadata=_req09_metadata(prompt,offset)
+        details['input_metadata']=input_metadata
+        request=processor.process_inputs('b1-req09-'+('after-' if normal else '')+case['id'],prompt,
+            sampling_class(max_tokens=1,routed_experts_prompt_start=offset),('generate',))
+        output=_req09_metadata({'prompt_token_ids':request.prompt_token_ids,'prompt_embeds':request.prompt_embeds,
+            'is_token_ids':request.prompt_is_token_ids},request.sampling_params.routed_experts_prompt_start)
+        details['admitted_metadata']={**output,'admission_completed':True,
+            'processor_input_sha256':input_metadata['canonical_sha256'],'processor_output_sha256':output['canonical_sha256']}
+    details={}
+    row.update(observe_call(invoke,rejection_type,tracked));row.update(details)
+    details={}
+    row['after']=observe_call(lambda:invoke(normal=True),rejection_type,tracked)
+    row['after'].update(details)
+    return row
+
+
+def capture_req09_target031(source_root:Path,workdir:Path)->dict:
+    """기존 실제 CPU 객체로 REQ09 12행과 후속 정상 12행만 수집한다."""
+    from guard.executors import input_cpu as product
+    root=Path(source_root).resolve();workdir=Path(workdir)
+    _online_verify_profile(root,'target031')
+    workdir.mkdir(parents=True,exist_ok=False)
+    producer_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    began=time.perf_counter();config_folder=workdir/'local-config';config_hashes={};processor=None
+    record={'profile':'b1-req09-target031-cpu/1','source_profile':'target031',
+        'source_commit':ONLINE_SOURCE_PROFILES['target031'],'scope':'source_cpu_input_processor_boundary_only',
+        'data_origin':'DECLARED','installed_target':None,'runner_consumption_verified':False,
+        'collection_id':'req09-target031-cpu-'+uuid4().hex,'started_at':datetime.now(timezone.utc).isoformat(),
+        'finished_at':None,'own_producer_sha256':producer_sha256,
+        'source_validation':{'pre':'verified','boundary':'source_fixture_component'},
+        'fixture_config':{'origin':'DECLARED','vocab_size':32,'max_model_len':16,'hidden_size':4},'results':[]}
+    settings={'VLLM_CACHE_ROOT':str(workdir/'vllm-cache'),'HF_HOME':str(workdir/'hf-home'),
+        'HF_HUB_CACHE':str(workdir/'hf-home/hub'),'HF_MODULES_CACHE':str(workdir/'hf-modules'),
+        'VLLM_PLUGINS':'','VLLM_TARGET_DEVICE':'cpu','CUDA_VISIBLE_DEVICES':'',
+        'HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1'}
+    previous={key:os.environ.get(key) for key in settings};os.environ.update(settings)
+    try:
+        import torch
+        if torch.version.cuda is not None:raise ValueError('REQ09_REQUIRES_CPU_TORCH')
+        from vllm.renderers.base import BaseRenderer
+        from vllm.v1.engine.input_processor import InputProcessor
+        from vllm.sampling_params import SamplingParams
+        from vllm.inputs import embeds_input
+        from vllm.exceptions import VLLMValidationError
+        processor=build_context(config_folder)
+        config_hashes=_online_config_hashes(config_folder)
+        tracked=[('render_cmpl',BaseRenderer.render_cmpl),('process_inputs',InputProcessor.process_inputs),
+            ('validate_prompt_len',InputProcessor._validate_prompt_len),('validate_model_input',InputProcessor._validate_model_input)]
+        inventory={name:{'present':True} for name,_ in tracked}
+        inventory['validate_token_ids']={'present':hasattr(BaseRenderer,'validate_token_ids')}
+        if inventory['validate_token_ids']['present']:tracked.append(('validate_token_ids',BaseRenderer.validate_token_ids))
+        files={}
+        for _,function in tracked:
+            path=Path(inspect.getsourcefile(function)).resolve()
+            if not path.is_relative_to(root/'vllm'):raise ValueError('REQ09_SOURCE_FUNCTION_ORIGIN_MISMATCH')
+            files[str(path.relative_to(root))]=hashlib.sha256(path.read_bytes()).hexdigest()
+        record.update(source_features=inventory,observed_source_file_bytes_sha256=files,
+            dependencies={key:importlib.metadata.version(key) for key in ('torch','transformers','tokenizers','pydantic')},
+            effective_config={'vocab_size':processor.model_config.get_vocab_size(),
+                'max_model_len':processor.model_config.max_model_len,'hidden_size':processor.model_config.get_hidden_size()})
+        if record['effective_config']!={'vocab_size':32,'max_model_len':16,'hidden_size':4}:
+            raise ValueError('REQ09_FIXTURE_CONFIG_MISMATCH')
+        for case in _req09_cases():
+            row={**product.describe(case),'outcome':'execution_error','events':[],
+                'after':{'outcome':'not_collected','events':[]}}
+            pre='unavailable'
+            try:
+                _online_verify_profile(root,'target031');pre='verified'
+                row=_req09_collect_case(case,processor,SamplingParams,embeds_input,torch.zeros,VLLMValidationError,tracked)
+            except Exception as error:
+                row['error_type']=type(error).__name__
+                if pre!='verified':pre='mismatch' if isinstance(error,ValueError) else 'unavailable'
+            row.update(source_profile='target031',source_commit=ONLINE_SOURCE_PROFILES['target031'],
+                collection_id=record['collection_id'],source_validation={'pre':pre,
+                    'post':_online_post(root,'target031',producer_sha256,config_folder,config_hashes),
+                    'boundary':'source_fixture_component'})
+            record['results'].append(row)
+    except Exception as error:
+        record['error_type']=type(error).__name__
+    finally:
+        if processor is not None:
+            try:processor.renderer.shutdown()
+            except Exception as error:record['shutdown_error_type']=type(error).__name__
+        record['source_validation']['post']=_online_post(root,'target031',producer_sha256,
+            config_folder if config_hashes else None,config_hashes)
+        record['finished_at']=datetime.now(timezone.utc).isoformat()
+        for key,value in previous.items():
+            if value is None:os.environ.pop(key,None)
+            else:os.environ[key]=value
+    record['config_file_bytes_sha256']=config_hashes
+    qualified=[row for row in record['results'] if row['source_validation']['pre']=='verified'
+        and row['source_validation']['post']['status'] in {'verified','unavailable'}
+        and row.get('outcome')=='accepted' and row.get('admitted_metadata',{}).get('admission_completed') is True
+        and 'process_inputs' in row.get('events',[])
+        and row['admitted_metadata'].get('processor_input_sha256')==row.get('input_metadata',{}).get('canonical_sha256')
+        and row['admitted_metadata'].get('processor_output_sha256')==row.get('input_metadata',{}).get('canonical_sha256')]
+    record['observations_by_check']={'REQ-09':product.project(qualified)['REQ-09']}
+    complete=len(record['results'])==len(_req09_cases()) and all(
+        row.get('outcome') in {'accepted','rejected'} and 'process_inputs' in row.get('events',[])
+        and row['source_validation']['pre']=='verified' and row['source_validation']['post']['status']=='verified'
+        and row.get('after',{}).get('outcome')=='accepted'
+        and row['after'].get('admitted_metadata',{}).get('admission_completed') is True
+        and 'process_inputs' in row['after'].get('events',[]) for row in record['results'])
+    record.update(capture_status='completed' if complete and record['source_validation']['post']['status']=='verified'
+        and 'error_type' not in record and 'shutdown_error_type' not in record else 'incomplete',
+        parent_wall_seconds=time.perf_counter()-began,auxiliary_write={'status':'completed'})
+    try:
+        with (workdir/'result.json').open('x') as stream:stream.write(json.dumps(record,indent=2))
+    except Exception as error:
+        record.update(capture_status='incomplete',auxiliary_write={'status':'failed','error_type':type(error).__name__})
+    return record
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--source-root', type=Path, required=True)
     parser.add_argument('--workdir', type=Path, required=True)
     parser.add_argument('--suite', choices=('input', 'sampling', 'embeddings', 'online'), default='input')
+    parser.add_argument('--source-profile',choices=ONLINE_SOURCE_PROFILES,default='reference5d')
+    parser.add_argument('--check',choices=('REQ-09',))
     args = parser.parse_args()
+    if args.check is not None:
+        if (args.suite,args.check,args.source_profile)!=('input','REQ-09','target031'):
+            parser.error('--check REQ-09 requires --suite input --source-profile target031')
+        result=capture_req09_target031(args.source_root,args.workdir)
+        print(result['capture_status'])
+        return 0 if result['capture_status']=='completed' else 2
+    if args.suite=='online':
+        result=capture_online(args.source_root,args.workdir,source_profile=args.source_profile)
+        print(result['capture_status'])
+        return 0 if result['capture_status']=='completed' else 2
+    if args.source_profile!='reference5d':parser.error('source-profile applies only to online suite')
     root = args.source_root.resolve()
     if subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip() != SOURCE_COMMIT:
         raise SystemExit('Reference SHA mismatch')

@@ -1,6 +1,6 @@
 # SUP-04 실행 이미지 승인 부분관측
 
-> 현행 팩27의 공통 container_config 실행기 버전은 0.5.1이다. PLT-01 수집 완전성 보강에 따른 버전 구분이며 SUP-04 이미지 승인 프로파일·정의·판정은 유지한다. 아래 팩24·0.5.0은 최초 구현 당시 기록이다.
+> 현행 팩31의 공통 container_config 실행기 버전은 0.6.2이다. 새 live 이미지 관측은 sealed ENV와 정확한 target ENV Ref를 먼저 확인한다. SUP-04 이미지 승인 프로파일·정의·판정은 유지한다. 아래 팩24·0.5.0은 최초 구현 당시 기록이다.
 
 팩24의 SUP-04는 기존 `container_config` 실행기의
 `collection_profile: running-image-approval-v1`을 재사용한다.
@@ -13,7 +13,7 @@
 
 수집 순서:
 
-1. target의 소유 run_id·엔진 컨테이너·pinned 이미지와 ENV를 대조한다.
+1. ENV seal과 target.environment_ref의 kind/id/revision/sha256 전체가 현재 ENV와 정확히 같은지 확인하고 소유 run_id·엔진 컨테이너·pinned 이미지를 대조한다.
 2. 소유 라벨·실행 상태·컨테이너 ID·실제 image ID·기동 시각을 투영한다.
 3. 실제 실행 image ID로 Docker image metadata를 조회하고 pinned RepoDigest를 연결한다.
 4. 재 inspect로 위 수집 구간의 identity가 같은지 확인한다.
@@ -22,6 +22,9 @@
 BYUL environment의 bare `sha256:<64>`는 명시적인 target의 pinned 참조와
 manifest digest가 같고 실제 Docker RepoDigest 연결까지 확인된 경우에만 허용한다.
 repository를 ENV에서 추정하거나 local image ID를 manifest digest로 바꾸지 않는다.
+ENV Ref가 없거나 다르면 `RUNNING_IMAGE_TARGET_UNVERIFIED`를 기록하고 Docker
+inspect·이미지 조회·정상 추론을 수행하지 않는다. 같은 이미지라도 다른 ENV의
+신원을 빌리지 않으며, 누락 Ref를 현재 ENV에서 자동 채우지 않는다.
 
 고정된 비승인 실행 이미지가 확인되면 보안 FAIL이다. 이후 정상 대조 수집 오류로
 그 근거를 지우지 않는다. tag-only·image ID/manifest 혼동·소유자/정체성 불일치·수집 실패는
@@ -34,7 +37,7 @@ UNKNOWN이다. daemon 원문·환경변수·기동 명령·호스트 경로·예
 
 기존 PLT-01의 수집·sentinel·판정은 그대로이고, 이 프로파일은 sentinel이나
 패키지 명령을 실행하지 않는다. 실행기 버전은 프로파일과 무관하게 정적
-`container_config/0.5.0`이므로 정상·ABORTED EVD에 같은 버전을 기록한다.
+`container_config/0.6.2`이므로 정상·ABORTED EVD에 같은 버전을 기록한다.
 과거 `0.4.0` EVD는 그대로 보존하고 버전 차이가 있으면 U1은 다시 선정한다.
 SUP-04의 동적 이미지 식별 자료를 PLT-01의 sentinel fixture로 예측하지 않는다.
 기존 registry 종류는 11종이고 연결된 점검은 12개다.

@@ -1,0 +1,13 @@
+--- a/update/src/guard/executors/registry.py
++++ b/update/src/guard/executors/registry.py
+@@ -26,3 +26,4 @@
+ from .unix_ipc import UnixIPCExecutor
+ from .boundary_egress import BoundaryEgressExecutor
++from .structured_tools_cpu import StructuredToolsCPUExecutor
+ from .api_transport import APITransportExecutor
+@@ -46,4 +47,5 @@
+     "unix_ipc:real": lambda cfg: UnixIPCExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ")),
+     "boundary_egress:real": lambda cfg: BoundaryEgressExecutor(cfg.get("boundary_egress", {})),
++    "structured_tools_cpu:reference-cpu": lambda cfg: StructuredToolsCPUExecutor(cfg.get("structured_tools_cpu", {})),
+     "api_transport:real": lambda cfg: APITransportExecutor(cfg.get("api_transport", {})),
+ }

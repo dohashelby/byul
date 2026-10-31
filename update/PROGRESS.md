@@ -1,3 +1,143 @@
+## 2026-10-30 — A-1 LIF08 선정 mp rank 실패 관측 제품 묶음
+
+- 한 일: PR123 확정683e48d를 보존하고 선정 mp의 worker 예외 응답·collective RPC/Future 결과·사망 monitor·core 실패 표식을 분리한 명시 native13/parser와 닫힌 six-probe·LIF08 전용 소비·DRAFT팩/registry를 초안으로 연결했다. 예외/사망/지연/통신정지 네 조건과 원팩 정상/output rank 기준·다른76정의·native8~12·A2/B 원본을 유지한다. callback·RPC·worker 상태를 바꾸거나 실제 장애를 주입하지 않는다.
+- 테스트 결과: 원본 MP/core 설치 캐시 bytes와 고정 공개 소스를 정적으로 확인했다. 원본 메서드 code·소유 CPU child 네 설정·기존 CLI/정확Ref·실제 localhost HTTP의 회귀 초안을 준비했다. runtime code 오프라인 최종 검토·소스 고정 전이며 기능 시험을 아직 실행하지 않았다.
+- 다음 단계: 구현/회귀/문서 검토 종료→자기 code 리터럴·전체 공통 소비 pin과 source/hash 고정→영향/불변식·동일 bytes Linux→설치본 CLI·정확Ref→확정 커밋/PR/정확HEAD CI/인계. 큰 실제 fault 제어 미준비와 준비된 독립 개발을 구분한다.
+- 막힌 것: 네 안전 fault 각각의 실제 활성·발생 시계·rank/group/요청 결합·감지/상위 접수·기한·실제 필수 rank 정상 계산/통신과 복구가 미완료다. 관측 표식만으로 fault/수신·네 종류 완료를 추정하지 않으며 전축UNKNOWN·정상null·생산자/전체범위false다. 원GPU창종료/Start0/마지막stopped·보존EBS과금·CI결제차단·A39/56/4·A1 19/27/2는 유지한다.
+
+## 2026-10-30 — A-1 LIF04 선택 transport buffer 관측 제품 연결
+
+- 한 일: PR122 이후 전용 stream_buffer:kubernetes와 명시 native12를 준비했다. 원팩31·LIF04 두 분기/질문/기준·다른76정의·A2/B 원본·기본8/9~11을 보존하고 기존 CLI/증거 경로를 사용한다. 실제 고정 Uvicorn send/drain/connection_lost와 선택 asyncio TCP buffer/kernel queue·전체process RSS를 구분한다. HTTP 다섯 요청·수신/시간/출력 한도·POL16개와 오류/누락 의미를 닫았다.
+- 테스트 결과: 구현·시험·문서 초안과 자기 code 오프라인 검토까지 준비했다. 기능 검증은 소스 고정 뒤 실행하며 아직 통과로 기록하지 않는다. 고정 실제 메서드 본문·소유 Linux 소켓·제품 정상/후보/누락/교체/후속오류·정확Ref 시험을 포함한다.
+- 다음 단계: 검토 checkpoint와 전체 공통 소비 pin 고정→직접/동일계약·인접·불변식→같은 bytes Linux→wheel/설치 CLI→확정 인계·초안PR·정확HEAD CI. 이후 준비된 본인 담당 개발을 이어간다.
+- 막힌 것: 실제 선택 이미지 Uvicorn 포함/세대·전체 serving buffer inventory·client close 회수 시계·debug 활성/정책·producer 신뢰/실제 Kubernetes/GPU 실증은 미완료다. 전축UNKNOWN·normal_control=null·producer/inventory/release/scope=false, CI결제차단·원GPU창종료/Start0/마지막stopped를 유지한다. 부모A39/56/4·A1 19/27/2 전체 완료 수는 늘리지 않는다.
+
+## 2026-10-29 — A-1 PLT01/04 확정 소비의 공통 등록
+
+- 한 일: 확정e8e915b를 보존한 분리 공간에서 A2 c4fdbe4 전용5파일을 원본 추적 cherry-pick으로 통합한다. 기존 container_config:kubernetes에 PLT01의 전용 수집을 연결하고 credential_exposure:kubernetes를 등록한다. 필수 permission 관문/정책 타입과 target hash를 I/O 전에 검사하고 최종 EVD 출처는 공통 live 기록/전송 경계보다 승격하지 않는다. 기존 SUP04 경로와 전용 bytes·팩31·판정은 유지한다.
+- 테스트 결과: 최초1108파일 고정 영향602통과/기존skip1·제외1(103.94/104.919초), 설치판165파일/등록CLI3사례 통과 뒤 기본 전체6284통과·아키텍처1실패(754.50/756.300초)를 확인했다. 공통 process collector의 runtime 직접 import를 기존 executor 함수 경계로 이동하고 같은 입력/출력·프로그램 bytes·검증 의미를 보존했다. 고정v2 영향/원래 아키텍처 계약630통과/기존skip1·제외1(76.00/77.137초), 최종 기본 전체6285통과·실패0·기존skip13/제외19(708.94/710.416초), source/wheel/격리설치165파일 일치(18.416초), 설치판의 실제 등록CLI3사례·각 정확6Ref 왕복(11.316초)도 통과했다. 검증 중1108파일 bytes 불변, A2 전용5파일 원본 일치다. 가장 긴 단계는 기본 전체의 아키텍처 첫 실패 보수/재검증이며 기존 사례/assert/허용목록은 유지했다.
+- 다음 단계: 영향/기본 전체 실패 보수·재고정·필요 재검증→wheel/정확HEAD CI·초안PR·인계. 정확 설치판 소비가 확인되면 같은 승인 인스턴스의 새 소유권/예산·기한/할당량을 확인해 실제 metadata/정상 대조를 준비한다.
+- 막힌 것: worker/source/model 귀속·무해 파일/device 접근·전체 권한/자격 PASS, native0.32·TP2는 미완료다. hosted CI5는 계정 문제로 미실행이며 현재 GPU는 stopped다. A39/56/4·A1 19/27/2 범위와 기존 실제 Ref/증거 정리는 보존한다.
+
+## 2026-10-29 — A-1 PLT08 Kubernetes 구간의 정책 결합 입력
+
+- 한 일: 확정f333fff를 보존한 분리 공간에서 A2 PLT08 요청의 versioned 구간 정책과 body 없는 live packet을 준비한다. Docker CID/network/endpoint를 재사용하지 않고 정확 ENV/target/양쪽 binding hash·IP/포트·명시 금지/유효창을 I/O 전에 결합한다. 기존 normal_requests와 구조 검증을 재사용하며 원문 body는 저장하지 않는다. HTTP 응답/완전성·정책창·세대·부모정리와 전체 보호 범위를 구분한다.
+- 테스트 결과: 1103파일 고정 직접/동일계약·인접·불변식372통과/기존skip1·제외1(pytest31.52초/부모32.286초), wheel 빌드2.703초·소스/wheel/격리설치164파일 일치(부모17.387초), 검증 중 bytes 불변이다. 실제 로컬 소켓의 같은 고정 source·범위불일치 pre-I/O 거부·부분200·유효창 만료·후속세대/정리실패를 확인했다. PACK31/PLT08 revision5의 Docker 필수 POL과 NO_POLICY_VALUE·전용 판정/실행기·팩/외부제품은 유지한다. 가장 긴 검증은 CPU 영향 시험이며 실제GPU/무변경 native source는 재실행하지 않았다.
+- 다음 단계: 공통 계약 검증·실패 보수·재고정·설치/초안PR·정확HEAD CI·인계. A2 확정 소비와 A1 versioned 정책/CheckDef/registry를 함께 연결하기 전 새 POL의 정식 PLT08 실행 완료로 표시하지 않는다. 준비된 PLT01/04 확정 통합을 우선한다.
+- 막힌 것: 정책의 기존/신규 profile별 정식 입력·CheckDef 통합과 A2 PLT08 전용 소비는 남아 있다. 관문을 dummy 값이나 required 완화로 우회하지 않는다. TLS/CA/실제 배포경로·IPC/TP·worker 소비·보안 전체는 미완료, CI5는 계정 차단, GPU/EC2는 stopped다.
+
+## 2026-10-29 — A-1 기존 PLT01/04 정상 대조 전송
+
+- 한 일: A2 확정 통합616fdaa를 보존한 분리 공간에서 기존 CheckDef의 completions 정상 대조 한 건을 같은 고정 수집기·정확 ENV/모델 별칭·엔진/프로브 전후 세대에 연결한다. 논리ID의 공백은 명시 고정 wire ID로 결합해 원래ID를 돌려주고 경로·본문은 유지한다. 완전한 EOF/UTF8/비절단·길이/hash 확인 전 body는 구조 검증에 제공하지 않는다.
+- 테스트 결과: 1100파일 고정 직접 공통 호출·기존 기능 구조 검증·실제 로컬 소켓·REQ11/REQ10 및 process 인접·불변식399통과/기존skip1·제외1(pytest34.69초/부모35.820초), wheel 빌드2.220초·소스/wheel/격리 설치163파일 일치(부모11.151초), 검증 중 bytes 불변이다. 실제 소켓의 완전 응답/잘린200, 원격I/O 전 범위거부·응답상관·엔진/프로브 세대 교체·후속 부모정리 실패와 앞선 관측 보존을 확인했다. A2 전용 구현·기존 assert/정책/팩31·보호된 core/외부 제품은 유지한다. 가장 긴 검증은 영향 CPU 시험이며 무변경 source/실제GPU 근거는 재시험하지 않았다.
+- 다음 단계: 직접 영향·실패 보수·재고정·설치/초안PR·정확HEAD CI/인계, A2 확정 전용 PLT01/04 소비 커밋이 준비되면 별도 통합·공통 등록을 마감한다. PLT08 hop과 본인19개 잔여 분기를 계속한다.
+- 막힌 것: 기업 Gateway/허용표·worker/source/model 귀속·전체 보안은 미확인이다. CI5는 계정 문제 실행 전 차단이며 실제 GPU/EC2는 stopped를 유지한다. 새 실제 소비자가 준비되기 전 재기동하지 않는다.
+
+## 2026-10-29 — A-1 자격 환경 수집 확정본 통합
+
+- 한 일: 공통 process acf91e6을 보존한 분리 공간에서 A2 확정a0248fa를 원본 추적 cherry-pick으로 통합했다. 전용 실행기·신규 회귀·문서3파일은 원본 bytes 그대로다. PID별 환경 이름/완료 구간과 명시된 응답ID를 검증하며 앞선 양성 관측·독립 FAIL, ID 없는 기존 순서형 callback 의미를 유지한다. 공통 producer 및 PLT01/04 Kubernetes 전용 소비 연결은 서로 구분한다.
+- 테스트 결과: 1097파일 고정 전용·공통 process·동일 계약·인접·불변식505통과/기존skip1·제외1(pytest65.68초/부모66.588초), wheel 빌드2.195초·소스/wheel/격리 설치162파일 일치(부모11.265초), 검증 중 bytes 불변이다. 기존 CLI3사례의 부분 수집UNKNOWN·양성독립FAIL·첨부실패와 정확6Ref 반출/복원·저장팩 재판정을 확인했다. 가장 긴 단계는 영향 CPU 시험이며 무변경 Linux reader의 기존 격리 검증을 재사용한다. 기존 시험·assert·skip·정책·팩31·core/models/store/judges·외부 contracts·루트 runtime/platform은 수정하지 않는다.
+- 다음 단계: 통합 영향 시험과 설치판 일치 → 정확 HEAD 초안PR/CI 상태·인계 → 준비된 A2 Kubernetes 전용 소비 확정본과 다음 공통 담당 분기. 임의 환경 JSON을 실제 측정 생산자로 승격하지 않는다.
+- 막힌 것: 계정 문제로 hosted CI5는 실행 전 차단 조건이다. 실제 worker/source/model 귀속·전체 보안 완료는 미확인이며 기존 native0.32/lifecycle 관문을 유지한다. 실제 EC2 stopped/증거 반출·소유 worker/GPU/임시 접근 정리 확인은 기존 원장으로 보존하고 재시작하지 않는다. 부모 A39/56/4·A1 19/27/2의 잔여 분기는 유지한다.
+
+## 2026-10-29 — A-1 선택 컨테이너 process 공통 입력
+
+- 한 일: 확정c5aa3e0를 보존한 분리 공간에서 A2 PLT01/04 요청의 공통 selector/고정 Linux reader/포착·CLI를 구현한다. 기존 정확 ENV/모델 매핑과 엔진/프로브 세대 전후 검증을 재사용하며 PID/start·UID/CapEff/mount namespace·환경 이름과 명시 후보 lstat metadata만 반환한다. reader 주체와 관측 PID를 분리하고 worker/source/model 귀속·전체worker·접근 시험은 미검증으로 고정한다. API 후속 실패와 개별 필드/선언 변경은 앞선 packet/관측을 보존한다.
+- 테스트 결과: 1096파일 고정 직접/인접·불변식402통과/기존skip1·제외1(70.19/71.050초), source/wheel/격리설치162파일 일치(부모12.676초), 검증 중 bytes 불변이다. 기존 WSL Ubuntu/Python3.12.3의 독립 PID/mount namespace에서 같은 고정 프로그램을 실행해 UID0/2000 제어 process·PID목록/metadata 안정성·환경값/파일내용 미출력·파일 내용/non-directory open 금지 제어를 확인했다(프로그램7.469초/검증 부모8.077초). 본인 제어 자원만 사용한 EXAMPLE이며 cluster/GPU 실증으로 집계하지 않는다. A2의 새 자격수집 보수a0248fa는 다음 별도 통합 대상이다.
+- 다음 단계: 고정 source 영향 검증·실패 보수·재고정·설치물·초안PR/정확HEAD CI 상태·본인 인계, A2 기존 전용 실행기의 live 공통 입력 소비와 정확Ref 왕복을 연결한다. 공통 reader만으로 PLT01/04 전환 완료를 표시하지 않는다.
+- 막힌 것: native0.32·실제 worker/source/model 세대 귀속과 승인 주체의 무해 접근은 이번 metadata 경계 밖이다. 기존 lifecycle lab/source gate는 유지한다. 실제EC2는 소유worker/GPU/task·임시접근 회수·원격/로컬 증거 보존 뒤 정상Stop으로 stopped가 확인됐고 암호화120GiB EBS는 보존/과금한다. 계정 문제로 hosted CI는 실행 전 차단 조건을 유지하며 전체 A39개 Goal은 active다.
+
+## 2026-10-29 — A-1 REQ01/03 선택 Pod 전송 연결
+
+- 한 일: 확정a742714와 원본을 보존한 별도 worktree에서 기존 direct_route/role_route의 수집·안전 프로브·정책·판정을 재사용하고 Kubernetes 대상 선택/전송만 연결한다. 정확 ENV/모델 별칭과 엔진/신뢰 프로브에 비신뢰 프로브·Gateway의 독립 Pod 세대를 더해 전후 검증한다. 같은 고정 stdlib HTTP/TCP 프로브와 bounded kubectl을 사용하며 역할 키는 stdin에만 전달한다.
+- 테스트 결과: 1091파일 고정 영향338통과/신규CLI 정리실패 종료코드 기대1건 오류/기존skip1·제외1(85.20/86.264초) 뒤 새 시험의 기존 exit1 기대를 바로잡아 직접/동일계약·불변식204통과(32.31/33.058초)를 확인했다. 정적 검토에서 개별 timeout의 합계가 직렬 결과 반환 직전에 프로브를 끊을 수 있는 경계를 찾아 기존 전체 실행 예산을 사용하도록 보수했다. 실제 소켓의 직렬 timeout·정확 프로그램 HTTP/TCP를 포함한 최종 직접/기존 동일 계약·인접·불변식340통과/기존skip1·제외1(65.74/66.770초), source/wheel/격리설치159파일 일치(부모11.114초), 검증 중 bytes 불변이다. A2 SUP03 전용4파일은 확정 bytes로 유지한다. 기존 실제04f REQ11·A2 SUP04/SUP03과 이번 CPU 연결은 구분한다.
+- 다음 단계: 영향 검증·첫 실패 보수·재고정·설치물·초안PR/정확HEAD CI 상태·인계. A2 실제 SUP03 이후 활성작업/다음 사용자를 확인해 임시 접근 회수·후보 worker/GPU 정리와 EC2 Stop을 마감한다.
+- 막힌 것: 이번 지원은 선택 Pod IPv4/HTTP·단일 ENV뿐이다. 현재 실제 환경에는 Gateway·신뢰 principal/기업 허용표·외부 출발점 구성이 없어 REQ01/03 실제 실증은 대기다. Service/TLS/host·두 이미지 update·native0.32/worker handler 소비나 인터넷 외부대역을 지원/증명했다고 표시하지 않는다. 계정 문제로 필수 hosted CI는 실행 전 차단 조건을 유지한다.
+
+## 2026-10-29 — A-1 실제 순차 전환 마감과 A-2 SUP03 공통 등록
+
+- 한 일: 고정04f7856 설치156파일로 실제 L4 dev 기준판0.31→후보0.32 after_baseline을 실행했다. 두 측 모두 MEASURED/COMPLETED 8사례·기능 PASS/보안 UNKNOWN이고 정확9Ref의 원격/로컬 복원·저장팩 재판정이 일치했다. 기준판의 선택 cgroup/PID/start 종료·GPU compute process 없음/메모리0MiB를 후보 시작 전에 별도 호스트 근거로 확인했다. 현재 후보 실측 ENV·전체34 inventory·Pod/프로브/compute 사실과 A2 API-only 실행차례를 외부 A1 인계에 제공했다. 이어 A2의9a632c3/9144f96 전용4파일을 원본 bytes로 통합하고 정식 registry에 template_validation:kubernetes를 연결한다.
+- 테스트 결과: 04f의 로컬 전체5983통과/13실패/12오류/기존skip13/제외19(1166.33/1170.414초)에서 본인 Windows tmp 길이로 발생한25건을 짧은 독립 경로의 영향100통과(72.75/73.933초)로 해소했다. 단일 clean 전체 재실행이나 CI 성공으로 보고하지 않는다. 이번1087파일 고정 SUP03 정식 registry/CLI·인접·불변식314통과/기존skip1/제외1(46.42/47.752초), source/wheel/격리설치157파일 일치(부모14.372초), 검증 중 bytes 불변을 확인했다. 첫108통과/206setup오류는 본인 짧은tmp 상위폴더 누락(6.08/7.282초)이며 실행보조의 폴더 준비만 보완했다. 제품/시험 assert는 변경하지 않았다. 문서 결과만 갱신하고 정확HEAD CI 미실행 조건을 별도로 기록한다.
+- 다음 단계: SUP03 정식 등록 직접/인접·불변식→설치물→초안PR/정확HEAD CI 상태·인계, 준비된 A2 실제소비와 기존 REQ01/03 공통 경계 개발을 이어간다. 다른 실제 활성작업이 없으면 후보 worker/GPU 정리·증거 보존·소유 EC2 Stop을 확인한다.
+- 막힌 것: GitHub 계정 결제/한도 문제로04f CI는 runner/step 시작 전 차단됐고 사용자도 당장 복구 불가를 알렸다. CI 미완료를 유지한다. SUP03 template bytes/API 입력 projection은 worker 실제 open/read/load·tensor 소비를 증명하지 않고 세 축 UNKNOWN을 유지한다. 신규 공통 변경은 아직 실제 엔진에 설치하지 않았다. 현재 후보의 최종 정리/Stop과 기업정책·native0.32는 미완료다.
+
+## 2026-10-29 — A-1 실제 REQ11 왕복과 순차 종료 대기 경계
+
+- 한 일: 고정9c wheel의 실제 L4/Kubernetes REQ11 8사례를 MEASURED/COMPLETED·functional PASS/security UNKNOWN으로 실행하고6개 정확 Ref의 원격/로컬 verify·반출/복원·저장팩 재판정 일치를 확인했다. 소스28파일·모델전체34파일 inventory와 실제 대상/프로브·회수 근거를 외부 A1 인계에 고정했다. 별도 작업 공간에서 정상 Terminating/최종 phase 지연이 전환 대기를 즉시 거부하는 경계를 보수한다. Ready 요청의 기본 검증은 그대로 두고 전환 gate의 require_ready=False 대기에서만 같은 소유 세대의 삭제 진행을 허용한다.
+- 테스트 결과: 회수 보수913c115의 정확CI5개 성공·기본6010통과/제외19(194.52/195.883초), 설치156파일 동등과 source tree 일치를 마감했다. 이번1083파일 고정 영향364통과·신규 fixture 인자 누락1실패·기존skip1/제외1(59.02/60.331초) 뒤 신규시험의 context/timeout 호출만 보완했다. 제품/기존 기대값을 유지한 직접·동일 전환/요청 계약·불변식182통과·기존skip1/제외1(21.31/22.352초), source/wheel/격리설치156파일 일치(설치 부모22.270초), 검증 중 bytes 불변을 확인했다. 문서 결과만 갱신하고 정확HEAD CI를 확인한다.
+- 다음 단계: 영향 검증·오류 보수·설치/정확CI를 마감하고 같은 고정 제품 판본으로 기준판→실제 후보 세대를 순차 실행한다. 기존 첫 실제 Ref는 보존한다.
+- 막힌 것: 삭제 중 Ready 요청은 계속 금지하며 UID/containerID/imageID/restart/start/소유자·namespace를 계속 확인한다. API phase/부재를 실제 worker/GPU 반납으로 승격하지 않는다. 후보0.32 exact image의 사전 확보는 성공했지만 아직 후보 Pod/worker를 생성하거나 미래 신원을 채우지 않았다. 독립 출력 oracle·A39개 전체 보안 완료는 미확보다.
+
+## 2026-10-29 — A-1 실제 bootstrap 접근 회수의 API 응답 처리
+
+- 한 일: 모델 안정성 통합16d97de의 정확CI5개 성공·기본6000통과/제외19(176.33/178.261초)와 source tree 일치를 외부 인계에 마감했다. 별도 A-1 공간에서 bootstrap helper의 회수 후 빈 ingress 생략 응답을 처리한다. 패치 전후 소유 UID/run·정확 Ingress 타입/selector를 확인하고 명시 null·비어 있지 않은 규칙·scope 교체는 거부한다. 기존 atomic UID/resourceVersion/run 테스트·원문 비저장·Job TTL 정리는 유지한다.
+- 테스트 결과: 1082파일 고정 helper/같은 계약·REQ11 제품/불변식209통과·기존skip1/제외1(pytest27.28초/부모29.158초), 검증 중 source bytes 불변을 확인했다. 누락/빈 ingress 정상과 null/남은 규칙/selector·type·UID·소유자 변경 거부를 검증했다. 결과 문서만 갱신하고 정확HEAD CI를 확인한다. src·팩·빌드 설정이 불변인 설치 wheel은16d97de의 검증된156파일 일치를 재사용한다.
+- 다음 단계: 고정 source 영향 검증·첫 실패 보존·정확HEAD CI/초안PR·인계 후 실제03의 회수 단계부터 재개하고 동일 출발점의 차단 대조·REQ11 EVD/RES/RPT 왕복·두 이미지 전환을 계속한다.
+- 막힌 것: 소유 g6.2xlarge의 CUDA vector-add 및 일반 생성·SSE 구조/모델/사용량 검증은 성공했다. 첫03은144행 회수 확인에서 실패했고 실제 API는 Ingress 타입·소유 selector와 생략된 ingress를 반환했다. 원본 파일·실패 Ref·로그 hash·성공 응답 요약을 보존한다. 이 코드 보수만으로 실제 송신 차단·worker/GPU 반납·보안 분기 완료를 주장하지 않는다.
+
+## 2026-10-29 — A-1 모델 inventory 안정성 확정 전달물 통합
+
+- 한 일: 검증된 SUP04 통합6b2a157을 보존한 별도 A-1 공간에서 A-2 확정04353f4의 전용3파일을0a34814로 반영했다. 전용 bytes와 기존 inventory/manifest/snapshot 제품 경로를 유지하며 공통 실행기·정책·팩31·판정·외부 계약은 변경하지 않는다. 이전 통합6b2a157의 필수CI5개 성공·기본5978통과/제외19(289.43/290.943초), 플랫폼175·Docker stub2·설치156파일 일치는 외부 인계에 마감했다.
+- 테스트 결과: A-2의 직접215통과·기존skip2/제외1(7.95/8.700초), 정확04353f4 CI5개 성공·기본5921통과/제외19(200.60/202.151초)·설치155파일 일치를 재사용했다. 통합1082파일 고정 직접/같은 계약/제품 연결/불변식304통과·기존skip2/제외1(46.41/47.246초), source·wheel·격리설치156파일 일치(설치 부모14.549초), 검증 중 bytes 불변을 확인했다. 문서 결과만 갱신하고 정확HEAD CI를 확인한다. 로컬 전체 suite는 중복하지 않았다.
+- 다음 단계: 고정 source 영향 검증·전용 bytes 감사·wheel·초안PR·정확 통합HEAD CI를 마감하고 REQ01/03 전환과 승인 GPU의 기존 REQ11 제품 왕복을 계속한다.
+- 막힌 것: metadata 안정성 확인은 원자적 snapshot·같은 metadata의 in-place 변조 차단·실제 worker bytes/tensor/rank 소비 증명이 아니다. GPU 호스트는01 설치 성공·재부팅 후 L4/580.178.04·containerd2.3.7·Kubernetes1.36.5·Helm4.3.1 및02 클러스터 설치 성공을 확인했다. 별도 고정9c wheel 설치·첫03 smoke를 진행하며 실제 GPU 계산·REQ11 Ref는 아직 없다. 최초01 호출의 sudo-v 실패 원본과 수정 사본을 보존한다.
+
+## 2026-10-29 — A-1 SUP04 확정 소비의 Kubernetes 제품 연결·승인 환경 준비
+
+- 한 일: 9c863a7의 필수 CI5개 성공·기본5919통과/제외19(pytest262.91초/부모264.630초), 플랫폼175·Docker stub2·설치155파일 일치를 외부 인계에 마감했다. 별도 통합 공간에서 A-2 확정 baf2d8b의3파일을5c3e5b8로 보존 반영하고 기존 container_config:kubernetes0.1.0에 API-only 소비를 연결한다. 공통 snapshot의 수집 구간·소스/target/정제 문서 hash를 기존 첨부로 전달하며 전용 분석기·정책·팩31·판정 의미와 정적 이월 None을 유지한다.
+- 테스트 결과: A-2 head의 CI5개·기본5940통과/제외19·직접284통과와 원래 Windows CP949 실패10/UTF8 영향10통과를 구분해 재사용했다. 통합1081파일 고정 영향414통과·신규시험1실패·기존skip1/제외1(56.55/57.352초) 뒤 NOT_RUN의 executor=None 계약을 신규시험에서 정확히 확인하도록 보완했다. 제품·기존 기대값을 유지한 직접/같은 계약/불변식183통과·기존skip1/제외1(16.64/17.311초), 소스·wheel·격리설치156파일 일치(설치 부모15.043초)를 확인했다. 검증 중 bytes 불변이며 결과 문서만 갱신하고 정확 HEAD CI를 확인한다. 본인 기존 Python3.12 venv를 재사용하고 통합 source/tmp/DB는 분리했다.
+- 다음 단계: API-only 실제 registry/CLI·정확Ref·반출/복원·후속 snapshot/첨부/정리 실패 보존 검증과 commit/push·초안PR·CI·인계를 마감한다. GPU 설치 대기로 독립 제품 연결을 멈추지 않고 REQ01/03 전송 전환도 이어간다.
+- 막힌 것: API snapshot은 node runtime 이미지 관계·승인·정상 추론의 증명이 아니며 보안 UNKNOWN이다. 사용자의 별도 SSM 최소 role/profile 생성·연결 승인 후 us-east-1a에 g6.2xlarge i-033320574ba74f6b9 한 대를 생성했고 SSM Online/첫 고정 호스트 명령 성공을 확인했다. 암호화gp3 120GiB·IMDSv2/hop1·인바운드0을 적용했으며 과금 원장의 보수 시작05:23:57UTC와 첫8시간 한도를 유지한다. 검토된 사본+9c wheel의 정확 archive를 전송하고 새 호스트의01 설치를 진행한다. 아직 실제 Kubernetes/GPU 계산·REQ11·A39개 완료가 아니다. GPU 소유/비용/정리 책임은 A1 인계파일에 기록한다.
+
+## 2026-10-29 — A-1 c9af729 공통 정제 snapshot 소비 경계
+
+- 한 일: 공동 base c9af729를 별도 A-1 worktree로 보존 분리했다. A-2 SUP04 공통 입력 요청에 맞춰 기존 verify_owned_pod 뒤 신원·mount 선언만 깊은 복사로 전달하고 KubernetesHTTP.model_snapshots·KubernetesLifecycleReader.snapshot의 기존 A-2 분석 소비 경로에 연결한다. 내부 {pod, namespace}와 A1-kubernetes-req11/1·model mapping/1·기존 lab gate를 유지한다. REQ11 전송 실행기는0.1.5이며 요청/판정/stream 소스와 A-2/B 전용 파일은 유지한다.
+- 테스트 결과: 1076파일 고정 영향 회귀373통과·기존skip1/제외1·신규시험 setup오류2(pytest53.29초/부모54.737초) 뒤 신규시험의 누락 fixture import만 보완했다. 제품/기대값을 유지한 직접·같은 소비계약·불변식217통과·기존skip1/제외1(10.73/12.159초), 소스·wheel·격리설치155파일 일치(설치검증 부모15.277초)를 확인했다. 각 검증 중 bytes 불변이며 결과 문서만 갱신했다. 정확 HEAD 기본 suite·플랫폼/공용계약·Docker stub CI는 별도 인계로 확인한다. 기존 CPU 연결 결과를 새 실제 Kubernetes/GPU 결과로 집계하지 않는다.
+- 다음 단계: 고정 source 영향 검증 → 실패 수정·재고정·재검증 → commit/push·초안 PR·정확 HEAD CI·A-2 인터페이스 인계 → 새 확정 전달물의 공통 소비 연결을 이어간다.
+- 막힌 것: 실제 AWS 현재 상태는 Windows 브라우저 URL 확인 제한으로 재확인하지 못했다. 과거 전용 SSM 관리 권한 승인 대기를 새 승인으로 간주하지 않으며 자원 생성/변경/Stop0이다. node containerd 이미지 관계 생산자·실제 worker/GPU·기업 Gateway/모델 허용표는 미준비다. SUP04의 POST /v1/completions와 REQ11 지원 범위를 자동으로 합치지 않는다. 정제 입력 계약은 docs/KUBERNETES_SNAPSHOT_BOUNDARY.md를 따른다.
+
+## 2026-10-28 — A-1 순차 Kubernetes 전환의 지연 후보 결합
+
+- 한 일: 검증된 모델 준비 통합ef75639를 별도 worktree로 보존 분리했다. 기존 prebound 계약을 유지하면서 명시 after_baseline 모드에서 기준판 API 종료 후 새 경로의 기존 candidate target 입력을 기다리고 exact ENV/세대/Ready를 확인한다. 선택 target의 정규 SHA를 공통 registry→실행기에 전달해 선택 이후 파일 교체를 요청 전 거부한다. API 전환 대기 한도를 기준판 요청 시간과 분리하며 stream 계산은 유지한다.
+- 테스트 결과: 1067파일 고정 직접/인접/불변식501통과·실패0·기존Windows skip1·제외1(pytest66.29초·부모67.889초), 플랫폼175통과(11.94/21.907초), wheel155파일 동일(부모13.457초). 기존 모드와 지연 모드·누락/불완전/외부ENV/신원재사용·대기 한도·선택 후 파일 교체·기존 CLI EVD/RES/RPT/기준판 첨부 보존을 확인했다. A-2/B·stream bytes와 검증 중1067파일 bytes 불변, 새 skip/제외0이다. 결과 문서만 갱신한 뒤 정확 head CI를 확인한다.
+- 다음 단계: 영향 검증 → 실패 수정·재고정·재검증 → 커밋·푸시·후속 초안 PR·정확 통합 head CI·A-2 인터페이스 및 GPU 재개 인계.
+- 막힌 것: 실제 Kubernetes·GPU 할당/반납·worker 종료는 미실증이고 AWS 실행은 승인 대기다. operator가 실제 후보 배포와 target 완성을 담당하며 제품은 배포/Pod/파일을 변경하지 않는다. 미검토 GPU source/image 및 기업 허용표를 임의로 채우지 않는다.
+
+## 2026-10-28 — A-1 A-2 모델 준비의 공통 요청·mount 소비 연결
+
+- 한 일: 검증된 Kubernetes REQ11 e4fe2f2를 보존한 별도 통합 worktree에서 A-2 c7bf2973 exact7파일을681698f 커밋으로 반영했다. A-2 매핑을 공통 요청/정상 응답 대조와 REQ11에 연결하고 ENV 모델 의미를 유지한다. 비교 조건에서 ENV Ref/host 위치와 모델·별칭 의미를 구분하며 기존 query의 전후 snapshot을 A-2 mount 분석기로 전달해 기존 첨부/수집 CLI를 사용한다. 전용 A-2/B 소스·새 실행기·판정 규칙은 추가하지 않는다.
+- 테스트 결과: 1066파일 고정 최초931통과·실패30·기존skip2·제외1(pytest123.90초·부모125.05초), 플랫폼175통과(11.10/17.933초). 공통 함수가 기존 duck-typed 호출 객체의 없는 필드를 요구한22실패는 공통 소비 경계를 보수했고, 새 시험의 누락 정책6개/stream tokenize packet 대역2개는 입력을 맞췄다. assert/판정 의미·A-2/B 원본은 유지했다. 재고정 동일 영향961통과·실패0·기존skip2·제외1(113.20/113.876초), 플랫폼175통과(11.35/14.362초), wheel155파일 동일(부모12.068초), 검증 중 bytes 불변. 재실행 명령 선택 오류1회는 pytest 미실행으로 별도 보존했다. 결과 문서만 갱신하고 정확 통합 head CI를 확인한다.
+- 다음 단계: 영향 검증 → 실패 수정·재고정·재검증 → 설치 wheel·커밋·푸시·후속 초안 PR·정확 head CI·A-2에 소비 경로/commit/예제 인계.
+- 막힌 것: 실제 Kubernetes/GPU와 worker 접근·소비·자원 반납은 미실증이며 AWS 실행 승인 대기다. 기존 capture lab=true gate를 완화하지 않으므로 lab=false mount 보조 관측은 미수집이다. 기업 경로/호출자 허용표는 준비 전이다.
+
+## 2026-10-28 — A-1 Kubernetes REQ-11 제품·전환 연결
+
+- 한 일: fcb6c40를 보존한 별도 worktree에서 A-2 c8f0e61 exact7파일을9c0a026 커밋으로 통합하고 SUP04 플랫폼 교차시험 target의 ENV Ref 누락을 맞췄다. 기존 KubernetesHTTP에 REQ11 JSON/SSE 프로파일·exact ENV/양쪽 세대·고정 template 읽기를 연결하고 기존 request_binding의 분석·판정/시간 계산을 재사용한다. 명시 API 모델명 매핑과 기존 CLI EVD→RES→RPT·반출/재판정, update의 API 종료/Ready 대기·후보 차단·복구 필요 진단을 연결했다.
+- 테스트 결과: 1057파일 고정 후 직접/불변식510통과·기존Windows skip6·제외1(pytest50.42초·부모51.549초), 인접CLI/전환/수집56통과(21.19/22.837초), 플랫폼 교차175통과(13.27/28.404초), wheel152파일 동일(부모12.241초). 검증 중1057파일 bytes 불변·실패0이며 새 skip/제외는 없다. 기존 REQ10 profile/v1 probe·stream_probe 시간 계산·strict_json 의미/alias·팩·공용 계약·core/models/store/judges·A-2 전용 bytes를 보존했다. 정확 최종 head 필수 CI는 별도 확인한다.
+- 다음 단계: 직접·인접/불변식·플랫폼 교차시험 → 실패 수정·재고정·재검증 → 설치 wheel·정확 통합 head CI·초안 PR·인터페이스/재개 인계.
+- 막힌 것: CPU 개발에는 없음. 로컬 kind API는 연결 거부였고 기동하지 않았다. AWS quota/자원·GPU 실행은 승인 대기이며 실제 Kubernetes/GPU 실증은0이다. GPU image/source 계약 미준비를 CPU digest 제한 해제로 대체하지 않는다. 기업 Gateway/호출자 허용표도 준비 전이다.
+
+## 2026-10-28 — A-1 REQ-02 completion 등록 handler 연결
+
+- 한 일: 검증된 공동 소스8de64a6에서 기존 인증·세션·handler 수집을 POST /v1/completions의 고정 callback까지 연결했다. profile8/source26이며 native completion api_router checksum1개만 추가했다. 두 번째 raw_request 인자/키워드의 scope로 등록 endpoint/dependant와 실제 실행을 대조하고 본문·토큰·stream·원예외를 수집하지 않는다. profile7 고정 LF/CRLF bytes·source25·GET handler와 과거1~6 판독을 보존한다.
+- 테스트 결과: 1052파일 고정 후 최초 명령의 파일명 지정 오류로 시험 미실행1회를 보존했다. 실제 영향 검증은610통과·실패15·기존skip1·제외1(pytest53.37초·부모54.111초)이며 source bytes 불변이었다. 새 EXAMPLE headers 대역이 native 본문의 get(key,default)를 지원하지 않는 같은 원인이어서 대역만 보수하고 기존 반환·거부·Ref 기대값과 제품 코드를 유지했다. 재고정625통과·실패0·기존skip1·제외1(pytest53.56초·부모54.559초), 설치 wheel150파일 일치(부모19.808초), 검증 중 bytes 불변과 기존 source25·고정 profile7 bytes 동일을 확인했다. 결과 문서만 갱신한 뒤 정확 head CI를 확인한다. EXAMPLE router/native 본문 회귀이며 실제 FastAPI/엔진 실증은 아니다.
+- 다음 단계: 소스 고정 → 영향 검증 → 실패 수정·재검증 → 설치 wheel·커밋·푸시·후속 초안 PR·정확 head CI·A-2 공통 인계.
+- 막힌 것: 이번 CPU 생산자 연결에는 없음. 기업 Gateway 변환/호출자 API·모델 허용표는 준비 전이며 신뢰 principal·전체 handler 범위·외부 ledger·자동 판정·실제 대상 실증은 미완료다. 팩/registry/CheckDef·판정 의미·의존성·스트림 시간 계산은 바꾸지 않는다.
+
+## 2026-10-28 — A-1/A-2 현재 소스 결합과 이월 경계 통합
+
+- 한 일: A-1 PR57 exact02d1212(CI5개·기본5645통과)에서 A-2 PR55 c47445d(CI5개 성공)의 확정13파일 patch를 보존 반영했다. 전용 source2개 포함12파일 exact bytes와 공유 시험의 버전1줄/기존 hook 회귀를 보존했다. 새 container_config0.6.1·구 credential live0.5.2의 source 결합에 맞춰 두 현재 실행기의 정적 이월을 기존 None 경계로 재선정한다. 제품 Store/판정/선정의 합성 DECLARED 계약에서 새 권한 수집도 run/container 변경 시 이전 PASS를 이월하던 경로를 재현한 뒤 보수한다.
+- 테스트 결과: 최초1049파일 고정 영향632통과·실패1·기존skip1·제외1(pytest111.43초·부모112.364초)과 검증 중 bytes 불변을 보존했다. 새 권한 FAIL 재생 fixture가 저장 전 메모리 EVD를 먼저 판정해 정규화된 저장 EVD 재판정의 사유 문자열 키 순서와 달랐다. 제품과 같이 정확한 저장 Ref로 읽은 EVD를 최초 판정하도록 시험 자료만 보수하며 FAIL·Ref 동일성 기대값과 제품 판정기는 유지한다. 재고정 후 직접/동일 이월·재생 계약219통과·실패0·기존skip1·제외1(pytest25.97초·부모26.699초), 설치 wheel150파일 일치(부모14.054초)를 확인했다. 검증 중 source bytes 불변과 A-2 전용 source2개 exact bytes를 확인한 뒤 결과 문서만 갱신한다. 정확 통합 head 기본 CI는 별도로 확인한다.
+- 다음 단계: 직접 source 결합·선정·과거 PASS/FAIL Ref 재생·기존 비교·첨부 보존·불변식 검증 → 실패 수정·재검증 → wheel·커밋·푸시·후속 초안 PR·정확 head CI·A-2 인계.
+- 막힌 것: 이번 CPU 통합에는 없음. 기업 Gateway·호출자 허용표는 준비 전이다. 실제 worker 귀속/자격 사용·전체 체크리스트 완료·실제 엔진/GPU/AWS 실증 증가는0이다. root contracts/platform/runtime·core/models/store/judges·팩·registry·의존성·스트림 시간은 바꾸지 않는다.
+
+## 2026-10-28 — A-1 현재 소스 결합 관측의 정적 이월 보수
+
+- 한 일: 현재 main4da12c0·PACK31에서 PLT-04의 현행 source-bound credential 프로파일을 고정 명령/정책만으로 이월하던 경계를 기존 None/PROCEDURE_OR_FIXTURE_UNCONFIRMED 재선정으로 보수한다. 합성 DECLARED 이전 PASS를 실제 Store·팩·rule_table·선정에 넣은 재현으로 run/container 변경에도 이월됨을 확인했으며 실제 엔진 PASS로 표시하지 않는다. 다른 실행기의 고정 이월과 두 실행 비교 조건·과거 Ref/판정 의미는 유지한다.
+- 테스트 결과: 1047파일 고정 후 직접/인접440통과·실패0·기존skip1·제외1(pytest61.46초·부모62.398초), 설치 wheel150파일 일치(부모15.780초)를 확인했다. 검증 중 source bytes 불변이며 runtime 변화는 reuse._http_fixture의 현행 source-bound credential 분기뿐이다. 기존 다른 이월·두 실행 비교·EVD/RES/RPT 반출/복원·정확 Ref 재판정·독립 FAIL·첨부 실패·불변식을 확인했다. 이후 결과 문서만 반영하고 정확 head CI를 확인한다. 실제 엔진/GPU/AWS 사용은0이다.
+- 다음 단계: 직접·인접 이월/재생·첨부 보수·불변식 검증 → 실패 수정·재검증 → wheel·커밋·푸시·초안 PR·정확 head CI → A-2의 기존 preview 훅 소비 인계.
+- 막힌 것: 이번 공통 이월 보수에는 없음. A-2의 새 permission/구 credential live 결합은 별도 작업이며 기업 Gateway·호출자 허용표는 준비 전이다. 전체 PLT-04·신규 자동 판정/점검 완료·실제 대상 실증 증가는0이다.
+
 # PROGRESS
 
 ## 2026-10-28 — A-1 REQ-11 모호한 JSON 응답 보수
@@ -1173,3 +1313,369 @@ git status
 - 테스트 결과: 기본 전체 **3300 passed / 19 deselected**, pytest **75.86초**, 부모 벽시계 **76.145초**. 별도 Python 3.12 설치본 검증 통과.
 - 다음 단계: PR #10 검토·병합. 실제 엔진 시험·기업 승인 별도.
 - 막힌 것: 없음. [상세 기록](docs/FRAMEWORK_SYNC_20261026.md).
+## 2026-10-28 — 개발자 A 고정 GPU 이미지 REQ11 연결
+
+- 한 일: 기존 f77973a와 미커밋을 보존한 별도 A worktree에서 공식 GPU amd64 manifest/설치 layer·후속12layer를 확인하고 소비/native 소스 합집합28파일의 기존 해시 일치를 확인했다. REQ11에 exact GPU digest와 gpu-bounded-v1 기동 선언만 추가하고 기존 CPU·다른 수집기의 제한·판정·stream 계산은 유지했다.
+- 테스트 결과: 1069파일 고정 직접/인접·불변식482통과·실패0·기존Windows skip1·제외1(pytest29.17초·부모30.203초), 검증 중 source bytes 불변이다. GPU 입력에서도 기존 JSON/SSE·CLI EVD/RES/RPT·첨부 실패·독립 FAIL·반출/복원·재판정을 확인했다. a7e85c7 전체CI는5870통과·이전 버전0.3.3 기대1실패·기존제외19(268.83/271.025초)였고 필수 다른4job은 성공했다. 저장·재생 회귀의 기대값도0.3.4로 고정한 실패 영향 재검증77통과·실패0(15.48/16.156초), 검증 중1069파일 bytes 불변이다. 최종 HEAD CI를 다시 확인한다. 설치 wheel155파일 일치(부모14.672초)다. 이미지 bytes 검토와 EXAMPLE 회귀는 실제 GPU 실증이 아니다.
+- 다음 단계: CPU 영향 검증·실패 수정/재고정·설치물·정확 HEAD CI·초안 PR을 마감하고, 승인된 단일 dev GPU에서 REQ11 기존 CLI→EVD/RES/RPT→반출/복원·재판정과 실제 종료를 확인한다.
+- 막힌 것: 실제 환경은 아직 미생성·미실증이다. 기업 경로/호출자 허용표는 준비 전이며 새 권한·비용 확대는 자동 승인하지 않는다.
+## 2026-10-29 — 개발자 A GPU 후보 이미지 소비 계약
+
+- 한 일: 검증된8c4ed09와 원본을 보존한 별도 worktree에서 공식0.32 GPU 후보의 exact amd64 manifest·설치 소스·후속13layer를 검토했다.0.31과 다른 소비3파일을 별도 고정하고 기존 request_binding·Kubernetes 전송/판정으로만 연결한다. native 및 다른 수집기/CPU 이미지의 제한은 유지한다.
+- 테스트 결과: 1070파일을 고정한 직접/동일 계약·인접·readiness·불변식615통과·실패0·기존Windows skip1·제외1(pytest44.04초·부모45.063초), 검증 중 bytes 불변이다. 두 판본의 기존 CLI 저장/반출·재판정·첨부 오류와 prebound/after_baseline 후보 누락·교체 시 기준판 보존을 확인했다. 이미지 layer 검토와 주입은 실제 GPU 실증이 아니다. 정확 HEAD의 필수 CI·wheel을 확인한다.
+- 다음 단계: 직접/동일 계약·인접·불변식 검증 → 실패 수정·재고정 → wheel·정확 HEAD CI·후속 초안 PR·인계, 승인된 실제 단일 dev GPU 제품 왕복.
+- 막힌 것: 전용 SSM role/profile 생성·연결은 사용자 확인 대기이며 실제 AWS 서버/SG/IAM은 생성하지 않았다. 기업 허용표·실제 GPU/worker 종료와 두 이미지 실행은 미실증이다.
+## 2026-10-29 — 개발자 A의 B-1 확정 전달물 통합
+
+- 한 일: 검증된 GPU pair811bdb5를 보존한 별도 통합 worktree에서 B의2505b2f/2528a98을 커밋 단위로 반영했다. 최종 전용4파일은 원본 commit blob을 유지하며 B 파일을 재작성하지 않았다. 공통 src·팩·registry·의존성·판정은 변경하지 않는다.
+- 테스트 결과: 1074파일 고정 B structured-tools/limits·sampling·Kubernetes·증거/불변식306통과·실패0·기존Windows skip1·제외1(pytest15.95초·부모17.829초), 검증 중 bytes 불변이며 전용4파일의 원본 commit blob이 같다. B의5사례는 EXAMPLE 제품 경로이며 실제 설치판 클래스·엔진 실증을 새로 집계하지 않는다. exact HEAD 필수 CI를 확인한다.
+- 다음 단계: 실패 수정·필요한 재검증 → 정확 통합 head의 초안 PR·CI·인계, B의 설치판 producer/정식 연결 계약과 실제 GPU 권한 확인 후 제품 실증을 이어간다.
+- 막힌 것: B 전체 CPU 도구는8761222 common source 불변을 요구해 현재 A source에서 전체 재실행할 수 없고 실제5d35ce source/증거의 로컬 재실행 자료도 미확보다. source pin/소비 API alias·validator producer·정식 정책/CheckDef 연결은 B/A 인계 조건으로 남긴다. AWS 관리 권한은 사용자 확인 대기다.
+# 2026-10-29 A1 PLT08 Kubernetes 한 구간 제품 연결
+
+- 한 일: A2 확정6c92cb6 전용4파일 bytes를 보존해 반영하고 기존 api_transport:kubernetes를 등록했다. 검토된 PACK31 정확Ref에서 생성하는 DRAFT PACK-KUBERNETES-API-HOP@1은77개ID/76개 정의 bytes와 PLT08 질문·기준·판정을 보존하며 profile/필수POL9개/제한만 versioning한다. 공통 body-free 기록에 고정 요청ID/method/route와 전후 세대가 확인된 선택 probe→engine endpoint 주체를 분리했다.
+- 테스트 결과: 고정1114파일 불변. 직접/동일 계약·인접·불변식442통과(pytest70.35초·부모71.485초), 전체6321통과/실패0/기존skip13·제외19(pytest835.62초·부모837.234초). wheel/격리 설치166파일 일치와 정식 설치본 CLI3사례/각6Ref의 verify·반출/복원·같은 시각 저장팩 재판정도 통과(6.828초)했다. CPU 사례는 EXAMPLE이며 actual로 승격하지 않는다.
+- 다음 단계: 현재 한 구간의 정식 선정→실행→EVD/RES/RPT→verify→반출/복원·저장팩 재판정과 설치 일치를 마감하고 정확HEAD CI/PR/인계를 남긴다. B REQ10 고정 소비 기준과 본인19개 잔여 제품 연결을 이어간다.
+- 막힌 것: AWS 같은 기존 g6.2xlarge 재시작은 InsufficientInstanceCapacity로 거부되고 stopped 재조회됐다. PLT01/04 및 새 PLT08 실제 실증은 미완료이며 원래13:23:57UTC/46.66USD 상한을 유지한다. CI5도 결제/한도로 시작 전 차단된다. API 전체·TLS/CA·배포caller·worker·IPC/TP/다중GPU·기업정책은 이 한 구간으로 완료하지 않는다.
+# 2026-10-29 A1 B REQ10 고정 CPU 소비의 정식 등록
+
+- 한 일: B 확정57a7537의18커밋·24파일 bytes를 보존해 통합했다. 기존 CLI에 reference-cpu/source031 두 전용 클래스를 등록하고 B 기존 CPU proposal의 정확 팩 Ref와 같은 입력 생성기를 제공한다. PACK31 numeric/Kubernetes 경로는 유지한다. 제품 snapshot c4e872e를 literal 소비 기준으로 두고 원래 B의 전체 source/index/archive/shadow 검사를 재사용하며 helper bytes·import·PACK31·framework도 대조한다. B의 c9 기본 pin이나 전용 파일은 재작성하지 않는다.
+- 테스트 결과: 고정1136파일의 Windows/Linux bytes 일치·검증 중 불변. Linux 전체6460통과/실패0/기존제외19(pytest276.42초·Linux부모277.389초), B 원본symlink5반례 포함이다. Windows pin+정식CLI18통과(13.37/14.355초), wheel/설치167파일 일치와 정식 설치본CLI4사례/각6Ref왕복도 통과(4.502초)했다. 첫 Windows365통과·7실패 중 신규시험2개의null/미수집 계약 가정만 보수했고 B5개는Win1314실패를 보존해 Linux에서 검증했다. WSL 임시환경/상위tmp폴더 준비실패는 별도 보존하고 환경만 보수했다. 새skip·판정/기대값 완화는 없다. 실제 vLLM CPU/GPU 실측으로 승격하지 않는다.
+- 다음 단계: 명시 소비 pin·제품 CLI/Ref·격리 설치를 검증하고 정확 통합HEAD CI/초안PR/인계로 마감한 뒤 A1 본인19개의 인증/요청·철회·취소·종료·관측 제품 연결을 이어간다. B가 이 고정 소비 기준을 수락해 기본 도구를 옮기는 단계와 실제 배포 대상 관측은 별도로 남긴다.
+- 막힌 것: 현재 A1 Python에는torch/xgrammar/transformers와 전체 고정 vLLM CPU source가 없고 B Mac의 실제CPU 원본을 새 통합 실측으로 소급하지 않는다. 같은 GPU 인스턴스의 두 Start는 용량 부족으로 거부돼 stopped이며 새 설치/실증은 없었다. 기존13:23:57UTC/46.66USD와EBS 보존을 유지하고 같은 시간창 Start는 더 반복하지 않는다. CI5는 계정 결제 차단이다.
+### 2026-10-29 A-1 REQ02 소유 기록 제품 묶음
+- 한 일: 고정 session·사전 file bytes pin·정확 ENV/target·유효창·소유 engine 전후 세대에 결합한 기록 수집을 정식 route_record:kubernetes 실행기에 연결했다. PACK31에서 REQ02만 바꾸는 명시 DRAFT 팩과 hash/enum 관측을 추가했다. native lab/source/image gate와 B 원본은 유지한다.
+- 검증: 첫 Windows 영향검증358통과/새16실패는 관측 객체의 불허 필드를 제거해 보수했다. 재고정213b486 기준 Windows155통과·기존skip1/제외1(47.26초/부모47.929초), 같은1140파일 bytes의 Linux 영향375통과·제외1(18.48초/부모18.757초), Windows 설치168파일 및 설치본 CLI4사례의6Ref 반출/복원·재판정 통과(8.217초). 검증 중 source 변경0. 이전6460전체통과/설치167파일/REQ11실증을 새 소스 근거로 이월하지 않는다.
+- 다음: 이 부분 묶음 마감 후 B REQ13 폐쇄3요청 공개 전송을 별도 확정하고 Online은 전송·serving callback/parser·출처/세션 경계로 나눈다.
+- 막힌 것: 실제 인가 생산자·정상/거부 ledger·기업 rewrite/principal POL·handler 귀속이 없어 REQ02 전체 미완료/전축UNKNOWN이다. GPU stopped·추가Start중단·CI결제차단 유지. 부모39/56/4 및 A1 19/27/2 범위 유지.
+### 2026-10-29 A-1 B REQ13 공개 전송
+- 한 일: B PR97 875ede64의 폐쇄3요청에 맞춘 VALIDATION_ERROR_PROFILE을 기존 KubernetesHTTP 공개 ABI에 추가했다. 정확 ENV/API alias/소유 engine+probe 전후 세대·고정 probe bytes·시간/출력/cleanup 경계를 재사용하고 기존 두 profile의 요청 범위는 유지한다.
+- 검증: 고정728d974·동일1142파일 bytes에서 Windows 영향377통과·기존skip1/제외1(106.94초/부모107.884초), Linux 영향378통과·제외1(34.99초/부모35.264초). Windows 설치168파일 일치와 격리 설치본 공개 ABI의 실제 stdlib probe→로컬 HTTP fixture 200/400/200·legacy profile 거부·소유 정리 통과(2.935초). 원문 오류응답은 transient이며 report에는 저장하지 않는다. 실제 vLLM/Kubernetes/GPU 실증이 아니다. 검증 중 source 변경0.
+- 다음: 작은 전송의 commit·공개 판본·bytes hash·소비 범위를 B 인계 파일에 제공한 뒤 별도 Online 계측/본인 준비 분기를 이어간다.
+- 막힌 것: B의 literal source pin 갱신/소비 검증과 실제0.31 ENV/POL/대상 세대/정상 대조/소유·정리 실행은 별도 미완료다. GPU stopped/추가Start중단·CI결제차단과 부모39/56/4·A1 19/27/2를 유지한다.
+
+### 2026-10-29 A-1 선정 native session 종료 경계
+- 한 일: 기존 KubernetesLifecycleReader에 exact prepared session의 고정 stdlib seal_session을 추가했다. 소유 private/nofollow/regular/nlink·경로 identity와 engine 전후 세대를 확인하며 marker 생성만으로 true를 반환하지 않고 bounded terminal END/two-census 안정성을 요구한다.
+- 검증: 첫 Windows289통과/새12 fixture 준비오류는 시험 import만 보수했다. 고정9721ed6·동일1145파일 bytes에서 Windows 보수145통과·기존skip1/제외1(10.02초/부모10.689초), Linux 영향302통과·제외1(14.71초/부모15.086초). Linux 실제FD/nofollow/hardlink/두 로컬Writer격리8사례(부모8.578초, 루트FD만 EXAMPLE치환), Windows 설치169파일 일치 및 격리 설치본 공개API4사례(1.328초) 통과. source변경0, 실제serving/Kubernetes/GPU실증 아님. 원문 tail/예외는 report에 저장하지 않는다.
+- 다음: 이 독립 계측 경계를 고정 제공하고 Online HTTP·serving hook/callback/parser/provenance/request-session join을 별도 묶음으로 이어간다. REQ05 등 본인 준비 분기는 큰 Online 미완성에 종속시키지 않는다.
+- 막힌 것: Online 전체·source/image/실제 serving·worker/GPU 회수는 미완료이며 기존 native0.32/lab/source/image gate와 stopped/추가Start중단을 유지한다. B 소비 pin/종결 범위 검증과 실제 ENV/POL/소유자 실행이 필요하다.
+
+### 2026-10-29 A-1 REQ05 소유 probe/native 제품 연결
+- 한 일: 한 선정 base-model alias에 명시한 서로 다른 allowed/denied 자격으로 before/challenge/after를 보내는 폐쇄 공개 HTTP profile과 model_authorization:kubernetes 실행기를 연결했다. source/model grant·퇴역 목록·시간·ENV/target POL을 명시하고 기존 prepared native session/request index·loader/forward 객체 관계를 소비한다. PACK31에서 REQ05만 바꾸는 DRAFT 팩을 제공한다.
+- 검증: registry의 순환 import와 adapter 선언주체 전달 오류를 자기 파일에서 보수했다. 보수606c235·동일1150파일 bytes의 Linux 영향449통과·기존제외1(40.94초/부모41.565초), Windows 보수209통과·기존skip1/제외1(105.50초/부모106.682초). 기존 전송 등은 앞선436통과와 같은 공통 소스 근거를 재사용한다. 설치171파일·격리 설치본 CLI4사례6Ref 반출/복원·재판정 통과(15.085초), source변경0. 설치 helper의 시험 fixture 해시 사슬 줄바꿈 누락만 별도 보수했고 실패 기록을 보존했다. metadata나 source/image 미확인을 최종 모델 사용·인가 증명으로 올리지 않는다.
+- 다음: 이 실행/관측 연결을 확정한 뒤 native 최종 모델·실제 주체/기업 정책/퇴역 전후 매핑 귀속을 이어가며, 별도 Online HTTP·hook/callback/parser/provenance 묶음도 유지한다.
+- 막힌 것: 현행 Kubernetes image_check=False·최종 file/tensor 정체·주체/alias/LoRA·퇴역 전후 실제 대조가 미확인이다. configured-policy/퇴역 후보는 confirmed FAIL이 아니며 전축UNKNOWN·REQ05 세분기/필수2결과 미완료다. native0.32/lab/source/image gate·원본B·c9·기존근거·stopped/추가Start중단·CI결제차단 유지.
+
+## 2026-10-29 — A-1 Online 공개 HTTP 입력 계약
+
+- 한 일: REQ05 확정9ef3993을 보존한 별도 공간에서 B PR95 e317a42의 실제 runner/callback bytes와 요청 형식을 읽고 ONLINE_INPUT_PROFILE /1을 기존 KubernetesHTTP 공개 ABI에 추가한다. 고정 API alias·0.31·전후 engine/probe 세대·one-request·최대16개 primary→after 쌍·30초 호출·16KiB wire body·닫힌 JSON/보호 필드를 검증한다. Online만 직렬화하며 기존 프로필·stream 소스·native gate·B 원본은 유지한다. 보고서에 본문 없이 출처 상한과 native 미검증을 표시하고 after 누락을 gap으로 남긴다.
+- 테스트 결과: 1152파일 고정 Windows 영향497통과·기존skip1/제외1·기존SSE deadline1실패(146.80/148.263초)를 보존하고 소스 변경 없이 같은 프로브/Online/불변식314통과·기존skip1/제외1(9.05/10.339초)을 확인했다. Linux 동일1152bytes499통과/제외1(47.04/47.568초), 소스·wheel·격리설치171파일 일치를 확인했다. 설치 공개 ABI는 보조 Python-I의CP949 출력 실패를 보존하고 OUT helper에-Xutf8만 명시한 뒤 실제 stdlib/소유 loopback8요청·기존4프로필 거부·원문 비저장·정리 검증이 통과했다(6.864초). 제품·기대값 완화·새skip/제외·검증 중 bytes 변경은 없다. 마지막 결과 문서만 갱신한다.
+- 다음 단계: 고정 소스 영향 검증→실패 보수→설치→commit/push·초안PR·정확HEAD CI·B 공개 HTTP 조기 인계. native callback/hook/parser/provenance/request-call-session-PID-start는 별도 묶음으로 이어간다.
+- 막힌 것: B의128KiB 제안은 기존16KiB wire 상한 전체를 지원하지 않는다. HTTP200/400은 native 소비·서버·GPU 실증이 아니다. 기존 lab/source/image와0.32 미지원·CI 결제 차단·GPU stopped·원래 승인창 종료 및 추가Start0을 유지한다. 부모A39·A1담당19와 B 전용 소유권은 축소하지 않는다.
+
+## 2026-10-29 — A-1 Online native hook·parser 공통 계측
+
+- 한 일: 확정Online HTTP a673e5f를 보존한 별도 공간에서 B callback 두 확정 커밋을 원본 추적 반영하고3파일 bytes·48개 직접 단위를 확인했다. 기본 /8 source를 그대로 보존한 명시 /9 controller에서 고정 base/callback·공식0.31 source/code·8개 실제 hook·살아 있는 chat ASGI·call/session/PID/start를 연결한다. 닫힌 metadata validator·기존 의미의 loaded code hash와 별도 relative code/1·콜백 provenance·선정 /9만의2MiB 읽기를 추가한다. 기존 lab/source/image/0.32와 B 전용 소유권은 유지한다.
+- 테스트 결과: 1160파일 고정 최초영향533통과·새 fixture code2실패·기존skip1/제외1(55.45/56.798초), fixture compile의 원래 import 문맥과 독립seal을 보완한320통과(22.13/23.011초)를 보존했다. 첫 Linux전체6729통과·새 compiler fixture35오류/제외19(330.72/331.779초)를 확인하고 같은 immutable source의 CPython3.12.3/3.12.14 offline code 계약을 별도 literal로 고정했다. 최종 Windows323통과·기존skip1/제외1(21.51/22.424초), Linux영향324통과/제외1(3.63/3.901초), Linux전체6767통과/제외19(287.50/288.465초)이며 source bytes는 검증 중 불변이다. source·wheel·격리설치174파일 일치, 설치 공개CLI3사례·8개 source body code·6개 callback/writer/parser 이벤트를4.055초에 확인했다. Linux 실제 소유 임시FD/정확module admission·원래 import예외 보존·불일치거부9사례가 통과했다(4.888초). 설치 helper의 잘못된 -mguard 호출 실패를 보존하고 OUT만 -mguard.cli로 수정했다. 실제 serving/GPU 실행이나 새skip/검사제외는 없다. 마지막 결과 문서만 갱신한다.
+- 다음 단계: 영향 검증·실패 보수·소스 재고정→설치·공개 CLI·정확Ref 범위 확인→commit/push·초안PR·정확HEAD CI·고정 소스/B 소비 판본 인계. 본인 취소/종료/관측과 A2 확정 IPC/worker 소비도 준비 순서대로 이어간다.
+- 막힌 것: 실제 getter/계측 비용·serving/worker/GPU·image ancestry·실제0.31 수집·B 전용 source pin/정책/소비·전체 Online은 미완료다. CI 결제 차단과 원래 GPU 승인창 종료·stopped·추가Start0을 유지한다. 부모A39/A1담당19/필수 결과를 축소하지 않는다.
+
+## 2026-10-30 — A-1 LIF10 연결 종료·native 종결 관측
+
+- 한 일: 확정 e24dfb5에서 기존 HTTP/native/session/CLI를 재사용해 LIF10 명시6POL·고정 JSON 전후 대조·소유 SSE1byte 후 client close·선정 session seal/capture·요청별 state/KV/worker 관측을 연결했다. 정확 source/lab/image gate와7개 회수 범위를 보존하며 다른 clock의 직접 차감·EXAMPLE 승격·부분 전체완료를 막는다. 원래77개·다른76개 정의 bytes와 질문/판정 기준을 보존하는 DRAFT 팩을 제공한다.
+- 테스트 결과: 586cb4d checkpoint와 검토된 소비 pin의1165파일 고정으로 Windows영향521통과·기존skip1/제외1(120.84/121.626초), 같은 bytes Linux영향522통과·제외1(36.94/37.257초)를 확인했다. source·wheel·격리설치176파일 일치, 설치CLI4사례·각6Ref 반출/복원·재판정이11.189초에 통과했다. 실제 stdlib 소유 loopback3요청과 client handle 종료·정상전후 대조, native 요청 결합·시계 불일치·기한후 active 후보·세대/수집/seal/첨부/정리 실패를 확인했다. 새skip/검사제외·기대값 완화·검증 중 source변경은 없다. 실제 serving/worker/GPU 실증 결과가 아니다. 마지막 결과 문서만 갱신한다.
+- 다음 단계: 정적 검토·고정 snapshot→직접/인접/불변식→Linux/설치·정확6Ref→commit/push·초안PR·정확HEAD CI·본인 인계. 다음 REQ12/종료 모드와 A2 준비된 확정 IPC/worker 소비를 이어간다.
+- 막힌 것: 전체 취소/timeout/stop·각 실행단계·독립 종결/전송/GPU proof·신뢰 producer·실제 기업POL 결합은 미완료다. 후보는 confirmed_violation=false, 모든 축 UNKNOWN이다. GPU 승인창 종료·추가Start0·stopped·CI 결제 차단과 부모A39/A1담당19·필수결과를 유지한다.
+
+## 2026-10-30 — A-1 A2 확정 IPC·가중치 수집 보수 통합
+
+- 한 일: 확정 LIF10 a043d9f 위에서 A2의0df509e/90f839b/47ba33e를 원본 추적 cherry-pick하고9개 전용파일 bytes를 보존한다. IPC 정상 대조의 응답ID 대응, 후속 transport/report 오류의 이전 파일 packet 보존, 명시 native9의 공통 parser/상한 소비를 기존 실행기·capture CLI에서 재사용한다. A측 전체 snapshot 검토 pin만 갱신하며 원본 B/c9 gate와 모든 경로·shadow 검사를 유지한다.
+- 테스트 결과: A2 원본9파일 bytes 일치와1172파일 고정으로 Windows영향308통과·기존skip1/제외1(33.07/34.153초), 같은 bytes Linux영향309통과·제외1(11.06/11.352초)를 확인했다. source·wheel·격리설치176파일 일치, native 수집CLI5사례(2.021초: 정상저장4·예상첨부실패 정제복구1)와 IPC 정식CLI6사례·각6Ref 왕복(12.227초)이 통과했다. IPC 독립FAIL과 native 파일 불일치/기존packet을 후속 실패 뒤에도 보존했다. 새skip/제외·원본 전용파일 수정·검증 중 source변경은 없다. A2의 과거 판본 근거는 따로 보존하며 실제/GPU 결과로 소급하지 않는다. 마지막 결과 문서만 갱신한다.
+- 다음 단계: 통합 source 고정→영향검증→설치CLI→확정 commit/push·초안PR·정확HEAD CI·A2 소비 인계. 본인 REQ12/잔여 취소·관측 개발을 이어간다.
+- 막힌 것: 정식 Kubernetes IPC actor/소켓·egress/worker 계약·명시 기업POL·실제 신뢰 source/image/producer·native0.32·TP/다중GPU·whole security/worker 실제 소비는 미완료다. 원래 GPU 승인창 종료·추가Start0·stopped·CI 결제 차단과 부모 A39/A1 19/A2 20 범위는 유지한다.
+
+## 2026-10-30 — A-1 REQ12 외부 ID 재사용·native 선택 관측
+
+- 한 일: 확정6bb1649에서 기존 request_termination:kubernetes를 명시 REQ12 절차로 확장한다. 같은 외부ID 정상 재요청2회와 SSE 종료A/같은외부ID 대체B/후속정상 요청을 닫힌 공개 profile로 연결하고, 보조session 표식과 실제 native ID·invocation·PID/start의 유일 관계를 투영한다. ASGI 기록에 attempt 필드가 없는 공백은 순서로 채우지 않고 null로 보존한다. 77개·두분기·원래기준·다른76개 bytes를 유지한 DRAFT 팩이다.
+- 테스트 결과: e7ed2da checkpoint와 검토pin의1177파일 고정으로 Windows영향550통과·기존skip1/제외1(149.97/150.676초), 같은 bytes Linux영향551통과·제외1(48.42/48.718초), source·wheel·격리설치178파일 일치 및 설치CLI4사례·각6Ref 왕복(9.126초)을 확인했다. 실제 stdlib 소유loopback5요청, 같은외부ID·보조session/nativeID 구분, 호출결합 충돌/누락·교체·후속수집/seal/첨부/정리 오류를 확인했으며 기존 LIF10도 회귀했다. native8/9·B27/A2전용9·parser/stream probe bytes 및 기존 판정 의미를 보존했다. 새skip/제외·기대값 완화·검증 중 source변경은 없다. CPU/EXAMPLE이고 마지막 결과 문서만 갱신한다.
+- 다음 단계: 구현·정적 검토 종료→source고정·검토pin→직접/인접/불변식→Linux/설치·정확6Ref→commit/push·초안PR·정확HEAD CI·인계. actual 늦은 chunk/소비자 귀속의 공통 관측 계약도 준비한다.
+- 막힌 것: 실제 취소대상/늦은chunk 폐기·전달·자동retry·신뢰producer/source/image/기업POL·worker/GPU와 전체 두분기 완료는 미확인이다. 후보는 독립FAIL이 아니며 전축UNKNOWN·late_delivery/automatic_retry/scope_complete=false를 유지한다. 원승인창종료·추가Start0·stopped·CI결제차단·부모A39/A1담당19 범위를 축소하지 않는다.
+
+## 2026-10-30 — A-1 native10 ASGI invocation 관측·REQ12 소비
+
+- 한 일: 확정243918a와 기존8/9/B/A2 bytes를 보존하고 명시10의4assets·고정base8/source/code·닫힌ATTEMPT parser·선정2MiB 읽기·REQ12 native selection/invocation 소비를 연결한다. ASGI callback 반환·실제client수신·native출력원천을 구분하고, 늦거나다른PID context·중복/누락·후속실패는 미확인/고정진단으로 남긴다. REQ12 derived팩revision2/check6은 원래77개·두분기·기준·다른76개 bytes를 보존한다.
+- 테스트 결과: 9ea23af guard와1182파일 고정 첫영향751통과·새시험12실패·기존skip1/제외1(142.89/143.998초)을 보존했다. socket 차단 뒤 만든 asyncio loop의 자체 self-pipe 생성이 막혔고, 새 CLI manifest/공개 오류 형식 가정2곳이 달랐다. 소유 loop를 차단 전에 만들고 동일 외부socket 금지·제품 기대값·asset4/3개·정확 거부 진단을 유지한다. 제품/runtime/code literal 변경 없이 새시험만 보수하고 source 재고정 후 검증한다. 실제 serving/worker/GPU 성과가 아니다.
+- 보수 검증: 고정72d3a7e에서 Windows175통과·기존skip1/제외1(39.18/39.823초), 동일1182bytes Linux전체6942통과·제외19(333.11/334.482초), source·wheel·격리설치180파일 일치와 준비CLI3·제품CLI4·각정확6Ref 왕복(7.745초)을 확인했다. Linux 실제소유FD/code admission·거부10사례(.087초)가 통과했다. 설치 OUT 하네스 native 지역변수의 module alias 충돌 실패는 보존하고 하네스만 수정했다. 제품·기대값·새skip/제외·검증중source변경은 없으며 마지막 결과 문서만 갱신한다. 이전whole6767/REQ12 설치178/실제REQ11wheel은 각 당시 판본의 근거로 따로 보존한다.
+- 다음 단계: 정적검토·source고정·검토pin→직접/인접/불변식→Linux/설치CLI·정확Ref→commit/push·초안PR·정확HEAD CI·인계. 실제 늦은chunk원천/소비자·취소/timeout/stop과 본인 관측 분기를 이어간다.
+- 막힌 것: producer/image신뢰·actual serving/hook/worker/GPU·실제client수신·native늦은출력원천·자동retry·기업POL·전체LIF10/REQ12/A39는 미완료다. 새profile10을B/A2전용소비나native0.32 지원으로 가정하지 않는다. 원승인창만료·추가Start0·마지막stopped·CI결제차단을 유지한다.
+
+## 2026-10-30 — A-1 native output collector/consumer 귀속 보완 착수
+
+- 한 일: 확정56a752d에서 보존된0.31 output_processor.py의 정확c72d0149...bytes를 확인하고 collector put/get/get_nowait·native add_request·RequestState 출력 생성 경로를 검토했다. RequestOutput.request_id는 외부ID이며 내부attempt로 쓰지 않는다. 명시11의 bounded weak identity·text hash와 닫힌metadata 초안2파일을 작성한다. collector 합산/교체를 실제원문·token 보존이나 단순 객체ID 동등성으로 오판하지 않게 한다.
+- 테스트 결과: source 정적 검토·초안 단계이며11은미등록/미고정/미검증이다. 기존8/9/10·B/A2 bytes와 제품흐름은 유지한다.
+- 다음 단계: 실제 native add/state/collector put/get와 살아있는ASGI invocation의 producer/wrapper·code provenance·strict parser·REQ12 소비·metadata 판본/정책/오류 의미를 마친 뒤 source고정·직접/인접/설치/Ref 검증한다. 반복시도/늦은chunk와실제수신·자원회수는별도다.
+- 막힌 것: actual serving/worker/GPU·producer/image·기업POL·native출력과최종client전달·자동retry·전체두분기/부모A는미완료다. 추가Start/시간/비용승인없음과원래stopped/CI결제차단을유지한다.
+
+
+## 2026-10-30 — A-1 native11 출력 귀속 제품 묶음 고정 준비
+
+- 한 일: controller11·정확10/8의5assets·slots 안전 관측·유일call/source/code·닫힌OUTPUT parser·REQ12 collector/객체/텍스트SHA/실제caller 소비·derived팩3/check7을 연결했다. 합산/객체수정·누락/중복·다른caller를 구분하며 원문/예외/token은 남기지 않는다.
+- 테스트 결과: 구현·시험·문서 초안 완료 후 AST/원본보존 정적검토→고정checkpoint→검토된 전체 pin→직접/인접/불변식·Linux·설치CLI/정확Ref 검증 순서다. 아직 새 검증 결과로 간주하지 않는다.
+- 다음 단계: 고정판 검증과 설치·커밋·초안PR·정확HEAD CI·인계 마감 후 준비된 담당 요청/취소/종료/관측 개발을 계속한다.
+- 막힌 것: 실제client수신·늦은출력 폐기/전달 정책·신뢰producer/image·자동retry·현재serving/worker/GPU 실증·전체REQ12/A39는 미완료다. 기존8/9/10와 B27/A2원본을 보존하며 원래GPU창종료·추가Start0·CI결제차단을 유지한다.
+
+- 첫 고정 검증: Windows804통과·새시험3실패·6오류·기존skip1/제외1(174.94초),1189파일 불변을 보존했다. 긴 parameter 이름이 Windows32767자 환경변수 한도를 넘고, 실제 put이 occupied 상태에서 BaseException을 교체하지 않는 원래 동작과 시험가정이 달랐다. 중복 ASGI fixture가 모든 nonce를 중복시켜 call 자체가 거부된 원인도 확인했다. 짧은 시험ID·원래 Exception/그외 BaseException 의미와 취소 시험·ASGI nonce만 중복시키는 대역으로 보수하며 제품 guard/code literal은 변경하지 않는다. pytest 종료 뒤 긴 행 정규식에 머문 소유 요약기만, 원본로그와 독립파일불변성 receipt를 남기고 종료했다. 검증중 소스변경이나 시험중단은 없었다.
+
+- 보수·설치 마감: 정확0c12a4d/같은guard ac48622에서 Windows183통과·기존skip1/제외1(42.12/42.776초),동일1189bytes Linux영향814통과·제외1(50.06/50.392초),183파일 source/wheel/격리설치 일치와 준비CLI3·제품CLI4 각정확6Ref 왕복(8.988초),실제LinuxFD/의존성/owncode/fork16사례(.044초)를 확인했다. 검증중 소스변경·새skip/제외·제품가정완화는 없었다. 이전native10 전체6942/실제REQ11wheel은 당시판본 근거로 보존한다. 최종 결과 문서만 갱신하고 초안PR·정확HEAD CI·인계를 마감한다.
+
+## 2026-10-30 — A-1 OBS01 필수 사건 기록 제품 묶음
+
+- 한 일: 확정ec4df88와c9기준·기존미커밋/전용bytes를 보존하고 SC23-03/02를 기존 CLI에 연결하는 required_event_record:kubernetes를 작성한다. OBS01 전용 허용/거부/후속정상 공개profile·별도 소유 정제record reader·명시 ENV/target/source주장/기업event policy/actor/필수사건/기한POL·현재request 및record 귀속대조·DRAFT77개/다른76bytes 보존을 포함한다. REQ02의 미인증 주장을 독립 사건 증거로 바꾸지 않는다.
+- 테스트 결과: 구현·시험·계약 문서 초안 후 AST/원본보존 정적검토 단계다. 고정checkpoint→검토된전체pin→직접/인접/불변식→동일bytes Linux/설치CLI·정확6Ref 검증 전에는 새 통과로 기록하지 않는다. 정상·잘못된귀속 후보·누락·교체/재시작·재확보·후속첨부/정리·민감필드재라벨 거부를 준비했다.
+- 다음 단계: 영향검증·설치·정확커밋/Ref 인계를 마감한 뒤 준비된 본인 담당개발을 이어간다. 기록metadata와공개응답은 trusted principal/감사생산자·승인/배포 실제사건의 독립증거가 아니므로 모든축UNKNOWN과scope/producer/independenttriggerfalse를 유지한다.
+- 막힌 것: 실제 trusted Gateway/감사생산자와관리·승인·소비·배포 발생원, 기업보존/기한조건·실제환경실증·전체OBS01/부모A는 미완료다. 필수미지원사건을missing에남기며 기존독립FAIL·기본native8~11/B/A2와원래GPU창종료·추가Start0·마지막확인stopped·CI결제차단을유지한다.
+
+- 첫 고정 검증: e84778a/1197파일 불변에서 Windows930통과·새시험1실패·기존skip1/제외1(319.74/320.513초)을 보존했다. HTTP 부모 정리 오류는기록됐으나 `_finish`가cleanup만으로실행을ABORTED로내리지않은누락을보수한다. 전후API정상구조를OBS01필수감사정상대조성공으로오해하지않도록 normal_control.succeeded=null과명시시험을추가한다. 기존guard/probe/전용bytes와테스트기대값·제외범위는유지하고새소스를재고정해영향만검증한다.
+
+- 보수·설치 마감: 정확0ac92da/guard3ae7cc2의Windows197통과·기존skip1/제외1(71.56/72.26초),동일1197bytes Linux영향932통과·제외1(101.67/101.983초),source/wheel/격리설치186파일일치와제품CLI4 각정확6Ref왕복(8.192초)을확인했다. 검증중변경·새제외없음,이전전체6942/실제REQ11wheel은당시판본근거다. 결과문서만갱신하고초안PR·정확HEAD CI·인계를마감한다. 전체OBS01·A39/실제신뢰생산자·실제환경은미완료다.
+
+## 2026-10-30 — A-1 A2 IPC 오류 단계 고정 소비 통합
+
+- 한 일: 확정17c8098에서 A2 PR114의3ecfd5f를cherry-pick -x로4693f1d에소비했다. 전용4파일 bytes·git원본·인계SHA일치를확인했다. 실제zero-payload connect의EACCES/EPERM만denied이며사전metadata/peer/사후조회실패는unknown이다. 이전유효path의독립관측/FAIL과정상응답상관·owner/PID/start/namespace/cutoff·기존판정은유지한다. A1전체검토pin만4693f1d로갱신하고B c9원본검사는그대로둔다.
+- 테스트 결과: A2의기존142/설치CLI6/36Ref는그고정원본판본근거로보존한다. 새통합소스는별도영향/설치검증전이며이번기록을새CPU수집/실제환경실증으로소급하지않는다. Source고정후직접/인접/불변식·동일bytes Linux·설치/정확Ref를확인한다.
+- 다음 단계: 변화가있는오류단계/독립FAIL보존과고정sourcepin을검증하고확정커밋/원본bytes/지원범위를인계한다. 현재없는Kubernetes IPC공개계약은별도actor-probe/realworker·UID/groups/PID/start/ns·socket세대·정상응답·시간출력/오류범위를고정해야하며제안서를현재지원으로올리지않는다.
+- 막힌 것: 실제worker/message소비·Kubernetes IPC transport·동일UID비승인process·SHM/TCP/TP·전체IPC인벤토리/부모A는미완료다. 기존원래GPU창종료·추가Start0·마지막확인stopped·새시간/비용미승인·CI결제차단을유지한다.
+
+- 통합검증 마감: 정확fa9ee19/검토pin4693f1d에서Windows260통과·기존skip1/제외1(31.53/32.156초),동일1199bytes Linux261통과·제외1(22.21/22.677초),source/wheel/격리설치186파일일치·기존CLI6/36Ref왕복(12.476초)을확인했다. 실제소유Linux임시socket2개에서각수신payload0bytes·SO_PEERCRED/첫path안정·둘째metadata불명·소유임시정리를확인했다. 이는EXAMPLE프로토콜검증이며새serving/worker/Kubernetes/GPU실증이아니다. A2원본4파일/과거팩Ref와source를보존하고검증중변경·새제외없이결과문서만갱신한다.
+
+## 2026-10-30 — A-1 Kubernetes IPC 공통 전송
+
+- 한 일: d1fafb0의 전용 원본과 공동 c9 기준을 보존하고 기존 KubernetesHTTP에 명시 정책/actor 기반 ipc_snapshot을 추가했다. 원본 A2 probe bytes, 소유 자식 자격 제한과 FD anchor, 전후 수집·세대 결합·엄격한 정제 parser·후속 실패 시 완료 packet 보존을 포함한다. 기존 전송 capture 성공 gate와 registry/전용 판정은 유지한다.
+- 테스트 결과: 구현·시험·계약 정적 검토를 마쳤으며 고정 소스 직접/인접·Linux 소유 임시 socket·설치 검증 전이다. 실행하지 않은 시험을 통과로 기록하지 않는다.
+- 다음 단계: 공통 전송 고정본과 정확 bytes/명령/지원 범위를 A2 소비용으로 인계한 뒤 본인19개 준비된 개발을 계속한다. 기존 CLI 회귀와 새 공통 API 검증은 구분한다.
+- 막힌 것: A2 새 envelope/groups 전용 소비·정상/위반/증거 왕복과 실제 worker/GPU/Kubernetes 실증·전체 PLT02/부모 A는 미완료다. EXAMPLE/UNKNOWN·생산자/worker/scope false와 원래 GPU 창 종료·추가 Start0·CI 결제 차단을 유지한다.
+
+- 공통 전송 검증 마감: 정확722d9db/검토pin6fe9cf5에서 Windows686통과·기존skip1/제외1(89.50/90.51초),동일1204파일 Linux687통과·제외1(39.40/39.662초),source/wheel/격리설치189파일일치와설치공개API4사례(.792초),기존CLI6/정확36Ref반출·복원·재판정(10.536초)을확인했다. 실제소유Linux임시socket의connected/denied/symlink·누락unknown,0payload·peerPID/UID/namespace·actor정리·FD4→4를확인했다. 후속deadline으로앞선행을보존했다. 최초deadline fixture는AF_UNIX backlog의즉시EAGAIN으로의도한대기를만들지못했으며실패원본을보존하고소유수집지연을명시주입한EXAMPLE fixture만보수했다. 제품/source변경·새skip/제외는없다. A2선정12/B원본27bytes와기존실증판본을보존한다. 새PLT02 Kubernetes전용소비·전체판정/실제환경완료는별도다.
+
+## 2026-10-30 — A-1 OBS02 상태 대조 제품
+
+- 한 일: ab84db5의 공통/전용 bytes를 보존하고 본인 OBS02 SC23-04를 observation_state:kubernetes와 명시 DRAFT 팩에 연결했다. 정확ENV/target/선택prepared와 전후Pod세대, 닫힌health/정상요청/clientclose, native8~11의선택·수집·정제관계와기존CLI/정확Ref를재사용한다.
+- 테스트 결과: 정상/HTTP실패·형식누락/교체·재시작/잘못된ID·method/같은nativeID충돌/native누락·후속seal·첨부·정리·원문비저장 시험과실제소유HTTP소켓프로브를준비했다. 아직검증전이며소스고정후직접/인접/불변식·동일bytesLinux·설치/정확Ref를확인한다.
+- 다음 단계: 고정 소비 pin·검증·초안PR·정확HEAD CI와인계를마감하고다음본인개발을이어간다. health응답·정상구조/clientclose·native사건을독립worker상태로올리지않으며normal_control.succeeded=null·전축UNKNOWN·scopefalse를유지한다.
+- 막힌 것: 기업상태의미·독립worker/생산자·실제환경실증과profiler/backend·승인/소비분기는미완료다. 부모A39/56/4·A119/27/2·원GPU창종료/추가Start0/마지막확인stopped·CI결제차단은유지한다.
+
+- 첫 고정 검증: 1fffcdd/1210파일 불변에서Windows1027통과·새OBS02시험19실패·기존skip1/제외1(316.30/317.231초)을보존했다. 새공개프로필이Ctx의공통최소모델매핑소비목록에누락되어기존3필드매핑을fullschema로오검사한제품누락이다. 동일원인설치CLI실패도보존했다. OBS02정확프로필을기존검증된transport/mapping동일성조건에추가하고변조매핑거부시험을추가하며기존정책/신뢰/기대값은완화하지않는다. 모든검증handle종료후고정source를보수한다.
+
+- 보수·제품 검증 마감: 정확a4aa0e9/guard검토pin01150be에서Windows225통과·기존skip1/제외1(60.38/61.079초),동일1210파일Linux영향1048통과·제외1(107.30/107.842초),source/wheel/격리설치192파일일치와설치CLI4각정확6Ref반출·복원·저장팩재판정(7.874초)을확인했다. Native8과실제10/11hook소비·소유HTTP5요청·정상/실패/누락/교체·후속오류와전축UNKNOWN을검증했다. 첫19실패와설치실패원본을보존했으며기대값/정책/제외완화·검증중소스변경은없다. A2선정12/B원본27/native8~11/stream/IPC bytes와원팩31을보존한다. 실제worker/기업상태의미·profiler/backend·승인/소비사건·실제Kubernetes/GPU와전체OBS02/부모A는미완료다. 결과문서만갱신하고초안PR·정확HEAD CI·인계를마감한다.
+
+## 2026-10-30 — A-1 REQ04 전달 신원 제품
+
+- 한 일: c88a951 기준의4Pod owner/HTTP·고정파일 reader를 재사용해 REQ04 SC01-04의 닫힌 normal-before/alternate/normal-after와 Gateway/engine 정제 기록을 registry/명시 DRAFT 팩/기존 CLI에 연결했다. 같은 자격·정확ENV/target/model/source/policy/session과 call/operation 관계, identity claim/운영 selector를 구분한다.
+- 테스트 결과: 구현·시험·계약 정적 검토 단계다. 소스 고정 후 직접/인접/불변식·동일bytes Linux·설치CLI/정확Ref를 검증한다. 실행 전 통과를 기록하지 않으며 정상/후보/누락·중복·내용교체·restart/후속 수집·첨부·정리 오류를 포함한다.
+- 다음 단계: 고정 소비 pin과 검증·초안PR·정확HEAD CI·인계를 마감하고 다음 준비된 담당개발을 계속한다. 원팩31/다른76정의·A2/B 원본·과거실증을 보존한다.
+- 막힌 것: 실제 trusted issuer/principal·Gateway 정규화/engine 소비 생산자·PID/start·최종권한 정책과 실제 환경/전체REQ04·부모A는 미완료다. normal_control=null·producer/principal/scopefalse·전축UNKNOWN, 원GPU창종료/추가Start0/마지막확인stopped·CI결제차단을 유지한다.
+
+- 첫 고정 검증: 637552b/1217파일 불변에서 Windows505통과·새시험2실패·기존skip1/제외1(207.21/207.913초)을 보존했다. 새 시험이 Observation을 dict로 접근했고 native0.32용 ENV 변경 뒤 seal을 빠뜨린 준비 오류다. 두 시험 준비만 보수하며 제품guard/팩/정책·기대 판정·원본bytes는 변경하지 않는다. 모든 검증 handle 종료 후 재고정해 직접/불변식·Linux/설치를 확인한다.
+
+- 검증 마감: 정확c5905e5/검토pin8af2031의 Windows205통과·기존skip1/제외1(74.82/75.627초),동일1217bytes Linux508통과·제외1(70.28/70.602초),source/wheel/격리설치196파일일치와설치CLI4/정확24Ref왕복(7.720초)을확인했다. 초기505통과/2시험준비실패와원소스를보존했으며제품guard변경·기대값완화·새제외·검증중변경은없다. 소유HTTP소켓3요청·정상/선언위반후보·누락/교체·후속오류·원문비저장을확인했다. B전체304파일고정소비·A2선정12/B원본27·기존native8~11/IPC/원팩31을보존한다. 새실제Kubernetes/worker/GPU·trusted issuer/producer/PID-start·기업권한정책·전체REQ04/부모A는미완료다. 결과문서만갱신하고초안PR/정확HEAD CI/인계를마감한다.
+
+## 2026-10-30 — A-1 REQ06 저장 응답 객체 제품
+
+- 한 일: f8995a8에서 보관0.31의Responses router/serving/protocol3파일을 정적으로 재사용해 REQ06 SC02-03의두주체/소유UUID·생성receipt·정상조회/취소/previous/overwrite효과와 Gateway/직통을 기존4Pod 전송·registry/명시DRAFT팩/CLI에 연결했다. 일반mutating gate·원본B/A2·원팩31·나머지76정의는 보존한다.
+- 테스트 결과: 구현·시험·계약 초안과 정적 검토 후 소스 고정/영향/설치 검증 전이다. 정상/선언위반후보·store비활성·동기취소·누락·교체/restart·후속수집/첨부/정리·원문비저장과 정확Ref 왕복을 준비했다. 실행 전 통과를 기록하지 않는다.
+- 다음 단계: 고정 소비pin·직접/인접/불변식·동일bytesLinux·설치CLI/정확Ref·초안PR/정확HEAD CI/인계를 마감하고 준비된 담당개발을 계속한다. 프로브소유ID 제한을 실제owner/권한 또는worker효과 인증으로 올리지 않는다.
+- 막힌 것: 실제principal/owner·공유/작업권한표·store/worker생산자·실제효과/PID-start·실제환경/전체REQ06·부모A는 미완료다. 전축UNKNOWN/normalnull/producer-owner-worker-scopefalse와원GPU창종료/추가Start0/마지막확인stopped/CI결제차단을 유지한다.
+
+- 첫 고정 검증: feb4957/1225파일 불변의Windows610통과·새시험31실패·기존skip1/제외1(237.05/237.911초)을보존했다. 제품POL의목록형식을지원되는list[str]로고치고,부정시험scope가공유역할사전을변경하던격리오류를deepcopy로보수한다. 지원타입회귀를추가하며정책/기대판정·기존제외는완화하지않는다. 모든검증handle종료후새소스를재고정한다.
+
+- 제품 검증 마감: 정확bef4e0e/검토pind5f06b2의Windows 187 passed, 1 skipped, 1 deselected in 52.80s·부모53.596초,동일1225bytes Linux 642 passed, 1 deselected in 84.25s (0:01:24)·부모84.71초,source/wheel/격리설치201파일일치·설치CLI4/정확24Ref왕복7.906초를확인했다. 첫610통과/31실패·원소스와실패로그를보존했고POL지원타입/list[str]·시험역할사전격리를보수했다. 소유HTTP실제소켓5요청·두origin/네동작의정상·선언위반후보·store비활성/동기취소·누락/교체·후속오류·원문비저장을확인했다. 검증중변경/새제외/기대값완화없음,B309전체pin·B원c9/A2선정12/B원본27/native8~11/IPC/원팩31을보존한다. 실제principal/owner/생산자·worker효과·기업정책/실제환경·전체REQ06/부모A는미완료이며전축UNKNOWN·normalnull·신뢰/전체범위false다. 결과문서만갱신하고초안PR/정확HEAD CI/인계를마감한다.
+
+- 제품 검증 마감: 정확241f9f21abbc98cb84cbeb90e9cff0ca22ff881f/검토pinbb66d60의Windows 192 passed, 1 skipped, 1 deselected in 53.37s·부모54.262초,동일1240bytes Linux 740 passed, 1 deselected in 69.79s (0:01:09)·부모70.167초,source/wheel/격리설치207파일일치·설치CLI4/정확24Ref왕복7.998초를확인했다. 첫수집오류·685통과/41실패와각보수로그·Linux734통과/1실패를보존했다. 새시험의선택의존성/원본class code·연결컨텍스트·미수집null가정을보수하고Windows stat/fstat의동일API ctime안정성과Linux실제deque buffer를제품에서보수했다. Linux소유TCP의실제buffer/outq/inode/RSS/abort뒤표본과고정Uvicorn메서드의실제send/drain부모귀속·예외보존,같은stdlib실제HTTP5요청·누락/교체/restart/후속오류·원문비저장을검증했다. 전체serving buffer회수·debug/실제Kubernetes/vLLM/GPU실증은아니다. 검증중변경/새제외/관문제외/관측hash자동승인없음,B315전체pin·B원c9/A2선정12/B원본27/native8~11/원팩31을보존했다. 기존Linux전체6942는이전native10소스근거로유지하고변하지않은전체시험은반복하지않았다. 모든새판정UNKNOWN·정상null·수집된신뢰/전체범위false이며전체LIF04/부모A완료는추가하지않는다. 원GPU창종료/Start0/마지막stopped·CI외부차단을유지한다.
+
+- 검증 마감: 정확 소스0261fc95ab31ace84c89a7ae621871faf43c083b, 공통 소비 pin5c1504b6c3e26f5efdbe24b995907c9e941b05b0에서 Windows 620 passed, 1 skipped, 1 deselected in 212.21s (0:03:32)(부모 213.367초), 동일 1,253개 파일 바이트의 Linux 621 passed, 1 deselected in 69.27s (0:01:09)(부모 69.689초), 소스/wheel/격리 설치212파일 일치, 설치본 CLI4사례·정확24 Ref 왕복 8.131초를 확인했다. 검증 중 소스 변경·새 제외·관문 제외·관측 hash 자동 승인은 없었다. 전체 공통 소비320파일과 A2 선정12/B 원본27/native8~12·원팩31을 보존했다. 고정 실제 MP/core 메서드 code·선정 output rank/Future 결과·worker 예외 객체·소유 CPU child의 네 설정/정리와 실제 사망 monitor→core 표식, closed HTTP6요청 및 누락/교체/후속 오류를 검증했다. 이 근거는 CPU/EXAMPLE 관측 제품 연결의 검증이며 실제 serving/TP/GPU·네 fault 활성/발생/기한·client 인수·필수 rank 정상 완료의 증명이 아니다. 모든 새 판정은 UNKNOWN이고 정상 succeeded=null, 생산자/전체 범위는 false다. 이전 Linux 전체6942는 당시 native10 소스 근거로 유지했다. 실제 전체 LIF08·부모 A 완료 수는 늘리지 않았다. 결과 문서 두 개만 갱신하고 확정 커밋/초안PR/정확HEAD CI/인계를 마감한다.
+
+
+## 2026-10-30 A1 LIF09 초기화 부분 실패 관측
+한 일: native14의 mp 초기화·두 static 준비 호출을 기존 Kubernetes 실행/팩/등록/증거 경계에 연결했다. 단일 선언 단계의 대응/정제 관측이며 전체 LIF09 완료가 아니다.
+검증: 구현·회귀·문서 초안 종료 뒤 소스 고정 예정. 현재 새 소스 시험/설치/실증 성공을 주장하지 않는다.
+다음: 고정 직접/인접·불변식/Linux·설치본 CLI/정확Ref·확정커밋/PR/정확CI/인계.
+막힌 것: 실제 실패/복귀 기동 lineage·독립접수/모델준비·신뢰 생산자·GPU창 종료/Start0·CI결제 차단. 기존실증은 당시 source만 증명한다.
+
+- 검증 마감: 검증 소스99e7f82efd45dcd18518ae577a0ede0e160a519b, 고정 공통 소비4b0483e48d7da0fc7b0aeaa5ff01e7549177bdf9. 첫 Windows26실패와 named pipe 보수 후 Windows1실패612통과/Linux1실패613통과 로그·1263파일 명세를 보존했다. 유일한 응답ID 불일치 wire 중단 기대를 보수한 후 Windows174통과/기존skip1·deselect1(55.99초/부모56.788초), 동일1263파일 Linux175통과/기존deselect1(16.99초/부모17.296초)을 확인했다. 제품 소스/팩/빌드 변경 없음과 소스-wheel217파일 bytes 동일성을 확인해 기존 인접 통과와 격리 설치217파일/CLI4사례/정확24Ref 왕복7.986초를 재사용했다. 공통 소비325파일/경로제외0/hash자동승인false, A2선정12/B원본27/native8~13을 보존했다. 전체 소스 변경·관문완화·새skip/제외·기대값 완화는 없다. 원GPU창종료/Start0/실제실증미완료·모든 새 판정UNKNOWN/normal succeeded=null·단일 선언 단계만 연결·부모A39 및 전체LIF09 완료false를 유지한다. 기존Linux전체6942는 당시 native10 소스의 이력이며 새 소스 전체 통과로 표시하지 않는다.
+
+
+## 2026-10-30 A1 LIF11 선정 자원 회수/후속 기동 관측
+한 일: 원팩 두 분기를 보존하고 선정 PID/start·FD/inode의 닫힌 Linux census를 기존 Kubernetes CLI/팩/등록·native13/14·증거 경계에 연결했다. 명시 무조건 절대 회수 기한의 동일 자원 잔존은 functional 독립 FAIL이며 조건부 장애 기한·전체 회수/후속 기동은 별도 미확인이다.
+검증: 구현·회귀·문서 초안 종료·source/hash 고정 뒤 영향/Linux/설치본 CLI/정확Ref 검증 예정이다. 현재 새 소스 통과/실제 실증을 선언하지 않는다.
+다음: 고정 검증/필요 보수/커밋·초안PR·정확CI/인계 후 준비된 담당 개발 지속.
+막힌 것: 실제 실패/회수 인과·전체 자원/공유참조/GPU·같은 환경의 다음 정상 기동 lineage·원GPU창종료/Start0·CI결제 차단.
+
+- 검증 마감: 정확 source f1bda4d9a0d726644defaaa005437038948bbe21, 검토 고정 공통 소비c0686ab20d5653091754570853472f9880930dc2. 첫 Windows33실패426통과/Linux33실패427통과와1273파일 명세를 보존했다. 새 census clock 정밀도·시험 Namespace/Legacy 보수 후 Windows194통과/기존skip1·deselect1(98.93초/부모99.812초), 동일1273파일 Linux195통과/기존deselect1(29.46초/부모29.718초), 소스-wheel-격리설치222파일 일치·설치본 두 분기4사례/정확24Ref 왕복8.226초를 확인했다. source/hash 고정 뒤 변경0·새skip/제외0·승인값 자동채움0이며 공통330파일/경로제외0·A2선정12/B원본27/native8~14를 보존했다. 바뀌지 않은 인접 통과를 재사용하고 전체suite를 새로 통과했다고 주장하지 않는다. 실제 소유 Linux CPU socket/shm/alias/child census와 두 분기의 무조건 절대 기한 잔존 FAIL/조건부UNKNOWN/누락/재사용/교체·후속 수집/첨부/부모 정리 오류 뒤 독립FAIL 및 정확Ref를 검증했다. 이 근거는 CPU/EXAMPLE이며 실제 serving/TP/GPU·실패 후 전체 회수/후속 정상 기동·부모A39/56/4·A1 19/27/2 전체 완료가 아니다. 원GPU창종료/Start0·기존비용/EBS과금·CI결제 외부차단과 과거실증source04f7856을 유지한다.
+
+
+## 2026-10-30 A1 PLT10 자격 철회/신규 접근 관측
+한 일: PLT10 원정상/issuer 철회/전파 기준을 보존하고 두 자격의5개 고정GETmodels·native8 auth/등록handler를 기존 Kubernetes CLI/팩/증거 경계에 연결했다. 실제 issuer/전파·principal·독립연결receipt는 미확인이고 별도 명시 무조건 접근 금지 제약의functional FAIL만 제공한다.
+검증: 구현·회귀·문서 종료 후 source 고정/영향/Linux/설치본 정확Ref 검증 준비. 현재 통과/실증/전체 완료를 선언하지 않는다.
+다음: 고정검증/보수/커밋·초안PR·정확CI/인계; LIF12 실제retry주체 질문은 대기하며 독립 담당 개발 지속.
+막힌 것: 실제 issuer/cache/event/시간/자격/철회 전 정상/새 연결/전파·원GPU창종료/Start0·CI결제 차단.
+
+- A1 PLT10 선택 자격 관측: 고정15036af Windows234/Linux235, source/wheel/설치225파일, CLI4 정확24Refs, 검토된 전체333소비452fdff. 초기14실패는 소유 ASGI loop 준비 보수; source/native/gate/판정 assert 유지. 실제 issuer 철회/전파·전체PLT10 미완료, 원GPU Start0/CI결제차단 유지.
+
+- A1 PLT11/SC19-02: 원criteria/76bytes 보존 파생팩·기존 CLI/registry와 닫힌 keep-alive5GET/동일 probe socket 및 별도 새 연결/native8 결합 초안. 구현/직접·인접회귀/문서 종료 후 고정·검증 준비이며 미검증·전체분기 미완료. issuer/cache/잔존 정책 질문 대기; source/lab/image/native0.32/원GPU Start0/CI결제차단 유지.
+
+- A1 PLT11 선정 probe keep-alive: 고정f0c0972 Windows264/Linux265, source/wheel/설치229파일, CLI4 정확24Refs(7.772초), 전체337 고정 소비372f354. 초기pin실패는 세 A1파일을 기존 reviewed blob bytes에 맞춘 것으로 보수; AST/판정/gate 유지. 실제 issuer/앱session·handle·전체PLT11 미완료. 다음PLT12 원범위·필수정책/관측 경계 검토.
+
+- A1 OBS02 SC23-05 profiler: 고정0.31 공식/이미지source3개 일치, opt-in native15(call/parent/object/source/code/전후flag)와 typed parser·기존 OBS02 HTTP/CLI·원기준파생팩 연결 초안. backend stop 예외와 stop후출력 예외를 분리하고 모든축UNKNOWN/실제backend·산출·다음시작 미확인을 유지한다. 회귀/문서 종료 뒤 고정·검증·설치/PR/인계를 진행하며 현재 미검증이다.
+
+- A1 OBS02 profiler CPU 검증 마감: 고정d94f614 Windows310/Linux311·동일1300파일, source/wheel/설치232파일 및 설치본4사례/정확24Refs(7.810초), 공통340 고정 소비36c378a. 초기 loader 준비·판본별 compiled cache·typed packet 투영·closure lookup 실패와 보수를 보존했다. 새skip/제외·runtime hash 승인0, 기존 native8~14·A2/B 원본·원3분기/76정의 bytes 유지. 실제backend 수집/종료·trace 산출/전송·다음 정상시작/RPC·producer 신뢰는 UNKNOWN이며 전체OBS02·A39/56/4·A1 19/27/2 미완료. 원GPU창종료/Start0·46.66USD/EBS과금·CI결제 차단을 유지한다.
+
+- A1 OBS02 SC23-03 재개: 사용자 답변에 따라 A1 공통 사건/출처·세대 결합·계측/parser와 사용자 승인 주체/허용 대상/정책을 분리했다. 기존 OBS01 /1·native8 model/load 관측을 기존 CLI/원기준 DRAFT팩의 선언 결합 후보로 연결하고 후속 수집 오류 보존 회귀·문서를 작성했다. 현재 미고정/미검증이며 실제 승인·검사 생산자/worker tensor 소비는 미연결·모든축UNKNOWN이다. 다음은 고정 영향/설치·정확Ref/PR/CI외부차단 인계 후 A2 기존IPC 소비 대조와 PLT07 egress 요청이다.
+
+- OBS02 SC23-03 첫 공통 제품 검증: 고정562d825 Windows43/Linux43·동일1306파일, 소스/wheel/설치234파일·설치본CLI4/정확24Refs15.428초, 공통342 고정pin3aeefcd. 초기535/536인접 통과와 external fixture 준비오류33·후속image 증명 가정5실패를 보존했다. 기존 node image false/강한 native결합false 관문을 유지하며 제한된 동일 process/object·API imageID·선언 pair 후보만 제공한다. 새skip/제외·실행중변경·runtime hash승인0. 실제 승인·검사 생산자/worker tensor/기업정책·전체분기는 UNKNOWN/미완료이며 다음A2 IPC·egress 준비를 이어간다.
+
+- PLT02/A2 전달 통합: fac0907/PR131 전용4파일을 원본 커밋으로 통합했고 기존3ec→d1 보수도 보존한다. 실제 groups·collector 구분/전후 actor/socket/owner·normal 응답 대응은 전용 소비를 그대로 쓴다. A1의 최소 Kube wrapper/registry/PLT02 파생팩과 새정식CLI/정확Ref 회귀·문서를 준비하며 현재 새소스 미고정/미검증이다. A2의 전용 함수6사례·legacyCLI6/36Refs를 이번 새등록 검증으로 집계하지 않는다. 실제worker/message/전체IPC·CI5는 미완료이며 다음은 확인된 전달물과 PLT07 egress 공통 계약이다.
+# 2026-10-30 PLT02 Kubernetes 고정 A2 소비 제품 연결 마감
+
+- A2 fac0907302d78c271d0b571d2413f7a8f4b295e5의4파일을 원본 bytes로 통합하고 기존 ab84 public IPC v1에 최소 unix_ipc:kubernetes registry·wrapper·PLT02 명시 DRAFT팩을 연결했다. 실제 groups·actor/collector/source·owner/peer 조건과 독립FAIL은 A2 전용 소비를 재사용한다.
+- source0bb4253/검토pin07cdbe6: Windows456통과·기존skip1/미선정1, Linux457통과/미선정1·동일1314파일, 소비344파일, 설치236일치, 설치CLI4사례·정확24Ref 반출/복원·저장팩 재판정을 확인했다. 후속 수집/normal/report/첨부/정리 오류가 앞선 독립FAIL을 지우지 않는다. 설치 대역의 argv 위치 오류와 수정 결과를 함께 보존했으며 제품/gate/assert 의미는 그대로다.
+- 지원은 lab=true/vLLM0.31/CPython3.12 CPU/EXAMPLE 제품 연결이다. 실제Kubernetes/socket/actor/worker/message·전체IPC/PLT02와 현재 전체suite는 미확인이다. 부모A39/56/4·A1 19/27/2·A2 20/29/2와 원승인/비용/Start0·CI결제 외부차단을 유지한다. 다음은 새 확정 인계 범위를 대조한 뒤 PLT07 최소 egress 공통 계약이다.
+# 2026-10-30 A1 PLT07 최소 Kubernetes 공통 입력 착수
+
+- A2의 확정 egress 검토와 현재 공통 입력을 대조했다. 기존 sender/receiver/ACK/receipt·원Docker 실행기/POL/판정 bytes를 보존하며 공개 egress_snapshot·정확13키 Kube POL binding·8키 receiver target·typed 부분 관측·전체30초/행·출력 한도를 구현했다. 실제 credential이 명시 actor와 이미 같을 때만 단일 TCP helper를 허용하고 새 기동/권한 전환은 없다.
+- 구현·회귀·문서 초안 및 정적검토 뒤 source/hash 고정 전이다. 아직 새 통과/설치/실제 실행을 주장하지 않는다. A2 전용 envelope 소비와 정식 registry/팩/CLI는 새 확정 전달물 뒤 별도로 연결하며 helper를 전체5분기/취득/cache/usage/telemetry 완료로 집계하지 않는다.
+- B PR130 f154419의 OBS06 수동 증거와 REQ09 source-CPU 문서를 확인했다. 새 A registry/팩 등록 요구와 직접 제품 경로를 구분했으며 전체 B branch 또는 미완성 전용 소스를 대신 작성하지 않았다. 원GPU창 종료/Start0·비용·기존Goal/담당 범위를 유지한다.
+# 2026-10-30 A1 PLT07 최소 공통 입력 검증 마감
+
+- source6db0549/검토pin cf7c757, 기존66파일과 이전 Kube method AST 보존. 신규33사례 Windows/Linux 통과, 전체소비347·설치239파일 일치·격리 공개method6사례/typed JSON 왕복·원문 비저장을 확인했다. 첫 source7c의 Windows443/Linux444통과와 신규fixture 실패1을 함께 보존하고 Ref 일관성만 보수했다. guard bytes는 같아 인접 검증·wheel/설치를 재사용했으며 전체suite 성공으로 합산하지 않는다.
+- 공통 입력은 제공됐지만 A2 새 envelope 소비·정식 PLT07 registry/팩/CLI·실제 실증·전체5분기는 미완료다. 기존 IPC CLI20사례/PR133 설치CLI4·정확24Ref는 해당 source/경로의 근거다. 실제 worker/권한/기동·승인/비용/Goal 경계를 유지하고 새 확정 전용 전달물 또는 준비된 A1 분기를 계속한다.
+# 2026-10-30 A1 REQ02 native 인증·등록 handler 연결 착수
+
+- 기존 native8 hook/route_handler_index·고정 source/PID/session reader/seal을 재사용해 REQ02 전용3HTTP·native_route:kubernetes registry·명시 DRAFT팩·동일 recording metadata 결합을 구현했다. 기존 route_record 제품과 다른76개 정의·A2/B/native8~15 bytes를 보존한다. 명시 환경 변수 시험 키만 선택 소비하고 값/키hash를 저장하지 않는다.
+- 준비된 본인 분기 개발이며 실제 principal/권한/Gateway rewriting 정책 미확정을 독립 코드 전체의 차단으로 삼지 않는다. 모든판정UNKNOWN/normal null·실제producer/nodeimage/worker/전체scopefalse를 유지한다. 구현/회귀/문서 초안 종료 후 source고정·영향/설치·정확Ref·커밋/초안PR/CI/인계를 이어간다. 아직 시험 통과나 실제 실증을 기록하지 않는다.
+# 2026-10-30 A1 REQ02 native 인증·등록 handler 제품 검증 마감
+
+- 고정 source3b871a8/검토pin065eb9b에서 Windows45·Linux45통과/동일1324파일, source/wheel/설치241일치, 설치CLI4·정확24Ref 반출/복원·저장팩 재판정·전체소비349를 확인했다. 기존96파일/native8~15·IPC/egress 메서드·원PACK31/76정의와 route_record를 보존했다.
+- 최초 모델별칭 호환 누락/시험report source출력, 다음fixture event-loop 생성 순서, cleanup exit1/ABORTED 보수를 원본 실패와 함께 기록했다. 기존 socket 차단·판정기대·source/lab/image/완전성 관문과 B원본c9 pin을 유지했다. 각 고정source의 직접/인접/설치 범위를 구분하며 현재 전체suite 통과로 합산하지 않는다.
+- 새제품은 자기 요청·같은 native recording의 auth bool/경로/등록 callback·source/module/seq 관측이다. 실제principal/정책/Gateway rewrite/producer/nodeimage/worker/전체scope는 false, 판정전축UNKNOWN/normal null·actual0이다. 다음 확정 전달물과 준비된 본인 분기를 이어가며 원승인창/추가Start0/비용/EBS·Goal범위를 유지한다.
+# 2026-10-30 A1 PLT07 고정 전용 소비 제품 연결 착수
+
+- A2 확정9482a75/PR135 전용3파일 bytes를 통합했다. 기존 공통2596337 method/source와 원분석을 재사용해 boundary_egress:kubernetes wrapper/registry·명시POL13/DRAFT팩·정확Ref 시험을 연결했다. 공통 미등록 상태 시험은 새 명시 factory와 기존 Docker factory를 함께 확인하도록 갱신한다.
+- 원PACK31/DockerPOL11/기존rule_table 독립FAIL·5분기와 다른76개 정의·A2원본3bytes/native/REQ02/IPC를 보존한다. 구현/회귀/문서 초안 종료 후 source고정·영향/설치/CLI·정확Ref·커밋/PR/CI/인계 전이며 실제/전체분기 완료를 주장하지 않는다. 새기동·권한·비용은없고원Goal/Start0/EBS경계를유지한다.
+# 2026-10-30 A1 PLT07 egress 정식 제품 통합 검증 마감
+
+- 고정 source7b6b660/검토pin cd128d5에서 Windows470통과·기존skip1/미선정1, Linux471통과/미선정1·동일1331파일, 소비351·보존104·설치243일치·설치CLI4/정확24Ref 반출/복원·저장팩 재판정을 확인했다. A2 9482a75의3원본 bytes·공통KubeHTTP전체/egress/source/native/REQ02/IPC·원Docker/POL11/판정/5분기/76정의를 보존했다.
+- 공통입력·전용소비·정식 registry/팩/CLI는 연결됐고 확인된 금지TCP FAIL은 ACK/후속pipe/report/첨부/정리 오류 뒤 보존된다. 거부·필수근거 누락/교체는UNKNOWN, normal false/null·기능/성능UNKNOWN·전체scopefalse다. 실제socket/Kubernetes/worker/GPU0·전체5분기/현재전체suite는 미확인이고 기존Goal·승인창/Start0/46.66USD/EBS·CI외부차단을유지한다.
+# 2026-10-30 A1 B PR130 원본 bytes 통합 착수
+
+- B 확정f154419/PR130의 OBS06 소유로그 수동증거 및 REQ09 sourceCPU subset21파일+전이의존2파일을 원본bytes로 가져왔다. 공통의존성5파일은현A1과B동일하고 새registry/core/팩변경은없다. B전용코드/판정/component033·gate/collector pin과 원helper c9는 재작성하지 않는다.
+- A1검토전체snapshot만갱신하고 B의기존component gate가현재A소스를거부하는부분은전용pin소비갱신으로남긴다. Windows scratch stat0777 vs Bfixture POSIX0700 assert를관측했으며 원시험의양쪽결과를그대로기록하고 새skip/제외/assert완화는없다. 고정후영향/설치·정확Ref를검증하며 새actualCPU/Kubernetes/principal/암호화/GPU나전체B/A완료는주장하지않는다.
+
+- 고정source e40fcfd / 검토pin299ea03: Linux339통과(동일1349파일), Windows328통과/기존skip1/미선정1·원B POSIX0700 fixture로10실패. 원B보수/새skip/제외/assert완화 없음. Windows 실제collector·전범위 성공은 미확인이고 B확정보수가 필요하다. 설치246일치/공개main CLI4·정확24Ref(15.100초)와 전체소비354는통과. 실제Kube/worker/GPU/신규sourceCPU0, B033 ancestor gate 거부를유지한다.
+
+# 2026-10-30 A1 OBS02/native16 공통 iterator 계측 착수
+
+- A2 최신647553f 제품수락과 worker/acquisition 미지원 초안을 대조하고 보존 source5파일/21함수를 검토했다. 별도 opt-in native16의 실제 generator step 및 parameter callback-return을 기존 OBS02 identity 제품에 연결하는 구현·회귀·문서 초안을 진행한다. 원 native8~15/A2/B bytes·기존팩/정책·판정은 보존한다.
+- 같은 native8 load-call/model 객체와의 결합, 누락/중복/다른귀속/부분소비/종결/후속오류를 구분한다. factory·yield·callback-return은 FD 읽기/최종tensor/worker배정/실제승인 증명이 아니며 UNKNOWN과 진실값false를 유지한다. 소스 고정 검증 전 통과·현재 지원·실제 실행·전체완료를 주장하지 않는다.
+
+- 고정sourcef1d4149/pinc8c4b26: 직접Win/Linux각36, 인접Win `635 passed in 991.34s (0:16:31)`·Linux `635 passed in 222.87s (0:03:42)`, 동일1358파일 불변. 설치248/CLI4·정확24Ref(29.963초), 전체소비356/제외0. 최초실패와OS별컴파일cache·새fixture 시각 보수를보존했고 gate/원assert/새skip/실행시hash승인없다. source-bound iterator/callback-return을 기존 OBS02에서소비하지만 실제FD/tensor/권한/worker·전체A/A1/분기완료는미확인이다. 원GPU창종료/Start0/비용·EBS/과거실증·B Windows원fixture 실패와CI차단을유지한다.
+
+# 2026-10-30 A1 OBS02/native17 eager FD/read 구현 초안
+
+- 고정된 eager source의 원본 binary open/read/close를 세션·ENV/대상·모델참조 범위와 결합해 기존 OBS02에서 소비한다. 별도 모델 helper read/전략전환/global builtins 변경은 없다. native8/native16/A2/B 센서·원본 bytes를 보존한다. 원문·credential hash는 수집하지 않으며 명시한 비밀 아닌 safetensors read buffer hash만 허용한다.
+- 검증 전 초안이다. C safe_open/mmap/torch.load read·최종tensor/backend·worker역할·승인권한·실제GPU는 미연결/UNKNOWN이다. 기존 CI 외부차단·GPU창종료/Start0·46.66USD/과거사용량/120GiB EBS·부모/A1 전체범위를 유지한다.
+
+- native17 고정source51e9a5c/pin7dc3416: 직접Win/Linux각38, 인접각313, 동일1365파일불변; 설치251/준비CLI2/기존OBS02 CLI4·정확24Ref(9.689초), 전체공통359/제외0. 첫source의scope/불변식근거는별도재사용하며 현재전체suite로합산하지않는다. 초기Win9/Linux8 실패와 보수 후Win1 실패는 원문·source별로보존했다. CPython3.12.14의 stat/fstat ctime 의미를 명시해 서로다른기준의일치를거부하고 필드/신뢰검사/원assert/새skip을완화하지않았다. EXAMPLE FD/read 사실은 실제serving/tensor/worker/승인/전체분기완료와분리한다.
+
+# 2026-10-30 A1 A2 native16 전용 소비 통합 착수
+
+- A2 PR140/9bda8b3 세 원본 파일을 bytes 그대로 소비하고 기존 OBS02 native16 공통 사건 뒤 전용 선택/진행 후보를 연결한다. 원 native16 metadata와 pin을 복원하고 native17은 명시적 별도 공통 투영으로 기존 FD/read 기능을 유지한다. 정상/누락/다른귀속/부분/후기consumer·수집·첨부 오류 및 정확Ref를 선정했으며 검증 전 초안이다. 실제SUP05/06·worker/tensor/권한·전체분기완료를 주장하지 않는다.
+
+- A2 native16 확정9bda8b3 세파일의원bytes와f8ced901/e7494eda 원pin을보존한 정식OBS02 소비를source9997936/pin1dab9b2에서검증했다. 직접각19·인접각90/동일1370불변, 원A2단위24는변경없는원본근거재사용. 설치252/A2native16 CLI4·정확24Ref와native17 인접CLI4·정확24Ref를각각확인, 전체공통360/제외0. 초기양쪽3실패는loader없는fixture와부모gap재계산을보수했고 loader없는음성대조·consumer오류/ABORTED·기존공통사실보존을추가했다. 실제SUP05/06/worker/tensor/권한/전체Goal 완료는아니다.
+
+# 2026-10-31 A1 B4cfc 로그/Graph/ID 확정 전달물 통합 착수
+
+- B PR130 고정27파일+전이3개 bytes를보존하고 기존 OBS03/manual/Ref와 REQ20준비경계를검토했다. B oldHTTPpin3da의정확A참조1c1f와현재A0fc의닫힌요청AST동일성을확인했으며 원B gate는거부그대로다. nativeGraph None/실제source-callback-close미지원·oldWindowsfixture실패를유지하고 검토fullsnapshot/영향/설치/CLI·Ref를별도로확인한다. 실제Kube/GPU/전체Goal완료를선언하지않는다.
+
+B4cfc 원본27+전이3파일을소비했다. A1 경계각4/인접각70·설치258/OBS03 CLI4·정확24Ref·REQ20미지원요청0·공통366/제외0을확인했다. 원B직접Win220pass4fail/Linux222pass2fail은그대로보존하며 제품거부검증으로원fixture실패를지우지않는다. actual/CI5/전체완료는미확인이다.
+
+A2 native17 ebb7a1f 전용3파일을원bytes로소비하고 본인OBS02에같은recording/model/forward이전파일읽기후보를연결한다. 실제승인/worker/tensor/전체분기증명으로승격하지않으며source고정뒤변경영향을검증한다.
+
+A2 native17 ebb7a1f 원본3/공통4pin을보존한OBS02전용소비를source6418de1/pinc90964c에서검증했다. 직접각48·인접각90/동일1395불변,설치259/CLI4·정확24Ref·공통367/제외0. bound/unbound partial·미진행/잘못된귀속·후기오류/소비실패를구분하고앞선공통read를보존한다. 실제worker/tensor/승인·전체분기는UNKNOWN/미완료다.
+
+B LIF13 a8ea25d 여섯파일을원bytes로통합한다. shared guard259/검토pinc90964c는변경없으며원source/zero-copy config·선언manual·정확Ref와actual native실행/daemon/IPC/recovery를분리검증한다.
+
+B a8ea LIF13 원본6/guard259불변을sourcea0a909e에서확인했다. Linux86pass/Windows76pass10fail, Linux설치CLI4·정확24Ref·native기본preflight/execute0/RPC0·공통367/제외0을분리인계한다. Windows POSIX경로/symlink/pipe/getpgid보수와actual daemon/source/IPC/recovery는미완료다.
+
+OBS02 SC23-03 native18 ordinary safe_open mapping의source/code/scope/PID/root/loader/model 경계와typed parser·기존CLI/EVD제품소비를동시에연결한초안을고정한다. 실제C/worker/tensor/승인·회수와분리하며원8/16/17/A2/Bbytes를보존한다.
+
+OBS02 native18 ordinary safe_open mapping을sourceecbbcac/pineba2440에서직접각49·인접각103/동일1407불변으로검증했다. 설치261/public준비CLI2/OBS02 CLI4·정확24Ref·공통369/제외0. Linux 소유mmap EXAMPLE와Cgate/class대역을구분하고actualC/serving/worker/인가·전체Goal완료로올리지않는다.
+
+B 확정571c3e5 전용20파일을원bytes로통합했다. LIF07 bounded observer→공개 preflight/정제capture 수입→manual/Ref 경로와 실제 worker hook/READY-send/UnreadyHTTP/delay 미연결을 구분한다. B가고정한A138 HTTP호환·OBS03/Graph fixture보수·componentpin을소비하며공통HTTP원bytes/helper858/c9보존. 고정영향검증 전.
+
+B readiness571c3e5→통합source d0f2ed4: Linux직접283/인접229통과, Windows264/19실패·인접221/7실패를원본보존했다. B LIF07 원fixture ctime basis 차이·닫힌거부를독립확인했고기존LIF13 POSIX/symlink제약은미해결이다. guard262 source/wheel/Windows설치일치·Linux격리설치 B공개CLI4사례/정확24Ref복원재판정·A138 HTTP고정소비를확인했다. actual0/세축UNKNOWN/CI5미확인/전체분기미완료.
+
+native19 worker startup공통을기존OBS02제품에연결하는초안을마쳤다. 원native8/16/17/18·Bcallback/helper bytes와source/image/lab·native0.32제한을보존한다. Source/decorator·callbackcode·명시root link·session observer정리·closedparser·기존CLI/Ref사례를고정검증한다. LIF09 native14 MPI/READY분기는대체하지않고후속결합으로남긴다. actual worker/GPU0/정책U1~U6미확정·C CPU11의존성답변대기.
+
+native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인접Win291/Linux292통과(기존skip/deselected유지), guard265 source/wheel/Windows설치일치·Linux설치CLI4/정확24Ref복원재판정. 초기fixture/pycache/vocabulary와설치후처리alias실패를보존하고영향만보수했다. 실제worker/GPU/C/Torch0, Bnative/LIF09MPI14추가결합·CI5/기업정책미완료.
+
+- A-1 LIF09 SC17-01 후속: native20에 원 Worker19·MP14 bytes를 조합하고 기존 initialization:kubernetes/팩 파생/EVD 관측에 별도 Worker events/candidates/missing을 연결했다. 정확 ENV/target/model scope·source/image/lab·세대·선정 seal·기존 정상/실패/복구 질문과 UNKNOWN을 유지한다. source 고정 후 직접/인접/설치/정확 Ref 검증 대기다. 실제 worker/GPU·fault/repair/service lineage와 전체 분기는 미완료이며 원GPU창 종료·추가 Start0·의존성 답변 대기를 유지한다.
+
+- A-1 native20/LIF09 마감: source250722f/reviewa391bc0, 직접 고유33각OS·인접Windows313/Linux314·guard267설치·CLI4/정확24Ref 왕복. 기존14/19·B 원본11파일 유지, Worker/MP를 별도 EVD 관측으로 연결했다. 초기 fixture·닫힌 사건/함수표 누락과 원 실패를 보존하고 변경 영향만 재검증했다. 실제 fault/repair/worker/rank/tensor/GPU/service lineage·CI5·전체LIF09/부모A는 미완료이며 추가Start0·의존성 승인은 대기다.
+
+- A-1 native21/LIF09 초안: 원14/19/20·B bytes를 유지하고 WorkerProc 생성자/Wrapper/Worker 객체 결합과 선정 원 pipe send/close를 기존 CLI/파생팩/EVD에 연결했다. 열린 main·실패/부분/중복·다른 귀속/thread·세대 종료·관측/수집/첨부 오류를 CPU EXAMPLE+소유 stdlib pipe로 검증한다. source 고정 뒤 검증 대기이며 실제 producer/worker/READY 수신/전체 모델/GPU/service·fault/repair lineage와 전체 분기는 미완료다. 원GPU창 종료/추가Start0·C/CPU 의존성 답변 대기·CI 결제 차단을 유지한다.
+
+- A-1 native21/LIF09 마감: sourceb88b4a6/review062af9d, 직접 고유49각OS·인접Windows337/Linux338·guard270설치·CLI4/정확24Ref 왕복. 원13파일 유지, 생성자/Wrapper/Worker 객체와 선정 원 pipe send/close를 별도 EVD로 연결했다. 원 실패(json 시험 import5)와 영향5 재검증을 보존했으며 제품 코드·assert·gate 변경은 없다. 실제 worker/GPU·전체 준비/서비스/fault/repair·CI5·전체분기는 미완료이고 추가Start0·C/CPU 의존성 답변 대기다.
+
+- 2026-10-31 A-1 LIF09 native22 초안: Linux 선정 READY creator/reader-recv/sender와 원14/21 사건 Ref 연결, closed prepare/parser 및 기존 LIF09 소비 초안을 작성했다. 원14/19/20/21/B bytes를 보존한다. 기능·회귀·설치·정확Ref·확정 commit/PR 검증은 미완료이며 새 지원/실제 실증/전체 완료를 주장하지 않는다. 다음은 원본 source 경계/프로세스 fixture 및 부정·오류 사례를 마무리한 뒤 source/hash 고정이다.
+
+- A-1 native22/LIF09 source726254e 검증: 직접57개씩, 인접 W377(기존skip1·기본제외1)/L378(기본제외1), 설치273파일·격리 CLI4/정확24Ref를 마쳤다. 기존43adapter bytes와76정의·과거팩/Ref, B 원 c9 pin을 보존한다. 최초source581c9d4의 W2실패/11설정오류·L20실패/11설정오류 및 fixture/명시 미지원 gap 보수를 보존했다. CPU EXAMPLE source bodies/inline Process.start 대역·소유 pipe 범위이며 실제 serving/worker/Torch/GPU와 전체 준비·fault/repair/service·전체 분기는 미완료, CI5도 미확인이다. 원GPU창종료/추가Start0·기존비용/EBS·의존성 질문 대기를 유지한다.
+
+- A-1 PLT12 사본 기록 제품 초안: 원 사본 정책·실제 처리·재사용 요구와 다른76정의/A2원본을 보존하고 기존 required_event_record/OBS01 reader에 닫힌 UUID inventory·처리/reuse/issuer 선언의 읽기 전용 소비를 연결했다. 정상/상충/누락/교체/후속오류·CLI/정확Ref 시험을 작성했고 source 고정 후 검증 대기다. 실제 producer·사본 멤버십/처리/reuse·issuer는 미연결/UNKNOWN이고 비밀 취득/변경/재사용 요청·AWS/Start/새 의존성은0이다.
+
+- A-1 PLT12 사본 선언 sourcefe1e5b3: 기존 required_event_record0.2/OBS01 reader·새 닫힌 copy profile·파생pack1/PLT12rev4를 CLI까지 연결했다. 직접 W/L91씩, 인접 W304(기존skip1·제외1)/L305(제외1), 설치275파일·격리CLI4/정확24Ref를 검증했다. 최초821a577 두 OS90통과/1실패는 cleanup 오류의 기존 종료코드1 시험 보수로 마감했다. A2/B bytes·원 기준/76정의·과거팩/Ref를 유지한다. 실제 사본/producer/처리/reuse/issuer 미연결·모든 축UNKNOWN·전체분기false, 정확HEAD CI5 미확인, 추가Start/새 의존성0이다.
+
+- A-1 B154 native21 소비 검토: 확정cbd7bae의 전용7파일을 A155903dd6f 위에 원 bytes로 받았다. 원 gate/c39/062 pin을 유지했고 현 A공통9d/383과의 차이·정확 거부/대상 미진입 시험을 분리했다. 실제 native 제품 지원은 B의 검토된 pin 갱신 전 미연결이다. B 원 EXAMPLE 시험과 독립 Linux stdlib peer3단계의 소스/소유 정리 경계를 검토하고 source 고정 후 검증 대기다. 새 worker/GPU/daemon/RPC/자격/Start/의존성 실행0이며 전체분기 미완료다.
+
+- A-1 B154 sourcea5c855b 결과 고정: B원7bytes 유지, 직접 W96통과/4실패·L98통과/2실패를 원 fixture 인자 누락·새 A 원gate 거부·Win권한/열린FD 차이로 구분했다. B원cbd/공통A1521438파일의 두node는 nativeCLI1통과/fixture1실패; 원6Ref를 현재A CLI 저장팩으로 재판정해 일치했다. LIF13 실제 Linux kernel3단계/소유정리 통과, frame EXAMPLE·원daemon/RPC/GPU0. Aguard275/383공통·wheel/설치 근거는 A155와 동일 재사용. 새A native제품은 B검토pin 갱신 전 미지원이며 전체분기/CI5 미완료다.
+
+- A-1 LIF12 선언 기록 제품 초안: 원 자동 retry/정상·수동대조·도전/원·새 attempt/잔존·반환·비용 기준을 보존하고 기존 request_termination 명시분기·소유 OBS01 reader·파생팩을 CLI까지 연결했다. source/code/config/image/model/ENV/run/session/PID-start·worker/clock·단위/source/epoch를 닫힌 비민감 scope에 고정한다. parser/후속오류/CLI·Ref 시험과 정적 검토를 마쳤으며 source 고정 후 검증 대기다. 원B7bytes·A2/adapters·과거팩/Ref를 유지하고 실제producer/retry/trigger/nonoccurrence/worker/cost는 미연결/UNKNOWN이다.
+
+- A-1 LIF12 source d73d197 검증: 직접 Windows/Linux154개씩, 인접 Windows283개(기존INV03skip1·기본제외1)/Linux284개(기본제외1), 설치277파일·격리 CLI4/정확24Ref 반출/복원·저장팩 재판정을 마쳤다. 원 LIF10/REQ12·71보호파일/B7bytes·76정의·과거팩/Ref를 보존하고 전체공통385파일 고정 소비로 확장했다. 정상·수동·자동 선언과 ID/clock/counter/후속오류를 구분하지만 실제 producer/retry/nonoccurrence/worker 종료/비용 집행은 미연결·모든 축UNKNOWN·전체분기false다. CI5/실제 환경은 별도 미완료, 추가Start/새 의존성0이다.
+
+- A-1 Worker HTTP 공통 입력 초안: B154 LIF07의 Running/Unready health 전후·한 token chat 범위를 별도 공개 profile/schema에 구현하고, 기존 A1 LIF09가 이미 사용한 startup 결합을 공유한다. 원 probe/일반 Ready gate/B7·전용 분석은 유지한다. 정확 ENV/model/세대/session/기한·출력/정리·후기 오류·엄격 envelope 검증과 직접/기존 LIF09 CLI 시험 초안·정적 검토를 마쳤으며 소스 고정 후 영향 검증 대기다. 실제 Kubernetes/worker/GPU·B 제품 연결/지연·전체 준비는 미연결이다.
+
+- A-1 Worker HTTP source f6fe356: 원 runtime 그대로 초기 Windows/Linux180통과+시험 계약 보수1개씩 통과, 인접 Windows265(기존skip1)/Linux266, 설치279파일·격리API6/기존LIF09 CLI4·정확24Ref 왕복을 확인했다. 공통387파일 검토 pin과 B7/probe/generic gate 원 bytes를 보존한다. B 전용 연결·실제 cluster/worker/GPU·delay·전체LIF07/09/부모A는 미완료이며 exactHEAD CI는 별도다.
+
+- A-1 B154 a7c6cab 확정 보수6파일 원 bytes를 A158 후속에 통합했다. B가 승인한 A152/A156 정확 쌍과 현재 A158 거부를 구분하며 source/provenance·fixture/정적 검토 후 고정 검증 대기다. 원 kernel3은 원8파일 반출로 제공하고 실제 daemon/GPU/worker·원LIF13 UNKNOWN은 유지한다.
+
+- B154 a7c6cab source65f1f87: 원6bytes 통합/입력교체 fixture 보수 확인, 현재A Windows104통과3실패8오류·Linux106통과1실패8오류를 보존했다. 미승인current source pair와 B exact gate fixture 가정, 기존Windows2차이를 분리한다. 승인A156참조 a17d48d의 B2모듈102통과·정확6Ref 현재A 재판정과 A158설치279 bytes 재사용을 확인했다. 현재 B pin의 A158 미소비·실제환경/전체Goal은 미완료다.
+
+- A-1 B160 b6c2bd6: 원7파일 bytes의 --collect-http·A158 exact source 소비를 통합하고 실제B gate/공개A API/parser·B main/정확Ref4사례 초안과 정적 검토를 마쳤다. 이전B154 원실패·A156참조102·원kernel8반출을 보존한다. 고정 영향 검증 전이며 실제cluster/worker/GPU·native 인과·상위READY/통제지연은 미연결이다.
+
+- A-1 B160 source1506685: 원7파일/원probe 보존, Linux155통과·Windows152통과3실패(원FS권한/열린FD차이), 실제B gate/full387→공개HTTP/parser→B main4사례·각OS24Ref 저장팩 왕복을 확인했다. 이전source거부/fixture8오류는 해소됐다. guard279 wheel/설치·인접 검증은 bytes동일로 재사용하고 혼합설치 source gate 거부/HTTP0/UNKNOWN·정확6Ref를 별도로 확인했다. 실제cluster/worker/GPU·인과/상위READY/통제지연·전체A/B는 미완료다.
+
+- B160 후속391506a는 원본입력 변경의 저장 전/저장 후 오류 보존 범위를 명확히 한 문서1파일뿐이다. 원bytes를 소비하고 A측 expected B commit/doc hash 데이터만 갱신한다. 함수/guard/Btools/팩/빌드 동작은 동일하므로 source1506685의 기능155/152+원FS3·CLI각4/24Ref·설치경계를 재사용하고 bytes pin1사례만 재검증한다.
+
+- B391506a metadata source24ad477의 원bytes pin1사례가 양OS 통과했고 검증 중1471파일 변경0이다. B source/runtime 동작은 source1506685와 같아 기능·설치·각24Ref를 재사용한다. 후속C CPU 의존성11개·다운로드250MiB/전용3GiB·합성6사례 승인 답변을 받았으며 이 문서묶음 인계 후 승인된 고정실행안을 진행한다.
+
+- 승인된 native18 C·CPU 구성요소6계약을 원5receipt+namespace 보완 alias1 영향검증으로 확인했다. 최초6사례 프로세스의 실패·설치전 metadata오분류와 원본을 보존하며 assert AST/guard/gate는 동일하다. 실제 C0.8/Torch2.13+cpu·자기mapping만 관측했고 vLLM/ENV/model/callback EXAMPLE·worker/승인/최종tensor/해제 미확인이다. 누적202775336bytes/전용958570431bytes로 각상한 안이며1407source 전후동일, 대상10파일은 현재source와 같다. 원증거zip435bfdbb…를 반출했고 native0.32/serving/GPU/부모A 미완료를 유지한다.
+
+- A-1 OBS02/native18: A2 PR162 0adedb5의 전용3파일 원bytes를 소비해 기존 identity 실행기 0.3.0의 summary/EVD에 동일 recording/PID/start/model/loader/root 및 forward 이전 context 후보를 연결했다. 잘린 마지막 source locator·원자적 첨부·후속 소비 오류/공통 사실 보존과 기존 CLI/정확Ref 검증 초안을 고정한다. 실제 worker/승인/tensor/해제 및 SUP05/06 전체 완료가 아니며 PR164 실제C CPU 구성요소 근거는 별도다.
+
+- OBS02/native18 A2 PR162 연결의 source6077141 영향 검증 마감: 원 v1 양OS78통과4실패9준비오류→시험 보수 v2 양26통과3실패(native18제품25통과)→B 저장관측 보수 v3 양4통과를 각 소스대로 보존한다. 인접W258/기존skip1·제외1/L259·제외1, wheel280·양설치CLI4/정확24Ref, 소스13사례/각78Ref 원반출물이다. 공통3e105b7/388파일이며 B 원승인쌍은 미소비 새A를 닫힌 상태로 거부한다. 실제worker/GPU/승인/tensor/전체분기와 CI5는 미완료다.
+
+- A-1 OBS02/native19: A2 PR163 715755e의 전용3파일 원bytes를 기존 identity 실행기0.4.0에 연결한다. 동일 startup/model/loader/root/process와 startup 종료·잘린 마지막mapping·root 마지막seq를 forward 이전에 결합하며 첨부 원자성과 공통/전용 소비 오류 격리를 추가했다. 고정 검증 대기이며 EXAMPLE library 대역을 명시한다. 실제 worker/READY/승인/최종tensor·GPU·SUP05/06 전체 완료로 집계하지 않는다.
+
+- OBS02/native19 A2 PR163 연결 검증: 원source9b795c4 양78통과9실패를 보존하고, fixture 준비순서만 보수한3fd89be의 선정28개 양OS통과. 인접W138/기존skip1·L139, guard281 설치일치·양설치CLI4/각24Ref와 소스CLI13/각78Ref 원반출물 확보. common d2ef4b9/389파일, B 원승인쌍 미승인 거부/HTTP0 유지. 실제worker/승인/최종tensor/전체분기와 정확HEAD CI5는 미완료다.
+
+- A-1 native16 부분수집: A2 f8f6025/PR143 전용3 원bytes의 analyze0.1.1을 기존 OBS02 0.4.1에서 소비한다. native17/PR144는 재적용하지 않았다. 다른 capture=None/binding=false가 있어도 유효 selection/iterator와 원recording index를 보존하는 정식CLI·후속첨부 복합오류·정확Ref 시험 초안을 고정한다. 실제 worker/승인/tensor/전체분기와 CI5는 미완료다.
+
+- native16 f8 부분capture 제품 소비 검증: 원68ad6d5 양55통과1실패를 보존하고 bound-partial fixture만 보수한e8ada7d 해당1사례 양통과. 인접W60/기존skip1·L61, guard281 설치일치·양설치CLI4/각24Ref, 원소스6+부분delta1/각42Ref. common4b6c0d2/389파일 고정·B미승인 거부 유지. PR166 실제CI는 Python3.12.15/native code gate 포함 default615실패169오류이며 CI5미완료, 결제차단으로 보지 않는다. 실제worker/승인/tensor/전체분기는 별도다.
+
+
+### 2026-10-31 A-1 CPython3.12.15 ABI 고정 검증 착수
+- 공통 검토 커밋 `752a390fc000fb5510a5f1efa891b9f12de5b41d`: Linux x86_64 optimize0 생산자·호스트 독립 수신 parser, 기존 source/code/lab gate 유지. A-1 검토 소비 pin만 갱신.
+- 원 소스 50개/관측기13개/표준연결4개 컴파일 대조 완료. 직접·인접·설치·제품 정확 Ref·정확 HEAD CI는 별도 후속 검증이며 아직 통과를 선언하지 않음. A2/B 원본 pin 보존, 전용 소비 재검토 대기. 실제 serving/GPU/승인/tensor 완료 아님.
+
+- ABI 마감: 공통 검토 b3e3bb0 / 검증 source d8c685b→089ebc3→fixture전용 f26f458. Windows/Linux3.12.3 직접369 및 보수143/출력37 통과, Linux3.12.15 최초265/104오류→delta76/28오류→출력37 통과. 원 실패 보존; 새 전체 suite 통과로 집계하지 않음.
+- 인접 Linux142, Windows135+짧은경로delta6/기존skip1. 설치 wheel089ebc3 SHA ad5a59481370b5e530dc8aaf37c86feb57cf2bd9ae2ccdc093bae66a3a295093: W3.12.14/L3.12.15 각각281파일·CLI4/24Ref·원팩/복원/재판정. A2/B pin 미갱신·closed 유지, exactHEAD CI5와 actual 별도.

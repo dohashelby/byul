@@ -237,7 +237,8 @@ def example_source_gate(tmp_path, monkeypatch):
     path.parent.mkdir(parents=True)
     original=(REPO/'update/tools/verify_req10_consumption.py').read_bytes()
     new_common='9d8987a5a306ffce28fcb735e012c400589303f2'
-    old=original.replace(new_common.encode(),tool.REVIEWED_COMMON_COMMIT.encode())
+    old=original.replace(new_common.encode(),tool.REVIEWED_COMMON_COMMIT.encode()).replace(
+        tool.HTTP_REVIEWED_COMMON_COMMIT.encode(),tool.REVIEWED_COMMON_COMMIT.encode())
     assert tool.hashlib.sha256(old).hexdigest()==tool.GATE_SHA256
     callback=root/'update/src/guard/adapters/vllm_worker_readiness.py'
     callback.parent.mkdir(parents=True);callback.write_bytes((REPO/'update/src/guard/adapters/vllm_worker_readiness.py').read_bytes())
@@ -292,3 +293,38 @@ def test_source_gate_symlink_rejected_before_read(example_source_gate):
     path.unlink();path.symlink_to(root/'EXAMPLE-missing-gate')
     with pytest.raises(ValueError,match='LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE'):tool.verify_source()
     assert calls==[]
+
+
+@pytest.mark.parametrize('common,file_common,mutate',[
+    (tool.HTTP_REVIEWED_COMMON_COMMIT,tool.REVIEWED_COMMON_COMMIT,False),
+    (tool.REVIEWED_COMMON_COMMIT,tool.HTTP_REVIEWED_COMMON_COMMIT,False),
+    (tool.HTTP_REVIEWED_COMMON_COMMIT,'9d8987a5a306ffce28fcb735e012c400589303f2',False),
+    ('9d8987a5a306ffce28fcb735e012c400589303f2',tool.HTTP_REVIEWED_COMMON_COMMIT,False),
+    (tool.HTTP_REVIEWED_COMMON_COMMIT,None,True),
+])
+def test_a158_mixed_or_unreviewed_gate_rejected(example_source_gate,common,file_common,mutate):
+    select,calls,_=example_source_gate;select(common,file_common,mutate)
+    with pytest.raises(ValueError,match='LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE'):tool.verify_source()
+    assert calls==[]
+
+
+def test_a158_http_source_literals_match_reviewed_git_blobs_and_fixed_wrapper():
+    import ast
+    import subprocess
+    common='f277fecd6df1e59505c0ad731032593f6fb22885'
+    head='1c3018f8cde4a4b8e674d112cee8e3626813b022'
+    def reviewed(commit,path):
+        return subprocess.check_output(['git','show',commit+':update/'+path],cwd=REPO)
+    probe=reviewed(common,'src/guard/executors/stream_probe.py').decode('utf-8').replace('\r\n','\n')
+    tree=ast.parse(reviewed(head,'tests/test_a1_worker_readiness_snapshot.py'))
+    fixture=next(row for row in tree.body if isinstance(row,ast.FunctionDef) and row.name=='reviewed_sources')
+    wrapper=next(row.value for row in fixture.body if isinstance(row,ast.Assign)
+        and any(isinstance(target,ast.Name) and target.id=='wrapper' for target in row.targets))
+    # 검토 Gitblob의 고정 문자열 조합만 평가한다. probe 본문은 실행하지 않는다.
+    wrapped=eval(compile(ast.Expression(wrapper),'<reviewed-A158-wrapper>','eval'),{'probe':probe})
+    expected={'collector':tool.hashlib.sha256(reviewed(common,'src/guard/runtime/kubernetes_worker_readiness.py')).hexdigest(),
+        'binding':tool.hashlib.sha256(reviewed(common,'src/guard/runtime/kubernetes_startup_binding.py')).hexdigest(),
+        'probe':tool.hashlib.sha256(wrapped.encode('utf-8')).hexdigest()}
+    assert tool.HTTP_REVIEWED_COMMON_COMMIT==common and tool.HTTP_EXPECTED_SOURCES==expected
+    assert tool.APPROVED_SOURCE_COMMIT=='b88b4a6491a9a0c2908b962b837247c0cea80b55'
+    assert tool.NATIVE_PROFILE=='vllm-native-lifecycle-metadata/21'

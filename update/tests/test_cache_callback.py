@@ -306,3 +306,99 @@ def test_existing_target_bound_http_collector_performs_real_transport_protocol_a
         assert not result['transport']['collection_gap']
         assert PRIVATE not in json.dumps(result)
         assert result['policy_values'] == {'original_policy': None}
+
+
+@pytest.mark.parametrize('observer_kind', ['cache', 'distributed'])
+@pytest.mark.parametrize('clock_failure', [1, 2, 3])
+@pytest.mark.parametrize('native_raises', [False, True])
+def test_observation_clock_never_changes_native_call_return_exception_or_next_parent(
+        world, tmp_path, observer_kind, clock_failure, native_raises):
+    calls = []; expected_exception = RuntimeError(PRIVATE); raises = [native_raises]
+    if observer_kind == 'cache':
+        observer = world.observer; expected_result = world.block
+        key = PRIVATE.encode() + b'\x00\x00\x00\x00'
+        class CountingMap(dict):
+            def get(self, key, default=None):
+                calls.append(key)
+                if raises[0]: raise expected_exception
+                return super().get(key, default)
+        world.mapping._cache = CountingMap(world.mapping._cache)
+        invoke = lambda: world.mapping.get_one_block(key)
+        projector = callback.project
+    else:
+        module = source_module(distributed.MP, tmp_path, targets=distributed.TARGETS, sources=distributed.rank.SOURCE_ADDITIONS)
+        module.envs = SimpleNamespace(VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS=10)
+        observer = distributed.DistributedCallbackObserver('d' * 32, context_provider=lambda: {'fixture': True})
+        module.MultiprocExecutor.execute_model = observer.wrap(module, 'MultiprocExecutor.execute_model')
+        owner = module.MultiprocExecutor(); owner.output_rank = 0
+        owner.kv_output_aggregator = None; owner.ec_output_aggregator = None
+        expected_result = type('Output', (), {})()
+        def collective(*a, **k):
+            calls.append(a)
+            if raises[0]: raise expected_exception
+            return expected_result
+        owner.collective_rpc = collective
+        scheduler = SimpleNamespace(num_scheduled_tokens={PRIVATE: 1})
+        invoke = lambda: owner.execute_model(scheduler, False)
+        projector = distributed.project
+    ticks = []
+    def clock():
+        ticks.append(len(ticks) + 1)
+        if len(ticks) == clock_failure: raise OSError(PRIVATE)
+        return len(ticks)
+    observer.clock = clock
+    if native_raises:
+        with pytest.raises(RuntimeError) as caught: invoke()
+        assert caught.value is expected_exception
+    else:
+        assert invoke() is expected_result
+    assert len(calls) == 1 and len(ticks) == 3
+    first_report = observer.report(); entry, terminal = first_report['events']
+    assert terminal['phase'] == ('RAISE' if native_raises else 'RETURN')
+    assert terminal['entry_qualified_before'] and terminal['entry_qualified_after']
+    assert 'CACHE_CALLBACK_CLOCK_UNAVAILABLE' in first_report['missing']
+    failed_field = {1: 'operation_started_ns', 2: 'native_started_ns', 3: 'native_finished_ns'}[clock_failure]
+    assert terminal[failed_field] is None
+    facts = projector(first_report, {'original_policy': ['retain-all']})
+    rows = facts.get('source_bound_returns', facts.get('source_bound_events'))
+    if not native_raises or observer_kind == 'distributed':
+        assert any(r['phase'] == terminal['phase'] for r in rows)
+    else:
+        assert rows == []
+    raises[0] = False; observer.clock = lambda: 100
+    assert invoke() is expected_result and len(calls) == 2
+    next_entry = observer.report()['events'][-2]
+    assert next_entry['parent_call_sha256'] is None
+    assert callback._ACTIVE.get() is None
+    assert PRIVATE not in json.dumps(observer.report())
+
+
+@pytest.mark.parametrize('clock_failure', [1, 6, 12])
+def test_timing_clock_gaps_preserve_received_response_facts_and_all_later_probes(clock_failure):
+    ticks = []; calls = []
+    def clock():
+        ticks.append(len(ticks) + 1)
+        if len(ticks) == clock_failure: raise OSError(PRIVATE)
+        return len(ticks)
+    def probe(case_id, case):
+        calls.append((case_id, case)); return packet()
+    values = {'required_cache_contexts': ['all', 'original', 'values'], 'criterion': None}
+    result = timing.collect_timing_experiment(probe, plan(), values, clock=clock)
+    assert len(calls) == len(result['trials']) == 6
+    assert result['normal_controls'] is True
+    assert all(r['callback_completed'] and r['cached_tokens'] == 3 and r['response_complete'] for r in result['trials'])
+    assert result['trials'][(clock_failure - 1) // 2]['elapsed_ns'] is None
+    assert 'CACHE_TIMING_CLOCK_UNAVAILABLE' in result['missing']
+    assert result['policy_values'] == values
+    assert PRIVATE not in json.dumps(result)
+
+
+def test_caller_label_and_unsalted_label_digest_are_absent_across_experiments():
+    labels = ['alice', 'bob', 'carol', 'dave', 'erin', 'frank']
+    selected_plan = [{**entry, 'case_id': label} for entry, label in zip(plan(), labels)]
+    results = [timing.collect_timing_experiment(lambda *a: packet(), selected_plan, {'preserve': None}) for _ in range(2)]
+    for result in results:
+        serialized = json.dumps(result)
+        assert all(label not in serialized and sha256_hex(label.encode()) not in serialized for label in labels)
+        assert all(set(row) >= {'index', 'case'} and 'case_id_sha256' not in row for row in result['trials'])
+        assert result['policy_values'] == {'preserve': None}

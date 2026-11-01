@@ -70,14 +70,22 @@ def collect_timing_experiment(probe, plan, policy_values, *, clock=None):
         raise ValueError('CACHE_TIMING_PLAN_INVALID')
     clock = clock or time.monotonic_ns
     rows = []; missing = set()
+    def now():
+        try:
+            value = clock()
+            if type(value) is int and 0 <= value < 2**63: return value
+        except BaseException:
+            pass
+        missing.add('CACHE_TIMING_CLOCK_UNAVAILABLE')
+        return None
     for number, entry in enumerate(plan):
         # Do not persist caller labels: a label may itself contain private text.
-        row = {'index': number, 'case_id_sha256': sha256_hex(entry['case_id'].encode()), 'case': entry['case'],
+        row = {'index': number, 'case': entry['case'],
             'attempted': True, 'elapsed_ns': None, 'callback_completed': False}
-        start = clock()
+        start = now()
         try:
             packet = probe(entry['case_id'], entry['case'])
-            finish = clock()
+            finish = now()
             if type(packet) is not dict: raise ValueError
             row.update(response_signal(packet), callback_completed=True)
             if type(start) is int and type(finish) is int and 0 <= start <= finish:

@@ -179,8 +179,18 @@ class CacheCallbackObserver:
             self.events.append(deepcopy(row))
         if self.sink is not None:
             try: self.sink(deepcopy(row))
-            except Exception:
+            except BaseException:
                 with self.lock: self.gaps.add('CACHE_CALLBACK_SINK_UNAVAILABLE')
+
+    def _now(self):
+        """An observation clock must never control native call semantics."""
+        try:
+            value = self.clock()
+            if type(value) is int and 0 <= value < 2**63: return value
+        except BaseException:
+            pass
+        with self.lock: self.gaps.add('CACHE_CALLBACK_CLOCK_UNAVAILABLE')
+        return None
 
     def wrap(self, module, point):
         """Return an explicitly selected callback; no module/class mutation.
@@ -209,43 +219,43 @@ class CacheCallbackObserver:
                 self.sequence += 1; call = self.fingerprint('call:' + str(self.sequence))
             parent = _ACTIVE.get()
             parent = parent if parent and parent['observer'] is self and parent['pid'] == os.getpid() and parent['thread'] == threading.get_ident() else None
-            started = self.clock(); state = 'CALL'; result = None; before = False; snapshot = {}
+            started = self._now(); state = 'CALL'; result = None; before = False; snapshot = {}
             try:
                 before = bool(qualified())
                 if before: snapshot = self._snapshot(point, args, kwargs)
                 else: self.gaps.add('CACHE_CALLBACK_ENTRY_REPLACED')
-            except Exception: self.gaps.add('CACHE_CALLBACK_ENTRY_UNAVAILABLE')
+            except BaseException: self.gaps.add('CACHE_CALLBACK_ENTRY_UNAVAILABLE')
             frame = {'observer': self, 'pid': os.getpid(), 'thread': threading.get_ident(), 'call': call,
                 'request_sha256': snapshot.get('request_sha256') or (parent['request_sha256'] if parent else None),
                 'request_sha256_list': snapshot.get('native_request_sha256') or (parent.get('request_sha256_list') if parent else None)}
             token = _ACTIVE.set(frame)
-            common = {'schema': self.schema, 'session_sha256': base.sha(self.session.encode()), 'process_sha256': self.process_sha256,
-                'call_sha256': call, 'parent_call_sha256': parent['call'] if parent else None, 'point': point,
-                'source_file_sha256': self.sources[name], 'entry_code_sha256': expected,
-                'entry_qualified_before': before, 'runtime_context_injected': self.injected_context,
-                'authenticated_identity_verified': False, 'actual_tensor_consumption_verified': False,
-                'transitive_dependencies_verified': False, 'native_profile_installed': False}
-            self._emit({**common, 'phase': state, 'operation_started_ns': started, 'operation_finished_ns': started, 'fields': snapshot})
-            native_started = self.clock()
             try:
-                result = original(*args, **kwargs); state = 'RETURN'; return result
-            except BaseException:
-                state = 'RAISE'; raise
-            finally:
-                finished = self.clock(); after = False; fields = {}
+                common = {'schema': self.schema, 'session_sha256': base.sha(self.session.encode()), 'process_sha256': self.process_sha256,
+                    'call_sha256': call, 'parent_call_sha256': parent['call'] if parent else None, 'point': point,
+                    'source_file_sha256': self.sources[name], 'entry_code_sha256': expected,
+                    'entry_qualified_before': before, 'runtime_context_injected': self.injected_context,
+                    'authenticated_identity_verified': False, 'actual_tensor_consumption_verified': False,
+                    'transitive_dependencies_verified': False, 'native_profile_installed': False}
+                self._emit({**common, 'phase': state, 'operation_started_ns': started, 'operation_finished_ns': started, 'fields': snapshot})
+                native_started = self._now()
                 try:
-                    after = bool(qualified())
-                    # Keep a before-qualified independent CALL even if later
-                    # requalification fails; never relabel the terminal result.
-                    if before and after: fields = self._snapshot(point, args, kwargs, result, state == 'RETURN')
-                    elif before: self.gaps.add('CACHE_CALLBACK_TERMINAL_ENTRY_REPLACED')
-                except Exception: self.gaps.add('CACHE_CALLBACK_TERMINAL_UNAVAILABLE')
-                try:
+                    result = original(*args, **kwargs); state = 'RETURN'; return result
+                except BaseException:
+                    state = 'RAISE'; raise
+                finally:
+                    finished = self._now(); after = False; fields = {}
+                    try:
+                        after = bool(qualified())
+                        # Keep independent entry facts when a later observation
+                        # fails; the original return/exception stays unchanged.
+                        if before and after: fields = self._snapshot(point, args, kwargs, result, state == 'RETURN')
+                        elif before: self.gaps.add('CACHE_CALLBACK_TERMINAL_ENTRY_REPLACED')
+                    except BaseException: self.gaps.add('CACHE_CALLBACK_TERMINAL_UNAVAILABLE')
                     self._emit({**common, 'phase': state, 'entry_qualified_after': after,
                         'operation_started_ns': started, 'operation_finished_ns': finished,
                         'native_started_ns': native_started, 'native_finished_ns': finished, 'fields': fields})
-                finally:
-                    _ACTIVE.reset(token)
+            finally:
+                _ACTIVE.reset(token)
         return wrapped
 
     def report(self):

@@ -20,7 +20,6 @@ from guard.adapters import vllm_ready_endpoint_sensor as endpoint_sensor
 from guard.adapters import vllm_worker_generation_metadata as generation_metadata
 from guard.adapters import vllm_ready_endpoint_metadata as endpoint_metadata
 from guard.collectors.file import load_environment
-from guard.collectors.lifecycle import load_prepared
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
@@ -82,6 +81,7 @@ class Generation:
 
 def load_generations(cfg, env, values):
     """Load only already prepared targets. No discovery or replacement fallback."""
+    from guard.collectors.lifecycle import load_prepared
     try:
         if set(cfg) - {'generations', 'kubectl_binary', 'request_timeout', 'max_duration_seconds'}:
             raise ValueError
@@ -194,9 +194,10 @@ class LifecycleTransitionExecutor:
     name = 'lifecycle_transition'
     version = '0.1.0'
 
-    def __init__(self, cfg, *, runner=None, clock=None, wait=None):
+    def __init__(self, cfg, *, runner=None, clock=None, wait=None, expected_target_sha256=None):
         self.cfg = cfg; self.runner = runner; self.clock = clock or utcnow
         self.wait = wait or time.sleep
+        self.expected_target = expected_target_sha256
 
     def validate_policy(self, check, values):
         if PROFILES.get(getattr(check, 'collection_profile', None)) != check.id:
@@ -260,6 +261,13 @@ class LifecycleTransitionExecutor:
         self.validate_policy(check, policy_values)
         schedule = normalize_policy(policy_values)
         generations, manifest = load_generations(self.cfg, env, policy_values)
+        if self.expected_target is not None:
+            approved = {row['id']: row['target_sha256'] for row in manifest}
+            matches = self.expected_target == approved
+            if type(self.expected_target) is str and len(approved) == 1:
+                matches = self.expected_target == next(iter(approved.values()))
+            if not matches:
+                raise ValueError('TRANSITION_EXPLICIT_GENERATION_TARGET_APPROVAL_REQUIRED')
         timeout = self.cfg.get('request_timeout', 30)
         if type(timeout) not in (int, float) or not math.isfinite(timeout) or not 0 < timeout <= 30:
             raise ValueError('TRANSITION_CONFIGURATION_INVALID')

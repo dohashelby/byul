@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+import hashlib
 import re
 import sys
+import tempfile
 
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from .base import DraftArtifact, EvidenceDraft
@@ -29,6 +31,11 @@ PROFILES = {
 }
 CPU_PROFILE = 'engine-sensor-slot-reference-cpu-v1'
 CPU_PREFIX = 'BYUL_ENGINE_SENSOR_SLOT='
+# Reviewed immutable tool/test snapshot. The old product snapshot remains its
+# independently selected b15b629 pin; neither value is discovered from HEAD.
+CPU_TOOL_SNAPSHOT = 'c8265f135c6bce389daafc6bce9ad11d308a10c9'
+CPU_SLOT_TOOL_SHA256 = '649cf7c065dbf085a3b7156a0bbeeb21401c8b02b76a07d13dfa8481c555b544'
+CPU_SNAPSHOT_HELPER_SHA256 = '858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 CPU_PROGRAM = r'''
 import json,pathlib,sys
 root=pathlib.Path(sys.argv[1]).resolve()
@@ -70,6 +77,35 @@ REQUIRED_BRANCHES = {
 
 class EngineSensorNotImplemented(NotImplementedError):
     """A missing implementation must not be reported as a completed collection."""
+
+
+def _verify_frozen_component(root):
+    """Verify foreign code using trusted parent code before importing any of it.
+
+    Tools import tests.builders and the product. Both transitive namespaces must
+    therefore be checked before the child gets their import path, even though
+    the original gate checks its own files again after import.
+    """
+    from tools import b_req18_slot as slot, b1_integration_cpu as helper
+    own_repo = Path(__file__).resolve().parents[4]
+    try:
+        for module, function, relative, digest in (
+            (slot, slot.verify_components, 'update/tools/b_req18_slot.py', CPU_SLOT_TOOL_SHA256),
+            (helper, helper.verify_snapshot, 'update/tools/b1_integration_cpu.py', CPU_SNAPSHOT_HELPER_SHA256)):
+            slot._identity(module, function, own_repo / relative, digest)
+        # This is the existing strict verifier, not the foreign module's method.
+        helper.verify_snapshot(Path(root), CPU_TOOL_SNAPSHOT, ('update/tools', 'update/tests'))
+        helper.verify_snapshot(Path(root), slot.COMPONENT_COMMIT, helper.PINNED_PATHS)
+    except Exception:
+        raise ValueError('ENGINE_SENSOR_FROZEN_COMPONENT_PARENT_VERIFICATION_FAILED') from None
+
+
+def _component_argv(cfg, cache):
+    # -B alone disables cache writes, not reads. The private fresh prefix makes
+    # every component import compile its verified source instead of old pyc.
+    return [cfg.get('python_binary', sys.executable), '-I', '-B', '-X', 'pycache_prefix='+str(cache),
+            '-c', CPU_PROGRAM, str(Path(cfg['component_root']).resolve()),
+            str(Path(cfg['source_root']).resolve()), str(Path(cfg['owned_parent']).resolve())]
 
 
 def _sha(value):
@@ -170,11 +206,18 @@ class EngineSensorExecutor:
         # The historical component gate covers the entire original src/pack tree.
         # Execute it in its frozen checkout, never relax it to admit this new file.
         from guard.runtime.bounded import capture_pipes, strict_json
+        _verify_frozen_component(self.cfg['component_root'])
         began = utcnow()
-        response = capture_pipes([self.cfg.get('python_binary', sys.executable), '-I', '-B', '-c', CPU_PROGRAM,
-            str(Path(self.cfg['component_root']).resolve()), str(Path(self.cfg['source_root']).resolve()),
-            str(Path(self.cfg['owned_parent']).resolve())], timeout=3600, env_extra={},
-            max_stdout_bytes=8*1024**2, max_stderr_bytes=4096)
+        cache = tempfile.TemporaryDirectory(prefix='guard-engine-sensor-import-')
+        cache_cleanup_failed = False
+        try:
+            response = capture_pipes(_component_argv(self.cfg, cache.name), timeout=3600, env_extra={},
+                max_stdout_bytes=8*1024**2, max_stderr_bytes=4096)
+        finally:
+            try:
+                cache.cleanup()
+            except Exception:
+                cache_cleanup_failed = True
         pipe = response['capture']
         if (response['returncode'] != 0 or pipe.get('complete') is not True
                 or pipe.get('bounded_at_source') is not True or pipe.get('truncated') is not False
@@ -186,6 +229,12 @@ class EngineSensorExecutor:
         raw = strict_json(lines[0], limit=8*1024**2)
         observations, result = slot_observations(raw)
         gap = ['ENGINE_SENSOR_COMPONENT_POSTCHECK_UNAVAILABLE'] if raw.get('engine_sensor_component_postcheck') else []
+        if cache_cleanup_failed:
+            gap.append('ENGINE_SENSOR_IMPORT_CACHE_CLEANUP_UNVERIFIED')
+        try:
+            _verify_frozen_component(self.cfg['component_root'])
+        except Exception:
+            gap.append('ENGINE_SENSOR_PARENT_COMPONENT_POSTCHECK_UNAVAILABLE')
         if pipe.get('pipes_closed') is False or 'child_reap' in pipe.get('read_errors', []):
             gap.append('ENGINE_SENSOR_COMPONENT_CLEANUP_UNVERIFIED')
         complete = result is not None and result.get('complete') is True and not gap

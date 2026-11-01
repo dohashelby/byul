@@ -179,6 +179,17 @@ def test_normal_transition_ongoing_request_and_recovery_all_profiles(monkeypatch
     assert PRIVATE not in draft.artifacts[0].path.read_text(encoding='utf-8')
 
 
+def test_external_scalar_approval_cannot_cover_other_generation_targets(monkeypatch, tmp_path):
+    executor, env, log = harness(monkeypatch)
+    executor.expected_target = 'a' * 64
+    generations, _ = subject.load_generations({}, env, policy())
+    manifest = [{'id': key, 'target_sha256': str(i)*64} for i, key in enumerate(generations, 1)]
+    monkeypatch.setattr(subject, 'load_generations', lambda *a: (generations, manifest))
+    with pytest.raises(ValueError, match='EXPLICIT_GENERATION_TARGET_APPROVAL_REQUIRED'):
+        executor.run(check(), env, policy(), None, tmp_path)
+    assert not log
+
+
 @pytest.mark.parametrize('failure', ['cleanup', 'recovery', 'replacement'])
 def test_later_error_keeps_independent_facts_and_other_generation(monkeypatch, tmp_path, failure):
     executor, env, log = harness(monkeypatch, failure=failure)

@@ -1,6 +1,8 @@
 # Strategic merge patch for the AWS bundle's serving-engine Deployment. It
-# only adds the read-only management listener sidecar; the bundle's engine
-# container, UID 2000:0, RuntimeClass nvidia and volumes stay unchanged.
+# adds the read-only management listener sidecar and enables engine request
+# logging for AWS-01. The bundle's engine UID 2000:0, RuntimeClass nvidia and
+# volumes stay unchanged. Strategic merge replaces the entire engine args list,
+# so keep every argument from engine.yaml.template before the two new flags.
 #
 #   kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine \
 #     --type strategic --patch-file deploy/gpu-lab/engine-management-sidecar.patch.yaml
@@ -11,11 +13,13 @@
 #
 # Per the AWS bundle, 03-engine-smoke.sh checks the engine-only baseline and
 # stops if extra containers or policies are left; scale 0 or apply does not
-# remove this patched sidecar. Keep the sidecar during normal tests. Only when
-# re-running 03, export evidence, remove it (and the other runtime policies in
-# README.md "03 기준 상태와 runtime 통합 층"), run 03, then re-apply:
+# remove this patched sidecar or restore engine args (check_baseline.py checks
+# containers/policies, not args). Keep the integration patch during normal
+# tests. Only when re-running 03, export evidence, remove the sidecar, restore
+# the original args (and remove the other runtime policies listed in README.md
+# "03 기준 상태와 runtime 통합 층"), run 03, then re-apply this patch:
 #   kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine --type strategic \
-#     -p '{"spec":{"template":{"spec":{"containers":[{"name":"management-listener","$patch":"delete"}]}}}}'
+#     -p '{"spec":{"template":{"spec":{"containers":[{"name":"management-listener","$patch":"delete"},{"name":"engine","args":["/models","--served-model-name","test-model","--host","0.0.0.0","--port","8000","--tensor-parallel-size","1","--max-model-len","2048","--max-num-seqs","2","--gpu-memory-utilization","0.70"]}]}}}}'
 #
 # The sidecar requests no GPU. It runs under the Pod's RuntimeClass nvidia, but
 # the device plugin injects GPU devices only into the container that requests
@@ -28,6 +32,25 @@ spec:
   template:
     spec:
       containers:
+        - name: engine
+          args:
+            - /models
+            - --served-model-name
+            - test-model
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --tensor-parallel-size
+            - "1"
+            - --max-model-len
+            - "2048"
+            - --max-num-seqs
+            - "2"
+            - --gpu-memory-utilization
+            - "0.70"
+            - --enable-log-requests
+            - --enable-request-id-headers
         - name: management-listener
           image: serving-gateway:REPLACE_GATEWAY_TAG
           imagePullPolicy: Never

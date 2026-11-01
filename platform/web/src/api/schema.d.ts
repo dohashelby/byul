@@ -530,8 +530,6 @@ export interface components {
             revision: number;
             /** Approved By */
             approved_by: string;
-            /** Approval Ref */
-            approval_ref: string;
         };
         /** PolicyRevision */
         PolicyRevision: {

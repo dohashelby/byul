@@ -178,7 +178,6 @@ export function PolicyEditorPage() {
 function ConfirmPolicy({ id, revision, stored, edited, onConfirmed }: { id: string; revision: number; stored: PolicyDoc; edited: PolicyDoc; onConfirmed: (d: PolicyDoc) => void }) {
   const confirm = useConfirmPolicy(id);
   const [approvedBy, setApprovedBy] = useState("");
-  const [approvalRef, setApprovalRef] = useState("");
   const [issues, setIssues] = useState<FieldIssue[]>([]);
   if (stored.status === "CONFIRMED") {
     return (
@@ -193,7 +192,7 @@ function ConfirmPolicy({ id, revision, stored, edited, onConfirmed }: { id: stri
   const dirty = JSON.stringify({ ...edited, status: "DRAFT" }) !== JSON.stringify(stored);
   const onConfirm = () =>
     confirm.mutate(
-      { revision, approved_by: approvedBy.trim(), approval_ref: approvalRef.trim() },
+      { revision, approved_by: approvedBy.trim() },
       {
         onSuccess: (res) => {
           setIssues([]);
@@ -205,17 +204,13 @@ function ConfirmPolicy({ id, revision, stored, edited, onConfirmed }: { id: stri
   return (
     <section className="card card-pad stack">
       <h2>판본 승인</h2>
-      <div className="small muted">저장된 판본 {revision}을 그대로 승인합니다. 자기 신고 기록이며 서명이 아닙니다.</div>
+      <div className="small muted">저장된 판본 {revision}을 그대로 승인합니다. 승인 번호와 시각은 자동으로 기록합니다. 자기 신고 기록이며 서명이 아닙니다.</div>
       <div className="row wrap">
-        <label className="small">
-          승인 번호
-          <input className="input" value={approvalRef} placeholder="LAB-RUNTIME-SELF-001" onChange={(e) => setApprovalRef(e.target.value)} />
-        </label>
         <label className="small">
           <span className={p.req}>승인자</span>
           <input className="input" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} />
         </label>
-        <button type="button" className="btn" disabled={dirty || !approvedBy.trim() || !approvalRef.trim() || confirm.isPending} onClick={onConfirm}>
+        <button type="button" className="btn" disabled={dirty || !approvedBy.trim() || confirm.isPending} onClick={onConfirm}>
           이 판본 승인
         </button>
       </div>

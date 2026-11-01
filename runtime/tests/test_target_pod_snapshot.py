@@ -219,6 +219,23 @@ class TargetSnapshotTests(unittest.TestCase):
         self.assertEqual(value["origin_note"], "host_snapshot")
         self.assertEqual(value["instance"]["pod_uid"], "uid-1")
 
+    def test_host_snapshot_keeps_failed_pod_visible_without_selecting_it(self) -> None:
+        failed = raw_pod("failed", "containerd://old")
+        failed["status"]["phase"] = "Failed"
+        running = raw_pod("current", "containerd://current")
+        path = self.root / "target-pods.json"
+        runner = FakeRunner(subprocess.CompletedProcess([], 0, json.dumps({"items": [failed, running]}), ""))
+        writer = feed.TargetPodSnapshotWriter(
+            path, self.registration.kubernetes,
+            interval_s=feed.DEFAULT_TARGET_INTERVAL_S, runner=runner,
+        )
+        with patch.object(feed, "_reader_gid", None):
+            writer.collect_once()
+        value, _ = self.collector(path).collect()
+        self.assertEqual(value["state"], "ok")
+        self.assertEqual(value["instance"]["pod_uid"], "current")
+        self.assertEqual({pod["phase"] for pod in value["pods"]}, {"Failed", "Running"})
+
     def test_gateway_rejects_schema_mismatch_registration_mismatch_and_stale(self) -> None:
         item = feed._reduce_pod(raw_pod("uid-1", "containerd://one"))
         cases = {

@@ -588,9 +588,19 @@ class AWSAcceptance:
         result = self._kubectl("get", "pods", "-l", "app=serving-engine", "-o", "json")
         document = _json_object(result.stdout.encode("utf-8")) if result.returncode == 0 else None
         items = document.get("items") if document else None
-        if not isinstance(items, list) or len(items) != 1 or not isinstance(items[0], dict):
+        if not isinstance(items, list):
             return None, result
-        pod = items[0]
+        active = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            status = item.get("status") if isinstance(item.get("status"), dict) else {}
+            metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            if status.get("phase") not in {"Failed", "Succeeded"} and metadata.get("deletionTimestamp") is None:
+                active.append(item)
+        if len(active) != 1:
+            return None, result
+        pod = active[0]
         metadata = pod.get("metadata") if isinstance(pod.get("metadata"), dict) else {}
         status = pod.get("status") if isinstance(pod.get("status"), dict) else {}
         container_statuses = status.get("containerStatuses")

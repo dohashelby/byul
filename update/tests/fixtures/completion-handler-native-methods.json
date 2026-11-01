@@ -1,0 +1,18 @@
+{
+  "completion": {
+    "method": "def completion(request: Request) -> OpenAIServingCompletion | None:\n    return request.app.state.openai_serving_completion",
+    "module": "vllm.entrypoints.openai.completion.api_router",
+    "full_source_sha256": "b93b00298a74a62a3f2d8da1c0a9380a2be5823f5ab7ab99a2c911906280d769",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "license": "Apache-2.0",
+    "scope": "EXAMPLE execution of reviewed function bodies; no real FastAPI or engine"
+  },
+  "create_completion": {
+    "method": "async def create_completion(request: CompletionRequest, raw_request: Request):\n    metrics_header_format = raw_request.headers.get(\n        ENDPOINT_LOAD_METRICS_FORMAT_HEADER_LABEL, \"\"\n    )\n    handler = completion(raw_request)\n    if handler is None:\n        raise NotImplementedError(\"The model does not support Completions API\")\n\n    generator = await handler.create_completion(request, raw_request)\n\n    if isinstance(generator, ErrorResponse):\n        return JSONResponse(\n            content=generator.model_dump(), status_code=generator.error.code\n        )\n    elif isinstance(generator, CompletionResponse):\n        return JSONResponse(\n            content=generator.model_dump(),\n            headers=metrics_header(metrics_header_format),\n        )\n\n    args = getattr(raw_request.app.state, \"args\", None)\n    keep_alive_interval = getattr(args, \"sse_keep_alive_interval\", 0)\n    return StreamingResponse(\n        content=with_sse_keep_alive(generator, float(keep_alive_interval)),\n        media_type=\"text/event-stream\",\n    )",
+    "module": "vllm.entrypoints.openai.completion.api_router",
+    "full_source_sha256": "b93b00298a74a62a3f2d8da1c0a9380a2be5823f5ab7ab99a2c911906280d769",
+    "public_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+    "license": "Apache-2.0",
+    "scope": "EXAMPLE execution of reviewed function bodies; no real FastAPI or engine"
+  }
+}

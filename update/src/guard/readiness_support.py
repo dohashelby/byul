@@ -121,7 +121,8 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
             continue
         row["policy_valid"] = True
         implementation = cfg.get("executors", {}).get(executor)
-        if implementation != "real" or registry.resolve_executor(executor, implementation) is None:
+        kube=executor=="request_binding" and implementation=="kubernetes" and not managed
+        if implementation != "real" and not kube or registry.resolve_executor(executor, implementation) is None:
             row["status"] = "UNSUPPORTED"
             row["reasons"].append("a registered real collector is not selected; fake execution is not engine support")
             continue
@@ -172,6 +173,10 @@ def assess_check_support(pack, env, policy, cfg: dict, *, selected_check_ids: It
                 if row["status"] != "UNSUPPORTED":
                     row["status"] = "UNKNOWN"
                 row["reasons"].append("external target ownership and launch metadata require runtime verification")
+                if kube:
+                    if adapter.request_binding_contract(env.engine.image_digest,env.engine.version) is None:
+                        unsupported("REQ-11 has no inspected consumer-source contract for the exact image/version")
+                    row["limitations"].append("Kubernetes direct Pod JSON/SSE only; no Service/Gateway/TLS or GPU-release proof")
                 continue
             launch = cfg.get("vllm", {})
             if launch.get("launch_profile") != "cpu-bounded" or env.runtime.gpu_count != 0:

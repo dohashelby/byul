@@ -1,5 +1,31 @@
 # DECISIONS
 
+- 2026-10-29 · process collector는 입력/정적 옵션을 처리하고 runtime 생성/프로그램 검증/포착은 기존 Kubernetes executor 경계에 둔다. · 기본 전체 시험에서 확인된 runtime 의존 아키텍처를 보존하고 같은 CLI/정책·출처·프로그램 bytes의 의미를 유지하기 위함이다.
+
+- 2026-10-29 · A2 c4fdbe4의 PLT01/04 전용5파일은 원본 bytes로 통합하고 최소 공통 dispatcher/registry 및 최약 출처 제한만 추가한다. · 정상 대조 성공을 전체 PASS로 올리거나 lab=false/기본 runner로 EXAMPLE을 MEASURED로 승격하지 않으며 기존 container 사실/worker 접근 구분과 독립 FAIL을 보존하기 위함이다.
+
+- 2026-10-29 · PLT08의 Kubernetes 한 구간 입력은 Docker 식별자 대신 정확 ENV/target/양쪽 binding hash와 명시 정책창을 결합하고 기존 정상 대조 source만 재사용한다. · 형식의 검증을 현재 PACK31의 정식 활성화로 오인하거나 Docker 필수값·기존 UNKNOWN/독립FAIL 의미를 우회하지 않기 위함이다.
+
+- 2026-10-29 · PLT01/04 정상 대조는 기존 completions 경로/본문·고정 JSON 수집기를 유지하고 공백을 포함한 논리ID만 명시 wire ID로 정확 결합한다. · 요청을 chat으로 대체하거나 부분200을 성공으로 만들지 않고 기존 CheckDef/기능 판정과 REQ11·REQ10의 지원 범위를 보존하기 위함이다.
+
+- 2026-10-29 · A2 자격수집 a0248fa는 전용3파일 원본 bytes로 공통 process 확정본 위에 통합한다. · 부분 scan의 앞선 환경 이름/독립 FAIL과 기존 ID 없는 callback을 보존하며 명시된 응답ID 불일치·완료 구간 오류로 환경 부재나 정상 대조를 확정하지 않기 위함이다.
+
+- 2026-10-29 · PLT01/04 공통 process 입력은 고정 reader의 선택 컨테이너 보고와 capture 주체를 분리하고 worker/source/model 귀속은 별도 근거 없으면 false로 고정한다. · metadata·동일 UID·PID 목록을 실제 worker 전체/파일 소비/권한 PASS로 올리지 않으며 기존 전용 분석과 의미를 보존하기 위함이다.
+
+- 2026-10-29 · REQ01/03은 기존 수집·안전 프로브·판정을 유지하고 선택한 네 Pod의 정확 세대/고정 HTTP-TCP 전송만 공통 경계로 연결한다. · Pod 이름/label을 외부대역·기업 principal·Gateway 변환표로 추정하지 않고 미지원 Service/TLS/host나 실제 실증으로 범위를 확대하지 않기 위함이다.
+
+- 2026-10-29 · SUP03의 확정 전용2커밋/4파일 bytes를 보존하고 기존 registry와 같은 KubernetesHTTP에 등록한다. · template bytes/API 입력 projection과 실제 worker 소비를 구분하고 기존 UNKNOWN·정책·팩31·Docker 의미를 유지하며, CI 계정 외부 차단은 로컬/실제 근거와 별도로 미완료 처리하기 위함이다.
+
+- 2026-10-29 · 순차 전환의 기준판 종료 대기만 require_ready=False/allow_terminating=True로 정확 소유 세대의 삭제 진행을 기다리고, terminal phase/부재를 보기 전에는 종료로 표시하지 않는다. · 정상 grace period와 교체/restart를 구분하면서 일반 HTTP/Ready/실증/worker-GPU 반납 관문을 유지하기 위함이다.
+
+- 2026-10-29 · bootstrap 임시 접근 회수는 정확 소유 Ingress 타입/selector·UID/run을 확인한 뒤 API의 생략된 빈 ingress를 빈 목록과 같이 처리하고 실제 차단 대조를 별도로 수행한다. · Kubernetes의 빈 필드 직렬화 차이를 회수 실패로 오인하지 않으면서 null·남은 규칙·대상 변경은 승인하지 않기 위함이다.
+
+- 2026-10-29 · A-2 inventory 안정성04353f4는 확정 전용3파일 bytes로 통합하고 stat/fstat 각 관측원의 안정성과 실제 열린 파일 신원을 구분한다. · 기존 모델 준비 제품 경로를 유지하며 metadata 변경 미관측을 불변 bytes·worker 소비·보안 완료로 확대하지 않기 위함이다.
+
+- 2026-10-29 · container_config의 명시 Kubernetes 구현은 SUP04 API-only 소비부터 기존 제품 경로에 연결하고 다른 점검·HTTP/정상 추론·node 이미지 승인으로 자동 확장하지 않는다. · 확정 A-2 분석기와 기존 판정을 보존하며 미준비 runtime 관계와 부분 제품 연결의 UNKNOWN을 구분하기 위함이다.
+
+- 2026-10-29 · 공동 base는 c9af729로 고정하고 A-1은 기존 Kubernetes 내부 snapshot 형태에서 검증된 소유 신원·mount 선언만 깊은 복사로 전달한다. · A-2의 기존 소비 의미와 lab/신뢰 gate를 보존하며 Pod API imageID를 node runtime·RepoDigest·manifest 계보 증명으로 승격하지 않기 위함이다.
+
 - 2026-10-28: 공동 기준선은 main4af4d31·원문91e84c7에 기존 PR34 UPDATE 보수를 보존하고 PACK31/DRAFT로 구성하며, CheckDef는 두 계보의 최고 revision부터 최소 증가한다. 과거 팩·Ref는 고정 보존하고 A-1만 공통 파일·팩을 작성해 A-2 전용 구현과 충돌을 줄인다.
 
 - 2026-10-27 · REQ-04는 기존 native/ASGI·소유 세션 경계에서 실제 helper 반환과 InputProcessor 필드를 관측하며 헤더 없는 호출도 별도 invocation으로 보존하고 profile5의 source23·지점·자산 bytes를 고정해 읽는다. · 운영 선택값·클라이언트 ID를 신뢰 신원/최종 worker 소비/기업 인가로 승격하지 않고 과거 기록의 의미를 보존하기 위함이다.
@@ -548,3 +574,134 @@
 - 2026-10-27: native 최종 iterator 파일 인수와 별도 소유 파일 SHA를 profile4/비공개 대조 CLI로만 연결한다. generator 생성·시점별 파일 일치를 최종 가중치/소비 증명으로 바꾸지 않고 과거 profile3의19개 source/고정 bytes를 유지하기 위해서다.
 
 - 2026-10-27: 인증 입력/bool·router 조회·async serving 반환을 profile5의 별도 살아 있는 ASGI 문맥/인덱스로 관측하고 profile4를 고정 호환한다. 동기 awaitable 반환·상속된 늦은 문맥·등록 endpoint와 모듈 변수의 차이를 실제 완료/인가로 오인하지 않기 위해서다.
+- 2026-10-28 · REQ11은 공식 GPU0.31.0의 exact amd64 manifest와 설치 소비 소스가 확인된 gpu-bounded-v1만 추가한다. · CPU digest/다른 수집기 제한과 과거 소비 계약을 보존하며 index/config/tag를 runtime imageID나 실제 GPU 소비 증명으로 바꾸지 않기 위함이다.
+- 2026-10-29 · REQ11의0.32 GPU 후보는 별도 exact amd64 manifest/소비3파일과 판본 조합으로 연결하고0.31·CPU·native gate를 보존한다. · 실제 두 이미지 비교 준비에서 후보 소스 근거를 기준판 해시로 이월하지 않기 위함이다.
+# 2026-10-29 A1 PLT08 제품 팩의 판본 분리
+
+- PACK31의 Docker 필수 신원을 제거하거나 빈 값으로 채우지 않고 검토된 정확Ref에서 별도 DRAFT Kubernetes 한 구간 팩을 생성한다. 새 팩도77개 점검·PLT08의 API/IPC-TP 필수 결과·기존 판정 의미를 유지하며 정책 관측값을 승인으로 사용하지 않는다. 공통 기록의 source-correlated 요청/선택 컨테이너 주체와 HTTP status·정책창·완전 응답을 각각 표시해 worker/배포caller 보호로 승격하지 않는다.
+- 2026-10-29 A1: B REQ10 전용24파일과c9기본 pin을 보존한 채 A1 정식 등록이 들어간c4e872e를 새 literal 소비 기준으로 제공한다. 같은 전체 검사를 새 고정 commit에 적용하고 B helper bytes/import/팩/프레임워크를 더 확인하며 런타임 관측 hash 승인·공통 경로 제외·B 전용파일 재작성은 하지 않는다. CPU proposal Ref를 그대로 쓰고 실제 배포/runner/GPU 완료와 분리하기 위함이다.
+
+
+## 2026-10-30 A1 LIF09 초기화 부분 실패 관측
+native14는 native8~13 bytes를 보존하고 source/code/descriptor 검증 후 원호출을 관측한다. 한 선언 단계의 같은 프로세스 준비/상위 결과만 결합하며 phase/scenario·READY·API200·종료 파일을 전체 모델/서비스/복귀 증명으로 올리지 않는다. 새 명시 HTTP 프로필에서 running engine Ready=false만 허용하고 소유 probe Ready=true와 기존 세대/source/image/lab 관문을 유지한다. 전체 범위UNKNOWN/null·미완료와 부모A39/56/4·A1 19/27/2·기존비용/권한/소유권 경계를 유지한다.
+
+
+## 2026-10-30 A1 LIF11 선정 자원 회수/후속 기동 관측
+선정 자원 census는 승인된 numeric PID/start/uid/namespace·FD/device/inode만 읽고 scan/신호/내용을 추가하지 않는다. selected FD 부재≠전체 자원 반환이다. 무조건 절대 기한과 실패 trigger에 조건부인 기한을 구분하며 전후 소유/시계 결합이 있는 명시 절대 잔존 위반만 기존 rule_table functional FAIL에 연결한다. 전체 PASS/회수/후속기동은 미완료로 유지하고 후속 오류가 독립 FAIL을 지우지 않게 한다. 기존 native8~14/A2/B 원본·lab/source/image/PID 관문·권한/비용을 보존한다.
+
+
+## 2026-10-30 A1 PLT10 자격 철회/신규 접근 관측
+NetworkPolicy 회수≠credential issuer 철회. PLT10은 기존 native8과5개 고정GETmodels를 재사용하고 키값/키hash/Authorization·원문 오류를 증거로 남기지 않는다. 선언issuer 사건과 무조건 deny-after 제약을 구분하며 실제 source/process/정상control 결합된 제약 위반만 functional FAIL이고 security/전체scope는UNKNOWN/false다. 후속 오류가 독립FAIL을 지우지 않게 하고 기존8~14/A2/B 원본·source/lab/image/PID 관문·권한/비용을 보존한다.
+
+- A1 PLT11은 새 GET을 기존 session 증명으로 재분류하지 않는다. 첫 범위는 auto_open=0의 동일 probe TCP keep-alive/socket identity 대조이며 실제 앱session/handle·serving receipt·issuer 사건/전파와 분리한다. 명시 unconditional 재사용 금지 제약의 독립 functional FAIL만 소비하고 security/전체scope UNKNOWN을 유지한다. 고정 framing/source gate·키원문/hash 비보존을 유지한다.
+
+- A1 OBS02 profiler는 vLLM adapter의 RAISE/RETURN과 내부 running flag를 실제 backend 수집/trace 산출/전송 종료로 올리지 않는다. 공식 source에서 _call_stop은 예외 후에도 running=false이고 Torch adapter에는 stop후출력도 있다. 실제 등록 callback을 검사하고 원 결과/예외/순서·native8~14 bytes를 보존한다. 새 start/stop HTTP·다른PID 시간/hash 기반 RPC 결합·B 전용 service 판정은 하지 않는다.
+# 2026-10-30 OBS02 SC23-03 공통 결합 후보
+
+2026-10-30 PLT02: A2 fac0907의 실제 groups·actor/collector/source·경로별 전후 근거 소비를 원본 bytes로 통합한다. A1은 기존 public IPC v1의 wrapper/정식등록/팩·핀·cleanup/출처 경계만 연결하고, 후속 수집·정상/report/첨부/정리 오류가 앞선 독립FAIL을 지우지 않게 한다. 원본probe·legacy parser·공통source pins는 유지한다.
+
+사용자 답변: A1이 사건/출처/물리세대 결합·계측·parser·제품 소비의 기술 계약을 설계하고, 실제 승인/검사 주체·허용 대상·정책·운영 범위는 사용자 결정으로 남긴다. 기존 OBS01 /1 선언과 native8 configured-object/load 경계의 결합 후보는 기존 CLI에서 소비하되 실제 승인/검사/최종 tensor 소비로 승격하지 않으며 근거 전 모든 판정축 UNKNOWN을 유지한다.
+# 2026-10-30 A1 PLT07 Kubernetes 공통 경계
+
+기존 Docker CID/POL·A2 predicate와 sender/receiver bytes는 유지한다. 새 Kube capability는 정확 full containerd ID·양쪽 target SHA와 명시 UID/netns·소유 receiver/source를 요구하고, 실행 helper 자체의 현재 UID/GID/groups가 이미 일치할 때만 송신한다. 다른 UID 전환/새 Pod 또는 receiver 기동·worker/SDK/기업 허용표는 추가하지 않는다. 공통 typed 부분 자료와 전용 분석·정식 제품·actual·전체5분기를 분리하고, 후속 오류가 이전 자료를 지우지 않게 한다. UNKNOWN/EXAMPLE·source/image/lab/native0.32 관문을 유지한다.
+# 2026-10-30 REQ02 native route 제품
+
+기존 native8 인증 bool·등록 callback 관측과 REQ02 자체HTTP ID를 같은 recording/entry method-path·source/module/seq로 연결하되, 실제principal 권한·Gateway rewrite와 producer/worker 인증은 false로 남긴다. 선택된 시험 키 변수 하나만 사용하고 키값/키hash는 저장하지 않는다. 기존 선언파일 route_record·다른 점검 ID/profile·source/image/lab/native0.32 관문을 보존한다. 기술 관측 제품 연결과 사용자 기업 정책/실제 환경을 분리한다.
+# 2026-10-30 PLT07 전용 소비 정식 연결
+
+A2 9482a75의3원본 bytes를 보존하며 A1은 기존 egress v1의 wrapper/registry/POL13 명시팩·검토pin·CLI/Ref만 연결한다. 원래 Docker/POL11·predicate와 A2 분석은 재작성하지 않는다. 필수 사건 검증 뒤 ACK/최종clock/후속수집·첨부·정리 오류가 독립FAIL을지우지않게 하고 technical ABORTED/기존cleanup exit1을유지한다. source/lab/image/native032/UNKNOWN·실제·전체5분기/Goal·권한비용 경계를 유지한다.
+# 2026-10-30 B 기록접근/입력 CPU 확정 통합
+
+B PR130의21파일은 확정tree bytes로통합하고 전용수집/판정/source pin은B가유지한다. 원component033/collector literal을현재A의읽은hash로자동승인하지않고 A1검토전체snapshot과별도로남긴다. 원Store/Ref/whole normal·암호화UNKNOWN/후기독립FAIL을보존하고 실제CPU원결과와새A통합을구분한다. POSIXscratch fixture/Windowsstat 차이는 원검증에드러내며 새skip·assert완화·원B재작성을하지않는다.
+
+B immutable21+전이의존2 통합은 Linux/설치본 근거와 Windows 원fixture10실패를 분리해 초안PR로인계한다. A가B원본을고치거나 gate/검증제외로성공을만들지 않는다. B033의 ancestry거부와 A검토354 전체소비는별개다. 원OBS06/REQ09 전체완료·실제GPU·부모Goal완료를선언하지않는다.
+
+native16은 고정된 undecorated generator 구간의 실제 진행과 callback-return만 공통 사건으로 제공하고 기존 OBS02 제품이 소비한다. decorator 반환·generator 생성·독립파일hash를 실제worker FD읽기/최종tensor/실제승인으로 올리지 않으며 A2 전용 분석은 확정 원본을 기다린다. 정책 미확정은 독립 공통 코드의 일괄 차단 사유로 삼지 않는다.
+
+소스코드 고정값은 독립 OS source compiler에서 산출하고 bytecode cache를공유하지않는다. 실제5지점의 코드/시각 gate가 초기사례를거부한 근거를보존하며 새fixture오류·컴파일도구보수는 제품허용범위완화와구분한다. native16은 기존OBS02/정확Ref에서소비하되 native9 A2전용소비·FD/tensor/승인·실제worker는별도미완료다.
+
+native17은 기존 OBS02 제품의 별도 명시적 공통 profile이다. 사전 ENV/target/model/revision/inventory/비밀 아닌 참조 파일 범위가 없으면 준비를 거부한다. FD metadata/원본 read buffer/선언 참조일치는 실제승인·최종tensor 소비가 아니다. 기존 native16 bytes와 판정/신뢰/lab/source/image gate를 보존하고 일반 C 경로 지원을 가정하거나 serving 적재전략을 강제하지 않는다.
+
+native17 ctime은 고정 runtime/API별 기준을 함께 저장한다. Windows path stat의생성시각과 FD fstat의변경시각은 숫자가일치해도같은증거로인정하지않는다. 모든metadata비교를유지하고 FD read buffer/범위/참조bytes관측과승인권한을분리한다. 공개prepare/기존OBS02 CLI의소비위치와정확Ref 검증을마감하되 actual C safe_open/tensor/worker/authority·A2전용분석을 별도미완료로남긴다.
+
+A2 native16 소비기의 source pin을 현재 읽은hash로승인하거나 전용원본을수정하지않는다. 공개된 native16 metadata 원bytes를유지하고 native17의확장은 별도공통adapter에서닫힌journal을재사용한다. A2 analyze는 기존admitted native16packet만소비하며 예외는정제localgap으로남겨 앞선공통사실·독립FAIL을보존한다.
+
+A2 native16 고정 소비는 원본3파일/source pin을그대로보존하고A1의기존OBS02 연결점·공통기준만갱신한다. native17새투영은원journal을직접재사용하며16로header를바꾸지않는다. 전용consumer오류는부모수집의gap재계산뒤에도정제진단·ABORTED로남기고 기존paired common사실·독립FAIL을삭제하지않는다. 다른실행·loader없는부분사례를같은loader에의귀속으로완화하지않는다.
+
+B4cfc의변경파일과전이의존성은원bytes로통합한다. B rootAGENTS는참조로보존하고A1규칙에적용하지않는다. 원B HTTP/component/sourcepin을A1이변조하거나실행중hash로승인하지않는다. 같은닫힌wire메서드와정확구sourceRef를검토해새A고정소비기준을제공하고B는전용pin/소비수락을확정한다. Graph모듈가용성은actual worker/callback/close 계약완료가아니다.
+
+B 전달물 오류fixture를A1에서재작성하거나새skip/assert완화로통과시키지않는다. 실제 반환오류에대한A1제품경계시험과원B실패를함께인계한다. Graph LF/CRLF의동일컴파일코드도파일bytes가다르면sourcegate는거부한다. BHTTPpin갱신과nativeGraph실제hook은별도미연결이다.
+
+native17 전용분석은A2원본을재작성하지않고기존OBS02관측에붙인다. 공통고정4pin/native16/B원본을보존한다. bound/unbound partial을구분하고선행read와후기close/root/collector상태를합쳐성공으로만들지않는다. 전용실패는ABORTED/정제진단,앞선common사실과독립FAIL은보존한다.
+
+새전용결합을기존identity_native_models/summary에추가하며A2의원본bytes와sourcegate를그대로소비한다. 동일recording/model/forward이전root와FDsource locator만귀속한다. loader없는부분read는공통사실로보존하되전용loader후보로승격하지않는다. 전용오류는부모gap재계산뒤정제진단/ABORTED로남기며공통관측·기존독립FAIL을삭제하지않는다.
+
+B native producer를A1이재작성하거나원sourcepin·실제release승인경계를완화하지않는다. 이번통합에서는actual native --execute/RPC/IPC/release/daemon start/GPU start를하지않고원B CPU EXAMPLE·기본preflight·정제선언capture/정확Ref만검증한다. guard불변범위의기존설치근거는새도구의실제실증으로승격하지않는다.
+
+Windows 원B실패10개를새skip/경로gate완화/시험재작성으로숨기지않는다. POSIX public계약은Linux설치본에서검증하고실패/성공범위를각각보존한다. 정적client3bytes는실제daemon/image/인가증거가아니며선언capture/native기본preflight를actualzero-copy로승격하지않는다.
+
+mapping은파일read/fault·Tensor소비·인가·release와별개다. oldsource전략을바꾸거나C opaque함수반환을권한검증으로승격하지않는다. 메타데이터수집실패는원C값/예외/정리를바꾸지않으며rawmaps/주소/주소hash/내용을저장하지않는다. 새profile은기존OBS02소비와검증·인계까지같은묶음에서마감한다.
+
+observer code hash의first-line/line-table도계약이다. literal줄수변경으로생긴초기실패를원본으로남기고동일관문을보수한뒤독립compile대조를추가했다. region opaque좌표는mapping세대/존속증거가아니다. 새common관측은기존OBS02CLI/증거/정확Ref까지같은묶음에서연결하되actualC와전용A2소비·실제정책은별도다.
+
+B LIF07의 source_qualified/actual_worker/ready 긍정신고는 자격근거로쓰지않는다. 원 B NATIVE/UnreadyHTTP/delay None gate를유지하고 원 공개 import 경로만 검증한다. 현재 common0fc2dec는 B가명시적으로 검토고정한A138호환으로 소비하며 runtimehash자동승인·profile완화·A1전용B재작성은하지않는다.
+
+열린질문: native18 실제 C/CPU 검증용 Torch2.13.0+cpu/safetensors0.8.0+전이9의 고정250MiB/전용3GiB 실행안은 CLAUDE18 신규의존성규칙에따라현재채팅답변대기다. 기존프로젝트의존성/원환경/AWS/GPU는변경하지않으며 B통합·독립개발은계속한다. B Windows ctime basis 문제는 원 B 담당자의 고정 보수를 받아소비하며 비교삭제/자동허용으로우회하지않는다.
+
+Worker.init_device/initialize_from_config/compile_or_warm_up_model은원 tracing decorator를보존한다. 고정source/code와backendalias·closurefunc를확인해원바깥callable을한번호출하며바깥RETURN을내부진입/GPU/READY/승인으로추정하지않는다. B원callback/helper는private고정import간선으로원bytes를소비하고guardnamespace를변경하지않는다. 같은PID/시간중첩대신정확factory record와startupcontext를결합하며helper/EXAMPLE를실제worker로표시하지않는다.
+
+code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가sourcebytes를직접compile한다. 이번unknownmodule거부시험과원SourceHash검사를유지하고profile19의고정네module이름만privacy vocabulary에추가했다. 설치후처리는pytest current alias를실제사례로세지않으며통과한CLI/Store를재실행하거나변경하지않고정확Ref검증으로회수한다.
+
+- A-1 LIF09: Worker19·MP14 원본을 바꾸지 않고 명시 native20/13자산으로 조합한다. 부모 MP와 Worker 사실은 별도 EVD 필드로 소비하며 PID/시간 일치만으로 start/assignment/rank/shard·실제 실패/서비스/수정 후 계보를 결합하지 않는다. 기존 정책·정상/부분 실패/수정 후 질문과 UNKNOWN을 유지하고 원 journal header를 relabel하지 않는다.
+
+- A-1 native20/LIF09 마감: source250722f/reviewa391bc0, 직접 고유33각OS·인접Windows313/Linux314·guard267설치·CLI4/정확24Ref 왕복. 기존14/19·B 원본11파일 유지, Worker/MP를 별도 EVD 관측으로 연결했다. 초기 fixture·닫힌 사건/함수표 누락과 원 실패를 보존하고 변경 영향만 재검증했다. 실제 fault/repair/worker/rank/tensor/GPU/service lineage·CI5·전체LIF09/부모A는 미완료이며 추가Start0·의존성 승인은 대기다.
+
+- A-1 LIF09 native21은 정확 source/decorator/descriptor를 보존한 constructor→Wrapper→Worker opaque 결합과 해당 worker_main의 원 READY pipe 위임만 관측한다. 새 send/close·전역 Connection patch·payload/handle/FD/주소/env/argv 저장을 하지 않는다. 원 반환/예외/정리를 유지하며 READY send 반환과 main 종료를 전체 준비·수신·서비스 접수로 쓰지 않는다. 옛14/19/20과 저장팩/Ref를 유지하고 새 세대 관측을 명시한 check만21 실행에 사용한다.
+
+- A-1 native21/LIF09 마감: sourceb88b4a6/review062af9d, 직접 고유49각OS·인접Windows337/Linux338·guard270설치·CLI4/정확24Ref 왕복. 원13파일 유지, 생성자/Wrapper/Worker 객체와 선정 원 pipe send/close를 별도 EVD로 연결했다. 원 실패(json 시험 import5)와 영향5 재검증을 보존했으며 제품 코드·assert·gate 변경은 없다. 실제 worker/GPU·전체 준비/서비스/fault/repair·CI5·전체분기는 미완료이고 추가Start0·C/CPU 의존성 답변 대기다.
+
+- 2026-10-31 A-1 LIF09 endpoint 초안: Linux exact stdlib Connection/FIFO만 세션·boot·namespace/time domain token으로 관측하며 get_mp_context를 추가 호출하지 않는다. Windows HANDLE과 fork 상속은 미검증이다. producer/worker 신뢰·tensor/GPU·전체 준비·서비스 접수 판정은 올리지 않는다. native22는 source/제품 검증 완료 전 미지원 초안이다.
+
+- A-1 LIF09 native22는 기존 실행기의 명시 판본으로 creator/selected recv/sender의 정확 원14/21 사건 Ref와 Linux held-FIFO domain 후보를 제공한다. PID/rank/time-only join·Windows HANDLE 변환·get_mp_context 추가 호출을 하지 않는다. 양성 EXAMPLE 두 identity와 inline Process.start 대역은 물리 worker 증거가 아니다. runtime endpoint token과 코드 승인 pin을 구분하며 실제 trust/전체 준비/service·fault/repair 판정을 올리지 않는다.
+
+- A-1 PLT12는 같은 required_event_record:kubernetes의 명시 copy profile로 추가한다. OBS01 /1/역할/요청 의미와 A2 후보 코드·원 기준을 보존하며 new copy_inventory는 비민감 정책 입력이다. producer/source hash·파일 소유 결합·자기 complete/처리/issuer 선언은 실제 사본/처리/reuse 신뢰가 아니다. 실제 값·운영 주체와 승인 질문은 미확정으로 두고 이 소프트웨어 단계는 읽기 전용·모든 축UNKNOWN이다.
+
+- A-1 PLT12의 copy source/session/inventory/policy 결합은 비민감 선언의 귀속·정합성 검사다. producer·사본 멤버십/처리·issuer/reuse 집행의 인증이 아니며 complete 선언·처리실패 선언을 실제 PASS/FAIL로 올리지 않는다. 기존 CLI cleanup 미완료 종료코드1과 앞선 유효 관측/후속오류 보존을 유지한다. 실제 운영 주체·위치/수신자·기한/방법/보존예외·재사용/복구 정책은 미확정으로 남긴다.
+
+- B154 원7파일의 A152 native21 source gate는 확정 bytes로 보존한다. 새 A공통 소비 검증383파일과 B 고정 old gate의 거부는 각각 기록한다. A가 B source pin/함수/private gate/판본을 바꾸지 않는다. Linux LIF13 peer·epoch·bounded recv는 실제 kernel·EXAMPLE frame의 별도 검증이며 원 vLLM recv_msg/RPC/weights/GPU·전체 판정 근거로 올리지 않는다.
+
+- B154의 raw7파일·원 source gate c39/062를 유지하고 새A공통9d/383 source 검증과 source gate 거부를 구분한다. 원B source의 native CLI 통과/6Ref와 새A의 거부를 섞지 않는다. B 입력변경 fixture의 native_observation keyword 누락과 Win 환경 오류는 B가 보수할 전달 근거로 남긴다. 독립 Linux peer3단계는 실제kernel/EXAMPLE frame이며 전체 LIF13·실제 worker/weights/GPU 판정으로 승격하지 않는다.
+
+- A-1 LIF12는 기존 request_termination:kubernetes의 명시 retry-record profile로 확장한다. 실제 retry나 실패 주입을 구현하지 않고 원 LIF10/REQ12 절차와 B/A2 원본을 유지한다. 같은 선정 process/worker/domain의 선언 내부 시간만 계산하고 다른 PID의 domain hash로 시계를 결합하지 않는다. 비용은 고정 단위/source/epoch별로만 비교하고 reset 이후는 미확인이다. 선언·모델 파일/Pod 소유·source/code hash를 실제 생산자/worker/retry/비용 인증으로 올리지 않는다. 새 공통2파일에 따라 A측 정확 소비 범위만383→385로 검토하며 B 원 c9/pin/gate와 전용7bytes는 바꾸지 않는다.
+
+- LIF12 수집 완료는 선언 파일의 정확 결합과 기술적 수집 상태다. 실제 정상·자동 retry·비발생·잔존 작업/비용/종결을 검증했다는 의미가 아니다. 같은 PID-start/worker/domain의 선언 내부 시간과 동일 단위/source/epoch의 counter만 비교하고 reset·다른 PID·후속오류를 분리한다. 기존 원 B source gate는 계속 닫히며 새 공통385파일의 검토 pin을 B 승인으로 자동 전환하지 않는다. 기업 정책과 실제 생산자 연결·실증은 미확정/UNKNOWN으로 유지한다.
+
+- A-1 Worker HTTP는 LIF07 전용 닫힌 GET-health/chat/GET-health 입력이다. 다른 점검 RID/private Ready 우회는 허용하지 않는다. 기존 LIF09 startup 결합만 공통 추출하고 일반 HTTP gate/probe 원 bytes는 유지한다. EXAMPLE 정제 envelope의 source SHA는 provenance이며 검토한 불변 source로 소비 검증한다. collector UTC 역행은 gap이고 native/probe 시계로 변환하지 않는다. 새2파일에 따른 A측 전체 소비 범위385→387만 갱신하며 B 원 c9/pin/gate는 보존한다.
+
+- Worker HTTP의 sampling_complete는 닫힌 HTTP/API 수집의 기술적 완전성이다. 503/timeout·shape 실패가 관측 가능하고 실제 worker/rank/model/GPU/receiver/서비스 준비 판정은 전부 false/UNKNOWN으로 유지한다. 기존 generic snapshot은 Unready에서 예외를 내며 새 시험도 그 계약을 요구한다. 새 common collector/parser는 B 전용 소비·정책·인과 receipt를 대신하지 않는다.
+
+- B154의 A156 정확 gate/common 허용은 A158의 새 공통 기준 승인이 아니다. B전용 원 bytes를 유지하고 현재full387 검증과 B exact-pair 거부, 승인된 A156 reference 소비를 별도로 검증한다. B fixture/runtime pin을 A측에서 완화하거나 새 skip/우회로 통과시키지 않는다.
+
+- B154 고정 승인쌍은 A152/A156에 한정되며 현재 A158 공통387파일의 자동 승인이 아니다. 현재소스의 B 실패/fixture오류를 기록하고 승인된 A156+같은Bbytes 참조102통과를 별도 근거로 제공한다. B 원본을 재작성·완화·skip하지 않으며 현재 버전 소비 pin과 fixture 확장은 B가 검토한다. 원 kernel proof 반출과 새로운 실제 실증을 구분한다.
+
+- B160의 사전검토 A158 source 쌍은 확정 원 bytes로 소비한다. A측 통합시험의 기존 거부 기대는 B의 명시 새쌍에 맞춰 승인을 요구하고 미승인쌍 음성검사는 계속 유지한다. B fixture/assert/pin을 대신 완화하지 않는다. guard source/wheel279 bytes는 변하지 않으며 B 소스전용 gate와 설치본 혼합경계는 분리한다.
+
+- B160의 현재source pair 소비 성공은 B의 확정 사전검토 literal·원fullscope gate를 사용한 결과다. 원B 파일·FS실패와 과거거부/Ref를 유지하며 새skip/검사제외나 runtime hash승인은 없다. source CLI4/24Ref와 설치guard+Bsource 혼합의 import거부/무요청·UNKNOWN은 다른 범위다. 후자를 설치제품 성공이나 실제 worker 준비로 올리지 않는다.
+
+- B391506a의 문서 정정은 입력변경을 항상 EVD저장 전 거부한다고 확대하지 않고 저장 후 검사의 기존 출력/facts 보존을 구분한다. B 원본문bytes를 유지하고 A측 검토metadata2상수만 갱신하며 AST 제어 동일성을 대조한다. 변경없는 기능/설치/실증을 반복하지 않는다.
+
+- 새 승인 답변은 고정 native18 C·CPU 의존성11개와 전용환경/합성6사례만 허용한다. 프로젝트·기존환경·AWS/GPU·serving/worker·기업승인/최종tensor 소비 범위나 기존46.66USD/과거사용량·시간을 확대/초기화하지 않는다.
+
+- 실제 C 직접대조로 확인한 namespace 차이는 합성 FunctionType 모듈의 __builtins__만 보완한다. 원worker3498의 실패와5receipt를 유지하고 assert AST가 같은 영향 worker68eb의 alias1을 합쳐6계약 근거를 제시하며 최초 전체실행6통과로 바꾸지 않는다. library descriptor/bytes·자기process mapping은 실제 관측이고 application/worker/model/정책 귀속은 EXAMPLE/UNKNOWN이다. helper/기술검증·actual C 하위관측·서빙/승인·최종소비/해제를 분리한다.
+
+- native18 A2 전용 분석은 원bytes로 소비하고 A1 제품 연결에서 root와 전후 locator를 엄격히 결합한다. 전용 오류는 기존 공통 관측을 지우지 않으며 공통 실패 뒤 재호출하지 않는다. 공통 pin은 전체 동일 경로 검토 후 새 고정 커밋으로 갱신하며 B160 원 승인쌍/원c9/helper는 보존한다. 새 A 기준은 B 재검토 전 거부됨을 시험하고 우회 승인하지 않는다.
+
+- B의 http_observation_invoked는 collect_http 호출 선택이며 target HTTP 실행 증거가 아니다. 실제 거부는 저장된 http_observation.gaps와 sample_attempted=false, target_io_attempted=false, requests0로 검증한다. A1 시험의 신규 fixture/메타데이터 기대 오류는 원 결과를 보존하고 제품/gate 수정 없이 선정 영향만 보수·재검증했다. 최신 전체suite 통과로 재집계하지 않는다.
+
+- native19 전용 소비는 공통 startup 성공 뒤 별도 경계로 한정한다. public parser와 A2의 원8파일 pins를 유지하고 CPU fixture의 library_identity 대역을 EXAMPLE로 명시한다. startup 종료와 untruncated 마지막mapping을 selected forward와 비교하며 부분/후속오류로 앞선 사실·독립FAIL을 지우지 않는다. B 원 소유 승인쌍은 바꾸지 않고 A 공통389파일 새 pin 검토를 분리한다.
+
+- native19 양성 fixture는 원 A2와 같은 EXAMPLE library 대역 시점을 따른다. immutable observer code 검사 전 대역을 적용한 원실패를 보존하고 준비순서만 보수했다. source gate/parser/production library gate/원 assert는 유지한다. startup 호출 종료·root/link와 잘리지 않은 mapping 마지막 경계를 forward 이전에 대조하며 실제 worker/READY로 승격하지 않는다.
+
+- native16 capture=None은 두 binding=false인 admitted 실패행에만 허용하는 A2 원 보수로 소비한다. 누락을 관측/전체완료로 만들지 않고 다른 recording의 사실을 지우지 않는다. A1 executor 판본0.4.1·전체389파일 고정 pin을 갱신하며 source gate/parser·B 원 c9/helper/승인쌍과 native17/18/19 원bytes를 유지한다.
+
+- native16 부분iterator의 귀속은 원 DefaultModelLoader 호출 경계 안에서만 검증한다. 경계 밖 fixture의 정상 미귀속을 지우거나 assert를 완화하지 않고 입력을 구체적 bound early-close로 보수했으며 비소진을 추가 검증했다. CI가 고른3.12.15와 고정 지원 ABI3.12.14nt/3.12.3posix 차이는 정제 근거로 남기고 source/code gate를 자동완화하거나 검사설정을 바꾸지 않는다.

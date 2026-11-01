@@ -71,8 +71,9 @@ def values():
 
 
 @pytest.mark.parametrize("damage", ["missing-ref", "wrong-ref", "missing-run", "wrong-container", "wrong-pin", "broken-seal"])
-def test_invalid_declaration_is_unknown_before_reading_any_runtime_source(damage):
-    ctx = context(values())
+@pytest.mark.parametrize("legacy", [False, True])
+def test_invalid_declaration_is_unknown_before_reading_any_runtime_source(damage, legacy):
+    ctx = context(values(), legacy=legacy)
     if damage == "missing-ref":
         del ctx.target["environment_ref"]
     elif damage == "wrong-ref":
@@ -95,8 +96,9 @@ def test_invalid_declaration_is_unknown_before_reading_any_runtime_source(damage
 
 
 @pytest.mark.parametrize("wrong", ["owner", "image", "container", "stopped", "missing-generation", "unavailable"])
-def test_stable_wrong_or_missing_instance_never_becomes_credential_absence(wrong):
-    ctx = context(values())
+@pytest.mark.parametrize("legacy", [False, True])
+def test_stable_wrong_or_missing_instance_never_becomes_credential_absence(wrong, legacy):
+    ctx = context(values(), legacy=legacy)
     calls = []
     ctx.cprobe = lambda *args: calls.append(True)
     docker = BindingDocker(wrong=wrong)
@@ -160,6 +162,63 @@ def test_temporary_name_mapping_between_owner_samples_cannot_select_another_gene
     assert docker.exec_targets == ["a" * 64, "a" * 64]
 
 
+def test_legacy_live_preserves_field_names_but_still_binds_its_sources():
+    docker = BindingDocker(mounts=[{"Type": "bind", "Destination": "/credentials"}])
+    observations, normal, _, detail = CredentialExposureExecutor({}, docker=docker).collect(context(values(), legacy=True))
+    assert set(observations) == {"process_scan_complete", "worker_env_names", "exposed_credential_paths",
+                                "functional_probes_planned", "functional_probe_results"}
+    assert observations["exposed_credential_paths"] == {"value": ["/credentials"], "collected": True}
+    assert normal["succeeded"] and not docker.requests
+    assert docker.exec_targets == ["a" * 64]
+    assert all(detail["source_binding"]["intervals_verified"].values())
+    assert CANARY not in json.dumps(detail)
+
+
+def test_legacy_live_later_changed_source_cannot_supply_an_independent_environment_violation():
+    docker = BindingDocker(change_after="environment", mounts=[{"Type": "bind", "Destination": "/credentials"}],
+                           process_names=["FORBIDDEN_CANARY"])
+    observations, normal, _, detail = CredentialExposureExecutor({}, docker=docker).collect(context(values(), legacy=True))
+    assert observations["exposed_credential_paths"] == {"value": ["/credentials"], "collected": True}
+    assert observations["worker_env_names"]["collected"] is False
+    assert normal["attempted"] is False and normal["succeeded"] is False and not docker.requests
+    assert detail["source_binding"]["intervals_verified"] == {"mounts": True, "environment": False, "normal_control": False}
+
+
+def test_legacy_live_wrong_owner_is_aborted_unknown_through_the_product(tmp_path, monkeypatch):
+    from tests import test_automation_phase1_contracts as phase1
+    original = phase1._executor
+    docker = BindingDocker(wrong="owner", process_names=["GUARD_TEST_CREDENTIAL"])
+    def wrong_source(*args, **kwargs):
+        executor = original(*args, **kwargs)
+        executor._docker = docker
+        return executor
+    monkeypatch.setattr(phase1, "_executor", wrong_source)
+    _, _, _, _, evd, res = phase1._run(tmp_path, monkeypatch, "PLT-04", "PASS")
+    assert evd.execution.status.value == "ABORTED" and res.verdicts.security.value == "UNKNOWN"
+    assert docker.environment_reads == 0 and not docker.requests
+    assert CANARY not in canonical_json(evd.to_dict()).decode()
+
+
+def test_legacy_saved_evidence_rejudge_and_restore_never_call_the_live_collector(tmp_path, monkeypatch):
+    from guard.core.judge import judge_plan
+    from guard.core.report import build_report
+    from guard.store.bundle import export_bundle, restore_bundle
+    from guard.store.packs import get_pack
+    from tests import test_automation_phase1_contracts as phase1
+    store, pack, env, plan, evd, result = phase1._run(tmp_path, monkeypatch, "PLT-04", "PASS")
+    report = build_report(store, pack, plan, as_of=env.created_at); store.put(report)
+    original = canonical_json(evd.to_dict())
+    def forbidden(*args, **kwargs): raise AssertionError("saved Ref replay must not collect")
+    monkeypatch.setattr(CredentialExposureExecutor, "collect", forbidden)
+    bundle, restored_path = tmp_path / "saved.zip", tmp_path / "saved-restored"
+    export_bundle(store.root, bundle); restore_bundle(bundle, restored_path)
+    restored = Store(restored_path)
+    replayed, = judge_plan(restored, get_pack(restored, pack.ref()), restored.resolve(plan.ref()), as_of=env.created_at)
+    assert replayed.ref() == result.ref()
+    assert canonical_json(restored.resolve(evd.ref()).to_dict()) == original
+    assert restored.resolve(report.ref()).to_dict() == report.to_dict() and restored.verify() == []
+
+
 @pytest.mark.parametrize("mode,expected", [("normal", "PASS"), ("wrong-owner", "UNKNOWN"),
                                           ("later-generation", "FAIL"), ("later-attachment", "FAIL")])
 def test_binding_product_cli_report_bundle_and_exact_ref_replay(tmp_path, monkeypatch, mode, expected):
@@ -210,7 +269,7 @@ def test_binding_product_cli_report_bundle_and_exact_ref_replay(tmp_path, monkey
     res, = store.find_latest("RES", lambda r: True)
     rpt, = store.find_latest("RPT", lambda r: True)
     assert res.verdicts.security.value == expected and evd.data_origin.value == "EXAMPLE"
-    assert evd.execution.executor.version == "0.5.1" and rpt.official is False
+    assert evd.execution.executor.version == "0.5.2" and rpt.official is False
     assert evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest
     assert CANARY not in canonical_json(evd.to_dict()).decode()
     if violated:

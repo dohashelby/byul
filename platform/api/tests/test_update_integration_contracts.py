@@ -310,8 +310,6 @@ def test_sup04_executor_to_rpt_preserves_contract_verdicts_and_exact_refs(
               "engine": {"container": container, "image_digest": pinned,
                          "trusted_url": "http://engine:8000", "ready_timeout": 1}}
     target_path = tmp_path / "target.json"
-    target_path.write_text(json.dumps(target), encoding="utf-8")
-
     class ExampleDocker:
         def inspect_json(self, name, *, timeout):
             assert name == container and timeout > 0
@@ -349,6 +347,8 @@ def test_sup04_executor_to_rpt_preserves_contract_verdicts_and_exact_refs(
     env = Environment(id=new_id("ENV"), created_at=T0, data_origin="EXAMPLE",
                       engine={"name": "vllm", "version": "0.32.0", "image_digest": pinned.partition("@")[2]},
                       model={"id": "example-model"}).seal()
+    target["environment_ref"] = env.ref().model_dump(mode="json")
+    target_path.write_text(json.dumps(target), encoding="utf-8")
     pol = Policy(id=new_id("POL"), created_at=T0, data_origin="EXAMPLE", status="DRAFT",
                  pack=current_pack.ref(), scope={"include": ["SUP-04"], "exclude": []},
                  values={"SUP-04": {"approved_image_digests": [pinned if approved_matches else other]}}).seal()

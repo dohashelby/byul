@@ -20,6 +20,7 @@ from guard.models import ExecStatus, Mode, Side
 from guard.store.packs import put_pack
 from guard.runtime.docker import Docker
 from guard.runtime import generation_readiness, sandbox
+from guard.runtime.kubernetes_transition import KubernetesTransition
 
 
 def merge_config(base: dict, override: dict) -> dict:
@@ -143,6 +144,18 @@ def update_inputs(envs, cfg: dict):
                         or not actual or actual.split("@")[-1] != (env.engine.image_digest or "").split("@")[-1]):
                     raise ValueError(f"{side}: target identity differs from ENV; regenerate/verify target metadata")
 
+    if any(c.get("executors",{}).get("request_binding")=="kubernetes" for c in side_cfgs.values()):
+        if mode!="external" or cfg.get("update",{}).get("kubernetes_transition",True) is not True:
+            raise ValueError("KUBERNETES_TRANSITION_REQUIRED")
+        paths=[c.get("request_binding",{}).get("target") for c in side_cfgs.values()]
+        if not all(paths) or Path(paths[0]).resolve()==Path(paths[1]).resolve():
+            raise ValueError("KUBERNETES_TRANSITION_TARGETS_UNVERIFIED")
+        try:
+            KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
+                poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
+                candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
+        except Exception:
+            raise ValueError("KUBERNETES_TRANSITION_CONFIGURATION_INVALID") from None
     return mode, side_cfgs, managed
 
 
@@ -178,11 +191,29 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
         rc.side_configs[side] = RunConfig(executors=c.get("executors", {}), adapter=c.get("adapter", {}).get("name"), raw=c)
     lifecycle_errors = []
     diagnostic_refs = []
+    kube_transition=None
+    if any(c.get("executors",{}).get("request_binding")=="kubernetes" for c in side_cfgs.values()):
+        kube_transition=KubernetesTransition(envs,side_cfgs,timeout=cfg.get("update",{}).get("transition_timeout",300),
+            poll_interval=cfg.get("update",{}).get("transition_poll_interval",0.25),
+                candidate_binding=cfg.get("update",{}).get("kubernetes_candidate_binding","prebound"))
     for side, env in zip((Side.baseline, Side.candidate), envs):
         if not any(item.selected for item in plan.items):
             break  # 이월 전용 PLAN은 엔진을 기동하지 않는다.
         side_cfg = rc.side_configs[side.value]
         if mode == "external":
+            if kube_transition is not None:
+                try:
+                    if side==Side.baseline:
+                        kube_transition.prepare_baseline()
+                    else:
+                        previous_evidence=store.find_latest("EVD",lambda e:e.plan==plan.ref() and e.side==Side.baseline)
+                        if any(e.execution.status!=ExecStatus.COMPLETED for e in previous_evidence):
+                            raise ValueError("BASELINE_EXECUTION_FAILED")
+                        kube_transition.candidate_ready()
+                    side_cfg.raw["_kubernetes_target_sha256"]=kube_transition.transports[side.value].target_sha256
+                except Exception:
+                    side_cfg.abort_reason="KUBERNETES_TRANSITION_UNVERIFIED"
+                    lifecycle_errors.append(f"{side.value}: KUBERNETES_TRANSITION_UNVERIFIED; operator recovery required; GPU release unverified")
             run_plan(store, pack, plan, rc, only_side=side)
             continue
         c = side_cfg.raw
@@ -225,6 +256,13 @@ def execute_update(store, pack, envs, policy, cfg: dict, run_dir: Path, as_of: d
                     lifecycle_errors.append(f"{side.value}: cleanup incomplete after startup/execution failure ({type(exc).__name__}); guard.run={run_id}")
                 side_cfg.abort_reason = f"managed startup/execution failed: {type(exc).__name__}"
                 run_plan(store, pack, plan, rc, only_side=side)
+    if kube_transition is not None:
+        from guard.models import canonical_json
+        try:
+            stored=store.put_artifact(canonical_json(kube_transition.report()))
+            diagnostic_refs.append(f"Kubernetes transition diagnostic (not EVD): artifacts/{stored.sha256}; GPU release unverified")
+        except Exception:
+            lifecycle_errors.append("KUBERNETES_TRANSITION_DIAGNOSTIC_STORE_UNAVAILABLE")
     judge_plan(store, pack, plan, as_of)
     report = build_report(store, pack, plan, as_of)
     if lifecycle_errors or diagnostic_refs:
@@ -403,7 +441,8 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
                 raise ValueError(f"{item.check_id}: unresolved selection gaps {item.gaps}")
             for side, c in prepared[1].items():
                 factory = registry.resolve_executor(item.executor, c.get("executors", {}).get(item.executor, ""))
-                if factory is None or c.get("executors", {}).get(item.executor) != "real":
+                kube=(item.executor=="request_binding" and c.get("executors",{}).get(item.executor)=="kubernetes" and prepared[0]=="external")
+                if factory is None or c.get("executors", {}).get(item.executor) != "real" and not kube:
                     raise ValueError(f"{side}/{item.check_id}: real executor is required")
                 if prepared[0] == "managed":
                     c, _ = _credentials(c, c.get("validation" if single else "update", {}).get("gateway_profile", "single"))
@@ -423,6 +462,18 @@ def update_readiness(pack, envs, policy, cfg: dict, *, single: bool = False,
         # Validation errors contain field descriptions; daemon output is never copied.
         record("inputs", False, str(exc) if isinstance(exc, ValueError) else type(exc).__name__)
 
+    kube_requested=cfg.get("executors",{}).get("request_binding")=="kubernetes" or any(
+        c.get("executors",{}).get("request_binding")=="kubernetes" for c in cfg.get("sides",{}).values())
+    if kube_requested:
+        record("kubernetes-static-binding",prepared is not None,"Exact target/ENV declarations checked; actual cluster, Pods, template and GPU remain unverified")
+        if cfg.get("update",{}).get("kubernetes_candidate_binding")=="after_baseline":
+            record("candidate-binding-deferred",True,"Only baseline target is selected; exact candidate ENV/generation will be required after baseline API termination, before candidate dispatch")
+        if not single and envs[0].engine.image_digest==envs[1].engine.image_digest:
+            record("image-pair",False,"use different image digests for an update validation")
+        return {"ready":all(c["ok"] for c in checks),"checks":checks,"check_support":check_support,
+            "limitations":["Static Kubernetes preparation only; no kubectl, Docker, engine or GPU execution.",
+                "Existing inspected image/source limits remain; unreviewed GPU images are unsupported.",
+                "Operator supplies exact running generations and controls termination/recovery. API termination does not prove GPU release."]}
     docker = Docker("readiness")
     try:
         server = docker.daemon_info(timeout=15)

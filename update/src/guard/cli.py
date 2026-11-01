@@ -464,12 +464,37 @@ def verify(config: Path = ConfigOpt, store: Optional[Path] = StoreOpt) -> None:
     raise typer.Exit(1 if problems else 0)
 
 
+@app.command("prepare-model-read-scope")
+def prepare_model_read_scope(env: Path = typer.Option(...,"--env"),target: Path = typer.Option(...,"--target"),
+    model_manifest: Path = typer.Option(...,"--model-manifest"),model_root: str = typer.Option(...,"--model-root"),
+    output: Path = typer.Option(...,"--output"),nonsecret_model_weights: bool = typer.Option(False,"--nonsecret-model-weights"),
+    hash_model_bytes: bool = typer.Option(False,"--hash-model-bytes"),max_hash_bytes: int = typer.Option(2**31,"--max-hash-bytes")) -> None:
+    """선언한 비밀 아닌 safetensors 참조 범위를 만든다. 모델 파일을 읽지 않는다."""
+    from guard.collectors.file import load_environment
+    from guard.collectors.model_read_scope import build_scope
+    from guard.executors.owned_capture import strict_json
+    from guard.collectors.route_observations import validate_output
+    from guard.models import canonical_json
+    try:
+        environment=load_environment(env)
+        with target.open('rb') as stream:topology=strict_json(stream.read(65537))
+        value=build_scope(environment,topology,model_manifest,model_root,nonsecret_model_weights=nonsecret_model_weights,
+            hash_model_bytes=hash_model_bytes,max_hash_bytes=max_hash_bytes)
+        validate_output(output,Path(__file__).resolve().parents[3]);destination=output.absolute()
+        with destination.open('xb') as stream:stream.write(canonical_json(value))
+    except (OSError,ValueError,TypeError):
+        typer.echo("MODEL_READ_SCOPE_PREPARATION_FAILED");raise typer.Exit(2)
+    typer.echo(json.dumps({"prepared":True,"model_files_read":False,"approval_verified":False}))
+
+
 @app.command("prepare-lifecycle-sensor")
-def prepare_lifecycle_sensor(output: Path = typer.Option(..., "--output")) -> None:
+def prepare_lifecycle_sensor(output: Path = typer.Option(..., "--output"),
+    profile: str | None = typer.Option(None, "--profile"),
+    model_read_scope: Path | None = typer.Option(None, "--model-read-scope")) -> None:
     """소유 대상용 native metadata 센서를 준비한다. 엔진·클라이언트를 만들지 않는다."""
     from guard.collectors.lifecycle import prepare_assets
     try:
-        value = prepare_assets(output, Path(__file__).resolve().parents[3])
+        value = prepare_assets(output, Path(__file__).resolve().parents[3], profile=profile,model_read_scope=model_read_scope)
     except (OSError, ValueError, TypeError):
         typer.echo("LIFECYCLE_PREPARATION_FAILED")
         raise typer.Exit(2)
@@ -561,21 +586,23 @@ def capture_kubernetes_lifecycle_session(
     prepared: Path = typer.Option(...,"--prepared"),
     output: Path = typer.Option(...,"--output"),
     kubectl_binary: str = typer.Option("kubectl","--kubectl-binary"),
+    model_mapping: Path | None = typer.Option(None,"--model-mapping",help="ENV에 결합된 명시 API 이름·모델 mount 매핑"),
     max_duration: float = typer.Option(180,"--max-duration"),
     execute: bool = typer.Option(False,"--execute",help="명시 소유 Kubernetes 세션의 파일·프로세스 metadata만 읽기"),
 ) -> None:
     """명시 context/Pod 세대에서 고정 읽기 helper만 실행한다. 보안 판정은 UNKNOWN이다."""
     import hashlib
-    from guard.collectors.kubernetes_lifecycle import load_inputs,validate_options,collect
+    from guard.collectors.kubernetes_lifecycle import load_inputs,load_model_mapping,validate_options,collect
     from guard.collectors.route_observations import validate_output
     try:
         environment,topology,assets=load_inputs(env,target,prepared)
+        mapping=load_model_mapping(environment,model_mapping) if model_mapping is not None else None
         validate_options(kubectl_binary,max_duration)
         validate_output(output,Path(__file__).resolve().parents[3])
         if not execute:
             typer.echo(json.dumps({"capture_executed":False,"engine_started":False,"security":"UNKNOWN"}))
             return
-        value=collect(environment,topology,assets,binary=kubectl_binary,duration=max_duration)
+        value=collect(environment,topology,assets,binary=kubectl_binary,duration=max_duration,model_mapping=mapping)
         raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
         if len(raw.encode("utf-8"))>64*1024**2:raise ValueError("LIFECYCLE_SESSION_ATTACHMENT_BOUND")
     except (OSError,ValueError,TypeError,KeyError,yaml.YAMLError):
@@ -591,6 +618,48 @@ def capture_kubernetes_lifecycle_session(
     typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"security":"UNKNOWN",
         "recordings":len(value["recordings"]),"sha256":hashlib.sha256(raw.encode("utf-8")).hexdigest(),
         "bytes":len(raw.encode("utf-8"))}))
+
+
+@app.command("capture-kubernetes-process-snapshot")
+def capture_kubernetes_process_snapshot(
+    env: Path=typer.Option(...,"--env"),target: Path=typer.Option(...,"--target"),
+    output: Path=typer.Option(...,"--output"),
+    candidate_paths: Path | None=typer.Option(None,"--candidate-paths",help="명시한 후보 경로 목록 JSON; lstat metadata만"),
+    kubectl_binary: str=typer.Option("kubectl","--kubectl-binary"),
+    max_duration: float=typer.Option(300,"--max-duration"),
+    execute: bool=typer.Option(False,"--execute",help="선택 컨테이너의 process metadata·환경 이름만 읽기"),
+) -> None:
+    """기존 권한/자격 소비자의 공통 입력. worker/source 귀속과 보안 판정은 미확인이다."""
+    import hashlib
+    from guard.collectors.kubernetes_process import load_inputs,validate_options,collect
+    from guard.collectors.route_observations import validate_output
+    try:
+        environment,topology,selected=load_inputs(env,target,candidate_paths)
+        validate_options(kubectl_binary,max_duration)
+        validate_output(output,Path(__file__).resolve().parents[3])
+        if not execute:
+            typer.echo(json.dumps({"capture_executed":False,"engine_started":False,
+                "worker_subject_verified":False,"worker_inventory_complete":False,"security":"UNKNOWN"}))
+            return
+        value=collect(environment,topology,binary=kubectl_binary,duration=max_duration,candidate_paths=selected)
+        raw=json.dumps(value,ensure_ascii=True,sort_keys=True,separators=(",",":"))+"\n"
+        if len(raw.encode())>1024**2:
+            raise ValueError('KUBERNETES_PROCESS_ATTACHMENT_BOUND')
+    except (OSError,ValueError,TypeError,KeyError,RuntimeError,yaml.YAMLError):
+        typer.echo('KUBERNETES_PROCESS_CAPTURE_FAILED')
+        raise typer.Exit(2)
+    try:
+        validate_output(output,Path(__file__).resolve().parents[3])
+        with output.open('x',encoding='utf-8',newline='\n') as stream:stream.write(raw)
+    except (OSError,UnicodeError,ValueError):
+        typer.echo(json.dumps({"capture_executed":True,"artifact_saved":False,"security":"UNKNOWN",
+            "diagnostic_codes":["PROCESS_SNAPSHOT_ARTIFACT_UNAVAILABLE"],"capture":value},ensure_ascii=True))
+        raise typer.Exit(1)
+    typer.echo(json.dumps({"capture_executed":True,"artifact_saved":True,"available":value['available'],
+        "worker_subject_verified":False,"worker_inventory_complete":False,"security":"UNKNOWN",
+        "sha256":hashlib.sha256(raw.encode()).hexdigest(),"bytes":len(raw.encode())}))
+    if not value['available']:
+        raise typer.Exit(1)
 
 
 @app.command("capture-native-weight-files")

@@ -23,6 +23,7 @@ IMAGE_ID = "sha256:" + "b" * 64
 CONTAINER = "guard-example-engine"
 RUN = "example-image-approval"
 _DEFAULT_ENV_IMAGE = object()
+_DEFAULT_ENV_REF = object()
 
 
 def _inspect(pin=PIN):
@@ -63,17 +64,14 @@ class FakeDocker:
 
 def _run(tmp_path, monkeypatch, *, docker=None, values=None, pin=PIN,
          cfg_container=None, target_extra=None, functional_error=False, status=200,
-         environment_image=_DEFAULT_ENV_IMAGE):
+         environment_image=_DEFAULT_ENV_IMAGE, target_ref=_DEFAULT_ENV_REF):
     docker = docker or FakeDocker()
     target = {"lab": True, "run_id": RUN, "probe_image": "unused",
               "origins": {"trusted": {"network": "trusted"}},
               "gateway": {"url": "http://gateway:8080"},
               "engine": {"container": CONTAINER, "image_digest": pin,
                          "trusted_url": "http://engine:8000", "ready_timeout": 1}}
-    if target_extra:
-        target.update(target_extra)
     source = tmp_path / "target.json"
-    source.write_text(json.dumps(target), encoding="utf-8")
     cfg = {"target": str(source)}
     if cfg_container is not None:
         cfg["container"] = cfg_container
@@ -94,6 +92,13 @@ def _run(tmp_path, monkeypatch, *, docker=None, values=None, pin=PIN,
     assert check.executor == "container_config" and check.collection_profile == PROFILE
     declared = pin if environment_image is _DEFAULT_ENV_IMAGE else environment_image
     env = environment(engine={"name": "vllm", "version": "0.32.0", "image_digest": declared}, model={"id": "m"})
+    if target_ref is _DEFAULT_ENV_REF:
+        target["environment_ref"] = env.ref().model_dump(mode="json")
+    elif target_ref is not None:
+        target["environment_ref"] = target_ref
+    if target_extra:
+        target.update(target_extra)
+    source.write_text(json.dumps(target), encoding="utf-8")
     values = {"approved_image_digests": [PIN]} if values is None else values
     pol = policy(pack.ref(), scope={"include": ["SUP-04"], "exclude": []}, values={"SUP-04": values})
     store.put_many([env, pol])
@@ -113,7 +118,7 @@ def test_approved_running_image_is_partial_unknown_not_full_supply_pass(tmp_path
     store, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch)
     assert evd.execution.status == ExecStatus.COMPLETED
     assert evd.data_origin.value == "EXAMPLE"
-    assert evd.execution.executor.name == "container_config" and evd.execution.executor.version == "0.5.1"
+    assert evd.execution.executor.name == "container_config" and evd.execution.executor.version == "0.6.2"
     assert result.verdicts.security == Verdict.UNKNOWN
     assert evd.observations["running_image_identity_verified"].value is True
     assert evd.observations["running_image_repo_digest"].value == PIN
@@ -273,12 +278,12 @@ def test_aborted_supply_collection_records_same_static_executor_version(tmp_path
     def interrupted(self, ctx):
         raise RuntimeError("EXAMPLE interrupted collection")
 
-    assert ContainerConfigExecutor.version == "0.5.1"
+    assert ContainerConfigExecutor.version == "0.6.2"
     monkeypatch.setattr(ContainerConfigExecutor, "collect", interrupted)
     _, _, _, evd, result, _, _ = _run(tmp_path, monkeypatch)
     assert evd.execution.status == ExecStatus.ABORTED
     assert evd.execution.executor.name == "container_config"
-    assert evd.execution.executor.version == ContainerConfigExecutor.version == "0.5.1"
+    assert evd.execution.executor.version == ContainerConfigExecutor.version == "0.6.2"
     assert result.verdicts.security == Verdict.UNKNOWN
 
 
@@ -315,3 +320,125 @@ def test_static_guidance_names_partial_scope_without_claiming_runtime_identity()
     pol = pol.model_copy(update={"values": {"SUP-04": {"approved_image_digests": [IMAGE_ID]}}})
     bad, = assess_check_support(pack, env, pol, cfg, selected_check_ids=["SUP-04"])
     assert bad["status"] == "UNKNOWN" and bad["policy_valid"] is False
+
+
+@pytest.mark.parametrize("target_ref", [None, {}, "ENV-example",
+    {"kind": "ENV", "id": "ENV-OTHER", "revision": 1, "sha256": "0" * 64}])
+def test_missing_or_foreign_environment_ref_cannot_supply_image_observations(tmp_path, monkeypatch, target_ref):
+    store, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch, target_ref=target_ref,
+        values={"approved_image_digests": [OTHER]})
+    assert result.verdicts.security == Verdict.UNKNOWN
+    assert evd.observations["running_image_identity_verified"].value is False
+    assert evd.observations["running_image_unapproved"].collected is False
+    assert not docker.calls and not any(p.get("method") == "POST" for p in probes)
+    summary, _ = _summary(store, evd)
+    assert summary["collection_errors"] == ["RUNNING_IMAGE_TARGET_UNVERIFIED"]
+
+
+@pytest.mark.parametrize("field,value", [("kind", "POL"), ("id", "ENV-OTHER"),
+    ("revision", 999), ("sha256", "0" * 64), ("extra", "EXAMPLE-extra-field")])
+def test_environment_ref_comparison_uses_the_complete_exact_ref(tmp_path, monkeypatch, field, value):
+    env = environment(engine={"name": "vllm", "version": "0.32.0", "image_digest": PIN}, model={"id": "m"})
+    bad_ref = env.ref().model_dump(mode="json")
+    bad_ref[field] = value
+    _, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch, target_ref=bad_ref)
+    assert evd.environment == env.ref()
+    assert evd.observations["running_image_identity_verified"].value is False
+    assert result.verdicts.security == Verdict.UNKNOWN and not docker.calls
+    assert not any(p.get("method") == "POST" for p in probes)
+
+
+def test_unsealed_environment_cannot_supply_a_running_image_identity():
+    from types import SimpleNamespace
+    from guard.executors.running_image_approval import _target
+
+    env = environment(engine={"name": "vllm", "version": "0.32.0", "image_digest": PIN})
+    target = {"environment_ref": env.ref().model_dump(mode="json"), "run_id": RUN,
+              "engine": {"container": CONTAINER, "image_digest": PIN}}
+    assert _target(SimpleNamespace(env=env, target=target), None) == (CONTAINER, PIN, RUN)
+    invalid = env.model_copy(update={"content_sha256": "0" * 64})
+    assert not invalid.hash_ok()
+    assert _target(SimpleNamespace(env=invalid, target=target), None) is None
+
+
+@pytest.mark.parametrize("mode,expected", [("approved", "UNKNOWN"), ("unapproved", "FAIL"),
+    ("missing-ref", "UNKNOWN"), ("foreign-ref", "UNKNOWN"), ("bare-digest", "FAIL"),
+    ("later-functional-error", "FAIL")])
+def test_environment_binding_product_cli_report_restore_and_exact_refs(tmp_path, monkeypatch, mode, expected):
+    import socket
+    import subprocess
+    from typer.testing import CliRunner
+    from guard.cli import app
+    from guard.models import canonical_json
+    from tests.builders import T0
+
+    declared = PIN.partition("@")[2] if mode == "bare-digest" else PIN
+    env = environment(engine={"name": "vllm", "version": "0.32.0", "image_digest": declared}, model={"id": "m"})
+    pack = baseline_pack()
+    approved = [PIN] if mode == "approved" else [OTHER]
+    pol = policy(pack.ref(), scope={"include": ["SUP-04"], "exclude": []},
+                 values={"SUP-04": {"approved_image_digests": approved}})
+    env_path, pol_path, target_path = [tmp_path / name for name in ("env.json", "policy.json", "target.json")]
+    env_path.write_bytes(canonical_json(env.to_dict())); pol_path.write_bytes(canonical_json(pol.to_dict()))
+    target = {"lab": True, "run_id": RUN, "probe_image": "EXAMPLE-unused",
+        "environment_ref": env.ref().model_dump(mode="json"),
+        "engine": {"container": CONTAINER, "image_digest": PIN, "trusted_url": "http://engine:8000", "ready_timeout": 1},
+        "origins": {"trusted": {"network": "trusted"}}, "gateway": {"url": "http://gateway:8080"}}
+    if mode == "missing-ref":
+        target.pop("environment_ref")
+    elif mode == "foreign-ref":
+        target["environment_ref"] = env.model_copy(update={"id": "ENV-OTHER"}).seal().ref().model_dump(mode="json")
+    target_path.write_text(json.dumps(target), encoding="utf-8")
+    config = tmp_path / "guard.toml"
+    config.write_text('[executors]\ncontainer_config="real"\n[adapter]\nname="vllm"\n'
+        '[container_config]\ntarget=' + json.dumps(target_path.as_posix()) + '\n', encoding="utf-8")
+    docker, probes = FakeDocker(), []
+    def probe(network, requests, timeout):
+        probes.extend(deepcopy(requests))
+        if mode == "later-functional-error" and any(r.get("method") == "POST" for r in requests):
+            raise OSError("NEVER_PERSIST_FUNCTIONAL_ERROR")
+        return [{"id": r["id"], "method": r["method"], "url": r["url"], **completion_response(r)} for r in requests]
+    monkeypatch.setitem(registry.EXECUTORS, "container_config:real", lambda raw:
+        ContainerConfigExecutor(raw["container_config"], docker=docker, container_probe=probe))
+    def forbidden(*args, **kwargs):
+        raise AssertionError("EXAMPLE_NO_NETWORK_OR_SUBPROCESS")
+    monkeypatch.setattr(subprocess, "Popen", forbidden); monkeypatch.setattr(socket, "socket", forbidden)
+    runner, store_path = CliRunner(), tmp_path / "store"
+    common = ["--config", str(config), "--store", str(store_path)]
+    def cli(args):
+        result = runner.invoke(app, args)
+        assert result.exit_code == 0, (args, result.stdout, repr(result.exception))
+        assert "NEVER_PERSIST" not in result.stdout
+        return result.stdout
+    plan_ref = cli(["select", "--pack", str(pack.path), "--env", str(env_path), "--policy", str(pol_path), *common]).strip().splitlines()[-1]
+    cli(["run", "--plan", plan_ref, "--pack", str(pack.path), *common])
+    cli(["judge", "--plan", plan_ref, "--pack", str(pack.path), "--as-of", T0.isoformat(), *common])
+    cli(["report", "--plan", plan_ref, "--pack", str(pack.path), "--json", str(tmp_path / "report.json"), "--as-of", T0.isoformat(), *common])
+    cli(["verify", *common])
+    store = Store(store_path)
+    evd, = store.find_latest("EVD", lambda r: True); res, = store.find_latest("RES", lambda r: True)
+    rpt, = store.find_latest("RPT", lambda r: True)
+    assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.6.2"
+    assert evd.execution.status == ExecStatus.COMPLETED and res.verdicts.security.value == expected
+    assert evd.environment == env.ref() and rpt.official is False
+    assert evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest
+    if mode in {"missing-ref", "foreign-ref"}:
+        assert not docker.calls and not any(p.get("method") == "POST" for p in probes)
+        assert evd.observations["running_image_unapproved"].collected is False
+    else:
+        assert evd.observations["running_image_identity_verified"].value is True
+    for artifact in evd.artifacts:
+        assert b"NEVER_PERSIST" not in (store.root / artifact.path).read_bytes()
+    bundle, restored = tmp_path / "bundle.zip", tmp_path / "restored"
+    cli(["evidence", "export", "--store", str(store_path), "--output", str(bundle)])
+    cli(["evidence", "restore", "--bundle", str(bundle), "--destination", str(restored)])
+    # Saved evidence remains usable after the live target has disappeared.
+    target_path.unlink()
+    monkeypatch.setattr(ContainerConfigExecutor, "collect", forbidden)
+    cli(["judge", "--plan", plan_ref, "--pack", str(pack.path), "--as-of", T0.isoformat(),
+         "--config", str(config), "--store", str(restored)])
+    cli(["verify", "--config", str(config), "--store", str(restored)])
+    restored_store = Store(restored)
+    replayed, = restored_store.find_latest("RES", lambda r: True)
+    assert replayed.ref() == res.ref() and restored_store.resolve(evd.ref()).to_dict() == evd.to_dict()
+    assert restored_store.resolve(rpt.ref()).to_dict() == rpt.to_dict()

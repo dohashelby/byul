@@ -22,7 +22,9 @@ import re
 import secrets
 from typing import Any
 
+from guard.models import canonical_json, sha256_hex
 from .http_common import Ctx, HttpCheckExecutor, functional_requests, functional_results
+from .owned_capture import engine_identity
 from .running_image_approval import (PROFILE as SUPPLY_IMAGE_PROFILE,
                                      collect_running_image_approval, validate_image_approval_policy)
 
@@ -121,9 +123,88 @@ def _mount_key(m: dict) -> str:
     return f"{m.get('Destination')}:{'rw' if m.get('RW') else 'ro'}"
 
 
+def read_kubernetes_process_observations(ctx, candidate_paths=None):
+    """Consume the live common reader; caller-supplied packets are not inputs."""
+    from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+    if (not isinstance(ctx.cprobe, KubernetesHTTP) or ctx.cprobe.profile != REQUEST_BINDING_PROFILE
+            or ctx.cprobe.target_sha256 != sha256_hex(canonical_json(ctx.target))
+            or not callable(getattr(ctx.cprobe, "process_snapshot", None))):
+        raise ValueError("KUBERNETES_PROCESS_COMMON_INTERFACE_UNAVAILABLE")
+    from guard.runtime.kubernetes_process import PROFILE
+    record = ctx.cprobe.process_snapshot(candidate_paths)
+    if (type(record) is not dict or record.get("profile") != PROFILE
+            or record.get("target_sha256") != ctx.cprobe.target_sha256):
+        raise ValueError("KUBERNETES_PROCESS_COMMON_RECORD_INVALID")
+    from guard.models import DataOrigin
+    ctx._kubernetes_process_data_origin = DataOrigin(record["data_origin"])
+    return record
+
+
+def kubernetes_process_rows(record):
+    """Stable reported processes, without classifying them as model workers."""
+    packet = record.get("packet")
+    if (record.get("available") is not True or record.get("binding_verified_before_after") is not True
+            or type(packet) is not dict or packet.get("capture_process_excluded") is not True
+            or packet.get("capture_subject", {}).get("identity_stable") is not True):
+        return []
+    return [row for row in packet["processes"] if row["pid_identity_stable"] is True]
+
+
+def kubernetes_process_control(ctx):
+    """Use the existing CheckDef/validator through the common live transport."""
+    from guard.runtime.kubernetes_http import KubernetesBindingError
+    requests, probes = functional_requests(ctx, via="engine")
+    try:
+        responses = ctx.cprobe.normal_requests(ctx.trusted_net, requests, ctx.timeout) if requests else []
+    except KubernetesBindingError:
+        # A later control/owner/cleanup gap does not erase earlier process facts.
+        responses = []
+    raw = dict(zip(probes, responses))
+    for pid, response in raw.items():
+        ctx.record("trusted", "functional-engine", pid, probes[pid].as_role, response)
+    functional, _, normal = functional_results(probes, raw)
+    return ({"functional_probes_planned": {"value": list(probes), "collected": True},
+             "functional_probe_results": {"value": functional, "collected": bool(probes)}}, normal)
+
+
+def collect_kubernetes_process_permissions(ctx):
+    """PLT01's limited actual process facts; whole permission scope stays open."""
+    if ctx.check.id != "PLT-01":
+        raise ValueError("KUBERNETES_PROCESS_PERMISSION_CHECK_UNSUPPORTED")
+    record = read_kubernetes_process_observations(ctx)
+    rows = kubernetes_process_rows(record)
+    status = [row for row in rows if row["uid_effective"] is not None and row["cap_eff"] is not None]
+    caps = sorted({cap for row in status for cap in decode_caps(row["cap_eff"])})
+    uids = sorted({row["uid_effective"] for row in status})
+    observations = {key: {"value": None, "collected": False} for key in
+        ("mounts", "devices", "privileged", "host_namespaces", "sentinel_results", "exec_writable_mounts")}
+    observations.update({
+        "permission_scan_complete": {"value": False, "collected": True},
+        "process_scan_complete": {"value": False, "collected": True},
+        "capabilities_effective": {"value": caps if status else None, "collected": bool(status)},
+        # A known root process is positive evidence in the selected container.
+        # No observed root is not proof that every worker is non-root.
+        "root_uid_present": {"value": True if 0 in uids else None, "collected": 0 in uids},
+    })
+    functional, normal = kubernetes_process_control(ctx)
+    observations.update(functional)
+    summary = {"profile": "kubernetes-process-permission-consumer-v1", "process_observation": record,
+        "reported_process_uids": uids, "reported_capabilities_effective": caps,
+        "kubernetes": ctx.cprobe.report(),
+        "worker_subject_verified": False, "permission_scan_complete": False,
+        "fixture": {"process_profile": record["profile"], "program_sha256": record["program_sha256"],
+                    "declared_control": [probe.model_dump(mode="json") for probe in ctx.check.functional_probes]},
+        "limitations": ["Container-reported PID/UID/capability facts do not establish whole-worker coverage.",
+            "Collector identity is distinct and excluded; no source/model worker classification is inferred.",
+            "Actual process mounts, host isolation, device permissions and harmless access tests are unavailable."]}
+    challenges = [{"step": step, "attempted": index == 0 and type(record.get("packet")) is dict}
+                  for index, step in enumerate(ctx.check.challenge_steps)]
+    return observations, normal, challenges, summary
+
+
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
-    version = "0.5.1"
+    version = "0.6.2"
     requires_roles = False
     requires_route_scope = False
     functional_via = "engine"
@@ -148,21 +229,60 @@ class ContainerConfigExecutor(HttpCheckExecutor):
     def collect(self, ctx: Ctx):
         if getattr(ctx.check, "collection_profile", None) == SUPPLY_IMAGE_PROFILE:
             return collect_running_image_approval(self._docker_obj(), ctx, self.cfg.get("container"))
+        completeness_gate = any(obs.key == "permission_scan_complete" for obs in ctx.check.required_observations)
         container = self.cfg.get("container") or ctx.target.get("engine", {}).get("container")
-        if not container:
-            raise RuntimeError("container_config: no target container (set [container_config].container)")
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", container):
-            raise RuntimeError(f"container_config: invalid container name {container!r}")
+        if type(container) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", container):
+            raise ValueError("CONTAINER_TARGET_UNVERIFIED")
         docker = self._docker_obj()
+        anchor, intervals = None, {}
+        source_unverified = False
+        source_container = container
+        try:
+            image = ctx.env.engine.image_digest
+            anchor = engine_identity(docker, ctx.target, ctx.env, container, image, 30)
+            if not anchor["started_at"]:
+                raise ValueError("missing source generation")
+        except Exception:
+            raise ValueError("CONTAINER_TARGET_UNVERIFIED") from None
+        source_container = anchor["container_id"]
+
+        def check_owner():
+            nonlocal source_unverified
+            try:
+                current = engine_identity(docker, ctx.target, ctx.env, container, image, 5)
+                if current != anchor:
+                    raise ValueError("changed generation")
+            except Exception:
+                source_unverified = True
+                raise ValueError("CONTAINER_SOURCE_UNVERIFIED") from None
+
+        def bound(name, action):
+            try:
+                check_owner()
+                result = action()
+                check_owner()
+            except Exception:
+                intervals[name] = False
+                raise
+            intervals.setdefault(name, True)
+            return result
+
+        def inventory():
+            row = docker.inspect_json(source_container, timeout=30)
+            if type(row) is not dict:
+                raise ValueError("invalid inspect envelope")
+            state, config = row.get("State"), row.get("Config")
+            if (type(state) is not dict or type(config) is not dict
+                    or {"container_id": row.get("Id"), "image_id": row.get("Image"),
+                        "started_at": state.get("StartedAt"), "image": config.get("Image")} != anchor):
+                raise ValueError("CONTAINER_SOURCE_UNVERIFIED")
+            return row
 
         # Each permission source is independent. A later read failure must not
         # replace an already observed permission with an empty ABORTED record.
         errors, ins = [], {}
         try:
-            inspected = docker.inspect_json(container, timeout=30)
-            if type(inspected) is not dict:
-                raise ValueError("invalid inspect envelope")
-            ins = inspected
+            ins = bound("inventory", inventory)
         except Exception:
             errors.append("CONTAINER_INSPECTION_UNAVAILABLE")
         hc = ins.get("HostConfig") if type(ins.get("HostConfig")) is dict else {}
@@ -211,7 +331,7 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         # 2. 모든 프로세스의 유효 capability·UID
         procs, proc_rc = [], None
         try:
-            proc = docker.exec(container, ["sh", "-c", PROC_CMD], timeout=30)
+            proc = bound("process", lambda: docker.exec(source_container, ["sh", "-c", PROC_CMD], timeout=30))
             proc_rc = proc.returncode
             if type(proc.stdout) is not str:
                 raise ValueError("invalid process output")
@@ -225,9 +345,10 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         if not complete:
             errors.append("PROCESS_PERMISSION_SCAN_INCOMPLETE")
 
-        def write_probe(path):
+        def write_probe(path, source="sentinel"):
             try:
-                result = docker.exec(container, ["sh", "-c", SENTINEL_CMD, "_", path, secrets.token_hex(4)], timeout=30)
+                result = bound(source, lambda: docker.exec(source_container,
+                    ["sh", "-c", SENTINEL_CMD, "_", path, secrets.token_hex(4)], timeout=30))
                 value = result.stdout.strip()
                 if result.returncode == 0 and value in {"absent", "succeeded", "denied"}:
                     return value
@@ -247,7 +368,7 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         # 3-b. 쓰기 가능 + 실행 가능 마운트(그 자체가 권한): 마운트 표의 후보마다 실제 쓰기 시도
         mount_text, mount_rc = "", None
         try:
-            mt = docker.exec(container, ["sh", "-c", MOUNTS_CMD], timeout=30)
+            mt = bound("mount_table", lambda: docker.exec(source_container, ["sh", "-c", MOUNTS_CMD], timeout=30))
             mount_rc = mt.returncode
             if type(mt.stdout) is not str:
                 raise ValueError("invalid mount output")
@@ -263,14 +384,13 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         exec_checks: dict[str, str] = {}
         for c in candidates:
             if c["target"] not in exec_checks:
-                exec_checks[c["target"]] = write_probe(c["target"])
+                exec_checks[c["target"]] = write_probe(c["target"], "exec_sentinel")
         exec_writable = sorted(t for t, o in exec_checks.items() if o == "succeeded")
         permission_complete = (inspect_complete and complete and process_mounts_complete
                                and all(value != "error" for value in (*writes.values(), *exec_checks.values())))
         # Older saved definitions retain their original complete-list contract.
         # The new definition has an explicit whole-permission PASS gate so known
         # partial values can remain collected without manufacturing a PASS.
-        completeness_gate = any(obs.key == "permission_scan_complete" for obs in ctx.check.required_observations)
 
         # 4. 정상 대조(신뢰 출발점 → 엔진)
         probes = {fp.id: fp for fp in ctx.check.functional_probes}
@@ -278,8 +398,11 @@ class ContainerConfigExecutor(HttpCheckExecutor):
         functional_attempted = False
         try:
             reqs, probes = functional_requests(ctx, via="engine")
-            functional_attempted = bool(reqs)
-            res = ctx.cprobe(ctx.trusted_net, reqs, max(ctx.timeout, 30.0)) if reqs else []
+            def normal_probe():
+                nonlocal functional_attempted
+                functional_attempted = bool(reqs)
+                return ctx.cprobe(ctx.trusted_net, reqs, max(ctx.timeout, 30.0)) if reqs else []
+            res = bound("normal_control", normal_probe)
             if (type(res) is not list or len(res) != len(reqs) or any(type(r) is not dict for r in res)
                     or [r.get("id") for r in res] != [r["id"] for r in reqs]):
                 raise ValueError("incomplete functional response correlation")
@@ -290,6 +413,8 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             errors.append("CONTAINER_FUNCTIONAL_PROBE_UNAVAILABLE")
         functional, functional_status, normal = functional_results(probes, func_raw, ctx.env.model.id)
         normal["attempted"] = functional_attempted
+        if source_unverified:
+            permission_complete = False
         observations = {
             "process_scan_complete": {"value": complete, "collected": True},
             "capabilities_effective": {"value": caps, "collected": any("caps" in p for p in procs)},
@@ -329,4 +454,7 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             "permission_scan_complete": permission_complete, "collection_errors": sorted(set(errors)),
             "fixture": {"sentinel_paths": list(writes), "proc_cmd": PROC_CMD, "sentinel_cmd": SENTINEL_CMD},
         }
+        summary["source_binding"] = {"profile": "docker-engine-source-intervals/1",
+            "environment_ref": ctx.env.ref().model_dump(mode="json"),
+            "owner_sha256": sha256_hex(canonical_json(anchor)), "intervals_verified": intervals}
         return observations, normal, challenges, summary

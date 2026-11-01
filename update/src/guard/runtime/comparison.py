@@ -1,5 +1,13 @@
 """Canonical execution conditions. Addresses and resource names are evidence, not conditions."""
 from urllib.parse import urlsplit
+from guard.models import canonical_json, sha256_hex
+
+
+def model_request_conditions(mapping):
+    # ENV Ref and host address bind provenance, not baseline/candidate conditions.
+    if type(mapping) is dict and mapping.get("schema")=="guard.model-request-mapping/1":
+        return {key:mapping[key] for key in ("schema","repository_id","revision","inventory_sha256","served_model_name","container_mount")}
+    return mapping
 
 
 def execution_conditions(target: dict, settings: dict, roles: list[str]) -> dict:
@@ -29,6 +37,7 @@ def execution_conditions(target: dict, settings: dict, roles: list[str]) -> dict
         "gateway_known_routes": sorted(target.get("gateway_known_routes", []), key=str),
         "launch": target.get("comparison_config"),
         "roles": sorted(roles),
+        **({"model_mapping_sha256":sha256_hex(canonical_json(model_request_conditions(target["model_mapping"])))} if "model_mapping" in target else {}),
         "settings": {k: v for k, v in settings.items()
                      if k not in {"target", "container", "roles", "wrong_key_env", "allowed_key_env", "denied_key_env"}},
     }

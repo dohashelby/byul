@@ -94,21 +94,27 @@ def connect_paths(paths, timeout):
     deadline = time.monotonic() + 10
     for index, path in enumerate(paths):
         row = {"index": index, "outcome": "unknown"}
+        connecting = False
         try:
             if time.monotonic() >= deadline:
                 raise TimeoutError("connection deadline")
             before = _stat_socket(path)
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
                 peer.settimeout(min(timeout, max(0.001, deadline - time.monotonic())))
+                connecting = True
                 peer.connect(path)  # zero payload: never send a command or material
+                connecting = False
                 pid, uid, gid = struct.unpack("3i", peer.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
                 row.update(outcome="connected", peer={"pid": pid, "uid": uid, "gid": gid})
             row["identity"] = before
             row["path_stable"] = _stat_socket(path) == before
         except OSError as error:
-            row.update(outcome="denied" if error.errno in (errno.EACCES, errno.EPERM) else "unknown")
+            row.update(outcome="denied" if connecting and error.errno in (errno.EACCES, errno.EPERM) else "unknown")
         except ValueError:
-            pass
+            # A successful connect with an unavailable peer/path recheck is
+            # unverified, not a denial or a malformed connected row that would
+            # make the consumer discard earlier independent path observations.
+            row["outcome"] = "unknown"
         rows.append(row)
     return {"schema": "guard-unix-ipc-probe/1", "mode": "connect", "uid": os.geteuid(),
             "groups": os.getgroups(), "namespaces": _namespaces(), "rows": rows}

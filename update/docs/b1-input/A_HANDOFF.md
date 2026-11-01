@@ -1,5 +1,28 @@
 # A에게 필요한 B-1 연결 인계
 
+## REQ-09 원 정의 연결 추가 — 2026-10-30
+
+`run_req09_pipeline(source_root, output_root, *, source_store, plan_id, pack_path, entered_by)`는
+원 PACK31 REQ-09 revision 8의 고정 source CPU 부분을 기존 manual override에 연결한다.
+기존 Online 3점검 proposal 함수·source profile·pin 의미는 유지한다. 대상 source는
+db9527a46873454610df6dbedf79a36d6bf1a7f6 하나이며 실제 이미지·모델·HTTP·GPU는 실행하지 않는다.
+
+인계 시 원 source ENV/POL/PACK/PLAN과 정책 4개, 새 output, 신고 입력자를 명시한다.
+원 source Store는 보존하고 새 사본에만 append-only EVD/RES/RPT를 추가한다. 전체 정상
+대조와 원 token/길이 챌린지를 부분 mask/offset CPU 성공으로 대체하지 않는다.
+원 10개 관측 중 `confirmed_input_violations`만 자격 있는 실제 행에서 투영하고 다른
+9개는 미수집이다. 수동 판정의 기존 input scope ceiling과 DECLARED 출처도 유지한다.
+
+원 gate·component·collector literal의 변경은 root가 선정 소스 전체를 고정한 뒤 별도로
+수행한다. bridge는 관측한 현행 bytes를 새 승인값으로 쓰지 않는다. 단위 시험은
+EXAMPLE fixture만 사용하며 수집기 실제 실행은 통합 후 한 번으로 구분한다.
+artifact·후속 정상·마지막 component 확인이나 export 실패가 독립적으로 확인된 위반을
+삭제하지 않는 기존 수동 증거/판정 계약을 사용한다. 원 모델 consumer·HTTP·메모리 영향과
+전체 REQ-09 충족은 남은 범위로 표시한다.
+행별 사전 검증·실제 invalid 입력 수용·입출력 동일성을 확인했다면 명시적 후기
+`unavailable`이 독립 FAIL을 지우지 않는다. 이 경우 수집은 incomplete이고 전체 범위는
+UNKNOWN이다. 명시적 source mismatch·후기 상태 누락/오류는 계속 자격에서 제외한다.
+
 PR43은 보존한다. PR46은 그 브랜치를 base로 하는 B-1 전용 후속이다.
 REQ-10 structured_limits.py/sampling_cpu.py, REQ-07·08·09 input_cpu.py,
 REQ-09 embedding_cpu.py와 CPU 실행 도구를 제공한다. 공통 등록/CLI/팩은 수정하지 않았다.

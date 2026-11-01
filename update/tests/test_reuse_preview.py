@@ -17,8 +17,8 @@ def _cfg(tmp_path, executor, **settings):
             executor: {"target": str(path), **settings}}
 
 
-def test_container_preview_uses_existing_fixed_fixture_without_docker(tmp_path, monkeypatch):
-    from guard.executors.container_config import PROC_CMD, SENTINEL_CMD, ContainerConfigExecutor
+def test_source_bound_container_preview_cannot_confirm_live_identity_without_docker(tmp_path, monkeypatch):
+    from guard.executors.container_config import ContainerConfigExecutor
 
     def forbidden(*args, **kwargs):
         raise AssertionError("preview must not run or collect")
@@ -28,12 +28,8 @@ def test_container_preview_uses_existing_fixed_fixture_without_docker(tmp_path, 
     cfg = _cfg(tmp_path, "container_config", sentinel_paths=["/one", "/one", "/two"])
     check = baseline_pack().checks["PLT-01"]
     preview = preview_inputs(check, environment(), {}, cfg)
-    assert preview is not None
-    assert preview.fixture_sha256 == sha256_hex(canonical_json({
-        "sentinel_paths": ["/one", "/two"], "proc_cmd": PROC_CMD, "sentinel_cmd": SENTINEL_CMD}))
-    assert preview.executor.name == "container_config"
-    assert preview.executor.version == ContainerConfigExecutor.version == "0.5.1"
-    assert preview.config_sha256 == preview.executor.config_sha256
+    assert preview is None
+    assert ContainerConfigExecutor.version == "0.6.2"
 
 
 def test_supply_image_identity_cannot_borrow_platform_sentinel_fixture(tmp_path, monkeypatch):
@@ -88,6 +84,7 @@ def test_executor_plugin_can_supply_pure_inputs_without_core_name_branch(monkeyp
 
 def test_executor_hook_can_withhold_dynamic_source_without_http_fallback(tmp_path, monkeypatch):
     from guard.executors.container_config import ContainerConfigExecutor
+    from guard.executors import reuse
 
     class SourceBoundExecutor(ContainerConfigExecutor):
         def preview_reuse_inputs(self, check, env, values, adapter):
@@ -98,6 +95,7 @@ def test_executor_hook_can_withhold_dynamic_source_without_http_fallback(tmp_pat
 
     monkeypatch.setattr(SourceBoundExecutor, "collect", forbidden)
     monkeypatch.setattr(SourceBoundExecutor, "_docker_obj", forbidden)
+    monkeypatch.setattr(reuse, "_http_fixture", forbidden)
     monkeypatch.setitem(registry.EXECUTORS, "container_config:source-bound", lambda cfg: SourceBoundExecutor(cfg["container_config"]))
     cfg = _cfg(tmp_path, "container_config")
     cfg["executors"]["container_config"] = "source-bound"
@@ -116,3 +114,18 @@ def test_fixed_routes_can_be_prepared_without_observed_registrations(tmp_path, m
     preview = preview_inputs(baseline_pack().checks["REQ-01"], environment(), {"allowed_callers": ["allowed"]}, cfg)
     assert preview is not None
     assert preview.executor.version == DirectRouteExecutor.fixed_fixture_version
+
+
+def test_old_credential_field_names_do_not_bypass_current_live_source_boundary(tmp_path, monkeypatch):
+    from guard.executors.credential_exposure import CredentialExposureExecutor
+    from tests.response_semantics_support import with_legacy_check
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("legacy preview must not collect a new source identity")
+
+    monkeypatch.setattr(CredentialExposureExecutor, "collect", forbidden)
+    monkeypatch.setattr(CredentialExposureExecutor, "_docker_obj", forbidden)
+    check = with_legacy_check(baseline_pack(), "PLT-04").checks["PLT-04"]
+    assert any(obs.key == "exposed_credential_paths" for obs in check.required_observations)
+    cfg = _cfg(tmp_path, "credential_exposure")
+    assert preview_inputs(check, environment(), {"forbidden_env_names": [], "forbidden_mount_paths": []}, cfg) is None

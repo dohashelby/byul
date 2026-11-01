@@ -1,0 +1,973 @@
+{
+  "archive": "validation-evidence.zip",
+  "archive_sha256": "40c93d9054b0ce160f07c8656a092e231589487928b63361a0a61308f0d961d7",
+  "archive_bytes": 1097351,
+  "files": [
+    {
+      "path": "pack-owner2/checklist-status-final.log",
+      "sha256": "ed5db021fb5ba03051c93f737149048534ba8393e013bbd1f228ac2b55e47047",
+      "bytes": 29
+    },
+    {
+      "path": "pack-owner2/checklist-status.log",
+      "sha256": "ed5db021fb5ba03051c93f737149048534ba8393e013bbd1f228ac2b55e47047",
+      "bytes": 29
+    },
+    {
+      "path": "pack-owner2/cli-help.log",
+      "sha256": "781437fca2890a8bc08d620a430779e994a766d91170711aad28440579c517a0",
+      "bytes": 6490
+    },
+    {
+      "path": "pack-owner2/collected-tests.txt",
+      "sha256": "8f69004c54e4da8ede5ddb1066759b454272726105fecc0bde1d09dcab8dd774",
+      "bytes": 2235257
+    },
+    {
+      "path": "pack-owner2/contracts-final-timing.json",
+      "sha256": "0fea84bcc050449bc2ba58919ce4af61314c2581b25062e88d6c88b37cce5dcc",
+      "bytes": 305
+    },
+    {
+      "path": "pack-owner2/contracts-final.log",
+      "sha256": "99bcb47f27a7b733b8f73a08ee879322dbe06c58d78635ef19fc8fd317f6bce2",
+      "bytes": 184
+    },
+    {
+      "path": "pack-owner2/derived-builders-final.json",
+      "sha256": "e0cb8eb235c2dc6f79c9d6a520d43691f5858bb8123c4d800e3325882874c8ae",
+      "bytes": 9610
+    },
+    {
+      "path": "pack-owner2/direct-linux-process-rss.json",
+      "sha256": "918663f4c96360d2e46cc98d66d6282d3cd1200b0861c0408b1264e30cf50aae",
+      "bytes": 565
+    },
+    {
+      "path": "pack-owner2/engine-contract-before-gate-fix.log",
+      "sha256": "6a32e20c1fff2454919ab4c67610f8539d67e5af5901552f73c3b8bc041fd04c",
+      "bytes": 101
+    },
+    {
+      "path": "pack-owner2/engine-contract-initial-failure.log",
+      "sha256": "ca873c502e9e589fd6c322c0ce2f64ded897f0fd59a21b9f9404631698027938",
+      "bytes": 3825
+    },
+    {
+      "path": "pack-owner2/engine-contract-timing.json",
+      "sha256": "b55966a8f60f727981901a970b9122310787bbbe217c248230d38cb76d04237c",
+      "bytes": 197
+    },
+    {
+      "path": "pack-owner2/engine-contract.log",
+      "sha256": "6a32e20c1fff2454919ab4c67610f8539d67e5af5901552f73c3b8bc041fd04c",
+      "bytes": 101
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/engine-sensor-source-cpu-example-contract.zip",
+      "sha256": "29d3055c4ea944280dc34203cd04704bae9ced694bc6535a5d0a95305465bd77",
+      "bytes": 7808
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/manifest-initial-selection.json",
+      "sha256": "2cce0a33ca3d0d7b142f4d76d4d03091ff3d6d85332a8bef044d06e1b4722eb3",
+      "bytes": 660
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/manifest.json",
+      "sha256": "f091bb1b078cb446d496efcd4ca232160a98f3110d2054d55e2aef14984fa42f",
+      "bytes": 2900
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/test_lif03_real_registered_fac0.zip",
+      "sha256": "5c014715f26fbee1aa6aad1ff159207c8c3d00c6d31217f0dab0ad711212d8ad",
+      "bytes": 33361
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/test_lif03_real_registered_fac1.zip",
+      "sha256": "3df574af43ae8760f5e6c90cef16c3a5b6394409fd78ea77561fe8bee25cba72",
+      "bytes": 33531
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/test_lif03_real_registered_fac2.zip",
+      "sha256": "3f7be4c3e4dbeb3d1189c384ee5ae21756824c9aa6274e4af72a0dc0a0af78e8",
+      "bytes": 33198
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/test_obs02_separate_producers_0.zip",
+      "sha256": "9323e432d1f641707b8c50a2fdcce30eea27fca41250f625da43b0a12ded685c",
+      "bytes": 27159
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/test_obs02_separate_producers_1.zip",
+      "sha256": "645128d1faf0d883c4d70b0d41faeec4f6584d9e15e21f30a07fc87cfd47e69c",
+      "bytes": 22112
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/test_profiler_control_register0.zip",
+      "sha256": "c2618ddc6a7eedb9c31d1bac935619bf8a6e989af726f2449a8e0b808509cd8a",
+      "bytes": 43720
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/test_profiler_control_register1.zip",
+      "sha256": "20750119f2cf188b99bfee5a848070442a8d2a3b5341856b062224070652f3a8",
+      "bytes": 44311
+    },
+    {
+      "path": "pack-owner2/example-product-bundles/test_transition_registered_fac0.zip",
+      "sha256": "3cd97a1051f942df244bd4a5556b864a824174b65fb58cfb4316a21253d50513",
+      "bytes": 10400
+    },
+    {
+      "path": "pack-owner2/extensions-verification-record.json",
+      "sha256": "c15ae9684d7c220576049a2e12fda6348e75fbda5e5f655d58bb01a72cc25896",
+      "bytes": 7122
+    },
+    {
+      "path": "pack-owner2/foundation-status-final.json",
+      "sha256": "90a5b82c1512768749a88d4dc905235fc4a7c437f70e7df59a226e1d587d389c",
+      "bytes": 304
+    },
+    {
+      "path": "pack-owner2/full-scope-inventory-2247aab.json",
+      "sha256": "0d1642a9dba126aa129960574c3139c4c83e77334e9588f30a6147eaa24b59d7",
+      "bytes": 102091
+    },
+    {
+      "path": "pack-owner2/full-scope-inventory.json",
+      "sha256": "3d9679e49226511939a0fc57ce06001c51b6e826fab3c7a85a0f81e5815e2bf3",
+      "bytes": 50485
+    },
+    {
+      "path": "pack-owner2/full-suite-initial-cp949-error.log",
+      "sha256": "c56fb1f8cd0d6f69d3086f122f46a4bd1ea57b7b5797a52be26374503e698d17",
+      "bytes": 928
+    },
+    {
+      "path": "pack-owner2/full-suite-initial-cp949-timing.json",
+      "sha256": "4abf9ba5367c993eae4cdb9d41fb32da1b1f2269fa3a7b5f989ab58028f8d226",
+      "bytes": 159
+    },
+    {
+      "path": "pack-owner2/full-suite-timing.json",
+      "sha256": "4abf9ba5367c993eae4cdb9d41fb32da1b1f2269fa3a7b5f989ab58028f8d226",
+      "bytes": 159
+    },
+    {
+      "path": "pack-owner2/full-suite-utf8-timing.json",
+      "sha256": "4798b38783a01696c8428a0de72c12f181669b7f16e32544c5ae389256450282",
+      "bytes": 224
+    },
+    {
+      "path": "pack-owner2/full-suite-utf8.log",
+      "sha256": "cd33a8674b2deaa685912c4baa4bb4da1b61382f88e951380d6696d26dd6011a",
+      "bytes": 4389684
+    },
+    {
+      "path": "pack-owner2/full-suite.log",
+      "sha256": "c56fb1f8cd0d6f69d3086f122f46a4bd1ea57b7b5797a52be26374503e698d17",
+      "bytes": 928
+    },
+    {
+      "path": "pack-owner2/integrated-contract-timing.json",
+      "sha256": "ae24503eb9ee880db289aea389032bcfe990d3c20fc8ec53fbe526c69d1e66b4",
+      "bytes": 274
+    },
+    {
+      "path": "pack-owner2/integrated-contract.log",
+      "sha256": "3e4e2a4776208f4061cb032468f489c849bfd9f57ed89d5616d1d5ae4eb0eaa0",
+      "bytes": 183
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-additional-27-classification.json",
+      "sha256": "b16a041b0c08e6638f20b56a6f984cb251d20f194f39fd8d579a26d2e7814745",
+      "bytes": 30597
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-additional-9-progress63-78-classification.json",
+      "sha256": "4586bfc5156205b5c6dfef3816237c92c29671d68151c245a3d4e3bb366fa5a0",
+      "bytes": 11955
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-additional-progress-failures.json",
+      "sha256": "090af366c2d1889819321dec42aace2cd90e394aa7e3be1a900b1af801a76c20",
+      "bytes": 6264
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-autocrlf-false-diagnostic.json",
+      "sha256": "66312b8de63bbbec438a4666359c1ac7c37831110d7dead420683a979e3f9f58",
+      "bytes": 1570
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-autocrlf-false-diagnostic.log",
+      "sha256": "8f97cc8a2c99859863d5a2393c5c52d5571bdddc4f5779816e52ae16770ab4cb",
+      "bytes": 809
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-guard-import.log",
+      "sha256": "63bd1e85d72c03e2885faf9e49c5e64f6177b22b7832745364bbf2cdbb67971c",
+      "bytes": 703
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress26-37-default-git.json",
+      "sha256": "92a751e8af59ee4f565a5cac102480191441d77397697b258d179094980b347a",
+      "bytes": 3456
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress26-37-default-git.log",
+      "sha256": "b5843ac77bad4a32a3e3bc06b6b4cd0eeef9ebffb7437dce2071df09d21ce53e",
+      "bytes": 60390
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress26-37-os-facts.json",
+      "sha256": "b7f18812074ce3b7a979da21719d3b247e5aef460bb8737fdb155dd31d4e0a9d",
+      "bytes": 1508
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress47-default-git.json",
+      "sha256": "0656ceb70cc8a365b7c94c90d147277057d8200dcaa51ebc605bd245a0ba4df2",
+      "bytes": 2865
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress47-default-git.log",
+      "sha256": "5a3f035c1c10b93ae2525d59fa9517339049ff47f68f9f645393db681b74f765",
+      "bytes": 15778
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress47-import.log",
+      "sha256": "0071f24ec091f4eb80b83d212816b0fe24fe584bf4b5d362b1164265f0db038e",
+      "bytes": 722
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress47-mode-diagnostic.json",
+      "sha256": "a1b859c1ae5b263824472d13c3bd4efdd4f095fdf73b37eee45b506bfe30456b",
+      "bytes": 3414
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress47-mode-diagnostic.log",
+      "sha256": "49cf710c9bc384a266968a5ee4df49f5e02683ac183e9370620c1a94a1cda947",
+      "bytes": 1472
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress47-source-newline-facts.json",
+      "sha256": "7324096a6d2f5644033b4f9beccfeb40d58cef79bd0553850b638451cda9810f",
+      "bytes": 448
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress63-78-default-git.json",
+      "sha256": "7c9a5d53a5cd3db71511adbd04e5dd03c8690f1dc75921fe7728db2715a1a4e3",
+      "bytes": 2580
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress63-78-default-git.log",
+      "sha256": "41c4055f8b2aed91c712f9bfd46c86b11a350693ea7b84ae4e8291546183975b",
+      "bytes": 38267
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress63-78-plugin-facts.json",
+      "sha256": "344993a733b766e640f47a12617f3df99047c4dff509dddb5ce9c68d83bdb940",
+      "bytes": 2309
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress89-93-default-git.json",
+      "sha256": "cbb0988d04adff5b8c9fcdf0e95a0a2b29a7768d72f5571d96febed84bcf58ba",
+      "bytes": 2407
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress89-93-default-git.log",
+      "sha256": "54f6d589eeafd0a5b7848358baba903c0bf0e666684b00125ced7dd227d442a9",
+      "bytes": 6360537
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress93-corrected-nodes.json",
+      "sha256": "57fac0b900e5e122362de841caf765bb985d5b5d69a02fab1fa742721525cb17",
+      "bytes": 2211
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-progress93-corrected-nodes.log",
+      "sha256": "2909da161069f62118c264fa1a7207552391b697f7908f69ce3b370dfcf38e9b",
+      "bytes": 3932
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-requested-symlink-cases.json",
+      "sha256": "81c26426dfe2799d2010833980d4ccf759c423217a45d8dae81138bf7febd0f0",
+      "bytes": 2515
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-requested-symlink-cases.log",
+      "sha256": "2cbb3b7418833a0bfb4f6857fed231fc02700c16c3f6725c02ab62fbcdcce9fe",
+      "bytes": 68025
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-shorttemp-requested-cases.json",
+      "sha256": "28dc87fc0c9968c387d5a660f0cb17cd4bf70590c1df24183575605be34cf973",
+      "bytes": 2369
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-shorttemp-requested-cases.log",
+      "sha256": "5b22b3d5180cfdd90a965f2fc2fc8dcb3bbabb61fd74236bcc8b8a69bf0e3bfc",
+      "bytes": 26225
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-template-fixture-byte-facts.json",
+      "sha256": "db8ed083420c5b3e84fa6ab46a80f9db33373f767bf7007725f1c2176e3d44fa",
+      "bytes": 630
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-tmp/test_consumption_rejects_pinne0/update/docs/b2-response/reference-source.json",
+      "sha256": "9484aba2124ac90c867024cb3a203ba15675173b1eb9291b524eaea229094c82",
+      "bytes": 16
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-tmp/test_consumption_reuses_common0/update/docs/b2-response/reference-source.json",
+      "sha256": "9484aba2124ac90c867024cb3a203ba15675173b1eb9291b524eaea229094c82",
+      "bytes": 16
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-baseline-c826-tmp/test_explicit_b2_hashes_are_in0/update/docs/b2-response/reference-source.json",
+      "sha256": "9484aba2124ac90c867024cb3a203ba15675173b1eb9291b524eaea229094c82",
+      "bytes": 16
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-2247aab-progress93-corrected-nodes.json",
+      "sha256": "dc2e2fad6652fff17899df6e8dcfde1df6854919ecb6c0fbe8a45d7918419283",
+      "bytes": 2215
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-2247aab-progress93-corrected-nodes.log",
+      "sha256": "f42a3481aecc0b63b0f842d8c26d04c948d43b38ff89635bf839cccdf164abc1",
+      "bytes": 3932
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-2247aab-template-fixture-byte-facts.json",
+      "sha256": "fb41dd8c3cb6fe06d026a18dd0a1d325790f44d78eda2241ab300ff04933d520",
+      "bytes": 630
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-autocrlf-false-diagnostic.json",
+      "sha256": "6a2244c6df4eb341ce562163a7525886cbaa301818700ec3f2f3819ec8ebb0ea",
+      "bytes": 1575
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-autocrlf-false-diagnostic.log",
+      "sha256": "fce49c69d168011180d6fdf3d0188f8d6baa839146347d7d209840a38f8d9090",
+      "bytes": 809
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-guard-import.log",
+      "sha256": "de1efd7500fed2acb351af8b032d0487018b7c3950720311611459f55612e537",
+      "bytes": 703
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress26-37-default-git.json",
+      "sha256": "05e60cb26adceac1c7841c3b93d0a49b16448b7b8a9f7c5ebeda2927f29bf534",
+      "bytes": 3460
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress26-37-default-git.log",
+      "sha256": "d72e1b2b6726a581952e7c103b31fc66523325a9e71e8a555864827f126ef57f",
+      "bytes": 78525
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress26-37-os-facts.json",
+      "sha256": "5323f024be7de2fff14dce7611cde6c4bbc0798e2bf7a1deeb1ee1a320c074a5",
+      "bytes": 1508
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress47-default-git.json",
+      "sha256": "802681b3199139aa4130da17dc1645aac3348233d483a01dfdaba505eebabd4d",
+      "bytes": 2870
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress47-default-git.log",
+      "sha256": "d48acc262496ab55cb71f972df214b3703cba695e7b1f82aa644ee0eea9dc9a0",
+      "bytes": 15778
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress47-import.log",
+      "sha256": "e2e8943f319779fd59eca696a9c4662964c8362d53ea94c5e211c981998ecec2",
+      "bytes": 722
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress47-mode-diagnostic.json",
+      "sha256": "0cf1005426de5adc3506bf59281ebac5bf6c3f613d659b86a1b794a2fb30177a",
+      "bytes": 3416
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress47-mode-diagnostic.log",
+      "sha256": "e78a9bd706efd28162a363347ab482443a007859f4490fe604c0cf3c316ae850",
+      "bytes": 1472
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress47-source-newline-facts.json",
+      "sha256": "ea36c56462e523d2bda63575027e49895fbc3695fbaa9c4987eb922918fbcf68",
+      "bytes": 450
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress63-78-default-git.json",
+      "sha256": "3d4c03eba3164e33d4fcdd52bc11e074044151129800a48d83014bbaac3d8476",
+      "bytes": 2585
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress63-78-default-git.log",
+      "sha256": "86267adc23560c5573b9c866d39b13b80269f750feae17ee1181999cf43d7d72",
+      "bytes": 38267
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress63-78-plugin-facts.json",
+      "sha256": "073d87763ce6894ba7ba038769477da11251660b0080c6e26d2600f36f8dd84b",
+      "bytes": 2309
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress89-93-default-git.json",
+      "sha256": "207265eda0f75e0c5635425cacb8d5390f4110291077aa684e5172e3345667a4",
+      "bytes": 2411
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-progress89-93-default-git.log",
+      "sha256": "6b9150a37b7853535023b572bffe8b7af1f295b49cb97bbf8101ba6763844592",
+      "bytes": 6358867
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-requested-symlink-cases.json",
+      "sha256": "b982911567fdc986aee5f2b4aa6160234a86c6c139fd9b13f42f53bb05528f2b",
+      "bytes": 2521
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-requested-symlink-cases.log",
+      "sha256": "be2eede5bb4ce2349df6bd36fab62d9f1db317ec51eb1ec9730d5b33ba448101",
+      "bytes": 68099
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-shorttemp-requested-cases.json",
+      "sha256": "c01fbcf62b6545b55637c08870ee1d1efa97487945adb57de12b098d2631e623",
+      "bytes": 2373
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-shorttemp-requested-cases.log",
+      "sha256": "e1482f96a2ffed4287114632e5173c855378905cf3bbe0d16b7f0137301cbace",
+      "bytes": 26225
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-tmp/test_consumption_rejects_pinne0/update/docs/b2-response/reference-source.json",
+      "sha256": "9484aba2124ac90c867024cb3a203ba15675173b1eb9291b524eaea229094c82",
+      "bytes": 16
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-tmp/test_consumption_reuses_common0/update/docs/b2-response/reference-source.json",
+      "sha256": "9484aba2124ac90c867024cb3a203ba15675173b1eb9291b524eaea229094c82",
+      "bytes": 16
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-3a54ffa-tmp/test_explicit_b2_hashes_are_in0/update/docs/b2-response/reference-source.json",
+      "sha256": "9484aba2124ac90c867024cb3a203ba15675173b1eb9291b524eaea229094c82",
+      "bytes": 16
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/case/manifest.json",
+      "sha256": "7341be0bbd3131bb890cc9aba35a89b83d05d641c4ea38358fe4f27ef3b18acf",
+      "bytes": 548
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/case/model-manifest.json",
+      "sha256": "ca8a064df90b56927e6e569db028d179d1e4759d9b4fe03173ff3437d0b025cb",
+      "bytes": 291
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/case/prepared/manifest.json",
+      "sha256": "dd0526654f571db2b458a905d7e5f1673cfb12d143190123df905d04eaa805ef",
+      "bytes": 7174
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/case/prepared/model-read-scope.json",
+      "sha256": "88bc36edb6b9561e89667ff503b4d25c069ed926a918369c1f01397e5a856545",
+      "bytes": 1196
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/case/prepared/settings.json",
+      "sha256": "fc0ff9848ad4b7b25fce434f73b6923661c8e54f844ca2618e053840e905fe9a",
+      "bytes": 258
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/case/scope.json",
+      "sha256": "c10c043d807145ab163c2e62b23188fb7a24a7217ab3293edcab7650b24b86bb",
+      "bytes": 982
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/case/target.json",
+      "sha256": "9ee29768bc8152211d96394a0669eb59ad6d94b62e7fca1af873d7f236ff0c99",
+      "bytes": 2801
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/invocation.json",
+      "sha256": "e43a1b81847f3faaaa5a107b4f947dad1da701174f8ce982a8cdea1721fed19c",
+      "bytes": 13848
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/stderr.log",
+      "sha256": "9c5b0a022435ffe1a582c71ca003ae5aec0996ddc273d91a28b03dc9abefae90",
+      "bytes": 2126
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-case-evidence/stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-underlying-exceptions.json",
+      "sha256": "5362588e54fe7a18542483f23a87bc69cd4a4b61187fc0ab7d8cf7b2f8241d84",
+      "bytes": 933
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-underlying-trace-metadata.json",
+      "sha256": "bbcbdb1dce32e5540dbef6dfcb3ac44e250748ac4617eb6a50062ed3abe8e970",
+      "bytes": 2184
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-current-lif07-underlying-trace.log",
+      "sha256": "a6c2fbf0a72b0a1ca7ba1a7d1962da9dda8fb66ce93905b839752d976b545154",
+      "bytes": 2386
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-final-late21-classification.json",
+      "sha256": "6cb77c39e84f60d32152bac925d3fc3dcd647650da77f70ec347d3b51c57188b",
+      "bytes": 1070042
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-final-linux3123-suite-classification.json",
+      "sha256": "acff64332685e76e905cb2fd985c9cded8fad57954fa8dc7065e5581fbd0b89f",
+      "bytes": 7721
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-final-windows-suite-classification.json",
+      "sha256": "b3fa536d9693cea174c45cb7a353215975e463fb368d59d5ce9fa712c2d2c8be",
+      "bytes": 1083874
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-full-final-failed-error-nodes.json",
+      "sha256": "99eef5ae9b707910a64d8d79a2bfc1b7c5fe6caf652e0f8d0311d41f2b047398",
+      "bytes": 2109188
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux-baseline-c826-three-sensor-representatives.json",
+      "sha256": "c346f30069354f884b0e4924936b2ab833aa6a78ac1ce5ba80bc793a2a2e83cf",
+      "bytes": 1514
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux-baseline-c826-three-sensor-representatives.log",
+      "sha256": "e6b2443277bbc3163dea28e1910788ac2b2963129601eb38c4564d57270274c3",
+      "bytes": 21934
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux-current-2247aab-three-sensor-representatives.json",
+      "sha256": "b966701301c10cbd6528d6d5721e980ac9052fcab12838500431f72afafb0dd2",
+      "bytes": 1493
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux-current-2247aab-three-sensor-representatives.log",
+      "sha256": "cc9aede1e28a1b49d6bec806a668391dd48b0d4a90ea39b1b33fd99b805fb5a7",
+      "bytes": 21834
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux31214-runtime-gate-classification.json",
+      "sha256": "5f3778b7b6acb40a4c49965d972958518adf06cc08c832c04e974d737d51acc1",
+      "bytes": 5345
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux3123-baseline-seven-historical-gates.json",
+      "sha256": "6594b92b0ff55ec28c44ca08862fcca8e80495f6b9c6c0fce2750ec4e84428b8",
+      "bytes": 2136
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux3123-baseline-seven-historical-gates.log",
+      "sha256": "ebb316d0791d3aed2967b4833e0dccd6e1f3681010b0e3c7953a91dc017f8f53",
+      "bytes": 98
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux3123-current-seven-historical-gates.json",
+      "sha256": "7ce955236310ff3291721806239c3c4b4868ab678148b7898f04688e1abebdfd",
+      "bytes": 2165
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux3123-current-seven-historical-gates.log",
+      "sha256": "2b4c28744aca4c55dcc10c8bc169849a89e06df85bb58d6303adf99ae11d7b3c",
+      "bytes": 56170
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-linux3123-final-failed-nodeids.json",
+      "sha256": "5c7e8f67d952be33a3a2dcf5ea445602fc0ab38f0192fc627d20c01c02e6dfcb",
+      "bytes": 807
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-progress-after42-failures.json",
+      "sha256": "a2eb0a95324fdb284482f2b33a587e88ea03fd20351a89070cd3b17ee11bf5f5",
+      "bytes": 1849
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-progress-after51-failures.json",
+      "sha256": "efb0bf6efee1bdf67d2363c75673d57aadb39985fc5a85a3dd9f56884d3f48d0",
+      "bytes": 1054058
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-progress89-93-exact-nodeids.json",
+      "sha256": "82159c25e0cb99b5c25225ea238daa450aa5c2ac61885d1b99e05215878ca68c",
+      "bytes": 1051303
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-requested-cases-classification.json",
+      "sha256": "2b0840c17195840672ca7d31c3a182c17fc33a9d4d9d040345e4d74f622ce557",
+      "bytes": 3457
+    },
+    {
+      "path": "pack-owner2/legacy-comparison/review-shorttemp-byte-facts.json",
+      "sha256": "6641591cff2de51fe96a7bcc72a58a30d986d80e8d35da867806a4839c44ee11",
+      "bytes": 1263
+    },
+    {
+      "path": "pack-owner2/linux-runtime-preparation.json",
+      "sha256": "585be7f0499b5283ea09093a6196550b90293f8c7c6143e4798064e5c29d6ea7",
+      "bytes": 366
+    },
+    {
+      "path": "pack-owner2/linux-supported3/clone-0-timing.json",
+      "sha256": "63531e07eb35307f668d8ce22cb3bf1c3ec5854fe259e9df1041dd790f7d7f4a",
+      "bytes": 482
+    },
+    {
+      "path": "pack-owner2/linux-supported3/clone-0.log",
+      "sha256": "8e4165cd9c69837cd7edfa833c15af0248794820640b08bd901b88b203c37d21",
+      "bytes": 101
+    },
+    {
+      "path": "pack-owner2/linux-supported3/clone-1-timing.json",
+      "sha256": "c29263a3883551833092a00693977dd46181213358e0b7a274bbf16f53366c21",
+      "bytes": 482
+    },
+    {
+      "path": "pack-owner2/linux-supported3/clone-1.log",
+      "sha256": "310529a0fecad71cef62ef11960223b6189ec0dffb7a3b8250b765e41eb97b30",
+      "bytes": 101
+    },
+    {
+      "path": "pack-owner2/linux-supported3/clone-2-timing.json",
+      "sha256": "d621533644bbbd944a69dd6c3bd24f9a685d2b4576591541f3d65c9b4fd99874",
+      "bytes": 483
+    },
+    {
+      "path": "pack-owner2/linux-supported3/clone-2.log",
+      "sha256": "b6c574ef8f8f59d1a750b5fab18371f4b1ff20bf705e33709cf02e3824d6c7a0",
+      "bytes": 101
+    },
+    {
+      "path": "pack-owner2/linux-supported3/clone-3-timing.json",
+      "sha256": "ea8e830e9787de3f8df10bf089d58f2e649a3ea3e84035ffa8cffdbb7a7aec72",
+      "bytes": 483
+    },
+    {
+      "path": "pack-owner2/linux-supported3/clone-3.log",
+      "sha256": "b719f0ea7dfcb3fa35b9107c60e711bab60f80111ad1d3620e9fc828c44eae26",
+      "bytes": 101
+    },
+    {
+      "path": "pack-owner2/linux-supported3/collection-timing.json",
+      "sha256": "b7bb04ae55a0738a0378a644d08a0e3b87fb8eb7ac515a8aff37270710dbe5d6",
+      "bytes": 450
+    },
+    {
+      "path": "pack-owner2/linux-supported3/collection.log",
+      "sha256": "470f45b2106dd8dc0927f7933ddc0e2f06a03b3096e101292df0b167676d0cd2",
+      "bytes": 2225020
+    },
+    {
+      "path": "pack-owner2/linux-supported3/manifest.json",
+      "sha256": "ed61bf82f0f83dc1f5d50e73c9baef629e734ad09d87f6eb3f06eb9da50e7e56",
+      "bytes": 16194
+    },
+    {
+      "path": "pack-owner2/linux-supported3/pytest-0-timing.json",
+      "sha256": "09069063ab03bb14f9e5c844277b43a8dd1a75b652b488635e1f45227e62860d",
+      "bytes": 4148
+    },
+    {
+      "path": "pack-owner2/linux-supported3/pytest-0.log",
+      "sha256": "cf8563a39e9db1b527a80e10019fe6dae11d13442cd73938d336c87cd34de0a2",
+      "bytes": 36872
+    },
+    {
+      "path": "pack-owner2/linux-supported3/pytest-1-timing.json",
+      "sha256": "763c1dcf999d8d8aed80a661a496f0e112348211943de459bcf1f3cd8ffb23c6",
+      "bytes": 4140
+    },
+    {
+      "path": "pack-owner2/linux-supported3/pytest-1.log",
+      "sha256": "22ad941cd19c62228349946fe37bf3c6207a0b301ab90da1fc3c5b4d14b023ed",
+      "bytes": 5805
+    },
+    {
+      "path": "pack-owner2/linux-supported3/pytest-2-timing.json",
+      "sha256": "c1c0a2967f5e8297421a9a1d1def9a1707826d5e1b3d456e0ebb805f3a7413d4",
+      "bytes": 4142
+    },
+    {
+      "path": "pack-owner2/linux-supported3/pytest-2.log",
+      "sha256": "3f672e3974518d636bf6476cba9486701cb8547d2c7e4f9fd637b85fd6440d1b",
+      "bytes": 22813
+    },
+    {
+      "path": "pack-owner2/linux-supported3/pytest-3-timing.json",
+      "sha256": "f6044d780e764e18479069b5c2854e94e097d79e7b33470aa351ebc27357a3fe",
+      "bytes": 4279
+    },
+    {
+      "path": "pack-owner2/linux-supported3/pytest-3.log",
+      "sha256": "ed9a03e11cf10173c70c7793bf74751b6ed142f12d0a3d7eba6c3ca09490b59d",
+      "bytes": 2913
+    },
+    {
+      "path": "pack-owner2/linux-supported3/source-integrity.json",
+      "sha256": "2eb862429ab7179055962c42f574f03a2186f2e078a3203ee271e276120a3323",
+      "bytes": 3692
+    },
+    {
+      "path": "pack-owner2/linux-supported3/summary.json",
+      "sha256": "a6f009be49823a7636fbcd43f125c6962e1cede9ae948c5eaf99973971ea4738",
+      "bytes": 35908
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync-0-timing.json",
+      "sha256": "d195b423b6ac98111db7a1787ec628263f1ae0ecdc997bde1402774cf262d14c",
+      "bytes": 367
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync-0.log",
+      "sha256": "e2d7ba7b9aafbf3a09c34dbc97864e3a4100b5cf9abee2f11a6e8e4766ffcec5",
+      "bytes": 879
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync-1-timing.json",
+      "sha256": "df128477b1486a046e7335278fc5f47150a04f26be8fcd26d5499a95a56546c3",
+      "bytes": 367
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync-1.log",
+      "sha256": "93f445db5e667ebf6a0f41e9c1cfcdb2673db59eb65e2a35d7cd8d32a069f405",
+      "bytes": 879
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync-2-timing.json",
+      "sha256": "8ce697c42b54e7c8ce61a470d8da298a642db4a5224aca53792d390d4a7e1a7b",
+      "bytes": 367
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync-2.log",
+      "sha256": "9c755305a94755005180e2e6e4457efb40e999593bf93d6bf561e87824b5ebeb",
+      "bytes": 879
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync-3-timing.json",
+      "sha256": "10fca214c3b0cbebdbc709b03442e533e065b984889c602de78f55cf732ca80f",
+      "bytes": 367
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync-3.log",
+      "sha256": "0d20df5c57c3e9fda19e5186031494f304bd06a3e9ae04333d7d697275d7ae87",
+      "bytes": 879
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync-timing.json",
+      "sha256": "f35f40e443eb2d96fb436df8f6e30f1453b2299ddd9bca0fb6f4e8c0f178e989",
+      "bytes": 359
+    },
+    {
+      "path": "pack-owner2/linux-supported3/sync.log",
+      "sha256": "ccb2a026683513b30a2e67b457abae5321433d11ca53a95dd079b538268a98d8",
+      "bytes": 853
+    },
+    {
+      "path": "pack-owner2/linux-supported3-final-result.json",
+      "sha256": "e5fd24d20d8e9af55598d125e4767c5b2ee4bb739f4807c1fa54b5ad4f926676",
+      "bytes": 1322
+    },
+    {
+      "path": "pack-owner2/linux31214-validation-logs.tar.gz",
+      "sha256": "482e3f7c2d05cc77c40eae7bec86803f7c02ff81448c601d416b14c5c0e8fee8",
+      "bytes": 205858
+    },
+    {
+      "path": "pack-owner2/native-integrated.log",
+      "sha256": "c20af21ff872aef62afcce9046ae182aede58dc908f03def083dd7c4146d7ced",
+      "bytes": 184
+    },
+    {
+      "path": "pack-owner2/pin-additional-baseline-c826.log",
+      "sha256": "07e16d1536d13a546d0b30bca304e77e66015d482ebb25354e67f77b6484efad",
+      "bytes": 100
+    },
+    {
+      "path": "pack-owner2/pin-additional-diagnostics.log",
+      "sha256": "ea21c374cec4695c4231dbc91f78c3cda5af93f719e9dd95e7abe71025d9501a",
+      "bytes": 3462
+    },
+    {
+      "path": "pack-owner2/pin-baseline-c826.log",
+      "sha256": "cc15001d1c381c147c1f78effb7fc5b1fbcfbd3d5468cf8512b8d71da7a20762",
+      "bytes": 101
+    },
+    {
+      "path": "pack-owner2/pin-baseline-c826.log.timing.json",
+      "sha256": "ab3efbbdc6bd7582f9878030eb6244c073af9d3dceb9dcedf242546271e8b7b3",
+      "bytes": 312
+    },
+    {
+      "path": "pack-owner2/pin-diagnostics-timing.json",
+      "sha256": "fdb88a4c87191ceda7e9a6f7e25d2ce4989bc14a04ce56a30875e4a2eebe4838",
+      "bytes": 256
+    },
+    {
+      "path": "pack-owner2/pin-diagnostics.log",
+      "sha256": "673e59f6b7d4891e5a1f25b686259da28889cf57c44de1690f22813506b8c6e9",
+      "bytes": 37471
+    },
+    {
+      "path": "pack-owner2/pipelines-timing.json",
+      "sha256": "549033251b9bfefaf8cc1ffd3606c558e1e250f6ff46e65aed1cb89d3689d3dd",
+      "bytes": 275
+    },
+    {
+      "path": "pack-owner2/pipelines.log",
+      "sha256": "cb2b0889d2421d5414084fea3730f5130fbfb11b08569c2238387b4883a96cc5",
+      "bytes": 101
+    },
+    {
+      "path": "pack-owner2/product-pipelines-complete.log",
+      "sha256": "6b2829776928f2495fc9e5ad3298e2db6abc009c090df51c8a57e12506fa73ef",
+      "bytes": 100
+    },
+    {
+      "path": "pack-owner2/product-pipelines-initial-failure.log",
+      "sha256": "54319a51ff9741aad7fb9499f381b1bec91b8d544293981acc7da78e15895302",
+      "bytes": 9971
+    },
+    {
+      "path": "pack-owner2/product-pipelines-timing.json",
+      "sha256": "122afb8a050fe5259e901f52aaf22fde205faace64cd1e938998ed09e99ccd49",
+      "bytes": 210
+    },
+    {
+      "path": "pack-owner2/product-pipelines.log",
+      "sha256": "58a29d409b05b7fd2295e15326482bde4759e394b923f94a9e90f6bee219d06b",
+      "bytes": 100
+    },
+    {
+      "path": "pack-owner2/readiness-check.json",
+      "sha256": "bc5bd10853e03b00f2001887821335f7bc6f3c45807d3ea328a4b4d04e6e7269",
+      "bytes": 14468
+    },
+    {
+      "path": "pack-owner2/readiness-final.json",
+      "sha256": "bc5bd10853e03b00f2001887821335f7bc6f3c45807d3ea328a4b4d04e6e7269",
+      "bytes": 14468
+    },
+    {
+      "path": "pack-owner2/readiness.json",
+      "sha256": "069e16e56658d34bcf62cdbabe8611bec1b2c51d26900c595f60b34856211dd9",
+      "bytes": 14479
+    },
+    {
+      "path": "pack-owner2/retry-diagnostics.log",
+      "sha256": "4c55e0d454b00fa5b49e190e9598a9cd2e32067b001b595307bb2c666073ca98",
+      "bytes": 3557
+    },
+    {
+      "path": "pack-owner2/retry-final-timing.json",
+      "sha256": "d4332ad873bf4704566ef73fe85f00520166cb90aa9298819cf37c50c07fdafa",
+      "bytes": 339
+    },
+    {
+      "path": "pack-owner2/retry-final-verified-timing.json",
+      "sha256": "685302e5ec6fb6673acc9c953502192a58df02ce2016d5c99443ed76dfaf5e57",
+      "bytes": 92
+    },
+    {
+      "path": "pack-owner2/retry-final-verified.log",
+      "sha256": "1483fb495c6ea41484b24efe79bd0dfddfe9807d640e4046b807679eef8caf23",
+      "bytes": 357
+    },
+    {
+      "path": "pack-owner2/retry-final.log",
+      "sha256": "5d5a34b64140fec48c8fe8ba033f1390788bd6fa6486703202a198c13a7e8453",
+      "bytes": 109
+    },
+    {
+      "path": "pack-owner2/rss-verification-record.json",
+      "sha256": "6d58e3373b8a5441b77f68ca57477b954cff454c1a3348ceead93ac623f208ec",
+      "bytes": 3657
+    },
+    {
+      "path": "pack-owner2/run_linux_supported3_validation.py",
+      "sha256": "339c2be34bbdc8df71fecc9f48019e2f788963501936a6c0a2a97a55d4abafe3",
+      "bytes": 4205
+    },
+    {
+      "path": "pack-owner2/run_linux_validation.py",
+      "sha256": "90f503939c90fa1b3746c832c26c2f109d065d0bbf40b59612992e1a7dad2dec",
+      "bytes": 4159
+    },
+    {
+      "path": "pack-owner2/shards/files-0.txt",
+      "sha256": "530466ff0de1516c157afcc4ceeffb35a909a62f37abdb592394e0e05abbb52c",
+      "bytes": 3261
+    },
+    {
+      "path": "pack-owner2/shards/files-1.txt",
+      "sha256": "f9730b088a7b0c95805f2c8a88931944b07201336c320802686e0325cfc8860a",
+      "bytes": 3206
+    },
+    {
+      "path": "pack-owner2/shards/files-2.txt",
+      "sha256": "a9e41adfa0fa70995638e19631558b6f0669484db228dbf76208e79b1a57c7dd",
+      "bytes": 3215
+    },
+    {
+      "path": "pack-owner2/shards/files-3.txt",
+      "sha256": "6836a8dbff5e3c6859578c20b6f8ed3c831cb26f076bbefe7b08f72736706303",
+      "bytes": 3202
+    },
+    {
+      "path": "pack-owner2/shards/manifest.json",
+      "sha256": "cc02298c17a3ee38e62443e8adf735673398b880e497720502bb163ee8f8c2a0",
+      "bytes": 525
+    },
+    {
+      "path": "pack-owner2/source-snapshot-2247aab.json",
+      "sha256": "5436f6040e7eb3b3a12e1d9ec2c42511aaeb0f1de174bbc224f7bb0feba4f4db",
+      "bytes": 3805
+    },
+    {
+      "path": "pack-owner2/source-snapshot-final.json",
+      "sha256": "2d856a4fa89a506aedc3d483275492f6c5b99f551553b40383aec4112a76ac10",
+      "bytes": 3740
+    },
+    {
+      "path": "pack-owner2/source-snapshot.json",
+      "sha256": "402a36f52b318cd863454e7c6137b8b75e034b90f90ec627f6c3cd6097b9f4c8",
+      "bytes": 2903
+    },
+    {
+      "path": "pack-owner2/status-checks.json",
+      "sha256": "9b311477d78b6f46eb684285b6e464886e051342884aa4e1ed3dc741fccbb67e",
+      "bytes": 181
+    },
+    {
+      "path": "pack-owner2/status-final.json",
+      "sha256": "363720ae4d43875567b82152bcac1f3fc5cadf26e3531d2191d52f6b5de3165b",
+      "bytes": 122
+    },
+    {
+      "path": "pack-owner2-extensions/direct-linux-process-rss.json",
+      "sha256": "6b9e1c9e11bec18c4e17bc2de8f3b5718094456e8be03cba4525d38ab412e00d",
+      "bytes": 565
+    }
+  ],
+  "contents": "Original commands/logs, timing, source observations, paired baseline comparisons, eight EXAMPLE product bundles plus one distinct source-cpu EXAMPLE bundle. No native engine/GPU measurement."
+}

@@ -29,6 +29,23 @@ def policy():
         'transition_phase_generation': dict(zip(subject.PHASES, ('old', 'new', 'new', 'restored')))}
 
 
+def test_public_policy_types_are_selectable_and_flat_schedule_preserves_values():
+    from guard.core.select import check_policy_value
+    original = policy()
+    flat = {'transition_inputs_sha256': original['transition_inputs_sha256'],
+        **{f'transition_{phase}_at': original['transition_sample_at'][phase] for phase in subject.PHASES},
+        **{f'transition_{phase}_generation': original['transition_phase_generation'][phase] for phase in subject.PHASES}}
+    for key, kind in subject.POLICY_TYPES.items():
+        check_policy_value('LIF-05', key, kind, flat[key])
+    assert subject.normalize_policy_values(flat) == original
+    assert subject.normalize_policy(flat) == subject.normalize_policy(original)
+    for key in flat:
+        if key != 'transition_inputs_sha256':
+            missing = dict(flat); missing.pop(key)
+            with pytest.raises(ValueError, match='TRANSITION_POLICY_INVALID'):
+                subject.normalize_policy_values(missing)
+
+
 def check(profile='lif05-stopped-redeploy-v1'):
     return SimpleNamespace(id=subject.PROFILES[profile], collection_profile=profile)
 

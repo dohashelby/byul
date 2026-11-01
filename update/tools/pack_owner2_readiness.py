@@ -15,7 +15,7 @@ from guard.executors.kubernetes_resource_recovery import PROFILE as RESOURCE_PRO
 from guard.executors.retry_record_contract import PROFILE as RETRY_PROFILE
 from guard.executors.kubernetes_request_attempts import PROFILE as ATTEMPT_PROFILE
 from guard.executors.kubernetes_observation_composite import PROFILE as OBS_PROFILE
-from guard.executors.profiler_lifecycle_cpu import PROFILE as CPU_PROFILER_PROFILE
+from guard.executors.kubernetes_profiler_control import PROFILE as PROFILER_CONTROL_PROFILE
 from guard.models import load_pack
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +34,7 @@ MAPPING = {
     'OBS-02': ('observation_state', 'kubernetes', (OBS_PROFILE,)),
     'LIF-03': ('stream_buffer', 'kubernetes', (BUDGET_PROFILE,)),
     'LIF-07': ('initialization', 'kubernetes', (READINESS_PROFILE,)),
-    'LIF-14': ('profiler_observation', 'source-cpu', (CPU_PROFILER_PROFILE,)),
+    'LIF-14': ('profiler_observation', 'kubernetes', (PROFILER_CONTROL_PROFILE,)),
 }
 EXCLUDED = ('SUP-01', 'SUP-02', 'SUP-14', 'LIF-15', 'OBS-07', 'OBS-08', 'OBS-10', 'OBS-12')
 

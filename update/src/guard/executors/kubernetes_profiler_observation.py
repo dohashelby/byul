@@ -37,6 +37,10 @@ class KubernetesProfilerObservationExecutor(KubernetesObservationStateExecutor):
             if check.id!='LIF-14' or getattr(check,'collection_profile',None)!=CPU_PROFILE or values:
                 raise ValueError('PROFILER_CPU_PROFILE_UNSUPPORTED')
             return
+        from .kubernetes_profiler_control import PROFILE as CONTROL_PROFILE,KubernetesProfilerControlExecutor
+        if check.id=='LIF-14' and getattr(check,'collection_profile',None)==CONTROL_PROFILE:
+            KubernetesProfilerControlExecutor(self.cfg).validate_policy(check,values)
+            return
         return super().validate_policy(check,values)
 
     def run(self,check,env,policy_values,adapter,workdir):
@@ -44,6 +48,10 @@ class KubernetesProfilerObservationExecutor(KubernetesObservationStateExecutor):
         if self.implementation=='source-cpu':
             from .profiler_lifecycle_cpu import ProfilerLifecycleCPUExecutor
             return ProfilerLifecycleCPUExecutor(self.cfg).run(check,env,policy_values,adapter,workdir)
+        from .kubernetes_profiler_control import PROFILE as CONTROL_PROFILE,KubernetesProfilerControlExecutor
+        if check.id=='LIF-14' and getattr(check,'collection_profile',None)==CONTROL_PROFILE:
+            return KubernetesProfilerControlExecutor(self.cfg,runner=self.runner,environ=self._environ,
+                expected_target_sha256=self.expected_target_sha256).run(check,env,policy_values,adapter,workdir)
         from guard.collectors.lifecycle import load_prepared
         try:
             prepared=load_prepared(self.cfg['prepared'])

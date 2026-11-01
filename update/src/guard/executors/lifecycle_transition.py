@@ -36,6 +36,32 @@ PROFILES = {
     'lif16-restore-redeploy-v1': 'LIF-16',
 }
 PHASES = ('before', 'during', 'after', 'recovered')
+POLICY_TYPES = {'transition_inputs_sha256': 'str',
+    **{f'transition_{phase}_at': 'str' for phase in PHASES},
+    **{f'transition_{phase}_generation': 'str' for phase in PHASES}}
+OBSERVATIONS = {key: 'list' for key in ('transition_native_generation_facts',
+    'transition_request_generation_bindings', 'transition_request_configuration_facts',
+    'transition_request_configuration_conflicts', 'transition_trials', 'transition_missing')}
+OBSERVATIONS.update({key: 'bool' for key in ('transition_inflight_task_schedule_overlap',
+    'transition_scope_complete', 'transition_actual_consumption_verified')})
+
+
+def normalize_policy_values(values):
+    """Publish scalar policy types supported by select; retain old private calls.
+
+    The pre-integration helper API used nested dicts. Keeping its reader is not
+    permission to declare unsupported dict policy types in a product CheckDef.
+    """
+    if type(values) is not dict:
+        raise ValueError('TRANSITION_POLICY_INVALID')
+    flat = set(POLICY_TYPES) - {'transition_inputs_sha256'}
+    if not flat.intersection(values):
+        return values
+    if not flat <= set(values) or {'transition_sample_at', 'transition_phase_generation'} & set(values):
+        raise ValueError('TRANSITION_POLICY_INVALID')
+    return {**{key: value for key, value in values.items() if key not in flat},
+        'transition_sample_at': {phase: values[f'transition_{phase}_at'] for phase in PHASES},
+        'transition_phase_generation': {phase: values[f'transition_{phase}_generation'] for phase in PHASES}}
 
 
 def stamp(value):
@@ -53,6 +79,7 @@ def _sha(value):
 
 def normalize_policy(values):
     """Absolute operator-selected sample times, not inferred transition boundaries."""
+    values = normalize_policy_values(values)
     try:
         times = [stamp(values['transition_sample_at'][p]) for p in PHASES]
         if set(values['transition_sample_at']) != set(PHASES) or not all(a < b for a, b in zip(times, times[1:])):
@@ -82,6 +109,7 @@ class Generation:
 def load_generations(cfg, env, values):
     """Load only already prepared targets. No discovery or replacement fallback."""
     from guard.collectors.lifecycle import load_prepared
+    values = normalize_policy_values(values)
     try:
         if set(cfg) - {'generations', 'kubectl_binary', 'request_timeout', 'max_duration_seconds'}:
             raise ValueError
@@ -258,6 +286,7 @@ class LifecycleTransitionExecutor:
             self.wait(min(remaining, 0.2))
 
     def run(self, check, env, policy_values, adapter, workdir):
+        policy_values = normalize_policy_values(policy_values)
         self.validate_policy(check, policy_values)
         schedule = normalize_policy(policy_values)
         generations, manifest = load_generations(self.cfg, env, policy_values)

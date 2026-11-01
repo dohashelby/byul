@@ -5,7 +5,6 @@ import re
 import uuid
 
 from guard.adapters import vllm_profiler_sensor as sensor, vllm_profiler_metadata as metadata
-from guard.collectors.lifecycle import load_prepared
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from guard.runtime.bounded import strict_json
 from guard.runtime.kubernetes_profiler_control import KubernetesProfilerControlHTTP, SLOTS, CONTROL_PATHS
@@ -106,6 +105,7 @@ class KubernetesProfilerControlExecutor:
             owner_identity=reader.owner_identity, read_file=reader.read_file, image_check=reader.image_check)
 
     def run(self, check, env, policy_values, adapter, workdir):
+        from guard.collectors.lifecycle import load_prepared
         self.validate_policy(check, policy_values); start, end = normalize_policy(policy_values)
         try:
             if set(self.cfg) - {'target', 'prepared', 'kubectl_binary', 'max_duration_seconds'}: raise ValueError

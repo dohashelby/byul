@@ -1679,3 +1679,5 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 
 - ABI 마감: 공통 검토 b3e3bb0 / 검증 source d8c685b→089ebc3→fixture전용 f26f458. Windows/Linux3.12.3 직접369 및 보수143/출력37 통과, Linux3.12.15 최초265/104오류→delta76/28오류→출력37 통과. 원 실패 보존; 새 전체 suite 통과로 집계하지 않음.
 - 인접 Linux142, Windows135+짧은경로delta6/기존skip1. 설치 wheel089ebc3 SHA ad5a59481370b5e530dc8aaf37c86feb57cf2bd9ae2ccdc093bae66a3a295093: W3.12.14/L3.12.15 각각281파일·CLI4/24Ref·원팩/복원/재판정. A2/B pin 미갱신·closed 유지, exactHEAD CI5와 actual 별도.
+
+- 2026-11-01 A39 인수: 수락된 local0af OBS02/native20~22 공통·전용12파일을 main920 위로 원 bytes 소비. B PR171 fixture/tool 보수는 보존. 본 묶음의 새로운 실제 실증·전체 분기 완료 주장은 없음. 첫 PLT 실증은 Start1회 용량 부족 후 stopped 확인·자동 재시도 없음. 영향 검증과 A측 검토 pin은 후속 고정 단계로 분리한다.

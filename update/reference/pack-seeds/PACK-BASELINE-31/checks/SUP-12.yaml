@@ -1,0 +1,56 @@
+id: SUP-12
+framework_id: CHK-SUP-012
+mechanism_ids:
+- mechanism-09
+- mechanism-10
+revision: 3
+retired: false
+area: SUP
+purpose: 자료 해석 안전성
+secondary_purposes: []
+question: 실제로 사용하는 파일·메시지 해석기가 금지된 객체나 동작을 거부하는가?
+scope: null
+risk_category: 보안 위협 점검
+risk_summary: 파일·메시지를 제공할 수 있는 주체가 reader의 해석·역직렬화 동작을 악용해 허용 밖 코드 실행·객체 접근을 유도할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 기본 모델·설정의 reader를 확인한다. 대체 파일·compiled cache·공유 daemon 메시지·직렬화 engine은 실제 소비 경로별로 추가한다.
+policy_params: []
+policy_prose:
+  policy_to_decide: null
+  enterprise_decisions: 필요한 형식·reader·의존성 판본, 허용 객체·금지 부수 동작과 입력/처리 예산. 다른 형식이 필요하면 정책 변경·승인·재시험한다. 미디어는 현재 텍스트 구성 밖의 선택 기능이다.
+normal_control: 선정 엔진에서 승인한 형식·reader·의존성 조합으로 정상 모델·설정 또는 메시지 자료를 처리한다.
+challenge_steps:
+- 유효 형식 선택값·실제 파일/메시지 식별·reader 기록
+- 정상 자료와 금지 형식·허용 형식 안의 금지 객체/동작을 나타내는 무해 fixture·손상 자료를 각각 제공
+- 거부 또는 fallback·대체 공급원과 최종 reader·객체 생성·파일/통신/코드 부수 동작 확인
+required_observations: []
+required_observations_prose:
+- 파일 형식·magic·실제 reader/거부 또는 fallback 경로/실패 후 상태
+satisfied_if: 비허용 동작이 발생하지 않고 정상 공급물은 처리된다. PT 선택 자체를 코드 실행 결함으로 판정하지 않는다.
+fail_criteria: 불허 reader·형식으로 조용히 fallback하거나 허용하지 않은 부수 동작이 발생한다.
+unknown_criteria: 확장자만 보거나 실제 reader·fallback·부수 접근을 관측하지 못했다.
+remediation: '- 실제로 읽는 파일·메시지 형식과 reader를 정하고 해당 reader·의존성의 검토된 버전을 사용한다. 허용하지 않은 형식으로의 자동 fallback을 제한하고, 해석 프로세스의 코드 실행·파일·통신 권한을 필요한 범위로 줄인다.'
+method_and_evidence: 모델·설정·compiled cache·공유 daemon 등 실제 파일·메시지 소비 경로마다 승인 형식·reader·의존성 판본을 고정한다. 정상 자료, 금지 형식, 허용 형식 안의 금지 객체·부수 동작을 나타내는 무해 fixture와 손상 자료를 대조해 최종 reader·fallback·객체 생성·파일/통신/코드 부수 동작을 확인한다. 공급원의 접근 자격 변경은 CHK-PLT-005, writer의 변조 가능성은 CHK-SUP-007에서 각각 판정한다. template renderer는 CHK-SUP-013, 외부 진단 자료 consumer는 CHK-OBS-008의 고유 조건과 같은 reader 증거를 공유한다.
+remaining_setup: 격리 손상 fixture와 파일 읽기 계측; 공유 weight/replay는 별도 consumer 조건
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-R05-07
+  - Q-R05-11
+  - Q-C13
+  - Q-C07
+  scenario_ids:
+  - SC-11-06
+  - SC-13-02
+  - SC-13-03
+  - SC-16-02
+  subtest_ids:
+  - Q-R05-07/SC-11-06
+  - Q-R05-11/SC-13-02
+  - Q-R05-11/SC-13-03
+  - Q-C13/SC-16-02
+source:
+  array: supply_assessment_draft

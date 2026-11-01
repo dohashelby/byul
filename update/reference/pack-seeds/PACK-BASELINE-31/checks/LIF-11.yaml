@@ -1,0 +1,50 @@
+id: LIF-11
+framework_id: CHK-LIF-011
+mechanism_ids:
+- mechanism-13
+- mechanism-10
+revision: 4
+retired: false
+area: LIF
+purpose: 종결·자원 회수
+secondary_purposes: []
+question: 실패한 worker와 내부 통신·공유 자원을 정리해 다음 기동이 가능한가?
+scope: 기본 TP; Ray/PP는 별도 선택
+risk_category: 일반 장애·복구 점검
+risk_summary: 실패 worker·socket·공유 메모리가 남아 후속 기동을 막거나 자원을 계속 점유할 수 있음. 악의적 유발 가능성과 피해 범위는 별도 확인.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 기본 TP worker·통신·자원 회수와 다음 기동을 확인한다. Ray·PP는 사용 시 추가한다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 회수 대상·기한·재기동 조건
+  enterprise_decisions: 요청별/그룹별 회수 대상·잔존 참조·강제 종료·중복 비용 처리. 공유 weights/profiler/retry는 기능 선택 후 별도 수명·종료 계약을 확인한다.
+normal_control: 정상 종료 후 TP process·통신 자원을 정리하고 다시 기동한다.
+challenge_steps:
+- 격리 worker 실패
+- process·IPC·shared memory 잔존 조사
+- 같은 시험 환경 재기동·정상 요청
+required_observations: []
+required_observations_prose:
+- PID·rank·IPC 자원/cleanup 결과/재기동 준비·추론
+satisfied_if: 정한 자원이 회수되고 후속 정상 기동이 가능하다. shutdown 호출만으로 완료 처리하지 않는다.
+fail_criteria: 회수 기한 위반이나 잔존 자원 때문에 다음 기동·정상 요청이 실패한다.
+unknown_criteria: 자원 목록·소유자·기한 또는 실패 후 재기동을 확인하지 못했다.
+remediation: '- 장애가 난 실행 그룹의 프로세스·IPC·GPU 관련 자원과 잔존 참조를 정한 기한에 정리한다. 정리 완료를 확인하고 새 실행 그룹의 기동·정상 요청을 시험한 뒤 서비스를 재개한다.'
+method_and_evidence: '초기화 또는 실행 중 worker/그룹 실패를 격리 환경에서 주입하고, 실패 전후 process·queue·GPU·IPC·shared memory와 선택한 actor/placement/DAG/channel의 목록·소유자·잔존·반환 시각을 대조한다. shutdown 호출 뒤 실제 자원 회수와 같은 시험 환경의 재기동·정상 요청을 확인한다. 실패 감지·상위 전달은 CHK-LIF-008, 초기 부분 실패의 집계는 CHK-LIF-009, 준비 후 접수 gate는 CHK-LIF-007에서 각각 판정한다. vLLM v0.31.0의 공통 【F32】 근거 중 선정 executor·그룹 종료에 해당하는 조건을 참조한다. 근거 원문: [F32](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33911).'
+remaining_setup: 자원별 회수 기한과 전후 inventory 수집
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C08
+  - Q-C09
+  scenario_ids:
+  - SC-18-02
+  - SC-17-01
+  subtest_ids:
+  - Q-C08/SC-18-02
+  - Q-R05-12/SC-17-01
+source:
+  array: lifecycle_assessment_draft

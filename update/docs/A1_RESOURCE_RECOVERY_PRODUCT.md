@@ -2,7 +2,7 @@
 
 원팩31 LIF11의 SC18-02 실행 중 실패·SC17-01 초기화 부분 실패 두 분기와 정상 종료/자원 회수/같은 시험 환경의 후속 기동·정상 요청 기준을 유지한다. 부모 A39/56/4·A1 19/27/2·공동c9af729와 PR125 확정9e96929·기존 미커밋/worktree·sources/·A2/B 원본·과거팩/정확Ref·실증을 보존한다. 이 묶음은 선정 자원 census와 명시 절대 기한 위반의 제품 연결이며 전체 두 분기/부모 Goal 완료가 아니다.
 
-`resource_recovery:kubernetes` 0.1.0, collection `kubernetes-selected-resource-recovery-v1`을 기존 select/run/judge/report/verify/export/restore에 연결한다. `tools/build_kubernetes_resource_recovery_pack.py --seed packs/PACK-BASELINE --output <새 외부 폴더>`는 LIF11만 명시 DRAFT로 바꾸고 원질문·정상·FAIL/UNKNOWN·두 시나리오·다른76개 정의 bytes를 유지한다. core/models/store/judges·외부 contracts와 루트 runtime은 변경하지 않는다.
+`resource_recovery:kubernetes` 0.1.0, collection `kubernetes-selected-resource-recovery-v1`을 기존 select/run/judge/report/verify/export/restore에 연결한다. `tools/build_kubernetes_resource_recovery_pack.py --seed reference/pack-seeds/PACK-BASELINE-31 --output <새 외부 폴더>`는 LIF11만 명시 DRAFT로 바꾸고 원질문·정상·FAIL/UNKNOWN·두 시나리오·다른76개 정의 bytes를 유지한다. core/models/store/judges·외부 contracts와 루트 runtime은 변경하지 않는다.
 
 선정 vLLM0.31 mp의 기존 native13(runtime-failure) 또는 native14(partial-initialization) 준비 manifest를 명시 소비한다. 기본 native8~14의 원래 source/bytes·현재 PID/start·source/image/lab 관문과 native0.32 미지원은 유지한다. 종료 기록이 남았어도 현재 프로세스 결합이 없으면 기존 의미대로 미확인이다. kernel helper는 별도 exec 수집 주체이며 serving native hook이 아니다. native 원기록을 kernel 소유자 인증이나 실제 모델/TP/GPU 소비로 승격하지 않는다.
 

@@ -1,0 +1,47 @@
+id: REQ-08
+framework_id: CHK-REQ-008
+mechanism_ids:
+- mechanism-02
+revision: 2
+retired: false
+area: REQ
+purpose: 최종 입력 검증
+secondary_purposes: []
+question: 미리 만든 토큰 ID를 재사용하는 입력도 필요한 검사를 거치는가?
+scope: 도달 조건 확인
+risk_category: 보안 위협 점검
+risk_summary: 재사용 token ID 입력을 제출할 수 있는 호출자가 렌더링·tokenize 검사를 건너뛰어 허용 밖 입력을 실제 모델에 전달할 수 있음.
+review_order: implementation_path_first
+impact: null
+applies_when:
+  prose: dict/prompt_token_ids 등 재사용 token 입력의 지원·노출 경로에서 수용·전달 여부 또는 금지 정책의 거부·제거를 확인한다. PD 비활성만으로 비사용을 판단하지 않는다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 허용 입력 경로·검사 요구
+  enterprise_decisions: 허용 endpoint·텍스트/직접 token 등 입력 형식, template override 필요성, 옵션·길이·출력 한도·정상 대조 입력. vocab·버퍼 범위·옵션 필수 관계 등 구현상 제약은 기업 정책으로 완화하지 않는다.
+normal_control: 일반 메시지는 필요한 검사 후 정상 처리된다. 재사용 입력을 허용한 구성에서는 신뢰된 재사용 값도 해당 경로의 필수 검사를 거쳐 정상 처리된다.
+challenge_steps:
+- 활성 재사용 경로 확인
+- 무해 token ID와 메시지가 다른 요청 제출
+- 실제 렌더 생략·검사·소비 경로 확인
+required_observations: []
+required_observations_prose:
+- 실제 재사용 입력 필드·호출 경로·허용 주체/문맥과 유효 정책
+- 제출 메시지·재사용 토큰 값, 렌더 생략·검사 위치·최종 소비값 또는 사전 제거·거부
+satisfied_if: 팀 참조 구성에서는 외부 재사용 토큰 경로를 이용한 입력 검사 우회가 실제 모델 입력으로 소비되기 전에 차단돼야 한다. 기업이 정책을 변경해 허용하면 우회 분기에도 유효성·정책 검사가 유지돼야 한다. 미도달은 호출 경로 근거로 확인한다.
+fail_criteria: 비허용 재사용 입력이 필수 검사나 신원·문맥 확인을 우회한다.
+unknown_criteria: renderer 분기만 보고 상위 호출자 제한·실제 endpoint 도달을 확인하지 못했다.
+remediation: '- 재사용 token ID를 받는 경로의 허용 여부를 정하고 금지한 필드는 거부하거나 제거한다. 허용하면 일반 변환을 생략하더라도 입력 범위·신원·문맥에 필요한 검사를 유지한다.'
+method_and_evidence: 토큰 ID 등 렌더링을 생략·재사용하는 실제 입력 경로에서 호출자·원 메시지·재사용 값·최종 모델 입력을 연결한다. 금지 구성의 수용·제거·거부와 허용 구성의 필수 검사·신원/문맥 확인을 각각 대조한다.
+remaining_setup: 선정 endpoint의 재사용 입력 지원·노출·소비 경로와 무해 token fixture; 전송 기능 하나의 비사용으로 전체 경로를 제외하지 않음
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C04
+  scenario_ids:
+  - SC-03-02
+  subtest_ids:
+  - Q-C04/SC-03-02
+source:
+  array: request_state_assessment_draft

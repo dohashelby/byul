@@ -25,7 +25,7 @@ VALUES = {"allowed_template_sha256": [SHA]}
 
 
 def definition():
-    raw = yaml.safe_load((ROOT / "packs/PACK-BASELINE/checks/SUP-03.yaml").read_text(encoding="utf-8"))
+    raw = yaml.safe_load((ROOT / "reference/pack-seeds/PACK-BASELINE-31/checks/SUP-03.yaml").read_text(encoding="utf-8"))
     raw.update(yaml.safe_load((ROOT / "tools/overrides/SUP-03.yaml").read_text(encoding="utf-8")))
     return CheckDef.model_validate(raw)
 
@@ -310,7 +310,7 @@ def test_static_executor_version_and_no_dynamic_fixture_preview(tmp_path):
 
 
 def test_original_checklist_challenges_are_preserved_and_never_claimed_complete():
-    original = yaml.safe_load((ROOT / "packs/PACK-BASELINE/checks/SUP-03.yaml").read_text(encoding="utf-8"))
+    original = yaml.safe_load((ROOT / "reference/pack-seeds/PACK-BASELINE-31/checks/SUP-03.yaml").read_text(encoding="utf-8"))
     assert definition().challenge_steps == original["challenge_steps"]
     assert definition().judge.params["pass_when_all"] == []
     assert definition().judge.params["fail_when_any"] == []

@@ -233,7 +233,7 @@ def test_legacy_and_projected_native_store_replay_stays_read_only(tmp_path, proj
     spec = importlib.util.spec_from_file_location("native_wheel_fixture", Path(__file__).resolve().parents[1]/"tools/wheel_log_fixture.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    store, report = module.build_native(tmp_path/"store", source.ROOT/"packs/PACK-BASELINE", projection=projection)
+    store, report = module.build_native(tmp_path/"store", source.ROOT/"reference/pack-seeds/PACK-BASELINE-31", projection=projection)
     before = inventory_tree(store)
     result = analyze_saved_logs(store, report)
     assert result["accepted"] and result["official"] is False, result

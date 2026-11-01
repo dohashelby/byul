@@ -87,7 +87,7 @@ def _api_transport_cli(docker, run_id, network, pinned, run_dir, env):
         'schema = "guard-stream-pressure-settings/1"\nmax_duration_seconds = 30\n'
         'request_timeout_seconds = 3\nmax_resource_samples = 3\nresource_interval_ms = 10\n'
         'post_close_wait_ms = 0\n', encoding="utf-8")
-    common = ["--config", str(cfg), "--pack", str(ROOT / "packs/PACK-BASELINE")]
+    common = ["--config", str(cfg), "--pack", str(ROOT / "reference/pack-seeds/PACK-BASELINE-31")]
     plan = _ok(["select", "--env", str(ep), "--policy", str(pp), *common], env).strip().splitlines()[-1]
     _ok(["run", "--plan", plan, *common], env)
     _ok(["judge", "--plan", plan, *common], env)
@@ -282,7 +282,7 @@ def test_lab_topology_end_to_end(tmp_path, topology, expected):
             f'target = "{source_path.as_posix()}"\nreceiver_target = "{receiver_path.as_posix()}"\n'
             'connect_timeout = 0.5\nmax_duration_seconds = 30\n', encoding="utf-8")
         egress_c = ["--config", str(egress_cfg)]
-        egress_pack = ["--pack", str(ROOT / "packs/PACK-BASELINE")]
+        egress_pack = ["--pack", str(ROOT / "reference/pack-seeds/PACK-BASELINE-31")]
         selected = _ok(["select", *egress_pack, "--env", str(egress_env_path),
                         "--policy", str(egress_policy_path), *egress_c], env)
         egress_plan = selected.strip().splitlines()[-1]
@@ -318,10 +318,10 @@ def test_lab_topology_end_to_end(tmp_path, topology, expected):
             f'[direct_route]\ntarget = "{(run_dir / "target.json").as_posix()}"\nallowed_key_env = "GUARD_LAB_ALLOWED_KEY"\n'
             f'denied_key_env = "GUARD_LAB_DENIED_KEY"\nrequest_timeout = 3.0\n', encoding="utf-8")
         c = ["--config", str(cfg)]
-        out = _ok(["select", "--pack", str(ROOT / "packs/PACK-BASELINE"), "--env", str(run_dir / "env.yaml"),
+        out = _ok(["select", "--pack", str(ROOT / "reference/pack-seeds/PACK-BASELINE-31"), "--env", str(run_dir / "env.yaml"),
                    "--policy", str(policy_path), *c], env)
         plan = out.strip().splitlines()[-1]
-        pack = ["--pack", str(ROOT / "packs/PACK-BASELINE")]
+        pack = ["--pack", str(ROOT / "reference/pack-seeds/PACK-BASELINE-31")]
         print(_ok(["run", "--plan", plan, *pack, *c], env))
         print(_ok(["judge", "--plan", plan, *pack, *c], env))
         _ok(["report", "--plan", plan, *pack, *c, "--json", str(run_dir / "report.json")], env)

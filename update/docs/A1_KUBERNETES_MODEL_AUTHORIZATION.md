@@ -40,7 +40,7 @@ denied = "OWNED_DENIED_KEY"
 허용표는 독립 준비 입력이다. runtime 기록의 authenticated/ALLOWED 선언만으로 신뢰하지 않는다.
 환경변수 값·자격 해시를 증거로 저장하지 않는다.
 
-`python -m tools.build_kubernetes_model_authorization_pack --seed packs/PACK-BASELINE --output /owned/new-pack`
+`python -m tools.build_kubernetes_model_authorization_pack --seed reference/pack-seeds/PACK-BASELINE-31 --output /owned/new-pack`
 으로 PACK31 exact Ref에서 REQ05만 바꾸는 명시 DRAFT 팩을 만든다.
 기존77개 질문/판정 기준과 다른76개 정의 bytes·과거 Ref는 보존한다.
 POL.scope.include에 REQ-05를 선정하고 아래8개 필수 값을 제공한다.

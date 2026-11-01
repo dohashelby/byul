@@ -1,0 +1,47 @@
+id: PLT-06
+framework_id: CHK-PLT-006
+mechanism_ids: []
+revision: 3
+retired: false
+area: PLT
+purpose: 실행 최소 권한
+secondary_purposes: []
+question: Core·worker가 공유하는 권한과 신뢰 범위가 채택한 격리 요구에 맞고, 한 worker 침해의 영향 범위를 확인했는가?
+scope: 기본 TP; 실제 protocol과 공격자 시작 권한 확인
+risk_category: 보안 위협 점검
+risk_summary: worker를 장악한 주체가 공유 신뢰 범위의 내부 명령을 이용해 다른 요청·모델에 영향을 줄 수 있음. 프로세스 분리만으로 인가 경계를 가정하지 않음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 실제 core·worker protocol·UID·실행 신뢰 범위를 확인한다. 동일 신뢰 그룹 내부를 독립된 사용자 권한 경계로 가정하지 않는다.
+policy_params: []
+policy_prose:
+  policy_to_decide: worker 신뢰 범위·허용 명령·보완 경계
+  enterprise_decisions: 허용 프로세스·명령·신뢰 집단, 목적지·포트·프로토콜·작업, 마지막 유효 정책 유지/만료/초기 정책 부재의 처리. 같은 TP worker의 역할별 인가를 실제 지원하지 않으면 있다고 가정하지 않고 경계 제한과 잔여 위험을 기록한다.
+normal_control: 실제 신뢰 그룹의 core·worker가 허용된 송신·명령·자료 범위로 정상 작업을 수행한다. 정책이 독립 경계를 요구한 다른 실행 그룹은 그 경계로 구분한다.
+challenge_steps:
+- core·worker의 UID·namespace·직렬화/명령 reader·공유 파일/장치/자격과 실제 신뢰 그룹을 지도화
+- 정상 편입된 시험 worker의 실제 송신 권한으로 허용/비허용 대상·무해 명령/자료의 영향 범위를 대조
+- 실제 독립 경계와 공유 권한을 채택한 격리 요구에 대조하고 제한·보완 경계·잔여 영향을 기록
+required_observations: []
+required_observations_prose:
+- 신뢰 그룹별 process UID·namespace·공유 파일/장치/자격과 직렬화·명령 reader
+- 편입된 worker가 보낼 수 있는 대상·메시지·실제 영향, 요구한 독립 경계의 집행·보완 통제와 잔여 영향
+satisfied_if: 실제 공유 권한·UID·직렬화/명령 실행 범위와 worker 침해의 영향을 식별하고 채택한 격리 요구를 집행한다. 독립 경계가 필수이면 실제로 그 경계를 확인한다. 정책이 동등한 보완 통제를 허용한 범위에서는 해당 통제의 적용·효과를 증거로 확인하며, 잔여 위험 승인만으로 필수 경계를 대체하지 않는다. 같은 실행 그룹 안에 구현되지 않은 역할별 인가를 있는 것으로 기록하지 않으며 공유 신뢰의 잔여 영향은 실제 범위로 남긴다.
+fail_criteria: 채택한 격리 요구와 달리 편입된 worker의 공유 권한·명령/자료 소비로 금지 대상이나 독립 그룹에 영향을 줄 수 있음이 확인되거나, 필수 독립 경계 또는 정책이 허용한 동등 보완 통제가 집행되지 않는다. 잔여 위험 승인만으로 필수 경계를 대신한 경우도 포함한다.
+unknown_criteria: 실제 신뢰 그룹·공유 권한·메시지 reader·worker의 송신/영향 범위 또는 적용할 격리 요구와 보완 통제를 확인하지 못했다. 동일 UID나 비허용 외부 peer의 접속 거부만으로 내부 공유 신뢰의 영향을 확인한 것으로 처리하지 않는다.
+remediation: '- Core·worker의 OS 계정·IPC·RPC에서 공유하는 권한과 침해 영향을 기록한다. 그 범위로 진입하는 외부 접점의 권한을 제한하고, 조직이 요구한 격리를 실제 실행 구성에 적용한다.'
+method_and_evidence: 실제 core·worker의 신뢰 그룹·공유 UID/namespace·파일/장치/자격·pickle/cloudpickle 등 직렬화와 명령 소비를 확인한다. 편입된 시험 worker의 실제 송신 능력 안에서 허용/비허용 대상·무해 명령·자료의 소비와 영향 범위를 대조하고 채택한 독립 경계·보완 통제를 확인한다. 역할별 명령 인가가 없는 실행 그룹의 내부를 독립 사용자 경계로 기록하지 않는다. 외부 비허용 peer의 진입 차단은 로컬 IPC에서는 CHK-PLT-002, 실제 원격 peer/transport 구간에서는 CHK-PLT-008의 관측과 연결하고, peer가 이 신뢰 그룹에 편입되는 조건과 접근 제한이 채택한 정책을 지키는지 대조한다. 내부 자료의 요청 귀속은 CHK-REQ-014에서 판정한다.
+remaining_setup: 신뢰 단위 확정; 이미 장악한 worker를 독립 저권한 사용자처럼 가정하지 않음
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C07
+  - Q-C10
+  scenario_ids:
+  - SC-08-02
+  subtest_ids:
+  - Q-C07/SC-08-02
+source:
+  array: platform_assessment_draft

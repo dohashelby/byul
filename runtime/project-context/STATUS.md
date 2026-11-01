@@ -223,6 +223,7 @@
 
 ## 2026-11-01 AWS dev 인수 판정 보수
 
+- AWS-03 최대 256토큰 응답을 GPU 속도 미측정 상태에서 5초 504로 오판하지 않도록 GPU LAB `relay_timeout_s`를 60초로 늘렸고, `stream_idle_timeout_s` 30초·`request_deadline_s` 300초는 유지했다. `kubectl kustomize`와 전용 unittest 33건은 통과했다. 요청된 기본 discover는 `tests/__init__.py`가 없어 0건(종료 5)이었고, 저장소 표준 `discover -s tests`는 526건 중 418건 통과·환경상 108건 skip·실패 0이었다. Claude가 샌드박스 밖에서 전체 unittest 526개 전부 통과(skip 0)를 확인했다. **Codex 구현·시험, Claude 검수 완료**
 - 사용자 결정에 따라 AWS-01~08이 기능 연결을 근거 없이 통과하지 않도록 보수했다. stream SSE·상한값 허용/상한+1 엔진 로그 부재, TCP timeout errno와 정확한 Hubble dropped/허용 경로, `EROFS`만 RO 증거, 수집·Pod 교체 뒤 유한 재시도 창의 정상 추론 회복을 필수화했다. `ECONNREFUSED`, `EACCES`, `EPERM`과 증거 부재는 통과시키지 않는다. AWS-08 뒤 AWS-04·05 재실행 절차도 추가했다.
 - 지적 전 시험: Codex 환경에서 `tests.test_aws_lab_acceptance` 32건 전부 통과, 전체 unittest 525건 중 417건 통과·108건 skip·실패 0이었다. Claude가 샌드박스 밖에서 지적 전 코드로 전체 unittest 525개 전부 통과(skip 0)를 확인했다.
 - Claude 검수 지적에 따라 AWS-01의 `stream_ok`를 결정 항목에 추가했다. stream HTTP 200·SSE data/`[DONE]`·record `ALLOWED`·전달 시도 중 하나라도 명시적으로 어긋나면 실패하고, stream record를 읽지 못한 경우에는 `stream_ok: null`로 근거 부족(`unknown`)을 유지한다. 수정 후 Codex 환경에서 `tests.test_aws_lab_acceptance` 33건 전부 통과, 전체 unittest 526건 중 418건 통과·108건 skip·실패 0이었다. skip은 이 샌드박스의 local socket/socket I/O `Operation not permitted`로 인한 HTTP·socket 통합시험이다. 실제 AWS와 Cilium의 차단 errno/동작은 실행하지 않아 미확인이다. 수정 후 Claude가 샌드박스 밖에서 전체 unittest 526개 전부 통과(skip 0)를 확인했다. **Codex 구현·시험, Claude 검수 지적 반영·재검수 완료**

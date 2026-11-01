@@ -3,6 +3,7 @@
 import pytest
 
 from guard.collectors.file import load_environment, load_policy
+from guard.models import load_pack
 from tests.builders import ROOT, baseline_pack
 
 
@@ -22,7 +23,7 @@ def test_declared_file_shorthand_is_declared_never_measured(tmp_path):
 
 
 def test_policy_must_match_pack_revision(tmp_path):
-    pack = baseline_pack()
+    pack = load_pack(ROOT / "packs/PACK-BASELINE")  # 예시 정책은 현행 팩에 묶여 있다
     pol = load_policy(ROOT / "examples/policy.yaml", pack)
     assert pol.pack == pack.ref() and pol.status == "DRAFT"
     p = tmp_path / "policy.yaml"

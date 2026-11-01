@@ -82,6 +82,7 @@ OPS = {
     "gt": _safe(lambda a, e, o: _number(a) and a > e),
     "ge": _safe(lambda a, e, o: _number(a) and a >= e),
     "nonempty": _safe(lambda a, e, o: isinstance(a, (list, dict, tuple, set, str)) and len(a) > 0),
+    "empty": _safe(lambda a, e, o: isinstance(a, (list, dict, tuple, set, str)) and len(a) == 0),
     "all_in": _safe(lambda a, e, o: a is not None and all(_member(x, e) for x in _elements(a))),
     "any_in": _safe(lambda a, e, o: a is not None and any(_member(x, e) for x in _elements(a))),
     "none_in": _safe(lambda a, e, o: a is not None and not any(_member(x, e) for x in _elements(a))),
@@ -108,7 +109,7 @@ def _describe(rule: dict) -> str:
         rhs = f"<policy:{rule['value_policy']}>"
     else:
         rhs = repr(rule.get("value"))
-    text = f"{rule['obs']} {rule['op']}" + ("" if rule["op"] == "nonempty" else f" {rhs}")
+    text = f"{rule['obs']} {rule['op']}" + ("" if rule["op"] in ("nonempty", "empty") else f" {rhs}")
     if rule.get("when"):
         text += f" (when {_describe(rule['when'])})"
     if rule.get("when_policy"):

@@ -107,7 +107,7 @@ def verify_components(repo):
 
 def _diagnostic_check():
     repo = Path(__file__).resolve().parents[2]
-    check = yaml.safe_load((repo / 'update/packs/PACK-BASELINE/checks/REQ-18.yaml').read_text())
+    check = yaml.safe_load((repo / 'update/reference/pack-seeds/PACK-BASELINE-31/checks/REQ-18.yaml').read_text())
     check['executor'] = EXECUTOR
     check['judge'] = {'plugin': 'rule_table', 'params': {'fail_when_any': [
         {'obs': 'req18_mask_inheritance_mismatch', 'op': 'eq', 'value': True}]}}

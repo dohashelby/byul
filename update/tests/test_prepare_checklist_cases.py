@@ -24,7 +24,7 @@ def external_path():
 
 @pytest.fixture(scope="module")
 def pack():
-    return load_pack(ROOT / "packs/PACK-BASELINE")
+    return load_pack(ROOT / "reference/pack-seeds/PACK-BASELINE-31")
 
 
 def test_preparation_preserves_current_definitions_and_does_not_make_results(pack):

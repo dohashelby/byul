@@ -30,7 +30,7 @@ class _BeforeCapture(Exception):
 ])
 def test_generated_env_policy_refs_use_existing_contract_and_distinct_ids(tmp_path, monkeypatch, producer):
     module = importlib.import_module('tools.' + producer)
-    pack = load_pack(ROOT / 'update/packs/PACK-BASELINE')
+    pack = load_pack(ROOT / 'update/reference/pack-seeds/PACK-BASELINE-31')
     generated = []
 
     def stop_at_store(*args, **kwargs):

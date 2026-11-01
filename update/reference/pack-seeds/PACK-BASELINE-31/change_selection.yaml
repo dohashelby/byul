@@ -1,0 +1,1050 @@
+version: 1
+engine_categories:
+  API_ROUTE:
+  - REQ-01
+  - REQ-03
+  - REQ-06
+  AUTH:
+  - REQ-01
+  - REQ-02
+  - REQ-03
+  - REQ-04
+  - REQ-06
+  - REQ-15
+  STREAMING:
+  - LIF-04
+  INPUT_PROCESSING:
+  - REQ-08
+  - REQ-09
+  - SUP-12
+  TEMPLATE:
+  - REQ-07
+  - SUP-13
+  SAMPLING:
+  - REQ-10
+  MODEL_SELECTION:
+  - REQ-05
+  - LIF-06
+  CACHE:
+  - REQ-15
+  - REQ-16
+  - REQ-17
+  RUNNER_KERNEL:
+  - REQ-18
+  - REQ-19
+  - REQ-20
+  - REQ-21
+  DISTRIBUTED_IPC:
+  - REQ-14
+  - PLT-02
+  - PLT-04
+  - PLT-06
+  - PLT-08
+  - LIF-13
+  - SUP-12
+  MODEL_LOADING:
+  - SUP-03
+  - SUP-06
+  - SUP-12
+  - LIF-01
+  - LIF-02
+  REMOTE_CODE:
+  - SUP-08
+  - SUP-09
+  PLUGIN:
+  - SUP-10
+  - SUP-11
+  COMPILE_CACHE:
+  - SUP-07
+  - SUP-15
+  SCHEDULER:
+  - LIF-03
+  STARTUP_HEALTH:
+  - LIF-07
+  - LIF-09
+  FAILURE:
+  - LIF-08
+  - LIF-10
+  - LIF-11
+  - LIF-12
+  PROFILER:
+  - LIF-14
+  USAGE_STATS:
+  - OBS-04
+  - OBS-05
+  REPLAY:
+  - OBS-07
+  - OBS-08
+  OBSERVABILITY:
+  - OBS-02
+  - OBS-03
+  - OBS-09
+  OUTPUT:
+  - REQ-11
+  - REQ-12
+  ERROR:
+  - REQ-13
+  OUTPUT_PARSING: []
+  DEPENDENCY:
+  - SUP-04
+  IMAGE:
+  - SUP-04
+  CLI_OPTION: []
+  ENV_VAR: []
+  GENERIC: []
+patch_always:
+- SUP-04
+- SUP-11
+- SUP-16
+- REQ-02
+- REQ-04
+- REQ-11
+- REQ-12
+- REQ-13
+- PLT-07
+- LIF-08
+- LIF-09
+- LIF-10
+- LIF-11
+- LIF-12
+- OBS-02
+- OBS-03
+- OBS-09
+- LIF-03
+- REQ-09
+- REQ-10
+model_categories:
+  MODEL_WEIGHTS:
+  - SUP-03
+  - SUP-05
+  - SUP-06
+  - SUP-16
+  - LIF-01
+  - LIF-02
+  MODEL_CODE:
+  - SUP-08
+  - SUP-09
+  - SUP-12
+  MODEL_TEMPLATE:
+  - SUP-13
+  - REQ-07
+  MODEL_TOKENIZER:
+  - REQ-08
+  - REQ-09
+  - REQ-10
+  MODEL_ARCH:
+  - REQ-09
+  - REQ-10
+  - LIF-03
+  - REQ-18
+  - REQ-19
+  - REQ-20
+  - REQ-21
+model_common:
+- REQ-05
+- REQ-16
+- SUP-15
+- LIF-05
+- LIF-06
+fact_triggers:
+  alternate_sources_or_formats_or_derived_cache:
+  - SUP-07
+  - SUP-12
+  - SUP-15
+  dynamic_import:
+  - SUP-11
+  gateway:
+  - LIF-10
+  - LIF-12
+  - PLT-08
+  - REQ-01
+  - REQ-02
+  - REQ-04
+  - REQ-13
+  managed_or_external_fallback:
+  - LIF-13
+  - PLT-05
+  - REQ-07
+  - SUP-12
+  - SUP-13
+  prefix_cache:
+  - REQ-15
+  prefix_cache_or_shared_cache:
+  - REQ-15
+  - REQ-17
+  r10_features:
+  - REQ-06
+  remote_acquisition_or_retry:
+  - LIF-02
+  - LIF-03
+  - OBS-06
+  - PLT-03
+  - REQ-16
+  - SUP-12
+  - SUP-15
+  - SUP-16
+  request_code_revision_selection:
+  - SUP-08
+  runtime.gpu_count:
+  - LIF-01
+  - LIF-03
+  - LIF-05
+  - LIF-06
+  - LIF-07
+  - LIF-08
+  - LIF-09
+  - LIF-10
+  - LIF-11
+  - LIF-13
+  - OBS-02
+  - PLT-01
+  - PLT-02
+  - PLT-04
+  - PLT-06
+  - PLT-08
+  - REQ-09
+  - REQ-10
+  - REQ-11
+  - REQ-14
+  - REQ-15
+  - REQ-17
+  - REQ-18
+  - REQ-19
+  - REQ-20
+  - REQ-21
+  - SUP-06
+  - SUP-07
+  - SUP-15
+  runtime.nodes:
+  - LIF-01
+  - LIF-03
+  - LIF-05
+  - LIF-06
+  - LIF-07
+  - LIF-08
+  - LIF-09
+  - LIF-10
+  - LIF-11
+  - LIF-13
+  - OBS-02
+  - PLT-01
+  - PLT-02
+  - PLT-04
+  - PLT-06
+  - PLT-08
+  - REQ-09
+  - REQ-10
+  - REQ-11
+  - REQ-14
+  - REQ-15
+  - REQ-17
+  - REQ-18
+  - REQ-19
+  - REQ-20
+  - REQ-21
+  - SUP-06
+  - SUP-07
+  - SUP-15
+  runtime.tp_groups:
+  - LIF-01
+  - LIF-03
+  - LIF-05
+  - LIF-06
+  - LIF-07
+  - LIF-08
+  - LIF-09
+  - LIF-10
+  - LIF-11
+  - LIF-13
+  - OBS-02
+  - PLT-01
+  - PLT-02
+  - PLT-04
+  - PLT-06
+  - PLT-08
+  - REQ-09
+  - REQ-10
+  - REQ-11
+  - REQ-14
+  - REQ-15
+  - REQ-17
+  - REQ-18
+  - REQ-19
+  - REQ-20
+  - REQ-21
+  - SUP-06
+  - SUP-07
+  - SUP-15
+  shared_or_remote_weights:
+  - LIF-13
+  - REQ-05
+  - SUP-06
+  - SUP-12
+fact_trigger_sources:
+  alternate_sources_or_formats_or_derived_cache:
+  - check: SUP-07
+    framework_id: CHK-SUP-007
+    source: supply_assessment_draft/CHK-SUP-007/applicability_criteria
+    matched_terms:
+    - 파생 cache
+  - check: SUP-07
+    framework_id: CHK-SUP-007
+    source: supply_assessment_draft/CHK-SUP-007/test_branch_conditions
+    matched_terms:
+    - 파생 cache
+  - check: SUP-12
+    framework_id: CHK-SUP-012
+    source: supply_assessment_draft/CHK-SUP-012/applicability_criteria
+    matched_terms:
+    - 대체 파일
+  - check: SUP-12
+    framework_id: CHK-SUP-012
+    source: supply_assessment_draft/CHK-SUP-012/test_branch_conditions
+    matched_terms:
+    - 대체 파일
+  - check: SUP-15
+    framework_id: CHK-SUP-015
+    source: supply_assessment_draft/CHK-SUP-015/test_branch_conditions
+    matched_terms:
+    - 파생/compiled/npcache
+  dynamic_import:
+  - check: SUP-11
+    framework_id: CHK-SUP-011
+    source: supply_assessment_draft/CHK-SUP-011/applicability_criteria
+    matched_terms:
+    - 동적 import
+  - check: SUP-11
+    framework_id: CHK-SUP-011
+    source: supply_assessment_draft/CHK-SUP-011/test_branch_conditions
+    matched_terms:
+    - 동적 import
+  gateway:
+  - check: REQ-01
+    framework_id: CHK-REQ-001
+    source: request_state_assessment_draft/CHK-REQ-001/applicability_criteria
+    matched_terms:
+    - Gateway
+  - check: REQ-01
+    framework_id: CHK-REQ-001
+    source: request_state_assessment_draft/CHK-REQ-001/test_branch_conditions
+    matched_terms:
+    - Gateway
+  - check: REQ-02
+    framework_id: CHK-REQ-002
+    source: request_state_assessment_draft/CHK-REQ-002/applicability_criteria
+    matched_terms:
+    - Gateway
+  - check: REQ-02
+    framework_id: CHK-REQ-002
+    source: request_state_assessment_draft/CHK-REQ-002/test_branch_conditions
+    matched_terms:
+    - Gateway
+  - check: REQ-04
+    framework_id: CHK-REQ-004
+    source: request_state_assessment_draft/CHK-REQ-004/applicability_criteria
+    matched_terms:
+    - Gateway
+  - check: REQ-04
+    framework_id: CHK-REQ-004
+    source: request_state_assessment_draft/CHK-REQ-004/test_branch_conditions
+    matched_terms:
+    - Gateway
+  - check: REQ-13
+    framework_id: CHK-REQ-013
+    source: request_state_assessment_draft/CHK-REQ-013/applicability_criteria
+    matched_terms:
+    - Gateway
+  - check: PLT-08
+    framework_id: CHK-PLT-008
+    source: platform_assessment_draft/CHK-PLT-008/applicability_criteria
+    matched_terms:
+    - Gateway
+  - check: LIF-10
+    framework_id: CHK-LIF-010
+    source: lifecycle_assessment_draft/CHK-LIF-010/applicability_criteria
+    matched_terms:
+    - Gateway
+  - check: LIF-12
+    framework_id: CHK-LIF-012
+    source: lifecycle_assessment_draft/CHK-LIF-012/applicability_criteria
+    matched_terms:
+    - Gateway
+  - check: LIF-12
+    framework_id: CHK-LIF-012
+    source: lifecycle_assessment_draft/CHK-LIF-012/test_branch_conditions
+    matched_terms:
+    - Gateway
+  managed_or_external_fallback:
+  - check: SUP-12
+    framework_id: CHK-SUP-012
+    source: supply_assessment_draft/CHK-SUP-012/applicability_criteria
+    matched_terms:
+    - fallback
+  - check: SUP-12
+    framework_id: CHK-SUP-012
+    source: supply_assessment_draft/CHK-SUP-012/test_branch_conditions
+    matched_terms:
+    - fallback
+  - check: SUP-13
+    framework_id: CHK-SUP-013
+    source: supply_assessment_draft/CHK-SUP-013/test_branch_conditions
+    matched_terms:
+    - fallback
+  - check: REQ-07
+    framework_id: CHK-REQ-007
+    source: request_state_assessment_draft/CHK-REQ-007/test_branch_conditions
+    matched_terms:
+    - fallback
+  - check: PLT-05
+    framework_id: CHK-PLT-005
+    source: platform_assessment_draft/CHK-PLT-005/applicability_criteria
+    matched_terms:
+    - fallback
+  - check: LIF-13
+    framework_id: CHK-LIF-013
+    source: lifecycle_assessment_draft/CHK-LIF-013/applicability_criteria
+    matched_terms:
+    - fallback
+  prefix_cache:
+  - check: REQ-15
+    framework_id: CHK-REQ-015
+    source: request_state_assessment_draft/CHK-REQ-015/test_branch_conditions
+    matched_terms:
+    - prefix cache
+  prefix_cache_or_shared_cache:
+  - check: REQ-15
+    framework_id: CHK-REQ-015
+    source: request_state_assessment_draft/CHK-REQ-015/test_branch_conditions
+    matched_terms:
+    - prefix cache
+  - check: REQ-17
+    framework_id: CHK-REQ-017
+    source: request_state_assessment_draft/CHK-REQ-017/applicability_criteria
+    matched_terms:
+    - 공유 cache
+  r10_features:
+  - check: REQ-06
+    framework_id: CHK-REQ-006
+    source: request_state_assessment_draft/CHK-REQ-006/test_branch_conditions
+    matched_terms:
+    - R10
+  remote_acquisition_or_retry:
+  - check: SUP-12
+    framework_id: CHK-SUP-012
+    source: supply_assessment_draft/CHK-SUP-012/test_branch_conditions
+    matched_terms:
+    - 원격 취득
+  - check: SUP-15
+    framework_id: CHK-SUP-015
+    source: supply_assessment_draft/CHK-SUP-015/applicability_criteria
+    matched_terms:
+    - 다운로드
+  - check: SUP-16
+    framework_id: CHK-SUP-016
+    source: supply_assessment_draft/CHK-SUP-016/applicability_criteria
+    matched_terms:
+    - 다운로드
+  - check: SUP-16
+    framework_id: CHK-SUP-016
+    source: supply_assessment_draft/CHK-SUP-016/test_branch_conditions
+    matched_terms:
+    - 다운로드
+  - check: REQ-16
+    framework_id: CHK-REQ-016
+    source: request_state_assessment_draft/CHK-REQ-016/applicability_criteria
+    matched_terms:
+    - 다운로드
+  - check: PLT-03
+    framework_id: CHK-PLT-003
+    source: platform_assessment_draft/CHK-PLT-003/applicability_criteria
+    matched_terms:
+    - 원격 취득
+  - check: LIF-02
+    framework_id: CHK-LIF-002
+    source: lifecycle_assessment_draft/CHK-LIF-002/applicability_criteria
+    matched_terms:
+    - 원격 취득
+  - check: LIF-02
+    framework_id: CHK-LIF-002
+    source: lifecycle_assessment_draft/CHK-LIF-002/test_branch_conditions
+    matched_terms:
+    - 원격 취득
+  - check: LIF-03
+    framework_id: CHK-LIF-003
+    source: lifecycle_assessment_draft/CHK-LIF-003/applicability_criteria
+    matched_terms:
+    - 다운로드
+  - check: LIF-03
+    framework_id: CHK-LIF-003
+    source: lifecycle_assessment_draft/CHK-LIF-003/test_branch_conditions
+    matched_terms:
+    - 다운로드
+  - check: OBS-06
+    framework_id: CHK-OBS-006
+    source: observability_assessment_draft/CHK-OBS-006/applicability_criteria
+    matched_terms:
+    - 다운로드
+  request_code_revision_selection:
+  - check: SUP-08
+    framework_id: CHK-SUP-008
+    source: supply_assessment_draft/CHK-SUP-008/applicability_criteria
+    matched_terms:
+    - 코드 판본 선택
+  - check: SUP-08
+    framework_id: CHK-SUP-008
+    source: supply_assessment_draft/CHK-SUP-008/test_branch_conditions
+    matched_terms:
+    - code_revision
+  runtime.gpu_count:
+  - check: SUP-06
+    framework_id: CHK-SUP-006
+    source: supply_assessment_draft/CHK-SUP-006/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: SUP-07
+    framework_id: CHK-SUP-007
+    source: supply_assessment_draft/CHK-SUP-007/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: SUP-15
+    framework_id: CHK-SUP-015
+    source: supply_assessment_draft/CHK-SUP-015/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-09
+    framework_id: CHK-REQ-009
+    source: request_state_assessment_draft/CHK-REQ-009/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-10
+    framework_id: CHK-REQ-010
+    source: request_state_assessment_draft/CHK-REQ-010/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-11
+    framework_id: CHK-REQ-011
+    source: request_state_assessment_draft/CHK-REQ-011/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-14
+    framework_id: CHK-REQ-014
+    source: request_state_assessment_draft/CHK-REQ-014/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-15
+    framework_id: CHK-REQ-015
+    source: request_state_assessment_draft/CHK-REQ-015/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-17
+    framework_id: CHK-REQ-017
+    source: request_state_assessment_draft/CHK-REQ-017/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-18
+    framework_id: CHK-REQ-018
+    source: request_state_assessment_draft/CHK-REQ-018/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-19
+    framework_id: CHK-REQ-019
+    source: request_state_assessment_draft/CHK-REQ-019/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-20
+    framework_id: CHK-REQ-020
+    source: request_state_assessment_draft/CHK-REQ-020/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-21
+    framework_id: CHK-REQ-021
+    source: request_state_assessment_draft/CHK-REQ-021/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-01
+    framework_id: CHK-PLT-001
+    source: platform_assessment_draft/CHK-PLT-001/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-02
+    framework_id: CHK-PLT-002
+    source: platform_assessment_draft/CHK-PLT-002/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-04
+    framework_id: CHK-PLT-004
+    source: platform_assessment_draft/CHK-PLT-004/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-06
+    framework_id: CHK-PLT-006
+    source: platform_assessment_draft/CHK-PLT-006/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-08
+    framework_id: CHK-PLT-008
+    source: platform_assessment_draft/CHK-PLT-008/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-01
+    framework_id: CHK-LIF-001
+    source: lifecycle_assessment_draft/CHK-LIF-001/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-03
+    framework_id: CHK-LIF-003
+    source: lifecycle_assessment_draft/CHK-LIF-003/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-05
+    framework_id: CHK-LIF-005
+    source: lifecycle_assessment_draft/CHK-LIF-005/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-06
+    framework_id: CHK-LIF-006
+    source: lifecycle_assessment_draft/CHK-LIF-006/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-07
+    framework_id: CHK-LIF-007
+    source: lifecycle_assessment_draft/CHK-LIF-007/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-08
+    framework_id: CHK-LIF-008
+    source: lifecycle_assessment_draft/CHK-LIF-008/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-09
+    framework_id: CHK-LIF-009
+    source: lifecycle_assessment_draft/CHK-LIF-009/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-10
+    framework_id: CHK-LIF-010
+    source: lifecycle_assessment_draft/CHK-LIF-010/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-11
+    framework_id: CHK-LIF-011
+    source: lifecycle_assessment_draft/CHK-LIF-011/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-13
+    framework_id: CHK-LIF-013
+    source: lifecycle_assessment_draft/CHK-LIF-013/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: OBS-02
+    framework_id: CHK-OBS-002
+    source: observability_assessment_draft/CHK-OBS-002/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  runtime.nodes:
+  - check: SUP-06
+    framework_id: CHK-SUP-006
+    source: supply_assessment_draft/CHK-SUP-006/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: SUP-07
+    framework_id: CHK-SUP-007
+    source: supply_assessment_draft/CHK-SUP-007/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: SUP-15
+    framework_id: CHK-SUP-015
+    source: supply_assessment_draft/CHK-SUP-015/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-09
+    framework_id: CHK-REQ-009
+    source: request_state_assessment_draft/CHK-REQ-009/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-10
+    framework_id: CHK-REQ-010
+    source: request_state_assessment_draft/CHK-REQ-010/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-11
+    framework_id: CHK-REQ-011
+    source: request_state_assessment_draft/CHK-REQ-011/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-14
+    framework_id: CHK-REQ-014
+    source: request_state_assessment_draft/CHK-REQ-014/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-15
+    framework_id: CHK-REQ-015
+    source: request_state_assessment_draft/CHK-REQ-015/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-17
+    framework_id: CHK-REQ-017
+    source: request_state_assessment_draft/CHK-REQ-017/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-18
+    framework_id: CHK-REQ-018
+    source: request_state_assessment_draft/CHK-REQ-018/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-19
+    framework_id: CHK-REQ-019
+    source: request_state_assessment_draft/CHK-REQ-019/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-20
+    framework_id: CHK-REQ-020
+    source: request_state_assessment_draft/CHK-REQ-020/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-21
+    framework_id: CHK-REQ-021
+    source: request_state_assessment_draft/CHK-REQ-021/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-01
+    framework_id: CHK-PLT-001
+    source: platform_assessment_draft/CHK-PLT-001/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-02
+    framework_id: CHK-PLT-002
+    source: platform_assessment_draft/CHK-PLT-002/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-04
+    framework_id: CHK-PLT-004
+    source: platform_assessment_draft/CHK-PLT-004/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-06
+    framework_id: CHK-PLT-006
+    source: platform_assessment_draft/CHK-PLT-006/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-08
+    framework_id: CHK-PLT-008
+    source: platform_assessment_draft/CHK-PLT-008/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-01
+    framework_id: CHK-LIF-001
+    source: lifecycle_assessment_draft/CHK-LIF-001/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-03
+    framework_id: CHK-LIF-003
+    source: lifecycle_assessment_draft/CHK-LIF-003/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-05
+    framework_id: CHK-LIF-005
+    source: lifecycle_assessment_draft/CHK-LIF-005/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-06
+    framework_id: CHK-LIF-006
+    source: lifecycle_assessment_draft/CHK-LIF-006/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-07
+    framework_id: CHK-LIF-007
+    source: lifecycle_assessment_draft/CHK-LIF-007/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-08
+    framework_id: CHK-LIF-008
+    source: lifecycle_assessment_draft/CHK-LIF-008/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-09
+    framework_id: CHK-LIF-009
+    source: lifecycle_assessment_draft/CHK-LIF-009/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-10
+    framework_id: CHK-LIF-010
+    source: lifecycle_assessment_draft/CHK-LIF-010/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-11
+    framework_id: CHK-LIF-011
+    source: lifecycle_assessment_draft/CHK-LIF-011/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-13
+    framework_id: CHK-LIF-013
+    source: lifecycle_assessment_draft/CHK-LIF-013/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: OBS-02
+    framework_id: CHK-OBS-002
+    source: observability_assessment_draft/CHK-OBS-002/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  runtime.tp_groups:
+  - check: SUP-06
+    framework_id: CHK-SUP-006
+    source: supply_assessment_draft/CHK-SUP-006/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: SUP-07
+    framework_id: CHK-SUP-007
+    source: supply_assessment_draft/CHK-SUP-007/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: SUP-15
+    framework_id: CHK-SUP-015
+    source: supply_assessment_draft/CHK-SUP-015/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-09
+    framework_id: CHK-REQ-009
+    source: request_state_assessment_draft/CHK-REQ-009/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-10
+    framework_id: CHK-REQ-010
+    source: request_state_assessment_draft/CHK-REQ-010/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-11
+    framework_id: CHK-REQ-011
+    source: request_state_assessment_draft/CHK-REQ-011/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-14
+    framework_id: CHK-REQ-014
+    source: request_state_assessment_draft/CHK-REQ-014/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-15
+    framework_id: CHK-REQ-015
+    source: request_state_assessment_draft/CHK-REQ-015/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-17
+    framework_id: CHK-REQ-017
+    source: request_state_assessment_draft/CHK-REQ-017/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-18
+    framework_id: CHK-REQ-018
+    source: request_state_assessment_draft/CHK-REQ-018/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-19
+    framework_id: CHK-REQ-019
+    source: request_state_assessment_draft/CHK-REQ-019/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-20
+    framework_id: CHK-REQ-020
+    source: request_state_assessment_draft/CHK-REQ-020/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: REQ-21
+    framework_id: CHK-REQ-021
+    source: request_state_assessment_draft/CHK-REQ-021/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-01
+    framework_id: CHK-PLT-001
+    source: platform_assessment_draft/CHK-PLT-001/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-02
+    framework_id: CHK-PLT-002
+    source: platform_assessment_draft/CHK-PLT-002/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-04
+    framework_id: CHK-PLT-004
+    source: platform_assessment_draft/CHK-PLT-004/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-06
+    framework_id: CHK-PLT-006
+    source: platform_assessment_draft/CHK-PLT-006/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: PLT-08
+    framework_id: CHK-PLT-008
+    source: platform_assessment_draft/CHK-PLT-008/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-01
+    framework_id: CHK-LIF-001
+    source: lifecycle_assessment_draft/CHK-LIF-001/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-03
+    framework_id: CHK-LIF-003
+    source: lifecycle_assessment_draft/CHK-LIF-003/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-05
+    framework_id: CHK-LIF-005
+    source: lifecycle_assessment_draft/CHK-LIF-005/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-06
+    framework_id: CHK-LIF-006
+    source: lifecycle_assessment_draft/CHK-LIF-006/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-07
+    framework_id: CHK-LIF-007
+    source: lifecycle_assessment_draft/CHK-LIF-007/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-08
+    framework_id: CHK-LIF-008
+    source: lifecycle_assessment_draft/CHK-LIF-008/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-09
+    framework_id: CHK-LIF-009
+    source: lifecycle_assessment_draft/CHK-LIF-009/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-10
+    framework_id: CHK-LIF-010
+    source: lifecycle_assessment_draft/CHK-LIF-010/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-11
+    framework_id: CHK-LIF-011
+    source: lifecycle_assessment_draft/CHK-LIF-011/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: LIF-13
+    framework_id: CHK-LIF-013
+    source: lifecycle_assessment_draft/CHK-LIF-013/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  - check: OBS-02
+    framework_id: CHK-OBS-002
+    source: observability_assessment_draft/CHK-OBS-002/applicability_criteria/environment_axes
+    axis: 6
+    document: 02_환경별_적용기준.md#팀-참조-구성과-12개-환경-조건
+    input_mapping: 02_환경별_적용기준.md#12개-환경-조건과-현재-json-입력-키:6
+  shared_or_remote_weights:
+  - check: SUP-06
+    framework_id: CHK-SUP-006
+    source: supply_assessment_draft/CHK-SUP-006/applicability_criteria
+    matched_terms:
+    - 공유·원격 weights
+    - 공유/원격 공급
+  - check: SUP-06
+    framework_id: CHK-SUP-006
+    source: supply_assessment_draft/CHK-SUP-006/test_branch_conditions
+    matched_terms:
+    - 공유·원격 weights
+  - check: SUP-12
+    framework_id: CHK-SUP-012
+    source: supply_assessment_draft/CHK-SUP-012/test_branch_conditions
+    matched_terms:
+    - weights daemon
+  - check: REQ-05
+    framework_id: CHK-REQ-005
+    source: request_state_assessment_draft/CHK-REQ-005/test_branch_conditions
+    matched_terms:
+    - weights daemon
+  - check: LIF-13
+    framework_id: CHK-LIF-013
+    source: lifecycle_assessment_draft/CHK-LIF-013/applicability_criteria
+    matched_terms:
+    - weights daemon
+unlinked_facts: []

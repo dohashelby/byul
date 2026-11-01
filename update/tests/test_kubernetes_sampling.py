@@ -250,7 +250,7 @@ def test_product_cli_stores_exact_binding_judges_reports_and_verifies(tmp_path, 
     config.write_text('[executors]\nsampling_validation = "kubernetes"\n[adapter]\nname = "vllm"\n'
         '[sampling_validation]\n' + '\n'.join(f'{k} = {json.dumps(v)}' for k, v in {**cfg(), "target": str(path)}.items()), encoding="utf-8")
     cli = CliRunner()
-    pack_path = Path(__file__).resolve().parents[1] / "packs/PACK-BASELINE"
+    pack_path = Path(__file__).resolve().parents[1] / "reference/pack-seeds/PACK-BASELINE-31"
     for command in (["run", "--plan", plan.id, "--pack", str(pack_path)],
                     ["judge", "--plan", plan.id, "--pack", str(pack_path)],
                     ["report", "--plan", plan.id, "--pack", str(pack_path), "--json", str(tmp_path / "report.json")], ["verify"]):

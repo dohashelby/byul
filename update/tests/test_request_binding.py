@@ -23,7 +23,7 @@ VALUES = {"result_binding": "originating_connection", "client_request_id_trust":
 
 
 def check():
-    raw = yaml.safe_load((ROOT / "packs/PACK-BASELINE/checks/REQ-11.yaml").read_text(encoding="utf-8"))
+    raw = yaml.safe_load((ROOT / "reference/pack-seeds/PACK-BASELINE-31/checks/REQ-11.yaml").read_text(encoding="utf-8"))
     raw.update(yaml.safe_load((ROOT / "tools/overrides/REQ-11.yaml").read_text(encoding="utf-8")))
     return CheckDef.model_validate(raw)
 

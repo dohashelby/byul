@@ -21,7 +21,7 @@ CSV_PATH = Path("docs/checklist_validation_status.csv")
 MD_PATH = Path("docs/CHECKLIST_VALIDATION_STATUS.md")
 FIELDS = (
     "check_id", "area", "question", "pack_revision", "check_revision", "retired",
-    "policy_keys", "executor", "judge", "real_executor_registered", "judge_registered",
+    "policy_keys", "executor", "judge", "real_executor_registered", "supported_implementations", "judge_registered",
     "implementation", "historical_grade", "grade_uncertainty", "experiment_group", "priority",
     "windows_cpu_status", "current_pack_actual_status", "required_observations",
     "normal_case", "violation_case", "missing_case", "unsupported_case", "reuse_candidate",
@@ -39,6 +39,8 @@ GROUPS = {
     "fault_injection": "LIFECYCLE_RECOVERY", "lifecycle_transition": "LIFECYCLE_RECOVERY",
     "load_resource": "LIFECYCLE_RECOVERY",
 }
+# 제품 경로로 세는 구현. reference-cpu·source-cpu 같은 CPU 전용 구현은 표시만 하고 세지 않는다.
+PRODUCT_IMPLEMENTATIONS = {"real", "kubernetes"}
 REUSE = {
     "http_boundary": "direct_route / role_route: endpoint·신원·최종 소비 관측의 재사용 범위 검토",
     "object_authz": "HTTP probe 재사용 후보; 객체 소유권·신뢰 신원 관측 추가 필요",
@@ -69,6 +71,12 @@ def registry_keys(path: Path, variable: str) -> set[str]:
                 raise ValueError(f"duplicate_registry_key:{variable}")
             return set(keys)
     raise ValueError(f"registry_not_found:{variable}")
+
+
+def supported_implementations(executor: str, executor_keys: set[str]) -> list[str]:
+    """이 실행기 이름으로 등록된 구현. 공용 fake 대역은 지원 구현으로 세지 않는다."""
+    prefix = executor + ":"
+    return sorted(key[len(prefix):] for key in executor_keys if executor and key.startswith(prefix))
 
 
 def _check_records(value):
@@ -130,9 +138,11 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
         executor = check.get("executor") or ""
         judge = (check.get("judge") or {}).get("plugin", "")
         real = bool(executor and f"{executor}:real" in executor_keys)
+        supported = supported_implementations(executor, executor_keys)
+        product = bool(set(supported) & PRODUCT_IMPLEMENTATIONS)
         judging = bool(judge and judge in judge_keys)
         params = (check.get("judge") or {}).get("params", {})
-        observation_only = (real and judging and judge == "rule_table"
+        observation_only = (product and judging and judge == "rule_table"
                             and "pass_when_all" in params and "fail_when_any" in params
                             and not params["pass_when_all"] and not params["fail_when_any"])
         policy_keys = [p["key"] for p in check.get("policy_params", [])]
@@ -142,13 +152,15 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
             implementation = "OBSERVATION_ONLY_NO_SECURITY_RULES"
         elif real and judging:
             implementation = "REAL_EXECUTOR_AND_JUDGE_CONNECTED"
+        elif product and judging:
+            implementation = "SUPPORTED_EXECUTOR_AND_JUDGE_CONNECTED"
         elif executor or judge:
             implementation = "PARTIALLY_CONNECTED"
         elif policy_keys:
             implementation = "POLICY_REGISTERED_NO_REAL_EXECUTOR"
         else:
             implementation = "NO_REAL_EXECUTOR"
-        if real:
+        if product:
             priority = "P1_OBSERVATION_GAP"
         else:
             priority = {"A": "P2_LOCAL_FEASIBILITY_REVIEW", "B": "P3_ADDITIONAL_INFRA", "C": "P4_ENTERPRISE_ENV"}.get(old["grade"], "ENVIRONMENT_REVIEW_REQUIRED")
@@ -161,6 +173,7 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
             "pack_revision": str(pack_revision), "check_revision": str(check["revision"]),
             "retired": str(bool(check.get("retired"))).lower(), "policy_keys": "; ".join(policy_keys),
             "executor": executor, "judge": judge, "real_executor_registered": str(real).lower(),
+            "supported_implementations": "; ".join(supported),
             "judge_registered": str(judging).lower(), "implementation": implementation,
             "historical_grade": old["grade"], "grade_uncertainty": old["uncertain"],
             "experiment_group": GROUPS.get(family, "PLATFORM_CREDENTIAL_NETWORK"), "priority": priority,
@@ -173,7 +186,7 @@ def build_rows(checks: list[dict], matrix: list[dict], *, pack_revision: int,
             "unsupported_case": str((check.get("applies_when") or {}).get("prose", "")) + " / " + str(check.get("remaining_setup") or "지원 환경·정책 범위를 확인"),
             "reuse_candidate": REUSE.get(family, "기존 수집을 대조한 뒤 부족한 관측·새 시험 절차만 추가"),
             "next_experiment": ("관측 전용: 실제 소비의 독립 근거와 보안 판정 계약을 먼저 확정: " if observation_only else
-                                "현행 정의의 정상·위반·미수집을 실제로 재확인: " if real else
+                                "현행 정의의 정상·위반·미수집을 실제로 재확인: " if product else
                                 "지원 범위·필수 관측을 확정하고 실제 정상·위반·미수집 시험 구현: ") + check["question"],
             "prerequisites": "; ".join(v for v in (old.get("new_infra"), check.get("remaining_setup")) if v),
             "team_decisions": policy.get("enterprise_decisions") or policy.get("policy_to_decide") or "",
@@ -201,6 +214,9 @@ def load_rows(root: Path = ROOT) -> list[dict[str, str]]:
                       evidence=historical_evidence(root))
 
 
+CONNECTED = {"REAL_EXECUTOR_AND_JUDGE_CONNECTED", "SUPPORTED_EXECUTOR_AND_JUDGE_CONNECTED"}
+
+
 def render_csv(rows: list[dict[str, str]]) -> str:
     out = io.StringIO(newline="")
     writer = csv.DictWriter(out, fieldnames=FIELDS, lineterminator="\n")
@@ -210,14 +226,16 @@ def render_csv(rows: list[dict[str, str]]) -> str:
 
 
 def render_markdown(rows: list[dict[str, str]]) -> str:
-    real = sum(r["implementation"] == "REAL_EXECUTOR_AND_JUDGE_CONNECTED" for r in rows)
+    real = sum(r["implementation"] in CONNECTED for r in rows)
+    kubernetes_only = sum(r["implementation"] == "SUPPORTED_EXECUTOR_AND_JUDGE_CONNECTED" for r in rows)
     observation_only = sum(r["implementation"] == "OBSERVATION_ONLY_NO_SECURITY_RULES" for r in rows)
     policy = sum(bool(r["policy_keys"]) for r in rows)
     paths = sum(len(r["policy_keys"].split("; ")) for r in rows if r["policy_keys"])
     groups = Counter(r["experiment_group"] for r in rows)
     lines = ["# 체크리스트 구현·실험 추적", "", "이 문서와 CSV는 `tools/checklist_status.py`의 생성물이다. 수정할 정본은 팩·registry·기존 자동화표·명시된 선별 실험 기록이다.", "",
-             f"현행 팩 revision {rows[0]['pack_revision'] if rows else '없음'}의 정의 {len(rows)}개, 정책 등록 {policy}점검/{paths}경로, 실행·보안 판정 규칙 연결 {real}개, 관측 전용 {observation_only}개, 나머지 미연결 {len(rows)-real-observation_only}개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.", "",
+             f"현행 팩 revision {rows[0]['pack_revision'] if rows else '없음'}의 정의 {len(rows)}개, 정책 등록 {policy}점검/{paths}경로, 실행·보안 판정 규칙 연결 {real}개, 관측 전용 {observation_only}개, 나머지 미연결 {len(rows)-real-observation_only}개다. 연결 중 kubernetes 구현만 있는 점검 {kubernetes_only}개다. 연결 수는 실제 전체 분기 검증 완료 수가 아니다.", "",
              "- [분기별 전체 CSV](checklist_validation_status.csv): 현재 정의·필수 관측·정상/위반/미수집/지원 밖 계획·선행 조건·기업 결정·과거 EVD/RES를 연결한다.",
+             "- `supported_implementations`는 registry에 등록된 구현을 그대로 표시한다. `real`과 `kubernetes`는 서로 대체하지 않고, 공용 `fake`와 CPU 전용 구현은 연결 수에 넣지 않는다.",
              "- 이번 구현 묶음은 사용자 지시에 따라 실제 vLLM 실증을 보류한다. `current_pack_actual_status=DEFERRED_NOT_MEASURED`이며, 과거 기록이나 단위 시험을 현행 팩의 새 실측으로 승격하지 않는다.",
              "- `historical_pack_revisions`와 EVD/RES는 구조화된 과거 CPU 선별 기록(팩17·18·19)에서만 읽는다. 팩21·22의 후속 두 이미지 결과는 원래 자동화표의 `historical_verification`·`remaining_scope`와 [실측 문서](UPDATE_VALIDATION.md)를 함께 따른다.",
              "- 이 선별 JSON은 독립 복원 가능한 원본 bundle 전체가 아니다. 추적된 EVD Ref만으로 현행 코드 재현·무결성 검증·기업 승인을 주장하지 않는다.",
@@ -250,7 +268,8 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
         else:
             path.write_bytes(expected)
-    print(f"checks={len(rows)} real_connected={sum(r['implementation'] == 'REAL_EXECUTOR_AND_JUDGE_CONNECTED' for r in rows)}")
+    print(f"checks={len(rows)} real_connected={sum(r['implementation'] == 'REAL_EXECUTOR_AND_JUDGE_CONNECTED' for r in rows)} "
+          f"supported_connected={sum(r['implementation'] in CONNECTED for r in rows)}")
     return 0
 
 

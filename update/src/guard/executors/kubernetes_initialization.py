@@ -14,6 +14,10 @@ from .lifecycle_session import capture_session
 from .initialization_contract import PROFILE,normalize_policy,stamp
 
 
+READINESS_PROFILE='kubernetes-mp-readiness-observation-v1'
+CHECK_PROFILES={'LIF-09':PROFILE,'LIF-07':READINESS_PROFILE}
+
+
 class KubernetesInitializationExecutor(HttpCheckExecutor):
     name='initialization';version='0.4.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
@@ -21,7 +25,7 @@ class KubernetesInitializationExecutor(HttpCheckExecutor):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
 
     def validate_policy(self,check,values):
-        if check.id!='LIF-09' or getattr(check,'collection_profile',None)!=PROFILE:raise ValueError('INITIALIZATION_PROFILE_UNSUPPORTED')
+        if CHECK_PROFILES.get(check.id)!=getattr(check,'collection_profile',None) or check.id not in CHECK_PROFILES:raise ValueError('INITIALIZATION_PROFILE_UNSUPPORTED')
         normalize_policy(values)
 
     def run(self,check,env,policy_values,adapter,workdir):
@@ -108,7 +112,7 @@ class KubernetesInitializationExecutor(HttpCheckExecutor):
         ctx._init_cleanup=list(http['cleanup_errors'])
         if read_report and read_report.get('parent_cleanup_unverified'):ctx._init_cleanup.append('INITIALIZATION_PARENT_CLEANUP_UNVERIFIED')
         ctx._init_gap=bool(diagnostics or http['collection_gap'] or ctx._init_cleanup)
-        summary={'profile':PROFILE,'declared_phase':ctx.policy_values['init_phase'],
+        summary={'profile':ctx.check.collection_profile,'declared_phase':ctx.policy_values['init_phase'],
             'declared_scenario_sha256':ctx.policy_values['init_scenario_sha256'],'trials':trials,'native':packet,'projection':projection,
             'transport':http,'reader':read_report,'worker_startup':worker,'sealed_selected_session':sealed,'diagnostic_codes':diagnostics,
             'fixture':{'profile':PROFILE},'failure_control_implemented':False,'failure_activation_verified':False,

@@ -11,6 +11,10 @@ from .lifecycle_session import capture_session
 from .stream_buffer_contract import PROFILE,normalize_policy,stamp
 
 
+BUDGET_PROFILE='kubernetes-stream-buffer-budget-observation-v1'
+CHECK_PROFILES={'LIF-04':PROFILE,'LIF-03':BUDGET_PROFILE}
+
+
 class KubernetesStreamBufferExecutor(HttpCheckExecutor):
     name='stream_buffer';version='0.1.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
@@ -18,7 +22,7 @@ class KubernetesStreamBufferExecutor(HttpCheckExecutor):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
 
     def validate_policy(self,check,values):
-        if check.id!='LIF-04' or getattr(check,'collection_profile',None)!=PROFILE:raise ValueError('STREAM_BUFFER_PROFILE_UNSUPPORTED')
+        if CHECK_PROFILES.get(check.id)!=getattr(check,'collection_profile',None) or check.id not in CHECK_PROFILES:raise ValueError('STREAM_BUFFER_PROFILE_UNSUPPORTED')
         normalize_policy(values)
 
     def run(self,check,env,policy_values,adapter,workdir):
@@ -84,7 +88,7 @@ class KubernetesStreamBufferExecutor(HttpCheckExecutor):
                     if not packet.get('recorded_files_covered'):diagnostics.append('STREAM_BUFFER_NATIVE_COVERAGE_UNAVAILABLE')
                 except Exception:diagnostics.append('STREAM_BUFFER_CAPTURE_UNAVAILABLE')
         projection=metadata.project(packet,trials,ctx.policy_values);http=ctx.cprobe.report();read_report=reader.report() if reader else None
-        summary={'profile':PROFILE,'trials':trials,'native':packet,'projection':projection,'transport':http,'reader':read_report,
+        summary={'profile':ctx.check.collection_profile,'trials':trials,'native':packet,'projection':projection,'transport':http,'reader':read_report,
             'sealed_selected_session':sealed,'diagnostic_codes':diagnostics,'fixture':{'profile':PROFILE},'whole_scope_complete':False,
             'server_memory_is_client_read_timing':False,'worker_gpu_release_verified':False}
         ctx._buffer_cleanup=list(http['cleanup_errors'])

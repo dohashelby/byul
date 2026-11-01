@@ -75,7 +75,8 @@ def test_request_termination_closed_consumer_selection(check_id,profile,implemen
         check=SimpleNamespace(id=check_id,collection_profile=candidate)
         if candidate==profile:assert type(executor._consumer(check)) is implementation
         else:
-            with pytest.raises(ValueError,match='TERMINATION_PROFILE_UNSUPPORTED'):executor._consumer(check)
+            error='RETRY_PROFILE_UNSUPPORTED' if check_id=='LIF-12' else 'TERMINATION_PROFILE_UNSUPPORTED'
+            with pytest.raises(ValueError,match='^'+error+'$'):executor._consumer(check)
 
 
 @pytest.mark.parametrize('mismatch',[False,True])

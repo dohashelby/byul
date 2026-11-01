@@ -70,7 +70,10 @@ class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
         branches={('LIF-10',PROFILE):None,('LIF-12',RETRY_PROFILE):KubernetesRetryRecordExecutor,
             ('REQ-12',ATTEMPT_PROFILE):KubernetesRequestAttemptsExecutor}
         key=(check.id,getattr(check,'collection_profile',None))
-        if key not in branches:raise ValueError('TERMINATION_PROFILE_UNSUPPORTED')
+        if key not in branches:
+            # Preserve the established retry consumer's public rejection code.
+            if check.id=='LIF-12':raise ValueError('RETRY_PROFILE_UNSUPPORTED')
+            raise ValueError('TERMINATION_PROFILE_UNSUPPORTED')
         implementation=branches[key]
         if implementation is None:return self
         return implementation(self.cfg,runner=self.runner,environ=self._environ,

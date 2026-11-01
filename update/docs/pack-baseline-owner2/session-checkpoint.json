@@ -1,0 +1,28 @@
+{
+  "task": "PACK-BASELINE executor connection owner 2",
+  "start_origin_main": "c8265f1",
+  "latest_observed_origin_main": "f15210b",
+  "branch": "codex/pack-baseline-owner2-20261101",
+  "common_foundation": {
+    "merged": false,
+    "pr": null,
+    "owner_github_login": "dohashelby",
+    "pack_connection_allowed": false
+  },
+  "historical_pack": {"id": "PACK-BASELINE", "revision": 31, "modified": false},
+  "native_engine_sensor_connections": 0,
+  "native_engine_sensor_note": "Nine native profiles have unresolved or absent producer contracts. Registration and EXAMPLE CPU tests are not counted as native connections.",
+  "measured_kubernetes_runs": 0,
+  "measured_gpu_runs": 0,
+  "measured_source_cpu_runs": 0,
+  "validation": {
+    "engine_sensor_direct_contracts": {"passed": 24, "pytest_seconds": 1.22, "parent_wall_seconds": 2.0462903},
+    "basic_full_suite": "pending_integration"
+  },
+  "continuation_gate": {
+    "independent_work_remaining": true,
+    "next": ["integrate reviewed dedicated collectors", "implement available cache source callbacks", "validate registered collector pipelines", "run full suite and preserve logs", "recheck common foundation merge before pack connection"],
+    "status": "implementation_in_progress",
+    "background_automation": false
+  }
+}

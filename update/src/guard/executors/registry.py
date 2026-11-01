@@ -51,9 +51,12 @@ from .kubernetes_model_authorization import KubernetesModelAuthorizationExecutor
 from .kubernetes_request_termination import KubernetesRequestTerminationExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
 from .template_source_cpu import TemplateSourceCPUExecutor
+from .engine_sensor import EngineSensorExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
 EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
+    "engine_sensor:kubernetes": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="kubernetes", expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
+    "engine_sensor:source-cpu": lambda cfg: EngineSensorExecutor(cfg.get("engine_sensor", {}), implementation="source-cpu"),
     "boundary_egress:kubernetes": lambda cfg: KubernetesEgressProductExecutor(cfg.get("boundary_egress", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "native_route:kubernetes": lambda cfg: KubernetesNativeRouteExecutor(cfg.get("native_route", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "unix_ipc:kubernetes": lambda cfg: KubernetesIPCProductExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),

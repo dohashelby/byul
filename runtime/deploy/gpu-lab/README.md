@@ -1,6 +1,6 @@
 # AWS GPU lab — runtime 배포 층 (초안)
 
-AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS 묶음") **위에 얹는** runtime 쪽 파일이다. 엔진·namespace·계정·엔진 격리 정책은 AWS 묶음이 만들고, 여기서는 Gateway·관리 수신부·observer 자리·추가 통신 정책·intent·호스트 수집기만 더한다. 2026-11-01 dev에서 통합 층과 AWS-01~03을 실행했다. 저장소의 서버별 값은 `REPLACE…`로 비워 두고 서버 사본에서 채운다.
+AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS 묶음") **위에 얹는** runtime 쪽 파일이다. 엔진·namespace·계정·엔진 격리 정책은 AWS 묶음이 만들고, 여기서는 Gateway·관리 수신부·observer 자리·추가 통신 정책·intent·호스트 수집기만 더한다. 2026-11-01 g6.2xlarge dev에서 AWS-01~08을 단계별로 통과했다(Claude 실행, Codex 교차 검수 전). 이는 기능 연결 확인 1회이며 reference 정식 평가가 아니다. 적용 규칙·제외 규칙·결과와 한계는 [`ACCEPTANCE.md`](ACCEPTANCE.md)에 있다. 저장소의 서버별 값은 `REPLACE…`로 비워 두고 서버 사본에서 채운다.
 
 ## AWS 묶음이 이미 만드는 것 (여기서 다시 만들지 않음)
 
@@ -134,9 +134,9 @@ kubectl kustomize deploy/gpu-lab                          # 렌더링만
 serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out /tmp/render
 ```
 
-- reference 환경의 실제 AWS 적용·실행, Gateway의 hostPath 읽기 권한(10010 그룹)·SELinux/AppArmor 영향
-- host가 쓴 `target-pods.json`을 Gateway가 읽고 rollout 뒤 `instance_changed`(`pod_replaced`)를 남기는지
-- 사이드카가 nvidia RuntimeClass Pod 안에서 정상 기동하는지
+- reference 환경의 실제 AWS 적용·실행, Gateway의 hostPath 읽기 권한(10010 그룹)에 대한 다양한 조건·SELinux/AppArmor 영향
+- 다른 노드 조건에서 host `target-pods.json` 조회·rollout 이력 재현(dev에서는 `instance_changed`/`pod_replaced` 확인)
+- reference 환경에서 nvidia RuntimeClass Pod의 사이드카 기동 재현
 - 관리 수신부 우회(같은 Pod의 loopback 공유) 시험 — AWS 묶음 README도 별도 시험 대상으로 둠
 - observer 수집 프로그램, Gateway의 클러스터 노출 방식(현재 127.0.0.1 bind)
 - SGLang 전환(AWS 묶음 범위는 vLLM만)

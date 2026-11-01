@@ -1103,7 +1103,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
 
       <section id="pol-approval" className="card card-pad stack">
         <h2>승인 조건</h2>
-        <div className="small muted">여기에는 무엇을 어떤 조건으로 승인하는지 적습니다. 승인 번호와 승인자는 저장한 뒤 아래 '판본 승인'에서 기록합니다. 서명이 아닙니다.</div>
+        <div className="small muted">여기에는 무엇을 어떤 조건으로 승인하는지 적습니다. 승인자는 저장한 뒤 아래 '판본 승인'에서 기록합니다. 서명이 아닙니다.</div>
         <div className={p.qGrid}>
           <div className={p.qField}>
             <div className={p.qLabel}>

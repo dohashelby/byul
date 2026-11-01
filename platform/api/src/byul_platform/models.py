@@ -338,7 +338,6 @@ class EnvironmentSaved(BaseModel):
 class PolicyConfirm(BaseModel):
     revision: int
     approved_by: str
-    approval_ref: str
 
 
 class PolicySaved(BaseModel):

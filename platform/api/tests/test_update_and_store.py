@@ -197,10 +197,10 @@ def test_confirm_records_approval_on_latest_draft(store_client):
     assert store_client.post("/api/environments", json=_env()).status_code == 201
     saved = store_client.post("/api/policies", json=_policy()).json()["saved"]
     doc_id, revision = saved["meta"]["doc_id"], saved["meta"]["revision"]
-    body = {"revision": revision, "approved_by": "보안 담당", "approval_ref": "APPROVAL-001"}
+    body = {"revision": revision, "approved_by": "보안 담당"}
 
     assert store_client.post(f"/api/policies/{doc_id}/confirm", json={**body, "revision": revision + 1}).status_code == 409
-    assert store_client.post(f"/api/policies/{doc_id}/confirm", json={**body, "approval_ref": "bad id"}).status_code == 422
+    assert store_client.post(f"/api/policies/{doc_id}/confirm", json={**body, "approved_by": ""}).status_code == 422
     assert store_client.post("/api/policies/missing/confirm", json=body).status_code == 404
 
     r = store_client.post(f"/api/policies/{doc_id}/confirm", json=body)
@@ -208,7 +208,7 @@ def test_confirm_records_approval_on_latest_draft(store_client):
     confirmed = r.json()["saved"]
     assert confirmed["meta"]["revision"] == revision + 1
     assert confirmed["meta"]["status"] == confirmed["document"]["status"] == "CONFIRMED"
-    assert confirmed["document"]["approval"]["approval_ref"] == "APPROVAL-001"
+    assert confirmed["document"]["approval"]["approval_ref"] == f"{doc_id}-v{revision + 1}"
     assert confirmed["document"]["policy_version"] == saved["document"]["policy_version"]
 
     again = store_client.post(f"/api/policies/{doc_id}/confirm", json={**body, "revision": revision + 1})

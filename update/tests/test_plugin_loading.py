@@ -10,7 +10,7 @@ import yaml
 
 
 def definition():
-    return CheckDef.model_validate(yaml.safe_load((Path(__file__).parents[1]/'packs/PACK-BASELINE/checks/SUP-10.yaml').read_text()))
+    return CheckDef.model_validate(yaml.safe_load((Path(__file__).parents[1]/'reference/pack-seeds/PACK-BASELINE-31/checks/SUP-10.yaml').read_text()))
 
 
 def test_case_matrix_keeps_unset_empty_and_group_specific_scope():

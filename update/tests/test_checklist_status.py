@@ -139,3 +139,21 @@ def test_check_mode_rejects_a_stale_output_without_writing(tmp_path, monkeypatch
     monkeypatch.setattr("tools.checklist_status.load_rows", lambda root: rows)
     assert main(["--root", str(tmp_path), "--check"]) == 1
     assert csv_path.read_bytes() == b"stale\n"
+
+
+def test_kubernetes_only_executor_is_connected_but_not_reported_as_real():
+    checks, matrix, kwargs = _inputs()
+    kwargs["executor_keys"] = {"fake", "direct_route:kubernetes"}
+    row, = build_rows(checks, matrix, **kwargs)
+    assert row["real_executor_registered"] == "false"
+    assert row["supported_implementations"] == "kubernetes"
+    assert row["implementation"] == "SUPPORTED_EXECUTOR_AND_JUDGE_CONNECTED"
+    assert "kubernetes 구현만 있는 점검 1개" in render_markdown([row])
+
+
+def test_fake_and_cpu_only_implementations_do_not_count_as_connected():
+    checks, matrix, kwargs = _inputs()
+    kwargs["executor_keys"] = {"fake", "direct_route:reference-cpu"}
+    row, = build_rows(checks, matrix, **kwargs)
+    assert row["supported_implementations"] == "reference-cpu"
+    assert row["implementation"] == "PARTIALLY_CONNECTED"

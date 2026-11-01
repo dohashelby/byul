@@ -1,0 +1,54 @@
+id: REQ-14
+framework_id: CHK-REQ-014
+mechanism_ids:
+- mechanism-16
+- mechanism-04
+revision: 4
+retired: false
+area: REQ
+purpose: 요청·결과 귀속
+secondary_purposes: []
+question: 여러 실행 프로세스가 주고받는 중간 자료와 최종 출력이 원래 요청에 맞게 처리·반환되는가?
+scope: 기본+선택 기능
+risk_category: 보안 위협 점검
+risk_summary: 전송 입력·peer에 영향을 줄 수 있는 주체가 요청·모델·buffer 연결을 바꿔 타 요청의 중간 자료를 읽거나 출력을 오염시킬 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 기본 TP 내부 전달을 확인한다. 다중 노드·PP·PD는 실제 구성에 포함될 때 별도 경로로 추가한다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 분산 구성·요청/세대 연결 규칙
+  enterprise_decisions: 결과 독자·공유 관계·허용 응답/오류 필드, 입력 사본 반환 필요성, 취소 확정 시점·늦은 출력 처리, Gateway/SDK/엔진별 재시도, 저장 결과 기능. 결과 수신 권한과 반환 필드 권한을 각각 정한다.
+normal_control: TP 처리에서 각 rank의 담당 계산·중간 상태와 선정 출력 rank·집계 경로의 최종 반환을 요청·모델·buffer에 연결한다.
+challenge_steps:
+- 기본 TP 요청 추적
+- 안전한 지연·실패를 한 구간에 주입
+- 중간 자료와 최종 결과의 귀속 확인
+required_observations: []
+required_observations_prose:
+- request·model·generation ID/rank·buffer 전달/완료·회수·출력 연결
+satisfied_if: 실제 사용하는 구성에서 다른 요청/세대의 자료가 잘못 소비되지 않는다. TP/PP와 PD의 결과를 별도 기록한다.
+fail_criteria: 다른 요청·모델 세대의 자료가 결과에 사용되거나 잘못된 요청으로 반환된다.
+unknown_criteria: 분산 중간 자료·세대·buffer 대응을 계측하지 못했다.
+remediation: '- 분산 단계마다 요청·모델 버전·중간 자료의 식별정보를 대조하고 최종 출력의 수신자를 확인한다. 지연·재전송·장애 때 다른 요청이나 모델 버전의 자료가 사용되지 않도록 전달·폐기 규칙을 적용한다.'
+method_and_evidence: '선정 executor에서 request·model·generation→actor/rank·중간 buffer/블록→집계·출력 rank→최종 요청 연결을 추적한다. 허용된 지연·실패 변형에서 다른 요청·모델 세대의 자료를 잘못 소비·반환하는지 정상 TP 결과와 비교한다. 기본 TP, 선택 Ray/PP, PD/KV connector의 실제 경로·증거를 구분하고 legacy 출력 rank 설명을 다른 executor에 일반화하지 않는다. 【F18】PD/NIXL을 선택하면 API의 kv_transfer_params/remote peer·block 메타데이터가 실제 요청·허용 peer·블록에 연결되는지 확인한다. 잘못된 참조의 거부와 정상 전송을 대조하며 전달 자체를 성공/취약점으로 단정하지 않는다. IPC 접근 인가·공유 실행 신뢰·구간 보호는 CHK-PLT-002·CHK-PLT-006·CHK-PLT-008의 결과와 연결한다. 근거 원문: [F18](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33474).'
+remaining_setup: TP 기본 경로 우선; PD 등은 별도 활성 조건과 추적 구현 필요
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C02
+  - Q-C06
+  - Q-C07
+  - Q-C08
+  scenario_ids:
+  - SC-08-02
+  - SC-08-03
+  - SC-08-04
+  subtest_ids:
+  - Q-C07/SC-08-02
+  - Q-C07/SC-08-03
+  - Q-C02/SC-08-04
+source:
+  array: request_state_assessment_draft

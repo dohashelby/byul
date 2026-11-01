@@ -57,7 +57,7 @@ def source_repo(tmp_path):
 
 
 def test_git_source_bytes_rename_delete_exclusions_and_artifact(source_repo):
-    extraction = extract_git_change(source_repo, "v1.0.0", "v1.0.1", pack=load_pack(ROOT / "packs/PACK-BASELINE"))
+    extraction = extract_git_change(source_repo, "v1.0.0", "v1.0.1", pack=load_pack(ROOT / "reference/pack-seeds/PACK-BASELINE-31"))
     change = extraction.change
     artifact = json.loads(extraction.artifact_bytes)
     assert len(change.baseline.source_commit) == 40
@@ -225,7 +225,7 @@ def test_checklist_framework_metadata_and_exact_internal_mapping(tmp_path):
     pack_dir = tmp_path / "pack"
     # 기존 ID 맵을 써서 질문이 모두 바뀐 원본의 73+4 연결을 검증한다.
     pack_dir.mkdir()
-    (pack_dir / "id_map.yaml").write_bytes((ROOT / "packs/PACK-BASELINE/id_map.yaml").read_bytes())
+    (pack_dir / "id_map.yaml").write_bytes((ROOT / "reference/pack-seeds/PACK-BASELINE-31/id_map.yaml").read_bytes())
     manifest = import_checklist(ROOT / "reference/framework/data/checklist.json", pack_dir, ROOT / "tools/overrides")
     pack = load_pack(pack_dir)
     assert len(manifest["checks"]) == 77
@@ -246,7 +246,7 @@ def test_checklist_framework_metadata_and_exact_internal_mapping(tmp_path):
 
 
 def test_legacy_checkdef_omits_new_optional_metadata():
-    check = load_pack(ROOT / "packs/PACK-BASELINE").checks["REQ-01"].model_dump(mode="json")
+    check = load_pack(ROOT / "reference/pack-seeds/PACK-BASELINE-31").checks["REQ-01"].model_dump(mode="json")
     check.pop("framework_id")
     check.pop("mechanism_ids")
     assert CheckDef.model_validate(check).model_dump(mode="json") == check
@@ -306,7 +306,7 @@ def test_source_refresh_and_image_profile_revisions_preserve_other_definitions(t
 
 
 def test_pack_rejects_unknown_change_selection_reference():
-    pack_dir = ROOT / "packs/PACK-BASELINE"
+    pack_dir = ROOT / "reference/pack-seeds/PACK-BASELINE-31"
     manifest = yaml.safe_load((pack_dir / "pack.yaml").read_bytes())
     files = {row["path"]: (pack_dir / row["path"]).read_bytes() for row in manifest["files_sha256"]}
     selection = yaml.safe_load(files["change_selection.yaml"])

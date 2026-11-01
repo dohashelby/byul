@@ -1,0 +1,46 @@
+id: REQ-19
+framework_id: CHK-REQ-019
+mechanism_ids:
+- mechanism-05
+revision: 3
+retired: false
+area: REQ
+purpose: GPU 메모리 안전성
+secondary_purposes: []
+question: 실제 사용하는 GPU 연산 코드가 입력·버퍼 경계를 지키고 필요한 영역을 초기화하는가?
+scope: 선정 구현 조건
+risk_category: 보안 위협·일반 장애 함께 점검
+risk_summary: 호출자가 실제 kernel에 도달하는 경계 입력을 제출할 때 접근 범위 결함이 있다면 다른 자료의 노출·계산 오염·서비스 장애로 이어질 수 있음. 결함·영향 미확인.
+review_order: implementation_path_first
+impact: null
+applies_when:
+  prose: 실제 GPU/backend/dtype/shape·의존성에 도달하는 kernel 분기를 확인한다. 다른 kernel의 결과를 전용하지 않는다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 서비스 입력 제한; 메모리 유효성은 구현 요구
+  enterprise_decisions: 지원 GPU·runner·mode·shape/입력 범위, 정상 대조 방식·수치 오차·성능·장애 처리 기준과 실제 peer. 범위 밖 접근·타 요청 혼입·유출은 정책이나 허용 수치 오차로 완화할 수 없다.
+normal_control: 선택한 kernel이 유효 shape·length 입력으로 대조 구현과 맞는 결과를 낸다.
+challenge_steps:
+- 활성 kernel·dtype·shape 고정
+- 길이 경계와 padding 변형을 작은 fixture로 실행
+- 오류·guard·출력 비교
+required_observations: []
+required_observations_prose:
+- kernel·GPU·dtype/buffer 범위·초기화/동기화 오류·대조 출력
+satisfied_if: 시험한 kernel 분기에서 주소·인덱스·크기 계산과 필요한 영역의 초기화가 유효한 범위를 지키고, 범위 밖 접근이나 초기화되지 않은 값의 소비가 확인되지 않으며 정상 대조 연산이 성립한다. slot 상태·graph replay·통신 버퍼의 소유자와 시간 순서는 CHK-REQ-018·CHK-REQ-020·CHK-REQ-021의 결과와 연결한다. 계측 미비는 미확인으로 둔다.
+fail_criteria: 유효 범위 밖 접근이나 초기화되지 않은 값의 소비가 증거로 확인된다.
+unknown_criteria: 집계 GPU 지표만 있거나 kernel·buffer 수준 증거를 얻지 못했다.
+remediation: '- 선택한 kernel·의존성의 수정 버전을 적용하고 실제 buffer 크기·입력 범위에 맞춰 접근·초기화 조건을 검사한다. 수정 전 임시 제한은 확인된 영향 경로에 적용하고 유효 입력의 정상 처리도 함께 확인한다.'
+method_and_evidence: 근거 있는 경계 입력을 격리 환경에서 시험하고 실제 분기 도달·메모리/오류 계측·정상 출력을 확보한다.
+remaining_setup: 소형 kernel 시험 입력 자료·계측/검사 도구; 출력 차이만으로 메모리 유출 확정하지 않음
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C06
+  scenario_ids:
+  - SC-06-02
+  subtest_ids:
+  - Q-C06/SC-06-02
+source:
+  array: request_state_assessment_draft

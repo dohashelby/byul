@@ -81,7 +81,7 @@ def test_profiler_cpu_route_reuses_producer_and_failed_stop_next_start_record(tm
     monkeypatch.setattr(cpu,'capture',lambda **kwargs:sample)
     env=environment(engine={'name':'vllm','version':'reference-'+cpu.SOURCE_COMMIT})
     check=baseline_pack().checks['LIF-14'].model_copy(update={'collection_profile':cpu.PROFILE})
-    draft=profiler.KubernetesProfilerObservationExecutor({'source_root':'owned-source','owned_parent':'owned-output'}).run(check,env,{},None,tmp_path)
+    draft=profiler.KubernetesProfilerObservationExecutor({'source_root':'owned-source','owned_parent':'owned-output'},implementation='source-cpu').run(check,env,{},None,tmp_path)
     assert draft.status==ExecStatus.COMPLETED and draft.data_origin==DataOrigin.EXAMPLE
     assert draft.observations['profiler_cpu_stop_mismatch'].value is mismatch
     assert {r['case_id'] for r in draft.observations['profiler_cpu_trials'].value}==set(cpu.CASE_IDS)
@@ -232,3 +232,15 @@ def test_readiness_retains_original_required_policy_without_inference(value):
     check=baseline_pack().checks['LIF-07'].model_copy(update={'collection_profile':initialization.READINESS_PROFILE})
     with pytest.raises(ValueError,match='INITIALIZATION_READINESS_POLICY_INVALID'):
         initialization.normalize_check_policy(check,{'required_readiness_items':value})
+
+
+@pytest.mark.parametrize('implementation',['kubernetes','source-cpu'])
+def test_profiler_implementation_and_collection_profile_are_both_closed(monkeypatch,implementation,tmp_path):
+    def forbidden(*args,**kwargs):raise AssertionError('CPU capture must not run')
+    monkeypatch.setattr(cpu,'capture',forbidden)
+    check=baseline_pack().checks['LIF-14' if implementation=='kubernetes' else 'OBS-02'].model_copy(
+        update={'collection_profile':cpu.PROFILE if implementation=='kubernetes' else profiler.PROFILE})
+    with pytest.raises(ValueError):
+        profiler.KubernetesProfilerObservationExecutor({},implementation=implementation).run(check,environment(),{},None,tmp_path)
+    with pytest.raises(ValueError,match='PROFILER_IMPLEMENTATION_UNSUPPORTED'):
+        profiler.KubernetesProfilerObservationExecutor({},implementation='unreviewed')

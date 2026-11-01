@@ -26,19 +26,24 @@ class KubernetesProfilerObservationExecutor(KubernetesObservationStateExecutor):
     name='profiler_observation';version='0.1.0';collection_profile=PROFILE
     supported_native_profiles=frozenset({sensor.PROFILE});policy_normalizer=staticmethod(normalize_policy)
 
+    def __init__(self,cfg,*,implementation='kubernetes',runner=None,environ=None,expected_target_sha256=None):
+        if implementation not in {'kubernetes','source-cpu'}:raise ValueError('PROFILER_IMPLEMENTATION_UNSUPPORTED')
+        super().__init__(cfg,runner=runner,environ=environ,expected_target_sha256=expected_target_sha256)
+        self.implementation=implementation
+
     def validate_policy(self,check,values):
         from .profiler_lifecycle_cpu import PROFILE as CPU_PROFILE
-        if check.id=='LIF-14' and getattr(check,'collection_profile',None)==CPU_PROFILE:
-            if values:raise ValueError('PROFILER_CPU_POLICY_UNSUPPORTED')
+        if self.implementation=='source-cpu':
+            if check.id!='LIF-14' or getattr(check,'collection_profile',None)!=CPU_PROFILE or values:
+                raise ValueError('PROFILER_CPU_PROFILE_UNSUPPORTED')
             return
         return super().validate_policy(check,values)
 
     def run(self,check,env,policy_values,adapter,workdir):
-        from .profiler_lifecycle_cpu import PROFILE as CPU_PROFILE,ProfilerLifecycleCPUExecutor
-        if check.id=='LIF-14' and getattr(check,'collection_profile',None)==CPU_PROFILE:
-            self.validate_policy(check,policy_values)
-            return ProfilerLifecycleCPUExecutor(self.cfg).run(check,env,policy_values,adapter,workdir)
         self.validate_policy(check,policy_values)
+        if self.implementation=='source-cpu':
+            from .profiler_lifecycle_cpu import ProfilerLifecycleCPUExecutor
+            return ProfilerLifecycleCPUExecutor(self.cfg).run(check,env,policy_values,adapter,workdir)
         from guard.collectors.lifecycle import load_prepared
         try:
             prepared=load_prepared(self.cfg['prepared'])

@@ -387,7 +387,7 @@ T12와 T13의 위반 전제는 분리한다. T12에 필요 없는 다른 항목�
 너는 gua 정책 개발 담당 B다. 저장소는 https://github.com/dohashelby/gua.git 이다.
 이번 M7은 docs/POLICY_M6_PLAN.md의 OBS-11 최초 수동 검증 프로파일을 구현하는 작업이다.
 
-먼저 AGENTS/CLAUDE/SPEC/POLICY_PROMPT/PROGRESS/DECISIONS와 M5/M6 계획, 실제 코드를 읽어라.
+먼저 AGENTS/CLAUDE/SPEC/PROGRESS/DECISIONS와 M5/M6 계획, 실제 코드를 읽어라.
 git status/fetch와 M5/M6 PR 병합 상태를 확인해 M6를 포함하는 기준에서 새 브랜치를 만들어라.
 M6 미병합이면 codex/gua-policy-obs11-m6-design을 base로 codex/gua-policy-obs11-m7을 사용한다.
 기존 사용자 변경/다른 작업 트리/원문/증거를 보존하고 강제 조작·main 직접 push·자동 병합은 하지 마라.

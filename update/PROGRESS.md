@@ -502,7 +502,7 @@
 
 ## 2026-10-25 — U1 변경 유형별 시험 선정 설계 확정
 
-- 한 일: 사용자 결정으로 엔진 정식 릴리스는 적용 점검 전체 시험(소스 diff는 보고·도달 확인·공백 보고용), 엔진 패치 릴리스(0.xx.1 …)는 항상 시험 20개와 diff에 걸리는 점검만 기준·후보로 시험, 모델·환경·정책 변경은 증분 감사로 골라서 시험하도록 [설계](docs/UPDATE_SELECTION.md)·[구현 지시](UPDATE_SELECTION_PROMPT.md)·SPEC(U1 절·INV-05 개정·INV-19)·DECISIONS를 갱신했다. 2026-10-24의 "모든 엔진 릴리스에 diff 선정" 안은 폐기했다. scratchpad에서 v0.31.0→v0.32.0 1차 검증 실험(변경 경로 2,801·미분류 10·보안 공지 9건 대조)과 과거 패치 5개 선정 계산(25~38/77)을 했다(설계 §8).
+- 한 일: 사용자 결정으로 엔진 정식 릴리스는 적용 점검 전체 시험(소스 diff는 보고·도달 확인·공백 보고용), 엔진 패치 릴리스(0.xx.1 …)는 항상 시험 20개와 diff에 걸리는 점검만 기준·후보로 시험, 모델·환경·정책 변경은 증분 감사로 골라서 시험하도록 [설계](docs/UPDATE_SELECTION.md)·구현 지시·SPEC(U1 절·INV-05 개정·INV-19)·DECISIONS를 갱신했다. 2026-10-24의 "모든 엔진 릴리스에 diff 선정" 안은 폐기했다. scratchpad에서 v0.31.0→v0.32.0 1차 검증 실험(변경 경로 2,801·미분류 10·보안 공지 9건 대조)과 과거 패치 5개 선정 계산(25~38/77)을 했다(설계 §8).
 - 테스트 결과: 문서만 바꿨다. 코드·팩·테스트는 바꾸지 않았고 테스트를 실행하지 않았다. 현재 코드는 개정 INV-05·INV-19를 아직 구현하지 않았다(SPEC 앞섬).
 - 한 일(추가): 팀원 개선안을 검토해 채택 항목 8개(CHG 근거 무결성, prepare-update·update_validation 연결, git 호출 안전, 비교 해시 분리, 도달 확인 다섯 단계, 평가 건수, 구현 순서, 소스·이미지 관계 세 상태)를 설계·프롬프트에 반영했다. 열린 PR을 정리했다(#24·#25·#27·#28·#26 닫음, #30·#31 검토 댓글). 원격 브랜치 26개는 사용자가 직접 삭제했다.
 - 한 일(추가 2): PR #30·#31에 검토 의견을 반영하고(cbea1e0: 원인 프로파일 데이터 파일 분리·문서화) main에 병합했다(55c9a24, fb0c103). 반영 후 기본 suite 2905 통과·실패/오류/skip 0·기존 18 제외·pytest 39.43초/부모 39초(macOS), 설치본 95파일 일치, PR CI 통과.
@@ -1278,13 +1278,13 @@ git status
 - 자세한 명령/범위/직접 결과와 후속 조건은 [AUTOMATION_PHASE1](docs/AUTOMATION_PHASE1.md), 선별 실증 요약은 [검증 JSON](docs/evidence/automation-phase1-20261023.json)을 따른다. 전체 모델/DB/로그/개인 경로는 커밋하지 않고 저장소 밖 output의 이번 phase 폴더에 원본을 보존했다. 커밋 후 최종SHA 원격일치·지원Linux CI·wheel 결과는 초안PR 본문과 종료 보고에 기록한다.
 
 ## 자동화 2차 — 고정 CPU chat·REQ-07·관측 계약 (2026-10-23)
-- 한 일: [실행 프롬프트](docs/AUTOMATION_PHASE2_PROMPT.md)에 따라 고정 readonly template/안정 비교 설정, REQ-07 POL3·관측13·4챌린지·실제 token 소비/경계·수동 PASS 상한·보고서, REQ-13 private_system 실측, matrix/2·읽기 전용 과거 분석을 연결했다. PACK18/DRAFT·9자동연결·19정책점검/41경로·카탈로그317행/609연결이다.
+- 한 일: 실행 프롬프트에 따라 고정 readonly template/안정 비교 설정, REQ-07 POL3·관측13·4챌린지·실제 token 소비/경계·수동 PASS 상한·보고서, REQ-13 private_system 실측, matrix/2·읽기 전용 과거 분석을 연결했다. PACK18/DRAFT·9자동연결·19정책점검/41경로·카탈로그317행/609연결이다.
 - 테스트 결과: 기본 전체 1781pass/5skip/18제외(JUnit suite 364.50s), 마지막 adapter 보수 관련 128회귀 통과. 실제 표와 원본 UNKNOWN/FAIL 보존·반출/복원/저장 팩 재판정·wheel71파일/17CLI 검증은 [직접 기록](docs/AUTOMATION_PHASE2.md#검증-기록)·[선별 증거](docs/evidence/automation-phase2-20261023.json)를 따른다. 과거1차14/15 exit1과590파일 보존. 최종SHA Linux CI는 PR에서 별도 확인.
 - 다음 단계: REQ-11의 일반/SSE 소비 귀속·OBS-09의 실제 collector/parser를 독립 계약으로 설계한 뒤 제한 실행기를 확대한다. 기업 정책 확정과 운영 증거 수집은 구분한다. Windows 기본 테스트1분 목표 미달의 I/O도 후속 개선한다.
 - 남은 것: 9연결은77전체 완료 수가 아니다. CPU성능/GPU/서로 다른 두 실제 이미지 비교·임의template·REQ10하위소비·OBS03예외dump·기업승인 전체는 미검증. 비용서버/운영시험/병합은 수행하지 않았다.
 
 ## 자동화 3차 — REQ-11 연결 귀속·OBS-09 실제 참조 수집 (2026-10-23)
-- 한 일: [실행 프롬프트](docs/AUTOMATION_PHASE3_PROMPT.md)에 따라 두 실행기·경계 있는 JSON/SSE 수집기·명시적 native INFO 기동·실제 parser/별도 escaped HTML·순수 정책/수동 PASS 상한을 연결했다. PACK19/DRAFT·11자동연결·21정책점검46경로·카탈로그322행614연결·adapter0.4.0/declared0.12.0이다.
+- 한 일: 실행 프롬프트에 따라 두 실행기·경계 있는 JSON/SSE 수집기·명시적 native INFO 기동·실제 parser/별도 escaped HTML·순수 정책/수동 PASS 상한을 연결했다. PACK19/DRAFT·11자동연결·21정책점검46경로·카탈로그322행614연결·adapter0.4.0/declared0.12.0이다.
 - 테스트: HTML 마지막 보수 전 기본전체 2016pass/5skip/18제외(JUnit455.55s), 마지막 표시바이트 회귀55pass(3.42s). 첫9실패의 FD/시계/기대목록을 고치고 전체 재실행했다. 최종 SHA 전체 Linux CI는 초안 PR에서 별도 확인한다. Windows1분 목표 미달이며 skip/제외를 통과로 세지 않는다.
 - 실측: Windows/WSL2 pinned CPU·실제 OPT로 REQ-11(JSON4쌍/SSE4쌍,20요청)·OBS-09(7사례)·PLT-01 S/F PASS/PUNKNOWN. 첫 OBS 표시내용/첨부Ref는 맞지만 별도 display digest가 Windows 줄바꿈과 달라 원본 보존 후 고정 UTF8저장+새OBS 단독02로 재검증했다. 기업 principal/SIEM/worker 병렬성·GPU/성능/두 실제 이미지 비교는 미검증, official=false다.
 - 보존/배포: 두 시도 verify·반출·새 복원·저장 팩 재판정·JSONHTML, 기존 객체/보고서/store/모델/컨테이너 불변·관리자원정리. 최종wheel77파일/17CLI·frozen/-I·readonly준비,팩재생성2회/metadata/로컬출처·보호167추적파일과다른75정의 보존을 확인했다. [직접 기록](docs/AUTOMATION_PHASE3.md#검증-기록)·[선별 증거](docs/evidence/automation-phase3-20261023.json)를 따른다.

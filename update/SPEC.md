@@ -733,7 +733,7 @@ declared0.9.1과 기존 캐시 helper만 변경한다. 수동 구조/1·양식/3
 
 ## U1 변경 유형별 시험 선정 (2026-10-24·25 사용자 결정, 구현·검증 범위는 설계 §11)
 
-- 정본 설계는 [UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md), 구현 지시는 [UPDATE_SELECTION_PROMPT.md](UPDATE_SELECTION_PROMPT.md), 결정은 `DECISIONS.md` U1 절이다.
+- 정본 설계는 [UPDATE_SELECTION.md](docs/UPDATE_SELECTION.md), 결정은 `DECISIONS.md` U1 절이다.
 - **엔진 정식 릴리스**(major·minor가 바뀜, 롤백·rc·버전 확인 불가 포함): 적용 점검 전체를 기준·후보 두 이미지로 시험·비교한다. 줄이지 않고 이월하지 않는다. vLLM 소스 diff는 보고서의 바뀐 영역 표시, 도달 확인(이 배포가 쓰는 진입점은 미도달 0이 목표), 체크리스트 공백 후보에만 쓴다.
 - **엔진 패치 릴리스**(major·minor 같고 패치 자리만 올라감, 예: 0.32.0 → 0.32.1): 항상 시험 20개(경로 규칙으로 추적할 수 없는 흩어진 속성), 소스 diff의 변경 종류가 가리키는 점검, 입력 변경에 걸리는 점검을 기준·후보로 시험한다. 미분류 엔진 파일이 있으면 변경 종류 표의 모든 점검을 고른다. 나머지는 이전 PASS를 이월한다.
 - **모델 변경**(엔진 이미지 같음): 모델 manifest diff의 변경 종류(가중치·추가 코드·template·tokenizer·아키텍처)와 모든 모델 변경 공통 점검을 시험한다. 규칙에 없는 모델 파일 변경은 모든 모델 변경 종류를 적용한다.

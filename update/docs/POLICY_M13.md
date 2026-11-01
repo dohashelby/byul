@@ -238,7 +238,7 @@ M14 후보는 REQ15 override→팩/manifest·설명 metadata/catalog, 작은 REQ
 이번 요청은 M13의 REQ15 제안을 채택하여 제한적 수동 정책 계약을 구현하는 M14다.
 기업 실제 정책값/승인/시험 권한과 실제 엔진 시험은 승인하지 않는다.
 
-1. AGENTS/CLAUDE·SPEC·PROGRESS·DECISIONS·POLICY_PROMPT·M11/M12/M13과 코드를 읽어라.
+1. AGENTS/CLAUDE·SPEC·PROGRESS·DECISIONS·M11/M12/M13과 코드를 읽어라.
    M13 최종 HEAD/CI를 확인하고 미병합이면 최신 M13에서 codex/gua-policy-cache-m14를 만들고 base=M13로 둬라.
    병합됐다면 M13을 포함한 최신 기준을 확인하라. 기존 변경/작업트리/원문/증거를 보존하라.
    main 직접push·force·자동병합·임의reset/clean을 하지 마라.

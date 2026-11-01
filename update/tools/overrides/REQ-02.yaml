@@ -1,0 +1,100 @@
+executor: route_record
+collection_profile: kubernetes-route-record-native-composite-v1
+policy_params:
+- key: route_environment_sha256
+  type: str
+  required: true
+- key: route_target_sha256
+  type: str
+  required: true
+- key: route_session
+  type: str
+  required: true
+- key: route_file_sha256
+  type: str
+  required: true
+- key: route_validity_start
+  type: str
+  required: true
+- key: route_validity_end
+  type: str
+  required: true
+- key: route_native_environment_sha256
+  type: str
+  required: true
+- key: route_native_target_sha256
+  type: str
+  required: true
+- key: route_native_prepared_sha256
+  type: str
+  required: true
+- key: route_native_validity_start
+  type: str
+  required: true
+- key: route_native_validity_end
+  type: str
+  required: true
+required_observations:
+- key: route_events
+  type: list
+- key: route_record_collected
+  type: bool
+- key: route_producer_authenticated
+  type: bool
+- key: route_authorization_scope_complete
+  type: bool
+- key: native_route_trials
+  type: list
+- key: native_route_events
+  type: list
+- key: native_route_associations
+  type: list
+- key: native_route_missing
+  type: list
+- key: native_route_authorization_verified
+  type: bool
+- key: native_route_scope_complete
+  type: bool
+- key: route_bypass_claims
+  type: list
+- key: composite_subcollections
+  type: dict
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: route_record_collected
+      op: eq
+      value: true
+    - obs: native_route_trials
+      op: nonempty
+    - obs: route_producer_authenticated
+      op: eq
+      value: true
+    - obs: native_route_authorization_verified
+      op: eq
+      value: true
+    - obs: route_authorization_scope_complete
+      op: eq
+      value: true
+    - obs: native_route_scope_complete
+      op: eq
+      value: true
+    - obs: route_bypass_claims
+      op: empty
+    - obs: native_route_missing
+      op: empty
+    fail_when_any:
+    - obs: route_bypass_claims
+      op: nonempty
+      when:
+        obs: route_producer_authenticated
+        op: eq
+        value: true
+limitations:
+- '구현 분기: 소유 기록 파일과 native8 세션을 각각 별도로 수집한 뒤 한 EVD에 모은다. 시간이 가깝다는 이유로 두 결과를 합치지 않고,
+  한쪽 실패가 다른 쪽 사실을 지우지 않는다.'
+- '미구현 분기: 생산자 인증·실제 principal·기업 재작성 정책 근거가 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다. 거부
+  후 handler 진입 주장은 후보로만 남는다.'
+- kubernetes 구현만 있다. lab=true/vLLM 0.31 범위이며 실제 Gateway 변환과 전체 handler 범위는 미시험이다.
+  과거 파생 팩의 route_record·native_route 프로파일은 그대로 지원한다.

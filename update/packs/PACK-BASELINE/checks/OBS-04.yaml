@@ -2,7 +2,7 @@ id: OBS-04
 framework_id: CHK-OBS-004
 mechanism_ids:
 - mechanism-15
-revision: 4
+revision: 5
 retired: false
 area: OBS
 purpose: 부가정보 수집·송신 통제
@@ -19,6 +19,12 @@ policy_params:
 - key: usage_allowed
   type: bool
   required: true
+- key: usage_report_paths
+  type: list[str]
+  required: true
+- key: usage_settings_fresh_process
+  type: bool
+  required: true
 policy_prose:
   policy_to_decide: usage 허용 여부·적용 시점
   enterprise_decisions: 민감정보·수집 목적·허용 필드·목적지·주기, 진단 필요성/승인자. usage 허용은 정책 변경·필드/목적지/사본 검토·재시험 후에만 적용한다.
@@ -27,7 +33,23 @@ challenge_steps:
 - 실제 통계 생성·송신 주체와 비활성 설정·적용 시점 확인
 - 해당 엔진의 유효 설정을 적용한 새 실행에서 정상 추론 수행
 - 초기·주기 보고 생성과 송신 시도·수신을 관측하고 이전 사본과 대조
-required_observations: []
+required_observations:
+- key: usage_policy_forbidden
+  type: bool
+- key: usage_effective_settings
+  type: dict
+- key: usage_settings_fresh_process
+  type: bool
+- key: usage_new_local_reports
+  type: list
+- key: usage_sink_receipts
+  type: list
+- key: usage_send_sensor_available
+  type: bool
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, pass|fail|no_response]
 required_observations_prose:
 - 실제 env·config path/최초 판단·새 보고/송신 관측·기존 파일 구분
 satisfied_if: 정책이 금지한 생성/전송 단계가 수행되지 않는다. 환경변수 변경만으로 실행 중 중단을 가정하지 않는다.
@@ -36,8 +58,52 @@ unknown_criteria: 동일 프로세스의 cache 판단을 재사용했거나 송�
 remediation: '- usage opt-out의 실제 환경변수 판정식과 적용 시점을 확인하고 승인한 설정으로 새 프로세스를 기동한다. 금지한 보고 생성·송신 단계를 각각 제한·관측하고 기존 파일과 새 보고를 구분한다.'
 method_and_evidence: 선정 엔진의 내장 통계 생성·송신 기능, 실제 비활성 설정과 적용 시점을 확인한다. 적용된 새 실행에서 초기·주기 보고의 생성·파일·송신 시도를 관측하고 이전 사본과 구분한다. 기능 부재는 설정·코드/등록 경로 등 해당 판본의 근거로 확인한다. 같은 송신 관측을 CHK-PLT-007과 공유하더라도 이 항목은 정책이 금지한 보고 생성·전송 단계의 수행 여부를 판정한다. 외부 목적지 차단만으로 로컬 보고 생성까지 중단됐다고 처리하지 않는다.
 remaining_setup: 선정 엔진의 실제 비활성 설정·적용 시점과 보고 생성·송신 관측 수단; 수신 실패·timeout만으로 비전송을 판정하지 않음
-executor: null
-judge: null
+executor: boundary_egress
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: usage_policy_forbidden
+      op: eq
+      value: true
+    - obs: usage_settings_fresh_process
+      op: eq
+      value: true
+    - obs: usage_send_sensor_available
+      op: eq
+      value: true
+    - obs: usage_new_local_reports
+      op: empty
+    - obs: usage_sink_receipts
+      op: empty
+    fail_when_any:
+    - obs: usage_new_local_reports
+      op: nonempty
+      when:
+        obs: usage_policy_forbidden
+        op: eq
+        value: true
+    - obs: usage_sink_receipts
+      op: nonempty
+      when:
+        obs: usage_policy_forbidden
+        op: eq
+        value: true
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        fail_when_any:
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
 legacy:
   q_ids:
   - Q-C11
@@ -48,6 +114,18 @@ legacy:
   - Q-C11/SC-22-01
 source:
   array: observability_assessment_draft
+collection_profile: usage-report-silence-v1
+functional_probes:
+- method: POST
+  path: /v1/completions
+  body:
+    model: '{model}'
+    prompt: ping
+    max_tokens: 1
+  expect:
+  - 200
+  via: engine
 limitations:
-- usage_allowed={usage_allowed}은 이 점검 범위의 기업 정책 신고다. false는 비생성·비전송의 관측이 아니고 true는 금지 정책 분기를 충족하지 않는다. 정책값만으로 비적용·PASS를 만들지 않는다.
-- usage 실제 활성·생성·송신·필드·목적지·주기는 자동 검증하지 않는다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.
+- '구현 분기: 명시한 보고 파일을 정상 추론 전후로 비교하고, 소유 수신지가 있으면 새 수신 기록을 함께 본다. 금지 정책에서 새 보고가 생성되거나 수신되면 FAIL이다.'
+- '미구현 분기: 소유 수신지 없이는 송신 센서가 없어 PASS에 도달하지 않는다. 수신 실패·timeout만으로 비전송을 판정하지 않는다.'
+- real 구현만 있다. usage_settings_fresh_process는 준비 절차의 신고이며 실행기가 재기동하지 않는다. 명시하지 않은 경로와 주기 보고의 다음 주기는 확인하지 않는다.

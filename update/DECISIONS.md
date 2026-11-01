@@ -1,5 +1,7 @@
 # DECISIONS
 
+- 2026-11-01 · PACK31 원본은 reference/pack-seeds에 보존하고 현행 팩은 tools/regenerate_baseline_pack로 만든다. 복합 프로파일은 하위 수집별 세션을 따로 두고 결과만 모은다. · 파생 팩·과거 Ref를 현행 팩 변경과 분리하고 시간이 가까운 결과를 합치지 않기 위함이다.
+
 - 2026-10-29 · process collector는 입력/정적 옵션을 처리하고 runtime 생성/프로그램 검증/포착은 기존 Kubernetes executor 경계에 둔다. · 기본 전체 시험에서 확인된 runtime 의존 아키텍처를 보존하고 같은 CLI/정책·출처·프로그램 bytes의 의미를 유지하기 위함이다.
 
 - 2026-10-29 · A2 c4fdbe4의 PLT01/04 전용5파일은 원본 bytes로 통합하고 최소 공통 dispatcher/registry 및 최약 출처 제한만 추가한다. · 정상 대조 성공을 전체 PASS로 올리거나 lab=false/기본 runner로 EXAMPLE을 MEASURED로 승격하지 않으며 기존 container 사실/worker 접근 구분과 독립 FAIL을 보존하기 위함이다.

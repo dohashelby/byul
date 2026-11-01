@@ -2,7 +2,7 @@ id: SUP-15
 framework_id: CHK-SUP-015
 mechanism_ids:
 - mechanism-04
-revision: 4
+revision: 5
 retired: false
 area: SUP
 purpose: 재사용 문맥의 호환성
@@ -15,7 +15,31 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 다운로드·변환·compile/npcache 등 파생 결과의 재사용 여부를 확인한다. 활성 cache를 조사하지 않은 채 제외하지 않는다.
-policy_params: []
+policy_params:
+- key: supply_environment_sha256
+  type: str
+  required: true
+- key: supply_normal_target_sha256
+  type: str
+  required: true
+- key: supply_challenge_target_sha256
+  type: str
+  required: true
+- key: supply_normal_prepared_sha256
+  type: str
+  required: true
+- key: supply_challenge_prepared_sha256
+  type: str
+  required: true
+- key: supply_record_source_sha256
+  type: str
+  required: true
+- key: supply_validity_start
+  type: str
+  required: true
+- key: supply_validity_end
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 캐시 위치·writer·완료/원자적 공개 규칙·정리 방식, 모델 구조·weights 값·dtype·양자화·TP·도구/장치·설정 중 생성물에 영향을 주는 조건과 호환성 근거. 무관한 설정 변경까지 일괄 삭제하지 않는다.
@@ -24,7 +48,25 @@ challenge_steps:
 - 보호·호환 조건이 같은 승인 묶음의 정상 재사용 기준선
 - 모델 내용·compiler·옵션 중 보호·호환 조건에 영향이 있는 값 하나를 선정해 변경하고, 무관한 설정 변경은 별도 대조
 - 관련 조건 변경 시 정책에 맞는 재생성·재사용 거부 또는 검증된 호환 재사용을 확인하고, 무관한 변경에 일률적 무효화를 요구하지 않음
-required_observations: []
+required_observations:
+- key: supply_boot_sessions
+  type: list
+- key: supply_boot_violations
+  type: list
+- key: supply_boot_missing
+  type: list
+- key: supply_boot_complete
+  type: bool
+- key: supply_boot_normal_verified
+  type: bool
+- key: supply_boot_change_applied
+  type: bool
+- key: supply_boot_record_authenticated
+  type: bool
+- key: supply_boot_native_consumption
+  type: list
+- key: supply_boot_change
+  type: dict
 required_observations_prose:
 - 생성 입력·도구 판본·옵션/cache key·경로/재사용 또는 재생성 기록
 satisfied_if: 현재 보호·호환 조건을 만족하는 생성물만 재사용한다. 관련 조건이 바뀌면 재생성하거나 재사용을 거부하며, 기존 결과가 바뀐 조건에서도 호환됨을 확인한 경우에는 검증된 재사용을 허용한다. 관련성 없는 설정 변경까지 일률적으로 무효화하지 않는다.
@@ -33,8 +75,30 @@ unknown_criteria: cache key·실제 재사용 여부·의존성 호환 기준을
 remediation: '- 파생 결과를 만들 때 사용한 모델·도구·의존성·설정·실행 조건을 식별정보와 함께 기록한다. 현재 묶음과의 호환성을 확인하고 변경된 조건에 맞지 않는 캐시는 무효화하거나 다시 생성한다.'
 method_and_evidence: '선정 파생·compiled·npcache마다 생성 입력·도구/의존성 판본·옵션과 실제 cache 식별·consumer를 연결한다. 동일한 보호·호환 조건에서 정상 재사용한 뒤 관련 조건 하나를 변경해 재생성·거부 또는 검증된 호환 재사용을 대조한다. 무관한 설정 변경은 별도 정상 대조로 둔다. 【F03】실제 backend·AOT·cache 활성값·의존성 및 사용 중인 vLLM·Inductor·Triton 경로를 고정하고, 묶음 변경 전후의 key·lookup·소비 결과를 기록한다. writer 변조 통제는 CHK-SUP-007, 요청 KV/prefix·미디어 상태의 재사용 문맥은 CHK-REQ-016에서 각각 판정한다. 근거 원문: [F03](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33609).'
 remaining_setup: 변경별 재생성 대상 목록과 실제 cache 계측
-executor: null
-judge: null
+executor: supply_boot
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: supply_boot_complete
+      op: eq
+      value: true
+    - obs: supply_boot_normal_verified
+      op: eq
+      value: true
+    - obs: supply_boot_change_applied
+      op: eq
+      value: true
+    - obs: supply_boot_violations
+      op: empty
+    - obs: supply_boot_missing
+      op: empty
+    - obs: supply_boot_record_authenticated
+      op: eq
+      value: true
+    fail_when_any:
+    - obs: supply_boot_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-R05-11
@@ -45,3 +109,8 @@ legacy:
   - Q-R05-02/SC-12-02
 source:
   array: supply_assessment_draft
+collection_profile: supply-boot-cache-reuse-v1
+limitations:
+- '구현 분기: 관련 조건 변경 뒤 호환 확인 없이 재사용한 기록이 있으면 FAIL이다. 무관한 변경의 재사용은 위반으로 보지 않는다.'
+- '미구현 분기: cache key와 실제 재사용의 독립 근거가 없어 PASS에 도달하지 않는다.'
+- kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로 받으며, 두 세션을 각각 수집해 합치지 않는다.

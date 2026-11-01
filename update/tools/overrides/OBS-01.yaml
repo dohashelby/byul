@@ -1,0 +1,46 @@
+executor: required_event_record
+collection_profile: kubernetes-required-event-record-observation-v1
+policy_params:
+  - { key: observation_environment_sha256, type: str, required: true }
+  - { key: observation_target_sha256, type: str, required: true }
+  - { key: observation_validity_start, type: str, required: true }
+  - { key: observation_validity_end, type: str, required: true }
+  - { key: observation_max_delay_ms, type: int, required: true }
+  - { key: observation_required_events, type: "list[str]", required: true }
+  - { key: observation_required_fields, type: "list[str]", required: true }
+  - { key: observation_session, type: str, required: true }
+  - { key: observation_expected_source_sha256, type: str, required: true }
+  - { key: observation_event_policy_sha256, type: str, required: true }
+  - { key: observation_allowed_actor_sha256, type: str, required: true }
+  - { key: observation_denied_actor_sha256, type: str, required: true }
+required_observations:
+  - { key: required_event_trials, type: list }
+  - { key: required_event_records, type: list }
+  - { key: required_event_matches, type: list }
+  - { key: required_event_missing, type: list }
+  - { key: required_event_conflict_candidates, type: list }
+  - { key: required_event_collection, type: list }
+  - { key: required_event_records_collected, type: bool }
+  - { key: required_event_producer_authenticated, type: bool }
+  - { key: required_event_independent_trigger_verified, type: bool }
+  - { key: required_event_scope_complete, type: bool }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: required_event_trials, op: nonempty }
+      - { obs: required_event_records_collected, op: eq, value: true }
+      - { obs: required_event_producer_authenticated, op: eq, value: true }
+      - { obs: required_event_independent_trigger_verified, op: eq, value: true }
+      - { obs: required_event_scope_complete, op: eq, value: true }
+      - { obs: required_event_missing, op: empty }
+      - { obs: required_event_conflict_candidates, op: empty }
+    fail_when_any:
+      - { obs: required_event_missing, op: nonempty,
+          when: { obs: required_event_producer_authenticated, op: eq, value: true } }
+      - { obs: required_event_conflict_candidates, op: nonempty,
+          when: { obs: required_event_producer_authenticated, op: eq, value: true } }
+limitations:
+  - "구현 분기: 허용·거부·후속 정상 probe를 보내고 소유 기록의 필수 사건·필드·도착 기한을 대조한다. 누락·중복·교체·후속 수집 오류를 구분한다."
+  - "미구현 분기: 관리·승인·공급물 소비·배포 사건의 독립 발생 근거와 기록 생산자 인증이 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다."
+  - "kubernetes 구현만 있다. lab=true/vLLM 0.31 범위다. probe 응답은 실제 principal이나 독립 감사 생성원의 증명이 아니다."

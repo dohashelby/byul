@@ -1,5 +1,44 @@
+executor: boundary_egress
+collection_profile: usage-report-silence-v1
 policy_params:
-- {key: usage_allowed, type: bool, required: true}
+  - { key: usage_allowed, type: bool, required: true }
+  - { key: usage_report_paths, type: "list[str]", required: true }
+  - { key: usage_settings_fresh_process, type: bool, required: true }
+required_observations:
+  - { key: usage_policy_forbidden, type: bool }
+  - { key: usage_effective_settings, type: dict }
+  - { key: usage_settings_fresh_process, type: bool }
+  - { key: usage_new_local_reports, type: list }
+  - { key: usage_sink_receipts, type: list }
+  - { key: usage_send_sensor_available, type: bool }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, pass|fail|no_response]" }
+functional_probes:
+  - method: POST
+    path: /v1/completions
+    body: { model: "{model}", prompt: ping, max_tokens: 1 }
+    expect: [200]
+    via: engine
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: usage_policy_forbidden, op: eq, value: true }
+      - { obs: usage_settings_fresh_process, op: eq, value: true }
+      - { obs: usage_send_sensor_available, op: eq, value: true }
+      - { obs: usage_new_local_reports, op: empty }
+      - { obs: usage_sink_receipts, op: empty }
+    fail_when_any:
+      - { obs: usage_new_local_reports, op: nonempty, when: { obs: usage_policy_forbidden, op: eq, value: true } }
+      - { obs: usage_sink_receipts, op: nonempty, when: { obs: usage_policy_forbidden, op: eq, value: true } }
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+        fail_when_any:
+          - { obs: functional_probe_results, op: any_in, value: [fail] }
 limitations:
-- 'usage_allowed={usage_allowed}은 이 점검 범위의 기업 정책 신고다. false는 비생성·비전송의 관측이 아니고 true는 금지 정책 분기를 충족하지 않는다. 정책값만으로 비적용·PASS를 만들지 않는다.'
-- 'usage 실제 활성·생성·송신·필드·목적지·주기는 자동 검증하지 않는다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.'
+  - "구현 분기: 명시한 보고 파일을 정상 추론 전후로 비교하고, 소유 수신지가 있으면 새 수신 기록을 함께 본다. 금지 정책에서 새 보고가 생성되거나 수신되면 FAIL이다."
+  - "미구현 분기: 소유 수신지 없이는 송신 센서가 없어 PASS에 도달하지 않는다. 수신 실패·timeout만으로 비전송을 판정하지 않는다."
+  - "real 구현만 있다. usage_settings_fresh_process는 준비 절차의 신고이며 실행기가 재기동하지 않는다. 명시하지 않은 경로와 주기 보고의 다음 주기는 확인하지 않는다."

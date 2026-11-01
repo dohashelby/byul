@@ -1,0 +1,43 @@
+executor: input_validation
+collection_profile: request-code-selection-v1
+policy_params:
+  - { key: code_selection_fields, type: "list[str]", required: true }
+  - { key: code_selection_allowed, type: bool, required: true }
+  - { key: rejection_codes, type: "list[str]", required: true }
+required_observations:
+  - { key: code_selection_trials, type: list }
+  - { key: code_selection_forbidden, type: bool }
+  - { key: code_selection_fields_planned, type: "list[str]" }
+  - { key: code_selection_rejected_fields, type: list }
+  - { key: code_selection_unverified_fields, type: list }
+  - { key: code_selection_confirmed_violations, type: list }
+  - { key: code_selection_final_code_verified, type: bool }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, pass|fail|no_response]" }
+functional_probes:
+  - method: POST
+    path: /v1/chat/completions
+    body: { model: "{model}", messages: [{ role: user, content: hello }], max_tokens: 1, temperature: 0 }
+    expect: [200]
+    via: engine
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: code_selection_forbidden, op: eq, value: true }
+      - { obs: code_selection_rejected_fields, op: superset_of, value_obs: code_selection_fields_planned }
+      - { obs: code_selection_unverified_fields, op: empty }
+      - { obs: code_selection_confirmed_violations, op: empty }
+    fail_when_any:
+      - { obs: code_selection_confirmed_violations, op: nonempty }
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+        fail_when_any:
+          - { obs: functional_probe_results, op: any_in, value: [fail] }
+limitations:
+  - "구현 분기: 지정 필드에 무해한 비허용 판본값을 넣어 import 전 거부를 정상 대조와 비교한다. 지정 필드가 모두 거부되면 해당 필드 범위의 금지 분기를 충족한다."
+  - "미구현 분기: 최종 선택 모듈·import를 보는 수집이 없어 수락된 요청은 accepted_unverified로 UNKNOWN이고, 금지 override 소비의 FAIL과 허용 구성의 판본 대조는 현재 도달하지 않는다."
+  - "real 구현만 있다. 지정하지 않은 필드는 확인하지 않는다. kwargs 전달까지만 보인 경우를 판정하지 않는다."

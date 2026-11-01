@@ -1,0 +1,79 @@
+executor: record_access
+collection_profile: kubernetes-record-access-scope-v1
+policy_params:
+- key: record_environment_sha256
+  type: str
+  required: true
+- key: record_target_sha256
+  type: str
+  required: true
+- key: record_subject_plan_sha256
+  type: str
+  required: true
+- key: record_inventory_session
+  type: str
+  required: true
+- key: record_inventory_source_sha256
+  type: str
+  required: true
+- key: record_validity_start
+  type: str
+  required: true
+- key: record_validity_end
+  type: str
+  required: true
+required_observations:
+- key: record_access_rows
+  type: list
+- key: record_unauthorized_read_verified
+  type: bool
+- key: record_normal_read_verified
+  type: bool
+- key: record_access_gaps
+  type: list
+- key: record_copy_inventory
+  type: list
+- key: record_copy_violations
+  type: list
+- key: record_copy_missing
+  type: list
+- key: record_access_partial
+  type: bool
+- key: record_denial_verified
+  type: bool
+- key: record_scope_complete
+  type: bool
+- key: record_inventory_authenticated
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: record_normal_read_verified
+      op: eq
+      value: true
+    - obs: record_denial_verified
+      op: eq
+      value: true
+    - obs: record_scope_complete
+      op: eq
+      value: true
+    - obs: record_inventory_authenticated
+      op: eq
+      value: true
+    - obs: record_copy_violations
+      op: empty
+    fail_when_any:
+    - obs: record_unauthorized_read_verified
+      op: eq
+      value: true
+    - obs: record_copy_violations
+      op: nonempty
+limitations:
+- '구현 분기: 허용·비허용 두 신원의 선택 Pod 로그 조회를 실제로 수행하고, 사본별 반출·복호화·저장 암호화 기록을 대조한다. 비허용 신원의
+  조회 성공, 기록이 드러낸 반출·복호화 성공, 필수 암호화 누락은 FAIL이다.'
+- '미구현 분기: 비허용 조회의 실패가 정책 거부임을 증명하는 근거와 사본 기록 생산자 인증, 독립 감사 기록이 없어 PASS에 도달하지 않는다.
+  클라이언트 오류를 거부로 세지 않는다.'
+- kubernetes 구현만 있다. 두 신원의 로그 조회만 수집되면 record_access_partial=true로 남기고 전체 충족으로 보지
+  않는다. 저장 보호 요구가 미정인 사본은 미확인이다.
+- 신원 계획은 운영자 선언이며 RBAC·IAM을 바꾸지 않는다. 로그 본문·키 값은 저장하지 않는다.

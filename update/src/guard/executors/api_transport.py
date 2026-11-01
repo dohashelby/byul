@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex
 from .base import EvidenceDraft
-from . import stream_pressure, stream_probe
+from . import record_transport, stream_pressure, stream_probe
 
 
 PROFILE = "explicit-owned-api-plaintext-v1"
@@ -199,12 +199,21 @@ def collect_kubernetes_api_transport(ctx):
 class APITransportExecutor:
     name, version = "api_transport", "0.1.0"
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, *, docker=None):
         if type(cfg) is not dict:
             raise ValueError("API_TRANSPORT_CONFIGURATION_INVALID")
-        self.cfg = cfg
+        self.cfg, self.docker = cfg, docker
+
+    def validate_policy(self, check, values):
+        if getattr(check, "collection_profile", None) == record_transport.PROFILE:
+            record_transport.validate_policy(values)
+        else:
+            normalize_policy(values)
 
     def run(self, check, env, policy_values, adapter, workdir):
+        if getattr(check, "collection_profile", None) == record_transport.PROFILE:
+            self.version = record_transport.VERSION
+            return record_transport.run(check, env, policy_values, self.cfg, docker=self.docker)
         started = datetime.now(timezone.utc)
         policy = normalize_policy(policy_values)  # Before any file/runtime/HTTP.
         try:

@@ -1,0 +1,38 @@
+executor: forwarded_identity
+collection_profile: kubernetes-forwarded-identity-observation-v1
+policy_params:
+  - { key: forwarded_environment_sha256, type: str, required: true }
+  - { key: forwarded_target_sha256, type: str, required: true }
+  - { key: forwarded_session, type: str, required: true }
+  - { key: forwarded_gateway_source_sha256, type: str, required: true }
+  - { key: forwarded_engine_source_sha256, type: str, required: true }
+  - { key: forwarded_identity_policy_sha256, type: str, required: true }
+  - { key: forwarded_validity_start, type: str, required: true }
+  - { key: forwarded_validity_end, type: str, required: true }
+required_observations:
+  - { key: forwarded_trials, type: list }
+  - { key: forwarded_records, type: list }
+  - { key: forwarded_matches, type: list }
+  - { key: forwarded_missing, type: list }
+  - { key: forwarded_conflict_candidates, type: list }
+  - { key: forwarded_collection, type: list }
+  - { key: forwarded_producer_authenticated, type: bool }
+  - { key: forwarded_principal_identity_verified, type: bool }
+  - { key: forwarded_scope_complete, type: bool }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: forwarded_trials, op: nonempty }
+      - { obs: forwarded_producer_authenticated, op: eq, value: true }
+      - { obs: forwarded_principal_identity_verified, op: eq, value: true }
+      - { obs: forwarded_scope_complete, op: eq, value: true }
+      - { obs: forwarded_missing, op: empty }
+      - { obs: forwarded_conflict_candidates, op: empty }
+    fail_when_any:
+      - { obs: forwarded_conflict_candidates, op: nonempty,
+          when: { obs: forwarded_principal_identity_verified, op: eq, value: true } }
+limitations:
+  - "구현 분기: 같은 자격의 정상·대체 header 요청을 Gateway로 보내고 Gateway·engine 양쪽 소유 기록의 입력→정규화→소비를 대조한다."
+  - "미구현 분기: 생산자 인증과 신뢰 principal 근거가 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다. 교체 header 소비는 후보로만 남는다."
+  - "kubernetes 구현만 있다. lab=true/vLLM 0.31 명시 프로필이며 운영 Gateway·IdP·native 0.32는 추정하지 않는다. 원문 로그·자격을 읽지 않는다."

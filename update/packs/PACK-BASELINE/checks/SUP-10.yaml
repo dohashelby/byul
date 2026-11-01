@@ -2,7 +2,7 @@ id: SUP-10
 framework_id: CHK-SUP-010
 mechanism_ids:
 - mechanism-09
-revision: 2
+revision: 3
 retired: false
 area: SUP
 purpose: 추가 코드 실행 허용
@@ -15,7 +15,31 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 설치된 entry point와 자동 발견 그룹을 기본 조사한다. 실제 설치·도달하는 general·endpoint·logits·io 그룹별로 확인한다.
-policy_params: []
+policy_params:
+- key: supply_environment_sha256
+  type: str
+  required: true
+- key: supply_normal_target_sha256
+  type: str
+  required: true
+- key: supply_challenge_target_sha256
+  type: str
+  required: true
+- key: supply_normal_prepared_sha256
+  type: str
+  required: true
+- key: supply_challenge_prepared_sha256
+  type: str
+  required: true
+- key: supply_record_source_sha256
+  type: str
+  required: true
+- key: supply_validity_start
+  type: str
+  required: true
+- key: supply_validity_end
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 필요한 모델 코드·plugin·모드·권한·공급 방식, 승인/변경 절차. auto_map 존재만으로 실행이나 거부를 확정하지 않고 실제 선택되는 코드 출처를 확인한다.
@@ -24,7 +48,25 @@ challenge_steps:
 - 설치 entry point와 plugin group 수집
 - 비승인 무해 plugin을 격리 환경에 등록
 - group별 import·호출과 제한 결과 확인
-required_observations: []
+required_observations:
+- key: supply_boot_sessions
+  type: list
+- key: supply_boot_violations
+  type: list
+- key: supply_boot_missing
+  type: list
+- key: supply_boot_complete
+  type: bool
+- key: supply_boot_normal_verified
+  type: bool
+- key: supply_boot_change_applied
+  type: bool
+- key: supply_boot_record_authenticated
+  type: bool
+- key: supply_boot_native_consumption
+  type: list
+- key: supply_boot_change
+  type: dict
 required_observations_prose:
 - 실제 설치·도달하는 확장 종류·등록/선택 경로와 설치 목록·승인 범위
 - 종류별 유효 제한 설정, 실제 로딩·import·hook 호출 또는 거부와 허용 기능 결과
@@ -34,8 +76,30 @@ unknown_criteria: group 등록만 확인하고 실제 runner·hook 도달이나 
 remediation: '- 자동 발견되는 plugin 종류와 실제 호출 경로를 조사하고 종류별 허용 목록을 적용한다. plugin을 불러오거나 실행하기 전에 승인 여부를 검사하고 필요 없는 확장을 비활성화한다.'
 method_and_evidence: 선정 엔진에서 실제 설치·도달하는 확장 종류와 발견·선택·import·호출 순서를 목록화한다. 종류별 승인 설치물·허용 설정을 실제 로딩과 대조하고, 승인 확장과 무해한 비승인 시험 확장의 실행·거부를 각각 확인한다. 한 종류의 필터 결과로 다른 종류를 대신 판정하지 않는다.
 remaining_setup: 선정 엔진의 확장 종류별 승인 목록·제한 설정과 무해 시험 확장; 실제 실행기·호출 경로 확인
-executor: null
-judge: null
+executor: supply_boot
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: supply_boot_complete
+      op: eq
+      value: true
+    - obs: supply_boot_normal_verified
+      op: eq
+      value: true
+    - obs: supply_boot_change_applied
+      op: eq
+      value: true
+    - obs: supply_boot_violations
+      op: empty
+    - obs: supply_boot_missing
+      op: empty
+    - obs: supply_boot_record_authenticated
+      op: eq
+      value: true
+    fail_when_any:
+    - obs: supply_boot_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-R05-05
@@ -47,3 +111,8 @@ legacy:
   - Q-R05-05/SC-11-04
 source:
   array: supply_assessment_draft
+collection_profile: supply-boot-plugin-v1
+limitations:
+- '구현 분기: 기존 plugin 단계 판정을 재사용해 허용 밖 plugin의 실행 표식이 남으면 FAIL이다.'
+- '미구현 분기: 그룹별 실제 runner 도달의 독립 근거가 없어 PASS에 도달하지 않는다. logits 그룹에는 VLLM_PLUGINS 보장을 가정하지 않는다.'
+- kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로 받으며, 두 세션을 각각 수집해 합치지 않는다.

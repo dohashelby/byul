@@ -2,7 +2,7 @@ id: PLT-11
 framework_id: CHK-PLT-011
 mechanism_ids:
 - mechanism-12
-revision: 2
+revision: 3
 retired: false
 area: PLT
 purpose: 권한 철회
@@ -15,7 +15,52 @@ review_order: conditional_when_selected
 impact: null
 applies_when:
   prose: 철회 대상 자격으로 생성된 지속 연결·session·handle이 있을 때 적용한다. 신규 요청 차단으로 대신 판정하지 않는다.
-policy_params: []
+policy_params:
+- key: session_environment_sha256
+  type: str
+  required: true
+- key: session_target_sha256
+  type: str
+  required: true
+- key: session_prepared_sha256
+  type: str
+  required: true
+- key: session_validity_start
+  type: str
+  required: true
+- key: session_validity_end
+  type: str
+  required: true
+- key: session_issuer_id
+  type: str
+  required: true
+- key: session_event_id
+  type: str
+  required: true
+- key: session_event_at
+  type: str
+  required: true
+- key: session_open_before
+  type: str
+  required: true
+- key: session_deny_after
+  type: str
+  required: true
+- key: session_deadline_basis
+  type: str
+  required: true
+- key: session_propagation_limit_ms
+  type: int
+  required: true
+- key: session_max_clock_skew_ms
+  type: int
+  required: true
+- key: session_max_wait_seconds
+  type: int
+  required: true
+- key: session_residual_policy
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: 진행 작업·세션 처리와 기한
   enterprise_decisions: 철회 대상·issuer·정책 캐시, 진행 요청과 기존 세션 처리, 자격 교체·사본 정리 담당과 근거.
@@ -25,7 +70,31 @@ challenge_steps:
 - 자격 철회
 - 같은 session과 새 session을 각각 제한 호출
 - 허용 잔존·강제 종료 정책 비교
-required_observations: []
+required_observations:
+- key: session_trials
+  type: list
+- key: session_native_bindings
+  type: list
+- key: session_conflict_candidates
+  type: list
+- key: session_missing
+  type: list
+- key: session_existing_connection_constraint_violated
+  type: bool
+- key: session_selected_probe_connection_reuse_observed
+  type: bool
+- key: session_distinct_new_probe_connection_observed
+  type: bool
+- key: session_issuer_event_verified
+  type: bool
+- key: session_provider_propagation_verified
+  type: bool
+- key: session_application_session_or_handle_verified
+  type: bool
+- key: session_serving_session_receipt_verified
+  type: bool
+- key: session_scope_complete
+  type: bool
 required_observations_prose:
 - session/handle 생성·소유자/철회 시각/기존·신규 접근 결과
 satisfied_if: 기존 접근 유지/종료 방침과 기한을 지킨다.
@@ -34,8 +103,52 @@ unknown_criteria: 기존 session과 재연결을 구분하지 못했거나 잔�
 remediation: '- 이미 열린 session·handle에 철회 후 허용할 작업, 재인증·제한·종료 조건과 기한을 정한다. 채택한 방침에 따라 기존 접근권을 갱신·회수하거나 세션을 종료하고, 신규 접근과 기존 접근의 처리 결과를 각각 확인한다.'
 method_and_evidence: 철회 전 열린 세션의 후속 사용과 종료를 관측한다. 작업 회수는 종결 영역에 연결한다.
 remaining_setup: 기존 연결 처리 정책과 session 식별 계측
-executor: null
-judge: null
+executor: session_revocation
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: session_trials
+      op: nonempty
+    - obs: session_existing_connection_constraint_violated
+      op: eq
+      value: false
+    - obs: session_selected_probe_connection_reuse_observed
+      op: eq
+      value: true
+    - obs: session_distinct_new_probe_connection_observed
+      op: eq
+      value: true
+    - obs: session_issuer_event_verified
+      op: eq
+      value: true
+    - obs: session_provider_propagation_verified
+      op: eq
+      value: true
+    - obs: session_application_session_or_handle_verified
+      op: eq
+      value: true
+    - obs: session_serving_session_receipt_verified
+      op: eq
+      value: true
+    - obs: session_scope_complete
+      op: eq
+      value: true
+    fail_when_any:
+    - obs: session_existing_connection_constraint_violated
+      op: eq
+      value: true
+      when:
+        obs: session_issuer_event_verified
+        op: eq
+        value: true
+    axes:
+      functional:
+        pass_when_all: []
+        fail_when_any:
+        - obs: session_existing_connection_constraint_violated
+          op: eq
+          value: true
 legacy:
   q_ids:
   - Q-C10
@@ -47,3 +160,8 @@ legacy:
   - Q-C10/SC-19-02
 source:
   array: platform_assessment_draft
+collection_profile: kubernetes-existing-http-session-observation-v1
+limitations:
+- '구현 분기: probe HTTP/1.1 keep-alive 한 연결의 재사용과 별도 새 연결을 구분하고, 명시 잔존 정책을 넘긴 기존 연결의 수락은 기능 축 독립 FAIL이다.'
+- '미구현 분기: issuer 사건·전파·애플리케이션 session/handle·서빙 영수증의 독립 근거가 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다.'
+- kubernetes 구현만 있다. lab=true/vLLM 0.31 고정 GET /v1/models 범위이며 스트리밍·Gateway·공유 자원 접근권 전체는 미시험이다. 자격 원문은 저장하지 않는다.

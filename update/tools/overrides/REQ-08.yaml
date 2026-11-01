@@ -1,0 +1,39 @@
+executor: input_validation
+collection_profile: reused-token-input-v1
+policy_params:
+  - { key: reused_token_field, type: str, required: true }
+  - { key: reused_token_allowed, type: bool, required: true }
+  - { key: rejection_codes, type: "list[str]", required: true }
+required_observations:
+  - { key: reused_input_trials, type: list }
+  - { key: reused_input_state, type: str }
+  - { key: reused_input_forbidden, type: bool }
+  - { key: reused_input_violations, type: list }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, pass|fail|no_response]" }
+functional_probes:
+  - method: POST
+    path: /v1/chat/completions
+    body: { model: "{model}", messages: [{ role: user, content: hello }], max_tokens: 1, temperature: 0 }
+    expect: [200]
+    via: engine
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: reused_input_forbidden, op: eq, value: true }
+      - { obs: reused_input_state, op: in, value: [rejected, ignored] }
+      - { obs: reused_input_violations, op: empty }
+    fail_when_any:
+      - { obs: reused_input_violations, op: nonempty }
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+        fail_when_any:
+          - { obs: functional_probe_results, op: any_in, value: [fail] }
+limitations:
+  - "구현 분기: 정상 메시지 요청에 무해한 재사용 토큰 필드를 더해 거부·제거·소비를 응답이 돌려준 prompt_token_ids와 정상 대조로 구분한다. 금지 정책에서 fixture 토큰이 소비되면 FAIL이다."
+  - "미구현 분기: 허용 정책에서 재사용 값의 필수 검사를 확인하는 수집이 없어 reused_token_allowed=true는 PASS에 도달하지 않는다. 응답이 소비 토큰을 돌려주지 않으면 accepted_unverified로 UNKNOWN이다."
+  - "real 구현만 있다. 한 endpoint·한 필드의 표본이며 다른 경로의 미도달을 증명하지 않는다. renderer 내부 분기는 관측하지 않는다."

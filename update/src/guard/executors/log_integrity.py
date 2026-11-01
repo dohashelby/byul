@@ -17,6 +17,7 @@ import time
 from guard.automation_policy import validate_log_integrity_policy
 from guard.report.log_integrity import render_log_integrity, verify_log_display
 from guard.runtime.docker import Docker
+from . import log_collection_gap
 from .content_common import (append_artifact, content_request, control_state, json_body,
                              redact_value, text_artifact)
 from .http_common import HttpCheckExecutor
@@ -53,6 +54,10 @@ class LogIntegrityExecutor(HttpCheckExecutor):
         self._capture = capture
 
     def validate_policy(self, check, values):
+        if getattr(check, "collection_profile", None) == log_collection_gap.PROFILE:
+            log_collection_gap.validate_policy(values)
+            log_collection_gap.source(self.cfg)
+            return
         validate_log_integrity_policy(values)
         for key, default, maximum in (("max_total_requests", 12, 12), ("max_duration_seconds", 300, 300),
                                       ("max_id_bytes", 512, 512), ("max_events", 128, 128)):
@@ -75,6 +80,8 @@ class LogIntegrityExecutor(HttpCheckExecutor):
 
     def _finish(self, ctx):
         draft = super()._finish(ctx)
+        if getattr(ctx.check, "collection_profile", None) == log_collection_gap.PROFILE:
+            return draft
         for filename in ("log_integrity_samples.json", "log_integrity_events.json", "log_integrity_display.html"):
             append_artifact(draft, ctx, filename, f"{self.name}/{self.version}")
         return draft
@@ -168,6 +175,9 @@ class LogIntegrityExecutor(HttpCheckExecutor):
 
     def collect(self, ctx):
         self.validate_policy(ctx.check, ctx.policy_values)
+        if getattr(ctx.check, "collection_profile", None) == log_collection_gap.PROFILE:
+            self.version = log_collection_gap.VERSION
+            return log_collection_gap.collect(ctx, self.docker, self.cfg)
         values = ctx.policy_values
         deadline = time.monotonic() + self.cfg.get("max_duration_seconds", 300)
         launch = (ctx.target.get("comparison_config") or {}).get("launch") or {}

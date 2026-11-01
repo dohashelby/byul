@@ -2,7 +2,7 @@ id: OBS-01
 framework_id: CHK-OBS-001
 mechanism_ids:
 - mechanism-17
-revision: 3
+revision: 4
 retired: false
 area: OBS
 purpose: 필수 사건 기록
@@ -15,7 +15,43 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 필수 접근·관리·승인·소비 사건과 기록의 연결을 기본 확인한다. 필수 사건 정책이 미정이면 미확인이다.
-policy_params: []
+policy_params:
+- key: observation_environment_sha256
+  type: str
+  required: true
+- key: observation_target_sha256
+  type: str
+  required: true
+- key: observation_validity_start
+  type: str
+  required: true
+- key: observation_validity_end
+  type: str
+  required: true
+- key: observation_max_delay_ms
+  type: int
+  required: true
+- key: observation_required_events
+  type: list[str]
+  required: true
+- key: observation_required_fields
+  type: list[str]
+  required: true
+- key: observation_session
+  type: str
+  required: true
+- key: observation_expected_source_sha256
+  type: str
+  required: true
+- key: observation_event_policy_sha256
+  type: str
+  required: true
+- key: observation_allowed_actor_sha256
+  type: str
+  required: true
+- key: observation_denied_actor_sha256
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: 필수 사건·식별값·책임 역할
   enterprise_decisions: 사건별 생성 집행점·필수 필드·수집 위치·책임자·증거 전달 방식. 요청 접수/응답 종료와 실제 실행 완료의 의미를 나눈다.
@@ -25,7 +61,27 @@ challenge_steps:
 - 작은 허용·거부 사건을 각각 발생시키고 원 동작의 독립 증거 확보
 - Gateway·배포·엔진·승인 기록을 수집하고 필요한 경우 기한 내 복구·최종 확보 확인
 - 주체·대상·실행 ID·정책 버전과 사건·기록의 일치 확인
-required_observations: []
+required_observations:
+- key: required_event_trials
+  type: list
+- key: required_event_records
+  type: list
+- key: required_event_matches
+  type: list
+- key: required_event_missing
+  type: list
+- key: required_event_conflict_candidates
+  type: list
+- key: required_event_collection
+  type: list
+- key: required_event_records_collected
+  type: bool
+- key: required_event_producer_authenticated
+  type: bool
+- key: required_event_independent_trigger_verified
+  type: bool
+- key: required_event_scope_complete
+  type: bool
 required_observations_prose:
 - 필수 사건·필드와 수집 및 보존 조건·기한, 사건 발생의 독립 증거
 - 원본 기록·수집 및 복구 시각, 같은 사건의 주체·대상·실행·정책·승인 ID
@@ -35,8 +91,42 @@ unknown_criteria: 필수 사건·필드·수집 및 보존 조건·기한이 미
 remediation: '- 사건별 필수 필드·수집 및 보존 조건·기한과 기록 위치를 정한다. 구성요소 간 같은 사건을 식별하고 일시 중단의 버퍼 보존·복구·기한 내 기록 확보를 확인한다. 다른 주체·대상·실행의 기록 혼입을 제한한다.'
 method_and_evidence: 정책상 필수 사건과 필드·수집 및 보존 조건·기한을 정하고 실제 사건과 기록을 대조한다. 일시 수집 중단은 버퍼 보존·기한 내 복구와 최종 기록 확보를 함께 확인한다. 승인·소비 기록은 주체·대상·결과·시각·승인/실행 ID를 대응시킨다. 이 항목의 결과는 필수 사건 기록의 확보·기한·귀속이다. 같은 시험의 상태 표현 진실성은 CHK-OBS-002, 수집 장애의 표시·경보·의존 판정 처리는 CHK-OBS-011에서 따로 남긴다.
 remaining_setup: 필수 사건 목록, 기록을 남기는 구성요소, 여러 기록에서 같은 사건을 찾을 필드와 수집 방법
-executor: null
-judge: null
+executor: required_event_record
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: required_event_trials
+      op: nonempty
+    - obs: required_event_records_collected
+      op: eq
+      value: true
+    - obs: required_event_producer_authenticated
+      op: eq
+      value: true
+    - obs: required_event_independent_trigger_verified
+      op: eq
+      value: true
+    - obs: required_event_scope_complete
+      op: eq
+      value: true
+    - obs: required_event_missing
+      op: empty
+    - obs: required_event_conflict_candidates
+      op: empty
+    fail_when_any:
+    - obs: required_event_missing
+      op: nonempty
+      when:
+        obs: required_event_producer_authenticated
+        op: eq
+        value: true
+    - obs: required_event_conflict_candidates
+      op: nonempty
+      when:
+        obs: required_event_producer_authenticated
+        op: eq
+        value: true
 legacy:
   q_ids:
   - Q-R05-15
@@ -49,3 +139,8 @@ legacy:
   - Q-C11/SC-23-02
 source:
   array: observability_assessment_draft
+collection_profile: kubernetes-required-event-record-observation-v1
+limitations:
+- '구현 분기: 허용·거부·후속 정상 probe를 보내고 소유 기록의 필수 사건·필드·도착 기한을 대조한다. 누락·중복·교체·후속 수집 오류를 구분한다.'
+- '미구현 분기: 관리·승인·공급물 소비·배포 사건의 독립 발생 근거와 기록 생산자 인증이 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다.'
+- kubernetes 구현만 있다. lab=true/vLLM 0.31 범위다. probe 응답은 실제 principal이나 독립 감사 생성원의 증명이 아니다.

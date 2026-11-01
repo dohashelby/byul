@@ -2,7 +2,7 @@ id: PLT-03
 framework_id: CHK-PLT-003
 mechanism_ids:
 - mechanism-11
-revision: 4
+revision: 5
 retired: false
 area: PLT
 purpose: 자격 제공·사용 제한
@@ -15,7 +15,34 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 실제 취득·마운트 주체의 자격과 접근 범위를 확인한다. 원격 취득 비사용 시 로컬 반입/마운트 주체를 확인한다.
-policy_params: []
+policy_params:
+- key: supply_environment_sha256
+  type: str
+  required: true
+- key: supply_normal_target_sha256
+  type: str
+  required: true
+- key: supply_challenge_target_sha256
+  type: str
+  required: true
+- key: supply_normal_prepared_sha256
+  type: str
+  required: true
+- key: supply_challenge_prepared_sha256
+  type: str
+  required: true
+- key: supply_record_source_sha256
+  type: str
+  required: true
+- key: supply_validity_start
+  type: str
+  required: true
+- key: supply_validity_end
+  type: str
+  required: true
+- key: supply_allowed_objects
+  type: list[str]
+  required: true
 policy_prose:
   policy_to_decide: 취득·검수·배치·읽기 역할과 객체 범위
   enterprise_decisions: 역할별 저장소·객체 범위, 자격 공급·갱신 방식과 실제 필요한 worker 자격, 허용 대체 경로. 비밀 원문 대신 참조·수신자·범위를 기록한다.
@@ -24,7 +51,25 @@ challenge_steps:
 - 허용 객체 다운로드 또는 승인 로컬 파일의 반입·마운트·읽기를 정상 대조로 수행
 - 같은 실제 주체로 비허용 시험 저장소·객체 또는 로컬 파일 접근을 비교
 - 최종 대리 접근 신원·마운트 주체와 허용·거부 결과를 대조
-required_observations: []
+required_observations:
+- key: supply_boot_sessions
+  type: list
+- key: supply_boot_violations
+  type: list
+- key: supply_boot_missing
+  type: list
+- key: supply_boot_complete
+  type: bool
+- key: supply_boot_normal_verified
+  type: bool
+- key: supply_boot_change_applied
+  type: bool
+- key: supply_boot_record_authenticated
+  type: bool
+- key: supply_boot_native_consumption
+  type: list
+- key: supply_boot_change
+  type: dict
 required_observations_prose:
 - 최종 저장소·object/사용 identity·권한/허용·거부 감사 기록
 satisfied_if: 실제 취득·반입·마운트 주체가 승인한 자격·권한으로 허용된 저장소 객체 또는 로컬 파일만 공급하고, 대리 접근권으로 허용 밖 자료를 취득하지 않는다.
@@ -33,8 +78,30 @@ unknown_criteria: URL 제출자와 서버 자격이 섞였거나 실제 대리 �
 remediation: '- 모델 취득 계정에 허용 저장소·객체·작업만 부여하고 서빙 계정의 자격과 분리한다. SDK가 실제 선택하는 자격과 redirect 뒤 최종 대상도 같은 허용 범위로 제한한다.'
 method_and_evidence: 명시 자격과 SDK 기본 자격의 선택·소비자·허용/금지 객체 접근을 확인한다. 로컬 공급은 실제 반입·마운트·파일 접근 주체와 권한을 대조한다. 비밀값은 기록하지 않는다.
 remaining_setup: 시험 저장소·대상별 권한과 무해 객체
-executor: null
-judge: null
+executor: supply_boot
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: supply_boot_complete
+      op: eq
+      value: true
+    - obs: supply_boot_normal_verified
+      op: eq
+      value: true
+    - obs: supply_boot_change_applied
+      op: eq
+      value: true
+    - obs: supply_boot_violations
+      op: empty
+    - obs: supply_boot_missing
+      op: empty
+    - obs: supply_boot_record_authenticated
+      op: eq
+      value: true
+    fail_when_any:
+    - obs: supply_boot_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-R05-09
@@ -45,3 +112,8 @@ legacy:
   - Q-R05-09/SC-14-01
 source:
   array: platform_assessment_draft
+collection_profile: supply-boot-fetch-scope-v1
+limitations:
+- '구현 분기: 같은 주체의 허용·비허용 객체 접근 기록을 승인 목록과 대조해 비허용 객체 취득이면 FAIL이다.'
+- '미구현 분기: 저장소 쪽 독립 감사 기록이 없어 PASS에 도달하지 않는다.'
+- kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로 받으며, 두 세션을 각각 수집해 합치지 않는다.

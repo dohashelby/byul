@@ -2,7 +2,7 @@ id: OBS-05
 framework_id: CHK-OBS-005
 mechanism_ids:
 - mechanism-15
-revision: 4
+revision: 5
 retired: false
 area: OBS
 purpose: 부가정보 수집·송신 통제
@@ -19,6 +19,18 @@ policy_params:
 - key: usage_allowed
   type: bool
   required: true
+- key: usage_report_paths
+  type: list[str]
+  required: true
+- key: usage_settings_fresh_process
+  type: bool
+  required: true
+- key: allowed_usage_fields
+  type: list[str]
+  required: true
+- key: allowed_usage_sinks
+  type: list[str]
+  required: true
 policy_prose:
   policy_to_decide: 허용 필드·목적지·주기
   enterprise_decisions: 민감정보·수집 목적·허용 필드·목적지·주기, 진단 필요성/승인자. usage 허용은 정책 변경·필드/목적지/사본 검토·재시험 후에만 적용한다.
@@ -27,7 +39,29 @@ challenge_steps:
 - 허용 정책과 보고 schema 확보
 - 시험 목적지·추가 필드 변경을 제한 적용
 - 실제 payload·목적지·차단 비교
-required_observations: []
+required_observations:
+- key: usage_policy_forbidden
+  type: bool
+- key: usage_effective_settings
+  type: dict
+- key: usage_settings_fresh_process
+  type: bool
+- key: usage_new_local_reports
+  type: list
+- key: usage_sink_receipts
+  type: list
+- key: usage_send_sensor_available
+  type: bool
+- key: usage_fields_seen
+  type: list
+- key: usage_sinks_seen
+  type: list
+- key: usage_report_observed
+  type: bool
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, pass|fail|no_response]
 required_observations_prose:
 - 승인 fields·sink/새 보고 payload/실제 연결·sink 수신
 satisfied_if: 허용한 usage 보고가 정한 필드·목적지·주기 범위에서 생성·전송되고 허용 밖 항목·수신지의 보고는 차단된다.
@@ -36,8 +70,56 @@ unknown_criteria: 적용한 허용 보고의 필드·목적지·주기 기준값
 remediation: '- usage 보고를 별도로 허용한 환경에서 필드·목적지·주기·공개 범위를 승인하고 실제 payload·송신 대상에 적용한다. 설정 변경과 redirect 뒤에도 승인 범위가 유지되는지 확인한다. 팀 참조 구성은 usage 비허용을 유지한다.'
 method_and_evidence: 초기/추가 runtime 필드와 실제 수신 목적지를 허용표와 대조한다.
 remaining_setup: 기본 비사용; 기업이 별도 허용할 때만 필드·목적지·보존 결정
-executor: null
-judge: null
+executor: boundary_egress
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: usage_policy_forbidden
+      op: eq
+      value: false
+    - obs: usage_send_sensor_available
+      op: eq
+      value: true
+    - obs: usage_report_observed
+      op: eq
+      value: true
+    - obs: usage_fields_seen
+      op: subset_of
+      value_policy: allowed_usage_fields
+    - obs: usage_sinks_seen
+      op: subset_of
+      value_policy: allowed_usage_sinks
+    fail_when_any:
+    - obs: usage_fields_seen
+      op: not_subset_of
+      value_policy: allowed_usage_fields
+      when:
+        obs: usage_policy_forbidden
+        op: eq
+        value: false
+    - obs: usage_sinks_seen
+      op: not_subset_of
+      value_policy: allowed_usage_sinks
+      when:
+        obs: usage_policy_forbidden
+        op: eq
+        value: false
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        fail_when_any:
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
 legacy:
   q_ids:
   - Q-C11
@@ -48,6 +130,18 @@ legacy:
   - Q-C11/SC-22-02
 source:
   array: observability_assessment_draft
+collection_profile: usage-report-scope-v1
+functional_probes:
+- method: POST
+  path: /v1/completions
+  body:
+    model: '{model}'
+    prompt: ping
+    max_tokens: 1
+  expect:
+  - 200
+  via: engine
 limitations:
-- usage_allowed={usage_allowed}은 이 점검 범위의 기업 정책 신고다. true는 필드·목적지·주기의 승인 또는 실제 준수 증명이 아니고 false는 허용 환경 검토 분기를 충족하지 않는다. 정책값만으로 비적용·PASS를 만들지 않는다.
-- 허용 범위·승인·payload·실제 수신의 수동 근거가 별도로 필요하다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.
+- '구현 분기: 허용 정책에서 새 보고의 필드 이름과 소유 수신지의 목적지를 승인 목록과 대조한다. 허용 밖 필드나 목적지가 보이면 FAIL이다.'
+- '미구현 분기: 보고 주기 대조와 허용 밖 수신지로의 전송 차단 시험은 없다. 소유 수신지 없이는 PASS에 도달하지 않는다.'
+- real 구현만 있다. 파일과 수신 기록은 필드 이름과 해시만 남기며 보고 본문을 저장하지 않는다.

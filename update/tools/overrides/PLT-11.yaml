@@ -1,0 +1,56 @@
+executor: session_revocation
+collection_profile: kubernetes-existing-http-session-observation-v1
+policy_params:
+  - { key: session_environment_sha256, type: str, required: true }
+  - { key: session_target_sha256, type: str, required: true }
+  - { key: session_prepared_sha256, type: str, required: true }
+  - { key: session_validity_start, type: str, required: true }
+  - { key: session_validity_end, type: str, required: true }
+  - { key: session_issuer_id, type: str, required: true }
+  - { key: session_event_id, type: str, required: true }
+  - { key: session_event_at, type: str, required: true }
+  - { key: session_open_before, type: str, required: true }
+  - { key: session_deny_after, type: str, required: true }
+  - { key: session_deadline_basis, type: str, required: true }
+  - { key: session_propagation_limit_ms, type: int, required: true }
+  - { key: session_max_clock_skew_ms, type: int, required: true }
+  - { key: session_max_wait_seconds, type: int, required: true }
+  - { key: session_residual_policy, type: str, required: true }
+required_observations:
+  - { key: session_trials, type: list }
+  - { key: session_native_bindings, type: list }
+  - { key: session_conflict_candidates, type: list }
+  - { key: session_missing, type: list }
+  - { key: session_existing_connection_constraint_violated, type: bool }
+  - { key: session_selected_probe_connection_reuse_observed, type: bool }
+  - { key: session_distinct_new_probe_connection_observed, type: bool }
+  - { key: session_issuer_event_verified, type: bool }
+  - { key: session_provider_propagation_verified, type: bool }
+  - { key: session_application_session_or_handle_verified, type: bool }
+  - { key: session_serving_session_receipt_verified, type: bool }
+  - { key: session_scope_complete, type: bool }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: session_trials, op: nonempty }
+      - { obs: session_existing_connection_constraint_violated, op: eq, value: false }
+      - { obs: session_selected_probe_connection_reuse_observed, op: eq, value: true }
+      - { obs: session_distinct_new_probe_connection_observed, op: eq, value: true }
+      - { obs: session_issuer_event_verified, op: eq, value: true }
+      - { obs: session_provider_propagation_verified, op: eq, value: true }
+      - { obs: session_application_session_or_handle_verified, op: eq, value: true }
+      - { obs: session_serving_session_receipt_verified, op: eq, value: true }
+      - { obs: session_scope_complete, op: eq, value: true }
+    fail_when_any:
+      - { obs: session_existing_connection_constraint_violated, op: eq, value: true,
+          when: { obs: session_issuer_event_verified, op: eq, value: true } }
+    axes:
+      functional:
+        pass_when_all: []
+        fail_when_any:
+          - { obs: session_existing_connection_constraint_violated, op: eq, value: true }
+limitations:
+  - "구현 분기: probe HTTP/1.1 keep-alive 한 연결의 재사용과 별도 새 연결을 구분하고, 명시 잔존 정책을 넘긴 기존 연결의 수락은 기능 축 독립 FAIL이다."
+  - "미구현 분기: issuer 사건·전파·애플리케이션 session/handle·서빙 영수증의 독립 근거가 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다."
+  - "kubernetes 구현만 있다. lab=true/vLLM 0.31 고정 GET /v1/models 범위이며 스트리밍·Gateway·공유 자원 접근권 전체는 미시험이다. 자격 원문은 저장하지 않는다."

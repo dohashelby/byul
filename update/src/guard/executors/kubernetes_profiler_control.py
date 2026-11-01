@@ -16,7 +16,8 @@ from .lifecycle_session import capture_session
 PROFILE = 'kubernetes-profiler-control-v1'
 POLICY_TYPES = {'profiler_environment_sha256': 'str', 'profiler_target_sha256': 'str',
     'profiler_prepared_sha256': 'str', 'profiler_validity_start': 'str', 'profiler_validity_end': 'str',
-    'profiler_backend_kind': 'str', 'profiler_required_ranks': 'list[str]', 'profiler_case': 'str'}
+    'profiler_backend_kind': 'str', 'profiler_required_ranks': 'list[str]', 'profiler_case': 'str',
+    'profiler_control_scope': 'str', 'profiler_control_owner_ref': 'str'}
 OBSERVATIONS = {'profiler_control_trials': 'list', 'profiler_control_projections': 'list',
     'profiler_control_api_links': 'list', 'profiler_control_flag_adapter_conflicts': 'list',
     'profiler_control_missing': 'list', 'profiler_next_start_api_linked': 'bool',
@@ -32,6 +33,16 @@ def normalize_policy(values):
         start, end = (_time(values[k]) for k in ('profiler_validity_start', 'profiler_validity_end'))
         if not 0 < (end - start).total_seconds() <= 600: raise ValueError
         if values['profiler_backend_kind'] != 'torch' or values['profiler_case'] not in {'normal', 'prepared-stop-failure'}: raise ValueError
+        # /15 cannot establish backend inactivity or ownership. Only an explicit
+        # dedicated-fixture declaration authorizes stopping/restarting even an
+        # already active profiler on these exact environment/target/prepared pins.
+        # A successful/failed start never acquires ownership by itself.
+        if values['profiler_control_scope'] != 'dedicated-owned-profiler': raise ValueError
+        owner_ref = values['profiler_control_owner_ref']
+        if (type(owner_ref) is not str or not 3 <= len(owner_ref) <= 512
+                or any(ord(v) < 32 or ord(v) == 127 for v in owner_ref)
+                or re.fullmatch(r'(?:[A-Za-z][A-Za-z0-9+.-]*:[^\s]+|[A-Z][A-Z0-9_]*-[A-Za-z0-9][^\s]*)', owner_ref) is None):
+            raise ValueError
         ranks = values['profiler_required_ranks']
         if (type(ranks) is not list or not 1 <= len(ranks) <= 64 or len(set(ranks)) != len(ranks)
                 or any(type(v) is not str or re.fullmatch('0|[1-9][0-9]?', v) is None or int(v) > 63 for v in ranks)):
@@ -186,12 +197,17 @@ class KubernetesProfilerControlExecutor:
             'profiler_control_api_links': projection['api_links'], 'profiler_control_flag_adapter_conflicts': projection['flag_adapter_conflicts'],
             'profiler_control_missing': sorted(set(projection['missing'] + diagnostics + [
                 'independent_backend_stop_trace_and_transfer_unverified', 'prepared_fault_activation_unverified',
-                'next_start_API_success_is_not_next_backend_collection'])),
+                'next_start_API_success_is_not_next_backend_collection', 'preexisting_backend_inactive_unverified',
+                'control_scope_and_owner_are_operator_declarations'])),
             'profiler_next_start_api_linked': any(r['case_id'] == 'next-start' and r['http_status_matches'] for r in projection['api_links']),
             'profiler_backend_collection_stopped_verified': False, 'profiler_trace_output_completed_verified': False,
             'profiler_cross_process_rpc_verified': False, 'profiler_scope_complete': False}
+        scope_declaration = {key: policy_values[key] for key in ('profiler_control_scope', 'profiler_control_owner_ref',
+            'profiler_environment_sha256', 'profiler_target_sha256', 'profiler_prepared_sha256')}
         summary = {'profile': PROFILE, 'declared_case': policy_values['profiler_case'], 'policy_values': deepcopy(policy_values),
             'trials': trials, 'captures': captures, 'transport': http, 'observations': values,
+            'control_scope_declaration': scope_declaration, 'preexisting_backend_inactive_verified': False,
+            'profiler_ownership_acquired_by_start_verified': False,
             'selected_session_sealed': sealed, 'faults_injected': False, 'engine_started': False, 'whole_scope_complete': False}
         artifacts = []
         try:
@@ -207,5 +223,6 @@ class KubernetesProfilerControlExecutor:
             challenges=[{'step': 'observe prepared profiler stop failure and next start', 'attempted': any(t['attempted'] for t in stop_attempts),
                 'observations': {'fault_activation_verified': False}}],
             observations={k: {'value': v, 'collected': True} for k, v in values.items()}, artifacts=artifacts,
-            cleanup_errors=cleanup, config={'profile': PROFILE, 'target_sha256': digest, 'prepared_sha256': sha256_hex(canonical_json(prepared))},
+            cleanup_errors=cleanup, config={'profile': PROFILE, 'target_sha256': digest, 'prepared_sha256': sha256_hex(canonical_json(prepared)),
+                'control_scope_declaration': scope_declaration},
             started_at=started, finished_at=utcnow())

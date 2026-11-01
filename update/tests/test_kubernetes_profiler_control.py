@@ -27,7 +27,8 @@ class World(PodWorld):
         super().__init__(target)
         self.mode = mode; self.prepared = prepared; self.replaced = False; self.stages = []
         self.native = make_world(session=prepared['session'], patch=monkeypatch,
-            mode='backend-stop-failure' if mode in {'conflict', 'followup-error', 'capture-error', 'replacement'} else 'normal')
+            mode='backend-stop-failure' if mode in {'conflict', 'followup-error', 'capture-error', 'replacement'}
+            else 'start-failure' if mode == 'source-start-error' else 'normal')
         self.mutate = self.mutation
 
     def mutation(self, role, value, after):
@@ -55,6 +56,7 @@ class World(PodWorld):
         else: text = json.dumps({'model': 'fixture-model', 'choices': [{'text': PRIVATE}]})
         if self.mode == 'followup-error' and slot == 'normal-after': raise OSError(PRIVATE)
         if self.mode == 'baseline-error' and slot == 'normal-before': outcome = 503
+        if self.mode == 'http-start-error' and slot == 'start': outcome = 503
         if self.mode == 'replacement' and slot == 'normal-next': self.replaced = True
         row = {'id': slot, 'method': 'POST', 'mode': 'json', 'outcome': outcome, 'body': text,
             'body_bytes': len(text.encode()), 'body_sha256': sha256_hex(text.encode()), 'eof': True,
@@ -87,12 +89,16 @@ def inputs(tmp_path, external, monkeypatch, mode='normal'):
         'profiler_validity_start': (now - timedelta(seconds=30)).isoformat(),
         'profiler_validity_end': (now + timedelta(seconds=90)).isoformat(),
         'profiler_backend_kind': 'torch', 'profiler_required_ranks': ['0'],
+        'profiler_control_scope': 'dedicated-owned-profiler', 'profiler_control_owner_ref': 'approval:EXAMPLE-owned-profiler-case',
         'profiler_case': 'prepared-stop-failure' if mode != 'normal' else 'normal'}
     return env, world, cfg, values
 
 
 def run(tmp_path, external, monkeypatch, mode):
     env, world, cfg, values = inputs(tmp_path, external, monkeypatch, mode)
+    if mode == 'preexisting':
+        asyncio.run(world.native.router.router.dispatch('/start_profile', SimpleNamespace()))
+        assert world.native.backend.running is True and world.native.backend.starts == 1 and world.native.backend.stops == 0
     class Reader:
         def __init__(self, target, env, prepared, **kwargs): self.binding = {'engine': world.target['kubernetes']['engine']}
         def snapshot(self): return {}
@@ -182,3 +188,61 @@ def test_same_time_or_different_request_identity_cannot_join_api_calls(tmp_path,
     projection = product.project_captures(artifact['captures'], trials)
     assert projection['api_links'] == []
     assert any('unique_binding_unavailable' in item for item in projection['missing'])
+
+
+@pytest.mark.parametrize('change', ['missing-scope', 'missing-owner', 'unknown-scope', 'false-scope', 'empty-owner',
+    'whitespace-owner', 'false-owner', 'unqualified-owner', 'control-character-owner'])
+def test_preexisting_active_profiler_is_untouched_without_explicit_dedicated_fixture_declaration(
+        tmp_path, external, monkeypatch, change):
+    env, world, cfg, values = inputs(tmp_path, external, monkeypatch)
+    asyncio.run(world.native.router.router.dispatch('/start_profile', SimpleNamespace()))
+    assert world.native.backend.running is True
+    assert world.native.backend.starts == 1 and world.native.backend.stops == 0
+    if change == 'missing-scope': values.pop('profiler_control_scope')
+    if change == 'missing-owner': values.pop('profiler_control_owner_ref')
+    if change == 'unknown-scope': values['profiler_control_scope'] = 'shared-existing-profiler'
+    if change == 'false-scope': values['profiler_control_scope'] = False
+    if change == 'empty-owner': values['profiler_control_owner_ref'] = ''
+    if change == 'whitespace-owner': values['profiler_control_owner_ref'] = '   '
+    if change == 'false-owner': values['profiler_control_owner_ref'] = False
+    if change == 'unqualified-owner': values['profiler_control_owner_ref'] = 'someone'
+    if change == 'control-character-owner': values['profiler_control_owner_ref'] = 'approval:owner\x00'
+    executor = product.KubernetesProfilerControlExecutor(cfg, runner=world.runner)
+    with pytest.raises(ValueError, match='PROFILER_CONTROL_POLICY_INVALID'):
+        executor.run(SimpleNamespace(id='LIF-14', collection_profile=product.PROFILE), env, values, None, tmp_path)
+    assert world.stages == [] and world.execs == [] and world.calls == []
+    assert world.native.backend.running is True
+    assert world.native.backend.starts == 1 and world.native.backend.stops == 0
+
+
+def test_explicit_dedicated_fixture_declaration_allows_preexisting_stop_without_backend_truth_claim(tmp_path, external, monkeypatch):
+    draft, world, values = run(tmp_path, external, monkeypatch, 'preexisting')
+    assert world.stages == list(SLOTS)
+    assert world.native.backend.starts == 2 and world.native.backend.stops == 2
+    assert world.native.backend.running is False
+    artifact = json.loads(draft.artifacts[0].path.read_bytes())
+    expected = {key: values[key] for key in ('profiler_control_scope', 'profiler_control_owner_ref',
+        'profiler_environment_sha256', 'profiler_target_sha256', 'profiler_prepared_sha256')}
+    assert artifact['control_scope_declaration'] == draft.config['control_scope_declaration'] == expected
+    assert artifact['policy_values'] == values
+    assert artifact['preexisting_backend_inactive_verified'] is False
+    assert artifact['profiler_ownership_acquired_by_start_verified'] is False
+    assert draft.observations['profiler_backend_collection_stopped_verified'].value is False
+    assert draft.observations['profiler_scope_complete'].value is False
+
+
+@pytest.mark.parametrize('mode', ['source-start-error', 'http-start-error'])
+def test_failed_start_never_acquires_ownership_stop_scope_comes_only_from_explicit_fixture_policy(tmp_path, external, monkeypatch, mode):
+    draft, world, values = run(tmp_path, external, monkeypatch, mode)
+    artifact = json.loads(draft.artifacts[0].path.read_bytes())
+    assert world.stages == list(SLOTS)
+    assert artifact['profiler_ownership_acquired_by_start_verified'] is False
+    assert artifact['control_scope_declaration']['profiler_control_owner_ref'] == values['profiler_control_owner_ref']
+    assert artifact['control_scope_declaration']['profiler_control_scope'] == 'dedicated-owned-profiler'
+    if mode == 'source-start-error':
+        assert any(s['point'] == 'TorchProfilerWrapper._start' and s['phase'] == 'RAISE'
+            for projection in draft.observations['profiler_control_projections'].value for s in projection['samples'])
+    else:
+        assert next(t for t in draft.observations['profiler_control_trials'].value if t['case_id'] == 'start')['profiler_control_response_success'] is False
+    assert draft.observations['profiler_backend_collection_stopped_verified'].value is False
+    assert draft.observations['profiler_scope_complete'].value is False

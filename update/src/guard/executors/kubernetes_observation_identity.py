@@ -3,6 +3,7 @@ from guard.models import canonical_json,sha256_hex,utcnow
 from guard.adapters import vllm_safe_open_mapping_sensor as mapping_sensor
 from guard.adapters import vllm_safe_open_mapping_metadata as mapping_metadata
 from guard.adapters import vllm_worker_startup_sensor as startup_sensor,vllm_worker_startup_metadata as startup_metadata
+from guard.adapters import vllm_generation_file_metadata as generation_files
 from guard.adapters import vllm_file_read_sensor as read_sensor,vllm_file_read_metadata as read_metadata
 from guard.adapters import vllm_weight_iteration_sensor as weight_sensor,vllm_weight_iteration_metadata as weight_metadata
 from guard.runtime.bounded import strict_json
@@ -87,8 +88,8 @@ def _attach_startup_file_contexts(trials,projection):
 
 
 class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
-    name='observation_identity';version='0.4.1';collection_profile=PROFILE
-    supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8',weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE})
+    name='observation_identity';version='0.5.1';collection_profile=PROFILE
+    supported_native_profiles=frozenset({'vllm-native-lifecycle-metadata/8',weight_sensor.PROFILE,read_sensor.PROFILE,mapping_sensor.PROFILE,startup_sensor.PROFILE,*generation_files.PROFILES})
     policy_normalizer=staticmethod(contract.normalize_policy)
 
     def run(self,check,env,policy_values,adapter,workdir):
@@ -200,6 +201,33 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
                     value['scoped_startup_file_contexts']=None
                     value['scoped_startup_file_context_diagnostic']='NATIVE_WORKER_FILE_CONSUMER_UNAVAILABLE'
                     ctx._termination_gap=True
+        if ctx._termination_prepared['profile'] in generation_files.PROFILES:
+            try:
+                projected=generation_files.project_file_contexts(packet,ctx._termination_prepared)
+                value['generation_file_contexts']=projected
+                value['weight_iteration']=projected['weight_iteration']
+                value['safe_open_mappings']=projected['safe_open_mappings']
+                weight_metadata.attach_configured_models(value['identity_native_models'],projected['weight_iteration'])
+                mapping_metadata.attach_configured_models(value['identity_native_models'],projected['safe_open_mappings'])
+                generation_files.attach_configured_models(value['identity_native_models'],projected)
+                if projected['diagnostics']:ctx._termination_gap=True
+            except (KeyError,ValueError,TypeError,OSError,RuntimeError):
+                value.setdefault('generation_file_contexts',None)
+                value['generation_file_context_diagnostic']='GENERATION_FILE_CONTEXT_CONSUMER_UNAVAILABLE'
+                ctx._termination_gap=True
+        if (ctx._termination_prepared['profile'] in generation_files.PROFILES
+                and value.get('generation_file_contexts') is not None
+                and not value.get('generation_file_context_diagnostic')):
+            try:
+                from guard.collectors import native_generation_model_files as dedicated
+                analysis=dedicated.analyze(packet,ctx._termination_prepared)
+                value['generation_scoped_file_contexts']=analysis
+                dedicated.attach_configured_models(value['identity_native_models'],analysis)
+            except Exception:
+                # Keep the already admitted common facts and returned analysis.
+                value.setdefault('generation_scoped_file_contexts',None)
+                value['generation_scoped_file_context_diagnostic']='NATIVE_GENERATION_FILE_CONSUMER_UNAVAILABLE'
+                ctx._termination_gap=True
         return value
 
     def collect(self,ctx):
@@ -247,6 +275,10 @@ class KubernetesObservationIdentityExecutor(KubernetesObservationStateExecutor):
             summary['diagnostic_codes'].append('WORKER_STARTUP_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         if summary['projection'].get('scoped_startup_file_context_diagnostic')=='NATIVE_WORKER_FILE_CONSUMER_UNAVAILABLE':
             summary['diagnostic_codes'].append('NATIVE_WORKER_FILE_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
+        if summary['projection'].get('generation_file_context_diagnostic')=='GENERATION_FILE_CONTEXT_CONSUMER_UNAVAILABLE':
+            summary['diagnostic_codes'].append('GENERATION_FILE_CONTEXT_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
+        if summary['projection'].get('generation_scoped_file_context_diagnostic')=='NATIVE_GENERATION_FILE_CONSUMER_UNAVAILABLE':
+            summary['diagnostic_codes'].append('NATIVE_GENERATION_FILE_CONSUMER_UNAVAILABLE');ctx._termination_gap=True
         values={'identity_record_collections':state['collections'],'identity_declared_records':projected['records'],
             'identity_native_models':models,'identity_binding_candidates':projected['candidates'],
             'identity_conflict_candidates':projected['conflict_candidates'],'identity_missing':projected['missing'],

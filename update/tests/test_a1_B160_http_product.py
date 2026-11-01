@@ -50,7 +50,7 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
     # real closed gate and exact product refs until B reviews that fixed pair.
     if gate.REVIEWED_COMMON_COMMIT not in helper.APPROVED_REVIEWED_COMMON_COMMITS:
         proof=gate.verify(Path(__file__).resolve().parents[2])
-        assert proof['files_verified']==392 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
+        assert proof['files_verified']==394 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
         with pytest.raises(ValueError,match='^LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE$'):helper.verify_source()
         now=utcnow();argv=['--collect-http']
         window={'http_validity_start':(now-timedelta(seconds=30)).isoformat(),'http_validity_end':(now+timedelta(minutes=3)).isoformat()}
@@ -86,7 +86,8 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
         (tmp_path/'a1-product-receipt.json').write_bytes(canonical_json(receipt))
         return
     proof=helper.verify_source()
-    assert proof['files_verified']==392 and proof['reviewed_common_commit']=='df6255e96a877ebfbe185230ed87320aa84d2c30'
+    assert proof['files_verified']==394 and proof['reviewed_common_commit']=='adcde856375a4de43d4a5d789c00de875e43e321'
+    assert proof['verified_manifest_sha256']=='0ee4b9da536307f9f5d68b55f3b938c591260da3386dc401d6a01a51a9ebc3c2'
     assert proof['runtime_hash_approval'] is False and proof['paths_excluded']==[]
     now=utcnow();window={'http_validity_start':(now-timedelta(seconds=30)).isoformat(),
         'http_validity_end':(now+timedelta(minutes=3)).isoformat()}

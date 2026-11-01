@@ -2,10 +2,11 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed PR171 integrated tree: A2 PR170 pins, B product/module registration,
-# and malformed-profile rejection. All original five roots and trust gates remain.
+# Reviewed A39 intake: all394 pinned Git blobs exactly equal the previously
+# reviewed716c29a/native20~22 source. Public PR171 B fixture/tool bytes remain.
+# B approval of this new gate/common pair is separate; no B allowlist is changed.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='df6255e96a877ebfbe185230ed87320aa84d2c30'
+REVIEWED_COMMON_COMMIT='adcde856375a4de43d4a5d789c00de875e43e321'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

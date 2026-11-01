@@ -236,7 +236,28 @@ REVIEWED_GATE_FIXTURES = {
     tool.HTTP_REVIEWED_COMMON_COMMIT:('1c3018f8cde4a4b8e674d112cee8e3626813b022',
         '15701b1e83eab8665414456b3072bcad73ee2220ed02e9f63a06a3441b55d157'),
     tool.PR171_REVIEWED_COMMON_COMMIT:(tool.PR171_GATE_SOURCE_COMMIT,tool.PR171_GATE_SHA256),
+    tool.NATIVE20_REVIEWED_COMMON_COMMIT:(tool.NATIVE20_GATE_SOURCE_COMMIT,tool.NATIVE20_GATE_SHA256),
 }
+
+
+@pytest.mark.parametrize('old_common', [tool.REVIEWED_COMMON_COMMIT,
+    '9d8987a5a306ffce28fcb735e012c400589303f2', tool.HTTP_REVIEWED_COMMON_COMMIT, tool.PR171_REVIEWED_COMMON_COMMIT])
+@pytest.mark.parametrize('new_file', [False, True])
+def test_native20_new_pair_rejects_every_mixed_old_pair_before_delegation(example_source_gate, old_common, new_file):
+    select, calls, _ = example_source_gate
+    common = old_common if new_file else tool.NATIVE20_REVIEWED_COMMON_COMMIT
+    file_common = tool.NATIVE20_REVIEWED_COMMON_COMMIT if new_file else old_common
+    select(common, file_common)
+    with pytest.raises(ValueError, match='LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE'): tool.verify_source()
+    assert calls == []
+
+
+@pytest.mark.parametrize('mutate, common', [(True, tool.NATIVE20_REVIEWED_COMMON_COMMIT), (False, '0' * 40)])
+def test_native20_mutated_or_unknown_pair_rejected_before_delegation(example_source_gate, mutate, common):
+    select, calls, _ = example_source_gate
+    select(common, tool.NATIVE20_REVIEWED_COMMON_COMMIT, mutate)
+    with pytest.raises(ValueError, match='LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE'): tool.verify_source()
+    assert calls == []
 
 
 def _reviewed_gate_bytes(common):
@@ -392,8 +413,9 @@ def test_pr171_historical_blob_failure_has_no_current_fallback(monkeypatch,failu
 
 def test_pr171_HTTP_known_common_scope_excludes_native_only_histories():
     assert tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS==frozenset({
-        'f277fecd6df1e59505c0ad731032593f6fb22885','df6255e96a877ebfbe185230ed87320aa84d2c30'})
+        'f277fecd6df1e59505c0ad731032593f6fb22885','df6255e96a877ebfbe185230ed87320aa84d2c30',
+        'adcde856375a4de43d4a5d789c00de875e43e321'})
     assert tool.HTTP_REVIEWED_COMMON_COMMIT=='f277fecd6df1e59505c0ad731032593f6fb22885'
     assert tool.REVIEWED_COMMON_COMMIT not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
     assert '9d8987a5a306ffce28fcb735e012c400589303f2' not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
-    assert len(tool.APPROVED_GATE_PROFILES)==4
+    assert len(tool.APPROVED_GATE_PROFILES)==5

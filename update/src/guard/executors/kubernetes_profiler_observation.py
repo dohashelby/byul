@@ -26,8 +26,32 @@ class KubernetesProfilerObservationExecutor(KubernetesObservationStateExecutor):
     name='profiler_observation';version='0.1.0';collection_profile=PROFILE
     supported_native_profiles=frozenset({sensor.PROFILE});policy_normalizer=staticmethod(normalize_policy)
 
+    def __init__(self,cfg,*,implementation='kubernetes',runner=None,environ=None,expected_target_sha256=None):
+        if implementation not in {'kubernetes','source-cpu'}:raise ValueError('PROFILER_IMPLEMENTATION_UNSUPPORTED')
+        super().__init__(cfg,runner=runner,environ=environ,expected_target_sha256=expected_target_sha256)
+        self.implementation=implementation
+
+    def validate_policy(self,check,values):
+        from .profiler_lifecycle_cpu import PROFILE as CPU_PROFILE
+        if self.implementation=='source-cpu':
+            if check.id!='LIF-14' or getattr(check,'collection_profile',None)!=CPU_PROFILE or values:
+                raise ValueError('PROFILER_CPU_PROFILE_UNSUPPORTED')
+            return
+        from .kubernetes_profiler_control import PROFILE as CONTROL_PROFILE,KubernetesProfilerControlExecutor
+        if check.id=='LIF-14' and getattr(check,'collection_profile',None)==CONTROL_PROFILE:
+            KubernetesProfilerControlExecutor(self.cfg).validate_policy(check,values)
+            return
+        return super().validate_policy(check,values)
+
     def run(self,check,env,policy_values,adapter,workdir):
         self.validate_policy(check,policy_values)
+        if self.implementation=='source-cpu':
+            from .profiler_lifecycle_cpu import ProfilerLifecycleCPUExecutor
+            return ProfilerLifecycleCPUExecutor(self.cfg).run(check,env,policy_values,adapter,workdir)
+        from .kubernetes_profiler_control import PROFILE as CONTROL_PROFILE,KubernetesProfilerControlExecutor
+        if check.id=='LIF-14' and getattr(check,'collection_profile',None)==CONTROL_PROFILE:
+            return KubernetesProfilerControlExecutor(self.cfg,runner=self.runner,environ=self._environ,
+                expected_target_sha256=self.expected_target_sha256).run(check,env,policy_values,adapter,workdir)
         from guard.collectors.lifecycle import load_prepared
         try:
             prepared=load_prepared(self.cfg['prepared'])

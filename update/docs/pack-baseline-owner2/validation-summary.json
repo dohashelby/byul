@@ -1,0 +1,206 @@
+{
+  "source_commit": "2247aabb3447ccb3210b100cade06bce51ed771e",
+  "start_commit": "c8265f135c6bce389daafc6bce9ad11d308a10c9",
+  "branch": "codex/pack-baseline-owner2-20261101",
+  "foundation": {
+    "url": "https://github.com/dohashelby/byul/pull/183",
+    "origin_main": "f15210b1e98037594b601664da57d819e322425f",
+    "state": "open",
+    "pr": 183,
+    "head": "c468e9a3990f3c6b5bdaad6df2820166cec0c8eb",
+    "merged": false,
+    "checked_at": "2026-11-01T14:44:09.5377178Z",
+    "merged_at": null
+  },
+  "state": "DEDICATED_IMPLEMENTATION_PREPARED_NOT_23_CONNECTIONS_COMPLETE",
+  "factory_available": 23,
+  "baseline_connections": 0,
+  "native_engine_sensor_implemented_profiles": 0,
+  "full_default_suite_passed": false,
+  "validation": {
+    "engine_sensor_direct_contracts": {
+      "passed": 24,
+      "pytest_seconds": 1.22,
+      "parent_wall_seconds": 2.0462903
+    },
+    "basic_full_suite": {
+      "status": "initial_collection_failed",
+      "reason": "existing cp949 read_text in test_b_produced_ids.py",
+      "pytest_seconds": 12.21,
+      "parent_wall_seconds": 13.4530528,
+      "next_environment": {
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    },
+    "integrated_contracts": {
+      "passed": 103,
+      "pytest_seconds": 16.14,
+      "parent_wall_seconds": 17.3062752,
+      "source_note": "pre native-profiler/RSS final source"
+    },
+    "registered_factory_pipelines": {
+      "passed": 33,
+      "pytest_seconds": 7.1,
+      "parent_wall_seconds": 8.0991058
+    },
+    "basic_full_suite_utf8": {
+      "status": "completed_with_failures",
+      "source_head": "3a54ffa",
+      "log": "out/pack-owner2/full-suite-utf8.log",
+      "known_pin_conflicts": 7,
+      "known_compatibility_regressions": 0,
+      "passed": 10150,
+      "failed": 71,
+      "skipped": 13,
+      "deselected": 19,
+      "error_events": 2,
+      "pytest_seconds": 2578.14,
+      "parent_wall_seconds": 2580.55462,
+      "classification": {
+        "baseline_Windows_failures": 63,
+        "baseline_Windows_error_nodes": 1,
+        "baseline_Windows_error_events": 2,
+        "historical_snapshot_gate_failures": 7,
+        "new_compatibility_regression_fixed_in_2247aab": 1
+      }
+    },
+    "pin_control_baseline": {
+      "source_head": "c8265f1",
+      "first_two_files_passed": 8,
+      "additional_pin_case_passed": 1,
+      "extra_case_pytest_seconds": 3.76
+    },
+    "final_linux_full_suite": {
+      "source_head": "2247aabb3447ccb3210b100cade06bce51ed771e",
+      "python": "3.12.3",
+      "selected_nodes": 10235,
+      "selected_files": 351,
+      "same_default_selection": true,
+      "extra_exclusions": [],
+      "passed": 10228,
+      "failed": 7,
+      "skipped": 0,
+      "errors": 0,
+      "parent_total_wall_seconds": 349.397275459,
+      "shards": [
+        {
+          "index": 0,
+          "summary": "4 failed, 2555 passed in 347.68s (0:05:47)",
+          "pytest_seconds": 347.68,
+          "parent_wall_seconds": 348.48050339299994,
+          "exit_code": 1,
+          "source_unchanged": true
+        },
+        {
+          "index": 1,
+          "summary": "1 failed, 2558 passed in 296.95s (0:04:56)",
+          "pytest_seconds": 296.95,
+          "parent_wall_seconds": 297.99567474500003,
+          "exit_code": 1,
+          "source_unchanged": true
+        },
+        {
+          "index": 2,
+          "summary": "2 failed, 2557 passed, 1 deselected in 310.07s (0:05:10)",
+          "pytest_seconds": 310.07,
+          "parent_wall_seconds": 311.211262948,
+          "exit_code": 1,
+          "source_unchanged": true
+        },
+        {
+          "index": 3,
+          "summary": "2558 passed in 338.46s (0:05:38)",
+          "pytest_seconds": 338.46,
+          "parent_wall_seconds": 339.34225320499996,
+          "exit_code": 0,
+          "source_unchanged": true
+        }
+      ],
+      "default_collection_deselected": 19,
+      "native_engine_or_GPU_measurement": false,
+      "status": "completed_with_immutable_snapshot_gate_failures",
+      "log_directory": "out/pack-owner2/linux-supported3",
+      "baseline_same_seven": {
+        "passed": 7,
+        "pytest_seconds": 5.09,
+        "parent_wall_seconds": 5.31
+      },
+      "current_same_seven": {
+        "failed": 7,
+        "pytest_seconds": 1.2,
+        "parent_wall_seconds": 1.415
+      },
+      "source_changed_during_test": false,
+      "new_or_modified_test_module_failures": 0
+    },
+    "historical_builders": {
+      "status": "passed",
+      "builders": 10,
+      "parent_wall_seconds": 7.891,
+      "seed_ref_preserved": true
+    },
+    "retry_contracts_final": {
+      "status": "passed",
+      "passed": 258,
+      "pytest_seconds": 240.71,
+      "parent_wall_seconds": 242.3331351,
+      "source_head": "2247aab",
+      "log": "out/pack-owner2/retry-final-verified.log"
+    },
+    "linux31214_unsupported_runtime": {
+      "status": "completed_with_failures",
+      "failed": 320,
+      "passed": 9915,
+      "parent_wall_seconds": 374.456080472,
+      "new_or_modified_test_module_failures": 0,
+      "representative_baseline_comparisons": 3,
+      "reason": "Existing explicit native sensor runtime/OS pairs exclude (cpython-3.12.14,posix). No hashes or allowed pairs changed."
+    },
+    "pack_integrity": {
+      "status": "passed",
+      "original_ref": "PACK-BASELINE@31/54f4f2357533a8b201ad4397d4b182b08b89ee4821ffe67763e3fbecd8f369ac",
+      "modified": false
+    },
+    "checklist_status": {
+      "status": "passed",
+      "command": "uv run python -m tools.checklist_status --check",
+      "checks": 77,
+      "existing_real_connected": 16,
+      "not_owner2_new_connections": true
+    },
+    "owner2_readiness": {
+      "registered_factory_available": 23,
+      "baseline_connected": 0,
+      "exit_code": 1,
+      "expected_exit_until_actual_connections": true,
+      "excluded_eight_preserved": true
+    },
+    "preserved_product_examples": {
+      "registered_kubernetes_factory_example_bundles": 8,
+      "separate_engine_sensor_source_cpu_example_bundle": 1,
+      "native_measurements": 0,
+      "evidence": "out/pack-owner2/example-product-bundles/manifest.json"
+    }
+  },
+  "measured": {
+    "kubernetes": 0,
+    "GPU": 0,
+    "new_source_cpu_sampler_or_profiler": 0,
+    "owned_WSL_proc_RSS_query": true
+  },
+  "approval_changes": {
+    "old_hashes": false,
+    "new_skip_or_xfail": false,
+    "assert_weakening": false,
+    "pack_or_common_owner1_files": false
+  },
+  "report": "REPORT.md",
+  "original_evidence_archive": "validation-evidence.zip",
+  "remaining_prerequisites": [
+    "PR183 merge commit on origin/main, then create a fresh integration worktree and retain exact PACK31 seed Ref",
+    "Reviewed native producer/sourcepoint/callback/transport contracts and actual-consumption boundaries for the nine engine_sensor profiles; existing gates remain intact",
+    "ENV/POL/target/prepared and explicit experiment ownership/transition/kernel/TP inputs; no AWS start/cost/permission changes authorized",
+    "A separately reviewed source snapshot contract for the seven historical gate conflicts; observed hashes are not approval"
+  ]
+}

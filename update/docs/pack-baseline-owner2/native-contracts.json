@@ -1,0 +1,77 @@
+{
+  "scope": "담당 2 전용 콜백 본체와 공통 native 생산 경계의 남은 계약",
+  "native_connected_count": 0,
+  "new_rule_table_operator_required": false,
+  "trust_boundary": {
+    "required_bindings": ["정확한 ENV Ref", "target_sha256", "prepared_sha256", "session", "recording capture/file identity", "source/code/callback의 고정 검토 계약", "process start/boot/namespace/owner", "rank", "실제 request/consumer/event 대응"],
+    "not_accepted": ["입력의 verified=true 자기 신고", "입력/HEAD에서 만든 hash의 자동 승인", "HTTP 200 또는 센서 호출 수", "시간 근접만으로 만든 다른 세션 join", "CPU/EXAMPLE 결과의 GPU·배포 승격"],
+    "failure_observation": "필수 source/대상/세대/실제 효과가 검증된 독립 위반만 collected=true. 누락을 violation=false로 대체하지 않는다.",
+    "late_failure": "후속 수집·세대 교체·정리·저장 실패는 앞선 독립 위반과 당시 계보를 삭제하지 않는다.",
+    "unsupported_implementation": "native 지원 자체가 없으면 UNIMPLEMENTED로 표시하고 연결 수에서 제외한다. 환경·정책·지원 센서·수집 입력 부족의 UNKNOWN과 구분한다."
+  },
+  "checks": {
+    "LIF-13": {
+      "executor": "engine_sensor",
+      "profile": "engine-sensor-weights-lifetime-v1",
+      "reused": ["tools.b_lif13_weights.project", "tools.b_lif13_weights_native"],
+      "required": ["실제 release 주체·허용 범위", "동일 daemon의 두 소비자 취득", "release 뒤 다른 소비자의 재취득", "fallback 승인 및 실제 소비", "기존 native 참조의 효과"],
+      "remaining": "기존 도구는 DECLARED claims와 native_measurement_verified=false를 보존한다. 권한·다른 소비자·fallback·native 참조의 검증 producer가 아직 없다."
+    },
+    "REQ-14": {
+      "executor": "engine_sensor",
+      "profile": "engine-sensor-distributed-attribution-v1",
+      "reused": ["guard.adapters.vllm_distributed_callback.DistributedCallbackObserver"],
+      "required": ["요청·모델·세대·rank", "중간 buffer 전달과 실제 소비", "완료·회수", "선정 출력 rank", "최종 출력의 클라이언트 요청 귀속"],
+      "remaining": "고정 MP sourcepoint 콜백 본체는 있으나 설치/prepared/parser, 다른 프로세스의 중간 buffer·출력 귀속 연결은 없다. decoder 점검으로 대신하지 않는다."
+    },
+    "REQ-15": {
+      "executor": "engine_sensor",
+      "profile": "engine-sensor-cache-group-v1",
+      "reused": ["guard.adapters.vllm_cache_callback.CacheCallbackObserver"],
+      "existing_policy_preserved": ["public_prefix_sharing_allowed", "isolated_cache_groups", "cache_identity_policy_ref"],
+      "required": ["검증 신원→공유 집단·salt 발급/정규화", "위조·누락 시험", "실제 key→entry→consumer", "모든 격리 집단 ordered pair와 정상 대조"],
+      "remaining": "lookup key/반환 block의 source-bound 콜백은 있으나 인증 신원 경계와 GPU 소비·prepared/parser 연결은 없다. salt 존재만으로 격리 판정하지 않는다."
+    },
+    "REQ-16": {
+      "executor": "engine_sensor",
+      "profile": "engine-sensor-cache-context-v1",
+      "reused": ["guard.adapters.vllm_cache_callback.CacheCallbackObserver"],
+      "existing_policy_preserved": ["required_cache_contexts"],
+      "required": ["같은 문맥 정상 재사용", "실제 객체/승인 세대 변경", "바뀐 문맥의 key 생성", "hit·실제 entry 소비", "새 문맥/비사용 독립 출력 대조"],
+      "remaining": "lookup 관측과 문맥 생성·소비를 연결하는 producer 및 profile installer가 없다. 임의 hash 충돌이나 key hash 존재를 위반·격리 증명으로 쓰지 않는다."
+    },
+    "REQ-17": {
+      "executor": "engine_sensor",
+      "profile": "engine-sensor-cache-timing-v1",
+      "reused": ["guard.executors.cache_observations.collect_timing_experiment", "guard.executors.cache_observations.collect_kubernetes_timing"],
+      "required": ["비공개 cache 존재와 요청·신원 대응", "미리 정한 독립 반복과 순서", "잡음/부하/정상 성능 대조", "완전 응답의 hit 필드 및 metrics 읽기 범위", "기업의 위협·반복·통계/허용 기준"],
+      "remaining": "반복·완전 응답 정제 본체는 있으나 private cache 귀속·독립 대조·통계 판정과 native 설치가 없다. 단순 지연 차로 유출 또는 안전을 선언하지 않는다."
+    },
+    "REQ-18": {
+      "executor": "engine_sensor",
+      "profile": "engine-sensor-slot-lifetime-v1",
+      "reused": ["tools.b_req18_slot", "guard.adapters.vllm_slot_mask"],
+      "required": ["slot 이동/재사용 계보", "현재 요청의 제한 상태", "실제 Sampler 인자와 최종 계산 소비", "동일 logits의 standalone 대조", "실제 backend"],
+      "remaining": "A_SOURCE_PINS/POINT_CONTRACTS/CALLBACK_CODE_SHA256 및 전용 native transport 계약이 미확정이다. 별도 CPU source-component 결과는 실제 배포 ENV로 옮기지 않는다."
+    },
+    "REQ-19": {
+      "executor": "engine_sensor",
+      "profile": "engine-sensor-kernel-bounds-v1",
+      "required": ["선정한 실제 kernel/source·GPU·dtype·shape 도달", "실제 buffer capacity와 접근 범위", "초기화된 영역과 실제 소비", "GPU 완료/오류", "같은 입력의 독립 대조 출력"],
+      "remaining": "해당 native producer와 선정 kernel 실험 입력이 없다. API·센서 횟수·집계 GPU 지표·다른 kernel 결과로 대체하지 않는다. 범위 밖 접근은 허용 수치 오차로 완화하지 않는다."
+    },
+    "REQ-20": {
+      "executor": "engine_sensor",
+      "profile": "engine-sensor-graph-lifetime-v1",
+      "reused": ["tools.b_req20_graph", "guard.adapters.vllm_graph_buffers"],
+      "required": ["현재 입력 갱신과 유효 길이", "실제 graph key/도달", "출력 소비", "GPU copy/stream 완료", "같은 buffer 세대의 재사용/덮어쓰기 순서", "독립 출력 대조"],
+      "remaining": "NATIVE_CONTRACT 미확정, 실제 graph 출력 소비·완료·buffer 세대 연결과 수치 대조가 없다. version 변화·주소 일치만으로 위반/충족 판정하지 않는다."
+    },
+    "REQ-21": {
+      "executor": "engine_sensor",
+      "profile": "engine-sensor-communication-buffer-v1",
+      "required": ["현재 process/rank/통신기 등록 세대", "등록 handle·buffer 범위", "graph·GPU 완료", "참조 해제와 재기동/재등록", "현재 실행의 실제 buffer 소비", "복구 후 정상 대조"],
+      "remaining": "실제 통신기 등록/참조/해제·재등록 효과 producer와 TP 시험 대상이 없다. 재기동은 외부 준비 절차이며 실행기가 엔진을 재기동하지 않는다."
+    }
+  }
+}

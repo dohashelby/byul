@@ -413,8 +413,9 @@ def test_pr171_historical_blob_failure_has_no_current_fallback(monkeypatch,failu
 
 def test_pr171_HTTP_known_common_scope_excludes_native_only_histories():
     assert tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS==frozenset({
-        'f277fecd6df1e59505c0ad731032593f6fb22885','df6255e96a877ebfbe185230ed87320aa84d2c30'})
+        'f277fecd6df1e59505c0ad731032593f6fb22885','df6255e96a877ebfbe185230ed87320aa84d2c30',
+        'adcde856375a4de43d4a5d789c00de875e43e321'})
     assert tool.HTTP_REVIEWED_COMMON_COMMIT=='f277fecd6df1e59505c0ad731032593f6fb22885'
     assert tool.REVIEWED_COMMON_COMMIT not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
     assert '9d8987a5a306ffce28fcb735e012c400589303f2' not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
-    assert len(tool.APPROVED_GATE_PROFILES)==4
+    assert len(tool.APPROVED_GATE_PROFILES)==5

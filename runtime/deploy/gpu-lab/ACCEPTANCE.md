@@ -36,6 +36,8 @@ AWS 묶음 `COST-PLAN.md`에 따라 먼저 dev(g6.2xlarge)에서 기능 연결�
 
 서버에서는 CLI의 패키지 메타데이터가 필요하므로 저장소 `runtime/`에서 `python3 -m venv .venv && .venv/bin/pip install --no-deps -e .`로 준비한다. 정책 묶음은 AWS 묶음 03 이후 `images.lock`의 엔진 digest를 확인해 서버 사본에서 만들고, 값이 채워진 intent를 `enforcement_intent`로 포함한다.
 
+`enforce render`의 Cilium 후보 중 `runtime-receiver-fixture-ingress`는 `test-receiver`를 `artifact-acquire` 송신만 허용한다. AWS-05의 `other-client`→receiver 양성 대조 연결을 막아 결과가 `unknown`이 되므로 **AWS-05 전에는 적용하지 않는다.** `runtime-acquire-egress`는 이번 시험에 `artifact-acquire` Pod가 없어 불필요하다. 이번 dev에는 Tetragon monitor 규칙 `runtime-tg-asset-01`·`runtime-tg-cache-01`·`runtime-tg-secret-01`과 Cilium `runtime-engine-egress`·`runtime-engine-ingress`·`runtime-gateway-egress`·`runtime-observer-0-egress`를 적용했다. AWS-06 전에 TG-CACHE-01을 감시하는 규칙을 적용해야 한다. 없으면 `/cache` 쓰기가 성공해도 `cache_tetragon` 증거가 없어 `unknown`이다.
+
 비파괴 사례부터 확인:
 
 ```bash
@@ -97,9 +99,40 @@ dev 결과와 수정 사항을 확인한 뒤 AWS 묶음 `COST-PLAN.md` 절차로
 
 AWS-04·05는 `connect_ex`가 반환한 errno와 이름을 기록한다. `EAGAIN`/`EWOULDBLOCK`/`ETIMEDOUT`만 차단 후보로 보고, `ECONNREFUSED` 등 다른 실패나 DNS 예외는 정책 차단 근거가 아니므로 `unknown`이다. AWS-04는 Gateway 이미지가 Python 기반이고 컨테이너 이름이 `gateway`임을 전제로 직통 probe 직전·직후 Gateway Pod 안에서 engine:8000 연결 성공을 확인한다. exec가 불가능하면 `unknown`이다. AWS-05는 팀 소유 `test-receiver` Pod IP만 대상으로 하며, `other-client`가 같은 receiver에 연결하지 못하면 `대조 실패: receiver에 닿지 않음`으로 `unknown`이다. 두 사례 모두 정확한 대상 흐름의 Hubble verdict가 `dropped`여야 하며 `DROPPED` 단독으로는 통과하지 않는다.
 
+AWS-04·05 통과만으로는 기본 NetworkPolicy와 runtime Cilium 규칙 중 어느 쪽이 패킷을 막았는지 구분할 수 없다. runtime 규칙만의 효과를 확인할 때는 기본 정책 `engine-runtime`·`engine-management-observer`의 원본을 절대 경로에 저장하고 spec·labels를 기록한 뒤, 짧은 통제 구간에 두 정책만 제거해 AWS-01·04·05를 재실행한다. 즉시 **절대 경로의 복원용 파일**로 복원하고 현재 객체의 spec·labels를 원본과 대조한다. 복원 스크립트에만 의존하지 말고 실제 적용·대조를 확인하며, 복원 후 AWS-01·04·05·06을 다시 실행한다. dev에서는 약 1분 제거 후 EAGAIN·Hubble dropped로 AWS-01·04·05가 통과했다. 자동 복원은 스크립트 경로 실수로 실패해 다음 명령에서 수동 복원했고 원본 spec·labels 일치를 확인했다. 모든 정책을 제거해 연결이 열리는지 보는 대조 시험은 아직 하지 않았다. 이 runtime 규칙만의 확인은 Pod 교체 전 결과다.
+
+복원용 파일 생성·검사가 실패하면 정책을 제거하지 않는다. 아래 복원 명령은 사례 실행 여부와 무관하게 수행하고, 적용 결과를 확인한다.
+
+```bash
+kubectl --context byul-aws-lab -n serving-lab get networkpolicy engine-runtime engine-management-observer -o json > /tmp/byul-aws-base-networkpolicies-original.json
+# 원본의 spec·metadata.labels를 대조용으로 보관하고, 복원용 파일에서는 서버 관리 metadata만 제외
+python3 -c 'import json,sys; d=json.load(sys.stdin); json.dump({"apiVersion":"v1","kind":"List","items":[{"apiVersion":i["apiVersion"],"kind":i["kind"],"metadata":{k:v for k,v in i["metadata"].items() if k in ("name","namespace","labels","annotations")},"spec":i["spec"]} for i in d["items"]]},sys.stdout)' < /tmp/byul-aws-base-networkpolicies-original.json > /tmp/byul-aws-base-networkpolicies-restore.json
+test -s /tmp/byul-aws-base-networkpolicies-restore.json
+# runtime Cilium 규칙이 적용됐는지 확인
+kubectl --context byul-aws-lab -n serving-lab delete networkpolicy engine-runtime engine-management-observer
+# 위 AWS-01·04·05 명령을 --cases AWS-01,AWS-04,AWS-05로 실행
+kubectl --context byul-aws-lab -n serving-lab apply -f /tmp/byul-aws-base-networkpolicies-restore.json
+kubectl --context byul-aws-lab -n serving-lab get networkpolicy engine-runtime engine-management-observer -o json
+# 두 객체의 spec·metadata.labels가 저장한 원본과 같은지 대조하고 AWS-01·04·05·06 재실행
+```
+
 `192.0.2.1`은 비라우팅 TEST-NET-1이고 이 AWS 묶음은 IMDSv2 hop limit 1이므로 external·IMDS connect는 egress 정책이 없어도 실패한다. 두 probe와 Hubble 행은 보고서의 보조 증거일 뿐 판정에서 제외한다. AWS-06의 모델 probe는 `EPERM`·`EACCES`·`EROFS`를 모두 `WRITE_DENIED`로 출력하지만 `EROFS`만 read-only mount 증거로 인정한다. 모델 폴더 소유자 10002와 엔진 UID 2000 때문에 mount가 read-only가 아니어도 `EACCES`가 날 수 있고, `EPERM`은 Tetragon 등 다른 집행일 수 있다. TG-ASSET-01은 RO mount가 hook보다 먼저 거부하면 미관측일 수 있지만, cache 쓰기 관측이 없으면 연결 근거 부족으로 `unknown`이다.
 
 AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. stop 뒤 heartbeat `stopped`와 `stale_after_s` 안 collector non-ok를 기다리고 중지 구간 정상 요청 1건의 HTTP status·reason_code는 보고서에만 남긴다. start 뒤 collector가 ok가 되면 `min(stale_after_s + 30초, 90초)` 재시도 창 안에 정상 chat 200·`ALLOWED`·전달 시도가 회복돼야 한다. 정상 SIGTERM의 gap 행은 보조다. AWS-08은 rollout과 target instance/history 확인 뒤, restart 이후 `engine_info`가 ok가 될 때까지 요청을 보내지 않는다. 그 뒤 90초 재시도 창에서 정상 chat 회복을 확인하고 끝까지 실패하면 마지막 status·reason_code를 남긴다. host snapshot stale은 `snapshot_note`에만 남으며 통과로 채우지 않는다. 도구는 정책이나 Deployment spec을 바꾸지 않고 AWS-06 임시 파일 외에는 삭제하지 않는다.
+
+## 2026-11-01 dev 실행 기록 (Claude 실행, Codex 교차 검수 전)
+
+g6.2xlarge·vLLM 0.31.0에서의 기능 연결 확인 1회이며 정식 평가가 아니다. Gateway `serving-gateway:rt-894dfe7`(코드 `894dfe7`), 묶음 `bundle-aws-lab-dev-894dfe7`의 네 역할(`gateway_policy`·`policy_approvals`·`target`·`enforcement_intent`)을 적용했다. 패킷 차단 주체는 Cilium이고 `/models`의 EROFS는 Kubernetes 읽기 전용 mount의 결과다. runtime은 규칙을 생성·확인·기록한다.
+
+| 단계 | 결과 | 보고서 |
+| --- | --- | --- |
+| 초기 | AWS-01~03 통과 | `aws-acceptance-20261101T073229Z-9585` |
+| 기본 NetworkPolicy | AWS-04·05 통과, AWS-06 `unknown`(TG-CACHE-01 없음) | `aws-acceptance-20261101T074054Z-11030` |
+| Tetragon monitor 3개 적용 | AWS-06 통과(`/models` EROFS, `/cache` TG-CACHE-01 기록) | `aws-acceptance-20261101T075604Z-13453` |
+| Cilium 4개 적용·기본 정책 잠시 제거·복원 | AWS-01·04·05 각각 통과; 복원 뒤 AWS-01·04·05·06 통과 | `aws-acceptance-20261101T075648Z-13909`·`aws-acceptance-20261101T075733Z-14397`·`aws-acceptance-20261101T075802Z-14966` |
+| 수집 중단·Pod 교체·교체 뒤 재검사 | AWS-07·08 통과, 교체 뒤 기본 정책+runtime 규칙에서 AWS-04·05 통과 | `aws-acceptance-20261101T113730Z-6730`·`aws-acceptance-20261101T114125Z-8766` |
+
+AWS-07은 stop/start 뒤 각각 약 4초에 feed error/ok, 복구 요청 200이었다. 중지 중 약 4초의 요청 1건은 200이었으나 판정 대상이 아니었다. stale 15초 뒤 503 hold는 이번에 관측하지 않았고 정상 종료라 gap 행도 없다. AWS-08은 Pod UID·instance 변경과 `instance_changed`/`pod_replaced` 이력, 복구 요청 200을 확인했다. 최종 증거는 `~/.local/state/serving-runtime/aws-lab/evidence/dev-20261101-stage6`, 요청·관측 화면 복사본은 `dev-20261101-dashboard-copy-final`이다. EC2 stopped를 확인했으며 컴퓨트는 약 1.5시간(추정)이다.
 
 ## 결과 반출과 비용 절약
 
@@ -109,7 +142,7 @@ AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. s
 
 ## Known gaps
 
-- 첫 AWS 실행에서 실제 Cilium 차단이 `connect_ex`의 시간 초과 errno(`EAGAIN`/`EWOULDBLOCK`/`ETIMEDOUT`)로 나타나는지 확인해야 한다. 다른 errno이면 도구는 보수적으로 `unknown`으로 둔다.
+- dev에서 `connect_ex`의 `EAGAIN`과 Hubble `dropped`를 확인했다. reference에서는 다시 확인하며 다른 errno이면 도구는 보수적으로 `unknown`으로 둔다.
 - Hubble `DROPPED`는 단독 차단 증명이 아니며, 시간 초과와 허용 경로 대조를 함께 확인한다.
 - AWS-06은 `EROFS`만 RO mount 증거로 쓴다. Tetragon 등이 `EPERM`을 내거나 UID/소유권 때문에 `EACCES`가 나면 RO 여부는 `unknown`이다.
-- vLLM v0.31.0 이미지의 실제 요청 ID 로그가 `Received request chatcmpl-<Gateway id>` 형식인지 첫 AWS-01에서 확인해야 한다. 다르면 엔진 수신을 추정하지 않고 `unknown`으로 남긴다.
+- dev AWS-01에서는 vLLM 0.31.0의 `Received request chatcmpl-<Gateway id>` 로그를 확인했다. reference에서도 형식을 다시 대조하며 다르면 엔진 수신을 추정하지 않고 `unknown`으로 남긴다.

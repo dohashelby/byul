@@ -1,9 +1,13 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-10-28
+최종 갱신: 2026-11-01
 
 ## 현재 단계
 
+- **2026-11-01 AWS GPU lab dev 기능 연결 확인(Claude 실행, Codex 교차 검수 전).** 기준 HEAD `144798c`, Gateway 이미지 `serving-gateway:rt-894dfe7`/코드 `894dfe7`, 정책 묶음 `bundle-aws-lab-dev-894dfe7`의 `gateway_policy`·`policy_approvals`·`target`·`enforcement_intent` 모두 적용. AWS g6.2xlarge, vLLM 0.31.0 이미지 digest `sha256:c1c9f6fd…67c3`에서 AWS-01~03 통과(`aws-acceptance-20261101T073229Z-9585`). **dev 1회 확인이며 정식 평가가 아니다.**
+- 기본 NetworkPolicy만으로 AWS-04·05 통과, TG-CACHE-01 부재로 AWS-06 `unknown`(`…T074054Z-11030`). Tetragon monitor 규칙 3개(`runtime-tg-asset-01`·`runtime-tg-cache-01`·`runtime-tg-secret-01`) 뒤 AWS-06 통과(`/models` EROFS, `/cache` TG-CACHE-01 기록; `…T075604Z-13453`). Cilium 규칙 4개(`runtime-engine-egress`·`runtime-engine-ingress`·`runtime-gateway-egress`·`runtime-observer-0-egress`) 뒤 AWS-01·04·05 통과(`…T075648Z-13909`). 기본 정책 `engine-runtime`·`engine-management-observer`를 원본 저장 후 약 1분 제거한 상태에서도 AWS-01·04·05 통과(EAGAIN + Hubble dropped; `…T075733Z-14397`); 스크립트 경로 실수로 자동 복원에 실패해 다음 명령에서 수동 복원했고 spec·labels 원본 일치를 확인했다. 복원 후 AWS-01·04·05·06 통과(`…T075802Z-14966`). 정책 전체 제거 대조는 미실행이다.
+- AWS-07·08 통과(`…T113730Z-6730`): collector stop/start 뒤 각각 약 4초에 feed error/ok, 복구 요청 200; 중지 중 약 4초의 요청 1건은 200으로 판정 제외, stale 15초 뒤 503 hold는 관측하지 않았고 정상 종료라 gap 행은 없다. rollout 뒤 Pod UID·instance 변경과 `instance_changed`/`pod_replaced` 이력, 복구 요청 200. 교체 뒤 기본 정책+runtime 규칙에서 AWS-04·05 재실행 통과(`…T114125Z-8766`); runtime 규칙만의 확인은 교체 전이다. 최종 증거 `~/.local/state/serving-runtime/aws-lab/evidence/dev-20261101-stage6`, 요청·관측 화면 복사본 `dev-20261101-dashboard-copy-final`; EC2 stopped 확인, 컴퓨트 약 1.5시간(추정).
+- platform 화면은 `RUNTIME_BASE_URL`의 Gateway 요청·관측 기록을 터널/복사본 Gateway로 확인했으나 `runtime-aws-acceptance/1.0` 판정표 화면은 없다. platform 승인 정책을 Gateway 정책 묶음으로 변환·생성·전달하는 코드는 없고 이번에는 수동 구성했다. 패킷 차단은 Cilium, `/models` 쓰기 거부는 Kubernetes 읽기 전용 mount이며 runtime은 규칙 생성·확인·기록을 맡는다. 다음은 **16 vCPU 승인 대기 중인 reference 재실행**과 대시보드 AWS 판정 화면 검토다.
 - 2026-10-21 개발계획서 v1.4(개정일 2026-10-21, 문서 상태: 개발 기준 설계안)가 전달되어 저장소에 반영됐다. 이는 문서 반영이며 구현·시험·팀 승인을 의미하지 않는다.
 - 2026-10-19 사용자 신가영이 작성한 개발계획서 v1.0 초안이 전달됐다. 저장소 사본은 `project-context/런타임_통제_개발계획서_v1.0.md`다.
 - 사용자 요청으로 직접 개발할 모듈의 언어는 Python으로 선택했다. 실제 환경·연동 계약·정책값 등 남은 결정은 별도 확인이 필요하다.
@@ -141,7 +145,7 @@
 
 ## 다음 준비 작업
 
-- 정식 GPU·Kubernetes 1.36.5 환경 검증, 정책 로드 상태의 Tetragon 재시작·업그레이드 재현 시험, 앞 단계(체크리스트·검증 도구) 담당자에게 받을 입력(실제 정책값·승인 구성·허용 통신 목적지·보호 경로·공통 결과 형식)이 필요하다. 설치·다운로드·운영 환경 변경은 자동으로 시작하지 않는다.
+- AWS dev 기능 연결 확인 뒤 16 vCPU 승인 대기 중인 reference 재실행과 platform AWS 판정 화면 검토가 다음 작업이다. 정식 Kubernetes 1.36.5 환경 검증, 정책 로드 상태의 Tetragon 재시작·업그레이드 재현, 앞 단계 담당자의 정책값·승인 구성·공통 결과 형식도 남았다.
 
 ## 갱신 방법
 

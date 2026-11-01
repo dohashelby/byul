@@ -261,6 +261,7 @@ def test_HTTP_unvalidated_after_sample_retains_null_in_storage_and_recovery(case
 @pytest.mark.parametrize('reviewed,mode', [
     (COMMON, 'normal'),
     ('df6255e96a877ebfbe185230ed87320aa84d2c30', 'cleanup-after-canary'),
+    ('adcde856375a4de43d4a5d789c00de875e43e321', 'cleanup-after-canary'),
     ('062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89', 'normal'),
     ('9d8987a5a306ffce28fcb735e012c400589303f2', 'normal'),
     (PRIVATE, 'normal'), (None, 'normal'), ([], 'normal'),
@@ -268,7 +269,7 @@ def test_HTTP_unvalidated_after_sample_retains_null_in_storage_and_recovery(case
 def test_HTTP_approved_feature_scope_preserves_selected_common_and_closes_others(case, monkeypatch, reviewed, mode):
     """source gate의 확정 proof/set만 EXAMPLE 주입하고 실제 공개 sample/report/validator를 소비한다."""
     world, created, window = configure(case, monkeypatch, mode)
-    approved = frozenset({COMMON, 'df6255e96a877ebfbe185230ed87320aa84d2c30'})
+    approved = frozenset({COMMON, 'df6255e96a877ebfbe185230ed87320aa84d2c30', 'adcde856375a4de43d4a5d789c00de875e43e321'})
     monkeypatch.setattr(helper, 'HTTP_APPROVED_REVIEWED_COMMON_COMMITS', approved, raising=False)
     monkeypatch.setattr(helper, 'verify_source', lambda: {'reviewed_common_commit': reviewed})
     observation = collect(case, window)

@@ -8,6 +8,7 @@ import {
   useEnvironmentRevision,
   usePolicyRevision,
   useSaveEnvironment,
+  useConfirmPolicy,
   useSavePolicy,
   type DocKind,
 } from "../api/hooks";
@@ -165,8 +166,66 @@ export function PolicyEditorPage() {
     <div className="page">
       <SaveBar onSave={onSave} pending={save.isPending} issues={issues} savedRev={savedRev} />
       <PolicyForm doc={doc} setDoc={setDoc} issues={issues} warnings={[]} isNew={isNew} />
+      {!isNew && id && latest !== null && current.data && (
+        <ConfirmPolicy id={id} revision={latest} stored={current.data.document} edited={doc} onConfirmed={(d) => setDoc({ ...d, status: "DRAFT" })} />
+      )}
       {!isNew && id && <History kind="policies" id={id} />}
     </div>
+  );
+}
+
+/** 저장된 최신 DRAFT 판본을 승인한다. 승인은 그 내용 그대로 새 CONFIRMED 판본을 만든다. */
+function ConfirmPolicy({ id, revision, stored, edited, onConfirmed }: { id: string; revision: number; stored: PolicyDoc; edited: PolicyDoc; onConfirmed: (d: PolicyDoc) => void }) {
+  const confirm = useConfirmPolicy(id);
+  const [approvedBy, setApprovedBy] = useState("");
+  const [approvalRef, setApprovalRef] = useState("");
+  const [issues, setIssues] = useState<FieldIssue[]>([]);
+  if (stored.status === "CONFIRMED") {
+    return (
+      <section className="card card-pad stack">
+        <h2>판본 승인</h2>
+        <span className="small">
+          판본 {revision} 승인됨 · {stored.approval?.approval_ref} · {stored.approval?.approved_by} · <Time iso={stored.approval?.approved_at ?? null} />
+        </span>
+      </section>
+    );
+  }
+  const dirty = JSON.stringify({ ...edited, status: "DRAFT" }) !== JSON.stringify(stored);
+  const onConfirm = () =>
+    confirm.mutate(
+      { revision, approved_by: approvedBy.trim(), approval_ref: approvalRef.trim() },
+      {
+        onSuccess: (res) => {
+          setIssues([]);
+          onConfirmed(res.saved.document);
+        },
+        onError: (e) => setIssues(rejected(e)),
+      },
+    );
+  return (
+    <section className="card card-pad stack">
+      <h2>판본 승인</h2>
+      <div className="small muted">저장된 판본 {revision}을 그대로 승인합니다. 자기 신고 기록이며 서명이 아닙니다.</div>
+      <div className="row wrap">
+        <label className="small">
+          승인 번호
+          <input className="input" value={approvalRef} placeholder="LAB-RUNTIME-SELF-001" onChange={(e) => setApprovalRef(e.target.value)} />
+        </label>
+        <label className="small">
+          <span className={p.req}>승인자</span>
+          <input className="input" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} />
+        </label>
+        <button type="button" className="btn" disabled={dirty || !approvedBy.trim() || !approvalRef.trim() || confirm.isPending} onClick={onConfirm}>
+          이 판본 승인
+        </button>
+      </div>
+      {dirty && <span className="small muted">바뀐 내용을 먼저 저장해야 승인할 수 있습니다.</span>}
+      {issues.map((i, k) => (
+        <span key={k} className="small" style={{ color: "var(--error)" }}>
+          {i.path}: {i.message}
+        </span>
+      ))}
+    </section>
   );
 }
 

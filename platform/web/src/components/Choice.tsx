@@ -58,6 +58,19 @@ function Checks({ value, options, onChange }: { value: unknown; options: Choice[
   );
 }
 
+/** 목록·표·서술 답의 '없음'·'모름'. 없음은 빈 값(empty)으로 저장한다. */
+function EmptyAnswer({ label, none, empty, value, onChange }: { label: string; none?: string; empty: unknown; value: unknown; onChange: (v: unknown) => void }) {
+  const isEmpty = value === "" || (Array.isArray(value) && !value.length) || (typeof value === "object" && value !== null && !Object.keys(value).length);
+  return (
+    <Segmented
+      label={`${label} 없음·모름`}
+      value={value === null ? null : isEmpty ? "none" : undefined}
+      onChange={(v) => onChange(v === "none" ? empty : v)}
+      options={[...(none ? [{ value: "none", label: none }] : []), UNKNOWN]}
+    />
+  );
+}
+
 function ListInput({ value, onChange, placeholder }: { value: unknown; onChange: (v: unknown) => void; placeholder?: string }) {
   const list = Array.isArray(value) ? (value as string[]) : [];
   const [draft, setDraft] = useState("");
@@ -159,7 +172,7 @@ export function KvInput({
 }
 
 /** 카탈로그 항목 하나를 그린다. */
-export function InputFieldView({ field, value, onChange, error }: { field: InputField; value: unknown; onChange: (v: unknown) => void; error?: string }) {
+export function InputFieldView({ field, value, onChange, error, required }: { field: InputField; value: unknown; onChange: (v: unknown) => void; error?: string; required?: boolean }) {
   const wide = field.kind === "multi" || field.kind === "kv" || field.kind === "list";
   let control;
   switch (field.kind) {
@@ -206,19 +219,34 @@ export function InputFieldView({ field, value, onChange, error }: { field: Input
       );
       break;
     case "text":
-      control = <input className="input" value={typeof value === "string" ? value : ""} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)} />;
+      control = (
+        <div className="stack" style={{ gap: 6 }}>
+          <input className="input" value={typeof value === "string" ? value : ""} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)} />
+          <EmptyAnswer label={field.label} none={field.none} empty="" value={value} onChange={onChange} />
+        </div>
+      );
       break;
     case "list":
-      control = <ListInput value={value} onChange={onChange} placeholder={field.placeholder} />;
+      control = (
+        <div className="stack" style={{ gap: 6 }}>
+          <ListInput value={value} onChange={onChange} placeholder={field.placeholder} />
+          <EmptyAnswer label={field.label} none={field.none} empty={[]} value={value} onChange={onChange} />
+        </div>
+      );
       break;
     case "kv":
-      control = <KvInput value={value} onChange={onChange} keyLabel={field.keyLabel} valueLabel={field.valueLabel} suggestions={field.suggestions} />;
+      control = (
+        <div className="stack" style={{ gap: 6 }}>
+          <KvInput value={value} onChange={onChange} keyLabel={field.keyLabel} valueLabel={field.valueLabel} suggestions={field.suggestions} />
+          <EmptyAnswer label={field.label} none={field.none} empty={{}} value={value} onChange={onChange} />
+        </div>
+      );
       break;
   }
   return (
     <div className={`${p.qField} ${wide ? p.qWide : ""}`}>
       <div className={p.qLabel}>
-        {field.label}
+        <span className={required ? p.req : undefined}>{field.label}</span>
         {value === undefined && <span className={p.qMissing}>미입력</span>}
       </div>
       {control}
@@ -243,7 +271,7 @@ export function NumberEntry({ def, value, onChange }: { def: NumberDef; value: P
   return (
     <div className={p.numRow}>
       <div className={p.qLabel}>
-        {def.label}
+        <span className={value?.status === "confirmed" ? p.req : undefined}>{def.label}</span>
         {value === undefined && <span className={p.qMissing}>미입력</span>}
         {def.measure && <span className={p.measureTag}>측정 필요</span>}
       </div>

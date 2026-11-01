@@ -85,6 +85,12 @@
 .field > textarea {
   color: var(--text);
 }
+/* 필수 입력 표시. 조건부 칸은 필수가 되는 조건일 때만 붙인다. */
+.req::after {
+  content: " *";
+  color: var(--required);
+  font-weight: 700;
+}
 .fieldError {
   color: var(--error);
   font-size: 12px;

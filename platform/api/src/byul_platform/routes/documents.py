@@ -1,4 +1,4 @@
-"""환경·정책 입력. 저장은 항상 새 판본이고, 이번 단계는 DRAFT로만 저장한다."""
+"""환경·정책 입력. 저장은 항상 새 판본이다. 정책은 DRAFT로 저장하고 승인으로만 CONFIRMED가 된다."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from ..diff import json_diff
 from ..models import (
     EnvironmentRevision,
     EnvironmentSaved,
+    PolicyConfirm,
     PolicyRevision,
     PolicySaved,
     RevisionDiff,
@@ -189,7 +190,7 @@ def policy_diff(doc_id: str, from_revision: int, to_revision: int, state: AppSta
 def save_policy(document: PolicyDoc = Body(...), state: AppState = Depends(get_state)) -> Any:
     doc = copy.deepcopy(document)
     if doc.get("status", "DRAFT") != "DRAFT":
-        return _reject("STATUS_NOT_ALLOWED", [{"path": "/status", "message": "이번 단계에서는 DRAFT로만 저장합니다(확정은 다음 단계)"}])
+        return _reject("STATUS_NOT_ALLOWED", [{"path": "/status", "message": "DRAFT로만 저장합니다. 확정은 판본 승인으로 합니다"}])
     doc["status"] = "DRAFT"
     doc["created_at"] = now_utc()
     doc_id = doc.get("policy_id")
@@ -218,4 +219,34 @@ def save_policy(document: PolicyDoc = Body(...), state: AppState = Depends(get_s
         return _reject("SCHEMA_INVALID", [{"path": "/policy_id", "message": "ID 형식이 맞지 않습니다"}])
     except RevisionExists:
         return _reject("BAD_REQUEST", [{"path": "/", "message": "같은 판본이 이미 있습니다. 다시 저장하세요"}], 409)
+    return JSONResponse(status_code=201, content={"saved": _revision_out(saved), "warnings": []})
+
+
+@router.post(
+    "/policies/{doc_id}/confirm",
+    status_code=201,
+    response_model=PolicySaved,
+    responses={409: {"model": SaveRejected}, 422: {"model": SaveRejected}},
+    tags=["policies"],
+)
+def confirm_policy(doc_id: str, body: PolicyConfirm, state: AppState = Depends(get_state)) -> Any:
+    """저장된 최신 DRAFT 판본을 내용 그대로 CONFIRMED 새 판본으로 남긴다. 승인 기록은 자기 신고다."""
+    revisions = _revisions(state.policies, doc_id)
+    if not revisions:
+        raise _not_found()
+    latest = revisions[-1]
+    if body.revision != latest.revision:
+        return _reject("BAD_REQUEST", [{"path": "/revision", "message": "최신 판본만 승인할 수 있습니다"}], 409)
+    if latest.document.get("status") != "DRAFT":
+        return _reject("STATUS_NOT_ALLOWED", [{"path": "/status", "message": "이미 승인된 판본입니다"}])
+    doc = copy.deepcopy(latest.document)
+    doc["status"] = "CONFIRMED"
+    doc["approval"] = {"approved_by": body.approved_by, "approved_at": now_utc(), "approval_ref": body.approval_ref}
+    errors = _schema_errors(state, "policy", doc)
+    if errors:
+        return _reject("SCHEMA_INVALID", errors)
+    try:
+        saved = state.policies.append(doc_id, latest.revision + 1, doc, status="CONFIRMED", label=str(doc.get("policy_version")))
+    except RevisionExists:
+        return _reject("BAD_REQUEST", [{"path": "/", "message": "같은 판본이 이미 있습니다. 다시 승인하세요"}], 409)
     return JSONResponse(status_code=201, content={"saved": _revision_out(saved), "warnings": []})

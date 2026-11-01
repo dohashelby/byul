@@ -335,6 +335,12 @@ class EnvironmentSaved(BaseModel):
     warnings: list[FieldIssue]
 
 
+class PolicyConfirm(BaseModel):
+    revision: int
+    approved_by: str
+    approval_ref: str
+
+
 class PolicySaved(BaseModel):
     saved: PolicyRevision
     warnings: list[FieldIssue]

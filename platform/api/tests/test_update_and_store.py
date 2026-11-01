@@ -193,6 +193,29 @@ def test_policy_saved_as_draft_only(store_client):
     assert r.json()["errors"][0]["path"] == "/environment_ref/sha256"
 
 
+def test_confirm_records_approval_on_latest_draft(store_client):
+    assert store_client.post("/api/environments", json=_env()).status_code == 201
+    saved = store_client.post("/api/policies", json=_policy()).json()["saved"]
+    doc_id, revision = saved["meta"]["doc_id"], saved["meta"]["revision"]
+    body = {"revision": revision, "approved_by": "보안 담당", "approval_ref": "APPROVAL-001"}
+
+    assert store_client.post(f"/api/policies/{doc_id}/confirm", json={**body, "revision": revision + 1}).status_code == 409
+    assert store_client.post(f"/api/policies/{doc_id}/confirm", json={**body, "approval_ref": "bad id"}).status_code == 422
+    assert store_client.post("/api/policies/missing/confirm", json=body).status_code == 404
+
+    r = store_client.post(f"/api/policies/{doc_id}/confirm", json=body)
+    assert r.status_code == 201
+    confirmed = r.json()["saved"]
+    assert confirmed["meta"]["revision"] == revision + 1
+    assert confirmed["meta"]["status"] == confirmed["document"]["status"] == "CONFIRMED"
+    assert confirmed["document"]["approval"]["approval_ref"] == "APPROVAL-001"
+    assert confirmed["document"]["policy_version"] == saved["document"]["policy_version"]
+
+    again = store_client.post(f"/api/policies/{doc_id}/confirm", json={**body, "revision": revision + 1})
+    assert again.status_code == 422
+    assert again.json()["code"] == "STATUS_NOT_ALLOWED"
+
+
 def test_bad_doc_ids_are_rejected(store_client):
     assert store_client.get("/api/environments/..%2F..%2Fetc/revisions").status_code == 404
     env = _env()

@@ -103,3 +103,11 @@ export function useSavePolicy() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["policies"] }),
   });
 }
+
+export function useConfirmPolicy(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { revision: number; approved_by: string; approval_ref: string }) => postJson<PolicySaved>(`/api/policies/${enc(id)}/confirm`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["policies"] }),
+  });
+}

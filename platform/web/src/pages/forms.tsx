@@ -26,6 +26,7 @@ import {
   ENV_CONDITIONS,
   FRAMEWORK_CHECKLIST_SHA256,
   SECURITY_FUNCTIONS,
+  isRequired,
   visible,
   type EnvCondition,
   type InputField,
@@ -379,11 +380,13 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
 
       <section id="env-basic" className="card card-pad stack">
         <h2>기본 정보·프로필</h2>
-        <div className="small muted">판본 번호와 생성 시각은 저장할 때 서버가 정합니다.</div>
+        <div className="small muted">
+          판본 번호와 생성 시각은 저장할 때 서버가 정합니다. <span className={p.req}>표시</span>는 필수 입력입니다.
+        </div>
         <div className={p.formGrid}>
-          {props.isNew ? <TextField ctx={ctx} path="/environment_id" label="환경 ID" /> : <ReadOnly label="환경 ID" value={doc.environment_id} />}
+          {props.isNew ? <TextField ctx={ctx} path="/environment_id" label="환경 ID" required /> : <ReadOnly label="환경 ID" value={doc.environment_id} />}
           <ReadOnly label="현재 판본" value={String(doc.revision)} />
-          <TextField ctx={ctx} path="/target/target_ref" label="대상 ID (target_ref)" hint="runtime 정책의 target_id와 같은 값" />
+          <TextField ctx={ctx} path="/target/target_ref" label="대상 ID (target_ref)" hint="runtime 정책의 target_id와 같은 값" required />
         </div>
         <div className={p.qGrid}>
           <div className={p.qField}>
@@ -400,6 +403,21 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
             />
             <span className="muted small">업데이트 평가에서는 현재·후보·시험 환경을 각각 다른 환경 ID로 저장합니다.</span>
           </div>
+          <div className={p.qField}>
+            <div className={p.qLabel}>
+              <span className={p.req}>입력값 상태</span>
+            </div>
+            <Segmented
+              label="입력값 상태"
+              value={profile?.profile_status ?? undefined}
+              onChange={(v) => setProfile((pr) => ({ ...pr, profile_status: (v ?? null) as string | null }))}
+              options={[
+                { value: "planned", label: "계획값" },
+                { value: "observed", label: "실제 확인값" },
+              ]}
+            />
+            <span className="muted small">계획값이면 비사용 근거가 있어도 비적용 후보가 되지 않습니다.</span>
+          </div>
         </div>
         {doc.data_origin === "EXAMPLE" && <Note>예시·시연용 자료로 저장돼 있습니다. 판정 근거로 쓰지 않습니다.</Note>}
         <FieldMessages ctx={ctx} path="/framework_profile" exact />
@@ -411,15 +429,15 @@ export function EnvironmentForm(props: FormProps<EnvironmentDoc>) {
 }
 
 /** 조건 카드 안에 그리는 계약 필드(target·deployment). 다른 구역에서 다시 묻지 않는다. */
-function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: EnvironmentDoc }) {
+function ContractFields({ cond, ctx, doc, values, update }: { cond: string; ctx: FormCtx; doc: EnvironmentDoc; values: Values; update: (next: Values) => void }) {
   switch (cond) {
     case "engine": {
       const name = doc.target.engine.name;
       return (
         <div className={p.formGrid}>
-          <SelectField ctx={ctx} path="/target/engine/name" label="엔진" options={Object.entries(ENGINE_NAME).map(([value, label]) => ({ value, label }))} />
-          <TextField ctx={ctx} path="/target/engine/version" label="버전" nullable suggestions={ENGINE_VERSIONS[name]} placeholder="목록에서 고르거나 입력 (모르면 비워 둠)" />
-          <TextField ctx={ctx} path="/target/engine/image_digest" label="이미지 digest" nullable placeholder="sha256:… (모르면 비워 둠)" />
+          <SelectField ctx={ctx} path="/target/engine/name" label="엔진" options={Object.entries(ENGINE_NAME).map(([value, label]) => ({ value, label }))} required />
+          <TextField ctx={ctx} path="/target/engine/version" label="버전" nullable required suggestions={ENGINE_VERSIONS[name]} placeholder="목록에서 고르거나 입력 (모르면 비워 둠)" />
+          <TextField ctx={ctx} path="/target/engine/image_digest" label="이미지 digest" nullable required placeholder="sha256:… (모르면 비워 둠)" />
           <TextField ctx={ctx} path="/target/engine/source_commit" label="소스 커밋" nullable placeholder="7~40자리 hex (모르면 비워 둠)" />
         </div>
       );
@@ -427,8 +445,8 @@ function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: E
     case "supply":
       return (
         <div className={p.formGrid}>
-          <TextField ctx={ctx} path="/target/model/id" label="모델 ID" nullable />
-          <TextField ctx={ctx} path="/target/model/revision" label="모델 판본" nullable />
+          <TextField ctx={ctx} path="/target/model/id" label="모델 ID" nullable required />
+          <TextField ctx={ctx} path="/target/model/revision" label="모델 판본" nullable required />
           <TextField ctx={ctx} path="/target/model/inventory_sha256" label="snapshot 목록 해시" nullable />
           <TextField ctx={ctx} path="/target/model/tokenizer_revision" label="토크나이저 판본" nullable />
         </div>
@@ -438,8 +456,8 @@ function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: E
         <div className={p.formGrid}>
           <NumberField ctx={ctx} path="/target/runtime/nodes" label="노드 수" optional />
           <NumberField ctx={ctx} path="/target/runtime/tp_groups" label="TP 그룹 수" optional />
-          <NumberField ctx={ctx} path="/target/runtime/gpu_count" label="GPU 수" nullable />
-          <TextField ctx={ctx} path="/target/runtime/gpu_model" label="GPU 모델" nullable suggestions={GPU_MODELS} placeholder="목록에서 고르거나 입력 (모르면 비워 둠)" />
+          <NumberField ctx={ctx} path="/target/runtime/gpu_count" label="GPU 수" nullable required />
+          <TextField ctx={ctx} path="/target/runtime/gpu_model" label="GPU 모델" nullable required suggestions={GPU_MODELS} placeholder="목록에서 고르거나 입력 (모르면 비워 둠)" />
           <TextField ctx={ctx} path="/target/runtime/driver" label="드라이버" nullable />
         </div>
       );
@@ -448,7 +466,9 @@ function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: E
       return (
         <div className="stack" style={{ gap: 10 }}>
           <div className={p.qField}>
-            <div className={p.qLabel}>배치 종류</div>
+            <div className={p.qLabel}>
+              <span className={p.req}>배치 종류</span>
+            </div>
             <Segmented
               label="배치 종류"
               value={deployment ? deployment.kind : deployment === null ? null : undefined}
@@ -461,6 +481,12 @@ function ContractFields({ cond, ctx, doc }: { cond: string; ctx: FormCtx; doc: E
             <div className={p.formGrid}>
               {deployment.kind === "kubernetes" && <TextField ctx={ctx} path="/deployment/kubernetes_context" label="Kubernetes context" nullable />}
               {deployment.kind === "kubernetes" && <TextField ctx={ctx} path="/deployment/namespace" label="namespace" nullable />}
+              {deployment.kind === "kubernetes" && (
+                <label className={p.field}>
+                  엔진 컨테이너
+                  <input className="input" value={typeof values.k8s_container === "string" ? values.k8s_container : ""} placeholder="engine" onChange={(e) => update(putKey(values, "k8s_container", e.target.value || undefined))} />
+                </label>
+              )}
               <NumberField ctx={ctx} path="/deployment/engine_port" label="엔진 포트" nullable />
               <NumberField ctx={ctx} path="/deployment/management_port" label="관리 포트" nullable />
               <LabelsField ctx={ctx} path="/deployment/gateway_labels" label="Gateway labels" />
@@ -568,6 +594,7 @@ function ClaimEditor({
     );
   }
   const set = (patch: Partial<Claim>) => onChange({ ...claim, ...patch });
+  const reviewed = claim.status === "reviewed";
   const engine = doc.target.engine;
   const stale = claim.target.environment_snapshot_sha256 != null && snapshot != null && claim.target.environment_snapshot_sha256 !== snapshot;
   const targetDiff =
@@ -590,11 +617,11 @@ function ClaimEditor({
       </div>
       <div className={p.qGrid}>
         <label className={p.field}>
-          검토자
+          <span className={reviewed ? p.req : undefined}>검토자</span>
           <input className="input" value={claim.reviewer ?? ""} onChange={(e) => set({ reviewer: e.target.value || null })} />
         </label>
         <label className={p.field}>
-          검토 시각
+          <span className={reviewed ? p.req : undefined}>검토 시각</span>
           <input
             className="input"
             type="datetime-local"
@@ -603,7 +630,9 @@ function ClaimEditor({
           />
         </label>
         <div className={p.qField}>
-          <div className={p.qLabel}>확인한 사실</div>
+          <div className={p.qLabel}>
+            <span className={reviewed ? p.req : undefined}>확인한 사실</span>
+          </div>
           <div className={p.checks}>
             <label className={`${p.check} ${claim.disabled ? p.checkOn : ""}`}>
               <input type="checkbox" checked={claim.disabled === true} onChange={(e) => set({ disabled: e.target.checked ? true : null })} />
@@ -618,12 +647,13 @@ function ClaimEditor({
       </div>
       <InputFieldView
         field={{ key: "references", label: "확인 자료 (유효 설정·등록 경로·소비 경로)", kind: "list", placeholder: "예: deploy/values.yaml#L40" }}
+        required={reviewed}
         value={claim.references.length ? claim.references : undefined}
         onChange={(v) => set({ references: Array.isArray(v) ? (v as string[]) : [] })}
       />
       <div className={p.claimTarget}>
         <div className="small">
-          <span className="muted">대상 </span>
+          <span className={`muted ${reviewed ? p.req : ""}`}>대상</span>{" "}
           <span className="mono">
             {[claim.target.engine, claim.target.version, claim.target.source_commit?.slice(0, 12), claim.target.image_digest?.slice(0, 19)].filter(Boolean).join(" · ") || "미기록"}
           </span>
@@ -727,7 +757,7 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
             {cond.runtime && <div>byul runtime: {cond.runtime}</div>}
           </Note>
         )}
-        <ContractFields cond={cond.key} ctx={ctx} doc={doc} />
+        <ContractFields cond={cond.key} ctx={ctx} doc={doc} values={values} update={update} />
         <div className={p.qGrid}>
           {cond.fields
             .filter((f) => visible(f, values, others))
@@ -736,6 +766,7 @@ function ConditionCard({ cond, done, total, edit }: { cond: EnvCondition; done: 
                 key={f.key}
                 field={f}
                 value={values[f.key]}
+                required={isRequired(f, values, others)}
                 error={issuesAt(ctx.issues, `${path}/values/${f.key}`)[0]?.message}
                 onChange={(v) => update(putKey(values, f.key, v))}
               />
@@ -791,11 +822,17 @@ function showDetail(entry: ReqEntry | undefined): boolean {
   return entry?.decision === "change" || Object.keys(entry?.values ?? {}).length > 0 || Object.keys(entry?.numbers ?? {}).length > 0;
 }
 
-function reqProgress(req: Requirement, entry: ReqEntry | undefined): [number, number] {
+/** 지금 답에서 보일 수치 칸. 이미 저장된 수치는 숨기지 않는다. */
+function shownNumbers(req: Requirement, values: Values, numbers: Record<string, PolicyNumber>, others: Record<string, Values | undefined>) {
+  return req.numbers.filter((d) => visible(d, values, others) || numbers[d.key]);
+}
+
+function reqProgress(req: Requirement, entry: ReqEntry | undefined, others: Record<string, Values | undefined>): [number, number] {
   if (!showDetail(entry)) return [entry?.decision ? 1 : 0, 1];
-  const [d, t] = filled(req.fields, entry?.values ?? {});
-  const nums = req.numbers.filter((x) => entry?.numbers[x.key]).length;
-  return [d + nums + (entry?.decision ? 1 : 0), t + req.numbers.length + 1];
+  const [d, t] = filled(req.fields, entry?.values ?? {}, others);
+  const shown = shownNumbers(req, entry?.values ?? {}, entry?.numbers ?? {}, others);
+  const nums = shown.filter((x) => entry?.numbers[x.key]).length;
+  return [d + nums + (entry?.decision ? 1 : 0), t + shown.length + 1];
 }
 
 /** 저장할 때마다 정책 판본을 올린다. 끝의 숫자를 올리고, 숫자가 없으면 붙인다. */
@@ -819,7 +856,7 @@ function GatewayFields({ req, ctx }: { req: string; ctx: FormCtx }) {
   if (req === "1.2") {
     return (
       <div className={p.formGrid}>
-        <ListField ctx={ctx} path="/runtime/gateway/allowed_models" label="허용 모델" />
+        <ListField ctx={ctx} path="/runtime/gateway/allowed_models" label="허용 모델" required />
       </div>
     );
   }
@@ -828,7 +865,7 @@ function GatewayFields({ req, ctx }: { req: string; ctx: FormCtx }) {
     <div className="stack" style={{ gap: 10 }}>
       <div className={p.formGrid}>
         <NumberField ctx={ctx} path="/runtime/gateway/output_default_tokens" label="기본 출력 토큰" />
-        <NumberField ctx={ctx} path="/runtime/gateway/output_max_tokens" label="최대 출력 토큰" />
+        <NumberField ctx={ctx} path="/runtime/gateway/output_max_tokens" label="최대 출력 토큰" required />
         <NumberField ctx={ctx} path="/runtime/gateway/max_body_bytes" label="최대 본문 바이트" />
         <NumberField ctx={ctx} path="/runtime/gateway/max_context_tokens" label="최대 context 토큰 (입력+출력)" nullable />
         <NumberField ctx={ctx} path="/runtime/gateway/max_n" label="max_n (선택)" optional />
@@ -872,7 +909,12 @@ function isEditableRule(rule: ExtraRule): boolean {
 }
 
 function BoundInput({ label, value, onChange }: { label: string; value: unknown; onChange: (v: number | undefined) => void }) {
-  return <input className="input" type="number" aria-label={label} placeholder={label} style={{ maxWidth: 120 }} value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} />;
+  return (
+    <>
+      <span className="small muted">{label}</span>
+      <input className="input" type="number" aria-label={label} style={{ maxWidth: 120 }} value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} />
+    </>
+  );
 }
 
 /** chat 요청에서 엔진에 더 넘길 필드(runtime.gateway.extra_fields). 기본 profile은 범위가 있는 validate 규칙만 받는다. */
@@ -963,6 +1005,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
   const envId = doc.environment_ref?.id ?? null;
   const envRevs = useDocRevisions("environments", envId);
   const baseEnv = useEnvironmentRevision(envId, doc.environment_ref?.revision ?? null).data?.document;
+  const envAnswers = { ...conditionValues(baseEnv ? profileOf(baseEnv) : null), facts: Object.fromEntries(Object.entries(baseEnv?.facts ?? {}).map(([k, f]) => [k, f?.value])) };
   const fv = valuesOf(doc);
   const setFv = (fn: (v: FrameworkValues) => FrameworkValues) => setDoc({ ...doc, framework_values: fn(fv ?? emptyValues()) } as PolicyDoc);
   const [filter, setFilter] = useState<"all" | "undecided" | "measure">("all");
@@ -992,6 +1035,8 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
   // 근거 칸은 문서에 하나다. 계약의 요구별 basis에 같은 값을 넣어 저장한다.
   const entries = Object.values(fv?.requirements ?? {});
   const basis = entries.find((e) => e.basis)?.basis ?? null;
+  // 프레임워크는 변경한 값에 근거를 요구한다.
+  const changed = entries.some((e) => e.decision === "change");
 
   return (
     <div className="stack">
@@ -1007,11 +1052,11 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
       <section id="pol-basic" className="card card-pad stack">
         <h2>기본 정보·유효 기간</h2>
         <div className="small muted">
-          {props.isNew ? "판본은 1부터 시작하고 저장할 때마다 자동으로 올라갑니다." : `현재 판본 ${doc.policy_version}. 저장하면 다음 판본의 초안(DRAFT)이 됩니다.`}
+          {props.isNew ? "판본은 1부터 시작하고 저장할 때마다 자동으로 올라갑니다." : `현재 판본 ${doc.policy_version}. 저장하면 다음 판본의 초안(DRAFT)이 됩니다.`} <span className={p.req}>표시</span>는 필수 입력입니다.
         </div>
         {doc.data_origin === "EXAMPLE" && <Note>예시·시연용 자료로 저장돼 있습니다. 판정 근거로 쓰지 않습니다.</Note>}
         <div className={p.formGrid}>
-          {props.isNew ? <TextField ctx={ctx} path="/policy_id" label="정책 ID" /> : <ReadOnly label="정책 ID" value={doc.policy_id} />}
+          {props.isNew ? <TextField ctx={ctx} path="/policy_id" label="정책 ID" required /> : <ReadOnly label="정책 ID" value={doc.policy_id} />}
           <label className={p.field}>
             기준 환경
             <select
@@ -1031,7 +1076,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
             </select>
             <FieldMessages ctx={ctx} path="/environment_ref" />
           </label>
-          {doc.environment_ref ? <ReadOnly label="대상 ID (기준 환경)" value={doc.target_ref} /> : <TextField ctx={ctx} path="/target_ref" label="대상 ID (target_ref)" />}
+          {doc.environment_ref ? <ReadOnly label="대상 ID (기준 환경)" value={doc.target_ref} /> : <TextField ctx={ctx} path="/target_ref" label="대상 ID (target_ref)" required />}
           {doc.environment_ref && (envRevs.data?.items.length ?? 0) > 1 && (
             <label className={p.field}>
               환경 판본
@@ -1051,17 +1096,19 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
               </select>
             </label>
           )}
-          <DateTimeField ctx={ctx} path="/validity/valid_from" label="유효 시작" />
+          <DateTimeField ctx={ctx} path="/validity/valid_from" label="유효 시작" required />
           <DateTimeField ctx={ctx} path="/validity/valid_until" label="유효 끝" />
         </div>
       </section>
 
       <section id="pol-approval" className="card card-pad stack">
         <h2>승인 조건</h2>
-        <div className="small muted">누가·언제 승인했는지(approval)는 CONFIRMED 전환 때 기록합니다. 여기에는 무엇을 어떤 조건으로 승인하는지 적습니다. 서명이 아닙니다.</div>
+        <div className="small muted">여기에는 무엇을 어떤 조건으로 승인하는지 적습니다. 승인 번호와 승인자는 저장한 뒤 아래 '판본 승인'에서 기록합니다. 서명이 아닙니다.</div>
         <div className={p.qGrid}>
           <div className={p.qField}>
-            <div className={p.qLabel}>승인 결정</div>
+            <div className={p.qLabel}>
+              <span className={p.req}>승인 결정</span>
+            </div>
             <Segmented
               label="승인 결정"
               value={fv?.approval_terms.decision ?? undefined}
@@ -1074,18 +1121,20 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
             />
           </div>
           <label className={p.field}>
-            승인 범위
+            <span className={p.req}>승인 범위</span>
             <input
               className="input"
+              aria-required
               value={fv?.approval_terms.scope ?? ""}
               placeholder="예: 운영 서비스 A의 현재 환경, 보호 요구 전체"
               onChange={(e) => setFv((x) => ({ ...x, approval_terms: { ...x.approval_terms, scope: e.target.value || null } }))}
             />
           </label>
           <label className={p.field}>
-            근거 문서
+            <span className={changed ? p.req : undefined}>근거 문서</span>
             <input
               className="input"
+              aria-required={changed}
               value={basis ?? ""}
               disabled={!entries.length}
               placeholder={entries.length ? "예: 보안정책 v3 §4" : "보호 요구를 하나 이상 결정하면 입력할 수 있습니다"}
@@ -1097,9 +1146,10 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
           </label>
           {fv?.approval_terms.decision === "conditional" && (
             <label className={p.field} style={{ gridColumn: "1 / -1" }}>
-              승인 조건
+              <span className={p.req}>승인 조건</span>
               <textarea
                 className="input"
+                aria-required
                 rows={2}
                 value={fv.approval_terms.conditions ?? ""}
                 placeholder="조건부 채택의 조건과 기한"
@@ -1126,7 +1176,15 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
           />
         </div>
         <div className="small muted">
-          요구마다 기존 승인 정책을 <b>유지</b>·<b>변경</b>·<b>확인 필요</b> 중에서 고릅니다. 구체적인 값은 변경을 고르면 나타납니다. 수치는 확정·측정 후 결정·미정 상태로 남기고, 근거 없는 숫자를 채우지 않습니다. 결정 {totals.decided}/{active.length} · 측정 후 결정 수치 {totals.measure}개
+          {props.isNew ? (
+            <>
+              요구마다 <b>새로 정함</b>·<b>확인 필요</b> 중에서 고릅니다. 구체적인 값은 새로 정함을 고르면 나타납니다.
+            </>
+          ) : (
+            <>
+              요구마다 기존 승인 정책을 <b>유지</b>·<b>변경</b>·<b>확인 필요</b> 중에서 고릅니다. 구체적인 값은 변경을 고르면 나타납니다.
+            </>
+          )} 수치는 확정·측정 후 결정·미정 상태로 남기고, 근거 없는 숫자를 채우지 않습니다. 결정 {totals.decided}/{active.length} · 측정 후 결정 수치 {totals.measure}개
         </div>
         {SECURITY_FUNCTIONS.map((fn) => {
           const reqs = fn.requirements.filter((r) => {
@@ -1154,6 +1212,7 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
                   ctx={ctx}
                   isNew={props.isNew}
                   emptyModels={!doc.runtime.gateway.allowed_models.length}
+                  envAnswers={envAnswers}
                   onChange={(next) => setFv((x) => ({ ...x, requirements: putKey(x.requirements, r.id, next && next.basis === null ? { ...next, basis } : next) as FrameworkValues["requirements"] }))}
                 />
               ))}
@@ -1185,14 +1244,15 @@ export function PolicyForm(props: FormProps<PolicyDoc>) {
   );
 }
 
-function RequirementCard({ req, entry, ctx, isNew, emptyModels, onChange }: { req: Requirement; entry: ReqEntry | undefined; ctx: FormCtx; isNew: boolean; emptyModels: boolean; onChange: (e: ReqEntry | undefined) => void }) {
+function RequirementCard({ req, entry, ctx, isNew, emptyModels, envAnswers, onChange }: { req: Requirement; entry: ReqEntry | undefined; ctx: FormCtx; isNew: boolean; emptyModels: boolean; envAnswers: Record<string, Values | undefined>; onChange: (e: ReqEntry | undefined) => void }) {
   const cur = entry ?? emptyReq();
   const update = (patch: Partial<ReqEntry>) => {
     const next = { ...cur, ...patch };
     const empty = next.decision === null && !Object.keys(next.values).length && !Object.keys(next.numbers).length && next.note === null;
     onChange(empty ? undefined : next);
   };
-  const [done, total] = reqProgress(req, entry);
+  const [done, total] = reqProgress(req, entry, envAnswers);
+  const numbers = shownNumbers(req, cur.values, cur.numbers, envAnswers);
   const path = `/framework_values/requirements/${req.id}`;
   const errs = issuesAt(ctx.issues, path);
   const hasError = errs.length > 0 || (GATEWAY_PATHS[req.id] ?? []).some((k) => issuesAt(ctx.issues, `/runtime/gateway/${k}`).length > 0);
@@ -1220,14 +1280,16 @@ function RequirementCard({ req, entry, ctx, isNew, emptyModels, onChange }: { re
         <GatewayFields req={req.id} ctx={ctx} />
         {!req.fixed && (
           <div className={p.qField}>
-            <div className={p.qLabel}>기존 승인 정책 처리</div>
+            <div className={p.qLabel}>
+              <span className={p.req}>기존 승인 정책 처리</span>
+            </div>
             <Segmented
               label="기존 승인 정책 처리"
               value={cur.decision ?? undefined}
               onChange={(v) => update({ decision: (v ?? null) as string | null })}
               options={[
-                { value: "keep", label: "유지" },
-                { value: "change", label: isNew ? "변경·새로 정함" : "변경" },
+                ...(isNew ? [] : [{ value: "keep", label: "유지" }]),
+                { value: "change", label: isNew ? "새로 정함" : "변경" },
                 { value: "needs_confirmation", label: "확인 필요" },
               ]}
             />
@@ -1236,22 +1298,23 @@ function RequirementCard({ req, entry, ctx, isNew, emptyModels, onChange }: { re
         {showDetail(entry) && req.fields.length > 0 && (
           <div className={p.qGrid}>
             {req.fields
-              .filter((f) => visible(f, cur.values))
+              .filter((f) => visible(f, cur.values, envAnswers) || cur.values[f.key] !== undefined)
               .map((f) => (
                 <InputFieldView
                   key={f.key}
                   field={f}
                   value={cur.values[f.key]}
+                  required={isRequired(f, cur.values, envAnswers)}
                   error={issuesAt(ctx.issues, `${path}/values/${f.key}`)[0]?.message}
                   onChange={(v) => update({ values: putKey(cur.values, f.key, v) })}
                 />
               ))}
           </div>
         )}
-        {showDetail(entry) && req.numbers.length > 0 && (
+        {showDetail(entry) && numbers.length > 0 && (
           <div className="stack" style={{ gap: 8 }}>
             <div className={p.qLabel}>수치·기한</div>
-            {req.numbers.map((d) => (
+            {numbers.map((d) => (
               <NumberEntry
                 key={d.key}
                 def={d}

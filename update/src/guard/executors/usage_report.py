@@ -11,6 +11,7 @@ import time
 
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.docker import Docker
+from .boundary_egress import BoundaryEgressExecutor
 from .content_common import bounded_probe, control_state
 from .http_common import HttpCheckExecutor, functional_requests
 from .owned_capture import read_owned_jsonl
@@ -206,4 +207,20 @@ class UsageReportExecutor(HttpCheckExecutor):
         draft = super()._finish(ctx)
         if ctx._usage_gap:
             draft.status = ExecStatus.ABORTED
+        return draft
+
+
+class BoundaryEgressDispatch(BoundaryEgressExecutor):
+    """boundary_egress:real 진입점. boundary_egress.py bytes는 기존 고정값을 유지하므로 프로파일 분기를 여기 둔다."""
+
+    def validate_policy(self, check, values):
+        if getattr(check, "collection_profile", None) in PROFILES:
+            validate_policy(check, values)
+
+    def run(self, check, env, policy_values, adapter, workdir):
+        if getattr(check, "collection_profile", None) not in PROFILES:
+            return super().run(check, env, policy_values, adapter, workdir)
+        executor = UsageReportExecutor(self.cfg, docker=self.docker)
+        draft = executor.run(check, env, policy_values, adapter, workdir)
+        self.version = executor.version
         return draft

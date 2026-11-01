@@ -219,20 +219,7 @@ class BoundaryEgressExecutor:
         self.cfg, self.injected = cfg, docker is not None
         self.docker = docker if docker is not None else Docker("egress" + secrets.token_hex(6))
 
-    def validate_policy(self, check, values):
-        from . import usage_report
-        if getattr(check, "collection_profile", None) in usage_report.PROFILES:
-            usage_report.validate_policy(check, values)
-        else:
-            normalize_policy(values)
-
     def run(self, check, env, policy_values, adapter, workdir):
-        from . import usage_report
-        if getattr(check, "collection_profile", None) in usage_report.PROFILES:
-            executor = usage_report.UsageReportExecutor(self.cfg, docker=self.docker)
-            draft = executor.run(check, env, policy_values, adapter, workdir)
-            self.version = executor.version
-            return draft
         rule = normalize_policy(policy_values)
         _require(type(self.cfg) is dict and not set(self.cfg) - {
             "target", "receiver_target", "connect_timeout", "max_duration_seconds"}, "EGRESS_POLICY_BINDING_UNVERIFIED")

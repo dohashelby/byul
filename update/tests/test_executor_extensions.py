@@ -15,7 +15,6 @@ from guard.core.select import select
 from guard.executors import (ipc_trust_scope, log_collection_gap, record_transport, registry, request_field_probe,
                              usage_report)
 from guard.executors.api_transport import APITransportExecutor
-from guard.executors.boundary_egress import BoundaryEgressExecutor
 from guard.executors.input_validation import InputValidationExecutor
 from guard.executors.log_integrity import LogIntegrityExecutor
 from guard.executors.unix_ipc import UnixIPCExecutor
@@ -190,7 +189,7 @@ def usage_run(tmp_path, cid, docker, values, monkeypatch, sink=None):
     probe = lambda n, rs, t: [completion_response(r) for r in rs]
     monkeypatch.setattr(REAL_USAGE, "_sink_rows", lambda self, ctx: sink.pop(0) if sink else None)
     monkeypatch.setattr(usage_report, "UsageReportExecutor", lambda c, docker=None: REAL_USAGE(c, container_probe=probe, docker=docker))
-    return pipeline(tmp_path, cid, lambda cfg: BoundaryEgressExecutor({**cfg, "usage_wait_seconds": 0}, docker=docker), values)
+    return pipeline(tmp_path, cid, lambda cfg: usage_report.BoundaryEgressDispatch({**cfg, "usage_wait_seconds": 0}, docker=docker), values)
 
 
 def receipt(fields, sink="sink"):

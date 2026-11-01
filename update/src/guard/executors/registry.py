@@ -28,7 +28,7 @@ from .request_binding import RequestBindingExecutor
 from .kubernetes_request_binding import KubernetesRequestBindingExecutor
 from .log_integrity import LogIntegrityExecutor
 from .unix_ipc import UnixIPCExecutor
-from .boundary_egress import BoundaryEgressExecutor
+from .usage_report import BoundaryEgressDispatch
 from .api_transport import APITransportExecutor
 from .kubernetes_api_transport import KubernetesAPITransportExecutor
 from .kubernetes_route_record import KubernetesRouteRecordExecutor
@@ -97,7 +97,7 @@ EXECUTORS: dict[str, Callable[[dict[str, Any]], Executor]] = {
     "request_binding:kubernetes": lambda cfg: KubernetesRequestBindingExecutor(cfg.get("request_binding", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "log_integrity:real": lambda cfg: LogIntegrityExecutor(cfg.get("log_integrity", {}), environ=cfg.get("_runtime_environ")),
     "unix_ipc:real": lambda cfg: UnixIPCExecutor(cfg.get("unix_ipc", {}), environ=cfg.get("_runtime_environ")),
-    "boundary_egress:real": lambda cfg: BoundaryEgressExecutor(cfg.get("boundary_egress", {})),
+    "boundary_egress:real": lambda cfg: BoundaryEgressDispatch(cfg.get("boundary_egress", {})),
     "api_transport:real": lambda cfg: APITransportExecutor(cfg.get("api_transport", {})),
     "api_transport:kubernetes": lambda cfg: KubernetesAPITransportExecutor(cfg.get("api_transport", {}), environ=cfg.get("_runtime_environ"), expected_target_sha256=cfg.get("_kubernetes_target_sha256")),
     "structured_tools_cpu:reference-cpu": lambda cfg: StructuredToolsCPUExecutor(cfg.get("structured_tools_cpu", {})),

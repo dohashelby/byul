@@ -65,14 +65,16 @@ _EXTERNAL_TEST_IP = "192.0.2.1"
 _IMDS_IP = "169.254.169.254"
 _MODEL = "test-model"
 TCP_PROBE_CODE = (
-    "import socket,sys; s=socket.socket(); s.settimeout(3); "
+    "import errno,socket,sys; s=socket.socket(); s.settimeout(3); "
     "r=s.connect_ex((sys.argv[1],int(sys.argv[2]))); s.close(); "
-    "print('CONNECT_FAILED' if r else 'CONNECTED'); sys.exit(0 if r else 1)"
+    "name=errno.errorcode.get(r,'UNKNOWN'); "
+    "print(('CONNECT_FAILED errno=%d name=%s' % (r,name)) if r else 'CONNECTED'); "
+    "sys.exit(0 if r else 1)"
 )
 WRITE_DENY_CODE = (
     "import errno,os,sys; p=sys.argv[1]; "
     "\ntry:\n f=open(p,'xb'); f.close()\n"
-    "except OSError as e:\n print('WRITE_DENIED' if e.errno in (errno.EPERM,errno.EACCES,errno.EROFS) else 'WRITE_ERROR'); sys.exit(0 if e.errno in (errno.EPERM,errno.EACCES,errno.EROFS) else 2)\n"
+    "except OSError as e:\n name=errno.errorcode.get(e.errno,'UNKNOWN'); marker='WRITE_DENIED' if e.errno in (errno.EPERM,errno.EACCES,errno.EROFS) else 'WRITE_ERROR'; print('%s errno=%d name=%s' % (marker,e.errno,name)); sys.exit(0 if marker == 'WRITE_DENIED' else 2)\n"
     "else:\n os.unlink(p); print('WRITE_SUCCEEDED'); sys.exit(1)"
 )
 CACHE_WRITE_CODE = (
@@ -263,23 +265,31 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
 
     checks: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         "AWS-01": (
-            ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match"),
-            ("http_200", "valid_completion", "record_allowed", "delivery_attempted"),
+            ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match", "stream_ok"),
+            ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "stream_ok"),
         ),
         "AWS-02": (
             ("auth_codes", "records_denied", "not_delivered", "engine_log_absent", "engine_log_format_confirmed"),
             ("auth_codes", "records_denied", "not_delivered", "engine_log_absent"),
         ),
         "AWS-03": (
-            ("policy_limit_read", "http_403", "reason_code", "not_delivered"),
-            ("http_403", "reason_code", "not_delivered"),
+            (
+                "policy_limit_read",
+                "boundary_allowed",
+                "http_403",
+                "reason_code",
+                "not_delivered",
+                "engine_log_absent",
+                "engine_log_format_confirmed",
+            ),
+            ("boundary_allowed", "http_403", "reason_code", "not_delivered", "engine_log_absent"),
         ),
         "AWS-04": (
-            ("direct_failed", "gateway_control_200", "hubble_observed"),
+            ("direct_failed", "gateway_tcp_control", "gateway_control_200", "hubble_dropped"),
             ("direct_failed", "gateway_control_200"),
         ),
         "AWS-05": (
-            ("engine_receiver_failed", "receiver_control_connected", "receiver_hubble"),
+            ("engine_receiver_failed", "receiver_control_connected", "receiver_hubble_dropped"),
             ("engine_receiver_failed", "receiver_control_connected"),
         ),
         "AWS-06": (
@@ -287,8 +297,8 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
             ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed"),
         ),
         "AWS-07": (
-            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered"),
-            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered"),
+            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered", "inference_recovered"),
+            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered", "inference_recovered"),
         ),
         "AWS-08": (
             (
@@ -473,14 +483,16 @@ class AWSAcceptance:
         )
         return response
 
-    def _get_json(self, path: str) -> tuple[HTTPResponse, dict[str, Any] | None]:
+    def _get_json(
+        self, path: str, *, timeout: float = 30
+    ) -> tuple[HTTPResponse, dict[str, Any] | None]:
         response = self._request(
-            "GET", path, token=self.tokens["RUNTIME_VIEWER_TOKEN"], timeout=30
+            "GET", path, token=self.tokens["RUNTIME_VIEWER_TOKEN"], timeout=timeout
         )
         return response, _json_object(response.body)
 
     def _completion(
-        self, *, token: str | None, max_tokens: int = 8
+        self, *, token: str | None, max_tokens: int = 8, timeout: float = 300
     ) -> tuple[HTTPResponse, str | None, bool]:
         response = self._request(
             "POST",
@@ -491,7 +503,7 @@ class AWSAcceptance:
                 "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
                 "max_tokens": max_tokens,
             },
-            timeout=300,
+            timeout=timeout,
         )
         request_id = response.headers.get("X-Request-ID") or response.headers.get("x-request-id")
         valid = False
@@ -505,10 +517,48 @@ class AWSAcceptance:
                 valid = isinstance(content, str) and bool(content.strip())
         return response, request_id if isinstance(request_id, str) else None, valid
 
-    def _detail(self, request_id: str | None) -> dict[str, Any] | None:
+    def _stream_completion(
+        self, *, token: str
+    ) -> tuple[HTTPResponse, str | None, bool, bool]:
+        response = self._request(
+            "POST",
+            "/v1/chat/completions",
+            token=token,
+            payload={
+                "model": _MODEL,
+                "messages": [{"role": "user", "content": "Say hello in one short sentence."}],
+                "max_tokens": 8,
+                "stream": True,
+            },
+            timeout=300,
+        )
+        request_id = response.headers.get("X-Request-ID") or response.headers.get("x-request-id")
+        data_seen = False
+        done_seen = False
+        if response.status == 200:
+            for raw_line in response.body.splitlines():
+                line = raw_line.strip()
+                if not line.startswith(b"data:"):
+                    continue
+                data = line[5:].strip()
+                if data == b"[DONE]":
+                    done_seen = True
+                    continue
+                if _json_object(data) is not None:
+                    data_seen = True
+        return (
+            response,
+            request_id if isinstance(request_id, str) else None,
+            data_seen,
+            done_seen,
+        )
+
+    def _detail(
+        self, request_id: str | None, *, timeout: float = 30
+    ) -> dict[str, Any] | None:
         if request_id is None or _REQUEST_ID.fullmatch(request_id) is None:
             return None
-        response, detail = self._get_json(f"/api/requests/{request_id}")
+        response, detail = self._get_json(f"/api/requests/{request_id}", timeout=timeout)
         return detail if response.status == 200 else None
 
     def _engine_logs(self, since: str) -> tuple[CommandResult, str]:
@@ -606,16 +656,93 @@ class AWSAcceptance:
         marker = "CONNECT_FAILED" if "CONNECT_FAILED" in result.stdout else (
             "CONNECTED" if "CONNECTED" in result.stdout else None
         )
+        errno_match = re.search(r"CONNECT_FAILED errno=(\d+) name=([A-Z0-9_]+)", result.stdout)
+        error_number = int(errno_match.group(1)) if errno_match else None
+        error_name = errno_match.group(2) if errno_match else None
+        timed_out = error_name in {"EAGAIN", "EWOULDBLOCK", "ETIMEDOUT"}
         missing_python = result.returncode != 0 and (
             "not found" in result.stderr.lower() or "executable file" in result.stderr.lower()
         )
         return {
             "returncode": result.returncode,
             "marker": marker,
+            "errno": error_number,
+            "errno_name": error_name,
             "python_available": not missing_python,
             "connection_failed": result.returncode == 0 and marker == "CONNECT_FAILED",
+            "connection_timed_out": result.returncode == 0 and marker == "CONNECT_FAILED" and timed_out,
             "connected": result.returncode == 1 and marker == "CONNECTED",
         }
+
+    def _retry_inference(
+        self, timeout: float
+    ) -> tuple[bool, dict[str, Any] | None, dict[str, Any]]:
+        started = self.monotonic()
+        deadline = started + timeout
+        attempts = 0
+        last_record: dict[str, Any] | None = None
+        last_status: int | None = None
+        last_reason: str | None = None
+        while True:
+            if attempts and self.monotonic() >= deadline:
+                return False, last_record, {
+                    "attempts": attempts,
+                    "elapsed_s": round(self.monotonic() - started, 3),
+                    "window_s": timeout,
+                    "last_status": last_status,
+                    "last_reason_code": last_reason,
+                }
+            attempts += 1
+            last_status = None
+            try:
+                request_timeout = min(30.0, max(0.1, deadline - self.monotonic()))
+                response, request_id, valid = self._completion(
+                    token=self.tokens["RUNTIME_INFERENCE_TOKEN"],
+                    timeout=request_timeout,
+                )
+                last_status = response.status
+                detail_timeout = min(30.0, max(0.1, deadline - self.monotonic()))
+                last_record = _record_fields(
+                    self._detail(request_id, timeout=detail_timeout)
+                )
+                response_document = _json_object(response.body)
+                response_error = (
+                    response_document.get("error")
+                    if response_document and isinstance(response_document.get("error"), dict)
+                    else {}
+                )
+                last_reason = (
+                    last_record.get("reason_code")
+                    if last_record is not None
+                    else response_error.get("code")
+                )
+                recovered = (
+                    response.status == 200
+                    and valid
+                    and last_record is not None
+                    and last_record["result"] == "ALLOWED"
+                    and last_record["delivery"]["attempted"] is True
+                )
+                if recovered:
+                    return True, last_record, {
+                        "attempts": attempts,
+                        "elapsed_s": round(self.monotonic() - started, 3),
+                        "window_s": timeout,
+                        "last_status": last_status,
+                        "last_reason_code": last_reason,
+                    }
+            except (OSError, URLError, TimeoutError) as error:
+                last_reason = _safe_exception(error)
+                last_record = None
+            if self.monotonic() >= deadline:
+                return False, last_record, {
+                    "attempts": attempts,
+                    "elapsed_s": round(self.monotonic() - started, 3),
+                    "window_s": timeout,
+                    "last_status": last_status,
+                    "last_reason_code": last_reason,
+                }
+            self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
 
     @staticmethod
     def _normalized_raw(source: str, document: object) -> dict[str, Any] | None:
@@ -791,6 +918,17 @@ class AWSAcceptance:
         )
         detail = self._detail(request_id)
         record = _record_fields(detail)
+        stream_response, stream_request_id, stream_data, stream_done = (
+            self._stream_completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
+        )
+        stream_record = _record_fields(self._detail(stream_request_id))
+        stream_ok = None if stream_record is None else (
+            stream_response.status == 200
+            and stream_data
+            and stream_done
+            and stream_record["result"] == "ALLOWED"
+            and stream_record["delivery"]["attempted"] is True
+        )
         logs_result, logs = self._engine_logs(since)
         log_match = logs_result.returncode == 0 and self._log_received(
             logs, request_id, "/v1/chat/completions"
@@ -802,9 +940,16 @@ class AWSAcceptance:
             "record_allowed": None if record is None else record["result"] == "ALLOWED",
             "delivery_attempted": None if record is None else record["delivery"]["attempted"] is True,
             "engine_log_match": log_match if logs_result.returncode == 0 else None,
+            "stream_ok": stream_ok,
         }
         return facts, {
             "record_fields_used": record,
+            "stream": {
+                "http_status": stream_response.status,
+                "sse_data_received": stream_data,
+                "done_received": stream_done,
+                "record_fields_used": stream_record,
+            },
             "engine_evidence": {
                 "state": "observed" if log_match else "unknown",
                 "match": "Received request chatcmpl-<gateway request id>",
@@ -878,14 +1023,33 @@ class AWSAcceptance:
                 "policy_http_code": policy_response.status,
                 "policy_limit": None,
             }
+        since = _now()
+        boundary_response, boundary_request_id, boundary_valid = self._completion(
+            token=self.tokens["RUNTIME_INFERENCE_TOKEN"], max_tokens=limit
+        )
+        boundary_record = _record_fields(self._detail(boundary_request_id))
+        boundary_allowed = (
+            boundary_response.status == 200
+            and boundary_valid
+            and boundary_record is not None
+            and boundary_record["result"] == "ALLOWED"
+            and boundary_record["delivery"]["attempted"] is True
+        )
         response, request_id, _valid = self._completion(
             token=self.tokens["RUNTIME_INFERENCE_TOKEN"], max_tokens=limit + 1
         )
         body = _json_object(response.body)
         error = body.get("error") if body and isinstance(body.get("error"), dict) else {}
         record = _record_fields(self._detail(request_id))
+        logs_result, logs = self._engine_logs(since)
+        log_absent = (
+            not self._log_received(logs, request_id, "/v1/chat/completions")
+            if logs_result.returncode == 0 and request_id is not None
+            else None
+        )
         facts = {
             "policy_limit_read": True,
+            "boundary_allowed": boundary_allowed,
             "http_403": response.status == 403,
             "reason_code": (
                 None
@@ -894,15 +1058,32 @@ class AWSAcceptance:
                 and record["reason_code"] == "MAX_TOKENS_EXCEEDED"
             ),
             "not_delivered": None if record is None else record["delivery"]["attempted"] is False,
+            "engine_log_absent": log_absent,
+            "engine_log_format_confirmed": self.engine_log_format_confirmed,
         }
         return facts, {
             "policy_limit": limit,
             "record_fields_used": record,
+            "boundary": {
+                "http_status": boundary_response.status,
+                "record_fields_used": boundary_record,
+            },
+            "engine_evidence": {
+                "state": "not_observed" if log_absent is True and self.engine_log_format_confirmed else "unknown",
+                "reference": "kubectl logs deployment/serving-engine -c engine --since-time",
+                "note": "positive log format must first be confirmed by AWS-01",
+            },
         }
 
     def aws_04(self) -> tuple[dict[str, Any], dict[str, Any]]:
         since = _now()
+        gateway_before = self._tcp_probe(
+            "deployment/serving-gateway", "gateway", "serving-engine", 8000
+        )
         probe = self._tcp_probe("pod/other-client", "client", "serving-engine", 8000)
+        gateway_after = self._tcp_probe(
+            "deployment/serving-gateway", "gateway", "serving-engine", 8000
+        )
         control, request_id, valid = self._completion(
             token=self.tokens["RUNTIME_INFERENCE_TOKEN"]
         )
@@ -914,10 +1095,17 @@ class AWSAcceptance:
                 str((item.get("src") or {}).get("pod", "")).startswith("other-client")
                 and str((item.get("dst") or {}).get("pod", "")).startswith("serving-engine")
                 and (item.get("dst") or {}).get("port") == 8000
+                and str(item.get("verdict", "")).lower() == "dropped"
             ),
         )
+        gateway_tcp_control = gateway_before["connected"] and gateway_after["connected"]
         facts: dict[str, Any] = {
-            "direct_failed": probe["connection_failed"] if probe["marker"] is not None else None,
+            "direct_failed": probe["connection_timed_out"] if probe["marker"] is not None else None,
+            "gateway_tcp_control": (
+                gateway_tcp_control
+                if gateway_before["marker"] is not None and gateway_after["marker"] is not None
+                else None
+            ),
             "gateway_control_200": (
                 None
                 if control_record is None
@@ -926,18 +1114,28 @@ class AWSAcceptance:
                 and control_record["result"] == "ALLOWED"
                 and control_record["delivery"]["attempted"] is True
             ),
-            "hubble_observed": bool(refs) if available else None,
+            "hubble_dropped": bool(refs) if available else None,
         }
         if not probe["python_available"]:
             facts = {"not_run_reason": "other-client에 python3가 없음"}
+        elif not gateway_before["python_available"] or not gateway_after["python_available"]:
+            facts = {"unknown_reason": "Gateway 컨테이너에서 TCP 대조 probe를 실행하지 못함"}
+        elif probe["connection_failed"] and not probe["connection_timed_out"]:
+            facts = {
+                "unknown_reason": (
+                    "other-client→engine 연결 실패가 시간 초과가 아님"
+                    f"({probe['errno_name'] or 'errno 미확인'})"
+                )
+            }
         return facts, {
             "direct_probe": probe,
+            "gateway_tcp_control": {"before": gateway_before, "after": gateway_after},
             "record_fields_used": control_record,
             "observation_references": refs,
             "observation": {
                 "state": "observed" if refs else "not_observed",
                 "references": refs,
-                "note": "Hubble DROPPED는 관측 verdict이며 차단 확인 자체가 아님",
+                "note": "해당 other-client→engine:8000 흐름의 Hubble dropped만 필수 관측으로 인정함",
             },
         }
 
@@ -979,6 +1177,7 @@ class AWSAcceptance:
                 (item.get("src") or {}).get("pod") == pod["name"]
                 and (item.get("dst") or {}).get("ip") == receiver["ip"]
                 and (item.get("dst") or {}).get("port") == 8080
+                and str(item.get("verdict", "")).lower() == "dropped"
             ),
         )
         available_external, refs_external = self._wait_observation_refs(
@@ -999,9 +1198,9 @@ class AWSAcceptance:
                 and (item.get("dst") or {}).get("port") == 80
             ),
         )
-        return {
+        facts: dict[str, Any] = {
             "engine_receiver_failed": (
-                engine_receiver["connection_failed"]
+                engine_receiver["connection_timed_out"]
                 if engine_receiver["marker"] is not None
                 else None
             ),
@@ -1010,7 +1209,7 @@ class AWSAcceptance:
                 if receiver_control["marker"] is not None
                 else None
             ),
-            "receiver_hubble": bool(refs_receiver) if available_receiver else None,
+            "receiver_hubble_dropped": bool(refs_receiver) if available_receiver else None,
             "supplementary_external_failed": (
                 external["connection_failed"] if external["marker"] is not None else None
             ),
@@ -1021,7 +1220,15 @@ class AWSAcceptance:
                 bool(refs_external) if available_external else None
             ),
             "supplementary_imds_hubble": bool(refs_imds) if available_imds else None,
-        }, {
+        }
+        if engine_receiver["connection_failed"] and not engine_receiver["connection_timed_out"]:
+            facts = {
+                "unknown_reason": (
+                    "engine→receiver 연결 실패가 시간 초과가 아님"
+                    f"({engine_receiver['errno_name'] or 'errno 미확인'})"
+                )
+            }
+        return facts, {
             "engine_pod": pod,
             "receiver_pod": receiver,
             "engine_receiver_probe": engine_receiver,
@@ -1034,7 +1241,7 @@ class AWSAcceptance:
                 "external": refs_external,
                 "imds": refs_imds,
                 "note": (
-                    "engine→receiver Hubble 관측은 필수 연결 증거지만 차단 판정 자체는 아님. "
+                    "engine→receiver 해당 흐름의 Hubble dropped는 필수 연결 증거임. "
                     "TEST-NET-1·IMDS probe는 정책이 없어도 실패하므로 보조 증거일 뿐 단독으로 아무것도 입증하지 않음"
                 ),
             },
@@ -1071,8 +1278,21 @@ class AWSAcceptance:
             lambda item: item.get("rule_id") == "TG-CACHE-01" and item.get("path") == cache_path,
         )
         model_denied: bool | None = None
-        if "WRITE_DENIED" in model_result.stdout:
+        model_marker = (
+            "WRITE_DENIED" if "WRITE_DENIED" in model_result.stdout else
+            "WRITE_SUCCEEDED" if "WRITE_SUCCEEDED" in model_result.stdout else
+            "WRITE_ERROR" if "WRITE_ERROR" in model_result.stdout else None
+        )
+        errno_match = re.search(
+            r"(?:WRITE_DENIED|WRITE_ERROR) errno=(\d+) name=([A-Z0-9_]+)",
+            model_result.stdout,
+        )
+        model_errno = int(errno_match.group(1)) if errno_match else None
+        model_errno_name = errno_match.group(2) if errno_match else None
+        if model_marker == "WRITE_DENIED" and model_errno_name == "EROFS":
             model_denied = model_result.returncode == 0
+        elif model_marker == "WRITE_DENIED" and model_errno_name in {"EPERM", "EACCES"}:
+            model_denied = False
         elif "WRITE_SUCCEEDED" in model_result.stdout:
             model_denied = False
         cache_succeeded = (
@@ -1080,20 +1300,32 @@ class AWSAcceptance:
             if "CACHE_WRITE_REMOVED" in cache_result.stdout
             else None
         )
-        return {
+        facts: dict[str, Any] = {
             "model_write_denied": model_denied,
             "cache_write_succeeded": cache_succeeded,
             "cache_harmless_removed": cache_succeeded,
             "cache_tetragon": bool(cache_refs) if cache_available else None,
-        }, {
+        }
+        if model_marker == "WRITE_DENIED" and model_errno_name in {"EPERM", "EACCES"}:
+            facts = {
+                "unknown_reason": (
+                    f"모델 쓰기 거부 errno {model_errno_name}는 read-only mount 증거가 아님"
+                )
+            }
+        return facts, {
             "engine_pod": pod,
-            "model_probe": {"returncode": model_result.returncode, "marker": "WRITE_DENIED" if "WRITE_DENIED" in model_result.stdout else "other"},
+            "model_probe": {
+                "returncode": model_result.returncode,
+                "marker": model_marker,
+                "errno": model_errno,
+                "errno_name": model_errno_name,
+            },
             "cache_probe": {"returncode": cache_result.returncode, "marker": "CACHE_WRITE_REMOVED" if "CACHE_WRITE_REMOVED" in cache_result.stdout else "other"},
             "observation_references": [*model_refs, *cache_refs],
             "observations": {
                 "model": {"state": "observed" if model_refs else "not_observed", "references": model_refs},
                 "cache": {"state": "observed" if cache_refs else "not_observed", "references": cache_refs},
-                "note": "RO mount 거부가 Tetragon hook보다 먼저 일어나면 TG-ASSET-01 not_observed여도 write-deny 실패가 아님",
+                "note": "EROFS만 read-only mount 증거이며 EPERM·EACCES는 통과 근거가 아님",
                 "sources_readable": {"model": model_available, "cache": cache_available},
             },
         }
@@ -1290,6 +1522,20 @@ class AWSAcceptance:
         start_completed_at: str | None = None
         start_elapsed: float | None = None
         recovery_elapsed: float | None = None
+        stopped_request: dict[str, Any] = {
+            "http_status": None,
+            "reason_code": None,
+            "error": None,
+        }
+        inference_recovered = False
+        inference_record: dict[str, Any] | None = None
+        inference_retry: dict[str, Any] = {
+            "attempts": 0,
+            "elapsed_s": 0.0,
+            "window_s": min(stale + 30.0, 90.0),
+            "last_status": None,
+            "last_reason_code": None,
+        }
         try:
             if stop.returncode == 0:
                 stopped_window_started = self.monotonic()
@@ -1309,6 +1555,33 @@ class AWSAcceptance:
                 )
                 if unavailable:
                     unavailable_elapsed = self.monotonic() - stopped_window_started
+                try:
+                    stopped_response, stopped_request_id, _stopped_valid = self._completion(
+                        token=self.tokens["RUNTIME_INFERENCE_TOKEN"],
+                        timeout=min(max(stale, 1.0), 30.0),
+                    )
+                    stopped_record = _record_fields(self._detail(stopped_request_id))
+                    stopped_document = _json_object(stopped_response.body)
+                    stopped_error = (
+                        stopped_document.get("error")
+                        if stopped_document and isinstance(stopped_document.get("error"), dict)
+                        else {}
+                    )
+                    stopped_request = {
+                        "http_status": stopped_response.status,
+                        "reason_code": (
+                            stopped_record.get("reason_code")
+                            if stopped_record
+                            else stopped_error.get("code")
+                        ),
+                        "error": None,
+                    }
+                except (OSError, URLError, TimeoutError) as error:
+                    stopped_request = {
+                        "http_status": None,
+                        "reason_code": None,
+                        "error": _safe_exception(error),
+                    }
         finally:
             start_requested_at = _now()
             start_started = self.monotonic()
@@ -1319,8 +1592,13 @@ class AWSAcceptance:
             start_elapsed = self.monotonic() - start_started
             if start.returncode == 0:
                 recovery_started = self.monotonic()
-                recovery_ok, recovered = self._wait_collectors_ok(stale + 30.0)
+                recovery_window = min(stale + 30.0, 90.0)
+                recovery_ok, recovered = self._wait_collectors_ok(recovery_window)
                 recovery_elapsed = self.monotonic() - recovery_started
+                if recovery_ok:
+                    inference_recovered, inference_record, inference_retry = (
+                        self._retry_inference(recovery_window)
+                    )
         gap_scan_ok, gap_refs = self._new_gap_refs(positions) if gaps_readable else (False, [])
         heartbeat_refs = list(heartbeat_snapshot.values())
         return {
@@ -1329,6 +1607,7 @@ class AWSAcceptance:
             "collectors_unavailable": unavailable,
             "start_ok": bool(start and start.returncode == 0),
             "collectors_recovered": recovery_ok,
+            "inference_recovered": inference_recovered,
             "supplementary_gap_recorded": bool(gap_refs) if gap_scan_ok else None,
         }, {
             "timings": {
@@ -1357,6 +1636,11 @@ class AWSAcceptance:
                 "recovered": {source: recovered.get(source, {}).get("state") for source in _OBSERVATION_SOURCES},
             },
             "heartbeat_stopped": heartbeat_snapshot,
+            "stopped_interval_request": stopped_request,
+            "recovery_request": {
+                **inference_retry,
+                "record_fields_used": inference_record,
+            },
             "gap_references": gap_refs,
             "observation_references": [*heartbeat_refs, *gap_refs],
             "gap_note": "clean systemd stop은 gap 행을 만들지 않으며 gap은 보조 증거임",
@@ -1397,9 +1681,6 @@ class AWSAcceptance:
             "rollout", "status", "deployment/serving-engine", "--timeout=25m", timeout=1510
         ) if restart.returncode == 0 else CommandResult(1)
         after, _after_result = self._engine_pod()
-        response: HTTPResponse | None = None
-        request_id: str | None = None
-        valid = False
         gateway_instance_changed = False
         target_after: dict[str, Any] | None = None
         matching_history: dict[str, Any] | None = None
@@ -1443,11 +1724,6 @@ class AWSAcceptance:
                 if self.monotonic() >= deadline:
                     break
                 self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
-        if rollout.returncode == 0:
-            response, request_id, valid = self._completion(
-                token=self.tokens["RUNTIME_INFERENCE_TOKEN"]
-            )
-        recovery_record = _record_fields(self._detail(request_id)) if request_id else None
         engine_info_ok = False
         engine_info: dict[str, Any] | None = None
         if rollout.returncode == 0:
@@ -1468,6 +1744,17 @@ class AWSAcceptance:
                 if self.monotonic() >= deadline:
                     break
                 self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
+        gateway_recovered = False
+        recovery_record: dict[str, Any] | None = None
+        recovery_retry: dict[str, Any] = {
+            "attempts": 0,
+            "elapsed_s": 0.0,
+            "window_s": 90.0,
+            "last_status": None,
+            "last_reason_code": None,
+        }
+        if engine_info_ok:
+            gateway_recovered, recovery_record, recovery_retry = self._retry_inference(90.0)
         changed: bool | None = None
         if after and after.get("uid") and after.get("container_id") and after.get("ready"):
             # A rollout replacement must change the Pod identity. A container
@@ -1477,20 +1764,14 @@ class AWSAcceptance:
         return {
             "restart_ok": restart.returncode == 0 and rollout.returncode == 0,
             "pod_changed": changed,
-            "gateway_recovered": (
-                None
-                if response is None or recovery_record is None
-                else response.status == 200
-                and valid
-                and recovery_record["result"] == "ALLOWED"
-                and recovery_record["delivery"]["attempted"] is True
-            ),
+            "gateway_recovered": gateway_recovered,
             "engine_info_recovered": engine_info_ok,
             "gateway_instance_changed": gateway_instance_changed,
         }, {
             "engine_before": before,
             "engine_after": after,
             "record_fields_used": recovery_record,
+            "recovery_request": recovery_retry,
             "engine_info": {
                 "state": engine_info.get("state") if engine_info else None,
                 "last_success_at": engine_info.get("last_success_at") if engine_info else None,
@@ -1534,19 +1815,19 @@ class AWSAcceptance:
             },
             "decision_notes": [
                 (
-                    "AWS-05 is decided by engine-to-test-receiver failure plus a successful "
-                    "other-client control to the same receiver Pod IP. TEST-NET-1 and IMDS "
-                    "probes fail without an egress policy in this bundle and prove nothing alone."
+                    "AWS-04 and AWS-05 accept only connect_ex timeout errnos as a block candidate, "
+                    "and require the exact Hubble flow to be dropped plus their allowed-path "
+                    "controls. ECONNREFUSED and other failures remain unknown."
                 ),
                 (
                     "AWS-07 clean stop is decided by stopped heartbeats, Gateway collector "
-                    "unavailability, and recovery. Gap records are supplementary because a clean "
-                    "systemd stop does not create them."
+                    "unavailability, collector recovery, and recovered inference. Its stopped-window "
+                    "request and gap records are supplementary."
                 ),
             ],
             "known_gaps": [
-                "Hubble DROPPED is an observation verdict, not independent proof that the connection was blocked.",
-                "A read-only mount can reject AWS-06 before the Tetragon file hook observes it.",
+                "The first AWS run must confirm that this Cilium configuration manifests a blocked connect as EAGAIN/EWOULDBLOCK/ETIMEDOUT; another errno is not accepted as policy-block evidence.",
+                "AWS-06 accepts only EROFS as read-only mount evidence. EPERM may be Tetragon enforcement and EACCES may come from ownership/mode before a read-only mount is tested.",
             ],
             "cases": self.cases,
         }

@@ -64,6 +64,7 @@ class FakeHTTP:
                 "path": urlsplit(url).path,
                 "has_authorization": "Authorization" in (headers or {}),
                 "has_body": body is not None,
+                "json": json.loads(body) if body is not None else None,
             }
         )
         if not self.responses:
@@ -74,6 +75,22 @@ class FakeHTTP:
 def response(status: int, body: object, request_id: str | None = None) -> HTTPResponse:
     headers = {"X-Request-ID": request_id} if request_id else {}
     return HTTPResponse(status, headers, json.dumps(body).encode("utf-8"))
+
+
+def sse_response(body: bytes, request_id: str) -> HTTPResponse:
+    return HTTPResponse(200, {"X-Request-ID": request_id}, body)
+
+
+class FakeClock:
+    def __init__(self, *, sleep_jump: float | None = None) -> None:
+        self.value = 0.0
+        self.sleep_jump = sleep_jump
+
+    def monotonic(self) -> float:
+        return self.value
+
+    def sleep(self, seconds: float) -> None:
+        self.value += self.sleep_jump if self.sleep_jump is not None else seconds
 
 
 def detail(
@@ -171,23 +188,34 @@ class ArgumentTests(unittest.TestCase):
 class DecisionTests(unittest.TestCase):
     PASS_FACTS = {
         "AWS-01": dict.fromkeys(
-            ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match"), True
+            ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match", "stream_ok"), True
         ),
         "AWS-02": dict.fromkeys(
             ("auth_codes", "records_denied", "not_delivered", "engine_log_absent", "engine_log_format_confirmed"), True
         ),
         "AWS-03": dict.fromkeys(
-            ("policy_limit_read", "http_403", "reason_code", "not_delivered"), True
+            (
+                "policy_limit_read",
+                "boundary_allowed",
+                "http_403",
+                "reason_code",
+                "not_delivered",
+                "engine_log_absent",
+                "engine_log_format_confirmed",
+            ),
+            True,
         ),
-        "AWS-04": dict.fromkeys(("direct_failed", "gateway_control_200", "hubble_observed"), True),
+        "AWS-04": dict.fromkeys(
+            ("direct_failed", "gateway_tcp_control", "gateway_control_200", "hubble_dropped"), True
+        ),
         "AWS-05": dict.fromkeys(
-            ("engine_receiver_failed", "receiver_control_connected", "receiver_hubble"), True
+            ("engine_receiver_failed", "receiver_control_connected", "receiver_hubble_dropped"), True
         ),
         "AWS-06": dict.fromkeys(
             ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed", "cache_tetragon"), True
         ),
         "AWS-07": dict.fromkeys(
-            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered"), True
+            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered", "inference_recovered"), True
         ),
         "AWS-08": dict.fromkeys(
             (
@@ -227,8 +255,9 @@ class DecisionTests(unittest.TestCase):
         for case_id, key in (
             ("AWS-01", "engine_log_match"),
             ("AWS-02", "engine_log_format_confirmed"),
-            ("AWS-04", "hubble_observed"),
-            ("AWS-05", "receiver_hubble"),
+            ("AWS-03", "engine_log_format_confirmed"),
+            ("AWS-04", "hubble_dropped"),
+            ("AWS-05", "receiver_hubble_dropped"),
             ("AWS-06", "cache_tetragon"),
         ):
             with self.subTest(case_id=case_id):
@@ -253,6 +282,30 @@ class DecisionTests(unittest.TestCase):
         facts = dict(self.PASS_FACTS["AWS-07"])
         self.assertNotIn("gap_recorded", facts)
         self.assertEqual(evaluate_case("AWS-07", facts)[0], "passed")
+
+    def test_new_decisive_controls_cannot_be_omitted(self) -> None:
+        for case_id, key in (
+            ("AWS-01", "stream_ok"),
+            ("AWS-03", "boundary_allowed"),
+            ("AWS-03", "engine_log_absent"),
+            ("AWS-07", "inference_recovered"),
+        ):
+            with self.subTest(case_id=case_id, key=key):
+                facts = dict(self.PASS_FACTS[case_id])
+                facts[key] = False
+                self.assertEqual(evaluate_case(case_id, facts)[0], "failed")
+
+    def test_forwarded_hubble_or_non_timeout_failure_does_not_pass(self) -> None:
+        for case_id, key in (
+            ("AWS-04", "hubble_dropped"),
+            ("AWS-05", "receiver_hubble_dropped"),
+            ("AWS-04", "direct_failed"),
+            ("AWS-05", "engine_receiver_failed"),
+        ):
+            with self.subTest(case_id=case_id, key=key):
+                facts = dict(self.PASS_FACTS[case_id])
+                facts[key] = False
+                self.assertNotEqual(evaluate_case(case_id, facts)[0], "passed")
 
     def test_aws_08_gateway_instance_change_is_decisive(self) -> None:
         facts = dict(self.PASS_FACTS["AWS-08"])
@@ -309,12 +362,18 @@ class FakeExecutionTests(unittest.TestCase):
 
     def test_aws_01_uses_fake_http_runner_and_requires_exact_engine_log(self) -> None:
         request_id = "normal-1"
+        stream_request_id = "stream-1"
         fake_http = FakeHTTP(
             [
                 response(
                     200,
                     {"choices": [{"message": {"content": "response text not retained"}}]},
                     request_id,
+                ),
+                response(200, detail("ALLOWED", attempted=True, outcome="completed")),
+                sse_response(
+                    b'data: {"choices":[{"delta":{"content":"stream body not retained"}}]}\n\ndata: [DONE]\n\n',
+                    stream_request_id,
                 ),
                 response(200, detail("ALLOWED", attempted=True, outcome="completed")),
             ]
@@ -335,6 +394,51 @@ class FakeExecutionTests(unittest.TestCase):
             self.assertEqual(command[0:3], ["kubectl", "--context", "byul-aws-lab"])
             serialized = json.dumps(checker.cases, ensure_ascii=False)
             self.assertNotIn("response text not retained", serialized)
+            self.assertNotIn("stream body not retained", serialized)
+            self.assertNotIn(INFERENCE, serialized)
+
+    def test_aws_01_stream_without_done_cannot_pass(self) -> None:
+        fake_http = FakeHTTP(
+            [
+                response(200, {"choices": [{"message": {"content": "hello"}}]}, "normal-1"),
+                response(200, detail("ALLOWED", attempted=True)),
+                sse_response(b'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n', "stream-1"),
+                response(200, detail("ALLOWED", attempted=True)),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            checker = AWSAcceptance(
+                arguments(Path(temporary), cases=("AWS-01",)),
+                runner=FakeRunner([CommandResult(0, "Received request chatcmpl-normal-1\n")]),
+                http=fake_http,
+            )
+            checker._run_case("AWS-01", checker.aws_01)
+            self.assertEqual(checker.cases[0]["result"], "failed")
+            self.assertFalse(checker.cases[0]["facts"]["stream_ok"])
+
+    def test_aws_01_missing_stream_record_is_unknown(self) -> None:
+        fake_http = FakeHTTP(
+            [
+                response(200, {"choices": [{"message": {"content": "hello"}}]}, "normal-1"),
+                response(200, detail("ALLOWED", attempted=True)),
+                sse_response(
+                    b'data: {"choices":[{"delta":{"content":"hello"}}]}\n\ndata: [DONE]\n\n',
+                    "stream-1",
+                ),
+                response(404, {"error": {"code": "NOT_FOUND"}}),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            checker = AWSAcceptance(
+                arguments(Path(temporary), cases=("AWS-01",)),
+                runner=FakeRunner([CommandResult(0, "Received request chatcmpl-normal-1\n")]),
+                http=fake_http,
+            )
+            checker._run_case("AWS-01", checker.aws_01)
+            case = checker.cases[0]
+            self.assertEqual(case["result"], "unknown")
+            self.assertIsNone(case["facts"]["stream_ok"])
+            self.assertEqual(case["reason"], "판정 근거 부족: stream_ok")
 
     def test_aws_02_checks_both_auth_codes_records_and_no_engine_line(self) -> None:
         fake_http = FakeHTTP(
@@ -361,6 +465,12 @@ class FakeExecutionTests(unittest.TestCase):
         fake_http = FakeHTTP(
             [
                 response(200, {"current": {"output_max_tokens": 128}}),
+                response(
+                    200,
+                    {"choices": [{"message": {"content": "boundary response"}}]},
+                    "boundary-1",
+                ),
+                response(200, detail("ALLOWED", attempted=True)),
                 response(403, {"error": {"code": "MAX_TOKENS_EXCEEDED"}}, "limit-1"),
                 response(
                     200,
@@ -376,14 +486,109 @@ class FakeExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             checker = AWSAcceptance(
                 arguments(Path(temporary), cases=("AWS-03",)),
-                runner=FakeRunner(),
+                runner=FakeRunner([CommandResult(0, "Received request chatcmpl-boundary-1\n")]),
                 http=fake_http,
             )
+            checker.engine_log_format_confirmed = True
             checker._run_case("AWS-03", checker.aws_03)
             self.assertEqual(checker.cases[0]["result"], "passed")
             self.assertEqual(checker.cases[0]["evidence"]["policy_limit"], 128)
+            completion_payloads = [call["json"] for call in fake_http.calls if call["has_body"]]
+            self.assertEqual([item["max_tokens"] for item in completion_payloads], [128, 129])
         self.assertEqual(_extract_policy_limit({"policy": {"output_max_tokens": 7}}), 7)
         self.assertIsNone(_extract_policy_limit({"current": {}}))
+
+    def test_aws_03_requires_positive_log_format_and_denied_id_absence(self) -> None:
+        def run(logs: str, confirmed: bool) -> str:
+            http = FakeHTTP(
+                [
+                    response(200, {"current": {"output_max_tokens": 8}}),
+                    response(200, {"choices": [{"message": {"content": "ok"}}]}, "boundary"),
+                    response(200, detail("ALLOWED", attempted=True)),
+                    response(403, {"error": {"code": "MAX_TOKENS_EXCEEDED"}}, "denied"),
+                    response(200, detail("DENIED", reason="MAX_TOKENS_EXCEEDED", attempted=False, status=403)),
+                ]
+            )
+            with tempfile.TemporaryDirectory() as temporary:
+                checker = AWSAcceptance(
+                    arguments(Path(temporary), cases=("AWS-03",)),
+                    runner=FakeRunner([CommandResult(0, logs)]),
+                    http=http,
+                )
+                checker.engine_log_format_confirmed = confirmed
+                checker._run_case("AWS-03", checker.aws_03)
+                return checker.cases[0]["result"]
+
+        self.assertEqual(run("Received request chatcmpl-boundary\n", False), "unknown")
+        self.assertEqual(
+            run("Received request chatcmpl-denied\n", True),
+            "failed",
+        )
+
+    def test_aws_04_requires_timeout_dropped_flow_and_gateway_tcp_control(self) -> None:
+        runner = FakeRunner(
+            [
+                CommandResult(1, "CONNECTED\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
+                CommandResult(1, "CONNECTED\n"),
+            ]
+        )
+        http = FakeHTTP(
+            [
+                response(200, {"choices": [{"message": {"content": "ok"}}]}, "control"),
+                response(200, detail("ALLOWED", attempted=True)),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            observation = root / "observation"
+            observation.mkdir()
+            (observation / "hubble.jsonl").write_text(
+                json.dumps(
+                    {
+                        "flow": {
+                            "time": "9999-01-01T00:00:00+00:00",
+                            "verdict": "DROPPED",
+                            "source": {"pod_name": "other-client"},
+                            "destination": {"pod_name": "serving-engine-abc"},
+                            "IP": {"destination": "10.0.0.10"},
+                            "l4": {"TCP": {"destination_port": 8000}},
+                        }
+                    }
+                ) + "\n",
+                encoding="utf-8",
+            )
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-04",)), runner=runner, http=http
+            )
+            checker._run_case("AWS-04", checker.aws_04)
+            case = checker.cases[0]
+            self.assertEqual(case["result"], "passed")
+            self.assertEqual(case["evidence"]["direct_probe"]["errno_name"], "ETIMEDOUT")
+            self.assertTrue(case["facts"]["gateway_tcp_control"])
+
+    def test_aws_04_refused_is_unknown_not_policy_block(self) -> None:
+        runner = FakeRunner(
+            [
+                CommandResult(1, "CONNECTED\n"),
+                CommandResult(0, "CONNECT_FAILED errno=111 name=ECONNREFUSED\n"),
+                CommandResult(1, "CONNECTED\n"),
+            ]
+        )
+        http = FakeHTTP(
+            [
+                response(200, {"choices": [{"message": {"content": "ok"}}]}, "control"),
+                response(200, detail("ALLOWED", attempted=True)),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "observation").mkdir()
+            checker = AWSAcceptance(arguments(root, cases=("AWS-04",)), runner=runner, http=http)
+            checker._wait_observation_refs = lambda *_args, **_kwargs: (True, [])
+            checker._run_case("AWS-04", checker.aws_04)
+            self.assertEqual(checker.cases[0]["result"], "unknown")
+            self.assertIn("ECONNREFUSED", checker.cases[0]["reason"])
 
     def test_aws_05_uses_receiver_pod_ip_and_a_successful_control(self) -> None:
         engine = {
@@ -413,10 +618,10 @@ class FakeExecutionTests(unittest.TestCase):
             [
                 CommandResult(0, json.dumps(engine)),
                 CommandResult(0, json.dumps(receiver)),
-                CommandResult(0, "CONNECT_FAILED\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
                 CommandResult(1, "CONNECTED\n"),
-                CommandResult(0, "CONNECT_FAILED\n"),
-                CommandResult(0, "CONNECT_FAILED\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
             ]
         )
         with tempfile.TemporaryDirectory() as temporary:
@@ -457,6 +662,43 @@ class FakeExecutionTests(unittest.TestCase):
             self.assertEqual(runner.history[3]["argv"][-2:], ["10.0.0.42", "8080"])
             self.assertEqual(runner.history[3]["argv"][5:8], ["exec", "pod/other-client", "-c"])
 
+    def test_aws_05_refused_is_unknown_not_policy_block(self) -> None:
+        engine = {
+            "items": [{
+                "metadata": {"name": "serving-engine-abc", "uid": "uid"},
+                "status": {
+                    "containerStatuses": [{"name": "engine", "containerID": "containerd://id"}],
+                    "conditions": [{"type": "Ready", "status": "True"}],
+                },
+            }]
+        }
+        receiver = {
+            "metadata": {"name": "test-receiver", "labels": {"app": "test-receiver"}},
+            "status": {"podIP": "10.0.0.42", "conditions": [{"type": "Ready", "status": "True"}]},
+        }
+        runner = FakeRunner(
+            [
+                CommandResult(0, json.dumps(engine)),
+                CommandResult(0, json.dumps(receiver)),
+                CommandResult(0, "CONNECT_FAILED errno=111 name=ECONNREFUSED\n"),
+                CommandResult(1, "CONNECTED\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
+                CommandResult(0, "CONNECT_FAILED errno=110 name=ETIMEDOUT\n"),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "observation").mkdir()
+            checker = AWSAcceptance(
+                arguments(root, cases=("AWS-05",)),
+                runner=runner,
+                http=FakeHTTP([]),
+            )
+            checker._wait_observation_refs = lambda *_args, **_kwargs: (True, [])
+            checker._run_case("AWS-05", checker.aws_05)
+            self.assertEqual(checker.cases[0]["result"], "unknown")
+            self.assertIn("ECONNREFUSED", checker.cases[0]["reason"])
+
     def test_gateway_policy_status_exposes_the_numeric_limit_needed_by_aws_03(self) -> None:
         policy = SimpleNamespace(
             profile="default",
@@ -466,6 +708,45 @@ class FakeExecutionTests(unittest.TestCase):
         )
         self.assertEqual(GatewayApp._profile_status(policy)["output_max_tokens"], 128)
         self.assertIsNone(GatewayApp._profile_status(None)["output_max_tokens"])
+
+    def test_aws_06_only_erofs_proves_read_only_mount(self) -> None:
+        engine = json.dumps(
+            {
+                "items": [{
+                    "metadata": {"name": "serving-engine-abc", "uid": "uid"},
+                    "status": {
+                        "containerStatuses": [{"name": "engine", "containerID": "containerd://id"}],
+                        "conditions": [{"type": "Ready", "status": "True"}],
+                    },
+                }]
+            }
+        )
+        for error_number, error_name, expected in (
+            (30, "EROFS", "passed"),
+            (13, "EACCES", "unknown"),
+            (1, "EPERM", "unknown"),
+        ):
+            with self.subTest(errno=error_name), tempfile.TemporaryDirectory() as temporary:
+                checker = AWSAcceptance(
+                    arguments(Path(temporary), cases=("AWS-06",)),
+                    runner=FakeRunner(
+                        [
+                            CommandResult(0, engine),
+                            CommandResult(0, f"WRITE_DENIED errno={error_number} name={error_name}\n"),
+                            CommandResult(0, "CACHE_WRITE_REMOVED\n"),
+                        ]
+                    ),
+                    http=FakeHTTP([]),
+                )
+                checker._wait_observation_refs = lambda *_args, **_kwargs: (
+                    True,
+                    [{"reference": "fixture", "rule_id": "TG-CACHE-01"}],
+                )
+                checker._run_case("AWS-06", checker.aws_06)
+                case = checker.cases[0]
+                self.assertEqual(case["result"], expected)
+                self.assertEqual(case["evidence"]["model_probe"]["marker"], "WRITE_DENIED")
+                self.assertEqual(case["evidence"]["model_probe"]["errno_name"], error_name)
 
     def test_aws_07_clean_stop_uses_stopped_heartbeats_without_gap_files(self) -> None:
         before = {
@@ -513,7 +794,11 @@ class FakeExecutionTests(unittest.TestCase):
                     [
                         response(200, before),
                         response(200, unavailable),
+                        response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}, "stopped-request"),
+                        response(200, detail("HELD", reason="TARGET_UNAVAILABLE", attempted=False, status=503)),
                         response(200, recovered),
+                        response(200, {"choices": [{"message": {"content": "recovered"}}]}, "recovered-request"),
+                        response(200, detail("ALLOWED", attempted=True)),
                     ]
                 ),
             )
@@ -524,6 +809,11 @@ class FakeExecutionTests(unittest.TestCase):
             self.assertIsNone(case["facts"]["supplementary_gap_recorded"])
             self.assertFalse(list(observation.glob("*.gaps.jsonl")))
             self.assertEqual(case["evidence"]["timings"]["stale_after_s"], 2.0)
+            self.assertEqual(
+                case["evidence"]["stopped_interval_request"],
+                {"http_status": 503, "reason_code": "TARGET_UNAVAILABLE", "error": None},
+            )
+            self.assertTrue(case["facts"]["inference_recovered"])
 
     def test_aws_08_requires_gateway_instance_change_and_pod_replaced_history(self) -> None:
         def engine_pod(uid: str, container_id: str) -> str:
@@ -574,12 +864,6 @@ class FakeExecutionTests(unittest.TestCase):
                 response(200, after_target),
                 response(
                     200,
-                    {"choices": [{"message": {"content": "hello"}}]},
-                    "recovery-request",
-                ),
-                response(200, detail("ALLOWED", attempted=True)),
-                response(
-                    200,
                     {
                         "collectors": [
                             {
@@ -590,6 +874,12 @@ class FakeExecutionTests(unittest.TestCase):
                         ]
                     },
                 ),
+                response(
+                    200,
+                    {"choices": [{"message": {"content": "hello"}}]},
+                    "recovery-request",
+                ),
+                response(200, detail("ALLOWED", attempted=True)),
             ]
         )
         with tempfile.TemporaryDirectory() as temporary:
@@ -611,6 +901,101 @@ class FakeExecutionTests(unittest.TestCase):
             "pod_replaced",
         )
         self.assertIn("stale", case["evidence"]["snapshot_note"])
+        self.assertEqual(
+            [call["path"] for call in http.calls],
+            ["/api/target", "/api/target", "/api/collectors", "/v1/chat/completions", "/api/requests/recovery-request"],
+        )
+
+    def test_aws_08_retries_temporary_hold_but_reports_final_failure(self) -> None:
+        def engine_pod(uid: str) -> str:
+            return json.dumps(
+                {
+                    "items": [{
+                        "metadata": {"name": f"engine-{uid}", "uid": uid},
+                        "status": {
+                            "containerStatuses": [{"name": "engine", "containerID": f"containerd://{uid}"}],
+                            "conditions": [{"type": "Ready", "status": "True"}],
+                        },
+                    }]
+                }
+            )
+
+        before_target = {
+            "instance": {"state": "ok", "current": {"instance_id": "old"}},
+            "history": [],
+            "kubernetes": {"state": "ok"},
+        }
+        after_target = {
+            "instance": {"state": "ok", "current": {"instance_id": "new"}},
+            "history": [{
+                "event": "instance_changed",
+                "reason": "pod_replaced",
+                "previous_instance_id": "old",
+                "instance": {"instance_id": "new"},
+            }],
+            "kubernetes": {"state": "ok"},
+        }
+        collectors = {
+            "collectors": [{
+                "source": "engine_info",
+                "state": "ok",
+                "last_success_at": "9999-01-01T00:00:00+00:00",
+            }]
+        }
+
+        def run(recovery_responses: list[HTTPResponse], clock: FakeClock) -> dict[str, object]:
+            runner = FakeRunner(
+                [
+                    CommandResult(0, engine_pod("old-uid")),
+                    CommandResult(0),
+                    CommandResult(0),
+                    CommandResult(0, engine_pod("new-uid")),
+                ]
+            )
+            http = FakeHTTP(
+                [response(200, before_target), response(200, after_target), response(200, collectors), *recovery_responses]
+            )
+            with tempfile.TemporaryDirectory() as temporary:
+                checker = AWSAcceptance(
+                    arguments(Path(temporary), cases=("AWS-08",), allow_engine_restart=True),
+                    runner=runner,
+                    http=http,
+                    monotonic=clock.monotonic,
+                    sleeper=clock.sleep,
+                )
+                checker._run_case("AWS-08", checker.aws_08)
+                return checker.cases[0]
+
+        transient_clock = FakeClock()
+        transient = run(
+            [
+                response(503, {"error": {"code": "TARGET_UNVERIFIED"}}, "hold"),
+                response(200, detail("HELD", reason="TARGET_UNVERIFIED", attempted=False, status=503)),
+                response(200, {"choices": [{"message": {"content": "ok"}}]}, "ok"),
+                response(200, detail("ALLOWED", attempted=True)),
+            ],
+            transient_clock,
+        )
+        self.assertEqual(transient["result"], "passed")
+        self.assertEqual(transient["evidence"]["recovery_request"]["attempts"], 2)
+
+        failure_clock = FakeClock(sleep_jump=89.0)
+        failed = run(
+            [
+                response(503, {"error": {"code": "TARGET_UNVERIFIED"}}, "hold-1"),
+                response(200, detail("HELD", reason="TARGET_UNVERIFIED", attempted=False, status=503)),
+                response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}, "hold-2"),
+                response(200, detail("HELD", reason="TARGET_UNAVAILABLE", attempted=False, status=503)),
+            ],
+            failure_clock,
+        )
+        self.assertEqual(failed["result"], "failed")
+        self.assertEqual(failed["evidence"]["recovery_request"]["attempts"], 2)
+        self.assertEqual(failed["evidence"]["recovery_request"]["last_status"], 503)
+        self.assertEqual(
+            failed["evidence"]["recovery_request"]["last_reason_code"],
+            "TARGET_UNAVAILABLE",
+        )
 
 
 class EvidenceTests(unittest.TestCase):

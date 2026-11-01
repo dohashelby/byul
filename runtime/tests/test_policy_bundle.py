@@ -19,6 +19,7 @@ from serving_runtime.mvp.app import GatewayApp
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.policy import load_policy
 from serving_runtime.mvp.policy_bundle import PolicyBundleError, verify_policy_bundle
+from serving_runtime.enforcement.intent import load_intent
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -139,6 +140,33 @@ class PolicyBundleVerificationTests(unittest.TestCase):
             _refresh_entry(directory, _entry(document, "gateway_policy"))
             _write_manifest(directory, document)
             with self.assertRaisesRegex(PolicyBundleError, "runtime-policy.json.*schema_version"):
+                verify_policy_bundle(directory, now=NOW)
+
+    def test_real_enforcement_intent_schema_is_verified_and_loaded(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = _copy_bundle(Path(temporary))
+            intent = json.loads((ROOT / "deploy/gpu-lab/intent.aws-lab.json").read_text(encoding="utf-8"))
+            intent["assets"]["cache_generation"]["image_id"] = "a" * 64
+            intent["assets"]["cache_generation"]["compile_profile"] = "dev-profile-01"
+            intent_path = directory / "intent.json"
+            intent_path.write_text(json.dumps(intent), encoding="utf-8")
+            document = _manifest(directory)
+            entry = {
+                "role": "enforcement_intent",
+                "path": "intent.json",
+                "schema_version": intent["schema"],
+            }
+            _refresh_entry(directory, entry)
+            document["files"].append(entry)
+            _write_manifest(directory, document)
+            bundle = verify_policy_bundle(directory, now=NOW)
+            with bundle.materialized_files() as paths:
+                options, status = bundle.mvp_options((("tetragon", "events.jsonl"),), role_paths=paths)
+                self.assertEqual(load_intent(options["observation_intent_path"]).schema, intent["schema"])
+                self.assertTrue(next(item for item in status["files"] if item["role"] == "enforcement_intent")["applied"])
+            entry["schema_version"] = "runtime-enforcement-intent/1.0"
+            _write_manifest(directory, document)
+            with self.assertRaisesRegex(PolicyBundleError, "intent.json.*내부 schema"):
                 verify_policy_bundle(directory, now=NOW)
 
     def test_missing_gateway_policy_is_rejected(self) -> None:
@@ -282,7 +310,7 @@ class PolicyBundleIntegrationTests(unittest.TestCase):
                 ("exec_exceptions", "exceptions.json", "runtime-exec-exceptions/1.0"),
             ):
                 path = directory / name
-                path.write_text(json.dumps({"schema_version": schema}), encoding="utf-8")
+                path.write_text(json.dumps({"schema" if role == "enforcement_intent" else "schema_version": schema}), encoding="utf-8")
                 raw = path.read_bytes()
                 files.append(
                     {

@@ -335,7 +335,11 @@ def summarize_pods(document: object, container: str) -> dict[str, Any]:
             }
         )
     pods.sort(key=lambda pod: pod["name"] or "")
-    live = [pod for pod in pods if not pod["deleting"]]
+    # Keep finished Pods in the observation, but never treat them as current targets.
+    live = [
+        pod for pod in pods
+        if not pod["deleting"] and pod["phase"] not in {"Failed", "Succeeded"}
+    ]
     if not live:
         state, current = "not_found", None
     elif len(live) > 1:

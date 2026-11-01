@@ -1,6 +1,6 @@
 """B160/PR171 history and B70431's explicitly reviewed native20 exact pair."""
 from pathlib import Path
-import hashlib,socket,subprocess
+import ast,hashlib,socket,subprocess
 import pytest
 from tools import b_lif07_native_capture as native
 from tools import verify_req10_consumption as gate
@@ -17,8 +17,20 @@ REVIEWED_B_NATIVE20_BYTES={
     'update/tests/test_b_native20_common_consumption.py':'02de728aabc98aa44d27c491fd24ba0dcc2e6b7ec7a9876577987af61d4d00cc',
     'update/docs/b-lif07/PR171_SOURCE_CONSUMPTION.md':'52480575feae69b4a8acb74ee434c40962f11a10d2691ffd89bdcbab13d2d13c',
 }
+REVIEWED_B_NATIVE20_FIXTURE_COMMIT='3900e2ab832a9ec0a80391306033a00022d99d05'
+REVIEWED_B_NATIVE20_FIXTURE_BYTES={
+    'update/tests/test_b_lif07_native_capture.py':'48fc8801b3ffeaf4e215e8ba130e5b1b0623b45b9ff71a26c76c33c0ada6742a',
+}
 PREVIOUS_B154_REPAIRED_BYTES={'update/docs/b-lif07/WORKER_READINESS.md': '890309ab74ae1f26951dd2021edd44ff8fee9592cda89a58148785b7bbc71871', 'update/docs/b-lif13/WEIGHTS_LIFETIME.md': '074edb488ae421c5fb8f2b71b0efa80479c33f344c157b3b9f9ad1a9d61548f2', 'update/tests/test_b_lif07_native_capture.py': '4d5e54ff880ad8d1b8a76d0db97b28aeec8a1045e12ec9b64ccfb98cbd0d35e1', 'update/tests/test_b_lif07_readiness.py': '5f31b26ecf6629744b45cd64816d69984a12432448e498c96dd0074bbe5abb4c', 'update/tools/b_lif07_native_capture.py': 'af90b8015c9f99d27065304ad7f04bda46d8abccbbcfbbe8900c649d63055e3c', 'update/tools/b_lif07_readiness.py': '636057bf4a4a0aa34232ec6d29abf9152b6e72bd4647c149be92659dfba28f2e', 'update/tests/linux_cpu/lif13_peer_probe.py': '789b08ff1acc549e478558fa8317eac074905e675d4cce87deede99f5d528e2d'}
 REVIEWED_B_BYTES={'update/docs/b-lif07/WORKER_READINESS.md': '5ede75e817cd57af5364be475d1d7eb0d6ff41423d37a2549019d405b5f2ab5f', 'update/docs/b-lif13/WEIGHTS_LIFETIME.md': '074edb488ae421c5fb8f2b71b0efa80479c33f344c157b3b9f9ad1a9d61548f2', 'update/tests/test_b_lif07_http_readiness.py': '8e8a9323132b32b7e5444cbc48954352dbab07809a5cf6bbfa04505c9226b1b0', 'update/tests/test_b_lif07_native_capture.py': '5376fc3eafbed4bf566ce48a1b1c4ca78936a74bb823971d5410c4c260f51585', 'update/tests/test_b_lif07_readiness.py': '5f31b26ecf6629744b45cd64816d69984a12432448e498c96dd0074bbe5abb4c', 'update/tools/b_lif07_native_capture.py': '3aa4ca2d21d9531859b6f19de5d5e7f206e3ec8d5f2050122275309e9417396d', 'update/tools/b_lif07_readiness.py': '172c726fa06a94a51963d3d20438178c96f02944ab42382d3de3e09f9e2e2dab', 'update/tests/linux_cpu/lif13_peer_probe.py': '789b08ff1acc549e478558fa8317eac074905e675d4cce87deede99f5d528e2d'}
+
+def _current_native20_blob(name,original):
+    if name not in REVIEWED_B_NATIVE20_FIXTURE_BYTES:
+        return original
+    successor=subprocess.check_output(['git','show',REVIEWED_B_NATIVE20_FIXTURE_COMMIT+':'+name],cwd=ROOT)
+    assert hashlib.sha256(successor).hexdigest()==REVIEWED_B_NATIVE20_FIXTURE_BYTES[name]
+    return successor
+
 
 def test_original_B160_eight_files_are_exact_confirmed_bytes():
     assert len(REVIEWED_B_BYTES)==8
@@ -33,7 +45,7 @@ def test_original_B160_eight_files_are_exact_confirmed_bytes():
             if name in REVIEWED_B_NATIVE20_BYTES:
                 current=subprocess.check_output(['git','show',REVIEWED_B_NATIVE20_COMMIT+':'+name],cwd=ROOT)
                 assert hashlib.sha256(current).hexdigest()==REVIEWED_B_NATIVE20_BYTES[name]
-                assert (ROOT/name).read_bytes()==current
+                assert (ROOT/name).read_bytes()==_current_native20_blob(name,current)
             else:
                 assert (ROOT/name).read_bytes()==successor
         else:
@@ -56,7 +68,23 @@ def test_B_native20_five_files_are_exact_owner_confirmed_bytes():
     for name,digest in REVIEWED_B_NATIVE20_BYTES.items():
         blob=subprocess.check_output(['git','show',REVIEWED_B_NATIVE20_COMMIT+':'+name],cwd=ROOT)
         assert hashlib.sha256(blob).hexdigest()==digest
-        assert (ROOT/name).read_bytes()==blob
+        assert (ROOT/name).read_bytes()==_current_native20_blob(name,blob)
+
+
+def test_B_owner_fixture_successor_preserves_product_sources_and_other_tests():
+    changed=subprocess.check_output(['git','diff-tree','--no-commit-id','--name-only','-r',REVIEWED_B_NATIVE20_FIXTURE_COMMIT],cwd=ROOT).decode().splitlines()
+    assert set(changed)==set(REVIEWED_B_NATIVE20_FIXTURE_BYTES)
+    name,=REVIEWED_B_NATIVE20_FIXTURE_BYTES
+    before=ast.parse(subprocess.check_output(['git','show',REVIEWED_B_NATIVE20_COMMIT+':'+name],cwd=ROOT))
+    after=ast.parse(_current_native20_blob(name,b''))
+    assert len(before.body)==len(after.body)
+    differing=[getattr(left,'name',type(left).__name__) for left,right in zip(before.body,after.body)
+               if ast.dump(left)!=ast.dump(right)]
+    assert differing==['test_pr171_HTTP_known_common_scope_excludes_native_only_histories']
+    assert native.HTTP_APPROVED_REVIEWED_COMMON_COMMITS==frozenset({
+        'f277fecd6df1e59505c0ad731032593f6fb22885','df6255e96a877ebfbe185230ed87320aa84d2c30',
+        'adcde856375a4de43d4a5d789c00de875e43e321'})
+    assert len(native.APPROVED_GATE_PROFILES)==5
 
 
 def test_public_PR171_392_snapshot_remains_historical_and_rejects_current394():

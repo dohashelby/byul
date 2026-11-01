@@ -1,5 +1,7 @@
 # A39 인수 후 native20~22 최소 통합
 
+후속 마감 안내: 아래 내용은 adcde856/d8904d0 인수 시점의 기록이다. 현재 B70431의 정확 조합 승인과 B3900e2a의 역사 fixture 보수는 원 bytes로 소비됐으며 현재 상태는 `A_B_NATIVE20_70431_ACCEPTANCE.md`를 따른다. 공통394/gate61c29 및 원 B helper/c9 기준은 유지한다. 아래의 당시 B 수락 대기·운영창·고정 예산 문구는 이력이며 최신 실행 승인이나 현재 잔액으로 사용하지 않는다. REQ13 후속 초안·운영 보수·실제 serving/GPU와 전체77 원분기 완료는 이 통합 마감과 별개다.
+
 이 문서는 과거 `A1_GENERATION_DEDICATED_LOCAL_PREPARATION.md`의 당시 작업 상태와 구분하는 현재 인계다. PR171은 병합됐으며 main920의 CI41275191055는5검사 모두 성공했다. 과거 B15 실패는 현재 main의 잔여가 아니다.
 
 `adcde856375a4de43d4a5d789c00de875e43e321`은 main920 위로 수락된 local0af의 공통·전용12파일을 원 bytes로 소비한다. A-2 원본4파일과 기존17개 의존 pin을 보존한다. B의 공개 fixture/tool 보수와 문서는 되돌리지 않는다. 전체5개 pin root의394 Git blob이 기존 검토716c29a와 정확히 같다. 따라서 A측 소비 literal을 이 새 ancestry의 adcde856으로 고정한다. 실행 시 읽은 해시를 승인하거나 검사 경로를 제외하지 않는다. 원 B helper858과 c9 기본값은 그대로다.

@@ -2,8 +2,9 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import type { EnvironmentDoc, PolicyDoc } from "../src/api/types";
+import { InputFieldView } from "../src/components/Choice";
 import { canonicalJson, environmentSnapshotSha256 } from "../src/lib/canonical";
-import { ALL_REQUIREMENTS, ENV_CONDITIONS, SECURITY_FUNCTIONS, visible, type InputField } from "../src/lib/frameworkCatalog";
+import { ALL_REQUIREMENTS, ENV_CONDITIONS, SECURITY_FUNCTIONS, isRequired, visible, type InputField } from "../src/lib/frameworkCatalog";
 import { CONDITION_FACTS, DERIVED_FACTS, EnvironmentForm, PolicyForm, REGISTERED_FACTS, claimSummary, deriveFact, newEnvironment, newPolicy, nextPolicyVersion } from "../src/pages/forms";
 import { mockApi, renderAt } from "./helpers";
 
@@ -212,7 +213,7 @@ describe("policy form", () => {
     const state = setup();
     const group = screen.getAllByRole("radiogroup", { name: "기존 승인 정책 처리" })[0];
     expect(screen.queryByRole("radiogroup", { name: "모델 사용 권한 단위" })).toBeNull();
-    fireEvent.click(within(group).getByRole("radio", { name: "변경·새로 정함" }));
+    fireEvent.click(within(group).getByRole("radio", { name: "새로 정함" }));
     expect(screen.getByRole("radiogroup", { name: "모델 사용 권한 단위" })).toBeTruthy();
     expect((state.doc as unknown as { framework_values: { requirements: Record<string, { decision: string }> } }).framework_values.requirements["1.2"].decision).toBe("change");
   });
@@ -242,5 +243,72 @@ describe("policy form", () => {
     expect(nextPolicyVersion("1")).toBe("2");
     expect(nextPolicyVersion("v9")).toBe("v10");
     expect(nextPolicyVersion("draft")).toBe("draft-2");
+  });
+});
+
+describe("프레임워크·솔루션 기준 입력 항목", () => {
+  const fieldKeys = (id: string) => ALL_REQUIREMENTS.find((r) => r.id === id)!.fields.map((f) => f.key);
+
+  it("runtime이 받지 않는 미디어·tool_choice는 묻지 않고 승인값은 묻는다", () => {
+    expect(fieldKeys("3.1")).not.toContain("tool_choice");
+    expect(fieldKeys("6.1")).not.toContain("media_input");
+    expect(ALL_REQUIREMENTS.find((r) => r.id === "6.1")!.numbers.map((n) => n.key)).not.toContain("media_bytes");
+    expect(fieldKeys("2.1")).toEqual(expect.arrayContaining(["approved_image_digests", "approved_tp_size"]));
+    expect(fieldKeys("4.2")).toContain("cache_isolation");
+  });
+
+  it("프레임워크가 지정한 질문만 필수로 표시한다", () => {
+    const env = ENV_CONDITIONS.flatMap((c) => c.fields).filter((f) => f.required);
+    const policy = ALL_REQUIREMENTS.flatMap((r) => r.fields).filter((f) => f.required);
+    expect(env).toHaveLength(33);
+    expect(policy.filter((f) => f.required === true)).toHaveLength(86);
+    expect(policy.filter((f) => typeof f.required === "object")).toHaveLength(12);
+    // 선정 구현 CHK에서만 쓰는 값은 필수가 아니다. 강제 종료는 기본 확인 LIF-010의 결정값이라 필수다.
+    expect(policy.map((f) => f.key)).not.toContain("supported_gpus");
+    expect(policy.map((f) => f.key)).toContain("force_kill");
+  });
+
+  it("조건부 필수는 프레임워크 조건일 때만 필수다", () => {
+    const req = (id: string, key: string) => ALL_REQUIREMENTS.find((r) => r.id === id)!.fields.find((f) => f.key === key)!;
+    const off = { prefix_cache: false, prefix_cache_or_shared_cache: false };
+    expect(isRequired(req("4.2", "sharing_unit"), {}, { facts: off })).toBe(false);
+    expect(isRequired(req("4.2", "sharing_unit"), {}, { facts: { ...off, prefix_cache: true } })).toBe(true);
+    expect(isRequired(req("4.2", "sharing_unit"), {}, { facts: { ...off, prefix_cache_or_shared_cache: true } })).toBe(true);
+    // 사용 여부를 모르면 제외하지 않는다.
+    expect(isRequired(req("4.2", "sharing_unit"), {}, { facts: { ...off, prefix_cache: null } })).toBe(true);
+    expect(isRequired(req("4.2", "sharing_unit"), {}, {})).toBe(true);
+    expect(isRequired(req("7.3", "mixed_generation"), { strategy: "live_update" })).toBe(true);
+    expect(isRequired(req("5.4", "key_management"), { encryption: "none" })).toBe(false);
+    expect(isRequired(req("1.6", "egress_rules"), { egress_default: "allow_all" })).toBe(false);
+    expect(isRequired(req("1.2", "caller_models"), { model_access: "authenticated" })).toBe(false);
+    expect(isRequired(req("1.2", "caller_models"), { model_access: "per_role" })).toBe(true);
+    expect(isRequired(req("6.4", "shared_lifecycle"), {}, { weights: { delivery: "local_file" }, observability: { diagnostics: false } })).toBe(false);
+    expect(isRequired(req("6.4", "shared_lifecycle"), {}, { observability: { diagnostics: true } })).toBe(true);
+    expect(isRequired(req("7.3", "mixed_generation"), { strategy: "stop_redeploy" })).toBe(false);
+    expect(isRequired(req("7.3", "mixed_generation"), { strategy: "canary" })).toBe(true);
+  });
+
+  it("결과 저장 기능은 기준 환경 엔진에 /v1/responses가 있을 때만 묻는다", () => {
+    const field = ALL_REQUIREMENTS.find((r) => r.id === "4.1")!.fields.find((f) => f.key === "stored_results")!;
+    expect(visible(field, {}, {})).toBe(false);
+    expect(visible(field, {}, { entry: { active_routes: ["chat"] } })).toBe(false);
+    expect(visible(field, {}, { entry: { active_routes: ["chat", "responses"] } })).toBe(true);
+    expect(visible(field, {}, { entry: { active_routes: null } })).toBe(true);
+  });
+
+  it("같은 결정을 두 곳에서 묻지 않는다", () => {
+    const keys = ALL_REQUIREMENTS.flatMap((r) => [...r.fields, ...r.numbers].map((f) => f.key));
+    for (const k of ["retry_allowed", "rto", "allowed_destinations", "diag_ttl"]) expect(keys).not.toContain(k);
+    expect(ALL_REQUIREMENTS.find((r) => r.id === "1.6")!.numbers.map((n) => n.key)).toContain("policy_ttl");
+  });
+
+  it("목록·서술 답에서 없음과 모름을 고를 수 있다", () => {
+    const answers: unknown[] = [];
+    const field = ALL_REQUIREMENTS.find((r) => r.id === "1.4")!.fields.find((f) => f.key === "allowed_capabilities")!;
+    renderAt("/", "/", <InputFieldView field={field} value={undefined} onChange={(v) => answers.push(v)} />);
+    const group = screen.getByRole("radiogroup", { name: "허용 capability 없음·모름" });
+    fireEvent.click(within(group).getByRole("radio", { name: "없음" }));
+    fireEvent.click(within(group).getByRole("radio", { name: "모름" }));
+    expect(answers).toEqual([[], null]);
   });
 });

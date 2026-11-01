@@ -68,10 +68,10 @@ export function FieldMessages({ ctx, path, exact }: { ctx: FormCtx; path: string
   );
 }
 
-function Field({ label, ctx, path, children, hint }: { label: string; ctx: FormCtx; path: string; children: ReactNode; hint?: string }) {
+function Field({ label, ctx, path, children, hint, required }: { label: string; ctx: FormCtx; path: string; children: ReactNode; hint?: string; required?: boolean }) {
   return (
     <label className={p.field}>
-      {label}
+      <span className={required ? p.req : undefined}>{label}</span>
       {children}
       {hint && <span className="muted">{hint}</span>}
       <FieldMessages ctx={ctx} path={path} exact />
@@ -91,6 +91,7 @@ export function TextField({
   placeholder,
   hint,
   suggestions,
+  required,
 }: {
   ctx: FormCtx;
   path: string;
@@ -100,13 +101,15 @@ export function TextField({
   placeholder?: string;
   hint?: string;
   suggestions?: string[];
+  required?: boolean;
 }) {
   const v = getIn(ctx.doc, path);
   const listId = useId();
   return (
-    <Field label={label} ctx={ctx} path={path} hint={hint}>
+    <Field label={label} ctx={ctx} path={path} hint={hint} required={required}>
       <input
         className={`input ${bad(ctx, path)}`}
+        aria-required={required}
         list={suggestions?.length ? listId : undefined}
         value={typeof v === "string" ? v : ""}
         placeholder={nullable ? (placeholder ?? "모르면 비워 둠 (null)") : placeholder}
@@ -123,12 +126,13 @@ export function TextField({
   );
 }
 
-export function NumberField({ ctx, path, label, nullable, optional }: { ctx: FormCtx; path: string; label: string; nullable?: boolean; optional?: boolean }) {
+export function NumberField({ ctx, path, label, nullable, optional, required }: { ctx: FormCtx; path: string; label: string; nullable?: boolean; optional?: boolean; required?: boolean }) {
   const v = getIn(ctx.doc, path);
   return (
-    <Field label={label} ctx={ctx} path={path} hint={nullable ? "모르면 비워 둠 (null)" : optional ? "비우면 필드 없음" : undefined}>
+    <Field label={label} ctx={ctx} path={path} hint={required ? undefined : nullable ? "모르면 비워 둠 (null)" : optional ? "비우면 필드 없음" : undefined} required={required}>
       <input
         className={`input ${bad(ctx, path)}`}
+        aria-required={required}
         type="number"
         value={typeof v === "number" ? v : ""}
         onChange={(e) => {
@@ -152,19 +156,21 @@ export function SelectField({
   label,
   options,
   nullable,
+  required,
 }: {
   ctx: FormCtx;
   path: string;
   label: string;
   options: { value: string; label: string }[];
   nullable?: boolean;
+  required?: boolean;
 }) {
   const v = getIn(ctx.doc, path);
   // 이전 판본에 목록 밖 값이 있으면 지우지 않고 그대로 보여준다.
   const outside = typeof v === "string" && v !== "" && !options.some((o) => o.value === v);
   return (
-    <Field label={label} ctx={ctx} path={path}>
-      <select className={`select ${bad(ctx, path)}`} value={typeof v === "string" ? v : ""} onChange={(e) => ctx.set(path, e.target.value === "" ? (nullable ? null : undefined) : e.target.value)}>
+    <Field label={label} ctx={ctx} path={path} required={required}>
+      <select className={`select ${bad(ctx, path)}`} aria-required={required} value={typeof v === "string" ? v : ""} onChange={(e) => ctx.set(path, e.target.value === "" ? (nullable ? null : undefined) : e.target.value)}>
         <option value="">{nullable ? "– (null)" : "선택"}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -178,14 +184,15 @@ export function SelectField({
 }
 
 /** 쉼표로 나눈 문자열 목록. */
-export function ListField({ ctx, path, label }: { ctx: FormCtx; path: string; label: string }) {
+export function ListField({ ctx, path, label, required }: { ctx: FormCtx; path: string; label: string; required?: boolean }) {
   const v = getIn(ctx.doc, path);
   const [text, setText] = useState(Array.isArray(v) ? v.join(", ") : "");
   useEffect(() => setText(Array.isArray(v) ? v.join(", ") : ""), [JSON.stringify(v)]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <Field label={label} ctx={ctx} path={path} hint="쉼표로 구분">
+    <Field label={label} ctx={ctx} path={path} hint="쉼표로 구분" required={required}>
       <input
         className={`input ${bad(ctx, path)}`}
+        aria-required={required}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
@@ -202,13 +209,14 @@ export function ListField({ ctx, path, label }: { ctx: FormCtx; path: string; la
   );
 }
 
-export function DateTimeField({ ctx, path, label }: { ctx: FormCtx; path: string; label: string }) {
+export function DateTimeField({ ctx, path, label, required }: { ctx: FormCtx; path: string; label: string; required?: boolean }) {
   const v = getIn(ctx.doc, path);
   const local = typeof v === "string" ? toLocal(v) : "";
   return (
-    <Field label={label} ctx={ctx} path={path} hint={typeof v === "string" ? `저장 값: ${v}` : "비우면 null"}>
+    <Field label={label} ctx={ctx} path={path} hint={typeof v === "string" ? `저장 값: ${v}` : "비우면 null"} required={required}>
       <input
         className={`input ${bad(ctx, path)}`}
+        aria-required={required}
         type="datetime-local"
         value={local}
         onChange={(e) => ctx.set(path, e.target.value ? new Date(e.target.value).toISOString().replace(/\.\d{3}Z$/, "Z") : null)}

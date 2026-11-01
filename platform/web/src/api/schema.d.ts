@@ -349,6 +349,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policies/{doc_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Policy
+         * @description 저장된 최신 DRAFT 판본을 내용 그대로 CONFIRMED 새 판본으로 남긴다. 승인 기록은 자기 신고다.
+         */
+        post: operations["confirm_policy_api_policies__doc_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evidence": {
         parameters: {
             query?: never;
@@ -503,6 +523,15 @@ export interface components {
             /** Open Revalidation */
             open_revalidation: number | null;
             revalidation_error?: components["schemas"]["ErrorBody"] | null;
+        };
+        /** PolicyConfirm */
+        PolicyConfirm: {
+            /** Revision */
+            revision: number;
+            /** Approved By */
+            approved_by: string;
+            /** Approval Ref */
+            approval_ref: string;
         };
         /** PolicyRevision */
         PolicyRevision: {
@@ -2556,6 +2585,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_policy_api_policies__doc_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicySaved"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveRejected"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SaveRejected"];
                 };
             };
         };

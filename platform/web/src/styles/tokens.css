@@ -19,6 +19,7 @@
   --chart-gray: #a3a6b1;
   --chart-gray-2: #d3d5dc;
   --error: #cf3b34;
+  --required: #1f6feb;
   --error-soft: #fbeceb;
   --warn: #a8661a;
   --warn-soft: #f9f0e3;
@@ -45,6 +46,7 @@
     --chart-gray: #5c5f6c;
     --chart-gray-2: #3a3d48;
     --error: #ec6a60;
+    --required: #58a6ff;
     --error-soft: rgba(236, 106, 96, 0.14);
     --warn: #d9a050;
     --warn-soft: rgba(217, 160, 80, 0.14);
@@ -69,6 +71,7 @@
   --chart-gray: #5c5f6c;
   --chart-gray-2: #3a3d48;
   --error: #ec6a60;
+  --required: #58a6ff;
   --error-soft: rgba(236, 106, 96, 0.14);
   --warn: #d9a050;
   --warn-soft: rgba(217, 160, 80, 0.14);

@@ -86,7 +86,7 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
         (tmp_path/'a1-product-receipt.json').write_bytes(canonical_json(receipt))
         return
     proof=helper.verify_source()
-    assert proof['files_verified']==387 and proof['reviewed_common_commit']=='f277fecd6df1e59505c0ad731032593f6fb22885'
+    assert proof['files_verified']==392 and proof['reviewed_common_commit']=='df6255e96a877ebfbe185230ed87320aa84d2c30'
     assert proof['runtime_hash_approval'] is False and proof['paths_excluded']==[]
     now=utcnow();window={'http_validity_start':(now-timedelta(seconds=30)).isoformat(),
         'http_validity_end':(now+timedelta(minutes=3)).isoformat()}

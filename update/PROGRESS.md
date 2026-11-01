@@ -1682,3 +1682,4 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 
 - 2026-11-01 A39 인수: 수락된 local0af OBS02/native20~22 공통·전용12파일을 main920 위로 원 bytes 소비. B PR171 fixture/tool 보수는 보존. 본 묶음의 새로운 실제 실증·전체 분기 완료 주장은 없음. 첫 PLT 실증은 Start1회 용량 부족 후 stopped 확인·자동 재시도 없음. 영향 검증과 A측 검토 pin은 후속 고정 단계로 분리한다.
 - 2026-11-01 A측 소비 pin: adcde856 전체394 blob은 기존716c29a와 일치·manifest0ee4b9da 유지. 새 ancestry/source-index-shadow 영향9통과(13.83s). B 원본 gate/common 승인 목록은 유지되며 새 gate61c29e98/common adcde856는 검토 전 거부를 확인했다. 기존286 설치/CLI4/24Ref는 동일 bytes 범위로 이월. 새 후보 전체 CI5·B 조합 수락·실제 worker/GPU는 미완료.
+- 2026-11-01 B70431 수락: B가 검토한 gate61c29/common adcde의 전용5파일 원bytes를 소비하고 전체394 literal manifest를 대조했다. A측 두 수락 시험은 B160/PR171 역사 원본과 새5파일을 구분하고 현재394 정상 수락·혼합/미등록·과거392 snapshot 거부를 확인하도록 고정한다. 직접/인접/최종 검증은 receipt로 마감하며 actual/CI5로 확대하지 않는다. PLT source920 실증은 준비 run ID 거부로 미실행, 양 서버 Stop·실패팩 정확복원을 마감했고 후속 ID 보수는 로컬 CPU 검증만 수행했다.

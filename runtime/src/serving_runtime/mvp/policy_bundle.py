@@ -355,8 +355,9 @@ def verify_policy_bundle(
         inner = _strict_json(raw, relative)
         if not isinstance(inner, dict):
             raise _error(relative, "내부 문서는 JSON 객체여야 합니다")
-        if inner.get("schema_version") != entry["schema_version"]:
-            raise _error(relative, "내부 schema_version이 bundle.json 항목과 다릅니다")
+        schema_field = "schema" if entry["role"] == "enforcement_intent" else "schema_version"
+        if inner.get(schema_field) != entry["schema_version"]:
+            raise _error(relative, f"내부 {schema_field}이 bundle.json 항목과 다릅니다")
         if entry["role"] == "gateway_policy":
             gateway_document = inner
         verified_files.append(

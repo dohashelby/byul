@@ -183,6 +183,21 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
         with self.assertRaises(ValueError):
             summarize_pods({"kind": "List"}, "engine")
 
+    def test_finished_pods_are_observed_but_not_target_candidates(self) -> None:
+        failed = pod("failed", "old", "old-container", running=False)
+        failed["status"]["phase"] = "Failed"
+        succeeded = pod("succeeded", "done", "done-container", running=False)
+        succeeded["status"]["phase"] = "Succeeded"
+        running = pod("running", "current", "containerd://current")
+        pending = pod("pending", "next", "", running=False)
+        pending["status"]["phase"] = "Pending"
+        one = summarize_pods({"items": [failed, succeeded, running]}, "engine")
+        self.assertEqual((one["state"], one["instance"]["pod"]), ("ok", "running"))
+        self.assertEqual({item["phase"] for item in one["pods"]}, {"Failed", "Succeeded", "Running"})
+        self.assertEqual(summarize_pods({"items": [failed, succeeded]}, "engine")["state"], "not_found")
+        self.assertEqual(summarize_pods({"items": [failed, running, pod("another", "u2", "c2")]}, "engine")["state"], "multiple_targets")
+        self.assertEqual(summarize_pods({"items": [failed, running, pending]}, "engine")["state"], "multiple_targets")
+
     def test_collector_uses_fixed_read_only_argv(self) -> None:
         registration = load_target(self.write("t.json", target_document(kubernetes=kubernetes_block())))
         runner = FakeRunner({"items": [pod("p1", "u1", "c1")]})

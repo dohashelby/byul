@@ -6,6 +6,8 @@
 
 AWS 호스트의 `ubuntu` 사용자로 다음을 확인한다.
 
+EC2 Stop/Start 직후에는 GPU 플러그인 복구 전 생성된 엔진 Pod가 `UnexpectedAdmissionError`와 `Failed` 상태로 남을 수 있다. `kubectl --context byul-aws-lab get node -o json`에서 `nvidia.com/gpu` allocatable이 1인지, 현재 엔진 Pod가 Ready인지 확인한 뒤 시험한다. 종료된 Pod는 현재 대상 후보에서 제외되지만 실행 또는 대기 중인 후보가 둘 이상이면 보류한다.
+
 ```bash
 kubectl --context byul-aws-lab -n serving-lab get deploy,pod
 systemctl --user status byul-observation-feed
@@ -31,6 +33,8 @@ AWS-01의 엔진 로그 매칭에는 runtime 통합 patch의 `--enable-log-reque
 ## 실행
 
 AWS 묶음 `COST-PLAN.md`에 따라 먼저 dev(g6.2xlarge)에서 기능 연결을 확인하고, 정식 결과는 reference(g6.4xlarge)로 다시 실행한다. 로컬 단위시험과 문서 검토를 끝낸 뒤 GPU 서버에서는 사례를 묶어서 실행한다.
+
+서버에서는 CLI의 패키지 메타데이터가 필요하므로 저장소 `runtime/`에서 `python3 -m venv .venv && .venv/bin/pip install --no-deps -e .`로 준비한다. 정책 묶음은 AWS 묶음 03 이후 `images.lock`의 엔진 digest를 확인해 서버 사본에서 만들고, 값이 채워진 intent를 `enforcement_intent`로 포함한다.
 
 비파괴 사례부터 확인:
 
@@ -101,7 +105,7 @@ AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. s
 
 각 실행은 현재 폴더의 `evidence/aws-acceptance-<UTC>-<pid>/`를 0700으로 만들고 0600의 `report.json`·`report.md`를 쓴다. 명령 argv, HTTP code, request ID, 판정에 사용한 record 필드, 관측 파일·행 또는 API query가 들어가며 token·token hash·prompt·응답 본문은 넣지 않는다.
 
-로컬 준비 → dev 비파괴 6건 → dev 변경 2건 → Pod 교체 뒤 AWS-04·05 재실행 → 필요한 수정과 재시험 → reference 8건 및 같은 재실행 → 증거 반출 → EC2 Stop 순서로 묶는다. 사례 사이에 엔진을 내리지 않고, AWS-08에서만 한 번 cold-start한다. 종료 전에 실행 폴더를 관리자 보관소나 개발 노트북으로 반출하고 파일 권한을 유지한다.
+로컬 준비 → dev 비파괴 6건 → dev 변경 2건 → Pod 교체 뒤 AWS-04·05 재실행 → 필요한 수정과 재시험 → reference 8건 및 같은 재실행 → 증거 반출 → EC2 Stop 순서로 묶는다. 사례 사이에 엔진을 내리지 않고, AWS-08에서만 한 번 cold-start한다. 종료 전에 `report.json`·`report.md` 등 증거 파일의 존재를 확인하고, 실행 폴더를 관리자 보관소나 개발 노트북으로 반출한 뒤 파일 권한을 유지하며 Stop한다.
 
 ## Known gaps
 

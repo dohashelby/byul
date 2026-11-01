@@ -337,6 +337,35 @@ class DecisionTests(unittest.TestCase):
 
 
 class FakeExecutionTests(unittest.TestCase):
+    def test_engine_pod_ignores_finished_and_terminating_pods(self) -> None:
+        def item(name: str, phase: str, *, deleting: bool = False) -> dict[str, object]:
+            metadata: dict[str, object] = {"name": name, "uid": name}
+            if deleting:
+                metadata["deletionTimestamp"] = "2026-11-01T00:00:00Z"
+            return {
+                "metadata": metadata,
+                "status": {
+                    "phase": phase,
+                    "containerStatuses": [{"name": "engine", "containerID": name}],
+                    "conditions": [{"type": "Ready", "status": "True"}],
+                },
+            }
+
+        finished = [item("failed", "Failed"), item("succeeded", "Succeeded")]
+        running = item("running", "Running")
+        cases = (
+            (finished + [running], "running"),
+            (finished, None),
+            (finished + [running, item("other", "Running")], None),
+            ([running, item("terminating", "Running", deleting=True)], "running"),
+        )
+        for pods, expected in cases:
+            with self.subTest(expected=expected, count=len(pods)), tempfile.TemporaryDirectory() as temporary:
+                runner = FakeRunner([CommandResult(0, json.dumps({"items": pods}))])
+                checker = AWSAcceptance(arguments(Path(temporary)), runner=runner, http=FakeHTTP([]))
+                selected, _ = checker._engine_pod()
+                self.assertEqual(selected["name"] if selected else None, expected)
+
     def test_engine_log_matching_is_route_aware(self) -> None:
         request_id = "route-1"
         chat = f"Received request chatcmpl-{request_id}"

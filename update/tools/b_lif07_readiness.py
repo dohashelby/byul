@@ -380,9 +380,10 @@ def _collect_http(env, target, prepared, manifest, start, end):
     from tools import b_lif07_native_capture as helper
     try:
         proof = helper.verify_source()
-        if type(proof) is not dict or proof.get('reviewed_common_commit') != helper.HTTP_REVIEWED_COMMON_COMMIT:
+        reviewed_common = proof.get('reviewed_common_commit') if type(proof) is dict else None
+        if type(reviewed_common) is not str or reviewed_common not in helper.HTTP_APPROVED_REVIEWED_COMMON_COMMITS:
             raise ValueError
-        result['source_validation'] = {'reviewed_common_commit': helper.HTTP_REVIEWED_COMMON_COMMIT,
+        result['source_validation'] = {'reviewed_common_commit': reviewed_common,
             'runtime_hash_approval': False, 'producer_authenticated': False}
     except Exception:
         result['gaps'].append('HTTP_SOURCE_UNAVAILABLE')

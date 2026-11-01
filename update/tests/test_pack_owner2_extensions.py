@@ -41,8 +41,12 @@ def test_existing_producers_feed_dedicated_check_profiles(tmp_path,group,native_
     check=baseline_pack().checks[check_id].model_copy(update={'collection_profile':profile,
         'required_observations':pack.checks[old_id].required_observations})
     target=tmp_path/'target.json';target.write_bytes(canonical_json(world.target))
+    if kind=='budget':
+        from tests.test_budget_process_rss import example_rss_runner
+        selected_runner=example_rss_runner(world.runner)
+    else:selected_runner=world.runner
     executor=(buffer.KubernetesStreamBufferExecutor if kind=='budget' else initialization.KubernetesInitializationExecutor)(
-        {'target':str(target),'prepared':str(group.manifest_path)},runner=world.runner)
+        {'target':str(target),'prepared':str(group.manifest_path)},runner=selected_runner)
     draft=executor.run(check,group.env,values,VllmAdapter(),tmp_path/'evidence')
     assert draft.data_origin==DataOrigin.EXAMPLE
     assert draft.observations['buffer_scope_complete' if kind=='budget' else 'init_scope_complete'].value is False

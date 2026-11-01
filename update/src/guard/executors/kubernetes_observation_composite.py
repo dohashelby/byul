@@ -3,6 +3,7 @@ from pathlib import Path
 from guard.collectors.lifecycle import load_prepared
 from guard.models import DataOrigin,ExecStatus,ORIGIN_STRENGTH,canonical_json,sha256_hex,utcnow
 from guard.runtime.bounded import strict_json
+from guard.runtime.kubernetes_http import KubernetesHTTP
 from .base import EvidenceDraft
 from .kubernetes_observation_state import OBSERVATIONS as BASE_OBSERVATIONS
 from .kubernetes_observation_identity import KubernetesObservationIdentityExecutor
@@ -10,7 +11,8 @@ from . import observation_identity_contract as identity
 from . import kubernetes_profiler_observation as profiler
 
 PROFILE='kubernetes-observation-state-composite-v1'
-POLICY_TYPES={**identity.POLICY_TYPES,**profiler.POLICY_TYPES}
+POLICY_TYPES={k:v for k,v in {**identity.POLICY_TYPES,**profiler.POLICY_TYPES}.items() if k!='observation_state_target_sha256'}
+POLICY_TYPES.update(identity_target_sha256='str',profiler_target_sha256='str')
 OBSERVATIONS={**BASE_OBSERVATIONS,**identity.OBSERVATIONS,**profiler.OBSERVATIONS,
     'state_collection_sessions':'list','state_collection_scope_complete':'bool'}
 
@@ -18,8 +20,13 @@ OBSERVATIONS={**BASE_OBSERVATIONS,**identity.OBSERVATIONS,**profiler.OBSERVATION
 def normalize_policy(values):
     if type(values) is not dict or set(values)!=set(POLICY_TYPES):
         raise ValueError('OBSERVATION_COMPOSITE_POLICY_INVALID')
-    identity.normalize_policy({k:values[k] for k in identity.POLICY_TYPES})
-    profiler.normalize_policy({k:values[k] for k in profiler.POLICY_TYPES})
+    identity.normalize_policy(child_policy(values,'identity',identity))
+    profiler.normalize_policy(child_policy(values,'profiler',profiler))
+
+
+def child_policy(values,label,contract):
+    return {key:values[label+'_target_sha256'] if key=='observation_state_target_sha256' else values[key]
+        for key in contract.POLICY_TYPES}
 
 
 class KubernetesObservationCompositeExecutor:
@@ -37,29 +44,36 @@ class KubernetesObservationCompositeExecutor:
         """Validate both bindings before the first child can send a probe."""
         self.validate_policy(check,values)
         try:
-            if (type(self.cfg) is not dict or set(self.cfg)-{'target','identity_prepared','profiler_prepared','kubectl_binary','max_duration_seconds'}
+            if (type(self.cfg) is not dict or set(self.cfg)-{'identity_target','profiler_target','identity_prepared','profiler_prepared','kubectl_binary','max_duration_seconds'}
                     or adapter is None or not env.hash_ok() or env.engine.name!='vllm' or env.engine.version!='0.31.0'
                     or any(type(v) is not str or not v for v in (env.model.id,env.model.revision))):raise ValueError
-            with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
-            digest=sha256_hex(canonical_json(target))
-            if (digest!=values['observation_state_target_sha256'] or env.ref().sha256!=values['observation_state_environment_sha256']
-                    or self.expected_target is not None and digest!=self.expected_target):raise ValueError
-            children=[];sessions=[]
+            expected={label:values[label+'_target_sha256'] for label in ('identity','profiler')}
+            if (env.ref().sha256!=values['observation_state_environment_sha256']
+                    or self.expected_target is not None and self.expected_target!=expected):raise ValueError
+            children=[];sessions=[];bindings=[]
             for label,implementation,contract in (('identity',KubernetesObservationIdentityExecutor,identity),
                     ('profiler',profiler.KubernetesProfilerObservationExecutor,profiler)):
+                with Path(self.cfg[label+'_target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
+                digest=sha256_hex(canonical_json(target))
+                if digest!=expected[label]:raise ValueError
+                # Constructor validates both complete immutable target bindings without I/O.
+                transport=KubernetesHTTP(target,env,duration=self.cfg.get('max_duration_seconds',120),
+                    binary=self.cfg.get('kubectl_binary','kubectl'),runner=self.runner,profile=implementation.transport_profile)
+                engine=transport.binding['engine']
+                bindings.append((transport.binding['context'],engine['namespace_uid'],engine['pod_uid'],engine['container_id']))
                 prepared=load_prepared(self.cfg[label+'_prepared']);sessions.append(prepared['session'])
                 if (prepared['profile'] not in implementation.supported_native_profiles
                         or sha256_hex(canonical_json(prepared))!=values[label+'_prepared_sha256']):raise ValueError
-                selected={k:values[k] for k in contract.POLICY_TYPES}
+                selected=child_policy(values,label,contract)
                 start,end=contract.normalize_policy(selected)
                 if not start<=utcnow()<=end:raise ValueError
-                cfg={k:v for k,v in self.cfg.items() if k in {'target','kubectl_binary','max_duration_seconds'}}
-                cfg['prepared']=self.cfg[label+'_prepared']
-                executor=implementation(cfg,runner=self.runner,environ=self.environ,expected_target_sha256=self.expected_target)
+                cfg={k:v for k,v in self.cfg.items() if k in {'kubectl_binary','max_duration_seconds'}}
+                cfg['target']=self.cfg[label+'_target'];cfg['prepared']=self.cfg[label+'_prepared']
+                executor=implementation(cfg,runner=self.runner,environ=self.environ,expected_target_sha256=expected[label])
                 child_check=check.model_copy(update={'collection_profile':contract.PROFILE})
                 executor.validate_policy(child_check,selected)
                 children.append((label,executor,child_check,selected,prepared))
-            if len(set(sessions))!=2:raise ValueError
+            if len(set(sessions))!=2 or len(set(bindings))!=2:raise ValueError
             return children
         except (KeyError,ValueError,TypeError,OSError,RuntimeError):
             raise ValueError('OBSERVATION_COMPOSITE_CONFIGURATION_INVALID') from None
@@ -84,17 +98,17 @@ class KubernetesObservationCompositeExecutor:
         observations={}
         for key in OBSERVATIONS:
             if key.startswith('state_collection_'):continue
-            selected=[d.observations.get(key) for d in drafts if key in d.observations]
-            if key in BASE_OBSERVATIONS and (len(selected)!=2 or any(not o.collected for o in selected)):
-                observations[key]={'value':None,'collected':False}
-            elif not selected or not all(o.collected for o in selected):
-                observations[key]={'value':None,'collected':False}
-            elif len(selected)==1:observations[key]=selected[0]
-            elif BASE_OBSERVATIONS[key]=='list':
-                observations[key]={'value':[{**v,'collection_component':children[index][0],
+            selected=[(index,d.observations[key]) for index,d in enumerate(drafts)
+                if key in d.observations and d.observations[key].collected]
+            if key in BASE_OBSERVATIONS and BASE_OBSERVATIONS[key]=='list':
+                observations[key]={'value':[{**value,'collection_component':children[index][0],
                     'collection_session_sha256':sessions[index]['session_sha256']}
-                    for index,o in enumerate(selected) for v in o.value],'collected':True}
-            else:observations[key]={'value':all(o.value is True for o in selected),'collected':True}
+                    for index,observation in selected for value in observation.value] if selected else None,
+                    'collected':bool(selected)}
+            elif not selected:observations[key]={'value':None,'collected':False}
+            elif key in BASE_OBSERVATIONS:
+                observations[key]={'value':len(selected)==2 and all(o.value is True for _,o in selected),'collected':True}
+            else:observations[key]=selected[0][1]
         observations['state_collection_sessions']={'value':sessions,'collected':True}
         observations['state_collection_scope_complete']={'value':False,'collected':True}
         complete=all(d.status==ExecStatus.COMPLETED and not d.cleanup_errors for d in drafts)

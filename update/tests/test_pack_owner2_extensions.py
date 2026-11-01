@@ -37,6 +37,7 @@ def test_existing_producers_feed_dedicated_check_profiles(tmp_path,group,native_
     module,inputs,check_id,profile,old_id=(buffer,buffer_inputs,'LIF-03',buffer.BUDGET_PROFILE,'LIF-04') if kind=='budget' else (
         initialization,initialization_inputs,'LIF-07',initialization.READINESS_PROFILE,'LIF-09')
     world,values,pack,_=inputs(tmp_path,group,native_target,mode)
+    if kind=='readiness':values['required_readiness_items']=['required-rank','required-model']
     check=baseline_pack().checks[check_id].model_copy(update={'collection_profile':profile,
         'required_observations':pack.checks[old_id].required_observations})
     target=tmp_path/'target.json';target.write_bytes(canonical_json(world.target))
@@ -55,6 +56,9 @@ def test_existing_producers_feed_dedicated_check_profiles(tmp_path,group,native_
     if mode=='budget-candidate':
         candidates=draft.observations['buffer_conflict_candidates'].value
         assert candidates and all(c['confirmed_violation'] is False for c in candidates)
+    if kind=='readiness':
+        assert draft.observations['init_required_readiness_items'].value==['required-rank','required-model']
+        assert draft.observations['init_unverified_readiness_items'].value==['required-rank','required-model']
     if mode=='engine-replaced':assert len(world.sent)<=1
 
 
@@ -87,15 +91,26 @@ def test_profiler_cpu_route_reuses_producer_and_failed_stop_next_start_record(tm
         check.model_copy(update={'collection_profile':profiler.PROFILE}),{})
 
 
+
+def separate_profiler_target(target,native=False):
+    engine=target['kubernetes']['engine']
+    engine.update(namespace='profiler-engine',namespace_uid='00000000-0000-0000-0000-000000000003',
+        pod_uid='10000000-0000-0000-0000-000000000003',container_id='containerd://'+'3'*64,pod_ip='127.0.0.3')
+    if not native:target['engine']['trusted_url']='http://127.0.0.3:8000'
+
 def composite_inputs(tmp_path,group,native_target):
     env=group.env.model_copy(deep=True);env.model.id='EXAMPLE-model';env.model.revision='EXAMPLE-revision';group.env=env.seal()
     target=deepcopy(native_target);target['environment_ref']=group.env.ref().model_dump(mode='json')
-    world=StateWorld(group,target,'normal');path=tmp_path/'target.json';path.write_bytes(canonical_json(world.target))
-    cfg={'target':str(path)};prepared={}
+    world=StateWorld(group,target,'normal');cfg={};prepared={};targets={}
+    for label in ('identity','profiler'):
+        targets[label]=deepcopy(world.target)
+        if label=='profiler':separate_profiler_target(targets[label])
+        path=tmp_path/(label+'-target.json');path.write_bytes(canonical_json(targets[label]));cfg[label+'_target']=str(path)
     for label,profile in [('identity','vllm-native-lifecycle-metadata/8'),('profiler',vllm_profiler_sensor.PROFILE)]:
         folder=group.root/(label+'-assets');prepared[label]=prepare_assets(folder,REPO,profile=profile);cfg[label+'_prepared']=str(folder/'manifest.json')
     now=utcnow();values={'observation_state_environment_sha256':group.env.ref().sha256,
-        'observation_state_target_sha256':sha256_hex(canonical_json(world.target)),
+        'identity_target_sha256':sha256_hex(canonical_json(targets['identity'])),
+        'profiler_target_sha256':sha256_hex(canonical_json(targets['profiler'])),
         'observation_state_validity_start':(now-timedelta(seconds=30)).isoformat(),
         'observation_state_validity_end':(now+timedelta(seconds=300)).isoformat(),
         'observation_state_required_components':['http_listener'],'identity_record_session':'a'*32,
@@ -110,7 +125,7 @@ def test_composite_independent_drafts_preserve_followup_evidence_and_cleanup(tmp
     cfg,values,check=composite_inputs(tmp_path,group,native_target);seen=[]
     def run(self,child,env,selected,adapter,workdir):
         label='identity' if type(self) is KubernetesObservationIdentityExecutor else 'profiler';seen.append(label)
-        assert selected=={k:values[k] for k in (composite.identity.POLICY_TYPES if label=='identity' else profiler.POLICY_TYPES)}
+        assert selected==composite.child_policy(values,label,composite.identity if label=='identity' else profiler)
         if mode==label.replace('identity','first').replace('profiler','second')+'-raise':raise OSError('PRIVATE')
         observations={'state_native_events':{'value':[{'local_seq':1}],'collected':True},
             'state_scope_complete':{'value':False,'collected':True},
@@ -133,12 +148,15 @@ def test_composite_independent_drafts_preserve_followup_evidence_and_cleanup(tmp
         assert len(draft.observations['state_native_events'].value)==2
         assert {r['collection_component'] for r in draft.observations['state_native_events'].value}=={'identity','profiler'}
         assert {a.name for a in draft.artifacts}=={'identity-probe_log.jsonl','profiler-probe_log.jsonl'}
-    if mode in {'missing','first-raise','second-raise'}:assert not draft.observations['state_native_events'].collected
+    if mode in {'missing','first-raise','second-raise'}:
+        assert draft.observations['state_native_events'].collected
+        assert len(draft.observations['state_native_events'].value)==1
+        assert draft.observations['state_native_events'].value[0]['collection_component']==('profiler' if mode=='first-raise' else 'identity')
     if mode=='first-raise':assert draft.observations['profiler_missing'].collected
     assert 'PRIVATE' not in canonical_json(draft.model_dump(mode='json')).decode()
 
 
-@pytest.mark.parametrize('mode',['same-session','wrong-profiler-hash','unsupported-identity','wrong-target','missing-prepared'])
+@pytest.mark.parametrize('mode',['same-session','wrong-profiler-hash','unsupported-identity','wrong-target','missing-prepared','same-target'])
 def test_composite_rejects_all_bindings_before_first_probe(tmp_path,group,native_target,monkeypatch,mode):
     cfg,values,check=composite_inputs(tmp_path,group,native_target)
     if mode=='same-session':
@@ -150,7 +168,9 @@ def test_composite_rejects_all_bindings_before_first_probe(tmp_path,group,native
         for label in ('identity','profiler'):values[label+'_prepared_sha256']=sha256_hex(canonical_json(load(cfg[label+'_prepared'])))
     elif mode=='wrong-profiler-hash':values['profiler_prepared_sha256']='0'*64
     elif mode=='unsupported-identity':cfg['identity_prepared']=cfg['profiler_prepared'];values['identity_prepared_sha256']=values['profiler_prepared_sha256']
-    elif mode=='wrong-target':values['observation_state_target_sha256']='0'*64
+    elif mode=='wrong-target':values['profiler_target_sha256']='0'*64
+    elif mode=='same-target':
+        cfg['profiler_target']=cfg['identity_target'];values['profiler_target_sha256']=values['identity_target_sha256']
     else:del cfg['profiler_prepared']
     def forbidden(*args,**kwargs):raise AssertionError('child must not run')
     monkeypatch.setattr(KubernetesObservationIdentityExecutor,'run',forbidden)
@@ -168,12 +188,18 @@ def test_composite_consumes_real_identity_and_profiler_producer_outputs(tmp_path
     identity_folder=tmp_path/'identity';identity_folder.mkdir()
     profiler_folder=tmp_path/'profiler';profiler_folder.mkdir()
     identity_world,identity_values,_=identity_inputs(identity_folder,identity_group,native_target,monkeypatch,'normal')
-    profiler_world,profiler_values,_=profiler_inputs(profiler_folder,profiler_group,native_target,monkeypatch,mode)
-    assert identity_group.env.ref()==profiler_group.env.ref() and identity_world.target==profiler_world.target
-    target=tmp_path/'target.json';target.write_bytes(canonical_json(identity_world.target))
-    cfg={'target':str(target),'identity_prepared':str(identity_folder/'prepared/manifest.json'),
+    profiler_native_target=deepcopy(native_target);separate_profiler_target(profiler_native_target,native=True)
+    profiler_world,profiler_values,_=profiler_inputs(profiler_folder,profiler_group,profiler_native_target,monkeypatch,mode)
+    profiler_world.target['engine']['trusted_url']='http://127.0.0.3:8000'
+    profiler_values['observation_state_target_sha256']=sha256_hex(canonical_json(profiler_world.target))
+    assert identity_group.env.ref()==profiler_group.env.ref()
+    identity_target=tmp_path/'identity-target.json';identity_target.write_bytes(canonical_json(identity_world.target))
+    profiler_target=tmp_path/'profiler-target.json';profiler_target.write_bytes(canonical_json(profiler_world.target))
+    cfg={'identity_target':str(identity_target),'profiler_target':str(profiler_target),'identity_prepared':str(identity_folder/'prepared/manifest.json'),
         'profiler_prepared':str(profiler_folder/'prepared/manifest.json')}
     values={**profiler_values,**identity_values}
+    del values['observation_state_target_sha256']
+    values.update(identity_target_sha256=identity_values['observation_state_target_sha256'],profiler_target_sha256=profiler_values['observation_state_target_sha256'])
     check=baseline_pack().checks['OBS-02'].model_copy(update={'collection_profile':composite.PROFILE})
     identity_run=KubernetesObservationIdentityExecutor.run;profiler_run=profiler.KubernetesProfilerObservationExecutor.run
     def run_identity(self,*args):
@@ -199,3 +225,10 @@ def test_composite_consumes_real_identity_and_profiler_producer_outputs(tmp_path
     assert len(draft.observations['state_http_trials'].value)==10
     assert {r['collection_component'] for r in draft.observations['state_http_trials'].value}=={'identity','profiler'}
     assert {r['collection_component'] for r in draft.observations['state_native_events'].value}=={'profiler'}
+
+
+@pytest.mark.parametrize('value',[None,1,['rank',1]])
+def test_readiness_retains_original_required_policy_without_inference(value):
+    check=baseline_pack().checks['LIF-07'].model_copy(update={'collection_profile':initialization.READINESS_PROFILE})
+    with pytest.raises(ValueError,match='INITIALIZATION_READINESS_POLICY_INVALID'):
+        initialization.normalize_check_policy(check,{'required_readiness_items':value})

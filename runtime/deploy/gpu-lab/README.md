@@ -86,7 +86,7 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
    kubectl --context byul-aws-lab -n serving-lab patch deployment serving-engine \
      --type strategic --patch-file deploy/gpu-lab/engine-management-sidecar.patch.yaml
    ```
-   patch는 엔진 Pod를 다시 만든다(Recreate: GPU 반납 후 재기동·cold start). 시험 시간 계획에 넣는다.
+   patch는 묶음 `engine.yaml.template`의 엔진 args를 유지하면서 `--enable-log-requests`, `--enable-request-id-headers`를 더한다. 첫 옵션은 AWS-01의 `Received request` 로그 매칭에 필요한 전제이고, 둘째는 응답의 `X-Request-Id` 헤더를 켠다. patch는 엔진 Pod를 다시 만든다(Recreate: GPU 반납 후 재기동·cold start). 시험 시간 계획에 넣는다. vLLM 0.31.0의 `request_logger.py`는 INFO에 요청 ID·sampling params를, DEBUG에는 prompt·토큰 ID·JSON 본문을 남길 수 있다. 시험에는 무해한 고정 문장만 쓰고 원시 엔진 로그를 반출할 때는 요청 내용이 담긴 기록으로 취급한다.
    적용한 이미지 tag·patch·실제 Deployment/Pod imageID·정책과 run ID는 **통합 기록**으로 저장하고, 03의 `evidence/smoke-*`(기반 점검)와 섞지 않는다. 일반 시험 중에는 사이드카를 그대로 둔다. 03을 다시 돌릴 때만 아래 "03 기준 상태와 runtime 통합 층" 절차로 뗐다가 다시 붙인다.
 6. **세부 통제 정책** — `serving-runtime enforce render --intent deploy/gpu-lab/intent.aws-lab.json --out <dir>`로 Cilium·Tetragon 후보를 만들어 검토 후 적용한다. 이 intent의 빈 `engine_egress_allow`는 DNS 허용 없이 Cilium의 deny-all egress 규칙으로 렌더돼 AWS 묶음의 "엔진 egress 없음"과 맞는다. AWS 인수 확인은 [`ACCEPTANCE.md`](ACCEPTANCE.md)의 `tools/aws_lab_acceptance.py`를 사용한다. kind 전용 `tools/k8s_lab_check.py`는 fake engine과 관리 정책을 생성·삭제하므로 AWS 엔진에 사용하지 않는다.
 7. 접속: 서버에서 `kubectl --context byul-aws-lab -n serving-lab port-forward deploy/serving-gateway 8080`, 노트북에서 SSH 터널(`ssh -L 18081:127.0.0.1:8080 ubuntu@<host>`). 노트북의 개발 서버(`byul-dev`)가 8080을 쓰므로 로컬 포트는 다른 번호(예: 18081)를 쓴다.
@@ -95,7 +95,7 @@ UID: 엔진 2000은 AWS 묶음(vLLM 0.31.0 공식 비root 지원)을 따른다(`
 
 AWS 묶음의 03(`03-engine-smoke.sh`)은 **엔진 컨테이너만 있는 기준 상태**를 점검한다. runtime의 사이드카·관리 조회 정책·Cilium/Tetragon 통제는 엔진 템플릿(`engine.yaml.template`)에 넣지 않고, 이 폴더의 patch와 `apply -k`로 **별도 통합 층**으로 붙인다. 03은 남은 추가 컨테이너·init·volume과 추가 NetworkPolicy·TracingPolicy를 발견하면 중단하며 다른 팀 설정을 자동 삭제하지 않는다. `scale 0`이나 `apply`만으로는 patch로 붙인 사이드카가 지워지지 않는다.
 
-03 재검증이 필요할 때의 순서:
+03 재검증이 필요할 때의 순서 (`check_baseline.py`는 엔진 args를 검사하지 않으므로 직접 복원한다):
 
 1. 통합 증거(Gateway 기록·인수 시험 `evidence/`·통합 기록)를 먼저 반출한다.
 2. 아래 회수 목록을 실제로 적용한 자원 이름 그대로 회수한다.
@@ -105,12 +105,12 @@ AWS 묶음의 03(`03-engine-smoke.sh`)은 **엔진 컨테이너만 있는 기준
 
 | 회수 대상 | 회수 방법 |
 | --- | --- |
-| 사이드카 컨테이너 `management-listener` | `engine-management-sidecar.patch.yaml` 주석의 `$patch: delete` 명령 |
+| 사이드카 컨테이너 `management-listener`·엔진 로그 args | `engine-management-sidecar.patch.yaml` 주석의 단일 strategic patch 명령으로 사이드카를 삭제하고 묶음의 엔진 args 15개 항목을 복원 |
 | NetworkPolicy `engine-management-observer` | `kubectl --context byul-aws-lab -n serving-lab delete networkpolicy engine-management-observer` |
 | 6단계에서 적용한 CiliumNetworkPolicy·TracingPolicy | 적용할 때 기록한 정확한 이름으로만 삭제 |
 | Service `serving-engine-management` 등 나머지 runtime 자원 | 03 검사 대상이 아니면 유지 가능. 전부 내릴 때는 `kubectl --context byul-aws-lab delete -k deploy/gpu-lab` |
 
-사이드카만 떼는 것으로 03 기준 복원이 끝나지 않는다. 회수와 재적용 모두 적용 기준 commit과 회수 목록을 함께 기록한다.
+사이드카만 떼는 것으로 03 기준 복원이 끝나지 않는다. 회수 후 실제 Deployment의 엔진 args가 묶음 `engine.yaml.template`과 같은지도 확인한다. 회수와 재적용 모두 적용 기준 commit과 회수 목록을 함께 기록한다.
 
 엔진 캐시는 묶음 구조(현재 세대 폴더만 컨테이너 `/cache`에 마운트)를 그대로 쓴다. intent에 `assets.cache_mount_path: "/cache"`를 두어 Tetragon 캐시 규칙(TG-CACHE-01)이 `/cache`를 감시하고, 호스트 쪽 `cache_root`(`/srv/serving/cache`)와 세대 경로는 03이 만드는 `/srv/serving/cache/vllm/<digest hex>/<revision>/<profile>-profile-01`과 같게 둔다. 엔진은 다른 세대를 볼 수 없으므로 컨테이너 안 쓰기는 모두 "현재 세대", 그 밖은 "캐시 밖"으로 분류된다. 호스트에서 `serving-runtime enforce cache-check --intent deploy/gpu-lab/intent.aws-lab.json`으로 세대·권한을 점검한다.
 

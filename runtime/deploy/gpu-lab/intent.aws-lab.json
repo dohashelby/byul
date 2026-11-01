@@ -37,9 +37,9 @@
   },
   "allowed_engine_binaries": ["/usr/local/bin/vllm-nonroot-entrypoint.sh"],
   "phase_binaries": {
-    "loading": ["/usr/bin/python3"],
-    "compiling": ["/usr/bin/python3"],
-    "inferring": ["/usr/bin/python3"]
+    "loading": ["/usr/bin/python3", "/usr/bin/python3.12"],
+    "compiling": ["/usr/bin/python3", "/usr/bin/python3.12"],
+    "inferring": ["/usr/bin/python3", "/usr/bin/python3.12"]
   },
   "suspect_binaries": ["/bin/sh", "/bin/bash", "/usr/bin/curl", "/usr/bin/wget"],
   "tetragon_mode": "monitor"

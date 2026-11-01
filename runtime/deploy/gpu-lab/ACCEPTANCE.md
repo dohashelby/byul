@@ -26,6 +26,8 @@ test -d /srv/serving/observation
 
 엔진 `serving-engine`, Gateway `serving-gateway`, 시험 Pod `other-client`·`test-receiver`, host collector가 준비돼야 한다. Gateway 정책에는 `test-model`과 인증 역할이 반영돼 있어야 한다. 정책 묶음의 `target` 역할에는 context `byul-aws-lab`, namespace `serving-lab`, selector `app=serving-engine`, container `engine`인 대상 등록이 들어 있어야 하며 host collector의 `/srv/serving/observation/target-pods.json`이 Gateway에 읽기 전용으로 보여야 한다.
 
+AWS-01의 엔진 로그 매칭에는 runtime 통합 patch의 `--enable-log-requests`가 필요하고, 함께 추가한 `--enable-request-id-headers`는 응답의 `X-Request-Id` 헤더를 켠다. vLLM 0.31.0 `entrypoints/serve/utils/request_logger.py`의 `log_inputs`는 INFO에 요청 ID·sampling params를, DEBUG에 prompt·토큰 ID를 기록하고 `log_request_body`는 DEBUG에 JSON 본문을 기록한다. 시험 요청은 무해한 고정 문장만 사용한다. 원시 엔진 로그를 증거로 반출한다면 요청 내용이 담길 수 있는 기록으로 취급한다. 인수 도구의 `report.json`·`report.md`에는 엔진 로그 본문 대신 매칭 결과·조회 명령 참조만 넣는다.
+
 ## 실행
 
 AWS 묶음 `COST-PLAN.md`에 따라 먼저 dev(g6.2xlarge)에서 기능 연결을 확인하고, 정식 결과는 reference(g6.4xlarge)로 다시 실행한다. 로컬 단위시험과 문서 검토를 끝낸 뒤 GPU 서버에서는 사례를 묶어서 실행한다.

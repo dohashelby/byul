@@ -1336,17 +1336,12 @@
           "approved_by": {
             "type": "string",
             "title": "Approved By"
-          },
-          "approval_ref": {
-            "type": "string",
-            "title": "Approval Ref"
           }
         },
         "type": "object",
         "required": [
           "revision",
-          "approved_by",
-          "approval_ref"
+          "approved_by"
         ],
         "title": "PolicyConfirm"
       },

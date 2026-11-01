@@ -241,12 +241,15 @@ def confirm_policy(doc_id: str, body: PolicyConfirm, state: AppState = Depends(g
         return _reject("STATUS_NOT_ALLOWED", [{"path": "/status", "message": "이미 승인된 판본입니다"}])
     doc = copy.deepcopy(latest.document)
     doc["status"] = "CONFIRMED"
-    doc["approval"] = {"approved_by": body.approved_by, "approved_at": now_utc(), "approval_ref": body.approval_ref}
+    revision = latest.revision + 1
+    # 승인 번호는 사람이 정하지 않는다. 정책 ID와 승인 판본으로 만들고 local_id 길이(128자)에 맞춘다.
+    suffix = f"-v{revision}"
+    doc["approval"] = {"approved_by": body.approved_by, "approved_at": now_utc(), "approval_ref": f"{doc_id[:128 - len(suffix)]}{suffix}"}
     errors = _schema_errors(state, "policy", doc)
     if errors:
         return _reject("SCHEMA_INVALID", errors)
     try:
-        saved = state.policies.append(doc_id, latest.revision + 1, doc, status="CONFIRMED", label=str(doc.get("policy_version")))
+        saved = state.policies.append(doc_id, revision, doc, status="CONFIRMED", label=str(doc.get("policy_version")))
     except RevisionExists:
         return _reject("BAD_REQUEST", [{"path": "/", "message": "같은 판본이 이미 있습니다. 다시 승인하세요"}], 409)
     return JSONResponse(status_code=201, content={"saved": _revision_out(saved), "warnings": []})

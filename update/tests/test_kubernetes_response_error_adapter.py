@@ -178,7 +178,7 @@ def test_example_installed_layout_capability_checks_positive_bytes_and_origin(tm
     (root / 'adapters').mkdir(parents=True); (root / 'runtime').mkdir()
     file = root / 'runtime/kubernetes_http.py'
     source = "VALIDATION_ERROR_PROFILE='kubernetes-owned-validation-error-http-v1'\nclass KubernetesHTTP:\n def __init__(self):pass\n def __call__(self):pass\n def report(self):pass\n"
-    file.write_text(source)
+    file.write_text(source, encoding='utf-8', newline='\n')
     module = ModuleType('EXAMPLE-approved-public-a'); module.__file__ = str(file)
     exec(compile(source, str(file), 'exec'), module.__dict__)
     monkeypatch.setattr(adapter, '__file__', str(root / 'adapters/kubernetes_response_error.py'))

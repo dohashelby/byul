@@ -18,15 +18,15 @@ on:
 permissions:
   contents: read
 
-# A push followed by its PR event validates the same head only once.
+# Keep push and PR verification independent; supersede only the same event/ref.
 concurrency:
-  group: update-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: update-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   update-default:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: update

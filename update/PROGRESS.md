@@ -1703,3 +1703,9 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 테스트 결과: 실측 결과는 `docs/evidence/*-cpu-20261102.json`. Kubernetes는 docker 대역이다.
 - 다음 단계: GPU 환경에서 REQ-19, REQ-20, REQ-21, LIF-13 수집기와 조건부 36개 실측.
 - 막힌 것: 위 4개는 GPU가 필요하다. 기업 기준값과 서명 기록 내보내기 도구는 고객 환경 입력이다.
+
+### 2026-11-02 CI 실행 취소와 전체 시험 시간 설정 보수
+- 한 일: push와 pull_request가 같은 concurrency 그룹에서 서로 취소하던 설정을 workflow·event·PR 번호 또는 ref별로 분리했다. 최신 동일 이벤트의 이전 실행 취소는 유지한다. 최근 전체 회귀 1968.36초를 고려해 update-default 제한을 30분에서 60분으로 늘렸다.
+- 테스트 결과: YAML 해석과 기존 triggers·jobs·permissions·실행 명령 보존을 확인했다. 실제 수정 HEAD의 push·PR 검증 결과는 PR186의 Actions 실행에서 확인한다. 테스트·assert·고정 hash·marker 제외 조건은 바꾸지 않았다.
+- 다음 단계: 새 HEAD의 전체 시험·wheel 설치·Docker stub·공용 계약·플랫폼 검사를 끝까지 확인한다.
+- 막힌 것: 아직 새 HEAD의 원격 검증 결과를 기다리는 단계다. 이 변경은 GPU 기동이나 source 승인 변경이 아니다.

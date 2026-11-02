@@ -25,7 +25,10 @@ PROFILE = 'vllm-engine-callback-metadata/1'
 SCHEMA = 'guard-engine-callback-events/1'
 ROOT = '/guard-lifecycle/engine-callbacks'
 DATA_ROOT = '/guard-lifecycle/data'
-MODULES = {**cache.TARGETS, **distributed.TARGETS}
+SLOT_MODULE = 'vllm.v1.worker.gpu_input_batch'
+SLOT_TARGETS = {SLOT_MODULE: ('InputBatch.add_request', 'InputBatch.remove_request')}
+SLOT_SOURCE = {SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}
+MODULES = {**cache.TARGETS, **distributed.TARGETS, **SLOT_TARGETS}
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -50,6 +53,26 @@ class DistributedObserver(_Keyed, distributed.DistributedCallbackObserver):
     pass
 
 
+class SlotObserver(_Keyed, cache.CacheCallbackObserver):
+    """요청이 받은 batch 자리와 제한 여부만 남긴다. 값 자체는 남기지 않는다."""
+    targets = SLOT_TARGETS
+    sources = SLOT_SOURCE
+    schema = 'guard-vllm-slot-callback/1'
+    profile = 'source-bound-slot-callback-candidate-v1'
+
+    def _snapshot(self, point, args, kwargs, result=None, returned=False):
+        value = args[1] if len(args) > 1 else kwargs.get('request', kwargs.get('req_id'))
+        if point == 'InputBatch.add_request':
+            fields = cache.base.attrs(value)
+            allowed = cache.base.attrs(fields.get('sampling_params')).get('allowed_token_ids')
+            row = {'request_sha256': self.fingerprint(fields.get('req_id')), 'restricted': type(allowed) is list and bool(allowed)}
+        else:
+            row = {'request_sha256': self.fingerprint(value)}
+        if returned:
+            row['slot'] = cache._uint(result)
+        return row
+
+
 class Sink:
     def __init__(self, directory):
         self.path = Path(directory) / f'callbacks-{os.getpid()}.jsonl'
@@ -71,12 +94,13 @@ class EngineCallbacks:
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
         self.distributed = DistributedObserver(session, **options)
-        self.cache.secret = self.distributed.secret = secret
+        self.slot = SlotObserver(session, **options)
+        self.cache.secret = self.distributed.secret = self.slot.secret = secret
 
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
         name = vars(module).get('__name__')
-        observer = self.cache if name in cache.TARGETS else self.distributed
+        observer = self.cache if name in cache.TARGETS else self.slot if name in SLOT_TARGETS else self.distributed
         try:
             changes = [(cache._function(module, point), observer.wrap(module, point)) for point in MODULES[name]]
         except Exception:
@@ -106,7 +130,7 @@ class EngineCallbacks:
             pass
 
     def flush_gaps(self):
-        for code in sorted(self.cache.gaps | self.distributed.gaps):
+        for code in sorted(self.cache.gaps | self.distributed.gaps | self.slot.gaps):
             self.gap(code)
 
 

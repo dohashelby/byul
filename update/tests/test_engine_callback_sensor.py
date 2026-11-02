@@ -297,3 +297,43 @@ def test_sequence_binding_needs_one_request_per_case():
     events = [computed('byul-cb-' + str(i) * 32, 0) for i in range(4)]
     assert set(projection.sequence_rows(events, IDENTITY_CASES)) == {c['case_id'] for c in IDENTITY_CASES}
     assert projection.sequence_rows(events[:3], IDENTITY_CASES) == {}
+
+
+SLOT_CASES = [{'case_id': 'a', 'role': 'standalone', 'prompt': 'x'}, {'case_id': 'b', 'role': 'standalone', 'prompt': 'x'},
+    {'case_id': 'c', 'role': 'restricted', 'prompt': 'y', 'allowed_token_ids': [1]}, {'case_id': 'd', 'role': 'reused', 'prompt': 'x'}]
+
+
+def slot_event(tag, slot, restricted):
+    return {'point': 'InputBatch.add_request', 'phase': 'RETURN', 'entry_qualified_before': True, 'entry_qualified_after': True,
+        'fields': {'request_sha256': projection.tag_digest(SECRET, tag), 'slot': slot, 'restricted': restricted}}
+
+
+def slot(outputs, *, b_slot=0):
+    events = [slot_event(TAGS['c'], 0, True), slot_event(TAGS['d'], b_slot, False)]
+    return projection.project_slot(SLOT_CASES, outputs, events, SECRET, TAGS)
+
+
+def test_reused_slot_with_changed_output_is_a_violation():
+    assert slot({'a': 'o', 'b': 'o', 'd': 'other'})['violation'] is True
+
+
+def test_reused_slot_with_the_standalone_output_completes_scope():
+    result = slot({'a': 'o', 'b': 'o', 'd': 'o'})
+    assert result['violation'] is False and result['full_scope'] is True
+
+
+def test_different_slot_proves_nothing():
+    assert slot({'a': 'o', 'b': 'o', 'd': 'other'}, b_slot=1)['violation'] is None
+
+
+def test_unstable_controls_cannot_condemn_the_engine():
+    result = slot({'a': 'o', 'b': 'p', 'd': 'other'})
+    assert result['violation'] is None and 'standalone_control_not_deterministic' in result['missing']
+
+
+def test_slot_observer_records_slot_and_restriction_without_values():
+    rows = []
+    observer = sensor.SlotObserver('a' * 32, sink=rows.append, context_provider=lambda: {})
+    request = SimpleNamespace(req_id=TAGS['a'], sampling_params=SimpleNamespace(allowed_token_ids=[5]))
+    fields = observer._snapshot('InputBatch.add_request', (None, request), {}, 3, True)
+    assert fields['slot'] == 3 and fields['restricted'] is True and '5' not in str(fields['request_sha256'][:0])

@@ -9,6 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 from pathlib import Path
 import hashlib
+import json
 import os
 import re
 import sys
@@ -32,7 +33,7 @@ PROFILES = {
     'REQ-21': 'engine-sensor-communication-buffer-v1',
 }
 # These checks read the prepared callback session instead of a lifecycle recording.
-CALLBACK_CHECKS = frozenset({'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17'})
+CALLBACK_CHECKS = frozenset({'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17', 'REQ-18'})
 CPU_PROFILE = 'engine-sensor-slot-reference-cpu-v1'
 CPU_PREFIX = 'BYUL_ENGINE_SENSOR_SLOT='
 # Reviewed immutable tool/test snapshot. The old product snapshot remains its
@@ -110,6 +111,14 @@ def _component_argv(cfg, cache):
     return [cfg.get('python_binary', sys.executable), '-I', '-B', '-X', 'pycache_prefix='+str(cache),
             '-c', CPU_PROGRAM, str(Path(cfg['component_root']).resolve()),
             str(Path(cfg['source_root']).resolve()), str(Path(cfg['owned_parent']).resolve())]
+
+
+def _answer(body):
+    """비교용 답변 해시. 원문은 증거에 남기지 않는다."""
+    try:
+        return sha256_hex(json.loads(body)['choices'][0]['message']['content'].encode())
+    except (TypeError, ValueError, KeyError, IndexError, AttributeError):
+        return None
 
 
 def _sha(value):
@@ -341,11 +350,13 @@ class EngineSensorExecutor:
         transport = self.transport or KubernetesHTTP(target, env, duration=duration,
             binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=ENGINE_CALLBACK_PROFILE)
         endpoint = transport.endpoint.scheme + '://' + transport.endpoint.netloc + '/v1/chat/completions'
-        tags = {}; elapsed = {}; trials = []; cleanup = []
+        tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []
         for number, case in enumerate(cases):
             tag = tags[case['case_id']] = 'byul-cb-' + uuid.uuid4().hex
             body = {'model': transport.api_model, 'messages': [{'role': 'user', 'content': case['prompt']}],
-                'max_tokens': 1, 'temperature': 0, 'stream': False}
+                'max_tokens': case.get('max_tokens', 1), 'temperature': 0, 'stream': False}
+            if 'allowed_token_ids' in case:
+                body['allowed_token_ids'] = case['allowed_token_ids']
             salt = case.get('forged_salt', case.get('cache_salt'))
             if salt is not None:
                 body['cache_salt'] = salt
@@ -363,6 +374,8 @@ class EngineSensorExecutor:
                 break
             good = row.get('outcome') == 200 and row.get('capture_complete') is True
             trials.append({'case_id': case['case_id'], 'role': case['role'], 'outcome': row.get('outcome'), 'normal_shape': good})
+            if good:
+                outputs[case['case_id']] = _answer(row.get('body'))
             if good and type(row.get('elapsed_ms')) in (int, float):
                 elapsed[case['case_id']] = row['elapsed_ms']
         try:
@@ -382,6 +395,8 @@ class EngineSensorExecutor:
             result = projection.project_cache_group(cases, rows, values, identity)
         elif check.id == 'REQ-16':
             result = projection.project_cache_context(cases, rows, values)
+        elif check.id == 'REQ-18':
+            result = projection.project_slot(cases, outputs, events, secret, tags)
         else:
             result = projection.project_cache_timing(cases, rows, elapsed, values)
         gaps = sorted({e['code'] for e in events if e.get('phase') == 'GAP' and type(e.get('code')) is str})

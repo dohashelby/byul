@@ -11,7 +11,8 @@ import hmac
 SCHEMA = 'byul-engine-callback-cohort/1'
 COMPUTED = 'KVCacheManager.get_computed_blocks'
 ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post'},
-    'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'}}
+    'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
+    'REQ-18': {'standalone', 'restricted', 'reused'}}
 MAX_CASES = 512
 
 
@@ -24,10 +25,13 @@ def validate_cases(check_id, cases):
             or len({c.get('case_id') for c in cases if type(c) is dict}) != len(cases)):
         raise ValueError('ENGINE_CALLBACK_CASES_INVALID')
     for case in cases:
-        if (set(case) - {'case_id', 'role', 'group', 'context', 'prefix', 'prompt', 'cache_salt', 'principal', 'forged_salt'}
+        if (set(case) - {'case_id', 'role', 'group', 'context', 'prefix', 'prompt', 'cache_salt', 'principal', 'forged_salt',
+                'allowed_token_ids', 'max_tokens'}
                 or case.get('role') not in ROLES[check_id] or type(case.get('prompt')) is not str
                 or not 0 < len(case['prompt']) <= 4096 or type(case['case_id']) is not str
-                or 'cache_salt' in case and (type(case['cache_salt']) is not str or not 0 < len(case['cache_salt']) <= 64)):
+                or 'cache_salt' in case and (type(case['cache_salt']) is not str or not 0 < len(case['cache_salt']) <= 64)
+                or type(case.get('max_tokens', 1)) is not int or not 1 <= case.get('max_tokens', 1) <= 8
+                or 'allowed_token_ids' in case and (type(case['allowed_token_ids']) is not list or not case['allowed_token_ids'])):
             raise ValueError('ENGINE_CALLBACK_CASES_INVALID')
 
 
@@ -188,3 +192,33 @@ def project_distributed(events, secret, tags):
         'violation': True if violations else (False if complete else None), 'full_scope': False,
         'missing': ['intermediate_tensor_buffer_lineage_unobserved', 'model_generation_consumption_unobserved',
             *([] if complete else ['distributed_batches_incomplete'])]}
+
+
+def project_slot(cases, outputs, events, secret, tags):
+    """A가 쓴 자리를 B가 다시 받았을 때 B의 출력이 단독 실행과 같아야 한다."""
+    slots = {}
+    for event in events:
+        fields = event.get('fields') or {}
+        if (event.get('point') == 'InputBatch.add_request' and event.get('phase') == 'RETURN'
+                and event.get('entry_qualified_before') is True and event.get('entry_qualified_after') is True):
+            slots[fields.get('request_sha256')] = {'slot': fields.get('slot'), 'restricted': fields.get('restricted')}
+    slot_of = lambda case: slots.get(tag_digest(secret, tags[case['case_id']]), {})
+    alone = [outputs.get(c['case_id']) for c in cases if c['role'] == 'standalone']
+    missing = []
+    if len(alone) < 2 or None in alone or len(set(alone)) != 1:
+        missing.append('standalone_control_not_deterministic')
+    rows = []
+    for index, case in enumerate(cases):
+        if case['role'] != 'reused':
+            continue
+        previous = next((c for c in reversed(cases[:index]) if c['role'] == 'restricted'), None)
+        former = slot_of(previous) if previous else {}
+        same = former.get('slot') is not None and former.get('slot') == slot_of(case).get('slot') and former.get('restricted') is True
+        rows.append({'slot_reused': same, 'output_matches_standalone': bool(alone) and outputs.get(case['case_id']) == alone[0]})
+    if not rows or not all(r['slot_reused'] for r in rows):
+        missing.append('slot_reuse_not_observed')
+    violations = [r for r in rows if r['slot_reused'] and not r['output_matches_standalone']]
+    if 'standalone_control_not_deterministic' in missing:
+        violations = []
+    return {'rows': rows, 'violation': True if violations else (None if missing else False),
+        'full_scope': not missing and not violations, 'missing': missing}

@@ -80,7 +80,7 @@ def _target(ctx, *, profile_support=None, kubernetes=False):
         return None
     container, image, model = engine.get("container"), engine.get("image_digest"), ctx.env.model.id
     run_id = ctx.target.get("run_id")
-    api_model = model
+    api_model = ctx.api_model
     if kubernetes:
         from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
         if (not isinstance(ctx.cprobe, KubernetesHTTP) or ctx.cprobe.profile != REQUEST_BINDING_PROFILE
@@ -183,7 +183,7 @@ def collect(executor, ctx, *, kubernetes=False):
     approved = None
     functional = {ctx.check.functional_probes[0].id: "no_response"}
     attempted = False
-    api_model = ctx.api_model if kubernetes else ctx.env.model.id
+    api_model = ctx.api_model
 
     def send(label, endpoint, body):
         nonlocal requests

@@ -46,7 +46,7 @@ def _token_ids(value, maximum):
 
 class TemplateValidationExecutor(HttpCheckExecutor):
     name = "template_validation"
-    version = "0.4.0"
+    version = "0.4.1"
     requires_roles = False
     requires_route_scope = False
 
@@ -54,7 +54,7 @@ class TemplateValidationExecutor(HttpCheckExecutor):
         super().__init__(cfg, *args, **kwargs)
         self.docker = docker or Docker("template" + secrets.token_hex(4))
         if cfg.get("native_observation_path") is not None:
-            self.version = "0.5.0"
+            self.version = "0.5.1"
 
     def _identity_snapshot(self, ctx, identity, argv, deadline):
         """Read only the owned running engine and selected readonly template.

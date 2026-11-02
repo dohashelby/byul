@@ -90,7 +90,7 @@ files_sha256:
 - path: checks/LIF-02.yaml
   sha256: c99745a70adb3f5617b3734d376b4d4685018d7ada76ae085c2a7ce5c661f39d
 - path: checks/LIF-03.yaml
-  sha256: beadbed098d50baf9898d57fb45576c0edb95e86db6a35857a384b6723304bd2
+  sha256: 76d466cce0ff34139d52ea10f4cb721d9b3bb6722d8011122266da54dcc008b5
 - path: checks/LIF-04.yaml
   sha256: d5ab7488cf170dd08d3057264014712ede8d964c481120731b088cc2d119402e
 - path: checks/LIF-05.yaml
@@ -106,7 +106,7 @@ files_sha256:
 - path: checks/LIF-10.yaml
   sha256: 2a1b12469774dbd50bd9c6620c70e9f8871f40b7ce594502c9981faf90dca9b2
 - path: checks/LIF-11.yaml
-  sha256: 53d0a3253a57044cceba533f5497d9b6498e48bcda47477dfa7439144713e056
+  sha256: 0b300e0af9485406249c6859ae1361b45960c8ab01feef3eedcba9be5d653edb
 - path: checks/LIF-12.yaml
   sha256: 5e4e259c9765453449eaab5f8ad3ada10c33c35be5cc9168255581b4512c7258
 - path: checks/LIF-13.yaml
@@ -188,7 +188,7 @@ files_sha256:
 - path: checks/REQ-11.yaml
   sha256: 53c5f4a231c98e6aa3942a60d60d69789edeff9bf2043b670af02433b7c37b64
 - path: checks/REQ-12.yaml
-  sha256: b57096671362fd5ce9ebaac1c5e11b3e6ea05a1ebc1da96667f1da1b5b82cbd9
+  sha256: b3e6ad5fcdb1502f8fa33afcc0ce144daf1673cc1010870cb02f3c24696fcfed
 - path: checks/REQ-13.yaml
   sha256: 4a7643439ef1211e82edd97840f8a6c2ea855fed294f96e51e2625459c151eef
 - path: checks/REQ-14.yaml

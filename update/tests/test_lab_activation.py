@@ -236,7 +236,6 @@ def test_unfinished_real_run_is_never_measured(tmp_path, monkeypatch):
 
 
 def test_registry_wraps_only_with_explicit_activation_settings():
-    factory = registry.resolve_executor('stream_buffer', 'kubernetes')
-    assert not isinstance(factory({}), lab.ActivatedExecutor)
-    wrapped = factory({'lab_activation': deepcopy(BASE)})
+    assert not isinstance(registry.build_executor('stream_buffer', 'kubernetes', {}), lab.ActivatedExecutor)
+    wrapped = registry.build_executor('stream_buffer', 'kubernetes', {'lab_activation': deepcopy(BASE)})
     assert isinstance(wrapped, lab.ActivatedExecutor) and wrapped.name == 'stream_buffer'

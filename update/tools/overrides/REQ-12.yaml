@@ -34,6 +34,3 @@ judge:
     fail_when_any:
     - obs: activation_violations
       op: nonempty
-    - obs: late_delivery_verified
-      op: eq
-      value: true

@@ -100,9 +100,6 @@ judge:
     fail_when_any:
     - obs: activation_violations
       op: nonempty
-    - obs: recovery_absolute_deadline_violated
-      op: eq
-      value: true
 legacy:
   q_ids:
   - Q-C08

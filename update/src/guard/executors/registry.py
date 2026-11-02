@@ -133,7 +133,12 @@ ACTIVATED = frozenset({"stream_buffer", "initialization", "rank_failure", "reque
 
 
 def resolve_executor(executor: str, impl: str) -> Callable[[dict[str, Any]], Executor] | None:
-    factory = EXECUTORS.get(f"{executor}:{impl}") or EXECUTORS.get(impl)
-    if factory and impl == "kubernetes":
-        return activated(factory) if executor in ACTIVATED else attested(factory)
-    return factory
+    return EXECUTORS.get(f"{executor}:{impl}") or EXECUTORS.get(impl)
+
+
+def build_executor(executor: str, impl: str, cfg: dict[str, Any]) -> Executor:
+    """실행 설정에 lab_activation·record_attestation이 있으면 해당 계층을 덧씌운다."""
+    factory = resolve_executor(executor, impl)
+    if impl == "kubernetes":
+        factory = activated(factory) if executor in ACTIVATED else attested(factory)
+    return factory(cfg)

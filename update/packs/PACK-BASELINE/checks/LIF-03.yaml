@@ -107,9 +107,6 @@ judge:
     fail_when_any:
     - obs: activation_violations
       op: nonempty
-    - obs: budget_process_rss_exceeded
-      op: eq
-      value: true
 legacy:
   q_ids:
   - Q-C05

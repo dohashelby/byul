@@ -116,6 +116,5 @@ def test_every_attested_fact_is_required_by_a_connected_check():
 
 
 def test_registry_wraps_only_with_explicit_settings():
-    factory = registry.resolve_executor('supply_boot', 'kubernetes')
-    assert not isinstance(factory({}), tool.AttestedExecutor)
-    assert isinstance(factory({'record_attestation': {'key_env': 'KEY'}}), tool.AttestedExecutor)
+    assert not isinstance(registry.build_executor('supply_boot', 'kubernetes', {}), tool.AttestedExecutor)
+    assert isinstance(registry.build_executor('supply_boot', 'kubernetes', {'record_attestation': {'key_env': 'KEY'}}), tool.AttestedExecutor)

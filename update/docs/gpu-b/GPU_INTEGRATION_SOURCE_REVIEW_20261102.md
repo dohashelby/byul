@@ -42,3 +42,9 @@ main 25a88d4 실행의 Graph 시험은 값 비노출 확인용 문자열 `999`�
 ## 검토 범위
 
 새 GPU 요청·AWS 기동·권한 변경·정책 확정은 수행하지 않는다. 과거 PACK31/32·EVD·RES·RPT·원 ZIP·원 FAIL/UNKNOWN은 그대로 보존한다. 현재 팩 revision과 체크리스트 질문·judge·required_observations는 변경하지 않는다.
+
+## 검증 경로
+
+Windows Python 3.12.14 직접 353개, Linux Python 3.12.3 직접·팩/source gate 502개가 통과했다. Windows의 합성 source fixture는 UTF-8/LF bytes를 명시해 같은 pin을 검증한다. Linux 검증은 과거 B160 고정 커밋까지 포함하는 전체 Git 이력을 공급하고 수행했다. 각각 최초 준비/fixture 실패와 수정 후 결과를 별도 로그로 보존했다.
+
+`tools.checklist_status --check`는 checks=77, real_connected=23, supported_connected=68로 통과했다. 연결 수를 새 실측 완료 수로 해석하지 않는다. 기본 전체 suite·설치 wheel·GitHub CI의 최종 결과는 이 PR 본문에 명령·실행 커밋·pytest 및 부모 시간과 함께 기록한다.

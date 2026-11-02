@@ -1709,3 +1709,9 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 테스트 결과: YAML 해석과 기존 triggers·jobs·permissions·실행 명령 보존을 확인했다. 실제 수정 HEAD의 push·PR 검증 결과는 PR186의 Actions 실행에서 확인한다. 테스트·assert·고정 hash·marker 제외 조건은 바꾸지 않았다.
 - 다음 단계: 새 HEAD의 전체 시험·wheel 설치·Docker stub·공용 계약·플랫폼 검사를 끝까지 확인한다.
 - 막힌 것: 아직 새 HEAD의 원격 검증 결과를 기다리는 단계다. 이 변경은 GPU 기동이나 source 승인 변경이 아니다.
+
+### 2026-11-02 GPU 보수 통합과 source 고정 회귀 복구
+- 한 일: #189 병합 main 93a3674에서 #188의 검증된 별칭·장치 미확인 범위·요청 시간 보수를 새 브랜치에 통합했다. GPU에서 거부된 REQ-14 async 출력 후보는 원 PR에 보존하고 이번 변경에서 제외했다. REQ-13의 전체 helper 파일 pin과 통합 소스 목록 후보를 구체적인 파일 diff·함수 AST 검토와 함께 제시한다.
+- 테스트 결과: Windows 직접 353 passed, Linux 직접·팩/source gate 502 passed, checklist_status --check 통과. 기본 전체·wheel 설치·원격 CI의 최종 명령과 결과는 이 통합 PR 본문에 기록한다. 원 실패 로그는 보존한다.
+- 다음 단계: A/B 소유자가 source/pin 변경 후보와 전체 검증 결과를 검토한 뒤 통합 기준 커밋을 확정한다. GPU·기업 정책 승인이나 새 native 기능 지원으로 확대하지 않는다.
+- 막힌 것: REQ-14 후보의 실제 설치·출력 귀속과 남은 native·TP 실측은 별도다. 팩 질문·판정 규칙·원 B helper/default pin·기존 marker 조건은 유지한다.

@@ -71,6 +71,7 @@
         "instance_pod",
         "instance_restart_count",
         "gateway_hold",
+        "verification",
         "comparison_counts",
         "last_history"
       ],
@@ -151,6 +152,16 @@
               }
             }
           ]
+        },
+        "verification": {
+          "description": "대상 확인 결과. unavailable은 직전 정상 확인을 근거로 요청을 처리하지만 현재 값은 미확인이다.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "last_confirmed_at"],
+          "properties": {
+            "state": {"enum": ["ok", "unavailable", "blocked"]},
+            "last_confirmed_at": {"$ref": "common.schema.json#/$defs/nullable_timestamp"}
+          }
         },
         "comparison_counts": {
           "$ref": "#/$defs/compare_counts"

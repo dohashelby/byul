@@ -181,7 +181,10 @@ def project_cache_timing(cases, rows, elapsed, policy):
     hits = [_hit(rows, c) for c in cases if c['role'] == 'present']
     # Without a native cross-group hit a gap is noise; without control power a clean result proves nothing.
     violation = cross > limit and any(h is True for h in hits)
-    if control <= limit:
+    # 정상 대조는 캐시가 있는 쪽이 빨라야 한다. 반대로 갈리면 순서·워밍업 같은 교란을 먼저 의심한다.
+    if control < 100 - limit:
+        missing.append('timing_control_direction_reversed')
+    elif control <= limit:
         missing.append('timing_control_has_no_power')
     if cross > limit and not violation:
         missing.append('timing_gap_without_native_hit')

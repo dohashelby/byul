@@ -29,6 +29,11 @@ good_manifest = "lab/good.yaml"
 update_manifest = "lab/update.yaml"
 trace_directory = "/tmp/trace"      # LIF-14. 엔진은 --profiler-config로 켠다
 fault_directory = "/guard-lifecycle/data/<session>"  # LIF-08 예외 주입. prepare-engine-callbacks --lab-faults
+change_path = "rolling"             # LIF-06. 실제로 켠 변경 경로
+generation_models = { before = "EXAMPLE-served-model", after = "EXAMPLE-served-model-v2" }  # LIF-06. 세대마다 다른 별칭
+failure_marker = "EXAMPLE: one shard missing"  # LIF-09. faulty 세대가 한 구성요소만 실패했다는 로그 표식
+restore_objects = { "configmap/engine-config" = "<승인된 내용의 SHA-256>" }  # LIF-16. 복원 대상과 승인 해시
+tampered_objects = ["configmap/engine-config-tampered"]  # LIF-16. 변조 사본. 복구 뒤 참조가 남으면 위반
 
 [engine_sensor]
 target = "lab/target.json"

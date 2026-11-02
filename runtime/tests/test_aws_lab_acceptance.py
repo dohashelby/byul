@@ -215,7 +215,7 @@ class DecisionTests(unittest.TestCase):
             ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed", "cache_tetragon"), True
         ),
         "AWS-07": dict.fromkeys(
-            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered", "inference_recovered"), True
+            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "stopped_request_200_unverified", "start_ok", "collectors_recovered", "target_recovered", "inference_recovered"), True
         ),
         "AWS-08": dict.fromkeys(
             (
@@ -782,7 +782,7 @@ class FakeExecutionTests(unittest.TestCase):
             "collectors": [
                 {"source": source, "state": "ok", "stale_after_s": 2.0}
                 for source in ("observation_feed_hubble", "observation_feed_tetragon")
-            ]
+            ] + [{"source": "target_pods", "state": "ok", "stale_after_s": 15.0}]
         }
         unavailable = {
             "collectors": [
@@ -812,6 +812,7 @@ class FakeExecutionTests(unittest.TestCase):
                     ),
                     encoding="utf-8",
                 )
+            clock = FakeClock()
             checker = AWSAcceptance(
                 arguments(
                     root,
@@ -823,13 +824,15 @@ class FakeExecutionTests(unittest.TestCase):
                     [
                         response(200, before),
                         response(200, unavailable),
-                        response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}, "stopped-request"),
-                        response(200, detail("HELD", reason="TARGET_UNAVAILABLE", attempted=False, status=503)),
+                        response(200, {"choices": [{"message": {"content": "during stop"}}]}, "stopped-request"),
+                        response(200, detail("ALLOWED", attempted=True)),
+                        response(200, {"verification": {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"}, "gateway_hold": None}),
                         response(200, recovered),
+                        response(200, {"verification": {"state": "ok", "last_confirmed_at": "2026-10-26T00:00:20+00:00"}, "gateway_hold": None}),
                         response(200, {"choices": [{"message": {"content": "recovered"}}]}, "recovered-request"),
                         response(200, detail("ALLOWED", attempted=True)),
                     ]
-                ),
+                ), sleeper=clock.sleep, monotonic=clock.monotonic,
             )
             checker._run_case("AWS-07", checker.aws_07)
             case = checker.cases[0]
@@ -837,12 +840,35 @@ class FakeExecutionTests(unittest.TestCase):
             self.assertTrue(case["facts"]["heartbeat_stopped_seen"])
             self.assertIsNone(case["facts"]["supplementary_gap_recorded"])
             self.assertFalse(list(observation.glob("*.gaps.jsonl")))
-            self.assertEqual(case["evidence"]["timings"]["stale_after_s"], 2.0)
+            self.assertEqual(case["evidence"]["timings"]["stale_after_s"], 15.0)
+            self.assertGreaterEqual(clock.value, 17.0)
             self.assertEqual(
                 case["evidence"]["stopped_interval_request"],
-                {"http_status": 503, "reason_code": "TARGET_UNAVAILABLE", "error": None},
+                {"http_status": 200, "reason_code": None, "error": None},
             )
+            self.assertTrue(case["facts"]["stopped_request_200_unverified"])
+            self.assertTrue(case["facts"]["target_recovered"])
             self.assertTrue(case["facts"]["inference_recovered"])
+
+            failed_clock = FakeClock()
+            failed = AWSAcceptance(
+                arguments(root, cases=("AWS-07",), allow_collector_stop=True,
+                    evidence_dir=str(root / "failed-evidence")),
+                runner=FakeRunner([CommandResult(0), CommandResult(0)]),
+                http=FakeHTTP([
+                    response(200, before), response(200, unavailable),
+                    response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}, "stopped-request"),
+                    response(200, detail("ERROR", reason="TARGET_UNAVAILABLE", attempted=False, status=503)),
+                    response(200, {"verification": {"state": "blocked", "last_confirmed_at": None}, "gateway_hold": {"reason_code": "TARGET_UNAVAILABLE"}}),
+                    response(200, recovered),
+                    response(200, {"verification": {"state": "ok", "last_confirmed_at": None}, "gateway_hold": None}),
+                    response(200, {"choices": [{"message": {"content": "recovered"}}]}, "recovered-request"),
+                    response(200, detail("ALLOWED", attempted=True)),
+                ]), sleeper=failed_clock.sleep, monotonic=failed_clock.monotonic,
+            )
+            failed._run_case("AWS-07", failed.aws_07)
+            self.assertEqual(failed.cases[0]["result"], "failed")
+            self.assertFalse(failed.cases[0]["facts"]["stopped_request_200_unverified"])
 
     def test_aws_08_requires_gateway_instance_change_and_pod_replaced_history(self) -> None:
         def engine_pod(uid: str, container_id: str) -> str:
@@ -1028,6 +1054,86 @@ class FakeExecutionTests(unittest.TestCase):
 
 
 class EvidenceTests(unittest.TestCase):
+    @staticmethod
+    def _case(case_id: str, evidence: dict, facts: dict | None = None) -> dict:
+        facts = dict(DecisionTests.PASS_FACTS[case_id] if facts is None else facts)
+        result, reason = evaluate_case(case_id, facts)
+        return {
+            "case_id": case_id, "title": case_id, "rt_ids": [],
+            "result": result, "reason": reason, "facts": facts, "evidence": evidence,
+        }
+
+    def test_markdown_uses_korean_sections_and_only_selected_case_notes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            checker = AWSAcceptance(arguments(Path(temporary), cases=("AWS-06",)), runner=FakeRunner(), http=FakeHTTP([]))
+            checker.cases.append(self._case("AWS-06", {
+                "model_probe": {"errno_name": "EROFS"},
+                "cache_probe": {"marker": "CACHE_WRITE_REMOVED"},
+            }))
+            json_path, md_path = checker.write_report()
+            md = md_path.read_text(encoding="utf-8")
+            report = json.loads(json_path.read_text(encoding="utf-8"))
+            for heading in ("# AWS 런타임 인수 시험 보고서", "## 시험 결과", "## 판정 기준", "## 아는 한계"):
+                self.assertIn(heading, md)
+            self.assertIn("통과가 기능 완성을 뜻하지 않는다", md)
+            self.assertIn("/models 쓰기 EROFS", md)
+            self.assertIn("/cache 쓰기·삭제 CACHE_WRITE_REMOVED", md)
+            self.assertIn("TG-CACHE-01 기록 예", md)
+            for excluded in ("AWS-04", "AWS-05", "AWS-07", "Decision notes", "Known gaps"):
+                self.assertNotIn(excluded, md)
+            self.assertEqual(report["schema"], "runtime-aws-acceptance/1.0")
+            self.assertEqual(len(report["decision_notes"]), 2)
+            self.assertEqual(len(report["known_gaps"]), 2)
+            self.assertEqual(report["requested_cases"], ["AWS-06"])
+
+    def test_each_case_displays_collected_values_without_copying_sensitive_text(self) -> None:
+        examples = {
+            "AWS-01": ({"http_codes": [200], "stream": {"http_status": 200, "sse_data_received": True, "done_received": True}}, "일반 HTTP 200, stream HTTP 200"),
+            "AWS-02": ({"attempts": [{"kind": "missing", "status": 401, "error_code": "AUTH_REQUIRED"}, {"kind": "invalid", "status": 401, "error_code": "AUTH_INVALID"}]}, "missing HTTP 401/AUTH_REQUIRED, invalid HTTP 401/AUTH_INVALID"),
+            "AWS-03": ({"policy_limit": 256, "boundary": {"http_status": 200}}, "상한 256토큰, 상한 요청 HTTP 200"),
+            "AWS-04": ({"direct_probe": {"errno_name": "EAGAIN"}}, "직통 연결 EAGAIN"),
+            "AWS-05": ({"engine_receiver_probe": {"errno_name": "ETIMEDOUT"}}, "engine→receiver 연결 ETIMEDOUT"),
+            "AWS-06": ({"model_probe": {"errno_name": "EROFS"}, "cache_probe": {"marker": "CACHE_WRITE_REMOVED"}}, "/models 쓰기 EROFS"),
+            "AWS-07": ({"stopped_interval_request": {"http_status": 200}, "stopped_target_verification": {"state": "unavailable"}, "recovered_target_verification": {"state": "ok"}, "recovery_request": {"last_status": 200}}, "중단 중 요청 HTTP 200, 대상 확인 unavailable; 복구 대상 ok, 요청 HTTP 200"),
+            "AWS-08": ({"engine_info": {"state": "ok"}, "recovery_request": {"last_status": 200}}, "engine_info ok, 복구 요청 HTTP 200"),
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            checker = AWSAcceptance(arguments(Path(temporary)), runner=FakeRunner(), http=FakeHTTP([]))
+            for case_id, (evidence, _expected) in examples.items():
+                evidence["unrelated_text"] = "private-prompt-and-response-body"
+                checker.cases.append(self._case(case_id, evidence))
+            md = checker.write_report()[1].read_text(encoding="utf-8")
+            for case_id, (_evidence, expected) in examples.items():
+                with self.subTest(case_id=case_id):
+                    self.assertIn(expected, md)
+            self.assertNotIn("private-prompt-and-response-body", md)
+            self.assertNotIn(INFERENCE, md)
+            self.assertNotIn(VIEWER, md)
+
+    def test_missing_values_and_nonpassing_required_facts_are_explicit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            checker = AWSAcceptance(arguments(Path(temporary)), runner=FakeRunner(), http=FakeHTTP([]))
+            failed = dict(DecisionTests.PASS_FACTS["AWS-07"])
+            failed["stopped_request_200_unverified"] = False
+            unknown = dict(DecisionTests.PASS_FACTS["AWS-06"])
+            unknown["cache_tetragon"] = None
+            auth_failed = dict(DecisionTests.PASS_FACTS["AWS-02"])
+            auth_failed["auth_codes"] = False
+            checker.cases.extend((
+                self._case("AWS-07", {"stopped_interval_request": {"http_status": 503}}, failed),
+                self._case("AWS-06", {}, unknown),
+                self._case("AWS-08", {}, {"not_run_reason": "--allow-engine-restart 없음"}),
+                self._case("AWS-02", {"attempts": [{"kind": "missing", "status": 403, "error_code": "OTHER_CODE"}]}, auth_failed),
+            ))
+            md = checker.write_report()[1].read_text(encoding="utf-8")
+            self.assertIn("중단 중 요청 HTTP 503, 대상 확인 확인 못 함", md)
+            self.assertIn("stopped_request_200_unverified=아니요", md)
+            self.assertIn("cache_tetragon=확인 못 함", md)
+            self.assertIn("restart_ok=확인 못 함", md)
+            self.assertIn("/models 쓰기 확인 못 함", md)
+            self.assertIn("missing HTTP 403/OTHER_CODE", md)
+            self.assertIn("auth_codes=아니요", md)
+
     def test_tokens_and_token_hashes_never_appear_and_permissions_are_private(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             checker = AWSAcceptance(

@@ -297,8 +297,8 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
             ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed"),
         ),
         "AWS-07": (
-            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered", "inference_recovered"),
-            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "start_ok", "collectors_recovered", "inference_recovered"),
+            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "stopped_request_200_unverified", "start_ok", "collectors_recovered", "target_recovered", "inference_recovered"),
+            ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "stopped_request_200_unverified", "start_ok", "collectors_recovered", "target_recovered", "inference_recovered"),
         ),
         "AWS-08": (
             (
@@ -386,6 +386,114 @@ def _redact(value: Any, secrets: Iterable[str]) -> Any:
     if isinstance(value, dict):
         return {str(key): _redact(item, secret_values) for key, item in value.items()}
     return value
+
+
+def _report_at(value: object, *path: str) -> object:
+    for key in path:
+        if not isinstance(value, Mapping):
+            return None
+        value = value.get(key)
+    return value
+
+
+def _report_value(value: object, *, allowed: set[str] | None = None) -> str:
+    """Render only known, short result values; never copy arbitrary evidence text."""
+    if value is True:
+        return "예"
+    if value is False:
+        return "아니요"
+    if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 599:
+        return str(value)
+    if isinstance(value, str) and allowed is not None and value in allowed:
+        return value
+    return "확인 못 함"
+
+
+def _report_code(value: object) -> str:
+    if isinstance(value, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", value):
+        return value
+    return "확인 못 함"
+
+
+def _report_summary(case: Mapping[str, Any]) -> str:
+    case_id = case.get("case_id")
+    facts = case.get("facts") or {}
+    evidence = case.get("evidence") or {}
+    at = lambda *path: _report_at(evidence, *path)
+    fact = lambda name: _report_value(_report_at(facts, name))
+    status = lambda value: _report_value(value) if isinstance(value, int) else "확인 못 함"
+    state = lambda value, choices: _report_value(value, allowed=set(choices))
+    if case_id == "AWS-01":
+        codes = at("http_codes")
+        chat_status = next((code for code in codes if isinstance(code, int)), None) if isinstance(codes, list) else None
+        return (f"일반 HTTP {status(chat_status)}, stream HTTP {status(at('stream', 'http_status'))}; "
+                f"SSE data {state(at('stream', 'sse_data_received'), ())}, [DONE] {state(at('stream', 'done_received'), ())}; "
+                f"record ALLOWED {fact('record_allowed')}, 엔진 로그 일치 {fact('engine_log_match')}")
+    if case_id == "AWS-02":
+        attempts = at("attempts")
+        parts = []
+        for kind in ("missing", "invalid"):
+            item = next((entry for entry in attempts if isinstance(entry, Mapping) and entry.get("kind") == kind), {}) if isinstance(attempts, list) else {}
+            parts.append(f"{kind} HTTP {status(item.get('status'))}/{_report_code(item.get('error_code'))}")
+        return ", ".join(parts) + f"; 미전달 {fact('not_delivered')}, 엔진 로그 부재 {fact('engine_log_absent')}"
+    if case_id == "AWS-03":
+        limit = at("policy_limit")
+        limit_text = str(limit) if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0 else "확인 못 함"
+        return (f"상한 {limit_text}토큰, 상한 요청 HTTP {status(at('boundary', 'http_status'))}, "
+                f"초과 요청 403 {fact('http_403')}; reason_code {_report_code(at('record_fields_used', 'reason_code'))}, "
+                f"MAX_TOKENS_EXCEEDED 일치 {fact('reason_code')}, 미전달 {fact('not_delivered')}")
+    if case_id == "AWS-04":
+        return (f"직통 연결 {_report_code(at('direct_probe', 'errno_name'))}, "
+                f"Gateway 앞/뒤 연결 {fact('gateway_tcp_control')}, 요청 200 {fact('gateway_control_200')}, "
+                f"Hubble dropped {fact('hubble_dropped')}")
+    if case_id == "AWS-05":
+        return (f"engine→receiver 연결 {_report_code(at('engine_receiver_probe', 'errno_name'))}, "
+                f"other-client 대조 연결 {fact('receiver_control_connected')}, Hubble dropped {fact('receiver_hubble_dropped')}")
+    if case_id == "AWS-06":
+        return (f"/models 쓰기 {_report_code(at('model_probe', 'errno_name'))}, "
+                f"/cache 쓰기·삭제 {state(at('cache_probe', 'marker'), ('CACHE_WRITE_REMOVED',))}, "
+                f"TG-CACHE-01 기록 {fact('cache_tetragon')}")
+    if case_id == "AWS-07":
+        return (f"중단 중 요청 HTTP {status(at('stopped_interval_request', 'http_status'))}, "
+                f"대상 확인 {state(at('stopped_target_verification', 'state'), ('ok', 'unavailable', 'blocked'))}; "
+                f"복구 대상 {state(at('recovered_target_verification', 'state'), ('ok', 'unavailable', 'blocked'))}, "
+                f"요청 HTTP {status(at('recovery_request', 'last_status'))}, 추론 회복 {fact('inference_recovered')}")
+    if case_id == "AWS-08":
+        return (f"Pod 교체 {fact('pod_changed')}, Gateway instance 변경 {fact('gateway_instance_changed')}, "
+                f"engine_info {state(at('engine_info', 'state'), ('ok', 'error', 'stale'))}, "
+                f"복구 요청 HTTP {status(at('recovery_request', 'last_status'))}, 추론 회복 {fact('gateway_recovered')}")
+    return "확인 못 함"
+
+
+@dataclass(frozen=True)
+class _ReportCase:
+    criteria: str
+    gap: str
+    required: tuple[str, ...]
+
+
+REPORT_CASES: dict[str, _ReportCase] = {
+    "AWS-01": _ReportCase("일반·stream 200과 유효 응답, ALLOWED·전달 시도, SSE 완료와 엔진 로그 일치를 확인한다.", "엔진 로그 형식이 다르면 수신 여부를 확인할 수 없다.", ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match", "stream_ok")),
+    "AWS-02": _ReportCase("인증 없음·오류가 각각 401과 AUTH_REQUIRED·AUTH_INVALID이고, DENIED·미전달·엔진 로그 부재를 확인한다.", "엔진 로그 부재는 AWS-01에서 양성 로그 형식을 확인해야 해석할 수 있다.", ("auth_codes", "records_denied", "not_delivered", "engine_log_absent", "engine_log_format_confirmed")),
+    "AWS-03": _ReportCase("상한 요청은 허용되고 상한+1은 403 MAX_TOKENS_EXCEEDED·미전달·엔진 로그 부재여야 한다.", "엔진 로그 부재는 AWS-01에서 양성 로그 형식을 확인해야 해석할 수 있다.", ("policy_limit_read", "boundary_allowed", "http_403", "reason_code", "not_delivered", "engine_log_absent", "engine_log_format_confirmed")),
+    "AWS-04": _ReportCase("직통 연결은 시간 초과 errno, Gateway 경로는 앞뒤 연결과 요청이 성공하고 해당 Hubble 흐름은 dropped여야 한다.", "ECONNREFUSED 등 다른 errno나 Hubble 단독 기록은 정책 차단 증거가 아니다.", ("direct_failed", "gateway_tcp_control", "gateway_control_200", "hubble_dropped")),
+    "AWS-05": _ReportCase("engine→receiver는 시간 초과 errno와 Hubble dropped, other-client→receiver는 연결 성공이어야 한다.", "다른 errno나 허용 경로 대조 실패는 정책 차단 증거가 아니다.", ("engine_receiver_failed", "receiver_control_connected", "receiver_hubble_dropped")),
+    "AWS-06": _ReportCase("/models 쓰기는 EROFS, /cache 쓰기·삭제는 성공하고 TG-CACHE-01에 기록돼야 한다.", "EPERM·EACCES는 읽기 전용 mount 증거가 아니며 TG-ASSET-01은 선행 거부 시 안 보일 수 있다.", ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed", "cache_tetragon")),
+    "AWS-07": _ReportCase("중단 heartbeat·collector 비정상, stale 이후 요청 200·대상 unavailable, 재시작 뒤 collector·대상·추론 회복을 확인한다.", "정상 종료의 gap 기록은 보조 증거이며 없어도 판정할 수 있다.", ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "stopped_request_200_unverified", "start_ok", "collectors_recovered", "target_recovered", "inference_recovered")),
+    "AWS-08": _ReportCase("재시작 뒤 Pod·Gateway instance 변경, engine_info ok와 유한 창 내 추론 회복을 확인한다.", "Pod snapshot stale은 별도 메모이며 통과 근거가 아니다.", ("restart_ok", "pod_changed", "gateway_recovered", "engine_info_recovered", "gateway_instance_changed")),
+}
+
+
+def _report_reason(case: Mapping[str, Any]) -> str:
+    spec = REPORT_CASES[case["case_id"]]
+    facts = case.get("facts") or {}
+    if case.get("result") == "passed":
+        return "기준 충족: " + spec.criteria
+    values = ", ".join(
+        f"{name}={_report_value(_report_at(facts, name))}"
+        for name in spec.required if _report_at(facts, name) is not True
+    )
+    return f"{case.get('reason') or '확인 못 함'}; 필수 항목: {values or '확인 못 함'}"
 
 
 class AWSAcceptance:
@@ -1511,6 +1619,9 @@ class AWSAcceptance:
         ):
             return {"unknown_reason": "collector stale_after_s를 확인하지 못함"}, {}
         stale = max(float(value) for value in stale_values)
+        target_stale = before.get("target_pods", {}).get("stale_after_s")
+        if isinstance(target_stale, (int, float)) and not isinstance(target_stale, bool) and math.isfinite(float(target_stale)):
+            stale = max(stale, float(target_stale))
         gaps_readable, positions = self._gap_positions()
         stop_requested_at = _now()
         stop_started = self.monotonic()
@@ -1537,6 +1648,12 @@ class AWSAcceptance:
             "reason_code": None,
             "error": None,
         }
+        stopped_target: dict[str, Any] | None = None
+        stopped_target_status: int | None = None
+        stopped_valid = False
+        target_recovered = False
+        recovered_target: dict[str, Any] | None = None
+        recovered_target_status: int | None = None
         inference_recovered = False
         inference_record: dict[str, Any] | None = None
         inference_retry: dict[str, Any] = {
@@ -1565,8 +1682,11 @@ class AWSAcceptance:
                 )
                 if unavailable:
                     unavailable_elapsed = self.monotonic() - stopped_window_started
+                # The Pod snapshot has its own freshness window. Exercise the
+                # stopped window only after it has expired, with polling slack.
+                self.sleep(max(0.0, stale + 2.0 - (self.monotonic() - stopped_window_started)))
                 try:
-                    stopped_response, stopped_request_id, _stopped_valid = self._completion(
+                    stopped_response, stopped_request_id, stopped_valid = self._completion(
                         token=self.tokens["RUNTIME_INFERENCE_TOKEN"],
                         timeout=min(max(stale, 1.0), 30.0),
                     )
@@ -1586,6 +1706,8 @@ class AWSAcceptance:
                         ),
                         "error": None,
                     }
+                    _target_response, stopped_target = self._get_json("/api/target")
+                    stopped_target_status = _target_response.status
                 except (OSError, URLError, TimeoutError) as error:
                     stopped_request = {
                         "http_status": None,
@@ -1606,6 +1728,20 @@ class AWSAcceptance:
                 recovery_ok, recovered = self._wait_collectors_ok(recovery_window)
                 recovery_elapsed = self.monotonic() - recovery_started
                 if recovery_ok:
+                    target_deadline = self.monotonic() + recovery_window
+                    while True:
+                        try:
+                            _target_response, recovered_target = self._get_json("/api/target")
+                            recovered_target_status = _target_response.status
+                        except (OSError, URLError, TimeoutError):
+                            recovered_target = None
+                        verification = recovered_target.get("verification") if recovered_target else None
+                        if recovered_target_status == 200 and isinstance(verification, dict) and verification.get("state") == "ok" and recovered_target.get("gateway_hold") is None:
+                            target_recovered = True
+                            break
+                        if self.monotonic() >= target_deadline:
+                            break
+                        self.sleep(min(2.0, max(0.0, target_deadline - self.monotonic())))
                     inference_recovered, inference_record, inference_retry = (
                         self._retry_inference(recovery_window)
                     )
@@ -1615,8 +1751,18 @@ class AWSAcceptance:
             "stop_ok": stop.returncode == 0,
             "heartbeat_stopped_seen": heartbeat_seen,
             "collectors_unavailable": unavailable,
+            "stopped_request_200_unverified": (
+                stopped_request["http_status"] == 200
+                and stopped_valid
+                and stopped_target_status == 200
+                and isinstance(stopped_target, dict)
+                and isinstance(stopped_target.get("verification"), dict)
+                and stopped_target["verification"].get("state") == "unavailable"
+                and stopped_target.get("gateway_hold") is None
+            ),
             "start_ok": bool(start and start.returncode == 0),
             "collectors_recovered": recovery_ok,
+            "target_recovered": target_recovered,
             "inference_recovered": inference_recovered,
             "supplementary_gap_recorded": bool(gap_refs) if gap_scan_ok else None,
         }, {
@@ -1647,6 +1793,8 @@ class AWSAcceptance:
             },
             "heartbeat_stopped": heartbeat_snapshot,
             "stopped_interval_request": stopped_request,
+            "stopped_target_verification": stopped_target.get("verification") if stopped_target else None,
+            "recovered_target_verification": recovered_target.get("verification") if recovered_target else None,
             "recovery_request": {
                 **inference_retry,
                 "record_fields_used": inference_record,
@@ -1831,8 +1979,8 @@ class AWSAcceptance:
                 ),
                 (
                     "AWS-07 clean stop is decided by stopped heartbeats, Gateway collector "
-                    "unavailability, collector recovery, and recovered inference. Its stopped-window "
-                    "request and gap records are supplementary."
+                    "unavailability, a 200 request with target marked unverified after the stale window, "
+                    "collector and target recovery, and recovered inference. Gap records are supplementary."
                 ),
             ],
             "known_gaps": [
@@ -1854,20 +2002,24 @@ class AWSAcceptance:
         json_path.write_text(encoded, encoding="utf-8")
         os.chmod(json_path, 0o600)
         lines = [
-            "# AWS runtime acceptance",
+            "# AWS 런타임 인수 시험 보고서",
             "",
-            f"- run: `{safe_report['run_id']}`",
-            f"- context/namespace: `{self.context}` / `{self.namespace}`",
-            f"- overall: **{safe_report['overall']}**",
+            "이 보고서는 해당 환경에서 한 번 실행한 결과다. 통과가 기능 완성을 뜻하지 않는다.",
+            f"- 실행: `{safe_report['run_id']}`",
+            f"- 환경/네임스페이스: `{self.context}` / `{self.namespace}`",
+            f"- 전체 결과: **{safe_report['overall']}**",
             "",
-            "| 사례 | 결과 | RT | 이유 |",
-            "| --- | --- | --- | --- |",
+            "## 시험 결과",
+            "",
+            "| 시험 | 결과 | RT | 확인한 값 | 판정 이유 |",
+            "| --- | --- | --- | --- | --- |",
         ]
         for case in safe_report["cases"]:
-            reason = str(case["reason"]).replace("|", "\\|")
+            reason = _report_reason(case).replace("|", "\\|")
+            summary = _report_summary(case).replace("|", "\\|")
             lines.append(
                 f"| {case['case_id']} {case['title']} | {case['result']} | "
-                f"{', '.join(case['rt_ids'])} | {reason} |"
+                f"{', '.join(case['rt_ids'])} | {summary} | {reason} |"
             )
         lines.extend(
             [
@@ -1875,13 +2027,13 @@ class AWSAcceptance:
                 "상세 명령, HTTP 상태, 요청 ID, 사용한 record 필드와 관측 참조는 `report.json`에 있다.",
                 "응답 본문, prompt, token 및 token hash는 보고서에 저장하지 않는다.",
                 "",
-                "## Decision notes",
+                "## 판정 기준",
                 "",
-                *[f"- {item}" for item in safe_report["decision_notes"]],
+                *[f"- {case['case_id']}: {REPORT_CASES[case['case_id']].criteria}" for case in safe_report["cases"]],
                 "",
-                "## Known gaps",
+                "## 아는 한계",
                 "",
-                *[f"- {item}" for item in safe_report["known_gaps"]],
+                *[f"- {case['case_id']}: {REPORT_CASES[case['case_id']].gap}" for case in safe_report["cases"]],
                 "",
             ]
         )

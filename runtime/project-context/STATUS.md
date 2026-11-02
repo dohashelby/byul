@@ -1,9 +1,13 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-11-01
+최종 갱신: 2026-11-02
 
 ## 현재 단계
 
+- **2026-11-02 Claude 검수 3건 반영(로컬).** host Pod의 마지막 확인 시각을 파일 재조회 시각 대신 `collected_at`으로 맞추고, 요청 기록의 대상 판단에서 이력 파일 전체 읽기를 제거했다. Gateway 재시작 뒤 새 스냅샷 대기 중 약 10초 503 가능성과 지속 시 중단 조건을 배포 절차·안내에 추가했다. AWS는 켜지 않았고 기존 미커밋 변경은 유지했다.
+- runtime 전체 unittest 539건 중 428건 통과·111건 skip, 실패 0건. platform API 관련 60건 통과(소켓 환경에서 멈춘 TestClient 4건 제외), web 관련 8건 통과. Gateway 실제 재시작과 AWS 재시험은 미확인이다.
+- **2026-11-02 로컬 수정, AWS 재시험 전.** 수집기 중단 후 직전 Pod·엔진 정보가 정상이면 요청 처리와 대상 미확인·마지막 확인 시각을 표시하고, 초기 미확인·확인된 불일치·잘못된 스냅샷은 503을 유지하도록 수정했다. 정책 묶음의 `policy_ref` ID·판본 대조, AWS-07의 stale 이후 200·미확인 및 복구 후 ok 판정, platform 경고·계약·수동 적용 절차도 갱신했다. AWS는 켜지 않았고 새 동작을 AWS에 쓰기 전 Gateway 이미지 재빌드와 재시험이 필요하다. 수집 중 같은 판본 Pod 교체는 복구까지 확인할 수 없으며 Gateway 재시작 뒤에는 이전 정상 확인을 사용할 수 없다.
+- 로컬 `unittest discover` 537건 성공, 110건은 샌드박스 소켓 제한으로 skip. platform API의 계약 예시·runtime 변환·읽기 전용 경계 60건 성공, web 56건·타입 검사·빌드 성공. API 전체 시험은 update overlay 의존 패키지 부재와 오프라인 캐시 제한으로 수집 실패했고, update 제외 API 시험의 TestClient 경로는 샌드박스에서 완료되지 않아 미확인이다. AWS-07 새 기준은 로컬 모의 시험만 완료했다.
 - **2026-11-01 AWS GPU lab dev 기능 연결 확인(Claude 실행, Codex 교차 검수 전).** 기준 HEAD `144798c`, Gateway 이미지 `serving-gateway:rt-894dfe7`/코드 `894dfe7`, 정책 묶음 `bundle-aws-lab-dev-894dfe7`의 `gateway_policy`·`policy_approvals`·`target`·`enforcement_intent` 모두 적용. AWS g6.2xlarge, vLLM 0.31.0 이미지 digest `sha256:c1c9f6fd…67c3`에서 AWS-01~03 통과(`aws-acceptance-20261101T073229Z-9585`). **dev 1회 확인이며 정식 평가가 아니다.**
 - 기본 NetworkPolicy만으로 AWS-04·05 통과, TG-CACHE-01 부재로 AWS-06 `unknown`(`…T074054Z-11030`). Tetragon monitor 규칙 3개(`runtime-tg-asset-01`·`runtime-tg-cache-01`·`runtime-tg-secret-01`) 뒤 AWS-06 통과(`/models` EROFS, `/cache` TG-CACHE-01 기록; `…T075604Z-13453`). Cilium 규칙 4개(`runtime-engine-egress`·`runtime-engine-ingress`·`runtime-gateway-egress`·`runtime-observer-0-egress`) 뒤 AWS-01·04·05 통과(`…T075648Z-13909`). 기본 정책 `engine-runtime`·`engine-management-observer`를 원본 저장 후 약 1분 제거한 상태에서도 AWS-01·04·05 통과(EAGAIN + Hubble dropped; `…T075733Z-14397`); 스크립트 경로 실수로 자동 복원에 실패해 다음 명령에서 수동 복원했고 spec·labels 원본 일치를 확인했다. 복원 후 AWS-01·04·05·06 통과(`…T075802Z-14966`). 정책 전체 제거 대조는 미실행이다.
 - AWS-07·08 통과(`…T113730Z-6730`): collector stop/start 뒤 각각 약 4초에 feed error/ok, 복구 요청 200; 중지 중 약 4초의 요청 1건은 200으로 판정 제외, stale 15초 뒤 503 hold는 관측하지 않았고 정상 종료라 gap 행은 없다. rollout 뒤 Pod UID·instance 변경과 `instance_changed`/`pod_replaced` 이력, 복구 요청 200. 교체 뒤 기본 정책+runtime 규칙에서 AWS-04·05 재실행 통과(`…T114125Z-8766`); runtime 규칙만의 확인은 교체 전이다. 최종 증거 `~/.local/state/serving-runtime/aws-lab/evidence/dev-20261101-stage6`, 요청·관측 화면 복사본 `dev-20261101-dashboard-copy-final`; EC2 stopped 확인, 컴퓨트 약 1.5시간(추정).
@@ -244,3 +248,19 @@
 - **이번 수정은 Codex 구현·시험과 Claude 검수 완료(샌드박스 밖 unittest 530개 전부 통과, skip 0).** `enforcement_intent`만 실제 문서의 `schema`를 bundle 항목 `schema_version`과 비교하게 바꿨다. 실제 GPU lab intent의 서버별 값 사본으로 verify → tetragon feed가 있는 `mvp_options` → `load_intent`까지 통과하고, 불일치는 거부하는 시험을 추가했다. `gateway_policy`·`policy_approvals`·`exec_exceptions`·`target`은 기존 `schema_version` 비교를 유지한다. contracts의 bundle 항목 이름은 `schema_version`이며 platform API에는 이 역할의 실제 번들 생성 코드가 확인되지 않았다. contracts·platform은 수정하지 않았다.
 - 대상 요약은 `Failed`·`Succeeded` Pod를 현재 후보에서 제외하고, 기존 `pods` 관측에는 phase와 함께 남긴다. Terminating은 기존처럼 제외한다. 실행 또는 대기 후보가 둘 이상이면 `multiple_targets`, 종료 Pod뿐이면 `not_found`를 유지한다. host `target-pods.json`은 phase를 이미 전달하므로 writer 변경 없이 Gateway 요약에 반영된다. AWS 인수 도구의 엔진 Pod 선택도 같은 기준으로 고쳤다. 이미지 digest 대조 방법, Stop/Start 뒤 GPU·Ready 확인, 서버 CLI 설치, 03 뒤 묶음 작성, 증거 파일 확인 뒤 Stop을 GPU lab 문서에 반영했다. 변경된 Gateway 코드를 AWS에 쓰려면 이미지 재빌드·재반입이 필요하다.
 - 시험: `.venv/bin/python -B -m unittest tests.test_policy_bundle tests.test_mvp_target tests.test_aws_lab_acceptance` 70건 중 66건 통과·4건 skip, `tests.test_target_pod_snapshot` 12건 통과(실패 Pod를 host writer→Gateway collector로 전달하는 시험 포함), 전체 `discover -s tests` 530건 중 422건 통과·108건 skip·실패 0, `kubectl kustomize deploy/gpu-lab` 성공, `git diff --check` 성공. skip은 이 실행 환경의 local socket/socket I/O 제한 등 기존 사유이며 Claude의 샌드박스 밖 재시험과 실제 AWS 재적용은 남았다. 기준 `ae5be37`, 미커밋·미푸시. PR #177 상태는 `gh`의 GitHub API 연결 실패로 확인하지 못했다.
+
+## 2026-11-02 GPU lab 정책 수동 적용 절차
+
+- `deploy/gpu-lab/정책_수동적용_절차.md`에 플랫폼 승인 판본의 수동 변환·전달·적용, 검증, 되돌리기와 한계를 기록하고 README의 작성 주체를 첫 버전 기준으로 고쳤다. 근거는 `contracts/README.md`, `docs/결정기록_정책묶음_수신.md`, `mvp/policy_bundle.py`·`approval.py`, GPU lab 배포 파일이다.
+- 저장소 밖 임시 폴더에서 GPU lab JSON 4개로 묶음을 만들어 `bundle verify` 성공, 정책 파일의 길이 같은 한 글자 변경은 SHA-256 불일치로 거부됨을 확인했다. `bundle.json.policy_ref`의 ID·판본이 Gateway 정책 파일과 달라도 로더가 통과시키는 결함을 재현했다. 런타임 코드는 고치지 않았다.
+- 미확인: 플랫폼 승인 판본의 실제 변환·전달, AWS 서버 배치·재시작·정상/거부 요청. 다음 작업은 승인 판본과 서버 권한·경로를 확정한 뒤 절차를 AWS에서 실행하고 `policy_ref` 대조 결함을 별도 코드 작업으로 검토하는 것이다. 이번 작업은 커밋·푸시하지 않았다.
+
+## 2026-11-02 AWS dev 시험 README 정리
+
+- 2026-11-02 `README.md`의 AWS GPU 상태를 dev AWS-01~08 1회 통과로 바로잡고, 코드·판정·설치·실행 중 겪은 문제를 네 표로 정리했다. 상세 근거는 `deploy/gpu-lab/ACCEPTANCE.md`다.
+- reference 정식 시험과 속도 측정은 미실행이며 dev 통과가 기능 완성을 뜻하지 않는다. 이번 문서 작업에서 코드·AWS 환경은 변경하지 않았고 커밋·푸시하지 않았다.
+
+## 2026-11-02 AWS 인수 보고서 양식
+
+- 다음 실행의 `report.md`에 시험별 실제 값·미확인 필수 항목·한국어 판정 기준과 한계를 표시하도록 수정했다. `report.json` 필드와 판정 로직은 유지하며 기존 보고서와 AWS 서버는 건드리지 않았다.
+- 전용 unittest 37건 통과, 전체 542건 중 111건 환경상 skip·실패 0, `git diff --check` 통과. 합성 예시는 저장소 밖 임시 폴더에 만들었으며 실제 AWS 재실행은 하지 않았다.

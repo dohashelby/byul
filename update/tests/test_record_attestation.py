@@ -41,7 +41,7 @@ def test_valid_record_returns_its_facts():
     (record(issued=datetime.now(timezone.utc) - timedelta(days=2)), 'RECORD_NOT_FRESH'),
     (record(issued=datetime.now(timezone.utc) + timedelta(days=2)), 'RECORD_NOT_FRESH'),
     (b'not json', 'RECORD_UNREADABLE'),
-])
+], ids=['other-key', 'other-check', 'other-env', 'extra-fact', 'stale', 'future', 'not-json'])
 def test_invalid_record_is_rejected(raw, code):
     with pytest.raises(tool.RecordInvalid, match=code):
         verify(raw)

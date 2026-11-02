@@ -35,3 +35,13 @@ REQ-19(kernel 접근 범위), REQ-20(CUDA Graph 재실행), REQ-21(TP 통신 buf
 - 각 deadline·budget 값과 REQ-17 `cache_timing_max_auc_percent`·`cache_timing_min_samples`는 기업 기준이다.
 - 서명 기록 키 관리와 기업 시스템별 내보내기 도구는 고객 환경에서 정한다.
 - LIF-08 delay·stall에서 SIGSTOP한 worker가 약 15초 뒤 재개됐다. 재개 원인은 확인하지 못했다.
+
+## 2026-11-02 활성화 범위 보강
+
+- LIF-16: 복원 대상(ConfigMap·Secret)의 승인 해시를 시험 전후로 대조하고, 변조 사본 복원이 Ready가 되지 않는지, 승인 원본 복구 뒤 Ready Pod가 변조 사본을 참조하지 않는지 본다. volume·snapshot 내용은 읽지 않으며 snapshot 분기는 별도 시험이다.
+- LIF-09: faulty 세대가 선언한 한 구성요소만 실패했다는 로그 표식(`failure_marker`)을 확인해야 범위가 찬다.
+- LIF-06: 두 세대의 응답 모델 별칭이 달라야 범위가 찬다. 같은 별칭 안에서 일부 weights·cache만 바뀌는 혼합은 이 방법으로 보이지 않는다. 한 stream 응답에 별칭이 둘 이상이면 LIF-05·06 위반이다.
+- 실패 중 응답이 허용 세대 밖에서 오면 위반이다.
+- REQ-17: 정상 대조가 기대와 반대 방향으로 갈리면 `timing_control_direction_reversed`로 따로 남긴다.
+- CPU 실측 기록의 LIF-06·09·16 값은 보강 전 시나리오의 결과다.
+

@@ -115,4 +115,12 @@ uv run pytest -q --basetemp=C:/Users/dudwh/.codex/tmp/pack-owner2-full-20261101
 
 `pack_owner2_readiness --check`는 23개 실제 연결이 없으면 실패하는 준비 상태 검사다. 현재 0/23이므로 실패가 예상되며, 이를 테스트 회귀 통과나 전체 완료로 표현하지 않는다. 공통 선행 조건·미구현 producer·정책/실험 입력 부족을 해소하기 전에는 69개 전체 연결 또는 시험 전체 완료를 선언하지 않는다.
 
-현재 연결을 진행하려면 PR183이 실제 병합된 origin/main의 커밋부터 새 통합 worktree를 만들고 이 전용 구현을 옮겨야 한다. 원 PACK31 seed의 정확한 Ref를 먼저 검증한 뒤 담당 2의 23개 CheckDef만 연결하며 revision·files_sha256·생성 문서는 통합 때 한 번 갱신한다. PR 병합만으로 위 native 9개 producer나 과거 전체 소스 승인 대기가 해결되지는 않는다. 해당 미구현을 UNKNOWN wrapper로 연결 수에 넣지 않는다. 현재 백그라운드 실행이나 자동 재개 예약은 없다.
+현재 연결을 진행하려면 PR183이 실제 병합된 origin/main의 커밋부터 새 통합 worktree를 만들고 이 전용 구현을 옮겨야 한다. 원 PACK31 seed의 정확한 Ref를 먼저 검증한 뒤 담당 2의 23개 CheckDef만 연결하며 revision·files_sha256·생성 문서는 통합 때 한 번 갱신한다. PR 병합만으로 위 native 9개 producer나 과거 전체 소스 승인 대기가 해결되지는 않는다. 해당 미구현을 UNKNOWN wrapper로 연결 수에 넣지 않는다. 현재 로컬 백그라운드 실행이나 자동 재개 예약은 없다. 원격 CI는 각 커밋의 별도 검사 상태를 따른다.
+
+## 2026-11-02 입력 확인과 원격 CI
+
+사용자가 실측용 ENV·POL·target·prepared 파일이 **없다**고 확인했다. Kubernetes·GPU 및 신규 source CPU sampler/profiler 실측은 계속 0건이다. 실제 입력이나 수락 정책을 임의 생성하지 않았으며, 누락된 입력을 실행된 UNKNOWN 결과로 만들지 않았다. 기존 CPU 계약·EXAMPLE 저장 번들·소유 프로세스 RSS 조회의 검증 범위는 그대로다.
+
+초안 PR184의 `0829b3c` 원격 CI(run `41318242161`)는 공용 계약 등 4개 검사가 성공했고 `update-default`가 실패로 끝났다. 기본 전체 시험은 **10228 passed, 7 failed, 19 deselected**, pytest **1108.85초** / 부모 **1110.779초**다. 실패 node 7개가 로컬 최종 시험의 고정 snapshot gate 거부 목록과 정확히 일치한다. wheel 빌드·설치 검증 단계는 앞선 실패로 실행되지 않았으므로 통과로 집계하지 않는다.
+
+원문 로그는 `remote-ci-0829b3c.zip`, 명령·시간·실패 목록·원본 SHA256은 `remote-ci-0829b3c.json`에 보존했다. 이 갱신은 문서·증거만 바꾸며 제품 소스는 `2247aab`와 같다. PR183은 여전히 미병합이고 PR184에 새 검토 의견은 없었다. 팩 연결·native producer 구현·실측의 남은 조건은 해소되지 않았다.

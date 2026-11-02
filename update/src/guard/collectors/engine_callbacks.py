@@ -25,7 +25,7 @@ def _sources():
     return values
 
 
-def prepare_assets(output):
+def prepare_assets(output, *, lab_faults=False):
     output = Path(output).absolute()
     if output.exists():
         raise ValueError('ENGINE_CALLBACK_OUTPUT_EXISTS')
@@ -33,8 +33,8 @@ def prepare_assets(output):
     values = _sources(); session = secrets.token_hex(16)
     for name, data in values.items():
         (output / name).write_bytes(data)
-    (output / 'settings.json').write_text(json.dumps({'session': session, 'secret': secrets.token_hex(32)}), encoding='utf-8')
-    manifest = {'schema': SCHEMA, 'profile': sensor.PROFILE, 'session': session, 'engine_started': False,
+    (output / 'settings.json').write_text(json.dumps({'session': session, 'secret': secrets.token_hex(32), 'lab_faults': lab_faults}), encoding='utf-8')
+    manifest = {'schema': SCHEMA, 'profile': sensor.PROFILE, 'session': session, 'engine_started': False, 'lab_faults': lab_faults,
         'assets': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(values.items())}}
     (output / 'manifest.json').write_text(json.dumps(manifest, sort_keys=True), encoding='utf-8')
     return manifest

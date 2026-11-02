@@ -32,47 +32,23 @@ policy_params:
   type: str
   required: true
 required_observations:
-- key: profiler_control_trials
+- key: activation_steps
   type: list
-- key: profiler_control_projections
+- key: activation_violations
   type: list
-- key: profiler_control_api_links
+- key: activation_missing
   type: list
-- key: profiler_control_flag_adapter_conflicts
-  type: list
-- key: profiler_control_missing
-  type: list
-- key: profiler_next_start_api_linked
-  type: bool
-- key: profiler_backend_collection_stopped_verified
-  type: bool
-- key: profiler_trace_output_completed_verified
-  type: bool
-- key: profiler_cross_process_rpc_verified
-  type: bool
-- key: profiler_scope_complete
+- key: activation_scope_complete
   type: bool
 judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: profiler_next_start_api_linked
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: profiler_backend_collection_stopped_verified
-      op: eq
-      value: true
-    - obs: profiler_trace_output_completed_verified
-      op: eq
-      value: true
-    - obs: profiler_cross_process_rpc_verified
-      op: eq
-      value: true
-    - obs: profiler_scope_complete
-      op: eq
-      value: true
-    - obs: profiler_control_flag_adapter_conflicts
+    - obs: activation_violations
       op: empty
-    - obs: profiler_control_missing
-      op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

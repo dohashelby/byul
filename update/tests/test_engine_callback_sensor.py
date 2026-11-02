@@ -246,3 +246,14 @@ def test_executor_keeps_an_incomplete_clean_run_uncollected(tmp_path):
     draft = run_check(tmp_path, [0, 16, 0])
     assert draft.observations['engine_sensor_violation'].collected is False
     assert draft.abort_reason == 'ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE'
+
+
+def test_lab_fault_raises_once_in_the_worker_and_only_when_enabled(tmp_path):
+    fault = tmp_path / 'fault'
+    callbacks = sensor.EngineCallbacks('a' * 32, SECRET, lambda row: None, context_provider=lambda: {}, fault_file=str(fault))
+    faulted = callbacks._fault(lambda: 'done')
+    assert faulted() == 'done'
+    fault.write_text('1')
+    with pytest.raises(RuntimeError, match='GUARD_LAB_FAULT'):
+        faulted()
+    assert faulted() == 'done' and not fault.exists()

@@ -37,33 +37,13 @@ challenge_steps:
 - 같은 외부 ID의 새 B 요청
 - 늦은 A 결과와 B 결과·작업 상태 대조
 required_observations:
-- key: request_attempt_trials
+- key: activation_steps
   type: list
-- key: request_attempt_native_bindings
+- key: activation_violations
   type: list
-- key: request_attempt_native_events
+- key: activation_missing
   type: list
-- key: request_attempt_conflict_candidates
-  type: list
-- key: request_attempt_unbound_asgi_events
-  type: list
-- key: native_attempt_binding_observed
-  type: bool
-- key: late_delivery_verified
-  type: bool
-- key: automatic_retry_verified
-  type: bool
-- key: request_attempt_scope_complete
-  type: bool
-- key: request_attempt_asgi_events
-  type: list
-- key: asgi_invocation_binding_observed
-  type: bool
-- key: request_attempt_output_events
-  type: list
-- key: request_attempt_output_links
-  type: list
-- key: native_output_collector_binding_observed
+- key: activation_scope_complete
   type: bool
 required_observations_prose:
 - 내부 attempt ID/abort 도달/늦은 chunk·B 결과·작업 상태
@@ -78,21 +58,14 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: native_attempt_binding_observed
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: native_output_collector_binding_observed
-      op: eq
-      value: true
-    - obs: request_attempt_scope_complete
-      op: eq
-      value: true
-    - obs: late_delivery_verified
-      op: eq
-      value: false
-    - obs: request_attempt_conflict_candidates
+    - obs: activation_violations
       op: empty
     fail_when_any:
+    - obs: activation_violations
+      op: nonempty
     - obs: late_delivery_verified
       op: eq
       value: true

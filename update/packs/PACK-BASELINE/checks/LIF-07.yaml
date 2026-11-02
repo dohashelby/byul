@@ -70,46 +70,14 @@ challenge_steps:
 - listener·health·Gateway readiness·추론 결과 비교
 - 준비 후 허용 확인
 required_observations:
-- key: init_ready_endpoint_events
+- key: activation_steps
   type: list
-- key: init_ready_endpoint_candidates
+- key: activation_violations
   type: list
-- key: init_worker_generation_events
+- key: activation_missing
   type: list
-- key: init_worker_generation_candidates
-  type: list
-- key: init_ready_send_observations
-  type: list
-- key: init_worker_startup_events
-  type: list
-- key: init_worker_startup_candidates
-  type: list
-- key: init_worker_startup_missing
-  type: list
-- key: init_observation_trials
-  type: list
-- key: init_native_samples
-  type: list
-- key: init_native_calls
-  type: list
-- key: init_correspondence
-  type: list
-- key: init_missing
-  type: list
-- key: init_producer_authenticated
+- key: activation_scope_complete
   type: bool
-- key: init_all_preparation_verified
-  type: bool
-- key: init_service_gate_verified
-  type: bool
-- key: init_cross_phase_lineage_verified
-  type: bool
-- key: init_scope_complete
-  type: bool
-- key: init_required_readiness_items
-  type: list
-- key: init_unverified_readiness_items
-  type: list
 required_observations_prose:
 - rank 준비/listener 시각/readiness 판정·실제 추론
 satisfied_if: 필수 준비 미완료 상태에서는 접수를 허용하지 않고 완료 후 정상 처리한다.
@@ -123,26 +91,14 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: init_producer_authenticated
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: init_all_preparation_verified
-      op: eq
-      value: true
-    - obs: init_service_gate_verified
-      op: eq
-      value: true
-    - obs: init_cross_phase_lineage_verified
-      op: eq
-      value: true
-    - obs: init_scope_complete
-      op: eq
-      value: true
-    - obs: init_missing
+    - obs: activation_violations
       op: empty
-    - obs: init_unverified_readiness_items
-      op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-R05-12

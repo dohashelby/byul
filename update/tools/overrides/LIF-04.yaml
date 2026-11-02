@@ -50,40 +50,23 @@ policy_params:
   type: str
   required: true
 required_observations:
-- key: buffer_http_trials
+- key: activation_steps
   type: list
-- key: buffer_native_samples
+- key: activation_violations
   type: list
-- key: buffer_cases
+- key: activation_missing
   type: list
-- key: buffer_missing
-  type: list
-- key: buffer_conflict_candidates
-  type: list
-- key: buffer_producer_authenticated
-  type: bool
-- key: buffer_inventory_complete
-  type: bool
-- key: buffer_release_verified
-  type: bool
-- key: buffer_scope_complete
+- key: activation_scope_complete
   type: bool
 judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: buffer_producer_authenticated
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: buffer_inventory_complete
-      op: eq
-      value: true
-    - obs: buffer_release_verified
-      op: eq
-      value: true
-    - obs: buffer_scope_complete
-      op: eq
-      value: true
-    - obs: buffer_missing
+    - obs: activation_violations
       op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

@@ -44,61 +44,23 @@ policy_params:
   type: int
   required: true
 required_observations:
-- key: init_ready_endpoint_events
+- key: activation_steps
   type: list
-- key: init_ready_endpoint_candidates
+- key: activation_violations
   type: list
-- key: init_worker_generation_events
+- key: activation_missing
   type: list
-- key: init_worker_generation_candidates
-  type: list
-- key: init_ready_send_observations
-  type: list
-- key: init_worker_startup_events
-  type: list
-- key: init_worker_startup_candidates
-  type: list
-- key: init_worker_startup_missing
-  type: list
-- key: init_observation_trials
-  type: list
-- key: init_native_samples
-  type: list
-- key: init_native_calls
-  type: list
-- key: init_correspondence
-  type: list
-- key: init_missing
-  type: list
-- key: init_producer_authenticated
-  type: bool
-- key: init_all_preparation_verified
-  type: bool
-- key: init_service_gate_verified
-  type: bool
-- key: init_cross_phase_lineage_verified
-  type: bool
-- key: init_scope_complete
+- key: activation_scope_complete
   type: bool
 judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: init_producer_authenticated
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: init_all_preparation_verified
-      op: eq
-      value: true
-    - obs: init_service_gate_verified
-      op: eq
-      value: true
-    - obs: init_cross_phase_lineage_verified
-      op: eq
-      value: true
-    - obs: init_scope_complete
-      op: eq
-      value: true
-    - obs: init_missing
+    - obs: activation_violations
       op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

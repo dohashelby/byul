@@ -52,23 +52,13 @@ challenge_steps:
 - 선정 경로의 정상 변경을 수행하고 진행 요청·weights·cache·replica의 세대와 실제 소비를 추적
 - 같은 경로의 제한된 부분 실패를 주입하고 요청별 허용 세대·상태 일관성과 실패 처리를 정상 변경과 비교
 required_observations:
-- key: transition_native_generation_facts
+- key: activation_steps
   type: list
-- key: transition_request_generation_bindings
+- key: activation_violations
   type: list
-- key: transition_request_configuration_facts
+- key: activation_missing
   type: list
-- key: transition_request_configuration_conflicts
-  type: list
-- key: transition_trials
-  type: list
-- key: transition_missing
-  type: list
-- key: transition_inflight_task_schedule_overlap
-  type: bool
-- key: transition_scope_complete
-  type: bool
-- key: transition_actual_consumption_verified
+- key: activation_scope_complete
   type: bool
 required_observations_prose:
 - live·rolling 활성 근거/weight·cache·요청 세대/변경 실패 상태
@@ -83,20 +73,14 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: transition_scope_complete
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: transition_actual_consumption_verified
-      op: eq
-      value: true
-    - obs: transition_inflight_task_schedule_overlap
-      op: eq
-      value: true
-    - obs: transition_missing
+    - obs: activation_violations
       op: empty
-    - obs: transition_request_configuration_conflicts
-      op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-C09

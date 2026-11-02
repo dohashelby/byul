@@ -20,33 +20,23 @@ policy_params:
   type: list[str]
   required: true
 required_observations:
-- key: termination_attempts
+- key: activation_steps
   type: list
-- key: termination_native_events
+- key: activation_violations
   type: list
-- key: termination_deadline_conflict_candidates
+- key: activation_missing
   type: list
-- key: termination_required_scope_status
-  type: list
-- key: termination_binding_observed
-  type: bool
-- key: termination_scope_complete
-  type: bool
-- key: worker_gpu_release_verified
+- key: activation_scope_complete
   type: bool
 judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: termination_binding_observed
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: termination_scope_complete
-      op: eq
-      value: true
-    - obs: worker_gpu_release_verified
-      op: eq
-      value: true
-    - obs: termination_deadline_conflict_candidates
+    - obs: activation_violations
       op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

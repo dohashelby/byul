@@ -71,23 +71,13 @@ challenge_steps:
 - process·IPC·shared memory 잔존 조사
 - 같은 시험 환경 재기동·정상 요청
 required_observations:
-- key: recovery_trials
+- key: activation_steps
   type: list
-- key: recovery_resource_censuses
+- key: activation_violations
   type: list
-- key: recovery_selected_resource_status
+- key: activation_missing
   type: list
-- key: recovery_missing
-  type: list
-- key: recovery_absolute_deadline_violated
-  type: bool
-- key: recovery_selected_absence_observed
-  type: bool
-- key: recovery_global_resources_released
-  type: bool
-- key: recovery_next_normal_launch_verified
-  type: bool
-- key: recovery_scope_complete
+- key: activation_scope_complete
   type: bool
 required_observations_prose:
 - PID·rank·IPC 자원/cleanup 결과/재기동 준비·추론
@@ -102,24 +92,14 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: recovery_selected_absence_observed
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: recovery_global_resources_released
-      op: eq
-      value: true
-    - obs: recovery_next_normal_launch_verified
-      op: eq
-      value: true
-    - obs: recovery_scope_complete
-      op: eq
-      value: true
-    - obs: recovery_absolute_deadline_violated
-      op: eq
-      value: false
-    - obs: recovery_missing
+    - obs: activation_violations
       op: empty
     fail_when_any:
+    - obs: activation_violations
+      op: nonempty
     - obs: recovery_absolute_deadline_violated
       op: eq
       value: true

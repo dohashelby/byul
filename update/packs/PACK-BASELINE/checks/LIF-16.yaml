@@ -54,23 +54,13 @@ challenge_steps:
 - '기본: 승인 원본으로 복구한 뒤 정상 요청과 잔존 접근·사본 상태를 비교한다.'
 - 선택 snapshot은 별도 TP1 지원 구성에서 재로딩 파일·generated-cache fingerprint·1토큰 oracle·외부 gate 순서를 시험한다.
 required_observations:
-- key: transition_native_generation_facts
+- key: activation_steps
   type: list
-- key: transition_request_generation_bindings
+- key: activation_violations
   type: list
-- key: transition_request_configuration_facts
+- key: activation_missing
   type: list
-- key: transition_request_configuration_conflicts
-  type: list
-- key: transition_trials
-  type: list
-- key: transition_missing
-  type: list
-- key: transition_inflight_task_schedule_overlap
-  type: bool
-- key: transition_scope_complete
-  type: bool
-- key: transition_actual_consumption_verified
+- key: activation_scope_complete
   type: bool
 required_observations_prose:
 - 복원 전후 승인 자료·설정·자격 참조/실제 파일/설정 소비·외부 접수·정상 요청/사본과 잔존 접근/snapshot 지원 조건·생성 거부 근거/snapshot 및 다시 읽는 모델·설정 파일 digest/oracle·listener·외부 gate 시각과 실제 요청
@@ -85,20 +75,14 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: transition_scope_complete
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: transition_actual_consumption_verified
-      op: eq
-      value: true
-    - obs: transition_inflight_task_schedule_overlap
-      op: eq
-      value: true
-    - obs: transition_missing
+    - obs: activation_violations
       op: empty
-    - obs: transition_request_configuration_conflicts
-      op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-C12

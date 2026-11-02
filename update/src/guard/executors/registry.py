@@ -55,6 +55,7 @@ from .kubernetes_supply_boot import KubernetesSupplyBootExecutor
 from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTarget031CPUExecutor
 from .template_source_cpu import TemplateSourceCPUExecutor
 from .engine_sensor import EngineSensorExecutor
+from .lab_activation import activated
 from .lifecycle_transition import LifecycleTransitionExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
@@ -125,5 +126,11 @@ ADAPTERS: dict[str, Callable[[], EngineAdapter]] = {
 }
 
 
+# 소유 실험 환경에서 챌린지를 직접 일으키는 실행기. lab_activation 설정이 없으면 그대로다.
+ACTIVATED = frozenset({"stream_buffer", "initialization", "rank_failure", "request_termination", "resource_recovery",
+    "lifecycle_transition", "profiler_observation", "observation_state"})
+
+
 def resolve_executor(executor: str, impl: str) -> Callable[[dict[str, Any]], Executor] | None:
-    return EXECUTORS.get(f"{executor}:{impl}") or EXECUTORS.get(impl)
+    factory = EXECUTORS.get(f"{executor}:{impl}") or EXECUTORS.get(impl)
+    return activated(factory) if factory and impl == "kubernetes" and executor in ACTIVATED else factory

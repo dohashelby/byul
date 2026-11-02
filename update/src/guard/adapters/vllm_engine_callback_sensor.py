@@ -7,6 +7,7 @@ engine keeps its original behaviour. Rows hold keyed fingerprints only.
 from __future__ import annotations
 
 import atexit
+import functools
 import hashlib
 import importlib.abc
 import importlib.machinery
@@ -28,6 +29,8 @@ MODULES = {**cache.TARGETS, **distributed.TARGETS}
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
+FAULT_POINT = '_execute_worker_rpc'
+FAULT_FILE = 'lab-fault-exception'
 
 
 class _Keyed:
@@ -63,8 +66,8 @@ class Sink:
 
 
 class EngineCallbacks:
-    def __init__(self, session, secret, sink, *, context_provider=None, clock=None):
-        self.sink = sink
+    def __init__(self, session, secret, sink, *, context_provider=None, clock=None, fault_file=None):
+        self.sink = sink; self.fault_file = fault_file
         options = {'sink': sink, 'context_provider': context_provider, 'clock': clock}
         self.cache = CacheObserver(session, **options)
         self.distributed = DistributedObserver(session, **options)
@@ -80,8 +83,20 @@ class EngineCallbacks:
             self.gap('ENGINE_CALLBACK_INSTALL_UNAVAILABLE', name)
             return False
         for (owner, method, _), wrapped in changes:
-            setattr(owner, method, wrapped)
+            setattr(owner, method, self._fault(wrapped) if method == FAULT_POINT and self.fault_file else wrapped)
         return True
+
+    def _fault(self, wrapped):
+        """Lab only: raise once in the worker when the parent placed the fault file."""
+        path = Path(self.fault_file)
+        @functools.wraps(wrapped)
+        def faulted(*args, **kwargs):
+            try:
+                path.unlink()
+            except OSError:
+                return wrapped(*args, **kwargs)
+            raise RuntimeError('GUARD_LAB_FAULT')
+        return faulted
 
     def gap(self, code, detail=None):
         try:
@@ -131,7 +146,8 @@ def install(root=ROOT, data_root=DATA_ROOT, *, context_provider=None):
         directory = Path(data_root) / settings['session']
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         callbacks = EngineCallbacks(settings['session'], bytes.fromhex(settings['secret']), Sink(directory),
-            context_provider=context_provider)
+            context_provider=context_provider,
+            fault_file=str(directory / FAULT_FILE) if settings.get('lab_faults') is True else None)
         sys.meta_path.insert(0, Finder(callbacks))
         atexit.register(callbacks.flush_gaps)
         return True

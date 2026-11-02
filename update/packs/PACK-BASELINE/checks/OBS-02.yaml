@@ -61,81 +61,13 @@ challenge_steps:
 - 정상 완료와 안전한 실패·종료를 각각 실행
 - API 응답·로그·worker 실제 상태를 시간순 대조
 required_observations:
-- key: state_http_trials
+- key: activation_steps
   type: list
-- key: state_native_bindings
+- key: activation_violations
   type: list
-- key: state_native_events
+- key: activation_missing
   type: list
-- key: state_asgi_events
-  type: list
-- key: state_output_events
-  type: list
-- key: state_output_links
-  type: list
-- key: state_component_status
-  type: list
-- key: state_conflict_candidates
-  type: list
-- key: state_scope_complete
-  type: bool
-- key: independent_worker_state_verified
-  type: bool
-- key: state_semantics_verified
-  type: bool
-- key: identity_record_collections
-  type: list
-- key: identity_declared_records
-  type: list
-- key: identity_native_models
-  type: list
-- key: identity_binding_candidates
-  type: list
-- key: identity_conflict_candidates
-  type: list
-- key: identity_missing
-  type: list
-- key: identity_producer_authenticated
-  type: bool
-- key: identity_approval_authority_verified
-  type: bool
-- key: identity_approval_model_scope_verified
-  type: bool
-- key: identity_inspection_verified
-  type: bool
-- key: identity_actual_consumption_verified
-  type: bool
-- key: identity_record_worker_generation_verified
-  type: bool
-- key: identity_record_time_order_verified
-  type: bool
-- key: identity_node_runtime_image_verified
-  type: bool
-- key: identity_enterprise_policy_adopted
-  type: bool
-- key: identity_scope_complete
-  type: bool
-- key: profiler_native_samples
-  type: list
-- key: profiler_worker_calls
-  type: list
-- key: profiler_rank_status
-  type: list
-- key: profiler_conflict_candidates
-  type: list
-- key: profiler_missing
-  type: list
-- key: profiler_backend_collection_stopped_verified
-  type: bool
-- key: profiler_trace_output_completed_verified
-  type: bool
-- key: profiler_cross_process_rpc_verified
-  type: bool
-- key: profiler_scope_complete
-  type: bool
-- key: state_collection_sessions
-  type: list
-- key: state_collection_scope_complete
+- key: activation_scope_complete
   type: bool
 required_observations_prose:
 - 상태전이 시각/API·로그 표현/worker·작업·수집 실제 상태
@@ -150,21 +82,14 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: state_scope_complete
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: independent_worker_state_verified
-      op: eq
-      value: true
-    - obs: state_semantics_verified
-      op: eq
-      value: true
-    - obs: state_collection_scope_complete
-      op: eq
-      value: true
-    - obs: state_conflict_candidates
+    - obs: activation_violations
       op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-C11

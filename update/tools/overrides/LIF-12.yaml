@@ -32,59 +32,23 @@ policy_params:
   type: int
   required: true
 required_observations:
-- key: retry_record_snapshots
+- key: activation_steps
   type: list
-- key: retry_event_declarations
+- key: activation_violations
   type: list
-- key: retry_attempt_candidates
+- key: activation_missing
   type: list
-- key: retry_family_candidates
-  type: list
-- key: retry_cost_candidates
-  type: list
-- key: retry_missing
-  type: list
-- key: retry_conflicts
-  type: list
-- key: retry_collection
-  type: list
-- key: retry_unverified
-  type: list
-- key: retry_records_collected
-  type: bool
-- key: retry_producer_authenticated
-  type: bool
-- key: automatic_retry_verified
-  type: bool
-- key: retry_nonoccurrence_verified
-  type: bool
-- key: retry_previous_work_termination_verified
-  type: bool
-- key: retry_cost_enforcement_verified
-  type: bool
-- key: retry_scope_complete
+- key: activation_scope_complete
   type: bool
 judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: retry_records_collected
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: retry_producer_authenticated
-      op: eq
-      value: true
-    - obs: retry_previous_work_termination_verified
-      op: eq
-      value: true
-    - obs: retry_cost_enforcement_verified
-      op: eq
-      value: true
-    - obs: retry_scope_complete
-      op: eq
-      value: true
-    - obs: retry_conflicts
+    - obs: activation_violations
       op: empty
-    - obs: retry_missing
-      op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

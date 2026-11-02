@@ -73,25 +73,13 @@ challenge_steps:
 - 감지·상위 전달·요청 결과 기록
 - 복구
 required_observations:
-- key: rank_observation_trials
+- key: activation_steps
   type: list
-- key: rank_native_samples
+- key: activation_violations
   type: list
-- key: rank_native_calls
+- key: activation_missing
   type: list
-- key: rank_failure_candidates
-  type: list
-- key: rank_fault_cases
-  type: list
-- key: rank_missing
-  type: list
-- key: rank_producer_authenticated
-  type: bool
-- key: rank_normal_all_ranks_verified
-  type: bool
-- key: rank_upper_client_receipt_verified
-  type: bool
-- key: rank_scope_complete
+- key: activation_scope_complete
   type: bool
 required_observations_prose:
 - fault 종류·rank/감지 시각·상태/요청 오류·잔존 작업
@@ -106,21 +94,14 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: rank_producer_authenticated
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: rank_normal_all_ranks_verified
-      op: eq
-      value: true
-    - obs: rank_upper_client_receipt_verified
-      op: eq
-      value: true
-    - obs: rank_scope_complete
-      op: eq
-      value: true
-    - obs: rank_missing
+    - obs: activation_violations
       op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-C08

@@ -75,25 +75,13 @@ challenge_steps:
 - 정상 미디어와 단일 항목의 인코딩/decoded 크기·동일 요청 복수 항목/재시도 누적량 중 하나만 늘린 작은 경계 fixture를 제출하고 초과 감지·거부/중단·처리 도달 여부를 관측
 - 정상 대조 요청을 병행해 단계·요청·전체 비용/지연·admission/queue·거부·완료·회복을 기록한다. 예산 회복의 임시 자원 관측을 공유하며 일반 작업·참조/그룹 회수 판정은 CHK-LIF-010·CHK-LIF-011에 연결
 required_observations:
-- key: buffer_http_trials
+- key: activation_steps
   type: list
-- key: buffer_native_samples
+- key: activation_violations
   type: list
-- key: buffer_cases
+- key: activation_missing
   type: list
-- key: buffer_missing
-  type: list
-- key: buffer_conflict_candidates
-  type: list
-- key: buffer_producer_authenticated
-  type: bool
-- key: buffer_inventory_complete
-  type: bool
-- key: buffer_release_verified
-  type: bool
-- key: buffer_scope_complete
-  type: bool
-- key: budget_process_rss_exceeded
+- key: activation_scope_complete
   type: bool
 required_observations_prose:
 - 요청 비용·동시성·n/queue·KV·거부·완료와 정상 대조 지연/처리율
@@ -111,24 +99,14 @@ judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: buffer_producer_authenticated
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: buffer_inventory_complete
-      op: eq
-      value: true
-    - obs: buffer_release_verified
-      op: eq
-      value: true
-    - obs: buffer_scope_complete
-      op: eq
-      value: true
-    - obs: buffer_missing
+    - obs: activation_violations
       op: empty
-    - obs: budget_process_rss_exceeded
-      op: eq
-      value: false
     fail_when_any:
+    - obs: activation_violations
+      op: nonempty
     - obs: budget_process_rss_exceeded
       op: eq
       value: true

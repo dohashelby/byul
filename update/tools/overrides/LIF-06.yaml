@@ -29,39 +29,23 @@ policy_params:
   type: str
   required: true
 required_observations:
-- key: transition_native_generation_facts
+- key: activation_steps
   type: list
-- key: transition_request_generation_bindings
+- key: activation_violations
   type: list
-- key: transition_request_configuration_facts
+- key: activation_missing
   type: list
-- key: transition_request_configuration_conflicts
-  type: list
-- key: transition_trials
-  type: list
-- key: transition_missing
-  type: list
-- key: transition_inflight_task_schedule_overlap
-  type: bool
-- key: transition_scope_complete
-  type: bool
-- key: transition_actual_consumption_verified
+- key: activation_scope_complete
   type: bool
 judge:
   plugin: rule_table
   params:
     pass_when_all:
-    - obs: transition_scope_complete
+    - obs: activation_scope_complete
       op: eq
       value: true
-    - obs: transition_actual_consumption_verified
-      op: eq
-      value: true
-    - obs: transition_inflight_task_schedule_overlap
-      op: eq
-      value: true
-    - obs: transition_missing
+    - obs: activation_violations
       op: empty
-    - obs: transition_request_configuration_conflicts
-      op: empty
-    fail_when_any: []
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

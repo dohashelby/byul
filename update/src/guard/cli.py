@@ -488,10 +488,11 @@ def prepare_model_read_scope(env: Path = typer.Option(...,"--env"),target: Path 
 
 
 @app.command("prepare-engine-callbacks")
-def prepare_engine_callbacks(output: Path = typer.Option(..., "--output", help="새 준비 자산 폴더")):
+def prepare_engine_callbacks(output: Path = typer.Option(..., "--output", help="새 준비 자산 폴더"),
+    lab_faults: bool = typer.Option(False, "--lab-faults", help="소유 실험 환경의 LIF-08 예외 주입을 켠다")):
     """REQ-14~17 콜백 센서 자산을 만든다. 엔진을 시작하지 않는다."""
     from guard.collectors.engine_callbacks import prepare_assets
-    typer.echo(json.dumps(prepare_assets(output), ensure_ascii=False))
+    typer.echo(json.dumps(prepare_assets(output, lab_faults=lab_faults), ensure_ascii=False))
 
 
 @app.command("prepare-lifecycle-sensor")

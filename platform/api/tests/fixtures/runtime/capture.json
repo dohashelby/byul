@@ -24,6 +24,7 @@
                 "target_ref": null,
                 "error_code": null,
                 "gateway_hold": null,
+                "verification": {"state": "ok", "last_confirmed_at": null},
                 "counts": {
                     "match": 0,
                     "mismatch": 0,
@@ -1251,6 +1252,7 @@
                 "error_message": null
             },
             "gateway_hold": null,
+            "verification": {"state": "ok", "last_confirmed_at": null},
             "comparison": [],
             "counts": {
                 "match": 0,

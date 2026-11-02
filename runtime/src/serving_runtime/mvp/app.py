@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timezone
 from pathlib import Path
 import threading
 import time
@@ -164,7 +165,7 @@ class GatewayApp:
             self.backend.kind,
             config.environment,
             config.run_id,
-            target_context=self._target.record_context,
+            target_context=self._target_record_context,
         )
         self._engine_store = JsonlStore(
             Path(config.data_dir) / "engine_receipts.jsonl"
@@ -330,6 +331,7 @@ class GatewayApp:
                         config.target_pod_snapshot,
                         registration.kubernetes,
                         stale_after_s=config.collector_stale_after_s,
+                        not_before=datetime.now(timezone.utc),
                     ).collect,
                     config.collector_interval_s,
                     config.collector_stale_after_s,
@@ -433,13 +435,31 @@ class GatewayApp:
         collectors = self.collectors_status()
         by_source = {item["source"]: item for item in collectors.get("collectors", [])}
         pods = by_source.get("target_pods")
+        pod_value = pods.get("last_value") if pods else None
+        pod_confirmed_at = pods.get("last_success_at") if pods else None
+        if isinstance(pod_value, dict) and pod_value.get("origin_note") == "host_snapshot":
+            pod_confirmed_at = pod_value.get("collected_at")
         return {
             "backend_kind": self.backend.kind,
             "engine_info": by_source.get("engine_info"),
-            "kubernetes": (pods.get("last_value") if pods and pods.get("state") == "ok" else (
-                {"state": pods.get("state"), "error": pods.get("last_error")} if pods else None
-            )),
+            "kubernetes": (
+                {**pods["last_value"], "last_success_at": pod_confirmed_at}
+                if pods and pods.get("state") == "ok" and isinstance(pods.get("last_value"), dict)
+                else {
+                    "state": pods.get("state"),
+                    "last_value": pods.get("last_value"),
+                    "last_success_at": pod_confirmed_at,
+                    "last_error_kind": pods.get("last_error_kind"),
+                } if pods else None
+            ),
         }
+
+    def _target_record_context(self) -> dict[str, Any]:
+        policy = self.policy_state.policy
+        return self._target.record_context(
+            policy_target_id=policy.target_id if policy else None,
+            **self._target_inputs(),
+        )
 
     def _cache_isolation_status(self, policy: Any) -> dict[str, Any]:
         return isolation_status(
@@ -550,6 +570,7 @@ class GatewayApp:
                 and revalidation["storage"]["ok"]
                 and self.auth_state.state != "error"
                 and target["gateway_hold"] is None
+                and target["verification"]["state"] == "ok"
                 and cache_isolation["ready"]
                 else "degraded"
             ),
@@ -560,6 +581,7 @@ class GatewayApp:
                 "target_ref": target["registration"]["target_ref"],
                 "error_code": target["registration"]["error_code"],
                 "gateway_hold": target["gateway_hold"],
+                "verification": target["verification"],
                 "counts": target["counts"],
                 "instance": target["instance"],
             },

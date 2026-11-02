@@ -47,7 +47,7 @@ export function RuntimeTargetPage() {
           };
           let instance = "";
           if (t.instance_state === "not_configured") instance = "Pod 조회 미설정 — 관측 인스턴스를 구분하지 않음";
-          else if (t.instance_id) instance = `현재 인스턴스 ${t.instance_id} · ${t.instance_pod ?? "–"} · 재시작 ${t.instance_restart_count ?? "–"}회 · 조회 ${formatTime(t.instance_observed_at)}`;
+          else if (t.instance_id) instance = `마지막 확인 인스턴스 ${t.instance_id} · ${t.instance_pod ?? "–"} · 재시작 ${t.instance_restart_count ?? "–"}회 · 조회 ${formatTime(t.instance_observed_at)}`;
           else instance = `인스턴스 확인 불가: ${t.instance_state} — 추정하지 않음`;
           if (t.last_history) instance += ` · 최근 이력 ${t.last_history.event}${t.last_history.reason ? `(${t.last_history.reason})` : ""} ${formatTime(t.last_history.recorded_at)}`;
           const rv = s.revalidation;
@@ -61,6 +61,11 @@ export function RuntimeTargetPage() {
                 {t.gateway_hold && (
                   <div style={{ padding: "0 16px 8px" }}>
                     <WarningBox>신규 추론 요청 보류(503): {t.gateway_hold.reason_code} — {t.gateway_hold.message}</WarningBox>
+                  </div>
+                )}
+                {t.verification.state === "unavailable" && !t.gateway_hold && (
+                  <div style={{ padding: "0 16px 8px" }}>
+                    <WarningBox>대상 미확인, 요청은 처리 중 · 마지막 확인 시각 {formatTime(t.verification.last_confirmed_at)}</WarningBox>
                   </div>
                 )}
                 <table className={rt.statusTable}>

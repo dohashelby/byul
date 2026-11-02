@@ -192,6 +192,24 @@ def test_captured_runtime_details_convert_to_valid_events(contracts):
     assert seen == {"allowed", "denied", "invalid"}
 
 
+def test_runtime_status_preserves_unverified_target_without_hold(contracts):
+    capture = copy.deepcopy(load_json(FIXTURES / "runtime" / "capture.json"))
+    status = capture["endpoints"]["status"]
+    status["status"] = "degraded"
+    status["target"]["verification"] = {
+        "state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"
+    }
+    endpoints = capture["endpoints"]
+    doc = runtime_status(status, endpoints["policy"], endpoints["collectors"],
+        target=endpoints["target"], summary=endpoints["summary"],
+        revalidation=endpoints["revalidation"], observations=endpoints["observations"],
+        baseline=endpoints["baseline"])
+    assert doc["overall"] == "degraded"
+    assert doc["target"]["gateway_hold"] is None
+    assert doc["target"]["verification"] == status["target"]["verification"]
+    assert contracts.errors("runtime-status", doc) == []
+
+
 _MISSING = object()
 
 

@@ -11,6 +11,7 @@ belonging to the current one. Conflicts are reported; nothing is guessed.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import errno
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -40,6 +41,10 @@ _LABEL_KEY = re.compile(r"([a-z0-9]([-a-z0-9.]*[a-z0-9])?/)?[A-Za-z0-9]([-A-Za-z
 _LABEL_VALUE = re.compile(r"([A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?)?")
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 _ERROR_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,63}")
+
+
+class TargetSnapshotInvalidError(ValueError):
+    """A readable snapshot is unsafe or does not match its registration."""
 
 
 def _utc_now() -> str:
@@ -417,6 +422,7 @@ class TargetPodSnapshotCollector:
         *,
         stale_after_s: float,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+        not_before: datetime | None = None,
     ) -> None:
         if stale_after_s <= 0:
             raise ValueError("target Pod snapshot stale window must be positive")
@@ -424,18 +430,23 @@ class TargetPodSnapshotCollector:
         self.selector = selector
         self.stale_after_s = float(stale_after_s)
         self.now = now
+        self.not_before = not_before.astimezone(timezone.utc) if not_before else None
 
     def _read(self) -> bytes:
-        descriptor = os.open(
-            self.path,
-            os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
-        )
+        try:
+            descriptor = os.open(
+                self.path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
+            )
+        except OSError as error:
+            if error.errno == errno.ELOOP:
+                raise TargetSnapshotInvalidError("target Pod snapshot is a symlink") from error
+            raise
         try:
             information = os.fstat(descriptor)
             if not stat.S_ISREG(information.st_mode):
-                raise OSError("target Pod snapshot is not a regular file")
+                raise TargetSnapshotInvalidError("target Pod snapshot is not a regular file")
             if information.st_size > POD_SNAPSHOT_MAX_BYTES:
-                raise ValueError("target Pod snapshot exceeds 4 MiB")
+                raise TargetSnapshotInvalidError("target Pod snapshot exceeds 4 MiB")
             chunks: list[bytes] = []
             remaining = POD_SNAPSHOT_MAX_BYTES + 1
             while remaining:
@@ -446,7 +457,7 @@ class TargetPodSnapshotCollector:
                 remaining -= len(chunk)
             raw = b"".join(chunks)
             if len(raw) > POD_SNAPSHOT_MAX_BYTES:
-                raise ValueError("target Pod snapshot exceeds 4 MiB")
+                raise TargetSnapshotInvalidError("target Pod snapshot exceeds 4 MiB")
             return raw
         finally:
             os.close(descriptor)
@@ -465,6 +476,12 @@ class TargetPodSnapshotCollector:
 
     def collect(self) -> tuple[dict[str, Any], str]:
         raw = self._read()
+        try:
+            return self._parse_snapshot(raw)
+        except ValueError as error:
+            raise TargetSnapshotInvalidError(str(error)) from error
+
+    def _parse_snapshot(self, raw: bytes) -> tuple[dict[str, Any], str]:
         try:
             document = json.loads(
                 raw.decode("utf-8"),
@@ -497,6 +514,8 @@ class TargetPodSnapshotCollector:
         ):
             raise ValueError("target Pod snapshot does not match the target registration")
         collected_at = self._timestamp(document.get("collected_at"))
+        if self.not_before is not None and collected_at < self.not_before:
+            raise OSError("target Pod snapshot predates Gateway startup")
         state = document.get("state")
         if state not in {"ok", "error"}:
             raise ValueError("target Pod snapshot state is invalid")
@@ -633,12 +652,30 @@ class TargetRegistry:
         with self._lock:
             return dict(self._current) if self._current else None
 
-    def record_context(self) -> dict[str, Any]:
+    def record_context(
+        self,
+        status: dict[str, Any] | None = None,
+        *,
+        policy_target_id: str | None = None,
+        backend_kind: str | None = None,
+        engine_info: dict[str, Any] | None = None,
+        kubernetes: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Target fields attached to every request record."""
 
+        if status is None and backend_kind is not None:
+            _, _, verification, tracker = self._evaluate(
+                policy_target_id=policy_target_id,
+                backend_kind=backend_kind,
+                engine_info=engine_info,
+                kubernetes=kubernetes,
+            )
+        else:
+            tracker = status["instance"] if status is not None else None
+            verification = status["verification"] if status is not None else None
         with self._lock:
-            current = self._current
-            k8s_state = self._k8s_state
+            current = tracker["current"] if tracker is not None else self._current
+            k8s_state = tracker["state"] if tracker is not None else self._k8s_state
         return {
             "registration": self.registration.state,
             "target_id": self.registration.target_id,
@@ -646,6 +683,8 @@ class TargetRegistry:
             "instance_state": (
                 k8s_state if self.registration.kubernetes is not None else "not_configured"
             ),
+            "verification_state": verification["state"] if verification else None,
+            "last_confirmed_at": verification["last_confirmed_at"] if verification else None,
         }
 
     def hold(
@@ -671,6 +710,25 @@ class TargetRegistry:
             rows,
             kubernetes_declared=self.registration.kubernetes is not None,
             kubernetes=kubernetes,
+            last_rows=self._last_comparison_rows(policy_target_id, backend_kind, engine_info, kubernetes),
+        )
+
+    def _last_comparison_rows(
+        self,
+        policy_target_id: str | None,
+        backend_kind: str,
+        engine_info: dict[str, Any] | None,
+        kubernetes: dict[str, Any] | None,
+    ) -> list[dict[str, Any]]:
+        previous_engine = dict(engine_info) if isinstance(engine_info, dict) else {}
+        if isinstance(previous_engine.get("last_value"), dict):
+            previous_engine["state"] = "ok"
+        previous_pods = kubernetes
+        if isinstance(kubernetes, dict) and kubernetes.get("state") != "ok":
+            previous_pods = kubernetes.get("last_value")
+        return self._comparison_rows(
+            policy_target_id=policy_target_id, backend_kind=backend_kind,
+            engine_info=previous_engine, kubernetes=previous_pods,
         )
 
     def _comparison_rows(
@@ -751,7 +809,11 @@ class TargetRegistry:
                     and isinstance(kubernetes.get("instance"), dict)
                     else None
                 )
-                instance = snapshot_instance or self.current_instance()
+                instance = snapshot_instance or (
+                    self.current_instance()
+                    if not isinstance(kubernetes, dict) or "instance" not in kubernetes
+                    else None
+                )
                 k8s_state = kubernetes.get("state") if kubernetes else "disconnected"
                 if instance is None:
                     rows.append(_unknown("engine.image_digest", registration.image_digest, "kubernetes_api", f"pod snapshot {k8s_state}"))
@@ -769,7 +831,7 @@ class TargetRegistry:
         history_limit: int = 20,
     ) -> dict[str, Any]:
         registration = self.registration
-        rows = self._comparison_rows(
+        rows, hold, verification, tracker = self._evaluate(
             policy_target_id=policy_target_id,
             backend_kind=backend_kind,
             engine_info=engine_info,
@@ -785,23 +847,10 @@ class TargetRegistry:
         counts = {"match": 0, "mismatch": 0, "unknown": 0, "not_declared": 0}
         for row in rows:
             counts[row["state"]] = counts.get(row["state"], 0) + 1
-        with self._lock:
-            tracker = {
-                "state": self._k8s_state if registration.kubernetes else "not_configured",
-                "observed_at": self._observed_at,
-                "current": dict(self._current) if self._current else None,
-                "events_this_session": self._events_this_session,
-            }
-        hold = self.gateway_decision(policy_target_id)
-        if hold is None and registration.state == "ok":
-            hold = comparison_hold(
-                rows,
-                kubernetes_declared=registration.kubernetes is not None,
-                kubernetes=kubernetes,
-            )
         return {
             "registration": registration.view(),
             "gateway_hold": {"reason_code": hold[0], "message": hold[1]} if hold else None,
+            "verification": verification,
             "comparison": rows,
             "counts": counts,
             "kubernetes": kubernetes,
@@ -815,9 +864,64 @@ class TargetRegistry:
             "limits": [
                 "model.id 일치는 weight 해시·revision·실제 로딩을 증명하지 않음",
                 "Pod 관측은 대상 등록의 kubernetes.context에서 직접 읽기 전용 조회하거나 같은 API 조회의 host snapshot을 읽음",
-                "선언한 값이 다르거나 확인되지 않으면 신규 요청을 503으로 보류(model.revision은 engine API로 확인할 수 없어 보류 조건에서 제외, 자산 manifest로 확인)",
+                "확인된 불일치·초기 미확인·잘못된 스냅샷은 503. 직전 확인이 정상이면 조회 중단 동안 요청 처리·대상 미확인 표시(model.revision은 자산 manifest로 확인)",
             ],
         }
+
+    def _evaluate(
+        self,
+        *,
+        policy_target_id: str | None,
+        backend_kind: str,
+        engine_info: dict[str, Any] | None,
+        kubernetes: dict[str, Any] | None,
+    ) -> tuple[list[dict[str, Any]], tuple[str, str] | None, dict[str, Any], dict[str, Any]]:
+        """Compute live target state without reading the history store."""
+
+        registration = self.registration
+        rows = self._comparison_rows(
+            policy_target_id=policy_target_id,
+            backend_kind=backend_kind,
+            engine_info=engine_info,
+            kubernetes=kubernetes,
+        )
+        with self._lock:
+            tracker = {
+                "state": (
+                    kubernetes.get("state", "unknown") if isinstance(kubernetes, dict)
+                    else self._k8s_state
+                ) if registration.kubernetes else "not_configured",
+                "observed_at": self._observed_at,
+                "current": dict(self._current) if self._current else None,
+                "events_this_session": self._events_this_session,
+            }
+        hold = self.gateway_decision(policy_target_id)
+        if hold is None and registration.state == "ok":
+            hold = comparison_hold(
+                rows,
+                kubernetes_declared=registration.kubernetes is not None,
+                kubernetes=kubernetes,
+                last_rows=self._last_comparison_rows(policy_target_id, backend_kind, engine_info, kubernetes),
+            )
+        unavailable = registration.state == "ok" and (
+            (isinstance(engine_info, dict) and engine_info.get("state") != "ok")
+            or (registration.kubernetes is not None and isinstance(kubernetes, dict) and kubernetes.get("state") != "ok")
+        )
+        confirmed_times = [
+            source.get("last_success_at") for source in (engine_info, kubernetes)
+            if isinstance(source, dict) and isinstance(source.get("last_success_at"), str)
+        ]
+        verification = {
+            "state": "blocked" if hold else "unavailable" if unavailable else "ok",
+            "last_confirmed_at": (
+                min(
+                    confirmed_times,
+                    key=lambda value: datetime.fromisoformat(value.replace("Z", "+00:00")),
+                )
+                if confirmed_times and hold is None else None
+            ),
+        }
+        return rows, hold, verification, tracker
 
 
 # The engine API cannot expose these by design; they are checked through the
@@ -830,23 +934,36 @@ def comparison_hold(
     *,
     kubernetes_declared: bool,
     kubernetes: dict[str, Any] | None,
+    last_rows: list[dict[str, Any]] | None = None,
 ) -> tuple[str, str] | None:
-    """Hold new requests when a declared value differs or cannot be confirmed.
-
-    Plan §4.1/§7.3: a confirmed target mismatch, multiple matching targets or
-    missing metadata are not estimated; admission waits (503) until fixed.
-    """
+    """Hold confirmed problems; use a last good value during a lookup outage."""
 
     gating = [row for row in rows if row["field"] not in _NON_GATING_FIELDS]
     for row in gating:
         if row["state"] == "mismatch":
             return ("TARGET_MISMATCH", f"observed {row['field']} differs from the registered target")
+    previous = [row for row in (last_rows or []) if row["field"] not in _NON_GATING_FIELDS]
+    for row in previous:
+        if row["state"] == "mismatch":
+            return ("TARGET_MISMATCH", f"last observed {row['field']} differs from the registered target")
     if kubernetes_declared:
         state = kubernetes.get("state") if isinstance(kubernetes, dict) else None
+        if isinstance(kubernetes, dict) and kubernetes.get("last_error_kind") == "TargetSnapshotInvalidError":
+            return ("TARGET_UNAVAILABLE", "target pod snapshot is invalid")
         if state != "ok":
-            return ("TARGET_UNAVAILABLE", f"target pod snapshot is {state or 'not collected'}")
+            prior = kubernetes.get("last_value") if isinstance(kubernetes, dict) else None
+            if not isinstance(prior, dict) or prior.get("state") != "ok":
+                return ("TARGET_UNAVAILABLE", f"target pod snapshot is {state or 'not collected'}")
+        if state == "ok" and isinstance(kubernetes, dict) and kubernetes.get("instance") is None:
+            return ("TARGET_UNAVAILABLE", "target pod has no confirmed instance")
+    for row in previous:
+        if row["state"] == "unknown":
+            return ("TARGET_UNVERIFIED", f"{row['field']} could not be confirmed ({row['note'] or 'not observed'})")
+    prior_states = {row["field"]: row["state"] for row in previous}
     for row in gating:
         if row["state"] == "unknown":
+            if row["source"] in {"engine_api", "kubernetes_api"} and prior_states.get(row["field"]) == "match":
+                continue
             return ("TARGET_UNVERIFIED", f"{row['field']} could not be confirmed ({row['note'] or 'not observed'})")
     return None
 

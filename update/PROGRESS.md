@@ -1691,3 +1691,9 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 2026-11-01 B70431 수락: B가 검토한 gate61c29/common adcde의 전용5파일 원bytes를 소비하고 전체394 literal manifest를 대조했다. A측 두 수락 시험은 B160/PR171 역사 원본과 새5파일을 구분하고 현재394 정상 수락·혼합/미등록·과거392 snapshot 거부를 확인하도록 고정한다. 직접/인접/최종 검증은 receipt로 마감하며 actual/CI5로 확대하지 않는다. PLT source920 실증은 준비 run ID 거부로 미실행, 양 서버 Stop·실패팩 정확복원을 마감했고 후속 ID 보수는 로컬 CPU 검증만 수행했다.
 - 2026-11-01 PR 마감 후보: B3900e2a의 역사 HTTP fixture 보수 한 파일을 원bytes로 소비했다. A측 수락은 B70431 원본과3900 successor를 각각 검토한 literal로 확인하며 제품/gate/common394는 바꾸지 않았다. main144798c의 update 밖 원본을 결합했다. 원 a3 Linux10146pass/1fixture fail와 c464 Windows10068pass/65fail/2error는 보존하고 수정 후보의 직접·정확HEAD CI5·설치는 별도 검증한다. B POSIX107 근거는 bytes 동일 범위에서 재사용한다. REQ13 후속 초안·운영기 보수와 실제 PLT 미실행은 미완료로 남긴다. 새 전체 점검 완료·AWS 작업은0이다.
 - PR 후보 직접 검증: A의 source/역사/current-successor 수락·공개 B HTTP 제품4사례·원 실패1사례의12시험 통과(Windows3.12.14, pytest23.29초/부모24.153초, 실행 중 source 동일). B 원5파일·후속fixture1파일·394 manifest와 원팩/반출복원/저장팩 정확Ref를 확인했다. 검증 뒤 인계 문서만 정합화했으며 코드/팩/lock은 동일하다. 최종 정확 HEAD CI5·설치 결과는 PR 검사와 외부 receipt로 마감한다.
+
+### 2026-11-02 점검 엔진 통합 개발
+- 한 일: 담당 2(PR184)·담당 1·PR180을 한 브랜치로 합쳤다. 소스 고정을 커밋에서 파일 해시 목록(`release/reviewed-source.json`)으로 바꿨다. 담당 2의 23개를 팩에 연결하고 update 범위 밖 8개를 retired로 뺐다. REQ-14~17 native 콜백 수집과 SGLang·TensorRT-LLM 외부 HTTP 어댑터를 추가했다.
+- 테스트 결과: EXAMPLE 대역과 고정 vLLM 소스 조각의 계약 시험만 수행했다. 실제 엔진·Kubernetes·GPU는 미실측이다.
+- 다음 단계: LIF-13, REQ-18~21의 native 수집기와 LIF·OBS 능동 활성화.
+- 막힌 것: 위 5개는 GPU와 검토된 대상 소스 계약이 필요하다. 능동 장애 주입은 상태 변경 승인 범위 결정이 필요하다.

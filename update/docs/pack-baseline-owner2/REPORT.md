@@ -128,3 +128,7 @@ uv run pytest -q --basetemp=C:/Users/dudwh/.codex/tmp/pack-owner2-full-20261101
 ## 2026-11-02 고정 커밋 갱신
 
 사용자 지시로 `REVIEWED_COMMON_COMMIT`을 제품 소스 고정 커밋 `2247aabb3447ccb3210b100cade06bce51ed771e`로 올렸다. 고정 범위 파일은 401개다. gate `fc08866`과 그 해시를 B 승인 조합에 추가했고, 이전 조합은 그대로 둔다. 이 커밋은 CI의 소스 고정 검사를 맞춘 것이며 23개 실제 연결이나 실측을 완료로 올리지 않는다. 고정 커밋이 `HEAD`의 조상이어야 하므로 이 PR은 squash 없이 병합한다.
+
+## 2026-11-02 팩 연결 통합
+
+담당 2의 23개를 팩에 연결했다. `pack_owner2_readiness` 기준 연결은 18/23이고 LIF-13, REQ-18, REQ-19, REQ-20, REQ-21은 native 수집기가 없어 연결 수에서 제외된다. 연결된 수집기 대부분은 수동 관측이라 scope_complete=false를 내므로 실행 결과는 UNKNOWN이거나 독립 위반의 FAIL이다. PASS는 능동 활성화가 구현돼야 나온다. 실측은 여전히 0건이다.

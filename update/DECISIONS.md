@@ -707,3 +707,10 @@ code pin 준비는 공유cp312 pycache를읽지않고각고정인터프리터가
 - native16 capture=None은 두 binding=false인 admitted 실패행에만 허용하는 A2 원 보수로 소비한다. 누락을 관측/전체완료로 만들지 않고 다른 recording의 사실을 지우지 않는다. A1 executor 판본0.4.1·전체389파일 고정 pin을 갱신하며 source gate/parser·B 원 c9/helper/승인쌍과 native17/18/19 원bytes를 유지한다.
 
 - native16 부분iterator의 귀속은 원 DefaultModelLoader 호출 경계 안에서만 검증한다. 경계 밖 fixture의 정상 미귀속을 지우거나 assert를 완화하지 않고 입력을 구체적 bound early-close로 보수했으며 비소진을 추가 검증했다. CI가 고른3.12.15와 고정 지원 ABI3.12.14nt/3.12.3posix 차이는 정제 근거로 남기고 source/code gate를 자동완화하거나 검사설정을 바꾸지 않는다.
+
+- 2026-11-02 · 소스 고정은 `verify_req10_consumption.py`가 `release/reviewed-source.json`의 파일 해시와 비교한다. git·커밋 조상이 필요 없어 squash·설치본에서도 같게 동작한다. 제품 소스를 바꾸면 `python tools/verify_req10_consumption.py --write`로 목록을 다시 만들고 그 diff를 검토한다. 과거 커밋 조합은 이력으로 남긴다. · 사용자 지시(점검 엔진 전부 개발).
+- 2026-11-02 · SUP-01, SUP-02, SUP-14, LIF-15, OBS-07, OBS-08, OBS-10, OBS-12는 update 검증 범위에서 뺀다. ID는 유지하고 팩에서 retired로 표시한다. · 사용자 지시.
+- 2026-11-02 · REQ-14~17은 lifecycle 프로파일을 늘리지 않고 전용 준비 자산 `guard_engine_callbacks`로 고정 소스 콜백을 설치한다. 요청 태그 `byul-cb-<32hex>`를 준비 자산의 키로 지문화해 native 행과 시험 사례를 묶는다. · 기존 콜백 재사용.
+- 2026-11-02 · REQ-15·REQ-14는 인증 신원 연결과 중간 버퍼 대응을 관측하지 못하므로 위반이 없어도 full_scope=false로 둔다. PASS가 아니라 UNKNOWN이다. · 근거 없으면 UNKNOWN.
+- 2026-11-02 · REQ-17 판정값 `cache_timing_max_auc_percent`, `cache_timing_min_samples`는 기업 정책 입력이다. 기본값을 두지 않는다. · 기업 기준 임의 금지.
+- 2026-11-02 · SGLang·TensorRT-LLM은 공개 문서 기준 경로 표로 외부 HTTP 점검만 지원한다. 모르는 POST 경로는 보내지 않는다. Kubernetes·내부 센서 수집기는 vLLM 0.31 전용으로 남는다. · 사용자 지시, 실측 전.

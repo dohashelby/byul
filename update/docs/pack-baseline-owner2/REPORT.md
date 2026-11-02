@@ -124,3 +124,7 @@ uv run pytest -q --basetemp=C:/Users/dudwh/.codex/tmp/pack-owner2-full-20261101
 초안 PR184의 `0829b3c` 원격 CI(run `41318242161`)는 공용 계약 등 4개 검사가 성공했고 `update-default`가 실패로 끝났다. 기본 전체 시험은 **10228 passed, 7 failed, 19 deselected**, pytest **1108.85초** / 부모 **1110.779초**다. 실패 node 7개가 로컬 최종 시험의 고정 snapshot gate 거부 목록과 정확히 일치한다. wheel 빌드·설치 검증 단계는 앞선 실패로 실행되지 않았으므로 통과로 집계하지 않는다.
 
 원문 로그는 `remote-ci-0829b3c.zip`, 명령·시간·실패 목록·원본 SHA256은 `remote-ci-0829b3c.json`에 보존했다. 이 갱신은 문서·증거만 바꾸며 제품 소스는 `2247aab`와 같다. PR183은 여전히 미병합이고 PR184에 새 검토 의견은 없었다. 팩 연결·native producer 구현·실측의 남은 조건은 해소되지 않았다.
+
+## 2026-11-02 고정 커밋 갱신
+
+사용자 지시로 `REVIEWED_COMMON_COMMIT`을 제품 소스 고정 커밋 `2247aabb3447ccb3210b100cade06bce51ed771e`로 올렸다. 고정 범위 파일은 401개다. gate `fc08866`과 그 해시를 B 승인 조합에 추가했고, 이전 조합은 그대로 둔다. 이 커밋은 CI의 소스 고정 검사를 맞춘 것이며 23개 실제 연결이나 실측을 완료로 올리지 않는다. 고정 커밋이 `HEAD`의 조상이어야 하므로 이 PR은 squash 없이 병합한다.

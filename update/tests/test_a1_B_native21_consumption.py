@@ -30,7 +30,7 @@ def test_original_B160_eight_files_are_exact_confirmed_bytes():
 
 def test_new_A_full_common_pin_is_the_exact_B_reviewed_pair():
     proof=native.verify_source()
-    assert proof['files_verified']==392 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
+    assert proof['files_verified']==401 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
     assert not proof['original_B_default_pin_changed']
     assert proof['reviewed_common_commit']==gate.REVIEWED_COMMON_COMMIT
 
@@ -53,6 +53,6 @@ def test_B_reviewed_exact_A152_A156_A158_PR171_pairs_are_closed_and_literal():
         ("67b917029c6458fc16cc53be787134d652fdb096673721a486febe4d68a0c0b6","9d8987a5a306ffce28fcb735e012c400589303f2"),
         ("15701b1e83eab8665414456b3072bcad73ee2220ed02e9f63a06a3441b55d157","f277fecd6df1e59505c0ad731032593f6fb22885"),
         ("00979cf6b5139e0337d1f7976acad2b816e1018c4422cf8a44a087b0c28fc233","df6255e96a877ebfbe185230ed87320aa84d2c30")})
-    assert gate.REVIEWED_COMMON_COMMIT=="df6255e96a877ebfbe185230ed87320aa84d2c30"
+    assert gate.REVIEWED_COMMON_COMMIT=="2247aabb3447ccb3210b100cade06bce51ed771e"
     assert gate.REVIEWED_COMMON_COMMIT in native.APPROVED_REVIEWED_COMMON_COMMITS
     assert PREVIOUS_B154_BYTES["update/tests/linux_cpu/lif13_peer_probe.py"]==REVIEWED_B_BYTES["update/tests/linux_cpu/lif13_peer_probe.py"]

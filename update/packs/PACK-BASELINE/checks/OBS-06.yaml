@@ -2,7 +2,7 @@ id: OBS-06
 framework_id: CHK-OBS-006
 mechanism_ids:
 - mechanism-14
-revision: 4
+revision: 5
 retired: false
 area: OBS
 purpose: 저장 자료 보호
@@ -15,7 +15,28 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 저장 로그·기록의 독자와 반출 권한을 기본 확인한다. 선택 진단·usage 사본은 실제 생성·보존 경로별로 추가한다. 저장 위치·자료 등급별 암호화 요구와 복호화 권한을 확인한다. 요구나 실제 설정이 미정이면 해당 결과를 미확인으로 남긴다.
-policy_params: []
+policy_params:
+- key: record_environment_sha256
+  type: str
+  required: true
+- key: record_target_sha256
+  type: str
+  required: true
+- key: record_subject_plan_sha256
+  type: str
+  required: true
+- key: record_inventory_session
+  type: str
+  required: true
+- key: record_inventory_source_sha256
+  type: str
+  required: true
+- key: record_validity_start
+  type: str
+  required: true
+- key: record_validity_end
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: 자료별 독자·반출 목적·범위
   enterprise_decisions: 자료별 독자·반출 목적·범위·승인, 진단 실행 역할·격리 환경과 parser/입력 신뢰 범위. 자료 등급·저장 위치별 암호화 필요 여부, 허용 독자·복호화 역할, 키 관리 책임·보존·교체 및 예외 조건을 정한다.
@@ -27,7 +48,29 @@ challenge_steps:
 - 원본·사본·백업의 자료 등급과 저장 암호화 요구·적용 계층 확인
 - 암호화가 필요한 저장 위치의 설정·키 참조·복호화 권한 대조
 - 허용·비허용 계정의 조회·복호화 결과와 정상 기록·조회를 비교
-required_observations: []
+required_observations:
+- key: record_access_rows
+  type: list
+- key: record_unauthorized_read_verified
+  type: bool
+- key: record_normal_read_verified
+  type: bool
+- key: record_access_gaps
+  type: list
+- key: record_copy_inventory
+  type: list
+- key: record_copy_violations
+  type: list
+- key: record_copy_missing
+  type: list
+- key: record_access_partial
+  type: bool
+- key: record_denial_verified
+  type: bool
+- key: record_scope_complete
+  type: bool
+- key: record_inventory_authenticated
+  type: bool
 required_observations_prose:
 - 사본별 ACL·owner/실제 reader identity/조회·반출 감사 결과
 - 자료 등급별 저장 보호 요구, 저장소·볼륨·백업의 암호화 설정과 적용 증거, 키 식별 참조·복호화 권한·감사 기록(키 값 제외)
@@ -39,8 +82,31 @@ remediation: '- 로그·진단·사용통계의 로컬 원본·수집 사본·�
   - 자료 등급과 저장 위치별로 필요한 저장 암호화를 적용하고 키·복호화 권한을 제한한다. 원본·회전 파일·진단·backup 사본의 실제 저장 계층을 확인하며, 수집·조회 프로그램의 권한과 키 관리 권한을 함께 검토한다.'
 method_and_evidence: '기록·진단 원본과 collector·원격 sink·backup 사본의 위치·소유자·자료 등급을 식별하고, 허용·비허용 계정의 실제 조회·다운로드·반출 결과를 대조한다. CHK-OBS-003에서 확보한 같은 로그·dump artifact를 사용하더라도 수집 필드의 허용 여부와 사본의 조회·반출 권한은 따로 판정한다. 로컬 파일·볼륨·객체 저장소·backup의 저장 암호화 요구와 실제 설정을 대조한다. 암호화가 필요한 위치의 적용 증거·키 식별 참조·복호화 권한·감사 기록을 확인하고, 허용·비허용 계정의 조회·복호화와 정상 기록·조회를 비교한다. 키 값과 실제 민감정보는 수집하지 않는다. 예외 dump·선택 debug 사본의 생성 조건은 공통 【F26】 근거를 참조한다. 근거 원문: [F26](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33848).'
 remaining_setup: 자료별 독자·반출 범위와 시험 계정, 저장 위치·등급별 암호화 요구 결정, 실제 저장·키 관리 설정과 권한 시험 준비. 실제 시험 미실행.
-executor: null
-judge: null
+executor: record_access
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: record_normal_read_verified
+      op: eq
+      value: true
+    - obs: record_denial_verified
+      op: eq
+      value: true
+    - obs: record_scope_complete
+      op: eq
+      value: true
+    - obs: record_inventory_authenticated
+      op: eq
+      value: true
+    - obs: record_copy_violations
+      op: empty
+    fail_when_any:
+    - obs: record_unauthorized_read_verified
+      op: eq
+      value: true
+    - obs: record_copy_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-C11
@@ -52,3 +118,9 @@ legacy:
   - Q-C11/SC-22-03
 source:
   array: observability_assessment_draft
+collection_profile: kubernetes-record-access-scope-v1
+limitations:
+- '구현 분기: 허용·비허용 두 신원의 선택 Pod 로그 조회를 실제로 수행하고, 사본별 반출·복호화·저장 암호화 기록을 대조한다. 비허용 신원의 조회 성공, 기록이 드러낸 반출·복호화 성공, 필수 암호화 누락은 FAIL이다.'
+- '미구현 분기: 비허용 조회의 실패가 정책 거부임을 증명하는 근거와 사본 기록 생산자 인증, 독립 감사 기록이 없어 PASS에 도달하지 않는다. 클라이언트 오류를 거부로 세지 않는다.'
+- kubernetes 구현만 있다. 두 신원의 로그 조회만 수집되면 record_access_partial=true로 남기고 전체 충족으로 보지 않는다. 저장 보호 요구가 미정인 사본은 미확인이다.
+- 신원 계획은 운영자 선언이며 RBAC·IAM을 바꾸지 않는다. 로그 본문·키 값은 저장하지 않는다.

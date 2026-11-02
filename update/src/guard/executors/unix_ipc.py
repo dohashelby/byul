@@ -126,6 +126,10 @@ class UnixIPCExecutor(HttpCheckExecutor):
         return super().run(check, env, policy_values, adapter, workdir)
 
     def validate_policy(self, check, values):
+        from . import ipc_trust_scope
+        if getattr(check, "collection_profile", None) == ipc_trust_scope.PROFILE:
+            ipc_trust_scope.validate_policy(values)
+            return
         policy_shape(values)
         uids = self.cfg.get("probe_uids")
         if (type(uids) is not list or not 2 <= len(uids) <= 4
@@ -174,6 +178,10 @@ class UnixIPCExecutor(HttpCheckExecutor):
             return None
 
     def collect(self, ctx):
+        from . import ipc_trust_scope
+        if getattr(ctx.check, "collection_profile", None) == ipc_trust_scope.PROFILE:
+            self.version = ipc_trust_scope.VERSION
+            return ipc_trust_scope.collect(ctx, self.docker)
         paths = ctx.policy_values["protected_unix_paths"]
         uids = self.cfg["probe_uids"]
         script = Path(ipc_probe.__file__).read_text(encoding="utf-8")

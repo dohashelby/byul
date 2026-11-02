@@ -55,6 +55,16 @@ def test_current_pack_never_disagrees_with_the_map():
 
 @pytest.mark.parametrize("name", sorted({v for v in CHECKS.values() if v and v != OWNER2_PENDING} - {"engine_sensor", "lifecycle_transition"}))
 def test_connected_executor_has_a_supported_non_fake_implementation(name):
-    if name in ("supply_boot", "record_access") and not _implementations(name):
-        pytest.xfail("구현 전: 담당 1 순서상 뒤에 등록")
     assert _implementations(name), name
+
+
+OWNER1 = [cid for cid, name in CHECKS.items() if name not in (None, OWNER2_PENDING, "engine_sensor", "lifecycle_transition")]
+
+
+def test_owner1_checks_are_connected_exactly_as_designed():
+    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    assert len(OWNER1) == 46  # 기존 17 + 담당 1의 29
+    for check_id in OWNER1:
+        check = pack.checks[check_id]
+        assert check.executor == CHECKS[check_id] and check.judge is not None, check_id
+        assert _implementations(check.executor), check_id

@@ -15,6 +15,7 @@ from guard.judges.rule_table import evaluate_rule
         ("eq", True, 1, False), ("eq", 1, True, False),  # bool과 int를 섞지 않는다
         # 모음
         ("nonempty", None, ["/a"], True), ("nonempty", None, [], False), ("nonempty", None, {}, False),
+        ("empty", None, [], True), ("empty", None, {}, True), ("empty", None, ["/a"], False), ("empty", None, 0, False),
         ("nonempty", None, None, False),
         ("all_in", [401, "refused"], {"/a": 401, "/b": "refused"}, True),
         ("all_in", [401, "refused"], {"/a": 401, "/b": 404}, False),

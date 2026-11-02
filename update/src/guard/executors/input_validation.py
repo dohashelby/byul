@@ -2,6 +2,7 @@
 from copy import deepcopy
 from guard.models import canonical_json, sha256_hex
 from guard.input_policy import contract_state, policy_context
+from . import request_field_probe
 from .http_common import HttpCheckExecutor, functional_requests
 from .content_common import (append_artifact, bounded_probe, control_state, record_content,
                              sample_artifact)
@@ -32,6 +33,9 @@ class InputValidationExecutor(HttpCheckExecutor):
 
     def validate_configuration(self, check):
         """Validate execution bounds even when policy scope is unsupported."""
+        if request_field_probe.supported(check):
+            request_field_probe.validate_configuration(check, self.cfg)
+            return
         if "length_cause_evidence" in self.cfg and type(self.cfg["length_cause_evidence"]) is not bool:
             raise ValueError("length_cause_evidence must be an explicit boolean")
         if type(self.cfg.get("vocab_size")) is not int or self.cfg["vocab_size"] < 1 or not self.cfg.get("vocab_source"):
@@ -41,6 +45,10 @@ class InputValidationExecutor(HttpCheckExecutor):
             raise ValueError("max_probe_tokens must be an integer of at least two tokens")
 
     def validate_policy(self, check, values):
+        if request_field_probe.supported(check):
+            request_field_probe.validate_policy(check, values)
+            self.validate_configuration(check)
+            return
         if response_contract_state(check) == "incomplete":
             raise ValueError("input response evidence contract is incomplete")
         context = policy_context(check, values)
@@ -62,6 +70,9 @@ class InputValidationExecutor(HttpCheckExecutor):
         return draft
 
     def collect(self, ctx):
+        if request_field_probe.supported(ctx.check):
+            self.version = request_field_probe.VERSION
+            return request_field_probe.collect(ctx, self.cfg)
         requests, probes = functional_requests(ctx, via="engine")
         if len(requests) != 1 or requests[0].get("body", {}).get("prompt") != [0]:
             raise ValueError("input validation needs one engine token-array control with prompt=[0]")

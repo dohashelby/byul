@@ -1,0 +1,48 @@
+executor: required_event_record
+collection_profile: kubernetes-credential-copy-record-observation-v1
+policy_params:
+  - { key: copy_environment_sha256, type: str, required: true }
+  - { key: copy_target_sha256, type: str, required: true }
+  - { key: copy_inventory_sha256, type: str, required: true }
+  - { key: copy_policy_sha256, type: str, required: true }
+  - { key: copy_record_source_sha256, type: str, required: true }
+  - { key: copy_record_session, type: str, required: true }
+  - { key: copy_validity_start, type: str, required: true }
+  - { key: copy_validity_end, type: str, required: true }
+  - { key: copy_max_record_delay_ms, type: int, required: true }
+required_observations:
+  - { key: copy_inventory_declarations, type: list }
+  - { key: copy_record_snapshots, type: list }
+  - { key: copy_event_declarations, type: list }
+  - { key: copy_treatment_candidates, type: list }
+  - { key: copy_reuse_candidates, type: list }
+  - { key: copy_issuer_declarations, type: list }
+  - { key: copy_missing, type: list }
+  - { key: copy_conflicts, type: list }
+  - { key: copy_collection, type: list }
+  - { key: copy_records_collected, type: bool }
+  - { key: copy_producer_authenticated, type: bool }
+  - { key: copy_membership_verified, type: bool }
+  - { key: copy_treatment_verified, type: bool }
+  - { key: copy_reuse_enforcer_verified, type: bool }
+  - { key: copy_issuer_verified, type: bool }
+  - { key: copy_scope_complete, type: bool }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: copy_records_collected, op: eq, value: true }
+      - { obs: copy_producer_authenticated, op: eq, value: true }
+      - { obs: copy_membership_verified, op: eq, value: true }
+      - { obs: copy_treatment_verified, op: eq, value: true }
+      - { obs: copy_reuse_enforcer_verified, op: eq, value: true }
+      - { obs: copy_issuer_verified, op: eq, value: true }
+      - { obs: copy_scope_complete, op: eq, value: true }
+      - { obs: copy_missing, op: empty }
+      - { obs: copy_conflicts, op: empty }
+    fail_when_any:
+      - { obs: copy_conflicts, op: nonempty, when: { obs: copy_producer_authenticated, op: eq, value: true } }
+limitations:
+  - "구현 분기: 닫힌 inventory·소유 기록의 사본 처리·재사용·issuer 선언을 읽어 정상·누락·상충·교체·후속 수집 오류를 구분한다."
+  - "미구현 분기: 기록 생산자 인증과 실제 사본 처리·재사용 집행의 독립 근거가 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다. 선언 상충은 후보로만 남는다."
+  - "kubernetes 구현만 있다. issuer 거부와 실제 사본 처리는 각각 증거로 본다. 자격 원문은 수집하지 않는다."

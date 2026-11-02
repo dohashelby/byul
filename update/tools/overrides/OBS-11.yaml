@@ -1,9 +1,32 @@
+executor: log_integrity
+collection_profile: collection-gap-visibility-v1
 policy_params:
 - {key: required_records, type: 'list[str]', required: true}
 - {key: collection_deadline_ms, type: 'dict[str,int]', required: true}
 - {key: max_clock_uncertainty_ms, type: 'dict[str,int]', required: true}
 - {key: detection_deadline_ms, type: 'dict[str,int]', required: true}
 - {key: alert_deadline_ms, type: 'dict[str,int]', required: true}
+- { key: collection_session, type: str, required: true }
+required_observations:
+  - { key: collection_gap_violations, type: list }
+  - { key: collection_records_unverified, type: list }
+  - { key: collection_records_missing, type: list }
+  - { key: collection_normal_arrivals, type: list }
+  - { key: collection_producer_authenticated, type: bool }
+  - { key: collection_independent_event_verified, type: bool }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: collection_producer_authenticated, op: eq, value: true }
+      - { obs: collection_independent_event_verified, op: eq, value: true }
+      - { obs: collection_gap_violations, op: empty }
+      - { obs: collection_records_unverified, op: empty }
+      - { obs: collection_records_missing, op: empty }
+    fail_when_any:
+      - { obs: collection_gap_violations, op: nonempty }
 limitations:
-- 'OBS-11은 필수 누락 모두에 경보가 필요한 제한 프로파일의 자기 신고 근거를 대조한다. 실제 collector 제어·원본 진위·운영 대응·모든 종속 RES 전파는 검증하지 않는다.'
-- '사건별 수치와 독립 근거는 기업이 제공해야 하며 프로파일 적용·시각·조회 범위가 불명확하면 UNKNOWN이다. 보안만 제한 판정하고 기능·성능 PASS는 검증하지 않는다.'
+  - "구현 분기: 준비 절차가 남긴 소유 상태 기록을 읽어 필수 기록별 도착·누락 표시·경보·의존 판정을 기한과 대조한다. 기록 자체가 인정한 기한 위반은 FAIL이다."
+  - "미구현 분기: 사건 발생의 독립 근거와 상태 기록 생산자 인증이 없어 PASS에 도달하지 않는다. 시간 오차가 기준을 넘긴 행은 판단하지 않고 UNKNOWN에 남긴다."
+  - "real 구현만 있다. 실행기는 수집기를 중단하지 않는다. OBS-09의 고정 fixture와 판정은 변경하지 않는다."
+  - "사건별 수치는 기업이 제공해야 하며 실제 운영 대응과 모든 종속 RES 전파는 검증하지 않는다."

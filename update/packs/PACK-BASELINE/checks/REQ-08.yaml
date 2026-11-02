@@ -2,7 +2,7 @@ id: REQ-08
 framework_id: CHK-REQ-008
 mechanism_ids:
 - mechanism-02
-revision: 2
+revision: 3
 retired: false
 area: REQ
 purpose: 최종 입력 검증
@@ -15,7 +15,16 @@ review_order: implementation_path_first
 impact: null
 applies_when:
   prose: dict/prompt_token_ids 등 재사용 token 입력의 지원·노출 경로에서 수용·전달 여부 또는 금지 정책의 거부·제거를 확인한다. PD 비활성만으로 비사용을 판단하지 않는다.
-policy_params: []
+policy_params:
+- key: reused_token_field
+  type: str
+  required: true
+- key: reused_token_allowed
+  type: bool
+  required: true
+- key: rejection_codes
+  type: list[str]
+  required: true
 policy_prose:
   policy_to_decide: 허용 입력 경로·검사 요구
   enterprise_decisions: 허용 endpoint·텍스트/직접 token 등 입력 형식, template override 필요성, 옵션·길이·출력 한도·정상 대조 입력. vocab·버퍼 범위·옵션 필수 관계 등 구현상 제약은 기업 정책으로 완화하지 않는다.
@@ -24,7 +33,19 @@ challenge_steps:
 - 활성 재사용 경로 확인
 - 무해 token ID와 메시지가 다른 요청 제출
 - 실제 렌더 생략·검사·소비 경로 확인
-required_observations: []
+required_observations:
+- key: reused_input_trials
+  type: list
+- key: reused_input_state
+  type: str
+- key: reused_input_forbidden
+  type: bool
+- key: reused_input_violations
+  type: list
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, pass|fail|no_response]
 required_observations_prose:
 - 실제 재사용 입력 필드·호출 경로·허용 주체/문맥과 유효 정책
 - 제출 메시지·재사용 토큰 값, 렌더 생략·검사 위치·최종 소비값 또는 사전 제거·거부
@@ -34,8 +55,39 @@ unknown_criteria: renderer 분기만 보고 상위 호출자 제한·실제 endp
 remediation: '- 재사용 token ID를 받는 경로의 허용 여부를 정하고 금지한 필드는 거부하거나 제거한다. 허용하면 일반 변환을 생략하더라도 입력 범위·신원·문맥에 필요한 검사를 유지한다.'
 method_and_evidence: 토큰 ID 등 렌더링을 생략·재사용하는 실제 입력 경로에서 호출자·원 메시지·재사용 값·최종 모델 입력을 연결한다. 금지 구성의 수용·제거·거부와 허용 구성의 필수 검사·신원/문맥 확인을 각각 대조한다.
 remaining_setup: 선정 endpoint의 재사용 입력 지원·노출·소비 경로와 무해 token fixture; 전송 기능 하나의 비사용으로 전체 경로를 제외하지 않음
-executor: null
-judge: null
+executor: input_validation
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: reused_input_forbidden
+      op: eq
+      value: true
+    - obs: reused_input_state
+      op: in
+      value:
+      - rejected
+      - ignored
+    - obs: reused_input_violations
+      op: empty
+    fail_when_any:
+    - obs: reused_input_violations
+      op: nonempty
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        fail_when_any:
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
 legacy:
   q_ids:
   - Q-C04
@@ -45,3 +97,21 @@ legacy:
   - Q-C04/SC-03-02
 source:
   array: request_state_assessment_draft
+collection_profile: reused-token-input-v1
+functional_probes:
+- method: POST
+  path: /v1/chat/completions
+  body:
+    model: '{model}'
+    messages:
+    - role: user
+      content: hello
+    max_tokens: 1
+    temperature: 0
+  expect:
+  - 200
+  via: engine
+limitations:
+- '구현 분기: 정상 메시지 요청에 무해한 재사용 토큰 필드를 더해 거부·제거·소비를 응답이 돌려준 prompt_token_ids와 정상 대조로 구분한다. 금지 정책에서 fixture 토큰이 소비되면 FAIL이다.'
+- '미구현 분기: 허용 정책에서 재사용 값의 필수 검사를 확인하는 수집이 없어 reused_token_allowed=true는 PASS에 도달하지 않는다. 응답이 소비 토큰을 돌려주지 않으면 accepted_unverified로 UNKNOWN이다.'
+- real 구현만 있다. 한 endpoint·한 필드의 표본이며 다른 경로의 미도달을 증명하지 않는다. renderer 내부 분기는 관측하지 않는다.

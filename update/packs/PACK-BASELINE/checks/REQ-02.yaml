@@ -2,7 +2,7 @@ id: REQ-02
 framework_id: CHK-REQ-002
 mechanism_ids:
 - mechanism-01
-revision: 2
+revision: 3
 retired: false
 area: REQ
 purpose: 작업·대상 인가
@@ -15,7 +15,40 @@ review_order: conditional_when_selected
 impact: null
 applies_when:
   prose: root_path·경로 prefix·Gateway/프록시 재작성이 있을 때 적용한다. 재작성 비사용은 기본 route 인증 점검의 제외 사유가 아니다.
-policy_params: []
+policy_params:
+- key: route_environment_sha256
+  type: str
+  required: true
+- key: route_target_sha256
+  type: str
+  required: true
+- key: route_session
+  type: str
+  required: true
+- key: route_file_sha256
+  type: str
+  required: true
+- key: route_validity_start
+  type: str
+  required: true
+- key: route_validity_end
+  type: str
+  required: true
+- key: route_native_environment_sha256
+  type: str
+  required: true
+- key: route_native_target_sha256
+  type: str
+  required: true
+- key: route_native_prepared_sha256
+  type: str
+  required: true
+- key: route_native_validity_start
+  type: str
+  required: true
+- key: route_native_validity_end
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: 허용 경로·프록시 재작성 규칙
   enterprise_decisions: 인증 방식·실제 계정, 사용자/조직별 모델·작업 허용표, 직통 허용 주체·목적, 관리 역할, Gateway의 신원 전달·경로 변환과 선택 API. 저장 결과 기능을 쓰면 객체 소유자·조회·취소 권한도 결정한다.
@@ -24,7 +57,31 @@ challenge_steps:
 - 실제 서버·프록시의 경로 prefix·재작성 설정 수집
 - 동등 작업의 원경로·변환경로를 각각 호출
 - 인증·인가 입력 경로/작업과 최종 처리 함수의 선택·실행을 대조
-required_observations: []
+required_observations:
+- key: route_events
+  type: list
+- key: route_record_collected
+  type: bool
+- key: route_producer_authenticated
+  type: bool
+- key: route_authorization_scope_complete
+  type: bool
+- key: native_route_trials
+  type: list
+- key: native_route_events
+  type: list
+- key: native_route_associations
+  type: list
+- key: native_route_missing
+  type: list
+- key: native_route_authorization_verified
+  type: bool
+- key: native_route_scope_complete
+  type: bool
+- key: route_bypass_claims
+  type: list
+- key: composite_subcollections
+  type: dict
 required_observations_prose:
 - 외부 요청 주소·작업, 프록시/Gateway의 변환 설정과 변환 후 경로
 - 인증·인가가 판단한 경로/작업과 최종 처리 함수의 선택·실행 또는 거부
@@ -34,8 +91,39 @@ unknown_criteria: 외부 응답만 있고 내부 경로·handler 선택을 확�
 remediation: '- Gateway·프록시·인증 계층·router가 해석하는 요청 경로를 대조하고 재작성 규칙을 일치시킨다. root_path·경로 prefix를 포함한 최종 API에 필요한 권한 검사를 적용한다.'
 method_and_evidence: 정상/재작성 경로의 원 요청·인증 입력·최종 handler·허용/거부를 한 실행으로 기록한다.
 remaining_setup: 선정 서버·프록시의 유효 경로 변환 설정과 인증·최종 작업의 연결을 확인할 수단
-executor: null
-judge: null
+executor: route_record
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: route_record_collected
+      op: eq
+      value: true
+    - obs: native_route_trials
+      op: nonempty
+    - obs: route_producer_authenticated
+      op: eq
+      value: true
+    - obs: native_route_authorization_verified
+      op: eq
+      value: true
+    - obs: route_authorization_scope_complete
+      op: eq
+      value: true
+    - obs: native_route_scope_complete
+      op: eq
+      value: true
+    - obs: route_bypass_claims
+      op: empty
+    - obs: native_route_missing
+      op: empty
+    fail_when_any:
+    - obs: route_bypass_claims
+      op: nonempty
+      when:
+        obs: route_producer_authenticated
+        op: eq
+        value: true
 legacy:
   q_ids:
   - Q-C01
@@ -45,3 +133,8 @@ legacy:
   - Q-C01/SC-01-02
 source:
   array: request_state_assessment_draft
+collection_profile: kubernetes-route-record-native-composite-v1
+limitations:
+- '구현 분기: 소유 기록 파일과 native8 세션을 각각 별도로 수집한 뒤 한 EVD에 모은다. 시간이 가깝다는 이유로 두 결과를 합치지 않고, 한쪽 실패가 다른 쪽 사실을 지우지 않는다.'
+- '미구현 분기: 생산자 인증·실제 principal·기업 재작성 정책 근거가 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다. 거부 후 handler 진입 주장은 후보로만 남는다.'
+- kubernetes 구현만 있다. lab=true/vLLM 0.31 범위이며 실제 Gateway 변환과 전체 handler 범위는 미시험이다. 과거 파생 팩의 route_record·native_route 프로파일은 그대로 지원한다.

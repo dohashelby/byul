@@ -14,6 +14,7 @@ from guard.core.run import RunConfig, run_plan
 from guard.core.select import select
 from guard.models import DataOrigin, ExecStatus, Verdict
 from guard.store import Store
+from guard.models import load_pack
 from tests.builders import T0, baseline_pack, environment, policy
 from tests.prepared_fixtures import copy_workdir, dump_fixture_yaml, manual_setup_seed
 
@@ -219,7 +220,7 @@ def test_cli_template_and_import(tmp_path, monkeypatch):
     assert r.exit_code == 0, r.output
     doc = yaml.safe_load((tmp_path / "manual.yaml").read_text(encoding="utf-8"))
     assert {entry['check_id'] for entry in doc['checks']} == {
-        check.id for check in baseline_pack().active_checks() if check.executor is None}
+        check.id for check in load_pack(tmp_path / "packs/PACK-BASELINE").active_checks() if check.executor is None}
     _fill(_entry(doc, "SUP-01"))
     p = _write(tmp_path, doc)
     r = runner.invoke(app, ["evidence", "import", str(p)])

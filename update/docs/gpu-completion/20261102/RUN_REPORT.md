@@ -18,7 +18,7 @@
 
 제품 보수: Windows import의 POSIX signal 접근(0b6b644), 실제 Kubernetes stream 시계와 CPU elapsed 계약 소비(b54148d). async GPU 출력 확장 후보는 CPU 통과 후 실제 설치에서 거부돼 GPU 지원 완료로 보지 않는다. source·entry·policy gate와 고정 hash를 자동 변경하지 않았다.
 
-검증: Linux3.12.3 준비279개/8.91초, Windows 신호 관련40개/2.74초, 최종 Linux 직접·인접213개/5.58초(부모6.1066초), Windows 신규 직접50개/10.34초. 별도 Windows 관련92개 실행은91통과/1실패이며 기존 O_NOFOLLOW 기록 경로에서 GAP 파일이 없었다. 이 실패를 제거하거나 skip하지 않았다. 기본 전체 suite는 별도 Linux 소스 snapshot에서 실행 중이며 통과를 선언하지 않는다.
+검증: Linux3.12.3 준비279개/8.91초, Windows 신호 관련40개/2.74초, 최종 Linux 직접·인접213개/5.58초(부모6.1066초), Windows 신규 직접50개/10.34초. 별도 Windows 관련92개 실행은91통과/1실패이며 기존 O_NOFOLLOW 기록 경로에서 GAP 파일이 없었다. 이 실패를 제거하거나 skip하지 않았다. 기본 전체 suite는 b54148d Linux snapshot에서 2026-11-02 19:02 KST에 exit1로 종료했다. 10,657passed/41failed/19deselected, pytest1968.36초/부모1972.414초이며 전체 통과를 선언하지 않는다.
 
 전원: 전용 namespace의 engine replicas0, probe 종료, GPU 프로세스 없음·NVML0MiB 확인 후 증거를 반출했다. EC209:40:22UTC 종료 예약,09:41:22UTC poweroff. 정상 종료가 중지 중 상태로 지연되어 기존 인스턴스 강제 중지를 수행했다(OS 종료 건너뛰기는 선택하지 않음). AWS 콘솔에서 중지됨을 최종 확인했고 G33-power-state.png를 보존했다. 기존 총USD20/최초8시간 상한은 재설정하지 않았고 추가GPU·자원·권한은 만들지 않았다. EBS·키·SG는 중지 보관 선택대로 유지한다.
 

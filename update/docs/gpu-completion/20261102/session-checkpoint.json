@@ -1,6 +1,6 @@
 {
-  "status": "gpu_stopped_comparison_and_next_prompt_delivered_cpu_regression_running",
-  "updated_at": "2026-11-02T09:47:13.290277+00:00",
+  "status": "gpu_stopped_cpu_regression_completed_with_failures",
+  "updated_at": "2026-11-02T10:07:58.483689+00:00",
   "user_requests": [
     "미실측34개도 모두 실제 GPU 실증",
     "현재 프롬프트와 gpu-handoff.html 비교 및 더 나은 방법 설명"
@@ -44,21 +44,40 @@
     "linux_parent_seconds": 9.378653638,
     "windows_portability_passed": 40,
     "windows_pytest_seconds": 2.74,
-    "full_current_suite_rerun": false,
+    "full_current_suite_rerun": true,
     "linux_direct_passed": 213,
     "linux_direct_pytest_seconds": 5.58,
     "linux_direct_parent_seconds": 6.106601756,
     "windows_new_direct_passed": 50,
     "windows_new_direct_pytest_seconds": 10.34,
     "default_full_suite": {
-      "state": "running",
+      "state": "completed",
       "source_commit": "b54148d",
       "started_at_utc": "2026-11-02T09:30:56Z",
       "process_pid_wsl": 815,
       "runner_session": 53807,
       "command": "uv run --locked --python /usr/bin/python3.12 python -m pytest -q --basetemp /home/youngjo/.cache/byul-gpu-completion-20261102-v2/G29FULL/pytest-tmp",
       "durable_logs": "/home/youngjo/.cache/byul-gpu-completion-20261102-v2/G29FULL",
-      "no_pass_claim": true
+      "no_pass_claim": true,
+      "returncode": 1,
+      "passed": 10657,
+      "failed": 41,
+      "deselected": 19,
+      "pytest_seconds": 1968.36,
+      "parent_seconds": 1972.413606575,
+      "ended_at_utc": "2026-11-02T10:02:29.709291+00:00",
+      "failed_files": {
+        "tests/test_a1_B160_http_product.py": 4,
+        "tests/test_a1_B_native21_consumption.py": 2,
+        "tests/test_a1_req10_consumption_pin.py": 1,
+        "tests/test_b_lif07_readiness.py": 1,
+        "tests/test_b_native20_common_consumption.py": 2,
+        "tests/test_boundary_egress.py": 1,
+        "tests/test_kubernetes_response_error_adapter.py": 16,
+        "tests/test_response_kubernetes_capture.py": 14
+      },
+      "stdout_sha256": "bc0c7c0f2b812db2595ca6abe61ac1684ee0d8cbe5f345d0c85dc97cefbfbea9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   },
   "gpu": {
@@ -423,18 +442,18 @@
     "raw_archive_sha256": "b20d6c1a27a203a1331b63a8d9452e6954b426121989a94e8fe4aa6256ae9904",
     "owned_gpu_workload_stopped": true
   },
-  "next": "Confirm cloud Stopped, preserve full-suite original output and triage without gate/hash approval. Follow METHOD_COMPARISON: representative actual factory/Kubernetes end-to-end first; repair REQ14 native file/entry qualification, improve REQ17 unbiased control design. Native4 and TP2 remain pending; request explicit additional GPU/cost/time authorization before provisioning.",
+  "next": "Triage the completed b54148d CPU full-suite41 failures without automatic gate/hash approval. GPU remains Stopped. Remaining native/TP2 work requires existing approval boundaries; summary PR is documentation only.",
   "comparison": "METHOD_COMPARISON.md",
   "automatic_followup_monitor_scheduled": false,
   "source_hash_automatically_approved": false,
   "continuation_gate": {
     "independent_remaining_work": true,
     "gpu_work_active": false,
-    "local_cpu_full_suite_active": true,
+    "local_cpu_full_suite_active": false,
     "automatic_followup_monitor": false,
     "all_gpu_work_complete": false,
     "latest_user_comparison_answer_ready": true,
-    "latest_user_request": "next-work prompt drafting; no new GPU start"
+    "latest_user_request": "Publish a documentation-only PR summarizing the handoff report; no AWS action"
   },
   "new_user_request": {
     "task": "Draft prompt to finish all remaining40-candidate GPU branches with no task-time limit and total cost capUSD100",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import closing
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import subprocess
@@ -22,6 +23,7 @@ from serving_runtime.mvp.policy import load_policy
 from serving_runtime.mvp.store import JsonlStore
 from serving_runtime.mvp.target import (
     KubernetesTargetCollector,
+    POD_SNAPSHOT_SCHEMA,
     TargetRegistry,
     instance_id,
     load_target,
@@ -360,6 +362,53 @@ class PodSnapshotTests(TempMixin, unittest.TestCase):
         )
         self.assertEqual(multiple[0], "TARGET_UNAVAILABLE")
 
+    def test_last_confirmed_values_control_unavailable_engine_and_pod(self) -> None:
+        digest = "sha256:" + "a" * 64
+        registration = load_target(self.write("last.json", target_document(
+            engine={"kind": "mock", "version": "mock-1.0", "image_digest": digest},
+            kubernetes=kubernetes_block(),
+        )))
+        registry = TargetRegistry(registration, data_dir=Path(self.temporary.name) / "last", observation_session_id="s")
+        good_pod = summarize_pods({"items": [pod("p1", "u1", "c1")]}, "engine")
+        registry.observe_kubernetes(good_pod, None)
+        engine = {"state": "ok", "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"}, "last_success_at": "2026-10-26T00:00:00+00:00"}
+        stale_pod = {"state": "stale", "last_value": good_pod, "last_success_at": "2026-10-26T00:00:01+00:00"}
+        args = {"policy_target_id": "mock-engine-001", "backend_kind": "mock"}
+        self.assertIsNone(registry.hold(**args, engine_info=engine, kubernetes=stale_pod))
+        self.assertIsNone(registry.hold(**args, engine_info=engine, kubernetes={**stale_pod, "state": "error", "last_error_kind": "OSError"}))
+        status = registry.status(**args, engine_info=engine, kubernetes=stale_pod)
+        self.assertEqual(status["verification"], {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"})
+        self.assertEqual(registry.record_context(status)["instance_state"], "stale")
+        self.assertEqual(registry.record_context(status)["last_confirmed_at"], "2026-10-26T00:00:00+00:00")
+        stale_engine = {**engine, "state": "error"}
+        self.assertIsNone(registry.hold(**args, engine_info=stale_engine, kubernetes=good_pod))
+        self.assertEqual(registry.hold(**args, engine_info={"state": "never", "last_value": None}, kubernetes=good_pod)[0], "TARGET_UNVERIFIED")
+        self.assertEqual(registry.hold(**args, engine_info=engine, kubernetes=None)[0], "TARGET_UNAVAILABLE")
+        bad_engine = {**stale_engine, "last_value": {"engine.version": "wrong", "model.id": "test-model"}}
+        self.assertEqual(registry.hold(**args, engine_info=bad_engine, kubernetes=stale_pod)[0], "TARGET_MISMATCH")
+        for bad_pod in ("multiple_targets", "not_found", "not_running"):
+            with self.subTest(bad_pod=bad_pod):
+                self.assertEqual(registry.hold(**args, engine_info=engine, kubernetes={"state": "stale", "last_value": {"state": bad_pod}})[0], "TARGET_UNAVAILABLE")
+        self.assertEqual(registry.hold(**args, engine_info=engine, kubernetes={**stale_pod, "last_error_kind": "TargetSnapshotInvalidError"})[0], "TARGET_UNAVAILABLE")
+
+    def test_recovery_preserves_instance_change_and_blocks_new_digest_mismatch(self) -> None:
+        digest = "sha256:" + "a" * 64
+        registration = load_target(self.write("replacement.json", target_document(
+            engine={"kind": "mock", "version": "mock-1.0", "image_digest": digest},
+            kubernetes=kubernetes_block(),
+        )))
+        registry = TargetRegistry(registration, data_dir=Path(self.temporary.name) / "replacement", observation_session_id="s")
+        first = summarize_pods({"items": [pod("p1", "u1", "c1")]}, "engine")
+        registry.observe_kubernetes(first, None)
+        replacement = pod("p2", "u2", "c2")
+        replacement["status"]["containerStatuses"][0]["imageID"] = "docker.io/library/x@sha256:" + "b" * 64
+        second = summarize_pods({"items": [replacement]}, "engine")
+        registry.observe_kubernetes(second, None)
+        status = registry.status(policy_target_id="mock-engine-001", backend_kind="mock", engine_info={"state": "ok", "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"}}, kubernetes=second)
+        self.assertEqual(status["gateway_hold"]["reason_code"], "TARGET_MISMATCH")
+        self.assertEqual(status["history"][0]["event"], "instance_changed")
+        self.assertEqual(status["history"][0]["reason"], "pod_replaced")
+
     def test_hold_uses_instance_from_published_snapshot_while_callback_is_paused(self) -> None:
         approved_digest = "sha256:" + "a" * 64
         unapproved_digest = "sha256:" + "b" * 64
@@ -515,6 +564,16 @@ class TargetGatewayHttpTests(TempMixin, unittest.TestCase):
         self.assertEqual(rows["engine.version"], "match")
         self.assertEqual(self.get("/api/status")["target"]["registration"], "ok")
 
+    def test_request_record_context_does_not_read_target_history(self) -> None:
+        self.start(EXAMPLE_TARGET)
+        with patch.object(self.gateway._target.store, "read_all", side_effect=AssertionError("history read")):
+            status, headers, _ = self.post()
+        self.assertEqual(status, 200)
+        record = self.final(headers["X-Request-ID"])["target"]
+        target = self.get("/api/target")
+        self.assertEqual(record["verification_state"], target["verification"]["state"])
+        self.assertEqual(record["instance_state"], target["instance"]["state"])
+
     def test_target_conflicts_hold_requests_without_relay(self) -> None:
         for label, document, code in (
             ("mismatch", target_document(target_id="other-target"), "TARGET_MISMATCH"),
@@ -550,6 +609,71 @@ class TargetGatewayHttpTests(TempMixin, unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "kubernetes.context"):
             GatewayApp(config, load_policy(POLICY), self.engine.address)
+
+    def test_snapshot_stop_and_invalid_selector_admission(self) -> None:
+        target = self.write("snapshot-target.json", target_document(kubernetes=kubernetes_block()))
+        snapshot_path = Path(self.temporary.name) / "target-pods.json"
+        config = MVPConfig(gateway_port=0, engine_port=0, policy_path=str(POLICY),
+            data_dir=str(self.data_dir), target_path=str(target), target_pod_snapshot=str(snapshot_path),
+            collector_interval_s=0.05, collector_stale_after_s=0.3)
+        try:
+            self.gateway = GatewayApp(config, load_policy(POLICY), self.engine.address).start()
+        except PermissionError as error:
+            self.skipTest(f"local sockets are unavailable: {error}")
+        self.addCleanup(self.gateway.stop)
+        self.assertEqual(self.post()[0], 503)  # never confirmed
+        document = {"schema": POD_SNAPSHOT_SCHEMA, "context": "kind-runtime-lab", "namespace": "serving-lab",
+            "selector": {"app": "serving-engine"}, "collected_at": datetime.now(timezone.utc).isoformat(),
+            "state": "ok", "error": None, "items": [pod("p1", "u1", "c1")]}
+        snapshot_path.write_text(json.dumps(document), encoding="utf-8")
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline and self.get("/api/target")["verification"]["state"] != "ok":
+            time.sleep(0.05)
+        time.sleep(0.1)  # Gateway can reread the same, still-fresh host file.
+        self.assertEqual(self.gateway._target_inputs()["kubernetes"]["last_success_at"], document["collected_at"])
+        self.assertLessEqual(self.get("/api/target")["verification"]["last_confirmed_at"], document["collected_at"])
+        self.assertLessEqual(self.gateway._target_record_context()["last_confirmed_at"], document["collected_at"])
+        self.assertEqual(self.post()[0], 200)
+        snapshot_path.unlink()
+        time.sleep(0.5)
+        status, headers, _ = self.post()
+        self.assertEqual(status, 200)
+        self.assertEqual(self.get("/api/target")["verification"]["state"], "unavailable")
+        self.assertEqual(self.get("/api/status")["status"], "degraded")
+        record = self.final(headers["X-Request-ID"])
+        self.assertEqual(record["target"]["verification_state"], "unavailable")
+        self.assertEqual(record["target"]["last_confirmed_at"], document["collected_at"])
+        self.assertEqual(self.get("/api/target")["verification"]["last_confirmed_at"], document["collected_at"])
+        document["selector"] = {"app": "wrong"}
+        document["collected_at"] = datetime.now(timezone.utc).isoformat()
+        snapshot_path.write_text(json.dumps(document), encoding="utf-8")
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            collector = next(c for c in self.get("/api/collectors")["collectors"] if c["source"] == "target_pods")
+            if collector["last_error_kind"] == "TargetSnapshotInvalidError":
+                break
+            time.sleep(0.05)
+        self.assertEqual(self.post()[0], 503)
+
+    def test_single_observation_feed_failure_keeps_requests_running(self) -> None:
+        self.start(EXAMPLE_TARGET)
+        def fail():
+            raise OSError("feed stopped")
+        feeds = [Collector(source, lambda: {"last_lost_at": None}, interval_s=10, stale_after_s=10)
+                 for source in ("observation_feed_hubble", "observation_feed_tetragon")]
+        for feed in feeds:
+            feed.collect()
+        self.gateway._collectors.collectors.extend(feeds)
+        for failed in feeds:
+            with self.subTest(source=failed.source):
+                failed.fetch = fail
+                failed.collect()
+                states = {item["source"]: item["state"] for item in self.get("/api/collectors")["collectors"]}
+                self.assertEqual(states[failed.source], "error")
+                self.assertEqual(states[next(feed.source for feed in feeds if feed is not failed)], "ok")
+                self.assertEqual(self.post()[0], 200)
+                failed.fetch = lambda: {"last_lost_at": None}
+                failed.collect()
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@
        조회 API (GET /api/*) → byul platform 화면
 ```
 
-## 현재 상태 (2026-10-27)
+## 현재 상태 (2026-11-02)
 
 | 구분 | 확인 수준 |
 | --- | --- |
@@ -24,10 +24,53 @@
 | 대상 등록·정책 묶음·승인 목록 | 모의·가짜, 실제 vLLM CPU, 로컬 kind(Pod 교체) |
 | Cilium 통신 제한 · Hubble · Tetragon 관측/선택 차단 | 로컬 kind(WSL) |
 | SGLang 연결 | 가짜 SGLang만 |
-| AWS GPU lab 배포·인수 시험(AWS-01~08) | 배포 파일·자동 판정 도구 작성, **실제 AWS 미실행** |
+| AWS GPU lab 배포·인수 시험(AWS-01~08) | AWS GPU dev에서 1회 통과. 정식(reference) 시험·속도 측정은 미실행이며, 기능 완성을 뜻하지 않음 |
 | 시험 | unittest 482개, 수용 시험 39개, CPU vLLM 점검 CPU-01~14 통과 |
 
-**아직 안 한 것:** 정식 GPU 환경 시험(S3B·AWS-01~08), 실제 SGLang, logprobs, 운영 인증 연동(D-02)·계정/역할(D-03). 기능별 상세 확인 수준은 [`docs/지원_미지원_목록.md`](docs/지원_미지원_목록.md)에 있습니다.
+**아직 안 한 것:** 정식 GPU 환경 시험(S3B·reference AWS-01~08)과 속도 측정, 실제 SGLang, logprobs, 운영 인증 연동(D-02)·계정/역할(D-03). 기능별 상세 확인 수준은 [`docs/지원_미지원_목록.md`](docs/지원_미지원_목록.md)에 있습니다.
+
+## AWS dev 시험에서 겪은 문제
+
+### 코드·설정을 고친 문제
+
+| 문제 | 조치 |
+| --- | --- |
+| 엔진 요청 로그가 꺼져 AWS-01~03이 `unknown` | 통합 patch에 `--enable-log-requests`, `--enable-request-id-headers` 추가 |
+| 실제 intent를 묶음에 못 넣음(묶음 검사는 `schema_version`, intent는 `schema`; 가짜 파일 시험으로 못 잡음) | `policy_bundle.py` 수정, 실제 형식 시험 추가 |
+| 죽은 Pod까지 세어 재시작 뒤 `multiple_targets` 503 | `target.py`와 시험 도구 수정 |
+| Gateway 응답 대기 5초로 상한값 요청을 504로 오판할 위험 | 60초로 조정 |
+| GPU 이미지 실행 파일이 `/usr/bin/python3.12` | intent `phase_binaries`에 추가, 단계별 판정은 미확인 |
+
+### 시험 전 검토에서 고친 판정
+
+| 문제 | 조치 |
+| --- | --- |
+| AWS-03이 Gateway 기록만 믿음 | 엔진 로그와 상한값 대조 추가 |
+| AWS-04·05가 연결 실패 이유를 안 봄 | 시간 초과와 Hubble `dropped`만 인정 |
+| AWS-06이 권한 오류로도 통과 | `EROFS`만 인정 |
+| AWS-07이 회복 뒤 실제 요청을 안 봄 | 정상 요청 200 필수 |
+| AWS-08이 재시작 직후 1번만 요청 | 엔진 정보 회복 뒤 정해진 시간 안에서 재시도 |
+| AWS-01이 stream을 안 봄 | stream 요청 추가 |
+
+### 설치 중 겪은 문제
+
+| 문제 | 해결법 | 후속 |
+| --- | --- | --- |
+| `01-host.sh`의 `sudo -v`가 이 Ubuntu 이미지에서 실패 | AWS 묶음 원본 대신 서버 사본에서 그 줄만 삭제하고 차이 보관 | 묶음 담당자에게 공유 필요 |
+| 설치 중 자동 업데이트(`unattended-upgrades`)가 패키지 잠금을 잡음 | 끝난 뒤 이번 실행이 만든 `config.toml`을 옮기고 서버 사본에서 재실행 | 묶음 담당자에게 공유 필요 |
+| 서버 재시작 때 GPU 플러그인이 늦어 엔진 Pod 하나 실패 | 자동으로 새 Pod가 뜸, 실패 Pod는 제외하도록 코드 수정 | 문서에 절차 추가 |
+| 후보 규칙 `runtime-receiver-fixture-ingress`가 AWS-05와 충돌 | 적용에서 제외 | 문서에 기록 |
+
+### 실행 중 실수
+
+| 실수 | 영향 | 조치 |
+| --- | --- | --- |
+| `pkill` 패턴이 원격 셸까지 끊어 증거 복사 실패, 그대로 Stop | 보고서를 다음 실행 때까지 못 가져옴 | 다음 실행 때 회수, 파일 확인 후 Stop으로 절차 변경 |
+| 복사 명령 출력이 복사본에 섞임 | 복사본 생성 실패 | 다시 복사하고 건수 확인 |
+| 기본 정책 자동 복원이 경로 문제로 실패 | 기본 정책이 약 1분 빠짐, runtime 규칙은 적용 상태 | 바로 수동 복원, 원본과 일치 확인 |
+| 서버 켜기 전 엔진 로그 옵션 대조 안 함 | 켠 뒤 발견해 수정 때문에 Stop | 수정 후 재실행 |
+
+상세 근거: [`deploy/gpu-lab/ACCEPTANCE.md`](deploy/gpu-lab/ACCEPTANCE.md).
 
 ## 빠른 시작
 

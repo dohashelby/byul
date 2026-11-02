@@ -55,6 +55,7 @@ class Collector:
         self.last_attempt_at: str | None = None
         self.last_success_at: str | None = None
         self.last_error: str | None = None
+        self.last_error_kind: str | None = None
         self.last_value: Any = None
         self.data_origin: str | None = None
         self._last_attempt_monotonic: float | None = None
@@ -90,6 +91,7 @@ class Collector:
                 self.last_attempt_at = attempted_at
                 self._last_attempt_monotonic = attempted_monotonic
                 self.last_error = str(error)
+                self.last_error_kind = type(error).__name__
             return
         completed_at = _utc_now()
         completed_monotonic = time.monotonic()
@@ -97,6 +99,7 @@ class Collector:
             self.last_attempt_at = attempted_at
             self.last_success_at = completed_at
             self.last_error = None
+            self.last_error_kind = None
             self.last_value = value
             self.data_origin = data_origin if isinstance(data_origin, str) else None
             self._last_attempt_monotonic = attempted_monotonic
@@ -119,6 +122,7 @@ class Collector:
             last_attempt_at = self.last_attempt_at
             last_success_at = self.last_success_at
             last_error = self.last_error
+            last_error_kind = self.last_error_kind
             last_value = self.last_value
             data_origin = self.data_origin
             success_monotonic = self._last_success_monotonic
@@ -176,6 +180,7 @@ class Collector:
             "last_attempt_at": last_attempt_at,
             "last_success_at": last_success_at,
             "last_error": last_error,
+            "last_error_kind": last_error_kind,
             "last_value": last_value,
             "data_origin": data_origin,
         }

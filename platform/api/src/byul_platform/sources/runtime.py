@@ -632,6 +632,10 @@ def runtime_status(
             "instance_restart_count": _int(current.get("restart_count")),
             "gateway_hold": {"reason_code": str(hold.get("reason_code")), "message": _str_or_none(hold.get("message"))}
             if isinstance(hold, dict) else None,
+            "verification": {
+                "state": str(_d(st_target.get("verification")).get("state") or ("blocked" if hold else "ok")),
+                "last_confirmed_at": _str_or_none(_d(st_target.get("verification")).get("last_confirmed_at")),
+            },
             "comparison_counts": {k: _nonneg(counts.get(k)) for k in ("match", "mismatch", "unknown", "not_declared")},
             "last_history": {
                 "event": str(last_hist.get("event")),

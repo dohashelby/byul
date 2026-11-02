@@ -16,6 +16,7 @@
     "instance_pod": null,
     "instance_restart_count": null,
     "gateway_hold": null,
+    "verification": {"state": "ok", "last_confirmed_at": "2026-10-25T01:04:58Z"},
     "comparison_counts": {
       "match": 0,
       "mismatch": 0,

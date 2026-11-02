@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 from serving_runtime.cli import main
 from serving_runtime.mvp.app import GatewayApp
+from serving_runtime.mvp.collectors import Collector
 from serving_runtime.mvp.config import (
     DEFAULT_COLLECTOR_INTERVAL_S,
     DEFAULT_COLLECTOR_STALE_AFTER_S,
@@ -26,6 +27,7 @@ from serving_runtime.mvp.target import (
     POD_SNAPSHOT_MAX_BYTES,
     POD_SNAPSHOT_SCHEMA,
     TargetPodSnapshotCollector,
+    TargetSnapshotInvalidError,
     TargetRegistry,
     load_target,
     pods_command,
@@ -219,6 +221,53 @@ class TargetSnapshotTests(unittest.TestCase):
         self.assertEqual(value["origin_note"], "host_snapshot")
         self.assertEqual(value["instance"]["pod_uid"], "uid-1")
 
+    def test_gateway_confirmation_uses_host_collection_time_without_history_read(self) -> None:
+        observed = NOW.astimezone(timezone(timedelta(hours=9))).isoformat()
+        path = self.write_snapshot(snapshot(
+            [feed._reduce_pod(raw_pod("uid-1", "containerd://one"))], collected_at=observed,
+        ))
+        value, origin = self.collector(path).collect()
+        app = GatewayApp(
+            MVPConfig(data_dir=str(self.root / "gateway"), target_path=str(self.target_path),
+                target_pod_snapshot=str(path)),
+            load_policy(POLICY), ("127.0.0.1", 1),
+        )
+        app._target.observe_kubernetes(value, origin)
+        engine = {"source": "engine_info", "state": "ok",
+            "last_value": {"engine.version": "mock-1.0", "model.id": "test-model"},
+            "last_success_at": (NOW + timedelta(seconds=20)).isoformat()}
+        pods = {"source": "target_pods", "state": "ok", "last_value": value,
+            "last_success_at": (NOW + timedelta(seconds=12)).isoformat()}
+        with patch.object(app, "collectors_status", return_value={"collectors": [engine, pods]}):
+            self.assertEqual(app._target_inputs()["kubernetes"]["last_success_at"], value["collected_at"])
+            with patch.object(app._target.store, "read_all", side_effect=AssertionError("history read")):
+                record = app._target_record_context()
+            target = app.target_status()
+            self.assertEqual(record["last_confirmed_at"], value["collected_at"])
+            self.assertEqual(record["verification_state"], target["verification"]["state"])
+            self.assertEqual(record["instance_state"], target["instance"]["state"])
+            self.assertEqual(target["verification"]["last_confirmed_at"], value["collected_at"])
+            pods["state"] = "stale"
+            with patch.object(app._target.store, "read_all", side_effect=AssertionError("history read")):
+                stale_record = app._target_record_context()
+            self.assertEqual(stale_record["last_confirmed_at"], value["collected_at"])
+            self.assertEqual(stale_record["verification_state"], "unavailable")
+            direct = {key: item for key, item in value.items() if key != "origin_note"}
+            pods.update(state="ok", last_value=direct)
+            self.assertEqual(app._target_inputs()["kubernetes"]["last_success_at"], pods["last_success_at"])
+            self.assertEqual(app.target_status()["verification"]["last_confirmed_at"], pods["last_success_at"])
+
+    def test_gateway_restart_cannot_confirm_a_prestartup_snapshot(self) -> None:
+        item = feed._reduce_pod(raw_pod("uid-1", "containerd://one"))
+        path = self.write_snapshot(snapshot([item]))
+        collector = TargetPodSnapshotCollector(path, self.registration.kubernetes,
+            stale_after_s=30, now=lambda: NOW + timedelta(seconds=1),
+            not_before=NOW + timedelta(seconds=1))
+        with self.assertRaisesRegex(OSError, "predates Gateway startup"):
+            collector.collect()
+        self.write_snapshot(snapshot([item], collected_at=(NOW + timedelta(seconds=2)).isoformat()))
+        self.assertEqual(collector.collect()[0]["state"], "ok")
+
     def test_host_snapshot_keeps_failed_pod_visible_without_selecting_it(self) -> None:
         failed = raw_pod("failed", "containerd://old")
         failed["status"]["phase"] = "Failed"
@@ -255,13 +304,44 @@ class TargetSnapshotTests(unittest.TestCase):
     def test_gateway_rejects_oversize_and_symlink(self) -> None:
         path = self.root / "oversize.json"
         path.write_bytes(b" " * (POD_SNAPSHOT_MAX_BYTES + 1))
-        with self.assertRaisesRegex(ValueError, "4 MiB"):
+        with self.assertRaisesRegex(TargetSnapshotInvalidError, "4 MiB"):
             self.collector(path).collect()
         real = self.write_snapshot(snapshot([]))
         link = self.root / "link.json"
         os.symlink(real, link)
-        with self.assertRaises(OSError):
+        with self.assertRaises(TargetSnapshotInvalidError):
             self.collector(link).collect()
+
+    def test_invalid_snapshot_after_success_keeps_last_value_but_is_distinct_from_unavailable(self) -> None:
+        item = feed._reduce_pod(raw_pod("uid-1", "containerd://one"))
+        path = self.write_snapshot(snapshot([item]))
+        collector = Collector("target_pods", self.collector(path).collect, interval_s=1, stale_after_s=30)
+        collector.collect()
+        good = collector.snapshot()["last_value"]
+        cases = [
+            snapshot([item], schema="wrong"),
+            snapshot([item], context="wrong"),
+            snapshot([item], namespace="wrong"),
+            snapshot([item], selector={"app": "wrong"}),
+            {"not": "a snapshot"},
+        ]
+        for document in cases:
+            with self.subTest(document=document):
+                path.write_text(json.dumps(document), encoding="utf-8")
+                collector.collect()
+                state = collector.snapshot()
+                self.assertEqual(state["last_error_kind"], "TargetSnapshotInvalidError")
+                self.assertEqual(state["last_value"], good)
+        path.write_bytes(b" " * (POD_SNAPSHOT_MAX_BYTES + 1))
+        collector.collect()
+        self.assertEqual(collector.snapshot()["last_error_kind"], "TargetSnapshotInvalidError")
+        path.unlink()
+        path.symlink_to(self.root / "somewhere")
+        collector.collect()
+        self.assertEqual(collector.snapshot()["last_error_kind"], "TargetSnapshotInvalidError")
+        path.unlink()
+        collector.collect()
+        self.assertEqual(collector.snapshot()["last_error_kind"], "FileNotFoundError")
 
     def test_snapshot_observation_produces_pod_replaced_history(self) -> None:
         path = self.write_snapshot(snapshot([feed._reduce_pod(raw_pod("uid-1", "containerd://one"))]))

@@ -22,9 +22,9 @@
 | `AUTH_INVALID` | `authentication` | Gateway / `gateway` | bearer 값이 맞지 않거나 Authorization 헤더가 모호하다. | `DENIED`·미전달 → `denied` | §3.4, §4.2 | update 담당 확인 필요 |
 | `ROLE_NOT_ALLOWED` | `route_roles` | Gateway / `gateway` | 주체 역할이 추론 route에 허용되지 않는다. | `DENIED`·미전달 → `denied` | §3.4, §4.2 | update 담당 확인 필요 |
 | `PRINCIPAL_MODEL_NOT_ALLOWED` | `principal_allowed_models` | Gateway / `gateway` | 주체별 모델 허용 목록에 요청 모델이 없다. | `DENIED`·미전달 → `denied` | §4.2 | update 담당 확인 필요 |
-| `TARGET_UNAVAILABLE` | `target_registration` | Gateway / `gateway` | 대상 등록을 유효하게 읽지 못했거나, 등록에 `kubernetes`가 있는데 Pod 조회가 정상이 아니어서(조회 안 함·없음·여러 개·실행 안 됨) 판정을 보류한다. | `ERROR` → `error` | §4.1 | update 담당 확인 필요 |
+| `TARGET_UNAVAILABLE` | `target_registration` | Gateway / `gateway` | 대상 등록 오류, Pod 최초 미확인·없음·여러 개·미실행 또는 스냅샷 내용 오류로 보류한다. 직전 확인이 정상인 조회 중단·stale만으로는 보류하지 않고 미확인 표시 후 요청을 처리한다. | `ERROR` → `error` | §4.1, §7.3 | update 담당 확인 필요 |
 | `TARGET_MISMATCH` | `target_registration` | Gateway / `gateway` | 정책의 `target_id`와 등록 대상이 다르거나, 관측한 engine kind·version·model ID·image digest가 등록값과 다르다. | `ERROR` → `error` | §4.1, §7.3 | update 담당 확인 필요 |
-| `TARGET_UNVERIFIED` | `target_registration` | Gateway / `gateway` | 등록에 선언한 값을 아직 확인하지 못했다(engine_info 수집 실패·미보고 등). `model.revision`은 제외. | `ERROR` → `error` | §4.1, §7.3 | update 담당 확인 필요 |
+| `TARGET_UNVERIFIED` | `target_registration` | Gateway / `gateway` | 등록에 선언한 엔진 값을 시작 후 한 번도 정상 확인하지 못했거나 마지막 값이 미보고였다. 직전 정상 확인 뒤의 engine_info 조회 실패만으로는 보류하지 않는다. `model.revision`은 제외. | `ERROR` → `error` | §4.1, §7.3 | update 담당 확인 필요 |
 | `MODEL_NOT_ALLOWED` | `allowed_models` | Gateway / `gateway` | 정책의 모델 허용 목록 밖이다. | `DENIED`·미전달 → `denied` | §4.2, §4.10 | update 담당 확인 필요 |
 | `MAX_TOKENS_EXCEEDED` | `output_max_tokens` | Gateway / `gateway` | 요청 출력 토큰 수가 정책 상한을 넘는다. | `DENIED`·미전달 → `denied` | §4.10 | update 담당 확인 필요 |
 | `CONTEXT_LIMIT_EXCEEDED` | `max_context_tokens` | Gateway / `gateway` | 입력 토큰과 출력 요청 합이 context 상한을 넘는다. | `DENIED`·미전달 → `denied` | §4.10 | update 담당 확인 필요 |

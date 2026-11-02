@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import re
-import signal
 import time
 
 from guard.models import DataOrigin, ExecStatus, canonical_json, utcnow
@@ -29,6 +28,9 @@ REQUIRED_KEYS = {'namespace', 'selector', 'container', 'probe_pod', 'probe_conta
     'deployment', 'process_pattern', 'deadline_ms'}
 POLL_SECONDS = 0.5
 FAULT_FILE = 'lab-fault-exception'
+# Signals are sent by a Python helper inside the Linux engine container.
+# They must not depend on the controller host's signal module (e.g. Windows).
+POSIX_SIGKILL, POSIX_SIGSTOP, POSIX_SIGCONT = 9, 19, 18
 
 CLIENT = r'''
 import concurrent.futures as f,hashlib,http.client,json,sys,time
@@ -385,8 +387,8 @@ def _partial_start(lab, values):
         _rejected(lab, 'PARTIAL_INITIALIZATION_REPORTED_READY')
 
 
-FAULTS = {'death': (signal.SIGKILL, 'rank_death_detection_ms'), 'delay': (signal.SIGSTOP, 'rank_delay_detection_ms'),
-    'communication-stall': (signal.SIGSTOP, 'rank_communication_stall_detection_ms')}
+FAULTS = {'death': (POSIX_SIGKILL, 'rank_death_detection_ms'), 'delay': (POSIX_SIGSTOP, 'rank_delay_detection_ms'),
+    'communication-stall': (POSIX_SIGSTOP, 'rank_communication_stall_detection_ms')}
 
 
 def _rank_faults(lab, values):
@@ -412,9 +414,9 @@ def _one_fault(lab, fault, inject, limit_ms, number):
     except (OSError, TimeoutError, ValueError):
         return lab.miss('FAULT_NOT_INJECTED:' + fault)
     finally:
-        if number == signal.SIGSTOP:
+        if number == POSIX_SIGSTOP:
             try:
-                lab.signal_worker(signal.SIGCONT)
+                lab.signal_worker(POSIX_SIGCONT)
             except (OSError, TimeoutError, ValueError):
                 lab.miss('FAULT_NOT_RELEASED:' + fault)
     lab.note('fault-' + fault, outcome=row['outcome'], elapsed_ms=row['elapsed_ms'], complete=row['complete'], injected_ms=int(injected_ms))
@@ -440,7 +442,7 @@ def _disconnect(lab, values):
 
 def _worker_cleanup(lab, values):
     lab.normal_request('normal-before'); before = lab.census()
-    lab.signal_worker(signal.SIGKILL); lab.wait(POLL_SECONDS)
+    lab.signal_worker(POSIX_SIGKILL); lab.wait(POLL_SECONDS)
     try:
         after = lab.census(); left = len(after['processes']); shm = after['shm_entries']
     except (OSError, TimeoutError, ValueError):
@@ -501,7 +503,7 @@ def _profiler(lab, values):
 
 def _record_state(lab, values):
     lab.normal_request('normal-before')
-    lab.signal_worker(signal.SIGKILL); lab.wait(POLL_SECONDS)
+    lab.signal_worker(POSIX_SIGKILL); lab.wait(POLL_SECONDS)
     row, = lab.requests([{'method': 'GET', 'path': '/health', 'timeout': 10}])
     try:
         alive = len(lab.census()['processes'])

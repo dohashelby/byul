@@ -229,11 +229,12 @@ def run_check(tmp_path, tokens):
 
 def test_executor_reports_an_independent_cross_group_failure(tmp_path):
     draft = run_check(tmp_path, [0, 16, 16])
-    assert draft.observations['engine_sensor_violation'] == {'value': True, 'collected': True}
-    assert draft.observations['engine_sensor_full_scope']['value'] is False and draft.data_origin == DataOrigin.EXAMPLE
+    violation = draft.observations['engine_sensor_violation']
+    assert violation.value is True and violation.collected is True
+    assert draft.observations['engine_sensor_full_scope'].value is False and draft.data_origin == DataOrigin.EXAMPLE
 
 
 def test_executor_keeps_an_incomplete_clean_run_uncollected(tmp_path):
     draft = run_check(tmp_path, [0, 16, 0])
-    assert draft.observations['engine_sensor_violation'] == {'value': None, 'collected': False}
+    assert draft.observations['engine_sensor_violation'].collected is False
     assert draft.abort_reason == 'ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE'

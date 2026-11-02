@@ -79,7 +79,7 @@
   "update/packs/PACK-BASELINE/checks/SUP-15.yaml": "529d3ece91c35d2d229dfb173af489688e8cd87b4042e8cb72c215683819dd27",
   "update/packs/PACK-BASELINE/checks/SUP-16.yaml": "482996c0386654117bf45d613e7f8f032027a306e3e4dabf14e484f5884a8621",
   "update/packs/PACK-BASELINE/id_map.yaml": "b0f611ac95a33a2ed32cf39f0be72d1316a016bc0b9156eb1e0a1239dd901e3b",
-  "update/packs/PACK-BASELINE/pack.yaml": "dfcfa287e48fd74e2496ce677f7b159ab500fee5813ec73dbcc63e85fd809e02",
+  "update/packs/PACK-BASELINE/pack.yaml": "c96cdd448b55a575b891495474165ebaedf1ee01c9172935c1ce226dc82d1bb5",
   "update/pyproject.toml": "d58a4b33a50a9eac08c795ef9b8df547b0d98e210d2b99a285efc0e82824dd48",
   "update/reference/framework/01_프레임워크와_위협통제연결.md": "ac4c00edf3b7066480285f3a244de4f700847bac66b872f5d765916a037ec785",
   "update/reference/framework/02_환경별_적용기준.md": "253362d1d6fed107cec55109e4a1a1ba1815e6606d842b300ce4beb46891bad5",
@@ -117,6 +117,7 @@
   "update/src/guard/adapters/git_diff.py": "72d222462b9154b63a8619b9cf9925447337c5bba76fc65ad551815213e4cba3",
   "update/src/guard/adapters/kubernetes_response_error.py": "2fb9f8c059e0e5739f202b278e49e90b0d7825fd8cdddf27f55566aa9d67ba05",
   "update/src/guard/adapters/model_inventory.py": "3e053cc16dad9c9cd080ba51cefa87a80634ef65e2ec50f764a2c23589e88810",
+  "update/src/guard/adapters/openai_engine.py": "a7fc0e2f9661202542271e9b2ee77174acd40a45681da22b94b2fa6e7cc8e3f7",
   "update/src/guard/adapters/resource_recovery_probe.py": "86f51b71a70b494562c04bb518afdab420a4f70d2577d6f7f205cec5a067240c",
   "update/src/guard/adapters/reviewed_profiles/vllm-cpu-length-cause-1.json": "16f4f61acc8747916f8a2cb6b2d9855b25f178ac69b4b831ed45767b201ee8ed",
   "update/src/guard/adapters/template_boundary_evidence.py": "d900a15741d12f564854c6dc94030ec4018981ecc5d06ce15d023799d9ebfcc7",
@@ -307,7 +308,7 @@
   "update/src/guard/executors/rank_failure_contract.py": "34d2dd4718c8648271859c6f0ff23bfe901615ea13320fb8dd682ab1f97a2e76",
   "update/src/guard/executors/record_access_evidence.py": "8ff10894f2cd474e86f2dfdd5bc9b848b373fb96961d7f1b6a607e7529e640ba",
   "update/src/guard/executors/record_transport.py": "c48fb2e18bc8a030ca766a62b6fee5f448cfeecfb93dcbcfbc0d8b5a4586bf2d",
-  "update/src/guard/executors/registry.py": "5bb12c57f101f73f26c8df5e2be8e392a5437520684baa887fc4add9b17aa850",
+  "update/src/guard/executors/registry.py": "1f17f3d0d2af0d05e1bd4273e0f6e1871c6a81b15eacccd2a857f3d4b96b1427",
   "update/src/guard/executors/request_binding.py": "38eacd67bf5e3c41a6e13a04116f2372a1f22b818f1742b1ee17ea9956ec2ff3",
   "update/src/guard/executors/request_field_probe.py": "5da63e555cdff1ec15144b384323b1e4ab5e9dc533ec85902e61faadfaa2dee8",
   "update/src/guard/executors/resource_recovery_contract.py": "cd183b31f4c7cf63f3769a247315eb254c76e99364ffe697ea3f43ca863d2949",
@@ -424,7 +425,7 @@
   "id": "PACK-BASELINE",
   "kind": "PACK",
   "revision": 32,
-  "sha256": "0ba9c25045c26e7c3828d5a352f019a33d02403f22bfeb61c5a5c2c583477b0b"
+  "sha256": "596a4efa01b66da4dcbf31bff586fa0c5d37018495084b2e26921b73b61d20dd"
  },
  "paths": [
   "update/src/guard",

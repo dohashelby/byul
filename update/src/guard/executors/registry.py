@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from guard.adapters.base import EngineAdapter
 from guard.adapters.fake import FakeAdapter
+from guard.adapters.openai_engine import SGLangAdapter, TensorRTAdapter
 from guard.adapters.vllm import VllmAdapter
 
 from .base import Executor
@@ -119,6 +120,8 @@ EXECUTOR_DEFAULT_JUDGES: dict[str, str] = {
 ADAPTERS: dict[str, Callable[[], EngineAdapter]] = {
     "fake": FakeAdapter,
     "vllm": VllmAdapter,
+    "sglang": SGLangAdapter,
+    "tensorrt-llm": TensorRTAdapter,
 }
 
 

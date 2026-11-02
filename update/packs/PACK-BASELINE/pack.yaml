@@ -2,6 +2,8 @@ pack_id: PACK-BASELINE
 revision: 32
 engines:
 - vllm
+- sglang
+- tensorrt-llm
 checks:
 - SUP-01
 - SUP-02

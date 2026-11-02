@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -23,7 +24,10 @@ OBSERVATIONS = {'activation_steps': 'list', 'activation_violations': 'list', 'ac
     'activation_scope_complete': 'bool'}
 CONFIG_KEYS = {'namespace', 'selector', 'container', 'probe_pod', 'probe_container', 'service_url', 'model', 'kubectl_binary',
     'kubectl_context', 'deployment', 'process_pattern', 'deadline_ms', 'burst_requests', 'faulty_manifest', 'good_manifest',
-    'update_manifest', 'allowed_models', 'trace_directory', 'fault_directory', 'max_duration_seconds'}
+    'update_manifest', 'allowed_models', 'trace_directory', 'fault_directory', 'max_duration_seconds',
+    'generation_models', 'change_path', 'failure_marker', 'restore_objects', 'tampered_objects'}
+# 해시로 비교할 수 있는 복원 대상. volume·snapshot 내용은 이 실행기가 읽지 않는다.
+RESTORE_KINDS = frozenset({'configmap', 'secret'})
 REQUIRED_KEYS = {'namespace', 'selector', 'container', 'probe_pod', 'probe_container', 'service_url', 'model',
     'deployment', 'process_pattern', 'deadline_ms'}
 POLL_SECONDS = 0.5
@@ -33,7 +37,7 @@ FAULT_FILE = 'lab-fault-exception'
 POSIX_SIGKILL, POSIX_SIGSTOP, POSIX_SIGCONT = 9, 19, 18
 
 CLIENT = r'''
-import concurrent.futures as f,hashlib,http.client,json,sys,time
+import concurrent.futures as f,hashlib,http.client,json,re,sys,time
 from urllib.parse import urlsplit
 spec=json.load(sys.stdin);base=urlsplit(spec["url"])
 def one(item):
@@ -56,6 +60,7 @@ def one(item):
             if close_after is not None and got>=close_after:row["closed_early"]=True;break
         row["sha256"]=digest.hexdigest();row["bytes"]=got
         try:
+            row["models"]=sorted({m.decode("utf-8","replace") for m in re.findall(rb'"model":\s*"([^"]{1,200})"',text)})
             document=json.loads(text);row["model"]=document.get("model")
             row["answer"]=hashlib.sha256(document["choices"][0]["message"]["content"].encode()).hexdigest()
         except Exception:pass
@@ -196,6 +201,47 @@ class Lab:
         raw = Path(self.cfg[name]).read_bytes()
         self._kubectl('apply', '-f', '-', stdin=raw)
 
+    def object_digests(self, names):
+        """복원 대상의 내용 해시. 값 자체는 남기지 않는다."""
+        found = {}
+        for name in names:
+            kind, _, item = name.partition('/')
+            if kind not in RESTORE_KINDS or not item:
+                self.miss('RESTORE_OBJECT_KIND_UNSUPPORTED:' + kind); continue
+            raw = strict_json(self._kubectl('get', kind, item, '-o', 'json'), limit=2 * 1024 ** 2)
+            body = {key: raw.get(key) for key in ('data', 'binaryData', 'stringData')}
+            found[name] = hashlib.sha256(canonical_json(body)).hexdigest()
+        return found
+
+    def references(self, names):
+        """Ready Pod가 volume·env로 아직 참조하는 대상 이름."""
+        wanted = {name.partition('/')[2] for name in names}; used = set(); ready = set(self.ready_pods())
+        for pod in self._pods():
+            if pod['metadata']['name'] not in ready:
+                continue
+            spec = pod.get('spec', {})
+            for volume in spec.get('volumes', []):
+                used.add((volume.get('configMap') or {}).get('name')); used.add((volume.get('secret') or {}).get('secretName'))
+                for source in (volume.get('projected') or {}).get('sources', []):
+                    used.add((source.get('configMap') or {}).get('name')); used.add((source.get('secret') or {}).get('name'))
+            for container in spec.get('containers', []):
+                for item in container.get('envFrom', []):
+                    used.add((item.get('configMapRef') or {}).get('name')); used.add((item.get('secretRef') or {}).get('name'))
+                for item in container.get('env', []):
+                    source = item.get('valueFrom') or {}
+                    used.add((source.get('configMapKeyRef') or {}).get('name')); used.add((source.get('secretKeyRef') or {}).get('name'))
+        return sorted(wanted & used)
+
+    def log_contains(self, pod, marker):
+        """선언한 한 구성요소의 실패 표식이 로그에 있는지만 본다. 로그 원문은 남기지 않는다."""
+        for extra in ((), ('--previous',)):  # 이미 재시작한 컨테이너는 직전 실행의 로그에 남는다
+            try:
+                if marker.encode() in self._kubectl('logs', pod, '--all-containers', '--tail=2000', *extra, cap=8 * 1024 ** 2):
+                    return True
+            except OSError:
+                continue
+        return False
+
     def wait_ready(self):
         end = self.clock() + self.cfg['deadline_ms'] / 1000
         while True:
@@ -317,9 +363,12 @@ def _replace(lab, change):
                 break
             lab.wait(POLL_SECONDS)
         first, = inflight.result()
-    lab.note('inflight', outcome=first['outcome'], complete=first['complete'])
+    lab.note('inflight', outcome=first['outcome'], complete=first['complete'], models=first.get('models', []))
     if first['outcome'] == 'timeout':
         lab.violate('INFLIGHT_REQUEST_HUNG_ACROSS_TRANSITION')
+    # 한 stream 안에서 세대 별칭이 바뀌면 한 요청이 두 세대를 소비한 것이다.
+    if len(first.get('models', [])) > 1:
+        lab.violate('MIXED_GENERATIONS_IN_ONE_REQUEST', models=first['models'])
     models = {r.get('model') for r in rows if r.get('outcome') == 200}
     lab.note('during-transition', samples=len(rows), models=sorted(m for m in models if m))
     if allowed and models - set(allowed) - {None}:
@@ -333,31 +382,76 @@ def _redeploy(lab, values):
 
 
 def _live_change(lab, values):
-    if not _needs(lab, 'update_manifest', 'faulty_manifest', 'good_manifest'):
+    """선정 변경 경로의 정상 변경과 같은 경로의 부분 실패를 각각 일으킨다.
+
+    세대는 응답의 모델 별칭으로만 구분한다. 같은 별칭 안에서 weights·cache 일부만 바뀌는
+    혼합은 이 방법으로 보이지 않으므로 두 세대 별칭이 다르지 않으면 범위를 채우지 않는다.
+    """
+    if not _needs(lab, 'update_manifest', 'faulty_manifest', 'good_manifest', 'change_path', 'generation_models'):
         return
+    generations = lab.cfg['generation_models']
+    if (type(generations) is not dict or set(generations) != {'before', 'after'}
+            or generations['before'] == generations['after']):
+        return lab.miss('GENERATION_NOT_DISTINGUISHABLE')
+    lab.note('change-path', path=lab.cfg['change_path'], generations=generations)
     _replace(lab, lambda: lab.apply('update_manifest'))
     _rejected(lab, 'PARTIAL_CHANGE_ACCEPTED')
 
 
-def _rejected(lab, code):
-    """잘못된 세대는 Ready가 되지 않고 기존 응답도 바뀌지 않아야 한다."""
+def _rejected(lab, code, marker=None):
+    """잘못된 세대는 Ready가 되지 않고, 그동안 나간 응답도 허용 세대에서만 와야 한다."""
+    allowed = set(lab.cfg.get('allowed_models') or ())
     lab.apply('faulty_manifest')
-    end = lab.clock() + lab.cfg['deadline_ms'] / 1000; served = False
+    end = lab.clock() + lab.cfg['deadline_ms'] / 1000; served = False; seen = set(); activated = marker is None
     while lab.clock() < end:
-        pods = lab._pods()
-        if any(p['metadata'].get('labels', {}).get('byul.lab/generation') == 'faulty'
-                and any(c.get('type') == 'Ready' and c.get('status') == 'True' for c in p.get('status', {}).get('conditions', []))
-                for p in pods):
+        faulty = [p for p in lab._pods() if p['metadata'].get('labels', {}).get('byul.lab/generation') == 'faulty']
+        if any(any(c.get('type') == 'Ready' and c.get('status') == 'True' for c in p.get('status', {}).get('conditions', []))
+                for p in faulty):
             served = True; break
+        if not activated:
+            for pod in faulty:
+                try:
+                    activated = activated or lab.log_contains(pod['metadata']['name'], marker)
+                except (OSError, TimeoutError, ValueError):
+                    pass
+        try:
+            row, = lab.requests([lab.chat(timeout=5)])
+            if row.get('outcome') == 200:
+                seen.add(row.get('model'))
+        except (OSError, TimeoutError, ValueError):
+            pass
         lab.wait(POLL_SECONDS)
-    lab.note('faulty-generation', became_ready=served)
+    lab.note('faulty-generation', became_ready=served, served_models=sorted(m for m in seen if m),
+        failure_marker_seen=None if marker is None else activated)
     if served:
         lab.violate(code)
+    if allowed and seen - allowed - {None}:
+        lab.violate('DISALLOWED_MODEL_SERVED_DURING_FAILED_CHANGE')
+    if not activated:
+        lab.miss('PARTIAL_FAILURE_ACTIVATION_UNVERIFIED')
 
 
 def _restore_material(lab, values):
-    if _needs(lab, 'faulty_manifest', 'good_manifest'):
-        _rejected(lab, 'TAMPERED_RESTORE_ACCEPTED')
+    """복원 대상과 승인을 기록하고, 변조 사본 복원이 거부되며 승인 원본 복구 뒤 잔존이 없는지 본다.
+
+    선택 snapshot 분기는 별도 TP1 구성 시험이라 이 시나리오에 넣지 않는다.
+    """
+    if not _needs(lab, 'faulty_manifest', 'good_manifest', 'restore_objects', 'tampered_objects'):
+        return
+    approved = lab.cfg['restore_objects']
+    before = lab.object_digests(approved)
+    lab.note('restore-targets', objects=sorted(approved), matches_approval=before == approved)
+    if before != approved:
+        return lab.miss('RESTORE_TARGETS_NOT_APPROVED_AT_START')
+    lab.normal_request('normal-before')
+    _rejected(lab, 'TAMPERED_RESTORE_ACCEPTED')
+    lab.restore(); lab.mutated = False
+    after = lab.object_digests(approved); residual = lab.references(lab.cfg['tampered_objects'])
+    lab.note('after-restore', matches_approval=after == approved, tampered_still_referenced=residual)
+    if after != approved:
+        lab.violate('RESTORED_MATERIAL_DIFFERS_FROM_APPROVAL')
+    if residual:
+        lab.violate('TAMPERED_MATERIAL_STILL_REFERENCED', objects=residual)
 
 
 def _startup_gate(lab, values):
@@ -383,8 +477,9 @@ def _startup_gate(lab, values):
 
 
 def _partial_start(lab, values):
-    if _needs(lab, 'faulty_manifest', 'good_manifest'):
-        _rejected(lab, 'PARTIAL_INITIALIZATION_REPORTED_READY')
+    """한 구성요소만 실패시킨 세대. 그 실패가 실제로 일어났다는 로그 표식이 있어야 범위가 찬다."""
+    if _needs(lab, 'faulty_manifest', 'good_manifest', 'failure_marker'):
+        _rejected(lab, 'PARTIAL_INITIALIZATION_REPORTED_READY', lab.cfg['failure_marker'])
 
 
 FAULTS = {'death': (POSIX_SIGKILL, 'rank_death_detection_ms'), 'delay': (POSIX_SIGSTOP, 'rank_delay_detection_ms'),

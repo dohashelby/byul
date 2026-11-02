@@ -80,7 +80,7 @@
   "update/packs/PACK-BASELINE/checks/SUP-16.yaml": "482996c0386654117bf45d613e7f8f032027a306e3e4dabf14e484f5884a8621",
   "update/packs/PACK-BASELINE/id_map.yaml": "b0f611ac95a33a2ed32cf39f0be72d1316a016bc0b9156eb1e0a1239dd901e3b",
   "update/packs/PACK-BASELINE/pack.yaml": "c37d318cd46bcf59c5ac098ce6511c331bebdd3f882f576369efa681b2bd242d",
-  "update/pyproject.toml": "d58a4b33a50a9eac08c795ef9b8df547b0d98e210d2b99a285efc0e82824dd48",
+  "update/pyproject.toml": "bfda17103fe0ea4486754de7052fc35020c19e477b8af4e149509e1b8f877e54",
   "update/reference/framework/01_프레임워크와_위협통제연결.md": "ac4c00edf3b7066480285f3a244de4f700847bac66b872f5d765916a037ec785",
   "update/reference/framework/02_환경별_적용기준.md": "253362d1d6fed107cec55109e4a1a1ba1815e6606d842b300ce4beb46891bad5",
   "update/reference/framework/03_체크리스트와_보완가이드.md": "8dc05b3e758ded02882278d1c9afc324e37d0d461e7ad3a7b81cf6ca07843d1d",
@@ -228,7 +228,7 @@
   "update/src/guard/executors/egress_probe.py": "cd5b395f08dc141074964b0804b37f5f9cd3aafbe3db4271b0128dae57d23687",
   "update/src/guard/executors/egress_receiver.py": "f16f8544908e038ddd90d66516eafc3a52cc3bc8b673cccdf4b8e05254aae599",
   "update/src/guard/executors/embedding_cpu.py": "41370c01648ed53c6e9ee81d5b385ffc9533f94a19fa2df699af94872e31cea6",
-  "update/src/guard/executors/engine_callback_projection.py": "e0792d2c8b2d512bdabd931cd8294ccc219214d3d0eb6e3b0b409ba2a679d5a3",
+  "update/src/guard/executors/engine_callback_projection.py": "7277cf4c587301383522f6a795ec3faf185dbe51724be06054f662921852053f",
   "update/src/guard/executors/engine_identity.py": "dad39d00f728277fd609bf618fcc894ae6169dbf0ce5c29b02757aacd503731a",
   "update/src/guard/executors/engine_sensor.py": "9258d942512069ac3ef34ce5b5eedd2e5f306e7cbd230575a234501026ffaed0",
   "update/src/guard/executors/fake.py": "6bcf6167936443136e19c519c890b5ff733767f3994d1b3c70af46547cc03e66",
@@ -280,7 +280,7 @@
   "update/src/guard/executors/kubernetes_supply_boot.py": "704c0a9949b071af8b331a3068285e248937c6a114e853b18ccf7f66ac392b0e",
   "update/src/guard/executors/kubernetes_template_supply.py": "9f4a9f2d8c524c27a70d9bb2949053083c02bf3cca541278826cb55d6fc96811",
   "update/src/guard/executors/kubernetes_unix_ipc.py": "0c715e3222a14666f03348deb2927a56ffc2855605ffd5191d9157652de22249",
-  "update/src/guard/executors/lab_activation.py": "4ef16f99988a5229866ae486b769998a768884272a8ea18c9f2a36a43f2f711d",
+  "update/src/guard/executors/lab_activation.py": "0a1f960a75f67abaf8b57b714ea85019d63ca869b0dd8016248fa41447085bf3",
   "update/src/guard/executors/lifecycle_capture.py": "18c6227678f502ee3efca3a09af7bc9eb74a3641dfa658893c66e2cd5c54de7a",
   "update/src/guard/executors/lifecycle_session.py": "38526674e8df7de6b25499e924f30c4ed6e94e3346ff944249a5fee00de467e1",
   "update/src/guard/executors/lifecycle_transition.py": "d081a8459fcdb68fb3fac31a8e9d4a933dc75e00923c81a08b7f1804c5dcecbe",
@@ -421,7 +421,7 @@
   "update/tools/b1_integration_cpu.py": "858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf",
   "update/tools/b_lif07_native_capture.py": "c133d7a4fd6d367b792175df74861dea4ac8ecbd87887bd836c76ebe6ef6aae2",
   "update/tools/b_lif07_readiness.py": "7c3ef7f1b6055cac33b0f6f0216105d5cb102296d475a0024c74015c81c70346",
-  "update/uv.lock": "fb03d89051bffa48077655032367c102cd250e631b610e01689aa9b5e410b08e"
+  "update/uv.lock": "a45e375165df38d7f916568f9cb6d6de32e9b289c81beb2e9d0ed68fe49b923b"
  },
  "pack_ref": {
   "id": "PACK-BASELINE",

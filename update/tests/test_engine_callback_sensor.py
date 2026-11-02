@@ -90,9 +90,9 @@ def test_unmeasured_required_context_stays_uncollected():
     assert context([computed(TAGS['a'], 0), computed(TAGS['b'], 16)])['violation'] is None
 
 
-def timing(present_hit, *, fast=True, power=True):
+def timing(present_hit, *, fast=True, power=True, control=None):
     cases, tags, events, elapsed = [], {}, [], {}
-    for role, value, hit in (('control-present', 1 if power else 5, 1), ('control-absent', 5, 0),
+    for role, value, hit in (('control-present', control or (1 if power else 5), 1), ('control-absent', 5, 0),
             ('present', 1 if fast else 5, present_hit), ('absent', 5, 0)):
         for index in range(4):
             case_id = f'{role}-{index}'; tag = 'byul-cb-' + f'{len(tags):032x}'
@@ -113,6 +113,12 @@ def test_timing_gap_needs_a_native_cross_group_hit():
 def test_clean_timing_needs_a_control_with_detection_power():
     assert timing(False, fast=False)['violation'] is False and timing(False, fast=False)['full_scope'] is True
     assert timing(False, fast=False, power=False)['violation'] is None
+
+
+def test_control_slower_with_the_cache_is_reported_as_reversed_not_as_no_power():
+    result = timing(False, fast=False, control=9)
+    assert result['control_auc_percent'] == 0 and result['violation'] is None
+    assert 'timing_control_direction_reversed' in result['missing'] and 'timing_control_has_no_power' not in result['missing']
 
 
 def test_too_few_samples_stays_uncollected():

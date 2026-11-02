@@ -6,12 +6,40 @@ on:
     paths:
       - ".github/workflows/update.yml"
       - "update/**"
+      # Prose-only docs skip CI; the docs tests read stay listed (test_workflow_paths.py checks this).
+      - "!update/docs/**/*.md"
+      - "update/docs/AUTOMATION_HARDENING.md"
+      - "update/docs/AUTOMATION_PHASE1.md"
+      - "update/docs/AUTOMATION_PHASE2.md"
+      - "update/docs/AUTOMATION_PHASE3.md"
+      - "update/docs/CHECKLIST_VALIDATION_STATUS.md"
+      - "update/docs/POLICY_M12.md"
+      - "update/docs/POLICY_M14.md"
+      - "update/docs/UPDATE_SELECTION.md"
+      - "update/docs/UPDATE_VALIDATION.md"
+      - "update/docs/b-lif07/PR171_SOURCE_CONSUMPTION.md"
+      - "update/docs/b-lif07/WORKER_READINESS.md"
+      - "update/docs/b-lif13/WEIGHTS_LIFETIME.md"
       - "contracts/**"
       - "platform/api/**"
   pull_request:
     paths:
       - ".github/workflows/update.yml"
       - "update/**"
+      # Prose-only docs skip CI; the docs tests read stay listed (test_workflow_paths.py checks this).
+      - "!update/docs/**/*.md"
+      - "update/docs/AUTOMATION_HARDENING.md"
+      - "update/docs/AUTOMATION_PHASE1.md"
+      - "update/docs/AUTOMATION_PHASE2.md"
+      - "update/docs/AUTOMATION_PHASE3.md"
+      - "update/docs/CHECKLIST_VALIDATION_STATUS.md"
+      - "update/docs/POLICY_M12.md"
+      - "update/docs/POLICY_M14.md"
+      - "update/docs/UPDATE_SELECTION.md"
+      - "update/docs/UPDATE_VALIDATION.md"
+      - "update/docs/b-lif07/PR171_SOURCE_CONSUMPTION.md"
+      - "update/docs/b-lif07/WORKER_READINESS.md"
+      - "update/docs/b-lif13/WEIGHTS_LIFETIME.md"
       - "contracts/**"
       - "platform/api/**"
 
@@ -51,7 +79,7 @@ jobs:
           import time
 
           start = time.perf_counter()
-          result = subprocess.run([sys.executable, "-m", "pytest", "-q", "--durations=50",
+          result = subprocess.run([sys.executable, "-m", "pytest", "-q", "-n", "auto", "--durations=50",
               "--basetemp", os.path.join(os.environ["RUNNER_TEMP"], "byul-update-pytest")])
           print(f"Default suite parent wall clock: {time.perf_counter() - start:.3f}s", flush=True)
           raise SystemExit(result.returncode)

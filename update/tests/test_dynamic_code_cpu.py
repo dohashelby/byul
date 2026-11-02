@@ -16,7 +16,7 @@ def row(entry='autoconfig',trust=False,mode='normal',events=None,outcome='reject
 
 
 def definition(check_id):
-    return CheckDef.model_validate(yaml.safe_load((Path(__file__).parents[1]/'packs/PACK-BASELINE/checks'/f'{check_id}.yaml').read_text()))
+    return CheckDef.model_validate(yaml.safe_load((Path(__file__).parents[1]/'reference/pack-seeds/PACK-BASELINE-31/checks'/f'{check_id}.yaml').read_text()))
 
 
 def test_two_loader_paths_reuse_one_case_matrix_for_three_python_modes():

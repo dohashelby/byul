@@ -1,0 +1,54 @@
+id: OBS-06
+framework_id: CHK-OBS-006
+mechanism_ids:
+- mechanism-14
+revision: 4
+retired: false
+area: OBS
+purpose: 저장 자료 보호
+secondary_purposes: []
+question: 기록·진단 사본의 조회·반출을 허용된 주체로 제한하고, 필요한 저장 암호화를 적용하는가?
+scope: 기본 저장 기록; 진단 기능별 선택
+risk_category: 보안 위협 점검
+risk_summary: 기록 저장소·사본에 접근 가능한 비허용 주체가 진단 본문·식별정보·자격을 조회·반출할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 저장 로그·기록의 독자와 반출 권한을 기본 확인한다. 선택 진단·usage 사본은 실제 생성·보존 경로별로 추가한다. 저장 위치·자료 등급별 암호화 요구와 복호화 권한을 확인한다. 요구나 실제 설정이 미정이면 해당 결과를 미확인으로 남긴다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 자료별 독자·반출 목적·범위
+  enterprise_decisions: 자료별 독자·반출 목적·범위·승인, 진단 실행 역할·격리 환경과 parser/입력 신뢰 범위. 자료 등급·저장 위치별 암호화 필요 여부, 허용 독자·복호화 역할, 키 관리 책임·보존·교체 및 예외 조건을 정한다.
+normal_control: 허용된 독자는 필요한 로그·진단 사본을 읽고, 저장 암호화가 필요한 자료는 승인된 저장·키 관리 설정으로 정상 기록·조회한다.
+challenge_steps:
+- 원본·collector·backup 위치 확보
+- 비허용 독자 계정으로 조회·다운로드
+- 허용 독자와 결과 비교
+- 원본·사본·백업의 자료 등급과 저장 암호화 요구·적용 계층 확인
+- 암호화가 필요한 저장 위치의 설정·키 참조·복호화 권한 대조
+- 허용·비허용 계정의 조회·복호화 결과와 정상 기록·조회를 비교
+required_observations: []
+required_observations_prose:
+- 사본별 ACL·owner/실제 reader identity/조회·반출 감사 결과
+- 자료 등급별 저장 보호 요구, 저장소·볼륨·백업의 암호화 설정과 적용 증거, 키 식별 참조·복호화 권한·감사 기록(키 값 제외)
+satisfied_if: 허용된 주체만 기록·진단 원본과 사본을 조회·반출하며, 저장 암호화가 필요한 위치에 암호화와 복호화 권한 제한이 적용된다. 정상 기록·조회도 동작한다.
+fail_criteria: 비허용 주체가 기록을 조회·반출·복호화하거나, 암호화가 필수인 저장 위치에 자료가 평문으로 저장된다.
+unknown_criteria: 원본·사본의 접근 결과, 저장 암호화 요구·적용 상태 또는 키·복호화 권한 증거를 확보하지 못했다. 저장 보호 요구가 미정인 부분은 판정을 보류한다.
+remediation: '- 로그·진단·사용통계의 로컬 원본·수집 사본·백업마다 읽기·조회·반출 권한을 제한한다. 허용 역할과 일반 계정의 실제 접근 결과를 비교하고 반출 기록을 남긴다.
+
+  - 자료 등급과 저장 위치별로 필요한 저장 암호화를 적용하고 키·복호화 권한을 제한한다. 원본·회전 파일·진단·backup 사본의 실제 저장 계층을 확인하며, 수집·조회 프로그램의 권한과 키 관리 권한을 함께 검토한다.'
+method_and_evidence: '기록·진단 원본과 collector·원격 sink·backup 사본의 위치·소유자·자료 등급을 식별하고, 허용·비허용 계정의 실제 조회·다운로드·반출 결과를 대조한다. CHK-OBS-003에서 확보한 같은 로그·dump artifact를 사용하더라도 수집 필드의 허용 여부와 사본의 조회·반출 권한은 따로 판정한다. 로컬 파일·볼륨·객체 저장소·backup의 저장 암호화 요구와 실제 설정을 대조한다. 암호화가 필요한 위치의 적용 증거·키 식별 참조·복호화 권한·감사 기록을 확인하고, 허용·비허용 계정의 조회·복호화와 정상 기록·조회를 비교한다. 키 값과 실제 민감정보는 수집하지 않는다. 예외 dump·선택 debug 사본의 생성 조건은 공통 【F26】 근거를 참조한다. 근거 원문: [F26](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33848).'
+remaining_setup: 자료별 독자·반출 범위와 시험 계정, 저장 위치·등급별 암호화 요구 결정, 실제 저장·키 관리 설정과 권한 시험 준비. 실제 시험 미실행.
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C11
+  scenario_ids:
+  - SC-21-02
+  - SC-22-03
+  subtest_ids:
+  - Q-C11/SC-21-02
+  - Q-C11/SC-22-03
+source:
+  array: observability_assessment_draft

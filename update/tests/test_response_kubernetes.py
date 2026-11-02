@@ -204,7 +204,7 @@ def test_declared_environment_cannot_use_example_capture(tmp_path, inputs):
 def test_draft_preserves_original_policy_required_observations_and_judge_rules(inputs):
     check = inputs[2].checks['REQ-13']
     original = producer.CheckDef.model_validate(producer.yaml.safe_load((Path(producer.__file__).resolve().parents[1]
-        / 'packs/PACK-BASELINE/checks/REQ-13.yaml').read_text()))
+        / 'reference/pack-seeds/PACK-BASELINE-31/checks/REQ-13.yaml').read_text()))
     assert check.policy_params == original.policy_params
     assert check.required_observations[:-1] == original.required_observations
     assert check.judge.params['pass_when_all'] == original.judge.params['pass_when_all']

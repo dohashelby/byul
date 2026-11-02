@@ -1,0 +1,49 @@
+id: LIF-09
+framework_id: CHK-LIF-009
+mechanism_ids:
+- mechanism-10
+revision: 4
+retired: false
+area: LIF
+purpose: 기동 준비 확인
+secondary_purposes: []
+question: 일부 worker의 초기화나 모델 준비가 실패했을 때 성공으로 처리하지 않는가?
+scope: 기본; Ray actor/DAG 단계는 선택
+risk_category: 일반 장애·복구 점검
+risk_summary: 일부 worker 초기화·로딩 실패를 성공으로 처리하면 불완전 모델로 응답하거나 장애가 반복될 수 있음. 공격자의 유발 능력은 별도 확인.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 기본 초기화·모델 적재의 부분 실패를 확인한다. Ray actor/DAG는 해당 실행기 선택 시 추가한다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 초기화 실패·접수 제한·복귀 방침
+  enterprise_decisions: 실패 유형별 감지·전달·중단·복구 절차와 책임자, 영향 요청 오류 처리·알림 경로.
+normal_control: 모든 준비 단계가 성공한 정상 기동만 완료 상태가 된다.
+challenge_steps:
+- 시험 모델 파일·rank 준비 한 곳만 실패
+- 상위 기동·readiness·진행 작업 상태 확인
+- 수정 후 재기동
+required_observations: []
+required_observations_prose:
+- 실패한 구성요소·초기화/로딩 단계의 원결과와 상위 기동·그룹 상태의 대응
+- 부분 실패 후 readiness·접수 gate·진행 작업 상태와 수정 후 정상 기동 기록
+- 임시 자원·실패 후 재기동 관측은 CHK-LIF-011과 공유하고 해당 범위를 별도 판정
+satisfied_if: 일부 필수 초기화·모델 준비가 실패하면 그 결과를 상위 기동 실패로 반영하고 부분 준비를 전체 성공으로 보고 서비스하지 않는다.
+fail_criteria: 부분 준비 실패가 전체 성공으로 표시되거나 서비스에 들어간다.
+unknown_criteria: 실패한 구성요소와 집계 상태의 대응을 확인하지 못했다.
+remediation: '- 초기화·모델 준비 단계와 필수 rank의 성공·실패를 모아 전체 준비 상태를 판정한다. 일부 실패를 표시하고 서비스 수용을 보류하며 남은 자원 정리와 재기동 절차를 수행한다.'
+method_and_evidence: '설정·모델 로딩·필수 worker 준비 중 한 구성요소를 제한적으로 실패시키고, 그 원결과가 상위 기동/그룹 상태와 readiness·서비스 비수용 결정에 반영되는지 대조한다. 수정 후 모든 필수 단계가 성공한 정상 기동의 완료 상태와 비교한다. 실패가 집계됐는지와 실제 접수 gate가 지켜졌는지는 각각 기록하고 CHK-LIF-007과 같은 관측을 공유할 수 있다. 부분 자원 회수·재기동 자체는 CHK-LIF-011에서 판정한다. vLLM v0.31.0의 공통 【F32】 근거 중 불완전 적재·기본 재배포 조건을 참조한다. 근거 원문: [F32](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33911).'
+remaining_setup: 작은 준비 실패 fixture·단계별 상태 계측
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-R05-12
+  - Q-C09
+  scenario_ids:
+  - SC-17-01
+  subtest_ids:
+  - Q-R05-12/SC-17-01
+source:
+  array: lifecycle_assessment_draft

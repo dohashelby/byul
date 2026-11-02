@@ -1,0 +1,47 @@
+id: LIF-06
+framework_id: CHK-LIF-006
+mechanism_ids:
+- mechanism-04
+revision: 4
+retired: false
+area: LIF
+purpose: 변경 중 일관성
+secondary_purposes: []
+question: 실행 중 변경이나 순차 교체 중에도 각 요청의 모델·상태가 일관되는가?
+scope: 조건부; live weights·LoRA·다중 replica
+risk_category: 보안 위협·일반 장애 함께 점검
+risk_summary: 변경 권한자의 부적절한 조작이나 동시성 오류로 live·rolling 중 요청이 서로 다른 weights·KV 세대를 사용해 잘못된 결과가 나올 수 있음.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: live weights·LoRA 변경·rolling·다중 replica 전환을 실제 사용할 때 적용한다. 기본 중단 재배포와 구분한다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 기능별 원자성·진행 요청·실패 처리
+  enterprise_decisions: 수용 차단점·drain·강제 종료·서비스 중단 계획. live/rolling/canary를 선택하면 허용 세대 혼용·원자성·실패 처리를 별도로 정한다.
+normal_control: 선정한 live weights·LoRA 변경 또는 rolling·다중 replica 전환에서 허용한 전이·라우팅 정책을 지키며 각 요청이 일관된 모델·상태로 정상 처리된다.
+challenge_steps:
+- 실제로 활성화한 변경 경로·지원 조건과 허용 전이·세대·라우팅 정책을 확인
+- 선정 경로의 정상 변경을 수행하고 진행 요청·weights·cache·replica의 세대와 실제 소비를 추적
+- 같은 경로의 제한된 부분 실패를 주입하고 요청별 허용 세대·상태 일관성과 실패 처리를 정상 변경과 비교
+required_observations: []
+required_observations_prose:
+- live·rolling 활성 근거/weight·cache·요청 세대/변경 실패 상태
+satisfied_if: 요청이 허용하지 않은 부분 갱신·세대 조합을 소비하지 않는다.
+fail_criteria: 사용 환경에서 비호환 weight·cache·요청 상태가 섞인다.
+unknown_criteria: 선택 기능 사용 여부·전이 계약 또는 세대 대응이 미확인이다.
+remediation: '- 실행 중 변경·순차 교체를 선택한 환경에서는 요청이 사용할 모델·가중치·캐시의 버전을 구분한다. 변경 전 작업의 처리·공유 상태 무효화·새 버전 전환 조건을 적용하고 부분 변경 시 복구 절차를 둔다.'
+method_and_evidence: '실제로 선정한 live weights·LoRA 변경 또는 rolling·다중 replica 전환에서 정상 변경과 제한된 부분 실패를 비교한다. 진행 요청별 실제 model/weights·cache·replica·반환 세대를 허용 전이·라우팅 정책에 맞춰 추적한다. 세션 lock을 추론 격리로 간주하지 않으며 LoRA·weight transfer·reload를 하나의 공통 chunk 절차로 합치지 않는다. 기본 중단 재배포의 정상 대조는 CHK-LIF-005에서 유지하고, 이 항목의 비사용은 유효 설정·도달성 근거로 적용 판단에 남긴다. vLLM v0.31.0의 공통 【F32】 근거 중 선택 live/keep/collective_rpc·abort/wait/keep 및 모델·cache·요청 세대 조건을 참조한다. 근거 원문: [F32](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33911).'
+remaining_setup: 실제 지원 엔진·변경 방식 선정; 기본 구성에 live 시험 강제하지 않음
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C09
+  - Q-C02
+  scenario_ids:
+  - SC-17-03
+  subtest_ids:
+  - Q-C09/SC-17-03
+source:
+  array: lifecycle_assessment_draft

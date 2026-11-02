@@ -1,0 +1,63 @@
+id: REQ-15
+framework_id: CHK-REQ-015
+mechanism_ids:
+- mechanism-01
+revision: 3
+retired: false
+area: REQ
+purpose: 공유 권한·범위
+secondary_purposes: []
+question: 캐시를 공유할 사용자 집단을 검증된 신원에 따라 결정하는가?
+scope: 기본+정책 조건
+risk_category: 보안 위협 점검
+risk_summary: 호출자가 cache 공유 집단 식별자를 사칭해 허용되지 않은 집단과 상태를 공유하거나 그 사용 여부를 추론할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: KV/prefix 등 재사용 cache를 사용할 때 공유 집단과 신원 연결을 확인한다. 실제 집단·공유 정책 미정은 제외 사유가 아니다.
+policy_params:
+- key: public_prefix_sharing_allowed
+  type: bool
+  required: true
+- key: isolated_cache_groups
+  type: list[str]
+  required: true
+- key: cache_identity_policy_ref
+  type: str
+  required: true
+policy_prose:
+  policy_to_decide: 공유 집단·salt 발급/검사 주체
+  enterprise_decisions: 공유 단위(사용자/서비스 계정/tenant), 공개 prefix 공유 여부, 인증 주체 식별·salt 발급/덮어쓰기/검사 주체, 필요한 key 문맥, 비공개 정보와 공격자의 반복 관측 조건·통계 기준·성능 허용 범위. 같은 서비스 자격 뒤 여러 사용자가 있으면 추가 신원 전달이나 환경 분리가 필요한지 결정한다.
+normal_control: 같은 허용 집단은 캐시를 재사용하고 다른 집단은 공유하지 않는다.
+challenge_steps:
+- A·B 신원과 허용 공유 관계를 기록하고 같은 입력 반복
+- 클라이언트가 보낼 수 있는 공유 선택값의 위조·누락을 시험
+- 정책상 집단과 실제 cache 재사용 범위·소비를 대조
+required_observations:
+- key: declared_cache_group_evidence
+  type: dict
+required_observations_prose:
+- 검증된 신원·공유 집단 정책과 실제 선택/정규화 결과
+- 실제 key·namespace·실행 영역 등 공유 경계, 집단별 cache 적중·소비 또는 재사용 거부
+satisfied_if: 금지된 집단 간 재사용이 없다. salt 존재만으로 격리를 판정하지 않는다.
+fail_criteria: 클라이언트가 공유 집단을 바꾸거나 금지 집단 간 캐시 재사용이 발생한다.
+unknown_criteria: 신뢰 salt 주입 또는 실제 캐시 hit의 집단 귀속을 확인하지 못했다.
+remediation: '- 검증한 사용자 신원에서 캐시 공유 집단을 결정하고 모든 도달 가능한 입력 경로에 적용한다. 사용자가 임의로 공유 집단이나 salt를 지정해 다른 집단의 캐시를 사용하지 못하게 한다.'
+method_and_evidence: 검증된 신원→허용 공유 집단→실제 재사용 범위→cache 적중·소비를 연결한다. 선정 엔진의 key·namespace 또는 실행 영역 분리 등 실제 집행 수단에서 집단 위조·누락과 교차 집단 재사용을 대조한다.
+remaining_setup: 허용 공유 관계·검증된 시험 신원과 선정 엔진의 실제 cache 재사용·소비를 확인할 수단
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C03
+  scenario_ids:
+  - SC-05-01
+  subtest_ids:
+  - Q-C03/SC-05-01
+source:
+  array: request_state_assessment_draft
+limitations:
+- public_prefix_sharing_allowed={public_prefix_sharing_allowed}는 공개 prefix 공유의 기업 신고 기준이다. private_groups_server_overwrite는 false만 지원하며 true를 격리·공유 승인이나 해당 없음으로 바꾸지 않는다.
+- isolated_cache_groups={isolated_cache_groups}는 서로 비공개 캐시를 격리할 기업 전체 집단 목록이다. 최소 두 고유 집단과 정확한 cache_identity_policy_ref={cache_identity_policy_ref}를 명시해야 하며 bool에서 관계·승인·신원을 추론하거나 목록을 줄이지 않는다.
+- 한 entrypoint/target/workload·집단별 distinct_authenticated_credential 대표 주체 한 명에 대해 전체 ordered pair와 역방향의 source_warmup/same_group_reuse/cross_group_probe/forged_salt/omitted_salt/post_control을 DECLARED로 대조한다. 실제 key→entry→consumer·신원·사건 순서·첨부 내용과 정책 승인 진위는 자동 인증하지 않는다.
+- 공개 공유 true·공유 서비스 자격 뒤 여러 사용자·클라이언트 salt만의 신원·안전 거부 방식·다른 진입점은 지원 밖 UNKNOWN이다. 전체 허용 관계표/신원 책임표·REQ-17 통계·성능은 미검증이며 실제 캐시 실행기는 없다. 신고 PASS의 상한만 적용하고 성능 PASS는 UNKNOWN이다.

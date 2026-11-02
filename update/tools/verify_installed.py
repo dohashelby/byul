@@ -378,7 +378,7 @@ def supervisor(args) -> None:
     subprocess.run([uv, "venv", "--python", sys.executable, str(environment)], cwd=repo, check=True)
     python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     subprocess.run([uv, "pip", "install", "--python", str(python), "--requirements", str(requirements), str(wheel)], cwd=output, check=True)
-    shutil.copytree(repo / "packs/PACK-BASELINE", output / "fixture-pack")
+    shutil.copytree(repo / "reference/pack-seeds/PACK-BASELINE-31", output / "fixture-pack")
     shutil.copyfile(__file__, output / "worker.py")
     shutil.copyfile(repo / "tools/wheel_log_fixture.py", output / "wheel_log_fixture.py")
     write_json(output / "source-manifest.json", {"guard/" + name: value for name, value in inventory(repo / "src/guard").items()})

@@ -25,7 +25,7 @@ VALUES = {"collector_profile": "guard-vllm-native-info-v1", "required_trusted_fi
 
 
 def check():
-    value = yaml.safe_load((ROOT / "packs/PACK-BASELINE/checks/OBS-09.yaml").read_text(encoding="utf-8"))
+    value = yaml.safe_load((ROOT / "reference/pack-seeds/PACK-BASELINE-31/checks/OBS-09.yaml").read_text(encoding="utf-8"))
     value.update(yaml.safe_load((ROOT / "tools/overrides/OBS-09.yaml").read_text(encoding="utf-8")))
     return CheckDef.model_validate(value)
 

@@ -1,0 +1,46 @@
+id: SUP-05
+framework_id: CHK-SUP-005
+mechanism_ids:
+- mechanism-08
+revision: 4
+retired: false
+area: SUP
+purpose: 실제 사용의 무결성
+secondary_purposes: []
+question: 승인 뒤 파일·symlink·마운트가 바뀌어도 승인하지 않은 자료의 사용을 막는가?
+scope: null
+risk_category: 보안 위협 점검
+risk_summary: 저장소·마운트 변경권자가 승인 후 실물을 바꿔 검사하지 않은 파일을 worker가 소비하게 할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 승인한 공급물을 실제 소비하는 환경. 쓰기 제한이 있다는 주장도 실제 교체 거부 시험·근거로 확인한다.
+policy_params: []
+policy_prose:
+  policy_to_decide: null
+  enterprise_decisions: 변경을 허용할 주체, 불변 저장소·쓰기 제한·읽기 전 검증의 적용 방법, 각 rank가 읽은 파일·담당 shard·변환 결과의 증거와 기록 위치.
+normal_control: 승인한 불변 파일 경로로 일반·스트리밍 요청을 처리한다.
+challenge_steps:
+- 격리 사본 승인
+- 읽기 전 파일·symlink·마운트 중 허용된 시험 변경 하나 수행
+- 실제로 연 파일의 식별정보와 사용 거부 결과를 승인 내용과 대조
+required_observations: []
+required_observations_prose:
+- 승인 당시 파일 해시, 파일을 바꾼 계정·시각, 엔진이 실제 연 파일과 읽은 시각
+satisfied_if: 변경 자체를 제한하거나, 변경된 내용의 사용을 차단한다.
+fail_criteria: 승인 후 교체된 비승인 자료가 제한 없이 소비된다.
+unknown_criteria: 쓰기 거부만 확인했으나 다른 교체 경로 또는 실제 소비 대상을 확인하지 못했다.
+remediation: '- 승인 파일과 symlink·mount를 변경할 권한을 제한하고, 불변 저장소 또는 실제 읽기 전 검증을 적용한다. 파일 선택부터 읽기까지 교체될 수 있는 지점을 확인하고, 승인 내용과 다른 파일의 사용을 막는다.'
+method_and_evidence: '승인한 파일·경로의 검사→배치→읽기 시점을 연결하고, 격리 사본에서 허용된 시험 계정으로 파일·symlink·mount를 하나씩 교체해 변경 자체의 거부 또는 변경 내용의 소비 전 차단을 확인한다. 실제 연 파일과 읽기 시각을 승인 식별정보에 대조한다. 【F34】redirect를 실제 사용하면 승인 뒤 매핑 파일 또는 대상 경로를 바꾸는 변형을 추가하고 writer·변경 시각·resolved 경로·실제 읽기를 기록한다. 변경 전 승인 묶음의 정상 소비와 비교한다. 근거 원문: [F34](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33778).'
+remaining_setup: 교체 시점을 관측할 계측과 쓰기 권한별 시험 사본
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-R05-04
+  scenario_ids:
+  - SC-10-01
+  subtest_ids:
+  - Q-R05-04/SC-10-01
+source:
+  array: supply_assessment_draft

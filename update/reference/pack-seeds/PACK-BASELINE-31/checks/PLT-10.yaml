@@ -1,0 +1,46 @@
+id: PLT-10
+framework_id: CHK-PLT-010
+mechanism_ids:
+- mechanism-12
+revision: 2
+retired: false
+area: PLT
+purpose: 권한 철회
+secondary_purposes: []
+question: 자격을 철회한 뒤 새 접근을 정한 기한 안에 거부하는가?
+scope: 기본; 선정 issuer·정책 캐시
+risk_category: 보안 위협 점검
+risk_summary: 권한이 철회된 주체가 남은 자격·정책 반영 지연을 이용해 새 작업이나 자료 접근을 계속할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 사용 중인 자격·권한의 철회 계약과 신규 접근 처리를 확인한다. 철회 정책·발급 주체 미정은 미확인이다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 철회 대상·전파 기한
+  enterprise_decisions: 철회 대상·issuer·정책 캐시, 진행 요청과 기존 세션 처리, 자격 교체·사본 정리 담당과 근거.
+normal_control: 철회 전 허용 자격으로 신규 접근이 가능하다.
+challenge_steps:
+- 시험 자격 철회
+- 정한 간격의 소수 신규 접근
+- 철회 시각부터 거부까지 측정
+required_observations: []
+required_observations_prose:
+- 철회 사건/신규 연결·작업 시각/identity·거부 결과
+satisfied_if: 정한 기한 이후 비허용 신규 접근이 거부된다.
+fail_criteria: 정한 철회 기한 이후에도 신규 접근이 허용된다.
+unknown_criteria: 기한이 미정이거나 캐시·provider 전파·실제 신규 연결을 확인하지 못했다.
+remediation: '- 자격 철회 기준과 기한을 정하고 실제 권한 발급·검사 위치에 반영한다. key·권한 캐시의 갱신·무효화와 새 접근의 거부 결과를 확인한다.'
+method_and_evidence: 철회 시각과 이후 새 연결·갱신·객체 접근을 정상 대조와 기록한다.
+remaining_setup: 철회 기한·시험 자격·시간 동기화
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C10
+  scenario_ids:
+  - SC-19-01
+  subtest_ids:
+  - Q-C10/SC-19-01
+source:
+  array: platform_assessment_draft

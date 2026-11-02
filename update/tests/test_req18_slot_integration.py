@@ -158,7 +158,7 @@ def test_unconfigured_component_gate_closes_before_actual_cpu_capture(tmp_path, 
 
 def test_original_req18_remains_unregistered_and_private_diagnostic_has_no_pass_rule(inputs):
     original = producer.yaml.safe_load((Path(producer.__file__).resolve().parents[1]
-        / 'packs/PACK-BASELINE/checks/REQ-18.yaml').read_text())
+        / 'reference/pack-seeds/PACK-BASELINE-31/checks/REQ-18.yaml').read_text())
     assert original['executor'] is None and original['judge'] is None and original['policy_params'] == []
     assert inputs[2].checks['REQ-18'].policy_params == []
     assert 'pass_when_all' not in inputs[2].checks['REQ-18'].judge.params

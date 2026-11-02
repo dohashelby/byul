@@ -2,7 +2,7 @@
 
 REQ02/SC01-02의 기존 `route_record:kubernetes` 선언 파일 제품은 유지한다. 새 `native_route:kubernetes`는 기존 native8의 AuthenticationMiddleware 경로/token bool·등록 GET /v1/models 및 POST /v1/completions callback·source/code/session/PID-start 기록을 기존 lifecycle_session의 route_handler_index로 소비한다. 새로운 sensor/hook/native 판본이나 Gateway 구현은 없다. 현재 관측을 실제 principal 권한·신뢰된 경로 재작성·기업 허용 정책·인가 우회 FAIL·최종 worker/tensor 소비로 올리지 않는다.
 
-기존 CLI select→run→judge→report→verify→반출/복원·저장팩 정확 Ref 재판정을 사용한다. `tools/build_kubernetes_native_route_pack.py --seed packs/PACK-BASELINE --output <새폴더>`는 PACK31의 REQ02 revision4/executor native_route/profile `kubernetes-native-route-observation-v1`만 명시 DRAFT로 연결한다. 원질문/정상/challenge/기준/분기와 다른76개 정의 bytes·원PACK31 Ref를 보존한다. 판정은 모든축UNKNOWN, 정상 succeeded=null이며 전용 관측은 trials/events/associations/missing 및 authorization/scope false다. HTTP200·token bool·등록 함수 관측은 전체 정상·인가 증명이 아니다.
+기존 CLI select→run→judge→report→verify→반출/복원·저장팩 정확 Ref 재판정을 사용한다. `tools/build_kubernetes_native_route_pack.py --seed reference/pack-seeds/PACK-BASELINE-31 --output <새폴더>`는 PACK31의 REQ02 revision4/executor native_route/profile `kubernetes-native-route-observation-v1`만 명시 DRAFT로 연결한다. 원질문/정상/challenge/기준/분기와 다른76개 정의 bytes·원PACK31 Ref를 보존한다. 판정은 모든축UNKNOWN, 정상 succeeded=null이며 전용 관측은 trials/events/associations/missing 및 authorization/scope false다. HTTP200·token bool·등록 함수 관측은 전체 정상·인가 증명이 아니다.
 
 ```toml
 [executors]

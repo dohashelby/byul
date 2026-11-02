@@ -1,0 +1,143 @@
+id: REQ-01
+framework_id: CHK-REQ-001
+mechanism_ids:
+- mechanism-01
+revision: 8
+retired: false
+area: REQ
+purpose: 작업·대상 인가
+secondary_purposes: []
+question: Gateway를 거치지 않은 요청으로 허용받지 않은 작업을 할 수 없는가?
+scope: 기본
+risk_category: 보안 위협 점검
+risk_summary: 엔진 주소에 접근 가능한 호출자가 Gateway를 우회해 앞단에서 금지한 추론·관리 작업을 수행할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  all:
+  - fact: gateway
+    eq: true
+  prose: 엔진의 진입 경로를 항상 확인한다. Gateway 사용 시 경유·직통을 비교하고, 비사용 시 직접 진입점의 인증·인가·노출 제한을 확인한다.
+policy_params:
+- key: allowed_callers
+  type: list[str]
+  required: true
+policy_prose:
+  policy_to_decide: 직통 허용 주체·망 경계·역할 정책
+  enterprise_decisions: 인증 방식·실제 계정, 사용자/조직별 모델·작업 허용표, 직통 허용 주체·목적, 관리 역할, Gateway의 신원 전달·경로 변환과 선택 API. 저장 결과 기능을 쓰면 객체 소유자·조회·취소 권한도 결정한다.
+normal_control: 허용 신원이 실제 진입 경로에서 정상 추론한다. Gateway 사용 시 경유 요청을, 비사용 시 직접 진입점의 허용 요청을 정상 대조로 삼는다.
+challenge_steps:
+- 실제 route·listener와 허용/비허용 호출 위치·신원 목록 확보
+- Gateway 사용 시 경유·직통을, 비사용 시 직접 진입점의 무키·오키·허용키 요청과 노출 제한을 비교
+- 실제 handler의 실행·거부와 허용 요청의 정상 처리를 대조
+required_observations:
+- key: routes_registered
+  type: list[str]
+- key: routes_tested
+  type: list[str]
+- key: direct_outcomes
+  type: dict[str, int|outcome]
+- key: gateway_outcomes
+  type: dict[str, int]
+- key: trusted_origin_reachable
+  type: bool
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, pass|fail|no_response]
+required_observations_prose:
+- 요청을 보낸 위치, API 경로, 인증 적용 범위, 처리 함수의 실행·거부 기록
+satisfied_if: 비허용 주체의 작업은 수행되지 않고 허용 요청은 정상 처리된다.
+fail_criteria: 비허용 출발점이나 신원이 직통 경로에서 금지 작업을 실행한다.
+unknown_criteria: /v1만 확인했거나 /invocations 등 등록 경로·도달성·집행점을 확인하지 못했다.
+remediation: '- Gateway와 허용 호출자만 엔진에 접근하도록 배포망·수신 주소의 노출을 제한한다. 실제 열린 추론·관리 API 전체에서 경유·직통 경로의 작업 권한을 확인하고 우회 가능한 경로를 제한한다.'
+method_and_evidence: '실제 frontend·protocol·route·listener와 허용/비허용 출발점·신원을 목록화하고 동일 무해 작업의 수행·거부를 비교한다. Gateway 사용 시 경유·직통을, 비사용 시 직접 진입점의 인증·인가·노출 제한을 확인한다. 경로 재작성의 인증 입력–최종 handler 대응은 CHK-REQ-002와 공유 시험으로 연결한다. 【F39】일반 TCP의 실제 bind와 UDS·배포망·방화벽·Gateway를 확인한다. CORS 설정과 허용/비허용 Origin의 브라우저·비브라우저 호출은 실제 사용 경로에서 확인하며, CORS 선언만으로 직통 인가를 판정하지 않는다. 허용 앱·신원의 정상 추론과 비교한다. 근거 원문: [F39](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33565).'
+remaining_setup: 격리 endpoint와 허용표; OPTIONS 응답과 실제 작업 실행 구분
+executor: direct_route
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: routes_registered
+      op: nonempty
+    - obs: routes_tested
+      op: superset_of
+      value_obs: routes_registered
+    - obs: direct_outcomes
+      op: superset_of
+      value_obs: routes_registered
+    - obs: direct_outcomes
+      op: all_in
+      value:
+      - 401
+      - 403
+      - refused
+      - timeout
+      - unreachable
+    - obs: trusted_origin_reachable
+      op: eq
+      value: true
+      when:
+        obs: direct_outcomes
+        op: any_in
+        value:
+        - refused
+        - timeout
+        - unreachable
+    fail_when_any:
+    - obs: direct_outcomes
+      op: any_between
+      value:
+      - 200
+      - 299
+    - obs: direct_outcomes
+      op: any_in
+      value:
+      - handler_reached
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: nonempty
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        fail_when_any:
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
+legacy:
+  q_ids:
+  - Q-C01
+  - Q-C07
+  scenario_ids:
+  - SC-01-01
+  subtest_ids:
+  - Q-C01/SC-01-01
+source:
+  array: request_state_assessment_draft
+observation_notes:
+  direct_outcomes: '경로별 무키·오키 대표 직통 결과. (출발점·대상, 키) 조합의 TCP 연결 자체가 timeout/refused/unreachable이면 HTTP 없이 모든 등록 경로(상태 변경 포함)를 그 값으로 기록(basis: tcp_connect, 추론). 연결되면 비상태변경 경로만 HTTP.'
+  routes_tested: 모든 (대상, 비허용 키) 조합의 직통 결과가 있는 경로. 연결되는 위상에서 상태 변경 경로는 미시험.
+functional_probes:
+- method: POST
+  path: /v1/completions
+  body:
+    model: '{model}'
+    prompt: ping
+    max_tokens: 1
+  expect:
+  - 200
+  as_role: allowed
+functional_scope:
+  probed_obs: functional_probe_results
+  of_obs: routes_registered
+route_scope:
+  include_kinds:
+  - inference
+  - admin

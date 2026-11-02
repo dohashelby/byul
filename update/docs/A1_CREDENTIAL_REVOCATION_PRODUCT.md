@@ -1,6 +1,6 @@
 # PLT10 자격 철회 표본 제품 계약
 
-`credential_revocation:kubernetes` 0.1.0과 `kubernetes-credential-revocation-observation-v1`은 기존 CLI/증거/정확Ref 제품 경로의 한 부분이다. 원팩31 PLT10/SC19-01의 실제 issuer 철회·철회 전 정상·신규 접근/전파 기한·FAIL/UNKNOWN 기준과 다른76개 정의 bytes를 보존한다. `tools/build_kubernetes_credential_revocation_pack.py --seed packs/PACK-BASELINE --output <새 외부 폴더>`는 해당 점검만 명시 DRAFT로 연결한다.
+`credential_revocation:kubernetes` 0.1.0과 `kubernetes-credential-revocation-observation-v1`은 기존 CLI/증거/정확Ref 제품 경로의 한 부분이다. 원팩31 PLT10/SC19-01의 실제 issuer 철회·철회 전 정상·신규 접근/전파 기한·FAIL/UNKNOWN 기준과 다른76개 정의 bytes를 보존한다. `tools/build_kubernetes_credential_revocation_pack.py --seed reference/pack-seeds/PACK-BASELINE-31 --output <새 외부 폴더>`는 해당 점검만 명시 DRAFT로 연결한다.
 
 기존 native8을 명시 소비하며 새 sensor/hook/profile을 추가하지 않는다. `prepare-lifecycle-sensor --profile vllm-native-lifecycle-metadata/8 --output <새 외부 폴더>`를 재사용한다. native8~14와 A2/B 원본·과거팩/Ref의 bytes를 유지한다. 현재 지원은 lab=true/vLLM0.31·선정 engine/probe·직접 Pod HTTP·GET /v1/models다. source/image/lab/현재 PID-start 관문·native0.32 미지원은 그대로이며 일반 Gateway/TLS/다른 경로나 모든 issuer로 확대하지 않는다.
 

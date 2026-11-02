@@ -12,7 +12,7 @@
 
 기존 native8~15, OBS01 `/1`, A2/B 전용 bytes·B c9 기본 pin·외부 contracts·core/models/store/judges·루트 runtime을 보존한다. 기존 source/image/lab gate 위에서 lab=true/vLLM0.31/native8만 지원한다. native0.32, 다른 프로필과 실제 운영 생산자는 지원하지 않는다. 별도 Pod exec Python을 serving hook으로 취급하지 않으며 전자서명·감사 outbox·Gateway·새 의존성을 만들지 않는다.
 
-공통 준비는 기존 `guard prepare-lifecycle-sensor --output <새폴더> --profile vllm-native-lifecycle-metadata/8`이다. `tools/build_kubernetes_observation_identity_pack.py --seed packs/PACK-BASELINE --output <새팩>`이 PACK31 정확 Ref에서 `PACK-KUBERNETES-OBSERVATION-IDENTITY` revision1/OBS02 check7을 만든다. 원3분기·질문·정상/위반/미확인 기준과 다른76개 정의 bytes는 같다.
+공통 준비는 기존 `guard prepare-lifecycle-sensor --output <새폴더> --profile vllm-native-lifecycle-metadata/8`이다. `tools/build_kubernetes_observation_identity_pack.py --seed reference/pack-seeds/PACK-BASELINE-31 --output <새팩>`이 PACK31 정확 Ref에서 `PACK-KUBERNETES-OBSERVATION-IDENTITY` revision1/OBS02 check7을 만든다. 원3분기·질문·정상/위반/미확인 기준과 다른76개 정의 bytes는 같다.
 
 ```toml
 [executors]

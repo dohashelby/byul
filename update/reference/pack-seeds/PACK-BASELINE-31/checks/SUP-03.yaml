@@ -1,0 +1,95 @@
+id: SUP-03
+framework_id: CHK-SUP-003
+mechanism_ids:
+- mechanism-08
+revision: 5
+retired: false
+area: SUP
+purpose: 승인 대상·출처 식별
+secondary_purposes: []
+question: 기본 모델과 함께 읽는 설정·tokenizer·chat template, 하위 모델·추가 공급원의 파일도 승인 범위에 포함되는가?
+scope: null
+risk_category: 보안 위협 점검
+risk_summary: 공급자가 승인 목록 밖 하위 모델·tokenizer·설정을 끼워 넣어 실제 처리 내용이나 실행 코드를 바꿀 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  always: true
+  prose: 모델을 로딩하는 환경. 기본 config·tokenizer·template를 포함하고, secondary source·redirect·adapter는 실제 사용 시 추가한다.
+policy_params:
+- key: allowed_template_sha256
+  type: list[str]
+  required: true
+policy_prose:
+  policy_to_decide: null
+  enterprise_decisions: 모델·공급원·파일 목록·이미지 digest·패키지 판본·실제 TP 크기와 설정, 승인 식별 방식·역할·환경. 로컬 반입/직접 취득/마운트 중 실제 방식은 별도 선택한다.
+normal_control: 승인 목록에 포함된 config·tokenizer·template와 필요한 하위 모델로 정상 로딩한다.
+challenge_steps:
+- 실제 읽는 공급원 목록 확보
+- 하위 자료 하나를 승인 목록에서 뺀 시험 묶음 준비
+- 새 기동에서 그 자료의 선택·소비·차단 관측
+required_observations:
+- key: selected_template_sha256
+  type: str
+- key: template_identity_verified
+  type: bool
+- key: selected_template_approved
+  type: bool
+- key: input_projection_exact_match
+  type: bool
+- key: template_consumer_verified
+  type: bool
+- key: supply_scope_complete
+  type: bool
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, outcome]
+required_observations_prose:
+- resolved repo·commit·파일/redirect·secondary source 설정/승인 목록과 실제 읽기 대응
+satisfied_if: 모든 필수 소비 대상이 승인 목록과 연결되고 누락 대상은 사용 전에 처리된다.
+fail_criteria: 승인에 필요한 하위 자료가 목록에 없거나 다른 판본인데 실제로 사용된다.
+unknown_criteria: 하위 모델·resolver·redirect 활성 여부 또는 실제 소비 자료를 확인하지 못했다.
+remediation: '- 기본 모델이 함께 읽는 설정·tokenizer·chat template과 선택한 하위 모델·추가 공급원의 파일을 승인 목록에 포함한다. 실제 로딩 시 선택한 경로·버전을 목록과 대조한다.'
+method_and_evidence: '실제 소비하는 config·tokenizer·template·generation config와 하위·추가 공급원을 목록화하고 각 repo·불변 판본·파일을 승인 범위에 연결한다. 【F10】선택 MM processor·LoRA resolver의 실제 소비·다운로드 대상을 포함하고, 요청의 코드 판본 선택 제한은 CHK-SUP-008에서 판정한다. 【F11】Ultravox secondary·speculators_config 등 실제 선택된 하위/verifier 모델의 별도 repo·resolved commit·파일을 포함한다. 【F34】redirect가 실제 설정되면 유효 env·매핑 파일 digest·resolved model/tokenizer 경로를 같은 목록에 포함한다. 동일 표시명만으로 공급원을 식별하지 않는다. 근거 원문: [F10](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33662) · [F11](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33689) · [F34](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33778).'
+remaining_setup: 선정 모델과 의존성별 실제 읽기 계측; 선택 기능은 별도 fixture
+executor: template_validation
+judge:
+  plugin: rule_table
+  params:
+    declared_pass_ceiling: true
+    pass_when_all: []
+    fail_when_any: []
+    axes:
+      functional:
+        pass_when_all: []
+        fail_when_any: []
+legacy:
+  q_ids:
+  - Q-R05-02
+  scenario_ids:
+  - SC-10-02
+  subtest_ids:
+  - Q-R05-02/SC-10-02
+source:
+  array: supply_assessment_draft
+collection_profile: fixed-template-supply-v1
+functional_probes:
+- method: POST
+  path: /v1/chat/completions
+  body:
+    model: '{model}'
+    messages:
+    - role: user
+      content: guard template control
+    max_tokens: 1
+  expect:
+  - 200
+  via: engine
+limitations:
+- fixed-template-supply-v1은 관리 고정 template의 현재 bytes·소유권·readonly·기동 argv·전후 instance와 API 입력 projection만 수집하는 관측 전용 부분 연결이다. 전체 공급물 보안·기능 PASS/FAIL 판정 연결 완료가 아니다.
+- allowed_template_sha256는 SUP-03에 독립 입력하는 승인 해시 목록이다. 빈 목록은 명시적인 승인 template 없음이며 REQ-07·관측·ENV에서 보충하지 않는다. 승인 일치/불일치는 관측이고 승인 주체 인증이나 실제 소비의 증명이 아니다.
+- 정확한 /tokenize tokens와 추론 prompt_token_ids 일치는 동일 엔진이 보고한 API 입력 projection이다. worker 파일 open·기동 시 loaded bytes·template cache·전체 하위 공급물 소비를 독립 계측하지 못하므로 비승인 파일이 mount되어도 실제 소비 FAIL을 확정하지 않는다.
+- 원문의 실제 읽기 inventory·승인 제외 시험 묶음·새 기동 선택/소비/차단 challenge는 미실행이다. 정상 chat 표본 관측이 pass여도 전체 기능 PASS는 만들지 않는다. 독립적인 loader/worker 소비 수집원 연결은 후속 과제다.
+- 기존 REQ-07 수동 bounded 정책 계약은 SUP-03 수동 PASS를 지원하지 않는다. 수동 PASS는 보류되고 AUTOMATION_MANUAL_POLICY_UNRESOLVED 사유가 남으며 신고 FAIL/UNKNOWN은 보존한다. 불필요한 REQ-07 정책키를 SUP-03에 추가하지 않는다.
+- 검토된 fixed text-chat profile과 full pinned ENV/target 이미지·일치한 모델만 지원한다. bare SHA ENV나 미지원 template·image/model 충돌·identity 변화·token 개수만 일치·수집 실패는 UNKNOWN이다. 응답·토큰 원문과 host mount 경로는 증거 artifact에 저장하지 않는다.

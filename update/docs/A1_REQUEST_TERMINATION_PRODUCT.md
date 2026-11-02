@@ -22,7 +22,7 @@ prepared = "/owned/prepared/manifest.json"
 max_duration_seconds = 120
 ```
 
-`python -m tools.build_kubernetes_request_termination_pack --seed packs/PACK-BASELINE --output /owned/new-pack`
+`python -m tools.build_kubernetes_request_termination_pack --seed reference/pack-seeds/PACK-BASELINE-31 --output /owned/new-pack`
 은 exact PACK31에서 LIF10 연결만 바꾼 DRAFT 팩을 만든다. 기존 77개, 다른76개 정의 bytes,
 원래 질문·정상/위반/UNKNOWN 기준을 보존한다. POL.scope.include에 LIF-10을 선정하고
 아래6개 입력을 제공한다. 관측에서 기업 정책값을 생성하지 않는다.

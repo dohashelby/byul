@@ -1,0 +1,47 @@
+id: REQ-20
+framework_id: CHK-REQ-020
+mechanism_ids:
+- mechanism-05
+revision: 3
+retired: false
+area: REQ
+purpose: 실행 상태·버퍼 수명
+secondary_purposes: []
+question: CUDA Graph 재실행이 현재 입력을 쓰고 아직 읽는 출력 버퍼를 덮어쓰지 않는가?
+scope: 조건부
+risk_category: 보안 위협·일반 장애 함께 점검
+risk_summary: 호출자가 graph 재사용·동시 실행 조건을 유발할 때 입력 갱신·출력 수명 결함이 있다면 이전 요청 자료가 반환되거나 계산이 잘못될 수 있음.
+review_order: implementation_path_first
+impact: null
+applies_when:
+  prose: CUDA Graph의 실제 활성 여부와 runner/mode를 먼저 확인한다. 명시 활성 옵션 부재만으로 비사용을 판단하지 않는다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 지원 mode·정상 대조·출력 허용 차이
+  enterprise_decisions: 지원 GPU·runner·mode·shape/입력 범위, 정상 대조 방식·수치 오차·성능·장애 처리 기준과 실제 peer. 범위 밖 접근·타 요청 혼입·유출은 정책이나 허용 수치 오차로 완화할 수 없다.
+normal_control: capture 후 동일 shape의 새 입력을 넣으면 새 입력에 해당하는 결과가 나온다.
+challenge_steps:
+- capture 기준선
+- 같은 buffer에 다른 무해 입력을 넣고 replay
+- 연속 replay·출력 복사·완료 순서를 대조
+required_observations: []
+required_observations_prose:
+- capture key·주소/입력 갱신·출력 소비/stream event·대조 출력
+satisfied_if: 현재 replay의 입력과 유효 길이가 실제 계산에 반영되고, 유효 길이 밖이나 이전 요청의 상태를 소비하지 않으며, 출력 소비가 끝나기 전에 같은 버퍼를 덮어쓰거나 다른 replay의 결과로 바꾸지 않는다. 입력 갱신·copy/동기화·소비·재사용 순서를 증거로 확인한다. kernel 자체의 주소·인덱스 계산은 CHK-REQ-019, TP native 등록 참조는 CHK-REQ-021의 결과와 연결한다. 주소 일치 assert만으로 충족 처리하지 않는다.
+fail_criteria: 이전 입력·출력의 재사용 또는 소비 전 overwrite로 결과 귀속이 깨진다.
+unknown_criteria: replay 도달·copy 완료·동기화 순서를 관측하지 못했다.
+remediation: '- CUDA Graph 재실행 전에 현재 입력을 갱신하고, 연산·출력 사용·buffer 재사용의 동기화 순서를 지킨다. 실행 모드나 buffer가 바뀌면 graph 관리자의 재캡처·재사용 조건을 확인한다.'
+method_and_evidence: 입력 갱신→descriptor→capture/replay→출력 소비→재사용을 계측한다. 가변 길이·배치·취소 후 재사용을 eager 대조와 비교하고 입력/출력 결과를 따로 남긴다.
+remaining_setup: CUDA Graph 활성 조건과 buffer/stream 계측; 입력 갱신 누락·잘못된 참조·격리 위반을 실패 기준으로 관측
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C06
+  - Q-C02
+  scenario_ids:
+  - SC-06-02
+  subtest_ids:
+  - Q-C06/SC-06-02
+source:
+  array: request_state_assessment_draft

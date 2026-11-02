@@ -101,7 +101,7 @@ def verify_runtime_components(repo):
 
 def _scoped_check():
     repo = Path(__file__).resolve().parents[2]
-    original = CheckDef.model_validate(yaml.safe_load((repo / 'update/packs/PACK-BASELINE/checks/REQ-13.yaml').read_text()))
+    original = CheckDef.model_validate(yaml.safe_load((repo / 'update/reference/pack-seeds/PACK-BASELINE-31/checks/REQ-13.yaml').read_text()))
     raw = original.model_dump(mode='json')
     raw['executor'] = EXECUTOR
     # Same allowed_error_fields policy violation, represented by helper hashes.

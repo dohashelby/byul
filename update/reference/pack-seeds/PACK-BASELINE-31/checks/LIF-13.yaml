@@ -1,0 +1,48 @@
+id: LIF-13
+framework_id: CHK-LIF-013
+mechanism_ids:
+- mechanism-13
+revision: 4
+retired: false
+area: LIF
+purpose: 실행 상태·버퍼 수명
+secondary_purposes: []
+question: 공유 가중치 전체 해제 후 재취득·대체 공급과 기존 참조의 사용이 승인·접근·수명 기준을 지키는가?
+scope: 조건부; 공유 weights copy/zero-copy
+risk_category: 보안 위협 점검
+risk_summary: 해당 daemon에 release를 보낼 수 있는 소비자가 전체 해제를 유발해 다른 소비자의 취득·참조·서비스를 방해할 수 있음. 기존 참조 영향은 시험 필요.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: ipc_cache/preload 등 별도 weights daemon을 선택할 때 적용한다. 기본 TP 자체를 daemon 사용으로 간주하지 않는다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 소유·release·수명·실패 시 처리
+  enterprise_decisions: 요청별/그룹별 회수 대상·잔존 참조·강제 종료·중복 비용 처리. 공유 weights/profiler/retry는 기능 선택 후 별도 수명·종료 계약을 확인한다.
+normal_control: daemon을 사용하지 않는 기본 TP와 별개로 선택 환경의 정상 취득·release를 확인한다.
+challenge_steps:
+- 동일 daemon의 시험 소비자 둘이 취득
+- daemon 전체 release
+- 각 소비자의 다음 취득·fallback·기존 참조 관측
+required_observations: []
+required_observations_prose:
+- daemon rank·model 범위/release 응답/후속 취득·소비·native 참조
+satisfied_if: release가 허용된 주체·범위에서 수행되고, 다른 소비자의 후속 취득·fallback이 승인 조건을 지킨다. 사용 중 참조를 잘못 해제하거나 폐기 참조를 재사용하지 않는다.
+fail_criteria: 비허용 전역 release, 정책에 어긋나는 다른 소비자의 후속 취득·접근 실패, 승인 밖 fallback 소비 또는 참조 일관성 위반을 확인한다. native 참조 위반은 해당 효과의 별도 증거로 판정한다.
+unknown_criteria: release 응답만 있고 다른 소비자의 후속 취득·fallback 소비 또는 기존 native 참조 효과를 확인하지 못했다. 확인하지 못한 분기를 다른 분기의 정상 결과로 대신 판정하지 않는다.
+remediation: '- 별도 가중치 daemon을 사용하는 환경에서는 전체 release 권한과 허용 시점을 제한한다. 다른 사용 프로세스의 다음 취득·기존 참조 상태를 확인하고, fallback에는 승인한 공급물·접근 정책을 적용한다.'
+method_and_evidence: '선택한 별도 weights daemon에서 두 소비자의 정상 취득 후 전체 release 주체·범위·시점, 다른 소비자의 재취득/fallback, 기존 copy/zero-copy 참조를 같은 실행 계보로 추적한다. release 권한·후속 공급·기존 참조 수명의 세 필수 결과를 각각 남긴다. 【F05】기본 TP는 대상이 아니며 실제 daemon socket 신뢰·copy/zero_copy를 고정한다. copy 완료/실패 자동 release와 zero_copy 소비 중 release를 구분해 이후 요청·기존 CUDA IPC 참조·fallback을 관측한다. peer 접근은 CHK-PLT-002, 최종 payload 승인은 CHK-SUP-006, fallback reader는 CHK-SUP-012, 일반 작업/그룹 회수는 CHK-LIF-010·CHK-LIF-011과 관측을 공유하되 전체 release 전후 다른 소비자의 상태 전이를 이 행에서 판정한다. 근거 원문: [F05](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33637).'
+remaining_setup: 선택 daemon 환경과 native 계측; handle 단위 해제 가정 금지
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C13
+  - Q-C08
+  - Q-C12
+  scenario_ids:
+  - SC-16-04
+  subtest_ids:
+  - Q-C13/SC-16-04
+source:
+  array: lifecycle_assessment_draft

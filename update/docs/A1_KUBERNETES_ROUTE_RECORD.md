@@ -5,7 +5,7 @@ collection profile `kubernetes-owned-route-record-v1`는 기존 CLI의
 select→run→judge→report→verify→evidence export/restore를 사용한다.
 별도 CPU 제품이나 외부 관측 JSON import를 추가하지 않는다.
 
-`python -m tools.build_kubernetes_route_pack --seed packs/PACK-BASELINE --output /owned/new-pack`
+`python -m tools.build_kubernetes_route_pack --seed reference/pack-seeds/PACK-BASELINE-31 --output /owned/new-pack`
 으로 PACK31 exact Ref에서 DRAFT PACK-KUBERNETES-ROUTE-RECORD@1을 생성한다.
 77개 질문·판정 기준과 나머지76개 정의 bytes를 보존한다. POL.scope.include에 REQ-02를
 선택하고 다음 여섯 값을 명시한다.

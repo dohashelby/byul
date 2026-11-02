@@ -1,0 +1,88 @@
+# PACK-BASELINE 77개의 실행기 연결 설계. 사용자가 확정한 표이며 재분류하지 않는다.
+# executor: null은 기존 수동 경로를 유지한다.
+# executor: owner2는 담당 2 범위에서 이름을 확정하는 non-null 연결이다.
+new_executors: [supply_boot, record_access, engine_sensor, lifecycle_transition]
+checks:
+  # 이미 연결된 17개
+  SUP-03: template_validation
+  SUP-04: container_config
+  SUP-13: template_validation
+  REQ-01: direct_route
+  REQ-03: role_route
+  REQ-07: template_validation
+  REQ-09: input_validation
+  REQ-10: sampling_validation
+  REQ-11: request_binding
+  REQ-13: response_content
+  PLT-01: container_config
+  PLT-02: unix_ipc
+  PLT-04: credential_exposure
+  PLT-07: boundary_egress
+  PLT-08: api_transport
+  OBS-03: log_analysis
+  OBS-09: log_integrity
+  # 담당 1: 신규 실행기
+  LIF-01: supply_boot
+  LIF-02: supply_boot
+  PLT-03: supply_boot
+  PLT-05: supply_boot
+  SUP-05: supply_boot
+  SUP-06: supply_boot
+  SUP-07: supply_boot
+  SUP-09: supply_boot
+  SUP-10: supply_boot
+  SUP-11: supply_boot
+  SUP-12: supply_boot
+  SUP-15: supply_boot
+  SUP-16: supply_boot
+  OBS-06: record_access
+  # 담당 1: 기존 실행기 연결
+  PLT-10: credential_revocation
+  PLT-11: session_revocation
+  PLT-12: required_event_record
+  OBS-01: required_event_record
+  REQ-02: route_record
+  REQ-04: forwarded_identity
+  REQ-05: model_authorization
+  REQ-06: stored_responses
+  # 담당 1: 기존 실행기 확장
+  REQ-08: input_validation
+  SUP-08: input_validation
+  OBS-04: boundary_egress
+  OBS-05: boundary_egress
+  PLT-06: unix_ipc
+  PLT-09: api_transport
+  OBS-11: log_integrity
+  # 담당 2
+  LIF-13: engine_sensor
+  REQ-14: engine_sensor
+  REQ-15: engine_sensor
+  REQ-16: engine_sensor
+  REQ-17: engine_sensor
+  REQ-18: engine_sensor
+  REQ-19: engine_sensor
+  REQ-20: engine_sensor
+  REQ-21: engine_sensor
+  LIF-05: lifecycle_transition
+  LIF-06: lifecycle_transition
+  LIF-16: lifecycle_transition
+  LIF-03: owner2
+  LIF-04: owner2
+  LIF-07: owner2
+  LIF-08: owner2
+  LIF-09: owner2
+  LIF-10: owner2
+  LIF-11: owner2
+  LIF-12: owner2
+  LIF-14: owner2
+  REQ-12: owner2
+  OBS-02: owner2
+  # 제외 8개: 기존 수동 경로
+  SUP-01: null
+  SUP-02: null
+  SUP-14: null
+  LIF-15: null
+  OBS-07: null
+  OBS-08: null
+  OBS-10: null
+  OBS-12: null

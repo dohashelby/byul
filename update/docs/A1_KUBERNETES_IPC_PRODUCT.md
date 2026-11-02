@@ -23,7 +23,7 @@ max_duration_seconds = 30
 
 정확 ENV Ref·target canonical SHA·API model mapping·run/context·engine/probe namespace/Pod UID·containerID/imageID·restart/start를 기존 REQUEST_BINDING_PROFILE에서 확인한다. 환경 모델 repository/revision·inventory와 API 별칭은 기존 공통 모델 매핑을 그대로 사용한다. 전용 함수는 엄격한 envelope/source/program/policy/actor/경로 검사를 재사용한다. 보고된 CPython code SHA는 metadata이며 source/image/producer/실제 worker 인증으로 승격하지 않는다.
 
-`tools/build_kubernetes_unix_ipc_pack.py --seed packs/PACK-BASELINE --output <새폴더>`는 검토 PACK31 exact Ref에서 PLT02 revision6/collection profile만 연결하는 PACK-KUBERNETES-UNIX-IPC revision1 DRAFT를 만든다. 원질문·기준·두POL·고정 completion 정상표본·judge/독립FAIL·분기와 다른76개 정의 bytes를 보존한다. 기존 select→run→judge→report→verify→evidence export/restore→저장팩 정확 Ref 재판정을 쓴다. 별도 CPU registry·collector 복제·우회 importer는 없다.
+`tools/build_kubernetes_unix_ipc_pack.py --seed reference/pack-seeds/PACK-BASELINE-31 --output <새폴더>`는 검토 PACK31 exact Ref에서 PLT02 revision6/collection profile만 연결하는 PACK-KUBERNETES-UNIX-IPC revision1 DRAFT를 만든다. 원질문·기준·두POL·고정 completion 정상표본·judge/독립FAIL·분기와 다른76개 정의 bytes를 보존한다. 기존 select→run→judge→report→verify→evidence export/restore→저장팩 정확 Ref 재판정을 쓴다. 별도 CPU registry·collector 복제·우회 importer는 없다.
 
 선정 경로의 전후 socket inode/owner PID-start-UID, actor와 collector의 서로 다른 PID·namespace/boot/time-domain·UID/GID/groups/capability 및 peer/anchor가 갖춰진 연결만 `connection_verified`다. kernel 시도 없는 metadata 실패는 접속 거부가 아니다. 실제 groups·전후 packet/owner 조건은 A2 전용 소비가 판단하고 A1이 재작성하지 않는다.
 

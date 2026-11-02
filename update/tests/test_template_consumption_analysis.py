@@ -236,7 +236,7 @@ def test_diagnostic_tool_does_not_replace_product_observation_only_contract():
     import yaml
     from tools.analyze_template_consumption import ANALYSIS_SCHEMA
     root = Path(__file__).resolve().parents[1]
-    definition = yaml.safe_load((root / "packs/PACK-BASELINE/checks/SUP-03.yaml").read_text(encoding="utf-8"))
+    definition = yaml.safe_load((root / "reference/pack-seeds/PACK-BASELINE-31/checks/SUP-03.yaml").read_text(encoding="utf-8"))
     assert definition["judge"]["params"]["pass_when_all"] == definition["judge"]["params"]["fail_when_any"] == []
     assert definition["judge"]["params"]["axes"]["functional"] == {"pass_when_all": [], "fail_when_any": []}
     assert definition["collection_profile"] == "fixed-template-supply-v1"

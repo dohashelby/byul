@@ -22,7 +22,7 @@ max_duration_seconds = 30
 
 POL13은 기존11개 이름과 source_target_sha256/receiver_target_sha256 두 필수 str이다. container 신원은 전체 containerd://64hex이며 기존 Docker CID/POL11 형식을 변경하지 않는다. 정확 ENV Ref/source·receiver target/model mapping/run/context·양쪽 namespace/Pod/container/image/restart/start와 소유 receiver의 source command/PID-start/FD-listener/file prefix·device/inode·수신 상관/tuple/32bytes·정책과 operator 창을 원래 관문으로 검증한다. supplementary groups·source gate·parser를 변조하지 않는다.
 
-`tools/build_kubernetes_boundary_egress_pack.py --seed packs/PACK-BASELINE --output <새폴더>`는 검토 PACK31에서 PACK-KUBERNETES-BOUNDARY-EGRESS revision1 DRAFT와 PLT07 revision6/profile/POL2추가만 연결한다. 원래 질문·정상/challenge·5분기·functional_probes=[]·rule_table/보안 nonempty FAIL·다른76개 정의 bytes를 보존한다. 기존 select→run→EVD→RES→RPT→verify→반출/복원·저장팩 정확 Ref 재판정을 쓴다. 기존 boundary_egress:real도 유지한다. 공통 미등록 확인 시험은 이제 새 명시 factory와 기존 Docker factory를 함께 확인한다.
+`tools/build_kubernetes_boundary_egress_pack.py --seed reference/pack-seeds/PACK-BASELINE-31 --output <새폴더>`는 검토 PACK31에서 PACK-KUBERNETES-BOUNDARY-EGRESS revision1 DRAFT와 PLT07 revision6/profile/POL2추가만 연결한다. 원래 질문·정상/challenge·5분기·functional_probes=[]·rule_table/보안 nonempty FAIL·다른76개 정의 bytes를 보존한다. 기존 select→run→EVD→RES→RPT→verify→반출/복원·저장팩 정확 Ref 재판정을 쓴다. 기존 boundary_egress:real도 유지한다. 공통 미등록 확인 시험은 이제 새 명시 factory와 기존 Docker factory를 함께 확인한다.
 
 명시 금지 UID/netns TCP connect와 독립 receiver receipt의 필수 신원/양끝/상관/시각이 갖춰진 사건만 A2의 원래 forbidden_egress_successes·egress_trials로 소비해 security FAIL을 유지한다. ACK timeout/mismatch·최종 clock·후속 pipe/report/첨부/정리 오류가 이미 확인된 독립FAIL을 지우지 않는다. 누락·다른 귀속·교체/restart·필수근거 불일치·거부/timeout은 UNKNOWN이고 전체 차단 PASS가 아니다. normal attempted=false/succeeded=null, functional/performance UNKNOWN, egress_scope_complete=false다.
 

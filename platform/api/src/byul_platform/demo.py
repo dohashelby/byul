@@ -229,6 +229,7 @@ def native_payloads(g: Gen, records: list[dict[str, Any]], observations: list[di
         "last_error": None if kind == "hubble" else "observation writer heartbeat is stale (age 1100s)", "data_origin": "synthetic",
         "last_value": {"processed": n, "accepted": n - 2, "duplicates": 1, "rejected": 1,
                        "rejected_details": [{"line": 412, "reason": "$.flow.l4 is missing"}], "corrupt_lines_total": 1,
+                       "skipped_unsupported_total": 0,
                        "out_of_window": 0, "out_of_window_total": 3, "idle": False,
                        "writer": {"configured": True, "state": "running", "updated_at": iso(g.now - timedelta(seconds=3)),
                                   "reconnect_count": 2 if kind == "hubble" else 0,

@@ -114,6 +114,7 @@
                 "active": 1,
                 "limit": 64,
                 "rejected": 0,
+                "skipped_unsupported_total": 0,
                 "request_header_timeout_s": 5.0,
                 "request_body_timeout_s": 10.0
             },

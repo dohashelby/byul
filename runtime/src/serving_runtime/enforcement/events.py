@@ -21,6 +21,10 @@ class EventError(ValueError):
     """One source event is malformed or unsupported."""
 
 
+class UnsupportedTetragonEvent(EventError):
+    """A valid Tetragon envelope for an event this adapter does not analyze."""
+
+
 def _object(value: Any, path: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise EventError(f"{path} must be an object")
@@ -220,6 +224,18 @@ def _image_digest(process: Any) -> str | None:
     return match.group(0) if match else None
 
 
+def _matches_engine(event: dict[str, Any], intent: Any) -> bool:
+    process = event.get("process")
+    pod = process.get("pod") if isinstance(process, dict) else None
+    labels = pod.get("pod_labels") if isinstance(pod, dict) else None
+    return (
+        isinstance(pod, dict)
+        and pod.get("namespace") == intent.namespace
+        and isinstance(labels, dict)
+        and all(labels.get(key) == value for key, value in intent.engine.labels.items())
+    )
+
+
 def parse_tetragon(
     document: Any,
     *,
@@ -231,11 +247,13 @@ def parse_tetragon(
 ) -> dict[str, Any]:
     root = _object(document, "$")
     observed_at = _event_time(root)
-    event_names = [name for name in ("process_exec", "process_kprobe") if name in root]
+    event_names = [name for name in root if name.startswith("process_")]
     if len(event_names) != 1:
-        raise EventError("event must contain exactly one supported Tetragon event")
+        raise EventError("event must contain exactly one process_* Tetragon event")
     event_name = event_names[0]
     event = _object(root[event_name], f"$.{event_name}")
+    if event_name not in {"process_exec", "process_kprobe"}:
+        raise UnsupportedTetragonEvent(f"unsupported Tetragon event: {event_name}")
     if event_name == "process_exec":
         binary, pod = _process(event, "$.process_exec", require_binary=True)
         assert binary is not None
@@ -260,10 +278,16 @@ def parse_tetragon(
                 "action": "observed",
                 "action_raw": "observed",
                 "action_mode": "monitor",
-                "allowed_binary": binary in allowlist if allowlist else None,
+                "allowed_binary": (
+                    binary in allowlist
+                    if allowlist and (exec_policy is None or _matches_engine(event, exec_policy.intent))
+                    else None
+                ),
             }
         )
-        if exec_policy is not None:
+        # Suspect paths are suspicious in every Pod. Engine phases, exceptions,
+        # and the engine cache root require positive selector attribution.
+        if exec_policy is not None and _matches_engine(event, exec_policy.intent):
             parent = event.get("parent")
             parent_binary = (
                 parent.get("binary")
@@ -278,12 +302,19 @@ def parse_tetragon(
                     observed_at=observed_at,
                 )
             )
+        elif exec_policy is not None and binary in exec_policy.intent.suspect_binaries:
+            parent = event.get("parent")
+            parent_binary = parent.get("binary") if isinstance(parent, dict) else None
+            normalized.update(exec_policy.classify_suspect(
+                binary, parent=parent_binary if isinstance(parent_binary, str) and parent_binary else None,
+                image=_image_digest(event.get("process")),
+            ))
         return normalized
 
     binary, pod = _process(event, "$.process_kprobe", require_binary=False)
     function_name = _string(event.get("function_name"), "$.process_kprobe.function_name")
     if function_name != "security_file_permission":
-        raise EventError(f"unsupported kprobe function: {function_name}")
+        raise UnsupportedTetragonEvent(f"unsupported kprobe function: {function_name}")
     policy_name = _string(event.get("policy_name"), "$.process_kprobe.policy_name")
     match = _RULE_ID.search(policy_name)
     if match is None:
@@ -408,6 +439,8 @@ def transform_lines_with_loss(
                     run_id=run_id,
                     exec_policy=exec_policy,
                 )
+        except UnsupportedTetragonEvent:
+            continue
         except (json.JSONDecodeError, EventError, RecursionError) as error:
             rejected.append({"line": line_number, "reason": str(error)})
             continue

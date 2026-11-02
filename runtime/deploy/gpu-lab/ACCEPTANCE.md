@@ -1,6 +1,6 @@
 # AWS GPU lab runtime 인수 절차
 
-이 절차는 AWS 묶음 위에 runtime 배포를 올린 뒤 “첫 완료 기준” 8가지를 한 번의 GPU 가동 구간에서 확인한다. `tools/k8s_lab_check.py`는 fake engine과 시험 정책을 생성·삭제하는 kind 전용 도구이므로 이 환경에서 사용하지 않는다. 아래 도구는 정책을 적용·변경·삭제하지 않으며, 두 opt-in 사례 외에는 배포 상태를 바꾸지 않는다.
+이 절차는 AWS 묶음 위에 runtime 배포를 올린 뒤 기존 “첫 완료 기준” 8가지와 추가 준비 사례 AWS-09~11을 확인한다. 기존 AWS-01~08 결과는 다시 판정하지 않는다. `tools/k8s_lab_check.py`는 fake engine과 시험 정책을 생성·삭제하는 kind 전용 도구이므로 이 환경에서 사용하지 않는다. 아래 도구는 정책을 적용·변경·삭제하지 않으며, 두 opt-in 사례 외에는 배포 상태를 바꾸지 않는다.
 
 ## 준비
 
@@ -82,7 +82,24 @@ dev 결과와 수정 사항을 확인한 뒤 AWS 묶음 `COST-PLAN.md` 절차로
   --allow-engine-restart
 ```
 
-`--cases`를 생략하면 AWS-01~08을 순서대로 실행하지만 opt-in flag가 없는 AWS-07·08은 `not_run`이다. `not_run`과 `unknown`은 통과로 세지 않으며, 요청한 모든 사례가 `passed`일 때만 overall이 `passed`다.
+`--cases`를 생략하면 AWS-01~11을 순서대로 실행하지만 opt-in flag가 없는 AWS-07·08은 `not_run`이다. `not_run`과 `unknown`은 통과로 세지 않으며, 요청한 모든 사례가 `passed`일 때만 overall이 `passed`다.
+
+AWS-09~11은 새 intent를 포함한 정책 묶음을 다시 작성하고 TG-SECRET-01 후보를 재적용한 뒤 엔진을 재시작한 환경에서만 실행한다. 파일 ConfigMap과 마운트 patch도 먼저 적용해야 한다. AWS-11을 선택할 때 AWS-09·10도 함께 선택한다. 도구는 AWS-09·10 직전에 일반 요청·stream·`/cache` 쓰기 대조를 수행하고 두 탐지 시험 뒤 같은 대조를 반복한다. 응답 시간은 참고값이며 판정에 쓰지 않는다. 탐지 시간도 기준 없이 판정하지 않는다.
+
+Gateway 관측 조회는 최근 50행만 반환한다. AWS-11 구간이 이 범위를 넘으면 잘못된 경고 0건을 입증할 수 없어 `unknown`으로 둔다. 단계가 유효한 실행이 구간에 하나도 없거나 모두 `phase_unknown`이면 경고 0건이어도 `unknown`이다. 보고서에는 시간표 신선도·쓰기 시각·단계 출처와 유효/미확인 실행 수를 남긴다. 의도한 shell 시험은 잘못된 경고에서 제외하며 AWS-09 근거는 엔진 Pod 기록으로 한정한다.
+
+### 단계 연결 후 서버 시험 순서
+
+**1차 관찰 → 허용 목록 작성 → 2차 판정** 순서를 지킨다. 1차 관찰에서는 현재 엔진 Pod UID와 로그 시간표 상태·표지 일치 건수, 단계 경계, Tetragon 실행 경로를 수집한다. `tools/aws_lab_acceptance.py inventory --tetragon <tetragon.jsonl> --timeline <phase-timeline.json>`는 읽기 전용으로 단계·Pod·경로별 건수만 출력하고 판정에 쓰지 않는다. 시간표와 Tetragon의 Pod UID 또는 정확한 Pod 이름이 다르면 단계는 `unknown`이다. 단계 전용 실행과 반복 정상 경로의 출처를 검토한 뒤 `allowed_engine_binaries`·`phase_binaries` 변경안을 만든다. **이번 로컬 변경에는 허용 목록 확장을 넣지 않았다.** 변경안을 서버에 적용하고 2차에서 AWS-09~11을 판정한다. 시간표만 먼저 활성화하면 기존 관측 재생 기준 정상 실행 다수가 `outside_allowlist`가 될 수 있다.
+
+현재 `phase_signals.py`는 vLLM CPU 로그 발췌의 표지를 사용한다. 저장된 GPU 관련 로그 파일 5개 중 2개에서 각각 5건이 일치했지만 GPU 전용 컴파일 경계와 전체 패턴은 서버에서 검증 전이다. 실제 단계가 잡히지 않으면 허용 목록을 추측하거나 AWS-11을 통과시키지 않는다. 시간표는 호스트 수집기의 별도 스레드가 현재 Pod 로그로 생성하고 Gateway는 읽기 전용 관측 마운트에서 읽는다. Pod가 없거나 여럿, 로그 실패·역순, 수집 중단 후 쓰기 시각 15초 만료는 단계 `unknown`이며 이것만으로 일반 요청을 막지 않는다. `engine_signal`은 신뢰 입력이 아니므로 단계 전용 예외·허용은 `phase_signal_unverified`가 될 수 있다.
+
+```bash
+.venv/bin/python -B tools/aws_lab_acceptance.py \
+  --kube-context byul-aws-lab \
+  --token-env-file ~/runtime-acceptance.env \
+  --cases AWS-09,AWS-10,AWS-11
+```
 
 ## 사례와 증거
 
@@ -96,6 +113,9 @@ dev 결과와 수정 사항을 확인한 뒤 AWS 묶음 `COST-PLAN.md` 절차로
 | AWS-06 RO 쓰기 거부 | 비파괴 | `/models` 쓰기가 `EROFS`, `/cache` 임시 파일 쓰기·자체 삭제 성공 | exec errno·이름과 TG-ASSET-01/TG-CACHE-01 관측. `EPERM`·`EACCES`는 `unknown` | RT-SYS-03, RT-ASSET-02, RT-ASSET-05 |
 | AWS-07 수집 중단 | 변경(opt-in) | collector stop 뒤 두 heartbeat `stopped`와 Gateway collector non-ok, stale 창 15초+여유 뒤 정상 chat 200·대상 미확인, restart 뒤 collector 및 대상 상태 ok와 정상 chat 회복 | heartbeat, `/api/collectors`, `/api/target`, 중지 구간·복구 요청 record·재시도 timing. gap은 보조 | RT-OBS-01, RT-SYS-06 |
 | AWS-08 Pod 교체 | 변경(opt-in) | rollout 뒤 Pod UID·Gateway instance 변경, restart 이후 `engine_info` ok 뒤 유한 창 안 정상 chat 회복 | host 신원, target 이력, engine_info, 재시도 횟수·경과·마지막 status/reason | RT-NET-04, RT-PHASE-01 |
+| AWS-09 실행 탐지 | 비파괴 | 엔진에서 `/bin/sh -c true`와 PATH 탐색 `sh -c true`를 실행. 절대 경로 실행이 엔진 Pod에 귀속되고 `suspect_binary` | 실행 시작 이후의 엔진 Pod·실행 경로·시각·판정. 다른 Pod의 같은 경로는 제외. 인자는 기록되지 않음 | RT-SYS-01, RT-SYS-02 |
+| AWS-10 보호 파일 읽기 | 비파괴 | 엔진 Python이 가짜 파일을 읽고 TG-SECRET-01이 동일 경로·엔진 Pod·read·monitor를 기록 | 파일 내용은 보고하지 않음. 읽기 차단은 기준 아님 | RT-SYS-05 |
+| AWS-11 정상 동작 대조 | 비파괴 | AWS-09·10 전후 일반·stream 요청과 `/cache` 쓰기가 정상이며 cache 세대 current·비정상 분류 없음, 잘못된 경고 0건 | 구간 내 `outside_allowlist`·`phase_signal_unverified`·`exec_from_cache` 목록과 건수, 응답·탐지 시간. 의도한 shell probe는 잘못된 경고에서 제외 | RT-API-01, RT-SYS-02, RT-ASSET-05 |
 
 AWS-04·05는 `connect_ex`가 반환한 errno와 이름을 기록한다. `EAGAIN`/`EWOULDBLOCK`/`ETIMEDOUT`만 차단 후보로 보고, `ECONNREFUSED` 등 다른 실패나 DNS 예외는 정책 차단 근거가 아니므로 `unknown`이다. AWS-04는 Gateway 이미지가 Python 기반이고 컨테이너 이름이 `gateway`임을 전제로 직통 probe 직전·직후 Gateway Pod 안에서 engine:8000 연결 성공을 확인한다. exec가 불가능하면 `unknown`이다. AWS-05는 팀 소유 `test-receiver` Pod IP만 대상으로 하며, `other-client`가 같은 receiver에 연결하지 못하면 `대조 실패: receiver에 닿지 않음`으로 `unknown`이다. 두 사례 모두 정확한 대상 흐름의 Hubble verdict가 `dropped`여야 하며 `DROPPED` 단독으로는 통과하지 않는다.
 

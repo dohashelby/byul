@@ -264,7 +264,7 @@ class EventAdapterTests(unittest.TestCase):
             data_origin="real",
         )
         self.assertEqual(accepted, [])
-        self.assertEqual([item["line"] for item in rejected], [1, 2])
+        self.assertEqual([item["line"] for item in rejected], [1])
         self.assertNotIn("not-json", json.dumps(rejected))
 
     def test_kprobe_without_binary_or_pod_marks_attribution_unavailable(self) -> None:

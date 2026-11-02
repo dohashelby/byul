@@ -15,10 +15,36 @@ from serving_runtime.cli import main
 from serving_runtime.mvp.config import MVPConfig
 from serving_runtime.mvp.mock_engine import MockEngine
 from serving_runtime.mvp.policy import load_policy
+from serving_runtime.enforcement.execpolicy import ExecPolicy
+from serving_runtime.enforcement.intent import load_intent
 
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_POLICY = ROOT / "examples/mvp/policy.json"
+INTENT = ROOT / "examples/enforcement/intent-v1.1.example.json"
+
+
+def stale_timeline(path: Path) -> None:
+    path.write_text(json.dumps({
+        "schema_version": "runtime-phase-timeline/1.0", "entries": [],
+        "collector": {"state": "running", "pod_uid": "old", "pod_name": "old-engine",
+                      "written_at": "2026-01-01T00:00:00Z", "last_log_at": None,
+                      "log_delivery_lag_seconds": None},
+    }), encoding="utf-8")
+
+
+class StaleTimelineDecisionTests(unittest.TestCase):
+    def test_stale_timeline_has_unknown_phase_without_socket(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            timeline = Path(directory) / "phase-timeline.json"
+            stale_timeline(timeline)
+            verdict = ExecPolicy(load_intent(INTENT), timeline_path=timeline).classify_exec(
+                binary="/usr/bin/uname", parent=None, image=None,
+                observed_at="2026-11-02T10:00:00Z",
+            )
+            self.assertEqual(verdict["exec_verdict"], "phase_unknown")
+            self.assertIs(verdict["phase_timeline_fresh"], False)
+            self.assertEqual(verdict["phase_source_error"], "stale")
 
 
 class GatewayAppTests(unittest.TestCase):
@@ -57,6 +83,28 @@ class GatewayAppTests(unittest.TestCase):
         self.assertTrue(status["record_store"]["ok"])
         self.assertEqual(status["record_store"]["data_dir"], self.temporary.name)
         self.assertEqual(len(status["observation_session_id"]), 32)
+
+    def test_stale_observation_timeline_does_not_block_chat(self) -> None:
+        timeline = Path(self.temporary.name) / "phase-timeline.json"
+        stale_timeline(timeline)
+        feed = Path(self.temporary.name) / "tetragon.jsonl"
+        feed.touch()
+        config = MVPConfig(
+            gateway_port=0, engine_port=0, policy_path=str(EXAMPLE_POLICY),
+            data_dir=str(Path(self.temporary.name) / "with-timeline"),
+            observation_feeds=(("tetragon", str(feed)),),
+            observation_intent_path=str(INTENT),
+            observation_timeline_path=str(timeline),
+        )
+        gateway = GatewayApp(config, load_policy(EXAMPLE_POLICY), self.engine.address).start()
+        self.addCleanup(gateway.stop)
+        host, port = gateway.address
+        request = Request(f"http://{host}:{port}/v1/chat/completions",
+                          data=json.dumps({"model": "test-model", "messages": [{"role": "user", "content": "hello"}],
+                                           "max_tokens": 4}).encode(),
+                          headers={"Content-Type": "application/json"}, method="POST")
+        with closing(urlopen(request, timeout=3)) as response:
+            self.assertEqual(response.status, 200)
 
     def test_gateway_serves_no_dashboard(self) -> None:
         # 화면은 byul platform이 맡는다. Gateway는 조회 API(JSON)만 낸다.

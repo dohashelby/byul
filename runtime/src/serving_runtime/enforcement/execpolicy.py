@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -171,13 +172,29 @@ def parse_exceptions(document: Any) -> tuple[ExecException, ...]:
 
 
 def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
-    allowed_root = {"schema_version", "target_ref", "entries", "extraction"}
+    allowed_root = {"schema_version", "target_ref", "entries", "extraction", "collector"}
     if not isinstance(document, dict) or set(document) - allowed_root:
         raise IntentError(
             "timeline must contain only schema_version, target_ref, entries, extraction"
         )
     if document.get("schema_version") != TIMELINE_SCHEMA:
         raise IntentError(f"schema_version must be {TIMELINE_SCHEMA}")
+    collector = document.get("collector")
+    if collector is not None:
+        if not isinstance(collector, dict) or set(collector) != {
+            "state", "pod_uid", "pod_name", "written_at", "last_log_at", "log_delivery_lag_seconds"
+        } or collector["state"] not in {"running", "no_target", "multiple_targets", "pod_error", "log_error", "incomplete_history", "stopped"}:
+            raise IntentError("timeline.collector is invalid")
+        _time(collector["written_at"], "timeline.collector.written_at")
+        if collector["last_log_at"] is not None:
+            _time(collector["last_log_at"], "timeline.collector.last_log_at")
+        if collector["pod_uid"] is not None and (not isinstance(collector["pod_uid"], str) or not collector["pod_uid"]):
+            raise IntentError("timeline.collector.pod_uid is invalid")
+        if collector["pod_name"] is not None and (not isinstance(collector["pod_name"], str) or not collector["pod_name"]):
+            raise IntentError("timeline.collector.pod_name is invalid")
+        lag = collector["log_delivery_lag_seconds"]
+        if lag is not None and (isinstance(lag, bool) or not isinstance(lag, (int, float)) or not math.isfinite(lag)):
+            raise IntentError("timeline.collector.log_delivery_lag_seconds is invalid")
     extraction = document.get("extraction")
     if extraction is not None:
         extraction_fields = {
@@ -187,6 +204,7 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
         }
         optional_extraction_fields = {
             "follow", "collector_state", "clock_sources", "health_probe",
+            "skipped_lines", "history_incomplete",
         }
         if (
             not isinstance(extraction, dict)
@@ -240,6 +258,15 @@ def parse_timeline(document: Any) -> tuple[PhaseEntry, ...]:
             values = extraction[name]
             if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
                 raise IntentError(f"timeline.extraction.{name} must be a string array")
+        skipped = extraction.get("skipped_lines")
+        if skipped is not None and (not isinstance(skipped, dict) or any(
+            not isinstance(name, str) or not name or isinstance(count, bool)
+            or not isinstance(count, int) or count < 0
+            for name, count in skipped.items()
+        )):
+            raise IntentError("timeline.extraction.skipped_lines is invalid")
+        if "history_incomplete" in extraction and not isinstance(extraction["history_incomplete"], bool):
+            raise IntentError("timeline.extraction.history_incomplete is invalid")
         follow = extraction.get("follow")
         if follow is not None:
             follow_fields = {
@@ -348,25 +375,29 @@ class _ReloadingFile:
     def __init__(self, path: str | Path | None, parser) -> None:
         self.path = Path(path) if path is not None else None
         self.parser = parser
-        self._signature: tuple[int, int] | None = None
+        self._signature: tuple[int, int, int] | None = None
         self.value: tuple = ()
         self.error: str | None = None
+        self.collector: dict[str, Any] | None = None
 
     def get(self) -> tuple:
         if self.path is None:
             return ()
         try:
             info = os.stat(self.path)
-            signature = (info.st_mtime_ns, info.st_size)
+            signature = (info.st_ino, info.st_mtime_ns, info.st_size)
         except OSError as error:
-            self.value, self.error, self._signature = (), f"{type(error).__name__}", None
+            self.value, self.error, self._signature, self.collector = (), f"{type(error).__name__}", None, None
             return ()
         if signature != self._signature:
             try:
-                self.value, self.error = self.parser(_read(self.path)), None
+                document = _read(self.path)
+                self.value, self.error = self.parser(document), None
+                self.collector = document.get("collector") if isinstance(document, dict) else None
             except IntentError as error:
                 # A broken file yields no exceptions and no phases: fail toward alerts.
                 self.value, self.error = (), str(error)
+                self.collector = None
             self._signature = signature
         return self.value
 
@@ -384,10 +415,27 @@ class ExecPolicy:
         self._timeline = _ReloadingFile(timeline_path, parse_timeline)
         self._lock = threading.Lock()
 
+    def classify_suspect(self, binary: str, *, parent: str | None = None,
+                         image: str | None = None) -> dict[str, Any]:
+        """Classify an intent suspect without assigning an engine phase to its Pod."""
+        if binary not in self.intent.suspect_binaries:
+            raise ValueError("binary is not a suspect path")
+        return {
+            "phase": ["unknown"], "phase_basis": [], "phase_trusted": [],
+            "phase_source_error": None, "exec_verdict": "suspect_binary",
+            "exception_id": None, "exception_kind": None, "exception_candidate_id": None,
+            "binary_location": "other",
+            "parent_attribution": "available" if parent else "unavailable",
+            "image_digest": image, "rule_refs": ["SP3-EXEC"],
+        }
+
     def status(self) -> dict[str, Any]:
         with self._lock:
             exceptions = self._exceptions.get()
             timeline = self._timeline.get()
+            collector = self._timeline.collector
+            stale = self._collector_stale(collector)
+            unavailable = collector is not None and collector["state"] != "running"
             return {
                 "exceptions": {
                     "path": str(self._exceptions.path) if self._exceptions.path else None,
@@ -396,8 +444,9 @@ class ExecPolicy:
                 },
                 "timeline": {
                     "path": str(self._timeline.path) if self._timeline.path else None,
-                    "entries": len(timeline),
-                    "error": self._timeline.error,
+                    "entries": 0 if stale or unavailable else len(timeline),
+                    "error": "stale" if stale else collector["state"] if unavailable else self._timeline.error,
+                    "collector": collector,
                 },
             }
 
@@ -421,6 +470,11 @@ class ExecPolicy:
             timeline = self._timeline.get()
             exceptions = self._exceptions.get()
             timeline_error = self._timeline.error
+            collector = self._timeline.collector
+        if self._collector_stale(collector):
+            timeline, timeline_error = (), "stale"
+        elif collector is not None and collector["state"] != "running":
+            timeline, timeline_error = (), collector["state"]
         entries = [entry for entry in timeline if at is not None and entry.active(at)]
         active = sorted({entry.phase for entry in entries})
         bases = sorted({entry.basis for entry in entries})
@@ -479,6 +533,8 @@ class ExecPolicy:
             "phase_basis": bases,
             "phase_trusted": trusted,
             "phase_source_error": timeline_error,
+            "phase_timeline_written_at": collector["written_at"] if collector is not None else None,
+            "phase_timeline_fresh": None if collector is None else timeline_error is None,
             "exec_verdict": verdict,
             "exception_id": matched.exception_id if matched else None,
             "exception_kind": matched.kind if matched else None,
@@ -488,6 +544,13 @@ class ExecPolicy:
             "image_digest": image,
             "rule_refs": rule_refs,
         }
+
+    @staticmethod
+    def _collector_stale(collector: dict[str, Any] | None) -> bool:
+        if collector is None:
+            return False  # legacy timelines have no heartbeat contract
+        age = (datetime.now().astimezone() - _time(collector["written_at"], "written_at")).total_seconds()
+        return age < -5 or age >= 15
 
     def classify_cache_write(self, path: str) -> dict[str, Any]:
         assets = self.intent.assets

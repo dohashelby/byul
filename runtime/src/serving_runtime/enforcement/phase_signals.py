@@ -101,7 +101,8 @@ _LOG_TIME = re.compile(
     r"(?<!\d)(?P<month>0[1-9]|1[0-2])-(?P<day>0[1-9]|[12]\d|3[01]) "
     r"(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d):(?P<second>[0-5]\d)(?!\d)"
 )
-_REQUEST_LINE = re.compile(r"request_logger|SamplingParams|(?:^|[\s,])prompt\s*[:=]", re.IGNORECASE)
+_REQUEST_LINE = re.compile(r"request_logger|Received request|SamplingParams|(?:^|[\s,])prompt\s*[:=]", re.IGNORECASE)
+_KUBECTL_TIME = re.compile(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d))\s")
 
 
 def parse_timezone(value: str) -> tzinfo:
@@ -125,6 +126,11 @@ def parse_timezone(value: str) -> tzinfo:
 
 
 def _line_time(line: str, *, year: int, zone: tzinfo) -> datetime | None:
+    # kubectl logs --timestamps supplies an absolute RFC3339 time. It wins
+    # over the engine's yearless, timezone-free MM-DD HH:MM:SS prefix.
+    outer = _KUBECTL_TIME.match(line)
+    if outer is not None:
+        return datetime.fromisoformat(outer.group(1).replace("Z", "+00:00"))
     match = _LOG_TIME.search(line)
     if match is None:
         return None

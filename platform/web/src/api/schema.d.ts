@@ -1744,6 +1744,7 @@ export interface components {
             rejected: number;
             rejected_details: components["schemas"]["RuntimeStatus_line_issue"][];
             corrupt_lines_total: number;
+            skipped_unsupported_total: number;
             out_of_window: number;
             out_of_window_total: number;
             idle: boolean;

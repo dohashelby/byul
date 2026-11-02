@@ -4,6 +4,7 @@
 
 ## 현재 단계
 
+- **2026-11-02 단계 연결 로컬 구현(서버 미적용).** 기준 `34f6395`, 기존 2단계 미커밋 변경 유지. 의심 경로 판정을 모든 Pod에 복원하고, 엔진 selector의 단계·허용·예외·캐시 범위는 유지했다. 호스트 수집기가 현재 엔진 Pod UID의 `kubectl logs --timestamps`를 재생해 시간표를 원자 교체하고 Gateway가 읽는다. 수집 실패/Pod 모호/15초 stale은 `phase_unknown`이며 요청 차단 원인이 아니다. AWS-11은 유효 단계 실행이 없으면 `unknown`이다. 허용 목록은 넓히지 않았다. 저장 로그 5개 중 2개에서 기존 표지 각 5건 일치했으나 GPU 전체 패턴은 미검증. 저장 Tetragon 재생은 exec 309건(엔진 `phase_unknown` 272, 기타 판정 없음 37). 검수 지적(샌드박스에서 skip되어 드러나지 않은 시험 오류, 잘못된 바이트·로그 8 MiB 초과 시 단계 수집 중단)을 Codex가 수정하던 중 사용 한도로 멈춰, 시험 실행과 이 기록은 Claude가 이어서 했다(마지막 수정분 **Codex 교차 검수 전**). 수집 방식은 `--since-time` 증분 조회로 바뀌었다. 샌드박스 밖 runtime 557건 통과, platform API 93건(update 시험 파일 2개 제외), web 57건·타입 검사·Kustomize·diff 검사 통과. 합성 재현: `Received request` 줄의 표지는 무시되지만, 그런 표시 없이 표지 문구가 들어간 줄은 단계 신호로 인식된다. `engine_signal`은 신뢰 입력이 아니며 실제 요청 로그 형식은 서버에서 확인한다. 실제 서버 적용·1차 단계별 실행 관찰·허용 목록 검토·2차 판정이 남아 있다.
 - **2026-11-02 Claude 검수 3건 반영(로컬).** host Pod의 마지막 확인 시각을 파일 재조회 시각 대신 `collected_at`으로 맞추고, 요청 기록의 대상 판단에서 이력 파일 전체 읽기를 제거했다. Gateway 재시작 뒤 새 스냅샷 대기 중 약 10초 503 가능성과 지속 시 중단 조건을 배포 절차·안내에 추가했다. AWS는 켜지 않았고 기존 미커밋 변경은 유지했다.
 - runtime 전체 unittest 539건 중 428건 통과·111건 skip, 실패 0건. platform API 관련 60건 통과(소켓 환경에서 멈춘 TestClient 4건 제외), web 관련 8건 통과. Gateway 실제 재시작과 AWS 재시험은 미확인이다.
 - **2026-11-02 로컬 수정, AWS 재시험 전.** 수집기 중단 후 직전 Pod·엔진 정보가 정상이면 요청 처리와 대상 미확인·마지막 확인 시각을 표시하고, 초기 미확인·확인된 불일치·잘못된 스냅샷은 503을 유지하도록 수정했다. 정책 묶음의 `policy_ref` ID·판본 대조, AWS-07의 stale 이후 200·미확인 및 복구 후 ok 판정, platform 경고·계약·수동 적용 절차도 갱신했다. AWS는 켜지 않았고 새 동작을 AWS에 쓰기 전 Gateway 이미지 재빌드와 재시험이 필요하다. 수집 중 같은 판본 Pod 교체는 복구까지 확인할 수 없으며 Gateway 재시작 뒤에는 이전 정상 확인을 사용할 수 없다.
@@ -264,3 +265,11 @@
 
 - 다음 실행의 `report.md`에 시험별 실제 값·미확인 필수 항목·한국어 판정 기준과 한계를 표시하도록 수정했다. `report.json` 필드와 판정 로직은 유지하며 기존 보고서와 AWS 서버는 건드리지 않았다.
 - 전용 unittest 37건 통과, 전체 542건 중 111건 환경상 skip·실패 0, `git diff --check` 통과. 합성 예시는 저장소 밖 임시 폴더에 만들었으며 실제 AWS 재실행은 하지 않았다.
+
+## 2026-11-02 AWS GPU 추가 시험 준비 (기준 34f6395, 미커밋)
+
+- Tetragon 미지원 `process_*` 이벤트를 손상과 분리해 `skipped_unsupported_total`로 누적한다. 기존 checkpoint의 손상 255는 수정하지 않는다. platform 상태 계약·예시·API·화면에 새 필드를 연결했다.
+- AWS-09~11의 실행 코드·보고 기준과 가짜 보호 파일 ConfigMap/엔진 읽기 전용 patch, intent 의심 경로·보호 경로를 준비했다. `enforce render`의 TG-SECRET-01 후보 경로 일치와 `kubectl kustomize` 및 로컬 strategic patch의 기존 볼륨 보존을 확인했다. 실제 AWS 실행·적용은 미확인이다. 기존 AWS-01~08의 결과는 변경하지 않았다.
+- 단계 판정은 Tetragon 원본의 namespace·Pod labels가 intent 엔진 selector에 맞는 실행으로 제한했다. 읽기 전용 원본 재생: exec 309건(엔진 272, 그 밖 37), exit 건너뜀 256, kprobe 2. 시간표 없음은 엔진 `phase_unknown` 272; 전 구간 합성 inferring 시간표는 엔진 `outside_allowlist` 221·`allowed_in_phase` 51이다. 실제 GPU 단계 경계가 아니며 상세 근거·정상 후보는 `docs/AWS_GPU_단계_사전분석.md`에 있다.
+- 로그 수집 주체, 시간표 전달 경로, 열린 구간 만료 기준은 배포·계획에서 정해지지 않았다. `gateway.yaml`에 `--observation-timeline`을 추가하지 않았다. 권장 구조와 대안은 분석 문서에 적었고 선택 후 구현·AWS 검증이 필요하다.
+- 시험: runtime 전체 546건 중 111건 skip·실패 0, platform API 변환 52건 통과, web 56건 통과·타입 검사 통과, `kubectl kustomize`·`enforce render`·로컬 strategic patch·`git diff --check` 통과. platform API `test_runtime_client.py`는 이 환경에서 60초 넘게 종료되지 않아 중단했다. 서버는 켜지 않았고 커밋·푸시하지 않았다.

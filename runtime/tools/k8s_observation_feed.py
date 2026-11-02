@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 import math
 import os
@@ -35,10 +37,14 @@ from serving_runtime.mvp.target import (
     pods_command,
     validate_kubernetes_name,
 )
+from serving_runtime.enforcement.phase_signals import (
+    _KUBECTL_TIME, _REQUEST_LINE, _TimelineState, VLLM_CPU_029,
+)
 
 
 EXPECTED_CONTEXT = DEFAULT_KUBE_CONTEXT
 LAB_NAMESPACE = "serving-lab"
+PHASE_LOG_LIMIT_BYTES = 8 * 1024 * 1024
 
 
 class _StopRequested(Exception):
@@ -663,6 +669,181 @@ class TargetPodSnapshotWriter:
             stop_requested.wait(self.interval_s)
 
 
+class EnginePhaseTimelineWriter:
+    """Keep one Pod's extraction state and fetch only its new timestamped logs."""
+
+    def __init__(self, path: Path, selector: KubernetesSelector, *,
+                 interval_s: float = 2.0, timeout_s: float = 4.0,
+                 runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run) -> None:
+        self.path, self.selector = path, selector
+        self.interval_s, self.timeout_s, self.runner = interval_s, timeout_s, runner
+        self._uid: str | None = None
+        self._phase: _TimelineState | None = None
+        self._cursor: datetime | None = None
+        self._boundary: set[bytes] = set()
+        self._skip_boundary = False
+        self._incomplete = False
+        self._skipped: Counter[str] = Counter()
+
+    def _reset(self, uid: str | None, year: int) -> None:
+        self._uid = uid
+        self._phase = _TimelineState(engine="vllm", year=year, timezone_offset="Z") if uid else None
+        self._cursor = None
+        self._boundary.clear()
+        self._skip_boundary = False
+        self._incomplete = False
+        self._skipped.clear()
+
+    def _ingest(self, data: bytes, *, limited: bool, year: int) -> None:
+        assert self._phase is not None
+        # kubectl may cut the last line at any byte, including inside UTF-8 or
+        # its RFC3339 prefix. It is fetched again from the boundary timestamp.
+        if data and not data.endswith(b"\n"):
+            self._skipped["partial_tail"] += 1
+            data = data[:data.rfind(b"\n") + 1]
+        if limited:
+            self._incomplete = True
+        previous = self._cursor
+        for raw in data.splitlines(keepends=True):
+            try:
+                line = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                self._skipped["invalid_utf8"] += 1
+                continue
+            match = _KUBECTL_TIME.match(line)
+            if match is None:
+                self._skipped["missing_timestamp"] += 1
+                continue
+            try:
+                at = datetime.fromisoformat(match.group(1).replace("Z", "+00:00"))
+            except ValueError:
+                self._skipped["invalid_timestamp"] += 1
+                continue
+            if previous is not None and at < previous:
+                self._skipped["out_of_order"] += 1
+                continue
+            key = hashlib.sha256(raw).digest()
+            if at == self._cursor:
+                if key in self._boundary:
+                    continue
+                self._boundary.add(key)
+            else:
+                self._cursor = at
+                self._boundary = {key}
+            previous = at
+            # A capped replay cannot establish the current run's opening
+            # boundary. Wait for a new, directly observed loading start.
+            if self._incomplete:
+                if limited or _REQUEST_LINE.search(line) or not VLLM_CPU_029.patterns[1].expression.search(line):
+                    continue
+                self._phase = _TimelineState(engine="vllm", year=year, timezone_offset="Z")
+                self._incomplete = False
+            try:
+                self._phase.process_line(raw)
+            except ValueError:
+                self._skipped["invalid_engine_timestamp"] += 1
+        self._skip_boundary = limited
+
+    def _snapshot(self) -> tuple[list[dict[str, object]], dict[str, object]]:
+        assert self._phase is not None
+        timeline = self._phase.snapshot()
+        extraction = timeline["extraction"]
+        extraction["skipped_lines"] = dict(self._skipped)
+        extraction["history_incomplete"] = self._incomplete
+        return ([] if self._incomplete else timeline["entries"]), extraction
+
+    def collect_once(self) -> dict[str, object]:
+        now = datetime.now(timezone.utc)
+        state, uid, name, entries, extraction = "pod_error", None, None, [], None
+        last_log_at = None
+        try:
+            pods = self.runner(pods_command(self.selector), stdin=subprocess.DEVNULL,
+                               capture_output=True, timeout=self.timeout_s, check=False, shell=False)
+            if pods.returncode == 0:
+                raw = json.loads(pods.stdout)
+                items = raw.get("items") if isinstance(raw, dict) else None
+                if not isinstance(items, list):
+                    raise ValueError("invalid Pod list")
+                current = [item for item in items if isinstance(item, dict)
+                           and isinstance(item.get("status"), dict)
+                           and item["status"].get("phase") == "Running"
+                           and isinstance(item.get("metadata"), dict)
+                           and not item["metadata"].get("deletionTimestamp")]
+                state = "no_target" if not current else "multiple_targets" if len(current) > 1 else "running"
+                if state == "running":
+                    metadata = current[0].get("metadata", {})
+                    uid, name = metadata.get("uid"), metadata.get("name")
+                    if not isinstance(uid, str) or not uid or not isinstance(name, str) or not name:
+                        state = "pod_error"
+                    else:
+                        if uid != self._uid:
+                            self._reset(uid, now.year)
+                        command = ["kubectl", "--context", self.selector.context,
+                                   "--namespace", self.selector.namespace, "logs", "pod/" + name,
+                                   "-c", self.selector.container, "--timestamps=true",
+                                   f"--limit-bytes={PHASE_LOG_LIMIT_BYTES}"]
+                        if self._cursor is not None:
+                            # Ask just before the boundary: kubectl versions
+                            # may treat --since-time as exclusive. A capped
+                            # response must advance past its truncated edge.
+                            boundary = self._cursor + timedelta(microseconds=1) if self._skip_boundary else self._cursor - timedelta(microseconds=1)
+                            command.append(f"--since-time={boundary.isoformat()}")
+                        result = self.runner(command, stdin=subprocess.DEVNULL,
+                                             capture_output=True, timeout=self.timeout_s,
+                                             check=False, shell=False)
+                        if result.returncode != 0:
+                            state = "log_error"
+                        else:
+                            confirmed = self.runner(pods_command(self.selector), stdin=subprocess.DEVNULL,
+                                                    capture_output=True, timeout=self.timeout_s,
+                                                    check=False, shell=False)
+                            if confirmed.returncode != 0:
+                                raise ValueError("Pod identity recheck failed")
+                            confirmed_doc = json.loads(confirmed.stdout)
+                            confirmed_items = confirmed_doc.get("items") if isinstance(confirmed_doc, dict) else None
+                            current_after = [item for item in confirmed_items if isinstance(item, dict)
+                                             and isinstance(item.get("metadata"), dict)
+                                             and isinstance(item.get("status"), dict)
+                                             and item["status"].get("phase") == "Running"
+                                             and not item["metadata"].get("deletionTimestamp")] if isinstance(confirmed_items, list) else []
+                            if len(current_after) != 1 or current_after[0]["metadata"].get("uid") != uid:
+                                self._reset(None, now.year)
+                                raise ValueError("Pod identity changed during log fetch")
+                            self._ingest(result.stdout, limited=len(result.stdout) >= PHASE_LOG_LIMIT_BYTES,
+                                         year=now.year)
+                            last_log_at = self._cursor.isoformat() if self._cursor else None
+                            entries, extraction = self._snapshot()
+                            if self._incomplete:
+                                state = "incomplete_history"
+                else:
+                    self._reset(None, now.year)
+            # A failed Pod query leaves state pod_error and no entries.
+        except (OSError, subprocess.SubprocessError, ValueError, UnicodeError,
+                json.JSONDecodeError):
+            state = "log_error" if uid else "pod_error"
+        written = datetime.now(timezone.utc)
+        lag = (written - datetime.fromisoformat(last_log_at)).total_seconds() if last_log_at else None
+        document: dict[str, object] = {
+            "schema_version": "runtime-phase-timeline/1.0", "entries": entries,
+            "collector": {"state": state, "pod_uid": uid, "pod_name": name,
+                          "written_at": written.isoformat(),
+                          "last_log_at": last_log_at, "log_delivery_lag_seconds": lag},
+        }
+        if extraction is not None:
+            document["extraction"] = extraction
+        _write_json_atomic(self.path, document)
+        return document
+
+    def follow(self, stop_requested: threading.Event) -> None:
+        while not stop_requested.is_set():
+            try:
+                self.collect_once()
+            except OSError:
+                # Optional phase extraction never stops the other feeds.
+                pass
+            stop_requested.wait(self.interval_s)
+
+
 def _stop_children(group: _FeedGroup) -> None:
     for child in group.children:
         if child.process is not None and child.process.poll() is None:
@@ -838,8 +1019,11 @@ def run(
     target_selector: tuple[tuple[str, str], ...] | None = None,
     target_namespace: str = LAB_NAMESPACE,
     target_interval_s: float = DEFAULT_TARGET_INTERVAL_S,
+    phase_timeline: bool = False,
 ) -> int:
     global _reader_gid
+    if phase_timeline and target_selector is None:
+        raise ValueError("--phase-timeline requires --target-selector")
     assert_safe_context(context)
     check_reader_group(reader_gid)
     _reader_gid = reader_gid
@@ -847,6 +1031,7 @@ def run(
     output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     _share(output_dir, directory=True)
     target_writer: TargetPodSnapshotWriter | None = None
+    phase_writer: EnginePhaseTimelineWriter | None = None
     if target_selector is not None:
         validate_kubernetes_name(target_namespace, "target namespace")
         target_writer = TargetPodSnapshotWriter(
@@ -854,6 +1039,11 @@ def run(
             KubernetesSelector(context, target_namespace, target_selector, ""),
             interval_s=target_interval_s,
         )
+        if phase_timeline:
+            phase_writer = EnginePhaseTimelineWriter(
+                output_dir / "phase-timeline.json",
+                KubernetesSelector(context, target_namespace, target_selector, "engine"),
+            )
     hubble_path = output_dir / "hubble.jsonl"
     tetragon_path = output_dir / "tetragon.jsonl"
     stop_requested = threading.Event()
@@ -917,6 +1107,7 @@ def run(
         supervisor = _Supervisor(groups, context=context, stop_requested=stop_requested)
         previous_signal_handlers = _install_stop_signal_handlers(stop_requested)
         target_thread: threading.Thread | None = None
+        phase_thread: threading.Thread | None = None
         if target_writer is not None:
             target_thread = threading.Thread(
                 target=target_writer.follow,
@@ -925,6 +1116,10 @@ def run(
                 daemon=True,
             )
             target_thread.start()
+        if phase_writer is not None:
+            phase_thread = threading.Thread(target=phase_writer.follow,
+                                            args=(stop_requested,), name="engine-phase-timeline", daemon=True)
+            phase_thread.start()
         try:
             try:
                 for group in groups:
@@ -962,6 +1157,8 @@ def run(
             stop_requested.set()
             if target_thread is not None:
                 target_thread.join(timeout=TARGET_QUERY_TIMEOUT_S + 1)
+            if phase_thread is not None:
+                phase_thread.join(timeout=2 * TARGET_QUERY_TIMEOUT_S + 1)
             for group in groups:
                 _stop_children(group)
             supervisor.write(final_state=final_state)
@@ -1000,6 +1197,8 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="KEY=VALUE[,KEY=VALUE]",
         help="이 selector의 Pod 최소 스냅샷을 target-pods.json에 주기적으로 기록",
     )
+    parser.add_argument("--phase-timeline", action="store_true",
+                        help="현재 엔진 Pod 로그에서 단계 시간표를 별도 수집")
     parser.add_argument(
         "--target-namespace",
         default=LAB_NAMESPACE,
@@ -1035,6 +1234,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             target_selector=target_selector,
             target_namespace=args.target_namespace,
             target_interval_s=args.target_interval,
+            phase_timeline=args.phase_timeline,
         )
     except ReaderGroupError as error:
         # Configuration error: exit 2 so a supervisor does not restart in a loop.

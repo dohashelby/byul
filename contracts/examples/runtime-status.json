@@ -140,6 +140,7 @@
         "rejected": 0,
         "rejected_details": [],
         "corrupt_lines_total": 0,
+        "skipped_unsupported_total": 0,
         "out_of_window": 0,
         "out_of_window_total": 0,
         "idle": false,

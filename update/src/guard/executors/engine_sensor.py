@@ -186,7 +186,7 @@ class EngineSensorExecutor:
         else:
             required = {'sensor_environment_sha256', 'sensor_target_sha256',
                         'sensor_prepared_sha256', 'sensor_manifest_sha256'}
-            if type(values) is not dict or set(values) != required or any(not _sha(v) for v in values.values()):
+            if type(values) is not dict or not required <= set(values) or any(not _sha(values[k]) for k in required):
                 raise ValueError('ENGINE_SENSOR_EXACT_POLICY_BINDING_REQUIRED')
 
     def run(self, check, env, policy_values, adapter, workdir):

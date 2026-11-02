@@ -1,0 +1,135 @@
+executor: observation_state
+collection_profile: kubernetes-observation-state-composite-v1
+policy_params:
+- key: observation_state_environment_sha256
+  type: str
+  required: true
+- key: observation_state_validity_start
+  type: str
+  required: true
+- key: observation_state_validity_end
+  type: str
+  required: true
+- key: observation_state_required_components
+  type: list[str]
+  required: true
+- key: identity_prepared_sha256
+  type: str
+  required: true
+- key: identity_record_session
+  type: str
+  required: true
+- key: identity_record_source_sha256
+  type: str
+  required: true
+- key: profiler_prepared_sha256
+  type: str
+  required: true
+- key: profiler_backend_kind
+  type: str
+  required: true
+- key: profiler_required_ranks
+  type: list[str]
+  required: true
+- key: identity_target_sha256
+  type: str
+  required: true
+- key: profiler_target_sha256
+  type: str
+  required: true
+required_observations:
+- key: state_http_trials
+  type: list
+- key: state_native_bindings
+  type: list
+- key: state_native_events
+  type: list
+- key: state_asgi_events
+  type: list
+- key: state_output_events
+  type: list
+- key: state_output_links
+  type: list
+- key: state_component_status
+  type: list
+- key: state_conflict_candidates
+  type: list
+- key: state_scope_complete
+  type: bool
+- key: independent_worker_state_verified
+  type: bool
+- key: state_semantics_verified
+  type: bool
+- key: identity_record_collections
+  type: list
+- key: identity_declared_records
+  type: list
+- key: identity_native_models
+  type: list
+- key: identity_binding_candidates
+  type: list
+- key: identity_conflict_candidates
+  type: list
+- key: identity_missing
+  type: list
+- key: identity_producer_authenticated
+  type: bool
+- key: identity_approval_authority_verified
+  type: bool
+- key: identity_approval_model_scope_verified
+  type: bool
+- key: identity_inspection_verified
+  type: bool
+- key: identity_actual_consumption_verified
+  type: bool
+- key: identity_record_worker_generation_verified
+  type: bool
+- key: identity_record_time_order_verified
+  type: bool
+- key: identity_node_runtime_image_verified
+  type: bool
+- key: identity_enterprise_policy_adopted
+  type: bool
+- key: identity_scope_complete
+  type: bool
+- key: profiler_native_samples
+  type: list
+- key: profiler_worker_calls
+  type: list
+- key: profiler_rank_status
+  type: list
+- key: profiler_conflict_candidates
+  type: list
+- key: profiler_missing
+  type: list
+- key: profiler_backend_collection_stopped_verified
+  type: bool
+- key: profiler_trace_output_completed_verified
+  type: bool
+- key: profiler_cross_process_rpc_verified
+  type: bool
+- key: profiler_scope_complete
+  type: bool
+- key: state_collection_sessions
+  type: list
+- key: state_collection_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: state_scope_complete
+      op: eq
+      value: true
+    - obs: independent_worker_state_verified
+      op: eq
+      value: true
+    - obs: state_semantics_verified
+      op: eq
+      value: true
+    - obs: state_collection_scope_complete
+      op: eq
+      value: true
+    - obs: state_conflict_candidates
+      op: empty
+    fail_when_any: []

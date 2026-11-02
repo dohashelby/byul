@@ -1,4 +1,113 @@
 policy_params:
+- key: init_environment_sha256
+  type: str
+  required: true
+- key: init_target_sha256
+  type: str
+  required: true
+- key: init_prepared_sha256
+  type: str
+  required: true
+- key: init_validity_start
+  type: str
+  required: true
+- key: init_validity_end
+  type: str
+  required: true
+- key: init_executor_backend
+  type: str
+  required: true
+- key: init_expected_ranks
+  type: list[str]
+  required: true
+- key: init_scenario_sha256
+  type: str
+  required: true
+- key: init_phase
+  type: str
+  required: true
+- key: init_required_stages
+  type: list[str]
+  required: true
+- key: init_failure_rank
+  type: int
+  required: true
+- key: init_failure_stage
+  type: str
+  required: true
+- key: init_preparation_deadline_ms
+  type: int
+  required: true
+- key: init_recovery_deadline_ms
+  type: int
+  required: true
 - key: required_readiness_items
   type: list[str]
   required: true
+executor: initialization
+collection_profile: kubernetes-mp-readiness-observation-v1
+required_observations:
+- key: init_ready_endpoint_events
+  type: list
+- key: init_ready_endpoint_candidates
+  type: list
+- key: init_worker_generation_events
+  type: list
+- key: init_worker_generation_candidates
+  type: list
+- key: init_ready_send_observations
+  type: list
+- key: init_worker_startup_events
+  type: list
+- key: init_worker_startup_candidates
+  type: list
+- key: init_worker_startup_missing
+  type: list
+- key: init_observation_trials
+  type: list
+- key: init_native_samples
+  type: list
+- key: init_native_calls
+  type: list
+- key: init_correspondence
+  type: list
+- key: init_missing
+  type: list
+- key: init_producer_authenticated
+  type: bool
+- key: init_all_preparation_verified
+  type: bool
+- key: init_service_gate_verified
+  type: bool
+- key: init_cross_phase_lineage_verified
+  type: bool
+- key: init_scope_complete
+  type: bool
+- key: init_required_readiness_items
+  type: list
+- key: init_unverified_readiness_items
+  type: list
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: init_producer_authenticated
+      op: eq
+      value: true
+    - obs: init_all_preparation_verified
+      op: eq
+      value: true
+    - obs: init_service_gate_verified
+      op: eq
+      value: true
+    - obs: init_cross_phase_lineage_verified
+      op: eq
+      value: true
+    - obs: init_scope_complete
+      op: eq
+      value: true
+    - obs: init_missing
+      op: empty
+    - obs: init_unverified_readiness_items
+      op: empty
+    fail_when_any: []

@@ -1,0 +1,90 @@
+executor: request_termination
+collection_profile: kubernetes-automatic-retry-record-observation-v1
+policy_params:
+- key: retry_environment_sha256
+  type: str
+  required: true
+- key: retry_target_sha256
+  type: str
+  required: true
+- key: retry_scope_sha256
+  type: str
+  required: true
+- key: retry_policy_sha256
+  type: str
+  required: true
+- key: retry_record_source_sha256
+  type: str
+  required: true
+- key: retry_session
+  type: str
+  required: true
+- key: retry_validity_start
+  type: str
+  required: true
+- key: retry_validity_end
+  type: str
+  required: true
+- key: retry_policy_mode
+  type: str
+  required: true
+- key: retry_max_record_delay_ms
+  type: int
+  required: true
+required_observations:
+- key: retry_record_snapshots
+  type: list
+- key: retry_event_declarations
+  type: list
+- key: retry_attempt_candidates
+  type: list
+- key: retry_family_candidates
+  type: list
+- key: retry_cost_candidates
+  type: list
+- key: retry_missing
+  type: list
+- key: retry_conflicts
+  type: list
+- key: retry_collection
+  type: list
+- key: retry_unverified
+  type: list
+- key: retry_records_collected
+  type: bool
+- key: retry_producer_authenticated
+  type: bool
+- key: automatic_retry_verified
+  type: bool
+- key: retry_nonoccurrence_verified
+  type: bool
+- key: retry_previous_work_termination_verified
+  type: bool
+- key: retry_cost_enforcement_verified
+  type: bool
+- key: retry_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: retry_records_collected
+      op: eq
+      value: true
+    - obs: retry_producer_authenticated
+      op: eq
+      value: true
+    - obs: retry_previous_work_termination_verified
+      op: eq
+      value: true
+    - obs: retry_cost_enforcement_verified
+      op: eq
+      value: true
+    - obs: retry_scope_complete
+      op: eq
+      value: true
+    - obs: retry_conflicts
+      op: empty
+    - obs: retry_missing
+      op: empty
+    fail_when_any: []

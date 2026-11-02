@@ -2,7 +2,7 @@ id: REQ-12
 framework_id: CHK-REQ-012
 mechanism_ids:
 - mechanism-13
-revision: 4
+revision: 5
 retired: false
 area: REQ
 purpose: 요청·결과 귀속
@@ -15,7 +15,19 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 취소·연결 종료 뒤 늦은 결과를 기본 확인한다. 자동 retry가 있으면 이전 시도와 새 시도를 추가 대조한다.
-policy_params: []
+policy_params:
+- key: attempt_environment_sha256
+  type: str
+  required: true
+- key: attempt_target_sha256
+  type: str
+  required: true
+- key: attempt_validity_start
+  type: str
+  required: true
+- key: attempt_validity_end
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: 취소 의미·늦은 결과 처리·retry 정책
   enterprise_decisions: 결과 독자·공유 관계·허용 응답/오류 필드, 입력 사본 반환 필요성, 취소 확정 시점·늦은 출력 처리, Gateway/SDK/엔진별 재시도, 저장 결과 기능. 결과 수신 권한과 반환 필드 권한을 각각 정한다.
@@ -24,7 +36,35 @@ challenge_steps:
 - A를 생성 중 취소·연결 종료
 - 같은 외부 ID의 새 B 요청
 - 늦은 A 결과와 B 결과·작업 상태 대조
-required_observations: []
+required_observations:
+- key: request_attempt_trials
+  type: list
+- key: request_attempt_native_bindings
+  type: list
+- key: request_attempt_native_events
+  type: list
+- key: request_attempt_conflict_candidates
+  type: list
+- key: request_attempt_unbound_asgi_events
+  type: list
+- key: native_attempt_binding_observed
+  type: bool
+- key: late_delivery_verified
+  type: bool
+- key: automatic_retry_verified
+  type: bool
+- key: request_attempt_scope_complete
+  type: bool
+- key: request_attempt_asgi_events
+  type: list
+- key: asgi_invocation_binding_observed
+  type: bool
+- key: request_attempt_output_events
+  type: list
+- key: request_attempt_output_links
+  type: list
+- key: native_output_collector_binding_observed
+  type: bool
 required_observations_prose:
 - 내부 attempt ID/abort 도달/늦은 chunk·B 결과·작업 상태
 satisfied_if: 취소가 올바른 대상에 적용되고 늦은 결과가 비허용 소비자에게 전달되지 않는다. 실제 작업·자원 회수는 6.4 종결·자원 회수의 CHK-LIF-010·CHK-LIF-011에서 별도로 판정한다.
@@ -33,8 +73,29 @@ unknown_criteria: abort 접수만 확인했거나 취소 대상·내부 attempt�
 remediation: '- 요청과 실행 시도마다 식별정보를 구분하고 취소 대상·종료 상태를 기록한다. 종료된 시도의 늦은 출력을 버리거나 격리하고 같은 외부 ID의 새 요청에 이전 취소·결과가 적용되지 않게 한다.'
 method_and_evidence: 취소 대상·Core abort·worker finished·출력 폐기/반환을 연결한다. retry 사용 시 이전/새 attempt를 따로 추적한다.
 remaining_setup: 안전한 지연 주입과 attempt 식별 계측
-executor: null
-judge: null
+executor: request_termination
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: native_attempt_binding_observed
+      op: eq
+      value: true
+    - obs: native_output_collector_binding_observed
+      op: eq
+      value: true
+    - obs: request_attempt_scope_complete
+      op: eq
+      value: true
+    - obs: late_delivery_verified
+      op: eq
+      value: false
+    - obs: request_attempt_conflict_candidates
+      op: empty
+    fail_when_any:
+    - obs: late_delivery_verified
+      op: eq
+      value: true
 legacy:
   q_ids:
   - Q-C02
@@ -47,3 +108,4 @@ legacy:
   - Q-C08/SC-18-03
 source:
   array: request_state_assessment_draft
+collection_profile: kubernetes-request-attempt-observation-v1

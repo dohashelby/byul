@@ -2,8 +2,8 @@ id: SUP-01
 framework_id: CHK-SUP-001
 mechanism_ids:
 - mechanism-01
-revision: 3
-retired: false
+revision: 4
+retired: true
 area: SUP
 purpose: 승인 권한 분리
 secondary_purposes: []

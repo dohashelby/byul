@@ -1,0 +1,67 @@
+executor: lifecycle_transition
+collection_profile: lif05-stopped-redeploy-v1
+policy_params:
+- key: transition_inputs_sha256
+  type: str
+  required: true
+- key: transition_before_at
+  type: str
+  required: true
+- key: transition_during_at
+  type: str
+  required: true
+- key: transition_after_at
+  type: str
+  required: true
+- key: transition_recovered_at
+  type: str
+  required: true
+- key: transition_before_generation
+  type: str
+  required: true
+- key: transition_during_generation
+  type: str
+  required: true
+- key: transition_after_generation
+  type: str
+  required: true
+- key: transition_recovered_generation
+  type: str
+  required: true
+required_observations:
+- key: transition_native_generation_facts
+  type: list
+- key: transition_request_generation_bindings
+  type: list
+- key: transition_request_configuration_facts
+  type: list
+- key: transition_request_configuration_conflicts
+  type: list
+- key: transition_trials
+  type: list
+- key: transition_missing
+  type: list
+- key: transition_inflight_task_schedule_overlap
+  type: bool
+- key: transition_scope_complete
+  type: bool
+- key: transition_actual_consumption_verified
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: transition_scope_complete
+      op: eq
+      value: true
+    - obs: transition_actual_consumption_verified
+      op: eq
+      value: true
+    - obs: transition_inflight_task_schedule_overlap
+      op: eq
+      value: true
+    - obs: transition_missing
+      op: empty
+    - obs: transition_request_configuration_conflicts
+      op: empty
+    fail_when_any: []

@@ -1,6 +1,5 @@
 # PACK-BASELINE 77개의 실행기 연결 설계. 사용자가 확정한 표이며 재분류하지 않는다.
-# executor: null은 기존 수동 경로를 유지한다.
-# executor: owner2는 담당 2 범위에서 이름을 확정하는 non-null 연결이다.
+# executor: null 8개는 update 검증 범위에서 뺀 점검이며 팩에서 retired로 표시한다(2026-11-02 사용자 결정).
 new_executors: [supply_boot, record_access, engine_sensor, lifecycle_transition]
 checks:
   # 이미 연결된 17개
@@ -66,17 +65,17 @@ checks:
   LIF-05: lifecycle_transition
   LIF-06: lifecycle_transition
   LIF-16: lifecycle_transition
-  LIF-03: owner2
-  LIF-04: owner2
-  LIF-07: owner2
-  LIF-08: owner2
-  LIF-09: owner2
-  LIF-10: owner2
-  LIF-11: owner2
-  LIF-12: owner2
-  LIF-14: owner2
-  REQ-12: owner2
-  OBS-02: owner2
+  LIF-03: stream_buffer
+  LIF-04: stream_buffer
+  LIF-07: initialization
+  LIF-08: rank_failure
+  LIF-09: initialization
+  LIF-10: request_termination
+  LIF-11: resource_recovery
+  LIF-12: request_termination
+  LIF-14: profiler_observation
+  REQ-12: request_termination
+  OBS-02: observation_state
   # 제외 8개: 기존 수동 경로
   SUP-01: null
   SUP-02: null

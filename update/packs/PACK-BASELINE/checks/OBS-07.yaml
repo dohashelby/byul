@@ -2,8 +2,8 @@ id: OBS-07
 framework_id: CHK-OBS-007
 mechanism_ids:
 - mechanism-01
-revision: 5
-retired: false
+revision: 6
+retired: true
 area: OBS
 purpose: 작업·대상 인가
 secondary_purposes: []

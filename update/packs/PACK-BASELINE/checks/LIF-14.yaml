@@ -2,7 +2,7 @@ id: LIF-14
 framework_id: CHK-LIF-014
 mechanism_ids:
 - mechanism-13
-revision: 3
+revision: 4
 retired: false
 area: LIF
 purpose: 종결·자원 회수
@@ -15,7 +15,37 @@ review_order: conditional_when_selected
 impact: null
 applies_when:
   prose: profiler의 실제 활성·등록 route·backend 종료 경로가 있을 때 적용한다. 비사용 기능은 등록·도달성을 확인한 뒤 제외한다.
-policy_params: []
+policy_params:
+- key: profiler_environment_sha256
+  type: str
+  required: true
+- key: profiler_target_sha256
+  type: str
+  required: true
+- key: profiler_prepared_sha256
+  type: str
+  required: true
+- key: profiler_validity_start
+  type: str
+  required: true
+- key: profiler_validity_end
+  type: str
+  required: true
+- key: profiler_backend_kind
+  type: str
+  required: true
+- key: profiler_required_ranks
+  type: list[str]
+  required: true
+- key: profiler_case
+  type: str
+  required: true
+- key: profiler_control_scope
+  type: str
+  required: true
+- key: profiler_control_owner_ref
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: 종료 대상·기한·미완료 표시
   enterprise_decisions: 요청별/그룹별 회수 대상·잔존 참조·강제 종료·중복 비용 처리. 공유 weights/profiler/retry는 기능 선택 후 별도 수명·종료 계약을 확인한다.
@@ -24,7 +54,27 @@ challenge_steps:
 - 짧은 정상 진단을 실행하고 실제 수집 확인
 - 종료 호출 후 backend의 수집·산출/전송 완료와 자원 상태 대조
 - 별도 격리 실행에서 종료 오류를 주입하고 실제 실패 상태·다음 시작 가능 여부 확인
-required_observations: []
+required_observations:
+- key: profiler_control_trials
+  type: list
+- key: profiler_control_projections
+  type: list
+- key: profiler_control_api_links
+  type: list
+- key: profiler_control_flag_adapter_conflicts
+  type: list
+- key: profiler_control_missing
+  type: list
+- key: profiler_next_start_api_linked
+  type: bool
+- key: profiler_backend_collection_stopped_verified
+  type: bool
+- key: profiler_trace_output_completed_verified
+  type: bool
+- key: profiler_cross_process_rpc_verified
+  type: bool
+- key: profiler_scope_complete
+  type: bool
 required_observations_prose:
 - 진단 backend·종료 계약, 종료 API/명령 결과·경고와 실행 주체별 실제 수집 상태
 - backend가 사용하는 파일·스트림·원격 수신 등 산출 방식의 완료/계속 수집 여부와 자원·다음 시작 상태
@@ -34,8 +84,31 @@ unknown_criteria: API 200만 있고 실제 수집 종료·파일 상태를 확�
 remediation: '- profiler의 시작·종료 요청과 실제 수집·출력·자원 정리 상태를 각각 기록한다. 종료 실패·지연을 성공으로 보고하지 않고 정한 기한 내 수집 중단·잔여 자원 정리를 확인한다.'
 method_and_evidence: '선정 진단 backend의 시작·수집·종료 계약과 산출 방식을 확인한다. 종료 응답·경고·실제 수집 상태·해당 산출물/전송·자원 사용과 다음 시작 가능 여부를 대조한다. 같은 시험의 종료 API·로그 표현과 실제 상태의 일치는 CHK-OBS-002에서 별도로 판정한다. vLLM v0.31.0의 공통 【F38】 근거를 사용할 때 실제 profiler 설정·route 등록·접근 범위와 격리된 backend 시작/정지 실패 주입 조건을 유지한다. 근거 원문: [F38](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33961).'
 remaining_setup: 짧은 profile fixture·오류 주입·종료 기한
-executor: null
-judge: null
+executor: profiler_observation
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: profiler_next_start_api_linked
+      op: eq
+      value: true
+    - obs: profiler_backend_collection_stopped_verified
+      op: eq
+      value: true
+    - obs: profiler_trace_output_completed_verified
+      op: eq
+      value: true
+    - obs: profiler_cross_process_rpc_verified
+      op: eq
+      value: true
+    - obs: profiler_scope_complete
+      op: eq
+      value: true
+    - obs: profiler_control_flag_adapter_conflicts
+      op: empty
+    - obs: profiler_control_missing
+      op: empty
+    fail_when_any: []
 legacy:
   q_ids:
   - Q-C08
@@ -46,3 +119,4 @@ legacy:
   - Q-C08/SC-23-05
 source:
   array: lifecycle_assessment_draft
+collection_profile: kubernetes-profiler-control-v1

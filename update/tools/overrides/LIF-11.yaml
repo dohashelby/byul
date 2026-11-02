@@ -1,0 +1,92 @@
+executor: resource_recovery
+collection_profile: kubernetes-selected-resource-recovery-v1
+policy_params:
+- key: recovery_environment_sha256
+  type: str
+  required: true
+- key: recovery_target_sha256
+  type: str
+  required: true
+- key: recovery_prepared_sha256
+  type: str
+  required: true
+- key: recovery_selection_sha256
+  type: str
+  required: true
+- key: recovery_scenario_sha256
+  type: str
+  required: true
+- key: recovery_validity_start
+  type: str
+  required: true
+- key: recovery_validity_end
+  type: str
+  required: true
+- key: recovery_branch
+  type: str
+  required: true
+- key: recovery_executor_backend
+  type: str
+  required: true
+- key: recovery_expected_ranks
+  type: list[str]
+  required: true
+- key: recovery_phase
+  type: str
+  required: true
+- key: recovery_deadline_basis
+  type: str
+  required: true
+- key: recovery_required_absent_after
+  type: str
+  required: true
+- key: recovery_max_clock_skew_ms
+  type: int
+  required: true
+- key: recovery_required_resource_kinds
+  type: list[str]
+  required: true
+required_observations:
+- key: recovery_trials
+  type: list
+- key: recovery_resource_censuses
+  type: list
+- key: recovery_selected_resource_status
+  type: list
+- key: recovery_missing
+  type: list
+- key: recovery_absolute_deadline_violated
+  type: bool
+- key: recovery_selected_absence_observed
+  type: bool
+- key: recovery_global_resources_released
+  type: bool
+- key: recovery_next_normal_launch_verified
+  type: bool
+- key: recovery_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: recovery_selected_absence_observed
+      op: eq
+      value: true
+    - obs: recovery_global_resources_released
+      op: eq
+      value: true
+    - obs: recovery_next_normal_launch_verified
+      op: eq
+      value: true
+    - obs: recovery_scope_complete
+      op: eq
+      value: true
+    - obs: recovery_absolute_deadline_violated
+      op: eq
+      value: false
+    - obs: recovery_missing
+      op: empty
+    fail_when_any:
+    - obs: recovery_absolute_deadline_violated
+      op: eq
+      value: true

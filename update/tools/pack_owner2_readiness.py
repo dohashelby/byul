@@ -65,7 +65,7 @@ def rows(pack):
 
 def inspect(pack):
     items = rows(pack)
-    preserved = all(pack.checks[key].executor is None for key in EXCLUDED)
+    preserved = all(pack.checks[key].executor is None and pack.checks[key].retired for key in EXCLUDED)
     return {'pack': pack.ref().model_dump(mode='json'), 'assigned': len(items),
         'baseline_connected': sum(row['baseline_connected'] for row in items),
         'registered_factory_available': sum(row['registered_factory_available'] for row in items),

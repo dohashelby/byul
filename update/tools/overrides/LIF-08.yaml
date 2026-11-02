@@ -1,0 +1,91 @@
+executor: rank_failure
+collection_profile: kubernetes-mp-rank-failure-observation-v1
+policy_params:
+- key: rank_environment_sha256
+  type: str
+  required: true
+- key: rank_target_sha256
+  type: str
+  required: true
+- key: rank_prepared_sha256
+  type: str
+  required: true
+- key: rank_validity_start
+  type: str
+  required: true
+- key: rank_validity_end
+  type: str
+  required: true
+- key: rank_executor_backend
+  type: str
+  required: true
+- key: rank_expected_ranks
+  type: list[str]
+  required: true
+- key: rank_output_rank
+  type: int
+  required: true
+- key: rank_exception_detection_ms
+  type: int
+  required: true
+- key: rank_exception_notification_ms
+  type: int
+  required: true
+- key: rank_death_detection_ms
+  type: int
+  required: true
+- key: rank_death_notification_ms
+  type: int
+  required: true
+- key: rank_delay_detection_ms
+  type: int
+  required: true
+- key: rank_delay_notification_ms
+  type: int
+  required: true
+- key: rank_communication_stall_detection_ms
+  type: int
+  required: true
+- key: rank_communication_stall_notification_ms
+  type: int
+  required: true
+required_observations:
+- key: rank_observation_trials
+  type: list
+- key: rank_native_samples
+  type: list
+- key: rank_native_calls
+  type: list
+- key: rank_failure_candidates
+  type: list
+- key: rank_fault_cases
+  type: list
+- key: rank_missing
+  type: list
+- key: rank_producer_authenticated
+  type: bool
+- key: rank_normal_all_ranks_verified
+  type: bool
+- key: rank_upper_client_receipt_verified
+  type: bool
+- key: rank_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: rank_producer_authenticated
+      op: eq
+      value: true
+    - obs: rank_normal_all_ranks_verified
+      op: eq
+      value: true
+    - obs: rank_upper_client_receipt_verified
+      op: eq
+      value: true
+    - obs: rank_scope_complete
+      op: eq
+      value: true
+    - obs: rank_missing
+      op: empty
+    fail_when_any: []

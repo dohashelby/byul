@@ -1,0 +1,78 @@
+executor: profiler_observation
+collection_profile: kubernetes-profiler-control-v1
+policy_params:
+- key: profiler_environment_sha256
+  type: str
+  required: true
+- key: profiler_target_sha256
+  type: str
+  required: true
+- key: profiler_prepared_sha256
+  type: str
+  required: true
+- key: profiler_validity_start
+  type: str
+  required: true
+- key: profiler_validity_end
+  type: str
+  required: true
+- key: profiler_backend_kind
+  type: str
+  required: true
+- key: profiler_required_ranks
+  type: list[str]
+  required: true
+- key: profiler_case
+  type: str
+  required: true
+- key: profiler_control_scope
+  type: str
+  required: true
+- key: profiler_control_owner_ref
+  type: str
+  required: true
+required_observations:
+- key: profiler_control_trials
+  type: list
+- key: profiler_control_projections
+  type: list
+- key: profiler_control_api_links
+  type: list
+- key: profiler_control_flag_adapter_conflicts
+  type: list
+- key: profiler_control_missing
+  type: list
+- key: profiler_next_start_api_linked
+  type: bool
+- key: profiler_backend_collection_stopped_verified
+  type: bool
+- key: profiler_trace_output_completed_verified
+  type: bool
+- key: profiler_cross_process_rpc_verified
+  type: bool
+- key: profiler_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: profiler_next_start_api_linked
+      op: eq
+      value: true
+    - obs: profiler_backend_collection_stopped_verified
+      op: eq
+      value: true
+    - obs: profiler_trace_output_completed_verified
+      op: eq
+      value: true
+    - obs: profiler_cross_process_rpc_verified
+      op: eq
+      value: true
+    - obs: profiler_scope_complete
+      op: eq
+      value: true
+    - obs: profiler_control_flag_adapter_conflicts
+      op: empty
+    - obs: profiler_control_missing
+      op: empty
+    fail_when_any: []

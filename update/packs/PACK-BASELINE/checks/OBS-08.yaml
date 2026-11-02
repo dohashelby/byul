@@ -2,8 +2,8 @@ id: OBS-08
 framework_id: CHK-OBS-008
 mechanism_ids:
 - mechanism-09
-revision: 5
-retired: false
+revision: 6
+retired: true
 area: OBS
 purpose: 자료 해석 안전성
 secondary_purposes: []

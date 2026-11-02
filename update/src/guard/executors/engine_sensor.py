@@ -351,9 +351,11 @@ class EngineSensorExecutor:
             binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=ENGINE_CALLBACK_PROFILE)
         endpoint = transport.endpoint.scheme + '://' + transport.endpoint.netloc + '/v1/chat/completions'
         tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []
+        # 같은 엔진을 다시 시험해도 이전 실행의 캐시가 교차 적중으로 보이지 않게 한다.
+        nonce = uuid.uuid4().hex
         for number, case in enumerate(cases):
             tag = tags[case['case_id']] = 'byul-cb-' + uuid.uuid4().hex
-            body = {'model': transport.api_model, 'messages': [{'role': 'user', 'content': case['prompt']}],
+            body = {'model': transport.api_model, 'messages': [{'role': 'user', 'content': nonce + ' ' + case['prompt']}],
                 'max_tokens': case.get('max_tokens', 1), 'temperature': 0, 'stream': False}
             if 'allowed_token_ids' in case:
                 body['allowed_token_ids'] = case['allowed_token_ids']
@@ -401,8 +403,11 @@ class EngineSensorExecutor:
             result = projection.project_cache_timing(cases, rows, elapsed, values)
         gaps = sorted({e['code'] for e in events if e.get('phase') == 'GAP' and type(e.get('code')) is str})
         collected = result['violation'] is not None
-        draft = EvidenceDraft(status=ExecStatus.COMPLETED if collected and not cleanup else ExecStatus.ABORTED,
-            data_origin=DataOrigin(transport.process_observation_origin),
+        finished = collected and not cleanup
+        origin = DataOrigin(transport.process_observation_origin)
+        # INV-02: 끝나지 않은 실행은 MEASURED가 될 수 없다.
+        draft = EvidenceDraft(status=ExecStatus.COMPLETED if finished else ExecStatus.ABORTED,
+            data_origin=origin if finished or origin == DataOrigin.EXAMPLE else DataOrigin.DECLARED,
             normal_control={'attempted': bool(trials), 'succeeded': bool(trials) and all(t['normal_shape'] for t in trials)},
             observations={'engine_sensor_violation': {'value': result['violation'], 'collected': collected},
                           'engine_sensor_full_scope': {'value': result['full_scope'] and not gaps and not cleanup, 'collected': True}},

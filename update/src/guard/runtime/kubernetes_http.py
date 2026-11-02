@@ -49,7 +49,8 @@ root="/guard-lifecycle/data/"+sys.argv[1];rows=[];left=6*1024**2;truncated=False
 for name in sorted(os.listdir(root)):
     if re.fullmatch(r"callbacks-[1-9][0-9]*\.jsonl",name) is None:continue
     with os.fdopen(os.open(os.path.join(root,name),os.O_RDONLY|os.O_NOFOLLOW),"rb") as stream:raw=stream.read(left+1)
-    if len(raw)>left:raw=raw[:left].rpartition(b"\n")[0];truncated=True
+    if len(raw)>left:raw=raw[:left];truncated=True
+    raw=raw.rpartition(b"\n")[0]
     left-=len(raw);rows.extend(json.loads(line) for line in raw.splitlines())
 print(json.dumps({"events":rows,"truncated":truncated}))
 '''

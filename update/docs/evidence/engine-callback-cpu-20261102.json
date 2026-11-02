@@ -1,0 +1,149 @@
+{
+ "schema": "byul-cpu-measurement/1",
+ "measured_on": "2026-11-02",
+ "engine": "vllm/vllm-openai-cpu:v0.31.0",
+ "engine_source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+ "image_id": "sha256:495c84fe30f3",
+ "platform": "linux/arm64 Docker Desktop on macOS",
+ "model": "facebook/opt-125m@27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+ "launch": [
+  "--max-model-len",
+  "512",
+  "--max-num-seqs",
+  "2",
+  "--dtype",
+  "float32",
+  "--block-size",
+  "32",
+  "--enable-prefix-caching"
+ ],
+ "tool": "tools/engine_callback_cpu_smoke.py",
+ "limits": [
+  "CPU 단일 프로세스. TP/PP·GPU·Kubernetes 없음",
+  "REQ-15는 Gateway 없이 직접 salt를 보낸 결과라 신원 연결 미검증"
+ ],
+ "results": [
+  {
+   "check_id": "REQ-14",
+   "status": "COMPLETED",
+   "violation": false,
+   "collected": true,
+   "full_scope": false,
+   "normal": true,
+   "facts": {
+    "batches_checked": 62,
+    "full_scope": false,
+    "missing": [
+     "intermediate_tensor_buffer_lineage_unobserved",
+     "model_generation_consumption_unobserved"
+    ],
+    "sensor_gaps": [],
+    "violation": false,
+    "violations": []
+   },
+   "requests": 3
+  },
+  {
+   "check_id": "REQ-15",
+   "status": "COMPLETED",
+   "violation": false,
+   "collected": true,
+   "full_scope": false,
+   "normal": true,
+   "facts": {
+    "full_scope": false,
+    "identity": null,
+    "missing": [
+     "authenticated_principal_binding_unverified"
+    ],
+    "pairs": [
+     {
+      "control_hit": true,
+      "cross_hit": false,
+      "from": "A",
+      "salts_distinct": true,
+      "to": "B"
+     },
+     {
+      "control_hit": true,
+      "cross_hit": false,
+      "from": "B",
+      "salts_distinct": true,
+      "to": "A"
+     }
+    ],
+    "sensor_gaps": [],
+    "violation": false
+   },
+   "requests": 6
+  },
+  {
+   "check_id": "REQ-16",
+   "status": "COMPLETED",
+   "violation": false,
+   "collected": true,
+   "full_scope": true,
+   "normal": true,
+   "facts": {
+    "contexts": [
+     {
+      "changed_hit": false,
+      "context": "cache_salt",
+      "control_hit": true,
+      "same_key": false
+     }
+    ],
+    "full_scope": true,
+    "missing": [],
+    "sensor_gaps": [],
+    "violation": false
+   },
+   "requests": 4
+  },
+  {
+   "check_id": "REQ-17",
+   "status": "COMPLETED",
+   "violation": false,
+   "collected": true,
+   "full_scope": true,
+   "normal": true,
+   "facts": {
+    "control_auc_percent": 94.44444444444444,
+    "cross_auc_percent": 63.888888888888886,
+    "full_scope": true,
+    "missing": [],
+    "native_cross_hits": 0,
+    "samples": {
+     "absent": 6,
+     "control-absent": 6,
+     "control-present": 6,
+     "present": 6
+    },
+    "sensor_gaps": [],
+    "violation": false
+   },
+   "requests": 30
+  },
+  {
+   "check_id": "REQ-18",
+   "status": "COMPLETED",
+   "violation": false,
+   "collected": true,
+   "full_scope": true,
+   "normal": true,
+   "facts": {
+    "full_scope": true,
+    "missing": [],
+    "rows": [
+     {
+      "output_matches_standalone": true,
+      "slot_reused": true
+     }
+    ],
+    "sensor_gaps": [],
+    "violation": false
+   },
+   "requests": 4
+  }
+ ]
+}

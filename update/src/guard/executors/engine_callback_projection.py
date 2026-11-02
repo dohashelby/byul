@@ -5,6 +5,7 @@ never become violation=false. Elapsed time alone never decides anything.
 """
 from __future__ import annotations
 
+from collections import deque
 import hashlib
 import hmac
 
@@ -14,6 +15,8 @@ ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16'
     'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'},
     'REQ-18': {'standalone', 'restricted', 'reused'}}
 MAX_CASES = 512
+# 비동기 스케줄링에서는 출력이 다음 배치 뒤에 도착할 수 있다.
+PIPELINE_DEPTH = 2
 
 
 def tag_digest(secret, tag):
@@ -171,22 +174,24 @@ def project_cache_timing(cases, rows, elapsed, policy):
 
 
 def project_distributed(events, secret, tags):
+    """worker가 받은 배치와 다음에 내보낸 출력의 요청 ID를 프로세스별 순서로 대조한다."""
     wanted = {tag_digest(secret, tag) for tag in tags.values()}
-    seen = set(); checked = 0; violations = []
+    recent = {}; seen = set(); checked = 0; violations = []
     for event in events:
-        if event.get('phase') != 'RETURN' or event.get('entry_qualified_before') is not True \
-                or event.get('entry_qualified_after') is not True or not str(event.get('point')).endswith(('.execute_model', '._execute_worker_rpc')):
+        if event.get('entry_qualified_before') is not True or event.get('phase') != 'CALL':
             continue
-        fields = event.get('fields') or {}
-        scheduled, returned = fields.get('native_request_sha256'), fields.get('output_request_sha256')
-        if type(scheduled) is not list:
-            continue
-        seen.update(set(scheduled) & wanted)
-        if type(returned) is list:
+        fields = event.get('fields') or {}; process = event.get('process_sha256')
+        if event.get('point') == 'WorkerProc._execute_worker_rpc' and fields.get('rpc_method') == 'execute_model':
+            scheduled = fields.get('native_request_sha256')
+            if scheduled:
+                seen.update(set(scheduled) & wanted)
+                recent.setdefault(process, deque(maxlen=PIPELINE_DEPTH)).append(set(scheduled))
+        elif event.get('point') == 'WorkerProc.handle_output' and fields.get('output_request_sha256'):
+            allowed = set().union(*recent.get(process, ()))
             checked += 1
-            if set(returned) - set(scheduled):
-                violations.append({'point': event['point'], 'rank': fields.get('rank'),
-                    'unscheduled_outputs': len(set(returned) - set(scheduled))})
+            extra = set(fields['output_request_sha256']) - allowed
+            if extra:
+                violations.append({'point': event['point'], 'unscheduled_outputs': len(extra)})
     complete = wanted <= seen and checked > 0
     return {'batches_checked': checked, 'violations': violations,
         'violation': True if violations else (False if complete else None), 'full_scope': False,

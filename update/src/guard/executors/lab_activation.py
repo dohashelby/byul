@@ -558,7 +558,7 @@ class ActivatedExecutor:
             **{k: Observation(value=v, collected=True) for k, v in facts.items()}}
         complete = facts['activation_scope_complete'] or bool(facts['activation_violations'])
         return EvidenceDraft(status=ExecStatus.COMPLETED if complete else ExecStatus.ABORTED,
-            data_origin=DataOrigin.EXAMPLE if self.runner is not None else DataOrigin.MEASURED,
+            data_origin=DataOrigin.EXAMPLE if self.runner is not None else DataOrigin.MEASURED if complete else DataOrigin.DECLARED,
             normal_control={'attempted': bool(lab.normal), 'succeeded': bool(lab.normal) and all(lab.normal),
                 'detail': 'Parent-measured normal requests around the activated fault.'},
             challenges=[{'step': step, 'attempted': complete} for step in check.challenge_steps],

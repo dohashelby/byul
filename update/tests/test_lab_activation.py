@@ -215,6 +215,16 @@ def test_incomplete_scope_cannot_clear_the_pass_gate(tmp_path):
     assert draft.status == ExecStatus.ABORTED and not draft.challenges[0].attempted
 
 
+def test_unfinished_real_run_is_never_measured(tmp_path, monkeypatch):
+    world = Cluster()
+    config = {k: v for k, v in BASE.items() if k != 'faulty_manifest'}
+    executor = lab.ActivatedExecutor(Passive(), config)
+    monkeypatch.setattr(lab, 'capture_pipes', world)
+    executor.clock = world.clock; executor.wait = world.wait
+    draft = executor.run(SimpleNamespace(id='LIF-09', challenge_steps=['one']), None, POLICY, None, tmp_path / 'work')
+    assert draft.status == ExecStatus.ABORTED and draft.data_origin == DataOrigin.DECLARED
+
+
 def test_registry_wraps_only_with_explicit_activation_settings():
     factory = registry.resolve_executor('stream_buffer', 'kubernetes')
     assert not isinstance(factory({}), lab.ActivatedExecutor)

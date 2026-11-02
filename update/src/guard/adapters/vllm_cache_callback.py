@@ -210,7 +210,7 @@ class CacheCallbackObserver:
             current = vars(cls).get(method)
             if os.getpid() != self.pid:
                 self.gaps.add('CACHE_CALLBACK_PROCESS_CHANGED'); return False
-            return (current in (original, wrapped) and original.__globals__ is vars(module)
+            return (current in (original, wrapped, getattr(wrapped, 'guard_outer', None)) and original.__globals__ is vars(module)
                 and _digest(original.__code__, name) == expected and _codes(module, self.targets, self.sources).get(point) == expected)
 
         @functools.wraps(original)

@@ -44,6 +44,14 @@ class _Keyed:
             if found: value = found.group()
         return super().fingerprint(value)
 
+    def _emit(self, row):
+        """오래 도는 엔진에서 메모리 상한이 기록을 끊지 않게 행을 파일로만 보낸다."""
+        try:
+            self.sink(row)
+        except BaseException:
+            with self.lock:
+                self.gaps.add('CACHE_CALLBACK_SINK_UNAVAILABLE')
+
 
 class CacheObserver(_Keyed, cache.CacheCallbackObserver):
     pass
@@ -120,6 +128,7 @@ class EngineCallbacks:
             except OSError:
                 return wrapped(*args, **kwargs)
             raise RuntimeError('GUARD_LAB_FAULT')
+        wrapped.guard_outer = faulted
         return faulted
 
     def gap(self, code, detail=None):

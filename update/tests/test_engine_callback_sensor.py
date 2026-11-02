@@ -120,20 +120,26 @@ def test_too_few_samples_stays_uncollected():
     assert result['violation'] is None
 
 
-def batch(scheduled, returned, point='MultiprocExecutor.execute_model'):
+def batch(scheduled, returned):
     digest = lambda key: projection.tag_digest(SECRET, TAGS[key])
-    return {'point': point, 'phase': 'RETURN', 'entry_qualified_before': True, 'entry_qualified_after': True,
-        'fields': {'native_request_sha256': [digest(k) for k in scheduled], 'output_request_sha256': [digest(k) for k in returned], 'rank': 0}}
+    common = {'phase': 'CALL', 'entry_qualified_before': True, 'process_sha256': 'p'}
+    return [{**common, 'point': 'WorkerProc._execute_worker_rpc',
+            'fields': {'rpc_method': 'execute_model', 'native_request_sha256': [digest(k) for k in scheduled]}},
+        {**common, 'point': 'WorkerProc.handle_output', 'fields': {'output_request_sha256': [digest(k) for k in returned]}}]
 
 
 def test_output_for_a_request_outside_the_batch_is_a_violation():
-    tags = {'a': TAGS['a']}
-    assert projection.project_distributed([batch(['a'], ['a', 'b'])], SECRET, tags)['violation'] is True
+    assert projection.project_distributed(batch(['a'], ['a', 'b']), SECRET, {'a': TAGS['a']})['violation'] is True
 
 
 def test_clean_batches_stay_partial_scope_because_buffers_are_unobserved():
-    result = projection.project_distributed([batch(['a'], ['a'])], SECRET, {'a': TAGS['a']})
+    result = projection.project_distributed(batch(['a'], ['a']), SECRET, {'a': TAGS['a']})
     assert result['violation'] is False and result['full_scope'] is False
+
+
+def test_output_from_the_previous_batch_is_allowed_in_pipelined_execution():
+    events = [*batch(['a'], []), *batch(['b'], ['a'])]
+    assert projection.project_distributed(events, SECRET, {'a': TAGS['a'], 'b': TAGS['b']})['violation'] is False
 
 
 def test_real_sources_and_shared_key_bind_engine_ids_back_to_the_parent_tag(tmp_path):
@@ -337,3 +343,12 @@ def test_slot_observer_records_slot_and_restriction_without_values():
     request = SimpleNamespace(req_id=TAGS['a'], sampling_params=SimpleNamespace(allowed_token_ids=[5]))
     fields = observer._snapshot('InputBatch.add_request', (None, request), {}, 3, True)
     assert fields['slot'] == 3 and fields['restricted'] is True and '5' not in str(fields['request_sha256'][:0])
+
+
+def test_recording_continues_past_the_in_memory_event_limit():
+    from guard.adapters import vllm_cache_callback as callback
+    rows = []
+    observer = sensor.SlotObserver('a' * 32, sink=rows.append, context_provider=lambda: {})
+    for _ in range(callback.MAX_EVENTS + 5):
+        observer._emit({'phase': 'CALL'})
+    assert len(rows) == callback.MAX_EVENTS + 5 and not observer.gaps and not observer.events

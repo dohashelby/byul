@@ -10,6 +10,7 @@ from copy import deepcopy
 from pathlib import Path
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -35,6 +36,22 @@ PROFILES = {
 # These checks read the prepared callback session instead of a lifecycle recording.
 INFORMATIONAL_GAPS = frozenset({'CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE', 'DISTRIBUTED_NON_EXECUTE_RPC_UNSUPPORTED'})
 CALLBACK_CHECKS = frozenset({'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17', 'REQ-18'})
+
+
+def _callback_elapsed_ms(row):
+    """Use the probe's request clock, never the enclosing kubectl wall time."""
+    if row.get('outcome') != 200 or row.get('capture_complete') is not True:
+        return None
+    if row.get('timing_basis') == 'batch_monotonic_client_connection_only':
+        times = [row.get(key) for key in ('dispatch_ms', 'request_sent_ms', 'headers_ms', 'end_ms')]
+        if (any(type(value) is not int for value in times)
+                or not 0 <= times[0] <= times[1] <= times[2] <= times[3] <= 120000):
+            return None
+        return times[3] - times[0]
+    if 'timing_basis' in row:
+        return None
+    value = row.get('elapsed_ms')
+    return value if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 120000 else None
 CPU_PROFILE = 'engine-sensor-slot-reference-cpu-v1'
 CPU_PREFIX = 'BYUL_ENGINE_SENSOR_SLOT='
 # Reviewed immutable tool/test snapshot. The old product snapshot remains its
@@ -170,7 +187,7 @@ def slot_observations(record):
 class EngineSensorExecutor:
     """A single executor name; source CPU is never substituted for Kubernetes."""
     name = 'engine_sensor'
-    version = '0.1.0'
+    version = '0.1.1'
 
     def __init__(self, cfg, *, implementation='kubernetes', expected_target_sha256=None):
         self.cfg = deepcopy(cfg)
@@ -388,8 +405,9 @@ class EngineSensorExecutor:
             trials.append({'case_id': case['case_id'], 'role': case['role'], 'outcome': row.get('outcome'), 'normal_shape': good})
             if good:
                 outputs[case['case_id']] = _answer(row.get('body'))
-            if good and type(row.get('elapsed_ms')) in (int, float):
-                elapsed[case['case_id']] = row['elapsed_ms']
+            latency = _callback_elapsed_ms(row)
+            if good and latency is not None:
+                elapsed[case['case_id']] = latency
         try:
             read = transport.engine_callback_events(prepared['session'])
             events = read['events'] if any('principal' in case for case in cases) else projection.window(

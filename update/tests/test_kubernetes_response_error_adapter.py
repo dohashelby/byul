@@ -5,6 +5,7 @@ import hashlib
 import inspect
 import json
 from pathlib import Path
+import shutil
 from types import ModuleType, SimpleNamespace
 
 import pytest
@@ -136,6 +137,38 @@ def test_example_transport_injection_cannot_enter_declared_environment(inputs):
 def test_helper_foreign_function_origin_is_rejected(inputs, monkeypatch):
     monkeypatch.setattr(adapter, 'observe_error_response', lambda *a, **kw: None)
     with pytest.raises(ValueError, match='HELPER_IMPORT_MISMATCH'): adapter.verify_product_helpers()
+
+
+@pytest.mark.parametrize('module', [adapter, original_capture], ids=['installed', 'source-tool'])
+def test_modified_template_helper_blocks_capture_before_transport(inputs, tmp_path, monkeypatch, module):
+    source = Path(adapter.__file__).resolve().parents[1]
+    root = tmp_path / 'update/src/guard'
+    for relative in module.HELPER_PINS:
+        dest = root / relative
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / relative, dest)
+    template = root / 'executors/template_validation.py'
+    with template.open('ab') as stream:
+        stream.write(b'\n# unreviewed module change\n')
+    module_path = (root / 'adapters/kubernetes_response_error.py' if module is adapter
+                   else tmp_path / 'update/tools/b2_response_kubernetes_capture.py')
+    monkeypatch.setattr(module, '__file__', str(module_path))
+    with pytest.raises(ValueError, match='REQ13_HELPER_BYTES_MISMATCH'):
+        module.verify_product_helpers()
+    calls = []
+    def forbidden(*args, **kwargs):
+        calls.append(True)
+        raise AssertionError('unreviewed helper must not dispatch')
+    record = module.capture_validation_error(*inputs, _transport_factory=forbidden)
+    assert calls == [] and record['attempted_requests'] == 0
+    assert record['error_observation'] is None and record['gaps']
+
+
+@pytest.mark.parametrize('module', [adapter, original_capture], ids=['installed', 'source-tool'])
+def test_template_helper_foreign_function_origin_is_rejected(monkeypatch, module):
+    monkeypatch.setattr(module, '_token_ids', lambda value: None)
+    with pytest.raises(ValueError, match='REQ13_HELPER_IMPORT_MISMATCH'):
+        module.verify_product_helpers()
 
 
 def test_example_installed_layout_capability_checks_positive_bytes_and_origin(tmp_path, monkeypatch):

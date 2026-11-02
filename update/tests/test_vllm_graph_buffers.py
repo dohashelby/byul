@@ -3,6 +3,7 @@ from copy import deepcopy
 import gc
 import json
 import os
+import re
 from types import SimpleNamespace
 import weakref
 
@@ -129,6 +130,17 @@ def test_absent_graph_frame_does_not_claim_replay_or_mode_selection(observer):
     assert 'GRAPH_FRAME_UNAVAILABLE' in ret['gaps']
 
 
+def _without_identity_hashes(value):
+    """Raw-output checks exclude only well-formed identity hashes in their named fields."""
+    if type(value) is dict:
+        return {key: _without_identity_hashes(item) for key, item in value.items()
+                if not (key.endswith(('_token', '_sha256')) and type(item) is str
+                        and re.fullmatch(r'[0-9a-f]{64}', item))}
+    if type(value) is list:
+        return [_without_identity_hashes(item) for item in value]
+    return value
+
+
 def test_async_original_event_retained_reference_and_consumer_boundaries(observer):
     owner = Object();point = 'AsyncGPUModelRunnerOutput.__init__'
     tensor, event, stream = Tensor(), Event(), Object()
@@ -150,7 +162,8 @@ def test_async_original_event_retained_reference_and_consumer_boundaries(observe
     assert state['event_completion_verified'] is state['value_comparison_verified'] is None
     assert returned['metadata']['event_token'] == initialized['metadata']['event_token']
     assert returned['metadata']['stream_token'] == initialized['metadata']['stream_token']
-    assert '999' not in json.dumps(returned) and 'PRIVATE' not in json.dumps(returned)
+    assert '999' not in json.dumps(_without_identity_hashes(returned))
+    assert 'PRIVATE' not in json.dumps(returned)
     assert observer.close()['collection_gap'] is False
 
 

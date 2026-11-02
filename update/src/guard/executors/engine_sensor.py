@@ -33,6 +33,7 @@ PROFILES = {
     'REQ-21': 'engine-sensor-communication-buffer-v1',
 }
 # These checks read the prepared callback session instead of a lifecycle recording.
+INFORMATIONAL_GAPS = frozenset({'CACHE_CALLBACK_WEAK_OBJECT_IDENTITY_UNAVAILABLE', 'DISTRIBUTED_NON_EXECUTE_RPC_UNSUPPORTED'})
 CALLBACK_CHECKS = frozenset({'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17', 'REQ-18'})
 CPU_PROFILE = 'engine-sensor-slot-reference-cpu-v1'
 CPU_PREFIX = 'BYUL_ENGINE_SENSOR_SLOT='
@@ -353,21 +354,30 @@ class EngineSensorExecutor:
         tags = {}; elapsed = {}; outputs = {}; trials = []; cleanup = []
         # 같은 엔진을 다시 시험해도 이전 실행의 캐시가 교차 적중으로 보이지 않게 한다.
         nonce = uuid.uuid4().hex
+        # 경계 요청: 이 요청 앞의 세션 기록은 이번 시험 근거에서 뺀다.
+        barrier = 'byul-cb-' + uuid.uuid4().hex
+        try:
+            transport('kubernetes-probe', [{'id': 'cb-9999', 'mode': 'json', 'method': 'POST', 'url': endpoint,
+                'headers': {'X-Request-Id': barrier, **self._auth(cases[0])},
+                'body': {'model': transport.api_model, 'messages': [{'role': 'user', 'content': nonce + ' barrier'}],
+                    'max_tokens': 1, 'stream': False, **({} if 'principal' in cases[0] else {'temperature': 0})}}], 30)
+        except (KubernetesBindingError, ValueError):
+            cleanup.append('ENGINE_SENSOR_CALLBACK_BARRIER_UNAVAILABLE')
         for number, case in enumerate(cases):
             tag = tags[case['case_id']] = 'byul-cb-' + uuid.uuid4().hex
             body = {'model': transport.api_model, 'messages': [{'role': 'user', 'content': nonce + ' ' + case['prompt']}],
                 'max_tokens': case.get('max_tokens', 1), 'temperature': 0, 'stream': False}
             if 'allowed_token_ids' in case:
                 body['allowed_token_ids'] = case['allowed_token_ids']
+            if 'principal' in case:
+                del body['temperature']  # Gateway가 표본 설정을 정한다
             salt = case.get('forged_salt', case.get('cache_salt'))
             if salt is not None:
                 body['cache_salt'] = salt
-            headers = {'X-Request-Id': tag}
-            if 'principal' in case:
-                token = os.environ.get((self.cfg.get('principal_token_env') or {}).get(case['principal'], ''))
-                if not token:
-                    cleanup.append('ENGINE_SENSOR_PRINCIPAL_TOKEN_UNAVAILABLE'); break
-                headers['Authorization'] = 'Bearer ' + token
+            try:
+                headers = {'X-Request-Id': tag, **self._auth(case)}
+            except ValueError:
+                cleanup.append('ENGINE_SENSOR_PRINCIPAL_TOKEN_UNAVAILABLE'); break
             try:
                 row, = transport('kubernetes-probe', [{'id': f'cb-{number}', 'mode': 'json', 'method': 'POST',
                     'url': endpoint, 'headers': headers, 'body': body}], 30)
@@ -382,18 +392,22 @@ class EngineSensorExecutor:
                 elapsed[case['case_id']] = row['elapsed_ms']
         try:
             read = transport.engine_callback_events(prepared['session'])
-            events = read['events']
+            events = read['events'] if any('principal' in case for case in cases) else projection.window(
+                read['events'], engine_callbacks.load_secret(self.cfg['prepared']), barrier)
             if read['truncated']:
                 cleanup.append('ENGINE_SENSOR_CALLBACK_EVENTS_TRUNCATED')
         except KubernetesBindingError:
             events = []; cleanup.append('ENGINE_SENSOR_CALLBACK_EVENTS_UNAVAILABLE')
         secret = engine_callbacks.load_secret(self.cfg['prepared'])
         gateway = any('principal' in case for case in cases)
-        rows = projection.sequence_rows(events, cases) if gateway else projection.computed_rows(events, secret, tags)
+        served = [c for c in cases if outputs.get(c['case_id']) is not None or c['case_id'] in elapsed]
+        # Gateway가 4xx로 막은 위조 요청은 엔진에 닿지 않는다.
+        rejected = {t['case_id'] for t in trials if type(t['outcome']) is int and 400 <= t['outcome'] < 500}
+        rows = projection.sequence_rows(events, served) if gateway else projection.computed_rows(events, secret, tags)
         if check.id == 'REQ-14':
             result = projection.project_distributed(events, secret, tags)
         elif check.id == 'REQ-15':
-            identity = projection.project_identity(cases, rows) if gateway else None
+            identity = projection.project_identity(cases, rows, rejected) if gateway else None
             result = projection.project_cache_group(cases, rows, values, identity)
         elif check.id == 'REQ-16':
             result = projection.project_cache_context(cases, rows, values)
@@ -401,7 +415,8 @@ class EngineSensorExecutor:
             result = projection.project_slot(cases, outputs, events, secret, tags)
         else:
             result = projection.project_cache_timing(cases, rows, elapsed, values)
-        gaps = sorted({e['code'] for e in events if e.get('phase') == 'GAP' and type(e.get('code')) is str})
+        # 약한 참조가 안 되는 출력 객체, 관측 대상이 아닌 다른 RPC는 근거 공백이 아니다.
+        gaps = sorted({e['code'] for e in events if e.get('phase') == 'GAP' and type(e.get('code')) is str} - INFORMATIONAL_GAPS)
         collected = result['violation'] is not None
         finished = collected and not cleanup
         origin = DataOrigin(transport.process_observation_origin)
@@ -419,6 +434,14 @@ class EngineSensorExecutor:
                     'implementation': 'kubernetes', 'engine_started': False})
         return self._artifact(draft, workdir, {'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps},
             'required_branches': REQUIRED_BRANCHES[check.id]})
+
+    def _auth(self, case):
+        if 'principal' not in case:
+            return {}
+        token = os.environ.get((self.cfg.get('principal_token_env') or {}).get(case['principal'], ''))
+        if not token:
+            raise ValueError('ENGINE_SENSOR_PRINCIPAL_TOKEN_UNAVAILABLE')
+        return {'Authorization': 'Bearer ' + token}
 
     @staticmethod
     def _artifact(draft, workdir, payload):

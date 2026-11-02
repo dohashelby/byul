@@ -209,11 +209,12 @@ class Transport:
     def __call__(self, network, requests, timeout):
         request, = requests
         tag = request['headers']['X-Request-Id']
+        barrier = request['id'] == 'cb-9999'
         self.events.append({'point': projection.COMPUTED, 'phase': 'RETURN', 'entry_qualified_before': True,
             'entry_qualified_after': True, 'fields': {'request_sha256': projection.tag_digest(self.secret, tag),
-                'num_computed_tokens': self.tokens[self.count], 'request_block_hashes_sha256': ['h'],
+                'num_computed_tokens': 0 if barrier else self.tokens[self.count], 'request_block_hashes_sha256': ['h'],
                 'request_cache_salt_sha256': request['body'].get('cache_salt')}})
-        self.count += 1
+        self.count += 0 if barrier else 1
         return [{'outcome': 200, 'capture_complete': True, 'elapsed_ms': 5}]
 
     def engine_callback_events(self, session):
@@ -303,6 +304,8 @@ def test_sequence_binding_needs_one_request_per_case():
     events = [computed('byul-cb-' + str(i) * 32, 0) for i in range(4)]
     assert set(projection.sequence_rows(events, IDENTITY_CASES)) == {c['case_id'] for c in IDENTITY_CASES}
     assert projection.sequence_rows(events[:3], IDENTITY_CASES) == {}
+    earlier = [computed('byul-cb-' + 'e' * 32, 0)]
+    assert projection.sequence_rows(earlier + events, IDENTITY_CASES)['A0'] == projection.sequence_rows(events, IDENTITY_CASES)['A0']
 
 
 SLOT_CASES = [{'case_id': 'a', 'role': 'standalone', 'prompt': 'x'}, {'case_id': 'b', 'role': 'standalone', 'prompt': 'x'},
@@ -352,3 +355,17 @@ def test_recording_continues_past_the_in_memory_event_limit():
     for _ in range(callback.MAX_EVENTS + 5):
         observer._emit({'phase': 'CALL'})
     assert len(rows) == callback.MAX_EVENTS + 5 and not observer.gaps and not observer.events
+
+
+def test_gateway_rejecting_the_forged_salt_counts_as_bound():
+    rows = {'A0': [{'salt': 'a'}], 'B0': [{'salt': 'b'}]}
+    assert projection.project_identity(IDENTITY_CASES, rows, {'A1', 'B1'})['bound'] is True
+
+
+def test_window_drops_earlier_runs_and_processes_without_the_barrier():
+    barrier = 'byul-cb-' + 'f' * 32
+    old = {**computed(TAGS['a'], 16), 'process_sha256': 'p1'}
+    mark = {**computed(barrier, 0), 'process_sha256': 'p1'}
+    new = {**computed(TAGS['b'], 16), 'process_sha256': 'p1'}
+    gone = {**computed(TAGS['c'], 16), 'process_sha256': 'p0'}
+    assert projection.window([old, gone, mark, new], SECRET, barrier) == [mark, new]

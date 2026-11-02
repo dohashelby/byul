@@ -22,7 +22,7 @@ class LocalTransport:
     process_observation_origin = 'MEASURED'
 
     def __init__(self, base, model, data):
-        self.base = base; self.api_model = model; self.data = Path(data)
+        self.base = base.rstrip('/'); self.api_model = model; self.data = Path(data)
         self.endpoint = SimpleNamespace(scheme='http', netloc=base.split('//')[1])
 
     def __call__(self, network, requests, timeout):
@@ -83,7 +83,18 @@ def slot_cases():
         {'case_id': 'b', 'role': 'reused', 'prompt': 'tell me', 'max_tokens': 4}]
 
 
-def run_check(check_id, cases, values, env, assets, transport, workdir):
+def gateway_cases():
+    cases = []
+    for index, (first, second) in enumerate((('A', 'B'), ('B', 'A'))):
+        prompt = f'gateway {index} {PREFIX}'
+        cases += [{'case_id': f'g{index}-prime', 'role': 'prime', 'group': first, 'prefix': str(index), 'prompt': prompt, 'principal': first},
+            {'case_id': f'g{index}-control', 'role': 'control', 'group': first, 'prefix': str(index), 'prompt': prompt, 'principal': first},
+            {'case_id': f'g{index}-forged', 'role': 'probe', 'group': second, 'prefix': 'forged', 'prompt': 'forged', 'principal': second, 'forged_salt': 'salt-' + first},
+            {'case_id': f'g{index}-probe', 'role': 'probe', 'group': second, 'prefix': str(index), 'prompt': prompt, 'principal': second}]
+    return cases
+
+
+def run_check(check_id, cases, values, env, assets, transport, workdir, extra=None):
     prepared = engine_callbacks.load_prepared(assets)
     target = {'kubernetes': {}, 'lab': False}
     workdir = Path(workdir) / check_id; workdir.mkdir(parents=True, exist_ok=True)
@@ -91,7 +102,7 @@ def run_check(check_id, cases, values, env, assets, transport, workdir):
         'environment_ref': env.ref().model_dump(mode='json'), 'cases': cases}
     (workdir / 'target.json').write_bytes(canonical_json(target)); (workdir / 'manifest.json').write_bytes(canonical_json(manifest))
     executor = engine_sensor.EngineSensorExecutor({'target': str(workdir / 'target.json'), 'prepared': str(Path(assets) / 'manifest.json'),
-        'manifest': str(workdir / 'manifest.json')}, implementation='kubernetes')
+        'manifest': str(workdir / 'manifest.json'), **(extra or {})}, implementation='kubernetes')
     executor.transport = transport
     check = SimpleNamespace(id=check_id, executor='engine_sensor', collection_profile=engine_sensor.PROFILES[check_id], challenge_steps=[])
     draft = executor.run(check, env, {'sensor_environment_sha256': env.ref().sha256, 'sensor_target_sha256': sha256_hex(canonical_json(target)),
@@ -109,6 +120,7 @@ def main():
     parser.add_argument('--url', default='http://127.0.0.1:18000'); parser.add_argument('--model', default='opt')
     parser.add_argument('--assets', type=Path, required=True); parser.add_argument('--data', type=Path, required=True)
     parser.add_argument('--work', type=Path, required=True); parser.add_argument('--output', type=Path)
+    parser.add_argument('--gateway-url', help='per_principal Gateway. 토큰은 BYUL_TOKEN_A·BYUL_TOKEN_B 환경변수')
     args = parser.parse_args()
     env = Environment(id='ENV-CPU-CALLBACK', data_origin=DataOrigin.MEASURED, engine={'name': 'vllm', 'version': '0.31.0'}).seal()
     transport = LocalTransport(args.url, args.model, args.data)
@@ -118,6 +130,10 @@ def main():
         ('REQ-17', timing_cases(6), {'cache_timing_max_auc_percent': 75, 'cache_timing_min_samples': 6}),
         ('REQ-18', slot_cases(), {})]
     results = [run_check(c, cases, values, env, args.assets, transport, args.work) for c, cases, values in plans]
+    if args.gateway_url:
+        gateway = LocalTransport(args.gateway_url, args.model, args.data)
+        results.append({**run_check('REQ-15', gateway_cases(), {'isolated_cache_groups': ['A', 'B']}, env, args.assets, gateway,
+            args.work / 'gateway', {'principal_token_env': {'A': 'BYUL_TOKEN_A', 'B': 'BYUL_TOKEN_B'}}), 'path': 'gateway-per-principal'})
     text = json.dumps(results, ensure_ascii=False, indent=1)
     if args.output:
         args.output.write_text(text + '\n', encoding='utf-8')

@@ -133,7 +133,7 @@ class EngineCallbacks:
 
     def gap(self, code, detail=None):
         try:
-            self.sink({'schema': SCHEMA, 'phase': 'GAP', 'code': code,
+            self.sink({'schema': SCHEMA, 'phase': 'GAP', 'code': code, 'process_sha256': self.cache.process_sha256,
                 'detail_sha256': hashlib.sha256(str(detail).encode()).hexdigest()})
         except Exception:
             pass

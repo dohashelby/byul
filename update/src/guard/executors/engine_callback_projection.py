@@ -23,6 +23,22 @@ def tag_digest(secret, tag):
     return hmac.new(secret, b's:' + tag.encode(), hashlib.sha256).hexdigest()
 
 
+def window(events, secret, barrier):
+    """같은 세션의 앞선 시험 행을 버린다. 프로세스마다 이번 경계 요청이 처음 보인 곳부터 쓴다.
+
+    시계를 쓰지 않으므로 노드와 실행기의 시각 차이에 영향받지 않는다. 경계 요청을 보지 못한
+    프로세스(이미 끝난 이전 세대 포함)의 행은 이번 시험의 근거가 아니다.
+    """
+    marker = tag_digest(secret, barrier); kept = []; started = set()
+    for event in events:
+        process = event.get('process_sha256'); fields = event.get('fields') or {}
+        if process not in started and marker in (fields.get('request_sha256'), *(fields.get('native_request_sha256') or ())):
+            started.add(process)
+        if process in started:
+            kept.append(event)
+    return kept
+
+
 def validate_cases(check_id, cases):
     if (type(cases) is not list or not 1 <= len(cases) <= MAX_CASES
             or len({c.get('case_id') for c in cases if type(c) is dict}) != len(cases)):
@@ -55,7 +71,7 @@ def computed_rows(events, secret, tags):
 
 
 def sequence_rows(events, cases):
-    """Gateway가 요청 ID를 다시 발급할 때 직렬 시험의 순서로 사례를 잇는다."""
+    """Gateway가 요청 ID를 다시 발급할 때 직렬 시험의 순서로 사례를 잇는다. 엔진에 닿은 사례만 넘긴다."""
     ordered = {}
     for event in events:
         fields = event.get('fields') or {}
@@ -63,16 +79,19 @@ def sequence_rows(events, cases):
                 and event.get('entry_qualified_after') is True and type(fields.get('num_computed_tokens')) is int):
             ordered.setdefault(fields.get('request_sha256'), []).append({'tokens': fields['num_computed_tokens'],
                 'hashes': fields.get('request_block_hashes_sha256'), 'salt': fields.get('request_cache_salt_sha256')})
-    if len(ordered) != len(cases):
+    # 경계 요청 ID도 Gateway가 바꾸므로, 직렬로 보낸 마지막 사례 수만큼을 이번 시험으로 본다.
+    if len(ordered) < len(cases):
         return {}
-    return {case['case_id']: rows for case, rows in zip(cases, ordered.values())}
+    return {case['case_id']: rows for case, rows in zip(cases, list(ordered.values())[len(ordered) - len(cases):])}
 
 
-def project_identity(cases, rows):
-    """인증 주체가 salt를 정하는지 본다. 위조·생략한 요청의 salt는 같아야 한다."""
+def project_identity(cases, rows, rejected=()):
+    """인증 주체가 salt를 정하는지 본다. 위조한 salt는 거부되거나 무시돼야 한다."""
     salts = {}; forged = {}; omitted = {}
     for case in cases:
         principal = case.get('principal'); found = rows.get(case['case_id'])
+        if principal is not None and 'forged_salt' in case and case['case_id'] in rejected:
+            forged[principal] = 0; continue
         if principal is None or not found:
             continue
         salts.setdefault(principal, set()).add(found[0]['salt'])

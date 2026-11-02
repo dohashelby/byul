@@ -443,7 +443,7 @@ class KubernetesHTTP:
                 or set(request.get("headers",{}))-{"Authorization"}!={"X-Request-Id"}
                 or not re.fullmatch(r"byul-cb-[0-9a-f]{32}",str(request["headers"]["X-Request-Id"]))
                 or type(body) is not dict or set(body)-{"model","messages","max_tokens","temperature","stream","cache_salt","allowed_token_ids"}
-                or type(body.get("max_tokens")) is not int or not 1<=body["max_tokens"]<=8 or body.get("temperature")!=0
+                or type(body.get("max_tokens")) is not int or not 1<=body["max_tokens"]<=8 or body.get("temperature",0)!=0
                 or "allowed_token_ids" in body and (type(body["allowed_token_ids"]) is not list or not 0<len(body["allowed_token_ids"])<=4096
                     or any(type(v) is not int or v<0 for v in body["allowed_token_ids"])) or body.get("stream") is not False
                 or "cache_salt" in body and (type(body["cache_salt"]) is not str or not 0<len(body["cache_salt"])<=64)

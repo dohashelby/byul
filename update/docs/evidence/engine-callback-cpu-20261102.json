@@ -20,7 +20,8 @@
  "tool": "tools/engine_callback_cpu_smoke.py",
  "limits": [
   "CPU 단일 프로세스. TP/PP·GPU·Kubernetes 없음",
-  "REQ-15는 Gateway 없이 직접 salt를 보낸 결과라 신원 연결 미검증"
+  "REQ-15 직접 경로는 salt를 직접 보낸 대조, gateway-per-principal 행은 runtime Gateway(cache_isolation=per_principal)를 거친 결과",
+  "REQ-14는 중간 tensor 버퍼를 관측하지 않아 full_scope=false"
  ],
  "results": [
   {
@@ -31,7 +32,7 @@
    "full_scope": false,
    "normal": true,
    "facts": {
-    "batches_checked": 62,
+    "batches_checked": 4,
     "full_scope": false,
     "missing": [
      "intermediate_tensor_buffer_lineage_unobserved",
@@ -108,8 +109,8 @@
    "full_scope": true,
    "normal": true,
    "facts": {
-    "control_auc_percent": 94.44444444444444,
-    "cross_auc_percent": 63.888888888888886,
+    "control_auc_percent": 100.0,
+    "cross_auc_percent": 58.333333333333336,
     "full_scope": true,
     "missing": [],
     "native_cross_hits": 0,
@@ -144,6 +145,44 @@
     "violation": false
    },
    "requests": 4
+  },
+  {
+   "check_id": "REQ-15",
+   "status": "COMPLETED",
+   "violation": false,
+   "collected": true,
+   "full_scope": true,
+   "normal": false,
+   "facts": {
+    "full_scope": true,
+    "identity": {
+     "bound": true,
+     "client_changed_group": [],
+     "principals": 2,
+     "principals_sharing_salt": []
+    },
+    "missing": [],
+    "pairs": [
+     {
+      "control_hit": true,
+      "cross_hit": false,
+      "from": "A",
+      "salts_distinct": true,
+      "to": "B"
+     },
+     {
+      "control_hit": true,
+      "cross_hit": false,
+      "from": "B",
+      "salts_distinct": true,
+      "to": "A"
+     }
+    ],
+    "sensor_gaps": [],
+    "violation": false
+   },
+   "requests": 8,
+   "path": "gateway-per-principal"
   }
  ]
 }

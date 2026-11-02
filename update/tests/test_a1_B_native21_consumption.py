@@ -52,7 +52,8 @@ def test_B_reviewed_exact_A152_A156_A158_PR171_pairs_are_closed_and_literal():
         ("5ac8204da0bc92858ab64591078d4ddb19aa2ed10a25f5437031611c1620282e","062af9d1e0bc76a9c6f180af40e2b9fe52ffeb89"),
         ("67b917029c6458fc16cc53be787134d652fdb096673721a486febe4d68a0c0b6","9d8987a5a306ffce28fcb735e012c400589303f2"),
         ("15701b1e83eab8665414456b3072bcad73ee2220ed02e9f63a06a3441b55d157","f277fecd6df1e59505c0ad731032593f6fb22885"),
-        ("00979cf6b5139e0337d1f7976acad2b816e1018c4422cf8a44a087b0c28fc233","df6255e96a877ebfbe185230ed87320aa84d2c30")})
+        ("00979cf6b5139e0337d1f7976acad2b816e1018c4422cf8a44a087b0c28fc233","df6255e96a877ebfbe185230ed87320aa84d2c30"),
+        ("eb2337fd75d8e5b5f66802758ef7d8a0a78df9603ce7d069752cf92d4e73dee4","2247aabb3447ccb3210b100cade06bce51ed771e")})
     assert gate.REVIEWED_COMMON_COMMIT=="2247aabb3447ccb3210b100cade06bce51ed771e"
     assert gate.REVIEWED_COMMON_COMMIT in native.APPROVED_REVIEWED_COMMON_COMMITS
     assert PREVIOUS_B154_BYTES["update/tests/linux_cpu/lif13_peer_probe.py"]==REVIEWED_B_BYTES["update/tests/linux_cpu/lif13_peer_probe.py"]

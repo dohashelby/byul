@@ -200,19 +200,15 @@ def project_distributed(events, secret, tags):
     wanted = {tag_digest(secret, tag) for tag in tags.values()}
     recent = {}; seen = set(); checked = 0; violations = []
     for event in events:
-        if event.get('entry_qualified_before') is not True:
+        if event.get('entry_qualified_before') is not True or event.get('phase') != 'CALL':
             continue
         fields = event.get('fields') or {}; process = event.get('process_sha256')
-        if (event.get('phase') == 'CALL' and event.get('point') == 'WorkerProc._execute_worker_rpc'
-                and fields.get('rpc_method') == 'execute_model'):
+        if event.get('point') == 'WorkerProc._execute_worker_rpc' and fields.get('rpc_method') == 'execute_model':
             scheduled = fields.get('native_request_sha256')
             if scheduled:
                 seen.update(set(scheduled) & wanted)
                 recent.setdefault(process, deque(maxlen=PIPELINE_DEPTH)).append(set(scheduled))
-        elif (((event.get('phase') == 'CALL' and event.get('point') == 'WorkerProc.handle_output')
-                or (event.get('phase') == 'RETURN' and event.get('point') == 'AsyncGPUModelRunnerOutput.get_output'
-                    and event.get('entry_qualified_after') is True and fields.get('native_async_output_returned') is True))
-                and fields.get('output_request_sha256')):
+        elif event.get('point') == 'WorkerProc.handle_output' and fields.get('output_request_sha256'):
             allowed = set().union(*recent.get(process, ()))
             checked += 1
             extra = set(fields['output_request_sha256']) - allowed

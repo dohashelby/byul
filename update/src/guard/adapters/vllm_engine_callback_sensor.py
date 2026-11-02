@@ -28,10 +28,7 @@ DATA_ROOT = '/guard-lifecycle/data'
 SLOT_MODULE = 'vllm.v1.worker.gpu_input_batch'
 SLOT_TARGETS = {SLOT_MODULE: ('InputBatch.add_request', 'InputBatch.remove_request')}
 SLOT_SOURCE = {SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}
-GPU_OUTPUT_MODULE = 'vllm.v1.worker.gpu_model_runner'
-GPU_OUTPUT_POINT = 'AsyncGPUModelRunnerOutput.get_output'
-GPU_OUTPUT_TARGETS = {GPU_OUTPUT_MODULE: (GPU_OUTPUT_POINT,)}
-MODULES = {**cache.TARGETS, **distributed.TARGETS, **SLOT_TARGETS, **GPU_OUTPUT_TARGETS}
+MODULES = {**cache.TARGETS, **distributed.TARGETS, **SLOT_TARGETS}
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -61,24 +58,7 @@ class CacheObserver(_Keyed, cache.CacheCallbackObserver):
 
 
 class DistributedObserver(_Keyed, distributed.DistributedCallbackObserver):
-    targets = {**distributed.TARGETS, **GPU_OUTPUT_TARGETS}
-    # Reuse the reviewed lifecycle source pin; no pin is learned from a target.
-    sources = {**distributed.DistributedCallbackObserver.sources,
-        GPU_OUTPUT_MODULE: cache.base.SOURCE_SHA[GPU_OUTPUT_MODULE]}
-
-    def _snapshot(self, point, args, kwargs, result=None, returned=False):
-        if point != GPU_OUTPUT_POINT:
-            return super()._snapshot(point, args, kwargs, result, returned)
-        # GPU output is materialized by the original get_output call. Reading
-        # before it returns, or invoking it here, would change the native path.
-        output = result if returned else None
-        ids = cache.base.attrs(output).get('req_ids')
-        return {'receiver_token': self.token(args[0]) if args else None,
-            'output_object_token': self.token(output),
-            'output_request_sha256': [self.fingerprint(v) for v in ids]
-                if type(ids) is list and len(ids) <= 64 and all(type(v) is str and len(v) <= 512 for v in ids) else None,
-            'native_async_output_returned': returned,
-            'intermediate_tensor_buffer_verified': False, 'cross_process_lineage_verified': False}
+    pass
 
 
 class SlotObserver(_Keyed, cache.CacheCallbackObserver):

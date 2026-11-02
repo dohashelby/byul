@@ -1,20 +1,24 @@
-"""Closed envelope checks use immutable reviewed Git bytes, never packet hashes."""
+"""Closed envelope checks use reviewed manifest bytes, never packet hashes."""
 from copy import deepcopy
+import hashlib
+import json
 from pathlib import Path
-import subprocess
 import pytest
 
 from guard.models import canonical_json, sha256_hex
 from guard.runtime.kubernetes_worker_readiness import KubernetesWorkerReadinessHTTP, validate_snapshot, FLAGS
 from tests.test_a1_worker_readiness_http import inputs, assert_safe
-from tools.verify_req10_consumption import REVIEWED_COMMON_COMMIT
+from tools.verify_req10_consumption import MANIFEST_PATH
 
 
 @pytest.fixture(scope='module')
 def reviewed_sources():
     repo = Path(__file__).resolve().parents[2]
+    manifest = json.loads((repo / MANIFEST_PATH).read_text(encoding='utf-8'))['files']
     def reviewed(path):
-        return subprocess.check_output(['git', 'show', REVIEWED_COMMON_COMMIT + ':update/src/guard/' + path], cwd=repo)
+        raw = (repo / 'update/src/guard' / path).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == manifest['update/src/guard/' + path]
+        return raw
     probe = reviewed('executors/stream_probe.py').decode('utf-8').replace('\r\n', '\n')
     wrapper = ("import math,os,sys,threading\nlimit=float(sys.argv[1])\n"
         "if not math.isfinite(limit) or not 0 < limit <= 120: sys.exit(124)\n"

@@ -238,6 +238,7 @@ REVIEWED_GATE_FIXTURES = {
     tool.PR171_REVIEWED_COMMON_COMMIT:(tool.PR171_GATE_SOURCE_COMMIT,tool.PR171_GATE_SHA256),
     tool.NATIVE20_REVIEWED_COMMON_COMMIT:(tool.NATIVE20_GATE_SOURCE_COMMIT,tool.NATIVE20_GATE_SHA256),
     tool.PR184_REVIEWED_COMMON_COMMIT:(tool.PR184_GATE_SOURCE_COMMIT,tool.PR184_GATE_SHA256),
+    tool.MANIFEST_REVIEWED_COMMON:(None,tool.MANIFEST_GATE_SHA256),
 }
 
 
@@ -264,7 +265,9 @@ def test_native20_mutated_or_unknown_pair_rejected_before_delegation(example_sou
 def _reviewed_gate_bytes(common):
     import subprocess
     commit,expected=REVIEWED_GATE_FIXTURES[common]
-    raw=subprocess.check_output(['git','show',commit+':update/tools/verify_req10_consumption.py'],cwd=REPO)
+    # 파일 해시 목록 gate는 역사 commit이 아니라 현재 gate bytes로 고정한다.
+    raw=(REPO/'update/tools/verify_req10_consumption.py').read_bytes() if commit is None else \
+        subprocess.check_output(['git','show',commit+':update/tools/verify_req10_consumption.py'],cwd=REPO)
     assert tool.hashlib.sha256(raw).hexdigest()==expected
     return raw
 
@@ -415,10 +418,9 @@ def test_pr171_historical_blob_failure_has_no_current_fallback(monkeypatch,failu
 def test_pr171_HTTP_known_common_scope_excludes_native_only_histories():
     assert tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS==frozenset({
         'f277fecd6df1e59505c0ad731032593f6fb22885','df6255e96a877ebfbe185230ed87320aa84d2c30',
-        'adcde856375a4de43d4a5d789c00de875e43e321',
-
-        '2247aabb3447ccb3210b100cade06bce51ed771e'})
+        'adcde856375a4de43d4a5d789c00de875e43e321','2247aabb3447ccb3210b100cade06bce51ed771e',
+        tool.MANIFEST_REVIEWED_COMMON})
     assert tool.HTTP_REVIEWED_COMMON_COMMIT=='f277fecd6df1e59505c0ad731032593f6fb22885'
     assert tool.REVIEWED_COMMON_COMMIT not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
     assert '9d8987a5a306ffce28fcb735e012c400589303f2' not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
-    assert len(tool.APPROVED_GATE_PROFILES)==5
+    assert len(tool.APPROVED_GATE_PROFILES)==7

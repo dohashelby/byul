@@ -97,6 +97,22 @@ class PolicyBundleVerificationTests(unittest.TestCase):
             with self.assertRaisesRegex(PolicyBundleError, "runtime-policy.json.*SHA-256"):
                 verify_policy_bundle(directory, now=NOW)
 
+    def test_policy_ref_id_and_version_match_gateway_policy(self) -> None:
+        for field, wrong in (("policy_id", "another-policy"), ("policy_version", "another-version")):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as temporary:
+                directory = _copy_bundle(Path(temporary))
+                document = _manifest(directory)
+                document["policy_ref"][field] = wrong
+                _write_manifest(directory, document)
+                with self.assertRaisesRegex(PolicyBundleError, "policy_id 또는 policy_version"):
+                    verify_policy_bundle(directory, now=NOW)
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = _copy_bundle(Path(temporary))
+            document = _manifest(directory)
+            document["policy_ref"]["sha256"] = "f" * 64
+            _write_manifest(directory, document)
+            self.assertEqual(verify_policy_bundle(directory, now=NOW).policy_ref["sha256"], "f" * 64)
+
     def test_byte_count_mismatch_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             directory = _copy_bundle(Path(temporary))

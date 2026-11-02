@@ -373,6 +373,14 @@ def verify_policy_bundle(
         )
 
     assert gateway_document is not None
+    if (
+        gateway_document.get("policy_id") != policy_id
+        or gateway_document.get("policy_version") != policy_version
+    ):
+        gateway_path = next(
+            item.relative_path for item in verified_files if item.role == "gateway_policy"
+        )
+        raise _error(gateway_path, "policy_id 또는 policy_version이 bundle.json의 policy_ref와 다릅니다")
     if gateway_document.get("target_id") != target_ref:
         gateway_path = next(
             item.relative_path for item in verified_files if item.role == "gateway_policy"

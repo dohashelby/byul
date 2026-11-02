@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { RuntimeRequestDetail, RuntimeStatus } from "../src/api/types";
 import { RequestDrawer } from "../src/pages/runtime/RequestDrawer";
 import { RuntimeOverviewPage } from "../src/pages/runtime/RuntimeOverviewPage";
+import { RuntimeTargetPage } from "../src/pages/runtime/RuntimeTargetPage";
 import { SOURCE, mockApi, renderAt } from "./helpers";
 
 const STATUS = Object.values(
@@ -71,5 +72,24 @@ describe("사용자별 캐시 분리 표시", () => {
 
     const label = await screen.findByText("캐시 분리");
     expect(label.parentElement?.textContent).toContain(expected);
+  });
+});
+
+describe("대상 확인 중단 표시", () => {
+  it("직전 정상 확인 뒤 수집이 끊기면 요청 처리와 마지막 확인 시각을 경고한다", async () => {
+    const status = clone(STATUS);
+    status.overall = "degraded";
+    status.target.verification = {
+      state: "unavailable", last_confirmed_at: "2026-10-25T01:04:58Z",
+    };
+    status.target.gateway_hold = null;
+    mockApi({
+      "/api/runtime/status": { item: status, invalid: null, source: SOURCE },
+      "/api/update/revalidation": { items: [], source: SOURCE },
+    });
+    renderAt("/runtime/target", "/runtime/target", <RuntimeTargetPage />);
+    expect(await screen.findByText(/대상 미확인, 요청은 처리 중/)).toBeTruthy();
+    expect(screen.getByText(/마지막 확인 시각/)).toBeTruthy();
+    expect(screen.queryByText(/신규 추론 요청 보류\(503\)/)).toBeNull();
   });
 });

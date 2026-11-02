@@ -1570,6 +1570,12 @@ export interface components {
                     reason_code: string;
                     message: string | null;
                 };
+                /** @description 대상 확인 결과. unavailable은 직전 정상 확인을 근거로 요청을 처리하지만 현재 값은 미확인이다. */
+                verification: {
+                    /** @enum {unknown} */
+                    state: "ok" | "unavailable" | "blocked";
+                    last_confirmed_at: components["schemas"]["Common_nullable_timestamp"];
+                };
                 comparison_counts: components["schemas"]["RuntimeStatus_compare_counts"];
                 last_history: null | {
                     event: string;

@@ -94,7 +94,7 @@ dev 결과와 수정 사항을 확인한 뒤 AWS 묶음 `COST-PLAN.md` 절차로
 | AWS-04 직통 거부 | 비파괴 | `other-client`→engine:8000은 timeout errno, Gateway Pod→engine:8000은 직전·직후 연결 성공, Gateway 요청 200 | errno·이름과 해당 흐름의 Hubble `dropped` 행 또는 API 관측 | RT-API-03, RT-NET-02, RT-TASKNET-02 |
 | AWS-05 금지 송신 | 비파괴 | engine→`test-receiver` Pod IP:8080은 timeout errno, `other-client`→같은 IP:8080 연결 성공 | kubectl receiver Pod IP, errno·이름, engine→receiver 해당 흐름의 Hubble `dropped` | RT-NET-02, RT-TASKNET-01 |
 | AWS-06 RO 쓰기 거부 | 비파괴 | `/models` 쓰기가 `EROFS`, `/cache` 임시 파일 쓰기·자체 삭제 성공 | exec errno·이름과 TG-ASSET-01/TG-CACHE-01 관측. `EPERM`·`EACCES`는 `unknown` | RT-SYS-03, RT-ASSET-02, RT-ASSET-05 |
-| AWS-07 수집 중단 | 변경(opt-in) | collector stop 뒤 두 heartbeat `stopped`와 stale window 안 Gateway non-ok, restart 뒤 collector ok 및 유한 창 안 정상 chat 회복 | heartbeat, `/api/collectors`, recovery 요청 record·재시도 timing. 중지 구간 요청과 gap은 보고만 함 | RT-OBS-01, RT-SYS-06 |
+| AWS-07 수집 중단 | 변경(opt-in) | collector stop 뒤 두 heartbeat `stopped`와 Gateway collector non-ok, stale 창 15초+여유 뒤 정상 chat 200·대상 미확인, restart 뒤 collector 및 대상 상태 ok와 정상 chat 회복 | heartbeat, `/api/collectors`, `/api/target`, 중지 구간·복구 요청 record·재시도 timing. gap은 보조 | RT-OBS-01, RT-SYS-06 |
 | AWS-08 Pod 교체 | 변경(opt-in) | rollout 뒤 Pod UID·Gateway instance 변경, restart 이후 `engine_info` ok 뒤 유한 창 안 정상 chat 회복 | host 신원, target 이력, engine_info, 재시도 횟수·경과·마지막 status/reason | RT-NET-04, RT-PHASE-01 |
 
 AWS-04·05는 `connect_ex`가 반환한 errno와 이름을 기록한다. `EAGAIN`/`EWOULDBLOCK`/`ETIMEDOUT`만 차단 후보로 보고, `ECONNREFUSED` 등 다른 실패나 DNS 예외는 정책 차단 근거가 아니므로 `unknown`이다. AWS-04는 Gateway 이미지가 Python 기반이고 컨테이너 이름이 `gateway`임을 전제로 직통 probe 직전·직후 Gateway Pod 안에서 engine:8000 연결 성공을 확인한다. exec가 불가능하면 `unknown`이다. AWS-05는 팀 소유 `test-receiver` Pod IP만 대상으로 하며, `other-client`가 같은 receiver에 연결하지 못하면 `대조 실패: receiver에 닿지 않음`으로 `unknown`이다. 두 사례 모두 정확한 대상 흐름의 Hubble verdict가 `dropped`여야 하며 `DROPPED` 단독으로는 통과하지 않는다.
@@ -118,7 +118,7 @@ kubectl --context byul-aws-lab -n serving-lab get networkpolicy engine-runtime e
 
 `192.0.2.1`은 비라우팅 TEST-NET-1이고 이 AWS 묶음은 IMDSv2 hop limit 1이므로 external·IMDS connect는 egress 정책이 없어도 실패한다. 두 probe와 Hubble 행은 보고서의 보조 증거일 뿐 판정에서 제외한다. AWS-06의 모델 probe는 `EPERM`·`EACCES`·`EROFS`를 모두 `WRITE_DENIED`로 출력하지만 `EROFS`만 read-only mount 증거로 인정한다. 모델 폴더 소유자 10002와 엔진 UID 2000 때문에 mount가 read-only가 아니어도 `EACCES`가 날 수 있고, `EPERM`은 Tetragon 등 다른 집행일 수 있다. TG-ASSET-01은 RO mount가 hook보다 먼저 거부하면 미관측일 수 있지만, cache 쓰기 관측이 없으면 연결 근거 부족으로 `unknown`이다.
 
-AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. stop 뒤 heartbeat `stopped`와 `stale_after_s` 안 collector non-ok를 기다리고 중지 구간 정상 요청 1건의 HTTP status·reason_code는 보고서에만 남긴다. start 뒤 collector가 ok가 되면 `min(stale_after_s + 30초, 90초)` 재시도 창 안에 정상 chat 200·`ALLOWED`·전달 시도가 회복돼야 한다. 정상 SIGTERM의 gap 행은 보조다. AWS-08은 rollout과 target instance/history 확인 뒤, restart 이후 `engine_info`가 ok가 될 때까지 요청을 보내지 않는다. 그 뒤 90초 재시도 창에서 정상 chat 회복을 확인하고 끝까지 실패하면 마지막 status·reason_code를 남긴다. host snapshot stale은 `snapshot_note`에만 남으며 통과로 채우지 않는다. 도구는 정책이나 Deployment spec을 바꾸지 않고 AWS-06 임시 파일 외에는 삭제하지 않는다.
+AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. stop 뒤 heartbeat `stopped`와 Gateway collector non-ok를 확인하고, target Pod 스냅샷을 포함한 stale 창보다 2초 더 기다려 정상 요청 1건의 HTTP 200 및 `/api/target.verification.state=unavailable`(gateway_hold 없음)을 판정한다. 503은 실패다. start 뒤 collector와 target verification이 ok로 돌아오고 `min(stale_after_s + 30초, 90초)` 재시도 창 안에 정상 chat 200·`ALLOWED`·전달 시도가 회복돼야 한다. 정상 SIGTERM의 gap 행은 보조다. **이 기준은 AWS 재시험 전**이며 적용에는 Gateway 이미지 재빌드가 필요하다. AWS-08은 rollout과 target instance/history 확인 뒤, restart 이후 `engine_info`가 ok가 될 때까지 요청을 보내지 않는다. 그 뒤 90초 재시도 창에서 정상 chat 회복을 확인하고 끝까지 실패하면 마지막 status·reason_code를 남긴다. host snapshot stale은 `snapshot_note`에만 남으며 통과로 채우지 않는다. 도구는 정책이나 Deployment spec을 바꾸지 않고 AWS-06 임시 파일 외에는 삭제하지 않는다.
 
 ## 2026-11-01 dev 실행 기록 (Claude 실행, Codex 교차 검수 전)
 
@@ -134,9 +134,13 @@ g6.2xlarge·vLLM 0.31.0에서의 기능 연결 확인 1회이며 정식 평가�
 
 AWS-07은 stop/start 뒤 각각 약 4초에 feed error/ok, 복구 요청 200이었다. 중지 중 약 4초의 요청 1건은 200이었으나 판정 대상이 아니었다. stale 15초 뒤 503 hold는 이번에 관측하지 않았고 정상 종료라 gap 행도 없다. AWS-08은 Pod UID·instance 변경과 `instance_changed`/`pod_replaced` 이력, 복구 요청 200을 확인했다. 최종 증거는 `~/.local/state/serving-runtime/aws-lab/evidence/dev-20261101-stage6`, 요청·관측 화면 복사본은 `dev-20261101-dashboard-copy-final`이다. EC2 stopped를 확인했으며 컴퓨트는 약 1.5시간(추정)이다.
 
+위 AWS-07 통과는 이전 판정 기준이다. 수정한 stale 이후 200·대상 미확인·복구 후 대상 ok 기준은 AWS에서 아직 실행하지 않았다. 새 코드 사용 전 Gateway 이미지를 재빌드해야 한다.
+
 ## 결과 반출과 비용 절약
 
 각 실행은 현재 폴더의 `evidence/aws-acceptance-<UTC>-<pid>/`를 0700으로 만들고 0600의 `report.json`·`report.md`를 쓴다. 명령 argv, HTTP code, request ID, 판정에 사용한 record 필드, 관측 파일·행 또는 API query가 들어가며 token·token hash·prompt·응답 본문은 넣지 않는다.
+
+다음 실행부터 `report.md`는 한국어 머리말·시험 결과·판정 기준·아는 한계로 쓴다. 결과 표는 각 시험의 수집값을 짧게 보여 주고, 미통과 때는 확인되지 않았거나 어긋난 필수 facts 값을 적는다. 판정 기준과 한계는 이번 실행에 포함된 시험만 표시한다. 통과는 해당 환경의 1회 결과이며 기능 완성을 뜻하지 않는다. 기존 보고서는 바꾸지 않고 `report.json`의 필드 구조도 유지한다.
 
 로컬 준비 → dev 비파괴 6건 → dev 변경 2건 → Pod 교체 뒤 AWS-04·05 재실행 → 필요한 수정과 재시험 → reference 8건 및 같은 재실행 → 증거 반출 → EC2 Stop 순서로 묶는다. 사례 사이에 엔진을 내리지 않고, AWS-08에서만 한 번 cold-start한다. 종료 전에 `report.json`·`report.md` 등 증거 파일의 존재를 확인하고, 실행 폴더를 관리자 보관소나 개발 노트북으로 반출한 뒤 파일 권한을 유지하며 Stop한다.
 

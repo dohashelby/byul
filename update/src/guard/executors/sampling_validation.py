@@ -39,7 +39,7 @@ def _integer(value, label, minimum, maximum):
 
 class SamplingValidationExecutor(HttpCheckExecutor):
     name = "sampling_validation"
-    version = "0.2.0"
+    version = "0.2.1"
     requires_roles = False
     requires_route_scope = False
 
@@ -142,7 +142,7 @@ class SamplingValidationExecutor(HttpCheckExecutor):
                 if (type(choices) is list and len(choices) == 1 and type(choices[0]) is dict
                         and type(choices[0].get("text")) is str
                         and choices[0].get("finish_reason") in {"stop", "length"}
-                        and body.get("model") == ctx.env.model.id
+                        and body.get("model") == ctx.api_model
                         and type(usage.get("completion_tokens")) is int
                         and 0 < usage["completion_tokens"] <= self.cfg["max_output_tokens"]):
                     return "pass"

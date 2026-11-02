@@ -1,6 +1,6 @@
 {
-  "status": "comparison_complete_gpu_shutdown_requested_cpu_regression_running",
-  "updated_at": "2026-11-02T09:43:44.866512+00:00",
+  "status": "gpu_stopped_comparison_and_next_prompt_delivered_cpu_regression_running",
+  "updated_at": "2026-11-02T09:47:13.290277+00:00",
   "user_requests": [
     "미실측34개도 모두 실제 GPU 실증",
     "현재 프롬프트와 gpu-handoff.html 비교 및 더 나은 방법 설명"
@@ -15,7 +15,7 @@
     "instance": "i-00c7a1495dad2066b",
     "type": "g6.2xlarge",
     "physical_gpu_count": 1,
-    "state": "stopping_confirmed_in_console",
+    "state": "stopped",
     "resumed_at_utc": "2026-11-02T08:46:34Z",
     "public_ip": "3.39.22.180",
     "ssh_source": "211.212.221.147/32",
@@ -29,9 +29,14 @@
     "delete_authorized": false,
     "shutdown_requested_at_utc": "2026-11-02T09:40:22Z",
     "scheduled_poweroff_at_utc": "2026-11-02T09:41:22Z",
-    "cloud_stopped_verified": false,
+    "cloud_stopped_verified": true,
     "gpu_processes_after": [],
-    "gpu_memory_mib_after": 0
+    "gpu_memory_mib_after": 0,
+    "cloud_stopped_verified_at_utc": "2026-11-02T09:47:13.290277+00:00",
+    "force_stop_used_after_normal_shutdown_stalled": true,
+    "skip_os_shutdown_selected": false,
+    "power_state_screenshot": "out/gpu-completion/G33-power-state.png",
+    "power_state_screenshot_sha256": "b26582107afd23ed5924d9efaf32c16bfeaaf7b854a04c9aed325eaadcd77cbc"
   },
   "cpu": {
     "linux_readiness_passed": 279,
@@ -428,6 +433,12 @@
     "local_cpu_full_suite_active": true,
     "automatic_followup_monitor": false,
     "all_gpu_work_complete": false,
-    "latest_user_comparison_answer_ready": true
+    "latest_user_comparison_answer_ready": true,
+    "latest_user_request": "next-work prompt drafting; no new GPU start"
+  },
+  "new_user_request": {
+    "task": "Draft prompt to finish all remaining40-candidate GPU branches with no task-time limit and total cost capUSD100",
+    "new_aws_execution_authorized_by_this_request": false,
+    "additional_gpu_requires_user_question": true
   }
 }

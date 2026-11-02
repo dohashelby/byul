@@ -118,7 +118,7 @@ def test_approved_running_image_is_partial_unknown_not_full_supply_pass(tmp_path
     store, _, _, evd, result, docker, probes = _run(tmp_path, monkeypatch)
     assert evd.execution.status == ExecStatus.COMPLETED
     assert evd.data_origin.value == "EXAMPLE"
-    assert evd.execution.executor.name == "container_config" and evd.execution.executor.version == "0.6.2"
+    assert evd.execution.executor.name == "container_config" and evd.execution.executor.version == "0.6.3"
     assert result.verdicts.security == Verdict.UNKNOWN
     assert evd.observations["running_image_identity_verified"].value is True
     assert evd.observations["running_image_repo_digest"].value == PIN
@@ -278,12 +278,12 @@ def test_aborted_supply_collection_records_same_static_executor_version(tmp_path
     def interrupted(self, ctx):
         raise RuntimeError("EXAMPLE interrupted collection")
 
-    assert ContainerConfigExecutor.version == "0.6.2"
+    assert ContainerConfigExecutor.version == "0.6.3"
     monkeypatch.setattr(ContainerConfigExecutor, "collect", interrupted)
     _, _, _, evd, result, _, _ = _run(tmp_path, monkeypatch)
     assert evd.execution.status == ExecStatus.ABORTED
     assert evd.execution.executor.name == "container_config"
-    assert evd.execution.executor.version == ContainerConfigExecutor.version == "0.6.2"
+    assert evd.execution.executor.version == ContainerConfigExecutor.version == "0.6.3"
     assert result.verdicts.security == Verdict.UNKNOWN
 
 
@@ -418,7 +418,7 @@ def test_environment_binding_product_cli_report_restore_and_exact_refs(tmp_path,
     store = Store(store_path)
     evd, = store.find_latest("EVD", lambda r: True); res, = store.find_latest("RES", lambda r: True)
     rpt, = store.find_latest("RPT", lambda r: True)
-    assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.6.2"
+    assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.6.3"
     assert evd.execution.status == ExecStatus.COMPLETED and res.verdicts.security.value == expected
     assert evd.environment == env.ref() and rpt.official is False
     assert evd.ref() in rpt.inputs_manifest and res.ref() in rpt.inputs_manifest

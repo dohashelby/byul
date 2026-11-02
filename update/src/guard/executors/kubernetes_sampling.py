@@ -10,7 +10,7 @@ from .sampling_validation import SamplingValidationExecutor
 
 
 class KubernetesSamplingExecutor(SamplingValidationExecutor):
-    version = "0.2.1"
+    version = "0.2.2"
 
     def __init__(self, cfg, *, runner=None, environ=None):
         super().__init__(cfg, environ=environ)

@@ -139,7 +139,7 @@ def _obs03(evd, sample, values):
     elif (sample.get("schema") == "guard-log-analysis-capture/3" and version == "0.2.1"
             and sample.get("analysis_profile") == STRICT_JSON_PROFILE):
         profile = STRICT_JSON_PROFILE
-    elif (sample.get("schema") == "guard-log-analysis-capture/4" and version == "0.3.0"
+    elif (sample.get("schema") == "guard-log-analysis-capture/4" and version in {"0.3.0", "0.3.1"}
             and sample.get("analysis_profile") == STRICT_JSON_PROFILE
             and sample.get("projection_profile") == LOG_PROJECTION_PROFILE):
         validate_projection(sample, values)

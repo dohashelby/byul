@@ -1,0 +1,1174 @@
+[
+  {
+    "stage": "G27REQ14",
+    "check_id": "REQ-14",
+    "plan": "PLAN-01M6DQY85DAVJD4NVN71N8J6Z9",
+    "as_of": "2026-11-02T09:04:54.397822+00:00",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M6DQY8KFYVFDAEYV8FSFDA0S",
+      "revision": 1,
+      "sha256": "53726f0ff86c953726573bc8bc8263a68bc1604b26a055a57448c93f9bbcdd70"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M6DR29FTA37EAJE9RHWHKVR1",
+      "revision": 1,
+      "sha256": "b20203aa2ccb89c757e3b3bf405effc028c9133ae95aaf4a24402a3d3b9ac95b"
+    },
+    "report_ref": {
+      "kind": "RPT",
+      "id": "RPT-01M6DR29YH85QV40ZMG45SA1GS",
+      "revision": 1,
+      "sha256": "14bc4da9ee40efb3955d3597e7ab8acc7ec5dbfd7df5f23e31eb2c18d6e72186"
+    },
+    "bundle_sha256": "b9e17e71bbcc1486c29dbbfe0357e1f522202c1ef1b0baf2b8bb9a0c728dfd2d",
+    "origin": "DECLARED",
+    "execution": {
+      "status": "ABORTED",
+      "executor": {
+        "name": "engine_sensor",
+        "version": "0.1.0",
+        "config_sha256": "bfce2f45ff05aa2258bb66aa5c349fe2a242a724ea1c191f6f34e888e2a144d8"
+      },
+      "adapter": {
+        "name": "vllm",
+        "version": "0.4.2"
+      },
+      "started_at": "2026-11-02T09:02:42Z",
+      "finished_at": "2026-11-02T09:02:46Z",
+      "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE",
+      "cleanup_errors": [
+        "ENGINE_SENSOR_CALLBACK_EVENTS_UNAVAILABLE"
+      ]
+    },
+    "observations": {
+      "engine_sensor_full_scope": {
+        "value": false,
+        "collected": true
+      },
+      "engine_sensor_violation": {
+        "value": null,
+        "collected": false
+      }
+    },
+    "official": false,
+    "safe_facts": {
+      "batches_checked": 0,
+      "full_scope": false,
+      "missing": [
+        "intermediate_tensor_buffer_lineage_unobserved",
+        "model_generation_consumption_unobserved",
+        "distributed_batches_incomplete"
+      ],
+      "sensor_gaps": [],
+      "trials": [
+        {
+          "case_id": "n0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "normal"
+        },
+        {
+          "case_id": "n1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "normal"
+        },
+        {
+          "case_id": "n2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "normal"
+        }
+      ],
+      "violation": null,
+      "violations": []
+    },
+    "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "local_saved_pack_exact_refs": true
+  },
+  {
+    "stage": "G28REQ14",
+    "check_id": "REQ-14",
+    "plan": "PLAN-01M6DR812XYKNPX26K9GKFB4RX",
+    "as_of": "2026-11-02T09:08:08.120665+00:00",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M6DR81GWH52EM439545N94R2",
+      "revision": 1,
+      "sha256": "0b36ca72498504263c668b392b992490a49219fe6422d6a014e7ab2fa2152fd3"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M6DR86NP9GHY2FB7W9DWBN7K",
+      "revision": 1,
+      "sha256": "3a516c8e3ab2b8c96de2b0121891099d73d99261d30ff512f9b2a25f9433a896"
+    },
+    "report_ref": {
+      "kind": "RPT",
+      "id": "RPT-01M6DR874AMXNS9CKR0ND9EQGV",
+      "revision": 1,
+      "sha256": "571c1ff1534a071ab1e09c8f551c555f99539047ae93965a4c57f60719447a88"
+    },
+    "bundle_sha256": "92a14228f50a9bc1c1cd6cd7316626af3619303b4175a8a17466262b99f08450",
+    "origin": "DECLARED",
+    "execution": {
+      "status": "ABORTED",
+      "executor": {
+        "name": "engine_sensor",
+        "version": "0.1.0",
+        "config_sha256": "f5d5f3bccc94b3572e82f5ecdc84d0ceeac0728913781a2cb9ad5cef51c58b3d"
+      },
+      "adapter": {
+        "name": "vllm",
+        "version": "0.4.2"
+      },
+      "started_at": "2026-11-02T09:08:03Z",
+      "finished_at": "2026-11-02T09:08:08Z",
+      "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE"
+    },
+    "observations": {
+      "engine_sensor_full_scope": {
+        "value": false,
+        "collected": true
+      },
+      "engine_sensor_violation": {
+        "value": null,
+        "collected": false
+      }
+    },
+    "official": false,
+    "safe_facts": {
+      "batches_checked": 0,
+      "full_scope": false,
+      "missing": [
+        "intermediate_tensor_buffer_lineage_unobserved",
+        "model_generation_consumption_unobserved",
+        "distributed_batches_incomplete"
+      ],
+      "sensor_gaps": [],
+      "trials": [
+        {
+          "case_id": "n0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "normal"
+        },
+        {
+          "case_id": "n1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "normal"
+        },
+        {
+          "case_id": "n2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "normal"
+        }
+      ],
+      "violation": null,
+      "violations": []
+    },
+    "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "local_saved_pack_exact_refs": true
+  },
+  {
+    "stage": "G28REQ16",
+    "check_id": "REQ-16",
+    "plan": "PLAN-01M6DRKSYEN35E90XZA1694RWE",
+    "as_of": "2026-11-02T09:14:34.946291+00:00",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M6DRKTCZR52AE9GKQ4FHAPN2",
+      "revision": 1,
+      "sha256": "4bca4f2cd0745e629002489aafabd9fc1d0db6d163bbbc581b10315a3b14256d"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M6DRM0E3CE8HTFJ5DVWFVQZF",
+      "revision": 1,
+      "sha256": "418cd75d1908bb258857fccc988adf83e4e75e265c5faf6c891bfec1d2205cdf"
+    },
+    "report_ref": {
+      "kind": "RPT",
+      "id": "RPT-01M6DRM0WFS55FE6Y9X73ZXQWV",
+      "revision": 1,
+      "sha256": "1e88fa2a8c1d9f3ae250f554657cd886a5ac1c579a505ae674715bb305761e14"
+    },
+    "bundle_sha256": "20b8272527490e119cc065cfd50177e5c61b9582a1457ece7cc9e1cab384efe6",
+    "origin": "MEASURED",
+    "execution": {
+      "status": "COMPLETED",
+      "executor": {
+        "name": "engine_sensor",
+        "version": "0.1.0",
+        "config_sha256": "705a216f0b31033a6da8291f001619a2e92520ce01dcdeaf8f33856500d6a5d8"
+      },
+      "adapter": {
+        "name": "vllm",
+        "version": "0.4.2"
+      },
+      "started_at": "2026-11-02T09:14:29Z",
+      "finished_at": "2026-11-02T09:14:34Z",
+      "abort_reason": null
+    },
+    "observations": {
+      "engine_sensor_full_scope": {
+        "value": true,
+        "collected": true
+      },
+      "engine_sensor_violation": {
+        "value": false,
+        "collected": true
+      }
+    },
+    "official": false,
+    "safe_facts": {
+      "contexts": [
+        {
+          "changed_hit": false,
+          "context": "cache_salt",
+          "control_hit": true,
+          "same_key": false
+        }
+      ],
+      "full_scope": true,
+      "missing": [],
+      "sensor_gaps": [],
+      "trials": [
+        {
+          "case_id": "prime",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "control",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control"
+        },
+        {
+          "case_id": "probe",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "probe"
+        },
+        {
+          "case_id": "post",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "post"
+        }
+      ],
+      "violation": false
+    },
+    "verdicts": {
+      "security": "PASS",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "local_saved_pack_exact_refs": true
+  },
+  {
+    "stage": "G28REQ17",
+    "check_id": "REQ-17",
+    "plan": "PLAN-01M6DRT3HBZ856CFYYHSXXG89M",
+    "as_of": "2026-11-02T09:18:27.062576+00:00",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M6DRT3Z6TKQGEPSAKP21MXMN",
+      "revision": 1,
+      "sha256": "9819eab622ecc948dc70374509f74c279b8288ab3c889c1597a5284b19fc149e"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M6DRV33MGJ8439M81FMZCZPH",
+      "revision": 1,
+      "sha256": "2d7927ee37d5b40c450dc61a310dc9085563b0087afbc37d3676c75be980a4ff"
+    },
+    "report_ref": {
+      "kind": "RPT",
+      "id": "RPT-01M6DRV3J0HEZ8ZVHE7NGJJN1S",
+      "revision": 1,
+      "sha256": "ba9a87d69f2701fabbafe6322737a2c8c4fb26b1c9a372e097e8336a770f3581"
+    },
+    "bundle_sha256": "fbf5f3ceba686d0fa85d96dc300e9a470e32ad5e6687da5d5c32261a5d15769f",
+    "origin": "DECLARED",
+    "execution": {
+      "status": "ABORTED",
+      "executor": {
+        "name": "engine_sensor",
+        "version": "0.1.0",
+        "config_sha256": "0b1e7f9abfe319752f17222f9c3c2258e465004590d8ddc2d5d3c55bffe5f3e5"
+      },
+      "adapter": {
+        "name": "vllm",
+        "version": "0.4.2"
+      },
+      "started_at": "2026-11-02T09:17:55Z",
+      "finished_at": "2026-11-02T09:18:26Z",
+      "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE"
+    },
+    "observations": {
+      "engine_sensor_full_scope": {
+        "value": false,
+        "collected": true
+      },
+      "engine_sensor_violation": {
+        "value": null,
+        "collected": false
+      }
+    },
+    "official": false,
+    "safe_facts": {
+      "full_scope": false,
+      "missing": [
+        "timing_samples_below_policy_minimum"
+      ],
+      "samples": {
+        "absent": 0,
+        "control-absent": 0,
+        "control-present": 0,
+        "present": 0
+      },
+      "sensor_gaps": [],
+      "trials": [
+        {
+          "case_id": "prime-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        }
+      ],
+      "violation": null
+    },
+    "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "local_saved_pack_exact_refs": true
+  },
+  {
+    "stage": "G28REQ18",
+    "check_id": "REQ-18",
+    "plan": "PLAN-01M6DRPG8020CDQFTTBYZ6XB2F",
+    "as_of": "2026-11-02T09:16:04.823859+00:00",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M6DRPGPQ4BQG7E48DEYWS7QB",
+      "revision": 1,
+      "sha256": "5e6f4231705a3573bfaea01983c88991af013c9365aaf32e79a96137871958f6"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M6DRPR6TY1KG2875BMN15GN7",
+      "revision": 1,
+      "sha256": "aee93eb2f4d3fed6f5993b8eb98a35d52a9c5b15e9973582f9f91fc6de36509e"
+    },
+    "report_ref": {
+      "kind": "RPT",
+      "id": "RPT-01M6DRPRNDTGKKVP7HKAR25BPM",
+      "revision": 1,
+      "sha256": "9888edd646a53965026d734d211c2d21c6f8ba2316a87e9f1060a91171510bfc"
+    },
+    "bundle_sha256": "23a2dd933f9a2e4e4ec096932f48a73302db22db7d88d0af5f376727083d66df",
+    "origin": "MEASURED",
+    "execution": {
+      "status": "COMPLETED",
+      "executor": {
+        "name": "engine_sensor",
+        "version": "0.1.0",
+        "config_sha256": "c1e02ca646776a7d1dbb194a73cac79ebb7c731d176daa9fcda6b43ba502a8de"
+      },
+      "adapter": {
+        "name": "vllm",
+        "version": "0.4.2"
+      },
+      "started_at": "2026-11-02T09:15:57Z",
+      "finished_at": "2026-11-02T09:16:04Z",
+      "abort_reason": null
+    },
+    "observations": {
+      "engine_sensor_full_scope": {
+        "value": true,
+        "collected": true
+      },
+      "engine_sensor_violation": {
+        "value": false,
+        "collected": true
+      }
+    },
+    "official": false,
+    "safe_facts": {
+      "full_scope": true,
+      "missing": [],
+      "rows": [
+        {
+          "output_matches_standalone": true,
+          "slot_reused": true
+        }
+      ],
+      "sensor_gaps": [],
+      "trials": [
+        {
+          "case_id": "s1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "standalone"
+        },
+        {
+          "case_id": "s2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "standalone"
+        },
+        {
+          "case_id": "r",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "restricted"
+        },
+        {
+          "case_id": "b",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "reused"
+        }
+      ],
+      "violation": false
+    },
+    "verdicts": {
+      "security": "PASS",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "local_saved_pack_exact_refs": true
+  },
+  {
+    "stage": "G29REQ14",
+    "check_id": "REQ-14",
+    "plan": "PLAN-01M6DSKXK6AN2PVNBBFXMBJHNQ",
+    "as_of": "2026-11-02T09:32:06.297762+00:00",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M6DSKY1885YTJ93FH007T610",
+      "revision": 1,
+      "sha256": "97c8e740158861d605dbfedb2197d805f2c6622c64c08225dc56f0dc63f208e3"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M6DSM34PXNQ18CEWKKTHB3CG",
+      "revision": 1,
+      "sha256": "e6cd7eb5f38ad22f9928331bca1c3aed798900827133ee70842a185f5d094364"
+    },
+    "report_ref": {
+      "kind": "RPT",
+      "id": "RPT-01M6DSM3KCCSSWN0PNQ703BQFK",
+      "revision": 1,
+      "sha256": "10d6ba326e0f0b76a59f1de75e288ebfe4399d6721683b7d343bfd2e7d1536a9"
+    },
+    "bundle_sha256": "277521486ff03e0b35378e79f5de34c9700179fdbd36bf650edb2b4735117004",
+    "origin": "DECLARED",
+    "execution": {
+      "status": "ABORTED",
+      "executor": {
+        "name": "engine_sensor",
+        "version": "0.1.1",
+        "config_sha256": "5a33541362c3e7d1c3e45c4e105d3f92f56ed363a6d425ace0f1a395bc9f8924"
+      },
+      "adapter": {
+        "name": "vllm",
+        "version": "0.4.2"
+      },
+      "started_at": "2026-11-02T09:32:01Z",
+      "finished_at": "2026-11-02T09:32:06Z",
+      "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE"
+    },
+    "observations": {
+      "engine_sensor_full_scope": {
+        "value": false,
+        "collected": true
+      },
+      "engine_sensor_violation": {
+        "value": null,
+        "collected": false
+      }
+    },
+    "official": false,
+    "safe_facts": {
+      "batches_checked": 0,
+      "full_scope": false,
+      "missing": [
+        "intermediate_tensor_buffer_lineage_unobserved",
+        "model_generation_consumption_unobserved",
+        "distributed_batches_incomplete"
+      ],
+      "sensor_gaps": [],
+      "trials": [
+        {
+          "case_id": "n0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "normal"
+        },
+        {
+          "case_id": "n1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "normal"
+        },
+        {
+          "case_id": "n2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "normal"
+        }
+      ],
+      "violation": null,
+      "violations": []
+    },
+    "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "local_saved_pack_exact_refs": true
+  },
+  {
+    "stage": "G29REQ16",
+    "check_id": "REQ-16",
+    "plan": "PLAN-01M6DSTM319ZE68E821FPM7TTP",
+    "as_of": "2026-11-02T09:35:46.984361+00:00",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M6DSTMH8N55NXB3Y6N9ZG3Y7",
+      "revision": 1,
+      "sha256": "1723db639c29774c63537265efa35108e84c254d0226297e81ffc56bc23b8d66"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M6DSTTN1Q237JZQB7NQN6MT7",
+      "revision": 1,
+      "sha256": "af83337444c52ecbad8ed7ceb920a25ed03138439f201e0d0ebb1da66756cd16"
+    },
+    "report_ref": {
+      "kind": "RPT",
+      "id": "RPT-01M6DSTV3Q5KJ1V7EFHG2B3M30",
+      "revision": 1,
+      "sha256": "eb402d3aab6587a041623089bebdfc21586b140a7222abdeaa3e2efb4a409c39"
+    },
+    "bundle_sha256": "5b4e5bc07f4bbdde83914180a98cc7a844116e7f1a04a0e5040dfdb0367c37de",
+    "origin": "MEASURED",
+    "execution": {
+      "status": "COMPLETED",
+      "executor": {
+        "name": "engine_sensor",
+        "version": "0.1.1",
+        "config_sha256": "b82f892cec7f8ec3e51571df7e3eede44b1cf9f4f1ababfeee9c047853341ef8"
+      },
+      "adapter": {
+        "name": "vllm",
+        "version": "0.4.2"
+      },
+      "started_at": "2026-11-02T09:35:41Z",
+      "finished_at": "2026-11-02T09:35:46Z",
+      "abort_reason": null
+    },
+    "observations": {
+      "engine_sensor_full_scope": {
+        "value": true,
+        "collected": true
+      },
+      "engine_sensor_violation": {
+        "value": false,
+        "collected": true
+      }
+    },
+    "official": false,
+    "safe_facts": {
+      "contexts": [
+        {
+          "changed_hit": false,
+          "context": "cache_salt",
+          "control_hit": true,
+          "same_key": false
+        }
+      ],
+      "full_scope": true,
+      "missing": [],
+      "sensor_gaps": [],
+      "trials": [
+        {
+          "case_id": "prime",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "control",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control"
+        },
+        {
+          "case_id": "probe",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "probe"
+        },
+        {
+          "case_id": "post",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "post"
+        }
+      ],
+      "violation": false
+    },
+    "verdicts": {
+      "security": "PASS",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "local_saved_pack_exact_refs": true
+  },
+  {
+    "stage": "G29REQ17",
+    "check_id": "REQ-17",
+    "plan": "PLAN-01M6DSPPQN2E5QMZQ21Q88XHQ0",
+    "as_of": "2026-11-02T09:34:04.443670+00:00",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M6DSPQ66K9PX85PH10F57H7E",
+      "revision": 1,
+      "sha256": "fbc56b8eec3bf1766d80afaa6c617bb4dbc808bab0901c36b89db4e0163680ad"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M6DSQPGTKEA2R7TN7BMG9EYP",
+      "revision": 1,
+      "sha256": "36cad958e80a54e7955ee2d97eb06dc3a744a9b02e3588cfc0a083676521d718"
+    },
+    "report_ref": {
+      "kind": "RPT",
+      "id": "RPT-01M6DSQPZE449GR5SF3R451EEN",
+      "revision": 1,
+      "sha256": "7e53aafe634dd468f722fb454dac1b50d36c6bb1bfa5230b010680124f3ae485"
+    },
+    "bundle_sha256": "437abdfc30f382185140d74d7b6618ec7e4e2ba3931da4a455461edc76590f6b",
+    "origin": "DECLARED",
+    "execution": {
+      "status": "ABORTED",
+      "executor": {
+        "name": "engine_sensor",
+        "version": "0.1.1",
+        "config_sha256": "af467ad7156263b8af38d104bb6423bf78bb5c17d3875e9671c9d65dbcc805ea"
+      },
+      "adapter": {
+        "name": "vllm",
+        "version": "0.4.2"
+      },
+      "started_at": "2026-11-02T09:33:32Z",
+      "finished_at": "2026-11-02T09:34:04Z",
+      "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE"
+    },
+    "observations": {
+      "engine_sensor_full_scope": {
+        "value": false,
+        "collected": true
+      },
+      "engine_sensor_violation": {
+        "value": null,
+        "collected": false
+      }
+    },
+    "official": false,
+    "safe_facts": {
+      "control_auc_percent": 0.0,
+      "cross_auc_percent": 50.0,
+      "full_scope": false,
+      "missing": [
+        "timing_control_has_no_power"
+      ],
+      "native_cross_hits": 5,
+      "samples": {
+        "absent": 6,
+        "control-absent": 6,
+        "control-present": 6,
+        "present": 6
+      },
+      "sensor_gaps": [],
+      "trials": [
+        {
+          "case_id": "prime-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-0",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-3",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-4",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        },
+        {
+          "case_id": "prime-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "prime"
+        },
+        {
+          "case_id": "cp-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-present"
+        },
+        {
+          "case_id": "ca-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "control-absent"
+        },
+        {
+          "case_id": "p-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "present"
+        },
+        {
+          "case_id": "a-5",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "absent"
+        }
+      ],
+      "violation": null
+    },
+    "verdicts": {
+      "security": "UNKNOWN",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "local_saved_pack_exact_refs": true
+  },
+  {
+    "stage": "G29REQ18",
+    "check_id": "REQ-18",
+    "plan": "PLAN-01M6DSVGJ4SXRAWZR1V96PCKK3",
+    "as_of": "2026-11-02T09:36:17.542834+00:00",
+    "evidence_ref": {
+      "kind": "EVD",
+      "id": "EVD-01M6DSVH01CD7ZAK1B5P8ZTCRR",
+      "revision": 1,
+      "sha256": "83cf7aadeb8e8bb59205fb9284416edc6f4e5bf26e7ea4359a5b2237e37e94b3"
+    },
+    "result_ref": {
+      "kind": "RES",
+      "id": "RES-01M6DSVRG4W60G2ZGG196NVJXG",
+      "revision": 1,
+      "sha256": "ed169f4f34cf748501f5e7d2c09d71c1ff939a22c4bc33bca76c731db4f72f58"
+    },
+    "report_ref": {
+      "kind": "RPT",
+      "id": "RPT-01M6DSVRYQK7SHJDMM4Q32G8P6",
+      "revision": 1,
+      "sha256": "1bc9d4263264e3c3145e1fe278eb2ce8a68cdbc5ff6b8b2b1fb07a8335313e0e"
+    },
+    "bundle_sha256": "6f90525cc8ada03a7da0facc248a9d8e33e953d338f2192a1d8af40cfee39c6d",
+    "origin": "MEASURED",
+    "execution": {
+      "status": "COMPLETED",
+      "executor": {
+        "name": "engine_sensor",
+        "version": "0.1.1",
+        "config_sha256": "3e511228224c06200f7f3dfc36af913833811c9f7e06f6a5756bb727610c3329"
+      },
+      "adapter": {
+        "name": "vllm",
+        "version": "0.4.2"
+      },
+      "started_at": "2026-11-02T09:36:10Z",
+      "finished_at": "2026-11-02T09:36:17Z",
+      "abort_reason": null
+    },
+    "observations": {
+      "engine_sensor_full_scope": {
+        "value": true,
+        "collected": true
+      },
+      "engine_sensor_violation": {
+        "value": false,
+        "collected": true
+      }
+    },
+    "official": false,
+    "safe_facts": {
+      "full_scope": true,
+      "missing": [],
+      "rows": [
+        {
+          "output_matches_standalone": true,
+          "slot_reused": true
+        }
+      ],
+      "sensor_gaps": [],
+      "trials": [
+        {
+          "case_id": "s1",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "standalone"
+        },
+        {
+          "case_id": "s2",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "standalone"
+        },
+        {
+          "case_id": "r",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "restricted"
+        },
+        {
+          "case_id": "b",
+          "normal_shape": true,
+          "outcome": 200,
+          "role": "reused"
+        }
+      ],
+      "violation": false
+    },
+    "verdicts": {
+      "security": "PASS",
+      "functional": "UNKNOWN",
+      "performance": "UNKNOWN"
+    },
+    "local_saved_pack_exact_refs": true
+  }
+]

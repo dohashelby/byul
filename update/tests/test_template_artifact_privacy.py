@@ -153,7 +153,7 @@ def test_product_pipeline_preserves_hashes_refs_and_fail_after_late_collection_g
     (evd,) = run_plan(store, pack, plan, RunConfig(executors={"template_validation": "privacy-sim"}, adapter="vllm"))
     (result,) = judge_plan(store, pack, plan, as_of=T0)
     assert result.verdicts.security == Verdict.FAIL and result.verdicts.functional == Verdict.UNKNOWN
-    assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.4.0"
+    assert evd.data_origin.value == "EXAMPLE" and evd.execution.executor.version == "0.4.1"
     for artifact in evd.artifacts:
         assert PRIVATE_OUTPUT not in (store.root / artifact.path).read_text(encoding="utf-8")
     rpt = build_report(store, pack, plan, as_of=T0)

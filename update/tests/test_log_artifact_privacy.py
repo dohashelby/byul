@@ -173,6 +173,24 @@ def product(tmp_path_factory,monkeypatch):
     return run
 
 
+@pytest.mark.parametrize('version', ['0.3.0', '0.3.1', '0.3.2'])
+def test_alias_fix_keeps_saved_projection_versions_closed_and_old_evidence_unchanged(product, version):
+    from guard.log_evidence import _obs03
+    case = product('normal')
+    original = canonical_json(case.evd.to_dict())
+    previous = inventory_tree(case.store.root)
+    example = case.evd.model_copy(deep=True)
+    example.execution.executor.version = version
+    if version in {'0.3.0', '0.3.1'}:
+        assert _obs03(example, deepcopy(case.sample), source.VALUES) == _obs03(
+            case.evd, deepcopy(case.sample), source.VALUES)
+    else:
+        with pytest.raises(ValueError, match='profile differs from executor version'):
+            _obs03(example, deepcopy(case.sample), source.VALUES)
+    assert canonical_json(case.evd.to_dict()) == original
+    assert inventory_tree(case.store.root) == previous
+
+
 @pytest.mark.parametrize("mode,verdict",[("normal","PASS"),("leak","FAIL"),("unknown","UNKNOWN"),
     ("ambiguous","FAIL"),("extra-key","FAIL"),("source-exception","UNKNOWN"),("late","UNKNOWN"),
     ("leak-late","FAIL"),("file","PASS"),("no-control","UNKNOWN"),("bad-error-status","UNKNOWN"),("credential","FAIL")])
@@ -180,7 +198,7 @@ def test_real_collector_path_preserves_verdicts_and_omits_raw_values(product,mod
     case=product(mode)
     assert case.res.verdicts.security.value==verdict
     assert case.evd.execution.status.value=="COMPLETED" and case.evd.data_origin.value=="EXAMPLE"
-    assert case.evd.execution.executor.version=="0.3.0"
+    assert case.evd.execution.executor.version=="0.3.1"
     assert case.sample["projection_profile"]==PROFILE and case.sample["markers"]==PUBLIC_MARKERS
     validate_projection(case.sample,source.VALUES)
     for saved,submitted in zip(case.sample["requests"],case.sent,strict=True):

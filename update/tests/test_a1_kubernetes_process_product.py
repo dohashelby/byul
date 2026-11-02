@@ -87,6 +87,9 @@ def test_registered_process_cli_preserves_origin_facts_failures_and_exact_refs(
     else:
         assert not evd.observations['worker_env_names'].collected
         assert evd.observations['credential_candidate_results'].value=={'/EXAMPLE-credentials/key':'unknown'}
+        # The normal request actually ran, even if its response or a later
+        # artifact is incomplete. Keep that attempt in the saved EVD too.
+        assert evd.challenges[2].attempted is evd.normal_control.attempted
     assert PRIVATE not in canonical_json(evd.to_dict()).decode()
     if not attachment_failure:
         artifact,=[a for a in evd.artifacts if a.name=='probe_log.jsonl']

@@ -105,8 +105,9 @@ def collect_kubernetes_credential_exposure(ctx):
             "Pod volumeMount declarations are not observed process mounts or actual credential access.",
             "An explicit empty candidate list tests no path; whole-worker credential coverage is unverified."]}
     packet = record.get("packet")
-    challenges = [{"step": step, "attempted": type(packet) is dict and
-                   (index == 0 or index == 1 and bool(packet.get("candidate_metadata")))}
+    challenges = [{"step": step, "attempted": (bool(normal.get("attempted")) if index == 2 else
+                   type(packet) is dict and
+                   (index == 0 or index == 1 and bool(packet.get("candidate_metadata"))))}
                   for index, step in enumerate(ctx.check.challenge_steps)]
     return observations, normal, challenges, summary
 

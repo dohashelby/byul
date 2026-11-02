@@ -1704,6 +1704,13 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 다음 단계: GPU 환경에서 REQ-19, REQ-20, REQ-21, LIF-13 수집기와 조건부 36개 실측.
 - 막힌 것: 위 4개는 GPU가 필요하다. 기업 기준값과 서명 기록 내보내기 도구는 고객 환경 입력이다.
 
+
+### 2026-11-02 PACK32 GPU 실증 및 인계 HTML 비교
+- 한 일: merged1174da6 기준으로 기존 GPU 보수를 이식하고, Windows 신호 import와 Kubernetes callback 시간 소비를 보수했다. HTML과 기존 프롬프트의 방법 비교는 docs/gpu-completion/20261102/METHOD_COMPARISON.md.
+- 테스트 결과: Linux 직접213개 통과(5.58초), Windows 신규50개 통과(10.34초). 실제GPU REQ16 salt·REQ18 V1 슬롯 부분 실측, REQ14 설치·REQ17 대조 판별력 미완료/UNKNOWN 보존. 실패 포함9묶음 로컬 반출·정확Ref 재판정 일치. 기본 전체 suite는 실행 중이며 통과 주장이 없다.
+- 다음 단계: 모드별 대표 factory/Kubernetes 종단 시험 후 확대. 핵심 native4개와 TP2 미완료.
+- 막힌 것: 실제 함수 파일/entry 검증, 편향 없는 시간 대조, 기업 정책, 추가GPU 승인. 기존 gate/hash 자동 변경 없음.
+
 ### 2026-11-02 CI 실행 취소와 전체 시험 시간 설정 보수
 - 한 일: push와 pull_request가 같은 concurrency 그룹에서 서로 취소하던 설정을 workflow·event·PR 번호 또는 ref별로 분리했다. 최신 동일 이벤트의 이전 실행 취소는 유지한다. 최근 전체 회귀 1968.36초를 고려해 update-default 제한을 30분에서 60분으로 늘렸다.
 - 테스트 결과: YAML 해석과 기존 triggers·jobs·permissions·실행 명령 보존을 확인했다. 실제 수정 HEAD의 push·PR 검증 결과는 PR186의 Actions 실행에서 확인한다. 테스트·assert·고정 hash·marker 제외 조건은 바꾸지 않았다.

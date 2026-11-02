@@ -270,9 +270,9 @@ def test_sup03_optional_native_capture_is_attached_without_changing_verdict_ceil
 
 def test_optional_native_capture_has_separate_executor_version():
     from guard.executors.template_validation import TemplateValidationExecutor
-    assert TemplateValidationExecutor({}, docker=object()).version == "0.4.0"
+    assert TemplateValidationExecutor({}, docker=object()).version == "0.4.1"
     assert TemplateValidationExecutor({"native_observation_path": "/guard-observations/template.json"},
-                                     docker=object()).version == "0.5.0"
+                                     docker=object()).version == "0.5.1"
 
 
 @pytest.mark.parametrize("broken", ["yaml", "target-list", "existing-output"])

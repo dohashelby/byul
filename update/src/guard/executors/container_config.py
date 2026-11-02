@@ -204,7 +204,7 @@ def collect_kubernetes_process_permissions(ctx):
 
 class ContainerConfigExecutor(HttpCheckExecutor):
     name = "container_config"
-    version = "0.6.2"
+    version = "0.6.3"
     requires_roles = False
     requires_route_scope = False
     functional_via = "engine"
@@ -305,6 +305,12 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             if type(devices_raw) is list else []
         devices_complete = "Devices" in hc and (devices_raw is None or
                            type(devices_raw) is list and len(device_rows) == len(devices_raw))
+        # Runtime device drivers can inject GPU nodes without listing them in
+        # HostConfig.Devices. Requested devices are not observed access rights.
+        device_requests_unverified = hc.get("DeviceRequests") not in (None, [])
+        if device_requests_unverified:
+            devices_complete = False
+            errors.append("DEVICE_REQUESTS_UNVERIFIED")
         devices = sorted(f"{d['PathOnHost']}:{d['PathInContainer']}:{d['CgroupPermissions']}" for d in device_rows)
         privileged = hc.get("Privileged") if type(hc.get("Privileged")) is bool else None
         namespaces_complete = all(type(hc.get(key)) is str for _, key in HOST_NAMESPACE_KEYS)
@@ -446,6 +452,7 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             "container": container, "config": config, "privileged": privileged, "host_namespaces": host_ns,
             "mounts": mounts, "all_mounts": sorted(f"{m.get('Type')}:{_mount_key(m)}" for m in mounts_all),
             "devices": devices, "capabilities_effective": caps, "uids": uids,
+            "device_requests_unverified": device_requests_unverified,
             "processes": [{k: p.get(k) for k in ("pid", "name", "uid_effective", "caps")} for p in procs],
             "proc_read_rc": proc_rc, "sentinel_results": sentinel_results,
             "container_fs_writes": container_fs_writes,

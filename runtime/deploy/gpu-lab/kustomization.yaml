@@ -9,6 +9,7 @@ kind: Kustomization
 namespace: serving-lab
 resources:
   - backend-config.yaml
+  - probe-file-configmap.yaml
   - gateway.yaml
   - management-service.yaml
   - network-policies.yaml

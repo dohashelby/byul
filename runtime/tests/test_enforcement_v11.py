@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 from serving_runtime.enforcement import cilium, tetragon
 from serving_runtime.enforcement.cache import _ancestor, check_cache
-from serving_runtime.enforcement.events import parse_tetragon, transform_lines
+from serving_runtime.enforcement.events import parse_tetragon, transform_lines, transform_lines_with_loss
 from serving_runtime.enforcement.execpolicy import ExecPolicy, parse_exceptions, parse_timeline
 from serving_runtime.enforcement.intent import IntentError, load_intent, parse_intent
 from serving_runtime.enforcement.security import render_pod_security
@@ -37,7 +37,7 @@ def exec_event(binary: str, at: str, *, image: str | None = None, parent: str | 
     process: dict = {
         "binary": binary,
         "arguments": "--token super-secret-argument",
-        "pod": {"namespace": "serving-lab", "name": "serving-engine-1"},
+        "pod": {"namespace": "serving-lab", "name": "serving-engine-1", "pod_labels": {"app": "serving-engine"}},
     }
     if image is not None:
         process["pod"]["container"] = {"image": {"id": f"docker.io/x@{image}"}}
@@ -535,6 +535,53 @@ class AdapterIntegrationTests(unittest.TestCase):
         self.assertNotIn("super-secret-argument", json.dumps(item))
         plain = parse_tetragon(exec_event("/usr/bin/ptxas", "2026-10-24T09:05:00Z"), data_origin="synthetic")
         self.assertNotIn("exec_verdict", plain)
+
+    def test_other_pod_and_missing_labels_do_not_get_engine_verdict(self) -> None:
+        for labels in ({"app": "serving-gateway"}, None):
+            with self.subTest(labels=labels):
+                event = exec_event("/usr/bin/uname", "2026-10-24T09:20:00Z")
+                event["process_exec"]["process"]["pod"]["pod_labels"] = labels
+                item = parse_tetragon(event, data_origin="synthetic",
+                                      allowed_engine_binaries=self.policy.intent.allowed_engine_binaries,
+                                      exec_policy=self.policy)
+                self.assertNotIn("exec_verdict", item)
+                self.assertIsNone(item["allowed_binary"])
+
+    def test_gateway_shell_reproduction_and_missing_labels(self) -> None:
+        for labels in ({"app": "serving-gateway"}, None):
+            event = exec_event("/bin/sh", "2026-10-24T09:20:00Z")
+            event["process_exec"]["process"]["pod"].update(name="serving-gateway-1", pod_labels=labels)
+            accepted, rejected, losses = transform_lines_with_loss(
+                [json.dumps(event)], kind="tetragon", data_origin="synthetic", exec_policy=self.policy)
+            self.assertEqual((rejected, losses), ([], []))
+            self.assertEqual(accepted[0]["exec_verdict"], "suspect_binary")
+            self.assertEqual(accepted[0]["phase"], ["unknown"])
+            self.assertEqual(accepted[0]["pod"]["pod"], "serving-gateway-1")
+
+    def test_cache_exec_stays_engine_scoped(self) -> None:
+        binary = "/var/cache/serving/vllm/x/y/z/kernel.so"
+        engine = parse_tetragon(exec_event(binary, "2026-10-24T09:20:00Z"),
+                                data_origin="synthetic", exec_policy=self.policy)
+        self.assertEqual(engine["exec_verdict"], "exec_from_cache")
+        other_event = exec_event(binary, "2026-10-24T09:20:00Z")
+        other_event["process_exec"]["process"]["pod"]["pod_labels"] = {"app": "serving-gateway"}
+        other = parse_tetragon(other_event, data_origin="synthetic", exec_policy=self.policy)
+        self.assertNotIn("exec_verdict", other)
+
+    def test_aws_intent_phase_and_no_phase_classification(self) -> None:
+        intent = load_intent(ROOT / "deploy/gpu-lab/intent.aws-lab.json")
+        with tempfile.TemporaryDirectory() as directory:
+            timeline = Path(directory) / "timeline.json"
+            for phase in ("loading", "compiling", "inferring"):
+                timeline.write_text(json.dumps({
+                    "schema_version": "runtime-phase-timeline/1.0",
+                    "entries": [{"phase": phase, "from": "2026-10-24T09:00:00Z", "until": "2026-10-24T10:00:00Z", "basis": "declared"}],
+                }), encoding="utf-8")
+                policy = ExecPolicy(intent, timeline_path=timeline)
+                self.assertEqual(policy.classify_exec(binary="/usr/bin/python3", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"], "allowed_in_phase")
+                self.assertEqual(policy.classify_exec(binary="/usr/bin/uname", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"], "outside_allowlist")
+                self.assertEqual(policy.classify_exec(binary="/bin/sh", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"], "suspect_binary")
+            self.assertEqual(ExecPolicy(intent).classify_exec(binary="/usr/bin/uname", parent=None, image=None, observed_at="2026-10-24T09:20:00Z")["exec_verdict"], "phase_unknown")
 
     def test_cache_write_generation_tag(self) -> None:
         def kprobe(path: str) -> str:

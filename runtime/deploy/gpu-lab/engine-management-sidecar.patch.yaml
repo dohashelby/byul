@@ -24,6 +24,8 @@
 # The sidecar requests no GPU. It runs under the Pod's RuntimeClass nvidia, but
 # the device plugin injects GPU devices only into the container that requests
 # nvidia.com/gpu.
+# The probe file is a harmless ConfigMap item. Keep engine args and all existing
+# volumes when applying this strategic merge patch.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,6 +35,11 @@ spec:
     spec:
       containers:
         - name: engine
+          volumeMounts:
+            - name: probe-file
+              mountPath: /run/byul-probe/secret.txt
+              subPath: secret.txt
+              readOnly: true
           args:
             - /models
             - --served-model-name
@@ -73,3 +80,8 @@ spec:
           resources:
             requests: {cpu: "50m", memory: 64Mi}
             limits: {cpu: "200m", memory: 128Mi}
+      volumes:
+        - name: probe-file
+          configMap:
+            name: serving-engine-probe-file
+            defaultMode: 0444

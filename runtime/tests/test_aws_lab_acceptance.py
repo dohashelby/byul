@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from argparse import Namespace
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 import hashlib
 import io
 import json
@@ -26,6 +26,7 @@ from tools.aws_lab_acceptance import (
     _overall,
     evaluate_case,
     parse_args,
+    phase_exec_inventory,
 )
 from serving_runtime.mvp.app import GatewayApp
 from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
@@ -139,6 +140,35 @@ def arguments(root: Path, *, cases=CASE_IDS, **updates) -> Namespace:
 
 
 class ArgumentTests(unittest.TestCase):
+    def test_phase_inventory_groups_without_verdicts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            timeline = root / "timeline.json"
+            timeline.write_text(json.dumps({"schema_version": "runtime-phase-timeline/1.0",
+                "entries": [{"phase": "inferring", "from": "2026-11-02T10:00:00Z",
+                             "until": None, "basis": "engine_signal"}],
+                "collector": {"state": "running", "pod_uid": "uid-a", "pod_name": "engine-a",
+                              "written_at": "2026-11-02T10:00:02Z", "last_log_at": None,
+                              "log_delivery_lag_seconds": None}}), encoding="utf-8")
+            source = root / "tetragon.jsonl"
+            source.write_text(json.dumps({"time": "2026-11-02T10:00:01Z", "process_exec": {
+                "process": {"binary": "/usr/bin/python3", "pod": {"namespace": "serving-lab",
+                    "pod_name": "engine-a", "uid": "uid-a", "pod_labels": {"app": "serving-engine"}}}}}) + "\n", encoding="utf-8")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(phase_exec_inventory(["--tetragon", str(source), "--timeline", str(timeline)]), 0)
+            report = json.loads(output.getvalue())
+            self.assertEqual(report["counts"], [{"phase": "inferring", "pod": "engine-a",
+                                                  "path": "/usr/bin/python3", "count": 1}])
+            self.assertNotIn("verdict", output.getvalue())
+            old = json.loads(timeline.read_text(encoding="utf-8"))
+            old["collector"]["written_at"] = "2026-11-02T09:59:00Z"
+            timeline.write_text(json.dumps(old), encoding="utf-8")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(phase_exec_inventory(["--tetragon", str(source), "--timeline", str(timeline)]), 0)
+            self.assertEqual(json.loads(output.getvalue())["counts"][0]["phase"], "unknown")
+
     def test_context_and_token_file_are_required(self) -> None:
         stderr = io.StringIO()
         with redirect_stderr(stderr), self.assertRaises(SystemExit):
@@ -184,8 +214,38 @@ class ArgumentTests(unittest.TestCase):
                 [("AWS-07", "not_run"), ("AWS-08", "not_run")],
             )
 
+    def test_exec_evidence_requires_exact_engine_pod(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            checker = AWSAcceptance(arguments(Path(temporary)), runner=FakeRunner(), http=FakeHTTP([]))
+            target = {"pod": {"namespace": "serving-lab", "pod": "serving-engine-1"}, "binary": "/bin/sh"}
+            other = {"pod": {"namespace": "serving-lab", "pod": "other-client"}, "binary": "/bin/sh"}
+            self.assertTrue(checker._engine_event(target, "serving-engine-1"))
+            self.assertFalse(checker._engine_event(other, "serving-engine-1"))
+
 
 class DecisionTests(unittest.TestCase):
+    def test_aws11_unknown_without_valid_phase(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=FakeHTTP([]))
+            checker.normal_before = {"normal_ok": True, "stream_ok": True, "cache_ok": True}
+            checker.detection_started_at = "2026-11-02T10:00:00Z"
+            checker._normal_control = lambda: {"normal_ok": True, "stream_ok": True, "cache_ok": True}
+            rows = [{"kind": "process_exec", "phase": ["unknown"], "exec_verdict": "phase_unknown",
+                     "observed_at": "2026-11-02T10:00:01Z"}]
+            checker._tetragon_observations = lambda _since: (True, rows)
+            facts, evidence = checker.aws_11()
+            self.assertIsNone(facts["false_warnings_zero"])
+            self.assertEqual(evidence["phase_evidence"]["unknown_exec_count"], 1)
+            rows[0].update(phase=["inferring"], exec_verdict="allowed_in_phase",
+                           phase_basis=["engine_signal"], phase_timeline_fresh=True,
+                           phase_timeline_written_at="2026-11-02T10:00:01Z")
+            facts, evidence = checker.aws_11()
+            self.assertTrue(facts["false_warnings_zero"])
+            self.assertEqual(evidence["phase_evidence"]["bases"], ["engine_signal"])
+            rows[0]["phase_timeline_fresh"] = False
+            facts, _evidence = checker.aws_11()
+            self.assertIsNone(facts["false_warnings_zero"])
+
     PASS_FACTS = {
         "AWS-01": dict.fromkeys(
             ("http_200", "valid_completion", "record_allowed", "delivery_attempted", "engine_log_match", "stream_ok"), True
@@ -227,6 +287,9 @@ class DecisionTests(unittest.TestCase):
             ),
             True,
         ),
+        "AWS-09": dict.fromkeys(("absolute_exec_ok", "path_exec_ok", "path_observed", "engine_pod_match", "suspect_verdict"), True),
+        "AWS-10": dict.fromkeys(("read_ok", "path_match", "engine_pod_match", "read_access", "monitor_detected"), True),
+        "AWS-11": dict.fromkeys(("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero"), True),
     }
 
     def test_every_case_passes_only_with_all_required_facts(self) -> None:
@@ -244,6 +307,9 @@ class DecisionTests(unittest.TestCase):
             "AWS-06": "model_write_denied",
             "AWS-07": "heartbeat_stopped_seen",
             "AWS-08": "pod_changed",
+            "AWS-09": "suspect_verdict",
+            "AWS-10": "monitor_detected",
+            "AWS-11": "false_warnings_zero",
         }
         for case_id, key in decisive.items():
             with self.subTest(case_id=case_id):
@@ -1094,7 +1160,7 @@ class EvidenceTests(unittest.TestCase):
             "AWS-04": ({"direct_probe": {"errno_name": "EAGAIN"}}, "직통 연결 EAGAIN"),
             "AWS-05": ({"engine_receiver_probe": {"errno_name": "ETIMEDOUT"}}, "engine→receiver 연결 ETIMEDOUT"),
             "AWS-06": ({"model_probe": {"errno_name": "EROFS"}, "cache_probe": {"marker": "CACHE_WRITE_REMOVED"}}, "/models 쓰기 EROFS"),
-            "AWS-07": ({"stopped_interval_request": {"http_status": 200}, "stopped_target_verification": {"state": "unavailable"}, "recovered_target_verification": {"state": "ok"}, "recovery_request": {"last_status": 200}}, "중단 중 요청 HTTP 200, 대상 확인 unavailable; 복구 대상 ok, 요청 HTTP 200"),
+            "AWS-07": ({"stopped_interval_request": {"http_status": 200}, "stopped_target_verification": {"state": "unavailable"}, "recovered_target_verification": {"state": "ok"}, "recovery_request": {"last_status": 200}}, "중단 중 요청 HTTP 200, 대상 상태 unavailable; 복구 대상 ok, 요청 HTTP 200"),
             "AWS-08": ({"engine_info": {"state": "ok"}, "recovery_request": {"last_status": 200}}, "engine_info ok, 복구 요청 HTTP 200"),
         }
         with tempfile.TemporaryDirectory() as temporary:
@@ -1126,7 +1192,7 @@ class EvidenceTests(unittest.TestCase):
                 self._case("AWS-02", {"attempts": [{"kind": "missing", "status": 403, "error_code": "OTHER_CODE"}]}, auth_failed),
             ))
             md = checker.write_report()[1].read_text(encoding="utf-8")
-            self.assertIn("중단 중 요청 HTTP 503, 대상 확인 확인 못 함", md)
+            self.assertIn("중단 중 요청 HTTP 503, 대상 상태 확인 못 함", md)
             self.assertIn("stopped_request_200_unverified=아니요", md)
             self.assertIn("cache_tetragon=확인 못 함", md)
             self.assertIn("restart_ok=확인 못 함", md)

@@ -948,6 +948,7 @@
         "rejected",
         "rejected_details",
         "corrupt_lines_total",
+        "skipped_unsupported_total",
         "out_of_window",
         "out_of_window_total",
         "idle",
@@ -984,6 +985,10 @@
           }
         },
         "corrupt_lines_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped_unsupported_total": {
           "type": "integer",
           "minimum": 0
         },

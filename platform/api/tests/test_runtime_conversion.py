@@ -117,6 +117,18 @@ def test_tetragon_outcome_table(contracts, exec_verdict, action_mode, outcome):
     assert contracts.errors("runtime-event", event) == []
 
 
+def test_gateway_pod_suspect_exec_is_displayed_as_detected(contracts):
+    record = {"schema_version": "runtime-observation/1.0", "observed_at": "2026-11-02T10:00:00Z",
+              "source": "tetragon", "kind": "process_exec", "data_origin": "real",
+              "action_mode": "monitor", "exec_verdict": "suspect_binary", "binary": "/bin/sh",
+              "phase": ["unknown"], "pod": {"namespace": "serving-lab", "pod": "serving-gateway-1"}}
+    event = observation_event(record)
+    assert event["outcome"] == "detected"
+    assert event["observation"]["pod_name"] == "serving-gateway-1"
+    assert event["observation"]["exec_verdict"] == "suspect_binary"
+    assert contracts.errors("runtime-event", event) == []
+
+
 @pytest.mark.parametrize(
     ("rule_id", "action_mode", "cache_generation", "outcome"),
     [
@@ -364,6 +376,7 @@ def test_hubble_loss_status_passes_through_and_validates(contracts):
             "rejected": 0,
             "rejected_details": [],
             "corrupt_lines_total": 0,
+            "skipped_unsupported_total": 0,
             "out_of_window": 0,
             "out_of_window_total": 0,
             "idle": False,

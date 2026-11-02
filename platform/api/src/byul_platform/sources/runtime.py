@@ -449,6 +449,7 @@ def _collector_detail(item: dict[str, Any]) -> dict[str, Any] | None:
             "rejected": _nonneg(value.get("rejected")),
             "rejected_details": _line_issues(value.get("rejected_details"), source),
             "corrupt_lines_total": _nonneg(value.get("corrupt_lines_total")),
+            "skipped_unsupported_total": _nonneg(value.get("skipped_unsupported_total")),
             "out_of_window": _nonneg(value.get("out_of_window")),
             "out_of_window_total": _nonneg(value.get("out_of_window_total")),
             "idle": value.get("idle") is True,

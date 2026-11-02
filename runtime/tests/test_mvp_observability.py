@@ -323,6 +323,24 @@ class ObservationFeedTests(unittest.TestCase):
         self.assertEqual(corrupt, [])
         return records
 
+    def test_unsupported_tetragon_events_skip_without_rewriting_old_corrupt_count(self) -> None:
+        path = self.root / "tetragon.jsonl"
+        path.write_text(json.dumps({"time": "2026-10-24T09:20:00Z", "process_exit": {}}) + "\n", encoding="utf-8")
+        def feed() -> ObservationFeed:
+            return ObservationFeed(kind="tetragon", path=path, data_dir=self.data_dir, data_origin="real", environment=None, run_id=None)
+        first, _ = feed().collect()
+        self.assertEqual((first["rejected"], first["corrupt_lines_total"], first["skipped_unsupported_total"]), (0, 0, 1))
+        checkpoint = self.data_dir / "observation_feed_tetragon.json"
+        old = json.loads(checkpoint.read_text(encoding="utf-8"))
+        old.pop("skipped_unsupported_total")
+        old["corrupt_lines_total"] = 255
+        checkpoint.write_text(json.dumps(old), encoding="utf-8")
+        with path.open("a", encoding="utf-8") as output:
+            output.write(json.dumps({"time": "2026-10-24T09:20:01Z", "process_future": {}}) + "\n")
+            output.write(json.dumps({"time": "2026-10-24T09:20:02Z", "process_exit": []}) + "\n")
+        second, _ = feed().collect()
+        self.assertEqual((second["rejected"], second["corrupt_lines_total"], second["skipped_unsupported_total"]), (1, 256, 1))
+
     def test_append_partial_line_idle_and_restart_offset(self) -> None:
         self.path.write_bytes(self.lines[0] + b"\n" + self.lines[1][:20])
         feed = self.feed()
@@ -624,6 +642,23 @@ class FeedHelperTests(unittest.TestCase):
                 self.assertEqual(heartbeat["state"], "stopped")
                 self.assertEqual(handlers[signal.SIGTERM], signal.SIG_DFL)
                 self.assertEqual(handlers[signal.SIGHUP], signal.SIG_DFL)
+
+    def test_phase_log_failure_does_not_stop_feed_or_target_writer(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            patch("tools.k8s_observation_feed.assert_safe_context"),
+            patch("tools.k8s_observation_feed._wait_for_hubble"),
+            patch("tools.k8s_observation_feed._start", side_effect=[FakeProcess(), FakeProcess(), FakeProcess()]),
+            patch("tools.k8s_observation_feed.EnginePhaseTimelineWriter.collect_once", side_effect=OSError("log unavailable")) as phase,
+            patch("tools.k8s_observation_feed.TargetPodSnapshotWriter.collect_once", return_value={}) as target,
+        ):
+            root = Path(temporary)
+            result = run_observation_feed(root, EXPECTED_CONTEXT, max_ticks=1,
+                                          target_selector=(("app", "serving-engine"),), phase_timeline=True)
+            self.assertEqual(result, 0)
+            self.assertTrue(phase.called)
+            self.assertTrue(target.called)
+            self.assertEqual(json.loads((root / "tetragon.heartbeat.json").read_text())["state"], "stopped")
 
     def test_tetragon_backfill_uses_since_time_on_reconnect(self) -> None:
         self.assertIn("--tail=0", tetragon_command())

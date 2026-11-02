@@ -48,6 +48,8 @@ spec:
             - /etc/serving/bundles/current
             - --target-pod-snapshot
             - /srv/serving/observation/target-pods.json
+            - --observation-timeline
+            - /srv/serving/observation/phase-timeline.json
             - --auth-config
             - /etc/serving/auth/auth.json
             - --gateway-port

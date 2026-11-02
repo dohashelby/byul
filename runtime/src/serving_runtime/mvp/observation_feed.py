@@ -68,6 +68,7 @@ class ObservationFeed:
         self._inode: int | None = None
         self._line_number = 0
         self._corrupt_lines_total = 0
+        self._skipped_unsupported_total = 0
         self._out_of_window_total = 0
         self._hubble_lines_seen_total = 0
         self._lost_events_total = 0
@@ -117,6 +118,7 @@ class ObservationFeed:
             device = document.get("device")
             inode = document.get("inode")
             corrupt = document.get("corrupt_lines_total", 0)
+            skipped = document.get("skipped_unsupported_total", 0)
             out_of_window = document.get("out_of_window_total", 0)
             line_number = document.get("line_number", 0)
             hubble_lines_seen = document.get("hubble_lines_seen_total", 0)
@@ -134,6 +136,9 @@ class ObservationFeed:
                 or not isinstance(inode, int)
                 or not isinstance(corrupt, int)
                 or corrupt < 0
+                or not isinstance(skipped, int)
+                or isinstance(skipped, bool)
+                or skipped < 0
                 or not isinstance(out_of_window, int)
                 or out_of_window < 0
                 or not isinstance(line_number, int)
@@ -175,6 +180,7 @@ class ObservationFeed:
         self._device = device
         self._inode = inode
         self._corrupt_lines_total = corrupt
+        self._skipped_unsupported_total = skipped
         self._out_of_window_total = out_of_window
         self._line_number = line_number
         self._hubble_lines_seen_total = hubble_lines_seen
@@ -196,6 +202,7 @@ class ObservationFeed:
             "offset": self._offset,
             "line_number": self._line_number,
             "corrupt_lines_total": self._corrupt_lines_total,
+            "skipped_unsupported_total": self._skipped_unsupported_total,
             "out_of_window_total": self._out_of_window_total,
             "hubble_lines_seen_total": self._hubble_lines_seen_total,
             "lost_events_total": self._lost_events_total,
@@ -428,6 +435,7 @@ class ObservationFeed:
             "rejected": len(rejected),
             "rejected_details": rejected[:20],
             "corrupt_lines_total": self._corrupt_lines_total,
+            "skipped_unsupported_total": self._skipped_unsupported_total,
             "out_of_window": out_of_window,
             "out_of_window_total": self._out_of_window_total,
             "offset": self._offset,
@@ -512,6 +520,7 @@ class ObservationFeed:
         out_of_window_count = 0
         valid_hubble_count = 0
         corrupt_count = 0
+        skipped_count = 0
         rejected: list[dict[str, Any]] = []
         first_line_number = self._line_number + 1
         for index, raw_line in enumerate(raw_lines, start=1):
@@ -545,6 +554,9 @@ class ObservationFeed:
                     {"line": line_number, "reason": line_rejected[0]["reason"]}
                 )
                 corrupt_count += 1
+                continue
+            if not accepted and not losses:
+                skipped_count += 1
                 continue
             item = accepted[0] if accepted else losses[0]
             if writer_started_at is not None:
@@ -598,6 +610,7 @@ class ObservationFeed:
         self._offset += complete_length
         self._line_number += len(raw_lines)
         self._corrupt_lines_total += corrupt_count
+        self._skipped_unsupported_total += skipped_count
         self._out_of_window_total += out_of_window_count
         self._hubble_lines_seen_total += valid_hubble_count
         checkpoint_error = self._checkpoint_error

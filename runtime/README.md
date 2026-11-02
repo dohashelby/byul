@@ -25,9 +25,14 @@
 | Cilium 통신 제한 · Hubble · Tetragon 관측/선택 차단 | 로컬 kind(WSL) |
 | SGLang 연결 | 가짜 SGLang만 |
 | AWS GPU lab 배포·인수 시험(AWS-01~08) | AWS GPU dev에서 1회 통과. 정식(reference) 시험·속도 측정은 미실행이며, 기능 완성을 뜻하지 않음 |
-| 시험 | unittest 482개, 수용 시험 39개, CPU vLLM 점검 CPU-01~14 통과 |
+| AWS-09~11 준비 | 실행·보호 파일 읽기·정상 동작 대조와 호스트 엔진 로그→단계 시간표 연결을 로컬 구현. 실제 AWS 단계 패턴·판정은 미확인. 허용 목록 확장 전 1차 관찰 필요 |
+| 시험 | 로컬 unittest 554건 중 112건 환경상 skip·실패 0, 수용 시험 39개, CPU vLLM 점검 CPU-01~14 통과 |
 
 **아직 안 한 것:** 정식 GPU 환경 시험(S3B·reference AWS-01~08)과 속도 측정, 실제 SGLang, logprobs, 운영 인증 연동(D-02)·계정/역할(D-03). 기능별 상세 확인 수준은 [`docs/지원_미지원_목록.md`](docs/지원_미지원_목록.md)에 있습니다.
+
+AWS-09~11 실행 옵션은 `tools/aws_lab_acceptance.py --cases AWS-09,AWS-10,AWS-11`이며, 순서와 판정은 [`deploy/gpu-lab/ACCEPTANCE.md`](deploy/gpu-lab/ACCEPTANCE.md)에 적었다. 단계 위험·재생 결과는 [`docs/AWS_GPU_단계_사전분석.md`](docs/AWS_GPU_단계_사전분석.md)에 있다.
+
+호스트 수집기는 현재 엔진 Pod UID의 `kubectl logs --timestamps`만 단계 시간표로 바꾸며, Gateway는 관측 폴더의 시간표를 읽는다. 수집 시각이 15초 오래되면 단계는 `unknown`·`phase_unknown`으로 돌아가고 요청은 계속 처리한다. 다른 Pod의 의심 경로 실행은 단계와 무관하게 `suspect_binary` 탐지다. 캐시 경로·허용 목록·예외는 엔진 selector에만 적용한다. 서버에서는 1차 단계별 실행 관찰 → 허용 목록 검토 → 2차 AWS-09~11 판정 순서를 지킨다.
 
 ## AWS dev 시험에서 겪은 문제
 

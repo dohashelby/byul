@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 from ipaddress import ip_address
 import json
@@ -36,7 +36,7 @@ from serving_runtime.mvp.kube_context import validate_kube_context
 from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
 
 
-CASE_IDS = tuple(f"AWS-{number:02d}" for number in range(1, 9))
+CASE_IDS = tuple(f"AWS-{number:02d}" for number in range(1, 12))
 CASE_TITLES = {
     "AWS-01": "정상",
     "AWS-02": "인증 거부",
@@ -46,6 +46,9 @@ CASE_TITLES = {
     "AWS-06": "RO 쓰기 거부",
     "AWS-07": "수집 중단",
     "AWS-08": "Pod 교체",
+    "AWS-09": "실행 탐지",
+    "AWS-10": "보호 파일 읽기",
+    "AWS-11": "정상 동작 대조",
 }
 CASE_RT_IDS = {
     "AWS-01": ["RT-API-01", "RT-ENV-02"],
@@ -56,6 +59,9 @@ CASE_RT_IDS = {
     "AWS-06": ["RT-SYS-03", "RT-ASSET-02", "RT-ASSET-05"],
     "AWS-07": ["RT-OBS-01", "RT-SYS-06"],
     "AWS-08": ["RT-NET-04", "RT-PHASE-01"],
+    "AWS-09": ["RT-SYS-01", "RT-SYS-02"],
+    "AWS-10": ["RT-SYS-05"],
+    "AWS-11": ["RT-API-01", "RT-SYS-02", "RT-ASSET-05"],
 }
 RESULTS = frozenset({"passed", "failed", "not_run", "unknown"})
 _NAMESPACE = re.compile(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?")
@@ -80,6 +86,9 @@ WRITE_DENY_CODE = (
 CACHE_WRITE_CODE = (
     "import os,sys; p=sys.argv[1]; "
     "f=open(p,'xb'); f.write(b'x'); f.close(); os.unlink(p); print('CACHE_WRITE_REMOVED')"
+)
+PROBE_READ_CODE = (
+    "import pathlib,sys; pathlib.Path(sys.argv[1]).read_bytes(); print('READ_OK')"
 )
 
 
@@ -316,6 +325,18 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
                 "gateway_instance_changed",
             ),
         ),
+        "AWS-09": (
+            ("absolute_exec_ok", "path_exec_ok", "path_observed", "engine_pod_match", "suspect_verdict"),
+            ("absolute_exec_ok", "engine_pod_match", "suspect_verdict"),
+        ),
+        "AWS-10": (
+            ("read_ok", "path_match", "engine_pod_match", "read_access", "monitor_detected"),
+            ("read_ok", "path_match", "engine_pod_match", "read_access", "monitor_detected"),
+        ),
+        "AWS-11": (
+            ("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero"),
+            ("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero"),
+        ),
     }
     required, decisive = checks[case_id]
     false_decisive = [name for name in decisive if facts.get(name) is False]
@@ -415,6 +436,20 @@ def _report_code(value: object) -> str:
     return "확인 못 함"
 
 
+def _report_probe_value(value: object) -> str:
+    if isinstance(value, str) and (value in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash", "suspect_binary"} or _parse_time(value) is not None):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+        return str(value)
+    return "확인 못 함"
+
+
+def _report_binary_path(value: object) -> str:
+    if isinstance(value, str) and len(value) <= 256 and re.fullmatch(r"/[A-Za-z0-9_./-]+", value):
+        return value
+    return "확인 못 함"
+
+
 def _report_summary(case: Mapping[str, Any]) -> str:
     case_id = case.get("case_id")
     facts = case.get("facts") or {}
@@ -455,13 +490,29 @@ def _report_summary(case: Mapping[str, Any]) -> str:
                 f"TG-CACHE-01 기록 {fact('cache_tetragon')}")
     if case_id == "AWS-07":
         return (f"중단 중 요청 HTTP {status(at('stopped_interval_request', 'http_status'))}, "
-                f"대상 확인 {state(at('stopped_target_verification', 'state'), ('ok', 'unavailable', 'blocked'))}; "
+                f"대상 상태 {state(at('stopped_target_verification', 'state'), ('ok', 'unavailable', 'blocked'))}; "
                 f"복구 대상 {state(at('recovered_target_verification', 'state'), ('ok', 'unavailable', 'blocked'))}, "
                 f"요청 HTTP {status(at('recovery_request', 'last_status'))}, 추론 회복 {fact('inference_recovered')}")
     if case_id == "AWS-08":
         return (f"Pod 교체 {fact('pod_changed')}, Gateway instance 변경 {fact('gateway_instance_changed')}, "
                 f"engine_info {state(at('engine_info', 'state'), ('ok', 'error', 'stale'))}, "
                 f"복구 요청 HTTP {status(at('recovery_request', 'last_status'))}, 추론 회복 {fact('gateway_recovered')}")
+    if case_id == "AWS-09":
+        return (f"절대 경로 /bin/sh 실행 {fact('absolute_exec_ok')}, PATH 탐색 실행 {fact('path_exec_ok')}; "
+                f"관측 경로 {_report_probe_value(at('absolute', 'binary'))}, Pod 귀속 {fact('engine_pod_match')}, "
+                f"판정 {_report_probe_value(at('absolute', 'exec_verdict'))}, 시각 {_report_probe_value(at('absolute', 'observed_at'))}, "
+                f"탐지 시간 {_report_probe_value(at('absolute', 'detection_delay_s'))}초; "
+                f"PATH 실행 기록 경로 {_report_probe_value(at('path_lookup', 'binary'))}, 판정 {_report_probe_value(at('path_lookup', 'exec_verdict'))}")
+    if case_id == "AWS-10":
+        return (f"가짜 파일 읽기 {fact('read_ok')}, 경로 {fact('path_match')}, Pod 귀속 {fact('engine_pod_match')}, "
+                f"기록 경로 {_report_binary_path(at('observation', 'path'))}, 시각 {_report_probe_value(at('observation', 'observed_at'))}, "
+                f"read {fact('read_access')}, monitor 탐지 {fact('monitor_detected')}, "
+                f"탐지 시간 {_report_probe_value(at('observation', 'detection_delay_s'))}초")
+    if case_id == "AWS-11":
+        return (f"전후 정상 요청 {fact('normal_before')}/{fact('normal_after')}, stream {fact('stream_before')}/{fact('stream_after')}, "
+                f"현재 cache {fact('cache_current_before')}/{fact('cache_current_after')}, 잘못된 경고 {_report_probe_value(at('false_warning_count'))}건, "
+                f"일반 응답 시간 전/후 {_report_probe_value(at('before', 'response_time_ms', 'normal'))}/{_report_probe_value(at('after', 'response_time_ms', 'normal'))}ms, "
+                f"stream 전/후 {_report_probe_value(at('before', 'response_time_ms', 'stream'))}/{_report_probe_value(at('after', 'response_time_ms', 'stream'))}ms (참고값)")
     return "확인 못 함"
 
 
@@ -481,6 +532,9 @@ REPORT_CASES: dict[str, _ReportCase] = {
     "AWS-06": _ReportCase("/models 쓰기는 EROFS, /cache 쓰기·삭제는 성공하고 TG-CACHE-01에 기록돼야 한다.", "EPERM·EACCES는 읽기 전용 mount 증거가 아니며 TG-ASSET-01은 선행 거부 시 안 보일 수 있다.", ("model_write_denied", "cache_write_succeeded", "cache_harmless_removed", "cache_tetragon")),
     "AWS-07": _ReportCase("중단 heartbeat·collector 비정상, stale 이후 요청 200·대상 unavailable, 재시작 뒤 collector·대상·추론 회복을 확인한다.", "정상 종료의 gap 기록은 보조 증거이며 없어도 판정할 수 있다.", ("stop_ok", "heartbeat_stopped_seen", "collectors_unavailable", "stopped_request_200_unverified", "start_ok", "collectors_recovered", "target_recovered", "inference_recovered")),
     "AWS-08": _ReportCase("재시작 뒤 Pod·Gateway instance 변경, engine_info ok와 유한 창 내 추론 회복을 확인한다.", "Pod snapshot stale은 별도 메모이며 통과 근거가 아니다.", ("restart_ok", "pod_changed", "gateway_recovered", "engine_info_recovered", "gateway_instance_changed")),
+    "AWS-09": _ReportCase("엔진 Pod의 /bin/sh -c true 실행이 해당 Pod·시각·경로의 관측 기록과 연결되고 suspect_binary여야 한다. PATH 탐색 sh -c true도 실행해 실제 기록 경로와 판정을 남긴다.", "인자를 수집하지 않으므로 동일 Pod·경로·시각은 강한 대조이나 단일 프로세스 ID 증명은 아니다.", ("absolute_exec_ok", "path_exec_ok", "path_observed", "engine_pod_match", "suspect_verdict")),
+    "AWS-10": _ReportCase("가짜 파일 읽기 성공과 TG-SECRET-01의 동일 경로·엔진 Pod·read·monitor 탐지를 확인한다.", "읽기 차단은 요구하지 않으며 파일 내용은 보고하지 않는다.", ("read_ok", "path_match", "engine_pod_match", "read_access", "monitor_detected")),
+    "AWS-11": _ReportCase("AWS-09·10 앞뒤의 일반 요청·stream·현재 cache 쓰기가 정상이고, 구간 실행에 유효한 단계 근거가 있으며, 잘못된 경고가 0건이어야 한다. 응답 시간은 참고값이다.", "탐지 시간은 측정만 하며 기준 없이 판정하지 않는다. 실제 GPU 단계 패턴과 정상 허용 목록은 미확인이다.", ("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero")),
 }
 
 
@@ -542,6 +596,8 @@ class AWSAcceptance:
         self.http_events: list[dict[str, Any]] = []
         self.cases: list[dict[str, Any]] = []
         self.engine_log_format_confirmed = False
+        self.normal_before: dict[str, Any] | None = None
+        self.detection_started_at: str | None = None
         self.run_started_at = _now()
         base = Path(args.evidence_dir).expanduser()
         base.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -978,6 +1034,60 @@ class AWSAcceptance:
             if attempt < 7:
                 self.sleep(2.0)
         return available, []
+
+    def _tetragon_observations(self, since: str) -> tuple[bool, list[dict[str, Any]]]:
+        """Use Gateway-normalized observations for verdict and cache generation."""
+        try:
+            response, document = self._get_json(
+                "/api/observations?" + urlencode({"source": "tetragon"})
+            )
+        except (OSError, URLError, TimeoutError):
+            return False, []
+        rows = document.get("observations") if document else None
+        if response.status != 200 or not isinstance(rows, list):
+            return False, []
+        recent = [item for item in rows if isinstance(item, dict) and _after(item.get("observed_at"), since)]
+        counts = document.get("counts") if isinstance(document.get("counts"), dict) else {}
+        total = counts.get("total")
+        # The query returns only the latest 50 rows. Never claim zero warnings
+        # if the requested interval may extend beyond that page.
+        complete = not (isinstance(total, int) and total > len(rows) and len(rows) >= 50 and len(recent) == len(rows))
+        return complete, recent
+
+    def _wait_tetragon(self, since: str, predicate: Callable[[Mapping[str, Any]], bool]) -> tuple[bool, dict[str, Any] | None]:
+        available = False
+        for attempt in range(8):
+            readable, rows = self._tetragon_observations(since)
+            available = available or readable
+            match = next((item for item in rows if predicate(item)), None)
+            if match is not None:
+                return True, match
+            if attempt < 7:
+                self.sleep(2.0)
+        return available, None
+
+    def _engine_event(self, item: Mapping[str, Any], pod_name: str) -> bool:
+        pod = item.get("pod")
+        return isinstance(pod, Mapping) and pod.get("namespace") == self.namespace and pod.get("pod") == pod_name
+
+    @staticmethod
+    def _event_summary(item: Mapping[str, Any] | None, started_at: str) -> dict[str, Any] | None:
+        if item is None:
+            return None
+        start, observed = _parse_time(started_at), _parse_time(item.get("observed_at"))
+        return {
+            "observed_at": item.get("observed_at"),
+            "binary": item.get("binary"),
+            "path": item.get("path"),
+            "pod": item.get("pod"),
+            "rule_id": item.get("rule_id"),
+            "access": item.get("access"),
+            "action_mode": item.get("action_mode"),
+            "exec_verdict": item.get("exec_verdict"),
+            "cache_generation": item.get("cache_generation"),
+            "phase": item.get("phase"),
+            "detection_delay_s": round((observed - start).total_seconds(), 3) if start and observed else None,
+        }
 
     def _case_result(
         self,
@@ -1953,6 +2063,154 @@ class AWSAcceptance:
             ),
         }
 
+    def aws_09(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        pod, _ = self._engine_pod()
+        if not pod or not pod.get("ready") or not isinstance(pod.get("name"), str):
+            return {"unknown_reason": "Ready 엔진 Pod 하나를 식별하지 못함"}, {}
+        probes: dict[str, dict[str, Any]] = {}
+        for label, executable in (("absolute", "/bin/sh"), ("path", "sh")):
+            started = _now()
+            result = self._kubectl(
+                "exec", "pod/" + pod["name"], "-c", "engine", "--", executable, "-c", "true", timeout=15
+            )
+            available, match = self._wait_tetragon(
+                started,
+                lambda item: item.get("kind") == "process_exec"
+                and self._engine_event(item, pod["name"])
+                and item.get("binary") in ({"/bin/sh"} if label == "absolute" else {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"}),
+            )
+            probes[label] = {
+                "started_at": started,
+                "returncode": result.returncode,
+                "observation_available": available,
+                "observation": self._event_summary(match, started),
+            }
+        absolute = probes["absolute"]["observation"]
+        path = probes["path"]["observation"]
+        return {
+            "absolute_exec_ok": probes["absolute"]["returncode"] == 0,
+            "path_exec_ok": probes["path"]["returncode"] == 0,
+            "path_observed": None if not probes["path"]["observation_available"] else path is not None and path["exec_verdict"] is not None,
+            "engine_pod_match": None if absolute is None else absolute["pod"] == {"namespace": self.namespace, "pod": pod["name"]} and absolute["binary"] == "/bin/sh",
+            "suspect_verdict": None if absolute is None else absolute["exec_verdict"] == "suspect_binary" and absolute["binary"] == "/bin/sh",
+        }, {
+            "engine_pod": {"name": pod["name"], "uid": pod.get("uid")},
+            "absolute": absolute,
+            "path_lookup": path,
+            "probes": probes,
+            "detection_reason": "intent suspect_binaries에 있는 실행 경로",
+        }
+
+    def aws_10(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        pod, _ = self._engine_pod()
+        if not pod or not pod.get("ready") or not isinstance(pod.get("name"), str):
+            return {"unknown_reason": "Ready 엔진 Pod 하나를 식별하지 못함"}, {}
+        path = "/run/byul-probe/secret.txt"
+        started = _now()
+        result = self._kubectl(
+            "exec", "pod/" + pod["name"], "-c", "engine", "--", "python3", "-c", PROBE_READ_CODE, path, timeout=15
+        )
+        available, match = self._wait_tetragon(
+            started,
+            lambda item: item.get("rule_id") == "TG-SECRET-01"
+            and item.get("path") == path
+            and self._engine_event(item, pod["name"]),
+        )
+        observation = self._event_summary(match, started)
+        return {
+            "read_ok": result.returncode == 0 and "READ_OK" in result.stdout,
+            "path_match": None if observation is None else observation["path"] == path,
+            "engine_pod_match": None if observation is None else observation["pod"] == {"namespace": self.namespace, "pod": pod["name"]},
+            "read_access": None if observation is None else observation["access"] == "read",
+            "monitor_detected": None if observation is None else observation["rule_id"] == "TG-SECRET-01" and observation["action_mode"] == "monitor",
+        }, {
+            "engine_pod": {"name": pod["name"], "uid": pod.get("uid")},
+            "started_at": started,
+            "read_returncode": result.returncode,
+            "observation_available": available,
+            "observation": observation,
+        }
+
+    def _normal_control(self) -> dict[str, Any]:
+        pod, _ = self._engine_pod()
+        if not pod or not pod.get("ready") or not isinstance(pod.get("name"), str):
+            return {"error": "Ready 엔진 Pod 하나를 식별하지 못함"}
+        request_start = self.monotonic()
+        response, request_id, valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
+        request_ms = round((self.monotonic() - request_start) * 1000, 3)
+        record = _record_fields(self._detail(request_id))
+        stream_start = self.monotonic()
+        streamed, stream_id, data_seen, done_seen = self._stream_completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
+        stream_ms = round((self.monotonic() - stream_start) * 1000, 3)
+        stream_record = _record_fields(self._detail(stream_id))
+        cache_path = "/cache/.byul-acceptance-" + uuid4().hex[:12]
+        cache_started = _now()
+        cache = self._kubectl(
+            "exec", "pod/" + pod["name"], "-c", "engine", "--", "python3", "-c", CACHE_WRITE_CODE, cache_path, timeout=15
+        )
+        available, match = self._wait_tetragon(
+            cache_started,
+            lambda item: item.get("rule_id") == "TG-CACHE-01"
+            and item.get("path") == cache_path
+            and self._engine_event(item, pod["name"]),
+        )
+        return {
+            "pod": pod["name"],
+            "normal_ok": response.status == 200 and valid and record is not None and record["result"] == "ALLOWED" and record["delivery"]["attempted"] is True,
+            "stream_ok": streamed.status == 200 and data_seen and done_seen and stream_record is not None and stream_record["result"] == "ALLOWED" and stream_record["delivery"]["attempted"] is True,
+            "cache_ok": None if not available else cache.returncode == 0 and "CACHE_WRITE_REMOVED" in cache.stdout and match is not None and match.get("cache_generation") == "current" and match.get("exec_verdict") is None,
+            "cache_observation_available": available,
+            "cache_observation": self._event_summary(match, cache_started),
+            "response_time_ms": {"normal": request_ms, "stream": stream_ms},
+        }
+
+    def aws_11(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        if self.normal_before is None or self.detection_started_at is None:
+            return {"not_run_reason": "AWS-09·10을 함께 선택해야 전후 대조 가능"}, {}
+        after = self._normal_control()
+        available, rows = self._tetragon_observations(self.detection_started_at)
+        suspect_paths = {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"}
+        false_warnings = [
+            self._event_summary(item, self.detection_started_at)
+            for item in rows
+            if item.get("exec_verdict") in {"outside_allowlist", "phase_signal_unverified", "exec_from_cache"}
+            and item.get("binary") not in suspect_paths
+        ]
+        phase_rows = [item for item in rows if item.get("kind") == "process_exec"
+                      and isinstance(item.get("phase"), list)
+                      and any(phase != "unknown" for phase in item["phase"])
+                      and item.get("phase_timeline_fresh") is not False]
+        phase_evidence = {
+            "valid_exec_count": len(phase_rows),
+            "unknown_exec_count": sum(item.get("exec_verdict") == "phase_unknown" for item in rows),
+            "bases": sorted({basis for item in phase_rows for basis in item.get("phase_basis", [])
+                             if isinstance(basis, str)}),
+            "timeline_written_at": sorted({item["phase_timeline_written_at"] for item in phase_rows
+                                           if isinstance(item.get("phase_timeline_written_at"), str)}),
+            "freshness": "fresh" if any(item.get("phase_timeline_fresh") is True for item in phase_rows)
+                         else "legacy_unbounded" if phase_rows else "unconfirmed",
+        }
+        return {
+            "normal_before": self.normal_before.get("normal_ok"),
+            "normal_after": after.get("normal_ok"),
+            "stream_before": self.normal_before.get("stream_ok"),
+            "stream_after": after.get("stream_ok"),
+            "cache_current_before": self.normal_before.get("cache_ok"),
+            "cache_current_after": after.get("cache_ok"),
+            "false_warnings_zero": len(false_warnings) == 0 if available and phase_rows else None,
+        }, {
+            "before": self.normal_before,
+            "after": after,
+            "false_warning_count": len(false_warnings) if available else None,
+            "false_warning_observed_partial_count": len(false_warnings),
+            "warning_list_complete": available,
+            "false_warnings": false_warnings,
+            "phase_evidence": phase_evidence,
+            "warning_criterion": "구간 내 outside_allowlist·phase_signal_unverified·exec_from_cache; 의도한 shell probe 제외",
+            "response_time_note": "응답 시간은 참고값이며 판정에 쓰지 않음",
+            "detection_time_note": "실행 시각→관측 시각을 측정하며 기준 없이 판정하지 않음",
+        }
+
     def write_report(self) -> tuple[Path, Path]:
         report = {
             "schema": "runtime-aws-acceptance/1.0",
@@ -2037,6 +2295,37 @@ class AWSAcceptance:
                 "",
             ]
         )
+        for case in safe_report["cases"]:
+            if case["case_id"] != "AWS-11":
+                continue
+            evidence = case.get("evidence") or {}
+            warnings = evidence.get("false_warnings")
+            lines.extend(["## AWS-11 잘못된 경고 목록", ""])
+            phase_evidence = evidence.get("phase_evidence")
+            if isinstance(phase_evidence, Mapping):
+                lines.extend([
+                    f"단계 근거: 유효 실행 {_report_probe_value(phase_evidence.get('valid_exec_count'))}건, "
+                    f"미확인 실행 {_report_probe_value(phase_evidence.get('unknown_exec_count'))}건, "
+                    f"신선도 {_report_value(phase_evidence.get('freshness'), allowed={'fresh', 'legacy_unbounded', 'unconfirmed'})}, "
+                    f"출처 {', '.join(_report_value(item, allowed={'declared', 'engine_signal', 'test_controller'}) for item in phase_evidence.get('bases', [])) or '확인 못 함'}, "
+                    f"시간표 쓰기 시각 {_report_probe_value(phase_evidence.get('timeline_written_at', [None])[-1] if phase_evidence.get('timeline_written_at') else None)}", "",
+                ])
+            if evidence.get("warning_list_complete") is not True:
+                lines.extend(["관측 조회 실패 또는 최근 50행 제한으로 전체 목록·건수 확인 못 함. 아래는 조회된 일부다.", ""])
+            if not isinstance(warnings, list):
+                lines.append("관측 목록 확인 못 함")
+            elif not warnings:
+                lines.append("관측된 잘못된 경고 0건 (단계 근거와 목록 완전성은 별도 판정)")
+            else:
+                for item in warnings:
+                    if not isinstance(item, Mapping):
+                        continue
+                    lines.append(
+                        f"- {_report_probe_value(item.get('observed_at'))} · "
+                        f"{_report_binary_path(item.get('binary'))} · "
+                        f"{_report_value(item.get('exec_verdict'), allowed={'outside_allowlist', 'phase_signal_unverified', 'exec_from_cache'})}"
+                    )
+            lines.extend(["", "응답 시간은 참고값이며 판정에 쓰지 않는다. 탐지 시간은 기준 없이 판정에 쓰지 않는다.", ""])
         markdown = "\n".join(lines)
         if any(secret and secret in markdown for secret in secrets):
             raise RuntimeError("secret redaction failed")
@@ -2055,8 +2344,17 @@ class AWSAcceptance:
             "AWS-06": self.aws_06,
             "AWS-07": self.aws_07,
             "AWS-08": self.aws_08,
+            "AWS-09": self.aws_09,
+            "AWS-10": self.aws_10,
+            "AWS-11": self.aws_11,
         }
         for case_id in self.args.cases:
+            if case_id == "AWS-09" and "AWS-11" in self.args.cases and "AWS-10" in self.args.cases:
+                self.detection_started_at = _now()
+                try:
+                    self.normal_before = self._normal_control()
+                except Exception as error:
+                    self.normal_before = {"error": _safe_exception(error)}
             self._run_case(case_id, functions[case_id])
         json_path, md_path = self.write_report()
         overall = _overall(self.cases)
@@ -2092,7 +2390,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--cases",
         action="append",
         metavar="AWS-01[,AWS-02...]",
-        help="case subset; repeatable (default: AWS-01 through AWS-08)",
+        help="case subset; repeatable (default: AWS-01 through AWS-11); AWS-11 wraps AWS-09/10",
     )
     parser.add_argument(
         "--allow-collector-stop",
@@ -2119,6 +2417,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv and argv[0] == "inventory":
+        return phase_exec_inventory(argv[1:])
     try:
         args = parse_args(argv)
         return AWSAcceptance(args).run()
@@ -2127,6 +2429,71 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     except (OSError, subprocess.SubprocessError) as error:
         print(f"AWS acceptance failed before report: {_safe_exception(error)}", file=sys.stderr)
+        return 2
+
+
+def phase_exec_inventory(argv: Sequence[str]) -> int:
+    """Read-only first-pass stage/Pod/path counts; never classify verdicts."""
+    from collections import Counter
+    from serving_runtime.enforcement.events import parse_tetragon, UnsupportedTetragonEvent
+    from serving_runtime.enforcement.execpolicy import parse_timeline
+
+    parser = argparse.ArgumentParser(prog="aws_lab_acceptance.py inventory")
+    parser.add_argument("--tetragon", required=True, type=Path)
+    parser.add_argument("--timeline", required=True, type=Path)
+    args = parser.parse_args(argv)
+    try:
+        timeline = json.loads(args.timeline.read_text(encoding="utf-8"))
+        entries = parse_timeline(timeline)
+        collector = timeline.get("collector") or {}
+        target_uid = collector.get("pod_uid")
+        target_name = collector.get("pod_name")
+        collector_written = _parse_time(collector.get("written_at"))
+        counts: Counter[tuple[str, str, str]] = Counter()
+        skipped = 0
+        with args.tetragon.open(encoding="utf-8") as source:
+            for raw in source:
+                document = json.loads(raw)
+                if "process_exec" not in document:
+                    continue
+                try:
+                    item = parse_tetragon(document, data_origin="real")
+                except (ValueError, UnsupportedTetragonEvent):
+                    skipped += 1
+                    continue
+                process = document["process_exec"].get("process", {})
+                original_pod = process.get("pod", {})
+                if not isinstance(original_pod, dict):
+                    original_pod = {}
+                pod = item.get("pod") or {}
+                pod_name = pod.get("pod") or "unknown"
+                is_engine = (pod.get("namespace") == "serving-lab"
+                             and isinstance(original_pod.get("pod_labels"), dict)
+                             and original_pod["pod_labels"].get("app") == "serving-engine")
+                uid = original_pod.get("uid")
+                same_pod = is_engine and (
+                    isinstance(uid, str) and uid == target_uid
+                    or uid is None and isinstance(target_name, str) and pod_name == target_name
+                )
+                # A Pod name is unique for its lifetime. Use it when this
+                # Tetragon version omits UID; never assign a different Pod's phase.
+                at = _parse_time(item.get("observed_at"))
+                phase_fresh = (collector.get("state") == "running" and at is not None
+                               and collector_written is not None
+                               and at <= collector_written + timedelta(seconds=15))
+                phases = sorted({entry.phase for entry in entries
+                                 if same_pod and phase_fresh and entry.active(at)})
+                counts[("+".join(phases) if phases else "unknown", pod_name, item["binary"])] += 1
+        report = {"schema": "runtime-phase-exec-inventory/1.0", "purpose": "observation_only",
+                  "timeline_pod_uid_available": isinstance(target_uid, str),
+                  "timeline_pod_name_available": isinstance(target_name, str),
+                  "skipped": skipped,
+                  "counts": [{"phase": phase, "pod": pod, "path": path, "count": count}
+                             for (phase, pod, path), count in sorted(counts.items())]}
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
+    except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as error:
+        print(f"phase inventory failed: {type(error).__name__}", file=sys.stderr)
         return 2
 
 

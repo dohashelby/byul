@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SOURCE, mockApi, renderAt } from "./helpers";
 import { EventsPage } from "../src/pages/EventsPage";
+import { RuntimeObservePage } from "../src/pages/runtime/RuntimeObservePage";
 import { RequestsPage, filterRequests } from "../src/pages/RequestsPage";
 import type { RequestRow, RuntimeEvent } from "../src/api/types";
 
@@ -40,6 +41,22 @@ const row = (over: Partial<RequestRow>): RequestRow => ({
 const EMPTY_LIST = { items: [], source: { name: "store", mode: "example", detail: null } };
 
 describe("사건 로그", () => {
+  it("Gateway Pod의 의심 실행을 Tetragon 탐지 행으로 표시한다", async () => {
+    const sample = EVENTS.find((e) => e.source === "tetragon")!;
+    const suspect: RuntimeEvent = {
+      ...sample, event_id: "sha:" + "d".repeat(64), outcome: "detected",
+      observation: { ...sample.observation!, kind: "process_exec", binary: "/bin/sh",
+        pod_namespace: "serving-lab", pod_name: "serving-gateway-1",
+        exec_verdict: "suspect_binary", phases: ["unknown"], allowed_binary: null },
+    };
+    mockApi({ "/api/runtime/events": { items: [suspect], invalid: [], source: SOURCE, truncated: false } });
+    renderAt("/runtime/observe/tetragon", "/runtime/observe/:sub", <RuntimeObservePage />);
+    const row = (await screen.findByText("/bin/sh")).closest("tr")!;
+    expect(row.textContent).toContain("의심 실행");
+    expect(row.className).toContain("rowFlagged");
+    expect(row.querySelector("td[title='serving-lab/serving-gateway-1']")).toBeTruthy();
+  });
+
   it("Hubble 사건(DROPPED 포함)은 거부 확인으로 표시되지 않는다", async () => {
     mockApi({
       "/api/runtime/events": { items: EVENTS, invalid: [], source: SOURCE, truncated: false },

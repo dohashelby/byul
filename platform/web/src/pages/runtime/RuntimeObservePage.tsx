@@ -27,7 +27,7 @@ function CollectorSummary({ c }: { c: Collector }) {
   }
   if (d.kind === "observation_feed") {
     lines.push([
-      `최근 처리 ${d.processed} · 저장 ${d.accepted} · 중복 ${d.duplicates} · 거부 ${d.rejected} · 손상 누적 ${d.corrupt_lines_total} · 실행 전 이벤트 누적 ${d.out_of_window_total}`,
+      `최근 처리 ${d.processed} · 저장 ${d.accepted} · 미지원 건너뜀 누적 ${d.skipped_unsupported_total} · 중복 ${d.duplicates} · 거부 ${d.rejected} · 손상 누적 ${d.corrupt_lines_total} · 실행 전 이벤트 누적 ${d.out_of_window_total}`,
       d.rejected > 0 || d.corrupt_lines_total > 0 || d.out_of_window_total > 0,
     ]);
     if (c.source === "observation_feed_hubble") {

@@ -1,7 +1,9 @@
 # 기존 실행기와 체크리스트 GPU 실증 인계 보고서
 
-기준 시각: **2026-11-02 19:01 KST**  
-대상 저장소: https://github.com/dohashelby/byul  
+기준 시각: **2026-11-02 19:01 KST**
+
+대상 저장소: https://github.com/dohashelby/byul
+
 대상 업무: 기존 GPU 후보 40개에 대한 실제 실행 검증과 오류 수정 현황 인계
 
 ## 1 현재 진행량과 해석

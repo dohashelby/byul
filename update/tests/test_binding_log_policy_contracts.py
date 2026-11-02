@@ -32,7 +32,7 @@ def validator(check_id):
 
 
 def sample(check_id, raw="PASS"):
-    definition = yaml.safe_load((ROOT / f"packs/PACK-BASELINE/checks/{check_id}.yaml").read_text(encoding="utf-8"))
+    definition = yaml.safe_load((ROOT / f"reference/pack-seeds/PACK-BASELINE-31/checks/{check_id}.yaml").read_text(encoding="utf-8"))
     definition.update(yaml.safe_load((ROOT / f"tools/overrides/{check_id}.yaml").read_text(encoding="utf-8")))
     check = CheckDef.model_validate(definition)
     if check_id == "REQ-11":

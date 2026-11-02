@@ -2,7 +2,7 @@ id: LIF-07
 framework_id: CHK-LIF-007
 mechanism_ids:
 - mechanism-10
-revision: 5
+revision: 6
 retired: false
 area: LIF
 purpose: 기동 준비 확인
@@ -16,6 +16,48 @@ impact: null
 applies_when:
   prose: 기본 TP의 필수 rank·모델 준비와 접수 gate를 확인한다. 선택 graph/backend의 준비 항목은 실제 설정에 맞춰 추가한다.
 policy_params:
+- key: init_environment_sha256
+  type: str
+  required: true
+- key: init_target_sha256
+  type: str
+  required: true
+- key: init_prepared_sha256
+  type: str
+  required: true
+- key: init_validity_start
+  type: str
+  required: true
+- key: init_validity_end
+  type: str
+  required: true
+- key: init_executor_backend
+  type: str
+  required: true
+- key: init_expected_ranks
+  type: list[str]
+  required: true
+- key: init_scenario_sha256
+  type: str
+  required: true
+- key: init_phase
+  type: str
+  required: true
+- key: init_required_stages
+  type: list[str]
+  required: true
+- key: init_failure_rank
+  type: int
+  required: true
+- key: init_failure_stage
+  type: str
+  required: true
+- key: init_preparation_deadline_ms
+  type: int
+  required: true
+- key: init_recovery_deadline_ms
+  type: int
+  required: true
 - key: required_readiness_items
   type: list[str]
   required: true
@@ -27,7 +69,15 @@ challenge_steps:
 - 준비 단계의 rank 하나를 안전하게 지연
 - listener·health·Gateway readiness·추론 결과 비교
 - 준비 후 허용 확인
-required_observations: []
+required_observations:
+- key: activation_steps
+  type: list
+- key: activation_violations
+  type: list
+- key: activation_missing
+  type: list
+- key: activation_scope_complete
+  type: bool
 required_observations_prose:
 - rank 준비/listener 시각/readiness 판정·실제 추론
 satisfied_if: 필수 준비 미완료 상태에서는 접수를 허용하지 않고 완료 후 정상 처리한다.
@@ -36,8 +86,19 @@ unknown_criteria: health 응답만 있고 rank·model 준비 또는 실제 접�
 remediation: '- 실제 모델 로딩과 필수 worker·실행 모드 준비를 서비스 수용 조건에 반영한다. 준비 확인용 정상 추론까지 성공한 뒤 요청을 받고 일부 준비 실패 시 수용을 보류한다.'
 method_and_evidence: '필수 rank의 모델 로딩·KV·선택 graph/backend 준비와 외부 service gate의 실제 신규 요청 수용 시각을 연결한다. 필수 준비 하나를 지연한 동안 listener·health 응답과 실제 접수를 구분해 대조하고, 준비 완료 후 정상 canary와 요청 수용을 확인한다. 초기 준비 실패를 상위 기동 결과에 반영하는지는 CHK-LIF-009에서 따로 판정한다. vLLM v0.31.0의 공통 【F32】 근거 중 기본 재배포·외부 gate·정상 로딩 조건을 참조한다. 근거 원문: [F32](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33911).'
 remaining_setup: 준비 gate·외부 proxy 확인; keep/dev 옵션 유효값 기록
-executor: null
-judge: null
+executor: initialization
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: activation_scope_complete
+      op: eq
+      value: true
+    - obs: activation_violations
+      op: empty
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-R05-12
@@ -51,3 +112,4 @@ legacy:
   - Q-C09/SC-17-02
 source:
   array: lifecycle_assessment_draft
+collection_profile: kubernetes-mp-readiness-observation-v1

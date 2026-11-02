@@ -1,0 +1,46 @@
+id: LIF-01
+framework_id: CHK-LIF-001
+mechanism_ids:
+- mechanism-07
+revision: 3
+retired: false
+area: LIF
+purpose: 자원 예산·공정성
+secondary_purposes: []
+question: 모델을 가져와 해석·변환·로딩할 때 단계별·전체 자원 예산을 지키는가?
+scope: 기본; compile은 활성 시
+risk_category: 보안 위협 점검
+risk_summary: 공급자가 과도한 파일·metadata·변환 입력을 제공해 준비 단계의 CPU·메모리·디스크·GPU를 소모시키고 다른 작업을 방해할 수 있음.
+review_order: reference_baseline_first
+impact: null
+applies_when:
+  prose: 모델 취득·해석·변환·로딩 비용을 기본 확인한다. compile이 실제 사용되면 해당 단계·누적 비용을 포함한다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 단계·누적 예산·단위·중단 기준
+  enterprise_decisions: 모델·GPU·부하·공정성·정상 기능/성능 요구, 초과 시 거부/중단/정리 방식, 취득 retry 허용과 부분 자료 처리.
+normal_control: 선정 모델이 합의한 시간·메모리·저장 예산 안에 기동한다.
+challenge_steps:
+- 단계별 정상 비용 측정
+- 작은 과다 metadata·변환 입력 fixture 적용
+- 단계 한도와 누적 중단·정리 확인
+required_observations: []
+required_observations_prose:
+- 취득·해석·변환·로딩별 비용/한도 설정/중단·임시 자원 회수
+satisfied_if: 정한 예산과 정상 준비 조건을 만족한다.
+fail_criteria: 정한 단계·누적 예산을 넘겨 계속 소비하거나 필요한 정리를 하지 않는다.
+unknown_criteria: 예산 미정 또는 단계별 비용을 분리 측정하지 못했다.
+remediation: '- 모델 취득·압축 해제·해석·변환·컴파일·로딩의 단계별 시간·메모리·디스크와 누적 예산을 적용한다. 사전 크기 검사와 동시 준비 수 제한을 두고 예산 초과 시 중단·잔여 자료 정리를 수행한다.'
+method_and_evidence: 제한된 정상/경계 공급물로 시간·CPU/GPU·메모리·저장량과 중단 위치를 측정한다. 같은 준비 실행에서 취득 retry의 반복·backoff·누적 비용은 CHK-LIF-002로, 부분 생성물의 완료 판정과 후속 소비는 CHK-SUP-016으로 따로 남긴다. 추론 요청 부하는 CHK-LIF-003에서 확인한다.
+remaining_setup: 자원·시간 상한과 안전한 중단 장치; 작은 fixture부터
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-R05-10
+  scenario_ids:
+  - SC-15-01
+  subtest_ids:
+  - Q-R05-10/SC-15-01
+source:
+  array: lifecycle_assessment_draft

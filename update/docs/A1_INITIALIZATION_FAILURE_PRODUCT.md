@@ -2,7 +2,7 @@
 
 정본은 PACK31의 LIF09/SC17-01 원질문·정상·부분 실패·수정 후 정상 기동·FAIL/UNKNOWN 기준이다. 부모 A39/56/4와 A1 19/27/2, 공동 c9af729와 PR124, 과거 팩/Ref·실증·A2/B 원본을 유지한다. 이 묶음은 한 선언 단계의 준비/상위 기동 관측 연결이며 전체 LIF09 완료가 아니다.
 
-`initialization:kubernetes` 0.1.0과 `kubernetes-mp-initialization-observation-v1`을 기존 select/run/judge/report/verify/export/restore에 등록한다. `tools/build_kubernetes_initialization_pack.py --seed packs/PACK-BASELINE --output <새 외부 폴더>`는 전체77개 중 LIF09만 명시 DRAFT로 연결하며 다른76개 정의 bytes와 기존 정본을 보존한다. 원래 정상/위반 기준을 관측 성공으로 대체하지 않는다.
+`initialization:kubernetes` 0.1.0과 `kubernetes-mp-initialization-observation-v1`을 기존 select/run/judge/report/verify/export/restore에 등록한다. `tools/build_kubernetes_initialization_pack.py --seed reference/pack-seeds/PACK-BASELINE-31 --output <새 외부 폴더>`는 전체77개 중 LIF09만 명시 DRAFT로 연결하며 다른76개 정의 bytes와 기존 정본을 보존한다. 원래 정상/위반 기준을 관측 성공으로 대체하지 않는다.
 
 `prepare-lifecycle-sensor --profile vllm-native-lifecycle-metadata/14 --output <새 외부 폴더>`가 native14와 검토된 immutable native8을 묶는다. 기본8과9~13의 bytes·소스/image/lab 관문·native0.32 미지원은 유지한다. 준비 자산을 실제 serving 시작 경계에 설치하는 작업과 CPU 준비 생성은 다르다. 별도 Pod Python 실행을 serving hook으로 표현하지 않는다.
 

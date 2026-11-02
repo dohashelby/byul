@@ -28,3 +28,28 @@
 4. `test_B_reviewed_exact_A152_A156_A158_pairs_are_closed_and_literal`: 원 세 pair와 새 PR171 pair를 정확한 네 쌍으로 고정한다. SHA와 common을 독립 허용 목록으로 만들지 않는다.
 
 최종 PR171 Python3.12.3 CI 성공은 이 A 소유 기대 정정과 B 전달물 적용 뒤 확인해야 한다. source 승인·EXAMPLE 전송을 실제 worker/READY/GPU 완료로 집계하지 않는다. 정제 원 증거·소스 동결·명령·setup 실패 보존은 외부 `byul-b-record-access-evidence-20261030/pr171-stabilization-20261101`에 둔다.
+
+
+## A native20~22 통합394의 B 소비
+
+A 고정 전달 source d8904d0ee9d666d9d0070dbf2003b15f4e0b14bd와
+검토 common adcde856375a4de43d4a5d789c00de875e43e321의 gate SHA
+61c29e98ece3c27c3fb978c180b86c6ef1a2ba6bf60edcf9263a2fc3943acab7를
+다섯 번째 정확 조합으로 추가한다. HTTP 기능 범위도 해당 common 하나만 추가한다.
+기존 네 조합·공개392/main920·HTTP 두 기존 common·helper858/c9는 보존한다.
+
+근거는 A 파일의 관측 hash를 자동 채택한 것이 아니라, 과거 소유자 수락 source716의
+전체394 Git blob과 새 common 전체394가 같은지 대조한 결과다. 승인 manifest는
+0ee4b9da536307f9f5d68b55f3b938c591260da3386dc401d6a01a51a9ebc3c2다.
+A gate 알고리즘은 reviewed common literal 외 AST가 공개920과 같고, 원 B 도구/fixture와
+HTTP collector/binding/probe·native callback bytes가 유지됐다. 과거40CLI/240Ref와
+286파일 설치·ABI·원 실제 증거는 해당 원소스의 근거로 재사용한다.
+
+이 변경은 기존 source 진입점의 승인 조합과 fixture를 확장한다. 수집·finally·seal·전후
+snapshot·project·manual/Store·정리 함수는 바꾸지 않는다. 설치된 guard의 source-only
+gate 거부는 유지하며 설치 경로 우회를 추가하지 않는다. 실제 worker/READY/GPU·승인
+진위·tensor 소비를 입증하지 않고 native0.32 미지원 및 21/22 paired-span 미제공도 유지한다.
+
+A 소유 acceptance 시험의 공개392/네 조합/원 fixture bytes 기대는 A가 새 B 전달물을
+소비한 뒤 새394/다섯 조합/정확 후속 bytes로 갱신한다. B는 A 시험과 공통 pin을 수정하지
+않는다. 첫 PLT의 기존920 배포와 이 후보의 통합·정확HEAD CI5·실측은 각각 별도다.

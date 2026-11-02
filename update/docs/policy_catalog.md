@@ -38,8 +38,8 @@
 - origin: `https://github.com/dohashelby/gua.git`; 원격 main: `d9e9729116eeb16299247ecb9e7df8ff16d882ec`.
 - 기존 기본 작업 트리는 main이고 `.assessment/`가 미추적이었다. 기존 통합 작업 트리는 깨끗했으므로 그 경로를 사용했다. fetch 후 통합 브랜치 앞섬/뒤짐 `0/0`; `git pull --ff-only`는 `Already up to date.`. 원격 main만을 기준으로 삼지 않았다. 다른 두 작업 트리는 수정하지 않았다.
 - 사용자 추가 참고: [체크리스트와 보완 가이드](https://github.com/mg-princess/serving-security-framework/blob/cdfea2401007091f8e5452d87d4ff2fbfaf1219f/03_체크리스트와_보완가이드.md)의 고정 커밋 `cdfea2401007091f8e5452d87d4ff2fbfaf1219f`. 팀 참조 기준 28개와 최신 CHK 연결·변경 사항은 §14에 정리했다.
-- 현재 팩: PACK-BASELINE revision 15, DRAFT(M1 10, M2/M4 11, M5/M6 12, M7 13). [CLAUDE](../CLAUDE.md), [정책 요청](../POLICY_PROMPT.md), [SPEC](../SPEC.md), [결정 기록](../DECISIONS.md), [진행 기록](../PROGRESS.md)을 기준으로 코드·77 CheckDef·원문 JSON을 대조했다.
-- [POLICY_PROMPT](../POLICY_PROMPT.md)의 “3행만 구조화”는 과거 설명이다. M1은 5개 점검·11개 파라미터였고 M2/M4는 7개 점검·13개 파라미터였고 M5/M6는 9개 점검·15개 파라미터였고 M7은 10개 점검·20개 파라미터였고 M8은 **14개 점검·24개 파라미터**다. 자동 실행기 연결은 5개로 유지하며 과거 실측 3개와 신규 모의 검증 2개를 구별해야 한다.
+- 현재 팩: PACK-BASELINE revision 15, DRAFT(M1 10, M2/M4 11, M5/M6 12, M7 13). [CLAUDE](../CLAUDE.md), [SPEC](../SPEC.md), [결정 기록](../DECISIONS.md), [진행 기록](../PROGRESS.md)을 기준으로 코드·77 CheckDef·원문 JSON을 대조했다.
+- POLICY_PROMPT의 “3행만 구조화”는 과거 설명이다. M1은 5개 점검·11개 파라미터였고 M2/M4는 7개 점검·13개 파라미터였고 M5/M6는 9개 점검·15개 파라미터였고 M7은 10개 점검·20개 파라미터였고 M8은 **14개 점검·24개 파라미터**다. 자동 실행기 연결은 5개로 유지하며 과거 실측 3개와 신규 모의 검증 2개를 구별해야 한다.
 - Phase 1 당시 변경 범위: 이 문서, [CSV](policy_catalog.csv), DECISIONS의 관련 열린 질문, PROGRESS의 작업 기록. 코드·팩·정책 파일·SPEC·기존 증거·참고 원문은 변경하지 않는다. 커밋·푸시·엔진/운영 시험·유료 자원 생성·새 의존성 설치는 수행하지 않는다.
 
 ## 2. 용어와 CSV 계약

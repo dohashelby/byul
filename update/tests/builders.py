@@ -19,7 +19,7 @@ from guard.models import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-PACK_DIR = ROOT / "packs/PACK-BASELINE"
+PACK_DIR = ROOT / "reference/pack-seeds/PACK-BASELINE-31"
 T0 = datetime(2026, 10, 19, 0, 0, 0, tzinfo=timezone.utc)
 
 REQ01_STEPS = ["실제 route·listener와 허용/비허용 호출 위치·신원 목록 확보", "Gateway 사용 시 경유·직통을, 비사용 시 직접 진입점의 무키·오키·허용키 요청과 노출 제한을 비교", "실제 handler의 실행·거부와 허용 요청의 정상 처리를 대조"]

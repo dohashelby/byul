@@ -27,7 +27,7 @@ def test_latest_criteria_and_exact_pack_ref_are_selected():
     assert len(rows) == len({r["id"] for r in rows}) == 77
     assert sum(len(r["test_branch_conditions"]) for r in rows) == 116
     assert sum(len(r.get("required_subresults", [])) for r in rows) == 9
-    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    pack = load_pack(ROOT / "reference/pack-seeds/PACK-BASELINE-31")
     assert pack.ref().model_dump(mode="json") == CURRENT_REF
     assert not pack.reviewed and not any(c.retired for c in pack.checks.values())
     for row in rows:
@@ -39,7 +39,7 @@ def test_latest_criteria_and_exact_pack_ref_are_selected():
 def test_current_definitions_keep_both_lineages_without_revision_reuse(tmp_path):
     main = historical_pack("main29", tmp_path / "main29")
     prior = historical_pack("prior30", tmp_path / "prior30")
-    current = load_pack(ROOT / "packs/PACK-BASELINE")
+    current = load_pack(ROOT / "reference/pack-seeds/PACK-BASELINE-31")
     changed = set()
     for cid, check in current.checks.items():
         new = check.model_dump(mode="json")
@@ -68,7 +68,7 @@ def test_current_definitions_keep_both_lineages_without_revision_reuse(tmp_path)
 def test_distinct_historical_refs_with_same_id_revision_coexist(tmp_path, labels):
     packs = [historical_pack(label, tmp_path / label) for label in labels]
     store = Store(tmp_path / "EXAMPLE-store")
-    current = load_pack(ROOT / "packs/PACK-BASELINE")
+    current = load_pack(ROOT / "reference/pack-seeds/PACK-BASELINE-31")
     current_ref = put_pack(store,current.path)
     refs = [put_pack(store,pack.path) for pack in packs]
     assert refs[0].id == refs[1].id and refs[0].revision == refs[1].revision == 29

@@ -2,7 +2,7 @@ id: LIF-08
 framework_id: CHK-LIF-008
 mechanism_ids:
 - mechanism-13
-revision: 4
+revision: 5
 retired: false
 area: LIF
 purpose: 실패 감지·상위 통지
@@ -15,7 +15,55 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 선정 executor에서 rank 예외·사망·지연·통신 정지를 구분한다. 다른 executor의 장애 처리를 기본 근거로 쓰지 않는다.
-policy_params: []
+policy_params:
+- key: rank_environment_sha256
+  type: str
+  required: true
+- key: rank_target_sha256
+  type: str
+  required: true
+- key: rank_prepared_sha256
+  type: str
+  required: true
+- key: rank_validity_start
+  type: str
+  required: true
+- key: rank_validity_end
+  type: str
+  required: true
+- key: rank_executor_backend
+  type: str
+  required: true
+- key: rank_expected_ranks
+  type: list[str]
+  required: true
+- key: rank_output_rank
+  type: int
+  required: true
+- key: rank_exception_detection_ms
+  type: int
+  required: true
+- key: rank_exception_notification_ms
+  type: int
+  required: true
+- key: rank_death_detection_ms
+  type: int
+  required: true
+- key: rank_death_notification_ms
+  type: int
+  required: true
+- key: rank_delay_detection_ms
+  type: int
+  required: true
+- key: rank_delay_notification_ms
+  type: int
+  required: true
+- key: rank_communication_stall_detection_ms
+  type: int
+  required: true
+- key: rank_communication_stall_notification_ms
+  type: int
+  required: true
 policy_prose:
   policy_to_decide: 실패 유형별 기한·격리·전체 중단 방침
   enterprise_decisions: 실패 유형별 감지·전달·중단·복구 절차와 책임자, 영향 요청 오류 처리·알림 경로.
@@ -24,7 +72,15 @@ challenge_steps:
 - 격리 rank에 예외·사망·지연·통신 정지를 각각 단독 주입
 - 감지·상위 전달·요청 결과 기록
 - 복구
-required_observations: []
+required_observations:
+- key: activation_steps
+  type: list
+- key: activation_violations
+  type: list
+- key: activation_missing
+  type: list
+- key: activation_scope_complete
+  type: bool
 required_observations_prose:
 - fault 종류·rank/감지 시각·상태/요청 오류·잔존 작업
 satisfied_if: 정한 기한 안에 실패가 전달되고 불완전 작업을 성공으로 처리하지 않는다.
@@ -33,8 +89,19 @@ unknown_criteria: 네 장애를 하나로 대신했거나 감지 기한·상위 
 remediation: '- rank 예외·프로세스 종료·지연·통신 정지를 구분해 감지하고 영향받는 요청·실행 그룹에 오류를 전달한다. 감지·전달 기한을 정하고 실패를 정상 완료로 처리하는 경로를 보완한다.'
 method_and_evidence: 선정 executor에서 rank의 무해 예외·프로세스 종료·제한 지연·통신 정지를 각각 주입하고, fault 발생→감지→상위 전달·요청 실패 결과의 시각과 대응을 기록한다. 각 장애를 다른 종류의 장애 관측으로 대신하지 않는다. 초기화·모델 준비의 부분 실패 집계는 CHK-LIF-009에서, 실패 후 process·IPC·공유 자원 회수와 다음 기동은 CHK-LIF-011에서 판정한다. 같은 시험의 로그/API 표현과 실제 상태의 일치는 CHK-OBS-002에서 별도로 대조한다.
 remaining_setup: 장애별 안전 주입기·종료 상한·복구 절차
-executor: null
-judge: null
+executor: rank_failure
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: activation_scope_complete
+      op: eq
+      value: true
+    - obs: activation_violations
+      op: empty
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-C08
@@ -45,3 +112,4 @@ legacy:
   - Q-C08/SC-18-02
 source:
   array: lifecycle_assessment_draft
+collection_profile: kubernetes-mp-rank-failure-observation-v1

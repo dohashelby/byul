@@ -215,7 +215,7 @@ def test_collector_exception_message_cannot_enter_observations_or_artifacts(tmp_
 def test_ambiguous_json_cannot_complete_new_log_collection(tmp_path, monkeypatch, kind):
     store, evd, res = run_log(tmp_path, monkeypatch, AmbiguousSource(kind))
     assert evd.execution.status.value == "COMPLETED"
-    assert evd.execution.executor.version == "0.3.0"
+    assert evd.execution.executor.version == "0.3.1"
     assert evd.observations["log_coverage_complete"].value is False
     assert res.verdicts.security.value == "UNKNOWN", res.reasons
     sample_artifact = next(item for item in evd.artifacts if item.name == "log_samples.json")

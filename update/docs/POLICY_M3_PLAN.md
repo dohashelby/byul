@@ -18,7 +18,7 @@ M2는 승인된 입력 전제·팩 보호·두 정책 등록 범위에서 완료
 | M3 문서 브랜치 | `codex/gua-policy-m3-design`, 위 M2에서 분기 |
 | 선행 PR | [#2 통합](https://github.com/dohashelby/gua/pull/2) → [#3 M1](https://github.com/dohashelby/gua/pull/3) → [#4 M2](https://github.com/dohashelby/gua/pull/4); 검토 시 모두 open/draft·미병합 |
 | M3 PR의 기반 | 미병합 M2를 포함해야 하므로 `codex/gua-policy-m2`. main에 완료 기능이 있다고 가정하지 않음 |
-| 정본·지침 | [SPEC](../SPEC.md), [CLAUDE](../CLAUDE.md), [DECISIONS](../DECISIONS.md), [PROGRESS](../PROGRESS.md), [기존 정책 요청](../POLICY_PROMPT.md) |
+| 정본·지침 | [SPEC](../SPEC.md), [CLAUDE](../CLAUDE.md), [DECISIONS](../DECISIONS.md), [PROGRESS](../PROGRESS.md) |
 | 정책 근거 | [현재 입력 계약](POLICY_TEMPLATE.md), [카탈로그 설명](policy_catalog.md), [303개 후보 CSV](policy_catalog.csv) |
 
 기존 정책 요청의 3점검·null 양식·Phase 1 커밋 금지는 이후 M1/M2 승인 및 이번 문서 커밋 지시와 구분한다. 이번 범위는 문서 네 파일뿐이다. 제품 코드·SPEC·팩·overrides·정책 예시·카탈로그·의존성·기존 증거·다른 작업 트리·sources/를 변경하지 않는다. 시작 추적 파일 340개의 바이트 해시와 원격 상태는 별도 ignored `out/test-runs/policy-m3-design-20261021/`에 기록했다.

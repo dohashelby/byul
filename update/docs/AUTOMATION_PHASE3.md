@@ -2,7 +2,7 @@
 
 > 2026-10-27 저장 경계 보수: 현재 `request_binding` 0.3.0의 `request-binding-response-projection/1`은 원문 요청·응답·SSE event·token 배열·렌더 문구·API/연결 ID 대신 hash와 허용 metadata를 저장한다. 기존 `analyze_response`는 완전한 transient 자료로 계속 판정하고 반환값의 원문 필드만 저장 직전에 투영한다. 수집기·JSON/SSE 분석·시간 측정·구간 중첩 계산과 fixture 비교 hash는 유지한다. 저장 시간 필드는 기존 측정값만 직렬화하며 잘못된 타입/비유한 값은 null이다. 원문 body의 JSON parse 상태는 저장 metadata이며 SSE 검증 결과를 대신하지 않는다. 한 응답의 잘못된 outcome은 그 응답의 수집 공백으로 한정해 다른 연결의 유효 위반을 보존한다. 출력 귀속은 여전히 미확인이고 보안 PASS를 만들지 않는다. 아래는 최초 3차 구현 당시 기록이며 과거 팩·증거·Ref는 보존한다.
 
-기준은 `1952533efa0c4cd292fdbaede9f0abda7977fb30`, 작업 브랜치는 `codex/gua-automation-phase3`다. [실행 프롬프트](AUTOMATION_PHASE3_PROMPT.md)의 REQ-11·OBS-09 두 제한 프로파일을 구현한다. 전체 구현 후 기본 회귀·실제 CPU·저장 증거·설치본을 검증했다. 직접 결과와 제한은 아래에 기록한다.
+기준은 `1952533efa0c4cd292fdbaede9f0abda7977fb30`, 작업 브랜치는 `codex/gua-automation-phase3`다. 실행 프롬프트의 REQ-11·OBS-09 두 제한 프로파일을 구현한다. 전체 구현 후 기본 회귀·실제 CPU·저장 증거·설치본을 검증했다. 직접 결과와 제한은 아래에 기록한다.
 
 ## 범위와 정책
 

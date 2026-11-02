@@ -1,0 +1,54 @@
+executor: profiler_observation
+collection_profile: kubernetes-profiler-control-v1
+policy_params:
+- key: profiler_environment_sha256
+  type: str
+  required: true
+- key: profiler_target_sha256
+  type: str
+  required: true
+- key: profiler_prepared_sha256
+  type: str
+  required: true
+- key: profiler_validity_start
+  type: str
+  required: true
+- key: profiler_validity_end
+  type: str
+  required: true
+- key: profiler_backend_kind
+  type: str
+  required: true
+- key: profiler_required_ranks
+  type: list[str]
+  required: true
+- key: profiler_case
+  type: str
+  required: true
+- key: profiler_control_scope
+  type: str
+  required: true
+- key: profiler_control_owner_ref
+  type: str
+  required: true
+required_observations:
+- key: activation_steps
+  type: list
+- key: activation_violations
+  type: list
+- key: activation_missing
+  type: list
+- key: activation_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: activation_scope_complete
+      op: eq
+      value: true
+    - obs: activation_violations
+      op: empty
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

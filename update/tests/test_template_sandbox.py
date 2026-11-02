@@ -28,7 +28,7 @@ IMAGE = CHAT_REVIEWED_IMAGE
 
 
 def definition():
-    return CheckDef.model_validate(yaml.safe_load((ROOT / "packs/PACK-BASELINE/checks/SUP-13.yaml").read_text(encoding="utf-8")))
+    return CheckDef.model_validate(yaml.safe_load((ROOT / "reference/pack-seeds/PACK-BASELINE-31/checks/SUP-13.yaml").read_text(encoding="utf-8")))
 
 
 class World:

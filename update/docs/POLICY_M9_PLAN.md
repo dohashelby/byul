@@ -317,7 +317,7 @@ M9 완료 증거는 네 문서만 변경, 모든 기존 제품/팩/CSV/정책/�
 M9 최신 HEAD·문서와 docs/POLICY_M9_PLAN.md를 읽고 아래 제한 프로파일을 구현하라.
 이 실행 요청은 M9의 기술제안 POL-M9-SCOPE/PAIR/OBS를 채택하지만 기업 실제값·승인이나 실제 엔진 시험을 승인하는 것은 아니다.
 
-1. 작업 지침·SPEC·PROGRESS·DECISIONS·POLICY_PROMPT·M8/M9 문서와 실제 코드를 먼저 대조하라.
+1. 작업 지침·SPEC·PROGRESS·DECISIONS·M8/M9 문서와 실제 코드를 먼저 대조하라.
    M9 PR이 미병합이면 M9 최신HEAD에서 codex/gua-policy-input-m10을 만들고 PR base를 M9로 지정하라.
    병합됐다면 M9가 포함된 기준을 확인하라. 기존 변경/다른작업트리/증거를 보존하고 main 직접push·force·자동병합은 하지 마라.
 

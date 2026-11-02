@@ -242,7 +242,7 @@ M12 예상 위치는 REQ16 override→팩/manifest, 새 작은 `manual_cache_con
 M11 최신 HEAD와 docs/POLICY_M11.md의 캐시 설계/판정 표를 읽고 REQ-16의 제한적 수동 계약을 구현하라.
 이 실행 요청은 아래 기술 프로파일을 채택하지만 기업 실제값·담당자·승인·실제 엔진 시험을 승인하지 않는다.
 
-1. 작업 지침·SPEC·PROGRESS·DECISIONS·POLICY_PROMPT·M10/M11과 실제 코드를 대조하라.
+1. 작업 지침·SPEC·PROGRESS·DECISIONS·M10/M11과 실제 코드를 대조하라.
    M11이 미병합이면 최신 M11에서 codex/gua-policy-cache-m12를 만들고 base를M11로 둬라.
    병합됐으면 M11이 포함된 최신 기준을 확인하라. 기존 변경/다른작업트리/원문/증거를 보존하라.
    main 직접push·force·자동병합은 하지 마라.

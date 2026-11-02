@@ -164,7 +164,7 @@ def _run_one(store, check, item, env, policy_values, cfg, adapter, adapter_info,
     started = utcnow()
     info_stub: ExecutorInfo | None = None
     try:
-        executor = registry.resolve_executor(item.executor, impl_name)(cfg.raw)
+        executor = registry.build_executor(item.executor, impl_name, cfg.raw)
         info_stub = ExecutorInfo(name=executor.name, version=executor.version, config_sha256=sha256_hex(b""))
         workdir = Path(store.root) / "work" / plan.id / check.id / str(common["side"])
         draft = executor.run(check, env, policy_values, adapter, workdir)

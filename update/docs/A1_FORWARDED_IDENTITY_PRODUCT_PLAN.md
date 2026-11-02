@@ -45,7 +45,7 @@ header 이름은 ASCII 문자로 시작하는1~64자 이름이며 Authorization�
 
 단일 request의 ingress→normalized→consumed는 유일한 미변경 행, 정확한 입력/operation과 call/parent 관계를 요구한다. 인가는 동일 role에서 해당 정규화 또는 소비 call의 자식이어야 한다. 동일 eventID 내용 교체·중복 phase·누락/끊긴 call은 귀속 불명이다. 다른 header가 소비되거나 같은 bearer에서 principal 주장이 바뀌면 `confirmed_violation=false` 후보만 남긴다. 전후 source/세대 교체와 후속 읽기·첨부·정리 오류는 앞선 유효 기록을 지우지 않고 ABORTED/UNKNOWN으로 보존한다. 관계 중복만 있으면 수집 절차 COMPLETED라도 판정은 UNKNOWN이다.
 
-`tools/build_kubernetes_forwarded_identity_pack.py --seed packs/PACK-BASELINE --output <새 폴더>`가 원팩31과 다른76정의를 bytes 그대로 보존한다. REQ04 revision4의 질문·분기·필수결과·기준을 보존하며 전축 rule_table UNKNOWN인 DRAFT 팩만 만든다. 기존 `guard select/run/judge/report/verify`, `guard evidence export/restore`와 저장팩 정확6Ref 재판정을 사용한다. normal HTTP 구조·선언 관계는 별도 사실이며 `normal_control.succeeded=null`, producer/principal/scope=false다.
+`tools/build_kubernetes_forwarded_identity_pack.py --seed reference/pack-seeds/PACK-BASELINE-31 --output <새 폴더>`가 원팩31과 다른76정의를 bytes 그대로 보존한다. REQ04 revision4의 질문·분기·필수결과·기준을 보존하며 전축 rule_table UNKNOWN인 DRAFT 팩만 만든다. 기존 `guard select/run/judge/report/verify`, `guard evidence export/restore`와 저장팩 정확6Ref 재판정을 사용한다. normal HTTP 구조·선언 관계는 별도 사실이며 `normal_control.succeeded=null`, producer/principal/scope=false다.
 
 읽기 전용 참고 `runtime/src/serving_runtime/mvp/auth.py`는 LAB static bearer와 IdP/계정 역할 미결을 명시한다. `request_records.py`의 runtime-mvp-record/1.0은 이 정제 문서와 다르고, `backend.py`의 고정 헤더와 `request_flow.py`의 Authorization 소비를 전달 신원 normalization 생산자로 취급하지 않는다. 루트 runtime 파일/구현/상태는 수정하지 않았다. 실제 Gateway/engine 생산자·코드와 실행 PID/start·issuer·최종권한 정책 및 전체 SC01-04/부모A 완료는 미완료이며 별도 실제 관측이 필요하다.
 

@@ -30,7 +30,7 @@ runner = CliRunner()
 RUN_STAMP = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + f"-{os.getpid()}"
 OUT = ROOT / "out/test-runs" / RUN_STAMP  # 실행마다 새 폴더. 기존 폴더를 지우거나 덮어쓰지 않는다
 PROTECTED = [ROOT / "out/5b"]  # 보존 증거
-PACK = ROOT / "packs/PACK-BASELINE"
+PACK = ROOT / "reference/pack-seeds/PACK-BASELINE-31"
 
 
 def _vllm_cfg() -> dict:

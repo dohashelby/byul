@@ -40,6 +40,14 @@ class KubernetesObservationStateExecutor(KubernetesRequestTerminationExecutor):
     policy_normalizer=staticmethod(normalize_policy);transport_profile=OBSERVATION_STATE_PROFILE
     supported_native_profiles=KubernetesRequestTerminationExecutor.supported_native_profiles|{attempt_sensor.PROFILE,output_sensor.PROFILE}
 
+    def _consumer(self,check):
+        if type(self) is KubernetesObservationStateExecutor:
+            from .kubernetes_observation_composite import PROFILE as COMPOSITE_PROFILE,KubernetesObservationCompositeExecutor
+            if check.id=='OBS-02' and getattr(check,'collection_profile',None)==COMPOSITE_PROFILE:
+                return KubernetesObservationCompositeExecutor(self.cfg,runner=self.runner,environ=self._environ,
+                    expected_target_sha256=self.expected_target_sha256)
+        return super()._consumer(check)
+
     def project_native(self,ctx,packet,trials):
         """Project the validated packet before its redacted artifact summary."""
         return project(packet,trials,ctx.policy_values['observation_state_required_components'])

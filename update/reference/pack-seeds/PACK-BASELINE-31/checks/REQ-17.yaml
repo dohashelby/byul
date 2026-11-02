@@ -1,0 +1,46 @@
+id: REQ-17
+framework_id: CHK-REQ-017
+mechanism_ids:
+- mechanism-06
+revision: 3
+retired: false
+area: REQ
+purpose: 부채널 노출 제한
+secondary_purposes: []
+question: 캐시 적중에 따른 시간 차이로 비공개 정보가 허용 범위 밖에 드러나지 않는가?
+scope: 조건부
+risk_category: 보안 위협 점검
+risk_summary: 동일 cache에 반복 접근할 수 있는 호출자가 시간·hit 필드 등 관측 신호로 타인의 비공개 입력 사용 여부를 추론할 수 있음. 추론 가능성은 시험 필요.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: 공유 cache·비공개 prefix·시간/상태 관측 경로와 보호 요구가 관련된 환경에서 적용한다. 관측 가능성이나 정책 미확인은 조사 과제로 남긴다.
+policy_params: []
+policy_prose:
+  policy_to_decide: 비공개 정보·허용 관측 범위·통계 판정 기준
+  enterprise_decisions: 공유 단위(사용자/서비스 계정/tenant), 공개 prefix 공유 여부, 인증 주체 식별·salt 발급/덮어쓰기/검사 주체, 필요한 key 문맥, 비공개 정보와 공격자의 반복 관측 조건·통계 기준·성능 허용 범위. 같은 서비스 자격 뒤 여러 사용자가 있으면 추가 신원 전달이나 환경 분리가 필요한지 결정한다.
+normal_control: 허용 공개 문맥에서 지연·hit 신호가 정상 범위로 관측된다.
+challenge_steps:
+- A의 무해 비공개 표식으로 cache 준비
+- B의 허용된 작은 반복 요청
+- 시간·cached_tokens·metrics 신호 비교
+required_observations: []
+required_observations_prose:
+- 공유 정책/지연 분포·반복 수/반환 hit 필드·metrics 독자
+satisfied_if: 정한 위협 조건과 기준에서 금지한 정보 추론이 확인되지 않는다. 단순 지연 차만으로 유출 또는 안전을 판정하지 않는다.
+fail_criteria: 채택한 비공개 정보 보호 기준을 넘는 교차 집단 hit 정보가 관측된다.
+unknown_criteria: 반복·잡음 대조가 부족하거나 허용 누출 기준이 미정이다.
+remediation: '- 공유 범위를 제한하거나 캐시 정책·응답 관측 정보를 조정하는 대책을 검토한다. 선택한 대책이 비공개 입력 추론을 얼마나 줄이는지와 정상 성능에 미치는 영향을 같은 조건에서 시험한다.'
+method_and_evidence: '통제된 prefix 존재/부재와 부하 조건에서 반복 측정하고 사전 표본·오차·판정 기준을 적용한다.<br><br>**vLLM v0.31.0 구현 메모:** 【F15】cached_tokens와 Anthropic 값은 details 활성 조건. /metrics 집계값은 개별 요청의 결정적 신호로 단정 불가. 시간 측정 전에 응답 cached_tokens/cache_read_input_tokens와 metrics 접근을 확인한다. 동시부하 통제 및 집계 범위를 기록하고 허용되지 않은 집단의 prefix 존재 추론을 비교한다. 정상 대조: 자기 집단의 허용된 지표와 정상 hit/miss 대조'
+remaining_setup: 측정 횟수·오차·수용 기준과 허용 metrics 접근 결정
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C03
+  scenario_ids:
+  - SC-05-03
+  subtest_ids:
+  - Q-C03/SC-05-03
+source:
+  array: request_state_assessment_draft

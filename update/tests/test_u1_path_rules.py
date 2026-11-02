@@ -53,7 +53,7 @@ def test_rule_basis_is_partial_and_not_an_independent_or_human_approved_oracle(p
 
 
 def test_rules_only_use_existing_categories_and_keep_output_parser_gap(path_rules):
-    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    pack = load_pack(ROOT / "reference/pack-seeds/PACK-BASELINE-31")
     existing = set(pack.change_selection["engine_categories"])
     assert {category for rule in path_rules["rules"] for category in rule["categories"]} <= existing
     assert pack.change_selection["engine_categories"]["OUTPUT_PARSING"] == []

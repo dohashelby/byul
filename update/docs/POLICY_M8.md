@@ -117,7 +117,7 @@ REQ-09 정책을 바꾸거나 REQ-07/08/10까지 자동 등록하는 것은 M8 �
 
 ```text
 너는 gua 정책 개발 담당 B다. M8 최신 HEAD·PR·실제 CI와 작업 지침을 확인하고
-docs/POLICY_M8.md·POLICY_PROMPT.md·SPEC.md·PROGRESS.md·DECISIONS.md·카탈로그를 읽어라.
+docs/POLICY_M8.md·SPEC.md·PROGRESS.md·DECISIONS.md·카탈로그를 읽어라.
 M8의 bool 문맥/FAIL 보존·실제 상태와의 구분·구형 팩/증거 계약을 먼저 검토하라.
 
 M9는 P-DRAFT-INPUT-ENDPOINTS/FORMATS의 설계 문서 작업이다.

@@ -220,7 +220,7 @@ def test_diff_to_cli_report_and_portable_store_without_engine(tmp_path, source_r
     assert selected.exit_code == 0, selected.output
     plan = list(store.iter_kind("PLAN"))[0]
     assert plan.inputs.change == change.ref()
-    assert runner.invoke(app, ["run", "--plan", plan.id, *common]).exit_code == 0
+    assert runner.invoke(app, ["run", "--plan", plan.id, "--pack", str(PACK_DIR), *common]).exit_code == 0
     assert runner.invoke(app, ["judge", "--plan", plan.id, *common]).exit_code == 0
     report_json = tmp_path / "report.json"
     reported = runner.invoke(app, ["report", "--plan", plan.id, "--json", str(report_json), *common])

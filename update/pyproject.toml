@@ -13,7 +13,10 @@ dependencies = [
 guard = "guard.cli:app"
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "pytest>=8",
+    "pytest-xdist>=3",
+]
 
 [build-system]
 requires = ["hatchling"]

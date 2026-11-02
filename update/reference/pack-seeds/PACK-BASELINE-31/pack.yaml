@@ -1,0 +1,245 @@
+pack_id: PACK-BASELINE
+revision: 31
+engines:
+- vllm
+checks:
+- SUP-01
+- SUP-02
+- SUP-03
+- SUP-04
+- SUP-05
+- SUP-06
+- SUP-07
+- SUP-08
+- SUP-09
+- SUP-10
+- SUP-11
+- SUP-12
+- SUP-13
+- SUP-14
+- SUP-15
+- SUP-16
+- REQ-01
+- REQ-02
+- REQ-03
+- REQ-04
+- REQ-05
+- REQ-06
+- REQ-07
+- REQ-08
+- REQ-09
+- REQ-10
+- REQ-11
+- REQ-12
+- REQ-13
+- REQ-14
+- REQ-15
+- REQ-16
+- REQ-17
+- REQ-18
+- REQ-19
+- REQ-20
+- REQ-21
+- PLT-01
+- PLT-02
+- PLT-03
+- PLT-04
+- PLT-05
+- PLT-06
+- PLT-07
+- PLT-08
+- PLT-09
+- PLT-10
+- PLT-11
+- PLT-12
+- LIF-01
+- LIF-02
+- LIF-03
+- LIF-04
+- LIF-05
+- LIF-06
+- LIF-07
+- LIF-08
+- LIF-09
+- LIF-10
+- LIF-11
+- LIF-12
+- LIF-13
+- LIF-14
+- LIF-15
+- LIF-16
+- OBS-01
+- OBS-02
+- OBS-03
+- OBS-04
+- OBS-05
+- OBS-06
+- OBS-07
+- OBS-08
+- OBS-09
+- OBS-10
+- OBS-11
+- OBS-12
+files_sha256:
+- path: change_selection.yaml
+  sha256: 95e3c3a982edf8db4e6356269dea036d30f8ca8f76d8064e8341973f3e230d3f
+- path: checks/LIF-01.yaml
+  sha256: 11ad834f3647e523069dca024043a254cac67231406a1921cc2d3d5df4232746
+- path: checks/LIF-02.yaml
+  sha256: 36812268e59c37966853372c9ebd83d47b4fce28cad9386a8a580e7de573d167
+- path: checks/LIF-03.yaml
+  sha256: 57c70f37b64c89111f7490e0a266df0b8c048d698014005537223618e0a597b2
+- path: checks/LIF-04.yaml
+  sha256: c2891aaf0eaf3d0203474adfd6e978b80e7d4abeea2491854aab358fd1e33bdf
+- path: checks/LIF-05.yaml
+  sha256: 105f95c3c6615be34bdefd34efaa6a9d4f874c6175cdd13b3680176a31295de5
+- path: checks/LIF-06.yaml
+  sha256: 965bdcd193523f93c11db13205b880f91df1644ddee241fee5e7ed8b2515f4c5
+- path: checks/LIF-07.yaml
+  sha256: 8ebd54a0ec32ba3de3e41ec0b04fb09e7f7215792a3822a73d592d14ba7416af
+- path: checks/LIF-08.yaml
+  sha256: 241d88b8f0cfcba8fcb1cd929fc26b899434974fcca09a045defae5a01c0cc55
+- path: checks/LIF-09.yaml
+  sha256: 5bb8a058382221c4e85aedf8c13da231a2a4e2eeeb2b936d5888c0e72e93c9b0
+- path: checks/LIF-10.yaml
+  sha256: d2e9288c618505497717fe4a4f6af90319bb298ba479f6f1090c29fbffacab87
+- path: checks/LIF-11.yaml
+  sha256: 719980186e64dfa24885a0a3eb6674fd9c453b24d3b47480e102e60b43b3d59c
+- path: checks/LIF-12.yaml
+  sha256: 79b9e0e52f204f1e35b661993de2f8e1f91a0da3052be174c3f58cdac38ae0a3
+- path: checks/LIF-13.yaml
+  sha256: 8c7884a1446b8dbd6c4132698380f760ccef2867f357934433ca9399715681ed
+- path: checks/LIF-14.yaml
+  sha256: 68b8933d04a6548e840889e656179569001433fcc53b39206f50914faf255bba
+- path: checks/LIF-15.yaml
+  sha256: 4dad7be1aeb16d903eed9cd81653b083e3088f8ec5d53519711ef9346dd1f254
+- path: checks/LIF-16.yaml
+  sha256: 4e61a532e407725c9acca1f5cdef38ec609f22ebc556eb64aedb2b597fab98b5
+- path: checks/OBS-01.yaml
+  sha256: 3c583747de65845dfc0be59eeff92336f5bef6640085570f15cd4155788ed86c
+- path: checks/OBS-02.yaml
+  sha256: 3da5d3f9e49017806ec73ec2242f6f29427a20f1c1cf880ecd6398d2205148ef
+- path: checks/OBS-03.yaml
+  sha256: 275b621f5598970d4a6c0875880ed202253728693f61e59a958d6fa541d8cfc3
+- path: checks/OBS-04.yaml
+  sha256: af8f45a0d94209d74b9e6ff291d90ada650ee56888d8394d75b45748d531d7e9
+- path: checks/OBS-05.yaml
+  sha256: d20b3e08928f04772f334d35af46552c2ef463d9250c17f428206c156a104b64
+- path: checks/OBS-06.yaml
+  sha256: 185ab70d335fc8090680465862eaba9a5c1b7931dd0f13db903ecab6d81d86e5
+- path: checks/OBS-07.yaml
+  sha256: 742a2a4a87303f20ddec1c98e1b921191a113bf056b015eebc00621d86654e72
+- path: checks/OBS-08.yaml
+  sha256: c976284876ffa274581f2caf83678d56af23444f5c8f3f7d40916192e7fdde09
+- path: checks/OBS-09.yaml
+  sha256: 9ac95a6fbf2008168b73a21c4ec76a6f337fa18848cbbbd26e9d98eb75708ef0
+- path: checks/OBS-10.yaml
+  sha256: 02615fd8d11117a61fa374e399239eecf32a21282d3ba22b926a217fe70507f0
+- path: checks/OBS-11.yaml
+  sha256: d3881aa7c00341fc07fda443d5da686c69f1ff93f0f454cbd03b512c76feeeae
+- path: checks/OBS-12.yaml
+  sha256: 8e6405e7910bd58f13b13e1c7fddaa8966329d43dd819283adcbf61e0773342d
+- path: checks/PLT-01.yaml
+  sha256: a2a60f206e463ad93c844f242f4c022ea99cf2e7cf9d9ff91bff4619a6fc398b
+- path: checks/PLT-02.yaml
+  sha256: a86f3df65dd0d725526359bb83a7e0d6af0ddfba2884b63c754c74a2346a1eec
+- path: checks/PLT-03.yaml
+  sha256: bf9fcb997ffdfe2556981da0898c35ccd76c62ee955e1731227740053394b49d
+- path: checks/PLT-04.yaml
+  sha256: 5c9ad137ee446bada4822e3c86eded3ea53d0ebb53e0d6e626353668b44ebb96
+- path: checks/PLT-05.yaml
+  sha256: db2356d0666ec203ae779f22fa9232b85e120013a3dcbf2e6c358c44cb6ae7ce
+- path: checks/PLT-06.yaml
+  sha256: b48934d399b2df27bcb1c09b674009c5c4c23ac50c241dcbf74e44d4f05c1188
+- path: checks/PLT-07.yaml
+  sha256: 1d07770ea197706e27e252832294bd9f24671026e7be93e670395b7ac146e67d
+- path: checks/PLT-08.yaml
+  sha256: b2a5c2ffae8691582e2cfb670e36eaef7b355cc5935168dcc77f7794158f16ff
+- path: checks/PLT-09.yaml
+  sha256: 2d282cefa8391f0d2d7fe6a2bd0a8f2dfe112b5bfd148d288c97459f74441c6f
+- path: checks/PLT-10.yaml
+  sha256: 4f150c808f309e41afee5665024e0d5d17958587dc92e9c98ddd787d24b17a34
+- path: checks/PLT-11.yaml
+  sha256: 69405400406a7b8aaec05e573f2e068de35e0759b7f35625ff5e779706a47850
+- path: checks/PLT-12.yaml
+  sha256: b379b497c6910d3ceae31f5cf85c33943d06dc741e2e76086ed896999d94e02d
+- path: checks/REQ-01.yaml
+  sha256: 52235258dd9992b58e2d057f17541ac9f252915b527ca785eb13742cf980063e
+- path: checks/REQ-02.yaml
+  sha256: 614168bb6a0c092c4e96db64b2761b1a22fc7314d97c2a67eccae52adcc295c1
+- path: checks/REQ-03.yaml
+  sha256: fced422c96da9873e889881d042b41d37c0f82cceb8a436d72e22bea0fb435c4
+- path: checks/REQ-04.yaml
+  sha256: c937c54da69d21b53b9ced9f3fd3634fc7d4ecdf3a25ba3e513e29ee6728efad
+- path: checks/REQ-05.yaml
+  sha256: 5e87210d86e24cecda916f120ec82f03a607b0f413524cda07bc22d0c20f151d
+- path: checks/REQ-06.yaml
+  sha256: d09502947c2f11364a6f5010bcac4aac289cd8d2d58a02a75d2b4020c95c5954
+- path: checks/REQ-07.yaml
+  sha256: 4bf1b00ec6d72e40c059c652b8ccca26268e4327e023e4d203133d52626249ce
+- path: checks/REQ-08.yaml
+  sha256: 2a9ff795a9f9a2d49a4d94e2274cf79bf2a9e5b68971cc8835f8908c54195855
+- path: checks/REQ-09.yaml
+  sha256: 07acac86bf990aa4485ce9ebc19f1d8b852dfcdf340119b7ec21500a472ab972
+- path: checks/REQ-10.yaml
+  sha256: d069d3f8c263376228bac02bec57bf9b4cfebd261ffe6f80c24f449b4c6363a0
+- path: checks/REQ-11.yaml
+  sha256: 53c5f4a231c98e6aa3942a60d60d69789edeff9bf2043b670af02433b7c37b64
+- path: checks/REQ-12.yaml
+  sha256: 559f0deced19d8bb09a9dacdb447573f3df99152c10b948b671452ac479c7792
+- path: checks/REQ-13.yaml
+  sha256: 4a7643439ef1211e82edd97840f8a6c2ea855fed294f96e51e2625459c151eef
+- path: checks/REQ-14.yaml
+  sha256: 967422eea66aeaacecd0adaece38bdd9aa58c13a1769831245b831bfd6da3331
+- path: checks/REQ-15.yaml
+  sha256: 137639799ad8769b8da1ebc158aec3edea0d12e1c495916237090bd8017900ae
+- path: checks/REQ-16.yaml
+  sha256: 9d9b01f7fc2430e1f8d0fe698f1f96b95c723c618c1ec8f9fc732b73f2c88602
+- path: checks/REQ-17.yaml
+  sha256: 62a2031ecbb74d21fd4900cd3a2fabc77b900984708035ea02080ea479fb5ab7
+- path: checks/REQ-18.yaml
+  sha256: 335e4655908b15af2d7445baf83f494d49c87a8d96ba64249591297b0133eb1b
+- path: checks/REQ-19.yaml
+  sha256: b5cdf3b313ce96ec07450756a18f451a5e8cc9ee61efdb0f562052fc0f81e7d1
+- path: checks/REQ-20.yaml
+  sha256: 516b90f59b0cdbbdfeec7a851412c5d9ad063a55328d2eddd0a688bab0df51a7
+- path: checks/REQ-21.yaml
+  sha256: e5b49a521782c2e8a25a46ce97ca2baf7554d5201aeb42ed5ba04891fa2a666c
+- path: checks/SUP-01.yaml
+  sha256: 5acff48cc0915b7481d9e3811753468e149e380315d514686bf99500590e4695
+- path: checks/SUP-02.yaml
+  sha256: 5c87a6fdbdf3d37724bb634653391b9d157bea093afa0553c805a101b0bec6f1
+- path: checks/SUP-03.yaml
+  sha256: 45cc69a5fd3fa6dff3dd35999b1e92b5d16ac14dd0b22a5c7450229c75176e1a
+- path: checks/SUP-04.yaml
+  sha256: c9822e19818158b3b067dffa9c5021081d38c62a1a8f9e6a4f9dc071a32712e3
+- path: checks/SUP-05.yaml
+  sha256: a87d993b29b37027aefde2ee69d567484aa8008a8c610cc3a714abea3818216f
+- path: checks/SUP-06.yaml
+  sha256: 779fcf5bd71b81c1782a282ee2e3fcc995fe078f7b1b1e0023383af4bdaee6fe
+- path: checks/SUP-07.yaml
+  sha256: e706fdd40e4d51350f11efd93992854999b81ab88bd575a041dc2260fccece8b
+- path: checks/SUP-08.yaml
+  sha256: 892658eb3785cc20591dc514256fc518787d4a0c8942bdc3d6ea57bc4f9ae0b4
+- path: checks/SUP-09.yaml
+  sha256: 0e1781706abe002cfe3785bf583f2d4c8a788842fbc3e516f096a72d9b8f6319
+- path: checks/SUP-10.yaml
+  sha256: 2030d83f2cc48c667a2ec54fee0601cafb54e8202bdd8376a9654d3563c487e3
+- path: checks/SUP-11.yaml
+  sha256: b7d634a040bc5c4ebc15d051e392b4447b7bda5d6b4e9775c19c04c94af9c84f
+- path: checks/SUP-12.yaml
+  sha256: 17818c57efdf7b3e084cf7c006f6bc4bd44df2394c6e405bc0c5271d4856bfc4
+- path: checks/SUP-13.yaml
+  sha256: a2c55976e407d47494d44e3664443b906855dc39bceffb91ea5930b2b6566c21
+- path: checks/SUP-14.yaml
+  sha256: fcc208e79341969efcc1a66a7cd41e18f775e8d8748378ae774f949188c24b00
+- path: checks/SUP-15.yaml
+  sha256: 049d309126cb357fa9e669ddf59d39706cf20f6c4878979c84c8407b87872318
+- path: checks/SUP-16.yaml
+  sha256: 757aebc0281070ffa82e5fa1b178ce54fe20baac9a46d94a9c95e8707421e171
+- path: id_map.yaml
+  sha256: b0f611ac95a33a2ed32cf39f0be72d1316a016bc0b9156eb1e0a1239dd901e3b
+review:
+  status: DRAFT
+  reviewer: null
+  reviewed_at: null

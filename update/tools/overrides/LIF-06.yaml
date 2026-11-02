@@ -1,0 +1,51 @@
+executor: lifecycle_transition
+collection_profile: lif06-live-weights-v1
+policy_params:
+- key: transition_inputs_sha256
+  type: str
+  required: true
+- key: transition_before_at
+  type: str
+  required: true
+- key: transition_during_at
+  type: str
+  required: true
+- key: transition_after_at
+  type: str
+  required: true
+- key: transition_recovered_at
+  type: str
+  required: true
+- key: transition_before_generation
+  type: str
+  required: true
+- key: transition_during_generation
+  type: str
+  required: true
+- key: transition_after_generation
+  type: str
+  required: true
+- key: transition_recovered_generation
+  type: str
+  required: true
+required_observations:
+- key: activation_steps
+  type: list
+- key: activation_violations
+  type: list
+- key: activation_missing
+  type: list
+- key: activation_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: activation_scope_complete
+      op: eq
+      value: true
+    - obs: activation_violations
+      op: empty
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

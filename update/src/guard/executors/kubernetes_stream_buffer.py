@@ -11,6 +11,10 @@ from .lifecycle_session import capture_session
 from .stream_buffer_contract import PROFILE,normalize_policy,stamp
 
 
+BUDGET_PROFILE='kubernetes-stream-buffer-budget-observation-v1'
+CHECK_PROFILES={'LIF-04':PROFILE,'LIF-03':BUDGET_PROFILE}
+
+
 class KubernetesStreamBufferExecutor(HttpCheckExecutor):
     name='stream_buffer';version='0.1.0';requires_roles=False;requires_route_scope=False;functional_via='engine'
 
@@ -18,7 +22,7 @@ class KubernetesStreamBufferExecutor(HttpCheckExecutor):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
 
     def validate_policy(self,check,values):
-        if check.id!='LIF-04' or getattr(check,'collection_profile',None)!=PROFILE:raise ValueError('STREAM_BUFFER_PROFILE_UNSUPPORTED')
+        if CHECK_PROFILES.get(check.id)!=getattr(check,'collection_profile',None) or check.id not in CHECK_PROFILES:raise ValueError('STREAM_BUFFER_PROFILE_UNSUPPORTED')
         normalize_policy(values)
 
     def run(self,check,env,policy_values,adapter,workdir):
@@ -42,11 +46,17 @@ class KubernetesStreamBufferExecutor(HttpCheckExecutor):
     def collect(self,ctx):
         start,end,profiles=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex
         trials=[];diagnostics=[];reader=None;packet=None;sealed=False
+        budget_profile=ctx.check.collection_profile==BUDGET_PROFILE;rss_samples=[]
         native_target={'schema':'guard-kubernetes-lifecycle-target/1','lab':ctx.target['lab'],'run_id':ctx.cprobe.binding['run_id'],
             'environment_ref':ctx.env.ref().model_dump(mode='json'),'kubernetes':{'context':ctx.cprobe.binding['context'],'engine':ctx.cprobe.binding['engine']}}
         try:
-            reader=KubernetesLifecycleReader(native_target,ctx.env,ctx._buffer_prepared,runner=self.runner,
+            reader_type=KubernetesLifecycleReader
+            if budget_profile:
+                from .kubernetes_process_rss import KubernetesProcessRSSReader
+                reader_type=KubernetesProcessRSSReader
+            reader=reader_type(native_target,ctx.env,ctx._buffer_prepared,runner=self.runner,
                 binary=self.cfg.get('kubectl_binary','kubectl'),duration=self.cfg.get('max_duration_seconds',120));reader.snapshot()
+            if budget_profile:self._collect_rss(reader,native_target,ctx._buffer_prepared,'before',rss_samples,diagnostics)
             for slot in SLOTS:
                 if slot in {'normal','slow','slow-close'} and not trials[0].get('normal_shape_verified'):continue
                 rid='byul-lif04-'+token+'-'+slot;streaming=slot not in {'normal-before','normal-after'}
@@ -72,6 +82,8 @@ class KubernetesStreamBufferExecutor(HttpCheckExecutor):
                     if row['attempted']:row['finished_at']=utcnow().isoformat()
                     row['policy_window_verified']=bool(row['started_at'] and start<=stamp(row['started_at'])<=stamp(row['finished_at'])<=end)
                     if row['attempted'] and not row['policy_window_verified']:diagnostics.append('STREAM_BUFFER_POLICY_WINDOW_UNVERIFIED')
+                    if budget_profile and slot in {'normal','slow','slow-close'}:
+                        self._collect_rss(reader,native_target,ctx._buffer_prepared,slot,rss_samples,diagnostics)
         except Exception:diagnostics.append('STREAM_BUFFER_PREFLIGHT_UNAVAILABLE')
         finally:
             if reader is not None:
@@ -82,19 +94,39 @@ class KubernetesStreamBufferExecutor(HttpCheckExecutor):
                     b=reader.binding['engine'];packet=capture_session(reader,native_target,container=b['container'],image=b['image'],
                         prepared=ctx._buffer_prepared,owner_identity=reader.owner_identity,read_file=reader.read_file,image_check=reader.image_check)
                     if not packet.get('recorded_files_covered'):diagnostics.append('STREAM_BUFFER_NATIVE_COVERAGE_UNAVAILABLE')
+                    if budget_profile:rss_samples.extend(reader.sample_packet(packet,'after'))
                 except Exception:diagnostics.append('STREAM_BUFFER_CAPTURE_UNAVAILABLE')
         projection=metadata.project(packet,trials,ctx.policy_values);http=ctx.cprobe.report();read_report=reader.report() if reader else None
-        summary={'profile':PROFILE,'trials':trials,'native':packet,'projection':projection,'transport':http,'reader':read_report,
+        summary={'profile':ctx.check.collection_profile,'trials':trials,'native':packet,'projection':projection,'transport':http,'reader':read_report,
             'sealed_selected_session':sealed,'diagnostic_codes':diagnostics,'fixture':{'profile':PROFILE},'whole_scope_complete':False,
             'server_memory_is_client_read_timing':False,'worker_gpu_release_verified':False}
         ctx._buffer_cleanup=list(http['cleanup_errors'])
         if read_report and read_report.get('parent_cleanup_unverified'):ctx._buffer_cleanup.append('STREAM_BUFFER_PARENT_CLEANUP_UNVERIFIED')
+        if budget_profile:
+            if read_report and read_report.get('collection_gap'):diagnostics.append('BUDGET_RSS_COLLECTION_GAP')
+            summary['budget_process_rss_samples']=rss_samples
+            summary['budget_unimplemented_scopes']=['concurrency','queue','KV','media_cumulative_budget','fairness']
+            if any(not row['process_context_verified'] or not row['owner_binding_verified'] for row in rss_samples):
+                diagnostics.append('BUDGET_RSS_SAMPLING_INCOMPLETE')
         ctx._buffer_gap=bool(diagnostics or http['collection_gap'] or ctx._buffer_cleanup)
         data={'buffer_http_trials':trials,'buffer_native_samples':projection['samples'],'buffer_cases':projection['cases'],
             'buffer_missing':projection['missing'],'buffer_conflict_candidates':projection['conflict_candidates'],
             'buffer_producer_authenticated':False,'buffer_inventory_complete':False,'buffer_release_verified':False,'buffer_scope_complete':False}
-        return {k:{'value':v,'collected':True} for k,v in data.items()}, {'attempted':bool(trials and trials[0]['attempted']),
+        observations={k:{'value':v,'collected':True} for k,v in data.items()}
+        if budget_profile:
+            from .kubernetes_process_rss import project_samples
+            observations.update(project_samples(rss_samples,ctx.policy_values['buffer_max_process_rss_bytes']))
+        return observations, {'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Bounded client/actual selected transport samples; whole serving buffer inventory, debug and release policy unverified.'},[],summary
+
+    @staticmethod
+    def _collect_rss(reader,target,prepared,stage,samples,diagnostics):
+        try:
+            engine=reader.binding['engine']
+            packet=capture_session(reader,target,container=engine['container'],image=engine['image'],prepared=prepared,
+                owner_identity=reader.owner_identity,read_file=reader.read_file,image_check=reader.image_check)
+            samples.extend(reader.sample_packet(packet,stage))
+        except Exception:diagnostics.append('BUDGET_RSS_CAPTURE_UNAVAILABLE')
 
     def _finish(self,ctx):
         draft=super()._finish(ctx);draft.data_origin=DataOrigin.EXAMPLE

@@ -2,8 +2,8 @@ id: SUP-14
 framework_id: CHK-SUP-014
 mechanism_ids:
 - mechanism-10
-revision: 3
-retired: false
+revision: 4
+retired: true
 area: SUP
 purpose: 필수 검사 결과 집행
 secondary_purposes: []

@@ -5,7 +5,7 @@
 소비하며 `[executors] api_transport="kubernetes"`와 `[api_transport] target`을
 기존 guard.toml에 지정한다. 별도 CPU 실행기나 수입 capture는 없다.
 
-`python tools/build_kubernetes_api_pack.py --seed packs/PACK-BASELINE --output <새 폴더>`는
+`python tools/build_kubernetes_api_pack.py --seed reference/pack-seeds/PACK-BASELINE-31 --output <새 폴더>`는
 검토된 PACK31 정확 Ref와 manifest를 검증한 snapshot에서 생성한다. 원래 PACK31과
 Docker 정책/저장 Ref는 유지하고 77개 ID·76개 정의 bytes·PLT08 질문/기준/판정도
 보존한다. PLT08 revision6의 수집 profile·9개 필수 POL 형식·제한만 versioning한다.

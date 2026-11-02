@@ -1,0 +1,49 @@
+id: LIF-12
+framework_id: CHK-LIF-012
+mechanism_ids:
+- mechanism-13
+revision: 3
+retired: false
+area: LIF
+purpose: 재시도 비용 제한
+secondary_purposes: []
+question: 재시도할 때 이전 작업이 남아 있는지 확인하고 중복 실행 비용을 제한하는가?
+scope: 조건부; 자동 retry
+risk_category: 보안 위협·일반 장애 함께 점검
+risk_summary: 실패·timeout을 유발할 수 있는 호출자가 재시도를 겹치게 하거나 일반 장애 후 중복 실행이 남아 비용을 증폭시키고 결과를 중복 전달할 수 있음.
+review_order: conditional_when_selected
+impact: null
+applies_when:
+  prose: 앱·SDK·Gateway·엔진의 추론 자동 retry 주체·발동 조건과 허용 정책을 먼저 확인한다. 금지 구성은 자동 retry의 거부와 실제 미발생 근거를 확인하고, 허용·사용 구성은 원·새 attempt의 중복·잔존·비용을 대조한다. 실제 비사용 근거가 있으면 자동 retry 실행 분기만 비적용 후보로 남기며, 기능·정책 미정은 적용 미정으로 둔다. 취득 SDK retry는 LIF-002에서 확인한다.
+policy_params: []
+policy_prose:
+  policy_to_decide: retry 허용·중복 처리·기한
+  enterprise_decisions: 요청별/그룹별 회수 대상·잔존 참조·강제 종료·중복 비용 처리. 공유 weights/profiler/retry는 기능 선택 후 별도 수명·종료 계약을 확인한다.
+normal_control: 선정한 retry 정책의 정상 호출을 추적한다. 비사용 구성은 한 호출·한 attempt를, 허용 구성은 정상 응답에서 불필요한 추가 attempt 없이 완료됨을 확인한다.
+challenge_steps:
+- 정상 호출과 수동 재호출의 독립 attempt 기준선을 기록하고 자동 retry와 구분
+- 실제 자동 retry 주체·발동 조건·상한을 고정하고 제한된 timeout·연결 종료 등 해당 조건 하나만 주입
+- 자동 재호출의 원·새 attempt ID와 시작·종료, 원 작업 잔존·반환·누적 비용을 연결하고 금지 구성의 자동 재호출 거부와 비교
+required_observations: []
+required_observations_prose:
+- 자동 retry 주체·발동 조건·허용 정책·유효 설정과 상한
+- 원·새 attempt ID와 시각·중첩 실행·종결·반환·누적 비용, 사용자 수동 재호출의 별도 기록
+satisfied_if: 금지한 자동 재시도가 수행되지 않는다. 허용한 자동 retry는 정한 attempt·중복 실행·반환·잔존·누적 비용 한도를 지키며 이전 작업이 정한 상태로 종결된다.
+fail_criteria: 금지 자동 재시도나 채택한 중복 비용·잔존 한도 위반이 발생한다.
+unknown_criteria: 적용한 자동 retry의 주체·발동·원/새 attempt·잔존 작업·누적 비용 또는 판정 한도를 확인하지 못했다. 수동 재호출만 확인한 경우 자동 retry의 증거는 미확인이다.
+remediation: '- 자동 재시도를 허용하는 환경에서는 이전 시도의 종료 상태와 새 시도의 식별정보를 구분한다. 시도 수·누적 비용·중복 실행 한도를 적용하고 이전 작업과 늦은 결과를 정리한다. 팀 참조 구성에서는 자동 재시도 비사용을 확인한다.'
+method_and_evidence: 수동 재호출을 독립 대조로 남기고, 실제 자동 retry의 주체·발동 조건에서 원/새 attempt·실행·출력·잔존 비용·종결을 연결한다.
+remaining_setup: 실제 retry 주체·발동 조건·attempt 및 비용 계측, 허용 상한·종결 기한과 안전한 실패 주입. 자동 retry를 새로 구현하지 않으며 미지원·비사용은 근거와 함께 기록한다.
+executor: null
+judge: null
+legacy:
+  q_ids:
+  - Q-C08
+  - Q-C05
+  - Q-C02
+  scenario_ids:
+  - SC-18-03
+  subtest_ids:
+  - Q-C08/SC-18-03
+source:
+  array: lifecycle_assessment_draft

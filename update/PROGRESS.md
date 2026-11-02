@@ -502,7 +502,7 @@
 
 ## 2026-10-25 — U1 변경 유형별 시험 선정 설계 확정
 
-- 한 일: 사용자 결정으로 엔진 정식 릴리스는 적용 점검 전체 시험(소스 diff는 보고·도달 확인·공백 보고용), 엔진 패치 릴리스(0.xx.1 …)는 항상 시험 20개와 diff에 걸리는 점검만 기준·후보로 시험, 모델·환경·정책 변경은 증분 감사로 골라서 시험하도록 [설계](docs/UPDATE_SELECTION.md)·[구현 지시](UPDATE_SELECTION_PROMPT.md)·SPEC(U1 절·INV-05 개정·INV-19)·DECISIONS를 갱신했다. 2026-10-24의 "모든 엔진 릴리스에 diff 선정" 안은 폐기했다. scratchpad에서 v0.31.0→v0.32.0 1차 검증 실험(변경 경로 2,801·미분류 10·보안 공지 9건 대조)과 과거 패치 5개 선정 계산(25~38/77)을 했다(설계 §8).
+- 한 일: 사용자 결정으로 엔진 정식 릴리스는 적용 점검 전체 시험(소스 diff는 보고·도달 확인·공백 보고용), 엔진 패치 릴리스(0.xx.1 …)는 항상 시험 20개와 diff에 걸리는 점검만 기준·후보로 시험, 모델·환경·정책 변경은 증분 감사로 골라서 시험하도록 [설계](docs/UPDATE_SELECTION.md)·구현 지시·SPEC(U1 절·INV-05 개정·INV-19)·DECISIONS를 갱신했다. 2026-10-24의 "모든 엔진 릴리스에 diff 선정" 안은 폐기했다. scratchpad에서 v0.31.0→v0.32.0 1차 검증 실험(변경 경로 2,801·미분류 10·보안 공지 9건 대조)과 과거 패치 5개 선정 계산(25~38/77)을 했다(설계 §8).
 - 테스트 결과: 문서만 바꿨다. 코드·팩·테스트는 바꾸지 않았고 테스트를 실행하지 않았다. 현재 코드는 개정 INV-05·INV-19를 아직 구현하지 않았다(SPEC 앞섬).
 - 한 일(추가): 팀원 개선안을 검토해 채택 항목 8개(CHG 근거 무결성, prepare-update·update_validation 연결, git 호출 안전, 비교 해시 분리, 도달 확인 다섯 단계, 평가 건수, 구현 순서, 소스·이미지 관계 세 상태)를 설계·프롬프트에 반영했다. 열린 PR을 정리했다(#24·#25·#27·#28·#26 닫음, #30·#31 검토 댓글). 원격 브랜치 26개는 사용자가 직접 삭제했다.
 - 한 일(추가 2): PR #30·#31에 검토 의견을 반영하고(cbea1e0: 원인 프로파일 데이터 파일 분리·문서화) main에 병합했다(55c9a24, fb0c103). 반영 후 기본 suite 2905 통과·실패/오류/skip 0·기존 18 제외·pytest 39.43초/부모 39초(macOS), 설치본 95파일 일치, PR CI 통과.
@@ -1278,13 +1278,13 @@ git status
 - 자세한 명령/범위/직접 결과와 후속 조건은 [AUTOMATION_PHASE1](docs/AUTOMATION_PHASE1.md), 선별 실증 요약은 [검증 JSON](docs/evidence/automation-phase1-20261023.json)을 따른다. 전체 모델/DB/로그/개인 경로는 커밋하지 않고 저장소 밖 output의 이번 phase 폴더에 원본을 보존했다. 커밋 후 최종SHA 원격일치·지원Linux CI·wheel 결과는 초안PR 본문과 종료 보고에 기록한다.
 
 ## 자동화 2차 — 고정 CPU chat·REQ-07·관측 계약 (2026-10-23)
-- 한 일: [실행 프롬프트](docs/AUTOMATION_PHASE2_PROMPT.md)에 따라 고정 readonly template/안정 비교 설정, REQ-07 POL3·관측13·4챌린지·실제 token 소비/경계·수동 PASS 상한·보고서, REQ-13 private_system 실측, matrix/2·읽기 전용 과거 분석을 연결했다. PACK18/DRAFT·9자동연결·19정책점검/41경로·카탈로그317행/609연결이다.
+- 한 일: 실행 프롬프트에 따라 고정 readonly template/안정 비교 설정, REQ-07 POL3·관측13·4챌린지·실제 token 소비/경계·수동 PASS 상한·보고서, REQ-13 private_system 실측, matrix/2·읽기 전용 과거 분석을 연결했다. PACK18/DRAFT·9자동연결·19정책점검/41경로·카탈로그317행/609연결이다.
 - 테스트 결과: 기본 전체 1781pass/5skip/18제외(JUnit suite 364.50s), 마지막 adapter 보수 관련 128회귀 통과. 실제 표와 원본 UNKNOWN/FAIL 보존·반출/복원/저장 팩 재판정·wheel71파일/17CLI 검증은 [직접 기록](docs/AUTOMATION_PHASE2.md#검증-기록)·[선별 증거](docs/evidence/automation-phase2-20261023.json)를 따른다. 과거1차14/15 exit1과590파일 보존. 최종SHA Linux CI는 PR에서 별도 확인.
 - 다음 단계: REQ-11의 일반/SSE 소비 귀속·OBS-09의 실제 collector/parser를 독립 계약으로 설계한 뒤 제한 실행기를 확대한다. 기업 정책 확정과 운영 증거 수집은 구분한다. Windows 기본 테스트1분 목표 미달의 I/O도 후속 개선한다.
 - 남은 것: 9연결은77전체 완료 수가 아니다. CPU성능/GPU/서로 다른 두 실제 이미지 비교·임의template·REQ10하위소비·OBS03예외dump·기업승인 전체는 미검증. 비용서버/운영시험/병합은 수행하지 않았다.
 
 ## 자동화 3차 — REQ-11 연결 귀속·OBS-09 실제 참조 수집 (2026-10-23)
-- 한 일: [실행 프롬프트](docs/AUTOMATION_PHASE3_PROMPT.md)에 따라 두 실행기·경계 있는 JSON/SSE 수집기·명시적 native INFO 기동·실제 parser/별도 escaped HTML·순수 정책/수동 PASS 상한을 연결했다. PACK19/DRAFT·11자동연결·21정책점검46경로·카탈로그322행614연결·adapter0.4.0/declared0.12.0이다.
+- 한 일: 실행 프롬프트에 따라 두 실행기·경계 있는 JSON/SSE 수집기·명시적 native INFO 기동·실제 parser/별도 escaped HTML·순수 정책/수동 PASS 상한을 연결했다. PACK19/DRAFT·11자동연결·21정책점검46경로·카탈로그322행614연결·adapter0.4.0/declared0.12.0이다.
 - 테스트: HTML 마지막 보수 전 기본전체 2016pass/5skip/18제외(JUnit455.55s), 마지막 표시바이트 회귀55pass(3.42s). 첫9실패의 FD/시계/기대목록을 고치고 전체 재실행했다. 최종 SHA 전체 Linux CI는 초안 PR에서 별도 확인한다. Windows1분 목표 미달이며 skip/제외를 통과로 세지 않는다.
 - 실측: Windows/WSL2 pinned CPU·실제 OPT로 REQ-11(JSON4쌍/SSE4쌍,20요청)·OBS-09(7사례)·PLT-01 S/F PASS/PUNKNOWN. 첫 OBS 표시내용/첨부Ref는 맞지만 별도 display digest가 Windows 줄바꿈과 달라 원본 보존 후 고정 UTF8저장+새OBS 단독02로 재검증했다. 기업 principal/SIEM/worker 병렬성·GPU/성능/두 실제 이미지 비교는 미검증, official=false다.
 - 보존/배포: 두 시도 verify·반출·새 복원·저장 팩 재판정·JSONHTML, 기존 객체/보고서/store/모델/컨테이너 불변·관리자원정리. 최종wheel77파일/17CLI·frozen/-I·readonly준비,팩재생성2회/metadata/로컬출처·보호167추적파일과다른75정의 보존을 확인했다. [직접 기록](docs/AUTOMATION_PHASE3.md#검증-기록)·[선별 증거](docs/evidence/automation-phase3-20261023.json)를 따른다.
@@ -1679,3 +1679,40 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 
 - ABI 마감: 공통 검토 b3e3bb0 / 검증 source d8c685b→089ebc3→fixture전용 f26f458. Windows/Linux3.12.3 직접369 및 보수143/출력37 통과, Linux3.12.15 최초265/104오류→delta76/28오류→출력37 통과. 원 실패 보존; 새 전체 suite 통과로 집계하지 않음.
 - 인접 Linux142, Windows135+짧은경로delta6/기존skip1. 설치 wheel089ebc3 SHA ad5a59481370b5e530dc8aaf37c86feb57cf2bd9ae2ccdc093bae66a3a295093: W3.12.14/L3.12.15 각각281파일·CLI4/24Ref·원팩/복원/재판정. A2/B pin 미갱신·closed 유지, exactHEAD CI5와 actual 별도.
+
+
+### 2026-11-01 PACK-BASELINE 실행기 연결 담당 1
+- 한 일: PACK31 불변 원본·연결표·추적표 지원 구현 열(PR183)과 담당 1의 29개 오버라이드, supply_boot·record_access, 기존 실행기 연결 8개·확장 7개, REQ-02 복합 수집을 구현했다. 팩은 PACK-BASELINE 32로 재생성했다.
+- 테스트 결과: EXAMPLE 대역의 계약·왕복 시험만 수행했다. 실제 엔진·Kubernetes·GPU는 미실측이다.
+- 다음 단계: `src/guard` 변경으로 실패하는 df6255e 고정 gate 7건의 재고정 결정, 담당 2 통합 뒤 revision 재생성.
+- 막힌 것: 위 gate 재고정은 사용자·검토자 결정이다.
+- 2026-11-01 A39 인수: 수락된 local0af OBS02/native20~22 공통·전용12파일을 main920 위로 원 bytes 소비. B PR171 fixture/tool 보수는 보존. 본 묶음의 새로운 실제 실증·전체 분기 완료 주장은 없음. 첫 PLT 실증은 Start1회 용량 부족 후 stopped 확인·자동 재시도 없음. 영향 검증과 A측 검토 pin은 후속 고정 단계로 분리한다.
+- 2026-11-01 A측 소비 pin: adcde856 전체394 blob은 기존716c29a와 일치·manifest0ee4b9da 유지. 새 ancestry/source-index-shadow 영향9통과(13.83s). B 원본 gate/common 승인 목록은 유지되며 새 gate61c29e98/common adcde856는 검토 전 거부를 확인했다. 기존286 설치/CLI4/24Ref는 동일 bytes 범위로 이월. 새 후보 전체 CI5·B 조합 수락·실제 worker/GPU는 미완료.
+- 2026-11-01 B70431 수락: B가 검토한 gate61c29/common adcde의 전용5파일 원bytes를 소비하고 전체394 literal manifest를 대조했다. A측 두 수락 시험은 B160/PR171 역사 원본과 새5파일을 구분하고 현재394 정상 수락·혼합/미등록·과거392 snapshot 거부를 확인하도록 고정한다. 직접/인접/최종 검증은 receipt로 마감하며 actual/CI5로 확대하지 않는다. PLT source920 실증은 준비 run ID 거부로 미실행, 양 서버 Stop·실패팩 정확복원을 마감했고 후속 ID 보수는 로컬 CPU 검증만 수행했다.
+- 2026-11-01 PR 마감 후보: B3900e2a의 역사 HTTP fixture 보수 한 파일을 원bytes로 소비했다. A측 수락은 B70431 원본과3900 successor를 각각 검토한 literal로 확인하며 제품/gate/common394는 바꾸지 않았다. main144798c의 update 밖 원본을 결합했다. 원 a3 Linux10146pass/1fixture fail와 c464 Windows10068pass/65fail/2error는 보존하고 수정 후보의 직접·정확HEAD CI5·설치는 별도 검증한다. B POSIX107 근거는 bytes 동일 범위에서 재사용한다. REQ13 후속 초안·운영기 보수와 실제 PLT 미실행은 미완료로 남긴다. 새 전체 점검 완료·AWS 작업은0이다.
+- PR 후보 직접 검증: A의 source/역사/current-successor 수락·공개 B HTTP 제품4사례·원 실패1사례의12시험 통과(Windows3.12.14, pytest23.29초/부모24.153초, 실행 중 source 동일). B 원5파일·후속fixture1파일·394 manifest와 원팩/반출복원/저장팩 정확Ref를 확인했다. 검증 뒤 인계 문서만 정합화했으며 코드/팩/lock은 동일하다. 최종 정확 HEAD CI5·설치 결과는 PR 검사와 외부 receipt로 마감한다.
+
+### 2026-11-02 점검 엔진 통합 개발
+- 한 일: 담당 2(PR184)·담당 1·PR180을 한 브랜치로 합쳤다. 소스 고정을 커밋에서 파일 해시 목록(`release/reviewed-source.json`)으로 바꿨다. 담당 2의 23개를 팩에 연결하고 update 범위 밖 8개를 retired로 뺐다. REQ-14~17 native 콜백 수집과 SGLang·TensorRT-LLM 외부 HTTP 어댑터를 추가했다.
+- 테스트 결과: EXAMPLE 대역과 고정 vLLM 소스 조각의 계약 시험만 수행했다. 실제 엔진·Kubernetes·GPU는 미실측이다.
+- 다음 단계: LIF-13, REQ-18~21의 native 수집기와 LIF·OBS 능동 활성화.
+- 막힌 것: 위 5개는 GPU와 검토된 대상 소스 계약이 필요하다. 능동 장애 주입은 상태 변경 승인 범위 결정이 필요하다.
+
+### 2026-11-02 GPU 전 완성
+- 한 일: lab 능동 활성화 14개, 서명 기록 검증 18개, REQ-15 인증 신원 연결, REQ-18 자리 재사용 수집을 구현했다. 실제 vLLM 0.31.0 CPU(arm64 Docker)에서 콜백 5개와 활성화 14개를 실측하고 발견한 결함 6건을 고쳤다.
+- 테스트 결과: 실측 결과는 `docs/evidence/*-cpu-20261102.json`. Kubernetes는 docker 대역이다.
+- 다음 단계: GPU 환경에서 REQ-19, REQ-20, REQ-21, LIF-13 수집기와 조건부 36개 실측.
+- 막힌 것: 위 4개는 GPU가 필요하다. 기업 기준값과 서명 기록 내보내기 도구는 고객 환경 입력이다.
+
+
+### 2026-11-02 PACK32 GPU 실증 및 인계 HTML 비교
+- 한 일: merged1174da6 기준으로 기존 GPU 보수를 이식하고, Windows 신호 import와 Kubernetes callback 시간 소비를 보수했다. HTML과 기존 프롬프트의 방법 비교는 docs/gpu-completion/20261102/METHOD_COMPARISON.md.
+- 테스트 결과: Linux 직접213개 통과(5.58초), Windows 신규50개 통과(10.34초). 실제GPU REQ16 salt·REQ18 V1 슬롯 부분 실측, REQ14 설치·REQ17 대조 판별력 미완료/UNKNOWN 보존. 실패 포함9묶음 로컬 반출·정확Ref 재판정 일치. 기본 전체 suite는 실행 중이며 통과 주장이 없다.
+- 다음 단계: 모드별 대표 factory/Kubernetes 종단 시험 후 확대. 핵심 native4개와 TP2 미완료.
+- 막힌 것: 실제 함수 파일/entry 검증, 편향 없는 시간 대조, 기업 정책, 추가GPU 승인. 기존 gate/hash 자동 변경 없음.
+
+### 2026-11-02 CI 실행 취소와 전체 시험 시간 설정 보수
+- 한 일: push와 pull_request가 같은 concurrency 그룹에서 서로 취소하던 설정을 workflow·event·PR 번호 또는 ref별로 분리했다. 최신 동일 이벤트의 이전 실행 취소는 유지한다. 최근 전체 회귀 1968.36초를 고려해 update-default 제한을 30분에서 60분으로 늘렸다.
+- 테스트 결과: YAML 해석과 기존 triggers·jobs·permissions·실행 명령 보존을 확인했다. 실제 수정 HEAD의 push·PR 검증 결과는 PR186의 Actions 실행에서 확인한다. 테스트·assert·고정 hash·marker 제외 조건은 바꾸지 않았다.
+- 다음 단계: 새 HEAD의 전체 시험·wheel 설치·Docker stub·공용 계약·플랫폼 검사를 끝까지 확인한다.
+- 막힌 것: 아직 새 HEAD의 원격 검증 결과를 기다리는 단계다. 이 변경은 GPU 기동이나 source 승인 변경이 아니다.

@@ -2,7 +2,7 @@ id: REQ-15
 framework_id: CHK-REQ-015
 mechanism_ids:
 - mechanism-01
-revision: 3
+revision: 4
 retired: false
 area: REQ
 purpose: 공유 권한·범위
@@ -16,6 +16,18 @@ impact: null
 applies_when:
   prose: KV/prefix 등 재사용 cache를 사용할 때 공유 집단과 신원 연결을 확인한다. 실제 집단·공유 정책 미정은 제외 사유가 아니다.
 policy_params:
+- key: sensor_environment_sha256
+  type: str
+  required: true
+- key: sensor_target_sha256
+  type: str
+  required: true
+- key: sensor_prepared_sha256
+  type: str
+  required: true
+- key: sensor_manifest_sha256
+  type: str
+  required: true
 - key: public_prefix_sharing_allowed
   type: bool
   required: true
@@ -34,8 +46,10 @@ challenge_steps:
 - 클라이언트가 보낼 수 있는 공유 선택값의 위조·누락을 시험
 - 정책상 집단과 실제 cache 재사용 범위·소비를 대조
 required_observations:
-- key: declared_cache_group_evidence
-  type: dict
+- key: engine_sensor_violation
+  type: bool
+- key: engine_sensor_full_scope
+  type: bool
 required_observations_prose:
 - 검증된 신원·공유 집단 정책과 실제 선택/정규화 결과
 - 실제 key·namespace·실행 영역 등 공유 경계, 집단별 cache 적중·소비 또는 재사용 거부
@@ -45,8 +59,21 @@ unknown_criteria: 신뢰 salt 주입 또는 실제 캐시 hit의 집단 귀속�
 remediation: '- 검증한 사용자 신원에서 캐시 공유 집단을 결정하고 모든 도달 가능한 입력 경로에 적용한다. 사용자가 임의로 공유 집단이나 salt를 지정해 다른 집단의 캐시를 사용하지 못하게 한다.'
 method_and_evidence: 검증된 신원→허용 공유 집단→실제 재사용 범위→cache 적중·소비를 연결한다. 선정 엔진의 key·namespace 또는 실행 영역 분리 등 실제 집행 수단에서 집단 위조·누락과 교차 집단 재사용을 대조한다.
 remaining_setup: 허용 공유 관계·검증된 시험 신원과 선정 엔진의 실제 cache 재사용·소비를 확인할 수단
-executor: null
-judge: null
+executor: engine_sensor
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: engine_sensor_full_scope
+      op: eq
+      value: true
+    - obs: engine_sensor_violation
+      op: eq
+      value: false
+    fail_when_any:
+    - obs: engine_sensor_violation
+      op: eq
+      value: true
 legacy:
   q_ids:
   - Q-C03
@@ -61,3 +88,4 @@ limitations:
 - isolated_cache_groups={isolated_cache_groups}는 서로 비공개 캐시를 격리할 기업 전체 집단 목록이다. 최소 두 고유 집단과 정확한 cache_identity_policy_ref={cache_identity_policy_ref}를 명시해야 하며 bool에서 관계·승인·신원을 추론하거나 목록을 줄이지 않는다.
 - 한 entrypoint/target/workload·집단별 distinct_authenticated_credential 대표 주체 한 명에 대해 전체 ordered pair와 역방향의 source_warmup/same_group_reuse/cross_group_probe/forged_salt/omitted_salt/post_control을 DECLARED로 대조한다. 실제 key→entry→consumer·신원·사건 순서·첨부 내용과 정책 승인 진위는 자동 인증하지 않는다.
 - 공개 공유 true·공유 서비스 자격 뒤 여러 사용자·클라이언트 salt만의 신원·안전 거부 방식·다른 진입점은 지원 밖 UNKNOWN이다. 전체 허용 관계표/신원 책임표·REQ-17 통계·성능은 미검증이며 실제 캐시 실행기는 없다. 신고 PASS의 상한만 적용하고 성능 PASS는 UNKNOWN이다.
+collection_profile: engine-sensor-cache-group-v1

@@ -26,7 +26,7 @@ max_duration_seconds = 120
 
 명시 kubernetes-request-attempt-observation-v1과 REQ-12 조합에만 구현0.2가 dispatch된다.
 기존 LIF-10 구현0.1과 판정은 유지한다. derive 명령은
-`python -m tools.build_kubernetes_request_attempts_pack --seed packs/PACK-BASELINE --output /owned/new-pack`다.
+`python -m tools.build_kubernetes_request_attempts_pack --seed reference/pack-seeds/PACK-BASELINE-31 --output /owned/new-pack`다.
 PACK31 exact Ref와77개·다른76개 정의 bytes·원래 질문/정상/위반/UNKNOWN·두 시나리오를 보존한다.
 새 팩은 DRAFT이고 모든 판정 축은 UNKNOWN이다.
 

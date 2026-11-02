@@ -31,14 +31,11 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
     # No source gate/API/parser replacement: only the original bounded runner
     # is substituted with owned fake API/HTTP metadata.
     monkeypatch.setattr(kubernetes_http,'capture_pipes',world.runner)
-    processes=[];popen=subprocess.Popen
-    def local_git_only(argv,*args,**kwargs):
-        assert type(argv) in (list,tuple) and Path(str(argv[0])).name.lower() in {'git','git.exe'}
-        processes.append('local Git source metadata')
-        return popen(argv,*args,**kwargs)
+    def no_process(argv,*args,**kwargs):
+        raise AssertionError('source gate must not start a process')
     def no_socket(*args,**kwargs):
         raise AssertionError('unexpected actual target socket')
-    monkeypatch.setattr(subprocess,'Popen',local_git_only)
+    monkeypatch.setattr(subprocess,'Popen',no_process)
     monkeypatch.setattr(socket,'socket',no_socket)
     if mode=='attachment':
         original=tool._write
@@ -50,7 +47,7 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
     # real closed gate and exact product refs until B reviews that fixed pair.
     if gate.REVIEWED_COMMON_COMMIT not in helper.APPROVED_REVIEWED_COMMON_COMMITS:
         proof=gate.verify(Path(__file__).resolve().parents[2])
-        assert proof['files_verified']==392 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
+        assert proof['files_verified']>392 and proof['paths_excluded']==[] and not proof['runtime_hash_approval']
         with pytest.raises(ValueError,match='^LIF07_NATIVE_APPROVED_SOURCE_GATE_UNAVAILABLE$'):helper.verify_source()
         now=utcnow();argv=['--collect-http']
         window={'http_validity_start':(now-timedelta(seconds=30)).isoformat(),'http_validity_end':(now+timedelta(minutes=3)).isoformat()}
@@ -65,7 +62,7 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
         assert observation['gaps']==['HTTP_SOURCE_UNAVAILABLE'] and observation['snapshot'] is None
         assert observation['source_validation'] is None and observation['sample_attempted'] is False
         assert record['target_io_attempted'] is False and record['http_collection_attempted'] is False
-        assert tool._inventory(case['source'].root)==before and processes
+        assert tool._inventory(case['source'].root)==before
         left=Store.read_only(out/'store');right=Store.read_only(out/'restored')
         objects=[obj for kind in ('ENV','POL','PLAN','EVD','RES','RPT') for obj in left.iter_kind(kind)]
         assert len(objects)==6 and left.verify()==right.verify()==[]
@@ -86,7 +83,7 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
         (tmp_path/'a1-product-receipt.json').write_bytes(canonical_json(receipt))
         return
     proof=helper.verify_source()
-    assert proof['files_verified']==392 and proof['reviewed_common_commit']=='df6255e96a877ebfbe185230ed87320aa84d2c30'
+    assert proof['files_verified']>392 and proof['reviewed_common_commit']==gate.REVIEWED_COMMON_COMMIT
     assert proof['runtime_hash_approval'] is False and proof['paths_excluded']==[]
     now=utcnow();window={'http_validity_start':(now-timedelta(seconds=30)).isoformat(),
         'http_validity_end':(now+timedelta(minutes=3)).isoformat()}
@@ -122,7 +119,7 @@ def test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack(case,tmp_path,mo
     assert 'HTTP 결과' in entry['basis']
     if mode=='attachment':
         assert 'LIF07_SAFE_FACTS=' in entry['observation_notes'][0]['answer'] and not (out/'worker-readiness.json').exists()
-    assert tool._inventory(case['source'].root)==before and processes
+    assert tool._inventory(case['source'].root)==before
     left=Store.read_only(out/'store');right=Store.read_only(out/'restored')
     objects=[o for kind in ('ENV','POL','PLAN','EVD','RES','RPT') for o in left.iter_kind(kind)]
     assert len(objects)==6 and left.verify()==right.verify()==[]

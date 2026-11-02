@@ -17,7 +17,7 @@ CHECKS = ("REQ-10", "REQ-13", "OBS-03")
 
 
 def fixture(cid, raw="PASS"):
-    check = CheckDef.model_validate(yaml.safe_load((ROOT / f"packs/PACK-BASELINE/checks/{cid}.yaml").read_text(encoding="utf-8")))
+    check = CheckDef.model_validate(yaml.safe_load((ROOT / f"reference/pack-seeds/PACK-BASELINE-31/checks/{cid}.yaml").read_text(encoding="utf-8")))
     common = {"functional_probes_planned": ["before", "after"],
               "functional_probe_results": {"before": "pass", "after": "pass"}}
     if cid == "REQ-10":

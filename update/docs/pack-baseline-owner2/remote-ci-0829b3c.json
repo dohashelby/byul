@@ -1,0 +1,38 @@
+{
+  "observed_on_client_date": "2026-11-02",
+  "source_commit": "2247aabb3447ccb3210b100cade06bce51ed771e",
+  "tested_pr_head": "0829b3c72cb22b975f175446b5d853ab93762dbc",
+  "pr": 184,
+  "run": 41318242161,
+  "job": 124882827429,
+  "job_url": "https://github.com/dohashelby/byul/actions/runs/41318242161/job/124882827429",
+  "conclusion": "failure",
+  "passed": 10228,
+  "failed": 7,
+  "deselected": 19,
+  "pytest_seconds": 1108.85,
+  "parent_wall_seconds": 1110.779,
+  "failed_nodes": [
+    "tests/test_a1_B160_http_product.py::test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack[unready]",
+    "tests/test_a1_B160_http_product.py::test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack[partial-body]",
+    "tests/test_a1_B160_http_product.py::test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack[cleanup-after-canary]",
+    "tests/test_a1_B160_http_product.py::test_real_B_gate_public_HTTP_main_exact_refs_and_saved_pack[attachment]",
+    "tests/test_a1_B_native21_consumption.py::test_new_A_full_common_pin_is_the_exact_B_reviewed_pair",
+    "tests/test_a1_req10_consumption_pin.py::test_actual_fixed_integration_snapshot_passes_and_original_B_default_still_rejects",
+    "tests/test_b_lif07_readiness.py::test_actual_native_helper_default_public_entrypoint_store_restore_preserved"
+  ],
+  "exactly_matches_local_failed_nodes": true,
+  "other_latest_jobs_successful": [
+    "shared-contracts (ubuntu-latest)",
+    "shared-contracts (windows-latest)",
+    "platform-update-contracts",
+    "update-docker-stub"
+  ],
+  "wheel_build_and_verification": "not executed because the default suite step failed",
+  "evidence": {
+    "archive": "remote-ci-0829b3c.zip",
+    "sha256": "b91534face976172bdd8e8ba48e21fe1d3e9f1d6687898b30582abab938b8b69",
+    "bytes": 51110,
+    "provenance": "Original GitHub Actions workflow log archive downloaded through the signed-in browser. Anonymous REST log retrieval returned 403; no credential extraction or permission change."
+  }
+}

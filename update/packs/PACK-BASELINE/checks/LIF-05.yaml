@@ -2,7 +2,7 @@ id: LIF-05
 framework_id: CHK-LIF-005
 mechanism_ids:
 - mechanism-10
-revision: 4
+revision: 5
 retired: false
 area: LIF
 purpose: 변경 중 일관성
@@ -15,7 +15,34 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 재시작·재배포의 접수 중단·진행 요청·그룹 종료·새 모델 준비를 확인한다.
-policy_params: []
+policy_params:
+- key: transition_inputs_sha256
+  type: str
+  required: true
+- key: transition_before_at
+  type: str
+  required: true
+- key: transition_during_at
+  type: str
+  required: true
+- key: transition_after_at
+  type: str
+  required: true
+- key: transition_recovered_at
+  type: str
+  required: true
+- key: transition_before_generation
+  type: str
+  required: true
+- key: transition_during_generation
+  type: str
+  required: true
+- key: transition_after_generation
+  type: str
+  required: true
+- key: transition_recovered_generation
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: drain·기존 요청 처리·세대 전환 조건
   enterprise_decisions: 수용 차단점·drain·강제 종료·서비스 중단 계획. live/rolling/canary를 선택하면 허용 세대 혼용·원자성·실패 처리를 별도로 정한다.
@@ -24,7 +51,15 @@ challenge_steps:
 - 기존 요청 하나 진행
 - 새 묶음 재배포
 - 각 요청의 model generation·drain·라우팅 추적
-required_observations: []
+required_observations:
+- key: activation_steps
+  type: list
+- key: activation_violations
+  type: list
+- key: activation_missing
+  type: list
+- key: activation_scope_complete
+  type: bool
 required_observations_prose:
 - 요청 세대/배포 digest·설정/종료·준비·라우팅 전이
 satisfied_if: 변경 경계를 넘는 비허용 상태 혼합 없이 요청 처리 방침을 지킨다.
@@ -33,8 +68,19 @@ unknown_criteria: 요청 세대·drain 정책·실제 전환 시점을 알 수 �
 remediation: '- 재배포 시 신규 요청을 제한하고 진행 요청을 정한 방식으로 처리한 뒤 기존 실행 그룹을 종료한다. 새 모델·설정과 필수 rank의 준비·정상 추론을 확인한 뒤 해당 배포로 요청을 보낸다.'
 method_and_evidence: '진행 요청을 둔 기본 중단·재시작 재배포에서 접수 중단→이전 요청의 허용 drain/종결→그룹 종료→새 승인 모델·설정 준비→라우팅 재개의 전이를 기록한다. 각 요청·worker·weights·cache의 배포 세대와 실제 소비·반환을 연결해 비호환 혼합이나 준비 전 전환을 확인한다. 새 배포의 준비 gate와 부분 실패 집계는 CHK-LIF-007·CHK-LIF-009와 같은 시험에서 별도 판정한다. 실제 live/rolling·다중 replica 변경은 CHK-LIF-006에 연결한다. vLLM v0.31.0의 공통 【F32】 근거 중 기본 재배포 조건을 참조한다. 근거 원문: [F32](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33911).'
 remaining_setup: drain·전환 기준과 배포별 식별 계측
-executor: null
-judge: null
+executor: lifecycle_transition
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: activation_scope_complete
+      op: eq
+      value: true
+    - obs: activation_violations
+      op: empty
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-C09
@@ -48,3 +94,4 @@ legacy:
   - Q-C09/SC-17-02
 source:
   array: lifecycle_assessment_draft
+collection_profile: lif05-stopped-redeploy-v1

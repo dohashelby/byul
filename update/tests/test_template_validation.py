@@ -23,7 +23,7 @@ VALUES = {"allowed_template_sha256": [SHA], "max_rendered_input_tokens": 31,
 
 
 def check():
-    raw = yaml.safe_load((ROOT / "packs/PACK-BASELINE/checks/REQ-07.yaml").read_text(encoding="utf-8"))
+    raw = yaml.safe_load((ROOT / "reference/pack-seeds/PACK-BASELINE-31/checks/REQ-07.yaml").read_text(encoding="utf-8"))
     raw.update(yaml.safe_load((ROOT / "tools/overrides/REQ-07.yaml").read_text(encoding="utf-8")))
     return CheckDef.model_validate(raw)
 

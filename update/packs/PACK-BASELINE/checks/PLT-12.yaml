@@ -2,7 +2,7 @@ id: PLT-12
 framework_id: CHK-PLT-012
 mechanism_ids:
 - mechanism-12
-revision: 3
+revision: 4
 retired: false
 area: PLT
 purpose: 권한 철회
@@ -15,7 +15,34 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 실제 사용 자격의 전달·저장·교체 과정에서 남는 사본과 재사용 경로를 확인한다.
-policy_params: []
+policy_params:
+- key: copy_environment_sha256
+  type: str
+  required: true
+- key: copy_target_sha256
+  type: str
+  required: true
+- key: copy_inventory_sha256
+  type: str
+  required: true
+- key: copy_policy_sha256
+  type: str
+  required: true
+- key: copy_record_source_sha256
+  type: str
+  required: true
+- key: copy_record_session
+  type: str
+  required: true
+- key: copy_validity_start
+  type: str
+  required: true
+- key: copy_validity_end
+  type: str
+  required: true
+- key: copy_max_record_delay_ms
+  type: int
+  required: true
 policy_prose:
   policy_to_decide: 자격 수명·사본 정리·교체 절차
   enterprise_decisions: 철회 대상·issuer·정책 캐시, 진행 요청과 기존 세션 처리, 자격 교체·사본 정리 담당과 근거.
@@ -24,7 +51,39 @@ challenge_steps:
 - 시험 자격의 대상 위치·수신자별 교체·폐기 기한·방법과 보존 예외를 기록
 - 자격 교체·폐기 후 env·mount·배포 Secret·임시 파일·snapshot/backup 등 승인된 조사 위치에서 이전 사본의 실제 처리 상태 확인
 - 남은 시험 사본·복원 경로의 재사용 시도를 대조하고 issuer 철회/만료 결과와 위치별 사본 처리 결과를 각각 기록
-required_observations: []
+required_observations:
+- key: copy_inventory_declarations
+  type: list
+- key: copy_record_snapshots
+  type: list
+- key: copy_event_declarations
+  type: list
+- key: copy_treatment_candidates
+  type: list
+- key: copy_reuse_candidates
+  type: list
+- key: copy_issuer_declarations
+  type: list
+- key: copy_missing
+  type: list
+- key: copy_conflicts
+  type: list
+- key: copy_collection
+  type: list
+- key: copy_records_collected
+  type: bool
+- key: copy_producer_authenticated
+  type: bool
+- key: copy_membership_verified
+  type: bool
+- key: copy_treatment_verified
+  type: bool
+- key: copy_reuse_enforcer_verified
+  type: bool
+- key: copy_issuer_verified
+  type: bool
+- key: copy_scope_complete
+  type: bool
 required_observations_prose:
 - 대상 위치·수신자별 사본 inventory, 교체·폐기 기한·방법·보존 예외와 승인
 - 실제 교체·회수·삭제 또는 제한 보존 상태·시각, 이전 사본/복원 경로의 재사용 시도와 issuer·집행점의 거부 결과(비밀 원문 제외)
@@ -34,8 +93,43 @@ unknown_criteria: 사본의 대상 위치·수신자·기한·처리 방법·보
 remediation: '- 자격이 남을 수 있는 설정·파일·환경변수·백업·복원 자료를 관리하고 폐기 대상 사본을 삭제하거나 접근을 제한한다. 원 자격을 철회·교체해 사본이 복원돼도 금지된 접근에 재사용되지 않게 한다.'
 method_and_evidence: 자격 교체·폐기 정책의 대상 위치·수신자·기한·방법·보존 예외를 먼저 고정한다. worker env·임시 파일·배포 Secret·mount·snapshot/backup 등 실제 사본 위치에서 교체·회수·삭제 또는 제한 보존 상태를 확인하고, 남은 시험 자격·복원 경로의 재사용 결과를 대조한다. issuer의 철회/만료는 CHK-PLT-010, 이미 열린 session/handle의 처리는 CHK-PLT-011과 증거를 공유하되 실제 사본 처리 결과와 각각 기록한다. 비밀 원문은 기록하지 않는다.
 remaining_setup: 사본 조사 범위·보존 예외·철회 기한; 비밀값 출력 금지
-executor: null
-judge: null
+executor: required_event_record
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: copy_records_collected
+      op: eq
+      value: true
+    - obs: copy_producer_authenticated
+      op: eq
+      value: true
+    - obs: copy_membership_verified
+      op: eq
+      value: true
+    - obs: copy_treatment_verified
+      op: eq
+      value: true
+    - obs: copy_reuse_enforcer_verified
+      op: eq
+      value: true
+    - obs: copy_issuer_verified
+      op: eq
+      value: true
+    - obs: copy_scope_complete
+      op: eq
+      value: true
+    - obs: copy_missing
+      op: empty
+    - obs: copy_conflicts
+      op: empty
+    fail_when_any:
+    - obs: copy_conflicts
+      op: nonempty
+      when:
+        obs: copy_producer_authenticated
+        op: eq
+        value: true
 legacy:
   q_ids:
   - Q-C10
@@ -46,3 +140,8 @@ legacy:
   - Q-C12/SC-19-03
 source:
   array: platform_assessment_draft
+collection_profile: kubernetes-credential-copy-record-observation-v1
+limitations:
+- '구현 분기: 닫힌 inventory·소유 기록의 사본 처리·재사용·issuer 선언을 읽어 정상·누락·상충·교체·후속 수집 오류를 구분한다.'
+- '미구현 분기: 기록 생산자 인증과 실제 사본 처리·재사용 집행의 독립 근거가 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다. 선언 상충은 후보로만 남는다.'
+- kubernetes 구현만 있다. issuer 거부와 실제 사본 처리는 각각 증거로 본다. 자격 원문은 수집하지 않는다.

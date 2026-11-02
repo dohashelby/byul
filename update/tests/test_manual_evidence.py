@@ -218,7 +218,7 @@ def test_cli_template_and_import(tmp_path, monkeypatch):
     out = runner.invoke(app, ["select", "--pack", str(SEED_DIR), "--env", "examples/env.yaml",
                               "--policy", "examples/policy.yaml"]).output
     plan = out.strip().splitlines()[-1]
-    assert runner.invoke(app, ["run", "--plan", plan]).exit_code == 0
+    assert runner.invoke(app, ["run", "--plan", plan, "--pack", str(SEED_DIR)]).exit_code == 0
     r = runner.invoke(app, ["evidence", "template", "--plan", plan, "--out", "manual.yaml"])
     assert r.exit_code == 0, r.output
     doc = yaml.safe_load((tmp_path / "manual.yaml").read_text(encoding="utf-8"))

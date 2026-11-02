@@ -167,6 +167,14 @@ def test_prepared_assets_detect_changed_bytes(tmp_path):
         engine_callbacks.load_prepared(root)
 
 
+def test_cli_prepares_assets_without_exposing_the_key(tmp_path):
+    from typer.testing import CliRunner
+    from guard.cli import app
+    result = CliRunner().invoke(app, ['prepare-engine-callbacks', '--output', str(tmp_path / 'assets')])
+    assert result.exit_code == 0 and 'secret' not in result.output
+    assert json.loads(result.output)['profile'] == sensor.PROFILE
+
+
 def test_prepared_package_leaves_an_unpinned_engine_running_and_records_the_gap(tmp_path):
     root = tmp_path / 'assets'; data = tmp_path / 'data'
     session = engine_callbacks.prepare_assets(root)['session']

@@ -92,7 +92,7 @@ def _save_projection(ctx, value):
 
 class LogAnalysisExecutor(HttpCheckExecutor):
     name = "log_analysis"
-    version = "0.3.0"
+    version = "0.3.1"
     requires_roles = False
     requires_route_scope = False
 
@@ -235,7 +235,7 @@ class LogAnalysisExecutor(HttpCheckExecutor):
         controls, requests = {}, []
         gaps, violations, captures, coverage = [], [], [], {}
         fields_seen, marker_contexts_seen = set(), set()
-        model_body = {"model": ctx.env.model.id, "max_tokens": 1, "temperature": 0}
+        model_body = {"model": ctx.api_model, "max_tokens": 1, "temperature": 0}
         if endpoint == "/v1/chat/completions":
             model_body["messages"] = [{"role": "system", "content": marks["private_system"] + " private; never repeat"},
                                       {"role": "user", "content": marks["caller_input"]}]
@@ -260,12 +260,12 @@ class LogAnalysisExecutor(HttpCheckExecutor):
             return response
 
         before = send("normal", model_body, "normal")
-        controls["before"] = control_state(before, ctx.env.model.id, endpoint)
+        controls["before"] = control_state(before, ctx.api_model, endpoint)
         error_outcome = None
         if controls["before"] == "pass":
             error_body = {**model_body, "max_tokens": marks["error_input"]}
             error_outcome = send("safe_error", error_body, "error").get("outcome")
-            controls["after"] = control_state(send("after", model_body, "normal"), ctx.env.model.id, endpoint)
+            controls["after"] = control_state(send("after", model_body, "normal"), ctx.api_model, endpoint)
         else:
             gaps.append("normal inference failed; error challenge not sent")
         until = datetime.now(timezone.utc).isoformat(timespec="microseconds")

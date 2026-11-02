@@ -1,0 +1,158 @@
+"""Cohort validation and callback event projection for REQ-14~17. No I/O.
+
+A violation needs a source-bound native fact. Missing rows stay uncollected and
+never become violation=false. Elapsed time alone never decides anything.
+"""
+from __future__ import annotations
+
+import hashlib
+import hmac
+
+SCHEMA = 'byul-engine-callback-cohort/1'
+COMPUTED = 'KVCacheManager.get_computed_blocks'
+ROLES = {'REQ-14': {'normal'}, 'REQ-15': {'prime', 'control', 'probe'}, 'REQ-16': {'prime', 'control', 'probe', 'post'},
+    'REQ-17': {'prime', 'control-present', 'control-absent', 'present', 'absent'}}
+MAX_CASES = 512
+
+
+def tag_digest(secret, tag):
+    return hmac.new(secret, b's:' + tag.encode(), hashlib.sha256).hexdigest()
+
+
+def validate_cases(check_id, cases):
+    if (type(cases) is not list or not 1 <= len(cases) <= MAX_CASES
+            or len({c.get('case_id') for c in cases if type(c) is dict}) != len(cases)):
+        raise ValueError('ENGINE_CALLBACK_CASES_INVALID')
+    for case in cases:
+        if (set(case) - {'case_id', 'role', 'group', 'context', 'prefix', 'prompt', 'cache_salt'}
+                or case.get('role') not in ROLES[check_id] or type(case.get('prompt')) is not str
+                or not 0 < len(case['prompt']) <= 4096 or type(case['case_id']) is not str
+                or 'cache_salt' in case and (type(case['cache_salt']) is not str or not 0 < len(case['cache_salt']) <= 64)):
+            raise ValueError('ENGINE_CALLBACK_CASES_INVALID')
+
+
+def computed_rows(events, secret, tags):
+    """Keep only rows whose entry stayed qualified through the return."""
+    cases = {tag_digest(secret, tag): case_id for case_id, tag in tags.items()}
+    rows = {}
+    for event in events:
+        if (event.get('point') != COMPUTED or event.get('phase') != 'RETURN'
+                or event.get('entry_qualified_before') is not True or event.get('entry_qualified_after') is not True):
+            continue
+        fields = event.get('fields') or {}
+        case_id = cases.get(fields.get('request_sha256'))
+        if case_id is not None and type(fields.get('num_computed_tokens')) is int:
+            rows.setdefault(case_id, []).append({'tokens': fields['num_computed_tokens'],
+                'hashes': fields.get('request_block_hashes_sha256'), 'salt': fields.get('request_cache_salt_sha256')})
+    return rows
+
+
+def _hit(rows, case):
+    found = rows.get(case['case_id'])
+    return None if not found else max(r['tokens'] for r in found) > 0
+
+
+def _first_hash(rows, case):
+    for row in rows.get(case['case_id'], ()):
+        if row['hashes']:
+            return row['hashes'][0]
+    return None
+
+
+def _related(cases, probe, role):
+    return next((c for c in cases if c['role'] == role and c.get('prefix') == probe.get('prefix')), None)
+
+
+def project_cache_group(cases, rows, policy):
+    groups = policy['isolated_cache_groups']
+    wanted = {(a, b) for a in groups for b in groups if a != b}
+    pairs = []
+    for probe in (c for c in cases if c['role'] == 'probe'):
+        prime, control = _related(cases, probe, 'prime'), _related(cases, probe, 'control')
+        if prime is None or control is None:
+            continue
+        salts = {r['salt'] for case in (prime, probe) for r in rows.get(case['case_id'], ())}
+        pairs.append({'from': prime.get('group'), 'to': probe.get('group'), 'control_hit': _hit(rows, control),
+            'cross_hit': _hit(rows, probe), 'salts_distinct': len(salts) > 1})
+    measured = {(p['from'], p['to']) for p in pairs if p['control_hit'] is True and p['cross_hit'] is not None}
+    violations = [p for p in pairs if p['cross_hit'] is True and p['control_hit'] is True
+        and (p['from'], p['to']) in wanted]
+    missing = ['authenticated_principal_binding_unverified', 'forged_and_omitted_group_unverified']
+    if not wanted <= measured:
+        missing.append('ordered_group_pairs_incomplete')
+    return {'pairs': pairs, 'violation': True if violations else (False if wanted <= measured else None),
+        'full_scope': False, 'missing': missing}
+
+
+def project_cache_context(cases, rows, policy):
+    required = set(policy['required_cache_contexts'])
+    results = []
+    for probe in (c for c in cases if c['role'] == 'probe'):
+        prime, control = _related(cases, probe, 'prime'), _related(cases, probe, 'control')
+        if prime is None or control is None:
+            continue
+        same_key = _first_hash(rows, prime) is not None and _first_hash(rows, prime) == _first_hash(rows, probe)
+        results.append({'context': probe.get('context'), 'control_hit': _hit(rows, control),
+            'changed_hit': _hit(rows, probe), 'same_key': same_key})
+    measured = {r['context'] for r in results if r['control_hit'] is True and r['changed_hit'] is not None}
+    violations = [r for r in results if r['changed_hit'] is True and r['control_hit'] is True and r['same_key']
+        and r['context'] in required]
+    posts = [_hit(rows, c) for c in cases if c['role'] == 'post']
+    complete = required <= measured and bool(posts) and all(v is True for v in posts)
+    missing = [] if complete else ['required_cache_context_cases_incomplete']
+    return {'contexts': results, 'violation': True if violations else (False if complete else None),
+        'full_scope': complete and not violations, 'missing': missing}
+
+
+def advantage(faster, slower):
+    """Probability that a sample from ``faster`` beats one from ``slower``."""
+    wins = sum((a < b) + 0.5 * (a == b) for a in faster for b in slower)
+    return 100 * wins / (len(faster) * len(slower))
+
+
+def project_cache_timing(cases, rows, elapsed, policy):
+    limit, minimum = policy['cache_timing_max_auc_percent'], policy['cache_timing_min_samples']
+    samples = {role: [elapsed[c['case_id']] for c in cases if c['role'] == role and elapsed.get(c['case_id']) is not None]
+        for role in ('control-present', 'control-absent', 'present', 'absent')}
+    missing = []
+    if min(map(len, samples.values())) < minimum:
+        return {'samples': {k: len(v) for k, v in samples.items()}, 'violation': None, 'full_scope': False,
+            'missing': ['timing_samples_below_policy_minimum']}
+    control = advantage(samples['control-present'], samples['control-absent'])
+    cross = advantage(samples['present'], samples['absent'])
+    hits = [_hit(rows, c) for c in cases if c['role'] == 'present']
+    # Without a native cross-group hit a gap is noise; without control power a clean result proves nothing.
+    violation = cross > limit and any(h is True for h in hits)
+    if control <= limit:
+        missing.append('timing_control_has_no_power')
+    if cross > limit and not violation:
+        missing.append('timing_gap_without_native_hit')
+    if any(h is None for h in hits):
+        missing.append('timing_native_rows_incomplete')
+    return {'samples': {k: len(v) for k, v in samples.items()}, 'control_auc_percent': control, 'cross_auc_percent': cross,
+        'native_cross_hits': sum(h is True for h in hits), 'violation': True if violation else (None if missing else False),
+        'full_scope': not missing and not violation, 'missing': missing}
+
+
+def project_distributed(events, secret, tags):
+    wanted = {tag_digest(secret, tag) for tag in tags.values()}
+    seen = set(); checked = 0; violations = []
+    for event in events:
+        if event.get('phase') != 'RETURN' or event.get('entry_qualified_before') is not True \
+                or event.get('entry_qualified_after') is not True or not str(event.get('point')).endswith(('.execute_model', '._execute_worker_rpc')):
+            continue
+        fields = event.get('fields') or {}
+        scheduled, returned = fields.get('native_request_sha256'), fields.get('output_request_sha256')
+        if type(scheduled) is not list:
+            continue
+        seen.update(set(scheduled) & wanted)
+        if type(returned) is list:
+            checked += 1
+            if set(returned) - set(scheduled):
+                violations.append({'point': event['point'], 'rank': fields.get('rank'),
+                    'unscheduled_outputs': len(set(returned) - set(scheduled))})
+    complete = wanted <= seen and checked > 0
+    return {'batches_checked': checked, 'violations': violations,
+        'violation': True if violations else (False if complete else None), 'full_scope': False,
+        'missing': ['intermediate_tensor_buffer_lineage_unobserved', 'model_generation_consumption_unobserved',
+            *([] if complete else ['distributed_batches_incomplete'])]}

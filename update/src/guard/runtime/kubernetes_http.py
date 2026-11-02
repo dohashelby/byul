@@ -29,10 +29,11 @@ ROUTE_AUTHENTICATION_PROFILE = "kubernetes-owned-native-route-http-v1"
 ONLINE_INPUT_PROFILE = "kubernetes-owned-online-input-http-v1"
 TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
 REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
+ENGINE_CALLBACK_PROFILE = "kubernetes-owned-engine-callback-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
-_BINDING_PROFILES = frozenset({REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE})
+_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE})
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -40,6 +41,18 @@ from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS
 
 BINDING_PROBE_SHA256 = "6ffd129cd855170a1a2fefb496efef4abfcfd7928d2dc6795c22344bd152a765"
 TEMPLATE_READER_SHA256 = "badf4bc4b01fc5bacbba103a606cac994e0921be28ef054116bd34dfd4b1c74b"
+
+
+ENGINE_CALLBACK_READER = r'''
+import json,os,re,sys
+root="/guard-lifecycle/data/"+sys.argv[1];rows=[];left=6*1024**2;truncated=False
+for name in sorted(os.listdir(root)):
+    if re.fullmatch(r"callbacks-[1-9][0-9]*\.jsonl",name) is None:continue
+    with os.fdopen(os.open(os.path.join(root,name),os.O_RDONLY|os.O_NOFOLLOW),"rb") as stream:raw=stream.read(left+1)
+    if len(raw)>left:raw=raw[:left].rpartition(b"\n")[0];truncated=True
+    left-=len(raw);rows.extend(json.loads(line) for line in raw.splitlines())
+print(json.dumps({"events":rows,"truncated":truncated}))
+'''
 
 
 class KubernetesBindingError(RuntimeError):
@@ -351,6 +364,10 @@ class KubernetesHTTP:
                     if len(requests) != 1:
                         raise KubernetesBindingError()
                     self._attempt_request(request, timeout)
+                elif self.profile == ENGINE_CALLBACK_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._engine_callback_request(request)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -416,6 +433,33 @@ class KubernetesHTTP:
                 self.rows.extend({"id":rid,"binding_verified_before_after":False,"diagnostic":"KUBERNETES_HTTP_BINDING_UNAVAILABLE"} for rid in ids or [None])
             raise KubernetesBindingError() from None
 
+
+    def _engine_callback_request(self,request):
+        """One-token chat cohort request. The tag binds native rows to this case."""
+        body=request.get("body") if type(request) is dict else None
+        messages=body.get("messages") if type(body) is dict else None
+        if (type(request) is not dict or type(request.get("id")) is not str or not re.fullmatch(r"cb-[0-9]{1,4}",request["id"])
+                or set(request.get("headers",{}))!={"X-Request-Id"}
+                or not re.fullmatch(r"byul-cb-[0-9a-f]{32}",str(request["headers"]["X-Request-Id"]))
+                or type(body) is not dict or set(body)-{"model","messages","max_tokens","temperature","stream","cache_salt"}
+                or body.get("max_tokens")!=1 or body.get("temperature")!=0 or body.get("stream") is not False
+                or "cache_salt" in body and (type(body["cache_salt"]) is not str or not 0<len(body["cache_salt"])<=64)
+                or type(messages) is not list or not 1<=len(messages)<=8
+                or any(type(m) is not dict or set(m)!={"role","content"} or m["role"]!="user"
+                    or type(m["content"]) is not str or not 0<len(m["content"])<=4096 for m in messages)):
+            raise KubernetesBindingError()
+
+    def engine_callback_events(self,session):
+        """Bounded read of the selected session's callback rows from the engine Pod."""
+        if self.profile!=ENGINE_CALLBACK_PROFILE or not re.fullmatch(r"[0-9a-f]{32}",session):
+            raise KubernetesBindingError()
+        self._verify();engine=self.binding["engine"]
+        value=self._call([f"--namespace={engine['namespace']}","exec",engine["pod"],
+            f"--container={engine['container']}","--","python3","-c",ENGINE_CALLBACK_READER,session],cap=8*1024**2,budget=30)
+        self._verify()
+        if type(value) is not dict or type(value.get("events")) is not list or type(value.get("truncated")) is not bool:
+            raise KubernetesBindingError()
+        return value
 
     def _state_request(self,request,timeout):
         from .kubernetes_observation_state import validate_request

@@ -12,6 +12,7 @@ import hashlib
 import re
 import sys
 import tempfile
+import uuid
 
 from guard.models import DataOrigin, ExecStatus, canonical_json, sha256_hex, utcnow
 from .base import DraftArtifact, EvidenceDraft
@@ -29,6 +30,8 @@ PROFILES = {
     'REQ-20': 'engine-sensor-graph-lifetime-v1',
     'REQ-21': 'engine-sensor-communication-buffer-v1',
 }
+# These checks read the prepared callback session instead of a lifecycle recording.
+CALLBACK_CHECKS = frozenset({'REQ-14', 'REQ-15', 'REQ-16', 'REQ-17'})
 CPU_PROFILE = 'engine-sensor-slot-reference-cpu-v1'
 CPU_PREFIX = 'BYUL_ENGINE_SENSOR_SLOT='
 # Reviewed immutable tool/test snapshot. The old product snapshot remains its
@@ -116,6 +119,8 @@ def native_capability(check_id):
     """Read only reviewed program constants; never approve pins from input/HEAD."""
     if check_id not in PROFILES:
         raise ValueError('ENGINE_SENSOR_CHECK_UNSUPPORTED')
+    if check_id in CALLBACK_CHECKS:
+        return {'implemented': True, 'reason': None}
     if check_id == 'REQ-18':
         from tools import b_req18_slot as slot
         from guard.runtime import kubernetes_http
@@ -132,10 +137,6 @@ def native_capability(check_id):
         return {'implemented': bool(ready), 'reason': None if ready else 'REVIEWED_GRAPH_NATIVE_CONTRACT_UNAVAILABLE'}
     reasons = {
         'LIF-13': 'WEIGHTS_TOOL_HAS_NO_NATIVE_AUTHORIZATION_OR_REFERENCE_ATTESTATION',
-        'REQ-14': 'CROSS_RANK_INTERMEDIATE_BUFFER_AND_OUTPUT_ATTRIBUTION_PRODUCER_UNIMPLEMENTED',
-        'REQ-15': 'AUTHENTICATED_CACHE_KEY_ENTRY_CONSUMER_PRODUCER_UNIMPLEMENTED',
-        'REQ-16': 'CONTEXT_CHANGE_TO_CACHE_CONSUMPTION_PRODUCER_UNIMPLEMENTED',
-        'REQ-17': 'INDEPENDENT_CACHE_TIMING_COHORT_PRODUCER_UNIMPLEMENTED',
         'REQ-19': 'ACTUAL_KERNEL_BOUNDS_AND_REFERENCE_OUTPUT_PRODUCER_UNIMPLEMENTED',
         'REQ-21': 'GPU_COMPLETION_AND_REGISTRATION_GENERATION_PRODUCER_UNIMPLEMENTED',
     }
@@ -164,6 +165,7 @@ class EngineSensorExecutor:
         self.cfg = deepcopy(cfg)
         self.implementation = implementation
         self.expected_target = expected_target_sha256
+        self.transport = None
 
     def support(self, check_id, collection_profile):
         if self.implementation == 'source-cpu':
@@ -255,6 +257,7 @@ class EngineSensorExecutor:
 
     def _native(self, check, env, values, workdir):
         from guard.collectors.lifecycle import load_prepared
+        from guard.collectors import engine_callbacks
         from guard.runtime.bounded import strict_json
         from guard.executors.kubernetes_lifecycle_capture import validate_target
         if (set(self.cfg) - {'target', 'prepared', 'manifest', 'max_duration_seconds', 'kubectl_binary'}
@@ -264,7 +267,8 @@ class EngineSensorExecutor:
         def read(path):
             with Path(path).open('rb') as stream:
                 return strict_json(stream.read(262145), limit=262144)
-        target, prepared, manifest = read(self.cfg['target']), load_prepared(self.cfg['prepared']), read(self.cfg['manifest'])
+        load = engine_callbacks.load_prepared if check.id in CALLBACK_CHECKS else load_prepared
+        target, prepared, manifest = read(self.cfg['target']), load(self.cfg['prepared']), read(self.cfg['manifest'])
         if (values['sensor_environment_sha256'] != env.ref().sha256
                 or any(values[key] != sha256_hex(canonical_json(value)) for key, value in (
                     ('sensor_target_sha256', target), ('sensor_prepared_sha256', prepared), ('sensor_manifest_sha256', manifest)))
@@ -274,6 +278,8 @@ class EngineSensorExecutor:
         if type(duration) not in (int, float) or not 0 < duration <= 300:
             raise ValueError('ENGINE_SENSOR_DURATION_INVALID')
         began = utcnow()
+        if check.id in CALLBACK_CHECKS:
+            return self._callback(check, env, values, target, prepared, manifest, duration, began, workdir)
         if check.id == 'REQ-18':
             from tools import b_req18_slot as slot
             from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
@@ -320,6 +326,69 @@ class EngineSensorExecutor:
                     'prepared_sha256': values['sensor_prepared_sha256'], 'manifest_sha256': values['sensor_manifest_sha256'],
                     'implementation': 'kubernetes', 'engine_started': False})
         return self._artifact(draft, workdir, {'safe_facts': result, 'required_branches': REQUIRED_BRANCHES[check.id]})
+
+    def _callback(self, check, env, values, target, prepared, manifest, duration, began, workdir):
+        """Send the fixed cohort once, then project the session's native rows."""
+        from guard.collectors import engine_callbacks
+        from guard.runtime.kubernetes_http import KubernetesBindingError, KubernetesHTTP, ENGINE_CALLBACK_PROFILE
+        from . import engine_callback_projection as projection
+        if (type(manifest) is not dict or manifest.get('schema') != projection.SCHEMA or manifest.get('session') != prepared['session']
+                or manifest.get('target_sha256') != values['sensor_target_sha256']
+                or manifest.get('environment_ref') != env.ref().model_dump(mode='json')):
+            raise ValueError('ENGINE_SENSOR_CALLBACK_MANIFEST_BINDING_MISMATCH')
+        cases = manifest.get('cases'); projection.validate_cases(check.id, cases)
+        transport = self.transport or KubernetesHTTP(target, env, duration=duration,
+            binary=self.cfg.get('kubectl_binary', 'kubectl'), profile=ENGINE_CALLBACK_PROFILE)
+        endpoint = transport.endpoint.scheme + '://' + transport.endpoint.netloc + '/v1/chat/completions'
+        tags = {}; elapsed = {}; trials = []; cleanup = []
+        for number, case in enumerate(cases):
+            tag = tags[case['case_id']] = 'byul-cb-' + uuid.uuid4().hex
+            body = {'model': transport.api_model, 'messages': [{'role': 'user', 'content': case['prompt']}],
+                'max_tokens': 1, 'temperature': 0, 'stream': False}
+            if 'cache_salt' in case:
+                body['cache_salt'] = case['cache_salt']
+            try:
+                row, = transport('kubernetes-probe', [{'id': f'cb-{number}', 'mode': 'json', 'method': 'POST',
+                    'url': endpoint, 'headers': {'X-Request-Id': tag}, 'body': body}], 30)
+            except KubernetesBindingError:
+                cleanup.append('ENGINE_SENSOR_CALLBACK_REQUEST_UNAVAILABLE')
+                break
+            good = row.get('outcome') == 200 and row.get('capture_complete') is True
+            trials.append({'case_id': case['case_id'], 'role': case['role'], 'outcome': row.get('outcome'), 'normal_shape': good})
+            if good and type(row.get('elapsed_ms')) in (int, float):
+                elapsed[case['case_id']] = row['elapsed_ms']
+        try:
+            read = transport.engine_callback_events(prepared['session'])
+            events = read['events']
+            if read['truncated']:
+                cleanup.append('ENGINE_SENSOR_CALLBACK_EVENTS_TRUNCATED')
+        except KubernetesBindingError:
+            events = []; cleanup.append('ENGINE_SENSOR_CALLBACK_EVENTS_UNAVAILABLE')
+        secret = engine_callbacks.load_secret(self.cfg['prepared'])
+        rows = projection.computed_rows(events, secret, tags)
+        if check.id == 'REQ-14':
+            result = projection.project_distributed(events, secret, tags)
+        elif check.id == 'REQ-15':
+            result = projection.project_cache_group(cases, rows, values)
+        elif check.id == 'REQ-16':
+            result = projection.project_cache_context(cases, rows, values)
+        else:
+            result = projection.project_cache_timing(cases, rows, elapsed, values)
+        gaps = sorted({e['code'] for e in events if e.get('phase') == 'GAP' and type(e.get('code')) is str})
+        collected = result['violation'] is not None
+        draft = EvidenceDraft(status=ExecStatus.COMPLETED if collected and not cleanup else ExecStatus.ABORTED,
+            data_origin=DataOrigin(transport.process_observation_origin),
+            normal_control={'attempted': bool(trials), 'succeeded': bool(trials) and all(t['normal_shape'] for t in trials)},
+            observations={'engine_sensor_violation': {'value': result['violation'], 'collected': collected},
+                          'engine_sensor_full_scope': {'value': result['full_scope'] and not gaps and not cleanup, 'collected': True}},
+            challenges=[{'step': step, 'attempted': True} for step in check.challenge_steps],
+            cleanup_errors=cleanup, started_at=began, finished_at=utcnow(),
+            abort_reason=None if collected and not cleanup else 'ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE',
+            config={'profile': PROFILES[check.id], 'target_sha256': values['sensor_target_sha256'],
+                    'prepared_sha256': values['sensor_prepared_sha256'], 'manifest_sha256': values['sensor_manifest_sha256'],
+                    'implementation': 'kubernetes', 'engine_started': False})
+        return self._artifact(draft, workdir, {'safe_facts': {**result, 'trials': trials, 'sensor_gaps': gaps},
+            'required_branches': REQUIRED_BRANCHES[check.id]})
 
     @staticmethod
     def _artifact(draft, workdir, payload):

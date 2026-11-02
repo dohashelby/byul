@@ -52,7 +52,7 @@ def run(tmp_path, monkeypatch, raw, *, output_error=False):
     return draft, calls
 
 
-@pytest.mark.parametrize('check_id', list(sensor.PROFILES))
+@pytest.mark.parametrize('check_id', sorted(set(sensor.PROFILES) - sensor.CALLBACK_CHECKS))
 def test_no_unreviewed_native_capability_is_counted_or_wrapped_as_unknown(check_id):
     instance = registry.resolve_executor('engine_sensor', 'kubernetes')({})
     state = instance.support(check_id, sensor.PROFILES[check_id])

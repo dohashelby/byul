@@ -13,6 +13,12 @@ policy_params:
 - key: sensor_manifest_sha256
   type: str
   required: true
+- key: cache_timing_max_auc_percent
+  type: int
+  required: true
+- key: cache_timing_min_samples
+  type: int
+  required: true
 required_observations:
 - key: engine_sensor_violation
   type: bool

@@ -28,6 +28,12 @@ policy_params:
 - key: sensor_manifest_sha256
   type: str
   required: true
+- key: cache_timing_max_auc_percent
+  type: int
+  required: true
+- key: cache_timing_min_samples
+  type: int
+  required: true
 policy_prose:
   policy_to_decide: 비공개 정보·허용 관측 범위·통계 판정 기준
   enterprise_decisions: 공유 단위(사용자/서비스 계정/tenant), 공개 prefix 공유 여부, 인증 주체 식별·salt 발급/덮어쓰기/검사 주체, 필요한 key 문맥, 비공개 정보와 공격자의 반복 관측 조건·통계 기준·성능 허용 범위. 같은 서비스 자격 뒤 여러 사용자가 있으면 추가 신원 전달이나 환경 분리가 필요한지 결정한다.

@@ -1,0 +1,44 @@
+executor: stored_responses
+collection_profile: kubernetes-stored-response-ownership-v1
+policy_params:
+  - { key: stored_environment_sha256, type: str, required: true }
+  - { key: stored_target_sha256, type: str, required: true }
+  - { key: stored_session, type: str, required: true }
+  - { key: stored_identity_policy_sha256, type: str, required: true }
+  - { key: stored_api_router_source_sha256, type: str, required: true }
+  - { key: stored_serving_source_sha256, type: str, required: true }
+  - { key: stored_protocol_source_sha256, type: str, required: true }
+  - { key: stored_validity_start, type: str, required: true }
+  - { key: stored_validity_end, type: str, required: true }
+  - { key: stored_origins, type: "list[str]", required: true }
+  - { key: stored_operations, type: "list[str]", required: true }
+  - { key: stored_retention, type: str, required: true }
+required_observations:
+  - { key: stored_trials, type: list }
+  - { key: stored_objects, type: list }
+  - { key: stored_effects, type: list }
+  - { key: stored_missing, type: list }
+  - { key: stored_conflict_candidates, type: list }
+  - { key: stored_cleanup, type: list }
+  - { key: stored_producer_authenticated, type: bool }
+  - { key: stored_object_owner_verified, type: bool }
+  - { key: stored_worker_effect_verified, type: bool }
+  - { key: stored_scope_complete, type: bool }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: stored_trials, op: nonempty }
+      - { obs: stored_producer_authenticated, op: eq, value: true }
+      - { obs: stored_object_owner_verified, op: eq, value: true }
+      - { obs: stored_worker_effect_verified, op: eq, value: true }
+      - { obs: stored_scope_complete, op: eq, value: true }
+      - { obs: stored_missing, op: empty }
+      - { obs: stored_conflict_candidates, op: empty }
+    fail_when_any:
+      - { obs: stored_conflict_candidates, op: nonempty,
+          when: { obs: stored_object_owner_verified, op: eq, value: true } }
+limitations:
+  - "구현 분기: 두 자격으로 소유 실행 UUID의 닫힌 객체를 만들어 상호 조회·취소·previous 연결·덮어쓰기를 시험한다. 현재 실행이 만든 ID만 사용한다."
+  - "미구현 분기: 실제 owner·principal·worker 효과의 독립 근거가 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다. 타 주체 접근 성공은 HTTP 사실과 후보로만 남는다."
+  - "kubernetes 구현만 있다. lab=true/vLLM 0.31 명시 프로필이다. 정리는 소유 cancel-target만 다루고 DELETE나 worker 재시작을 가정하지 않는다."

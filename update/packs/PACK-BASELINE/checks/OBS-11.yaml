@@ -2,7 +2,7 @@ id: OBS-11
 framework_id: CHK-OBS-011
 mechanism_ids:
 - mechanism-17
-revision: 3
+revision: 4
 retired: false
 area: OBS
 purpose: 실행 상태 관측·수집 건전성
@@ -31,6 +31,9 @@ policy_params:
 - key: alert_deadline_ms
   type: dict[str,int]
   required: true
+- key: collection_session
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: 필수 기록·수집 기한·시간 오차·장애 대응
   enterprise_decisions: 기록 형식·writer/reader/admin 권한·무결성/변조 탐지 수단, 사건 중요도별 수집 장애 때 운영 유지/제한/중단 절차. 운영 적용 전에 사건별 대응을 확정한다. 미정이면 기본 지속이나 즉시 중단 어느 쪽도 가정하지 않는다.
@@ -39,7 +42,19 @@ challenge_steps:
 - 합성 사건 발생
 - 수집기 중단 또는 기록 저장 거부를 발생시킴
 - 누락 표시·경보와 해당 기록을 사용하는 시험의 판정을 확인한 뒤 복구
-required_observations: []
+required_observations:
+- key: collection_gap_violations
+  type: list
+- key: collection_records_unverified
+  type: list
+- key: collection_records_missing
+  type: list
+- key: collection_normal_arrivals
+  type: list
+- key: collection_producer_authenticated
+  type: bool
+- key: collection_independent_event_verified
+  type: bool
 required_observations_prose:
 - 사건 발생의 독립 증거, 수집·보존 및 탐지·경보 조건과 기한
 - 수집·복구 상태와 시각, 누락 표시·경보, 다른 필수 증거와 의존 시험 판정
@@ -49,8 +64,26 @@ unknown_criteria: 수집 기한·시간 오차 기준이 없거나 사건 발생
 remediation: '- 사건별 수집·보존·탐지·알림 기한과 수집기 상태 확인 방법을 정한다. 누락·중단·시간 불확실성을 표시·경보하고, 기한 내 복구·최종 확보와 의존 시험의 증거 충분성을 각각 확인한다. 이미 확인한 위반은 미충족으로 유지한다.'
 method_and_evidence: 합성 사건의 독립 발생 증거와 수집·보존 조건·기한을 정하고 collector·권한·저장 장애를 제한적으로 주입한다. 누락·장애 표시와 경보, 복구, 의존 시험의 판정 처리를 각각 확인한다. 확보한 다른 필수 증거와 확인된 위반을 함께 검토한다.
 remaining_setup: 필수 사건·수집 기한·시간 동기화·장애 후 복구
-executor: null
-judge: null
+executor: log_integrity
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: collection_producer_authenticated
+      op: eq
+      value: true
+    - obs: collection_independent_event_verified
+      op: eq
+      value: true
+    - obs: collection_gap_violations
+      op: empty
+    - obs: collection_records_unverified
+      op: empty
+    - obs: collection_records_missing
+      op: empty
+    fail_when_any:
+    - obs: collection_gap_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-C11
@@ -60,6 +93,9 @@ legacy:
   - Q-C11/SC-23-02
 source:
   array: observability_assessment_draft
+collection_profile: collection-gap-visibility-v1
 limitations:
-- OBS-11은 필수 누락 모두에 경보가 필요한 제한 프로파일의 자기 신고 근거를 대조한다. 실제 collector 제어·원본 진위·운영 대응·모든 종속 RES 전파는 검증하지 않는다.
-- 사건별 수치와 독립 근거는 기업이 제공해야 하며 프로파일 적용·시각·조회 범위가 불명확하면 UNKNOWN이다. 보안만 제한 판정하고 기능·성능 PASS는 검증하지 않는다.
+- '구현 분기: 준비 절차가 남긴 소유 상태 기록을 읽어 필수 기록별 도착·누락 표시·경보·의존 판정을 기한과 대조한다. 기록 자체가 인정한 기한 위반은 FAIL이다.'
+- '미구현 분기: 사건 발생의 독립 근거와 상태 기록 생산자 인증이 없어 PASS에 도달하지 않는다. 시간 오차가 기준을 넘긴 행은 판단하지 않고 UNKNOWN에 남긴다.'
+- real 구현만 있다. 실행기는 수집기를 중단하지 않는다. OBS-09의 고정 fixture와 판정은 변경하지 않는다.
+- 사건별 수치는 기업이 제공해야 하며 실제 운영 대응과 모든 종속 RES 전파는 검증하지 않는다.

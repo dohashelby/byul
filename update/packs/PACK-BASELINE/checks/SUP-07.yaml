@@ -2,7 +2,7 @@ id: SUP-07
 framework_id: CHK-SUP-007
 mechanism_ids:
 - mechanism-09
-revision: 4
+revision: 5
 retired: false
 area: SUP
 purpose: 실제 사용의 무결성
@@ -15,7 +15,31 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 실제 compile/AOT·파생 cache의 생성·읽기 경로를 먼저 확인한다. 명시적 활성 옵션이 없다는 이유로 기본 cache를 제외하지 않는다.
-policy_params: []
+policy_params:
+- key: supply_environment_sha256
+  type: str
+  required: true
+- key: supply_normal_target_sha256
+  type: str
+  required: true
+- key: supply_challenge_target_sha256
+  type: str
+  required: true
+- key: supply_normal_prepared_sha256
+  type: str
+  required: true
+- key: supply_challenge_prepared_sha256
+  type: str
+  required: true
+- key: supply_record_source_sha256
+  type: str
+  required: true
+- key: supply_validity_start
+  type: str
+  required: true
+- key: supply_validity_end
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 변경을 허용할 주체, 불변 저장소·쓰기 제한·읽기 전 검증의 적용 방법, 각 rank가 읽은 파일·담당 shard·변환 결과의 증거와 기록 위치.
@@ -24,7 +48,25 @@ challenge_steps:
 - vLLM·Inductor·Triton 실제 cache 경로 확인
 - 비허용 계정의 무해 표식 변경 시도
 - 재기동 시 소비 전 제한과 실제 읽기 확인
-required_observations: []
+required_observations:
+- key: supply_boot_sessions
+  type: list
+- key: supply_boot_violations
+  type: list
+- key: supply_boot_missing
+  type: list
+- key: supply_boot_complete
+  type: bool
+- key: supply_boot_normal_verified
+  type: bool
+- key: supply_boot_change_applied
+  type: bool
+- key: supply_boot_record_authenticated
+  type: bool
+- key: supply_boot_native_consumption
+  type: list
+- key: supply_boot_change
+  type: dict
 required_observations_prose:
 - cache 경로·소유자·writer/묶음 식별·cache key/pickle 등 reader 도달과 소비 기록
 satisfied_if: 허용되지 않은 생성·변조 결과를 소비하지 않는다. 생성 결과마다 사람의 별도 승인을 필수로 요구하지 않는다.
@@ -33,8 +75,30 @@ unknown_criteria: cache 파일 변경은 확인했지만 소비 도달·내용 �
 remediation: '- 컴파일 결과·생성 파일·캐시의 작성자와 읽는 프로세스를 구분하고 저장 위치의 쓰기 권한을 제한한다. 생성 입력·도구·설정의 식별정보를 기록하고, 무단 변경된 결과를 읽기 전에 거부하거나 승인한 조건으로 다시 생성한다.'
 method_and_evidence: '실제 파생·compiled·npcache의 생성자·writer·경로·consumer·reader와 소비 전 무결성 집행을 확인한다. 비허용 writer의 무해 변경·교체를 승인 생성물의 정상 소비와 비교하고, 변경된 파일이 실제 읽히는지와 거부를 기록한다. pickle 등 reader의 해석 안전성은 CHK-SUP-012와 증거를 공유한다. 【F03】실제 backend·AOT·기본 cache 활성값·의존성 판본을 고정하고 VLLM_CACHE_ROOT·compilation_config.cache_dir·TORCHINDUCTOR_CACHE_DIR·TRITON_CACHE_DIR 중 사용 경로와 rank별 파일을 조사한다. 타 계정과 엔진 자신의 잔존 writer·오염 지속성을 각각 확인한다. 근거 원문: [F03](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33609).'
 remaining_setup: 격리 cache와 안전한 계측; 임의 코드 실행 payload는 사용하지 않음
-executor: null
-judge: null
+executor: supply_boot
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: supply_boot_complete
+      op: eq
+      value: true
+    - obs: supply_boot_normal_verified
+      op: eq
+      value: true
+    - obs: supply_boot_change_applied
+      op: eq
+      value: true
+    - obs: supply_boot_violations
+      op: empty
+    - obs: supply_boot_missing
+      op: empty
+    - obs: supply_boot_record_authenticated
+      op: eq
+      value: true
+    fail_when_any:
+    - obs: supply_boot_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-R05-04
@@ -46,3 +110,8 @@ legacy:
   - Q-R05-04/SC-12-01
 source:
   array: supply_assessment_draft
+collection_profile: supply-boot-cache-tamper-v1
+limitations:
+- '구현 분기: 준비 절차의 cache 변경 기록을 읽어 비허용 writer의 변경물이 검사 없이 소비됐으면 FAIL이다.'
+- '미구현 분기: cache reader 도달의 독립 근거와 기록 생산자 인증이 없어 PASS에 도달하지 않는다.'
+- kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로 받으며, 두 세션을 각각 수집해 합치지 않는다.

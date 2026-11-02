@@ -8,7 +8,7 @@ from guard.models import canonical_json,sha256_hex
 VERSION='0.1.0'
 SCHEMA='guard-native-startup-file-context-candidates/1'
 SOURCE_PINS={
-    'vllm_worker_startup_metadata.py':'d122b34e03da52f78f425bca84660b302cac062a889dfecccf8c5393091c25cc',
+    'vllm_worker_startup_metadata.py':'b5d0be2de94fe9453a5f68b58e019b62a2f454bd59718fb43512a321755e651a',
     'vllm_worker_startup_sensor.py':'2fb8b6386bc59e236c9227251da05f8e8704e08a935dcff27a8c18bc57ed91f4',
     'vllm_worker_startup_contract.py':'6788df2f4c6f04f46e681eb5eab48631e2ba037754d26166bb02341e4b592950',
     'vllm_safe_open_mapping_metadata.py':'833030d5d24aad97bc7ec0050ef105488daeb0f2023987d75bb1d8ffdbc0be29',
@@ -34,16 +34,21 @@ def _source_gate():
     if not matched:raise ValueError('NATIVE_WORKER_FILE_COMMON_SOURCE_MISMATCH')
 
 
-def _inputs(packet,prepared):
-    _require(type(prepared) is dict and prepared.get('profile')==sensor.PROFILE)
-    session=prepared['session'];_require(type(session) is str and len(session)==32 and all(c in '0123456789abcdef' for c in session))
+def _declared_references(prepared,*,origins=('EXAMPLE','DECLARED')):
     scope=prepared['model_read_scope'];asset=prepared['assets']['model-read-scope.json']
-    _require(type(scope) is dict and type(asset) is dict and mapping.fingerprint(asset['sha256']) and scope['nonsecret_model_weights'] is True and scope['data_origin'] in {'EXAMPLE','DECLARED'})
+    _require(type(scope) is dict and type(asset) is dict and mapping.fingerprint(asset['sha256']) and scope['nonsecret_model_weights'] is True and scope['data_origin'] in origins)
     files=scope['files'];_require(type(files) is list and 0<len(files)<=256);allowed={}
     for row in files:
         _require(type(row) is dict and set(row)=={'normalized_path_sha256','reference_sha256','bytes'} and mapping.fingerprint(row['normalized_path_sha256'])
             and mapping.fingerprint(row['reference_sha256']) and type(row['bytes']) is int and 0<=row['bytes']<2**63 and row['normalized_path_sha256'] not in allowed)
         allowed[row['normalized_path_sha256']]=row
+    return allowed
+
+
+def _inputs(packet,prepared):
+    _require(type(prepared) is dict and prepared.get('profile')==sensor.PROFILE)
+    session=prepared['session'];_require(type(session) is str and len(session)==32 and all(c in '0123456789abcdef' for c in session))
+    allowed=_declared_references(prepared)
     _require(type(packet) is dict and type(packet.get('recordings')) is list and len(packet['recordings'])<=32)
     missing=[]
     for recording in packet['recordings']:
@@ -66,6 +71,10 @@ def _inputs(packet,prepared):
 def _analyze(packet,prepared):
     allowed,missing=_inputs(packet,prepared)
     startups=common.project(packet,prepared);weights=common.project_iterations(packet);maps=common.project_mappings(packet,prepared)
+    return _join_candidates(allowed,missing,startups,weights,maps,prepared['assets']['model-read-scope.json']['sha256'])
+
+
+def _join_candidates(allowed,missing,startups,weights,maps,scope_sha256,*,profile=sensor.PROFILE,allow_missing_spans=False):
     roots={(r['recording'],r['call_sha256']):r for r in weights['model_candidates']}
     joined={};eligible=set();unjoined=[];unjoined_count=0
     spans={(r['recording'],r['call_sha256']):r for r in startups['spans']}
@@ -95,12 +104,14 @@ def _analyze(packet,prepared):
         joined[key]['rows'].append(row)
     candidates=[]
     for key,value in joined.items():
-        start,root,rows=value['start'],value['root'],value['rows'];first=rows[0];ref=allowed[first['normalized_path_sha256']];span=spans[(key[0],key[1])]
+        start,root,rows=value['start'],value['root'],value['rows'];first=rows[0];ref=allowed[first['normalized_path_sha256']]
+        span=spans.get((key[0],key[1])) if allow_missing_spans else spans[(key[0],key[1])]
+        if span is None:missing.append('startup_file_pair_facts_unavailable')
         complete=len(rows)<=MAX_LOCATORS
         if not complete:missing.append('startup_file_event_locator_output_bound')
         candidates.append({'recording':key[0],'pid':first['pid'],'start_ticks':first['start_ticks'],'startup_call_sha256':key[1],
             'startup_point':start['worker_point'],'startup_call_event':[key[0],start['worker_start_seq']],'startup_terminal_event':[key[0],start['worker_end_seq']],
-            'startup_return_observed':span['returned'],'startup_callback_method_pair_verified':span['callback_method_pair_verified'],
+            'startup_return_observed':span['returned'] if span is not None else False,'startup_callback_method_pair_verified':span['callback_method_pair_verified'] if span is not None else False,
             'root_event':[key[0],root['factory_seq']],'root_link_event':[key[0],start['link_event_seq']],'root_load_sha256':key[2],
             'observed_model_object_sha256':first['model_object_sha256'],'loader_call_sha256':first['loader_call_sha256'],'context_sha256':key[3],
             'scope_sha256':first['scope_sha256'],'normalized_path_sha256':first['normalized_path_sha256'],
@@ -113,10 +124,10 @@ def _analyze(packet,prepared):
             'context_exception_observed':any(r['phase'].endswith('RAISE') for r in rows),'root_exhausted_observed':root['root_exhausted_observed'],
             'recording_closed':root['recording_closed'],**{k:False for k in TRUTH}})
     if not candidates:missing.append('startup_scoped_file_context_candidate_unavailable')
-    return {'schema':SCHEMA,'version':VERSION,'profile':sensor.PROFILE,'candidates':candidates,
+    return {'schema':SCHEMA,'version':VERSION,'profile':profile,'candidates':candidates,
         'candidate_context_count':len(eligible),'candidate_context_locators_complete':len(eligible)<=MAX_CANDIDATES,
         'unjoined_mapping_event_count':unjoined_count,'unjoined_mapping_events':unjoined,'unjoined_locators_complete':unjoined_count<=MAX_LOCATORS,
-        'declared_scope_sha256':prepared['assets']['model-read-scope.json']['sha256'],'declared_path_count':len(allowed),
+        'declared_scope_sha256':scope_sha256,'declared_path_count':len(allowed),
         'missing':sorted(set(missing+startups['missing']+weights['missing']+maps['missing'])),
         'security':'UNKNOWN',**{k:False for k in TRUTH}}
 

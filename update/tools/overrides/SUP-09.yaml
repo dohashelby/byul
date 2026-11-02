@@ -1,0 +1,74 @@
+executor: supply_boot
+collection_profile: supply-boot-model-code-v1
+policy_params:
+- key: supply_environment_sha256
+  type: str
+  required: true
+- key: supply_normal_target_sha256
+  type: str
+  required: true
+- key: supply_challenge_target_sha256
+  type: str
+  required: true
+- key: supply_normal_prepared_sha256
+  type: str
+  required: true
+- key: supply_challenge_prepared_sha256
+  type: str
+  required: true
+- key: supply_record_source_sha256
+  type: str
+  required: true
+- key: supply_validity_start
+  type: str
+  required: true
+- key: supply_validity_end
+  type: str
+  required: true
+required_observations:
+- key: supply_boot_sessions
+  type: list
+- key: supply_boot_violations
+  type: list
+- key: supply_boot_missing
+  type: list
+- key: supply_boot_complete
+  type: bool
+- key: supply_boot_normal_verified
+  type: bool
+- key: supply_boot_change_applied
+  type: bool
+- key: supply_boot_record_authenticated
+  type: bool
+- key: supply_boot_native_consumption
+  type: list
+- key: supply_boot_change
+  type: dict
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: supply_boot_complete
+      op: eq
+      value: true
+    - obs: supply_boot_normal_verified
+      op: eq
+      value: true
+    - obs: supply_boot_change_applied
+      op: eq
+      value: true
+    - obs: supply_boot_violations
+      op: empty
+    - obs: supply_boot_missing
+      op: empty
+    - obs: supply_boot_record_authenticated
+      op: eq
+      value: true
+    fail_when_any:
+    - obs: supply_boot_violations
+      op: nonempty
+limitations:
+- '구현 분기: 기존 무해 표식 모듈 판정을 재사용해 금지 설정에서 import 표식이 남으면 FAIL이다.'
+- '미구현 분기: 기록 생산자 인증이 없어 PASS에 도달하지 않는다. CPU 표식 fixture 범위이며 실제 모델의 auto_map 전체가 아니다.'
+- kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로
+  받으며, 두 세션을 각각 수집해 합치지 않는다.

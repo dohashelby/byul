@@ -1,4 +1,69 @@
 policy_params:
+- key: init_environment_sha256
+  type: str
+  required: true
+- key: init_target_sha256
+  type: str
+  required: true
+- key: init_prepared_sha256
+  type: str
+  required: true
+- key: init_validity_start
+  type: str
+  required: true
+- key: init_validity_end
+  type: str
+  required: true
+- key: init_executor_backend
+  type: str
+  required: true
+- key: init_expected_ranks
+  type: list[str]
+  required: true
+- key: init_scenario_sha256
+  type: str
+  required: true
+- key: init_phase
+  type: str
+  required: true
+- key: init_required_stages
+  type: list[str]
+  required: true
+- key: init_failure_rank
+  type: int
+  required: true
+- key: init_failure_stage
+  type: str
+  required: true
+- key: init_preparation_deadline_ms
+  type: int
+  required: true
+- key: init_recovery_deadline_ms
+  type: int
+  required: true
 - key: required_readiness_items
   type: list[str]
   required: true
+executor: initialization
+collection_profile: kubernetes-mp-readiness-observation-v1
+required_observations:
+- key: activation_steps
+  type: list
+- key: activation_violations
+  type: list
+- key: activation_missing
+  type: list
+- key: activation_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: activation_scope_complete
+      op: eq
+      value: true
+    - obs: activation_violations
+      op: empty
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

@@ -1,0 +1,428 @@
+{
+ "schema": "byul-cpu-measurement/1",
+ "measured_on": "2026-11-02",
+ "engine": "vllm/vllm-openai-cpu:v0.31.0",
+ "engine_source_commit": "db9527a46873454610df6dbedf79a36d6bf1a7f6",
+ "platform": "linux/arm64 Docker Desktop on macOS, 단일 CPU worker",
+ "model": "facebook/opt-125m@27dcfa74d334bc871f3234de431e71c6eeba5dd6",
+ "tool": "tools/lab_activation_cpu_smoke.py",
+ "limits": [
+  "kubectl 호출을 docker로 옮긴 대역. Pod·Deployment·Ready 조건은 /health로 흉내 냈다",
+  "TP/PP 다중 rank·GPU 없음",
+  "LIF-08 delay·stall은 SIGSTOP 후 약 15초 뒤 200으로 끝났고 재개 원인은 확인하지 못했다",
+  "LIF-11 장애 뒤 컨테이너가 끝나 잔존 자원 조사는 컨테이너 종료로 대신됐다"
+ ],
+ "results": [
+  {
+   "check_id": "LIF-03",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "normal-under-load",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "load",
+     "requests": 4,
+     "shed": 0,
+     "served": 4,
+     "rss_before": 2749431808,
+     "rss_peak": 2749444096
+    },
+    {
+     "step": "normal-after",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-04",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "slow-close",
+     "outcome": 200,
+     "closed_early": true,
+     "rss_before": 2749181952,
+     "rss_peak": 2749116416
+    },
+    {
+     "step": "normal-after",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-05",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "inflight",
+     "outcome": 200,
+     "complete": false
+    },
+    {
+     "step": "during-transition",
+     "samples": 22,
+     "models": [
+      "opt"
+     ]
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-06",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "inflight",
+     "outcome": 200,
+     "complete": false
+    },
+    {
+     "step": "during-transition",
+     "samples": 42,
+     "models": [
+      "opt"
+     ]
+    },
+    {
+     "step": "faulty-generation",
+     "became_ready": false
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-07",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "startup",
+     "samples": 23,
+     "ready_without_service": 0,
+     "ready": true
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-08",
+   "activation_steps": [
+    {
+     "step": "normal-before-death",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "fault-death",
+     "outcome": 500,
+     "elapsed_ms": 976,
+     "complete": true,
+     "injected_ms": 504
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "normal-before-delay",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "fault-delay",
+     "outcome": 200,
+     "elapsed_ms": 15016,
+     "complete": true,
+     "injected_ms": 505
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "normal-before-communication-stall",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "fault-communication-stall",
+     "outcome": 200,
+     "elapsed_ms": 18324,
+     "complete": true,
+     "injected_ms": 504
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "normal-before-exception",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "fault-exception",
+     "outcome": 500,
+     "elapsed_ms": 1816,
+     "complete": true,
+     "injected_ms": 504
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-09",
+   "activation_steps": [
+    {
+     "step": "faulty-generation",
+     "became_ready": false
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-10",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "disconnect",
+     "outcome": 200,
+     "closed_early": true
+    },
+    {
+     "step": "normal-after",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-11",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "worker-failure",
+     "processes_before": 1,
+     "processes_after": null,
+     "shm_before": 3,
+     "shm_after": null
+    },
+    {
+     "step": "normal-after-restart",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-12",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "disconnect-attempts",
+     "engine_attempts": 1.0,
+     "client_attempts": 1
+    },
+    {
+     "step": "normal-after",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-14",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "normal-active",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "profiler",
+     "start": 200,
+     "stop": 200,
+     "trace_files": [
+      3,
+      3
+     ],
+     "next_start": 200,
+     "next_stop": 200
+    },
+    {
+     "step": "normal-after",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "LIF-16",
+   "activation_steps": [
+    {
+     "step": "faulty-generation",
+     "became_ready": false
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "OBS-02",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "state-after-failure",
+     "health": 503,
+     "processes": 0
+    },
+    {
+     "step": "recovered",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  },
+  {
+   "check_id": "REQ-12",
+   "activation_steps": [
+    {
+     "step": "normal-before",
+     "outcome": 200,
+     "succeeded": true
+    },
+    {
+     "step": "same-external-id",
+     "baseline": true,
+     "first": 200,
+     "second": 200
+    },
+    {
+     "step": "normal-after",
+     "outcome": 200,
+     "succeeded": true
+    }
+   ],
+   "activation_violations": [],
+   "activation_missing": [],
+   "activation_scope_complete": true
+  }
+ ]
+}

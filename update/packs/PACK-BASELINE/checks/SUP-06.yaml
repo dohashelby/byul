@@ -2,7 +2,7 @@ id: SUP-06
 framework_id: CHK-SUP-006
 mechanism_ids:
 - mechanism-08
-revision: 4
+revision: 5
 retired: false
 area: SUP
 purpose: 실제 사용의 무결성
@@ -15,7 +15,31 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 기본 worker 적재는 항상 확인한다. 공유·원격 weights를 사용하면 publisher·model·rank·generation·layout·payload 대응을 추가한다.
-policy_params: []
+policy_params:
+- key: supply_environment_sha256
+  type: str
+  required: true
+- key: supply_normal_target_sha256
+  type: str
+  required: true
+- key: supply_challenge_target_sha256
+  type: str
+  required: true
+- key: supply_normal_prepared_sha256
+  type: str
+  required: true
+- key: supply_challenge_prepared_sha256
+  type: str
+  required: true
+- key: supply_record_source_sha256
+  type: str
+  required: true
+- key: supply_validity_start
+  type: str
+  required: true
+- key: supply_validity_end
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 변경을 허용할 주체, 불변 저장소·쓰기 제한·읽기 전 검증의 적용 방법, 각 rank가 읽은 파일·담당 shard·변환 결과의 증거와 기록 위치.
@@ -24,7 +48,25 @@ challenge_steps:
 - rank별 정상 적재 기록
 - 필수 tensor 일부가 없는 별도 fixture로 기동
 - 누락 처리와 준비 상태 확인
-required_observations: []
+required_observations:
+- key: supply_boot_sessions
+  type: list
+- key: supply_boot_violations
+  type: list
+- key: supply_boot_missing
+  type: list
+- key: supply_boot_complete
+  type: bool
+- key: supply_boot_normal_verified
+  type: bool
+- key: supply_boot_change_applied
+  type: bool
+- key: supply_boot_record_authenticated
+  type: bool
+- key: supply_boot_native_consumption
+  type: list
+- key: supply_boot_change
+  type: dict
 required_observations_prose:
 - rank·shard·mapper·변환 설정/필수 tensor 정의·tracking 반환/로딩 완료 또는 거부. 공유·원격 weights 사용 시 publisher·세대·layout·payload와 실제 적재의 대응도 확보한다.
 satisfied_if: 필요한 worker의 실제 적재 대상이 승인 내용과 일치한다. 공유·원격 weights를 사용하면 승인된 model·rank·generation·layout의 payload가 실제 적재돼야 한다. 전체 접수 준비·재개는 7.2 기동 준비 확인의 CHK-LIF-007·CHK-LIF-009에서 별도로 판정한다.
@@ -33,8 +75,27 @@ unknown_criteria: 모델별 필수 tensor·의도된 후처리 생성값 또는 
 remediation: '- 각 worker·rank가 읽을 승인 파일과 담당 shard를 기록하고 실제 적재 결과와 대조한다. 필수 부분이 없거나 다른 모델·버전이 적재되면 준비 완료로 처리하지 않고 원인을 해소한 뒤 정상 추론을 확인한다.'
 method_and_evidence: '필요한 node/rank마다 승인된 model·shard·필수 tensor와 실제 read/load·mapper·변환·후처리 결과를 연결한다. 공유·원격 weights는 publisher·model·rank·generation·layout·payload의 실제 적재까지 대조한다. 동일 경로명·key/header 또는 canary 성공만으로 적재 일치를 판정하지 않는다. 【F33】선정 model.load_weights 반환·양자화·enable_weights_track 유효값을 고정하고 완전 checkpoint와 필수 tensor 누락 fixture를 비교한다. 의도된 후처리 생성값과 누락을 구분한다. 【F34】redirect 사용 시 최종 resolved 파일이 각 worker에 배정된 승인 대상과 일치하는지 기록한다. 전체 접수 준비·재개는 CHK-LIF-007·CHK-LIF-009의 판정과 연결한다. 근거 원문: [F33](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33757) · [F34](https://github.com/mg-princess/serving-security-framework/blob/8a0c7fe42446ff0d3a1f58e2a18cf3069d5c714e/data/checklist.json#L33778).'
 remaining_setup: 모델·양자화별 필수 tensor 기준과 rank 계측
-executor: null
-judge: null
+executor: supply_boot
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: supply_boot_complete
+      op: eq
+      value: true
+    - obs: supply_boot_normal_verified
+      op: eq
+      value: true
+    - obs: supply_boot_change_applied
+      op: eq
+      value: true
+    - obs: supply_boot_violations
+      op: empty
+    - obs: supply_boot_missing
+      op: empty
+    fail_when_any:
+    - obs: supply_boot_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-R05-14
@@ -47,3 +108,8 @@ legacy:
   - Q-C13/SC-16-03
 source:
   array: supply_assessment_draft
+collection_profile: supply-boot-worker-shard-v1
+limitations:
+- '구현 분기: native 읽기 bytes와 rank별 기록을 함께 본다. 필수 부분이 없는데 준비 완료를 기록하면 FAIL이다.'
+- '미구현 분기: 공유·원격 weights의 publisher·payload 대응과 필수 tensor 정의, 실제 rank 적재 tensor는 수집하지 않는다.'
+- kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로 받으며, 두 세션을 각각 수집해 합치지 않는다.

@@ -1,0 +1,52 @@
+executor: credential_revocation
+collection_profile: kubernetes-credential-revocation-observation-v1
+policy_params:
+  - { key: revocation_environment_sha256, type: str, required: true }
+  - { key: revocation_target_sha256, type: str, required: true }
+  - { key: revocation_prepared_sha256, type: str, required: true }
+  - { key: revocation_validity_start, type: str, required: true }
+  - { key: revocation_validity_end, type: str, required: true }
+  - { key: revocation_issuer_id, type: str, required: true }
+  - { key: revocation_event_id, type: str, required: true }
+  - { key: revocation_event_at, type: str, required: true }
+  - { key: revocation_deny_after, type: str, required: true }
+  - { key: revocation_deadline_basis, type: str, required: true }
+  - { key: revocation_propagation_limit_ms, type: int, required: true }
+  - { key: revocation_max_clock_skew_ms, type: int, required: true }
+  - { key: revocation_subject_label, type: str, required: true }
+  - { key: revocation_max_new_access_samples, type: int, required: true }
+required_observations:
+  - { key: revocation_trials, type: list }
+  - { key: revocation_auth_bindings, type: list }
+  - { key: revocation_conflict_candidates, type: list }
+  - { key: revocation_missing, type: list }
+  - { key: revocation_absolute_denial_constraint_violated, type: bool }
+  - { key: revocation_issuer_event_verified, type: bool }
+  - { key: revocation_provider_propagation_verified, type: bool }
+  - { key: revocation_normal_before_issuer_verified, type: bool }
+  - { key: revocation_new_connection_receipt_verified, type: bool }
+  - { key: revocation_scope_complete, type: bool }
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: revocation_trials, op: nonempty }
+      - { obs: revocation_absolute_denial_constraint_violated, op: eq, value: false }
+      - { obs: revocation_issuer_event_verified, op: eq, value: true }
+      - { obs: revocation_provider_propagation_verified, op: eq, value: true }
+      - { obs: revocation_normal_before_issuer_verified, op: eq, value: true }
+      - { obs: revocation_new_connection_receipt_verified, op: eq, value: true }
+      - { obs: revocation_scope_complete, op: eq, value: true }
+    fail_when_any:
+      - { obs: revocation_absolute_denial_constraint_violated, op: eq, value: true,
+          when: { obs: revocation_issuer_event_verified, op: eq, value: true } }
+    axes:
+      functional:
+        pass_when_all: []
+        fail_when_any:
+          - { obs: revocation_absolute_denial_constraint_violated, op: eq, value: true }
+limitations:
+  - "구현 분기: 고정 GET /v1/models 5회로 철회 전후 정상 대조와 retired 자격의 신규 접근을 native 인증·handler 기록과 결합한다. 명시 absolute-unconditional 기한을 넘긴 수락은 기능 축 독립 FAIL이다."
+  - "미구현 분기: issuer 사건·전파·철회 전 정상·새 연결 영수증의 독립 근거 수집이 없어 보안 PASS와 보안 FAIL은 현재 도달하지 않는다. 규칙은 근거가 들어오면 그대로 적용된다."
+  - "kubernetes 구현만 있다. lab=true/vLLM 0.31의 native8 prepared 세션이 필요하고, 일반 protected endpoint·Gateway·TLS는 범위 밖이다. 401/403·HTTP 200만으로 PLT-10 전체를 판정하지 않는다."
+  - "자격 원문·해시·응답 원문을 증거에 저장하지 않는다. 실제 issuer 변경·키 삭제·세션 종료는 수행하지 않는다. 기존 session과 사본 처리는 PLT-11·PLT-12에서 따로 본다."

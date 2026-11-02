@@ -1,0 +1,69 @@
+executor: resource_recovery
+collection_profile: kubernetes-selected-resource-recovery-v1
+policy_params:
+- key: recovery_environment_sha256
+  type: str
+  required: true
+- key: recovery_target_sha256
+  type: str
+  required: true
+- key: recovery_prepared_sha256
+  type: str
+  required: true
+- key: recovery_selection_sha256
+  type: str
+  required: true
+- key: recovery_scenario_sha256
+  type: str
+  required: true
+- key: recovery_validity_start
+  type: str
+  required: true
+- key: recovery_validity_end
+  type: str
+  required: true
+- key: recovery_branch
+  type: str
+  required: true
+- key: recovery_executor_backend
+  type: str
+  required: true
+- key: recovery_expected_ranks
+  type: list[str]
+  required: true
+- key: recovery_phase
+  type: str
+  required: true
+- key: recovery_deadline_basis
+  type: str
+  required: true
+- key: recovery_required_absent_after
+  type: str
+  required: true
+- key: recovery_max_clock_skew_ms
+  type: int
+  required: true
+- key: recovery_required_resource_kinds
+  type: list[str]
+  required: true
+required_observations:
+- key: activation_steps
+  type: list
+- key: activation_violations
+  type: list
+- key: activation_missing
+  type: list
+- key: activation_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: activation_scope_complete
+      op: eq
+      value: true
+    - obs: activation_violations
+      op: empty
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

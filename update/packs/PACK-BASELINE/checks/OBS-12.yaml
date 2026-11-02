@@ -2,8 +2,8 @@ id: OBS-12
 framework_id: CHK-OBS-012
 mechanism_ids:
 - mechanism-14
-revision: 3
-retired: false
+revision: 4
+retired: true
 area: OBS
 purpose: 보존·삭제
 secondary_purposes: []

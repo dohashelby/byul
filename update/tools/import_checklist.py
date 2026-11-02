@@ -24,7 +24,7 @@ AREAS: dict[str, str] = {
     "observability_assessment_draft": "OBS",
 }
 PACK_ID = "PACK-BASELINE"
-ENGINES = ["vllm"]
+ENGINES = ["vllm", "sglang", "tensorrt-llm"]
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = ROOT / "reference/framework/data/checklist.json"

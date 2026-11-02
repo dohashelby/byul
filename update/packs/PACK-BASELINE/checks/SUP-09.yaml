@@ -2,7 +2,7 @@ id: SUP-09
 framework_id: CHK-SUP-009
 mechanism_ids:
 - mechanism-09
-revision: 3
+revision: 4
 retired: false
 area: SUP
 purpose: 추가 코드 실행 허용
@@ -15,7 +15,31 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 추가 코드 사용·금지 설정과 실제 소비 경로를 확인한다. 허용 시 승인 코드만 실행되는지, 금지 시 코드 선택이 차단되는지 확인한다.
-policy_params: []
+policy_params:
+- key: supply_environment_sha256
+  type: str
+  required: true
+- key: supply_normal_target_sha256
+  type: str
+  required: true
+- key: supply_challenge_target_sha256
+  type: str
+  required: true
+- key: supply_normal_prepared_sha256
+  type: str
+  required: true
+- key: supply_challenge_prepared_sha256
+  type: str
+  required: true
+- key: supply_record_source_sha256
+  type: str
+  required: true
+- key: supply_validity_start
+  type: str
+  required: true
+- key: supply_validity_end
+  type: str
+  required: true
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 필요한 모델 코드·plugin·모드·권한·공급 방식, 승인/변경 절차. auto_map 존재만으로 실행이나 거부를 확정하지 않고 실제 선택되는 코드 출처를 확인한다.
@@ -24,7 +48,25 @@ challenge_steps:
 - 모델이 선택하는 auto_map·코드 출처 확인
 - 무해 표식 custom module fixture 준비
 - trust 허용/거부 설정에서 실제 import 비교
-required_observations: []
+required_observations:
+- key: supply_boot_sessions
+  type: list
+- key: supply_boot_violations
+  type: list
+- key: supply_boot_missing
+  type: list
+- key: supply_boot_complete
+  type: bool
+- key: supply_boot_normal_verified
+  type: bool
+- key: supply_boot_change_applied
+  type: bool
+- key: supply_boot_record_authenticated
+  type: bool
+- key: supply_boot_native_consumption
+  type: list
+- key: supply_boot_change
+  type: dict
 required_observations_prose:
 - 유효 trust 설정/코드 선택 분기/import된 파일·판본·실행 계정
 satisfied_if: 금지한 코드는 실행되지 않고 허용한 모델은 정상 사용된다.
@@ -33,8 +75,30 @@ unknown_criteria: auto_map 존재만 확인했거나 실제 코드 선택·impor
 remediation: '- 추가 코드 사용을 금지한 구성에서는 실제 import·실행 경로까지 차단되는 설정을 적용한다. 허용한 구성에서는 코드 출처·버전·실행 권한을 승인 묶음에 포함하고 승인한 코드만 실행한다.'
 method_and_evidence: auto_map의 존재만으로 실행을 단정하지 않고 실제 선택된 class·코드 출처(로컬/모델 저장소/다른 저장소/동적 캐시)·판본·의존 파일·trust 검사→import 순서를 확인한다. 무해 실행 표식을 허용/금지 조건에서 대조한다.
 remaining_setup: 선정 모델의 custom code 필요성·승인 목록과 무해 모듈 fixture
-executor: null
-judge: null
+executor: supply_boot
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: supply_boot_complete
+      op: eq
+      value: true
+    - obs: supply_boot_normal_verified
+      op: eq
+      value: true
+    - obs: supply_boot_change_applied
+      op: eq
+      value: true
+    - obs: supply_boot_violations
+      op: empty
+    - obs: supply_boot_missing
+      op: empty
+    - obs: supply_boot_record_authenticated
+      op: eq
+      value: true
+    fail_when_any:
+    - obs: supply_boot_violations
+      op: nonempty
 legacy:
   q_ids:
   - Q-R05-05
@@ -44,3 +108,8 @@ legacy:
   - Q-R05-05/SC-11-02
 source:
   array: supply_assessment_draft
+collection_profile: supply-boot-model-code-v1
+limitations:
+- '구현 분기: 기존 무해 표식 모듈 판정을 재사용해 금지 설정에서 import 표식이 남으면 FAIL이다.'
+- '미구현 분기: 기록 생산자 인증이 없어 PASS에 도달하지 않는다. CPU 표식 fixture 범위이며 실제 모델의 auto_map 전체가 아니다.'
+- kubernetes 구현만 있다. 실행기는 엔진을 만들거나 바꾸지 않는다. 정상·변경 기동은 준비 절차가 만들고 target·prepared로 받으며, 두 세션을 각각 수집해 합치지 않는다.

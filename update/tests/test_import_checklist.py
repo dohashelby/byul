@@ -200,5 +200,5 @@ def test_legacy_map_migration_preserves_all_internal_ids(tmp_path, imported_pack
     after = {p.stem: yaml.safe_load(p.read_text())["framework_id"]
              for p in (imported_pack / "checks").glob("*.yaml")}
     assert before == after
-    assert all(not yaml.safe_load(p.read_text())["retired"]
-               for p in (imported_pack / "checks").glob("*.yaml"))
+    assert {p.stem for p in (imported_pack / "checks").glob("*.yaml") if yaml.safe_load(p.read_text())["retired"]} == {
+        "SUP-01", "SUP-02", "SUP-14", "LIF-15", "OBS-07", "OBS-08", "OBS-10", "OBS-12"}

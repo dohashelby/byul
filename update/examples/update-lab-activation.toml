@@ -1,0 +1,42 @@
+# 소유 실험 환경에서 챌린지를 직접 일으킬 때의 설정 예시. 값은 모두 EXAMPLE이다.
+# 네임스페이스에 byul.lab/owned=true 레이블이 없으면 어떤 변경도 보내지 않는다.
+[executors]
+stream_buffer = "kubernetes"
+initialization = "kubernetes"
+rank_failure = "kubernetes"
+request_termination = "kubernetes"
+resource_recovery = "kubernetes"
+lifecycle_transition = "kubernetes"
+profiler_observation = "kubernetes"
+observation_state = "kubernetes"
+engine_sensor = "kubernetes"
+
+[lab_activation]
+namespace = "byul-lab"
+selector = "app=vllm"
+container = "engine"
+probe_pod = "byul-probe"
+probe_container = "probe"
+service_url = "http://vllm.byul-lab.svc:8000"
+model = "EXAMPLE-served-model"
+deployment = "vllm"
+process_pattern = "VLLM::Worker"
+deadline_ms = 90000                 # 운영자가 정한다. 기본값 없음
+burst_requests = 4                  # LIF-03
+allowed_models = ["EXAMPLE-served-model"]
+faulty_manifest = "lab/faulty.yaml" # LIF-06·LIF-09·LIF-16. 세대 레이블 byul.lab/generation=faulty
+good_manifest = "lab/good.yaml"
+update_manifest = "lab/update.yaml"
+trace_directory = "/tmp/trace"      # LIF-14. 엔진은 --profiler-config로 켠다
+fault_directory = "/guard-lifecycle/data/<session>"  # LIF-08 예외 주입. prepare-engine-callbacks --lab-faults
+
+[engine_sensor]
+target = "lab/target.json"
+prepared = "lab/engine-callbacks/manifest.json"
+manifest = "lab/cohort.json"
+principal_token_env = { A = "BYUL_TOKEN_A", B = "BYUL_TOKEN_B" }  # REQ-15 Gateway 경로
+
+[record_attestation]
+key_env = "BYUL_RECORD_KEY"         # 기업 시스템 내보내기 도구와 공유한 HMAC 키
+max_age_seconds = 86400
+records = { PLT-10 = "records/plt10.json", SUP-07 = "records/sup07.json" }

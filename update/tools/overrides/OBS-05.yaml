@@ -1,5 +1,51 @@
+executor: boundary_egress
+collection_profile: usage-report-scope-v1
 policy_params:
-- {key: usage_allowed, type: bool, required: true}
+  - { key: usage_allowed, type: bool, required: true }
+  - { key: usage_report_paths, type: "list[str]", required: true }
+  - { key: usage_settings_fresh_process, type: bool, required: true }
+  - { key: allowed_usage_fields, type: "list[str]", required: true }
+  - { key: allowed_usage_sinks, type: "list[str]", required: true }
+required_observations:
+  - { key: usage_policy_forbidden, type: bool }
+  - { key: usage_effective_settings, type: dict }
+  - { key: usage_settings_fresh_process, type: bool }
+  - { key: usage_new_local_reports, type: list }
+  - { key: usage_sink_receipts, type: list }
+  - { key: usage_send_sensor_available, type: bool }
+  - { key: usage_fields_seen, type: list }
+  - { key: usage_sinks_seen, type: list }
+  - { key: usage_report_observed, type: bool }
+  - { key: functional_probes_planned, type: "list[str]" }
+  - { key: functional_probe_results, type: "dict[str, pass|fail|no_response]" }
+functional_probes:
+  - method: POST
+    path: /v1/completions
+    body: { model: "{model}", prompt: ping, max_tokens: 1 }
+    expect: [200]
+    via: engine
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+      - { obs: usage_policy_forbidden, op: eq, value: false }
+      - { obs: usage_send_sensor_available, op: eq, value: true }
+      - { obs: usage_report_observed, op: eq, value: true }
+      - { obs: usage_fields_seen, op: subset_of, value_policy: allowed_usage_fields }
+      - { obs: usage_sinks_seen, op: subset_of, value_policy: allowed_usage_sinks }
+    fail_when_any:
+      - { obs: usage_fields_seen, op: not_subset_of, value_policy: allowed_usage_fields,
+          when: { obs: usage_policy_forbidden, op: eq, value: false } }
+      - { obs: usage_sinks_seen, op: not_subset_of, value_policy: allowed_usage_sinks,
+          when: { obs: usage_policy_forbidden, op: eq, value: false } }
+    axes:
+      functional:
+        pass_when_all:
+          - { obs: functional_probe_results, op: superset_of, value_obs: functional_probes_planned }
+          - { obs: functional_probe_results, op: all_in, value: [pass] }
+        fail_when_any:
+          - { obs: functional_probe_results, op: any_in, value: [fail] }
 limitations:
-- 'usage_allowed={usage_allowed}은 이 점검 범위의 기업 정책 신고다. true는 필드·목적지·주기의 승인 또는 실제 준수 증명이 아니고 false는 허용 환경 검토 분기를 충족하지 않는다. 정책값만으로 비적용·PASS를 만들지 않는다.'
-- '허용 범위·승인·payload·실제 수신의 수동 근거가 별도로 필요하다. 점검별 값은 자동 복사하지 않으며 공유 정책의 범위·일관성·승인은 별도 업무 검토가 필요하다.'
+  - "구현 분기: 허용 정책에서 새 보고의 필드 이름과 소유 수신지의 목적지를 승인 목록과 대조한다. 허용 밖 필드나 목적지가 보이면 FAIL이다."
+  - "미구현 분기: 보고 주기 대조와 허용 밖 수신지로의 전송 차단 시험은 없다. 소유 수신지 없이는 PASS에 도달하지 않는다."
+  - "real 구현만 있다. 파일과 수신 기록은 필드 이름과 해시만 남기며 보고 본문을 저장하지 않는다."

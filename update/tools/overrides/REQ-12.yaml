@@ -1,0 +1,36 @@
+executor: request_termination
+collection_profile: kubernetes-request-attempt-observation-v1
+policy_params:
+- key: attempt_environment_sha256
+  type: str
+  required: true
+- key: attempt_target_sha256
+  type: str
+  required: true
+- key: attempt_validity_start
+  type: str
+  required: true
+- key: attempt_validity_end
+  type: str
+  required: true
+required_observations:
+- key: activation_steps
+  type: list
+- key: activation_violations
+  type: list
+- key: activation_missing
+  type: list
+- key: activation_scope_complete
+  type: bool
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: activation_scope_complete
+      op: eq
+      value: true
+    - obs: activation_violations
+      op: empty
+    fail_when_any:
+    - obs: activation_violations
+      op: nonempty

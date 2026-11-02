@@ -2,8 +2,8 @@ id: LIF-15
 framework_id: CHK-LIF-015
 mechanism_ids:
 - mechanism-12
-revision: 2
-retired: false
+revision: 3
+retired: true
 area: LIF
 purpose: 복구 정책·상태 검증
 secondary_purposes: []

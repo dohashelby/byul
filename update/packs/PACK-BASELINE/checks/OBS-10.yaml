@@ -2,8 +2,8 @@ id: OBS-10
 framework_id: CHK-OBS-010
 mechanism_ids:
 - mechanism-17
-revision: 2
-retired: false
+revision: 3
+retired: true
 area: OBS
 purpose: 기록 위변조 방지
 secondary_purposes: []

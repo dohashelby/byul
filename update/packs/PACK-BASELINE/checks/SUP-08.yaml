@@ -2,7 +2,7 @@ id: SUP-08
 framework_id: CHK-SUP-008
 mechanism_ids:
 - mechanism-09
-revision: 3
+revision: 4
 retired: false
 area: SUP
 purpose: 추가 코드 실행 허용
@@ -15,7 +15,16 @@ review_order: reference_baseline_first
 impact: null
 applies_when:
   prose: 요청의 코드 판본 선택 필드와 실제 지원·노출 경로를 먼저 확인한다. 금지 구성에서도 해당 필드의 거부·제거를 확인하고, 허용 구성에서는 실제 선택·소비 판본을 추가 확인한다. 입력 미지원·비노출을 근거로 확인하면 코드 소비 분기만 비적용 후보로 남긴다. 지원 여부나 선택 허용 정책이 미정이면 해당 분기의 적용을 미정으로 둔다.
-policy_params: []
+policy_params:
+- key: code_selection_fields
+  type: list[str]
+  required: true
+- key: code_selection_allowed
+  type: bool
+  required: true
+- key: rejection_codes
+  type: list[str]
+  required: true
 policy_prose:
   policy_to_decide: null
   enterprise_decisions: 필요한 모델 코드·plugin·모드·권한·공급 방식, 승인/변경 절차. auto_map 존재만으로 실행이나 거부를 확정하지 않고 실제 선택되는 코드 출처를 확인한다.
@@ -24,7 +33,25 @@ challenge_steps:
 - 선정 엔진의 요청→코드 선택→소비 경로와 실제 지원 필드 확인
 - 금지 구성에서 무해한 비허용 판본 선택의 거부·제거와 정상 요청 대조
 - 허용 구성에서는 승인 안/밖 판본을 대조하고 최종 소비 코드 확인
-required_observations: []
+required_observations:
+- key: code_selection_trials
+  type: list
+- key: code_selection_forbidden
+  type: bool
+- key: code_selection_fields_planned
+  type: list[str]
+- key: code_selection_rejected_fields
+  type: list
+- key: code_selection_unverified_fields
+  type: list
+- key: code_selection_confirmed_violations
+  type: list
+- key: code_selection_final_code_verified
+  type: bool
+- key: functional_probes_planned
+  type: list[str]
+- key: functional_probe_results
+  type: dict[str, pass|fail|no_response]
 required_observations_prose:
 - 실제 지원·노출된 코드 판본 선택 필드, 호출자·선택 허용 범위와 유효 설정
 - 제출값·검증/제거·전달 결과, 최종 선택 모듈·출처·불변 판본과 import/실행 또는 사전 거부
@@ -34,8 +61,39 @@ unknown_criteria: 적용한 분기에서 kwargs 전달까지만 확인했거나 
 remediation: '- 요청에서 코드 버전을 바꾸는 필드와 전달 경로를 제한한다. 운영 설정에 승인한 버전을 고정하고, 예외적으로 허용한 요청 값도 최종 코드 선택 전에 승인 범위와 대조한다.'
 method_and_evidence: 요청에서 코드 판본을 선택할 수 있는 필드와 실제 소비 모듈을 연결한다. 허용·비허용 선택값의 수용·제거·거부, 최종 코드 출처·판본과 실행 전 제한을 대조한다.
 remaining_setup: 실제 코드 선택 필드·소비 모듈·의존성 판본과 무해 판본 fixture; 비노출·미지원은 호출 경로 근거로 확인
-executor: null
-judge: null
+executor: input_validation
+judge:
+  plugin: rule_table
+  params:
+    pass_when_all:
+    - obs: code_selection_forbidden
+      op: eq
+      value: true
+    - obs: code_selection_rejected_fields
+      op: superset_of
+      value_obs: code_selection_fields_planned
+    - obs: code_selection_unverified_fields
+      op: empty
+    - obs: code_selection_confirmed_violations
+      op: empty
+    fail_when_any:
+    - obs: code_selection_confirmed_violations
+      op: nonempty
+    axes:
+      functional:
+        pass_when_all:
+        - obs: functional_probe_results
+          op: superset_of
+          value_obs: functional_probes_planned
+        - obs: functional_probe_results
+          op: all_in
+          value:
+          - pass
+        fail_when_any:
+        - obs: functional_probe_results
+          op: any_in
+          value:
+          - fail
 legacy:
   q_ids:
   - Q-R05-03
@@ -45,3 +103,21 @@ legacy:
   - Q-R05-03/SC-11-01
 source:
   array: supply_assessment_draft
+collection_profile: request-code-selection-v1
+functional_probes:
+- method: POST
+  path: /v1/chat/completions
+  body:
+    model: '{model}'
+    messages:
+    - role: user
+      content: hello
+    max_tokens: 1
+    temperature: 0
+  expect:
+  - 200
+  via: engine
+limitations:
+- '구현 분기: 지정 필드에 무해한 비허용 판본값을 넣어 import 전 거부를 정상 대조와 비교한다. 지정 필드가 모두 거부되면 해당 필드 범위의 금지 분기를 충족한다.'
+- '미구현 분기: 최종 선택 모듈·import를 보는 수집이 없어 수락된 요청은 accepted_unverified로 UNKNOWN이고, 금지 override 소비의 FAIL과 허용 구성의 판본 대조는 현재 도달하지 않는다.'
+- real 구현만 있다. 지정하지 않은 필드는 확인하지 않는다. kwargs 전달까지만 보인 경우를 판정하지 않는다.

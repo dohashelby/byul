@@ -2,8 +2,8 @@ id: SUP-02
 framework_id: CHK-SUP-002
 mechanism_ids:
 - mechanism-01
-revision: 3
-retired: false
+revision: 4
+retired: true
 area: SUP
 purpose: 작업·대상 인가
 secondary_purposes: []

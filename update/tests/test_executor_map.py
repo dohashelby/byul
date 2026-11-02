@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[1]
 MAP = yaml.safe_load((ROOT / "docs/pack_baseline_executor_map.yaml").read_text(encoding="utf-8"))
 CHECKS = MAP["checks"]
 EXCLUDED = {"SUP-01", "SUP-02", "SUP-14", "LIF-15", "OBS-07", "OBS-08", "OBS-10", "OBS-12"}
-OWNER2_PENDING = "owner2"
 
 
 def _yaml_keys():
@@ -27,7 +26,7 @@ def _implementations(name):
             and registry.resolve_executor(name, impl) is not None]
 
 
-def test_map_has_77_unique_checks_with_69_connected_and_8_manual():
+def test_map_has_77_unique_checks_with_69_connected_and_8_retired():
     keys = _yaml_keys()
     assert len(keys) == len(set(keys)) == 77 == len(CHECKS)
     assert set(keys) == set(load_pack(ROOT / "packs/PACK-BASELINE").checks)
@@ -37,7 +36,7 @@ def test_map_has_77_unique_checks_with_69_connected_and_8_manual():
 
 def test_exactly_four_new_executor_names():
     assert MAP["new_executors"] == ["supply_boot", "record_access", "engine_sensor", "lifecycle_transition"]
-    planned = {v for v in CHECKS.values() if v and v != OWNER2_PENDING}
+    planned = {v for v in CHECKS.values() if v}
     registered = {key.split(":")[0] for key in registry.EXECUTORS}
     assert planned - registered <= set(MAP["new_executors"])
     assert set(MAP["new_executors"]) <= planned
@@ -48,13 +47,23 @@ def test_current_pack_never_disagrees_with_the_map():
     for check_id, check in pack.checks.items():
         planned = CHECKS[check_id]
         if planned is None:
-            assert check.executor is None, check_id
-        elif check.executor is not None and planned != OWNER2_PENDING:
+            assert check.executor is None and check.retired, check_id
+        elif check.executor is not None:
             assert check.executor == planned, check_id
 
 
-@pytest.mark.parametrize("name", sorted({v for v in CHECKS.values() if v and v != OWNER2_PENDING} - {"engine_sensor", "lifecycle_transition"}))
+@pytest.mark.parametrize("name", sorted({v for v in CHECKS.values() if v} - {"engine_sensor", "lifecycle_transition"}))
 def test_connected_executor_has_a_supported_non_fake_implementation(name):
-    if name in ("supply_boot", "record_access") and not _implementations(name):
-        pytest.xfail("구현 전: 담당 1 순서상 뒤에 등록")
     assert _implementations(name), name
+
+
+OWNER1 = [cid for cid, name in CHECKS.items() if name not in (None, "engine_sensor", "lifecycle_transition")]
+
+
+def test_owner1_checks_are_connected_exactly_as_designed():
+    pack = load_pack(ROOT / "packs/PACK-BASELINE")
+    assert len(OWNER1) == 57  # 기존 17 + 담당 1의 29 + 담당 2 기존 실행기 11
+    for check_id in OWNER1:
+        check = pack.checks[check_id]
+        assert check.executor == CHECKS[check_id] and check.judge is not None, check_id
+        assert _implementations(check.executor), check_id

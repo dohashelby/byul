@@ -42,19 +42,21 @@ class Cluster:
         return self.manifest != 'faulty' or self.modes.get('faulty_ready', False)
 
     def http(self, item):
-        row = {'outcome': 200, 'elapsed_ms': 10, 'sha256': 'a' * 64, 'model': 'm', 'closed_early': False, 'complete': True, 'bytes': 10}
+        row = {'outcome': 200, 'elapsed_ms': 10, 'sha256': 'a' * 64, 'model': 'm', 'closed_early': False, 'complete': True, 'bytes': 10, 'answer': 'b' * 64}
         if item['path'] == '/metrics':
             running = 1 if self.modes.get('stuck') else 0
-            return {**row, 'metrics': f"vllm:num_requests_running {running}\nvllm:request_prompt_tokens_seconds_count {self.counter}\n"}
+            return {**row, 'metrics': f"vllm:num_requests_running {running}\nvllm:prompt_tokens_total {self.counter}\n"}
         if item['path'] == '/health':
             return row
         if item['path'] in ('/start_profile', '/stop_profile'):
             return row
+        if item['body'] and item['body']['messages'][0]['content'].startswith('retry') and not item.get('close_after_bytes'):
+            self.counter += 10
         if item.get('close_after_bytes'):
-            self.counter += 3 if self.modes.get('retry') else 1
+            self.counter += 30 if self.modes.get('retry') else 10
             return {**row, 'closed_early': True, 'complete': False}
-        if item['body']['messages'][0]['content'] == 'fault' and self.modes.get('hang'):
-            return {**row, 'outcome': 'timeout', 'complete': False}
+        if item['body']['messages'][0]['content'].startswith('fault'):
+            return {**row, 'outcome': 'timeout', 'complete': False} if self.modes.get('hang') else {**row, 'elapsed_ms': 2000}
         if self.modes.get('model'):
             return {**row, 'model': self.modes['model']}
         if self.modes.get('not_serving') and self.modes['not_serving'] > 0:
@@ -123,6 +125,14 @@ def test_clean_target_completes_scope_with_no_violation(check_id):
 def test_activated_fault_produces_the_named_violation(check_id, modes, code):
     facts, _ = scenario(check_id, **modes)
     assert code in {row['code'] for row in facts['activation_violations']}, facts
+
+
+def test_request_that_ended_before_the_fault_is_not_evidence(monkeypatch):
+    world = Cluster()
+    original = world.http
+    monkeypatch.setattr(world, 'http', lambda item: {**original(item), 'elapsed_ms': 1})
+    facts, _ = lab.run_scenario('LIF-08', BASE, POLICY, runner=world, clock=world.clock, wait=world.wait)
+    assert facts['activation_scope_complete'] is False and 'FAULT_AFTER_REQUEST_FINISHED:death' in facts['activation_missing']
 
 
 def test_ready_before_service_is_a_violation():

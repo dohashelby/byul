@@ -53,11 +53,14 @@ def one(item):
             if delay:time.sleep(delay)
             if close_after is not None and got>=close_after:row["closed_early"]=True;break
         row["sha256"]=digest.hexdigest();row["bytes"]=got
-        try:row["model"]=json.loads(text).get("model")
+        try:
+            document=json.loads(text);row["model"]=document.get("model")
+            row["answer"]=hashlib.sha256(document["choices"][0]["message"]["content"].encode()).hexdigest()
         except Exception:pass
         if item.get("metrics"):row["metrics"]=text.decode("utf-8","replace")
-    except OSError as error:
-        row["outcome"]="timeout" if isinstance(error,TimeoutError) else "error"
+    except (OSError,http.client.HTTPException) as error:
+        if row["outcome"]=="error" or isinstance(error,TimeoutError):
+            row["outcome"]="timeout" if isinstance(error,TimeoutError) else row["outcome"]
     finally:
         connection.close()
     row["elapsed_ms"]=int((time.monotonic()-began)*1000);return row
@@ -398,24 +401,29 @@ def _rank_faults(lab, values):
 
 
 def _one_fault(lab, fault, inject, limit_ms, number):
+    """긴 요청이 진행 중일 때 주입한다. 주입 전에 끝난 요청은 근거로 쓰지 않는다."""
     lab.normal_request('normal-before-' + fault)
+    began = lab.clock()
     try:
         with ThreadPoolExecutor(max_workers=1) as pool:
-            running = pool.submit(lab.requests, [lab.chat('fault', max_tokens=64, timeout=limit_ms / 1000 + 5)])
-            lab.wait(POLL_SECONDS); inject()
+            running = pool.submit(lab.requests, [lab.chat('fault ' * 16, max_tokens=256, timeout=limit_ms / 1000 + 5)])
+            lab.wait(POLL_SECONDS); injected_ms = (lab.clock() - began) * 1000; inject()
             row, = running.result()
     except (OSError, TimeoutError, ValueError):
         return lab.miss('FAULT_NOT_INJECTED:' + fault)
-    lab.note('fault-' + fault, outcome=row['outcome'], elapsed_ms=row['elapsed_ms'], complete=row['complete'])
-    if row['outcome'] == 'timeout' or row['elapsed_ms'] > limit_ms:
+    finally:
+        if number == signal.SIGSTOP:
+            try:
+                lab.signal_worker(signal.SIGCONT)
+            except (OSError, TimeoutError, ValueError):
+                lab.miss('FAULT_NOT_RELEASED:' + fault)
+    lab.note('fault-' + fault, outcome=row['outcome'], elapsed_ms=row['elapsed_ms'], complete=row['complete'], injected_ms=int(injected_ms))
+    if row['outcome'] == 200 and row['complete'] and row['elapsed_ms'] < injected_ms:
+        lab.miss('FAULT_AFTER_REQUEST_FINISHED:' + fault)
+    elif row['outcome'] == 'timeout' or row['elapsed_ms'] > limit_ms:
         lab.violate('FAULT_NOT_DETECTED_BEFORE_DEADLINE', fault=fault, elapsed_ms=row['elapsed_ms'])
     elif row['outcome'] == 200 and not row['complete']:
         lab.violate('INCOMPLETE_WORK_REPORTED_AS_SUCCESS', fault=fault)
-    if number == signal.SIGSTOP:
-        try:
-            lab.signal_worker(signal.SIGCONT)
-        except (OSError, TimeoutError, ValueError):
-            lab.miss('FAULT_NOT_RELEASED:' + fault)
     lab.restore()
 
 
@@ -448,17 +456,24 @@ def _worker_cleanup(lab, values):
 
 
 def _retry(lab, values):
+    """끊긴 요청 하나가 엔진 입력 토큰을 몇 번 소비했는지 정상 요청 기준으로 잰다."""
+    name = 'vllm:prompt_tokens_total'; prompt = 'retry ' * 32
     lab.normal_request('normal-before')
-    name = 'vllm:request_prompt_tokens_seconds_count'
-    before = lab.metric(name)
-    if before is None:
+    first = lab.metric(name)
+    if first is None:
         return lab.miss('ATTEMPT_COUNTER_METRIC_UNAVAILABLE')
-    lab.requests([lab.chat('retry', max_tokens=64, stream=True, close_after_bytes=64, timeout=30)])
-    lab.wait_idle(lab.cfg['deadline_ms'])
-    delta = lab.metric(name) - before
-    lab.note('disconnect-attempts', engine_attempts=delta, client_attempts=1)
-    if delta > 1 and values.get('retry_policy_mode') in (None, 'forbidden'):
-        lab.violate('FORBIDDEN_AUTOMATIC_RETRY_OBSERVED', engine_attempts=delta)
+    lab.requests([lab.chat(prompt, timeout=30)])
+    single = lab.metric(name) - first
+    before = lab.metric(name)
+    lab.requests([lab.chat(prompt, max_tokens=64, stream=True, close_after_bytes=64, timeout=30)])
+    if lab.wait_idle(lab.cfg['deadline_ms']) is False:
+        lab.miss('DISCONNECTED_WORK_DID_NOT_FINISH')
+    attempts = (lab.metric(name) - before) / single if single > 0 else None
+    lab.note('disconnect-attempts', engine_attempts=attempts, client_attempts=1)
+    if attempts is None or attempts < 1:
+        lab.miss('ATTEMPT_COUNT_UNAVAILABLE')
+    elif attempts >= 2 and values.get('retry_policy_mode') in (None, 'forbidden'):
+        lab.violate('FORBIDDEN_AUTOMATIC_RETRY_OBSERVED', engine_attempts=attempts)
     lab.normal_request('normal-after')
 
 
@@ -507,7 +522,9 @@ def _late_result(lab, values):
     lab.note('same-external-id', baseline=bool(baseline), first=first['outcome'], second=second['outcome'])
     if first['outcome'] != 200 or second['outcome'] != 200:
         lab.miss('SAME_ID_REQUEST_NOT_SERVED')
-    elif first['sha256'] is None or second['sha256'] is None or first['bytes'] != second['bytes']:
+    elif first.get('answer') is None or second.get('answer') is None:
+        lab.miss('SAME_ID_ANSWER_UNAVAILABLE')
+    elif first['answer'] != second['answer']:
         lab.violate('LATE_RESULT_CHANGED_FOLLOWING_REQUEST')
     lab.normal_request('normal-after')
 

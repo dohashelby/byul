@@ -15,6 +15,7 @@ from guard.core.select import select
 from guard.models import DataOrigin, ExecStatus, Verdict
 from guard.store import Store
 from guard.models import load_pack
+from tools.pack_seed import SEED_DIR, SEED_REF
 from tests.builders import T0, baseline_pack, environment, policy
 from tests.prepared_fixtures import copy_workdir, dump_fixture_yaml, manual_setup_seed
 
@@ -209,10 +210,12 @@ def test_cli_template_and_import(tmp_path, monkeypatch):
     policy_path = tmp_path / "examples/policy.yaml"
     fixture = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
     fixture.setdefault("values", {})["SUP-01"] = {"approval_record_system": "EXAMPLE approval registry"}
+    # 수동 경로는 과거 팩을 위해 남긴다. 현행 팩은 수동 점검이 없으므로 불변 원본으로 시험한다.
+    fixture["pack"] = SEED_REF
     policy_path.write_text(yaml.safe_dump(fixture), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
-    out = runner.invoke(app, ["select", "--pack", "packs/PACK-BASELINE", "--env", "examples/env.yaml",
+    out = runner.invoke(app, ["select", "--pack", str(SEED_DIR), "--env", "examples/env.yaml",
                               "--policy", "examples/policy.yaml"]).output
     plan = out.strip().splitlines()[-1]
     assert runner.invoke(app, ["run", "--plan", plan]).exit_code == 0
@@ -220,7 +223,7 @@ def test_cli_template_and_import(tmp_path, monkeypatch):
     assert r.exit_code == 0, r.output
     doc = yaml.safe_load((tmp_path / "manual.yaml").read_text(encoding="utf-8"))
     assert {entry['check_id'] for entry in doc['checks']} == {
-        check.id for check in load_pack(tmp_path / "packs/PACK-BASELINE").active_checks() if check.executor is None}
+        check.id for check in load_pack(SEED_DIR).active_checks() if check.executor is None}
     _fill(_entry(doc, "SUP-01"))
     p = _write(tmp_path, doc)
     r = runner.invoke(app, ["evidence", "import", str(p)])

@@ -65,11 +65,12 @@ def rows(pack):
 
 def inspect(pack):
     items = rows(pack)
-    preserved = all(pack.checks[key].executor is None and pack.checks[key].retired for key in EXCLUDED)
+    preserved = all(pack.checks[key].executor is None for key in EXCLUDED)
+    retired = all(pack.checks[key].retired for key in EXCLUDED)
     return {'pack': pack.ref().model_dump(mode='json'), 'assigned': len(items),
         'baseline_connected': sum(row['baseline_connected'] for row in items),
         'registered_factory_available': sum(row['registered_factory_available'] for row in items),
-        'excluded_manual_paths_preserved': preserved,
+        'excluded_manual_paths_preserved': preserved, 'excluded_checks_retired': retired,
         'note': 'factory 존재·CPU/EXAMPLE 계약 검증·실제 환경 시험 완료를 구분하며, 미구현 capability는 연결 수에서 제외한다.',
         'checks': items}
 
@@ -81,7 +82,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     summary = inspect(load_pack(args.pack))
     print(json.dumps(summary, ensure_ascii=False, indent=2))
-    return int(args.check and (summary['baseline_connected'] != 23 or not summary['excluded_manual_paths_preserved']))
+    return int(args.check and (summary['baseline_connected'] != 23 or not summary['excluded_checks_retired']))
 
 
 if __name__ == '__main__':

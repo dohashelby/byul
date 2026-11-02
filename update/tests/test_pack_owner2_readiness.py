@@ -13,7 +13,7 @@ def test_exact_user_assignment_and_manual_exclusions():
     assert result['assigned'] == 23 and result['excluded_manual_paths_preserved']
     assert all(not row['whole_check_experiment_complete'] and not row['gpu_measured'] for row in result['checks'])
     assert {row['check_id'] for row in result['checks'] if row['unimplemented_reason']} == {
-        'LIF-13','REQ-14','REQ-15','REQ-16','REQ-17','REQ-18','REQ-19','REQ-20','REQ-21'}
+        'LIF-13','REQ-18','REQ-19','REQ-20','REQ-21'}
 
 
 def test_fake_factory_does_not_count_as_support(monkeypatch):

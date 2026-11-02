@@ -1,0 +1,21 @@
+# update.yml의 push 경로 필터와 같은 목록이다. PR은 이 목록으로 실행 여부를 job 단위에서 정한다.
+# GitHub 경로 필터처럼 위에서 아래로 읽고 마지막으로 맞은 줄이 이긴다. '!'로 시작하면 제외다.
+.github/workflows/update.yml
+.github/scripts/update_ci_relevance.py
+.github/update-ci-paths.txt
+update/**
+!update/docs/**/*.md
+update/docs/AUTOMATION_HARDENING.md
+update/docs/AUTOMATION_PHASE1.md
+update/docs/AUTOMATION_PHASE2.md
+update/docs/AUTOMATION_PHASE3.md
+update/docs/CHECKLIST_VALIDATION_STATUS.md
+update/docs/POLICY_M12.md
+update/docs/POLICY_M14.md
+update/docs/UPDATE_SELECTION.md
+update/docs/UPDATE_VALIDATION.md
+update/docs/b-lif07/PR171_SOURCE_CONSUMPTION.md
+update/docs/b-lif07/WORKER_READINESS.md
+update/docs/b-lif13/WEIGHTS_LIFETIME.md
+contracts/**
+platform/api/**

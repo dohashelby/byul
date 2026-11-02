@@ -236,6 +236,7 @@ REVIEWED_GATE_FIXTURES = {
     tool.HTTP_REVIEWED_COMMON_COMMIT:('1c3018f8cde4a4b8e674d112cee8e3626813b022',
         '15701b1e83eab8665414456b3072bcad73ee2220ed02e9f63a06a3441b55d157'),
     tool.PR171_REVIEWED_COMMON_COMMIT:(tool.PR171_GATE_SOURCE_COMMIT,tool.PR171_GATE_SHA256),
+    tool.PR184_REVIEWED_COMMON_COMMIT:(tool.PR184_GATE_SOURCE_COMMIT,tool.PR184_GATE_SHA256),
 }
 
 
@@ -392,8 +393,9 @@ def test_pr171_historical_blob_failure_has_no_current_fallback(monkeypatch,failu
 
 def test_pr171_HTTP_known_common_scope_excludes_native_only_histories():
     assert tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS==frozenset({
-        'f277fecd6df1e59505c0ad731032593f6fb22885','df6255e96a877ebfbe185230ed87320aa84d2c30'})
+        'f277fecd6df1e59505c0ad731032593f6fb22885','df6255e96a877ebfbe185230ed87320aa84d2c30',
+        '2247aabb3447ccb3210b100cade06bce51ed771e'})
     assert tool.HTTP_REVIEWED_COMMON_COMMIT=='f277fecd6df1e59505c0ad731032593f6fb22885'
     assert tool.REVIEWED_COMMON_COMMIT not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
     assert '9d8987a5a306ffce28fcb735e012c400589303f2' not in tool.HTTP_APPROVED_REVIEWED_COMMON_COMMITS
-    assert len(tool.APPROVED_GATE_PROFILES)==4
+    assert len(tool.APPROVED_GATE_PROFILES)==5

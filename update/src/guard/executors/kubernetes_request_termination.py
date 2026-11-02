@@ -62,15 +62,22 @@ class KubernetesRequestTerminationExecutor(HttpCheckExecutor):
         self.policy_normalizer(values)
 
     def _consumer(self,check):
-        if self.check_id=="LIF-10" and check.id=="LIF-12":
-            from .kubernetes_retry_records import KubernetesRetryRecordExecutor
-            return KubernetesRetryRecordExecutor(self.cfg,runner=self.runner,environ=self._environ,
-                expected_target_sha256=self.expected_target_sha256)
-        if self.check_id=="LIF-10" and check.id=="REQ-12":
-            from .kubernetes_request_attempts import KubernetesRequestAttemptsExecutor
-            return KubernetesRequestAttemptsExecutor(self.cfg,runner=self.runner,environ=self._environ,
-                expected_target_sha256=self.expected_target_sha256)
-        return self
+        # Only the public dispatcher selects consumers; subclasses never redispatch.
+        if type(self) is not KubernetesRequestTerminationExecutor:return self
+        from .kubernetes_retry_records import KubernetesRetryRecordExecutor
+        from .retry_record_contract import PROFILE as RETRY_PROFILE
+        from .kubernetes_request_attempts import KubernetesRequestAttemptsExecutor,PROFILE as ATTEMPT_PROFILE
+        branches={('LIF-10',PROFILE):None,('LIF-12',RETRY_PROFILE):KubernetesRetryRecordExecutor,
+            ('REQ-12',ATTEMPT_PROFILE):KubernetesRequestAttemptsExecutor}
+        key=(check.id,getattr(check,'collection_profile',None))
+        if key not in branches:
+            # Preserve the established retry consumer's public rejection code.
+            if check.id=='LIF-12':raise ValueError('RETRY_PROFILE_UNSUPPORTED')
+            raise ValueError('TERMINATION_PROFILE_UNSUPPORTED')
+        implementation=branches[key]
+        if implementation is None:return self
+        return implementation(self.cfg,runner=self.runner,environ=self._environ,
+            expected_target_sha256=self.expected_target_sha256)
 
     def run(self,check,env,policy_values,adapter,workdir):
         consumer=self._consumer(check)

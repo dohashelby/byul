@@ -2,10 +2,10 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,sys
 
-# Reviewed PR171 integrated tree: A2 PR170 pins, B product/module registration,
-# and malformed-profile rejection. All original five roots and trust gates remain.
+# Reviewed PR184 owner2 product tree: dedicated executors, callbacks and profiler
+# control on the PR171 base. All original five roots and trust gates remain.
 # Original B helper/default c9 pin remains unchanged.
-REVIEWED_COMMON_COMMIT='df6255e96a877ebfbe185230ed87320aa84d2c30'
+REVIEWED_COMMON_COMMIT='2247aabb3447ccb3210b100cade06bce51ed771e'
 B_SOURCE_COMMIT='57a7537968c0c09a7aab8f741965d64a7eb0f0d5'
 B_HELPER_SHA256='858666f5595fa6328a2975ef5a91eb9db19ad0712d11be08f64d8296cadaf6bf'
 PINNED_PATHS=('update/src/guard','update/packs','update/uv.lock',

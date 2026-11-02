@@ -11,7 +11,23 @@ from guard.runtime.kubernetes_initialization import KubernetesInitializationHTTP
 from .http_common import Ctx,HttpCheckExecutor
 from .kubernetes_lifecycle_capture import KubernetesLifecycleReader
 from .lifecycle_session import capture_session
-from .initialization_contract import PROFILE,normalize_policy,stamp
+from .initialization_contract import PROFILE,POLICY_TYPES,normalize_policy,stamp
+
+
+READINESS_PROFILE='kubernetes-mp-readiness-observation-v1'
+CHECK_PROFILES={'LIF-09':PROFILE,'LIF-07':READINESS_PROFILE}
+
+READINESS_POLICY_TYPES={**POLICY_TYPES,'required_readiness_items':'list[str]'}
+READINESS_OBSERVATIONS={'init_required_readiness_items':'list','init_unverified_readiness_items':'list'}
+
+
+def normalize_check_policy(check,values):
+    if check.id!='LIF-07':return normalize_policy(values)
+    if (type(values) is not dict or set(values)!=set(READINESS_POLICY_TYPES)
+            or type(values['required_readiness_items']) is not list
+            or any(type(value) is not str for value in values['required_readiness_items'])):
+        raise ValueError('INITIALIZATION_READINESS_POLICY_INVALID')
+    return normalize_policy({key:values[key] for key in POLICY_TYPES})
 
 
 class KubernetesInitializationExecutor(HttpCheckExecutor):
@@ -21,8 +37,8 @@ class KubernetesInitializationExecutor(HttpCheckExecutor):
         super().__init__(cfg,environ=environ);self.runner=runner;self.expected_target=expected_target_sha256
 
     def validate_policy(self,check,values):
-        if check.id!='LIF-09' or getattr(check,'collection_profile',None)!=PROFILE:raise ValueError('INITIALIZATION_PROFILE_UNSUPPORTED')
-        normalize_policy(values)
+        if CHECK_PROFILES.get(check.id)!=getattr(check,'collection_profile',None) or check.id not in CHECK_PROFILES:raise ValueError('INITIALIZATION_PROFILE_UNSUPPORTED')
+        normalize_check_policy(check,values)
 
     def run(self,check,env,policy_values,adapter,workdir):
         from guard.collectors.lifecycle import load_prepared
@@ -31,7 +47,7 @@ class KubernetesInitializationExecutor(HttpCheckExecutor):
             if set(self.cfg)-{'target','prepared','kubectl_binary','max_duration_seconds'} or adapter is None:raise ValueError
             if any(type(v) is not str or not v for v in (env.model.id,env.model.revision)):raise ValueError
             with Path(self.cfg['target']).open('rb') as stream:target=strict_json(stream.read(65537),limit=65536)
-            target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end=normalize_policy(policy_values)
+            target_hash=sha256_hex(canonical_json(target));prepared=load_prepared(self.cfg['prepared']);start,end=normalize_check_policy(check,policy_values)
             if prepared['profile'] in {generation_sensor.PROFILE,endpoint_sensor.PROFILE}:
                 required={item.key for item in check.required_observations}
                 if not {'init_worker_generation_events','init_worker_generation_candidates','init_ready_send_observations'}<=required:raise ValueError
@@ -47,7 +63,7 @@ class KubernetesInitializationExecutor(HttpCheckExecutor):
         ctx._init_prepared=prepared;return self._finish(ctx)
 
     def collect(self,ctx):
-        start,end=normalize_policy(ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[]
+        start,end=normalize_check_policy(ctx.check,ctx.policy_values);token=uuid.uuid4().hex;reader=None;packet=None;sealed=False;trials=[];diagnostics=[]
         native_target={'schema':'guard-kubernetes-lifecycle-target/1','lab':ctx.target['lab'],'run_id':ctx.cprobe.binding['run_id'],
             'environment_ref':ctx.env.ref().model_dump(mode='json'),'kubernetes':{'context':ctx.cprobe.binding['context'],'engine':ctx.cprobe.binding['engine']}}
         try:
@@ -108,7 +124,7 @@ class KubernetesInitializationExecutor(HttpCheckExecutor):
         ctx._init_cleanup=list(http['cleanup_errors'])
         if read_report and read_report.get('parent_cleanup_unverified'):ctx._init_cleanup.append('INITIALIZATION_PARENT_CLEANUP_UNVERIFIED')
         ctx._init_gap=bool(diagnostics or http['collection_gap'] or ctx._init_cleanup)
-        summary={'profile':PROFILE,'declared_phase':ctx.policy_values['init_phase'],
+        summary={'profile':ctx.check.collection_profile,'declared_phase':ctx.policy_values['init_phase'],
             'declared_scenario_sha256':ctx.policy_values['init_scenario_sha256'],'trials':trials,'native':packet,'projection':projection,
             'transport':http,'reader':read_report,'worker_startup':worker,'sealed_selected_session':sealed,'diagnostic_codes':diagnostics,
             'fixture':{'profile':PROFILE},'failure_control_implemented':False,'failure_activation_verified':False,
@@ -118,6 +134,9 @@ class KubernetesInitializationExecutor(HttpCheckExecutor):
             'init_worker_startup_missing':worker['missing'],'init_observation_trials':trials,'init_native_samples':projection['samples'],'init_native_calls':projection['calls'],
             'init_correspondence':projection['correspondence'],'init_missing':projection['missing'],'init_producer_authenticated':False,
             'init_all_preparation_verified':False,'init_service_gate_verified':False,'init_cross_phase_lineage_verified':False,'init_scope_complete':False}
+        if ctx.check.id=='LIF-07':
+            observations['init_required_readiness_items']=list(ctx.policy_values['required_readiness_items'])
+            observations['init_unverified_readiness_items']=list(ctx.policy_values['required_readiness_items'])
         return {k:{'value':v,'collected':True} for k,v in observations.items()},{'attempted':bool(trials and trials[0]['attempted']),
             'succeeded':None,'detail':'Single declared startup stage: same-process readiness/aggregate facts, bounded HTTP admission samples; independent failure, full model readiness and repaired launch lineage unverified.'},[],summary
 

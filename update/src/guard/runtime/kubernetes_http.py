@@ -439,7 +439,7 @@ class KubernetesHTTP:
         body=request.get("body") if type(request) is dict else None
         messages=body.get("messages") if type(body) is dict else None
         if (type(request) is not dict or type(request.get("id")) is not str or not re.fullmatch(r"cb-[0-9]{1,4}",request["id"])
-                or set(request.get("headers",{}))!={"X-Request-Id"}
+                or set(request.get("headers",{}))-{"Authorization"}!={"X-Request-Id"}
                 or not re.fullmatch(r"byul-cb-[0-9a-f]{32}",str(request["headers"]["X-Request-Id"]))
                 or type(body) is not dict or set(body)-{"model","messages","max_tokens","temperature","stream","cache_salt"}
                 or body.get("max_tokens")!=1 or body.get("temperature")!=0 or body.get("stream") is not False

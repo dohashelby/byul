@@ -257,3 +257,43 @@ def test_lab_fault_raises_once_in_the_worker_and_only_when_enabled(tmp_path):
     with pytest.raises(RuntimeError, match='GUARD_LAB_FAULT'):
         faulted()
     assert faulted() == 'done' and not fault.exists()
+
+
+IDENTITY_CASES = [{'case_id': f'{p}{i}', 'role': 'probe', 'prompt': 'x', 'principal': p, **({'forged_salt': 'z'} if i else {})}
+    for p in 'AB' for i in (0, 1)]
+
+
+def identity(salts):
+    rows = {case['case_id']: [{'salt': salt}] for case, salt in zip(IDENTITY_CASES, salts)}
+    return projection.project_identity(IDENTITY_CASES, rows)
+
+
+def test_principal_decides_the_salt_even_when_the_client_forges_one():
+    assert identity(['a', 'a', 'b', 'b'])['bound'] is True
+
+
+def test_forged_salt_reaching_the_engine_is_a_group_change():
+    result = identity(['a', 'z', 'b', 'b'])
+    assert result['client_changed_group'] == ['A'] and not result['bound']
+
+
+def test_two_principals_sharing_a_salt_is_not_isolated():
+    assert identity(['a', 'a', 'a', 'a'])['principals_sharing_salt'] == ['A']
+
+
+def test_group_scope_completes_only_with_a_bound_identity():
+    mirrored = [{**case, 'case_id': case['case_id'] + '2', 'prefix': 'q',
+        'group': {'A': 'B', 'B': 'A'}[case['group']]} for case in GROUP_CASES]
+    tags = {**TAGS, 'a2': 'byul-cb-' + '1' * 32, 'b2': 'byul-cb-' + '2' * 32, 'c2': 'byul-cb-' + '3' * 32}
+    rows = projection.computed_rows([computed(tags['b'], 16), computed(tags['c'], 0), computed(tags['b2'], 16), computed(tags['c2'], 0)], SECRET, tags)
+    cases = GROUP_CASES + mirrored
+    result = projection.project_cache_group(cases, rows, GROUP_POLICY, identity(['a', 'a', 'b', 'b']))
+    assert result['violation'] is False and result['full_scope'] is True
+    changed = projection.project_cache_group(cases, rows, GROUP_POLICY, identity(['a', 'z', 'b', 'b']))
+    assert changed['violation'] is True and changed['full_scope'] is False
+
+
+def test_sequence_binding_needs_one_request_per_case():
+    events = [computed('byul-cb-' + str(i) * 32, 0) for i in range(4)]
+    assert set(projection.sequence_rows(events, IDENTITY_CASES)) == {c['case_id'] for c in IDENTITY_CASES}
+    assert projection.sequence_rows(events[:3], IDENTITY_CASES) == {}

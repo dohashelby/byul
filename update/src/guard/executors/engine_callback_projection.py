@@ -24,7 +24,7 @@ def validate_cases(check_id, cases):
             or len({c.get('case_id') for c in cases if type(c) is dict}) != len(cases)):
         raise ValueError('ENGINE_CALLBACK_CASES_INVALID')
     for case in cases:
-        if (set(case) - {'case_id', 'role', 'group', 'context', 'prefix', 'prompt', 'cache_salt'}
+        if (set(case) - {'case_id', 'role', 'group', 'context', 'prefix', 'prompt', 'cache_salt', 'principal', 'forged_salt'}
                 or case.get('role') not in ROLES[check_id] or type(case.get('prompt')) is not str
                 or not 0 < len(case['prompt']) <= 4096 or type(case['case_id']) is not str
                 or 'cache_salt' in case and (type(case['cache_salt']) is not str or not 0 < len(case['cache_salt']) <= 64)):
@@ -47,6 +47,36 @@ def computed_rows(events, secret, tags):
     return rows
 
 
+def sequence_rows(events, cases):
+    """Gateway가 요청 ID를 다시 발급할 때 직렬 시험의 순서로 사례를 잇는다."""
+    ordered = {}
+    for event in events:
+        fields = event.get('fields') or {}
+        if (event.get('point') == COMPUTED and event.get('phase') == 'RETURN' and event.get('entry_qualified_before') is True
+                and event.get('entry_qualified_after') is True and type(fields.get('num_computed_tokens')) is int):
+            ordered.setdefault(fields.get('request_sha256'), []).append({'tokens': fields['num_computed_tokens'],
+                'hashes': fields.get('request_block_hashes_sha256'), 'salt': fields.get('request_cache_salt_sha256')})
+    if len(ordered) != len(cases):
+        return {}
+    return {case['case_id']: rows for case, rows in zip(cases, ordered.values())}
+
+
+def project_identity(cases, rows):
+    """인증 주체가 salt를 정하는지 본다. 위조·생략한 요청의 salt는 같아야 한다."""
+    salts = {}; forged = {}; omitted = {}
+    for case in cases:
+        principal = case.get('principal'); found = rows.get(case['case_id'])
+        if principal is None or not found:
+            continue
+        salts.setdefault(principal, set()).add(found[0]['salt'])
+        (forged if 'forged_salt' in case else omitted).setdefault(principal, 0)
+    changed = sorted(p for p, values in salts.items() if len(values) > 1)
+    shared = sorted({p for p in salts for q in salts if p < q and salts[p] & salts[q]})
+    complete = bool(salts) and set(forged) == set(omitted) == set(salts) and len(salts) > 1
+    return {'principals': len(salts), 'client_changed_group': changed, 'principals_sharing_salt': shared,
+        'bound': complete and not changed and not shared}
+
+
 def _hit(rows, case):
     found = rows.get(case['case_id'])
     return None if not found else max(r['tokens'] for r in found) > 0
@@ -63,7 +93,7 @@ def _related(cases, probe, role):
     return next((c for c in cases if c['role'] == role and c.get('prefix') == probe.get('prefix')), None)
 
 
-def project_cache_group(cases, rows, policy):
+def project_cache_group(cases, rows, policy, identity=None):
     groups = policy['isolated_cache_groups']
     wanted = {(a, b) for a in groups for b in groups if a != b}
     pairs = []
@@ -77,11 +107,13 @@ def project_cache_group(cases, rows, policy):
     measured = {(p['from'], p['to']) for p in pairs if p['control_hit'] is True and p['cross_hit'] is not None}
     violations = [p for p in pairs if p['cross_hit'] is True and p['control_hit'] is True
         and (p['from'], p['to']) in wanted]
-    missing = ['authenticated_principal_binding_unverified', 'forged_and_omitted_group_unverified']
+    missing = [] if identity and identity['bound'] else ['authenticated_principal_binding_unverified']
     if not wanted <= measured:
         missing.append('ordered_group_pairs_incomplete')
-    return {'pairs': pairs, 'violation': True if violations else (False if wanted <= measured else None),
-        'full_scope': False, 'missing': missing}
+    changed = bool(identity and (identity['client_changed_group'] or identity['principals_sharing_salt']))
+    violated = bool(violations) or changed
+    return {'pairs': pairs, 'identity': identity, 'violation': True if violated else (False if wanted <= measured else None),
+        'full_scope': not missing and not violated, 'missing': missing}
 
 
 def project_cache_context(cases, rows, policy):

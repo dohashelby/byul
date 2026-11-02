@@ -56,6 +56,7 @@ from .structured_tools_cpu import StructuredToolsCPUExecutor, StructuredToolsTar
 from .template_source_cpu import TemplateSourceCPUExecutor
 from .engine_sensor import EngineSensorExecutor
 from .lab_activation import activated
+from .record_attestation import attested
 from .lifecycle_transition import LifecycleTransitionExecutor
 
 # 키: "<CheckDef.executor>:<구현>" (특정 실행기 전용) 또는 "<구현>" (공용). guard.toml [executors]의 값이 <구현>.
@@ -133,4 +134,6 @@ ACTIVATED = frozenset({"stream_buffer", "initialization", "rank_failure", "reque
 
 def resolve_executor(executor: str, impl: str) -> Callable[[dict[str, Any]], Executor] | None:
     factory = EXECUTORS.get(f"{executor}:{impl}") or EXECUTORS.get(impl)
-    return activated(factory) if factory and impl == "kubernetes" and executor in ACTIVATED else factory
+    if factory and impl == "kubernetes":
+        return activated(factory) if executor in ACTIVATED else attested(factory)
+    return factory

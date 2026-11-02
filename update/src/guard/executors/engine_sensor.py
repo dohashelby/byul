@@ -9,6 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 from pathlib import Path
 import hashlib
+import os
 import re
 import sys
 import tempfile
@@ -260,7 +261,7 @@ class EngineSensorExecutor:
         from guard.collectors import engine_callbacks
         from guard.runtime.bounded import strict_json
         from guard.executors.kubernetes_lifecycle_capture import validate_target
-        if (set(self.cfg) - {'target', 'prepared', 'manifest', 'max_duration_seconds', 'kubectl_binary'}
+        if (set(self.cfg) - {'target', 'prepared', 'manifest', 'max_duration_seconds', 'kubectl_binary', 'principal_token_env'}
                 or not {'target', 'prepared', 'manifest'} <= set(self.cfg)
                 or not env.hash_ok() or env.engine.name != 'vllm' or env.engine.version != '0.31.0'):
             raise ValueError('ENGINE_SENSOR_NATIVE_CONFIGURATION_INVALID')
@@ -345,11 +346,18 @@ class EngineSensorExecutor:
             tag = tags[case['case_id']] = 'byul-cb-' + uuid.uuid4().hex
             body = {'model': transport.api_model, 'messages': [{'role': 'user', 'content': case['prompt']}],
                 'max_tokens': 1, 'temperature': 0, 'stream': False}
-            if 'cache_salt' in case:
-                body['cache_salt'] = case['cache_salt']
+            salt = case.get('forged_salt', case.get('cache_salt'))
+            if salt is not None:
+                body['cache_salt'] = salt
+            headers = {'X-Request-Id': tag}
+            if 'principal' in case:
+                token = os.environ.get((self.cfg.get('principal_token_env') or {}).get(case['principal'], ''))
+                if not token:
+                    cleanup.append('ENGINE_SENSOR_PRINCIPAL_TOKEN_UNAVAILABLE'); break
+                headers['Authorization'] = 'Bearer ' + token
             try:
                 row, = transport('kubernetes-probe', [{'id': f'cb-{number}', 'mode': 'json', 'method': 'POST',
-                    'url': endpoint, 'headers': {'X-Request-Id': tag}, 'body': body}], 30)
+                    'url': endpoint, 'headers': headers, 'body': body}], 30)
             except KubernetesBindingError:
                 cleanup.append('ENGINE_SENSOR_CALLBACK_REQUEST_UNAVAILABLE')
                 break
@@ -365,11 +373,13 @@ class EngineSensorExecutor:
         except KubernetesBindingError:
             events = []; cleanup.append('ENGINE_SENSOR_CALLBACK_EVENTS_UNAVAILABLE')
         secret = engine_callbacks.load_secret(self.cfg['prepared'])
-        rows = projection.computed_rows(events, secret, tags)
+        gateway = any('principal' in case for case in cases)
+        rows = projection.sequence_rows(events, cases) if gateway else projection.computed_rows(events, secret, tags)
         if check.id == 'REQ-14':
             result = projection.project_distributed(events, secret, tags)
         elif check.id == 'REQ-15':
-            result = projection.project_cache_group(cases, rows, values)
+            identity = projection.project_identity(cases, rows) if gateway else None
+            result = projection.project_cache_group(cases, rows, values, identity)
         elif check.id == 'REQ-16':
             result = projection.project_cache_context(cases, rows, values)
         else:

@@ -2,6 +2,16 @@
 
 최종 갱신: 2026-11-03
 
+## 2026-11-03 AWS GPU preflight 검수 보정 (기준 46f0309, 미커밋)
+
+- kind 재현 지적을 반영해 namespaced Tetragon 정책을 `tracingpoliciesnamespaced`로 조회하고, 빈 수집기 `ExecStart`를 `unknown`으로 판정한다. 증거 폴더 5 GiB 검사와 별도로 containerd 이미지 저장소 여유(기본 60 GiB, 경로·기준 옵션)를 확인하며 조회 불가는 `unknown`이다. 가짜 runner 회귀시험 3건을 추가했다.
+- 서버 순서표에 SGLang digest 고정 이미지 선받기와 12단계 전 완료 확인, Gateway 태그 비교, 관리 키의 알려진 `/proc` 인자 노출 기록, SGLang OOM·GPU 메모리 확인을 반영했다. 실제 AWS·SGLang 실행은 미확인이다. `python3 -B -m unittest tests.test_aws_lab_preflight tests.test_aws_lab_acceptance`: 85건 통과, skip 0. `git diff --check` 통과. 커밋·푸시하지 않았다.
+
+## 2026-11-03 AWS GPU 11/4 서버 전 준비 (기준 46f0309, 미커밋)
+
+- 읽기 전용 `tools/aws_lab_preflight.py`와 가짜 runner 시험 8건, `deploy/gpu-lab/서버_실행순서표.md`를 추가했다. 확인 근거는 기존 인수 도구의 실제 `--cases`·`--allow-*` 옵션, GPU lab 수동 정책 절차, SGLang 전환 절차다. SGLang도 vLLM과 같은 승인 판본·정책 파일을 쓰도록 전환 문구를 바로잡았다.
+- `python3 -B -m unittest tests.test_aws_lab_preflight tests.test_aws_lab_acceptance`: 82건 통과, skip 0. `git diff --check` 통과. 서버·실제 kubectl·실제 Gateway·SGLang 실행은 미확인이다. 다음은 서버 전 digest·승인 원본 해시를 확정하고, 11/4에 순서표대로 preflight → 두 엔진 인수 시험 → vLLM 복귀·증거 반출을 실제로 확인하는 것이다. 커밋·푸시하지 않았다.
+
 ## 2026-11-03 AWS 단계·거부 기록 판정과 보존 보정 (기준 887291e, 미커밋)
 
 - AWS-16은 수집 중단 전에 vLLM 시간표의 15초 신선도(`ExecPolicy._collector_stale`)와 현재 엔진 Pod UID를 확인한다. SGLang은 단계 수집 꺼짐으로 `unknown`이다. AWS-17도 재시작 전 같은 신선도와 UID를 확인하고 SGLang에서는 `unknown`이다. AWS-11은 기존 SGLang 단계 판정 `None` 경로를 남은 시간표 시험으로 확인했다.

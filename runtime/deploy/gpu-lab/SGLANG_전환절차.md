@@ -2,6 +2,8 @@
 
 이 절차는 GPU 1장인 AWS dev lab에서 **순차 전환**할 때 사용한다. 여기 적힌 명령은 저장소에서 실행하지 않았다. 서버 주소와 비밀값은 증거에 넣지 않는다. 서버에서 적용 전 `kubectl config current-context`가 `byul-aws-lab`인지 확인하고, 현재 Deployment·묶음 ID·imageID와 AWS 묶음이 생성한 vLLM `engine.yaml` 사본(`<saved-vllm-engine.yaml>`)을 별도 증거 폴더에 보관한다. `03-engine-smoke.sh`와 AWS 설치 묶음 원본은 수정하지 않는다.
 
+**서버를 켜기 전**, 연결된 작업 환경에서 `skopeo inspect --format '{{.Digest}}' docker://docker.io/lmsysorg/sglang:v0.5.22`로 레지스트리 digest를 확정하고 반입 tar와 함께 기록한다. 아래 서버 전환에서는 그 고정값 `sha256:<digest>`만 사용한다.
+
 ## 1. vLLM 끄기와 이미지 반입
 
 ```bash
@@ -11,9 +13,8 @@ kubectl --context byul-aws-lab -n serving-lab get deployment serving-engine -o j
   > evidence/vllm-engine-before.json
 # 삭제 후 새로 만든다. apply로 덮으면 vLLM 환경변수·patch 잔여물이 섞일 수 있다.
 kubectl --context byul-aws-lab -n serving-lab delete deployment serving-engine --wait=true
-# 별도 연결된 작업 환경에서 v0.5.22 이미지를 digest로 고정하고 tar 반입
-skopeo inspect --format '{{.Digest}}' docker://docker.io/lmsysorg/sglang:v0.5.22
-# digest를 검증한 뒤 docker pull/save 및 서버의 ctr -n k8s.io images import로 반입
+# 서버 전 확정한 digest를 대조한 tar를 서버의 ctr -n k8s.io images import로 반입
+sudo ctr -n k8s.io images import <sglang-이미지.tar>
 sudo ctr -n k8s.io images ls | grep sglang
 ```
 
@@ -29,7 +30,7 @@ kubectl --context byul-aws-lab -n serving-lab get secret serving-sglang-admin -o
 
 ## 2. SGLang 켜기, Gateway·대상·규칙 전환
 
-정책 묶음은 [정책_수동적용_절차.md](정책_수동적용_절차.md)의 승인 판본 → 변환 → 해시·크기 대조 → 검증 → 상대 링크 교체 → Gateway 재시작 순서를 따른다. `deploy/gpu-lab-sglang/policy.aws-lab.json`, 승인 목록, target, intent를 서버 사본의 새 bundle ID에 넣고 `bundle verify`를 먼저 실행한다. `target.engine.version`은 생략한다. `image_digest`만 고정하고 Pod 스냅샷의 imageID와 비교한다. SGLang 정책은 LAB 예시이며 플랫폼 정식 승인으로 취급하지 않는다.
+정책 묶음은 [정책_수동적용_절차.md](정책_수동적용_절차.md)의 승인 판본 → 변환 → 해시·크기 대조 → 검증 → 상대 링크 교체 → Gateway 재시작 순서를 따른다. SGLang도 vLLM과 같은 플랫폼 승인 판본 `aws-lab-policy-001`(승인 번호 `aws-lab-policy-001-v2`, 시험용 자기 신고 승인)의 **같은 정책 파일**을 쓴다. 엔진별 target·intent는 실제 digest와 서버 값으로 새 묶음에 넣고 `bundle verify`를 먼저 실행한다. `target.engine.version`은 생략한다. `image_digest`를 고정하고 Pod 스냅샷의 imageID와 비교한다.
 
 ```bash
 cd ~/byul/runtime

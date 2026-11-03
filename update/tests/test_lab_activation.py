@@ -181,7 +181,8 @@ class Cluster:
             if self.modes.get('two_workers'):
                 processes = [*processes, {'pid': 8, 'state': 'S', 'rss_pages': 100, 'start_ticks': 200,
                     'command': 'VLLM rank=1', 'comm': 'VLLM'}]
-            return self.result({'processes': processes, 'process_scope_complete': True, 'process_scope_errors': [], 'shm_entries': 1, 'shm_names': ['shm0'], 'page_bytes': 4096})
+            return self.result({'processes': processes, 'process_scope_complete': True, 'process_scope_errors': [],
+                'process_count_before': len({p['pid'] for p in processes}), 'process_count_after': len({p['pid'] for p in processes}), 'shm_entries': 1, 'shm_names': ['shm0'], 'page_bytes': 4096})
         if lab.FILE_COUNT in argv:
             return self.result({'count': self.traces.pop(0)})
         if lab.SIGNAL in argv and self.modes.get('die_on_signal'):

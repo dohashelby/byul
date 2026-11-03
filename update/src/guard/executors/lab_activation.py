@@ -1569,6 +1569,14 @@ def _restore_sensor_session(lab, old_pod, new_pod):
 
 
 
+def _complete_census(value):
+    if type(value) is not dict or value.get('process_scope_complete') is not True:
+        return False
+    before, after = value.get('process_count_before'), value.get('process_count_after')
+    return (type(value.get('process_scope_errors')) is list and value['process_scope_errors'] == []
+        and type(before) is int and type(after) is int and 0 <= before == after)
+
+
 def _worker_cleanup(lab, values):
     lab.miss('IPC_OWNERSHIP_AND_GPU_RESOURCE_RELEASE_UNOBSERVED')
     lab.miss('FAILED_GROUP_ABSENCE_DEADLINE_UNOBSERVED')
@@ -1595,10 +1603,14 @@ def _worker_cleanup(lab, values):
         target=target, process_identities_before=[(p['pid'], p.get('start_ticks')) for p in before['processes']],
         process_identities_after=None if after is None else [(p['pid'], p.get('start_ticks')) for p in after['processes']],
         shm_before=before['shm_entries'], shm_after=shm,
-        shm_names_before=before.get('shm_names'), shm_names_after=None if after is None else after.get('shm_names'))
-    death_observed = after is not None and all(
+        shm_names_before=before.get('shm_names'), shm_names_after=None if after is None else after.get('shm_names'),
+        process_scope_complete_after=_complete_census(after),
+        process_scope_errors_after=None if after is None else after.get('process_scope_errors'))
+    death_observed = _complete_census(after) and all(
         p['pid'] != target['pid'] or p.get('start_ticks') != target['start_ticks']
         for p in after['processes'])
+    if not _complete_census(after):
+        lab.miss('SELECTED_WORKER_DEATH_CENSUS_INCOMPLETE')
     if not death_observed:
         lab.miss('SELECTED_WORKER_DEATH_UNOBSERVED')
     if 'good_manifest' in lab.cfg:
@@ -1736,7 +1748,7 @@ def _record_state(lab, values):
         alive = None; before_census = None
         lab.miss('STATE_FAILED_WORKER_CENSUS_UNAVAILABLE')
     direct = None; after_alive = None; after_census = None
-    before_complete = before_census is not None and before_census.get('process_scope_complete') is True
+    before_complete = _complete_census(before_census)
     if alive == 0 and not before_complete:
         lab.miss('STATE_WORKER_ABSENCE_CENSUS_INCOMPLETE')
     if alive == 0 and before_complete:
@@ -1755,7 +1767,7 @@ def _record_state(lab, values):
                     if direct is not None:
                         after_census = lab.census(target['pod'], target['pod_uid'])
                         after_alive = len(after_census['processes'])
-                        if after_census.get('process_scope_complete') is not True:
+                        if not _complete_census(after_census):
                             lab.miss('STATE_HEALTH_POST_CENSUS_INCOMPLETE')
                             direct = None
                         current = next((p for p in lab._pods() if p['metadata'].get('uid') == target['pod_uid']), None)
@@ -1774,7 +1786,7 @@ def _record_state(lab, values):
     lab.note('state-after-failure', health=row['outcome'], processes=alive, target=target,
         health_worker_binding_verified=direct is not None, processes_after_health=after_alive,
         process_scope_complete_before=before_complete,
-        process_scope_complete_after=after_census is not None and after_census.get('process_scope_complete') is True,
+        process_scope_complete_after=_complete_census(after_census),
         process_scope_errors_before=None if before_census is None else before_census.get('process_scope_errors'),
         process_scope_errors_after=None if after_census is None else after_census.get('process_scope_errors'))
     if alive == 0 and direct is not None and direct.get('outcome') == 200:

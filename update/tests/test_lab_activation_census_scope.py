@@ -70,14 +70,16 @@ def test_actual_census_keeps_scope_completeness_and_specific_error(mode, code):
         assert value['process_scope_errors'] == []
 
 
-def consume(before_mode, after_mode='empty'):
+def consume(before_mode, after_mode='empty', transform=None):
     world = fixture.Cluster(); calls = []; direct_requests = []
     def runner(argv, **options):
         if lab.CENSUS in argv:
             calls.append(argv)
             mode = 'alive' if len(calls) <= 2 else before_mode if len(calls) == 3 else after_mode
             if mode == 'command-error': raise OSError('census command unavailable')
-            return world.result(produced_census(mode))
+            value = produced_census(mode)
+            if transform is not None and len(calls) >= 3: transform(value)
+            return world.result(value)
         if lab.CLIENT in argv:
             payload = json.loads(options['input_bytes'])
             if payload['url'].startswith('http://10.'):
@@ -140,3 +142,60 @@ def test_actual_complete_before_census_and_later_command_error_preserve_independ
     assert len(calls) == 4 and len(direct) == 1
     assert instance.violations == [{'code': 'CONFIRMED_INDEPENDENT_FAIL'}]
     assert 'STATE_HEALTH_POST_CENSUS_OR_BINDING_UNAVAILABLE' in instance.missing
+
+
+@pytest.mark.parametrize('field', ['process_scope_complete', 'process_scope_errors',
+    'process_count_before', 'process_count_after'])
+def test_missing_producer_completeness_field_cannot_verify_health_absence(field):
+    instance, calls, direct = consume('empty', transform=lambda value: value.pop(field))
+    assert len(calls) == 3 and direct == []
+    assert instance.violations == [{'code': 'CONFIRMED_INDEPENDENT_FAIL'}]
+    assert 'STATE_WORKER_ABSENCE_CENSUS_INCOMPLETE' in instance.missing
+
+
+@pytest.mark.parametrize('mode', ['empty', 'permission', 'enoent', 'pid-reused', 'enumeration-error', 'scope-change'])
+def test_actual_census_to_worker_cleanup_requires_complete_death_proof(tmp_path, monkeypatch, mode):
+    spec = importlib.util.spec_from_file_location('_cleanup_fixture', Path(__file__).with_name('test_lab_activation_lif11_restart.py'))
+    restart = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(restart)
+    instance = restart.FakeLab(tmp_path, replaced=True)
+    instance.violate('CONFIRMED_INDEPENDENT_FAIL')
+    monkeypatch.setattr(instance, 'selected_worker', lambda: {
+        'pod': 'engine', 'pod_uid': 'old', 'pid': 7, 'start_ticks': 100})
+    calls = 0
+    def census(*args):
+        nonlocal calls
+        calls += 1
+        return produced_census('alive' if calls == 1 else mode)
+    monkeypatch.setattr(instance, 'census', census)
+    lab._worker_cleanup(instance, {})
+    note = next(value for step, value in instance.steps if step == 'worker-failure')
+    actual_after = produced_census(mode)
+    assert note['process_identities_after'] == [(p['pid'], p['start_ticks']) for p in actual_after['processes']]
+    assert note['process_scope_errors_after'] == actual_after['process_scope_errors']
+    restart_note = next(value for step, value in instance.steps if step == 'worker-restart-generation')
+    assert restart_note['selected_worker_death_observed'] is (mode == 'empty')
+    if mode == 'empty':
+        assert 'SELECTED_WORKER_DEATH_CENSUS_INCOMPLETE' not in instance.missing
+        assert instance.mutated is False
+    else:
+        assert 'SELECTED_WORKER_DEATH_CENSUS_INCOMPLETE' in instance.missing
+        assert 'SELECTED_WORKER_DEATH_UNOBSERVED' in instance.missing
+        assert instance.mutated is True
+    assert instance.violations == ['CONFIRMED_INDEPENDENT_FAIL']
+
+
+def test_contradictory_complete_flag_does_not_override_census_scope_errors():
+    def inconsistent(value):
+        value['process_scope_errors'] = [{'code': 'PID_READ_UNAVAILABLE', 'pid': 8}]
+    instance, calls, direct = consume('empty', transform=inconsistent)
+    assert len(calls) == 3 and not direct
+    assert 'STATE_WORKER_ABSENCE_CENSUS_INCOMPLETE' in instance.missing
+    assert instance.violations == [{'code': 'CONFIRMED_INDEPENDENT_FAIL'}]
+
+
+def test_changed_enumeration_counts_cannot_verify_health_absence():
+    instance, calls, direct = consume('empty', transform=lambda value: value.update(process_count_after=1))
+    assert len(calls) == 3 and not direct
+    assert 'STATE_WORKER_ABSENCE_CENSUS_INCOMPLETE' in instance.missing
+    assert instance.violations == [{'code': 'CONFIRMED_INDEPENDENT_FAIL'}]

@@ -1,6 +1,6 @@
-# GPU B 수명주기 실행기 개발 기록 (2026-11-02)
+# GPU B 수명주기 실행기 경계와 개발 기록
 
-기준은 `origin/main` 2f28942이다. 이 문서는 CPU 계약 개발만 기록한다. `update/docs/evidence/lab-activation-cpu-20261102.json`은 과거 CPU 원본으로 보존하며, 이번 변경을 GPU/TP 실증으로 표시하지 않는다.
+현재 실행 계약은 `3bba3c73a6bee1966b784cd90a9690e3e9d2512a` 기준이다. 개발 기록은 2026-11-02의 `origin/main` 2f28942에서 시작했다. `update/docs/evidence/lab-activation-cpu-20261102.json`과 아래 당시 시험 결과는 과거 CPU 원본이며 현재 source의 GPU/TP 실증으로 소급하지 않는다. 이후 별도 후보의 수정은 이 문서에 반영하지 않는다.
 
 ## LIF-08 주입 대상과 SIGSTOP
 
@@ -8,7 +8,7 @@
 
 SIGSTOP 직후와 요청 종료 직후, SIGCONT 직전의 프로세스 상태를 기록한다. `T`/`t`가 확인되지 않거나 요청 종료 전에 다시 실행 가능한 상태가 되면 범위를 미완료로 둔다. 2026-11-02 CPU 기록의 약 15초 뒤 200 완료는 당시 PID·시작 tick·SIGCONT 전 상태가 없어서 원인을 특정할 수 없다. 현 코드는 요청 future의 `result()`가 반환된 뒤 `finally`에서 SIGCONT를 보낸다. 이 순서만 보면 실행기 SIGCONT가 200 완료보다 앞섰다고 주장할 수 없다. 엔진 자체 복구, worker 교체, 다른 프로세스의 신호 여부는 새 상태 기록과 엔진 로그가 필요하다. SIGSTOP은 프로세스 지연이며 통신만 멈춘 별도 장애를 증명하지 않으므로 `COMMUNICATION_STALL_INJECTION_UNOBSERVED`로 둔다. CPU 단일 worker 시험은 TP rank 실증이 아니다.
 
-후속 리뷰 반영: exception 파일은 선택한 Pod UID에 고정해 쓴다. 고정 callback 파일 protocol에는 rank 지정/확인 필드가 없으므로 이 방식으로 선택 rank 예외 발생을 증명하지 않으며 `EXCEPTION_RANK_ATTRIBUTION_UNOBSERVED`를 남긴다. 모든 challenge 완료 표시는 전체 scope가 채워졌을 때만 한다. 별도 fault에서 FAIL을 관측했더라도 미실행 통신 정지나 rank 예외를 시도 완료로 표시하지 않는다. 복구 예외는 앞 fault의 FAIL과 분리해 missing·cleanup error에 남긴다.
+후속 리뷰 반영: exception 파일은 선택한 Pod UID에 고정해 쓴다. 고정 callback 파일 protocol에는 rank 지정/확인 필드가 없으므로 이 방식으로 선택 rank 예외 발생을 증명하지 않으며 `EXCEPTION_RANK_ATTRIBUTION_UNOBSERVED`를 남긴다. 모든 challenge 완료 표시는 전체 scope가 채워졌을 때만 한다. 별도 fault에서 FAIL을 관측했더라도 미실행 통신 정지나 rank 예외를 시도 완료로 표시하지 않는다. 현재 `_one_fault`는 관측 예외·조기 반환을 포함한 모든 종료 경로의 `finally`에서 복원을 시도한다. SIGSTOP 해제도 같은 target에 시도하며 오류를 따로 남긴다. 복원은 명시적인 `True`만 확인으로 인정한다. `False`·`None`·예외이면 앞 fault의 FAIL과 원 오류를 보존하고 missing·cleanup error를 추가한 뒤 다음 fault를 주입하지 않는다. `run_scenario`도 일반 수집 예외 종류에 관계없이 마지막 `finally` 복원을 시도한다.
 
 추가 코드 조사: 과거 소스의 `_one_fault`는 `running.result()`가 돌아온 다음 `finally`에서 SIGCONT를 호출한다. 기록의 delay 200/15,016ms와 stall 200/18,324ms는 그 반환값이다. `CLIENT`의 HTTP timeout은 정책 30초+5초, `Lab.requests`의 kubectl timeout은 120초이며, `DockerCluster._run`의 subprocess timeout도 전달값이다. 15초 SIGCONT 타이머나 `trap`은 `lab_activation.py`·`lab_activation_cpu_smoke.py`에 없다. `DockerCluster`의 `docker restart -t 2`는 시나리오 복구에서만 호출된다. CPU smoke의 `--launch-script`는 외부 필수 인수이고 과거 기록에는 경로/내용이 없어 그 스크립트의 trap·finally·timeout은 확인할 수 없다. 로컬 vLLM 0.31.0 참고 소스에서 `SIGSTOP`/`SIGCONT` 직접 호출은 검색되지 않았다. 따라서 과거 약 15초 완료를 내부 자동재개나 수정 완료로 귀속하지 않는다.
 
@@ -18,7 +18,9 @@ LIF-03은 부하 전/중 RSS, 대기·실행 요청 집계 지표와 각 HTTP �
 
 LIF-10은 연결 종료 요청에 고유 클라이언트 `X-Request-Id`를 붙여 결과와 기록한다. 집계 `vllm:num_requests_running == 0`은 그 ID/attempt의 Core abort, worker 완료, 전송·참조 회수를 특정하지 못한다. 집계 실행 요청이 0보다 큰 경우도 다른 정상 요청 때문일 수 있어 해당 요청의 기한 위반 FAIL로 단정하지 않고 `AGGREGATE_RUNNING_NOT_REQUEST_ATTRIBUTED`로 남긴다. 현재 실행기는 stream 연결 종료만 수행하며 별도 취소·timeout 경로를 수행하지 않는다. 요청 직접 결합이 생기면 그때 확인된 지속 위반을 FAIL로 판정한다.
 
-LIF-11은 선택한 Pod/UID의 PID·시작 tick과 `/dev/shm` 이름의 전후 목록을 기록한다. 재조회 때 같은 이름의 Pod가 다른 UID로 교체되면 예전 세대의 후속 inventory로 취급하지 않는다. 목록의 항목 수나 컨테이너 재기동 성공만으로 IPC 소유자·GPU 자원 반환 및 실패한 그룹의 회수 기한을 증명할 수 없다. 이 두 간극도 미완료로 둔다.
+LIF-11은 선택한 Pod/UID의 PID·시작 tick과 `/dev/shm` 이름의 전후 목록을 기록한다. 재조회 때 같은 이름의 Pod가 다른 UID로 교체되면 예전 세대의 inventory로 취급하지 않는다. `CENSUS`는 읽기 실패·ENOENT·PID start 교체·열거 실패/변동을 `process_scope_errors`와 전후 열거수에 보존한다. target이 행에서 보이지 않는다는 이유만으로 종료를 주장하지 않고, `process_scope_complete is True`, 빈 오류 목록, 같은 비음수 정수 전후 열거수가 모두 확인될 때만 target PID/start 부재를 `death_observed`에 쓴다. legacy·필드 누락·모순·부분 목록이면 `SELECTED_WORKER_DEATH_CENSUS_INCOMPLETE`와 종료 미관측을 남기며 관측한 다른 process 행과 독립 FAIL은 보존한다.
+
+종료가 확인된 worker 뒤 동일 Deployment 소유의 새 세대가 관측됐지만 Ready가 되지 않은 경우의 `NEXT_START_BLOCKED_AFTER_WORKER_FAILURE`, 안정된 새 engine의 직접 정상 요청 실패는 별도로 판정한다. 단순 재기동·항목 개수만으로 IPC 소유자·GPU 자원 반환·실패한 그룹의 회수 기한을 증명하지 않으며 전체 범위는 미완료다. `good_manifest`는 hash와 YAML 스키마·대상·실제 mount를 검증한다. 세션은 컨트롤러 로컬 hostPath가 아니라 UID가 고정된 실제 Pod에서 읽고, 장애 전 보존한 원 세션과 복원 세션을 구분한다. 고정 reader만 `-I -S -B`로 실행하고 parent dirfd no-follow·최종 파일 NONBLOCK/no-follow·소유자/권한·크기/JSON·전후 파일 및 Pod/CID/restart/start/node/mount를 확인한다. 검증된 whole sensor RO+data RW와 A204의 callbacks RO/data RW 분리 mount는 허용하며, 다른 가림·subPath·권한 불일치는 거부한다. 복원이 기존 기한 안에 확인되지 않으면 다음 장애/전환을 실행하지 않는다.
 
 ### A 공통 센서 입출력 요청
 
@@ -32,13 +34,15 @@ LIF-11은 선택한 Pod/UID의 PID·시작 tick과 `/dev/shm` 이름의 전후 �
 
 센서는 원본 측정 상태·오류도 반환해야 하며, 실행기는 측정 불가를 `activation_missing`, 확인된 기한 초과·잔존을 `activation_violations`로 독립 보존해야 한다. 선정 executor에서 이 연결이 생긴 뒤 같은 시나리오의 실제 관측과 정책 기한을 재대조해야 한다.
 
+현재 선택 진단은 필수 Service 관측·판정 뒤 별도 남은 예산에서 수행한다. `_optional_observation_end`는 apply·마지막 Ready 조회·정상 요청의 기존 호출 한도와 cfg Ready 창·poll을 남기며, 진단 성공을 위해 원 기한을 늘리지 않는다. `Lab._kubectl`은 남은 기한 안의 양수 ns request-timeout을 사용하고 진단 기록도 주입된 clock을 사용한다. 선택 진단/artifact 실패는 앞선 FAIL을 덮지 않는다.
+
 ## LIF-14 GB03 이후 범위·실패 주입 준비
 
-GB03의 실제 L4/TP1 정상 start/stop/next start/next stop 200 및 trace 3개·CUDA kernel 258/258/282 관측은 정상 분기의 자료다. 원본 ZIP을 재작성하지 않는다. 당시 passive cleanup의 `PROFILER_CONTROL_SESSION_SEAL_UNAVAILABLE`과 실패 뒤 재시작 미실행 상태를 함께 보존해야 하므로 전체 LIF-14 범위 완료는 아니다. 현재 실행기는 다음 start와 stop 사이에 정상 GPU 요청을 보내고 세 번째 trace 수를 기록한다. passive 수집/cleanup 오류가 있거나 실제 backend stop 실패 분기를 수행하지 않으면 `activation_scope_complete=false`, 전체 challenge `attempted=false`로 둔다. 정상 분기의 독립 위반은 계속 FAIL로 보존한다.
+GB03의 실제 L4/TP1 정상 start/stop/next start/next stop 200 및 trace 3개·CUDA kernel 258/258/282 관측은 정상 분기의 자료다. 원본 ZIP을 재작성하지 않는다. 당시 passive cleanup의 `PROFILER_CONTROL_SESSION_SEAL_UNAVAILABLE`과 실패 뒤 재시작 미실행 상태를 함께 보존해야 하므로 전체 LIF-14 범위 완료는 아니다. 선택 Lab `_profiler` 경로는 다음 start와 stop 사이의 정상 요청과 세 번째 trace 수를 기록한다. passive 수집/cleanup 오류가 있거나 backend stop 실패 분기를 수행하지 않으면 Lab의 `activation_scope_complete=false`, 전체 challenge `attempted=false`를 유지하고 확인된 정상 분기의 독립 위반은 보존한다. 이 선택 계층과 canonical `KubernetesProfilerControlExecutor`는 구분한다. lab 설정이 없으면 기존 factory의 `KubernetesProfilerObservationExecutor`가 LIF-14 profile에 따라 `KubernetesProfilerControlExecutor`로 dispatch하여 지원된 `normal` 8단계 start/inference/stop/next-start/stop을 수행한다. A207을 포함한 3bba는 stop/next-stop의 미종결 공백 중 같은 session의 sealed final이 실제 해소한 것만 `profiler_control_provisional_missing`으로 보존한다. canonical은 주입 runner가 없는 기본 경로에서도 원 EvidenceDraft origin이 EXAMPLE이고, 기존 팩의 `activation_*` 필수 관측은 미수집 UNKNOWN으로 남는다. 이를 측정 등급·GPU 성공·질문 전체 완료로 계수하지 않는다. 독립 backend 종료·output·인증·cross-process와 stop-failure 미실측은 계속 false/UNKNOWN이다.
 
 기존 `profiler_lifecycle_cpu.py`/`tools/lif14_profiler_cpu.py`는 검토 고정 vLLM 0.31.0 CPU source의 소유 임시 경로에 일반 파일을 먼저 만들어 `torch.profiler`의 기본 trace writer가 디렉터리 생성에 실패하는 두 번째 사례를 실행한다. 실제 source의 `WorkerProfiler._call_stop`은 `_stop()` 예외를 경고로 기록하지만 `_running=False`로 바꾸므로, API 200 또는 wrapper 상태만으로 native 종료 성공을 주장할 수 없다. CPU 사례는 실패 지점과 소유 경계의 참고 자료이며 GPU backend·다중 rank·HTTP 제어·재기동의 실증 근거가 아니다.
 
-GPU 실패 run 준비안: 소유한 별도 격리 세션/Pod의 trace 경로를 새 전용 디렉터리로 고정하고, 해당 경로에 예상 바이트·UID·mode를 기록한 일반 파일 collision을 **엔진 시작 전에** 둔다. `lstat`으로 경로와 부모가 symlink가 아니고 소유 UID·경계 안에 있는지 확인하며 원 mode와 복구 절차를 저장한다. 정상 세션의 trace 경로는 건드리지 않는다. 시작 전 정상 GPU 요청과 활성 수집을 확인하고 stop을 호출한 뒤 API 결과, worker별 warning, native 수집 상태, 실제 trace writer 실패와 산출물, 자원 반환을 같은 세션/시각에 결합한다. 오류 뒤 일반 파일이 동일 바이트/UID인지 확인해 소유 경로 안에서 제거하고 디렉터리를 복원한 다음 **같은 시험 환경을 재기동**해 정상 요청·새 profile start/stop·실제 trace 산출을 확인한다. 소유·nofollow·원상 복구 확인이 안 되면 주입하지 않고 UNKNOWN으로 둔다. 구체적 실행은 GPU 설정/trace 경로와 A의 worker별 native stop/경고·세션 봉인 센서가 연결된 뒤 진행하며, 이 문서는 실측 수행을 주장하지 않는다.
+GB03 뒤 당시 GPU 실패 run 준비 구상(미실행): 소유한 별도 격리 세션/Pod의 trace 경로를 새 전용 디렉터리로 고정하고, 해당 경로에 예상 바이트·UID·mode를 기록한 일반 파일 collision을 **엔진 시작 전에** 둔다. `lstat`으로 경로와 부모가 symlink가 아니고 소유 UID·경계 안에 있는지 확인하며 원 mode와 복구 절차를 저장한다. 정상 세션의 trace 경로는 건드리지 않는다. 시작 전 정상 GPU 요청과 활성 수집을 확인하고 stop을 호출한 뒤 API 결과, worker별 warning, native 수집 상태, 실제 trace writer 실패와 산출물, 자원 반환을 같은 세션/시각에 결합한다. 오류 뒤 일반 파일이 동일 바이트/UID인지 확인해 소유 경로 안에서 제거하고 디렉터리를 복원한 다음 **같은 시험 환경을 재기동**해 정상 요청·새 profile start/stop·실제 trace 산출을 확인한다. 소유·nofollow·원상 복구 확인이 안 되면 주입하지 않고 UNKNOWN으로 둔다. 이 구상은 현재의 주입 승인이나 복원 보장 근거가 아니다. GPU 설정/trace 경로·worker별 native stop/경고·봉인 연결과 기존 기한 내 복원 조건이 검증되기 전에는 재주입하지 않는다. 이 문서는 해당 실측 수행을 주장하지 않는다.
 
 ## 전환·기동·재시도 계약 보강
 
@@ -48,7 +52,7 @@ LIF-06에서는 `generation_models.before`를 전환 전 정상·진행 요청�
 
 LIF-07은 rollout 전 Pod UID 목록을 기록하고 새 UID의 Pod Ready를 구분한다. old Pod의 Ready/200만으로 완료하지 않는다. after 별칭 응답과 새 Pod Ready의 시간 관계는 후보 관측으로 남기되 응답 Pod 귀속 없이는 조기 접수 FAIL을 만들지 않는다. LIF-12는 고유 클라이언트 ID 두 개를 남기지만 전역 `prompt_tokens_total` 증감으로 같은 요청의 실제 attempt 수를 추론하거나 retry FAIL을 내지 않는다. A의 `request_id`/`attempt_id`별 입력 소비·retry 사건이 연결되기 전까지 `REQUEST_ATTEMPT_ID_AND_TOKEN_ATTRIBUTION_UNOBSERVED`다.
 
-후속 리뷰의 직접 반례: probe 파일과 아직 끝나지 않은 클라이언트 future는 **클라이언트 수신 겹침**만 확인한다. 서버 작업은 이미 끝났고 probe 버퍼 읽기만 남았을 수 있으므로 LIF-05/06에는 `SERVER_INFLIGHT_REQUEST_AND_GENERATION_UNOBSERVED`를 항상 남긴다. 서버 request ID→worker→weights/cache 세대 active 시각이 묶여야 전체 범위를 채울 수 있다. 서버 귀속이 없는 in-flight timeout도 전환이 요청을 멈췄다는 FAIL로 만들지 않는다. 한 응답 안의 서로 다른 모델 별칭이 실제 나타난 독립 위반은 별도로 보존한다.
+후속 리뷰의 직접 반례: probe 파일과 아직 끝나지 않은 클라이언트 future는 **클라이언트 수신 겹침**만 확인한다. 서버 작업은 이미 끝났고 probe 버퍼 읽기만 남았을 수 있으므로 LIF-05/06에는 `SERVER_INFLIGHT_REQUEST_AND_GENERATION_UNOBSERVED`를 항상 남긴다. 서버 request ID→worker→weights/cache 세대 active 시각이 묶여야 전체 범위를 채울 수 있다. 3bba에서는 실제 첫 body 표식과 아직 끝나지 않은 요청이 전환 호출과 겹치고 원 요청이 timeout이면 `INFLIGHT_REQUEST_HUNG_ACROSS_TRANSITION`을 보존한다. 그 겹침 근거가 없으면 `INFLIGHT_TIMEOUT_WITHOUT_SERVER_ATTRIBUTION`으로 남긴다. 이 요청 수준의 위반은 서버 request→worker→weights/cache active 범위 전체를 확인했다는 뜻이 아니므로 위 native 미관측은 유지한다. 한 응답 안에 서로 다른 모델 별칭이 나타난 독립 위반 및 완료된 원 요청의 위반은 후속 수집·progress 정리 오류와 별개로 보존한다.
 
 LIF-06의 faulty 세대는 적용 전 UID와 다른 Pod UID 및 선언된 `failure_marker`를 실제 그 Pod 로그에서 확인해야 부분 실패가 활성화된 것이다. 레이블만 `faulty`인 Ready Pod, marker가 없는 200 응답, 다른 Pod의 응답은 `PARTIAL_CHANGE_ACCEPTED` 근거가 아니다. 새 faulty UID·marker·요청 귀속 중 없는 항목은 각각 미완료로 남긴다. 같은 새 faulty UID의 marker와 Ready가 함께 확인된 위반은 독립 FAIL로 유지한다.
 
@@ -56,9 +60,9 @@ LIF-06의 faulty 세대는 적용 전 UID와 다른 Pod UID 및 선언된 `failu
 
 같은 Pod UID에서도 engine 컨테이너가 재시작될 수 있다. LIF-06 FAIL에 쓸 marker는 선택한 `container`의 **현재** 로그에서만 찾고, 읽기 전후 `containerID`·`restartCount`·running `startedAt`와 Pod UID가 동일해야 한다. `--all-containers`/`--previous`의 이전 engine 또는 sidecar marker는 진단 목록에만 남긴다. 현재 engine 로그의 marker와 Ready가 같은 컨테이너 실행 신원으로 결합되지 않으면 `PARTIAL_CHANGE_ACCEPTED`를 기록하지 않는다. 두 반례와 로그 조회 중 컨테이너 교체 반례를 CPU 계약으로 고정했다.
 
-LIF-07의 새 Pod UID/after 별칭만으로 필수 rank·모델·backend 준비가 끝났는지 보이지 않는다. 또한 Service HTTP 응답은 어떤 Pod의 것인지 직접 연결되지 않아 Ready와 404/200의 선후만으로 조기 접수 또는 미준비 수락 FAIL을 만들 수 없다. `STARTUP_NATIVE_RANK_MODEL_BACKEND_UNOBSERVED`와 `STARTUP_RESPONSE_POD_UNATTRIBUTED`를 항상 남기고, Ready/응답 불일치는 관측값과 추가 missing으로 보존한다. 직접 응답 Pod UID와 그 Pod의 native 준비 상태가 결합되기 전에는 전체 범위 완료가 아니다.
+LIF-07의 새 Pod UID/after 별칭만으로 필수 rank·모델·backend 준비가 끝났는지 보이지 않는다. 또한 Service HTTP 응답은 어떤 Pod의 것인지 직접 연결되지 않아 Ready와 404/200의 선후만으로 조기 접수 또는 미준비 수락 FAIL을 만들 수 없다. `STARTUP_NATIVE_RANK_MODEL_BACKEND_UNOBSERVED`와 `STARTUP_RESPONSE_POD_UNATTRIBUTED`를 항상 남기고 과거 Service 불일치의 미귀속도 보존한다. 필수 Service 관측창이 끝난 뒤 복원 reserve 밖에 충분한 예산이 있을 때만 현재 새 Pod 하나를 직접 확인한다. 요청 전후 Ready·동일 Pod/CID/node/IP가 유지되고 실제 HTTP 5xx이면 `READY_BEFORE_INFERENCE_AVAILABLE`을 보존한다. timeout/error/403/404나 Ready·identity 교체는 이 FAIL로 승격하지 않는다. 직접 응답은 Service 귀속이나 native rank/model/backend 준비의 전체 증명이 아니다.
 
-## 직접 시험
+## 당시 직접 시험 기록 (2026-11-02)
 
 - 명령: `uv run --python 3.12 pytest -q tests/test_lab_activation.py tests/test_lab_activation_platform.py`
 - 첫 실행: 50 passed, 2 failed, pytest 6.23초, 부모 wall 10.978초. 기존 `test_passive_and_active_facts_merge_into_a_completed_evidence`, `test_passive_failure_does_not_block_active_measurement`의 완료 기대가 새 보수적 범위 조건과 충돌했다. 기대를 미완료 증거 계약으로 수정했다.
@@ -74,8 +78,8 @@ LIF-07의 새 Pod UID/after 별칭만으로 필수 rank·모델·backend 준비�
 - 새 faulty Pod UID가 없는 marker/Ready도 수락 FAIL로 오판하지 않는 반례를 더했다. 같은 명령 최종 72 passed, pytest 2.11초, 부모 wall 2.947초. 전체 suite는 재실행하지 않았다.
 - 마지막 2 Pod 교차 반례 직접 계약: 같은 명령에서 73 passed, pytest 2.05초, 부모 wall 3.276초. Pod A marker와 Pod B Ready를 하나의 수락 위반으로 합치지 않는 것을 확인했다. 전체 suite는 재실행하지 않았다.
 - 같은 Pod 안의 컨테이너 경계 직접 계약: 같은 명령에서 최종 76 passed, pytest 2.22초, 부모 wall 3.065초. 이전 engine·sidecar marker 및 현재 로그 읽기 중 containerID/restartCount/startedAt 교체를 현재 Ready의 FAIL로 합치지 않는다. 전체 suite는 재실행하지 않았다.
-# 추가 상태·세대 결합 보수
+## 현재 상태·세대 결합 경계
 
-OBS-02의 worker 조회 실패를 0명으로 바꾸지 않는다. 신호를 보낸 Pod UID로 다시 조회하고, 서비스 health 응답이 해당 Pod·worker·로그와 결합되지 않으면 범위 미완료로 기록한다. LIF-05는 실제 update manifest와 서로 다른 전후 별칭을 사용하며 복구 시 before 별칭을 사용한다. LIF-09의 실패 표식과 Ready는 새 Pod의 동일한 현재 engine 컨테이너에 속해야 한다. 이전 컨테이너·sidecar·다른 Pod의 표식으로 현재 Ready를 위반으로 판정하지 않는다.
+OBS-02의 worker 조회 실패·부분 CENSUS를 완전한 0명으로 바꾸지 않는다. 신호를 보낸 Pod UID에서 직접 health 전후 모두 위 완전성 조건의 0명을 관측하고 같은 CID/node 및 후속 census 뒤 신원까지 유지될 때만 `HEALTH_REPORTED_AFTER_WORKERS_GONE`을 보존한다. 같은 CID에서 worker가 다시 나타나거나 읽기·열거·신원 확인이 불완전하면 해당 분기를 missing으로 두며 다른 독립 FAIL은 유지한다. Service health 응답만으로 선택 Pod의 위반을 만들지 않는다. 이 추가 health 요청과 후속 census/신원 조회는 같은 선택 deadline 안에서 수행하고 `finally`로 원 deadline을 복구한다. 예산이 부족하면 추가 조회 전에 생략 사유를 남겨 마지막 복원의 기존 호출 예산을 보존한다. LIF-05는 실제 update manifest와 서로 다른 전후 별칭을 사용하며 복구 시 before 별칭을 사용한다. LIF-09의 실패 표식과 Ready는 새 Pod의 동일한 현재 engine 컨테이너에 속해야 한다. 이전 컨테이너·sidecar·다른 Pod의 표식으로 현재 Ready를 위반으로 판정하지 않는다.
 
-관련 직접 CPU 계약은 `uv run pytest -q tests/test_lab_activation.py tests/test_lab_activation_platform.py tests/test_lab_activation_observation_state.py tests/test_lab_activation_redeploy.py tests/test_lab_activation_partial_start.py`에서 90개 통과했다. 이는 GPU 질문 전체 완료를 뜻하지 않는다. Ready가 false인 실패 컨테이너의 현재 표식 인증과 요청별 worker·GPU 완료·자원 회수는 직접 관측이 없는 한 미완료로 남는다. 원본 증거·판정과 저장 팩 Ref는 변경하지 않는다.
+당시 상태·세대 결합 CPU 계약은 `uv run pytest -q tests/test_lab_activation.py tests/test_lab_activation_platform.py tests/test_lab_activation_observation_state.py tests/test_lab_activation_redeploy.py tests/test_lab_activation_partial_start.py`에서 90개 통과했다. 이는 GPU 질문 전체 완료를 뜻하지 않는다. Ready가 false인 실패 컨테이너의 현재 표식 인증과 요청별 worker·GPU 완료·자원 회수는 직접 관측이 없는 한 미완료로 남는다. 원본 증거·판정과 저장 팩 Ref는 변경하지 않는다.

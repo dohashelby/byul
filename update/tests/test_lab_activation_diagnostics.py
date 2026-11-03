@@ -434,7 +434,8 @@ def test_optional_work_uses_original_idle_and_keeps_service_cadence_and_narrow_f
                 services.append(world.now)
             return original(argv, **options)
         def optional(*args, **kwargs):
-            assert kwargs['idle_end'] == world.now + .5
+            assert kwargs['idle_end'] == world.now + 10
+            assert any(step['step'] == 'faulty-generation' for step in args[0].steps)
             world.now += optional_duration
         monkeypatch.setattr(lab, '_diagnostic_fault_pod_request', optional)
         activation = lab.Lab({**fixture.BASE, 'deadline_ms': 1200}, runner=runner,

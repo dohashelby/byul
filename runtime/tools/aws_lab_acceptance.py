@@ -294,6 +294,17 @@ def _record_fields(detail: object) -> dict[str, Any] | None:
     }
 
 
+def _stream_final_success(record: dict[str, Any] | None) -> bool | None:
+    if record is None:
+        return None
+    delivery = record["delivery"]
+    return (record["result"] == "ALLOWED"
+            and record["final_outcome"] == "completed"
+            and delivery["attempted"] is True
+            and delivery["response"] == "completed"
+            and delivery["error_code"] is None)
+
+
 def _extract_policy_limit(document: object) -> int | None:
     """Read the enforced output limit exposed by GET /api/policy."""
 
@@ -1408,11 +1419,12 @@ class AWSAcceptance:
             self._stream_completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
         )
         stream_record = _record_fields(self._detail(stream_request_id))
-        stream_ok = None if stream_record is None else (
+        stream_final = _stream_final_success(stream_record)
+        stream_ok = None if stream_final is None else (
             stream_response.status == 200
             and stream_data
             and stream_done
-            and stream_record["result"] == "ALLOWED"
+            and stream_final
             and stream_record["delivery"]["attempted"] is True
         )
         logs_result, logs = self._engine_logs(since)
@@ -1559,15 +1571,21 @@ class AWSAcceptance:
                 valid = isinstance(choices, list) and bool(choices)
                 done = b"data: [DONE]" in response.body if stream else None
                 data_seen = any(line.strip().startswith(b"data: {") for line in response.body.splitlines()) if stream else None
+                record = _record_fields(self._detail(request_id)) if stream else None
+                stream_final = _stream_final_success(record) if stream else None
                 usage = _completion_usage(response) if not stream else None
                 rows.append({"route": route, "stream": stream, "status": response.status,
                              "request_id": request_id, "valid": valid if not stream else data_seen,
                              "done": done, "truncated": stream and not done,
+                             "record": record, "stream_final": stream_final,
                              "completion_tokens": usage,
                              "max_tokens": payload["max_tokens"]})
         logs_result, logs = self._engine_logs(since)
         normal = all(row["status"] == 200 and row["valid"] for row in rows if not row["stream"])
-        stream_ok = all(row["status"] == 200 and row["valid"] and row["done"] for row in rows if row["stream"])
+        stream_rows = [row for row in rows if row["stream"]]
+        stream_ok = (None if any(row["stream_final"] is None for row in stream_rows)
+                     else all(row["status"] == 200 and row["valid"] and row["done"]
+                              and row["stream_final"] for row in stream_rows))
         usages = [row["completion_tokens"] for row in rows if not row["stream"]]
         usage_ok = None if any(value is None for value in usages) else all(value <= 8 for value in usages)
         log_match = (all(self._log_received(logs, row["request_id"], row["route"])

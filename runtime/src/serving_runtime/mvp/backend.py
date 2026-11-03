@@ -39,7 +39,7 @@ _TOP_LEVEL_FIELDS = frozenset(
 # request field names; see BackendConfig.output_tokens_field.
 EXTERNAL_BACKEND_KINDS = frozenset({"vllm", "sglang"})
 _TIMEOUT_FIELDS = frozenset(
-    {"relay_timeout_s", "stream_idle_timeout_s", "request_deadline_s"}
+    {"relay_timeout_s", "status_timeout_s", "stream_idle_timeout_s", "request_deadline_s"}
 )
 _METRIC_FIELDS = frozenset({"metric", "type", "unit", "source_doc", "verified"})
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")

@@ -31,6 +31,12 @@ AWS 공통 GPU 시험환경 설치 묶음(`aws-handoff-20261026`, 이하 "AWS �
 | `policy-approvals.aws-lab.json` | 위 정책의 LAB 승인 목록(SHA-256 대조). runtime 자체 기록이며 정식 승인 아님 |
 | `perf-plan.aws-lab.json` | B0/B1/B2 성능 비교 계획(`tools/perf_compare.py`) |
 
+## Gateway 시간 제한과 수집
+
+`backend-config.yaml`의 `timeouts.status_timeout_s`는 엔진 health·models/version·metrics 조회와 상태 API health 확인에 쓰며 기본값은 5초다. 각 엔진 조회는 이 값으로 제한된다. 추론 및 토큰 계산·모의 receipt 조회는 `relay_timeout_s`(이 배포 예시 60초)를 계속 사용한다. 엔진 health·info·metrics는 엔진 전용 스레드 하나에서 순차 수집하고, Hubble/Tetragon 관측·Cilium·대상 Pod 수집은 별도 일반 수집 루프에서 진행한다. 한 엔진 조회가 지연되면 같은 그룹의 다음 조회와 기준선 재검증도 늦어질 수 있다. 상태 API의 수집원별 표시 형식은 같다.
+
+일반 응답의 `request_deadline_s`(이 배포 예시 300초)는 동시 요청 슬롯 획득 시점부터 토큰 계산과 엔진 연결·요청 전송·응답 헤더·본문 수신까지 적용된다. 일반 응답 본문은 최대 64 MiB다. completions SSE는 유효한 이벤트가 완성되는 즉시 전달하며, 이후 잘림·오류·기한 초과는 이미 시작한 HTTP 200의 최종 요청 기록에서 구분한다. AWS-01·18의 stream 성공은 `[DONE]`과 Gateway 최종 기록을 함께 확인한다.
+
 ## LAB 시험값 (2026-10-27, runtime 선정 · 다른 담당 확인 전)
 
 정책/검증·시험 담당의 값을 받기 전에 runtime이 정한 시험 출발값이다. 기업 운영값이나 정식 승인값이 아니다. update 점검(REQ-01·09·10·13, OBS-11)과 같은 시험에서 결과를 이으려면 같은 값을 써야 한다.

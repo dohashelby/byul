@@ -1709,23 +1709,33 @@ def _record_state(lab, values):
         lab.miss('STATE_FAILED_WORKER_CENSUS_UNAVAILABLE')
     direct = None; after_alive = None
     if alive == 0:
+        original_deadline = getattr(lab, 'observation_deadline', None)
         try:
-            pod = next((p for p in lab._pods() if p['metadata'].get('uid') == target['pod_uid']), None)
-            if pod is not None:
-                direct = _bound_pod_request(lab, pod, {'method': 'GET', 'path': '/health', 'timeout': 10})
-                if direct is not None:
-                    after_alive = len(lab.census(target['pod'], target['pod_uid'])['processes'])
-                    current = next((p for p in lab._pods() if p['metadata'].get('uid') == target['pod_uid']), None)
-                    if (current is None or lab.engine_container_identity(current) != lab.engine_container_identity(pod)
-                            or current.get('spec', {}).get('nodeName') != pod.get('spec', {}).get('nodeName')):
-                        lab.miss('STATE_HEALTH_WORKER_GENERATION_CHANGED')
-                        direct = None
-                    if after_alive != 0:
-                        lab.miss('STATE_WORKERS_REAPPEARED_DURING_HEALTH')
-                        direct = None
+            observation_end = _optional_observation_end(lab)
+            if observation_end - lab.clock() <= 5 + POLL_SECONDS:
+                lab.miss('STATE_DIRECT_HEALTH_SKIPPED_RESTORE_BUDGET')
+            else:
+                # 직접 응답 뒤 census/신원 확인까지 같은 선택 관측 예산에 포함한다.
+                lab.observation_deadline = observation_end
+                pod = next((p for p in lab._pods() if p['metadata'].get('uid') == target['pod_uid']), None)
+                if pod is not None:
+                    direct = _bound_pod_request(lab, pod,
+                            {'method': 'GET', 'path': '/health', 'timeout': 10}, observation_end=observation_end)
+                    if direct is not None:
+                        after_alive = len(lab.census(target['pod'], target['pod_uid'])['processes'])
+                        current = next((p for p in lab._pods() if p['metadata'].get('uid') == target['pod_uid']), None)
+                        if (current is None or lab.engine_container_identity(current) != lab.engine_container_identity(pod)
+                                or current.get('spec', {}).get('nodeName') != pod.get('spec', {}).get('nodeName')):
+                            lab.miss('STATE_HEALTH_WORKER_GENERATION_CHANGED')
+                            direct = None
+                        if after_alive != 0:
+                            lab.miss('STATE_WORKERS_REAPPEARED_DURING_HEALTH')
+                            direct = None
         except (OSError, TimeoutError, ValueError, KeyError, AttributeError):
             direct = None
             lab.miss('STATE_HEALTH_POST_CENSUS_OR_BINDING_UNAVAILABLE')
+        finally:
+            lab.observation_deadline = original_deadline
     lab.note('state-after-failure', health=row['outcome'], processes=alive, target=target,
         health_worker_binding_verified=direct is not None, processes_after_health=after_alive)
     if alive == 0 and direct is not None and direct.get('outcome') == 200:

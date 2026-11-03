@@ -386,3 +386,60 @@ def test_post_health_census_of_new_container_cannot_prove_prior_worker_absence(m
     assert calls == 4
     assert 'STATE_HEALTH_WORKER_GENERATION_CHANGED' in instance.missing
     assert not instance.violations
+
+
+@pytest.mark.parametrize('duration', [5.5, 10])
+def test_optional_health_preserves_service_observation_and_final_restore(duration, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'good.yaml').write_text('good')
+    world = base.Cluster(die_on_signal=True); world.clock = lambda: world.now
+    original_requests = lab.Lab.requests
+    requests = []
+    def observed_requests(instance, items, **options):
+        requests.append((world.now, items[0]['path'], options.get('url')))
+        if options.get('url'):
+            # 이 선택 요청이 실행되면 남은 기한을 전부 소비하는 반례다.
+            world.now = instance.deadline
+            raise TimeoutError('direct exhausted lab deadline')
+        return original_requests(instance, items, **options)
+    def scenario(instance, values):
+        instance.violate('CONFIRMED_INDEPENDENT_FAIL')
+        lab._record_state(instance, values)
+    monkeypatch.setattr(lab.Lab, 'requests', observed_requests)
+    monkeypatch.setitem(lab.SCENARIOS, 'OBS-02', scenario)
+    facts, instance = lab.run_scenario('OBS-02',
+        {**base.BASE, 'deadline_ms': 1000, 'max_duration_seconds': duration}, {},
+        runner=world, clock=world.clock, wait=world.wait)
+    assert requests == [(0, '/v1/chat/completions', None), (.5, '/health', None),
+        (.5, '/v1/chat/completions', None)]
+    assert 'STATE_DIRECT_HEALTH_SKIPPED_RESTORE_BUDGET' in facts['activation_missing']
+    assert 'STATE_SERVICE_HEALTH_WITHOUT_SELECTED_POD_ATTRIBUTION' in facts['activation_missing']
+    assert facts['activation_violations'] == [{'code': 'CONFIRMED_INDEPENDENT_FAIL'}]
+    assert instance.steps[-1]['step'] == 'recovered' and instance.normal[-1] is True
+    assert not instance.cleanup_errors and instance.observation_deadline is None
+
+
+def test_health_post_census_shares_optional_deadline_before_final_restore(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'good.yaml').write_text('good')
+    world = base.Cluster(die_on_signal=True); world.clock = lambda: world.now
+    original_runner = world.__call__; direct_done = False; post_census_timeout = []
+    def runner(argv, **options):
+        nonlocal direct_done
+        if lab.CLIENT in argv and json.loads(options['input_bytes'])['url'].startswith('http://10.'):
+            world.now += 9
+            direct_done = True
+        elif lab.CENSUS in argv and direct_done:
+            post_census_timeout.append(options['timeout'])
+            world.now += options['timeout']
+            raise TimeoutError('post census optional budget exhausted')
+        return original_runner(argv, **options)
+    facts, instance = lab.run_scenario('OBS-02',
+        {**base.BASE, 'deadline_ms': 1000, 'max_duration_seconds': 260}, {},
+        runner=runner, clock=world.clock, wait=world.wait)
+    assert post_census_timeout == [1]
+    assert 'STATE_HEALTH_POST_CENSUS_OR_BINDING_UNAVAILABLE' in facts['activation_missing']
+    assert not facts['activation_violations']
+    assert instance.steps[-1]['step'] == 'recovered' and instance.normal[-1] is True
+    assert instance.observation_deadline is None and not instance.cleanup_errors
+    assert world.now < instance.deadline

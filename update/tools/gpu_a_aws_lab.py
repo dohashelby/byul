@@ -22,14 +22,21 @@ NAMESPACE = 'serving-lab'
 # 인계 profile.sh와 같은 값. dev와 reference 결과를 서로 비교쌍으로 쓰지 않는다.
 PROFILES = {'dev': ('2', '4', '8Gi', '16Gi'), 'reference': ('4', '8', '12Gi', '24Gi')}
 CALLBACKS, DATA = '/guard-lifecycle/engine-callbacks', '/guard-lifecycle/data'
+MP = ('--distributed-executor-backend', 'mp')
+# guard 어댑터의 고정 SUP-03 템플릿(adapters/assets/chat). 호스트 사본은 실행 전에 같은 바이트로 둔다.
+CHAT_TEMPLATE_PATH = '/guard-assets/chat/guard-text-chat-v1.jinja'
+CHAT_TEMPLATE_SHA256 = 'e5b96cc7595d53305284a40f579747da846f01b566ad571ad2cb67526bdadc2e'
 GENERATIONS = {
-    # 콜백 센서는 V1 고정 소스 지점을 감싼다. REQ-14·16·17·18.
-    'v1-callback': {'sensor': True, 'args': ['--enable-prefix-caching'], 'env': {'VLLM_USE_V2_MODEL_RUNNER': '0'}},
+    # 콜백 센서는 V1 고정 소스 지점을 감싼다. REQ-14·16·17·18. TP1의 기본 executor는 워커를 따로 띄우지 않아
+    # REQ-14가 감싸는 MultiprocExecutor·WorkerProc 지점이 불리지 않는다. 첫 실증과 같은 MP backend로 띄운다.
+    'v1-callback': {'sensor': True, 'args': ['--enable-prefix-caching', *MP], 'env': {'VLLM_USE_V2_MODEL_RUNNER': '0'}},
     # REQ-14 동기 분기. async 기본 세대와 결과를 섞지 않는다.
-    'v1-callback-sync': {'sensor': True, 'args': ['--enable-prefix-caching', '--no-async-scheduling'],
+    'v1-callback-sync': {'sensor': True, 'args': ['--enable-prefix-caching', *MP, '--no-async-scheduling'],
         'env': {'VLLM_USE_V2_MODEL_RUNNER': '0'}},
-    # REQ-08·09·10, SUP-03·08. 기본 V2 runner, 센서 없음.
+    # REQ-08·09·10, SUP-08. 기본 V2 runner, 센서 없음.
     'v2-default': {'sensor': False, 'args': [], 'env': {}},
+    # SUP-03. guard 고정 템플릿 파일을 읽기 전용으로 마운트하고 --chat-template으로 고른다.
+    'v2-template': {'sensor': False, 'template': True, 'args': ['--chat-template', CHAT_TEMPLATE_PATH], 'env': {}},
     # REQ-16 lab 문맥. 소유 lab 네임스페이스에서만 띄운다.
     'v1-req16-lab': {'sensor': True, 'lab': True,
         'args': ['--enable-prefix-caching', '--enable-lora', '--max-lora-rank', '8', '--max-loras', '1'],
@@ -87,8 +94,12 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
             {'name': 'guard-data', 'mountPath': DATA}]
         pod['spec']['volumes'] += [{'name': 'guard-callbacks', 'hostPath': {'path': run_root + '/engine-callbacks', 'type': 'Directory'}},
             {'name': 'guard-data', 'hostPath': {'path': run_root + '/lifecycle-data', 'type': 'Directory'}}]
+    if spec.get('template'):
+        engine['volumeMounts'].append({'name': 'guard-chat-template', 'mountPath': CHAT_TEMPLATE_PATH, 'readOnly': True})
+        pod['spec']['volumes'].append({'name': 'guard-chat-template',
+            'hostPath': {'path': run_root + '/guard-text-chat-v1.jinja', 'type': 'File'}})
     if spec.get('lab'):
-        engine['volumeMounts'] += [{'name': 'guard-lora', 'mountPath': '/guard-lora'},
+        engine['volumeMounts'] +=[{'name': 'guard-lora', 'mountPath': '/guard-lora'},
             {'name': 'guard-weights', 'mountPath': '/guard-weights'}]
         pod['spec']['volumes'] += [{'name': 'guard-lora', 'emptyDir': {'sizeLimit': '1Gi'}},
             {'name': 'guard-weights', 'emptyDir': {'sizeLimit': '4Gi'}}]
@@ -110,6 +121,8 @@ def render(handoff_dir, *, generation, profile, run_id, engine_image, model_revi
         'lab_namespace_owner_label_required': bool(spec.get('lab')),
         'host_directories': ({'engine_callbacks': run_root + '/engine-callbacks', 'lifecycle_data': run_root + '/lifecycle-data'}
             if spec['sensor'] else {}),
+        **({'chat_template': {'host_file': run_root + '/guard-text-chat-v1.jinja', 'container_path': CHAT_TEMPLATE_PATH,
+            'sha256': CHAT_TEMPLATE_SHA256}} if spec.get('template') else {}),
         'outputs_sha256': {'engine.yaml': _sha(engine_yaml), 'probe.yaml': _sha(probe_yaml)}}
     return engine_yaml, probe_yaml, record
 

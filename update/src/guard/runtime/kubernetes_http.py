@@ -30,10 +30,12 @@ ONLINE_INPUT_PROFILE = "kubernetes-owned-online-input-http-v1"
 TERMINATION_PROFILE = "kubernetes-owned-termination-http-v1"
 REQUEST_ATTEMPTS_PROFILE = "kubernetes-owned-request-attempts-http-v1"
 ENGINE_CALLBACK_PROFILE = "kubernetes-owned-engine-callback-http-v1"
+INPUT_VALIDATION_PROFILE = "kubernetes-owned-input-validation-http-v1"
 from .kubernetes_observation import PROFILE as REQUIRED_EVENT_PROFILE
 from .kubernetes_observation_state import PROFILE as OBSERVATION_STATE_PROFILE
 _CLOSE_PROFILES = frozenset({TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, OBSERVATION_STATE_PROFILE})
-_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE})
+_BINDING_PROFILES = frozenset({ENGINE_CALLBACK_PROFILE, REQUEST_BINDING_PROFILE, VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ROUTE_AUTHENTICATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE})
+_INPUT_FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}")
 PROBE_SOURCE_SHA256 = "ffa7d7f44236818ae0842344f88f2ec01c2f75ed5b4a0a6032cd6fb38a36587d"
 from .kubernetes_binding import (NAME as _NAME, UID as _UID, PIN as _PIN, FIELDS as _FIELDS,
                                  validate_container_binding, verify_owned_pod, project_owned_snapshot)
@@ -139,7 +141,7 @@ class KubernetesHTTP:
         self.lab = target.get('lab')
         self.engine_name = env.engine.name
         self.engine_version = env.engine.version
-        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
+        if profile in {VALIDATION_ERROR_PROFILE, MODEL_AUTHORIZATION_PROFILE, ONLINE_INPUT_PROFILE, TERMINATION_PROFILE, REQUEST_ATTEMPTS_PROFILE, REQUIRED_EVENT_PROFILE, OBSERVATION_STATE_PROFILE, INPUT_VALIDATION_PROFILE} and (env.engine.name != "vllm" or env.engine.version != "0.31.0"):
             raise KubernetesBindingError()
         if profile==OBSERVATION_STATE_PROFILE and target.get('lab') is not True:raise KubernetesBindingError()
         if profile in _BINDING_PROFILES:
@@ -226,6 +228,7 @@ class KubernetesHTTP:
         self._state_cases = set()
         self._callback_lab = None
         self._callback_switches = 0
+        self._input_contract = None
 
     def _call(self, args, *, payload=None, cap=262144, budget=None, allow_empty=False, on_document=None):
         remaining = self.deadline - self.clock()
@@ -416,6 +419,10 @@ class KubernetesHTTP:
                         switch_path=self._engine_callback_switch_request(request)
                     else:
                         self._engine_callback_request(request)
+                elif self.profile == INPUT_VALIDATION_PROFILE:
+                    if len(requests) != 1:
+                        raise KubernetesBindingError()
+                    self._input_validation_request(request)
                 elif type(request) is not dict or type(request.get("id")) is not str or not label.fullmatch(request["id"]):
                     raise KubernetesBindingError()
                 ids.append(request["id"])
@@ -426,6 +433,8 @@ class KubernetesHTTP:
                 paths={"/tokenize","/v1/chat/completions"}
                 if self.profile in _CLOSE_PROFILES:
                     allowed.add("read_profile");paths.add("/v1/completions")
+                if self.profile == INPUT_VALIDATION_PROFILE:
+                    paths={self._input_contract["path"]}
                 models={self.api_model}
                 if switch_path is not None:
                     paths={switch_path};models=None
@@ -503,6 +512,60 @@ class KubernetesHTTP:
                 or any(type(m) is not dict or set(m)!={"role","content"} or m["role"]!="user"
                     or not _callback_content(m["content"]) for m in messages)):
             raise KubernetesBindingError()
+
+    def declare_input_contract(self, contract):
+        """REQ-08·09·SUP-08: the executor's control body plus its declared fixtures, once, before any request.
+
+        path: the one control endpoint. control: the exact control body. prompt_tokens: optional bounds for a
+        token-array prompt replacing the control's. fields: top-level extra fields and their exact fixture values.
+        """
+        try:
+            if (self.profile != INPUT_VALIDATION_PROFILE or self._input_contract is not None or type(contract) is not dict
+                    or set(contract) != {"path", "control", "prompt_tokens", "fields"}
+                    or contract["path"] not in {"/v1/completions", "/v1/chat/completions"}
+                    or type(contract["control"]) is not dict or contract["control"].get("model") != self.api_model
+                    or len(canonical_json(contract["control"])) > 4096
+                    or type(contract["fields"]) is not dict or len(contract["fields"]) > 8
+                    or any(type(k) is not str or not _INPUT_FIELD.fullmatch(k) or k in contract["control"]
+                        or len(canonical_json(v)) > 4096 for k, v in contract["fields"].items())):
+                raise ValueError
+            bounds = contract["prompt_tokens"]
+            if bounds is not None and (type(bounds) is not dict or set(bounds) != {"max_length", "max_value"}
+                    or type(bounds["max_length"]) is not int or not 1 <= bounds["max_length"] <= 8192
+                    or type(bounds["max_value"]) is not int or not 1 <= bounds["max_value"] < 2**31
+                    or type(contract["control"].get("prompt")) is not list):
+                raise ValueError
+        except (TypeError, ValueError):
+            raise KubernetesBindingError() from None
+        self._input_contract = deepcopy(contract)
+
+    def _input_validation_request(self, request):
+        """The control body, or it with one declared fixture field or a bounded token-array prompt."""
+        contract = self._input_contract
+        body = request.get("body") if type(request) is dict else None
+        try:
+            if (contract is None or type(request) is not dict or type(request.get("id")) is not str
+                    or request["id"] != "func|POST_" + contract["path"]
+                    or request.get("method") != "POST" or request.get("mode", "json") != "json"
+                    or request.get("headers", {}) != {} or type(body) is not dict):
+                raise ValueError
+            control, bounds = contract["control"], contract["prompt_tokens"]
+            if set(control) - set(body):
+                raise ValueError
+            for key, value in body.items():
+                if key in contract["fields"]:
+                    if canonical_json(value) != canonical_json(contract["fields"][key]):
+                        raise ValueError
+                elif key not in control:
+                    raise ValueError
+                elif key == "prompt" and bounds is not None and value != control["prompt"]:
+                    if (type(value) is not list or not 1 <= len(value) <= bounds["max_length"]
+                            or any(type(v) is not int or not 0 <= v <= bounds["max_value"] for v in value)):
+                        raise ValueError
+                elif canonical_json(value) != canonical_json(control[key]):
+                    raise ValueError
+        except (TypeError, ValueError, KeyError):
+            raise KubernetesBindingError() from None
 
     def declare_callback_lab(self,spec):
         """REQ-16 lab contexts: accept the declared variants only for an owned lab namespace."""

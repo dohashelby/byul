@@ -35,7 +35,13 @@ TARGETS = {
 MAX_EVENTS = 1024
 MAX_OBJECTS = 256
 MAX_BLOCKS = 256
+# Pinned sources above the default 128 KiB read bound, by SHA-256 and exact reviewed
+# size (vLLM 0.31.0 image). A file of any other size or content is still refused.
+SOURCE_BYTES = {'bb903dffcb5a6e5b8a477daf0854b3812e135349d61fc20c6133f91cd3c9752a': 335342}
 _ACTIVE = contextvars.ContextVar('guard_cache_callback_active', default=None)
+# Digests of bytes that already matched their pin. The bytes are re-read and
+# re-hashed on every call; only the compile of identical bytes is reused.
+_COMPILED = {}
 
 
 def _digest(code, name):
@@ -47,15 +53,20 @@ def _codes(module, targets=TARGETS, sources=base.SOURCE_SHA):
     name = vars(module).get('__name__')
     if name not in targets or name not in sources or sys.version_info[:2] != (3, 12) or sys.flags.optimize:
         raise ValueError('CACHE_CALLBACK_SOURCE_UNSUPPORTED')
-    raw = artifact(vars(module).get('__file__'), sources[name])
-    result = {}
-    def visit(code):
-        result[code.co_qualname] = _digest(code, name)
-        for child in code.co_consts:
-            if type(child) is types.CodeType:
-                visit(child)
-    visit(compile(raw, vars(module)['__file__'], 'exec', dont_inherit=True, optimize=0))
-    return result
+    path = vars(module).get('__file__')
+    pin = sources[name]
+    raw = artifact(path, pin, **({'limit': SOURCE_BYTES[pin]} if pin in SOURCE_BYTES else {}))
+    key = (name, path, pin)
+    if key not in _COMPILED:
+        result = {}
+        def visit(code):
+            result[code.co_qualname] = _digest(code, name)
+            for child in code.co_consts:
+                if type(child) is types.CodeType:
+                    visit(child)
+        visit(compile(raw, path, 'exec', dont_inherit=True, optimize=0))
+        _COMPILED[key] = result
+    return dict(_COMPILED[key])
 
 
 def _function(module, point):

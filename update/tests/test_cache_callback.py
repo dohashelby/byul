@@ -148,6 +148,45 @@ def test_after_call_code_change_cannot_qualify_terminal_but_keeps_entry_fact(wor
     assert any(r['point'] == 'BlockPool.get_cached_block' for r in callback.project(world.observer.report(), {})['source_bound_returns'])
 
 
+def test_same_size_rewrite_is_caught_because_bytes_are_rehashed_on_every_call(world):
+    path = Path(world.manager_module.__file__); raw = path.read_bytes()
+    path.write_bytes(raw[:-1] + (b' ' if raw[-1:] != b' ' else b'\n'))
+    assert path.stat().st_size == len(raw)
+    assert world.manager.get_computed_blocks(world.request)[1] == 4
+    assert 'CACHE_CALLBACK_ENTRY_UNAVAILABLE' in world.observer.report()['missing']
+
+
+def test_verified_bytes_are_compiled_once_and_still_read_every_call(world, monkeypatch):
+    compiled, read = [], []
+    original_artifact = callback.artifact
+    monkeypatch.setattr(callback, 'compile', lambda *a, **k: compiled.append(a) or compile(*a, **k), raising=False)
+    monkeypatch.setattr(callback, 'artifact', lambda *a, **k: read.append(a) or original_artifact(*a, **k))
+    for _ in range(3):
+        assert world.manager.get_computed_blocks(world.request)[1] == 4
+    # 요청마다 감싼 호출 3개(manager·pool·map)가 호출 전후로 한 번씩 원본을 다시 확인한다.
+    assert compiled == [] and len(read) == 3 * 3 * 2
+    assert not world.observer.report()['missing']
+
+
+def test_large_pinned_source_needs_its_exact_reviewed_size(tmp_path, monkeypatch):
+    assert callback.SOURCE_BYTES == {callback.base.SOURCE_SHA['vllm.v1.worker.gpu_model_runner']: 335342}
+    raw = b'class Big:\n    def run(self):\n        return 7\n' + b'#' * 200000 + b'\n'
+    path = tmp_path / 'big.py'; path.write_bytes(raw)
+    module = ModuleType('example.big'); module.__file__ = str(path)
+    code = next(c for c in compile(raw, str(path), 'exec').co_consts if type(c) is CodeType)
+    module.Big = type('Big', (), {'__module__': 'example.big',
+        'run': FunctionType(next(c for c in code.co_consts if type(c) is CodeType), vars(module))})
+    observer = callback.CacheCallbackObserver('a' * 32, context_provider=lambda: {})
+    observer.targets = {'example.big': ('Big.run',)}; observer.sources = {'example.big': sha256_hex(raw)}
+    with pytest.raises(ValueError, match='WORKER_STARTUP_SOURCE_UNAVAILABLE'):
+        observer.wrap(module, 'Big.run')
+    monkeypatch.setitem(callback.SOURCE_BYTES, sha256_hex(raw), len(raw) - 1)
+    with pytest.raises(ValueError, match='WORKER_STARTUP_SOURCE_UNAVAILABLE'):
+        observer.wrap(module, 'Big.run')
+    monkeypatch.setitem(callback.SOURCE_BYTES, sha256_hex(raw), len(raw))
+    assert observer.wrap(module, 'Big.run')(module.Big()) == 7
+
+
 def test_no_raw_verified_claim_can_qualify_changed_callable_or_foreign_global(tmp_path):
     module = source_module('vllm.v1.core.block_pool', tmp_path)
     observer = callback.CacheCallbackObserver('a' * 32, context_provider=lambda: {})

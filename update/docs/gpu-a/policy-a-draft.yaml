@@ -1,0 +1,35 @@
+# 담당 A의 REQ-16·REQ-17 시험 정책 초안. 기업 승인값이 아니다.
+# sensor_*_sha256은 실행할 때 그 실행의 환경·target·준비 자산·사례 manifest 해시로 바꾼다.
+# 근거와 한계: docs/gpu-a/README.md, docs/gpu-a/REQ-17_DESIGN.md
+data_origin: EXAMPLE
+status: DRAFT
+pack:
+  id: PACK-BASELINE
+  revision: 32
+values:
+  REQ-16:
+    sensor_environment_sha256: REPLACE_WITH_RUN_ENVIRONMENT_SHA256
+    sensor_target_sha256: REPLACE_WITH_RUN_TARGET_SHA256
+    sensor_prepared_sha256: REPLACE_WITH_RUN_PREPARED_SHA256
+    sensor_manifest_sha256: REPLACE_WITH_RUN_MANIFEST_SHA256
+    # 첫 실증의 cache_salt만 넣으면 남은 문맥 없이 full_scope가 된다. 남은 분기를 정책으로 지우지 않는다.
+    required_cache_contexts:
+    - cache_salt
+    - adapter_content
+    - media_identity
+    - model_generation
+  REQ-17:
+    sensor_environment_sha256: REPLACE_WITH_RUN_ENVIRONMENT_SHA256
+    sensor_target_sha256: REPLACE_WITH_RUN_TARGET_SHA256
+    sensor_prepared_sha256: REPLACE_WITH_RUN_PREPARED_SHA256
+    sensor_manifest_sha256: REPLACE_WITH_RUN_MANIFEST_SHA256
+    cache_timing_max_auc_percent: 75
+    cache_timing_min_samples: 24
+scope:
+  include:
+  - REQ-16
+  - REQ-17
+  exclude: []
+exceptions: []
+confirmed_by: null
+confirmed_at: null

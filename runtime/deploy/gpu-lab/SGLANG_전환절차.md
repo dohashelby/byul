@@ -15,10 +15,13 @@ kubectl --context byul-aws-lab -n serving-lab get deployment serving-engine -o j
 kubectl --context byul-aws-lab -n serving-lab delete deployment serving-engine --wait=true
 # 서버 전 확정한 digest를 대조한 tar를 서버의 ctr -n k8s.io images import로 반입
 sudo ctr -n k8s.io images import <sglang-이미지.tar>
-sudo ctr -n k8s.io images ls | grep sglang
+# 11/3 서버 확인: 태그+digest 이름(docker.io/lmsysorg/sglang:v0.5.22@sha256:...)으로만 있으면 kubelet이 찾지 못해 ErrImageNeverPull.
+# kubelet은 digest만 있는 이름으로 찾으므로 같은 digest를 이 이름으로도 등록한다(내용이 이미 있으면 수 초).
+sudo ctr -n k8s.io images pull docker.io/lmsysorg/sglang@sha256:<digest>
+sudo ctr -n k8s.io images ls | grep sglang   # 두 이름이 모두 보여야 한다
 ```
 
-서버 사본의 `deploy/gpu-lab-sglang/engine.yaml`, `deploy/gpu-lab-sglang/target.aws-lab.json`, `deploy/gpu-lab-sglang/intent.aws-lab.json`에 **같은 승인 digest**를 채운다. 호스트 `/srv/serving/cache/sglang/<digest>/<model-revision>/dev-profile-01`을 UID 2000, GID 0, mode 0700으로 만들고 `REPLACE_CACHE_PATH`를 그 절대 경로로 바꾼다. CPU·메모리 자리값은 현 dev profile로 채운다. `serving-sglang-admin` Secret은 서버의 소유자만 읽는 파일에서 만든다. 파일 값·생성 명령의 shell 기록이 증거에 들어가지 않게 한다.
+서버 사본의 `deploy/gpu-lab-sglang/engine.yaml`, `deploy/gpu-lab-sglang/target.aws-lab.json`, `deploy/gpu-lab-sglang/intent.aws-lab.json`에 **같은 승인 digest**를 채운다. 호스트 `/srv/serving/cache/sglang/<digest>/<model-revision>/dev-profile-01`을 UID 2000, GID 0, mode 0700으로 만들고 `REPLACE_CACHE_PATH`를 그 절대 경로로 바꾼다. CPU·메모리 자리값은 현 dev profile로 채운다. **캐시 폴더 안의 하위 폴더도 미리 만든다.** 엔진은 `TMPDIR=/cache/tmp` 등 하위 폴더가 있다고 가정하며, 없으면 첫 커널 컴파일에서 `nvcc fatal: Could not open output file '/cache/tmp/...'`로 기동이 실패한다(11/3 서버 확인). `for d in tmp home config xdg hf inductor triton cuda pycache; do sudo install -d -o 2000 -g 0 -m 0700 <캐시경로>/$d; done`. 처음 기동(캐시가 빈 상태)에서는 커널 JIT 컴파일 때문에 `nvcc`·`ninja`가 `/bin/sh`를 여러 번 실행해 의심 실행 기록이 남는다. 캐시가 만들어진 뒤의 재시작에서는 나오지 않았다. `serving-sglang-admin` Secret은 서버의 소유자만 읽는 파일에서 만든다. 파일 값·생성 명령의 shell 기록이 증거에 들어가지 않게 한다.
 
 ```bash
 kubectl --context byul-aws-lab -n serving-lab create secret generic serving-sglang-admin --from-file=admin-api-key=<비공개-파일>

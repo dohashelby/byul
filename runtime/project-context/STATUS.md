@@ -324,3 +324,9 @@
 - `deploy/gpu-lab-sglang/`에 별도 engine·Gateway overlay·backend·target·intent·LAB 정책/승인 목록·단계 수집 없는 host service를 추가했다. UID 2000/GID 0, `/models` 읽기 전용, `/cache`, GPU 1, 8000, Secret 파일의 admin key, 레벨 0 JSON 요청 로그, 관리 수신부 허용 3경로를 명시했다. `SGLANG_전환절차.md`와 `ACCEPTANCE.md`에 순차 전환·vLLM 복귀·비파괴 확인·증거 절차를 적었다. AWS 설치 묶음 원본과 기본 vLLM kustomization은 바꾸지 않았다.
 - AWS 도구에는 `--engine`(기본 vllm), SGLang JSON 로그 ID 대조, 두 엔진 고정 요청 목록 해시, 실제 Pod 인자·환경변수 이름·imageID 증거, stream 잘림 및 응답 usage 판정, 명시 선택 AWS-18(일반·stream·토큰화 경계/초과)·AWS-19(미지원 경로·필드)를 추가했다. AWS-11·16·17은 단계 근거가 없으면 `unknown`을 유지한다. AWS-18의 정확한 경계 프롬프트 탐색은 실제 환경에서 미확인이며, 토큰 계산 실패를 의도적으로 주입하는 사례는 가짜 엔진 시험으로만 확인했다.
 - 검증: 가짜 runner·로그 표본과 target·경로·필드 단위 시험, SGLang YAML 구문 검사, `enforce render`(후보 10개) 통과. 실제 `kubectl kustomize`, 서버 접속, 실제 kubectl, 실제 SGLang 실행은 사용자 지시로 수행하지 않았다. 로컬 socket 제한으로 일부 HTTP 통합 시험은 skip되어 실제 엔진 결과를 증명하지 않는다. 전체 unittest와 `git diff --check` 최종 결과는 아래 인계에 별도로 기록한다. 커밋·푸시하지 않았다.
+
+## 2026-11-03 AWS GPU 10회차 전 보정 (기준 e1c4b1b, 미커밋)
+
+- AWS-13은 재시작 전 Gateway Pod UID를 기록하고 새 UID Pod의 종료·재시작·CrashLoop 및 그 Pod의 이전/현재 로그만 판정한다. AWS-17은 새 컨테이너 startedAt 이후 시작한 새 UID 시간표만 인정하며 이전 단계 행이 남으면 실패한다. AWS-07은 요청 직전 `/api/target`이 200·`unavailable`일 때만 중단 중 요청을 보낸다. `blocked`는 기대 200과 모순되어 실패, 조회 실패·기한 초과는 요청 없이 unknown으로 남긴다.
+- backend 선택 필드 `context_headroom_tokens`(기본 0, SGLang 예시·배포 64)를 추가했다. `/api/status.engine_context_capacity`가 기존 `/v1/models` 수집의 `max_model_len`과 정책 상한+여유를 비교해 ok/insufficient/unknown 및 경고 코드만 표시한다. 플랫폼 contracts는 수정하지 않았다. SGLang 엔진 `--context-length`는 2112다.
+- preflight `--boundary-probe`는 opt-in으로 Gateway 정책 상한을 읽고 엔진 Pod 내부의 `/tokenize`·chat/completions 경계를 직접 생성해 각 결과만 표시한다. AWS-18은 length 종료와 부족한 completion usage를 엔진 잘림으로 판정한다. 가짜 runner·회귀 시험과 `kubectl kustomize` 렌더를 확인했다. 실제 AWS 엔진 실측과 10회차 결과는 미확인이다.

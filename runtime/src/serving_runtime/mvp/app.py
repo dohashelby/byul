@@ -553,6 +553,24 @@ class GatewayApp:
     def revalidation_status(self) -> dict[str, Any]:
         return self._revalidation.summary()
 
+    @staticmethod
+    def _engine_context_capacity(policy: Any, backend: BackendConfig, collectors: dict[str, Any]) -> dict[str, Any]:
+        engine_info = next((item for item in collectors["collectors"] if item["source"] == "engine_info"), None)
+        observed = (engine_info.get("last_value") or {}).get("option.max_model_len") if engine_info and engine_info.get("state") == "ok" and isinstance(engine_info.get("last_value"), dict) else None
+        observed = observed if isinstance(observed, int) and not isinstance(observed, bool) and observed > 0 else None
+        limit = policy.max_context_tokens if policy else None
+        required = limit + backend.context_headroom_tokens if limit is not None else None
+        capacity_state = ("unknown" if required is None or observed is None else
+                          "ok" if observed >= required else "insufficient")
+        return {
+            "state": capacity_state,
+            "max_model_len": observed,
+            "max_context_tokens": limit,
+            "context_headroom_tokens": backend.context_headroom_tokens,
+            "required_model_len": required,
+            "reason_code": "ENGINE_CONTEXT_CAPACITY_INSUFFICIENT" if capacity_state == "insufficient" else None,
+        }
+
     def status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
         engine = self._engine_client.status()
@@ -560,6 +578,7 @@ class GatewayApp:
         policy_runtime = self.policy_status()
         baseline = self.baseline_status()
         collectors = self.collectors_status()
+        context_capacity = self._engine_context_capacity(policy, self.backend, collectors)
         revalidation = self.revalidation_status()
         target = self.target_status()
         cache_isolation = self._cache_isolation_status(policy)
@@ -595,6 +614,7 @@ class GatewayApp:
                 else f"external_{self.backend.kind}_backend"
             ),
             "backend_kind": self.backend.kind,
+            "engine_context_capacity": context_capacity,
             "cache_isolation": cache_isolation,
             "observation_session_id": self.observation_session_id,
             "environment": self.config.environment,

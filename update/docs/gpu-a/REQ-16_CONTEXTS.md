@@ -17,32 +17,57 @@
 
 ## 문맥별 시험
 
-| 문맥 | prime·control | probe(문맥만 바꿈) | 엔진 구성 | 상태 |
+| 문맥 | prime·control | 바꾸기(`switch`) | probe·post | 엔진 구성 |
 |---|---|---|---|---|
-| `cache_salt` | salt A | salt B, 같은 prompt | 지금 세대 | G29에서 이 문맥은 full_scope. 새 센서 자산으로 다시 잼 |
-| `adapter_content` | LoRA `byul-lora`(경로 P, 내용 A) | 어댑터를 내리고 같은 경로 P에 내용 B를 쓴 뒤 같은 이름으로 다시 올림 | `--enable-lora`, `VLLM_ALLOW_RUNTIME_LORA_UPDATING=True`, 런타임 load/unload API | 실행기·도구 개발 필요 |
-| `media_identity` | 이미지 X | 같은 문장, 다른 이미지 Y. 요청이 미디어 uuid를 정할 수 있으면 같은 uuid로도 시험 | 멀티모달 모델 세대(모델 선정 필요) | 실행기 개발·모델 결정 필요 |
-| `model_generation` | 가중치 세대 1 | 실행 중 가중치를 세대 2로 바꾼 뒤 같은 prompt | `VLLM_SERVER_DEV_MODE=1`의 개발용 가중치 갱신 API(`/init_weight_transfer_engine`, `/update_weights` 등) | 갱신 방법 조사·실행기 개발 필요 |
+| `cache_salt` | salt A | 없음 | salt B로 probe, salt A로 post | 지금 세대. G29에서 이 문맥은 full_scope였고 새 센서 자산으로 다시 잰다 |
+| `adapter_content` | LoRA `byul-lora`, 내용 A | `lora_reload` B: 같은 경로의 파일을 내용 B로 바꾸고 `load_inplace`로 다시 올림 | 같은 이름·경로·prompt | `--enable-lora --max-lora-rank 8`, `VLLM_ALLOW_RUNTIME_LORA_UPDATING=True` |
+| `model_generation` | 원래 가중치 | `weights_reload` gen2: `/collective_rpc`로 `reload_weights(weights_path=gen2)` | 같은 prompt | `VLLM_SERVER_DEV_MODE=1` |
+| `media_identity` | 같은 문장 + 이미지 seed X | 없음 | 같은 문장 + 이미지 seed Y. uuid를 같게 둔 사례도 따로 | 멀티모달 모델(선정 필요) |
 
-대조: 각 문맥마다 control은 prime과 같은 문맥으로 적중해야 하고(정상 대조), post는 원래 문맥으로 돌아와 적중해야 한다. control이 적중하지 않으면 그 문맥은 잰 것으로 세지 않는다.
+- 대조: control은 prime과 같은 문맥으로 적중해야 합니다. post는 probe 뒤 같은 prompt로 적중해야 합니다. 둘 중 하나라도 아니면 그 문맥은 잰 것으로 세지 않습니다.
+- 판정: 기존 규칙 그대로입니다. 첫 블록 키가 같은데 probe가 적중하면 위반입니다.
+- 바꾸기 실패: 실패한 `switch` 뒤의 사례는 보내지 않고 결과는 UNKNOWN입니다.
 
-## 개발할 것 (A 소유 파일)
+## 구현 (2026-11-03)
 
-1. **사례 필드**(`engine_callback_projection.validate_cases`, `engine_sensor`):
-   - `adapter`: 요청 `model`을 manifest에 적힌 어댑터 이름 중 하나로 바꾼다.
-   - `media`: 실행기가 seed로 같은 이미지를 다시 만들 수 있는 작은 PNG를 생성해 content part로 붙인다. 원본 이미지는 증거에 남기지 않고 해시만 남긴다.
-   - prompt 4,096자 상한은 그대로 둔다.
-2. **사례 사이의 lab 동작:** role `switch`와 `action`(`lora_reload`, `weights_update`)
-   - `target.lab`이 참이고 소유 네임스페이스(`byul.lab/owned=true`)일 때만 실행한다. `lab_activation`과 같은 소유 확인을 쓴다.
-   - 동작마다 요청·응답 원문 해시와 전후 세대를 기록한다. 동작이 실패하면 그 문맥은 UNKNOWN이다.
-3. **어댑터 생성 도구:** Qwen2.5-0.5B의 q_proj·v_proj에 맞는 rank 8 LoRA 두 벌(내용 A·B)을 seed로 만든다. 엔진 이미지 안의 torch·safetensors로 만들고, 아무것도 내려받지 않는다.
-4. **계약 시험:** 어댑터 내용 교체·이미지 교체·가중치 교체 각각에 대해 같은 키 적중은 위반, 다른 키·미적중은 통과, 동작 실패는 UNKNOWN.
+| 파일 | 내용 |
+|---|---|
+| `executors/engine_callback_projection.py` | REQ-16 사례에 `adapter`, `media`(`seed`, 선택 `uuid`)와 role `switch`(`lora_reload`·`weights_reload`, `variant`)를 더함. 다른 점검은 받지 않음. 닫힌 lab 선언 검사 `validate_lab_contexts`, 결정적 16×16 PNG `media_png`, content part `message_content` |
+| `executors/engine_sensor.py` | `switch`나 `adapter` 사례, 또는 lab 선언이 있으면 `target.lab`이 참이어야 함. 전송에 선언을 맡긴 뒤 사례 순서대로 바꾸기와 요청을 보냄. `lab_switches`를 결과에 남김 |
+| `runtime/kubernetes_http.py` | `declare_callback_lab`: lab 대상 + 엔진 네임스페이스 이름·UID·`byul.lab/owned=true` 확인. `engine_callback_switch`: 선언된 변형만 사용. LoRA는 고정 프로그램 `LORA_VARIANT_COPY`로 엔진 컨테이너 안에서 파일을 바꾼 뒤 `/v1/load_lora_adapter`에 선언된 이름·경로로만 보냄. 가중치는 `/collective_rpc` `reload_weights`에 선언된 경로로만 보냄. 채팅 요청의 model은 서빙 별칭과 선언된 어댑터 이름만, content는 문자열이거나 문장 + 생성 PNG 한 개만 받음 |
+| `tools/gpu_a_lab_variants.py` | 엔진 컨테이너 안에서 표준 라이브러리만으로 LoRA 두 벌(`lora --model-dir --out --seed`)과 두 번째 가중치 세대(`weights --model-dir --out`, `model.norm.weight`를 1.0으로)를 만듦. 내려받지 않음 |
+
+계약 시험 `tests/test_req16_lab_contexts.py`:
+- 사례·선언 검사
+- 미디어 part
+- 소유 표시가 없거나 lab이 아니면 선언 거부
+- 선언 밖 바꾸기·재적재 요청 거부
+- 어댑터 이름은 선언 뒤에만 사용
+- 같은 키 적중은 위반, 미적중은 위반 아님
+- 바꾸기 실패와 소유 미확인은 UNKNOWN
+- 복사 프로그램이 같은 경로에서 내용만 바꾸고, 링크·빠진 파일은 거부
+- 변형 도구 결과
+
+생성한 LoRA와 두 번째 가중치 파일은 0.31.0 이미지의 `safetensors`로 읽히는 것을 로컬에서 확인했습니다.
+
+## 배포 요건 (lab 전용)
+
+- 엔진 네임스페이스에 `byul.lab/owned=true` 표시, 실행 대상(target)에 `"lab": true`.
+- 엔진 컨테이너에 쓰기 가능한 `/guard-lora`와 `/guard-weights`(emptyDir). 변형은 `tools/gpu_a_lab_variants.py`를 엔진 컨테이너 안에서 실행해 만듭니다. 두 번째 가중치 세대는 모델 크기만큼 공간이 필요합니다(0.5B 기준 약 1GB).
+- `adapter_content` 세대: `--enable-lora --max-lora-rank 8`, `VLLM_ALLOW_RUNTIME_LORA_UPDATING=True`.
+- `model_generation` 세대: `VLLM_SERVER_DEV_MODE=1`. 개발용 API가 열리므로 소유 lab 밖에서는 띄우지 않습니다.
+- 사례 manifest의 `lab_contexts` 예:
+  ```json
+  {"lora": {"name": "byul-lora", "active_path": "/guard-lora/active",
+            "variants": {"A": "/guard-lora/variants/a", "B": "/guard-lora/variants/b"}},
+   "weights": {"variants": {"gen2": "/guard-weights/gen2"}}}
+  ```
 
 ## 정할 것
 
-- `media_identity`의 멀티모달 모델과 고정 revision: 내려받기 크기·비용 승인이 필요하다. L4 24GB에서 도는 소형 VL 모델이 후보다.
-- `model_generation`의 가중치 갱신 방법: 개발용 weight transfer는 송신 쪽 프로세스가 필요하다. 같은 노드 안에서 끝나는 방법을 먼저 조사한다.
-- 요청이 정한 미디어 uuid가 캐시 식별자로 쓰이는지: 0.31.0 소스에서 더 확인하고 GPU에서 확인한다.
+- `media_identity`의 멀티모달 모델과 고정 revision: 내려받기 크기·비용 승인이 필요합니다. 실행기·전송 쪽 지원은 끝났습니다.
+- 요청의 미디어 `uuid`가 캐시 식별자로 쓰이는지: GPU에서 같은 uuid·다른 이미지 사례로 확인합니다.
+- `load_inplace`와 `reload_weights` 뒤 vLLM이 접두 캐시를 비우는지: 소스상으로는 보이지 않으며, GPU 결과가 이 질문에 대한 답입니다.
 
 ## 세대 계획
 
@@ -51,5 +76,7 @@
 | V1 센서 + 런타임 LoRA 갱신 | `cache_salt`, `adapter_content` |
 | 멀티모달 모델 | `media_identity` |
 | 개발 모드 가중치 갱신 | `model_generation` |
+
+LoRA 세대와 개발 모드 세대는 한 엔진으로 합칠 수 있지만, 결과를 나눠 보기 위해 세대 기록은 따로 남깁니다.
 
 세대마다 환경·target·준비 자산·manifest를 따로 만들고 결과를 섞지 않는다.

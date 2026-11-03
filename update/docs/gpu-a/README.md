@@ -13,6 +13,7 @@ A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18
 | REQ-17 통계 설계 | 확정. 사례 생성기와 계약 시험 추가 | `REQ-17_DESIGN.md`, `tools/gpu_a_req17_cohort.py` |
 | REQ-14 거부 원인 | 소스에서 특정, CPU로 재현, 보수 | `REQ-14_REJECTION.md` |
 | 센서 보수 3건 | 구현·계약 시험 완료(사용자 승인 2026-11-02). GPU 확인 전 | 아래 |
+| REQ-16 lab 문맥 | 어댑터 내용·가중치 세대 바꾸기와 미디어 사례 실행기 구현, 계약 시험 완료(2026-11-03). 멀티모달 모델 선정과 GPU 확인 전 | `REQ-16_CONTEXTS.md`, `tools/gpu_a_lab_variants.py` |
 
 ## 센서 보수 (A 소유 파일, GPU 확인 전)
 
@@ -40,7 +41,7 @@ A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18
 | SUP-08 | `code_selection_fields`, `code_selection_allowed`, `rejection_codes` |
 | REQ-14·18·19·20·21, LIF-13 | 실행마다 정하는 `sensor_*_sha256` 4개만 |
 
-REQ-16은 네 문맥을 모두 이번 범위에 넣는다(2026-11-03 사용자 결정). 시험 방법과 개발할 것은 `REQ-16_CONTEXTS.md`에 있다.
+REQ-16은 네 문맥을 모두 이번 범위에 넣는다(2026-11-03 사용자 결정). 시험 방법, 구현, lab 배포 요건은 `REQ-16_CONTEXTS.md`에 있다.
 
 ## 기록 규칙
 

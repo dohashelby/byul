@@ -1186,6 +1186,7 @@ class FakeExecutionTests(unittest.TestCase):
                     [
                         response(200, before),
                         response(200, unavailable),
+                        response(200, {"verification": {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"}, "gateway_hold": None}),
                         response(200, {"choices": [{"message": {"content": "during stop"}}]}, "stopped-request"),
                         response(200, detail("ALLOWED", attempted=True)),
                         response(200, {"verification": {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"}, "gateway_hold": None}),
@@ -1219,6 +1220,7 @@ class FakeExecutionTests(unittest.TestCase):
                 runner=FakeRunner([CommandResult(0), CommandResult(0)]),
                 http=FakeHTTP([
                     response(200, before), response(200, unavailable),
+                    response(200, {"verification": {"state": "blocked", "last_confirmed_at": None}, "gateway_hold": {"reason_code": "TARGET_UNAVAILABLE"}}),
                     response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}, "stopped-request"),
                     response(200, detail("ERROR", reason="TARGET_UNAVAILABLE", attempted=False, status=503)),
                     response(200, {"verification": {"state": "blocked", "last_confirmed_at": None}, "gateway_hold": {"reason_code": "TARGET_UNAVAILABLE"}}),
@@ -1711,6 +1713,7 @@ class NewCaseExecutionTests(unittest.TestCase):
             (bundles / "current").symlink_to("previous")
             runner = RestartRunner()
             checker = AWSAcceptance(arguments(root, cases=("AWS-13",), allow_bundle_switch=True, bundle_root=str(bundles)), runner=runner, http=HTTP(runner))
+            checker._gateway_crashed = lambda _window: (True, {"restart_count": 1})
             checker._retry_inference = lambda _timeout: (checker._completion(token=INFERENCE)[0].status == 200, {"result": "ALLOWED"}, {"last_status": 200})
             checker._detail = lambda _id: detail("DENIED", reason="AUTH_REQUIRED", attempted=False, status=401)
             self.assertEqual(checker.run(), 0)
@@ -2022,6 +2025,27 @@ class NewCaseExecutionTests(unittest.TestCase):
                 self.assertTrue(all("serving-engine" not in row and "serving-gateway" not in row for row in commands))
                 self.assertEqual(evidence["blocked_probe"]["errno_name"], "ETIMEDOUT")
 
+    def test_gateway_crash_detection_reads_newest_pod_state(self) -> None:
+        def pods(restart_count, waiting=None):
+            state = {"waiting": {"reason": waiting}} if waiting else {"running": {}}
+            return json.dumps({"items": [
+                {"metadata": {"creationTimestamp": "2026-11-03T00:00:00Z"}, "status": {"containerStatuses": [{"name": "gateway", "restartCount": 0, "state": {"running": {}}}]}},
+                {"metadata": {"creationTimestamp": "2026-11-03T00:01:00Z"}, "status": {"containerStatuses": [{"name": "gateway", "restartCount": restart_count, "state": state}]}},
+            ]})
+        clock = FakeClock()
+        with tempfile.TemporaryDirectory() as directory:
+            for name in ("crashed", "steady", "unreadable"):
+                (Path(directory) / name).mkdir()
+            crashed = AWSAcceptance(arguments(Path(directory) / "crashed"), runner=FakeRunner([CommandResult(0, pods(1, "CrashLoopBackOff"))]),
+                                    http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            self.assertIs(crashed._gateway_crashed(10.0)[0], True)
+            steady = AWSAcceptance(arguments(Path(directory) / "steady"), runner=FakeRunner([CommandResult(0, pods(0))] * 20),
+                                   http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            self.assertIs(steady._gateway_crashed(10.0)[0], False)
+            unreadable = AWSAcceptance(arguments(Path(directory) / "unreadable"), runner=FakeRunner([CommandResult(1)] * 20),
+                                       http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            self.assertIsNone(unreadable._gateway_crashed(10.0)[0])
+
     def test_bad_bundle_is_restored_even_when_gateway_recovery_fails(self) -> None:
         for fail_recovery in (False, True):
             with self.subTest(fail_recovery=fail_recovery), tempfile.TemporaryDirectory() as directory:
@@ -2039,6 +2063,7 @@ class NewCaseExecutionTests(unittest.TestCase):
                     calls.append(1)
                     return (len(calls) == 2 and not fail_recovery), {"attempt": len(calls)}
                 checker._restart = restart
+                checker._gateway_crashed = lambda _window: (True, {"restart_count": 1})
                 checker._retry_inference = lambda _timeout: (True, {"result": "ALLOWED"}, {"attempts": 1, "last_status": 200})
                 checker._completion = lambda **_kwargs: (response(401, {}, "denied-1"), "denied-1", False)
                 checker._detail = lambda _id: detail("DENIED", reason="AUTH_REQUIRED", attempted=False, status=401)

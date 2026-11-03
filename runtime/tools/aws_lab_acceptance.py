@@ -2253,6 +2253,19 @@ class AWSAcceptance:
                 # The Pod snapshot has its own freshness window. Exercise the
                 # stopped window only after it has expired, with polling slack.
                 self.sleep(max(0.0, stale + 2.0 - (self.monotonic() - stopped_window_started)))
+                # The Gateway re-reads the snapshot on its own poll (5 s by
+                # default), so expiry is visible up to one poll after `stale`.
+                # Wait for the unavailable state before sending the request.
+                unavailable_deadline = stopped_window_started + stale + 12.0
+                while True:
+                    try:
+                        _probe_response, probe_target = self._get_json("/api/target")
+                    except (OSError, URLError, TimeoutError):
+                        probe_target = None
+                    probe_state = ((probe_target or {}).get("verification") or {}).get("state") if isinstance(probe_target, dict) else None
+                    if probe_state in {"unavailable", "blocked"} or self.monotonic() >= unavailable_deadline:
+                        break
+                    self.sleep(1.0)
                 try:
                     stopped_response, stopped_request_id, stopped_valid = self._completion(
                         token=self.tokens["RUNTIME_INFERENCE_TOKEN"],
@@ -2724,6 +2737,37 @@ class AWSAcceptance:
         status = self._kubectl("rollout", "status", f"deployment/{deployment}", f"--timeout={timeout_s}s", timeout=timeout_s + 10) if restart.returncode == 0 else CommandResult(1)
         return restart.returncode == 0 and status.returncode == 0, {"restart_rc": restart.returncode, "rollout_rc": status.returncode}
 
+    def _gateway_crashed(self, window_s: float) -> tuple[bool | None, dict[str, Any]]:
+        """True if the newest Gateway container exited after the restart.
+
+        False only when it stayed running for the whole window; None when the
+        Pod state could not be read.
+        """
+        deadline = self.monotonic() + window_s
+        last: dict[str, Any] = {}
+        seen = False
+        while True:
+            result = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
+            document = _json_object(result.stdout.encode()) if result.returncode == 0 else None
+            items = document.get("items") if isinstance(document, dict) else None
+            pods = [item for item in items if isinstance(item, dict) and not (item.get("metadata") or {}).get("deletionTimestamp")] if isinstance(items, list) else []
+            if pods:
+                pod = max(pods, key=lambda item: str((item.get("metadata") or {}).get("creationTimestamp", "")))
+                statuses = (pod.get("status") or {}).get("containerStatuses") or []
+                status = next((item for item in statuses if isinstance(item, dict) and item.get("name") == "gateway"), None)
+                if isinstance(status, dict):
+                    seen = True
+                    state = status.get("state") or {}
+                    last_state = status.get("lastState") or {}
+                    waiting = (state.get("waiting") or {}).get("reason")
+                    last = {"restart_count": status.get("restartCount"), "waiting_reason": waiting,
+                            "terminated": bool(state.get("terminated") or last_state.get("terminated"))}
+                    if (isinstance(status.get("restartCount"), int) and status["restartCount"] > 0) or last["terminated"] or waiting in {"CrashLoopBackOff", "Error"}:
+                        return True, last
+            if self.monotonic() >= deadline:
+                return (False if seen else None), last
+            self.sleep(2.0)
+
     def aws_12(self) -> tuple[dict[str, Any], dict[str, Any]]:
         if not getattr(self.args, "allow_compare_policy", False):
             return {"not_run_reason": "--allow-compare-policy 없음"}, {}
@@ -2852,6 +2896,16 @@ class AWSAcceptance:
         switched = False
         try:
             shutil.copytree(root / previous, bad, symlinks=False)
+            # Keep the source group (Gateway reads via group 10000) so the bad
+            # bundle is rejected for its hash, not for a permission error.
+            source_gid = (root / previous).stat().st_gid
+            for path in (bad, *bad.rglob("*")):
+                try:
+                    if path.stat().st_gid != source_gid:
+                        os.chown(path, -1, source_gid)
+                except PermissionError:
+                    evidence["group_copy"] = "not_permitted"
+                    break
             manifest = json.loads((bad / "bundle.json").read_text(encoding="utf-8"))
             role = next(item for item in manifest["files"] if item["role"] == "gateway_policy")
             target = bad / role["path"]
@@ -2865,10 +2919,20 @@ class AWSAcceptance:
             os.symlink(bad.name, swap)
             os.replace(swap, current)
             switched = True
-            bad_restart, evidence["bad_restart"] = self._restart("serving-gateway", 45)
-            logs = self._kubectl("logs", "deployment/serving-gateway", "-c", "gateway", "--tail=100")
-            hash_error = logs.returncode == 0 and ("SHA-256" in logs.stdout or "sha256" in logs.stdout.lower())
-            facts["bad_bundle_rejected"] = False if bad_restart else (True if hash_error else None)
+            # The Gateway has no readiness probe: a refused bundle makes the new
+            # Pod start, exit, and crash-loop, while `rollout status` can still
+            # succeed. Judge by the container's exit and its log, not rollout.
+            _bad_rollout, evidence["bad_restart"] = self._restart("serving-gateway", 45)
+            crashed, crash_state = self._gateway_crashed(45.0)
+            evidence["bad_gateway_state"] = crash_state
+            hash_error = False
+            if crashed:
+                for extra in (("--previous",), ()):
+                    logs = self._kubectl("logs", "deployment/serving-gateway", "-c", "gateway", "--tail=100", *extra)
+                    if logs.returncode == 0 and ("SHA-256" in logs.stdout or "sha256" in logs.stdout.lower()):
+                        hash_error = True
+                        break
+            facts["bad_bundle_rejected"] = (True if hash_error else None) if crashed else (False if crashed is False else None)
             evidence["hash_error_seen"] = hash_error
         except (OSError, ValueError, KeyError, StopIteration, TypeError, json.JSONDecodeError) as error:
             facts["unknown_reason"] = "잘못된 묶음 준비 실패: " + _safe_exception(error)
@@ -3126,11 +3190,25 @@ class AWSAcceptance:
                 break
             self.sleep(2.0)
         timeline_at_probe = self._timeline()
-        available, rows = self._tetragon_observations(started)
-        matched = [row for row in rows if row.get("kind") == "process_exec" and row.get("binary") in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"} and self._engine_event(row, after["name"]) and _parse_time(row.get("observed_at")) == _parse_time(raw_time)]
+        # The Gateway ingests the feed a few seconds after the raw event.
+        available, rows, matched = False, [], []
+        for attempt in range(10):
+            available, rows = self._tetragon_observations(started)
+            matched = [row for row in rows if row.get("kind") == "process_exec" and row.get("binary") in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"} and self._engine_event(row, after["name"]) and _parse_time(row.get("observed_at")) == _parse_time(raw_time)]
+            if matched or not raw_uid or attempt == 9:
+                break
+            self.sleep(2.0)
         probe_collector = (timeline_at_probe or {}).get("collector") or {}
         old_stale = (probe_collector.get("pod_uid") == before["uid"] and all(row.get("phase") in (None, [], ["unknown"]) for row in matched))
-        new_fresh = (probe_collector.get("pod_uid") == after["uid"] and isinstance(probe_collector.get("written_at"), str) and all(row.get("phase_timeline_written_at") == probe_collector.get("written_at") and row.get("phase_timeline_fresh") is True for row in matched))
+        # The timeline is rewritten every few seconds, so exact written_at
+        # equality never holds. A fresh timeline written after the old Pod's
+        # last write, while the collector follows the new Pod UID, can only be
+        # the new Pod's timeline.
+        old_written = _parse_time((timeline_before.get("collector") or {}).get("written_at")) if isinstance(timeline_before, dict) else None
+        new_fresh = (probe_collector.get("pod_uid") == after["uid"] and old_written is not None
+                     and all(row.get("phase_timeline_fresh") is True
+                             and (_parse_time(row.get("phase_timeline_written_at")) or old_written) > old_written
+                             for row in matched))
         facts["old_phase_absent"] = (old_stale or new_fresh) if raw_uid and available and matched else None
         evidence.update({"raw_process_pod_uid": raw_uid, "raw_event_time": raw_time, "timeline_at_probe": probe_collector, "probe_phase": [row.get("phase") for row in matched], "phase_source": "old_uid_rejected" if old_stale else "new_uid_timeline" if new_fresh else None})
         timeline_new = None

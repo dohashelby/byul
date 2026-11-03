@@ -7,6 +7,8 @@ metadata:
 spec:
   serviceAccountName: probe
   automountServiceAccountToken: false
+  # Python as PID 1 ignores SIGTERM; a short grace keeps cleanup inside the tool timeout.
+  terminationGracePeriodSeconds: 2
   securityContext:
     runAsNonRoot: true
     runAsUser: 10003
@@ -18,6 +20,11 @@ spec:
       imagePullPolicy: __COMPARE_PULL_POLICY__
       command: ["python", "-m", "http.server", "8080", "--directory", "/tmp"]
       ports: [{containerPort: 8080}]
+      # Ready only once http.server listens; otherwise the baseline probe races it.
+      readinessProbe:
+        tcpSocket: {port: 8080}
+        periodSeconds: 1
+        failureThreshold: 30
       securityContext:
         allowPrivilegeEscalation: false
         readOnlyRootFilesystem: true
@@ -36,6 +43,8 @@ metadata:
 spec:
   serviceAccountName: probe
   automountServiceAccountToken: false
+  # Python as PID 1 ignores SIGTERM; a short grace keeps cleanup inside the tool timeout.
+  terminationGracePeriodSeconds: 2
   securityContext:
     runAsNonRoot: true
     runAsUser: 10003

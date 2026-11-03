@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 from typing import Callable, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -159,15 +160,22 @@ def collect(args: argparse.Namespace, runner: Runner | None = None, *, opener: C
         checks.append(_check("engine_digest", "ok" if matches else "fail", "엔진 선언 이미지 또는 Pod imageID digest 일치" if matches else "엔진 이미지 digest 불일치"))
     root = Path(args.bundle_root)
     current = root / "current"
-    if not current.is_symlink():
+    try:
+        is_link = current.is_symlink()
+        target = os.readlink(current) if is_link else ""
+        complete = bool(target) and not os.path.isabs(target) and Path(target).name == target and (root / target).is_dir()
+    except PermissionError:
+        is_link = None
+    if is_link is None:
+        # The bundle root is root:10000 0750; the operator account may not read it.
+        checks.append(_check("bundle", "unknown", "묶음 폴더 읽기 권한 없음; sudo로 bundle verify 별도 확인"))
+    elif not is_link:
         checks.append(_check("bundle", "fail", "current가 심볼릭 링크 아님"))
+    elif not complete:
+        checks.append(_check("bundle", "fail", "상대 링크가 완성된 묶음을 가리키지 않음"))
     else:
-        target = os.readlink(current)
-        if os.path.isabs(target) or Path(target).name != target or not (root / target).is_dir():
-            checks.append(_check("bundle", "fail", "상대 링크가 완성된 묶음을 가리키지 않음"))
-        else:
-            verified = runner.run(["serving-runtime", "bundle", "verify", "--bundle-dir", str(root / target)], timeout=15)
-            checks.append(_check("bundle", "ok" if verified.returncode == 0 else "fail", "상대 링크와 묶음 검증 성공" if verified.returncode == 0 else "묶음 검증 실패"))
+        verified = runner.run([sys.executable, "-m", "serving_runtime", "bundle", "verify", "--bundle-dir", str(root / target)], timeout=15)
+        checks.append(_check("bundle", "ok" if verified.returncode == 0 else "fail", "상대 링크와 묶음 검증 성공" if verified.returncode == 0 else "묶음 검증 실패"))
     service = runner.run(["systemctl", "--user", "is-active", "byul-observation-feed"])
     checks.append(_check("collector_service", "ok" if service.returncode == 0 and service.stdout.strip() == "active" else "fail", "active" if service.returncode == 0 and service.stdout.strip() == "active" else "active 아님"))
     service_args = runner.run(["systemctl", "--user", "show", "byul-observation-feed", "-p", "ExecStart"])

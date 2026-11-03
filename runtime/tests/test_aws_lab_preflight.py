@@ -26,7 +26,7 @@ class FakeRunner:
         self.calls.append(tuple(argv))
         if argv[-2:] == ["config", "current-context"]:
             return CommandResult(0, "byul-aws-lab\n")
-        if argv[0] == "serving-runtime":
+        if list(argv[1:4]) == ["-m", "serving_runtime", "bundle"]:
             return CommandResult(self.verify_code, "secret output")
         if argv[0] == "systemctl":
             if "show" in argv:
@@ -136,6 +136,11 @@ class PreflightTests(unittest.TestCase):
         checks = self.check()
         self.assertEqual(checks["engine_digest"].status, "fail")
         self.assertEqual(checks["bundle"].status, "fail")
+
+    def test_unreadable_bundle_root_is_unknown_not_crash(self):
+        with patch("tools.aws_lab_preflight.Path.is_symlink", side_effect=PermissionError(13, "denied")):
+            checks = self.check()
+        self.assertEqual(checks["bundle"].status, "unknown")
 
     def test_registry_digest_can_differ_from_pod_config_digest(self):
         self.args.expect_engine_digest = "sha256:" + "a" * 64

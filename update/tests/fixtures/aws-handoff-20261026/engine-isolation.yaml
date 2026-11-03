@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: engine-runtime
+  namespace: serving-lab
+spec:
+  podSelector:
+    matchLabels: {app: serving-engine}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: serving-gateway}
+      ports: [{protocol: TCP, port: 8000}]
+  egress: []

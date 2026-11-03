@@ -81,25 +81,40 @@ VLLM_CPU_029 = EnginePatternSet(
 )
 
 
-SGLANG_UNSUPPORTED = EnginePatternSet(
+SGLANG_GPU_0522 = EnginePatternSet(
     engine="sglang",
-    name="sglang-unverified",
-    support_level="unsupported_no_source_log",
+    name="sglang-gpu-0.5.22-cached-start-observed",
+    support_level="observed_gpu_cached_start_log_excerpt_first_start_jit_unverified",
     basis="engine_signal",
-    patterns=(),
-    limitations=("SGLang 단계 표지는 근거 로그가 없어 미지원",),
+    patterns=(
+        _pattern("loading_start", "Load weight begin."),
+        _pattern("loading_end", "Load weight end."),
+        _pattern("compiling_start", "Capture target prefill CUDA graph begin."),
+        _pattern("compiling_end", "Capture target decode CUDA graph end."),
+        _pattern("inferring_start", "The server is fired up and ready to roll!"),
+    ),
+    limitations=(
+        "SGLang v0.5.22 GPU 캐시 있는 기동 로그 근거, 첫 기동 JIT 컴파일 위치는 미확인",
+        "캐시 재기동은 컨테이너 시작 07:31:15Z부터 첫 Load weight begin. 07:31:55Z까지 약 40초간 단계 없음; 07:31:23Z ptxas 등 단계 전용 실행은 phase_unknown이며 AWS-11 잘못된 경고 집계에서 제외",
+        "캐시 재기동의 07:31:58 컴파일러 실행은 07:31:57 CUDA graph 시작 뒤 compiling에 포함; 첫 기동 JIT 약 3분은 로그 부재로 경계 미확인",
+        "engine_signal은 신뢰된 단계 근거가 아님",
+    ),
 )
 
 
 ENGINE_PATTERN_SETS: dict[str, EnginePatternSet] = {
     "vllm": VLLM_CPU_029,
-    "sglang": SGLANG_UNSUPPORTED,
+    "sglang": SGLANG_GPU_0522,
 }
 
 
 _LOG_TIME = re.compile(
     r"(?<!\d)(?P<month>0[1-9]|1[0-2])-(?P<day>0[1-9]|[12]\d|3[01]) "
     r"(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d):(?P<second>[0-5]\d)(?!\d)"
+)
+_SGLANG_LOG_TIME = re.compile(
+    r"\[(?P<year>\d{4})-(?P<month>0[1-9]|1[0-2])-(?P<day>0[1-9]|[12]\d|3[01]) "
+    r"(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d):(?P<second>[0-5]\d)\]"
 )
 _REQUEST_LINE = re.compile(r"request_logger|Received request|SamplingParams|(?:^|[\s,])prompt\s*[:=]", re.IGNORECASE)
 _KUBECTL_TIME = re.compile(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d))\s")
@@ -131,6 +146,12 @@ def _line_time(line: str, *, year: int, zone: tzinfo) -> datetime | None:
     outer = _KUBECTL_TIME.match(line)
     if outer is not None:
         return datetime.fromisoformat(outer.group(1).replace("Z", "+00:00"))
+    sglang = _SGLANG_LOG_TIME.search(line)
+    if sglang is not None:
+        try:
+            return datetime(**{name: int(value) for name, value in sglang.groupdict().items()}, tzinfo=zone)
+        except ValueError as error:
+            raise ValueError(f"invalid log timestamp: {sglang.group(0)}") from error
     match = _LOG_TIME.search(line)
     if match is None:
         return None

@@ -228,11 +228,15 @@ def _matches_engine(event: dict[str, Any], intent: Any) -> bool:
     process = event.get("process")
     pod = process.get("pod") if isinstance(process, dict) else None
     labels = pod.get("pod_labels") if isinstance(pod, dict) else None
+    container = pod.get("container") if isinstance(pod, dict) else None
+    container_name = container.get("name") if isinstance(container, dict) else None
     return (
         isinstance(pod, dict)
         and pod.get("namespace") == intent.namespace
         and isinstance(labels, dict)
         and all(labels.get(key) == value for key, value in intent.engine.labels.items())
+        and (intent.engine.container_name is None or not isinstance(container_name, str)
+             or not container_name or container_name == intent.engine.container_name)
     )
 
 
@@ -260,7 +264,8 @@ def parse_tetragon(
             normalized = _base(observed_at, "tetragon", "process_exec", data_origin,
                                environment=environment, run_id=run_id)
             normalized.update({"binary": None, "process_attribution": "unavailable",
-                               "pod": None, "pod_attribution": "unavailable", "path": None,
+                               "pod": None, "pod_attribution": "unavailable",
+                               "container_attribution": "unavailable", "path": None,
                                "access": None, "rule_id": "TG-EXEC-01", "action": "observed",
                                "action_raw": "observed", "action_mode": "monitor", "allowed_binary": None})
             normalized.update(exec_policy.classify_exec(
@@ -283,6 +288,12 @@ def parse_tetragon(
                 "process_attribution": "available",
                 "pod": pod,
                 "pod_attribution": "available" if pod is not None else "unavailable",
+                "container_attribution": (
+                    "available" if isinstance(raw_process.get("pod"), dict)
+                    and isinstance(raw_process["pod"].get("container"), dict)
+                    and isinstance(raw_process["pod"]["container"].get("name"), str)
+                    and raw_process["pod"]["container"]["name"] else "unavailable"
+                ),
                 "path": None,
                 "access": None,
                 "rule_id": "TG-EXEC-01",

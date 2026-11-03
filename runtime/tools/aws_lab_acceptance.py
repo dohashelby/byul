@@ -2701,6 +2701,27 @@ class AWSAcceptance:
                       and isinstance(item.get("phase"), list)
                       and any(phase != "unknown" for phase in item["phase"])
                       and item.get("phase_timeline_fresh") is not False]
+        if self.engine == "sglang":
+            timeline = self._timeline()
+            pod, _ = self._engine_pod()
+            collector = timeline.get("collector") if isinstance(timeline, dict) else None
+            extraction = timeline.get("extraction") if isinstance(timeline, dict) else None
+            try:
+                current_phase_source = (
+                    isinstance(extraction, dict) and extraction.get("engine") == "sglang"
+                    and isinstance(collector, dict) and collector.get("state") == "running"
+                    and isinstance(pod, dict) and bool(pod.get("uid"))
+                    and collector.get("pod_uid") == pod["uid"]
+                    and not ExecPolicy._collector_stale(collector)
+                )
+            except (KeyError, TypeError, ValueError, OverflowError):
+                current_phase_source = False
+            if not current_phase_source:
+                phase_rows = []
+            else:
+                phase_rows = [item for item in phase_rows
+                              if isinstance(item.get("pod"), dict)
+                              and item["pod"].get("pod") == pod.get("name")]
         phase_evidence = {
             "valid_exec_count": len(phase_rows),
             "unknown_exec_count": sum(item.get("exec_verdict") == "phase_unknown" for item in rows),
@@ -2718,8 +2739,7 @@ class AWSAcceptance:
             "stream_after": after.get("stream_ok"),
             "cache_current_before": self.normal_before.get("cache_ok"),
             "cache_current_after": after.get("cache_ok"),
-            "false_warnings_zero": (len(false_warnings) == 0 if available and phase_rows else None)
-                                   if self.engine == "vllm" else None,
+            "false_warnings_zero": len(false_warnings) == 0 if available and phase_rows else None,
         }, {
             "before": self.normal_before,
             "after": after,
@@ -3090,11 +3110,11 @@ class AWSAcceptance:
             return {"not_run_reason": "--allow-collector-stop 없음"}, {}
         if restart_gateway and not getattr(self.args, "allow_gateway_restart", False):
             return {"not_run_reason": "--allow-gateway-restart 없음"}, {}
-        if not restart_gateway and self.engine == "sglang":
-            return {"unknown_reason": "SGLang 단계 수집 꺼짐"}, {}
         before = self._timeline()
         if not restart_gateway:
-            if (before is None or not isinstance(before.get("collector"), dict)
+            if (before is None or not isinstance(before.get("extraction"), dict)
+                    or before["extraction"].get("engine") != self.engine
+                    or not isinstance(before.get("collector"), dict)
                     or before["collector"].get("state") != "running" or not before.get("entries")):
                 return {"unknown_reason": "단계 시간표 비활성 또는 읽기 실패"}, {}
             pod, _pod_result = self._engine_pod()
@@ -3192,12 +3212,13 @@ class AWSAcceptance:
     def aws_17(self) -> tuple[dict[str, Any], dict[str, Any]]:
         if not getattr(self.args, "allow_engine_restart", False):
             return {"not_run_reason": "--allow-engine-restart 없음"}, {}
-        if self.engine == "sglang":
-            return {"unknown_reason": "SGLang 단계 수집 꺼짐"}, {}
         before, _result = self._engine_pod()
         timeline_before = self._timeline()
         if not before or not before.get("uid") or timeline_before is None:
             return {"unknown_reason": "이전 Pod 또는 단계 시간표 미확인"}, {}
+        if (not isinstance(timeline_before.get("extraction"), dict)
+                or timeline_before["extraction"].get("engine") != self.engine):
+            return {"unknown_reason": "현재 엔진의 단계 시간표 미확인"}, {}
         collector_before = timeline_before.get("collector") or {}
         try:
             fresh = not ExecPolicy._collector_stale(collector_before)
@@ -3238,6 +3259,10 @@ class AWSAcceptance:
                 break
             self.sleep(2.0)
         timeline_at_probe = self._timeline()
+        if (not isinstance(timeline_at_probe, dict)
+                or not isinstance(timeline_at_probe.get("extraction"), dict)
+                or timeline_at_probe["extraction"].get("engine") != self.engine):
+            return {"unknown_reason": "새 Pod의 엔진별 단계 시간표 미확인"}, evidence
         # The Gateway ingests the feed a few seconds after the raw event.
         available, rows, matched = False, [], []
         for attempt in range(10):
@@ -3273,6 +3298,10 @@ class AWSAcceptance:
                 break
             if attempt < 19:
                 self.sleep(1.0)
+        if (not isinstance(timeline_new, dict)
+                or not isinstance(timeline_new.get("extraction"), dict)
+                or timeline_new["extraction"].get("engine") != self.engine):
+            return {"unknown_reason": "새 Pod의 엔진별 단계 시간표 미확인"}, evidence
         facts["timeline_new_uid"] = (timeline_new or {}).get("collector", {}).get("pod_uid") == after["uid"]
         facts["timeline_reset"] = (_timeline_reset(timeline_before, timeline_new, after.get("started_at"))
                                    if facts["timeline_new_uid"] and (timeline_new or {}).get("entries") else None)

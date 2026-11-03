@@ -11,7 +11,8 @@
       "app": "serving-engine"
     },
     "port": 8000,
-    "management_port": 8001
+    "management_port": 8001,
+    "container_name": "engine"
   },
   "metrics_collectors": [
     {
@@ -78,24 +79,52 @@
     "probe_uid": 10003
   },
   "allowed_engine_binaries": [
-    "/opt/sglang/bin/python",
-    "/usr/bin/python3"
+    "/opt/sglang/bin/python3",
+    "/usr/bin/nvidia-ctk",
+    "/sbin/ldconfig",
+    "/sbin/ldconfig.real",
+    "/usr/bin/nvidia-smi",
+    "/usr/bin/file"
   ],
   "phase_binaries": {
     "loading": [
-      "/opt/sglang/bin/python",
-      "/usr/bin/python3",
-      "/usr/bin/python3.12"
+      "/opt/sglang/bin/python3",
+      "/usr/local/cuda/bin/nvcc",
+      "/opt/sglang/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas",
+      "/usr/local/cuda/bin/ptxas",
+      "/opt/sglang/bin/ninja",
+      "/usr/bin/gcc",
+      "/usr/bin/c++",
+      "/usr/libexec/gcc/x86_64-linux-gnu/13/cc1",
+      "/usr/libexec/gcc/x86_64-linux-gnu/13/cc1plus",
+      "/usr/bin/as",
+      "/usr/bin/ld",
+      "/usr/libexec/gcc/x86_64-linux-gnu/13/collect2",
+      "/usr/local/cuda/bin/cudafe++",
+      "/usr/local/cuda/nvvm/bin/cicc",
+      "/usr/local/cuda/bin/../nvvm/bin/cicc",
+      "/usr/local/cuda/bin/fatbinary"
     ],
     "compiling": [
-      "/opt/sglang/bin/python",
-      "/usr/bin/python3",
-      "/usr/bin/python3.12"
+      "/opt/sglang/bin/python3",
+      "/usr/local/cuda/bin/nvcc",
+      "/opt/sglang/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas",
+      "/usr/local/cuda/bin/ptxas",
+      "/opt/sglang/bin/ninja",
+      "/usr/bin/gcc",
+      "/usr/bin/c++",
+      "/usr/libexec/gcc/x86_64-linux-gnu/13/cc1",
+      "/usr/libexec/gcc/x86_64-linux-gnu/13/cc1plus",
+      "/usr/bin/as",
+      "/usr/bin/ld",
+      "/usr/libexec/gcc/x86_64-linux-gnu/13/collect2",
+      "/usr/local/cuda/bin/cudafe++",
+      "/usr/local/cuda/nvvm/bin/cicc",
+      "/usr/local/cuda/bin/../nvvm/bin/cicc",
+      "/usr/local/cuda/bin/fatbinary"
     ],
     "inferring": [
-      "/opt/sglang/bin/python",
-      "/usr/bin/python3",
-      "/usr/bin/python3.12"
+      "/opt/sglang/bin/python3"
     ]
   },
   "suspect_binaries": [

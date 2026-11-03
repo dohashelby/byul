@@ -459,6 +459,8 @@ class ExecPolicy:
         observed_at: str,
         pod_uid: str | None = None,
     ) -> dict[str, Any]:
+        # Tetragon supplies the execve argument. Compare it exactly: lexical
+        # normalization could turn an attacker-controlled path into an allowlisted one.
         try:
             at: datetime | None = datetime.fromisoformat(observed_at)
         except ValueError:
@@ -519,6 +521,8 @@ class ExecPolicy:
             verdict = "exec_from_cache"
         elif binary in intent.suspect_binaries:
             verdict = "suspect_binary"
+        elif binary in intent.allowed_engine_binaries:
+            verdict = "allowed_in_phase"
         elif not active:
             verdict = "phase_unknown"
         elif candidate is not None:

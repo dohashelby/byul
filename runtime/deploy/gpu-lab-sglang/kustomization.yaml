@@ -13,7 +13,3 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/args/2
         value: sglang
-      - op: remove
-        path: /spec/template/spec/containers/0/args/10
-      - op: remove
-        path: /spec/template/spec/containers/0/args/9

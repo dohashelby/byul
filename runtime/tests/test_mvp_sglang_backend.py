@@ -559,7 +559,9 @@ class SGLangDeploymentFilesTests(unittest.TestCase):
     def test_engine_launch_uses_source_backed_options(self) -> None:
         root = Path(__file__).resolve().parents[1] / "deploy" / "gpu-lab-sglang"
         manifest = (root / "engine.yaml").read_text(encoding="utf-8")
-        self.assertIn("--context-length 2112", manifest)
+        self.assertIn("- --config", manifest)
+        self.assertIn("- --context-length\n            - \"2112\"", manifest)
+        self.assertNotIn("/bin/sh", manifest)
         self.assertNotIn("--max-model-len", manifest)
         self.assertIn("../gpu-lab", (root / "kustomization.yaml").read_text(encoding="utf-8"))
 

@@ -38,7 +38,7 @@ from serving_runtime.mvp.target import (
     validate_kubernetes_name,
 )
 from serving_runtime.enforcement.phase_signals import (
-    _KUBECTL_TIME, _REQUEST_LINE, _TimelineState, VLLM_CPU_029,
+    _KUBECTL_TIME, _REQUEST_LINE, _TimelineState, ENGINE_PATTERN_SETS,
 )
 
 
@@ -672,10 +672,13 @@ class TargetPodSnapshotWriter:
 class EnginePhaseTimelineWriter:
     """Keep one Pod's extraction state and fetch only its new timestamped logs."""
 
-    def __init__(self, path: Path, selector: KubernetesSelector, *,
+    def __init__(self, path: Path, selector: KubernetesSelector, *, engine: str = "vllm",
                  interval_s: float = 2.0, timeout_s: float = 4.0,
                  runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run) -> None:
         self.path, self.selector = path, selector
+        self.engine = engine
+        self.patterns = ENGINE_PATTERN_SETS[engine].patterns
+        self.loading_start = next(item.expression for item in self.patterns if item.signal == "loading_start")
         self.interval_s, self.timeout_s, self.runner = interval_s, timeout_s, runner
         self._uid: str | None = None
         self._phase: _TimelineState | None = None
@@ -689,7 +692,7 @@ class EnginePhaseTimelineWriter:
 
     def _reset(self, uid: str | None, year: int) -> None:
         self._uid = uid
-        self._phase = _TimelineState(engine="vllm", year=year, timezone_offset="Z") if uid else None
+        self._phase = _TimelineState(engine=self.engine, year=year, timezone_offset="Z") if uid else None
         self._cursor = None
         self._boundary.clear()
         self._second_seen.clear()
@@ -752,16 +755,16 @@ class EnginePhaseTimelineWriter:
             progressed = True
             if self._order_unknown:
                 start_signal = any(pattern.signal in {"loading_start", "compiling_start", "inferring_start"}
-                                   and pattern.expression.search(line) for pattern in VLLM_CPU_029.patterns)
+                                   and pattern.expression.search(line) for pattern in self.patterns)
                 if _REQUEST_LINE.search(line) or not start_signal:
                     continue
                 self._order_unknown = False
             # A capped replay cannot establish the current run's opening
             # boundary. Wait for a new, directly observed loading start.
             if self._incomplete:
-                if limited or _REQUEST_LINE.search(line) or not VLLM_CPU_029.patterns[1].expression.search(line):
+                if limited or _REQUEST_LINE.search(line) or not self.loading_start.search(line):
                     continue
-                self._phase = _TimelineState(engine="vllm", year=year, timezone_offset="Z")
+                self._phase = _TimelineState(engine=self.engine, year=year, timezone_offset="Z")
                 self._incomplete = False
             try:
                 self._phase.process_line(raw)
@@ -1052,6 +1055,7 @@ def run(
     target_namespace: str = LAB_NAMESPACE,
     target_interval_s: float = DEFAULT_TARGET_INTERVAL_S,
     phase_timeline: bool = False,
+    phase_engine: str = "vllm",
 ) -> int:
     global _reader_gid
     if phase_timeline and target_selector is None:
@@ -1075,6 +1079,7 @@ def run(
             phase_writer = EnginePhaseTimelineWriter(
                 output_dir / "phase-timeline.json",
                 KubernetesSelector(context, target_namespace, target_selector, "engine"),
+                engine=phase_engine,
             )
     hubble_path = output_dir / "hubble.jsonl"
     tetragon_path = output_dir / "tetragon.jsonl"
@@ -1231,6 +1236,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--phase-timeline", action="store_true",
                         help="현재 엔진 Pod 로그에서 단계 시간표를 별도 수집")
+    parser.add_argument("--phase-engine", choices=("vllm", "sglang"), default="vllm",
+                        help="단계 시간표의 엔진 종류")
     parser.add_argument(
         "--target-namespace",
         default=LAB_NAMESPACE,
@@ -1267,6 +1274,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             target_namespace=args.target_namespace,
             target_interval_s=args.target_interval,
             phase_timeline=args.phase_timeline,
+            phase_engine=args.phase_engine,
         )
     except ReaderGroupError as error:
         # Configuration error: exit 2 so a supervisor does not restart in a loop.

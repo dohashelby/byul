@@ -28,6 +28,7 @@ from serving_runtime.enforcement.phase_signals import (
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/fixtures/enforcement/vllm_cpu_029_startup_excerpt.log"
+SGLANG_FIXTURE = ROOT / "tests/fixtures/enforcement/sglang_gpu_0522_cached_start_excerpt.log"
 INTENT = ROOT / "examples/enforcement/intent-v1.1.example.json"
 
 
@@ -119,12 +120,25 @@ class PhaseSignalExtractionTests(unittest.TestCase):
         self.assertIsNone(inferring[1]["until"])
         self.assertTrue(all(item["basis"] == "engine_signal" for item in inferring))
 
-    def test_sglang_and_invalid_time_inputs_fail_without_guessing(self) -> None:
-        self.assertEqual(ENGINE_PATTERN_SETS["sglang"].patterns, ())
-        with self.assertRaisesRegex(ValueError, "no source-backed patterns"):
-            extract_phase_timeline(
-                FIXTURE, engine="sglang", year=2026, timezone_offset="+00:00"
-            )
+    def test_sglang_cached_start_and_timestamp_precedence(self) -> None:
+        self.assertEqual(len(ENGINE_PATTERN_SETS["sglang"].patterns), 5)
+        timeline = extract_phase_timeline(SGLANG_FIXTURE, engine="sglang", year=2025,
+                                          timezone_offset="+09:00")
+        self.assertEqual([(entry["phase"], entry["from"], entry["until"]) for entry in timeline["entries"]], [
+            ("loading", "2026-11-03T07:31:55+09:00", "2026-11-03T07:31:56+09:00"),
+            ("compiling", "2026-11-03T07:31:57+09:00", "2026-11-03T07:32:04+09:00"),
+            ("inferring", "2026-11-03T07:32:05+09:00", None),
+        ])
+        self.assertEqual(timeline["extraction"]["matched_signals"], {
+            "loading_start": 1, "loading_end": 1, "compiling_start": 1,
+            "compiling_end": 1, "inferring_start": 1})
+        self.assertIn("첫 기동 JIT", timeline["extraction"]["limitations"][0])
+        line = b"2026-11-02T22:31:55Z [2026-11-03 07:31:55] Load weight begin.\n"
+        outer = extract_phase_timeline(io.BytesIO(line), engine="sglang", year=2025,
+                                       timezone_offset="+09:00")
+        self.assertEqual(outer["entries"][0]["from"], "2026-11-02T22:31:55+00:00")
+
+    def test_invalid_time_inputs_fail_without_guessing(self) -> None:
         for value in ("UTC", "local", "+24:00", "+00:60"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 parse_timezone(value)

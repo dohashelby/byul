@@ -48,6 +48,7 @@ class Workload:
     labels: dict[str, str]
     port: int | None = None
     management_port: int | None = None
+    container_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -230,7 +231,7 @@ def _workload(
 ) -> Workload:
     allowed = {"labels", "port"} if engine else {"labels"}
     if engine and v11:
-        allowed = allowed | {"management_port"}
+        allowed = allowed | {"management_port", "container_name"}
     item = _object(value, path, allowed)
     labels = _labels(_required(item, "labels", path), f"{path}.labels")
     if engine:
@@ -240,7 +241,12 @@ def _workload(
             management = _port(management, f"{path}.management_port")
             if management == port:
                 raise IntentError(f"{path}.management_port must differ from port")
-        return Workload(labels, port, management)
+        container_name = item.get("container_name")
+        if container_name is not None:
+            container_name = _segment(container_name, f"{path}.container_name")
+            if _KUBERNETES_NAME.fullmatch(container_name) is None:
+                raise IntentError(f"{path}.container_name must be a Kubernetes container name")
+        return Workload(labels, port, management, container_name)
     return Workload(labels)
 
 
@@ -298,10 +304,17 @@ def _egress_list(raw: Any, path: str, *, allow_endpoint: bool) -> tuple[EgressAl
     return tuple(egress)
 
 
-def _binary_list(raw: Any, path: str) -> tuple[str, ...]:
+def _binary_list(raw: Any, path: str, *, allow_literal_parent: bool = False) -> tuple[str, ...]:
     if not isinstance(raw, list):
         raise IntentError(f"{path} must be an array")
-    values = tuple(_absolute_path(item, f"{path}[{index}]") for index, item in enumerate(raw))
+    if allow_literal_parent:
+        # Phase binaries are compared to the raw execve string, without path
+        # normalization. A literal observed spelling can be approved explicitly.
+        values = tuple(_nonempty_string(item, f"{path}[{index}]") for index, item in enumerate(raw))
+        if any(not value.startswith("/") for value in values):
+            raise IntentError(f"{path} must contain absolute paths")
+    else:
+        values = tuple(_absolute_path(item, f"{path}[{index}]") for index, item in enumerate(raw))
     if len(set(values)) != len(values):
         raise IntentError(f"{path} must not contain duplicates")
     return values
@@ -630,7 +643,8 @@ def parse_intent(document: Any) -> EnforcementIntent:
             for phase in PHASES:
                 if phase in phases_raw:
                     phase_binaries.append(
-                        (phase, _binary_list(phases_raw[phase], f"$.phase_binaries.{phase}"))
+                        (phase, _binary_list(phases_raw[phase], f"$.phase_binaries.{phase}",
+                                             allow_literal_parent=True))
                     )
         if "suspect_binaries" in root:
             suspect = _binary_list(root["suspect_binaries"], "$.suspect_binaries")

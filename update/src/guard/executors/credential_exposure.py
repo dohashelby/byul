@@ -79,6 +79,8 @@ def collect_kubernetes_credential_exposure(ctx):
         raise ValueError("KUBERNETES_CREDENTIAL_CHECK_UNSUPPORTED")
     selected = candidate_paths(ctx.policy_values.get("credential_candidate_paths"))
     record = read_kubernetes_process_observations(ctx, selected)
+    from .kubernetes_gpu_process_observations import collect as collect_passive_gpu_process
+    passive = collect_passive_gpu_process(record, ctx.cprobe)
     rows = kubernetes_process_rows(record)
     names = sorted({name for row in rows for name in row["environment_names"]})
     # v1 explicitly reports no source-bound worker identity/access. Its names
@@ -94,6 +96,7 @@ def collect_kubernetes_credential_exposure(ctx):
     functional, normal = kubernetes_process_control(ctx)
     observations.update(functional)
     summary = {"profile": "kubernetes-credential-metadata-consumer-v1", "process_observation": record,
+        "passive_gpu_process_observation": passive,
         "container_environment_names_observed": names, "worker_subject_verified": False,
         "candidate_access_verified": False, "kubernetes": ctx.cprobe.report(),
         "candidate_request": "missing" if selected is None else "explicit_empty" if not selected else "explicit_paths",
@@ -103,6 +106,7 @@ def collect_kubernetes_credential_exposure(ctx):
         "limitations": ["Container-reported environment names are not source-bound worker environment names.",
             "Candidate lstat absence/mode does not establish a worker's namespace, effective access or credential use.",
             "Pod volumeMount declarations are not observed process mounts or actual credential access.",
+            "An open read-capable credential FD is a positive process fact, not model-worker identity or provider use.",
             "An explicit empty candidate list tests no path; whole-worker credential coverage is unverified."]}
     packet = record.get("packet")
     challenges = [{"step": step, "attempted": (bool(normal.get("attempted")) if index == 2 else
@@ -270,10 +274,16 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
             errors.append("FUNCTIONAL_PROBE_UNAVAILABLE")
         normal["attempted"] = functional_attempted
         mount_fact_collected = mounts_collected or bool(violations)
+        # The legacy Docker reader scans container PIDs, without identifying
+        # GPU workers or binding their generations. Retain the raw names in
+        # the summary, but do not present their union as worker exposure.
+        gpu_worker_scope_unverified = bool(ctx.env.runtime.gpu_count)
+        if gpu_worker_scope_unverified:
+            errors.append("GPU_WORKER_CREDENTIAL_SCOPE_UNVERIFIED")
         obs = {
-            "process_scan_complete": {"value": complete, "collected": True},
-            "worker_env_names": {"value": names if complete or names else None,
-                                 "collected": complete or bool(names)},
+            "process_scan_complete": {"value": complete and not gpu_worker_scope_unverified, "collected": True},
+            "worker_env_names": {"value": None if gpu_worker_scope_unverified else names if complete or names else None,
+                                 "collected": False if gpu_worker_scope_unverified else complete or bool(names)},
             # A valid forbidden row proves overlap even in a partial list.
             # An incomplete list with no known violation proves no absence.
             "forbidden_mount_violations": {"value": violations if mount_fact_collected else None,
@@ -288,6 +298,7 @@ class CredentialExposureExecutor(ContainerConfigExecutor):
         }
         return obs, normal, [{"step": step, "attempted": True} for step in ctx.check.challenge_steps], {
             "credential_names": names, "mount_destinations": destinations, "scan_complete": complete,
+            "gpu_worker_scope_unverified": gpu_worker_scope_unverified,
             "forbidden_mount_violations": violations if mount_fact_collected else None,
             "candidate_request": "missing" if paths is None else "explicit_empty" if not paths else "explicit_paths",
             "candidate_configured": requested,

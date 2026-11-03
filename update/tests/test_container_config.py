@@ -115,8 +115,9 @@ def _target(tmp_path, container="guard-lab-engine", env=None):
     return p
 
 
-def _run(tmp_path, docker, values=None, cfg_extra=None, *, probe=_probe):
-    env = environment({}, engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE}, model={"id": "m"})
+def _run(tmp_path, docker, values=None, cfg_extra=None, *, probe=_probe, gpu_count=None):
+    env = environment({}, engine={"name": "vllm", "version": "0.31.0", "image_digest": IMAGE},
+                      model={"id": "m"}, runtime={"gpu_count": gpu_count})
     docker.owner_name = (cfg_extra or {}).get("container", "guard-lab-engine")
     cfg = {"target": str(_target(tmp_path, docker.owner_name, env)), **(cfg_extra or {})}
     registry.EXECUTORS["container_config:sim"] = lambda raw: ContainerConfigExecutor(cfg, container_probe=probe, docker=docker)

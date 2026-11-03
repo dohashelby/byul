@@ -26,13 +26,18 @@ class DockerCluster:
             f"import urllib.request as u;print(u.urlopen('http://{self.engine}:8000/health',timeout=3).status)"], 10)
         return check['returncode'] == 0 and check['stdout_bytes'].strip() == b'200'
 
+    def _container_id(self):
+        result = self._run(['docker', 'inspect', '--format', '{{.Id}}', self.engine], 10)
+        return result['stdout_bytes'].decode().strip() if result['returncode'] == 0 else None
+
     def __call__(self, argv, *, timeout, env_extra, max_stdout_bytes, max_stderr_bytes, input_bytes=None):
         args = [a for a in argv[1:] if not a.startswith(('--namespace=', '--request-timeout=', '--context='))]
         if args[:2] == ['get', 'namespace']:
             value = {'metadata': {'labels': {lab.OWNED_LABEL: 'true'}}}
         elif args[:2] == ['get', 'pods']:
             status = 'True' if self._ready() else 'False'
-            value = {'items': [{'metadata': {'name': 'engine', 'labels': {'byul.lab/generation': self.generation}},
+            value = {'items': [{'metadata': {'name': 'engine', 'uid': self._container_id(),
+                'labels': {'byul.lab/generation': self.generation}},
                 'status': {'conditions': [{'type': 'Ready', 'status': status}]}}]}
         elif args[:2] == ['rollout', 'restart']:
             return self._run(['docker', 'restart', '-t', '2', self.engine], min(timeout, 60))
@@ -58,6 +63,10 @@ def main():
     parser.add_argument('--launch-script', required=True, help='세대 이름을 받아 엔진을 기동할 명령을 출력하는 스크립트')
     parser.add_argument('--session', required=True); parser.add_argument('--work', type=Path, required=True)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--worker-pid', type=int, help='주입 대상 PID. 시작세대와 함께 고정한다')
+    parser.add_argument('--worker-start-ticks', type=int, help='/proc/PID/stat의 starttime')
+    parser.add_argument('--worker-rank', type=int, help='worker-rank-regex 첫 캡처 그룹과 일치시킬 rank')
+    parser.add_argument('--worker-rank-regex', help='worker 명령/comm에서 rank를 읽는 첫 캡처 그룹 정규식')
     args = parser.parse_args()
     def launch(generation):
         return json.loads(subprocess.check_output([args.launch_script, generation]))
@@ -70,6 +79,10 @@ def main():
         'deadline_ms': 90000, 'burst_requests': 4, 'allowed_models': ['opt'], 'faulty_manifest': str(args.work / 'faulty.yaml'),
         'good_manifest': str(args.work / 'good.yaml'), 'update_manifest': str(args.work / 'update.yaml'), 'trace_directory': '/tmp/trace',
         'fault_directory': f'/guard-lifecycle/data/{args.session}', 'max_duration_seconds': 900}
+    for arg, key in (('worker_pid', 'worker_pid'), ('worker_start_ticks', 'worker_start_ticks'),
+                     ('worker_rank', 'worker_rank'), ('worker_rank_regex', 'worker_rank_regex')):
+        if getattr(args, arg) is not None:
+            config[key] = getattr(args, arg)
     policy = {'buffer_max_process_rss_bytes': 6 * 1024 ** 3, 'buffer_max_send_wait_ms': 60000, 'buffer_release_deadline_ms': 15000,
         'termination_max_delay_ms': 15000, 'retry_policy_mode': 'forbidden', 'rank_death_detection_ms': 30000,
         'rank_delay_detection_ms': 30000, 'rank_communication_stall_detection_ms': 30000, 'rank_exception_detection_ms': 30000}

@@ -172,6 +172,8 @@ def collect_kubernetes_process_permissions(ctx):
     if ctx.check.id != "PLT-01":
         raise ValueError("KUBERNETES_PROCESS_PERMISSION_CHECK_UNSUPPORTED")
     record = read_kubernetes_process_observations(ctx)
+    from .kubernetes_gpu_process_observations import collect as collect_passive_gpu_process
+    passive = collect_passive_gpu_process(record, ctx.cprobe)
     rows = kubernetes_process_rows(record)
     status = [row for row in rows if row["uid_effective"] is not None and row["cap_eff"] is not None]
     caps = sorted({cap for row in status for cap in decode_caps(row["cap_eff"])})
@@ -189,6 +191,7 @@ def collect_kubernetes_process_permissions(ctx):
     functional, normal = kubernetes_process_control(ctx)
     observations.update(functional)
     summary = {"profile": "kubernetes-process-permission-consumer-v1", "process_observation": record,
+        "passive_gpu_process_observation": passive,
         "reported_process_uids": uids, "reported_capabilities_effective": caps,
         "kubernetes": ctx.cprobe.report(),
         "worker_subject_verified": False, "permission_scan_complete": False,
@@ -196,6 +199,7 @@ def collect_kubernetes_process_permissions(ctx):
                     "declared_control": [probe.model_dump(mode="json") for probe in ctx.check.functional_probes]},
         "limitations": ["Container-reported PID/UID/capability facts do not establish whole-worker coverage.",
             "Collector identity is distinct and excluded; no source/model worker classification is inferred.",
+            "Passive opened GPU-device FD/NVML joins do not prove model-worker identity, cgroup allowance or whole-device scope.",
             "Actual process mounts, host isolation, device permissions and harmless access tests are unavailable."]}
     challenges = [{"step": step, "attempted": index == 0 and type(record.get("packet")) is dict}
                   for index, step in enumerate(ctx.check.challenge_steps)]
@@ -312,6 +316,13 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             devices_complete = False
             errors.append("DEVICE_REQUESTS_UNVERIFIED")
         devices = sorted(f"{d['PathOnHost']}:{d['PathInContainer']}:{d['CgroupPermissions']}" for d in device_rows)
+        # Docker's device list is a launch declaration. In a GPU environment
+        # the runtime may inject additional nodes, and neither this list nor
+        # DeviceRequests proves an effective worker cgroup/access decision.
+        gpu_device_scope_unverified = bool(ctx.env.runtime.gpu_count)
+        if gpu_device_scope_unverified:
+            devices_complete = False
+            errors.append("GPU_EFFECTIVE_DEVICE_ACCESS_UNVERIFIED")
         privileged = hc.get("Privileged") if type(hc.get("Privileged")) is bool else None
         namespaces_complete = all(type(hc.get(key)) is str for _, key in HOST_NAMESPACE_KEYS)
         host_ns = sorted(ns for ns, key in HOST_NAMESPACE_KEYS if hc.get(key) == "host")
@@ -425,7 +436,9 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             "process_scan_complete": {"value": complete, "collected": True},
             "capabilities_effective": {"value": caps, "collected": any("caps" in p for p in procs)},
             "mounts": {"value": mounts, "collected": mounts_complete or completeness_gate and bool(host_mounts)},
-            "devices": {"value": devices, "collected": devices_complete or completeness_gate and bool(device_rows)},
+            "devices": {"value": None if gpu_device_scope_unverified else devices,
+                        "collected": False if gpu_device_scope_unverified else
+                        devices_complete or completeness_gate and bool(device_rows)},
             "privileged": {"value": privileged, "collected": privileged is not None},
             "host_namespaces": {"value": host_ns, "collected": namespaces_complete or completeness_gate and bool(host_ns)},
             "root_uid_present": {"value": 0 in uids, "collected": 0 in uids or complete},
@@ -453,6 +466,8 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             "mounts": mounts, "all_mounts": sorted(f"{m.get('Type')}:{_mount_key(m)}" for m in mounts_all),
             "devices": devices, "capabilities_effective": caps, "uids": uids,
             "device_requests_unverified": device_requests_unverified,
+            "gpu_effective_device_access_unverified": gpu_device_scope_unverified,
+            "declared_devices": devices,
             "processes": [{k: p.get(k) for k in ("pid", "name", "uid_effective", "caps")} for p in procs],
             "proc_read_rc": proc_rc, "sentinel_results": sentinel_results,
             "container_fs_writes": container_fs_writes,

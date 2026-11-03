@@ -61,6 +61,21 @@ def test_later_failure_keeps_prior_identified_names_without_borrowing_a_record(t
     assert names == ["FORBIDDEN_CANARY"] and complete is False
 
 
+def test_gpu_container_environment_union_is_not_a_worker_credential_claim():
+    ctx = context(VALUES)
+    ctx.env = environment(engine={"name": "engine-x", "version": "1.0.0", "image_digest": IMAGE},
+                          model={"id": "test"}, runtime={"gpu_count": 1})
+    ctx.target["environment_ref"] = ctx.env.ref().model_dump(mode="json")
+    obs, _, _, detail = CredentialExposureExecutor({}, docker=NameDocker(
+        "PID 1\nFORBIDDEN_CANARY\nGUARD_READ_OK\n",
+        mounts=[{"Type": "bind", "Destination": "/credentials"}])).collect(ctx)
+    assert obs["worker_env_names"] == {"value": None, "collected": False}
+    assert obs["process_scan_complete"] == {"value": False, "collected": True}
+    assert detail["credential_names"] == ["FORBIDDEN_CANARY"]
+    assert obs["forbidden_mount_violations"] == {"value": ["/credentials"], "collected": True}
+    assert "GPU_WORKER_CREDENTIAL_SCOPE_UNVERIFIED" in detail["collection_errors"]
+
+
 @pytest.mark.parametrize("returncode", [1, None, False])
 def test_non_success_status_keeps_positive_names_but_no_complete_scan(returncode):
     assert parse_environment_names("PID 1\nFORBIDDEN_CANARY\nGUARD_READ_OK\n", returncode) == (

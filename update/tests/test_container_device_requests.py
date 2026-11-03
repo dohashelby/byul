@@ -7,6 +7,20 @@ from guard.models import Verdict
 from tests.test_container_config import FakeDocker, _run, _summary
 
 
+@pytest.mark.parametrize('profile,expected', [
+    ('hardened', Verdict.UNKNOWN), ('overprivileged', Verdict.FAIL),
+])
+def test_gpu_device_declarations_never_prove_effective_worker_access(tmp_path, profile, expected):
+    store, evd, result = _run(tmp_path, FakeDocker(profile), gpu_count=1)
+    assert result.verdicts.security == expected
+    assert evd.observations['devices'].collected is False
+    assert evd.observations['devices'].value is None
+    summary = _summary(store, evd)
+    assert summary['declared_devices'] == []
+    assert summary['gpu_effective_device_access_unverified'] is True
+    assert 'GPU_EFFECTIVE_DEVICE_ACCESS_UNVERIFIED' in summary['collection_errors']
+
+
 @pytest.mark.parametrize('requests,known_device,profile,expected', [
     (None, False, 'hardened', Verdict.PASS),
     ([], False, 'hardened', Verdict.PASS),

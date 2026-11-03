@@ -1,0 +1,229 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-03",
+  "check_id": "REQ-16",
+  "scope": "one NVIDIA L4 on existing AWS g6.2xlarge dev instance; generations kept separate",
+  "enterprise_approval_claimed": false,
+  "judge_and_policy_rules_weakened": false,
+  "notes": [
+    "Original lab FAIL is preserved for adapter-content and model-generation cache reuse.",
+    "Media content changes diverged at image block 13; shared text-prefix hits caused a coarse projection false positive. Same UUID produced equal image block keys, but actual image-block reuse was not observed. Projection/judge rules were unchanged."
+  ],
+  "runs": [
+    {
+      "run": "a-g1-20261103-1/REQ-16",
+      "evidence_kind": "automated",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/bundles/a-g1-20261103-1__REQ-16.zip",
+      "bundle_sha256": "aeefbd64c5699235da55031a434ea189444015b72d13ca25c3f98637cf55d85e",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GGPVP97K64PRWPM5R23S6T",
+          "revision": 1,
+          "content_sha256": "f6d2656554850749b4b8f4c93d5feef79b66445f8cd77b0e572c8d48f80c7ae7",
+          "check_id": "REQ-16",
+          "data_origin": "DECLARED",
+          "verification_level": null,
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: UNKNOWN (not collected for: engine_sensor_violation eq False; pass rules unmet: engine_sensor_full_scope eq True (observed False))",
+            "functional: no rule for this axis",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": [
+            "engine_sensor_violation"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GGPR8NA4BPCF7BQGCWYDKY",
+          "revision": 1,
+          "sha256": "84f2c33642870d9ed18a4405e193fc7ab6d7fb78e1dbc238cfd6febf11060010",
+          "data_origin": "DECLARED",
+          "execution": {
+            "status": "ABORTED",
+            "executor": {
+              "name": "engine_sensor",
+              "version": "0.1.1",
+              "config_sha256": "192c587697d570fddd5424988740069b682355c9c5dec1d6d51a1443aa00c11b"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.2"
+            },
+            "started_at": "2026-11-03T10:53:59Z",
+            "finished_at": "2026-11-03T10:54:02Z",
+            "abort_reason": "ENGINE_SENSOR_CALLBACK_SCOPE_INCOMPLETE"
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": ""
+          },
+          "scope_observation": {
+            "value": false,
+            "collected": true
+          }
+        }
+      ]
+    },
+    {
+      "run": "a-g4-20261103-1/REQ-16",
+      "evidence_kind": "automated",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/bundles/a-g4-20261103-1__REQ-16.zip",
+      "bundle_sha256": "b537765edad502adc208822fccb71e9d7ad9c482cb4d8b68884cfd6b4a27aedf",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GH9F6FHB53X1679G1GM5HS",
+          "revision": 1,
+          "content_sha256": "00e64ed0ae41eafb1d5893906356eab5a7efddf9c0301c2eb23abc06270998ae",
+          "check_id": "REQ-16",
+          "data_origin": "EXAMPLE",
+          "verification_level": "EXAMPLE",
+          "verdicts": {
+            "security": "FAIL",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: FAIL because engine_sensor_violation eq True (observed engine_sensor_violation=True)",
+            "functional: no rule for this axis",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": []
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GH928TSCKWEY7BR4ZFX085",
+          "revision": 1,
+          "sha256": "1f8043ddb0c763c4a0f975126f68c8421ac72408df42c05cb2c820297cffcbeb",
+          "data_origin": "EXAMPLE",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "engine_sensor",
+              "version": "0.1.1",
+              "config_sha256": "6776ab57809724969ca42f625c58403b1c910aa87de9873d54e747d7b2da4a3c"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.2"
+            },
+            "started_at": "2026-11-03T11:04:00Z",
+            "finished_at": "2026-11-03T11:04:12Z",
+            "abort_reason": null
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": ""
+          },
+          "scope_observation": {
+            "value": false,
+            "collected": true
+          }
+        }
+      ]
+    },
+    {
+      "run": "a-g4-20261103-2/REQ-16",
+      "evidence_kind": "automated",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/bundles/a-g4-20261103-2__REQ-16.zip",
+      "bundle_sha256": "1faa75ec30b70c5ef1b4cb2f155f5ad7f8a1d326258d4005a08e24ace22ffae4",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GJCSJ61AJZMCV3EWH6T59R",
+          "revision": 1,
+          "content_sha256": "ee11aa40666fa603e5ea5ffc44b4c56e78b364fa2b8fd9577cc316edb3540b39",
+          "check_id": "REQ-16",
+          "data_origin": "EXAMPLE",
+          "verification_level": "EXAMPLE",
+          "verdicts": {
+            "security": "FAIL",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: FAIL because engine_sensor_violation eq True (observed engine_sensor_violation=True)",
+            "functional: no rule for this axis",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": []
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GJC9RQ6FYVTRP0BB9YANFG",
+          "revision": 1,
+          "sha256": "c9ba1ef076f63015cb47ab0f87dc8c13c73032f50919b0079c4888ebf6172251",
+          "data_origin": "EXAMPLE",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "engine_sensor",
+              "version": "0.1.1",
+              "config_sha256": "24d93d8aa046ab01850db8d32a41b7bb5e90947b5db6924402a52cd787ebe7ce"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.2"
+            },
+            "started_at": "2026-11-03T11:23:14Z",
+            "finished_at": "2026-11-03T11:23:30Z",
+            "abort_reason": null
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": ""
+          },
+          "scope_observation": {
+            "value": false,
+            "collected": true
+          }
+        }
+      ]
+    }
+  ],
+  "raw_export": {
+    "schema": "byul-gpu-a-raw-export/1",
+    "files": {
+      "byul-a-lifecycle-codex.tgz": {
+        "sha256": "45d411c9eedd818239495474a961b999dc3ae10f7714a0a18dc2320ac9a50a05",
+        "bytes": 978873
+      },
+      "byul-a-runs-codex.tgz": {
+        "sha256": "fe1606bd0ffa16ca8910b5036af2a33909f079fa19217891a092baf0fc2d60b6",
+        "bytes": 4054594
+      },
+      "privacy-scan.json": {
+        "sha256": "704d9a5f3b7c9c27c87d9b15958aa5314fbce07b89e63eea6c674a18bbe64330",
+        "bytes": 522
+      }
+    }
+  },
+  "raw_export_directory": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/raw",
+  "native_automatic_collection_implemented": true,
+  "post_measurement_eviction": {
+    "run": "a-g4-20261103-2",
+    "reason": "Evicted",
+    "message": "Usage of EmptyDir volume \"guard-weights\" exceeds the limit \"4Gi\". ",
+    "evidence_finished_at_utc": "2026-11-03T11:23:30Z",
+    "pod_ready_false_at_utc": "2026-11-03T11:24:09Z",
+    "seconds_after_evidence": 39,
+    "source_file": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/stale-pod-before-delete.json",
+    "source_sha256": "2eb05b000617edfdc2a33deac5758ff6b65c299ed416be619427c8d28a535bfe",
+    "future_large_model_render_capacity_fix_required": true
+  }
+}

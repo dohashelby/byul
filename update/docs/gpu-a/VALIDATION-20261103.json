@@ -1,0 +1,51 @@
+{
+  "schema": "byul-gpu-a-validation-summary/1",
+  "direct_contracts": {
+    "macos_passed": 164,
+    "macos_pytest_seconds": 1.92,
+    "linux_passed": 164,
+    "linux_pytest_seconds": 4.64
+  },
+  "macos_full_original": {
+    "passed": 10782,
+    "failed": 18,
+    "deselected": 19,
+    "pytest_seconds": 631.49,
+    "parent_wall_seconds": 632.3594117080793
+  },
+  "macos_checklist_after_regeneration": {
+    "passed": 13,
+    "pytest_seconds": 0.63
+  },
+  "linux_original_failure_delta": {
+    "passed": 18,
+    "pytest_seconds": 7.51,
+    "parent_wall_seconds": 7.941964083816856
+  },
+  "linux_full": {
+    "passed": 10800,
+    "failed": 0,
+    "deselected": 19,
+    "pytest_seconds": 1515.95,
+    "returncode": 0,
+    "parent_wall_seconds": 1517.6468008749998,
+    "source_manifest_sha256": "4644ad2fe2ea6699e3fe01f8130c4af1827aee7b932d34bbab9e497c32273498"
+  },
+  "new_skips_or_weakened_assertions": false,
+  "core_source_manifest_sha256": "4644ad2fe2ea6699e3fe01f8130c4af1827aee7b932d34bbab9e497c32273498",
+  "pinned_files": 423,
+  "portable_stores_verified": 24,
+  "exact_saved_pack_result_refs_unchanged": true,
+  "native_scope": "direct native component observations and selected zero-copy daemon; overall manual UNKNOWN; automatic serving-path collectors incomplete",
+  "cleanup": {
+    "serving_lab_pods_remaining": 0,
+    "gpu_mib": 0,
+    "engine_replicas": 0,
+    "ec2_stop_pending": false,
+    "ec2_state": "stopped",
+    "stopped_observed_at_utc": "2026-11-03T12:57:10+00:00",
+    "normal_os_shutdown_requested": true,
+    "force_stop_requested": false,
+    "ebs_retained": true
+  }
+}

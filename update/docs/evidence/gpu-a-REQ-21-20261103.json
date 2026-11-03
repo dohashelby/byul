@@ -1,0 +1,31 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-03",
+  "check_id": "REQ-21",
+  "scope": "one NVIDIA L4 on existing AWS g6.2xlarge dev instance; generations kept separate",
+  "enterprise_approval_claimed": false,
+  "judge_and_policy_rules_weakened": false,
+  "notes": [
+    "Not executed. The current L4 one-GPU server cannot exercise multi-GPU registration/completion/restart branches."
+  ],
+  "runs": [],
+  "raw_export": {
+    "schema": "byul-gpu-a-raw-export/1",
+    "files": {
+      "byul-a-lifecycle-codex.tgz": {
+        "sha256": "45d411c9eedd818239495474a961b999dc3ae10f7714a0a18dc2320ac9a50a05",
+        "bytes": 978873
+      },
+      "byul-a-runs-codex.tgz": {
+        "sha256": "fe1606bd0ffa16ca8910b5036af2a33909f079fa19217891a092baf0fc2d60b6",
+        "bytes": 4054594
+      },
+      "privacy-scan.json": {
+        "sha256": "704d9a5f3b7c9c27c87d9b15958aa5314fbce07b89e63eea6c674a18bbe64330",
+        "bytes": 522
+      }
+    }
+  },
+  "raw_export_directory": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/raw",
+  "native_automatic_collection_implemented": false
+}

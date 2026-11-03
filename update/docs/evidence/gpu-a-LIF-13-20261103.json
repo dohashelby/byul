@@ -1,0 +1,101 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-03",
+  "check_id": "LIF-13",
+  "scope": "one NVIDIA L4 on existing AWS g6.2xlarge dev instance; generations kept separate",
+  "enterprise_approval_claimed": false,
+  "judge_and_policy_rules_weakened": false,
+  "notes": [
+    "User authorized agent-selected EXAMPLE configuration. Two real CUDA IPC consumers each rebuilt 267 entries and retained equal selected 16-element reads after global release.",
+    "New acquisitions reported weights_released. Two original IPC loaders fell back to the pinned disk model and consumed its norm weight on CUDA with matching independent oracle.",
+    "Selected zero_copy mode only. Enterprise authorization, copy mode, full-model inference, and daemon native counter/limbo cleanup remain unverified. Initial failed fallback preparation and successful second attempt are both preserved."
+  ],
+  "runs": [
+    {
+      "run": "a-native-20261103-1/LIF-13",
+      "evidence_kind": "manual_native_component",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/native-bundles/a-native-20261103-1__LIF-13.zip",
+      "bundle_sha256": "7a13a30d08e1567adc19e9a7c6693504e444fc360dd794e854b08e6fb49769b6",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GNP06EHJQ32K2G451HA7DA",
+          "revision": 1,
+          "content_sha256": "6fca675b35ea92493dc7e97d81df25583f39a9f5ae7dc85e255c32602d8f9dee",
+          "check_id": "LIF-13",
+          "data_origin": "EXAMPLE",
+          "verification_level": "DECLARED",
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "declared by Codex / user-authorized BYUL A lab observation at 2026-11-03T12:20:58+00:00 (self-reported, not authenticated)",
+            "security: declared UNKNOWN → UNKNOWN",
+            "functional: declared UNKNOWN → UNKNOWN",
+            "performance: declared UNKNOWN → UNKNOWN"
+          ],
+          "missing_observations": [
+            "engine_sensor_violation"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GNP063M77NY525H055E7R9",
+          "revision": 1,
+          "sha256": "c206ce839281ba9df7b0cfc807fe5475b86daf41a1a1520daca6cc023bca2524",
+          "data_origin": "DECLARED",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "manual-entry",
+              "version": "0.5.0",
+              "config_sha256": "ae4dfbe1593b3558556c60a417f8119c638617ca28ba6a25b9fb02ad8a7a15a5",
+              "default_judge": "declared"
+            },
+            "adapter": null,
+            "started_at": "2026-11-03T12:14:38.262836Z",
+            "finished_at": "2026-11-03T12:20:58Z",
+            "abort_reason": null,
+            "operator": {
+              "by": "Codex / user-authorized BYUL A lab observation",
+              "at": "2026-11-03T12:20:58Z"
+            },
+            "override_reason": "Automatic native source/transport contract unavailable; preserve explicitly scoped actual GPU observations as manual evidence."
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": "declared: succeeded — Scoped native component control only. Actual pinned vLLM daemon; two CUDA IPC consumers each rebuilt 267 entries; selected 16-element reads remained equal after owned global release. Both later get_state calls reported weights_released. Two original ipc_cache loaders fell back to the same pinned disk model and consumed its norm weight on CUDA with an independent oracle."
+          },
+          "scope_observation": {
+            "value": false,
+            "collected": true
+          }
+        }
+      ]
+    }
+  ],
+  "raw_export": {
+    "schema": "byul-gpu-a-raw-export/1",
+    "files": {
+      "byul-a-lifecycle-codex.tgz": {
+        "sha256": "45d411c9eedd818239495474a961b999dc3ae10f7714a0a18dc2320ac9a50a05",
+        "bytes": 978873
+      },
+      "byul-a-runs-codex.tgz": {
+        "sha256": "fe1606bd0ffa16ca8910b5036af2a33909f079fa19217891a092baf0fc2d60b6",
+        "bytes": 4054594
+      },
+      "privacy-scan.json": {
+        "sha256": "704d9a5f3b7c9c27c87d9b15958aa5314fbce07b89e63eea6c674a18bbe64330",
+        "bytes": 522
+      }
+    }
+  },
+  "raw_export_directory": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/raw",
+  "native_automatic_collection_implemented": false
+}

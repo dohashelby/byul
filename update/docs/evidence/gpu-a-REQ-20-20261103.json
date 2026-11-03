@@ -1,0 +1,100 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-03",
+  "check_id": "REQ-20",
+  "scope": "one NVIDIA L4 on existing AWS g6.2xlarge dev instance; generations kept separate",
+  "enterprise_approval_claimed": false,
+  "judge_and_policy_rules_weakened": false,
+  "notes": [
+    "Installed CudaGraphManager captured three descriptors; A/B/A RMSNorm input generations matched an independent oracle after CUDA completion.",
+    "Whole-model serving graphs, cancellation, asynchronous output consumption and buffer lineage remain unverified."
+  ],
+  "runs": [
+    {
+      "run": "a-native-20261103-1/REQ-20",
+      "evidence_kind": "manual_native_component",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/native-bundles/a-native-20261103-1__REQ-20.zip",
+      "bundle_sha256": "84eef1536dd92788f6855b33feb7f5c4f879a4af067295bf81e85fa76271e914",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GNP13W4EXR1X8M4RDQQ55R",
+          "revision": 1,
+          "content_sha256": "71bb337206800936ecce008b7da0a48ef9084d152ce91d0a5300ecc7f7ea2eed",
+          "check_id": "REQ-20",
+          "data_origin": "EXAMPLE",
+          "verification_level": "DECLARED",
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "declared by Codex / user-authorized BYUL A lab observation at 2026-11-03T12:20:59+00:00 (self-reported, not authenticated)",
+            "security: declared UNKNOWN → UNKNOWN",
+            "functional: declared UNKNOWN → UNKNOWN",
+            "performance: declared UNKNOWN → UNKNOWN"
+          ],
+          "missing_observations": [
+            "engine_sensor_violation"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GNP13J9QDK8SNGKEJCQBB2",
+          "revision": 1,
+          "sha256": "32274abd2a3052b3b0e3a4e108a7d126cab88ddefc28560b1bff18a11b47dd71",
+          "data_origin": "DECLARED",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "manual-entry",
+              "version": "0.5.0",
+              "config_sha256": "eb9381fd1f883338b71cf2f6a96763be9843dda957ba6d1d3103a8933ba5d974",
+              "default_judge": "declared"
+            },
+            "adapter": null,
+            "started_at": "2026-11-03T12:17:27.176522Z",
+            "finished_at": "2026-11-03T12:20:59Z",
+            "abort_reason": null,
+            "operator": {
+              "by": "Codex / user-authorized BYUL A lab observation",
+              "at": "2026-11-03T12:20:59Z"
+            },
+            "override_reason": "Automatic native source/transport contract unavailable; preserve explicitly scoped actual GPU observations as manual evidence."
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": "declared: succeeded — Scoped native component control only. Original CudaGraphManager capture/run_fullgraph and RMSNorm: three descriptors, A/B/A input generations, GPU completion before CPU consumption, independent output oracle and retained-copy checks."
+          },
+          "scope_observation": {
+            "value": false,
+            "collected": true
+          }
+        }
+      ]
+    }
+  ],
+  "raw_export": {
+    "schema": "byul-gpu-a-raw-export/1",
+    "files": {
+      "byul-a-lifecycle-codex.tgz": {
+        "sha256": "45d411c9eedd818239495474a961b999dc3ae10f7714a0a18dc2320ac9a50a05",
+        "bytes": 978873
+      },
+      "byul-a-runs-codex.tgz": {
+        "sha256": "fe1606bd0ffa16ca8910b5036af2a33909f079fa19217891a092baf0fc2d60b6",
+        "bytes": 4054594
+      },
+      "privacy-scan.json": {
+        "sha256": "704d9a5f3b7c9c27c87d9b15958aa5314fbce07b89e63eea6c674a18bbe64330",
+        "bytes": 522
+      }
+    }
+  },
+  "raw_export_directory": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/raw",
+  "native_automatic_collection_implemented": false
+}

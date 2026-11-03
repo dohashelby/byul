@@ -1,0 +1,216 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-03",
+  "check_id": "SUP-08",
+  "scope": "one NVIDIA L4 on existing AWS g6.2xlarge dev instance; generations kept separate",
+  "enterprise_approval_claimed": false,
+  "judge_and_policy_rules_weakened": false,
+  "notes": [
+    "code_revision fixture returned HTTP 200; final code-selection consumption was not observed, so security remains UNKNOWN."
+  ],
+  "runs": [
+    {
+      "run": "a-g3-20261103-3/SUP-08",
+      "evidence_kind": "automated",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/bundles/a-g3-20261103-3__SUP-08.zip",
+      "bundle_sha256": "47ec5b89d18bae8441e6fc2dbd562a6d12eefb55acd70295a42db8b7ff7803f7",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GKBF8FD8KASAJX94EFEBH2",
+          "revision": 1,
+          "content_sha256": "1cb29ae8419b6b9618ec67e96e634c964201544ab243e898745fb48f6f7f69eb",
+          "check_id": "SUP-08",
+          "data_origin": "EXAMPLE",
+          "verification_level": "MEASURED",
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: UNKNOWN (not collected for: code_selection_rejected_fields superset_of <code_selection_fields_planned>; code_selection_unverified_fields empty; code_selection_confirmed_violations empty)",
+            "functional: UNKNOWN (pass rules unmet: functional_probe_results all_in ['pass'] (observed {'before': 'no_response'}))",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": [
+            "code_selection_confirmed_violations",
+            "code_selection_rejected_fields",
+            "code_selection_trials",
+            "code_selection_unverified_fields"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GKBEGGWK72K6E9MRCRM3Y7",
+          "revision": 1,
+          "sha256": "67b9aa59c34741b0e3411e7ff28b49e9de7b10ee3f92094a07706541a12ca9e1",
+          "data_origin": "MEASURED",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "input_validation",
+              "version": "0.9.0",
+              "config_sha256": "09921b9096e7eb134455b68d842fc9a3c3939cf8a6759b279e6f9e9908f4f38e"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.2"
+            },
+            "started_at": "2026-11-03T11:40:15Z",
+            "finished_at": "2026-11-03T11:40:15Z",
+            "abort_reason": null
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": false,
+            "detail": "challenge 전후 같은 정상 요청을 대조"
+          },
+          "scope_observation": null
+        }
+      ]
+    },
+    {
+      "run": "a-g3-20261103-3/SUP-08-codex-idfix-1",
+      "evidence_kind": "automated",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/bundles/a-g3-20261103-3__SUP-08-codex-idfix-1.zip",
+      "bundle_sha256": "843ca15f264e6a0e5f00b61fd512d6d205ba60b02c2834dcb1c28c4f28f1cd5f",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GKYAY8AJNR8YD12022FJFQ",
+          "revision": 1,
+          "content_sha256": "c4e572b80fd60712db513164fe24bcf80c0f0e166104be7bf073243279dee505",
+          "check_id": "SUP-08",
+          "data_origin": "EXAMPLE",
+          "verification_level": "MEASURED",
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "PASS",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: UNKNOWN (pass rules unmet: code_selection_rejected_fields superset_of <code_selection_fields_planned> (observed []); code_selection_unverified_fields empty (observed ['code_revision']))",
+            "functional: all pass rules met: functional_probe_results superset_of <functional_probes_planned>; functional_probe_results all_in ['pass']",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": []
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GKY927Z01VA3C4XZNRB1D5",
+          "revision": 1,
+          "sha256": "2374509afec1679f562270ffcde80fdf2770a531201bcdd1e775479495ffd23d",
+          "data_origin": "MEASURED",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "input_validation",
+              "version": "0.9.0",
+              "config_sha256": "09921b9096e7eb134455b68d842fc9a3c3939cf8a6759b279e6f9e9908f4f38e"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.2"
+            },
+            "started_at": "2026-11-03T11:50:32Z",
+            "finished_at": "2026-11-03T11:50:33Z",
+            "abort_reason": null
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": "challenge 전후 같은 정상 요청을 대조"
+          },
+          "scope_observation": null
+        }
+      ]
+    },
+    {
+      "run": "a-g3-20261103-3/SUP-08-try1-id",
+      "evidence_kind": "automated",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/bundles/a-g3-20261103-3__SUP-08-try1-id.zip",
+      "bundle_sha256": "6fde7c324af1c38e4ff7fd6884415dd02ec7a17fb70f3388d2778dc7dedcfa7b",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GK9WBDG2VE4E3RD2C8YJ8Z",
+          "revision": 1,
+          "content_sha256": "c3a2081215d20dd526c600dc4ce6cfcfaa2e28f43bc4c1f69665e144b4de15f8",
+          "check_id": "SUP-08",
+          "data_origin": "EXAMPLE",
+          "verification_level": "MEASURED",
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: UNKNOWN (not collected for: code_selection_rejected_fields superset_of <code_selection_fields_planned>; code_selection_unverified_fields empty; code_selection_confirmed_violations empty)",
+            "functional: UNKNOWN (pass rules unmet: functional_probe_results all_in ['pass'] (observed {'before': 'no_response'}))",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": [
+            "code_selection_confirmed_violations",
+            "code_selection_rejected_fields",
+            "code_selection_trials",
+            "code_selection_unverified_fields"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GK9VX0XQP2GZYV69CE74A6",
+          "revision": 1,
+          "sha256": "148076f8502d21c7b6960e14f8059d4f046e715c728055578c2524ab37053131",
+          "data_origin": "MEASURED",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "input_validation",
+              "version": "0.9.0",
+              "config_sha256": "09921b9096e7eb134455b68d842fc9a3c3939cf8a6759b279e6f9e9908f4f38e"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.2"
+            },
+            "started_at": "2026-11-03T11:39:23Z",
+            "finished_at": "2026-11-03T11:39:23Z",
+            "abort_reason": null
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": false,
+            "detail": "challenge 전후 같은 정상 요청을 대조"
+          },
+          "scope_observation": null
+        }
+      ]
+    }
+  ],
+  "raw_export": {
+    "schema": "byul-gpu-a-raw-export/1",
+    "files": {
+      "byul-a-lifecycle-codex.tgz": {
+        "sha256": "45d411c9eedd818239495474a961b999dc3ae10f7714a0a18dc2320ac9a50a05",
+        "bytes": 978873
+      },
+      "byul-a-runs-codex.tgz": {
+        "sha256": "fe1606bd0ffa16ca8910b5036af2a33909f079fa19217891a092baf0fc2d60b6",
+        "bytes": 4054594
+      },
+      "privacy-scan.json": {
+        "sha256": "704d9a5f3b7c9c27c87d9b15958aa5314fbce07b89e63eea6c674a18bbe64330",
+        "bytes": 522
+      }
+    }
+  },
+  "raw_export_directory": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/raw",
+  "native_automatic_collection_implemented": true
+}

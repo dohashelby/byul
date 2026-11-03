@@ -1716,3 +1716,10 @@ native19 common→OBS02 source aed77b0 검증: Windows/Linux직접고유53, 인�
 - 테스트 결과: YAML 해석과 기존 triggers·jobs·permissions·실행 명령 보존을 확인했다. 실제 수정 HEAD의 push·PR 검증 결과는 PR186의 Actions 실행에서 확인한다. 테스트·assert·고정 hash·marker 제외 조건은 바꾸지 않았다.
 - 다음 단계: 새 HEAD의 전체 시험·wheel 설치·Docker stub·공용 계약·플랫폼 검사를 끝까지 확인한다.
 - 막힌 것: 아직 새 HEAD의 원격 검증 결과를 기다리는 단계다. 이 변경은 GPU 기동이나 source 승인 변경이 아니다.
+
+### 2026-11-03 GPU A Codex 인수 후속
+- 한 일: Claude의 input-validation 요청 ID 공백 거부 중단점을 보수하고 기존 L4 서버에서 REQ-08·09·SUP-08을 새 Store로 실행했다. 각각 보안/기능 PASS/PASS, UNKNOWN/PASS, UNKNOWN/PASS이며 EXAMPLE 정책·official=false를 유지한다. 이전 REQ-10·SUP-03·REQ-16 네 문맥 결과와 실패 시도도 함께 보존했다.
+- 추가 GPU 관측: 사용자 승인으로 EXAMPLE daemon/release 설정을 정해 LIF-13 실제 zero-copy 두 소비자·전체 release·기존 참조·두 fallback 소비를 관측했다. 원 V2 Sampler 자리 재사용, Triton kernel 경계 5사례, CUDA Graph descriptor 3개×A/B/A 9회를 직접 대조했다. 전체 serving 경로 계보가 없어 기존 manual-entry의 DECLARED 관측·전체 UNKNOWN으로 저장했다. 자동 native 수집 완료로 세지 않는다.
+- 검증: 직접·입력 도구·불변식 macOS/Linux 각164 통과. macOS 전체10782 통과/18실패 원본, CSV 갱신 후 현황표13 통과, 같은18개 Linux 통과를 보존했다. Linux 전체10800 통과/19기존제외(1515.95초, 부모1517.647초). 소스 목록4644ad2f/423파일과 기존 팩32·B pin·고정 probe 유지. 실패 포함24개 Store 반출·복원·저장팩 재판정의 정확 RES Ref 일치.
+- 정리: 시험 예외 회수 후8초 timeout, probe/native Pod 삭제·엔진 scale0·GPU0MiB 확인. 원자료와13개 점검 요약은 `docs/gpu-a/RESULTS-20261103.md`와 `docs/evidence/gpu-a-*.json`. 사용자 승인 뒤 EC2 중지 요청21:47:45, 콘솔 stopped 관측21:57:10 KST. EBS 보존·자동 공인IP 해제, Claude 자동 계속 꺼짐.
+- 다음 단계/남은 것: `docs/gpu-a/NATIVE-20261103.md`의 실제 서빙 요청·세대·buffer 소비를 묶는 자동 producer/전송 계약, kernel 읽기·초기화 계측, LIF-13 기업 인가/다른 선택 모드. REQ-14 중간 tensor/REQ-21은 다중 GPU 별도 범위다.

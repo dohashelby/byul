@@ -1,0 +1,161 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-03",
+  "check_id": "REQ-18",
+  "scope": "one NVIDIA L4 on existing AWS g6.2xlarge dev instance; generations kept separate",
+  "enterprise_approval_claimed": false,
+  "judge_and_policy_rules_weakened": false,
+  "notes": [
+    "Original V1 run and new V2 component observation have separate ENV/PLAN/EVD/RES references.",
+    "V2 actual RequestState slot reuse and Sampler logit-bias clearing matched standalone output. Deployed V2 scheduler/request lineage and allowed-token mask coverage remain unverified."
+  ],
+  "runs": [
+    {
+      "run": "a-g1-20261103-1/REQ-18",
+      "evidence_kind": "automated",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/bundles/a-g1-20261103-1__REQ-18.zip",
+      "bundle_sha256": "d3b7ac33c997dc18bd92c936122bce20caab5b5d8651ac2f818f159d5808b47c",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GGQQ3884HN36YQVXBYS5PW",
+          "revision": 1,
+          "content_sha256": "70df7c3500929942b596cdcb830372a4c7987494206064958e8ac31fe6fa8c1f",
+          "check_id": "REQ-18",
+          "data_origin": "DECLARED",
+          "verification_level": "MEASURED",
+          "verdicts": {
+            "security": "PASS",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: all pass rules met: engine_sensor_full_scope eq True; engine_sensor_violation eq False",
+            "functional: no rule for this axis",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": []
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GGQKJ3DRFFY6PGQH9G3GEG",
+          "revision": 1,
+          "sha256": "5d7fc28c8b3902962fe80c778623dfce64733fad43bd94469dc9c877162c165e",
+          "data_origin": "MEASURED",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "engine_sensor",
+              "version": "0.1.1",
+              "config_sha256": "d0fa5d1059af845c43b51abdd9b992bb2c92b717e7c102a0eb4a0d95be547abc"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.2"
+            },
+            "started_at": "2026-11-03T10:54:27Z",
+            "finished_at": "2026-11-03T10:54:31Z",
+            "abort_reason": null
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": ""
+          },
+          "scope_observation": {
+            "value": true,
+            "collected": true
+          }
+        }
+      ]
+    },
+    {
+      "run": "a-native-20261103-1/REQ-18",
+      "evidence_kind": "manual_native_component",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/native-bundles/a-native-20261103-1__REQ-18.zip",
+      "bundle_sha256": "b19aa0f600534f546228b6418b6b3dbb44de6d7d8a3aacd738d96dd1c15f34b1",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GNP0GB8JDC58R8F7167X0T",
+          "revision": 1,
+          "content_sha256": "352e5f9d5d24a3aca176481bdcaca159b9cce7f17c82d543072216fe6ef95a50",
+          "check_id": "REQ-18",
+          "data_origin": "EXAMPLE",
+          "verification_level": "DECLARED",
+          "verdicts": {
+            "security": "UNKNOWN",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "declared by Codex / user-authorized BYUL A lab observation at 2026-11-03T12:20:58+00:00 (self-reported, not authenticated)",
+            "security: declared UNKNOWN → UNKNOWN",
+            "functional: declared UNKNOWN → UNKNOWN",
+            "performance: declared UNKNOWN → UNKNOWN"
+          ],
+          "missing_observations": [
+            "engine_sensor_violation"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GNP0G092Y2DA23VF7ST951",
+          "revision": 1,
+          "sha256": "ebe511392ef2ccb0968bc57660e6f60609aa421d7b8feca6a5c45c4654756f7c",
+          "data_origin": "DECLARED",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "manual-entry",
+              "version": "0.5.0",
+              "config_sha256": "d8dda5f1bb47190fdf53371e47fa4f7f91452b01a7d6526de7922b3038dada56",
+              "default_judge": "declared"
+            },
+            "adapter": null,
+            "started_at": "2026-11-03T12:17:27.176522Z",
+            "finished_at": "2026-11-03T12:20:58Z",
+            "abort_reason": null,
+            "operator": {
+              "by": "Codex / user-authorized BYUL A lab observation",
+              "at": "2026-11-03T12:20:58Z"
+            },
+            "override_reason": "Automatic native source/transport contract unavailable; preserve explicitly scoped actual GPU observations as manual evidence."
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": "declared: succeeded — Scoped native component control only. Original V2 RequestState and Sampler: an actual freed slot was reused, logit-bias state cleared, and CUDA sampled output matched standalone B from the same logits."
+          },
+          "scope_observation": {
+            "value": false,
+            "collected": true
+          }
+        }
+      ]
+    }
+  ],
+  "raw_export": {
+    "schema": "byul-gpu-a-raw-export/1",
+    "files": {
+      "byul-a-lifecycle-codex.tgz": {
+        "sha256": "45d411c9eedd818239495474a961b999dc3ae10f7714a0a18dc2320ac9a50a05",
+        "bytes": 978873
+      },
+      "byul-a-runs-codex.tgz": {
+        "sha256": "fe1606bd0ffa16ca8910b5036af2a33909f079fa19217891a092baf0fc2d60b6",
+        "bytes": 4054594
+      },
+      "privacy-scan.json": {
+        "sha256": "704d9a5f3b7c9c27c87d9b15958aa5314fbce07b89e63eea6c674a18bbe64330",
+        "bytes": 522
+      }
+    }
+  },
+  "raw_export_directory": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/raw",
+  "native_automatic_collection_implemented": "V1 callback only; V2 component observation is manual"
+}

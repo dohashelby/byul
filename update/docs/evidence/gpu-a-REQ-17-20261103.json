@@ -1,0 +1,93 @@
+{
+  "schema": "byul-gpu-a-check-summary/1",
+  "date_kst": "2026-11-03",
+  "check_id": "REQ-17",
+  "scope": "one NVIDIA L4 on existing AWS g6.2xlarge dev instance; generations kept separate",
+  "enterprise_approval_claimed": false,
+  "judge_and_policy_rules_weakened": false,
+  "notes": [
+    "Original timing cohort, cache-native hit evidence, and scoped PASS are preserved."
+  ],
+  "runs": [
+    {
+      "run": "a-g1-20261103-1/REQ-17",
+      "evidence_kind": "automated",
+      "official": false,
+      "bundle_path": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/bundles/a-g1-20261103-1__REQ-17.zip",
+      "bundle_sha256": "3e5bb634c0426736a3dd98338f34a6ce537938f0fb7f071b8485b1317bb1ab23",
+      "exact_saved_pack_rejudgment_verified": true,
+      "results": [
+        {
+          "id": "RES-01M6GGKX1AXTES3M3N6BVJTHFF",
+          "revision": 1,
+          "content_sha256": "8e38842670950114e7a19c06e28e7c1ceeea880808e905ef6ae4f97cbcddefd0",
+          "check_id": "REQ-17",
+          "data_origin": "DECLARED",
+          "verification_level": "MEASURED",
+          "verdicts": {
+            "security": "PASS",
+            "functional": "UNKNOWN",
+            "performance": "UNKNOWN"
+          },
+          "reasons": [
+            "security: all pass rules met: engine_sensor_full_scope eq True; engine_sensor_violation eq False",
+            "functional: no rule for this axis",
+            "performance: no rule for this axis"
+          ],
+          "missing_observations": []
+        }
+      ],
+      "evidence": [
+        {
+          "id": "EVD-01M6GGHSJSCZ4EMFRJ1612WAP3",
+          "revision": 1,
+          "sha256": "cf12ef78babd7a748b04ca305e320fe74a4c6a75387ef0409ee454fe6a36705d",
+          "data_origin": "MEASURED",
+          "execution": {
+            "status": "COMPLETED",
+            "executor": {
+              "name": "engine_sensor",
+              "version": "0.1.1",
+              "config_sha256": "8151be01415ac5ace04212199a87ee05ddf87039ec1d5e1b36194d96350cb2b7"
+            },
+            "adapter": {
+              "name": "vllm",
+              "version": "0.4.2"
+            },
+            "started_at": "2026-11-03T10:51:17Z",
+            "finished_at": "2026-11-03T10:52:21Z",
+            "abort_reason": null
+          },
+          "normal_control": {
+            "attempted": true,
+            "succeeded": true,
+            "detail": ""
+          },
+          "scope_observation": {
+            "value": true,
+            "collected": true
+          }
+        }
+      ]
+    }
+  ],
+  "raw_export": {
+    "schema": "byul-gpu-a-raw-export/1",
+    "files": {
+      "byul-a-lifecycle-codex.tgz": {
+        "sha256": "45d411c9eedd818239495474a961b999dc3ae10f7714a0a18dc2320ac9a50a05",
+        "bytes": 978873
+      },
+      "byul-a-runs-codex.tgz": {
+        "sha256": "fe1606bd0ffa16ca8910b5036af2a33909f079fa19217891a092baf0fc2d60b6",
+        "bytes": 4054594
+      },
+      "privacy-scan.json": {
+        "sha256": "704d9a5f3b7c9c27c87d9b15958aa5314fbce07b89e63eea6c674a18bbe64330",
+        "bytes": 522
+      }
+    }
+  },
+  "raw_export_directory": "/Users/doha/Desktop/byul-a-evidence/20261103-codex-continuation/raw",
+  "native_automatic_collection_implemented": true
+}

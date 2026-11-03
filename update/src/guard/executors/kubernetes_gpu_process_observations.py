@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import re
 
-from guard.models import canonical_json, sha256_hex, utcnow
-from guard.runtime.kubernetes_http import KubernetesHTTP, REQUEST_BINDING_PROFILE
+from guard.models import sha256_hex, utcnow
 from guard.runtime.kubernetes_process import PROFILE as PROCESS_PROFILE
 
 PROFILE = "kubernetes-b-gpu-process-passive-v1"
 SCHEMA = "guard-b-gpu-process-passive/1"
-SOURCE_SHA256 = "9b5908b23f9d38f1205a2dbd2033ad23f2838beef1553feb911023a81d2f4037"
+SOURCE_SHA256 = "c6c0f0703207e73463f02ead1a35610e35f19ca7a307c877f7ae6ecb915f2a8c"
 
 SOURCE = r'''
 import hashlib,json,os,re,signal,stat,subprocess,sys,time
@@ -22,6 +21,7 @@ spec=json.loads(sys.argv[1]);root=spec['proc_root']
 if type(root) is not str or not os.path.isabs(root) or '..' in root.split(os.sep) or len(root)>256:raise SystemExit(64)
 if type(spec['pids']) is not list or len(spec['pids'])>128:raise SystemExit(65)
 if type(spec['candidates']) is not list or len(spec['candidates'])>64:raise SystemExit(66)
+class ScopeChanged(ValueError):pass
 def digest(raw):return hashlib.sha256(raw).hexdigest()
 def stat_ticks(pid):
  raw=open(root+'/'+str(pid)+'/stat','rb').read(8192).decode('utf-8','replace')
@@ -52,7 +52,7 @@ for expected in spec['pids']:
       or before['mount_namespace_inode']!=expected['mount_namespace_inode']
       or before['pid_namespace_inode']!=expected['pid_namespace_inode']
       or not before['uids'] or len(before['uids'])!=4
-      or before['uids'][1]!=expected['uid_effective']):raise ValueError('PID_REUSED_OR_SCOPE_CHANGED')
+      or before['uids'][1]!=expected['uid_effective']):raise ScopeChanged()
   row['uid_effective']=before['uids'][1] if before['uids'] and len(before['uids'])==4 else None
   row['pid_namespace_inode']=before['pid_namespace_inode'];row['mount_namespace_inode']=before['mount_namespace_inode']
   row['nspid']=before['nspid'][:8]
@@ -75,7 +75,7 @@ for expected in spec['pids']:
     continue
    mode=flags&os.O_ACCMODE
    metadata_only=bool(flags&getattr(os,'O_PATH',0))
-   if stat.S_ISCHR(st.st_mode) and re.fullmatch('/dev/(?:nvidia(?:[0-9]+|ctl|-uvm(?:-tools)?)|dri/renderD[0-9]+)',link):
+   if stat.S_ISCHR(st.st_mode) and re.fullmatch('/dev/(?:nvidia(?:[0-9]+|ctl|-uvm(?:-tools)?|-caps/nvidia-cap[0-9]+)|dri/renderD[0-9]+)',link):
     row['device_fds'].append({'path':link,'major':os.major(st.st_rdev),'minor':os.minor(st.st_rdev),
                               'read_capable':not metadata_only and mode in (os.O_RDONLY,os.O_RDWR),
                               'write_capable':not metadata_only and mode in (os.O_WRONLY,os.O_RDWR),
@@ -92,6 +92,9 @@ for expected in spec['pids']:
   if not row['pid_identity_stable']:
    row['diagnostic_codes'].append('PID_IDENTITY_CHANGED')
    row['device_fds']=[];row['credential_fds']=[]
+ except ScopeChanged:
+  row['diagnostic_codes'].append('PID_REUSED_OR_SCOPE_CHANGED')
+  row['device_fds']=[];row['credential_fds']=[]
  except Exception:
   row['diagnostic_codes'].append('PID_READ_UNAVAILABLE')
   row['device_fds']=[];row['credential_fds']=[]
@@ -174,7 +177,7 @@ def _decode(raw: dict, pids: list[dict], candidates: list[dict]) -> tuple[list[d
             or len(raw["rows"]) != len(pids) or type(raw["nvml"]) is not dict):
         raise ValueError("B_GPU_PROCESS_PACKET_INVALID")
     allowed_diagnostics = {"CGROUP_UNAVAILABLE", "FD_SET_BOUND", "FD_GONE_OR_UNREADABLE",
-                           "PID_IDENTITY_CHANGED", "PID_READ_UNAVAILABLE"}
+                           "PID_IDENTITY_CHANGED", "PID_READ_UNAVAILABLE", "PID_REUSED_OR_SCOPE_CHANGED"}
     candidate_paths = {row["path"] for row in candidates}
     rows = []
     for expected, row in zip(pids, raw["rows"]):
@@ -207,7 +210,7 @@ def _decode(raw: dict, pids: list[dict], candidates: list[dict]) -> tuple[list[d
             if (type(fd) is not dict or set(fd) != {"path", "major", "minor", "read_capable", "write_capable",
                                                   "metadata_only"}
                     or type(fd["path"]) is not str or re.fullmatch(
-                        r"/dev/(?:nvidia(?:[0-9]+|ctl|-uvm(?:-tools)?)|dri/renderD[0-9]+)", fd["path"]) is None
+                        r"/dev/(?:nvidia(?:[0-9]+|ctl|-uvm(?:-tools)?|-caps/nvidia-cap[0-9]+)|dri/renderD[0-9]+)", fd["path"]) is None
                     or any(type(fd[key]) is not int or fd[key] < 0 for key in ("major", "minor"))
                     or any(type(fd[key]) is not bool for key in ("read_capable", "write_capable", "metadata_only"))
                     or fd["metadata_only"] and (fd["read_capable"] or fd["write_capable"])):
@@ -235,42 +238,30 @@ def _decode(raw: dict, pids: list[dict], candidates: list[dict]) -> tuple[list[d
     return rows, nvml
 
 
-def collect(record: dict, transport: KubernetesHTTP) -> dict:
-    """Use the current bound transport; never alter process-v1 or judge observations."""
-    result = _empty("B_GPU_PROCESS_UNAVAILABLE")
-    result["started_at"] = utcnow().isoformat()
+def collect(record: dict, transport) -> dict:
+    """Keep the public-contract dependency explicit; never bypass A's registry.
+
+    The fixed SOURCE and decoder remain directly CPU-testable. Live execution
+    requires an A-owned public bounded metadata contract, not private transport
+    fields or mutation of another consumer's model_snapshots.
+    """
+    result = _empty("B_GPU_PROCESS_PUBLIC_CONTRACT_UNAVAILABLE")
+    result["unresolved_credential_candidates"] = []
+    result["availability_reason"] = "A_PUBLIC_BOUNDED_PROCESS_METADATA_CONTRACT_PENDING"
     try:
-        if (not isinstance(transport, KubernetesHTTP) or transport.injected
-                or transport.profile != REQUEST_BINDING_PROFILE
-                or record.get("target_sha256") != transport.target_sha256
-                or sha256_hex(SOURCE.encode()) != SOURCE_SHA256):
-            raise ValueError("B_GPU_PROCESS_SOURCE_OR_BINDING_UNAVAILABLE")
         pids, candidates = _inputs(record)
-        if not pids:
-            raise ValueError("B_GPU_PROCESS_PID_SET_UNAVAILABLE")
-        if transport.deadline - transport.clock() < 18:
-            raise ValueError("B_GPU_PROCESS_TIME_BUDGET_UNAVAILABLE")
-        transport._verify(capture_snapshot=True)
-        binding = transport.binding["engine"]
-        raw = transport._call(["--namespace=" + binding["namespace"], "exec", binding["pod"],
-                               "--container=" + binding["container"], "--", "python3", "-I", "-S", "-B",
-                               "-c", SOURCE, canonical_json({"proc_root": "/proc", "pids": pids,
-                                                              "candidates": candidates}).decode()],
-                              cap=262144, budget=10)
-        transport._verify(capture_snapshot=True)
-        valid_rows, nvml = _decode(raw, pids, candidates)
-        result.update(binding_stable=True, rows=valid_rows, nvml=nvml,
-                      nvml_joins=_join_nvml(valid_rows, nvml), diagnostic_codes=[])
-        if any(not row["pid_identity_stable"] or row["diagnostic_codes"] for row in valid_rows):
-            result["diagnostic_codes"].append("B_GPU_PROCESS_PARTIAL")
-        if not nvml["available"]:
-            result["diagnostic_codes"].append("B_GPU_NVML_UNAVAILABLE")
-        if any(not row["joined"] for row in result["nvml_joins"]):
-            result["diagnostic_codes"].append("B_GPU_NVML_PID_UNJOINED")
-    except Exception:
-        result["diagnostic_codes"] = ["B_GPU_PROCESS_UNAVAILABLE"]
+        result["selected_process_count"] = len(pids)
+        result["metadata_candidate_count"] = len(candidates)
+        result["unresolved_credential_candidates"] = [
+            {"path": row["path"], "state": "symlink_not_followed",
+             "diagnostic_code": "CREDENTIAL_CANDIDATE_SYMLINK_UNRESOLVED"}
+            for row in record["packet"]["candidate_metadata"]
+            if row["state"] == "symlink_not_followed"]
+        if result["unresolved_credential_candidates"]:
+            result["diagnostic_codes"].append("CREDENTIAL_CANDIDATE_SYMLINK_UNRESOLVED")
+    except (KeyError, TypeError, ValueError):
+        result["diagnostic_codes"].append("B_GPU_PROCESS_V1_INPUT_UNAVAILABLE")
     result["finished_at"] = utcnow().isoformat()
     return result
-
 
 __all__ = ["PROFILE", "SCHEMA", "SOURCE_SHA256", "collect"]

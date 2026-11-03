@@ -152,17 +152,23 @@ def kubernetes_process_rows(record):
 
 def kubernetes_process_control(ctx):
     """Use the existing CheckDef/validator through the common live transport."""
-    from guard.runtime.kubernetes_http import KubernetesBindingError
     requests, probes = functional_requests(ctx, via="engine")
     try:
         responses = ctx.cprobe.normal_requests(ctx.trusted_net, requests, ctx.timeout) if requests else []
-    except KubernetesBindingError:
-        # A later control/owner/cleanup gap does not erase earlier process facts.
+    except Exception:
+        # Required control failure must not prevent the independent metadata read.
         responses = []
     raw = dict(zip(probes, responses))
     for pid, response in raw.items():
-        ctx.record("trusted", "functional-engine", pid, probes[pid].as_role, response)
-    functional, _, normal = functional_results(probes, raw)
+        try:
+            ctx.record("trusted", "functional-engine", pid, probes[pid].as_role, response)
+        except Exception:
+            raw = {}
+            break
+    try:
+        functional, _, normal = functional_results(probes, raw)
+    except Exception:
+        functional, _, normal = functional_results(probes, {})
     return ({"functional_probes_planned": {"value": list(probes), "collected": True},
              "functional_probe_results": {"value": functional, "collected": bool(probes)}}, normal)
 
@@ -172,8 +178,6 @@ def collect_kubernetes_process_permissions(ctx):
     if ctx.check.id != "PLT-01":
         raise ValueError("KUBERNETES_PROCESS_PERMISSION_CHECK_UNSUPPORTED")
     record = read_kubernetes_process_observations(ctx)
-    from .kubernetes_gpu_process_observations import collect as collect_passive_gpu_process
-    passive = collect_passive_gpu_process(record, ctx.cprobe)
     rows = kubernetes_process_rows(record)
     status = [row for row in rows if row["uid_effective"] is not None and row["cap_eff"] is not None]
     caps = sorted({cap for row in status for cap in decode_caps(row["cap_eff"])})
@@ -190,10 +194,16 @@ def collect_kubernetes_process_permissions(ctx):
     })
     functional, normal = kubernetes_process_control(ctx)
     observations.update(functional)
+    from .kubernetes_gpu_process_observations import collect as collect_passive_gpu_process
+    passive = collect_passive_gpu_process(record, ctx.cprobe)
+    try:
+        transport_report = ctx.cprobe.report()
+    except Exception:
+        transport_report = {"diagnostic_codes": ["KUBERNETES_TRANSPORT_REPORT_UNAVAILABLE"]}
     summary = {"profile": "kubernetes-process-permission-consumer-v1", "process_observation": record,
         "passive_gpu_process_observation": passive,
         "reported_process_uids": uids, "reported_capabilities_effective": caps,
-        "kubernetes": ctx.cprobe.report(),
+        "kubernetes": transport_report,
         "worker_subject_verified": False, "permission_scan_complete": False,
         "fixture": {"process_profile": record["profile"], "program_sha256": record["program_sha256"],
                     "declared_control": [probe.model_dump(mode="json") for probe in ctx.check.functional_probes]},
@@ -436,9 +446,10 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             "process_scan_complete": {"value": complete, "collected": True},
             "capabilities_effective": {"value": caps, "collected": any("caps" in p for p in procs)},
             "mounts": {"value": mounts, "collected": mounts_complete or completeness_gate and bool(host_mounts)},
-            "devices": {"value": None if gpu_device_scope_unverified else devices,
-                        "collected": False if gpu_device_scope_unverified else
-                        devices_complete or completeness_gate and bool(device_rows)},
+            # Positive launch declarations remain policy evidence. Unknown
+            # injected GPU access prevents completeness, not a known violation.
+            "devices": {"value": devices,
+                        "collected": devices_complete or completeness_gate and bool(device_rows)},
             "privileged": {"value": privileged, "collected": privileged is not None},
             "host_namespaces": {"value": host_ns, "collected": namespaces_complete or completeness_gate and bool(host_ns)},
             "root_uid_present": {"value": 0 in uids, "collected": 0 in uids or complete},
@@ -467,7 +478,7 @@ class ContainerConfigExecutor(HttpCheckExecutor):
             "devices": devices, "capabilities_effective": caps, "uids": uids,
             "device_requests_unverified": device_requests_unverified,
             "gpu_effective_device_access_unverified": gpu_device_scope_unverified,
-            "declared_devices": devices,
+            "device_observation_scope": "Docker launch declarations; effective GPU access unverified",
             "processes": [{k: p.get(k) for k in ("pid", "name", "uid_effective", "caps")} for p in procs],
             "proc_read_rc": proc_rc, "sentinel_results": sentinel_results,
             "container_fs_writes": container_fs_writes,

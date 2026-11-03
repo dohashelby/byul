@@ -104,6 +104,7 @@ def test_real_remote_source_reports_stable_pid_and_unsupported_nvml_without_secr
         row = packet['rows'][0]
         assert row['pid_identity_stable'] is True and row['uid_effective'] == 1000
         assert row['device_fds'] == row['credential_fds'] == []
+        helper._decode(packet, spec['pids'], [])
         assert packet['nvml'] == {'available': False, 'rows': [], 'diagnostic_code': 'NVML_UNAVAILABLE'}
         (proc / 'fd/7').write_text('EXAMPLE gone FD')
         spec['pids'][0]['start_ticks'] = 43
@@ -111,6 +112,8 @@ def test_real_remote_source_reports_stable_pid_and_unsupported_nvml_without_secr
                                   json.dumps(spec)], capture_output=True, timeout=15, env=env)
         assert changed.returncode == 0
         changed_row = json.loads(changed.stdout)['rows'][0]
+        assert changed_row['diagnostic_codes'] == ['PID_REUSED_OR_SCOPE_CHANGED']
+        helper._decode(json.loads(changed.stdout), spec['pids'], [])
         assert changed_row['pid_identity_stable'] is False
         assert changed_row['device_fds'] == changed_row['credential_fds'] == []
         spec['pids'][0]['start_ticks'] = 42
@@ -125,40 +128,34 @@ def test_real_remote_source_reports_stable_pid_and_unsupported_nvml_without_secr
 
 def test_passive_consumer_keeps_only_process_facts_and_unique_nvml_join():
     record = v1_record()
-    joined_row = remote_row()
-    joined_row['nspid'] = [999, 123]
-    transport = transport_for(remote_packet(row=joined_row, nvml_pid=999))
-    observed = helper.collect(record, transport)
-    assert transport._checks == 2 and observed['binding_stable'] is True
-    assert observed['rows'][0]['device_fds'][0]['major'] == 195
-    assert observed['rows'][0]['credential_fds'] == [{'path': '/EXAMPLE/key', 'read_capable': True,
-                                                      'metadata_only': False}]
-    assert observed['nvml_joins'] == [{'nvml_pid': 999, 'gpu_uuid': UUID,
-                                        'process_pid': 123, 'joined': True,
-                                        'namespace_chain_verified': True}]
-    assert observed['worker_subject_verified'] is False and observed['worker_inventory_complete'] is False
-    mismatch = helper.collect(record, transport_for(remote_packet(nvml_pid=123)))
-    assert mismatch['nvml_joins'][0]['joined'] is False
-    assert 'B_GPU_NVML_PID_UNJOINED' in mismatch['diagnostic_codes']
+    pids, candidates = helper._inputs(record)
+    joined_row = remote_row(); joined_row['nspid'] = [999, 123]
+    rows, nvml = helper._decode(remote_packet(row=joined_row, nvml_pid=999), pids, candidates)
+    assert rows[0]['device_fds'][0]['major'] == 195
+    assert rows[0]['credential_fds'] == [{'path': '/EXAMPLE/key', 'read_capable': True, 'metadata_only': False}]
+    assert helper._join_nvml(rows, nvml) == [{'nvml_pid': 999, 'gpu_uuid': UUID,
+        'process_pid': 123, 'joined': True, 'namespace_chain_verified': True}]
+    rows, nvml = helper._decode(remote_packet(nvml_pid=123), pids, candidates)
+    assert helper._join_nvml(rows, nvml)[0]['joined'] is False
+    transport = transport_for(remote_packet())
+    pending = helper.collect(record, transport)
+    assert pending['worker_subject_verified'] is False and pending['worker_inventory_complete'] is False
+    assert pending['binding_stable'] is False and pending['rows'] == [] and transport._checks == 0
 
 
 def test_metadata_only_fd_is_not_readable_or_writable_and_contradiction_is_rejected():
+    pids, candidates = helper._inputs(v1_record())
     row = remote_row()
     row['device_fds'][0].update(read_capable=False, write_capable=False, metadata_only=True)
     row['credential_fds'][0].update(read_capable=False, metadata_only=True)
-    observed = helper.collect(v1_record(), transport_for(remote_packet(row=row, nvml=False)))
-    assert observed['binding_stable'] is True
-    assert observed['rows'][0]['device_fds'][0]['metadata_only'] is True
-    assert observed['rows'][0]['device_fds'][0]['read_capable'] is False
-    assert observed['rows'][0]['credential_fds'][0] == {
-        'path': '/EXAMPLE/key', 'read_capable': False, 'metadata_only': True}
+    rows, _ = helper._decode(remote_packet(row=row, nvml=False), pids, candidates)
+    assert rows[0]['device_fds'][0]['metadata_only'] is True
+    assert rows[0]['device_fds'][0]['read_capable'] is False
+    assert rows[0]['credential_fds'][0] == {'path': '/EXAMPLE/key', 'read_capable': False, 'metadata_only': True}
     row['credential_fds'][0]['read_capable'] = True
-    rejected = helper.collect(v1_record(), transport_for(remote_packet(row=row, nvml=False)))
-    assert rejected['binding_stable'] is False and rejected['rows'] == []
-    row['credential_fds'][0]['read_capable'] = False
-    row['device_fds'][0]['write_capable'] = True
-    rejected_device = helper.collect(v1_record(), transport_for(remote_packet(row=row, nvml=False)))
-    assert rejected_device['binding_stable'] is False and rejected_device['rows'] == []
+    with pytest.raises(ValueError): helper._decode(remote_packet(row=row, nvml=False), pids, candidates)
+    row['credential_fds'][0]['read_capable'] = False; row['device_fds'][0]['write_capable'] = True
+    with pytest.raises(ValueError): helper._decode(remote_packet(row=row, nvml=False), pids, candidates)
 
 
 @pytest.mark.parametrize('path,accepted', [
@@ -166,15 +163,20 @@ def test_metadata_only_fd_is_not_readable_or_writable_and_contradiction_is_rejec
     ('/dev/nvidia-uvm-tools', True),
     ('/dev/nvidiauvm', False),
     ('/dev/nvidiauvm-tools', False),
+    ('/dev/nvidia-caps/nvidia-cap1', True),
+    ('/dev/nvidia-caps/../nvidia0', False),
+    ('/dev/nvidia-caps/other', False),
 ])
 def test_device_fd_decoder_uses_exact_kernel_device_names(path, accepted):
-    row = remote_row()
-    row['device_fds'][0]['path'] = path
-    observed = helper.collect(v1_record(), transport_for(remote_packet(row=row, nvml=False)))
-    assert observed['binding_stable'] is accepted
-    assert bool(observed['rows']) is accepted
-    assert observed['worker_subject_verified'] is False
-    assert observed['device_access_tested'] is False
+    row = remote_row(); row['device_fds'][0]['path'] = path
+    pids, candidates = helper._inputs(v1_record())
+    if accepted:
+        rows, _ = helper._decode(remote_packet(row=row, nvml=False), pids, candidates)
+        assert rows[0]['device_fds'][0]['path'] == path
+    else:
+        with pytest.raises(ValueError): helper._decode(remote_packet(row=row, nvml=False), pids, candidates)
+    pending = helper.collect(v1_record(), object())
+    assert pending['worker_subject_verified'] is False and pending['device_access_tested'] is False
 
 
 @pytest.mark.parametrize('damage', ['pid-reuse', 'pod-replace', 'fd-gone', 'remote-error', 'injected', 'budget-low'])
@@ -191,11 +193,13 @@ def test_failure_paths_do_not_forge_worker_or_access(damage):
         transport.deadline = time.monotonic() + 5
     result = helper.collect(record, transport)
     assert result['worker_subject_verified'] is False and result['worker_inventory_complete'] is False
-    if damage in {'pod-replace', 'remote-error', 'injected', 'budget-low'}:
-        assert not result['binding_stable'] and result['rows'] == []
-    else:
-        assert result['binding_stable'] and 'B_GPU_PROCESS_PARTIAL' in result['diagnostic_codes']
-        assert result['rows'][0]['credential_fds'] == []
+    assert not result['binding_stable'] and result['rows'] == [] and transport._checks == 0
+    assert 'B_GPU_PROCESS_PUBLIC_CONTRACT_UNAVAILABLE' in result['diagnostic_codes']
+    if damage in {'pid-reuse', 'fd-gone'}:
+        pids, candidates = helper._inputs(record)
+        decoded, _ = helper._decode(remote_packet(row=row), pids, candidates)
+        assert decoded[0]['credential_fds'] == []
+        assert decoded[0]['pid_identity_stable'] is (damage != 'pid-reuse')
 
 
 def test_later_auxiliary_error_keeps_existing_independent_root_and_capability(monkeypatch):

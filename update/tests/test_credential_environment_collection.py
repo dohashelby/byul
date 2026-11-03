@@ -2,6 +2,10 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+import shlex
+import shutil
+import subprocess
+import sys
 
 import pytest
 from typer.testing import CliRunner
@@ -16,6 +20,73 @@ from guard.runtime.docker import CmdResult
 from guard.store import Store
 from tests.builders import T0, baseline_pack, completion_response, environment, evidence, policy
 from tests.test_credential_mount_semantics import FakeDocker, IMAGE, RUN, context
+
+
+@pytest.mark.parametrize("tail", [
+    "invalid=value\nGUARD_READ_OK\n",
+    "PID -1\nGUARD_READ_OK\n",
+    "GUARD_READ_ERROR\nGUARD_READ_OK\n",
+    "GUARD_READ_OK\nGUARD_READ_OK\n",
+])
+def test_invalid_subject_record_cannot_recover_from_a_later_ok_marker(tail):
+    subjects = []
+    names, complete = parse_environment_names(
+        "PID 19\nFORBIDDEN_CANARY\n" + tail + "PID 27\nEXAMPLE_NAME\nGUARD_READ_OK\n", 0,
+        subjects=subjects)
+    assert names == ["EXAMPLE_NAME", "FORBIDDEN_CANARY"] and complete is False
+    assert subjects == [
+        {"pid": 19, "environment_names": ["FORBIDDEN_CANARY"], "read_complete": False},
+        {"pid": 27, "environment_names": ["EXAMPLE_NAME"], "read_complete": True}]
+
+
+@pytest.mark.parametrize("second_state", ["valid", "missing", "invalid-name"])
+def test_actual_fixed_environment_producer_on_example_proc_tree_consumes_subject_records(
+        tmp_path, second_state):
+    from guard.executors.credential_exposure import ENV_CMD
+    proc = tmp_path / "example-proc"
+    for pid in (19, 27):
+        (proc / str(pid)).mkdir(parents=True)
+    private = "EXAMPLE_PRODUCER_VALUE_MUST_NOT_BE_EXPORTED"
+    (proc / "19/environ").write_bytes(("FORBIDDEN_CANARY=" + private + "\0").encode())
+    if second_state == "valid":
+        (proc / "27/environ").write_bytes(b"EXAMPLE_NAME=EXAMPLE\0")
+    elif second_state == "invalid-name":
+        (proc / "27/environ").write_bytes(b"INVALID-NAME=EXAMPLE\0")
+    shell = shutil.which("sh")
+    if sys.platform == "win32":
+        git = Path(shutil.which("git")).resolve()
+        shell = str(git.parent.parent / "bin/sh.exe")
+    assert shell and Path(shell).is_file(), "The existing POSIX producer requires the installed Git/POSIX shell"
+    # Same fixed producer body, only the /proc fixture root is substituted.
+    command = ENV_CMD.replace("/proc/", shlex.quote(proc.as_posix() + "/"))
+    assert "/proc/" not in command
+    result = subprocess.run([shell, "-c", "PATH=/usr/bin:/bin:$PATH\n" + command],
+        capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0
+    assert private not in result.stdout
+    if second_state == "invalid-name":
+        assert result.stdout.count("GUARD_READ_OK") == 2
+    subjects = []
+    names, complete = parse_environment_names(result.stdout, result.returncode, subjects=subjects)
+    assert complete is (second_state == "valid")
+    assert subjects == [
+        {"pid": 19, "environment_names": ["FORBIDDEN_CANARY"], "read_complete": True},
+        {"pid": 27, "environment_names": ["EXAMPLE_NAME"] if second_state == "valid" else [],
+         "read_complete": second_state == "valid"}]
+    ctx = context(VALUES)
+    ctx.env = environment(engine={"name": "engine-x", "version": "1.0.0", "image_digest": IMAGE},
+        model={"id": "test"}, runtime={"gpu_count": 1})
+    ctx.target["environment_ref"] = ctx.env.ref().model_dump(mode="json")
+    obs, normal, _, summary = CredentialExposureExecutor({}, docker=NameDocker(result.stdout)).collect(ctx)
+    assert obs["worker_env_names"]["value"] == names and obs["worker_env_names"]["collected"] is True
+    assert obs["process_scan_complete"]["value"] is False
+    assert summary["observed_environment_subjects"] == subjects
+    assert summary["worker_inventory_complete"] is summary["provider_scope_verified"] is False
+    pack = baseline_pack()
+    judged = judge_evidence(pack.checks["PLT-04"], evidence(check_id="PLT-04", observations=obs, normal=normal),
+        policy(pack.ref(), values={"PLT-04": VALUES}), T0)
+    assert judged.verdicts.security == Verdict.FAIL
+    assert private not in json.dumps(summary)
 
 
 PRIVATE = "EXAMPLE_PRIVATE_ENVIRONMENT_VALUE_71a4"
@@ -69,9 +140,10 @@ def test_gpu_container_environment_union_is_not_a_worker_credential_claim():
     obs, _, _, detail = CredentialExposureExecutor({}, docker=NameDocker(
         "PID 1\nFORBIDDEN_CANARY\nGUARD_READ_OK\n",
         mounts=[{"Type": "bind", "Destination": "/credentials"}])).collect(ctx)
-    assert obs["worker_env_names"] == {"value": None, "collected": False}
+    assert obs["worker_env_names"] == {"value": ["FORBIDDEN_CANARY"], "collected": True}
     assert obs["process_scan_complete"] == {"value": False, "collected": True}
     assert detail["credential_names"] == ["FORBIDDEN_CANARY"]
+    assert detail["observed_environment_subjects"] == [{"pid": 1, "environment_names": ["FORBIDDEN_CANARY"], "read_complete": True}]
     assert obs["forbidden_mount_violations"] == {"value": ["/credentials"], "collected": True}
     assert "GPU_WORKER_CREDENTIAL_SCOPE_UNVERIFIED" in detail["collection_errors"]
 

@@ -93,15 +93,15 @@ class _Runner:
         source_doc = (
             _VLLM_METRICS_DOC
             if flavor == "vllm"
-            else "https://github.com/sgl-project/sglang/blob/v0.5.21/python/sglang/srt/observability/metrics_collector.py"
+            else "https://github.com/sgl-project/sglang/blob/v0.5.22/python/sglang/srt/observability/metrics_collector.py"
         )
         document: dict[str, Any] = {
             "schema_version": "runtime-backend/1.0",
             "kind": flavor,
             "base_url": self.fake_backend.base_url,
             "model_map": {"test-model": "backend-test-model"},
-            "health_path": "/health",
-            "models_path": "/v1/models" if flavor == "vllm" else "/get_model_info",
+            "health_path": "/health" if flavor == "vllm" else "/ready",
+            "models_path": "/v1/models",
             "version_path": "/version" if flavor == "vllm" else None,
             "metrics_url": (
                 f"http://{self.fake_backend.address[0]}:"
@@ -1834,8 +1834,7 @@ def _run_sgl_01(runner: _Runner) -> AcceptanceResult:
         and info.get("last_value", {}).get("engine.version") == "not_collected"
         and engine_row.get("state") == "drift"
         and engine_row.get("observed") == "sglang"
-        and unknown_row.get("state") == "not_collected"
-        and unknown_row.get("observed") == "unknown"
+        and unknown_row.get("observed") == 2048
         and drift is not None
         and drift.get("data_origin") == "external_backend"
     )

@@ -144,7 +144,7 @@ def _line_time(line: str, *, year: int, zone: tzinfo) -> datetime | None:
 
 
 def _iso(value: datetime) -> str:
-    return value.isoformat(timespec="seconds")
+    return value.isoformat(timespec="microseconds" if value.microsecond else "seconds")
 
 
 def _configuration(engine: str, year: int, timezone_offset: str) -> tuple[EnginePatternSet, tzinfo]:

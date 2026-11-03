@@ -1,6 +1,8 @@
 # AWS GPU lab runtime 인수 절차
 
-이 절차는 AWS 묶음 위에 runtime 배포를 올린 뒤 기존 “첫 완료 기준” 8가지와 추가 준비 사례 AWS-09~11을 확인한다. 기존 AWS-01~08 결과는 다시 판정하지 않는다. `tools/k8s_lab_check.py`는 fake engine과 시험 정책을 생성·삭제하는 kind 전용 도구이므로 이 환경에서 사용하지 않는다. 아래 도구는 정책을 적용·변경·삭제하지 않으며, 두 opt-in 사례 외에는 배포 상태를 바꾸지 않는다.
+11/4 서버 1회차는 [서버 실행순서표](서버_실행순서표.md)와 읽기 전용 [preflight 도구](../../tools/aws_lab_preflight.py)를 따른다.
+
+이 절차는 AWS 묶음 위에 runtime 배포를 올린 뒤 기존 “첫 완료 기준” 8가지와 추가 준비 사례 AWS-09~11을 확인한다. 기존 AWS-01~08 결과는 다시 판정하지 않는다. `tools/k8s_lab_check.py`는 fake engine과 시험 정책을 생성·삭제하는 kind 전용 도구이므로 이 환경에서 사용하지 않는다. AWS-12~17은 `--cases`로 명시 선택해야 하며, 배포 상태를 바꾸는 사례에는 별도 허용 플래그가 필요하다.
 
 ## 준비
 
@@ -14,7 +16,7 @@ systemctl --user status byul-observation-feed
 kubectl --context byul-aws-lab -n serving-lab port-forward deploy/serving-gateway 18080:8080
 ```
 
-포트포워드는 별도 터미널에서 계속 실행한다. 시험 도구가 포트포워드를 만들거나 종료하지 않는다. 토큰 파일은 Gateway `auth.json`의 원문이 아니라 실제 시험용 token 두 개를 아래처럼 넣고 소유자만 읽게 한다. 값은 명령행에 쓰지 않는다.
+포트포워드는 별도 터미널에서 계속 실행한다. AWS-13·14·15에서 Gateway를 재시작하면 이 사용자 포트포워드는 이전 Pod와 함께 끊긴다. loopback `--gateway-url` 사용 시 도구는 연결 오류를 Gateway 응답으로 세지 않고 같은 로컬 포트에 자체 `kubectl port-forward deploy/serving-gateway`를 다시 연다. 사용자 포트포워드가 아직 포트를 점유하면 도구는 연결 가능할 때까지 제한된 시험 구간에서 재시도한다. 도구 소유 포트포워드는 정상 종료·예외 모두에서 닫으며 사용자 프로세스는 종료하지 않는다. 비 loopback URL에는 포트포워드를 만들지 않는다. 보고서 `port_forward`와 각 사례의 `reconnect_at`은 재연결 시도 시각 및 사용 경로를 기록한다. **도구 종료 뒤 자체 포트포워드는 없고, 재시작으로 끊긴 사용자 포트포워드도 자동 복구되지 않는다.** 다음 사례를 별도 실행할 때는 사용자 터미널의 포트포워드를 종료하고 위 명령으로 새로 연다. 같은 도구 실행에서 이어지는 사례는 도구 소유 포트포워드를 사용한다. 토큰 파일은 Gateway `auth.json`의 원문이 아니라 실제 시험용 token 두 개를 아래처럼 넣고 소유자만 읽게 한다. 값은 명령행에 쓰지 않는다.
 
 ```text
 RUNTIME_INFERENCE_TOKEN=<inference token>
@@ -84,6 +86,44 @@ dev 결과와 수정 사항을 확인한 뒤 AWS 묶음 `COST-PLAN.md` 절차로
 
 `--cases`를 생략하면 AWS-01~11을 순서대로 실행하지만 opt-in flag가 없는 AWS-07·08은 `not_run`이다. `not_run`과 `unknown`은 통과로 세지 않으며, 요청한 모든 사례가 `passed`일 때만 overall이 `passed`다.
 
+### 추가 확인 AWS-12~17
+
+다음 명령은 서버의 `runtime/`에서 실행한다. 각 명령은 독립 실행이며 `--cases`로 선택하지 않은 추가 사례는 실행하지 않는다. 변경 사례는 시험 전후의 객체·링크·수집기 상태를 보고서에서 대조한다. 복구·정리 실패는 `failed`이고 즉시 운영자가 상태를 확인해야 한다.
+
+```bash
+# AWS-12: 비교 Pod 두 개와 비교 CiliumNetworkPolicy만 임시 적용·제거
+.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+  --token-env-file ~/runtime-acceptance.env --cases AWS-12 --allow-compare-policy
+
+# AWS-13: Gateway가 읽는 bundle root에 쓰기 권한이 있는 실행 주체에서만 실행
+.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+  --token-env-file ~/runtime-acceptance.env --cases AWS-13 --allow-bundle-switch \
+  --bundle-root /srv/serving/bundles
+
+# AWS-14: Gateway 재시작 뒤 503과 10초 안의 정상 200
+.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+  --token-env-file ~/runtime-acceptance.env --cases AWS-14 --allow-gateway-restart
+
+# AWS-15: 수집기 정지 중 Gateway 재시작, 끝에 수집기 복구
+.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+  --token-env-file ~/runtime-acceptance.env --cases AWS-15 \
+  --allow-collector-stop --allow-gateway-restart
+
+# AWS-16: 수집기 정지 15초 초과 뒤 단계 unknown, 일반 요청 200
+.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+  --token-env-file ~/runtime-acceptance.env --cases AWS-16 --allow-collector-stop
+
+# AWS-17: 엔진 Pod 교체 뒤 단계 시간표 UID와 새 실행 대조
+.venv/bin/python -B tools/aws_lab_acceptance.py --kube-context byul-aws-lab \
+  --token-env-file ~/runtime-acceptance.env --cases AWS-17 --allow-engine-restart
+```
+
+AWS-12의 `policy-compare-pods.yaml`·`policy-compare-cilium.yaml`은 기본 kustomization 밖에 있다. 도구가 실행 중인 `other-client` Pod의 실제 image와 `imagePullPolicy`를 읽어 비교 Pod 두 개에 치환한 내용을 stdin으로 적용한다. 읽지 못하면 `unknown`이며 비교 Pod를 만들지 않는다. 사용한 image와 pull 정책은 보고서에 기록한다. 두 Pod는 엔진·Gateway와 다른 라벨을 쓰고 비교 정책은 receiver만 선택한다. 규칙 전 연결 성공, 적용 중 timeout errno(`EAGAIN`/`EWOULDBLOCK`/`ETIMEDOUT`)와 정확한 흐름의 Hubble `dropped`, 제거 뒤 재연결 성공이 모두 있어야 통과한다. 규칙 전부터 막히면 비교 불가 `unknown`이며 `ECONNREFUSED`는 차단 증거가 아니다.
+
+AWS-13은 `current`의 이전 상대 링크를 보존하고 복제한 묶음의 `gateway_policy` 파일에서 길이가 같은 1바이트만 바꾼다. Gateway 재시작에서 SHA-256 오류와 시작 거부를 확인한 뒤 반드시 이전 링크로 돌리고 다시 시작해 정상 200과 인증 거부 401 한 건을 확인한다. 이는 묶음 파일 바이트와 `bundle.json`의 SHA-256 대조이며 서명이나 승인 검증이 아니다. Gateway 호스트 마운트 경로에 쓰기 권한이 없으면 `unknown`이며 권한을 우회하지 않는다.
+
+AWS-14의 `not_before`는 실제 코드에서 Gateway 시작 시각이다. 보고서는 Gateway Pod 시작 시각과 대상 스냅샷 `collected_at`, 응답의 `TARGET_UNAVAILABLE` 및 첫 503부터 200까지의 시간을 남긴다. 10초 초과는 `failed`다. 포트포워드 재연결 사이에 503 구간을 놓치면 503→200 시간을 판정할 수 없어 `unknown`으로 두고 `reconnect_at`을 기록한다. AWS-15·16은 수집기를 `finally`에서 재개하고 collector `ok`까지 확인한다. AWS-16·17은 단계 시간표가 비활성인 SGLang 환경에서 `unknown`이며 AWS-07·08의 기존 기준에는 영향을 주지 않는다. AWS-17은 원시 Tetragon `process_exec.process.pod.uid`와 정규화 실행 관측을 대조한다. `process_exit`는 지원되지 않는 이벤트로 건너뜀 수가 증가하고 손상 수는 늘지 않아야 하며, 도구가 이 수치를 보조 근거로 기록한다. 관측 화면 표시는 사람이 확인한다.
+
 AWS-09~11은 새 intent를 포함한 정책 묶음을 다시 작성하고 TG-SECRET-01 후보를 재적용한 뒤 엔진을 재시작한 환경에서만 실행한다. 파일 ConfigMap과 마운트 patch도 먼저 적용해야 한다. AWS-11을 선택할 때 AWS-09·10도 함께 선택한다. 도구는 AWS-09·10 직전에 일반 요청·stream·`/cache` 쓰기 대조를 수행하고 두 탐지 시험 뒤 같은 대조를 반복한다. 응답 시간은 참고값이며 판정에 쓰지 않는다. 탐지 시간도 기준 없이 판정하지 않는다.
 
 Gateway 관측 조회는 최근 50행만 반환한다. AWS-11 구간이 이 범위를 넘으면 잘못된 경고 0건을 입증할 수 없어 `unknown`으로 둔다. 단계가 유효한 실행이 구간에 하나도 없거나 모두 `phase_unknown`이면 경고 0건이어도 `unknown`이다. 보고서에는 시간표 신선도·쓰기 시각·단계 출처와 유효/미확인 실행 수를 남긴다. 의도한 shell 시험은 잘못된 경고에서 제외하며 AWS-09 근거는 엔진 Pod 기록으로 한정한다.
@@ -116,29 +156,20 @@ Gateway 관측 조회는 최근 50행만 반환한다. AWS-11 구간이 이 범�
 | AWS-09 실행 탐지 | 비파괴 | 엔진에서 `/bin/sh -c true`와 PATH 탐색 `sh -c true`를 실행. 절대 경로 실행이 엔진 Pod에 귀속되고 `suspect_binary` | 실행 시작 이후의 엔진 Pod·실행 경로·시각·판정. 다른 Pod의 같은 경로는 제외. 인자는 기록되지 않음 | RT-SYS-01, RT-SYS-02 |
 | AWS-10 보호 파일 읽기 | 비파괴 | 엔진 Python이 가짜 파일을 읽고 TG-SECRET-01이 동일 경로·엔진 Pod·read·monitor를 기록 | 파일 내용은 보고하지 않음. 읽기 차단은 기준 아님 | RT-SYS-05 |
 | AWS-11 정상 동작 대조 | 비파괴 | AWS-09·10 전후 일반·stream 요청과 `/cache` 쓰기가 정상이며 cache 세대 current·비정상 분류 없음, 잘못된 경고 0건 | 구간 내 `outside_allowlist`·`phase_signal_unverified`·`exec_from_cache` 목록과 건수, 응답·탐지 시간. 의도한 shell probe는 잘못된 경고에서 제외 | RT-API-01, RT-SYS-02, RT-ASSET-05 |
+| AWS-12 규칙 전후 비교 | 변경(opt-in) | 규칙 전 연결, 적용 중 timeout+dropped, 제거 뒤 재연결 | 비교 Pod·정책만 적용·제거하고 잔존 객체 확인 | RT-NET-02 |
+| AWS-13 잘못된 묶음 되돌리기 | 변경(opt-in) | 해시 불일치 Gateway 시작 거부, 이전 묶음 복구 뒤 200·401 거부 | SHA-256 오류 로그, 상대 링크 복구, 요청 기록 | RT-OPT-04 |
+| AWS-14 재시작 직후 503 | 변경(opt-in) | `TARGET_UNAVAILABLE` 503 관측, 첫 503 뒤 10초 안에 200 | Pod 시작 시각·스냅샷 수집 시각·응답 열 | RT-OBS-01 |
+| AWS-15 수집 중단 중 재시작 | 변경(opt-in) | 정지 중 503, 재개 뒤 200 | 수집기 재개·collector ok 필수 | RT-OBS-01 |
+| AWS-16 단계 만료 | 변경(opt-in) | 15초 초과 뒤 런타임 단계 판정 경로가 unknown, 일반 요청 200 | 시간표 쓰기 시각·런타임 만료 함수·수집기 복구. 정지 중 새 Tetragon 이벤트는 수집되지 않음 | RT-PHASE-01 |
+| AWS-17 Pod 단계 초기화 | 변경(opt-in) | 새 UID 시간표, 이전 단계가 새 실행에 미부착 | 원시 `process.pod.uid`, 정규화 실행, process_exit 집계 | RT-PHASE-01 |
 
 AWS-04·05는 `connect_ex`가 반환한 errno와 이름을 기록한다. `EAGAIN`/`EWOULDBLOCK`/`ETIMEDOUT`만 차단 후보로 보고, `ECONNREFUSED` 등 다른 실패나 DNS 예외는 정책 차단 근거가 아니므로 `unknown`이다. AWS-04는 Gateway 이미지가 Python 기반이고 컨테이너 이름이 `gateway`임을 전제로 직통 probe 직전·직후 Gateway Pod 안에서 engine:8000 연결 성공을 확인한다. exec가 불가능하면 `unknown`이다. AWS-05는 팀 소유 `test-receiver` Pod IP만 대상으로 하며, `other-client`가 같은 receiver에 연결하지 못하면 `대조 실패: receiver에 닿지 않음`으로 `unknown`이다. 두 사례 모두 정확한 대상 흐름의 Hubble verdict가 `dropped`여야 하며 `DROPPED` 단독으로는 통과하지 않는다.
 
-AWS-04·05 통과만으로는 기본 NetworkPolicy와 runtime Cilium 규칙 중 어느 쪽이 패킷을 막았는지 구분할 수 없다. runtime 규칙만의 효과를 확인할 때는 기본 정책 `engine-runtime`·`engine-management-observer`의 원본을 절대 경로에 저장하고 spec·labels를 기록한 뒤, 짧은 통제 구간에 두 정책만 제거해 AWS-01·04·05를 재실행한다. 즉시 **절대 경로의 복원용 파일**로 복원하고 현재 객체의 spec·labels를 원본과 대조한다. 복원 스크립트에만 의존하지 말고 실제 적용·대조를 확인하며, 복원 후 AWS-01·04·05·06을 다시 실행한다. dev에서는 약 1분 제거 후 EAGAIN·Hubble dropped로 AWS-01·04·05가 통과했다. 자동 복원은 스크립트 경로 실수로 실패해 다음 명령에서 수동 복원했고 원본 spec·labels 일치를 확인했다. 모든 정책을 제거해 연결이 열리는지 보는 대조 시험은 아직 하지 않았다. 이 runtime 규칙만의 확인은 Pod 교체 전 결과다.
-
-복원용 파일 생성·검사가 실패하면 정책을 제거하지 않는다. 아래 복원 명령은 사례 실행 여부와 무관하게 수행하고, 적용 결과를 확인한다.
-
-```bash
-kubectl --context byul-aws-lab -n serving-lab get networkpolicy engine-runtime engine-management-observer -o json > /tmp/byul-aws-base-networkpolicies-original.json
-# 원본의 spec·metadata.labels를 대조용으로 보관하고, 복원용 파일에서는 서버 관리 metadata만 제외
-python3 -c 'import json,sys; d=json.load(sys.stdin); json.dump({"apiVersion":"v1","kind":"List","items":[{"apiVersion":i["apiVersion"],"kind":i["kind"],"metadata":{k:v for k,v in i["metadata"].items() if k in ("name","namespace","labels","annotations")},"spec":i["spec"]} for i in d["items"]]},sys.stdout)' < /tmp/byul-aws-base-networkpolicies-original.json > /tmp/byul-aws-base-networkpolicies-restore.json
-test -s /tmp/byul-aws-base-networkpolicies-restore.json
-# runtime Cilium 규칙이 적용됐는지 확인
-kubectl --context byul-aws-lab -n serving-lab delete networkpolicy engine-runtime engine-management-observer
-# 위 AWS-01·04·05 명령을 --cases AWS-01,AWS-04,AWS-05로 실행
-kubectl --context byul-aws-lab -n serving-lab apply -f /tmp/byul-aws-base-networkpolicies-restore.json
-kubectl --context byul-aws-lab -n serving-lab get networkpolicy engine-runtime engine-management-observer -o json
-# 두 객체의 spec·metadata.labels가 저장한 원본과 같은지 대조하고 AWS-01·04·05·06 재실행
-```
+AWS-04·05 통과만으로는 규칙 전 연결 가능 여부를 입증하지 못한다. 2026-11-01 dev에서는 기본 NetworkPolicy 두 개를 약 1분간 제거해 runtime 규칙 아래 AWS-01·04·05를 확인했고 복원 후 spec·labels 일치를 확인했다. 자동 복원은 경로 실수로 실패해 수동 복원했다. 이 이력은 규칙이 전혀 없을 때의 연결 성공 증거가 아니다. 새 비교는 AWS-12의 별도 Pod·정책으로 수행하며 기본 엔진 통제를 제거하지 않는다.
 
 `192.0.2.1`은 비라우팅 TEST-NET-1이고 이 AWS 묶음은 IMDSv2 hop limit 1이므로 external·IMDS connect는 egress 정책이 없어도 실패한다. 두 probe와 Hubble 행은 보고서의 보조 증거일 뿐 판정에서 제외한다. AWS-06의 모델 probe는 `EPERM`·`EACCES`·`EROFS`를 모두 `WRITE_DENIED`로 출력하지만 `EROFS`만 read-only mount 증거로 인정한다. 모델 폴더 소유자 10002와 엔진 UID 2000 때문에 mount가 read-only가 아니어도 `EACCES`가 날 수 있고, `EPERM`은 Tetragon 등 다른 집행일 수 있다. TG-ASSET-01은 RO mount가 hook보다 먼저 거부하면 미관측일 수 있지만, cache 쓰기 관측이 없으면 연결 근거 부족으로 `unknown`이다.
 
-AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. stop 뒤 heartbeat `stopped`와 Gateway collector non-ok를 확인하고, target Pod 스냅샷을 포함한 stale 창보다 2초 더 기다려 정상 요청 1건의 HTTP 200 및 `/api/target.verification.state=unavailable`(gateway_hold 없음)을 판정한다. 503은 실패다. start 뒤 collector와 target verification이 ok로 돌아오고 `min(stale_after_s + 30초, 90초)` 재시도 창 안에 정상 chat 200·`ALLOWED`·전달 시도가 회복돼야 한다. 정상 SIGTERM의 gap 행은 보조다. **이 기준은 AWS 재시험 전**이며 적용에는 Gateway 이미지 재빌드가 필요하다. AWS-08은 rollout과 target instance/history 확인 뒤, restart 이후 `engine_info`가 ok가 될 때까지 요청을 보내지 않는다. 그 뒤 90초 재시도 창에서 정상 chat 회복을 확인하고 끝까지 실패하면 마지막 status·reason_code를 남긴다. host snapshot stale은 `snapshot_note`에만 남으며 통과로 채우지 않는다. 도구는 정책이나 Deployment spec을 바꾸지 않고 AWS-06 임시 파일 외에는 삭제하지 않는다.
+AWS-07은 `systemctl --user stop/start byul-observation-feed`만 수행한다. stop 뒤 heartbeat `stopped`와 Gateway collector non-ok를 확인하고, target Pod 스냅샷을 포함한 stale 창보다 2초 더 기다려 정상 요청 1건의 HTTP 200 및 `/api/target.verification.state=unavailable`(gateway_hold 없음)을 판정한다. 503은 실패다. start 뒤 collector와 target verification이 ok로 돌아오고 `min(stale_after_s + 30초, 90초)` 재시도 창 안에 정상 chat 200·`ALLOWED`·전달 시도가 회복돼야 한다. 정상 SIGTERM의 gap 행은 보조다. **이 기준은 AWS 재시험 전**이며 적용에는 Gateway 이미지 재빌드가 필요하다. AWS-08은 rollout과 target instance/history 확인 뒤, restart 이후 `engine_info`가 ok가 될 때까지 요청을 보내지 않는다. 그 뒤 90초 재시도 창에서 정상 chat 회복을 확인하고 끝까지 실패하면 마지막 status·reason_code를 남긴다. host snapshot stale은 `snapshot_note`에만 남으며 통과로 채우지 않는다. AWS-01~11의 도구 경로는 정책이나 Deployment spec을 바꾸지 않고 AWS-06 임시 파일 외에는 삭제하지 않는다.
 
 ## 2026-11-01 dev 실행 기록 (Claude 실행, Codex 교차 검수 전)
 
@@ -170,3 +201,11 @@ AWS-07은 stop/start 뒤 각각 약 4초에 feed error/ok, 복구 요청 200이�
 - Hubble `DROPPED`는 단독 차단 증명이 아니며, 시간 초과와 허용 경로 대조를 함께 확인한다.
 - AWS-06은 `EROFS`만 RO mount 증거로 쓴다. Tetragon 등이 `EPERM`을 내거나 UID/소유권 때문에 `EACCES`가 나면 RO 여부는 `unknown`이다.
 - dev AWS-01에서는 vLLM 0.31.0의 `Received request chatcmpl-<Gateway id>` 로그를 확인했다. reference에서도 형식을 다시 대조하며 다르면 엔진 수신을 추정하지 않고 `unknown`으로 남긴다.
+
+## SGLang v0.5.22 선택 사례 (로컬 코드·가짜 시험, 서버 미실행)
+
+`tools/aws_lab_acceptance.py --engine {vllm,sglang}`의 기본값은 `vllm`이다. `--cases`를 생략하면 기존과 같이 AWS-01~11만 선택한다. AWS-12~19는 명시 선택한다. 두 엔진에 같은 고정 chat·completions 요청 목록과 SHA-256을 기록한다. AWS-18은 각 경로의 일반·stream 응답, `[DONE]`과 잘림, `usage.completion_tokens`에 따른 답변 길이, 엔진 로그 수신을 검사한다. `usage`가 없으면 단어 수로 보완하지 않고 `unknown`이다. AWS-19는 미지원 12개 경로와 4개 필드를 일부러 보내 HTTP 코드·기록·엔진 미전달을 검사한다. 같은 구간의 정상 ID가 엔진 로그에 없으면 거부 ID 부재만으로 통과시키지 않는다. 이 새 사례는 서버에서 실제 실행한 적이 없다.
+
+SGLang 로그는 `request.received`/`request.finished` JSON의 `headers.x-request-id`로 대조한다. `--log-requests-level 0`이어도 프롬프트 관련 필드가 나오면 보고서에 필드 이름을 표시한다. 엔진 Pod의 실제 command·args·환경변수 **이름**·imageID를 기록하되 Secret 값은 기록하지 않는다. SGLang 단계 수집이 없어 AWS-11·16·17의 단계 판정은 `unknown`이다. AWS-14·15의 대상 판단은 버전 미선언과 Pod image digest 수집에 의존한다. SGLang 전환 명령과 정책 묶음 순서는 [SGLANG_전환절차.md](SGLANG_전환절차.md)를 따른다.
+
+AWS-18은 엔진 Pod 안에서 `/tokenize`를 읽기 전용으로 호출해 짧은 답변 길이로 입력+답변 합이 한도와 같아지는 프롬프트를 찾는다. 그 요청의 200·usage와 1토큰 초과 요청의 `CONTEXT_LIMIT_EXCEEDED`·생성 미전달을 대조한다. 정확한 경계 프롬프트나 토큰화 결과를 못 얻으면 `unknown`이다. 토큰 계산 실패를 의도적으로 주입하는 시험은 가짜 엔진 단위 시험에서만 확인하며 실제 엔진에서는 미확인으로 남긴다. 실제 SGLang 결과가 코드 예상과 다르면 결과를 수정해 꾸미지 않고 사유를 인계한다.

@@ -121,6 +121,27 @@ class RetentionTests(unittest.TestCase):
                 summary["files"]["engine_receipts.jsonl"]["removed_lines"], 1
             )
 
+    def test_route_rejections_share_request_hold_and_retention_unit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary)
+            routes = JsonlStore(data / "gateway_route_rejections.jsonl")
+            gateway = JsonlStore(data / "gateway_records.jsonl")
+            routes.append({"request_id": "held", "recorded_at": iso(20)})
+            routes.append({"request_id": "joined", "recorded_at": iso(20)})
+            routes.append({"request_id": "expired", "recorded_at": iso(20)})
+            routes.append({"request_id": "recent", "recorded_at": iso(1)})
+            gateway.append({"request_id": "joined", "recorded_at": iso(1)})
+            hold = data / "hold.json"
+            hold.write_text(json.dumps({"schema": HOLD_SCHEMA, "request_ids": ["held"]}), encoding="utf-8")
+
+            preview = RecordRetention(data, hold_path=hold).run(now=NOW)
+            self.assertEqual(preview["files"]["gateway_route_rejections.jsonl"]["removable_by_age"], 1)
+            self.assertEqual(len(routes.read_all()[0]), 4)
+            applied = RecordRetention(data, enforce=True, hold_path=hold).run(now=NOW)
+            self.assertEqual([row["request_id"] for row in routes.read_all()[0]], ["held", "joined", "recent"])
+            self.assertEqual(applied["files"]["gateway_route_rejections.jsonl"]["removed_lines"], 1)
+            self.assertEqual([row["request_id"] for row in gateway.read_all()[0]], ["joined"])
+
     def test_size_limit_selects_cross_file_request_as_one_unit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             data = Path(temporary)

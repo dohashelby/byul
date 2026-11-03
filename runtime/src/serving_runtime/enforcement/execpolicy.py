@@ -457,6 +457,7 @@ class ExecPolicy:
         parent: str | None,
         image: str | None,
         observed_at: str,
+        pod_uid: str | None = None,
     ) -> dict[str, Any]:
         try:
             at: datetime | None = datetime.fromisoformat(observed_at)
@@ -475,6 +476,13 @@ class ExecPolicy:
             timeline, timeline_error = (), "stale"
         elif collector is not None and collector["state"] != "running":
             timeline, timeline_error = (), collector["state"]
+        elif collector is not None and (
+            not isinstance(pod_uid, str) or not pod_uid or pod_uid != collector["pod_uid"]
+        ):
+            timeline, timeline_error = (), (
+                "pod_uid_unavailable" if not isinstance(pod_uid, str) or not pod_uid or not collector["pod_uid"]
+                else "pod_uid_mismatch"
+            )
         entries = [entry for entry in timeline if at is not None and entry.active(at)]
         active = sorted({entry.phase for entry in entries})
         bases = sorted({entry.basis for entry in entries})

@@ -255,6 +255,17 @@ def parse_tetragon(
     if event_name not in {"process_exec", "process_kprobe"}:
         raise UnsupportedTetragonEvent(f"unsupported Tetragon event: {event_name}")
     if event_name == "process_exec":
+        raw_process = event.get("process")
+        if not isinstance(raw_process, dict) and exec_policy is not None:
+            normalized = _base(observed_at, "tetragon", "process_exec", data_origin,
+                               environment=environment, run_id=run_id)
+            normalized.update({"binary": None, "process_attribution": "unavailable",
+                               "pod": None, "pod_attribution": "unavailable", "path": None,
+                               "access": None, "rule_id": "TG-EXEC-01", "action": "observed",
+                               "action_raw": "observed", "action_mode": "monitor", "allowed_binary": None})
+            normalized.update(exec_policy.classify_exec(
+                binary="", parent=None, image=None, observed_at=observed_at, pod_uid=None))
+            return normalized
         binary, pod = _process(event, "$.process_exec", require_binary=True)
         assert binary is not None
         normalized = _base(
@@ -300,8 +311,14 @@ def parse_tetragon(
                     parent=parent_binary,
                     image=_image_digest(event.get("process")),
                     observed_at=observed_at,
+                    pod_uid=(raw_process["pod"].get("uid")
+                             if isinstance(raw_process.get("pod"), dict) else None),
                 )
             )
+        elif exec_policy is not None and "pod" in raw_process and not isinstance(raw_process["pod"], dict):
+            normalized.update(exec_policy.classify_exec(
+                binary=binary, parent=None, image=_image_digest(raw_process),
+                observed_at=observed_at, pod_uid=None))
         elif exec_policy is not None and binary in exec_policy.intent.suspect_binaries:
             parent = event.get("parent")
             parent_binary = parent.get("binary") if isinstance(parent, dict) else None

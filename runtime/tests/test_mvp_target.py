@@ -156,6 +156,33 @@ class TargetRegistrationTests(TempMixin, unittest.TestCase):
         )
         self.assertEqual(broken.gateway_decision("mock-engine-001")[0], "TARGET_UNAVAILABLE")
 
+    def test_sglang_digest_only_registration_and_pod_gate(self) -> None:
+        template = json.loads((ROOT / "deploy/gpu-lab-sglang/target.aws-lab.json").read_text())
+        digest = "sha256:" + "a" * 64
+        template["engine"]["image_digest"] = digest
+        registration = load_target(self.write("sglang.json", template))
+        self.assertEqual(registration.state, "ok")
+        registry = TargetRegistry(registration, data_dir=Path(self.temporary.name) / "sglang", observation_session_id="s")
+        info = {"state": "ok", "last_value": {"engine.version": "not_collected", "model.ids": ["test-model"]}}
+        args = {"policy_target_id": template["target_id"], "backend_kind": "sglang", "engine_info": info}
+        good = summarize_pods({"items": [pod("p1", "u1", "c1")]}, "engine")
+        registry.observe_kubernetes(good, None)
+        self.assertIsNone(registry.hold(**args, kubernetes=good))
+        rows = {row["field"]: row["state"] for row in registry.status(**args, kubernetes=good)["comparison"]}
+        self.assertEqual(rows["engine.version"], "not_declared")
+        self.assertEqual(registry.hold(**args, kubernetes=None)[0], "TARGET_UNAVAILABLE")
+        stale = {"state": "error", "last_value": good, "last_error_kind": "OSError"}
+        self.assertIsNone(registry.hold(**args, kubernetes=stale))
+        wrong = json.loads(json.dumps(good))
+        wrong["instance"]["image_digest"] = "sha256:" + "b" * 64
+        self.assertEqual(registry.hold(**args, kubernetes=wrong)[0], "TARGET_MISMATCH")
+        declared = json.loads(json.dumps(template))
+        declared["engine"]["version"] = "0.5.22"
+        mismatched = TargetRegistry(load_target(self.write("version.json", declared)),
+                                    data_dir=Path(self.temporary.name) / "wrong", observation_session_id="s")
+        mismatched.observe_kubernetes(good, None)
+        self.assertEqual(mismatched.hold(**args, kubernetes=good)[0], "TARGET_MISMATCH")
+
 
 class PodSnapshotTests(TempMixin, unittest.TestCase):
     def setUp(self) -> None:

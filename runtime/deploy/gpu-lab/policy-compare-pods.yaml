@@ -1,0 +1,52 @@
+# Opt-in only. Separate from the engine, Gateway, and the default kustomization.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: runtime-compare-receiver
+  labels: {app: runtime-compare-receiver, purpose: runtime-policy-compare}
+spec:
+  serviceAccountName: probe
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10003
+    runAsGroup: 10003
+    seccompProfile: {type: RuntimeDefault}
+  containers:
+    - name: receiver
+      image: __COMPARE_IMAGE__
+      imagePullPolicy: __COMPARE_PULL_POLICY__
+      command: ["python", "-m", "http.server", "8080", "--directory", "/tmp"]
+      ports: [{containerPort: 8080}]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: {drop: ["ALL"]}
+      volumeMounts:
+        - {name: tmp, mountPath: /tmp}
+  volumes:
+    - name: tmp
+      emptyDir: {sizeLimit: 16Mi}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: runtime-compare-client
+  labels: {app: runtime-compare-client, purpose: runtime-policy-compare}
+spec:
+  serviceAccountName: probe
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10003
+    runAsGroup: 10003
+    seccompProfile: {type: RuntimeDefault}
+  containers:
+    - name: client
+      image: __COMPARE_IMAGE__
+      imagePullPolicy: __COMPARE_PULL_POLICY__
+      command: ["python", "-c", "import time; time.sleep(10**9)"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: {drop: ["ALL"]}

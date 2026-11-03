@@ -82,7 +82,7 @@ class EngineClient:
             tokenize_request["prompt"] = input_value
         else:
             raise ValueError("unsupported request kind")
-        # vLLM's tokenize API accepts this template option. SGLang v0.5.21's
+        # vLLM's tokenize API accepts this template option. SGLang v0.5.22's
         # TokenizeRequest has model/messages but no add_generation_prompt field.
         if request_kind == "chat" and self.backend.kind == "vllm":
             tokenize_request["add_generation_prompt"] = True
@@ -141,9 +141,18 @@ class EngineClient:
         entries = models.get("data")
         model_id = None
         max_model_len = None
-        if isinstance(entries, list) and entries and isinstance(entries[0], dict):
-            model_id = entries[0].get("id")
-            max_model_len = entries[0].get("max_model_len")
+        if isinstance(entries, list):
+            if self.backend.kind == "sglang":
+                main_model = next((item for item in entries if isinstance(item, dict)
+                                   and item.get("id") in self.backend.model_map.values()), None)
+                if main_model is None:
+                    main_model = next((item for item in entries if isinstance(item, dict)
+                                       and item.get("max_model_len") is not None), None)
+            else:
+                main_model = entries[0] if entries and isinstance(entries[0], dict) else None
+            if main_model is not None:
+                model_id = main_model.get("id")
+                max_model_len = main_model.get("max_model_len")
         if self.backend.kind == "mock":
             available_ids = sorted(
                 {
@@ -169,26 +178,11 @@ class EngineClient:
             )
             return value, data_origin
 
-        if self.backend.kind == "sglang" and not isinstance(entries, list):
-            # v0.5.21 /get_model_info returns an object, unlike /v1/models.
-            # Only the live served name/model path is used.  Missing values
-            # stay absent; /server_info is not called to fill them.
-            candidates = (models.get("served_model_name"), models.get("model_path"))
-            available_ids = list(
-                dict.fromkeys(item for item in candidates if isinstance(item, str) and item)
-            )
-        else:
-            available_ids = (
-                sorted(
-                    {
-                        item.get("id")
-                        for item in entries
-                        if isinstance(item, dict) and isinstance(item.get("id"), str)
-                    }
-                )
-                if isinstance(entries, list)
-                else []
-            )
+        available_ids = (
+            sorted({item.get("id") for item in entries
+                    if isinstance(item, dict) and isinstance(item.get("id"), str)})
+            if isinstance(entries, list) else []
+        )
         mapped_ids = list(dict.fromkeys(self.backend.model_map.values()))
         mapped_availability = {
             policy_model: {
@@ -208,7 +202,7 @@ class EngineClient:
             "model.map": mapped_availability,
         }
         if self.backend.kind == "sglang":
-            value["option.max_model_len"] = "unknown"
+            value["option.max_model_len"] = max_model_len if max_model_len is not None else "unknown"
         if len(mapped_ids) == 1 and mapped_ids[0] in available_ids:
             value["model.id"] = mapped_ids[0]
         if self.backend.kind == "vllm" and max_model_len is not None:

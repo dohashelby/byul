@@ -1,0 +1,42 @@
+{
+  "schema_version": "byul-platform-approval-summary/0.1",
+  "note": "플랫폼 승인 판본 요약. 원본 전체는 승인한 노트북에만 보관하며 승인자 실명은 저장소에 넣지 않는다. 시험용 자기 신고 승인이며 서명이 아니다.",
+  "source": {
+    "system": "byul platform (local dev)",
+    "doc_id": "aws-lab-policy-001",
+    "revision": 2,
+    "status": "CONFIRMED",
+    "document_sha256": "b37fa34fee6fa68b53a15ab0d01c614c993f5b93db45fd35ebb040f6c739a48f",
+    "document_sha256_rule": "원본 document의 정규 JSON(키 정렬, 공백 없음, UTF-8) SHA-256. 플랫폼 판본 sha256과 같음"
+  },
+  "policy_id": "aws-lab-policy-001",
+  "policy_version": "1",
+  "target_ref": "serving-engine-aws-lab",
+  "environment_ref": {
+    "id": "aws-lab-env-001",
+    "revision": 1,
+    "sha256": "ab231dca19dbb2d54b282a1544c46ebd3ae58a4cd1bd9fb6417a07875d29928d"
+  },
+  "validity": {
+    "valid_from": "2026-10-27T00:00:00+00:00",
+    "valid_until": "2026-12-31T23:59:59+00:00"
+  },
+  "approval": {
+    "approval_ref": "aws-lab-policy-001-v2",
+    "approved_at": "2026-11-03T05:18:02Z",
+    "approved_by": "runtime 담당"
+  },
+  "runtime": {
+    "gateway": {
+      "allowed_models": [
+        "test-model"
+      ],
+      "output_default_tokens": 128,
+      "output_max_tokens": 256,
+      "max_body_bytes": 65536,
+      "max_context_tokens": 2048
+    },
+    "enforcement": null,
+    "exec_exceptions": []
+  }
+}

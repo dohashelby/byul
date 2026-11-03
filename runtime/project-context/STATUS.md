@@ -1,6 +1,43 @@
 # 런타임 작업 상태
 
-최종 갱신: 2026-11-02
+최종 갱신: 2026-11-03
+
+## 2026-11-03 AWS GPU preflight 검수 보정 (기준 46f0309, 미커밋)
+
+- kind 재현 지적을 반영해 namespaced Tetragon 정책을 `tracingpoliciesnamespaced`로 조회하고, 빈 수집기 `ExecStart`를 `unknown`으로 판정한다. 증거 폴더 5 GiB 검사와 별도로 containerd 이미지 저장소 여유(기본 60 GiB, 경로·기준 옵션)를 확인하며 조회 불가는 `unknown`이다. 가짜 runner 회귀시험 3건을 추가했다.
+- 서버 순서표에 SGLang digest 고정 이미지 선받기와 12단계 전 완료 확인, Gateway 태그 비교, 관리 키의 알려진 `/proc` 인자 노출 기록, SGLang OOM·GPU 메모리 확인을 반영했다. 실제 AWS·SGLang 실행은 미확인이다. `python3 -B -m unittest tests.test_aws_lab_preflight tests.test_aws_lab_acceptance`: 85건 통과, skip 0. `git diff --check` 통과. 커밋·푸시하지 않았다.
+
+## 2026-11-03 AWS GPU 11/4 서버 전 준비 (기준 46f0309, 미커밋)
+
+- 읽기 전용 `tools/aws_lab_preflight.py`와 가짜 runner 시험 8건, `deploy/gpu-lab/서버_실행순서표.md`를 추가했다. 확인 근거는 기존 인수 도구의 실제 `--cases`·`--allow-*` 옵션, GPU lab 수동 정책 절차, SGLang 전환 절차다. SGLang도 vLLM과 같은 승인 판본·정책 파일을 쓰도록 전환 문구를 바로잡았다.
+- `python3 -B -m unittest tests.test_aws_lab_preflight tests.test_aws_lab_acceptance`: 82건 통과, skip 0. `git diff --check` 통과. 서버·실제 kubectl·실제 Gateway·SGLang 실행은 미확인이다. 다음은 서버 전 digest·승인 원본 해시를 확정하고, 11/4에 순서표대로 preflight → 두 엔진 인수 시험 → vLLM 복귀·증거 반출을 실제로 확인하는 것이다. 커밋·푸시하지 않았다.
+
+## 2026-11-03 AWS 단계·거부 기록 판정과 보존 보정 (기준 887291e, 미커밋)
+
+- AWS-16은 수집 중단 전에 vLLM 시간표의 15초 신선도(`ExecPolicy._collector_stale`)와 현재 엔진 Pod UID를 확인한다. SGLang은 단계 수집 꺼짐으로 `unknown`이다. AWS-17도 재시작 전 같은 신선도와 UID를 확인하고 SGLang에서는 `unknown`이다. AWS-11은 기존 SGLang 단계 판정 `None` 경로를 남은 시간표 시험으로 확인했다.
+- AWS-19는 경로 기록 조회 실패·잘못된 응답을 `unknown`, 조회 성공 후 `found:false`를 기록 없음(`failed`)으로 구분한다. 한도 초과 수는 Gateway API에 노출되지 않아 기록 누락과 한도 초과를 구분할 수 없음을 증거에 적는다. 거부 기록 JSONL을 보존 대상에 넣고 `recorded_at`·`request_id` 단위와 hold 동작을 시험했다.
+- `.venv/bin/python -B -m unittest tests.test_aws_lab_acceptance tests.test_mvp_retention`: 87건 통과. 전체 `discover -s tests`: 616건, 실패 0·skip 115. SGLang HTTP 통합 8건은 로컬 소켓 생성 `Operation not permitted`로 skip. `git diff --check` 통과. 실제 AWS·소켓 허용 환경 시험은 미확인이다. 다음은 AWS-11·16·17·19와 거부 기록 보존을 실제 환경에서 재확인하는 것이다. 기존 미커밋 변경을 보존했고 커밋·푸시하지 않았다.
+
+## 2026-11-03 SGLang 1~6단계 (기준 887291e, 미커밋)
+
+- Codex가 구현하던 중 사용 한도로 전체 시험 직전에 중단되어, 마지막 수정은 **Claude 구현분, Codex 교차 검수 전**이다: 가짜 SGLang 인수 사례의 `/ready`·`/v1/models` 전환, 존재하지 않는 `--max-model-len`을 `--context-length`로 교체(SGLang v0.5.22 `arg_groups/fields/model.py`), `kustomize` 순환으로 렌더되지 않던 overlay를 `deploy/gpu-lab-sglang/`으로 이동, 전환 절차의 복원 저장본 충돌 방지.
+- `kubectl kustomize deploy/gpu-lab-sglang` 렌더 확인. 실제 SGLang 기동, 요청 ID 로그, UID 2000 실행, `--admin-api-key` 인자 노출, 내부 포트, 관리 경로 노출, 지표 이름은 **미확인**이다. 다음은 시험 준비와 서버 1회차다.
+
+## 2026-11-03 AWS 추가 인수 시험 구현 (기준 887291e, 미커밋)
+
+- AWS-12의 별도 비교 Pod·Cilium 정책과 규칙 전 연결/적용 중 timeout+Hubble dropped/제거 뒤 재연결 판정을 추가했다. 기본 kustomization과 serving-engine·Gateway 정책은 변경하지 않는다. 기존 AWS-01~11 번호·합격 기준을 유지하고, AWS-13~17은 명시 선택·변경 허용 플래그가 있어야 실행한다.
+- AWS-13 해시 불일치 묶음 재시작 거부와 이전 상대 링크 복구, AWS-14 재시작 직후 503→10초 내 200, AWS-15 수집 중단 중 재시작과 복구, AWS-16 시간표 15초 만료와 일반 요청 200, AWS-17 Pod UID 교체와 원시 Tetragon `process.pod.uid`를 대조하는 경로를 추가했다. AWS-07·08에는 단계 상태를 보조 근거로만 기록한다. 수집 중단 중 새 Tetragon 이벤트가 Gateway에 들어오지 않으므로 AWS-16의 단계 unknown은 실제 시간표와 런타임 만료 코드로 판정한다. `process_exit`의 건너뜀/손상 집계는 AWS-17 보조 근거다.
+- 로컬 가짜 runner·임시 파일 시험과 전체 unittest 583건을 실행해 실패 0건, skip 113건(로컬 소켓 생성 불가 110건, 소켓 I/O 불가 3건)을 확인했다. 실제 서버의 네트워크 규칙 효과, Gateway 묶음 거부·복구, 503 시간창, 수집 중단, GPU Pod 교체, 관측 화면은 **미확인**이다. 서버 시험 명령과 복구·정리 절차는 `deploy/gpu-lab/ACCEPTANCE.md`에 있다. 커밋·푸시하지 않았다.
+
+## 2026-11-03 SGLang 출력 상한·범위 밖 경로 기록 (기준 887291e, 미커밋)
+
+- 실패 시험으로 SGLang completions의 잘못된 출력 상한 필드와 범위 밖 경로의 기록 누락을 확인한 뒤, chat에는 `max_completion_tokens`, completions에는 `max_tokens`를 전달했다. 가짜 SGLang도 경로별 한 필드만 읽고 없으면 16으로 처리한다. 범위 밖 경로는 별도 `gateway_route_rejections.jsonl`에 제한된 필드로 기록하며, 한 프로세스의 한 시간 창당 1,000건 뒤에는 메모리 초과 건수만 센다. 이 상한은 반복 탐색의 디스크 쓰기·fsync 폭증을 막기 위한 것이다. 정상 요청 집계와 플랫폼 입력은 바꾸지 않았다.
+- runtime 전체 unittest 576건 중 463건 통과·113건 skip(로컬 소켓 생성 110, 소켓 I/O 3), 실패 0건. 새 경로별 HTTP 통합 시험은 소켓 제한으로 skip되어 실제 Gateway 전달 경로와 실제 SGLang 실행은 미확인이다. 다음은 소켓 허용 환경에서 chat/completions 각 stream·일반 요청과 거부 기록을 재시험하는 것이다. 커밋·푸시하지 않았다.
+
+## 2026-11-03 단계·AWS-11 결함 5건 (기준 887291e, 미커밋)
+
+- 수정 전 실패 시험으로 교체 Pod UID의 이전 단계 부착, AWS-11의 Tetragon 공백·수집기 불가 무시, 역순 줄 뒤 열린 단계 유지, 같은 초 경계의 0초 구간, 바이트 제한 뒤 같은 시각 줄 누락을 재현했다. 이번 검수에서도 실제 Tetragon `process.pod.uid` 형식과 `--since-time` 초 단위 재조회에 대한 실패 시험을 먼저 추가했다. 수집기 시간표는 이벤트 `uid`가 `collector.pod_uid`와 일치할 때만 단계를 적용한다. UID가 없거나 다르면 `phase_unknown`; `collector` 없는 수동 선언 시간표는 기존 단계 판정을 유지한다. 역순 뒤 열린 단계는 마지막 정상 시각에 닫고 다음 시작 표지에서 회복한다. 커서가 속한 초의 줄 해시로 재조회 중복을 건너뛰고 처음 보는 역순 줄만 역순으로 센다. 바이트 제한 페이지에 새 줄이 없으면 다음 초부터 조회하며 이력 미완전을 유지한다.
+- AWS-11은 시험 구간의 Tetragon gap, 수집기 불가, 관측 조회 불가 시 경고 목록 미완전·`unknown`이다. 단계 근거와 경고 0건의 기존 합격 요건은 유지한다. 로컬 runtime 전체 567건 중 455건 통과·112건 skip(소켓 생성 제한 109, 소켓 I/O 제한 3), `git diff --check` 통과. 실제 AWS 재시험과 GPU 단계 패턴·정상 허용 목록은 미확인이다. 다음은 변경 이미지를 적용한 AWS-09~11 및 Pod 교체·로그 잘림 관측 확인이다. 커밋·푸시하지 않았다.
 
 ## 현재 단계
 
@@ -273,3 +310,17 @@
 - 단계 판정은 Tetragon 원본의 namespace·Pod labels가 intent 엔진 selector에 맞는 실행으로 제한했다. 읽기 전용 원본 재생: exec 309건(엔진 272, 그 밖 37), exit 건너뜀 256, kprobe 2. 시간표 없음은 엔진 `phase_unknown` 272; 전 구간 합성 inferring 시간표는 엔진 `outside_allowlist` 221·`allowed_in_phase` 51이다. 실제 GPU 단계 경계가 아니며 상세 근거·정상 후보는 `docs/AWS_GPU_단계_사전분석.md`에 있다.
 - 로그 수집 주체, 시간표 전달 경로, 열린 구간 만료 기준은 배포·계획에서 정해지지 않았다. `gateway.yaml`에 `--observation-timeline`을 추가하지 않았다. 권장 구조와 대안은 분석 문서에 적었고 선택 후 구현·AWS 검증이 필요하다.
 - 시험: runtime 전체 546건 중 111건 skip·실패 0, platform API 변환 52건 통과, web 56건 통과·타입 검사 통과, `kubectl kustomize`·`enforce render`·로컬 strategic patch·`git diff --check` 통과. platform API `test_runtime_client.py`는 이 환경에서 60초 넘게 종료되지 않아 중단했다. 서버는 켜지 않았고 커밋·푸시하지 않았다.
+
+## 2026-11-03 AWS-12 이미지와 AWS-13~15 Gateway 재연결 보정 (기준 887291e, 미커밋)
+
+- AWS-12는 실행 중인 `other-client`의 `client` 이미지와 `imagePullPolicy`를 조회해 비교 Pod manifest의 두 placeholder에 치환한 뒤 stdin으로 적용한다. 이미지·pull 정책·실행 상태를 확인할 수 없으면 `unknown`으로 종료하고 비교 Pod를 만들지 않는다. 사용한 값은 보고서 증거에 남긴다. 비교 정책 판정 기준은 유지했다.
+- AWS-13~15의 loopback Gateway 재시작 뒤 연결 오류가 나면 도구 소유 `kubectl port-forward`를 다시 열고 종료·예외 때 닫는다. 이미 사용자 포워드가 포트를 잡고 있으면 제한된 시험 구간에서 재시도한다. 비 loopback URL은 건드리지 않는다. 연결 오류는 Gateway 상태로 세지 않고, AWS-14에서 재연결 중 503을 놓치면 `unknown`으로 남긴다. 보고서에 복구 포워드와 재연결 시각을 기록한다. 별도 실행의 다음 사례 전에는 끊긴 사용자 포워드를 직접 다시 열어야 한다.
+- 수정 전 회귀시험 2건을 추가한 전체 unittest 585건에서 그 2건이 각각 실패·오류로 재현됐다. 추가 회귀시험은 총 6건이며, 최종 `.venv/bin/python -B -m unittest discover -s tests`는 589건 중 476건 통과·113건 skip·실패 0이다. skip은 로컬 소켓 생성 제한 110건, 소켓 I/O 제한 3건이다. `git diff --check`도 통과했다. 서버 연결·실제 kubectl·실제 포트포워드·AWS 재실행은 하지 않았고 fake runner로만 확인했다. 기존 미커밋 변경은 보존했으며 커밋·푸시는 하지 않았다.
+
+## 2026-11-03 SGLang v0.5.22 연결 준비 (기준 887291e, 미커밋)
+
+- 사용자 지정 범위의 코드·가짜 시험·배포 초안을 추가했다. 포워드 복구는 도구 소유 프로세스가 살아 있으면 재시작하지 않고 새 포워드의 로컬 포트 준비를 최대 2초 기다린다. 수정 전 지연 포워드 시험 실패를 확인했고 수정 후 통과했다. 기존 미커밋 변경은 유지했다.
+- SGLang 기본 조회를 `/ready`·`/v1/models`로 옮기고 본 모델의 `max_model_len`을 사용한다. `/server_info`는 자동 조회하지 않고 target은 version을 생략해 digest로 대조한다. `v0.5.22` 소스 근거와 미확인을 `docs/SGLang_v0.5.22_차이표.md`에 적었다. 가짜 SGLang은 `/ready`·`/v1/models`와 모든 도착 경로 관측을 제공한다. vLLM 기본 경로와 첫 모델 선택 규칙은 유지했다.
+- `deploy/gpu-lab-sglang/`에 별도 engine·Gateway overlay·backend·target·intent·LAB 정책/승인 목록·단계 수집 없는 host service를 추가했다. UID 2000/GID 0, `/models` 읽기 전용, `/cache`, GPU 1, 8000, Secret 파일의 admin key, 레벨 0 JSON 요청 로그, 관리 수신부 허용 3경로를 명시했다. `SGLANG_전환절차.md`와 `ACCEPTANCE.md`에 순차 전환·vLLM 복귀·비파괴 확인·증거 절차를 적었다. AWS 설치 묶음 원본과 기본 vLLM kustomization은 바꾸지 않았다.
+- AWS 도구에는 `--engine`(기본 vllm), SGLang JSON 로그 ID 대조, 두 엔진 고정 요청 목록 해시, 실제 Pod 인자·환경변수 이름·imageID 증거, stream 잘림 및 응답 usage 판정, 명시 선택 AWS-18(일반·stream·토큰화 경계/초과)·AWS-19(미지원 경로·필드)를 추가했다. AWS-11·16·17은 단계 근거가 없으면 `unknown`을 유지한다. AWS-18의 정확한 경계 프롬프트 탐색은 실제 환경에서 미확인이며, 토큰 계산 실패를 의도적으로 주입하는 사례는 가짜 엔진 시험으로만 확인했다.
+- 검증: 가짜 runner·로그 표본과 target·경로·필드 단위 시험, SGLang YAML 구문 검사, `enforce render`(후보 10개) 통과. 실제 `kubectl kustomize`, 서버 접속, 실제 kubectl, 실제 SGLang 실행은 사용자 지시로 수행하지 않았다. 로컬 socket 제한으로 일부 HTTP 통합 시험은 skip되어 실제 엔진 결과를 증명하지 않는다. 전체 unittest와 `git diff --check` 최종 결과는 아래 인계에 별도로 기록한다. 커밋·푸시하지 않았다.

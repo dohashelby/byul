@@ -1,0 +1,13 @@
+{
+  "schema_version": "runtime-policy-approvals/1.0",
+  "entries": [
+    {
+      "policy_id": "aws-lab-policy-001",
+      "policy_version": "1",
+      "sha256": "472a7ccabe769f6d2eb3f961ffe41aab320e4138bd9a0e7262f69c6396f2f1dc",
+      "approval_ref": "aws-lab-policy-001-v2",
+      "approved_at": "2026-11-03T05:18:02+00:00",
+      "valid_until": "2026-12-31T23:59:59+00:00"
+    }
+  ]
+}

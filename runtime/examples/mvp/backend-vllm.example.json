@@ -1,6 +1,7 @@
 {
   "schema_version": "runtime-backend/1.0",
   "kind": "vllm",
+  "context_headroom_tokens": 0,
   "base_url": "http://127.0.0.1:8000",
   "model_map": {
     "test-model": "example-backend-model-id"

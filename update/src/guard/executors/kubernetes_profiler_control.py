@@ -51,18 +51,32 @@ def normalize_policy(values):
     except (KeyError, TypeError, ValueError): raise ValueError('PROFILER_CONTROL_POLICY_INVALID') from None
 
 
-def project_captures(captures, trials):
+# Gaps a pre-seal capture shows only because its recording was still open.
+CLOSURE_ONLY = frozenset({'profiler_source_process_call_binding_unavailable', 'required_profiler_worker_rank_unavailable'})
+
+
+def project_captures(captures, trials, *, sealed=False):
     """Only exact source/physical process/ASGI identity pairs join HTTP and API.
 
     Existing metadata validates native15 records. Do not infer an API-to-worker
     cross-process edge or backend status from flags, timestamps or HTTP success.
+    A pre-seal capture's open-recording gap is kept apart once the sealed final
+    capture of the same session no longer has it; every other gap still counts.
     """
-    conflicts = []; seen = set(); links = []; missing = []
+    conflicts = []; seen = set(); links = []; missing = []; provisional = {}
+    final = next((c for c in captures if c.get('phase') == 'final' and c.get('projection') is not None), None)
+    settled = sealed is True and final is not None
     for number, capture in enumerate(captures):
         data = capture.get('projection')
         if data is None:
             missing.append('profiler_native_projection_unavailable'); continue
-        missing.extend(data['missing'])
+        codes = list(data['missing'])
+        if settled and capture is not final and set(data.get('call_binding_failures', {})) <= {'recording_not_closed'}:
+            deferred = sorted({c for c in codes if c in CLOSURE_ONLY and c not in final['projection']['missing']})
+            if deferred:
+                provisional[capture['phase']] = deferred
+                codes = [c for c in codes if c not in deferred]
+        missing.extend(codes)
         session = capture['session']
         for candidate in data['conflict_candidates']:
             key = (session, candidate['call_sha256'])
@@ -96,7 +110,7 @@ def project_captures(captures, trials):
                         and end['phase'] == 'RETURN' and trial.get('outcome') == end['api_status_code'])}
         if len(matched) == 1: links.extend(matched.values())
         else: missing.append('profiler_control_api_unique_binding_unavailable:' + slot)
-    return {'api_links': links, 'flag_adapter_conflicts': conflicts, 'missing': sorted(set(missing))}
+    return {'api_links': links, 'flag_adapter_conflicts': conflicts, 'missing': sorted(set(missing)), 'provisional_missing': provisional}
 
 
 class KubernetesProfilerControlExecutor:
@@ -185,7 +199,7 @@ class KubernetesProfilerControlExecutor:
             try:
                 if reader.report().get('parent_cleanup_unverified'): cleanup.append('PROFILER_CONTROL_READER_CLEANUP_UNVERIFIED')
             except Exception: cleanup.append('PROFILER_CONTROL_READER_REPORT_UNAVAILABLE')
-        projection = project_captures(captures, trials)
+        projection = project_captures(captures, trials, sealed=sealed)
         normal_slots = [t for t in trials if t['case_id'] not in CONTROL_PATHS]
         if not all(t['normal_shape_verified'] for t in normal_slots): diagnostics.append('PROFILER_CONTROL_NORMAL_REQUEST_UNAVAILABLE')
         stop_attempts = [t for t in trials if t['case_id'] in {'stop', 'next-stop'} and t['attempted']]
@@ -195,6 +209,7 @@ class KubernetesProfilerControlExecutor:
             cleanup.append('PROFILER_CONTROL_STOP_NOT_ATTEMPTED')
         values = {'profiler_control_trials': trials, 'profiler_control_projections': [c['projection'] for c in captures],
             'profiler_control_api_links': projection['api_links'], 'profiler_control_flag_adapter_conflicts': projection['flag_adapter_conflicts'],
+            'profiler_control_provisional_missing': projection['provisional_missing'],
             'profiler_control_missing': sorted(set(projection['missing'] + diagnostics + [
                 'independent_backend_stop_trace_and_transfer_unverified', 'prepared_fault_activation_unverified',
                 'next_start_API_success_is_not_next_backend_collection', 'preexisting_backend_inactive_unverified',

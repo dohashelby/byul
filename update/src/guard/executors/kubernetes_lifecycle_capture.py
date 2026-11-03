@@ -165,7 +165,7 @@ class KubernetesLifecycleReader:
         before=self._owner(self._remaining(deadline))
         role=self.binding["engine"]
         row={"program":key,"owner_before_after_verified":False,"transport_complete":False,
-             "diagnostic_codes":[]}
+             "diagnostic_codes":[],**({"pid":int(argv[3]),"result":"unavailable"} if key=="context" else {})}
         try:
             budget=self._remaining(deadline)
             raw=self._request([f"--namespace={role['namespace']}","exec",role["pod"],f"--container={role['container']}",
@@ -173,6 +173,10 @@ class KubernetesLifecycleReader:
                 deadline=deadline,cap=max_bytes)
             text=raw.decode("utf-8","strict")
             row["transport_complete"]=True
+            if key=="context":
+                try:schema=strict_json(raw,limit=4096).get("schema")
+                except Exception:schema=None
+                row["result"]={"guard-lifecycle-process-context/1":"context","guard-lifecycle-process-absent/1":"process_absent"}.get(schema,"unrecognized")
         except Exception:
             row["diagnostic_codes"].append("KUBERNETES_READ_TRANSPORT_UNAVAILABLE")
             self.gap=True
@@ -186,6 +190,13 @@ class KubernetesLifecycleReader:
             owner_binding_verified=row["owner_before_after_verified"],
             capture={"complete":True,"bounded_at_source":True,"timed_out":False,"truncated":False,
                      "owner_binding_verified":row["owner_before_after_verified"]})
+
+    def mark_collection_gap(self,pid,code):
+        """A caller finding the read could not show: a recorded process vanished without its exit record."""
+        self.gap=True
+        row=next((r for r in reversed(self.rows) if r.get("program")=="context" and r.get("pid")==pid),None)
+        if row is None:raise KubernetesCaptureError()
+        row["diagnostic_codes"].append(code)
 
     def read_file(self,client,target,*,container,image,path,timeout=5,max_bytes=MAX_BYTES):
         self._selected(client,target,container,image)

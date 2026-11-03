@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving-engine
+  namespace: serving-lab
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: serving-engine
+  template:
+    metadata:
+      labels:
+        app: serving-engine
+        lab-profile: __LAB_PROFILE__
+    spec:
+      serviceAccountName: engine
+      automountServiceAccountToken: false
+      runtimeClassName: nvidia
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsUser: 2000
+        runAsGroup: 0
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: engine
+          image: __ENGINE_IMAGE__
+          workingDir: /cache
+          command: [/usr/local/bin/vllm-nonroot-entrypoint.sh]
+          args: [/models, --served-model-name, test-model, --host, 0.0.0.0, --port, "8000", --tensor-parallel-size, "1", --max-model-len, "2048", --max-num-seqs, "2", --gpu-memory-utilization, "0.70"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            - {name: VLLM_NO_USAGE_STATS, value: "1"}
+            - {name: DO_NOT_TRACK, value: "1"}
+            - {name: HOME, value: /cache/home}
+            - {name: XDG_CONFIG_HOME, value: /cache/config}
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: HF_HOME, value: /cache/hf}
+            - {name: VLLM_CACHE_ROOT, value: /cache/vllm}
+            - {name: TORCHINDUCTOR_CACHE_DIR, value: /cache/inductor}
+            - {name: TRITON_CACHE_DIR, value: /cache/triton}
+            - {name: CUDA_CACHE_PATH, value: /cache/cuda}
+            - {name: XDG_CACHE_HOME, value: /cache/xdg}
+          ports:
+            - {name: http, containerPort: 8000}
+          resources:
+            requests: {cpu: "__ENGINE_CPU_REQUEST__", memory: __ENGINE_MEMORY_REQUEST__, nvidia.com/gpu: "1"}
+            limits: {cpu: "__ENGINE_CPU_LIMIT__", memory: __ENGINE_MEMORY_LIMIT__, nvidia.com/gpu: "1"}
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            failureThreshold: 120
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: model, mountPath: /models, readOnly: true}
+            - {name: cache, mountPath: /cache}
+            - {name: shm, mountPath: /dev/shm}
+      volumes:
+        - name: model
+          hostPath: {path: /srv/serving/models/__MODEL_REVISION__, type: Directory}
+        - name: cache
+          hostPath: {path: __CACHE_PATH__, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 2Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: serving-engine
+  namespace: serving-lab
+spec:
+  type: ClusterIP
+  selector: {app: serving-engine}
+  ports:
+    - {name: http, port: 8000, targetPort: http}

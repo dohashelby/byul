@@ -1,0 +1,15 @@
+# Temporary exception for the named test role; remove after engine-direct tests.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: engine-direct-test
+  namespace: serving-lab
+spec:
+  podSelector:
+    matchLabels: {app: serving-engine}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: engine-test-probe}
+      ports: [{protocol: TCP, port: 8000}]

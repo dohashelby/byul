@@ -14,6 +14,7 @@ A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18
 | REQ-14 거부 원인 | 소스에서 특정, CPU로 재현, 보수 | `REQ-14_REJECTION.md` |
 | 센서 보수 3건 | 구현·계약 시험 완료(사용자 승인 2026-11-02). GPU 확인 전 | 아래 |
 | REQ-16 lab 문맥 | 어댑터 내용·가중치 세대 바꾸기와 미디어 사례 실행기 구현, 계약 시험 완료(2026-11-03). 멀티모달 모델 선정과 GPU 확인 전 | `REQ-16_CONTEXTS.md`, `tools/gpu_a_lab_variants.py` |
+| AWS 구성 | 팀 인계 묶음 기준 세대별 배포 덧씌우기 도구와 절차서, 콜백 점검 입력 조립 도구(2026-11-03). G-A3 REQ-08·09·SUP-08은 Docker 의존으로 결정 필요 | `AWS_RUNBOOK.md`, `tools/gpu_a_aws_lab.py`, `tools/gpu_a_run_inputs.py` |
 
 ## 센서 보수 (A 소유 파일, GPU 확인 전)
 
@@ -27,6 +28,18 @@ A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18
 - 2는 처음 후보(파일 메타데이터가 같으면 재사용)보다 엄격하게 구현했다. 파일 교체 감지는 지금처럼 바이트 SHA 비교다.
 - 3은 엔진 센서의 설치 목록만 바꿨다. 범용 관측기 `vllm_cache_callback.TARGETS`와 그 계약 시험은 그대로다.
 - 센서 소스가 바뀌었으므로 GPU에서는 `prepare-engine-callbacks` 자산을 새로 만들어야 한다. 첫 실증 자산은 `load_prepared`가 거부한다.
+
+## B 요청 처리 (#196)
+
+| 요청 | 처리 | 파일 |
+|---|---|---|
+| GB12 봉인 상한 불일치 | 봉인기가 profile별 기록 상한(262,144 / 2,097,152)을 받음 | #200 |
+| profiler 결합 공백 원인 | 다섯 조건별 개수(`call_binding_failures`) | #200 |
+| GB08 봉인 전·뒤 capture 구분 | 봉인 뒤 final capture가 같은 세션에서 더는 보이지 않는 미종결 공백(`profiler_source_process_call_binding_unavailable`, `required_profiler_worker_rank_unavailable`)만 최종 공백에서 빼고 `profiler_control_provisional_missing`에 단계별로 보존. 다른 결합 실패가 섞였거나 봉인·final capture가 없으면 그대로 공백 | `executors/kubernetes_profiler_control.py` |
+| GB36 프로세스 정보 읽기 진단 | 읽기 프로그램이 사라진 프로세스를 오류 대신 `guard-lifecycle-process-absent/1`로 답함. reader 읽기 기록에 `pid`와 `result`(`context`·`process_absent`·`unavailable`), 기록별 `process_recheck`(pid, start_ticks, 종료 이유, `matched`·`mismatch`·`process_exited`·`process_absent_without_exit_record`·`unavailable`) | `executors/lifecycle_capture.py`, `executors/kubernetes_lifecycle_capture.py` |
+| GB36 과거·현재 신원 구분 | `PROCESS_EXIT`로 닫힌 기록의 프로세스가 없으면 수집 공백이 아니라 `LIFECYCLE_PROCESS_EXITED_RECORDED_IDENTITY_ONLY`. `process_context_verified`는 거짓 그대로, 목록·producer 인증도 올리지 않음. 종료 기록 없이 사라졌으면 `LIFECYCLE_PROCESS_ABSENT_WITHOUT_EXIT_RECORD`로 수집 공백. 전송 실패도 지금처럼 공백 | 같음 |
+
+프로세스 정보 읽기 프로그램 SHA가 `2a944d63…`에서 `24f678bc…`로 바뀌었습니다.
 
 ## 1단계 정책 값
 

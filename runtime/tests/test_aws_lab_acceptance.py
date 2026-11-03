@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from argparse import Namespace
 from contextlib import redirect_stderr, redirect_stdout
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import io
 import json
@@ -33,6 +33,7 @@ from tools.aws_lab_acceptance import (
     parse_args,
     phase_exec_inventory,
     _completion_usage,
+    _timeline_reset,
     _fixed_request_hash,
 )
 from serving_runtime.mvp.app import GatewayApp
@@ -251,6 +252,17 @@ class ArgumentTests(unittest.TestCase):
             self.assertTrue(exceeded)
             self.assertEqual(evidence["sum"], 128)
             self.assertEqual([call["json"]["max_tokens"] for call in http.calls], [8, 9])
+
+    def test_context_probe_marks_engine_length_truncation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            http = FakeHTTP([response(200, {"choices": [{"finish_reason": "length"}], "usage": {"completion_tokens": 3}}, "boundary"),
+                             response(403, {"error": {"code": "CONTEXT_LIMIT_EXCEEDED"}}, "over")])
+            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(), http=http)
+            checker._engine_token_count = lambda route, prompt: len(prompt.split())
+            checker._detail = lambda _id: detail("DENIED", reason="CONTEXT_LIMIT_EXCEEDED", attempted=False, status=403)
+            boundary, _exceeded, evidence = checker._context_probe("/v1/completions", INFERENCE, 128, 128)
+            self.assertFalse(boundary)
+            self.assertTrue(evidence["engine_truncated"])
 
     def test_direct_token_count_keeps_prompt_out_of_command_journal(self) -> None:
         class CountingRunner(FakeRunner):
@@ -563,7 +575,7 @@ class DecisionTests(unittest.TestCase):
         "AWS-14": dict.fromkeys(("restart_ok", "initial_503", "recovered_200", "within_10s"), True),
         "AWS-15": dict.fromkeys(("stop_ok", "restart_ok", "observed_503", "recovered_200", "cleanup_ok"), True),
         "AWS-16": dict.fromkeys(("stop_ok", "expired_unknown", "request_200", "cleanup_ok"), True),
-        "AWS-17": dict.fromkeys(("pod_changed", "timeline_new_uid", "old_phase_absent"), True),
+        "AWS-17": dict.fromkeys(("pod_changed", "timeline_new_uid", "timeline_reset", "old_phase_absent"), True),
         "AWS-18": dict.fromkeys(("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"), True),
         "AWS-19": dict.fromkeys(("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"), True),
     }
@@ -1186,6 +1198,7 @@ class FakeExecutionTests(unittest.TestCase):
                     [
                         response(200, before),
                         response(200, unavailable),
+                        response(200, {"verification": {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"}, "gateway_hold": None}),
                         response(200, {"choices": [{"message": {"content": "during stop"}}]}, "stopped-request"),
                         response(200, detail("ALLOWED", attempted=True)),
                         response(200, {"verification": {"state": "unavailable", "last_confirmed_at": "2026-10-26T00:00:00+00:00"}, "gateway_hold": None}),
@@ -1219,8 +1232,6 @@ class FakeExecutionTests(unittest.TestCase):
                 runner=FakeRunner([CommandResult(0), CommandResult(0)]),
                 http=FakeHTTP([
                     response(200, before), response(200, unavailable),
-                    response(503, {"error": {"code": "TARGET_UNAVAILABLE"}}, "stopped-request"),
-                    response(200, detail("ERROR", reason="TARGET_UNAVAILABLE", attempted=False, status=503)),
                     response(200, {"verification": {"state": "blocked", "last_confirmed_at": None}, "gateway_hold": {"reason_code": "TARGET_UNAVAILABLE"}}),
                     response(200, recovered),
                     response(200, {"verification": {"state": "ok", "last_confirmed_at": None}, "gateway_hold": None}),
@@ -1231,6 +1242,8 @@ class FakeExecutionTests(unittest.TestCase):
             failed._run_case("AWS-07", failed.aws_07)
             self.assertEqual(failed.cases[0]["result"], "failed")
             self.assertFalse(failed.cases[0]["facts"]["stopped_request_200_unverified"])
+            self.assertEqual(failed.cases[0]["evidence"]["request_target_verification"]["state"], "blocked")
+            self.assertIsNone(failed.cases[0]["evidence"]["stopped_interval_request"]["http_status"])
 
     def test_aws_08_requires_gateway_instance_change_and_pod_replaced_history(self) -> None:
         def engine_pod(uid: str, container_id: str) -> str:
@@ -1711,6 +1724,8 @@ class NewCaseExecutionTests(unittest.TestCase):
             (bundles / "current").symlink_to("previous")
             runner = RestartRunner()
             checker = AWSAcceptance(arguments(root, cases=("AWS-13",), allow_bundle_switch=True, bundle_root=str(bundles)), runner=runner, http=HTTP(runner))
+            checker._gateway_pods = lambda: [{"metadata": {"uid": "old"}}]
+            checker._gateway_crashed = lambda _window, _uids: (True, {"restart_count": 1, "pod_name": "gateway-new", "pod_uid": "new"})
             checker._retry_inference = lambda _timeout: (checker._completion(token=INFERENCE)[0].status == 200, {"result": "ALLOWED"}, {"last_status": 200})
             checker._detail = lambda _id: detail("DENIED", reason="AUTH_REQUIRED", attempted=False, status=401)
             self.assertEqual(checker.run(), 0)
@@ -1952,21 +1967,22 @@ class NewCaseExecutionTests(unittest.TestCase):
             )
             runner = FakeRunner()
             checker = AWSAcceptance(arguments(root, cases=("AWS-17",), allow_engine_restart=True), runner=runner, http=FakeHTTP([]), sleeper=lambda _s: None)
-            pods = iter(({"name": "engine-old", "uid": "old-uid"}, {"name": "engine-new", "uid": "new-uid"}))
+            pods = iter(({"name": "engine-old", "uid": "old-uid"}, {"name": "engine-new", "uid": "new-uid", "started_at": "2026-11-03T00:00:00Z"}))
             checker._engine_pod = lambda: (next(pods), CommandResult(0))
             timelines = iter((
-                {"schema_version": "runtime-phase-timeline/1.0", "collector": {"pod_uid": "old-uid", "state": "running", "written_at": datetime.now(timezone.utc).isoformat()}, "entries": [{"phase": "inferring"}]},
-                {"schema_version": "runtime-phase-timeline/1.0", "collector": {"pod_uid": "old-uid", "state": "running"}},
-                {"schema_version": "runtime-phase-timeline/1.0", "collector": {"pod_uid": "new-uid", "state": "running"}},
+                {"schema_version": "runtime-phase-timeline/1.0", "collector": {"pod_uid": "old-uid", "state": "running", "written_at": datetime.now(timezone.utc).isoformat()}, "entries": [{"phase": "inferring", "from": "2026-11-02T23:59:00Z"}]},
+                {"schema_version": "runtime-phase-timeline/1.0", "collector": {"pod_uid": "new-uid", "state": "running"}, "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}]},
+                {"schema_version": "runtime-phase-timeline/1.0", "collector": {"pod_uid": "new-uid", "state": "running"}, "entries": [{"phase": "ready", "from": "2026-11-03T00:00:00Z"}]},
             ))
             checker._timeline = lambda: next(timelines)
-            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "binary": "/bin/sh", "observed_at": event_time, "pod": {"namespace": "serving-lab", "pod": "engine-new"}, "phase": ["unknown"]}])
+            checker._tetragon_observations = lambda _since: (True, [{"kind": "process_exec", "binary": "/bin/sh", "observed_at": event_time, "pod": {"namespace": "serving-lab", "pod": "engine-new"}, "phase": ["ready"], "phase_timeline_fresh": True, "phase_timeline_written_at": (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat()}])
             counts = iter(({"skipped_unsupported_total": 0, "corrupt_lines_total": 0}, {"skipped_unsupported_total": 1, "corrupt_lines_total": 0}))
             checker._tetragon_counts = lambda: next(counts)
             with patch("tools.aws_lab_acceptance._now", return_value="2026-11-03T00:00:00Z"):
                 facts, evidence = checker.aws_17()
             self.assertEqual(evaluate_case("AWS-17", facts)[0], "passed")
             self.assertEqual(evidence["raw_process_pod_uid"], "new-uid")
+            self.assertTrue(evidence["timeline_reset"]["entries_after_new_start"])
             self.assertTrue(evidence["process_exit_accounting"]["expected_pattern_seen"])
 
     def test_aws17_rejects_stale_timeline_and_sglang_leftover_before_restart(self) -> None:
@@ -1985,6 +2001,17 @@ class NewCaseExecutionTests(unittest.TestCase):
             facts, _evidence = checker.aws_17()
             self.assertIn("단계 수집 꺼짐", facts["unknown_reason"])
             self.assertFalse(runner.history)
+
+    def test_aws17_rejects_old_entry_carried_into_new_pod_timeline(self) -> None:
+        previous = {"entries": [{"phase": "inferring", "from": "2026-11-03T00:00:00Z"}]}
+        new_start = "2026-11-03T00:01:00Z"
+        carried = {"entries": [previous["entries"][0], {"phase": "ready", "from": "2026-11-03T00:01:01Z"}]}
+        reset = {"entries": [{"phase": "ready", "from": "2026-11-03T00:01:01Z"}]}
+        self.assertFalse(_timeline_reset(previous, carried, new_start))
+        self.assertTrue(_timeline_reset(previous, reset, new_start))
+        self.assertEqual(evaluate_case("AWS-17", {"pod_changed": True, "timeline_new_uid": True,
+                                                   "timeline_reset": _timeline_reset(previous, carried, new_start),
+                                                   "old_phase_absent": True})[0], "failed")
 
     def test_compare_policy_uses_only_fixture_and_records_cleanup_failure(self) -> None:
         class CompareRunner(FakeRunner):
@@ -2022,6 +2049,28 @@ class NewCaseExecutionTests(unittest.TestCase):
                 self.assertTrue(all("serving-engine" not in row and "serving-gateway" not in row for row in commands))
                 self.assertEqual(evidence["blocked_probe"]["errno_name"], "ETIMEDOUT")
 
+    def test_gateway_crash_detection_reads_newest_pod_state(self) -> None:
+        def pods(restart_count, waiting=None):
+            state = {"waiting": {"reason": waiting}} if waiting else {"running": {}}
+            return json.dumps({"items": [
+                {"metadata": {"name": "old", "uid": "old", "creationTimestamp": "2026-11-03T00:00:00Z"}, "status": {"containerStatuses": [{"name": "gateway", "restartCount": 5, "state": {"running": {}}}]}},
+                {"metadata": {"name": "new", "uid": "new", "creationTimestamp": "2026-11-03T00:01:00Z"}, "status": {"containerStatuses": [{"name": "gateway", "restartCount": restart_count, "state": state}]}},
+            ]})
+        clock = FakeClock()
+        with tempfile.TemporaryDirectory() as directory:
+            for name in ("crashed", "steady", "unreadable"):
+                (Path(directory) / name).mkdir()
+            crashed = AWSAcceptance(arguments(Path(directory) / "crashed"), runner=FakeRunner([CommandResult(0, pods(1, "CrashLoopBackOff"))]),
+                                    http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            self.assertIs(crashed._gateway_crashed(10.0, set())[0], True)
+            self.assertIsNone(crashed._gateway_crashed(0.0, {"old", "new"})[0])
+            steady = AWSAcceptance(arguments(Path(directory) / "steady"), runner=FakeRunner([CommandResult(0, pods(0))] * 20),
+                                   http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            self.assertIs(steady._gateway_crashed(10.0, {"old"})[0], False)
+            unreadable = AWSAcceptance(arguments(Path(directory) / "unreadable"), runner=FakeRunner([CommandResult(1)] * 20),
+                                       http=FakeHTTP([]), sleeper=clock.sleep, monotonic=clock.monotonic)
+            self.assertIsNone(unreadable._gateway_crashed(10.0, set())[0])
+
     def test_bad_bundle_is_restored_even_when_gateway_recovery_fails(self) -> None:
         for fail_recovery in (False, True):
             with self.subTest(fail_recovery=fail_recovery), tempfile.TemporaryDirectory() as directory:
@@ -2039,11 +2088,15 @@ class NewCaseExecutionTests(unittest.TestCase):
                     calls.append(1)
                     return (len(calls) == 2 and not fail_recovery), {"attempt": len(calls)}
                 checker._restart = restart
+                checker._gateway_pods = lambda: [{"metadata": {"uid": "old"}}]
+                checker._gateway_crashed = lambda _window, _uids: (True, {"restart_count": 1, "pod_name": "gateway-new", "pod_uid": "new"})
                 checker._retry_inference = lambda _timeout: (True, {"result": "ALLOWED"}, {"attempts": 1, "last_status": 200})
                 checker._completion = lambda **_kwargs: (response(401, {}, "denied-1"), "denied-1", False)
                 checker._detail = lambda _id: detail("DENIED", reason="AUTH_REQUIRED", attempted=False, status=401)
                 facts, _evidence = checker.aws_13()
                 self.assertEqual(evaluate_case("AWS-13", facts)[0], "failed" if fail_recovery else "passed")
+                log_calls = [item["argv"] for item in runner.history if "logs" in item["argv"]]
+                self.assertTrue(log_calls and all("pod/gateway-new" in call for call in log_calls))
                 self.assertEqual((bundles / "current").readlink(), Path("previous"))
                 self.assertEqual(sorted(path.name for path in bundles.iterdir()), ["current", "previous"])
 

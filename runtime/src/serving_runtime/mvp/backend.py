@@ -32,6 +32,7 @@ _TOP_LEVEL_FIELDS = frozenset(
         "metrics_url",
         "timeouts",
         "metrics_map",
+        "context_headroom_tokens",
     }
 )
 # External serving engines this Gateway can relay to. Each keeps its own
@@ -109,6 +110,7 @@ class BackendConfig:
     metrics_path: str | None = None
     timeouts: dict[str, float] = field(default_factory=dict)
     metrics_map: dict[str, dict[str, Any]] = field(default_factory=dict)
+    context_headroom_tokens: int = 0
     credential_status: str = "configured"
     credential_configured: bool = False
     metrics_credential_status: str = "not_configured"
@@ -341,6 +343,9 @@ def load_backend_config(
     kind = document["kind"]
     if not isinstance(kind, str) or kind not in EXTERNAL_BACKEND_KINDS:
         raise ValueError("backend kind must be vllm or sglang")
+    headroom = document.get("context_headroom_tokens", 0)
+    if isinstance(headroom, bool) or not isinstance(headroom, int) or headroom < 0:
+        raise ValueError("context_headroom_tokens must be a non-negative integer")
 
     target = _parse_origin(document["base_url"], field_name="base_url")
     raw_model_map = _require_object(document["model_map"], "model_map")
@@ -441,6 +446,7 @@ def load_backend_config(
         metrics_path=metrics_path,
         timeouts=timeouts,
         metrics_map=metrics_map,
+        context_headroom_tokens=headroom,
         credential_status=credential_status,
         credential_configured=configured,
         metrics_credential_status=metrics_credential_status,

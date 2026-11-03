@@ -39,9 +39,14 @@ def read_context():
       "boot_sha256":hashlib.sha256(pathlib.Path("/proc/sys/kernel/random/boot_id").read_bytes()).hexdigest(),
       "pid_namespace":os.stat(p/"ns/pid").st_ino,"time_namespace":os.stat(p/"ns/time").st_ino,
       "time_offsets_sha256":hashlib.sha256((p/"timens_offsets").read_bytes()).hexdigest()}
-before=read_context()
-same=os.readlink(p/"exe")==os.readlink("/proc/self/exe")
-after=read_context()
+try:
+  before=read_context()
+  same=os.readlink(p/"exe")==os.readlink("/proc/self/exe")
+  after=read_context()
+except (FileNotFoundError,ProcessLookupError):
+  # The process is gone. Its recording keeps only the identity it wrote.
+  if p.exists():raise
+  print(json.dumps({"schema":"guard-lifecycle-process-absent/1","pid":pid}));raise SystemExit(0)
 print(json.dumps({"schema":"guard-lifecycle-process-context/1","context":before,
   "stable":before==after,"same_executable":same}))
 """
@@ -478,6 +483,10 @@ def parse_recording(raw, prepared):
                 "code_runtime":online_runtime} if online.CALLBACK_MODULE in ready else None)} if is_online else {})}
 
 
+class ProcessAbsent(ValueError):
+    """The recorded process no longer exists; distinct from a failed read."""
+
+
 def process_context(docker, container, pid):
     result = docker.exec_bounded(container, ["python3","-c",CONTEXT_READER,str(pid)], timeout=5, max_bytes=4096)
     pipe = result.capture or {}
@@ -488,6 +497,8 @@ def process_context(docker, container, pid):
     if pipe.get("owner_binding_verified",True) is not True:
         raise ValueError("LIFECYCLE_PROCESS_SOURCE_OWNER_UNVERIFIED")
     value = strict_json(result.stdout.encode(), limit=4096)
+    if value == {"schema":"guard-lifecycle-process-absent/1","pid":pid}:
+        raise ProcessAbsent("LIFECYCLE_PROCESS_ABSENT")
     if (type(value) is not dict or set(value) != {"schema","context","stable","same_executable"}
             or value["schema"] != "guard-lifecycle-process-context/1"
             or value["stable"] is not True or value["same_executable"] is not True):
@@ -514,6 +525,8 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     if source["path"] != expected_path:
         raise ValueError("LIFECYCLE_RECORDING_PROCESS_PATH_INVALID")
     verified, image_verified, diagnostic = False, False, []
+    recheck = {"pid":context["pid"],"start_ticks":context["start_ticks"],"recording_end":summary["recording_end"],
+        "recording_closed":summary["recording_closed"],"result":"unavailable"}
     # Keep the first safe recording if a later recheck fails.
     try:
         if image_check is not None:
@@ -535,6 +548,19 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
                     and provenance["file_identity"] == second["file_identity"]
                     and provenance.get("owner_binding_verified",True) is True
                     and second.get("owner_binding_verified",True) is True)
+        recheck["result"] = "matched" if verified else "mismatch" if before != context or after != context else "not_verified"
+    except ProcessAbsent:
+        # A recording closed by its own exit keeps its past identity only. This is
+        # neither a current-worker binding nor a failed read of a live process.
+        if summary["recording_closed"] and summary["recording_end"] == "PROCESS_EXIT":
+            recheck["result"] = "process_exited"
+            diagnostic.append("LIFECYCLE_PROCESS_EXITED_RECORDED_IDENTITY_ONLY")
+        else:
+            recheck["result"] = "process_absent_without_exit_record"
+            diagnostic.append("LIFECYCLE_PROCESS_ABSENT_WITHOUT_EXIT_RECORD")
+            mark = getattr(docker, "mark_collection_gap", None)
+            if mark is not None:
+                mark(context["pid"], "LIFECYCLE_PROCESS_ABSENT_WITHOUT_EXIT_RECORD")
     except Exception:
         diagnostic.append("LIFECYCLE_RECHECK_UNAVAILABLE")
     if not image_verified:
@@ -550,7 +576,8 @@ def capture(docker, target, *, source, prepared, read_file=None, image_check=Non
     return {"schema":"guard-lifecycle-capture/1", "records":records, "summary":summary,
         **({"online_callback_provenance":summary["online_callback_provenance"],
             "online_code_contract":online.CODE_CONTRACT} if is_online else {}),
-        "provenance":safe_provenance, "process_context_verified":verified, "image_digest_verified":image_verified,
+        "provenance":safe_provenance, "process_context_verified":verified, "process_recheck":recheck,
+        "image_digest_verified":image_verified,
         "diagnostic_codes":diagnostic, "product_connected":False, "security":"UNKNOWN",
         "producer_authenticated":False, "record_authenticity_verified":False,
         "scope":"one supplied process recording; not whole-run coverage"}

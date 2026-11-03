@@ -22,7 +22,7 @@ def pod(uid, sensor_root, *, foreign=False, explicit_port=None,
         'uid': 'foreign-rs-uid' if foreign else 'owned-rs-uid',
         'controller': True}], 'labels': {'guard.run': 'gpu-b-20261102',
             'byul.lab/generation': 'restore' if uid == 'new' else 'normal'}},
-        'spec': {'containers': [{'name': 'engine', 'ports': [{'containerPort': 8000,
+        'spec': {'nodeName': 'node-1', 'containers': [{'name': 'engine', 'ports': [{'containerPort': 8000,
             'name': 'http', 'protocol': 'TCP'}],
             'command': [] if explicit_port is None else ['vllm', '--port', str(explicit_port)],
             'volumeMounts': mounts}],
@@ -123,7 +123,8 @@ class FakeLab:
                     sensor_mount_option=(self.sensor_mount_option
                         if self.sensor_mount_phase == ('new' if replaced else 'old') else None))]
 
-    def _exec(self, _source, *args, pod, pod_uid):
+    def _exec(self, _source, *args, pod, pod_uid, isolated=False):
+        assert isolated is True
         assert pod == 'engine' and pod_uid in ('old', 'new')
         assert args[0] in ('/guard-lifecycle/settings.json', '/guard-lifecycle/engine-callbacks/settings.json')
         root = self.new_sensor if pod_uid == 'new' else self.old_sensor
@@ -175,6 +176,17 @@ class FakeLab:
 
     def rollout(self):
         self.applied.append('rollout')
+
+
+def restore_from_snapshots(instance, old, new):
+    # 두 번의 실제 대상 조회에 대응하는 원본 Pod snapshots를 순서대로 제공한다.
+    snapshots = iter(([deepcopy(old)], [deepcopy(new)]))
+    original = instance._pods
+    instance._pods = lambda: next(snapshots)
+    try:
+        return _restore_sensor_session(instance, old, new)
+    finally:
+        instance._pods = original
 
 
 def test_lif11_old_ready_pod_does_not_count_as_next_start(tmp_path):
@@ -312,7 +324,7 @@ def test_restore_sensor_session_accepts_omitted_false_default_without_mutating_r
         if phase in (name, 'both'):
             item['spec']['containers'][0]['volumeMounts'][1].pop('readOnly')
     before = deepcopy((old, new))
-    assert _restore_sensor_session(lab, old, new) == 'b' * 32
+    assert restore_from_snapshots(lab, old, new) == 'b' * 32
     assert (old, new) == before
 
 
@@ -321,7 +333,7 @@ def test_restore_sensor_session_rejects_false_lookalikes_and_readonly_data(tmp_p
     lab = FakeLab(tmp_path, replaced=True)
     old, new = pod('old', lab.old_sensor), pod('new', lab.new_sensor)
     new['spec']['containers'][0]['volumeMounts'][1]['readOnly'] = value
-    assert _restore_sensor_session(lab, old, new) is None
+    assert restore_from_snapshots(lab, old, new) is None
 
 
 def test_restore_sensor_default_normalization_does_not_admit_extra_shadow_mount(tmp_path):
@@ -330,4 +342,4 @@ def test_restore_sensor_default_normalization_does_not_admit_extra_shadow_mount(
     new['spec']['containers'][0]['volumeMounts'][1].pop('readOnly')
     new['spec']['containers'][0]['volumeMounts'].append({
         'name': 'other', 'mountPath': '/guard-lifecycle/settings.json', 'readOnly': True})
-    assert _restore_sensor_session(lab, old, new) is None
+    assert restore_from_snapshots(lab, old, new) is None

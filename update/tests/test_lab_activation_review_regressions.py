@@ -113,7 +113,7 @@ def test_yaml_split_callbacks_and_remote_node_settings_are_supported(tmp_path):
     new['spec']['nodeName'] = 'remote-node'
     pin_manifest(instance, manifest)
     original = deepcopy((old, new))
-    assert lab._restore_sensor_session(instance, old, new) == 'b' * 32
+    assert restart.restore_from_snapshots(instance, old, new) == 'b' * 32
     assert (old, new) == original
 
 
@@ -122,7 +122,7 @@ def test_remote_settings_error_is_diagnosable_without_path_or_secret(tmp_path, m
     def unavailable(*_args, **_kwargs):
         raise OSError('/remote/private/settings: SECRET_CANARY')
     monkeypatch.setattr(instance, '_exec', unavailable)
-    assert lab._restore_sensor_session(instance,
+    assert restart.restore_from_snapshots(instance,
         restart.pod('old', instance.old_sensor), restart.pod('new', instance.new_sensor)) is None
     assert 'RESTORE_SENSOR_SESSION_UNVERIFIED:OSError' in instance.missing
     assert 'SECRET_CANARY' not in repr(instance.missing)
@@ -220,3 +220,169 @@ def test_transition_fail_survives_later_pod_collection_error(tmp_path, monkeypat
         base.POLICY, runner=world, clock=world.clock, wait=world.wait)
     assert 'INFLIGHT_REQUEST_HUNG_ACROSS_TRANSITION' in {v['code'] for v in facts['activation_violations']}
     assert 'SCENARIO_INTERRUPTED:OSError' in facts['activation_missing']
+
+
+@pytest.mark.parametrize('duration', [.6, 5])
+def test_startup_optional_request_runs_after_original_service_window(duration, monkeypatch):
+    world = base.Cluster(); world.clock = lambda: world.now
+    instance = lab.Lab({**base.BASE, 'deadline_ms': 2000}, runner=world,
+        clock=world.clock, wait=world.wait)
+    original = instance.requests
+    service_times = []; direct_times = []
+    def requests(items, **kwargs):
+        if world.rollout_generation:
+            if kwargs.get('url'):
+                direct_times.append(world.now)
+                world.now += duration
+            else:
+                service_times.append(world.now)
+            return [{**row, 'outcome': 503} for row in original(items, **kwargs)]
+        return original(items, **kwargs)
+    monkeypatch.setattr(instance, 'requests', requests)
+    lab._startup_gate(instance, {})
+    assert service_times == [0, .5, 1, 1.5]
+    assert direct_times == [2]
+    assert next(step for step in instance.steps if step['step'] == 'startup')['samples'] == 4
+    assert any(v['code'] == 'READY_BEFORE_INFERENCE_AVAILABLE' for v in instance.violations)
+    assert 'READY_WITHOUT_SERVICE_REQUEST_POD_UNATTRIBUTED' in instance.missing
+
+
+@pytest.mark.parametrize('outcome', ['timeout', 'error', 404, 403])
+def test_startup_transport_or_request_error_is_not_inference_unavailable(outcome, monkeypatch):
+    world = base.Cluster(); world.clock = lambda: world.now
+    instance = lab.Lab({**base.BASE, 'deadline_ms': 1000}, runner=world,
+        clock=world.clock, wait=world.wait)
+    original = instance.requests
+    def requests(items, **kwargs):
+        rows = original(items, **kwargs)
+        return [{**row, 'outcome': outcome if kwargs.get('url') else 503} for row in rows] if world.rollout_generation else rows
+    monkeypatch.setattr(instance, 'requests', requests)
+    lab._startup_gate(instance, {})
+    assert not any(v['code'] == 'READY_BEFORE_INFERENCE_AVAILABLE' for v in instance.violations)
+    assert 'READY_WITHOUT_SERVICE_REQUEST_POD_UNATTRIBUTED' in instance.missing
+
+
+def test_startup_ready_lost_during_direct_request_does_not_prove_ready_conflict(monkeypatch):
+    world = base.Cluster(); world.clock = lambda: world.now
+    world.ready = lambda: world.now < 1.2
+    instance = lab.Lab({**base.BASE, 'deadline_ms': 1000}, runner=world,
+        clock=world.clock, wait=world.wait)
+    original = instance.requests
+    def requests(items, **kwargs):
+        rows = original(items, **kwargs)
+        if kwargs.get('url'):
+            world.now += .6
+        return [{**row, 'outcome': 503} for row in rows] if world.rollout_generation else rows
+    monkeypatch.setattr(instance, 'requests', requests)
+    lab._startup_gate(instance, {})
+    assert not any(v['code'] == 'READY_BEFORE_INFERENCE_AVAILABLE' for v in instance.violations)
+
+
+@pytest.mark.parametrize('post_error', [False, True])
+def test_reappearing_workers_or_lost_census_cannot_conflict_with_health(post_error, monkeypatch):
+    world = base.Cluster(die_on_signal=True)
+    instance = lab.Lab(base.BASE, runner=world, clock=world.clock, wait=world.wait)
+    instance.violate('CONFIRMED_INDEPENDENT_FAIL')
+    requests = instance.requests; census = instance.census; direct_done = False
+    def wrapped_requests(items, **kwargs):
+        nonlocal direct_done
+        rows = requests(items, **kwargs)
+        if kwargs.get('url'):
+            direct_done = True
+            world.modes['gone'] = False
+        return rows
+    def wrapped_census(*args):
+        if post_error and direct_done:
+            raise OSError('post census unavailable')
+        return census(*args)
+    monkeypatch.setattr(instance, 'requests', wrapped_requests)
+    monkeypatch.setattr(instance, 'census', wrapped_census)
+    lab._record_state(instance, {})
+    assert instance.violations == [{'code': 'CONFIRMED_INDEPENDENT_FAIL'}]
+    expected = 'STATE_HEALTH_POST_CENSUS_OR_BINDING_UNAVAILABLE' if post_error else 'STATE_WORKERS_REAPPEARED_DURING_HEALTH'
+    assert expected in instance.missing
+
+
+@pytest.mark.parametrize('change', ['node', 'container', 'restart', 'started', 'pod_uid'])
+def test_sensor_read_rejects_identity_change_after_exec(tmp_path, monkeypatch, change):
+    instance = restart.FakeLab(tmp_path, replaced=True)
+    pod = restart.pod('new', instance.new_sensor)
+    after = deepcopy(pod)
+    status = after['status']['containerStatuses'][0]
+    if change == 'node': after['spec']['nodeName'] = 'other-node'
+    elif change == 'container': status['containerID'] += '-replacement'
+    elif change == 'restart': status['restartCount'] += 1
+    elif change == 'started': status['state']['running']['startedAt'] = '2026-11-04T00:00:00Z'
+    else: after['metadata']['uid'] = 'replacement'
+    monkeypatch.setattr(instance, '_pods', lambda: [after])
+    with pytest.raises(ValueError, match='RESTORE_SENSOR_TARGET_IDENTITY_CHANGED'):
+        lab._sensor_session(instance, pod, lab._sensor_mount(pod, 'engine'))
+
+
+def test_sensor_exec_uses_isolated_python_and_closed_program_only(monkeypatch):
+    world = base.Cluster()
+    instance = lab.Lab(base.BASE, runner=world, clock=world.clock, wait=world.wait)
+    monkeypatch.setattr(instance, '_pods', lambda: world.pods())
+    calls = []
+    def runner(argv, **options):
+        calls.append((argv, options))
+        return {'returncode': 0, 'stdout_bytes': b'{"session":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'}
+    instance.runner = runner
+    instance._exec(lab.SENSOR_SESSION, '/guard-lifecycle/settings.json', pod='engine-0',
+        pod_uid='pod-0', isolated=True)
+    argv, options = calls[0]
+    position = argv.index('python3')
+    assert argv[position:position + 5] == ['python3', '-I', '-S', '-B', '-c']
+    assert argv[position + 5] == lab.SENSOR_SESSION
+    assert 0 < float(argv[-1]) <= 60
+    assert options['timeout'] <= 60
+    with pytest.raises(ValueError, match='ISOLATED_PROGRAM_INVALID'):
+        instance._exec('print(1)', isolated=True)
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize('duration', [5.5, 10])
+def test_optional_startup_observation_preserves_final_restore_budget(duration, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'good.yaml').write_text('good')
+    world = base.Cluster(); world.clock = lambda: world.now
+    original = world.http
+    def http(item):
+        row = original(item)
+        return {**row, 'outcome': 503} if world.rollout_generation and not world.apply_generation else row
+    monkeypatch.setattr(world, 'http', http)
+    cfg = {**base.BASE, 'deadline_ms': 1000, 'max_duration_seconds': duration}
+    facts, instance = lab.run_scenario('LIF-07', cfg, {}, runner=world,
+        clock=world.clock, wait=world.wait)
+    assert 'READY_WITHOUT_SERVICE_REQUEST_POD_UNATTRIBUTED' in facts['activation_missing']
+    assert instance.normal[-1] is True
+    assert not instance.cleanup_errors
+    assert not facts['activation_violations']
+
+
+def test_overlapping_tampered_and_approved_names_are_rejected_before_mutation():
+    world = base.Cluster()
+    cfg = {**base.BASE, 'tampered_objects': list(base.BASE['restore_objects'])}
+    instance = lab.Lab(cfg, runner=world, clock=world.clock, wait=world.wait)
+    lab._restore_material(instance, {})
+    assert 'RESTORE_TAMPERED_NAMES_OVERLAP_APPROVAL' in instance.missing
+    assert not instance.mutated and not world.calls
+    assert not instance.violations
+
+
+def test_post_health_census_of_new_container_cannot_prove_prior_worker_absence(monkeypatch):
+    world = base.Cluster(die_on_signal=True)
+    instance = lab.Lab(base.BASE, runner=world, clock=world.clock, wait=world.wait)
+    census = instance.census; calls = 0
+    def wrapped_census(*args):
+        nonlocal calls
+        calls += 1
+        value = census(*args)
+        if calls == 4:
+            world.container_epoch += 1
+        return value
+    monkeypatch.setattr(instance, 'census', wrapped_census)
+    lab._record_state(instance, {})
+    assert calls == 4
+    assert 'STATE_HEALTH_WORKER_GENERATION_CHANGED' in instance.missing
+    assert not instance.violations

@@ -40,6 +40,8 @@ RESTORE_KINDS = frozenset({'configmap', 'secret'})
 REQUIRED_KEYS = {'namespace', 'selector', 'container', 'probe_pod', 'probe_container', 'service_url', 'model',
     'deployment', 'process_pattern', 'deadline_ms'}
 POLL_SECONDS = 0.5
+KUBECTL_CALL_TIMEOUT = 60
+REQUEST_CALL_TIMEOUT = 120
 FAULT_FILE = 'lab-fault-exception'
 # Signals are sent by a Python helper inside the Linux engine container.
 # They must not depend on the controller host's signal module (e.g. Windows).
@@ -159,6 +161,7 @@ class Lab:
         self.diagnostics = []; self.diagnostic_write_errors = []; self.diagnostic_namespace = None
         self.diagnostic_poll = None; self.diagnostic_deadline = None
         self.diagnostic_idle_overrun = False
+        self.observation_deadline = None
 
     def diagnostic(self, event, **facts):
         self.diagnostics.append({'poll': self.diagnostic_poll, 'event': event,
@@ -179,8 +182,10 @@ class Lab:
                 self.diagnostic_write_errors.append({'reason': _diagnostic_error_kind(error)})
         return artifacts
 
-    def _kubectl(self, *args, stdin=None, cap=2 * 1024 ** 2, timeout=60):
+    def _kubectl(self, *args, stdin=None, cap=2 * 1024 ** 2, timeout=KUBECTL_CALL_TIMEOUT):
         remaining = min(timeout, self.deadline - self.clock())
+        if self.observation_deadline is not None:
+            remaining = min(remaining, self.observation_deadline - self.clock())
         if self.diagnostic_deadline is not None:
             remaining = min(remaining, self.diagnostic_deadline - self.clock())
         timeout_ns = int(remaining * 1_000_000_000)
@@ -232,7 +237,7 @@ class Lab:
             return any(c.get('type') == 'Ready' and c.get('status') == 'True' for c in pod.get('status', {}).get('conditions', []))
         return [p['metadata']['name'] for p in self._pods() if ready(p)]
 
-    def _exec(self, program, *args, stdin=None, pod=None, pod_uid=None):
+    def _exec(self, program, *args, stdin=None, pod=None, pod_uid=None, isolated=False):
         if pod is None:
             pods = self.ready_pods()
             if not pods:
@@ -242,9 +247,21 @@ class Lab:
             identities = {p['metadata']['name']: p['metadata'].get('uid') for p in self._pods()}
             if pod not in identities or pod_uid is not None and identities[pod] != pod_uid:
                 raise OSError('LAB_ACTIVATION_TARGET_POD_GENERATION_CHANGED')
-        return json.loads(self._kubectl('exec', pod, f"--container={self.cfg['container']}", '--', 'python3', '-c', program, *args))
+        flags = []
+        if isolated:
+            if program != SENSOR_SESSION:
+                raise ValueError('LAB_ACTIVATION_ISOLATED_PROGRAM_INVALID')
+            flags = ['-I', '-S', '-B']
+            remaining = min(KUBECTL_CALL_TIMEOUT, self.deadline - self.clock())
+            if self.observation_deadline is not None:
+                remaining = min(remaining, self.observation_deadline - self.clock())
+            if remaining <= 0:
+                raise TimeoutError('LAB_ACTIVATION_BUDGET_EXHAUSTED')
+            args = (*args, str(remaining))
+        return json.loads(self._kubectl('exec', pod, f"--container={self.cfg['container']}", '--',
+            'python3', *flags, '-c', program, *args))
 
-    def requests(self, items, *, timeout=120, progress_path=None, url=None):
+    def requests(self, items, *, timeout=REQUEST_CALL_TIMEOUT, progress_path=None, url=None):
         payload = json.dumps({'url': url or self.cfg['service_url'], 'requests': items,
             'progress_path': progress_path}).encode()
         raw = self._kubectl('exec', '-i', self.cfg['probe_pod'], f"--container={self.cfg['probe_container']}", '--',
@@ -788,10 +805,13 @@ def _rejected(lab, code, marker=None, *, request_model=None, require_new_faulty_
 
     if require_new_faulty_uid:
         # 필수 Service/marker 관측과 판정을 끝낸 뒤 별도 남은 실행 예산으로 한 번만 진단한다.
-        diagnostic_end = min(lab.deadline, lab.clock() + 10)
+        diagnostic_end = _optional_observation_end(lab)
         lab.diagnostic_poll = poll
-        _diagnostic_fault_pod_request(lab, faulty[:1], diagnostic_end,
-            request_model or lab.cfg['model'], idle_end=diagnostic_end)
+        if diagnostic_end - lab.clock() > 5 + POLL_SECONDS:
+            _diagnostic_fault_pod_request(lab, faulty[:1], diagnostic_end,
+                request_model or lab.cfg['model'], idle_end=diagnostic_end)
+        else:
+            lab.diagnostic('direct-request-skipped', reason='FINAL_RESTORE_BUDGET_RESERVED')
         lab.diagnostic_poll = None
 
 
@@ -831,6 +851,8 @@ def _restore_material(lab, values):
     lab.miss('RESTORE_CONSUMPTION_AND_EXTERNAL_GATE_UNOBSERVED')
     lab.miss('RESTORE_NONREADY_VOLUME_GATEWAY_RESIDUAL_UNOBSERVED')
     approved = lab.cfg['restore_objects']
+    if set(approved) & set(lab.cfg['tampered_objects']):
+        return lab.miss('RESTORE_TAMPERED_NAMES_OVERLAP_APPROVAL')
     before = lab.object_digests(approved)
     lab.note('restore-targets', objects=sorted(approved), matches_approval=before == approved)
     if before != approved:
@@ -850,11 +872,25 @@ def _restore_material(lab, values):
         lab.violate('TAMPERED_MATERIAL_STILL_REFERENCED', objects=residual)
 
 
-def _bound_pod_request(lab, pod, item):
+def _optional_observation_end(lab):
+    # 최종 복원의 apply, 마지막 Ready 조회, 정상 요청의 기존 최대 호출 시간을 보존한다.
+    reserve = 2 * KUBECTL_CALL_TIMEOUT + REQUEST_CALL_TIMEOUT + lab.cfg['deadline_ms'] / 1000 + POLL_SECONDS
+    return min(lab.clock() + 10, lab.deadline - reserve)
+
+
+def _pod_ready(pod):
+    return any(c.get('type') == 'Ready' and c.get('status') == 'True'
+        for c in pod.get('status', {}).get('conditions', []))
+
+
+def _bound_pod_request(lab, pod, item, *, require_ready=False, observation_end=None):
     """직접 Pod 주소 요청과 전후 컨테이너 신원만 연결한다. Service 귀속은 주장하지 않는다."""
+    original_deadline = lab.observation_deadline
+    lab.observation_deadline = min(lab.deadline, lab.clock() + 10,
+        observation_end if observation_end is not None else lab.deadline)
     try:
         before = lab.engine_container_identity(pod)
-        if before is None:
+        if before is None or require_ready and not _pod_ready(pod):
             return None
         url = _owned_direct_pod_url(lab, pod)
         if url is None:
@@ -862,13 +898,17 @@ def _bound_pod_request(lab, pod, item):
         row, = lab.requests([item], url=url)
         current = next((p for p in lab._pods()
             if p['metadata'].get('uid') == pod['metadata']['uid']), None)
-        if (current is None or lab.engine_container_identity(current) != before
+        if (current is None or require_ready and not _pod_ready(current)
+                or lab.engine_container_identity(current) != before
                 or current.get('status', {}).get('podIP') != pod.get('status', {}).get('podIP')
                 or current.get('spec', {}).get('nodeName') != pod.get('spec', {}).get('nodeName')):
             return None
         return row
     except (OSError, TimeoutError, ValueError, KeyError, TypeError, AttributeError):
         return None
+
+    finally:
+        lab.observation_deadline = original_deadline
 
 
 def _startup_gate(lab, values):
@@ -907,12 +947,6 @@ def _startup_gate(lab, values):
         samples += 1
         if ready and row.get('outcome') != 200:
             premature += 1
-            for pod in new_pods:
-                if any(c.get('type') == 'Ready' and c.get('status') == 'True'
-                        for c in pod.get('status', {}).get('conditions', [])):
-                    direct = _bound_pod_request(lab, pod, lab.chat(model=after_model, timeout=5))
-                    if direct is not None and direct.get('outcome') != 200:
-                        lab.violate('READY_BEFORE_INFERENCE_AVAILABLE', pod_uid=pod['metadata']['uid'])
         if distinct and new_pods and not ready and row.get('outcome') == 200 and row.get('model') == after_model:
             early += 1
         if ready and row.get('outcome') == 200 and (not distinct or row.get('model') == after_model):
@@ -926,6 +960,23 @@ def _startup_gate(lab, values):
         transition_native_session_bound=False)
     if premature:
         lab.miss('READY_WITHOUT_SERVICE_REQUEST_POD_UNATTRIBUTED')
+        # 원 Service 관측을 완료한 뒤 현재 Ready 상태만 별도 예산으로 확인한다.
+        # 과거 premature 샘플의 응답 귀속은 여전히 missing이다.
+        observation_end = _optional_observation_end(lab)
+        if observation_end - lab.clock() > 5:
+            try:
+                candidates = [p for p in lab._pods() if p['metadata'].get('uid') in new_uids_seen]
+                for pod in candidates[:1]:
+                    if any(c.get('type') == 'Ready' and c.get('status') == 'True'
+                            for c in pod.get('status', {}).get('conditions', [])):
+                        direct = _bound_pod_request(lab, pod,
+                            lab.chat(model=after_model, timeout=5), require_ready=True, observation_end=observation_end)
+                        if direct is not None and type(direct.get('outcome')) is int and 500 <= direct['outcome'] < 600:
+                            lab.violate('READY_BEFORE_INFERENCE_AVAILABLE', pod_uid=pod['metadata']['uid'])
+            except (OSError, TimeoutError, ValueError, KeyError, AttributeError):
+                lab.miss('STARTUP_DIRECT_POD_OBSERVATION_UNAVAILABLE')
+        else:
+            lab.miss('STARTUP_DIRECT_POD_OBSERVATION_SKIPPED_RESTORE_BUDGET')
     if early:
         lab.miss('EARLY_ADMISSION_POD_UNATTRIBUTED')
     if not ready:
@@ -1344,20 +1395,79 @@ def _sensor_mount(pod, container):
     return volumes[0]['hostPath']['path'], selected['mountPath']
 
 
-def _sensor_session(lab, pod, mount):
-    # 대상 Pod에서 UID를 검증해 읽는다. 컨트롤러의 로컬 hostPath는 읽지 않는다.
-    source = """import json,os,stat,sys
-fd=os.open(sys.argv[1],os.O_RDONLY|os.O_NOFOLLOW)
+# 실험실 소유 고정 프로그램. 경로만 argv로 받고 임의 소스·비밀값은 반환하지 않는다.
+SENSOR_SESSION = r'''import json,math,os,re,signal,stat,sys
+
+def fail(): raise ValueError('RESTORE_SETTINGS_UNTRUSTED')
+def identity(info):
+    return (info.st_dev,info.st_ino,info.st_mode,info.st_uid,info.st_gid,
+        info.st_size,info.st_mtime_ns,info.st_ctime_ns)
+def directory(info):
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid not in (0,os.geteuid()) or info.st_mode&0o022: fail()
+def pairs(rows):
+    result={}
+    for key,value in rows:
+        if key in result: fail()
+        result[key]=value
+    return result
+path=sys.argv[1]
+seconds=float(sys.argv[2])
+if not math.isfinite(seconds) or not 0<seconds<=60: fail()
+signal.signal(signal.SIGALRM,lambda *_:fail())
+signal.setitimer(signal.ITIMER_REAL,seconds)
+if path not in ('/guard-lifecycle/settings.json','/guard-lifecycle/engine-callbacks/settings.json'): fail()
+fds=[]
 try:
-    if not stat.S_ISREG(os.fstat(fd).st_mode): raise ValueError('not regular')
-    raw=os.read(fd,65537)
-    if len(raw)>65536: raise ValueError('settings too large')
-    print(json.dumps({'session':json.loads(raw)['session']}))
-finally: os.close(fd)"""
-    result = lab._exec(source, posixpath.join(mount[1], 'settings.json'),
-        pod=pod['metadata']['name'], pod_uid=pod['metadata']['uid'])
+    fd=os.open('/',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW);fds.append(fd)
+    directory(os.fstat(fd))
+    for component in path.split('/')[1:-1]:
+        fd=os.open(component,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=fd);fds.append(fd)
+        directory(os.fstat(fd))
+    parent=fd
+    fd=os.open('settings.json',os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=parent);fds.append(fd)
+    before=os.fstat(fd)
+    if (not stat.S_ISREG(before.st_mode) or before.st_uid!=os.geteuid()
+            or stat.S_IMODE(before.st_mode) not in (0o400,0o600) or not 0<before.st_size<=65536): fail()
+    raw=b''
+    while len(raw)<=65536:
+        chunk=os.read(fd,min(65537-len(raw),8192))
+        if not chunk: break
+        raw+=chunk
+    after=os.fstat(fd)
+    current=os.stat('settings.json',dir_fd=parent,follow_symlinks=False)
+    if len(raw)!=before.st_size or identity(before)!=identity(after) or identity(after)!=identity(current): fail()
+    for index,directory_fd in enumerate(fds[:-1]):
+        directory(os.fstat(directory_fd))
+        if index:
+            actual=os.stat(path.split('/')[index],dir_fd=fds[index-1],follow_symlinks=False)
+            if (actual.st_dev,actual.st_ino)!=(os.fstat(directory_fd).st_dev,os.fstat(directory_fd).st_ino): fail()
+    value=json.loads(raw,object_pairs_hook=pairs,parse_constant=lambda _:fail())
+    if type(value) is not dict or type(value.get('session')) is not str or not re.fullmatch('[0-9a-f]{32}',value['session']): fail()
+    print(json.dumps({'session':value['session']}))
+finally:
+    for fd in reversed(fds): os.close(fd)
+    signal.setitimer(signal.ITIMER_REAL,0)
+'''
+SENSOR_SESSION_SHA256 = hashlib.sha256(SENSOR_SESSION.encode()).hexdigest()
+
+
+def _sensor_identity(lab, pod):
+    identity = lab.engine_container_identity(pod)
+    node = pod.get('spec', {}).get('nodeName')
+    if identity is None or type(node) is not str or not node:
+        raise ValueError('RESTORE_SENSOR_TARGET_IDENTITY_UNAVAILABLE')
+    return (pod['metadata']['name'], pod['metadata']['uid'], node, identity)
+
+
+def _sensor_session(lab, pod, mount):
+    before = _sensor_identity(lab, pod)
+    result = lab._exec(SENSOR_SESSION, posixpath.join(mount[1], 'settings.json'),
+        pod=pod['metadata']['name'], pod_uid=pod['metadata']['uid'], isolated=True)
+    current = next((p for p in lab._pods() if p['metadata'].get('uid') == pod['metadata']['uid']), None)
+    if current is None or _sensor_identity(lab, current) != before or _sensor_mount(current, lab.cfg['container']) != mount:
+        raise ValueError('RESTORE_SENSOR_TARGET_IDENTITY_CHANGED')
     session = result.get('session')
-    if type(session) is not str or re.fullmatch(r'[0-9a-f]{32}', session) is None:
+    if set(result) != {'session'} or type(session) is not str or re.fullmatch(r'[0-9a-f]{32}', session) is None:
         raise ValueError('RESTORE_SENSOR_SESSION_INVALID')
     return session
 
@@ -1597,16 +1707,27 @@ def _record_state(lab, values):
     except (OSError, TimeoutError, ValueError):
         alive = None
         lab.miss('STATE_FAILED_WORKER_CENSUS_UNAVAILABLE')
-    direct = None
+    direct = None; after_alive = None
     if alive == 0:
         try:
             pod = next((p for p in lab._pods() if p['metadata'].get('uid') == target['pod_uid']), None)
             if pod is not None:
                 direct = _bound_pod_request(lab, pod, {'method': 'GET', 'path': '/health', 'timeout': 10})
+                if direct is not None:
+                    after_alive = len(lab.census(target['pod'], target['pod_uid'])['processes'])
+                    current = next((p for p in lab._pods() if p['metadata'].get('uid') == target['pod_uid']), None)
+                    if (current is None or lab.engine_container_identity(current) != lab.engine_container_identity(pod)
+                            or current.get('spec', {}).get('nodeName') != pod.get('spec', {}).get('nodeName')):
+                        lab.miss('STATE_HEALTH_WORKER_GENERATION_CHANGED')
+                        direct = None
+                    if after_alive != 0:
+                        lab.miss('STATE_WORKERS_REAPPEARED_DURING_HEALTH')
+                        direct = None
         except (OSError, TimeoutError, ValueError, KeyError, AttributeError):
-            pass
+            direct = None
+            lab.miss('STATE_HEALTH_POST_CENSUS_OR_BINDING_UNAVAILABLE')
     lab.note('state-after-failure', health=row['outcome'], processes=alive, target=target,
-        health_worker_binding_verified=direct is not None)
+        health_worker_binding_verified=direct is not None, processes_after_health=after_alive)
     if alive == 0 and direct is not None and direct.get('outcome') == 200:
         lab.violate('HEALTH_REPORTED_AFTER_WORKERS_GONE')
     elif row['outcome'] == 200 and alive == 0:

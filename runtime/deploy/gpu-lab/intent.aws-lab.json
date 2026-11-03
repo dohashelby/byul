@@ -121,5 +121,45 @@
     "/usr/bin/curl",
     "/usr/bin/wget"
   ],
-  "tetragon_mode": "monitor"
+  "tetragon_mode": "monitor",
+  "parent_constraints": {
+    "/sbin/ldconfig": [
+      "/usr/bin/python3",
+      "/usr/local/bin/vllm"
+    ],
+    "/sbin/ldconfig.real": [
+      "/sbin/ldconfig"
+    ],
+    "/usr/bin/awk": [
+      "/usr/local/bin/vllm-nonroot-entrypoint.sh"
+    ],
+    "/usr/bin/id": [
+      "/usr/local/bin/vllm-nonroot-entrypoint.sh"
+    ],
+    "/usr/bin/nvidia-ctk": [
+      "/usr/sbin/runc"
+    ],
+    "/usr/bin/uname": [
+      "/usr/bin/python3",
+      "/usr/local/bin/vllm"
+    ],
+    "/usr/local/bin/vllm": [
+      "/usr/local/bin/vllm-nonroot-entrypoint.sh"
+    ],
+    "/usr/local/bin/vllm-nonroot-entrypoint.sh": [
+      "/usr/local/bin/containerd-shim-runc-v2"
+    ],
+    "/usr/local/cuda/bin/nvcc": [
+      "/usr/bin/python3"
+    ],
+    "/usr/local/cuda/bin/ptxas": [
+      "/usr/bin/python3"
+    ],
+    "/usr/local/lib/python3.12/dist-packages/triton/backends/nvidia/bin/ptxas": [
+      "/usr/bin/python3"
+    ],
+    "/usr/sbin/ip": [
+      "/usr/local/bin/vllm"
+    ]
+  }
 }

@@ -1,5 +1,11 @@
 # AWS GPU lab runtime 인수 절차
 
+## 실행 부모 조건의 의미
+
+두 AWS intent의 선택적 `parent_constraints`는 Tetragon `process_exec.parent.binary`의 **관측 문자열**이 지정된 부모 중 하나일 때만 해당 실행 파일을 기존 상시·단계 허용 목록과 대조한다. 부모가 다르거나 없으면 `outside_allowlist`이며 `parent_check`에 `mismatch` 또는 `unavailable`을 남긴다. 지정되지 않은 실행 파일은 기존 판정을 유지한다. 이 두 필드는 runtime 소유 1.1 intent의 선택적 확장으로, 기존 1.1 문서를 읽는 방식은 유지하고 버전은 올리지 않았다. SGLang의 `suspect_parent_contexts`는 관측된 `nvcc`·`ninja` → `/bin/sh`를 loading/compiling 단계에서만 `suspect_context=compile_toolchain_parent`로 설명한다. 신뢰 단계를 포함해 셸의 `exec_verdict=suspect_binary` 의심 경고는 유지하며, 설명이 없는 경우 `suspect_context=null`이다. `containerd-shim` → 셸(`kubectl exec` 포함)도 계속 `suspect_binary`다. `ExecException`은 해당 실행 파일의 부모 제약을 먼저 만족한 뒤 기존의 신뢰 단계·기간·image·부모 조건을 적용하며, 이 셸 설명 설정은 예외보다 의심 판정이 우선한다.
+
+이 조건은 탐지 판정을 좁히는 관측 규칙이며 현재 Tetragon 커널 차단 규칙은 아니다. 엔진 Python이 장악되면 `ninja` 등을 통해 셸을 띄울 수 있으므로 완전 차단으로 해석하지 않는다. 시작 Python의 `containerd-shim` 부모는 정상 기동과 `kubectl exec`을 구별할 수 없어 제약하지 않았다. vLLM의 미관측 `/usr/bin/python3.12`도 부모 근거가 없어 기존 판정을 유지한다. SGLang에서 관측된 `id`·`awk`·`cat`은 기존 허용 목록에 없으므로 관측만으로 추가하지 않았고, 미관측 정규 표기 `cicc`는 허용 목록에서 제외했다. 추후 차단 단계에서는 별도 검증 후 Tetragon `matchParentBinaries`로 옮기고 parents map 비용을 확인해야 한다. 관측 쌍은 저장소 밖 2026-11-03 두 JSONL의 `engine` 컨테이너에서 추렸으며 SGLang 파일에 섞인 vLLM Pod를 분리했다. 시험 도구의 `containerd-shim` → 셸·Python은 정상 쌍에서 제외했다. 관측은 승인 자체를 뜻하지 않으며, 새 image·단계·부모 관계는 다시 확인해야 한다. 부모 정보가 빠진 정상 실행도 의도대로 `outside_allowlist`가 되므로 AWS-11의 잘못된 경고로 셀 수 있다. 11/3 증거 867건에서는 부모 누락이 0건이었다.
+
 11/4 서버 1회차는 [서버 실행순서표](서버_실행순서표.md)와 읽기 전용 [preflight 도구](../../tools/aws_lab_preflight.py)를 따른다.
 
 이 절차는 AWS 묶음 위에 runtime 배포를 올린 뒤 기존 “첫 완료 기준” 8가지와 추가 준비 사례 AWS-09~11을 확인한다. 기존 AWS-01~08 결과는 다시 판정하지 않는다. `tools/k8s_lab_check.py`는 fake engine과 시험 정책을 생성·삭제하는 kind 전용 도구이므로 이 환경에서 사용하지 않는다. AWS-12~17은 `--cases`로 명시 선택해야 하며, 배포 상태를 바꾸는 사례에는 별도 허용 플래그가 필요하다.

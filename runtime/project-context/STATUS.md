@@ -349,3 +349,8 @@
 - Pod selector가 맞으면 컨테이너 이름 누락·형식 오류도 엔진으로 판정하고 귀속은 `unavailable`로 표시한다. 명시적으로 다른 컨테이너 이름은 제외한다. AWS-16/17은 vLLM·SGLang 모두 시간표 `extraction.engine`이 선택 엔진과 일치해야 판정한다.
 - D는 11/3 서버 관찰 문서의 위험 표와 일치한다. `--config`는 `/proc` cmdline 노출과 시작 셸만 없앤다. 시작 로그 `server_args`와 키 없는 `/server_info`의 관리 키 노출은 그대로이며, 엔진 8000 직통 차단(AWS-04)과 증거 반출 전 값 검사·가림으로 다룬다. 외부 이슈 링크는 확인하지 않아 넣지 않았다.
 - 로컬 검증: `.venv/bin/python -m unittest discover -s tests` 645건 통과(skip 115: 로컬 소켓 제약), `git diff --check` 통과. 실제 서버 적용과 AWS-11/16/17 재측정, 새 묶음 검증·정책 적용은 미확인이다. 다음은 서버에서 값 비노출 범위를 확인하고 새 intent로 시험을 재실행하는 것이다. intent SHA-256/크기: vLLM `0e347a98…`/2759바이트, SGLang `74753590…`/3430바이트. 커밋·푸시하지 않았다.
+
+## 2026-11-03 실행 부모 조건 (기준 961c455, 미커밋)
+
+- 두 AWS intent 1.1에 관측 실행 파일별 부모 제약을 추가했다. 부모 불일치·누락은 `outside_allowlist`; 제약 없는 실행 파일은 기존 판정을 유지한다. SGLang `suspect_parent_contexts`는 `nvcc`·`ninja`의 `/bin/sh`를 loading/compiling에서만 `suspect_context=compile_toolchain_parent`로 설명하며, 신뢰 단계에서도 `suspect_binary` 의심 경고를 유지한다. `containerd-shim` 셸도 의심 판정을 유지한다. 시작 Python 부모는 정상 기동과 시험용 exec를 구별할 수 없어 제약하지 않았다. SGLang의 미관측 정규 `cicc` 표기는 목록에서 제외했다. 관측 출처와 부모 누락의 AWS-11 한계는 `deploy/gpu-lab/ACCEPTANCE.md`에 기록했다.
+- 재검수 수정 후 `.venv/bin/python -m unittest discover -s tests`: 647건, 실패 0·skip 115(로컬 소켓 제약). `git diff --check` 통과. 앞선 `.venv/bin/serving-runtime enforce render`에서는 두 AWS intent 각각 후보 10개를 생성했다. 실제 서버 적용·새 image의 부모 관계·커널 차단은 미확인이다. 기존 미추적 파일은 건드리지 않았고 커밋·푸시하지 않았다.

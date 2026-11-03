@@ -106,7 +106,8 @@ class EnginePhaseFeedTests(unittest.TestCase):
                     if legacy_id is not None:
                         pod["pod_id"] = legacy_id
                     event = {"time": "2026-11-02T10:00:05Z", "process_exec": {
-                        "process": {"binary": "/usr/bin/uname", "pod": pod}}}
+                        "process": {"binary": "/usr/bin/uname", "pod": pod},
+                        "parent": {"binary": "/usr/bin/python3"}}}
                     result = parse_tetragon(event, data_origin="synthetic", exec_policy=policy)
                     self.assertEqual(result["phase"], [expected])
                     self.assertEqual(result["exec_verdict"], "phase_unknown" if expected == "unknown" else "outside_allowlist")
@@ -124,7 +125,7 @@ class EnginePhaseFeedTests(unittest.TestCase):
             document.pop("collector")
             path.write_text(json.dumps(document), encoding="utf-8")
             legacy = ExecPolicy(policy.intent, timeline_path=path).classify_exec(
-                binary="/usr/bin/uname", parent=None, image=None, observed_at="2026-11-02T10:00:05Z")
+                binary="/usr/bin/uname", parent="/usr/bin/python3", image=None, observed_at="2026-11-02T10:00:05Z")
             self.assertEqual(legacy["phase"], ["inferring"])
 
     def test_reverse_time_closes_open_phase_and_new_start_recovers(self) -> None:
@@ -325,13 +326,13 @@ class EnginePhaseFeedTests(unittest.TestCase):
             document = feed.collect_once()
             intent = load_intent(ROOT / "deploy/gpu-lab/intent.aws-lab.json")
             policy = ExecPolicy(intent, timeline_path=path)
-            fresh = policy.classify_exec(binary="/usr/bin/uname", parent=None, image=None,
+            fresh = policy.classify_exec(binary="/usr/bin/uname", parent="/usr/bin/python3", image=None,
                                          observed_at="2026-11-02T10:00:05Z", pod_uid="pod-a")
             self.assertEqual((fresh["phase"], fresh["exec_verdict"]), (["inferring"], "outside_allowlist"))
             document["collector"]["written_at"] = (datetime.now(timezone.utc) - timedelta(seconds=16)).isoformat()
             path.write_text(json.dumps(document), encoding="utf-8")
             stale = ExecPolicy(intent, timeline_path=path).classify_exec(
-                binary="/usr/bin/uname", parent=None, image=None,
+                binary="/usr/bin/uname", parent="/usr/bin/python3", image=None,
                 observed_at="2026-11-02T10:00:05Z")
             self.assertEqual((stale["phase"], stale["exec_verdict"], stale["phase_source_error"]),
                              (["unknown"], "phase_unknown", "stale"))

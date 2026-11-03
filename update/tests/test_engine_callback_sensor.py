@@ -154,7 +154,7 @@ def test_real_sources_and_shared_key_bind_engine_ids_back_to_the_parent_tag(tmp_
     pool_module = source_module('vllm.v1.core.block_pool', tmp_path)
     rows = []
     callbacks = sensor.EngineCallbacks('a' * 32, SECRET, rows.append, context_provider=lambda: {'fixture': True})
-    assert callbacks.instrument(manager_module) and callbacks.instrument(pool_module)
+    assert callbacks.instrument(manager_module)
     manager = manager_module.KVCacheManager()
     manager.prefix_cache_lookup_enabled = lambda request: True
     manager.enable_kv_cache_events = False
@@ -165,6 +165,33 @@ def test_real_sources_and_shared_key_bind_engine_ids_back_to_the_parent_tag(tmp_
     manager.get_computed_blocks(request)
     found = projection.computed_rows(rows, SECRET, {'a': TAGS['a']})
     assert found['a'][0]['tokens'] == 4 and 'private-salt-value' not in json.dumps(rows) and TAGS['a'] not in json.dumps(rows)
+
+
+def test_installed_sensor_leaves_block_lookups_unwrapped_so_a_long_hit_costs_one_call(tmp_path):
+    """REQ-17 시간 대조가 계측 비용이 아니라 캐시 적중을 재게 한다."""
+    assert sensor.Finder(None).find_spec('vllm.v1.core.block_pool') is None
+    manager_module = source_module('vllm.v1.core.kv_cache_manager', tmp_path)
+    pool_module = source_module('vllm.v1.core.block_pool', tmp_path)
+    rows = []
+    callbacks = sensor.EngineCallbacks('a' * 32, SECRET, rows.append, context_provider=lambda: {'fixture': True})
+    assert callbacks.instrument(manager_module)
+    blocks = [type('KVCacheBlock', (), {'block_id': i})() for i in range(64)]
+    def find(keys, maximum):
+        return ([blocks], 64 * 16, 0) if keys == ['hit'] else ([[]], 0, 0)
+    manager = manager_module.KVCacheManager()
+    manager.prefix_cache_lookup_enabled = lambda request: True
+    manager.enable_kv_cache_events = False
+    manager.create_kv_cache_blocks = lambda found: SimpleNamespace(blocks=tuple(found))
+    manager.block_pool = pool_module.BlockPool()
+    manager.coordinator = SimpleNamespace(find_longest_cache_hit=find)
+    for tag, keys in (('a', ['hit']), ('b', ['miss'])):
+        manager.get_computed_blocks(SimpleNamespace(request_id=TAGS[tag], cache_salt=None, block_hashes=keys,
+            lora_request=None, num_tokens=64 * 16 + 1))
+    counts = {tag: sum(r['fields'].get('request_sha256') == projection.tag_digest(SECRET, TAGS[tag])
+        for r in rows if r.get('phase') in ('CALL', 'RETURN')) for tag in 'ab'}
+    assert counts == {'a': 2, 'b': 2} and len(rows) == 4
+    found = projection.computed_rows(rows, SECRET, {'a': TAGS['a'], 'b': TAGS['b']})
+    assert found['a'][0]['tokens'] == 64 * 16 and found['b'][0]['tokens'] == 0
 
 
 def test_prepared_assets_detect_changed_bytes(tmp_path):
@@ -193,11 +220,11 @@ def test_prepared_package_leaves_an_unpinned_engine_running_and_records_the_gap(
     package = tmp_path / 'engine/vllm/v1/core'; package.mkdir(parents=True)
     for folder in (tmp_path / 'engine/vllm', tmp_path / 'engine/vllm/v1', package):
         (folder / '__init__.py').write_text('')
-    (package / 'block_pool.py').write_text('class BlockPool:\n    def get_cached_block(self):\n        return 7\n')
+    (package / 'kv_cache_manager.py').write_text('class KVCacheManager:\n    def get_computed_blocks(self):\n        return 7\n')
     code = ('import sys\nsys.path[:0]=[sys.argv[1],sys.argv[2]]\n'
         'from guard_engine_callbacks import vllm_engine_callback_sensor as s\n'
         "assert s.install(sys.argv[1],sys.argv[3],context_provider=lambda:{'fixture':True})\n"
-        'import vllm.v1.core.block_pool as b\nprint(b.BlockPool().get_cached_block())\n')
+        'import vllm.v1.core.kv_cache_manager as m\nprint(m.KVCacheManager().get_computed_blocks())\n')
     done = subprocess.run([sys.executable, '-I', '-c', code, str(root), str(tmp_path / 'engine'), str(data)],
         capture_output=True, text=True, timeout=60)
     assert done.returncode == 0 and done.stdout.strip() == '7', done.stderr

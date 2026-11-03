@@ -143,14 +143,15 @@ def test_async_original_event_retained_reference_and_consumer_boundaries(observe
     assert before['metadata']['consumer']['pending_output_version_changed'] is True
     assert before['metadata']['consumer']['event_completion_verified'] is None
     del owner._sampled_token_ids
-    result = Object(sampled_token_ids=[[999]], private='PRIVATE_OUTPUT')
+    # 짧은 값은 무작위 16진수 토큰 안에 우연히 나타나 시험이 가끔 실패했다.
+    result = Object(sampled_token_ids=[[987654321987654]], private='PRIVATE_OUTPUT')
     returned = emit(observer, 'AsyncGPUModelRunnerOutput.get_output', owner, 'RETURN', call='e', result=result)
     state = returned['metadata']['consumer']
     assert state['get_output_boundary_returned'] is True and state['retained_reference_released'] is True
     assert state['event_completion_verified'] is state['value_comparison_verified'] is None
     assert returned['metadata']['event_token'] == initialized['metadata']['event_token']
     assert returned['metadata']['stream_token'] == initialized['metadata']['stream_token']
-    assert '999' not in json.dumps(returned) and 'PRIVATE' not in json.dumps(returned)
+    assert '987654321987654' not in json.dumps(returned) and 'PRIVATE' not in json.dumps(returned)
     assert observer.close()['collection_gap'] is False
 
 

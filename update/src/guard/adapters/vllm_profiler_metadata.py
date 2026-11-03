@@ -49,7 +49,7 @@ def validate_sample(value):
 
 
 def project(packet,required_ranks=()):
-    samples=[];calls={};missing=[];candidates=[]
+    samples=[];calls={};missing=[];candidates=[];binding_failures={}
     for number,recording in enumerate([] if not packet else packet.get('recordings',[])):
         capture=recording.get('capture') or {};records=capture.get('records',[])
         if not records:continue
@@ -69,9 +69,15 @@ def project(packet,required_ranks=()):
             missing.append('profiler_call_pair_unavailable');continue
         first,last=starts[0],ends[0]
         fields=('point','parent_call_sha256','owner_sha256','asgi_request_sha256','asgi_invocation_sha256','registered_handler_observed','is_start','state_before')
-        if (any(first[k]!=last[k] for k in fields) or first['seq']>=last['seq'] or not first['source_verified'] or not last['source_verified']
-            or not first['physical_process_binding_verified'] or not last['physical_process_binding_verified'] or not last['recording_closed']):
-            missing.append('profiler_source_process_call_binding_unavailable');continue
+        # Same gap code as before; the separate counts only say which condition was missing.
+        reasons=[name for name,failed in (('call_fields_changed',any(first[k]!=last[k] for k in fields)),
+            ('call_order_invalid',first['seq']>=last['seq']),('source_unverified',not first['source_verified'] or not last['source_verified']),
+            ('physical_process_binding_unverified',not first['physical_process_binding_verified'] or not last['physical_process_binding_verified']),
+            ('recording_not_closed',not last['recording_closed'])) if failed]
+        if reasons:
+            missing.append('profiler_source_process_call_binding_unavailable')
+            for reason in reasons:binding_failures[reason]=binding_failures.get(reason,0)+1
+            continue
         complete[key]=(first,last)
     worker_calls=[{'recording':key[0],'call_sha256':key[1],'phase':last['phase'],'rank':last['state_after']['rank'],
         'backend_kind':last['state_after']['backend_kind'],'wrapper_sha256':last['state_after']['wrapper_sha256'],
@@ -103,5 +109,6 @@ def project(packet,required_ranks=()):
     missing.extend(['independent_backend_activity_and_trace_callback_output_transfer_unverified','cross_process_API_RPC_worker_causality_unverified',
         'next_normal_profiler_start_unverified','wrapper_flag_is_not_collection_or_output_truth'])
     return {'samples':samples,'complete_calls':len(complete),'worker_calls':worker_calls,'rank_status':rank_status,'conflict_candidates':candidates,'missing':sorted(set(missing)),
+        'call_binding_failures':dict(sorted(binding_failures.items())),
         'backend_collection_stopped_verified':False,'trace_output_completed_verified':False,'cross_process_rpc_verified':False,
         'state_semantics_verified':False,'scope_complete':False,'producer_authenticated':False}

@@ -28,7 +28,10 @@ DATA_ROOT = '/guard-lifecycle/data'
 SLOT_MODULE = 'vllm.v1.worker.gpu_input_batch'
 SLOT_TARGETS = {SLOT_MODULE: ('InputBatch.add_request', 'InputBatch.remove_request')}
 SLOT_SOURCE = {SLOT_MODULE: 'e7e57887b396014a84d64cab26bf678f982844fea15361b09d95f36bd78bc58d'}
-MODULES = {**cache.TARGETS, **distributed.TARGETS, **SLOT_TARGETS}
+# Block-level lookups feed no projection. Wrapping them made every cache hit
+# slower in proportion to its length and multiplied the session rows.
+CACHE_TARGETS = {'vllm.v1.core.kv_cache_manager': cache.TARGETS['vllm.v1.core.kv_cache_manager']}
+MODULES = {**CACHE_TARGETS, **distributed.TARGETS, **SLOT_TARGETS}
 # Engine request ids carry generated prefixes and suffixes around this tag.
 TAG = re.compile(r'byul-cb-[0-9a-f]{32}')
 MAX_FILE_BYTES = 16 * 1024 ** 2
@@ -54,7 +57,7 @@ class _Keyed:
 
 
 class CacheObserver(_Keyed, cache.CacheCallbackObserver):
-    pass
+    targets = CACHE_TARGETS
 
 
 class DistributedObserver(_Keyed, distributed.DistributedCallbackObserver):
@@ -108,7 +111,7 @@ class EngineCallbacks:
     def instrument(self, module):
         """Validate every point of a module before changing any of them."""
         name = vars(module).get('__name__')
-        observer = self.cache if name in cache.TARGETS else self.slot if name in SLOT_TARGETS else self.distributed
+        observer = self.cache if name in CACHE_TARGETS else self.slot if name in SLOT_TARGETS else self.distributed
         try:
             changes = [(cache._function(module, point), observer.wrap(module, point)) for point in MODULES[name]]
         except Exception:

@@ -17,6 +17,19 @@ MP = rank.MP
 PROFILE = 'source-bound-distributed-callback-candidate-v1'
 TARGETS = {MP: ('MultiprocExecutor.execute_model', 'WorkerProc._execute_worker_rpc',
     'WorkerProc.handle_output', 'WorkerProc.enqueue_output')}
+# With async scheduling the worker hands these objects to handle_output. Each keeps
+# the ModelRunnerOutput it was built with, and get_output() returns that same object.
+ASYNC_OUTPUTS = frozenset({('vllm.v1.worker.gpu_model_runner', 'AsyncGPUModelRunnerOutput'),
+    ('vllm.v1.worker.gpu_model_runner', 'AsyncGPUPoolingModelRunnerOutput')})
+
+
+def _output_ids(output):
+    """Return (request ids, read from a pending async output). Never calls get_output()."""
+    ids = shared.base.attrs(output).get('req_ids')
+    if ids is None and (type(output).__module__, type(output).__qualname__) in ASYNC_OUTPUTS:
+        stored = shared.base.attrs(output).get('_model_runner_output')
+        return shared.base.attrs(stored).get('req_ids'), True
+    return ids, False
 
 
 class DistributedCallbackObserver(shared.CacheCallbackObserver):
@@ -56,8 +69,8 @@ class DistributedCallbackObserver(shared.CacheCallbackObserver):
         config = worker_fields.get('model_config')
         if config is None: config = shared.base.attrs(worker_fields.get('vllm_config')).get('model_config')
         config_fields = shared.base.attrs(config)
-        ids = shared.base.attrs(output).get('req_ids')
-        returned_ids = ([self.fingerprint(v) for v in ids] if type(ids) is list and len(ids) <= 64
+        ids, pending = _output_ids(output)
+        returned_ids =([self.fingerprint(v) for v in ids] if type(ids) is list and len(ids) <= 64
             and all(type(v) is str and len(v) <= 512 for v in ids) else None)
         # These are Python object/batch boundary facts only, not tensor hashes.
         return {'receiver_token': self.token(owner), 'worker_token': self.token(worker),
@@ -68,6 +81,7 @@ class DistributedCallbackObserver(shared.CacheCallbackObserver):
             'configured_model_sha256': self.fingerprint(config_fields.get('model')),
             'configured_revision_sha256': self.fingerprint(config_fields.get('revision')),
             'output_object_token': self.token(output), 'output_request_sha256': returned_ids,
+            'output_ids_from_pending_async_output': pending and returned_ids is not None,
             'output_is_exception': isinstance(output, Exception),
             'intermediate_tensor_buffer_verified': False, 'cross_process_lineage_verified': False,
             'upper_client_receipt_verified': False}

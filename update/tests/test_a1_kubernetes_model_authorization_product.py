@@ -99,7 +99,7 @@ class World:
             call=next(n for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="compile")
             source=ast.literal_eval(call.args[0])
             if source==SESSION_SEALER:
-                assert command[5]==supervised_source(SESSION_SEALER) and command[7:]==[self.group.prepared["session"]]
+                assert command[5]==supervised_source(SESSION_SEALER) and command[7]==self.group.prepared["session"] and command[8:] in (["262144"],["2097152"])
                 self.native_ops.append("seal")
                 value={"schema":"guard-session-seal/1","session":self.group.prepared["session"],"sealed":self.mode!="seal-failure",
                     "recordings_closed":2,"terminal_inventory_sha256":"c"*64}

@@ -148,6 +148,45 @@ def test_after_call_code_change_cannot_qualify_terminal_but_keeps_entry_fact(wor
     assert any(r['point'] == 'BlockPool.get_cached_block' for r in callback.project(world.observer.report(), {})['source_bound_returns'])
 
 
+def test_same_size_rewrite_is_caught_because_bytes_are_rehashed_on_every_call(world):
+    path = Path(world.manager_module.__file__); raw = path.read_bytes()
+    path.write_bytes(raw[:-1] + (b' ' if raw[-1:] != b' ' else b'\n'))
+    assert path.stat().st_size == len(raw)
+    assert world.manager.get_computed_blocks(world.request)[1] == 4
+    assert 'CACHE_CALLBACK_ENTRY_UNAVAILABLE' in world.observer.report()['missing']
+
+
+def test_verified_bytes_are_compiled_once_and_still_read_every_call(world, monkeypatch):
+    compiled, read = [], []
+    original_artifact = callback.artifact
+    monkeypatch.setattr(callback, 'compile', lambda *a, **k: compiled.append(a) or compile(*a, **k), raising=False)
+    monkeypatch.setattr(callback, 'artifact', lambda *a, **k: read.append(a) or original_artifact(*a, **k))
+    for _ in range(3):
+        assert world.manager.get_computed_blocks(world.request)[1] == 4
+    # 요청마다 감싼 호출 3개(manager·pool·map)가 호출 전후로 한 번씩 원본을 다시 확인한다.
+    assert compiled == [] and len(read) == 3 * 3 * 2
+    assert not world.observer.report()['missing']
+
+
+def test_large_pinned_source_needs_its_exact_reviewed_size(tmp_path, monkeypatch):
+    assert callback.SOURCE_BYTES == {callback.base.SOURCE_SHA['vllm.v1.worker.gpu_model_runner']: 335342}
+    raw = b'class Big:\n    def run(self):\n        return 7\n' + b'#' * 200000 + b'\n'
+    path = tmp_path / 'big.py'; path.write_bytes(raw)
+    module = ModuleType('example.big'); module.__file__ = str(path)
+    code = next(c for c in compile(raw, str(path), 'exec').co_consts if type(c) is CodeType)
+    module.Big = type('Big', (), {'__module__': 'example.big',
+        'run': FunctionType(next(c for c in code.co_consts if type(c) is CodeType), vars(module))})
+    observer = callback.CacheCallbackObserver('a' * 32, context_provider=lambda: {})
+    observer.targets = {'example.big': ('Big.run',)}; observer.sources = {'example.big': sha256_hex(raw)}
+    with pytest.raises(ValueError, match='WORKER_STARTUP_SOURCE_UNAVAILABLE'):
+        observer.wrap(module, 'Big.run')
+    monkeypatch.setitem(callback.SOURCE_BYTES, sha256_hex(raw), len(raw) - 1)
+    with pytest.raises(ValueError, match='WORKER_STARTUP_SOURCE_UNAVAILABLE'):
+        observer.wrap(module, 'Big.run')
+    monkeypatch.setitem(callback.SOURCE_BYTES, sha256_hex(raw), len(raw))
+    assert observer.wrap(module, 'Big.run')(module.Big()) == 7
+
+
 def test_no_raw_verified_claim_can_qualify_changed_callable_or_foreign_global(tmp_path):
     module = source_module('vllm.v1.core.block_pool', tmp_path)
     observer = callback.CacheCallbackObserver('a' * 32, context_provider=lambda: {})
@@ -220,6 +259,44 @@ def test_actual_worker_rpc_rank_request_and_output_object_facts_are_process_loca
     assert PRIVATE not in json.dumps(report)
     assert not projected['native_profile_supported'] and not projected['scope_complete']
     assert 'per_rank_intermediate_tensor_buffer_transport_unimplemented' in projected['missing']
+
+
+@pytest.mark.parametrize('owner', ['vllm.v1.worker.gpu_model_runner', 'example.lookalike'])
+def test_pending_async_output_ids_are_read_without_calling_get_output(tmp_path, owner):
+    """GPU 기본 async 스케줄링에서도 출력 귀속을 보되 장치 복사를 기다리지 않는다."""
+    module = source_module(distributed.MP, tmp_path, targets=distributed.TARGETS, sources=distributed.rank.SOURCE_ADDITIONS)
+    module.AsyncModelRunnerOutput = type('AsyncModelRunnerOutput', (), {})
+    module.WorkerProc.ResponseStatus = SimpleNamespace(SUCCESS='SUCCESS', FAILURE='FAILURE')
+    observer = distributed.DistributedCallbackObserver('c' * 32, context_provider=lambda: {'fixture': True})
+    for point in distributed.TARGETS[module.__name__]:
+        name, method = point.split('.'); setattr(vars(module)[name], method, observer.wrap(module, point))
+    stored = type('ModelRunnerOutput', (), {})(); stored.req_ids = [PRIVATE]
+    calls = []
+    def get_output(self):
+        calls.append(len(observer.report()['events'])); return self._model_runner_output
+    pending_type = type('AsyncGPUModelRunnerOutput', (module.AsyncModelRunnerOutput,),
+        {'__module__': owner, 'get_output': get_output})
+    pending = pending_type(); pending._model_runner_output = stored
+    scheduler = type('Scheduler', (), {})(); scheduler.num_scheduled_tokens = {PRIVATE: 4}
+    queue = []
+    worker = module.WorkerProc(); worker.rank = 1; worker.local_rank = 0
+    worker.worker = SimpleNamespace(execute_model=lambda scheduler: pending,
+        model_config=SimpleNamespace(model=PRIVATE, revision=PRIVATE))
+    worker.use_async_scheduling = True
+    worker.async_output_queue = SimpleNamespace(put=queue.append)
+    worker.worker_response_mq = SimpleNamespace(enqueue=queue.append)
+    assert worker._execute_worker_rpc(('execute_model', (scheduler,), {}, 1)) is None
+    assert calls == [] and queue == [pending]
+    events = observer.report()['events']
+    rpc = next(r for r in events if r['point'] == 'WorkerProc._execute_worker_rpc' and r['phase'] == 'CALL')
+    handled = next(r for r in events if r['point'] == 'WorkerProc.handle_output' and r['phase'] == 'CALL')
+    trusted = owner == 'vllm.v1.worker.gpu_model_runner'
+    assert handled['fields']['output_request_sha256'] == (rpc['fields']['native_request_sha256'] if trusted else None)
+    assert handled['fields']['output_ids_from_pending_async_output'] is trusted
+    worker.enqueue_output(queue.pop())
+    # vLLM 원래 경로만 get_output을 한 번 부른다.
+    assert len(calls) == 1 and queue == [('SUCCESS', stored)]
+    assert PRIVATE not in json.dumps(observer.report())
 
 
 def packet(cached=3):

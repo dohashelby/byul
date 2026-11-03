@@ -2,7 +2,9 @@
 SESSION_SEALER = r'''
 import hashlib,json,os,re,stat,sys,time
 session=sys.argv[1]
-if re.fullmatch(r"[0-9a-f]{32}",session) is None:raise ValueError()
+# The recording profile's approved per-file bound, the same one its capture reads with.
+limit=int(sys.argv[2])
+if re.fullmatch(r"[0-9a-f]{32}",session) is None or limit not in (262144,2097152):raise ValueError()
 path='/guard-lifecycle/data/'+session
 
 def directory():
@@ -46,7 +48,7 @@ try:
    fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=root)
    try:
     first=os.fstat(fd)
-    if not private_file(first) or not 0<first.st_size<=262144:raise ValueError()
+    if not private_file(first) or not 0<first.st_size<=limit:raise ValueError()
     os.lseek(fd,max(0,first.st_size-16384),os.SEEK_SET)
     tail=os.read(fd,16385)
     last=os.fstat(fd);named=os.stat(name,dir_fd=root,follow_symlinks=False)

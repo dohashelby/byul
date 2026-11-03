@@ -153,6 +153,8 @@ class FakeLab:
         self.census_calls = getattr(self, 'census_calls', 0) + 1
         processes = [{'pid': 42, 'start_ticks': 123}] if self.census_calls == 1 or not self.death else []
         return {'processes': processes, 'shm_entries': 0,
+                'process_scope_complete': True, 'process_scope_errors': [],
+                'process_count_before': len(processes), 'process_count_after': len(processes),
                 'shm_names': []}
 
     def engine_container_identity(self, value):

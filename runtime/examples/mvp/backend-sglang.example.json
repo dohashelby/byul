@@ -1,14 +1,14 @@
 {
   "schema_version": "runtime-backend/1.0",
   "kind": "sglang",
-  "base_url": "http://127.0.0.1:30000",
+  "base_url": "http://127.0.0.1:8000",
   "model_map": {
     "test-model": "example-backend-model-id"
   },
-  "health_path": "/health",
-  "models_path": "/get_model_info",
+  "health_path": "/ready",
+  "models_path": "/v1/models",
   "version_path": null,
-  "metrics_url": "http://127.0.0.1:30000/metrics",
+  "metrics_url": "http://127.0.0.1:8000/metrics",
   "timeouts": {
     "relay_timeout_s": 5,
     "stream_idle_timeout_s": 30,
@@ -19,28 +19,28 @@
       "metric": "sglang:num_running_reqs",
       "type": "gauge",
       "unit": "requests",
-      "source_doc": "https://github.com/sgl-project/sglang/blob/v0.5.21/python/sglang/srt/observability/metrics_collector.py",
+      "source_doc": "https://github.com/sgl-project/sglang/blob/v0.5.22/python/sglang/srt/observability/metrics_collector.py",
       "verified": false
     },
     "requests.waiting": {
       "metric": "sglang:num_queue_reqs",
       "type": "gauge",
       "unit": "requests",
-      "source_doc": "https://github.com/sgl-project/sglang/blob/v0.5.21/python/sglang/srt/observability/metrics_collector.py",
+      "source_doc": "https://github.com/sgl-project/sglang/blob/v0.5.22/python/sglang/srt/observability/metrics_collector.py",
       "verified": false
     },
     "token_pool.usage": {
       "metric": "sglang:token_usage",
       "type": "gauge",
       "unit": "ratio",
-      "source_doc": "https://github.com/sgl-project/sglang/blob/v0.5.21/python/sglang/srt/observability/metrics_collector.py",
+      "source_doc": "https://github.com/sgl-project/sglang/blob/v0.5.22/python/sglang/srt/observability/metrics_collector.py",
       "verified": false
     },
     "tokens.generated": {
       "metric": "sglang:generation_tokens_total",
       "type": "counter",
       "unit": "tokens",
-      "source_doc": "https://github.com/sgl-project/sglang/blob/v0.5.21/python/sglang/srt/observability/metrics_collector.py",
+      "source_doc": "https://github.com/sgl-project/sglang/blob/v0.5.22/python/sglang/srt/observability/metrics_collector.py",
       "verified": false
     }
   }

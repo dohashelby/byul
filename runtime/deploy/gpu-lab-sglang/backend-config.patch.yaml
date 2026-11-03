@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: serving-gateway-backend
+data:
+  backend.json: "{\n  \"schema_version\": \"runtime-backend/1.0\",\n  \"kind\": \"\
+    sglang\",\n  \"base_url\": \"http://serving-engine.serving-lab.svc.cluster.local:8000\"\
+    ,\n  \"model_map\": {\n    \"test-model\": \"test-model\"\n  },\n  \"health_path\"\
+    : \"/ready\",\n  \"models_path\": \"/v1/models\",\n  \"version_path\": null,\n\
+    \  \"metrics_url\": \"http://serving-engine.serving-lab.svc.cluster.local:8000/metrics\"\
+    ,\n  \"timeouts\": {\n    \"relay_timeout_s\": 60,\n    \"stream_idle_timeout_s\"\
+    : 30,\n    \"request_deadline_s\": 300\n  }\n}\n"

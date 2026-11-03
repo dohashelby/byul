@@ -681,8 +681,10 @@ class EnginePhaseTimelineWriter:
         self._phase: _TimelineState | None = None
         self._cursor: datetime | None = None
         self._boundary: set[bytes] = set()
+        self._second_seen: set[bytes] = set()
         self._skip_boundary = False
         self._incomplete = False
+        self._order_unknown = False
         self._skipped: Counter[str] = Counter()
 
     def _reset(self, uid: str | None, year: int) -> None:
@@ -690,8 +692,10 @@ class EnginePhaseTimelineWriter:
         self._phase = _TimelineState(engine="vllm", year=year, timezone_offset="Z") if uid else None
         self._cursor = None
         self._boundary.clear()
+        self._second_seen.clear()
         self._skip_boundary = False
         self._incomplete = False
+        self._order_unknown = False
         self._skipped.clear()
 
     def _ingest(self, data: bytes, *, limited: bool, year: int) -> None:
@@ -704,6 +708,7 @@ class EnginePhaseTimelineWriter:
         if limited:
             self._incomplete = True
         previous = self._cursor
+        progressed = False
         for raw in data.splitlines(keepends=True):
             try:
                 line = raw.decode("utf-8")
@@ -719,10 +724,23 @@ class EnginePhaseTimelineWriter:
             except ValueError:
                 self._skipped["invalid_timestamp"] += 1
                 continue
-            if previous is not None and at < previous:
-                self._skipped["out_of_order"] += 1
-                continue
             key = hashlib.sha256(raw).digest()
+            if (self._cursor is not None
+                    and at.replace(microsecond=0) == self._cursor.replace(microsecond=0)
+                    and key in self._second_seen):
+                continue
+            if previous is not None and at < previous:
+                if at.replace(microsecond=0) == self._cursor.replace(microsecond=0):
+                    self._second_seen.add(key)
+                self._skipped["out_of_order"] += 1
+                for phase in tuple(self._phase.open_phases):
+                    self._phase.close_phase(phase, previous, max(1, self._phase.lines_read))
+                self._phase.finish_run(max(1, self._phase.lines_read))
+                self._order_unknown = True
+                continue
+            if self._cursor is None or at.replace(microsecond=0) != self._cursor.replace(microsecond=0):
+                self._second_seen.clear()
+            self._second_seen.add(key)
             if at == self._cursor:
                 if key in self._boundary:
                     continue
@@ -731,6 +749,13 @@ class EnginePhaseTimelineWriter:
                 self._cursor = at
                 self._boundary = {key}
             previous = at
+            progressed = True
+            if self._order_unknown:
+                start_signal = any(pattern.signal in {"loading_start", "compiling_start", "inferring_start"}
+                                   and pattern.expression.search(line) for pattern in VLLM_CPU_029.patterns)
+                if _REQUEST_LINE.search(line) or not start_signal:
+                    continue
+                self._order_unknown = False
             # A capped replay cannot establish the current run's opening
             # boundary. Wait for a new, directly observed loading start.
             if self._incomplete:
@@ -742,7 +767,12 @@ class EnginePhaseTimelineWriter:
                 self._phase.process_line(raw)
             except ValueError:
                 self._skipped["invalid_engine_timestamp"] += 1
-        self._skip_boundary = limited
+        # Re-read a capped page's last timestamp once. If the same capped
+        # page yields no new complete lines, advance to avoid a retry loop.
+        if progressed:
+            self._skip_boundary = False
+        elif limited:
+            self._skip_boundary = True
 
     def _snapshot(self) -> tuple[list[dict[str, object]], dict[str, object]]:
         assert self._phase is not None
@@ -783,10 +813,12 @@ class EnginePhaseTimelineWriter:
                                    "-c", self.selector.container, "--timestamps=true",
                                    f"--limit-bytes={PHASE_LOG_LIMIT_BYTES}"]
                         if self._cursor is not None:
-                            # Ask just before the boundary: kubectl versions
-                            # may treat --since-time as exclusive. A capped
-                            # response must advance past its truncated edge.
-                            boundary = self._cursor + timedelta(microseconds=1) if self._skip_boundary else self._cursor - timedelta(microseconds=1)
+                            # Kubernetes serializes this parameter at second
+                            # precision. Replay the cursor's whole second;
+                            # a stuck capped page must move to the next one.
+                            boundary = self._cursor.replace(microsecond=0)
+                            if self._skip_boundary:
+                                boundary += timedelta(seconds=1)
                             command.append(f"--since-time={boundary.isoformat()}")
                         result = self.runner(command, stdin=subprocess.DEVNULL,
                                              capture_output=True, timeout=self.timeout_s,

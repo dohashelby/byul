@@ -18,6 +18,17 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def effective_output_limit(flavor: str, route: str | None, document: dict[str, Any]) -> Any:
+    """Imitate the one limit field read by each fake engine route."""
+
+    field = (
+        "max_completion_tokens"
+        if flavor == "sglang" and route == "/v1/chat/completions"
+        else "max_tokens"
+    )
+    return document.get(field, 16)
+
+
 class FakeBackend:
     """Exercise the external adapter without claiming behavior of a real vLLM server."""
 
@@ -82,9 +93,12 @@ class FakeBackend:
         self.tokenize_failure_status = 500
         self.tokenize_response_body: bytes | None = None
         self.tokenize_calls = 0
+        self.ready_status = 200
+        self.max_model_len = 2048
         # Bodies the Gateway sent to the tokenizer, for test assertions only.
         self.tokenize_documents: list[dict[str, Any]] = []
         self._requests: list[dict[str, Any]] = []
+        self._arrivals: list[dict[str, str | None]] = []
         self._redirect_follow_count = 0
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -107,6 +121,11 @@ class FakeBackend:
     def requests(self) -> list[dict[str, Any]]:
         with self._lock:
             return [dict(item) for item in self._requests]
+
+    @property
+    def arrivals(self) -> list[dict[str, str | None]]:
+        with self._lock:
+            return [dict(item) for item in self._arrivals]
 
     @property
     def request_count(self) -> int:
@@ -194,6 +213,9 @@ class FakeBackend:
                     "model": document.get("model"),
                     "max_tokens": document.get("max_tokens"),
                     "max_completion_tokens": document.get("max_completion_tokens"),
+                    "effective_max_tokens": effective_output_limit(
+                        owner.flavor, self._route(), document
+                    ),
                     "stream": document.get("stream") is True,
                     "n": document.get("n"),
                     # Test-only visibility into which request fields reached
@@ -269,6 +291,8 @@ class FakeBackend:
 
             def do_GET(self) -> None:
                 route = self._route()
+                with owner._lock:
+                    owner._arrivals.append({"method": "GET", "path": route})
                 if route == "/redirect-target":
                     with owner._lock:
                         owner._redirect_follow_count += 1
@@ -277,9 +301,9 @@ class FakeBackend:
                 if not self._authorized():
                     self._send_json(401, {"error": {"code": "FAKE_AUTH_REQUIRED"}})
                     return
-                if route == "/health":
+                if route == ("/ready" if owner.flavor == "sglang" else "/health"):
                     self._send_json(
-                        200,
+                        owner.ready_status,
                         {
                             "status": "reachable",
                             "meaning": "test-only reachability; inference is not verified",
@@ -289,21 +313,12 @@ class FakeBackend:
                 if route == "/v1/models":
                     self._send_json(
                         200,
-                        {"object": "list", "data": [{"id": owner.model_id}]},
-                    )
-                    return
-                if route == "/get_model_info" and owner.flavor == "sglang":
-                    self._send_json(
-                        200,
-                        {
-                            "model_path": owner.model_id,
-                            "served_model_name": owner.model_id,
-                            "is_generation": True,
-                        },
+                        {"object": "list", "data": [{"id": owner.model_id,
+                                                     "max_model_len": owner.max_model_len}]},
                     )
                     return
                 if route == "/version" and owner.flavor == "vllm":
-                    # SGLang v0.5.21 has no /version route.
+                    # SGLang v0.5.22 has no /version route.
                     self._send_json(200, {"version": owner.version})
                     return
                 if route == "/metrics":
@@ -314,7 +329,7 @@ class FakeBackend:
                         self._send_json(500, {"error": {"code": "FAKE_METRICS_FAILURE"}})
                         return
                     if owner.flavor == "sglang":
-                        # Names from SGLang v0.5.21 metrics_collector.py.
+                        # Names from SGLang v0.5.22 metrics_collector.py.
                         families = (
                             "# TYPE sglang:num_running_reqs gauge\n"
                             "sglang:num_running_reqs{model_name=\"m\"} 1\n"
@@ -395,6 +410,8 @@ class FakeBackend:
 
             def do_POST(self) -> None:
                 route = self._route()
+                with owner._lock:
+                    owner._arrivals.append({"method": "POST", "path": route})
                 if route == "/tokenize" or (
                     owner.flavor == "sglang" and route == "/v1/tokenize"
                 ):

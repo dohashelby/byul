@@ -1,9 +1,7 @@
 """AWS GPU lab acceptance checks for the already-installed runtime stack.
 
-This tool is deliberately separate from ``k8s_lab_check.py``.  It never
-applies or deletes Kubernetes policy objects.  The only disruptive actions
-are an explicitly enabled collector service stop/start and engine Deployment
-rollout restart.
+This tool is deliberately separate from ``k8s_lab_check.py``. Disruptive
+comparison and recovery cases require explicit selection and opt-in flags.
 """
 
 from __future__ import annotations
@@ -18,6 +16,8 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -34,9 +34,32 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 from serving_runtime.mvp.backend import is_valid_credential_value
 from serving_runtime.mvp.kube_context import validate_kube_context
 from serving_runtime.mvp.observation_feed import HEARTBEAT_SCHEMA
+from serving_runtime.enforcement.execpolicy import ExecPolicy
 
 
-CASE_IDS = tuple(f"AWS-{number:02d}" for number in range(1, 12))
+CASE_IDS = tuple(f"AWS-{number:02d}" for number in range(1, 20))
+FIXED_REQUESTS = (
+    ("/v1/chat/completions", {"model": "test-model", "messages": [{"role": "user", "content": "Say hello in one short sentence."}], "max_tokens": 8}),
+    ("/v1/completions", {"model": "test-model", "prompt": "Say hello in one short sentence.", "max_tokens": 8}),
+)
+COUNT_TOKENS_CODE = (
+    "import json,sys,urllib.request; "
+    "req=urllib.request.Request('http://127.0.0.1:8000/tokenize', "
+    "data=sys.stdin.buffer.read(), headers={'Content-Type':'application/json'}, method='POST'); "
+    "print(json.load(urllib.request.urlopen(req,timeout=20)).get('count'))"
+)
+
+
+def _fixed_request_hash() -> str:
+    encoded = json.dumps(FIXED_REQUESTS, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _completion_usage(response: HTTPResponse) -> int | None:
+    document = _json_object(response.body)
+    usage = document.get("usage") if document else None
+    value = usage.get("completion_tokens") if isinstance(usage, dict) else None
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
 CASE_TITLES = {
     "AWS-01": "정상",
     "AWS-02": "인증 거부",
@@ -49,6 +72,14 @@ CASE_TITLES = {
     "AWS-09": "실행 탐지",
     "AWS-10": "보호 파일 읽기",
     "AWS-11": "정상 동작 대조",
+    "AWS-12": "규칙 적용 전후 비교",
+    "AWS-13": "수동 적용 실패와 되돌리기",
+    "AWS-14": "Gateway 재시작 직후 503",
+    "AWS-15": "수집 중단 중 Gateway 재시작",
+    "AWS-16": "수집 중단 시 단계 만료",
+    "AWS-17": "Pod 교체 시 단계 초기화",
+    "AWS-18": "동일 요청 목록",
+    "AWS-19": "미지원 입구와 필드 거부",
 }
 CASE_RT_IDS = {
     "AWS-01": ["RT-API-01", "RT-ENV-02"],
@@ -62,6 +93,14 @@ CASE_RT_IDS = {
     "AWS-09": ["RT-SYS-01", "RT-SYS-02"],
     "AWS-10": ["RT-SYS-05"],
     "AWS-11": ["RT-API-01", "RT-SYS-02", "RT-ASSET-05"],
+    "AWS-12": ["RT-NET-02"],
+    "AWS-13": ["RT-OPT-04"],
+    "AWS-14": ["RT-OBS-01"],
+    "AWS-15": ["RT-OBS-01"],
+    "AWS-16": ["RT-PHASE-01"],
+    "AWS-17": ["RT-PHASE-01"],
+    "AWS-18": ["RT-API-01", "RT-OPT-01"],
+    "AWS-19": ["RT-API-03", "RT-OPT-04"],
 }
 RESULTS = frozenset({"passed", "failed", "not_run", "unknown"})
 _NAMESPACE = re.compile(r"[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?")
@@ -70,6 +109,10 @@ _OBSERVATION_SOURCES = ("observation_feed_hubble", "observation_feed_tetragon")
 _EXTERNAL_TEST_IP = "192.0.2.1"
 _IMDS_IP = "169.254.169.254"
 _MODEL = "test-model"
+_DEFAULT_CASES = CASE_IDS[:11]
+_COMPARE_PODS = ("runtime-compare-client", "runtime-compare-receiver")
+_COMPARE_POLICY = "runtime-compare-ingress"
+_DEPLOY = Path(__file__).resolve().parents[1] / "deploy" / "gpu-lab"
 TCP_PROBE_CODE = (
     "import errno,socket,sys; s=socket.socket(); s.settimeout(3); "
     "r=s.connect_ex((sys.argv[1],int(sys.argv[2]))); s.close(); "
@@ -89,6 +132,13 @@ CACHE_WRITE_CODE = (
 )
 PROBE_READ_CODE = (
     "import pathlib,sys; pathlib.Path(sys.argv[1]).read_bytes(); print('READ_OK')"
+)
+ROUTE_RECORD_PROBE_CODE = (
+    "import json,sys; p=sys.argv[1]; rid=sys.argv[2]; match=None\n"
+    "for line in open(p):\n"
+    " try:\n  row=json.loads(line)\n except ValueError:\n  continue\n"
+    " if row.get('request_id')==rid: match=row\n"
+    "print(json.dumps({'found':bool(match),'reason':match.get('reason') if match else None,'response_code':match.get('response_code') if match else None,'forwarded_to_engine':match.get('forwarded_to_engine') if match else None}))"
 )
 
 
@@ -116,7 +166,7 @@ class Runner:
     def __init__(self) -> None:
         self.history: list[dict[str, Any]] = []
 
-    def run(self, argv: Sequence[str], *, timeout: float = 30) -> CommandResult:
+    def run(self, argv: Sequence[str], *, timeout: float = 30, input: str | None = None) -> CommandResult:
         started = _now()
         try:
             completed = subprocess.run(
@@ -125,6 +175,7 @@ class Runner:
                 text=True,
                 check=False,
                 timeout=timeout,
+                input=input,
             )
             result = CommandResult(completed.returncode, completed.stdout, completed.stderr)
         except subprocess.TimeoutExpired:
@@ -138,6 +189,10 @@ class Runner:
             }
         )
         return result
+
+    def start_port_forward(self, argv: Sequence[str]) -> subprocess.Popen[bytes]:
+        return subprocess.Popen(list(argv), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, shell=False)
 
 
 class HTTPClient:
@@ -265,6 +320,8 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
 
     if case_id not in CASE_IDS:
         raise ValueError("unknown AWS acceptance case")
+    if case_id in {"AWS-12", "AWS-13", "AWS-15", "AWS-16"} and facts.get("cleanup_ok") is False:
+        return "failed", "시험 뒤 정리 또는 복구 실패"
     if facts.get("not_run_reason"):
         return "not_run", str(facts["not_run_reason"])
     if facts.get("unknown_reason"):
@@ -337,8 +394,30 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
             ("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero"),
             ("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero"),
         ),
+        "AWS-12": (("baseline_connected", "policy_timeout", "hubble_dropped", "restored_connected", "cleanup_ok"),
+                   ("restored_connected", "cleanup_ok")),
+        "AWS-13": (("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok"),
+                   ("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok")),
+        "AWS-14": (("restart_ok", "initial_503", "recovered_200", "within_10s"),
+                   ("restart_ok", "recovered_200", "within_10s")),
+        "AWS-15": (("stop_ok", "restart_ok", "observed_503", "recovered_200", "cleanup_ok"),
+                   ("restart_ok", "observed_503", "recovered_200", "cleanup_ok")),
+        "AWS-16": (("stop_ok", "expired_unknown", "request_200", "cleanup_ok"),
+                   ("expired_unknown", "request_200", "cleanup_ok")),
+        "AWS-17": (("pod_changed", "timeline_new_uid", "old_phase_absent"),
+                   ("pod_changed", "timeline_new_uid", "old_phase_absent")),
+        "AWS-18": (("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded"),
+                   ("normal", "stream", "usage", "context_boundary", "context_exceeded")),
+        "AWS-19": (("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control"),
+                   ("codes", "reasons", "records", "not_delivered", "positive_control")),
     }
     required, decisive = checks[case_id]
+    if case_id == "AWS-12" and facts.get("baseline_connected") is False:
+        return "unknown", "규칙 적용 전 이미 연결이 막혀 비교 불가"
+    if case_id == "AWS-12" and facts.get("policy_other_error"):
+        return "unknown", "규칙 적용 중 시간 초과 아닌 연결 오류"
+    if case_id == "AWS-12" and facts.get("policy_connected"):
+        return "failed", "비교 정책 적용 중 연결이 성공함"
     false_decisive = [name for name in decisive if facts.get(name) is False]
     if false_decisive:
         return "failed", "기대 결과 불일치: " + ", ".join(false_decisive)
@@ -358,7 +437,7 @@ def evaluate_case(case_id: str, facts: Mapping[str, Any]) -> tuple[str, str]:
 
 def _parse_cases(values: Sequence[str] | None) -> tuple[str, ...]:
     if not values:
-        return CASE_IDS
+        return _DEFAULT_CASES
     requested: list[str] = []
     for value in values:
         requested.extend(part.strip().upper() for part in value.split(",") if part.strip())
@@ -535,6 +614,14 @@ REPORT_CASES: dict[str, _ReportCase] = {
     "AWS-09": _ReportCase("엔진 Pod의 /bin/sh -c true 실행이 해당 Pod·시각·경로의 관측 기록과 연결되고 suspect_binary여야 한다. PATH 탐색 sh -c true도 실행해 실제 기록 경로와 판정을 남긴다.", "인자를 수집하지 않으므로 동일 Pod·경로·시각은 강한 대조이나 단일 프로세스 ID 증명은 아니다.", ("absolute_exec_ok", "path_exec_ok", "path_observed", "engine_pod_match", "suspect_verdict")),
     "AWS-10": _ReportCase("가짜 파일 읽기 성공과 TG-SECRET-01의 동일 경로·엔진 Pod·read·monitor 탐지를 확인한다.", "읽기 차단은 요구하지 않으며 파일 내용은 보고하지 않는다.", ("read_ok", "path_match", "engine_pod_match", "read_access", "monitor_detected")),
     "AWS-11": _ReportCase("AWS-09·10 앞뒤의 일반 요청·stream·현재 cache 쓰기가 정상이고, 구간 실행에 유효한 단계 근거가 있으며, 잘못된 경고가 0건이어야 한다. 응답 시간은 참고값이다.", "탐지 시간은 측정만 하며 기준 없이 판정하지 않는다. 실제 GPU 단계 패턴과 정상 허용 목록은 미확인이다.", ("normal_before", "normal_after", "stream_before", "stream_after", "cache_current_before", "cache_current_after", "false_warnings_zero")),
+    "AWS-12": _ReportCase("비교 Pod 연결이 규칙 전 성공, 적용 중 timeout과 Hubble dropped, 제거 뒤 재성공해야 한다.", "기본 통제가 이미 막으면 비교 불가다. 정리 실패는 failed다.", ("baseline_connected", "policy_timeout", "hubble_dropped", "restored_connected", "cleanup_ok")),
+    "AWS-13": _ReportCase("해시 불일치 묶음 시작 거부 뒤 이전 묶음으로 복구하고 정상 200·거부 1건을 확인한다.", "SHA-256 바이트 대조이며 서명 검증이 아니다. 복구 실패는 failed다.", ("bad_bundle_rejected", "recovered_200", "recovered_denied", "cleanup_ok")),
+    "AWS-14": _ReportCase("Gateway 재시작 직후 503을 관측하고 준비 뒤 10초 안에 200으로 복귀한다.", "503은 스냅샷 not_before가 원인인지 상태와 함께 대조한다.", ("restart_ok", "initial_503", "recovered_200", "within_10s")),
+    "AWS-15": _ReportCase("수집기 정지 중 Gateway 재시작 후 503, 수집 재개 뒤 200을 확인한다.", "수집기 복구 실패는 failed다.", ("stop_ok", "restart_ok", "observed_503", "recovered_200", "cleanup_ok")),
+    "AWS-16": _ReportCase("수집기 정지 15초 초과 뒤 단계가 unknown이고 일반 요청은 200이어야 한다.", "단계 수집 비활성 시 unknown이다. 수집기 복구 실패는 failed다.", ("stop_ok", "expired_unknown", "request_200", "cleanup_ok")),
+    "AWS-17": _ReportCase("교체 후 시간표 collector.pod_uid가 새 Pod이고 새 실행에 이전 단계가 붙지 않아야 한다.", "Tetragon 원시 Pod UID는 process.pod.uid다.", ("pod_changed", "timeline_new_uid", "old_phase_absent")),
+    "AWS-18": _ReportCase("동일 고정 chat·completions 요청의 일반·stream 종료, 응답 usage의 답변 길이, 토큰화 경계·초과, 엔진 로그 수신을 대조한다.", "토큰 실패 주입은 서버 자동 사례에 포함되지 않아 별도 가짜 엔진 시험으로만 확인한다. 토큰화 결과를 못 얻으면 unknown이다.", ("normal", "stream", "usage", "log_match", "context_boundary", "context_exceeded")),
+    "AWS-19": _ReportCase("미지원 경로·필드는 거부되고 사유가 기록되며 엔진 로그에는 정상 대조 ID만 남아야 한다.", "정상 ID가 같은 구간의 로그에 없으면 거부 미전달은 unknown이다.", ("codes", "reasons", "records", "not_delivered", "engine_log_absent", "positive_control")),
 }
 
 
@@ -583,17 +670,24 @@ class AWSAcceptance:
             port = parsed.port or 80
         except ValueError as error:
             raise ConfigurationError("gateway URL has an invalid port") from error
-        self.gateway = f"http://{parsed.hostname}:{port}"
+        self.gateway = f"http://{parsed.hostname if ':' not in parsed.hostname else '[' + parsed.hostname + ']'}:{port}"
+        self.gateway_loopback = parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+        self.gateway_host = parsed.hostname
+        self.gateway_port = port
         self.tokens = _read_tokens(Path(args.token_env_file).expanduser())
         self.wrong_token = "aws-acceptance-invalid-" + uuid4().hex
         while self.wrong_token in self.tokens.values():
             self.wrong_token = "aws-acceptance-invalid-" + uuid4().hex
         self.observation_dir = Path(args.observation_dir).expanduser()
         self.runner = runner or Runner()
+        self.engine = getattr(args, "engine", "vllm")
         self.http = http or HTTPClient()
         self.sleep = sleeper
         self.monotonic = monotonic
         self.http_events: list[dict[str, Any]] = []
+        self._forward: Any = None
+        self._restart_pending = False
+        self.reconnect_at: str | None = None
         self.cases: list[dict[str, Any]] = []
         self.engine_log_format_confirmed = False
         self.normal_before: dict[str, Any] | None = None
@@ -612,6 +706,46 @@ class AWSAcceptance:
             timeout=timeout,
         )
 
+    def _close_forward(self) -> None:
+        forward, self._forward = self._forward, None
+        if forward is not None and forward.poll() is None:
+            forward.terminate()
+            try:
+                forward.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                forward.kill()
+                forward.wait(timeout=3)
+
+    def _gateway_restart_started(self) -> None:
+        self._close_forward()
+        self._restart_pending = self.gateway_loopback
+        self.reconnect_at = None
+
+    def _reopen_forward(self) -> None:
+        if self._forward is not None and self._forward.poll() is None:
+            return
+        self._close_forward()
+        self._forward = self.runner.start_port_forward([
+            "kubectl", "--context", self.context, "-n", self.namespace,
+            "port-forward", "deploy/serving-gateway", f"{self.gateway_port}:8080",
+            "--address=::1" if self.gateway_host == "::1" else "--address=127.0.0.1",
+        ])
+        self.reconnect_at = _now()
+
+    def _port_accepting(self) -> bool:
+        try:
+            with socket.create_connection((self.gateway_host, self.gateway_port), timeout=0.1):
+                return True
+        except OSError:
+            return False
+
+    def _wait_forward_ready(self, timeout: float) -> None:
+        deadline = self.monotonic() + min(max(timeout, 0), 2.0)
+        while self._forward is not None and self._forward.poll() is None:
+            if self._port_accepting() or self.monotonic() >= deadline:
+                return
+            self.sleep(min(0.1, deadline - self.monotonic()))
+
     def _request(
         self,
         method: str,
@@ -629,13 +763,18 @@ class AWSAcceptance:
             headers["Content-Type"] = "application/json"
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         try:
-            response = self.http.request(
-                method,
-                self.gateway + path,
-                headers=headers,
-                body=body,
-                timeout=timeout,
-            )
+            try:
+                response = self.http.request(
+                    method, self.gateway + path, headers=headers, body=body, timeout=timeout,
+                )
+            except (OSError, URLError, TimeoutError):
+                if not self._restart_pending:
+                    raise
+                self._reopen_forward()
+                self._wait_forward_ready(timeout)
+                response = self.http.request(
+                    method, self.gateway + path, headers=headers, body=body, timeout=timeout,
+                )
         except (OSError, URLError, TimeoutError) as error:
             self.http_events.append(
                 {"method": method, "path": path, "status": None, "error": _safe_exception(error)}
@@ -736,9 +875,23 @@ class AWSAcceptance:
         )
         return result, result.stdout + result.stderr
 
-    @staticmethod
-    def _log_received(logs: str, request_id: str | None, route: str) -> bool:
+    def _log_received(self, logs: str, request_id: str | None, route: str) -> bool:
         if request_id is None:
+            return False
+        if self.engine == "sglang":
+            for line in logs.splitlines():
+                start = line.find("{")
+                if start < 0:
+                    continue
+                try:
+                    record = json.loads(line[start:])
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict) or record.get("event") not in {"request.received", "request.finished"}:
+                    continue
+                headers = record.get("headers")
+                if isinstance(headers, dict) and headers.get("x-request-id") == request_id:
+                    return True
             return False
         if route == "/v1/chat/completions":
             engine_id = f"chatcmpl-{request_id}"
@@ -747,6 +900,25 @@ class AWSAcceptance:
         else:
             return False
         return f"Received request {engine_id}" in logs
+
+    @staticmethod
+    def _sglang_prompt_fields(logs: str) -> list[str]:
+        sensitive = {"text", "prompt", "input_ids", "input_embeds", "image_data", "audio_data", "video_data"}
+        found: set[str] = set()
+        for line in logs.splitlines():
+            start = line.find("{")
+            if start < 0:
+                continue
+            try:
+                record = json.loads(line[start:])
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(record, dict) or record.get("event") not in {"request.received", "request.finished"}:
+                continue
+            obj = record.get("obj")
+            if isinstance(obj, dict):
+                found.update(key for key in obj if key in sensitive and obj[key] is not None)
+        return sorted(found)
 
     def _engine_pod(self) -> tuple[dict[str, Any] | None, CommandResult]:
         result = self._kubectl("get", "pods", "-l", "app=serving-engine", "-o", "json")
@@ -789,6 +961,32 @@ class AWSAcceptance:
             "container_id": engine.get("containerID") if isinstance(engine, dict) else None,
             "ready": ready,
         }, result
+
+    def _pod_configuration(self) -> dict[str, Any]:
+        result = self._kubectl("get", "pods", "-l", "app=serving-engine", "-o", "json")
+        document = _json_object(result.stdout.encode()) if result.returncode == 0 else None
+        items = document.get("items") if document else None
+        if not isinstance(items, list) or len(items) != 1 or not isinstance(items[0], dict):
+            return {"state": "unknown"}
+        pod = items[0]
+        spec = pod.get("spec") if isinstance(pod.get("spec"), dict) else {}
+        status = pod.get("status") if isinstance(pod.get("status"), dict) else {}
+        containers = spec.get("containers") if isinstance(spec.get("containers"), list) else []
+        engine = next((item for item in containers if isinstance(item, dict) and item.get("name") == "engine"), None)
+        statuses = status.get("containerStatuses") if isinstance(status.get("containerStatuses"), list) else []
+        engine_status = next((item for item in statuses if isinstance(item, dict) and item.get("name") == "engine"), {})
+        if engine is None:
+            return {"state": "unknown"}
+        secret_arg = re.compile(r'(--(?:admin-)?api-key)\s+(?:"[^"]*"|\x27[^\x27]*\x27|\S+)')
+        def redact_arg(value: Any) -> Any:
+            return secret_arg.sub(r'\1 [REDACTED]', value) if isinstance(value, str) else value
+        args = [redact_arg(item) for item in (engine.get("args") or [])]
+        for index, value in enumerate(args[:-1]):
+            if value in {"--admin-api-key", "--api-key"}:
+                args[index + 1] = "[REDACTED]"
+        return {"state": "observed", "command": [redact_arg(item) for item in (engine.get("command") or [])], "args": args,
+                "env_names": [item.get("name") for item in engine.get("env", []) if isinstance(item, dict)],
+                "image": engine.get("image"), "image_id": engine_status.get("imageID")}
 
     def _test_receiver_pod(self) -> tuple[dict[str, Any] | None, CommandResult]:
         result = self._kubectl("get", "pod", "test-receiver", "-o", "json")
@@ -854,6 +1052,7 @@ class AWSAcceptance:
         started = self.monotonic()
         deadline = started + timeout
         attempts = 0
+        response_count = 0
         last_record: dict[str, Any] | None = None
         last_status: int | None = None
         last_reason: str | None = None
@@ -864,6 +1063,7 @@ class AWSAcceptance:
                     "elapsed_s": round(self.monotonic() - started, 3),
                     "window_s": timeout,
                     "last_status": last_status,
+                    "response_count": response_count,
                     "last_reason_code": last_reason,
                 }
             attempts += 1
@@ -875,6 +1075,7 @@ class AWSAcceptance:
                     timeout=request_timeout,
                 )
                 last_status = response.status
+                response_count += 1
                 detail_timeout = min(30.0, max(0.1, deadline - self.monotonic()))
                 last_record = _record_fields(
                     self._detail(request_id, timeout=detail_timeout)
@@ -903,6 +1104,7 @@ class AWSAcceptance:
                         "elapsed_s": round(self.monotonic() - started, 3),
                         "window_s": timeout,
                         "last_status": last_status,
+                        "response_count": response_count,
                         "last_reason_code": last_reason,
                     }
             except (OSError, URLError, TimeoutError) as error:
@@ -914,6 +1116,7 @@ class AWSAcceptance:
                     "elapsed_s": round(self.monotonic() - started, 3),
                     "window_s": timeout,
                     "last_status": last_status,
+                    "response_count": response_count,
                     "last_reason_code": last_reason,
                 }
             self.sleep(min(2.0, max(0.0, deadline - self.monotonic())))
@@ -1054,6 +1257,46 @@ class AWSAcceptance:
         complete = not (isinstance(total, int) and total > len(rows) and len(rows) >= 50 and len(recent) == len(rows))
         return complete, recent
 
+    def _tetragon_gaps_clear(self, since: str) -> bool:
+        if not self.observation_dir.is_dir():
+            return False
+        path = self.observation_dir / "tetragon.gaps.jsonl"
+        if not path.exists():
+            return True
+        try:
+            gaps: dict[str, tuple[str | None, str | None]] = {}
+            with path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    item = json.loads(line)
+                    if not isinstance(item, dict) or item.get("kind") != "tetragon":
+                        return False
+                    gap_id = item.get("gap_id")
+                    if not isinstance(gap_id, str):
+                        return False
+                    if item.get("event") == "gap_opened":
+                        gaps[gap_id] = (item.get("opened_at"), None)
+                    elif item.get("event") == "gap_closed":
+                        opened, _ = gaps.get(gap_id, (item.get("opened_at"), None))
+                        gaps[gap_id] = (opened, item.get("closed_at"))
+            boundary = _parse_time(since)
+            if boundary is None:
+                return False
+            return all(
+                _parse_time(opened) is not None
+                and _parse_time(closed) is not None
+                and _parse_time(closed) < boundary
+                for opened, closed in gaps.values()
+            )
+        except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
+            return False
+
+    def _tetragon_collector_ok(self) -> bool:
+        try:
+            response, collectors = self._collectors()
+        except (OSError, URLError, TimeoutError, ValueError):
+            return False
+        return response.status == 200 and collectors.get("observation_feed_tetragon", {}).get("state") == "ok"
+
     def _wait_tetragon(self, since: str, predicate: Callable[[Mapping[str, Any]], bool]) -> tuple[bool, dict[str, Any] | None]:
         available = False
         for attempt in range(8):
@@ -1176,14 +1419,228 @@ class AWSAcceptance:
                 "http_status": stream_response.status,
                 "sse_data_received": stream_data,
                 "done_received": stream_done,
+                "truncated": not stream_done,
                 "record_fields_used": stream_record,
             },
             "engine_evidence": {
                 "state": "observed" if log_match else "unknown",
-                "match": "Received request chatcmpl-<gateway request id>",
+                "match": ("JSON request.received/request.finished headers.x-request-id"
+                          if self.engine == "sglang" else "Received request chatcmpl-<gateway request id>"),
                 "reference": "kubectl logs deployment/serving-engine -c engine --since-time",
+                "prompt_fields": self._sglang_prompt_fields(logs) if self.engine == "sglang" else None,
             },
         }
+
+    def _context_limits(self) -> tuple[int, int] | None:
+        response, document = self._get_json("/api/policy")
+        if response.status != 200 or not isinstance(document, dict):
+            return None
+        for name in ("current", "policy"):
+            policy = document.get(name)
+            if not isinstance(policy, dict):
+                continue
+            context = policy.get("max_context_tokens")
+            output = policy.get("output_max_tokens")
+            if (isinstance(context, int) and not isinstance(context, bool)
+                    and isinstance(output, int) and not isinstance(output, bool)
+                    and context > output > 1):
+                return context, output
+        return None
+
+    def _engine_token_count(self, route: str, text: str) -> int | None:
+        pod, _ = self._engine_pod()
+        if not pod or not isinstance(pod.get("name"), str):
+            return None
+        payload: dict[str, Any] = {"model": _MODEL}
+        if route == "/v1/chat/completions":
+            payload["messages"] = [{"role": "user", "content": text}]
+            if self.engine == "vllm":
+                payload["add_generation_prompt"] = True
+        else:
+            payload["prompt"] = text
+        result = self.runner.run(
+            ["kubectl", "--context", self.context, "-n", self.namespace,
+             "exec", "-i", "pod/" + pod["name"], "-c", "engine", "--",
+             "python3", "-c", COUNT_TOKENS_CODE],
+            timeout=30, input=json.dumps(payload, ensure_ascii=False),
+        )
+        if result.returncode != 0:
+            return None
+        try:
+            count = int(result.stdout.strip())
+        except ValueError:
+            return None
+        return count if count >= 0 else None
+
+    def _context_probe(self, route: str, token: str, limit: int, output_max: int) -> tuple[bool | None, bool | None, dict[str, Any]]:
+        low, high = 1, 4096
+        selected: tuple[int, int] | None = None
+        # A short output (1..8 tokens) keeps the exact-boundary generation cheap.
+        lower = limit - min(output_max - 1, 8)
+        while low <= high:
+            middle = (low + high) // 2
+            count = self._engine_token_count(route, ("hello " * middle).strip())
+            if count is None:
+                return None, None, {"state": "token_count_unavailable"}
+            if lower <= count < limit:
+                selected = middle, count
+                break
+            if count < lower:
+                low = middle + 1
+            else:
+                high = middle - 1
+        if selected is None:
+            return None, None, {"state": "exact_boundary_prompt_unavailable"}
+        repeats, input_tokens = selected
+        output_tokens = limit - input_tokens
+        prompt = ("hello " * repeats).strip()
+        payload: dict[str, Any] = {"model": _MODEL, "max_tokens": output_tokens}
+        if route == "/v1/chat/completions":
+            payload["messages"] = [{"role": "user", "content": prompt}]
+        else:
+            payload["prompt"] = prompt
+        boundary = self._request("POST", route, token=token, payload=payload, timeout=300)
+        usage = _completion_usage(boundary)
+        boundary_ok = False if boundary.status != 200 else (usage <= output_tokens if usage is not None else None)
+        exceeded = self._request("POST", route, token=token,
+                                 payload={**payload, "max_tokens": output_tokens + 1}, timeout=300)
+        body = _json_object(exceeded.body)
+        error = body.get("error") if body else None
+        request_id = exceeded.headers.get("X-Request-ID") or exceeded.headers.get("x-request-id")
+        record = _record_fields(self._detail(request_id))
+        reason_ok = isinstance(error, dict) and error.get("code") == "CONTEXT_LIMIT_EXCEEDED"
+        if exceeded.status != 403 or not reason_ok:
+            exceeded_ok = False
+        elif record is None:
+            exceeded_ok = None
+        else:
+            exceeded_ok = record["delivery"]["attempted"] is False
+        return boundary_ok, exceeded_ok, {
+            "state": "tested", "input_tokens": input_tokens, "output_tokens": output_tokens,
+            "sum": input_tokens + output_tokens, "limit": limit,
+            "boundary_status": boundary.status, "boundary_usage_completion_tokens": usage,
+            "exceeded_status": exceeded.status,
+            "exceeded_reason": error.get("code") if isinstance(error, dict) else None,
+            "exceeded_record": record,
+        }
+
+    def aws_18(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        since = _now()
+        rows: list[dict[str, Any]] = []
+        token = self.tokens["RUNTIME_INFERENCE_TOKEN"]
+        for route, payload in FIXED_REQUESTS:
+            for stream in (False, True):
+                response = self._request("POST", route, token=token,
+                                         payload={**payload, "stream": stream}, timeout=300)
+                request_id = response.headers.get("X-Request-ID") or response.headers.get("x-request-id")
+                document = _json_object(response.body) if not stream else None
+                choices = document.get("choices") if document else None
+                valid = isinstance(choices, list) and bool(choices)
+                done = b"data: [DONE]" in response.body if stream else None
+                data_seen = any(line.strip().startswith(b"data: {") for line in response.body.splitlines()) if stream else None
+                usage = _completion_usage(response) if not stream else None
+                rows.append({"route": route, "stream": stream, "status": response.status,
+                             "request_id": request_id, "valid": valid if not stream else data_seen,
+                             "done": done, "truncated": stream and not done,
+                             "completion_tokens": usage,
+                             "max_tokens": payload["max_tokens"]})
+        logs_result, logs = self._engine_logs(since)
+        normal = all(row["status"] == 200 and row["valid"] for row in rows if not row["stream"])
+        stream_ok = all(row["status"] == 200 and row["valid"] and row["done"] for row in rows if row["stream"])
+        usages = [row["completion_tokens"] for row in rows if not row["stream"]]
+        usage_ok = None if any(value is None for value in usages) else all(value <= 8 for value in usages)
+        log_match = (all(self._log_received(logs, row["request_id"], row["route"])
+                         for row in rows if row["status"] == 200)
+                     if logs_result.returncode == 0 else None)
+        limits = self._context_limits()
+        probes = [self._context_probe(route, token, *limits) for route, _ in FIXED_REQUESTS] if limits else []
+        boundary_ok = all(item[0] is True for item in probes) if probes and all(item[0] is not None for item in probes) else None
+        exceeded_ok = all(item[1] is True for item in probes) if probes and all(item[1] is not None for item in probes) else None
+        return {"normal": normal, "stream": stream_ok, "usage": usage_ok,
+                "log_match": log_match, "context_boundary": boundary_ok,
+                "context_exceeded": exceeded_ok}, {
+            "requests": rows, "fixed_request_sha256": _fixed_request_hash(),
+            "usage_rule": "response.usage.completion_tokens <= requested max_tokens; missing usage is unknown",
+            "context_limits": limits,
+            "context_probes": [item[2] for item in probes],
+            "log_prompt_fields": self._sglang_prompt_fields(logs) if self.engine == "sglang" else None,
+        }
+
+    def _route_rejection_record(self, request_id: str | None) -> dict[str, Any] | None:
+        if not isinstance(request_id, str) or not _REQUEST_ID.fullmatch(request_id):
+            return None
+        try:
+            result = self._kubectl("exec", "deployment/serving-gateway", "-c", "gateway", "--",
+                                   "python3", "-c", ROUTE_RECORD_PROBE_CODE,
+                                   "/srv/serving/runtime/data/gateway_route_rejections.jsonl", request_id)
+        except (OSError, TimeoutError):
+            return None
+        record = _json_object(result.stdout.encode()) if result.returncode == 0 else None
+        return record if isinstance(record, dict) and isinstance(record.get("found"), bool) else None
+
+    def aws_19(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        since = _now()
+        token = self.tokens["RUNTIME_INFERENCE_TOKEN"]
+        normal, normal_id, valid = self._completion(token=token)
+        paths = ("/generate", "/v1/responses", "/v1/messages", "/api/chat", "/api/generate",
+                 "/invocations", "/vertex_generate", "/v1/realtime", "/v1/score", "/encode",
+                 "/classify", "/v1/audio/transcriptions")
+        fields = ("input_ids", "custom_logit_processor", "cache_salt", "session")
+        attempts: list[dict[str, Any]] = []
+        for path in paths:
+            response = self._request("POST", path, token=token, payload={"model": _MODEL})
+            request_id = response.headers.get("X-Request-ID") or response.headers.get("x-request-id")
+            attempts.append({"path": path, "field": None, "status": response.status,
+                             "request_id": request_id, "record": self._route_rejection_record(request_id)})
+        for field in fields:
+            payload = dict(FIXED_REQUESTS[0][1])
+            payload[field] = "test-only"
+            response = self._request("POST", "/v1/chat/completions", token=token, payload=payload)
+            request_id = response.headers.get("X-Request-ID") or response.headers.get("x-request-id")
+            body = _json_object(response.body)
+            error = body.get("error") if body else None
+            record = _record_fields(self._detail(request_id))
+            attempts.append({"path": "/v1/chat/completions", "field": field,
+                             "status": response.status, "request_id": request_id,
+                             "reason": error.get("code") if isinstance(error, dict) else None,
+                             "record": record})
+        logs_result, logs = self._engine_logs(since)
+        positive = (self._log_received(logs, normal_id, "/v1/chat/completions")
+                    if logs_result.returncode == 0 and normal.status == 200 and valid else None)
+        absent = (all(not self._log_received(logs, row["request_id"], row["path"])
+                      for row in attempts) if positive else None)
+        records_available = all(isinstance(row["record"], dict) for row in attempts)
+        route_records = [row for row in attempts if row["field"] is None]
+        missing_routes = [row["request_id"] for row in route_records
+                          if isinstance(row["record"], dict) and row["record"].get("found") is False]
+        return {
+            "codes": all(row["status"] in {404, 405} for row in attempts if row["field"] is None)
+                     and all(row["status"] == 400 for row in attempts if row["field"] is not None),
+            "reasons": all(row["record"].get("found") is True
+                           and row["record"].get("reason") == "NOT_FOUND"
+                           and row["record"].get("response_code") == row["status"]
+                           for row in route_records)
+                       and all(row.get("reason") == "UNSUPPORTED_FIELD"
+                               and row["record"].get("reason_code") == "UNSUPPORTED_FIELD"
+                               for row in attempts if row["field"] is not None)
+                       if records_available else None,
+            "records": (all(row["record"].get("found") is True for row in route_records)
+                        if records_available else None),
+            "not_delivered": all((row["record"].get("found") is True
+                                  and row["record"].get("forwarded_to_engine") is False
+                                  if row["field"] is None else
+                                  isinstance(row["record"].get("delivery"), dict)
+                                  and row["record"]["delivery"].get("attempted") is False)
+                                 for row in attempts)
+                             if records_available else None,
+            "engine_log_absent": absent,
+            "positive_control": positive if positive else None,
+        }, {"normal_control": {"status": normal.status, "request_id": normal_id,
+                                "log_seen": positive}, "attempts": attempts,
+            "missing_route_record_ids": missing_routes,
+            "route_record_limit_note": ("Gateway가 한도 초과 수를 노출하지 않아 found:false를 기록 누락과 한도 초과로 구분할 수 없음"
+                                        if missing_routes else None),
+            "log_prompt_fields": self._sglang_prompt_fields(logs) if self.engine == "sglang" else None}
 
     def aws_02(self) -> tuple[dict[str, Any], dict[str, Any]]:
         since = _now()
@@ -1716,6 +2173,7 @@ class AWSAcceptance:
     def aws_07(self) -> tuple[dict[str, Any], dict[str, Any]]:
         if not self.args.allow_collector_stop:
             return {"not_run_reason": "--allow-collector-stop 없음"}, {}
+        phase_before = self._timeline()
         before_response, before = self._collectors()
         if before_response.status != 200 or not all(source in before for source in _OBSERVATION_SOURCES):
             return {"unknown_reason": "observation_feed collector 상태를 읽지 못함"}, {}
@@ -1825,6 +2283,7 @@ class AWSAcceptance:
                         "error": _safe_exception(error),
                     }
         finally:
+            phase_stopped = self._timeline()
             start_requested_at = _now()
             start_started = self.monotonic()
             start = self.runner.run(
@@ -1912,11 +2371,18 @@ class AWSAcceptance:
             "gap_references": gap_refs,
             "observation_references": [*heartbeat_refs, *gap_refs],
             "gap_note": "clean systemd stop은 gap 행을 만들지 않으며 gap은 보조 증거임",
+            "phase_state_supplementary": {
+                "before": (phase_before or {}).get("collector"),
+                "stopped": (phase_stopped or {}).get("collector"),
+                "recovered": (self._timeline() or {}).get("collector"),
+                "note": "단계 수집 비활성(SGLang 등)이면 기존 AWS-07 판정에 영향 없음",
+            },
         }
 
     def aws_08(self) -> tuple[dict[str, Any], dict[str, Any]]:
         if not self.args.allow_engine_restart:
             return {"not_run_reason": "--allow-engine-restart 없음(GPU 반납 및 cold-start 동반)"}, {}
+        phase_before = self._timeline()
         print("경고: AWS-08은 serving-engine GPU를 반납한 뒤 cold-start합니다.")
         _target_response, target_before = self._get_json("/api/target")
         before_tracker = target_before.get("instance") if target_before else None
@@ -2061,6 +2527,11 @@ class AWSAcceptance:
                 if snapshot_stale_seen
                 else None
             ),
+            "phase_state_supplementary": {
+                "before": (phase_before or {}).get("collector"),
+                "after": (self._timeline() or {}).get("collector"),
+                "note": "단계 수집 비활성(SGLang 등)이면 기존 AWS-08 판정에 영향 없음",
+            },
         }
 
     def aws_09(self) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -2169,6 +2640,8 @@ class AWSAcceptance:
             return {"not_run_reason": "AWS-09·10을 함께 선택해야 전후 대조 가능"}, {}
         after = self._normal_control()
         available, rows = self._tetragon_observations(self.detection_started_at)
+        available = (available and self._tetragon_gaps_clear(self.detection_started_at)
+                     and self._tetragon_collector_ok())
         suspect_paths = {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"}
         false_warnings = [
             self._event_summary(item, self.detection_started_at)
@@ -2197,7 +2670,8 @@ class AWSAcceptance:
             "stream_after": after.get("stream_ok"),
             "cache_current_before": self.normal_before.get("cache_ok"),
             "cache_current_after": after.get("cache_ok"),
-            "false_warnings_zero": len(false_warnings) == 0 if available and phase_rows else None,
+            "false_warnings_zero": (len(false_warnings) == 0 if available and phase_rows else None)
+                                   if self.engine == "vllm" else None,
         }, {
             "before": self.normal_before,
             "after": after,
@@ -2211,6 +2685,478 @@ class AWSAcceptance:
             "detection_time_note": "실행 시각→관측 시각을 측정하며 기준 없이 판정하지 않음",
         }
 
+    def _timeline(self) -> dict[str, Any] | None:
+        try:
+            document = json.loads((self.observation_dir / "phase-timeline.json").read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
+            return None
+        return document if isinstance(document, dict) and document.get("schema_version") == "runtime-phase-timeline/1.0" else None
+
+    def _tetragon_counts(self) -> dict[str, int] | None:
+        try:
+            response, collectors = self._collectors()
+        except (OSError, URLError, TimeoutError):
+            return None
+        if response.status != 200:
+            return None
+        counts = collectors.get("observation_feed_tetragon", {}).get("last_value")
+        if not isinstance(counts, dict):
+            return None
+        result = {key: counts.get(key) for key in ("skipped_unsupported_total", "corrupt_lines_total")}
+        return result if all(isinstance(value, int) and not isinstance(value, bool) for value in result.values()) else None
+
+    def _raw_process_exit_count(self, since: str) -> int | None:
+        count = 0
+        try:
+            with (self.observation_dir / "tetragon.jsonl").open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    item = json.loads(line)
+                    if isinstance(item, dict) and isinstance(item.get("process_exit"), dict) and _after(item.get("time"), since):
+                        count += 1
+        except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
+            return None
+        return count
+
+    def _restart(self, deployment: str, timeout_s: int = 90) -> tuple[bool, dict[str, Any]]:
+        restart = self._kubectl("rollout", "restart", f"deployment/{deployment}")
+        if deployment == "serving-gateway" and restart.returncode == 0:
+            self._gateway_restart_started()
+        status = self._kubectl("rollout", "status", f"deployment/{deployment}", f"--timeout={timeout_s}s", timeout=timeout_s + 10) if restart.returncode == 0 else CommandResult(1)
+        return restart.returncode == 0 and status.returncode == 0, {"restart_rc": restart.returncode, "rollout_rc": status.returncode}
+
+    def aws_12(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        if not getattr(self.args, "allow_compare_policy", False):
+            return {"not_run_reason": "--allow-compare-policy 없음"}, {}
+        evidence: dict[str, Any] = {"manifests": [str(_DEPLOY / "policy-compare-pods.yaml"), str(_DEPLOY / "policy-compare-cilium.yaml")]}
+        source = self._kubectl("get", "pod", "other-client", "-o", "json")
+        source_doc = _json_object(source.stdout.encode()) if source.returncode == 0 else None
+        source_spec = source_doc.get("spec") if isinstance(source_doc, dict) else None
+        source_status = source_doc.get("status") if isinstance(source_doc, dict) else None
+        containers = source_spec.get("containers") if isinstance(source_spec, dict) else None
+        client = next((item for item in containers if isinstance(item, dict) and item.get("name") == "client"), None) if isinstance(containers, list) else None
+        image = client.get("image") if isinstance(client, dict) else None
+        pull_policy = client.get("imagePullPolicy") if isinstance(client, dict) else None
+        statuses = source_status.get("containerStatuses") if isinstance(source_status, dict) else None
+        client_status = next((item for item in statuses if isinstance(item, dict) and item.get("name") == "client"), None) if isinstance(statuses, list) else None
+        if (not isinstance(image, str) or not image or not isinstance(pull_policy, str)
+                or pull_policy not in {"Never", "IfNotPresent", "Always"}
+                or not isinstance(source_status, dict) or source_status.get("phase") != "Running"):
+            return {"unknown_reason": "실행 중인 other-client 이미지 또는 pull 정책 미확인"}, evidence
+        if not isinstance(client_status, dict) or client_status.get("ready") is not True:
+            return {"unknown_reason": "실행 중인 other-client 이미지 또는 pull 정책 미확인"}, evidence
+        evidence["compare_image"] = image
+        evidence["compare_image_pull_policy"] = pull_policy
+        manifest = (_DEPLOY / "policy-compare-pods.yaml").read_text(encoding="utf-8")
+        if manifest.count("__COMPARE_IMAGE__") != 2 or manifest.count("__COMPARE_PULL_POLICY__") != 2 or re.fullmatch(r"[A-Za-z0-9._:/@-]+", image) is None:
+            return {"unknown_reason": "비교 Pod 이미지 치환 불가"}, evidence
+        manifest = manifest.replace("__COMPARE_IMAGE__", image).replace("__COMPARE_PULL_POLICY__", pull_policy)
+        for kind, name in (("pod", *_COMPARE_PODS[:1]), ("pod", *_COMPARE_PODS[1:]), ("ciliumnetworkpolicy", _COMPARE_POLICY)):
+            check = self._kubectl("get", kind, name, "--ignore-not-found", "-o", "name")
+            if check.returncode != 0 or check.stdout.strip():
+                return {"unknown_reason": "비교 객체 존재 또는 사전 조회 실패"}, {**evidence, "preflight": {"kind": kind, "name": name, "rc": check.returncode, "existing": bool(check.stdout.strip())}}
+        facts: dict[str, Any] = {}
+        pods_attempted = False
+        policy_attempted = False
+        try:
+            pods_attempted = True
+            pods = self.runner.run(["kubectl", "--context", self.context, "-n", self.namespace, "apply", "-f", "-"], input=manifest)
+            if pods.returncode != 0:
+                facts["unknown_reason"] = "비교 Pod 적용 실패"
+            else:
+                ready = all(self._kubectl("wait", "--for=condition=Ready", f"pod/{name}", "--timeout=90s", timeout=100).returncode == 0 for name in _COMPARE_PODS)
+                if not ready:
+                    facts["unknown_reason"] = "비교 Pod Ready 미확인"
+                else:
+                    receiver_raw = self._kubectl("get", "pod", _COMPARE_PODS[1], "-o", "json")
+                    receiver = _json_object(receiver_raw.stdout.encode()) if receiver_raw.returncode == 0 else None
+                    address = (receiver.get("status") or {}).get("podIP") if receiver else None
+                    try:
+                        address = str(ip_address(address))
+                    except (ValueError, TypeError):
+                        address = None
+                    if address is None:
+                        facts["unknown_reason"] = "비교 receiver IP 미확인"
+                    else:
+                        baseline = self._tcp_probe("pod/" + _COMPARE_PODS[0], "client", address, 8080)
+                        evidence["baseline_probe"] = baseline
+                        facts["baseline_connected"] = baseline["connected"] if baseline["marker"] else None
+                        if facts["baseline_connected"] is True:
+                            policy_attempted = True
+                            applied = self._kubectl("apply", "-f", str(_DEPLOY / "policy-compare-cilium.yaml"))
+                            if applied.returncode != 0:
+                                facts["unknown_reason"] = "비교 정책 적용 실패"
+                            else:
+                                self.sleep(2.0)
+                                since = _now()
+                                blocked = self._tcp_probe("pod/" + _COMPARE_PODS[0], "client", address, 8080)
+                                available, refs = self._wait_observation_refs("hubble", since, lambda item:
+                                    (item.get("src") or {}).get("pod") == _COMPARE_PODS[0]
+                                    and (item.get("dst") or {}).get("ip") == address
+                                    and (item.get("dst") or {}).get("port") == 8080
+                                    and str(item.get("verdict", "")).lower() == "dropped")
+                                facts["policy_timeout"] = blocked["connection_timed_out"] if blocked["marker"] else None
+                                facts["policy_other_error"] = blocked["connection_failed"] and not blocked["connection_timed_out"]
+                                facts["policy_connected"] = blocked["connected"]
+                                facts["hubble_dropped"] = bool(refs) if available else None
+                                evidence.update({"blocked_probe": blocked, "observation_references": refs})
+                        if policy_attempted:
+                            removed = self._kubectl("delete", "-f", str(_DEPLOY / "policy-compare-cilium.yaml"), "--ignore-not-found")
+                            evidence["policy_remove_rc"] = removed.returncode
+                            policy_attempted = removed.returncode != 0
+                            if removed.returncode == 0:
+                                self.sleep(2.0)
+                                restored = self._tcp_probe("pod/" + _COMPARE_PODS[0], "client", address, 8080)
+                                evidence["restored_probe"] = restored
+                                facts["restored_connected"] = restored["connected"] if restored["marker"] else None
+        except Exception as error:
+            facts["unknown_reason"] = "비교 실행 오류(" + _safe_exception(error) + ")"
+        finally:
+            cleanup: list[int | None] = []
+            if policy_attempted:
+                try:
+                    cleanup.append(self._kubectl("delete", "-f", str(_DEPLOY / "policy-compare-cilium.yaml"), "--ignore-not-found").returncode)
+                except Exception:
+                    cleanup.append(None)
+            if pods_attempted:
+                try:
+                    cleanup.append(self._kubectl("delete", "pod", *_COMPARE_PODS, "--ignore-not-found").returncode)
+                except Exception:
+                    cleanup.append(None)
+            remaining = []
+            for kind, name in (("pod", _COMPARE_PODS[0]), ("pod", _COMPARE_PODS[1]), ("ciliumnetworkpolicy", _COMPARE_POLICY)):
+                try:
+                    check = self._kubectl("get", kind, name, "--ignore-not-found", "-o", "name")
+                    remaining.append({"kind": kind, "name": name, "rc": check.returncode, "present": bool(check.stdout.strip())})
+                except Exception:
+                    remaining.append({"kind": kind, "name": name, "rc": None, "present": None})
+            facts["cleanup_ok"] = all(code == 0 for code in cleanup) and all(item["rc"] == 0 and not item["present"] for item in remaining)
+            evidence["cleanup_returncodes"] = cleanup
+            evidence["cleanup_remaining"] = remaining
+        return facts, evidence
+
+    def aws_13(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        if not getattr(self.args, "allow_bundle_switch", False):
+            return {"not_run_reason": "--allow-bundle-switch 없음"}, {}
+        root = Path(getattr(self.args, "bundle_root", "/srv/serving/bundles"))
+        current = root / "current"
+        evidence: dict[str, Any] = {"bundle_root": str(root), "integrity_check": "SHA-256 byte comparison; not a signature"}
+        if not current.is_symlink():
+            return {"unknown_reason": "current가 상대 symlink가 아님"}, evidence
+        previous = os.readlink(current)
+        if Path(previous).name != previous or not (root / previous).is_dir():
+            return {"unknown_reason": "이전 묶음 링크 대상이 안전한 상대 폴더가 아님"}, evidence
+        bad = root / ("aws-acceptance-bad-" + uuid4().hex)
+        swap = root / ("aws-acceptance-swap-" + uuid4().hex)
+        evidence["previous_bundle"] = previous
+        facts: dict[str, Any] = {}
+        switched = False
+        try:
+            shutil.copytree(root / previous, bad, symlinks=False)
+            manifest = json.loads((bad / "bundle.json").read_text(encoding="utf-8"))
+            role = next(item for item in manifest["files"] if item["role"] == "gateway_policy")
+            target = bad / role["path"]
+            if not target.resolve().is_relative_to(bad.resolve()) or not target.is_file():
+                raise ValueError("bundle role path unsafe")
+            data = target.read_bytes()
+            if not data:
+                raise ValueError("bundle role empty")
+            target.write_bytes(bytes([data[0] ^ 1]) + data[1:])
+            evidence["same_byte_length"] = target.stat().st_size == len(data)
+            os.symlink(bad.name, swap)
+            os.replace(swap, current)
+            switched = True
+            bad_restart, evidence["bad_restart"] = self._restart("serving-gateway", 45)
+            logs = self._kubectl("logs", "deployment/serving-gateway", "-c", "gateway", "--tail=100")
+            hash_error = logs.returncode == 0 and ("SHA-256" in logs.stdout or "sha256" in logs.stdout.lower())
+            facts["bad_bundle_rejected"] = False if bad_restart else (True if hash_error else None)
+            evidence["hash_error_seen"] = hash_error
+        except (OSError, ValueError, KeyError, StopIteration, TypeError, json.JSONDecodeError) as error:
+            facts["unknown_reason"] = "잘못된 묶음 준비 실패: " + _safe_exception(error)
+        finally:
+            cleanup_ok = True
+            try:
+                if switched:
+                    os.symlink(previous, swap)
+                    os.replace(swap, current)
+                    cleanup_ok, evidence["recovery_restart"] = self._restart("serving-gateway", 120)
+                    if cleanup_ok:
+                        recovered, record, retry = self._retry_inference(30.0)
+                        facts["recovered_200"] = recovered if retry.get("response_count", 1 if retry.get("last_status") is not None else 0) else None
+                        evidence["recovered_request"] = {"record": record, "retry": retry}
+                        if recovered:
+                            try:
+                                denied, request_id, _valid = self._completion(token=None, timeout=30)
+                                denial = _record_fields(self._detail(request_id))
+                                facts["recovered_denied"] = (denied.status == 401 and denial.get("result") == "DENIED" and denial.get("reason_code") == "AUTH_REQUIRED" and denial["delivery"]["attempted"] is False) if denial is not None else None
+                                evidence["denied_request"] = {"http_status": denied.status, "record": denial}
+                            except (OSError, URLError, TimeoutError) as error:
+                                evidence["denied_request_error"] = _safe_exception(error)
+                if bad.exists():
+                    shutil.rmtree(bad)
+            except (OSError, ValueError, URLError, TimeoutError) as error:
+                cleanup_ok = False
+                evidence["recovery_error"] = _safe_exception(error)
+            facts["cleanup_ok"] = cleanup_ok and current.is_symlink() and os.readlink(current) == previous
+            evidence["reconnect_at"] = self.reconnect_at
+            evidence["recovery_forward"] = "tool_owned" if self.reconnect_at else "none"
+        return facts, evidence
+
+    def aws_14(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        if not getattr(self.args, "allow_gateway_restart", False):
+            return {"not_run_reason": "--allow-gateway-restart 없음"}, {}
+        before_pods = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
+        before_doc = _json_object(before_pods.stdout.encode()) if before_pods.returncode == 0 else None
+        before_items = before_doc.get("items") if before_doc else None
+        before_uid = (before_items[0].get("metadata") or {}).get("uid") if isinstance(before_items, list) and len(before_items) == 1 else None
+        if not isinstance(before_uid, str):
+            return {"unknown_reason": "재시작 전 Gateway Pod UID 미확인"}, {}
+        restart = self._kubectl("rollout", "restart", "deployment/serving-gateway")
+        evidence: dict[str, Any] = {"restart_rc": restart.returncode, "pod_uid_before": before_uid}
+        facts: dict[str, Any] = {"restart_ok": restart.returncode == 0}
+        if restart.returncode != 0:
+            return facts, evidence
+        self._gateway_restart_started()
+        startup_deadline = self.monotonic() + 120.0
+        new_uid = None
+        while self.monotonic() < startup_deadline:
+            observed_pods = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
+            observed_doc = _json_object(observed_pods.stdout.encode()) if observed_pods.returncode == 0 else None
+            items = observed_doc.get("items") if observed_doc else None
+            active = [item for item in items or [] if isinstance(item, dict) and not (item.get("metadata") or {}).get("deletionTimestamp")]
+            if len(active) == 1:
+                new_uid = (active[0].get("metadata") or {}).get("uid")
+                if isinstance(new_uid, str) and new_uid != before_uid:
+                    break
+            self.sleep(0.5)
+        evidence["pod_uid_after"] = new_uid
+        if not new_uid or new_uid == before_uid:
+            return {"restart_ok": False}, evidence
+        statuses: list[int | None] = []
+        recovered = False
+        first_503_at: float | None = None
+        recovered_at: float | None = None
+        reasons: list[str | None] = []
+        while True:
+            try:
+                response, _request_id, valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"], timeout=2.0)
+                statuses.append(response.status)
+                body = _json_object(response.body)
+                error = body.get("error") if isinstance(body, dict) else None
+                reasons.append(error.get("code") if isinstance(error, dict) else None)
+                if response.status == 503 and first_503_at is None:
+                    first_503_at = self.monotonic()
+                if response.status == 200 and valid:
+                    recovered = True
+                    recovered_at = self.monotonic()
+                    break
+            except (OSError, URLError, TimeoutError):
+                pass
+            if self.monotonic() >= startup_deadline or (first_503_at is not None and self.monotonic() - first_503_at > 10.0):
+                break
+            self.sleep(0.5)
+        elapsed = recovered_at - first_503_at if first_503_at is not None and recovered_at is not None else None
+        rollout = self._kubectl("rollout", "status", "deployment/serving-gateway", "--timeout=120s", timeout=130)
+        facts.update({"restart_ok": rollout.returncode == 0, "initial_503": (first_503_at is not None and "TARGET_UNAVAILABLE" in reasons) if statuses else None, "recovered_200": recovered if statuses else None, "within_10s": elapsed <= 10.0 if elapsed is not None else (False if first_503_at is not None and self.monotonic() - first_503_at > 10.0 else None)})
+        pod_result = self._kubectl("get", "pods", "-l", "app=serving-gateway", "-o", "json")
+        pod_doc = _json_object(pod_result.stdout.encode()) if pod_result.returncode == 0 else None
+        pods = pod_doc.get("items") if pod_doc else None
+        started_at = None
+        if isinstance(pods, list) and len(pods) == 1:
+            statuses_pod = (pods[0].get("status") or {}).get("containerStatuses") or []
+            if statuses_pod:
+                started_at = ((statuses_pod[0].get("state") or {}).get("running") or {}).get("startedAt")
+        snapshot = None
+        try:
+            snapshot = json.loads((self.observation_dir / "target-pods.json").read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            pass
+        evidence.update({"statuses": statuses, "reason_codes": reasons, "elapsed_from_first_503_s": round(elapsed, 3) if elapsed is not None else None, "gateway_started_at": started_at, "target_snapshot_collected_at": snapshot.get("collected_at") if isinstance(snapshot, dict) else None, "not_before_comparison": "target collected_at must be at or after Gateway startup", "rollout_rc": rollout.returncode, "reconnect_at": self.reconnect_at, "recovery_forward": "tool_owned" if self.reconnect_at else "none"})
+        return facts, evidence
+
+    def _collector_interruption(self, *, restart_gateway: bool) -> tuple[dict[str, Any], dict[str, Any]]:
+        if not getattr(self.args, "allow_collector_stop", False):
+            return {"not_run_reason": "--allow-collector-stop 없음"}, {}
+        if restart_gateway and not getattr(self.args, "allow_gateway_restart", False):
+            return {"not_run_reason": "--allow-gateway-restart 없음"}, {}
+        if not restart_gateway and self.engine == "sglang":
+            return {"unknown_reason": "SGLang 단계 수집 꺼짐"}, {}
+        before = self._timeline()
+        if not restart_gateway:
+            if (before is None or not isinstance(before.get("collector"), dict)
+                    or before["collector"].get("state") != "running" or not before.get("entries")):
+                return {"unknown_reason": "단계 시간표 비활성 또는 읽기 실패"}, {}
+            pod, _pod_result = self._engine_pod()
+            collector = before["collector"]
+            try:
+                fresh = not ExecPolicy._collector_stale(collector)
+            except (KeyError, TypeError, ValueError, OverflowError):
+                fresh = False
+            if (not fresh or not pod or not pod.get("uid")
+                    or collector.get("pod_uid") != pod["uid"]):
+                return {"unknown_reason": "현재 엔진 Pod의 신선한 단계 시간표 미확인"}, {
+                    "timeline_before": collector, "pod_before": pod, "timeline_fresh": fresh}
+        evidence: dict[str, Any] = {"timeline_before": (before or {}).get("collector")}
+        facts: dict[str, Any] = {}
+        stop = self.runner.run(["systemctl", "--user", "stop", "byul-observation-feed"], timeout=30)
+        facts["stop_ok"] = stop.returncode == 0
+        try:
+            if stop.returncode == 0:
+                if restart_gateway:
+                    restart = self._kubectl("rollout", "restart", "deployment/serving-gateway")
+                    facts["restart_ok"] = restart.returncode == 0
+                    if restart.returncode == 0:
+                        self._gateway_restart_started()
+                        rollout = self._kubectl("rollout", "status", "deployment/serving-gateway", "--timeout=120s", timeout=130)
+                        facts["restart_ok"] = rollout.returncode == 0
+                    statuses: list[int | None] = []
+                    reasons: list[str | None] = []
+                    for _ in range(30):
+                        try:
+                            response, _id, _valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"], timeout=3)
+                            statuses.append(response.status)
+                            body = _json_object(response.body)
+                            error = body.get("error") if isinstance(body, dict) else None
+                            reasons.append(error.get("code") if isinstance(error, dict) else None)
+                        except (OSError, URLError, TimeoutError):
+                            pass
+                        if statuses and statuses[-1] == 503:
+                            break
+                        self.sleep(1.0)
+                    facts["observed_503"] = (503 in statuses and "TARGET_UNAVAILABLE" in reasons) if any(status is not None for status in statuses) else None
+                    evidence["stopped_request_statuses"] = statuses
+                    evidence["stopped_request_reasons"] = reasons
+                else:
+                    written = _parse_time(before["collector"].get("written_at"))
+                    if written is None:
+                        facts["unknown_reason"] = "시간표 쓰기 시각 미확인"
+                    else:
+                        deadline = written + timedelta(seconds=15, milliseconds=100)
+                        remaining = (deadline - datetime.now(timezone.utc)).total_seconds()
+                        self.sleep(max(0.0, remaining))
+                        timeline = self._timeline()
+                        evidence["timeline_stopped"] = (timeline or {}).get("collector")
+                        same_snapshot = timeline is not None and timeline.get("collector", {}).get("written_at") == before["collector"].get("written_at")
+                        stale_by_code = ExecPolicy._collector_stale(timeline["collector"]) if same_snapshot else None
+                        facts["expired_unknown"] = stale_by_code if same_snapshot else None
+                        evidence["phase_expiry"] = {"same_snapshot": same_snapshot, "stale_by_runtime_code": stale_by_code,
+                                                    "inference": "classify_exec clears timeline and returns phase unknown when _collector_stale is true; no fresh Tetragon event is available while feed is stopped"}
+                        try:
+                            response, _id, valid = self._completion(token=self.tokens["RUNTIME_INFERENCE_TOKEN"])
+                            facts["request_200"] = response.status == 200 and valid
+                            evidence["stopped_request_status"] = response.status
+                        except (OSError, URLError, TimeoutError) as error:
+                            evidence["stopped_request_error"] = _safe_exception(error)
+                            facts["request_200"] = False
+        except Exception as error:
+            facts["unknown_reason"] = "수집 중단 시험 오류(" + _safe_exception(error) + ")"
+        finally:
+            try:
+                start = self.runner.run(["systemctl", "--user", "start", "byul-observation-feed"], timeout=30)
+            except Exception as error:
+                start = CommandResult(1)
+                evidence["collector_start_error"] = _safe_exception(error)
+            recovered = False
+            if start.returncode == 0:
+                recovered, states = self._wait_collectors_ok(45.0)
+                evidence["collector_recovered_states"] = {key: value.get("state") for key, value in states.items() if key in _OBSERVATION_SOURCES}
+            facts["cleanup_ok"] = start.returncode == 0 and recovered
+            evidence["collector_start_rc"] = start.returncode
+            if restart_gateway and facts["cleanup_ok"]:
+                facts["recovered_200"], record, retry = self._retry_inference(45.0)
+                if not retry.get("response_count", 1 if retry.get("last_status") is not None else 0):
+                    facts["recovered_200"] = None
+                evidence["recovery_request"] = {"record": record, "retry": retry}
+            if restart_gateway:
+                evidence["reconnect_at"] = self.reconnect_at
+                evidence["recovery_forward"] = "tool_owned" if self.reconnect_at else "none"
+        return facts, evidence
+
+    def aws_15(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        return self._collector_interruption(restart_gateway=True)
+
+    def aws_16(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        return self._collector_interruption(restart_gateway=False)
+
+    def aws_17(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        if not getattr(self.args, "allow_engine_restart", False):
+            return {"not_run_reason": "--allow-engine-restart 없음"}, {}
+        if self.engine == "sglang":
+            return {"unknown_reason": "SGLang 단계 수집 꺼짐"}, {}
+        before, _result = self._engine_pod()
+        timeline_before = self._timeline()
+        if not before or not before.get("uid") or timeline_before is None:
+            return {"unknown_reason": "이전 Pod 또는 단계 시간표 미확인"}, {}
+        collector_before = timeline_before.get("collector") or {}
+        try:
+            fresh = not ExecPolicy._collector_stale(collector_before)
+        except (KeyError, TypeError, ValueError, OverflowError):
+            fresh = False
+        if (collector_before.get("pod_uid") != before["uid"] or collector_before.get("state") != "running"
+                or not timeline_before.get("entries") or not fresh):
+            return {"unknown_reason": "이전 Pod의 활성 단계 수집 미확인"}, {"timeline_before": collector_before}
+        evidence: dict[str, Any] = {"pod_before": before, "timeline_before": collector_before, "tetragon_counts_before": self._tetragon_counts()}
+        accounting_since = _now()
+        restart = self._kubectl("rollout", "restart", "deployment/serving-engine")
+        rollout = self._kubectl("rollout", "status", "deployment/serving-engine", "--timeout=25m", timeout=1510) if restart.returncode == 0 else CommandResult(1)
+        after, _result = self._engine_pod()
+        facts: dict[str, Any] = {"pod_changed": bool(after and after.get("uid") and after["uid"] != before["uid"] and rollout.returncode == 0)}
+        evidence["pod_after"] = after
+        if not facts["pod_changed"]:
+            return facts, evidence
+        # The raw Tetragon identity is process_exec.process.pod.uid.
+        started = _now()
+        executed = self._kubectl("exec", "pod/" + after["name"], "-c", "engine", "--", "/bin/sh", "-c", "true", timeout=15)
+        evidence["probe_exec_rc"] = executed.returncode
+        raw_uid = None
+        raw_time = None
+        path = self.observation_dir / "tetragon.jsonl"
+        for attempt in range(8):
+            try:
+                with path.open("r", encoding="utf-8") as handle:
+                    for line in handle:
+                        item = json.loads(line)
+                        process = (item.get("process_exec") or {}).get("process") or {}
+                        pod = process.get("pod") or {}
+                        if _after(item.get("time"), started) and process.get("binary") in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"} and pod.get("uid") == after["uid"]:
+                            raw_uid, raw_time = pod["uid"], item["time"]
+                            break
+            except (OSError, UnicodeError, json.JSONDecodeError, TypeError, AttributeError):
+                pass
+            if raw_uid or attempt == 7:
+                break
+            self.sleep(2.0)
+        timeline_at_probe = self._timeline()
+        available, rows = self._tetragon_observations(started)
+        matched = [row for row in rows if row.get("kind") == "process_exec" and row.get("binary") in {"/bin/sh", "/usr/bin/sh", "/bin/dash", "/usr/bin/dash"} and self._engine_event(row, after["name"]) and _parse_time(row.get("observed_at")) == _parse_time(raw_time)]
+        probe_collector = (timeline_at_probe or {}).get("collector") or {}
+        old_stale = (probe_collector.get("pod_uid") == before["uid"] and all(row.get("phase") in (None, [], ["unknown"]) for row in matched))
+        new_fresh = (probe_collector.get("pod_uid") == after["uid"] and isinstance(probe_collector.get("written_at"), str) and all(row.get("phase_timeline_written_at") == probe_collector.get("written_at") and row.get("phase_timeline_fresh") is True for row in matched))
+        facts["old_phase_absent"] = (old_stale or new_fresh) if raw_uid and available and matched else None
+        evidence.update({"raw_process_pod_uid": raw_uid, "raw_event_time": raw_time, "timeline_at_probe": probe_collector, "probe_phase": [row.get("phase") for row in matched], "phase_source": "old_uid_rejected" if old_stale else "new_uid_timeline" if new_fresh else None})
+        timeline_new = None
+        for attempt in range(20):
+            timeline_new = self._timeline()
+            if (timeline_new or {}).get("collector", {}).get("pod_uid") == after["uid"]:
+                break
+            if attempt < 19:
+                self.sleep(1.0)
+        facts["timeline_new_uid"] = (timeline_new or {}).get("collector", {}).get("pod_uid") == after["uid"]
+        evidence["timeline_after"] = (timeline_new or {}).get("collector")
+        evidence["tetragon_counts_after"] = self._tetragon_counts()
+        counts_before, counts_after = evidence["tetragon_counts_before"], evidence["tetragon_counts_after"]
+        if counts_before is not None and counts_after is not None:
+            raw_exit_count = self._raw_process_exit_count(accounting_since)
+            evidence["process_exit_accounting"] = {
+                "raw_process_exit_count": raw_exit_count,
+                "skipped_unsupported_delta": counts_after["skipped_unsupported_total"] - counts_before["skipped_unsupported_total"],
+                "corrupt_lines_delta": counts_after["corrupt_lines_total"] - counts_before["corrupt_lines_total"],
+                "expected_pattern_seen": (raw_exit_count is not None and raw_exit_count > 0
+                                          and counts_after["skipped_unsupported_total"] > counts_before["skipped_unsupported_total"]
+                                          and counts_after["corrupt_lines_total"] == counts_before["corrupt_lines_total"]),
+                "note": "process_exit 원시 행과 같은 구간에서 비교; 건너뜀 증가·손상 증가 없음은 보조 근거. 화면 확인은 사람 수행",
+            }
+        return facts, evidence
+
     def write_report(self) -> tuple[Path, Path]:
         report = {
             "schema": "runtime-aws-acceptance/1.0",
@@ -2219,11 +3165,24 @@ class AWSAcceptance:
             "ended_at": _now(),
             "kube_context": self.context,
             "namespace": self.namespace,
+            "engine": self.engine,
+            "fixed_request_sha256": _fixed_request_hash(),
+            "fixed_requests": [{"route": route, "max_tokens": payload["max_tokens"],
+                                "payload_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True,
+                                  separators=(",", ":")).encode()).hexdigest()}
+                               for route, payload in FIXED_REQUESTS],
+            "engine_pod_configuration": self._pod_configuration(),
             "gateway_url": self.gateway,
+            "port_forward": {"recovery": "tool_owned_kubectl_port_forward" if self.reconnect_at else "external_url_untouched" if not self.gateway_loopback else "none_opened",
+                             "reconnect_at": self.reconnect_at,
+                             "after_exit": "tool_owned_forward_closed; user_forward_must_be_restarted_if_its_pod_died" if self.gateway_loopback else "unchanged"},
             "observation_dir": str(self.observation_dir),
             "requested_cases": list(self.args.cases),
             "allow_collector_stop": self.args.allow_collector_stop,
             "allow_engine_restart": self.args.allow_engine_restart,
+            "allow_compare_policy": getattr(self.args, "allow_compare_policy", False),
+            "allow_bundle_switch": getattr(self.args, "allow_bundle_switch", False),
+            "allow_gateway_restart": getattr(self.args, "allow_gateway_restart", False),
             "overall": _overall(self.cases),
             "result_counts": {
                 result: sum(case["result"] == result for case in self.cases)
@@ -2240,6 +3199,7 @@ class AWSAcceptance:
                     "unavailability, a 200 request with target marked unverified after the stale window, "
                     "collector and target recovery, and recovered inference. Gap records are supplementary."
                 ),
+                "AWS-13 compares bundle file bytes to SHA-256 in bundle.json; this is not a signature or approval verification.",
             ],
             "known_gaps": [
                 "The first AWS run must confirm that this Cilium configuration manifests a blocked connect as EAGAIN/EWOULDBLOCK/ETIMEDOUT; another errno is not accepted as policy-block evidence.",
@@ -2284,6 +3244,8 @@ class AWSAcceptance:
                 "",
                 "상세 명령, HTTP 상태, 요청 ID, 사용한 record 필드와 관측 참조는 `report.json`에 있다.",
                 "응답 본문, prompt, token 및 token hash는 보고서에 저장하지 않는다.",
+                "AWS-13 무결성 검사는 SHA-256 바이트 대조이며 서명 검증이 아니다.",
+                "관측 화면 확인은 사람이 수행한다. 도구 결과만으로 화면 표시를 통과 처리하지 않는다.",
                 "",
                 "## 판정 기준",
                 "",
@@ -2311,7 +3273,7 @@ class AWSAcceptance:
                     f"시간표 쓰기 시각 {_report_probe_value(phase_evidence.get('timeline_written_at', [None])[-1] if phase_evidence.get('timeline_written_at') else None)}", "",
                 ])
             if evidence.get("warning_list_complete") is not True:
-                lines.extend(["관측 조회 실패 또는 최근 50행 제한으로 전체 목록·건수 확인 못 함. 아래는 조회된 일부다.", ""])
+                lines.extend(["관측 조회 실패·수집 공백·수집기 불가 또는 최근 50행 제한으로 전체 목록·건수 확인 못 함. 아래는 조회된 일부다.", ""])
             if not isinstance(warnings, list):
                 lines.append("관측 목록 확인 못 함")
             elif not warnings:
@@ -2347,26 +3309,37 @@ class AWSAcceptance:
             "AWS-09": self.aws_09,
             "AWS-10": self.aws_10,
             "AWS-11": self.aws_11,
+            "AWS-12": self.aws_12,
+            "AWS-13": self.aws_13,
+            "AWS-14": self.aws_14,
+            "AWS-15": self.aws_15,
+            "AWS-16": self.aws_16,
+            "AWS-17": self.aws_17,
+            "AWS-18": self.aws_18,
+            "AWS-19": self.aws_19,
         }
-        for case_id in self.args.cases:
-            if case_id == "AWS-09" and "AWS-11" in self.args.cases and "AWS-10" in self.args.cases:
-                self.detection_started_at = _now()
-                try:
-                    self.normal_before = self._normal_control()
-                except Exception as error:
-                    self.normal_before = {"error": _safe_exception(error)}
-            self._run_case(case_id, functions[case_id])
-        json_path, md_path = self.write_report()
-        overall = _overall(self.cases)
-        print(f"overall: {overall}")
-        print(f"JSON: {json_path}")
-        print(f"Markdown: {md_path}")
-        return 0 if overall == "passed" else (1 if overall == "failed" else 3)
+        try:
+            for case_id in self.args.cases:
+                if case_id == "AWS-09" and "AWS-11" in self.args.cases and "AWS-10" in self.args.cases:
+                    self.detection_started_at = _now()
+                    try:
+                        self.normal_before = self._normal_control()
+                    except Exception as error:
+                        self.normal_before = {"error": _safe_exception(error)}
+                self._run_case(case_id, functions[case_id])
+            json_path, md_path = self.write_report()
+            overall = _overall(self.cases)
+            print(f"overall: {overall}")
+            print(f"JSON: {json_path}")
+            print(f"Markdown: {md_path}")
+            return 0 if overall == "passed" else (1 if overall == "failed" else 3)
+        finally:
+            self._close_forward()
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="AWS GPU lab runtime acceptance (does not apply or delete policies)"
+        description="AWS GPU lab runtime acceptance; mutating cases require explicit flags"
     )
     parser.add_argument(
         "--kube-context",
@@ -2374,6 +3347,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="explicit Kubernetes context; every kubectl command receives --context",
     )
     parser.add_argument("--namespace", default="serving-lab")
+    parser.add_argument("--engine", choices=("vllm", "sglang"), default="vllm")
     parser.add_argument("--gateway-url", default="http://127.0.0.1:18080")
     parser.add_argument(
         "--token-env-file",
@@ -2390,7 +3364,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--cases",
         action="append",
         metavar="AWS-01[,AWS-02...]",
-        help="case subset; repeatable (default: AWS-01 through AWS-11); AWS-11 wraps AWS-09/10",
+        help="case subset; repeatable (default: AWS-01 through AWS-11); AWS-12 through AWS-19 require --cases",
     )
     parser.add_argument(
         "--allow-collector-stop",
@@ -2402,6 +3376,10 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="allow AWS-08 rollout restart (releases GPU and cold-starts)",
     )
+    parser.add_argument("--allow-compare-policy", action="store_true", help="allow AWS-12 temporary comparison Pods and Cilium policy")
+    parser.add_argument("--allow-bundle-switch", action="store_true", help="allow AWS-13 temporary bad bundle switch and recovery")
+    parser.add_argument("--bundle-root", default="/srv/serving/bundles", help="host bundle root mounted by Gateway")
+    parser.add_argument("--allow-gateway-restart", action="store_true", help="allow AWS-14/15 Gateway rollout restart")
     return parser
 
 

@@ -1,0 +1,14 @@
+# Same CiliumNetworkPolicy shape as enforce render's engine_ingress, scoped
+# exclusively to the opt-in receiver. No rule admits the compare client.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: runtime-compare-ingress
+spec:
+  endpointSelector:
+    matchLabels: {app: runtime-compare-receiver, purpose: runtime-policy-compare}
+  ingress:
+    - fromEndpoints:
+        - matchLabels: {app: runtime-compare-observer}
+      toPorts:
+        - ports: [{port: "8080", protocol: TCP}]

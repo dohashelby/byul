@@ -37,6 +37,7 @@ class ManagedFile:
 # on restart and are small, so they are never pruned here.
 MANAGED_FILES = (
     ManagedFile("gateway_records.jsonl", "recorded_at", "request_id"),
+    ManagedFile("gateway_route_rejections.jsonl", "recorded_at", "request_id"),
     ManagedFile("engine_receipts.jsonl", "received_at", "request_id"),
     ManagedFile("observations.jsonl", "observed_at", None),
 )

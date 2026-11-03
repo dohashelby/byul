@@ -58,6 +58,7 @@ from .retention import RecordRetention
 from .revalidation import RevalidationRequests
 from .request_flow import ConcurrencyLimiter, RequestFlow
 from .request_records import RequestRecords
+from .route_rejections import RouteRejections
 from .store import JsonlStore
 
 
@@ -167,6 +168,7 @@ class GatewayApp:
             config.run_id,
             target_context=self._target_record_context,
         )
+        self._route_rejections = RouteRejections(config.data_dir)
         self._engine_store = JsonlStore(
             Path(config.data_dir) / "engine_receipts.jsonl"
         )
@@ -415,6 +417,7 @@ class GatewayApp:
                 "profile": None,
                 "test_only": False,
                 "output_max_tokens": None,
+                "max_context_tokens": None,
                 "max_n": None,
                 "extra_fields": [],
                 "passthrough_count": None,
@@ -425,6 +428,7 @@ class GatewayApp:
             "profile": policy.profile,
             "test_only": policy.profile == "zeroday-lab",
             "output_max_tokens": policy.output_max_tokens,
+            "max_context_tokens": policy.max_context_tokens,
             "max_n": policy.max_n,
             "extra_fields": extra,
             "passthrough_count": sum(1 for item in extra if item["mode"] == "passthrough"),
@@ -700,6 +704,7 @@ class GatewayApp:
                 request_body_timeout_s=self.config.request_body_timeout_s,
                 target_status=self.target_status,
                 authorize_read=lambda header: self.auth_state.authorize_read(header),
+                record_rejected=self._route_rejections.record,
             )
         )
         self._server = LimitedThreadingHTTPServer(

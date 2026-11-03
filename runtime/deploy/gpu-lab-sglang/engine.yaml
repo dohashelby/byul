@@ -1,0 +1,114 @@
+# SGLang v0.5.22 replacement for the bundle-owned serving-engine Deployment.
+# Replace image digest, cache path and resource placeholders in a server copy.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: serving-engine
+  namespace: serving-lab
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: serving-engine}
+  template:
+    metadata:
+      labels: {app: serving-engine, lab-profile: dev}
+    spec:
+      serviceAccountName: engine
+      automountServiceAccountToken: false
+      runtimeClassName: nvidia
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsUser: 2000
+        runAsGroup: 0
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: engine
+          image: lmsysorg/sglang:v0.5.22@sha256:REPLACE_IMAGE_DIGEST_HEX
+          imagePullPolicy: Never
+          workingDir: /cache
+          # Secret is read at launch; its value is absent from this manifest.
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              exec python3 -m sglang.launch_server \
+                --model-path /models --served-model-name test-model \
+                --host 0.0.0.0 --port 8000 --context-length 2048 \
+                --log-requests --log-requests-level 0 --log-requests-format json \
+                --enable-metrics \
+                --admin-api-key "$(cat /run/sglang-admin/admin-api-key)"
+          env:
+            - {name: SGLANG_RUST_SERVER, value: "0"}
+            - {name: SGLANG_LOG_REQUEST_HEADERS, value: x-request-id}
+            - {name: HOME, value: /cache/home}
+            - {name: XDG_CONFIG_HOME, value: /cache/config}
+            - {name: XDG_CACHE_HOME, value: /cache/xdg}
+            - {name: HF_HOME, value: /cache/hf}
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: TORCHINDUCTOR_CACHE_DIR, value: /cache/inductor}
+            - {name: TRITON_CACHE_DIR, value: /cache/triton}
+            - {name: CUDA_CACHE_PATH, value: /cache/cuda}
+            - {name: TMPDIR, value: /cache/tmp}
+            - {name: PYTHONPYCACHEPREFIX, value: /cache/pycache}
+          ports:
+            - {name: http, containerPort: 8000}
+          resources:
+            requests: {cpu: "REPLACE_ENGINE_CPU_REQUEST", memory: REPLACE_ENGINE_MEMORY_REQUEST, nvidia.com/gpu: "1"}
+            limits: {cpu: "REPLACE_ENGINE_CPU_LIMIT", memory: REPLACE_ENGINE_MEMORY_LIMIT, nvidia.com/gpu: "1"}
+          startupProbe:
+            httpGet: {path: /ready, port: http}
+            periodSeconds: 10
+            failureThreshold: 120
+          readinessProbe:
+            httpGet: {path: /ready, port: http}
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: model, mountPath: /models, readOnly: true}
+            - {name: cache, mountPath: /cache}
+            - {name: shm, mountPath: /dev/shm}
+            - {name: probe-file, mountPath: /run/byul-probe/secret.txt, subPath: secret.txt, readOnly: true}
+            - {name: admin-key, mountPath: /run/sglang-admin, readOnly: true}
+        - name: management-listener
+          image: serving-gateway:REPLACE_GATEWAY_TAG
+          imagePullPolicy: Never
+          args:
+            - management-listener
+            - --listen-host
+            - 0.0.0.0
+            - --listen-port
+            - "8001"
+            - --engine-url
+            - http://127.0.0.1:8000
+            - --allow-path
+            - /metrics
+            - --allow-path
+            - /ready
+            - --allow-path
+            - /v1/models
+          ports:
+            - {name: management, containerPort: 8001}
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: "50m", memory: 64Mi}
+            limits: {cpu: "200m", memory: 128Mi}
+      volumes:
+        - name: model
+          hostPath: {path: /srv/serving/models/7ae557604adf67be50417f59c2c2f167def9a775, type: Directory}
+        - name: cache
+          hostPath: {path: REPLACE_CACHE_PATH, type: Directory}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 2Gi}
+        - name: probe-file
+          configMap: {name: serving-engine-probe-file, defaultMode: 0444}
+        - name: admin-key
+          secret: {secretName: serving-sglang-admin, defaultMode: 0440}

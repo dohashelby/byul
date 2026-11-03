@@ -14,6 +14,7 @@ import stat
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
+from .auth import CHAT_ROUTE
 from .policy import DuplicateKeyError, _object_without_duplicates, _reject_json_constant
 
 
@@ -135,15 +136,14 @@ class BackendConfig:
     def external(self) -> bool:
         return self.kind != "mock"
 
-    @property
-    def output_tokens_field(self) -> str:
-        """The engine's own name for the output-token limit.
+    def output_tokens_field(self, route: str) -> str:
+        """The engine and request route determine the output-token field."""
 
-        SGLang v0.5.21 marks ``max_tokens`` deprecated in favour of
-        ``max_completion_tokens``; vLLM and the mock engine take ``max_tokens``.
-        """
-
-        return "max_completion_tokens" if self.kind == "sglang" else "max_tokens"
+        return (
+            "max_completion_tokens"
+            if self.kind == "sglang" and route == CHAT_ROUTE
+            else "max_tokens"
+        )
 
     @property
     def authorization(self) -> str | None:
@@ -355,15 +355,13 @@ def load_backend_config(
             raise ValueError("model_map keys and values must be non-empty strings")
         model_map[policy_model] = backend_model
 
-    health_path = _route(document.get("health_path", "/health"), "health_path")
-    # SGLang v0.5.21 exposes its live model identity at /get_model_info.
-    # /server_info is deliberately not used because it returns the complete
-    # resolved server arguments.  vLLM keeps the OpenAI-compatible model list.
+    health_path = _route(document.get("health_path", "/ready" if kind == "sglang" else "/health"), "health_path")
+    # Both engines expose the served model through the OpenAI model list.
     models_path = _route(
-        document.get("models_path", "/v1/models" if kind == "vllm" else "/get_model_info"),
+        document.get("models_path", "/v1/models"),
         "models_path",
     )
-    # SGLang v0.5.21 has no /version route; its version is only inside
+    # SGLang v0.5.22 has no /version route; its version is only inside
     # /server_info, which also returns the resolved server arguments. The
     # default therefore skips version collection for sglang (null = disabled).
     raw_version_path = document.get(

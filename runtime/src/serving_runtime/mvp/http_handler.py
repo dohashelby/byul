@@ -115,6 +115,7 @@ class HandlerDependencies:
     request_body_timeout_s: float
     target_status: Callable[[], dict[str, Any]] = lambda: {"registration": {"state": "not_configured"}}
     authorize_read: Callable[[str | None], tuple[int, str, str] | None] = lambda _header: None
+    record_rejected: Callable[[str, str, str, int, str], None] = lambda *_args: None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -372,12 +373,22 @@ class Handler(BaseHTTPRequestHandler):
                 close_connection=close_connection,
             )
         else:
+            self._record_route_rejection(404, "NOT_FOUND")
             self._send_json(
                 404,
                 {"error": {"code": "NOT_FOUND"}},
                 request_id=request_id,
                 close_connection=close_connection,
             )
+
+    def _record_route_rejection(self, status: int, reason: str) -> None:
+        self.dependencies.record_rejected(
+            getattr(self, "_transport_request_id", uuid4().hex),
+            self.command,
+            urlsplit(self.path).path,
+            status,
+            reason,
+        )
 
     def _send_query_error(self, status: int, code: str, message: str) -> None:
         self._send_json(status, {"error": {"code": code, "message": message}})
@@ -456,6 +467,8 @@ class Handler(BaseHTTPRequestHandler):
             refusal = self.dependencies.authorize_read(self.request_header("Authorization"))
             if refusal is not None:
                 status, code, message = refusal
+                if not self._known_path():
+                    self._record_route_rejection(status, code)
                 self._send_read_refusal(status, code, message)
                 return
         if path == "/api/status":
@@ -494,6 +507,7 @@ class Handler(BaseHTTPRequestHandler):
         if path in {"/v1/chat/completions", "/v1/completions"}:
             self._send_json(405, {"error": {"code": "METHOD_NOT_ALLOWED"}})
             return
+        self._record_route_rejection(404, "NOT_FOUND")
         self._send_json(404, {"error": {"code": "NOT_FOUND"}})
 
     def do_POST(self) -> None:

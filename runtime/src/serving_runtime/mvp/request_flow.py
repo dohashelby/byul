@@ -16,7 +16,7 @@ from .cache_isolation import (
 )
 from .backend import BackendConfig
 from .engine_client import EngineClient
-from .engine_client import TokenizeHTTPError
+from .engine_client import RequestDeadlineExceeded, TokenizeHTTPError
 from .policy import PolicyState
 from .policy_state import RevocationState, evaluate_policy
 from .relay import Relay, StreamResponse, engine_error
@@ -138,7 +138,7 @@ class RequestFlow:
                 attempted=False,
                 backend_receipt=self._engine_client.receipt_not_queried(),
                 response="none",
-                error_code=None,
+                error_code=(decision.reason_code if decision.reason_code == "ENGINE_DEADLINE" else None),
                 stream=stream,
                 http_start_status=decision.http_status,
                 final_outcome=decision.reason_code,
@@ -175,6 +175,7 @@ class RequestFlow:
         decision: Decision,
         policy_snapshot: PolicyState,
         request_kind: str,
+        deadline_at: float | None = None,
     ) -> Decision | None:
         context_limit = (
             policy_snapshot.policy.max_context_tokens
@@ -204,8 +205,16 @@ class RequestFlow:
                 backend_model_id,
                 request_kind=request_kind,
                 extra_fields=extra_fields,
+                deadline_at=deadline_at,
             )
+            if deadline_at is not None and time.monotonic() >= deadline_at:
+                raise RequestDeadlineExceeded()
+        except RequestDeadlineExceeded:
+            return engine_error(504, "ENGINE_DEADLINE", "deadline exceeded", decision)
         except Exception as error:
+            if (deadline_at is not None and time.monotonic() >= deadline_at
+                    and isinstance(error, (TimeoutError, OSError))):
+                return engine_error(504, "ENGINE_DEADLINE", "deadline exceeded", decision)
             # Store only the exception class; backend messages may contain secrets.
             context_error = {
                 "limit": context_limit,
@@ -639,12 +648,14 @@ class RequestFlow:
                 decision,
                 policy_snapshot,
                 request_kind,
+                acquired_at + self._relay.request_deadline_s,
             )
             if context_decision is not None:
                 self.finish_without_relay(
                     response,
                     request_id,
                     context_decision,
+                    close_connection=context_decision.reason_code == "ENGINE_DEADLINE",
                     stream=stream,
                 )
                 return
@@ -716,7 +727,11 @@ class RequestFlow:
                         cache_salt=cache_salt,
                     )
                 )
-                backend_receipt = self._engine_client.backend_receipt(request_id)
+                backend_receipt = (
+                    self._engine_client.receipt_not_queried()
+                    if final_outcome == "deadline_exceeded"
+                    else self._engine_client.backend_receipt(request_id)
+                )
                 abnormal_started = response_started and final_outcome not in {
                     "completed",
                     "backend_truncated",
@@ -729,7 +744,7 @@ class RequestFlow:
                             request_id,
                             wait=final_outcome == "client_disconnected",
                         )
-                        if abnormal_started
+                        if abnormal_started and final_outcome != "deadline_exceeded"
                         else "not_applicable"
                     )
                 completed = final_outcome == "completed"
@@ -771,8 +786,13 @@ class RequestFlow:
                 decision,
                 route=route,
                 cache_salt=cache_salt,
+                started_at=acquired_at,
             )
-            backend_receipt = self._engine_client.backend_receipt(request_id)
+            backend_receipt = (
+                self._engine_client.receipt_not_queried()
+                if final_decision.reason_code == "ENGINE_DEADLINE"
+                else self._engine_client.backend_receipt(request_id)
+            )
             completed = (
                 final_decision.result == "ALLOWED" and engine_body is not None
             )
@@ -803,6 +823,7 @@ class RequestFlow:
                 response.send_error_decision(
                     final_decision,
                     request_id,
+                    close_connection=final_decision.reason_code == "ENGINE_DEADLINE",
                     extra_headers=(
                         {"Retry-After": final_decision.retry_after}
                         if final_decision.retry_after is not None

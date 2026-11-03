@@ -159,8 +159,10 @@ class ArgumentTests(unittest.TestCase):
             responses = [
                 response(200, {"choices": [{"message": {"content": "ok"}}], "usage": {"completion_tokens": 8}}, "chat-n"),
                 sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "chat-s"),
+                response(200, detail("ALLOWED", attempted=True, outcome="completed")),
                 response(200, {"choices": [{"text": "ok"}], "usage": {"completion_tokens": 8}}, "comp-n"),
                 sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "comp-s"),
+                response(200, detail("ALLOWED", attempted=True, outcome="completed")),
             ]
             checker = AWSAcceptance(arguments(Path(directory)), runner=LogRunner(), http=FakeHTTP(responses))
             checker._context_limits = lambda: (2048, 256)
@@ -171,12 +173,54 @@ class ArgumentTests(unittest.TestCase):
             self.assertTrue(all(row["truncated"] is False for row in evidence["requests"] if row["stream"]))
             checker.http.responses = responses = [response(200, {"choices": [{"message": {"content": "ok"}}]}, "chat-n"),
                                                   sse_response(b'data: {"choices":[{}]}\n\n', "chat-s"),
+                                                  response(200, detail("ALLOWED", attempted=True, outcome="completed")),
                                                   response(200, {"choices": [{"text": "ok"}]}, "comp-n"),
-                                                  sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "comp-s")]
+                                                  sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "comp-s"),
+                                                  response(200, detail("ALLOWED", attempted=True, outcome="completed"))]
             facts, evidence = checker.aws_18()
             self.assertIsNone(facts["usage"])
             self.assertFalse(facts["stream"])
             self.assertTrue(evidence["requests"][1]["truncated"])
+
+    def test_aws_18_done_with_failed_gateway_record_is_not_stream_success(self) -> None:
+        failed = detail("ERROR", reason="ENGINE_BAD_RESPONSE", attempted=True,
+                        outcome="invalid_completion_stream")
+        failed["final_state"]["delivery"].update(
+            response="failed", error_code="ENGINE_BAD_RESPONSE")
+        responses = [
+            response(200, {"choices": [{"message": {"content": "ok"}}],
+                           "usage": {"completion_tokens": 1}}, "chat-n"),
+            sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "chat-s"),
+            response(200, detail("ALLOWED", attempted=True, outcome="completed")),
+            response(200, {"choices": [{"text": "ok"}],
+                           "usage": {"completion_tokens": 1}}, "comp-n"),
+            sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\ndata: {bad}\n\n', "comp-s"),
+            response(200, failed),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(),
+                                    http=FakeHTTP(responses))
+            checker._context_limits = lambda: None
+            facts, evidence = checker.aws_18()
+        self.assertFalse(facts["stream"])
+        self.assertEqual(evidence["requests"][3]["record"]["delivery"]["error_code"],
+                         "ENGINE_BAD_RESPONSE")
+
+    def test_aws_18_missing_gateway_record_is_unknown(self) -> None:
+        responses = [
+            response(200, {"choices": [{}], "usage": {"completion_tokens": 1}}, "chat-n"),
+            sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "chat-s"),
+            response(404, {}),
+            response(200, {"choices": [{}], "usage": {"completion_tokens": 1}}, "comp-n"),
+            sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "comp-s"),
+            response(200, detail("ALLOWED", attempted=True, outcome="completed")),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            checker = AWSAcceptance(arguments(Path(directory)), runner=FakeRunner(),
+                                    http=FakeHTTP(responses))
+            checker._context_limits = lambda: None
+            facts, _ = checker.aws_18()
+        self.assertIsNone(facts["stream"])
 
     def test_rejection_case_requires_positive_sglang_log(self) -> None:
         class LogRunner(FakeRunner):
@@ -877,6 +921,23 @@ class FakeExecutionTests(unittest.TestCase):
             self.assertEqual(case["result"], "unknown")
             self.assertIsNone(case["facts"]["stream_ok"])
             self.assertEqual(case["reason"], "판정 근거 부족: stream_ok")
+
+    def test_aws_01_done_with_failed_final_record_is_not_stream_success(self) -> None:
+        failed = detail("ERROR", reason="ENGINE_BAD_RESPONSE", attempted=True,
+                        outcome="invalid_completion_stream")
+        failed["final_state"]["delivery"].update(
+            response="failed", error_code="ENGINE_BAD_RESPONSE")
+        fake_http = FakeHTTP([
+            response(200, {"choices": [{"message": {"content": "hello"}}]}, "normal-1"),
+            response(200, detail("ALLOWED", attempted=True, outcome="completed")),
+            sse_response(b'data: {"choices":[{}]}\n\ndata: [DONE]\n\n', "stream-1"),
+            response(200, failed),
+        ])
+        with tempfile.TemporaryDirectory() as temporary:
+            checker = AWSAcceptance(arguments(Path(temporary), cases=("AWS-01",)),
+                                    runner=FakeRunner(), http=fake_http)
+            facts, _ = checker.aws_01()
+        self.assertFalse(facts["stream_ok"])
 
     def test_aws_02_checks_both_auth_codes_records_and_no_engine_line(self) -> None:
         fake_http = FakeHTTP(

@@ -43,14 +43,18 @@ class Collector:
         stale_after_s: float = 15,
         dedicated_thread: bool = False,
         on_collected: Callable[[Any, str | None], None] | None = None,
+        engine_group: bool = False,
     ) -> None:
         if interval_s <= 0 or stale_after_s <= 0:
             raise ValueError("collector intervals must be positive")
+        if dedicated_thread and engine_group:
+            raise ValueError("engine group collectors cannot use dedicated threads")
         self.source = source
         self.fetch = fetch
         self.interval_s = float(interval_s)
         self.stale_after_s = float(stale_after_s)
         self.dedicated_thread = dedicated_thread
+        self.engine_group = engine_group
         self.on_collected = on_collected
         self.last_attempt_at: str | None = None
         self.last_success_at: str | None = None
@@ -187,12 +191,16 @@ class Collector:
 
 
 class CollectorManager:
-    """Poll ordinary sources together and slow sources on dedicated threads."""
+    """Poll ordinary and engine sources separately; isolate slow sources."""
 
-    def __init__(self, collectors: list[Collector]) -> None:
+    def __init__(self, collectors: list[Collector], startup_timeout_s: float = 5) -> None:
+        if startup_timeout_s <= 0:
+            raise ValueError("startup timeout must be positive")
         self.collectors = collectors
+        self.startup_timeout_s = startup_timeout_s
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._engine_thread: threading.Thread | None = None
         self._dedicated_threads: list[threading.Thread] = []
 
     def start(self) -> None:
@@ -200,13 +208,27 @@ class CollectorManager:
             return
         self._stop.clear()
         for collector in self.collectors:
-            if collector.dedicated_thread:
+            if collector.dedicated_thread or collector.engine_group:
                 continue
             collector.collect()
         self._thread = threading.Thread(
             target=self._run, name="mvp-collectors", daemon=True
         )
         self._thread.start()
+        engine_collectors = [
+            collector for collector in self.collectors
+            if collector.engine_group and collector.fetch is not None
+        ]
+        if engine_collectors:
+            first_collection_done = threading.Event()
+            self._engine_thread = threading.Thread(
+                target=self._run_engine,
+                args=(engine_collectors, first_collection_done),
+                name="mvp-engine-collectors",
+                daemon=True,
+            )
+            self._engine_thread.start()
+            first_collection_done.wait(self.startup_timeout_s)
         self._dedicated_threads = [
             threading.Thread(
                 target=self._run_dedicated,
@@ -224,7 +246,19 @@ class CollectorManager:
         while not self._stop.wait(0.05):
             now = time.monotonic()
             for collector in self.collectors:
-                if not collector.dedicated_thread and collector.due(now):
+                if not collector.dedicated_thread and not collector.engine_group and collector.due(now):
+                    collector.collect()
+
+    def _run_engine(
+        self, collectors: list[Collector], first_collection_done: threading.Event
+    ) -> None:
+        for collector in collectors:
+            collector.collect()
+        first_collection_done.set()
+        while not self._stop.wait(0.05):
+            now = time.monotonic()
+            for collector in collectors:
+                if collector.due(now):
                     collector.collect()
 
     def _run_dedicated(self, collector: Collector) -> None:
@@ -240,9 +274,12 @@ class CollectorManager:
             return
         self._stop.set()
         thread.join(timeout=5)
+        if self._engine_thread is not None:
+            self._engine_thread.join(timeout=5)
         for dedicated in self._dedicated_threads:
             dedicated.join(timeout=5)
         self._thread = None
+        self._engine_thread = None
         self._dedicated_threads = []
 
     def snapshots(self) -> list[dict[str, Any]]:

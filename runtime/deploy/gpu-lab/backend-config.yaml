@@ -19,6 +19,7 @@ data:
       "metrics_url": "http://serving-engine.serving-lab.svc.cluster.local:8000/metrics",
       "timeouts": {
         "relay_timeout_s": 60,
+        "status_timeout_s": 5,
         "stream_idle_timeout_s": 30,
         "request_deadline_s": 300
       }

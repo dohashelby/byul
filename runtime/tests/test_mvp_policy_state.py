@@ -183,6 +183,47 @@ class HistoryAndCompatibilityTests(unittest.TestCase):
 
 
 class CollectorAndBaselineTests(unittest.TestCase):
+    def test_engine_group_has_initial_snapshots_when_start_returns(self) -> None:
+        collectors = [
+            Collector(name, lambda name=name: {"source": name}, engine_group=True)
+            for name in ("engine_health", "engine_info", "metrics")
+        ]
+        manager = CollectorManager(collectors, startup_timeout_s=0.5)
+        manager.start()
+        self.addCleanup(manager.stop)
+        for collector in collectors:
+            with self.subTest(source=collector.source):
+                snapshot = manager.get(collector.source)
+                self.assertEqual(snapshot["state"], "ok")
+                self.assertEqual(snapshot["last_value"], {"source": collector.source})
+
+    def test_engine_group_startup_wait_is_bounded(self) -> None:
+        blocked = threading.Event()
+        release = threading.Event()
+
+        def fetch() -> dict[str, bool]:
+            blocked.set()
+            release.wait(1)
+            return {"ok": True}
+
+        manager = CollectorManager(
+            [Collector("engine_health", fetch, engine_group=True)],
+            startup_timeout_s=0.02,
+        )
+        started = time.monotonic()
+        manager.start()
+        elapsed = time.monotonic() - started
+        self.addCleanup(manager.stop)
+        self.addCleanup(release.set)
+        self.assertLess(elapsed, 0.2)
+        self.assertTrue(blocked.wait(0.2))
+        self.assertEqual(manager.get("engine_health")["state"], "never")
+        release.set()
+        deadline = time.monotonic() + 1
+        while manager.get("engine_health")["state"] != "ok" and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(manager.get("engine_health")["state"], "ok")
+
     def test_collector_retains_success_then_error_and_stale(self) -> None:
         calls = [{"engine.version": "mock-1.0", "data_origin": "mock"}]
 

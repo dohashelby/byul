@@ -118,6 +118,8 @@ class GatewayApp:
             "request_deadline_s", config.request_deadline_s
         )
         self._engine_client = EngineClient(self.backend, self.relay_timeout_s)
+        self.status_timeout_s = self.backend.timeouts.get("status_timeout_s", 5.0)
+        self._status_engine_client = EngineClient(self.backend, self.status_timeout_s)
         self._relay = Relay(
             self.backend,
             self.relay_timeout_s,
@@ -209,26 +211,29 @@ class GatewayApp:
         collectors = [
             Collector(
                 "engine_health",
-                self._engine_client.collect_health,
+                self._status_engine_client.collect_health,
                 config.collector_interval_s,
                 config.collector_stale_after_s,
+                engine_group=True,
             ),
             Collector(
                 "engine_info",
-                self._engine_client.collect_info,
+                self._status_engine_client.collect_info,
                 config.collector_interval_s,
                 config.collector_stale_after_s,
+                engine_group=True,
                 on_collected=self._evaluate_baseline_revalidation,
             ),
             Collector(
                 "metrics",
                 (
-                    self._engine_client.collect_metrics
+                    self._status_engine_client.collect_metrics
                     if self.backend.metrics_target is not None
                     else None
                 ),
                 config.collector_interval_s,
                 config.collector_stale_after_s,
+                engine_group=True,
             ),
             Collector(
                 "record_retention",
@@ -340,7 +345,9 @@ class GatewayApp:
                     on_collected=self._target.observe_kubernetes,
                 )
             )
-        self._collectors = CollectorManager(collectors)
+        self._collectors = CollectorManager(
+            collectors, startup_timeout_s=self.status_timeout_s
+        )
 
     def _approval_result(self) -> ApprovalResult | None:
         if self._approval_verifier is None:
@@ -573,7 +580,7 @@ class GatewayApp:
 
     def status(self) -> dict[str, Any]:
         policy = self.policy_state.policy
-        engine = self._engine_client.status()
+        engine = self._status_engine_client.status()
         record_store = self._records.status()
         policy_runtime = self.policy_status()
         baseline = self.baseline_status()
@@ -668,6 +675,7 @@ class GatewayApp:
                 **self.backend.safe_status(),
                 "timeouts": {
                     "relay_timeout_s": self.relay_timeout_s,
+                    "status_timeout_s": self.status_timeout_s,
                     "stream_idle_timeout_s": self.stream_idle_timeout_s,
                     "request_deadline_s": self.request_deadline_s,
                 },

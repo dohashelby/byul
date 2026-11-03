@@ -172,7 +172,7 @@ class CompletionRouteTests(unittest.TestCase):
         self.assertEqual(json.loads(body)["error"]["code"], "ENGINE_BAD_RESPONSE")
 
         with patch(
-            "serving_runtime.mvp.relay.validate_completion_stream",
+            "serving_runtime.mvp.relay._completion_choices",
             return_value=False,
         ):
             status, _, body = self.post(self.body(stream=True))

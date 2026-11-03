@@ -96,22 +96,49 @@ with f.ThreadPoolExecutor(max_workers=max(1,len(spec["requests"]))) as pool:
 
 CENSUS = r'''
 import json,os,re,sys
-pattern=re.compile(sys.argv[1]);found=[]
-for name in os.listdir("/proc"):
-    if not name.isdigit():continue
+pattern=re.compile(sys.argv[1]);found=[];errors=[]
+def problem(code,pid=None):
+    row={'code':code}
+    if pid is not None:row['pid']=pid
+    errors.append(row)
+def enumerate_pids():
+    try:return {name for name in os.listdir('/proc') if name.isdigit() and int(name)!=os.getpid()}
+    except OSError:
+        problem('PROC_ENUMERATION_UNAVAILABLE');return None
+def process_stat(name):
+    with open(f'/proc/{name}/stat') as stream:raw=stream.read()
+    fields=raw[raw.rfind(')')+2:].split()
+    return fields[0],int(fields[19]),int(fields[21])
+before=enumerate_pids()
+for name in sorted(before or (),key=int):
     try:
-        with open(f"/proc/{name}/cmdline","rb") as stream:command=stream.read(4096).replace(b"\0",b" ").decode("utf-8","replace")
-        with open(f"/proc/{name}/stat") as stream:state=stream.read();state=state[state.rfind(")")+2:].split()
-        with open(f"/proc/{name}/comm") as stream:comm=stream.read().strip()
-    except OSError:continue
-    if (pattern.search(command) or pattern.search(comm)) and int(name)!=os.getpid():
-        found.append(dict(pid=int(name),state=state[0],rss_pages=int(state[21]),start_ticks=int(state[19]),
-            command=command[:4096],comm=comm))
-try:shm=sorted(os.listdir("/dev/shm"))
+        state,start,rss=process_stat(name)
+        with open(f'/proc/{name}/cmdline','rb') as stream:raw=stream.read(4097)
+        with open(f'/proc/{name}/comm') as stream:comm=stream.read().strip()
+        after_state,after_start,after_rss=process_stat(name)
+        if start!=after_start:
+            problem('PID_IDENTITY_CHANGED_DURING_READ',int(name));continue
+        if len(raw)>4096:problem('PID_CMDLINE_TRUNCATED',int(name))
+        command=raw[:4096].replace(b'\0',b' ').decode('utf-8','replace')
+    except FileNotFoundError:
+        problem('PID_DISAPPEARED_DURING_READ',int(name));continue
+    except OSError:
+        problem('PID_READ_UNAVAILABLE',int(name));continue
+    except (ValueError,IndexError,UnicodeError):
+        problem('PID_METADATA_INVALID',int(name));continue
+    if pattern.search(command) or pattern.search(comm):
+        found.append(dict(pid=int(name),state=after_state,rss_pages=after_rss,start_ticks=after_start,
+            command=command,comm=comm))
+after=enumerate_pids()
+if before is not None and after is not None and before!=after:problem('PROC_SCOPE_CHANGED_DURING_READ')
+try:shm=sorted(os.listdir('/dev/shm'))
 except OSError:shm=None
-print(json.dumps(dict(processes=found,shm_entries=None if shm is None else len(shm),
-    shm_names=shm,page_bytes=os.sysconf("SC_PAGE_SIZE"))))
+print(json.dumps(dict(processes=found,process_scope_complete=not errors,
+    process_scope_errors=errors,process_count_before=None if before is None else len(before),
+    process_count_after=None if after is None else len(after),
+    shm_entries=None if shm is None else len(shm),shm_names=shm,page_bytes=os.sysconf('SC_PAGE_SIZE'))))
 '''
+
 
 SIGNAL = """import os,sys
 pid,number,start=map(int,sys.argv[1:4])
@@ -1703,12 +1730,16 @@ def _record_state(lab, values):
     target = lab.signal_worker(POSIX_SIGKILL); lab.wait(POLL_SECONDS)
     row, = lab.requests([{'method': 'GET', 'path': '/health', 'timeout': 10}])
     try:
-        alive = len(lab.census(target['pod'], target['pod_uid'])['processes'])
+        before_census = lab.census(target['pod'], target['pod_uid'])
+        alive = len(before_census['processes'])
     except (OSError, TimeoutError, ValueError):
-        alive = None
+        alive = None; before_census = None
         lab.miss('STATE_FAILED_WORKER_CENSUS_UNAVAILABLE')
-    direct = None; after_alive = None
-    if alive == 0:
+    direct = None; after_alive = None; after_census = None
+    before_complete = before_census is not None and before_census.get('process_scope_complete') is True
+    if alive == 0 and not before_complete:
+        lab.miss('STATE_WORKER_ABSENCE_CENSUS_INCOMPLETE')
+    if alive == 0 and before_complete:
         original_deadline = getattr(lab, 'observation_deadline', None)
         try:
             observation_end = _optional_observation_end(lab)
@@ -1722,7 +1753,11 @@ def _record_state(lab, values):
                     direct = _bound_pod_request(lab, pod,
                             {'method': 'GET', 'path': '/health', 'timeout': 10}, observation_end=observation_end)
                     if direct is not None:
-                        after_alive = len(lab.census(target['pod'], target['pod_uid'])['processes'])
+                        after_census = lab.census(target['pod'], target['pod_uid'])
+                        after_alive = len(after_census['processes'])
+                        if after_census.get('process_scope_complete') is not True:
+                            lab.miss('STATE_HEALTH_POST_CENSUS_INCOMPLETE')
+                            direct = None
                         current = next((p for p in lab._pods() if p['metadata'].get('uid') == target['pod_uid']), None)
                         if (current is None or lab.engine_container_identity(current) != lab.engine_container_identity(pod)
                                 or current.get('spec', {}).get('nodeName') != pod.get('spec', {}).get('nodeName')):
@@ -1737,7 +1772,11 @@ def _record_state(lab, values):
         finally:
             lab.observation_deadline = original_deadline
     lab.note('state-after-failure', health=row['outcome'], processes=alive, target=target,
-        health_worker_binding_verified=direct is not None, processes_after_health=after_alive)
+        health_worker_binding_verified=direct is not None, processes_after_health=after_alive,
+        process_scope_complete_before=before_complete,
+        process_scope_complete_after=after_census is not None and after_census.get('process_scope_complete') is True,
+        process_scope_errors_before=None if before_census is None else before_census.get('process_scope_errors'),
+        process_scope_errors_after=None if after_census is None else after_census.get('process_scope_errors'))
     if alive == 0 and direct is not None and direct.get('outcome') == 200:
         lab.violate('HEALTH_REPORTED_AFTER_WORKERS_GONE')
     elif row['outcome'] == 200 and alive == 0:

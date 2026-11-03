@@ -78,7 +78,24 @@
    kubectl -n serving-lab wait --for=condition=Ready pod/engine-test-probe-$RUN --timeout=5m
    kubectl apply -f ~/byul-aws-lab/engine-test-access.yaml   # 시험 직전에만
    ```
-6. **실행 대상과 입력:** 엔진·시험 Pod의 이름, UID, IP, 컨테이너 ID, imageID, 시작 시각과 네임스페이스 UID로 target·환경·사례 manifest·정책 값을 만듭니다. 이 단계의 조립 도구는 다음 작업입니다.
+6. **실행 대상과 입력** (`tools/gpu_a_run_inputs.py`)
+   ```bash
+   kubectl get namespace serving-lab -o json > ~/byul-a/$RUN/namespace.json
+   kubectl -n serving-lab get pod -l guard.run=$RUN,app=serving-engine -o jsonpath='{.items[0]}' > ~/byul-a/$RUN/engine-pod.json
+   kubectl -n serving-lab get pod engine-test-probe-$RUN -o json > ~/byul-a/$RUN/probe-pod.json
+   uv run python -m tools.gpu_a_run_inputs env --render ~/byul-a/$RUN/render/render.json \
+     --gpu-model "$(nvidia-smi --query-gpu=name --format=csv,noheader)" \
+     --driver "$(nvidia-smi --query-gpu=driver_version --format=csv,noheader)" --out ~/byul-a/$RUN/env.json
+   uv run python -m tools.gpu_a_run_inputs target --env ~/byul-a/$RUN/env.json --render ~/byul-a/$RUN/render/render.json \
+     --namespace ~/byul-a/$RUN/namespace.json --engine-pod ~/byul-a/$RUN/engine-pod.json --probe-pod ~/byul-a/$RUN/probe-pod.json \
+     --context "$(kubectl config current-context)" --out ~/byul-a/$RUN/target.json
+   uv run python -m tools.gpu_a_run_inputs check --check REQ-17 --env ~/byul-a/$RUN/env.json --target ~/byul-a/$RUN/target.json \
+     --prepared ~/byul-a/$RUN/prepared --cases ~/byul-a/$RUN/req17-cohort.json --out ~/byul-a/$RUN/REQ-17
+   ```
+   - target은 두 Pod의 `guard.run`·세대 라벨, 역할 라벨(`serving-engine`, `engine-test-probe`), 엔진 이미지가 렌더 기록·환경과 같아야 만들어집니다. 만든 뒤 A 전송 계층 검사로 바로 확인합니다.
+   - `check`는 점검마다 실행합니다(사례 목록이 점검 하나의 role만 받습니다). 사례: REQ-14 `req14-normal`, REQ-16 `req16-salt`(G-A1)·`req16-lab`(G-A4), REQ-18 `req18-slot`, REQ-17은 `python -m tools.gpu_a_req17_cohort --seed <값> --out ~/byul-a/$RUN/req17-cohort.json`의 출력.
+   - 출력 폴더의 `policy.yaml`(sensor 해시 4개 채움, 그 점검만 범위), `guard.toml`, `manifest.json`, `commands.txt`(select → run → judge → report)를 씁니다.
+   - Pod가 다시 시작되거나 바뀌면 target과 입력을 다시 만듭니다. 이전 입력으로 돌리면 바인딩 불일치로 멈춥니다.
 7. **점검 실행:** 세대 표의 점검을 돌리고 확인 항목(`ENVIRONMENT.md`, `REQ-17_DESIGN.md` 4절, `REQ-14_REJECTION.md`, `REQ-16_CONTEXTS.md`)을 봅니다.
 8. **정리**
    ```bash
@@ -104,6 +121,8 @@
 - 증거를 반출한 뒤 Stop합니다.
 
 ## 이 구성으로 못 하는 것
+- **G-A3의 REQ-08·REQ-09·SUP-08:** 이 점검들이 쓰는 `input_validation` 실행기는 `real` 구현만 있고, 시험 컨테이너를 Docker로 띄웁니다. 인계 구성은 containerd만 있어 그대로는 돌지 않습니다(첫 실증은 별도 Docker 세션에서 돌렸습니다). Kubernetes 구현을 만들지, 호스트에 Docker를 따로 둘지 결정이 필요합니다. 같은 세대의 REQ-10(`sampling_validation`)과 SUP-03(`template_validation`)은 Kubernetes 구현이 있습니다. 실행 설정은 아직 입력 도구가 만들지 않습니다.
+- **REQ-16 full_scope:** 정책이 요구하는 네 문맥을 한 실행에서 모두 재야 full_scope가 됩니다. G-A4 실행은 `cache_salt`·`adapter_content`·`model_generation` 세 문맥이라, 위반이 없어도 UNKNOWN으로 남습니다. 문맥을 정책에서 빼서 채우지 않습니다.
 
 - **다중 GPU:** REQ-14의 TP2 분기와 REQ-21은 L4 1장 구성에서 할 수 없습니다. 인계 묶음도 두 번째 GPU 서버를 범위에서 뺐습니다. 별도 구성 승인이 필요합니다.
 - **REQ-16 `media_identity`:** 멀티모달 모델 선정 전입니다.

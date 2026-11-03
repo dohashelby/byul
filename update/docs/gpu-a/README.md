@@ -14,7 +14,7 @@ A가 맡은 점검 13개: REQ-08, REQ-09, REQ-10, REQ-14, REQ-16, REQ-17, REQ-18
 | REQ-14 거부 원인 | 소스에서 특정, CPU로 재현, 보수 | `REQ-14_REJECTION.md` |
 | 센서 보수 3건 | 구현·계약 시험 완료(사용자 승인 2026-11-02). GPU 확인 전 | 아래 |
 | REQ-16 lab 문맥 | 어댑터 내용·가중치 세대 바꾸기와 미디어 사례 실행기 구현, 계약 시험 완료(2026-11-03). 멀티모달 모델 선정과 GPU 확인 전 | `REQ-16_CONTEXTS.md`, `tools/gpu_a_lab_variants.py` |
-| AWS 구성 | 팀 인계 묶음 기준 세대별 배포 덧씌우기 도구와 절차서(2026-11-03). 입력 조립 도구는 다음 | `AWS_RUNBOOK.md`, `tools/gpu_a_aws_lab.py` |
+| AWS 구성 | 팀 인계 묶음 기준 세대별 배포 덧씌우기 도구와 절차서, 콜백 점검 입력 조립 도구(2026-11-03). G-A3 REQ-08·09·SUP-08은 Docker 의존으로 결정 필요 | `AWS_RUNBOOK.md`, `tools/gpu_a_aws_lab.py`, `tools/gpu_a_run_inputs.py` |
 
 ## 센서 보수 (A 소유 파일, GPU 확인 전)
 
